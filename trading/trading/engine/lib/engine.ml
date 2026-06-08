@@ -6,64 +6,19 @@ open Types
 
 type t = {
   config : engine_config;
-  market_state : (symbol, intraday_path) Hashtbl.t;
-  path_scratches : (symbol, Price_path.Scratch.t) Hashtbl.t;
+  market_state : Market_state.t;
+      (** Per-symbol bars + lazy intraday-path generation; see {!Market_state}.
+      *)
 }
-(** Per-symbol scratch buffers for [Price_path] path generation. PR-3 of the
-    engine-pooling plan ([dev/plans/engine-layer-pooling.md]) threads these
-    through the per-tick [update_market] loop so the dominant per-tick
-    allocation (Brownian-bridge intermediate float arrays inside [Price_path])
-    drops to zero after each symbol's first day.
 
-    Lazy creation: a scratch is allocated on first sight of a symbol, sized to
-    the [path_config] passed in that call. If a later [update_market] call
-    arrives with a larger [total_points] than the cached scratch can hold, the
-    scratch is grown lazily by re-allocation. Across a typical backtest
-    [path_config] is constant, so the post-warmup steady state is one
-    pre-allocated scratch per symbol and zero allocation per [update_market]
-    inside [Price_path].
+let create config = { config; market_state = Market_state.create () }
 
-    Not thread-safe: see {!Price_path.Scratch} — one scratch per logical caller
-    (here, per symbol) and the engine is single-threaded by construction. *)
-
-let create config =
-  {
-    config;
-    market_state = Hashtbl.create (module String);
-    path_scratches = Hashtbl.create (module String);
-  }
-
-(* Look up (or lazily create) a [Price_path.Scratch.t] for [symbol] sized for
-   [path_config]. The capacity probe is pure — no scratch is allocated unless
-   one is actually missing or too small.
-
-   PR-4 of the engine-pooling plan: use [Hashtbl.find_or_add] (which calls
-   [default ()] only on miss) instead of [Hashtbl.find] + match on
-   [Some]/[None]. The earlier [match Hashtbl.find …] form allocated a fresh
-   [Some] tag on every call — the largest per-call cost left in
-   [Engine.update_market.(fun)] after PR-3 per the post-PR-A memtrace
-   ([dev/notes/panels-memtrace-postA-2026-04-26.md]). *)
-let _scratch_for_symbol engine ~symbol ~path_config =
-  let required = Price_path.Scratch.required_capacity path_config in
-  let scratch =
-    Hashtbl.find_or_add engine.path_scratches symbol ~default:(fun () ->
-        Price_path.Scratch.for_config path_config)
-  in
-  if Price_path.Scratch.capacity scratch >= required then scratch
-  else
-    let grown = Price_path.Scratch.for_config path_config in
-    Hashtbl.set engine.path_scratches ~key:symbol ~data:grown;
-    grown
-
+(* Store today's bars; intraday [Price_path] generation is deferred to
+   [Market_state.path_for] at order-processing time, so paths are materialized
+   only for the few symbols an order references rather than the whole universe.
+   See {!Market_state}. *)
 let update_market ?(path_config = Price_path.default_config) engine bars =
-  List.iter bars ~f:(fun bar ->
-      let scratch =
-        _scratch_for_symbol engine ~symbol:bar.symbol ~path_config
-      in
-      let path =
-        Price_path.generate_path_into ~scratch ~config:path_config bar
-      in
-      Hashtbl.set engine.market_state ~key:bar.symbol ~data:path)
+  Market_state.update engine.market_state ~path_config bars
 
 let _calculate_commission config quantity =
   Float.max (quantity *. config.commission.per_share) config.commission.minimum
@@ -214,7 +169,9 @@ let _apply_slippage_to_fill engine ~side (fill : fill_result) : float =
 (* Execute market order - returns Some trade if successful, None otherwise *)
 let _execute_market_order engine (ord : Trading_orders.Types.order) =
   let open Option.Let_syntax in
-  let%bind path = Hashtbl.find engine.market_state ord.symbol in
+  let%bind path =
+    Market_state.path_for engine.market_state ~symbol:ord.symbol
+  in
   let%bind fill = _would_fill_market path in
   let commission = _calculate_commission engine.config ord.quantity in
   let price = _apply_slippage_to_fill engine ~side:ord.side fill in
@@ -224,7 +181,9 @@ let _execute_market_order engine (ord : Trading_orders.Types.order) =
 (* Execute limit order - returns Some trade if successful, None otherwise *)
 let _execute_limit_order engine (ord : Trading_orders.Types.order) limit_price =
   let open Option.Let_syntax in
-  let%bind path = Hashtbl.find engine.market_state ord.symbol in
+  let%bind path =
+    Market_state.path_for engine.market_state ~symbol:ord.symbol
+  in
   let%bind fill = _would_fill_limit ~path ~side:ord.side ~limit_price in
   let commission = _calculate_commission engine.config ord.quantity in
   let price = _apply_slippage_to_fill engine ~side:ord.side fill in
@@ -255,7 +214,9 @@ let _process_limit_order engine order_mgr order limit_price =
 (* Execute stop order - returns Some trade if triggered, None otherwise *)
 let _execute_stop_order engine (ord : Trading_orders.Types.order) stop_price =
   let open Option.Let_syntax in
-  let%bind path = Hashtbl.find engine.market_state ord.symbol in
+  let%bind path =
+    Market_state.path_for engine.market_state ~symbol:ord.symbol
+  in
   let%bind fill = _would_fill_stop ~path ~side:ord.side ~stop_price in
   let commission = _calculate_commission engine.config ord.quantity in
   let price = _apply_slippage_to_fill engine ~side:ord.side fill in
@@ -272,7 +233,9 @@ let _process_stop_order engine order_mgr order stop_price =
 let _execute_stop_limit_order engine (ord : Trading_orders.Types.order)
     stop_price limit_price =
   let open Option.Let_syntax in
-  let%bind path = Hashtbl.find engine.market_state ord.symbol in
+  let%bind path =
+    Market_state.path_for engine.market_state ~symbol:ord.symbol
+  in
   let%bind fill =
     _would_fill_stop_limit ~path ~side:ord.side ~stop_price ~limit_price
   in
