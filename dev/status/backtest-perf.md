@@ -1,11 +1,42 @@
 # Status: backtest-perf
 
-## Last updated: 2026-06-04
+## Last updated: 2026-06-08
 
 ## Status
 IN_PROGRESS
 
-### Recent activity (2026-06-07)
+### Recent activity (2026-06-08)
+
+- **[x] P3 — time-underwater + antifragility convexity prototypes**
+  (branch `feat/rolling-start-time-underwater`). P3 ("prototype, hold
+  skeptically") of `dev/plans/evaluation-objective-and-metrics-2026-06-07.md`
+  §P3: pure analysis-only metrics over an equity curve / period-return
+  `float list`, companion to `Dispersion_stats`.
+  - Surface: new `Convexity_stats` pure module at
+    `trading/trading/backtest/rolling_start/lib/convexity_stats.{ml,mli}`:
+    - `time_underwater_pct` — fraction of NAV observations strictly below
+      the running prior high-water mark, ×100 (monotone-up / flat /
+      empty / singleton → 0.0).
+    - `tail_ratio` — convexity tail-ratio `|p95| / |p5|` over a return
+      series (type-7 percentile via `Dispersion_stats.percentile`;
+      `+infinity` when p5 mag is 0 and p95 mag positive; 0.0 on empty /
+      both-tails-zero).
+    - `return_skew` — third standardized moment (population variance,
+      matching the simulation-layer `Skewness` convention; 0.0 on empty /
+      singleton / zero-variance).
+  - Additive / analysis-only: not wired into the default metric suite,
+    no strategy behaviour change, all existing goldens bit-identical →
+    no experiment-flag gate. (NB: step-based counterparts
+    `TimeInDrawdownPct` / `TailRatio` / `Skewness` already exist in the
+    simulation metrics layer; these are the equity-curve formulations the
+    rolling-start harness consumes.)
+  - **worst-vol-decile conditional return: DEFERRED** — it needs a
+    per-period volatility / regime tag not available from a plain return
+    series; the plan flags it the most involved prototype and explicitly
+    says not to build new regime-tagging infra here. Shipped
+    time_underwater + tail_ratio + skew only.
+  - Verify: `dune runtest trading/backtest/rolling_start/` (51 tests:
+    19 dispersion-stats + 17 convexity-stats + 8 types + 7 runner).
 
 - **[x] Rolling-start dispersion — pure stats core (PR-1 of 2)**
   (branch `feat/rolling-start-dispersion`). P1 ("highest value") of
