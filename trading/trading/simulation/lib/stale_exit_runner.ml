@@ -61,33 +61,33 @@ let _set_or_drop_if_closed acc ~key ~data =
    unchanged when no Holding position for [symbol] exists (the portfolio is the
    source of truth for the realised trade; the strategy map is best-effort kept
    in sync). *)
+(* Drive a Holding [pos] (id [id]) through Exiting to Closed at [exit_price],
+   returning the closed position, or [None] if any transition is rejected. *)
+let _drive_holding_to_closed ~id ~date ~exit_price ~exit_reason pos =
+  let open Position in
+  let qty = match get_state pos with Holding h -> h.quantity | _ -> 0.0 in
+  let steps =
+    [
+      { position_id = id; date; kind = TriggerExit { exit_reason; exit_price } };
+      {
+        position_id = id;
+        date;
+        kind = ExitFill { filled_quantity = qty; fill_price = exit_price };
+      };
+      { position_id = id; date; kind = ExitComplete };
+    ]
+  in
+  List.fold_result steps ~init:pos ~f:(fun acc trans ->
+      apply_transition acc trans)
+  |> Result.ok
+
 let _close_strategy_position ~date ~exit_price ~exit_reason ~positions symbol =
   match _find_holding positions symbol with
   | None -> positions
   | Some (id, pos) -> (
-      let open Position in
-      let qty = match get_state pos with Holding h -> h.quantity | _ -> 0.0 in
-      let steps =
-        [
-          {
-            position_id = id;
-            date;
-            kind = TriggerExit { exit_reason; exit_price };
-          };
-          {
-            position_id = id;
-            date;
-            kind = ExitFill { filled_quantity = qty; fill_price = exit_price };
-          };
-          { position_id = id; date; kind = ExitComplete };
-        ]
-      in
-      match
-        List.fold_result steps ~init:pos ~f:(fun acc trans ->
-            apply_transition acc trans)
-      with
-      | Ok closed -> _set_or_drop_if_closed positions ~key:id ~data:closed
-      | Error _ -> positions)
+      match _drive_holding_to_closed ~id ~date ~exit_price ~exit_reason pos with
+      | Some closed -> _set_or_drop_if_closed positions ~key:id ~data:closed
+      | None -> positions)
 
 (* Apply one stale force-exit: realise the synthetic trade against the portfolio
    and close the matching strategy position. A trade the portfolio rejects (e.g.

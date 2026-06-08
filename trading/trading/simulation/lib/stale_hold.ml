@@ -129,15 +129,19 @@ let _force_exit_for_position ~adapter ~date ~today_set ~exit_after_days
     in
     _force_exit_for_bar ~date ~exit_after_days pos prev
 
+(* Scan all held positions for force-exit candidates under an active policy. *)
+let _collect_force_exits ~adapter ~date ~today_bars ~portfolio ~exit_after_days
+    =
+  let today_set = _today_symbol_set today_bars in
+  List.filter_map portfolio.Trading_portfolio.Portfolio.positions
+    ~f:(_force_exit_for_position ~adapter ~date ~today_set ~exit_after_days)
+
 let force_exit_candidates ~adapter ~date ~portfolio ~today_bars ~config =
   match (config.enabled, config.stale_exit_after_days) with
   | false, _ | _, None -> []
   | true, Some exit_after_days ->
-      let today_set = _today_symbol_set today_bars in
-      List.filter_map portfolio.Trading_portfolio.Portfolio.positions
-        ~f:(fun pos ->
-          _force_exit_for_position ~adapter ~date ~today_set ~exit_after_days
-            pos)
+      _collect_force_exits ~adapter ~date ~today_bars ~portfolio
+        ~exit_after_days
 
 (** {1 Log} *)
 
