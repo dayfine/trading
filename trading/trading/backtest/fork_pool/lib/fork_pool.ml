@@ -217,3 +217,5 @@ let _run_pool ~parallel ~(jobs : (unit -> 'a) array) : 'a array =
 let run_parallel ~parallel ~jobs =
   _validate_parallel ~parallel;
   if parallel = 1 then _run_sequential ~jobs else _run_pool ~parallel ~jobs
+
+let run_each_forked ~jobs = _run_pool ~parallel:1 ~jobs

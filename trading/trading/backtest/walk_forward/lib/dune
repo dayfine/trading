@@ -2,6 +2,7 @@
  (name walk_forward)
  (libraries
   core
+  status
   fork_pool
   scenario_lib
   backtest

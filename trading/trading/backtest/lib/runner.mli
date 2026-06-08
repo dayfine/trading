@@ -177,6 +177,7 @@ val run_backtest :
   ?trace:Trace.t ->
   ?gc_trace:Gc_trace.t ->
   ?bar_data_source:Bar_data_source.t ->
+  ?shared_panels:Snapshot_runtime.Daily_panels.t ->
   ?progress_emitter:Backtest_progress.emitter ->
   ?slippage_bps:int ->
   ?cost_model:Backtest_cost_model.Cost_model.t ->
@@ -254,6 +255,13 @@ val run_backtest :
     to read OHLCV from a snapshot directory written by Phase B. See
     {!Bar_data_source.t} and the Phase D plan
     ([dev/plans/snapshot-engine-phase-d-2026-05-02.md]) for the full contract.
+
+    [shared_panels], when [Some p], reuses a caller-owned
+    [Snapshot_runtime.Daily_panels.t] for this run's snapshot reads instead of
+    allocating + closing a fresh cache. Threaded straight through to
+    {!Panel_runner.run}; see its [shared_panels] doc for the contract and the
+    walk-forward cache-reuse motivation. [None] (the default) is byte-identical
+    to the prior per-run create/close behaviour.
 
     [progress_emitter], when passed, threads a Friday-cycle checkpoint hook
     through the simulator step loop. See {!Backtest_progress.emitter}. Used by

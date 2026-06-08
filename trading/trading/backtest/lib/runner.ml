@@ -253,13 +253,13 @@ let _panel_input_of_deps (deps : _deps) : Panel_runner.input =
   }
 
 let _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days
-    ?strategy_choice ?trace ?gc_trace ?bar_data_source ?progress_emitter
-    ?slippage_bps ?cost_model () =
+    ?strategy_choice ?trace ?gc_trace ?bar_data_source ?shared_panels
+    ?progress_emitter ?slippage_bps ?cost_model () =
   Panel_runner.run
     ~input:(_panel_input_of_deps deps)
     ~start_date ~end_date ~warmup_days ~initial_cash ~commission
-    ?strategy_choice ?trace ?gc_trace ?bar_data_source ?progress_emitter
-    ?slippage_bps ?cost_model ()
+    ?strategy_choice ?trace ?gc_trace ?bar_data_source ?shared_panels
+    ?progress_emitter ?slippage_bps ?cost_model ()
 
 (** Drop simulator-side [stop_info]s whose [entry_date] is before [start_date] —
     i.e. positions opened during the warmup window. The simulator runs from
@@ -428,25 +428,12 @@ let _log_backtest_window ~start_date ~end_date ~warmup_start ~all_symbols =
     (Date.to_string end_date)
     (Date.to_string warmup_start)
 
-let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
-    ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
-    ?bar_data_source ?progress_emitter ?slippage_bps ?cost_model () =
-  let deps = _load_deps ?trace ?gc_trace ~overrides ~sector_map_override () in
-  let warmup_days = _warmup_days_for strategy_choice in
-  let warmup_start = Date.add_days start_date (-warmup_days) in
-  _log_backtest_window ~start_date ~end_date ~warmup_start
-    ~all_symbols:deps.all_symbols;
-  let ( sim_result,
-        stop_log,
-        trade_audit,
-        force_liquidation_log,
-        stale_hold_log,
-        final_close_prices ) =
-    _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days
-      ~strategy_choice ?trace ?gc_trace ?bar_data_source ?progress_emitter
-      ?slippage_bps ?cost_model ()
-  in
-  Gc_trace.record ?trace:gc_trace ~phase:"fill_done" ();
+(* Post-simulation assembly: filter steps to the requested window, extract the
+   teardown artefacts, and build the [result] record. Split out of
+   [run_backtest] to keep that function under the length limit. *)
+let _assemble_result ~start_date ~end_date ~deps ~overrides ~sim_result
+    ~stop_log ~trade_audit ~force_liquidation_log ~stale_hold_log
+    ~final_close_prices ?trace ?gc_trace () =
   let steps_in_range, steps = _filter_steps ~sim_result ~start_date in
   let final_value = (List.last_exn steps).portfolio_value in
   let ( round_trips,
@@ -478,3 +465,27 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
       _final_prices_for_held_symbols ~final_portfolio ~final_close_prices;
     universe = deps.universe;
   }
+
+let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
+    ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
+    ?bar_data_source ?shared_panels ?progress_emitter ?slippage_bps ?cost_model
+    () =
+  let deps = _load_deps ?trace ?gc_trace ~overrides ~sector_map_override () in
+  let warmup_days = _warmup_days_for strategy_choice in
+  let warmup_start = Date.add_days start_date (-warmup_days) in
+  _log_backtest_window ~start_date ~end_date ~warmup_start
+    ~all_symbols:deps.all_symbols;
+  let ( sim_result,
+        stop_log,
+        trade_audit,
+        force_liquidation_log,
+        stale_hold_log,
+        final_close_prices ) =
+    _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days
+      ~strategy_choice ?trace ?gc_trace ?bar_data_source ?shared_panels
+      ?progress_emitter ?slippage_bps ?cost_model ()
+  in
+  Gc_trace.record ?trace:gc_trace ~phase:"fill_done" ();
+  _assemble_result ~start_date ~end_date ~deps ~overrides ~sim_result ~stop_log
+    ~trade_audit ~force_liquidation_log ~stale_hold_log ~final_close_prices
+    ?trace ?gc_trace ()

@@ -73,3 +73,37 @@ val run_parallel : parallel:int -> jobs:(unit -> 'a) array -> 'a array
       if any job raises or its child exits abnormally. The exception message is
       wrapped with the failing job's index so the caller can correlate back to
       its work-item table. *)
+
+val run_each_forked : jobs:(unit -> 'a) array -> 'a array
+(** [run_each_forked ~jobs] runs each [jobs.(i)] in its OWN forked child, one at
+    a time (never more than one child alive), and returns results in input
+    order. Same marshalling contract and failure semantics as
+    [run_parallel ~parallel:1] would have — except this DOES fork, whereas
+    [run_parallel ~parallel:1] takes the in-process fast path.
+
+    Why a distinct entry point: forking each job lets the child's exit reclaim
+    everything it allocated — including (a) a per-call heap residue the OCaml GC
+    cannot collect (the ~25 MB/backtest "genuine leak" documented in
+    [dev/notes/bayesian-int-rounding-bug-2026-05-19.md], which scales to ~340
+    MB/fold at N=3000) and (b) on macOS/Rosetta, the process's
+    [VMAllocationTracker] slab, whose fixed budget is otherwise exhausted by the
+    cumulative VM allocations of many in-process decodes. Running each job in
+    its own short-lived child keeps both bounded: only one child's transient is
+    resident at a time, so the peak stays under the container ceiling, and
+    nothing accumulates across jobs in the long-lived parent. This is what the
+    walk-forward parallel=1 broad-universe (N=3000) path needs — an in-process
+    loop there both exhausts the slab (~fold 13, exit 133) and OOMs the
+    container across all folds.
+
+    Read-only state the parent built before calling is inherited by each child
+    copy-on-write, so callers may pass shared handles via the job closures; but
+    note that work which heavily re-touches such state (e.g. a backtest reading
+    a snapshot cache) copies those pages into the child anyway, so do not rely
+    on COW sharing to bound a child whose own working set already exceeds the
+    budget.
+
+    Results must be marshallable (same as [run_parallel]'s [parallel > 1] path).
+
+    @raise Failure
+      if any job raises or its child exits abnormally (same wrapping as
+      [run_parallel]). *)

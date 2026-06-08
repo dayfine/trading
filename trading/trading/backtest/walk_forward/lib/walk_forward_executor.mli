@@ -107,6 +107,34 @@ val execute_spec :
     CSV mode on the same input bars. Ignored when [?run_one] is supplied (the
     test stub bypasses the real backtest).
 
+    Broad-universe parallel=1 path: when
+    [?bar_data_source = Some (Snapshot {...})] and [?parallel = 1] and
+    [?run_one] is omitted, [execute_spec] runs each fold in its OWN forked child
+    (via {!Fork_pool.run_each_forked}) instead of in-process. It builds a
+    parent-owned [Snapshot_runtime.Daily_panels.t] (via
+    {!Backtest.Bar_data_source.build_shared_panels}) that each child reads
+    through as [~shared_panels] without closing, then closes it once after the
+    grid.
+
+    The fork-per-fold isolation is the fix: each fold's decode, transient
+    backtest heap, and the ~340 MB/fold-at-N=3000 GC-uncollectible residue all
+    live and DIE in the child, and the child's exit also resets the process
+    [VMAllocationTracker] slab. Only one child's transient is resident at a
+    time, so peak RSS stays under the container ceiling, and nothing accumulates
+    in the long-lived parent.
+
+    Without forking, an in-process loop re-decodes all N symbols per fold
+    ([misses_per_symbol = 1.00] every fold); on an N=3000 WF that cumulative VM
+    allocation exhausts Rosetta's fixed [VMAllocationTracker] slab after ~13
+    folds and crashes (exit 133), and the per-fold residue separately OOMs the
+    container across ~29 folds. Forking clears both. Per-fold metrics are
+    unchanged — the fork boundary is result-transparent (the child marshals the
+    same [fold_actual] back); [misses_per_symbol = 1.00] per fold persists (each
+    child decodes its own working set) but is harmless because each fold is
+    isolated. Under [?parallel > 1] each fold already runs in its own forked
+    child, so no parent handle is built (result unchanged from before this
+    behaviour existed).
+
     [?run_one] (default {!Backtest.Runner.run_backtest}-backed) is a test seam
     for substituting a deterministic per-scenario evaluator. Production callers
     should omit it. Documented in the body's {!fold_runner} doc.

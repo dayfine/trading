@@ -53,6 +53,36 @@ val build_adapter :
     the same snapshot directory — see Cliff #2 in
     [dev/notes/15y-memory-cliff-2026-05-08.md]. *)
 
+val build_shared_panels :
+  t -> Snapshot_runtime.Daily_panels.t option Status.status_or
+(** [build_shared_panels t] builds a caller-owned [Daily_panels.t] when [t] is a
+    {!Snapshot} (returns [Ok (Some panels)]), or [Ok None] for {!Csv} (CSV mode
+    builds a per-run in-process snapshot, so there is nothing reusable to
+    share). The cache cap is resolved via
+    {!Snapshot_cache_config.resolve_cache_mb} — the same cap {!Panel_runner.run}
+    would use for its per-run cache, so RSS behaviour is unchanged. The returned
+    cache is lazy: it decodes a symbol on first access, not eagerly here.
+
+    The intended use is the broad-universe walk-forward parallel=1 loop: build
+    the cache once in the parent, run each fold in a forked child (via
+    {!Fork_pool.run_each_forked}) that reads through it as [~shared_panels] and
+    does NOT close it, then {!close_shared_panels} once after all folds. The
+    parent owns the lifecycle so the child's [run_backtest] leaves it open.
+
+    RSS / [VMAllocationTracker] safety on that path comes from running each fold
+    in its own child ({!Fork_pool.run_each_forked}) — whose exit reclaims the
+    fold's decode + transient heap and resets the slab — NOT from cross-fold
+    cache reuse: each child decodes its own working set into its copy-on-write
+    view and that decode dies with the child. In-process callers that issue
+    several backtests against the same handle DO get true decode reuse (pinned
+    by [test_shared_panels_reused_across_backtests]). Returns [Error] only when
+    [Daily_panels.create] fails (corrupt manifest / invalid cap). *)
+
+val close_shared_panels : Snapshot_runtime.Daily_panels.t -> unit
+(** [close_shared_panels p] drops every cached symbol in [p]
+    ({!Snapshot_runtime.Daily_panels.close}). The owning caller calls this once
+    after the last backtest that read through [p]. *)
+
 val build_adapter_from_panels :
   Snapshot_runtime.Daily_panels.t ->
   Trading_simulation_data.Market_data_adapter.t

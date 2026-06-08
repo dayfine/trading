@@ -151,21 +151,30 @@ let _build_snapshot_bar_reader ~daily_panels ~calendar =
     (Array.length calendar);
   Weinstein_strategy.Bar_reader.of_snapshot_views ~calendar callbacks
 
+let _create_panels ~snapshot_dir ~manifest =
+  match
+    Daily_panels.create ~snapshot_dir ~manifest
+      ~max_cache_mb:(Snapshot_cache_config.resolve_cache_mb ())
+  with
+  | Ok p -> p
+  | Error err ->
+      failwithf "Panel_runner: Daily_panels.create failed: %s" (Status.show err)
+        ()
+
+(* Resolve the [Daily_panels.t] this run reads through. [Some p]: read through a
+   caller-owned cache ([run] does not close it). [None]: a per-run cache [run]
+   closes (the prior path). See [shared_panels] in [panel_runner.mli]. *)
+let _resolve_panels ~shared_panels ~snapshot_dir ~manifest =
+  match shared_panels with
+  | Some p -> p
+  | None -> _create_panels ~snapshot_dir ~manifest
+
 (* Hybrid setup: snapshot-backed strategy bar reader, snapshot-backed
    simulator adapter, snapshot-backed final-close lookup — all reading
    through one [Daily_panels.t]. See module-doc. *)
 let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
-    ~warmup_start ~end_date ~audit_recorder =
-  let daily_panels =
-    match
-      Daily_panels.create ~snapshot_dir ~manifest
-        ~max_cache_mb:(Snapshot_cache_config.resolve_cache_mb ())
-    with
-    | Ok p -> p
-    | Error err ->
-        failwithf "Panel_runner: Daily_panels.create failed: %s"
-          (Status.show err) ()
-  in
+    ~shared_panels ~warmup_start ~end_date ~audit_recorder =
+  let daily_panels = _resolve_panels ~shared_panels ~snapshot_dir ~manifest in
   let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
   let bar_reader = _build_snapshot_bar_reader ~daily_panels ~calendar in
   let strategy =
@@ -233,9 +242,19 @@ let engine_costs_with_overlay ~default_commission ?default_slippage_bps
       let commission, slip_bps = Cost_model.to_engine_costs cm in
       (commission, Some slip_bps)
 
+(* Emit the cache-thrash diagnostic and drop the LRU before returning (see
+   dev/notes/bayesian-int-rounding-bug-2026-05-19.md §"Third failure"). When
+   [shared_panels = Some _] the caller owns the cache lifecycle, so we must NOT
+   close it here — the owning caller (the walk-forward executor) closes it once
+   after the grid. *)
+let _finish_panels ~daily_panels ~n_all_symbols ~shared_panels =
+  Snapshot_cache_config.log_cache_stats ~daily_panels ~n_symbols:n_all_symbols;
+  if Option.is_none shared_panels then Daily_panels.close daily_panels
+
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     ~commission ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
-    ?bar_data_source ?progress_emitter ?slippage_bps ?cost_model () =
+    ?bar_data_source ?shared_panels ?progress_emitter ?slippage_bps ?cost_model
+    () =
   let warmup_start = Date.add_days start_date (-warmup_days) in
   eprintf
     "Panel_runner: simulator window %s..%s (warmup %d days, strategy %s)\n%!"
@@ -248,8 +267,8 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     _resolve_snapshot_source input ~warmup_start ~end_date ~bar_data_source
   in
   let strategy, market_data_adapter, final_close_prices_thunk, daily_panels =
-    _setup_hybrid input ~strategy_choice ~snapshot_dir ~manifest ~warmup_start
-      ~end_date ~audit_recorder:r.audit_recorder
+    _setup_hybrid input ~strategy_choice ~snapshot_dir ~manifest ~shared_panels
+      ~warmup_start ~end_date ~audit_recorder:r.audit_recorder
   in
   let on_trade_fill = _on_trade_fill_of_cost_model cost_model in
   let effective_commission, effective_slippage_bps =
@@ -272,10 +291,7 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
   in
   Option.iter progress_acc ~f:Backtest_progress.emit_final;
   let final_close_prices = final_close_prices_thunk () in
-  (* Emit the cache thrash diagnostic, then drop the LRU before returning. See
-     dev/notes/bayesian-int-rounding-bug-2026-05-19.md §"Third failure". *)
-  Snapshot_cache_config.log_cache_stats ~daily_panels ~n_symbols:n_all_symbols;
-  Daily_panels.close daily_panels;
+  _finish_panels ~daily_panels ~n_all_symbols ~shared_panels;
   ( sim_result,
     r.stop_log,
     r.trade_audit,

@@ -27,3 +27,16 @@ let build_adapter t ~data_dir ~max_cache_mb =
   | Csv -> Ok (Trading_simulation_data.Market_data_adapter.create ~data_dir)
   | Snapshot { snapshot_dir; manifest } ->
       _build_snapshot_adapter ~snapshot_dir ~manifest ~max_cache_mb
+
+let build_shared_panels t =
+  match t with
+  | Csv -> Ok None
+  | Snapshot { snapshot_dir; manifest } ->
+      let open Result.Let_syntax in
+      let%bind panels =
+        Daily_panels.create ~snapshot_dir ~manifest
+          ~max_cache_mb:(Snapshot_cache_config.resolve_cache_mb ())
+      in
+      Ok (Some panels)
+
+let close_shared_panels = Daily_panels.close

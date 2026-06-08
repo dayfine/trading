@@ -36,7 +36,7 @@ let _test_days (period : Scenario.period) =
     back into {!_run_one}, which would keep [result] live as a stack root across
     the [Gc.compact] call. See
     [dev/notes/bayesian-int-rounding-bug-2026-05-19.md]. *)
-let[@inline never] _extract_fold ~fixtures_root ~bar_data_source
+let[@inline never] _extract_fold ~fixtures_root ~bar_data_source ~shared_panels
     (s : Scenario.t) : Report.fold_actual =
   let resolved = Filename.concat fixtures_root s.universe_path in
   let sector_map_override =
@@ -46,7 +46,7 @@ let[@inline never] _extract_fold ~fixtures_root ~bar_data_source
     Backtest.Runner.run_backtest ~start_date:s.period.start_date
       ~end_date:s.period.end_date ~overrides:s.config_overrides
       ?sector_map_override ~strategy_choice:s.strategy
-      ?slippage_bps:s.slippage_bps ?bar_data_source ()
+      ?slippage_bps:s.slippage_bps ?bar_data_source ?shared_panels ()
   in
   let summary = result.summary in
   let get k = Map.find summary.metrics k |> Option.value ~default:Float.nan in
@@ -67,9 +67,9 @@ let[@inline never] _extract_fold ~fixtures_root ~bar_data_source
     avg_holding_days = get AvgHoldingDays;
   }
 
-let _run_one ~fixtures_root ~bar_data_source (s : Scenario.t) :
+let _run_one ~fixtures_root ~bar_data_source ~shared_panels (s : Scenario.t) :
     Report.fold_actual =
-  let fold = _extract_fold ~fixtures_root ~bar_data_source s in
+  let fold = _extract_fold ~fixtures_root ~bar_data_source ~shared_panels s in
   (* Partial bandaid for cumulative-state OOM (2026-05-19): each
      [Backtest.Runner.run_backtest] call leaks ~90 MB to the OCaml major
      heap. Forcing [Gc.compact] here reduces that to ~25 MB/backtest by
@@ -77,11 +77,14 @@ let _run_one ~fixtures_root ~bar_data_source (s : Scenario.t) :
      remaining 25 MB is a genuine reference leak (not collectible by GC)
      whose root cause is unidentified — see
      dev/notes/bayesian-int-rounding-bug-2026-05-19.md §"Root cause
-     identified 2026-05-19 PM". The complete fix is fork-per-fold (plan
-     PR #1197); with that landed, even at parallel=1 each backtest runs
-     in a child whose exit reclaims the leak, so this [Gc.compact] can
-     be removed. *)
-  Stdlib.Gc.compact ();
+     identified 2026-05-19 PM".
+
+     [shared_panels = Some _] is exactly the fork-per-fold path this comment
+     names as "the complete fix": each fold runs in a child whose exit reclaims
+     the leak (and its whole transient heap), so the compact is pointless work
+     there and is skipped. The in-process path (CSV, or no bar source) keeps the
+     compact as its only line of defence against the cross-call residue. *)
+  if Option.is_none shared_panels then Stdlib.Gc.compact ();
   fold
 
 (** Emit one progress event for the given (variant, fold) pair. *)
@@ -133,32 +136,86 @@ let _build_job_array ~run_one ~base ~variants ~folds ~progress
       _build_pair_job ~run_one ~base ~fold:folds_arr.(fi)
         ~variant:variants_arr.(vi) ~progress ~emit_progress_inside_job)
 
-let _evaluate_all ~run_one ~base ~(spec : Spec.t) ~progress ~parallel =
+(* Choose how the job array is run.
+
+   [fork_each = true] (the broad-universe snapshot parallel=1 path) forks one
+   child per fold via {!Fork_pool.run_each_forked}: each fold's backtest — its
+   decode, transient heap, and the ~340 MB/fold N=3000 GC-uncollectible residue
+   — lives and DIES in its own child, and the child's exit also resets the
+   process [VMAllocationTracker] slab. That isolation is what keeps an N=3000 WF
+   under the container ceiling and clears the slab crash an in-process loop hits
+   at ~fold 13. Progress is emitted up-front (children can't write the parent's
+   live-stderr trail in order), exactly as the [parallel > 1] path does.
+
+   Otherwise behaviour is unchanged: {!Fork_pool.run_parallel ~parallel} with
+   in-process progress on the [parallel = 1] fast path. *)
+let _evaluate_all ~run_one ~base ~(spec : Spec.t) ~progress ~parallel ~fork_each
+    =
   let folds = WS.generate spec.window_spec in
-  (* parallel=1 keeps the original live-stderr progress trail; parallel>1
-     emits up-front because child processes can't share the parent's
-     deterministic schedule otherwise. *)
-  let emit_progress_inside_job = parallel = 1 in
+  (* In-process parallel=1 keeps the original live-stderr progress trail; every
+     forking path (parallel>1 OR fork_each) emits up-front because child
+     processes can't share the parent's deterministic schedule otherwise. *)
+  let emit_progress_inside_job = parallel = 1 && not fork_each in
   if not emit_progress_inside_job then
     _emit_progress ~progress ~variants:spec.variants ~folds;
   let jobs =
     _build_job_array ~run_one ~base ~variants:spec.variants ~folds ~progress
       ~emit_progress_inside_job
   in
-  let results = Fork_pool.run_parallel ~parallel ~jobs in
+  let results =
+    if fork_each then Fork_pool.run_each_forked ~jobs
+    else Fork_pool.run_parallel ~parallel ~jobs
+  in
   Array.to_list results
+
+(* Build the parent-owned snapshot cache for the forked broad-universe path, but
+   only at parallel=1 with a snapshot bar source. A [Some] result is also the
+   signal that {!execute_spec} should run folds via {!Fork_pool.run_each_forked}
+   (one isolated child per fold). Each child reads through this handle and does
+   NOT close it (the parent owns it); the cache itself is lazy, so the real RSS /
+   [VMAllocationTracker] safety is the per-fold child isolation, not cross-fold
+   reuse — see [walk_forward_executor.mli]. Returns [None] for CSV mode (each
+   fold builds its own in-process snapshot over its own date window — nothing to
+   own) and when no [bar_data_source] is given; at parallel>1 each fold already
+   forks, so no parent handle is built. *)
+let _build_shared_panels_exn src =
+  match Backtest.Bar_data_source.build_shared_panels src with
+  | Ok panels -> panels
+  | Error err ->
+      failwithf "Walk_forward_executor: build_shared_panels failed: %s"
+        (Status.show err) ()
+
+let _maybe_build_shared_panels ~parallel ~bar_data_source =
+  match bar_data_source with
+  | Some src when parallel = 1 -> _build_shared_panels_exn src
+  | Some _ | None -> None
 
 let execute_spec ~base ~(spec : Spec.t) ~fixtures_root
     ?(progress = noop_progress) ?(parallel = 1) ?bar_data_source ?run_one () :
     result =
+  (* Shared panels are owned here only when we drive the default [_run_one]; a
+     caller-supplied [run_one] (e.g. the stub in the parity test) does not go
+     through [run_backtest], so there is nothing to share. *)
+  let shared_panels =
+    match run_one with
+    | Some _ -> None
+    | None -> _maybe_build_shared_panels ~parallel ~bar_data_source
+  in
   let run_one =
     match run_one with
     | Some f -> f
-    | None -> _run_one ~fixtures_root ~bar_data_source
+    | None -> _run_one ~fixtures_root ~bar_data_source ~shared_panels
   in
-  let fold_actuals = _evaluate_all ~run_one ~base ~spec ~progress ~parallel in
-  let aggregate =
-    Report.compute ~baseline_label:spec.baseline_label ~gate:spec.gate
-      ~fold_actuals
-  in
-  { fold_actuals; aggregate }
+  let fork_each = Option.is_some shared_panels in
+  Exn.protect
+    ~f:(fun () ->
+      let fold_actuals =
+        _evaluate_all ~run_one ~base ~spec ~progress ~parallel ~fork_each
+      in
+      let aggregate =
+        Report.compute ~baseline_label:spec.baseline_label ~gate:spec.gate
+          ~fold_actuals
+      in
+      { fold_actuals; aggregate })
+    ~finally:(fun () ->
+      Option.iter shared_panels ~f:Backtest.Bar_data_source.close_shared_panels)
