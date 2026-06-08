@@ -1,11 +1,41 @@
 # Status: backtest-perf
 
-## Last updated: 2026-06-08
+## Last updated: 2026-06-09
 
 ## Status
 IN_PROGRESS
 
-### Recent activity (2026-06-08)
+### Recent activity (2026-06-09)
+
+- **[x] `walk_forward_runner.exe --snapshot-dir`** (branch
+  `feat/backtest-wf-snapshot`). Threads a `Backtest.Bar_data_source.t`
+  through `Walk_forward.Walk_forward_executor` into every fold's
+  `Backtest.Runner.run_backtest`, so broad-universe (N≥1000) WF-CV can
+  read OHLCV from a pre-built snapshot warehouse instead of building the
+  whole universe's bars in-process from CSV (superlinear / OOMs at
+  N≥1000 per `feedback_large_n_needs_snapshot_mode`). Default-off:
+  omitting the flag is byte-identical to the prior CSV path. Unblocks
+  the broad-PIT WF-CV experiment agenda.
+  - Surface:
+    - `walk_forward_executor.{ml,mli}` — `execute_spec` gains
+      `?bar_data_source:Backtest.Bar_data_source.t`, threaded down
+      through `_run_one` → `_extract_fold` → `run_backtest` (the
+      `[@inline never]` + `Gc.compact` memory discipline kept intact).
+    - `bin/walk_forward_runner.ml` — `--snapshot-dir <path>` flag,
+      resolved via the shared `Scenario_lib.Bar_source_resolver.resolve`
+      (same resolver `rolling_start_eval` / `scenario_runner` use; reads
+      `<dir>/manifest.sexp`, exits non-zero on a missing/corrupt
+      manifest at parse time).
+  - Tests:
+    `trading/trading/backtest/walk_forward/test/test_walk_forward_snapshot_parity.ml`
+    — (1) end-to-end snapshot-vs-CSV parity: same synthetic OHLCV stream
+    built into both a CSV dir (via `TRADING_DATA_DIR`) and a snapshot dir
+    over `Backtest.Runner.all_snapshot_symbols`, a 2-fold WF run in each
+    mode yields byte-identical `aggregate` + `fold_actuals`; (2) flag-off
+    backward-compat: `?bar_data_source:None` is byte-identical to omitting
+    it at the executor seam.
+  - Verify:
+    `dune exec trading/backtest/walk_forward/test/test_walk_forward_snapshot_parity.exe`.
 
 - **[x] P3 — time-underwater + antifragility convexity prototypes**
   (branch `feat/rolling-start-time-underwater`). P3 ("prototype, hold

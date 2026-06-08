@@ -62,11 +62,12 @@ val execute_spec :
   fixtures_root:string ->
   ?progress:progress_callback ->
   ?parallel:int ->
+  ?bar_data_source:Backtest.Bar_data_source.t ->
   ?run_one:fold_runner ->
   unit ->
   result
-(** [execute_spec ~base ~spec ~fixtures_root ?progress ?parallel ?run_one ()]
-    runs the full walk-forward CV grid:
+(** [execute_spec ~base ~spec ~fixtures_root ?progress ?parallel
+     ?bar_data_source ?run_one ()] runs the full walk-forward CV grid:
 
     + For each [variant] in [spec.variants] (outer loop), and for each [fold] in
       [Window_spec.generate spec.window_spec] (inner loop):
@@ -94,6 +95,17 @@ val execute_spec :
     runs in a forked child; the parent reassembles results in canonical (variant
     outer, fold inner) order, so {!Walk_forward_report.compute} sees a
     byte-identical input list regardless of [parallel]. See plan #1197 §7 PR-2.
+
+    [?bar_data_source] selects the OHLCV backend each fold's
+    {!Backtest.Runner.run_backtest} reads from. Omitted (the default) leaves
+    [run_backtest] on [Bar_data_source.Csv] — byte-identical to the pre-snapshot
+    behaviour. Pass [Some (Snapshot {...})] (resolved from a [--snapshot-dir]
+    via {!Scenario_lib.Bar_source_resolver.resolve}) to read from a pre-built
+    snapshot warehouse instead; this is the only tractable backend for
+    broad-universe (N >= 1000) WF-CV, where CSV mode is superlinear and OOMs.
+    Snapshot is purely a faster bar backend — per-fold metrics are identical to
+    CSV mode on the same input bars. Ignored when [?run_one] is supplied (the
+    test stub bypasses the real backtest).
 
     [?run_one] (default {!Backtest.Runner.run_backtest}-backed) is a test seam
     for substituting a deterministic per-scenario evaluator. Production callers

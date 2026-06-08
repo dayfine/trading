@@ -36,8 +36,8 @@ let _test_days (period : Scenario.period) =
     back into {!_run_one}, which would keep [result] live as a stack root across
     the [Gc.compact] call. See
     [dev/notes/bayesian-int-rounding-bug-2026-05-19.md]. *)
-let[@inline never] _extract_fold ~fixtures_root (s : Scenario.t) :
-    Report.fold_actual =
+let[@inline never] _extract_fold ~fixtures_root ~bar_data_source
+    (s : Scenario.t) : Report.fold_actual =
   let resolved = Filename.concat fixtures_root s.universe_path in
   let sector_map_override =
     Universe_file.to_sector_map_override (Universe_file.load resolved)
@@ -46,7 +46,7 @@ let[@inline never] _extract_fold ~fixtures_root (s : Scenario.t) :
     Backtest.Runner.run_backtest ~start_date:s.period.start_date
       ~end_date:s.period.end_date ~overrides:s.config_overrides
       ?sector_map_override ~strategy_choice:s.strategy
-      ?slippage_bps:s.slippage_bps ()
+      ?slippage_bps:s.slippage_bps ?bar_data_source ()
   in
   let summary = result.summary in
   let get k = Map.find summary.metrics k |> Option.value ~default:Float.nan in
@@ -67,8 +67,9 @@ let[@inline never] _extract_fold ~fixtures_root (s : Scenario.t) :
     avg_holding_days = get AvgHoldingDays;
   }
 
-let _run_one ~fixtures_root (s : Scenario.t) : Report.fold_actual =
-  let fold = _extract_fold ~fixtures_root s in
+let _run_one ~fixtures_root ~bar_data_source (s : Scenario.t) :
+    Report.fold_actual =
+  let fold = _extract_fold ~fixtures_root ~bar_data_source s in
   (* Partial bandaid for cumulative-state OOM (2026-05-19): each
      [Backtest.Runner.run_backtest] call leaks ~90 MB to the OCaml major
      heap. Forcing [Gc.compact] here reduces that to ~25 MB/backtest by
@@ -148,9 +149,12 @@ let _evaluate_all ~run_one ~base ~(spec : Spec.t) ~progress ~parallel =
   Array.to_list results
 
 let execute_spec ~base ~(spec : Spec.t) ~fixtures_root
-    ?(progress = noop_progress) ?(parallel = 1) ?run_one () : result =
+    ?(progress = noop_progress) ?(parallel = 1) ?bar_data_source ?run_one () :
+    result =
   let run_one =
-    match run_one with Some f -> f | None -> _run_one ~fixtures_root
+    match run_one with
+    | Some f -> f
+    | None -> _run_one ~fixtures_root ~bar_data_source
   in
   let fold_actuals = _evaluate_all ~run_one ~base ~spec ~progress ~parallel in
   let aggregate =
