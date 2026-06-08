@@ -134,6 +134,28 @@ Merged in main:
 
 ## Completed
 
+- [x] **Stale/delisted position force-exit (default-off)** (2026-06-08,
+  `feat/backtest`, issue #1484). `Trading_simulation.Stale_hold` was a
+  detector only — a delisted/halted held position was carried open
+  indefinitely, marked at its last available close, and counted in
+  terminal NAV (8 of 9 terminal opens in a top-3000 PIT 15y run were such
+  zombies; see `dev/notes/p0-verify-broad-universe-790-2026-06-08.md` §3).
+  Added a **default-off** force-exit: `Stale_hold.config` gains
+  `stale_exit_after_days : int option [@sexp.default None]` and a pure
+  `force_exit_candidates` helper; `Weinstein_strategy.config` gains the
+  same field (axis-able via `Overlay_validator`, flag-discipline R2);
+  `Backtest.Panel_runner._make_simulator` threads it into the simulator's
+  `Stale_hold.config`. When `Some n`, a held position whose bar gap ≥ n is
+  force-sold at its last close as a **realised trade** (lands in
+  `trades.csv` / realised PnL, frees cash) — applied in
+  `Simulator._prepare_market_state`, only on bar-bearing days, and merged
+  into the step's `trades`. `None` everywhere ⇒ byte-identical to pre-#1484
+  (detector still records; no exit). Verify:
+  `dune runtest trading/simulation/test/` (new `force_exit_candidates` +
+  3 e2e simulator tests pinning realised-PnL = (last_close − avg_cost)×qty,
+  flat-after, and the disabled-keeps-open path). Plan:
+  `dev/plans/stale-position-force-exit-2026-06-08.md`.
+
 - [x] **15y SP500 trade-count investigation** (2026-05-05, PR #853).
   Root-cause investigation: `goldens-sp500-historical/sp500-2010-2026.sexp`
   produced 16 trades over 16y vs ~264 expected. **Dominant cause:

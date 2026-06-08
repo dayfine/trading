@@ -5,13 +5,21 @@ open Core
 
 (** {1 Configuration} *)
 
-type config = { enabled : bool; stale_after_days : int }
+type config = {
+  enabled : bool;
+  stale_after_days : int;
+  stale_exit_after_days : int option;
+}
 [@@deriving show, eq, sexp]
 
 let _default_stale_after_days = 5
 
 let default_config =
-  { enabled = true; stale_after_days = _default_stale_after_days }
+  {
+    enabled = true;
+    stale_after_days = _default_stale_after_days;
+    stale_exit_after_days = None;
+  }
 
 (** {1 Event} *)
 
@@ -78,6 +86,63 @@ let detect_stale ~adapter ~date ~portfolio ~today_bars ~config =
         _event_for_position ~adapter ~date ~today_set
           ~stale_after_days:config.stale_after_days pos)
 
+(** {1 Force-exit} *)
+
+type force_exit = {
+  symbol : string;
+  signed_quantity : float;
+  last_close : float;
+  last_bar_date : Date.t;
+  days_since_last_bar : int;
+}
+[@@deriving show, eq, sexp]
+
+(** Build a force-exit instruction for [pos] given its most recent prior bar
+    [prev]. Returns [None] when the gap is below [exit_after_days] or the
+    position is already flat. *)
+let _force_exit_for_bar ~date ~exit_after_days
+    (pos : Trading_portfolio.Types.portfolio_position)
+    (prev : Types.Daily_price.t) : force_exit option =
+  let last_bar_date = prev.Types.Daily_price.date in
+  let gap = Date.diff date last_bar_date in
+  let signed_quantity = Trading_portfolio.Calculations.position_quantity pos in
+  if gap < exit_after_days || Float.equal signed_quantity 0.0 then None
+  else
+    Some
+      {
+        symbol = pos.symbol;
+        signed_quantity;
+        last_close = prev.Types.Daily_price.close_price;
+        last_bar_date;
+        days_since_last_bar = gap;
+      }
+
+(** Build one force-exit for a held position, or [None] when the position has a
+    bar today, no prior bar, or the prior bar is recent enough. *)
+let _force_exit_for_position ~adapter ~date ~today_set ~exit_after_days
+    (pos : Trading_portfolio.Types.portfolio_position) : force_exit option =
+  if Set.mem today_set pos.symbol then None
+  else
+    let%bind.Option prev =
+      Trading_simulation_data.Market_data_adapter.get_previous_bar adapter
+        ~symbol:pos.symbol ~date
+    in
+    _force_exit_for_bar ~date ~exit_after_days pos prev
+
+(* Scan all held positions for force-exit candidates under an active policy. *)
+let _collect_force_exits ~adapter ~date ~today_bars ~portfolio ~exit_after_days
+    =
+  let today_set = _today_symbol_set today_bars in
+  List.filter_map portfolio.Trading_portfolio.Portfolio.positions
+    ~f:(_force_exit_for_position ~adapter ~date ~today_set ~exit_after_days)
+
+let force_exit_candidates ~adapter ~date ~portfolio ~today_bars ~config =
+  match (config.enabled, config.stale_exit_after_days) with
+  | false, _ | _, None -> []
+  | true, Some exit_after_days ->
+      _collect_force_exits ~adapter ~date ~today_bars ~portfolio
+        ~exit_after_days
+
 (** {1 Log} *)
 
 module Log = struct
@@ -96,7 +161,7 @@ module Log = struct
 
   let distinct_symbols t =
     events t
-    |> List.map ~f:(fun e -> e.symbol)
+    |> List.map ~f:(fun (e : event) -> e.symbol)
     |> List.dedup_and_sort ~compare:String.compare
 end
 

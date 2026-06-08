@@ -405,6 +405,13 @@ type config = {
           [enable_macro_bearish_exposure_trim = true]; default [0.70] mirrors
           the normal long-exposure cap (a no-op cap). See
           [Weinstein_strategy_config]. *)
+  stale_exit_after_days : int option; [@sexp.default None]
+      (** [Some n] force-sells a stale/delisted held position at its last close
+          after an [n]-day bar gap, as a realised trade — instead of carrying it
+          open at a stale mark indefinitely (issue #1484). [None] (default) is a
+          no-op (detector-only, byte-identical to pre-#1484). Threaded into the
+          simulator's [Trading_simulation.Stale_hold.config]. Searchable as a
+          [Variant_matrix] flag axis. See [Weinstein_strategy_config]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

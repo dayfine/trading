@@ -100,6 +100,10 @@ type config = {
       [@sexp.default macro_bearish_no_op_cap]
       (** Fraction of portfolio value the trim caps held long exposure at on a
           Bearish tape; default [0.70] is a no-op cap. See [.mli]. *)
+  stale_exit_after_days : int option; [@sexp.default None]
+      (** [Some n] force-sells a stale/delisted held position at its last close
+          after an [n]-day bar gap; default [None] is a no-op (#1484). Threaded
+          into the simulator's [Stale_hold.config]. See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -138,6 +142,7 @@ let default_config ~universe ~index_symbol =
     late_stage2_stop_buffer_pct = 0.0;
     enable_macro_bearish_exposure_trim = false;
     macro_bearish_max_long_exposure_pct = macro_bearish_no_op_cap;
+    stale_exit_after_days = None;
   }
 
 let name = "Weinstein"
