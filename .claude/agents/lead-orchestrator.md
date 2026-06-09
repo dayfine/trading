@@ -1549,7 +1549,7 @@ For each row in `dev/status/_index.md`:
    - **Status** — must match the (possibly just-updated) `## Status` heading value (IN_PROGRESS / READY_FOR_REVIEW / MERGED / APPROVED / BLOCKED).
    - **Owner** — must match `## Ownership` (or be `—` if the track has no active owner).
    - **Open PR(s)** — cross-reference against the GitHub REST API (via `curl -sSL -H "Authorization: Bearer ${GH_TOKEN}" "https://api.github.com/repos/${GITHUB_REPOSITORY:-dayfine/trading}/pulls?state=open"`) filtered to that track's branches; each currently-open PR targeting main that carries this track's work should appear. Merged PRs must not appear in this column.
-   - **Next task** — must be the top item from `## Next Steps` (or an equivalent synthesis of the most concrete pending item). For MERGED rows, use `—` plus a short parenthetical noting the merge date + PR number.
+   - **Next task** — ONE LINE only (≤ 160 chars); the single most concrete pending item from `## Next Steps`. History and rationale stay in the per-track file. For MERGED rows, use `—`. Do NOT accumulate multi-sentence run history here — the `index_size_linter.sh` CI check will FAIL if rows exceed 250 chars.
 4. If any cell drifts, fix it. Do not touch unrelated rows.
 5. Update the `Last updated:` line to today's date **at the end of Step 5.5**, not earlier — the timestamp must reflect the reconcile, not whatever the last feature agent happened to write.
 
