@@ -5,6 +5,7 @@
   test_ad_bars_weekly_e2e
   test_bar_reader
   test_entry_audit_capture
+  test_exit_audit_capture
   test_force_liquidation_runner
   test_force_liquidation_strategy
   test_macro_inputs

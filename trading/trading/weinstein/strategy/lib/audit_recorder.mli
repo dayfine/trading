@@ -110,6 +110,16 @@ type exit_event = {
       (** [(exit_price - ma_value) / ma_value] at exit time. Positive if exit
           was above the MA, negative if below. [0.0] when the MA could not be
           read. *)
+  max_favorable_excursion_pct : float;
+      (** Largest favourable move during the hold, as a fraction of entry price,
+          over the hold's {b weekly} bars. For a long:
+          [(max weekly high - entry_price) / entry_price]; for a short, mirrored
+          on the low. [0.0] when bars for the hold window are unavailable. *)
+  max_adverse_excursion_pct : float;
+      (** Largest adverse move during the hold, as a fraction of entry price
+          (typically negative), over the hold's {b weekly} bars. For a long:
+          [(min weekly low - entry_price) / entry_price]; for a short, mirrored
+          on the high. [0.0] when bars are unavailable. *)
 }
 (** Event captured at exit-decision time. *)
 

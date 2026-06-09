@@ -152,22 +152,9 @@ let _run_laggard_rotation ~config ~positions ~last_stop_out_dates ~bar_reader
          ~label:"laggard_rotation");
   laggard_ts
 
-let _run_special_exits ~config ~positions ~last_stop_out_dates
-    ~(portfolio : Portfolio_view.t) ~get_price ~peak_tracker ~audit_recorder
-    ~prior_stages ~prior_stage_ma_values ~stage3_streaks ~laggard_streaks
-    ~bar_reader ~index_view ~exit_transitions ~current_date =
-  let raw_force_exit_ts =
-    Force_liquidation_runner.update
-      ~config:config.portfolio_config.force_liquidation ~positions ~get_price
-      ~cash:portfolio.cash ~current_date ~peak_tracker ~audit_recorder
-  in
-  let stop_exited_ids = _trigger_exit_ids_of exit_transitions in
-  let force_exit_ts =
-    _filter_out_exited_ids stop_exited_ids raw_force_exit_ts
-  in
-  let is_friday =
-    Weinstein_strategy_screening.is_screening_day_view index_view
-  in
+let _run_stage3_force_exit ~config ~positions ~last_stop_out_dates
+    ~prior_stage_ma_values ~stage3_streaks ~get_price ~prior_stages ~is_friday
+    ~stop_exited_ids ~current_date =
   let stage3_ts =
     if config.enable_stage3_force_exit then
       Stage3_force_exit_runner.update ~config:config.stage3_force_exit_config
@@ -182,6 +169,48 @@ let _run_special_exits ~config ~positions ~last_stop_out_dates
       (_record_force_exit ~last_stop_out_dates ~positions ~current_date
          ~cooldown_weeks:config.stage3_reentry_cooldown_weeks
          ~label:"stage3_force_exit");
+  stage3_ts
+
+(* Emit the exit-side audit (incl. MFE/MAE) for a list of [TriggerExit]
+   transitions, mirroring the stops pass. Without this, stage3-force-exit,
+   laggard-rotation, and force-liquidation exits carry no [exit_decision] and
+   their excursion metrics default to 0.0 (a no-op on non-[TriggerExit]
+   transitions, so it is safe to pipe any list through). Must run while
+   [positions] still holds the position (before the exit transition applies). *)
+let _emit_exit_audit_for ~config ~audit_recorder ~prior_macro_result ~bar_reader
+    ~prior_stages ~positions ts =
+  List.iter ts
+    ~f:
+      (Exit_audit_capture.emit_exit_audit ~audit_recorder ~prior_macro_result
+         ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
+         ~bar_reader ~prior_stages ~positions)
+
+let _run_special_exits ~config ~positions ~last_stop_out_dates
+    ~(portfolio : Portfolio_view.t) ~get_price ~peak_tracker ~audit_recorder
+    ~prior_macro_result ~prior_stages ~prior_stage_ma_values ~stage3_streaks
+    ~laggard_streaks ~bar_reader ~index_view ~exit_transitions ~current_date =
+  let emit_audit =
+    _emit_exit_audit_for ~config ~audit_recorder ~prior_macro_result ~bar_reader
+      ~prior_stages ~positions
+  in
+  let raw_force_exit_ts =
+    Force_liquidation_runner.update
+      ~config:config.portfolio_config.force_liquidation ~positions ~get_price
+      ~cash:portfolio.cash ~current_date ~peak_tracker ~audit_recorder
+  in
+  let stop_exited_ids = _trigger_exit_ids_of exit_transitions in
+  let force_exit_ts =
+    _filter_out_exited_ids stop_exited_ids raw_force_exit_ts
+  in
+  let is_friday =
+    Weinstein_strategy_screening.is_screening_day_view index_view
+  in
+  let stage3_ts =
+    _run_stage3_force_exit ~config ~positions ~last_stop_out_dates
+      ~prior_stage_ma_values ~stage3_streaks ~get_price ~prior_stages ~is_friday
+      ~stop_exited_ids ~current_date
+  in
+  emit_audit stage3_ts;
   let stage3_exited_ids = _trigger_exit_ids_of stage3_ts in
   let force_exit_ts = _filter_out_exited_ids stage3_exited_ids force_exit_ts in
   let laggard_ts =
@@ -190,8 +219,10 @@ let _run_special_exits ~config ~positions ~last_stop_out_dates
       ~skip_ids:(Set.union stop_exited_ids stage3_exited_ids)
       ~current_date
   in
+  emit_audit laggard_ts;
   let laggard_exited_ids = _trigger_exit_ids_of laggard_ts in
   let force_exit_ts = _filter_out_exited_ids laggard_exited_ids force_exit_ts in
+  emit_audit force_exit_ts;
   ( force_exit_ts,
     stage3_ts,
     laggard_ts,
@@ -330,7 +361,7 @@ let _process_market_day ~fold_start_date ~config ~ad_bars ~stop_states
         stage3_exited_ids,
         laggard_exited_ids ) =
     _run_special_exits ~config ~positions ~last_stop_out_dates ~portfolio
-      ~get_price ~peak_tracker ~audit_recorder ~prior_stages
+      ~get_price ~peak_tracker ~audit_recorder ~prior_macro_result ~prior_stages
       ~prior_stage_ma_values ~stage3_streaks ~laggard_streaks ~bar_reader
       ~index_view ~exit_transitions ~current_date
   in

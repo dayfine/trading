@@ -41,6 +41,8 @@ type exit_event = {
   stage_at_exit : Weinstein_types.stage;
   rs_trend_at_exit : Weinstein_types.rs_trend option;
   distance_from_ma_pct : float;
+  max_favorable_excursion_pct : float;
+  max_adverse_excursion_pct : float;
 }
 
 type cascade_event = {
