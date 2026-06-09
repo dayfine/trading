@@ -58,12 +58,47 @@ as the follow-up.**
 3. **n_trials is small** (1 variant) so DSR deflation is light; the 0.995 edge
    is modest and not gate-backed.
 
-**Verdict: Inconclusive.** The laggard verdict is **not universe-invariant** —
-its sign flips from SP500 (laggard helps) to top-1000 (laggard-off has higher
-central Sharpe/DSR), confirming the breadth-sensitivity the §4 audit flagged.
-But on top-1000 the flip is gate-failing and fat-tail-driven, so it is **not a
-clean ACCEPT to flip the laggard default**. Keep laggard ON as default; record
-the reversal; confirm on top-3000 once the infra is unblocked.
+**Verdict (top-1000): Inconclusive.** The apparent flip is gate-failing and
+fat-tail-driven — not a clean accept. Confirm on top-3000. **→ See §3: the
+top-3000 confirmation REFUTES this reversal.**
+
+## 3. top-3000 confirmation — the reversal was fat-tail noise (REJECT)
+
+Once the fork-per-fold fix (#1494) made N=3000 WF-CV tractable, re-ran the same
+surface on **top-3000-2011 PIT** (15 WF folds, yearly step, 2011-2026):
+
+| variant | Sharpe μ ± σ | Calmar | MaxDD | DSR | Pareto |
+|---|---|---|---|---|---|
+| baseline (laggard **ON**) | **0.643** ± 1.04 | **1.382** | **14.79** | **0.9988** | **frontier** |
+| laggard **OFF** | 0.489 ± 1.09 | 1.295 | 16.51 | 0.9886 | **dominated** |
+
+On the **broadest** universe, laggard-ON **dominates** on every axis (higher
+Sharpe + Calmar + DSR, *lower* MaxDD); laggard-OFF is **off the Pareto frontier**
+and wins only **6/15** folds. This is the **opposite** of top-1000.
+
+**Conclusion across the breadth ladder:**
+- SP500 (≤506): laggard helps (disabling hurts) — prior REJECT.
+- top-1000: laggard-OFF higher *mean* — but fat-tail-driven (one +153pp fold),
+  gate-fail → Inconclusive.
+- **top-3000: laggard-ON clearly dominates** — laggard helps, *strengthened*.
+
+The top-1000 "reversal" was **fat-tail noise**, not a real breadth effect (the
+same fat-tail dynamic that inflated the broad-universe headline,
+`project_broad_universe_790_mtm_inflated`). **The laggard-rotation REJECT (of
+disabling) HOLDS and strengthens on the broad universe → keep laggard ON.** The
+candidate-supply-sensitivity hypothesis is **refuted**: laggard rotation is
+robustly beneficial across SP500 → top-3000.
+
+This is exactly what the discipline is for — testing a *surface across folds +
+DSR* (not a single point) caught what the top-1000 single-comparison + the
+fat-tail would have misled into a wrong "laggard flips on broad" conclusion.
+
+*(Gate SKIPPED on a spec typo — gate `n=14` vs generated 15 folds; the verdict
+rests on the Pareto+DSR ranking, which is unambiguous. A finer-geometry
+(step=182) re-run would add folds but cannot change the dominance.)*
+
+Ledger: `dev/experiments/_ledger/2026-06-09-laggard-broad-recheck-top3000.sexp`
+(Reject). Artifacts: `dev/experiments/laggard-broad-recheck-top3000-2026-06-09/`.
 
 ## Follow-ups
 - **top-3000 WF-CV** (batched parallel=1, or bigger container) — the real test;
