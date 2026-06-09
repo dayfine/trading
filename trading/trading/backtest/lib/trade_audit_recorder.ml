@@ -75,13 +75,14 @@ let _entry_decision_of_event (e : AR.entry_event) : Trade_audit.entry_decision =
 
 (** Translate one {!AR.exit_event} into a {!Trade_audit.exit_decision}.
 
-    The during-hold counters ([max_favorable_excursion_pct],
-    [max_adverse_excursion_pct], [weeks_macro_was_bearish],
-    [weeks_stage_left_2]) are filled with sensible defaults — populating them
-    requires per-step instrumentation through the simulator's step stream, which
-    is deferred to a follow-up PR. The state-at-decision fields (macro / stage /
-    rs / distance_from_ma) are populated from the strategy's snapshot captured
-    at the moment the [TriggerExit] fired. *)
+    [max_favorable_excursion_pct] / [max_adverse_excursion_pct] are now computed
+    at exit-capture time (over the hold's weekly-bar high/low vs entry price)
+    and threaded through verbatim. The remaining during-hold counters
+    ([weeks_macro_was_bearish], [weeks_stage_left_2]) still require per-step
+    instrumentation through the simulator's step stream and stay at [0] until a
+    follow-up wires them. The state-at-decision fields (macro / stage / rs /
+    distance_from_ma) are populated from the strategy's snapshot captured at the
+    moment the [TriggerExit] fired. *)
 let _exit_decision_of_event (e : AR.exit_event) : Trade_audit.exit_decision =
   {
     symbol = e.symbol;
@@ -93,8 +94,8 @@ let _exit_decision_of_event (e : AR.exit_event) : Trade_audit.exit_decision =
     stage_at_exit = e.stage_at_exit;
     rs_trend_at_exit = e.rs_trend_at_exit;
     distance_from_ma_pct = e.distance_from_ma_pct;
-    max_favorable_excursion_pct = 0.0;
-    max_adverse_excursion_pct = 0.0;
+    max_favorable_excursion_pct = e.max_favorable_excursion_pct;
+    max_adverse_excursion_pct = e.max_adverse_excursion_pct;
     weeks_macro_was_bearish = 0;
     weeks_stage_left_2 = 0;
   }
