@@ -44,3 +44,20 @@ trailing stop is the SOLE Pareto-frontier cell (Sharpe 0.679/Calmar 1.631/DSR
 (likely why the 6 S3-exit dials were rejected). First net-positive broad-universe
 mechanism change, and it's a REMOVAL. Modest/concentrated edge (1/15 fold-wins) ->
 needs a confirmation grid before promotion. Note: stage-2x2-2026-06-09.
+
+---
+**Confirmation grid -> REJECT for promotion (2026-06-09).** Ran the on/off surface
+across 3 cells: A=top-3000 2011-26 (the source surface), B=sp500-510 deep 2000-10
+(dot-com+GFC, CSV mode), C=top-1000 2011-26 (same period, narrower breadth).
+**force_exit_off wins only 1/3 cells** (needs >=2/3): A it dominates but on ~1/15
+folds; **B it is a complete NO-OP** (bit-identical across all 11 folds — the S3
+force-exit never fires differently in a bear-heavy regime, trailing stop + macro
+gate exit first); **C it REVERSES** (Sharpe 0.394<0.418, DSR 0.9268<0.9378, 0/15
+wins, only 2/15 folds differ). The Cell-A win is top-3000-breadth-specific +
+fat-tail-concentrated — same breadth-reversal signature as
+[[project_laggard_broad_recheck]]. **`enable_stage3_force_exit` stays DEFAULT-ON**;
+force_exit_off remains a default-off axis (never *badly* dominated — on the
+frontier in all 3 — but not grid-robust). The 2x2's "first net-positive broad
+change" headline was a single-surface artifact. Ledger:
+2026-06-09-stage3-force-exit-off-confirmation-grid (Reject). Note:
+stage3-force-exit-grid-2026-06-09.
