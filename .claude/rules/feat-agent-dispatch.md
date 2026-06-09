@@ -119,6 +119,11 @@ must include the new row in `_index.md` (the orchestrator has no
 other signal to invent one). For an existing row, never touch the
 index from a feature PR.
 
+**Terseness contract:** when you add a new row (the exception above), the
+`Next task` cell must be **one line, <= 160 chars** — the single most concrete
+pending item. The `index_size_linter.sh` CI check fails if any table row
+exceeds 250 chars. History and rationale stay in the per-track status file.
+
 ## What this file does NOT include
 
 Things the orchestrator does that I have NOT extracted here, because
@@ -140,3 +145,4 @@ in interactive mode:
 
 These remain in `lead-orchestrator.md` for unattended overnight use
 and stay out of the interactive-mode discipline list.
+
