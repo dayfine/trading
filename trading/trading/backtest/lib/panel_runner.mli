@@ -49,6 +49,7 @@ val run :
   ?trace:Trace.t ->
   ?gc_trace:Gc_trace.t ->
   ?bar_data_source:Bar_data_source.t ->
+  ?shared_panels:Snapshot_runtime.Daily_panels.t ->
   ?progress_emitter:Backtest_progress.emitter ->
   ?slippage_bps:int ->
   ?cost_model:Backtest_cost_model.Cost_model.t ->
@@ -120,6 +121,26 @@ val run :
     in-process or supplied externally. See
     `dev/notes/path-dependent-regression-848-investigation-2026-05-05.md` for
     the path-dependence surface this rewiring closes.
+
+    [shared_panels], when [Some p], makes the run read through a caller-owned
+    [Snapshot_runtime.Daily_panels.t] instead of allocating (and closing) a
+    fresh one. The caller owns the lifecycle: [run] neither creates nor
+    {!Snapshot_runtime.Daily_panels.close}s the cache. An in-process caller that
+    issues several [run] calls against the same handle reuses the first run's
+    decode instead of re-decoding (pinned by
+    [test_shared_panels_reused_across_backtests]). Only valid with
+    [bar_data_source = Some (Snapshot {...})] whose [snapshot_dir]/[manifest]
+    match the panels.
+
+    The broad-universe walk-forward path (see
+    {!Walk_forward.Walk_forward_executor}) passes a parent-owned handle so each
+    forked fold reads through it without closing it; on that path the per-fold
+    [misses_per_symbol = 1.00] is expected and harmless because each fold runs
+    in its OWN child process whose exit resets the [VMAllocationTracker] slab
+    and reclaims the heap — the RSS / crash safety comes from that fork
+    isolation, not from cross-fold cache reuse. [None] (the default) is
+    byte-identical to the prior per-run create/close behaviour — every existing
+    caller is unaffected.
 
     [cost_model], when passed, threads a {!Backtest_cost_model.Cost_model.t}
     overlay through the simulator on two surfaces:

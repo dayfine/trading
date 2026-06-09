@@ -7,6 +7,67 @@ IN_PROGRESS
 
 ### Recent activity (2026-06-09)
 
+- **[x] N=3000 walk-forward parallel=1 crash fixed — fork-per-fold for
+  the broad-universe snapshot path** (branch
+  `feat/backtest-wf-cache-reuse`). The `--snapshot-dir` WF runner
+  crashed at `--parallel 1` on N=3000 after ~13 folds with a Rosetta
+  `VmTracker slab allocator has run out of memory`
+  (`VMAllocationTracker.cpp:659`, exit 133): each fold's
+  `run_backtest` created **and closed** its own `Daily_panels` decode
+  cache, so every fold re-decoded all ~3015 symbols
+  (`misses_per_symbol = 1.00` logged on *every* fold). The cumulative
+  ~3015×N-folds fresh VM allocations exhaust the process's fixed
+  `VMAllocationTracker` slab; separately, the known ~25 MB/backtest
+  GC-uncollectible residue scales to ~340 MB/fold at N=3000 and OOMs
+  the 7.8 GB container across ~29 folds even with an in-process shared
+  cache.
+  - Root cause confirmed (diagnose loop, not assumed): reproduced the
+    crash, instrumented per-fold cache stats + RSS. Per-fold cache
+    `misses=3015 evictions=0` confirmed full rebuild each fold; RSS
+    sawtoothed to ~5.8 GB/fold with a ~340 MB/fold inter-fold floor
+    creep (the residue), so an in-process shared cache alone OOMs.
+  - Fix: for the broad-universe path (`bar_data_source = Snapshot` ∧
+    `parallel = 1`), the executor now runs each fold in its own forked
+    child via new `Fork_pool.run_each_forked` (one child at a time —
+    the parallel>1 path already forks, but runs ≥2 concurrent N=3000
+    caches which itself OOMs). Each fold's decode + transient heap +
+    the GC-residue live and **die with the child**, and the child's
+    exit also resets the `VMAllocationTracker` slab. Only one child's
+    transient is resident at a time → peak single-process RSS ~5.2 GB,
+    well under the 7.8 GB ceiling; the parent stays ~40 MB.
+  - Surface:
+    - `fork_pool.{ml,mli}` — new `run_each_forked` (forks each job in
+      its own child sequentially, parent persists; distinct from
+      `run_parallel ~parallel:1`'s in-process fast path).
+    - `walk_forward_executor.{ml,mli}` — `execute_spec` builds a
+      parent-owned `Daily_panels` via the new
+      `Bar_data_source.build_shared_panels` and runs folds via
+      `run_each_forked` when Snapshot+parallel=1; closes the handle once
+      after the grid (`Exn.protect`). The per-fold `Gc.compact` is
+      skipped on the forked path (the child exit reclaims it).
+    - `bar_data_source.{ml,mli}` — `build_shared_panels` /
+      `close_shared_panels` (a caller-owned cache; in-process callers
+      get true cross-call decode reuse).
+    - `panel_runner.{ml,mli}` + `runner.{ml,mli}` — `?shared_panels`
+      threaded through `run` / `run_backtest`: read through a
+      caller-owned cache without closing it. `None` (the default) is
+      byte-identical to the prior per-run create/close path.
+  - Tests:
+    `test_walk_forward_snapshot_parity.ml` gains
+    `test_shared_panels_reused_across_backtests` — two backtests over
+    one shared `Daily_panels` decode each symbol once (second run adds
+    zero misses; `evictions = 0`). Existing snapshot/CSV parity +
+    flag-off tests still pass (signature additions are default-off).
+  - Verify (acceptance): the full 29-fold × 2-variant N=3000 WF at
+    `--parallel 1` completes without the VMTracker crash and writes
+    `aggregate.sexp` + `fold_actuals.sexp`:
+    `SNAPSHOT_CACHE_MB=4096 dune exec
+    trading/backtest/walk_forward/bin/walk_forward_runner.exe --
+    --spec <rolling-29-fold-spec> --snapshot-dir <top3000-snapshot>
+    --parallel 1 --out-dir <out>`. `misses_per_symbol = 1.00` per fold
+    is expected and harmless on the forked path (each fold is an
+    isolated child). Unblocks broad-PIT WF-CV.
+
 - **[x] `walk_forward_runner.exe --snapshot-dir`** (branch
   `feat/backtest-wf-snapshot`). Threads a `Backtest.Bar_data_source.t`
   through `Walk_forward.Walk_forward_executor` into every fold's

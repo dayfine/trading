@@ -42,6 +42,7 @@ module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
 module Snapshot_format = Data_panel_snapshot.Snapshot_format
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 module Pipeline = Snapshot_pipeline.Pipeline
+module Daily_panels = Snapshot_runtime.Daily_panels
 
 (* ---- Test tunables (named so the magic-number linter sees no surprises) ---- *)
 
@@ -300,6 +301,70 @@ let test_flag_off_is_byte_identical_to_none _ =
   let explicit_none = _stub_aggregate ?bar_data_source:None () in
   assert_that explicit_none (equal_to omitted)
 
+(* ---- §3 Shared-panel cache reuse across folds ---------------------- *)
+
+(* Sector-map override for the fixture universe so [run_backtest] trades over
+   exactly these symbols (one sector each) without touching [data/sectors.csv].
+   Mirrors what [Universe_file.to_sector_map_override] produces from the Pinned
+   universe written by [_write_universe]. *)
+let _fixture_sector_map () =
+  let tbl = Hashtbl.create (module String) in
+  List.iter _universe_symbols ~f:(fun s -> Hashtbl.set tbl ~key:s ~data:s);
+  tbl
+
+(* Run one fold's backtest in snapshot mode through a caller-owned shared cache.
+   The two adjacent test folds match [_make_spec]'s windows. *)
+let _run_fold_shared ~snapshot_dir ~manifest ~panels ~start ~end_ =
+  let _ : Backtest.Runner.result =
+    Backtest.Runner.run_backtest ~start_date:start ~end_date:end_
+      ~sector_map_override:(_fixture_sector_map ())
+      ~bar_data_source:(Bar_data_source.Snapshot { snapshot_dir; manifest })
+      ~shared_panels:panels ()
+  in
+  ()
+
+(* The load-bearing regression for the [~shared_panels] cache-reuse contract:
+   two backtests over the SAME shared [Daily_panels.t], in one process, must
+   decode each symbol only ONCE — the second backtest reads what the first
+   decoded. This is the in-process half of the broad-universe fix: the executor
+   forks each fold (so a fold's transient heap + the N=3000 GC-residue die with
+   the child), and within whichever process reads through a shared handle,
+   [Panel_runner.run] must NOT close the caller-owned cache, so a second read
+   reuses the first's decode instead of re-decoding.
+
+   Three exact invariants, each its own value + assert:
+   - The first backtest decodes a real working set: misses > 0 after fold-0.
+   - The second backtest adds ZERO new misses for symbols fold-0 already decoded
+     — a strictly-smaller delta than a full re-decode. The pre-fix path (each
+     backtest creates + CLOSES its own cache) would re-decode the whole set, so
+     the delta would equal the first backtest's misses.
+   - [evictions = 0] throughout, so the small fixture's working set never falls
+     out of the LRU (which would manufacture spurious re-decodes). *)
+let test_shared_panels_reused_across_backtests _ =
+  let _data_dir, snapshot_dir, manifest = _setup_dual_fixtures () in
+  let panels =
+    match
+      Bar_data_source.build_shared_panels
+        (Bar_data_source.Snapshot { snapshot_dir; manifest })
+    with
+    | Ok (Some p) -> p
+    | Ok None -> assert_failure "expected Some panels for Snapshot source"
+    | Error err ->
+        assert_failure ("build_shared_panels failed: " ^ Status.show err)
+  in
+  let run start end_ =
+    _run_fold_shared ~snapshot_dir ~manifest ~panels ~start ~end_
+  in
+  run (_ymd 2020 4 1) (_ymd 2020 8 1);
+  let misses_after_first = (Daily_panels.cache_stats panels).misses in
+  run (_ymd 2020 8 1) (_ymd 2020 12 1);
+  let stats = Daily_panels.cache_stats panels in
+  Daily_panels.close panels;
+  let second_run_miss_delta = stats.misses - misses_after_first in
+  assert_that misses_after_first (gt (module Int_ord) 0);
+  assert_that second_run_miss_delta (lt (module Int_ord) misses_after_first);
+  assert_that stats.evictions (equal_to 0)
+
 let suite =
   "Walk_forward_snapshot_parity"
   >::: [
@@ -307,6 +372,8 @@ let suite =
          >:: test_snapshot_csv_aggregate_parity;
          "test_flag_off_is_byte_identical_to_none"
          >:: test_flag_off_is_byte_identical_to_none;
+         "test_shared_panels_reused_across_backtests"
+         >:: test_shared_panels_reused_across_backtests;
        ]
 
 let () = run_test_tt_main suite
