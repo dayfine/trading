@@ -4,7 +4,12 @@ module Mat = Owl.Dense.Matrix.D
 
 (* Render a symbol's weekly close coloured by its programmatic Weinstein stage,
    overlaid on the 30-week MA, so the classifier can be eyeballed against the
-   chart. Usage: stage_chart <SYMBOL> <START> <END> <DATA_DIR> <OUT.png> *)
+   chart. Usage:
+     stage_chart <SYMBOL> <START> <END> <DATA_DIR> <OUT.png> [stage2_ma_hold]
+   The optional 6th arg, when set to "true"/"1"/"on", enables the default-off
+   [Stage.enable_stage2_ma_hold] refinement (holds a Stage-2 pullback that keeps
+   the MA, instead of demoting it to Stage 3) so the before/after stage churn
+   can be compared from the emitted .csv (the [stage] column). *)
 
 let stage_rgb = function
   | Weinstein_types.Stage1 _ -> (40, 90, 220) (* blue: basing *)
@@ -64,9 +69,9 @@ let load_weekly ~data_dir ~symbol ~end_date =
 
 (* Rolling stage classification: per week, classify the prefix [0..i] threading
    the prior stage. Returns (stage option array, MA-value array). *)
-let classify_series arr =
+let classify_series ?(enable_stage2_ma_hold = false) arr =
   let n = Array.length arr in
-  let cfg = Stage.default_config in
+  let cfg = { Stage.default_config with Stage.enable_stage2_ma_hold } in
   let stages = Array.create ~len:n None in
   let mas = Array.create ~len:n Float.nan in
   let prior = ref None in
@@ -114,13 +119,20 @@ let () =
   let end_date = Date.of_string argv.(3) in
   let data_dir = Fpath.v argv.(4) in
   let out = argv.(5) in
+  let enable_stage2_ma_hold =
+    Array.length argv > 6
+    &&
+    match String.lowercase argv.(6) with
+    | "true" | "1" | "on" -> true
+    | _ -> false
+  in
   let weekly =
     load_weekly ~data_dir ~symbol ~end_date
     |> List.filter ~f:(fun b -> Date.( >= ) b.Types.Daily_price.date start_date)
   in
   let arr = Array.of_list weekly in
   let n = Array.length arr in
-  let stages, mas = classify_series arr in
+  let stages, mas = classify_series ~enable_stage2_ma_hold arr in
   emit_csv ~out ~arr ~stages ~mas;
   Core_unix.putenv ~key:"QT_QPA_PLATFORM" ~data:"offscreen";
   let h = Plot.create out in

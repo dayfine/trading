@@ -646,6 +646,68 @@ let test_default_config_early_admission_none _ =
   assert_that default_config.early_admission_ma_period is_none
 
 (* ------------------------------------------------------------------ *)
+(* Stage-2 MA-hold refinement (default-off flag)                       *)
+(*                                                                      *)
+(* Drives [classify_with_callbacks] with a FLAT slow MA so the standard *)
+(* classifier reads a prior [Stage2] as a [Stage3] topping demotion     *)
+(* (the [_classify_flat_ma] path the refinement targets). The contract  *)
+(* is the CONTRAST between [enable_stage2_ma_hold = false] (default) and *)
+(* [true] on the SAME callbacks: when the close holds the MA the flag    *)
+(* keeps [Stage2]; when the close is below the MA the flag is inert and  *)
+(* the legitimate below-MA exit to [Stage3] still happens.              *)
+(* ------------------------------------------------------------------ *)
+
+let cfg_ma_hold = { default_config with enable_stage2_ma_hold = true }
+
+(** Pullback that HOLDS the MA: the close series ends at 110 (above the flat 100
+    MA). With the flag off the flat MA demotes a prior [Stage2] to [Stage3];
+    with the flag on it stays [Stage2] (advancing count incremented, prior
+    [late] flag preserved). The contrast IS the contract. *)
+let test_stage2_ma_hold_holds_pullback_above_ma _ =
+  let closes_above = Array.create ~len:40 110.0 in
+  let get_ma = make_get_ma_arr flat_slow_ma in
+  let get_close = make_get_close_arr closes_above in
+  let prior = Some (Stage2 { weeks_advancing = 9; late = true }) in
+  let off =
+    classify_with_callbacks ~config:default_config ~get_ma ~get_close
+      ~prior_stage:prior
+  in
+  let on =
+    classify_with_callbacks ~config:cfg_ma_hold ~get_ma ~get_close
+      ~prior_stage:prior
+  in
+  assert_that (off.stage, on.stage)
+    (all_of
+       [
+         field fst is_stage3;
+         field snd
+           (equal_to (Stage2 { weeks_advancing = 10; late = true } : stage));
+       ])
+
+(** Genuine below-MA break: the close series ends at 90 (below the flat 100 MA).
+    The flag is inert — both [false] and [true] demote the prior [Stage2] to
+    [Stage3], so the refinement never blocks a legitimate below-MA exit. *)
+let test_stage2_ma_hold_allows_below_ma_exit _ =
+  let closes_below = Array.create ~len:40 90.0 in
+  let get_ma = make_get_ma_arr flat_slow_ma in
+  let get_close = make_get_close_arr closes_below in
+  let prior = Some (Stage2 { weeks_advancing = 9; late = false }) in
+  let off =
+    classify_with_callbacks ~config:default_config ~get_ma ~get_close
+      ~prior_stage:prior
+  in
+  let on =
+    classify_with_callbacks ~config:cfg_ma_hold ~get_ma ~get_close
+      ~prior_stage:prior
+  in
+  assert_that (off.stage, on.stage)
+    (all_of [ field fst is_stage3; field snd (equal_to (off.stage : stage)) ])
+
+(** Default config leaves the flag off. *)
+let test_default_config_stage2_ma_hold_off _ =
+  assert_that default_config.enable_stage2_ma_hold (equal_to false)
+
+(* ------------------------------------------------------------------ *)
 (* Sexp round-trip: defaulted field tolerates omission                 *)
 (* ------------------------------------------------------------------ *)
 
@@ -658,7 +720,24 @@ let test_config_sexp_omitted_field_defaults_none _ =
        4) (confirm_weeks 6) (late_stage2_decel 0.5) (stage_method MaSlope))"
   in
   let cfg = config_of_sexp sexp in
-  assert_that cfg.early_admission_ma_period is_none
+  assert_that cfg
+    (all_of
+       [
+         field (fun c -> c.early_admission_ma_period) is_none;
+         field (fun c -> c.enable_stage2_ma_hold) (equal_to false);
+       ])
+
+(** A serialized [config] sexp that includes [(enable_stage2_ma_hold true)]
+    parses with the flag set. *)
+let test_config_sexp_stage2_ma_hold_parses _ =
+  let sexp =
+    Sexp.of_string
+      "((ma_period 30) (ma_type Wma) (slope_threshold 0.005) (slope_lookback \
+       4) (confirm_weeks 6) (late_stage2_decel 0.5) (stage_method MaSlope) \
+       (enable_stage2_ma_hold true))"
+  in
+  let cfg = config_of_sexp sexp in
+  assert_that cfg.enable_stage2_ma_hold (equal_to true)
 
 (** A serialized [config] sexp that includes [(early_admission_ma_period (13))]
     parses to [Some 13]. *)
@@ -722,8 +801,16 @@ let suite =
          >:: test_early_admission_slow_ma_stage2_unaffected;
          "test_default_config_early_admission_none"
          >:: test_default_config_early_admission_none;
+         "test_stage2_ma_hold_holds_pullback_above_ma"
+         >:: test_stage2_ma_hold_holds_pullback_above_ma;
+         "test_stage2_ma_hold_allows_below_ma_exit"
+         >:: test_stage2_ma_hold_allows_below_ma_exit;
+         "test_default_config_stage2_ma_hold_off"
+         >:: test_default_config_stage2_ma_hold_off;
          "test_config_sexp_omitted_field_defaults_none"
          >:: test_config_sexp_omitted_field_defaults_none;
+         "test_config_sexp_stage2_ma_hold_parses"
+         >:: test_config_sexp_stage2_ma_hold_parses;
          "test_config_sexp_present_field_parses"
          >:: test_config_sexp_present_field_parses;
        ]
