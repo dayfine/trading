@@ -747,9 +747,89 @@ let test_writer_reader_post_g2_round_trip _ =
               ]);
        ])
 
+(* --- Join tolerance + blob-format load (resurrection regression) -------
+
+   Two latent breaks kept this report from working on real runs:
+   (1) the loader read a bare [audit_record list] but the runner persists a
+       full [audit_blob] envelope; and
+   (2) the audit<->round-trip join was an exact (symbol, entry_date) match, but
+       the audit carries the Friday decision date while trades.csv carries the
+       next-trading-day fill, so ~every trade failed to join and the entire
+       analysis layer (ratings / behavioural / Weinstein) rendered empty.
+   These tests pin both fixes. *)
+
+let test_row_matches_audit_with_off_by_one_date _ =
+  (* trades.csv fill date (Mon) is 3 days after the audit's Friday decision
+     date; the tolerant join must still attach the audit fields. *)
+  let trade = make_trade ~symbol:"AAPL" ~entry_date:(_date "2024-01-15") () in
+  let entry =
+    make_entry_decision ~symbol:"AAPL" ~entry_date:(_date "2024-01-12")
+      ~cascade_grade:Weinstein_types.A ~cascade_score:75 ()
+  in
+  let record = make_record entry (make_exit_decision ()) in
+  let report = TAR.render ~trade_audit:[ record ] ~trades:[ trade ] () in
+  assert_that report.rows
+    (elements_are
+       [
+         field
+           (fun (r : TAR.per_trade_row) -> r.cascade_grade)
+           (is_some_and (equal_to Weinstein_types.A));
+       ])
+
+let test_analysis_nonempty_with_off_by_one_date _ =
+  (* The key regression: with the off-by-one fill date, [rate_all] must still
+     match the audit so [analysis] is populated (was silently [None]). *)
+  let trade = make_trade ~symbol:"AAPL" ~entry_date:(_date "2024-01-15") () in
+  let entry =
+    make_entry_decision ~symbol:"AAPL" ~entry_date:(_date "2024-01-12") ()
+  in
+  let record = make_record entry (make_exit_decision ()) in
+  let report = TAR.render ~trade_audit:[ record ] ~trades:[ trade ] () in
+  assert_that report.analysis
+    (is_some_and (field (fun (a : TAR.analysis) -> a.ratings) (size_is 1)))
+
+let _write_blob_audit_sexp path =
+  let aapl =
+    make_record
+      (make_entry_decision ~symbol:"AAPL" ~entry_date:(_date "2020-04-25")
+         ~position_id:"AAPL-1" ~cascade_grade:Weinstein_types.A
+         ~cascade_score:80 ())
+      (make_exit_decision ~symbol:"AAPL" ~exit_date:(_date "2020-08-01")
+         ~position_id:"AAPL-1" ())
+  in
+  let blob : TA.audit_blob =
+    { audit_records = [ aapl ]; cascade_summaries = [] }
+  in
+  Sexp.save_hum path (TA.sexp_of_audit_blob blob)
+
+let test_load_reads_blob_format_audit _ =
+  (* The runner persists the [audit_blob] envelope; the loader must parse it
+     (not only the legacy bare-list format). *)
+  let dir = Core_unix.mkdtemp "/tmp/trade_audit_report_" in
+  let scenario_dir = Filename.concat dir "blob-scenario" in
+  Core_unix.mkdir_p scenario_dir;
+  _write_trades_csv (Filename.concat scenario_dir "trades.csv");
+  _write_summary_sexp (Filename.concat scenario_dir "summary.sexp");
+  _write_blob_audit_sexp (Filename.concat scenario_dir "trade_audit.sexp");
+  let report = TAR.load ~scenario_dir in
+  assert_that report
+    (field
+       (fun (t : TAR.t) ->
+         List.find t.rows ~f:(fun (r : TAR.per_trade_row) ->
+             String.equal r.symbol "AAPL"))
+       (is_some_and
+          (field
+             (fun (r : TAR.per_trade_row) -> r.cascade_grade)
+             (is_some_and (equal_to Weinstein_types.A)))))
+
 let suite =
   "Trade_audit_report"
   >::: [
+         "row matches audit with off-by-one date"
+         >:: test_row_matches_audit_with_off_by_one_date;
+         "analysis non-empty with off-by-one date"
+         >:: test_analysis_nonempty_with_off_by_one_date;
+         "load reads blob-format audit" >:: test_load_reads_blob_format_audit;
          "header counts winners and losers"
          >:: test_header_counts_winners_and_losers;
          "header empty trades" >:: test_header_empty_trades;
