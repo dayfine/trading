@@ -25,9 +25,15 @@ findings).
 | PR | What | Status |
 |---|---|---|
 | **#1504** | Resurrect `trade_audit_report` — blob-load + tolerant audit join (4 exact-date join sites → ±7d nearest). 3 regression tests. | **MERGED** (3 gates green) |
-| **`wip/trade-audit-mfe-mae`** | Compute MFE/MAE at exit-capture (the dead metric). Fields added to `Audit_recorder.exit_event`, computed in `exit_audit_capture._excursions`, threaded through the bridge. Unit test passes. | **WIP — DO NOT MERGE** (undercounting bug, below) |
-| PR-3 | Post-exit capture-ratio (did the stock keep ripping after we sold?) | not started — **blocked on PR-2** |
+| **#1506** | Compute MFE/MAE at exit-capture + audit ALL exit paths. | **MERGED** (3 gates green) |
+| PR-3 | Post-exit capture-ratio (did the stock keep ripping after we sold?) | not started — **unblocked** (PR-2 done) |
 | PR-4 | Auto-render `stage_chart` for top-impact trades + wrap workflow as a skill | not started |
+
+### PR-2 (#1506) — DONE. The two real bugs behind the undercounting:
+1. The excursion math used `daily_bars_for` (bounded resident window) → switched to `weekly_bars_for ~n` (controlled lookback).
+2. **The real one:** `emit_exit_audit` was only wired into the stops pass; **stage3 / laggard / force-liq exits (all `TriggerExit`) were never audited** → ~60% of exits (70/112 winners) had no `exit_decision` → MFE defaulted to 0.0 → `avg left on the table` went provably-impossibly negative (−7.66pp). Fixed by emitting exit audit on all exit paths in `_run_special_exits`.
+
+Verified: avg-left-on-table **−7.66 → +7.05** (correct sign for longs), max MFE **0.49 → 1.74** (matches BA's true ~1.76). The original WIP-bug section below is retained for the record.
 
 ## PR-2 bug to fix (branch `wip/trade-audit-mfe-mae`, commit c8f2c8c1)
 MFE/MAE are now wired end-to-end and non-zero, but **severely undercounted**.
