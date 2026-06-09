@@ -334,21 +334,40 @@ let rate ~config (record : TA.audit_record)
 
 (* Joining audit + trades -------------------------------------------------- *)
 
+(** Max calendar-day gap tolerated when joining a [trades.csv] round-trip to its
+    audit record (and back). The audit [entry_date] is the Friday decision date;
+    the round-trip [entry_date] is the actual fill (next trading day), so the
+    two differ by 1-3 days across a weekend. A week bridges that without
+    cross-matching a distinct re-entry of the same symbol. Kept in sync with
+    [Trade_audit_report]'s join tolerance. *)
+let _join_tolerance_days = 7
+
+(* From [candidates] sharing a symbol, return the one whose [date_of] is closest
+   to [entry_date], within [_join_tolerance_days]. *)
+let _nearest_within ~entry_date ~date_of candidates =
+  List.filter_map candidates ~f:(fun c ->
+      let gap = Int.abs (Date.diff (date_of c) entry_date) in
+      if gap <= _join_tolerance_days then Some (gap, c) else None)
+  |> List.min_elt ~compare:(fun (g1, _) (g2, _) -> Int.compare g1 g2)
+  |> Option.map ~f:snd
+
 let _audit_index audit =
   List.fold audit
     ~init:(Map.empty (module String))
     ~f:(fun acc (record : TA.audit_record) ->
-      let key =
-        record.entry.symbol ^ "|" ^ Date.to_string record.entry.entry_date
-      in
-      Map.set acc ~key ~data:record)
+      Map.add_multi acc ~key:record.entry.symbol ~data:record)
 
 let rate_all ~config ~audit ~trades =
   let idx = _audit_index audit in
   List.filter_map trades
     ~f:(fun (t : Trading_simulation.Metrics.trade_metrics) ->
-      let key = t.symbol ^ "|" ^ Date.to_string t.entry_date in
-      Option.map (Map.find idx key) ~f:(fun record -> rate ~config record t))
+      match Map.find idx t.symbol with
+      | None -> None
+      | Some records ->
+          _nearest_within ~entry_date:t.entry_date
+            ~date_of:(fun (r : TA.audit_record) -> r.entry.entry_date)
+            records
+          |> Option.map ~f:(fun record -> rate ~config record t))
 
 (* Behavioural metric (a) — over-trading ---------------------------------- *)
 
@@ -436,15 +455,22 @@ let _exit_winners ~config ~ratings ~trades : exit_winners_too_early =
     List.fold trades
       ~init:(Map.empty (module String))
       ~f:(fun acc (t : Trading_simulation.Metrics.trade_metrics) ->
-        Map.set acc ~key:(t.symbol ^ "|" ^ Date.to_string t.entry_date) ~data:t)
+        Map.add_multi acc ~key:t.symbol ~data:t)
   in
   let winners = List.filter ratings ~f:(fun r -> equal_outcome r.outcome Win) in
   let realized_pct (r : rating) =
-    let key = r.symbol ^ "|" ^ Date.to_string r.entry_date in
-    match Map.find trade_idx key with
-    | Some (t : Trading_simulation.Metrics.trade_metrics) ->
-        t.pnl_percent /. 100.0
+    match Map.find trade_idx r.symbol with
     | None -> 0.0
+    | Some trades -> (
+        match
+          _nearest_within ~entry_date:r.entry_date
+            ~date_of:(fun (t : Trading_simulation.Metrics.trade_metrics) ->
+              t.entry_date)
+            trades
+        with
+        | Some (t : Trading_simulation.Metrics.trade_metrics) ->
+            t.pnl_percent /. 100.0
+        | None -> 0.0)
   in
   let gaps = List.map winners ~f:(fun r -> (r, r.mfe_pct -. realized_pct r)) in
   let flagged =
@@ -541,8 +567,14 @@ let _quartile_assignments_by_score ~audit (ratings : rating list) :
   let idx = _audit_index audit in
   let with_score =
     List.filter_map ratings ~f:(fun (r : rating) ->
-        let key = r.symbol ^ "|" ^ Date.to_string r.entry_date in
-        Option.map (Map.find idx key) ~f:(fun a -> (r, a.entry.cascade_score)))
+        match Map.find idx r.symbol with
+        | None -> None
+        | Some records ->
+            _nearest_within ~entry_date:r.entry_date
+              ~date_of:(fun (a : TA.audit_record) -> a.entry.entry_date)
+              records
+            |> Option.map ~f:(fun (a : TA.audit_record) ->
+                (r, a.entry.cascade_score)))
   in
   let sorted_desc =
     List.sort with_score ~compare:(fun (_, sa) (_, sb) -> Int.compare sb sa)

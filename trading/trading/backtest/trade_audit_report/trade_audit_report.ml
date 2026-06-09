@@ -68,14 +68,33 @@ type t = {
 
 (* Render ----------------------------------------------------------------- *)
 
+(** Max calendar-day gap tolerated when joining a [trades.csv] round-trip to its
+    audit record. The audit [entry_date] is the Friday decision date; the
+    round-trip [entry_date] is the actual fill (next trading day), so the two
+    differ by 1-3 days across a weekend. A week is wide enough to bridge that
+    without cross-matching a distinct re-entry of the same symbol. *)
+let _audit_join_tolerance_days = 7
+
+(* Group audit records by symbol so the join can match the round-trip's fill
+   date to the nearest decision date within [_audit_join_tolerance_days]. *)
 let _audit_index audit =
   List.fold audit
     ~init:(Map.empty (module String))
     ~f:(fun acc (record : TA.audit_record) ->
-      let key =
-        record.entry.symbol ^ "|" ^ Date.to_string record.entry.entry_date
-      in
-      Map.set acc ~key ~data:record)
+      Map.add_multi acc ~key:record.entry.symbol ~data:record)
+
+(* Find the audit record for [symbol] whose decision date is closest to the
+   round-trip [entry_date], within tolerance. Returns [None] when the symbol has
+   no audit record or the nearest one is too far away. *)
+let _find_audit audit_idx ~symbol ~entry_date =
+  match Map.find audit_idx symbol with
+  | None -> None
+  | Some records ->
+      List.filter_map records ~f:(fun (r : TA.audit_record) ->
+          let gap = Int.abs (Date.diff r.entry.entry_date entry_date) in
+          if gap <= _audit_join_tolerance_days then Some (gap, r) else None)
+      |> List.min_elt ~compare:(fun (g1, _) (g2, _) -> Int.compare g1 g2)
+      |> Option.map ~f:snd
 
 let _exit_trigger_label (trigger : Stop_log.exit_trigger) =
   match trigger with
@@ -90,8 +109,9 @@ let _exit_trigger_label (trigger : Stop_log.exit_trigger) =
 
 let _row_of_trade audit_idx (trade : Trading_simulation.Metrics.trade_metrics) :
     per_trade_row =
-  let key = trade.symbol ^ "|" ^ Date.to_string trade.entry_date in
-  let audit = Map.find audit_idx key in
+  let audit =
+    _find_audit audit_idx ~symbol:trade.symbol ~entry_date:trade.entry_date
+  in
   let entry = Option.map audit ~f:(fun (r : TA.audit_record) -> r.entry) in
   let exit_ = Option.bind audit ~f:(fun (r : TA.audit_record) -> r.exit_) in
   let side =
@@ -453,8 +473,15 @@ let load ~scenario_dir : t =
   let trades = _read_trades_csv trades_path in
   let audit_path = Filename.concat scenario_dir "trade_audit.sexp" in
   let trade_audit =
-    if Sys_unix.file_exists_exn audit_path then
-      TA.audit_records_of_sexp (Sexp.load_sexp audit_path)
+    if Sys_unix.file_exists_exn audit_path then begin
+      let sexp = Sexp.load_sexp audit_path in
+      (* The runner persists a full [audit_blob] envelope ([audit_records] +
+         [cascade_summaries]); older runs persisted a bare [audit_record list].
+         Parse as a blob first and fall back to the bare list so both on-disk
+         formats load. *)
+      try (TA.audit_blob_of_sexp sexp).audit_records
+      with _ -> TA.audit_records_of_sexp sexp
+    end
     else []
   in
   let summary =
