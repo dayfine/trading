@@ -15,7 +15,7 @@ Each row: one line; deeper task detail in the linked status file.
 |---|---|---|---|---|
 | [backtest-infra](backtest-infra.md) | MERGED | — | — | — |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
-| [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | worst-vol-decile prototype (regime-tag gated) + multi-start E2E run (data-gated, maintainer-local) |
+| [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | broad-PIT WF-CV now runs locally (#1491 snapshot-WF + #1494 fork-per-fold N=3000); worst-vol-decile prototype still regime-tag-gated |
 | [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | manual ghcr.io devcontainer rebuild (flambda) + Win #4 production wiring for active_through pruning |
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
@@ -26,7 +26,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — |
 | [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | track in steady state; Phase 3 verdict locked (marginal edge in 1 of 4 bear windows only) |
 | [spy-only-reference](spy-only-reference.md) | IN_PROGRESS | feat-weinstein | — | WF-CV on sector-rotation testbed; top-1000 bankability gate; long-short verification (human session) |
-| [stage-accuracy](stage-accuracy.md) | IN_PROGRESS | feat-weinstein | — | breadth/broad-universe is the lever (6 dials rejected); stale-exit promotion grid (data-gated) |
+| [stage-accuracy](stage-accuracy.md) | IN_PROGRESS | feat-weinstein | — | classifier oscillation diagnosed (false S3 on MA-holding pullbacks); Stage-2 MA-hold refinement (default-off) in flight → WF-CV on top-3000 |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | Tier 1 fully checked off; T3-H low-priority; no active dispatch surface |
@@ -36,10 +36,10 @@ Each row: one line; deeper task detail in the linked status file.
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
 | [screener](screener.md) | MERGED | — | — | — |
-| [simulation](simulation.md) | IN_PROGRESS | feat-backtest | — | stale-exit promotion grid (data-gated, maintainer-local); M5 walk-forward catch-all items |
+| [simulation](simulation.md) | IN_PROGRESS | feat-backtest | — | stale-exit promotion grid now runnable via WF-CV (#1491/#1494); M5 walk-forward + tuner catch-all items |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
-| [experiment-platform](experiment-platform.md) | IN_PROGRESS | feat-backtest | — | broad-universe lever (data-gated in GHA); lever-#2 regime/breadth candidates not yet built |
+| [experiment-platform](experiment-platform.md) | IN_PROGRESS | feat-backtest | — | broad-PIT WF-CV unblocked locally (#1491/#1494); laggard re-check done (top-3000 REJECT #1495); next: stage-debounce + stage3_force_exit on top-3000 |
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
