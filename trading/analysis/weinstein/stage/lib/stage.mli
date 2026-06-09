@@ -71,6 +71,31 @@ type config = {
           is expressible as a [Variant_matrix] axis. Not wired into any default
           config; awaits a surface-sweep ACCEPT per the experiment-flag
           discipline. *)
+  enable_stage2_ma_hold : bool; [@sexp.default false]
+      (** Default-off Stage-2 MA-hold refinement (see {!Stage2_ma_hold}).
+
+          [false] (default): no behavioural change — [classify] is bit-identical
+          to the pre-flag classifier on every input.
+
+          [true]: a held [Stage2] whose standard classification would demote to
+          [Stage3] (the "topping" flag the flat-MA branch raises on a normal
+          pullback) is held as a continued [Stage2]
+          {b while the current close is at/above the current MA}. This fixes a
+          diagnosed oscillation defect where a pullback that merely flattens the
+          30-week MA fragments one continuous Stage-2 advance into many short
+          stages with dozens of spurious transitions (KO 2010-2018). A genuine
+          break {b below} the MA still transitions out normally, so legitimate
+          Stage-3 / Stage-4 exits are preserved.
+
+          Faithful Weinstein, not a new mechanic: Stage 2 IS "price above a
+          rising 30-week MA" (docs/design/weinstein-book-reference.md §Stage 2:
+          Advancing); a pullback that holds the MA is still Stage 2, not a top.
+
+          Wired as a config field so it routes through [Overlay_validator] and
+          is expressible as a [Variant_matrix] axis (nested key path
+          [stage_config.enable_stage2_ma_hold]). Not wired into any default
+          config; awaits a surface-sweep ACCEPT per the experiment-flag
+          discipline. *)
 }
 [@@deriving sexp]
 (** Configuration for stage classification. All thresholds are configurable to

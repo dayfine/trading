@@ -24,6 +24,7 @@ type config = {
   late_stage2_decel : float;
   stage_method : stage_method;
   early_admission_ma_period : int option; [@sexp.default None]
+  enable_stage2_ma_hold : bool; [@sexp.default false]
 }
 [@@deriving sexp]
 
@@ -37,6 +38,7 @@ let default_config =
     late_stage2_decel = 0.5;
     stage_method = MaSlope;
     early_admission_ma_period = None;
+    enable_stage2_ma_hold = false;
   }
 
 (* ------------------------------------------------------------------ *)
@@ -332,30 +334,8 @@ let _count_above_ma_callback ~get_ma ~get_close ~confirm_weeks ~ma_depth :
   in
   loop 0 0 0
 
-(** Detect late Stage 2 via callbacks. Reads MA at three offsets:
-    [old = 2*slope_lookback - 1], [mid = slope_lookback - 1], [cur = 0]. All
-    three must be defined; otherwise returns [false] (matches the
-    [n < slope_lookback * 2] guard in the bar-list version). *)
-let _is_late_stage2_callback ~get_ma ~decel_threshold ~slope_lookback : bool =
-  let old_off = (2 * slope_lookback) - 1 in
-  let mid_off = slope_lookback - 1 in
-  match
-    ( get_ma ~week_offset:old_off,
-      get_ma ~week_offset:mid_off,
-      get_ma ~week_offset:0 )
-  with
-  | Some old_ma, Some mid_ma, Some cur_ma ->
-      let old_slope =
-        if Float.(old_ma = 0.0) then 0.0
-        else (mid_ma -. old_ma) /. Float.abs old_ma
-      in
-      let new_slope =
-        if Float.(mid_ma = 0.0) then 0.0
-        else (cur_ma -. mid_ma) /. Float.abs mid_ma
-      in
-      Float.(old_slope > 0.0)
-      && Float.(new_slope < old_slope *. (1.0 -. decel_threshold))
-  | _ -> false
+(* Late-Stage-2 detection lives in [Stage2_late] (extracted to keep this
+   declared-large coordinator under its line cap). *)
 
 (* ------------------------------------------------------------------ *)
 (* Default result for the empty / no-MA case                            *)
@@ -379,13 +359,20 @@ let _stage1_default_result : result =
     [classify_with_callbacks] so the latter stays a flat sequence of
     let-bindings. *)
 let _build_result ~current_ma ~ma_dir ~ma_slope_pct ~prior_stage ~above_ma_count
-    ~below_ma_count ~is_late ~early_admit ~confirm_weeks : result =
+    ~below_ma_count ~is_late ~early_admit ~enable_stage2_ma_hold ~current_close
+    ~confirm_weeks : result =
   let standard_stage =
     _classify_new_stage ~ma_dir ~prior_stage ~above_ma_count ~below_ma_count
       ~is_late ~confirm_weeks
   in
-  let new_stage =
+  let admitted_stage =
     Early_admission.apply ~early_admit ~prior_stage ~standard_stage
+  in
+  (* Stage-2 MA-hold refinement (default-off): a pullback that holds the MA
+     (close >= MA) stays Stage 2 rather than being demoted to Stage 3. *)
+  let new_stage =
+    Stage2_ma_hold.apply ~enabled:enable_stage2_ma_hold ~prior_stage
+      ~standard_stage:admitted_stage ~current_close ~current_ma
   in
   let transition = _detect_transition ~prior_stage ~new_stage in
   {
@@ -415,7 +402,7 @@ let _classify_signals ~config ~get_ma ~get_close ~prior_stage ~current_ma :
   in
   let below_ma_count = examined - above_ma_count in
   let is_late =
-    _is_late_stage2_callback ~get_ma ~decel_threshold:config.late_stage2_decel
+    Stage2_late.is_late_stage2 ~get_ma ~decel_threshold:config.late_stage2_decel
       ~slope_lookback:config.slope_lookback
   in
   let early_admit =
@@ -424,8 +411,11 @@ let _classify_signals ~config ~get_ma ~get_close ~prior_stage ~current_ma :
       ~slope_threshold:config.slope_threshold
       ~slope_lookback:config.slope_lookback
   in
+  let current_close = get_close ~week_offset:0 in
   _build_result ~current_ma ~ma_dir ~ma_slope_pct ~prior_stage ~above_ma_count
-    ~below_ma_count ~is_late ~early_admit ~confirm_weeks:config.confirm_weeks
+    ~below_ma_count ~is_late ~early_admit
+    ~enable_stage2_ma_hold:config.enable_stage2_ma_hold ~current_close
+    ~confirm_weeks:config.confirm_weeks
 
 let classify_with_callbacks ~config ~get_ma ~get_close ~prior_stage : result =
   match get_ma ~week_offset:0 with
