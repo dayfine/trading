@@ -32,3 +32,15 @@ This is a less-overfittable revival of the rejected exit-timing fix. Next: scan 
 symbols/eras to confirm the pattern generalizes, then implement a default-off
 price-below-MA confirmation gate on the Stage-2→3 transition. See
 `next-session-priorities-2026-06-03.md` P2. Related: [[project_sector_rotation_layer_attribution]].
+
+---
+**WF-CV outcome (2026-06-09, top-3000 2x2, #1500):** the chart-derived refinements
+went to walk-forward CV. **`enable_stage2_ma_hold` REJECTED** — it collapses the
+chart oscillation visually (KO 2010-13 -> one S2x160) but DEGRADES the strategy
+(Sharpe 0.643->0.486, off-frontier). **Visual stage-coherence != better returns.**
+**`enable_stage3_force_exit=false` INCONCLUSIVE-POSITIVE** — deferring exits to the
+trailing stop is the SOLE Pareto-frontier cell (Sharpe 0.679/Calmar 1.631/DSR
+0.9977 vs baseline 0.643/1.382/0.9964); confirms the S3 force-exit adds whipsaw
+(likely why the 6 S3-exit dials were rejected). First net-positive broad-universe
+mechanism change, and it's a REMOVAL. Modest/concentrated edge (1/15 fold-wins) ->
+needs a confirmation grid before promotion. Note: stage-2x2-2026-06-09.
