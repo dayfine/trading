@@ -1,0 +1,31 @@
+### inputs: trades=650 skip-records=11534
+### entry stage_kind:
+    554 breakout      99 early 
+
+===== (A) fwd-4w return by EXTENSION above 150dMA (held-weeks, adj-close) =====
+1:ext<0        n=138   median= +0.0083 mean= +0.0049
+2:ext0-10      n=1532  median= +0.0103 mean= +0.0098
+3:ext10-20     n=1379  median= +0.0021 mean= +0.0072
+4:ext20-30     n=515   median= -0.0033 mean= -0.0005
+5:ext30-50     n=368   median= +0.0115 mean= +0.0276
+6:ext>50       n=220   median= +0.0149 mean= +0.0183
+
+===== (A) fwd-4w return by WEEKS-SINCE-ENTRY =====
+1:wk0-4        n=1882  median= +0.0061 mean= +0.0080
+2:wk5-12       n=1218  median= +0.0029 mean= +0.0097
+3:wk13-26      n=806   median= +0.0105 mean= +0.0095
+4:wk27-52      n=242   median= +0.0179 mean= +0.0214
+5:wk53+        n=4     median= +0.0034 mean= -0.0070
+
+===== (A) fresh early-S2(wk0-4,early) vs mature-extended(wk27+,ext>20%) =====
+fresh-early    n=311   median= +0.0038 mean= +0.0115
+mature-ext     n=114   median= +0.0144 mean= +0.0259
+
+===== (B) OPPORTUNITY COST =====
+distinct insufficient-cash dates: 380
+skip-lookups=380 held-lookups=1879
+--- (B1) skipped-best vs AVG held capital (winsor mean + win%) ---
+matched=373  mean skipped=+0.0037  mean avg-held=+0.0101  %skip>held=48.0%
+--- (B2) skipped-best vs MOST-EXTENDED held (harvest target) ---
+matched=373  mean skipped=+0.0037  mean most-ext-held=+0.0216  %skip>ext-held=49.9%
+### done
