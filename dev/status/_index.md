@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-09 HEAD `479182be` (#1501; orchestrator reconcile — stage 2×2 verdicts #1500).
+Last updated: 2026-06-10 HEAD `d8867b8b` (#1508; orchestrator reconcile — force-exit grid REJECT #1503, trade-forensics #1504/#1506, cascade-inversion lead #1509).
 
 ## Active + complete tracks
 
@@ -26,7 +26,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — |
 | [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | track in steady state; Phase 3 verdict locked (marginal edge in 1 of 4 bear windows only) |
 | [spy-only-reference](spy-only-reference.md) | IN_PROGRESS | feat-weinstein | — | WF-CV on sector-rotation testbed; top-1000 bankability gate; long-short verification (human session) |
-| [stage-accuracy](stage-accuracy.md) | IN_PROGRESS | feat-weinstein | — | Stage-2 MA-hold REJECTED (#1500); P0 = stage3_force_exit=false confirmation grid (≥3 period×universe ctxs, incl. deep pre-2009) — data-gated in GHA |
+| [stage-accuracy](stage-accuracy.md) | IN_PROGRESS | feat-weinstein | #1509 | force_exit_off grid REJECTED for promotion (#1503); P0 cascade-selection inversion (Q1<Q4 win-rate) under validation (#1509) — broad-universe data-gated |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | Tier 1 fully checked off; T3-H low-priority; no active dispatch surface |
@@ -39,7 +39,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [simulation](simulation.md) | IN_PROGRESS | feat-backtest | — | stale-exit promotion grid now runnable via WF-CV (#1491/#1494); M5 walk-forward + tuner catch-all items |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
-| [experiment-platform](experiment-platform.md) | IN_PROGRESS | feat-backtest | — | stage 2×2 done (#1500): ma_hold REJECT, force-exit-off INCONCLUSIVE+ → P0 grid; next P1 continuation-buy recheck on top-3000 (data-gated) |
+| [experiment-platform](experiment-platform.md) | IN_PROGRESS | feat-backtest | — | force-exit-off grid REJECTED for promotion (#1503); single-dial surface exhausted; next: continuation-buy recheck on top-3000 (data-gated) |
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
