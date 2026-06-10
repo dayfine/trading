@@ -58,6 +58,7 @@ type position_state =
       exit_price : float;
       filled_quantity : float;
       started_date : Date.t;
+      risk_params : risk_params;
     }
   | Closed of {
       quantity : float;
@@ -101,6 +102,11 @@ type transition_kind =
   | EntryComplete of { risk_params : risk_params }
   | CancelEntry of { reason : string }
   | TriggerExit of { exit_reason : exit_reason; exit_price : float }
+  | TriggerPartialExit of {
+      exit_reason : exit_reason;
+      exit_price : float;
+      target_quantity : float;
+    }
   | UpdateRiskParams of { new_risk_params : risk_params }
   | ExitFill of { filled_quantity : float; fill_price : float }
   | ExitComplete
@@ -114,7 +120,9 @@ type transition = {
 [@@deriving show, eq]
 
 let trigger_of_kind = function
-  | CreateEntering _ | TriggerExit _ | UpdateRiskParams _ -> Strategy
+  | CreateEntering _ | TriggerExit _ | TriggerPartialExit _ | UpdateRiskParams _
+    ->
+      Strategy
   | EntryFill _ | EntryComplete _ | ExitFill _ | ExitComplete | CancelEntry _ ->
       Simulator
 
@@ -155,6 +163,21 @@ let _validate_no_fills filled =
     Error
       (Status.invalid_argument_error "Cannot cancel entry after fills occurred")
 
+(* A partial-exit target must lie in (0, held]. A target equal to [held] is a
+   full exit expressed via [TriggerPartialExit]; it closes on [ExitComplete]. *)
+let _validate_exit_target ~held target_quantity =
+  let in_range =
+    Float.(target_quantity > 0.0) && Float.(target_quantity <= held)
+  in
+  if in_range then Ok ()
+  else
+    let msg =
+      Printf.sprintf
+        "Exit target_quantity (%.2f) must be in (0, %.2f] (held quantity)"
+        target_quantity held
+    in
+    Error (Status.invalid_argument_error msg)
+
 let _validate_transition t transition =
   match (t.state, transition.kind) with
   | ( Entering { target_quantity; filled_quantity = curr_filled; _ },
@@ -171,6 +194,12 @@ let _validate_transition t transition =
       [ _validate_no_fills filled_quantity ]
   | Holding _, TriggerExit { exit_price; _ } ->
       [ _validate_positive "exit_price" exit_price ]
+  | ( Holding { quantity; _ },
+      TriggerPartialExit { exit_price; target_quantity; _ } ) ->
+      [
+        _validate_positive "exit_price" exit_price;
+        _validate_exit_target ~held:quantity target_quantity;
+      ]
   | Holding _, UpdateRiskParams _ -> []
   | ( Exiting { target_quantity; filled_quantity = curr_filled; _ },
       ExitFill { filled_quantity; fill_price } ) ->
@@ -298,18 +327,22 @@ let _apply_entering_transition t transition =
       _cancel_entry t ~date ~entry_price ~created_date
   | _, kind -> _invalid_transition kind
 
-let _trigger_exit t ~date ~quantity ~entry_price ~entry_date ~exit_reason
-    ~exit_price =
+(* Shared [Holding -> Exiting] builder. [target_quantity] is the resolved trim:
+   the full held [quantity] for a [TriggerExit], or the requested amount for a
+   [TriggerPartialExit]. *)
+let _trigger_exit t ~date ~quantity ~entry_price ~entry_date ~risk_params
+    ~exit_reason ~exit_price ~target_quantity =
   let state =
     Exiting
       {
         quantity;
         entry_price;
         entry_date;
-        target_quantity = quantity;
+        target_quantity;
         exit_price;
         filled_quantity = 0.0;
         started_date = date;
+        risk_params;
       }
   in
   Ok { t with state; exit_reason = Some exit_reason; last_updated = date }
@@ -328,10 +361,15 @@ let _update_risk_params t ~date ~quantity ~entry_price ~entry_date
 let _apply_holding_transition t transition =
   let date = transition.date in
   match (t.state, transition.kind) with
-  | ( Holding { quantity; entry_price; entry_date; _ },
+  | ( Holding { quantity; entry_price; entry_date; risk_params },
       TriggerExit { exit_reason; exit_price } ) ->
-      _trigger_exit t ~date ~quantity ~entry_price ~entry_date ~exit_reason
-        ~exit_price
+      (* Full exit: trim the whole held quantity. *)
+      _trigger_exit t ~date ~quantity ~entry_price ~entry_date ~risk_params
+        ~exit_reason ~exit_price ~target_quantity:quantity
+  | ( Holding { quantity; entry_price; entry_date; risk_params },
+      TriggerPartialExit { exit_reason; exit_price; target_quantity } ) ->
+      _trigger_exit t ~date ~quantity ~entry_price ~entry_date ~risk_params
+        ~exit_reason ~exit_price ~target_quantity
   | ( Holding { quantity; entry_price; entry_date; _ },
       UpdateRiskParams { new_risk_params } ) ->
       _update_risk_params t ~date ~quantity ~entry_price ~entry_date
@@ -339,7 +377,7 @@ let _apply_holding_transition t transition =
   | _, kind -> _invalid_transition kind
 
 let _exit_fill t ~date ~quantity ~entry_price ~entry_date ~target_quantity
-    ~exit_price ~curr ~started_date ~filled_quantity =
+    ~exit_price ~curr ~started_date ~risk_params ~filled_quantity =
   let state =
     Exiting
       {
@@ -350,27 +388,49 @@ let _exit_fill t ~date ~quantity ~entry_price ~entry_date ~target_quantity
         exit_price;
         filled_quantity = curr +. filled_quantity;
         started_date;
+        risk_params;
       }
   in
   Ok { t with state; last_updated = date }
 
-let _exit_complete t ~date ~filled_quantity ~entry_price ~exit_price ~entry_date
-    =
+let _closed_state ~date ~filled_quantity ~entry_price ~exit_price ~entry_date =
+  Closed
+    {
+      quantity = filled_quantity;
+      entry_price;
+      exit_price;
+      gross_pnl = None;
+      entry_date;
+      exit_date = date;
+      days_held = Date.diff date entry_date;
+    }
+
+let _holding_after_partial_exit ~quantity ~filled_quantity ~entry_price
+    ~entry_date ~risk_params =
+  Holding
+    {
+      quantity = quantity -. filled_quantity;
+      entry_price;
+      entry_date;
+      risk_params;
+    }
+
+(* On exit completion, a {b full} exit ([filled_quantity >= quantity], the held
+   amount) closes the position; a {b partial} exit returns to [Holding] with the
+   reduced quantity, preserving the original entry price/date and risk params so
+   the remainder keeps tracking its stop. *)
+let _exit_complete t ~date ~quantity ~filled_quantity ~entry_price ~exit_price
+    ~entry_date ~risk_params =
   let state =
-    Closed
-      {
-        quantity = filled_quantity;
-        entry_price;
-        exit_price;
-        gross_pnl = None;
-        entry_date;
-        exit_date = date;
-        days_held = Date.diff date entry_date;
-      }
+    if Float.(filled_quantity >= quantity) then
+      _closed_state ~date ~filled_quantity ~entry_price ~exit_price ~entry_date
+    else
+      _holding_after_partial_exit ~quantity ~filled_quantity ~entry_price
+        ~entry_date ~risk_params
   in
   Ok { t with state; last_updated = date }
 
-(* @nesting-ok: 7-field Exiting pattern forces multiline match; depth is structural *)
+(* @nesting-ok: 8-field Exiting pattern forces multiline match; depth is structural *)
 let _apply_exiting_transition t transition =
   let date = transition.date in
   match (t.state, transition.kind) with
@@ -383,14 +443,24 @@ let _apply_exiting_transition t transition =
           exit_price;
           filled_quantity = curr;
           started_date;
+          risk_params;
         },
       ExitFill { filled_quantity; _ } ) ->
       _exit_fill t ~date ~quantity ~entry_price ~entry_date ~target_quantity
-        ~exit_price ~curr ~started_date ~filled_quantity
-  | ( Exiting { filled_quantity; entry_price; exit_price; entry_date; _ },
+        ~exit_price ~curr ~started_date ~risk_params ~filled_quantity
+  | ( Exiting
+        {
+          quantity;
+          filled_quantity;
+          entry_price;
+          exit_price;
+          entry_date;
+          risk_params;
+          _;
+        },
       ExitComplete ) ->
-      _exit_complete t ~date ~filled_quantity ~entry_price ~exit_price
-        ~entry_date
+      _exit_complete t ~date ~quantity ~filled_quantity ~entry_price ~exit_price
+        ~entry_date ~risk_params
   | _, kind -> _invalid_transition kind
 
 (** {1 Transition Application} *)

@@ -104,7 +104,7 @@ let _process_transition t (trans : Position.transition) =
   | UpdateRiskParams { new_risk_params } ->
       let record = _ensure_record t ~position_id:trans.position_id ~symbol:"" in
       record.pos_current_stop <- new_risk_params.stop_loss_price
-  | TriggerExit { exit_reason; _ } ->
+  | TriggerExit { exit_reason; _ } | TriggerPartialExit { exit_reason; _ } ->
       let record = _ensure_record t ~position_id:trans.position_id ~symbol:"" in
       record.pos_exit_trigger <- Some (exit_trigger_of_reason exit_reason)
   | ExitComplete ->

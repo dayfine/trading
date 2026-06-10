@@ -22,8 +22,17 @@
 
     - {b Entering}: Order placed, waiting for fills (partial fills allowed)
     - {b Holding}: Position open, monitoring for exit signals
-    - {b Exiting}: Exit triggered, waiting for fills to close
+    - {b Exiting}: Exit triggered, waiting for fills (full close or partial
+      trim)
     - {b Closed}: Position fully closed, P&L realized
+
+    A {b partial exit} (a [TriggerPartialExit] with [target_quantity] strictly
+    less than the held quantity) trims the position: it goes
+    [Holding -> Exiting] like a full exit, but on [ExitComplete] returns to
+    [Holding] with the reduced quantity (original entry price/date and risk
+    params preserved) instead of moving to [Closed]. A full exit ([TriggerExit],
+    or a [TriggerPartialExit] with [target_quantity] equal to the held quantity)
+    behaves exactly as before and ends in [Closed].
 
     {1 Transitions}
 
@@ -31,10 +40,12 @@
     - [EntryFill]: Entry order filled (partially or fully)
     - [EntryComplete]: Entry fully filled, move to Holding
     - [CancelEntry]: Cancel entry before any fills
-    - [TriggerExit]: Exit signal detected, start closing
+    - [TriggerExit]: Exit signal detected, start closing the whole position
+    - [TriggerPartialExit]: Trim part of the position, keeping the remainder
     - [UpdateRiskParams]: Modify stop loss / take profit while holding
     - [ExitFill]: Exit order filled (partially or fully)
-    - [ExitComplete]: Exit fully filled, position closed
+    - [ExitComplete]: Exit filled — closes a full exit, or returns a partial
+      exit to Holding on the reduced quantity
 
     Each transition is validated for:
     - State compatibility (can only apply valid transitions to current state)
@@ -189,14 +200,22 @@ type position_state =
       risk_params : risk_params;
     }  (** State: Position is open, monitoring for exit *)
   | Exiting of {
-      quantity : float;  (** Position quantity being exited *)
+      quantity : float;  (** Position quantity held when the exit started *)
       entry_price : float;  (** Original entry price *)
       entry_date : Date.t;  (** Original entry date *)
-      target_quantity : float;  (** Amount to exit *)
+      target_quantity : float;
+          (** Amount to exit. A {b partial} exit has
+              [target_quantity < quantity] (the remainder returns to {!Holding}
+              on [ExitComplete]); a {b full} exit has
+              [target_quantity = quantity] (closes on [ExitComplete]). *)
       exit_price : float;  (** Price for exit order *)
       filled_quantity : float;  (** Amount exited so far *)
       started_date : Date.t;  (** When exit started *)
-    }  (** State: Attempting to close position *)
+      risk_params : risk_params;
+          (** Risk parameters carried over from {!Holding}. Re-applied to the
+              remaining {!Holding} when a partial exit completes, so the trimmed
+              position keeps tracking its stop on the reduced quantity. *)
+    }  (** State: Attempting to close (or trim) a position *)
   | Closed of {
       quantity : float;  (** Final position quantity *)
       entry_price : float;  (** Average entry price *)
@@ -233,7 +252,7 @@ type t = {
 (** Who triggers a transition.
 
     - [Strategy]: Returned from strategy's on_market_close (e.g.,
-      CreateEntering, TriggerExit, UpdateRiskParams)
+      CreateEntering, TriggerExit, TriggerPartialExit, UpdateRiskParams)
     - [Simulator]: Applied by simulator in response to order fills or timeouts
       (e.g., EntryFill, EntryComplete, ExitFill, ExitComplete, CancelEntry) *)
 type transition_trigger = Strategy | Simulator [@@deriving show, eq]
@@ -255,7 +274,23 @@ type transition_kind =
       (** Entry fully filled, transition to holding *)
   | CancelEntry of { reason : string }  (** Cancel entry before any fills *)
   | TriggerExit of { exit_reason : exit_reason; exit_price : float }
-      (** Exit condition triggered *)
+      (** Exit the {b whole} position. Unchanged from before: goes
+          [Holding -> Exiting] and closes on [ExitComplete]. *)
+  | TriggerPartialExit of {
+      exit_reason : exit_reason;
+      exit_price : float;
+      target_quantity : float;
+          (** Quantity to trim. Must satisfy
+              [0.0 < target_quantity <= held_quantity] (validated on the
+              [Holding -> Exiting] step; otherwise the transition is rejected).
+              When [target_quantity] is strictly less than the held quantity the
+              remainder returns to {!Holding} on [ExitComplete]; when it equals
+              the held quantity the position closes, identically to
+              {!TriggerExit}. *)
+    }
+      (** Trim part of a held position. The remainder keeps tracking its stop
+          (risk params) on the reduced quantity. Strategy-agnostic: any strategy
+          can request a partial exit without the core knowing why. *)
   | UpdateRiskParams of { new_risk_params : risk_params }
       (** Update stop loss / take profit levels *)
   | ExitFill of { filled_quantity : float; fill_price : float }
@@ -274,9 +309,9 @@ type transition = {
 val trigger_of_kind : transition_kind -> transition_trigger
 (** Get the trigger type for a transition kind.
 
-    Strategy-triggered: CreateEntering, TriggerExit, UpdateRiskParams
-    Simulator-triggered: EntryFill, EntryComplete, ExitFill, ExitComplete,
-    CancelEntry *)
+    Strategy-triggered: CreateEntering, TriggerExit, TriggerPartialExit,
+    UpdateRiskParams Simulator-triggered: EntryFill, EntryComplete, ExitFill,
+    ExitComplete, CancelEntry *)
 
 (** {1 Position Operations} *)
 

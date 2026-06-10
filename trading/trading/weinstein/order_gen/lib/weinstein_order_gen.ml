@@ -90,7 +90,7 @@ let _translate_transition ~(transition : Position.transition)
      breach. In live trading the GTC Stop order sent via UpdateRiskParams is
      already working at the broker and will execute automatically — no
      additional order is needed here. *)
-  | Position.TriggerExit _
+  | Position.TriggerExit _ | Position.TriggerPartialExit _
   (* Simulator-internal transitions: not relevant to the live broker *)
   | Position.EntryFill _ | Position.EntryComplete _ | Position.CancelEntry _
   | Position.ExitFill _ | Position.ExitComplete ->

@@ -57,6 +57,20 @@ let make_trigger_exit_transition ~position_id ~exit_price =
         };
   }
 
+let make_trigger_partial_exit_transition ~position_id ~exit_price
+    ~target_quantity =
+  {
+    position_id;
+    date = today;
+    kind =
+      TriggerPartialExit
+        {
+          exit_reason = SignalReversal { description = "rotate capital" };
+          exit_price;
+          target_quantity;
+        };
+  }
+
 let make_entry_fill_transition ~position_id ~quantity ~price =
   {
     position_id;
@@ -102,6 +116,18 @@ let make_exiting_position ?(side = Long) ~position_id ~symbol ~quantity ~price
     make_holding_position ~side ~position_id ~symbol ~quantity ~price ()
   in
   let exit_trans = make_trigger_exit_transition ~position_id ~exit_price in
+  apply_transition holding_pos exit_trans |> Result.ok |> Option.value_exn
+
+(** Helper to create a position in Exiting state from a partial-exit trigger. *)
+let make_partial_exiting_position ?(side = Long) ~position_id ~symbol ~quantity
+    ~price ~exit_price ~target_quantity () =
+  let holding_pos =
+    make_holding_position ~side ~position_id ~symbol ~quantity ~price ()
+  in
+  let exit_trans =
+    make_trigger_partial_exit_transition ~position_id ~exit_price
+      ~target_quantity
+  in
   apply_transition holding_pos exit_trans |> Result.ok |> Option.value_exn
 
 (* ==================== transitions_to_orders tests ==================== *)
@@ -176,6 +202,40 @@ let test_trigger_exit_with_position_generates_sell_order _ =
                       side = Sell;
                       order_type = Market;
                       quantity = 100.0;
+                      time_in_force = Day;
+                    }
+                     : order_essentials)));
+          ]))
+
+(* A partial exit sizes the sell order at the trim quantity (40), not the full
+   held quantity (100). *)
+let test_trigger_partial_exit_sizes_order_at_trim _ =
+  let position =
+    make_partial_exiting_position ~position_id:"AAPL-1" ~symbol:"AAPL"
+      ~quantity:100.0 ~price:150.0 ~exit_price:155.0 ~target_quantity:40.0 ()
+  in
+  let positions = String.Map.singleton "AAPL-1" position in
+  let transitions =
+    [
+      make_trigger_partial_exit_transition ~position_id:"AAPL-1"
+        ~exit_price:155.0 ~target_quantity:40.0;
+    ]
+  in
+  let result =
+    transitions_to_orders ~current_date:today ~positions transitions
+  in
+  assert_that result
+    (is_ok_and_holds
+       (elements_are
+          [
+            (fun o ->
+              assert_that (order_essentials o)
+                (equal_to
+                   ({
+                      symbol = "AAPL";
+                      side = Sell;
+                      order_type = Market;
+                      quantity = 40.0;
                       time_in_force = Day;
                     }
                      : order_essentials)));
@@ -347,6 +407,8 @@ let suite =
          >:: test_trigger_exit_no_position_returns_empty;
          "test_trigger_exit_with_position_generates_sell_order"
          >:: test_trigger_exit_with_position_generates_sell_order;
+         "test_trigger_partial_exit_sizes_order_at_trim"
+         >:: test_trigger_partial_exit_sizes_order_at_trim;
          "test_entry_fill_returns_no_orders"
          >:: test_entry_fill_returns_no_orders;
          "test_entry_complete_returns_no_orders"
