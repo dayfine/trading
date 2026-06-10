@@ -16,7 +16,7 @@ type sector_context = {
 
 type scoring_weights = {
   w_stage2_breakout : int;
-  w_early_stage2 : int option; [@sexp.option]
+  w_early_stage2 : int option; [@sexp.default None]
   w_strong_volume : int;
   w_adequate_volume : int;
   w_positive_rs : int;

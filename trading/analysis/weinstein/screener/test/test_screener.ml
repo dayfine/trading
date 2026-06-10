@@ -1389,13 +1389,23 @@ let test_w_early_stage2_no_effect_on_breakout _ =
     (score { default_scoring_weights with w_early_stage2 = Some 30 })
     (equal_to (score default_scoring_weights))
 
-(** Backward-compat contract: with [w_early_stage2 = None] (default), the field
-    is omitted from the serialized [scoring_weights] sexp ([@sexp.option]) — so
-    existing config goldens are bit-identical — and a sexp carrying
+(** Override-resolution contract: with [@sexp.default None] the field is PRESENT
+    in the serialized [scoring_weights] sexp even when [None] — required so
+    [Backtest.Overlay_validator] (which derives valid override key-paths from
+    the serialized base config) can resolve a
+    [screening_config.weights.w_early_stage2] override. A sexp {e missing} the
+    field still parses to [None] (older configs round-trip); a sexp carrying
     [(w_early_stage2 (v))] round-trips to [Some v]. *)
-let test_w_early_stage2_sexp_omitted_when_none _ =
+let test_w_early_stage2_sexp_present_and_roundtrips _ =
   let default_str =
     Sexp.to_string (sexp_of_scoring_weights default_scoring_weights)
+  in
+  let parsed_missing =
+    scoring_weights_of_sexp
+      (Sexp.of_string
+         "((w_stage2_breakout 30)(w_strong_volume 20)(w_adequate_volume \
+          10)(w_positive_rs 20)(w_bullish_rs_crossover 10)(w_clean_resistance \
+          15)(w_sector_strong 10)(w_late_stage2_penalty -15))")
   in
   let roundtrip =
     scoring_weights_of_sexp
@@ -1404,16 +1414,17 @@ let test_w_early_stage2_sexp_omitted_when_none _ =
   in
   assert_that
     ( String.is_substring default_str ~substring:"w_early_stage2",
+      parsed_missing.w_early_stage2,
       roundtrip.w_early_stage2 )
-    (equal_to (false, Some 22))
+    (equal_to (true, None, Some 22))
 
 let suite =
   "screener_tests"
   >::: [
          "test_w_early_stage2_none_preserves_half"
          >:: test_w_early_stage2_none_preserves_half;
-         "test_w_early_stage2_sexp_omitted_when_none"
-         >:: test_w_early_stage2_sexp_omitted_when_none;
+         "test_w_early_stage2_sexp_present_and_roundtrips"
+         >:: test_w_early_stage2_sexp_present_and_roundtrips;
          "test_w_early_stage2_no_effect_on_breakout"
          >:: test_w_early_stage2_no_effect_on_breakout;
          "test_min_price_zero_admits_low_priced"
