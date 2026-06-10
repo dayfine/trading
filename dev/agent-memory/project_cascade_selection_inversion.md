@@ -30,9 +30,26 @@ winners; top-3000 breakout mean +2.32 vs early +0.30). The WIN-RATE inversion
 persists into 2019-26 across breadths; the RETURN case for a reweight does not.
 → a naive `scoring_weights` reweight is unlikely to clear WF-CV; budget no-promote.
 
-**Next:** breakout/early reweight as an `experiment-gap-closing` surface
-(`w_stage2_breakout ∈ {30,22,15}`), WF-CV + confirmation grid, NOT a default flip.
-A consistency (win-rate/DD) gain may be worth it even if mean return is flat.
+**Axis SHIPPED (#1512, merged 2026-06-10):** `scoring_weights.w_early_stage2 :
+int option [@sexp.option]`, default None = the old `w_stage2_breakout/2` coupling
+(bit-identical). ⚠ The breakout/early RANKING is invariant to `w_stage2_breakout`
+magnitude (early = that /2, both scale) — so the lever is this NEW field, not the
+existing weight. Override path: `((screening_config ((weights ((w_early_stage2
+(N)))))))`. 3 gates green.
+
+**Experiment RUN + REJECTED (2026-06-10).** WF-CV `w_early_stage2 ∈ {None(=15
+baseline),22,30,38}` on top-3000-2011 15-fold. Baseline = SOLE Pareto-frontier cell
++ highest Deflated Sharpe (0.9883); every reweight dominated on Sharpe AND Calmar AND
+MaxDD, monotone-worse as early weight rises (w30 Sharpe 0.142 vs 0.643). Per-fold
+gate all FAIL (4/5/5 of 15, need 8). The in-sample top-1000 win (0.36 vs 0.19) was
+single-window overfit. **Mechanism: fat-tail winners (CALX/DEG/…) are confirmed
+breakouts in LIQUID names ([[project_trade_realism_liquidity]]); up-weighting early
+entries de-prioritises the very monsters that earn the return — the breakout premium
+is EARNING the tail, not a scoring error.** Cascade-inversion is a real WIN-RATE
+observation but NOT actionable via reweight. w_early_stage2 stays default-off; axis
+available, not promotable. Ledger:
+`2026-06-10-cascade-w-early-stage2-reweight-top3000.sexp` (Reject). Lesson: win-rate
+≠ return for a let-winners-run system; 'selection ≫ timing' ≠ 'this tweak helps'.
 
 Method note: the selection signal is trade_audit_report behavioural metric (d)
 entering-losers-too-often (buckets by `cascade_score`), NOT the decision-quality
