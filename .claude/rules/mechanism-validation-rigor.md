@@ -84,11 +84,44 @@ is weak, never **"rejected *because the data proves it fails*"** when the data o
 shows no-edge-at-one-point. The two are different epistemic objects; conflating
 them is the exact error this rule guards against.
 
+## The real deliverable is the *why*, not the verdict
+
+A verdict (build / no-build / ACCEPT / REJECT) is the cheap part. The valuable,
+compounding output is a **causal explanation of the result that transfers to other
+experiments.** A screen or test is not done when it has a verdict — it is done when
+it can answer *"why did it come out this way, and what does that imply for the next
+lever?"* "REJECT" alone teaches nothing; "REJECT **because** the strategy's edge is
+the let-winners-run fat tail and any winner-trimming mechanism taxes that tail —
+so stop proposing winner-touching levers" steers every future session.
+
+Three things every result must produce:
+
+1. **Attribute the result to a mechanism, decomposed.** Don't stop at "no edge."
+   Which failure mode? For a rotation/trim rule: is it **timing** (we act too
+   early/late), **picks** (the alternative wasn't actually better), the
+   **structural tax** (we occasionally give up the fat-tail monster — fundamental,
+   no rule can win), or **cost/turnover**? Each implies a *different* next move; a
+   bare "REJECT" collapses them and loses the guidance.
+2. **Connect it to the system's known structure.** Does this result agree with or
+   contradict existing findings (cascade-inversion, concentration-is-the-return,
+   prior rejections)? A result that *re-derives* a known mechanism from a new angle
+   is stronger evidence; one that contradicts it is a flag to dig.
+3. **Derive forward guidance.** State what the *why* rules in and out for future
+   search (e.g. "bias toward tail-preserving levers — breadth, entry quality,
+   holding discipline; away from trim/rotate/re-time/cap"). Record it where the
+   next session will see it (a `project_*` memory + the handoff), not just buried in
+   an experiment writeup.
+
+This is the antidote to the "we keep re-rejecting variants of the same idea"
+treadmill: each rejection should *narrow the search*, which only happens if the why
+is extracted and persisted. A verdict without a transferable why is a draft.
+
 ## The one-line self-check before publishing a screen
 
 > *Did I report the distribution, scale it economically, name the estimand gap and
-> the selection bias, sweep the knob, and calibrate the verdict to what a proxy can
-> actually claim?* If any answer is no, the writeup is a draft, not a verdict.
+> the selection bias, sweep the knob, calibrate the verdict to what a proxy can
+> actually claim — and explain WHY the result came out this way in a form that
+> guides the next lever?* If any answer is no, the writeup is a draft, not a verdict.
 
 ## Relationship to the other rules
 

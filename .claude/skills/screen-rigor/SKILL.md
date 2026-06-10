@@ -73,13 +73,29 @@ Only the real WF-CV test rejects. Write *"no-build decision (citing the prior)"*
 never *"rejected because the data proves it fails,"* when the data only shows
 no-edge-at-one-point.
 
-### Step 4 — Record it honestly
+### Step 4 — Explain the *why* (the actual deliverable)
+
+The verdict is the cheap part. Before writing it, answer: **why did it come out this
+way, and what does that imply for the next lever?** Decompose the result into a
+mechanism — for a trim/rotate rule: **timing** (acted too early/late), **picks**
+(the alternative wasn't better), **structural tax** (gave up the fat-tail monster —
+fundamental, no rule wins), or **cost/turnover**. Each implies a different next
+move; "no edge" alone collapses them. Then connect it to the system's known
+structure (does it re-derive or contradict cascade-inversion /
+concentration-is-the-return / prior rejections?) and state what the why rules in/out
+for future search. A screen that produces a verdict but not a transferable why is a
+draft — and it leaves the next session to re-litigate the same idea.
+
+### Step 5 — Record it honestly
 
 Writeup includes: the estimand+gap sentence, the distributions (not just medians),
 the annualized magnitude, the selection-bias note, the knob sweep (or an explicit
-"single-point screen — cannot reject" caveat), and a verdict that matches Step 3.
-If the signal is promising, open the `experiment-gap-closing` loop; if it's a
-no-build decision, say which prior it leans on.
+"single-point screen — cannot reject" caveat), the **why / failure-mechanism +
+forward guidance** (Step 4), and a verdict that matches Step 3. Persist the *why* as
+a `project_*` memory + in the handoff (not just buried in the experiment dir) so it
+actually narrows future search. If the signal is promising, open the
+`experiment-gap-closing` loop; if it's a no-build decision, say which prior it leans
+on.
 
 ## The one-line self-check
 

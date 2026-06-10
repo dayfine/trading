@@ -94,11 +94,40 @@ concern), **max single-name NAV%** over the run, **capital-relative MaxDD / Ulce
 (does rotation cut the concentration tail?), and **turnover / cost** (each trim is a
 taxable, spread-paying partial sale — the cost model prices `bid_ask_spread_bps`).
 
+## The primary deliverable is the *why*, not the verdict
+
+(Per `.claude/rules/mechanism-validation-rigor.md` §"the real deliverable is the
+why".) ACCEPT/REJECT is the cheap output. The goal is a **causal explanation that
+guides later work** — so this test must instrument the WF-CV to **decompose** the
+result, not just score it:
+
+- **Timing** — does the late-flag fire too early (winner still has a big advance
+  left → we trim the monster) or too late (already topping → the Stage-3 exit would
+  have caught it anyway, so harvest adds nothing)? Inspect the distribution of
+  forward return *after* the trigger fires, per fold.
+- **Picks** — were the cash-blocked candidates we rotated into actually better
+  ex-post than the capital we freed? (The screen said ~coin-flip; confirm under the
+  real rule with stops.) If picks are the problem, a better candidate-selector might
+  rescue it; if not, selection isn't the lever.
+- **Structural tax** — how much of any shortfall is *giving up the fat-tail
+  monster* (the realised-vs-unrealised + max-single-name-NAV% attribution)? If the
+  loss is dominated by abandoned right-tail winners, **no rotation rule can win** —
+  that's a fundamental property of a let-winners-run edge, not a tuning failure.
+- **Cost** — turnover × `bid_ask_spread_bps`. Bound how much is just frictional.
+
+Each attribution points somewhere different. The output we want is a sentence like
+*"harvest-rotate fails because X% of the gap is the structural tax (abandoned
+monsters), not timing or picks — therefore winner-trimming is a dead lever class and
+future search should move to tail-preserving levers"* — recorded as a `project_*`
+memory + in the handoff. That generalises beyond harvest-rotate (see
+`project_edge_is_the_fat_tail`).
+
 ## Prior-belief honesty
 
 The screen + the standing prior both lean against this. We run it anyway because
-(a) the user asked for the rigorous answer, and (b) the screen was genuinely
-inconclusive (coin-flip), not a rejection — so the cheap evidence doesn't settle it.
-Expected outcome is "REJECT, kept default-off" — but now with a WF-CV-grade verdict
-we can cite, not a proxy overclaim. If it surprises us and a faithful late-flag
-variant survives the grid, that's a real, promotable finding.
+(a) the user asked for the rigorous answer, (b) the screen was genuinely
+inconclusive (coin-flip), not a rejection, and (c) **even a REJECT is valuable if it
+delivers the decomposed *why* above** — that's what guides the next lever. Expected
+outcome is "REJECT, kept default-off, with the structural-tax explanation
+quantified" — but now WF-CV-grade, not a proxy overclaim. If a faithful late-flag
+variant surprises us and survives the grid, that's a real, promotable finding.
