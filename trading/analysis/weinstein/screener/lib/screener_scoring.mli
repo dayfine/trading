@@ -20,6 +20,22 @@ type sector_context = {
 type scoring_weights = {
   w_stage2_breakout : int;
       (** Weight for a clean Stage2 transition from Stage1. Default: 30. *)
+  w_early_stage2 : int option; [@sexp.option]
+      (** Weight for an early-Stage2 entry ([weeks_advancing <= 4] without an
+          observed Stage1→Stage2 breakout). [None] (default) preserves the
+          historical coupling [w_stage2_breakout / 2] — bit-identical to
+          pre-field behaviour. [Some v] decouples the early-entry weight from
+          the breakout weight, making the breakout/early {e ratio} configurable
+          rather than fixed at 2:1.
+
+          Motivation: the breakout-vs-early ranking is invariant to
+          [w_stage2_breakout]'s magnitude (both scale together via [/ 2]), so
+          the M5.4 weight-magnitude sweep could never test it. The
+          cascade-selection-inversion forensics (2026-06-10) found confirmed
+          Stage1→2 breakouts under-perform early-Stage2 entries on win-rate yet
+          are scored +30 vs +15 — this field is the axis that lets an experiment
+          flatten or invert that premium. Default-off per
+          [.claude/rules/experiment-flag-discipline.md]. *)
   w_strong_volume : int;
       (** Weight for Strong volume confirmation. Default: 20. *)
   w_adequate_volume : int;
@@ -39,10 +55,11 @@ type scoring_weights = {
 [@@deriving sexp]
 (** Scoring weights for each positive signal. All are configurable.
 
-    {b Field-name spellings for sweep overlays.} The eight fields above are the
+    {b Field-name spellings for sweep overlays.} The nine fields above are the
     {e exact} keys that any sweep overlay or config patch must use to mutate
     these weights:
     - [w_stage2_breakout]
+    - [w_early_stage2]
     - [w_strong_volume]
     - [w_adequate_volume]
     - [w_positive_rs]

@@ -16,6 +16,7 @@ type sector_context = {
 
 type scoring_weights = {
   w_stage2_breakout : int;
+  w_early_stage2 : int option; [@sexp.option]
   w_strong_volume : int;
   w_adequate_volume : int;
   w_positive_rs : int;
@@ -29,6 +30,7 @@ type scoring_weights = {
 let default_scoring_weights =
   {
     w_stage2_breakout = 30;
+    w_early_stage2 = None;
     w_strong_volume = 20;
     w_adequate_volume = 10;
     w_positive_rs = 20;
@@ -48,13 +50,18 @@ let default_grade_thresholds = { a_plus = 85; a = 70; b = 55; c = 40; d = 25 }
 (* Scoring signal helpers                                               *)
 (* ------------------------------------------------------------------ *)
 
+(** Early-Stage2 weight: explicit [w_early_stage2] when set, else the historical
+    [w_stage2_breakout / 2] coupling (bit-identical to pre-field behaviour). *)
+let _early_stage2_weight ~w =
+  match w.w_early_stage2 with Some v -> v | None -> w.w_stage2_breakout / 2
+
 (** Stage signal for long setups: Stage1→2 transition or early Stage2. *)
 let _stage_long_signal ~w ~(a : Stock_analysis.t) =
   match (a.stage.stage, a.prior_stage) with
   | Stage2 _, Some (Stage1 _) ->
       [ (w.w_stage2_breakout, "Stage1→Stage2 breakout") ]
   | Stage2 { weeks_advancing; _ }, _ when weeks_advancing <= 4 ->
-      [ (w.w_stage2_breakout / 2, "Early Stage2") ]
+      [ (_early_stage2_weight ~w, "Early Stage2") ]
   | _ -> []
 
 (** Late Stage2 deceleration penalty. *)
