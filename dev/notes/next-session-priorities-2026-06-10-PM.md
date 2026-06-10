@@ -1,7 +1,7 @@
-# Next-session priorities — 2026-06-11
+# Next-session priorities — 2026-06-10 (PM)
 
 **Supersedes** `next-session-priorities-2026-06-10.md`. Overnight autonomous
-session (2026-06-10). Check main CI green before dispatching.
+session (2026-06-09 night → 2026-06-10). Check main CI green before dispatching.
 
 ## TL;DR — what the night settled
 
@@ -23,7 +23,7 @@ session (2026-06-10). Check main CI green before dispatching.
 3. **The real open lever is concentration / position-management,** not selection
    or liquidity — and the faithful version needs a core change (below).
 
-## What shipped (7 PRs, all merged)
+## What shipped (9 PRs, all merged)
 - **#1509 / #1510** — cascade-inversion forensics writeup + memory snapshot.
 - **#1512** — `w_early_stage2` config axis (decouple early-Stage2 weight, default-off).
 - **#1513** — fix: `[@sexp.default None]` so the axis is actually overridable
@@ -31,6 +31,9 @@ session (2026-06-10). Check main CI green before dispatching.
   caught by an in-sample reweight run, not the unit tests).
 - **#1514** — liquidity-realism findings + cascade-reweight WF-CV scaffold.
 - **#1515** — concentration/rebalance plan.
+- **#1516** — cascade-reweight WF-CV REJECT ledger + report + this handoff.
+- **#1517** — agent-memory snapshot.
+- **#1518** — concentration entry-cap probe note + memory snapshot.
 
 ## Priorities for next session
 
@@ -47,9 +50,14 @@ whole-position only; there is no partial-exit transition. Recommended sequence:
 sign-off); (2) build the default-off `max_single_name_nav_pct` trim runner on top;
 (3) experiment surface {0.0, 0.25, 0.35, 0.50} on top-3000, measuring **max
 single-name NAV%, MaxDD/Ulcer, and realised-vs-unrealised split** (trimming converts
-unrealised marks to realised + redeployable capital). A crude full-exit-on-cap
-probe (no core change, mirrors `macro_bearish_trim`) can give a directional read
-sooner if you want it before the core change.
+unrealised marks to realised + redeployable capital).
+
+The entry-cap probe (`dev/notes/concentration-entry-cap-probe-2026-06-10.md`)
+already established the design constraint: **the concentration is largely the
+return** — shrinking the entry cap 0.14→0.07 cuts return ~6× (+761%→+116%) for only
+~5pp MaxDD. So the trim must be **generous** (35-50%, trim only extreme excess) and
+framed as **tail-risk insurance**, not a return enhancer; a tight entry cap is
+strictly dominated.
 
 **P1 — Re-weight the "top-3000 = artifact" priors.** The liquidity work shows the
 broad-universe edge is real on realized + liquid trades. Past rejections (laggard,
