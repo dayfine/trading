@@ -32,15 +32,29 @@ backtested under WF-CV with the engine doing the real rotation + stops. Full rec
 `dev/experiments/harvest-rotate-validation-2026-06-10/`. Memory:
 `project_harvest_rotate_rejected` + `project_mechanism_validation_rigor`.
 
-## What this de-prioritizes (decision, not a proven rejection)
+## ⏳ IN PROGRESS — the rigorous harvest-rotate test (user greenlit 2026-06-10 PM)
 
-- **Harvest-rotate dial — not prioritized.** The screen found no exploitable edge,
-  not a proof it fails. If revived, do it the rigorous way (surface + WF-CV), don't
-  re-run the cheap cross-sectional screen.
-- **P1 partial-exit core change — no longer motivated *by this*.** It only existed
-  to *fund* the harvest-rotate / concentration trim, neither of which cleared a
-  prioritization bar. Don't open the core `TriggerPartialExit` change for this
-  purpose now.
+The user chose to run the **rigorous** test (mechanism as a default-off surface →
+WF-CV), explicitly to get the *decomposed why* (timing / picks / structural-tax /
+cost), not just a verdict. Plan: `dev/plans/harvest-rotate-rigorous-test-2026-06-10.md`.
+
+Build sequence status:
+- **Step 1 — core partial-exit transition: ✅ MERGED #1525.** Strategy-agnostic
+  `TriggerPartialExit`; `Holding→Exiting→Holding(q−trim)`; default behaviour
+  bit-identical (dead code until a caller wires it). 3-gate green.
+- **Step 2 — harvest-rotate mechanism (NEXT).** Behind `harvest_rotate_enabled`
+  (default-off) in the Weinstein strategy: faithful **late-flag** trigger + detect a
+  cash-blocked higher-score candidate (the existing `alternatives_considered` /
+  `Insufficient_cash` signal) → emit `TriggerPartialExit(k)` on the held winner +
+  the rotation entry. Grounding the dispatch needs: where `on_market_close` builds
+  transitions, and where the blocked-candidate signal is available to the strategy.
+- **Step 3 — Variant_matrix axis wiring** (`harvest_rotate_enabled`, `k`, trigger,
+  `min_candidate_score`).
+- **Step 4 — decomposed WF-CV** on top-3000 (~4h) + **Step 5 — decision/ledger**.
+
+Expected outcome REJECT (per `project_edge_is_the_fat_tail`: winner-touching levers
+tax the tail) — but the deliverable is the WF-CV-grade *why*, quantifying how much is
+structural-tax vs timing vs picks.
 - **Concentration-TRIM direction — weak on a return basis.** Trimming an
   extended winner moves capital to a use with (at best) no better expected return.
   The only residual
