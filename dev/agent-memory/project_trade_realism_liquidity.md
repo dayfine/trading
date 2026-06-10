@@ -39,3 +39,15 @@ Implications: don't prefer top-1000 over top-3000 on liquidity; re-weight the
 generalisation, not implicit "illiquid"). [[project_pit_survivorship_inflation]] is
 about SURVIVORSHIP (separate, still valid), not liquidity. Liquidity-aware sizing is
 LOW priority; a concentration/winner-trim guard is the more relevant risk lever.
+
+**Concentration entry-cap probe (2026-06-10):** the concentration IS largely the
+return. Tightening max_position_pct_long 0.14→0.10→0.07 on top-3000 cut return
++761%→+140%→+116% while improving MaxDD only ~29→26→24% (Sharpe ~flat 0.44) — a
+terrible trade; the AXTI-style monsters need SIZE. → don't shrink entries. The
+faithful winner-trim (partial-exit, needs a core transition change = decision item)
+should be GENEROUS (cap 35-50%, trim only extreme concentration) and is tail-risk
+INSURANCE (held monster reversing pre-Stage3/4 exit), NOT a return enhancer —
+weight MaxDD/time-underwater/realised-vs-unrealised over mean return. Note:
+`dev/notes/concentration-entry-cap-probe-2026-06-10.md`, plan
+`dev/plans/concentration-rebalance-2026-06-10.md`. Cascade-reweight (the other lever
+from this thread) was REJECTED [[project_cascade_selection_inversion]].
