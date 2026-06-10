@@ -44,10 +44,12 @@ let _create_order ~id ~symbol ~side ~quantity =
 let _exit_order_for_position ~id position =
   let open Trading_strategy.Position in
   match get_state position with
-  | Exiting { quantity; _ } ->
+  | Exiting { target_quantity; _ } ->
+      (* Size the exit order at [target_quantity], not the full held [quantity]:
+         the two are equal for a full exit but differ for a partial trim. *)
       _create_order ~id ~symbol:position.symbol
         ~side:(_exit_order_side position.side)
-        ~quantity
+        ~quantity:target_quantity
   | _ -> Ok None
 
 let _transition_to_order ~id ~positions
@@ -57,9 +59,9 @@ let _transition_to_order ~id ~positions
   | CreateEntering { symbol; side; target_quantity; _ } ->
       _create_order ~id ~symbol ~side:(_entry_order_side side)
         ~quantity:target_quantity
-  | TriggerExit _ ->
+  | TriggerExit _ | TriggerPartialExit _ ->
       (* After _apply_transitions, the position is in Exiting state, not Holding.
-         We look up the Exiting position to get the quantity and side. *)
+         We look up the Exiting position to get the target quantity and side. *)
       Map.find positions transition.position_id
       |> Option.value_map ~default:(Ok None) ~f:(_exit_order_for_position ~id)
   | EntryFill _ | EntryComplete _ | CancelEntry _ | UpdateRiskParams _

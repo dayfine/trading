@@ -475,6 +475,12 @@ let _sample_exiting =
       exit_price = 110.0;
       filled_quantity = 0.0;
       started_date = Date.of_string "2024-01-10";
+      risk_params =
+        {
+          stop_loss_price = None;
+          take_profit_price = None;
+          max_hold_days = None;
+        };
     }
 
 let _sample_closed =

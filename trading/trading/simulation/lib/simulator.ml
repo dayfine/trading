@@ -314,7 +314,7 @@ let _apply_transitions ~positions ~transitions =
       | CreateEntering _ ->
           let%bind pos = Trading_strategy.Position.create_entering trans in
           Ok (Map.set acc ~key:pos.id ~data:pos)
-      | TriggerExit _ -> _apply_trigger_exit acc trans
+      | TriggerExit _ | TriggerPartialExit _ -> _apply_trigger_exit acc trans
       | CancelEntry _ -> Cancel_handler.apply_to_positions acc trans
       | _ -> Ok acc)
 

@@ -32,7 +32,7 @@ let _scale_holding_state factor quantity entry_price entry_date risk_params =
     }
 
 let _scale_exiting_state factor quantity entry_price entry_date target_quantity
-    exit_price filled_quantity started_date =
+    exit_price filled_quantity started_date risk_params =
   Trading_strategy.Position.Exiting
     {
       quantity = quantity *. factor;
@@ -42,6 +42,8 @@ let _scale_exiting_state factor quantity entry_price entry_date target_quantity
       exit_price = exit_price /. factor;
       filled_quantity = filled_quantity *. factor;
       started_date;
+      (* [risk_params] left unchanged, mirroring [_scale_holding_state]. *)
+      risk_params;
     }
 
 let _compute_scaled_state factor
@@ -60,9 +62,10 @@ let _compute_scaled_state factor
         exit_price;
         filled_quantity;
         started_date;
+        risk_params;
       } ->
       _scale_exiting_state factor quantity entry_price entry_date
-        target_quantity exit_price filled_quantity started_date
+        target_quantity exit_price filled_quantity started_date risk_params
   | (Entering _ | Closed _) as s -> s
 
 let apply_to_position (factor : float) (pos : Trading_strategy.Position.t) :
