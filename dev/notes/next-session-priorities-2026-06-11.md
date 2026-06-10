@@ -3,37 +3,47 @@
 **Supersedes** `next-session-priorities-2026-06-10-PM.md`. Check main CI green
 before dispatching.
 
-## TL;DR — the 2026-06-10-PM P0 was validated and REJECTED
+## TL;DR — the 2026-06-10-PM P0: NO-BUILD decision (the screen, corrected)
 
 The P0 from the prior handoff — **harvest-and-rotate by forward expected return**
 (trim a mature/extended Stage-2 winner to fund a cash-blocked fresh early-S2
-candidate; the AAPL-dividend logic) — was tested **read-only before building**,
-per the validate-first discipline. **It fails both required preconditions
-decisively** on the Cell-E top-3000 baseline. **No build.**
+candidate; the AAPL-dividend logic) — was screened **read-only before building**.
 
-- **(a) forward-return decay — FALSE.** fwd-4w return (adj_close, median, winsor)
-  is flat-to-*rising* with extension above the 150d MA AND with weeks-since-entry.
-  Fresh early-S2 median **+0.38%** vs mature-extended **+1.44%** — the mature
-  winner earns *more*, not less.
-- **(b) opportunity cost — REVERSED.** Best cash-blocked skipped candidate fwd-4w
-  **+0.37%** vs the most-extended held position (the harvest target) **+2.16%**
-  (~6×); win-rate ~50%. Rotating capital out of the winner destroys value.
+**⚠ The first writeup overclaimed ("REJECTED, decisively"); corrected after review.**
+The real distributions are weaker and differently shaped — see the new rule
+`.claude/rules/mechanism-validation-rigor.md`:
 
-The "declining forward rate" premise is simply false — a still-advancing Stage-2
-winner's forward rate does not decline (let-winners-run / momentum, directly
-measured). Consistent with the cascade-inversion (breakout earns the fat tail) and
-the entry-cap probe (concentration IS the return). Full record + scripts:
+- **(b) realizable per-event test** `diff = C_fwd − P_mostext_fwd` over the 373
+  actual cash-blocked decisions: **median −0.12%, mean −1.79%, C beats P 49.9%**
+  (p10 −22.9% / p90 +16.3%) — a **coin flip** per decision; the negative *mean* is
+  a fat-LEFT-tail effect (occasionally rotating out of a name that then rips), not
+  a consistent disadvantage.
+- **(a) fresh-early vs mature-extended** fwd-4w: early mean +1.15% (**+14.9%/yr**)
+  vs mature +2.59% (**+33.6%/yr**) — large mean gap but distributions overlap
+  almost fully, n small (311 vs 114), and **mature-extended is survivor-selected**
+  (not the real-time decision; biased favourable).
+
+**What the screen supports: no obvious free lunch + a mild tail-risk cost to
+rotating → don't prioritize a build** (also leaning on the standing prior against
+explorative position-management). It is **not** a rigorous rejection — that needs
+the mechanism as a default-off **surface** (`k`, late-threshold, pick-rank)
+backtested under WF-CV with the engine doing the real rotation + stops. Full record
+(incl. corrected distributions + `p0_stats.sh`):
 `dev/experiments/harvest-rotate-validation-2026-06-10/`. Memory:
-`project_harvest_rotate_rejected`.
+`project_harvest_rotate_rejected` + `project_mechanism_validation_rigor`.
 
-## What this closes
+## What this de-prioritizes (decision, not a proven rejection)
 
-- **Harvest-rotate dial — dropped.** Not built.
-- **P1 partial-exit core change — no longer motivated.** It only existed to *fund*
-  the harvest-rotate and the concentration trim. Both are now dominated; do not
-  open the core `TriggerPartialExit` change for this purpose.
-- **Concentration-TRIM direction generally — dead end on a return basis.** Trimming
-  an extended winner moves capital to a lower-forward-return use. The only residual
+- **Harvest-rotate dial — not prioritized.** The screen found no exploitable edge,
+  not a proof it fails. If revived, do it the rigorous way (surface + WF-CV), don't
+  re-run the cheap cross-sectional screen.
+- **P1 partial-exit core change — no longer motivated *by this*.** It only existed
+  to *fund* the harvest-rotate / concentration trim, neither of which cleared a
+  prioritization bar. Don't open the core `TriggerPartialExit` change for this
+  purpose now.
+- **Concentration-TRIM direction — weak on a return basis.** Trimming an
+  extended winner moves capital to a use with (at best) no better expected return.
+  The only residual
   reason to bound single-name NAV% is **unrealised-mark / tail-RISK**
   (`project_broad_universe_790_mtm_inflated`) — a *risk* argument, not a return
   one — and prior risk-cap probes were already strictly dominated. Revive only if
@@ -64,8 +74,9 @@ well-scoped fix if MFE/MAE-based forensics is wanted.
 
 The discrete-feature / position-management levers explored over the last sessions
 (cascade-reweight, laggard, force-exit, stage2-ma-hold, macro-bearish-trim,
-late-flag stop-tighten, early-admission, hysteresis, continuation, **and now
-harvest-rotate**) have all been REJECTED or kept default-off. The recurring lesson:
+late-flag stop-tighten, early-admission, hysteresis, continuation — each
+WF-CV-rejected or kept default-off — **and now harvest-rotate**, de-prioritized at
+the cheap-screen stage). The recurring lesson:
 the Cell-E baseline is near-optimal on its surface, and the broad-universe edge is
 the **fat-tailed let-winners-run** behaviour — mechanisms that trim, rotate, or
 re-time winners keep destroying that tail. Future search should bias toward levers

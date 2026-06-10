@@ -1,6 +1,37 @@
 # Harvest-and-rotate thesis — read-only validation — 2026-06-10
 
-**Verdict: REJECT at validation. Do NOT build the harvest-rotate dial.**
+> ## ⚠ Correction (2026-06-10, post-review) — the verdict below was OVERCLAIMED
+>
+> The original verdict ("REJECT — both fail decisively") was drawn from
+> point-estimate medians and does not survive looking at the **distributions**.
+> The honest finding is weaker and differently shaped. This screen is a
+> **NO-BUILD *decision*** (no obvious free lunch + a standing prior against
+> explorative position-management), **not a rigorous rejection of the mechanism.**
+> The corrective rule is `.claude/rules/mechanism-validation-rigor.md`.
+>
+> **(b) realizable per-event test** `diff = C_fwd − P_mostext_fwd` over the 373
+> actual cash-blocked decisions:
+> `median −0.12% · mean −1.79% · C beats P 49.9% · p10 −22.9% p25 −10.3% p75 +8.6% p90 +16.3%`.
+> → a **coin flip** per decision; the negative *mean* is a fat-LEFT-tail effect
+> (occasionally rotating out of a name that then rips), **not** a consistent
+> per-decision disadvantage.
+>
+> **(a) fresh-early vs mature-extended** fwd-4w (held-weeks): early mean +1.15%
+> (**+14.9%/yr**), mature mean +2.59% (**+33.6%/yr**) — the mean gap is large, BUT
+> the distributions overlap almost fully (early p10/p90 −10.7%/+12.5%, mature
+> −11.0%/+15.8%), n is small (311 vs 114), and **mature-extended is
+> survivor-selected** (conditioned on surviving 27+ weeks and staying 20%+
+> extended), so it reads falsely favourable and is not the decision the rule faces
+> in real time.
+>
+> A real rejection requires the mechanism implemented as a default-off **surface**
+> (harvest fraction `k`, late/extension threshold, candidate pick-rank) backtested
+> under WF-CV with the engine doing the real rotation and stops. Everything below
+> is the original (overclaimed) writeup, kept for the record.
+
+---
+
+**[SUPERSEDED] Original verdict: REJECT at validation. Do NOT build the harvest-rotate dial.**
 
 This is the P0 from `dev/notes/next-session-priorities-2026-06-10-PM.md`: validate
 the *capital-allocation-by-forward-expected-return* thesis **before** building any
