@@ -1330,9 +1330,92 @@ let test_passes_price_floor_missing_price_rejected _ =
 let test_passes_price_floor_missing_price_noop _ =
   assert_that (passes_price_floor ~min_price:0.0 ~price:None) (equal_to true)
 
+(* ------------------------------------------------------------------ *)
+(* w_early_stage2 — decoupled early-Stage2 weight                       *)
+(* ------------------------------------------------------------------ *)
+
+(** Synthetic early-Stage2 analysis: in Stage2 with [weeks_advancing <= 4] and
+    no observed Stage1 predecessor, so [score_long] takes the Early-Stage2 arm,
+    not the Stage1→2 breakout arm. *)
+let _early_stage2_analysis () =
+  let bars = rising_bars ~n:35 50.0 100.0 in
+  let base = make_analysis "EARLY" None bars in
+  {
+    base with
+    stage =
+      { base.stage with stage = Stage2 { weeks_advancing = 2; late = false } };
+    prior_stage = None;
+  }
+
+(** A confirmed Stage1→2 breakout analysis (prior_stage = Stage1) — the arm
+    [w_early_stage2] must NOT touch. *)
+let _breakout_analysis () =
+  let bars = rising_bars ~n:35 50.0 100.0 in
+  let base =
+    make_analysis "BREAKOUT" (Some (Stage1 { weeks_in_base = 12 })) bars
+  in
+  {
+    base with
+    stage =
+      { base.stage with stage = Stage2 { weeks_advancing = 2; late = false } };
+  }
+
+(** [w_early_stage2 = None] (default) reproduces the historical
+    [w_stage2_breakout / 2 = 15] coupling, and [Some v] decouples it: [Some 15]
+    is bit-identical to the default, while [Some 30] adds exactly 15 to the
+    early-Stage2 score (all other signals held constant). *)
+let test_w_early_stage2_none_preserves_half _ =
+  let a = _early_stage2_analysis () in
+  let sector = make_sector "Tech" in
+  let score weights = fst (score_long ~weights ~sector a) in
+  let s_none = score default_scoring_weights in
+  let s_some15 =
+    score { default_scoring_weights with w_early_stage2 = Some 15 }
+  in
+  let s_some30 =
+    score { default_scoring_weights with w_early_stage2 = Some 30 }
+  in
+  (* Some 15 reproduces the default (w_stage2_breakout/2 = 15); Some 30 adds 15. *)
+  assert_that (s_some15, s_some30 - s_none) (equal_to (s_none, 15))
+
+(** [w_early_stage2] only touches the Early-Stage2 arm: on a confirmed Stage1→2
+    breakout, changing it from [None] to [Some 30] leaves the score unchanged.
+*)
+let test_w_early_stage2_no_effect_on_breakout _ =
+  let a = _breakout_analysis () in
+  let sector = make_sector "Tech" in
+  let score weights = fst (score_long ~weights ~sector a) in
+  assert_that
+    (score { default_scoring_weights with w_early_stage2 = Some 30 })
+    (equal_to (score default_scoring_weights))
+
+(** Backward-compat contract: with [w_early_stage2 = None] (default), the field
+    is omitted from the serialized [scoring_weights] sexp ([@sexp.option]) — so
+    existing config goldens are bit-identical — and a sexp carrying
+    [(w_early_stage2 (v))] round-trips to [Some v]. *)
+let test_w_early_stage2_sexp_omitted_when_none _ =
+  let default_str =
+    Sexp.to_string (sexp_of_scoring_weights default_scoring_weights)
+  in
+  let roundtrip =
+    scoring_weights_of_sexp
+      (sexp_of_scoring_weights
+         { default_scoring_weights with w_early_stage2 = Some 22 })
+  in
+  assert_that
+    ( String.is_substring default_str ~substring:"w_early_stage2",
+      roundtrip.w_early_stage2 )
+    (equal_to (false, Some 22))
+
 let suite =
   "screener_tests"
   >::: [
+         "test_w_early_stage2_none_preserves_half"
+         >:: test_w_early_stage2_none_preserves_half;
+         "test_w_early_stage2_sexp_omitted_when_none"
+         >:: test_w_early_stage2_sexp_omitted_when_none;
+         "test_w_early_stage2_no_effect_on_breakout"
+         >:: test_w_early_stage2_no_effect_on_breakout;
          "test_min_price_zero_admits_low_priced"
          >:: test_min_price_zero_admits_low_priced;
          "test_min_price_floor_rejects_below"
