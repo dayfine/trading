@@ -153,17 +153,17 @@ let test_create_entering_generates_buy_order _ =
     (is_ok_and_holds
        (elements_are
           [
-            (fun o ->
-              assert_that (order_essentials o)
-                (equal_to
-                   ({
-                      symbol = "AAPL";
-                      side = Buy;
-                      order_type = Market;
-                      quantity = 100.0;
-                      time_in_force = Day;
-                    }
-                     : order_essentials)));
+            field
+              (fun o -> order_essentials o)
+              (equal_to
+                 ({
+                    symbol = "AAPL";
+                    side = Buy;
+                    order_type = Market;
+                    quantity = 100.0;
+                    time_in_force = Day;
+                  }
+                   : order_essentials));
           ]))
 
 let test_trigger_exit_no_position_returns_empty _ =
@@ -194,17 +194,17 @@ let test_trigger_exit_with_position_generates_sell_order _ =
     (is_ok_and_holds
        (elements_are
           [
-            (fun o ->
-              assert_that (order_essentials o)
-                (equal_to
-                   ({
-                      symbol = "AAPL";
-                      side = Sell;
-                      order_type = Market;
-                      quantity = 100.0;
-                      time_in_force = Day;
-                    }
-                     : order_essentials)));
+            field
+              (fun o -> order_essentials o)
+              (equal_to
+                 ({
+                    symbol = "AAPL";
+                    side = Sell;
+                    order_type = Market;
+                    quantity = 100.0;
+                    time_in_force = Day;
+                  }
+                   : order_essentials));
           ]))
 
 (* A partial exit sizes the sell order at the trim quantity (40), not the full
@@ -228,17 +228,17 @@ let test_trigger_partial_exit_sizes_order_at_trim _ =
     (is_ok_and_holds
        (elements_are
           [
-            (fun o ->
-              assert_that (order_essentials o)
-                (equal_to
-                   ({
-                      symbol = "AAPL";
-                      side = Sell;
-                      order_type = Market;
-                      quantity = 40.0;
-                      time_in_force = Day;
-                    }
-                     : order_essentials)));
+            field
+              (fun o -> order_essentials o)
+              (equal_to
+                 ({
+                    symbol = "AAPL";
+                    side = Sell;
+                    order_type = Market;
+                    quantity = 40.0;
+                    time_in_force = Day;
+                  }
+                   : order_essentials));
           ]))
 
 let test_entry_fill_returns_no_orders _ =
@@ -279,28 +279,28 @@ let test_multiple_create_entering_generates_multiple_orders _ =
     (is_ok_and_holds
        (elements_are
           [
-            (fun o ->
-              assert_that (order_essentials o)
-                (equal_to
-                   ({
-                      symbol = "AAPL";
-                      side = Buy;
-                      order_type = Market;
-                      quantity = 100.0;
-                      time_in_force = Day;
-                    }
-                     : order_essentials)));
-            (fun o ->
-              assert_that (order_essentials o)
-                (equal_to
-                   ({
-                      symbol = "GOOGL";
-                      side = Buy;
-                      order_type = Market;
-                      quantity = 50.0;
-                      time_in_force = Day;
-                    }
-                     : order_essentials)));
+            field
+              (fun o -> order_essentials o)
+              (equal_to
+                 ({
+                    symbol = "AAPL";
+                    side = Buy;
+                    order_type = Market;
+                    quantity = 100.0;
+                    time_in_force = Day;
+                  }
+                   : order_essentials));
+            field
+              (fun o -> order_essentials o)
+              (equal_to
+                 ({
+                    symbol = "GOOGL";
+                    side = Buy;
+                    order_type = Market;
+                    quantity = 50.0;
+                    time_in_force = Day;
+                  }
+                   : order_essentials));
           ]))
 
 let test_mixed_transitions_filters_non_order_generating _ =
@@ -323,17 +323,17 @@ let test_mixed_transitions_filters_non_order_generating _ =
     (is_ok_and_holds
        (elements_are
           [
-            (fun o ->
-              assert_that (order_essentials o)
-                (equal_to
-                   ({
-                      symbol = "AAPL";
-                      side = Buy;
-                      order_type = Market;
-                      quantity = 100.0;
-                      time_in_force = Day;
-                    }
-                     : order_essentials)));
+            field
+              (fun o -> order_essentials o)
+              (equal_to
+                 ({
+                    symbol = "AAPL";
+                    side = Buy;
+                    order_type = Market;
+                    quantity = 100.0;
+                    time_in_force = Day;
+                  }
+                   : order_essentials));
           ]))
 
 (* ==================== Short Position Tests ==================== *)
@@ -353,17 +353,17 @@ let test_short_create_entering_generates_sell_order _ =
     (is_ok_and_holds
        (elements_are
           [
-            (fun o ->
-              assert_that (order_essentials o)
-                (equal_to
-                   ({
-                      symbol = "AAPL";
-                      side = Sell;
-                      order_type = Market;
-                      quantity = 100.0;
-                      time_in_force = Day;
-                    }
-                     : order_essentials)));
+            field
+              (fun o -> order_essentials o)
+              (equal_to
+                 ({
+                    symbol = "AAPL";
+                    side = Sell;
+                    order_type = Market;
+                    quantity = 100.0;
+                    time_in_force = Day;
+                  }
+                   : order_essentials));
           ]))
 
 let test_short_trigger_exit_generates_buy_order _ =
@@ -383,17 +383,17 @@ let test_short_trigger_exit_generates_buy_order _ =
     (is_ok_and_holds
        (elements_are
           [
-            (fun o ->
-              assert_that (order_essentials o)
-                (equal_to
-                   ({
-                      symbol = "AAPL";
-                      side = Buy;
-                      order_type = Market;
-                      quantity = 100.0;
-                      time_in_force = Day;
-                    }
-                     : order_essentials)));
+            field
+              (fun o -> order_essentials o)
+              (equal_to
+                 ({
+                    symbol = "AAPL";
+                    side = Buy;
+                    order_type = Market;
+                    quantity = 100.0;
+                    time_in_force = Day;
+                  }
+                   : order_essentials));
           ]))
 
 let suite =

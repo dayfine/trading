@@ -99,28 +99,27 @@ let test_create_entering _ =
   in
   assert_that
     (create_entering transition)
-    (is_ok_and_holds (fun pos ->
-         assert_that pos
-           (equal_to
-              ({
-                 id = "pos-1";
-                 symbol = "AAPL";
-                 side = Long;
-                 entry_reasoning =
-                   TechnicalSignal { indicator = "EMA"; description = "Test" };
-                 exit_reason = None;
-                 state =
-                   Entering
-                     {
-                       target_quantity = 100.0;
-                       entry_price = 150.0;
-                       filled_quantity = 0.0;
-                       created_date = date_of_string "2024-01-01";
-                     };
-                 last_updated = date_of_string "2024-01-01";
-                 portfolio_lot_ids = [];
-               }
-                : t))))
+    (is_ok_and_holds
+       (equal_to
+          ({
+             id = "pos-1";
+             symbol = "AAPL";
+             side = Long;
+             entry_reasoning =
+               TechnicalSignal { indicator = "EMA"; description = "Test" };
+             exit_reason = None;
+             state =
+               Entering
+                 {
+                   target_quantity = 100.0;
+                   entry_price = 150.0;
+                   filled_quantity = 0.0;
+                   created_date = date_of_string "2024-01-01";
+                 };
+             last_updated = date_of_string "2024-01-01";
+             portfolio_lot_ids = [];
+           }
+            : t)))
 
 (* ==================== Entry Transitions ==================== *)
 
@@ -135,11 +134,12 @@ let test_entry_fill_partial _ =
   in
   assert_that
     (apply_transition pos transition)
-    (is_ok_and_holds (fun pos' ->
-         match get_state pos' with
-         | Entering entering ->
-             assert_that entering.filled_quantity (float_equal 50.0)
-         | _ -> assert_failure "Expected Entering state"))
+    (is_ok_and_holds
+       (field
+          (fun pos' -> get_state pos')
+          (matching ~msg:"Expected Entering state"
+             (function Entering e -> Some e.filled_quantity | _ -> None)
+             (float_equal 50.0))))
 
 let test_entry_fill_multiple _ =
   let pos = make_entering () in
@@ -153,11 +153,12 @@ let test_entry_fill_multiple _ =
   in
   assert_that
     (apply_transition pos transition)
-    (is_ok_and_holds (fun pos' ->
-         match get_state pos' with
-         | Entering entering ->
-             assert_that entering.filled_quantity (float_equal 80.0)
-         | _ -> assert_failure "Expected Entering state"))
+    (is_ok_and_holds
+       (field
+          (fun pos' -> get_state pos')
+          (matching ~msg:"Expected Entering state"
+             (function Entering e -> Some e.filled_quantity | _ -> None)
+             (float_equal 80.0))))
 
 let test_entry_fill_exceeds_target _ =
   let pos = make_entering ~target:100.0 () in
@@ -210,22 +211,23 @@ let test_entry_complete _ =
   in
   assert_that
     (apply_transition pos transition)
-    (is_ok_and_holds (fun pos' ->
-         assert_that (get_state pos')
-           (equal_to
-              (Holding
-                 {
-                   quantity = 100.0;
-                   entry_price = 150.0;
-                   entry_date = date_of_string "2024-01-02";
-                   risk_params =
-                     {
-                       stop_loss_price = Some 142.5;
-                       take_profit_price = Some 165.0;
-                       max_hold_days = Some 30;
-                     };
-                 }
-                : position_state))))
+    (is_ok_and_holds
+       (field
+          (fun pos' -> get_state pos')
+          (equal_to
+             (Holding
+                {
+                  quantity = 100.0;
+                  entry_price = 150.0;
+                  entry_date = date_of_string "2024-01-02";
+                  risk_params =
+                    {
+                      stop_loss_price = Some 142.5;
+                      take_profit_price = Some 165.0;
+                      max_hold_days = Some 30;
+                    };
+                }
+               : position_state))))
 
 let test_entry_complete_no_fills _ =
   let pos = make_entering () in
@@ -260,11 +262,16 @@ let test_cancel_entry_no_fills _ =
   in
   assert_that
     (apply_transition pos transition)
-    (is_ok_and_holds (fun pos' ->
-         assert_that (is_closed pos') (equal_to true);
-         match get_state pos' with
-         | Closed closed -> assert_that closed.quantity (float_equal 0.0)
-         | _ -> assert_failure "Expected Closed state"))
+    (is_ok_and_holds
+       (all_of
+          [
+            field (fun pos' -> is_closed pos') (equal_to true);
+            field
+              (fun pos' -> get_state pos')
+              (matching ~msg:"Expected Closed state"
+                 (function Closed c -> Some c.quantity | _ -> None)
+                 (float_equal 0.0));
+          ]))
 
 let test_cancel_entry_with_fills _ =
   let pos = make_entering () in
@@ -304,36 +311,41 @@ let test_trigger_exit _ =
   in
   assert_that
     (apply_transition pos transition)
-    (is_ok_and_holds (fun pos' ->
-         assert_that (get_state pos')
-           (equal_to
-              (Exiting
-                 {
-                   quantity = 100.0;
-                   entry_price = 150.0;
-                   entry_date = date_of_string "2024-01-02";
-                   target_quantity = 100.0;
-                   exit_price = 165.0;
-                   filled_quantity = 0.0;
-                   started_date = date_of_string "2024-01-10";
-                   risk_params =
-                     {
-                       stop_loss_price = Some 142.5;
-                       take_profit_price = Some 165.0;
-                       max_hold_days = Some 30;
-                     };
-                 }
-                : position_state));
-         assert_that pos'.exit_reason
-           (is_some_and
+    (is_ok_and_holds
+       (all_of
+          [
+            field
+              (fun pos' -> get_state pos')
               (equal_to
-                 (TakeProfit
+                 (Exiting
                     {
-                      target_price = 165.0;
-                      actual_price = 165.5;
-                      profit_percent = 10.3;
+                      quantity = 100.0;
+                      entry_price = 150.0;
+                      entry_date = date_of_string "2024-01-02";
+                      target_quantity = 100.0;
+                      exit_price = 165.0;
+                      filled_quantity = 0.0;
+                      started_date = date_of_string "2024-01-10";
+                      risk_params =
+                        {
+                          stop_loss_price = Some 142.5;
+                          take_profit_price = Some 165.0;
+                          max_hold_days = Some 30;
+                        };
                     }
-                   : exit_reason)))))
+                   : position_state));
+            field
+              (fun pos' -> pos'.exit_reason)
+              (is_some_and
+                 (equal_to
+                    (TakeProfit
+                       {
+                         target_price = 165.0;
+                         actual_price = 165.5;
+                         profit_percent = 10.3;
+                       }
+                      : exit_reason)));
+          ]))
 
 let test_update_risk_params _ =
   let pos = make_holding () in
@@ -353,17 +365,18 @@ let test_update_risk_params _ =
   in
   assert_that
     (apply_transition pos transition)
-    (is_ok_and_holds (fun pos' ->
-         assert_that (get_state pos')
-           (equal_to
-              (Holding
-                 {
-                   quantity = 100.0;
-                   entry_price = 150.0;
-                   entry_date = date_of_string "2024-01-02";
-                   risk_params = new_params;
-                 }
-                : position_state))))
+    (is_ok_and_holds
+       (field
+          (fun pos' -> get_state pos')
+          (equal_to
+             (Holding
+                {
+                  quantity = 100.0;
+                  entry_price = 150.0;
+                  entry_date = date_of_string "2024-01-02";
+                  risk_params = new_params;
+                }
+               : position_state))))
 
 (* ==================== Exit Transitions ==================== *)
 
@@ -408,21 +421,22 @@ let test_exit_fill _ =
   in
   assert_that
     (apply_transition pos transition)
-    (is_ok_and_holds (fun pos' ->
-         assert_that (get_state pos')
-           (equal_to
-              (Exiting
-                 {
-                   quantity = 100.0;
-                   entry_price = 150.0;
-                   entry_date = date_of_string "2024-01-02";
-                   target_quantity = 100.0;
-                   exit_price = 165.0;
-                   filled_quantity = 100.0;
-                   started_date = date_of_string "2024-01-10";
-                   risk_params = no_risk_params;
-                 }
-                : position_state))))
+    (is_ok_and_holds
+       (field
+          (fun pos' -> get_state pos')
+          (equal_to
+             (Exiting
+                {
+                  quantity = 100.0;
+                  entry_price = 150.0;
+                  entry_date = date_of_string "2024-01-02";
+                  target_quantity = 100.0;
+                  exit_price = 165.0;
+                  filled_quantity = 100.0;
+                  started_date = date_of_string "2024-01-10";
+                  risk_params = no_risk_params;
+                }
+               : position_state))))
 
 let test_exit_complete _ =
   let pos =
@@ -465,21 +479,25 @@ let test_exit_complete _ =
   in
   assert_that
     (apply_transition pos transition)
-    (is_ok_and_holds (fun pos' ->
-         assert_that (is_closed pos') (equal_to true);
-         assert_that (get_state pos')
-           (equal_to
-              (Closed
-                 {
-                   quantity = 100.0;
-                   entry_price = 150.0;
-                   exit_price = 165.5;
-                   gross_pnl = None;
-                   entry_date = date_of_string "2024-01-02";
-                   exit_date = date_of_string "2024-01-10";
-                   days_held = 8;
-                 }
-                : position_state))))
+    (is_ok_and_holds
+       (all_of
+          [
+            field (fun pos' -> is_closed pos') (equal_to true);
+            field
+              (fun pos' -> get_state pos')
+              (equal_to
+                 (Closed
+                    {
+                      quantity = 100.0;
+                      entry_price = 150.0;
+                      exit_price = 165.5;
+                      gross_pnl = None;
+                      entry_date = date_of_string "2024-01-02";
+                      exit_date = date_of_string "2024-01-10";
+                      days_held = 8;
+                    }
+                   : position_state));
+          ]))
 
 (* ==================== Partial Exit Transitions ==================== *)
 
@@ -729,28 +747,26 @@ let test_create_entering_creates_position _ =
   in
   assert_that
     (create_entering transition)
-    (is_ok_and_holds (fun pos ->
-         assert_that pos
-           (equal_to
-              ({
-                 id = "AAPL-1";
-                 symbol = "AAPL";
-                 side = Long;
-                 entry_reasoning =
-                   ManualDecision { description = "Buy and hold" };
-                 exit_reason = None;
-                 state =
-                   Entering
-                     {
-                       target_quantity = 100.0;
-                       entry_price = 150.0;
-                       filled_quantity = 0.0;
-                       created_date = date_of_string "2024-01-01";
-                     };
-                 last_updated = date_of_string "2024-01-01";
-                 portfolio_lot_ids = [];
-               }
-                : t))))
+    (is_ok_and_holds
+       (equal_to
+          ({
+             id = "AAPL-1";
+             symbol = "AAPL";
+             side = Long;
+             entry_reasoning = ManualDecision { description = "Buy and hold" };
+             exit_reason = None;
+             state =
+               Entering
+                 {
+                   target_quantity = 100.0;
+                   entry_price = 150.0;
+                   filled_quantity = 0.0;
+                   created_date = date_of_string "2024-01-01";
+                 };
+             last_updated = date_of_string "2024-01-01";
+             portfolio_lot_ids = [];
+           }
+            : t)))
 
 (** Test: CreateEntering with different reasoning types *)
 let test_create_entering_with_various_reasoning _ =
@@ -772,8 +788,7 @@ let test_create_entering_with_various_reasoning _ =
     in
     assert_that
       (create_entering transition)
-      (is_ok_and_holds (fun pos ->
-           assert_that pos (equal_to (expected_pos : t))))
+      (is_ok_and_holds (equal_to (expected_pos : t)))
   in
 
   (* Test all reasoning types *)
