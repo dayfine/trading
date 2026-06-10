@@ -20,13 +20,23 @@ type sector_context = {
 type scoring_weights = {
   w_stage2_breakout : int;
       (** Weight for a clean Stage2 transition from Stage1. Default: 30. *)
-  w_early_stage2 : int option; [@sexp.option]
+  w_early_stage2 : int option; [@sexp.default None]
       (** Weight for an early-Stage2 entry ([weeks_advancing <= 4] without an
           observed Stage1→Stage2 breakout). [None] (default) preserves the
-          historical coupling [w_stage2_breakout / 2] — bit-identical to
-          pre-field behaviour. [Some v] decouples the early-entry weight from
-          the breakout weight, making the breakout/early {e ratio} configurable
-          rather than fixed at 2:1.
+          historical coupling [w_stage2_breakout / 2] — behaviourally
+          bit-identical to pre-field behaviour. [Some v] decouples the
+          early-entry weight from the breakout weight, making the breakout/early
+          {e ratio} configurable rather than fixed at 2:1.
+
+          {b Why [@sexp.default None] and not [@sexp.option]:}
+          [Backtest.Overlay_validator] derives the set of valid override
+          key-paths from the {e serialized} base config, so a field omitted from
+          [sexp_of_config] (which [@sexp.option] does when [None]) cannot be
+          targeted by a [config_overrides] / [Variant_matrix] axis — the runner
+          rejects [screening_config.weights.w_early_stage2] as an unresolvable
+          key. [@sexp.default None] keeps the field present in the serialized
+          form (so the axis resolves) while still parsing a missing field to
+          [None] (so older config sexps round-trip).
 
           Motivation: the breakout-vs-early ranking is invariant to
           [w_stage2_breakout]'s magnitude (both scale together via [/ 2]), so
