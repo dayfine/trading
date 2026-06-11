@@ -1,5 +1,13 @@
 (library
  (name rolling_start)
- (libraries core backtest scenario_lib walk_forward trading_simulation_types)
+ (libraries
+  core
+  backtest
+  scenario_lib
+  walk_forward
+  trading_simulation_types
+  data_panel_snapshot
+  fork_pool
+  weinstein.snapshot_runtime)
  (preprocess
   (pps ppx_compare ppx_sexp_conv)))

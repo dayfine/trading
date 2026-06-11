@@ -61,7 +61,35 @@ val enumerate_starts_jittered :
 
     @raise Invalid_argument if [stride_days <= 0]. *)
 
+val bah_cagr_pct :
+  start_date:Date.t ->
+  end_date:Date.t ->
+  close_series:(Date.t * float) list ->
+  float
+(** [bah_cagr_pct ~start_date ~end_date ~close_series] is the annualised
+    buy-and-hold CAGR of a benchmark over [start_date .. end_date], computed
+    purely from its [close_series] (chronological [(date, close)] pairs — use
+    adjusted closes so dividends/splits are reflected).
+
+    - Entry close = the first pair whose date is [>= start_date]; exit close =
+      the last pair whose date is [<= end_date]. Buy-and-hold total return is
+      [(exit -. entry) /. entry *. 100], annualised over the inclusive day count
+      via {!Walk_forward.Walk_forward_runner.cagr_pct} — the same convention
+      {!per_start_of_summary} uses for the strategy's CAGR, so the two are
+      directly comparable as an edge.
+    - Returns [Float.nan] when the window cannot be priced: fewer than two
+      usable closes span it (empty series, all dates outside the window, or only
+      one bar), or the entry close is [<= 0.0]. The caller renders [nan] as a
+      blank cell rather than crashing.
+    - [close_series] need not be sorted — entry/exit are selected by date
+      comparison, not list position — but is expected chronological in practice.
+
+    Designed to be benchmark-agnostic: any symbol's close series (SPY, BRK-B,
+    GSPC.INDX) projects through the same function. *)
+
 val per_start_of_summary :
+  ?benchmark_cagr_pct:float ->
+  ?equity_curve:float list ->
   start_date:Date.t ->
   end_date:Date.t ->
   Backtest.Summary.t ->
@@ -79,7 +107,17 @@ val per_start_of_summary :
       [MaxUnderwaterVsInitialPct] metric (capital-relative drawdown, #1471);
       [Float.nan] if absent.
     - [max_drawdown_pct] is read from the summary's [MaxDrawdown] metric (peak-
-      relative); [Float.nan] if absent. *)
+      relative); [Float.nan] if absent.
+    - [benchmark_cagr_pct] (default [Float.nan] = "no benchmark") is recorded
+      verbatim, and [edge_pct] is set to [cagr_pct -. benchmark_cagr_pct] (so
+      [edge_pct] is also [nan] when no benchmark is supplied). Pass the result
+      of {!bah_cagr_pct} for the same window.
+    - [sharpe] is the summary [SharpeRatio] metric ([nan] if absent).
+    - [realized_return_pct] strips the summary [UnrealizedPnl] metric from the
+      terminal value: [(final -. unrealized -. initial) /. initial *. 100].
+    - [time_underwater_pct] is {!Convexity_stats.time_underwater_pct} over
+      [equity_curve] (default [[]] -> [0.0]); pass the run's per-step NAV series
+      (chronological). *)
 
 type config = {
   scenario : Scenario_lib.Scenario.t;
@@ -92,6 +130,28 @@ type config = {
   stride_days : int;
       (** Calendar-day cadence between successive start dates (91 = quarterly).
       *)
+  jitter_seed : int option;
+      (** When [Some seed], the start grid is jittered via
+          {!enumerate_starts_jittered} with this seed (avoids calendar-boundary
+          artefacts). [None] keeps the un-jittered fixed grid
+          ({!enumerate_starts}) — the pre-existing behaviour. *)
+  benchmark_symbol : string option;
+      (** When [Some sym] {b and} a snapshot [bar_data_source] is configured,
+          each start's [benchmark_cagr_pct] / [edge_pct] is filled by reading
+          [sym]'s adjusted-close series from the snapshot and projecting a
+          buy-and-hold CAGR over the same window ({!bah_cagr_pct}). [None] (or
+          CSV mode, which has no shared-panels handle) leaves the benchmark
+          columns [nan] — the report renders them blank, backward-compatibly. *)
+  parallel : int;
+      (** Number of starts to run concurrently. Each start is an independent
+          full backtest, so they fork cleanly. [1] runs every start in its own
+          short-lived child ({!Fork_pool.run_each_forked}) — the broad-universe
+          (N=3000) memory-safe path that mirrors the walk-forward fork-per-fold
+          runner: each child's exit reclaims the per-backtest heap residue and
+          resets the macOS [VMAllocationTracker] slab. [> 1] runs up to that
+          many children at once ({!Fork_pool.run_parallel}). Result order is
+          always input (ascending start-date) order, independent of completion
+          order. *)
   fixtures_root : string;
       (** Directory the scenario's [universe_path] is resolved against (mirrors
           [scenario_runner --fixtures-root]). *)
@@ -104,14 +164,17 @@ type config = {
 *)
 
 val run : config -> Rolling_start_types.report
-(** [run config] enumerates the start dates ({!enumerate_starts} over
+(** [run config] enumerates the start dates ({!enumerate_starts_jittered} when
+    [config.jitter_seed] is [Some], else {!enumerate_starts}, over
     [config.scenario.period.start_date] / [config.end_date] /
-    [config.stride_days]), runs {!Backtest.Runner.run_backtest} once per start
-    (clipping the start, holding the end fixed, threading the scenario's
-    overrides / strategy / slippage / cost model and the resolved sector-map
-    override + optional snapshot source), projects each result via
-    {!per_start_of_summary}, and assembles the {!Rolling_start_types.report} via
-    {!Rolling_start_types.build}.
+    [config.stride_days]), resolves the benchmark close series once (when
+    [config.benchmark_symbol] + a snapshot source are set), runs
+    {!Backtest.Runner.run_backtest} once per start (clipping the start, holding
+    the end fixed, threading the scenario's overrides / strategy / slippage /
+    cost model and the resolved sector-map override + optional snapshot source),
+    projects each result via {!per_start_of_summary} (with the benchmark CAGR
+    for that start's window via {!bah_cagr_pct}), and assembles the
+    {!Rolling_start_types.report} via {!Rolling_start_types.build}.
 
     Sequential — each backtest is run in-process, one after another. The cost is
     N backtests, so callers should keep the cadence coarse and only sweep on PIT
