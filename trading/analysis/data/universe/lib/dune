@@ -9,6 +9,7 @@
   composition_bar_reader
   composition_policy_types
   dual_class
+  composition_policy
   cross_validation)
  (libraries core eodhd kenneth_french shiller status synthetic)
  (preprocess
