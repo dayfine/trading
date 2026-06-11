@@ -27,6 +27,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | track in steady state; Phase 3 verdict locked (marginal edge in 1 of 4 bear windows only) |
 | [spy-only-reference](spy-only-reference.md) | IN_PROGRESS | feat-weinstein | — | WF-CV on sector-rotation testbed; top-1000 bankability gate; long-short verification (human session) |
 | [stage-accuracy](stage-accuracy.md) | IN_PROGRESS | feat-weinstein | — | force_exit_off grid REJECTED (#1503); cascade-selection inversion documented (#1509 merged); broad-universe WF-CV re-run data-gated |
+| [harvest-rotate](harvest-rotate.md) | IN_PROGRESS | feat-weinstein | feat/harvest-rotate | Step 3: Variant_matrix axis; then step 4 WF-CV surface test |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | Tier 1 fully checked off; T3-H low-priority; no active dispatch surface |
