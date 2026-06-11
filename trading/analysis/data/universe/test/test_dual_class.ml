@@ -46,6 +46,26 @@ let test_distinct_plain_symbols_distinct_keys _ =
     (String.equal (DC.entity_key "AAPL") (DC.entity_key "MSFT"))
     (equal_to false)
 
+(* False-positive guards: the heuristic strips ONLY an explicit two-char
+   separator+letter suffix ([-A] / [.B] style). A bare trailing class letter
+   with no separator is NOT a class suffix and must not be stripped. *)
+let test_bare_trailing_letter_not_stripped _ =
+  assert_that (DC.entity_key "TESLA") (equal_to "TESLA")
+
+(* Symbols that merely share a prefix are unrelated entities and must keep
+   distinct keys. *)
+let test_prefix_sharing_symbols_distinct_keys _ =
+  assert_that
+    (String.equal (DC.entity_key "FOO") (DC.entity_key "FOOD"))
+    (equal_to false)
+
+(* A suffixed class symbol collapses to its root, but an unrelated longer
+   symbol extending that root does not collide with it. *)
+let test_suffixed_class_distinct_from_longer_symbol _ =
+  assert_that
+    (String.equal (DC.entity_key "FOO-A") (DC.entity_key "FOOD"))
+    (equal_to false)
+
 (* known_pairs is non-empty and every member round-trips to its key. *)
 let test_known_pairs_members_round_trip _ =
   let all_consistent =
@@ -86,6 +106,12 @@ let suite =
          "test_plain_symbol_maps_to_itself" >:: test_plain_symbol_maps_to_itself;
          "test_distinct_plain_symbols_distinct_keys"
          >:: test_distinct_plain_symbols_distinct_keys;
+         "test_bare_trailing_letter_not_stripped"
+         >:: test_bare_trailing_letter_not_stripped;
+         "test_prefix_sharing_symbols_distinct_keys"
+         >:: test_prefix_sharing_symbols_distinct_keys;
+         "test_suffixed_class_distinct_from_longer_symbol"
+         >:: test_suffixed_class_distinct_from_longer_symbol;
          "test_known_pairs_members_round_trip"
          >:: test_known_pairs_members_round_trip;
          "test_default_config_is_current_behaviour"
