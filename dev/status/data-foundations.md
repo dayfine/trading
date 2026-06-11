@@ -1,6 +1,6 @@
 # Status: data-foundations
 
-## Last updated: 2026-06-11 (P1'.1 dollar-volume wiring)
+## Last updated: 2026-06-11
 
 ## Status
 READY_FOR_REVIEW
