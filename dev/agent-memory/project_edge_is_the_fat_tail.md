@@ -21,9 +21,12 @@ Independent findings keep re-deriving this from different angles:
   ([[project_cascade_selection_inversion]])
 - **Entry-cap probe** — shrinking the entry cap 0.14→0.07 cut return ~6× for ~5pp
   MaxDD: **concentration IS the return; the monsters need size.**
-- **Harvest-rotate screen** — trimming a mature winner to fund a fresh candidate is
-  a per-decision coin flip whose only systematic effect is a **fat-LEFT-tail cost**
-  (occasionally abandoning a monster). ([[project_harvest_rotate_rejected]])
+- **Harvest-rotate — WF-CV REJECTED** (2026-06-11, built + tested as a surface):
+  trimming `Stage2{late}` winners + recycling is **dispersion-amplifying noise**
+  (best variant Sharpe 0.627 ≈ baseline 0.645; return σ 37 vs 22.6), with the
+  gate-killers being folds where baseline rode winners to high Sharpe and harvest
+  trimmed them (the structural tax). All `harvest_fraction` fail.
+  ([[project_harvest_rotate_rejected]])
 
 **The mechanism of failure (the transferable why).** Any mechanism that **touches
 winners** — trims, rotates out of, re-times, or caps a still-advancing Stage-2
