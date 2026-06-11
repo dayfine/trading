@@ -1,9 +1,24 @@
 # Status: harvest-rotate
 
-## Last updated: 2026-06-10
+## Last updated: 2026-06-11
 
 ## Status
-IN_PROGRESS
+MERGED
+
+## Outcome (2026-06-11): WF-CV REJECT — mechanism stays default-off, axis NOT promoted
+
+The full rigorous test ran end-to-end (Steps 1–5 all merged: #1525 core
+partial-exit, #1528 mechanism, #1530 WF-CV surface spec, #1532 WF-CV REJECT +
+decomposed why). **Verdict: REJECT (WF-CV-grade).** No `harvest_fraction` passes
+the per-fold gate (k033 7/15, k050 8/15 but worst-fold ΔSharpe 1.57, k100 6/15).
+Decomposed *why* (the deliverable): harvest-rotate is **dispersion-amplifying
+noise, not Sharpe edge** — best variant Sharpe 0.627 ≈ baseline 0.645 while return
+σ inflates 1.64×; the gate-killer worst-folds are exactly where baseline rode
+winners to high Sharpe and harvest trimmed them (the structural tax — a quantified
+instance of `project_edge_is_the_fat_tail`). Mechanism remains default-off
+(`enable_harvest_rotate=false`, bit-identical baseline); not promotable. Ledger:
+`dev/experiments/_ledger/2026-06-11-harvest-rotate-top3000.sexp`; writeup +
+outputs: `dev/experiments/harvest-rotate-wfcv-2026-06-11/`.
 
 ## Interface stable
 YES
@@ -60,21 +75,15 @@ can reject the mechanism. This track builds that surface.
 
 ## In Progress
 
-- (none — Step 2 complete in this PR)
+- (none — all steps complete; track closed REJECT)
 
 ## Next Steps
 
-1. **Step 3 — Variant_matrix axis wiring**: make `enable_harvest_rotate` +
-   `harvest_fraction` expressible as `Variant_matrix` axes via
-   `Overlay_validator.apply_overrides` / `config_override`, pinned in
-   `test_variant_matrix.ml`.
-2. **Step 4 — WF-CV** on top-3000, 15 folds, fork-per-fold parallel=1. Variants =
-   baseline ∪ {late_flag × `harvest_fraction` grid}. Rank via `Variant_ranking`
-   (Pareto) + `Deflated_sharpe`. Instrument the decomposition (timing / picks /
-   structural-tax / cost) per the plan's "primary deliverable is the *why*."
-3. **Step 5 — decision** via `experiment-gap-closing` step 7 + the confirmation
-   grid (`.claude/rules/promotion-confirmation.md`); record ACCEPT/REJECT in the
-   ledger and keep default-off until a grid-robust value is pinned.
+- (none — Steps 3–5 complete, mechanism REJECTED at WF-CV. Step 3 axis wiring was
+  FREE — config fields resolve generically via `Overlay_validator`. Step 4 WF-CV
+  surface (#1530) had all variants FAIL the per-fold gate. Step 5 decision/ledger
+  recorded REJECT — `dev/experiments/_ledger/2026-06-11-harvest-rotate-top3000.sexp`.
+  See §Outcome above.)
 
 ## Follow-ups
 
