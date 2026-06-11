@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-11 HEAD `c4249670` (orchestrator run-2 reconcile — harvest-rotate concluded: Steps 1–5 merged (#1525/#1528/#1530/#1532), WF-CV REJECT, row flipped MERGED + Open-PR cleared).
+Last updated: 2026-06-11 HEAD `7bff1326` (P0 rolling-start v2 merged #1536; P1 universe-composition policy merged #1537/#1540/#1539 — #1538 auto-closed on stack-base deletion, reopened as #1540).
 
 ## Active + complete tracks
 
@@ -15,7 +15,7 @@ Each row: one line; deeper task detail in the linked status file.
 |---|---|---|---|---|
 | [backtest-infra](backtest-infra.md) | MERGED | — | — | — |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
-| [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | broad-PIT WF-CV now runs locally (#1491 snapshot-WF + #1494 fork-per-fold N=3000); worst-vol-decile prototype still regime-tag-gated |
+| [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | rolling-start v2 merged (#1536: jittered starts, edge-vs-SPY matrix, fork-per-start); next: run matrix on composition-policy universe |
 | [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | manual ghcr.io devcontainer rebuild (flambda) + Win #4 production wiring for active_through pruning |
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
@@ -46,7 +46,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
 | [weekly-snapshot](weekly-snapshot.md) | MERGED | — | — | — |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
-| [data-foundations](data-foundations.md) | READY_FOR_REVIEW | feat-data | — | bars-retention recovery strategy (synthesize vs accept loss for SCTY/MNK/LB zero-bar symbols) |
+| [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | composition-policy merged (#1537/#1540/#1539); next: wire $-volume into snapshots (ADR floor inert) + emit policy universe artifact |
 
 ## How to use
 
