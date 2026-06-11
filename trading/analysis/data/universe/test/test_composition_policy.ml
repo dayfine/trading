@@ -177,6 +177,53 @@ let test_preferred_exclusion_drops_preferred _ =
        ])
 
 (* ---------------------------------------------------------------------- *)
+(* Single-report attribution + reconciliation                              *)
+(* ---------------------------------------------------------------------- *)
+
+(* Count of input candidates accounted for by the result: survivors plus every
+   dropped record across all filter reports. *)
+let _kept_plus_total_dropped (r : CPT.result) =
+  List.length r.CPT.kept
+  + List.sum
+      (module Int)
+      r.CPT.reports
+      ~f:(fun rep -> List.length rep.CPT.dropped)
+
+(* A Real-Estate-sector ADR below the liquidity floor matches BOTH the REIT
+   filter and the ADR floor when both are active. Pins the .mli guarantee that
+   each dropped candidate appears in exactly one report, attributed to the
+   FIRST filter that removed it (reit_policy here), and that the reports
+   reconcile with the input: kept + total dropped = input size. *)
+let test_multi_criteria_drop_attributed_to_first_filter_only _ =
+  let candidates =
+    [
+      _candidate ~rank:0 "AAPL";
+      _candidate ~asset_type:Eodhd.Asset_type.ADR ~sector:"Real Estate"
+        ~avg_dollar_volume:1_000.0 ~rank:1 "RE-ADR";
+    ]
+  in
+  let config =
+    {
+      CPT.default_config with
+      reit_policy = CPT.Exclude;
+      adr_min_dollar_volume = Some 1_000_000.0;
+    }
+  in
+  let result = CP.apply ~config candidates in
+  assert_that result
+    (all_of
+       [
+         field _kept_symbols (elements_are [ equal_to "AAPL" ]);
+         field
+           (fun r -> _dropped_symbols (_report r "reit_policy"))
+           (elements_are [ equal_to "RE-ADR" ]);
+         field
+           (fun r -> _dropped_symbols (_report r "adr_liquidity_floor"))
+           (elements_are []);
+         field _kept_plus_total_dropped (equal_to 2);
+       ])
+
+(* ---------------------------------------------------------------------- *)
 (* Determinism                                                             *)
 (* ---------------------------------------------------------------------- *)
 
@@ -208,6 +255,8 @@ let suite =
          >:: test_adr_floor_drops_small_adr_only;
          "test_preferred_exclusion_drops_preferred"
          >:: test_preferred_exclusion_drops_preferred;
+         "test_multi_criteria_drop_attributed_to_first_filter_only"
+         >:: test_multi_criteria_drop_attributed_to_first_filter_only;
          "test_apply_is_deterministic" >:: test_apply_is_deterministic;
        ]
 

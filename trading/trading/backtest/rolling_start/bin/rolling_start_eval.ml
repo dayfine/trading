@@ -16,14 +16,22 @@
     Usage:
     {[
       rolling_start_eval --scenario <path.sexp>
-        [--end-date YYYY-MM-DD] [--start-stride-days N]
+        [--end-date YYYY-MM-DD] [--stride-days N] [--jitter-seed N]
+        [--benchmark SYMBOL] [--parallel N]
         [--fixtures-root <path>] [--snapshot-dir <path>] [--out <path>]
     ]}
 
     [--end-date] overrides the scenario's own end date (defaults to the
-    scenario's [period.end_date] when omitted). [--out], when given, writes the
-    markdown to that path; otherwise the markdown goes to stdout. The derived
-    sexp always goes to stderr so it can be redirected independently. *)
+    scenario's [period.end_date] when omitted). [--stride-days] (alias
+    [--start-stride-days]) sets the base start-grid cadence. [--jitter-seed]
+    enables seeded jitter of the start grid (avoids calendar-boundary
+    artefacts). [--benchmark SYMBOL] overlays buy-and-hold CAGR / edge for that
+    symbol per start (snapshot mode only — pair with [--snapshot-dir]).
+    [--parallel N] forks up to N starts concurrently (default 1 = each start in
+    its own short-lived child, the broad-universe memory-safe path). [--out],
+    when given, writes the markdown to that path; otherwise the markdown goes to
+    stdout. The derived sexp always goes to stderr so it can be redirected
+    independently. *)
 
 open Core
 module Runner = Rolling_start.Rolling_start_runner
@@ -34,10 +42,15 @@ module Bar_source_resolver = Scenario_lib.Bar_source_resolver
 
 let _default_stride_days = 91
 
+(* Default to 1 (each start forked one-at-a-time): the memory-safe broad-universe
+   path, and behaviour-preserving for small-N runs. *)
+let _default_parallel = 1
+
 let _usage () =
   eprintf
     "Usage: rolling_start_eval --scenario <path.sexp> [--end-date YYYY-MM-DD] \
-     [--start-stride-days N] [--fixtures-root <path>] [--snapshot-dir <path>] \
+     [--stride-days N | --start-stride-days N] [--jitter-seed N] [--benchmark \
+     SYMBOL] [--parallel N] [--fixtures-root <path>] [--snapshot-dir <path>] \
      [--out <path>]\n";
   Stdlib.exit 1
 
@@ -45,6 +58,9 @@ type _parse_acc = {
   mutable scenario_path : string option;
   mutable end_date : Date.t option;
   mutable stride_days : int option;
+  mutable jitter_seed : int option;
+  mutable benchmark_symbol : string option;
+  mutable parallel : int option;
   mutable fixtures_root : string option;
   mutable snapshot_dir : string option;
   mutable out_path : string option;
@@ -57,11 +73,18 @@ let _parse_date label s =
       eprintf "%s requires a YYYY-MM-DD date, got %S\n" label s;
       Stdlib.exit 1
 
-let _parse_stride s =
+let _parse_positive_int label s =
   match Int.of_string_opt s with
   | Some n when n > 0 -> n
   | _ ->
-      eprintf "--start-stride-days requires a positive integer, got %S\n" s;
+      eprintf "%s requires a positive integer, got %S\n" label s;
+      Stdlib.exit 1
+
+let _parse_int label s =
+  match Int.of_string_opt s with
+  | Some n -> n
+  | None ->
+      eprintf "%s requires an integer, got %S\n" label s;
       Stdlib.exit 1
 
 let _parse_flag args =
@@ -70,6 +93,9 @@ let _parse_flag args =
       scenario_path = None;
       end_date = None;
       stride_days = None;
+      jitter_seed = None;
+      benchmark_symbol = None;
+      parallel = None;
       fixtures_root = None;
       snapshot_dir = None;
       out_path = None;
@@ -84,8 +110,19 @@ let _parse_flag args =
     | "--end-date" :: s :: rest ->
         acc.end_date <- Some (_parse_date "--end-date" s);
         loop rest
-    | "--start-stride-days" :: s :: rest ->
-        acc.stride_days <- Some (_parse_stride s);
+    | ("--stride-days" | "--start-stride-days") :: s :: rest ->
+        (* [--stride-days] is the v2 spelling; [--start-stride-days] is kept as
+           a back-compat alias for the original flag. *)
+        acc.stride_days <- Some (_parse_positive_int "--stride-days" s);
+        loop rest
+    | "--jitter-seed" :: s :: rest ->
+        acc.jitter_seed <- Some (_parse_int "--jitter-seed" s);
+        loop rest
+    | "--benchmark" :: sym :: rest ->
+        acc.benchmark_symbol <- Some sym;
+        loop rest
+    | "--parallel" :: s :: rest ->
+        acc.parallel <- Some (_parse_positive_int "--parallel" s);
         loop rest
     | "--fixtures-root" :: path :: rest ->
         acc.fixtures_root <- Some path;
@@ -112,7 +149,17 @@ let _config_of (acc : _parse_acc) (scenario : Scenario.t) : Runner.config =
   let stride_days =
     Option.value acc.stride_days ~default:_default_stride_days
   in
-  { Runner.scenario; end_date; stride_days; fixtures_root; bar_data_source }
+  let parallel = Option.value acc.parallel ~default:_default_parallel in
+  {
+    Runner.scenario;
+    end_date;
+    stride_days;
+    jitter_seed = acc.jitter_seed;
+    benchmark_symbol = acc.benchmark_symbol;
+    parallel;
+    fixtures_root;
+    bar_data_source;
+  }
 
 let _emit ~(out_path : string option) (report : RT.report) =
   let markdown = RT.to_markdown report in
@@ -135,9 +182,13 @@ let () =
   let scenario = Scenario.load scenario_path in
   let config = _config_of acc scenario in
   eprintf "Rolling-start eval: %s\n%!" scenario.name;
-  eprintf "  start=%s end=%s stride=%d days\n%!"
+  eprintf
+    "  start=%s end=%s stride=%d days jitter=%s benchmark=%s parallel=%d\n%!"
     (Date.to_string config.scenario.period.start_date)
     (Date.to_string config.end_date)
-    config.stride_days;
+    config.stride_days
+    (Option.value_map config.jitter_seed ~default:"off" ~f:Int.to_string)
+    (Option.value config.benchmark_symbol ~default:"none")
+    config.parallel;
   let report = Runner.run config in
   _emit ~out_path:acc.out_path report

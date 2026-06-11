@@ -1,9 +1,52 @@
 # Status: backtest-perf
 
-## Last updated: 2026-06-09
+## Last updated: 2026-06-11
 
 ## Status
 IN_PROGRESS
+
+### Recent activity (2026-06-11)
+
+- **[x] Rolling-start robustness runner v2 — start-date × edge-vs-benchmark
+  matrix** (branch `feat/rolling-start-v2`, READY_FOR_REVIEW). P0 per
+  `dev/notes/next-session-priorities-2026-06-11-PM.md`: the single-start
+  headline numbers are misleading; the honest evaluation is "across many start
+  dates each held to today, does the strategy robustly beat buy-and-hold of the
+  benchmark?" Extends the existing `rolling_start` lib/bin (NOT a fresh module),
+  additively — existing report fields, default behaviour, goldens bit-identical.
+  Plan: `dev/plans/rolling-start-v2-2026-06-11.md`. Four increments:
+  - **Jittered start enumeration** — `Rolling_start_runner.enumerate_starts_jittered`:
+    the fixed base grid with a deterministic seeded per-point forward jitter
+    (uniform `[0, stride_days)`), so starts don't all land on calendar
+    boundaries. First point pinned; jittered points crossing `end_date` dropped.
+    Pure, deterministic given seed (exact dates pinned in tests for seed 42).
+  - **Benchmark overlay** — `Rolling_start_runner.bah_cagr_pct` (pure projection
+    of a `(date, close)` series → buy-and-hold CAGR over the same window via the
+    walk-forward `cagr_pct` convention; `nan` when unpriceable). `per_start`
+    gains `benchmark_cagr_pct` + `edge_pct` (= strategy − benchmark); the report
+    gains an `edge` dispersion summary + `pct_beating_benchmark` + an
+    "Edge-vs-benchmark robustness" markdown block (median edge / worst start /
+    % beating). Series sourced (snapshot mode) from `Daily_panels.read_history`
+    on the benchmark symbol's adjusted closes; designed so SPY / BRK-B /
+    GSPC.INDX all work.
+  - **Richer per-start matrix columns** — `per_start` gains `sharpe` (summary
+    `SharpeRatio`), `time_underwater_pct` (`Convexity_stats.time_underwater_pct`
+    over the run's NAV curve), and `realized_return_pct` (strips summary
+    `UnrealizedPnl` from the terminal value so an AXTI-style unrealized mark
+    can't flatter recent-start rows). Matrix detail table renders start ×
+    {CAGR, benchmark CAGR, edge, Sharpe, capital-DD, time-underwater, MaxDD,
+    realized}.
+  - **Parallel fork-per-start** — `run` forks each start via `Fork_pool`
+    (`run_each_forked` at `--parallel 1` = the N=3000 memory-safe path mirroring
+    the walk-forward fork-per-fold runner; `run_parallel ~parallel` for `>1`),
+    result order = ascending start-date order. `bin/rolling_start_eval.ml` wires
+    `--stride-days` (alias of `--start-stride-days`), `--jitter-seed`,
+    `--benchmark SYMBOL`, `--parallel N` (`--snapshot-dir` already existed).
+  - Verify: `dune runtest trading/backtest/rolling_start/` (27 tests pass: 7 new
+    jitter, 3 benchmark/edge, 1 matrix-columns in the runner suite; 3 edge/% +
+    extended markdown in the types suite). No full matrix backtest run here —
+    that's the dispatcher's job after merge (P1 universe-composition dependency;
+    every produced number is on the old universe until P1 lands).
 
 ### Recent activity (2026-06-09)
 
