@@ -35,6 +35,25 @@
   (pps ppx_jane)))
 
 (library
+ (name apply_composition_policy_runner_lib)
+ (modules apply_composition_policy_runner_lib)
+ (libraries core eodhd status universe)
+ (preprocess
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name apply_composition_policy)
+ (modules apply_composition_policy)
+ (libraries
+  apply_composition_policy_runner_lib
+  core
+  core_unix.command_unix
+  status
+  universe)
+ (preprocess
+  (pps ppx_jane)))
+
+(library
  (name cross_validation_runner_lib)
  (modules cross_validation_runner_lib)
  (libraries

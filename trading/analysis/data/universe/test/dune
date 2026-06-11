@@ -7,8 +7,11 @@
   test_build_composition_universes_runner
   test_dual_class
   test_composition_policy
+  test_composition_policy_report
+  test_apply_composition_policy_runner
   test_cross_validation)
  (libraries
+  apply_composition_policy_runner_lib
   build_composition_universes_runner_lib
   build_synthetic_universes_runner_lib
   core

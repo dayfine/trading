@@ -1,6 +1,6 @@
 # Status: data-foundations
 
-## Last updated: 2026-05-23
+## Last updated: 2026-06-11
 
 ## Status
 READY_FOR_REVIEW
@@ -272,6 +272,55 @@ Status carries forward from `hybrid-tier` track — that track stays IN_PROGRESS
 (M5.3 streaming Phases A through F COMPLETE on main as of 2026-05-06.
 Synth-v1/v2/v3 all MERGED. EODHD multi-market MERGED. 15y memory-cliff
 fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
+
+### READY_FOR_REVIEW — Universe-composition policy (P1, explicit flag-driven, additive) — 2026-06-11
+
+- [x] **Explicit, flag-driven composition policy + drop report**
+  (stacked PRs under `feat/universe-composition-policy-*`,
+  `analysis/data/universe/`). Per
+  `dev/notes/next-session-priorities-2026-06-11-PM.md` §P1 +
+  `dev/plans/universe-composition-policy-2026-06-11.md`. Makes the
+  universe-composition choices the PIT top-{500,1000,3000} builds
+  implicitly bake in (dual-class, REIT, ADR, junk) **explicit** and
+  applicable as a filter layer. **Every flag defaults to current
+  behaviour** (data-layer analog of `experiment-flag-discipline.md`);
+  a clean pool passes through bit-identical, so existing goldens are
+  unaffected until a flag is flipped.
+  - **PR-A** (`feat/universe-composition-policy-types`):
+    `lib/composition_policy_types.{ml,mli}` (candidate / config /
+    drop_reason / report types; `default_config` is the no-op) +
+    `lib/dual_class.{ml,mli}` (`entity_key` maps a ticker to its
+    economic entity via a curated known-pairs table
+    GOOG/GOOGL, BRK-A/BRK-B, ... + a root-symbol class-suffix
+    heuristic; limits documented). `test/test_dual_class.ml` (11
+    tests).
+  - **PR-B** (`feat/universe-composition-policy-filters`):
+    `lib/composition_policy.{ml,mli}` — `apply` runs four filters in
+    fixed order: dual-class dedup (always active, keeps higher-ranked
+    class) → REIT include/exclude → ADR/GDR liquidity floor →
+    preferred exclusion. Returns survivors + one `filter_report` per
+    filter. `test/test_composition_policy.ml` (7 tests, incl.
+    default-config pass-through).
+  - **PR-C** (`feat/universe-composition-policy-cli`):
+    `lib/composition_inputs.load_asset_type_lookup` (new; symbol →
+    Asset_type from `symbol_types.sexp`),
+    `lib/composition_policy_report.{ml,mli}` (snapshot → candidates +
+    text report renderer), `bin/apply_composition_policy_runner_lib`
+    + `bin/apply_composition_policy.exe` CLI (loads a snapshot +
+    symbol_types, applies policy flags, writes filtered snapshot +
+    drop report). `test/test_composition_policy_report.ml` (3) +
+    `test/test_apply_composition_policy_runner.ml` (3).
+  - Verify: `dune build && dune runtest analysis/data/universe/` —
+    full suite green (composition-policy adds 24 tests). `dune build
+    @fmt` clean; no Python; A2 boundary respected (all under
+    `analysis/data/universe/`).
+  - **Out of scope** (per the P1 brief): the weekly >1%-of-ADV
+    screener liquidity gate (weinstein-side); re-running backtests on
+    the policy universe (the P0/P2 rerun dependency).
+  - **Known limit:** the ADR liquidity floor needs per-symbol dollar
+    volume, which `Snapshot.t` does not carry; the CLI adapter defaults
+    absent volumes to `+inf` (floor inert) — wiring real volumes into
+    the snapshot is a follow-up.
 
 ### IN_PROGRESS — Cross-validation: composition vs Shiller (2026-05-17)
 

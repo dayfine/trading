@@ -37,6 +37,15 @@ val load_equity_like_lookup :
     anything other than [Common_stock], [Preferred_stock], [ADR], [GDR] map to
     [false]; entries unrecognised by the sexp shape are dropped silently. *)
 
+val load_asset_type_lookup :
+  string -> (string, Eodhd.Asset_type.t) Hashtbl.t Status.status_or
+(** [load_asset_type_lookup path] parses the canonical [symbol_types.sexp] and
+    returns a [symbol -> Asset_type.t] map. Only [Listed _] entries contribute;
+    [Not_in_eodhd_listing] symbols are omitted (downstream consumers default
+    such symbols to {!Eodhd.Asset_type.Common_stock}). The first occurrence of a
+    duplicated symbol wins. Returns [Error Status.Internal] on read / decode
+    failure. *)
+
 val load_sectors : string -> (string, string) Hashtbl.t Status.status_or
 (** [load_sectors path] parses [sectors.csv] (header [symbol,sector]) into a
     [symbol -> sector] map. Returns [Error Status.Internal] on read failure;
