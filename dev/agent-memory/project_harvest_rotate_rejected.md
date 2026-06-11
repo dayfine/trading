@@ -1,10 +1,28 @@
 ---
 name: project_harvest_rotate_rejected
-description: Harvest-and-rotate (allocate capital by forward expected return) — read-only screen 2026-06-10 found no exploitable per-decision edge; NO-BUILD decision (not a rigorous rejection)
+description: Harvest-and-rotate — built default-off (#1525 core partial-exit + #1528 mechanism) then WF-CV REJECTED 2026-06-11 (all harvest_fraction fail the gate); dispersion-amplifying noise, no Sharpe edge
 metadata:
   node_type: memory
   type: project
   originSessionId: ef5f87b6-2ba9-4ab1-870c-61358d4e71b7
+---
+
+**RESOLVED 2026-06-11 — WF-CV REJECT (the rigorous test the user greenlit).** Built
+the mechanism default-off (step 1 core `TriggerPartialExit` #1525; step 2
+`Harvest_rotate_runner` trims `Stage2{late}` longs #1528) and tested it as a surface
+under top-3000 WF-CV (baseline vs `harvest_fraction ∈ {0.33,0.5,1.0}`, 15 folds).
+**ALL variants FAIL the per-fold gate** (k033 7/15, k050 8/15 but worst-fold ΔSharpe
+1.57, k100 6/15). Decomposed why (the deliverable): harvest is **dispersion-
+amplifying NOISE, not Sharpe edge** — best variant Sharpe 0.627 ≈ baseline 0.645,
+but return σ 37 vs 22.6 (1.64×); no regime pattern in per-fold deltas (helps
+fold-002/010, hurts fold-006/009); the gate-killers are folds where baseline rode
+winners to high Sharpe and harvest trimmed them (fold-006 2017: 2.48→0.91 = the
+structural tax). Quantified instance of [[project_edge_is_the_fat_tail]]. Mechanism
+stays default-off; axis not promotable. Ledger:
+`2026-06-11-harvest-rotate-top3000.sexp`; writeup
+`dev/experiments/harvest-rotate-wfcv-2026-06-11/`. The screen-era detail below is
+retained for the methodology lesson.
+
 ---
 
 **Harvest-and-rotate: NO-BUILD decision (2026-06-10).** The P0 from
