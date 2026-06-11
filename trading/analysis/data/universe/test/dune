@@ -5,12 +5,14 @@
   test_build_from_individuals
   test_build_synthetic_universes_runner
   test_build_composition_universes_runner
+  test_dual_class
   test_cross_validation)
  (libraries
   build_composition_universes_runner_lib
   build_synthetic_universes_runner_lib
   core
   cross_validation_runner_lib
+  eodhd
   kenneth_french
   matchers
   ounit2
