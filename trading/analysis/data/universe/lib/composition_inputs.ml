@@ -82,6 +82,40 @@ let load_equity_like_lookup path : (string, bool) Hashtbl.t Status.status_or =
       Status.error_internal
         ("composition_inputs: symbol_types decode: " ^ Exn.to_string exn)
 
+let _asset_type_from_field_pairs pairs : (string * Eodhd.Asset_type.t) option =
+  match (_find_field pairs "symbol", _find_field pairs "asset_type") with
+  | Some (Atom sym), Some at_sexp -> (
+      match _asset_type_of_sexp at_sexp with
+      | Some at -> Some (sym, at)
+      | None -> None)
+  | _ -> None
+
+let _asset_type_from_entry_sexp sexp : (string * Eodhd.Asset_type.t) option =
+  match (sexp : Sexp.t) with
+  | List pairs -> _asset_type_from_field_pairs pairs
+  | _ -> None
+
+let _insert_asset_type tbl entry =
+  match _asset_type_from_entry_sexp entry with
+  | Some (sym, at) ->
+      let _ : [ `Duplicate | `Ok ] = Hashtbl.add tbl ~key:sym ~data:at in
+      ()
+  | None -> ()
+
+let _build_asset_type_lookup sexp : (string, Eodhd.Asset_type.t) Hashtbl.t =
+  let tbl = Hashtbl.create (module String) in
+  List.iter (_symbol_entries_from_sexp sexp) ~f:(_insert_asset_type tbl);
+  tbl
+
+let load_asset_type_lookup path :
+    (string, Eodhd.Asset_type.t) Hashtbl.t Status.status_or =
+  try Ok (_build_asset_type_lookup (Sexp.load_sexp path)) with
+  | Sys_error msg | Failure msg ->
+      Status.error_internal ("composition_inputs: symbol_types load: " ^ msg)
+  | Sexp.Of_sexp_error (exn, _) ->
+      Status.error_internal
+        ("composition_inputs: symbol_types decode: " ^ Exn.to_string exn)
+
 (* ------------------------------------------------------------------ *)
 (* Sector CSV loader                                                   *)
 (* ------------------------------------------------------------------ *)

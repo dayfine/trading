@@ -10,6 +10,7 @@
   composition_policy_types
   dual_class
   composition_policy
+  composition_policy_report
   cross_validation)
  (libraries core eodhd kenneth_french shiller status synthetic)
  (preprocess
