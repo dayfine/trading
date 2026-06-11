@@ -77,6 +77,76 @@ let test_enumerate_rejects_nonpositive_stride _ =
         ~end_date:(date ~y:2012 ~m:Month.Jan ~d:1)
         ~stride_days:0)
 
+(* ----- enumerate_starts_jittered ----- *)
+
+let jittered_start = date ~y:2011 ~m:Month.Jan ~d:1
+let jittered_end = date ~y:2012 ~m:Month.Jan ~d:1
+
+let jittered ~jitter_seed =
+  Runner.enumerate_starts_jittered ~scenario_start:jittered_start
+    ~end_date:jittered_end ~stride_days:91 ~jitter_seed
+
+(* Pinned exact dates for seed 42: the base grid is Jan-1 / Apr-2 / Jul-2 /
+   Oct-1; the first point is unjittered, every later point is shifted forward by
+   a deterministic uniform offset in [0, 91). The offsets for seed 42 land at
+   77 / 38 / 0 days -> Jun-18 / Aug-9 / Oct-1, all strictly before the Jan-1
+   end. This is the determinism contract: same (inputs, seed) -> same dates. *)
+let test_jitter_pins_exact_dates_for_seed _ =
+  assert_that (jittered ~jitter_seed:42)
+    (elements_are
+       [
+         equal_to (date ~y:2011 ~m:Month.Jan ~d:1);
+         equal_to (date ~y:2011 ~m:Month.Jun ~d:18);
+         equal_to (date ~y:2011 ~m:Month.Aug ~d:9);
+         equal_to (date ~y:2011 ~m:Month.Oct ~d:1);
+       ])
+
+(* Same seed -> identical output (pure function of inputs + seed). *)
+let test_jitter_deterministic _ =
+  assert_that (jittered ~jitter_seed:7)
+    (elements_are (List.map (jittered ~jitter_seed:7) ~f:equal_to))
+
+(* The first start is pinned to scenario_start (no jitter on k=0), every start
+   is strictly before end_date, and the sequence is strictly ascending. *)
+let test_jitter_first_pinned_and_in_range _ =
+  let starts = jittered ~jitter_seed:99 in
+  let ascending = List.is_sorted_strictly starts ~compare:Date.compare in
+  assert_that starts
+    (all_of
+       [
+         field List.hd_exn (equal_to jittered_start);
+         field
+           (fun s -> List.for_all s ~f:(fun d -> Date.( < ) d jittered_end))
+           (equal_to true);
+         field (fun _ -> ascending) (equal_to true);
+       ])
+
+(* Each non-first jittered start sits within [base, base + stride) of its base
+   grid point — the jitter only shifts forward, never past the next stride. *)
+let test_jitter_within_stride_of_base _ =
+  let base =
+    Runner.enumerate_starts ~scenario_start:jittered_start
+      ~end_date:jittered_end ~stride_days:91
+  in
+  let jit = jittered ~jitter_seed:123 in
+  (* jit may be shorter than base (a late jittered point can cross end_date), so
+     compare against the matching base prefix: each jittered point is in
+     [b, b + 91). *)
+  let base_prefix = List.take base (List.length jit) in
+  let within =
+    List.for_all2_exn base_prefix jit ~f:(fun b j ->
+        Date.( <= ) b j && Date.diff j b < 91)
+  in
+  assert_that within (equal_to true)
+
+(* A non-positive stride is rejected (delegates to enumerate_starts). *)
+let test_jitter_rejects_nonpositive_stride _ =
+  assert_raises
+    (Invalid_argument "enumerate_starts: stride_days must be positive, got 0")
+    (fun () ->
+      Runner.enumerate_starts_jittered ~scenario_start:jittered_start
+        ~end_date:jittered_end ~stride_days:0 ~jitter_seed:1)
+
 (* ----- per_start_of_summary ----- *)
 
 let make_summary ~start_date ~end_date ~initial_cash ~final_value ~metrics :
@@ -160,6 +230,14 @@ let suite =
          >:: test_enumerate_empty_when_start_after_end;
          "enumerate_rejects_nonpositive_stride"
          >:: test_enumerate_rejects_nonpositive_stride;
+         "jitter_pins_exact_dates_for_seed"
+         >:: test_jitter_pins_exact_dates_for_seed;
+         "jitter_deterministic" >:: test_jitter_deterministic;
+         "jitter_first_pinned_and_in_range"
+         >:: test_jitter_first_pinned_and_in_range;
+         "jitter_within_stride_of_base" >:: test_jitter_within_stride_of_base;
+         "jitter_rejects_nonpositive_stride"
+         >:: test_jitter_rejects_nonpositive_stride;
          "per_start_extracts_metrics" >:: test_per_start_extracts_metrics;
          "per_start_missing_metrics_are_nan"
          >:: test_per_start_missing_metrics_are_nan;

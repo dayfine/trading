@@ -30,6 +30,37 @@ val enumerate_starts :
 
     @raise Invalid_argument if [stride_days <= 0]. *)
 
+val enumerate_starts_jittered :
+  scenario_start:Date.t ->
+  end_date:Date.t ->
+  stride_days:int ->
+  jitter_seed:int ->
+  Date.t list
+(** [enumerate_starts_jittered ~scenario_start ~end_date ~stride_days
+     ~jitter_seed] is {!enumerate_starts}'s base grid with a deterministic
+    per-point jitter applied, so the enumerated starts do not all land on the
+    same calendar boundary (every base point is
+    [scenario_start + k*stride_days], which for a Jan-1 scenario start would
+    otherwise put every start on the first of a month — a calendar-boundary
+    artefact this avoids).
+
+    - The base grid is exactly {!enumerate_starts}'s:
+      [scenario_start + k* stride_days] for [k = 0, 1, ...], every base point
+      strictly before [end_date].
+    - The first base point ([k = 0], = [scenario_start]) is pinned — no jitter —
+      so the sweep still begins at the scenario's natural start.
+    - Every later base point [b] is shifted forward by a uniform offset in the
+      range [\[0, stride_days)] calendar days, drawn from a
+      [Stdlib.Random.State.t] seeded by [jitter_seed]. The draws are consumed in
+      ascending base-point order, so the result is fully determined by
+      [(scenario_start, end_date, stride_days, jitter_seed)].
+    - A jittered point that lands [>= end_date] is dropped, preserving the
+      strictly-before-end / non-empty-window invariant.
+    - Result is ascending and may be shorter than the base grid (when a late
+      jittered point crosses [end_date]).
+
+    @raise Invalid_argument if [stride_days <= 0]. *)
+
 val per_start_of_summary :
   start_date:Date.t ->
   end_date:Date.t ->

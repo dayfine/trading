@@ -14,6 +14,20 @@ let enumerate_starts ~scenario_start ~end_date ~stride_days =
   in
   loop [] scenario_start
 
+let enumerate_starts_jittered ~scenario_start ~end_date ~stride_days
+    ~jitter_seed =
+  let base = enumerate_starts ~scenario_start ~end_date ~stride_days in
+  let rng = Stdlib.Random.State.make [| jitter_seed |] in
+  (* Consume one uniform draw per non-first base point, in ascending order, so
+     the output is a pure function of (inputs, seed). The first point is pinned
+     to scenario_start; a jittered point that crosses end_date is dropped. *)
+  List.filter_mapi base ~f:(fun i d ->
+      if i = 0 then Some d
+      else
+        let offset = Stdlib.Random.State.int rng stride_days in
+        let jittered = Date.add_days d offset in
+        if Date.( >= ) jittered end_date then None else Some jittered)
+
 (** Inclusive calendar-day count of [start_date .. end_date]. *)
 let _inclusive_days ~start_date ~end_date = Date.diff end_date start_date + 1
 
