@@ -7,6 +7,8 @@
   build_from_individuals
   composition_inputs
   composition_bar_reader
+  composition_policy_types
+  dual_class
   cross_validation)
  (libraries core eodhd kenneth_french shiller status synthetic)
  (preprocess
