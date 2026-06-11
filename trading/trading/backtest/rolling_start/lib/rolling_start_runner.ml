@@ -117,6 +117,17 @@ let _benchmark_close_series ~panels ~symbol ~from ~to_ =
           | Some v when not (Float.is_nan v) -> Some (s.date, v)
           | _ -> None)
 
+(* Open [src]'s shared panels, read [symbol]'s close series over the window,
+   and close the panels. [] when the source exposes no panels or fails to
+   build. *)
+let _series_via_shared_panels ~src ~symbol ~from ~to_ =
+  match Backtest.Bar_data_source.build_shared_panels src with
+  | Ok (Some panels) ->
+      let series = _benchmark_close_series ~panels ~symbol ~from ~to_ in
+      Backtest.Bar_data_source.close_shared_panels panels;
+      series
+  | Ok None | Error _ -> []
+
 (* Resolve the benchmark's full-window close series once (shared across starts),
    when both a [benchmark_symbol] and a snapshot [bar_data_source] are
    configured. CSV mode has no caller-owned panels handle, so the benchmark
@@ -124,16 +135,9 @@ let _benchmark_close_series ~panels ~symbol ~from ~to_ =
    benchmark CAGR is nan (unbenchmarked), which the report renders as blank. *)
 let _resolve_benchmark_series ~config ~earliest_start =
   match (config.benchmark_symbol, config.bar_data_source) with
-  | Some symbol, Some src -> (
-      match Backtest.Bar_data_source.build_shared_panels src with
-      | Ok (Some panels) ->
-          let series =
-            _benchmark_close_series ~panels ~symbol ~from:earliest_start
-              ~to_:config.end_date
-          in
-          Backtest.Bar_data_source.close_shared_panels panels;
-          series
-      | Ok None | Error _ -> [])
+  | Some symbol, Some src ->
+      _series_via_shared_panels ~src ~symbol ~from:earliest_start
+        ~to_:config.end_date
   | _ -> []
 
 (** Resolve the scenario's [universe_path] (relative to [fixtures_root]) into

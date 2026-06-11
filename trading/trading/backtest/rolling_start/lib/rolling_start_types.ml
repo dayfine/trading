@@ -118,25 +118,24 @@ let _start_row (s : per_start) =
       _f2 s.realized_return_pct;
     ]
 
+(* Column titles of the per-start detail table, in {!_start_row} order. *)
+let _starts_header_cells =
+  [
+    "start";
+    "CAGR %";
+    "Benchmark CAGR %";
+    "Edge %";
+    "Sharpe";
+    "MaxUnderwaterVsInitial %";
+    "TimeUnderwater %";
+    "MaxDrawdown %";
+    "Realized return %";
+  ]
+
 (** The per-start detail table (one row per start date). *)
 let _starts_table report =
-  let header =
-    [
-      _row
-        [
-          "start";
-          "CAGR %";
-          "Benchmark CAGR %";
-          "Edge %";
-          "Sharpe";
-          "MaxUnderwaterVsInitial %";
-          "TimeUnderwater %";
-          "MaxDrawdown %";
-          "Realized return %";
-        ];
-      _row [ "---"; "---"; "---"; "---"; "---"; "---"; "---"; "---"; "---" ];
-    ]
-  in
+  let separator = List.map _starts_header_cells ~f:(fun _ -> "---") in
+  let header = [ _row _starts_header_cells; _row separator ] in
   String.concat ~sep:"\n" (header @ List.map report.starts ~f:_start_row)
 
 (** Full report body (non-empty case): header + dispersion table + per-start
