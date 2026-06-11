@@ -3,12 +3,15 @@
 **Supersedes** `next-session-priorities-2026-06-11.md` (the harvest-rotate-DONE
 doc). Check main CI green before dispatching.
 
-## TL;DR — the existential reframe: we've been judging the strategy on the wrong number
+## TL;DR — we've been judging the strategy on the wrong number; build the right evaluation
 
-A start-date robustness check (strategy vs BAH-SPY, **both from the same start
-through today**) shows the strategy **does NOT robustly beat buy-and-hold SPY.**
-The single-start headline numbers we'd been quoting (e.g. 2011-start +761% / 15.3%
-CAGR, "modestly beats SPY") are misleading — that's one of the *better* starts.
+A start-date check (strategy vs BAH-SPY, **both from the same start through today**)
+shows the **single-start headline numbers we'd been quoting are unreliable** — the
+edge over SPY swings wildly with *when you started*. This is **not** a verdict that
+the strategy is weak; it's that **we have not yet evaluated it properly.** Building
+that proper evaluation (robust start dates, longer history, clean universe) is the
+program — and those matrices double as the **substrate for feature work** (they show
+*where* the gaps and edges are, which guides what to build next).
 
 | Start | Strategy CAGR | SPY CAGR | Edge |
 |---|---|---|---|
@@ -22,24 +25,34 @@ CAGR, "modestly beats SPY") are misleading — that's one of the *better* starts
 | 2024 | 102.5% | 16.6% | +85.9 |
 
 (Source: the coarse rolling-start run `rolling_t3k`, 8 starts at 730-day stride,
-Cell-E top-3000 NAV/MTM, all → 2026-04-30.)
+Cell-E top-3000 NAV/MTM, all → 2026-04-30. **Preliminary** — see why below.)
 
-**Read it honestly:** ties-or-loses to SPY on the representative multi-year starts
-(2011/2012/2018 ≈ tie; **2014/2016 LOSE by 6-8pp/yr for a decade**); every big
-"win" is a **recent short window** (2020/2022/2024) dominated by the **AXTI
-fat-tail mark** (the 78%-of-NAV unrealized monster — see
-`project_broad_universe_790_mtm_inflated`). Strip the concentration/MTM and those
-collapse. **The apparent edge over SPY is a start-date + single-name artifact, not
-an established robust edge.**
+**Why this is preliminary, not a verdict** (the reasons to build the real eval, not
+to draw conclusions from this table):
 
-This reorders everything below: *before* polishing the strategy (broader universe,
-longer history, more mechanisms), the load-bearing question is **"does it robustly
-beat SPY?"** — and the honest current answer is **not clearly.** Make that the
-headline evaluation.
+1. **2011-2026 is a near-continuous bull — the least favorable regime for a
+   stage-timing strategy.** The strategy earns its keep by cutting losses in Stage 4
+   and sidestepping bears; this window had no real bear, so its core design value is
+   **untested, not disproven.** (Tell: it already shows *lower* MaxDD than SPY,
+   27.9% vs 33.7% — downside protection visible even with little to protect against.
+   A dot-com/GFC test is where that could actually pay.)
+2. **This table is on the incomplete setup** — MTM (not capital-capped, so the AXTI
+   mark inflates the recent-start wins), pre-composition universe, coarse 2-yr
+   stride. Capital-capped + clean-universe + finer-stride could look materially
+   different.
+3. **These are measurement *and* improvement tools.** Each lens reveals gaps (e.g.
+   *why* did 2014/2016 entries lag?) that point at the next feature to build.
 
-(Also for context: the realized — not MTM — return over 2011-2026 is **+158%** vs
-BAH-SPY's diversified +641%; ~80% of the strategy's NAV gain is unrealized in one
-name. And on Sharpe, BAH-SPY 0.85 > strategy 0.71.)
+So the takeaway is **methodological**: stop quoting single-start numbers; build the
+robust evaluation (P0) on the clean universe (P1) over longer history (P2), then
+honestly locate where the edge and the gaps are. The edge over SPY is an **open
+question to be measured properly**, and an opportunity to improve — not a settled
+result.
+
+(Context, same caveats apply: realized — not MTM — return over 2011-2026 is **+158%**
+vs BAH-SPY's +641%, with ~80% of NAV gain unrealized in one name; Sharpe 0.71 vs
+SPY 0.85. These too are bull-only / MTM / single-universe reads pending the proper
+evaluation.)
 
 ## P0 — Rolling-start robustness runner (the lens that makes every comparison honest)
 
@@ -70,7 +83,9 @@ metrics shipped (#1471 capital-relative DD, #1472 dispersion-stats core) but the
   it rather than starting fresh. Find it via the `rolling_t3k.sexp` producer.
 
 **Deliverable:** the start-date edge-vs-SPY matrix as the new headline evaluation —
-and an honest verdict on whether the strategy robustly beats SPY.
+an honest read of *where* the edge shows up and *which* start regimes the gaps
+cluster in (those gap regimes are direct feature targets). Not a pass/fail gate on
+the strategy; a measurement + improvement lens.
 
 ## P1 — Universe-composition policy + weekly liquidity test (defines what everything reruns on)
 
