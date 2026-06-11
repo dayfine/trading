@@ -3,6 +3,31 @@
 **Supersedes** `next-session-priorities-2026-06-10-PM.md`. Check main CI green
 before dispatching.
 
+## ⏳ PROGRESS 2026-06-11 (late) — rigorous test build is well underway
+
+The user greenlit the rigorous test (below) and it is being built:
+- **Step 1 — core partial-exit transition: ✅ MERGED #1525** (strategy-agnostic
+  `TriggerPartialExit`; `Holding→Exiting→Holding`).
+- **Step 2 — harvest-rotate mechanism: ✅ MERGED #1528** (default-off
+  `Harvest_rotate_runner`; trims `Stage2{late}` longs via `TriggerPartialExit`;
+  `enable_harvest_rotate` + `harvest_fraction` config; 13 tests; 3-gate green).
+- **Step 3 — Variant_matrix axis: ✅ FREE** (no wiring — the config fields resolve
+  as axes generically via `Overlay_validator`; confirmed by the WF-CV launch
+  accepting the overrides).
+- **Step 4a — WF-CV surface: 🏃 RUNNING** (launched 2026-06-11 ~03:31 UTC, ~4h).
+  Spec #1530: `dev/experiments/harvest-rotate-wfcv-2026-06-11/` — Cell-E top-3000,
+  2011-2026, 15 folds, baseline vs `harvest_fraction ∈ {0.33,0.5,1.0}`. Output:
+  container `/tmp/sweeps/harvest-wfcv/` (bind-mounted; survives session). Runner:
+  `walk_forward_runner.exe --spec … --snapshot-dir /tmp/snap_top3000_2011
+  --fixtures-root / --out-dir /tmp/sweeps/harvest-wfcv --parallel 1`.
+  **NEXT: collect `aggregate.sexp` + per-fold gate, rank (DSR/Pareto).**
+- **Step 4b — the decomposed WHY (the real deliverable):** follow-on analysis on
+  the WF-CV outputs + a trade-level harvest-on-vs-off comparison — attribute any
+  shortfall to timing / picks / structural-tax / cost (per
+  `dev/plans/harvest-rotate-rigorous-test-2026-06-10.md` §"primary deliverable is
+  the why"). Expected REJECT (`project_edge_is_the_fat_tail`), but the goal is the
+  quantified why, not the verdict.
+
 ## TL;DR — the 2026-06-10-PM P0: NO-BUILD decision (the screen, corrected)
 
 The P0 from the prior handoff — **harvest-and-rotate by forward expected return**
