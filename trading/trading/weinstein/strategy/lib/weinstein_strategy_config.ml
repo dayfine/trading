@@ -104,6 +104,13 @@ type config = {
       (** [Some n] force-sells a stale/delisted held position at its last close
           after an [n]-day bar gap; default [None] is a no-op (#1484). Threaded
           into the simulator's [Stale_hold.config]. See [.mli]. *)
+  enable_harvest_rotate : bool; [@sexp.default false]
+      (** Master switch for the harvest-rotate dial; default [false] is a no-op
+          (bit-identical to baseline). See [.mli]. *)
+  harvest_fraction : float; [@sexp.default 0.5]
+      (** Fraction of a held [Stage2 { late }] long trimmed by the
+          harvest-rotate runner; [0.5] = sell half. Only consulted when
+          [enable_harvest_rotate = true]. See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -143,6 +150,8 @@ let default_config ~universe ~index_symbol =
     enable_macro_bearish_exposure_trim = false;
     macro_bearish_max_long_exposure_pct = macro_bearish_no_op_cap;
     stale_exit_after_days = None;
+    enable_harvest_rotate = false;
+    harvest_fraction = 0.5;
   }
 
 let name = "Weinstein"

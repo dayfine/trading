@@ -85,6 +85,14 @@ module Late_stage2_stop_runner = Late_stage2_stop_runner
     transitions (never exits). Default-off preserves all baselines. See
     {!Late_stage2_stop_runner}. *)
 
+module Harvest_rotate_runner = Harvest_rotate_runner
+(** Harvest-rotate dial (default-off). Invoked on Friday ticks when
+    [config.enable_harvest_rotate = true]: trims [config.harvest_fraction] of
+    every held [Stage2 { late = true }] long via a [TriggerPartialExit] (the
+    book's "sell half as the Stage-3 top forms"), freeing capital to recycle
+    through the existing entry pipeline into a fresh Stage-2 leader. Default-off
+    preserves all baselines. See {!Harvest_rotate_runner}. *)
+
 module Macro_bearish_trim_runner = Macro_bearish_trim_runner
 (** Macro-bearish held-exposure trim runner (default-off). Invoked AFTER the
     special-exit passes on Friday ticks when
@@ -412,6 +420,17 @@ type config = {
           no-op (detector-only, byte-identical to pre-#1484). Threaded into the
           simulator's [Trading_simulation.Stale_hold.config]. Searchable as a
           [Variant_matrix] flag axis. See [Weinstein_strategy_config]. *)
+  enable_harvest_rotate : bool; [@sexp.default false]
+      (** Master switch for the harvest-rotate dial: trim [harvest_fraction] of
+          every held [Stage2 { late = true }] long via a [TriggerPartialExit] on
+          Friday ticks, recycling the freed capital through the existing entry
+          pipeline. Default [false] is a no-op (byte-identical to baseline).
+          Searchable as a [Variant_matrix] flag axis. See
+          [Weinstein_strategy_config] / {!Harvest_rotate_runner}. *)
+  harvest_fraction : float; [@sexp.default 0.5]
+      (** Fraction of a held [Stage2 { late }] long trimmed by the
+          harvest-rotate runner; [0.5] = sell half. Only consulted when
+          [enable_harvest_rotate = true]. See [Weinstein_strategy_config]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

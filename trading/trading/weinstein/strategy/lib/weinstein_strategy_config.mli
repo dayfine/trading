@@ -180,6 +180,43 @@ type config = {
           [None] keeps every existing backtest byte-identical (detector still
           records stale holds; no force-exit). Searchable as a [Variant_matrix]
           flag axis ([((flag stale_exit_after_days) (values (() (5))))]). *)
+  enable_harvest_rotate : bool; [@sexp.default false]
+      (** Master switch for the harvest-rotate dial ({!Harvest_rotate_runner},
+          plan [dev/plans/harvest-rotate-rigorous-test-2026-06-10.md]). When
+          [true], on a screening (Friday) day the runner trims a fraction
+          [harvest_fraction] of every held long whose current stage is
+          [Stage2 { late = true }] (the earliest Stage-3 topping precursor),
+          emitting a [TriggerPartialExit]; the freed capital recycles through
+          the existing entry pipeline into a fresh Stage-2 leader. Default
+          [false] preserves all existing baselines — the runner short-circuits
+          to [[]] before any work, so the disabled path is byte-identical to the
+          pre-feature strategy.
+
+          This is the {b exit-aggressiveness} dial ("sell half as the Stage-3
+          top forms") combined with {b rotate-into-leadership}, both Weinstein's
+          "The Trader's Way" — a faithful adaptation of
+          [docs/design/weinstein-book-reference.md] §Stage 3 detail (Ch. 2):
+          "Investors: sell half, protect remaining half." The strategy {b spine}
+          is untouched — stage classification, the Stage-2-only buy rule,
+          breakout+volume entry, the macro/sector gate, and relative strength
+          are all unaffected; only the size of an existing held long is reduced
+          when it begins to top. Searchable as a [Variant_matrix] flag axis
+          ([((flag enable_harvest_rotate) (values (true false)))]). Default-off
+          until an experiment-ledger ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md] +
+          [.claude/rules/promotion-confirmation.md]). See
+          {!Harvest_rotate_runner}. *)
+  harvest_fraction : float; [@sexp.default 0.5]
+      (** Fraction of a held long position trimmed by {!Harvest_rotate_runner}
+          when it enters [Stage2 { late = true }]: the trimmed quantity is
+          [held_quantity *. Float.min 1.0 harvest_fraction]. [0.5] = sell half
+          (the book's "sell half as the Stage-3 top forms"); [1.0] = full rotate
+          out of the topping name. Only consulted when
+          [enable_harvest_rotate = true]; because the runner is gated entirely
+          by the flag, the disabled path is byte-identical to baseline
+          regardless of this value. A value [<= 0.0] is itself a no-op (nothing
+          to trim). Searchable as a [Variant_matrix] axis. See
+          {!Harvest_rotate_runner}. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

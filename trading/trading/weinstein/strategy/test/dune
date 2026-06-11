@@ -16,6 +16,7 @@
   test_spy_only_weinstein_strategy
   test_stage3_force_exit_runner
   test_late_stage2_stop_runner
+  test_harvest_rotate_runner
   test_macro_bearish_trim_runner
   test_laggard_rotation_runner
   test_stops_runner
