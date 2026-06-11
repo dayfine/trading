@@ -38,21 +38,27 @@ carries the follow-ons. Check main CI green before dispatching.
   ~26 min). Check `verify: .../3015 files OK` in the log; status at session
   close recorded below.
 
-## P0 — Run the start-date edge-vs-SPY matrix (the deliverable the runner exists for)
+## P0 — Start-date edge matrix: PRELIMINARY RUN DONE (2026-06-11, ~10h wall)
 
-Two-stage, per the rerun-dependency note in the 06-11-PM doc:
+33 jittered starts, top-3000-2011, all → 2026-04-30, GSPC.INDX overlay. Full
+analysis: `dev/experiments/rolling-start-matrix-2026-06-11/ANALYSIS.md`.
 
-1. **Preliminary (runnable now):** top-3000 PIT snapshot warehouse
-   (`/tmp/snap_top3000_2011`), Cell-E overrides, `--stride-days ~120
-   --jitter-seed 42 --benchmark SPY --parallel 1` (N=3000 must stay fork-per-start
-   serial — memory wall), end 2026-04-30. ≈25-35 starts × ~30 min/run — budget a
-   day of wall-clock or trim the start count. Output = the honest replacement for
-   the coarse `rolling_t3k` table (capital-honest via `realized_return_pct`).
-2. **Definitive:** same matrix on the composition-policy universe — gated on P1'
-   below.
+**Result (trimmed n=30): median edge ≈ +3.2pp/yr vs price-only GSPC ≈ +1pp vs
+total-return SPX; 57% of starts beat; p10 ≈ −16pp.** No robust start-date edge
+on the 2011-2026 bull, pre-policy universe. Negative-edge starts cluster in
+2013-2018 (the gap regime = feature target). Post-2020 starts: MTM edge
+positive but realized NEGATIVE — recent wins are unrealized marks. Dot-com
+smoke (n=2, snap_top3000_2000): +13/+27pp edge — bear-regime read is promising
+and is the next big matrix.
 
-Note: SPY bars must be present in the snapshot warehouse for the overlay
-(`Daily_panels.read_history` on adjusted close); verify before the long run.
+**Blockers for the definitive run (do these first):**
+- A1: add min-window guard to start enumeration/report (3 sub-15-mo starts
+  poison the raw summary — CAGR 2393%).
+- A2: investigate impossible DD on 2023-01-26 row (MaxDD 190%, underwater 156%
+  — long-only NAV can't go negative; runner/metric bug).
+- A3: add SPY (+BRK-B) bars to warehouse builds (absent today; benchmark is
+  price-only GSPC).
+- A4: rerun on composition-policy universe once P1' lands.
 
 ## P1' — Finish the composition-policy data path
 
