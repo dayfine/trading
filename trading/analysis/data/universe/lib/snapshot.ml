@@ -18,6 +18,7 @@ type entry = {
   weight : float;
   sector : string;
   synthetic : bool;
+  avg_dollar_volume : float option; [@sexp.option]
 }
 [@@deriving sexp, show, eq]
 

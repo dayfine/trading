@@ -25,10 +25,15 @@ val candidates_of_snapshot :
     - [asset_type] supplies each symbol's classification; symbols absent from
       the map default to {!Eodhd.Asset_type.Common_stock} (the dominant case and
       the value that makes the ADR / preferred filters no-ops).
-    - [dollar_volume], when given, supplies [avg_dollar_volume] per symbol;
-      symbols absent from it — and the whole map when [dollar_volume] is omitted
-      — default to [Float.infinity], so the ADR liquidity floor never drops a
-      symbol whose volume is unknown (a conservative, no-surprise default).
+    - [avg_dollar_volume] is resolved per symbol by precedence: an explicit
+      [dollar_volume] map override (symbol present in the map) wins; otherwise
+      the entry's own [Snapshot.entry.avg_dollar_volume] is used when it is
+      [Some] (this is the value {!Build_from_individuals} populates, which makes
+      the ADR floor fire on a real composition snapshot); otherwise it defaults
+      to [Float.infinity], so the ADR liquidity floor never drops a symbol whose
+      volume is unknown (a conservative, no-surprise default). Passing
+      [?dollar_volume] thus overrides the snapshot's own volumes; omitting it
+      lets the entry volumes flow through.
     - [equity_like] is accepted for symmetry with the build inputs but is not
       consulted: the snapshot is already equity-like-filtered upstream.
 

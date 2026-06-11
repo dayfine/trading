@@ -10,8 +10,9 @@ module CPT = Composition_policy_types
 (* candidates_of_snapshot                                                  *)
 (* ---------------------------------------------------------------------- *)
 
-let _entry ?(weight = 0.1) ?(sector = "Tech") symbol : Snapshot.entry =
-  { symbol; weight; sector; synthetic = false }
+let _entry ?(weight = 0.1) ?(sector = "Tech") ?avg_dollar_volume symbol :
+    Snapshot.entry =
+  { symbol; weight; sector; synthetic = false; avg_dollar_volume }
 
 let _snapshot entries : Snapshot.t =
   {
@@ -83,6 +84,76 @@ let test_adr_floor_inert_without_volume _ =
        (fun r -> List.map r.CPT.kept ~f:(fun c -> c.CPT.symbol))
        (elements_are [ equal_to "AAPL"; equal_to "TSM" ]))
 
+(* The entry's own [avg_dollar_volume] flows into the candidate, so the ADR
+   floor fires: the ADR entry below the floor is dropped, the one above is kept.
+   No [?dollar_volume] map is passed — the volumes come from the snapshot. *)
+let test_adr_floor_fires_from_entry_volume _ =
+  let snapshot =
+    _snapshot
+      [
+        _entry "AAPL" ~avg_dollar_volume:5e9;
+        _entry "TSM" ~avg_dollar_volume:2e9 (* above floor → kept *);
+        _entry "ADRX" ~avg_dollar_volume:1e6 (* below floor → dropped *);
+      ]
+  in
+  let asset_type = Hashtbl.create (module String) in
+  Hashtbl.set asset_type ~key:"TSM" ~data:Eodhd.Asset_type.ADR;
+  Hashtbl.set asset_type ~key:"ADRX" ~data:Eodhd.Asset_type.ADR;
+  let equity_like = Hashtbl.create (module String) in
+  let candidates =
+    CPR.candidates_of_snapshot snapshot ~equity_like ~asset_type ()
+  in
+  let config = { CPT.default_config with adr_min_dollar_volume = Some 1e9 } in
+  assert_that
+    (CP.apply ~config candidates)
+    (field
+       (fun r -> List.map r.CPT.kept ~f:(fun c -> c.CPT.symbol))
+       (elements_are [ equal_to "AAPL"; equal_to "TSM" ]))
+
+(* An explicit [?dollar_volume] map overrides the entry's own volume: ADRX's
+   entry volume is below the floor, but the override map lifts it above, so it
+   is kept. *)
+let test_dollar_volume_map_overrides_entry _ =
+  let snapshot =
+    _snapshot
+      [
+        _entry "AAPL" ~avg_dollar_volume:5e9;
+        _entry "ADRX" ~avg_dollar_volume:1e6;
+      ]
+  in
+  let asset_type = Hashtbl.create (module String) in
+  Hashtbl.set asset_type ~key:"ADRX" ~data:Eodhd.Asset_type.ADR;
+  let equity_like = Hashtbl.create (module String) in
+  let dollar_volume = Hashtbl.create (module String) in
+  Hashtbl.set dollar_volume ~key:"ADRX" ~data:5e9;
+  let candidates =
+    CPR.candidates_of_snapshot snapshot ~equity_like ~asset_type ~dollar_volume
+      ()
+  in
+  let config = { CPT.default_config with adr_min_dollar_volume = Some 1e9 } in
+  assert_that
+    (CP.apply ~config candidates)
+    (field
+       (fun r -> List.map r.CPT.kept ~f:(fun c -> c.CPT.symbol))
+       (elements_are [ equal_to "AAPL"; equal_to "ADRX" ]))
+
+(* An entry with [avg_dollar_volume = None] and no map override falls back to
+   [+inf], so the ADR floor cannot drop it (conservative default preserved). *)
+let test_none_entry_volume_defaults_infinity _ =
+  let snapshot = _snapshot [ _entry "AAPL"; _entry "TSM" ] in
+  let asset_type = Hashtbl.create (module String) in
+  Hashtbl.set asset_type ~key:"TSM" ~data:Eodhd.Asset_type.ADR;
+  let equity_like = Hashtbl.create (module String) in
+  let candidates =
+    CPR.candidates_of_snapshot snapshot ~equity_like ~asset_type ()
+  in
+  let config = { CPT.default_config with adr_min_dollar_volume = Some 1e9 } in
+  assert_that
+    (CP.apply ~config candidates)
+    (field
+       (fun r -> List.map r.CPT.kept ~f:(fun c -> c.CPT.symbol))
+       (elements_are [ equal_to "AAPL"; equal_to "TSM" ]))
+
 (* ---------------------------------------------------------------------- *)
 (* render_reports                                                          *)
 (* ---------------------------------------------------------------------- *)
@@ -138,6 +209,12 @@ let suite =
          >:: test_candidates_rank_and_metadata;
          "test_adr_floor_inert_without_volume"
          >:: test_adr_floor_inert_without_volume;
+         "test_adr_floor_fires_from_entry_volume"
+         >:: test_adr_floor_fires_from_entry_volume;
+         "test_dollar_volume_map_overrides_entry"
+         >:: test_dollar_volume_map_overrides_entry;
+         "test_none_entry_volume_defaults_infinity"
+         >:: test_none_entry_volume_defaults_infinity;
          "test_render_reports_contains_filters_and_totals"
          >:: test_render_reports_contains_filters_and_totals;
        ]

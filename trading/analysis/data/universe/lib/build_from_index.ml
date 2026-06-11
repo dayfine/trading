@@ -168,6 +168,7 @@ let _make_entry ~industry ~uniform_weight ~rank : Snapshot.entry =
     weight = uniform_weight;
     sector = industry;
     synthetic = true;
+    avg_dollar_volume = None;
   }
 
 (* Per-symbol period returns are summarized into [aggregate_period_return]

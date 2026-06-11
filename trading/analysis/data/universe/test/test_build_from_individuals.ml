@@ -352,6 +352,24 @@ let test_sector_lookup_from_csv _ =
        (fun s -> List.map s.entries ~f:(fun e -> e.sector))
        (elements_are [ equal_to "Tech"; equal_to "Tech"; equal_to "Health" ]))
 
+(* Each emitted entry carries [avg_dollar_volume = Some (close * volume)] — the
+   same trailing-window score used to rank. Top-3 scores from the baseline:
+   AAA: 100 * 1M = 100M; BBB: 50 * 1M = 50M; CCC: 25 * 0.8M = 20M. This is what
+   lets the composition-policy ADR floor fire on a real snapshot. *)
+let test_entries_carry_dollar_volume _ =
+  let root, config = _setup_baseline_fixture ~size:3 in
+  let snapshot = _build_or_fail ~config in
+  _cleanup_dir root;
+  assert_that snapshot
+    (field
+       (fun s -> List.map s.entries ~f:(fun e -> e.avg_dollar_volume))
+       (elements_are
+          [
+            is_some_and (float_equal ~epsilon:1.0 100_000_000.0);
+            is_some_and (float_equal ~epsilon:1.0 50_000_000.0);
+            is_some_and (float_equal ~epsilon:1.0 20_000_000.0);
+          ]))
+
 (* Weights are uniform 1/size; total_weight ≈ 1.0. *)
 let test_weights_uniform_and_total_one _ =
   let root, config = _setup_baseline_fixture ~size:3 in
@@ -410,6 +428,7 @@ let suite =
          "test_aggregate_period_return_matches_forward_window"
          >:: test_aggregate_period_return_matches_forward_window;
          "test_sector_lookup_from_csv" >:: test_sector_lookup_from_csv;
+         "test_entries_carry_dollar_volume" >:: test_entries_carry_dollar_volume;
          "test_weights_uniform_and_total_one"
          >:: test_weights_uniform_and_total_one;
          "test_determinism_two_builds_identical"

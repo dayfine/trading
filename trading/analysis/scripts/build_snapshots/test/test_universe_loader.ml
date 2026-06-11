@@ -17,7 +17,7 @@ let pinned_sexp symbols =
     (Printf.sprintf "(Pinned (%s))" (String.concat ~sep:" " entries))
 
 let entry ~symbol ~synthetic ~sector : Snapshot.entry =
-  { symbol; weight = 0.001; sector; synthetic }
+  { symbol; weight = 0.001; sector; synthetic; avg_dollar_volume = None }
 
 (* A composition snapshot in the on-disk shape [Universe.Snapshot.save] writes.
    Serialized via [sexp_of_t] so the test exercises the real decode path. *)
