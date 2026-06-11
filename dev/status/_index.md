@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-10 HEAD `d8867b8b` (#1508; orchestrator reconcile — force-exit grid REJECT #1503, trade-forensics #1504/#1506, cascade-inversion lead #1509).
+Last updated: 2026-06-11 HEAD `53822998` (orchestrator reconcile — #1509 merged so stage-accuracy Open-PR cleared; harvest-rotate Step 2 open as maintainer PR #1528, row lands with that PR).
 
 ## Active + complete tracks
 
@@ -26,7 +26,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — |
 | [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | track in steady state; Phase 3 verdict locked (marginal edge in 1 of 4 bear windows only) |
 | [spy-only-reference](spy-only-reference.md) | IN_PROGRESS | feat-weinstein | — | WF-CV on sector-rotation testbed; top-1000 bankability gate; long-short verification (human session) |
-| [stage-accuracy](stage-accuracy.md) | IN_PROGRESS | feat-weinstein | #1509 | force_exit_off grid REJECTED for promotion (#1503); P0 cascade-selection inversion (Q1<Q4 win-rate) under validation (#1509) — broad-universe data-gated |
+| [stage-accuracy](stage-accuracy.md) | IN_PROGRESS | feat-weinstein | — | force_exit_off grid REJECTED (#1503); cascade-selection inversion documented (#1509 merged); broad-universe WF-CV re-run data-gated |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | Tier 1 fully checked off; T3-H low-priority; no active dispatch surface |
