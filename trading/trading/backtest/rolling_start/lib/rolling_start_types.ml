@@ -39,6 +39,13 @@ let _defined_edges starts =
   List.filter_map starts ~f:(fun s ->
       if Float.is_nan s.edge_pct then None else Some s.edge_pct)
 
+(* The long-enough subset of starts: a start is dropped only when
+   [min_window_days > 0] and its inclusive window is shorter than that. With
+   [min_window_days = 0] every start is kept (the predicate is always false). *)
+let _eligible_starts ~min_window_days ~end_date starts =
+  List.filter starts ~f:(fun s ->
+      not (is_short_window ~min_window_days ~end_date s))
+
 let build ?(min_window_days = 0) ~end_date starts =
   if min_window_days < 0 then
     invalid_arg
@@ -52,10 +59,7 @@ let build ?(min_window_days = 0) ~end_date starts =
      the long-enough subset so a short-window start's absurd annualised CAGR
      cannot poison the aggregate. With [min_window_days = 0] this keeps every
      start (predicate is always false), so the summaries are bit-identical. *)
-  let eligible =
-    List.filter sorted ~f:(fun s ->
-        not (is_short_window ~min_window_days ~end_date s))
-  in
+  let eligible = _eligible_starts ~min_window_days ~end_date sorted in
   {
     end_date;
     min_window_days;
@@ -73,10 +77,8 @@ let build ?(min_window_days = 0) ~end_date starts =
 
 let pct_beating_benchmark report =
   let eligible =
-    List.filter report.starts ~f:(fun s ->
-        not
-          (is_short_window ~min_window_days:report.min_window_days
-             ~end_date:report.end_date s))
+    _eligible_starts ~min_window_days:report.min_window_days
+      ~end_date:report.end_date report.starts
   in
   let defined = _defined_edges eligible in
   match defined with
