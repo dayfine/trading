@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-11 (P0 matrix first run recorded #1544 — no robust 2011-2026 start-date edge, A1-A4 artifacts; #1542 P1'.1 $-volume wiring MERGED after linter fix — ADR floor live, policy-universe artifact unblocked).
+Last updated: 2026-06-12 (orchestrator run 27421610137: P1 short-side hygiene — `short_min_price` no-op-default short-entry gate landed via #1551 (default-off axis, all goldens bit-equal); main green on a68e5c6c).
 
 ## Active + complete tracks
 
@@ -24,7 +24,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — |
-| [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | track in steady state; Phase 3 verdict locked (marginal edge in 1 of 4 bear windows only) |
+| [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | short_min_price no-op-default short-entry gate landed (#1551, axis-able); next: short-side economic-floor experiment + Phase-2 margin_call dedup fix |
 | [spy-only-reference](spy-only-reference.md) | IN_PROGRESS | feat-weinstein | — | WF-CV on sector-rotation testbed; top-1000 bankability gate; long-short verification (human session) |
 | [stage-accuracy](stage-accuracy.md) | IN_PROGRESS | feat-weinstein | — | force_exit_off grid REJECTED (#1503); cascade-selection inversion documented (#1509 merged); broad-universe WF-CV re-run data-gated |
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
