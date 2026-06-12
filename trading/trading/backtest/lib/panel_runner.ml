@@ -38,10 +38,14 @@ let _stale_hold_policy (config : Weinstein_strategy.config) : Stale_hold.config
   }
 
 let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
-    ~end_date ~warmup_days ~initial_cash ~commission ?slippage_bps
+    ~warmup_start ~end_date ~initial_cash ~commission ?slippage_bps
     ?on_trade_fill ~strategy ~market_data_adapter () =
-  let warmup_start = Date.add_days start_date (-warmup_days) in
-  let strategy = Strategy_wrapper.wrap ~stop_log strategy in
+  (* Default-off [Warmup_trade_gate] (#1549 A2); identity unless the flag is on. *)
+  let strategy =
+    Strategy_wrapper.wrap ~stop_log strategy
+    |> Warmup_trade_gate.wrap_strategy
+         ~suppress:input.config.suppress_warmup_trading ~start_date
+  in
   let sim_deps =
     Simulator.create_deps ~symbols:input.all_symbols
       ~data_dir:input.data_dir_fpath ~strategy ~commission
@@ -50,7 +54,7 @@ let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
       ~stale_hold_policy:(_stale_hold_policy input.config)
       ~margin_config:input.config.margin_config ?on_trade_fill ()
   in
-  let sim_config =
+  let config =
     Simulator.
       {
         start_date = warmup_start;
@@ -60,12 +64,10 @@ let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
         strategy_cadence = Types.Cadence.Daily;
       }
   in
-  match Simulator.create ~config:sim_config ~deps:sim_deps with
-  | Ok s -> s
-  | Error e ->
-      failwith
-        (sprintf "Backtest.Panel_runner: failed to create simulator: %s"
-           (Status.show e))
+  Simulator.create ~config ~deps:sim_deps
+  |> Result.map_error ~f:(fun e ->
+      "Backtest.Panel_runner: failed to create simulator: " ^ Status.show e)
+  |> Result.ok_or_failwith
 
 (* Read one symbol's close on [date]. Returns [None] when the symbol is not
    present in the snapshot, the read errors, or the close is NaN. *)
@@ -152,14 +154,11 @@ let _build_snapshot_bar_reader ~daily_panels ~calendar =
   Weinstein_strategy.Bar_reader.of_snapshot_views ~calendar callbacks
 
 let _create_panels ~snapshot_dir ~manifest =
-  match
-    Daily_panels.create ~snapshot_dir ~manifest
-      ~max_cache_mb:(Snapshot_cache_config.resolve_cache_mb ())
-  with
-  | Ok p -> p
-  | Error err ->
-      failwithf "Panel_runner: Daily_panels.create failed: %s" (Status.show err)
-        ()
+  Daily_panels.create ~snapshot_dir ~manifest
+    ~max_cache_mb:(Snapshot_cache_config.resolve_cache_mb ())
+  |> Result.map_error ~f:(fun e ->
+      "Panel_runner: Daily_panels.create failed: " ^ Status.show e)
+  |> Result.ok_or_failwith
 
 (* Resolve the [Daily_panels.t] this run reads through. [Some p]: read through a
    caller-owned cache ([run] does not close it). [None]: a per-run cache [run]
@@ -277,7 +276,7 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
   in
   let sim =
     _make_simulator input ~stop_log:r.stop_log ~stale_hold_log:r.stale_hold_log
-      ~start_date ~end_date ~warmup_days ~initial_cash
+      ~start_date ~warmup_start ~end_date ~initial_cash
       ~commission:effective_commission ?slippage_bps:effective_slippage_bps
       ?on_trade_fill ~strategy ~market_data_adapter ()
   in

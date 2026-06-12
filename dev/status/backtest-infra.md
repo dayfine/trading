@@ -12,6 +12,45 @@ moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
 
+## 2026-06-12 — `suppress_warmup_trading` flag (warmup-leak root-fix surface)
+
+- [x] **Default-off warmup-trading gate (P0, PR #1549 A2 follow-up).** Added a
+  no-op-default `suppress_warmup_trading : bool [@sexp.default false]` config
+  field on `Weinstein_strategy.config` plus a pure runner-side gate
+  (`Warmup_trade_gate`) that drops the strategy's `CreateEntering` transitions
+  (long and short) dated before the measurement `start_date`. The simulator
+  runs from `warmup_start = start_date - warmup_days`, so absent the flag the
+  strategy trades during the 210-day warmup window and every backtest inherits
+  a warmup-built portfolio at measurement start (the #1549 A2 root cause: the
+  2009-06-26 fold's warmup spanned the GFC bottom → portfolio depleted to ~35%
+  before measurement opened).
+  - **Lives at:** `trading/trading/backtest/warmup_gate/lib/warmup_trade_gate.{ml,mli}`
+    (micro-lib `warmup_trade_gate`), wired in `panel_runner.ml`
+    `_make_simulator` after `Strategy_wrapper.wrap`.
+  - **R1 default-off:** `suppress = false` short-circuits both
+    `filter_transitions` and `wrap_strategy` to the identity, so every
+    golden/snapshot/scenario decodes (via `[@sexp.default false]`) and replays
+    bit-equal. Full `dune build && dune runtest` exits 0 with the flag absent.
+    `Backtest.Fold_health` signatures fire exactly as before (terminal facts
+    unchanged with the flag off).
+  - **R2 axis-able (verified):** top-level bool flag, so `Variant_matrix`
+    resolves it by sexp name through `Overlay_validator` with no
+    overlay-validator change (same mechanism as `neutral_blocks_longs`). Axis
+    test added to `test_variant_matrix.ml`
+    (`suppress_warmup_trading flag axis expands`).
+  - **R3:** not wired into any default config or preset (stays default-off).
+  - **Scope:** only new-position entries are suppressed; exits / partial exits
+    / risk-param updates / fills are never dropped (warmup-window exit/stop
+    handling is never broken).
+  - **Verify:** `dune runtest trading/backtest/warmup_gate/` (7 unit tests:
+    no-op at false, drop-warmup-entry, inclusive boundary, short-side, never
+    drop non-entries, `wrap_strategy` end-to-end both flag states).
+  - **Plan:** `dev/plans/warmup-trading-flag-2026-06-12.md`. Branch
+    `feat/warmup-trading-flag`.
+  - **Next (out of scope here):** the comparison run quantifying how every
+    baseline shifts with the flag ON, then walk-forward CV + confirmation grid
+    before any promotion (P0 analysis step, `experiment-flag-discipline` R3).
+
 ## QC
 
 Step 1 (PR #399, merged) — overall_qc APPROVED at e59f8d2 (both prior blockers U6/F1 and the BC4 advisory resolved; `_held_symbols` strategy fix domain-correct).

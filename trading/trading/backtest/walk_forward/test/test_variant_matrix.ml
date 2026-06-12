@@ -240,6 +240,34 @@ let test_short_min_price_axis_expands _ =
            ];
        ])
 
+(* Proves R2 (experiment-flag-discipline) for the [suppress_warmup_trading]
+   warmup-trading gate (#1549 A2): it is a real top-level bool flag on
+   [Weinstein_strategy.config] (same mechanism as [neutral_blocks_longs]), so
+   the flag axis expands and passes [Overlay_validator] validation with no
+   overlay-validator change. The no-op default [false] and the experimental
+   [true] sit on the same axis. *)
+let test_suppress_warmup_trading_flag_axis_expands _ =
+  let axis =
+    VM.Flag
+      {
+        name = "suppress_warmup_trading";
+        values = Sexp.[ Atom "true"; Atom "false" ];
+      }
+  in
+  let t = { VM.axes = [ axis ]; expansion = VM.Cartesian } in
+  assert_that (VM.expand t)
+    (elements_are
+       [
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [ equal_to (Sexp.of_string "((suppress_warmup_trading true))") ]);
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [ equal_to (Sexp.of_string "((suppress_warmup_trading false))") ]);
+       ])
+
 (* ---------- Sampled determinism + fallback ---------- *)
 
 let test_sampled_determinism _ =
@@ -322,6 +350,8 @@ let suite =
          >:: test_macro_bearish_trim_axes_expand;
          "short_min_price float axis expands"
          >:: test_short_min_price_axis_expands;
+         "suppress_warmup_trading flag axis expands"
+         >:: test_suppress_warmup_trading_flag_axis_expands;
          "sampled determinism (same seed -> same labels)"
          >:: test_sampled_determinism;
          "sampled different seed -> different subset"
