@@ -1097,11 +1097,61 @@ let test_create_with_active_through_for_prunes_pre_fold_delisted _ =
       in
       assert_that kept (equal_to [ "AAPL"; "MSFT" ]))
 
+(* G1 (2026-06-12): a backtest fill must stamp the held lot's [acquisition_date]
+   with the simulated fill date, NOT the wall-clock run date. The engine stamps
+   fills with [Time_ns_unix.now ()]; the simulator re-stamps them to the
+   simulated date before they enter the portfolio. Without the re-stamp,
+   [open_positions.csv]'s [entry_date] (derived from the lot acquisition_date)
+   showed the run date for every open position. Here a market buy fills on
+   day 1 (2024-01-02); the resulting lot's acquisition_date must equal that
+   simulated date. *)
+let test_fill_lot_acquisition_date_is_simulated_date _ =
+  with_test_data "simulator_g1_acquisition_date"
+    [ ("AAPL", sample_aapl_prices) ]
+    ~f:(fun data_dir ->
+      let deps = make_deps data_dir in
+      let sim = Test_helpers.create_exn ~config:sample_config ~deps in
+      let order_params =
+        Trading_orders.Create_order.
+          {
+            symbol = "AAPL";
+            side = Trading_base.Types.Buy;
+            quantity = 10.0;
+            order_type = Trading_base.Types.Market;
+            time_in_force = Trading_orders.Types.GTC;
+          }
+      in
+      let order =
+        match Trading_orders.Create_order.create_order order_params with
+        | Ok o -> o
+        | Error err -> failwith ("Failed to create order: " ^ Status.show err)
+      in
+      Trading_orders.Manager.submit_orders deps.order_manager [ order ]
+      |> ignore;
+      assert_that (run sim)
+        (is_ok_and_holds (fun result ->
+             let aapl_lots =
+               List.find_map result.final_portfolio.positions
+                 ~f:(fun (p : Trading_portfolio.Types.portfolio_position) ->
+                   if String.equal p.symbol "AAPL" then Some p.lots else None)
+             in
+             assert_that aapl_lots
+               (is_some_and
+                  (elements_are
+                     [
+                       field
+                         (fun (l : Trading_portfolio.Types.position_lot) ->
+                           l.acquisition_date)
+                         (equal_to (date_of_string "2024-01-02"));
+                     ])))))
+
 (* ==================== Test Suite ==================== *)
 
 let suite =
   "Simulator Tests"
   >::: [
+         "G1: fill lot acquisition_date is the simulated fill date"
+         >:: test_fill_lot_acquisition_date_is_simulated_date;
          "create returns simulator" >:: test_create_returns_simulator;
          "create with empty symbols" >:: test_create_with_empty_symbols;
          "Win #4: prune_symbols_by_active_through drops pre-fold delistings"

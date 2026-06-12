@@ -26,7 +26,8 @@
   test_determinism
   test_bah_runner_e2e
   test_macro_trend_writer
-  test_csv_snapshot_builder_cleanup)
+  test_csv_snapshot_builder_cleanup
+  test_fold_health)
  (libraries
   ounit2
   core

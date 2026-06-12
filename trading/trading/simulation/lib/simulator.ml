@@ -188,9 +188,11 @@ let _get_today_bars t =
   in
   List.filter_map t.deps.symbols ~f:get_bar
 
-(** Extract trades from execution reports *)
-let _extract_trades reports =
+(** Extract fills, re-stamped with the simulated [date] (G1;
+    {!Fill_date_stamp}). *)
+let _extract_trades ~date reports =
   List.concat_map reports ~f:(fun report -> report.Trading_engine.Types.trades)
+  |> List.map ~f:(Fill_date_stamp.restamp ~date)
 
 (** Create get_price function for strategy *)
 let _make_get_price t : Trading_strategy.Strategy_interface.get_price_fn =
@@ -416,7 +418,7 @@ let _process_fills_and_cancels t ~portfolio ~positions =
   let%bind execution_reports =
     Trading_engine.Engine.process_orders t.deps.engine t.deps.order_manager
   in
-  let all_trades = _extract_trades execution_reports in
+  let all_trades = _extract_trades ~date:t.current_date execution_reports in
   let portfolio, trades, rejected_trades =
     _apply_trades_best_effort ?on_trade_fill:t.deps.on_trade_fill portfolio
       all_trades

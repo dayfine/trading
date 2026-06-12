@@ -12,6 +12,7 @@
   core)
  (modules
   simulator
+  fill_date_stamp
   split_handler
   cancel_handler
   order_generator

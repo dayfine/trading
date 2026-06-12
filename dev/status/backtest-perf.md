@@ -1,9 +1,69 @@
 # Status: backtest-perf
 
-## Last updated: 2026-06-11
+## Last updated: 2026-06-12
 
 ## Status
 IN_PROGRESS
+
+### Recent activity (2026-06-12) — runner fold-correctness fixes
+
+Branch `feat/runner-fold-fixes` (READY_FOR_REVIEW). Root-causes + fixes
+the silently-broken backtest fold (A2) surfaced by the rolling-start
+matrix, plus the G1 entry-date fix and a G2 investigation. Diagnosed
+from `dev/experiments/rolling-start-matrix-2026-06-11/ANALYSIS.md`.
+(A1 min-window guard was shipped in parallel by PR #1546
+`feat/backtest-perf-matrix-guards`; dropped from this branch to avoid
+the collision.)
+
+- **[x] A2 — degenerate-fold guard** (`trading/trading/backtest/lib/fold_health.{ml,mli}`,
+  wired into `scenarios/scenario_runner.ml`). **Root cause (deterministic,
+  start-date-specific):** the simulator runs from `warmup_start` (start − 210d)
+  with daily cadence, so the Weinstein strategy trades during the warmup window.
+  For the 2009-06-26 (Friday) start, the 2008-11-28→2009-06-26 warmup spans the
+  GFC bottom; warmup-window trades blow the portfolio down to ~35% of initial
+  cash *before* the measurement window opens. The in-window equity curve is then
+  flat (held positions frozen on cached/avg-cost marks) and `n_round_trips = 0`
+  (warmup entries can't pair with in-window exits in `extract_round_trips`),
+  while `align_summary_metrics` leaves the trade-stat metrics (numtrades 26,
+  largestlossdollar −556955, worstweekpct −60.6) warmup-inclusive — so the run
+  reports −64.78% as if it were in-window. The sibling Monday start (2009-06-29,
+  warmup 3 days later) is healthy: +30.88%, 68 round-trips, 512 distinct equity
+  values. Same class as the origin's "MaxDD 190.4%" (warmup drawdown folded in).
+  **Fix:** a pure `Fold_health.check` reads a run's terminal facts (initial/final
+  cash, n_round_trips, n_steps, equity curve) and returns findings for the
+  three degenerate signatures (zero in-window round-trips over a long window;
+  flat equity curve; unexplained terminal move with zero round-trips). The
+  scenario runner calls it after every run, prints each finding loudly to stderr
+  (`WARN: fold-health: …`), and writes `fold_health.sexp` per scenario. Purely
+  additive/diagnostic — changes no metric, every threshold config-routed via
+  `Fold_health.default_config` (no magic numbers). Verify:
+  `dune exec trading/backtest/test/test_fold_health.exe` (9 tests pin the A2
+  signature + each guard + the healthy-run silence).
+- **A1 — rolling-start min-window guard — shipped elsewhere.** Implemented in
+  parallel by PR #1546 (`feat/backtest-perf-matrix-guards`), which filters
+  short windows out of the report aggregate summary. Dropped from this branch
+  to avoid the collision.
+- **[x] G1 — open_positions.csv entry_date = simulated date**
+  (`trading/trading/simulation/lib/simulator.ml`). **Root cause:** the engine
+  stamps every fill with `Time_ns_unix.now ()` (`engine.ml:161`); the portfolio
+  builds each lot's `acquisition_date` from `trade.timestamp`, and
+  `reconciler_writer` derives `open_positions.csv`'s `entry_date` from the lot —
+  so every open-position row showed the *run* date. **Fix:** the simulator
+  re-stamps each fill's timestamp to the simulated `current_date` (UTC
+  start-of-day) at `_process_fills_and_cancels`, the single point backtest fills
+  enter the portfolio — no engine/portfolio core-module change. Round-trip
+  extraction is unaffected (it keys off `step.date`, not `trade.timestamp`).
+  Verify: `dune exec trading/simulation/test/test_simulator.exe` (new
+  `test_fill_lot_acquisition_date_is_simulated_date` pins the lot date to the
+  simulated fill date).
+- **G2 — investigated only** (no code change). The THM divergence (audit closed
+  a short with no `trades.csv` row, while `open_positions.csv` holds an open THM
+  short with no audit record) is the same warmup-leak class as A2: a short
+  *entered in warmup* and covered in-window is dropped from `trades.csv` by
+  `extract_round_trips` (entry not in `steps_in_range`) yet its close survives
+  in the audit (recorded from `warmup_start`); a *second* THM short opened
+  in-window and still open at run end is the `open_positions.csv` row. The A2
+  fold-health guard flags exactly the folds where this accounting splits.
 
 ### Recent activity (2026-06-11)
 
