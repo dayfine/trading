@@ -39,6 +39,27 @@ type config = {
           carry 83–362% maintenance margin) as a default-off, searchable
           {!Walk_forward.Variant_matrix} axis. Not wired into any default config
           or preset. *)
+  suppress_warmup_trading : bool; [@sexp.default false]
+      (** When [true], the backtest runner suppresses all new position entries
+          (long and short) before the measurement [start_date], so the warmup
+          window builds indicators/data only and the measurement window opens
+          with an all-cash portfolio.
+
+          Default [false] = prior behaviour: the simulator runs from
+          [start_date - warmup_days] and the strategy trades during the warmup
+          window, so every backtest inherits a warmup-built portfolio at
+          measurement start. This is a no-op default — existing
+          golden/baseline/snapshot/scenario sexps that omit the field decode to
+          [false] (via [@sexp.default false]) and replay bit-identically.
+
+          Motivated by PR #1549's A2 root-cause: warmup-window trading over the
+          GFC bottom depleted a fold's portfolio to ~35% before its measurement
+          window opened (see [Backtest.Fold_health]). The flag lets a spec test
+          the "warmup = indicators only" semantics. Implemented runner-side by
+          {!Backtest.Warmup_trade_gate}, which drops [CreateEntering]
+          transitions dated before [start_date]; exits/stops/fills are never
+          suppressed. A default-off, searchable {!Walk_forward.Variant_matrix}
+          axis. Not wired into any default config or preset. *)
   stop_update_cadence : Stops_runner.stop_update_cadence;
       [@sexp.default Stops_runner.Daily]
   stage3_force_exit_config : Stage3_force_exit.config;

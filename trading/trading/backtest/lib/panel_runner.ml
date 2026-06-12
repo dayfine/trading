@@ -42,6 +42,14 @@ let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
     ?on_trade_fill ~strategy ~market_data_adapter () =
   let warmup_start = Date.add_days start_date (-warmup_days) in
   let strategy = Strategy_wrapper.wrap ~stop_log strategy in
+  (* Default-off warmup-trading gate (#1549 A2). With the flag [false] (the
+     default) this is the identity, so every existing backtest is byte-equal;
+     with it [true] the runner drops strategy entries dated before the
+     measurement [start_date] (the simulator runs from [warmup_start]). *)
+  let strategy =
+    Warmup_trade_gate.wrap_strategy
+      ~suppress:input.config.suppress_warmup_trading ~start_date strategy
+  in
   let sim_deps =
     Simulator.create_deps ~symbols:input.all_symbols
       ~data_dir:input.data_dir_fpath ~strategy ~commission

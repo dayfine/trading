@@ -1,0 +1,5 @@
+(library
+ (name warmup_trade_gate)
+ (libraries core trading.strategy)
+ (preprocess
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
