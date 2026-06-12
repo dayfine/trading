@@ -13,7 +13,7 @@ let _tmp suffix = Stdlib.Filename.temp_file "acp_test_" ("_" ^ suffix)
 
 let _snapshot_entry ?(weight = 0.25) ?(sector = "Tech") symbol : Snapshot.entry
     =
-  { symbol; weight; sector; synthetic = false }
+  { symbol; weight; sector; synthetic = false; avg_dollar_volume = None }
 
 (* A symbol_types.sexp in the canonical Asset_type_enrichment shape, written by
    hand so the test does not cross dune-project boundaries. Each (symbol,

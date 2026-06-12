@@ -16,7 +16,7 @@ module Universe_snapshot = Scenario_lib.Universe_snapshot
 module Snapshot = Universe.Snapshot
 
 let _make_entry ~symbol ~sector ~synthetic : Snapshot.entry =
-  { symbol; weight = 0.01; sector; synthetic }
+  { symbol; weight = 0.01; sector; synthetic; avg_dollar_volume = None }
 
 let _make_snapshot ~method_ entries : Snapshot.t =
   {

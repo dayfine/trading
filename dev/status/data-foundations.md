@@ -317,10 +317,24 @@ fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
   - **Out of scope** (per the P1 brief): the weekly >1%-of-ADV
     screener liquidity gate (weinstein-side); re-running backtests on
     the policy universe (the P0/P2 rerun dependency).
-  - **Known limit:** the ADR liquidity floor needs per-symbol dollar
-    volume, which `Snapshot.t` does not carry; the CLI adapter defaults
-    absent volumes to `+inf` (floor inert) — wiring real volumes into
-    the snapshot is a follow-up.
+  - **[x] P1'.1 — dollar volume now flows through the snapshot
+    (DONE 2026-06-11, `feat/composition-dollar-volume`).** The ADR
+    liquidity floor is **live when configured**: `Snapshot.entry`
+    carries `avg_dollar_volume : float option [@sexp.option]`,
+    `Build_from_individuals` populates it with the trailing-60-day avg
+    `close × volume` it already computes for ranking, and
+    `Composition_policy_report.candidates_of_snapshot` prefers the
+    entry's own volume (precedence: explicit `?dollar_volume` map
+    override → `entry.avg_dollar_volume` → `+inf`). Backward-compatible:
+    `[@sexp.option]` means the 297 checked-in 4-field goldens decode to
+    `None` and round-trip byte-identically (verified via full
+    `dune runtest` + a dedicated decode test). Default-preserving:
+    with `adr_min_dollar_volume = None` behaviour is bit-identical to
+    today. Plan: `dev/plans/composition-dollar-volume-2026-06-11.md`.
+    **Remaining follow-up (P1'.2, data-gated):** regenerating goldens
+    with volumes populated + emitting the policy universe artifact via a
+    bulk `apply_composition_policy.exe` run — needs the maintainer-local
+    bar store.
 
 ### IN_PROGRESS — Cross-validation: composition vs Shiller (2026-05-17)
 

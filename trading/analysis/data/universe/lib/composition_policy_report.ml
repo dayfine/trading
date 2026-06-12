@@ -6,12 +6,18 @@ let _asset_type_for ~asset_type symbol =
   | Some t -> t
   | None -> Eodhd.Asset_type.Common_stock
 
-(* Absent volume (or no [dollar_volume] map) defaults to +inf so the ADR floor
-   never drops a symbol whose volume is unknown. *)
-let _dollar_volume_for ~dollar_volume symbol =
-  match dollar_volume with
-  | None -> Float.infinity
-  | Some tbl -> Option.value (Hashtbl.find tbl symbol) ~default:Float.infinity
+(* Volume precedence: an explicit [dollar_volume] map override (symbol present)
+   wins; else the entry's own [avg_dollar_volume] (if [Some]); else [+inf] so the
+   ADR floor never drops a symbol whose volume is unknown. *)
+let _dollar_volume_for ~dollar_volume (e : Snapshot.entry) =
+  let from_map =
+    match dollar_volume with
+    | None -> None
+    | Some tbl -> Hashtbl.find tbl e.symbol
+  in
+  match from_map with
+  | Some v -> v
+  | None -> Option.value e.avg_dollar_volume ~default:Float.infinity
 
 let _candidate_of_entry ~asset_type ~dollar_volume rank (e : Snapshot.entry) :
     CPT.candidate =
@@ -19,7 +25,7 @@ let _candidate_of_entry ~asset_type ~dollar_volume rank (e : Snapshot.entry) :
     symbol = e.symbol;
     asset_type = _asset_type_for ~asset_type e.symbol;
     sector = e.sector;
-    avg_dollar_volume = _dollar_volume_for ~dollar_volume e.symbol;
+    avg_dollar_volume = _dollar_volume_for ~dollar_volume e;
     rank;
   }
 

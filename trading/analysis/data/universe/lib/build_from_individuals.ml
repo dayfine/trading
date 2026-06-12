@@ -144,6 +144,7 @@ let _make_entry ~sector_lookup ~uniform_weight scored : Snapshot.entry =
     weight = uniform_weight;
     sector = _sector_for ~sector_lookup scored.symbol;
     synthetic = false;
+    avg_dollar_volume = Some scored.score;
   }
 
 let _aggregate_period_return scored_kept =

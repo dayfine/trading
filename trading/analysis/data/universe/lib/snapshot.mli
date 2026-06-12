@@ -52,6 +52,15 @@ type entry = {
           [method_] tag carries the same information at the snapshot level but
           the per-entry flag is convenient when downstream filters need to drop
           synthetic names. *)
+  avg_dollar_volume : float option; [@sexp.option]
+      (** Trailing 60-day average [close × volume] from the composition builder
+          ({!Build_from_individuals}), the same score used to rank the universe.
+          [None] for decomposition / synthetic snapshots (no real volume) and
+          for goldens emitted before this field existed. Serialized via
+          [[@sexp.option]]: a [None] entry omits the field entirely, so the
+          on-disk form is byte-identical to the pre-field 4-field shape and old
+          goldens decode to [None] unchanged. Consumed by the composition-policy
+          ADR liquidity floor (see {!Composition_policy_report}). *)
 }
 [@@deriving sexp, show, eq]
 (** One member of the snapshot. *)

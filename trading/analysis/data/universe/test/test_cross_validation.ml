@@ -35,6 +35,7 @@ let _write_composition_golden ~dir ~size ~year ~aggregate_period_return =
             weight = 1.0;
             sector = "Test";
             synthetic = false;
+            avg_dollar_volume = None;
           };
         ];
       aggregate_period_return;
