@@ -63,8 +63,8 @@ same footing — revive only if framed as explicit tail-RISK insurance
 a return improvement. Full record (incl. the corrected distributions):
 `dev/experiments/harvest-rotate-validation-2026-06-10/`.
 
-**Harness gap noted:** `Trade_audit.exit_decision.max_favorable_excursion_pct` (and
-`max_adverse_excursion_pct`) are **always 0** in every recent run — the simulator
-step-stream never populates them. Killed the audit-only give-back proxy; had to
-compute forward returns from bars instead. Worth fixing if MFE/MAE-based analysis
-is wanted later.
+**Harness gap RESOLVED 2026-06-12:** `max_favorable/adverse_excursion_pct` are now
+POPULATED in exit records (verified on the cell-e-top3000-2011 audit run, 646
+exits with real values — presumably fixed by the #1525/#1528 partial-exit work).
+Give-back analysis is live: see `dev/experiments/trade-forensics-2026-06-12/`
+(laggard_rotation exits avg MFE 52% vs realized 22% = 30pp give-back).
