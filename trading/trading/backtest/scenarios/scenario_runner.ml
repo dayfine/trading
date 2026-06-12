@@ -260,6 +260,35 @@ let _actual_path ~output_root (s : Scenario.t) =
 
 (* Run one scenario inside a child process *)
 
+(** Run the {!Backtest.Fold_health} degenerate-fold guard over a completed run
+    and surface any findings loudly: each finding is printed to stderr with a
+    [WARN: fold-health] prefix and the full list is written to
+    [<scenario_dir>/fold_health.sexp]. A healthy run writes the empty list (so
+    the artefact's presence is uniform across runs) and prints nothing. The
+    equity-curve series is the per-step [portfolio_value] over the in-window
+    steps — the same series {!Backtest.Result_writer} writes to
+    [equity_curve.csv]. Purely diagnostic: no metric or return value changes. *)
+let _emit_fold_health ~scenario_dir ~(result : Backtest.Runner.result) =
+  let summary = result.summary in
+  let equity_curve =
+    List.map result.steps
+      ~f:(fun (st : Trading_simulation_types.Simulator_types.step_result) ->
+        st.portfolio_value)
+  in
+  let findings =
+    Backtest.Fold_health.check ~config:Backtest.Fold_health.default_config
+      ~initial_cash:summary.initial_cash
+      ~final_portfolio_value:summary.final_portfolio_value
+      ~n_round_trips:summary.n_round_trips ~n_steps:summary.n_steps
+      ~equity_curve
+  in
+  List.iter findings ~f:(fun f ->
+      eprintf "WARN: fold-health: %s\n%!"
+        (Backtest.Fold_health.finding_to_string f));
+  Sexp.save_hum
+    (Filename.concat scenario_dir "fold_health.sexp")
+    ([%sexp_of: Backtest.Fold_health.finding list] findings)
+
 let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
     ~emit_all_eligible ~bar_data_source ~scenario_path (s : Scenario.t) =
   eprintf "\n>>> Running %s: %s (%s to %s)\n%!" s.name s.description
@@ -286,6 +315,11 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
   Backtest.Result_writer.write ~output_dir:scenario_dir result;
   let a = _actual_of_result result in
   Sexp.save_hum (_actual_path ~output_root s) (sexp_of_actual a);
+  (* Degenerate-fold guard: surface the silent-garbage signature (zero in-window
+     round-trips + flat equity + an unexplained terminal move — the A2 warmup-
+     leak class) loudly to stderr and as [fold_health.sexp]. Purely a reporting
+     post-step; it changes no metric and never aborts the run. *)
+  _emit_fold_health ~scenario_dir ~result;
   (* Emit wall_seconds.txt — the canonical perf-report convention
      (release_report._read_optional_float). Goldens may pin
      [expected.wall_seconds] to catch runtime regressions; scenarios that
