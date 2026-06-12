@@ -1,9 +1,36 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-05-23
+## Last updated: 2026-06-12
 
 ## Status
 IN_PROGRESS
+
+## 2026-06-12 — `short_min_price` short-entry gate (default-off axis)
+
+Added a no-op-default `short_min_price : float [@sexp.default 0.0]` config
+field on `Weinstein_strategy.config` plus a pure gate
+(`Short_min_price_gate.filter`) that drops short candidates whose
+`Screener.scored_candidate.suggested_entry` is below the threshold, wired at
+the short-candidate seam in `weinstein_strategy_screening.ml`. Encodes the
+researched sub-$17 economic-margin floor on shorts
+(`dev/notes/long-short-margin-mechanics-2026-06-12.md`) as a searchable
+`Variant_matrix` axis.
+
+- **R1 default-off:** threshold `0.0` short-circuits the gate to the identity,
+  so every golden/baseline decodes (via `[@sexp.default 0.0]`) and replays
+  bit-equal. Full `dune build && dune runtest` exits 0 (all goldens/snapshots
+  unchanged). `enable_short_side` default unchanged (`true`).
+- **R2 axis-able (verified):** `short_min_price` is a top-level float field, so
+  `Variant_matrix` resolves it by sexp name with no `Overlay_validator` change
+  (same mechanism as `stage3_exit_margin_pct`). Axis test added to
+  `test_variant_matrix.ml` (`short_min_price float axis expands`).
+- **R3:** not wired into any default config or preset (stays default-off).
+- The gate lives in its own micro-lib
+  (`weinstein_trading.short_min_price_gate`) to keep the strategy coordinator
+  module under the file-length cap and give tests a direct dependency.
+- Tests: `test_short_min_price_gate.ml` (no-op at 0.0, drop-below/retain-above
+  at 15.0, boundary-inclusive, gate untouches the long list).
+- Branch `feat/short-side-min-price`.
 
 ## Interface stable
 YES
