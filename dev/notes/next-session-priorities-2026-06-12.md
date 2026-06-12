@@ -71,13 +71,20 @@ and is the next big matrix.
 3. **Weekly >1%-of-ADV liquidity gate** in the screener — weinstein-side dispatch,
    still pending (deliberately split from P1).
 
-## P2' — Dot-com + GFC regime read
+## P2' — Dot-com + GFC regime read: DONE (2026-06-11 PM, ~6.5h)
 
-When the `snap_top3000_2000` warehouse verifies: Cell-E full run (or 2000-2011
-sub-window first — 26y N=3000 full run may exceed the 7.75 GB container; the
-15y run peaked ~5.8 GB RSS, 26y scales past it; sub-window or accept the risk)
-+ rolling-start matrix over 2000-2011 starts. This is the macro-regime-diversity
-cell `promotion-confirmation.md` demands.
+25-start matrix on `snap_top3000_2000`, 2000-01-03 → 2011-06-30. Analysis in
+`dev/experiments/rolling-start-matrix-2026-06-11/ANALYSIS.md` §Part 2.
+**Result (trimmed n=21): median edge +2.96pp (same ~+3pp as the bull matrix —
+no CAGR win anywhere), but the left tail is chopped: worst start −4.9pp (vs
+−28 on 2011-2026), edge IQR 4.9 (vs 17.9), median MaxDD 26% through two −50%+
+index crashes. The strategy is a distribution compressor; its product is
+bear-regime tail protection, not bull-market alpha.** Alpha clusters at
+post-bear bull-leg dawns (2003-04 starts +9-12pp). A2 bug second specimen
+(2009-06-26 row: CAGR −40% w/ MaxDD 0.00) — A2 is now top of the A-list.
+Remaining from the original P2': single 26y fold memory probe (sizes the full
+start→today matrix); the structural frame is in
+`memory/project_index_beating_structural_bar`.
 
 ## Carried / demoted
 

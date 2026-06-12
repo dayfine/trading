@@ -76,3 +76,52 @@ by +13.3 and +26.8 pp/yr with MaxDD 13-23%. n=2 — directional only, but the
 first evidence from a bear-containing regime, and the regime where the
 strategy is *supposed* to earn its keep. The full 2000-era matrix is the next
 big read (P2' in the handoff).
+
+---
+
+# Part 2 — 2000-2011 regime matrix (bear-decade read, 2026-06-11 PM)
+
+25 starts, `snap_top3000_2000`, 2000-01-03 → 2011-06-30, same Cell-E config +
+GSPC.INDX overlay. Raw: `matrix-t3k-2000-regime-raw.md`. Wall ~6.5h.
+
+## Trimmed read (n=21: drop 3 sub-15-month tail starts + 1 corrupt fold)
+
+| measure | 2000-2011 (this) | 2011-2026 (Part 1) |
+|---|---|---|
+| Median edge vs GSPC | +2.96 pp/yr | +3.2 pp/yr |
+| Starts beating | 67% (14/21) | 57% |
+| p10 edge | **−3.9 pp** | −16 pp |
+| Worst-start edge | **−4.9 pp** | −28 pp |
+| Edge IQR | **4.9** | 17.9 |
+| Median MaxDD | 26.2% (GSPC: −49% then −57%) | 44.2% |
+
+**Median edge is the SAME ~+3pp (≈ +1pp dividend-adjusted) in both regimes —
+the strategy never wins the CAGR race (Sharpe's arithmetic). What changes is
+the distribution shape: in the bear decade the left tail is chopped** (worst
+start −4.9pp vs −28; IQR compresses 3.6×; drawdowns ~half the index's through
+two −50%+ crashes). The strategy is a **distribution compressor**: Stage-4
+exits cut the left tail (pays in bear regimes), winner-touching cuts the right
+tail (costs in bulls). This is the per-start-date confirmation of the
+structural frame in `memory/project_index_beating_structural_bar` and the
+regime-conditional version of the barbell finding.
+
+## Structure
+
+1. **Alpha concentrates at the dawn of post-bear bull legs:** 2003-04 starts
+   (+8.9 to +12.2pp/yr, realized +51-114%) mirror the 2011-12 cluster in
+   Part 1. Early-Stage-2 entries off deep bases are the sweet spot.
+2. **2006-08 starts = protection without profit:** dodged the GFC (MaxDD
+   24-45% vs index −57%) but realized returns −18 to −29% — survival value,
+   CAGR ≈ index.
+3. **2000-02 starts (entering THROUGH the dot-com bust): all positive edge**
+   (+1.6 to +7.7pp) with MaxDD 20-31% — the macro gate + Stage-4 avoidance
+   doing exactly the designed job.
+
+## New artifact
+
+- **A2 second specimen:** 2009-06-26 row is corrupt — CAGR −40.5% with
+  MaxDD 0.00 and TimeUnderwater 0.00 (internally impossible). With Part 1's
+  190%-DD row, the per-start summary projection bug is now ~reproducible;
+  investigation moves up to the top of the A-list. Edge/CAGR columns of OTHER
+  rows are unaffected (computed from initial/final), but treat per-start DD
+  columns as suspect until fixed.
