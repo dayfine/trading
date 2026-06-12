@@ -104,3 +104,67 @@ No OCaml source or interface file changed between the two tips. The merge brough
 overall_qc: APPROVED
 structural_qc: APPROVED (SHA 937ec93 re-verification: zero OCaml delta from 26ff33ede0)
 behavioral_qc: APPROVED (SHA 937ec93 re-verification: zero OCaml delta from 26ff33ede0)
+
+---
+
+# Behavioral QC — short_min_price short-entry gate (PR #1551)
+
+Reviewed SHA: ba6c165b
+Date: 2026-06-12
+Reviewer: qc-behavioral
+
+PR #1551 (`feat/short-side-min-price`) adds a no-op-default `short_min_price : float [@sexp.default 0.0]`
+config field + `Short_min_price_gate.filter`, wired at the short-candidate seam in
+`weinstein_strategy_screening.ml`. Default `0.0` = identity (all goldens replay unchanged).
+This is a short-side eligibility **dial**, not a stage/stop/cascade change.
+
+## Contract Pinning Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| CP1 | Each non-trivial claim in new .mli docstrings has an identified test that pins it | PASS | `short_min_price_gate.mli` claims: (a) "drops short candidates whose `suggested_entry` strictly below `short_min_price`" → `test_threshold_drops_below_and_retains_above` (drops $10, retains $20 at threshold 15.0); (b) "No-op when `short_min_price <= 0.0`: returns candidates unchanged" → `test_zero_threshold_is_noop` (both tickers retained in order); (c) boundary `>=` (at-threshold retained) → `test_threshold_boundary_is_inclusive` ($15 at threshold 15.0 retained). `weinstein_strategy_config.mli` field docstring claims default-off identity + axis-ability → pinned by the no-op test + the variant-matrix axis test below. |
+| CP2 | Each PR-body "Test coverage" claim has a corresponding test in the committed test file | PASS | PR body / plan §Acceptance advertise: no-op default (`test_zero_threshold_is_noop` ✓), below dropped / at-above retained (`test_threshold_drops_below_and_retains_above` ✓), boundary inclusive (`test_threshold_boundary_is_inclusive` ✓), longs untouched (`test_gate_does_not_touch_long_list` ✓), axis expands (`test_short_min_price_axis_expands` in test_variant_matrix.ml ✓). All five exist in the committed test files. No advertised test is missing. |
+| CP3 | Pass-through / identity tests pin identity, not just size_is | PASS | The no-op (identity) contract is pinned by `test_zero_threshold_is_noop`, which asserts `elements_are [equal_to "LOW"; equal_to "HIGH"]` on the ticker list — membership AND order, not bare `size_is`. The `<= 0.0` branch returns the input list by reference (structural identity); the ticker+order assertion is an adequate observable proxy. Minor: the test asserts ticker identity rather than whole-`scored_candidate` equality, but since the no-op path returns the literal input list unchanged, this faithfully pins the byte-for-byte contract. Not a FAIL. |
+| CP4 | Each guard in code docstrings has a test exercising the guarded scenario | PASS | Guard 1: `<= 0.0` short-circuit (no-op) → `test_zero_threshold_is_noop`. Guard 2: strict-below drop with inclusive boundary (`>=`) → `test_threshold_boundary_is_inclusive` pins the exact-at-threshold edge the `>=` guard protects. Both guarded edges have dedicated tests. |
+
+## Behavioral Checklist (Weinstein domain)
+
+| # | Check | Status | Notes (cite authority) |
+|---|-------|--------|------------------------|
+| A1 | Core module modification is strategy-agnostic | NA | qc-structural did not flag A1. New module `weinstein/strategy/gate/lib/short_min_price_gate.{ml,mli}`; no core (Portfolio/Orders/Position/Strategy-iface/Engine) module modified. |
+| S1 | Stage 1 definition matches book | NA | Stage classifier not touched. |
+| S2 | Stage 2 definition matches book | NA | Not touched; Stage-2 buy criteria unchanged. |
+| S3 | Stage 3 definition matches book | NA | Not touched. |
+| S4 | Stage 4 definition matches book | NA | Not touched. |
+| S5 | Buy criteria: Stage 2 entry on breakout + volume | NA / PASS | Long path untouched — the gate is applied only to `screen_result.short_candidates`; `buy_candidates` are concatenated unchanged (weinstein_strategy_screening.ml:401–403). No regression to buy criteria. |
+| S6 | No buy signals in Stage 1/3/4 | NA | Buy path unchanged. |
+| L1 | Initial stop below base (long) / above ceiling (short) | NA | Stop placement not modified. |
+| L2 | Trailing stop never lowered/raised | NA | Trailing logic not modified. |
+| L3 | Stop triggers on weekly close | NA | Not modified. |
+| L4 | Stop state machine transitions correct | NA | Not modified. |
+| C1 | Screener cascade order | NA | Cascade not modified. The gate is a post-screener candidate filter at the strategy seam, after `_run_screener`, not a change to cascade order. |
+| C2 | Bearish macro blocks all buy candidates | NA | Macro gate not modified. Gate only narrows shorts by price; never adds a short or relaxes any gate. |
+| C3 | Sector RS vs market, not absolute | NA | Sector logic not modified. |
+| T1 | Tests cover all 4 stage transitions | NA | Not in scope. |
+| T2 | Bearish-macro → zero buy candidates test | NA | Macro path unchanged; existing screener tests still pin it. |
+| T3 | Stop trailing tests over multiple advances | NA | Not in scope. |
+| T4 | Tests assert domain outcomes, not just "no error" | PASS | Gate tests assert concrete domain outcomes: which tickers survive the price floor (`elements_are`), boundary inclusivity (count = 1 at exact threshold), and that the short list empties while the long list is untouched. The axis test asserts the resolved override sexp `((short_min_price 17.0))` and label, not merely "did not raise". |
+| W1 | Spine intact (Weinstein faithful core 1–7) | PASS | weinstein-faithful-core.md §spine. The gate filters short *candidates* by an economic price floor. It does not touch: stage classification (1), Stage-2-only buy (2), breakout+volume entry (3), Stage 3/4 sell (4), initial stop below base (5), macro+sector gates (6), or RS selection (7). It can only *remove* short candidates — never adds an entry, never relaxes a gate, never changes a stage decision. Spine untouched. |
+| W2 | Adaptation is a dial, config-expressed, with authority | PASS | weinstein-faithful-core.md §dials ("numeric thresholds tuned for the modern regime"). A min-price floor on short eligibility is an economic-viability eligibility threshold — a faithful dial. It is config-expressed as a real `Weinstein_strategy.config` float field (`short_min_price`, not a hardcoded constant), routes through `Overlay_validator`, and cites authority: margin research `dev/notes/long-short-margin-mechanics-2026-06-12.md` (sub-$17 shorts carry 83–362% maintenance margin). The book (§6 Short-Selling Criteria) does not prescribe a price floor, so this is a faithful modern-regime adaptation of a numeric threshold, not a spine change. |
+| W3 (R1) | Default-off on merge | PASS | experiment-flag-discipline.md R1. Field carries `[@sexp.default 0.0]`; `default_config` sets `short_min_price = 0.0`; gate short-circuits to identity when `<= 0.0`. Pre-existing behavior preserved bit-for-bit; pinned by `test_zero_threshold_is_noop`. |
+| W3 (R2) | Searchable axis the day it lands | PASS | experiment-flag-discipline.md R2. Real top-level `config` float field; `test_short_min_price_axis_expands` proves `((short_min_price ...))` expands as a `Variant_matrix` float axis AND passes `Overlay_validator` validation — `VM.expand` calls `_validate_override` → `Overlay_validator.apply_overrides` (variant_matrix.ml:98–112,140–142), which raises `Failure` on an unknown key-path. The test succeeding proves the field resolves. |
+| W3 (R3) | No default-on without ledger ACCEPT | PASS | experiment-flag-discipline.md R3. No default flipped; `enable_short_side` default stays `true` (untouched), `short_min_price` default stays `0.0` (no-op). Not wired into any default config or preset. No ACCEPT cited because none is needed (no promotion). |
+| — | Longs untouched (the one real domain risk) | PASS | The seam applies `Short_min_price_gate.filter` exclusively to `screen_result.Screener.short_candidates`; `buy_candidates` is a separate list field (screener.mli:281–282) concatenated untouched (weinstein_strategy_screening.ml:401–403). The whole expression is inside `if config.enable_short_side` — with shorts disabled the field is never read. The gate `filter` is itself side-agnostic (filters purely on `suggested_entry`), so even a hypothetical mis-wire would drop on price not side; but the wiring never routes longs through it. `test_gate_does_not_touch_long_list` documents the invariant (longs held separately survive while gated shorts drop). |
+
+### Notes on scope adherence
+
+- Pure additive change behind a no-op default; no golden/baseline changes (the `<= 0.0` short-circuit returns the input list unchanged).
+- `test_gate_does_not_touch_long_list` is closer to a documentation-of-invariant than a strong behavioral pin (it never actually routes a Long through the gate — it asserts a separately-held long list is unaffected). The seam reading confirms the real invariant holds, so this is acceptable, not a FAIL. A stronger end-to-end test would gate a mixed `buy_candidates @ short_candidates` flow and assert longs survive regardless of `short_min_price`; noted as a (minor) optional hardening, not a blocker.
+
+## Quality Score
+
+5 — Textbook experiment-flag-discipline slice: no-op default, real searchable config axis, spine untouched, economic-viability dial with cited authority. Contracts in the `.mli` are each pinned by a focused test asserting the domain outcome; the axis test correctly leans on `Overlay_validator` validation at expansion time. Clean, well-scoped, well-documented.
+
+## Verdict
+
+APPROVED
