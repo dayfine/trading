@@ -242,6 +242,15 @@ type config = {
           Sell→Buy round-trips so shorts are invisible in [trades.csv], and the
           cash floor only triggers on Buy so unbounded short losses cannot
           force-liquidate. *)
+  short_min_price : float; [@sexp.default 0.0]
+      (** Minimum entry price for short candidates. Short candidates whose
+          {!Screener.scored_candidate.suggested_entry} is strictly below this
+          value are dropped before they join the entry candidate list. Default
+          [0.0] = no gating (no-op, preserves prior behaviour). Encodes the
+          researched sub-$17 economic-margin floor on shorts
+          ([dev/notes/long-short-margin-mechanics-2026-06-12.md]) as a
+          default-off, searchable {!Walk_forward.Variant_matrix} axis. Not wired
+          into any default config or preset. *)
   stop_update_cadence : Stops_runner.stop_update_cadence;
       [@sexp.default Stops_runner.Daily]
       (** Cadence at which the trailing-stop state machine advances (G11).

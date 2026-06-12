@@ -22,6 +22,7 @@
   weinstein.rs
   weinstein.sector
   weinstein.screener
+  weinstein_trading.short_min_price_gate
   weinstein.stock_analysis
   weinstein.continuation
   indicators.types
