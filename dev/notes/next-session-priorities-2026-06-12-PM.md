@@ -1,4 +1,4 @@
-# Next-session priorities — 2026-06-13
+# Next-session priorities — 2026-06-12 (PM)
 
 **Supersedes** `next-session-priorities-2026-06-12.md`. Check main CI green
 before dispatching.
@@ -40,6 +40,11 @@ before dispatching.
    (net-negative, margin-free, incl. an unstopped THM zombie at −240%).
 
 ## P0 — Act on the warmup-trading discovery (the deepest finding)
+
+**See also issue #1553** (filed post-handoff): an open THM short rode a 4x
+adverse move unstopped with CONTINUOUS bars — no audit entry record, no stop
+registration. Suspected same warmup-entry path; P0 and the P1 short-hygiene
+item are likely the same bug family.
 
 A2's root cause is bigger than one fold: **every backtest trades for 210 days
 before its measurement window and inherits the resulting portfolio.** Decide
