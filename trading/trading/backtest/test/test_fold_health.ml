@@ -147,6 +147,38 @@ let test_has_findings_false_when_healthy _ =
   in
   assert_that suspect (equal_to false)
 
+(* #1553 divergence guard: portfolio holds more open positions than the strategy
+   monitors under stop evaluation. The default [max_stuck_held_positions = 0]
+   means any positive gap trips a single [Stuck_held_positions] finding. *)
+let test_check_divergence_fires_on_gap _ =
+  let findings =
+    FH.check_divergence ~config:cfg ~n_open_positions:24 ~n_stop_eligible:23
+  in
+  assert_that findings
+    (elements_are
+       [
+         equal_to
+           (FH.Stuck_held_positions
+              { n_open_positions = 24; n_stop_eligible = 23 });
+       ])
+
+(* No gap (every open position is under stop evaluation): silent. *)
+let test_check_divergence_silent_when_aligned _ =
+  let findings =
+    FH.check_divergence ~config:cfg ~n_open_positions:10 ~n_stop_eligible:10
+  in
+  assert_that findings (size_is 0)
+
+(* A wider tolerance suppresses a small gap: gap of 1 with
+   [max_stuck_held_positions = 1] does not fire (boundary is strict-greater). *)
+let test_check_divergence_respects_tolerance _ =
+  let findings =
+    FH.check_divergence
+      ~config:{ cfg with max_stuck_held_positions = 1 }
+      ~n_open_positions:11 ~n_stop_eligible:10
+  in
+  assert_that findings (size_is 0)
+
 let suite =
   "fold_health"
   >::: [
@@ -164,6 +196,11 @@ let suite =
          "has_findings_mirrors_check" >:: test_has_findings_mirrors_check;
          "has_findings_false_when_healthy"
          >:: test_has_findings_false_when_healthy;
+         "check_divergence_fires_on_gap" >:: test_check_divergence_fires_on_gap;
+         "check_divergence_silent_when_aligned"
+         >:: test_check_divergence_silent_when_aligned;
+         "check_divergence_respects_tolerance"
+         >:: test_check_divergence_respects_tolerance;
        ]
 
 let () = run_test_tt_main suite

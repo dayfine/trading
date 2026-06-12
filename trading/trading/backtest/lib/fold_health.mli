@@ -41,6 +41,17 @@ type config = {
           the starting stake). Combined with zero round-trips and a flat curve,
           a large terminal move that no in-window trade explains is the
           warmup-leak signature. A non-negative fraction. *)
+  max_stuck_held_positions : int;
+      (** Divergence guard (#1553): the largest tolerated gap between the count
+          of {e open portfolio positions} and the count of
+          {e strategy positions still under active stop evaluation}. A position
+          the portfolio holds but the strategy no longer monitors (e.g. stuck in
+          [Exiting] after a rejected exit fill, so the stop machinery — which
+          only re-evaluates [Holding] — never re-fires) is a terminally-stuck
+          zombie that rode an adverse move unbounded. A gap strictly greater
+          than this count trips {!Stuck_held_positions}. Default [0]: every open
+          position must be accounted for under stop evaluation. A non-negative
+          count. *)
 }
 [@@deriving sexp, eq]
 
@@ -48,9 +59,10 @@ val default_config : config
 (** Thresholds calibrated against the A2 repro (2009-06-26 start,
     top-3000-2000): [min_steps_for_check = 60] (≈ a quarter of trading days),
     [flat_equity_min_distinct_ratio = 0.05] (≤5% distinct NAV values = flat),
-    [depleted_abs_return_threshold = 0.5] (≥50% terminal move). These are the
-    defaults the scenario runner uses; callers may override for stricter or
-    looser gating. *)
+    [depleted_abs_return_threshold = 0.5] (≥50% terminal move),
+    [max_stuck_held_positions = 0] (every open position must be under stop
+    evaluation). These are the defaults the scenario runner uses; callers may
+    override for stricter or looser gating. *)
 
 type finding =
   | Zero_round_trips_over_long_window of { n_steps : int }
@@ -68,6 +80,14 @@ type finding =
           [depleted_abs_return_threshold]) while the run also showed zero
           in-window round-trips — i.e. a large P&L swing that no in-window trade
           accounts for (warmup-window leak). *)
+  | Stuck_held_positions of { n_open_positions : int; n_stop_eligible : int }
+      (** Portfolio↔strategy divergence (#1553): the portfolio holds
+          [n_open_positions] open positions but only [n_stop_eligible] of them
+          are under active strategy stop evaluation (the gap exceeds
+          [max_stuck_held_positions]). The unmonitored remainder are terminally
+          stuck — e.g. positions left in [Exiting] after a rejected exit fill,
+          which the stop machinery never re-evaluates — and ride their adverse
+          move unbounded. *)
 [@@deriving sexp, eq]
 
 val finding_to_string : finding -> string
@@ -98,6 +118,24 @@ val check :
       flagged); a non-positive [initial_cash] suppresses it (return is
       undefined). *)
 
+val check_divergence :
+  config:config -> n_open_positions:int -> n_stop_eligible:int -> finding list
+(** [check_divergence ~config ~n_open_positions ~n_stop_eligible] returns a
+    singleton [Stuck_held_positions] finding when
+    [n_open_positions - n_stop_eligible > config.max_stuck_held_positions], else
+    the empty list (#1553). [n_open_positions] is the count of open positions in
+    the end-of-run portfolio; [n_stop_eligible] is the count of strategy
+    positions still under active stop evaluation (in the simulator's terms,
+    positions in the [Holding] state). The two diverge exactly when a position
+    the portfolio holds is no longer monitored by the strategy — the
+    stuck-[Exiting] zombie signature.
+
+    Kept separate from {!check} because the divergence inputs (the two position
+    counts) come from the end-of-run portfolio + strategy state rather than the
+    summary/equity-curve facts {!check} reads. Callers union the two finding
+    lists. A negative gap (more eligible than open — should not occur) never
+    trips. *)
+
 val has_findings :
   config:config ->
   initial_cash:float ->
@@ -107,4 +145,5 @@ val has_findings :
   equity_curve:float list ->
   bool
 (** [has_findings ...] is [not (List.is_empty (check ...))] — a convenience for
-    callers that only need the boolean "is this fold suspect?". *)
+    callers that only need the boolean "is this fold suspect?". Covers only the
+    {!check} invariants, not {!check_divergence}. *)
