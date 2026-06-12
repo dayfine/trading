@@ -17,6 +17,23 @@ let filter_transitions ~suppress ~start_date transitions =
   else
     List.filter transitions ~f:(fun t -> not (_is_warmup_entry ~start_date t))
 
+(* Map an inner [on_market_close] result through {!filter_transitions} with
+   [suppress = true], leaving [Error] untouched. Extracted to a flat top-level
+   helper so [wrap_strategy]'s functor body stays shallow — the transform lives
+   here rather than nested inside the [module Wrapped] closure (keeps nesting
+   depth within the linter budget). *)
+let _filter_result ~start_date
+    (result : Strategy_interface.output Status.status_or) =
+  Result.map result ~f:(fun { Strategy_interface.transitions } ->
+      {
+        Strategy_interface.transitions =
+          filter_transitions ~suppress:true ~start_date transitions;
+      })
+
+let _filter_market_close ~start_date ~inner ~get_price ~get_indicator ~portfolio
+    =
+  inner ~get_price ~get_indicator ~portfolio |> _filter_result ~start_date
+
 let wrap_strategy ~suppress ~start_date (module S : Strategy_interface.STRATEGY)
     =
   if not suppress then (module S : Strategy_interface.STRATEGY)
@@ -24,14 +41,7 @@ let wrap_strategy ~suppress ~start_date (module S : Strategy_interface.STRATEGY)
     let module Wrapped = struct
       let name = S.name
 
-      let on_market_close ~get_price ~get_indicator ~portfolio =
-        match S.on_market_close ~get_price ~get_indicator ~portfolio with
-        | Ok { transitions } ->
-            Ok
-              {
-                Strategy_interface.transitions =
-                  filter_transitions ~suppress ~start_date transitions;
-              }
-        | Error _ as e -> e
+      let on_market_close =
+        _filter_market_close ~start_date ~inner:S.on_market_close
     end in
     (module Wrapped : Strategy_interface.STRATEGY)
