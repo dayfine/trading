@@ -6,6 +6,7 @@ type config = {
   min_steps_for_check : int;
   flat_equity_min_distinct_ratio : float;
   depleted_abs_return_threshold : float;
+  max_stuck_held_positions : int;
 }
 [@@deriving sexp, eq]
 
@@ -21,17 +22,23 @@ let _default_flat_equity_min_distinct_ratio = 0.05
    the warmup-leak signature. *)
 let _default_depleted_abs_return_threshold = 0.5
 
+(* 0 = every open portfolio position must be accounted for under stop
+   evaluation; any gap is a stuck/zombie position (#1553). *)
+let _default_max_stuck_held_positions = 0
+
 let default_config =
   {
     min_steps_for_check = _default_min_steps_for_check;
     flat_equity_min_distinct_ratio = _default_flat_equity_min_distinct_ratio;
     depleted_abs_return_threshold = _default_depleted_abs_return_threshold;
+    max_stuck_held_positions = _default_max_stuck_held_positions;
   }
 
 type finding =
   | Zero_round_trips_over_long_window of { n_steps : int }
   | Flat_equity_curve of { n_points : int; n_distinct : int }
   | Unexplained_terminal_move of { total_return_pct : float }
+  | Stuck_held_positions of { n_open_positions : int; n_stop_eligible : int }
 [@@deriving sexp, eq]
 
 let _zero_round_trips_msg n_steps =
@@ -52,6 +59,14 @@ let _terminal_move_msg total_return_pct =
      round-trips (likely warmup-window P&L leaked into the measurement window)"
     total_return_pct
 
+let _stuck_held_msg n_open_positions n_stop_eligible =
+  sprintf
+    "portfolio holds %d open position(s) but only %d are under active stop \
+     evaluation: %d unmonitored (likely stuck in Exiting after a rejected exit \
+     fill — see #1553)"
+    n_open_positions n_stop_eligible
+    (n_open_positions - n_stop_eligible)
+
 let finding_to_string = function
   | Zero_round_trips_over_long_window { n_steps } ->
       _zero_round_trips_msg n_steps
@@ -59,6 +74,8 @@ let finding_to_string = function
       _flat_equity_msg n_points n_distinct
   | Unexplained_terminal_move { total_return_pct } ->
       _terminal_move_msg total_return_pct
+  | Stuck_held_positions { n_open_positions; n_stop_eligible } ->
+      _stuck_held_msg n_open_positions n_stop_eligible
 
 (* Distinct count of the equity-curve values, with a float epsilon so two marks
    that differ only by floating noise are treated as the same NAV. *)
@@ -109,6 +126,12 @@ let check ~config ~initial_cash ~final_portfolio_value ~n_round_trips ~n_steps
       _terminal_move_finding ~config ~initial_cash ~final_portfolio_value
         ~n_round_trips;
     ]
+
+let check_divergence ~config ~n_open_positions ~n_stop_eligible =
+  let gap = n_open_positions - n_stop_eligible in
+  if gap > config.max_stuck_held_positions then
+    [ Stuck_held_positions { n_open_positions; n_stop_eligible } ]
+  else []
 
 let has_findings ~config ~initial_cash ~final_portfolio_value ~n_round_trips
     ~n_steps ~equity_curve =

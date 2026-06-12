@@ -342,28 +342,6 @@ let _build_run_result t =
       !(t.valuation_failure_count);
   { steps; final_portfolio = t.portfolio; metrics }
 
-(* Apply trades; partition into accepted vs rejected by the portfolio.
-   Rejected trades are routed through {!Cancel_handler} so the
-   corresponding [Entering] positions don't stay stuck forever. See PR
-   #1172 follow-up §"Option B". *)
-let _try_apply_trade portfolio trade =
-  match Trading_portfolio.Portfolio.apply_single_trade portfolio trade with
-  | Ok p -> (p, `Accepted trade)
-  | Error _ -> (portfolio, `Rejected trade)
-
-let _apply_trades_best_effort ?on_trade_fill portfolio trades =
-  let hook = Option.value on_trade_fill ~default:Fn.id in
-  let portfolio, accepted_rev, rejected_rev =
-    List.fold trades ~init:(portfolio, [], [])
-      ~f:(fun (portfolio, accepted, rejected) trade ->
-        let trade = hook trade in
-        let portfolio, outcome = _try_apply_trade portfolio trade in
-        match outcome with
-        | `Accepted t -> (portfolio, t :: accepted, rejected)
-        | `Rejected t -> (portfolio, accepted, t :: rejected))
-  in
-  (portfolio, List.rev accepted_rev, List.rev rejected_rev)
-
 (** Apply split detection, update market state, record stale-held positions, and
     (when configured, default-off) force-exit stale/delisted positions at their
     last close. Returns the post-split / post-force-exit portfolio, positions,
@@ -420,8 +398,8 @@ let _process_fills_and_cancels t ~portfolio ~positions =
   in
   let all_trades = _extract_trades ~date:t.current_date execution_reports in
   let portfolio, trades, rejected_trades =
-    _apply_trades_best_effort ?on_trade_fill:t.deps.on_trade_fill portfolio
-      all_trades
+    Cancel_handler.apply_trades_best_effort ?on_trade_fill:t.deps.on_trade_fill
+      portfolio all_trades
   in
   let%bind positions =
     _update_positions_from_trades ~date:t.current_date ~positions ~trades
@@ -432,6 +410,13 @@ let _process_fills_and_cancels t ~portfolio ~positions =
   in
   let%bind positions =
     _apply_transitions ~positions ~transitions:cancel_transitions
+  in
+  (* Exit-side mirror (#1553): an [Exiting] position whose exit fill was rejected
+     would otherwise stay stuck forever (stops only re-evaluate [Holding]).
+     Revert it to [Holding] so the stop re-fires next cycle. *)
+  let positions =
+    Cancel_handler.revert_rejected_exits ~date:t.current_date ~positions
+      ~rejected_trades
   in
   Ok (portfolio, positions, trades)
 

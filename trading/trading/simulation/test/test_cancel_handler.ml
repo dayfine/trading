@@ -1,8 +1,10 @@
-(** Unit tests for {!Cancel_handler} — the bridge that emits [CancelEntry]
-    transitions for fills rejected by the portfolio, so positions don't stay
-    stuck in [Entering] forever. Pins the four contracts from
-    {!Cancel_handler.mli}: matched-symbol emit, no-match drop, Closed-removal,
-    and unknown-id identity. Each contract has one dedicated test below. *)
+(** Unit tests for {!Cancel_handler} — the bridge that handles
+    portfolio-rejected fills so positions don't stay stuck. Pins the entry-side
+    contracts (matched-symbol [CancelEntry] emit, no-match drop, Closed-removal,
+    unknown-id identity) and the exit-side [revert_rejected_exits] contracts
+    (#1553): unfilled [Exiting] reverts to [Holding] preserving the stop,
+    partially-filled [Exiting] is left untouched, and a non-[Exiting] match is a
+    no-op. Each contract has one dedicated test below. *)
 
 open OUnit2
 open Core
@@ -55,6 +57,43 @@ let _make_holding_position ~id ~symbol : Position.t =
             };
         };
     last_updated = _date ~y:2024 ~m:Month.Jan ~d:10;
+    portfolio_lot_ids = [];
+  }
+
+(** Build an [Exiting] position for [symbol] keyed by [id]. [filled_quantity]
+    defaults to 0.0 (the stuck-exit signature #1553 targets); pass a positive
+    value to model a partially-filled exit that must NOT be reverted. The
+    carried [entry_date]/[risk_params] are the fields the revert reconstructs
+    [Holding] from. *)
+let _make_exiting_position ~id ~symbol ?(filled_quantity = 0.0) () : Position.t
+    =
+  {
+    id;
+    symbol;
+    side = Position.Short;
+    entry_reasoning = Position.ManualDecision { description = "test fixture" };
+    exit_reason =
+      Some
+        (Position.StopLoss
+           { stop_price = 0.53; actual_price = 0.55; loss_percent = -2.4 });
+    state =
+      Position.Exiting
+        {
+          quantity = 1000.0;
+          entry_price = 0.72;
+          entry_date = _date ~y:2022 ~m:Month.May ~d:27;
+          target_quantity = 1000.0;
+          exit_price = 0.55;
+          filled_quantity;
+          started_date = _date ~y:2022 ~m:Month.Nov ~d:10;
+          risk_params =
+            {
+              stop_loss_price = Some 0.53;
+              take_profit_price = None;
+              max_hold_days = None;
+            };
+        };
+    last_updated = _date ~y:2022 ~m:Month.Nov ~d:10;
     portfolio_lot_ids = [];
   }
 
@@ -157,6 +196,91 @@ let test_apply_to_positions_unknown_id_is_noop _ =
                  (field (fun (p : Position.t) -> p.symbol) (equal_to "SPY")));
           ]))
 
+(** Contract 5 (#1553): [revert_rejected_exits] reverts an unfilled [Exiting]
+    position whose exit fill was rejected back to [Holding], preserving the
+    pre-exit quantity / entry price / entry date / risk params (so the stop
+    keeps tracking on retry). This is the fix for the stuck-[Exiting] zombie. *)
+let test_revert_rejected_exits_reverts_unfilled_exiting _ =
+  let positions =
+    _positions_with
+      ~entries:[ _make_exiting_position ~id:"THM-pos-1" ~symbol:"THM" () ]
+  in
+  let rejected = [ _make_trade ~symbol:"THM" ] in
+  let positions =
+    Cancel_handler.revert_rejected_exits ~date:_build_date ~positions
+      ~rejected_trades:rejected
+  in
+  assert_that
+    (Map.find positions "THM-pos-1")
+    (is_some_and
+       (field
+          (fun (p : Position.t) -> p.state)
+          (matching ~msg:"Expected Holding after revert"
+             (function
+               | Position.Holding { quantity; entry_price; risk_params; _ } ->
+                   Some (quantity, entry_price, risk_params.stop_loss_price)
+               | _ -> None)
+             (all_of
+                [
+                  field (fun (q, _, _) -> q) (float_equal 1000.0);
+                  field (fun (_, ep, _) -> ep) (float_equal 0.72);
+                  field
+                    (fun (_, _, stop) -> stop)
+                    (is_some_and (float_equal 0.53));
+                ]))))
+
+(** Contract 6 (#1553): a {e partially} filled [Exiting] position is NOT
+    reverted — reverting would resurrect a [Holding] at the full pre-exit
+    quantity while the portfolio already booked the partial cover. The position
+    stays [Exiting]. *)
+let test_revert_rejected_exits_skips_partially_filled _ =
+  let positions =
+    _positions_with
+      ~entries:
+        [
+          _make_exiting_position ~id:"THM-pos-1" ~symbol:"THM"
+            ~filled_quantity:300.0 ();
+        ]
+  in
+  let rejected = [ _make_trade ~symbol:"THM" ] in
+  let positions =
+    Cancel_handler.revert_rejected_exits ~date:_build_date ~positions
+      ~rejected_trades:rejected
+  in
+  assert_that
+    (Map.find positions "THM-pos-1")
+    (is_some_and
+       (field
+          (fun (p : Position.t) -> p.state)
+          (matching ~msg:"Expected position to stay Exiting"
+             (function
+               | Position.Exiting { filled_quantity; _ } -> Some filled_quantity
+               | _ -> None)
+             (float_equal 300.0))))
+
+(** Contract 7 (#1553): a rejected trade whose symbol matches only a [Holding]
+    (not [Exiting]) position is a no-op — the map is returned unchanged. Guards
+    against reverting positions that were never exiting. *)
+let test_revert_rejected_exits_ignores_non_exiting _ =
+  let positions =
+    _positions_with
+      ~entries:[ _make_holding_position ~id:"SPY-pos-1" ~symbol:"SPY" ]
+  in
+  let rejected = [ _make_trade ~symbol:"SPY" ] in
+  let positions =
+    Cancel_handler.revert_rejected_exits ~date:_build_date ~positions
+      ~rejected_trades:rejected
+  in
+  assert_that
+    (Map.find positions "SPY-pos-1")
+    (is_some_and
+       (field
+          (fun (p : Position.t) -> p.state)
+          (matching ~msg:"Expected Holding unchanged"
+             (function
+               | Position.Holding { quantity; _ } -> Some quantity | _ -> None)
+             (float_equal 100.0))))
+
 let suite =
   "Cancel_handler"
   >::: [
@@ -169,6 +293,12 @@ let suite =
          >:: test_apply_to_positions_removes_on_closed;
          "apply_to_positions returns input unchanged for unknown position_id"
          >:: test_apply_to_positions_unknown_id_is_noop;
+         "revert_rejected_exits reverts an unfilled Exiting position to Holding"
+         >:: test_revert_rejected_exits_reverts_unfilled_exiting;
+         "revert_rejected_exits skips a partially-filled Exiting position"
+         >:: test_revert_rejected_exits_skips_partially_filled;
+         "revert_rejected_exits ignores a non-Exiting (Holding) position"
+         >:: test_revert_rejected_exits_ignores_non_exiting;
        ]
 
 let () = run_test_tt_main suite

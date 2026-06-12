@@ -3,7 +3,8 @@
     Three variants exercise the wiring contract:
 
     1. [on_trade_fill = None] — byte-equal to the pre-PR baseline (the
-    [_apply_trades_best_effort] path takes the identity branch). 2.
+    [Cancel_handler.apply_trades_best_effort] path takes the identity branch).
+    2.
     [on_trade_fill = Some Cost_model.apply_per_trade_commission retail_default]
     — [retail_default.per_trade_commission = 0.0], so cash matches the baseline
     byte-for-byte even though the hook is wired. 3.
