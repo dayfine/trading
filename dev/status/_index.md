@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-11 HEAD `bbd78879` (P0 rolling-start v2 #1536; P1 universe-composition policy #1537/#1540/#1539; 2026-06-12 priorities #1541. Open: #1542 P1'.1 $-volume wiring — maintainer in-flight, CI-red).
+Last updated: 2026-06-11 (P0 matrix first run recorded #1544 — no robust 2011-2026 start-date edge, A1-A4 artifacts; #1542 P1'.1 $-volume wiring MERGED after linter fix — ADR floor live, policy-universe artifact unblocked).
 
 ## Active + complete tracks
 
@@ -46,7 +46,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
 | [weekly-snapshot](weekly-snapshot.md) | MERGED | — | — | — |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
-| [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | #1542 (maintainer, CI-red) | P1'.1 wire $-volume into snapshots in flight (#1542); then emit policy universe artifact + weekly ADV gate |
+| [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | P1'.1 $-volume wiring MERGED (#1542); next: emit composition-policy universe artifact + weekly ADV screener gate |
 
 ## How to use
 
