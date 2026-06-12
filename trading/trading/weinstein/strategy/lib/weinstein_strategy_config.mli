@@ -24,6 +24,21 @@ type config = {
   universe_cap : int option;
   full_compute_tail_days : int option;
   enable_short_side : bool; [@sexp.default true]
+  short_min_price : float; [@sexp.default 0.0]
+      (** Minimum entry price for short candidates. Short candidates whose
+          {!Screener.scored_candidate.suggested_entry} is strictly below this
+          value are dropped before they join the entry candidate list.
+
+          Default [0.0] = no gating: the gate short-circuits to the identity
+          when [short_min_price <= 0.0], so the candidate list is bit-identical
+          to the prior behaviour and every existing golden/baseline decodes and
+          replays unchanged.
+
+          Encodes the researched sub-$17 economic-margin floor on shorts
+          ([dev/notes/long-short-margin-mechanics-2026-06-12.md]: sub-$17 shorts
+          carry 83–362% maintenance margin) as a default-off, searchable
+          {!Walk_forward.Variant_matrix} axis. Not wired into any default config
+          or preset. *)
   stop_update_cadence : Stops_runner.stop_update_cadence;
       [@sexp.default Stops_runner.Daily]
   stage3_force_exit_config : Stage3_force_exit.config;

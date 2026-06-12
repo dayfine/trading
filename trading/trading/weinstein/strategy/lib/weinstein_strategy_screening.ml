@@ -399,7 +399,8 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at ~config
   let combined_candidates =
     if config.enable_short_side then
       screen_result.Screener.buy_candidates
-      @ screen_result.Screener.short_candidates
+      @ Short_min_price_gate.filter ~short_min_price:config.short_min_price
+          screen_result.Screener.short_candidates
     else screen_result.Screener.buy_candidates
   in
   let entries =

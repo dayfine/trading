@@ -200,6 +200,46 @@ let test_macro_bearish_trim_axes_expand _ =
               "enable_macro_bearish_exposure_trim=false__macro_bearish_max_long_exposure_pct=0.35");
        ])
 
+(* Proves R2 (experiment-flag-discipline) for the [short_min_price] short-entry
+   gate: it is a real top-level float key on [Weinstein_strategy.config] (same
+   mechanism as [stage3_exit_margin_pct]), so the axis expands and passes
+   [Overlay_validator] validation with no overlay-validator change. The no-op
+   default value [0.0] and the researched ~$17 economic floor sit on the same
+   axis. *)
+let test_short_min_price_axis_expands _ =
+  let axis =
+    VM.Key
+      {
+        path = [ "short_min_price" ];
+        values = Sexp.[ Atom "0.0"; Atom "17.0" ];
+      }
+  in
+  let t = { VM.axes = [ axis ]; expansion = VM.Cartesian } in
+  assert_that (VM.expand t)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (v : WFR.variant) -> v.label)
+               (equal_to "short_min_price=0.0");
+             field
+               (fun (v : WFR.variant) -> v.overrides)
+               (elements_are
+                  [ equal_to (Sexp.of_string "((short_min_price 0.0))") ]);
+           ];
+         all_of
+           [
+             field
+               (fun (v : WFR.variant) -> v.label)
+               (equal_to "short_min_price=17.0");
+             field
+               (fun (v : WFR.variant) -> v.overrides)
+               (elements_are
+                  [ equal_to (Sexp.of_string "((short_min_price 17.0))") ]);
+           ];
+       ])
+
 (* ---------- Sampled determinism + fallback ---------- *)
 
 let test_sampled_determinism _ =
@@ -280,6 +320,8 @@ let suite =
          >:: test_neutral_blocks_longs_flag_axis_expands;
          "macro-bearish trim flag + cap axes expand + validate"
          >:: test_macro_bearish_trim_axes_expand;
+         "short_min_price float axis expands"
+         >:: test_short_min_price_axis_expands;
          "sampled determinism (same seed -> same labels)"
          >:: test_sampled_determinism;
          "sampled different seed -> different subset"
