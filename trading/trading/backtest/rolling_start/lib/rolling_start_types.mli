@@ -68,8 +68,22 @@ type per_start = {
 
 type report = {
   end_date : Date.t;  (** The fixed end date every run terminated on. *)
+  min_window_days : int;
+      (** The minimum window length (inclusive [start_date .. end_date] calendar
+          days) a start must span to be counted in the aggregate/dispersion
+          summaries below. Starts whose window is strictly shorter than this are
+          {b excluded from every summary} ([cagr] / [edge] / drawdowns /
+          {!pct_beating_benchmark}) because annualising a very short window
+          produces an absurd CAGR that poisons the aggregate (a sub-15-month
+          window can read +2393%/yr). They are {b still rendered} in the
+          per-start detail table, flagged [(short window, excluded)], so the raw
+          rows stay visible — only the summary is protected. [0] (the default,
+          via {!build}) excludes nothing: every start is counted, identical to
+          the pre-guard behaviour. *)
   starts : per_start list;
-      (** Per-start rows in start-date order (earliest first). *)
+      (** {b All} per-start rows in start-date order (earliest first), including
+          any below [min_window_days] — the detail table shows everything; the
+          summaries are computed over only the eligible subset. *)
   cagr : Dispersion_stats.summary;
       (** Dispersion of {!per_start.cagr_pct} across [starts]. *)
   max_underwater_vs_initial : Dispersion_stats.summary;
@@ -88,20 +102,39 @@ type report = {
 (** The full rolling-start dispersion report: the raw per-start rows plus one
     {!Dispersion_stats.summary} per collected metric. *)
 
-val build : end_date:Date.t -> per_start list -> report
+val build : ?min_window_days:int -> end_date:Date.t -> per_start list -> report
 (** [build ~end_date starts] sorts [starts] by [start_date] (ascending) and
     computes a {!Dispersion_stats.summary} for each metric column via
     {!Dispersion_stats.summarize}. The [edge] summary skips [nan] rows (starts
     with no benchmark). An empty [starts] yields all-zero-n summaries — see
-    {!Dispersion_stats.summarize}'s empty-list contract. *)
+    {!Dispersion_stats.summarize}'s empty-list contract.
+
+    [?min_window_days] (default [0]) is the {!report.min_window_days} guard: a
+    start whose inclusive window [start_date .. end_date] is strictly shorter
+    than [min_window_days] calendar days is excluded from {b every} summary (its
+    annualised CAGR would be absurd and poison the aggregate), but is still
+    retained in [starts] for the detail table. The default [0] excludes nothing
+    — bit-identical to the un-guarded behaviour.
+
+    @raise Invalid_argument if [min_window_days < 0]. *)
 
 val pct_beating_benchmark : report -> float
 (** [pct_beating_benchmark report] is the percentage (in [0.0, 100.0]) of starts
     with a defined ([non-nan]) [edge_pct] that is strictly positive — i.e. the
     share of start dates from which the strategy beat the benchmark's
     buy-and-hold. Computed over only the benchmarked starts (denominator = count
-    of non-[nan] [edge_pct]); returns [Float.nan] when no start has a benchmark.
-    The single headline robustness number. *)
+    of non-[nan] [edge_pct]) that {b also} clear [report.min_window_days]
+    (short-window starts are excluded, consistent with the summaries); returns
+    [Float.nan] when no eligible start has a benchmark. The single headline
+    robustness number. *)
+
+val is_short_window :
+  min_window_days:int -> end_date:Date.t -> per_start -> bool
+(** [is_short_window ~min_window_days ~end_date s] is [true] iff [s]'s inclusive
+    window ([s.start_date .. end_date], counted in calendar days) is strictly
+    shorter than [min_window_days] — i.e. [s] is excluded from the summaries.
+    Always [false] when [min_window_days <= 0]. Exposed so callers / tests can
+    reproduce the exclusion predicate {!build} applies. *)
 
 val to_markdown : report -> string
 (** [to_markdown report] renders a human-readable report: a header line naming

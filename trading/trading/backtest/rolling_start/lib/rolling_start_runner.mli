@@ -152,6 +152,14 @@ type config = {
           many children at once ({!Fork_pool.run_parallel}). Result order is
           always input (ascending start-date) order, independent of completion
           order. *)
+  min_window_days : int;
+      (** Minimum inclusive [start_date .. end_date] window (calendar days) a
+          start must span to be counted in the report's aggregate/dispersion
+          summaries. Short starts are still run and rendered in the detail
+          table, but excluded from the summaries (annualising a very short
+          window yields an absurd CAGR that poisons the aggregate). Threaded
+          verbatim into {!Rolling_start_types.build}. [0] (the default) excludes
+          nothing — bit-identical to the pre-guard behaviour. *)
   fixtures_root : string;
       (** Directory the scenario's [universe_path] is resolved against (mirrors
           [scenario_runner --fixtures-root]). *)

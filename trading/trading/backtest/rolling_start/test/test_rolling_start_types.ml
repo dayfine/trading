@@ -159,6 +159,99 @@ let test_edge_skips_nan_starts _ =
            (equal_to true);
        ])
 
+(* --- A1: min-window guard --- *)
+
+(* Three benchmarked starts plus one short-window start. With end_date
+   2020-12-31, the short start 2020-12-01 spans 31 inclusive days; the other
+   three span years. Its CAGR/edge are absurd (1000) so if it leaked into the
+   summary the median/min would move. *)
+let starts_with_short =
+  benchmarked_starts
+  @ [
+      make_start ~y:2020 ~m:Month.Dec ~d:1 ~cagr:1000.0 ~underwater:0.0
+        ~maxdd:(-1.0) ~benchmark:5.0 ();
+    ]
+
+(* Default (min_window_days = 0) counts every start — including the short one —
+   so the summaries match the no-guard behaviour over all four starts. *)
+let test_min_window_default_counts_all _ =
+  let report = RT.build ~end_date starts_with_short in
+  assert_that report
+    (all_of
+       [
+         field (fun r -> r.RT.min_window_days) (equal_to 0);
+         field (fun r -> r.RT.cagr.DS.n) (equal_to 4);
+         field (fun r -> r.RT.edge.DS.n) (equal_to 4);
+         (* short start's 1000 CAGR is the max when not excluded *)
+         field (fun r -> r.RT.cagr.DS.max) (float_equal 1000.0);
+       ])
+
+(* With a 60-day guard the 31-day short start is excluded from every summary,
+   leaving the three long benchmarked starts — identical to the un-guarded
+   [benchmarked_starts] report (edges [-15;10;30], cagr max 50). The short row
+   is still retained in [starts] for the detail table (4 rows). *)
+let test_min_window_excludes_short_from_summary _ =
+  let report = RT.build ~min_window_days:60 ~end_date starts_with_short in
+  assert_that report
+    (all_of
+       [
+         field (fun r -> r.RT.min_window_days) (equal_to 60);
+         field (fun r -> List.length r.RT.starts) (equal_to 4);
+         field (fun r -> r.RT.cagr.DS.n) (equal_to 3);
+         field (fun r -> r.RT.cagr.DS.max) (float_equal 50.0);
+         field (fun r -> r.RT.edge.DS.n) (equal_to 3);
+         field (fun r -> r.RT.edge.DS.median) (float_equal 10.0);
+         field (fun r -> r.RT.edge.DS.min) (float_equal (-15.0));
+       ])
+
+(* pct_beating_benchmark over the eligible subset: the short start beats its
+   benchmark (1000 > 5) but is excluded, so the headline is computed over the
+   three long starts only — 2 of 3 beat -> 66.67%, not 3 of 4 = 75%. *)
+let test_min_window_pct_beating_excludes_short _ =
+  let report = RT.build ~min_window_days:60 ~end_date starts_with_short in
+  assert_that
+    (RT.pct_beating_benchmark report)
+    (is_between (module Float_ord) ~low:66.6 ~high:66.7)
+
+(* Boundary: a start whose inclusive window is EXACTLY the threshold is included
+   (the predicate is strictly-less-than). 2020-12-01 .. 2020-12-31 = 31 days, so
+   min_window_days=31 keeps it (n=4) and min_window_days=32 drops it (n=3). *)
+let test_min_window_boundary_inclusive _ =
+  let at_31 = RT.build ~min_window_days:31 ~end_date starts_with_short in
+  let at_32 = RT.build ~min_window_days:32 ~end_date starts_with_short in
+  assert_that (at_31.RT.cagr.DS.n, at_32.RT.cagr.DS.n) (equal_to (4, 3))
+
+(* is_short_window reproduces the exclusion predicate; <=0 threshold excludes
+   nothing. *)
+let test_is_short_window_predicate _ =
+  let short =
+    make_start ~y:2020 ~m:Month.Dec ~d:1 ~cagr:1000.0 ~underwater:0.0
+      ~maxdd:(-1.0) ()
+  in
+  let long =
+    make_start ~y:2011 ~m:Month.Jan ~d:1 ~cagr:10.0 ~underwater:0.0
+      ~maxdd:(-1.0) ()
+  in
+  assert_that
+    ( RT.is_short_window ~min_window_days:60 ~end_date short,
+      RT.is_short_window ~min_window_days:60 ~end_date long,
+      RT.is_short_window ~min_window_days:0 ~end_date short )
+    (equal_to (true, false, false))
+
+(* A negative threshold is rejected. *)
+let test_min_window_negative_raises _ =
+  assert_raises
+    (Invalid_argument "build: min_window_days must be non-negative, got -1")
+    (fun () -> RT.build ~min_window_days:(-1) ~end_date sample_starts)
+
+(* The detail table flags the excluded short-window row but the summary table is
+   computed over the eligible subset. *)
+let test_min_window_markdown_flags_excluded _ =
+  let md =
+    RT.to_markdown (RT.build ~min_window_days:60 ~end_date starts_with_short)
+  in
+  assert_that md (contains_substring "short window, excluded")
+
 (* Round-trip the report through sexp to pin the derived serializer. Uses the
    benchmarked starts so every float is finite — [@@deriving equal] compares
    floats with [Float.equal], under which [nan <> nan], so a report carrying nan
@@ -182,6 +275,16 @@ let suite =
          "edge_skips_nan_starts" >:: test_edge_skips_nan_starts;
          "to_markdown_contains_sections" >:: test_to_markdown_contains_sections;
          "to_markdown_empty" >:: test_to_markdown_empty;
+         "min_window_default_counts_all" >:: test_min_window_default_counts_all;
+         "min_window_excludes_short_from_summary"
+         >:: test_min_window_excludes_short_from_summary;
+         "min_window_pct_beating_excludes_short"
+         >:: test_min_window_pct_beating_excludes_short;
+         "min_window_boundary_inclusive" >:: test_min_window_boundary_inclusive;
+         "is_short_window_predicate" >:: test_is_short_window_predicate;
+         "min_window_negative_raises" >:: test_min_window_negative_raises;
+         "min_window_markdown_flags_excluded"
+         >:: test_min_window_markdown_flags_excluded;
          "sexp_roundtrip" >:: test_sexp_roundtrip;
        ]
 

@@ -17,7 +17,7 @@
     {[
       rolling_start_eval --scenario <path.sexp>
         [--end-date YYYY-MM-DD] [--stride-days N] [--jitter-seed N]
-        [--benchmark SYMBOL] [--parallel N]
+        [--benchmark SYMBOL] [--parallel N] [--min-window-days N]
         [--fixtures-root <path>] [--snapshot-dir <path>] [--out <path>]
     ]}
 
@@ -28,10 +28,14 @@
     artefacts). [--benchmark SYMBOL] overlays buy-and-hold CAGR / edge for that
     symbol per start (snapshot mode only — pair with [--snapshot-dir]).
     [--parallel N] forks up to N starts concurrently (default 1 = each start in
-    its own short-lived child, the broad-universe memory-safe path). [--out],
-    when given, writes the markdown to that path; otherwise the markdown goes to
-    stdout. The derived sexp always goes to stderr so it can be redirected
-    independently. *)
+    its own short-lived child, the broad-universe memory-safe path).
+    [--min-window-days N] (default 0 = off) excludes starts whose inclusive
+    window spans fewer than N calendar days from the aggregate/dispersion
+    summaries — they are still run and shown in the detail table, flagged, but a
+    very short window's absurd annualised CAGR no longer poisons the median /
+    IQR / pct-beating. [--out], when given, writes the markdown to that path;
+    otherwise the markdown goes to stdout. The derived sexp always goes to
+    stderr so it can be redirected independently. *)
 
 open Core
 module Runner = Rolling_start.Rolling_start_runner
@@ -42,6 +46,12 @@ module Bar_source_resolver = Scenario_lib.Bar_source_resolver
 
 let _default_stride_days = 91
 
+(* Default 0 = no min-window guard: every start counted in the summaries, the
+   pre-guard behaviour. A positive value excludes short-window starts from the
+   aggregate (annualising a sub-window produces an absurd CAGR that poisons the
+   median / IQR / pct-beating). *)
+let _default_min_window_days = 0
+
 (* Default to 1 (each start forked one-at-a-time): the memory-safe broad-universe
    path, and behaviour-preserving for small-N runs. *)
 let _default_parallel = 1
@@ -50,8 +60,8 @@ let _usage () =
   eprintf
     "Usage: rolling_start_eval --scenario <path.sexp> [--end-date YYYY-MM-DD] \
      [--stride-days N | --start-stride-days N] [--jitter-seed N] [--benchmark \
-     SYMBOL] [--parallel N] [--fixtures-root <path>] [--snapshot-dir <path>] \
-     [--out <path>]\n";
+     SYMBOL] [--parallel N] [--min-window-days N] [--fixtures-root <path>] \
+     [--snapshot-dir <path>] [--out <path>]\n";
   Stdlib.exit 1
 
 type _parse_acc = {
@@ -61,6 +71,7 @@ type _parse_acc = {
   mutable jitter_seed : int option;
   mutable benchmark_symbol : string option;
   mutable parallel : int option;
+  mutable min_window_days : int option;
   mutable fixtures_root : string option;
   mutable snapshot_dir : string option;
   mutable out_path : string option;
@@ -80,6 +91,13 @@ let _parse_positive_int label s =
       eprintf "%s requires a positive integer, got %S\n" label s;
       Stdlib.exit 1
 
+let _parse_non_negative_int label s =
+  match Int.of_string_opt s with
+  | Some n when n >= 0 -> n
+  | _ ->
+      eprintf "%s requires a non-negative integer, got %S\n" label s;
+      Stdlib.exit 1
+
 let _parse_int label s =
   match Int.of_string_opt s with
   | Some n -> n
@@ -96,6 +114,7 @@ let _parse_flag args =
       jitter_seed = None;
       benchmark_symbol = None;
       parallel = None;
+      min_window_days = None;
       fixtures_root = None;
       snapshot_dir = None;
       out_path = None;
@@ -124,6 +143,10 @@ let _parse_flag args =
     | "--parallel" :: s :: rest ->
         acc.parallel <- Some (_parse_positive_int "--parallel" s);
         loop rest
+    | "--min-window-days" :: s :: rest ->
+        acc.min_window_days <-
+          Some (_parse_non_negative_int "--min-window-days" s);
+        loop rest
     | "--fixtures-root" :: path :: rest ->
         acc.fixtures_root <- Some path;
         loop rest
@@ -150,6 +173,9 @@ let _config_of (acc : _parse_acc) (scenario : Scenario.t) : Runner.config =
     Option.value acc.stride_days ~default:_default_stride_days
   in
   let parallel = Option.value acc.parallel ~default:_default_parallel in
+  let min_window_days =
+    Option.value acc.min_window_days ~default:_default_min_window_days
+  in
   {
     Runner.scenario;
     end_date;
@@ -157,6 +183,7 @@ let _config_of (acc : _parse_acc) (scenario : Scenario.t) : Runner.config =
     jitter_seed = acc.jitter_seed;
     benchmark_symbol = acc.benchmark_symbol;
     parallel;
+    min_window_days;
     fixtures_root;
     bar_data_source;
   }
@@ -183,12 +210,14 @@ let () =
   let config = _config_of acc scenario in
   eprintf "Rolling-start eval: %s\n%!" scenario.name;
   eprintf
-    "  start=%s end=%s stride=%d days jitter=%s benchmark=%s parallel=%d\n%!"
+    "  start=%s end=%s stride=%d days jitter=%s benchmark=%s parallel=%d \
+     min_window_days=%d\n\
+     %!"
     (Date.to_string config.scenario.period.start_date)
     (Date.to_string config.end_date)
     config.stride_days
     (Option.value_map config.jitter_seed ~default:"off" ~f:Int.to_string)
     (Option.value config.benchmark_symbol ~default:"none")
-    config.parallel;
+    config.parallel config.min_window_days;
   let report = Runner.run config in
   _emit ~out_path:acc.out_path report

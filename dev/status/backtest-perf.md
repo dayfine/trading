@@ -65,6 +65,45 @@ the collision.)
   in-window and still open at run end is the `open_positions.csv` row. The A2
   fold-health guard flags exactly the folds where this accounting splits.
 
+### Recent activity (2026-06-12)
+
+- **[x] A1 — min-window guard for the rolling-start matrix summary**
+  (branch `feat/backtest-perf-matrix-guards`, PR #1546). Surfaced as a
+  definitive-run blocker in
+  `dev/experiments/rolling-start-matrix-2026-06-11/ANALYSIS.md`: short windows
+  (≤15 months) annualise to absurd CAGR (up to +2393 %/yr) and poison the
+  report's aggregate stats (raw median edge +6.0 pp/yr vs honest trimmed
+  +3.2 pp/yr). Added a `min_window_days` concept — a start whose inclusive
+  `start_date..end_date` window is strictly shorter than the threshold is
+  **excluded from every aggregate/dispersion summary** (cagr / edge / drawdowns
+  / `pct_beating_benchmark`) but **still rendered** in the per-start detail
+  table, flagged `short window, excluded` (design (b): keep raw rows visible,
+  protect only the poisoned summary; documented in the `.mli`). Surfaced as
+  `--min-window-days N` on `bin/rolling_start_eval.ml` + a `Runner.config`
+  field threaded into `Rolling_start_types.build`. **Backward compatible:**
+  default `0` excludes nothing — bit-identical to prior behaviour; negative
+  raises. 7 new tests pin the predicate, default-no-op, boundary (== threshold
+  ⇒ included), pct-beating exclusion, and the detail-table flag.
+  Verify: `dune runtest trading/backtest/rolling_start/` (18 type + 16 runner
+  tests pass).
+- **[x] A2 — "impossible drawdown" (MaxDD 190.4 %) investigated → root-caused
+  upstream; no rolling-start-layer fix.** Both the 190.4 % MaxDD and 156.3 %
+  MaxUnderwaterVsInitial on the `2023-01-26` row are different lenses on the
+  **same negative-NAV step** — a true reflection of the equity curve, not a
+  rolling-start projection/fork defect (`per_start_of_summary` reads the
+  metrics verbatim; `Fork_pool` reassembles per-start records by index, no
+  summary mixing). Root cause is upstream in **portfolio cash accounting**: the
+  buy-side cash floor (`Portfolio._check_sufficient_cash`) permits negative
+  `current_cash` credited against a **stale** `unrealized_pnl_per_position`
+  cushion, so a later mark can drive NAV < 0 ⇒ >100 % DD. Distinct from the
+  fixed 2026-05-15 NAV-fallback bug (that flatlined NAV to non-negative cash,
+  ≤100 % DD only). **No guard added** in the rolling-start layer — clamping the
+  metric would mask a real data-integrity signal (the fail-loud philosophy of
+  `portfolio_valuation.ml`). Reproduction is warehouse-gated
+  (`/tmp/snap_top3000_2011`). Full writeup +
+  recommended portfolio-owner follow-up:
+  `dev/notes/rolling-start-maxdd-investigation-2026-06-12.md`.
+
 ### Recent activity (2026-06-11)
 
 - **[x] Rolling-start robustness runner v2 — start-date × edge-vs-benchmark
