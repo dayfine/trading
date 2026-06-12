@@ -1,6 +1,45 @@
 # Status: simulation
 
-## Last updated: 2026-05-22
+## Last updated: 2026-06-12
+
+### 2026-06-12 — exit-fill-reject retry (#1553)
+
+Fixed the cash-floor-rejected exit-fill zombie (issue #1553): a position
+whose stop fired and moved to `Exiting`, but whose cover/sell fill was
+then rejected by the portfolio cash floor, was stranded in `Exiting`
+forever (the stop machinery only re-evaluates `Holding`), so it rode the
+adverse move unbounded (THM short −240% in the Nov-2022 bear).
+
+Three pieces, all simulation/backtest-layer (no core-module edit):
+- **Revert (M):** `Cancel_handler.revert_rejected_exits` reverts an
+  unfilled `Exiting` position back to `Holding` (reconstructed from the
+  `Exiting` state's carried fields, preserving the stop), so the stop
+  re-evaluates next cycle and re-triggers the exit — a natural retry
+  loop. Wired into `Simulator._process_fills_and_cancels` right after the
+  entry-side `transitions_for_rejected_trades`. Partially-filled exits are
+  deliberately not reverted (would desync the portfolio's booked partial
+  cover). Rejected-fill apply/bucket relocated to
+  `Cancel_handler.apply_trades_best_effort` (keeps `simulator.ml` under
+  the file-length limit).
+- **Observability (S):** `apply_trades_best_effort` now emits a loud
+  per-trade `WARN` (symbol/side/qty/price/reason) on every
+  portfolio-rejected fill — no more silent drops.
+- **Fold_health (S):** additive `Stuck_held_positions` finding +
+  `Fold_health.check_divergence` (config-thresholded
+  `max_stuck_held_positions`, default 0) flags portfolio↔strategy
+  divergence (open positions not under stop evaluation). Pure/additive;
+  runner-wiring (threading the strategy position count through
+  `Runner.result`) deferred to a harness follow-up to keep the PR in
+  budget.
+
+Verify: `dune runtest trading/simulation/test trading/backtest/test`
+(7 cancel_handler tests + 12 fold_health tests green).
+Decision items for review (PR body): (1) a core `CancelExit`
+(`Exiting -> Holding`) transition to replace the simulation-layer state
+reconstruction; (2) exempting risk-reducing (closing) trades from the
+portfolio cash floor.
+
+## Last updated (prior): 2026-05-22
 
 ## Status
 IN_PROGRESS
