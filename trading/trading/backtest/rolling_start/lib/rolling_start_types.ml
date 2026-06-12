@@ -15,6 +15,7 @@ type per_start = {
 
 type report = {
   end_date : Date.t;
+  min_window_days : int;
   starts : per_start list;
   cagr : Dispersion_stats.summary;
   max_underwater_vs_initial : Dispersion_stats.summary;
@@ -23,6 +24,14 @@ type report = {
 }
 [@@deriving sexp, equal]
 
+(* Inclusive calendar-day count of [start_date .. end_date] — the window length
+   matching the runner's [_inclusive_days] / CAGR-annualisation convention. *)
+let _inclusive_window_days ~end_date (s : per_start) =
+  Date.diff end_date s.start_date + 1
+
+let is_short_window ~min_window_days ~end_date (s : per_start) =
+  min_window_days > 0 && _inclusive_window_days ~end_date s < min_window_days
+
 (* Edge can legitimately be nan (a start with no benchmark); the dispersion
    summary is computed over only the defined edges so nan rows neither poison
    the stats nor inflate n. *)
@@ -30,26 +39,46 @@ let _defined_edges starts =
   List.filter_map starts ~f:(fun s ->
       if Float.is_nan s.edge_pct then None else Some s.edge_pct)
 
-let build ~end_date starts =
+let build ?(min_window_days = 0) ~end_date starts =
+  if min_window_days < 0 then
+    invalid_arg
+      (sprintf "build: min_window_days must be non-negative, got %d"
+         min_window_days);
   let sorted =
     List.sort starts ~compare:(fun a b ->
         Date.compare a.start_date b.start_date)
   in
+  (* The detail table renders every start; the summaries are computed over only
+     the long-enough subset so a short-window start's absurd annualised CAGR
+     cannot poison the aggregate. With [min_window_days = 0] this keeps every
+     start (predicate is always false), so the summaries are bit-identical. *)
+  let eligible =
+    List.filter sorted ~f:(fun s ->
+        not (is_short_window ~min_window_days ~end_date s))
+  in
   {
     end_date;
+    min_window_days;
     starts = sorted;
-    cagr = Dispersion_stats.summarize (List.map sorted ~f:(fun s -> s.cagr_pct));
+    cagr =
+      Dispersion_stats.summarize (List.map eligible ~f:(fun s -> s.cagr_pct));
     max_underwater_vs_initial =
       Dispersion_stats.summarize
-        (List.map sorted ~f:(fun s -> s.max_underwater_vs_initial_pct));
+        (List.map eligible ~f:(fun s -> s.max_underwater_vs_initial_pct));
     max_drawdown =
       Dispersion_stats.summarize
-        (List.map sorted ~f:(fun s -> s.max_drawdown_pct));
-    edge = Dispersion_stats.summarize (_defined_edges sorted);
+        (List.map eligible ~f:(fun s -> s.max_drawdown_pct));
+    edge = Dispersion_stats.summarize (_defined_edges eligible);
   }
 
 let pct_beating_benchmark report =
-  let defined = _defined_edges report.starts in
+  let eligible =
+    List.filter report.starts ~f:(fun s ->
+        not
+          (is_short_window ~min_window_days:report.min_window_days
+             ~end_date:report.end_date s))
+  in
+  let defined = _defined_edges eligible in
   match defined with
   | [] -> Float.nan
   | _ ->
@@ -103,8 +132,14 @@ let _robustness_summary report =
 
 (** One per-start detail row — the matrix row: start x
     [strategy CAGR, benchmark CAGR, edge, Sharpe, capital-DD, time-underwater,
-     realized basis]. *)
-let _start_row (s : per_start) =
+     realized basis], plus a [note] cell flagging short-window starts that are
+    excluded from the summaries. *)
+let _start_row ~min_window_days ~end_date (s : per_start) =
+  let note =
+    if is_short_window ~min_window_days ~end_date s then
+      "short window, excluded"
+    else ""
+  in
   _row
     [
       Date.to_string s.start_date;
@@ -116,6 +151,7 @@ let _start_row (s : per_start) =
       _f2 s.time_underwater_pct;
       _f2 s.max_drawdown_pct;
       _f2 s.realized_return_pct;
+      note;
     ]
 
 (* Column titles of the per-start detail table, in {!_start_row} order. *)
@@ -130,13 +166,20 @@ let _starts_header_cells =
     "TimeUnderwater %";
     "MaxDrawdown %";
     "Realized return %";
+    "note";
   ]
 
 (** The per-start detail table (one row per start date). *)
 let _starts_table report =
   let separator = List.map _starts_header_cells ~f:(fun _ -> "---") in
   let header = [ _row _starts_header_cells; _row separator ] in
-  String.concat ~sep:"\n" (header @ List.map report.starts ~f:_start_row)
+  let rows =
+    List.map report.starts
+      ~f:
+        (_start_row ~min_window_days:report.min_window_days
+           ~end_date:report.end_date)
+  in
+  String.concat ~sep:"\n" (header @ rows)
 
 (** Full report body (non-empty case): header + dispersion table + per-start
     detail, trailing newline. *)

@@ -99,6 +99,7 @@ type config = {
   jitter_seed : int option;
   benchmark_symbol : string option;
   parallel : int;
+  min_window_days : int;
   fixtures_root : string;
   bar_data_source : Backtest.Bar_data_source.t option;
 }
@@ -213,4 +214,5 @@ let run config =
      else Fork_pool.run_parallel ~parallel:config.parallel ~jobs)
     |> Array.to_list
   in
-  Rolling_start_types.build ~end_date:config.end_date per_starts
+  Rolling_start_types.build ~min_window_days:config.min_window_days
+    ~end_date:config.end_date per_starts
