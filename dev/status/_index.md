@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-12 (orchestrator run 27421610137: P1 short-side hygiene — `short_min_price` no-op-default short-entry gate landed via #1551 (default-off axis, all goldens bit-equal); main green on a68e5c6c).
+Last updated: 2026-06-13 (orchestrator run 27453251622: FULL PASS, 0 dispatch — all forward work data-gated/fork-gated. Maintainer shipped #1554-#1556 + warmup flag #1555 (default-off `suppress_warmup_trading`, the P0 root-fix surface) overnight; main GREEN on d4ea7bb2. Open maintainer PR #1558 (fold-health runner wiring) is CI-RED on file-length: runner.ml + simulator.ml both 504 (>500 hard limit) — sole blocker, surfaced for the maintainer.)
 
 ## Active + complete tracks
 
@@ -13,7 +13,7 @@ Each row: one line; deeper task detail in the linked status file.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
-| [backtest-infra](backtest-infra.md) | MERGED | — | — | — |
+| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | #1558 | Fold_health runner wiring (#1557 item 1); CI-RED on file-length (runner.ml + simulator.ml both 504 > 500) — extract a helper from each to unblock |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
 | [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | rolling-start v2 merged (#1536: jittered starts, edge-vs-SPY matrix, fork-per-start); next: run matrix on composition-policy universe |
 | [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | manual ghcr.io devcontainer rebuild (flambda) + Win #4 production wiring for active_through pruning |
