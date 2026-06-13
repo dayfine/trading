@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-13 (orchestrator run 27453251622: FULL PASS, 0 dispatch — all forward work data-gated/fork-gated. Maintainer shipped #1554-#1556 + warmup flag #1555 (default-off `suppress_warmup_trading`, the P0 root-fix surface) overnight; main GREEN on d4ea7bb2. Open maintainer PR #1558 (fold-health runner wiring) is CI-RED on file-length: runner.ml + simulator.ml both 504 (>500 hard limit) — sole blocker, surfaced for the maintainer.)
+Last updated: 2026-06-13 (orchestrator run 27461622165 [run 2]: QC'd maintainer PR #1560 short-side suppression — APPROVED both gates (quality 5), but maintainer self-merged it at 08:50Z mid-review; verdict agrees. Maintainer also merged #1558 (fold-health runner wiring, prior file-length blocker resolved) + #1561 (warmup-suppression WF-CV REJECTS the flip — P0 warmup escalation resolved). Main GREEN on a849bf26 (build+runtest exit 0). 0 open PRs, 0 ci-red issues.)
 
 ## Active + complete tracks
 
@@ -13,7 +13,7 @@ Each row: one line; deeper task detail in the linked status file.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
-| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | #1558 | Fold_health runner wiring (#1557 item 1); CI-RED on file-length (runner.ml + simulator.ml both 504 > 500) — extract a helper from each to unblock |
+| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | — | Fold_health wiring MERGED (#1558); warmup-suppression WF-CV rejects the flip (#1561); next: P2 matrix on composition-policy universe (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
 | [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | rolling-start v2 merged (#1536: jittered starts, edge-vs-SPY matrix, fork-per-start); next: run matrix on composition-policy universe |
 | [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | manual ghcr.io devcontainer rebuild (flambda) + Win #4 production wiring for active_through pruning |
@@ -24,7 +24,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — |
-| [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | short_min_price no-op-default short-entry gate landed (#1551, axis-able); next: short-side economic-floor experiment + Phase-2 margin_call dedup fix |
+| [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | enable_short_side=false suppression now honest + tested (#1560, QC-APPROVED); next: WF-CV the short_min_price axis (0.0 vs ~17.0) + Phase-2 margin_call dedup fix |
 | [spy-only-reference](spy-only-reference.md) | IN_PROGRESS | feat-weinstein | — | WF-CV on sector-rotation testbed; top-1000 bankability gate; long-short verification (human session) |
 | [stage-accuracy](stage-accuracy.md) | IN_PROGRESS | feat-weinstein | — | force_exit_off grid REJECTED (#1503); cascade-selection inversion documented (#1509 merged); broad-universe WF-CV re-run data-gated |
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
