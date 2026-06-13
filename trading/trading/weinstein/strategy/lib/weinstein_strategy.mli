@@ -251,17 +251,18 @@ type config = {
           ([dev/notes/long-short-margin-mechanics-2026-06-12.md]) as a
           default-off, searchable {!Walk_forward.Variant_matrix} axis. Not wired
           into any default config or preset. *)
-  suppress_warmup_trading : bool; [@sexp.default false]
-      (** When [true], the backtest runner suppresses all new position entries
-          (long and short) before the measurement [start_date], so the warmup
-          window builds indicators/data only and the measurement window opens
-          with an all-cash portfolio. Default [false] = prior behaviour (the
-          strategy trades during the warmup window). No-op default: existing
-          sexps decode to [false] and replay bit-identically. Motivated by PR
-          #1549's A2 warmup-leak root cause; implemented runner-side by
-          {!Backtest.Warmup_trade_gate}. A default-off, searchable
-          {!Walk_forward.Variant_matrix} axis. Not wired into any default config
-          or preset. *)
+  suppress_warmup_trading : bool; [@sexp.default true]
+      (** When [true] (the default), the backtest runner suppresses all new
+          position entries (long and short) before the measurement [start_date],
+          so the warmup window builds indicators/data only and the measurement
+          window opens with an all-cash portfolio. Default [true] =
+          measurement-correctness invariant (user directive 2026-06-13:
+          "measured window = window only"); warmup forms indicators only.
+          [false] = legacy "running start" (the strategy trades during warmup),
+          kept as an escape hatch / searchable axis. No-op in live/forward mode.
+          Motivated by PR #1549's A2 warmup-leak root cause; implemented
+          runner-side by {!Backtest.Warmup_trade_gate}. Remains a searchable
+          {!Walk_forward.Variant_matrix} axis. *)
   stop_update_cadence : Stops_runner.stop_update_cadence;
       [@sexp.default Stops_runner.Daily]
       (** Cadence at which the trailing-stop state machine advances (G11).
