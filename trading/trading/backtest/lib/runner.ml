@@ -40,6 +40,7 @@ type result = {
   round_trips : Metrics.trade_metrics list;
   steps : Trading_simulation_types.Simulator_types.step_result list;
   final_portfolio : Trading_portfolio.Portfolio.t;
+  n_stop_eligible_positions : int;
   overrides : Sexp.t list;
   stop_infos : Stop_log.stop_info list;
   audit : Trade_audit.audit_record list;
@@ -455,6 +456,7 @@ let _assemble_result ~start_date ~end_date ~deps ~overrides ~sim_result
     round_trips;
     steps;
     final_portfolio;
+    n_stop_eligible_positions = sim_result.n_stop_eligible_positions;
     overrides;
     stop_infos;
     audit;

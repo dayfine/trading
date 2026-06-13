@@ -55,6 +55,14 @@ type result = {
           {!Portfolio_summary.t} projection that omits these details to keep
           [step_history] memory bounded; reconciler consumers must read this
           field instead. *)
+  n_stop_eligible_positions : int;
+      (** Count of strategy positions still under active stop evaluation (in the
+          [Holding] state) at the end of the run, threaded straight through from
+          {!Trading_simulation_types.Simulator_types.run_result}. Paired with
+          the open-position count of [final_portfolio] by {!divergence_findings}
+          to surface the portfolio↔strategy divergence the stuck-[Exiting]
+          zombie produces (#1553). In a healthy run this equals the
+          open-position count and the divergence check is silent. *)
   overrides : Sexp.t list;
       (** The override sexps used for this run, echoed into params.sexp *)
   stop_infos : Stop_log.stop_info list;

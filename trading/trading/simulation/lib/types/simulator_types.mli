@@ -83,6 +83,17 @@ type run_result = {
           end-of-run audits read this rather than reconstructing from
           [step_result.portfolio] (which is the skinny projection). Always
           populated with the simulator's last [t.portfolio]. *)
+  n_stop_eligible_positions : int;
+      (** Count of strategy positions in the [Holding] state at the end of the
+          run — i.e. positions still under active stop evaluation (the stop
+          machinery only re-evaluates [Holding] positions). Compared against the
+          count of open portfolio positions in [final_portfolio] by
+          {!Backtest.Fold_health.check_divergence} (#1553): a position the
+          portfolio holds but that is no longer [Holding] (e.g. stuck in
+          [Exiting] after a rejected exit fill) is a terminally-stuck zombie
+          that rode an adverse move unbounded. In a healthy run every open
+          portfolio position is [Holding], so this equals the open-position
+          count. *)
   metrics : Metric_types.metric_set;  (** Computed metrics from the simulation *)
 }
 (** Complete result of running a simulation with metrics *)

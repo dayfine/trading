@@ -275,12 +275,16 @@ let _emit_fold_health ~scenario_dir ~(result : Backtest.Runner.result) =
       ~f:(fun (st : Trading_simulation_types.Simulator_types.step_result) ->
         st.portfolio_value)
   in
+  let config = Backtest.Fold_health.default_config in
   let findings =
-    Backtest.Fold_health.check ~config:Backtest.Fold_health.default_config
-      ~initial_cash:summary.initial_cash
+    Backtest.Fold_health.check ~config ~initial_cash:summary.initial_cash
       ~final_portfolio_value:summary.final_portfolio_value
       ~n_round_trips:summary.n_round_trips ~n_steps:summary.n_steps
       ~equity_curve
+    (* Divergence guard (#1553): a position the portfolio holds but the strategy
+       no longer monitors under stop evaluation (stuck-[Exiting] zombie). Unioned
+       with the [check] invariants; in a healthy run this adds nothing. *)
+    @ Backtest.Fold_health_runner.divergence_findings ~config result
   in
   List.iter findings ~f:(fun f ->
       eprintf "WARN: fold-health: %s\n%!"

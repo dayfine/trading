@@ -92,6 +92,8 @@ let _make_result ?(steps = []) ?(final_prices = []) ?(stop_infos = [])
     round_trips;
     steps;
     final_portfolio;
+    n_stop_eligible_positions =
+      Backtest.Fold_health_runner.open_position_count final_portfolio;
     overrides = [];
     stop_infos;
     audit = [];
@@ -665,6 +667,7 @@ let test_trades_csv_populates_context_from_audit_and_stop_log _ =
       steps = [];
       final_portfolio =
         Trading_portfolio.Portfolio.create ~initial_cash:100_000.0 ();
+      n_stop_eligible_positions = 0;
       overrides = [];
       stop_infos = [ stop_info ];
       audit;

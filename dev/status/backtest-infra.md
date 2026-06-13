@@ -51,6 +51,42 @@ Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
     baseline shifts with the flag ON, then walk-forward CV + confirmation grid
     before any promotion (P0 analysis step, `experiment-flag-discipline` R3).
 
+## 2026-06-12 — Fold_health divergence runner wiring (#1557 item 1)
+
+- [x] **`Fold_health.check_divergence` wired into the runner path.** PR #1556
+  landed the pure `Stuck_held_positions` finding + `check_divergence`
+  (config-thresholded `max_stuck_held_positions`, default 0) but descoped the
+  runner wiring — nothing fed it the two position counts. This wires it as a
+  tripwire so the finding can fire in real runs (the #1553 THM zombie: portfolio
+  held it, strategy state terminally `Exiting`, stop never re-evaluated).
+  - **Seam (additive, no core-module edit):** `run_result` gains
+    `n_stop_eligible_positions : int` — the count of strategy positions in the
+    `Holding` state (still under stop evaluation) at end of run, populated in
+    `Simulator._build_run_result` via `_count_stop_eligible t.positions`.
+    Threaded through `Runner.result.n_stop_eligible_positions` in
+    `_assemble_result`. `Fold_health_runner.open_position_count` counts
+    `final_portfolio.positions` (closed positions already dropped, matching the
+    `open_positions.csv` per-row semantics); `Fold_health_runner.divergence_findings`
+    derives both counts and calls `check_divergence`. `scenario_runner`'s
+    `_emit_fold_health` unions the result with the existing `check` findings.
+    The divergence bridge lives in its own tiny lib module
+    `fold_health_runner.{ml,mli}` — extracted from `runner.ml` so both
+    `runner.ml` (493) and `simulator.ml` (500) stay under the 500-line
+    file-length hard limit.
+  - **Additive / default-0:** a non-empty divergence finding only WARNs to
+    stderr + lands in `fold_health.sexp` (same contract as the #1549 signatures
+    — never fails the run). On healthy runs every open position is `Holding`, so
+    the count equals the open-position count and the check is silent.
+  - **Lives at:** `simulator.ml` (+`simulator_types.{ml,mli}`),
+    `runner.{ml,mli}`, `fold_health_runner.{ml,mli}` (new), `scenario_runner.ml`.
+  - **Tests:** `test_fold_health_runner.ml` (+3, runner path):
+    divergence fires through `Fold_health_runner.divergence_findings` on a 2-open/1-eligible
+    gap; silent when aligned (2/2); silent when flat (0/0). Existing 12
+    `test_fold_health` pure tests + `test_result_writer` / `test_trade_audit_report`
+    (result-fixture field added) stay green.
+  - **Verify:** `dune runtest trading/backtest/test trading/simulation/test`.
+  - **Branch:** `feat/fold-health-runner-wiring`. Links #1557.
+
 ## QC
 
 Step 1 (PR #399, merged) — overall_qc APPROVED at e59f8d2 (both prior blockers U6/F1 and the BC4 advisory resolved; `_held_symbols` strategy fix domain-correct).

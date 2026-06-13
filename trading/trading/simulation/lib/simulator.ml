@@ -272,6 +272,16 @@ let _is_exiting_state = function
   | Trading_strategy.Position.Exiting _ -> true
   | _ -> false
 
+let _is_holding_state = function
+  | Trading_strategy.Position.Holding _ -> true
+  | _ -> false
+
+(* Count [Holding] positions = those still under stop evaluation; surfaced as
+   [run_result.n_stop_eligible_positions] for the divergence guard (#1553). *)
+let _count_stop_eligible positions =
+  Map.count positions ~f:(fun pos ->
+      _is_holding_state (Trading_strategy.Position.get_state pos))
+
 let _find_fill_target acc symbol =
   let try_find state_match is_entry =
     _find_position_by_symbol_state acc ~symbol ~state_match
@@ -340,7 +350,12 @@ let _build_run_result t =
        coverage gaps.\n\
        %!"
       !(t.valuation_failure_count);
-  { steps; final_portfolio = t.portfolio; metrics }
+  {
+    steps;
+    final_portfolio = t.portfolio;
+    n_stop_eligible_positions = _count_stop_eligible t.positions;
+    metrics;
+  }
 
 (** Apply split detection, update market state, record stale-held positions, and
     (when configured, default-off) force-exit stale/delisted positions at their
