@@ -1317,8 +1317,7 @@ let test_record_force_exit_label_mismatch_is_noop _ =
    [true] — warmup forms indicators only, no trading during warmup, so a
    backtest's measured window contains only that window's activity. *)
 let test_default_config_suppresses_warmup_trading _ =
-  assert_that cfg
-    (field (fun c -> c.suppress_warmup_trading) (equal_to true))
+  assert_that cfg (field (fun c -> c.suppress_warmup_trading) (equal_to true))
 
 (* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
