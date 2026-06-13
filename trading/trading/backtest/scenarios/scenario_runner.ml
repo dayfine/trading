@@ -284,7 +284,7 @@ let _emit_fold_health ~scenario_dir ~(result : Backtest.Runner.result) =
     (* Divergence guard (#1553): a position the portfolio holds but the strategy
        no longer monitors under stop evaluation (stuck-[Exiting] zombie). Unioned
        with the [check] invariants; in a healthy run this adds nothing. *)
-    @ Backtest.Runner.divergence_findings ~config result
+    @ Backtest.Fold_health_runner.divergence_findings ~config result
   in
   List.iter findings ~f:(fun f ->
       eprintf "WARN: fold-health: %s\n%!"

@@ -93,7 +93,7 @@ let _make_result ?(steps = []) ?(final_prices = []) ?(stop_infos = [])
     steps;
     final_portfolio;
     n_stop_eligible_positions =
-      Backtest.Runner.open_position_count final_portfolio;
+      Backtest.Fold_health_runner.open_position_count final_portfolio;
     overrides = [];
     stop_infos;
     audit = [];

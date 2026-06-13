@@ -1,8 +1,9 @@
 (** Runner-path tests for the {!Backtest.Fold_health} divergence guard (#1557
-    item 1). Exercises the wiring that {!Backtest.Runner.divergence_findings}
-    threads — open portfolio positions ([final_portfolio]) vs strategy positions
-    still under stop evaluation ([n_stop_eligible_positions]) — rather than the
-    pure {!Backtest.Fold_health.check_divergence} (already pinned by
+    item 1). Exercises the wiring that
+    {!Backtest.Fold_health_runner.divergence_findings} threads — open portfolio
+    positions ([final_portfolio]) vs strategy positions still under stop
+    evaluation ([n_stop_eligible_positions]) — rather than the pure
+    {!Backtest.Fold_health.check_divergence} (already pinned by
     [test_fold_health.ml]).
 
     The motivating specimen (#1553): a position the portfolio holds whose
@@ -68,7 +69,7 @@ let _empty_summary : Backtest.Summary.t =
 (** [Runner.result] with [n_open] open portfolio positions and [n_stop_eligible]
     strategy positions still under stop evaluation. Only the two divergence
     inputs are meaningful; the remaining fields are empty since
-    {!Backtest.Runner.divergence_findings} reads none of them. *)
+    {!Backtest.Fold_health_runner.divergence_findings} reads none of them. *)
 let _make_result ~n_open ~n_stop_eligible : Backtest.Runner.result =
   let positions =
     List.init n_open ~f:(fun i -> _make_position ~symbol:(sprintf "SYM%d" i))
@@ -97,10 +98,10 @@ let config = Backtest.Fold_health.default_config
 let test_divergence_fires_through_runner _ =
   let result = _make_result ~n_open:2 ~n_stop_eligible:1 in
   assert_that
-    (Backtest.Runner.open_position_count result.final_portfolio)
+    (Backtest.Fold_health_runner.open_position_count result.final_portfolio)
     (equal_to 2);
   assert_that
-    (Backtest.Runner.divergence_findings ~config result)
+    (Backtest.Fold_health_runner.divergence_findings ~config result)
     (elements_are
        [
          equal_to
@@ -112,12 +113,16 @@ let test_divergence_fires_through_runner _ =
    The tripwire stays quiet on healthy runs. *)
 let test_no_divergence_when_aligned _ =
   let result = _make_result ~n_open:2 ~n_stop_eligible:2 in
-  assert_that (Backtest.Runner.divergence_findings ~config result) (size_is 0)
+  assert_that
+    (Backtest.Fold_health_runner.divergence_findings ~config result)
+    (size_is 0)
 
 (* No open positions and none eligible → trivially aligned → silent. *)
 let test_no_divergence_when_flat _ =
   let result = _make_result ~n_open:0 ~n_stop_eligible:0 in
-  assert_that (Backtest.Runner.divergence_findings ~config result) (size_is 0)
+  assert_that
+    (Backtest.Fold_health_runner.divergence_findings ~config result)
+    (size_is 0)
 
 let suite =
   "fold_health_runner"

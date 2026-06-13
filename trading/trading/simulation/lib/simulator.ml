@@ -276,12 +276,8 @@ let _is_holding_state = function
   | Trading_strategy.Position.Holding _ -> true
   | _ -> false
 
-(* Count strategy positions still under active stop evaluation — i.e. in the
-   [Holding] state. The stop machinery only re-evaluates [Holding] positions, so
-   a held portfolio position whose strategy state is not [Holding] (e.g. stuck
-   in [Exiting] after a rejected exit fill) is no longer monitored (#1553).
-   Surfaced via [run_result.n_stop_eligible_positions] for the divergence
-   guard. *)
+(* Count [Holding] positions = those still under stop evaluation; surfaced as
+   [run_result.n_stop_eligible_positions] for the divergence guard (#1553). *)
 let _count_stop_eligible positions =
   Map.count positions ~f:(fun pos ->
       _is_holding_state (Trading_strategy.Position.get_state pos))

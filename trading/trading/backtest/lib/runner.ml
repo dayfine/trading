@@ -65,17 +65,6 @@ type result = {
           picked). *)
 }
 
-(* Divergence guard (#1553): open portfolio positions vs strategy positions
-   still under stop evaluation. Fully-closed positions are already dropped from
-   [portfolio.positions], so its length is the open-position count. *)
-let open_position_count (portfolio : Trading_portfolio.Portfolio.t) =
-  List.length portfolio.positions
-
-let divergence_findings ~config result =
-  Fold_health.check_divergence ~config
-    ~n_open_positions:(open_position_count result.final_portfolio)
-    ~n_stop_eligible:result.n_stop_eligible_positions
-
 (* Trading-day filter *)
 
 (** True if [step] represents a real trading day — i.e. the simulator saw at
