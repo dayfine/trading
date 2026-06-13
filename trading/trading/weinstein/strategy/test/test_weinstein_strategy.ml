@@ -1310,6 +1310,16 @@ let test_record_force_exit_label_mismatch_is_noop _ =
   assert_that (Hashtbl.length last_stop_out_dates) (equal_to 0)
 
 (* ------------------------------------------------------------------ *)
+(* suppress_warmup_trading default (measurement-correctness invariant)  *)
+(* ------------------------------------------------------------------ *)
+
+(* Pins the user-directive 2026-06-13 flip: the canonical default is
+   [true] — warmup forms indicators only, no trading during warmup, so a
+   backtest's measured window contains only that window's activity. *)
+let test_default_config_suppresses_warmup_trading _ =
+  assert_that cfg (field (fun c -> c.suppress_warmup_trading) (equal_to true))
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -1317,6 +1327,8 @@ let () =
   run_test_tt_main
     ("weinstein_strategy"
     >::: [
+           "default_config suppresses warmup trading"
+           >:: test_default_config_suppresses_warmup_trading;
            "record_force_exit: zero cooldown is no-op"
            >:: test_record_force_exit_zero_cooldown_is_noop;
            "record_force_exit: positive cooldown records date"

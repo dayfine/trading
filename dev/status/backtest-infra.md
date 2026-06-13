@@ -12,6 +12,51 @@ moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
 
+## 2026-06-13 — `suppress_warmup_trading` default flipped false→true (measurement-correctness BUGFIX)
+
+- [x] **Flipped the default `false→true` per USER DIRECTIVE (2026-06-13:
+  "measured window = window only").** This is a **measurement-semantics
+  correction, not an alpha-mechanism promotion** — so `experiment-flag-discipline`
+  R1/R3 (the ledger-ACCEPT gate that governs flipping *alpha* defaults) do
+  **not** apply. The directive: a backtest's measured window must contain only
+  that window's activity — "a 210-day backtest has trades for 210 days, not 420."
+  Warmup exists only to form indicators; trading during it contaminates the
+  measured return with pre-window activity / inherited positions. Default-true
+  makes the number honest; default-false (legacy "running start") is kept as a
+  config escape hatch + searchable axis for reproducing pre-flip baselines and
+  measurement experiments.
+  - **Note vs the merged experiment:** `dev/experiments/warmup-comparison-2026-06-12/ANALYSIS.md`
+    concluded "DO NOT FLIP" on a *performance* axis (suppress lowers WF-CV
+    Sharpe/return/Calmar — warmup trading is a net-beneficial bull "running
+    start"). The user has **explicitly reframed** the flag as a *correctness*
+    invariant, where that very "running start" gain is the contamination to
+    remove (it belongs to the pre-window period). The two are different
+    epistemic objects; the directive governs.
+  - **Lives at:** `weinstein_strategy_config.{ml,mli}` (type field
+    `[@sexp.default true]` + `default_config` initializer `true`),
+    `weinstein_strategy.mli` (mirror field + docstring). Gate code (`Warmup_trade_gate`,
+    `panel_runner.ml`) unchanged — only the default value moved.
+  - **Live path unaffected (verified):** the gate is wired only in
+    `panel_runner.ml` (the backtest path), keyed off the measurement `start_date`,
+    and only drops `CreateEntering` transitions dated *strictly before* it. In
+    live/forward mode `start_date` = "now" and the strategy never emits entries
+    dated in the past, so the gate never fires — default-true is a no-op there.
+  - **Re-pin scale: ZERO goldens re-pinned.** Full `dune build && dune runtest`
+    passes **exit 0** with the flip. This matches the experiment's
+    estimand finding: warmup trading only bites at the **walk-forward fold**
+    level (`warmup_start = fold_start − 210d` sits mid-data with warm
+    indicators); for a **standalone scenario/snapshot golden**, `warmup_start`
+    IS the simulator's first day, so it carries **zero** warmup-built positions
+    into measurement → off == on, bit-identical for every golden in the suite.
+    (The two `trade #0 differs` log lines are the `Test_determinism` start-shift
+    test asserting *expected* divergence — `Ran: 6 tests ... OK`.)
+  - **Test:** `test_weinstein_strategy.ml` +1
+    (`default_config suppresses warmup trading` pins `default_config.suppress_warmup_trading = true`).
+    The existing `warmup_gate` unit tests + the `test_variant_matrix` axis test
+    stay green (gate logic unchanged).
+  - **Verify:** `dune build && dune runtest` (exit 0, zero golden diffs).
+  - **Branch:** `feat/warmup-trading-default-flip`.
+
 ## 2026-06-12 — `suppress_warmup_trading` flag (warmup-leak root-fix surface)
 
 - [x] **Default-off warmup-trading gate (P0, PR #1549 A2 follow-up).** Added a
