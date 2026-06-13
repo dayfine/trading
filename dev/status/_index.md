@@ -14,6 +14,7 @@ Each row: one line; deeper task detail in the linked status file.
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
 | [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | — | Fold_health wiring MERGED (#1558); warmup-suppression WF-CV rejects the flip (#1561); next: P2 matrix on composition-policy universe (data-gated) |
+| [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 #1557#3 closing-trade cash-floor exemption (default-off flag); then #1563 short-proceeds, #1557#2 CancelExit, WF-CV DD experiment |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
 | [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | rolling-start v2 merged (#1536: jittered starts, edge-vs-SPY matrix, fork-per-start); next: run matrix on composition-policy universe |
 | [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | manual ghcr.io devcontainer rebuild (flambda) + Win #4 production wiring for active_through pruning |
