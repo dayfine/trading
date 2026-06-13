@@ -20,13 +20,14 @@
     true" and "the gate leaks". These tests pin the gate's contract directly so
     a future refactor cannot silently let shorts leak back into a [false] run,
     and the integration test below pins the same contract end-to-end through
-    {!Weinstein_strategy.entries_from_candidates} on the bear-window fixture that
-    {e otherwise} produces Short transitions (mirrors
+    {!Weinstein_strategy.entries_from_candidates} on the bear-window fixture
+    that {e otherwise} produces Short transitions (mirrors
     [test_short_side_bear_window.ml]).
 
     The spine is untouched: short selling in Stage 3/4 remains Weinstein's
-    methodology (see [.claude/rules/weinstein-faithful-core.md]); this only makes
-    the existing [enable_short_side] {e off} switch honest and testable. *)
+    methodology (see [.claude/rules/weinstein-faithful-core.md]); this only
+    makes the existing [enable_short_side] {e off} switch honest and testable.
+*)
 
 open OUnit2
 open Core
@@ -67,11 +68,8 @@ let _long ~ticker ~suggested_entry =
 let _short ~ticker ~suggested_entry =
   _make_candidate ~ticker ~side:Trading_base.Types.Short ~suggested_entry
 
-let _sides candidates =
-  List.map candidates ~f:(fun c -> c.Screener.side)
-
-let _tickers candidates =
-  List.map candidates ~f:(fun c -> c.Screener.ticker)
+let _sides candidates = List.map candidates ~f:(fun c -> c.Screener.side)
+let _tickers candidates = List.map candidates ~f:(fun c -> c.Screener.ticker)
 
 (* ------------------------------------------------------------------ *)
 (* Unit tests on Short_side_gate.combine                               *)
@@ -127,7 +125,8 @@ let test_enabled_admits_shorts_after_longs _ =
          field _sides
            (elements_are
               [
-                equal_to (Trading_base.Types.Long : Trading_base.Types.position_side);
+                equal_to
+                  (Trading_base.Types.Long : Trading_base.Types.position_side);
                 equal_to
                   (Trading_base.Types.Short : Trading_base.Types.position_side);
               ]);
@@ -268,14 +267,13 @@ let test_disabled_suppresses_short_transitions_e2e _ =
   let bar_reader = Bar_reader.empty () in
   let transitions =
     entries_from_candidates ~config:cfg ~candidates ~stop_states ~bar_reader
-      ~portfolio:_empty_portfolio
-      ~get_price:(_get_price_of candidates)
+      ~portfolio:_empty_portfolio ~get_price:(_get_price_of candidates)
       ~current_date:_as_of ()
   in
   let short_sides =
     List.filter_map transitions ~f:_entry_side
     |> List.filter ~f:(fun s ->
-           Trading_base.Types.equal_position_side s Trading_base.Types.Short)
+        Trading_base.Types.equal_position_side s Trading_base.Types.Short)
   in
   assert_that (List.length short_sides) (equal_to 0)
 
@@ -300,8 +298,7 @@ let test_enabled_emits_short_transitions_e2e _ =
   let bar_reader = Bar_reader.empty () in
   let transitions =
     entries_from_candidates ~config:cfg ~candidates ~stop_states ~bar_reader
-      ~portfolio:_empty_portfolio
-      ~get_price:(_get_price_of candidates)
+      ~portfolio:_empty_portfolio ~get_price:(_get_price_of candidates)
       ~current_date:_as_of ()
   in
   let sides = List.filter_map transitions ~f:_entry_side in

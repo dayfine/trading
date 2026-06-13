@@ -1,5 +1,8 @@
 (library
  (name short_side_gate)
  (public_name weinstein_trading.short_side_gate)
- (libraries core weinstein.screener trading.base
+ (libraries
+  core
+  weinstein.screener
+  trading.base
   weinstein_trading.short_min_price_gate))
