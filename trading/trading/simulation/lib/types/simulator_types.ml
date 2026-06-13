@@ -32,6 +32,8 @@ type step_result = {
 type run_result = {
   steps : step_result list;  (** Non-empty list of step results *)
   final_portfolio : Trading_portfolio.Portfolio.t;
+  n_stop_eligible_positions : int;
+      (** Count of strategy positions in the [Holding] state at end of run *)
   metrics : Metric_types.metric_set;
 }
 
