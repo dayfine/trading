@@ -42,6 +42,12 @@ type dependencies = {
       (** Phase-2 margin-accounting parameters (issue #859). When
           [enabled = false] (the default), every margin code path is a no-op and
           existing baselines are bit-equal. *)
+  exempt_closing_trades_from_cash_floor : bool;
+      (** NS1 (#1557#3): passed to [Portfolio.create] when the run's portfolio
+          is built. When [true], the cash floor skips the reducing portion of a
+          closing trade (long sell / short cover). [false] (the default)
+          preserves byte-equal baselines. The backtest runner threads this from
+          [config.portfolio_config.exempt_closing_trades_from_cash_floor]. *)
   on_trade_fill : (Trading_base.Types.trade -> Trading_base.Types.trade) option;
       (** Optional post-fill per-trade adjustment, applied inside the
           simulator's accept-trades path before the portfolio accounts for each
@@ -83,6 +89,7 @@ val create_deps :
   ?stale_hold_log:Stale_hold.Log.t ->
   ?slippage_bps:int ->
   ?margin_config:Trading_portfolio.Margin_config.t ->
+  ?exempt_closing_trades_from_cash_floor:bool ->
   ?on_trade_fill:(Trading_base.Types.trade -> Trading_base.Types.trade) ->
   ?active_through_for:(string -> Core.Date.t option) ->
   unit ->
@@ -119,6 +126,11 @@ val create_deps :
       {!Trading_portfolio.Margin_config.default_config} — disabled, so the
       simulator's per-step margin code paths are no-ops and existing baselines
       are bit-equal.
+    @param exempt_closing_trades_from_cash_floor
+      NS1 (#1557#3) cash-floor closing-trade exemption, passed to
+      [Portfolio.create]. Default [false] — the floor faces every full trade
+      exactly as before, so existing baselines are bit-equal. See the field doc
+      on {!dependencies.exempt_closing_trades_from_cash_floor}.
     @param on_trade_fill
       Optional per-trade adjustment applied to every accepted fill before the
       portfolio accounts for it. Default [None] — preserves byte-equal

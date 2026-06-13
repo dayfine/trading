@@ -8,8 +8,32 @@ IN_PROGRESS
 ## Interface stable
 NO
 
-No code shipped yet; this track is a scoped Next-Steps queue. Each NS lands a new
-default-off config field; interfaces firm up as NS1→NS4 ship.
+NS1 shipped (PR open on `feat/cash-floor-closing-exempt`); NS2–NS4 remain a
+scoped Next-Steps queue. Each NS lands a new default-off config field;
+interfaces firm up as NS2→NS4 ship.
+
+## Completed
+
+- **[NS1] #1557#3 — cash-floor closing-trade exemption** (branch
+  `feat/cash-floor-closing-exempt`). Added default-off
+  `Portfolio_risk.config.exempt_closing_trades_from_cash_floor : bool
+  [@sexp.default false]` (the `portfolio_config` seam of
+  `Weinstein_strategy.config`), threaded as a plain bool into
+  `Portfolio.create` via `Simulator.dependencies` /
+  `Panel_runner._make_simulator` so core `Portfolio` stays strategy-agnostic
+  (A1-generalizable). When on, `_check_sufficient_cash` (now delegating to the
+  new `Portfolio_cash_floor` module) skips the floor for the reducing portion of
+  a closing trade; an over-cover that flips short→long exempts only the closing
+  portion (`min(|trade_qty|, |existing_qty|)` split, mirroring
+  `portfolio_margin.ml:_classify_trade`), the new-opening portion still faces
+  the floor. Default-off ⇒ all goldens bit-equal (full `dune runtest` exit 0, no
+  re-pin). Plan: `dev/plans/cash-floor-closing-exempt-2026-06-13.md`. Axis-able:
+  pinned by `test_variant_matrix.ml` (`portfolio_config.exempt_closing_trades_from_cash_floor`
+  nested key). Unit tests in `test_portfolio.ml`: default-off no-op,
+  full/partial cover exempt, over-cover split (opening portion rejected /
+  accepted), long-sell reducing exempt (generalizability). File-length /
+  nesting linter pressure handled by extracting `Portfolio_cash_floor` +
+  `Simulator_metrics` modules (no limit bumps).
 
 ## Owner
 feat-weinstein (core Portfolio/Position edits authorized per the per-task notes
@@ -32,19 +56,8 @@ axis).
 
 ## Next Steps (ordered; each is a default-off flag → safe merge)
 
-1. **[NS1] #1557#3 — cash-floor closing-trade exemption.** Add a default-off
-   `portfolio_config` field `exempt_closing_trades_from_cash_floor : bool
-   [@sexp.default false]`. When on, `Portfolio._check_sufficient_cash` skips the
-   floor for the **reducing portion** of a closing trade (long sell / short
-   cover). Precondition from the investigation: scope to genuinely-reducing
-   trades — `|trade_qty| ≤ |position_qty|`; an over-cover that flips short→long
-   exempts only the closing portion, the new-long portion still faces the floor
-   (mirror the `min(trade.qty, |existing_qty|)` split in
-   `portfolio_margin.ml:_classify_trade`). **A1 core-module change** (Portfolio
-   on the watch-list) — strategy-agnostic, so it should pass the qc-behavioral
-   generalizability check; cite this note. Default-off ⇒ all goldens bit-equal.
-   This is the *root* fix for #1553 (cover books first-try; #1556's revert
-   becomes a backstop). Make it `Variant_matrix`-axis-able.
+1. **[NS1] #1557#3 — cash-floor closing-trade exemption.** ✅ SHIPPED — see
+   §Completed. Branch `feat/cash-floor-closing-exempt`.
 
 2. **[NS2] #1563 — short-sale proceeds collateral.** FIRST deliverable is a
    short design-recommendation in `dev/notes/` (read-only analysis): backtests

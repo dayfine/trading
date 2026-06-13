@@ -16,12 +16,10 @@ type input = {
 }
 
 (* Wrap the runner's already-constructed [daily_panels] in the simulator's
-   callback adapter, sharing the LRU cache with the strategy bar reader.
-
-   The naive path of going through [Bar_data_source.build_adapter (Snapshot
-   {...})] would call [Daily_panels.create] a second time and produce a
-   parallel ~330 MB LRU at the 15y SP500 window — see
-   [dev/notes/15y-memory-cliff-2026-05-08.md] §"Cliff #2". *)
+   callback adapter, sharing the LRU cache with the strategy bar reader. Going
+   through [Bar_data_source.build_adapter (Snapshot {...})] would instead call
+   [Daily_panels.create] again and produce a parallel ~330 MB LRU at the 15y
+   SP500 window — see [dev/notes/15y-memory-cliff-2026-05-08.md] §"Cliff #2". *)
 let _build_market_data_adapter ~daily_panels =
   Bar_data_source.build_adapter_from_panels daily_panels
 
@@ -52,7 +50,10 @@ let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
       ~metric_suite:(Metric_computers.default_metric_suite ~initial_cash ())
       ~market_data_adapter ~stale_hold_log ?slippage_bps
       ~stale_hold_policy:(_stale_hold_policy input.config)
-      ~margin_config:input.config.margin_config ?on_trade_fill ()
+      ~margin_config:input.config.margin_config
+      ~exempt_closing_trades_from_cash_floor:
+        input.config.portfolio_config.exempt_closing_trades_from_cash_floor
+      ?on_trade_fill ()
   in
   let config =
     Simulator.

@@ -25,10 +25,15 @@ type t = {
       (* Running total of borrow fees debited from current_cash. 0.0 unless
          accrue_daily_borrow_fee has been called with Margin_config.enabled
          = true. Audit-only field; not consumed by trading logic. *)
+  exempt_closing_trades_from_cash_floor : bool;
+      (* NS1 (#1557#3): when true, the cash floor exempts the reducing portion of
+         a closing trade. A plain bool so core Portfolio stays strategy-agnostic.
+         Default false ⇒ byte-identical to prior behaviour. See .mli + create. *)
 }
 [@@deriving show, eq, sexp]
 
-let create ?(accounting_method = AverageCost) ~initial_cash () =
+let create ?(accounting_method = AverageCost)
+    ?(exempt_closing_trades_from_cash_floor = false) ~initial_cash () =
   {
     initial_cash;
     trade_history = [];
@@ -38,6 +43,7 @@ let create ?(accounting_method = AverageCost) ~initial_cash () =
     unrealized_pnl_per_position = [];
     locked_collateral = 0.0;
     accrued_borrow_fee = 0.0;
+    exempt_closing_trades_from_cash_floor;
   }
 
 let _find_position_in_list positions symbol =
@@ -335,19 +341,15 @@ let _negative_unrealized_pnl_total portfolio =
   List.fold portfolio.unrealized_pnl_per_position ~init:0.0
     ~f:(fun acc (_symbol, pnl) -> acc +. Float.min 0.0 pnl)
 
-let _check_sufficient_cash portfolio cash_change =
-  let new_cash = portfolio.current_cash +. cash_change in
-  let unrealized_drag = _negative_unrealized_pnl_total portfolio in
-  let effective_cash = new_cash +. unrealized_drag in
-  if Float.(effective_cash < 0.0) then
-    error_invalid_argument
-      ("Insufficient cash for trade. Required: "
-      ^ Float.to_string (-.cash_change)
-      ^ ", Available: "
-      ^ Float.to_string portfolio.current_cash
-      ^ ", Unrealized loss drag: "
-      ^ Float.to_string unrealized_drag)
-  else Result.Ok new_cash
+(* Cash floor solvency check. Delegates to {!Portfolio_cash_floor.check} with
+   the portfolio's cash, paper-loss drag, and the NS1 closing-trade exemption
+   flag; flag-off is byte-identical to the prior behaviour. *)
+let _check_sufficient_cash ~existing_qty ~trade portfolio cash_change =
+  Portfolio_cash_floor.check
+    ~exempt:portfolio.exempt_closing_trades_from_cash_floor
+    ~current_cash:portfolio.current_cash
+    ~negative_unrealized_pnl:(_negative_unrealized_pnl_total portfolio)
+    ~existing_qty ~trade ~cash_change
 
 (* After a trade, prune the unrealized-pnl accumulator. Positions that no
    longer exist (fully closed) are dropped. New positions get a 0.0 seed,
@@ -367,9 +369,17 @@ let _refresh_unrealized_after_trade ~old_accumulator ~new_positions =
 let apply_single_trade (portfolio : t) (trade : Trading_base.Types.trade) :
     t status_or =
   let cash_change = _calculate_cash_change trade in
-  let%bind new_cash = _check_sufficient_cash portfolio cash_change in
+  let existing_position = get_position portfolio trade.symbol in
+  let existing_qty =
+    match existing_position with
+    | None -> 0.0
+    | Some p -> Calculations.position_quantity p
+  in
+  let%bind new_cash =
+    _check_sufficient_cash ~existing_qty ~trade portfolio cash_change
+  in
   let realized_pnl =
-    match get_position portfolio trade.symbol with
+    match existing_position with
     | None -> 0.0 (* New position - no realized P&L *)
     | Some existing_position -> _calculate_realized_pnl trade existing_position
   in

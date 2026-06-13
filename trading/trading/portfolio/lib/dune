@@ -5,6 +5,7 @@
  (modules
   types
   portfolio
+  portfolio_cash_floor
   portfolio_margin
   calculations
   split_event

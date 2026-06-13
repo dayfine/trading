@@ -202,6 +202,24 @@ type config = {
       [@sexp.default Force_liquidation.default_config]
       (** Force-liquidation thresholds — see {!Force_liquidation}. Default: 50%
           per-position loss, 40% portfolio-of-peak floor. *)
+  exempt_closing_trades_from_cash_floor : bool; [@sexp.default false]
+      (** NS1 (#1557#3): when [true], the core [Portfolio] cash floor
+          ([Portfolio._check_sufficient_cash]) skips the solvency check for the
+          {b reducing portion} of a closing trade (a long sell or short cover),
+          so a cover that {e reduces} risk is never rejected by stale paper-loss
+          drag — the #1553 zombie root cause. An over-cover that flips
+          short->long exempts only the closing portion; the new-long portion
+          still faces the floor.
+
+          Default-off ([false]) ⇒ the floor behaves exactly as before (the full
+          trade faces the check). This field is the [portfolio_config] seam of
+          [Weinstein_strategy.config], so it is expressible as a
+          [Variant_matrix] axis on the dot-path
+          [portfolio_config.exempt_closing_trades_from_cash_floor]. Strategy
+          code does not read it directly; the simulator threads its value into
+          [Portfolio.create] as a plain bool, keeping core [Portfolio]
+          strategy-agnostic. Promotion to default-on is human-gated, pending the
+          NS4 WF-CV experiment (experiment-flag-discipline R3). *)
 }
 [@@deriving show, eq, sexp]
 (** All risk management parameters — nothing hardcoded. *)
