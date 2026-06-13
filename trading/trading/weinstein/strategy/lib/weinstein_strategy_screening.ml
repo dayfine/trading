@@ -397,11 +397,10 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at ~config
       ~portfolio ~last_stop_out_dates ~current_date ()
   in
   let combined_candidates =
-    if config.enable_short_side then
-      screen_result.Screener.buy_candidates
-      @ Short_min_price_gate.filter ~short_min_price:config.short_min_price
-          screen_result.Screener.short_candidates
-    else screen_result.Screener.buy_candidates
+    Short_side_gate.combine ~enable_short_side:config.enable_short_side
+      ~short_min_price:config.short_min_price
+      ~buy_candidates:screen_result.Screener.buy_candidates
+      ~short_candidates:screen_result.Screener.short_candidates
   in
   let entries =
     entries_from_candidates

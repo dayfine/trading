@@ -14,6 +14,7 @@
   test_sector_rotation_weinstein_strategy
   test_short_side_bear_window
   test_short_min_price_gate
+  test_short_side_gate
   test_spy_only_weinstein_strategy
   test_stage3_force_exit_runner
   test_late_stage2_stop_runner
@@ -47,6 +48,7 @@
   weinstein.types
   weinstein.screener
   weinstein_trading.short_min_price_gate
+  weinstein_trading.short_side_gate
   weinstein.stage
   indicators.types
   indicators.sma

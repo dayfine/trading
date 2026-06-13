@@ -1,9 +1,37 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-06-12
+## Last updated: 2026-06-13
 
 ## Status
 IN_PROGRESS
+
+## 2026-06-13 — `enable_short_side=false` suppression made honest + pinned
+
+Resolved the trade-forensics G5 question ("shorts present in a 'long'
+baseline"): **the production multi-symbol path was already CLEAN** — the
+`enable_short_side=false` gate in `weinstein_strategy_screening.screen_universe`
+correctly dropped all short candidates before the entry walk. The shorts seen in
+the 2026-06-12 forensics run came from an ad-hoc `cell-e-top3000-2011-15y`
+scenario that was not committed; the committed canonical Cell-E configs all set
+`((enable_short_side false))` and the deep-merge override applies it faithfully
+(`Overlay_validator.apply_overrides`). No leak.
+
+Hardening shipped (correctness, no new mechanism, spine untouched):
+
+- Extracted the previously-inline `if enable_short_side then … else …` candidate
+  assembly into a named, pure, unit-tested function `Short_side_gate.combine`
+  (new micro-lib `weinstein_trading.short_side_gate`, sibling to
+  `short_min_price_gate`). `screen_universe` now calls it — bit-identical
+  behaviour, but the long-only contract is no longer an unpinned inline guard a
+  refactor could silently break.
+- Regression tests (`test_short_side_gate.ml`): `enable_short_side=false` →
+  zero short candidates (and end-to-end zero Short transitions through
+  `entries_from_candidates` on the bear-window fixture that otherwise emits
+  shorts); `=true` admits shorts after longs and applies the `short_min_price`
+  floor — pins that a THM-class $0.69 short is dropped when `short_min_price=17.0`.
+- No golden re-pin needed: default `enable_short_side=true` path is unchanged
+  (combine with `short_min_price=0.0` is the prior concat); the `false` path was
+  already suppressing shorts. `dune build && dune runtest` exits 0.
 
 ## 2026-06-12 — `short_min_price` short-entry gate (default-off axis)
 
