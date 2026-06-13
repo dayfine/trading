@@ -6,8 +6,10 @@
 IN_PROGRESS
 
 ## Interface stable
-NO — no code shipped yet; this track is a scoped Next-Steps queue. Each NS lands
-a new default-off config field; interfaces firm up as NS1→NS4 ship.
+NO
+
+No code shipped yet; this track is a scoped Next-Steps queue. Each NS lands a new
+default-off config field; interfaces firm up as NS1→NS4 ship.
 
 ## Owner
 feat-weinstein (core Portfolio/Position edits authorized per the per-task notes
