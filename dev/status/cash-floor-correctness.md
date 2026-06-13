@@ -33,7 +33,10 @@ interfaces firm up as NS2→NS4 ship.
   full/partial cover exempt, over-cover split (opening portion rejected /
   accepted), long-sell reducing exempt (generalizability). File-length /
   nesting linter pressure handled by extracting `Portfolio_cash_floor` +
-  `Simulator_metrics` modules (no limit bumps).
+  `Simulator_metrics` modules (no limit bumps). QC (PR #1567, tip
+  `31c9422`): structural_qc APPROVED; behavioral_qc APPROVED 2026-06-13
+  (A1 generalizability PASS — core Portfolio change is strategy-agnostic;
+  CP1–CP4 + R1/R2/R3 + W1 all PASS; quality 5).
 
 ## Owner
 feat-weinstein (core Portfolio/Position edits authorized per the per-task notes
@@ -59,15 +62,23 @@ axis).
 1. **[NS1] #1557#3 — cash-floor closing-trade exemption.** ✅ SHIPPED — see
    §Completed. Branch `feat/cash-floor-closing-exempt`.
 
-2. **[NS2] #1563 — short-sale proceeds collateral.** FIRST deliverable is a
-   short design-recommendation in `dev/notes/` (read-only analysis): backtests
-   run margin-OFF (`margin_config.ml:18`), so short proceeds hit `current_cash`
-   with no collateral lock → short sizing over-deploys. Options: (a) enable
-   margin mode in backtests, (b) reserve proceeds as locked collateral in the
-   non-margin path behind a default-off flag, (c) document margin-on requirement
-   for short-side backtests. Recommend one, then (if b) implement behind a
-   default-off flag. **A1 core; needs the design call surfaced before the impl.**
-   Moot for long-only Cell-E; matters for the long-short track.
+2. **[NS2] #1563 — short-sale proceeds collateral.** FIRST deliverable
+   (design-recommendation, read-only analysis) ✅ DONE —
+   `dev/notes/short-sale-proceeds-collateral-2026-06-13.md`. Confirmed the
+   defect: backtests run margin-OFF (`margin_config.ml:18`), short `Sell`
+   proceeds add to `current_cash` (`portfolio.ml:271-274`) with no
+   `locked_collateral` offset (margin path short-circuited,
+   `portfolio_margin.ml:103`), and sizing reads gross `current_cash` not
+   `available_cash` (`portfolio_risk.ml:173` vs `portfolio.ml:498`) → short leg
+   over-deploys. **Recommendation: option (b)** — reserve proceeds as locked
+   collateral in the non-margin path behind a default-off flag, paired with the
+   `current_cash`→`available_cash` sizing fix. Isolates the one defect (vs (a)'s
+   full margin model), safe merge (default-off, axis-able, promotion-gated per
+   experiment-flag-discipline), smallest A1 blast radius. Moot for long-only
+   Cell-E; matters only for the long-short track; run parallel, don't block.
+   **Implementation is human-gated** — the maintainer must ratify the lock
+   factor (1.0× vs 1.5× Reg-T) and the (b)-vs-(a) long-term call (see doc §4)
+   before the impl dispatch. **A1 core; the design call is now surfaced.**
 
 3. **[NS3] #1557#2 — `CancelExit` core Position transition.** Replace #1556's
    simulation-layer state reconstruction (Exiting→Holding) with a proper
