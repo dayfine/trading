@@ -13,6 +13,7 @@ type t = {
   unrealized_pnl_per_position : (symbol * float) list;
   locked_collateral : cash_value;
   accrued_borrow_fee : cash_value;
+  exempt_closing_trades_from_cash_floor : bool;
 }
 [@@deriving show, eq, sexp]
 (** Portfolio type. All fields are accessible for pattern matching and direct
@@ -46,13 +47,28 @@ type t = {
       [current_cash] over the portfolio's lifetime (issue #859 Phase 1). [0.0]
       unless [Margin_config.enabled = true] and [accrue_daily_borrow_fee] has
       been called. Exposed for audit reporting and tests — not consumed by
-      trading logic. *)
+      trading logic.
+    - [exempt_closing_trades_from_cash_floor]: NS1 (#1557#3). When [true],
+      [apply_single_trade]'s cash floor skips the solvency check for the
+      reducing portion of a closing trade (long sell / short cover). [false]
+      (the [create] default) reproduces the prior behaviour exactly. A plain
+      bool so this module stays strategy-agnostic; the strategy layer sets it
+      from [Portfolio_risk.config.exempt_closing_trades_from_cash_floor]. See
+      [apply_single_trade] for the exact semantics. *)
 
 val create :
-  ?accounting_method:accounting_method -> initial_cash:cash_value -> unit -> t
+  ?accounting_method:accounting_method ->
+  ?exempt_closing_trades_from_cash_floor:bool ->
+  initial_cash:cash_value ->
+  unit ->
+  t
 (** Create a new portfolio with initial cash balance and optional accounting
     method (default: AverageCost). This is the only safe way to construct a
-    valid portfolio. *)
+    valid portfolio.
+
+    [exempt_closing_trades_from_cash_floor] (default: [false]) controls the
+    cash-floor exemption for closing trades — see the field doc above and
+    [apply_single_trade]. The default preserves the legacy floor behaviour. *)
 
 val get_position : t -> symbol -> portfolio_position option
 (** Find a position by symbol. Returns None if no position exists for the
@@ -70,6 +86,20 @@ val apply_single_trade : t -> trade -> t status_or
     reducing a short) both go through the same effective cash floor. This bounds
     the unrealized paper loss a portfolio can carry on shorts before further
     activity is rejected.
+
+    NS1 (#1557#3) closing-trade exemption: when
+    [exempt_closing_trades_from_cash_floor = true] on the portfolio, the floor
+    is applied only to the {b opening portion} of a closing trade. A closing
+    trade is one opposite-signed to a non-flat existing position (a long sell or
+    a short cover). A {e genuinely-reducing} trade
+    ([|trade_qty| <= |existing_qty|]) has no opening portion and is therefore
+    always accepted — covering reduces risk and must not be blocked by stale
+    paper-loss drag (the #1553 zombie root cause). An {e over-cover} that flips
+    short->long exempts the closing portion but still applies the floor to the
+    new-opening portion's cash change ([opening_qty * price] + pro-rata
+    commission), mirroring [Portfolio_margin._classify_trade]'s
+    [min(|trade_qty|, |existing_qty|)] split. When the flag is [false] (the
+    default), the full trade faces the floor exactly as before.
 
     Strict broker-margin semantics (collateral pre-locked at short entry,
     refunded on cover) are deliberately deferred — see

@@ -42,6 +42,7 @@ let test_create_portfolio _ accounting_method =
       unrealized_pnl_per_position = [];
       locked_collateral = 0.0;
       accrued_borrow_fee = 0.0;
+      exempt_closing_trades_from_cash_floor = false;
     }
   in
   assert_equal expected portfolio ~msg:"Portfolio should match expected state"
@@ -753,6 +754,162 @@ let test_positive_unrealized_pnl_does_not_inflate_floor _ accounting_method =
   assert_that (apply_single_trade portfolio oversized_buy) is_error
 
 (* ========================================================================== *)
+(* NS1 (#1557#3): cash-floor closing-trade exemption                          *)
+(* ========================================================================== *)
+
+(* A short whose paper loss has pushed the effective floor below zero. Covering
+   it (a Buy reducing the short) is exactly the trade the floor wrongly rejects
+   (#1553). [exempt_closing_trades_from_cash_floor] lets the closing portion
+   bypass the floor. The helper builds: short 100 @ $50 (cash → +5000), mark @
+   $200 (unrealized −15000), so the floor is deeply negative before the cover. *)
+let _stranded_short_portfolio ~accounting_method ~exempt =
+  let portfolio =
+    create ~accounting_method ~exempt_closing_trades_from_cash_floor:exempt
+      ~initial_cash:1_000.0 ()
+  in
+  let portfolio =
+    apply_trades_exn portfolio
+      [
+        make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Sell
+          ~quantity:100.0 ~price:50.0 ();
+      ]
+      ~error_msg:"Short entry should succeed"
+  in
+  (* Cash now $6000. Mark AAPL @ $200 → unrealized = (200 - 50) * -100 =
+     -15000. Effective floor: 6000 - 15000 = -9000 (already below zero). *)
+  mark_to_market portfolio [ ("AAPL", 200.0) ]
+
+(* Default-off (flag false): the floor still rejects the risk-reducing cover —
+   pins R1 backward-compat at the unit level. Cover cost is 100 * 200 = 20000;
+   effective floor 6000 - 20000 - 15000 < 0. *)
+let test_cover_rejected_when_exemption_off _ accounting_method =
+  let portfolio = _stranded_short_portfolio ~accounting_method ~exempt:false in
+  let cover =
+    make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Buy ~quantity:100.0
+      ~price:200.0 ()
+  in
+  assert_that (apply_single_trade portfolio cover) is_error
+
+(* Flag on: a genuinely-reducing cover (|trade_qty| = |position_qty|) is
+   accepted despite the deeply-negative floor, because the reducing portion is
+   exempt. Cash after cover: 6000 - 100 * 200 = -14000 (negative cash is
+   permitted — the position is being closed, reducing risk). *)
+let test_full_cover_exempt_when_flag_on _ accounting_method =
+  let portfolio = _stranded_short_portfolio ~accounting_method ~exempt:true in
+  let cover =
+    make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Buy ~quantity:100.0
+      ~price:200.0 ()
+  in
+  assert_that
+    (apply_single_trade portfolio cover)
+    (is_ok_and_holds
+       (all_of
+          [
+            field (fun p -> p.current_cash) (float_equal (-14_000.0));
+            (* Position fully closed → accumulator pruned. *)
+            field (fun p -> p.unrealized_pnl_per_position) is_empty;
+          ]))
+
+(* Flag on, partial cover (|trade_qty| < |position_qty|): still genuinely
+   reducing (no opening portion), so exempt and accepted. The position is
+   reduced from -100 to -50, the accumulator keeps the (stale) entry. *)
+let test_partial_cover_exempt_when_flag_on _ accounting_method =
+  let portfolio = _stranded_short_portfolio ~accounting_method ~exempt:true in
+  let partial_cover =
+    make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Buy ~quantity:40.0
+      ~price:200.0 ()
+  in
+  assert_that
+    (apply_single_trade portfolio partial_cover)
+    (is_ok_and_holds
+       (* Cash: 6000 - 40 * 200 = -2000; position now -60 shares. *)
+       (all_of
+          [
+            field (fun p -> p.current_cash) (float_equal (-2_000.0));
+            field
+              (fun p -> position_quantity (List.hd_exn p.positions))
+              (float_equal (-60.0));
+          ]))
+
+(* Flag on, over-cover that flips short→long: the closing portion (100 shares)
+   is exempt, but the new-long portion (50 shares) still faces the floor. Here
+   the new-long cash outflow alone (50 * 200 = 10000) against cash 6000 and the
+   -15000 drag breaches the floor (6000 - 10000 - 15000 < 0) → rejected. This
+   proves the split: an over-cover is NOT blanket-exempt. *)
+let test_over_cover_opening_portion_faces_floor _ accounting_method =
+  let portfolio = _stranded_short_portfolio ~accounting_method ~exempt:true in
+  let over_cover =
+    make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Buy ~quantity:150.0
+      ~price:200.0 ()
+  in
+  assert_that (apply_single_trade portfolio over_cover) is_error
+
+(* Flag on, over-cover whose new-long portion is small enough to clear the
+   floor: the closing portion is exempt and the opening portion passes, so the
+   flip is accepted. Drag is small here so the opening-portion check passes.
+   Short 100 @ $50 (cash → 6000 from a $1000 start), mark @ $52 (unrealized
+   -200). Over-cover 120 @ $52: closing 100 exempt; opening 20 * 52 = 1040
+   outflow; floor check 1000 + 5000 - 1040 - 200 = 4760 >= 0 → accepted. *)
+let test_over_cover_small_opening_portion_accepted _ accounting_method =
+  let portfolio =
+    create ~accounting_method ~exempt_closing_trades_from_cash_floor:true
+      ~initial_cash:1_000.0 ()
+  in
+  let portfolio =
+    apply_trades_exn portfolio
+      [
+        make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Sell
+          ~quantity:100.0 ~price:50.0 ();
+      ]
+      ~error_msg:"Short entry should succeed"
+  in
+  let portfolio = mark_to_market portfolio [ ("AAPL", 52.0) ] in
+  let over_cover =
+    make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Buy ~quantity:120.0
+      ~price:52.0 ()
+  in
+  assert_that
+    (apply_single_trade portfolio over_cover)
+    (is_ok_and_holds
+       (* Position flips to +20 long. *)
+       (field
+          (fun p -> position_quantity (List.hd_exn p.positions))
+          (float_equal 20.0)))
+
+(* Symmetry / generalizability: the exemption is NOT short-specific. A long sell
+   that reduces a long position is also a closing trade and is exempt. With a
+   deeply-negative floor from an unrelated marked loss, the reducing long sell
+   is accepted under the flag. Buy 100 AAPL @ $50 (cash 10000 → 5000), open a
+   losing short on B to drag the floor, then sell the AAPL long. *)
+let test_long_sell_reducing_is_exempt _ accounting_method =
+  let portfolio =
+    create ~accounting_method ~exempt_closing_trades_from_cash_floor:true
+      ~initial_cash:10_000.0 ()
+  in
+  let portfolio =
+    apply_trades_exn portfolio
+      [
+        make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy
+          ~quantity:100.0 ~price:50.0 ();
+        make_trade ~id:"t2" ~order_id:"o2" ~symbol:"B" ~side:Sell
+          ~quantity:100.0 ~price:50.0 ();
+      ]
+      ~error_msg:"Long buy + short B should succeed"
+  in
+  (* Cash: 10000 - 5000 + 5000 = 10000. Mark B @ $200 → unrealized -15000.
+     Effective floor: 10000 - 15000 = -5000 (below zero). *)
+  let portfolio = mark_to_market portfolio [ ("AAPL", 50.0); ("B", 200.0) ] in
+  let long_sell =
+    make_trade ~id:"t3" ~order_id:"o3" ~symbol:"AAPL" ~side:Sell ~quantity:100.0
+      ~price:50.0 ()
+  in
+  assert_that
+    (apply_single_trade portfolio long_sell)
+    (is_ok_and_holds
+       (* Cash rises by 100 * 50 = 5000 → 15000; AAPL closed. *)
+       (field (fun p -> p.current_cash) (float_equal 15_000.0)))
+
+(* ========================================================================== *)
 (* Test suite organization                                                   *)
 (* ========================================================================== *)
 
@@ -803,6 +960,19 @@ let suite =
            make_parameterized_tests
              "positive_unrealized_pnl_does_not_inflate_floor"
              test_positive_unrealized_pnl_does_not_inflate_floor;
+           (* NS1: cash-floor closing-trade exemption *)
+           make_parameterized_tests "cover_rejected_when_exemption_off"
+             test_cover_rejected_when_exemption_off;
+           make_parameterized_tests "full_cover_exempt_when_flag_on"
+             test_full_cover_exempt_when_flag_on;
+           make_parameterized_tests "partial_cover_exempt_when_flag_on"
+             test_partial_cover_exempt_when_flag_on;
+           make_parameterized_tests "over_cover_opening_portion_faces_floor"
+             test_over_cover_opening_portion_faces_floor;
+           make_parameterized_tests "over_cover_small_opening_portion_accepted"
+             test_over_cover_small_opening_portion_accepted;
+           make_parameterized_tests "long_sell_reducing_is_exempt"
+             test_long_sell_reducing_is_exempt;
            (* FIFO-specific tests - only run for FIFO *)
            [
              "fifo_basic_buy_sell" >:: test_fifo_basic_buy_sell;

@@ -4,21 +4,6 @@
 open Core
 include Trading_simulation_types.Simulator_types
 
-(** Internal: compute metrics by running all step-based computers *)
-let _compute_metrics ~computers ~config ~steps =
-  List.fold computers ~init:Trading_simulation_types.Metric_types.empty
-    ~f:(fun acc (computer : any_metric_computer) ->
-      Trading_simulation_types.Metric_types.merge acc
-        (computer.run ~config ~steps))
-
-(** Internal: compute derived metrics. Folded in list order — callers must
-    pre-sort by dependency. *)
-let _compute_derived ~derived_computers ~config ~base_metrics =
-  List.fold derived_computers ~init:base_metrics
-    ~f:(fun acc (dc : derived_metric_computer) ->
-      Trading_simulation_types.Metric_types.merge acc
-        (dc.compute ~config ~base_metrics:acc))
-
 (** {1 Dependencies} *)
 
 type dependencies = {
@@ -33,6 +18,7 @@ type dependencies = {
   stale_hold_policy : Stale_hold.config;
   stale_hold_log : Stale_hold.Log.t;
   margin_config : Trading_portfolio.Margin_config.t;  (** See .mli. *)
+  exempt_closing_trades_from_cash_floor : bool;  (** See .mli. *)
   on_trade_fill : (Trading_base.Types.trade -> Trading_base.Types.trade) option;
   active_through_for : (string -> Core.Date.t option) option;  (** See .mli. *)
 }
@@ -42,7 +28,8 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?market_data_adapter ?(stale_hold_policy = Stale_hold.default_config)
     ?stale_hold_log ?(slippage_bps = 0)
     ?(margin_config = Trading_portfolio.Margin_config.default_config)
-    ?on_trade_fill ?active_through_for () =
+    ?(exempt_closing_trades_from_cash_floor = false) ?on_trade_fill
+    ?active_through_for () =
   let engine_config = { Trading_engine.Types.commission; slippage_bps } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
@@ -66,6 +53,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     stale_hold_policy;
     stale_hold_log;
     margin_config;
+    exempt_closing_trades_from_cash_floor;
     on_trade_fill;
     active_through_for;
   }
@@ -115,7 +103,9 @@ let _maybe_prune_deps ~fold_start_date deps =
 let _build_initial_state ~config ~deps =
   let deps = _maybe_prune_deps ~fold_start_date:config.start_date deps in
   let portfolio =
-    Trading_portfolio.Portfolio.create ~initial_cash:config.initial_cash ()
+    Trading_portfolio.Portfolio.create ~initial_cash:config.initial_cash
+      ~exempt_closing_trades_from_cash_floor:
+        deps.exempt_closing_trades_from_cash_floor ()
   in
   {
     config;
@@ -335,12 +325,13 @@ let _apply_transitions ~positions ~transitions =
 let _build_run_result t =
   let steps = List.rev t.step_history in
   let base_metrics =
-    _compute_metrics ~computers:t.deps.metric_suite.computers ~config:t.config
-      ~steps
+    Simulator_metrics.compute_base ~computers:t.deps.metric_suite.computers
+      ~config:t.config ~steps
   in
   let metrics =
-    _compute_derived ~derived_computers:t.deps.metric_suite.derived
-      ~config:t.config ~base_metrics
+    Simulator_metrics.compute_derived
+      ~derived_computers:t.deps.metric_suite.derived ~config:t.config
+      ~base_metrics
   in
   if !(t.valuation_failure_count) > 0 then
     eprintf

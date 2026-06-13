@@ -136,6 +136,7 @@ let _make_portfolio ~positions : Trading_portfolio.Portfolio.t =
     unrealized_pnl_per_position = [];
     locked_collateral = 0.0;
     accrued_borrow_fee = 0.0;
+    exempt_closing_trades_from_cash_floor = false;
   }
 
 (** Build a [step_result] with the supplied portfolio + splits_applied. The
