@@ -1,0 +1,16 @@
+(library
+ (name weinstein_snapshot_gen)
+ (public_name weinstein_trading.snapshot_gen)
+ (libraries
+  core
+  weinstein_trading.snapshot
+  weinstein_trading.strategy
+  weinstein.screener
+  weinstein.macro
+  weinstein.sector
+  weinstein.stock_analysis
+  weinstein.rs
+  weinstein.resistance
+  weinstein.types)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))

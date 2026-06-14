@@ -7,6 +7,18 @@ IN_PROGRESS
 
 (Owner: feat-weinstein per #778 scope expansion.)
 
+**2026-06-14 (M6.6 generator):** `generate_weekly_snapshot` bin SHIPPED via
+PR (`feat/weekly-snapshot-generator`). The missing producer is built: a new
+`weinstein_trading.snapshot_gen` lib (`Weekly_snapshot_generator.generate`)
+runs the existing screener cascade (`Macro.analyze` → `Sector.analyze` →
+`Stock_analysis.analyze` → `Screener.screen`) on cached bars for one as-of date
+and assembles a `Weekly_snapshot.t`; the CLI bin loads a Pinned universe + CSV
+bars, builds a `Bar_reader`, and `Snapshot_writer.write_to_file`s it to
+`dev/weekly-picks/<system-version>/<date>.sexp`. No strategy logic
+reimplemented — pure wiring of existing public primitives; no core-module
+changes. Remaining M6.6 (live DATA_SOURCE / cron / alerts / trading-state) stays
+deferred.
+
 Track created 2026-05-02 to absorb M6.1–M6.5 (verification harness via incremental processing). Plan: `dev/plans/m6-weekly-snapshot-verification-2026-05-02.md`. Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M6.1–M6.5 (added 2026-05-02).
 
 **2026-06-14 reconcile (orchestrator):** M6.1–M6.5 are SHIPPED on main —
@@ -86,18 +98,18 @@ Live `DATA_SOURCE` impl, cron wrapper, alert dispatch, trading-state durability.
 
 ## Next Steps
 
-M6.1–M6.5 (snapshot writer/reader/round-trip, forward-trace, pick-diff, report
-renderer, corporate-action verifier) are all SHIPPED — see the 2026-06-14
-reconcile above. The remaining queue is M6.6 (DEFERRED, human-gated):
+M6.1–M6.5 are SHIPPED (see the 2026-06-14 reconcile above). M6.6's generator is
+now also SHIPPED (`generate_weekly_snapshot` bin +
+`weinstein_trading.snapshot_gen` lib, PR `feat/weekly-snapshot-generator`). The
+remaining queue:
 
-1. **[M6.6, human-gated]** `generate_weekly_snapshot` bin — runs the existing
-   screener + `entries_from_candidates` + stop placement on cached data,
-   assembles `Weekly_snapshot.t`, and `Snapshot_writer.write`s it to
-   `dev/weekly-picks/<version>/<date>.sexp`. Smallest live-cycle unblock; the
-   reconciliation seam for the `trading-reconciler`. Dispatchable once the
-   maintainer green-lights M6.6 scope.
-2. **[M6.6, human-gated]** generate + commit a first baseline pick record to
-   diff future weeks against.
+1. **[M6.6, DONE]** ~~`generate_weekly_snapshot` bin~~ — SHIPPED 2026-06-14.
+   Runs the existing screener cascade on cached data, assembles
+   `Weekly_snapshot.t`, and `Snapshot_writer.write_to_file`s it to
+   `dev/weekly-picks/<version>/<date>.sexp`.
+2. **[M6.6, optional]** generate + commit a first baseline pick record to diff
+   future weeks against (the stretch item; deferred — needs a committed
+   universe + cached bars to run against, not done in the generator PR).
 3. **[M6.6, deferred]** live `DATA_SOURCE` impl, cron wrapper, alert dispatch,
    trading-state durability (see §Out of scope).
 
