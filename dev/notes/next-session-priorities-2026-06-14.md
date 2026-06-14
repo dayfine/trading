@@ -21,6 +21,53 @@
 
 ---
 
+## 🎯 RESOLVED PLAN (grill session 2026-06-14) — execute in this order
+
+All open decisions resolved with the user. **Strategic frame:** finish the
+long-only cluster first, *then* the profit-seeking long-short build.
+
+### Long-only cluster — two semi-independent threads
+
+**Thread 1 — data (unblock the universe):**
+1. **Volume-only enrichment tool** — recompute `avg_dollar_volume` for each
+   committed golden's *exact* symbol set, inject the field. No composition drift,
+   no backtest re-pin. (NOT a full rebuild — see §2 for why; builder is
+   deterministic, drift = untracked-inventory provenance gap.)
+2. **Commit `inventory.sexp` to git** — closes the reproducibility hole (it's
+   currently untracked, so committed goldens aren't regenerable from VC).
+3. **Emit policy artifact** —
+   `apply_composition_policy --exclude-reits --exclude-preferred --adr-min-dollar-volume 100000`
+   (token floor: drops only zombie/untradeable tickers; liquidity is a non-issue
+   at our scale per `project_trade_realism_liquidity`, so the floor is hygiene,
+   not a real screen).
+4. Matrix re-runs on the policy universe (lower value given the no-bull-edge
+   finding, but completes the cluster).
+
+**Thread 2 — understanding (higher-insight; runs NOW, no wait on Thread 1):**
+5. **Factor-decomposition lens** on the existing honest matrix (top-3000-2011
+   suppress-ON), **staged**: (a) cheap factors first — forward-index-drawdown
+   ("did it dodge a correction?"), melt-up, realized-vs-MTM gap — to triage how
+   much they explain; (b) **then** the screener-based factors that answer the
+   user's actual questions — macro stage at start, sector-RS dispersion, Stage-2
+   candidate count. Keyed on **realized** edge, not MTM. Design:
+   `dev/notes/factor-decomposition-lens-design-2026-06-14.md`. Commit to both
+   stages; cheap-first only orders by cost.
+
+### After the cluster
+6. **Initiative B (margin → long-short)** — local, P0-after-cluster, with
+   oversight (core `Portfolio`, qc-structural A1 flag, 5 phases, re-pins shorts).
+   The actual profit thesis (the matrix finding says profit is short/bear-side).
+   Plan: `dev/plans/short-side-margin-2026-05-13.md`, start Phase 1.
+7. **Initiative A (weekly trade-generation record)** — **dispatch to the GHA
+   orchestrator** (now 8×/day) to build the `generate_weekly_snapshot` bin in
+   parallel (self-contained, no core-module risk; M6.1–M6.5 libs already exist).
+
+### Two immediate next actions (no further input needed)
+- Factor-lens **cheap pass** (step 5a) — runs now on existing data.
+- **Enrichment tool** (steps 1-2).
+
+---
+
 ## (record) Original flip decision — cash-floor closing-trade exemption (NS1 #1567)
 
 **What:** `exempt_closing_trades_from_cash_floor` (core `Portfolio`, default-off,
@@ -97,7 +144,12 @@ contamination muddies it); the lens must be built, not eyeballed.
 
 ---
 
-## 2. ⚠ DECISION NEEDED — regen composition drift
+## 2. ✅ RESOLVED — regen composition drift (decision → enrichment + track inventory; see roadmap)
+
+**Resolution (grill 2026-06-14):** volume-only **enrichment** (freeze committed
+composition, no re-pin) + **commit `inventory.sexp`** to git. NOT the full rebuild.
+Verified root cause below for the record (the builder is deterministic; drift is an
+untracked-inventory provenance gap, NOT a tie-break). Original decision write-up:
 
 The goldens-regen ran successfully (all 84 now carry `avg_dollar_volume`), but
 **a full `build_composition_universes_runner` rebuild is NOT behavior-neutral** —
