@@ -27,11 +27,9 @@
 #     - CLAUDE_CODE_OAUTH_TOKEN   (claude-code-action auth)
 #     - GITHUB_TOKEN              (auto-provided by GHA; used for ghcr login)
 #
-#   cron_slots:              "17 7 * * *"   (00:17 PT / 07:17 UTC)
-#                            "17 13 * * *"  (06:17 PT / 13:17 UTC)
-#                            "17 19 * * *"  (12:17 PT / 19:17 UTC)
-#                            "17 1 * * *"   (18:17 PT / 01:17 UTC)
-#                            (UTC times — GitHub cron is UTC-only, no DST)
+#   cron_slots:              every 3h at :17 — 8 slots/day
+#                            00:17/03:17/06:17/09:17/12:17/15:17/18:17/21:17 PT
+#                            (07/10/13/16/19/22/01/04 UTC; cron UTC-only, no DST)
 #
 #   branch_patterns:         feat/, harness/, cleanup/, data/, fix/, ops/
 #   daily_summary_branch:    ops/daily-<date>-runN
@@ -75,19 +73,26 @@
 name: Daily orchestrator
 
 on:
-  # Four daily runs spaced 6h apart so routine agent work progresses
-  # through the day and overnight. Expanded from 2x to 4x on 2026-05-26
-  # to allow the orchestrator to pick up new tasks (e.g. v7 sweep speedup
-  # wins from `dev/status/sweep-perf.md`) more promptly between local
-  # sessions. Minute `:17` avoids top-of-hour GHA scheduler load
-  # (scheduled jobs at :00 – :05 get delayed or silently dropped).
-  # GitHub cron is UTC-only, no DST awareness — PT comments are
-  # informational (UTC-7 PDT; shift +1h during PST months).
+  # Eight daily runs spaced 3h apart. Progression: 2x (2026-04-26) -> 4x
+  # (2026-05-26) -> 8x (2026-06-13). Measured runs are 6-99 min (<2h), so a
+  # 3h gap leaves >1h margin; the concurrency guard below SKIPS (never
+  # parallelizes) the rare overrun, keeping the tighter cadence
+  # contamination-safe. Rationale for 8x: auth is a Max-20x subscription
+  # (flat-rate) and weekly utilization was ~13% — the binding constraint is
+  # eligible-work availability + rate-limits, not $ cost, so poll more often
+  # to pick up rework/follow-ups promptly. Empty-queue slots no-op in ~6 min.
+  # Minute `:17` avoids top-of-hour GHA scheduler load (scheduled jobs at
+  # :00 – :05 get delayed or silently dropped). GitHub cron is UTC-only, no
+  # DST awareness — PT comments are informational (UTC-7 PDT; +1h during PST).
   schedule:
     - cron: "17 7 * * *"    # 00:17 PT / 07:17 UTC
+    - cron: "17 10 * * *"   # 03:17 PT / 10:17 UTC
     - cron: "17 13 * * *"   # 06:17 PT / 13:17 UTC
+    - cron: "17 16 * * *"   # 09:17 PT / 16:17 UTC
     - cron: "17 19 * * *"   # 12:17 PT / 19:17 UTC
+    - cron: "17 22 * * *"   # 15:17 PT / 22:17 UTC
     - cron: "17 1 * * *"    # 18:17 PT / 01:17 UTC
+    - cron: "17 4 * * *"    # 21:17 PT / 04:17 UTC
   workflow_dispatch:
 
 # Queue, do not cancel, if a previous run is still executing when the
