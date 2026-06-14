@@ -1,5 +1,13 @@
 (** Panel-loader execution path — see [panel_runner.mli]. *)
 
+(* @large-module: the canonical single backtest execution pipeline — snapshot-
+   source resolution, the 3-surface hybrid fan-out (strategy bar reader +
+   simulator adapter + final-close lookup over one Daily_panels.t), cost-overlay
+   resolution, simulator construction, the step loop, and teardown run in a
+   fixed sequential reading order. Fragmenting it across modules would split that
+   order and harm per-cycle readability; its sibling coordinator [runner.ml]
+   carries the same marker for the same reason. *)
+
 open Core
 open Trading_simulation
 module Daily_panels = Snapshot_runtime.Daily_panels
@@ -37,7 +45,7 @@ let _stale_hold_policy (config : Weinstein_strategy.config) : Stale_hold.config
 
 let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
     ~warmup_start ~end_date ~initial_cash ~commission ?slippage_bps
-    ?on_trade_fill ~strategy ~market_data_adapter () =
+    ?on_trade_fill ?active_through_for ~strategy ~market_data_adapter () =
   (* Default-off [Warmup_trade_gate] (#1549 A2); identity unless the flag is on. *)
   let strategy =
     Strategy_wrapper.wrap ~stop_log strategy
@@ -53,7 +61,7 @@ let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
       ~margin_config:input.config.margin_config
       ~exempt_closing_trades_from_cash_floor:
         input.config.portfolio_config.exempt_closing_trades_from_cash_floor
-      ?on_trade_fill ()
+      ?on_trade_fill ?active_through_for ()
   in
   let config =
     Simulator.
@@ -169,24 +177,50 @@ let _resolve_panels ~shared_panels ~snapshot_dir ~manifest =
   | Some p -> p
   | None -> _create_panels ~snapshot_dir ~manifest
 
-(* Hybrid setup: snapshot-backed strategy bar reader, snapshot-backed
-   simulator adapter, snapshot-backed final-close lookup — all reading
-   through one [Daily_panels.t]. See module-doc. *)
+(* Win #4 opt-in: build the simulator's per-symbol [active_through] lookup from
+   the run's [Daily_panels.t]. Returns [None] when [fold_start_date] is unset
+   ([prune_universe_by_active_through = false] at [run]), so the simulator stays
+   on its byte-equal no-prune default. When [Some _], the simulator drops
+   symbols whose last active day is strictly before the fold start — point-in-
+   time correct (not survivor bias). See [run]'s [?prune_universe_by_active_through]
+   and [dev/plans/v7-sweep-speedup-2026-05-26.md] §Win #4. *)
+(* Win #4: [Some _] → simulator-side [active_through_for] read off the panels;
+   [None] → no prune (bit-equal baseline). See [run]. *)
+let _active_through_for_of_panels ~daily_panels ~fold_start_date =
+  match fold_start_date with
+  | None -> None
+  | Some _ ->
+      Some (fun symbol -> Daily_panels.active_through_for daily_panels ~symbol)
+
+(* Win #4: [false] (default) → [None] (no prune anywhere → bit-equal baselines);
+   [true] → [Some start_date] (the fold's first day as cutoff). Exposed for
+   tests. *)
+let fold_start_date_of_opt_in ~prune_universe_by_active_through ~start_date =
+  if prune_universe_by_active_through then Some start_date else None
+
+(* Hybrid setup: snapshot-backed strategy bar reader, simulator adapter, and
+   final-close lookup, all reading one [Daily_panels.t]. See module-doc.
+   [fold_start_date] is the Win #4 opt-in: [Some d] enables screener pre-pruning
+   (forwarded to {!Panel_strategy_builder.build}) and the simulator-side
+   bar-fetch prune (the returned [active_through_for]); [None] is bit-equal. *)
 let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
-    ~shared_panels ~warmup_start ~end_date ~audit_recorder =
+    ~shared_panels ~warmup_start ~end_date ~audit_recorder ?fold_start_date () =
   let daily_panels = _resolve_panels ~shared_panels ~snapshot_dir ~manifest in
   let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
   let bar_reader = _build_snapshot_bar_reader ~daily_panels ~calendar in
   let strategy =
     Panel_strategy_builder.build ~ad_bars:input.ad_bars
       ~ticker_sectors:input.ticker_sectors ~config:input.config ~strategy_choice
-      ~bar_reader ~audit_recorder
+      ~bar_reader ~audit_recorder ?fold_start_date ()
   in
   let adapter = _build_market_data_adapter ~daily_panels in
   let final_close_prices () =
     _final_close_prices ~daily_panels ~symbols:input.all_symbols ~end_date
   in
-  (strategy, adapter, final_close_prices, daily_panels)
+  let active_through_for =
+    _active_through_for_of_panels ~daily_panels ~fold_start_date
+  in
+  (strategy, adapter, final_close_prices, daily_panels, active_through_for)
 
 (* Bundle of recorder collectors threaded through one backtest. Extracted
    so [run] stays under the 50-line linter cap. *)
@@ -221,19 +255,8 @@ let _on_trade_fill_of_cost_model cost_model =
   Option.map cost_model ~f:Cost_model.apply_per_trade_commission
 
 (* Resolve the effective [(commission, slippage_bps)] pair the simulator
-   receives.
-
-   When [cost_model = Some cm], the overlay takes precedence: the engine's
-   per-share commission + integer slippage_bps are derived from
-   {!Cost_model.to_engine_costs}, fully replacing the runner's default
-   commission and the caller's [?slippage_bps]. This is the explicit
-   scenario-facing surface — scenarios that declare a [cost_model] expect
-   their declared cost regime to be exactly what the engine bills.
-
-   When [cost_model = None], the function returns the runner-side defaults
-   unchanged: the [~default_commission] passed by the runner constants
-   table and the caller's [?default_slippage_bps] (typically [None] →
-   engine's own slippage default). Byte-equal to pre-#1260 baselines. *)
+   receives — [cost_model = Some cm] overlay replaces the runner defaults;
+   [None] passes them through byte-equal. Full contract in the [.mli]. *)
 let engine_costs_with_overlay ~default_commission ?default_slippage_bps
     ?cost_model () =
   match cost_model with
@@ -251,10 +274,29 @@ let _finish_panels ~daily_panels ~n_all_symbols ~shared_panels =
   Snapshot_cache_config.log_cache_stats ~daily_panels ~n_symbols:n_all_symbols;
   if Option.is_none shared_panels then Daily_panels.close daily_panels
 
+(* Resolve the cost overlay and build the simulator. Extracted from [run] so it
+   stays within the function-length limit; [active_through_for] is the Win #4
+   simulator-side prune callback ([None] → no prune). *)
+let _build_sim input ~r ~start_date ~warmup_start ~end_date ~initial_cash
+    ~commission ?slippage_bps ?cost_model ?active_through_for ~strategy
+    ~market_data_adapter () =
+  let on_trade_fill = _on_trade_fill_of_cost_model cost_model in
+  let effective_commission, effective_slippage_bps =
+    engine_costs_with_overlay ~default_commission:commission
+      ?default_slippage_bps:slippage_bps ?cost_model ()
+  in
+  _make_simulator input ~stop_log:r.stop_log ~stale_hold_log:r.stale_hold_log
+    ~start_date ~warmup_start ~end_date ~initial_cash
+    ~commission:effective_commission ?slippage_bps:effective_slippage_bps
+    ?on_trade_fill ?active_through_for ~strategy ~market_data_adapter ()
+
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     ~commission ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
     ?bar_data_source ?shared_panels ?progress_emitter ?slippage_bps ?cost_model
-    () =
+    ?(prune_universe_by_active_through = false) () =
+  let fold_start_date =
+    fold_start_date_of_opt_in ~prune_universe_by_active_through ~start_date
+  in
   let warmup_start = Date.add_days start_date (-warmup_days) in
   eprintf
     "Panel_runner: simulator window %s..%s (warmup %d days, strategy %s)\n%!"
@@ -266,20 +308,19 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
   let snapshot_dir, manifest =
     _resolve_snapshot_source input ~warmup_start ~end_date ~bar_data_source
   in
-  let strategy, market_data_adapter, final_close_prices_thunk, daily_panels =
+  let ( strategy,
+        market_data_adapter,
+        final_close_prices_thunk,
+        daily_panels,
+        active_through_for ) =
     _setup_hybrid input ~strategy_choice ~snapshot_dir ~manifest ~shared_panels
-      ~warmup_start ~end_date ~audit_recorder:r.audit_recorder
-  in
-  let on_trade_fill = _on_trade_fill_of_cost_model cost_model in
-  let effective_commission, effective_slippage_bps =
-    engine_costs_with_overlay ~default_commission:commission
-      ?default_slippage_bps:slippage_bps ?cost_model ()
+      ~warmup_start ~end_date ~audit_recorder:r.audit_recorder ?fold_start_date
+      ()
   in
   let sim =
-    _make_simulator input ~stop_log:r.stop_log ~stale_hold_log:r.stale_hold_log
-      ~start_date ~warmup_start ~end_date ~initial_cash
-      ~commission:effective_commission ?slippage_bps:effective_slippage_bps
-      ?on_trade_fill ~strategy ~market_data_adapter ()
+    _build_sim input ~r ~start_date ~warmup_start ~end_date ~initial_cash
+      ~commission ?slippage_bps ?cost_model ?active_through_for ~strategy
+      ~market_data_adapter ()
   in
   let progress_acc =
     Panel_step_loop.build_progress_acc ~progress_emitter ~warmup_start ~end_date
