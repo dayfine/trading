@@ -62,7 +62,7 @@ type config = {
   big_winner_multiplier : float;
   force_liquidation : Force_liquidation.config;
       [@sexp.default Force_liquidation.default_config]
-  exempt_closing_trades_from_cash_floor : bool; [@sexp.default false]
+  exempt_closing_trades_from_cash_floor : bool; [@sexp.default true]
 }
 [@@deriving show, eq, sexp]
 
@@ -82,7 +82,7 @@ let default_config =
     max_unknown_sector_positions = 2;
     big_winner_multiplier = 1.5;
     force_liquidation = Force_liquidation.default_config;
-    exempt_closing_trades_from_cash_floor = false;
+    exempt_closing_trades_from_cash_floor = true;
   }
 
 (* ---- Snapshot helpers ---- *)
