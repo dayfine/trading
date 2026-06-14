@@ -7,6 +7,29 @@ metadata:
   originSessionId: 78c98b7f-b5bb-42f0-abac-d99c79b0a11d
 ---
 
+**⚠ STALE SEMANTICS (flagged 2026-06-13):** these numbers were measured under
+`suppress_warmup_trading=false` (warmup-trades ON), the OLD default. #1566
+flipped the default to `true` (suppress) on correctness grounds. The matrix's
+**interior** starts (2013/2015/2017…) have WARM warmups (warmup_start =
+start−210d sits mid-warehouse, snap floor 2010-06) so the flip BITES — verified
+materially: a 2015 interior probe gave OFF 24.9% vs ON 12.6% return (~2×, the
+running-start effect, [[project-warmup-trading-running-start]]). Do NOT re-cite
+these OFF-semantics numbers as current.
+
+**✅ HONEST RE-RUN COMPLETE (2026-06-14, same surface, suppress=ON default),
+`dev/experiments/warmup-matrix-rerun-2026-06-13/ANALYSIS.md`:** median edge
+**−2.76 pp/yr** (was +3.2), beat-rate **35.5%** (was 57%), p10 −24.2 (was −16),
+worst −49.5 (was −28); CAGR median 8.45%, MaxDD median 35.9%. **The warmup
+running-start was ~all the apparent edge** — removing it swung the median ~6pp
+negative. Dividend-adjusted (GSPC price-only) honest edge vs total-return SPX
+≈ **−4.8 pp/yr → NO bull-regime start-date return edge**, confirming
+[[project-index-beating-structural-bar]] cleanly. The +107% max start (2025-01)
+is MTM-inflated (realized −21%); all post-2020 starts have deeply negative
+realized despite positive MTM ([[project-broad-universe-790-mtm-inflated]]).
+Strategic read: long-only profit is NOT recoverable by tuning bull-window long
+entries; it's on the short/bear side → motivates the margin/long-short build.
+Original (OFF, stale) numbers below for reference:
+
 Rolling-start runner v2 (#1536) first full matrix, 2026-06-11 (preliminary:
 pre-policy universe, GSPC price-only benchmark). Trimmed n=30: **median edge
 ≈ +3.2pp/yr vs GSPC ≈ +1pp vs total-return SPX, 57% starts beat, p10 −16pp,
