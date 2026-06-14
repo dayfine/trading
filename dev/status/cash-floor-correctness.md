@@ -8,9 +8,9 @@ IN_PROGRESS
 ## Interface stable
 NO
 
-NS1 shipped (PR open on `feat/cash-floor-closing-exempt`); NS2–NS4 remain a
-scoped Next-Steps queue. Each NS lands a new default-off config field;
-interfaces firm up as NS2→NS4 ship.
+NS1 shipped + its default flipped ON (#1567 impl, #1582 flip — correctness,
+R3-NA); NS2–NS4 remain a scoped Next-Steps queue. Each NS lands a new
+default-off config field; interfaces firm up as NS2→NS4 ship.
 
 ## Completed
 
@@ -65,8 +65,11 @@ interfaces firm up as NS2→NS4 ship.
 ## Owner
 feat-weinstein (core Portfolio/Position edits authorized per the per-task notes
 below; every item lands as a **default-off flag** so merge is a no-op — the
-experiment-flag-discipline pattern. Flipping any default to on stays
-human-gated, after the WF-CV experiment in NS4.)
+experiment-flag-discipline pattern. The NS1 default was flipped ON by the
+maintainer via #1582 (2026-06-14) on **correctness** grounds (R3-NA, goldens
+bit-equal); flipping any **other** default to on stays human-gated — via a
+ledger ACCEPT + confirmation grid for alpha mechanisms, or an explicit
+maintainer correctness call.)
 
 ## Context
 
@@ -84,7 +87,13 @@ axis).
 ## Next Steps (ordered; each is a default-off flag → safe merge)
 
 1. **[NS1] #1557#3 — cash-floor closing-trade exemption.** ✅ SHIPPED — see
-   §Completed. Branch `feat/cash-floor-closing-exempt`.
+   §Completed. Branch `feat/cash-floor-closing-exempt`. **Default flipped ON via
+   #1582** (2026-06-14, merged by maintainer) on correctness grounds (R3-NA, not
+   an NS4 WF-CV ACCEPT; full `dune runtest` exit 0, goldens bit-equal). A
+   closing/reducing trade improves solvency by construction, so the absolute
+   cash-floor must never block it — the old default-off behaviour is what
+   produced the #1553 −240% zombie. Same correctness framing as warmup-flip
+   #1566.
 
 2. **[NS2] #1563 — short-sale proceeds collateral.** FIRST deliverable
    (design-recommendation, read-only analysis) ✅ DONE —
@@ -107,15 +116,18 @@ axis).
 3. **[NS3] #1557#2 — `CancelExit` core Position transition.** ✅ SHIPPED — see
    §Completed. Branch `feat/cash-floor-ns3-cancelexit`.
 
-4. **[NS4] WF-CV experiment — cash-floor opportunity cost.** After NS1 merges,
-   run `exempt_closing_trades_from_cash_floor ∈ {false,true}` as a WF-CV axis on
+4. **[NS4] WF-CV experiment — cash-floor opportunity cost.** ⚠ NO LONGER A
+   PROMOTION GATE — the NS1 default was flipped ON via #1582 on correctness
+   grounds (R3-NA), not via this WF-CV ACCEPT. NS4 is now an **optional
+   retrospective DD-validation** (nice-to-have, not blocking): run
+   `exempt_closing_trades_from_cash_floor ∈ {false,true}` as a WF-CV axis on
    bear-regime cells (top-3000-2011 15y incl. the THM run; a deep 2008 window;
    SP500 2019-2023). Measure realized return + **tail drawdown** (the zombie
    excursions live in the left tail), not headline CAGR. Expected shape:
-   strictly DD-improving, neutral return → behaves like a correctness fix, not a
-   tunable edge. A blanket floor-OFF is NOT safe (entries would open with
-   negative cash); the axis is the boolean closing-trade exemption only. Promote
-   the default to on only after this clears (human-gated).
+   strictly DD-improving, neutral return → confirms the correctness framing. A
+   blanket floor-OFF is NOT safe (entries would open with negative cash); the
+   axis is the boolean closing-trade exemption only. Data-gated (broad-universe
+   bear-regime cells); run when the composition-policy universe artifact lands.
 
 ## Not in scope here
 Warmup-trading default flip (`feat/warmup-trading-default-flip`) — handled
