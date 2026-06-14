@@ -53,6 +53,7 @@ val run :
   ?progress_emitter:Backtest_progress.emitter ->
   ?slippage_bps:int ->
   ?cost_model:Backtest_cost_model.Cost_model.t ->
+  ?prune_universe_by_active_through:bool ->
   unit ->
   Trading_simulation_types.Simulator_types.run_result
   * Stop_log.t
@@ -160,7 +161,43 @@ val run :
     commission and the caller's [?slippage_bps] flow through unchanged, and no
     [on_trade_fill] is set. The market-impact component of [cost_model] is not
     yet routed through the runner — it requires ADV plumbing that lives on the
-    simulation data layer. *)
+    simulation data layer.
+
+    [prune_universe_by_active_through] is the Win #4 production opt-in (see
+    [dev/plans/v7-sweep-speedup-2026-05-26.md] §Win #4). When [true], the run's
+    [start_date] becomes a point-in-time cutoff applied on two surfaces, both
+    reading the per-symbol [active_through] marker from the run's
+    [Snapshot_runtime.Daily_panels.t]:
+
+    - the strategy's per-Friday screener pre-prunes [config.universe] before
+      Phase-1 stage classification (via {!Weinstein_strategy.make}'s
+      [?fold_start_date], threaded through {!Panel_strategy_builder.build}); and
+    - the simulator's per-step bar-fetch loop drops the same symbols (via
+      {!Trading_simulation.Simulator.create_deps}'s [?active_through_for]).
+
+    Both drop only symbols whose last active day is strictly before [start_date]
+    — symbols genuinely uninvestable AT THE FOLD START. This is NOT survivor
+    bias: it never filters on the present date, so symbols delisted later in the
+    fold (or still trading today) are kept. The speedup comes from skipping the
+    per-symbol cost of names that can never appear in the fold's results (e.g.
+    ~1500 of 3015 symbols pre-IPO/already-delisted on a 1998 fold).
+
+    [false] (the default) is byte-identical to the pre-Win-#4 baseline: no
+    pruning on either surface, every universe symbol is classified and
+    bar-fetched, every golden / snapshot-parity test replays unchanged. Only the
+    {!Strategy_choice.Weinstein} strategy consumes the screener-side cutoff; the
+    simulator-side bar-fetch prune applies regardless of strategy choice (it
+    drops symbols no strategy could use). *)
+
+val fold_start_date_of_opt_in :
+  prune_universe_by_active_through:bool -> start_date:Date.t -> Date.t option
+(** Pure helper that mirrors the Win #4 opt-in resolution applied inside {!run}:
+    [prune_universe_by_active_through = false] (the default) → [None] (no
+    point-in-time pruning on either the strategy screener or the simulator
+    bar-fetch loop → bit-equal baselines); [true] → [Some start_date], the
+    fold's first day used as the [active_through] cutoff on both surfaces.
+    Exposed so tests pin the flag→cutoff mapping without spinning up a full
+    simulator run. *)
 
 val engine_costs_with_overlay :
   default_commission:Trading_engine.Types.commission_config ->

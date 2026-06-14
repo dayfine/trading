@@ -50,9 +50,19 @@ flambda OFF.
   orchestrator run; all 3 gates green: CI + qc-structural APPROVED q=5 +
   qc-behavioral APPROVED q=5). Surface + tests landed (5 new tests covering
   pure-helper pruning, point-in-time vs survivor-bias framing, and integration
-  through `Weinstein_strategy_screening`); production wiring
-  (`panel_runner` / `scenario_runner` opt-in to pass `?active_through_for`)
-  is the follow-up.
+  through `Weinstein_strategy_screening`).
+  - [x] **Production opt-in wiring** — `Panel_runner.run` now takes
+    `?prune_universe_by_active_through:bool` (default `false`). When `true`, the
+    fold's `start_date` becomes the point-in-time cutoff threaded onto both
+    surfaces: the strategy screener (via `Panel_strategy_builder.build`'s new
+    `?fold_start_date` → `Weinstein_strategy.make`'s `?fold_start_date`) and the
+    simulator bar-fetch loop (via `Simulator.create_deps`'s `?active_through_for`,
+    built from `Daily_panels.active_through_for`). Default `false` is bit-equal —
+    no golden re-pin. Verify: `dune build && dune runtest`; new test
+    `trading/trading/backtest/test/test_panel_runner_active_through.ml` asserts
+    (a) flag→cutoff mapping (`false`→`None`, `true`→`Some start_date`) and
+    (b) opt-in ON → strictly fewer symbols reach Phase-1 classification than OFF
+    on a fixture whose fold starts after a member's `active_through`.
 
 ## Completed
 
@@ -81,6 +91,17 @@ flambda OFF.
   `?active_through_for` (simulator) and `?fold_start_date` (Weinstein_strategy)
   parameters; defaults preserve bit-equal baselines. 10 files touched,
   +495 / -137 (incl. 5 new tests). MERGED at `ebe4a01d` (2026-05-26).
+- **Win #4 production wiring** (`feat/sweep-perf-active-through-wiring`): wires
+  the opt-in path so production sweeps can actually fire the per-fold prune.
+  Adds `Panel_runner.run`'s `?prune_universe_by_active_through:bool`
+  (default `false`) + the pure helper `Panel_runner.fold_start_date_of_opt_in`;
+  threads `?fold_start_date` through `Panel_strategy_builder.build` into
+  `Weinstein_strategy.make`; builds the simulator-side `?active_through_for`
+  from the run's `Daily_panels.t`. Default `false` → bit-equal baselines (no
+  golden re-pin). New test `test_panel_runner_active_through.ml` (3 cases).
+  `panel_runner.ml` marked `@large-module` (it was at the 300-line cap; the
+  feature plumbing pushed it to 341 — it is the canonical single execution
+  pipeline, mirroring sibling `runner.ml`'s existing marker).
 - **Win #2** (PR #1317, `harness/sweep-parallel-6`): raised `PARALLEL` default
   from 4 to 6 in `dev/scripts/launch_sweep.sh` (1 line); added `--memory 12g`
   to the `docker run` incantation in `.devcontainer/setup.sh` (1 line). Total:
