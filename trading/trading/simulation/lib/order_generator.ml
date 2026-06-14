@@ -64,8 +64,8 @@ let _transition_to_order ~id ~positions
          We look up the Exiting position to get the target quantity and side. *)
       Map.find positions transition.position_id
       |> Option.value_map ~default:(Ok None) ~f:(_exit_order_for_position ~id)
-  | EntryFill _ | EntryComplete _ | CancelEntry _ | UpdateRiskParams _
-  | ExitFill _ | ExitComplete ->
+  | EntryFill _ | EntryComplete _ | CancelEntry _ | CancelExit _
+  | UpdateRiskParams _ | ExitFill _ | ExitComplete ->
       Ok None
 
 (** Advance the (seq, accumulator) pair with [maybe_order].

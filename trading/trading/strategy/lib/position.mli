@@ -40,6 +40,8 @@
     - [EntryFill]: Entry order filled (partially or fully)
     - [EntryComplete]: Entry fully filled, move to Holding
     - [CancelEntry]: Cancel entry before any fills
+    - [CancelExit]: Revert an unfilled exit back to Holding (exit-side mirror of
+      [CancelEntry])
     - [TriggerExit]: Exit signal detected, start closing the whole position
     - [TriggerPartialExit]: Trim part of the position, keeping the remainder
     - [UpdateRiskParams]: Modify stop loss / take profit while holding
@@ -273,6 +275,20 @@ type transition_kind =
   | EntryComplete of { risk_params : risk_params }
       (** Entry fully filled, transition to holding *)
   | CancelEntry of { reason : string }  (** Cancel entry before any fills *)
+  | CancelExit of { reason : string }
+      (** Revert an {b unfilled} [Exiting] position back to [Holding], carrying
+          the same fields (quantity, entry price/date, risk params). The
+          exit-side mirror of {!CancelEntry}: where [CancelEntry] cancels an
+          [Entering] order before any fills (and closes the position),
+          [CancelExit] cancels an [Exiting] order before any fills (and resumes
+          [Holding]). Used when a portfolio-rejected exit fill strands a
+          position in [Exiting]; reverting to [Holding] lets the stop machinery
+          re-evaluate and re-trigger the exit next cycle (issue #1553).
+
+          Rejected (Invalid transition) when applied to a {b partially-filled}
+          [Exiting] (i.e. [filled_quantity > 0.0]): reverting would resurrect
+          the full pre-exit quantity after a booked partial cover, desyncing
+          strategy and portfolio. The [reason] string is purely diagnostic. *)
   | TriggerExit of { exit_reason : exit_reason; exit_price : float }
       (** Exit the {b whole} position. Unchanged from before: goes
           [Holding -> Exiting] and closes on [ExitComplete]. *)
@@ -311,7 +327,7 @@ val trigger_of_kind : transition_kind -> transition_trigger
 
     Strategy-triggered: CreateEntering, TriggerExit, TriggerPartialExit,
     UpdateRiskParams Simulator-triggered: EntryFill, EntryComplete, ExitFill,
-    ExitComplete, CancelEntry *)
+    ExitComplete, CancelEntry, CancelExit *)
 
 (** {1 Position Operations} *)
 
