@@ -5,7 +5,23 @@
 
 ---
 
-## ☀️ TOP — your flip decision: cash-floor closing-trade exemption (NS1 #1567)
+## ✅ DONE overnight (your "flip + regen" instruction)
+
+- **Flip MERGED (#1582)** — `exempt_closing_trades_from_cash_floor` is now
+  **default-ON** on main. Bit-equal (zero golden re-pins; the exemption only fires
+  on a blocked cover, which no golden exercises), both QC gates APPROVED the R3-NA
+  correctness framing, CI green. A `test_cash_floor_exemption_on_by_default` pin
+  guards the default.
+- **Regen RAN but needs your decision — NOT auto-committed (see §2).** The builder
+  works (84/84 goldens regenerated with `avg_dollar_volume`), but a full rebuild
+  also drifts composition ~2.9% (87/3000, mostly delisted `_old`↔`_old2` tie-break
+  swaps + a few preferred↔warrant). That re-pins backtests — NOT the
+  behavior-neutral add the queue doc assumed — so I preserved the output
+  (`/tmp/regen-goldens-with-volume/`) and left main untouched.
+
+---
+
+## (record) Original flip decision — cash-floor closing-trade exemption (NS1 #1567)
 
 **What:** `exempt_closing_trades_from_cash_floor` (core `Portfolio`, default-off,
 **merged #1567**, QC double-APPROVED, A1-generalizable). When on, the absolute
@@ -69,17 +85,47 @@ strategy's case is bear-regime tail defense, not bull return-beating. The
 long-short build (§4) is the right place to look, *once shorts are measured
 honestly* (Phase-1 margin accounting).
 
+**Deep-understanding follow-up (your 2026-06-14 ask):** "beats 35% of the time" is
+decomposed — first-pass WHEN/WHY in chat + a build design at
+`dev/notes/factor-decomposition-lens-design-2026-06-14.md`. Key correction: the
+honest beat-rate is **~23%** (7/31), not 35% — 4 of the 11 "beats" are MTM
+artifacts (positive MTM-edge, deeply negative *realized*). The lens (join each
+start to macro stage / forward index DD / Stage-2-supply, keyed on a **realized**
+edge) is the prime analytical next task — built on OCaml extension of
+`rolling_start_runner`. NOTE: eyeballing the raw table is unreliable (MTM
+contamination muddies it); the lens must be built, not eyeballed.
+
 ---
 
-## 2. Queued local pipeline — composition-policy universe artifact (the keystone)
+## 2. ⚠ DECISION NEEDED — regen composition drift
 
-`dev/experiments/warmup-matrix-rerun-2026-06-13/QUEUED-NEXT-LOCAL-STEP.md` has the
-verified commands. **Local-only** (needs the maintainer bar store; GHA can't do
-it — the checked-in goldens are volume-less). Unblocks ~5 data-gated tracks
-(matrices, broad-universe WF-CV, continuation recheck, cash-floor NS4). Sequence:
-matrix → goldens-regen (golden re-pin, your sign-off) → policy emit → data-gated
-re-runs. The one TBD is the **ADR $-volume threshold** (from the weekly >1%-ADV
-gate spec) — I'll surface the drop report before trusting the artifact.
+The goldens-regen ran successfully (all 84 now carry `avg_dollar_volume`), but
+**a full `build_composition_universes_runner` rebuild is NOT behavior-neutral** —
+it re-ranks the universe from the current bar store and drifts ~2.9% of symbols
+vs main (87/3000). Breakdown for top-3000-2011: **2913/3000 identical**; the 87
+turnover is **68 delisted `_old`↔`_old2` tie-break swaps**, ~10 warrant
+(regen: AIG-WS) ↔ ~9 preferred (main: BAC-PL, GS-PD) swaps. Economically marginal
+(tail names at 0.0003 weight) but **not bit-equal → re-pins any backtest reading
+these goldens.** The queue doc assumed a clean volume-only add; it isn't.
+
+**Output preserved:** `/tmp/regen-goldens-with-volume/` (container, 84 files with
+volumes). main untouched.
+
+**Your call — three options:**
+- **(a) Accept the rebuild** — `cp /tmp/regen-goldens-with-volume/* → goldens dir`,
+  commit, let golden-runs CI re-pin. Simplest; accepts the marginal tail drift as
+  a (arguably more survivorship-complete) universe refresh.
+- **(b) Volume-only enrichment** (behavior-neutral, the original intent) — a small
+  tool that recomputes `avg_dollar_volume` for main's **exact** symbol set and
+  injects the field, keeping composition bit-identical. Needs ~1 new bin; no
+  backtest re-pin. **My recommendation** if you want backtest continuity.
+- **(c) Defer** — the downstream policy artifact (Step 2) is **anyway blocked** on
+  the **ADR $-volume threshold value** (from the weekly >1%-ADV gate spec) which
+  only you can supply, so nothing downstream is unblocked tonight regardless.
+
+Whichever: Step 2 (`apply_composition_policy`) still needs that **threshold value**
+before the policy universe can be emitted — please supply it (or confirm the
+>1%-ADV gate spec to read it from).
 
 ---
 
