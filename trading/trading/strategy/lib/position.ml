@@ -101,6 +101,7 @@ type transition_kind =
   | EntryFill of { filled_quantity : float; fill_price : float }
   | EntryComplete of { risk_params : risk_params }
   | CancelEntry of { reason : string }
+  | CancelExit of { reason : string }
   | TriggerExit of { exit_reason : exit_reason; exit_price : float }
   | TriggerPartialExit of {
       exit_reason : exit_reason;
@@ -123,7 +124,8 @@ let trigger_of_kind = function
   | CreateEntering _ | TriggerExit _ | TriggerPartialExit _ | UpdateRiskParams _
     ->
       Strategy
-  | EntryFill _ | EntryComplete _ | ExitFill _ | ExitComplete | CancelEntry _ ->
+  | EntryFill _ | EntryComplete _ | ExitFill _ | ExitComplete | CancelEntry _
+  | CancelExit _ ->
       Simulator
 
 (** {1 Helper Functions} *)
@@ -211,6 +213,11 @@ let _validate_transition t transition =
       ]
   | Exiting { filled_quantity; _ }, ExitComplete ->
       [ _validate_has_fills filled_quantity ]
+  | Exiting { filled_quantity; _ }, CancelExit _ ->
+      (* Exit-side mirror of [CancelEntry]: only an unfilled exit may revert. A
+         partially-filled exit must NOT be reverted (would resurrect full
+         quantity after a booked partial cover). *)
+      [ _validate_no_fills filled_quantity ]
   | Closed _, _ -> []
   | _ -> []
 
@@ -430,6 +437,14 @@ let _exit_complete t ~date ~quantity ~filled_quantity ~entry_price ~exit_price
   in
   Ok { t with state; last_updated = date }
 
+(* Revert an unfilled [Exiting] back to [Holding], carrying the same fields
+   (quantity, entry price/date, risk params). Exit-side mirror of [_cancel_entry],
+   but resumes [Holding] instead of closing — so [exit_reason] is deliberately
+   left untouched (the position is no longer exiting). *)
+let _cancel_exit t ~date ~quantity ~entry_price ~entry_date ~risk_params =
+  let state = Holding { quantity; entry_price; entry_date; risk_params } in
+  Ok { t with state; last_updated = date }
+
 (* @nesting-ok: 8-field Exiting pattern forces multiline match; depth is structural *)
 let _apply_exiting_transition t transition =
   let date = transition.date in
@@ -461,6 +476,9 @@ let _apply_exiting_transition t transition =
       ExitComplete ) ->
       _exit_complete t ~date ~quantity ~filled_quantity ~entry_price ~exit_price
         ~entry_date ~risk_params
+  | ( Exiting { quantity; entry_price; entry_date; risk_params; _ },
+      CancelExit _ ) ->
+      _cancel_exit t ~date ~quantity ~entry_price ~entry_date ~risk_params
   | _, kind -> _invalid_transition kind
 
 (** {1 Transition Application} *)

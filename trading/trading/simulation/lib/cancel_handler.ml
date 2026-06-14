@@ -46,25 +46,18 @@ let apply_to_positions positions trans =
       if Position.is_closed updated then Ok (Map.remove positions key)
       else Ok (Map.set positions ~key ~data:updated)
 
-(** Reconstruct the [Holding] state from an [Exiting] position's carried fields
-    (quantity, entry price/date, risk params), so the position resumes stop
-    monitoring on its full pre-exit quantity. Returns [None] for any
-    non-[Exiting] state.
-
-    The core [Position] state machine has no [Exiting -> Holding] transition —
-    an asymmetry vs the entry side, where [CancelEntry] exists. We reconstruct
-    the [Holding] state here from the exposed [position_state] rather than add a
-    core transition variant, keeping the fix at the simulation layer (A1). A
-    future [CancelExit] core transition would let exit reversion route through
-    [apply_to_positions] like [CancelEntry]; see the cancel_handler.mli note. *)
-let _holding_from_exiting ~date (pos : Position.t) : Position.t option =
-  match pos.state with
-  | Exiting { quantity; entry_price; entry_date; risk_params; _ } ->
-      let state =
-        Position.Holding { quantity; entry_price; entry_date; risk_params }
-      in
-      Some { pos with state; last_updated = date }
-  | _ -> None
+(** Build a [CancelExit] transition for [position_id] on [date]. The exit-side
+    mirror of [_cancel_entry_transition]: it reverts an unfilled [Exiting]
+    position back to [Holding] via the core [Position] state machine. The reason
+    string is purely diagnostic. *)
+let _cancel_exit_transition ~date ~position_id ~symbol : Position.transition =
+  {
+    position_id;
+    date;
+    kind =
+      CancelExit
+        { reason = Printf.sprintf "exit fill rejected by portfolio for %s" symbol };
+  }
 
 (** True if [pos] is in the [Exiting] state for [symbol] with no partial fills
     yet — the stuck-exit signature. A partially-filled exit is deliberately NOT
@@ -79,19 +72,24 @@ let _is_unfilled_exiting_for_symbol ~symbol (pos : Position.t) =
   | _ -> false
 
 (* Revert the first unfilled [Exiting] position matching [symbol] in [acc] back
-   to [Holding], leaving [acc] unchanged when there is no such match. *)
+   to [Holding] by routing a [CancelExit] transition through the core
+   [Position.apply_transition] (via [apply_to_positions]) — the exit-side mirror
+   of the [CancelEntry] path. Leaves [acc] unchanged when there is no matching
+   unfilled-[Exiting] position. The match guard [_is_unfilled_exiting_for_symbol]
+   ensures we only attempt the transition on an unfilled exit; the core
+   [CancelExit] validator is a second backstop (it rejects a partially-filled
+   [Exiting]). On the (unexpected) validator error we leave [acc] unchanged. *)
 let _revert_one ~date ~acc ~symbol =
   let target =
     Map.to_alist acc
     |> List.find ~f:(fun (_, pos) ->
         _is_unfilled_exiting_for_symbol ~symbol pos)
   in
-  match
-    Option.bind target ~f:(fun (id, pos) ->
-        Option.map (_holding_from_exiting ~date pos) ~f:(fun r -> (id, r)))
-  with
-  | Some (id, reverted) -> Map.set acc ~key:id ~data:reverted
+  match target with
   | None -> acc
+  | Some (id, _) -> (
+      let trans = _cancel_exit_transition ~date ~position_id:id ~symbol in
+      match apply_to_positions acc trans with Ok acc' -> acc' | Error _ -> acc)
 
 let revert_rejected_exits ~date ~positions ~rejected_trades =
   List.fold rejected_trades ~init:positions ~f:(fun acc trade ->

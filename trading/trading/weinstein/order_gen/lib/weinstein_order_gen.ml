@@ -93,7 +93,7 @@ let _translate_transition ~(transition : Position.transition)
   | Position.TriggerExit _ | Position.TriggerPartialExit _
   (* Simulator-internal transitions: not relevant to the live broker *)
   | Position.EntryFill _ | Position.EntryComplete _ | Position.CancelEntry _
-  | Position.ExitFill _ | Position.ExitComplete ->
+  | Position.CancelExit _ | Position.ExitFill _ | Position.ExitComplete ->
       None
 
 let from_transitions ~transitions ~get_position =

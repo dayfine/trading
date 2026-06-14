@@ -117,7 +117,7 @@ let _process_transition t (trans : Position.transition) =
       let record = _ensure_record t ~position_id:trans.position_id ~symbol:"" in
       if Option.is_none record.pos_exit_trigger then
         record.pos_exit_trigger <- Some End_of_period
-  | EntryFill _ | CancelEntry _ | ExitFill _ -> ()
+  | EntryFill _ | CancelEntry _ | CancelExit _ | ExitFill _ -> ()
 
 let record_transitions t transitions =
   List.iter transitions ~f:(_process_transition t)

@@ -43,10 +43,12 @@ val apply_to_positions :
   Position.t String.Map.t ->
   Position.transition ->
   Position.t String.Map.t Status.status_or
-(** [apply_to_positions positions trans] applies a [CancelEntry] transition to
-    [positions] via [Position.apply_transition]. Drops the position from the map
-    when it reaches the terminal [Closed] state — same convention used by the
-    simulator for [TriggerExit] under [_set_or_drop_if_closed].
+(** [apply_to_positions positions trans] applies a transition (a [CancelEntry] on
+    the entry side, or a [CancelExit] on the exit side) to [positions] via
+    [Position.apply_transition]. Drops the position from the map when it reaches
+    the terminal [Closed] state — same convention used by the simulator for
+    [TriggerExit] under [_set_or_drop_if_closed]. (A [CancelExit] reverts to
+    [Holding], not [Closed], so the position is retained, updated in place.)
 
     Returns the original map unchanged when the transition's position_id has no
     entry in [positions] (defensive — same shape as the simulator's
@@ -79,9 +81,9 @@ val revert_rejected_exits :
     [Exiting] position whose exit fill was rejected back to [Holding], so the
     stop machinery re-evaluates it next cycle and re-triggers the exit (issue
     #1553). For each rejected trade it finds the first [Exiting] position
-    matching the trade's symbol {e with [filled_quantity = 0.0]} and rebuilds a
-    [Holding] state from the [Exiting] state's carried fields (quantity, entry
-    price/date, risk params); [last_updated] is set to [date].
+    matching the trade's symbol {e with [filled_quantity = 0.0]} and reverts it
+    to [Holding] — carrying the [Exiting] state's fields (quantity, entry
+    price/date, risk params), with [last_updated] set to [date].
 
     A {e partially} filled [Exiting] position is deliberately left untouched:
     reverting it would resurrect a [Holding] at the full pre-exit quantity while
@@ -90,10 +92,8 @@ val revert_rejected_exits :
     silently skipped (defensive — covers the case where the same symbol's
     [Entering] rejection is handled by [transitions_for_rejected_trades]).
 
-    No core [Position] transition is used: the state machine has no
-    [Exiting -> Holding] transition (an asymmetry vs the entry side's
-    [CancelEntry]). The [Holding] state is reconstructed here from the exposed
-    [position_state], keeping the fix at the simulation layer. A future
-    [CancelExit] core transition would let this route through
-    [apply_to_positions] like [CancelEntry]; that is a core-module (A1) change
-    deferred to a decision item on #1553. *)
+    The revert routes through the core [Position.CancelExit] transition (the
+    exit-side mirror of [CancelEntry]) via [apply_to_positions], so exit
+    reversion and entry cancellation share the same state-machine path. The
+    [CancelExit] validator independently rejects a partially-filled [Exiting], a
+    backstop to the [filled_quantity = 0.0] match guard above. *)
