@@ -96,10 +96,16 @@ verdicts:
    for now; file Phase-2 fix issue; gate Phase 5 (long-short re-pin)
    on the fix.
 
-**Next short-side step: fix the Phase 2 margin_call transition bug**
-(diagnosed in report Finding A), then re-run this sweep to populate
-the dot-com margin-on cell. Phase 4-5 (long-short combined re-pin)
-remains gated on the fix.
+**Next short-side step: ~~fix the Phase 2 margin_call transition bug~~**
+**(Finding A) — ALREADY FIXED.** Reconciled by lead-orchestrator
+2026-06-14: PR #1274 (`8636e636 fix(margin): dedup same-tick TriggerExit
+across margin/stop/strategy (closes #1266)`) landed
+`Margin_runner.dedup_strategy_exits_for_margin`, wired into
+`Margin_runner.tick` (margin wins by priority, strategy TriggerExit
+dropped), documented in `margin_runner.mli`, tested in
+`test_margin_runner.ml`. This §2026-05-23 "next step" claim was stale.
+Remaining open work: re-run the dot-com margin-on sweep cell to populate
+the empty cell (data-gated), then Phase 4-5 (long-short combined re-pin).
 
 **Earlier MERGED note retained below.**
 

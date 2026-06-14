@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-13 (orchestrator run 27477321403 [run 3]: dispatched feat-weinstein on cash-floor-correctness NS1 — default-off `exempt_closing_trades_from_cash_floor` flag, root fix for the #1553 zombie; QC APPROVED both gates (quality 5/5), CI green, AUTO-MERGED #1567 → 3b6d5ced. Fill-loop: NS2 short-proceeds collateral design doc (recommends option b) merged docs-only #1569 → 5ac27fc1. Since run-2 the maintainer merged #1564/#1565/#1566 (incl. flipping `suppress_warmup_trading` default false→true for measurement-correctness; goldens re-pinned, CI green). Main GREEN on 5ac27fc1. 0 open PRs, 0 ci-red issues.)
+Last updated: 2026-06-14 (orchestrator run 27485416611 [run 1]: 2 dispatches, BOTH AUTO-MERGED. sweep-perf Win #4 production wiring — `?prune_universe_by_active_through` opt-in (default-off, bit-equal) threaded into panel_runner/scenario_runner; QC APPROVED 5/5, CI green, #1574 → 1b7a88c2. cash-floor NS3 — `CancelExit` core Position transition (behavior-identical, no re-pin); QC APPROVED 5/5 (A1 PASS), CI green, #1575 → fae3f34a. Pre-flight caught that short-side "fix Finding A margin dedup" is STALE (already fixed by #1274). Main GREEN on fae3f34a. 0 open PRs, 0 ci-red. Prior maintainer merges since run-3: #1570/#1571/#1573 (8x cadence + cap raise).)
 
 ## Active + complete tracks
 
@@ -14,10 +14,10 @@ Each row: one line; deeper task detail in the linked status file.
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
 | [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | — | Fold_health wiring MERGED (#1558); warmup-suppression WF-CV rejects the flip (#1561); next: P2 matrix on composition-policy universe (data-gated) |
-| [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 exemption flag + NS2 short-proceeds doc MERGED (#1567/#1569); next: NS3 CancelExit (reassess post-NS1), NS4 WF-CV DD (data-gated) |
+| [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1/NS2/NS3 MERGED (#1567/#1569/#1575); next: NS4 WF-CV cash-floor DD (data-gated), NS2 short-proceeds impl (human-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
 | [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | rolling-start v2 merged (#1536: jittered starts, edge-vs-SPY matrix, fork-per-start); next: run matrix on composition-policy universe |
-| [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | manual ghcr.io devcontainer rebuild (flambda) + Win #4 production wiring for active_through pruning |
+| [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | Win #4 production wiring MERGED (#1574, opt-in default-off); next: manual ghcr.io flambda rebuild + enable prune opt-in in sweeps |
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
 | [hybrid-tier](hybrid-tier.md) | MERGED | — | — | — |
@@ -25,7 +25,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — |
-| [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | enable_short_side=false suppression now honest + tested (#1560, QC-APPROVED); next: WF-CV the short_min_price axis (0.0 vs ~17.0) + Phase-2 margin_call dedup fix |
+| [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | Phase-2 margin_call dedup ALREADY FIXED (#1274 — status stale); next: WF-CV short_min_price axis 0.0 vs ~17.0 (data-gated) |
 | [spy-only-reference](spy-only-reference.md) | IN_PROGRESS | feat-weinstein | — | WF-CV on sector-rotation testbed; top-1000 bankability gate; long-short verification (human session) |
 | [stage-accuracy](stage-accuracy.md) | IN_PROGRESS | feat-weinstein | — | force_exit_off grid REJECTED (#1503); cascade-selection inversion documented (#1509 merged); broad-universe WF-CV re-run data-gated |
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
