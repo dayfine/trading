@@ -24,40 +24,49 @@ let _macro_result ~(inputs : inputs) ~index_bars : Macro.result =
   Macro.analyze ~config:inputs.config.macro_config ~index_bars ~ad_bars:[]
     ~global_index_bars:[] ~prior_stage:None ~prior:None
 
-(* Sector context per ETF, expanded to every ticker in that sector. ETFs with no
-   bars are skipped; their tickers fall through to the screener's Neutral
-   default. *)
+(* Analyse one sector ETF and write its context onto every ticker in that
+   sector. ETFs with no bars are skipped; their tickers fall through to the
+   screener's Neutral default. *)
+let _set_sector_ctx_for_etf ~(inputs : inputs) ~index_bars ~by_sector
+    ~sector_map (etf, sector_name) =
+  let sector_bars = _weekly_bars ~inputs etf in
+  if not (List.is_empty sector_bars) then begin
+    let result =
+      Sector.analyze ~config:Sector.default_config ~sector_name ~sector_bars
+        ~benchmark_bars:index_bars ~constituent_analyses:[] ~prior_stage:None
+    in
+    let ctx = Sector.sector_context_of result in
+    List.iter (Hashtbl.find_multi by_sector sector_name) ~f:(fun ticker ->
+        Hashtbl.set sector_map ~key:ticker ~data:ctx)
+  end
+
+(* Sector context per ETF, expanded to every ticker in that sector. *)
 let _build_sector_map ~(inputs : inputs) ~index_bars :
     (string, Screener.sector_context) Hashtbl.t =
   let sector_map = Hashtbl.create (module String) in
   let by_sector = String.Table.create () in
   List.iter inputs.ticker_sectors ~f:(fun (ticker, sector) ->
       Hashtbl.add_multi by_sector ~key:sector ~data:ticker);
-  List.iter inputs.config.sector_etfs ~f:(fun (etf, sector_name) ->
-      let sector_bars = _weekly_bars ~inputs etf in
-      if not (List.is_empty sector_bars) then
-        let result =
-          Sector.analyze ~config:Sector.default_config ~sector_name ~sector_bars
-            ~benchmark_bars:index_bars ~constituent_analyses:[]
-            ~prior_stage:None
-        in
-        let ctx = Sector.sector_context_of result in
-        List.iter (Hashtbl.find_multi by_sector sector_name) ~f:(fun ticker ->
-            Hashtbl.set sector_map ~key:ticker ~data:ctx));
+  List.iter inputs.config.sector_etfs
+    ~f:(_set_sector_ctx_for_etf ~inputs ~index_bars ~by_sector ~sector_map);
   sector_map
 
-(* Per-stock analysis for the screened universe. Symbols with no weekly bars are
-   dropped — they cannot satisfy the screener's breakout / breakdown rules. *)
+(* Analyse one ticker. Symbols with no weekly bars are dropped ([None]) — they
+   cannot satisfy the screener's breakout / breakdown rules. *)
+let _analyze_ticker ~(inputs : inputs) ~analysis_config ~index_bars ticker :
+    Stock_analysis.t option =
+  let bars = _weekly_bars ~inputs ticker in
+  if List.is_empty bars then None
+  else
+    Some
+      (Stock_analysis.analyze ~config:analysis_config ~ticker ~bars
+         ~benchmark_bars:index_bars ~prior_stage:None ~as_of_date:inputs.as_of)
+
+(* Per-stock analysis for the screened universe. *)
 let _analyze_universe ~(inputs : inputs) ~index_bars : Stock_analysis.t list =
   let analysis_config = Stock_analysis.default_config in
   List.filter_map inputs.ticker_sectors ~f:(fun (ticker, _sector) ->
-      let bars = _weekly_bars ~inputs ticker in
-      if List.is_empty bars then None
-      else
-        Some
-          (Stock_analysis.analyze ~config:analysis_config ~ticker ~bars
-             ~benchmark_bars:index_bars ~prior_stage:None
-             ~as_of_date:inputs.as_of))
+      _analyze_ticker ~inputs ~analysis_config ~index_bars ticker)
 
 let _rs_vs_spy (analysis : Stock_analysis.t) : float option =
   Option.map analysis.rs ~f:(fun (r : Rs.result) -> r.current_normalized)
@@ -93,20 +102,31 @@ let _regime_label : Weinstein_types.market_trend -> string = function
 let _macro_context (macro : Macro.result) : Weekly_snapshot.macro_context =
   { regime = _regime_label macro.trend; score = macro.confidence }
 
+(* Rating of one sector ETF, or [None] when it has no bars. *)
+let _etf_rating ~(inputs : inputs) ~index_bars (etf, sector_name) =
+  let bars = _weekly_bars ~inputs etf in
+  if List.is_empty bars then None
+  else
+    let result =
+      Sector.analyze ~config:Sector.default_config ~sector_name
+        ~sector_bars:bars ~benchmark_bars:index_bars ~constituent_analyses:[]
+        ~prior_stage:None
+    in
+    Some result.rating
+
+(* [sector_name] if its ETF analyses to the [wanted] rating, else [None]. ETFs
+   with no bars are skipped. *)
+let _sector_name_if_rated ~(inputs : inputs) ~index_bars ~wanted
+    ((_etf, sector_name) as etf_sector) =
+  match _etf_rating ~inputs ~index_bars etf_sector with
+  | Some rating when Screener.equal_sector_rating rating wanted ->
+      Some sector_name
+  | Some _ | None -> None
+
 (* Strong / weak sector labels from the ETF-level ratings (deduplicated). *)
 let _sectors_by_rating ~(inputs : inputs) ~index_bars wanted =
-  List.filter_map inputs.config.sector_etfs ~f:(fun (etf, sector_name) ->
-      let bars = _weekly_bars ~inputs etf in
-      if List.is_empty bars then None
-      else
-        let result =
-          Sector.analyze ~config:Sector.default_config ~sector_name
-            ~sector_bars:bars ~benchmark_bars:index_bars
-            ~constituent_analyses:[] ~prior_stage:None
-        in
-        if Screener.equal_sector_rating result.rating wanted then
-          Some sector_name
-        else None)
+  List.filter_map inputs.config.sector_etfs
+    ~f:(_sector_name_if_rated ~inputs ~index_bars ~wanted)
   |> List.dedup_and_sort ~compare:String.compare
 
 let generate (inputs : inputs) : Weekly_snapshot.t =

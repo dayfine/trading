@@ -19,6 +19,14 @@ reimplemented — pure wiring of existing public primitives; no core-module
 changes. Remaining M6.6 (live DATA_SOURCE / cron / alerts / trading-state) stays
 deferred.
 
+**2026-06-14 rework (PR #1588):** CI `build-and-test` tripped the repo nesting
+linter (a full-runtest target the scoped `dune runtest` skipped) on three
+helpers in `weekly_snapshot_generator.ml`. Fixed by extracting the innermost
+nested blocks into named private `_helper`s (`_set_sector_ctx_for_etf`,
+`_analyze_ticker`, `_etf_rating` + `_sector_name_if_rated`) — pure structural
+refactor, no behavior change; full `dune runtest` now passes including the
+nesting linter.
+
 Track created 2026-05-02 to absorb M6.1–M6.5 (verification harness via incremental processing). Plan: `dev/plans/m6-weekly-snapshot-verification-2026-05-02.md`. Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M6.1–M6.5 (added 2026-05-02).
 
 **2026-06-14 reconcile (orchestrator):** M6.1–M6.5 are SHIPPED on main —
