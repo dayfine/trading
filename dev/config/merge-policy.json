@@ -2,9 +2,10 @@
   "followup_threshold": 10,
   "maintenance_cycle_ratio": 3,
   "auto_merge_enabled": true,
-  "max_daily_cost_usd": 50.0,
+  "_cost_note": "Auth is a Max-20x subscription (flat-rate, not per-token billing). The $ figures below are API-equivalent estimates only; they do not bill. max_daily_cost_usd is therefore a runaway-dispatch BACKSTOP, not a real budget — set high so it rarely gates, letting actual eligible-work availability + subscription rate-limits be the true constraint. Raised 50->200 on 2026-06-13 (weekly utilization was 13%).",
+  "max_daily_cost_usd": 200.0,
   "target_utilization_low": 0.60,
-  "target_utilization_high": 0.80,
+  "target_utilization_high": 0.95,
   "model_prices": {
     "_source": "https://claude.com/pricing — verified 2026-04-20",
     "_note": "Prices in USD per million tokens (MTok). cache_write is 5-minute TTL.",
