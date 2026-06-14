@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-14 (orchestrator run 27493395160 [run 2]: NO feat-dispatch — every forward code/strategy track is data-gated, human-gated, or a deferred milestone awaiting a maintainer green-light (run-1 already drained the eligible non-gated backlog: #1574/#1575). This run did status hygiene + queue housekeeping: merged the docs-only weekly track-pacer report (#1580 → 6eba615d), refreshed the stale weekly-snapshot.md (M6.1–M6.5 shipped; M6.6 generator/live-cycle deferred) and the stale backtest-infra.md header (MERGED/2026-05-01 → IN_PROGRESS). Main GREEN on 6eba615d (inherited: post-run-1 commits #1576–#1580 touch no OCaml source). Track-pacer flags the broad-universe composition-policy artifact as the single highest-leverage unblock (≥6 data-gated tracks). [run 1]: 2 dispatches BOTH AUTO-MERGED — sweep-perf Win #4 wiring #1574, cash-floor NS3 CancelExit #1575.)
+Last updated: 2026-06-14 (orchestrator run 27497045621 [run 3]: NO feat-dispatch — backlog still fully gated (run-1 drained the eligible non-gated work). Sole main change since run-2 is the maintainer-merged #1582, which flipped the NS1 cash-floor exemption default → ON on correctness grounds (R3-NA, goldens bit-equal) — resolving run-2's Question 2. This run reconciled the now-stale cash-floor-correctness.md (recorded the #1582 flip; NS4 demoted from promotion-gate to optional retrospective DD-validation; Owner note updated) + this index row. Main GREEN on 9d29ef28 (CI build-and-test + perf-tier1-smoke SUCCESS; 0 ci-red). [run 2]: status hygiene only — merged docs-only track-pacer #1580, refreshed weekly-snapshot.md + backtest-infra.md. [run 1]: 2 dispatches BOTH AUTO-MERGED — #1574 sweep-perf Win #4, #1575 cash-floor NS3.)
 
 ## Active + complete tracks
 
@@ -14,7 +14,7 @@ Each row: one line; deeper task detail in the linked status file.
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
 | [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | — | Fold_health wiring MERGED (#1558); warmup-suppression WF-CV rejects the flip (#1561); next: P2 matrix on composition-policy universe (data-gated) |
-| [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1/NS2/NS3 MERGED (#1567/#1569/#1575); next: NS4 WF-CV cash-floor DD (data-gated), NS2 short-proceeds impl (human-gated) |
+| [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
 | [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | rolling-start v2 merged (#1536: jittered starts, edge-vs-SPY matrix, fork-per-start); next: run matrix on composition-policy universe |
 | [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | Win #4 production wiring MERGED (#1574, opt-in default-off); next: manual ghcr.io flambda rebuild + enable prune opt-in in sweeps |
