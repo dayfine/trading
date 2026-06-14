@@ -55,6 +55,31 @@ let bah_cagr_pct ~start_date ~end_date ~close_series =
       Walk_forward.Walk_forward_runner.cagr_pct ~test_days ~total_return_pct
   | _ -> Float.nan
 
+(* Scan a chronological close list once: track the running peak, accumulate the
+   most-negative peak-to-trough decline as a negative percent (0.0 = no decline).
+   [first_close] seeds the running peak. *)
+let _worst_peak_to_trough ~first_close closes =
+  let _peak, worst_dd =
+    List.fold closes ~init:(first_close, 0.0)
+      ~f:(fun (peak, worst) (_, close) ->
+        let peak = Float.max peak close in
+        let dd = (close -. peak) /. peak *. 100.0 in
+        (peak, Float.min worst dd))
+  in
+  worst_dd
+
+let bench_max_dd_pct ~start_date ~end_date ~close_series =
+  (* Closes whose date is in [start_date .. end_date], chronological. *)
+  let in_window =
+    List.filter close_series ~f:(fun (d, _) ->
+        Date.( >= ) d start_date && Date.( <= ) d end_date)
+    |> List.sort ~compare:(fun (a, _) (b, _) -> Date.compare a b)
+  in
+  match in_window with
+  | (_, first_close) :: _ :: _ when Float.( > ) first_close 0.0 ->
+      _worst_peak_to_trough ~first_close in_window
+  | _ -> Float.nan
+
 (* Realized-basis return: strip the terminal unrealized mark on open positions
    so a single big paper winner cannot flatter the row. nan only when initial
    cash is non-positive (degenerate). *)
@@ -62,9 +87,9 @@ let _realized_return_pct ~initial_cash ~final_value ~unrealized_pnl =
   if Float.( <= ) initial_cash 0.0 then Float.nan
   else (final_value -. unrealized_pnl -. initial_cash) /. initial_cash *. 100.0
 
-let per_start_of_summary ?(benchmark_cagr_pct = Float.nan) ?(equity_curve = [])
-    ~start_date ~end_date (summary : Backtest.Summary.t) :
-    Rolling_start_types.per_start =
+let per_start_of_summary ?(benchmark_cagr_pct = Float.nan)
+    ?(benchmark_max_dd_pct = Float.nan) ?(equity_curve = []) ~start_date
+    ~end_date (summary : Backtest.Summary.t) : Rolling_start_types.per_start =
   let get k = Map.find summary.metrics k |> Option.value ~default:Float.nan in
   let total_return_pct =
     (summary.final_portfolio_value -. summary.initial_cash)
@@ -78,6 +103,18 @@ let per_start_of_summary ?(benchmark_cagr_pct = Float.nan) ?(equity_curve = [])
     Map.find summary.metrics Metric_types.UnrealizedPnl
     |> Option.value ~default:0.0
   in
+  let realized_return_pct =
+    _realized_return_pct ~initial_cash:summary.initial_cash
+      ~final_value:summary.final_portfolio_value ~unrealized_pnl
+  in
+  (* The honest edge: annualise the MTM-stripped realized return over the same
+     window via the same CAGR convention, then subtract the benchmark CAGR — so
+     it is directly comparable to (and the contamination-free counterpart of)
+     [edge_pct]. nan when no benchmark, mirroring [edge_pct]. *)
+  let realized_cagr_pct =
+    Walk_forward.Walk_forward_runner.cagr_pct ~test_days
+      ~total_return_pct:realized_return_pct
+  in
   {
     Rolling_start_types.start_date;
     cagr_pct;
@@ -85,11 +122,11 @@ let per_start_of_summary ?(benchmark_cagr_pct = Float.nan) ?(equity_curve = [])
     max_drawdown_pct = get Metric_types.MaxDrawdown;
     benchmark_cagr_pct;
     edge_pct = cagr_pct -. benchmark_cagr_pct;
+    realized_edge_pct = realized_cagr_pct -. benchmark_cagr_pct;
+    forward_index_max_dd_pct = benchmark_max_dd_pct;
     sharpe = get Metric_types.SharpeRatio;
     time_underwater_pct = Convexity_stats.time_underwater_pct equity_curve;
-    realized_return_pct =
-      _realized_return_pct ~initial_cash:summary.initial_cash
-        ~final_value:summary.final_portfolio_value ~unrealized_pnl;
+    realized_return_pct;
   }
 
 type config = {
@@ -166,6 +203,10 @@ let _run_one ~config ~sector_map_override ~benchmark_series ~start_date =
     bah_cagr_pct ~start_date ~end_date:config.end_date
       ~close_series:benchmark_series
   in
+  let benchmark_max_dd_pct =
+    bench_max_dd_pct ~start_date ~end_date:config.end_date
+      ~close_series:benchmark_series
+  in
   (* The run's per-step NAV series, chronological — the equity curve the
      time-underwater metric reads. [result.steps] is already filtered to
      trading days in [start_date .. end_date]. *)
@@ -174,8 +215,8 @@ let _run_one ~config ~sector_map_override ~benchmark_series ~start_date =
       ~f:(fun (s : Trading_simulation_types.Simulator_types.step_result) ->
         s.portfolio_value)
   in
-  per_start_of_summary ~benchmark_cagr_pct ~equity_curve ~start_date
-    ~end_date:config.end_date result.summary
+  per_start_of_summary ~benchmark_cagr_pct ~benchmark_max_dd_pct ~equity_curve
+    ~start_date ~end_date:config.end_date result.summary
 
 (* The start dates to sweep: jittered when [jitter_seed] is set, the fixed grid
    otherwise. Both share the same base grid. *)

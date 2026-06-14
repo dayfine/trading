@@ -42,8 +42,29 @@ type per_start = {
       (** [cagr_pct -. benchmark_cagr_pct] — the strategy's annualised
           out/under-performance versus buy-and-hold from this start. [Float.nan]
           when [benchmark_cagr_pct] is [nan]. Positive = strategy beat
-          buy-and-hold from this start; negative = lost to it. The primary
-          honest-evaluation column. *)
+          buy-and-hold from this start; negative = lost to it. {b Contaminated}
+          by terminal mark-to-market on still-open positions (a single
+          AXTI-style paper monster flatters it); kept for the realized-vs-MTM
+          gap diagnostic. The honest counterpart is [realized_edge_pct]. *)
+  realized_edge_pct : float;
+      (** The {b honest, primary} edge column (factor-decomposition lens primary
+          outcome): the {!realized_return_pct} annualised over the same window
+          via {!Rolling_start_runner.per_start_of_summary}'s CAGR convention,
+          minus [benchmark_cagr_pct]. Strips the terminal mark-to-market that
+          contaminates [edge_pct], so a still-open paper winner cannot flatter a
+          recent start. [Float.nan] when [benchmark_cagr_pct] is [nan] (mirrors
+          [edge_pct]). A large [edge_pct -. realized_edge_pct] gap flags a
+          mark-dependent start (concentration in unrealized winners). *)
+  forward_index_max_dd_pct : float;
+      (** The benchmark's worst peak-to-trough drawdown over this start's
+          [start_date .. end_date] window, as a {b negative} percent (same sign
+          convention as [max_drawdown_pct]: [0.0] = no decline, [-25.0] = a 25%
+          peak-to-trough drop). The factor-decomposition lens H1
+          ("dodge-a-correction") factor — a large forward index DD is the
+          correction the strategy's Stage-4 exits may sidestep. [Float.nan] when
+          no benchmark series priced the window (same nan discipline as
+          [benchmark_cagr_pct]). Computed via
+          {!Rolling_start_runner.bench_max_dd_pct}. *)
   sharpe : float;
       (** The run's Sharpe ratio (summary [SharpeRatio] metric); [Float.nan] if
           absent. The risk-adjusted lens alongside the raw CAGR — a high-CAGR
@@ -96,7 +117,16 @@ type report = {
           rows (starts with no benchmark). The headline distribution: median
           edge, worst-start edge ([min]), and spread directly answer "does the
           strategy robustly beat the benchmark across start dates?" An all-[nan]
-          / empty edge column yields a zero-[n] summary. *)
+          / empty edge column yields a zero-[n] summary. {b MTM-contaminated} —
+          see [realized_edge] for the honest version. *)
+  realized_edge : Dispersion_stats.summary;
+      (** Dispersion of {!per_start.realized_edge_pct} across [starts], skipping
+          [nan] rows (starts with no benchmark). The {b honest} headline
+          distribution — the MTM-stripped counterpart of [edge]. *)
+  forward_index_max_dd : Dispersion_stats.summary;
+      (** Dispersion of {!per_start.forward_index_max_dd_pct} across [starts],
+          skipping [nan] rows (starts whose window could not be priced). The H1
+          "dodge-a-correction" factor distribution. *)
 }
 [@@deriving sexp, equal]
 (** The full rolling-start dispersion report: the raw per-start rows plus one

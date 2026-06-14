@@ -5,6 +5,7 @@ module RT = Rolling_start.Rolling_start_types
 module DS = Rolling_start.Dispersion_stats
 
 let make_start ~y ~m ~d ~cagr ~underwater ~maxdd ?(benchmark = Float.nan)
+    ?(realized_edge = Float.nan) ?(forward_index_max_dd = Float.nan)
     ?(sharpe = 1.0) ?(time_underwater = 0.0) ?(realized = 0.0) () : RT.per_start
     =
   {
@@ -14,6 +15,8 @@ let make_start ~y ~m ~d ~cagr ~underwater ~maxdd ?(benchmark = Float.nan)
     max_drawdown_pct = maxdd;
     benchmark_cagr_pct = benchmark;
     edge_pct = cagr -. benchmark;
+    realized_edge_pct = realized_edge;
+    forward_index_max_dd_pct = forward_index_max_dd;
     sharpe;
     time_underwater_pct = time_underwater;
     realized_return_pct = realized;
@@ -36,11 +39,14 @@ let sample_starts =
 let benchmarked_starts =
   [
     make_start ~y:2011 ~m:Month.Jan ~d:1 ~cagr:30.0 ~underwater:0.0
-      ~maxdd:(-20.0) ~benchmark:20.0 ();
+      ~maxdd:(-20.0) ~benchmark:20.0 ~realized_edge:5.0
+      ~forward_index_max_dd:(-15.0) ();
     make_start ~y:2011 ~m:Month.Jul ~d:1 ~cagr:10.0 ~underwater:(-5.0)
-      ~maxdd:(-40.0) ~benchmark:25.0 ();
+      ~maxdd:(-40.0) ~benchmark:25.0 ~realized_edge:(-20.0)
+      ~forward_index_max_dd:(-30.0) ();
     make_start ~y:2012 ~m:Month.Apr ~d:1 ~cagr:50.0 ~underwater:0.0
-      ~maxdd:(-10.0) ~benchmark:20.0 ();
+      ~maxdd:(-10.0) ~benchmark:20.0 ~realized_edge:25.0
+      ~forward_index_max_dd:(-8.0) ();
   ]
 
 let end_date = Date.create_exn ~y:2020 ~m:Month.Dec ~d:31
@@ -108,6 +114,10 @@ let test_to_markdown_contains_sections _ =
          contains_substring "CAGR %";
          contains_substring "Benchmark CAGR %";
          contains_substring "Edge %";
+         contains_substring "Realized edge %";
+         contains_substring "Forward index max-DD %";
+         contains_substring "Realized edge vs benchmark %";
+         contains_substring "Median realized edge vs benchmark";
          contains_substring "Sharpe";
          contains_substring "TimeUnderwater %";
          contains_substring "Realized return %";
@@ -136,6 +146,44 @@ let test_build_edge_summary _ =
          field (fun s -> s.DS.median) (float_equal 10.0);
          field (fun s -> s.DS.min) (float_equal (-15.0));
          field (fun s -> s.DS.max) (float_equal 30.0);
+       ])
+
+(* Realized-edge summary across benchmarked starts: realized edges [5;-20;25] ->
+   sorted [-20;5;25] -> median 5, min -20, max 25, n=3. Skips nan rows like
+   [edge]. *)
+let test_build_realized_edge_summary _ =
+  let report = RT.build ~end_date benchmarked_starts in
+  assert_that report.realized_edge
+    (all_of
+       [
+         field (fun s -> s.DS.n) (equal_to 3);
+         field (fun s -> s.DS.median) (float_equal 5.0);
+         field (fun s -> s.DS.min) (float_equal (-20.0));
+         field (fun s -> s.DS.max) (float_equal 25.0);
+       ])
+
+(* Forward-index max-DD summary: forward DDs [-15;-30;-8] -> sorted [-30;-15;-8]
+   -> median -15, min -30, max -8, n=3. *)
+let test_build_forward_index_max_dd_summary _ =
+  let report = RT.build ~end_date benchmarked_starts in
+  assert_that report.forward_index_max_dd
+    (all_of
+       [
+         field (fun s -> s.DS.n) (equal_to 3);
+         field (fun s -> s.DS.median) (float_equal (-15.0));
+         field (fun s -> s.DS.min) (float_equal (-30.0));
+         field (fun s -> s.DS.max) (float_equal (-8.0));
+       ])
+
+(* sample_starts have no benchmark -> realized_edge / forward DD are nan and the
+   summaries skip them entirely (n=0), like the edge summary. *)
+let test_realized_edge_and_forward_dd_skip_nan_starts _ =
+  let report = RT.build ~end_date sample_starts in
+  assert_that report
+    (all_of
+       [
+         field (fun r -> r.RT.realized_edge.DS.n) (equal_to 0);
+         field (fun r -> r.RT.forward_index_max_dd.DS.n) (equal_to 0);
        ])
 
 (* Two of three benchmarked starts have positive edge -> 66.67%. *)
@@ -271,6 +319,11 @@ let suite =
          "build_preserves_end_date" >:: test_build_preserves_end_date;
          "build_empty" >:: test_build_empty;
          "build_edge_summary" >:: test_build_edge_summary;
+         "build_realized_edge_summary" >:: test_build_realized_edge_summary;
+         "build_forward_index_max_dd_summary"
+         >:: test_build_forward_index_max_dd_summary;
+         "realized_edge_and_forward_dd_skip_nan_starts"
+         >:: test_realized_edge_and_forward_dd_skip_nan_starts;
          "pct_beating_benchmark" >:: test_pct_beating_benchmark;
          "edge_skips_nan_starts" >:: test_edge_skips_nan_starts;
          "to_markdown_contains_sections" >:: test_to_markdown_contains_sections;
