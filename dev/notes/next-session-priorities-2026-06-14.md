@@ -46,15 +46,28 @@ is a separate margin item — see initiative B below.)
 
 ## 1. Matrix re-run result (warmup-flip re-measurement, P1 carried)
 
-Launched 2026-06-13 ~14:11 PDT; ETA ~01:00–01:30 PDT. **RESULT: _pending — filled
-on completion._** Output `/tmp/warmup-rerun/matrix-t3k-2011-ON.md`; watcher
-`btuf70jr5`. Writeup: `dev/experiments/warmup-matrix-rerun-2026-06-13/`.
+**✅ DONE (completed ~23:24 PDT 2026-06-13). Result is significant — the warmup
+running-start was ~ALL of the apparent start-date edge.** Full writeup:
+`dev/experiments/warmup-matrix-rerun-2026-06-13/ANALYSIS.md`.
 
-Decisive finding already banked: the warmup flip (#1566) is **material for
-interior rolling-start starts** (probe: OFF 24.9% vs ON 12.6% return on a 2015
-start). So the prior matrix (`project_rolling_start_matrix_first_run`, +3.2pp/yr
-edge) is **stale-semantics** — both memories flagged. The re-run gives the honest
-new-default distribution to replace it.
+| metric | STALE (OFF, what we'd been citing) | HONEST (ON, new default) |
+|---|---|---|
+| Median edge vs GSPC | +3.2 pp/yr | **−2.76 pp/yr** |
+| Beat-rate | ~57% | **35.5%** (11/31) |
+| Worst start | −28 pp | **−49.5 pp** |
+
+Removing warmup-window trading swung the median ~6pp negative. Dividend-adjusted
+(GSPC is price-only) honest edge vs total-return SPX ≈ **−4.8 pp/yr → no
+bull-regime start-date return edge** (confirms `project_index_beating_structural_bar`
+cleanly). The +107% max start (2025-01) is MTM-inflated (realized −21%); all
+post-2020 starts have deeply negative *realized* despite positive MTM.
+
+**Strategic takeaway (feeds initiative B):** long-only profit is NOT recoverable by
+tuning bull-window long entries — the prior +3.2pp was contamination. The
+strategy's case is bear-regime tail defense, not bull return-beating. The
+"missing profit" you're after is on the **short/bear side** → the margin &
+long-short build (§4) is the right place to look, *once shorts are measured
+honestly* (Phase-1 margin accounting).
 
 ---
 
