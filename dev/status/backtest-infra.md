@@ -1,9 +1,16 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-05-01
+## Last updated: 2026-06-14
 
 ## Status
-MERGED
+IN_PROGRESS
+
+<!-- 2026-06-14 orchestrator reconcile: header was stale (MERGED / 2026-05-01)
+     while this-week measurement-correctness work merged under this track
+     (#1558 Fold_health wiring, #1561/#1566 warmup-suppression flip). The
+     index already lists this track IN_PROGRESS; header now matches. Forward
+     work (P2 matrix on the composition-policy universe) is data-gated — see
+     §Next Steps and the daily-summary escalations. -->
 
 Step 1 (#399) + Step 2 (#419) landed long ago. Step 3 continued on
 the backtest-scale track. The perf-sweep harness extension (#547)
