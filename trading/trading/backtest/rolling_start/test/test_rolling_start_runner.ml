@@ -191,6 +191,67 @@ let test_bah_cagr_nan_when_unpriceable _ =
     (Float.is_nan nan_empty && Float.is_nan nan_single)
     (equal_to true)
 
+(* ----- bench_max_dd_pct ----- *)
+
+(* A benchmark that ran 100 -> 120 (new peak) -> 90 (trough) over the window: the
+   worst peak-to-trough drawdown is (90 - 120)/120 = -25%. Bars outside
+   [start, end] are ignored. *)
+let test_bench_max_dd_known_peak_trough _ =
+  let dd =
+    Runner.bench_max_dd_pct
+      ~start_date:(date ~y:2011 ~m:Month.Jan ~d:1)
+      ~end_date:(date ~y:2011 ~m:Month.Dec ~d:31)
+      ~close_series:
+        [
+          (date ~y:2010 ~m:Month.Dec ~d:31, 50.0);
+          (* before window: ignored *)
+          (date ~y:2011 ~m:Month.Jan ~d:3, 100.0);
+          (date ~y:2011 ~m:Month.Apr ~d:1, 120.0);
+          (* peak *)
+          (date ~y:2011 ~m:Month.Aug ~d:1, 90.0);
+          (* trough: -25% off the 120 peak *)
+          (date ~y:2011 ~m:Month.Dec ~d:30, 110.0);
+          (date ~y:2012 ~m:Month.Jan ~d:2, 30.0);
+          (* after window: ignored *)
+        ]
+  in
+  assert_that dd (float_equal (-25.0))
+
+(* A monotonically rising series has no peak-to-trough decline -> 0.0 (not nan,
+   not negative). *)
+let test_bench_max_dd_monotonic_is_zero _ =
+  let dd =
+    Runner.bench_max_dd_pct
+      ~start_date:(date ~y:2011 ~m:Month.Jan ~d:1)
+      ~end_date:(date ~y:2011 ~m:Month.Dec ~d:31)
+      ~close_series:
+        [
+          (date ~y:2011 ~m:Month.Jan ~d:3, 100.0);
+          (date ~y:2011 ~m:Month.Jun ~d:1, 150.0);
+          (date ~y:2011 ~m:Month.Dec ~d:30, 200.0);
+        ]
+  in
+  assert_that dd (float_equal 0.0)
+
+(* An empty series, or one with a single usable bar in the window, cannot be
+   priced -> nan (the caller renders a blank cell). *)
+let test_bench_max_dd_nan_when_unpriceable _ =
+  let nan_empty =
+    Runner.bench_max_dd_pct
+      ~start_date:(date ~y:2011 ~m:Month.Jan ~d:1)
+      ~end_date:(date ~y:2011 ~m:Month.Dec ~d:31)
+      ~close_series:[]
+  in
+  let nan_single =
+    Runner.bench_max_dd_pct
+      ~start_date:(date ~y:2011 ~m:Month.Jan ~d:1)
+      ~end_date:(date ~y:2011 ~m:Month.Dec ~d:31)
+      ~close_series:[ (date ~y:2011 ~m:Month.Jun ~d:1, 100.0) ]
+  in
+  assert_that
+    (Float.is_nan nan_empty && Float.is_nan nan_single)
+    (equal_to true)
+
 (* ----- per_start_of_summary ----- *)
 
 let make_summary ~start_date ~end_date ~initial_cash ~final_value ~metrics :
@@ -327,6 +388,104 @@ let test_per_start_realized_sharpe_and_underwater _ =
            (is_between (module Float_ord) ~low:33.0 ~high:33.4);
        ])
 
+(* realized_edge = annualised realized-return CAGR - benchmark CAGR. With no
+   open positions (no UnrealizedPnl), realized return == total return, so the run
+   that doubled over ~1y has a ~100% realized CAGR; benchmark 14 -> realized_edge
+   ~= 86, matching edge_pct exactly when there is nothing unrealized. *)
+let test_per_start_realized_edge_matches_edge_without_unrealized _ =
+  let start_date = date ~y:2011 ~m:Month.Jan ~d:1 in
+  let end_date = date ~y:2011 ~m:Month.Dec ~d:31 in
+  let summary =
+    make_summary ~start_date ~end_date ~initial_cash:1_000_000.0
+      ~final_value:2_000_000.0 ~metrics:[]
+  in
+  let per_start =
+    Runner.per_start_of_summary ~benchmark_cagr_pct:14.0 ~start_date ~end_date
+      summary
+  in
+  assert_that per_start
+    (all_of
+       [
+         field
+           (fun (p : RT.per_start) -> p.realized_edge_pct)
+           (is_between (module Float_ord) ~low:85.0 ~high:87.0);
+         (* No unrealized mark -> realized_edge == edge. *)
+         field
+           (fun (p : RT.per_start) -> p.realized_edge_pct -. p.edge_pct)
+           (float_equal 0.0);
+       ])
+
+(* realized_edge is nan (blank) when no benchmark is supplied, mirroring edge. *)
+let test_per_start_realized_edge_nan_without_benchmark _ =
+  let start_date = date ~y:2011 ~m:Month.Jan ~d:1 in
+  let end_date = date ~y:2011 ~m:Month.Dec ~d:31 in
+  let summary =
+    make_summary ~start_date ~end_date ~initial_cash:1_000_000.0
+      ~final_value:2_000_000.0 ~metrics:[]
+  in
+  let per_start = Runner.per_start_of_summary ~start_date ~end_date summary in
+  assert_that per_start
+    (field
+       (fun (p : RT.per_start) -> Float.is_nan p.realized_edge_pct)
+       (equal_to true))
+
+(* The design's realized-vs-MTM divergence diagnostic: a run whose terminal value
+   is inflated by a large still-open paper winner. final=2.0M, unrealized=0.9M,
+   initial=1.0M -> total return 100% (CAGR ~100, edge ~86 vs bench 14) but
+   realized return only (2.0-0.9-1.0)/1.0 = 10% (realized CAGR ~10, realized_edge
+   ~-4). The honest realized_edge sits materially below the MTM edge_pct, pinning
+   that they diverge when marks are concentrated in unrealized winners. *)
+let test_per_start_realized_edge_below_mtm_edge_when_unrealized _ =
+  let start_date = date ~y:2011 ~m:Month.Jan ~d:1 in
+  let end_date = date ~y:2011 ~m:Month.Dec ~d:31 in
+  let summary =
+    make_summary ~start_date ~end_date ~initial_cash:1_000_000.0
+      ~final_value:2_000_000.0
+      ~metrics:[ (Metric_types.UnrealizedPnl, 900_000.0) ]
+  in
+  let per_start =
+    Runner.per_start_of_summary ~benchmark_cagr_pct:14.0 ~start_date ~end_date
+      summary
+  in
+  assert_that per_start
+    (all_of
+       [
+         (* MTM edge unchanged by the unrealized mark: ~100% CAGR - 14 = ~86. *)
+         field
+           (fun (p : RT.per_start) -> p.edge_pct)
+           (is_between (module Float_ord) ~low:85.0 ~high:87.0);
+         (* Realized edge: ~10% realized CAGR - 14 -> negative, far below edge. *)
+         field
+           (fun (p : RT.per_start) -> p.realized_edge_pct)
+           (is_between (module Float_ord) ~low:(-5.0) ~high:(-3.0));
+         (* They differ by ~90 percentage points — the mark-dependence flag. *)
+         field
+           (fun (p : RT.per_start) -> p.edge_pct -. p.realized_edge_pct)
+           (gt (module Float_ord) 80.0);
+       ])
+
+(* forward_index_max_dd is recorded verbatim from the benchmark_max_dd argument,
+   and is nan (blank) when not supplied. *)
+let test_per_start_forward_index_max_dd _ =
+  let start_date = date ~y:2011 ~m:Month.Jan ~d:1 in
+  let end_date = date ~y:2011 ~m:Month.Dec ~d:31 in
+  let summary =
+    make_summary ~start_date ~end_date ~initial_cash:1_000_000.0
+      ~final_value:1_000_000.0 ~metrics:[]
+  in
+  let with_dd =
+    Runner.per_start_of_summary ~benchmark_max_dd_pct:(-18.5) ~start_date
+      ~end_date summary
+  in
+  let without_dd = Runner.per_start_of_summary ~start_date ~end_date summary in
+  assert_that
+    (with_dd.RT.forward_index_max_dd_pct, without_dd.RT.forward_index_max_dd_pct)
+    (all_of
+       [
+         field fst (float_equal (-18.5));
+         field (fun (_, x) -> Float.is_nan x) (equal_to true);
+       ])
+
 let suite =
   "rolling_start_runner"
   >::: [
@@ -348,12 +507,26 @@ let suite =
          >:: test_jitter_rejects_nonpositive_stride;
          "bah_cagr_full_year" >:: test_bah_cagr_full_year;
          "bah_cagr_nan_when_unpriceable" >:: test_bah_cagr_nan_when_unpriceable;
+         "bench_max_dd_known_peak_trough"
+         >:: test_bench_max_dd_known_peak_trough;
+         "bench_max_dd_monotonic_is_zero"
+         >:: test_bench_max_dd_monotonic_is_zero;
+         "bench_max_dd_nan_when_unpriceable"
+         >:: test_bench_max_dd_nan_when_unpriceable;
          "per_start_extracts_metrics" >:: test_per_start_extracts_metrics;
          "per_start_missing_metrics_are_nan"
          >:: test_per_start_missing_metrics_are_nan;
          "per_start_edge_from_benchmark" >:: test_per_start_edge_from_benchmark;
          "per_start_realized_sharpe_and_underwater"
          >:: test_per_start_realized_sharpe_and_underwater;
+         "per_start_realized_edge_matches_edge_without_unrealized"
+         >:: test_per_start_realized_edge_matches_edge_without_unrealized;
+         "per_start_realized_edge_nan_without_benchmark"
+         >:: test_per_start_realized_edge_nan_without_benchmark;
+         "per_start_realized_edge_below_mtm_edge_when_unrealized"
+         >:: test_per_start_realized_edge_below_mtm_edge_when_unrealized;
+         "per_start_forward_index_max_dd"
+         >:: test_per_start_forward_index_max_dd;
        ]
 
 let () = run_test_tt_main suite

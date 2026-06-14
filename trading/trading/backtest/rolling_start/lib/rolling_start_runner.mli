@@ -87,8 +87,36 @@ val bah_cagr_pct :
     Designed to be benchmark-agnostic: any symbol's close series (SPY, BRK-B,
     GSPC.INDX) projects through the same function. *)
 
+val bench_max_dd_pct :
+  start_date:Date.t ->
+  end_date:Date.t ->
+  close_series:(Date.t * float) list ->
+  float
+(** [bench_max_dd_pct ~start_date ~end_date ~close_series] is the benchmark's
+    worst peak-to-trough drawdown over [start_date .. end_date], as a
+    {b negative} percent (matching the
+    {!Rolling_start_types.per_start.max_drawdown_pct} sign convention: [0.0] =
+    no decline, [-25.0] = a 25% peak-to-trough drop). The forward-index-DD
+    factor of the factor-decomposition lens (H1 "dodge-a-correction").
+
+    - Computed purely from the closes in [close_series] whose date lies in
+      [start_date .. end_date] (inclusive), processed in chronological order.
+      For each close, the running peak is the max close seen so far; the
+      drawdown at that bar is [(close -. peak) /. peak *. 100]; the result is
+      the minimum (most negative) such drawdown over the window.
+    - Returns [Float.nan] when the window cannot be priced: fewer than two
+      in-window closes (empty series, all dates outside the window, or a single
+      bar), or the first in-window close is [<= 0.0]. The caller renders [nan]
+      as a blank cell — the same nan discipline as {!bah_cagr_pct}.
+    - [close_series] need not be sorted; it is sorted by date internally before
+      the peak-to-trough scan.
+
+    Benchmark-agnostic: any symbol's close series projects through the same
+    function. *)
+
 val per_start_of_summary :
   ?benchmark_cagr_pct:float ->
+  ?benchmark_max_dd_pct:float ->
   ?equity_curve:float list ->
   start_date:Date.t ->
   end_date:Date.t ->
@@ -115,6 +143,16 @@ val per_start_of_summary :
     - [sharpe] is the summary [SharpeRatio] metric ([nan] if absent).
     - [realized_return_pct] strips the summary [UnrealizedPnl] metric from the
       terminal value: [(final -. unrealized -. initial) /. initial *. 100].
+    - [realized_edge_pct] is the {b honest} counterpart to [edge_pct]: the
+      [realized_return_pct] (a total realized return) annualised over the
+      inclusive window via the {b same} {!Walk_forward_runner.cagr_pct}
+      convention [cagr_pct] uses, minus [benchmark_cagr_pct]. [Float.nan] when
+      [benchmark_cagr_pct] is [nan] (mirrors [edge_pct]). Unlike [edge_pct] it
+      is not flattered by a single still-open paper monster (the AXTI effect).
+    - [forward_index_max_dd_pct] (default [Float.nan] = "no benchmark") is
+      recorded verbatim — pass {!bench_max_dd_pct} for the same window. The H1
+      "dodge-a-correction" factor: the benchmark's worst peak-to-trough drawdown
+      over the run.
     - [time_underwater_pct] is {!Convexity_stats.time_underwater_pct} over
       [equity_curve] (default [[]] -> [0.0]); pass the run's per-step NAV series
       (chronological). *)

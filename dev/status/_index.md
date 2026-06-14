@@ -17,6 +17,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
 | [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | rolling-start v2 merged (#1536: jittered starts, edge-vs-SPY matrix, fork-per-start); next: run matrix on composition-policy universe |
+| [rolling-start-lens](rolling-start-lens.md) | IN_PROGRESS | feat-backtest | #1586 | realized-edge + forward-index-DD per-start columns (#1586); next: 3 data-gated factor cols (macro-stage, Stage-2 count, sector-RS) + 31-start causal analysis |
 | [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | Win #4 production wiring MERGED (#1574, opt-in default-off); next: manual ghcr.io flambda rebuild + enable prune opt-in in sweeps |
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
