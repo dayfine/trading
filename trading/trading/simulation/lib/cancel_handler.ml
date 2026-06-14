@@ -51,13 +51,8 @@ let apply_to_positions positions trans =
     position back to [Holding] via the core [Position] state machine. The reason
     string is purely diagnostic. *)
 let _cancel_exit_transition ~date ~position_id ~symbol : Position.transition =
-  {
-    position_id;
-    date;
-    kind =
-      CancelExit
-        { reason = Printf.sprintf "exit fill rejected by portfolio for %s" symbol };
-  }
+  let reason = Printf.sprintf "exit fill rejected by portfolio for %s" symbol in
+  { position_id; date; kind = CancelExit { reason } }
 
 (** True if [pos] is in the [Exiting] state for [symbol] with no partial fills
     yet — the stuck-exit signature. A partially-filled exit is deliberately NOT

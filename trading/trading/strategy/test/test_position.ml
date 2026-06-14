@@ -78,6 +78,46 @@ let make_holding ?(id = "pos-1") ?(symbol = "AAPL") ?(quantity = 100.0)
     portfolio_lot_ids = [];
   }
 
+(* Build an [Exiting] position carrying known fields. [filled_quantity] defaults
+   to 0.0 (the revertible, unfilled signature); pass a positive value to model a
+   partially-filled exit that must NOT be revertible via [CancelExit]. The
+   carried quantity / entry price / entry date / risk params are what a
+   [CancelExit] revert must reproduce on the resulting [Holding]. *)
+let make_exiting ?(id = "pos-1") ?(symbol = "AAPL") ?(filled_quantity = 0.0)
+    ?(quantity = 100.0) ?(entry_price = 150.0) () =
+  let risk_params =
+    {
+      stop_loss_price = Some 142.5;
+      take_profit_price = None;
+      max_hold_days = None;
+    }
+  in
+  {
+    id;
+    symbol;
+    side = Long;
+    entry_reasoning =
+      TechnicalSignal { indicator = "EMA"; description = "Test" };
+    exit_reason =
+      Some
+        (StopLoss
+           { stop_price = 142.5; actual_price = 141.0; loss_percent = -6.0 });
+    state =
+      Exiting
+        {
+          quantity;
+          entry_price;
+          entry_date = date_of_string "2024-01-02";
+          target_quantity = quantity;
+          exit_price = 141.0;
+          filled_quantity;
+          started_date = date_of_string "2024-01-10";
+          risk_params;
+        };
+    last_updated = date_of_string "2024-01-10";
+    portfolio_lot_ids = [];
+  }
+
 (* ==================== Creation Tests ==================== *)
 
 let test_create_entering _ =
@@ -286,6 +326,143 @@ let test_cancel_entry_with_fills _ =
   assert_that
     (apply_transition pos transition)
     (is_error_with Status.Invalid_argument ~msg:"after fills occurred")
+
+(* ==================== CancelExit Transitions ==================== *)
+
+(* CancelExit reverts an unfilled Exiting position back to Holding, carrying the
+   Exiting state's quantity / entry price / entry date / risk params unchanged.
+   This is the exit-side mirror of CancelEntry and the core path the simulator's
+   Cancel_handler.revert_rejected_exits routes through (#1553 / NS3). *)
+let test_cancel_exit_unfilled_reverts_to_holding _ =
+  let pos = make_exiting () in
+  let transition =
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-11";
+      kind = CancelExit { reason = "exit fill rejected" };
+    }
+  in
+  assert_that
+    (apply_transition pos transition)
+    (is_ok_and_holds
+       (field
+          (fun pos' -> get_state pos')
+          (equal_to
+             (Holding
+                {
+                  quantity = 100.0;
+                  entry_price = 150.0;
+                  entry_date = date_of_string "2024-01-02";
+                  risk_params =
+                    {
+                      stop_loss_price = Some 142.5;
+                      take_profit_price = None;
+                      max_hold_days = None;
+                    };
+                }
+               : position_state))))
+
+(* CancelExit must leave non-state fields untouched (it resumes Holding, it does
+   not close): in particular exit_reason carries over unchanged, and only
+   last_updated is bumped. Pins the byte-identity argument vs the prior
+   _holding_from_exiting reconstruction (no golden re-pin). *)
+let test_cancel_exit_preserves_other_fields _ =
+  let pos = make_exiting () in
+  let transition =
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-11";
+      kind = CancelExit { reason = "exit fill rejected" };
+    }
+  in
+  assert_that
+    (apply_transition pos transition)
+    (is_ok_and_holds
+       (all_of
+          [
+            field (fun p -> p.exit_reason) (equal_to pos.exit_reason);
+            field
+              (fun p -> p.last_updated)
+              (equal_to (date_of_string "2024-01-11"));
+            field (fun p -> p.id) (equal_to "pos-1");
+          ]))
+
+(* A partially-filled Exiting is NOT revertible: reverting would resurrect the
+   full pre-exit quantity after a booked partial cover. The CancelExit validator
+   rejects it (Invalid transition), matching the simulation-layer guard. *)
+let test_cancel_exit_partially_filled_rejected _ =
+  let pos = make_exiting ~filled_quantity:30.0 () in
+  let transition =
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-11";
+      kind = CancelExit { reason = "exit fill rejected" };
+    }
+  in
+  assert_that
+    (apply_transition pos transition)
+    (is_error_with Status.Invalid_argument ~msg:"after fills occurred")
+
+(* CancelExit is only valid from Exiting — rejected from Holding. *)
+let test_cancel_exit_from_holding_rejected _ =
+  let pos = make_holding () in
+  let transition =
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-11";
+      kind = CancelExit { reason = "not exiting" };
+    }
+  in
+  assert_that
+    (apply_transition pos transition)
+    (is_error_with Status.Invalid_argument ~msg:"Invalid transition")
+
+(* CancelExit is rejected from Entering (the entry side uses CancelEntry). *)
+let test_cancel_exit_from_entering_rejected _ =
+  let pos = make_entering () in
+  let transition =
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-11";
+      kind = CancelExit { reason = "not exiting" };
+    }
+  in
+  assert_that
+    (apply_transition pos transition)
+    (is_error_with Status.Invalid_argument ~msg:"Invalid transition")
+
+(* CancelExit is rejected from Closed (no transitions apply to a closed
+   position). *)
+let test_cancel_exit_from_closed_rejected _ =
+  let pos = make_holding () in
+  let pos =
+    apply_or_fail pos
+      (TriggerExit
+         {
+           exit_reason =
+             TakeProfit
+               {
+                 target_price = 165.0;
+                 actual_price = 165.5;
+                 profit_percent = 10.3;
+               };
+           exit_price = 165.0;
+         })
+  in
+  let pos =
+    apply_or_fail pos (ExitFill { filled_quantity = 100.0; fill_price = 165.5 })
+  in
+  let pos = apply_or_fail pos ExitComplete in
+  let transition =
+    {
+      position_id = "pos-1";
+      date = date_of_string "2024-01-12";
+      kind = CancelExit { reason = "already closed" };
+    }
+  in
+  assert_that
+    (apply_transition pos transition)
+    (is_error_with Status.Invalid_argument ~msg:"closed position")
 
 (* ==================== Holding Transitions ==================== *)
 
@@ -940,6 +1117,18 @@ let suite =
          "entry complete no fills" >:: test_entry_complete_no_fills;
          "cancel entry no fills" >:: test_cancel_entry_no_fills;
          "cancel entry with fills" >:: test_cancel_entry_with_fills;
+         "cancel exit unfilled reverts to holding"
+         >:: test_cancel_exit_unfilled_reverts_to_holding;
+         "cancel exit preserves other fields"
+         >:: test_cancel_exit_preserves_other_fields;
+         "cancel exit partially filled rejected"
+         >:: test_cancel_exit_partially_filled_rejected;
+         "cancel exit from holding rejected"
+         >:: test_cancel_exit_from_holding_rejected;
+         "cancel exit from entering rejected"
+         >:: test_cancel_exit_from_entering_rejected;
+         "cancel exit from closed rejected"
+         >:: test_cancel_exit_from_closed_rejected;
          "trigger exit" >:: test_trigger_exit;
          "update risk params" >:: test_update_risk_params;
          "exit fill" >:: test_exit_fill;

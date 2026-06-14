@@ -43,8 +43,8 @@ val apply_to_positions :
   Position.t String.Map.t ->
   Position.transition ->
   Position.t String.Map.t Status.status_or
-(** [apply_to_positions positions trans] applies a transition (a [CancelEntry] on
-    the entry side, or a [CancelExit] on the exit side) to [positions] via
+(** [apply_to_positions positions trans] applies a transition (a [CancelEntry]
+    on the entry side, or a [CancelExit] on the exit side) to [positions] via
     [Position.apply_transition]. Drops the position from the map when it reaches
     the terminal [Closed] state — same convention used by the simulator for
     [TriggerExit] under [_set_or_drop_if_closed]. (A [CancelExit] reverts to

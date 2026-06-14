@@ -1,6 +1,6 @@
 # Status: cash-floor-correctness
 
-## Last updated: 2026-06-13
+## Last updated: 2026-06-14
 
 ## Status
 IN_PROGRESS
@@ -37,6 +37,30 @@ interfaces firm up as NS2→NS4 ship.
   `31c9422`): structural_qc APPROVED; behavioral_qc APPROVED 2026-06-13
   (A1 generalizability PASS — core Portfolio change is strategy-agnostic;
   CP1–CP4 + R1/R2/R3 + W1 all PASS; quality 5).
+
+- **[NS3] #1557#2 — `CancelExit` core Position transition** (branch
+  `feat/cash-floor-ns3-cancelexit`). Added a `CancelExit of { reason : string }`
+  transition to the core `Position` state machine — the exit-side mirror of
+  `CancelEntry`. It reverts an **unfilled** `Exiting` position back to `Holding`,
+  carrying the same fields (quantity, entry_price, entry_date, risk_params) and
+  bumping only `last_updated`; `exit_reason` is left untouched (it resumes
+  Holding, it does not close). The validator reuses `_validate_no_fills`, so a
+  partially-filled `Exiting` (`filled_quantity > 0`) is rejected (Invalid
+  transition), matching the prior simulation-layer guard. `trigger_of_kind`
+  classifies it `Simulator`; the three other `transition_kind` matches
+  (order_generator, weinstein_order_gen, stop_log) get a no-op arm alongside
+  `CancelEntry`. `Cancel_handler.revert_rejected_exits` now routes through
+  `Position.apply_transition` / `apply_to_positions` (via a `CancelExit`
+  transition) instead of the manual `_holding_from_exiting` reconstruction (now
+  removed), so entry cancellation and exit reversion share one state-machine
+  path. **Behavior-identical to #1556**: the reverted `Holding` is byte-identical
+  field-for-field and the unfilled-only match guard is preserved, so no backtest
+  result changes (full `dune runtest` exit 0, no golden re-pin). Plan:
+  `dev/plans/cash-floor-ns3-cancelexit-2026-06-14.md`. Core unit tests in
+  `test_position.ml`: CancelExit valid from unfilled Exiting → Holding (carried
+  fields); preserves other fields (exit_reason / id, last_updated bumped);
+  rejected from partially-filled Exiting / Holding / Entering / Closed.
+  `test_cancel_handler.ml` revert contracts stay pinned and green.
 
 ## Owner
 feat-weinstein (core Portfolio/Position edits authorized per the per-task notes
@@ -80,12 +104,8 @@ axis).
    factor (1.0× vs 1.5× Reg-T) and the (b)-vs-(a) long-term call (see doc §4)
    before the impl dispatch. **A1 core; the design call is now surfaced.**
 
-3. **[NS3] #1557#2 — `CancelExit` core Position transition.** Replace #1556's
-   simulation-layer state reconstruction (Exiting→Holding) with a proper
-   `CancelExit` transition in the core Position state machine. Behavior-identical
-   to #1556 (no golden re-pin). **Reassess scope after NS1** — with the NS1 root
-   fix a rejected cover no longer happens, so this shrinks to pure
-   defense-in-depth. `position/` is in feat-weinstein scope.
+3. **[NS3] #1557#2 — `CancelExit` core Position transition.** ✅ SHIPPED — see
+   §Completed. Branch `feat/cash-floor-ns3-cancelexit`.
 
 4. **[NS4] WF-CV experiment — cash-floor opportunity cost.** After NS1 merges,
    run `exempt_closing_trades_from_cash_floor ∈ {false,true}` as a WF-CV axis on

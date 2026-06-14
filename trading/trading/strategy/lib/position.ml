@@ -476,8 +476,8 @@ let _apply_exiting_transition t transition =
       ExitComplete ) ->
       _exit_complete t ~date ~quantity ~filled_quantity ~entry_price ~exit_price
         ~entry_date ~risk_params
-  | ( Exiting { quantity; entry_price; entry_date; risk_params; _ },
-      CancelExit _ ) ->
+  | Exiting { quantity; entry_price; entry_date; risk_params; _ }, CancelExit _
+    ->
       _cancel_exit t ~date ~quantity ~entry_price ~entry_date ~risk_params
   | _, kind -> _invalid_transition kind
 
