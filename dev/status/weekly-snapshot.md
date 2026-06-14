@@ -1,18 +1,34 @@
 # Status: weekly-snapshot
 
-## Last updated: 2026-05-04
+## Last updated: 2026-06-14
 
 ## Status
-PENDING
+IN_PROGRESS
 
-(Owner moved to feat-weinstein per #778 scope expansion.)
+(Owner: feat-weinstein per #778 scope expansion.)
 
 Track created 2026-05-02 to absorb M6.1–M6.5 (verification harness via incremental processing). Plan: `dev/plans/m6-weekly-snapshot-verification-2026-05-02.md`. Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M6.1–M6.5 (added 2026-05-02).
 
-Per the 2026-05-04 daily summary (#830): M6.1–M6.5 absorbed into feat-weinstein scope; M6.6 live cycle DEFERRED.
+**2026-06-14 reconcile (orchestrator):** M6.1–M6.5 are SHIPPED on main —
+`trading/trading/weinstein/snapshot/lib/{weekly_snapshot,snapshot_writer,snapshot_reader,forward_trace,pick_diff,report_renderer,round_trip_verifier}.{ml,mli}`
+plus bins `trace_picks`, `diff_picks`, `render_weekly_report`,
+`verify_corporate_actions`. The remaining gap is **M6.6**: there is no
+*generator* that runs the screener+strategy on cached data, builds a
+`Weekly_snapshot.t`, and writes it to `dev/weekly-picks/<version>/<date>.sexp`
+(the dir does not yet exist). The consumers (trace/diff/render) all read an
+existing pick file; nothing produces one. The concrete next step is a small
+`generate_weekly_snapshot` bin (`--as-of/--universe/--bars/--snapshot-dir`).
+See `dev/notes/next-session-priorities-2026-06-14.md` §3. **M6.6 is DEFERRED
+pending a human scope green-light** (the live-cycle scheduling decision is an
+open Question to the maintainer — carried in the daily summary).
 
 ## Interface stable
-N/A
+NO
+
+M6.1–M6.5 interfaces (`Weekly_snapshot.t`, writer/reader, forward-trace,
+pick-diff, report-renderer) are merged and stable; the remaining M6.6
+`generate_weekly_snapshot` generator interface is not yet built, so the
+track interface is not fully stable.
 
 The reframe: **weekly picks are first-class durable artifacts before they're inputs to live trading.** This subsystem is a verification harness first; the M6.6 live cycle is wiring on top.
 
@@ -70,11 +86,20 @@ Live `DATA_SOURCE` impl, cron wrapper, alert dispatch, trading-state durability.
 
 ## Next Steps
 
-1. Wait for M5.1 hardening to land (CI green).
-2. Open M6.1 PR (snapshot writer + reader + round-trip test) — smallest unblock.
-3. M6.2 forward-trace next (pure function, easy to validate).
-4. M6.4 split/div verification harness — the highest-value PR for catching G14-class regressions.
-5. M6.3 pick diff + M6.5 report renderer in any order after M6.1.
+M6.1–M6.5 (snapshot writer/reader/round-trip, forward-trace, pick-diff, report
+renderer, corporate-action verifier) are all SHIPPED — see the 2026-06-14
+reconcile above. The remaining queue is M6.6 (DEFERRED, human-gated):
+
+1. **[M6.6, human-gated]** `generate_weekly_snapshot` bin — runs the existing
+   screener + `entries_from_candidates` + stop placement on cached data,
+   assembles `Weekly_snapshot.t`, and `Snapshot_writer.write`s it to
+   `dev/weekly-picks/<version>/<date>.sexp`. Smallest live-cycle unblock; the
+   reconciliation seam for the `trading-reconciler`. Dispatchable once the
+   maintainer green-lights M6.6 scope.
+2. **[M6.6, human-gated]** generate + commit a first baseline pick record to
+   diff future weeks against.
+3. **[M6.6, deferred]** live `DATA_SOURCE` impl, cron wrapper, alert dispatch,
+   trading-state durability (see §Out of scope).
 
 ## Parallelism
 M6 work runs in parallel with `experiments` track M5.2 — no shared source files.

@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-14 (orchestrator run 27485416611 [run 1]: 2 dispatches, BOTH AUTO-MERGED. sweep-perf Win #4 production wiring — `?prune_universe_by_active_through` opt-in (default-off, bit-equal) threaded into panel_runner/scenario_runner; QC APPROVED 5/5, CI green, #1574 → 1b7a88c2. cash-floor NS3 — `CancelExit` core Position transition (behavior-identical, no re-pin); QC APPROVED 5/5 (A1 PASS), CI green, #1575 → fae3f34a. Pre-flight caught that short-side "fix Finding A margin dedup" is STALE (already fixed by #1274). Main GREEN on fae3f34a. 0 open PRs, 0 ci-red. Prior maintainer merges since run-3: #1570/#1571/#1573 (8x cadence + cap raise).)
+Last updated: 2026-06-14 (orchestrator run 27493395160 [run 2]: NO feat-dispatch — every forward code/strategy track is data-gated, human-gated, or a deferred milestone awaiting a maintainer green-light (run-1 already drained the eligible non-gated backlog: #1574/#1575). This run did status hygiene + queue housekeeping: merged the docs-only weekly track-pacer report (#1580 → 6eba615d), refreshed the stale weekly-snapshot.md (M6.1–M6.5 shipped; M6.6 generator/live-cycle deferred) and the stale backtest-infra.md header (MERGED/2026-05-01 → IN_PROGRESS). Main GREEN on 6eba615d (inherited: post-run-1 commits #1576–#1580 touch no OCaml source). Track-pacer flags the broad-universe composition-policy artifact as the single highest-leverage unblock (≥6 data-gated tracks). [run 1]: 2 dispatches BOTH AUTO-MERGED — sweep-perf Win #4 wiring #1574, cash-floor NS3 CancelExit #1575.)
 
 ## Active + complete tracks
 
@@ -45,7 +45,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
-| [weekly-snapshot](weekly-snapshot.md) | MERGED | — | — | — |
+| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | M6.1–M6.5 verification harness SHIPPED; M6.6 generator + live-cycle DEFERRED (human-gated scope green-light) |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | P1'.1 $-volume wiring MERGED (#1542); next: emit composition-policy universe artifact + weekly ADV screener gate |
 
