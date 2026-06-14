@@ -202,7 +202,7 @@ type config = {
       [@sexp.default Force_liquidation.default_config]
       (** Force-liquidation thresholds — see {!Force_liquidation}. Default: 50%
           per-position loss, 40% portfolio-of-peak floor. *)
-  exempt_closing_trades_from_cash_floor : bool; [@sexp.default false]
+  exempt_closing_trades_from_cash_floor : bool; [@sexp.default true]
       (** NS1 (#1557#3): when [true], the core [Portfolio] cash floor
           ([Portfolio._check_sufficient_cash]) skips the solvency check for the
           {b reducing portion} of a closing trade (a long sell or short cover),
@@ -211,15 +211,20 @@ type config = {
           short->long exempts only the closing portion; the new-long portion
           still faces the floor.
 
-          Default-off ([false]) ⇒ the floor behaves exactly as before (the full
-          trade faces the check). This field is the [portfolio_config] seam of
-          [Weinstein_strategy.config], so it is expressible as a
-          [Variant_matrix] axis on the dot-path
+          Default-ON ([true]) as of 2026-06-14 (#1557#3 promotion). This is a
+          {b correctness invariant}, not an alpha promotion: a closing/reducing
+          trade improves solvency by construction, so a solvency floor must
+          never block it — the #1553 −240% zombie is the concrete failure of the
+          old default-off behaviour. Promoted on that correctness basis
+          (experiment-flag-discipline R3-NA, mirroring the warmup-flip #1566),
+          not on an NS4 WF-CV ACCEPT. Set [false] to restore the legacy
+          behaviour (full trade faces the check). This field is the
+          [portfolio_config] seam of [Weinstein_strategy.config], so it is
+          expressible as a [Variant_matrix] axis on the dot-path
           [portfolio_config.exempt_closing_trades_from_cash_floor]. Strategy
           code does not read it directly; the simulator threads its value into
           [Portfolio.create] as a plain bool, keeping core [Portfolio]
-          strategy-agnostic. Promotion to default-on is human-gated, pending the
-          NS4 WF-CV experiment (experiment-flag-discipline R3). *)
+          strategy-agnostic. *)
 }
 [@@deriving show, eq, sexp]
 (** All risk management parameters — nothing hardcoded. *)

@@ -623,6 +623,14 @@ let test_deriving _ =
   let _ = show_limit_violation (Max_positions_exceeded 20) in
   assert_that default_config (equal_to ~cmp:equal_config default_config)
 
+(* Pins the 2026-06-14 promotion (#1557#3): the cash-floor closing-trade
+   exemption is ON by default — a correctness invariant (a risk-reducing close
+   must never be blocked by the cash floor; the #1553 zombie was the failure of
+   the old default-off). A refactor must not silently revert this default. *)
+let test_cash_floor_exemption_on_by_default _ =
+  assert_that default_config.exempt_closing_trades_from_cash_floor
+    (equal_to true)
+
 let suite =
   "portfolio_risk"
   >::: [
@@ -686,6 +694,8 @@ let suite =
          "snapshot_buckets_missing_sectors_as_unknown"
          >:: test_snapshot_buckets_missing_sectors_as_unknown;
          "deriving" >:: test_deriving;
+         "cash_floor_exemption_on_by_default"
+         >:: test_cash_floor_exemption_on_by_default;
        ]
 
 let () = run_test_tt_main suite
