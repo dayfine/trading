@@ -83,6 +83,15 @@ type per_start = {
           monster cannot flatter a recent-start row — the simplest honest
           realized number. Equals the raw total return when nothing is held at
           end. [Float.nan] only if [initial_cash] is non-positive. *)
+  factors : Rolling_start_factors.factors;
+      (** The screener-based factor columns evaluated as-of [start_date] — the
+          factor-decomposition lens stage 5b candidate {b causes} (SPY/macro
+          stage, macro composite, Stage-2 candidate count, sector-RS dispersion)
+          that the analysis step correlates against [realized_edge_pct]. See
+          {!Rolling_start_factors.factors}. {!Rolling_start_factors.empty}
+          (all-unavailable) for a run with no snapshot warehouse to read from
+          (CSV mode / no benchmark). Appended as a strict superset: pre-existing
+          consumers that don't read it are unaffected. *)
 }
 [@@deriving sexp, equal]
 (** One backtest's terminal outcome, tagged with the start date it ran from. *)
@@ -172,4 +181,9 @@ val to_markdown : report -> string
     per metric: median / 10th-pct / IQR / min / max / n), and a per-start detail
     table. Mirrors the [walk_forward_render] table style. Floats are formatted
     to two decimals; an empty report renders the header with a "no starts" note.
-*)
+
+    The per-start detail table's columns are a strict superset: the outcome
+    columns, then the four factor-decomposition lens columns ([SPY stage] /
+    [Macro composite] / [Stage-2 count] / [Sector-RS dispersion], from each
+    row's {!per_start.factors}), then the [note] cell. An unavailable factor
+    ([None] / [nan]) renders blank / [nan]. *)
