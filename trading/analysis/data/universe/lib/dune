@@ -5,6 +5,7 @@
   snapshot
   build_from_index
   build_from_individuals
+  build_eligible_universe
   composition_inputs
   composition_bar_reader
   composition_policy_types

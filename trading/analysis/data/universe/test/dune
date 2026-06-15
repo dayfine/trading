@@ -3,6 +3,7 @@
   test_snapshot
   test_build_from_index
   test_build_from_individuals
+  test_build_eligible_universe
   test_build_synthetic_universes_runner
   test_build_composition_universes_runner
   test_dual_class

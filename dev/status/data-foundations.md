@@ -273,6 +273,47 @@ Status carries forward from `hybrid-tier` track — that track stays IN_PROGRESS
 Synth-v1/v2/v3 all MERGED. EODHD multi-market MERGED. 15y memory-cliff
 fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
 
+### READY_FOR_REVIEW — Eligibility-filter universe builder (live-universe) — 2026-06-14
+
+- [x] **`Build_eligible_universe` — all-eligible (no top-N cap) current-dated
+  universe builder** (`feat/eligible-universe`,
+  `analysis/data/universe/lib/build_eligible_universe.{ml,mli}` + the two
+  pure-helper exports on `build_from_individuals.{ml,mli}` +
+  `bin/build_eligible_universe_runner{,_lib}.{ml,mli}` +
+  `test/test_build_eligible_universe.ml`). Plan:
+  `dev/plans/eligible-universe-builder-2026-06-14.md`.
+  - **What it does:** sibling of `Build_from_individuals` (top-N by rank);
+    instead emits **every** common-stock-like US listing passing absolute
+    eligibility gates, equal-weighted, no size cap. Output is the same
+    `Universe.Snapshot.t` shape the screener / scenario_runner consume
+    (`method_ = Composition_from_individuals`; `size = K` survivors, NOT a
+    cap; `aggregate_period_return = 0.0` for a live build).
+  - **Pipeline:** active filter -> equity-like filter (drops ETF/MF/Fund/Bond/
+    Index/etc.) -> eligibility gates (`min_price`, `min_avg_dollar_volume`,
+    `min_window_bars`) -> `Composition_policy.apply` with `reit_policy=Exclude`,
+    `exclude_preferred=true` (drops REIT + preferred; always-on dual-class
+    dedup). Net survivors: Common + ADR + GDR clearing every gate.
+  - **Reuse, no dup:** exposes `Build_from_individuals.avg_dollar_volume_for_bars`
+    + `latest_close_for_bars` (pure helpers over a `bar list`, factored out of
+    the existing private `_dollar_volume_score` — `build`'s behaviour
+    unchanged); reuses `Composition_inputs` loaders, `Composition_bar_reader`,
+    and `Composition_policy`.
+  - **experiment-flag-discipline R2:** every gate is a config field.
+    `default_config` is a keep-all no-op (`min_price=0.0`,
+    `min_avg_dollar_volume=0.0`, `reit_policy=Include`,
+    `exclude_preferred=false`); `spec_config` is the live-universe spec
+    (`min_price=5.0`, `min_avg_dollar_volume=1_000_000.0`, `Exclude`, `true`).
+  - **Tests (10, fixture-based, no network):** min_price boundary, min-ADV gate,
+    min-window-bars gate, asset-type/junk filters (ETF/preferred/REIT dropped,
+    common+ADR kept), no-size-cap (K in -> K out), equal-weight + total~1.0,
+    default-config keep-all, empty-universe -> Failed_precondition, determinism,
+    entry metadata.
+  - **Runner:** `build_eligible_universe_runner.exe` — single-dash Core flags
+    `-inventory-path -csv-data-dir -date -min-price -min-adv -output-path`.
+    Builder-only here; the dispatcher runs it later on freshly-fetched data.
+  - **Verify:** `dune build @fmt && dune build && dune runtest
+    analysis/data/universe/`.
+
 ### READY_FOR_REVIEW — Composition-golden volume enrichment + track inventory.sexp (2026-06-14)
 
 - [x] **Volume-only enrichment tool**
