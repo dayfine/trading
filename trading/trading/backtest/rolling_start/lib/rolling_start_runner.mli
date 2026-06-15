@@ -118,6 +118,7 @@ val per_start_of_summary :
   ?benchmark_cagr_pct:float ->
   ?benchmark_max_dd_pct:float ->
   ?equity_curve:float list ->
+  ?factors:Rolling_start_factors.factors ->
   start_date:Date.t ->
   end_date:Date.t ->
   Backtest.Summary.t ->
@@ -155,7 +156,12 @@ val per_start_of_summary :
       over the run.
     - [time_underwater_pct] is {!Convexity_stats.time_underwater_pct} over
       [equity_curve] (default [[]] -> [0.0]); pass the run's per-step NAV series
-      (chronological). *)
+      (chronological).
+    - [factors] (default {!Rolling_start_factors.empty}) is recorded verbatim as
+      the row's screener-based factor columns (factor-decomposition lens stage
+      5b), computed by the runner from the snapshot warehouse as-of
+      [start_date]. The default leaves every factor unavailable, so a summary
+      projected without factors is backward-compatible. *)
 
 type config = {
   scenario : Scenario_lib.Scenario.t;
@@ -221,6 +227,17 @@ val run : config -> Rolling_start_types.report
     projects each result via {!per_start_of_summary} (with the benchmark CAGR
     for that start's window via {!bah_cagr_pct}), and assembles the
     {!Rolling_start_types.report} via {!Rolling_start_types.build}.
+
+    When a snapshot [bar_data_source] is configured, it also resolves each
+    start's screener-based factor columns (factor-decomposition lens stage 5b:
+    SPY/macro stage + macro composite from [benchmark_symbol], Stage-2 candidate
+    count + sector-RS dispersion across the scenario's universe, all as-of the
+    start date) once in the parent over a single shared panels handle, and
+    threads each into the matching row's
+    {!Rolling_start_types.per_start.factors}. The universe-scan factors are
+    unavailable (left [None] / nan) for a [Full_sector_map] universe (the
+    sectors.csv fallback is not resolved here) and for CSV mode (no
+    shared-panels handle).
 
     Sequential — each backtest is run in-process, one after another. The cost is
     N backtests, so callers should keep the cadence coarse and only sweep on PIT

@@ -3,6 +3,7 @@
   test_dispersion_stats
   test_convexity_stats
   test_rolling_start_types
+  test_rolling_start_factors
   test_rolling_start_runner)
  (libraries
   ounit2
