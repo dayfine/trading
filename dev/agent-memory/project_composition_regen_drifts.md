@@ -1,6 +1,6 @@
 ---
 name: project-composition-regen-drifts
-description: "A full build_composition_universes_runner rebuild is NOT behavior-neutral — it drifts ~3% of symbols (delisted-variant tie-breaks); volume-add needs an enrichment-in-place, not a rebuild"
+description: "A full build_composition_universes_runner rebuild drifts ~3% of symbols vs committed goldens — NOT a tie-break (builder is deterministic, verified); it's a provenance gap because inventory.sexp is UNTRACKED. Add volume via enrichment-in-place, not a rebuild; and track inventory.sexp"
 metadata: 
   node_type: memory
   type: project
@@ -20,6 +20,30 @@ behavior-neutral.** vs main, top-3000-2011 drifts **87/3000 symbols (2.9%)**:
 goldens.** The `composition-dollar-volume-2026-06-11` plan's assumption that regen
 is a clean `[@sexp.option]` add is WRONG for a full rebuild — the add is clean, the
 re-ranking is not.
+
+**VERIFIED CAUSE (2026-06-14 — corrects the "tie-break" wording above):** the
+builder is **deterministic** — rebuilding top-3000-2011 twice ~5h apart gave a
+byte-identical symbol set (0 diff). Ranking is `List.sort` (stable) over a
+list-ordered inventory; no RNG / hashtable-iteration. #1542 only ADDED the
+`avg_dollar_volume` field (didn't touch scoring). Inventory mtime stable (May 18),
+bars not re-fetched, symbol_types only cosmetic (#1235). So the drift vs the
+committed golden is a **provenance mismatch**, not a tie-break: the committed
+golden (#1190, May 18) was built from a different inputs snapshot than the current
+local store, biting only at the rank-3000 tail. **ROOT HOLE: `inventory.sexp` is
+UNTRACKED** (only `symbol_types.sexp` is in git) → committed goldens are NOT
+reproducible from version control; drift is silent + unauditable.
+
+**DECISION 2026-06-14 (user):** (1) add volume via a **volume-only enrichment**
+(freeze committed composition, recompute `avg_dollar_volume` per committed symbol
+from current bars, inject the field — no backtest re-pin); (2) **commit
+`inventory.sexp` to git** to close the reproducibility hole. Do NOT adopt the full
+rebuild.
+
+⚠ **Tension to resolve first** ([[project-trade-realism-liquidity]]): the user's
+2026-06-10 finding says liquidity is a non-issue at our scale — so the ADR
+liquidity FILTER the volume feeds may not earn its place vs plain REIT/preferred
+exclusion (which needs no volume). If the filter is dropped/token, the enrichment's
+value is reproducibility + future analysis, not the immediate policy artifact.
 
 **Two gotchas for next time:**
 1. **Path bug:** the builder's CLI usage says `--out-dir trading/test_data/...`
