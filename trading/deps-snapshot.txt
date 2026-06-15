@@ -31,7 +31,7 @@ conduit-async               8.0.0
 conf-libffi                 2.0.0
 conf-libssl                 4
 conf-openblas               0.2.3
-conf-pkg-config             4
+conf-pkg-config             5
 conf-plplot                 1
 conf-zlib                   1
 core                        v0.17.2
