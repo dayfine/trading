@@ -1,0 +1,17 @@
+(tests
+ (names test_weekly_snapshot_generator)
+ (libraries
+  core
+  async
+  ounit2
+  matchers
+  status
+  types
+  weinstein.types
+  weinstein.data_source
+  weinstein.data_source.testing
+  weinstein_trading.strategy
+  weinstein_trading.snapshot
+  weinstein_trading.snapshot_gen)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))

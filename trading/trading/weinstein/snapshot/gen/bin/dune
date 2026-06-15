@@ -1,0 +1,17 @@
+(executable
+ (name generate_weekly_snapshot)
+ (libraries
+  core
+  core_unix.command_unix
+  core_unix.filename_unix
+  fpath
+  csv
+  status
+  types
+  scenario_lib
+  weinstein.types
+  weinstein_trading.strategy
+  weinstein_trading.snapshot
+  weinstein_trading.snapshot_gen)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq ppx_sexp_conv ppx_let)))

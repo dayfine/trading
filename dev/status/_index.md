@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-14 (orchestrator run 27497045621 [run 3]: NO feat-dispatch — backlog still fully gated (run-1 drained the eligible non-gated work). Sole main change since run-2 is the maintainer-merged #1582, which flipped the NS1 cash-floor exemption default → ON on correctness grounds (R3-NA, goldens bit-equal) — resolving run-2's Question 2. This run reconciled the now-stale cash-floor-correctness.md (recorded the #1582 flip; NS4 demoted from promotion-gate to optional retrospective DD-validation; Owner note updated) + this index row. Main GREEN on 9d29ef28 (CI build-and-test + perf-tier1-smoke SUCCESS; 0 ci-red). [run 2]: status hygiene only — merged docs-only track-pacer #1580, refreshed weekly-snapshot.md + backtest-infra.md. [run 1]: 2 dispatches BOTH AUTO-MERGED — #1574 sweep-perf Win #4, #1575 cash-floor NS3.)
+Last updated: 2026-06-15 (orchestrator run 27519754639 [run 1]: NO feat-dispatch — RED-MAIN RECOVERY + reconcile. Main was RED on a05d9479 (#1588) from a CI-infra disk-exhaustion flake (`dune_trace_write(): No space left on device` during link; no linter/test FAIL; #1588 PR-branch CI was green on cd87d217). Token can't rerun jobs (403), so cleared it by squash-merging the CI-green, mergeable run-4 summary PR #1590 → fresh main CI on 567d7760 (build-and-test re-run on a clean runner) → GREEN; closed ci-red #1591. Reconciled data-foundations row to show the in-flight LOCAL maintainer PR #1589 (Thread-1 volume enrichment). No GHA-eligible non-gated work remained (grill roadmap routed all but Initiative A — shipped run-4 #1588 — to the LOCAL session). 2026-06-14 [run 4]: 1 DISPATCH → AUTO-MERGED #1588 (weekly-snapshot M6.6 generator / Initiative A). [run 3]: reconciled #1582 cash-floor NS1 flip. [run 1]: #1574 sweep-perf, #1575 cash-floor NS3.)
 
 ## Active + complete tracks
 
@@ -17,7 +17,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
 | [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | rolling-start v2 merged (#1536: jittered starts, edge-vs-SPY matrix, fork-per-start); next: run matrix on composition-policy universe |
-| [rolling-start-lens](rolling-start-lens.md) | IN_PROGRESS | feat-backtest | #1586 | realized-edge + forward-index-DD per-start columns (#1586); next: 3 data-gated factor cols (macro-stage, Stage-2 count, sector-RS) + 31-start causal analysis |
+| [rolling-start-lens](rolling-start-lens.md) | IN_PROGRESS | feat-backtest | — | realized-edge + forward-index-DD lens columns MERGED (#1586); next: 3 data-gated factor cols (macro-stage, Stage-2 count, sector-RS) + 31-start causal analysis |
 | [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | Win #4 production wiring MERGED (#1574, opt-in default-off); next: manual ghcr.io flambda rebuild + enable prune opt-in in sweeps |
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
@@ -46,9 +46,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
-| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | M6.1–M6.5 verification harness SHIPPED; M6.6 generator + live-cycle DEFERRED (human-gated scope green-light) |
+| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | M6.1–M6.5 + M6.6 generate_weekly_snapshot bin SHIPPED (#1588, orchestrator); next: baseline pick record + live-cycle (DATA_SOURCE/cron/alerts, human-gated) |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
-| [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | P1'.1 $-volume wiring MERGED (#1542); next: emit composition-policy universe artifact + weekly ADV screener gate |
+| [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | #1589 (local) | Thread-1 volume enrichment + inventory.sexp in flight LOCALLY (#1589, maintainer); next: policy artifact (ADR $-vol threshold human-gated) + weekly ADV gate |
 
 ## How to use
 
