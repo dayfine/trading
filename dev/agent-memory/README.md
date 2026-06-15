@@ -12,6 +12,7 @@ list). Generated file — edit the source memories, not this directory.
 
 ## Index
 
+- [`project_accuracy_is_unreachable_diversify_instead.md`](./project_accuracy_is_unreachable_diversify_instead.md) — Higher per-trade accuracy is structurally unreachable on the breakout engine (winners≈losers at entry); the route to a smoother/better-risk outcome is diversifying LAYERS (barbell, regime-gating, long-short), never entry-selection tuning
 - [`project_barbell_on_stocks.md`](./project_barbell_on_stocks.md) — Barbell (SPY-timing floor + Cell-E stock-selection engine) NAV blend dominates both standalone legs on Calmar in BOTH regimes; 70/30 regime-robust. Resolves the 918%-vs-drawdown tension.
 - [`project_bayesian_int_knob_crash.md`](./project_bayesian_int_knob_crash.md) — 11-knob BO sweep crashes int_of_sexp because cell_to_overrides emits raw %.17g floats for int-typed knobs. P3 BLOCKED until per-knob round added.
 - [`project_bayesian_sweep_checkpoint_needed.md`](./project_bayesian_sweep_checkpoint_needed.md) — V2 sweep lost ~5h of work to power-loss-induced restart (2026-05-20). User flagged checkpointing as a needed improvement for future frequent sweeps.
@@ -20,8 +21,9 @@ list). Generated file — edit the source memories, not this directory.
 - [`project_cascade_selection_inversion.md`](./project_cascade_selection_inversion.md) — Cascade score is anti-predictive at the top grade — confirmed Stage1→2 breakout (+30) underperforms early-Stage2 (+15); validated across breadth, but return edge non-stationary
 - [`project_cell_e_2020_stall_regime.md`](./project_cell_e_2020_stall_regime.md) — Cell E 2020-2026 stall is a payoff-geometry inversion from a two-sided regime change — explains why all 3 timing-knob tweaks failed
 - [`project_composition_golden_survivor_bias.md`](./project_composition_golden_survivor_bias.md) — top-500-2019 returns +175% (~8σ above random 500-from-top-3000 mean +13%). Strategy mechanics universe-invariant; returns dominated by post-hoc selection.
-- [`project_composition_regen_drifts.md`](./project_composition_regen_drifts.md) — A full build_composition_universes_runner rebuild is NOT behavior-neutral — it drifts ~3% of symbols (delisted-variant tie-breaks); volume-add needs an enrichment-in-place, not a rebuild
+- [`project_composition_regen_drifts.md`](./project_composition_regen_drifts.md) — A full build_composition_universes_runner rebuild drifts ~3% of symbols vs committed goldens — NOT a tie-break (builder is deterministic, verified); it's a provenance gap because inventory.sexp is UNTRACKED. Add volume via enrichment-in-place, not a rebuild; and track inventory.sexp
 - [`project_continuation_combined_rejected.md`](./project_continuation_combined_rejected.md) — 2026-05-14 cross-window sweep — combined weeks=2+range=0.15 wins big on 5y (Sharpe 0.59→0.73) but loses on 16y (0.71→0.68). Single-window overfit.
+- [`project_deep_1998_2026_contiguous.md`](./project_deep_1998_2026_contiguous.md) — First contiguous 28y top-3000 PIT Cell-E run (1998-2026) — realized +1552% vs SPX-price +599% (~+3.3pp/yr edge), MaxDD 35.9%; confirms multi-regime edge + fat-tail + laggard-harvest theses
 - [`project_deep_history_infra.md`](./project_deep_history_infra.md) — Deep-history (1999-2026) reproducible-rebuild infra + multi-regime battery seeds: build_deep_universe.sh #1388, PIT snapshots 2000/2005/2010/2015/2020, population-search direction
 - [`project_drawdown_tracking.md`](./project_drawdown_tracking.md) — Design item — 20-25% portfolio drawdown circuit breaker per Weinstein Ch. 7, partially covered by macro signal
 - [`project_early_admission_mechanism.md`](./project_early_admission_mechanism.md) — Dual-MA early Stage-2 admission flag (PR
