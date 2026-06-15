@@ -30,7 +30,7 @@ existing columns/ordering preserved as a strict superset. `Rolling_start_runner`
 gains `bench_max_dd_pct` and a `?benchmark_max_dd_pct` param on
 `per_start_of_summary`.
 
-Stage 5b (PR (feat/rolling-start-lens-5b)) adds two new modules — `Rolling_start_factors`
+Stage 5b (PR #1607) adds two new modules — `Rolling_start_factors`
 (the pure factor projections) and `Rolling_start_factor_reader` (the thin
 snapshot-warehouse I/O that feeds them; split out so the runner stays under the
 file-length limit) — and a `factors : Rolling_start_factors.factors` field on
@@ -55,7 +55,7 @@ churn for non-readers.
       Files: `trading/trading/backtest/rolling_start/lib/rolling_start_{types,runner}.{ml,mli}`,
       `trading/trading/backtest/rolling_start/test/test_rolling_start_{types,runner}.ml`.
 
-- [x] **Screener-based factor columns (stage 5b)** (PR (feat/rolling-start-lens-5b)). New pure module
+- [x] **Screener-based factor columns (stage 5b)** (PR #1607). New pure module
       `Rolling_start_factors` + four per-start factor columns, all read from the
       *precomputed* snapshot-warehouse fields (cheap point reads, no classifier
       re-run): (1) **SPY/macro stage at start** — decodes the benchmark index's
@@ -80,7 +80,7 @@ churn for non-readers.
 
 ### In-progress
 
-- (none — PR (feat/rolling-start-lens-5b) awaiting QC)
+- (none — PR #1607 awaiting QC)
 
 ### Next steps (data-gated / local-session — NOT GHA)
 
@@ -98,4 +98,4 @@ when a downstream decision starts to depend on them.
 
 - Plan: `dev/plans/rolling-start-realized-edge-lens-2026-06-14.md`
 - PR #1586 `feat/rolling-start-realized-edge-lens`
-- PR (feat/rolling-start-lens-5b) `feat/rolling-start-lens-5b` (screener-based factor columns)
+- PR #1607 `feat/rolling-start-lens-5b` (screener-based factor columns)
