@@ -27,6 +27,15 @@ nested blocks into named private `_helper`s (`_set_sector_ctx_for_etf`,
 refactor, no behavior change; full `dune runtest` now passes including the
 nesting linter.
 
+**2026-06-14 test follow-up (PR #1596, `feat/weekly-snapshot-generator`):**
+test-only follow-up to #1588 closing two gaps vs the M6.6 brief: (a) added the
+**C2 macro-gate pin** — `test_bearish_macro_blocks_longs` uses a `Declining`
+synthetic index so the macro gate reads `Bearish` and asserts zero long
+candidates (the merged suite had no bearish fixture); (b) fixed three P6
+`equal_to true` matchers wrapping boolean predicates (entry>0, stop<entry,
+regime-known) to use real matchers (`gt`, an `(entry - stop)` projection,
+`matching` over the closed label set). 7 tests pass; no lib/bin change.
+
 Track created 2026-05-02 to absorb M6.1–M6.5 (verification harness via incremental processing). Plan: `dev/plans/m6-weekly-snapshot-verification-2026-05-02.md`. Authority: `docs/design/weinstein-trading-system-v2.md` §7 sub-milestones M6.1–M6.5 (added 2026-05-02).
 
 **2026-06-14 reconcile (orchestrator):** M6.1–M6.5 are SHIPPED on main —
