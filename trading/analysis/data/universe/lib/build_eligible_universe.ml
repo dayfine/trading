@@ -85,26 +85,34 @@ let _is_equity_like ~equity_like_lookup symbol =
    snapshot's [avg_dollar_volume] field. *)
 type _eligible = { symbol : string; avg_dollar_volume : float }
 
-let _passes_price_gate ~config bars ~date =
+let _passes_price_gate ~config ~date bars =
   match BFI.latest_close_for_bars ~date bars with
   | None -> false
   | Some close -> Float.( >= ) close config.min_price
 
+(* The dollar-volume score, gated by [min_avg_dollar_volume] and the
+   min-window-bars requirement (the latter enforced inside
+   [avg_dollar_volume_for_bars]). [None] when either gate fails. *)
+let _passing_dollar_volume ~config ~date bars =
+  match
+    BFI.avg_dollar_volume_for_bars ~date
+      ~trailing_window_days:config.trailing_window_days
+      ~min_window_bars:config.min_window_bars bars
+  with
+  | Some score when Float.( >= ) score config.min_avg_dollar_volume ->
+      Some score
+  | _ -> None
+
+let _score_eligible_bars ~config ~date ~symbol bars : _eligible option =
+  if not (_passes_price_gate ~config ~date bars) then None
+  else
+    Option.map (_passing_dollar_volume ~config ~date bars) ~f:(fun score ->
+        { symbol; avg_dollar_volume = score })
+
 let _score_if_eligible ~date ~config symbol : _eligible option =
   match BR.read_bars ~bars_root:config.bars_root symbol with
   | None -> None
-  | Some bars -> (
-      if not (_passes_price_gate ~config bars ~date) then None
-      else
-        match
-          BFI.avg_dollar_volume_for_bars ~date
-            ~trailing_window_days:config.trailing_window_days
-            ~min_window_bars:config.min_window_bars bars
-        with
-        | None -> None
-        | Some score ->
-            if Float.( < ) score config.min_avg_dollar_volume then None
-            else Some { symbol; avg_dollar_volume = score })
+  | Some bars -> _score_eligible_bars ~config ~date ~symbol bars
 
 let _score_all ~date ~config symbols : _eligible list =
   List.filter_map symbols ~f:(_score_if_eligible ~date ~config)
@@ -161,15 +169,12 @@ let _make_entry ~uniform_weight (c : CPT.candidate) : Snapshot.entry =
   }
 
 let _empty_universe_error ~date =
-  Error
-    {
-      Status.code = Status.Failed_precondition;
-      message =
-        Printf.sprintf
-          "build_eligible_universe: no symbol survived the eligibility gates \
-           at %s"
-          (Date.to_string date);
-    }
+  let message =
+    Printf.sprintf
+      "build_eligible_universe: no symbol survived the eligibility gates at %s"
+      (Date.to_string date)
+  in
+  Error { Status.code = Status.Failed_precondition; message }
 
 let _make_snapshot ~date ~kept : Snapshot.t Status.status_or =
   let k = List.length kept in
