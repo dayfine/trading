@@ -174,6 +174,64 @@ let test_idempotent _ =
     (second_result.composition_changed, Snapshot.equal first second)
     (equal_to (0, true))
 
+(* Negative path for the behavior-neutrality guard. [run] writes a golden back
+   ONLY when [composition_preserved] holds (a false → file not written,
+   composition_changed incremented). [run] itself cannot drift composition by
+   construction ([enrich_snapshot] only touches avg_dollar_volume, with no
+   fault-injection seam), so the guard is defense-in-depth against a future
+   regression in [enrich_snapshot]. This test pins the guard's *decision
+   function* directly: each single-aspect non-volume drift must read as
+   composition-CHANGED (false), while a volume-only diff must read as preserved
+   (true). A regression that let a non-volume field mutate would flip one of
+   these from false→true and fail here — the exact failure the invariant exists
+   to catch. *)
+let test_composition_drift_detected _ =
+  let before = _make_snapshot () in
+  let first = List.hd_exn before.entries in
+  let rest = List.tl_exn before.entries in
+  let with_first e = { before with entries = e :: rest } in
+  let drift_weight = with_first { first with weight = first.weight +. 0.5 } in
+  let drift_symbol = with_first { first with symbol = "ZZZ" } in
+  let drift_sector = with_first { first with sector = "Energy" } in
+  let drift_synthetic = with_first { first with synthetic = true } in
+  let drift_order = { before with entries = List.rev before.entries } in
+  let drift_date = { before with date = Date.add_days before.date 1 } in
+  let drift_size = { before with size = before.size + 1 } in
+  let drift_aggregate =
+    {
+      before with
+      aggregate_period_return = before.aggregate_period_return +. 1.0;
+    }
+  in
+  (* avg_dollar_volume is the ONE field the guard ignores → still preserved. *)
+  let volume_only = with_first { first with avg_dollar_volume = Some 123.0 } in
+  assert_that
+    (List.map
+       ~f:(Enrich.composition_preserved before)
+       [
+         drift_weight;
+         drift_symbol;
+         drift_sector;
+         drift_synthetic;
+         drift_order;
+         drift_date;
+         drift_size;
+         drift_aggregate;
+         volume_only;
+       ])
+    (elements_are
+       [
+         equal_to false;
+         equal_to false;
+         equal_to false;
+         equal_to false;
+         equal_to false;
+         equal_to false;
+         equal_to false;
+         equal_to false;
+         equal_to true;
+       ])
+
 (* enrich_entry leaves a synthetic entry completely untouched regardless of
    whether bars happen to exist for its (synthetic) symbol. *)
 let test_synthetic_entry_untouched _ =
@@ -194,6 +252,7 @@ let suite =
   >::: [
          "test_enriched_volumes_written" >:: test_enriched_volumes_written;
          "test_composition_preserved" >:: test_composition_preserved;
+         "test_composition_drift_detected" >:: test_composition_drift_detected;
          "test_run_tally" >:: test_run_tally;
          "test_idempotent" >:: test_idempotent;
          "test_synthetic_entry_untouched" >:: test_synthetic_entry_untouched;
