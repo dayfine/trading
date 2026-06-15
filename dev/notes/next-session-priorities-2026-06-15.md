@@ -126,10 +126,19 @@ Once wired (with margin on + `enable_short_side` on), **Phase 3/4 Stage-A short-
 validation answers the profit question** ("does shorting Stage-4 help?") on a
 trustworthy model — that's the high-value next move.
 
-### Open analytical step (data-gated, safe)
-factor-lens **31-start causal analysis** — correlate the #1607 factor columns with
-`realized_edge_pct` to test H1/H2/H3 (the deploy-when guidance). Columns exist now;
-the analysis is the remaining read-only step. NOTE the low prior on entry-feature
+### ⏳ Overnight job RUNNING (launched 2026-06-15 14:52 PDT) — read its output first
+The **rolling-start factor matrix re-run** is in flight: `rolling_start_eval` (with
+#1607's factors compiled in) over cell-e-top3000-2011-15y, 2011-01-03→2026-04-30,
+stride 170 / seed 42, snapshot mode (`/tmp/snap_top3000_2011`), `--parallel 1`,
+~33 starts, **ETA ~10h (done ~01:00)**. Output → **`/tmp/rolling-factor-matrix/`**
+(container /tmp — NOT bind-mounted; **copy it to `dev/experiments/` first thing**
+before it's lost to a container restart). Log: `/tmp/rolling-factor-matrix.log`.
+This produces the matrix WITH the 5b factor columns + #1586 realized-edge.
+
+### Open analytical step (data-gated → unblocked once the job above finishes)
+factor-lens **causal analysis** — correlate the #1607 factor columns with
+`realized_edge_pct` to test H1/H2/H3 (the deploy-when guidance) on the
+just-produced matrix. Read-only step; columns + data will both exist. NOTE the low prior on entry-feature
 separation per [[project_accuracy_is_unreachable_diversify_instead]] — the lens's
 value is regime/deploy-when guidance, not entry accuracy.
 
