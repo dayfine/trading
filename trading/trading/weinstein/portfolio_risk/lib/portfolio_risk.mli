@@ -247,6 +247,7 @@ val default_config : config
 val compute_position_size :
   config:config ->
   portfolio_value:float ->
+  ?sizing_cash:float ->
   side:[ `Long | `Short ] ->
   entry_price:float ->
   stop_price:float ->
@@ -255,16 +256,17 @@ val compute_position_size :
   sizing_result
 (** Compute position size using fixed-risk sizing, capped by exposure limits.
 
-    Two formulas applied in series:
+    Three caps applied and [min]'d together:
     + Risk-based: shares_risk = floor((portfolio_value * risk_pct) / |entry -
       stop|)
     + Cap-bounded: shares_max = floor(min(side_exposure_cap, position_cap) /
       entry_price), where side_exposure_cap = portfolio_value *
       [max_long_exposure_pct] for [Long] (or [max_short_exposure_pct] for
       [Short]) and position_cap = portfolio_value * [max_position_pct].
+    + Spendable-cash cap: shares_cash = floor(sizing_cash / entry_price).
 
-    Final share count is the minimum of the two. The exposure cap prevents tight
-    stops (small [|entry - stop|]) from producing positions whose notional
+    Final share count is the minimum of the three. The exposure cap prevents
+    tight stops (small [|entry - stop|]) from producing positions whose notional
     exceeds the configured per-side budget — a sizing pathology observed in the
     sp500-2019-2023 rerun where shorts opened at 124% of portfolio value (ABBV
     2019-02-01). The per-position cap further bounds individual concentration —
@@ -281,6 +283,18 @@ val compute_position_size :
 
     @param config Risk configuration
     @param portfolio_value Total portfolio value for risk + exposure calculation
+    @param sizing_cash
+      Spendable cash that can fund this entry (issue #859 Phase 1, item 3 —
+      [dev/plans/short-side-margin-2026-05-13.md] §1.1). Defaults to
+      [portfolio_value], in which case the spendable-cash cap equals
+      [portfolio_value / entry_price] — always >= both fractional caps, hence
+      never binding, so the result is {b bit-identical} to before this parameter
+      existed and every existing golden replays unchanged. Margin-aware callers
+      pass [Portfolio.available_cash] (= current_cash net of locked short
+      collateral) so a long entry is no longer funded by short proceeds pledged
+      as collateral, fixing the Stance-A long-sizing inflation. The risk-pct and
+      %-cap math always use [portfolio_value]; only the cash-availability cap
+      consumes [sizing_cash]. (default: [portfolio_value])
     @param side
       [`Long] uses [max_long_exposure_pct]; [`Short] uses
       [max_short_exposure_pct]

@@ -216,13 +216,32 @@ let _max_shares_by_caps ~config ~side ~portfolio_value ~entry_price =
     let dollar_cap = Float.min exposure_cap position_cap in
     Int.of_float (Float.round_down (dollar_cap /. entry_price))
 
+(* Spendable-cash cap (issue #859 Phase 1, item 3 / plan §1.1). The number of
+   shares that [sizing_cash] dollars can fund at [entry_price]:
+   [floor(sizing_cash / entry_price)]. Under margin accounting, [sizing_cash] is
+   [Portfolio.available_cash] (= current_cash net of locked short collateral),
+   so a long entry can no longer be funded by short proceeds that are pledged as
+   collateral — the Stance-A long-sizing inflation the plan fixes.
+
+   When the caller passes [sizing_cash = portfolio_value] (the default — see
+   [compute_position_size]), this cap is >= both the exposure and per-position
+   caps (which are fractions <= 1.0 of [portfolio_value]), so the subsequent
+   [min] leaves the result bit-identical to the pre-change code. A non-finite or
+   non-positive [sizing_cash] yields no constraint. *)
+let _max_shares_by_sizing_cash ~sizing_cash ~entry_price =
+  if
+    (not (_is_finite_positive sizing_cash))
+    || not (_is_finite_positive entry_price)
+  then Int.max_value
+  else Int.of_float (Float.round_down (sizing_cash /. entry_price))
+
 (* Caller [compute_position_size] has already screened [portfolio_value],
    [entry_price], [stop_price] for NaN/inf. This helper handles the
    directional + zero-risk-per-share guards and the actual sizing math.
    Extracted so [compute_position_size] stays one if-level deep — the
    finite-input check would otherwise push nesting past the linter cap. *)
-let _compute_position_size_finite ~config ~portfolio_value ~side ~entry_price
-    ~stop_price ~big_winner =
+let _compute_position_size_finite ~config ~portfolio_value ~sizing_cash ~side
+    ~entry_price ~stop_price ~big_winner =
   let stop_on_correct_side =
     match side with
     | `Long -> Float.( < ) stop_price entry_price
@@ -244,7 +263,13 @@ let _compute_position_size_finite ~config ~portfolio_value ~side ~entry_price
     let exposure_capped_shares =
       _max_shares_by_caps ~config ~side ~portfolio_value ~entry_price
     in
-    let shares = Int.min risk_based_shares exposure_capped_shares in
+    let sizing_cash_capped_shares =
+      _max_shares_by_sizing_cash ~sizing_cash ~entry_price
+    in
+    let shares =
+      Int.min risk_based_shares
+        (Int.min exposure_capped_shares sizing_cash_capped_shares)
+    in
     let position_value = Float.of_int shares *. entry_price in
     let position_pct =
       if Float.( <= ) portfolio_value 0.0 then 0.0
@@ -253,8 +278,15 @@ let _compute_position_size_finite ~config ~portfolio_value ~side ~entry_price
     let risk_amount = Float.of_int shares *. risk_per_share in
     { shares; position_value; position_pct; risk_amount }
 
-let compute_position_size ~config ~portfolio_value ~side ~entry_price
-    ~stop_price ?(big_winner = false) () =
+let compute_position_size ~config ~portfolio_value ?sizing_cash ~side
+    ~entry_price ~stop_price ?(big_winner = false) () =
+  (* [sizing_cash] defaults to [portfolio_value] — the legacy denominator. With
+     the default, the spendable-cash cap is never binding (see
+     [_max_shares_by_sizing_cash]), so behaviour is bit-identical to before this
+     parameter existed. Margin-aware callers pass [Portfolio.available_cash]
+     (cash net of locked short collateral) to fix the Stance-A long-sizing
+     inflation (issue #859 Phase 1, item 3). *)
+  let sizing_cash = Option.value sizing_cash ~default:portfolio_value in
   (* Defense against NaN/inf inputs — see [_is_finite_positive] above. A NaN
      [portfolio_value] (e.g. mark-to-market summed an inf bar from bad CSV) or
      NaN [entry_price]/[stop_price] would slip past the directional and <= 0
@@ -267,8 +299,8 @@ let compute_position_size ~config ~portfolio_value ~side ~entry_price
     || not (Float.is_finite stop_price)
   then _zero_sizing
   else
-    _compute_position_size_finite ~config ~portfolio_value ~side ~entry_price
-      ~stop_price ~big_winner
+    _compute_position_size_finite ~config ~portfolio_value ~sizing_cash ~side
+      ~entry_price ~stop_price ~big_winner
 
 (* ---- Limit checks ---- *)
 
