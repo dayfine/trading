@@ -126,21 +126,61 @@ Once wired (with margin on + `enable_short_side` on), **Phase 3/4 Stage-A short-
 validation answers the profit question** ("does shorting Stage-4 help?") on a
 trustworthy model — that's the high-value next move.
 
-### ⏳ Overnight job RUNNING (launched 2026-06-15 14:52 PDT) — read its output first
-The **rolling-start factor matrix re-run** is in flight: `rolling_start_eval` (with
-#1607's factors compiled in) over cell-e-top3000-2011-15y, 2011-01-03→2026-04-30,
-stride 170 / seed 42, snapshot mode (`/tmp/snap_top3000_2011`), `--parallel 1`,
-~33 starts, **ETA ~10h (done ~01:00)**. Output → **`/tmp/rolling-factor-matrix/`**
-(container /tmp — NOT bind-mounted; **copy it to `dev/experiments/` first thing**
-before it's lost to a container restart). Log: `/tmp/rolling-factor-matrix.log`.
-This produces the matrix WITH the 5b factor columns + #1586 realized-edge.
+### 🔁 Window switched 2011→2000-2026 (user steer, 2026-06-15 ~18:00 PDT)
+The 2011-2026 matrix is **bull-only — the least-informative regime for the lens**
+(no corrections for H1 to dodge; prior analysis: "the window contains no real bear,
+the strategy's designed payoff"). Switched to the **2000-2026 (26y) multi-regime
+window** — covers dot-com bust + GFC, where the strategy earns its keep. Data was
+ready in-container: warehouse `snap_top3000_2000` (1.9G, 3015 snaps) + scenario
+`cell-e-top3000-2000-26y.sexp` (2000-01-03→2026-04-30). (1998 warehouse not in /tmp;
+2000-26 captures both crashes, so it's the right practical window.) Killed the 2011
+run, relaunched 2000-26 at cache=1024. Log: `/tmp/rolling-factor-matrix-2000.log`;
+out: `/tmp/rolling-factor-matrix/matrix-t3k-2000-26.md`.
+- **Heavier + slower:** ~48 starts, first = 26y window (heaviest child yet). At
+  cache=1024 the 15y run projected ~26h; 26y windows × more starts → likely **40-50h+**.
+  User chose to let it ride. WATCH the 26y child's memory — per-start mem must be FLAT
+  (a 26y plateau that OOMs the container = the eager-allocation bug, not scaling).
 
-### Open analytical step (data-gated → unblocked once the job above finishes)
+### ⚠️ (superseded) 2011 matrix re-run DIED on OOM, relaunched at cache=1024 (2026-06-15 ~22:40 PDT)
+The overnight `rolling_start_eval` re-run (launched 14:52) **crashed — Fork_pool
+child sigkilled (OOM)** before producing any output. Root cause: the **first start
+= the 15y full window (2011→2026) is the heaviest child**; at `SNAPSHOT_CACHE_MB=4096`
+(and even 2048) the child's backtest heap + the snapshot cache exceed the **7.8GB
+container** (confirmed: container free dropped to 44MB, swap fully exhausted, OOM-kill).
+WF-CV #1605 fit only because its folds are 1-year windows; rolling-start's first
+window is 15y.
+- **FIX (relaunched):** `SNAPSHOT_CACHE_MB=1024` (+ `setsid nohup`, `--parallel 1`).
+  Verified past the OOM cliff with ~3.7GB free headroom (vs 44MB at cache=2048).
+  Trade-off: smaller cache → more disk re-reads → slower load; full 33-start run
+  likely **longer than the original ~10h ETA**. Output (markdown) is written **only
+  at the very end** to `/tmp/rolling-factor-matrix/matrix-t3k-2011.md` (+ sexp on
+  stderr in `/tmp/rolling-factor-matrix.log`); container `/tmp` is **NOT bind-mounted
+  → copy to `dev/experiments/` immediately on completion** before any container restart.
+- **GOTCHA (cost ~1h this session):** Linux `comm` truncates to 15 chars, so the
+  process shows as `rolling_start_e` — `pgrep -x rolling_start_eval.exe` / `ps -C
+  rolling_start_eval.exe` **never match** and falsely report "dead". Use
+  `pgrep -f rolling_start_eval.exe` for liveness, and container **free-available MB
+  + swap** (not summed RSS, which double-counts COW-shared cache) as the true OOM signal.
+- **CONTAINER IS LOCKED for the duration:** the job holds ~5.5GB; do **NOT** dispatch
+  feat/qc agents or run container `dune` while it runs (sweep-hygiene) — they fight for
+  the 7.8GB and will re-trigger OOM. Host-side doc/analysis only until it completes.
+
+### Open analytical step (data-gated on the relaunched matrix above)
 factor-lens **causal analysis** — correlate the #1607 factor columns with
-`realized_edge_pct` to test H1/H2/H3 (the deploy-when guidance) on the
-just-produced matrix. Read-only step; columns + data will both exist. NOTE the low prior on entry-feature
+`realized_edge_pct` to test H1/H2/H3 (the deploy-when guidance). **Gated** on the
+cache=1024 re-run completing (above). NOTE the low prior on entry-feature
 separation per [[project_accuracy_is_unreachable_diversify_instead]] — the lens's
 value is regime/deploy-when guidance, not entry accuracy.
+- **Partial H1/H2 read already possible from the EXISTING 2026-06-11 matrix** (it has
+  per-start benchmark-CAGR + edge + realized). Directional finding (host-side, this
+  session): edge is weakly negative only at benchmark-CAGR **extremes** — the two
+  highest-CAGR starts (2023-04 17.95%→−16.7pp; 2023-10 20.2%→−28.1pp) lag most
+  (consistent with **H2 melt-up tax**), and the lowest (9.65%) is +6.5pp. BUT the
+  dominant negative-edge structure — the **2013-2017 cluster** — sits at *moderate*
+  CAGR (~11-13%) and is **orthogonal** to benchmark CAGR. That mid-2010s gap is the
+  real target the #1607 regime/supply factors (Stage-2 count, sector-RS dispersion)
+  exist to explain; H1 (forward-index-DD) is the strongest untested hypothesis and is
+  **only in the new matrix**, justifying the re-run despite the low prior.
 
 ### Deprioritized
 **policy universe ([1])** — subsumed by the live-universe eligibility builder (#1594);

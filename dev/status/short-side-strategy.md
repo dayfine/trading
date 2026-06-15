@@ -5,6 +5,34 @@
 ## Status
 IN_PROGRESS
 
+## 2026-06-15 PM — GHA-queued: differentiate short-side ranking `[non-blocking]`
+
+**Owner: feat-weinstein. GHA-dispatchable (fixture-testable, no PIT warehouse
+needed). `[non-blocking]`** — queued while the maintainer session is locked on a
+long local backtest; nothing local depends on it landing this cycle, so the
+orchestrator owns it end-to-end (no reclaim/poll).
+
+**Observed defect (from the first live weekly picks, `dev/weekly-picks/58ff1e79/2026-06-12.md`):**
+all 5 short candidates (ABG / ABR / ADMA / ADT / AHCO) came out **uniform grade
+C / score 50.00** — the short-side ranking is collapsing to a constant and not
+differentiating candidates. The long cascade differentiates fine; the short
+cascade does not, despite the volume/support/RS signals already wired (Follow-up
+#2 below).
+
+**Task:** diagnose *why* every Stage-4 short candidate scores an identical 50,
+then spread the ranking using the signals that already exist (breakdown-volume
+strength, below-support cleanliness, RS bearishness). Likely the short
+score-composition path isn't applying the cascade weights the way the long path
+does, or is short-circuiting to a default. Pin with screener unit tests +
+snapshot-generator fixture tests (the `weinstein/snapshot/gen` + screener test
+dirs already have fixtures — **no warehouse needed**).
+
+**Constraints (keep it safe):** ranking/display correctness only — **shorts are
+not traded yet** (gated on margin Initiative B), so this changes no live trading
+and no long-only Cell-E behavior. Do **not** touch the long entry path or re-pin
+any long/Cell-E goldens. Do **not** edit `dev/status/_index.md` from the PR
+(dispatcher reconciles the index post-merge). Standard 3-gate merge.
+
 ## 2026-06-15 — margin Phase 1 item 3 (`sizing_cash` plumbing) shipped
 
 Closed the one deferred slice of issue #859 Phase 1. PR #1113's body
