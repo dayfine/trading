@@ -349,6 +349,89 @@ let test_position_size_below_cap_unaffected _ =
          field (fun (s : sizing) -> s.risk_amount) (float_equal 1000.0);
        ])
 
+(* ---- sizing_cash spendable-cash cap (issue #859 Phase 1, item 3) ---- *)
+
+(* Omitting [sizing_cash] is bit-identical to passing [portfolio_value]: the
+   spendable-cash cap equals [portfolio_value / entry_price], always >= both
+   fractional caps, so it is never binding. This is the load-bearing default-off
+   invariant — every existing golden replays unchanged. *)
+let test_sizing_cash_omitted_equals_portfolio_value _ =
+  let omitted =
+    compute_position_size ~config:default_config ~portfolio_value:1_000_000.0
+      ~side:`Long ~entry_price:200.0 ~stop_price:199.0 ()
+  in
+  let explicit =
+    compute_position_size ~config:default_config ~portfolio_value:1_000_000.0
+      ~sizing_cash:1_000_000.0 ~side:`Long ~entry_price:200.0 ~stop_price:199.0
+      ()
+  in
+  assert_that omitted (equal_to (explicit : sizing))
+
+(* The basic-sizing case is unchanged when sizing_cash = portfolio_value: 200
+   shares (as in test_position_size_basic), proving the cap is inert at the
+   default. *)
+let test_sizing_cash_at_portfolio_value_inert _ =
+  let result =
+    compute_position_size ~config:default_config ~portfolio_value:100_000.0
+      ~sizing_cash:100_000.0 ~side:`Long ~entry_price:50.0 ~stop_price:45.0 ()
+  in
+  assert_that result
+    (match_sizing ~shares:(equal_to 200) ~position_value:(float_equal 10000.0)
+       ~position_pct:(float_equal ~epsilon:1e-6 0.10)
+       ~risk_amount:(float_equal 1000.0))
+
+(* When spendable cash is tighter than the risk + exposure caps, it binds. With
+   margin on, sizing_cash = available_cash = current_cash - locked_collateral.
+   Setup: $100K portfolio_value, but only $5K spendable (the rest locked as
+   short collateral). risk-based = floor($1K / $5) = 200 shares ($10K notional),
+   exposure/position caps allow more, but $5K / $50 = 100 shares is binding.
+   Final = min(200, ..., 100) = 100. *)
+let test_sizing_cash_binds_below_risk_cap _ =
+  let result =
+    compute_position_size ~config:default_config ~portfolio_value:100_000.0
+      ~sizing_cash:5_000.0 ~side:`Long ~entry_price:50.0 ~stop_price:45.0 ()
+  in
+  assert_that result
+    (match_sizing ~shares:(equal_to 100) ~position_value:(float_equal 5000.0)
+       ~position_pct:(float_equal ~epsilon:1e-6 0.05)
+       ~risk_amount:(float_equal 500.0))
+
+(* Plan §1.1 worked example, sizing slice: $10K cash, short 100@$50 locks 150%
+   = $7,500 collateral, leaving available_cash = $7,500. A subsequent long at
+   $50 with this sizing_cash is capped at floor($7,500 / $50) = 150 shares,
+   whereas with the un-netted $10K it could fund 200. Pins that locked short
+   collateral no longer inflates long sizing (the Stance-A bug). *)
+let test_sizing_cash_caps_long_after_short_collateral_lock _ =
+  let with_locked =
+    compute_position_size ~config:default_config ~portfolio_value:100_000.0
+      ~sizing_cash:7_500.0 ~side:`Long ~entry_price:50.0 ~stop_price:45.0 ()
+  in
+  let without_lock =
+    compute_position_size ~config:default_config ~portfolio_value:100_000.0
+      ~sizing_cash:10_000.0 ~side:`Long ~entry_price:50.0 ~stop_price:45.0 ()
+  in
+  assert_that
+    (with_locked.shares, without_lock.shares)
+    (equal_to ((150, 200) : int * int))
+
+(* The spendable-cash cap does not perturb the risk-pct or %-cap math: it only
+   bounds shares by cash. A non-binding sizing_cash (>= what the other caps
+   allow) leaves the result identical to the legacy per-position-cap case. *)
+let test_sizing_cash_non_binding_leaves_caps_intact _ =
+  let result =
+    compute_position_size ~config:default_config ~portfolio_value:1_000_000.0
+      ~sizing_cash:1_000_000.0 ~side:`Long ~entry_price:200.0 ~stop_price:199.0
+      ()
+  in
+  (* Same as test_position_size_long_capped_by_max_position_pct: per-position
+     cap binds at 1,500 shares; sizing_cash ($1M / $200 = 5,000) is looser. *)
+  assert_that result
+    (all_of
+       [
+         field (fun (s : sizing) -> s.shares) (equal_to 1500);
+         field (fun (s : sizing) -> s.position_value) (float_equal 300_000.0);
+       ])
+
 (* ---- Limit check tests ---- *)
 
 let test_check_limits_ok _ =
@@ -662,6 +745,16 @@ let suite =
          >:: test_position_size_short_capped_by_max_position_pct;
          "position_size_below_cap_unaffected"
          >:: test_position_size_below_cap_unaffected;
+         "sizing_cash_omitted_equals_portfolio_value"
+         >:: test_sizing_cash_omitted_equals_portfolio_value;
+         "sizing_cash_at_portfolio_value_inert"
+         >:: test_sizing_cash_at_portfolio_value_inert;
+         "sizing_cash_binds_below_risk_cap"
+         >:: test_sizing_cash_binds_below_risk_cap;
+         "sizing_cash_caps_long_after_short_collateral_lock"
+         >:: test_sizing_cash_caps_long_after_short_collateral_lock;
+         "sizing_cash_non_binding_leaves_caps_intact"
+         >:: test_sizing_cash_non_binding_leaves_caps_intact;
          "check_limits_ok" >:: test_check_limits_ok;
          "check_limits_max_positions" >:: test_check_limits_max_positions;
          "check_limits_long_exposure" >:: test_check_limits_long_exposure;
