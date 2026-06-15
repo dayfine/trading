@@ -382,6 +382,22 @@
  (action
   (run sh %{dep:sweep_worktrees_smoke.sh})))
 
+; Smoke test for record_qc_audit.sh: 6 fixture-driven scenarios covering
+; file-mode (dev/reviews/<feature>.md), PR-mode (mock gh binary), mixed
+; NEEDS_REWORK, non-numeric --pr-number rejection, COMMENTED body-parse,
+; and empty-PR-reviews fallback to file mode.
+; The test creates its own temp dir fixtures (no real dev/reviews/ or
+; dev/audit/ dirs are touched). record_qc_audit.sh and write_audit.sh are
+; declared as deps so the cache key invalidates when either changes.
+; Uses `bash` (not `sh`) because the test script uses set -euo pipefail
+; and bash-specific constructs (intentional — see #!/usr/bin/env bash shebang).
+
+(rule
+ (alias runtest)
+ (deps record_qc_audit.sh write_audit.sh)
+ (action
+  (run bash %{dep:record_qc_audit_test.sh})))
+
 ; Active exceptions report: lists all linter_exceptions.conf entries and
 ; inline @large-module / @large-function markers with status (active /
 ; expired / no-review-at).  Passive — exits 0 always; output goes to the
