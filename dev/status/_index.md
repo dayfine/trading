@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-15 (orchestrator run 27519754639 [run 1]: NO feat-dispatch — RED-MAIN RECOVERY + reconcile. Main was RED on a05d9479 (#1588) from a CI-infra disk-exhaustion flake (`dune_trace_write(): No space left on device` during link; no linter/test FAIL; #1588 PR-branch CI was green on cd87d217). Token can't rerun jobs (403), so cleared it by squash-merging the CI-green, mergeable run-4 summary PR #1590 → fresh main CI on 567d7760 (build-and-test re-run on a clean runner) → GREEN; closed ci-red #1591. Reconciled data-foundations row to show the in-flight LOCAL maintainer PR #1589 (Thread-1 volume enrichment). No GHA-eligible non-gated work remained (grill roadmap routed all but Initiative A — shipped run-4 #1588 — to the LOCAL session). 2026-06-14 [run 4]: 1 DISPATCH → AUTO-MERGED #1588 (weekly-snapshot M6.6 generator / Initiative A). [run 3]: reconciled #1582 cash-floor NS1 flip. [run 1]: #1574 sweep-perf, #1575 cash-floor NS3.)
+Last updated: 2026-06-15 (orchestrator run 27527290125 [run 2]: NO feat-dispatch — GHA-eligible surface still drained. Main GREEN on cb1fb59d (#1589/#1593/#1595 merged since run 1; ci-red #1591 now closed). Two open PRs are LOCAL maintainer (dayfine) work — #1596 weekly-snapshot C2 test, #1594 eligible-universe builder — fenced per gha-local-coordination.md (do not QC/merge). Reconciled their rows. Health CLEAN (linters exit 0). 0 subagents. [run 1]: NO feat-dispatch — RED-MAIN RECOVERY + reconcile. Main was RED on a05d9479 (#1588) from a CI-infra disk-exhaustion flake (`dune_trace_write(): No space left on device` during link; no linter/test FAIL; #1588 PR-branch CI was green on cd87d217). Token can't rerun jobs (403), so cleared it by squash-merging the CI-green, mergeable run-4 summary PR #1590 → fresh main CI on 567d7760 (build-and-test re-run on a clean runner) → GREEN; closed ci-red #1591. Reconciled data-foundations row to show the in-flight LOCAL maintainer PR #1589 (Thread-1 volume enrichment). No GHA-eligible non-gated work remained (grill roadmap routed all but Initiative A — shipped run-4 #1588 — to the LOCAL session). 2026-06-14 [run 4]: 1 DISPATCH → AUTO-MERGED #1588 (weekly-snapshot M6.6 generator / Initiative A). [run 3]: reconciled #1582 cash-floor NS1 flip. [run 1]: #1574 sweep-perf, #1575 cash-floor NS3.)
 
 ## Active + complete tracks
 
@@ -46,9 +46,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
-| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | M6.1–M6.5 + M6.6 generate_weekly_snapshot bin SHIPPED (#1588, orchestrator); next: baseline pick record + live-cycle (DATA_SOURCE/cron/alerts, human-gated) |
+| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | #1596 (local) | M6.6 bin SHIPPED (#1588); #1596 (local) adds C2 bearish-macro test; next: baseline pick record + live-cycle (DATA_SOURCE/cron/alerts, human-gated) |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
-| [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | #1589 (local) | Thread-1 volume enrichment + inventory.sexp in flight LOCALLY (#1589, maintainer); next: policy artifact (ADR $-vol threshold human-gated) + weekly ADV gate |
+| [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | #1594 (local) | Thread-1 enrichment MERGED (#1589); #1594 (local) eligibility-filter universe builder; next: policy artifact (ADR $-vol human-gated) + weekly ADV gate |
 
 ## How to use
 
