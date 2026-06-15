@@ -89,5 +89,50 @@ Materials/Real-Estate.
 ## Merged this session
 #1589 (volume enrichment + track inventory) · #1593 (28y deep analysis) · #1595 (live
 data refresh to 2026-06-12) · #1594 (eligibility universe builder) · #1598 (first live
-weekly-picks baseline) · #1586 (factor-lens cheap pass, realized-edge columns). #1596
-(generator C2 test + P6 fixes) auto-merging.
+weekly-picks baseline) · #1586 (factor-lens cheap pass, realized-edge columns) · #1596
+(generator C2 test + P6 fixes).
+
+---
+
+## 🌙 Night-2 continuation (2026-06-15 PM) — kept the queue moving
+
+Per the new rule [[feedback_work_through_the_night]] (don't wrap early when the queue
+has work), continued after the morning wrap. Additional merges:
+
+- **#1605 — deep 28y WF-CV baseline robustness.** Cell-E as 28 independent annual
+  folds 1998-2025 (PIT top-3000-1998, snapshot mode). **Sharpe 0.64 ± 0.86,
+  23/28 folds positive**, down-years shallow (2008 GFC −4.6% vs SPX ~−37%); mean
+  fold-Sharpe ≈ single-run 28y Sharpe 0.59 → the +1552% is NOT a lucky path.
+  Writeup `dev/experiments/deep-1998-2026-2026-06-14/wfcv/`. **Caveat:** worst fold
+  2024 (−21.9%) is a **PIT-1998 membership-decay artifact** → the WF-CV follow-up
+  is **per-fold rolling membership** (re-snapshot top-3000 as-of each fold start).
+- **#1606 — margin sizing-cash seam.** ⚠ **REFRAME: margin Phase 1/2 was ALREADY
+  BUILT on main** (collateral lock, available-cash check, maintenance force-cover,
+  borrow fee — #1113/#1115/#1119/#1274, fully tested in `test_margin_accounting.ml`).
+  The priorities premise ("margin is a no-op") was STALE (same as the M6.6 generator).
+  #1606 closed the one real gap: `~sizing_cash` threaded into
+  `compute_position_size` (default-off/bit-equal, goldens unchanged).
+- **#1607 — factor-lens 5b.** 4 screener factors on the rolling-start matrix (macro
+  stage / Macro_composite / Stage-2 count / sector-RS dispersion), from precomputed
+  warehouse fields. Universe-scan factors emit None for Full_sector_map (documented).
+
+### The real next step on Initiative B (PROFIT lever) — needs YOUR oversight
+The margin foundation is built + the sizing seam is in. The remaining step is
+**Phase 5: wire `Portfolio.available_cash` / `sizing_cash` into the strategy entry
+path** (`entry_audit_capture` / `weinstein_strategy`) so backtests size shorts on
+*trustworthy* (collateral-locked) cash. **This RE-PINS the with-shorts goldens
+(behavior-changing)** → it's the oversight boundary; I did NOT land it autonomously.
+Once wired (with margin on + `enable_short_side` on), **Phase 3/4 Stage-A short-only
+validation answers the profit question** ("does shorting Stage-4 help?") on a
+trustworthy model — that's the high-value next move.
+
+### Open analytical step (data-gated, safe)
+factor-lens **31-start causal analysis** — correlate the #1607 factor columns with
+`realized_edge_pct` to test H1/H2/H3 (the deploy-when guidance). Columns exist now;
+the analysis is the remaining read-only step. NOTE the low prior on entry-feature
+separation per [[project_accuracy_is_unreachable_diversify_instead]] — the lens's
+value is regime/deploy-when guidance, not entry accuracy.
+
+### Deprioritized
+**policy universe ([1])** — subsumed by the live-universe eligibility builder (#1594);
+the ADR $-volume floor is ADR-only hygiene. Skip unless a specific need arises.
