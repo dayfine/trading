@@ -81,6 +81,29 @@ val default_config :
      ~inventory_path] sets [trailing_window_days = 60] and
     [min_window_bars = 30]. *)
 
+val avg_dollar_volume_for_bars :
+  date:Date.t ->
+  trailing_window_days:int ->
+  min_window_bars:int ->
+  Composition_bar_reader.bar list ->
+  float option
+(** [avg_dollar_volume_for_bars ~date ~trailing_window_days ~min_window_bars
+     bars] is the trailing-window dollar-volume score over [bars]: it windows to
+    [[date - trailing_window_days, date]] and returns
+    [Some (avg (close * volume))] across that window when at least
+    [min_window_bars] bars fall inside it, else [None] (the same condition under
+    which {!build} drops a symbol). Pure helper over an already-read [bar list]
+    so a caller that needs both this score and {!latest_close_for_bars} reads
+    the CSV once. This is the exact scoring {!avg_dollar_volume_for_symbol} and
+    {!build}'s ranker apply. *)
+
+val latest_close_for_bars :
+  date:Date.t -> Composition_bar_reader.bar list -> float option
+(** [latest_close_for_bars ~date bars] is the [close] of the most recent bar on
+    or before [date], or [None] when no bar falls on / before [date]. Used by
+    the eligibility builder's [min_price] gate. Pure helper over an already-read
+    [bar list]. *)
+
 val avg_dollar_volume_for_symbol :
   date:Date.t -> config:config -> string -> float option
 (** [avg_dollar_volume_for_symbol ~date ~config symbol] computes the single

@@ -62,22 +62,32 @@ let _filter_by_equity_like ~equity_like_lookup symbols =
 (* Dollar-volume scoring                                               *)
 (* ------------------------------------------------------------------ *)
 
-let _in_trailing_window ~date ~config (b : BR.bar) =
-  let start_d = _trailing_window_start ~date ~config in
+let _in_window ~date ~trailing_window_days (b : BR.bar) =
+  let start_d = Date.add_days date (-trailing_window_days) in
   Date.( >= ) b.date start_d && Date.( <= ) b.date date
 
-let _dollar_volume_score ~date ~config bars =
+(* Pure trailing-window dollar-volume score over an already-read [bar list].
+   Windows to [[date - trailing_window_days, date]] and averages
+   [close * volume]; [None] when fewer than [min_window_bars] bars fall in the
+   window. Both the config-based ranker and the eligibility builder share this. *)
+let avg_dollar_volume_for_bars ~date ~trailing_window_days ~min_window_bars bars
+    =
   let window =
-    List.filter bars ~f:(fun b -> _in_trailing_window ~date ~config b)
+    List.filter bars ~f:(fun b -> _in_window ~date ~trailing_window_days b)
   in
   let n = List.length window in
-  if n < config.min_window_bars then None
+  if n < min_window_bars then None
   else
     let total =
       List.fold window ~init:0.0 ~f:(fun acc (b : BR.bar) ->
           acc +. (b.close *. b.volume))
     in
     Some (total /. Float.of_int n)
+
+let _dollar_volume_score ~date ~config bars =
+  avg_dollar_volume_for_bars ~date
+    ~trailing_window_days:config.trailing_window_days
+    ~min_window_bars:config.min_window_bars bars
 
 (* ------------------------------------------------------------------ *)
 (* Forward-return calculation                                          *)
@@ -91,6 +101,9 @@ let _first_on_or_after ~date bars =
 let _last_on_or_before ~date bars =
   List.fold bars ~init:None ~f:(fun acc (b : BR.bar) ->
       if Date.( <= ) b.date date then Some b else acc)
+
+let latest_close_for_bars ~date bars =
+  Option.map (_last_on_or_before ~date bars) ~f:(fun (b : BR.bar) -> b.close)
 
 let _forward_return ~date bars =
   let end_date = _forward_window_end ~date in
