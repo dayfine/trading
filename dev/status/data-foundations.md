@@ -1,6 +1,6 @@
 # Status: data-foundations
 
-## Last updated: 2026-06-11
+## Last updated: 2026-06-14
 
 ## Status
 READY_FOR_REVIEW
@@ -272,6 +272,44 @@ Status carries forward from `hybrid-tier` track — that track stays IN_PROGRESS
 (M5.3 streaming Phases A through F COMPLETE on main as of 2026-05-06.
 Synth-v1/v2/v3 all MERGED. EODHD multi-market MERGED. 15y memory-cliff
 fixes MERGED 2026-05-08. Only Norgate ingest remains — vendor-blocked.)
+
+### READY_FOR_REVIEW — Composition-golden volume enrichment + track inventory.sexp (2026-06-14)
+
+- [x] **Volume-only enrichment tool**
+  (`feat/composition-volume-enrichment`,
+  `analysis/data/universe/bin/enrich_composition_volume_runner{,_lib}.{ml,mli}`
+  + `test/test_enrich_composition_volume_runner.ml`). Per
+  `dev/notes/next-session-priorities-2026-06-14.md` §"Thread 1" + §2.
+  Backfills the `avg_dollar_volume` field on the committed composition
+  goldens **without re-ranking** — recomputes the trailing-window
+  `avg(close*volume)` per non-synthetic entry via the new public
+  `Build_from_individuals.avg_dollar_volume_for_symbol` (the *exact*
+  same scorer the builder ranks by), injects only that field, and a
+  per-file `composition_preserved` invariant guards that
+  symbols/weights/sectors/order/synthetic flags + all snapshot-level
+  fields stay bit-identical. Unlike a full
+  `build_composition_universes_runner` rebuild (which drifts ~2.9% of
+  symbols from bar-store movement → re-pins backtests), this is
+  behaviour-neutral: no backtest reading these goldens changes.
+  - **Verification:** ran on all 84 committed goldens
+    (`--goldens-dir test_data/goldens-custom-universe/composition/
+    --bars-root /workspaces/trading-1/data`); `composition_changed=0`;
+    `git diff` on a sample golden shows only added `(avg_dollar_volume …)`
+    tokens.
+  - **Inventory tracked:** removed the `/data/*` gitignore exclusion for
+    `data/inventory.sexp` and committed it (5.3 MB) — the committed
+    goldens (and this enrichment recompute) are now regenerable from VC
+    without an API key.
+  - **⚠ Volume-magnitude flag (triage separately):** pre-2010 delisted
+    symbols carry a `close` sentinel `999999.9999` in the bar CSVs (only
+    `adjusted_close` is populated for that vintage), so their enriched
+    `avg_dollar_volume` is `~close*volume ≈ 999999.9999 * volume` →
+    spuriously huge (e.g. AKR 1998). This is a **bar-data quality issue**
+    that the builder *already* produces identically (the enrichment
+    faithfully matches it — it is NOT an enrichment bug). The ADR
+    `$`-volume liquidity floor that consumes this field will mis-rank
+    those tickers as max-liquidity. Fix belongs in the bar store or the
+    scorer (use `adjusted_close` when `close` is sentinel), not here.
 
 ### READY_FOR_REVIEW — Universe-composition policy (P1, explicit flag-driven, additive) — 2026-06-11
 

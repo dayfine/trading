@@ -35,6 +35,24 @@
   (pps ppx_jane)))
 
 (library
+ (name enrich_composition_volume_runner_lib)
+ (modules enrich_composition_volume_runner_lib)
+ (libraries core core_unix.sys_unix status universe)
+ (preprocess
+  (pps ppx_let ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name enrich_composition_volume_runner)
+ (modules enrich_composition_volume_runner)
+ (libraries
+  core
+  core_unix.command_unix
+  enrich_composition_volume_runner_lib
+  status)
+ (preprocess
+  (pps ppx_jane)))
+
+(library
  (name apply_composition_policy_runner_lib)
  (modules apply_composition_policy_runner_lib)
  (libraries core eodhd status universe)

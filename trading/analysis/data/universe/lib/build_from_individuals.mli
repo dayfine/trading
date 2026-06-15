@@ -81,6 +81,24 @@ val default_config :
      ~inventory_path] sets [trailing_window_days = 60] and
     [min_window_bars = 30]. *)
 
+val avg_dollar_volume_for_symbol :
+  date:Date.t -> config:config -> string -> float option
+(** [avg_dollar_volume_for_symbol ~date ~config symbol] computes the single
+    symbol's trailing dollar-volume score using the *exact* same logic {!build}
+    applies when ranking the universe: read the symbol's bars from
+    [config.bars_root], window to [[date - config.trailing_window_days, date]],
+    and return [Some (avg (close * volume))] over the window when at least
+    [config.min_window_bars] bars fall inside it, else [None].
+
+    Exposed so a snapshot-enrichment pass can backfill the per-entry
+    [avg_dollar_volume] field for an *existing* symbol set without re-ranking
+    the universe (which would drift composition). [None] when the symbol's
+    [data.csv] is missing / unreadable or the window has too few bars — the same
+    conditions under which {!build} would have dropped the symbol. Only
+    [config.bars_root], [config.trailing_window_days], and
+    [config.min_window_bars] are consulted; the inventory / sector / size fields
+    are unused. *)
+
 val build : date:Date.t -> config:config -> Snapshot.t Status.status_or
 (** [build ~date ~config] runs the algorithm described in the module docstring
     and returns a composition snapshot anchored at [date].

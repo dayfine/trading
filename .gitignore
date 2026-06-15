@@ -39,6 +39,11 @@ _opam/
 !/data/sectors.meta.sexp
 !/data/symbol_types.sexp
 !/data/delisted_symbols.sexp
+# inventory.sexp IS committed: it is the point-in-time symbol-activity index
+# the composition goldens (+ the volume-enrichment recompute) are built from,
+# so the committed goldens are regenerable from version control without an API
+# key. Refreshed by ops-data via weinstein.data_source/Inventory.
+!/data/inventory.sexp
 
 # Agent runtime files (logs, lock files, worktrees)
 dev/logs/*.log

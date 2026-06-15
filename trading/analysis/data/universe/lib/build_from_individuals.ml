@@ -199,6 +199,11 @@ let _build_validated ~date ~config ~inventory ~equity_like_lookup ~sector_lookup
   let aggregate_period_return = _aggregate_period_return kept in
   Ok (_make_snapshot ~date ~config ~entries ~aggregate_period_return)
 
+let avg_dollar_volume_for_symbol ~date ~config symbol =
+  match BR.read_bars ~bars_root:config.bars_root symbol with
+  | None -> None
+  | Some bars -> _dollar_volume_score ~date ~config bars
+
 let build ~date ~config =
   let open Result.Let_syntax in
   let%bind () = _validate_size config.size in
