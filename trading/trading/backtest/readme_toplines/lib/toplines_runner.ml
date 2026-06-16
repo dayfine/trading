@@ -44,37 +44,43 @@ let sector_etf_universe =
     ("SPY", "Index");
   ]
 
-let read_coverage ~data_dir symbol =
+(* Load [symbol]'s full bar series from the CSV store. Returns the prices as a
+   [Result] so callers can choose to propagate or raise; flattens the two-level
+   create/get match into one place. *)
+let _load_prices ~data_dir symbol =
   match Csv.Csv_storage.create ~data_dir symbol with
   | Error err ->
       Error (sprintf "create storage for %s: %s" symbol (Status.show err))
   | Ok storage -> (
       match Csv.Csv_storage.get storage () with
       | Error err -> Error (sprintf "read %s: %s" symbol (Status.show err))
-      | Ok [] -> Error (sprintf "no bars for %s" symbol)
-      | Ok prices -> (
-          let dates =
-            List.map prices ~f:(fun (p : Types.Daily_price.t) -> p.date)
-          in
-          let first_bar = List.min_elt dates ~compare:Date.compare in
-          let last_bar = List.max_elt dates ~compare:Date.compare in
-          match (first_bar, last_bar) with
-          | Some first_bar, Some last_bar ->
-              Ok ({ symbol; first_bar; last_bar } : Coverage.coverage)
-          | _ -> Error (sprintf "no datable bars for %s" symbol)))
+      | Ok prices -> Ok prices)
+
+(* Min/max date over [prices] as a coverage record, or an error when empty. *)
+let _coverage_of_prices symbol (prices : Types.Daily_price.t list) =
+  let dates = List.map prices ~f:(fun p -> p.date) in
+  match
+    ( List.min_elt dates ~compare:Date.compare,
+      List.max_elt dates ~compare:Date.compare )
+  with
+  | Some first_bar, Some last_bar ->
+      Ok ({ symbol; first_bar; last_bar } : Coverage.coverage)
+  | _ -> Error (sprintf "no datable bars for %s" symbol)
+
+let read_coverage ~data_dir symbol =
+  match _load_prices ~data_dir symbol with
+  | Error _ as err -> err
+  | Ok [] -> Error (sprintf "no bars for %s" symbol)
+  | Ok prices -> _coverage_of_prices symbol prices
 
 (* Read [symbol]'s adjusted-close series over the full file as chronological
    [(date, adjusted_close)] pairs (dividend-adjusted). *)
 let _adjusted_close_series ~data_dir symbol =
-  match Csv.Csv_storage.create ~data_dir symbol with
-  | Error err ->
-      failwithf "create storage for %s: %s" symbol (Status.show err) ()
-  | Ok storage -> (
-      match Csv.Csv_storage.get storage () with
-      | Error err -> failwithf "read %s: %s" symbol (Status.show err) ()
-      | Ok prices ->
-          List.map prices ~f:(fun (p : Types.Daily_price.t) ->
-              (p.date, p.adjusted_close)))
+  match _load_prices ~data_dir symbol with
+  | Error msg -> failwith msg
+  | Ok prices ->
+      List.map prices ~f:(fun (p : Types.Daily_price.t) ->
+          (p.date, p.adjusted_close))
 
 let _cagr ~start_date ~end_date ~total_return_pct =
   let test_days = Coverage.inclusive_days ~start_date ~end_date in
@@ -127,19 +133,30 @@ let _spy_only_row ~data_dir:_ ~start_date ~end_date =
     ~note:"Spy_only_weinstein, 30-week investor MA, long/flat"
 
 let _sector_row ~data_dir:_ ~start_date ~end_date =
-  _weinstein_row ~start_date ~end_date
-    ~strategy_choice:
-      (Backtest.Strategy_choice.Sector_rotation_weinstein
-         {
-           k = 3;
-           ma_period_weeks = 30;
-           enable_macro_gate = false;
-           use_scenario_universe = false;
-           sector_cap = None;
-         })
+  let strategy_choice =
+    Backtest.Strategy_choice.Sector_rotation_weinstein
+      {
+        k = 3;
+        ma_period_weeks = 30;
+        enable_macro_gate = false;
+        use_scenario_universe = false;
+        sector_cap = None;
+      }
+  in
+  _weinstein_row ~start_date ~end_date ~strategy_choice
     ~sector_map_override:(_sector_map_override sector_etf_universe)
     ~label:"Sector-ETF Weinstein"
     ~note:"Sector_rotation_weinstein k=3, 30-week investor MA, RS vs SPY"
+
+let _build_rows ~data_dir ~start_date ~end_date =
+  [
+    _bah_row ~data_dir ~start_date ~end_date ~symbol:"SPY"
+      ~label:"SPY buy-and-hold";
+    _bah_row ~data_dir ~start_date ~end_date ~symbol:"BRK-B"
+      ~label:"BRK-B buy-and-hold";
+    _spy_only_row ~data_dir ~start_date ~end_date;
+    _sector_row ~data_dir ~start_date ~end_date;
+  ]
 
 let run ~data_dir =
   let coverages =
@@ -151,16 +168,7 @@ let run ~data_dir =
   match Coverage.period_intersection coverages with
   | None -> failwith "empty period intersection across period-defining symbols"
   | Some (start_date, end_date) ->
-      let rows =
-        [
-          _bah_row ~data_dir ~start_date ~end_date ~symbol:"SPY"
-            ~label:"SPY buy-and-hold";
-          _bah_row ~data_dir ~start_date ~end_date ~symbol:"BRK-B"
-            ~label:"BRK-B buy-and-hold";
-          _spy_only_row ~data_dir ~start_date ~end_date;
-          _sector_row ~data_dir ~start_date ~end_date;
-        ]
-      in
+      let rows = _build_rows ~data_dir ~start_date ~end_date in
       { start_date; end_date; period_instruments = coverages; rows }
 
 let _fmt_pct f = if Float.is_nan f then "n/a" else sprintf "%+.1f%%" f
