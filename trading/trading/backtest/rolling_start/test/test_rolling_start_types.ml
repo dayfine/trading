@@ -6,8 +6,8 @@ module DS = Rolling_start.Dispersion_stats
 
 let make_start ~y ~m ~d ~cagr ~underwater ~maxdd ?(benchmark = Float.nan)
     ?(realized_edge = Float.nan) ?(forward_index_max_dd = Float.nan)
-    ?(sharpe = 1.0) ?(time_underwater = 0.0) ?(realized = 0.0) () : RT.per_start
-    =
+    ?(sharpe = 1.0) ?(time_underwater = 0.0) ?(realized = 0.0)
+    ?(factors = Rolling_start.Rolling_start_factors.empty) () : RT.per_start =
   {
     start_date = Date.create_exn ~y ~m ~d;
     cagr_pct = cagr;
@@ -20,6 +20,7 @@ let make_start ~y ~m ~d ~cagr ~underwater ~maxdd ?(benchmark = Float.nan)
     sharpe;
     time_underwater_pct = time_underwater;
     realized_return_pct = realized;
+    factors;
   }
 
 let sample_starts =
@@ -122,8 +123,43 @@ let test_to_markdown_contains_sections _ =
          contains_substring "TimeUnderwater %";
          contains_substring "Realized return %";
          contains_substring "MaxUnderwaterVsInitial %";
+         (* Factor-decomposition lens 5b columns are a strict superset: the
+            pre-existing outcome columns above still render, and the four factor
+            headers are appended. *)
+         contains_substring "SPY stage";
+         contains_substring "Macro composite";
+         contains_substring "Stage-2 count";
+         contains_substring "Sector-RS dispersion";
          contains_substring "2011-01-01";
          contains_substring "2020-12-31";
+       ])
+
+(* A row whose factors are populated renders the decoded values: SPY stage 2 as
+   the bare integer "2", the Stage-2 candidate count "42", and the macro
+   composite / sector-RS dispersion as two-decimal floats. Pins that the
+   per-start detail table carries the factor cells, not just the headers. *)
+let test_to_markdown_renders_factor_values _ =
+  let factors =
+    {
+      Rolling_start.Rolling_start_factors.spy_stage_at_start = Some 2;
+      macro_composite_at_start = 0.75;
+      stage2_candidate_count = Some 42;
+      sector_rs_dispersion_at_start = 1.25;
+    }
+  in
+  let md =
+    RT.to_markdown
+      (RT.build ~end_date
+         [
+           make_start ~y:2015 ~m:Month.Jun ~d:1 ~cagr:12.0 ~underwater:0.0
+             ~maxdd:(-10.0) ~factors ();
+         ])
+  in
+  assert_that md
+    (all_of
+       [
+         contains_substring "| 2 | 0.75 | 42 | 1.25 |";
+         contains_substring "2015-06-01";
        ])
 
 let test_to_markdown_empty _ =
@@ -305,8 +341,24 @@ let test_min_window_markdown_flags_excluded _ =
    floats with [Float.equal], under which [nan <> nan], so a report carrying nan
    edges (unbenchmarked starts) would never compare equal to itself. The
    serializer is still exercised on the full field set. *)
+(* Fully-populated (no-nan) factors so the report's float fields are all
+   defined — [equal_report] uses [Float.equal], and [Float.equal nan nan] is
+   [false], which would spuriously break the roundtrip on the default
+   nan-bearing {!Rolling_start_factors.empty}. *)
+let populated_factors =
+  {
+    Rolling_start.Rolling_start_factors.spy_stage_at_start = Some 3;
+    macro_composite_at_start = 0.5;
+    stage2_candidate_count = Some 17;
+    sector_rs_dispersion_at_start = 2.0;
+  }
+
 let test_sexp_roundtrip _ =
-  let report = RT.build ~end_date benchmarked_starts in
+  let starts =
+    List.map benchmarked_starts ~f:(fun s ->
+        { s with RT.factors = populated_factors })
+  in
+  let report = RT.build ~end_date starts in
   let back = RT.report_of_sexp (RT.sexp_of_report report) in
   assert_that back (equal_to ~cmp:RT.equal_report report)
 
@@ -327,6 +379,8 @@ let suite =
          "pct_beating_benchmark" >:: test_pct_beating_benchmark;
          "edge_skips_nan_starts" >:: test_edge_skips_nan_starts;
          "to_markdown_contains_sections" >:: test_to_markdown_contains_sections;
+         "to_markdown_renders_factor_values"
+         >:: test_to_markdown_renders_factor_values;
          "to_markdown_empty" >:: test_to_markdown_empty;
          "min_window_default_counts_all" >:: test_min_window_default_counts_all;
          "min_window_excludes_short_from_summary"
