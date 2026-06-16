@@ -40,8 +40,18 @@ beats. Strategy = **bear-regime distribution compressor, not bull-return-beater*
 trim/cap/re-time it. Stops are the necessary premium. Evaluation MUST span a bear
 (bull-only tuning is the recurrent overfit trap). Bias to tail-preserving levers.
 
-**Caveats:** single contiguous run (not WF-CV — existence proof, not promotion-grade);
-one PIT-1998 snapshot; quote realized not MTM.
+**WF-CV CONFIRMATION (2026-06-15, no longer just a single path):** ran Cell-E as
+**28 independent annual folds** 1998-2025 (PIT top-3000-1998, snapshot mode). Mean
+fold **Sharpe 0.64 ± 0.86**, return 13.2%/yr ± 20, MaxDD 14.7% ± 5.6, Calmar 1.25;
+**23/28 folds positive**; mean fold-Sharpe ≈ single-run 28y Sharpe 0.59. Down years
+SHALLOW (2008 GFC −4.6% vs SPX ~−37%; 2001 −4.6, 2002 −7.6) = bear-defense holds
+per-fold; big years = bull legs/post-bear dawns (1999 +82%, 2013 +39%, 2017 +42%).
+**The +1552% is NOT a lucky path.** Caveat: worst fold 2024 (−21.9%) is a PIT-1998
+membership-decay artifact (universe delisted-thin by 2024) → per-fold rolling
+membership is the follow-up. Writeup: `dev/experiments/deep-1998-2026-2026-06-14/wfcv/`.
+
+**Caveats:** one PIT-1998 snapshot (membership decays in late folds); quote realized
+not MTM.
 
 **Snapshot-mode gotcha (cost me 2 dead runs):** a snapshot warehouse built with
 `build_snapshots -benchmark-symbol GSPC.INDX` does NOT include the macro/index/

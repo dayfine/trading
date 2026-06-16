@@ -88,8 +88,9 @@ let _realized_return_pct ~initial_cash ~final_value ~unrealized_pnl =
   else (final_value -. unrealized_pnl -. initial_cash) /. initial_cash *. 100.0
 
 let per_start_of_summary ?(benchmark_cagr_pct = Float.nan)
-    ?(benchmark_max_dd_pct = Float.nan) ?(equity_curve = []) ~start_date
-    ~end_date (summary : Backtest.Summary.t) : Rolling_start_types.per_start =
+    ?(benchmark_max_dd_pct = Float.nan) ?(equity_curve = [])
+    ?(factors = Rolling_start_factors.empty) ~start_date ~end_date
+    (summary : Backtest.Summary.t) : Rolling_start_types.per_start =
   let get k = Map.find summary.metrics k |> Option.value ~default:Float.nan in
   let total_return_pct =
     (summary.final_portfolio_value -. summary.initial_cash)
@@ -127,6 +128,7 @@ let per_start_of_summary ?(benchmark_cagr_pct = Float.nan)
     sharpe = get Metric_types.SharpeRatio;
     time_underwater_pct = Convexity_stats.time_underwater_pct equity_curve;
     realized_return_pct;
+    factors;
   }
 
 type config = {
@@ -189,8 +191,12 @@ let _sector_map_override ~fixtures_root (scenario : Scenario.t) =
     scenario's overrides / strategy / cost knobs and the shared sector-map
     override + optional snapshot source, and project the terminal summary into a
     {!Rolling_start_types.per_start}. [benchmark_series] is the (once-resolved)
-    benchmark close series; this start's benchmark CAGR is projected from it. *)
-let _run_one ~config ~sector_map_override ~benchmark_series ~start_date =
+    benchmark close series; this start's benchmark CAGR is projected from it.
+    [factors] is this start's precomputed screener-based factor columns
+    (resolved in the parent via {!_resolve_factors_per_start}); they ride along
+    into the projected row. *)
+let _run_one ~config ~sector_map_override ~benchmark_series ~factors ~start_date
+    =
   let result =
     Backtest.Runner.run_backtest ~start_date ~end_date:config.end_date
       ~overrides:config.scenario.config_overrides ?sector_map_override
@@ -216,7 +222,39 @@ let _run_one ~config ~sector_map_override ~benchmark_series ~start_date =
         s.portfolio_value)
   in
   per_start_of_summary ~benchmark_cagr_pct ~benchmark_max_dd_pct ~equity_curve
-    ~start_date ~end_date:config.end_date result.summary
+    ~factors ~start_date ~end_date:config.end_date result.summary
+
+(* The [(symbol, sector)] universe for the universe-scan factors. A [Pinned]
+   universe yields [Some tbl] -> its symbol list; [Full_sector_map] yields
+   [None] -> [[]], leaving the universe-scan factors unavailable (the sectors.csv
+   fallback is not resolved here — a documented gap). *)
+let _universe_of_override = function
+  | Some tbl -> Hashtbl.to_alist tbl
+  | None -> []
+
+(* One forked-job thunk: look this start's factors out of [factors_by_start]
+   (defaulting to the empty factors), then run + project its backtest. *)
+let _job_for_start ~config ~sector_map_override ~benchmark_series
+    ~factors_by_start start_date () =
+  let factors =
+    Map.find factors_by_start start_date
+    |> Option.value ~default:Rolling_start_factors.empty
+  in
+  _run_one ~config ~sector_map_override ~benchmark_series ~factors ~start_date
+
+(* The benchmark close series for the sweep: resolved once from the earliest
+   start, or [] when there are no starts (so every benchmark CAGR is nan). *)
+let _benchmark_series_for ~config ~starts =
+  match List.min_elt starts ~compare:Date.compare with
+  | Some earliest_start -> _resolve_benchmark_series ~config ~earliest_start
+  | None -> []
+
+(* Run the per-start jobs: forked one-at-a-time at [parallel <= 1] (the
+   memory-safe broad-universe path), else up to [parallel] children at once.
+   Result order is input order in both cases (see Fork_pool). *)
+let _run_jobs ~parallel ~jobs =
+  if parallel <= 1 then Fork_pool.run_each_forked ~jobs
+  else Fork_pool.run_parallel ~parallel ~jobs
 
 (* The start dates to sweep: jittered when [jitter_seed] is set, the fixed grid
    otherwise. Both share the same base grid. *)
@@ -235,25 +273,25 @@ let run config =
   let sector_map_override =
     _sector_map_override ~fixtures_root:config.fixtures_root config.scenario
   in
-  let benchmark_series =
-    match List.min_elt starts ~compare:Date.compare with
-    | Some earliest_start -> _resolve_benchmark_series ~config ~earliest_start
-    | None -> []
+  let benchmark_series = _benchmark_series_for ~config ~starts in
+  (* Every start's factor columns, resolved once in the parent over a single
+     open panels handle (cheap point reads), then handed to the matching forked
+     job. Empty map (CSV / no benchmark) -> every job uses the empty factors. *)
+  let factors_by_start =
+    Rolling_start_factor_reader.resolve_per_start
+      ~bar_data_source:config.bar_data_source
+      ~benchmark_symbol:config.benchmark_symbol
+      ~universe:(_universe_of_override sector_map_override)
+      ~starts
   in
   (* One job per start. Each job is a self-contained backtest of marshallable
      inputs/outputs (a per_start record of floats + a Date), so it forks
-     cleanly. parallel=1 forks each job one-at-a-time (memory-safe broad-universe
-     path); parallel>1 keeps up to [parallel] children alive. Result order is
-     input order in both cases — see Fork_pool. *)
-  let jobs =
-    Array.of_list
-      (List.map starts ~f:(fun start_date () ->
-           _run_one ~config ~sector_map_override ~benchmark_series ~start_date))
+     cleanly. *)
+  let job_of =
+    _job_for_start ~config ~sector_map_override ~benchmark_series
+      ~factors_by_start
   in
-  let per_starts =
-    (if config.parallel <= 1 then Fork_pool.run_each_forked ~jobs
-     else Fork_pool.run_parallel ~parallel:config.parallel ~jobs)
-    |> Array.to_list
-  in
+  let jobs = Array.of_list (List.map starts ~f:job_of) in
+  let per_starts = _run_jobs ~parallel:config.parallel ~jobs |> Array.to_list in
   Rolling_start_types.build ~min_window_days:config.min_window_days
     ~end_date:config.end_date per_starts

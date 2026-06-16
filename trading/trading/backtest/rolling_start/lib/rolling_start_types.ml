@@ -12,6 +12,7 @@ type per_start = {
   sharpe : float;
   time_underwater_pct : float;
   realized_return_pct : float;
+  factors : Rolling_start_factors.factors;
 }
 [@@deriving sexp, equal]
 
@@ -115,6 +116,10 @@ let _row cells = "| " ^ String.concat ~sep:" | " cells ^ " |"
 
 let _f2 x = Printf.sprintf "%.2f" x
 
+(** An optional integer factor cell: the integer, or a blank for [None] (the
+    "not available" marker, mirroring how a [nan] float renders empty-ish). *)
+let _opt_int = function Some n -> Int.to_string n | None -> ""
+
 (** One dispersion-summary line in the per-metric table. *)
 let _summary_row ~label (s : Dispersion_stats.summary) =
   _row
@@ -188,10 +193,17 @@ let _start_row ~min_window_days ~end_date (s : per_start) =
       _f2 s.max_drawdown_pct;
       _f2 s.forward_index_max_dd_pct;
       _f2 s.realized_return_pct;
+      _opt_int s.factors.spy_stage_at_start;
+      _f2 s.factors.macro_composite_at_start;
+      _opt_int s.factors.stage2_candidate_count;
+      _f2 s.factors.sector_rs_dispersion_at_start;
       note;
     ]
 
-(* Column titles of the per-start detail table, in {!_start_row} order. *)
+(* Column titles of the per-start detail table, in {!_start_row} order. The
+   factor columns (SPY stage / macro composite / Stage-2 count / sector-RS
+   dispersion) are appended after the outcome columns as a strict superset —
+   the factor-decomposition lens stage 5b. *)
 let _starts_header_cells =
   [
     "start";
@@ -205,6 +217,10 @@ let _starts_header_cells =
     "MaxDrawdown %";
     "Forward index max-DD %";
     "Realized return %";
+    "SPY stage";
+    "Macro composite";
+    "Stage-2 count";
+    "Sector-RS dispersion";
     "note";
   ]
 

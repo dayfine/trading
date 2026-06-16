@@ -1,6 +1,6 @@
 # Status: rolling-start-lens
 
-## Last updated: 2026-06-14
+## Last updated: 2026-06-15
 
 ## Status
 IN_PROGRESS
@@ -30,6 +30,15 @@ existing columns/ordering preserved as a strict superset. `Rolling_start_runner`
 gains `bench_max_dd_pct` and a `?benchmark_max_dd_pct` param on
 `per_start_of_summary`.
 
+Stage 5b (PR #1607) adds two new modules — `Rolling_start_factors`
+(the pure factor projections) and `Rolling_start_factor_reader` (the thin
+snapshot-warehouse I/O that feeds them; split out so the runner stays under the
+file-length limit) — and a `factors : Rolling_start_factors.factors` field on
+`per_start` (default `Rolling_start_factors.empty` via the new `?factors` param
+on `per_start_of_summary`). Four detail-table columns appended (SPY stage /
+Macro composite / Stage-2 count / Sector-RS dispersion) — strict superset, no
+churn for non-readers.
+
 ### Completed
 
 - [x] **Realized-edge + forward-index-DD lens columns** (PR #1586). Adds the
@@ -46,9 +55,32 @@ gains `bench_max_dd_pct` and a `?benchmark_max_dd_pct` param on
       Files: `trading/trading/backtest/rolling_start/lib/rolling_start_{types,runner}.{ml,mli}`,
       `trading/trading/backtest/rolling_start/test/test_rolling_start_{types,runner}.ml`.
 
+- [x] **Screener-based factor columns (stage 5b)** (PR #1607). New pure module
+      `Rolling_start_factors` + four per-start factor columns, all read from the
+      *precomputed* snapshot-warehouse fields (cheap point reads, no classifier
+      re-run): (1) **SPY/macro stage at start** — decodes the benchmark index's
+      `Stage` cell as-of `start_date` (1/2/3/4); (2) **Macro_composite at start**
+      — the benchmark's `Macro_composite` cell verbatim; (3) **Stage-2 candidate
+      count** — counts universe symbols whose `Stage` cell decodes to 2 as-of
+      `start_date`; (4) **sector-RS dispersion** — IQR of per-sector mean
+      `RS_line` across the universe as-of `start_date`. Factors are resolved once
+      in the parent over a single shared `Daily_panels` handle, then threaded into
+      each forked start's row. Unavailable factors emit `None`/`nan` (the report
+      renders blank) — universe-scan factors are blank for a `Full_sector_map`
+      universe (sectors.csv fallback not resolved here — documented gap) and for
+      CSV mode (no panels handle). The pure projections (stage decode, Stage-2
+      count, sector-RS IQR) are pinned by `test_rolling_start_factors.ml`
+      (known input → expected value); the superset render is pinned by
+      `test_rolling_start_types.ml`.
+      Verify: `dev/lib/run-in-env.sh dune runtest trading/backtest/rolling_start/`.
+      Files: `trading/trading/backtest/rolling_start/lib/rolling_start_{factors,factor_reader}.{ml,mli}`,
+      `.../rolling_start/lib/rolling_start_{types,runner}.{ml,mli}`,
+      `.../rolling_start/test/test_rolling_start_factors.ml`,
+      `.../rolling_start/test/{test_rolling_start_types.ml,dune}`.
+
 ### In-progress
 
-- (none — PR #1586 awaiting QC)
+- (none — PR #1607 awaiting QC)
 
 ### Next steps (data-gated / local-session — NOT GHA)
 
@@ -56,13 +88,6 @@ These need the top-3000 PIT snapshot warehouse + screener, so they are
 maintainer-local, not GHA-dispatchable. Tag `[blocking: by warehouse build]`
 when a downstream decision starts to depend on them.
 
-- [ ] **Macro-stage-at-start column** — stage classifier on GSPC at each
-      `start_date` (1/2/3/4) + `Macro_composite` continuous value (already in the
-      snapshot warehouse per date).
-- [ ] **Stage-2-candidate-count-at-start column** — screener candidate count on
-      `start_date` (the H3 fresh-supply factor).
-- [ ] **Sector-RS-dispersion-at-start column** — spread of sector relative
-      strength on `start_date`.
 - [ ] **31-start causal analysis** — per-factor Spearman vs realized-edge +
       tercile contingency, 3-4 traced starts (one clean beat, one melt-up miss,
       one bear-start), confirm/refute H1/H2/H3, and the resulting deployment
@@ -73,3 +98,4 @@ when a downstream decision starts to depend on them.
 
 - Plan: `dev/plans/rolling-start-realized-edge-lens-2026-06-14.md`
 - PR #1586 `feat/rolling-start-realized-edge-lens`
+- PR #1607 `feat/rolling-start-lens-5b` (screener-based factor columns)

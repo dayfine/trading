@@ -1,9 +1,39 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-06-13
+## Last updated: 2026-06-15
 
 ## Status
 IN_PROGRESS
+
+## 2026-06-15 — margin Phase 1 item 3 (`sizing_cash` plumbing) shipped
+
+Closed the one deferred slice of issue #859 Phase 1. PR #1113's body
+deferred "`Portfolio_risk.compute_position_size` plumbing for
+`sizing_cash` (deferred to a follow-up for review focus)" — every other
+Phase-1 + Phase-2 surface (margin_config, `Portfolio_margin`,
+`Margin_runner`, maintenance force-cover, borrow fee, dedup #1274) was
+already merged. This PR adds the missing follow-up:
+
+- `Portfolio_risk.compute_position_size` gains optional `?sizing_cash`
+  (branch `feat/margin-phase1-sizing-cash`). When omitted it defaults to
+  `portfolio_value`, so the new spendable-cash cap
+  (`floor(sizing_cash / entry_price)`) is `>=` both fractional caps and
+  never binds — **bit-identical** to the prior code; full
+  `dune build && dune runtest` (incl. all sp500 goldens) exits 0
+  unchanged. Margin-aware callers pass `Portfolio.available_cash`
+  (current_cash net of locked short collateral) to fix the Stance-A
+  long-sizing inflation (`dev/notes/short-cash-accounting-design-2026-05-01.md`).
+- Tests: omitted == explicit-`portfolio_value` bit-equality; cap inert at
+  default; cap binds when spendable cash is tight; the plan §1.1 worked
+  example ($10k cash, short 100@$50 → $7,500 available → long capped at
+  150 vs un-netted 200 shares); non-binding leaves %-caps intact.
+- **Strategy/simulator wiring of `available_cash` into the entry path is
+  NOT in this PR** — that flips sizing and re-pins goldens, which belongs
+  to the Phase-5 long-short re-pin step. The seam is now *ready* for it.
+- A1 watch-list: modifies `weinstein/portfolio_risk/` (core risk module),
+  strategy-agnostic — `sizing_cash` is a generic spendable-cash cap, no
+  Weinstein logic. Default-off (`= portfolio_value`) is the load-bearing
+  mitigation.
 
 ## 2026-06-13 — `enable_short_side=false` suppression made honest + pinned
 

@@ -49,14 +49,42 @@ let _syn_config : Synthetic_source.config =
       ];
   }
 
-let _bars_for symbol : Types.Daily_price.t list =
-  let ds = Synthetic_source.make _syn_config in
+(* A bearish variant: the index declines steadily so the macro gate classifies
+   the tape as [Bearish], which must block all long candidates regardless of
+   the (still-breaking-out) AAPL. Only the index pattern differs from
+   [_syn_config], isolating the macro-gate effect. *)
+let _bearish_syn_config : Synthetic_source.config =
+  {
+    start_date = Date.of_string "2022-01-01";
+    symbols =
+      [
+        ( "AAPL",
+          Breakout
+            {
+              base_price = 150.0;
+              base_weeks = 40;
+              weekly_gain_pct = 0.02;
+              breakout_volume_mult = 3.0;
+              base_volume = 50_000_000;
+            } );
+        ( _index_symbol,
+          Declining
+            {
+              start_price = 4500.0;
+              weekly_loss_pct = 0.03;
+              volume = 1_000_000_000;
+            } );
+      ];
+  }
+
+let _bars_for ~syn_config symbol : Types.Daily_price.t list =
+  let ds = Synthetic_source.make syn_config in
   let module DS = (val ds : Data_source.DATA_SOURCE) in
   let query : Data_source.bar_query =
     {
       symbol;
       period = Types.Cadence.Daily;
-      start_date = Some _syn_config.start_date;
+      start_date = Some syn_config.start_date;
       end_date = None;
     }
   in
@@ -64,10 +92,21 @@ let _bars_for symbol : Types.Daily_price.t list =
   | Ok bars -> bars
   | Error e -> assert_failure ("get_bars failed: " ^ Status.show e)
 
-(* A bar reader over the breakout AAPL + the index. *)
+(* A bar reader over the breakout AAPL + the (trending) index. *)
 let _breakout_bar_reader () =
   Bar_reader.of_in_memory_bars
-    [ ("AAPL", _bars_for "AAPL"); (_index_symbol, _bars_for _index_symbol) ]
+    [
+      ("AAPL", _bars_for ~syn_config:_syn_config "AAPL");
+      (_index_symbol, _bars_for ~syn_config:_syn_config _index_symbol);
+    ]
+
+(* A bar reader over the breakout AAPL + a declining index. *)
+let _bearish_bar_reader () =
+  Bar_reader.of_in_memory_bars
+    [
+      ("AAPL", _bars_for ~syn_config:_bearish_syn_config "AAPL");
+      (_index_symbol, _bars_for ~syn_config:_bearish_syn_config _index_symbol);
+    ]
 
 let _inputs ~bar_reader ~ticker_sectors : Generator.inputs =
   {
@@ -104,17 +143,16 @@ let test_metadata_stamped _ =
          field (fun (s : Weekly_snapshot.t) -> s.held_positions) (size_is 0);
        ])
 
-(* The breakout AAPL surfaces as a ranked long candidate with a stop below its
-   entry (the Weinstein long-stop invariant). *)
+(* The breakout AAPL surfaces as a ranked long candidate with a populated
+   entry / score / rationale (T4: domain outcome, not just "no error"). *)
 let test_breakout_is_long_candidate _ =
   let snap =
     _generate ~bar_reader:(_breakout_bar_reader ())
       ~ticker_sectors:[ ("AAPL", "Information Technology") ]
   in
-  let long_candidates = (snap : Weekly_snapshot.t).long_candidates in
   let aapl =
-    List.find long_candidates ~f:(fun (c : Weekly_snapshot.candidate) ->
-        String.equal c.symbol "AAPL")
+    List.find (snap : Weekly_snapshot.t).long_candidates
+      ~f:(fun (c : Weekly_snapshot.candidate) -> String.equal c.symbol "AAPL")
   in
   assert_that aapl
     (is_some_and
@@ -124,39 +162,76 @@ let test_breakout_is_long_candidate _ =
               (fun (c : Weekly_snapshot.candidate) -> c.symbol)
               (equal_to "AAPL");
             field
-              (fun (c : Weekly_snapshot.candidate) -> Float.( > ) c.entry 0.0)
-              (equal_to true);
+              (fun (c : Weekly_snapshot.candidate) -> c.entry)
+              (gt (module Float_ord) 0.0);
             field
-              (fun (c : Weekly_snapshot.candidate) ->
-                Float.( < ) c.stop c.entry)
-              (equal_to true);
+              (fun (c : Weekly_snapshot.candidate) -> c.score)
+              (gt (module Float_ord) 0.0);
             field
               (fun (c : Weekly_snapshot.candidate) -> String.length c.rationale)
               (gt (module Int_ord) 0);
           ]))
 
-(* The macro context is one of the known regime labels and carries a
-   confidence in [0, 1]. *)
+(* The long stop sits below the entry (the Weinstein long-stop invariant).
+   Asserted on the [entry - stop] projection so the relation is one matcher. *)
+let test_breakout_stop_below_entry _ =
+  let snap =
+    _generate ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  let entry_minus_stop =
+    List.find (snap : Weekly_snapshot.t).long_candidates
+      ~f:(fun (c : Weekly_snapshot.candidate) -> String.equal c.symbol "AAPL")
+    |> Option.map ~f:(fun (c : Weekly_snapshot.candidate) -> c.entry -. c.stop)
+  in
+  assert_that entry_minus_stop (is_some_and (gt (module Float_ord) 0.0))
+
+(* The macro context carries a known regime label and a confidence in [0, 1].
+   The regime is matched against the closed set of known labels via [matching]
+   (rather than a boolean predicate), per .claude/rules/test-patterns.md. The
+   trending index here screens [Bullish] or [Neutral]; the exact value is
+   data-dependent, so this test only pins "a known label". The bearish test
+   below pins the exact [Bearish] value. *)
 let test_macro_context_present _ =
   let snap =
     _generate ~bar_reader:(_breakout_bar_reader ())
       ~ticker_sectors:[ ("AAPL", "Information Technology") ]
   in
-  let macro = (snap : Weekly_snapshot.t).macro in
-  let regime_known =
-    List.mem
-      [ "Bullish"; "Bearish"; "Neutral" ]
-      macro.regime ~equal:String.equal
-  in
-  assert_that macro
+  assert_that (snap : Weekly_snapshot.t).macro
     (all_of
        [
          field
-           (fun (_ : Weekly_snapshot.macro_context) -> regime_known)
-           (equal_to true);
+           (fun (m : Weekly_snapshot.macro_context) -> m.regime)
+           (matching ~msg:"regime is one of Bullish / Bearish / Neutral"
+              (fun r ->
+                if
+                  List.mem
+                    [ "Bullish"; "Bearish"; "Neutral" ]
+                    r ~equal:String.equal
+                then Some ()
+                else None)
+              (equal_to ()));
          field
            (fun (m : Weekly_snapshot.macro_context) -> m.score)
            (is_between (module Float_ord) ~low:0.0 ~high:1.0);
+       ])
+
+(* C2 (macro gate): a bearish-macro tape blocks every long candidate, even when
+   an individual symbol (AAPL) is still breaking out. The macro regime must read
+   [Bearish]. weinstein-book-reference.md §Macro Analysis: a bearish tape blocks
+   all buys (the macro gate is unconditional). *)
+let test_bearish_macro_blocks_longs _ =
+  let snap =
+    _generate ~bar_reader:(_bearish_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  assert_that snap
+    (all_of
+       [
+         field
+           (fun (s : Weekly_snapshot.t) -> s.macro.regime)
+           (equal_to "Bearish");
+         field (fun (s : Weekly_snapshot.t) -> s.long_candidates) is_empty;
        ])
 
 (* The snapshot survives a writer -> reader round-trip unchanged. *)
@@ -190,8 +265,12 @@ let suite =
   >::: [
          "metadata stamped onto the snapshot" >:: test_metadata_stamped;
          "breakout AAPL is a long candidate" >:: test_breakout_is_long_candidate;
+         "breakout long stop sits below entry"
+         >:: test_breakout_stop_below_entry;
          "macro context is present and well-formed"
          >:: test_macro_context_present;
+         "bearish macro blocks all long candidates"
+         >:: test_bearish_macro_blocks_longs;
          "snapshot round-trips through writer/reader" >:: test_round_trips;
          "empty universe yields no candidates"
          >:: test_empty_universe_no_candidates;
