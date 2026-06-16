@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-15 (orchestrator run 27581855737 [run 5]: NO feat-dispatch (5th consecutive no-dispatch run today). Main GREEN on 3f931e13 (all required CI checks SUCCESS). The LOCAL maintainer session landed the whole locked-priority cluster overnight: factor-lens 5b (#1607), 28y WF-CV robustness (#1605), margin Phase-1 sizing_cash seam (#1606), deep health scan (#1603), weekly-snapshot C2 test (#1596). Reconciled rows: weekly-snapshot (#1596 merged → PR cell cleared), rolling-start-lens (5b cols #1607 done → next causal analysis), short-side (#1606 seam landed → next Phase-5 re-pin, human-gated). Remaining active work all LOCAL/in-flight or gated: factor-lens causal analysis data-gated on a LOCAL overnight matrix re-run (ETA ~01:00, container /tmp); WF-CV per-fold rolling-membership follow-up data-gated; margin Phase-5 + short-side human-gated (re-pins goldens). Open PRs #1604 (LOCAL maintainer harness, CI green — not orchestrator's to merge) + #1601 (automated opam chore). Health CLEAN (status-integrity + index-size linters exit 0). 0 subagents. [run 4]: NO feat-dispatch — drained; only #1600 (run-3 summary) merged. [run 3]: NO feat-dispatch; #1594/#1598/#1599 merged (dayfine local). [run 2]: NO feat-dispatch; #1589/#1593/#1595 merged, ci-red #1591 closed. [run 1]: RED-MAIN RECOVERY — disk-exhaustion flake cleared via #1590.)
+Last updated: 2026-06-16 (orchestrator run 27597871842 [run 1]: AUTO-MERGED #1612 (orchestrator-owned 3-gate merge), no feat-dispatch. Main GREEN on 9aaaeab5 at run start → a7d068ad after the merge. #1612 = short-side screener ranking-diff fix; it was the GHA-queued `[non-blocking]` item explicitly delegated "orchestrator owns end-to-end, standard 3-gate merge" (the maintainer authored + QC'd it locally to de-risk). Verified all 3 gates green at tip 571f40cd (build-and-test + perf-tier1-smoke SUCCESS; qc-structural APPROVED; qc-behavioral APPROVED q5; mergeable clean) → squash-merged. One open PR remains: #1604 (harness wire record_qc_audit_test; tip c8a911da ahead of reviewed fa9868a5 → maintainer still iterating; mergeable behind) — LOCAL maintainer work, NOT orchestrator's to merge per gha-local-coordination; reconciled harness Open-PR cell → #1604. Health CLEAN (status-integrity + index-size linters exit 0; deep scan 2026-06-15 = 0 critical / 27 advisory warnings / 125 info, Action-required NO). Followup accumulation 43 items (all on data/human-gated or LOCAL tracks). 1 merge, 0 subagents. Prior 2026-06-15: run-1 RED-MAIN RECOVERY (#1590) then runs 2-5 no-dispatch.)
 
 ## Active + complete tracks
 
@@ -26,13 +26,13 @@ Each row: one line; deeper task detail in the linked status file.
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — |
-| [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | margin Phase-1 sizing_cash seam MERGED (#1606); next: Phase-5 entry-path wiring re-pins goldens (human-gated) + WF-CV short_min_price (data-gated) |
+| [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | screener ranking-diff fix MERGED (#1612, 3-gate auto-merge); next: Phase-5 entry-path wiring re-pins goldens (human-gated) + WF-CV short_min_price (data-gated) |
 | [spy-only-reference](spy-only-reference.md) | IN_PROGRESS | feat-weinstein | — | WF-CV on sector-rotation testbed; top-1000 bankability gate; long-short verification (human session) |
 | [stage-accuracy](stage-accuracy.md) | IN_PROGRESS | feat-weinstein | — | force_exit_off grid REJECTED (#1503); cascade-selection inversion documented (#1509 merged); broad-universe WF-CV re-run data-gated |
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | Tier 1 fully checked off; T3-H low-priority; no active dispatch surface |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #1604 (LOCAL) | #1604 wire record_qc_audit_test into dune (LOCAL, iterating); T1 fully done; T3-H low-pri; no orchestrator dispatch surface |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | Phase 1 stable (PR-D'c #1332 merged); Phase 2 deferred; no outstanding work |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | no active backlog; next finding via weekly deep scan or Step 2e |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |

@@ -22,10 +22,18 @@ type scoring_weights = {
   w_positive_rs : int;
   w_bullish_rs_crossover : int;
   w_clean_resistance : int;
+  w_virgin_support : int option; [@sexp.default None]
   w_sector_strong : int;
   w_late_stage2_penalty : int;
 }
 [@@deriving sexp]
+
+(* Default Virgin-support weight. Ranked above [w_clean_resistance = 15] so the
+   most explosive short setup (no buyers waiting below) outscores a merely-clean
+   one — this is what spreads the short ranking (see [_virgin_support_weight]).
+   Named binding (rather than an inline [Some 20]) so the magic-number linter
+   accepts it as a config default and the rationale is documented at the value. *)
+let _default_virgin_support = 20
 
 let default_scoring_weights =
   {
@@ -36,6 +44,7 @@ let default_scoring_weights =
     w_positive_rs = 20;
     w_bullish_rs_crossover = 10;
     w_clean_resistance = 15;
+    w_virgin_support = Some _default_virgin_support;
     w_sector_strong = 10;
     w_late_stage2_penalty = -15;
   }
@@ -54,6 +63,18 @@ let default_grade_thresholds = { a_plus = 85; a = 70; b = 55; c = 40; d = 25 }
     [w_stage2_breakout / 2] coupling (bit-identical to pre-field behaviour). *)
 let _early_stage2_weight ~w =
   match w.w_early_stage2 with Some v -> v | None -> w.w_stage2_breakout / 2
+
+(** Virgin-support weight: explicit [w_virgin_support] when set, else falls back
+    to [w_clean_resistance] (the pre-field behaviour where Virgin and Clean both
+    scored [w_clean_resistance]). Virgin support below a breakdown is the most
+    explosive short setup — no prior buyers waiting below to cushion the fall —
+    so the default ([Some 20]) ranks it strictly above Clean
+    ([w_clean_resistance = 15]). This is what spreads otherwise-identical
+    Stage-4 / Strong-volume short candidates that previously all collapsed to
+    one score (see [Support] module doc: "Virgin_territory … Most explosive
+    downside potential"). *)
+let _virgin_support_weight ~w =
+  match w.w_virgin_support with Some v -> v | None -> w.w_clean_resistance
 
 (** Stage signal for long setups: Stage1→2 transition or early Stage2. *)
 let _stage_long_signal ~w ~(a : Stock_analysis.t) =
@@ -137,7 +158,7 @@ let _resistance_signal ~w ~(a : Stock_analysis.t) =
 let _support_signal ~w ~(a : Stock_analysis.t) =
   match a.support with
   | Some { quality = Virgin_territory; _ } ->
-      [ (w.w_clean_resistance, "Virgin support below") ]
+      [ (_virgin_support_weight ~w, "Virgin support below") ]
   | Some { quality = Clean; _ } ->
       [ (w.w_clean_resistance, "Clean support below") ]
   | Some { quality = Moderate_resistance; _ } ->

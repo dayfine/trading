@@ -862,12 +862,21 @@ let test_short_side_volume_adequate_label _ =
        ])
 
 (** Inject a [Support.result] directly onto an otherwise-identical candidate and
-    assert the screener's [_support_signal] picks it up as a clean-space- below
-    bonus. Pins the contract that mirrors [_resistance_signal] for the short
-    side: Virgin / Clean → [w_clean_resistance], Moderate → halved, Heavy / None
-    → 0. The candidate's other signals contribute a fixed baseline so the
-    support delta is the only thing varying across cases. Mirrors
-    {!test_negative_rs_scoring_order}'s injection-and-compare shape. *)
+    assert the screener's [_support_signal] picks it up as a clean-space-below
+    bonus. Pins the {b strict} short-side ordering Virgin > Clean > Moderate >
+    Heavy: Virgin → [w_virgin_support] (default 20), Clean →
+    [w_clean_resistance] (15), Moderate → halved (7), Heavy / None → 0. The
+    candidate's other signals contribute a fixed baseline so the support delta
+    is the only thing varying across cases. Mirrors
+    {!test_negative_rs_scoring_order}'s injection-and- compare shape.
+
+    This is the regression pin for the 2026-06-12 ranking-collapse defect: every
+    Stage-4 / Strong-volume short candidate scored an identical 50 because
+    Virgin and Clean support previously both weighted [w_clean_resistance], so
+    the most explosive setups (Virgin support below) could not rank above merely
+    clean ones. The fix differentiates them — Virgin now scores strictly above
+    Clean. See [Support] module doc ("Virgin_territory … Most explosive downside
+    potential"). *)
 let test_support_below_scoring_order _ =
   let bars = declining_bars_with_spike ~n:60 100.0 30.0 ~spike_idx:55 in
   let prior = Some (Stage3 { weeks_topping = 8 }) in
@@ -903,9 +912,89 @@ let test_support_below_scoring_order _ =
   let clean = by_ticker "CLEAN" in
   let mod_ = by_ticker "MOD" in
   let heavy = by_ticker "HEAVY" in
-  assert_that virgin.score (equal_to clean.score);
+  assert_that virgin.score (gt (module Int_ord) clean.score);
   assert_that clean.score (gt (module Int_ord) mod_.score);
   assert_that mod_.score (gt (module Int_ord) heavy.score)
+
+(** Reproduce the 2026-06-12 weekly-picks ranking collapse: with RS absent
+    ([rs = None], the freshly-built weekly-picks universe lacked the 52 aligned
+    weekly bars the RS MA needs), two Stage-4 short candidates that share the
+    same stage signal (Early Stage4) and the same Strong breakdown volume but
+    differ only on below-support cleanliness (Virgin vs Clean) previously both
+    scored an identical 50. After differentiating the Virgin-support weight, the
+    Virgin candidate ranks strictly above the Clean one — the ranking spreads
+    using a signal that already exists. This is the end-to-end (screen) pin of
+    the live defect, distinct from {!test_support_below_scoring_order} which
+    holds RS fixed (negative) — here RS is [None] exactly as in production. *)
+let test_short_ranking_spreads_with_rs_absent _ =
+  let bars = declining_bars_with_spike ~n:60 100.0 30.0 ~spike_idx:55 in
+  let prior = Some (Stage3 { weeks_topping = 8 }) in
+  let make ticker quality =
+    let base = make_analysis ticker prior bars in
+    let support : Support.result = { quality; breakdown_price = 50.0 } in
+    (* RS deliberately None — mirrors the live weekly-picks universe. *)
+    { base with rs = None; support = Some support }
+  in
+  let result =
+    screen ~config:cfg ~macro_trend:Bearish ~sector_map:(empty_sector_map ())
+      ~stocks:[ make "VIRGIN" Virgin_territory; make "CLEAN" Clean ]
+      ~held_tickers:[]
+  in
+  let by_ticker t =
+    List.find_exn result.short_candidates ~f:(fun c -> String.(c.ticker = t))
+  in
+  let virgin = (by_ticker "VIRGIN").score in
+  let clean = (by_ticker "CLEAN").score in
+  (* Both previously collapsed to the same score; now strictly ordered. The
+     screen sorts by score DESC, so the higher-scoring Virgin candidate must
+     also be ranked first. *)
+  assert_that
+    (virgin > clean, (List.hd_exn result.short_candidates).ticker)
+    (equal_to (true, "VIRGIN"))
+
+(** Exact-composition pin: the short cascade sums its per-signal weights into
+    the final score the same way the long cascade does (additive [_tally] over
+    stage
+    + volume + RS + support + sector signals). Inject a single candidate whose
+      every short signal is known and assert the exact integer score equals the
+      sum of the configured weights — Stage3→Stage4 breakdown
+      ([w_stage2_breakout = 30], the [prior_stage = Stage3] + declining bars
+      give the full transition, not the early-Stage4 half) + Strong breakdown
+      volume ([w_strong_volume = 20])
+    + RS negative & declining ([w_positive_rs = 20]) + Virgin support below
+      ([w_virgin_support = 20]) = 90. Guards against a regression where the
+      short path silently short-circuits to a default instead of composing the
+      weights. Mirrors {!test_short_side_volume_confirmation_strong}'s
+      composition pin (which fixed the same bars to score 85 with Clean
+      support); the only delta here is Virgin support (20) vs Clean (15). *)
+let test_short_score_composition_is_additive _ =
+  let bars = declining_bars_with_spike ~n:60 100.0 30.0 ~spike_idx:55 in
+  let prior = Some (Stage3 { weeks_topping = 8 }) in
+  let base = make_analysis "COMPOSE" prior bars in
+  let neg_rs : Rs.result =
+    {
+      current_rs = 0.8;
+      current_normalized = -10.0;
+      trend = Negative_declining;
+      history = [];
+    }
+  in
+  let support : Support.result =
+    { quality = Virgin_territory; breakdown_price = 50.0 }
+  in
+  let candidate = { base with rs = Some neg_rs; support = Some support } in
+  let result =
+    screen ~config:cfg ~macro_trend:Bearish ~sector_map:(empty_sector_map ())
+      ~stocks:[ candidate ] ~held_tickers:[]
+  in
+  let w = default_scoring_weights in
+  let expected =
+    w.w_stage2_breakout + w.w_strong_volume + w.w_positive_rs
+    + Option.value_exn w.w_virgin_support
+  in
+  assert_that result.short_candidates
+    (elements_are
+       [ field (fun (c : scored_candidate) -> c.score) (equal_to expected) ])
 
 (** Negative-RS scoring (already wired prior to this PR) is a positive signal
     for shorts: [Bearish_crossover] adds
@@ -1499,6 +1588,10 @@ let suite =
          >:: test_short_side_volume_adequate_label;
          "test_negative_rs_scoring_order" >:: test_negative_rs_scoring_order;
          "test_support_below_scoring_order" >:: test_support_below_scoring_order;
+         "test_short_ranking_spreads_with_rs_absent"
+         >:: test_short_ranking_spreads_with_rs_absent;
+         "test_short_score_composition_is_additive"
+         >:: test_short_score_composition_is_additive;
          "test_diagnostics_empty_universe" >:: test_diagnostics_empty_universe;
          "test_diagnostics_total_stocks_and_held"
          >:: test_diagnostics_total_stocks_and_held;
