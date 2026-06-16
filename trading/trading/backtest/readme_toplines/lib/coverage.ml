@@ -35,7 +35,9 @@ let bah_total_return_pct ~start_date ~end_date ~close_series =
   in
   match (entry, exit_) with
   | Some (entry_date, entry_close), Some (exit_date, exit_close)
-    when Date.( <= ) entry_date exit_date && Float.( > ) entry_close 0.0 ->
+    when Date.( < ) entry_date exit_date && Float.( > ) entry_close 0.0 ->
+      (* Require entry strictly before exit: a window spanning a single bar
+         (entry_date = exit_date) has zero holding span and is unpriceable. *)
       total_return_pct ~initial:entry_close ~final:exit_close
   | _ -> Float.nan
 

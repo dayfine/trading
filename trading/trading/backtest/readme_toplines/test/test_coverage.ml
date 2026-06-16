@@ -85,14 +85,25 @@ let test_bah_uses_first_and_last_in_window _ =
        ~end_date:(d "2002-01-01") ~close_series)
     (float_equal 100.0)
 
-let test_bah_unpriceable_window _ =
-  (* Only one bar in the window -> cannot price entry vs exit distinctly: still
-     entry=exit -> 0.0; but an empty window yields nan. *)
+(* Empty window: every bar is outside [start_date, end_date], so neither entry
+   nor exit can be selected -> nan. *)
+let test_bah_empty_window _ =
   assert_that
     (Float.is_nan
        (Coverage.bah_total_return_pct ~start_date:(d "2030-01-01")
           ~end_date:(d "2031-01-01")
           ~close_series:[ (d "1999-01-04", 20.0) ]))
+    (equal_to true)
+
+(* Single bar inside the window: entry and exit coincide (entry_date =
+   exit_date), so the holding span is zero and the window is unpriceable -> nan,
+   not a misleading 0.0. *)
+let test_bah_single_bar_window _ =
+  assert_that
+    (Float.is_nan
+       (Coverage.bah_total_return_pct ~start_date:(d "1999-01-01")
+          ~end_date:(d "1999-12-31")
+          ~close_series:[ (d "1999-06-15", 20.0) ]))
     (equal_to true)
 
 let test_inclusive_days _ =
@@ -107,6 +118,13 @@ let test_inclusive_days_span _ =
        ~end_date:(d "2020-01-31"))
     (equal_to 31)
 
+(* end_date strictly before start_date -> 0 (degenerate, non-negative span). *)
+let test_inclusive_days_end_before_start _ =
+  assert_that
+    (Coverage.inclusive_days ~start_date:(d "2020-01-31")
+       ~end_date:(d "2020-01-01"))
+    (equal_to 0)
+
 let suite =
   "coverage"
   >::: [
@@ -119,9 +137,12 @@ let suite =
          "total_return_nonpositive_base" >:: test_total_return_nonpositive_base;
          "bah_uses_first_and_last_in_window"
          >:: test_bah_uses_first_and_last_in_window;
-         "bah_unpriceable_window" >:: test_bah_unpriceable_window;
+         "bah_empty_window" >:: test_bah_empty_window;
+         "bah_single_bar_window" >:: test_bah_single_bar_window;
          "inclusive_days" >:: test_inclusive_days;
          "inclusive_days_span" >:: test_inclusive_days_span;
+         "inclusive_days_end_before_start"
+         >:: test_inclusive_days_end_before_start;
        ]
 
 let () = run_test_tt_main suite

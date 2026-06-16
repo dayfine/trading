@@ -47,8 +47,9 @@ val bah_total_return_pct :
       the last pair whose date is [<= end_date]. Result is
       [total_return_pct ~initial:entry ~final:exit].
     - Returns [Float.nan] when the window cannot be priced: fewer than two
-      usable closes span it (empty series, all dates outside the window, or only
-      one bar), or the entry close is [<= 0.0].
+      distinct bars span it (empty series, all dates outside the window, or a
+      single bar where entry and exit coincide — a zero-span, unpriceable
+      window), or the entry close is [<= 0.0].
     - [close_series] need not be sorted — entry/exit are selected by date
       comparison, not list position.
 
