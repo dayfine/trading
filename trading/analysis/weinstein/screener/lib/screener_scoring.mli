@@ -57,7 +57,27 @@ type scoring_weights = {
       (** Additional weight for RS crossing from negative to positive. Default:
           10. *)
   w_clean_resistance : int;
-      (** Weight for Virgin_territory or Clean overhead. Default: 15. *)
+      (** Weight for Virgin_territory or Clean overhead (long side), and for
+          Clean support below a breakdown (short side). Default: 15. *)
+  w_virgin_support : int option; [@sexp.default None]
+      (** Short-side weight for {b Virgin_territory support below} a breakdown —
+          no prior buyers waiting below to cushion the fall, the most explosive
+          short setup. [None] falls back to [w_clean_resistance] (the pre-field
+          behaviour where Virgin and Clean support scored identically and so
+          could not differentiate otherwise-identical Stage-4 short candidates).
+          The default [Some 20] ranks Virgin support strictly above Clean (15),
+          which is what spreads the short-candidate ranking — the
+          {!Screener._support_signal} flattening that collapsed every Stage-4 /
+          Strong-volume short to one score (e.g. the 2026-06-12 weekly picks,
+          all score 50). Affects {b only} the short path; [_resistance_signal]
+          (long side) is unchanged.
+
+          {b Why [@sexp.default None] and not [@sexp.option]:} same reason as
+          [w_early_stage2] — [Overlay_validator] derives valid override
+          key-paths from the serialized base config, so a [None]-omitted field
+          cannot be an axis. [@sexp.default None] keeps the field present in the
+          serialized form (axis resolves) while parsing a missing field to
+          [None] (older config sexps round-trip). *)
   w_sector_strong : int;  (** Weight bonus for a Strong sector. Default: 10. *)
   w_late_stage2_penalty : int;
       (** Negative weight for late Stage2 flag. Default: -15. *)
@@ -65,7 +85,7 @@ type scoring_weights = {
 [@@deriving sexp]
 (** Scoring weights for each positive signal. All are configurable.
 
-    {b Field-name spellings for sweep overlays.} The nine fields above are the
+    {b Field-name spellings for sweep overlays.} The ten fields above are the
     {e exact} keys that any sweep overlay or config patch must use to mutate
     these weights:
     - [w_stage2_breakout]
@@ -75,6 +95,7 @@ type scoring_weights = {
     - [w_positive_rs]
     - [w_bullish_rs_crossover]
     - [w_clean_resistance]
+    - [w_virgin_support]
     - [w_sector_strong]
     - [w_late_stage2_penalty]
 
