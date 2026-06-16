@@ -19,6 +19,32 @@ moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
 
+## 2026-06-16 — README top-line results module + bin
+
+- [x] **`readme_toplines` lib + bin** — computes four headline numbers over one
+  pinned full-history period and writes them into a comment-delimited block in
+  the repo-root `README.md`, idempotently regenerable. Lives at
+  `trading/trading/backtest/readme_toplines/{lib,bin,test}/`. Pure pieces
+  (`Coverage` period-intersection + return math; `Readme_block` marker upsert)
+  are unit-tested; the two backtest figures run `Backtest.Runner.run_backtest`
+  (CSV mode) on the SPY-only and sector-rotation reference strategies.
+  - **Pinned period** (from actual CSV coverage): **1998-12-22 → 2026-06-12**,
+    bound by the nine original (Dec-1998) SPDR sector ETFs; XLRE (2015) / XLC
+    (2018) are excluded from the period-defining set but still join the sector
+    universe mid-run via `Daily_price.active_through`.
+  - **Numbers (this data snapshot):** SPY buy-and-hold +888.9% (+8.7%/yr,
+    div-adj); BRK-B +1132.4% (+9.6%/yr, div-adj); SPY-only Weinstein +408.0%
+    (+6.1%/yr); Sector-ETF Weinstein (k=3, 30wk MA) +528.9% (+6.9%/yr). Both
+    Weinstein figures under-return buy-and-hold over this bull-heavy window —
+    consistent with the let-winners-run / dodge-drawdown tradeoff
+    (`project_edge_is_the_fat_tail`). These are reporting artefacts, not a
+    strategy change; no `Weinstein_strategy` edits, no default flips.
+  - **Verify / regenerate:** `dune exec
+    backtest/readme_toplines/bin/readme_toplines.exe -- --readme README.md`
+    (dune root `trading/trading`, run in the dev container). `--check` is a
+    CI-friendly drift check (non-zero exit when the block is stale).
+  - Plan: `dev/plans/readme-toplines-2026-06-16.md`.
+
 ## 2026-06-13 — `suppress_warmup_trading` default flipped false→true (measurement-correctness BUGFIX)
 
 - [x] **Flipped the default `false→true` per USER DIRECTIVE (2026-06-13:
