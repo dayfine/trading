@@ -1,11 +1,66 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-06-15
+## Last updated: 2026-06-16
 
 ## Status
 IN_PROGRESS
 
-## 2026-06-15 PM — GHA-queued: differentiate short-side ranking `[non-blocking]`
+## 2026-06-16 — short-side ranking differentiation SHIPPED (PR #1612)
+
+Resolved the GHA-queued ranking-collapse defect below. **Root cause** of the
+2026-06-12 uniform score-50: the displayed `50.00` is the raw composed integer
+score (`Float.of_int c.score` in `weekly_snapshot_generator.ml`), not a
+normalized midpoint — the composition path *was* applying weights. The collapse
+came from two factors acting together:
+
+1. **RS contributed nothing.** `analysis.rs` was `None` for all 5 candidates —
+   the freshly built weekly-picks universe lacked the ≥52 aligned weekly bars
+   the RS 52-week MA needs (`Rs.analyze` returns `None` below `rs_ma_period`).
+   `_rs_short_signal None = []`. They still pass `rs_blocks_short` (None is not
+   blocked), so they entered scoring with zero RS weight.
+2. **Virgin and Clean support were flattened.** `_support_signal` weighted
+   `Virgin_territory` and `Clean` support **identically** at `w_clean_resistance`
+   (15). So every candidate sharing Early-Stage4 (15) + Strong breakdown volume
+   (20) + any-clean support (15) composed to exactly **50**, regardless of
+   whether its below-support was Virgin (most explosive) or merely Clean.
+
+The short cascade differentiates fine when RS is present (e2e COVID test pins
+JPM 72 / KO 55 / CVX 52). The visible flattening the live data exposed is the
+Virgin==Clean collapse.
+
+**Fix (PR #1612, branch `feat/short-side-ranking-diff`):** added
+`w_virgin_support : int option [@sexp.default None]` to `scoring_weights`
+(default `Some 20`), used only in `_support_signal` for `Virgin_territory`,
+falling back to `w_clean_resistance` when `None`. Virgin support now ranks
+strictly above Clean — matching the `Support` module's documented ordering
+("Virgin_territory … Most explosive downside potential"). Spreads the live
+ranking: ADMA/ADT/AHCO (Virgin → 70) now outrank ABG/ABR (Clean → 65) instead
+of all tying at 50.
+
+- **Short path only** — `_resistance_signal` (long side) untouched; no long /
+  Cell-E golden re-pinned. Full `dune build && dune runtest` (incl. the cached
+  7-stock bear-window scenarios that emit shorts, and the magic-number linter)
+  exits 0 unchanged.
+- **Backward-compat / axis-able:** `None` falls back to `w_clean_resistance`, so
+  omitting-field configs round-trip bit-identically; `[@sexp.default None]`
+  keeps the field present in the serialized form so it stays a `Variant_matrix`
+  axis (same pattern as `w_early_stage2`). Spine untouched (Stage-4-only shorts,
+  Ch.11 RS hard gate unchanged).
+- **Tests:** `test_support_below_scoring_order` flattening pin flipped from
+  `virgin == clean` to `virgin > clean`;
+  `test_short_ranking_spreads_with_rs_absent` (end-to-end `screen` repro of the
+  live defect with `rs = None`, Virgin ranks first);
+  `test_short_score_composition_is_additive` (exact composed score 90 pins the
+  short cascade sums weights additively like the long cascade). 62/62 screener
+  unit tests pass.
+- **Note on snapshot-gen fixtures:** a synthetic-bar short fixture was attempted
+  but a pure linear `Declining` series does not trigger the screener's Stage-3→4
+  breakdown detection (long-standing limitation, see Follow-up #1) — it produced
+  zero short candidates. The differentiation is instead pinned deterministically
+  at the screener-`screen` seam (the exact path the generator calls), which is
+  more robust than brittle synthetic short bars.
+
+## 2026-06-15 PM — GHA-queued: differentiate short-side ranking `[non-blocking]` (ADDRESSED, see above)
 
 **Owner: feat-weinstein. GHA-dispatchable (fixture-testable, no PIT warehouse
 needed). `[non-blocking]`** — queued while the maintainer session is locked on a
