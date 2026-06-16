@@ -4,6 +4,42 @@
 
 ---
 
+## PROGRESS — P0 format-v2 underway (2026-06-16 PM3)
+
+**S0 + S1 are DONE.** The snapshot-format-v2 columnar-mmap project has started.
+
+- **S0 (de-risk spike) — PASS.** Confirmed the substrate on this exact
+  container/toolchain (throwaway spike, not committed):
+  - `Core_unix.map_file fd ~pos:(Int64.of_int byte) kind c_layout ~shared:false
+    [| n |]` then `Bigarray.array1_of_genarray` gives a **zero-copy** view —
+    **and `pos` does NOT need to be page-aligned** (offsets 32096 / 256096 mapped
+    fine). This removes the alignment worry; columns can sit back-to-back.
+  - float64 round-trips **bit-identical including `Float.nan`** (via
+    `Int64.bits_of_float`); `Array1.sub` over a binary-searched `int32` date
+    index is correct.
+- **S1 (the v2 format module) — MERGED as PR #1624** (`b4c20fae`). New module
+  **`Snapshot_columnar`** (`.ml`/`.mli`) + sibling **`Snapshot_columnar_codec`**
+  (byte/mmap primitives) in `trading/trading/data_panel/snapshot/lib/`,
+  **alongside** the unmodified v1 `Snapshot_format`. Layout: `magic "SNAPCOL1"` |
+  header (`format_version`,`n_rows`,`n_fields`,`schema_hash`,`symbol`) | sorted
+  `int32` epoch-days (1970 epoch) | one dense `float64[n]` column per schema
+  field. API: `write` (single-symbol+single-schema validated, sorts by date) ·
+  `open_reader`/`close`/`with_reader` · `read_all` · `read_range ~from ~until`
+  (inclusive; empty/inverted → `Ok []`) · `read_with_expected_schema`
+  (schema-hash gate). 13 tests pin every contract incl. nan bit-identity, bad
+  magic, range boundaries. 3 gates green (CI + structural + behavioral score 5).
+
+**NEXT = S2** — `Daily_panels` range/column-aware cache
+(`analysis/weinstein/snapshot_runtime/lib/daily_panels.ml`): replace the
+whole-file `_load_symbol_file` decode with mmap handles that slice the mapped
+columns over `[from,until]` ∩ fields via `Snapshot_columnar`. This is where the
+~2.95 GB → ~130 MB working-set drop happens. Then **S3** (writers
+`build_snapshots` / `build_scenario_snapshots` emit v2), **S4** (regenerate
+warehouses + **goldens bit-identical = the gate**), **S5** (tighten over-reads).
+Plan detail: `dev/plans/snapshot-format-research-2026-06-16.md` §S2-S5.
+
+---
+
 ## P0 — Snapshot format v2 (columnar mmap): the durable fix that unblocks top-3000
 
 **This is the headline project for a fresh session.** Plan + research:
