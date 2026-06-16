@@ -284,6 +284,9 @@ let run config =
       ~universe:(_universe_of_override sector_map_override)
       ~starts
   in
+  (* Free factor-precompute panels to the OS before forking: a Fork_pool child
+     COW-inherits parent RSS → a bloated parent OOMs at the fork (PR #1614). *)
+  Gc.compact ();
   (* One job per start. Each job is a self-contained backtest of marshallable
      inputs/outputs (a per_start record of floats + a Date), so it forks
      cleanly. *)
