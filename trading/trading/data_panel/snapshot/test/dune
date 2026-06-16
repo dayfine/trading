@@ -1,5 +1,9 @@
 (tests
- (names test_snapshot_schema test_snapshot test_snapshot_format)
+ (names
+  test_snapshot_schema
+  test_snapshot
+  test_snapshot_format
+  test_snapshot_columnar)
  (libraries
   core
   core_unix
