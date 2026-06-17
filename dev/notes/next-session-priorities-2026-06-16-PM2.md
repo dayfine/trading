@@ -6,8 +6,13 @@
 
 ## PROGRESS — P0 format-v2 underway (2026-06-16 PM3)
 
-**S0 + S1 + S2 are DONE.** The snapshot-format-v2 columnar-mmap project is past
-the hard part (the runtime cache). **NEXT = S3** (writers emit v2).
+**S0 + S1 + S2 + S3 are DONE.** The snapshot-format-v2 columnar-mmap project is
+past the runtime cache AND the writer flip. **NEXT = S4** (regenerate warehouses
++ goldens-bit-identical gate — the payoff step). S4 is a deliberate stop point
+for a fresh session: it's a ~30-40 min stateful warehouse rebuild whose
+acceptance gate is "goldens bit-identical", and the container showed memory
+pressure this session — better run carefully fresh than deep in a long session
+(`feedback_stop_continue_criteria`).
 
 - **S0 (de-risk spike) — PASS.** Confirmed the substrate on this exact
   container/toolchain (throwaway spike, not committed):
@@ -42,15 +47,32 @@ the hard part (the runtime cache). **NEXT = S3** (writers emit v2).
   on value fidelity. 3 gates green (CI + structural + behavioral score 5). **The
   ~2.95 GB → ~130 MB working-set drop is realized once warehouses are v2 (S4).**
 
-**NEXT = S3** — make the writers emit v2: `build_snapshots.exe` /
-`build_scenario_snapshots.exe` call `Snapshot_columnar.write` instead of
-`Snapshot_format.write`. Then **S4** (regenerate the local warehouses
-`snap_top3000_2000` etc. ~30-40 min + **goldens bit-identical = the gate**;
-this is where the format-detection flips everything to the mmap path and the
-memory drop lands), **S5** (tighten over-reads / read precomputed scalars).
-A later cleanup PR removes the v1 `Snapshot_format` + the `Decoded` fallback
-once all warehouses are v2. Plan detail:
-`dev/plans/snapshot-format-research-2026-06-16.md` §S3-S5.
+- **S3 (writers emit v2) — MERGED as PR #1629** (`424348733`). `Build_runner`
+  (the path `build_snapshots.exe` + `build_scenario_snapshots.exe` both use) now
+  calls `Snapshot_columnar.write`. New `Snapshot_io` module
+  (`data_panel/snapshot/lib`) = format-detecting whole-file reader
+  (`is_columnar_file` + `read_with_expected_schema`); `snapshot_verifier` now
+  reads through it so post-build verify handles v1+v2. `bar_reader`'s
+  `of_in_memory_bars` writer intentionally LEFT v1 (in-memory synthetic
+  warehouses for tests/backtests; `Daily_panels` reads v1 fine) — a noted
+  follow-on. 9 tests; writer-flip-changed-only-encoding pinned end-to-end. 3
+  gates green (CI + structural + behavioral 5).
+
+**NEXT = S4 (the payoff, and a deliberate fresh-session stop point)** —
+regenerate the local warehouses (`snap_top3000_2000` etc., ~30-40 min via
+`build_*_snapshots`), then run the SP500-5y + custom-universe **goldens — MUST
+be bit-identical** to pre-change (ANY drift = a v2 encode/slice bug; fix before
+proceeding). This is where the format-detection flips every warehouse to the
+mmap path and the **~2.95 GB → ~130 MB working-set drop actually lands**, and
+where the top-3000 26y matrix should be re-tried at `cache≤1024` to prove the
+ceiling is gone. Then **S5** (tighten over-reads / read precomputed scalars),
+then a cleanup PR removing v1 `Snapshot_format` + the `Decoded` fallback once all
+warehouses are v2. Plan detail:
+`dev/plans/snapshot-format-research-2026-06-16.md` §S4-S5.
+
+**Fast alternative still available** (independent of S4): bump Docker RAM to
+12-16 GB → rerun the top-3000 2000-26 matrix at `cache=4096` for a top-3000 lens
+before the regen lands.
 
 ---
 
