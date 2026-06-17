@@ -6,7 +6,8 @@
 
 ## PROGRESS — P0 format-v2 underway (2026-06-16 PM3)
 
-**S0 + S1 are DONE.** The snapshot-format-v2 columnar-mmap project has started.
+**S0 + S1 + S2 are DONE.** The snapshot-format-v2 columnar-mmap project is past
+the hard part (the runtime cache). **NEXT = S3** (writers emit v2).
 
 - **S0 (de-risk spike) — PASS.** Confirmed the substrate on this exact
   container/toolchain (throwaway spike, not committed):
@@ -29,14 +30,27 @@
   (schema-hash gate). 13 tests pin every contract incl. nan bit-identity, bad
   magic, range boundaries. 3 gates green (CI + structural + behavioral score 5).
 
-**NEXT = S2** — `Daily_panels` range/column-aware cache
-(`analysis/weinstein/snapshot_runtime/lib/daily_panels.ml`): replace the
-whole-file `_load_symbol_file` decode with mmap handles that slice the mapped
-columns over `[from,until]` ∩ fields via `Snapshot_columnar`. This is where the
-~2.95 GB → ~130 MB working-set drop happens. Then **S3** (writers
-`build_snapshots` / `build_scenario_snapshots` emit v2), **S4** (regenerate
-warehouses + **goldens bit-identical = the gate**), **S5** (tighten over-reads).
-Plan detail: `dev/plans/snapshot-format-research-2026-06-16.md` §S2-S5.
+- **S2 (Daily_panels mmap cache) — MERGED as PR #1626** (`85635d3f`).
+  `Daily_panels` is now **format-detecting**: v2 files (magic "SNAPCOL1") → mmap
+  path via `Snapshot_columnar.read_range` (slice the mapped columns, no whole-file
+  decode); v1 sexp files → the existing decode fallback (so the current v1
+  warehouses + all goldens stay green until S4 regen). Eviction = byte budget +
+  open-mmap-handle cap (closes fds on evict; `close` releases all). New module
+  `Daily_panels_backing` (extracted to keep files ≤300). `Snapshot_columnar`
+  refined to map columns once at `open_reader` + `schema_hash`/`symbol`/`n_rows`
+  accessors. 24 daily_panels + 15 columnar tests; v2≡v1 behavioral parity pinned
+  on value fidelity. 3 gates green (CI + structural + behavioral score 5). **The
+  ~2.95 GB → ~130 MB working-set drop is realized once warehouses are v2 (S4).**
+
+**NEXT = S3** — make the writers emit v2: `build_snapshots.exe` /
+`build_scenario_snapshots.exe` call `Snapshot_columnar.write` instead of
+`Snapshot_format.write`. Then **S4** (regenerate the local warehouses
+`snap_top3000_2000` etc. ~30-40 min + **goldens bit-identical = the gate**;
+this is where the format-detection flips everything to the mmap path and the
+memory drop lands), **S5** (tighten over-reads / read precomputed scalars).
+A later cleanup PR removes the v1 `Snapshot_format` + the `Decoded` fallback
+once all warehouses are v2. Plan detail:
+`dev/plans/snapshot-format-research-2026-06-16.md` §S3-S5.
 
 ---
 
