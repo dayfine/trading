@@ -308,6 +308,42 @@ let test_date_round_trips_through_epoch_days _ =
     (_write_then_read path rows)
     (is_ok_and_holds (field _dates_of_rows (equal_to (_dates_of_rows sorted))))
 
+(* ----- column-offset math: every (row, col) cell read back exactly ----- *)
+
+(* Guards the [cols_off + (col * n_rows + i) * float64_bytes] offset arithmetic
+   in the single-mmap reader: an off-by-one in the [col * n_rows] stride would
+   read a neighbouring column's cell. We write rows whose cell at (row [i],
+   field [c]) is the distinct value [i * 1000 + c], [read_all], and assert each
+   cell equals exactly that. Crosses many columns and rows so a transposed or
+   shifted stride is caught. *)
+let test_read_all_reads_every_column_at_correct_offset _ =
+  let path = _tmp_path () in
+  let n_fields = Snapshot_schema.n_fields Snapshot_schema.default in
+  let n_rows = 30 in
+  let make_row i =
+    let date = Date.add_days (Date.of_string "2024-01-01") i in
+    let values =
+      Array.init n_fields ~f:(fun c -> Float.of_int ((i * 1000) + c))
+    in
+    match
+      Snapshot.create ~schema:Snapshot_schema.default ~symbol:"AAPL" ~date
+        ~values
+    with
+    | Ok s -> s
+    | Error err -> failwith (Status.show err)
+  in
+  let rows = List.init n_rows ~f:make_row in
+  (* Expected bit pattern, row by row — the writer sorts by date, but the seeds
+     are already ascending so the order is preserved. *)
+  let expected_bits =
+    List.init n_rows ~f:(fun i ->
+        List.init n_fields ~f:(fun c ->
+            Int64.bits_of_float (Float.of_int ((i * 1000) + c))))
+  in
+  assert_that
+    (_write_then_read path rows)
+    (is_ok_and_holds (field _bits_of_rows (equal_to expected_bits)))
+
 let suite =
   "Snapshot_columnar tests"
   >::: [
@@ -329,6 +365,8 @@ let suite =
          "header accessors" >:: test_header_accessors;
          "date round trips through epoch days"
          >:: test_date_round_trips_through_epoch_days;
+         "read_all reads every column at correct offset"
+         >:: test_read_all_reads_every_column_at_correct_offset;
        ]
 
 let () = run_test_tt_main suite

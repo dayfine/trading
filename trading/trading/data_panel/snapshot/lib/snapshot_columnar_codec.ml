@@ -66,30 +66,18 @@ module Header = struct
     { format_version; n_rows; n_fields; schema_hash; symbol }
 end
 
-type dates_arr =
-  (int32, Bigarray.int32_elt, Bigarray.c_layout) Bigarray.Array1.t
+let get_date (bs : Bigstring.t) ~dates_off ~i : int =
+  Int32.to_int_exn
+    (Bigstring.get_int32_t_le bs ~pos:(dates_off + (i * int32_bytes)))
 
-type col_arr =
-  (float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Array1.t
+let get_cell (bs : Bigstring.t) ~cols_off ~n_rows ~col ~i : float =
+  let pos = cols_off + (((col * n_rows) + i) * float64_bytes) in
+  Int64.float_of_bits (Bigstring.get_int64_t_le bs ~pos)
 
-let map_col fd ~byte_pos ~n_rows : col_arr =
-  let g =
-    Core_unix.map_file fd ~pos:(Int64.of_int byte_pos) Bigarray.float64
-      Bigarray.c_layout ~shared:false [| n_rows |]
-  in
-  Bigarray.array1_of_genarray g
-
-let map_dates fd ~byte_pos ~n_rows : dates_arr =
-  let g =
-    Core_unix.map_file fd ~pos:(Int64.of_int byte_pos) Bigarray.int32
-      Bigarray.c_layout ~shared:false [| n_rows |]
-  in
-  Bigarray.array1_of_genarray g
-
-let lower_bound (dates : dates_arr) ~n ~target =
+let lower_bound (bs : Bigstring.t) ~dates_off ~n ~target =
   let lo = ref 0 and hi = ref n in
   while !lo < !hi do
     let mid = (!lo + !hi) / 2 in
-    if Int32.to_int_exn dates.{mid} < target then lo := mid + 1 else hi := mid
+    if get_date bs ~dates_off ~i:mid < target then lo := mid + 1 else hi := mid
   done;
   !lo

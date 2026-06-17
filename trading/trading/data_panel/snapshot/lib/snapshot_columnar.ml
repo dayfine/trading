@@ -109,44 +109,37 @@ type reader = {
   mutable fd : Core_unix.File_descr.t option;
   header : Header.t;
   schema : Snapshot_schema.t;
-  dates : C.dates_arr;
-  (* All [n_fields] float64 column blocks, mapped once at [open_reader] as
-     zero-copy views. [read_range] / [read_all] slice these rather than
-     re-mapping per call (which, under a high read rate, would create
-     unbounded transient mappings). The OCaml-heap cost is one bigarray
-     descriptor per column; the cells live in the OS page cache and only page
-     in on access, so untouched columns never fault. Dropping the reader (via
-     [close] then GC) unmaps them. *)
-  mutable cols : C.col_arr array;
+  (* The whole file mapped as ONE [Bigstring] (one VMA). [read_range] /
+     [read_all] read cells out by computed byte offset rather than holding ~14
+     per-column [Bigarray] views; cells page in on access, so untouched columns
+     never fault. One VMA per reader keeps the count bounded under a high handle
+     cap — the per-column scheme exhausted the Rosetta x86-64 translator's
+     mapping bookkeeping in forked children. [close] then GC unmaps the file. *)
+  mutable map : Core.Bigstring.t option;
+  dates_off : int;
+  cols_off : int;
 }
 
-(* Reads exactly [len] bytes from [fd]; [Error Internal what] on a short read. *)
-let _read_exact fd ~len ~what : Bytes.t Status.status_or =
-  let buf = Stdlib.Bytes.create len in
-  let n = Core_unix.read fd ~buf ~pos:0 ~len in
-  if n < len then
-    Status.error_internal (Printf.sprintf "Snapshot_columnar: %s" what)
-  else Ok buf
-
-let _check_magic prefix =
-  if String.equal (Stdlib.Bytes.sub_string prefix 0 C.magic_len) C.magic then
-    Ok ()
+let _check_magic bs =
+  if String.equal (Bigstring.To_string.sub bs ~pos:0 ~len:C.magic_len) C.magic
+  then Ok ()
   else Status.error_internal "Snapshot_columnar: bad magic / not a v2 file"
 
-(* Reads the [magic] + [header_len] prefix and the header block, returning the
-   decoded [Header.t] and the byte offset where the date block begins. *)
-let _read_header fd : (Header.t * int) Status.status_or =
-  let open Result.Let_syntax in
-  let prefix_len = C.magic_len + C.int32_bytes in
-  let%bind prefix =
-    _read_exact fd ~len:prefix_len ~what:"file too short for header"
-  in
-  let%bind () = _check_magic prefix in
+(* Decodes the header block out of the whole-file mapping [bs], returning the
+   [Header.t] and the byte offset where the date block begins. The leading
+   [magic] is validated by {!_check_magic} before this is called. *)
+let _decode_header bs : (Header.t * int) Status.status_or =
   let header_len =
-    Int32.to_int_exn (Stdlib.Bytes.get_int32_le prefix C.magic_len)
+    Int32.to_int_exn (Bigstring.get_int32_t_le bs ~pos:C.magic_len)
   in
-  let%bind hbuf = _read_exact fd ~len:header_len ~what:"truncated header" in
-  Ok (Header.of_bytes hbuf, prefix_len + header_len)
+  let hbuf =
+    Bigstring.To_string.sub bs
+      ~pos:(C.magic_len + C.int32_bytes)
+      ~len:header_len
+    |> Bytes.of_string
+  in
+  let header = Header.of_bytes hbuf in
+  Ok (header, C.magic_len + C.int32_bytes + header_len)
 
 let _check_version (header : Header.t) =
   if header.format_version <> C.format_version then
@@ -155,33 +148,42 @@ let _check_version (header : Header.t) =
          header.format_version)
   else Ok ()
 
-(* Maps all [n_fields] column blocks as zero-copy views, once at open time. *)
-let _map_all_cols fd ~cols_byte_pos ~n ~n_fields : C.col_arr array =
-  Array.init n_fields ~f:(fun c ->
-      C.map_col fd
-        ~byte_pos:(cols_byte_pos + (c * n * C.float64_bytes))
-        ~n_rows:n)
+(* Maps the whole file as one [Bigstring], or [Error Internal] if it is too
+   short to even hold the magic + length prefix (so we never [map_file] a
+   0-byte / truncated file). *)
+let _map_whole_file fd : Core.Bigstring.t Status.status_or =
+  let size = (Core_unix.fstat fd).st_size |> Int64.to_int_exn in
+  if size < C.magic_len + C.int32_bytes then
+    Status.error_internal "Snapshot_columnar: bad magic / file too short"
+  else Ok (Bigstring_unix.map_file ~shared:false fd size)
 
-let _build_reader fd (header : Header.t) ~dates_byte_pos : reader =
+let _build_reader fd (bs : Core.Bigstring.t) (header : Header.t) ~dates_off :
+    reader =
   let n = header.n_rows in
-  let dates = C.map_dates fd ~byte_pos:dates_byte_pos ~n_rows:n in
-  let cols_byte_pos = dates_byte_pos + (n * C.int32_bytes) in
-  let cols = _map_all_cols fd ~cols_byte_pos ~n ~n_fields:header.n_fields in
+  let cols_off = dates_off + (n * C.int32_bytes) in
   (* The header stores only [schema_hash] + [n_fields], not the ordered field
-     list, so row reconstruction uses the canonical [Snapshot_schema.default].
-     [read_all] / [read_range] gate on [header.schema_hash = default.hash]
-     before reconstructing, so a file under any other field order fails loudly
-     rather than reconstructing rows under the wrong schema. *)
-  { fd = Some fd; header; schema = Snapshot_schema.default; dates; cols }
+     list, so reconstruction uses the canonical [Snapshot_schema.default];
+     [read_all] / [read_range] gate on [schema_hash = default.hash] first
+     (see [_check_reconstructable]), so a foreign field order fails loudly. *)
+  {
+    fd = Some fd;
+    header;
+    schema = Snapshot_schema.default;
+    map = Some bs;
+    dates_off;
+    cols_off;
+  }
 
 let open_reader ~path =
   let open Result.Let_syntax in
   try
     let fd = Core_unix.openfile path ~mode:[ Core_unix.O_RDONLY ] in
     match
-      let%bind header, dates_byte_pos = _read_header fd in
+      let%bind bs = _map_whole_file fd in
+      let%bind () = _check_magic bs in
+      let%bind header, dates_off = _decode_header bs in
       let%bind () = _check_version header in
-      Ok (_build_reader fd header ~dates_byte_pos)
+      Ok (_build_reader fd bs header ~dates_off)
     with
     | Ok r -> Ok r
     | Error _ as e ->
@@ -196,9 +198,9 @@ let close r =
   | None -> ()
   | Some fd -> (
       r.fd <- None;
-      (* Drop the mapped column views so the GC can unmap them; the empty array
-         keeps the field well-typed without holding any mapping. *)
-      r.cols <- [||];
+      (* Drop the whole-file mapping so the GC can unmap it; [None] keeps the
+         field well-typed without holding any mapping. *)
+      r.map <- None;
       try Core_unix.close fd with _ -> ())
 
 let with_reader ~path ~f =
@@ -226,21 +228,30 @@ let _check_reconstructable (r : reader) =
           %s; cannot reconstruct rows"
          r.header.schema_hash Snapshot_schema.default.schema_hash)
 
-(* Reconstructs the single row at index [i] from the held mapped columns. *)
-let _row_at (r : reader) ~n_fields i =
-  let date = C.epoch_days_to_date (Int32.to_int_exn r.dates.{i}) in
-  let values = Array.init n_fields ~f:(fun c -> r.cols.(c).{i}) in
+(* Reconstructs the single row at index [i] by reading each cell out of the
+   whole-file mapping [bs] at its computed byte offset. *)
+let _row_at (r : reader) bs ~n_fields ~n_rows i =
+  let date = C.epoch_days_to_date (C.get_date bs ~dates_off:r.dates_off ~i) in
+  let values =
+    Array.init n_fields ~f:(fun col ->
+        C.get_cell bs ~cols_off:r.cols_off ~n_rows ~col ~i)
+  in
   Snapshot.create ~schema:r.schema ~symbol:r.header.symbol ~date ~values
 
-(* Reconstructs the rows in [[lo, hi)] (0-based, half-open), chronological.
-   Slices the columns mapped once at [open_reader] — no per-call re-mapping. *)
-let _reconstruct_rows (r : reader) ~lo ~hi : Snapshot.t list Status.status_or =
-  match r.fd with
+(* The live whole-file mapping, or [Error Internal] if the reader is closed. *)
+let _live_map (r : reader) : Core.Bigstring.t Status.status_or =
+  match r.map with
+  | Some bs -> Ok bs
   | None -> Status.error_internal "Snapshot_columnar: reader is closed"
-  | Some _ ->
-      let n_fields = r.header.n_fields in
-      List.init (hi - lo) ~f:(fun k -> _row_at r ~n_fields (lo + k))
-      |> Result.all
+
+(* Reconstructs the rows in [[lo, hi)] (0-based, half-open), chronological.
+   Reads cells out of the single whole-file mapping — no per-call re-mapping. *)
+let _reconstruct_rows (r : reader) ~lo ~hi : Snapshot.t list Status.status_or =
+  let open Result.Let_syntax in
+  let%bind bs = _live_map r in
+  let n_fields = r.header.n_fields and n_rows = r.header.n_rows in
+  List.init (hi - lo) ~f:(fun k -> _row_at r bs ~n_fields ~n_rows (lo + k))
+  |> Result.all
 
 let read_all r =
   let open Result.Let_syntax in
@@ -252,14 +263,16 @@ let read_all r =
 let read_range r ~from ~until =
   let open Result.Let_syntax in
   let%bind () = _check_reconstructable r in
+  let%bind bs = _live_map r in
   let n = r.header.n_rows in
   let from_days = C.date_to_epoch_days from in
   let until_days = C.date_to_epoch_days until in
   if until_days < from_days then Ok []
   else
-    let lo = C.lower_bound r.dates ~n ~target:from_days in
+    let bound target = C.lower_bound bs ~dates_off:r.dates_off ~n ~target in
+    let lo = bound from_days in
     (* exclusive upper bound = lower_bound of (until + 1) *)
-    let hi = C.lower_bound r.dates ~n ~target:(until_days + 1) in
+    let hi = bound (until_days + 1) in
     if lo >= hi then Ok [] else _reconstruct_rows r ~lo ~hi
 
 (* ----- schema-gated whole-file read ------------------------------------- *)

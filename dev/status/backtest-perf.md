@@ -5,6 +5,42 @@
 ## Status
 IN_PROGRESS
 
+### Recent activity (2026-06-16) — Snapshot_columnar reader: ONE mmap per file (Rosetta VMA fix)
+
+Branch `feat/snapshot-single-mmap`. Fixes the Rosetta VMA-exhaustion crash in
+the forked top-3000 backtest (`rolling_start_eval` forks per start; the child's
+Rosetta translator exhausts its mapping bookkeeping — NOT the Linux
+`vm.max_map_count` — and SIGTRAPs).
+
+- **[x] Single mmap per `.snap` file.** The `Snapshot_columnar` reader used to
+  map each file as ~14 separate mmaps (1 int32 date column + 13 float64 value
+  columns, via `Core_unix.map_file` per column). With `Daily_panels`' 256-handle
+  cap that is ~3,840 VMAs. The reader now maps each file ONCE as a whole-file
+  `Bigstring` (one VMA) via `Bigstring_unix.map_file ~shared:false` and reads
+  cells by little-endian byte offset (`Bigstring.get_int32_t_le` /
+  `get_int64_t_le` + `Int64.float_of_bits`). On-disk FORMAT and the public
+  `Snapshot_columnar.mli` are UNCHANGED — existing v2 files (incl.
+  `/tmp/snap_top3000_2000_v2`) still read bit-identically.
+- **Codec change** (`snapshot_columnar_codec.{ml,mli}`): replaced the per-column
+  mmap machinery (`dates_arr`, `col_arr`, `map_col`, `map_dates`, `Array1`-based
+  `lower_bound`) with byte-offset accessors over one `Bigstring`: `get_date`,
+  `get_cell` (stride `col*n_rows + i`), `lower_bound`. Added
+  `core_unix.bigstring_unix` to the lib `dune`. Empty/tiny files guarded before
+  mapping (`< magic_len + int32_bytes` → `Error Internal`, never `map_file` a
+  0-byte file).
+- **Reader** (`snapshot_columnar.ml`): `reader` holds `mutable map :
+  Bigstring.t option` + `dates_off` / `cols_off`; `close` sets `map <- None`
+  (GC unmaps) idempotently. `read_all` / `read_range` keep identical semantics
+  (inclusive `[from,until]`, empty→`Ok []`, full-row reconstruction).
+- **`Daily_panels` / `Daily_panels_backing` need NO changes** (same reader API);
+  their 24 `test_daily_panels` tests pass.
+- **Tests:** the 15 existing `test_snapshot_columnar` tests pass unchanged
+  (bit-identity incl. nan, range/boundary, bad-magic, schema-skew, empty) + 1
+  new test (`read_all reads every column at correct offset`) pins the
+  `col*n_rows + i` cell-offset math across 30 rows × all schema fields.
+- **Verify:** `dune runtest trading/data_panel/snapshot analysis/weinstein/snapshot_runtime`
+  (16 columnar + 24 daily-panels + io/format suites, all green).
+
 ### Recent activity (2026-06-16) — snapshot-format v2 S3: writers emit v2 + format-detecting verifier
 
 Branch `feat/snapshot-writers-v2` (READY_FOR_REVIEW). Plan:
