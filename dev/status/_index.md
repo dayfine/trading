@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-17 (orchestrator run 27660930852 [run 1]: FULL PASS / NO-DISPATCH reconcile. Main GREEN on `fc81ca8a` (CI + perf-tier1 success; golden-sp500-5y in_progress = known long golden). 0 open PRs. Since run-3 the maintainer landed snapshot-format-v2 S1/S2 (#1624/#1626) + docs (#1620–#1627) LOCALLY — that project (NEXT=S3) is the active LOCAL P0 per `next-session-priorities-2026-06-16-PM2.md`; NOT GHA-dispatched (collision-avoidance + S4 goldens gate needs local warehouses). Every other track data/human-gated. ops-data skipped (no EODHD key in GHA; data-gaps unchanged since 2026-05-03); harness no dispatch surface; cleanup no backlog. Health CLEAN (status-integrity + index-size exit 0; CI authoritative-green). 0 merges, 0 subagents.)
+Last updated: 2026-06-17 (orchestrator run 27668955226 [run 2]: FULL PASS / NO-DISPATCH reconcile. Main GREEN on `e22b1613` (CI build-and-test + perf-tier1-smoke + both goldens success). 0 open PRs. Since run 1 the maintainer landed snapshot-format-v2 S3 (#1629) + #1631 single-mmap Rosetta fix + docs (#1630) LOCALLY — that project (NEXT=S4 warehouse regen, goldens-bit-identical gate) is the active LOCAL P0 per `next-session-priorities-2026-06-16-PM2.md`; NOT GHA-dispatched (collision-avoidance + S4 gate needs local warehouses). Every other track data/human-gated. ops-data skipped (no EODHD key in GHA; data-gaps unchanged since 2026-05-03); harness no dispatch surface; cleanup no backlog. Health CLEAN (status-integrity + index-size exit 0; CI authoritative-green). 0 merges, 0 subagents.)
 
 ## Active + complete tracks
 
@@ -16,7 +16,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | — | readme_toplines top-line numbers MERGED (#1617, 3-gate auto-merge); next: P2 matrix on composition-policy universe (data-gated) |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
-| [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | rolling-start v2 merged (#1536: jittered starts, edge-vs-SPY matrix, fork-per-start); next: run matrix on composition-policy universe |
+| [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | snapshot-format-v2 S1-S3 + #1631 single-mmap Rosetta fix landed (LOCAL P0); next: S4 warehouse regen (LOCAL) then top-3000 matrix on composition-policy universe (data-gated) |
 | [rolling-start-lens](rolling-start-lens.md) | IN_PROGRESS | feat-backtest | — | realized-edge (#1586) + 5b screener factor cols (#1607) MERGED; next: causal analysis (factors vs realized_edge) — data-gated on the LOCAL overnight matrix re-run |
 | [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | Win #4 production wiring MERGED (#1574, opt-in default-off); next: manual ghcr.io flambda rebuild + enable prune opt-in in sweeps |
 | [cost-model](cost-model.md) | MERGED | — | — | — |
