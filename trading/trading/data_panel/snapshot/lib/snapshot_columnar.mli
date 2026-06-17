@@ -48,8 +48,9 @@
 
 type reader
 (** An opaque open handle over a memory-mapped v2 file. Holds the open fd, the
-    decoded header, and the mapped (zero-copy) date index. Must be released with
-    {!close} (or use {!with_reader}). *)
+    decoded header, and a single whole-file [Bigstring] mapping (one
+    virtual-memory area) that cells are read out of by byte offset. Must be
+    released with {!close} (or use {!with_reader}). *)
 
 val write : path:string -> Snapshot.t list -> unit Status.status_or
 (** [write ~path rows] serializes [rows] to [path] in the v2 columnar layout,
@@ -114,11 +115,11 @@ val read_range :
 (** [read_range r ~from ~until] returns the rows whose date is in the inclusive
     range [[from, until]], ordered chronologically.
 
-    The date index is binary-searched and only the matching row range is mapped
-    ([Array1.sub]) — the prune is real. An empty range (including
-    [until < from], a window entirely before the first date, or entirely after
-    the last date) yields [Ok []], not an error — mirroring
-    {!Daily_panels.read_history}.
+    The date index is binary-searched and only the matching row range is
+    reconstructed (cells read by byte offset out of the whole-file mapping) —
+    the prune is real. An empty range (including [until < from], a window
+    entirely before the first date, or entirely after the last date) yields
+    [Ok []], not an error — mirroring {!Daily_panels.read_history}.
 
     For S1, reconstructs full rows over the matching range; field-column pruning
     is a later step. *)

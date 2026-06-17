@@ -2,12 +2,19 @@
     ({!Snapshot_columnar}).
 
     Holds the layout constants, the date-to-epoch-days layer, the file [Header]
-    block codec, and the [map_file] helpers producing zero-copy [Bigarray]
-    views.
+    block codec, and the little-endian {b byte-offset accessors} that read
+    individual cells out of a whole-file [Bigstring] mapping.
+
+    The reader maps each file as {b one} [Bigstring] (one virtual-memory area)
+    and slices cells out by computed byte offset — rather than mapping each
+    column as its own typed [Bigarray] view. Collapsing the ~14 per-column maps
+    to one whole-file map keeps the VMA count bounded under a high handle count
+    (the Rosetta x86-64 translator exhausts its mapping bookkeeping well before
+    the Linux [vm.max_map_count] limit).
 
     Split out of {!Snapshot_columnar} so the latter reads as the
     writer/reader/reconstruction logic and stays within the file-length limit;
-    this module is the mechanical byte/mmap layer it builds on. See the
+    this module is the mechanical byte layer it builds on. See the
     {!Snapshot_columnar} docstring for the full on-disk layout. *)
 
 val magic : string
@@ -55,24 +62,22 @@ module Header : sig
       so a well-formed file never trips this). *)
 end
 
-type dates_arr =
-  (int32, Bigarray.int32_elt, Bigarray.c_layout) Bigarray.Array1.t
-(** A zero-copy view over the on-disk sorted [int32] epoch-days date column. *)
+val get_date : Core.Bigstring.t -> dates_off:int -> i:int -> int
+(** [get_date bs ~dates_off ~i] is the [i]-th epoch-days date, read as an
+    [int32] LE at byte offset [dates_off + i * int32_bytes] into the whole-file
+    mapping [bs]. *)
 
-type col_arr =
-  (float, Bigarray.float64_elt, Bigarray.c_layout) Bigarray.Array1.t
-(** A zero-copy view over one on-disk [float64] value column. *)
+val get_cell :
+  Core.Bigstring.t -> cols_off:int -> n_rows:int -> col:int -> i:int -> float
+(** [get_cell bs ~cols_off ~n_rows ~col ~i] is the [float64] cell at row [i] of
+    column [col], read by IEEE-754 bits (so [Float.nan] round-trips) at byte
+    offset [cols_off + (col * n_rows + i) * float64_bytes] into the whole-file
+    mapping [bs]. The struct-of-arrays layout stores all [n_rows] cells of a
+    column contiguously, hence the [col * n_rows] stride. *)
 
-val map_col : Core_unix.File_descr.t -> byte_pos:int -> n_rows:int -> col_arr
-(** [map_col fd ~byte_pos ~n_rows] memory-maps the [float64] column block of
-    [n_rows] cells starting at [byte_pos] as a zero-copy {!col_arr}. *)
-
-val map_dates :
-  Core_unix.File_descr.t -> byte_pos:int -> n_rows:int -> dates_arr
-(** [map_dates fd ~byte_pos ~n_rows] memory-maps the [int32] date column of
-    [n_rows] cells at [byte_pos] as a zero-copy {!dates_arr}. *)
-
-val lower_bound : dates_arr -> n:int -> target:int -> int
-(** [lower_bound dates ~n ~target] is the first index [i] in [[0, n]] with
-    [dates.{i} >= target] — a standard lower-bound binary search over the sorted
-    date column. Used to prune a [read_range] to its matching row range. *)
+val lower_bound :
+  Core.Bigstring.t -> dates_off:int -> n:int -> target:int -> int
+(** [lower_bound bs ~dates_off ~n ~target] is the first index [i] in [[0, n]]
+    with [get_date bs ~dates_off ~i >= target] — a standard lower-bound binary
+    search over the sorted date column at [dates_off]. Used to prune a
+    [read_range] to its matching row range. *)
