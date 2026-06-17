@@ -1,10 +1,13 @@
 (** Round-trip verification for a snapshot directory built by Phase B.
 
     Walks every entry in a {!Snapshot_manifest.t}, opens the file via
-    {!Snapshot_format.read} (which already runs payload-md5 + schema-hash +
-    row-count integrity checks), and accumulates pass/fail counts. The
-    file-format layer is the source of truth for byte-level integrity; this
-    verifier adds the directory-level sweep + summary.
+    {!Snapshot_io.read_with_expected_schema} (which format-detects v1 sexp
+    {!Snapshot_format} vs v2 columnar {!Snapshot_columnar} and runs the matching
+    layer's md5 / schema-hash / row-count integrity checks), and accumulates
+    pass/fail counts. The file-format layer is the source of truth for
+    byte-level integrity; this verifier adds the directory-level sweep +
+    summary. Because detection is per-file, a warehouse mid-migration that mixes
+    both formats verifies correctly.
 
     The verifier does {b not} re-derive indicator values from the source CSV.
     Phase B's parity guarantee (plan §R2) is structural: the pipeline calls the
@@ -22,7 +25,7 @@ type file_result = {
   path : string;  (** Filesystem path that was checked. *)
   status : (int, Status.t) Result.t;
       (** [Ok n] when the file round-trips and produced [n] rows. [Error err]
-          when {!Snapshot_format.read} failed (md5, schema, parse). *)
+          when the format-detecting read failed (md5, schema, parse). *)
 }
 (** Per-file verification outcome. *)
 
@@ -37,8 +40,9 @@ type t = {
 val verify_directory : manifest_path:string -> t Status.status_or
 (** [verify_directory ~manifest_path] reads the manifest at [manifest_path],
     iterates every entry, and round-trips each file via
-    {!Snapshot_format.read_with_expected_schema} using the manifest's schema as
-    the expected schema. Returns a {!t} summarizing the sweep.
+    {!Snapshot_io.read_with_expected_schema} (format-detecting v1/v2) using the
+    manifest's schema as the expected schema. Returns a {!t} summarizing the
+    sweep.
 
     Returns [Error] only when the manifest itself cannot be loaded; per-file
     failures are reported in the [results] list (and counted in [failed]) so a

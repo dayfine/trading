@@ -1,9 +1,44 @@
 # Status: backtest-perf
 
-## Last updated: 2026-06-12
+## Last updated: 2026-06-16
 
 ## Status
 IN_PROGRESS
+
+### Recent activity (2026-06-16) — snapshot-format v2 S3: writers emit v2 + format-detecting verifier
+
+Branch `feat/snapshot-writers-v2` (READY_FOR_REVIEW). Plan:
+`dev/plans/snapshot-format-research-2026-06-16.md` §S3. Follows S1 (#1624,
+the columnar mmap format) and S2 (#1626, the `Daily_panels` range/column
+cache), both merged.
+
+- **[x] S3 — warehouse writer emits v2.** `Build_runner` (the single write
+  site behind both `build_snapshots.exe` and `build_scenario_snapshots.exe`)
+  now writes per-symbol `.snap` files via `Snapshot_columnar.write` instead of
+  `Snapshot_format.write`. `Snapshot_columnar.write` validates single-symbol +
+  single-schema and sorts by date — the preconditions a per-symbol file already
+  meets, so it is a drop-in. New warehouses are v2; `Daily_panels` already
+  format-detects so a mixed v1/v2 warehouse reads fine during transition.
+  File: `trading/analysis/scripts/build_snapshots/build_runner.ml`.
+- **[x] S3 — coupled verifier format-detects.** `Snapshot_verifier._verify_one`
+  read every file via `Snapshot_format.read_with_expected_schema` (v1 only),
+  which would fail on every v2 file the writer now emits. It now reads via a
+  new format-detecting seam `Snapshot_io.read_with_expected_schema` (new module
+  in the `data_panel/snapshot` lib): peek the leading
+  `Snapshot_columnar_codec.magic` → v2 reader; else → v1 sexp reader. Chose the
+  shared-module option (b) over inline peek-and-dispatch: it is the reusable
+  seam future whole-file consumers want, and it has its own unit tests.
+  Files: `trading/trading/data_panel/snapshot/lib/snapshot_io.{ml,mli}`,
+  `trading/analysis/weinstein/snapshot_pipeline/lib/snapshot_verifier.{ml,mli}`.
+- **Verify:** `dune runtest trading/data_panel/snapshot analysis/weinstein/snapshot_pipeline analysis/scripts/build_snapshots`
+  (9 new assertions: 4 `Snapshot_io` format-detect cases + 5 verifier cases
+  covering v2-pass, v1-pass, v2-schema-skew-fail, v1-corruption-fail,
+  manifest-missing). The verifier test asserts the built file's first bytes are
+  the v2 magic.
+- **Out of scope (follow-ons):** `bar_reader.ml`'s `of_in_memory_bars` writer
+  stays v1 (in-memory synthetic warehouses for tests/backtests; `Daily_panels`
+  reads v1 fine). S4 (regenerate real warehouses + bit-identical golden gate)
+  and removing v1 `Snapshot_format` are later steps.
 
 ### Recent activity (2026-06-12) — runner fold-correctness fixes
 

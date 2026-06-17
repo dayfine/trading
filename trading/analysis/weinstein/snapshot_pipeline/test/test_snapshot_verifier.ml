@@ -5,6 +5,8 @@ module Pipeline = Snapshot_pipeline.Pipeline
 module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
 module Snapshot_verifier = Snapshot_pipeline.Snapshot_verifier
 module Snapshot_format = Data_panel_snapshot.Snapshot_format
+module Snapshot_columnar = Data_panel_snapshot.Snapshot_columnar
+module Snapshot_columnar_codec = Data_panel_snapshot.Snapshot_columnar_codec
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 
 (* The lib namespace [Snapshot_pipeline] holds three modules:
@@ -34,46 +36,62 @@ let _make_test_dir prefix =
   let path = Filename_unix.temp_dir prefix "" in
   path
 
-let _build_one_symbol_dir ~symbols =
+let _build_for_symbol symbol =
+  match
+    Pipeline.build_for_symbol ~symbol ~bars:(_ramp_bars ~n:10)
+      ~schema:Snapshot_schema.default ()
+  with
+  | Ok rs -> rs
+  | Error err -> assert_failure (Status.show err)
+
+let _write_entry ~dir ~write symbol =
+  let rows = _build_for_symbol symbol in
+  let path = Filename.concat dir (symbol ^ ".snap") in
+  (match write ~path rows with
+  | Ok () -> ()
+  | Error err -> assert_failure (Status.show err));
+  let bytes = In_channel.read_all path in
+  {
+    Snapshot_manifest.symbol;
+    path;
+    byte_size = String.length bytes;
+    payload_md5 = Stdlib.Digest.to_hex (Stdlib.Digest.string bytes);
+    csv_mtime = 0.0;
+    active_through = None;
+  }
+
+(* Build a one-symbol-per-file warehouse using [write] for the payload and
+   [manifest_schema] for the manifest's expected schema (defaults to the
+   builder's [default] schema; pass a different schema to provoke a skew). *)
+let _build_one_symbol_dir ?(write = Snapshot_columnar.write)
+    ?(manifest_schema = Snapshot_schema.default) ~symbols () =
   let dir = _make_test_dir "snapshot_verifier_test_" in
-  let entries =
-    List.map symbols ~f:(fun symbol ->
-        let bars = _ramp_bars ~n:10 in
-        let rows =
-          match
-            Pipeline.build_for_symbol ~symbol ~bars
-              ~schema:Snapshot_schema.default ()
-          with
-          | Ok rs -> rs
-          | Error err -> assert_failure (Status.show err)
-        in
-        let path = Filename.concat dir (symbol ^ ".snap") in
-        (match Snapshot_format.write ~path rows with
-        | Ok () -> ()
-        | Error err -> assert_failure (Status.show err));
-        let bytes = In_channel.read_all path in
-        {
-          Snapshot_manifest.symbol;
-          path;
-          byte_size = String.length bytes;
-          payload_md5 = Stdlib.Digest.to_hex (Stdlib.Digest.string bytes);
-          csv_mtime = 0.0;
-          active_through = None;
-        })
-  in
-  let manifest =
-    Snapshot_manifest.create ~schema:Snapshot_schema.default ~entries
-  in
+  let entries = List.map symbols ~f:(_write_entry ~dir ~write) in
+  let manifest = Snapshot_manifest.create ~schema:manifest_schema ~entries in
   let manifest_path = Filename.concat dir "manifest.sexp" in
   (match Snapshot_manifest.write ~path:manifest_path manifest with
   | Ok () -> ()
   | Error err -> assert_failure (Status.show err));
   (dir, manifest_path)
 
-let test_verify_passes_clean_directory _ =
-  let _, manifest_path =
-    _build_one_symbol_dir ~symbols:[ "AAPL"; "MSFT"; "GOOG" ]
+(* The first bytes of a [.snap] file written by [write]. *)
+let _magic_prefix path =
+  let len = Snapshot_columnar_codec.magic_len in
+  In_channel.with_file path ~f:(fun ic ->
+      let buf = Bytes.create len in
+      match In_channel.really_input ic ~buf ~pos:0 ~len with
+      | Some () -> Bytes.to_string buf
+      | None -> "")
+
+(* A v2 build writes the columnar magic; the verifier format-detects and
+   round-trips it. *)
+let test_verify_passes_v2_directory _ =
+  let dir, manifest_path =
+    _build_one_symbol_dir ~symbols:[ "AAPL"; "MSFT"; "GOOG" ] ()
   in
+  assert_that
+    (_magic_prefix (Filename.concat dir "AAPL.snap"))
+    (equal_to Snapshot_columnar_codec.magic);
   assert_that
     (Snapshot_verifier.verify_directory ~manifest_path)
     (is_ok_and_holds
@@ -84,7 +102,47 @@ let test_verify_passes_clean_directory _ =
             field (fun (r : Snapshot_verifier.t) -> r.failed) (equal_to 0);
           ]))
 
-(* Tampering: flip the last byte of a file to corrupt the payload md5. The
+(* A legacy v1 sexp warehouse still verifies (the other detection branch). *)
+let test_verify_passes_v1_directory _ =
+  let dir, manifest_path =
+    _build_one_symbol_dir ~write:Snapshot_format.write
+      ~symbols:[ "AAPL"; "MSFT" ] ()
+  in
+  assert_that
+    (not
+       (String.equal
+          (_magic_prefix (Filename.concat dir "AAPL.snap"))
+          Snapshot_columnar_codec.magic))
+    (equal_to true);
+  assert_that
+    (Snapshot_verifier.verify_directory ~manifest_path)
+    (is_ok_and_holds
+       (all_of
+          [
+            field (fun (r : Snapshot_verifier.t) -> r.total) (equal_to 2);
+            field (fun (r : Snapshot_verifier.t) -> r.passed) (equal_to 2);
+            field (fun (r : Snapshot_verifier.t) -> r.failed) (equal_to 0);
+          ]))
+
+(* A v2 file whose manifest declares a different schema fails the hash gate. *)
+let test_verify_detects_v2_schema_skew _ =
+  let _, manifest_path =
+    _build_one_symbol_dir
+      ~manifest_schema:
+        (Snapshot_schema.create ~fields:[ Snapshot_schema.EMA_50 ])
+      ~symbols:[ "AAPL" ] ()
+  in
+  assert_that
+    (Snapshot_verifier.verify_directory ~manifest_path)
+    (is_ok_and_holds
+       (all_of
+          [
+            field (fun (r : Snapshot_verifier.t) -> r.total) (equal_to 1);
+            field (fun (r : Snapshot_verifier.t) -> r.passed) (equal_to 0);
+            field (fun (r : Snapshot_verifier.t) -> r.failed) (equal_to 1);
+          ]))
+
+(* Tampering: flip the last byte of a file to corrupt the payload md5. The v1
    file's own integrity check fires, the verifier counts it as failed. *)
 let _corrupt_file path =
   let bytes = In_channel.read_all path |> Bytes.of_string in
@@ -94,7 +152,10 @@ let _corrupt_file path =
   Out_channel.write_all path ~data:(Bytes.to_string bytes)
 
 let test_verify_detects_corrupted_file _ =
-  let _, manifest_path = _build_one_symbol_dir ~symbols:[ "AAPL"; "MSFT" ] in
+  let _, manifest_path =
+    _build_one_symbol_dir ~write:Snapshot_format.write
+      ~symbols:[ "AAPL"; "MSFT" ] ()
+  in
   let manifest =
     match Snapshot_manifest.read ~path:manifest_path with
     | Ok m -> m
@@ -121,7 +182,9 @@ let test_verify_returns_error_when_manifest_missing _ =
 let suite =
   "Snapshot_verifier tests"
   >::: [
-         "verify passes clean directory" >:: test_verify_passes_clean_directory;
+         "verify passes v2 directory" >:: test_verify_passes_v2_directory;
+         "verify passes v1 directory" >:: test_verify_passes_v1_directory;
+         "verify detects v2 schema skew" >:: test_verify_detects_v2_schema_skew;
          "verify detects corrupted file" >:: test_verify_detects_corrupted_file;
          "verify returns error when manifest missing"
          >:: test_verify_returns_error_when_manifest_missing;
