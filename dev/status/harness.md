@@ -1,0 +1,418 @@
+# Status: harness
+
+## Last updated: 2026-05-22
+
+## Recent activity (2026-05-09..22, since last refresh)
+
+### CI hardening (PRs #1117, #1121, #1130, #1131, #1138)
+
+- **#1117 — `no_python_check.sh` race-proof prune** (MERGED 2026-05-16):
+  guards against dune sandbox cleanup racing the no-Python linter walk
+  (closes intermittent CI red triggered by sandbox dir disappearing
+  mid-`find`).
+- **#1121 — remove cache restore-keys** (MERGED 2026-05-16): GHA cache
+  partial-key hits were resurrecting stale binaries that built on a
+  prior libc. Explicit-key only.
+- **#1130 — rebuild image with `-march=x86-64-v2` + CPU-flag smoke
+  test** (MERGED 2026-05-16): baseline CPU level bump for #1129
+  dependency floor; smoke test added in the devcontainer build
+  pipeline.
+- **#1131 — browser headers + 503/429 retry-with-backoff for IWV
+  fetcher** (MERGED 2026-05-16): partial unblock attempt for the IWV
+  scrape (`data-foundations` Phase 1.4); Akamai still ultimately
+  blocks both local + GHA-runner egress (see `data-foundations.md`
+  for the open vendor decision).
+- **#1138 — `iwv-scrape-once` workflow_dispatch** (MERGED 2026-05-17):
+  GHA workflow for IP-independent IWV retries; Akamai blocks the GHA
+  egress path too, but the workflow lets ops-data run from a different
+  runner pool on demand.
+
+### CSV-storage / CSV-manifest test guards (PRs #1153, #1158)
+
+- **#1153 — `is_directory` guard on `_reconcile_log_for` readdir**
+  (MERGED 2026-05-17): closes a CSV-manifest test race that surfaced
+  on #1148/#1150 (Phase 2 + Phase 3 manifest stack) when test temp_dir
+  cleanup raced the reconcile-log inspection.
+- **#1158 — `is_directory` guard on `test_reconcile_log_path_layout`
+  readdir** (MERGED 2026-05-17): same hazard, second test site.
+
+### Weekly deep health scan + rules promotion (PRs #1198, #1227)
+
+- **#1198 — weekly deep health scan 2026-05-18** (MERGED 2026-05-18):
+  ops/health-deep PR per the existing GHA Monday-cron workflow.
+- **#1227 — promote session-tested QC + merge + rampup norms from
+  memory to repo** (MERGED 2026-05-21): institutional-knowledge-capture
+  PR. New repo-level rules under `.claude/rules/` (referenced by
+  qc-structural-authority.md, qc-behavioral-authority.md):
+  pr-merge-gates, session-rampup, code-health-discipline. Lifts norms
+  previously held only in `~/.claude/memory/` so they apply in every
+  harness session, not only when memory pre-loaded.
+
+## sweep-honor-locks (2026-05-08 incident)
+- **Incident (2026-05-08):** Operator ran `--force --stale-hours 0` while two cleanup agents were mid-flight. The script removed their worktrees, killing both agents' work in progress. Root cause: script used `git worktree remove --force` (overrides lock) and `rm -rf` fallback unconditionally; did not read lock state from `git worktree list --porcelain`.
+- **Fix (PR harness/sweep-honor-locks):** (1) Parse `git worktree list --porcelain` once per run; build locked-paths set; skip any locked candidate unless `--include-active` is passed. (2) Reject `--stale-hours 0` with exit 1. (3) Drop `--force` from `git worktree remove` so git's own lock check fires. (4) Log each skipped locked worktree. New `--include-active` flag for emergency override (must be combined with `--stale-hours >= 1`). Smoke test: `trading/devtools/checks/sweep_worktrees_smoke.sh` (wired into `dune runtest`). `.claude/rules/worktree-isolation.md §Cleanup` updated with new flags and lock-honoring behavior.
+- **Verify:** `dune runtest devtools/checks/` — prints `OK: sweep_worktrees_smoke — 3 assertion(s) passed, 0 failed.`; `bash dev/scripts/sweep_stale_worktrees.sh --stale-hours 0` exits 1 with error message.
+
+## Status
+IN_PROGRESS
+
+## structural_qc (gha-cost-tracking, PR #483): APPROVED (2026-04-21 run-2, re-review after rework)
+Branch: harness/gha-cost-tracking. SHA: 792b5b0901c963a021526e53223f6adaef65dcdf. See dev/reviews/harness.md §"Structural Checklist — harness gha-cost-tracking (PR #483, re-review after POSIX-sh rework)". All 13 checklist items PASS or NA; H3 now PASSES after POSIX-sh fixes (shebang `#!/bin/sh`, `set -eu`, bash array → tmpfile + xargs, `${BASH_SOURCE[0]}` → `repo_root` helper, `<<<` → `< /dev/null`). Behavioral review N/A (harness/utility-script PR — no domain logic). Mergeable_state "dirty" is a status-file conflict with #485 (docs-only), not a QC failure — resolved at merge time.
+
+**Prior review (historical):** structural_qc NEEDS_REWORK at SHA d1ba14a3 (2026-04-21 run-1). Original review body retained at top of dev/reviews/harness.md.
+
+## structural_qc: APPROVED (2026-04-20)
+Branch: harness/deep-scan-drift-coverage. SHA: f0c402a620247a9423a9982c4300222cf2cd644a. See dev/reviews/harness.md.
+
+## structural_qc (consolidate_day, PR #467): APPROVED (2026-04-20)
+Branch: harness/consolidate-day. SHA: 6f2255639cb326745aad06f755de1839a9fe3847. See dev/reviews/harness.md §"Structural Checklist — consolidate_day (PR #467)".
+
+## CI
+
+- CI is now live (#270, #271) — `dune build && dune runtest && dune build @fmt` gates on every PR
+- Weekly deps-freshness workflow added
+- `test_data/` fixtures committed for CI reproducibility
+
+## Design doc
+`docs/design/harness-engineering-plan.md`
+
+---
+
+## Tier 1 — Immediate
+
+- [x] T1-A: Add `dune fmt --check` as hard gate — `devtools/checks/fmt_check.sh` uses `ocamlformat --check` on all source files
+- [x] T1-A: Add architecture layer test (`analysis/` cannot import `trading/trading/`)
+- [x] T1-A+: Custom linter — function length (>50 lines = test failure) — OCaml AST-based via `compiler-libs`; `@large-function` annotation to opt out specific functions
+- [x] T1-A+: Custom linter — magic numbers in `analysis/weinstein/` not in config — extended to whole codebase; path exceptions in `devtools/checks/linter_exceptions.conf`
+- [x] T1-A+: Custom linter — magic numbers: allow named constant definitions (`let foo = <num>`)
+- [x] T1-A+: Custom linter — public `.ml` functions missing from `.mli`
+- [x] T1-B: Create `qc-structural` agent (refactored from `qc-reviewer`; A1 is FLAG not FAIL)
+- [x] T1-B: Create `qc-behavioral` agent (new, domain-focused; includes A1 generalizability judgment)
+- [x] T1-B: Update `lead-orchestrator` to spawn both QC agents (structural gates behavioral)
+- [x] T1-C: Add `## Acceptance Checklist` to each `feat-*.md` agent definition
+- [x] T1-C: Create `feat-agent-template.md` — required sections for all feat-agents (extensibility + health-scanner compliance)
+- [x] T1-D: Define structured QC checklist output format (per-item PASS/FAIL/FLAG, not prose)
+- [x] T1-E: Pre-flight context injection on every feat-agent dispatch (test failures, last QC, open follow-ups)
+- [x] T1-F: Define lead-orchestrator blueprint format (explicit deterministic vs agentic nodes)
+- [x] T1-G: Add max-iterations policy to each feat-agent definition (cap build-fix cycles at 3)
+- [x] T1-H: Specify allowed tool subsets per agent type in agent definitions
+- [x] T1-I: Agent definition compliance test — `devtools/checks/agent_compliance_check.sh` verifies all feat-*.md have required sections; runs as part of `dune runtest`
+- [x] T1-J: Stale branch preflight in `qc-structural` — Step 1 now checks commits-behind-main; FLAG (not FAIL) if > 10 commits behind
+- [x] T1-K: Linter exception retirement policy — `linter_exceptions.conf` entries now carry `# review_at:` annotations; health-scanner deep scan will surface expired ones (T3-A)
+- [x] T1-L: Parallel write conflict policy documented in `lead-orchestrator` Step 4 — shared files read-only during parallel execution; proposed changes surfaced in return values
+- [x] T1-M: "Done" definition — add explicit acceptance criteria to each Tier 1 item's completion note (harness items should state what was built, where it lives, and how to verify) — DONE: see Completed section below
+- [x] T1-N: Golden scenario test suite — screener regression tests; 8 scenarios using real AAPL data; `trading/analysis/weinstein/screener/test/regression_test.ml`. Verify: run `./_build/default/analysis/weinstein/screener/test/regression_test.exe` (8 tests, OK)
+- [x] T1-N: Golden scenario test suite — stop state machine regression tests; 5 scenarios covering Stage2 trailing, Stage3 tightening, stop-hit, short side; `trading/trading/weinstein/stops/test/regression_test.ml` — DONE: see completion note below (#204)
+- [x] T1-O: `health-scanner` agent — fast scan: stale status files, main build health, new unexcepted magic numbers; runs post-orchestrator; spec extends `docs/design/harness-engineering-plan.md`
+- [x] T1-P: Add `## Blocking Refactors` section to all feat-agent status files; update `lead-orchestrator` to dispatch blocking refactors before feat-agents
+- [x] T1-P: Update `lead-orchestrator` to count followup items and schedule non-blocking maintenance cycles (threshold: 10 items or every 3rd run)
+- [x] T1-P: Add `## Refactor Mode` prompt variant to feat-agent definitions
+- [x] T1-Q: Cyclomatic complexity linter — extend `fn_length_linter` via `compiler-libs`; CC > 10 = warning; output to `dev/metrics/cc-YYYY-MM-DD.json`
+- [x] T1-Q: qc-behavioral quality score — add `## Quality Score` (1–5 + rationale) to output; tracked in audit trail
+- [x] T1-R: Auto-cleanup merged-PR worktrees on session end — `dev/scripts/cleanup_merged_worktrees.sh` (jj-state-driven; no registry; sweeps `.claude/worktrees/agent-*/` whose branch is gone from origin); wired via Stop hook in `.claude/settings.json`. Closes the disk-pressure gap during long interactive sessions where merged-PR worktrees idle for hours before the SessionStart sweep catches them. Verify: dry-run via `bash dev/scripts/cleanup_merged_worktrees.sh --dry-run`. Slash-command surface (`/cleanup-merged` for opt-in mid-session reclaim) deferred to follow-up.
+- [x] T1-S: GitHub branch protection on `main` — required status checks `build-and-test` + `perf-tier1-smoke`, `enforce_admins: true`, no force-pushes, no deletions; `strict: true` (branch must be up-to-date before merge). Applied via `gh api repos/dayfine/trading/branches/main/protection`. Closes issue #885. Verify: `gh api repos/dayfine/trading/branches/main/protection | jq '.required_status_checks.checks'` — should show both check names; `gh pr merge --squash` on a PR with failed CI now returns an error. PR: harness/ci-merge-gate.
+
+## Tier 2 — Milestone-gated
+
+- [ ] T2-B: Performance gate test (`trading/weinstein/simulation/test/performance_gate_test.ml`) (at M5)
+- [x] T2-B: Reference backtest config + expected metrics — landed at `trading/test_data/backtest_scenarios/goldens/` via #316 (sexp, not json; different location than originally planned). See `dev/status/backtest-infra.md`.
+- [ ] T2-C: Walk-forward regression gate (`dev/benchmarks/best_config.json`) (at M7)
+- [ ] T2-D: Live trading gate + paper-trading validation period in `dev/milestones/m6-paper-trading.md` (before M6)
+
+## Tier 3 — After M5 stable
+
+- [x] T3-A: `health-scanner` agent — deep scan (weekly: dead code, design doc drift, TODO accumulation, size violations) — DONE: see completion note below
+- [x] T3-A: `health-scanner` deep scan — QC calibration audit (verdicts vs regression history) — DONE: see completion note below
+- [x] T3-A: `health-scanner` deep scan — harness scaffolding review (flag unused harness components) — DONE: Check 7 in `trading/devtools/checks/deep_scan.sh`; three heuristics (script not referenced, linter binary not wired, broken agent path ref); output under `## Harness Scaffolding` in `dev/health/YYYY-MM-DD-deep.md`. Verify: `sh trading/devtools/checks/deep_scan.sh` — report contains `## Harness Scaffolding` section.
+- [x] T3-A: `health-scanner` deep scan — feat-agent template compliance check (covered by T1-I: `agent_compliance_check.sh`)
+- [x] T3-A+: **Move health-scanner deep scan to weekly GHA cron.** `.github/workflows/health-deep-weekly.yml` dispatches `health-scanner` in deep mode every Monday at 15:17 UTC (08:17 PT). Report lands on `ops/health-deep-<YYYY-MM-DD>` branch; PR opened via GH REST API with title `ops: weekly deep health scan <YYYY-MM-DD>`. No auto-merge — advisory scan, human reviews and merges. `if: always()` on the push step captures partial reports on agent failure. Verify: `gh workflow run health-deep-weekly.yml` (manual trigger) or check a Monday GHA run; PR title matches pattern above; report at `dev/health/<date>-deep.md`.
+- [x] T3-A+: **Retire inline health-scanner fast scan; fold must-runs into orchestrator.** Step 6 in `lead-orchestrator.md` now runs two shell commands directly: (1) `dune build && dune runtest` exit code (gate is exit code only, not advisory `FAIL:` text), (2) `status_file_integrity.sh`. Both were the only load-bearing checks. Advisory checks (stale review, linter exception dates) deferred to weekly deep scan. `health-scanner.md` updated with "Fast mode deprecated" notice at top; deep mode intact. Harness plan §T3-A annotated. Verify: read `lead-orchestrator.md` Step 6 — should show deterministic sub-steps 6.1/6.2/6.3 with no `health-scanner` agent spawn. PR: harness/retire-inline-fast-scan.
+- [x] T3-A+: **Flip PR draft→ready on QC APPROVED.** `feat-*` agents open PRs as drafts by convention. Previously, once QC APPROVED, nothing flipped the `isDraft` flag — PRs looked un-reviewed in `gh pr list` (which filters out drafts by default). Added a new Stage 3 to `lead-orchestrator` Step 5 that calls GitHub's GraphQL `markPullRequestReadyForReview` mutation after `overall_qc: APPROVED`. No REST endpoint exists for this; scope-compatible with the existing `BOT_GITHUB_TOKEN`. Source: 2026-04-19 run-4 postmortem (QC APPROVED #447 but it stayed draft until manual flip).
+- [x] T3-A+: **Harness dispatch cap=2 + plan-first fresh-stack dispatch.** Two budget-utilization fixes for per-run throughput (`lead-orchestrator.md`). Step 2c now dispatches up to 2 harness items per run (was 1). Step 1.5 gains a "fresh-stack" branch — when `N == 0` on a plan-first track with ≥2 un-implemented increments, dispatches both (increment N against main + increment N+1 stacked on N's branch) instead of just one. Pairs with existing depth-2 cap-on-open-PR path so total plan-first throughput doubles when budget allows. Source: 2026-04-19 budget audit (run-5 used 24%; target 60–80%).
+- [x] T3-B: AVR loop closure in `lead-orchestrator` (auto-dispatch QC on READY_FOR_REVIEW)
+- [ ] T3-C: Cross-feature context injection (beyond T1-E baseline — superseded for basic case)
+- [x] T3-D: Audit trail — `dev/audit/YYYY-MM-DD-<feature>.json` with `harness_gap` field on NEEDS_REWORK
+- [x] T3-E: Cost/token budget visibility in daily summary + budget cap in `merge-policy.json`
+- [x] T3-F: Create `docs/design/dependency-rules.md` with initial known boundaries + state lifecycle
+- [x] T3-F: Architecture graph analyzer in health-scanner deep scan (import graph vs. rules doc) — DONE: see completion note below
+- [x] T3-F: Rule promotion path — generate dune checks from `enforced` rules automatically — DONE: see completion note below
+- [x] T3-G: Status file integrity check in health-scanner fast scan — verify required fields present (Status, Last updated, Interface stable) in each `dev/status/<feature>.md`; flag missing or malformed entries (part of T1-O fast scan). Done: see Completed section.
+- [x] T3-G: `health-scanner` deep scan extension — followup-item count + CC trend analysis in weekly report (extends T1-Q CC linter output)
+- [x] T3-G: Audit trail — include qc-behavioral quality score in `dev/audit/` records (extends T3-D)
+- [ ] T3-H: Commit-level QC mode — spawn `qc-structural` on individual commits (not whole branches) to catch violations earlier; low priority, adds cost; explore when golden scenarios (T1-N) are stable
+
+## Tier 4 — Continuous development loop (target end state)
+
+- [ ] T4-A: Automated PR creation (orchestrator runs `gh pr create` on APPROVED)
+- [ ] T4-B: Auto-merge on clean pass + `dev/config/merge-policy.json` + `automation-enabled.json` kill switch
+- [ ] T4-C: Requirements intake workflow (design doc → agent def → decisions.md → auto-pickup)
+- [ ] T4-D: Milestone evaluation reports (M4, M5, M7)
+- [ ] T4-E: Rollback/recovery protocol + health-scanner regression check against baseline
+
+---
+
+## Follow-up / Known Improvements
+
+Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
+
+- [x] **`record_qc_audit_test.sh` wired into dune runtest** (branch harness/wire-record-qc-audit-test, 2026-06-15): `trading/devtools/checks/record_qc_audit_test.sh` was a fixture-driven smoke test (6 scenarios) for `record_qc_audit.sh` that existed but was not wired into CI. Added a rule to `trading/devtools/checks/dune` declaring `record_qc_audit.sh` and `write_audit.sh` as deps (cache invalidation) and invoking the test with `bash` (not `sh`, because the script uses `set -euo pipefail` and bash-specific constructs). Verify: `dune runtest devtools/checks/` — prints `record_qc_audit_test: 6 passed, 0 failed`.
+
+- [x] **list_active_exceptions reporting tool** (issue #933 sub-item D, branch harness/list-active-exceptions): OCaml exe at `trading/devtools/list_active_exceptions/list_active_exceptions.{ml,mli}`. Reads `trading/devtools/checks/linter_exceptions.conf` (parse each non-comment row) and scans all `*.ml` files under `trading/` for `(* @large-module:` and `(* @large-function:` markers. Outputs a 3-section markdown report on stdout: (1) `linter_exceptions.conf entries (N)`, (2) `@large-module markers (N)`, (3) `@large-function markers (N)` — each as a markdown table with `status` column (`active` / `expired` / `no-review-at`). False positives avoided by requiring markers to be in genuine OCaml comments (trimmed line must start with `(*`). Wired into `dune runtest` as a passive linter (exits 0 always; output goes to build log). `dune build devtools/list_active_exceptions/list_active_exceptions.exe` builds the exe; invoke directly via `dune exec devtools/list_active_exceptions/list_active_exceptions.exe -- <trading-root>`. Verify: `dune runtest devtools/checks/` — all checks pass; the active-exceptions section of the build log shows 13 conf entries, 13 `@large-module` markers (no duplicates), 0 `@large-function` markers.
+
+- [~] **CI disk headroom -- recurring ENOSPC during dune link** (branch harness/ci-disk-headroom, 2026-06-17, GHA orchestrator run 27687153814): Root cause: CI image bakes `trading/_build` under `/workspaces/trading-1/` (~11 GB) which is explicitly unused in the CI job but occupies runner disk. Combined with the restored `_build` cache and fresh linker temporaries, the ubuntu-latest runner (~29 GB total) hit ENOSPC on `test_grid_search.exe`. Fix identified: add `Free disk headroom` step to remove `/workspaces/trading-1/trading/_build` (~11 GB), inactive opam `5.3` switch (~340 MB), opam download-cache (~34 MB), and opam logs. Also add `Disk diagnostic before build` step. BLOCKED: cannot push `.github/workflows/ci.yml` changes from GHA agent (requires `workflow` OAuth scope, not available in current token). Commit `4cc7d08066fdbd6856aa88acdc093d7acf9d73e2` has the correct ci.yml change and exists in git object store. Needs human with workflow-scoped PAT to push. See PR #1636 for details and the exact diff to apply. Closes issue #1634.
+
+- [x] **CI red-main watchdog** (issue #934, PR #983, branch harness/ci-main-watchdog): `.github/workflows/ci-main-watchdog.yml` — triggers on `workflow_run` completion of `CI` workflow on `main`; on failure, auto-creates GitHub issue `[ci-watchdog] main CI red on <short-sha>` with run URL + first 20 lines of log + `cc @dayfine`; labels `ci-red`/`urgent` (auto-created if absent). Idempotent: comments on existing open watchdog issue instead of creating a duplicate. Verify: merge PR and run `gh workflow run ci-main-watchdog.yml --ref main -F sha=<any-sha>` — a watchdog issue should appear in the Issues tab. Closes #934.
+
+- [x] **Dune linter dep tracking** (PR #943, harness/dune-linter-deps): `trading/devtools/checks/dune` rules for nesting_linter, fn_length_linter, cc_linter, linter_magic_numbers.sh, linter_mli_coverage.sh, linter_file_length.sh, fmt_check.sh, arch_layer_test.sh, testing_only_check.sh, posix_sh_check.sh did not declare `(deps (glob_files_rec ...))` for the source files they scan. Dune's cache key therefore only invalidated on the linter script/exe change — NOT on .ml content changes anywhere else. Root cause of incident PR #919 (linter cache hid violations; CI on fresh checkout caught them). Fix: add `(glob_files_rec %{workspace_root}/*.ml)`, `(glob_files_rec %{workspace_root}/*.mli)`, `(glob_files_rec %{workspace_root}/dune)`, `(glob_files_rec %{workspace_root}/*.sh)` deps as appropriate per linter. Files outside workspace (`.claude/agents/*.md`, `dev/status/*.md`) cannot be tracked via glob_files due to dune workspace boundary; those rules retain comment explaining the limitation. Verify: `dune build devtools/checks/` passes; introducing a new `.ml` violation should make `dune runtest` fail on next run.
+
+- ~~**A2 rule stale — false-positive NEEDS_REWORK verdicts**~~ — DONE (harness/a2-rule-update): `.claude/rules/qc-structural-authority.md` §A2 updated from blanket ban to explicit allow-list. `trading/trading/backtest/**/dune` files may declare `weinstein.*` dependencies (established practice: 5+ dune files verified). Still FAIL: (1) non-`weinstein.*` analysis imports; (2) `weinstein.*` imports outside `trading/trading/backtest/**`. Source: orchestrator override notes in `dev/reviews/optimal-strategy.md` (PRs #652, #666). Verify: read `A2` row in `.claude/rules/qc-structural-authority.md`.
+
+- ~~**`.claude/worktrees/` gitignore gap + stale worktree accumulation**~~ — DONE (harness/worktree-auto-cleanup-v2): `dev/scripts/sweep_stale_worktrees.sh` added (executable, bash, CLI flags: `--threshold-percent`, `--stale-hours`, `--dry-run`, `--force`). Probes disk via `df`, sweeps `agent-*` worktrees older than the stale threshold, falls back to `rm -rf` if `git worktree remove` fails, runs `git worktree prune` after sweep, appends to `dev/logs/worktree-sweep-YYYY-MM-DD.log`. `.claude/settings.json` `SessionStart` hook wired with default thresholds (85%/24h). `## Cleanup` section added to `.claude/rules/worktree-isolation.md` describing auto-detection trigger + manual invocation. Verify: `bash dev/scripts/sweep_stale_worktrees.sh --dry-run --force` prints candidates without deleting; `jq . .claude/settings.json` parses cleanly.
+
+- **`isolation: "worktree"` creates git-worktrees, not jj-workspaces — concurrent agents race shared `op_heads` + default WorkspaceName** (NEW 2026-05-04). Root cause investigation in `memory/project_jj_worktree_root_cause.md`. Symptoms: edits silently revert mid-session (jj issue [#8929](https://github.com/jj-vcs/jj/issues/8929)), files leak across "isolated" worktrees (e.g. F.3.c's `panel_callbacks.{ml,mli}` appearing in M5.2a's diff during 2026-05-04 session, forcing #836 to be closed). Per jj's official docs (`Git compatibility` page), running jj inside a `git worktree add` directory with shared colocated `.jj/` is **explicitly unsupported**. GHA is unaffected (orchestrator runs `claude -p` inline; subagents share the runner's plain-git checkout — no jj). Fix options:
+
+  - **Option A (low-effort, agent-side):** every feat-* dispatch prompt's pre-amble runs `jj workspace add /tmp/agent-ws-<id> --name agent-<id>` and `cd` there before doing work. Each agent gets a distinct `WorkspaceName` and an independent `@` slot in the shared view; op-merging is well-defined per [jj concurrency docs](https://docs.jj-vcs.dev/latest/technical/concurrency/). Update `feat-agent-template.md` + every feat-*.md prompt; document in `.claude/rules/worktree-isolation.md`. ~30 LOC of prompt boilerplate + one rule doc update. Removes the contamination class for cooperating agents but does not fix non-cooperating tools (e.g. linters, sweep scripts) that run in the parent worktree.
+  - **Option B (highest-effort, runtime-level):** modify the Claude Code runtime so `isolation: "worktree"` calls `jj workspace add` instead of `git worktree add` when invoked in a colocated jj+git repo. Requires upstream Claude Code change; out of our control.
+  - **Option C (medium-effort, dispatch-side):** stop using `isolation: "worktree"` for jj-writing agents; serialize them at ≤1 concurrent jj-writer (current rule). Read-only QC agents continue concurrent. Lossy on parallelism but immediately safe. Status quo as of 2026-05-04 sessions.
+
+  **Decision needed:** A vs C. A unblocks parallel feat work; C is what we're doing today. Until A lands, ≤1-jj-writer rule per `feedback_worktree_isolation.md` is mandatory. Verify before fix lands: dispatch any 2 concurrent jj-writing feat agents on disjoint paths and observe contamination in `jj diff` mid-session (reproduces every time). Verify after fix lands: same dispatch produces clean PRs with non-overlapping file lists. References: `memory/project_jj_worktree_root_cause.md`, [Panozzo: Avoid losing work with jj for AI agents](https://www.panozzaj.com/blog/2025/11/22/avoid-losing-work-with-jujutsu-jj-for-ai-coding-agents/), [Slava Kurilyak: Parallel Claude Code with jj](https://slavakurilyak.com/posts/parallel-claude-code-with-jujutsu).
+
+  **2026-05-04 update:** Option A landed via PR #839 — every feat-*/harness/ops-data agent prompt now includes a `## Pre-Work Setup` section that runs `jj workspace add /tmp/agent-ws-<id> --name agent-<id>` and `cd`s there before doing work. Boilerplate is byte-identical across the 5 agent files (md5 `008307131d6954b88f674145dd2cdf5d`); canonical template lives in `.claude/agents/feat-agent-template.md`. Two follow-up gaps remain (filed as separate items below).
+
+- ~~**Pre-Work Setup boilerplate not enforced by `agent_compliance_check.sh`**~~ — DONE (PR #840-follow-up, harness/prework-setup-enforcement): `agent_compliance_check.sh` extended with Rule 2 — requires `## Pre-Work Setup` on all jj-writing agents (feat-*, harness-maintainer, ops-data); read-only QC agents (qc-structural, qc-behavioral, health-scanner, track-pacer, lead-orchestrator, code-health) are exempt. Smoke test in `trading/devtools/checks/agent_compliance_test.sh` (2 assertions: as-is tree passes; stripped feat-data.md FAILs). Both wired into `dune runtest` via `trading/devtools/checks/dune`. Verify: `dune runtest devtools/checks/` — prints `OK: agent compliance — 5 feat-* / harness / ops-data files have ## Pre-Work Setup.` and `OK: agent_compliance_test — all 2 assertions passed.`
+
+- ~~**No automated smoke test for Pre-Work Setup runtime correctness**~~ — DONE (PR #840-follow-up, harness/prework-setup-enforcement): `trading/devtools/checks/jj_workspace_smoke.sh` added (~50 LOC POSIX sh). Execs the canonical boilerplate (`jj workspace add $AGENT_WS --name $AGENT_ID -r main@origin`), asserts `jj workspace list` shows the new entry, then cleans up (`jj workspace forget` + `rm -rf`). Skips cleanly if jj is not on PATH (`OK: jj_workspace_smoke — SKIPPED (jj not on PATH).`). Wired into `dune runtest` via `trading/devtools/checks/dune`. Verify: `dune runtest devtools/checks/` — prints `OK: jj_workspace_smoke — boilerplate exec + workspace_list + cleanup all passed.` (or SKIPPED on GHA).
+- ~~**Pre-existing nesting linter failures**~~ — DONE (#461): `atr.ml` + `ad_bars.ml` refactored; `analysis/scripts/universe_filter` and `analysis/scripts/fetch_finviz_sectors` grandfathered in `linter_exceptions.conf`; `weinstein_strategy.ml` annotated `@large-module` (#453). `dune runtest devtools/checks` → `OK: nesting linter — all 832 functions within limits.` (verified 2026-04-20). `fetch_universe.ml`, `test_data_loader.ml`, `weinstein_strategy.ml` all clean.
+- ~~**Orchestrator runner semantics**~~ — RESOLVED: `dev/run.sh` now has a
+  pre-flight block that fast-fails if `claude` is missing, the
+  lead-orchestrator agent file is missing, or its `## Allowed Tools` section
+  no longer lists `Agent`. See `### run-sh hardening` in Completed.
+- **Orchestrator daily summary drifts against reality** — sections like
+  `## Integration Queue`, `## Recent Commits`, and `## Questions for You`
+  get copied forward from prior daily summaries rather than derived from
+  current state. Example: the 2026-04-14 12:35 run carried forward a "7
+  open PRs from 2026-04-11" list that had been stale for 3 days; several
+  questions referenced PRs long since merged.
+  Fix: add a deterministic reconciliation step to `lead-orchestrator.md`
+  Step 7 (Write daily summary) that queries the actual open-PR list
+  (via `gh pr list` or the GH API) before writing `## Integration Queue`,
+  and derives `## Recent Commits` from `jj log main@origin..main@origin`
+  since the last daily summary date. Without `gh` auth in the runtime
+  environment (see `dev/status/orchestrator-automation.md`), this part
+  needs to land together with the automation work. Source:
+  `dev/daily/2026-04-14.md` (refreshed end-of-day).
+- ~~**Same-day summary consolidation**~~ — DONE (#467): `dev/lib/consolidate_day.sh` added;
+  merges all `${DATE}*.md` (non-plan) into `${DATE}-summary.md` with deduped
+  §Dispatched, merged §Escalations (with "(seen in: run-N)" suffix), summed §Budget,
+  latest §QC per track, and per-run links. Wired into `lead-orchestrator` Step 8b
+  (runs post-auto-merge when N >= 3). Smoke test: `trading/devtools/checks/consolidate_day_check.sh`.
+  Source: 2026-04-18 plan-mode audit.
+- **Deep scan heuristic gaps** — `trading/devtools/checks/deep_scan.sh`
+  (T3-A, see #331) is missing several useful checks. Today's manual
+  audit found four real issues the script didn't surface:
+  1. ~~**Drift coverage too narrow**~~ — DONE: `trading/trading/backtest/`
+     coverage added to `trading/devtools/checks/deep_scan/check_02_design_doc_drift.sh`;
+     checks top-level subdirs of `trading/trading/backtest/` against
+     `dev/plans/backtest-scale-optimization-2026-04-17.md`. Smoke test:
+     `trading/devtools/checks/deep_scan_drift_coverage_check.sh`. Wired into
+     `dune runtest` via `trading/devtools/checks/dune`. Current finding:
+     `trading/trading/backtest/bin/` not mentioned in plan (WARNING).
+     Verify: `dune runtest devtools/checks/` — prints OK; run
+     `sh trading/devtools/checks/deep_scan.sh` — report has
+     `Design doc drift items: 1` for `backtest/bin/`. See Completed section.
+  2. ~~**Status file template enforcement**~~ — DONE: Check 10 added to
+     `trading/devtools/checks/deep_scan.sh`; greps `dev/status/*.md` for
+     forbidden `## Recent Commits` heading; findings emitted under
+     `## Status File Template` in `dev/health/YYYY-MM-DD-deep.md`.
+     Smoke test: `trading/devtools/checks/deep_scan_recent_commits_check.sh`.
+     Zero current violations. Verify: `dune runtest devtools/checks/`.
+  3. ~~**Linter exception expiry** — `linter_exceptions.conf` entries
+     with `review_at: <milestone>` (e.g. M5) are never re-surfaced
+     when the milestone lands. Add a check that compares current
+     milestone in `weinstein-trading-system-v2.md` against the
+     `review_at:` values.~~ — DONE: see Completed section below
+  4. ~~**Stale local jj bookmarks**~~ — DONE: Check 12 added to
+     `trading/devtools/checks/deep_scan.sh`; enumerates local jj bookmarks
+     via `jj bookmark list --all 'glob:*'`, classifies as (a) local-only
+     (no @origin entry) or (b) behind origin (local is ancestor of remote).
+     Findings emitted under `## Stale Local Bookmarks` in
+     `dev/health/YYYY-MM-DD-deep.md`. Protected names (main/master/HEAD/trunk)
+     excluded. Severity: INFO. Degrades gracefully if jj absent.
+     Smoke test: `trading/devtools/checks/deep_scan_stale_bookmarks_check.sh`.
+     Verify: `dune runtest devtools/checks/` — prints OK; run
+     `sh trading/devtools/checks/deep_scan.sh` — report contains
+     `## Stale Local Bookmarks`.
+  Source: `dev/daily/2026-04-14.md` end-of-day audit.
+- ~~**POSIX shell portability linter**~~ — DONE (harness/posix-sh-linter): `trading/devtools/checks/posix_sh_check.sh` runs `dash -n` over all #!/bin/sh scripts in `trading/devtools/checks/`, `trading/devtools/checks/deep_scan/`, and `dev/lib/`. Scripts with `#!/usr/bin/env bash` shebang are exempt. Smoke test: `trading/devtools/checks/posix_sh_check_test.sh`. Wired into `dune runtest`. Verify: `dune runtest devtools/checks/` — prints `OK: posix-sh linter -- N scripts clean.` Pre-existing violations found: `dev/lib/cleanup-stale-worktrees.sh` and `dev/run.sh` use `#!/usr/bin/env bash` and are exempt (intentionally bash). Source: run-4 daily summary follow-up.
+- ~~**`cc_linter.exe` overwrites its first `.ml` argument with the JSON report**~~ — DONE (PR-#570): JSON output now requires explicit `--out <path>` flag; extra positional args after the trading-root are silently ignored and never written to. Smoke test `trading/devtools/cc_linter/test/test_no_overwrite.ml` invokes the linter with two `.ml` paths and asserts byte-equality before/after. Verify: `dune runtest devtools/cc_linter/`.
+
+- ~~**`isolation: "worktree"` creates git-worktrees, not jj-workspaces — concurrent agents race shared `op_heads` + default WorkspaceName**~~ — **DONE (PR #839, Option A).** Root cause: Claude Code's `isolation: "worktree"` uses `git worktree add`, not `jj workspace add`. All git-worktree dirs share the same `.jj/repo/` backend; they collide on `WorkspaceName = "default"` and the same `@` slot, causing file leaks and silent edit-reverts (jj issue #8929). Fix implemented: `## Pre-Work Setup` boilerplate (20 lines) added to `feat-agent-template.md`, `feat-weinstein.md`, `feat-data.md`, `feat-backtest.md`, `harness-maintainer.md`, and `ops-data.md`. Each agent now runs `jj workspace add /tmp/agent-ws-${AGENT_ID} --name ${AGENT_ID} -r main@origin && cd "$AGENT_WS"` as its first step, giving each agent a distinct `WorkspaceName` and independent `@` slot. `worktree-isolation.md` extended with §"jj workspace isolation" documenting the root cause and fix. Option B (upstream Claude Code change) remains out of scope. Option C (≤1 concurrent jj-writer) remains the conservative fallback for un-upgraded sessions. Root cause reference: `memory/project_jj_worktree_root_cause.md`. Verify: `grep -l "Pre-Work Setup" .claude/agents/*.md` should list 6 files; `grep "jj workspace isolation" .claude/rules/worktree-isolation.md` should match.
+
+---
+
+## Completed
+
+### Agent definitions
+
+- [x] `harness-maintainer` agent defined — `.claude/agents/harness-maintainer.md`; owns T1-M, T1-N, T1-P, T1-Q and future harness items; dispatched by lead-orchestrator Step 2d. Verify: `cat .claude/agents/harness-maintainer.md` — should have `## Acceptance Checklist`, `## Max-Iterations Policy`, `## Allowed Tools`.
+- [x] `health-scanner` agent defined — `.claude/agents/health-scanner.md`; fast scan (post-run) and deep scan (weekly); dispatched by lead-orchestrator Step 6; read-only. Verify: `cat .claude/agents/health-scanner.md`.
+- [x] T1-O: `health-scanner` fast scan — operational spec added. Fast scan now has 5 explicit steps with shell commands: (1) stale review check, (2) main build health via `dune build && dune runtest`, (3) magic number gate check via `dune runtest devtools/checks/`, (4) status file integrity check, (5) linter exception review date check. Harness plan §T3-A updated to match. Agent definition now self-sufficient — agent can run fast scan without additional prompting. Verify: `cat .claude/agents/health-scanner.md` — should have numbered steps with bash commands; `cat docs/design/harness-engineering-plan.md` — T3-A fast scan should have 5 items.
+- [x] `ops-data` agent defined — `.claude/agents/ops-data.md`; on-demand data fetch + inventory refresh; human-triggered. Verify: `cat .claude/agents/ops-data.md`.
+- [x] `lead-orchestrator` updated — Step 2d (harness backlog dispatch), Step 6 (health-scanner fast scan), daily summary template updated with Harness Work and Health Scan sections. Verify: grep for "Step 2d\|Step 6\|health-scanner" in `.claude/agents/lead-orchestrator.md`.
+
+### Plan and principles
+
+- [x] Harness plan drafted and committed (`docs/design/harness-engineering-plan.md`). Verify: file exists; contains T1–T4 tiers, Target State, Tier 4 end-state.
+- [x] Automation goals and target state defined (Target State + Tier 4).
+- [x] Added audit trail, rollback/recovery, live trading gate, QC non-determinism policy, cost visibility.
+- [x] Incorporated learnings from Anthropic, Fowler, Stripe Minions, and OpenAI harness articles.
+- [x] Refined architecture checks: A1 FLAG not FAIL in qc-structural; generalizability judgment in qc-behavioral.
+- [x] Added T3-F architecture graph analyzer + dependency-rules.md lifecycle to plan.
+- [x] Created `docs/design/engineering-principles.md` — living document of guiding principles. Verify: file exists.
+
+### T1-A: Hard deterministic gates
+
+- [x] T1-A: Architecture layer test — `trading/devtools/checks/arch_layer_check.sh` or equivalent; enforces `analysis/` cannot import `trading/trading/`. Verify: `dune runtest trading/devtools/checks/` passes; introducing an illegal import would fail the suite.
+- [x] T1-A: Magic number linter — `trading/devtools/checks/` with `linter_exceptions.conf` carrying `# review_at:` entries for path exceptions. Verify: `dune runtest trading/devtools/checks/` passes; adding an unexcepted numeric literal in `analysis/weinstein/` fails.
+- [x] T1-A: `.mli` coverage linter — public functions in `.ml` without a corresponding `.mli` entry are flagged. Verify: `dune runtest trading/devtools/checks/` passes.
+- [x] T1-A: File length linter — 300-line soft limit, 500-line declared-large (`@large-module`), 11% cap on oversized files. Verify: `dune runtest trading/devtools/checks/`.
+- [x] T1-A+: Function length linter — `trading/devtools/fn_length_linter/`; OCaml AST via `compiler-libs`; >50 lines = test failure; `@large-function` to opt out specific functions. Verify: `dune runtest trading/devtools/fn_length_linter/`.
+
+### T1-B: QC agent split
+
+- [x] T1-B: Created `qc-structural` (`.claude/agents/qc-structural.md`) and `qc-behavioral` (`.claude/agents/qc-behavioral.md`); deleted `qc-reviewer.md`. `qc-structural` runs first, gates `qc-behavioral`. PR #171. Verify: both files exist; neither contains the word "qc-reviewer".
+- [x] T1-B: `lead-orchestrator` spawns both QC agents in sequence (structural → behavioral). Verify: grep "qc-structural\|qc-behavioral" in `lead-orchestrator.md`.
+
+### T1-C: Acceptance checklists
+
+- [x] T1-C: `## Acceptance Checklist` added to all four feat-*.md agent definitions. `feat-agent-template.md` created. PR #171, #174. Verify: `dune runtest trading/devtools/checks/` (agent_compliance_check.sh verifies required sections).
+
+### T1-D: Structured QC output
+
+- [x] T1-D: Both QC agents produce structured per-item PASS/FAIL/FLAG output (not prose). Checklist items are verifiable claims. PR #171. Verify: read `qc-structural.md` and `qc-behavioral.md` — both have a checklist section with per-item verdicts.
+
+### T1-E: Pre-flight context injection
+
+- [x] T1-E: `lead-orchestrator` injects current test failures, last QC findings, and open follow-ups before every feat-agent dispatch. PR #171. Verify: grep "pre-flight\|preflight\|context injection" in `lead-orchestrator.md`.
+
+### T1-F: Blueprint format
+
+- [x] T1-F: `lead-orchestrator` uses an explicit blueprint format separating deterministic nodes (shell commands) from agentic steps (agent spawns). PR #171. Verify: grep "blueprint\|deterministic" in `lead-orchestrator.md`.
+
+### T1-G: Max-iterations policy
+
+- [x] T1-G: `## Max-Iterations Policy` (cap: 3 build-fix cycles) added to all four feat-agent definitions. PR #174. Verify: `dune runtest trading/devtools/checks/` (agent_compliance_check.sh).
+
+### T1-H: Tool curation
+
+- [x] T1-H: `## Allowed Tools` subset added to all four feat-agent definitions. PR #174. Verify: `dune runtest trading/devtools/checks/` (agent_compliance_check.sh).
+
+### T1-I: Agent compliance check
+
+- [x] T1-I: `trading/devtools/checks/agent_compliance_check.sh` verifies all `feat-*.md` have `## Acceptance Checklist`, `## Max-Iterations Policy`, and `## Allowed Tools`. Wired into `dune runtest`. Verify: `dune runtest trading/devtools/checks/`; adding a feat-agent without these sections fails.
+
+### T1-J: Stale branch preflight
+
+- [x] T1-J: `qc-structural` Step 1 counts commits on `main@origin` not reachable from the feature branch; FLAGs (not FAILs) if > 10 commits behind. Verify: read `qc-structural.md` Step 1 — should describe the stale-branch check.
+
+### T1-K: Linter exception retirement policy
+
+- [x] T1-K: All entries in `trading/devtools/checks/linter_exceptions.conf` carry `# review_at: YYYY-MM-DD` annotations. Format documented; health-scanner deep scan will surface expired entries (T3-A). Verify: `cat trading/devtools/checks/linter_exceptions.conf` — all exception lines have `# review_at:`.
+
+### T1-L: Parallel write conflict policy
+
+- [x] T1-L: `lead-orchestrator` Step 4 documents the parallel write conflict policy: shared files (status files, CLAUDE.md, design docs) are read-only during parallel feat-agent runs; proposed changes to shared files are surfaced in return values for orchestrator resolution. Verify: grep "parallel\|write conflict\|read-only" in `lead-orchestrator.md` Step 4.
+
+### T1-N: Golden scenarios
+
+- [x] T1-N: Screener regression tests — `trading/analysis/weinstein/screener/test/regression_test.ml`; 8 real-AAPL scenarios organised by module: Stage Classifier (6: 2023 bull, 2022 bear, mid-2023 stock analysis, 2019 pre-COVID, COVID crash, 2024 AI era), Screener (2: bearish macro gate, Stage4 short candidate with Stage3→4 breakdown). RS synthetic test moved to `analysis/weinstein/rs/test/test_rs.ml`. PR #217. Verify: `dune runtest analysis/weinstein/screener/test/` (8 tests, OK).
+- [x] T1-N: Stop state machine regression tests — `trading/trading/weinstein/stops/test/regression_test.ml`; 5 scenarios: Stage2 trailing stop, Stage3 tightening, stop-hit, short side, stop-raise. PR #204. Verify: `dune runtest trading/trading/weinstein/stops/test/`.
+
+### T1-Q: Cyclomatic complexity linter
+
+- [x] T1-Q: CC linter — `trading/devtools/cc_linter/cc_linter.ml`; OCaml AST via `compiler-libs`; CC > 10 = warning (not failure); exits 0 always; optional JSON output to `dev/metrics/cc-YYYY-MM-DD.json`. Wired into `dune runtest` via `trading/devtools/checks/dune`. Verify: `dune runtest trading/devtools/checks/` — exits 0; prints OK or warning list.
+
+### T3-G: Status file integrity check
+
+- [x] T3-G: Status file integrity check — `trading/devtools/checks/status_file_integrity.sh` deterministically enforces the `dev/status/*.md` schema: `## Status` with a valid value (IN_PROGRESS | READY_FOR_REVIEW | APPROVED | MERGED | BLOCKED), `## Last updated: YYYY-MM-DD`, and `## Interface stable` (YES|NO) for feature files. Exempt files: `harness.md` (orchestrator backlog, different shape) and `backtest-infra.md` (human-driven, uses `## Ownership`). Wired into `dune runtest` via `trading/devtools/checks/dune`; health-scanner fast scan Step 4 now references the script. Verify: `dune runtest devtools/checks/` — prints `OK: all dev/status/*.md files have required fields.`; removing an `## Interface stable` section from any feature status file fails the test.
+
+### T3-G: Deep scan Trends section
+
+- [x] T3-G: Deep scan Trends extension — Check 8 added to `trading/devtools/checks/deep_scan.sh`. Emits a `## Trends` section in `dev/health/YYYY-MM-DD-deep.md` with two sub-sections: (a) followup-item count per status file — today vs second-most-recent deep scan, with per-file delta table; "no baseline" on first run; (b) CC distribution buckets (1-5 / 6-10 / >10) vs previous `dev/metrics/cc-*.json`, plus top-5 highest-CC functions by name, file, and line number. CC JSON generated by the existing `cc_linter` binary; first snapshot at `dev/metrics/cc-2026-04-16.json`. Structural smoke test: `trading/devtools/checks/deep_scan_trends_check.sh` — wired into `dune runtest`, grep-asserts that both sub-sections are present in the script and the most-recent deep scan report contains `## Trends`. Verify: `sh trading/devtools/checks/deep_scan.sh` from repo root — report contains `## Trends` with Followup items table and CC distribution table.
+
+### T3-G: Audit quality score wiring
+
+- [x] T3-G: Audit trail quality score — `trading/devtools/checks/record_qc_audit.sh`; thin wrapper around `write_audit.sh` that extracts structural verdict, behavioral verdict, and quality score from `dev/reviews/<feature>.md` and writes `dev/audit/YYYY-MM-DD-<feature>.json`. Extraction handles all observed output formats: `structural_qc:/behavioral_qc:` fields, `## Verdict` blocks (bare and `**bold**`), `## Quality Score` / `### Quality Score` headings with bare-digit (`5 — rationale`) or bold-digit (`**5 — rationale`) formats; last Quality Score section wins (behavioral takes precedence). `lead-orchestrator.md` Step 5 Stage 4 added — instructs the orchestrator to call `record_qc_audit.sh` after QC completes (APPROVED or NEEDS_REWORK) for every reviewed feature. `qc-behavioral.md` output contract note added — documents canonical format (`## Quality Score` + bare digit line) for grep-parseable output. Files: `trading/devtools/checks/record_qc_audit.sh`, `.claude/agents/lead-orchestrator.md` (Stage 4 in Step 5), `.claude/agents/qc-behavioral.md` (output contract note). Verify: `bash trading/devtools/checks/record_qc_audit.sh backtest-scale feat/backtest-scale 2026-04-20` — writes `dev/audit/2026-04-20-backtest-scale.json` with `quality_score: 5` (not null).
+
+### T3-A: Deep scan
+
+- [x] T3-A: Deep scan deterministic script — `trading/devtools/checks/deep_scan.sh`; standalone shell script (not wired into `dune runtest` — runs weekly, not on every PR). Covers 5 checks: (1) dead code detection (`.ml` files not in any dune library), (2) design doc drift (`analysis/weinstein/` and `trading/weinstein/` modules vs `eng-design-{1,2,3}` docs), (3) TODO/FIXME/HACK accumulation across `.ml`/`.mli` files, (4) size violations (files >300 lines without `@large-module`), (5) follow-up item count across `dev/status/*.md`. Writes report to `dev/health/YYYY-MM-DD-deep.md`. Health-scanner agent definition updated with Phase 1 (deterministic script) and Phase 2 (agentic steps: architecture drift, QC calibration, harness scaffolding review). Verify: `sh trading/devtools/checks/deep_scan.sh` from repo root produces `dev/health/YYYY-MM-DD-deep.md` with Metrics section.
+
+- [x] T3-A: QC calibration audit — Check 6 in `trading/devtools/checks/deep_scan.sh`. For each `dev/reviews/*.md`, extracts the most recent overall verdict (APPROVED/NEEDS_REWORK) via three patterns (`overall_qc:`, `Status:`, `## Verdict`), then: (a) flags features with reviews but no audit trail record in `dev/audit/`, (b) if `dune` is on PATH, runs `dune runtest` on each feature's test directories and flags mismatches (APPROVED + failing tests = regression; NEEDS_REWORK + passing tests = stale review). Feature-to-test-directory mapping covers screener, data-layer, portfolio-stops, simulation. Output appears in the deep scan report under `## QC Calibration Detail`. Verify: `eval $(opam env) && sh trading/devtools/checks/deep_scan.sh` — report includes `QC calibration findings` in Metrics section.
+
+### T3-D: Audit trail
+
+- [x] T3-D: Audit trail writer — `trading/devtools/checks/write_audit.sh`; standalone shell script (not wired into `dune runtest` — operational tool, not a test gate). Takes `--date`, `--feature`, `--branch`, `--structural`, `--behavioral`, `--overall`, and optional `--harness-gap`, `--quality-score`, `--pass-count`, `--fail-count`, `--flag-count`, `--notes` arguments. Writes structured JSON to `dev/audit/YYYY-MM-DD-<feature>.json`. Computes `consecutive_rework_count` by reading prior audit files for the same feature (newest-first, counting contiguous NEEDS_REWORK verdicts). Idempotent (overwrites on same date+feature). Creates `dev/audit/` if missing. Validates date format, verdict values, and required arguments. Verify: `sh trading/devtools/checks/write_audit.sh --date 2026-04-14 --feature test --branch feat/test --structural APPROVED --behavioral APPROVED --overall APPROVED` — writes `dev/audit/2026-04-14-test.json` with valid JSON.
+
+### T3-B and T3-F
+
+- [x] T3-B: AVR loop closure already in `lead-orchestrator` Step 5 — auto-dispatches QC for any READY_FOR_REVIEW feature in the same orchestrator run. Verify: grep "READY_FOR_REVIEW\|auto.*QC\|Step 5" in `lead-orchestrator.md`.
+- [x] qc-structural: P1/P2/P4 items updated to "verified by linter (H3)" — QC no longer manually re-scans these; linters are the deterministic gate. Verify: read `qc-structural.md` checklist — P1/P2/P4 items reference linter gates.
+- [x] T3-F: `docs/design/dependency-rules.md` created — R1–R6 rules with lifecycle states (`proposed` / `monitored` / `enforced`); R1, R4, R6 enforced via dune tests; R2, R3 monitored; R5 proposed. Verify: file exists; `dune runtest trading/devtools/checks/` enforces R1.
+- [x] T3-F: Architecture graph analyzer — Check 9 added to `trading/devtools/checks/deep_scan.sh`; grep-based MVP covering the two monitored rules: R2 (trading/trading/weinstein/ must not open analysis modules) and R3 (trading.simulation must not be a library dependency of live execution paths). Findings emitted under `## Architecture Graph` in `dev/health/YYYY-MM-DD-deep.md`; violations are INFO (monitored — human decides to promote to enforced). Companion smoke test at `trading/devtools/checks/deep_scan_arch_graph_check.sh` wired into `dune runtest`. Verify: `sh trading/devtools/checks/deep_scan.sh` — report contains `## Architecture Graph` with R2 and R3 sub-sections; `dune runtest devtools/checks/` — prints `OK: deep scan Architecture Graph section (T3-F) structural check passed.`
+- [x] T3-F: Rule promotion path — `trading/devtools/checks/rule_promotion_check.sh` parses `docs/design/dependency-rules.md` for rules with `Lifecycle: enforced`, asserts each has a referenced check script that (a) exists on disk and (b) is mentioned in `trading/devtools/checks/dune`. Implicit checks (R4, R6 — enforced by dune structure) are accepted without a script path. Rules at `monitored` or `proposed` are skipped. Degrades gracefully if the rules doc is absent (WARNING, exits 0). Self-test at `trading/devtools/checks/rule_promotion_self_test.sh` (6 scenarios: valid pass, missing script, missing dune wiring, implicit-ok, monitored-ok, real-repo). `docs/design/dependency-rules.md` retrofitted: `State` → `Lifecycle` field in each rule table; `Check` field standardised to either a file path or `implicit (dune structure: ...)` or `none`. Both scripts wired into `dune runtest` via `trading/devtools/checks/dune`. Verify: `sh trading/devtools/checks/rule_promotion_check.sh` — prints 3 OK lines + summary; `sh trading/devtools/checks/rule_promotion_self_test.sh` — 6/6 assertions passed. To test failure mode: add `Lifecycle: enforced` + `Check: trading/devtools/checks/no_such_script.sh` to a rule, re-run — exits 1 with FAIL message.
+
+### Deep scan heuristic gap sub-item 2: Status file template enforcement
+
+- [x] Check 10 added to `trading/devtools/checks/deep_scan.sh` — greps `dev/status/*.md` for the forbidden `## Recent Commits` heading (anchored to line start) and emits findings under `## Status File Template` in `dev/health/YYYY-MM-DD-deep.md`. WARNING severity (easy fix: delete the section). Zero current violations (all three previously-offending files were already stripped). Smoke test: `trading/devtools/checks/deep_scan_recent_commits_check.sh` — verifies Check 10 logic markers are present in `deep_scan.sh` and that the most-recent deep scan report contains `## Status File Template`. Wired into `dune runtest` via `trading/devtools/checks/dune`. Verify: `dune runtest devtools/checks/` — prints `OK: deep scan Status File Template section (Recent Commits guard) structural check passed.`
+
+### Deep scan heuristic gap sub-item 3: Linter exception expiry
+
+- [x] Check 11 added to `trading/devtools/checks/deep_scan.sh` — reads `trading/devtools/checks/linter_exceptions.conf`, extracts each entry's `# review_at:` annotation, and surfaces entries whose review point has passed. Two comparison modes: milestone labels (M1-M7 extracted from annotation value, including descriptive phrases containing a milestone token; compared against current milestone from `docs/design/weinstein-trading-system-v2.md` — if doc has no current-milestone marker, emits a parse warning and surfaces all milestone-pinned entries for manual review); date strings (YYYY-MM-DD; compared to today). Entries with `review_at: never` are permanently exempt. Entries missing any `review_at:` annotation are flagged as policy violations (T1-K) in a separate "Missing review_at" sub-section. WARNING severity (not blocking). Findings emitted under `## Linter Exception Expiry` in `dev/health/YYYY-MM-DD-deep.md`. Smoke test: `trading/devtools/checks/deep_scan_linter_expiry_check.sh` — verifies Check 11 markers present in `deep_scan.sh` and most-recent deep scan report contains `## Linter Exception Expiry`. Wired into `dune runtest` via `trading/devtools/checks/dune`. Verify: `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh` — prints `OK: deep scan Linter Exception Expiry section (T1-K) structural check passed.`
+
+### Deep scan decomposition
+
+- [x] `trading/devtools/checks/deep_scan.sh` decomposed into per-check scripts under `trading/devtools/checks/deep_scan/`. The monolith (1284 lines, 11 checks) is replaced by a 4-line shim that execs `deep_scan/main.sh`. Per-check files: `_lib.sh` (shared helpers), `main.sh` (thin orchestrator, ~130 lines), `check_01_dead_code.sh` through `check_11_linter_expiry.sh`. Each check takes `<report_file> [findings_file]` and is independently runnable. The 4 existing smoke tests (`deep_scan_trends_check.sh`, `deep_scan_arch_graph_check.sh`, `deep_scan_recent_commits_check.sh`, `deep_scan_linter_expiry_check.sh`) updated to grep per-check files instead of the monolith. Report output is byte-identical to the monolith (verified by diff). Motivation: PRs #435 and #439 collided adding "Check 11"; future check additions are now 1-file PRs. Verify: `sh trading/devtools/checks/deep_scan.sh` — report matches expected output; `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh` — prints OK.
+
+### T3-E: Cost/token budget visibility
+
+- [x] T3-E: `max_daily_cost_usd` field added to `dev/config/merge-policy.json` (default: 50.0). Step 3.75 in `lead-orchestrator.md` now reads budget cap from merge-policy.json instead of using hardcoded $30 threshold; uses 60% of cap as the high-cost trigger and 40% as the clean-budget threshold. `## Budget` section added to Step 7 daily summary template — reports total subagents spawned, per-subagent breakdown (name, model, status, estimated tokens/cost), killed-mid-flight flag, budget utilization percentage, and whether scope was reduced. Verify: `jq .max_daily_cost_usd dev/config/merge-policy.json` returns 50; grep "Budget" in `.claude/agents/lead-orchestrator.md` shows the new section; grep "max_daily_cost_usd" in Step 3.75 shows the config reference.
+- [x] T3-E+: GHA cost capture — measured (not estimated) cost reporting via `claude-code-action@v1` execution_file. Fallback 1b: action exposes `total_cost_usd` in SDKResultMessage; GHA step "Capture run cost" parses it post-run and writes `dev/budget/<date>-run<N>.json`. Removes hardcoded `~$2-4` estimate from lead-orchestrator Step 3.75b; replaces with `model_prices` block in merge-policy.json (Opus 4.5: $5/$25, Sonnet 4.6: $3/$15, Haiku 4.5: $1/$5 per MTok). `dev/lib/budget_rollup.sh` rollup tool + `trading/devtools/checks/budget_rollup_check.sh` smoke test (8 assertions, wired into dune runtest). `dev/status/cost-tracking.md` documents measured vs estimated signals and known gaps (per-subagent breakdown not available). PR #483. Verify: `dune runtest trading/devtools/checks/`; `jq . dev/budget/2026-04-20-run1.json`; `dev/lib/budget_rollup.sh 2026-04-20`.
+
+### run-sh hardening
+
+- [x] `dev/run.sh` pre-flight — fast-fails at the shell (not inside the orchestrator) if `claude` isn't on PATH, `.claude/agents/lead-orchestrator.md` is missing, or its `## Allowed Tools` section no longer lists `Agent`. Each failure prints `FAIL: <what>` to stderr and exits 1. Block is placed immediately after `REPO_ROOT=...` and uses only POSIX-compatible constructs (works with `set -euo pipefail`). Verify: `sh -n dev/run.sh` passes syntax check; temporarily rename `.claude/agents/lead-orchestrator.md` and re-run `dev/run.sh` — it exits 1 with a clear `FAIL:` message.
+- [x] `dev/config/merge-policy.json` — default merge-policy config committed with inline defaults (`followup_threshold: 10`, `maintenance_cycle_ratio: 3`, `auto_merge_enabled: false`). Matches the inline defaults previously embedded in `lead-orchestrator.md` Step 2b — now visible and tweakable without editing the agent definition. Intent documented in `dev/config/README.md`. Verify: `jq . dev/config/merge-policy.json` parses cleanly.
+- [x] Orchestrator `## Plan Mode` — added to `.claude/agents/lead-orchestrator.md`; triggered by a `--plan` token in the prompt, short-circuits Steps 2–6, writes `dev/daily/<YYYY-MM-DD>-plan.md` with `(plan mode)` marker, never mutates branches or status files. Structural smoke test at `trading/devtools/checks/orchestrator_plan_check.sh` wired into `dune runtest` — grep-asserts the required Plan Mode contract pieces in the agent definition. Does NOT invoke `claude -p` from dune runtest (credentials/network/flakiness). Verify: `dune runtest trading/devtools/checks/` — prints `OK: lead-orchestrator plan mode contract present.`
+
+### Same-day summary consolidation
+
+- [x] `dev/lib/consolidate_day.sh` — merges all `${DATE}*.md` (non-plan) in `dev/daily/` into
+  `${DATE}-summary.md`. Sections: Pending work (last run), Dispatched (deduped union — same
+  (Track, Agent, Outcome) appears once; conflicting Outcomes get "(run-N)" suffix), QC per track
+  (latest per track), Budget (summed subagents + per-run utilization), Escalations (deduped union
+  with "(seen in: run-N, run-M)" suffix), Integration Queue (last run), Per-run links. Idempotent;
+  graceful on malformed sections (warns to stderr, continues). PR #467.
+  Wired into `lead-orchestrator.md` Step 8b — runs after auto-merge when N >= 3; consolidated
+  file committed into the same ops/daily-${DATE}-runN branch.
+  Smoke test: `trading/devtools/checks/consolidate_day_check.sh` (9 assertions: run header,
+  escalation dedup, distinct-outcome preservation, per-run links, budget sum, idempotency,
+  error cases for missing arg / malformed date / no files).
+  Verify: `dune runtest devtools/checks/` — prints `OK: consolidate_day_check — all assertions passed.`;
+  `sh dev/lib/consolidate_day.sh 2026-04-20` with three 2026-04-20 daily files present.
+
+### Deep scan heuristic gap sub-item 1: Drift coverage extension (backtest)
+
+- [x] `trading/trading/backtest/` subsystem added to `trading/devtools/checks/deep_scan/check_02_design_doc_drift.sh` — checks top-level subdirectories of `trading/trading/backtest/` against `dev/plans/backtest-scale-optimization-2026-04-17.md` using the same heuristic as the existing Weinstein subsystem checks (grep for dir name in plan doc; missing = WARNING). Plan document is the active backtest design spec. Current live finding: `trading/trading/backtest/bin/` is not mentioned in the plan (expected — runner binary added post-plan). Smoke test: `trading/devtools/checks/deep_scan_drift_coverage_check.sh` — verifies BACKTEST_PLAN, BACKTEST_DIR, and the plan filename markers are present in `check_02`, and that the most-recent deep scan report references drift. Wired into `dune runtest` via `trading/devtools/checks/dune`. Verify: `sh trading/devtools/checks/deep_scan_drift_coverage_check.sh` — prints OK; `sh trading/devtools/checks/deep_scan.sh` — report shows `Design doc drift items: 1` and warns about `backtest/bin/`.
+
+### orchestrator-daily bundle-budget checkout fix
+
+- [x] GHA "Bundle budget into daily summary and auto-merge" step now resets the working tree before `git checkout "${DAILY_BRANCH}"`. Root cause: lead-orchestrator (jj) leaves modified `dev/reviews/*.md` and untracked `dev/audit/*` / `dev/health/*` files in the git working copy after pushing to the daily branch; `git checkout` refuses to overwrite them. Fix: `git reset --hard HEAD && git clean -fd` added immediately before `git fetch origin "${DAILY_BRANCH}"` with an explanatory comment. Failed run: https://github.com/dayfine/trading/actions/runs/25109871573. File: `.github/workflows/orchestrator.yml` (lines 374–382). Verify: next scheduled run (00:17 or 05:17 PT) completes the step without checkout error.
+
+### Track pacer agent
+
+- [x] `track-pacer` agent defined — `.claude/agents/track-pacer.md`; weekly work-pace and strategic-fit audit; reads all track status files + git log; writes to `dev/reviews/track-pacer-YYYY-MM-DD.md`. GHA workflow `.github/workflows/track-pacer-weekly.yml` — schedule: Sunday 06:00 UTC; branch `ops/track-pacer-<date>`; PR opened for human review (not auto-merged). Seven checks: P1 PR cadence (active/slowing/stalled), P2 Next Steps staleness, P3 `[info]` carryover age (≥3 reconciles), P4 new tracks without owner, P5 recurring discussion topics, P6 diminishing returns (maintenance-only PRs), P7 capability gaps vs milestone plan. Distinct from `health-scanner` (code health) — this agent audits *work pace and strategic fit*. Verify: `cat .claude/agents/track-pacer.md` — should have 7 checks, output format section, and Allowed Tools; `cat .github/workflows/track-pacer-weekly.yml` — should have `cron: "0 6 * * 0"` and push+PR step.
+
+### POSIX shell portability linter
+
+- [x] POSIX shell portability linter — `trading/devtools/checks/posix_sh_check.sh`; runs `dash -n` (syntax-only parse) over all #!/bin/sh scripts in `trading/devtools/checks/`, `trading/devtools/checks/deep_scan/`, and `dev/lib/`. Scripts with `#!/usr/bin/env bash` or `#!/bin/bash` shebang are exempt. Approach: `dash` is pre-installed in the devcontainer base image; `shellcheck` is not. Catches parse-time bash-isms: bash arrays `arr=(...)`, here-strings `<<<`, and process substitution `<(...)` — exactly the class that caused rework on PR #483. Smoke test: `trading/devtools/checks/posix_sh_check_test.sh` (3 assertions: bad-fixture FAIL, clean-fixture OK, bash-exempt OK). Both wired into `dune runtest` via `trading/devtools/checks/dune`. Pre-existing violations found at survey time: `dev/lib/cleanup-stale-worktrees.sh` and `dev/run.sh` have `#!/usr/bin/env bash` and are correctly exempt (intentionally bash). Follow-up: add shellcheck to the devcontainer image for richer coverage of runtime bash-isms ([[ ]], mapfile, ${BASH_SOURCE[0]}). Verify: `dune runtest devtools/checks/` — prints `OK: posix-sh linter -- N scripts clean.` and `OK: posix_sh_check_test -- all 3 assertions passed.`; `sh trading/devtools/checks/posix_sh_check.sh` from repo root.
