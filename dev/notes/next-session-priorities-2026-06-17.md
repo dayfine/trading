@@ -1,6 +1,7 @@
-# Next-session priorities — 2026-06-16 (PM2 / late continuation)
+# Next-session priorities — 2026-06-17
 
-**Supersedes** `next-session-priorities-2026-06-16-PM.md`. Check main CI green first.
+**Supersedes** `next-session-priorities-2026-06-16-PM2.md` (renamed from it; the
+overnight run carried it into 06-17). Check main CI green first.
 
 ---
 
