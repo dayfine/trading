@@ -18,26 +18,48 @@
     symbol; a per-date file would force [N] file reads to serve a 30-day history
     for one symbol.
 
-    {2 "mmap" in Phase C}
+    {2 Dual backing: mmap (v2) and decoded (v1 fallback)}
 
-    Phase A's file format is sexp-encoded ([Snapshot_format] header docstring),
-    so the cache cannot literally [Bigarray.map_file] cells today. Phase C uses
-    "mmap-style" semantics in spirit — the entire file is decoded into a
-    [Snapshot.t list] on first access for a symbol, held in the cache until
-    evicted. Plan §C5 calls out the eventual upgrade to a raw-bytes payload with
-    [Bigarray.Array2.map_file] (Phase F); the API surface here is shaped so that
-    swap is local to {!Daily_panels} — [read_today] / [read_history] callers
-    don't see the difference. Until then, eviction is via dropping the
-    OCaml-heap rows and letting the GC reclaim them.
+    A cache entry is one of two backings, chosen by {b format-detecting} each
+    file's first bytes against the v2 columnar magic
+    ([Snapshot_columnar_codec.magic]):
 
-    {2 Memory budget}
+    - {b Mmap (v2)} — a columnar {!Data_panel_snapshot.Snapshot_columnar}
+      reader. The file's columns are memory-mapped once at open; each read
+      {b slices} the mapped columns over the requested date range. The OCaml
+      heap holds only the reader handle (fd + header + the int32 date index +
+      column descriptors); the float-column cells live in the OS page cache and
+      fault in lazily, so a resident entry is cheap. This is the path the
+      snapshot-format-v2 migration (S3/S4) moves the warehouses to.
+    - {b Decoded (v1 fallback)} — for files still in the v1 sexp format
+      ([Snapshot_format]), the entire file is decoded into a sorted
+      [Snapshot.t array] on first access and held until evicted. This is the
+      pre-v2 behaviour, preserved bit-for-bit so existing goldens are unaffected
+      until the warehouse is regenerated in v2.
 
-    Plan §C5: at N=10K symbols × 30-day window, ~22 MB of snapshot rows live in
-    the cache window. {!create}'s [max_cache_mb] sets a hard ceiling; once
-    inserting a new symbol's rows would push total tracked bytes above the cap,
-    the LRU symbol is evicted. The byte estimate is conservative (each row is
-    [Snapshot_schema.n_fields schema * 8] bytes plus per-row OCaml overhead), so
-    the actual memory pressure stays at or below the configured cap.
+    Both backings are transparent to {!read_today} / {!read_history} callers —
+    they see the same row-level results. A single cache may hold a mix of v1 and
+    v2 files (e.g. during a partial migration).
+
+    {2 Memory budget + open-handle cap}
+
+    Two limits bound resident state, enforced by the same LRU eviction loop:
+
+    - {b Byte budget.} {!create}'s [max_cache_mb] sets the heap-byte ceiling. A
+      [Decoded] entry's bytes ≈ [n_rows * (n_fields * 8 + overhead)]; an [Mmap]
+      entry's bytes is small (the int32 date array + a fixed per-handle constant
+      — the column pages are page-cache resident, not counted). Once inserting a
+      new symbol pushes tracked bytes above the cap, the LRU symbol is evicted.
+    - {b Open-handle cap.} Each [Mmap] entry holds an open fd. An internal cap
+      ([_max_open_mmap_handles], well under a typical 1024 fd ulimit) bounds the
+      number of resident [Mmap] readers; the eviction loop closes the LRU
+      reader's fd once the cap is exceeded, even if the byte budget alone would
+      admit more. This is the "LRU for handle count" the v2 plan calls for and
+      is {b not} a {!create} parameter.
+
+    Evicting an [Mmap] entry {!Data_panel_snapshot.Snapshot_columnar.close}s its
+    reader (releasing the fd + unmapping). {!close} closes every resident
+    reader.
 
     {2 Concurrency}
 
@@ -52,9 +74,10 @@ type t
 
     - the directory's manifest (read at {!create} time),
     - the schema the manifest was written under,
-    - a byte-budget cap, and
-    - an internal per-symbol cache that maps symbol → loaded snapshot rows,
-      ordered by recency for LRU eviction. *)
+    - a byte-budget cap + an open-handle cap, and
+    - an internal per-symbol cache that maps symbol → its loaded backing (an
+      mmap reader for v2 files, decoded rows for v1), ordered by recency for LRU
+      eviction. *)
 
 val create :
   snapshot_dir:string ->
@@ -151,9 +174,11 @@ val cache_stats : t -> stats
     caller can read them after the run to diagnose cache thrash. *)
 
 val close : t -> unit
-(** [close t] drops every cached symbol. After {!close}, [t] is logically empty;
+(** [close t] drops every cached symbol, closing every resident mmap reader's fd
+    (so no file descriptors leak). After {!close}, [t] is logically empty;
     subsequent {!read_today} / {!read_history} calls will reload from disk on
     demand. The handle is otherwise still usable.
 
     Provided so callers (notably the simulator in Phase D) can release snapshot
-    memory at well-defined points (e.g. between scenarios). *)
+    memory + file descriptors at well-defined points (e.g. between scenarios).
+*)

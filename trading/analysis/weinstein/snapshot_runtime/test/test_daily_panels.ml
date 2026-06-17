@@ -4,6 +4,7 @@ open Matchers
 module Daily_panels = Snapshot_runtime.Daily_panels
 module Snapshot = Data_panel_snapshot.Snapshot
 module Snapshot_format = Data_panel_snapshot.Snapshot_format
+module Snapshot_columnar = Data_panel_snapshot.Snapshot_columnar
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
 
@@ -57,7 +58,7 @@ let _make_tmp_dir () = Filename_unix.temp_dir ~in_dir:"/tmp" "daily_panels_" ""
    [max_cache_mb]). All series start at [_default_start]. *)
 let _default_start = _ymd 2024 1 2
 
-let _setup ~symbols ~n_days ~max_cache_mb =
+let _setup ~symbols ~n_days ~max_cache_mb () =
   let dir = _make_tmp_dir () in
   let entries =
     List.map symbols ~f:(fun symbol ->
@@ -66,6 +67,64 @@ let _setup ~symbols ~n_days ~max_cache_mb =
         metadata)
   in
   let manifest = Snapshot_manifest.create ~schema:_test_schema ~entries in
+  match Daily_panels.create ~snapshot_dir:dir ~manifest ~max_cache_mb with
+  | Ok t -> (dir, t)
+  | Error err -> assert_failure ("Daily_panels.create: " ^ Status.show err)
+
+(* --- v2 fixtures (must use the canonical default schema) -------------- *)
+
+(* The columnar reader can only reconstruct rows under [Snapshot_schema.default]
+   (it stores the schema hash + field count, not the ordered field list), so v2
+   fixtures use the default 13-field schema. Fields 0 and 1 carry the same
+   deterministic 100+i / 200+i series the v1 fixtures use, so the same value
+   assertions read across both formats; the remaining fields are deterministic
+   filler. *)
+let _v2_make_row ~symbol ~date ~day =
+  let n = Snapshot_schema.n_fields Snapshot_schema.default in
+  let values =
+    Array.init n ~f:(fun c ->
+        match c with
+        | 0 -> 100.0 +. Float.of_int day
+        | 1 -> 200.0 +. Float.of_int day
+        | _ -> Float.of_int ((day * 10) + c))
+  in
+  match
+    Snapshot.create ~schema:Snapshot_schema.default ~symbol ~date ~values
+  with
+  | Ok r -> r
+  | Error err -> assert_failure ("Snapshot.create: " ^ Status.show err)
+
+let _v2_series ~symbol ~n =
+  List.init n ~f:(fun i ->
+      _v2_make_row ~symbol ~date:(Date.add_days _default_start i) ~day:i)
+
+let _v2_write_symbol ~dir ~symbol rows =
+  let path = Filename.concat dir (symbol ^ ".snap") in
+  match Snapshot_columnar.write ~path rows with
+  | Ok () ->
+      let stat = Core_unix.stat path in
+      ({
+         Snapshot_manifest.symbol;
+         path;
+         byte_size = Int64.to_int_exn stat.st_size;
+         payload_md5 = "ignored";
+         csv_mtime = stat.st_mtime;
+         active_through = None;
+       }
+        : Snapshot_manifest.file_metadata)
+  | Error err -> assert_failure ("Snapshot_columnar.write: " ^ Status.show err)
+
+(* Build a directory of v2 columnar files (one per symbol) and a manifest under
+   the default schema; return the resulting [Daily_panels.t]. *)
+let _v2_setup ~symbols ~n_days ~max_cache_mb =
+  let dir = _make_tmp_dir () in
+  let entries =
+    List.map symbols ~f:(fun symbol ->
+        _v2_write_symbol ~dir ~symbol (_v2_series ~symbol ~n:n_days))
+  in
+  let manifest =
+    Snapshot_manifest.create ~schema:Snapshot_schema.default ~entries
+  in
   match Daily_panels.create ~snapshot_dir:dir ~manifest ~max_cache_mb with
   | Ok t -> (dir, t)
   | Error err -> assert_failure ("Daily_panels.create: " ^ Status.show err)
@@ -80,14 +139,14 @@ let test_create_rejects_nonpositive_cap _ =
     (is_error_with Status.Invalid_argument)
 
 let test_schema_returns_manifest_schema _ =
-  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 in
+  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 () in
   assert_that (Daily_panels.schema t).schema_hash
     (equal_to _test_schema.schema_hash)
 
 (* --- read_today ----------------------------------------------------- *)
 
 let test_read_today_returns_correct_row _ =
-  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 in
+  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 () in
   let date = Date.add_days _default_start 2 in
   assert_that
     (Daily_panels.read_today t ~symbol:"AAPL" ~date)
@@ -101,13 +160,13 @@ let test_read_today_returns_correct_row _ =
           ]))
 
 let test_read_today_unknown_symbol_returns_not_found _ =
-  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 in
+  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 () in
   assert_that
     (Daily_panels.read_today t ~symbol:"XYZ" ~date:_default_start)
     (is_error_with Status.NotFound)
 
 let test_read_today_unknown_date_returns_not_found _ =
-  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 in
+  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 () in
   let outside = Date.add_days _default_start 100 in
   assert_that
     (Daily_panels.read_today t ~symbol:"AAPL" ~date:outside)
@@ -116,7 +175,7 @@ let test_read_today_unknown_date_returns_not_found _ =
 (* --- read_history --------------------------------------------------- *)
 
 let test_read_history_returns_ordered_subset _ =
-  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:10 ~max_cache_mb:1 in
+  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:10 ~max_cache_mb:1 () in
   let from = Date.add_days _default_start 2 in
   let until = Date.add_days _default_start 5 in
   let dates_in_result rows =
@@ -135,7 +194,7 @@ let test_read_history_returns_ordered_subset _ =
              ])))
 
 let test_read_history_empty_range_returns_empty_list _ =
-  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 in
+  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 () in
   let future_from = Date.add_days _default_start 100 in
   let future_until = Date.add_days _default_start 110 in
   assert_that
@@ -155,7 +214,7 @@ let test_lru_evicts_when_over_budget _ =
   (* Each symbol: 5000 rows × (16 bytes values + 64 overhead) ≈ 400 KB.
      With max_cache_mb = 1 (1 MB = 1,048,576 bytes), at most 2 symbols
      fully fit; loading all 6 should evict at least the earliest 2. *)
-  let _dir, t = _setup ~symbols ~n_days:5000 ~max_cache_mb:1 in
+  let _dir, t = _setup ~symbols ~n_days:5000 ~max_cache_mb:1 () in
   let date = _default_start in
   List.iter symbols ~f:(fun symbol ->
       match Daily_panels.read_today t ~symbol ~date with
@@ -170,7 +229,7 @@ let test_lru_evicts_when_over_budget _ =
 
 let test_lru_keeps_recently_used_symbol_resident _ =
   let symbols = [ "A"; "B"; "C"; "D"; "E"; "F" ] in
-  let _dir, t = _setup ~symbols ~n_days:5000 ~max_cache_mb:1 in
+  let _dir, t = _setup ~symbols ~n_days:5000 ~max_cache_mb:1 () in
   let date = _default_start in
   (* Touch symbol A first, then load B-F. A should be the LRU and likely
      evicted; touching it again would reload from disk. We assert this
@@ -197,7 +256,7 @@ let test_lru_keeps_recently_used_symbol_resident _ =
    persistence is the source of truth). Verifies that close doesn't corrupt
    the manifest's file pointers. *)
 let test_close_then_read_reloads _ =
-  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 in
+  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 () in
   let date = _default_start in
   let _ =
     match Daily_panels.read_today t ~symbol:"AAPL" ~date with
@@ -266,7 +325,7 @@ let test_round_trip_30d_10sym _ =
     [ "S0"; "S1"; "S2"; "S3"; "S4"; "S5"; "S6"; "S7"; "S8"; "S9" ]
   in
   let n_days = 30 in
-  let _dir, t = _setup ~symbols ~n_days ~max_cache_mb:1 in
+  let _dir, t = _setup ~symbols ~n_days ~max_cache_mb:1 () in
   let s7_date_5 = Date.add_days _default_start 5 in
   let s7_full =
     match
@@ -287,7 +346,7 @@ let test_round_trip_30d_10sym _ =
 (* A first read of a fresh symbol is a miss (one disk decode), no hit, no
    eviction. *)
 let test_cache_stats_first_read_is_a_miss _ =
-  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 in
+  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 () in
   let _ =
     match Daily_panels.read_today t ~symbol:"AAPL" ~date:_default_start with
     | Ok r -> r
@@ -300,7 +359,7 @@ let test_cache_stats_first_read_is_a_miss _ =
 (* A second read of the same resident symbol is a hit; the miss count stays
    at one. *)
 let test_cache_stats_second_read_is_a_hit _ =
-  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 in
+  let _dir, t = _setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 () in
   let read () =
     match Daily_panels.read_today t ~symbol:"AAPL" ~date:_default_start with
     | Ok _ -> ()
@@ -316,7 +375,7 @@ let test_cache_stats_second_read_is_a_hit _ =
    least one eviction; each first-touch is a miss and none are hits. *)
 let test_cache_stats_counts_evictions_under_pressure _ =
   let symbols = [ "A"; "B"; "C"; "D"; "E"; "F" ] in
-  let _dir, t = _setup ~symbols ~n_days:5000 ~max_cache_mb:1 in
+  let _dir, t = _setup ~symbols ~n_days:5000 ~max_cache_mb:1 () in
   List.iter symbols ~f:(fun symbol ->
       match Daily_panels.read_today t ~symbol ~date:_default_start with
       | Ok _ -> ()
@@ -333,6 +392,212 @@ let test_cache_stats_counts_evictions_under_pressure _ =
            (fun (s : Daily_panels.stats) -> s.evictions)
            (gt (module Int_ord) 0);
        ])
+
+(* --- v2 (Mmap) fixtures: same reads through the columnar backing ----- *)
+
+(* read_today on a v2 file returns the correct row (the Mmap path slices the
+   mapped columns). *)
+let test_v2_read_today_returns_correct_row _ =
+  let _dir, t = _v2_setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 in
+  let date = Date.add_days _default_start 2 in
+  assert_that
+    (Daily_panels.read_today t ~symbol:"AAPL" ~date)
+    (is_ok_and_holds
+       (all_of
+          [
+            field (fun (r : Snapshot.t) -> r.symbol) (equal_to "AAPL");
+            field (fun (r : Snapshot.t) -> r.date) (equal_to date);
+            field (fun (r : Snapshot.t) -> r.values.(0)) (float_equal 102.0);
+            field (fun (r : Snapshot.t) -> r.values.(1)) (float_equal 202.0);
+          ]))
+
+(* read_today for a date absent from a v2 file is NotFound (empty range). *)
+let test_v2_read_today_unknown_date_returns_not_found _ =
+  let _dir, t = _v2_setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 in
+  let outside = Date.add_days _default_start 100 in
+  assert_that
+    (Daily_panels.read_today t ~symbol:"AAPL" ~date:outside)
+    (is_error_with Status.NotFound)
+
+(* read_history on a v2 file returns the ordered subset over an inclusive
+   range, boundaries included. *)
+let test_v2_read_history_ordered_subset_inclusive _ =
+  let _dir, t = _v2_setup ~symbols:[ "AAPL" ] ~n_days:10 ~max_cache_mb:1 in
+  let from = Date.add_days _default_start 2 in
+  let until = Date.add_days _default_start 5 in
+  let dates_in_result rows =
+    List.map rows ~f:(fun (r : Snapshot.t) -> r.date)
+  in
+  assert_that
+    (Daily_panels.read_history t ~symbol:"AAPL" ~from ~until)
+    (is_ok_and_holds
+       (field dates_in_result
+          (equal_to
+             [
+               Date.add_days _default_start 2;
+               Date.add_days _default_start 3;
+               Date.add_days _default_start 4;
+               Date.add_days _default_start 5;
+             ])))
+
+(* An inverted (until < from) v2 range yields Ok []. *)
+let test_v2_read_history_inverted_range_is_empty _ =
+  let _dir, t = _v2_setup ~symbols:[ "AAPL" ] ~n_days:10 ~max_cache_mb:1 in
+  let from = Date.add_days _default_start 5 in
+  let until = Date.add_days _default_start 2 in
+  assert_that
+    (Daily_panels.read_history t ~symbol:"AAPL" ~from ~until)
+    (is_ok_and_holds (size_is 0))
+
+(* A v2 range entirely outside the data yields Ok []. *)
+let test_v2_read_history_empty_range_is_empty _ =
+  let _dir, t = _v2_setup ~symbols:[ "AAPL" ] ~n_days:5 ~max_cache_mb:1 in
+  let from = Date.add_days _default_start 100 in
+  let until = Date.add_days _default_start 110 in
+  assert_that
+    (Daily_panels.read_history t ~symbol:"AAPL" ~from ~until)
+    (is_ok_and_holds (size_is 0))
+
+(* The indicator floats round-trip exactly through the v2 columnar payload. *)
+let test_v2_values_round_trip _ =
+  let _dir, t = _v2_setup ~symbols:[ "AAPL" ] ~n_days:30 ~max_cache_mb:1 in
+  let date = Date.add_days _default_start 7 in
+  assert_that
+    (Daily_panels.read_today t ~symbol:"AAPL" ~date)
+    (is_ok_and_holds
+       (all_of
+          [
+            field (fun (r : Snapshot.t) -> r.values.(0)) (float_equal 107.0);
+            field (fun (r : Snapshot.t) -> r.values.(1)) (float_equal 207.0);
+          ]))
+
+(* A v2 file written under a different schema is rejected loudly when the
+   manifest declares [_test_schema] (same Failed_precondition contract as v1). *)
+let test_v2_schema_mismatch_fails_loud _ =
+  let dir = _make_tmp_dir () in
+  let other_schema =
+    Snapshot_schema.create ~fields:[ Snapshot_schema.RSI_14 ]
+  in
+  let other_row =
+    match
+      Snapshot.create ~schema:other_schema ~symbol:"AAPL" ~date:_default_start
+        ~values:[| 50.0 |]
+    with
+    | Ok r -> r
+    | Error err -> assert_failure ("Snapshot.create: " ^ Status.show err)
+  in
+  let path = Filename.concat dir "AAPL.snap" in
+  let () =
+    match Snapshot_columnar.write ~path [ other_row ] with
+    | Ok () -> ()
+    | Error err -> assert_failure ("Snapshot_columnar.write: " ^ Status.show err)
+  in
+  let metadata =
+    {
+      Snapshot_manifest.symbol = "AAPL";
+      path;
+      byte_size = 0;
+      payload_md5 = "ignored";
+      csv_mtime = 0.0;
+      active_through = None;
+    }
+  in
+  let manifest =
+    Snapshot_manifest.create ~schema:_test_schema ~entries:[ metadata ]
+  in
+  let t =
+    match Daily_panels.create ~snapshot_dir:dir ~manifest ~max_cache_mb:1 with
+    | Ok t -> t
+    | Error err -> assert_failure ("Daily_panels.create: " ^ Status.show err)
+  in
+  assert_that
+    (Daily_panels.read_today t ~symbol:"AAPL" ~date:_default_start)
+    (is_error_with Status.Failed_precondition)
+
+(* --- handle-cap eviction (v2-specific) ------------------------------- *)
+
+(* More v2 symbols than the internal open-handle cap (256). Tiny rows keep the
+   byte budget far below 1 MB, so the byte cap never fires — the open-handle
+   cap is the sole eviction driver. Reading every symbol must force at least
+   one eviction, and a re-read of an evicted symbol must reopen + return the
+   correct row (proves the reopen-after-evict path works). *)
+let test_v2_handle_cap_evicts_and_reopens _ =
+  let symbols = List.init 300 ~f:(fun i -> Printf.sprintf "S%03d" i) in
+  let _dir, t = _v2_setup ~symbols ~n_days:5 ~max_cache_mb:1 in
+  let read_first s =
+    match Daily_panels.read_today t ~symbol:s ~date:_default_start with
+    | Ok _ -> ()
+    | Error err -> assert_failure ("read_today " ^ s ^ ": " ^ Status.show err)
+  in
+  List.iter symbols ~f:read_first;
+  (* The open-handle cap (256) is below the 300 symbols, so eviction fired. *)
+  assert_that
+    (Daily_panels.cache_stats t)
+    (field
+       (fun (s : Daily_panels.stats) -> s.evictions)
+       (gt (module Int_ord) 0));
+  (* S000 was the very first loaded, so it is the LRU and has been evicted; a
+     re-read reopens it from disk and returns its row. *)
+  assert_that
+    (Daily_panels.read_today t ~symbol:"S000" ~date:_default_start)
+    (is_ok_and_holds
+       (all_of
+          [
+            field (fun (r : Snapshot.t) -> r.symbol) (equal_to "S000");
+            field (fun (r : Snapshot.t) -> r.values.(0)) (float_equal 100.0);
+          ]))
+
+(* --- mixed v1 + v2 in one cache -------------------------------------- *)
+
+(* One v1 file and one v2 file in the same manifest/dir must both read
+   correctly through the same [Daily_panels.t] (format detection per-file). *)
+let test_mixed_v1_and_v2_both_read _ =
+  let dir = _make_tmp_dir () in
+  (* Both files use the default schema (the v2 reader can only reconstruct
+     default-schema rows); OLD is written v1 sexp, NEW v2 columnar. *)
+  let v1_path = Filename.concat dir "OLD.snap" in
+  let m1 =
+    match
+      Snapshot_format.write ~path:v1_path (_v2_series ~symbol:"OLD" ~n:5)
+    with
+    | Ok () ->
+        ({
+           Snapshot_manifest.symbol = "OLD";
+           path = v1_path;
+           byte_size = 0;
+           payload_md5 = "ignored";
+           csv_mtime = 0.0;
+           active_through = None;
+         }
+          : Snapshot_manifest.file_metadata)
+    | Error err -> assert_failure ("Snapshot_format.write: " ^ Status.show err)
+  in
+  let m2 =
+    _v2_write_symbol ~dir ~symbol:"NEW" (_v2_series ~symbol:"NEW" ~n:5)
+  in
+  let manifest =
+    Snapshot_manifest.create ~schema:Snapshot_schema.default ~entries:[ m1; m2 ]
+  in
+  let t =
+    match Daily_panels.create ~snapshot_dir:dir ~manifest ~max_cache_mb:1 with
+    | Ok t -> t
+    | Error err -> assert_failure ("Daily_panels.create: " ^ Status.show err)
+  in
+  let date = Date.add_days _default_start 3 in
+  let check_symbol s =
+    assert_that
+      (Daily_panels.read_today t ~symbol:s ~date)
+      (is_ok_and_holds
+         (all_of
+            [
+              field (fun (r : Snapshot.t) -> r.symbol) (equal_to s);
+              field (fun (r : Snapshot.t) -> r.values.(0)) (float_equal 103.0);
+            ]))
+  in
+  (* OLD is read through the v1 Decoded path, NEW through the v2 Mmap path;
+     both must surface the same row shape. *)
+  check_symbol "OLD";
+  check_symbol "NEW"
 
 let suite =
   "Daily_panels tests"
@@ -363,6 +628,21 @@ let suite =
          >:: test_cache_stats_second_read_is_a_hit;
          "cache stats counts evictions under pressure"
          >:: test_cache_stats_counts_evictions_under_pressure;
+         "v2 read_today returns correct row"
+         >:: test_v2_read_today_returns_correct_row;
+         "v2 read_today unknown date returns not_found"
+         >:: test_v2_read_today_unknown_date_returns_not_found;
+         "v2 read_history ordered subset inclusive"
+         >:: test_v2_read_history_ordered_subset_inclusive;
+         "v2 read_history inverted range is empty"
+         >:: test_v2_read_history_inverted_range_is_empty;
+         "v2 read_history empty range is empty"
+         >:: test_v2_read_history_empty_range_is_empty;
+         "v2 values round trip" >:: test_v2_values_round_trip;
+         "v2 schema mismatch fails loud" >:: test_v2_schema_mismatch_fails_loud;
+         "v2 handle cap evicts and reopens"
+         >:: test_v2_handle_cap_evicts_and_reopens;
+         "mixed v1 and v2 both read" >:: test_mixed_v1_and_v2_both_read;
        ]
 
 let () = run_test_tt_main suite

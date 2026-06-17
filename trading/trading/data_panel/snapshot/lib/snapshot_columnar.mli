@@ -90,6 +90,18 @@ val with_reader :
     leaking fds. If {!open_reader} fails, [f] is not run and the error is
     returned. *)
 
+val schema_hash : reader -> string
+(** [schema_hash r] is the [schema_hash] recorded in the file header. The
+    runtime gates on this to refuse a file produced under a different indicator
+    set before reading any rows. *)
+
+val symbol : reader -> string
+(** [symbol r] is the single symbol this file holds (the header's [symbol]). *)
+
+val n_rows : reader -> int
+(** [n_rows r] is the number of dated rows in the file (the header's [n_rows]).
+*)
+
 val read_all : reader -> Snapshot.t list Status.status_or
 (** [read_all r] returns every row in the file, ordered chronologically (oldest
     first). Reconstructs full {!Snapshot.t} rows (all schema fields). *)

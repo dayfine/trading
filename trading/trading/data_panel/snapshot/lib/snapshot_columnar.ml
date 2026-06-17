@@ -110,8 +110,14 @@ type reader = {
   header : Header.t;
   schema : Snapshot_schema.t;
   dates : C.dates_arr;
-  (* Byte offset of [col_0] (the first float64 column block) in the file. *)
-  cols_byte_pos : int;
+  (* All [n_fields] float64 column blocks, mapped once at [open_reader] as
+     zero-copy views. [read_range] / [read_all] slice these rather than
+     re-mapping per call (which, under a high read rate, would create
+     unbounded transient mappings). The OCaml-heap cost is one bigarray
+     descriptor per column; the cells live in the OS page cache and only page
+     in on access, so untouched columns never fault. Dropping the reader (via
+     [close] then GC) unmaps them. *)
+  mutable cols : C.col_arr array;
 }
 
 (* Reads exactly [len] bytes from [fd]; [Error Internal what] on a short read. *)
@@ -149,22 +155,24 @@ let _check_version (header : Header.t) =
          header.format_version)
   else Ok ()
 
+(* Maps all [n_fields] column blocks as zero-copy views, once at open time. *)
+let _map_all_cols fd ~cols_byte_pos ~n ~n_fields : C.col_arr array =
+  Array.init n_fields ~f:(fun c ->
+      C.map_col fd
+        ~byte_pos:(cols_byte_pos + (c * n * C.float64_bytes))
+        ~n_rows:n)
+
 let _build_reader fd (header : Header.t) ~dates_byte_pos : reader =
   let n = header.n_rows in
   let dates = C.map_dates fd ~byte_pos:dates_byte_pos ~n_rows:n in
   let cols_byte_pos = dates_byte_pos + (n * C.int32_bytes) in
+  let cols = _map_all_cols fd ~cols_byte_pos ~n ~n_fields:header.n_fields in
   (* The header stores only [schema_hash] + [n_fields], not the ordered field
      list, so row reconstruction uses the canonical [Snapshot_schema.default].
      [read_all] / [read_range] gate on [header.schema_hash = default.hash]
      before reconstructing, so a file under any other field order fails loudly
      rather than reconstructing rows under the wrong schema. *)
-  {
-    fd = Some fd;
-    header;
-    schema = Snapshot_schema.default;
-    dates;
-    cols_byte_pos;
-  }
+  { fd = Some fd; header; schema = Snapshot_schema.default; dates; cols }
 
 let open_reader ~path =
   let open Result.Let_syntax in
@@ -188,12 +196,21 @@ let close r =
   | None -> ()
   | Some fd -> (
       r.fd <- None;
+      (* Drop the mapped column views so the GC can unmap them; the empty array
+         keeps the field well-typed without holding any mapping. *)
+      r.cols <- [||];
       try Core_unix.close fd with _ -> ())
 
 let with_reader ~path ~f =
   match open_reader ~path with
   | Error _ as e -> e
   | Ok r -> Exn.protect ~f:(fun () -> f r) ~finally:(fun () -> close r)
+
+(* ----- header accessors ------------------------------------------------- *)
+
+let schema_hash r = r.header.schema_hash
+let symbol r = r.header.symbol
+let n_rows r = r.header.n_rows
 
 (* ----- row reconstruction ----------------------------------------------- *)
 
@@ -209,27 +226,20 @@ let _check_reconstructable (r : reader) =
           %s; cannot reconstruct rows"
          r.header.schema_hash Snapshot_schema.default.schema_hash)
 
-(* Maps all [n_fields] column blocks as zero-copy views. *)
-let _map_all_cols fd ~cols_byte_pos ~n ~n_fields : C.col_arr array =
-  Array.init n_fields ~f:(fun c ->
-      C.map_col fd
-        ~byte_pos:(cols_byte_pos + (c * n * C.float64_bytes))
-        ~n_rows:n)
-
-(* Reconstructs the single row at index [i] from the mapped columns. *)
-let _row_at (r : reader) (cols : C.col_arr array) ~n_fields i =
+(* Reconstructs the single row at index [i] from the held mapped columns. *)
+let _row_at (r : reader) ~n_fields i =
   let date = C.epoch_days_to_date (Int32.to_int_exn r.dates.{i}) in
-  let values = Array.init n_fields ~f:(fun c -> cols.(c).{i}) in
+  let values = Array.init n_fields ~f:(fun c -> r.cols.(c).{i}) in
   Snapshot.create ~schema:r.schema ~symbol:r.header.symbol ~date ~values
 
-(* Reconstructs the rows in [[lo, hi)] (0-based, half-open), chronological. *)
+(* Reconstructs the rows in [[lo, hi)] (0-based, half-open), chronological.
+   Slices the columns mapped once at [open_reader] — no per-call re-mapping. *)
 let _reconstruct_rows (r : reader) ~lo ~hi : Snapshot.t list Status.status_or =
   match r.fd with
   | None -> Status.error_internal "Snapshot_columnar: reader is closed"
-  | Some fd ->
-      let n = r.header.n_rows and n_fields = r.header.n_fields in
-      let cols = _map_all_cols fd ~cols_byte_pos:r.cols_byte_pos ~n ~n_fields in
-      List.init (hi - lo) ~f:(fun k -> _row_at r cols ~n_fields (lo + k))
+  | Some _ ->
+      let n_fields = r.header.n_fields in
+      List.init (hi - lo) ~f:(fun k -> _row_at r ~n_fields (lo + k))
       |> Result.all
 
 let read_all r =
