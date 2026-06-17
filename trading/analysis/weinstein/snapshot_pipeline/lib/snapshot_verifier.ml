@@ -1,5 +1,5 @@
 open Core
-module Snapshot_format = Data_panel_snapshot.Snapshot_format
+module Snapshot_io = Data_panel_snapshot.Snapshot_io
 
 type file_result = {
   symbol : string;
@@ -12,9 +12,7 @@ type t = { total : int; passed : int; failed : int; results : file_result list }
 let _verify_one ~(entry : Snapshot_manifest.file_metadata)
     ~(expected : Data_panel_snapshot.Snapshot_schema.t) : file_result =
   let status =
-    match
-      Snapshot_format.read_with_expected_schema ~path:entry.path ~expected
-    with
+    match Snapshot_io.read_with_expected_schema ~path:entry.path ~expected with
     | Ok rows -> Ok (List.length rows)
     | Error err -> Error err
   in

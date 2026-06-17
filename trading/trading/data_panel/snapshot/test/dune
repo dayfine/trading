@@ -3,7 +3,8 @@
   test_snapshot_schema
   test_snapshot
   test_snapshot_format
-  test_snapshot_columnar)
+  test_snapshot_columnar
+  test_snapshot_io)
  (libraries
   core
   core_unix

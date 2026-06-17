@@ -2,7 +2,7 @@ open Core
 module Pipeline = Snapshot_pipeline.Pipeline
 module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
 module Snapshot_verifier = Snapshot_pipeline.Snapshot_verifier
-module Snapshot_format = Data_panel_snapshot.Snapshot_format
+module Snapshot_columnar = Data_panel_snapshot.Snapshot_columnar
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 
 let default_progress_every = 50
@@ -83,7 +83,11 @@ let _active_through_of_bars (bars : Types.Daily_price.t list) : Date.t option =
   |> Option.bind ~f:(fun (b : Types.Daily_price.t) -> b.active_through)
 
 let _write_and_checksum ~symbol ~path ~csv_mtime ~active_through rows =
-  match Snapshot_format.write ~path rows with
+  (* Emit the v2 columnar mmap format ({!Snapshot_columnar}); it validates
+     single-symbol + single-schema and sorts rows by date, exactly the
+     preconditions a per-symbol [.snap] file already satisfies. The verifier
+     ([Snapshot_verifier]) format-detects, so v2 round-trips on read-back. *)
+  match Snapshot_columnar.write ~path rows with
   | Error err -> Error err
   | Ok () -> Ok (_file_metadata ~symbol ~path ~csv_mtime ~active_through)
 
