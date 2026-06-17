@@ -6,13 +6,24 @@
 
 ## PROGRESS — P0 format-v2 underway (2026-06-16 PM3)
 
-**S0 + S1 + S2 + S3 are DONE.** The snapshot-format-v2 columnar-mmap project is
-past the runtime cache AND the writer flip. **NEXT = S4** (regenerate warehouses
-+ goldens-bit-identical gate — the payoff step). S4 is a deliberate stop point
-for a fresh session: it's a ~30-40 min stateful warehouse rebuild whose
-acceptance gate is "goldens bit-identical", and the container showed memory
-pressure this session — better run carefully fresh than deep in a long session
-(`feedback_stop_continue_criteria`).
+**S0 + S1 + S2 + S3 are DONE, and S4 is PROVEN.** The snapshot-format-v2
+columnar-mmap project works end-to-end on the real top-3000 warehouse.
+
+**S4 result (2026-06-16/17):**
+- **Correctness PROVEN:** converted the real v1 warehouse `snap_top3000_2000` →
+  v2 — **3015/3015 symbols bit-identical** (dates + every IEEE-754 value bit).
+  v2 is smaller (1.2 G vs 1.9 G). v2 warehouse left at `/tmp/snap_top3000_2000_v2`.
+- **Memory ceiling GONE:** the top-3000 2000-26 backtest over the v2 warehouse at
+  `SNAPSHOT_CACHE_MB=1024` now **runs clean** (RSS ~0.3-1.5 G, container 6.8 G
+  free, no thrash/OOM) where v1 OOM'd (2.95 G decoded heap) and the first v2
+  reader SIGTRAP'd.
+- **Rosetta detour (fixed):** the first v2 reader mapped ~14 mmaps/symbol → 3,840
+  VMAs → exhausted Rosetta's translator in the forked child. Fixed by
+  **PR #1631 (single mmap per file)** — merged, main green. (`vm.max_map_count`
+  was fine; the limit was Rosetta-specific, not real memory.)
+
+**Shipped this arc:** #1624 (S1 format), #1626 (S2 cache), #1629 (S3 writers),
+#1631 (single-mmap reader). All merged, main green.
 
 - **S0 (de-risk spike) — PASS.** Confirmed the substrate on this exact
   container/toolchain (throwaway spike, not committed):
@@ -58,21 +69,25 @@ pressure this session — better run carefully fresh than deep in a long session
   follow-on. 9 tests; writer-flip-changed-only-encoding pinned end-to-end. 3
   gates green (CI + structural + behavioral 5).
 
-**NEXT = S4 (the payoff, and a deliberate fresh-session stop point)** —
-regenerate the local warehouses (`snap_top3000_2000` etc., ~30-40 min via
-`build_*_snapshots`), then run the SP500-5y + custom-universe **goldens — MUST
-be bit-identical** to pre-change (ANY drift = a v2 encode/slice bug; fix before
-proceeding). This is where the format-detection flips every warehouse to the
-mmap path and the **~2.95 GB → ~130 MB working-set drop actually lands**, and
-where the top-3000 26y matrix should be re-tried at `cache≤1024` to prove the
-ceiling is gone. Then **S5** (tighten over-reads / read precomputed scalars),
-then a cleanup PR removing v1 `Snapshot_format` + the `Decoded` fallback once all
-warehouses are v2. Plan detail:
-`dev/plans/snapshot-format-research-2026-06-16.md` §S4-S5.
+**NEXT (now that top-3000 fits) — the actual research payoff this whole project
+unblocked:**
+1. **top-3000 2000-26 rolling-start MATRIX** (not just the single backtest proven
+   above): `rolling_start_eval --scenario /tmp/cell-e-top3000-2000-26y.sexp
+   --snapshot-dir /tmp/snap_top3000_2000_v2 --stride-days 255 --parallel 1`
+   (`SNAPSHOT_CACHE_MB=1024`). Then **re-run the factor-lens H1/H2/H3 causal
+   analysis on top-3000** for the **net-edge SIGN** that top-1000 couldn't give
+   (top-1000 realized edge was all-negative — needs top-3000 breadth; see
+   `project_factor_lens_regime_governs_edge`).
+2. **Convert the OTHER warehouses to v2** (`snap_top3000_2011`,
+   `snap_top3000_1998_2026`) — the convert path (read v1 → `Snapshot_columnar.write`)
+   is fast + bit-identical; or rebuild via `build_snapshots` (now emits v2).
+3. **S5** (optional, marginal now): tighten over-reads / read precomputed
+   `Stage`/`RS_line` scalars directly — the single-mmap reader already
+   page-faults per column, so the big win is captured; S5 is incremental.
+4. **Cleanup PR**: remove v1 `Snapshot_format` + the `Decoded` fallback once all
+   warehouses are v2.
 
-**Fast alternative still available** (independent of S4): bump Docker RAM to
-12-16 GB → rerun the top-3000 2000-26 matrix at `cache=4096` for a top-3000 lens
-before the regen lands.
+Plan detail: `dev/plans/snapshot-format-research-2026-06-16.md`.
 
 ---
 
