@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-17 (orchestrator run 27668955226 [run 2]: FULL PASS / NO-DISPATCH reconcile. Main GREEN on `e22b1613` (CI build-and-test + perf-tier1-smoke + both goldens success). 0 open PRs. Since run 1 the maintainer landed snapshot-format-v2 S3 (#1629) + #1631 single-mmap Rosetta fix + docs (#1630) LOCALLY — that project (NEXT=S4 warehouse regen, goldens-bit-identical gate) is the active LOCAL P0 per `next-session-priorities-2026-06-16-PM2.md`; NOT GHA-dispatched (collision-avoidance + S4 gate needs local warehouses). Every other track data/human-gated. ops-data skipped (no EODHD key in GHA; data-gaps unchanged since 2026-05-03); harness no dispatch surface; cleanup no backlog. Health CLEAN (status-integrity + index-size exit 0; CI authoritative-green). 0 merges, 0 subagents.)
+Last updated: 2026-06-17 (orchestrator run 27687153814 [run 3]: FULL PASS, 1 dispatch. Main GREEN on `3fab6c91` (build-and-test + perf-tier1-smoke + both goldens success). Stale ci-watchdog issue #1634 (ENOSPC on docs commit `74acd21`) verified = disk-exhaustion infra flake superseded by green HEAD; could not close it (token lacks `issues:write`). Dispatched harness-maintainer on the recurring ENOSPC-during-link root cause: CI image's unused ~11 GB baked `_build` under /workspaces/trading-1/ exhausts the runner disk during ocamlopt linking. Fix designed+committed (free ~11.4 GB + df diagnostic) but BLOCKED — orchestrator token lacks `workflow` scope to push `.github/workflows/ci.yml`; PR #1636 carries the exact YAML for a human to apply. All feature tracks remain data/human-gated or LOCAL (snapshot-format-v2 S4 P0). Health CLEAN (status-integrity + index-size exit 0). 0 merges.)
 
 ## Active + complete tracks
 
@@ -32,7 +32,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #1604 (wire record_qc_audit_test into dune) MERGED; T1 fully done; T2 milestone-gated; T3-H low-pri; no orchestrator dispatch surface |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #1636 | CI disk-headroom fix for recurring ENOSPC-during-link (#1634); BLOCKED on `workflow` token scope to push ci.yml — exact fix in PR #1636 body |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | Phase 1 stable (PR-D'c #1332 merged); Phase 2 deferred; no outstanding work |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | no active backlog; next finding via weekly deep scan or Step 2e |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
