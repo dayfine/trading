@@ -69,25 +69,43 @@ columnar-mmap project works end-to-end on the real top-3000 warehouse.
   follow-on. 9 tests; writer-flip-changed-only-encoding pinned end-to-end. 3
   gates green (CI + structural + behavioral 5).
 
-**NEXT (now that top-3000 fits) — the actual research payoff this whole project
-unblocked:**
-1. **top-3000 2000-26 rolling-start MATRIX** (not just the single backtest proven
-   above): `rolling_start_eval --scenario /tmp/cell-e-top3000-2000-26y.sexp
-   --snapshot-dir /tmp/snap_top3000_2000_v2 --stride-days 255 --parallel 1`
-   (`SNAPSHOT_CACHE_MB=1024`). Then **re-run the factor-lens H1/H2/H3 causal
-   analysis on top-3000** for the **net-edge SIGN** that top-1000 couldn't give
-   (top-1000 realized edge was all-negative — needs top-3000 breadth; see
-   `project_factor_lens_regime_governs_edge`).
-2. **Convert the OTHER warehouses to v2** (`snap_top3000_2011`,
-   `snap_top3000_1998_2026`) — the convert path (read v1 → `Snapshot_columnar.write`)
-   is fast + bit-identical; or rebuild via `build_snapshots` (now emits v2).
-3. **S5** (optional, marginal now): tighten over-reads / read precomputed
-   `Stage`/`RS_line` scalars directly — the single-mmap reader already
-   page-faults per column, so the big win is captured; S5 is incremental.
-4. **Cleanup PR**: remove v1 `Snapshot_format` + the `Decoded` fallback once all
-   warehouses are v2.
+## MORNING HANDOFF (2026-06-17, overnight autonomous run)
 
-Plan detail: `dev/plans/snapshot-format-research-2026-06-16.md`.
+**Items 1 + 2 DONE; 3 + 4 deliberately deferred (see why).**
+
+1. ✅ **top-3000 2000-26 factor-lens — SHIPPED (PR #1639).** Ran the 38-start
+   rolling-start matrix (parallel 2, stride 255, GSPC.INDX, v2 mmap warehouse,
+   cache=1024, ~10.3h, 0 errors) — the run the OOM ceiling blocked.
+   **Result: H1 dodge-correction REPLICATES at top-3000 (realized_edge ~
+   fwd_index_maxDD r=−0.744, monotonic terciles); the MTM edge flips POSITIVE
+   (median +1.93%, 60.5% of starts beat GSPC vs t1k's 8.3%) but realized edge
+   stays negative in all 38 starts (median −5.82 vs t1k −8.90).** Breadth
+   compresses the realized lag + flips the beat-rate, doesn't flip the realized
+   sign — the gap is still-open fat-tail winners. Regime (not breadth, not
+   entry-supply) governs the edge sign. Full writeup:
+   `dev/experiments/rolling-start-matrix-t3k-2000-2026/ANALYSIS.md`;
+   `project_factor_lens_regime_governs_edge`.
+2. ✅ **All warehouses converted to v2** — `/tmp/snap_top3000_{2000,2011,1998_2026}_v2`
+   (3015 symbols each, 0 errors, bit-identical; all smaller than v1). Ready for
+   regime-diverse lenses.
+3. ⏸ **S5 (over-read tightening) — DEFERRED (low value).** The single-mmap reader
+   already page-faults per column, so the big memory win is captured; tightening
+   the 3653-day read window is marginal. Not worth an unattended PR.
+4. ⏸ **v1-removal cleanup — DEFERRED (blast radius; do with oversight).** Removing
+   v1 `Snapshot_format` + the `Decoded` fallback first requires flipping
+   `bar_reader.of_in_memory_bars` (still writes v1 for in-memory test warehouses)
+   to v2, and touches several importers (`snapshot_io`, `daily_panels_backing`,
+   `snapshot_verifier`, build) — risks goldens. Better reviewed live than merged
+   unattended.
+
+**RECOMMENDED NEXT (research, now unblocked):** the factor-lens points at a
+**regime-gated deploy rule** as the lever (deploy the strategy when forward
+drawdown is likely, prefer a SPY-timing floor in melt-ups) — but the deploy
+signal (forward DD) is ex-post; a *tradeable* proxy (macro gate / breadth) needs
+its own validation. Also: with 2011 + 1998_2026 warehouses now v2, run those
+matrices for **macro-regime-diverse** confirmation cells (per
+`promotion-confirmation.md`). Plan detail:
+`dev/plans/snapshot-format-research-2026-06-16.md`.
 
 ---
 
