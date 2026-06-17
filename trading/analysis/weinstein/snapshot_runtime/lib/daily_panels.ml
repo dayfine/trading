@@ -1,34 +1,23 @@
 open Core
 module Snapshot = Data_panel_snapshot.Snapshot
-module Snapshot_format = Data_panel_snapshot.Snapshot_format
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
+module Backing = Daily_panels_backing
 
 (* 1 MiB. Used to convert [max_cache_mb] to a byte budget. *)
 let _bytes_per_mb = 1_048_576
 
-(* Width of one Float64 cell on disk and on heap. *)
-let _bytes_per_float = 8
+(* Hard cap on resident [Mmap] backings, each of which holds an open fd. Sits
+   comfortably under a typical 1024 fd ulimit so the cache never exhausts file
+   descriptors even when the byte budget alone would admit far more mmap
+   entries (their heap footprint is tiny). The eviction loop closes the LRU
+   reader once this is exceeded. *)
+let _max_open_mmap_handles = 256
 
-(* Per-row byte estimate. The on-heap size of a [Snapshot.t] is dominated by
-   the [values] float array ([n_fields * _bytes_per_float] bytes) plus
-   per-record header / pointers; this constant captures the per-record
-   overhead so the cache budget tracks GC-resident memory more honestly than
-   counting only float bytes. Empirically the OCaml record header + symbol
-   string dominate. *)
-let _per_row_overhead_bytes = 64
-
-(* One-time cost of holding a symbol's entry in the cache (linked-list node +
-   hashtable bucket). Tiny next to the row payload but pinned out separately
-   so the math stays explicit. *)
-let _per_symbol_overhead_bytes = 128
-
-(* Cached, decoded snapshot file for one symbol. [rows] is held by date order
-   (the writer enumerates dates chronologically) as an array so [read_today] /
-   [read_history] can binary-search by date in O(log N) instead of walking the
-   list. [bytes] is the cache-budget contribution recomputed at insert time and
-   never revised. *)
-type cache_entry = { symbol : string; rows : Snapshot.t array; bytes : int }
+(* Cached file for one symbol. [backing] is the format-detected store (mmap
+   reader for v2, decoded rows for v1); [bytes] is the cache-budget
+   contribution recomputed at insert time and never revised. *)
+type cache_entry = { symbol : string; backing : Backing.t; bytes : int }
 
 type stats = { hits : int; misses : int; evictions : int }
 [@@deriving sexp, equal]
@@ -43,6 +32,9 @@ type t = {
      tail = LRU. Eviction pops from tail. *)
   lru : cache_entry Doubly_linked.t;
   mutable bytes : int;
+  (* Count of resident [Mmap] backings (= open fds). Capped at
+     [_max_open_mmap_handles]; eviction closes readers to keep this bounded. *)
+  mutable mmap_open : int;
   (* Cumulative cache-access counters since [create]. Surfaced via [cache_stats]
      for thrash diagnosis; never reset, not even by [close]. *)
   mutable hits : int;
@@ -56,20 +48,18 @@ let _resolve_path ~snapshot_dir (entry : Snapshot_manifest.file_metadata) =
   if Filename.is_absolute entry.path then entry.path
   else Filename.concat snapshot_dir entry.path
 
-(* --- Byte estimation -------------------------------------------------- *)
-
-let _estimate_bytes ~(schema : Snapshot_schema.t) (rows : Snapshot.t array) =
-  let n_rows = Array.length rows in
-  let row_value_bytes = Snapshot_schema.n_fields schema * _bytes_per_float in
-  _per_symbol_overhead_bytes
-  + (n_rows * (row_value_bytes + _per_row_overhead_bytes))
-
 (* --- LRU helpers ------------------------------------------------------ *)
 
 (* Promote an existing [elt] to MRU position. The elt remains valid, so the
    hashtable's stored elt pointer stays good. *)
 let _promote_to_mru t (elt : cache_entry Doubly_linked.Elt.t) =
   Doubly_linked.move_to_front t.lru elt
+
+(* Release the OS resources an entry holds. Only [Mmap] backings own an fd;
+   closing one unmaps its columns and decrements the handle count. *)
+let _release_entry t (entry : cache_entry) =
+  if Backing.is_mmap entry.backing then t.mmap_open <- t.mmap_open - 1;
+  Backing.close entry.backing
 
 (* Evict the LRU symbol (linked-list tail). Returns [true] if anything was
    evicted; [false] when the cache is empty. *)
@@ -81,17 +71,23 @@ let _evict_one t =
       Doubly_linked.remove t.lru elt;
       Hashtbl.remove t.cache entry.symbol;
       t.bytes <- t.bytes - entry.bytes;
+      _release_entry t entry;
       t.evictions <- t.evictions + 1;
       true
 
-(* Drop entries until the budget is restored. Always leaves at least one
-   entry resident if it was just inserted — i.e. the just-inserted entry is
-   at the head and the loop walks from the tail. A single oversized entry
-   (one symbol's bytes > budget) stays resident; the cap is best-effort, not
-   a hard upper bound on a single symbol's memory. *)
-let _enforce_budget t =
+(* True while the cache is over either limit: the byte budget OR the open-fd
+   handle cap. *)
+let _over_limits t =
+  t.bytes > t.max_cache_bytes || t.mmap_open > _max_open_mmap_handles
+
+(* Drop entries until both limits are satisfied. Always leaves at least one
+   entry resident if it was just inserted — the just-inserted entry sits at the
+   head and the loop walks from the tail. A single oversized entry stays
+   resident; the byte cap is best-effort, not a hard upper bound on one
+   symbol's memory. *)
+let _enforce_limits t =
   let rec loop () =
-    if t.bytes <= t.max_cache_bytes then ()
+    if not (_over_limits t) then ()
     else if Doubly_linked.length t.lru <= 1 then ()
     else if _evict_one t then loop ()
     else ()
@@ -100,32 +96,19 @@ let _enforce_budget t =
 
 (* --- File loading ----------------------------------------------------- *)
 
-let _load_symbol_file t (entry : Snapshot_manifest.file_metadata) =
-  let path = _resolve_path ~snapshot_dir:t.snapshot_dir entry in
-  Snapshot_format.read_with_expected_schema ~path ~expected:t.expected_schema
-
-let _insert_into_cache t ~symbol ~rows =
-  let bytes = _estimate_bytes ~schema:t.expected_schema rows in
-  let entry = { symbol; rows; bytes } in
+let _insert_into_cache t ~symbol ~backing =
+  let bytes = Backing.estimate_bytes ~schema:t.expected_schema backing in
+  if Backing.is_mmap backing then t.mmap_open <- t.mmap_open + 1;
+  let entry = { symbol; backing; bytes } in
   let elt = Doubly_linked.insert_first t.lru entry in
   Hashtbl.set t.cache ~key:symbol ~data:elt;
   t.bytes <- t.bytes + bytes;
-  _enforce_budget t;
+  _enforce_limits t;
   entry
 
-(* Cache miss: look up the manifest entry, load + insert. The on-disk row
-   list is converted to an array on insert (and sorted chronologically by
-   date) so subsequent reads can binary-search by date. The writer is
-   expected to emit rows in chronological order; the explicit sort is
-   defensive. *)
-let _sort_rows_by_date (rows : Snapshot.t array) =
-  Array.sort rows ~compare:(fun a b -> Date.compare a.date b.date)
-
-(* Convert a decoded row list into a sorted array and insert into cache. *)
-let _insert_rows t ~symbol rows_list =
-  let rows = Array.of_list rows_list in
-  _sort_rows_by_date rows;
-  _insert_into_cache t ~symbol ~rows
+let _load_symbol_file t (entry : Snapshot_manifest.file_metadata) =
+  let path = _resolve_path ~snapshot_dir:t.snapshot_dir entry in
+  Backing.load ~path ~expected:t.expected_schema
 
 let _load_and_insert t ~symbol =
   t.misses <- t.misses + 1;
@@ -134,7 +117,8 @@ let _load_and_insert t ~symbol =
       Status.error_not_found
         (Printf.sprintf "Daily_panels: symbol %s not in manifest" symbol)
   | Some metadata ->
-      Result.map (_load_symbol_file t metadata) ~f:(_insert_rows t ~symbol)
+      Result.map (_load_symbol_file t metadata) ~f:(fun backing ->
+          _insert_into_cache t ~symbol ~backing)
 
 (* Cache hit: promote to MRU and return the resident entry. *)
 let _hit_path t (elt : cache_entry Doubly_linked.Elt.t) =
@@ -159,6 +143,7 @@ let _empty_cache ~snapshot_dir ~manifest ~max_cache_bytes =
     cache = Hashtbl.create (module String);
     lru = Doubly_linked.create ();
     bytes = 0;
+    mmap_open = 0;
     hits = 0;
     misses = 0;
     evictions = 0;
@@ -175,43 +160,15 @@ let create ~snapshot_dir ~manifest ~max_cache_mb =
 
 let schema t = t.expected_schema
 
-(* --- Binary search over chronologically-ordered rows ----------------- *)
-
-(* Compare a [Snapshot.t] row to a target [Date.t] by date — the comparator
-   shape Core's [Array.binary_search] expects. *)
-let _compare_row_date (r : Snapshot.t) (d : Date.t) = Date.compare r.date d
-
 let read_today t ~symbol ~date =
   let open Result.Let_syntax in
   let%bind entry = _ensure_loaded t ~symbol in
-  match
-    Array.binary_search entry.rows ~compare:_compare_row_date `First_equal_to
-      date
-  with
-  | Some i -> Ok entry.rows.(i)
-  | None ->
-      Status.error_not_found
-        (Printf.sprintf "Daily_panels.read_today: %s has no row for %s" symbol
-           (Date.to_string date))
+  Backing.read_today entry.backing ~symbol ~date
 
 let read_history t ~symbol ~from ~until =
   let open Result.Let_syntax in
   let%bind entry = _ensure_loaded t ~symbol in
-  let n = Array.length entry.rows in
-  if Date.( > ) from until || n = 0 then Ok []
-  else
-    let lo =
-      Array.binary_search entry.rows ~compare:_compare_row_date
-        `First_greater_than_or_equal_to from
-      |> Option.value ~default:n
-    in
-    let hi =
-      Array.binary_search entry.rows ~compare:_compare_row_date
-        `First_strictly_greater_than until
-      |> Option.value ~default:n
-    in
-    if hi <= lo then Ok []
-    else Ok (Array.to_list (Array.sub entry.rows ~pos:lo ~len:(hi - lo)))
+  Backing.read_history entry.backing ~from ~until
 
 let active_through_for t ~symbol =
   Option.bind (Snapshot_manifest.find t.manifest ~symbol)
@@ -223,6 +180,10 @@ let cache_stats t =
   { hits = t.hits; misses = t.misses; evictions = t.evictions }
 
 let close t =
+  (* Release every resident entry first (closes [Mmap] fds), then clear the
+     bookkeeping. Walking the list before clearing it ensures no fd leaks. *)
+  Doubly_linked.iter t.lru ~f:(fun entry -> _release_entry t entry);
   Doubly_linked.clear t.lru;
   Hashtbl.clear t.cache;
-  t.bytes <- 0
+  t.bytes <- 0;
+  t.mmap_open <- 0

@@ -228,6 +228,59 @@ let test_empty_list_round_trip _ =
   let path = _tmp_path () in
   assert_that (_write_then_read path []) (is_ok_and_holds is_empty)
 
+(* ----- map-once regression: many sequential read_range on one reader ----- *)
+
+(* The reader maps all columns once at [open_reader]; [read_range] slices the
+   held views. This guards that change: one opened reader must serve many
+   sequential [read_range] calls, each returning the correct subset, with no
+   per-call re-mapping and no cross-call state corruption. We issue one
+   single-day [read_range] per row and check every result against the rows
+   sharing that date. *)
+let test_reader_serves_many_sequential_read_ranges _ =
+  let path = _tmp_path () in
+  let sorted = _sorted_sample () in
+  let n = List.length sorted in
+  let expected_at i =
+    let d = (List.nth_exn sorted i).date in
+    _dates_of_rows
+      (List.filter sorted ~f:(fun (s : Snapshot.t) -> Date.equal s.date d))
+  in
+  let read_each_day () =
+    Result.bind
+      (Snapshot_columnar.write ~path (_sample_rows ()))
+      ~f:(fun () ->
+        Snapshot_columnar.with_reader ~path ~f:(fun r ->
+            Result.all
+              (List.init n ~f:(fun i ->
+                   let d = (List.nth_exn sorted i).date in
+                   Result.map
+                     (Snapshot_columnar.read_range r ~from:d ~until:d)
+                     ~f:_dates_of_rows))))
+  in
+  assert_that (read_each_day ())
+    (is_ok_and_holds
+       (elements_are (List.init n ~f:(fun i -> equal_to (expected_at i)))))
+
+(* ----- header accessors ----- *)
+
+let test_header_accessors _ =
+  let path = _tmp_path () in
+  let sorted = _sorted_sample () in
+  let read () =
+    Result.bind
+      (Snapshot_columnar.write ~path (_sample_rows ()))
+      ~f:(fun () ->
+        Snapshot_columnar.with_reader ~path ~f:(fun r ->
+            Ok
+              ( Snapshot_columnar.symbol r,
+                Snapshot_columnar.schema_hash r,
+                Snapshot_columnar.n_rows r )))
+  in
+  assert_that (read ())
+    (is_ok_and_holds
+       (equal_to
+          ("AAPL", Snapshot_schema.default.schema_hash, List.length sorted)))
+
 (* ----- date <-> int round-trip ----- *)
 
 let test_date_round_trips_through_epoch_days _ =
@@ -271,6 +324,9 @@ let suite =
          "schema hash match succeeds" >:: test_schema_hash_match_succeeds;
          "bad magic rejected" >:: test_bad_magic_rejected;
          "empty list round trip" >:: test_empty_list_round_trip;
+         "reader serves many sequential read_ranges"
+         >:: test_reader_serves_many_sequential_read_ranges;
+         "header accessors" >:: test_header_accessors;
          "date round trips through epoch days"
          >:: test_date_round_trips_through_epoch_days;
        ]
