@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-17 (orchestrator run 27687153814 [run 3]: FULL PASS, 1 dispatch. Main GREEN on `3fab6c91` (build-and-test + perf-tier1-smoke + both goldens success). Stale ci-watchdog issue #1634 (ENOSPC on docs commit `74acd21`) verified = disk-exhaustion infra flake superseded by green HEAD; could not close it (token lacks `issues:write`). Dispatched harness-maintainer on the recurring ENOSPC-during-link root cause: CI image's unused ~11 GB baked `_build` under /workspaces/trading-1/ exhausts the runner disk during ocamlopt linking. Fix designed+committed (free ~11.4 GB + df diagnostic) but BLOCKED — orchestrator token lacks `workflow` scope to push `.github/workflows/ci.yml`; PR #1636 carries the exact YAML for a human to apply. All feature tracks remain data/human-gated or LOCAL (snapshot-format-v2 S4 P0). Health CLEAN (status-integrity + index-size exit 0). 0 merges.)
+Last updated: 2026-06-17 (orchestrator run 27696340464 [run 4]: NO-DISPATCH reconcile. Cleared two stuck in-flight docs-only PRs left open by run 3 — merged #1636 (harness CI-disk-headroom diagnosis note) + #1637 (run-3 summary bundle), both CI-green docs-only. Main GREEN; 0 open PRs after. The ci.yml ENOSPC fix remains BLOCKED on a human with `workflow`-scoped PAT (exact YAML in #1636 body / harness.md). Stale ci-watchdog #1634 still open — squash-merge of #1636 did not auto-close it and orchestrator token lacks `issues:write` (403). All feature tracks remain data/human-gated or LOCAL (snapshot-format-v2 S4 P0, "S4 PROVEN" per #1633). Health CLEAN (status-integrity + index-size exit 0). 2 docs-only merges, 0 subagents.)
 
 ## Active + complete tracks
 
@@ -32,7 +32,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #1636 | CI disk-headroom fix for recurring ENOSPC-during-link (#1634); BLOCKED on `workflow` token scope to push ci.yml — exact fix in PR #1636 body |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | CI disk-headroom diagnosis MERGED (#1636, harness.md `[~]`); ci.yml ENOSPC fix BLOCKED on human with `workflow`-scoped PAT — exact YAML in #1636 body |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | Phase 1 stable (PR-D'c #1332 merged); Phase 2 deferred; no outstanding work |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | no active backlog; next finding via weekly deep scan or Step 2e |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
