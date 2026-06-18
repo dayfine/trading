@@ -3,7 +3,9 @@
  (modules decision_grading_bin)
  (libraries
   core
+  core_unix.sys_unix
   status
+  backtest
   decision_grading
   trade_audit_report
   trading.base
