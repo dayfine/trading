@@ -1,0 +1,17 @@
+{
+  "date": "2026-06-18",
+  "feature": "decision-grading-mfe-fix",
+  "branch": "feat/decision-grading-mfe-fix",
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
