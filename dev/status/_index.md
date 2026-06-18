@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-17 (orchestrator run 27696340464 [run 4]: NO-DISPATCH reconcile. Cleared two stuck in-flight docs-only PRs left open by run 3 — merged #1636 (harness CI-disk-headroom diagnosis note) + #1637 (run-3 summary bundle), both CI-green docs-only. Main GREEN; 0 open PRs after. The ci.yml ENOSPC fix remains BLOCKED on a human with `workflow`-scoped PAT (exact YAML in #1636 body / harness.md). Stale ci-watchdog #1634 still open — squash-merge of #1636 did not auto-close it and orchestrator token lacks `issues:write` (403). All feature tracks remain data/human-gated or LOCAL (snapshot-format-v2 S4 P0, "S4 PROVEN" per #1633). Health CLEAN (status-integrity + index-size exit 0). 2 docs-only merges, 0 subagents.)
+Last updated: 2026-06-18 (orchestrator run 27739789505 [run 1]: NO-DISPATCH full pass — first run of the day. Main GREEN on `fb90df76` (build-and-test + perf-tier1-smoke + golden-sp500-5y + golden-custom-universe all SUCCESS); 0 open PRs; 0 open ci-red issues (stale #1634 CLOSED by human 2026-06-17T18:10Z — that carried `[info]` is RESOLVED). Overnight maintainer LOCAL work landed as docs: top-3000 factor-lens matrix #1639 (2000-26, H1 dodge-correction r=-0.744 replicates) + #1642 (2011-26 confirmation), morning handoff #1640, redated priorities #1641 — all docs-only, CI-green. Every feature track remains data-gated / human-gated / LOCAL (snapshot-format-v2 S4 PROVEN, S5+v1-cleanup deferred for oversight; warehouses all v2). Harness Tier-1 all `[x]` (ci.yml ENOSPC fix still `[~]`, human workflow-PAT-blocked — NOT applied). cleanup backlog all `[x]`. ops-data: no EODHD key in GHA. Health CLEAN (status-integrity + index-size exit 0). 0 subagents.)
 
 ## Active + complete tracks
 
@@ -16,8 +16,8 @@ Each row: one line; deeper task detail in the linked status file.
 | [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | — | readme_toplines top-line numbers MERGED (#1617, 3-gate auto-merge); next: P2 matrix on composition-policy universe (data-gated) |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
-| [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | snapshot-format-v2 S1-S3 + #1631 single-mmap Rosetta fix landed (LOCAL P0); next: S4 warehouse regen (LOCAL) then top-3000 matrix on composition-policy universe (data-gated) |
-| [rolling-start-lens](rolling-start-lens.md) | IN_PROGRESS | feat-backtest | — | realized-edge (#1586) + 5b screener factor cols (#1607) MERGED; next: causal analysis (factors vs realized_edge) — data-gated on the LOCAL overnight matrix re-run |
+| [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | snapshot-format-v2 S4 PROVEN (warehouses v2, top-3000 fits at cache<=1024); S5/v1-cleanup deferred (oversight); next: regime-diverse lenses on v2 (LOCAL) |
+| [rolling-start-lens](rolling-start-lens.md) | IN_PROGRESS | feat-backtest | — | t3k factor-lens matrix SHIPPED LOCAL (#1639 2000-26 H1 r=-0.744; #1642 2011-26 confirm); next: regime-gated deploy proxy validation (LOCAL/data-gated) |
 | [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | Win #4 production wiring MERGED (#1574, opt-in default-off); next: manual ghcr.io flambda rebuild + enable prune opt-in in sweeps |
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
