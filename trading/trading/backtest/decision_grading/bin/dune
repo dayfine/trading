@@ -1,0 +1,14 @@
+(executable
+ (name decision_grading_bin)
+ (modules decision_grading_bin)
+ (libraries
+  core
+  status
+  decision_grading
+  trade_audit_report
+  trading.base
+  weinstein_trading.strategy
+  weinstein.snapshot_runtime
+  weinstein.snapshot_pipeline)
+ (preprocess
+  (pps ppx_sexp_conv)))
