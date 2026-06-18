@@ -121,13 +121,17 @@ let test_multiple_horizons _ =
            [
              field (fun r -> r.PE.horizon_weeks) (equal_to 1);
              field (fun r -> r.PE.continuation_pct) (float_equal 0.10);
-             field (fun r -> r.PE.post_exit_max_favorable_pct) (float_equal 0.11);
+             field
+               (fun r -> r.PE.post_exit_max_favorable_pct)
+               (float_equal 0.11);
            ];
          all_of
            [
              field (fun r -> r.PE.horizon_weeks) (equal_to 2);
              field (fun r -> r.PE.continuation_pct) (float_equal 0.20);
-             field (fun r -> r.PE.post_exit_max_favorable_pct) (float_equal 0.21);
+             field
+               (fun r -> r.PE.post_exit_max_favorable_pct)
+               (float_equal 0.21);
            ];
          all_of
            [

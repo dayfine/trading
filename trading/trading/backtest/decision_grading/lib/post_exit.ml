@@ -18,9 +18,10 @@ let _days_of_weeks h = h * 7
 let _bars_after ~exit_date bars =
   bars
   |> List.filter ~f:(fun (b : Types.Daily_price.t) ->
-         Date.( >= ) b.date exit_date)
-  |> List.sort ~compare:(fun (a : Types.Daily_price.t) (b : Types.Daily_price.t)
-         -> Date.compare a.date b.date)
+      Date.( >= ) b.date exit_date)
+  |> List.sort
+       ~compare:(fun (a : Types.Daily_price.t) (b : Types.Daily_price.t) ->
+         Date.compare a.date b.date)
 
 (** Bars from [forward] (already ascending, all [>= exit_date]) whose date is
     within [horizon_weeks * 7] days of [exit_date], inclusive. *)
@@ -29,16 +30,16 @@ let _window_for ~exit_date ~horizon_weeks forward =
   List.filter forward ~f:(fun (b : Types.Daily_price.t) ->
       Date.( <= ) b.date last)
 
-(** Signed pct from [exit_price] to [price]: [(price - exit_price) /
-    exit_price]. *)
+(** Signed pct from [exit_price] to [price]:
+    [(price - exit_price) / exit_price]. *)
 let _pct ~exit_price price = (price -. exit_price) /. exit_price
 
 (** [horizon_result] for a single horizon over the [exit_date]-anchored
     [forward] bars. Mirrors [Exit_audit_capture._excursions]: favourable is in
     the trade's direction, adverse against it, short side mirrored around
     [exit_price]. Returns the all-[0.0] result when the window is empty. *)
-let _result_for ~(side : Trading_base.Types.position_side) ~exit_price ~exit_date
-    ~horizon_weeks forward =
+let _result_for ~(side : Trading_base.Types.position_side) ~exit_price
+    ~exit_date ~horizon_weeks forward =
   let zero =
     {
       horizon_weeks;

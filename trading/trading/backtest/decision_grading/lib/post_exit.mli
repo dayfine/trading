@@ -3,11 +3,11 @@
     §Phase 1).
 
     The strategy's edge is drawdown-avoidance via Stage-3/4 exits, so the
-    central question for grading any exit is: {b after we sold, did the stock
-    keep moving in our direction (we left money on the table) or did it reverse
-    (we dodged a drop)?} Existing MFE/MAE in [Exit_audit_capture] measure
-    excursion {b up to} the exit; this module measures excursion {b forward}
-    from the exit, relative to the exit price.
+    central question for grading any exit is:
+    {b after we sold, did the stock keep moving in our direction (we left money
+       on the table) or did it reverse (we dodged a drop)?} Existing MFE/MAE in
+    [Exit_audit_capture] measure excursion {b up to} the exit; this module
+    measures excursion {b forward} from the exit, relative to the exit price.
 
     Every function here is pure — no [Bar_reader], no I/O, no engine state. It
     operates on a caller-supplied list of weekly bars at/after the exit date, so
@@ -19,9 +19,9 @@ type horizon_result = {
   continuation_pct : float;
       (** Signed return from [exit_price] to the close of the last bar within
           [horizon_weeks] of the exit. For a {b long} a positive value means
-          price kept rising after we sold — we gave up gains (premature exit);
-          a negative value means price fell — we dodged a drop (good exit). For
-          a {b short} the sign is mirrored so the same interpretation holds (a
+          price kept rising after we sold — we gave up gains (premature exit); a
+          negative value means price fell — we dodged a drop (good exit). For a
+          {b short} the sign is mirrored so the same interpretation holds (a
           positive value still means "the move continued in the direction we
           would have wanted to stay in"). [0.0] when no bar falls within the
           horizon or when [exit_price <= 0.0]. *)
@@ -65,10 +65,10 @@ val post_exit_metrics :
     [Exit_audit_capture._excursions] does for the hold-window case.
 
     Edge cases (all documented per field above):
-    - [exit_price <= 0.0] -> every field of every result is [0.0] (no
-      meaningful percentage against a non-positive base).
-    - A horizon whose window contains no bar (e.g. a horizon beyond the data,
-      or [bars] empty) -> that result's float fields are all [0.0].
+    - [exit_price <= 0.0] -> every field of every result is [0.0] (no meaningful
+      percentage against a non-positive base).
+    - A horizon whose window contains no bar (e.g. a horizon beyond the data, or
+      [bars] empty) -> that result's float fields are all [0.0].
 
     The output list is in the same order as [horizons_weeks] (one result each,
     duplicates preserved). Pure: same inputs -> same output. *)
