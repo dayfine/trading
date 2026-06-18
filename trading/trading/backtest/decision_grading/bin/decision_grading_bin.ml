@@ -59,6 +59,12 @@ let _pct_scale = 100.0
    handful of weeks per closed trade, so a modest cap suffices. *)
 let _cache_mb = 512
 
+(* Max calendar-day gap when joining a trades.csv round-trip to its audit record
+   for MFE: the audit entry_date is the Friday decision date, the round-trip's is
+   the next-trading-day fill. Kept in sync with
+   [Trade_audit_ratings._join_tolerance_days]. *)
+let _join_tolerance_days = 7
+
 let _usage () =
   eprintf
     "Usage: decision_grading --scenario-dir <dir> --snapshot-dir <dir> \
@@ -185,15 +191,45 @@ let _exit_reason_lookup ~scenario_dir =
   | [] -> ());
   tbl
 
-(** Map [(symbol, entry_date) -> mfe_pct] from the report's per-trade ratings,
-    so a trade's in-trade peak (a fraction of entry price) is available for the
-    capture ratio. Trades without a matching audit record are absent. *)
-let _mfe_lookup (report : TAR.t) =
-  let tbl = Hashtbl.Poly.create () in
-  Option.iter report.analysis ~f:(fun (a : TAR.analysis) ->
-      List.iter a.ratings ~f:(fun (r : TAR.Trade_audit_ratings.rating) ->
-          Hashtbl.set tbl ~key:(r.symbol, r.entry_date) ~data:r.mfe_pct));
+(** Per-symbol MFE lookup built straight from [trade_audit.sexp]'s
+    [exit_decision.max_favorable_excursion_pct] (the in-trade peak as a fraction
+    of entry price).
+
+    Why not the report's ratings? The audit's [entry_date] is the Friday
+    decision date; the round-trip's [entry_date] in [trades.csv] is the actual
+    fill (next trading day), so the two differ by ~1 day. An exact
+    [(symbol, entry_date)] join therefore misses, so we replicate
+    {!Trade_audit_report.Trade_audit_ratings}'s nearest-within-tolerance join:
+    index audit MFEs by symbol, then at lookup time pick the audit record whose
+    [entry_date] is nearest the round-trip's, within [_join_tolerance_days]. *)
+let _mfe_index ~scenario_dir =
+  let path = Filename.concat scenario_dir "trade_audit.sexp" in
+  let records =
+    if not (Sys_unix.file_exists_exn path) then []
+    else
+      let sexp = Sexp.load_sexp path in
+      try (Backtest.Trade_audit.audit_blob_of_sexp sexp).audit_records
+      with _ -> Backtest.Trade_audit.audit_records_of_sexp sexp
+  in
+  let tbl = Hashtbl.create (module String) in
+  List.iter records ~f:(fun (r : Backtest.Trade_audit.audit_record) ->
+      Option.iter r.exit_ ~f:(fun (e : Backtest.Trade_audit.exit_decision) ->
+          Hashtbl.add_multi tbl ~key:r.entry.symbol
+            ~data:(r.entry.entry_date, e.max_favorable_excursion_pct)));
   tbl
+
+(** MFE for a round-trip: the audit record for [symbol] whose entry date is
+    nearest [entry_date], within [_join_tolerance_days]. [None] when the symbol
+    has no audit MFE within tolerance. *)
+let _find_mfe mfe_index ~symbol ~entry_date =
+  match Hashtbl.find mfe_index symbol with
+  | None -> None
+  | Some candidates ->
+      List.filter_map candidates ~f:(fun (d, mfe) ->
+          let gap = Int.abs (Date.diff d entry_date) in
+          if gap <= _join_tolerance_days then Some (gap, mfe) else None)
+      |> List.min_elt ~compare:(fun (g1, _) (g2, _) -> Int.compare g1 g2)
+      |> Option.map ~f:snd
 
 (** Continuation at [grade_horizon] from a post-exit result list, or [0.0] when
     that horizon is absent. *)
@@ -203,7 +239,7 @@ let _continuation_at ~grade_horizon post_exit =
   |> Option.value ~default:0.0
 
 (** Grade one round-trip row into a {!DG.Aggregate.graded_trade}. *)
-let _grade_row ~bar_reader ~mfe_lookup ~exit_reason_lookup ~horizons
+let _grade_row ~bar_reader ~mfe_index ~exit_reason_lookup ~horizons
     ~grade_config ~grade_horizon (row : TAR.per_trade_row) :
     DG.Aggregate.graded_trade =
   let max_horizon =
@@ -222,7 +258,7 @@ let _grade_row ~bar_reader ~mfe_lookup ~exit_reason_lookup ~horizons
   let realized_pnl_pct = row.pnl_percent /. _pct_scale in
   let entry_capture_ratio =
     Option.bind
-      (Hashtbl.find mfe_lookup (row.symbol, row.entry_date))
+      (_find_mfe mfe_index ~symbol:row.symbol ~entry_date:row.entry_date)
       ~f:(fun mfe ->
         DG.Grade.entry_capture_ratio ~realized_pnl_pct ~max_favorable_pct:mfe)
   in
@@ -275,14 +311,14 @@ let () =
   in
   let report = TAR.load ~scenario_dir in
   let bar_reader = _bar_reader_of_snapshot ~snapshot_dir in
-  let mfe_lookup = _mfe_lookup report in
+  let mfe_index = _mfe_index ~scenario_dir in
   let exit_reason_lookup = _exit_reason_lookup ~scenario_dir in
   eprintf "decision_grading: grading %d round-trips from %s\n%!"
     (List.length report.rows) scenario_dir;
   let graded =
     List.map report.rows
       ~f:
-        (_grade_row ~bar_reader ~mfe_lookup ~exit_reason_lookup ~horizons
+        (_grade_row ~bar_reader ~mfe_index ~exit_reason_lookup ~horizons
            ~grade_config ~grade_horizon)
   in
   let groups = DG.Aggregate.aggregate_by_exit_reason graded in
