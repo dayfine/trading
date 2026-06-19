@@ -37,6 +37,7 @@ type config = {
   tightened_stop_buffer_pct : float;
   support_floor_lookback_bars : int;
   max_stop_distance_pct : float;
+  trigger_on_weekly_close : bool; [@sexp.default false]
 }
 [@@deriving show, eq, sexp]
 
@@ -50,4 +51,5 @@ let default_config =
     tightened_stop_buffer_pct = 0.005;
     support_floor_lookback_bars = 90;
     max_stop_distance_pct = 0.15;
+    trigger_on_weekly_close = false;
   }

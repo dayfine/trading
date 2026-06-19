@@ -159,7 +159,7 @@ let _step_stop ~config ~(side : Position.position_side)
     ~(stage_result : Stage.result option) ~(state : Weinstein_stops.stop_state)
     ~(pos : Position.t) ~(bar : Types.Daily_price.t) :
     Weinstein_stops.stop_state * Position.transition option =
-  if Weinstein_stops.check_stop_hit ~state ~side ~bar then
+  if Weinstein_stops.check_stop_hit ~state ~side ~bar () then
     let stop_level = Weinstein_stops.get_stop_level state in
     (state, Some (Spy_only_transitions.build_stop_exit ~pos ~bar ~stop_level))
   else if not (_is_weekly_close ~date:bar.date) then (state, None)

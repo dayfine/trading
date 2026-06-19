@@ -145,26 +145,66 @@ let test_compute_initial_stop_short _ =
 let test_check_stop_hit_long _ =
   let state = Initial { stop_level = 45.0; reference_level = 47.0 } in
   assert_that
-    (check_stop_hit ~state ~side:Long ~bar:(make_bar ~low_price:44.0 ()))
+    (check_stop_hit ~state ~side:Long ~bar:(make_bar ~low_price:44.0 ()) ())
     (equal_to true);
   assert_that
-    (check_stop_hit ~state ~side:Long ~bar:(make_bar ~low_price:45.0 ()))
+    (check_stop_hit ~state ~side:Long ~bar:(make_bar ~low_price:45.0 ()) ())
     (equal_to true);
   assert_that
-    (check_stop_hit ~state ~side:Long ~bar:(make_bar ~low_price:46.0 ()))
+    (check_stop_hit ~state ~side:Long ~bar:(make_bar ~low_price:46.0 ()) ())
     (equal_to false)
 
 let test_check_stop_hit_short _ =
   let state = Initial { stop_level = 55.0; reference_level = 53.0 } in
   assert_that
-    (check_stop_hit ~state ~side:Short ~bar:(make_bar ~high_price:56.0 ()))
+    (check_stop_hit ~state ~side:Short ~bar:(make_bar ~high_price:56.0 ()) ())
     (equal_to true);
   assert_that
-    (check_stop_hit ~state ~side:Short ~bar:(make_bar ~high_price:55.0 ()))
+    (check_stop_hit ~state ~side:Short ~bar:(make_bar ~high_price:55.0 ()) ())
     (equal_to true);
   assert_that
-    (check_stop_hit ~state ~side:Short ~bar:(make_bar ~high_price:54.0 ()))
+    (check_stop_hit ~state ~side:Short ~bar:(make_bar ~high_price:54.0 ()) ())
     (equal_to false)
+
+(* on_close=true: a long stop ignores an intra-bar wick below the stop and fires
+   only when the bar CLOSES below it (Weinstein weekly-close rule). Stop 45. *)
+let test_check_stop_hit_weekly_close_long _ =
+  let state = Initial { stop_level = 45.0; reference_level = 47.0 } in
+  (* wick below (low 44) but close back above (46) -> no trigger on close;
+     the default low-based check WOULD have triggered. *)
+  let shakeout = make_bar ~low_price:44.0 ~close_price:46.0 () in
+  assert_that
+    (check_stop_hit ~on_close:true ~state ~side:Long ~bar:shakeout ())
+    (equal_to false);
+  assert_that
+    (check_stop_hit ~state ~side:Long ~bar:shakeout ())
+    (equal_to true);
+  (* close at/below the stop -> trigger on close. *)
+  assert_that
+    (check_stop_hit ~on_close:true ~state ~side:Long
+       ~bar:(make_bar ~low_price:44.0 ~close_price:45.0 ())
+       ())
+    (equal_to true);
+  assert_that
+    (check_stop_hit ~on_close:true ~state ~side:Long
+       ~bar:(make_bar ~low_price:40.0 ~close_price:43.0 ())
+       ())
+    (equal_to true)
+
+(* on_close=true short: ignores an intra-bar high spike above the stop, fires
+   only when the bar closes above it. Stop 55. *)
+let test_check_stop_hit_weekly_close_short _ =
+  let state = Initial { stop_level = 55.0; reference_level = 53.0 } in
+  let spike = make_bar ~high_price:56.0 ~close_price:54.0 () in
+  assert_that
+    (check_stop_hit ~on_close:true ~state ~side:Short ~bar:spike ())
+    (equal_to false);
+  assert_that (check_stop_hit ~state ~side:Short ~bar:spike ()) (equal_to true);
+  assert_that
+    (check_stop_hit ~on_close:true ~state ~side:Short
+       ~bar:(make_bar ~high_price:56.0 ~close_price:55.0 ())
+       ())
+    (equal_to true)
 
 (* ---- get_stop_level tests ---- *)
 
@@ -570,6 +610,10 @@ let suite =
          "initial_stop_short" >:: test_compute_initial_stop_short;
          "check_stop_hit_long" >:: test_check_stop_hit_long;
          "check_stop_hit_short" >:: test_check_stop_hit_short;
+         "check_stop_hit_weekly_close_long"
+         >:: test_check_stop_hit_weekly_close_long;
+         "check_stop_hit_weekly_close_short"
+         >:: test_check_stop_hit_weekly_close_short;
          "get_stop_level_initial" >:: test_get_stop_level_initial;
          "get_stop_level_trailing" >:: test_get_stop_level_trailing;
          "get_stop_level_tightened" >:: test_get_stop_level_tightened;

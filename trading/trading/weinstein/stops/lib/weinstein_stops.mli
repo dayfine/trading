@@ -116,11 +116,22 @@ val compute_initial_stop_with_floor_with_callbacks :
     inline. *)
 
 val check_stop_hit :
-  state:stop_state -> side:position_side -> bar:Types.Daily_price.t -> bool
+  ?on_close:bool ->
+  state:stop_state ->
+  side:position_side ->
+  bar:Types.Daily_price.t ->
+  unit ->
+  bool
 (** [true] if the bar's trigger price crossed the stop level.
 
-    Long: triggered by [low_price ≤ stop_level]. Short: triggered by
-    [high_price ≥ stop_level]. *)
+    Default ([on_close = false]) uses the intra-bar extreme — Long: triggered by
+    [low_price ≤ stop_level]; Short: [high_price ≥ stop_level].
+
+    With [on_close = true] the trigger uses the bar's [close_price] instead
+    (Long: [close ≤ stop_level]; Short: [close ≥ stop_level]) — Weinstein's
+    weekly-close rule: an intra-bar wick beyond the stop does not trigger unless
+    the bar closes beyond it. On the weekly strategy cadence the bar is a weekly
+    bar, so this is the weekly close. *)
 
 val get_stop_level : stop_state -> float
 (** Extract the current stop price from any state. *)

@@ -102,6 +102,19 @@ type config = {
           fix was driven by short candidates whose support-floor-derived stop
           sat 16%+ above entry (AOS, HOOD; see
           [dev/notes/g15-stops-diagnostic-aos-hood-2026-05-01.md]). *)
+  trigger_on_weekly_close : bool; [@sexp.default false]
+      (** When [true], a stop fires only when the bar's {b close} crosses the
+          stop level, not its intra-bar low (long) / high (short). On the weekly
+          strategy cadence the bar is a weekly bar, so this is Weinstein's
+          weekly-{e close} rule (book §Stop-Loss Rules, the qc-behavioral L3
+          contract): an intra-week shakeout wick below the stop does {b not}
+          trigger an exit if the week closes back above it.
+
+          Default [false] reproduces the prior intra-bar GTC-stop behaviour
+          bit-for-bit (longs trigger on [low ≤ stop], shorts on [high ≥ stop]),
+          so every existing golden replays unchanged. Default-off experiment
+          axis per [.claude/rules/experiment-flag-discipline.md]; design
+          [dev/plans/weekly-close-stop-2026-06-19.md]. *)
 }
 [@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable
