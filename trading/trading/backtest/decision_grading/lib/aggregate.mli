@@ -36,9 +36,27 @@ type graded_trade = {
   entry_capture_ratio : float option;
       (** {!Grade.entry_capture_ratio} for the trade — fraction of in-trade peak
           gain realized. [None] when the trade never showed an in-trade gain. *)
+  post_exit_max_adverse_pct : float;
+      (** Worst move {b against} the trade after the exit, at the grade horizon
+          ({!Post_exit.horizon_result.post_exit_max_adverse_pct}). For a long
+          this is how far price fell {b below} the exit — i.e.
+          {b the disaster dodged by being out} (typically [<= 0.0]). The benefit
+          side of a stop: a large negative value is a deep decline we sat out.
+      *)
+  post_exit_max_favorable_pct : float;
+      (** Best move {b in} the trade's direction after the exit, at the grade
+          horizon ({!Post_exit.horizon_result.post_exit_max_favorable_pct}). The
+          {b upside foregone} by exiting (typically [>= 0.0]). The cost side of
+          a stop: a large positive value is a recovery/run we missed. *)
 }
 [@@deriving show, eq, sexp]
-(** One graded round-trip, the unit of aggregation. *)
+(** One graded round-trip, the unit of aggregation.
+
+    [continuation_pct] is the {b net} post-exit move (favorable minus adverse,
+    realized at the horizon close); [post_exit_max_adverse_pct] and
+    [post_exit_max_favorable_pct] split that net into the {b benefit} (disaster
+    dodged) and {b cost} (upside foregone) of the exit — the decomposition the
+    mean continuation alone hides. *)
 
 type group_stats = {
   exit_reason : string;  (** The reason all trades in this group share. *)
@@ -65,14 +83,50 @@ type group_stats = {
       (** Mean {!graded_trade.entry_capture_ratio} over the trades in the group
           that have [Some] ratio. [None] when {b no} trade in the group has a
           defined ratio (none ever showed an in-trade gain). *)
+  mean_post_exit_max_adverse_pct : float;
+      (** Mean {!graded_trade.post_exit_max_adverse_pct} — the
+          {b average disaster dodged} by exits in this group. For [stop_loss]
+          this is the benefit side of the stop: how far the average stopped name
+          fell after we were out. *)
+  mean_post_exit_max_favorable_pct : float;
+      (** Mean {!graded_trade.post_exit_max_favorable_pct} — the
+          {b average upside foregone} by exits in this group (the whipsaw/cost
+          side). *)
+  continuation_p10 : float;
+      (** 10th-percentile {!graded_trade.continuation_pct} in the group
+          (nearest- rank). The left tail: the most-adverse-continuation exits —
+          for a stop, the disasters it sat out (continuation deeply negative).
+          [0.0] for an empty group. *)
+  continuation_p90 : float;
+      (** 90th-percentile {!graded_trade.continuation_pct} (nearest-rank). The
+          right tail: the biggest runs given up by exiting. [0.0] for an empty
+          group. *)
+  disaster_dodge_rate : float;
+      (** Fraction of the group whose {!graded_trade.post_exit_max_adverse_pct}
+          is at or below the [disaster_threshold_pct] passed to
+          {!aggregate_by_exit_reason} — i.e. the share of exits that sat out a
+          drop of at least that magnitude. In [[0.0, 1.0]]. This is the
+          {b frequency} of disaster-avoidance, complementing the magnitude in
+          [mean_post_exit_max_adverse_pct]. *)
 }
 [@@deriving show, eq, sexp]
 (** Aggregate statistics for one exit-reason group. *)
 
-val aggregate_by_exit_reason : graded_trade list -> group_stats list
-(** [aggregate_by_exit_reason trades] partitions [trades] by
-    {!graded_trade.exit_reason} and computes one {!group_stats} per distinct
-    reason.
+val default_disaster_threshold_pct : float
+(** [-0.20] — the default cutoff for {!group_stats.disaster_dodge_rate}: a
+    post-exit drop of 20% or more (as a fraction of exit price) counts as a
+    disaster dodged. *)
+
+val aggregate_by_exit_reason :
+  ?disaster_threshold_pct:float -> graded_trade list -> group_stats list
+(** [aggregate_by_exit_reason ?disaster_threshold_pct trades] partitions
+    [trades] by {!graded_trade.exit_reason} and computes one {!group_stats} per
+    distinct reason.
+
+    [disaster_threshold_pct] (default {!default_disaster_threshold_pct}) is the
+    [post_exit_max_adverse_pct] cutoff at or below which an exit counts toward
+    {!group_stats.disaster_dodge_rate}. Expressed as a {b signed} fraction (e.g.
+    [-0.20]); a trade counts when its [post_exit_max_adverse_pct <=] this value.
 
     The result is sorted by [exit_reason] ascending for deterministic output.
     Empty input -> empty output. Every emitted group has [n >= 1]. Pure: same
