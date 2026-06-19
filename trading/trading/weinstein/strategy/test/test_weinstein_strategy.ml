@@ -669,6 +669,106 @@ let test_entries_from_candidates_emits_long _ =
        ])
 
 (* ------------------------------------------------------------------ *)
+(* Reserved short sleeve (short_sleeve_fraction)                       *)
+(* ------------------------------------------------------------------ *)
+
+(** Count the [CreateEntering] transitions of a given side. *)
+let _count_entering_side transitions side =
+  List.count transitions ~f:(fun (t : Trading_strategy.Position.transition) ->
+      match t.kind with
+      | Trading_strategy.Position.CreateEntering { side = s; _ } ->
+          Trading_base.Types.equal_position_side s side
+      | _ -> false)
+
+(** Three longs + one short fed at $30k cash, sized so each long costs $9k (0.30
+    per-position exposure cap) and the short costs $6k (0.20 cap). The three
+    longs exhaust cash to $3k before the appended short is reached, so the short
+    is crowded out. Shared by the default-off and sleeve-active tests so they
+    exercise identical inputs. *)
+let _sleeve_candidates () =
+  let long ticker =
+    make_scored_candidate ~ticker ~side:Trading_base.Types.Long ~entry:100.0
+      ~stop:92.0 ~grade:Weinstein_types.C
+  in
+  let short =
+    make_scored_candidate ~ticker:"SHRT" ~side:Trading_base.Types.Short
+      ~entry:80.0 ~stop:88.0 ~grade:Weinstein_types.C
+  in
+  (* Screener order: longs first, then the appended short. *)
+  [ long "LNGA"; long "LNGB"; long "LNGC"; short ]
+
+let _sleeve_portfolio : Trading_strategy.Portfolio_view.t =
+  { cash = 30_000.0; positions = String.Map.empty }
+
+let _sleeve_get_price =
+  get_price_of
+    [
+      ("LNGA", make_bar "2024-01-05" 100.0);
+      ("LNGB", make_bar "2024-01-05" 100.0);
+      ("LNGC", make_bar "2024-01-05" 100.0);
+      ("SHRT", make_bar "2024-01-05" 80.0);
+    ]
+
+let _run_sleeve_entries cfg =
+  let stop_states = ref String.Map.empty in
+  entries_from_candidates ~config:cfg ~candidates:(_sleeve_candidates ())
+    ~stop_states ~bar_reader:(Bar_reader.empty ()) ~portfolio:_sleeve_portfolio
+    ~get_price:_sleeve_get_price
+    ~current_date:(Date.of_string "2024-01-05")
+    ()
+
+(** Default [short_sleeve_fraction = 0.0]: the single combined walk consumes the
+    long-only cash budget on the three longs before reaching the appended short,
+    so zero shorts enter — bit-identical to the pre-sleeve crowd-out. *)
+let test_short_sleeve_default_crowds_out_shorts _ =
+  let cfg = default_config ~universe:[ "X" ] ~index_symbol:"GSPCX" in
+  let transitions = _run_sleeve_entries cfg in
+  assert_that
+    (_count_entering_side transitions Trading_base.Types.Short)
+    (equal_to 0)
+
+(** [short_sleeve_fraction = 0.3] reserves $9k (0.30 * $30k PV) for a short-only
+    walk, so the $6k short now enters where it was crowded out at 0.0; the longs
+    walk against the reduced $21k budget so only two of the three $9k longs fit.
+    Pins the count flip on both sides. *)
+let test_short_sleeve_active_admits_short _ =
+  let cfg =
+    {
+      (default_config ~universe:[ "X" ] ~index_symbol:"GSPCX") with
+      short_sleeve_fraction = 0.3;
+    }
+  in
+  let transitions = _run_sleeve_entries cfg in
+  assert_that transitions
+    (all_of
+       [
+         field
+           (fun ts -> _count_entering_side ts Trading_base.Types.Short)
+           (equal_to 1);
+         field
+           (fun ts -> _count_entering_side ts Trading_base.Types.Long)
+           (equal_to 2);
+       ])
+
+(** Short-notional cap still binds under the sleeve: with
+    [max_short_notional_fraction = 0.0] no short notional is permitted, so even
+    a generously-funded short sleeve admits zero shorts. *)
+let test_short_sleeve_short_notional_cap_binds _ =
+  let base = default_config ~universe:[ "X" ] ~index_symbol:"GSPCX" in
+  let cfg =
+    {
+      base with
+      short_sleeve_fraction = 0.5;
+      portfolio_config =
+        { base.portfolio_config with max_short_notional_fraction = 0.0 };
+    }
+  in
+  let transitions = _run_sleeve_entries cfg in
+  assert_that
+    (_count_entering_side transitions Trading_base.Types.Short)
+    (equal_to 0)
+
+(* ------------------------------------------------------------------ *)
 (* Stage 4-5 PR-A: lazy stage filter — survivors_for_screening         *)
 (* ------------------------------------------------------------------ *)
 
@@ -1358,6 +1458,12 @@ let () =
            >:: test_entries_from_candidates_emits_short;
            "entries_from_candidates emits Long transition for Long candidate"
            >:: test_entries_from_candidates_emits_long;
+           "short sleeve default (0.0) crowds out shorts (bit-identical)"
+           >:: test_short_sleeve_default_crowds_out_shorts;
+           "short sleeve active (0.3) admits short, reduces longs"
+           >:: test_short_sleeve_active_admits_short;
+           "short sleeve: short-notional cap still binds"
+           >:: test_short_sleeve_short_notional_cap_binds;
            "survivors_for_screening filters by stage"
            >:: test_survivors_for_screening_filters_by_stage;
            "survivors_for_screening drops Stage1 and Stage3"

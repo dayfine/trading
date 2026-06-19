@@ -1,9 +1,64 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-06-16
+## Last updated: 2026-06-19
 
 ## Status
 IN_PROGRESS
+
+## 2026-06-19 — reserved short sleeve (default-off) SHIPPED (branch `feat/short-sleeve`)
+
+Addresses the short-funnel crowd-out diagnosed in
+`dev/agent-memory/project_short_funnel_crowded_out.md`: over a 28y long-short
+run the short cascade **offers** 1,662 candidate-slots but only 37 **enter**
+(2%), with **0 short fills rejected** — shorts are crowded out at the entry walk
+(`buy_candidates @ short_candidates` walked through one shared `remaining_cash`;
+longs exhaust cash before the appended shorts are reached), not by signal rarity
+or cash rejection.
+
+**Mechanism:** new default-off config field
+`Weinstein_strategy_config.short_sleeve_fraction : float [@sexp.default 0.0]`.
+- `<= 0.0` (default): **bit-identical to baseline** — single combined entry walk
+  over `buy_candidates @ short_candidates` against one `remaining_cash` seeded at
+  `portfolio.cash`. All existing goldens/baselines replay unchanged
+  (experiment-flag-discipline R1).
+- `> 0.0`: partitions the per-Friday cash budget in
+  `weinstein_strategy_screening.entries_from_candidates`. Reserves
+  `short_budget = short_sleeve_fraction * portfolio_value` for a short-only walk;
+  longs walk against `max 0 (portfolio.cash - short_budget)`. Two independent
+  `remaining_cash` refs, **shared** `short_notional_acc` + `sector_exposure_acc`
+  so the `max_short_notional_fraction` cap and per-sector cap still bind across
+  both sides. Kept transitions re-emitted in original screener order (audit
+  ordering preserved).
+
+**Faithfulness (W1/W2):** portfolio-allocation / diversification dial —
+Weinstein runs long+short simultaneously in bear markets
+(weinstein-book-reference §Short Selling). Spine untouched: Stage-4-only short
+entry, RS hard gate, Ch.11 cascade all unaffected; only the *capital available*
+to already-screened shorts changes.
+
+**Searchable axis (R2):** `short_sleeve_fraction` is a real top-level float
+config field, so it routes through `Overlay_validator.apply_overrides` and
+expands as `((flag short_sleeve_fraction) (values (0.0 0.1 0.2 0.3)))`.
+Test `test_short_sleeve_fraction_axis_expands` pins this. NOT wired into any
+default config/preset — stays default-off until a ledger ACCEPT
+(experiment-flag-discipline R3 + promotion-confirmation grid).
+
+**Tests** (`test_weinstein_strategy.ml` + `test_variant_matrix.ml`):
+- `test_short_sleeve_default_crowds_out_shorts` — default 0.0: 3 longs exhaust
+  $30k cash, 0 shorts enter (bit-identical crowd-out).
+- `test_short_sleeve_active_admits_short` — 0.3 reserves $9k: short now enters
+  (count 1 vs 0), longs reduced to 2 of 3 by the reserved budget.
+- `test_short_sleeve_short_notional_cap_binds` — `max_short_notional_fraction=0`
+  admits 0 shorts even with a funded sleeve.
+- `test_short_sleeve_fraction_axis_expands` — variant-matrix axis validates.
+
+**Files:** `weinstein_strategy_config.{ml,mli}`, `weinstein_strategy.mli`
+(config mirror), `weinstein_strategy_screening.ml` (partition),
+`test_weinstein_strategy.ml`, `test_variant_matrix.ml`.
+
+**Next:** screen the sleeve fractions with the decision-grading lens (do the
+now-numerous shorts add a real offsetting / DD-reducing leg?) → WF-CV → grid
+before any default flip. `[non-blocking]`.
 
 ## 2026-06-16 — short-side ranking differentiation SHIPPED (PR #1612)
 

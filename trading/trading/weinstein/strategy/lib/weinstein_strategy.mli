@@ -452,6 +452,12 @@ type config = {
       (** Fraction of a held [Stage2 { late }] long trimmed by the
           harvest-rotate runner; [0.5] = sell half. Only consulted when
           [enable_harvest_rotate = true]. See [Weinstein_strategy_config]. *)
+  short_sleeve_fraction : float; [@sexp.default 0.0]
+      (** Fraction of portfolio value reserved as a dedicated short-only cash
+          budget in the per-Friday entry walk; default [0.0] is a no-op
+          (bit-identical single combined walk). Reserves capital for shorts so
+          they are not crowded out by longs at the entry walk. See
+          [Weinstein_strategy_config]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
