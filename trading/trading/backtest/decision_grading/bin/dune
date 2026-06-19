@@ -1,6 +1,6 @@
-(executable
- (name decision_grading_bin)
- (modules decision_grading_bin)
+(executables
+ (names decision_grading_bin laggard_cf_bin)
+ (modules decision_grading_bin laggard_cf_bin)
  (libraries
   core
   core_unix.sys_unix
