@@ -88,13 +88,19 @@ let _compute_ma_and_stage ?ma_cache ?prior_stage_ma_values
     against profitable territory — the recorded actual price was the bar low,
     not the trigger price near the high. See G1 in
     [dev/notes/short-side-gaps-2026-04-29.md]. *)
-let _trigger_fill_price ~(side : Trading_base.Types.position_side) ~bar =
-  match side with
-  | Long -> bar.Types.Daily_price.low_price
-  | Short -> bar.Types.Daily_price.high_price
+let _trigger_fill_price ?(on_close = false)
+    ~(side : Trading_base.Types.position_side) ~bar () =
+  if on_close then bar.Types.Daily_price.close_price
+  else
+    match side with
+    | Long -> bar.Types.Daily_price.low_price
+    | Short -> bar.Types.Daily_price.high_price
 
-let _make_exit_transition ~(pos : Position.t) ~current_date ~state ~bar =
-  let actual_price = _trigger_fill_price ~side:pos.Position.side ~bar in
+let _make_exit_transition ?(on_close = false) ~(pos : Position.t) ~current_date
+    ~state ~bar () =
+  let actual_price =
+    _trigger_fill_price ~on_close ~side:pos.Position.side ~bar ()
+  in
   let exit_reason =
     Position.StopLoss
       {
@@ -131,19 +137,25 @@ let _make_adjust_transition ~(pos : Position.t) ~current_date
     placement re-evaluation is weekly. If the bar's high/low crosses the
     existing stop level, an exit transition is emitted at the same actual_price
     the daily path would have used (bar low for longs, bar high for shorts). *)
-let _handle_stop_trigger_only ~(pos : Position.t) ~state ~bar ~current_date =
-  if Weinstein_stops.check_stop_hit ~state ~side:pos.Position.side ~bar then
-    (Some (_make_exit_transition ~pos ~current_date ~state ~bar), None)
+let _handle_stop_trigger_only ~on_close ~(pos : Position.t) ~state ~bar
+    ~current_date =
+  if
+    Weinstein_stops.check_stop_hit ~on_close ~state ~side:pos.Position.side ~bar
+      ()
+  then
+    ( Some (_make_exit_transition ~on_close ~pos ~current_date ~state ~bar ()),
+      None )
   else (None, None)
 
 (** Translate a {!Weinstein_stops.stop_event} into the (exit, adjust) transition
     pair the runner emits to the strategy. Pure mapping — extracted from
     [_handle_stop] to keep that function within the nesting linter's limits. *)
-let _transitions_of_stop_event ~(pos : Position.t)
+let _transitions_of_stop_event ~on_close ~(pos : Position.t)
     ~(risk_params : Position.risk_params) ~state ~bar ~current_date ~event =
   match event with
   | Weinstein_stops.Stop_hit _ ->
-      (Some (_make_exit_transition ~pos ~current_date ~state ~bar), None)
+      ( Some (_make_exit_transition ~on_close ~pos ~current_date ~state ~bar ()),
+        None )
   | Weinstein_stops.Stop_raised { new_level; _ } ->
       ( None,
         Some
@@ -169,7 +181,9 @@ let _handle_stop_full ?ma_cache ?prior_stage_ma_values ~stops_config
       ~current_bar:bar ~ma_value ~ma_direction ~stage
   in
   stop_states := Map.set !stop_states ~key:ticker ~data:new_state;
-  _transitions_of_stop_event ~pos ~risk_params ~state ~bar ~current_date ~event
+  _transitions_of_stop_event
+    ~on_close:stops_config.Weinstein_stops.trigger_on_weekly_close ~pos
+    ~risk_params ~state ~bar ~current_date ~event
 
 (** Process stop logic for one held position. Returns (exit_transition option,
     adjust_transition option).
@@ -189,7 +203,9 @@ let _handle_stop ?ma_cache ?prior_stage_ma_values ?(stop_update_cadence = Daily)
     | Weekly -> _is_weekly_close ~as_of
   in
   if not advance_state_machine then
-    _handle_stop_trigger_only ~pos ~state ~bar ~current_date
+    _handle_stop_trigger_only
+      ~on_close:stops_config.Weinstein_stops.trigger_on_weekly_close ~pos ~state
+      ~bar ~current_date
   else
     _handle_stop_full ?ma_cache ?prior_stage_ma_values ~stops_config
       ~stage_config ~lookback_bars ~pos ~risk_params ~state ~bar ~stop_states

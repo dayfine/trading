@@ -244,7 +244,7 @@ let test_split_day_no_spurious_stop_hit _ =
   let scaled = Map.find_exn !stop_states symbol in
   assert_that
     (Weinstein_stops.check_stop_hit ~state:scaled ~side:Trading_base.Types.Long
-       ~bar:split_day_bar)
+       ~bar:split_day_bar ())
     (equal_to false)
 
 (* Control case: same scenario, but the post-split bar drops below the
@@ -291,7 +291,7 @@ let test_real_adverse_move_after_split_still_triggers _ =
   let scaled = Map.find_exn !stop_states symbol in
   assert_that
     (Weinstein_stops.check_stop_hit ~state:scaled ~side:Trading_base.Types.Long
-       ~bar:adverse_bar)
+       ~bar:adverse_bar ())
     (equal_to true)
 
 (* Pin: when the position has no entry in [stop_states], adjust is a

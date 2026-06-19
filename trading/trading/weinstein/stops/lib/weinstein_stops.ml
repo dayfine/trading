@@ -7,33 +7,11 @@ module Support_floor = Support_floor
 module Stop_split_adjust = Stop_split_adjust
 module Stop_widen = Stop_widen
 
-(* ---- Nudge functions ---- *)
-
-(* Round numbers and half-dollars attract heavy order flow, so stops placed right
-   at those levels are more likely to be triggered by noise. We step just outside
-   them when the raw stop lands within [config.round_number_nudge] of a level.
-   The nearest half-dollar (or whole dollar) is used as the reference point. *)
-
-let _nearest_half price =
-  let floor_half = Float.round_down (price /. 0.5) *. 0.5 in
-  let ceil_half = floor_half +. 0.5 in
-  if
-    Float.( < )
-      (Float.abs (price -. ceil_half))
-      (Float.abs (price -. floor_half))
-  then ceil_half
-  else floor_half
-
-(* For longs, nudge the stop below the nearest level; for shorts, above. *)
+(* Round-number nudging lives in {!Stop_nudge} (extracted to keep this
+   coordinator under the file-length cap). This adapts it to the stops config's
+   [round_number_nudge] distance. *)
 let nudge_round_number ~config ~side price =
-  let nudge = config.round_number_nudge in
-  let candidate = _nearest_half price in
-  if Float.( <= ) (Float.abs (price -. candidate)) nudge then
-    match side with
-    | Long when Float.( >= ) price candidate -> candidate -. nudge
-    | Short when Float.( <= ) price candidate -> candidate +. nudge
-    | _ -> price
-  else price
+  Stop_nudge.nudge_round_number ~nudge:config.round_number_nudge ~side price
 
 (* ---- Stop level extraction ---- *)
 
@@ -44,11 +22,25 @@ let get_stop_level = function
 
 (* ---- Stop hit check ---- *)
 
-let check_stop_hit ~state ~side ~bar =
+(* The price the stop trigger compares against the stop level: the intra-bar
+   extreme in the against-trend direction by default (low for longs, high for
+   shorts), or the bar [close] when [on_close] — Weinstein's weekly-close rule,
+   where an intra-bar wick beyond the stop is ignored unless the bar closes
+   beyond it. On the weekly strategy cadence the bar is a weekly bar, so
+   [on_close] = weekly close. *)
+let _trigger_price ~on_close ~side ~bar =
+  if on_close then bar.Types.Daily_price.close_price
+  else
+    match side with
+    | Long -> bar.Types.Daily_price.low_price
+    | Short -> bar.Types.Daily_price.high_price
+
+let check_stop_hit ?(on_close = false) ~state ~side ~bar () =
   let stop_level = get_stop_level state in
+  let price = _trigger_price ~on_close ~side ~bar in
   match side with
-  | Long -> Float.( <= ) bar.Types.Daily_price.low_price stop_level
-  | Short -> Float.( >= ) bar.Types.Daily_price.high_price stop_level
+  | Long -> Float.( <= ) price stop_level
+  | Short -> Float.( >= ) price stop_level
 
 (* ---- Initial stop computation ---- *)
 
@@ -192,8 +184,8 @@ let _should_tighten ~config ~side ~ma_direction ~stage : bool * string =
 
 (* ---- Shared transition builders ---- *)
 
-let _stop_hit_event ~side ~stop_level ~bar =
-  Stop_hit { trigger_price = _bar_extreme ~side ~bar; stop_level }
+let _stop_hit_event ?(on_close = false) ~side ~stop_level ~bar () =
+  Stop_hit { trigger_price = _trigger_price ~on_close ~side ~bar; stop_level }
 
 (* Transitions to Tightened state. Used by both Initial and Trailing handlers. *)
 let _to_tightened ~config ~side ~stop_level ~correction_extreme ~reason =
@@ -248,8 +240,9 @@ let _check_tighten ~config ~side ~stop_level ~correction_extreme ~ma_direction
 let _check_stop_or_tighten ~config ~side ~state ~bar ~correction_extreme
     ~ma_direction ~stage =
   let stop_level = get_stop_level state in
-  if check_stop_hit ~state ~side ~bar then
-    Some (state, _stop_hit_event ~side ~stop_level ~bar)
+  let on_close = config.trigger_on_weekly_close in
+  if check_stop_hit ~on_close ~state ~side ~bar () then
+    Some (state, _stop_hit_event ~on_close ~side ~stop_level ~bar ())
   else
     _check_tighten ~config ~side ~stop_level ~correction_extreme ~ma_direction
       ~stage
@@ -476,8 +469,9 @@ let _update_tightened ~config ~side ~state ~current_bar =
   let bar = current_bar in
   match state with
   | Tightened { stop_level; last_correction_extreme; reason } ->
-      if check_stop_hit ~state ~side ~bar then
-        (state, _stop_hit_event ~side ~stop_level ~bar)
+      let on_close = config.trigger_on_weekly_close in
+      if check_stop_hit ~on_close ~state ~side ~bar () then
+        (state, _stop_hit_event ~on_close ~side ~stop_level ~bar ())
       else
         _ratchet_tightened ~config ~side ~stop_level ~last_correction_extreme
           ~reason ~bar
