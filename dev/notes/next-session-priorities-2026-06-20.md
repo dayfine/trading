@@ -38,19 +38,46 @@ coin-flip or backfire (`project_edge_is_the_fat_tail`,
 structural diversification (barbell: SPY-floor + engine, `project_barbell_on_stocks`)
 and possibly breadth/universe** — NOT selection or exit tuning.
 
-## P0 NEXT — pick a STRUCTURAL lever, not another selection/exit tweak
+## P0 NEXT — two NEW levers surfaced 2026-06-19 (user review of the no-builds)
 
-The decision-grading lens has now exhausted the per-decision selection/exit
-questions with consistent dead-ends. The evidence points to **structural
-diversification** as the next lever:
+The user pushed back on two of the no-builds and BOTH reframings hold up — these
+are the top levers now (not selection tweaks; both default-off → lens screen →
+WF-CV → grid):
 
-- **Barbell promotion path** (`project_barbell_on_stocks`): SPY-timing floor +
-  Cell-E engine NAV blend beat both legs on Calmar in deep AND bull. This is the
-  best-validated DD diversifier and has NOT been pushed to a promotion grid. P0
-  candidate: run the barbell through the WF-CV + `promotion-confirmation.md` grid
-  → if it holds, it's the first promotable structural change.
-- Do NOT start another entry/exit/rotation/short-selection screen — the lens has
-  shown that class is a dead end five times over.
+### P0a — RESERVED SHORT SLEEVE (reframes the (c) long-short no-build)
+`project_short_funnel_crowded_out`. The (c) "short leg anemic (37 trades/28y)"
+was the symptom, not the cause. The short cascade OFFERS 1,662 candidate-slots
+over 28y but only 37 ENTER (2%), with **0 short fills rejected** — shorts are
+**never reached**: candidates are appended after longs (`buy_candidates @
+short_candidates`) and the entry walk exhausts capital/`max_long_exposure 0.70`
+on longs first. Shorts are crowded out by ordering + the long budget, NOT signal
+rarity/quality. **Build a reserved short exposure budget** (dedicated short
+sleeve, sized + walked independently of the long book) default-off, then lens-
+screen: do the now-numerous shorts add a real offsetting/DD-reducing leg?
+Injection point scoped: `weinstein_strategy_screening.ml` `entries_from_candidates`
++ `_entry_walk_state` (short-notional accumulator infra already exists; add a
+short-exposure reservation/cap). Portfolio-allocation lever = structural
+diversification (the live class), distinct from loosening the Ch.11 cascade
+(spine — do NOT).
+
+### P0b — VOL-SCALED STOP DISTANCE (the stop-quality lever weekly-close didn't touch)
+`project_weekly_close_stop_lever` §stop-quality-levers. Weekly-close REJECTED
+(held breakdowns deeper). But the live stop is a FIXED 8% buffer regardless of a
+name's volatility — high-vol names get whipsawed by the same buffer that fits
+low-vol names (the code's own flagged TODO on `min_correction_pct`). Scale the
+stop buffer to the name's volatility (ATR) → cuts whipsaw at its SOURCE without
+holding breakdowns deeper (weekly-close's fatal flaw). Default-off `vol_scaled_stop`
+flag → lens screen (does stop upside-foregone shrink while disaster-dodged holds,
+unlike weekly-close?) → WF-CV. Secondary stop lever: post-stop re-entry.
+
+### P1 — barbell promotion (still valid, lower priority than the two above)
+`project_barbell_on_stocks`: SPY-timing floor + Cell-E engine NAV blend beat both
+legs on Calmar (deep + bull); never taken to a promotion grid. WF-CV +
+`promotion-confirmation.md`.
+
+Do NOT start another *selection* screen (entry/cascade/swap/short-pick) — that
+class is a dead end five times over. P0a/P0b/P1 are all structural/quality, not
+selection.
 
 ## P1 — lens as standing instrument
 The `decision_grading` + `laggard_cf` bins are the repeatable instrument; grade any

@@ -72,3 +72,23 @@ before flipping default. This is a tail-PRESERVING holding-discipline lever
 - Phase-4 WF-CV correctly SKIPPED (uniformly worse → promising-only gate not met).
   Flag stays default-off as a REJECT axis on main. Writeup:
   `dev/experiments/weekly-close-screen-2026-06-19/FINDINGS.md`.
+
+**STOP-QUALITY LEVERS BEYOND WEEKLY-CLOSE (user 2026-06-19: "still things to
+explore in stop quality").** Weekly-close was ONE lever (trigger basis) and
+failed for a SPECIFIC reason (holds genuine breakdowns to Friday = deeper fills).
+That does NOT exhaust stop quality. The lens-aligned levers it does not touch:
+1. **Volatility/ATR-scaled stop distance** — the live stop is a FIXED 8% buffer
+   (`installed_stop_min_pct=0.08`) regardless of the name's volatility; a high-vol
+   name gets whipsawed by the same buffer that fits a low-vol name. The code
+   itself flags this TODO (`stop_types.config.min_correction_pct` doc: "Future
+   improvement: derive this threshold from the security's volatility"). Scaling
+   the buffer to the name's noise cuts whipsaw WITHOUT holding breakdowns deeper
+   (weekly-close's fatal flaw). **Strongest remaining stop-quality lever** —
+   attacks the whipsaw at its source (buffer mis-sized to volatility), keeps the
+   fast intra-bar cut. Default-off `vol_scaled_stop` flag → lens screen → WF-CV.
+2. **Post-stop re-entry** — keep the fast intra-bar stop, but explicitly re-buy a
+   stopped name if it re-breaks out within N weeks (recapture the recoverers the
+   lens found). Weinstein "Trader's Way" continuation re-entry. Distinct from the
+   incidental laggard/re-screen re-entry.
+Both UNTESTED. Vol-scaled is the better bet (the whipsaw is buffer-vs-volatility
+mismatch; weekly-close failed by changing WHEN not HOW-FAR).
