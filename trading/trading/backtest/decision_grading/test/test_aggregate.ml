@@ -1,3 +1,4 @@
+open Core
 open OUnit2
 open Matchers
 module A = Decision_grading.Aggregate
@@ -6,13 +7,16 @@ module G = Decision_grading.Grade
 (* A graded_trade with sensible defaults; override only what a test cares about. *)
 let trade ?(exit_reason = "stop_loss") ?(realized_pnl_pct = 0.0)
     ?(continuation_pct = 0.0) ?(exit_grade = G.Neutral)
-    ?(entry_capture_ratio = None) () =
+    ?(entry_capture_ratio = None) ?(post_exit_max_adverse_pct = 0.0)
+    ?(post_exit_max_favorable_pct = 0.0) () =
   {
     A.exit_reason;
     realized_pnl_pct;
     continuation_pct;
     exit_grade;
     entry_capture_ratio;
+    post_exit_max_adverse_pct;
+    post_exit_max_favorable_pct;
   }
 
 (* Empty input -> empty output. *)
@@ -95,7 +99,76 @@ let test_capture_ratio_mixed _ =
            (is_some_and (float_equal 0.5));
        ])
 
-(* markdown: header + one row per group, in the order given. *)
+(* Insurance decomposition: mean disaster-dodged (max_adverse) + mean upside-
+   foregone (max_favorable) are the group means of those fields. Two trades with
+   adverse -0.40 / -0.10 and favorable +0.05 / +0.15 → means -0.25 / +0.10. *)
+let test_insurance_means _ =
+  let trades =
+    [
+      trade ~post_exit_max_adverse_pct:(-0.40) ~post_exit_max_favorable_pct:0.05
+        ();
+      trade ~post_exit_max_adverse_pct:(-0.10) ~post_exit_max_favorable_pct:0.15
+        ();
+    ]
+  in
+  assert_that
+    (A.aggregate_by_exit_reason trades)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun g -> g.A.mean_post_exit_max_adverse_pct)
+               (float_equal (-0.25));
+             field
+               (fun g -> g.A.mean_post_exit_max_favorable_pct)
+               (float_equal 0.10);
+           ];
+       ])
+
+(* disaster_dodge_rate counts trades with max_adverse <= threshold. Default
+   threshold -0.20: of adverse {-0.40,-0.25,-0.10,-0.05}, two clear it → 0.5. *)
+let test_disaster_dodge_rate_default _ =
+  let trades =
+    List.map [ -0.40; -0.25; -0.10; -0.05 ] ~f:(fun a ->
+        trade ~post_exit_max_adverse_pct:a ())
+  in
+  assert_that
+    (A.aggregate_by_exit_reason trades)
+    (elements_are
+       [ field (fun g -> g.A.disaster_dodge_rate) (float_equal 0.5) ])
+
+(* Custom (tighter) threshold -0.30: only -0.40 clears → 0.25. Boundary is
+   inclusive (<=), so exactly -0.30 would also count. *)
+let test_disaster_dodge_rate_custom _ =
+  let trades =
+    List.map [ -0.40; -0.25; -0.10; -0.05 ] ~f:(fun a ->
+        trade ~post_exit_max_adverse_pct:a ())
+  in
+  assert_that
+    (A.aggregate_by_exit_reason ~disaster_threshold_pct:(-0.30) trades)
+    (elements_are
+       [ field (fun g -> g.A.disaster_dodge_rate) (float_equal 0.25) ])
+
+(* Continuation p10/p90 (nearest-rank). For continuations 0.0..1.0 in 0.1 steps
+   (11 values), p10 = index round(0.1*10)=1 → 0.1; p90 = index 9 → 0.9. *)
+let test_continuation_percentiles _ =
+  let trades =
+    List.init 11 ~f:(fun i ->
+        trade ~continuation_pct:(Float.of_int i /. 10.0) ())
+  in
+  assert_that
+    (A.aggregate_by_exit_reason trades)
+    (elements_are
+       [
+         all_of
+           [
+             field (fun g -> g.A.continuation_p10) (float_equal 0.1);
+             field (fun g -> g.A.continuation_p90) (float_equal 0.9);
+           ];
+       ])
+
+(* markdown: both tables present, one row per group per table. *)
 let test_to_markdown _ =
   let groups =
     A.aggregate_by_exit_reason [ trade ~exit_reason:"stop_loss" () ]
@@ -104,7 +177,8 @@ let test_to_markdown _ =
   assert_that md
     (all_of
        [
-         contains_substring "| exit_reason | n |";
+         contains_substring "Exit value vs hold-counterfactual";
+         contains_substring "Disaster-avoidance vs upside-foregone";
          contains_substring "| stop_loss | 1 |";
        ])
 
@@ -116,6 +190,10 @@ let suite =
          "group_stats" >:: test_group_stats;
          "capture_ratio_all_none" >:: test_capture_ratio_all_none;
          "capture_ratio_mixed" >:: test_capture_ratio_mixed;
+         "insurance_means" >:: test_insurance_means;
+         "disaster_dodge_rate_default" >:: test_disaster_dodge_rate_default;
+         "disaster_dodge_rate_custom" >:: test_disaster_dodge_rate_custom;
+         "continuation_percentiles" >:: test_continuation_percentiles;
          "to_markdown" >:: test_to_markdown;
        ]
 

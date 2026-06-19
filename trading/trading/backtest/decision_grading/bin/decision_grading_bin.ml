@@ -231,12 +231,11 @@ let _find_mfe mfe_index ~symbol ~entry_date =
       |> List.min_elt ~compare:(fun (g1, _) (g2, _) -> Int.compare g1 g2)
       |> Option.map ~f:snd
 
-(** Continuation at [grade_horizon] from a post-exit result list, or [0.0] when
-    that horizon is absent. *)
-let _continuation_at ~grade_horizon post_exit =
-  List.find_map post_exit ~f:(fun (h : DG.Post_exit.horizon_result) ->
-      if h.horizon_weeks = grade_horizon then Some h.continuation_pct else None)
-  |> Option.value ~default:0.0
+(** The {!DG.Post_exit.horizon_result} at [grade_horizon], or [None] when that
+    horizon was not computed. *)
+let _result_at ~grade_horizon post_exit =
+  List.find post_exit ~f:(fun (h : DG.Post_exit.horizon_result) ->
+      h.horizon_weeks = grade_horizon)
 
 (** Grade one round-trip row into a {!DG.Aggregate.graded_trade}. *)
 let _grade_row ~bar_reader ~mfe_index ~exit_reason_lookup ~horizons
@@ -269,12 +268,18 @@ let _grade_row ~bar_reader ~mfe_index ~exit_reason_lookup ~horizons
   let exit_reason =
     if String.is_empty exit_reason then "unlabeled" else exit_reason
   in
+  let at_grade = _result_at ~grade_horizon post_exit in
+  let field f = Option.value_map at_grade ~default:0.0 ~f in
   {
     DG.Aggregate.exit_reason;
     realized_pnl_pct;
-    continuation_pct = _continuation_at ~grade_horizon post_exit;
+    continuation_pct = field (fun h -> h.DG.Post_exit.continuation_pct);
     exit_grade = DG.Grade.grade_exit ~config:grade_config ~post_exit;
     entry_capture_ratio;
+    post_exit_max_adverse_pct =
+      field (fun h -> h.DG.Post_exit.post_exit_max_adverse_pct);
+    post_exit_max_favorable_pct =
+      field (fun h -> h.DG.Post_exit.post_exit_max_favorable_pct);
   }
 
 let _header (report : TAR.t) ~grade_horizon ~n =
