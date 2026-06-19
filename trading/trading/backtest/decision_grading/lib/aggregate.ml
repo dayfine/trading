@@ -32,6 +32,12 @@ type group_stats = {
 
 let default_disaster_threshold_pct = -0.20
 
+(** Lower-tail quantile for the post-exit continuation distribution. *)
+let _continuation_p10_quantile = 0.10
+
+(** Upper-tail quantile for the post-exit continuation distribution. *)
+let _continuation_p90_quantile = 0.90
+
 (** Arithmetic mean of [xs], or [0.0] for an empty list. *)
 let _mean xs =
   match xs with
@@ -94,22 +100,26 @@ let _stats_of_group ~exit_reason ~disaster_threshold_pct trades =
       _mean (List.map trades ~f:(fun t -> t.post_exit_max_adverse_pct));
     mean_post_exit_max_favorable_pct =
       _mean (List.map trades ~f:(fun t -> t.post_exit_max_favorable_pct));
-    continuation_p10 = _percentile ~p:0.10 continuations;
-    continuation_p90 = _percentile ~p:0.90 continuations;
+    continuation_p10 = _percentile ~p:_continuation_p10_quantile continuations;
+    continuation_p90 = _percentile ~p:_continuation_p90_quantile continuations;
     disaster_dodge_rate = Float.of_int n_dodged /. Float.of_int n;
   }
+
+(** Reduce one same-[exit_reason] group to its [group_stats], skipping empties.
+*)
+let _group_to_stats ~disaster_threshold_pct = function
+  | [] -> None
+  | (first : graded_trade) :: _ as group ->
+      Some
+        (_stats_of_group ~exit_reason:first.exit_reason ~disaster_threshold_pct
+           group)
 
 let aggregate_by_exit_reason
     ?(disaster_threshold_pct = default_disaster_threshold_pct) trades =
   trades
   |> List.sort_and_group ~compare:(fun (a : graded_trade) (b : graded_trade) ->
       String.compare a.exit_reason b.exit_reason)
-  |> List.filter_map ~f:(function
-    | [] -> None
-    | (first : graded_trade) :: _ as group ->
-        Some
-          (_stats_of_group ~exit_reason:first.exit_reason
-             ~disaster_threshold_pct group))
+  |> List.filter_map ~f:(_group_to_stats ~disaster_threshold_pct)
 
 (** A float formatted as a signed percentage with one decimal, e.g. ["+12.3%"].
 *)
