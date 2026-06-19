@@ -113,6 +113,10 @@ type config = {
       (** Fraction of a held [Stage2 { late }] long trimmed by the
           harvest-rotate runner; [0.5] = sell half. Only consulted when
           [enable_harvest_rotate = true]. See [.mli]. *)
+  short_sleeve_fraction : float; [@sexp.default 0.0]
+      (** Fraction of portfolio value reserved as a dedicated short-only cash
+          budget in the per-Friday entry walk; default [0.0] is a no-op
+          (bit-identical single combined walk). See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -156,6 +160,7 @@ let default_config ~universe ~index_symbol =
     stale_exit_after_days = None;
     enable_harvest_rotate = false;
     harvest_fraction = 0.5;
+    short_sleeve_fraction = 0.0;
   }
 
 let name = "Weinstein"

@@ -263,6 +263,50 @@ type config = {
           regardless of this value. A value [<= 0.0] is itself a no-op (nothing
           to trim). Searchable as a [Variant_matrix] axis. See
           {!Harvest_rotate_runner}. *)
+  short_sleeve_fraction : float; [@sexp.default 0.0]
+      (** Fraction of portfolio value reserved as a dedicated short-only cash
+          budget in the per-Friday entry walk
+          ({!Weinstein_strategy.entries_from_candidates}).
+
+          {b Motivation} (memory [project_short_funnel_crowded_out],
+          2026-06-19). Over a 28y long-short backtest the short cascade
+          {e offers} 1,662 candidate-slots but only 37 {e enter} (2%), with
+          zero short fills rejected. Shorts are not rare or bad — they are
+          {b crowded out at the entry walk}: the screener appends shorts after
+          longs ([buy_candidates @ short_candidates]) and a single shared
+          [remaining_cash] ref is consumed by the longs first, so the walk
+          rarely reaches the appended shorts. This reserves a separate cash
+          budget for shorts, walked independently of the long book, so shorts
+          get capital regardless of long demand.
+
+          {b Semantics.}
+          - [<= 0.0] (default): {b bit-identical to baseline} — one combined
+            entry walk over [buy_candidates @ short_candidates] against a single
+            [remaining_cash] seeded at [portfolio.cash]. Every existing
+            golden/baseline replays unchanged (experiment-flag-discipline R1).
+          - [> 0.0]: the per-Friday cash budget is partitioned. A short-only
+            budget [short_sleeve_fraction *. portfolio_value] is reserved; long
+            candidates walk against [max 0 (portfolio.cash -. short_budget)] and
+            short candidates walk against the reserved short budget — two
+            independent [remaining_cash] refs, so longs can no longer starve
+            shorts. The {!Portfolio_risk} short-notional cap
+            ([max_short_notional_fraction]) and the shared per-sector exposure
+            accumulator still apply across both walks; the kept transitions are
+            re-emitted in original screener order so audit ordering is
+            preserved.
+
+          {b Faithfulness} (W1/W2, [.claude/rules/weinstein-faithful-core.md]).
+          This is a {b portfolio-allocation / structural-diversification} dial —
+          Weinstein runs long and short simultaneously in bear markets
+          ([docs/design/weinstein-book-reference.md] §Short Selling). The spine
+          is untouched: Stage-4-only short entry, the relative-strength hard
+          gate, and the Ch.11 short cascade are all unaffected; only the
+          {e capital available} to the already-screened short candidates
+          changes. Searchable as a [Variant_matrix] axis
+          ([((flag short_sleeve_fraction) (values (0.0 0.1 0.2 0.3)))]).
+          Default-off until an experiment-ledger ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md] +
+          [.claude/rules/promotion-confirmation.md]). *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
