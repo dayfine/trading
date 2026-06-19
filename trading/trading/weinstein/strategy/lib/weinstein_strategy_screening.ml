@@ -117,8 +117,8 @@ let _make_entry_walk_state ~cash ~config ~portfolio ~portfolio_value
     max_sector_exposure_pct = config.portfolio_config.max_sector_exposure_pct;
   }
 
-(** Classify one [candidate] through the entry gates against [state], pairing
-    it with its decision. Mutates [state]'s accumulators in-place. *)
+(** Classify one [candidate] through the entry gates against [state], pairing it
+    with its decision. Mutates [state]'s accumulators in-place. *)
 let _classify_one ~held_set ~make_entry ~portfolio_value ~state candidate =
   ( candidate,
     Entry_audit_capture.classify_candidate ~held_set ~make_entry
@@ -134,7 +134,8 @@ let _classify_one ~held_set ~make_entry ~portfolio_value ~state candidate =
     in-place. *)
 let _classify_candidates ~held_set ~make_entry ~portfolio_value ~state
     candidates =
-  List.map candidates ~f:(_classify_one ~held_set ~make_entry ~portfolio_value ~state)
+  List.map candidates
+    ~f:(_classify_one ~held_set ~make_entry ~portfolio_value ~state)
 
 (** Classify [indexed_candidates] (in original order) while charging them
     against a side-specific [remaining_cash] budget [side_cash], reusing the
@@ -157,8 +158,8 @@ let _walk_side ~held_set ~make_entry ~portfolio_value ~state ~side_cash
     [long_cash]. Both walks reuse [state]'s shared [short_notional_acc] and
     [sector_exposure_acc] (caps apply across both sides) but carry independent
     [remaining_cash] refs. Decisions are re-ordered back into the original
-    [candidates] order so emit/kept ordering matches the combined-walk path.
-    See [project_short_funnel_crowded_out]. *)
+    [candidates] order so emit/kept ordering matches the combined-walk path. See
+    [project_short_funnel_crowded_out]. *)
 let _sleeve_decisions ~held_set ~make_entry ~portfolio_value ~state ~long_cash
     ~short_budget candidates =
   let indexed = List.mapi candidates ~f:(fun i c -> (i, c)) in

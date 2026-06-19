@@ -270,8 +270,8 @@ type config = {
 
           {b Motivation} (memory [project_short_funnel_crowded_out],
           2026-06-19). Over a 28y long-short backtest the short cascade
-          {e offers} 1,662 candidate-slots but only 37 {e enter} (2%), with
-          zero short fills rejected. Shorts are not rare or bad — they are
+          {e offers} 1,662 candidate-slots but only 37 {e enter} (2%), with zero
+          short fills rejected. Shorts are not rare or bad — they are
           {b crowded out at the entry walk}: the screener appends shorts after
           longs ([buy_candidates @ short_candidates]) and a single shared
           [remaining_cash] ref is consumed by the longs first, so the walk

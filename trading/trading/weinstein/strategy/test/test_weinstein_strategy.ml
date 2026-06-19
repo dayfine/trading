@@ -680,11 +680,11 @@ let _count_entering_side transitions side =
           Trading_base.Types.equal_position_side s side
       | _ -> false)
 
-(** Three longs + one short fed at $30k cash, sized so each long costs $9k
-    (0.30 per-position exposure cap) and the short costs $6k (0.20 cap). The
-    three longs exhaust cash to $3k before the appended short is reached, so the
-    short is crowded out. Shared by the default-off and sleeve-active tests so
-    they exercise identical inputs. *)
+(** Three longs + one short fed at $30k cash, sized so each long costs $9k (0.30
+    per-position exposure cap) and the short costs $6k (0.20 cap). The three
+    longs exhaust cash to $3k before the appended short is reached, so the short
+    is crowded out. Shared by the default-off and sleeve-active tests so they
+    exercise identical inputs. *)
 let _sleeve_candidates () =
   let long ticker =
     make_scored_candidate ~ticker ~side:Trading_base.Types.Long ~entry:100.0
@@ -712,8 +712,8 @@ let _sleeve_get_price =
 let _run_sleeve_entries cfg =
   let stop_states = ref String.Map.empty in
   entries_from_candidates ~config:cfg ~candidates:(_sleeve_candidates ())
-    ~stop_states ~bar_reader:(Bar_reader.empty ())
-    ~portfolio:_sleeve_portfolio ~get_price:_sleeve_get_price
+    ~stop_states ~bar_reader:(Bar_reader.empty ()) ~portfolio:_sleeve_portfolio
+    ~get_price:_sleeve_get_price
     ~current_date:(Date.of_string "2024-01-05")
     ()
 
