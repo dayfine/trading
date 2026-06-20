@@ -4,6 +4,39 @@ Deep 1998-2026 top-3000 PIT-1998 Cell-E. Grade horizon 26w. See `PLAN.md`.
 Batch run output: `dev/backtest/scenarios-2026-06-20-062510/`.
 **Status: COMPLETE. Both levers → NO-BUILD (keep default-off as axes).**
 
+## Follow-up screen (read-only) — MA-gated stop idea → KILLED
+
+After P0b's no-build, the proposed better stop lever was: gate the installed %
+stop on a real discriminator (Weinstein stage / 30w-MA structure) instead of
+volatility. Tested read-only on the 746 baseline `stop_loss` exits via
+`stop_ma_split.exe` (output `stop-ma-split-baseline.md`). The hypothesis: MA-
+rising / price-above-MA stops are whipsaws (gave up upside), MA-falling /
+price-below-MA stops are real breakdowns (dodged a drop). **Both discriminators
+fail:**
+
+| split | bucket | n | continuation (gave-up) | adverse (dodged) | realized |
+|---|---|---|---|---|---|
+| slope | rising | 445 | +4.4% | −18.3% | +0.7% |
+| slope | falling | 294 | **+8.9%** | −21.1% | −3.9% |
+| level | above MA | 521 | +6.6% | −18.8% | +0.0% |
+| level | below MA | 218 | +5.2% | −20.8% | −3.9% |
+
+The foregone upside (+continuation, and ~+30% mean *favorable* peak) is **present
+in every bucket, roughly equally** — and the slope split runs *backwards* (falling-
+MA stops gave up MORE, +8.9 vs +4.4). No exit-time MA signal flags which stops are
+whipsaws. The only consistent signal is that below/falling-MA stops have worse
+*realized* pnl (−3.9% — they were already bad trades) — but they give up just as
+much upside, so gating them out doesn't help.
+
+**Conclusion — stop discriminator search is CLOSED.** Three independent exit-time
+discriminators (volatility, weekly-close, MA-structure) all fail. The foregone
+upside *is* the unpredictable fat-tail recovery — ubiquitous across the universe,
+not flagged by any structural signal available at stop time. The stop's drag is
+**irreducible by trigger logic**; the only levers on it are exposure/sizing (take
+less risk) or accepting the drawdowns (don't stop) — both exposure decisions, not
+discriminators. Tool kept (`trading/backtest/decision_grading/bin/stop_ma_split.ml`,
+read-only) for re-grading any run's stops by MA structure.
+
 ## Baselines (graded; reused from prior sessions)
 
 ### P0b vol-scaled-stop baseline (mult=0, OFF) — long-only deep `scenarios-2026-06-18-232354`
