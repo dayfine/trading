@@ -92,3 +92,17 @@ That does NOT exhaust stop quality. The lens-aligned levers it does not touch:
    incidental laggard/re-screen re-entry.
 Both UNTESTED. Vol-scaled is the better bet (the whipsaw is buffer-vs-volatility
 mismatch; weekly-close failed by changing WHEN not HOW-FAR).
+
+**STATUS 2026-06-19: vol-scaled stop BUILT + MERGED #1662.** Default-off
+`Weinstein_stops.config.vol_scaled_stop_atr_mult : float [@sexp.default 0.0]`
+(+ `vol_scaled_stop_atr_period [@sexp.default 14]`). When `> 0.0`, the minimum
+installed-stop distance becomes `Float.max(installed_stop_min_pct, mult *
+ATR/entry)` via new pure primitive `Weinstein_stops.Vol_scaled_stop`
+(ATR from `analysis/technical/indicators/atr`); only ever WIDENS the floor
+(never narrows below 8%, never loosens a trailing stop), `max_stop_distance_pct`
+15% cap still rejects after; `<= 0.0` bit-identical. Wired per-candidate via
+`entry_stop_distance.ml`. Searchable nested axis; NOT wired into any preset.
+NEXT = lens-screen `vol_scaled_stop_atr_mult` ∈ {1.0,1.5,2.0}: does stop
+upside-foregone shrink while disaster-dodged holds (the asymmetry weekly-close
+failed)? Promising → WF-CV + grid. **Weekly-close (`trigger_on_weekly_close`,
+#1655) stays REJECTED.** Post-stop re-entry still untested.
