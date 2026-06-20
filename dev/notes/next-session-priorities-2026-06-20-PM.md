@@ -1,8 +1,8 @@
-# Next-session priorities — 2026-06-21
+# Next-session priorities — 2026-06-20 PM
 
 **Supersedes** `next-session-priorities-2026-06-20.md`. Check main CI green first
-(`.claude/rules/session-rampup.md`). The 2026-06-20 session lens-screened the two
-P0 levers landed 06-19; **both are NO-BUILD** (kept default-off as axes).
+(`.claude/rules/session-rampup.md`). The 2026-06-20 AM session lens-screened the
+two P0 levers landed 06-19; **both are NO-BUILD** (kept default-off as axes).
 
 ## What happened 2026-06-20 — both P0 screens → NO-BUILD
 
