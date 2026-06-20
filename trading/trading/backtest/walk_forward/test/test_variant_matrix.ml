@@ -345,6 +345,60 @@ let test_cash_floor_exemption_nested_axis_expands _ =
               ]);
        ])
 
+(* Proves R2 (experiment-flag-discipline) for the vol-scaled stop distance lever
+   (P0b): [vol_scaled_stop_atr_mult] is a real float field on
+   [Weinstein_stops.config], which is the [stops_config] field of
+   [Weinstein_strategy.config]. So the nested key path
+   [stops_config.vol_scaled_stop_atr_mult] expands and passes [Overlay_validator]
+   validation (same nesting mechanism as the cash-floor exemption above) with no
+   overlay-validator change. The no-op default [0.0] and the experimental
+   widens-the-floor values sit on the same axis. *)
+let test_vol_scaled_stop_nested_axis_expands _ =
+  let axis =
+    VM.Key
+      {
+        path = [ "stops_config"; "vol_scaled_stop_atr_mult" ];
+        values = Sexp.[ Atom "0.0"; Atom "1.0"; Atom "1.5"; Atom "2.0" ];
+      }
+  in
+  let t = { VM.axes = [ axis ]; expansion = VM.Cartesian } in
+  assert_that (VM.expand t)
+    (elements_are
+       [
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string
+                     "((stops_config ((vol_scaled_stop_atr_mult 0.0))))");
+              ]);
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string
+                     "((stops_config ((vol_scaled_stop_atr_mult 1.0))))");
+              ]);
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string
+                     "((stops_config ((vol_scaled_stop_atr_mult 1.5))))");
+              ]);
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string
+                     "((stops_config ((vol_scaled_stop_atr_mult 2.0))))");
+              ]);
+       ])
+
 (* ---------- Sampled determinism + fallback ---------- *)
 
 let test_sampled_determinism _ =
@@ -433,6 +487,8 @@ let suite =
          >:: test_suppress_warmup_trading_flag_axis_expands;
          "cash-floor exemption nested axis expands + validates"
          >:: test_cash_floor_exemption_nested_axis_expands;
+         "vol-scaled stop nested axis expands + validates"
+         >:: test_vol_scaled_stop_nested_axis_expands;
          "sampled determinism (same seed -> same labels)"
          >:: test_sampled_determinism;
          "sampled different seed -> different subset"

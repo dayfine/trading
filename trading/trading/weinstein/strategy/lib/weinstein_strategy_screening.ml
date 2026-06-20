@@ -179,14 +179,15 @@ let entries_from_candidates ?sector_lookup ~config ~candidates ~stop_states
     ?(audit_recorder = Audit_recorder.noop) ?macro () =
   let held_set = String.Set.of_list (held_symbols portfolio) in
   let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
-  let make_entry =
+  let make_entry (cand : Screener.scored_candidate) =
     Entry_audit_capture.make_entry_transition
       ~min_stop_distance_pct:
-        config.screening_config.candidate_params.installed_stop_min_pct
+        (Entry_stop_distance.min_stop_distance_for ~config ~bar_reader
+           ~current_date cand)
       ~portfolio_risk_config:config.portfolio_config
       ~stops_config:config.stops_config
       ~initial_stop_buffer:config.initial_stop_buffer ~stop_states ~bar_reader
-      ~portfolio_value ~current_date
+      ~portfolio_value ~current_date cand
   in
   let state =
     _make_entry_walk_state ~cash:portfolio.Portfolio_view.cash ~config

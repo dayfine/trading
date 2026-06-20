@@ -29,6 +29,12 @@ module Stop_widen = Stop_widen
     re-wire {!Screener.candidate_params.installed_stop_min_pct} into the
     installed-stop path. See the module doc for the contract. *)
 
+module Vol_scaled_stop = Vol_scaled_stop
+(** Volatility-scaled minimum installed-stop distance (default-off). Widens the
+    [min_distance_pct] floor fed to {!Stop_widen.widen_initial_to_min_distance}
+    in proportion to the candidate's ATR. See the module doc for the contract.
+*)
+
 (** {1 Core Functions} *)
 
 val compute_initial_stop :

@@ -493,6 +493,66 @@ let test_stop_within_15pct_admits _ =
           (fun (m : Entry_audit_capture.entry_meta) -> m.installed_stop)
           (is_between (module Float_ord) ~low:85.0 ~high:95.0)))
 
+(** Vol-scaled stop / [max_stop_distance_pct] interaction (reject side). The
+    vol-scaled-stop dial feeds its widened floor in via [min_stop_distance_pct]
+    (see {!Entry_stop_distance.min_stop_distance_for}); the 15% reject cap must
+    apply {e after} that floor. Here a 20% min-distance floor (what a high-ATR
+    name would produce) is passed directly while the natural buffer stays tight
+    (8%), so it is the floor — not the buffer — that crosses the cap. The result
+    must be [Stop_too_wide] with no [stop_states] side-effect. Pins the
+    documented contract in [stop_types.mli] §[vol_scaled_stop_atr_mult]. *)
+let test_vol_scaled_floor_over_cap_rejects _ =
+  let current_date = Date.of_string "2024-06-14" in
+  let bar_reader =
+    _bar_reader_with_current_close ~current_date ~current_close:100.0
+  in
+  let cand =
+    _long_candidate ~ticker:_ticker ~suggested_entry:100.0 ~suggested_stop:95.0
+      ~as_of_date:current_date
+  in
+  let stop_states = ref String.Map.empty in
+  let initial_stop_states_size = Map.length !stop_states in
+  let result =
+    Entry_audit_capture.make_entry_transition ~min_stop_distance_pct:0.20
+      ~portfolio_risk_config:_portfolio_risk_config ~stops_config:_stops_config
+      ~initial_stop_buffer:0.92
+        (* natural 8% buffer — under the cap on its own *)
+      ~stop_states ~bar_reader ~portfolio_value:100_000.0 ~current_date cand
+  in
+  assert_that result
+    (matching ~msg:"Expected Stop_too_wide"
+       (function Entry_audit_capture.Stop_too_wide -> Some () | _ -> None)
+       (equal_to ()));
+  assert_that (Map.length !stop_states) (equal_to initial_stop_states_size)
+
+(** Vol-scaled stop / cap interaction (admit side). A 12% min-distance floor
+    sits under the 15% cap, so the widened stop is admitted ([Entry_ok]) and the
+    installed stop lands at the floor (~12% below the $100 entry). Confirms the
+    floor only rejects when it actually exceeds the cap. *)
+let test_vol_scaled_floor_under_cap_admits _ =
+  let current_date = Date.of_string "2024-06-14" in
+  let bar_reader =
+    _bar_reader_with_current_close ~current_date ~current_close:100.0
+  in
+  let cand =
+    _long_candidate ~ticker:_ticker ~suggested_entry:100.0 ~suggested_stop:95.0
+      ~as_of_date:current_date
+  in
+  let stop_states = ref String.Map.empty in
+  let result =
+    Entry_audit_capture.make_entry_transition ~min_stop_distance_pct:0.12
+      ~portfolio_risk_config:_portfolio_risk_config ~stops_config:_stops_config
+      ~initial_stop_buffer:0.92 ~stop_states ~bar_reader
+      ~portfolio_value:100_000.0 ~current_date cand
+  in
+  assert_that result
+    (matching ~msg:"Expected Entry_ok"
+       (function
+         | Entry_audit_capture.Entry_ok (_, meta) -> Some meta | _ -> None)
+       (field
+          (fun (m : Entry_audit_capture.entry_meta) -> m.installed_stop)
+          (is_between (module Float_ord) ~low:86.0 ~high:89.0)))
+
 (** Pin sizing-uses-installed-stop: configure [cand.suggested_stop] divorced
     from [installed_stop] (suggested at 5% below entry, installed at 8% below
     entry) and confirm the [risk_amount] embedded in [meta] keys off
@@ -711,6 +771,10 @@ let () =
            "G15-step3: short stop too wide rejects at 25%"
            >:: test_short_stop_too_wide_rejects_at_25pct;
            "G15-step3: stop within 15% admits" >:: test_stop_within_15pct_admits;
+           "vol-scaled floor over cap rejects"
+           >:: test_vol_scaled_floor_over_cap_rejects;
+           "vol-scaled floor under cap admits"
+           >:: test_vol_scaled_floor_under_cap_admits;
            "G15-step3: sizing uses installed_stop"
            >:: test_sizing_uses_installed_stop;
            "P1: sector exposure cap off passes through"
