@@ -45,6 +45,36 @@ engine NAV blend, `project_barbell_on_stocks` — beat both legs on Calmar in de
 (≥3 period×universe cells incl. a bear-dominated macro regime). This is the
 correct class per the guardrail below.
 
+## Queued (secondary) — short-supply screen [~76min deep run]
+
+The 06-20 short re-decomposition (`dev/experiments/p0-screens-2026-06-20/`,
+longshort baseline 37 shorts) **corrected the earlier overclaim**: with stops the
+per-trade short payoff is fine (avg win +$109k vs avg loss −$34k, loss tail capped
+at −14.7%) — short P&L is ~breakeven at baseline, NOT −EV by construction. The real
+limits are **supply** (only 37 shorts / 28y, confirmed gated) and **unreliable
+bear timing** (shorts *lost* in 2000/2002/2008 — the grinding crashes — won only in
+single-shot 2001/2020). n=37 = selection-noise-dominated, low confidence.
+
+**The cheap test of the supply lever:** one deep run with `short_min_price`
+loosened (admit more, cheaper Stage-4 shorts), then the SAME read-only by-year +
+distribution decomposition. Does a bigger short book (a) actually grow the count,
+(b) stay per-trade-favorable, and crucially (c) finally fire in 2008?
+
+Recipe — clone `dev/backtest/decision-grading-longshort-2026-06-18/cell-e-top3000-1998-longshort.sexp`,
+change one override `((short_min_price 17.0))` → e.g. `((short_min_price 5.0))`
+(and optionally a 2nd variant at 1.0 to sweep). Run:
+`scenario_runner --dir <new-dir> --snapshot-dir /tmp/snap_top3000_1998_2026_v2
+--fixtures-root / --parallel 1`. Then decompose shorts with the awk used 06-20
+(by exit-year P&L + win/loss distribution on `trades.csv` side=SHORT), OR extend
+`stop_ma_split`-style.
+
+**Yellow flag going in:** the 2008 whipsaw loss suggests *more* name-level
+Stage-4 shorts may just lose more in grinding bears — individual-name short timing
+is the suspected failure, which loosening supply does NOT fix. If the loosened run
+*still* loses in 2008, the verdict is "name-level shorts aren't a dependable
+bear-hedge; use the regime/index overlay (barbell) instead" and this line closes.
+Lower priority than the P1 barbell grid above.
+
 ## Guardrail (HARDENED by today's two no-builds)
 Do NOT screen **winner/loser-touching** levers — the `edge_is_the_fat_tail`
 class now has ~8 rejections (laggard, force-exit, stage2-ma-hold, late-flag,
