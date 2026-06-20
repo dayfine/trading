@@ -1,6 +1,6 @@
 (executables
- (names decision_grading_bin laggard_cf_bin)
- (modules decision_grading_bin laggard_cf_bin)
+ (names decision_grading_bin laggard_cf_bin stop_ma_split)
+ (modules decision_grading_bin laggard_cf_bin stop_ma_split)
  (libraries
   core
   core_unix.sys_unix
