@@ -28,6 +28,11 @@ type stop_event =
   | No_change
 [@@deriving show, eq, sexp]
 
+(* Standard ATR lookback (Wilder's 14-period) used as the [sexp.default] for
+   [vol_scaled_stop_atr_period]. A named constant so the bare literal lives in
+   one exempt binding rather than inline in the field's [@sexp.default]. *)
+let default_vol_scaled_stop_atr_period = 14
+
 type config = {
   round_number_nudge : float;
   min_correction_pct : float;
@@ -39,7 +44,8 @@ type config = {
   max_stop_distance_pct : float;
   trigger_on_weekly_close : bool; [@sexp.default false]
   vol_scaled_stop_atr_mult : float; [@sexp.default 0.0]
-  vol_scaled_stop_atr_period : int; [@sexp.default 14]
+  vol_scaled_stop_atr_period : int;
+      [@sexp.default default_vol_scaled_stop_atr_period]
 }
 [@@deriving show, eq, sexp]
 
@@ -55,5 +61,5 @@ let default_config =
     max_stop_distance_pct = 0.15;
     trigger_on_weekly_close = false;
     vol_scaled_stop_atr_mult = 0.0;
-    vol_scaled_stop_atr_period = 14;
+    vol_scaled_stop_atr_period = default_vol_scaled_stop_atr_period;
   }
