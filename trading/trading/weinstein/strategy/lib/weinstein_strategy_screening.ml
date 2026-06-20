@@ -174,32 +174,6 @@ let _sleeve_decisions ~held_set ~make_entry ~portfolio_value ~state ~long_cash
   |> List.sort ~compare:(fun (i, _, _) (j, _, _) -> Int.compare i j)
   |> List.map ~f:(fun (_, c, d) -> (c, d))
 
-(** Per-candidate minimum installed-stop distance. The base floor is the
-    screener's [installed_stop_min_pct]; when
-    [stops_config.vol_scaled_stop_atr_mult > 0.0] it is widened in proportion to
-    the candidate's ATR over its recent daily bars (default-off — exact no-op
-    when the mult is [0.0], so the base floor passes through unchanged and every
-    golden replays bit-identically). [entry_price] mirrors
-    [Entry_audit_helpers.effective_entry_price]: the most recent raw close (the
-    price sizing/stops key off), falling back to [cand.suggested_entry] when no
-    bars are resident. See {!Weinstein_stops.Vol_scaled_stop}. *)
-let _min_stop_distance_for ~config ~bar_reader ~current_date
-    (cand : Screener.scored_candidate) =
-  let base = config.screening_config.candidate_params.installed_stop_min_pct in
-  if Float.( <= ) config.stops_config.vol_scaled_stop_atr_mult 0.0 then base
-  else
-    let bars =
-      Bar_reader.daily_bars_for bar_reader ~symbol:cand.ticker
-        ~as_of:current_date
-    in
-    let entry_price =
-      match List.last bars with
-      | Some bar -> bar.Types.Daily_price.close_price
-      | None -> cand.suggested_entry
-    in
-    Weinstein_stops.Vol_scaled_stop.effective_min_stop_distance_pct
-      ~config:config.stops_config ~base_min_distance_pct:base ~entry_price ~bars
-
 let entries_from_candidates ?sector_lookup ~config ~candidates ~stop_states
     ~bar_reader ~(portfolio : Portfolio_view.t) ~get_price ~current_date
     ?(audit_recorder = Audit_recorder.noop) ?macro () =
@@ -208,7 +182,8 @@ let entries_from_candidates ?sector_lookup ~config ~candidates ~stop_states
   let make_entry (cand : Screener.scored_candidate) =
     Entry_audit_capture.make_entry_transition
       ~min_stop_distance_pct:
-        (_min_stop_distance_for ~config ~bar_reader ~current_date cand)
+        (Entry_stop_distance.min_stop_distance_for ~config ~bar_reader
+           ~current_date cand)
       ~portfolio_risk_config:config.portfolio_config
       ~stops_config:config.stops_config
       ~initial_stop_buffer:config.initial_stop_buffer ~stop_states ~bar_reader
