@@ -47,3 +47,17 @@ screen is the test. Do NOT re-conclude "shorts work" until the sleeve is screene
 **STATUS 2026-06-19:** diagnosis done (read-only). Reserved-short-sleeve = NOT
 built. Candidate next lever alongside vol-scaled stop ([[project_weekly_close_stop_lever]]
 §stop-quality-levers-beyond-weekly-close).
+
+**STATUS 2026-06-19: BUILT + MERGED #1659.** Default-off
+`Weinstein_strategy_config.short_sleeve_fraction : float [@sexp.default 0.0]`.
+When `> 0.0`, `entries_from_candidates` partitions the per-Friday cash budget into
+a reserved short-only budget (`fraction * portfolio_value`) walked independently
+of the long book (two `remaining_cash` refs, shared `short_notional_acc` /
+`sector_exposure_acc` so caps still bind); `<= 0.0` bit-identical. Tests confirm
+the crowd-out (3 longs exhaust cash → 0 shorts) flips to a short entering at
+fraction 0.3. Searchable nested `Variant_matrix` axis; NOT wired into any preset.
+**The build only proved shorts now ENTER — it did NOT prove they HELP.** NEXT =
+lens-screen `short_sleeve_fraction` ∈ {0.1,0.2,0.3} via `decision_grading`: do the
+now-numerous shorts add a real offsetting/DD-reducing leg, or churn at ~breakeven
+(the (c) symptom)? Real offset → WF-CV + grid; else record no-build-with-why
+(capital reserved for a non-paying leg = drag) and keep default-off.
