@@ -38,6 +38,8 @@ type config = {
   support_floor_lookback_bars : int;
   max_stop_distance_pct : float;
   trigger_on_weekly_close : bool; [@sexp.default false]
+  vol_scaled_stop_atr_mult : float; [@sexp.default 0.0]
+  vol_scaled_stop_atr_period : int; [@sexp.default 14]
 }
 [@@deriving show, eq, sexp]
 
@@ -52,4 +54,6 @@ let default_config =
     support_floor_lookback_bars = 90;
     max_stop_distance_pct = 0.15;
     trigger_on_weekly_close = false;
+    vol_scaled_stop_atr_mult = 0.0;
+    vol_scaled_stop_atr_period = 14;
   }

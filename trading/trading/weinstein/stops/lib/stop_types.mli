@@ -115,6 +115,42 @@ type config = {
           so every existing golden replays unchanged. Default-off experiment
           axis per [.claude/rules/experiment-flag-discipline.md]; design
           [dev/plans/weekly-close-stop-2026-06-19.md]. *)
+  vol_scaled_stop_atr_mult : float; [@sexp.default 0.0]
+      (** Volatility-scaled minimum installed-stop distance (default-off). When
+          [> 0.0], the {e minimum} distance the installed initial stop must sit
+          from entry is widened from the fixed [installed_stop_min_pct] floor to
+          [Float.max installed_stop_min_pct (vol_scaled_stop_atr_mult *.
+           atr_pct)], where [atr_pct = ATR / entry_price] and [ATR] is the
+          {!Atr.atr} over the candidate's recent daily bars
+          ([vol_scaled_stop_atr_period]). The [Float.max] means the floor only
+          ever {b widens}: a high-volatility name gets a structurally wider stop
+          while a low-volatility name keeps the existing 8% floor, and the
+          [max_stop_distance_pct] reject cap still applies {e after} so a
+          vol-widened stop that exceeds the cap rejects the candidate.
+
+          Why: the live stop is whipsaw-dominated (it forgoes more upside than
+          disaster it dodges — see
+          [dev/agent-memory/project_weekly_close_stop_lever.md]
+          §stop-quality-levers). A fixed minimum buffer whipsaws volatile names
+          with the same distance that fits quiet names. Scaling the
+          {e minimum distance} to ATR cuts whipsaw at its source without holding
+          genuine breakdowns deeper (the flaw that got [trigger_on_weekly_close]
+          rejected). This is the [min_correction_pct] docstring's own flagged
+          improvement ("derive this threshold from the security's volatility").
+
+          Faithful-core: this is the {b initial-stop-placement dial} (book §5.1
+          + the volatility caveat) — the spine (structural support-floor stop,
+            never-loosen rule, weekly cadence) is untouched; only the
+            minimum-distance floor widens. Default [0.0] is an exact no-op
+            ([Float.max base 0.0 = base]) so every existing golden replays
+            unchanged. Default-off experiment axis per
+            [.claude/rules/experiment-flag-discipline.md] /
+            [.claude/rules/weinstein-faithful-core.md]; promoted only on a
+            ledger ACCEPT. *)
+  vol_scaled_stop_atr_period : int; [@sexp.default 14]
+      (** ATR lookback period (in daily bars) for [vol_scaled_stop_atr_mult].
+          Consulted only when [vol_scaled_stop_atr_mult > 0.0]; the standard
+          Wilder 14-day period (see {!Atr.atr}). *)
 }
 [@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable
