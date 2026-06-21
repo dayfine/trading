@@ -20,3 +20,4 @@ Running backtest (1998-01-01 to 2026-04-30, warmup from 1997-06-05)...
 Panel_runner: simulator window 1997-06-05..2026-04-30 (warmup 210 days, strategy Weinstein)
 Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB)
 Panel_runner: snapshot bar reader wired (calendar 7541 days) for strategy
+RUN_EXIT=0 DONE
