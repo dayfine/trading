@@ -1,0 +1,62 @@
+File ".", line 1, characters 0-0:
+Warning: No dune-project file has been found in directory ".". A default one
+is assumed but the project might break when dune is upgraded. Please create a
+dune-project file.
+Hint: generate the project file with: $ dune init project <name>
+[snapshot-mode] loaded manifest at /tmp/snap_top3000_1998_ls/manifest.sexp (schema_hash=060588c0224b7d7e73f367fbd1801084, 3015 entries)
+Loading 1 scenarios from /workspaces/trading-1/dev/backtest/short-supply-screen-2026-06-21 (parallel=1)
+Fixtures root: /
+Bar data source: snapshot mode (/tmp/snap_top3000_1998_ls)
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Output root: /workspaces/trading-1/dev/backtest/scenarios-2026-06-21-050200
+
+>>> Running cell-e-top3000-1998-longshort-sm5: Cell-E top-3000 PIT-1998 long-short, short_min_price LOOSENED 17->5, supply screen. (1998-01-01 to 2026-04-30)
+Using scenario-provided sector map (3000 symbols)...
+Universe: 3000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 3015
+Running backtest (1998-01-01 to 2026-04-30, warmup from 1997-06-05)...
+Panel_runner: simulator window 1997-06-05..2026-04-30 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 7541 days) for strategy
+WARN: portfolio rejected fill for NSC (side=Types.Buy qty=15301.0000 price=21.1500): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 323769.16, Available: 322403.97969622741, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for NWL (side=Types.Buy qty=17821.0000 price=24.3700): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 434475.98000000004, Available: 432793.67149979866, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for CMKG (side=Types.Buy qty=147948.0000 price=2.3100): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 343239.36, Available: 321880.07382337091, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for MGRC (side=Types.Buy qty=24404.0000 price=21.3300): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 520781.35999999993, Available: 497319.97567265987, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for FITB (side=Types.Buy qty=69190.0000 price=7.2400): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 501627.50000000006, Available: 497319.97567265987, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for INDB (side=Types.Buy qty=26357.0000 price=23.4000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 617017.36999999988, Available: 613259.38297265954, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for CHRW (side=Types.Buy qty=6624.0000 price=59.1500): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 391875.83999999997, Available: 225256.82297265949, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for WKC (side=Types.Buy qty=15550.0000 price=27.0500): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 420783., Available: 418203.96757265955, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for HTHIY (side=Types.Buy qty=28467.0000 price=35.1970): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 1002237.6690000001, Available: 990063.49960544077, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for ELME (side=Types.Buy qty=32557.0000 price=32.4600): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 1057125.79, Available: 1047964.3019694544, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
