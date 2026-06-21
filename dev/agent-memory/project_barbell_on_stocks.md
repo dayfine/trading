@@ -103,3 +103,19 @@ Only gate #2 remains before live: build the deployable rebalanced overlay behind
 a default-off flag. Caveat: broad-cell absolute returns are MTM-inclusive +
 start-date/survivorship-confounded; the weight-SURFACE SHAPE (where Calmar/Sharpe
 peak) is the robust signal, each cell internally consistent (same floor/window).
+
+## 2026-06-21 — CORRECT-WINDOW (1998-26) frontier: light floor, NOT 70/30
+Redid the weight surface on the correct full-cycle window (engine beats S&P here,
+unlike the 2000-26 peak-start used earlier). Engine 1998-26 = +1100%/48.3%DD; SPY
+floor = +478%/24.3%DD. Frontier (floor w → return/Sharpe/MaxDD): 0→1100/.54/48.3 ·
+.30→965/.61/38.6 · .40→904/.63/35.0 · .50→838/.65/31.4 · .70→696/.66/23.6 ·
+1.0→478/.57/24.3. **Every w≤0.65 beats S&P (+599%).** Sharpe/Calmar peak at ~.70 BUT
+that's a **regime-averaging artifact**: sub-windows show crash-decade 1998-2008 →
+pure-ENGINE optimal (floor hurts, Sharpe .77→.62), bull 2009-26 → pure-FLOOR optimal
+(engine hurts, Sharpe .36→.73). No fixed weight optimal in both. **Recommend LIGHT
+floor w≈0.30-0.40** (keeps ~90% of return = 900-965%, cuts DD 48→35-39%, lifts
+Sharpe) over 70/30 (gives up too much return for a regime-artifact Sharpe gain).
+Regime-timing the weight = known-dead lever. The earlier "70/30 robust" (#1670/#1673)
+was on weak-engine windows (2000-26/top-1000); on the strong-engine window the
+return cost of 70/30 is the real consideration. Record:
+`dev/backtest/engine-edge-1998-2026/FINDINGS.md` (#1679).
