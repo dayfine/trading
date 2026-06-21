@@ -76,3 +76,30 @@ config exists. The 70/30 ACCEPT from this grid satisfies R3's prerequisite.
 NB absolute engine returns drifted up vs 06-02 (cell A 1570% vs doc 918%) —
 current code carries 18d of fixes (#1481/#1556/#1487); MaxDD reproduced
 (36.8 vs 37.3). Grid is internally valid; don't compare absolutes to the old doc.
+
+## 2026-06-21 — BREADTH gate CLOSED (70/30 confirmed at 6× breadth)
+
+P0 gate #1 (next-session-priorities-2026-06-21). Re-ran the ENGINE leg on
+broader universes, 2000-26, vs the same `floor-2000-deep`:
+`dev/backtest/barbell-breadth-2026-06-21/FINDINGS.md`. Engine standalone by
+universe (pure w=0): SP500-515 1570%/.296-Calmar · top-1000 58%/.031 · top-3000
+332%/.128 · floor 387%/.319.
+
+**70/30 beats pure-engine Calmar in EVERY cell** (SP500 .437, top-1000 .225,
+top-3000 .311). In the engine's real breadth universe **top-3000** the
+Calmar/Sharpe optimum is **w∈[0.6,0.8]** and **70/30 is the robust central pick**
+(Sharpe .652 ≈ peak; Calmar .311 within 5% of the .80 peak; blend cuts DD
+43%→19% at ~flat return = the diversification signature at 6× breadth). 70/30 is
+the conservative-return end of the band; .75-.80 maxes top-3000 Calmar.
+
+**The barbell's optimal weight tracks ENGINE QUALITY, which is universe-dependent**
+— diagnostic exception at **top-1000** (the engine's documented trough,
+[[project_factor_lens_regime_governs_edge]] "top-3000 beats, top-1000 trails"):
+the optimum collapses to PURE-FLOOR because the engine has no edge to diversify.
+Lesson: **deploy the barbell with the engine on an edge universe (SP500/top-3000)
+at floor-weight ~.70-.80; never run the engine leg on top-1000.**
+
+Only gate #2 remains before live: build the deployable rebalanced overlay behind
+a default-off flag. Caveat: broad-cell absolute returns are MTM-inclusive +
+start-date/survivorship-confounded; the weight-SURFACE SHAPE (where Calmar/Sharpe
+peak) is the robust signal, each cell internally consistent (same floor/window).
