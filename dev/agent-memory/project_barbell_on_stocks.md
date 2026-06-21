@@ -1,6 +1,6 @@
 ---
 name: project-barbell-on-stocks
-description: Barbell (SPY-timing floor + Cell-E stock-selection engine) NAV blend dominates both standalone legs on Calmar in BOTH regimes; 70/30 regime-robust. Resolves the 918%-vs-drawdown tension.
+description: Barbell (SPY-timing floor + Cell-E stock-selection engine) NAV blend dominates both legs on Calmar; 70/30 regime-robust. 2026-06-20 PROMOTION GRID PASSED — first lever to clear a grid; 70/30 beats pure-engine Calmar 3/4 cells, highest worst-cell Calmar+Sharpe. Genuine diversification (DD falls faster than return), does NOT tax the fat tail.
 metadata: 
   node_type: memory
   type: project
@@ -38,3 +38,41 @@ Writeup: `dev/notes/barbell-on-stocks-2026-06-02.md`. Extends
 relates to [[project_cell_e_2020_stall_regime]] (breadth is the lever for the
 engine leg). Next: few-feature carrier as a better engine leg (lighter machinery
 → engine return at lower DD?).
+
+## 2026-06-20 PM — PROMOTION GRID PASSED (70/30 robust)
+
+Took the barbell to a `promotion-confirmation.md` grid. 4 engine cells (SPY-only
+floor per window), all current-code CSV mode: A=2000-26 SP500-2000 (full,
+bear-macro), B=2010-26 SP500-2000 (bull), C=2010-26 SP500-**2010** (diff
+composition), D=2000-2010 SP500-2000 (bear decade). Sweep floor-weight
+{0,.5,.6,.7,.8,1}. Record: `dev/backtest/barbell-grid-2026-06-20/FINDINGS.md`,
+blend tool `blend.awk`, outputs `dev/backtest/scenarios-2026-06-20-235722/`.
+
+**Calmar by w_floor (min-cell in []):** .50→[.369] .60→[.398] **.70→[.413]**
+.80→[.407]. 70/30 = highest worst-cell Calmar AND Sharpe (.699); beats
+pure-engine Calmar in 3/4 (A .437>.296, B .451>.303, C .457>.403), loses only
+narrowly in D (.413<.435). Per-cell winners DISAGREE (.70/.60/.50/.00) → single-
+window winner not promotable; 70/30 is the robust pick. **PROMOTE 70/30.**
+
+**Why real (transferable):** genuine diversification, not less-risk. Cell A
+annret −30% but MaxDD −53% (imperfectly-correlated legs) → Calmar UP. Barbell
+does NOT touch the fat tail (engine winners run fully in the engine leg; floor
+only reweights capital) — this is why it PASSES where 8 `edge_is_the_fat_tail`
+tail-touching levers were rejected. Confirms the diversification-layer guardrail.
+
+**Regime nuance:** benefit concentrates in bull/mixed (B,C: Sharpe+Calmar up) +
+high-DD full window (A); VANISHES in the isolated bear decade D, where the
+engine's own stage3-exit+laggard machinery already gives Sharpe 1.01 — barbell &
+internal crash-defense are partial substitutes.
+
+**Two gates before live capital (next-session-priorities-2026-06-21.md P0):**
+(1) one BREADTH cell (top-1000/3000 deep) re-blended at 70/30 — grid's
+universe-diversity leg is thin (3/4 cells same SP500-2000; C is a snapshot
+variant not a breadth jump); needs rebuilt snapshot warehouse (/tmp cleared).
+(2) build the barbell as deployable rebalanced overlay behind a default-off flag
+(`experiment-flag-discipline.md`) — today's blend is post-hoc, no `enable_barbell`
+config exists. The 70/30 ACCEPT from this grid satisfies R3's prerequisite.
+
+NB absolute engine returns drifted up vs 06-02 (cell A 1570% vs doc 918%) —
+current code carries 18d of fixes (#1481/#1556/#1487); MaxDD reproduced
+(36.8 vs 37.3). Grid is internally valid; don't compare absolutes to the old doc.
