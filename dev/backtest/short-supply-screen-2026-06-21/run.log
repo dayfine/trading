@@ -60,3 +60,4 @@ WARN: portfolio rejected fill for ELME (side=Types.Buy qty=32557.0000 price=32.4
   message =
   "Insufficient cash for trade. Required: 1057125.79, Available: 1047964.3019694544, Unrealized loss drag: 0."
   }. Stranded position will be reverted for retry (see Cancel_handler).
+RUN_EXIT=0 DONE
