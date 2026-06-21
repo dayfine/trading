@@ -63,3 +63,14 @@ entries → 0 trades, flat NAV. Fix: build with an AUGMENTED universe (tradeable
 `universe_path` at the tradeable set only (context symbols not traded). Incremental
 rebuild adds just the 15 (~17s). The working `snap_top3000_2011` has 3015 files
 (3000+15); a naive top-3000 build has only 3000.
+
+## 2026-06-21 — RE-PIN on current code + edge is crash-protection only
+Re-ran long-only Cell-E top-3000 1998-26 on CURRENT code (per-share $0.01 cost):
+**total +1100% / MaxDD 48.3% / Sharpe 0.54** (realized ~+836%, 24% open MTM). The
+cached **+1552% / 35.9%** headline is OPTIMISTIC vs current code (18d of fixes
+#1481/#1556/#1487) — RETIRE it; honest number is +1100%/48% DD. vs S&P like-for-
+like (sim values on close_price, NO dividends; GSPC price +599%): engine beats S&P
++1100 vs +599. **But the edge is 100% crash-protection:** 1998-2008 engine +421% vs
+S&P −7% (+428pp alpha); 2009-2026 bull engine +130% vs S&P +631% (LAGS −501pp).
+Any window excluding a crash shows the strat LOSING to S&P. Record:
+`dev/backtest/engine-edge-1998-2026/FINDINGS.md` (#1679).

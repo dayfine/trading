@@ -1,6 +1,6 @@
 # Status: experiment-platform
 
-## Last updated: 2026-05-30
+## Last updated: 2026-06-21
 
 ## Status
 IN_PROGRESS
@@ -188,11 +188,17 @@ Verify: `docker exec trading-1-dev bash -c 'cd /workspaces/trading-1/trading && 
 
 ## Next Steps
 
-1. **Repair the index/breadth golden coverage** (P0 for any further
-   surface sweep on `sp500-2010-2026`) — extend `GSPC.INDX` + NYSE A/D
-   breadth back to ~2009 so the macro gate runs across the full window.
-   Then re-run the early-admission surface on the true distribution to
-   settle its INCONCLUSIVE verdict (the 2017-2026 signal is promising).
+1. **[superseded 2026-06-21]** ~~Repair the index/breadth golden coverage
+   (P0 for any further surface sweep on `sp500-2010-2026`) — extend
+   `GSPC.INDX` + NYSE A/D breadth back to ~2009 so the macro gate runs
+   across the full window.~~ Overtaken by events: deep contiguous windows
+   now run routinely — PIT-2000 SP500 (2000-2026) and top-3000 (1998-2026)
+   via #1593 / #1645, plus the 28y WF-CV baseline-robustness panel via
+   #1605 (all merged 2026-06-15..18). The macro-gate coverage gap that
+   blocked full-window sweeps on `sp500-2010-2026` no longer constrains the
+   surface program; re-running the early-admission surface (to settle its
+   INCONCLUSIVE verdict) is now done on these deep windows, not gated on a
+   golden-extension fetch.
 2. **Wire DSR into the BO tuner** — the `backtest_stats` lib is shared;
    the BO program can adopt `Deflated_sharpe` for its own best-of-N
    correction (deferred to that program).

@@ -52,3 +52,16 @@ lever whose action is "tax the source of the edge."
   prior is strongly negative and the burden is to show it does NOT tax the tail
   (the decomposition in `dev/plans/harvest-rotate-rigorous-test-2026-06-10.md`:
   timing vs picks vs structural-tax vs cost).
+
+## 2026-06-21 — MA-period dial (30→10wk) = MTM/capacity mirage, NOT an edge
+Probed Weinstein's faithful 10wk trader MA to fix the engine's 2009-26 bull-lag
+(+130% vs S&P +631%). 10wk FULL 1998-26 = +25,602% (vs 30wk +1100%), bull +4207%
+(vs +130%) — looks like it crushes the lag, BUT Sharpe COLLAPSED 0.54→0.21; ONE
+trade realized +$209M, open positions $195M of $257M NAV (76%). Pure
+fat-tail-compounding/capacity mirage (capacity-infeasible position sizes), amplified
+by faster MA catching more monsters. NO-BUILD. Lesson: MA period is the most
+impactful dial but faster≠better — any lever that works by catching MORE fat-tail
+names hits the capacity wall; the realistic edge is capacity-bounded, not MA-bounded.
+The 30wk bull-lag is partly the PRICE of a capacity-realistic book. Bull-lag is
+STRUCTURAL; address via barbell floor (capacity-safe), not faster MA. Record:
+`dev/backtest/engine-edge-1998-2026/PHASE-C-ma-period.md` (#TBD).
