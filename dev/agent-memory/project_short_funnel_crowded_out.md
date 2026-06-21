@@ -61,3 +61,13 @@ lens-screen `short_sleeve_fraction` ∈ {0.1,0.2,0.3} via `decision_grading`: do
 now-numerous shorts add a real offsetting/DD-reducing leg, or churn at ~breakeven
 (the (c) symptom)? Real offset → WF-CV + grid; else record no-build-with-why
 (capital reserved for a non-paying leg = drag) and keep default-off.
+
+## 2026-06-21 — confirmed SUPPLY-gated, price-floor non-binding (line CLOSED)
+Loosened `short_min_price 17→5` on top-3000 1998-26 long-short deep: short count
+**36 vs baseline 37** — ~zero new shorts admitted → binding constraint is Stage-4
+signal supply (~1.3 shorts/yr), NOT the price filter. The 36 shorts net −$50k/28y,
+36% win, lottery-shaped (carried by 2009 +$206k); 2008 fired (7) but 2/7 win = not
+a reliable hedge. NO-BUILD: name-level Stage-4 shorts aren't a dependable bear
+defense — the barbell floor (index overlay) is. Record:
+`dev/backtest/short-supply-screen-2026-06-21/FINDINGS.md` (#1678). Route bear-
+defense to the regime/index overlay, not name-level shorts.
