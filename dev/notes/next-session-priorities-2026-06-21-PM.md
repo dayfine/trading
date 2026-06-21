@@ -5,6 +5,28 @@ Overnight autonomous run (user AFK). Check main CI green first
 (`.claude/rules/session-rampup.md`). All work below shipped as merged PRs +
 FINDINGS docs; no main breakage.
 
+## ⭐ PRIMARY NEXT-SESSION AGENDA → `dev/plans/capitalize-findings-build-plan-2026-06-21.md`
+
+Per user directive 2026-06-21: **capitalize on findings — avoid the weakness,
+double down on the strength** (don't binary-reject). That plan is the queued
+build/improve agenda. Headline items:
+- **P0:** operationalize the validated barbell (finish #1683 end-to-end wiring +
+  pin the light floor weight 0.30-0.40 via WF-CV + grid).
+- **P1 (the novel build):** the **slow-grind vs fast-V decline-character gate** —
+  shorts/defense pay in slow grinding bears (2002, 2008) but get squeezed in fast
+  V-crashes (2020). Distinguishable BEFORE the decision via Weinstein's
+  breadth-divergence lead (A/D peaks 5-10mo before *distribution* tops; *shock*
+  crashes have no warning). Use it to gate a **faithful** Weinstein short (the book
+  ADVOCATES shorting; our 2 tests were unfaithful — see below). Screen first.
+- **P2:** bull-participation (engine's structural weakness; faithful levers only,
+  low expectation).
+
+**Correction to tonight's short NO-BUILDs:** the actual book (Ch. 7) strongly
+advocates shorting weak *individual* stocks *in bear markets* with a buy-stop. Our
+SPY-index long-short was the WRONG instrument; #1678's individual short was likely
+ungated. So "shorts don't work" was overstated — the faithful, decline-character-
+gated short is genuinely UNTESTED (P1 gives it a fair shot).
+
 ## TL;DR — the thesis got reshaped (read this)
 
 The honest answer to **"do we have a strat that beats S&P?"** is now precise:
