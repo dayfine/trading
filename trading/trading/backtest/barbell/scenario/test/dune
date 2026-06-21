@@ -1,0 +1,15 @@
+(tests
+ (names test_barbell_scenario)
+ (libraries
+  ounit2
+  core
+  core_unix
+  core_unix.filename_unix
+  fpath
+  matchers
+  barbell
+  barbell_scenario
+  backtest
+  scenario_lib)
+ (preprocess
+  (pps ppx_sexp_conv)))

@@ -1,0 +1,5 @@
+(library
+ (name barbell_scenario)
+ (libraries core backtest barbell scenario_lib)
+ (preprocess
+  (pps ppx_sexp_conv)))
