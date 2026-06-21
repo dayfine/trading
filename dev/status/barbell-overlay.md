@@ -3,7 +3,15 @@
 ## Last updated: 2026-06-21
 
 ## Status
-READY_FOR_REVIEW
+MERGED
+
+<!-- Gate-#2 deployable overlay (PR #1683) merged to main 2026-06-21 (commit 3411c952).
+     Two [non-blocking] follow-ups remain (see ## Next Steps): scenario-entrypoint
+     wiring + exposing barbell_floor_weight as a Variant_matrix axis (R2). NB: the
+     axis follow-up entangles with the Weinstein_strategy.config-centric
+     Overlay_validator and likely depends on the scenario-entrypoint wiring landing
+     first — not a self-contained config-plumbing task. Surfaced to the maintainer
+     (orchestrator run 27906645873 [run 2] 2026-06-21). -->
 
 ## Notes
 Gate #2 of the barbell program: make the validated SPY-FLOOR + Cell-E-ENGINE
