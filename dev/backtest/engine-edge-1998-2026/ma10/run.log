@@ -4,14 +4,14 @@ is assumed but the project might break when dune is upgraded. Please create a
 dune-project file.
 Hint: generate the project file with: $ dune init project <name>
 [snapshot-mode] loaded manifest at /tmp/snap_top3000_1998_ls/manifest.sexp (schema_hash=060588c0224b7d7e73f367fbd1801084, 3015 entries)
-Loading 1 scenarios from /workspaces/trading-1/dev/backtest/engine-edge-1998-2026/eng (parallel=1)
+Loading 1 scenarios from /workspaces/trading-1/dev/backtest/engine-edge-1998-2026/ma10 (parallel=1)
 Fixtures root: /
 Bar data source: snapshot mode (/tmp/snap_top3000_1998_ls)
 Progress emission: every 4 Friday cycle(s) per scenario
 All-eligible diagnostic: disabled
-Output root: /workspaces/trading-1/dev/backtest/scenarios-2026-06-21-062834
+Output root: /workspaces/trading-1/dev/backtest/scenarios-2026-06-21-075019
 
->>> Running engine-top3000-1998-deep: Cell-E LONG-ONLY, top-3000 PIT-1998, 1998-2026 — engine-edge baseline + barbell engine leg. (1998-01-01 to 2026-04-30)
+>>> Running engine-top3000-1998-ma10: Cell-E LONG-ONLY 10wk-MA trader dial, top-3000 1998-2026 — bull-lag probe vs 30wk baseline. (1998-01-01 to 2026-04-30)
 Using scenario-provided sector map (3000 symbols)...
 Universe: 3000 stocks
 Loading AD breadth bars...
@@ -20,4 +20,3 @@ Running backtest (1998-01-01 to 2026-04-30, warmup from 1997-06-05)...
 Panel_runner: simulator window 1997-06-05..2026-04-30 (warmup 210 days, strategy Weinstein)
 Panel_runner: snapshot cache cap = 1024 MB (env SNAPSHOT_CACHE_MB)
 Panel_runner: snapshot bar reader wired (calendar 7541 days) for strategy
-RUN_EXIT=0 DONE

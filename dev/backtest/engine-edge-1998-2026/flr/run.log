@@ -1,0 +1,41 @@
+File ".", line 1, characters 0-0:
+Warning: No dune-project file has been found in directory ".". A default one
+is assumed but the project might break when dune is upgraded. Please create a
+dune-project file.
+Hint: generate the project file with: $ dune init project <name>
+Loading 1 scenarios from /workspaces/trading-1/dev/backtest/engine-edge-1998-2026/flr (parallel=1)
+Fixtures root: /workspaces/trading-1/trading/test_data/backtest_scenarios
+Bar data source: CSV mode
+Progress emission: every 4 Friday cycle(s) per scenario
+All-eligible diagnostic: disabled
+Output root: /workspaces/trading-1/dev/backtest/scenarios-2026-06-21-074236
+
+>>> Running floor-1998-deep: SPY-only Weinstein (30wk MA, long/flat) 1998-2026 — barbell grid FLOOR (1998-26 engine-edge window). (1998-01-01 to 2026-04-30)
+Using scenario-provided sector map (1 symbols)...
+Universe: 1 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 16
+Running backtest (1998-01-01 to 2026-04-30, warmup from 1997-06-05)...
+Panel_runner: simulator window 1997-06-05..2026-04-30 (warmup 210 days, strategy Spy_only_weinstein(SPY,ma=30wk))
+Panel_runner: in-process snapshot built (16 symbols, /tmp/panel_runner_csv_snapshot_261c91)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 7541 days) for strategy
+WARN: portfolio rejected fill for SPY (side=Types.Buy qty=7102.0000 price=147.0000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 1044065.02, Available: 1040905.9571999997, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for SPY (side=Types.Buy qty=10598.0000 price=314.1700): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 3329679.64, Available: 3303694.9697000002, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for SPY (side=Types.Buy qty=10901.0000 price=306.1600): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 3337559.17, Available: 3303694.9697000002, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=229803 misses=16 evictions=0 n_symbols=16 misses_per_symbol=1.00
+Scenario                       Return  Trades  WinRate    MaxDD   Result
+------------------------------------------------------------------------------
+floor-1998-deep                478.4%      22    54.5%    24.3%   PASS
+
+1/1 scenarios passed.
+RUN_EXIT=0 DONE
