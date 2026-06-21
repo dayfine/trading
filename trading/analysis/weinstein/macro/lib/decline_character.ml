@@ -27,11 +27,17 @@ let default_config =
 let _current_close (bars : Daily_price.t list) : float option =
   List.last bars |> Option.map ~f:(fun b -> b.Daily_price.close_price)
 
-(* Drawdown over the trailing [lookback] bars as a positive fraction
-   [(close_lookback - close_now) / close_lookback]; negative when the index
-   rose. [None] when there are too few bars or the reference close is
-   non-positive. Lookahead-free: reads only the last bar and the bar [lookback]
-   weeks earlier. *)
+(* Positive drawdown [(reference - now) / reference] given a [reference] and
+   [now] close; negative when the index rose. [None] when [reference] is
+   non-positive. A single-[if] helper so its callers stay flat. *)
+let _drawdown_fraction ~(reference : float) ~(now : float) : float option =
+  if Float.( <= ) reference 0.0 then None
+  else Some ((reference -. now) /. reference)
+
+(* Drawdown over the trailing [lookback] bars as a positive fraction relative to
+   the close [lookback] weeks earlier. [None] when there are too few bars or the
+   reference close is non-positive. Lookahead-free: reads only the last bar and
+   the bar [lookback] weeks earlier. *)
 let _trailing_drawdown_pct (bars : Daily_price.t list) ~(lookback : int) :
     float option =
   let n = List.length bars in
@@ -39,25 +45,25 @@ let _trailing_drawdown_pct (bars : Daily_price.t list) ~(lookback : int) :
   else
     let arr = Array.of_list bars in
     let close i = arr.(i).Daily_price.close_price in
-    let now = close (n - 1) and ref_close = close (n - 1 - lookback) in
-    if Float.( <= ) ref_close 0.0 then None
-    else Some ((ref_close -. now) /. ref_close)
+    _drawdown_fraction
+      ~reference:(close (n - 1 - lookback))
+      ~now:(close (n - 1))
+
+(* Highest close over the trailing [lookback] window (current bar inclusive). *)
+let _trailing_peak_close (bars : Daily_price.t list) ~(lookback : int) : float =
+  let window = List.drop bars (Int.max 0 (List.length bars - lookback)) in
+  List.fold window ~init:0.0 ~f:(fun acc b ->
+      Float.max acc b.Daily_price.close_price)
 
 (* Drawdown of the current close from the highest close over the trailing
-   [lookback] window (current bar inclusive), as a positive fraction. [None]
-   when there are no bars or the peak is non-positive. *)
+   [lookback] window, as a positive fraction. [None] when there are no bars or
+   the peak is non-positive. *)
 let _drawdown_from_trailing_high (bars : Daily_price.t list) ~(lookback : int) :
     float option =
-  match List.last bars with
+  match _current_close bars with
   | None -> None
-  | Some last ->
-      let window = List.drop bars (Int.max 0 (List.length bars - lookback)) in
-      let peak =
-        List.fold window ~init:0.0 ~f:(fun acc b ->
-            Float.max acc b.Daily_price.close_price)
-      in
-      if Float.( <= ) peak 0.0 then None
-      else Some ((peak -. last.Daily_price.close_price) /. peak)
+  | Some now ->
+      _drawdown_fraction ~reference:(_trailing_peak_close bars ~lookback) ~now
 
 (* Consecutive most-recent weeks whose close is below [ma_value]. Counts back
    from the latest bar and stops at the first bar at/above the MA. *)
@@ -74,6 +80,11 @@ let _ad_line_signal (macro : Macro.result) :
       String.equal r.Macro.name "A-D Line")
   |> Option.map ~f:(fun r -> r.Macro.signal)
 
+(* A trailing-high drawdown shallow enough that breadth is judged to be leading
+   price lower (the index has not yet broken far from its high). *)
+let _within_lead_band ~(config : config) (dd : float) : bool =
+  Float.( <= ) dd config.ad_lead_max_drawdown_pct
+
 (* The A-D line is "leading" the index lower when breadth is bearish while the
    index has not yet broken far from its trailing high. Weinstein's
    distribution-lead signature (book Ch. 8). A missing/Neutral/Bullish A-D
@@ -81,14 +92,11 @@ let _ad_line_signal (macro : Macro.result) :
 let _ad_line_is_leading (macro : Macro.result) (bars : Daily_price.t list)
     ~(config : config) : bool =
   match _ad_line_signal macro with
-  | Some `Bearish -> (
-      match
-        _drawdown_from_trailing_high bars
-          ~lookback:config.trailing_high_lookback_weeks
-      with
-      | Some dd -> Float.( <= ) dd config.ad_lead_max_drawdown_pct
-      | None -> false)
   | Some (`Bullish | `Neutral) | None -> false
+  | Some `Bearish ->
+      _drawdown_from_trailing_high bars
+        ~lookback:config.trailing_high_lookback_weeks
+      |> Option.exists ~f:(_within_lead_band ~config)
 
 (* Is a decline in progress at all? The MA must be falling and the current
    close below it. A rising/flat MA or a close above the MA is [Not_declining].
@@ -96,11 +104,10 @@ let _ad_line_is_leading (macro : Macro.result) (bars : Daily_price.t list)
 let _is_declining (macro : Macro.result) (bars : Daily_price.t list) : bool =
   let stage = macro.Macro.index_stage in
   match stage.Stage.ma_direction with
-  | Weinstein_types.Declining -> (
-      match _current_close bars with
-      | Some close -> Float.( < ) close stage.Stage.ma_value
-      | None -> false)
   | Weinstein_types.Rising | Weinstein_types.Flat -> false
+  | Weinstein_types.Declining ->
+      _current_close bars
+      |> Option.exists ~f:(fun close -> Float.( < ) close stage.Stage.ma_value)
 
 let _is_slow_grind (macro : Macro.result) (bars : Daily_price.t list)
     ~(config : config) ~(rate_pct : float) : bool =
@@ -112,18 +119,28 @@ let _is_slow_grind (macro : Macro.result) (bars : Daily_price.t list)
   in
   leading || grind_below_ma
 
+(* A fast-V shock: breadth is NOT leading the decline (no distribution warning)
+   and the recent rate-of-decline is steep. *)
+let _is_fast_v (macro : Macro.result) (bars : Daily_price.t list)
+    ~(config : config) ~(rate_pct : float) : bool =
+  (not (_ad_line_is_leading macro bars ~config))
+  && Float.( > ) rate_pct config.fast_v_min_rate_pct
+
+(* Classify a decline already known to be in progress. Kept separate from
+   {!classify} so neither function carries a nested [else]. *)
+let _classify_declining (macro : Macro.result) (bars : Daily_price.t list)
+    ~(config : config) : t =
+  let rate_pct =
+    Option.value
+      (_trailing_drawdown_pct bars ~lookback:config.rate_lookback_weeks)
+      ~default:0.0
+  in
+  match _is_slow_grind macro bars ~config ~rate_pct with
+  | true -> Slow_grind
+  | false ->
+      if _is_fast_v macro bars ~config ~rate_pct then Fast_v else Not_declining
+
 let classify ~(config : config) ~(macro : Macro.result)
     ~(index_bars : Daily_price.t list) : t =
   if not (_is_declining macro index_bars) then Not_declining
-  else
-    let rate_pct =
-      Option.value
-        (_trailing_drawdown_pct index_bars ~lookback:config.rate_lookback_weeks)
-        ~default:0.0
-    in
-    if _is_slow_grind macro index_bars ~config ~rate_pct then Slow_grind
-    else if
-      (not (_ad_line_is_leading macro index_bars ~config))
-      && Float.( > ) rate_pct config.fast_v_min_rate_pct
-    then Fast_v
-    else Not_declining
+  else _classify_declining macro index_bars ~config
