@@ -6,12 +6,13 @@
 MERGED
 
 <!-- Gate-#2 deployable overlay (PR #1683) merged to main 2026-06-21 (commit 3411c952).
-     Two [non-blocking] follow-ups remain (see ## Next Steps): scenario-entrypoint
-     wiring + exposing barbell_floor_weight as a Variant_matrix axis (R2). NB: the
-     axis follow-up entangles with the Weinstein_strategy.config-centric
-     Overlay_validator and likely depends on the scenario-entrypoint wiring landing
-     first — not a self-contained config-plumbing task. Surfaced to the maintainer
-     (orchestrator run 27906645873 [run 2] 2026-06-21). -->
+     Follow-up (a) scenario-entrypoint wiring MERGED 2026-06-21 (PR #1689, commit
+     1edd7621, authored + self-merged by the maintainer; orchestrator post-hoc QC
+     APPROVED/APPROVED quality 5, run 27919789702 [run 3]). One [non-blocking]
+     follow-up remains (see ## Next Steps): exposing barbell_floor_weight as a
+     Variant_matrix axis (R2). NB: that axis follow-up entangles with the
+     Weinstein_strategy.config-centric Overlay_validator (floor_weight lives in a
+     separate Barbell_config.t), so it is not self-contained config-plumbing. -->
 
 ## Notes
 Gate #2 of the barbell program: make the validated SPY-FLOOR + Cell-E-ENGINE
@@ -57,15 +58,24 @@ NO
   exact-match proof against `blend.awk` (5-point fixture: ret 27.4%, sharpe
   9.651, maxdd 6.4%, ulcer 3.37 — bit-identical) are all pinned by tests.
   Verify: `dune runtest trading/backtest/barbell/`.
+- [x] **(a) Scenario-entrypoint wiring** — PR #1689 (commit 1edd7621, MERGED
+  2026-06-21, authored + self-merged by the maintainer; orchestrator post-hoc QC
+  APPROVED/APPROVED quality 5). Adds `trading/trading/backtest/barbell/scenario/`
+  (thin lib + bin seam mirroring `Rolling_start_runner`'s pure/executable split):
+  `barbell_scenario.run` resolves the scenario universe, builds one
+  `Backtest.Runner.run_backtest` thunk per leg (FLOOR = `Spy_only_weinstein` 30wk;
+  ENGINE = `Weinstein` Cell-E), projects each to an equity curve, hands both +
+  `Barbell_config.t` to `Barbell_runner.run`. Default-off, no core edits; an
+  integration test runs both legs end-to-end on a 22-symbol fixture universe and
+  pins the blended NAV + `floor_weight=0.0`≡pure-engine no-op.
 
 ## Next Steps
-- [ ] Wire a `Barbell_overlay` scenario entrypoint (a bin / `scenario_runner`
-  flag) that builds the two leg thunks from a scenario's floor + engine configs
-  and runs `Barbell_runner.run` end-to-end on a real PIT universe. (Follow-up;
-  the orchestration logic + writer are done, only the `run_backtest` call-site
-  wiring + a scenario schema field remain.) `[non-blocking]`
 - [ ] Expose `barbell_floor_weight` as a `Variant_matrix` axis so 70/30 vs
-  neighbours stays searchable (R2 completion). `[non-blocking]`
+  neighbours stays searchable (R2 completion). NB: `floor_weight` lives in a
+  separate `Barbell_config.t`, but `Variant_matrix.expand` validates axis
+  overrides against `Weinstein_strategy.config` via `Overlay_validator` — so this
+  requires integrating the barbell config into that machinery, not trivial
+  config-plumbing. `[non-blocking]`
 
 ## Out of scope
 - Flipping any default on (promotion). Requires a confirmation-grid ACCEPT per
