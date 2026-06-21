@@ -1,0 +1,5 @@
+(library
+ (name barbell)
+ (libraries core trading.simulation.types)
+ (preprocess
+  (pps ppx_sexp_conv ppx_deriving.show ppx_deriving.eq)))
