@@ -29,16 +29,21 @@ B=2010-26 bull, C=2010-26 diff-index-composition, D=2000-2010 bear decade):
   where the engine's own stage3-exit+laggard machinery already gives Sharpe 1.01
   — the barbell and the engine's internal crash defense are partial substitutes.
 
-## P0 NEXT — two gates before the 70/30 barbell can take live capital
+## P0 NEXT — gate #1 CLOSED 2026-06-21; gate #2 (build overlay) remains
 
-1. **Breadth-universe confirmation cell.** The grid's universe-diversity leg is
-   thin: 3/4 cells share SP500 PIT-2000; only C differs (PIT-2010 *snapshot*, not
-   a breadth jump). Run ONE breadth cell — top-1000 or top-3000 deep — and re-blend
-   at 70/30 to confirm the weight transfers to breadth. Needs a rebuilt snapshot
-   warehouse (~26min; /tmp warehouses were cleared — see recipe in
-   `dev/backtest/barbell-grid-2026-06-20/PLAN.md`). The *engine* already
-   generalizes to breadth (`project_deep_1998_2026_contiguous` realized +1552%);
-   this confirms the *weight* does. `[blocking: confirm before live deploy]`
+1. **Breadth-universe confirmation cell — DONE 2026-06-21, 70/30 CONFIRMED.**
+   Record: `dev/backtest/barbell-breadth-2026-06-21/FINDINGS.md`. Ran two breadth
+   cells (2000-26, vs `floor-2000-deep`): top-1000 PIT-2000 (2×) and top-3000
+   PIT-2000 (6×). **70/30 beats pure-engine Calmar in EVERY cell** (SP500 .437,
+   top-1000 .225, top-3000 .311 — all > their pure-engine). In the engine's real
+   breadth universe (**top-3000**), the Calmar/Sharpe optimum lives in **w∈[0.6,0.8]**
+   and **70/30 is the robust central pick** (Sharpe 0.652 ≈ peak; Calmar 0.311
+   within 5% of the 0.80 peak; blend cuts DD 43%→19% at ~flat return). Diagnostic
+   exception: at **top-1000** (the engine's documented trough, `project_factor_lens`)
+   the optimum collapses to pure-floor — so **deploy the engine leg only on an
+   edge universe (SP500/top-3000), never top-1000**. Warehouse-build recipe:
+   `build_scenario_snapshots.exe` (single-dash flags) → `scenario_runner
+   --snapshot-dir`, cache=1024, parallel=1.
 2. **Build the barbell overlay as deployable code.** Today's blend is post-hoc
    (`blend.awk` over two equity curves). There is no `enable_barbell` config.
    To deploy live, build a rebalanced 70/30 floor/engine capital overlay behind a
