@@ -42,6 +42,54 @@ let _rebalance ~floor_weight ~nav_f ~nav_e =
   let total = nav_f +. nav_e in
   (floor_weight *. total, (1.0 -. floor_weight) *. total)
 
+(* Mutable per-step state for the two-sleeve walk: current sleeve NAVs, the
+   previous leg values (None until the second step), and the date of the last
+   rebalance. *)
+type sleeve_state = {
+  mutable nav_f : float;
+  mutable nav_e : float;
+  mutable prev_f : float option;
+  mutable prev_e : float option;
+  mutable last_rebalance : Date.t;
+}
+
+(* Compound both sleeves by this step's per-leg daily returns. No-op on the
+   first step, when there is no previous value to compound against. *)
+let _compound_step st ~fv ~ev =
+  match (st.prev_f, st.prev_e) with
+  | Some pf, Some pe ->
+      st.nav_f <- st.nav_f *. (1.0 +. _daily_return pf fv);
+      st.nav_e <- st.nav_e *. (1.0 +. _daily_return pe ev)
+  | _ -> ()
+
+(* Reset the sleeves to the target split once [stride_days] have elapsed since
+   the last rebalance. *)
+let _maybe_rebalance st ~floor_weight ~stride_days ~date =
+  if Date.diff date st.last_rebalance >= stride_days then begin
+    let f, e = _rebalance ~floor_weight ~nav_f:st.nav_f ~nav_e:st.nav_e in
+    st.nav_f <- f;
+    st.nav_e <- e;
+    st.last_rebalance <- date
+  end
+
+(* Advance the state by one aligned triple and emit the combined-NAV point. *)
+let _step st ~floor_weight ~stride_days (date, fv, ev) =
+  _compound_step st ~fv ~ev;
+  _maybe_rebalance st ~floor_weight ~stride_days ~date;
+  st.prev_f <- Some fv;
+  st.prev_e <- Some ev;
+  (date, st.nav_f +. st.nav_e)
+
+(* Fresh sleeve state at the target split, last rebalanced on the first date. *)
+let _init_state ~floor_weight ~start_date =
+  {
+    nav_f = floor_weight;
+    nav_e = 1.0 -. floor_weight;
+    prev_f = None;
+    prev_e = None;
+    last_rebalance = start_date;
+  }
+
 (* Walk the aligned triples, compounding each sleeve by its leg's daily return
    and rebalancing once at least [stride_days] calendar days have elapsed since
    the last rebalance. Emits one combined-NAV point per date (normalised to
@@ -50,28 +98,9 @@ let _rebalance ~floor_weight ~nav_f ~nav_e =
 let _run_sleeves ~floor_weight ~stride_days aligned =
   match aligned with
   | [] -> []
-  | (d0, _, _) :: _ ->
-      let nav_f = ref floor_weight in
-      let nav_e = ref (1.0 -. floor_weight) in
-      let prev_f = ref None and prev_e = ref None in
-      let last_rebalance = ref d0 in
-      List.map aligned ~f:(fun (d, fv, ev) ->
-          (match (!prev_f, !prev_e) with
-          | Some pf, Some pe ->
-              nav_f := !nav_f *. (1.0 +. _daily_return pf fv);
-              nav_e := !nav_e *. (1.0 +. _daily_return pe ev);
-              if Date.diff d !last_rebalance >= stride_days then begin
-                let f, e =
-                  _rebalance ~floor_weight ~nav_f:!nav_f ~nav_e:!nav_e
-                in
-                nav_f := f;
-                nav_e := e;
-                last_rebalance := d
-              end
-          | _ -> ());
-          prev_f := Some fv;
-          prev_e := Some ev;
-          (d, !nav_f +. !nav_e))
+  | (start_date, _, _) :: _ ->
+      let st = _init_state ~floor_weight ~start_date in
+      List.map aligned ~f:(_step st ~floor_weight ~stride_days)
 
 (* Per-step blended returns from the combined-NAV path. *)
 let _returns nav_curve =
@@ -84,19 +113,24 @@ let _returns nav_curve =
           prev := v;
           r)
 
-let _sharpe returns =
+(* Population mean and standard deviation of [returns]. Both are 0.0 for an
+   empty list. *)
+let _mean_and_sd returns =
   let n = List.length returns in
-  if n = 0 then 0.0
+  if n = 0 then (0.0, 0.0)
   else begin
-    let mean = List.sum (module Float) returns ~f:Fn.id /. Float.of_int n in
+    let nf = Float.of_int n in
+    let mean = List.sum (module Float) returns ~f:Fn.id /. nf in
     let var =
-      List.sum (module Float) returns ~f:(fun r -> (r -. mean) ** 2.0)
-      /. Float.of_int n
+      List.sum (module Float) returns ~f:(fun r -> (r -. mean) ** 2.0) /. nf
     in
-    let sd = Float.sqrt (Float.max var 0.0) in
-    if Float.( <= ) sd 0.0 then 0.0
-    else mean /. sd *. Float.sqrt _trading_days_per_year
+    (mean, Float.sqrt (Float.max var 0.0))
   end
+
+let _sharpe returns =
+  let mean, sd = _mean_and_sd returns in
+  if Float.( <= ) sd 0.0 then 0.0
+  else mean /. sd *. Float.sqrt _trading_days_per_year
 
 (* Worst peak-to-trough drawdown (fraction >= 0) and Ulcer index over the NAV
    path, in one pass — both as in [blend.awk]'s END block. *)

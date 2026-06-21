@@ -26,10 +26,14 @@ let run ~(config : Barbell_config.t) ~floor_leg ~engine_leg =
   in
   { config; floor; engine; blend }
 
+let _nav_csv_line (d, v) = Printf.sprintf "%s,%.6f\n" (Date.to_string d) v
+
+let _write_nav_curve oc nav_curve =
+  Out_channel.output_string oc "date,portfolio_value\n";
+  List.iter nav_curve ~f:(fun point ->
+      Out_channel.output_string oc (_nav_csv_line point))
+
 let write_equity_curve t ~output_dir =
   let path = output_dir ^ "/equity_curve.csv" in
   Out_channel.with_file path ~f:(fun oc ->
-      Out_channel.output_string oc "date,portfolio_value\n";
-      List.iter t.blend.nav_curve ~f:(fun (d, v) ->
-          Out_channel.output_string oc
-            (Printf.sprintf "%s,%.6f\n" (Date.to_string d) v)))
+      _write_nav_curve oc t.blend.nav_curve)
