@@ -1,4 +1,4 @@
-# Next-session priorities — 2026-06-22 (morning handoff)
+# Next-session priorities — 2026-06-21 PM (handoff)
 
 **Supersedes** `next-session-priorities-2026-06-21.md` + `overnight-plan-2026-06-21.md`.
 Overnight autonomous run (user AFK). Check main CI green first
