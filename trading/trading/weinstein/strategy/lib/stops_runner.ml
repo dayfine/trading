@@ -185,37 +185,83 @@ let _handle_stop_full ?ma_cache ?prior_stage_ma_values ~stops_config
     ~on_close:stops_config.Weinstein_stops.trigger_on_weekly_close ~pos
     ~risk_params ~state ~bar ~current_date ~event
 
+(** Fast-crash absolute-stop exit, OR'd alongside the structural trigger.
+
+    Build 2 (dev/notes/decline-character-exploration-2026-06-21-PM.md): when the
+    position's market is in a fast-V decline ([catastrophic_armed]) and the
+    [stops_config.catastrophic_stop_pct] knob is enabled, a long's bar low
+    breaching [trailing_high *. (1 - pct)] (mirror for shorts) fires an exit
+    even when the slower structural stop has not. The trail is read from [state]
+    via {!Weinstein_stops.trailing_high_of_state} — only a [Trailing] state
+    carries one, so the catastrophic stop is dormant until a trend leg exists.
+    No exit when [catastrophic_armed = false] or [pct = 0.0] (the default), so
+    existing callers / goldens are bit-identical. The exit fill price reuses the
+    structural [_make_exit_transition] (bar low for longs / high for shorts). *)
+let _catastrophic_hit ~catastrophic_armed ~stops_config ~(pos : Position.t)
+    ~state ~bar =
+  match Weinstein_stops.Catastrophic_stop.trailing_high_of_state state with
+  | None -> false
+  | Some trailing_high ->
+      Weinstein_stops.Catastrophic_stop.check_hit ~armed:catastrophic_armed
+        ~pct:stops_config.Weinstein_stops.catastrophic_stop_pct ~trailing_high
+        ~bar ~side:pos.Position.side
+
+let _catastrophic_exit ~catastrophic_armed ~stops_config ~(pos : Position.t)
+    ~state ~bar ~current_date =
+  if _catastrophic_hit ~catastrophic_armed ~stops_config ~pos ~state ~bar then
+    Some
+      (_make_exit_transition
+         ~on_close:stops_config.Weinstein_stops.trigger_on_weekly_close ~pos
+         ~current_date ~state ~bar ())
+  else None
+
 (** Process stop logic for one held position. Returns (exit_transition option,
     adjust_transition option).
 
     Under [Weekly] cadence with [as_of] not on a Friday, only the trigger check
     runs (see [_handle_stop_trigger_only]); the state machine is not advanced
     and [stop_states] is unchanged. Under [Daily] (or [Weekly] on Friday), the
-    state machine runs as before via [_handle_stop_full]. *)
+    state machine runs as before via [_handle_stop_full].
+
+    The fast-crash absolute stop ([_catastrophic_exit]) is OR'd alongside both
+    branches: if the structural path produced no exit but the catastrophic stop
+    fires, its exit is emitted instead. The structural exit takes precedence
+    when both fire (same [TriggerExit] kind). *)
 let _handle_stop ?ma_cache ?prior_stage_ma_values ?(stop_update_cadence = Daily)
-    ~stops_config ~stage_config ~lookback_bars ~(pos : Position.t)
-    ~(risk_params : Position.risk_params) ~state ~bar ~stop_states ~ticker
-    ~bar_reader ~as_of ~prior_stages () =
+    ?(catastrophic_armed = false) ~stops_config ~stage_config ~lookback_bars
+    ~(pos : Position.t) ~(risk_params : Position.risk_params) ~state ~bar
+    ~stop_states ~ticker ~bar_reader ~as_of ~prior_stages () =
   let current_date = bar.Types.Daily_price.date in
   let advance_state_machine =
     match stop_update_cadence with
     | Daily -> true
     | Weekly -> _is_weekly_close ~as_of
   in
-  if not advance_state_machine then
-    _handle_stop_trigger_only
-      ~on_close:stops_config.Weinstein_stops.trigger_on_weekly_close ~pos ~state
-      ~bar ~current_date
-  else
-    _handle_stop_full ?ma_cache ?prior_stage_ma_values ~stops_config
-      ~stage_config ~lookback_bars ~pos ~risk_params ~state ~bar ~stop_states
-      ~ticker ~bar_reader ~as_of ~prior_stages ~current_date ()
+  let exit_tr, adjust_tr =
+    if not advance_state_machine then
+      _handle_stop_trigger_only
+        ~on_close:stops_config.Weinstein_stops.trigger_on_weekly_close ~pos
+        ~state ~bar ~current_date
+    else
+      _handle_stop_full ?ma_cache ?prior_stage_ma_values ~stops_config
+        ~stage_config ~lookback_bars ~pos ~risk_params ~state ~bar ~stop_states
+        ~ticker ~bar_reader ~as_of ~prior_stages ~current_date ()
+  in
+  match exit_tr with
+  | Some _ -> (exit_tr, adjust_tr)
+  | None ->
+      let catastrophic_tr =
+        _catastrophic_exit ~catastrophic_armed ~stops_config ~pos ~state ~bar
+          ~current_date
+      in
+      (catastrophic_tr, adjust_tr)
 
 (** Process stop for one position; returns updated (exits, adjusts) accumulator.
 *)
 let _process_stop ?ma_cache ?prior_stage_ma_values ?stop_update_cadence
-    ~stops_config ~stage_config ~lookback_bars ~stop_states ~get_price
-    ~bar_reader ~as_of ~prior_stages (pos : Position.t) (exits, adjusts) =
+    ?catastrophic_armed ~stops_config ~stage_config ~lookback_bars ~stop_states
+    ~get_price ~bar_reader ~as_of ~prior_stages (pos : Position.t)
+    (exits, adjusts) =
   let ticker = pos.symbol in
   match
     (Position.get_state pos, Map.find !stop_states ticker, get_price ticker)
@@ -223,7 +269,7 @@ let _process_stop ?ma_cache ?prior_stage_ma_values ?stop_update_cadence
   | Position.Holding h, Some state, Some bar -> (
       match
         _handle_stop ?ma_cache ?prior_stage_ma_values ?stop_update_cadence
-          ~stops_config ~stage_config ~lookback_bars ~pos
+          ?catastrophic_armed ~stops_config ~stage_config ~lookback_bars ~pos
           ~risk_params:h.risk_params ~state ~bar ~stop_states ~ticker
           ~bar_reader ~as_of ~prior_stages ()
       with
@@ -232,10 +278,10 @@ let _process_stop ?ma_cache ?prior_stage_ma_values ?stop_update_cadence
       | None, None -> (exits, adjusts))
   | _ -> (exits, adjusts)
 
-let update ?ma_cache ?stop_update_cadence ?prior_stage_ma_values ~stops_config
-    ~stage_config ~lookback_bars ~positions ~get_price ~stop_states ~bar_reader
-    ~as_of ~prior_stages () =
+let update ?ma_cache ?stop_update_cadence ?prior_stage_ma_values
+    ?catastrophic_armed ~stops_config ~stage_config ~lookback_bars ~positions
+    ~get_price ~stop_states ~bar_reader ~as_of ~prior_stages () =
   Map.fold positions ~init:([], []) ~f:(fun ~key:_ ~data:pos acc ->
       _process_stop ?ma_cache ?prior_stage_ma_values ?stop_update_cadence
-        ~stops_config ~stage_config ~lookback_bars ~stop_states ~get_price
-        ~bar_reader ~as_of ~prior_stages pos acc)
+        ?catastrophic_armed ~stops_config ~stage_config ~lookback_bars
+        ~stop_states ~get_price ~bar_reader ~as_of ~prior_stages pos acc)

@@ -36,24 +36,12 @@ let entries_from_candidates = S.entries_from_candidates
 let survivors_for_screening = S.survivors_for_screening
 let prune_universe_by_active_through = S.prune_universe_by_active_through
 
-let _trigger_exit_ids_of (ts : Position.transition list) : String.Set.t =
-  List.filter_map ts ~f:(fun (t : Position.transition) ->
-      match t.kind with
-      | Position.TriggerExit _ -> Some t.position_id
-      | _ -> None)
-  |> String.Set.of_list
-
-let _filter_out_exited_ids exited_ids (ts : Position.transition list) :
-    Position.transition list =
-  if Set.is_empty exited_ids then ts
-  else
-    List.filter ts ~f:(fun (t : Position.transition) ->
-        not (Set.mem exited_ids t.position_id))
-
 let _positions_minus_exited ~(positions : Position.t Map.M(String).t)
     ~(stop_exit_transitions : Position.transition list) :
     Position.t Map.M(String).t =
-  let exited_ids = _trigger_exit_ids_of stop_exit_transitions in
+  let exited_ids =
+    Transition_assembly.trigger_exit_ids_of stop_exit_transitions
+  in
   if Set.is_empty exited_ids then positions
   else
     Map.filter positions ~f:(fun (p : Position.t) ->
@@ -116,25 +104,29 @@ let _record_force_exit ~last_stop_out_dates ~positions ~current_date
 
 let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
     ~prior_stage_ma_values ~get_price ~last_stop_out_dates ~audit_recorder
-    ~prior_macro_result ~current_date =
+    ~prior_macro_result ~prior_decline_character ~current_date =
   Stops_split_runner.adjust ~positions ~stop_states ~bar_reader
     ~as_of:current_date;
+  (* Arm the fast-crash absolute stop from the PRIOR cycle's decline-character
+     (strictly past — this cycle's classify runs later, at the macro step; a
+     plain bool keeps the stops lib macro-agnostic). *)
+  let catastrophic_armed =
+    phys_equal !prior_decline_character Decline_character.Fast_v
+  in
   let exit_transitions, adjust_transitions =
     Stops_runner.update
       ?ma_cache:(Bar_reader.ma_cache bar_reader)
       ~stop_update_cadence:config.stop_update_cadence ~prior_stage_ma_values
-      ~stops_config:config.stops_config ~stage_config:config.stage_config
-      ~lookback_bars:config.lookback_bars ~positions ~get_price ~stop_states
-      ~bar_reader ~as_of:current_date ~prior_stages ()
+      ~catastrophic_armed ~stops_config:config.stops_config
+      ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
+      ~positions ~get_price ~stop_states ~bar_reader ~as_of:current_date
+      ~prior_stages ()
   in
   List.iter exit_transitions
     ~f:
       (_handle_stop_out_transition ~last_stop_out_dates ~positions ~current_date);
-  List.iter exit_transitions
-    ~f:
-      (Exit_audit_capture.emit_exit_audit ~audit_recorder ~prior_macro_result
-         ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
-         ~bar_reader ~prior_stages ~positions);
+  Exit_audit_capture.emit_for_list ~config ~audit_recorder ~prior_macro_result
+    ~bar_reader ~prior_stages ~positions exit_transitions;
   (exit_transitions, adjust_transitions)
 
 let _run_laggard_rotation ~config ~positions ~last_stop_out_dates ~bar_reader
@@ -173,36 +165,24 @@ let _run_stage3_force_exit ~config ~positions ~last_stop_out_dates
          ~label:"stage3_force_exit");
   stage3_ts
 
-(* Emit the exit-side audit (incl. MFE/MAE) for a list of [TriggerExit]
-   transitions, mirroring the stops pass. Without this, stage3-force-exit,
-   laggard-rotation, and force-liquidation exits carry no [exit_decision] and
-   their excursion metrics default to 0.0 (a no-op on non-[TriggerExit]
-   transitions, so it is safe to pipe any list through). Must run while
-   [positions] still holds the position (before the exit transition applies). *)
-let _emit_exit_audit_for ~config ~audit_recorder ~prior_macro_result ~bar_reader
-    ~prior_stages ~positions ts =
-  List.iter ts
-    ~f:
-      (Exit_audit_capture.emit_exit_audit ~audit_recorder ~prior_macro_result
-         ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
-         ~bar_reader ~prior_stages ~positions)
-
 let _run_special_exits ~config ~positions ~last_stop_out_dates
     ~(portfolio : Portfolio_view.t) ~get_price ~peak_tracker ~audit_recorder
     ~prior_macro_result ~prior_stages ~prior_stage_ma_values ~stage3_streaks
     ~laggard_streaks ~bar_reader ~index_view ~exit_transitions ~current_date =
   let emit_audit =
-    _emit_exit_audit_for ~config ~audit_recorder ~prior_macro_result ~bar_reader
-      ~prior_stages ~positions
+    Exit_audit_capture.emit_for_list ~config ~audit_recorder ~prior_macro_result
+      ~bar_reader ~prior_stages ~positions
   in
   let raw_force_exit_ts =
     Force_liquidation_runner.update
       ~config:config.portfolio_config.force_liquidation ~positions ~get_price
       ~cash:portfolio.cash ~current_date ~peak_tracker ~audit_recorder
   in
-  let stop_exited_ids = _trigger_exit_ids_of exit_transitions in
+  let stop_exited_ids =
+    Transition_assembly.trigger_exit_ids_of exit_transitions
+  in
   let force_exit_ts =
-    _filter_out_exited_ids stop_exited_ids raw_force_exit_ts
+    Transition_assembly.filter_out_exited_ids stop_exited_ids raw_force_exit_ts
   in
   let is_friday =
     Weinstein_strategy_screening.is_screening_day_view index_view
@@ -213,8 +193,10 @@ let _run_special_exits ~config ~positions ~last_stop_out_dates
       ~stop_exited_ids ~current_date
   in
   emit_audit stage3_ts;
-  let stage3_exited_ids = _trigger_exit_ids_of stage3_ts in
-  let force_exit_ts = _filter_out_exited_ids stage3_exited_ids force_exit_ts in
+  let stage3_exited_ids = Transition_assembly.trigger_exit_ids_of stage3_ts in
+  let force_exit_ts =
+    Transition_assembly.filter_out_exited_ids stage3_exited_ids force_exit_ts
+  in
   let laggard_ts =
     _run_laggard_rotation ~config ~positions ~last_stop_out_dates ~bar_reader
       ~get_price ~laggard_streaks ~is_friday
@@ -222,8 +204,10 @@ let _run_special_exits ~config ~positions ~last_stop_out_dates
       ~current_date
   in
   emit_audit laggard_ts;
-  let laggard_exited_ids = _trigger_exit_ids_of laggard_ts in
-  let force_exit_ts = _filter_out_exited_ids laggard_exited_ids force_exit_ts in
+  let laggard_exited_ids = Transition_assembly.trigger_exit_ids_of laggard_ts in
+  let force_exit_ts =
+    Transition_assembly.filter_out_exited_ids laggard_exited_ids force_exit_ts
+  in
   emit_audit force_exit_ts;
   ( force_exit_ts,
     stage3_ts,
@@ -303,13 +287,18 @@ let _run_entries ~fold_start_date ~config ~stop_states ~last_stop_out_dates
     limits; the skip-id union (stop / Stage-3 / laggard / force-liq exits) is
     assembled here. *)
 let _run_macro_and_trim ~config ~ad_bars ~positions ~portfolio ~prior_macro
-    ~prior_macro_result ~peak_tracker ~bar_reader ~prior_stages ~get_price
-    ~current_date ~index_view ~is_screening_day ~stop_exited_ids
-    ~stage3_exited_ids ~laggard_exited_ids ~force_exit_transitions =
+    ~prior_macro_result ~prior_decline_character ~peak_tracker ~bar_reader
+    ~prior_stages ~get_price ~current_date ~index_view ~is_screening_day
+    ~stop_exited_ids ~stage3_exited_ids ~laggard_exited_ids
+    ~force_exit_transitions =
   let macro_result_opt =
     _run_macro ~config ~ad_bars ~prior_macro ~prior_macro_result ~peak_tracker
       ~bar_reader ~prior_stages ~current_date ~index_view ~is_screening_day
   in
+  (* Re-classify the index's decline character (strictly-past read by the next
+     tick's stops pass to arm the fast-crash absolute stop — Build 2). *)
+  Decline_character_wiring.update_ref ~prior_decline_character ~macro_result_opt
+    ~index_view;
   let skip_ids =
     Set.union_list
       (module String)
@@ -317,7 +306,7 @@ let _run_macro_and_trim ~config ~ad_bars ~positions ~portfolio ~prior_macro
         stop_exited_ids;
         stage3_exited_ids;
         laggard_exited_ids;
-        _trigger_exit_ids_of force_exit_transitions;
+        Transition_assembly.trigger_exit_ids_of force_exit_transitions;
       ]
   in
   let macro_trim_transitions =
@@ -326,51 +315,38 @@ let _run_macro_and_trim ~config ~ad_bars ~positions ~portfolio ~prior_macro
   in
   (macro_result_opt, macro_trim_transitions)
 
-let _assemble_output ~exit_transitions ~stage3_force_exit_transitions
-    ~laggard_rotation_transitions ~force_exit_transitions
-    ~macro_trim_transitions ~harvest_rotate_transitions ~adjust_transitions
-    ~entry_transitions ~stop_exited_ids ~stage3_exited_ids ~laggard_exited_ids =
-  let force_liq_exited_ids = _trigger_exit_ids_of force_exit_transitions in
-  let macro_trim_exited_ids = _trigger_exit_ids_of macro_trim_transitions in
-  let all_exited_ids =
-    Set.union_list
-      (module String)
-      [
-        stop_exited_ids;
-        stage3_exited_ids;
-        laggard_exited_ids;
-        force_liq_exited_ids;
-        macro_trim_exited_ids;
-      ]
+(** Run the held-position dials (late-Stage-2 tighten + harvest-rotate) and the
+    entry walk. Returns [(late_tighten, harvest_rotate, entries)]. Extracted
+    from {!_process_market_day} so that coordinator stays within the
+    function-length limit. *)
+let _run_dials_and_entries ~fold_start_date ~config ~stop_states
+    ~last_stop_out_dates ~peak_tracker ~bar_reader ~prior_stages
+    ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio ~current_date
+    ~index_view ~audit_recorder ~prior_macro_result ~is_screening_day
+    ~macro_result_opt ~positions =
+  let late_tighten_transitions, harvest_rotate_transitions =
+    _run_held_position_dials ~config ~positions ~get_price ~prior_stages
+      ~index_view ~audit_recorder ~prior_macro_result ~bar_reader ~current_date
   in
-  let adjust_transitions =
-    _filter_out_exited_ids all_exited_ids adjust_transitions
+  let entry_transitions =
+    _run_entries ~fold_start_date ~config ~stop_states ~last_stop_out_dates
+      ~peak_tracker ~bar_reader ~prior_stages ~sector_prior_stages
+      ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
+      ~audit_recorder ~is_screening_day ~macro_result_opt
   in
-  (* Drop a harvest-trim for any position already fully exited this tick (a stop
-     hit / Stage-3 / laggard / force-liq / macro-bearish exit) — that position is
-     closing, so there is nothing left to trim. *)
-  let harvest_rotate_transitions =
-    _filter_out_exited_ids all_exited_ids harvest_rotate_transitions
-  in
-  Ok
-    {
-      Strategy_interface.transitions =
-        exit_transitions @ stage3_force_exit_transitions
-        @ laggard_rotation_transitions @ force_exit_transitions
-        @ macro_trim_transitions @ harvest_rotate_transitions
-        @ adjust_transitions @ entry_transitions;
-    }
+  (late_tighten_transitions, harvest_rotate_transitions, entry_transitions)
 
 let _process_market_day ~fold_start_date ~config ~ad_bars ~stop_states
-    ~last_stop_out_dates ~prior_macro ~prior_macro_result ~peak_tracker
-    ~bar_reader ~prior_stages ~prior_stage_ma_values ~sector_prior_stages
-    ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price
-    ~(portfolio : Portfolio_view.t) ~current_date =
+    ~last_stop_out_dates ~prior_macro ~prior_macro_result
+    ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
+    ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors ~stage3_streaks
+    ~laggard_streaks ~audit_recorder ~get_price ~(portfolio : Portfolio_view.t)
+    ~current_date =
   let positions = portfolio.positions in
   let exit_transitions, adjust_transitions =
     _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
       ~prior_stage_ma_values ~get_price ~last_stop_out_dates ~audit_recorder
-      ~prior_macro_result ~current_date
+      ~prior_macro_result ~prior_decline_character ~current_date
   in
   let index_view =
     Bar_reader.weekly_view_for bar_reader ~symbol:config.indices.primary
@@ -392,40 +368,40 @@ let _process_market_day ~fold_start_date ~config ~ad_bars ~stop_states
   in
   let macro_result_opt, macro_trim_transitions =
     _run_macro_and_trim ~config ~ad_bars ~positions ~portfolio ~prior_macro
-      ~prior_macro_result ~peak_tracker ~bar_reader ~prior_stages ~get_price
-      ~current_date ~index_view ~is_screening_day ~stop_exited_ids
-      ~stage3_exited_ids ~laggard_exited_ids ~force_exit_transitions
+      ~prior_macro_result ~prior_decline_character ~peak_tracker ~bar_reader
+      ~prior_stages ~get_price ~current_date ~index_view ~is_screening_day
+      ~stop_exited_ids ~stage3_exited_ids ~laggard_exited_ids
+      ~force_exit_transitions
   in
-  let late_tighten_transitions, harvest_rotate_transitions =
-    _run_held_position_dials ~config ~positions ~get_price ~prior_stages
-      ~index_view ~audit_recorder ~prior_macro_result ~bar_reader ~current_date
+  let late_tighten_transitions, harvest_rotate_transitions, entry_transitions =
+    _run_dials_and_entries ~fold_start_date ~config ~stop_states
+      ~last_stop_out_dates ~peak_tracker ~bar_reader ~prior_stages
+      ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio ~current_date
+      ~index_view ~audit_recorder ~prior_macro_result ~is_screening_day
+      ~macro_result_opt ~positions
   in
-  let entry_transitions =
-    _run_entries ~fold_start_date ~config ~stop_states ~last_stop_out_dates
-      ~peak_tracker ~bar_reader ~prior_stages ~sector_prior_stages
-      ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
-      ~audit_recorder ~is_screening_day ~macro_result_opt
-  in
-  _assemble_output ~exit_transitions ~stage3_force_exit_transitions
-    ~laggard_rotation_transitions ~force_exit_transitions
-    ~macro_trim_transitions ~harvest_rotate_transitions
+  Transition_assembly.assemble_output ~exit_transitions
+    ~stage3_force_exit_transitions ~laggard_rotation_transitions
+    ~force_exit_transitions ~macro_trim_transitions ~harvest_rotate_transitions
     ~adjust_transitions:(adjust_transitions @ late_tighten_transitions)
     ~entry_transitions ~stop_exited_ids ~stage3_exited_ids ~laggard_exited_ids
 
 let _on_market_close ~fold_start_date ~config ~ad_bars ~stop_states
-    ~last_stop_out_dates ~prior_macro ~prior_macro_result ~peak_tracker
-    ~bar_reader ~prior_stages ~prior_stage_ma_values ~sector_prior_stages
-    ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price
-    ~get_indicator:_ ~(portfolio : Portfolio_view.t) =
+    ~last_stop_out_dates ~prior_macro ~prior_macro_result
+    ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
+    ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors ~stage3_streaks
+    ~laggard_streaks ~audit_recorder ~get_price ~get_indicator:_
+    ~(portfolio : Portfolio_view.t) =
   match get_price config.indices.primary with
   | None -> Ok { Strategy_interface.transitions = [] }
   | Some primary_bar ->
       let current_date = primary_bar.Types.Daily_price.date in
       _process_market_day ~fold_start_date ~config ~ad_bars ~stop_states
-        ~last_stop_out_dates ~prior_macro ~prior_macro_result ~peak_tracker
-        ~bar_reader ~prior_stages ~prior_stage_ma_values ~sector_prior_stages
-        ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder
-        ~get_price ~portfolio ~current_date
+        ~last_stop_out_dates ~prior_macro ~prior_macro_result
+        ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
+        ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors
+        ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price ~portfolio
+        ~current_date
 
 let _init_strategy_state ~initial_stop_states ~ad_bars =
   let stop_states = ref initial_stop_states in
@@ -435,6 +411,9 @@ let _init_strategy_state ~initial_stop_states ~ad_bars =
   let prior_macro = ref Weinstein_types.Neutral in
   let peak_tracker = Portfolio_risk.Force_liquidation.Peak_tracker.create () in
   let prior_macro_result : Macro.result option ref = ref None in
+  (* Most recent index decline-character; updated at the macro step, read
+     strictly-prior by the next tick's stops pass to arm the fast-crash stop. *)
+  let prior_decline_character = ref Decline_character.Not_declining in
   let prior_stages = Hashtbl.create (module String) in
   let prior_stage_ma_values : float Hashtbl.M(String).t =
     Hashtbl.create (module String)
@@ -454,6 +433,7 @@ let _init_strategy_state ~initial_stop_states ~ad_bars =
     prior_macro,
     peak_tracker,
     prior_macro_result,
+    prior_decline_character,
     prior_stages,
     prior_stage_ma_values,
     sector_prior_stages,
@@ -472,6 +452,7 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
         prior_macro,
         peak_tracker,
         prior_macro_result,
+        prior_decline_character,
         prior_stages,
         prior_stage_ma_values,
         sector_prior_stages,
@@ -486,9 +467,9 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
     let on_market_close =
       _on_market_close ~fold_start_date ~config ~ad_bars:weekly_ad_bars
         ~stop_states ~last_stop_out_dates ~prior_macro ~prior_macro_result
-        ~peak_tracker ~bar_reader ~prior_stages ~prior_stage_ma_values
-        ~sector_prior_stages ~ticker_sectors ~stage3_streaks ~laggard_streaks
-        ~audit_recorder
+        ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
+        ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors
+        ~stage3_streaks ~laggard_streaks ~audit_recorder
   end in
   (module M : Strategy_interface.STRATEGY)
 

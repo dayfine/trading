@@ -28,6 +28,7 @@ val update :
   ?ma_cache:Weekly_ma_cache.t ->
   ?stop_update_cadence:stop_update_cadence ->
   ?prior_stage_ma_values:float Hashtbl.M(String).t ->
+  ?catastrophic_armed:bool ->
   stops_config:Weinstein_stops.config ->
   stage_config:Stage.config ->
   lookback_bars:int ->
@@ -69,4 +70,14 @@ val update :
     {!Stage3_force_exit_runner} reads the same table to apply its
     [stage3_exit_margin_pct] filter (price-below-MA margin gate). When omitted,
     no MA values are recorded — the stage3 force-exit margin filter then
-    short-circuits as "margin met" and behaviour matches pre-fix runs. *)
+    short-circuits as "margin met" and behaviour matches pre-fix runs.
+
+    [catastrophic_armed] (optional, default [false]) arms the fast-crash
+    absolute stop ([stops_config.catastrophic_stop_pct]). When [true] {b and}
+    that knob is [> 0.0], a position whose bar low (long) / high (short)
+    breaches [trailing_high *. (1 ∓ pct)] gets a [TriggerExit] alongside the
+    structural stop — see {!Weinstein_stops.check_catastrophic_hit}. The arming
+    decision is made one level up in the strategy lib from the prior cycle's
+    {!Decline_character.t} (a fast-V decline), keeping this runner and the stops
+    lib macro-agnostic. The default [false] (and the knob's default [0.0]) is an
+    exact no-op, so every existing caller and golden replays bit-identically. *)

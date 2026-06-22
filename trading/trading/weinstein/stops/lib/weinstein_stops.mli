@@ -35,6 +35,11 @@ module Vol_scaled_stop = Vol_scaled_stop
     in proportion to the candidate's ATR. See the module doc for the contract.
 *)
 
+module Catastrophic_stop = Catastrophic_stop
+(** Fast-crash absolute stop (default-off, [config.catastrophic_stop_pct]).
+    Macro-agnostic trigger armed only in a fast-V decline. See the module doc
+    for the contract. *)
+
 (** {1 Core Functions} *)
 
 val compute_initial_stop :

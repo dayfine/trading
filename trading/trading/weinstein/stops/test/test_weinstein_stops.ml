@@ -598,9 +598,110 @@ let test_no_phantom_cycle_on_continuous_advance _ =
          | Trailing { correction_count; _ } -> Some correction_count | _ -> None)
        (equal_to 1))
 
+(* ---- Catastrophic_stop.check_hit tests ----
+   Fast-crash absolute stop (Build 2). With trailing_high=100.0 and pct=0.10:
+   - Long fires when bar.low <= 90.0; Short fires when bar.high >= 110.0.
+   The predicate is a no-op (false) when armed=false or pct<=0.0. *)
+
+let test_catastrophic_hit_long_fires_when_armed _ =
+  (* low 89 breaches 100*(1-0.10)=90 → fires when armed. *)
+  let bar = make_bar ~low_price:89.0 ~high_price:95.0 () in
+  assert_that
+    (Catastrophic_stop.check_hit ~armed:true ~pct:0.10 ~trailing_high:100.0 ~bar
+       ~side:Long)
+    (equal_to true)
+
+let test_catastrophic_hit_long_no_fire_above_threshold _ =
+  (* low 91 is above 90 → no fire even when armed. *)
+  let bar = make_bar ~low_price:91.0 ~high_price:95.0 () in
+  assert_that
+    (Catastrophic_stop.check_hit ~armed:true ~pct:0.10 ~trailing_high:100.0 ~bar
+       ~side:Long)
+    (equal_to false)
+
+let test_catastrophic_hit_long_noop_when_not_armed _ =
+  (* low 80 deeply breaches 90, but armed=false → dormant (no fire). *)
+  let bar = make_bar ~low_price:80.0 ~high_price:95.0 () in
+  assert_that
+    (Catastrophic_stop.check_hit ~armed:false ~pct:0.10 ~trailing_high:100.0
+       ~bar ~side:Long)
+    (equal_to false)
+
+let test_catastrophic_hit_long_noop_when_pct_zero _ =
+  (* pct=0.0 is the default no-op: never fires even armed + breaching. *)
+  let bar = make_bar ~low_price:50.0 ~high_price:95.0 () in
+  assert_that
+    (Catastrophic_stop.check_hit ~armed:true ~pct:0.0 ~trailing_high:100.0 ~bar
+       ~side:Long)
+    (equal_to false)
+
+let test_catastrophic_hit_short_fires_when_armed _ =
+  (* high 111 breaches 100*(1+0.10)=110 → fires when armed. *)
+  let bar = make_bar ~low_price:105.0 ~high_price:111.0 () in
+  assert_that
+    (Catastrophic_stop.check_hit ~armed:true ~pct:0.10 ~trailing_high:100.0 ~bar
+       ~side:Short)
+    (equal_to true)
+
+let test_catastrophic_hit_short_no_fire_below_threshold _ =
+  (* high 109 is below 110 → no fire even when armed. *)
+  let bar = make_bar ~low_price:105.0 ~high_price:109.0 () in
+  assert_that
+    (Catastrophic_stop.check_hit ~armed:true ~pct:0.10 ~trailing_high:100.0 ~bar
+       ~side:Short)
+    (equal_to false)
+
+let test_catastrophic_hit_short_noop_when_not_armed _ =
+  let bar = make_bar ~low_price:105.0 ~high_price:130.0 () in
+  assert_that
+    (Catastrophic_stop.check_hit ~armed:false ~pct:0.10 ~trailing_high:100.0
+       ~bar ~side:Short)
+    (equal_to false)
+
+let test_trailing_high_of_state _ =
+  (* Only Trailing carries last_trend_extreme; Initial / Tightened return None. *)
+  let trailing =
+    Trailing
+      {
+        stop_level = 90.0;
+        last_correction_extreme = 95.0;
+        last_trend_extreme = 120.0;
+        ma_at_last_adjustment = 100.0;
+        correction_count = 1;
+        correction_observed_since_reset = true;
+      }
+  in
+  assert_that
+    (Catastrophic_stop.trailing_high_of_state trailing)
+    (is_some_and (float_equal 120.0));
+  assert_that
+    (Catastrophic_stop.trailing_high_of_state
+       (Initial { stop_level = 90.0; reference_level = 95.0 }))
+    is_none;
+  assert_that
+    (Catastrophic_stop.trailing_high_of_state
+       (Tightened
+          { stop_level = 90.0; last_correction_extreme = 95.0; reason = "t" }))
+    is_none
+
 let suite =
   "weinstein_stops"
   >::: [
+         "catastrophic_hit_long_fires_when_armed"
+         >:: test_catastrophic_hit_long_fires_when_armed;
+         "catastrophic_hit_long_no_fire_above_threshold"
+         >:: test_catastrophic_hit_long_no_fire_above_threshold;
+         "catastrophic_hit_long_noop_when_not_armed"
+         >:: test_catastrophic_hit_long_noop_when_not_armed;
+         "catastrophic_hit_long_noop_when_pct_zero"
+         >:: test_catastrophic_hit_long_noop_when_pct_zero;
+         "catastrophic_hit_short_fires_when_armed"
+         >:: test_catastrophic_hit_short_fires_when_armed;
+         "catastrophic_hit_short_no_fire_below_threshold"
+         >:: test_catastrophic_hit_short_no_fire_below_threshold;
+         "catastrophic_hit_short_noop_when_not_armed"
+         >:: test_catastrophic_hit_short_noop_when_not_armed;
+         "trailing_high_of_state" >:: test_trailing_high_of_state;
          "initial_stop_long" >:: test_compute_initial_stop_long;
          "initial_stop_nudge_whole"
          >:: test_compute_initial_stop_nudge_at_whole_number;

@@ -35,3 +35,20 @@ val emit_exit_audit :
     last set inside [Weinstein_strategy._run_screen]. When it's still [None]
     (exit fired before the first Friday) the snapshot defaults to [Neutral] /
     [0.0]. *)
+
+val emit_for_list :
+  config:Weinstein_strategy_config.config ->
+  audit_recorder:Audit_recorder.t ->
+  prior_macro_result:Macro.result option ref ->
+  bar_reader:Bar_reader.t ->
+  prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
+  positions:Trading_strategy.Position.t Map.M(String).t ->
+  Trading_strategy.Position.transition list ->
+  unit
+(** [emit_for_list ~config ~audit_recorder ~prior_macro_result ~bar_reader
+     ~prior_stages ~positions ts] pipes every transition in [ts] through
+    {!emit_exit_audit} (reading [stage_config] / [lookback_bars] off [config]).
+    A convenience over a bare [List.iter] for the force-exit / stage3 / laggard
+    exit lists, which (unlike the stops pass) have no built-in audit emission.
+    Must run while [positions] still holds the position (before the exit
+    transition applies). No-op on non-[TriggerExit] transitions. *)
