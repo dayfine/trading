@@ -97,6 +97,9 @@ type config = {
   enable_slow_grind_short_gate : bool; [@sexp.default false]
       (** Admit shorts only in a slow-grind decline; default [false] = no-op.
           See [.mli]. *)
+  fast_v_arm_on_rate_alone : bool; [@sexp.default false]
+      (** Fast-crash absolute-stop arming-speed dial; default [false] = no-op.
+          See [.mli]. *)
   enable_late_stage2_stop_tighten : bool; [@sexp.default false]
       (** Master switch for the late-Stage-2 stop-tighten runner; see [.mli]. *)
   late_stage2_stop_buffer_pct : float; [@sexp.default 0.0]
@@ -162,6 +165,7 @@ let default_config ~universe ~index_symbol =
     neutral_blocks_longs = false;
     neutral_blocks_shorts = false;
     enable_slow_grind_short_gate = false;
+    fast_v_arm_on_rate_alone = false;
     enable_late_stage2_stop_tighten = false;
     late_stage2_stop_buffer_pct = 0.0;
     enable_macro_bearish_exposure_trim = false;

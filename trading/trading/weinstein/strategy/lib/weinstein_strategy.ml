@@ -297,8 +297,9 @@ let _run_macro_and_trim ~config ~ad_bars ~positions ~portfolio ~prior_macro
   in
   (* Re-classify the index's decline character (strictly-past read by the next
      tick's stops pass to arm the fast-crash absolute stop — Build 2). *)
-  Decline_character_wiring.update_ref ~prior_decline_character ~macro_result_opt
-    ~index_view;
+  Decline_character_wiring.update_ref
+    ~fast_v_arm_on_rate_alone:config.fast_v_arm_on_rate_alone
+    ~prior_decline_character ~macro_result_opt ~index_view;
   let skip_ids =
     Set.union_list
       (module String)
