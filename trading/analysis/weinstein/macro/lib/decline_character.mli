@@ -66,6 +66,35 @@ type config = {
   trailing_high_lookback_weeks : int;
       (** Window (weeks) over which the trailing index high is taken for the
           A-D-lead drawdown comparison. Default: 52 (~1 year). *)
+  fast_v_ignores_ma_filter : bool; [@sexp.default false]
+      (** {b Arming-speed dial} for the fast-V path (default [false] = exactly
+          today's behaviour). When [false], {!classify} returns [Not_declining]
+          for any tape that is not already in a decline by the MA test (MA
+          Rising/Flat, or the close not yet below a falling MA) — so the fast-V
+          path cannot arm until the weekly MA has rolled over and price has
+          fallen below it. In a fast V-crash that confirmation lags the crash by
+          weeks (the 2020 problem: the MA does not roll over until ~mid-March,
+          after the gap-down has already exited every long), so the
+          [Fast_v]-gated absolute stop never gets a chance to fire.
+
+          When [true], the fast-V-on-rate path is evaluated even when no decline
+          is in progress by the MA test: if the trailing rate-of-decline
+          drawdown over [rate_lookback_weeks] exceeds [fast_v_min_rate_pct] (and
+          the A-D line is not leading), {!classify} returns [Fast_v] on rate
+          alone — dropping the falling-MA precondition for the fast-V path only.
+          The slow-grind path is {b never} reached this way: a slow grind
+          legitimately requires weeks-below-a-falling-MA, which presupposes a
+          decline already in progress.
+
+          {b Faithfulness}: a fast crash gives no Advance-Decline breadth lead
+          and falls steeply before the weekly MA can roll over (book Ch. 8
+          distribution-lead doctrine — the MA confirmation is built for the slow
+          distribution top, not the V-crash). Arming the tail-RISK-insurance
+          absolute stop on rate captures the gap-down the weekly-MA confirmation
+          structurally misses. This changes no buy/sell rule — only {b when} the
+          [Fast_v]-gated absolute stop arms — so it is the sanctioned
+          tail-RISK-insurance exception ([weinstein-faithful-core.md]), not a
+          spine change. *)
 }
 [@@deriving sexp]
 (** Tunable thresholds for {!classify}. Every threshold is a config field (no
@@ -96,12 +125,19 @@ val classify :
       the weeks-below-falling-MA count.
 
     Classification rule (thresholds from [config]):
-    - {!Not_declining} when the MA is rising, or the current close is not below
-      a falling MA at all (no decline in progress).
-    - {!Slow_grind} when the A-D line is leading (A-D [`Bearish] while the index
-      is still within [ad_lead_max_drawdown_pct] of its trailing high), OR
-      (weeks-below-falling-MA ≥ [weeks_below_ma_slow_grind] AND the drawdown
-      magnitude over [rate_lookback_weeks] < [slow_grind_max_rate_pct]).
+    - When no decline is in progress (the MA is rising/flat, or the current
+      close is not below a falling MA): {!Not_declining}, {b unless}
+      [fast_v_ignores_ma_filter = true] — in which case the fast-V-on-rate path
+      is still evaluated and returns {!Fast_v} when the A-D line is not leading
+      AND the drawdown magnitude over [rate_lookback_weeks] >
+      [fast_v_min_rate_pct] (else {!Not_declining}). The slow-grind path is
+      never taken on this branch (a slow grind presupposes a decline in
+      progress).
+    - When a decline is in progress: {!Slow_grind} when the A-D line is leading
+      (A-D [`Bearish] while the index is still within [ad_lead_max_drawdown_pct]
+      of its trailing high), OR (weeks-below-falling-MA ≥
+      [weeks_below_ma_slow_grind] AND the drawdown magnitude over
+      [rate_lookback_weeks] < [slow_grind_max_rate_pct]).
     - {!Fast_v} when the A-D line is not leading AND the drawdown magnitude over
       [rate_lookback_weeks] > [fast_v_min_rate_pct].
     - {!Not_declining} otherwise (an ambiguous shallow dip with no qualifying

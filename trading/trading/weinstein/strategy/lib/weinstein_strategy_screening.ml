@@ -379,8 +379,12 @@ let _sector_lookup_of ~sector_map symbol =
 let _decline_is_slow_grind ~config ~macro_result ~index_view =
   if not config.enable_slow_grind_short_gate then true
   else
+    let classifier_config =
+      Decline_character_wiring.classifier_config
+        ~fast_v_arm_on_rate_alone:config.fast_v_arm_on_rate_alone
+    in
     match
-      Decline_character_wiring.classify ~config:Decline_character.default_config
+      Decline_character_wiring.classify ~config:classifier_config
         ~macro:macro_result ~index_view
     with
     | Decline_character.Slow_grind -> true

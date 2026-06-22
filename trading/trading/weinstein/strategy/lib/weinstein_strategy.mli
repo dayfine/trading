@@ -421,6 +421,17 @@ type config = {
           [Screener.screen_with_cooldown ~decline_is_slow_grind] (the screener
           lib stays macro-agnostic). [Variant_matrix] flag axis. See
           [Weinstein_strategy_config] for full semantics. *)
+  fast_v_arm_on_rate_alone : bool; [@sexp.default false]
+      (** Arming-speed dial for the fast-crash absolute stop (default-off): when
+          [true], the primary-index [Decline_character.Fast_v] classification
+          may arm on the rate of decline alone, without waiting for the weekly
+          MA to roll over (the 2020 arming-latency fix — the binding constraint
+          is when the stop arms, not its width). Default [false] is a no-op
+          (bit-identical; the classifier is unchanged). Threaded into
+          [Decline_character.fast_v_ignores_ma_filter] at both classify sites.
+          The {b spine} is untouched — it changes no buy/sell rule, only when
+          the tail-RISK-insurance absolute stop arms. [Variant_matrix] flag
+          axis. See [Weinstein_strategy_config] for full semantics. *)
   enable_late_stage2_stop_tighten : bool; [@sexp.default false]
       (** Held-position risk dial (default-off): when [true], the
           {!Late_stage2_stop_runner} tightens the trailing stop of every held

@@ -11,6 +11,16 @@
     [weinstein.macro]), so the stops lib and stops runner stay macro-agnostic
     (A2): they receive a plain [~armed:bool], not a {!Decline_character.t}. *)
 
+val classifier_config :
+  fast_v_arm_on_rate_alone:bool -> Decline_character.config
+(** [classifier_config ~fast_v_arm_on_rate_alone] is
+    [Decline_character.default_config] with [fast_v_ignores_ma_filter] set from
+    the strategy-level [fast_v_arm_on_rate_alone] flag — a single source of the
+    classifier config so both classify sites (the stop-arming {!update_ref} and
+    the slow-grind-gate screen-time classify) stay consistent. With
+    [fast_v_arm_on_rate_alone = false] it reproduces [default_config] exactly
+    (bit-identical to the pre-flag behaviour). *)
+
 val classify :
   config:Decline_character.config ->
   macro:Macro.result ->
@@ -26,15 +36,19 @@ val classify :
     lookahead-free: every input is at the current week or earlier. *)
 
 val update_ref :
+  fast_v_arm_on_rate_alone:bool ->
   prior_decline_character:Decline_character.t ref ->
   macro_result_opt:Macro.result option ->
   index_view:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
   unit
-(** [update_ref ~prior_decline_character ~macro_result_opt ~index_view] stores a
-    fresh {!classify} of the index into [prior_decline_character] when
-    [macro_result_opt] is [Some] (a screening day) — using
-    {!Decline_character.default_config}. On a non-screening day ([None]) it is a
-    no-op, so the ref retains the last classification: the strategy's stops pass
-    reads it on the NEXT tick (strictly prior, no lookahead — the Build 2
-    fast-crash absolute-stop arming seam). The searchable mechanism flag is
-    [stops_config.catastrophic_stop_pct]. *)
+(** [update_ref ~fast_v_arm_on_rate_alone ~prior_decline_character
+     ~macro_result_opt ~index_view] stores a fresh {!classify} of the index into
+    [prior_decline_character] when [macro_result_opt] is [Some] (a screening
+    day) — using {!classifier_config} built from the strategy-level
+    [fast_v_arm_on_rate_alone] arming-speed flag (default [false] reproduces
+    {!Decline_character.default_config} exactly). On a non-screening day
+    ([None]) it is a no-op, so the ref retains the last classification: the
+    strategy's stops pass reads it on the NEXT tick (strictly prior, no
+    lookahead — the Build 2 fast-crash absolute-stop arming seam). The
+    searchable mechanism flag is [stops_config.catastrophic_stop_pct]; the
+    arming-speed flag is [fast_v_arm_on_rate_alone]. *)

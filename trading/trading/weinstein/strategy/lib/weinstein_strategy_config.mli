@@ -200,6 +200,39 @@ type config = {
           ([((flag enable_slow_grind_short_gate) (values (true false)))]).
           Default-off until an experiment-ledger ACCEPT (per
           [.claude/rules/experiment-flag-discipline.md]). *)
+  fast_v_arm_on_rate_alone : bool; [@sexp.default false]
+      (** Arming-speed dial for the fast-crash absolute stop
+          ([stops_config.catastrophic_stop_pct]); default [false] is a no-op
+          (bit-identical to baseline — the decline classifier behaves exactly as
+          before). When [true], the primary-index [Decline_character.Fast_v]
+          classification may arm on the {b rate of decline alone}, without
+          waiting for the weekly MA to roll over and price to fall below it.
+
+          Motivation: in a fast V-crash (2020), the structural gap-down stop has
+          already exited every long before the weekly MA rolls over, so the
+          [Fast_v]-gated [catastrophic_stop_pct] absolute stop never fires — the
+          binding constraint is arming {b latency}, not stop width. This flag
+          drops the falling-MA precondition for the fast-V path only (the
+          slow-grind path is untouched, since it presupposes a decline already
+          in progress). It is threaded into
+          [Decline_character.fast_v_ignores_ma_filter] at the two classify sites
+          ([Decline_character_wiring.update_ref], the load-bearing stop-arming
+          seam, and the [enable_slow_grind_short_gate] screen-time classify,
+          inert here since it maps [Fast_v] -> not-slow-grind) so one config
+          builds the classifier config.
+
+          {b Faithfulness}: a fast crash gives no Advance-Decline breadth lead
+          and falls before the weekly MA can confirm
+          (weinstein-book-reference.md §Macro / Ch. 8 distribution-lead
+          doctrine). This changes no buy/sell rule — only {b when} the absolute
+          tail-RISK-insurance stop arms — so it is the sanctioned
+          tail-RISK-insurance exception
+          ([.claude/rules/weinstein-faithful-core.md]); the spine is intact.
+
+          Single-component [Variant_matrix] flag axis
+          ([((flag fast_v_arm_on_rate_alone) (values (true false)))]).
+          Default-off until an experiment-ledger ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md]). *)
   enable_late_stage2_stop_tighten : bool; [@sexp.default false]
       (** Held-position risk dial (default-off): when [true], the
           {!Late_stage2_stop_runner} tightens the trailing stop of every held
