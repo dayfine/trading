@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-22 (orchestrator run 27942558434 [run 3]: FULL PASS, 1 subagent dispatched + merged. Dispatched feat-backtest (plan-first) on the barbell floor_weight searchable axis — the [non-blocking] follow-up whose blocker (scenario-wiring #1689) had landed; PR #1697 self-contained Option-1 sweep, both QC gates APPROVED (quality 5/5), all 3 merge gates green → auto-merged (HEAD `f0147ddd`). decline-character flagship advanced LOCALLY by maintainer during the run: Build 1 #1692 + Build 2 #1695 MERGED, Build 3 #1696 (faithful short) OPEN but CI-red — held hands-off (collision-avoidance). Reconciled barbell-overlay (axis complete, no follow-ups) + decline-character rows. Health CLEAN (status-integrity + index-size + no-python exit 0). harness/cleanup backlogs drained; data-gaps unchanged. opam-weekly #1698 open (CI pending, normal-flow).)
+Last updated: 2026-06-22 (orchestrator run 27952423277 [run 4]: FULL PASS, 0 subagents dispatched. All orchestrator-dispatchable work is drained or gated: decline-character flagship (Builds 1-3, #1692/#1695/#1696) now all MERGED default-off; the 3 remaining next steps (read-only screens, Build 0 A/D wiring, barbell weight cert) are LOCAL/attended/human-mandate/data-gated per the 2026-06-22 handoff. Reconciled the decline-character row (Build 3 #1696 merged; #1703 screen fixtures open, maintainer-driven). Health CLEAN (status-integrity + index-size + no-python exit 0); main CI GREEN on HEAD `360c1fad` (build-and-test + perf-tier1-smoke + golden-custom-universe SUCCESS). harness/cleanup backlogs drained; data-gaps unchanged. Open PRs both maintainer-authored: #1703 (docs+fixtures) + #1698 (opam-weekly). Stale ci-red issue #1700 (on superseded f0147dd) — main since fixed; needs human close.)
 
 ## Active + complete tracks
 
@@ -28,7 +28,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — |
 | [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | #1659 short-sleeve budget (default-off) MERGED; next: LOCAL sleeve-fraction screen → WF-CV → grid before default flip `[non-blocking]` |
-| [decline-character](decline-character.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | feat/faithful-short (#1696) | Build 1 (#1692) + Build 2 (#1695) MERGED; Build 3 faithful short #1696 OPEN (CI-red); Build 0 A/D wiring next |
+| [decline-character](decline-character.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | #1703 (maintainer) | Builds 1-3 (#1692/#1695/#1696) MERGED default-off; next: Build 0 A/D wiring (attended) + read-only screens (LOCAL) |
 | [spy-only-reference](spy-only-reference.md) | IN_PROGRESS | feat-weinstein | — | WF-CV on sector-rotation testbed; top-1000 bankability gate; long-short verification (human session) |
 | [stage-accuracy](stage-accuracy.md) | IN_PROGRESS | feat-weinstein | — | force_exit_off grid REJECTED (#1503); cascade-selection inversion documented (#1509 merged); broad-universe WF-CV re-run data-gated |
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
