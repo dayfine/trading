@@ -541,6 +541,95 @@ let test_weekly_cadence_trigger_fires_on_midweek_bar _ =
        ])
 
 (* ------------------------------------------------------------------ *)
+(* Build 2: fast-crash absolute stop (catastrophic_stop_pct)            *)
+(*                                                                      *)
+(* When the index is in a fast-V decline (catastrophic_armed=true) and  *)
+(* the catastrophic_stop_pct knob is enabled, a long whose bar low      *)
+(* breaches trailing_high*(1-pct) gets a TriggerExit even when the      *)
+(* slower structural stop has not fired. Default-off: armed=false OR    *)
+(* pct=0.0 reproduces the structural-only behaviour bit-for-bit.        *)
+(* ------------------------------------------------------------------ *)
+
+(** A Trailing stop state seeded with [last_trend_extreme] = the rally peak the
+    catastrophic stop measures its absolute drop from, and a structural
+    [stop_level] far below the bar so the structural trigger never fires — the
+    catastrophic stop is isolated as the only possible exit. *)
+let _trailing_state ~stop_level ~trend_extreme =
+  Weinstein_stops.Trailing
+    {
+      stop_level;
+      last_correction_extreme = trend_extreme *. 0.95;
+      last_trend_extreme = trend_extreme;
+      ma_at_last_adjustment = trend_extreme *. 0.9;
+      correction_count = 1;
+      correction_observed_since_reset = true;
+    }
+
+(** Drive a single [Stops_runner.update] over one long position in a Trailing
+    state, with [catastrophic_stop_pct] = [pct] and [~catastrophic_armed]. The
+    bar low ($88) breaches trailing_high($100)*(1-0.10)=$90 but stays above the
+    structural stop ($80), so the only possible exit is the catastrophic stop.
+    Returns the exit transitions. *)
+let _run_catastrophic ~armed ~pct =
+  let ticker = "AAPL" in
+  let entry_date = Date.of_string "2024-01-05" in
+  let pos = make_holding_pos ticker 100.0 entry_date in
+  let positions = String.Map.singleton ticker pos in
+  let stop_states =
+    ref
+      (String.Map.singleton ticker
+         (_trailing_state ~stop_level:80.0 ~trend_extreme:100.0))
+  in
+  let stops_config =
+    { default_cfg with Weinstein_stops.catastrophic_stop_pct = pct }
+  in
+  (* Bar low 88 < trailing_high 100 * (1 - 0.10) = 90, but > structural stop 80. *)
+  let bar = make_bar "2024-01-12" ~close:89.0 ~low:88.0 ~high:90.0 () in
+  let exits, _adjusts =
+    Stops_runner.update ~catastrophic_armed:armed ~stops_config
+      ~stage_config:default_stage_cfg ~lookback_bars:52 ~positions
+      ~get_price:(get_price_of [ (ticker, bar) ])
+      ~stop_states ~bar_reader:(Bar_reader.empty ())
+      ~as_of:(Date.of_string "2024-01-12")
+      ~prior_stages:(Hashtbl.create (module String))
+      ()
+  in
+  exits
+
+(** Armed + pct>0 + breaching bar → a single TriggerExit is emitted. *)
+let test_catastrophic_armed_fires_trigger_exit _ =
+  let exits = _run_catastrophic ~armed:true ~pct:0.10 in
+  assert_that exits
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (tr : Trading_strategy.Position.transition) ->
+                 tr.position_id)
+               (equal_to "AAPL");
+             field
+               (fun (tr : Trading_strategy.Position.transition) -> tr.kind)
+               (matching ~msg:"Expected TriggerExit"
+                  (function
+                    | Trading_strategy.Position.TriggerExit _ -> Some ()
+                    | _ -> None)
+                  (equal_to ()));
+           ];
+       ])
+
+(** Not armed → the catastrophic stop is dormant; no exit (structural
+    unchanged). *)
+let test_catastrophic_not_armed_no_exit _ =
+  let exits = _run_catastrophic ~armed:false ~pct:0.10 in
+  assert_that exits is_empty
+
+(** pct=0.0 (default no-op) → no catastrophic exit even when armed. *)
+let test_catastrophic_pct_zero_no_exit _ =
+  let exits = _run_catastrophic ~armed:true ~pct:0.0 in
+  assert_that exits is_empty
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -548,6 +637,12 @@ let () =
   run_test_tt_main
     ("stops_runner"
     >::: [
+           "Build2: catastrophic stop fires TriggerExit when armed"
+           >:: test_catastrophic_armed_fires_trigger_exit;
+           "Build2: catastrophic stop dormant when not armed"
+           >:: test_catastrophic_not_armed_no_exit;
+           "Build2: catastrophic stop no-op at pct=0.0"
+           >:: test_catastrophic_pct_zero_no_exit;
            "update with no positions returns empty"
            >:: test_update_no_positions_returns_empty;
            "update with position but no stop state returns empty"

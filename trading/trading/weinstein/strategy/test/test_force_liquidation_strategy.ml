@@ -63,6 +63,7 @@ type _strategy_state = {
   last_stop_out_dates : Date.t Hashtbl.M(String).t;
   prior_macro : market_trend ref;
   prior_macro_result : Macro.result option ref;
+  prior_decline_character : Decline_character.t ref;
   peak_tracker : FL.Peak_tracker.t;
   prior_stages : stage Hashtbl.M(String).t;
   prior_stage_ma_values : float Hashtbl.M(String).t;
@@ -82,6 +83,7 @@ let _fresh_state ~bar_reader =
     last_stop_out_dates = Hashtbl.create (module String);
     prior_macro = ref Neutral;
     prior_macro_result = ref None;
+    prior_decline_character = ref Decline_character.Not_declining;
     peak_tracker = FL.Peak_tracker.create ();
     prior_stages = Hashtbl.create (module String);
     prior_stage_ma_values = Hashtbl.create (module String);
@@ -106,6 +108,7 @@ let _drive_tick state ~config ~current_date ~portfolio =
     ~stop_states:state.stop_states
     ~last_stop_out_dates:state.last_stop_out_dates
     ~prior_macro:state.prior_macro ~prior_macro_result:state.prior_macro_result
+    ~prior_decline_character:state.prior_decline_character
     ~peak_tracker:state.peak_tracker ~bar_reader:state.bar_reader
     ~prior_stages:state.prior_stages
     ~prior_stage_ma_values:state.prior_stage_ma_values

@@ -175,3 +175,11 @@ let emit_exit_audit ~(audit_recorder : Audit_recorder.t) ~prior_macro_result
         ~lookback_bars ~bar_reader ~prior_stages ~positions ~trans ~exit_reason
         ~exit_price
   | _ -> ()
+
+let emit_for_list ~(config : Weinstein_strategy_config.config) ~audit_recorder
+    ~prior_macro_result ~bar_reader ~prior_stages ~positions ts =
+  List.iter ts
+    ~f:
+      (emit_exit_audit ~audit_recorder ~prior_macro_result
+         ~stage_config:config.stage_config ~lookback_bars:config.lookback_bars
+         ~bar_reader ~prior_stages ~positions)

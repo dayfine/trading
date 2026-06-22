@@ -151,6 +151,36 @@ type config = {
       (** ATR lookback period (in daily bars) for [vol_scaled_stop_atr_mult].
           Consulted only when [vol_scaled_stop_atr_mult > 0.0]; the standard
           Wilder 14-day period (see {!Atr.atr}). *)
+  catastrophic_stop_pct : float; [@sexp.default 0.0]
+      (** Fast-crash {b absolute} stop distance from the position's trailing
+          high, as a positive fraction (default-off). When [> 0.0] {b and} the
+          position's market is in a fast-V decline (the [~armed] flag, decided
+          one level up in the strategy lib from {!Decline_character.Fast_v}), a
+          long's stop fires when
+          [bar.low ≤ trailing_high *. (1. -. catastrophic_stop_pct)] and a
+          short's when
+          [bar.high ≥ trailing_high *. (1. +. catastrophic_stop_pct)], where
+          [trailing_high] is the stop state's [last_trend_extreme] (the rally
+          peak for a long, the decline trough for a short). The check ORs into
+          the existing structural trigger — whichever fires first exits.
+
+          Why: the structural MA/correction-low trailing stop trails a distant
+          prior correction and re-checks only weekly, so in a fast crash (2020)
+          longs exit 3-4 weeks late, at the bottom, eating the full drawdown. An
+          absolute drop-% stop from the trailing high caps that fast-crash loss
+          the structural stop misses (design
+          [dev/notes/decline-character-exploration-2026-06-21-PM.md] §Build 2).
+
+          Faithful-core: this is explicit {b tail-RISK insurance}, not an
+          always-on tight stop. It is {e dormant} ([~armed = false]) in normal
+          bull chop, so it does not tax the let-winners-run fat tail (the
+          sanctioned exception in [.claude/rules/weinstein-faithful-core.md] —
+          winner-touching only as explicit tail-RISK insurance). It arms only
+          when the macro tape is a fast-V crash. Default [0.0] is an exact no-op
+          (the trigger is gated on [pct > 0.0]) so every existing golden replays
+          unchanged. Default-off experiment axis per
+          [.claude/rules/experiment-flag-discipline.md]; promoted only on a
+          ledger ACCEPT. *)
 }
 [@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable

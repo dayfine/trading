@@ -688,6 +688,7 @@ module Internal_for_test : sig
     last_stop_out_dates:Date.t Hashtbl.M(String).t ->
     prior_macro:Weinstein_types.market_trend ref ->
     prior_macro_result:Macro.result option ref ->
+    prior_decline_character:Decline_character.t ref ->
     peak_tracker:Portfolio_risk.Force_liquidation.Peak_tracker.t ->
     bar_reader:Bar_reader.t ->
     prior_stages:Weinstein_types.stage Hashtbl.M(String).t ->
