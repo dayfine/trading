@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-22 (orchestrator run 27933059401 [run 2]: full pass, dispatch-light, 0 subagents. Main GREEN on HEAD `7b25d5d7` (run-1 summary #1693 merged; build-and-test + perf + both goldens SUCCESS); health CLEAN (status-integrity + index-size + no-python exit 0). State materially unchanged from run 1 (~4h prior): the sole open PR #1692 (decline-character Build 1, maintainer LOCAL flagship) is unchanged — same tip `96ebd49c`, same REAL nesting_linter build-and-test FAILURE — still NOT merged (3-gate) and NOT dispatched (collision-avoidance; Question to maintainer pending). No status drift; harness/cleanup backlogs drained; data-gaps unchanged. Re-surfaced the #1692 fix Question.)
+Last updated: 2026-06-22 (orchestrator run 27942558434 [run 3]: FULL PASS, 1 subagent dispatched + merged. Dispatched feat-backtest (plan-first) on the barbell floor_weight searchable axis — the [non-blocking] follow-up whose blocker (scenario-wiring #1689) had landed; PR #1697 self-contained Option-1 sweep, both QC gates APPROVED (quality 5/5), all 3 merge gates green → auto-merged (HEAD `f0147ddd`). decline-character flagship advanced LOCALLY by maintainer during the run: Build 1 #1692 + Build 2 #1695 MERGED, Build 3 #1696 (faithful short) OPEN but CI-red — held hands-off (collision-avoidance). Reconciled barbell-overlay (axis complete, no follow-ups) + decline-character rows. Health CLEAN (status-integrity + index-size + no-python exit 0). harness/cleanup backlogs drained; data-gaps unchanged. opam-weekly #1698 open (CI pending, normal-flow).)
 
 ## Active + complete tracks
 
@@ -18,7 +18,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
 | [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | snapshot-format-v2 S4 PROVEN (warehouses v2, top-3000 fits at cache<=1024); S5/v1-cleanup deferred (oversight); next: regime-diverse lenses on v2 (LOCAL) |
 | [rolling-start-lens](rolling-start-lens.md) | IN_PROGRESS | feat-backtest | — | t3k factor-lens matrix SHIPPED LOCAL (#1639 2000-26 H1 r=-0.744; #1642 2011-26 confirm); next: regime-gated deploy proxy validation (LOCAL/data-gated) |
-| [barbell-overlay](barbell-overlay.md) | MERGED | — | — | Gate-#2 overlay (#1683) + scenario wiring (#1689) MERGED default-off; 1 [non-blocking] follow-up remains: floor_weight Variant_matrix axis (entangles w/ Overlay_validator) |
+| [barbell-overlay](barbell-overlay.md) | MERGED | — | — | Gate-#2 overlay (#1683) + scenario wiring (#1689) + floor_weight searchable axis (#1697, R2 complete) all MERGED default-off; no remaining follow-ups |
 | [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | Win #4 production wiring MERGED (#1574, opt-in default-off); next: manual ghcr.io flambda rebuild + enable prune opt-in in sweeps |
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
@@ -28,7 +28,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — |
 | [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | #1659 short-sleeve budget (default-off) MERGED; next: LOCAL sleeve-fraction screen → WF-CV → grid before default flip `[non-blocking]` |
-| [decline-character](decline-character.md) | IN_PROGRESS | feat-weinstein | feat/decline-character | Build 1 classifier (Slow_grind/Fast_v/Not_declining) READY_FOR_REVIEW; next: Build 0 A/D wiring, then Builds 2/3 (stop+short) |
+| [decline-character](decline-character.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | feat/faithful-short (#1696) | Build 1 (#1692) + Build 2 (#1695) MERGED; Build 3 faithful short #1696 OPEN (CI-red); Build 0 A/D wiring next |
 | [spy-only-reference](spy-only-reference.md) | IN_PROGRESS | feat-weinstein | — | WF-CV on sector-rotation testbed; top-1000 bankability gate; long-short verification (human session) |
 | [stage-accuracy](stage-accuracy.md) | IN_PROGRESS | feat-weinstein | — | force_exit_off grid REJECTED (#1503); cascade-selection inversion documented (#1509 merged); broad-universe WF-CV re-run data-gated |
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
