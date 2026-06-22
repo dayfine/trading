@@ -32,9 +32,24 @@ its computable-now legs: **rate-of-decline** (Build 2's `Fast_v` = steep rate) a
 **weeks-below-declining-MA** (Build 3's `Slow_grind`). Those are real and faithful;
 the A/D-*lead* refinement awaits Build 0.
 
+## ⚡ Screen result already in (fast-crash stop, Build 2) — READ THIS
+
+The Build-2 fast-crash stop was screened this session
+(`dev/backtest/fast-crash-stop-screen-2026-06-22/FINDINGS.md`, PR #1703):
+**it NEVER FIRED** (all `catastrophic_stop_pct` values byte-identical). WHY:
+`Fast_v` arms only with the *index below a falling MA*, which in 2020 wasn't true
+until ~mid-March — by then the structural gap-down `stop_loss` had already exited
+every long (Feb 28–Mar 13). **The binding constraint is arming LATENCY, not stop
+width** — and it's largely universe-independent (the arming keys off the ^GSPC MA).
+So the **real next lever is `Decline_character` arming SPEED**: add a default-off
+knob to arm `Fast_v` on **rate-of-decline ALONE** (drop the falling-MA precondition
+for the fast-V path), then re-screen on a broad PIT universe (top-500/1000 2019-2021,
+needs a snapshot rebuild). This redirects Build-2 follow-up away from
+`catastrophic_stop_pct` tuning. The faithful short (Build 3) is NOT yet screened.
+
 ## Next steps (priority order)
 
-### 1. SCREEN the two branches (read-only, screen-rigor) — the "does it work" payoff
+### 1. SCREEN the remaining branch (faithful short, Build 3) + the arming-speed variant
 Before any WF-CV. For each, run a backtest with the flag ON vs OFF over a window
 spanning 2020 (fast-V) AND 2000-02/2008 (slow bears), decompose by regime:
 - **Fast-crash stop (Build 2):** `catastrophic_stop_pct ∈ {0, 0.08, 0.10, 0.12}`.

@@ -33,3 +33,15 @@ on/off, regime-decomposed, screen-rigor) → WF-CV → promotion grid. Plan +
 exact next steps: `dev/notes/next-session-priorities-2026-06-22.md` +
 `dev/notes/decline-character-exploration-2026-06-21-PM.md`. Barbell `floor_weight` axis
 landed via #1697 (orchestrator) — P0.2 cert ready, weight choice is user-mandate.
+
+**Build-2 screen result (2026-06-22, `dev/backtest/fast-crash-stop-screen-2026-06-22/FINDINGS.md`,
+PR #1703):** the fast-crash stop **NEVER FIRED** — all `catastrophic_stop_pct ∈
+{0,.08,.10,.12}` byte-identical. WHY: `Fast_v` arms only with the index *below a
+falling MA* (+4wk drawdown), which in 2020 wasn't true until ~mid-March — by then the
+structural **gap-down `stop_loss` already exited every long** (Feb 28–Mar 13). **The
+binding constraint is arming LATENCY, not stop width.** Verdict = needs-different-test-design
+(not reject). Forward: the real lever is **`Decline_character` arming SPEED — arm `Fast_v`
+on rate-of-decline ALONE, drop the falling-MA precondition for the fast-V path** — NOT
+`catastrophic_stop_pct`. Also re-run on a broad PIT universe (survivors exit clean; the
+longs that ride to the bottom live in the broad tail). Caveat: 27-name survivor universe
+only saw -13.8% DD (not the motivating -38%).
