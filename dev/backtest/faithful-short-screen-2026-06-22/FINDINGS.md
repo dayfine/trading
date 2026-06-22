@@ -1,5 +1,21 @@
 # Faithful short (Build 3) — screen FINDINGS (2026-06-22)
 
+> **SUPERSEDED on the benefit question** by the deep re-screen
+> `dev/backtest/faithful-short-deep-screen-2026-06-22/FINDINGS.md` (2000-2010,
+> survivorship-correct 472-name PIT). The deep screen shows the short leg DOES
+> work in real bears (+148pp, lower DD), splits the two Build-3 flags
+> (`neutral_blocks_shorts` = keeper/promote-track; `slow_grind_gate` = taxes the
+> edge), and supplies the "keep half" this bull-only window could not.
+>
+> **Correction (2026-06-22):** the universe-coverage caveat below originally said
+> "309/510 names have committed bars" — that counted the wrong store
+> (`trading/test_data/`). The runner reads the gitignored repo-root `data/`,
+> which at run time held deep history for only **~25 mega-cap survivors**, so the
+> effective universe here was **25 mega-caps** (AAPL…XOM), not 309. This makes
+> the screen even *less* able to surface Stage-4 shorts (mega-caps rarely top out)
+> — which is exactly why only 5 shorts occurred. The verdict (NEEDS-DEEP-DATA) is
+> unchanged and strengthened.
+
 Read-only screen of the Build-3 mechanism (`Weinstein_strategy.config`
 `neutral_blocks_shorts` + `enable_slow_grind_short_gate`; merged #1696,
 both default-off). Question: does tightening shorts to confirmed bears
