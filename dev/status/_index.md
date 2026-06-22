@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-21 (orchestrator run 27906645873 [run 2]: merged 2 idle CI-green docs-only maintainer PRs per the pr-merge-gates.md docs-only carve-out — #1681 (4 stale status-header refreshes, track-pacer rec #5) + #1680 (weekly track-pacer report). Reconciled barbell-overlay → MERGED (gate-#2 deployable overlay #1683 landed default-off since run 1; status file had not been flipped). Barbell now has 2 [non-blocking] follow-ups (scenario-entrypoint wiring; floor_weight Variant_matrix axis) — surfaced as the top eligible-with-caveats GHA surface but NOT blind-dispatched: the axis follow-up entangles with the Weinstein_strategy.config-centric Overlay_validator + likely needs the wiring first, on the maintainer's actively-iterating flagship (collision-avoidance per gha-local-coordination.md). Every other feature track data-/human-/LOCAL-gated or parked. 0 open PRs after merges. Main CI GREEN on HEAD `8fea11a4`. Health CLEAN (status-integrity + index-size exit 0). 0 subagents.)
+Last updated: 2026-06-22 (orchestrator run 27925150093 [run 1]: full pass. Main GREEN on HEAD `8f4ff67f` (build-and-test + perf + both goldens SUCCESS); health CLEAN (status-integrity + index-size + no-python exit 0). Reconciled barbell-overlay: follow-up (a) scenario wiring MERGED (#1689) since run-2 — only follow-up (b) floor_weight axis remains. Surfaced the BLOCKER on maintainer LOCAL PR #1692 (decline-character Build 1): behaviorally APPROVED (self-review) but build-and-test RED on a REAL nesting_linter failure (3 functions in the new decline_character.ml) — NOT merged (3-gate rule), NOT dispatched (maintainer's active flagship, collision-avoidance); exact fix surfaced as the top Question. Recovered 5 orphaned run-3 records from the stuck/conflicted #1690 (dirty: stale _index+barbell edits) into today's branch + closed #1690 as superseded. Every feature track data-/human-/LOCAL-gated or parked. 0 subagents.)
 
 ## Active + complete tracks
 
@@ -18,7 +18,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
 | [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | snapshot-format-v2 S4 PROVEN (warehouses v2, top-3000 fits at cache<=1024); S5/v1-cleanup deferred (oversight); next: regime-diverse lenses on v2 (LOCAL) |
 | [rolling-start-lens](rolling-start-lens.md) | IN_PROGRESS | feat-backtest | — | t3k factor-lens matrix SHIPPED LOCAL (#1639 2000-26 H1 r=-0.744; #1642 2011-26 confirm); next: regime-gated deploy proxy validation (LOCAL/data-gated) |
-| [barbell-overlay](barbell-overlay.md) | MERGED | — | — | Gate-#2 overlay MERGED (#1683, default-off); 2 [non-blocking] follow-ups carry over (see status file): scenario-entrypoint wiring + floor_weight Variant_matrix axis |
+| [barbell-overlay](barbell-overlay.md) | MERGED | — | — | Gate-#2 overlay (#1683) + scenario wiring (#1689) MERGED default-off; 1 [non-blocking] follow-up remains: floor_weight Variant_matrix axis (entangles w/ Overlay_validator) |
 | [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | Win #4 production wiring MERGED (#1574, opt-in default-off); next: manual ghcr.io flambda rebuild + enable prune opt-in in sweeps |
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
