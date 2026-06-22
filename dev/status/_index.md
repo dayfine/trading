@@ -28,6 +28,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — |
 | [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | #1659 short-sleeve budget (default-off) MERGED; next: LOCAL sleeve-fraction screen → WF-CV → grid before default flip `[non-blocking]` |
+| [decline-character](decline-character.md) | IN_PROGRESS | feat-weinstein | feat/decline-character | Build 1 classifier (Slow_grind/Fast_v/Not_declining) READY_FOR_REVIEW; next: Build 0 A/D wiring, then Builds 2/3 (stop+short) |
 | [spy-only-reference](spy-only-reference.md) | IN_PROGRESS | feat-weinstein | — | WF-CV on sector-rotation testbed; top-1000 bankability gate; long-short verification (human session) |
 | [stage-accuracy](stage-accuracy.md) | IN_PROGRESS | feat-weinstein | — | force_exit_off grid REJECTED (#1503); cascade-selection inversion documented (#1509 merged); broad-universe WF-CV re-run data-gated |
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
