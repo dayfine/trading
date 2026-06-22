@@ -24,51 +24,6 @@ let held_symbols (portfolio : Portfolio_view.t) =
       | Entering _ | Holding _ | Exiting _ -> Some p.symbol
       | Closed _ -> None)
 
-(** Entry-price notional for a single [Holding] short position; 0.0 for all
-    other position types. Used by [_initial_short_notional] to fold over the
-    position map without introducing a deep nested match. *)
-let _short_holding_notional (pos : Position.t) =
-  match (pos.side, pos.state) with
-  | Trading_base.Types.Short, Position.Holding { quantity; entry_price; _ } ->
-      Float.abs quantity *. entry_price
-  | _ -> 0.0
-
-(** Sum entry-price-denominated short notional across all open [Holding] shorts.
-    Used to seed the per-Friday accumulator in [entries_from_candidates] before
-    the entry walk begins. Entry-price-denominated rather than current-price so
-    the cap measures committed-at-entry exposure. *)
-let _initial_short_notional (positions : Position.t Map.M(String).t) =
-  Map.fold positions ~init:0.0 ~f:(fun ~key:_ ~data:pos acc ->
-      acc +. _short_holding_notional pos)
-
-(** Entry-price-denominated absolute notional for a single [Holding] position
-    (long or short); 0.0 for all other states. P1 2026-05-15: companion to
-    [_short_holding_notional] for the sector-exposure cap, which counts long +
-    short exposure to the same sector toward the same bucket. *)
-let _holding_abs_notional (pos : Position.t) =
-  match pos.state with
-  | Position.Holding { quantity; entry_price; _ } ->
-      Float.abs quantity *. entry_price
-  | _ -> 0.0
-
-(** Build the per-sector exposure accumulator seeded with existing [Holding]
-    positions' entry-price-denominated absolute notional. Uses [sector_lookup]
-    to resolve each held symbol to its sector — same source the entry walk uses
-    for new candidates, so the seed and the per-tick bumps stay consistent. Held
-    symbols not in [sector_lookup] are bucketed under the empty string, which
-    the cap exempts (caller can ignore the bucket). *)
-let _initial_sector_exposures ~(positions : Position.t Map.M(String).t)
-    ~sector_lookup =
-  let acc = Hashtbl.create (module String) in
-  Map.iter positions ~f:(fun pos ->
-      let notional = _holding_abs_notional pos in
-      if Float.( > ) notional 0.0 then
-        let sector = sector_lookup pos.symbol |> Option.value ~default:"" in
-        Hashtbl.update acc sector ~f:(function
-          | None -> notional
-          | Some v -> v +. notional));
-  acc
-
 (* Bundle of per-Friday entry-walk accumulators + caps, seeded from
    [portfolio] and [config]. Factored out of [entries_from_candidates] to
    keep that function under the line cap; the accumulators are mutated
@@ -97,7 +52,9 @@ type _entry_walk_state = {
 let _make_entry_walk_state ~cash ~config ~portfolio ~portfolio_value
     ~sector_lookup =
   let short_notional_acc =
-    ref (_initial_short_notional portfolio.Portfolio_view.positions)
+    ref
+      (Screening_notional.initial_short_notional
+         portfolio.Portfolio_view.positions)
   in
   let short_notional_cap =
     portfolio_value *. config.portfolio_config.max_short_notional_fraction
@@ -106,8 +63,8 @@ let _make_entry_walk_state ~cash ~config ~portfolio ~portfolio_value
     match sector_lookup with
     | None -> Hashtbl.create (module String)
     | Some lookup ->
-        _initial_sector_exposures ~positions:portfolio.Portfolio_view.positions
-          ~sector_lookup:lookup
+        Screening_notional.initial_sector_exposures
+          ~positions:portfolio.Portfolio_view.positions ~sector_lookup:lookup
   in
   {
     remaining_cash = ref cash;
@@ -409,22 +366,51 @@ let _sector_lookup_of ~sector_map symbol =
   Hashtbl.find sector_map symbol
   |> Option.map ~f:(fun (ctx : Screener.sector_context) -> ctx.sector_name)
 
+(** Whether the current primary-index decline is a slow grind, for the faithful
+    short's [enable_slow_grind_short_gate]. Classified from the {b current}
+    cycle's macro result + index bars via {!Decline_character_wiring} — this is
+    lookahead-free for an entry gate (entries already gate on the current
+    [macro_trend]; the prior-cycle decline-character ref is the stops seam, not
+    the entry seam). Only consulted when the gate is enabled; returns [true]
+    otherwise so short admission stays bit-identical to the pre-gate behaviour
+    (the screener ignores the value when the gate is off). The classification
+    lives here, in the strategy lib (which depends on [weinstein.macro]), so the
+    screener lib stays macro-agnostic — it receives a plain bool. *)
+let _decline_is_slow_grind ~config ~macro_result ~index_view =
+  if not config.enable_slow_grind_short_gate then true
+  else
+    match
+      Decline_character_wiring.classify ~config:Decline_character.default_config
+        ~macro:macro_result ~index_view
+    with
+    | Decline_character.Slow_grind -> true
+    | Decline_character.Fast_v | Decline_character.Not_declining -> false
+
 (** Run the cascade screener over the Phase-2 [stocks], threading the top-level
-    [neutral_blocks_longs] entry-gate flag into the screener config so it is
-    expressible as a [Weinstein_strategy.config] flag axis. Default [false]
-    leaves the screener config untouched bit-equally. Factored out of
-    {!screen_universe} to keep that function under the 50-line linter cap. *)
-let _run_screener ?membership_at ~config ~macro_result ~sector_map ~stocks
-    ~portfolio ~last_stop_out_dates ~current_date () =
+    [neutral_blocks_longs] / [neutral_blocks_shorts] entry-gate flags and the
+    [enable_slow_grind_short_gate] decline-character gate into the screener
+    config so they are expressible as [Weinstein_strategy.config] flag axes.
+    Default [false] on all three leaves the screener config untouched
+    bit-equally. Factored out of {!screen_universe} to keep that function under
+    the 50-line linter cap. *)
+let _run_screener ?membership_at ~config ~(macro_result : Macro.result)
+    ~index_view ~sector_map ~stocks ~portfolio ~last_stop_out_dates
+    ~current_date () =
   let screening_config =
     {
       config.screening_config with
       Screener.neutral_blocks_longs = config.neutral_blocks_longs;
+      Screener.neutral_blocks_shorts = config.neutral_blocks_shorts;
+      Screener.enable_slow_grind_short_gate =
+        config.enable_slow_grind_short_gate;
     }
   in
-  Screener.screen_with_cooldown ?membership_at ~config:screening_config
-    ~macro_trend:macro_result.Macro.trend ~sector_map ~stocks
-    ~held_tickers:(held_symbols portfolio) ~as_of:current_date
+  let decline_is_slow_grind =
+    _decline_is_slow_grind ~config ~macro_result ~index_view
+  in
+  Screener.screen_with_cooldown ?membership_at ~decline_is_slow_grind
+    ~config:screening_config ~macro_trend:macro_result.Macro.trend ~sector_map
+    ~stocks ~held_tickers:(held_symbols portfolio) ~as_of:current_date
     ~last_stop_out_dates:(Hashtbl.to_alist last_stop_out_dates)
     ()
 
@@ -458,8 +444,8 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at ~config
   in
   _commit_prior_stages ~prior_stages classified;
   let screen_result =
-    _run_screener ?membership_at ~config ~macro_result ~sector_map ~stocks
-      ~portfolio ~last_stop_out_dates ~current_date ()
+    _run_screener ?membership_at ~config ~macro_result ~index_view ~sector_map
+      ~stocks ~portfolio ~last_stop_out_dates ~current_date ()
   in
   let combined_candidates =
     Short_side_gate.combine ~enable_short_side:config.enable_short_side

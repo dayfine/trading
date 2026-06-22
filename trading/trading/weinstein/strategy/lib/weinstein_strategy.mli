@@ -401,6 +401,26 @@ type config = {
           [screening_config.neutral_blocks_longs] at screen time so it is a
           [Variant_matrix] flag axis. See [Weinstein_strategy_config] for full
           semantics. *)
+  neutral_blocks_shorts : bool; [@sexp.default false]
+      (** Short-side mirror of {!neutral_blocks_longs} (default-off): when
+          [true], a macro-[Neutral] tape blocks new short entries (only
+          [Bearish] admits shorts). Default [false] preserves the historical
+          gate where both [Bearish] and [Neutral] admit shorts. Tightens the
+          short side to Weinstein's confirmed-bear rule; the Stage-4 breakdown
+          criteria and the macro gate are unaffected. Threaded into
+          [screening_config.neutral_blocks_shorts] at screen time so it is a
+          [Variant_matrix] flag axis. See [Weinstein_strategy_config] for full
+          semantics. *)
+  enable_slow_grind_short_gate : bool; [@sexp.default false]
+      (** Faithful-short decline-character gate (default-off): when [true],
+          shorts are admitted only when the current primary-index decline is a
+          [Decline_character.Slow_grind] (fast-V crashes and non-declines are
+          excluded). Default [false] is a no-op. The slow-grind bool is
+          classified at screen time from the current macro result + index bars
+          and threaded into
+          [Screener.screen_with_cooldown ~decline_is_slow_grind] (the screener
+          lib stays macro-agnostic). [Variant_matrix] flag axis. See
+          [Weinstein_strategy_config] for full semantics. *)
   enable_late_stage2_stop_tighten : bool; [@sexp.default false]
       (** Held-position risk dial (default-off): when [true], the
           {!Late_stage2_stop_runner} tightens the trailing stop of every held

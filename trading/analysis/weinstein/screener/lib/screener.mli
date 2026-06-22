@@ -175,6 +175,37 @@ type config = {
           diagnosis). Mirrored from the top-level
           [Weinstein_strategy.config.neutral_blocks_longs] field so the flag is
           a [Variant_matrix] axis. *)
+  neutral_blocks_shorts : bool; [@sexp.default false]
+      (** Short-side mirror of [neutral_blocks_longs]. When [true], a
+          macro-[Neutral] tape blocks new short candidates exactly as a
+          [Bullish] tape does — only [Bearish] admits shorts. Default [false]
+          preserves the historical gate bit-equally: shorts are admitted under
+          both [Bearish] and [Neutral], blocked only under [Bullish].
+
+          This *tightens* the short side to Weinstein's confirmed-bear rule
+          (weinstein-book-reference.md §Short-Selling Rules — "only short in a
+          confirmed bear market"): it removes the [Neutral] chop tape where
+          shorts are most likely to be squeezed (the 2020 V). The long-side gate
+          is unaffected by this flag.
+
+          Default-off short-side entry-gate axis. Mirrored from the top-level
+          [Weinstein_strategy.config.neutral_blocks_shorts] field so the flag is
+          a [Variant_matrix] axis. *)
+  enable_slow_grind_short_gate : bool; [@sexp.default false]
+      (** When [true], shorts are admitted only when the current index decline
+          is a slow grind — i.e. the caller-supplied [~decline_is_slow_grind]
+          (see {!screen_with_cooldown}) is [true]. When [false] (default) the
+          gate is a no-op and [~decline_is_slow_grind] is ignored entirely,
+          bit-identical to the prior behaviour.
+
+          Faithful short tightening (weinstein-book-reference.md §Short-Selling
+          Rules): Weinstein shorts a sustained distribution bear, not a fast
+          V-crash that snaps back. The slow-grind classification is computed by
+          the strategy lib (which owns the macro / decline-character analysis)
+          and passed in as a plain bool so this lib stays macro-agnostic — the
+          screener only [&&]s it into short admission. Default-off short-side
+          axis mirrored from
+          [Weinstein_strategy.config.enable_slow_grind_short_gate]. *)
   min_price : float; [@sexp.default 0.0]
       (** Minimum candidate price to admit — a liquidity floor. [0.0] (default)
           = no floor, bit-identical to pre-floor behaviour. A positive value
@@ -315,6 +346,7 @@ val screen :
 
 val screen_with_cooldown :
   ?membership_at:(string -> Core.Date.t -> bool) ->
+  ?decline_is_slow_grind:bool ->
   config:config ->
   macro_trend:Weinstein_types.market_trend ->
   sector_map:(string, sector_context) Core.Hashtbl.t ->
@@ -326,6 +358,16 @@ val screen_with_cooldown :
   result
 (** [screen_with_cooldown] is {!screen} with the per-symbol post-stop-out
     cooldown gate active and an optional point-in-time (PI) membership gate.
+
+    @param decline_is_slow_grind
+      Whether the current index decline is a slow grind (vs a fast V-crash or no
+      decline). Only consulted when [config.enable_slow_grind_short_gate] is
+      [true], in which case shorts are admitted only when this is [true].
+      Defaults to [true] so that when the gate is off — or the caller has no
+      decline-character information — short admission is bit-identical to the
+      pre-gate behaviour. The caller (the strategy lib) computes this via its
+      decline-character classifier; passing a plain bool keeps this lib
+      macro-agnostic.
 
     @param membership_at
       Optional point-in-time universe-membership predicate. When supplied, the
