@@ -92,18 +92,11 @@ type config = {
           where both [Bullish] and [Neutral] admit longs. Threaded into
           [screening_config.neutral_blocks_longs] at screen time. See [.mli]. *)
   neutral_blocks_shorts : bool; [@sexp.default false]
-      (** Short-side mirror of [neutral_blocks_longs]. When [true], a
-          macro-[Neutral] tape blocks new short entries (only [Bearish] admits
-          shorts); default [false] preserves the historical gate where both
-          [Bearish] and [Neutral] admit shorts. Threaded into
-          [screening_config.neutral_blocks_shorts] at screen time. See [.mli].
-      *)
+      (** Short-side mirror of [neutral_blocks_longs]; default [false] = prior
+          gate (both [Bearish] and [Neutral] admit shorts). See [.mli]. *)
   enable_slow_grind_short_gate : bool; [@sexp.default false]
-      (** When [true], shorts are admitted only when the current index decline
-          is a slow grind (skipping fast-V crashes). Default [false] is a no-op.
-          The slow-grind bool is classified at screen time via
-          [Decline_character] and threaded into [screening_config] +
-          [Screener.screen_with_cooldown ~decline_is_slow_grind]. See [.mli]. *)
+      (** Admit shorts only in a slow-grind decline; default [false] = no-op.
+          See [.mli]. *)
   enable_late_stage2_stop_tighten : bool; [@sexp.default false]
       (** Master switch for the late-Stage-2 stop-tighten runner; see [.mli]. *)
   late_stage2_stop_buffer_pct : float; [@sexp.default 0.0]
@@ -134,9 +127,10 @@ type config = {
 [@@deriving sexp]
 
 let default_config ~universe ~index_symbol =
+  let indices = { primary = index_symbol; global = [] } in
   {
     universe;
-    indices = { primary = index_symbol; global = [] };
+    indices;
     sector_etfs = [];
     stage_config = Stage.default_config;
     macro_config = Macro.default_config;

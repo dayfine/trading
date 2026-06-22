@@ -24,51 +24,6 @@ let held_symbols (portfolio : Portfolio_view.t) =
       | Entering _ | Holding _ | Exiting _ -> Some p.symbol
       | Closed _ -> None)
 
-(** Entry-price notional for a single [Holding] short position; 0.0 for all
-    other position types. Used by [_initial_short_notional] to fold over the
-    position map without introducing a deep nested match. *)
-let _short_holding_notional (pos : Position.t) =
-  match (pos.side, pos.state) with
-  | Trading_base.Types.Short, Position.Holding { quantity; entry_price; _ } ->
-      Float.abs quantity *. entry_price
-  | _ -> 0.0
-
-(** Sum entry-price-denominated short notional across all open [Holding] shorts.
-    Used to seed the per-Friday accumulator in [entries_from_candidates] before
-    the entry walk begins. Entry-price-denominated rather than current-price so
-    the cap measures committed-at-entry exposure. *)
-let _initial_short_notional (positions : Position.t Map.M(String).t) =
-  Map.fold positions ~init:0.0 ~f:(fun ~key:_ ~data:pos acc ->
-      acc +. _short_holding_notional pos)
-
-(** Entry-price-denominated absolute notional for a single [Holding] position
-    (long or short); 0.0 for all other states. P1 2026-05-15: companion to
-    [_short_holding_notional] for the sector-exposure cap, which counts long +
-    short exposure to the same sector toward the same bucket. *)
-let _holding_abs_notional (pos : Position.t) =
-  match pos.state with
-  | Position.Holding { quantity; entry_price; _ } ->
-      Float.abs quantity *. entry_price
-  | _ -> 0.0
-
-(** Build the per-sector exposure accumulator seeded with existing [Holding]
-    positions' entry-price-denominated absolute notional. Uses [sector_lookup]
-    to resolve each held symbol to its sector — same source the entry walk uses
-    for new candidates, so the seed and the per-tick bumps stay consistent. Held
-    symbols not in [sector_lookup] are bucketed under the empty string, which
-    the cap exempts (caller can ignore the bucket). *)
-let _initial_sector_exposures ~(positions : Position.t Map.M(String).t)
-    ~sector_lookup =
-  let acc = Hashtbl.create (module String) in
-  Map.iter positions ~f:(fun pos ->
-      let notional = _holding_abs_notional pos in
-      if Float.( > ) notional 0.0 then
-        let sector = sector_lookup pos.symbol |> Option.value ~default:"" in
-        Hashtbl.update acc sector ~f:(function
-          | None -> notional
-          | Some v -> v +. notional));
-  acc
-
 (* Bundle of per-Friday entry-walk accumulators + caps, seeded from
    [portfolio] and [config]. Factored out of [entries_from_candidates] to
    keep that function under the line cap; the accumulators are mutated
@@ -97,7 +52,9 @@ type _entry_walk_state = {
 let _make_entry_walk_state ~cash ~config ~portfolio ~portfolio_value
     ~sector_lookup =
   let short_notional_acc =
-    ref (_initial_short_notional portfolio.Portfolio_view.positions)
+    ref
+      (Screening_notional.initial_short_notional
+         portfolio.Portfolio_view.positions)
   in
   let short_notional_cap =
     portfolio_value *. config.portfolio_config.max_short_notional_fraction
@@ -106,8 +63,8 @@ let _make_entry_walk_state ~cash ~config ~portfolio ~portfolio_value
     match sector_lookup with
     | None -> Hashtbl.create (module String)
     | Some lookup ->
-        _initial_sector_exposures ~positions:portfolio.Portfolio_view.positions
-          ~sector_lookup:lookup
+        Screening_notional.initial_sector_exposures
+          ~positions:portfolio.Portfolio_view.positions ~sector_lookup:lookup
   in
   {
     remaining_cash = ref cash;
