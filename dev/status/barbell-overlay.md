@@ -82,10 +82,34 @@ NO
   produced, starts normalised at 1.0, and the 50/50 blend's terminal NAV lies
   between the two legs'. Verify:
   `dune runtest trading/backtest/barbell/scenario/`.
+- [x] **`floor_weight` searchable axis (R2 completion)** —
+  `feat/barbell-floor-weight-axis`. New pure module
+  `trading/trading/backtest/barbell/lib/barbell_floor_sweep.{ml,mli}`:
+  declares a floor-weight axis (a list of weights at a fixed rebalance cadence),
+  `cells` expands it into one ascending-ordered `Barbell_config` cell per weight
+  (each validated via `Barbell_config.validate`, raising loudly on a bad axis
+  like `Variant_matrix.expand`), and `metrics_table` evaluates each cell through
+  a blend thunk into a `(label, weight, metrics)` surface — the R2-completion
+  equivalent of a `Variant_matrix` axis scoped to `Barbell_config` (the canonical
+  axis machinery validates against `Weinstein_strategy.config`, which
+  `floor_weight` is not part of). A thin `barbell_floor_sweep_runner.exe`
+  (`scenario/bin/`) runs the two legs **once** via `Barbell_scenario.run` then
+  blends per weight (the legs are weight-independent), writing `floor_sweep.csv`.
+  Default-off preserved: enumerating weights flips no default; `0.0` stays a
+  valid no-op cell. **No core-module edits, no `Overlay_validator`/`Variant_matrix`
+  changes.** 7 pure unit tests (cell count/order, default-weight cell validity,
+  malformed-axis rejection, `metrics_table` row ordering via a stub thunk).
+  Verify: `dune runtest trading/backtest/barbell/test/`.
 
 ## Next Steps
-- [ ] Expose `barbell_floor_weight` as a `Variant_matrix` axis so 70/30 vs
-  neighbours stays searchable (R2 completion). `[non-blocking]`
+- [x] Expose `barbell_floor_weight` as a searchable axis so 70/30 vs neighbours
+  stays searchable (R2 completion). `feat/barbell-floor-weight-axis`. Built
+  Option 1 (self-contained barbell-local axis) per
+  `dev/plans/barbell-floor-weight-axis-2026-06-22.md` — the canonical
+  `Variant_matrix` cannot carry this field (it validates axis overrides against
+  `Weinstein_strategy.config` via `Overlay_validator`, and `floor_weight` lives
+  in a separate `Barbell_config.t`). Verify:
+  `dune runtest trading/backtest/barbell/test/`.
 
 ## Out of scope
 - Flipping any default on (promotion). Requires a confirmation-grid ACCEPT per
