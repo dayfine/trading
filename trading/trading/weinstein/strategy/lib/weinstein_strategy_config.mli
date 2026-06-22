@@ -156,6 +156,50 @@ type config = {
           through the [Neutral]/[Bullish] bear-rally blips, contributing to the
           false-breakout stop-out churn. Default-off until an experiment-ledger
           ACCEPT (per [.claude/rules/experiment-flag-discipline.md]). *)
+  neutral_blocks_shorts : bool; [@sexp.default false]
+      (** Short-side mirror of {!neutral_blocks_longs} (default-off). When
+          [true], a macro-[Neutral] tape blocks new short entries exactly as a
+          [Bullish] tape does — only a [Bearish] tape admits shorts. Default
+          [false] preserves the historical macro gate bit-equally (shorts
+          admitted under both [Bearish] and [Neutral], blocked only under
+          [Bullish]).
+
+          This *tightens* the short side to Weinstein's confirmed-bear rule
+          (weinstein-book-reference.md §Short-Selling Rules — short only in a
+          confirmed bear market) — a faithful exit/entry-aggressiveness dial,
+          not a spine change: the Stage-4-breakdown + negative-RS + weak-sector
+          \+ volume short criteria and the macro gate itself are unaffected. It
+          removes the [Neutral] chop tape (the 2020 V) where shorts are most
+          likely squeezed.
+
+          Wired by threading into [screening_config.neutral_blocks_shorts] at
+          screen time, so the flag is a single-component [Variant_matrix] flag
+          axis ([((flag neutral_blocks_shorts) (values (true false)))]).
+          Default-off until an experiment-ledger ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md]). *)
+  enable_slow_grind_short_gate : bool; [@sexp.default false]
+      (** Faithful-short decline-character gate (default-off). When [true],
+          shorts are admitted only when the current primary-index decline is a
+          slow grind ([Decline_character.Slow_grind]) — fast-V crashes and
+          non-declines are excluded. Default [false] is a no-op (bit-identical
+          to baseline; the decline classification is not even consumed).
+
+          Weinstein shorts a sustained distribution bear, not a fast V-crash
+          that snaps back (weinstein-book-reference.md §Short-Selling Rules).
+          The slow-grind bool is classified at screen time from the current
+          macro result + index bars via [Decline_character] /
+          [Decline_character_wiring] (which live in this lib, so
+          [weinstein.screener] stays macro-agnostic) and threaded into
+          [Screener.screen_with_cooldown ~decline_is_slow_grind] alongside
+          [screening_config.enable_slow_grind_short_gate]. The classification
+          uses the *current* cycle's macro + bars — lookahead-free for an entry
+          gate, since entries already gate on the current [macro_trend] (the
+          prior-cycle decline-character ref is for the stop, not entries).
+
+          Single-component [Variant_matrix] flag axis
+          ([((flag enable_slow_grind_short_gate) (values (true false)))]).
+          Default-off until an experiment-ledger ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md]). *)
   enable_late_stage2_stop_tighten : bool; [@sexp.default false]
       (** Held-position risk dial (default-off): when [true], the
           {!Late_stage2_stop_runner} tightens the trailing stop of every held

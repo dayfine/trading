@@ -650,6 +650,88 @@ let test_neutral_macro_produces_shorts _ =
   assert_bool "expected short candidate"
     (not (List.is_empty result.short_candidates))
 
+(* A Stage4 short candidate in a Weak sector — same setup as
+   {!test_neutral_macro_produces_shorts}, reused by the faithful-short gate
+   tests below. *)
+let short_setup () =
+  let bars = declining_bars_with_spike ~n:60 100.0 30.0 ~spike_idx:55 in
+  let prior = Some (Stage3 { weeks_topping = 8 }) in
+  let stocks = [ make_analysis "SHORT" prior bars ] in
+  let sector_map =
+    sector_map_of [ ("SHORT", make_sector ~rating:Weak "Energy") ]
+  in
+  (stocks, sector_map)
+
+let screen_short ?(decline_is_slow_grind = true) ~config ~macro_trend () =
+  let stocks, sector_map = short_setup () in
+  Screener.screen_with_cooldown ~decline_is_slow_grind ~config ~macro_trend
+    ~sector_map ~stocks ~held_tickers:[] ~as_of ~last_stop_out_dates:[] ()
+
+(* ------------------------------------------------------------------ *)
+(* neutral_blocks_shorts: Neutral tape blocks shorts when set          *)
+(* ------------------------------------------------------------------ *)
+
+(* Default ([neutral_blocks_shorts=false]) admits shorts in a Neutral tape. *)
+let test_neutral_blocks_shorts_default_admits _ =
+  let result = screen_short ~config:cfg ~macro_trend:Neutral () in
+  assert_that
+    (List.count result.short_candidates ~f:(fun _ -> true))
+    (equal_to 1)
+
+(* With the flag set, a Neutral tape produces zero shorts — symmetric to the
+   [neutral_blocks_longs] gate. *)
+let test_neutral_blocks_shorts_neutral_zero _ =
+  let gated_cfg = { cfg with neutral_blocks_shorts = true } in
+  let result = screen_short ~config:gated_cfg ~macro_trend:Neutral () in
+  assert_that
+    (List.count result.short_candidates ~f:(fun _ -> true))
+    (equal_to 0)
+
+(* The flag does not affect the Bearish tape — shorts still admitted. *)
+let test_neutral_blocks_shorts_bearish_unaffected _ =
+  let gated_cfg = { cfg with neutral_blocks_shorts = true } in
+  let result = screen_short ~config:gated_cfg ~macro_trend:Bearish () in
+  assert_that
+    (List.count result.short_candidates ~f:(fun _ -> true))
+    (equal_to 1)
+
+(* ------------------------------------------------------------------ *)
+(* enable_slow_grind_short_gate: gate short admission on slow-grind     *)
+(* ------------------------------------------------------------------ *)
+
+(* Gate off (default): [decline_is_slow_grind] is ignored — shorts admitted in
+   a Bearish tape even when the decline is not a slow grind. *)
+let test_slow_grind_gate_off_ignores_flag _ =
+  let result =
+    screen_short ~decline_is_slow_grind:false ~config:cfg ~macro_trend:Bearish
+      ()
+  in
+  assert_that
+    (List.count result.short_candidates ~f:(fun _ -> true))
+    (equal_to 1)
+
+(* Gate on + not a slow grind: zero shorts even in a Bearish tape. *)
+let test_slow_grind_gate_on_blocks_fast_v _ =
+  let gated_cfg = { cfg with enable_slow_grind_short_gate = true } in
+  let result =
+    screen_short ~decline_is_slow_grind:false ~config:gated_cfg
+      ~macro_trend:Bearish ()
+  in
+  assert_that
+    (List.count result.short_candidates ~f:(fun _ -> true))
+    (equal_to 0)
+
+(* Gate on + slow grind: shorts present in a Bearish tape. *)
+let test_slow_grind_gate_on_admits_slow_grind _ =
+  let gated_cfg = { cfg with enable_slow_grind_short_gate = true } in
+  let result =
+    screen_short ~decline_is_slow_grind:true ~config:gated_cfg
+      ~macro_trend:Bearish ()
+  in
+  assert_that
+    (List.count result.short_candidates ~f:(fun _ -> true))
+    (equal_to 1)
+
 (* ------------------------------------------------------------------ *)
 (* Short candidate fields: stop above entry                            *)
 (* ------------------------------------------------------------------ *)
@@ -1575,6 +1657,18 @@ let suite =
          >:: test_min_and_max_score_override_compose;
          "test_neutral_macro_produces_shorts"
          >:: test_neutral_macro_produces_shorts;
+         "test_neutral_blocks_shorts_default_admits"
+         >:: test_neutral_blocks_shorts_default_admits;
+         "test_neutral_blocks_shorts_neutral_zero"
+         >:: test_neutral_blocks_shorts_neutral_zero;
+         "test_neutral_blocks_shorts_bearish_unaffected"
+         >:: test_neutral_blocks_shorts_bearish_unaffected;
+         "test_slow_grind_gate_off_ignores_flag"
+         >:: test_slow_grind_gate_off_ignores_flag;
+         "test_slow_grind_gate_on_blocks_fast_v"
+         >:: test_slow_grind_gate_on_blocks_fast_v;
+         "test_slow_grind_gate_on_admits_slow_grind"
+         >:: test_slow_grind_gate_on_admits_slow_grind;
          "test_short_candidate_stop_above_entry"
          >:: test_short_candidate_stop_above_entry;
          "test_candidate_grade_matches_score"

@@ -409,22 +409,51 @@ let _sector_lookup_of ~sector_map symbol =
   Hashtbl.find sector_map symbol
   |> Option.map ~f:(fun (ctx : Screener.sector_context) -> ctx.sector_name)
 
+(** Whether the current primary-index decline is a slow grind, for the faithful
+    short's [enable_slow_grind_short_gate]. Classified from the {b current}
+    cycle's macro result + index bars via {!Decline_character_wiring} — this is
+    lookahead-free for an entry gate (entries already gate on the current
+    [macro_trend]; the prior-cycle decline-character ref is the stops seam, not
+    the entry seam). Only consulted when the gate is enabled; returns [true]
+    otherwise so short admission stays bit-identical to the pre-gate behaviour
+    (the screener ignores the value when the gate is off). The classification
+    lives here, in the strategy lib (which depends on [weinstein.macro]), so the
+    screener lib stays macro-agnostic — it receives a plain bool. *)
+let _decline_is_slow_grind ~config ~macro_result ~index_view =
+  if not config.enable_slow_grind_short_gate then true
+  else
+    match
+      Decline_character_wiring.classify ~config:Decline_character.default_config
+        ~macro:macro_result ~index_view
+    with
+    | Decline_character.Slow_grind -> true
+    | Decline_character.Fast_v | Decline_character.Not_declining -> false
+
 (** Run the cascade screener over the Phase-2 [stocks], threading the top-level
-    [neutral_blocks_longs] entry-gate flag into the screener config so it is
-    expressible as a [Weinstein_strategy.config] flag axis. Default [false]
-    leaves the screener config untouched bit-equally. Factored out of
-    {!screen_universe} to keep that function under the 50-line linter cap. *)
-let _run_screener ?membership_at ~config ~macro_result ~sector_map ~stocks
-    ~portfolio ~last_stop_out_dates ~current_date () =
+    [neutral_blocks_longs] / [neutral_blocks_shorts] entry-gate flags and the
+    [enable_slow_grind_short_gate] decline-character gate into the screener
+    config so they are expressible as [Weinstein_strategy.config] flag axes.
+    Default [false] on all three leaves the screener config untouched
+    bit-equally. Factored out of {!screen_universe} to keep that function under
+    the 50-line linter cap. *)
+let _run_screener ?membership_at ~config ~(macro_result : Macro.result)
+    ~index_view ~sector_map ~stocks ~portfolio ~last_stop_out_dates
+    ~current_date () =
   let screening_config =
     {
       config.screening_config with
       Screener.neutral_blocks_longs = config.neutral_blocks_longs;
+      Screener.neutral_blocks_shorts = config.neutral_blocks_shorts;
+      Screener.enable_slow_grind_short_gate =
+        config.enable_slow_grind_short_gate;
     }
   in
-  Screener.screen_with_cooldown ?membership_at ~config:screening_config
-    ~macro_trend:macro_result.Macro.trend ~sector_map ~stocks
-    ~held_tickers:(held_symbols portfolio) ~as_of:current_date
+  let decline_is_slow_grind =
+    _decline_is_slow_grind ~config ~macro_result ~index_view
+  in
+  Screener.screen_with_cooldown ?membership_at ~decline_is_slow_grind
+    ~config:screening_config ~macro_trend:macro_result.Macro.trend ~sector_map
+    ~stocks ~held_tickers:(held_symbols portfolio) ~as_of:current_date
     ~last_stop_out_dates:(Hashtbl.to_alist last_stop_out_dates)
     ()
 
@@ -458,8 +487,8 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at ~config
   in
   _commit_prior_stages ~prior_stages classified;
   let screen_result =
-    _run_screener ?membership_at ~config ~macro_result ~sector_map ~stocks
-      ~portfolio ~last_stop_out_dates ~current_date ()
+    _run_screener ?membership_at ~config ~macro_result ~index_view ~sector_map
+      ~stocks ~portfolio ~last_stop_out_dates ~current_date ()
   in
   let combined_candidates =
     Short_side_gate.combine ~enable_short_side:config.enable_short_side
