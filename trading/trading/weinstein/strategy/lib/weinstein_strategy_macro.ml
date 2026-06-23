@@ -7,8 +7,8 @@ open Weinstein_strategy_config
     Friday (including when the halt is active) so [_maybe_reset_halt] can
     consult the freshest macro trend even when the universe screen is gated off.
 *)
-let run_macro_only ~config ~ad_bars ~prior_macro ~prior_macro_result ~bar_reader
-    ~prior_stages ~current_date ~index_view =
+let run_macro_only ~config ~ad_series ~prior_macro ~prior_macro_result
+    ~bar_reader ~prior_stages ~current_date ~index_view =
   let index_prior_stage = Hashtbl.find prior_stages config.indices.primary in
   (* Phase F.3.d-2 caller migration: the global-index view assembly reads
      through {!Snapshot_runtime.Snapshot_callbacks} directly via the
@@ -23,13 +23,16 @@ let run_macro_only ~config ~ad_bars ~prior_macro ~prior_macro_result ~bar_reader
       ~global_index_symbols:config.indices.global ~cb ~as_of:current_date
   in
   let ma_cache = Bar_reader.ma_cache bar_reader in
-  let ad_bars =
-    Macro_inputs.ad_bars_at_or_before ~ad_bars ~as_of:current_date
-  in
+  (* The weekly A-D series is FIXED across the run; [ad_series] precomputes its
+     cumulative + momentum-MA scalars once, so this per-tick step is O(log n)
+     (binary search for the [current_date] cutoff) instead of the O(n) refold
+     the old [ad_bars_at_or_before] + [_build_cumulative_ad_array] path incurred.
+     Output is bit-identical (parity test: [Test_ad_series_cache]). *)
   let macro_callbacks =
-    Panel_callbacks.macro_callbacks_of_weekly_views ?ma_cache
+    Panel_callbacks.macro_callbacks_of_weekly_views_cached ?ma_cache
       ~index_symbol:config.indices.primary ~config:config.macro_config
-      ~index:index_view ~globals:global_index_views ~ad_bars ()
+      ~index:index_view ~globals:global_index_views ~ad_series
+      ~as_of:current_date ()
   in
   let macro_result =
     Macro.analyze_with_callbacks ~config:config.macro_config

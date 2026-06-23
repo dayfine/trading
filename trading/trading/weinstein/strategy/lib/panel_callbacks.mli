@@ -120,6 +120,25 @@ val macro_callbacks_of_weekly_views :
       0 only.
     - [global_index_stages] = each (name, view) -> Stage.callbacks. *)
 
+val macro_callbacks_of_weekly_views_cached :
+  ?ma_cache:Weekly_ma_cache.t ->
+  ?index_symbol:string ->
+  config:Macro.config ->
+  index:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
+  globals:(string * Snapshot_runtime.Snapshot_bar_views.weekly_view) list ->
+  ad_series:Ad_series_cache.t ->
+  as_of:Core.Date.t ->
+  unit ->
+  Macro.callbacks
+(** [macro_callbacks_of_weekly_views_cached ~ad_series ~as_of …] is the hot-path
+    twin of {!macro_callbacks_of_weekly_views}. It produces a bit-identical
+    {!Macro.callbacks} bundle but sources [get_cumulative_ad] /
+    [get_ad_momentum_ma] from a precomputed {!Ad_series_cache.t} sliced to
+    [as_of], avoiding the per-tick rebuild of the cumulative-A-D array and
+    momentum-MA scalar (the O(n²) A-D-live macro cost). The [index_stage],
+    [get_index_close] and [global_index_stages] are constructed identically to
+    {!macro_callbacks_of_weekly_views}. *)
+
 val support_floor_callbacks_of_daily_view :
   Snapshot_runtime.Snapshot_bar_views.daily_view -> Weinstein_stops.callbacks
 (** [support_floor_callbacks_of_daily_view view] builds a
