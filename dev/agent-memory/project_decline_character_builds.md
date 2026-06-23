@@ -89,6 +89,33 @@ MATTERS:
 **Runner reads gitignored repo-root `data/`** (NOT trading/test_data) — default_data_dir, override via
 TRADING_DATA_DIR. data/ had only ~25 deep mega-caps before this fetch (why the shallow screen was so thin).
 
-**Still open:** Build-2 arming-speed re-screen (needs the same deep data — now present in data/, ready to
-run a fast-crash-stop deep screen). neutral_blocks_shorts → WF-CV. A/D Build 0 needs oversight. Barbell
-70/30 cleared its grid ([[project_barbell_on_stocks]]).
+**FULL VALIDATION ARC (2026-06-22 deep run, 11 PRs #1707-1717, master deep-data fetch 1998-2026
+731 names into gitignored data/):**
+- **neutral_blocks_shorts**: WF-CV cell-1 (2000-2026 all-regime) ACCEPT (helpful-or-inert, 25/26 folds,
+  won 2003 squeeze); confirmation-grid cell-2 (2010-2026 bull) DISAGREED (flat-to-fractionally-worse) →
+  **NO EDGE flip** (regime-dependent). BUT user raised a faithfulness/asymmetry basis: sidelining shorts
+  in a Neutral tape is an acceptable conservative default (forgoing a Neutral short costs a thin opportunity;
+  a squeezed short costs real money — favourable tail at flat mean) + it's strictly more Weinstein-faithful
+  (short only confirmed bears). So a **default-on flip is on the table as a MANDATE call (faithfulness, not
+  edge)** — PENDING user go. Ledgers: 2026-06-22-neutral-blocks-shorts-{wfcv,grid}.
+- **fast_v_arm_on_rate_alone (#1708)**: WF-CV weak ACCEPT (frontier-dominant but small; WINS fast-V crashes
+  2020/2018-Q4, WHIPSAWS choppy chop 2010/2011, INERT in the 2008 slow cascade — confirms Fast_v is
+  crash-specific, not a slow-bear tool). Exposed fast_v_min_rate_pct as an axis (#1716, full 3-gate).
+  Threshold SURFACE {0.08,0.12,0.16} → REJECT tuning: 0.08 optimal; raising it suppresses the whipsaw BUT
+  kills the catch (2020 reverts to gap-down) — catch & whipsaw ride the SAME 4-week rate, no threshold
+  separates them. Ledgers: 2026-06-22-arming-speed-wfcv + fast-v-min-rate-surface.
+- **slow_grind_gate**: deep-screen REJECT-leaning (taxes the short tail; A-D-inert over-restricts).
+
+**THE UNLOCK = BUILD 0 (A-D breadth wiring, Ad_bars.load → pipeline.ml:103).** Two independent pieces of
+this session's evidence point to it: (a) slow_grind over-restricts because its A-D leg is inert; (b)
+arming-speed can't separate the 2020 catch from the 2010/2011 whipsaw with rate alone — the A-D-LEAD is
+the signal that distinguishes crash-that-keeps-falling from dip-that-recovers. Build 0 is behavior-changing
+(re-pins goldens) → attended. After it: re-run slow_grind screen + arming-speed WF-CV. This is the P0 next
+lever. Handoff: next-session-priorities-2026-06-22-EOD.md. Barbell 70/30 grid-passed ([[project_barbell_on_stocks]]).
+
+**KEY meta-pattern (both short/crash mechanisms): faithful tail-management tools with narrow regime-specific
+niches and small/regime-dependent aggregate edges — NOT robust standalone alpha.** Consistent with
+[[project_edge_is_the_fat_tail]] (the edge is the long fat tail; these are insurance/hygiene layers) +
+[[project_factor_lens_regime_governs_edge]] (the short leg's value is regime-governed). The disciplined
+outcome: keep them as faithful default-off axes; the one promotable-by-mandate exception is
+neutral_blocks_shorts on faithfulness grounds.
