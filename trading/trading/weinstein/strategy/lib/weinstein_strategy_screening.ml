@@ -382,6 +382,7 @@ let _decline_is_slow_grind ~config ~macro_result ~index_view =
     let classifier_config =
       Decline_character_wiring.classifier_config
         ~fast_v_arm_on_rate_alone:config.fast_v_arm_on_rate_alone
+        ~fast_v_min_rate_pct:config.fast_v_min_rate_pct
     in
     match
       Decline_character_wiring.classify ~config:classifier_config

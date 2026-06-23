@@ -233,6 +233,29 @@ type config = {
           ([((flag fast_v_arm_on_rate_alone) (values (true false)))]).
           Default-off until an experiment-ledger ACCEPT (per
           [.claude/rules/experiment-flag-discipline.md]). *)
+  fast_v_min_rate_pct : float; [@sexp.default 0.08]
+      (** Fast-V arming rate threshold: the minimum trailing rate-of-decline
+          drawdown (positive fraction over [rate_lookback_weeks]) at which the
+          primary index is classified [Decline_character.Fast_v]. Threaded into
+          [Decline_character.fast_v_min_rate_pct] at the two classify sites via
+          {!Decline_character_wiring.classifier_config}. Default [0.08] equals
+          [Decline_character.default_config.fast_v_min_rate_pct], so it is a
+          no-op (bit-identical classification to the pre-flag behaviour).
+
+          Whipsaw-suppression dial: in choppy corrections (e.g. 2010/2011) the
+          [fast_v_arm_on_rate_alone] path arms the fast-crash absolute stop on
+          rate alone, and a low rate threshold lets shallow rallies-into-decline
+          re-arm/dis-arm repeatedly. Raising the threshold (e.g. to 0.16)
+          requires a steeper drawdown before [Fast_v] is declared, suppressing
+          that whipsaw — at the cost of arming later in a genuine crash. A
+          higher value never widens the [Fast_v] band, so the spine is untouched
+          (it changes only when the tail-RISK-insurance stop arms, never a
+          buy/sell rule — see [.claude/rules/weinstein-faithful-core.md]).
+
+          Single-component [Variant_matrix] float axis (e.g.
+          [((flag fast_v_min_rate_pct) (values (0.08 0.12 0.16)))]). Default
+          no-op until an experiment-ledger ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md]). *)
   enable_late_stage2_stop_tighten : bool; [@sexp.default false]
       (** Held-position risk dial (default-off): when [true], the
           {!Late_stage2_stop_runner} tightens the trailing stop of every held

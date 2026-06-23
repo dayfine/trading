@@ -12,14 +12,19 @@
     (A2): they receive a plain [~armed:bool], not a {!Decline_character.t}. *)
 
 val classifier_config :
-  fast_v_arm_on_rate_alone:bool -> Decline_character.config
-(** [classifier_config ~fast_v_arm_on_rate_alone] is
+  fast_v_arm_on_rate_alone:bool ->
+  fast_v_min_rate_pct:float ->
+  Decline_character.config
+(** [classifier_config ~fast_v_arm_on_rate_alone ~fast_v_min_rate_pct] is
     [Decline_character.default_config] with [fast_v_ignores_ma_filter] set from
-    the strategy-level [fast_v_arm_on_rate_alone] flag — a single source of the
+    the strategy-level [fast_v_arm_on_rate_alone] flag and [fast_v_min_rate_pct]
+    set from the strategy-level field of the same name — a single source of the
     classifier config so both classify sites (the stop-arming {!update_ref} and
     the slow-grind-gate screen-time classify) stay consistent. With
-    [fast_v_arm_on_rate_alone = false] it reproduces [default_config] exactly
-    (bit-identical to the pre-flag behaviour). *)
+    [fast_v_arm_on_rate_alone = false] and
+    [fast_v_min_rate_pct = Decline_character.default_config.fast_v_min_rate_pct]
+    (0.08) it reproduces [default_config] exactly (bit-identical to the pre-flag
+    behaviour). *)
 
 val classify :
   config:Decline_character.config ->
@@ -37,18 +42,21 @@ val classify :
 
 val update_ref :
   fast_v_arm_on_rate_alone:bool ->
+  fast_v_min_rate_pct:float ->
   prior_decline_character:Decline_character.t ref ->
   macro_result_opt:Macro.result option ->
   index_view:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
   unit
-(** [update_ref ~fast_v_arm_on_rate_alone ~prior_decline_character
-     ~macro_result_opt ~index_view] stores a fresh {!classify} of the index into
-    [prior_decline_character] when [macro_result_opt] is [Some] (a screening
-    day) — using {!classifier_config} built from the strategy-level
-    [fast_v_arm_on_rate_alone] arming-speed flag (default [false] reproduces
-    {!Decline_character.default_config} exactly). On a non-screening day
-    ([None]) it is a no-op, so the ref retains the last classification: the
+(** [update_ref ~fast_v_arm_on_rate_alone ~fast_v_min_rate_pct
+     ~prior_decline_character ~macro_result_opt ~index_view] stores a fresh
+    {!classify} of the index into [prior_decline_character] when
+    [macro_result_opt] is [Some] (a screening day) — using {!classifier_config}
+    built from the strategy-level [fast_v_arm_on_rate_alone] arming-speed flag
+    and [fast_v_min_rate_pct] arming rate threshold (defaults [false] / 0.08
+    reproduce {!Decline_character.default_config} exactly). On a non-screening
+    day ([None]) it is a no-op, so the ref retains the last classification: the
     strategy's stops pass reads it on the NEXT tick (strictly prior, no
     lookahead — the Build 2 fast-crash absolute-stop arming seam). The
     searchable mechanism flag is [stops_config.catastrophic_stop_pct]; the
-    arming-speed flag is [fast_v_arm_on_rate_alone]. *)
+    arming-speed flag is [fast_v_arm_on_rate_alone]; the arming rate threshold
+    is [fast_v_min_rate_pct]. *)
