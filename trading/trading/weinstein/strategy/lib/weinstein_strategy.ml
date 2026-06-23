@@ -406,44 +406,6 @@ let _on_market_close ~fold_start_date ~config ~ad_series ~stop_states
         ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price ~portfolio
         ~current_date
 
-let _init_strategy_state ~initial_stop_states ~ad_bars =
-  let stop_states = ref initial_stop_states in
-  let last_stop_out_dates : Date.t Hashtbl.M(String).t =
-    Hashtbl.create (module String)
-  in
-  let prior_macro = ref Weinstein_types.Neutral in
-  let peak_tracker = Portfolio_risk.Force_liquidation.Peak_tracker.create () in
-  let prior_macro_result : Macro.result option ref = ref None in
-  (* Most recent index decline-character; updated at the macro step, read
-     strictly-prior by the next tick's stops pass to arm the fast-crash stop. *)
-  let prior_decline_character = ref Decline_character.Not_declining in
-  let prior_stages = Hashtbl.create (module String) in
-  let prior_stage_ma_values : float Hashtbl.M(String).t =
-    Hashtbl.create (module String)
-  in
-  let sector_prior_stages : Weinstein_types.stage Hashtbl.M(String).t =
-    Hashtbl.create (module String)
-  in
-  let stage3_streaks : int Hashtbl.M(String).t =
-    Hashtbl.create (module String)
-  in
-  let laggard_streaks : int Hashtbl.M(String).t =
-    Hashtbl.create (module String)
-  in
-  let weekly_ad_bars = Ad_bars_aggregation.daily_to_weekly ad_bars in
-  ( stop_states,
-    last_stop_out_dates,
-    prior_macro,
-    peak_tracker,
-    prior_macro_result,
-    prior_decline_character,
-    prior_stages,
-    prior_stage_ma_values,
-    sector_prior_stages,
-    stage3_streaks,
-    laggard_streaks,
-    weekly_ad_bars )
-
 let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
     ?(ticker_sectors = Hashtbl.create (module String)) ?bar_reader
     ?(audit_recorder = Audit_recorder.noop) ?fold_start_date config =
@@ -462,7 +424,7 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
         stage3_streaks,
         laggard_streaks,
         weekly_ad_bars ) =
-    _init_strategy_state ~initial_stop_states ~ad_bars
+    Weinstein_strategy_state.init ~initial_stop_states ~ad_bars
   in
   (* Precompute the A-D cumulative + momentum series ONCE; the weekly A-D bars
      are fixed for the whole run, so per-tick macro work reads from this cache
