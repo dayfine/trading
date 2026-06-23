@@ -432,6 +432,18 @@ type config = {
           The {b spine} is untouched — it changes no buy/sell rule, only when
           the tail-RISK-insurance absolute stop arms. [Variant_matrix] flag
           axis. See [Weinstein_strategy_config] for full semantics. *)
+  fast_v_min_rate_pct : float; [@sexp.default 0.08]
+      (** Fast-V arming rate threshold (whipsaw-suppression dial): the minimum
+          trailing rate-of-decline drawdown at which the primary index is
+          classified [Decline_character.Fast_v]. Default [0.08] equals
+          [Decline_character.default_config.fast_v_min_rate_pct] — a no-op
+          (bit-identical classification). Raising it (e.g. to 0.16) requires a
+          steeper drawdown before [Fast_v] arms, suppressing the rate-alone
+          re-arm whipsaw in choppy corrections. Threaded into
+          [Decline_character.fast_v_min_rate_pct] at both classify sites. The
+          {b spine} is untouched — it changes only when the tail-RISK-insurance
+          absolute stop arms. [Variant_matrix] float axis. See
+          [Weinstein_strategy_config] for full semantics. *)
   enable_late_stage2_stop_tighten : bool; [@sexp.default false]
       (** Held-position risk dial (default-off): when [true], the
           {!Late_stage2_stop_runner} tightens the trailing stop of every held
