@@ -167,9 +167,13 @@ let test_six_year_full_lifecycle _ =
      - max drawdown 54% (down from 95% pre-G15-step-3) reflects the
        smaller per-entry exposure capping the underlying short-side
        drawdown amplitude. *)
+  (* A-D-live default flip (2026-06-23, PR #1725): the synthetic breadth tail
+     makes the macro gate live for 2020-2023, admitting one fewer entry in this
+     2018-2023 window (29/26, 26 round-trips, 4W/22L vs 30/27, 27, 5W/22L).
+     Same 7-symbol set; final value and max-DD still inside their bands. *)
   assert_that (List.length result.steps) (equal_to 2187);
-  assert_that n_buys (equal_to 30);
-  assert_that n_sells (equal_to 27);
+  assert_that n_buys (equal_to 29);
+  assert_that n_sells (equal_to 26);
   assert_that symbols
     (elements_are
        [
@@ -181,12 +185,12 @@ let test_six_year_full_lifecycle _ =
          equal_to "KO";
          equal_to "MSFT";
        ]);
-  assert_that (List.length round_trips) (equal_to 27);
+  assert_that (List.length round_trips) (equal_to 26);
   assert_that stats
     (is_some_and
        (all_of
           [
-            field (fun s -> s.Metrics.win_count) (equal_to 5);
+            field (fun s -> s.Metrics.win_count) (equal_to 4);
             field (fun s -> s.Metrics.loss_count) (equal_to 22);
           ]));
   (* G15 step 3 (2026-05-01): final value $485,285.88; pin ±$3K. *)

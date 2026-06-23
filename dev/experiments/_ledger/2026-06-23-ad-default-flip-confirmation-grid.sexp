@@ -1,0 +1,21 @@
+((date 2026-06-23)
+ (slug ad-default-flip-confirmation-grid)
+ (hypothesis
+  "Making A-D-live the DEFAULT basis (skip_ad_breadth=false with synthetic breadth covering the full 1998-2026 window) improves the risk-adjusted profile of the real long-short strategy, and the improvement GENERALIZES across regimes and universes (not a single-window artifact of the 27y FINDINGS scenario).")
+ (base_scenario "GRID: sp500-2000 1999-2026 (deep dot-com+GFC+COVID) + sp500-2010 2010-2026 (post-GFC bull+COVID) + sp500-2015 2015-2026 (recent, diff universe)")
+ (window_id grid-3cell-period-x-universe-longshort-adlive-vs-adinert)
+ (baseline_label adinert)
+ (variants
+  (((label adlive-cell1-deep-1999-2026)
+    (config_hash adlive-sp500-2000-1999-2026)
+    (aggregate ((sharpe_mean 0.933) (sortino_mean 1.583) (calmar_mean 0.528) (maxdd_mean 25.6) (ulcer_mean 8.80) (return_mean 3077.4) (vs_inert better-all-risk-metrics))))
+   ((label adlive-cell2-postgfc-2010-2026)
+    (config_hash adlive-sp500-2010-2010-2026)
+    (aggregate ((sharpe_mean 0.594) (sortino_mean 0.919) (calmar_mean 0.233) (maxdd_mean 29.3) (ulcer_mean 11.30) (return_mean 193.7) (vs_inert better-all-risk-metrics))))
+   ((label adlive-cell3-recent-2015-2026)
+    (config_hash adlive-sp500-2015-2015-2026)
+    (aggregate ((sharpe_mean 0.461) (sortino_mean 0.664) (calmar_mean 0.169) (maxdd_mean 27.2) (ulcer_mean 11.68) (return_mean 66.2) (vs_inert better-return-sharpe-sortino-calmar-minor-worse-maxdd))))))
+ (verdict Accept)
+ (notes
+  "PROMOTE. A-D-live beats A-D-inert risk-adjusted in 3/3 longshort grid cells, none badly dominated -> passes promotion-confirmation.md. inert numbers: cell1 Sharpe 0.884/Sortino 1.481/Calmar 0.509/MaxDD 27.3/Ulcer 9.71/ret 3408.6; cell2 Sharpe 0.573/Sortino 0.879/Calmar 0.218/MaxDD 33.3/Ulcer 12.98/ret 212.9; cell3 Sharpe 0.231/Sortino 0.275/Calmar 0.082/MaxDD 25.6/Ulcer 11.43/ret 26.4. Cells 1&2: live wins EVERY risk metric (~10%/9% return cost = more conservative gate). Cell3: live wins return 2.5x + Sharpe 2x + Sortino/Calmar, only +1.6pp MaxDD worse (not badly dominated). Generalizes across deep/post-GFC/recent regimes + sp500-2000/2010/2015 universes. CAVEAT: a 5y LONG-ONLY default-config spot-check (goldens-sp500/sp500-2019-2023) was risk-WORSE (MaxDD 21.6->31.3, Calmar 0.46->0.26) -- A-D breadth's edge is SHORT-TIMING, which long-only can't exploit; that is NOT a grid cell and does not block the longshort promotion, but the global default flip does make long-only fixtures more conservative (re-pinned honestly). Mechanism corrected: skip_ad_breadth already defaulted false; the flip = commit synthetic post-2020 breadth tail into test_data/breadth + re-pin ~22 post-2020 goldens. Non-blocking for required CI (all perf-tier:1 scenarios end <=2020-01-03, inside Unicorn coverage). Grid + decision: dev/backtest/ad-grid-2026-06-23/STATUS.md. Built on the P0a perf fix (#1722).")
+ )
