@@ -36,6 +36,10 @@ open Core
 module Ad_bars = Ad_bars
 (** NYSE advance/decline breadth data loader. See {!Ad_bars}. *)
 
+module Ad_series_cache = Ad_series_cache
+(** Precomputed cumulative-A-D + momentum series for the per-tick macro path.
+    See {!Ad_series_cache}. *)
+
 module Bar_reader = Bar_reader
 (** Panel-backed bar source. See {!Bar_reader}. *)
 

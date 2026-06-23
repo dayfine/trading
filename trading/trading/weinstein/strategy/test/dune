@@ -1,5 +1,6 @@
 (tests
  (names
+  test_ad_series_cache
   test_ad_bars_unicorn
   test_ad_bars_compose
   test_ad_bars_weekly_e2e

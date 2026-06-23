@@ -7,7 +7,7 @@ open Core
 
 val run_macro_only :
   config:Weinstein_strategy_config.config ->
-  ad_bars:Macro.ad_bar list ->
+  ad_series:Ad_series_cache.t ->
   prior_macro:Weinstein_types.market_trend ref ->
   prior_macro_result:Macro.result option ref ->
   bar_reader:Bar_reader.t ->
