@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-22 (orchestrator run 27981173694 [run 5]: FULL PASS, 0 subagents dispatched. All orchestrator-dispatchable work drained or gated. Since run 4 the maintainer landed #1708 (Build 2b fast_v_arm_on_rate_alone knob, default-off) + screen-fixture docs (#1703/#1704/#1707) — all maintainer-LOCAL, not orchestrator drift. Reconciled the decline-character row (#1703 merged → no open PR; Build 2b #1708 added). Health CLEAN (status-integrity + index-size + no-python exit 0); main CI GREEN on HEAD `19696021` (build-and-test + perf-tier1-smoke + both goldens SUCCESS); 0 open ci-red issues. harness/cleanup backlogs drained; data-gaps unchanged. Open PRs both maintainer-authored: #1706 (weekly deep health scan, docs-only) + #1698 (opam-weekly), both CI-green, normal review flow.)
+Last updated: 2026-06-23 (orchestrator run 28004851562 [run 1]: FULL PASS, 0 subagents dispatched. No orchestrator-dispatchable work — harness backlog (T2 milestone-gated, T3 superseded/gated, T4 human-only, lone `[~]` ci.yml ENOSPC workflow-PAT-blocked) + cleanup backlog both drained; ops-data EODHD-absent + data-gaps unchanged → sentinel skip; every feature track data-/human-/LOCAL-/attended-gated. Maintainer drove decline-character A-D work LOCAL since run 5: landed #1712–#1721 (Build 0 A-D payoff #1719, fast_v_min_rate_pct axis #1716, slow_grind WF-CV NO-promote #1720, A-D-default flip teed up #1721); reconciled the decline-character row. Health CLEAN (status-integrity + index-size + no-python exit 0); main CI GREEN on HEAD `813b047b` (build-and-test + perf-tier1-smoke + both goldens SUCCESS); 0 open ci-red issues. 3 open PRs all maintainer-authored: #1722 (A-D macro perf), #1706 (weekly deep health scan, docs-only), #1698 (opam-weekly).)
 
 ## Active + complete tracks
 
@@ -28,7 +28,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — |
 | [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | #1659 short-sleeve budget (default-off) MERGED; next: LOCAL sleeve-fraction screen → WF-CV → grid before default flip `[non-blocking]` |
-| [decline-character](decline-character.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | Builds 1-3 + 2b knob (#1692/#1695/#1696/#1708) MERGED default-off; next: Build 0 A/D wiring (attended) + read-only screens (LOCAL) |
+| [decline-character](decline-character.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | #1722 | Builds 1-3+2b+axis MERGED default-off; Build 0 A-D payoff (#1719); A-D-default flip teed up (#1721) gated on perf #1722; screens LOCAL |
 | [spy-only-reference](spy-only-reference.md) | IN_PROGRESS | feat-weinstein | — | WF-CV on sector-rotation testbed; top-1000 bankability gate; long-short verification (human session) |
 | [stage-accuracy](stage-accuracy.md) | IN_PROGRESS | feat-weinstein | — | force_exit_off grid REJECTED (#1503); cascade-selection inversion documented (#1509 merged); broad-universe WF-CV re-run data-gated |
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
