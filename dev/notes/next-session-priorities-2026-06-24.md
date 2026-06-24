@@ -36,15 +36,20 @@ test_data-CSV vs 95% on the complete warehouse). NOT an A-D-live effect; pre-exi
 **Decision C (recorded, #1731):** GHA does NOT host the 2 GB warehouse; broad goldens
 stay **local-only** (already fail-on-missing in GHA = intentional signal) and are
 **rebuildable locally** via existing tooling. Full design + rebuild recipe:
-`dev/plans/broad-golden-complete-data-2026-06-24.md`. Remaining sub-tasks (both
-dispatchable, NOT interactive):
-1. **Re-pin runnable cells (top-1000/500) to warehouse complete-universe numbers**
-   (decade ≈ 95%). Recipe: `scenario_runner --snapshot-dir /tmp/snap_top3000_1998_2026
-   --no-emit-all-eligible`. ⚠ Warehouse is ephemeral `/tmp` (2 GB) — if lost, rebuild
-   via `build_broad_snapshot_incremental.sh` (needs top-3000 EODHD fetch first).
-2. **Top-3000 cells** (`tier4-broad-10y`, `weinstein-full-pool`) — blocked on the
-   snapshot memory crash (`project_panel_runner_memory_ceiling`; fork-per-cell /
-   `SNAPSHOT_CACHE_MB`). Separate engineering fix.
+`dev/plans/broad-golden-complete-data-2026-06-24.md`. Remaining sub-tasks:
+1. ~~**Re-pin runnable cells (top-1000/500) to warehouse complete-universe numbers**~~
+   **DONE — PR #1733 MERGED (2026-06-24).** Re-pinned 5 cells against
+   `/tmp/snap_top3000_1998_2026` (full universe loaded, verified bit-exact by
+   qc-behavioral): decade-2014-2023 95.28% (was 105–158), six-year-2018-2023
+   **19.45%** (was 71–106 — biggest survivorship correction), bull-crash-2015-2020
+   37.91% (was 49–74), covid-recovery-2020-2024 35.31% (≈ prior), weinstein-2019-top-500
+   72.77% (≈ prior). Bands centered on measured point ± file's tolerance scheme.
+   These stay GHA-fail-on-missing by design (decision C). 3-gate green.
+2. **Top-3000 cells** (`tier4-broad-1y/10y`, `sp500-30y-capacity-1996`,
+   `weinstein-full-pool`) — STILL BLOCKED on the snapshot memory crash
+   (`project_panel_runner_memory_ceiling`; fork-per-cell / `SNAPSHOT_CACHE_MB`).
+   Separate engineering fix; they carry permissive scaffolding ranges so are not
+   asserting false truth in the meantime.
 
 The merged flip (#1725) is sound (grid ran vs complete data/; sp500/small re-pins
 consistent-source). This is cleanup, not a flip correction.
