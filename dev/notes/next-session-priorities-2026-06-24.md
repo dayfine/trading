@@ -23,18 +23,31 @@ confirmation-grid ACCEPT, and the flip PR is up.
     + engine test `test_weinstein_backtest` (6y: 30/27→29/26).
   - Full record: `dev/backtest/ad-grid-2026-06-23/STATUS.md`, memory `project_ad_default_flip`.
 
-## P0 next session — finish/merge PR #1725
-1. **Confirm CI green + merge** #1725 (was red on `test_weinstein_backtest`; re-pinned
-   + pushed a61470b3). If CI surfaces another breadth-coupled code test, re-pin it the
-   same way (run vs `TRADING_DATA_DIR=test_data`, `--no-emit-all-eligible` for speed,
-   capture actuals, ±15% bands / exact pins). It touches a `.ml` test → run qc-structural.
-2. **Deferred: heavy-tier golden re-pin (snapshot mode).** The top-1000/3000
-   `goldens-broad/*` (6), `goldens-custom-universe-scenarios/*` (2), `perf-sweep/bull-3y`,
-   `goldens-broad/sp500-30y-capacity-1996` also shift but **OOM/crawl in CSV mode** —
-   they need a snapshot-mode re-pin. Mostly perf-tier:4 (local-release-gate, non-blocking)
-   + perf-tier:3 custom-universe. Build snapshots for those universes, run, re-pin.
-   The `all_eligible` diagnostic is the per-scenario time sink — always pass
-   `--no-emit-all-eligible` for re-pin runs.
+**UPDATE 2026-06-24 (later this same session):** #1725 MERGED; the "heavy-tier
+re-pin" was investigated to root cause and turned into a tracked decision — see P0
+below. P1/P2 unchanged.
+
+## P0 next session — broad-golden complete-data (issue #1729, decision C) — DISPATCHABLE
+The heavy top-1000/3000 `goldens-broad/*` + `goldens-custom-universe/*` goldens
+were found to measure **survivor subsets**: `test_data` covers only 462/1000 of
+top-1000-2014 (data/ 514, warehouse 3017); the runner silently skips missing
+symbols → survivorship-inflated, data-path-dependent numbers (decade: 227% on
+test_data-CSV vs 95% on the complete warehouse). NOT an A-D-live effect; pre-existing.
+**Decision C (recorded, #1731):** GHA does NOT host the 2 GB warehouse; broad goldens
+stay **local-only** (already fail-on-missing in GHA = intentional signal) and are
+**rebuildable locally** via existing tooling. Full design + rebuild recipe:
+`dev/plans/broad-golden-complete-data-2026-06-24.md`. Remaining sub-tasks (both
+dispatchable, NOT interactive):
+1. **Re-pin runnable cells (top-1000/500) to warehouse complete-universe numbers**
+   (decade ≈ 95%). Recipe: `scenario_runner --snapshot-dir /tmp/snap_top3000_1998_2026
+   --no-emit-all-eligible`. ⚠ Warehouse is ephemeral `/tmp` (2 GB) — if lost, rebuild
+   via `build_broad_snapshot_incremental.sh` (needs top-3000 EODHD fetch first).
+2. **Top-3000 cells** (`tier4-broad-10y`, `weinstein-full-pool`) — blocked on the
+   snapshot memory crash (`project_panel_runner_memory_ceiling`; fork-per-cell /
+   `SNAPSHOT_CACHE_MB`). Separate engineering fix.
+
+The merged flip (#1725) is sound (grid ran vs complete data/; sp500/small re-pins
+consistent-source). This is cleanup, not a flip correction.
 
 ## P1 — decline-character mechanisms on the A-D-live basis (from prior handoff)
 Now that A-D is live by default, re-run the A-D-inert WF-CVs on the live basis:
