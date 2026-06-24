@@ -75,18 +75,51 @@ symbols test_data covers (complete coverage of a smaller, explicitly-named set).
 No new data; honest. ✗ Loses the "broad" character; changes what they measure.
 Acceptable fallback if B's CI-warehouse provisioning proves too heavy.
 
-## Recommendation
-**B.** Provision the warehouse as a CI cache/artifact, switch the broad cells to
-snapshot mode, fix the top-3000 memory crash, re-pin to complete-universe numbers.
-Sequence:
-1. Decide warehouse CI-provisioning mechanism (cache vs build-job) — the gating
-   design choice.
-2. Fix the top-3000 snapshot crash (fork-per-cell / cache cap).
-3. Wire `--snapshot-dir` into perf-tier3/4 + custom-universe for broad cells.
-4. Re-pin all broad/custom cells to snapshot-warehouse A-D-live numbers.
+## DECISION (2026-06-24): C — local-only, rebuildable; do NOT host the data in GHA
+GHA does not need to host the 2 GB warehouse. The broad/custom goldens stay
+**local-only** (they already fail-on-missing-data in GHA perf-tier3, which is the
+*intentional* "data not provisioned" signal — see `perf_tier3_weekly.sh` header).
+They are **runnable + verifiable locally** by rebuilding the warehouse with the
+existing tooling (below). Their committed bands should reflect the **true
+complete-universe** numbers (warehouse), not the test_data-CSV survivor subset.
 
-Until then the broad goldens stay un-re-pinned (non-blocking). Do **not** pin them
-to test_data-CSV subset numbers — that locks in survivorship inflation.
+Sequence:
+1. **Re-pin runnable cells (top-1000/500) to warehouse complete-universe numbers**
+   (decade ≈ 95%, etc.). These will (correctly) keep failing in GHA against
+   incomplete test_data — that failure is the intentional missing-data signal; a
+   local snapshot run reproduces the pinned values.
+2. **Top-3000 cells** (`tier4-broad-10y`, `weinstein-full-pool`) — blocked on the
+   snapshot memory crash (`project_panel_runner_memory_ceiling`; fork-per-cell /
+   bigger `SNAPSHOT_CACHE_MB`). Follow-up sub-task.
+3. No GHA warehouse provisioning, no committed bars (option A/B infra avoided).
+
+## Local rebuild recipe (the "rebuildable locally" requirement)
+The full warehouse is reproducible from existing tooling — no manual one-off:
+
+1. **Fetch the universe's CSV bars** (delisting-aware) via the `fetch-historical-data`
+   skill / `dev/scripts/fetch_historical_sp500.sh` (EODHD; needs the API key). Writes
+   per-symbol CSVs under a data dir.
+2. **Build the snapshot warehouse** (checkpoint-resumable, incremental):
+   ```
+   dev/scripts/build_broad_snapshot_incremental.sh \
+     --universe trading/test_data/goldens-custom-universe/composition/<U>.sexp \
+     --output-dir <warehouse-dir> --csv-data-dir <fetched-csv-dir> \
+     --benchmark-symbol SPY
+   ```
+   (wraps `build_snapshots.exe`; or `build_scenario_snapshots.exe --scenario <golden>`
+   to build the *exact* warehouse a scenario needs.)
+3. **Run / re-pin the goldens in snapshot mode**:
+   ```
+   scenario_runner --dir <staged-goldens> --snapshot-dir <warehouse-dir> \
+     --fixtures-root trading/test_data/backtest_scenarios --no-emit-all-eligible
+   ```
+   with `TRADING_DATA_DIR=test_data` (breadth + universe files). `^GSPC` is stored
+   as `GSPC.INDX`; macro gate works (non-zero trades). Top-1000/500 run fast;
+   top-3000 crashes (memory — sub-task 2).
+
+The existing `/tmp/snap_top3000_1998_2026` warehouse (2 GB, 3017 syms) is ephemeral
+— if lost, rebuild via the recipe above (needs the top-3000 EODHD fetch first, since
+`data/` only has the sp500-scoped 731 names).
 
 ## Local repro
 - Warehouse run (works for top-1000/500, fast): `scenario_runner --dir <stage>
