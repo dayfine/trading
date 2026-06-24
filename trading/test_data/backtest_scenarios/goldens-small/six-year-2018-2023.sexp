@@ -60,10 +60,12 @@
    (bid_ask_spread_bps 5.0)
    (market_impact_bps_per_pct_adv 0.0)))
  (expected
-  ((total_return_pct   ((min  48.0)        (max  65.0)))
-   (total_trades       ((min 272)          (max 368)))
-   (win_rate           ((min  29.0)        (max  40.0)))
-   (sharpe_ratio       ((min   0.46)       (max   0.64)))
-   (max_drawdown_pct   ((min  21.9)        (max  29.7)))
-   (avg_holding_days   ((min  33.0)        (max  45.0)))
-   (open_positions_value ((min 1055000.0)  (max 1430000.0))))))
+  ;; Re-pinned 2026-06-23 for the A-D-live default flip (synthetic breadth tail).
+  ;; ±15% around A-D-live actuals; grid ACCEPT (dev/backtest/ad-grid-2026-06-23).
+  ((total_return_pct   ((min  66.0)        (max  89.4)))
+   (total_trades       ((min 273)          (max 369)))
+   (win_rate           ((min  32.0)        (max  43.3)))
+   (sharpe_ratio       ((min   0.61)       (max   0.82)))
+   (max_drawdown_pct   ((min  16.2)        (max  21.9)))
+   (avg_holding_days   ((min  34.7)        (max  46.9)))
+   (open_positions_value ((min 1235000.0)  (max 1672000.0))))))

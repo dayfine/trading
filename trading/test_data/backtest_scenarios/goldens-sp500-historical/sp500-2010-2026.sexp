@@ -125,14 +125,16 @@
  ;; variance. NOTE: this golden is perf-tier 3-historical (NOT in PR CI), so the
  ;; stale pin never surfaced as a CI failure — local goldens drift silently.
  (expected
-  ((total_return_pct   ((min 209.0)         (max 266.0)))
-   (total_trades       ((min 590)           (max  750)))
-   (win_rate           ((min  33.0)         (max  43.0)))
-   (sharpe_ratio       ((min   0.55)        (max   0.76)))
-   (max_drawdown_pct   ((min  14.5)         (max  21.0)))
-   (avg_holding_days   ((min  42.0)         (max  55.0)))
-   (open_positions_value ((min 2600000.0)   (max 3600000.0)))
-   (sortino_ratio_annualized ((min  0.88)   (max   1.18)))
-   (calmar_ratio       ((min   0.37)        (max   0.52)))
-   (ulcer_index        ((min   6.00)        (max   8.50)))
+  ;; Re-pinned 2026-06-23 for the A-D-live default flip (synthetic breadth tail).
+  ;; ±15% around A-D-live actuals; grid ACCEPT (dev/backtest/ad-grid-2026-06-23).
+  ((total_return_pct   ((min 294.0)         (max 398.0)))
+   (total_trades       ((min 678)           (max  918)))
+   (win_rate           ((min  30.9)         (max  41.8)))
+   (sharpe_ratio       ((min   0.62)        (max   0.84)))
+   (max_drawdown_pct   ((min  19.1)         (max  25.8)))
+   (avg_holding_days   ((min  37.1)         (max  50.2)))
+   (open_positions_value ((min 3256000.0)   (max 4406000.0)))
+   (sortino_ratio_annualized ((min  0.94)   (max   1.27)))
+   (calmar_ratio       ((min   0.36)        (max   0.49)))
+   (ulcer_index        ((min   7.35)        (max   9.95)))
    (wall_seconds       ((min 300.0)         (max 3600.0))))))
