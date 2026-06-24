@@ -59,31 +59,26 @@ Now that A-D is live by default, re-run the A-D-inert WF-CVs on the live basis:
 `neutral_blocks_shorts` (faithfulness flip still on the table), `fast_v_arm_on_rate_alone`
 (#1708) + `fast_v_min_rate_pct` (#1716) arming surface. See `project_decline_character_builds`.
 
-**⚠ BLOCKED (found 2026-06-24): the deep `data/` store is GONE.** The deep A-D-live
-WF-CVs read CSV `data/` (sp500-2000-2026 universe + `data/breadth/`). As of this
-session both `trading/data/` (731-name PIT bars) **and** `trading/data/breadth/` are
-empty on host+container — cleared since the prior handoff (disk pressure / sweep /
-container churn). Reconstituting needs an EODHD re-fetch of the deep sp500-2000
-universe (`fetch-historical-data` skill; needs API key + the user-GUI disk prep noted
-in `project_decline_character_builds`). The committed breadth (`test_data/breadth/
-synthetic_{advn,decln}.csv`, 1998–2026, 7159 rows) survives and can re-seed
-`data/breadth/`, but the **universe bars are the missing piece**. The warehouse
-snapshot `/tmp/snap_top3000_1998_2026` (2 GB, intact) is a *different* universe
-(top-3000) and carries the snapshot memory crash → not a drop-in substitute for the
-sp500-2000 CSV WF-CV baseline. **Scope status:** of P1, the short-gate half is
-effectively DONE (06-22 `slow-grind-adlive` WF-CV → NO-promote; `neutral_blocks_shorts`
-stays ≈ungated even A-D-live). The *only* not-yet-done, evidence-backed slice is the
-**fast_v arming-speed surface on A-D-live** (the 06-22 `fast_v_min_rate` REJECT named
-the A-D breadth lead as the unlock) — and it is the part this data gap blocks.
-**Next-session action:** re-provision the deep `data/` store (user disk prep + fetch),
-then run the arming-speed surface WF-CV on A-D-live via `experiment-gap-closing`.
+**CORRECTION 2026-06-24 (supersedes a wrong "BLOCKED" note in #1735):** P1 is NOT
+blocked. The deep `data/` store is **intact at the repo root** `data/` (the runner's
+`default_data_dir`), not `trading/data/` — a path mix-up produced a false "data gone"
+read. Verified: 735 `data.csv`, AAPL 1998-01-02→2026-06-22, delisted LEH present,
+503/515 of sp500-2000 covered, `data/breadth/` populated (synthetic 1998–2026 + nyse)
+→ **A-D-live basis is ready**. (The EODHD `secrets` file is gone but irrelevant — bars
+already fetched.) **Scope:** of P1 the short-gate half is effectively DONE (06-22
+`slow-grind-adlive` WF-CV → NO-promote; `neutral_blocks_shorts` ≈ungated even A-D-live).
+The one not-yet-done, evidence-backed slice = the **fast_v arming-speed surface on
+A-D-live** (the 06-22 `fast_v_min_rate` REJECT named the A-D breadth lead as the unlock).
+RUNNABLE NOW via `arming-speed-deep-2000-2026.sexp` (base `sp500-2000-2026-catstop`,
+axis `fast_v_arm_on_rate_alone {true,false}`, 26 folds) — must run in the MAIN session
+(repo-root `data/` is invisible to worktree-isolated agents).
 
 ## P2 — barbell weight cert (unchanged) — needs weight mandate.
 
 ## Operational notes
-- ⚠ Local `data/` (gitignored) is **now EMPTY** (was: synthetic breadth 1998–2026 +
-  731-name PIT bars). Cleared since the prior handoff. The synthetic breadth survives
-  only in committed `test_data/breadth/synthetic_*.csv`; the PIT universe bars are gone
+- Local deep `data/` (gitignored) lives at the **REPO ROOT** `data/` (NOT `trading/data/`;
+  it's the runner's `default_data_dir`). Intact: 735 symbols 1998–2026 + delisted +
+  `data/breadth/` (A-D-live source). Earlier "data gone" was a path mix-up (see P1 correction).
   and need an EODHD re-fetch to restore (blocks all deep A-D-live CSV WF-CVs — see P1).
 - A second orchestrator run (#1724) advanced main this session; main green.
 - Scenario runner writes output under the dune-root `trading/dev/backtest/scenarios-*`
