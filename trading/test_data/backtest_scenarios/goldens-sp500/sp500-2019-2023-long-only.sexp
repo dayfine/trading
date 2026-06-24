@@ -74,14 +74,18 @@
    (bid_ask_spread_bps 5.0)
    (market_impact_bps_per_pct_adv 0.0)))
  (expected
-  ((total_return_pct   ((min  56.5)        (max  76.5)))
-   (total_trades       ((min 210)          (max 285)))
-   (win_rate           ((min  33.2)        (max  45.0)))
-   (sharpe_ratio       ((min   0.58)       (max   0.78)))
-   (max_drawdown_pct   ((min  20.5)        (max  27.7)))
-   (avg_holding_days   ((min  36.0)        (max  48.0)))
-   (open_positions_value ((min 1190000.0)  (max 1611000.0)))
-   (sortino_ratio_annualized ((min 0.81)   (max 1.09)))
-   (calmar_ratio       ((min   0.38)       (max   0.51)))
-   (ulcer_index        ((min   7.32)       (max   9.90)))
+  ;; Re-pinned 2026-06-23 for the A-D-live default flip (synthetic breadth tail).
+  ;; ±15% around A-D-live actuals; grid ACCEPT (dev/backtest/ad-grid-2026-06-23).
+  ;; Long-only 2019-2023 fell sharply (ret 66→26): A-D-live's conservative COVID
+  ;; gate, and long-only can't exploit the breadth's short-timing edge.
+  ((total_return_pct   ((min  22.2)        (max  30.0)))
+   (total_trades       ((min 237)          (max 321)))
+   (win_rate           ((min  30.2)        (max  40.8)))
+   (sharpe_ratio       ((min   0.32)       (max   0.43)))
+   (max_drawdown_pct   ((min  26.5)        (max  35.9)))
+   (avg_holding_days   ((min  32.7)        (max  44.2)))
+   (open_positions_value ((min 798000.0)   (max 1080000.0)))
+   (sortino_ratio_annualized ((min 0.37)   (max 0.50)))
+   (calmar_ratio       ((min   0.13)       (max   0.18)))
+   (ulcer_index        ((min  11.1)        (max  15.1)))
    (wall_seconds       ((min 100.0)        (max 1500.0))))))

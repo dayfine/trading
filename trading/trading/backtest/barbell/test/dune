@@ -1,5 +1,9 @@
 (tests
- (names test_barbell_blend test_barbell_config test_barbell_runner)
+ (names
+  test_barbell_blend
+  test_barbell_config
+  test_barbell_floor_sweep
+  test_barbell_runner)
  (libraries ounit2 core matchers barbell trading.simulation.types)
  (preprocess
   (pps ppx_sexp_conv)))

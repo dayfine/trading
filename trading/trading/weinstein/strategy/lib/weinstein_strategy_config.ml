@@ -4,6 +4,12 @@ open Core
    long-exposure cap, so the trim never bites until a spec sets a tighter value. *)
 let macro_bearish_no_op_cap = 0.70
 
+(* No-op default for [fast_v_min_rate_pct]: equals [Decline_character]'s own
+   [default_config.fast_v_min_rate_pct], so threading this value into the
+   classifier config reproduces [default_config] exactly (bit-identical
+   classification) until a spec sets a different fast-V arming rate threshold. *)
+let fast_v_min_rate_no_op = 0.08
+
 type index_config = { primary : string; global : (string * string) list }
 [@@deriving sexp]
 
@@ -91,6 +97,19 @@ type config = {
           [Bullish] admits longs); default [false] preserves the historical gate
           where both [Bullish] and [Neutral] admit longs. Threaded into
           [screening_config.neutral_blocks_longs] at screen time. See [.mli]. *)
+  neutral_blocks_shorts : bool; [@sexp.default false]
+      (** Short-side mirror of [neutral_blocks_longs]; default [false] = prior
+          gate (both [Bearish] and [Neutral] admit shorts). See [.mli]. *)
+  enable_slow_grind_short_gate : bool; [@sexp.default false]
+      (** Admit shorts only in a slow-grind decline; default [false] = no-op.
+          See [.mli]. *)
+  fast_v_arm_on_rate_alone : bool; [@sexp.default false]
+      (** Fast-crash absolute-stop arming-speed dial; default [false] = no-op.
+          See [.mli]. *)
+  fast_v_min_rate_pct : float; [@sexp.default fast_v_min_rate_no_op]
+      (** Fast-V arming rate threshold (whipsaw-suppression dial); default
+          [fast_v_min_rate_no_op] (0.08) reproduces the classifier default. See
+          [.mli]. *)
   enable_late_stage2_stop_tighten : bool; [@sexp.default false]
       (** Master switch for the late-Stage-2 stop-tighten runner; see [.mli]. *)
   late_stage2_stop_buffer_pct : float; [@sexp.default 0.0]
@@ -121,9 +140,10 @@ type config = {
 [@@deriving sexp]
 
 let default_config ~universe ~index_symbol =
+  let indices = { primary = index_symbol; global = [] } in
   {
     universe;
-    indices = { primary = index_symbol; global = [] };
+    indices;
     sector_etfs = [];
     stage_config = Stage.default_config;
     macro_config = Macro.default_config;
@@ -153,6 +173,10 @@ let default_config ~universe ~index_symbol =
     enable_pi_filter = false;
     margin_config = Trading_portfolio.Margin_config.default_config;
     neutral_blocks_longs = false;
+    neutral_blocks_shorts = false;
+    enable_slow_grind_short_gate = false;
+    fast_v_arm_on_rate_alone = false;
+    fast_v_min_rate_pct = fast_v_min_rate_no_op;
     enable_late_stage2_stop_tighten = false;
     late_stage2_stop_buffer_pct = 0.0;
     enable_macro_bearish_exposure_trim = false;

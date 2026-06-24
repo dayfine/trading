@@ -65,10 +65,14 @@
    (bid_ask_spread_bps 5.0)
    (market_impact_bps_per_pct_adv 0.0)))
  (expected
-  ((total_return_pct   ((min  94.0)        (max 127.0)))
-   (total_trades       ((min 240)          (max 325)))
-   (win_rate           ((min  35.0)        (max  47.0)))
-   (sharpe_ratio       ((min   0.79)       (max   1.07)))
-   (max_drawdown_pct   ((min  15.7)        (max  21.3)))
-   (avg_holding_days   ((min  39.0)        (max  53.0)))
-   (open_positions_value ((min 1770000.0)  (max 2400000.0))))))
+  ;; Re-pinned 2026-06-23 for the A-D-live default flip (synthetic breadth tail).
+  ;; ±15% around A-D-live actuals; grid ACCEPT (dev/backtest/ad-grid-2026-06-23).
+  ;; A-D-live's conservative gate cut bull-window return here (110→59) — expected:
+  ;; the breadth edge is short-timing, which this long-only window can't exploit.
+  ((total_return_pct   ((min  50.0)        (max  67.7)))
+   (total_trades       ((min 250)          (max 338)))
+   (win_rate           ((min  32.1)        (max  43.4)))
+   (sharpe_ratio       ((min   0.54)       (max   0.73)))
+   (max_drawdown_pct   ((min  15.5)        (max  21.0)))
+   (avg_holding_days   ((min  37.7)        (max  51.0)))
+   (open_positions_value ((min 1154000.0)  (max 1672000.0))))))

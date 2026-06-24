@@ -136,6 +136,130 @@ let test_ambiguous_shallow_dip _ =
     (Decline_character.classify ~config:cfg ~macro ~index_bars)
     (equal_to Decline_character.Not_declining)
 
+(* ------------------------------------------------------------------ *)
+(* fast_v_ignores_ma_filter — arming-speed dial                        *)
+(* ------------------------------------------------------------------ *)
+
+(* Config with the fast-V arming-speed dial enabled. *)
+let cfg_arm_on_rate = { cfg with fast_v_ignores_ma_filter = true }
+
+(* A steep recent plunge while the weekly MA is still RISING (the 2020 lag: the
+   crash leads the MA roll-over). The close is still above the MA, so no decline
+   is "in progress" by the MA test, but the 4-week drawdown is ~25%. *)
+let steep_crash_with_rising_ma () =
+  let prices = List.init 56 ~f:(fun _ -> 100.0) @ [ 100.0; 92.0; 84.0; 75.0 ] in
+  let index_bars = weekly_bars prices in
+  let macro =
+    macro_result ~ma_value:60.0 ~ma_direction:Weinstein_types.Rising
+      ~ad_signal:`Neutral
+  in
+  (index_bars, macro)
+
+(* Flag OFF (default): a steep crash with a rising MA is still Not_declining —
+   the fast-V path cannot arm until the MA rolls over. Pins backward-compat. *)
+let test_arm_off_rising_ma_steep_is_not_declining _ =
+  let index_bars, macro = steep_crash_with_rising_ma () in
+  assert_that
+    (Decline_character.classify ~config:cfg ~macro ~index_bars)
+    (equal_to Decline_character.Not_declining)
+
+(* Flag ON: the same steep-crash-with-rising-MA input now arms as Fast_v on rate
+   alone (drops the falling-MA precondition for the fast-V path). *)
+let test_arm_on_rising_ma_steep_is_fast_v _ =
+  let index_bars, macro = steep_crash_with_rising_ma () in
+  assert_that
+    (Decline_character.classify ~config:cfg_arm_on_rate ~macro ~index_bars)
+    (equal_to Decline_character.Fast_v)
+
+(* Flag ON but a SHALLOW pullback with a rising MA: the rate gate still applies,
+   so this stays Not_declining (a slow dip never arms the fast-V stop). *)
+let test_arm_on_rising_ma_shallow_is_not_declining _ =
+  (* ~2% drop over the last 4 weeks — below [fast_v_min_rate_pct] (8%). *)
+  let prices = List.init 56 ~f:(fun _ -> 100.0) @ [ 100.0; 99.0; 98.5; 98.0 ] in
+  let index_bars = weekly_bars prices in
+  let macro =
+    macro_result ~ma_value:80.0 ~ma_direction:Weinstein_types.Rising
+      ~ad_signal:`Neutral
+  in
+  assert_that
+    (Decline_character.classify ~config:cfg_arm_on_rate ~macro ~index_bars)
+    (equal_to Decline_character.Not_declining)
+
+(* Flag ON must NOT change an already-declining classification: a real
+   falling-MA slow grind is still Slow_grind, and a falling-MA steep drop is
+   still Fast_v (the falling-MA branch is unchanged by the dial). *)
+let test_arm_on_preserves_declining_classification _ =
+  let slow_prices =
+    List.init 20 ~f:(fun i -> 100.0 -. (Float.of_int i *. 0.2))
+  in
+  let slow_bars = weekly_bars slow_prices in
+  let slow_macro =
+    macro_result ~ma_value:101.0 ~ma_direction:Weinstein_types.Declining
+      ~ad_signal:`Bearish
+  in
+  let fast_prices =
+    List.init 56 ~f:(fun _ -> 100.0) @ [ 100.0; 92.0; 84.0; 75.0 ]
+  in
+  let fast_bars = weekly_bars fast_prices in
+  let fast_macro =
+    macro_result ~ma_value:98.0 ~ma_direction:Weinstein_types.Declining
+      ~ad_signal:`Bearish
+  in
+  assert_that
+    [
+      Decline_character.classify ~config:cfg_arm_on_rate ~macro:slow_macro
+        ~index_bars:slow_bars;
+      Decline_character.classify ~config:cfg_arm_on_rate ~macro:fast_macro
+        ~index_bars:fast_bars;
+    ]
+    (elements_are
+       [
+         equal_to Decline_character.Slow_grind;
+         equal_to Decline_character.Fast_v;
+       ])
+
+(* ------------------------------------------------------------------ *)
+(* fast_v_min_rate_pct — arming rate threshold (whipsaw-suppression)   *)
+(* ------------------------------------------------------------------ *)
+
+(* A MODERATE 4-week drawdown of ~10% below a falling MA, A-D Neutral (not
+   leading). At the default threshold (8%) the 10% drop classifies as Fast_v;
+   raising the threshold to 16% requires a steeper drop, so the same input is
+   Not_declining. Both share this fixture. *)
+let moderate_drawdown_below_falling_ma () =
+  let prices = List.init 56 ~f:(fun _ -> 100.0) @ [ 100.0; 97.0; 94.0; 90.0 ] in
+  let index_bars = weekly_bars prices in
+  let macro =
+    macro_result ~ma_value:98.0 ~ma_direction:Weinstein_types.Declining
+      ~ad_signal:`Neutral
+  in
+  (index_bars, macro)
+
+(* Default config (threshold 8%): a ~10% drawdown arms Fast_v. Also pins that
+   the default reproduces today's classification on the steep-drop fixture. *)
+let test_default_rate_threshold_arms_fast_v _ =
+  let index_bars, macro = moderate_drawdown_below_falling_ma () in
+  assert_that
+    [
+      Decline_character.classify ~config:cfg ~macro ~index_bars;
+      (let steep_bars, steep_macro = steep_crash_with_rising_ma () in
+       (* default 0.08 == today's classification on the steep fixture *)
+       Decline_character.classify ~config:cfg_arm_on_rate ~macro:steep_macro
+         ~index_bars:steep_bars);
+    ]
+    (elements_are
+       [ equal_to Decline_character.Fast_v; equal_to Decline_character.Fast_v ])
+
+(* Raising fast_v_min_rate_pct to 16%: the same ~10% drawdown no longer meets
+   the (steeper) rate bar, so it is Not_declining — the whipsaw-suppression
+   behaviour (a moderate dip that would have armed Fast_v at 8% no longer does). *)
+let test_higher_rate_threshold_suppresses_fast_v _ =
+  let index_bars, macro = moderate_drawdown_below_falling_ma () in
+  let cfg_high_rate = { cfg with fast_v_min_rate_pct = 0.16 } in
+  assert_that
+    (Decline_character.classify ~config:cfg_high_rate ~macro ~index_bars)
+    (equal_to Decline_character.Not_declining)
+
 let suite =
   "decline_character"
   >::: [
@@ -145,6 +269,18 @@ let suite =
          "not_declining_above_ma" >:: test_not_declining_above_ma;
          "empty_bars" >:: test_empty_bars;
          "ambiguous_shallow_dip" >:: test_ambiguous_shallow_dip;
+         "arm_off_rising_ma_steep_is_not_declining"
+         >:: test_arm_off_rising_ma_steep_is_not_declining;
+         "arm_on_rising_ma_steep_is_fast_v"
+         >:: test_arm_on_rising_ma_steep_is_fast_v;
+         "arm_on_rising_ma_shallow_is_not_declining"
+         >:: test_arm_on_rising_ma_shallow_is_not_declining;
+         "arm_on_preserves_declining_classification"
+         >:: test_arm_on_preserves_declining_classification;
+         "default_rate_threshold_arms_fast_v"
+         >:: test_default_rate_threshold_arms_fast_v;
+         "higher_rate_threshold_suppresses_fast_v"
+         >:: test_higher_rate_threshold_suppresses_fast_v;
        ]
 
 let () = run_test_tt_main suite

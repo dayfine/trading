@@ -156,6 +156,106 @@ type config = {
           through the [Neutral]/[Bullish] bear-rally blips, contributing to the
           false-breakout stop-out churn. Default-off until an experiment-ledger
           ACCEPT (per [.claude/rules/experiment-flag-discipline.md]). *)
+  neutral_blocks_shorts : bool; [@sexp.default false]
+      (** Short-side mirror of {!neutral_blocks_longs} (default-off). When
+          [true], a macro-[Neutral] tape blocks new short entries exactly as a
+          [Bullish] tape does — only a [Bearish] tape admits shorts. Default
+          [false] preserves the historical macro gate bit-equally (shorts
+          admitted under both [Bearish] and [Neutral], blocked only under
+          [Bullish]).
+
+          This *tightens* the short side to Weinstein's confirmed-bear rule
+          (weinstein-book-reference.md §Short-Selling Rules — short only in a
+          confirmed bear market) — a faithful exit/entry-aggressiveness dial,
+          not a spine change: the Stage-4-breakdown + negative-RS + weak-sector
+          \+ volume short criteria and the macro gate itself are unaffected. It
+          removes the [Neutral] chop tape (the 2020 V) where shorts are most
+          likely squeezed.
+
+          Wired by threading into [screening_config.neutral_blocks_shorts] at
+          screen time, so the flag is a single-component [Variant_matrix] flag
+          axis ([((flag neutral_blocks_shorts) (values (true false)))]).
+          Default-off until an experiment-ledger ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md]). *)
+  enable_slow_grind_short_gate : bool; [@sexp.default false]
+      (** Faithful-short decline-character gate (default-off). When [true],
+          shorts are admitted only when the current primary-index decline is a
+          slow grind ([Decline_character.Slow_grind]) — fast-V crashes and
+          non-declines are excluded. Default [false] is a no-op (bit-identical
+          to baseline; the decline classification is not even consumed).
+
+          Weinstein shorts a sustained distribution bear, not a fast V-crash
+          that snaps back (weinstein-book-reference.md §Short-Selling Rules).
+          The slow-grind bool is classified at screen time from the current
+          macro result + index bars via [Decline_character] /
+          [Decline_character_wiring] (which live in this lib, so
+          [weinstein.screener] stays macro-agnostic) and threaded into
+          [Screener.screen_with_cooldown ~decline_is_slow_grind] alongside
+          [screening_config.enable_slow_grind_short_gate]. The classification
+          uses the *current* cycle's macro + bars — lookahead-free for an entry
+          gate, since entries already gate on the current [macro_trend] (the
+          prior-cycle decline-character ref is for the stop, not entries).
+
+          Single-component [Variant_matrix] flag axis
+          ([((flag enable_slow_grind_short_gate) (values (true false)))]).
+          Default-off until an experiment-ledger ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md]). *)
+  fast_v_arm_on_rate_alone : bool; [@sexp.default false]
+      (** Arming-speed dial for the fast-crash absolute stop
+          ([stops_config.catastrophic_stop_pct]); default [false] is a no-op
+          (bit-identical to baseline — the decline classifier behaves exactly as
+          before). When [true], the primary-index [Decline_character.Fast_v]
+          classification may arm on the {b rate of decline alone}, without
+          waiting for the weekly MA to roll over and price to fall below it.
+
+          Motivation: in a fast V-crash (2020), the structural gap-down stop has
+          already exited every long before the weekly MA rolls over, so the
+          [Fast_v]-gated [catastrophic_stop_pct] absolute stop never fires — the
+          binding constraint is arming {b latency}, not stop width. This flag
+          drops the falling-MA precondition for the fast-V path only (the
+          slow-grind path is untouched, since it presupposes a decline already
+          in progress). It is threaded into
+          [Decline_character.fast_v_ignores_ma_filter] at the two classify sites
+          ([Decline_character_wiring.update_ref], the load-bearing stop-arming
+          seam, and the [enable_slow_grind_short_gate] screen-time classify,
+          inert here since it maps [Fast_v] -> not-slow-grind) so one config
+          builds the classifier config.
+
+          {b Faithfulness}: a fast crash gives no Advance-Decline breadth lead
+          and falls before the weekly MA can confirm
+          (weinstein-book-reference.md §Macro / Ch. 8 distribution-lead
+          doctrine). This changes no buy/sell rule — only {b when} the absolute
+          tail-RISK-insurance stop arms — so it is the sanctioned
+          tail-RISK-insurance exception
+          ([.claude/rules/weinstein-faithful-core.md]); the spine is intact.
+
+          Single-component [Variant_matrix] flag axis
+          ([((flag fast_v_arm_on_rate_alone) (values (true false)))]).
+          Default-off until an experiment-ledger ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md]). *)
+  fast_v_min_rate_pct : float; [@sexp.default 0.08]
+      (** Fast-V arming rate threshold: the minimum trailing rate-of-decline
+          drawdown (positive fraction over [rate_lookback_weeks]) at which the
+          primary index is classified [Decline_character.Fast_v]. Threaded into
+          [Decline_character.fast_v_min_rate_pct] at the two classify sites via
+          {!Decline_character_wiring.classifier_config}. Default [0.08] equals
+          [Decline_character.default_config.fast_v_min_rate_pct], so it is a
+          no-op (bit-identical classification to the pre-flag behaviour).
+
+          Whipsaw-suppression dial: in choppy corrections (e.g. 2010/2011) the
+          [fast_v_arm_on_rate_alone] path arms the fast-crash absolute stop on
+          rate alone, and a low rate threshold lets shallow rallies-into-decline
+          re-arm/dis-arm repeatedly. Raising the threshold (e.g. to 0.16)
+          requires a steeper drawdown before [Fast_v] is declared, suppressing
+          that whipsaw — at the cost of arming later in a genuine crash. A
+          higher value never widens the [Fast_v] band, so the spine is untouched
+          (it changes only when the tail-RISK-insurance stop arms, never a
+          buy/sell rule — see [.claude/rules/weinstein-faithful-core.md]).
+
+          Single-component [Variant_matrix] float axis (e.g.
+          [((flag fast_v_min_rate_pct) (values (0.08 0.12 0.16)))]). Default
+          no-op until an experiment-ledger ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md]). *)
   enable_late_stage2_stop_tighten : bool; [@sexp.default false]
       (** Held-position risk dial (default-off): when [true], the
           {!Late_stage2_stop_runner} tightens the trailing stop of every held

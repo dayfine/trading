@@ -1,6 +1,6 @@
-(executable
- (name barbell_overlay_runner)
- (modules barbell_overlay_runner)
+(executables
+ (names barbell_overlay_runner barbell_floor_sweep_runner)
+ (modules barbell_overlay_runner barbell_floor_sweep_runner)
  (libraries core core_unix barbell barbell_scenario scenario_lib)
  (preprocess
   (pps ppx_sexp_conv)))

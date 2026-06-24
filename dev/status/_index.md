@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-22 (orchestrator run 27933059401 [run 2]: full pass, dispatch-light, 0 subagents. Main GREEN on HEAD `7b25d5d7` (run-1 summary #1693 merged; build-and-test + perf + both goldens SUCCESS); health CLEAN (status-integrity + index-size + no-python exit 0). State materially unchanged from run 1 (~4h prior): the sole open PR #1692 (decline-character Build 1, maintainer LOCAL flagship) is unchanged — same tip `96ebd49c`, same REAL nesting_linter build-and-test FAILURE — still NOT merged (3-gate) and NOT dispatched (collision-avoidance; Question to maintainer pending). No status drift; harness/cleanup backlogs drained; data-gaps unchanged. Re-surfaced the #1692 fix Question.)
+Last updated: 2026-06-24 (orchestrator run 28069928236 [run 1]: FULL PASS, 0 subagents dispatched — 8th consecutive 0-dispatch pass. New since the 06-23 run-2 summary: the maintainer's decline-character A-D-default flip is now an OPEN PR #1725 (`feat/ad-default-flip`, confirmation-grid ACCEPT, 15 files incl. golden re-pin, mergeable_state=blocked) — LOCAL/attended, collision-fenced (do NOT dispatch/QC/merge). Reconciled the decline-character row (Open PR `—` → #1725). No new orchestrator-dispatchable work: harness backlog (T2 milestone-gated M5/M6/M7, T3-C superseded, T3-H gated on T1-N, T4-* human-only, lone `[~]` ci.yml ENOSPC workflow-PAT-blocked) + cleanup backlog (template placeholder only) both drained; ops-data EODHD-absent + data-gaps unchanged since #814 (2026-05-03) → sentinel skip; every feature track data-/human-/LOCAL-/attended-gated. Health CLEAN (status-integrity + index-size + no-python exit 0 live); main CI GREEN on HEAD `6b002d8142` (build-and-test + perf-tier1-smoke + golden-custom-universe + golden-sp500-5y SUCCESS); 0 open ci-red issues. 3 open PRs all maintainer-authored: #1725 (A-D-default flip, LOCAL/attended), #1706 (weekly deep health scan, docs-only), #1698 (opam-weekly). Prior run-2 note (28062046550): FULL PASS, 0 subagents; perf gate #1722 MERGED unblocking the A-D-default flip; reconciled decline-character row; main GREEN on `b2f5a03c`.)
 
 ## Active + complete tracks
 
@@ -18,7 +18,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
 | [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | snapshot-format-v2 S4 PROVEN (warehouses v2, top-3000 fits at cache<=1024); S5/v1-cleanup deferred (oversight); next: regime-diverse lenses on v2 (LOCAL) |
 | [rolling-start-lens](rolling-start-lens.md) | IN_PROGRESS | feat-backtest | — | t3k factor-lens matrix SHIPPED LOCAL (#1639 2000-26 H1 r=-0.744; #1642 2011-26 confirm); next: regime-gated deploy proxy validation (LOCAL/data-gated) |
-| [barbell-overlay](barbell-overlay.md) | MERGED | — | — | Gate-#2 overlay (#1683) + scenario wiring (#1689) MERGED default-off; 1 [non-blocking] follow-up remains: floor_weight Variant_matrix axis (entangles w/ Overlay_validator) |
+| [barbell-overlay](barbell-overlay.md) | MERGED | — | — | Gate-#2 overlay (#1683) + scenario wiring (#1689) + floor_weight searchable axis (#1697, R2 complete) all MERGED default-off; no remaining follow-ups |
 | [sweep-perf](sweep-perf.md) | IN_PROGRESS | harness-maintainer | — | Win #4 production wiring MERGED (#1574, opt-in default-off); next: manual ghcr.io flambda rebuild + enable prune opt-in in sweeps |
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
@@ -28,7 +28,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — |
 | [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | #1659 short-sleeve budget (default-off) MERGED; next: LOCAL sleeve-fraction screen → WF-CV → grid before default flip `[non-blocking]` |
-| [decline-character](decline-character.md) | IN_PROGRESS | feat-weinstein | feat/decline-character | Build 1 classifier (Slow_grind/Fast_v/Not_declining) READY_FOR_REVIEW; next: Build 0 A/D wiring, then Builds 2/3 (stop+short) |
+| [decline-character](decline-character.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | #1725 | A-D-default flip OPEN (#1725, confirmation-grid ACCEPT, golden re-pin) — LOCAL/attended, collision-fenced; read-only screens LOCAL |
 | [spy-only-reference](spy-only-reference.md) | IN_PROGRESS | feat-weinstein | — | WF-CV on sector-rotation testbed; top-1000 bankability gate; long-short verification (human session) |
 | [stage-accuracy](stage-accuracy.md) | IN_PROGRESS | feat-weinstein | — | force_exit_off grid REJECTED (#1503); cascade-selection inversion documented (#1509 merged); broad-universe WF-CV re-run data-gated |
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |

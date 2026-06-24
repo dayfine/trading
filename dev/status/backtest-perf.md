@@ -663,6 +663,24 @@ mechanics + release-gate procedure.
 
 ## Completed
 
+- [x] **P0a — kill O(n²) A-D-live macro path** (2026-06-22). PR #1722
+  (`feat/ad-macro-perf`). PURE PERF, bit-identical (no golden re-pin). When A-D
+  breadth is LIVE the per-tick macro step was O(n) (`ad_bars_at_or_before`
+  `List.filter` + `_build_cumulative_ad_array`/`_compute_momentum_ma_scalar`
+  refold every Friday) → O(n²) over the run, 3-5× slower than A-D-inert. Fix:
+  new `Ad_series_cache` (`trading/trading/weinstein/strategy/lib/ad_series_cache.{ml,mli}`)
+  precomputes the cumulative-A-D int/float arrays + momentum_period ONCE from the
+  fixed `weekly_ad_bars`; per tick it binary-searches the `as_of` cutoff (O(log n))
+  and slices the prefix. New `Panel_callbacks.macro_callbacks_of_weekly_views_cached`
+  twin reads the cached closures; `run_macro_only` migrates from `~ad_bars` to
+  `~ad_series` threaded through `_on_market_close`. Bit-identical: same
+  int-then-float boundary; momentum MA via telescoped `cum_int.(k-1) -
+  cum_int.(k-1-period)` (A-D nets « 2^53, no rounding); empty bars → k=0 → all-`None`,
+  so A-D-inert goldens untouched. Verify: `dune runtest weinstein/strategy/test/`
+  (parity test `test_ad_series_cache` = 3 tests pin NEW cache == OLD path across
+  cutoffs/periods/offsets + empty input + prefix-length). The bar-list
+  `macro_callbacks_of_weekly_views` / `_of_snapshot_views` path is preserved.
+
 - **15y memory-cliff resolution + perf hotspot fixes** (2026-05-08..13). Combined
   data-side + simulator-side + orders-side work brought 15y SP500 wall from ~5 h
   to ~13.6 min (~22×) and peak RSS from 11.4 GB to ~766 MB. MERGED:

@@ -14,13 +14,30 @@ let _index_bars_of_weekly_view
         ~volume:(Float.to_int v.volumes.(i))
         ~adjusted_close:v.closes.(i) ())
 
+(* The decline-character classifier config built from the strategy-level
+   arming-speed flag and arming rate threshold: default config except
+   [fast_v_ignores_ma_filter] is set from [fast_v_arm_on_rate_alone] and
+   [fast_v_min_rate_pct] from the strategy field, so the strategy controls both
+   classify sites consistently. [fast_v_arm_on_rate_alone = false] together with
+   [fast_v_min_rate_pct = default_config.fast_v_min_rate_pct] (0.08) reproduces
+   [default_config] exactly. *)
+let classifier_config ~fast_v_arm_on_rate_alone ~fast_v_min_rate_pct =
+  {
+    Decline_character.default_config with
+    fast_v_ignores_ma_filter = fast_v_arm_on_rate_alone;
+    fast_v_min_rate_pct;
+  }
+
 let classify ~config ~macro ~index_view =
   let index_bars = _index_bars_of_weekly_view index_view in
   Decline_character.classify ~config ~macro ~index_bars
 
-let update_ref ~prior_decline_character ~macro_result_opt ~index_view =
+let update_ref ~fast_v_arm_on_rate_alone ~fast_v_min_rate_pct
+    ~prior_decline_character ~macro_result_opt ~index_view =
   match macro_result_opt with
   | None -> ()
   | Some macro ->
-      prior_decline_character :=
-        classify ~config:Decline_character.default_config ~macro ~index_view
+      let config =
+        classifier_config ~fast_v_arm_on_rate_alone ~fast_v_min_rate_pct
+      in
+      prior_decline_character := classify ~config ~macro ~index_view

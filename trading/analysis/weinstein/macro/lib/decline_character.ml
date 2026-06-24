@@ -10,6 +10,7 @@ type config = {
   fast_v_min_rate_pct : float;
   weeks_below_ma_slow_grind : int;
   trailing_high_lookback_weeks : int;
+  fast_v_ignores_ma_filter : bool; [@sexp.default false]
 }
 [@@deriving sexp]
 
@@ -21,6 +22,7 @@ let default_config =
     fast_v_min_rate_pct = 0.08;
     weeks_below_ma_slow_grind = 8;
     trailing_high_lookback_weeks = 52;
+    fast_v_ignores_ma_filter = false;
   }
 
 (* The most recent index close, or [None] when there are no bars. *)
@@ -126,21 +128,36 @@ let _is_fast_v (macro : Macro.result) (bars : Daily_price.t list)
   (not (_ad_line_is_leading macro bars ~config))
   && Float.( > ) rate_pct config.fast_v_min_rate_pct
 
+(* The trailing rate-of-decline drawdown as a positive fraction (0.0 when there
+   are too few bars). Shared by the decline-in-progress and pre-decline paths. *)
+let _rate_pct (bars : Daily_price.t list) ~(config : config) : float =
+  Option.value
+    (_trailing_drawdown_pct bars ~lookback:config.rate_lookback_weeks)
+    ~default:0.0
+
 (* Classify a decline already known to be in progress. Kept separate from
    {!classify} so neither function carries a nested [else]. *)
 let _classify_declining (macro : Macro.result) (bars : Daily_price.t list)
     ~(config : config) : t =
-  let rate_pct =
-    Option.value
-      (_trailing_drawdown_pct bars ~lookback:config.rate_lookback_weeks)
-      ~default:0.0
-  in
+  let rate_pct = _rate_pct bars ~config in
   match _is_slow_grind macro bars ~config ~rate_pct with
   | true -> Slow_grind
   | false ->
       if _is_fast_v macro bars ~config ~rate_pct then Fast_v else Not_declining
 
+(* The [fast_v_ignores_ma_filter] arming-speed path, evaluated only when no
+   decline is in progress by the MA test. Returns [Fast_v] on rate alone (the
+   gap-down the weekly-MA confirmation lags); never [Slow_grind] (a slow grind
+   presupposes weeks-below-a-falling-MA, i.e. a decline in progress). *)
+let _classify_pre_decline_fast_v (macro : Macro.result)
+    (bars : Daily_price.t list) ~(config : config) : t =
+  let rate_pct = _rate_pct bars ~config in
+  if _is_fast_v macro bars ~config ~rate_pct then Fast_v else Not_declining
+
 let classify ~(config : config) ~(macro : Macro.result)
     ~(index_bars : Daily_price.t list) : t =
-  if not (_is_declining macro index_bars) then Not_declining
-  else _classify_declining macro index_bars ~config
+  if _is_declining macro index_bars then
+    _classify_declining macro index_bars ~config
+  else if config.fast_v_ignores_ma_filter then
+    _classify_pre_decline_fast_v macro index_bars ~config
+  else Not_declining

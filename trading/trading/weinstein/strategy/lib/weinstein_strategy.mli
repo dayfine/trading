@@ -36,6 +36,10 @@ open Core
 module Ad_bars = Ad_bars
 (** NYSE advance/decline breadth data loader. See {!Ad_bars}. *)
 
+module Ad_series_cache = Ad_series_cache
+(** Precomputed cumulative-A-D + momentum series for the per-tick macro path.
+    See {!Ad_series_cache}. *)
+
 module Bar_reader = Bar_reader
 (** Panel-backed bar source. See {!Bar_reader}. *)
 
@@ -401,6 +405,49 @@ type config = {
           [screening_config.neutral_blocks_longs] at screen time so it is a
           [Variant_matrix] flag axis. See [Weinstein_strategy_config] for full
           semantics. *)
+  neutral_blocks_shorts : bool; [@sexp.default false]
+      (** Short-side mirror of {!neutral_blocks_longs} (default-off): when
+          [true], a macro-[Neutral] tape blocks new short entries (only
+          [Bearish] admits shorts). Default [false] preserves the historical
+          gate where both [Bearish] and [Neutral] admit shorts. Tightens the
+          short side to Weinstein's confirmed-bear rule; the Stage-4 breakdown
+          criteria and the macro gate are unaffected. Threaded into
+          [screening_config.neutral_blocks_shorts] at screen time so it is a
+          [Variant_matrix] flag axis. See [Weinstein_strategy_config] for full
+          semantics. *)
+  enable_slow_grind_short_gate : bool; [@sexp.default false]
+      (** Faithful-short decline-character gate (default-off): when [true],
+          shorts are admitted only when the current primary-index decline is a
+          [Decline_character.Slow_grind] (fast-V crashes and non-declines are
+          excluded). Default [false] is a no-op. The slow-grind bool is
+          classified at screen time from the current macro result + index bars
+          and threaded into
+          [Screener.screen_with_cooldown ~decline_is_slow_grind] (the screener
+          lib stays macro-agnostic). [Variant_matrix] flag axis. See
+          [Weinstein_strategy_config] for full semantics. *)
+  fast_v_arm_on_rate_alone : bool; [@sexp.default false]
+      (** Arming-speed dial for the fast-crash absolute stop (default-off): when
+          [true], the primary-index [Decline_character.Fast_v] classification
+          may arm on the rate of decline alone, without waiting for the weekly
+          MA to roll over (the 2020 arming-latency fix — the binding constraint
+          is when the stop arms, not its width). Default [false] is a no-op
+          (bit-identical; the classifier is unchanged). Threaded into
+          [Decline_character.fast_v_ignores_ma_filter] at both classify sites.
+          The {b spine} is untouched — it changes no buy/sell rule, only when
+          the tail-RISK-insurance absolute stop arms. [Variant_matrix] flag
+          axis. See [Weinstein_strategy_config] for full semantics. *)
+  fast_v_min_rate_pct : float; [@sexp.default 0.08]
+      (** Fast-V arming rate threshold (whipsaw-suppression dial): the minimum
+          trailing rate-of-decline drawdown at which the primary index is
+          classified [Decline_character.Fast_v]. Default [0.08] equals
+          [Decline_character.default_config.fast_v_min_rate_pct] — a no-op
+          (bit-identical classification). Raising it (e.g. to 0.16) requires a
+          steeper drawdown before [Fast_v] arms, suppressing the rate-alone
+          re-arm whipsaw in choppy corrections. Threaded into
+          [Decline_character.fast_v_min_rate_pct] at both classify sites. The
+          {b spine} is untouched — it changes only when the tail-RISK-insurance
+          absolute stop arms. [Variant_matrix] float axis. See
+          [Weinstein_strategy_config] for full semantics. *)
   enable_late_stage2_stop_tighten : bool; [@sexp.default false]
       (** Held-position risk dial (default-off): when [true], the
           {!Late_stage2_stop_runner} tightens the trailing stop of every held

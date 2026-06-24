@@ -78,16 +78,20 @@
    (bid_ask_spread_bps 5.0)
    (market_impact_bps_per_pct_adv 0.0)))
  (expected
-  ((total_return_pct   ((min  43.0)        (max  58.0)))
-   (total_trades       ((min 224)          (max 304)))
-   (win_rate           ((min  31.8)        (max  43.2)))
-   (sharpe_ratio       ((min   0.48)       (max   0.65)))
-   (max_drawdown_pct   ((min  18.4)        (max  24.9)))
-   (avg_holding_days   ((min  35.0)        (max  47.0)))
-   (open_positions_value ((min 1040000.0)  (max 1405000.0)))
-   (sortino_ratio_annualized ((min 0.64)   (max 0.86)))
-   (calmar_ratio       ((min   0.34)       (max   0.46)))
-   (ulcer_index        ((min   7.15)       (max   9.68)))
+  ;; Re-pinned 2026-06-23 for the A-D-live default flip (synthetic breadth tail).
+  ;; ±15% around A-D-live actuals; grid ACCEPT (dev/backtest/ad-grid-2026-06-23).
+  ;; A-D-live's conservative COVID gate raised risk metrics here (MaxDD 21.6→31.3,
+  ;; Calmar 0.46→0.26); return held (in band). Longshort still beats its long-only twin.
+  ((total_return_pct   ((min  40.7)        (max  55.1)))
+   (total_trades       ((min 233)          (max 315)))
+   (win_rate           ((min  31.0)        (max  42.0)))
+   (sharpe_ratio       ((min   0.46)       (max   0.63)))
+   (max_drawdown_pct   ((min  26.6)        (max  36.0)))
+   (avg_holding_days   ((min  34.6)        (max  46.8)))
+   (open_positions_value ((min 944000.0)   (max 1278000.0)))
+   (sortino_ratio_annualized ((min 0.60)   (max 0.81)))
+   (calmar_ratio       ((min   0.22)       (max   0.30)))
+   (ulcer_index        ((min  10.6)        (max  14.4)))
    ;; wall_seconds pin sized wide (CI ~920s, local parallel ~200s) —
    ;; catches only catastrophic 2x slowdowns per design intent.
    (wall_seconds       ((min 100.0)        (max 1500.0))))))

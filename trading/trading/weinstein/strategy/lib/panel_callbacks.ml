@@ -334,6 +334,32 @@ let macro_callbacks_of_weekly_views ?ma_cache ?index_symbol
       List.map globals ~f:(_named_global_stage ?ma_cache config);
   }
 
+(** Cache-backed twin of {!macro_callbacks_of_weekly_views}. Instead of
+    rebuilding the cumulative-A-D array and momentum-MA scalar from an [ad_bars]
+    list on every call (the O(n²) hot-loop cost), it reads the
+    [get_cumulative_ad] / [get_ad_momentum_ma] closures from a precomputed
+    {!Ad_series_cache.t} sliced to [as_of]. Output is bit-identical to
+    {!macro_callbacks_of_weekly_views} on the same underlying A-D series (parity
+    test: [Test_ad_series_cache]). Only the two A-D closures change; the index
+    stage / close / global-stage construction is identical. *)
+let macro_callbacks_of_weekly_views_cached ?ma_cache ?index_symbol
+    ~(config : Macro.config) ~(index : Snapshot_bar_views.weekly_view)
+    ~(globals : (string * Snapshot_bar_views.weekly_view) list)
+    ~(ad_series : Ad_series_cache.t) ~as_of () : Macro.callbacks =
+  let get_cumulative_ad, get_ad_momentum_ma =
+    Ad_series_cache.callbacks_at ad_series ~as_of
+  in
+  {
+    index_stage =
+      stage_callbacks_of_weekly_view ?ma_cache ?symbol:index_symbol
+        ~config:config.stage_config ~weekly:index ();
+    get_index_close = _get_from_float_array index.closes;
+    get_cumulative_ad;
+    get_ad_momentum_ma;
+    global_index_stages =
+      List.map globals ~f:(_named_global_stage ?ma_cache config);
+  }
+
 (* ------------------------------------------------------------------ *)
 (* Support floor — daily view with day_offset:0 = NEWEST                *)
 (* ------------------------------------------------------------------ *)
