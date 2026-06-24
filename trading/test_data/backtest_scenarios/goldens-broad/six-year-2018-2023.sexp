@@ -16,6 +16,24 @@
 ;;
 ;; Measured 2026-06-05 (Cell E, PIT top-1000-2018). Tolerances ±20%
 ;; (return/DD/sharpe/trades/holding), win_rate ±5pp — first PIT pin.
+;;
+;; RE-PINNED 2026-06-24 (#1729 decision C): complete-universe warehouse run
+;; (top-1000-2018, 1000/1000 symbols loaded; 1015 incl. ^GSPC + sector ETFs).
+;; The prior band (70.9-106.3%) was measured against an incomplete
+;; (survivor-subset, ~462/1000) test_data store — the runner silently skipped
+;; the missing symbols, badly inflating return. Re-measured against the
+;; delisting-complete warehouse snapshot /tmp/snap_top3000_1998_2026 (3015 syms);
+;; the complete top-1000-2018 universe (with COVID-era delistings) collapses the
+;; return from the survivor-inflated 70-106% to ~19%, and the MaxDD falls too
+;; (less concentrated). Determinism established on the sibling decade cell
+;; (bit-identical across two runs). This cell will (correctly) keep FAILING in
+;; GHA perf-tier4 against the incomplete committed test_data — that failure is
+;; the intentional missing-data signal; a local snapshot run reproduces the band.
+;;
+;; Measured 2026-06-24 (complete-universe warehouse, top-1000-2018):
+;;   total_return_pct 19.45   total_trades 280   win_rate 35.71
+;;   sharpe_ratio 0.28   max_drawdown 21.79   avg_holding_days 39.68   calmar 0.14
+;; Tolerances ±20% (return/DD/sharpe/trades/holding), win_rate ±5pp.
 ((name "six-year-2018-2023")
  (description "6-year run covering COVID crash and recovery (PIT top-1000-2018)")
  (period ((start_date 2018-01-02) (end_date 2023-12-29)))
@@ -31,9 +49,9 @@
    ((enable_laggard_rotation true))
    ((laggard_rotation_config ((hysteresis_weeks 2))))))
  (expected
-  ((total_return_pct   ((min 70.9) (max 106.3)))
-   (total_trades       ((min 254) (max 382)))
-   (win_rate           ((min 25.5) (max 35.5)))
-   (sharpe_ratio       ((min 0.35) (max 0.52)))
-   (max_drawdown_pct   ((min 46.4) (max 69.5)))
-   (avg_holding_days   ((min 29.1) (max 43.7))))))
+  ((total_return_pct   ((min 15.6) (max 23.3)))
+   (total_trades       ((min 224) (max 336)))
+   (win_rate           ((min 30.7) (max 40.7)))
+   (sharpe_ratio       ((min 0.23) (max 0.34)))
+   (max_drawdown_pct   ((min 17.4) (max 26.1)))
+   (avg_holding_days   ((min 31.7) (max 47.6))))))
