@@ -16,6 +16,22 @@
 ;;
 ;; Measured 2026-06-05 (Cell E, PIT top-1000-2014). Tolerances ±20%
 ;; (return/DD/sharpe/trades/holding), win_rate ±5pp — first PIT pin.
+;;
+;; RE-PINNED 2026-06-24 (#1729 decision C): complete-universe warehouse run
+;; (top-1000-2014, 1000/1000 symbols loaded; 1015 incl. ^GSPC + sector ETFs).
+;; The prior band (105.3-157.9%) was measured against an incomplete
+;; (survivor-subset, ~462/1000) test_data store — the runner silently skipped
+;; the missing symbols, inflating return. Re-measured against the
+;; delisting-complete warehouse snapshot /tmp/snap_top3000_1998_2026 (3015 syms).
+;; Deterministic: two independent warehouse runs produced bit-identical metrics.
+;; This cell will (correctly) keep FAILING in GHA perf-tier4 against the
+;; incomplete committed test_data — that failure is the intentional missing-data
+;; signal; a local snapshot run reproduces the band below.
+;;
+;; Measured 2026-06-24 (complete-universe warehouse, top-1000-2014):
+;;   total_return_pct 95.28   total_trades 462   win_rate 32.25
+;;   sharpe_ratio 0.50   max_drawdown 37.07   avg_holding_days 45.20   calmar 0.19
+;; Tolerances ±20% (return/DD/sharpe/trades/holding), win_rate ±5pp.
 ((name "decade-2014-2023")
  (description "10-year decade run spanning multiple regimes (PIT top-1000-2014)")
  (period ((start_date 2014-01-02) (end_date 2023-12-29)))
@@ -31,9 +47,9 @@
    ((enable_laggard_rotation true))
    ((laggard_rotation_config ((hysteresis_weeks 2))))))
  (expected
-  ((total_return_pct   ((min 105.3) (max 157.9)))
-   (total_trades       ((min 291) (max 437)))
-   (win_rate           ((min 26.3) (max 36.3)))
-   (sharpe_ratio       ((min 0.56) (max 0.84)))
-   (max_drawdown_pct   ((min 21.3) (max 32.0)))
-   (avg_holding_days   ((min 38.8) (max 58.2))))))
+  ((total_return_pct   ((min 76.2) (max 114.3)))
+   (total_trades       ((min 370) (max 554)))
+   (win_rate           ((min 27.3) (max 37.3)))
+   (sharpe_ratio       ((min 0.40) (max 0.60)))
+   (max_drawdown_pct   ((min 29.7) (max 44.5)))
+   (avg_holding_days   ((min 36.2) (max 54.2))))))

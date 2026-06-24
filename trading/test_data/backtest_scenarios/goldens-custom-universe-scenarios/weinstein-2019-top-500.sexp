@@ -109,17 +109,37 @@
  ;; Tolerances ±20% across the board, EXCEPT max_drawdown_pct +
  ;; win_rate + avg_holding_days at ±15% (those have lower per-run
  ;; variance per the #1180 random-sample distribution).
+ ;;
+ ;; **RE-PINNED 2026-06-24 (#1729 decision C): complete-universe warehouse run
+ ;; (top-500-2019, 500/500 symbols loaded; 515 incl. ^GSPC + sector ETFs).**
+ ;; The 2026-05-18 band was measured against a test_data store that covered only
+ ;; a survivor subset (~337/500) of this delisting-aware composition universe —
+ ;; the runner silently skipped the missing names. Re-measured against the
+ ;; delisting-complete warehouse snapshot /tmp/snap_top3000_1998_2026 (3015 syms).
+ ;; Return (72.77%) lands close to the prior band (which was already
+ ;; delisted-aware), but the full universe is less risky: MaxDD/ulcer fall and
+ ;; calmar rises. Determinism established on the sibling decade cell (bit-identical
+ ;; across two runs). This cell will (correctly) keep FAILING in GHA perf-tier3 /
+ ;; golden-runs-custom-universe against the incomplete committed test_data — that
+ ;; failure is the intentional missing-data signal; a local snapshot run
+ ;; reproduces the band below. Tolerances unchanged (±20%, EXCEPT DD/win/holding
+ ;; at ±15%); wall_seconds band kept (perf guard, not data-dependent).
+ ;;
+ ;; Measured 2026-06-24 (complete-universe warehouse, top-500-2019):
+ ;;   total_return_pct  72.77  total_trades 262  win_rate 36.64
+ ;;   sharpe_ratio 0.77  max_drawdown 27.31  avg_holding_days 39.39
+ ;;   open_positions_value 1,472,159  sortino 1.13  calmar 0.42  ulcer 12.57
  (expected
-  ((total_return_pct   ((min  62.7)         (max  94.0)))
-   (total_trades       ((min 210)           (max 316)))
-   (win_rate           ((min  27.1)         (max  36.7)))
-   (sharpe_ratio       ((min   0.55)        (max   0.83)))
-   (max_drawdown_pct   ((min  35.8)         (max  48.5)))
-   (avg_holding_days   ((min  35.7)         (max  48.3)))
-   (open_positions_value ((min 1139000.0)   (max 1710000.0)))
-   (sortino_ratio_annualized ((min  0.77)   (max   1.15)))
-   (calmar_ratio       ((min   0.23)        (max   0.35)))
-   (ulcer_index        ((min  15.2)         (max  22.8)))
+  ((total_return_pct   ((min  58.2)         (max  87.3)))
+   (total_trades       ((min 210)           (max 314)))
+   (win_rate           ((min  31.1)         (max  42.1)))
+   (sharpe_ratio       ((min   0.61)        (max   0.92)))
+   (max_drawdown_pct   ((min  23.2)         (max  31.4)))
+   (avg_holding_days   ((min  33.5)         (max  45.3)))
+   (open_positions_value ((min 1177727.0)   (max 1766591.0)))
+   (sortino_ratio_annualized ((min  0.90)   (max   1.36)))
+   (calmar_ratio       ((min   0.34)        (max   0.51)))
+   (ulcer_index        ((min  10.1)         (max  15.1)))
    ;; wall_seconds wide (CI ~5x local, local ~190s) — catches only
    ;; catastrophic 2x slowdowns per design intent.
    (wall_seconds       ((min 100.0)         (max 1800.0))))))
