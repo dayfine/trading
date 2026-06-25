@@ -1,6 +1,6 @@
 # Status: decline-character
 
-## Last updated: 2026-06-22
+## Last updated: 2026-06-25
 
 ## Status
 IN_PROGRESS
@@ -132,16 +132,30 @@ read-only dial, not a spine change. All builds default-off.
 
 ## Next steps
 
-1. Merge Build 2 (fast-crash absolute stop, PR feat/fast-crash-stop), Build 2b
-   (fast-V arming-speed dial, PR feat/decline-character/fast-v-arm-speed) + Build
-   3 (faithful short, PR feat/faithful-short).
-2. **Build 0** — A/D data wiring (feat-data) `[non-blocking]` — makes the
-   A/D-lead leg real (today the indicator is `Neutral` with `~ad_bars:[]`).
-3. Read-only screens (screen-rigor) on the `catastrophic_stop_pct` surface with
-   `fast_v_arm_on_rate_alone=true` (the dial that lets the absolute stop actually
-   fire in the 2020 fast-crash) and the faithful-short knobs
-   (`neutral_blocks_shorts` × `enable_slow_grind_short_gate`) → WF-CV if
-   promising → promotion grid, before any default flip.
+**WORKSTREAM EXHAUSTED (2026-06-25, #1739).** All builds merged; A-D-default flip
+merged (#1725, confirmation-grid 3/3 ACCEPT); the A-D-lead leg is now live (the deep
+`data/breadth/` store is populated). The final open empirical question — whether the
+now-live A-D-lead basis makes `fast_v_arm_on_rate_alone=true` promotable — was
+answered **NO** by the arming-speed A-D-live WF-CV (ledger
+`dev/experiments/_ledger/2026-06-24-arming-speed-adlive-wfcv.sexp`, verdict Reject;
+DSR 0.9999, go/no-go FAIL at 1/26 Sharpe wins; the A-D-live basis narrowed the knob
+to 2/26 folds — a marginal selectivity refinement, not the catch-vs-whipsaw
+separator the 06-22 `fast_v_min_rate` REJECT hoped for). Same meta-pattern as every
+decline-character mechanism: faithful narrow-niche tail-RISK insurance →
+**stays a default-off axis** (`catastrophic_stop_pct` armed on `Fast_v`;
+`neutral_blocks_shorts`; `enable_slow_grind_short_gate`; `fast_v_arm_on_rate_alone`),
+never default-on. See `memory/project_decline_character_builds` +
+`project_edge_is_the_fat_tail`.
+
+Remaining (all LOCAL/data-gated, none orchestrator-dispatchable):
+
+1. Heavy-tier golden re-pin — sub-task 1 (runnable broad/custom cells) DONE
+   (#1734/#1737, re-pinned to the complete-universe warehouse). Remaining
+   OOM/snapshot-mode cells (`sp500-30y-capacity-1996`, etc.) deferred — need
+   snapshots built first (EODHD-gated). Tracked in the 06-24 plan
+   `dev/plans/broad-golden-complete-data-2026-06-24.md`.
+2. No further mechanism search planned; the single-dial decline-character surface is
+   exhausted. Any revival would be a new hypothesis with its own ledger entry.
 
 ## Follow-ups
 
