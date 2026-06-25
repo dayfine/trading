@@ -101,15 +101,18 @@ val load_macro_trend :
     [Weinstein_types.Neutral]. Exposed for direct unit testing; the runner
     itself consumes it through {!run}. *)
 
-val run : output_dir:string -> unit
-(** [run ~output_dir] executes the full pipeline end-to-end:
+val run : ?warehouse_dir:string -> output_dir:string -> unit -> unit
+(** [run ?warehouse_dir ~output_dir ()] executes the full pipeline end-to-end:
 
     1. Loads actual-run artefacts from [output_dir] via
-    {!Optimal_run_artefacts.load}. 2. Builds the bar-panel world from
-    [Data_path.default_data_dir ()]. 3. Scans every Friday in the run window for
-    breakout candidates and scores each with a forward weekly walk. 4. Fills +
-    summarises the Constrained and Relaxed_macro variants, renders the markdown
-    report, and writes it to [<output_dir>/optimal_strategy.md].
+    {!Optimal_run_artefacts.load}. 2. Builds the bar-panel world — from the
+    pre-built snapshot warehouse at [warehouse_dir] when given (reads its
+    [manifest.sexp] and opens it directly, for broad universes the CSV [data/]
+    store doesn't hold), otherwise from [Data_path.default_data_dir ()]. 3.
+    Scans every Friday in the run window for breakout candidates and scores each
+    with a forward weekly walk. 4. Fills + summarises the Constrained and
+    Relaxed_macro variants, renders the markdown report, and writes it to
+    [<output_dir>/optimal_strategy.md].
 
     Raises [Failure] if [summary.sexp] or [actual.sexp] is missing / malformed,
     or if snapshot construction fails (corrupt CSVs, missing benchmark, etc.).

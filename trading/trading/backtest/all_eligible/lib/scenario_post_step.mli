@@ -36,9 +36,15 @@
     runner is invoked. This is the toggle the
     [scenario_runner.exe --no-emit-all-eligible] flag flips. *)
 
-val emit : enabled:bool -> scenario_path:string -> scenario_dir:string -> unit
-(** [emit ~enabled ~scenario_path ~scenario_dir] writes the all-eligible
-    diagnostic under [scenario_dir/all_eligible/] when [enabled = true].
+val emit :
+  enabled:bool ->
+  scenario_path:string ->
+  scenario_dir:string ->
+  warehouse_dir:string option ->
+  unit
+(** [emit ~enabled ~scenario_path ~scenario_dir ~warehouse_dir] writes the
+    all-eligible diagnostic under [scenario_dir/all_eligible/] when
+    [enabled = true].
 
     Parameters:
     - [enabled] — gate flag. When [false], the function returns immediately
@@ -47,6 +53,10 @@ val emit : enabled:bool -> scenario_path:string -> scenario_dir:string -> unit
       re-loads it (cheap; sexp-only).
     - [scenario_dir] — the per-scenario output directory the host scenario
       runner already populated with [actual.sexp] / [summary.sexp].
+    - [warehouse_dir] — when [Some dir], the diagnostic's bar world is opened
+      over that pre-built snapshot warehouse (matching the host backtest's
+      snapshot mode) instead of being built from CSV [data/]. Required for broad
+      universes the CSV store doesn't hold; [None] = build-from-CSV.
 
     Side effects (when [enabled = true]):
     - Creates [scenario_dir/all_eligible/].

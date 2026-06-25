@@ -15,42 +15,10 @@ module OT = Optimal_types
 
 let _warmup_days = 210
 
-(** LRU cache cap for the [Daily_panels.t] backing the strategy bar reads. Sized
-    for the optimal-strategy runner's typical universe (sp500 ≈ 500 symbols ×
-    ~140 KB per symbol full-history snapshot ≈ 70 MB). 256 MB is a comfortable
-    headroom. *)
-let _snapshot_cache_mb = 256
-
-(* ---------------------------------------------------------------- *)
-(* Snapshot construction                                              *)
-(* ---------------------------------------------------------------- *)
-
-(** Build a [Snapshot_callbacks.t] over [universe ∪ {primary_index}] for the
-    [start..end_] window. Materialises a tmp snapshot directory via
-    [Csv_snapshot_builder.build] (the same in-process pipeline the CSV runner
-    mode uses), opens a [Daily_panels.t] over it with an LRU cache, and exposes
-    the field-accessor shim. The tmp directory is left in place; the OS reaps it
-    on reboot. *)
-let _build_snapshot_callbacks ~data_dir_fpath ~universe ~start ~end_ :
-    Snapshot_callbacks.t =
-  let symbols =
-    Helpers.index_symbol :: universe
-    |> List.dedup_and_sort ~compare:String.compare
-  in
-  let snapshot_dir, manifest =
-    Backtest.Csv_snapshot_builder.build ~data_dir:data_dir_fpath
-      ~universe:symbols ~start_date:start ~end_date:end_
-  in
-  let panels =
-    match
-      Daily_panels.create ~snapshot_dir ~manifest
-        ~max_cache_mb:_snapshot_cache_mb
-    with
-    | Ok p -> p
-    | Error err ->
-        failwithf "Daily_panels.create failed: %s" (Status.show err) ()
-  in
-  Snapshot_callbacks.of_daily_panels panels
+(** LRU cache cap for the [Daily_panels.t] backing the strategy bar reads. Reads
+    [SNAPSHOT_CACHE_MB] (default 256, sized for the sp500 ≈ 500-symbol working
+    set); bump it for broad top-3000 runs to avoid cache thrash. *)
+let _snapshot_cache_mb = Backtest.Snapshot_world.default_cache_mb ()
 
 (* ---------------------------------------------------------------- *)
 (* Forward-walk outlooks for the scorer                               *)
@@ -188,7 +156,7 @@ type _world = {
     optimal return. The sector_map is still loaded for
     [Helpers.build_sector_context_map], but its keys are no longer the universe
     source. *)
-let _build_world ~output_dir ~(actual_run : Report.actual_run)
+let _build_world ~warehouse_dir ~output_dir ~(actual_run : Report.actual_run)
     ~(universe : string list) : _world =
   let data_dir_fpath = Data_path.default_data_dir () in
   let sectors_tbl = Sector_map.load ~data_dir:data_dir_fpath in
@@ -198,8 +166,10 @@ let _build_world ~output_dir ~(actual_run : Report.actual_run)
     (Date.to_string warmup_start)
     (Date.to_string actual_run.end_date);
   let snapshot_callbacks =
-    _build_snapshot_callbacks ~data_dir_fpath ~universe ~start:warmup_start
-      ~end_:actual_run.end_date
+    Backtest.Snapshot_world.build_callbacks ~warehouse_dir
+      ~data_dir:data_dir_fpath ~index_symbol:Helpers.index_symbol ~universe
+      ~start:warmup_start ~end_:actual_run.end_date
+      ~max_cache_mb:_snapshot_cache_mb
   in
   let sector_ctx_map = Helpers.build_sector_context_map sectors_tbl in
   let fridays =
@@ -268,7 +238,7 @@ let _emit_report ~output_dir ~(actual_run : Report.actual_run) ~scored : unit =
       relaxed_macro = relaxed_macro.summary;
     }
 
-let run ~output_dir =
+let run ?warehouse_dir ~output_dir () =
   eprintf "optimal_strategy: reading artefacts from %s\n%!" output_dir;
   let inputs = Optimal_run_artefacts.load ~output_dir in
   let actual_run = _build_actual_run inputs in
@@ -276,6 +246,9 @@ let run ~output_dir =
     (Date.to_string actual_run.start_date)
     (Date.to_string actual_run.end_date)
     actual_run.universe_size;
-  let world = _build_world ~output_dir ~actual_run ~universe:inputs.universe in
+  let world =
+    _build_world ~warehouse_dir ~output_dir ~actual_run
+      ~universe:inputs.universe
+  in
   let scored = _scan_and_score ~world in
   _emit_report ~output_dir ~actual_run ~scored

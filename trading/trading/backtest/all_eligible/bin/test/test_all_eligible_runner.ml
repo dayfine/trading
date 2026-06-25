@@ -152,6 +152,7 @@ let _make_args ~scenario_path ~out_dir : Runner.cli_args =
     min_grade = None;
     grade_sweep = false;
     config_overrides = [];
+    warehouse_dir = None;
   }
 
 (** Default-mode runs land artefacts under [out_dir/grade-C/] (the default
@@ -348,6 +349,23 @@ let test_parse_argv_grade_sweep _ =
          field (fun a -> a.Runner.min_grade) is_none;
        ])
 
+let test_parse_argv_snapshot_dir _ =
+  let argv =
+    [|
+      "all_eligible_runner.exe";
+      "--scenario";
+      "/tmp/foo.sexp";
+      "--snapshot-dir";
+      "/tmp/snap_top3000";
+    |]
+  in
+  assert_that (Runner.parse_argv argv).Runner.warehouse_dir
+    (is_some_and (equal_to "/tmp/snap_top3000"))
+
+let test_parse_argv_snapshot_dir_absent_is_none _ =
+  let argv = [| "all_eligible_runner.exe"; "--scenario"; "/tmp/foo.sexp" |] in
+  assert_that (Runner.parse_argv argv).Runner.warehouse_dir is_none
+
 let test_parse_argv_invalid_min_grade_raises _ =
   let argv =
     [|
@@ -409,6 +427,7 @@ let test_resolve_out_dir_default _ =
       min_grade = None;
       grade_sweep = false;
       config_overrides = [];
+      warehouse_dir = None;
     }
   in
   let resolved = Runner.resolve_out_dir ~scenario_name:"sp500-2019-2023" args in
@@ -431,6 +450,7 @@ let test_resolve_out_dir_explicit _ =
       min_grade = None;
       grade_sweep = false;
       config_overrides = [];
+      warehouse_dir = None;
     }
   in
   assert_that
@@ -590,6 +610,9 @@ let suite =
          "parse_argv all flags populated" >:: test_parse_argv_all_flags;
          "parse_argv --min-grade variants" >:: test_parse_argv_min_grade;
          "parse_argv --grade-sweep" >:: test_parse_argv_grade_sweep;
+         "parse_argv --snapshot-dir" >:: test_parse_argv_snapshot_dir;
+         "parse_argv --snapshot-dir absent is None"
+         >:: test_parse_argv_snapshot_dir_absent_is_none;
          "parse_argv invalid --min-grade raises Failure"
          >:: test_parse_argv_invalid_min_grade_raises;
          "parse_argv missing --scenario raises Failure"

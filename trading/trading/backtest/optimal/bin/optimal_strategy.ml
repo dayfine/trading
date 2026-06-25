@@ -13,23 +13,25 @@
 
 open Core
 
-type cli_args = { output_dir : string }
+type cli_args = { output_dir : string; warehouse_dir : string option }
 
 let _usage_and_exit () =
-  eprintf "Usage: optimal_strategy --output-dir <path>\n";
+  eprintf
+    "Usage: optimal_strategy --output-dir <path> [--snapshot-dir <warehouse>]\n";
   Stdlib.exit 1
 
 let _parse_args () : cli_args =
   let argv = Sys.get_argv () |> Array.to_list |> List.tl_exn in
-  let rec loop output_dir = function
-    | [] -> output_dir
-    | "--output-dir" :: v :: rest -> loop (Some v) rest
+  let rec loop output_dir warehouse_dir = function
+    | [] -> (output_dir, warehouse_dir)
+    | "--output-dir" :: v :: rest -> loop (Some v) warehouse_dir rest
+    | "--snapshot-dir" :: v :: rest -> loop output_dir (Some v) rest
     | _ :: _ -> _usage_and_exit ()
   in
-  match loop None argv with
-  | Some d -> { output_dir = d }
-  | None -> _usage_and_exit ()
+  match loop None None argv with
+  | Some d, warehouse_dir -> { output_dir = d; warehouse_dir }
+  | None, _ -> _usage_and_exit ()
 
 let () =
-  let { output_dir } = _parse_args () in
-  Backtest_optimal.Optimal_strategy_runner.run ~output_dir
+  let { output_dir; warehouse_dir } = _parse_args () in
+  Backtest_optimal.Optimal_strategy_runner.run ?warehouse_dir ~output_dir ()

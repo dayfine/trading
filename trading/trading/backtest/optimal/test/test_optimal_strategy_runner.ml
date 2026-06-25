@@ -172,7 +172,7 @@ let test_run_emits_optimal_strategy_md _ =
   let data_dir, output_dir = _mk_tmpdirs "opt_runner_smoke" in
   _stage_fixture ~data_dir ~output_dir;
   _with_data_dir ~data_dir (fun () ->
-      Backtest_optimal.Optimal_strategy_runner.run ~output_dir);
+      Backtest_optimal.Optimal_strategy_runner.run ~output_dir ());
   let report_path = Filename.concat output_dir "optimal_strategy.md" in
   let exists = Sys_unix.file_exists_exn report_path in
   let body = if exists then In_channel.read_all report_path else "" in
@@ -257,7 +257,7 @@ let test_run_consumes_macro_trend_sexp _ =
       (Date.of_string "2024-01-26", Weinstein_types.Bearish);
     ];
   _with_data_dir ~data_dir (fun () ->
-      Backtest_optimal.Optimal_strategy_runner.run ~output_dir);
+      Backtest_optimal.Optimal_strategy_runner.run ~output_dir ());
   let report_path = Filename.concat output_dir "optimal_strategy.md" in
   let body = In_channel.read_all report_path in
   assert_that body
@@ -276,7 +276,7 @@ let test_run_emits_optimal_summary_sexp _ =
   let data_dir, output_dir = _mk_tmpdirs "opt_runner_summary_sexp" in
   _stage_fixture ~data_dir ~output_dir;
   _with_data_dir ~data_dir (fun () ->
-      Backtest_optimal.Optimal_strategy_runner.run ~output_dir);
+      Backtest_optimal.Optimal_strategy_runner.run ~output_dir ());
   let sexp_path = Filename.concat output_dir "optimal_summary.sexp" in
   let exists = Sys_unix.file_exists_exn sexp_path in
   let body = if exists then In_channel.read_all sexp_path else "" in
@@ -304,7 +304,7 @@ let test_run_handles_missing_trade_audit _ =
   let audit_path = Filename.concat output_dir "trade_audit.sexp" in
   assert_that (Sys_unix.file_exists_exn audit_path) (equal_to false);
   _with_data_dir ~data_dir (fun () ->
-      Backtest_optimal.Optimal_strategy_runner.run ~output_dir);
+      Backtest_optimal.Optimal_strategy_runner.run ~output_dir ());
   let report_path = Filename.concat output_dir "optimal_strategy.md" in
   let body = In_channel.read_all report_path in
   assert_that body

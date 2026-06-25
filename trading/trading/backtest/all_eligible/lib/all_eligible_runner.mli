@@ -96,6 +96,12 @@ type cli_args = {
           forward-compatibility but not yet threaded into the scanner config.
           Documented as inert in the public surface so callers don't expect
           behavioural change. *)
+  warehouse_dir : string option;
+      (** When [Some dir], the bar-panel world is opened over the pre-built
+          snapshot warehouse at [dir] (its [manifest.sexp]) instead of being
+          built from CSV bars under [Data_path.default_data_dir ()]. Use for
+          broad universes (e.g. top-3000) the CSV [data/] store doesn't hold.
+          [None] keeps the build-from-CSV path. Set by [--snapshot-dir]. *)
 }
 (** Parsed CLI arguments. Exposed for unit testing the parser; the binary
     consumes this through {!run_with_args}. *)
