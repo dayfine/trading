@@ -89,7 +89,17 @@ narrow-niche tail tools, none promotable. The one promotable outcome — A-D-liv
 sharpening the macro entry gate broadly — already shipped as the #1725 default flip.
 No further decline-character lever indicated.
 
-## P2 — barbell weight cert (unchanged) — needs weight mandate.
+## P2 — barbell weight cert — RESOLVED 2026-06-24: NO FLOOR (pure engine).
+First A-D-live weight surface + a long-short engine leg (one fixed basis: 2000-2026,
+sp500-2000 PIT 515, current code). Floor=Spy_only_weinstein 387%/18.8%; engine LO
+871%/27.4%/.718, LS 721.7%/25.3%/.675. The short leg is a DD-reducer NOT a return-adder
+(lower return AND lower DD at every weight); shorts & floor are partial substitutes (LS
+Calmar-peak .459@w=.5 vs LO .436@w=.6). Both surfaces peak lighter than 70/30 on A-D-live
+(the old "70/30" was an A-D-inert/weak-engine artifact). **Decision (user): pure engine,
+w=0, no floor — keep full upside; internal stage3-exit+laggard+live-A-D-macro already
+supply crash defense; shorts stay default-off.** Writeup:
+`dev/backtest/barbell-adlive-weight-surface-2026-06-24/FINDINGS.md`; memory
+`project_barbell_on_stocks`.
 
 ## Operational notes
 - Local deep `data/` (gitignored) lives at the **REPO ROOT** `data/` (NOT `trading/data/`;
