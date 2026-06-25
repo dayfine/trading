@@ -123,9 +123,18 @@ breadth tradeoffs) and that **breadth is a DD/return tradeoff, not free return.*
 (My first chained launch mis-parsed the relative output-root path and skipped STEP 2;
 re-launched correctly — confirmed "universe=3000 / using snapshot warehouse (3015
 entries) / scanning 1478 Fridays", which **validates #1743's snapshot path on top-3000
-end-to-end**.) The forward-scan over 3000 × 1478 Fridays is ~6× the deep sp500 scan that
-didn't finish in 1h46m, so it may not complete by morning — append the broad missed-trades
-table if it lands; the capacity thesis from report #1 stands either way.
+end-to-end**.)
+
+**OUTCOME: OOM-killed mid-scan (~1h, RSS 7.1 GB on the 7.75 GB container), no output.**
+The bottleneck is **memory, not cache** (the 4096 MB snapshot cache was ample — the
+3000-symbol working set is only ~420 MB). The hog is the **`forward_table`**: a per-symbol
+`weekly_outlook list` across all 1478 Fridays for 3000 symbols (~4.4M stage-classified
+records held in RAM at once). It blew the ceiling before even finishing the scan phase
+(scoring would add more). So the broad missed-trades lens is **infeasible as-is** — the
+fix is not "faster"/"more cache" but **memory-bounded**: stream/chunk the forward_table
+(e.g. score per-symbol then drop, or window the Friday calendar), or run on a bigger box.
+The **capacity thesis from report #1 stands regardless** — it doesn't depend on the broad
+lens.
 
 ---
 
@@ -174,9 +183,11 @@ round of entry-signal tuning.
    `Weinstein_strategy.config` axes (most are already config fields) → WF-CV each on the
    sp500-2000 deep basis → confirmation grid. (`experiment-gap-closing` skill.)
 2. Merge #1743 (snapshot-mode runners; CI green, needs QC) — unblocks broad diagnostics.
-3. (Optional) make the optimal/all-eligible forward-scan scale to deep/broad windows: a
-   precompute/memoization pass so report #2/#3 *optimal* lenses finish (today the scan is
-   the bottleneck, not cache).
+3. Make the optimal/all-eligible forward-scan **memory-bounded** so the deep/broad optimal
+   lenses can finish: the `forward_table` materializes every symbol's full per-Friday
+   outlook list in RAM (OOM'd at ~7 GB on top-3000). Stream it — score per-symbol then
+   drop, or window the Friday calendar — rather than holding all ~4.4M records at once.
+   (Not a cache/speed fix; it's a working-set fix.)
 4. Fix the all-eligible post-step fixtures-root bug (below).
 
 ### Harness note (surfaced this session)
