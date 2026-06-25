@@ -119,3 +119,23 @@ Regime-timing the weight = known-dead lever. The earlier "70/30 robust" (#1670/#
 was on weak-engine windows (2000-26/top-1000); on the strong-engine window the
 return cost of 70/30 is the real consideration. Record:
 `dev/backtest/engine-edge-1998-2026/FINDINGS.md` (#1679).
+
+## 2026-06-24 — A-D-LIVE weight surface + LONG-SHORT engine → DECISION: NO FLOOR (pure engine)
+First weight surface on the A-D-LIVE basis (#1725) AND first with a long-short engine leg
+(`dev/backtest/barbell-adlive-weight-surface-2026-06-24/FINDINGS.md`). One fixed basis:
+2000-2026, sp500-2000 PIT (515), current code. Floor = Spy_only_weinstein 387%/18.8%/.575
+(matches prior). Engine LO (short off) 871%/27.4%/.718; engine LS (short on) 721.7%/25.3%/.675.
+Weight surface (w=floor): **LO** Sharpe-peak .744@.3, Calmar-peak .436@.6; **LS** Sharpe-peak
+.724@.4, Calmar-peak **.459@.5**. KEY whys: (1) the SHORT leg is a DD-reducer NOT a
+return-adder — at EVERY weight LS has lower return AND lower DD than LO (pure: −149pp ret,
+−2.1pp DD); adds no winning stream, shaves DD at a return cost (A-D short-timing signature
+[[project_ad_default_flip]] + [[project_edge_is_the_fat_tail]] shorts=insurance-not-alpha).
+(2) shorts & the floor are PARTIAL SUBSTITUTES (both cut DD) → turning shorts on shifts the
+Calmar-optimal floor weight DOWN (.5 vs .6). (3) LO keeps the better Sharpe peak + more return
+at every weight. On A-D-live both surfaces peak LIGHTER than 70/30 (Sharpe ~.3-.4, Calmar
+~.5-.6) — the old "70/30" was an A-D-inert/weak-engine artifact. **DECISION (user, 2026-06-24):
+PURE ENGINE (w=0), no floor — keep full upside; the barbell only buys DD with a real return
+give-up, and internal stage3-exit+laggard+live-A-D-macro already supply crash defense. Shorts
+stay default-off. P2 barbell weight cert RESOLVED: no floor, long-only pure engine = production
+stance.** Supersedes the "70/30 PROMOTE" grid framing for deployment purposes (that grid was
+A-D-inert, weak-engine windows; valid as methodology, not as the live weight).
