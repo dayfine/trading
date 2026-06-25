@@ -106,12 +106,50 @@ TRADING_DATA_DIR. data/ had only ~25 deep mega-caps before this fetch (why the s
   separates them. Ledgers: 2026-06-22-arming-speed-wfcv + fast-v-min-rate-surface.
 - **slow_grind_gate**: deep-screen REJECT-leaning (taxes the short tail; A-D-inert over-restricts).
 
-**THE UNLOCK = BUILD 0 (A-D breadth wiring, Ad_bars.load → pipeline.ml:103).** Two independent pieces of
+**BUILD 0 DONE (2026-06-22, PR #1719, dev/backtest/build0-ad-breadth-2026-06-22).** It was a DATA gap
+NOT a wiring gap: runner.ml:_load_ad_bars ALREADY calls Ad_bars.load ~data_dir (skip_ad_breadth=false
+default); A-D was inert only because data/breadth/ was empty (Ad_bars.load returns [] on missing files).
+Fix = generate synthetic ADL into data/breadth (compute_synthetic_adl.exe -data-dir data; 1998-2026,
+0.92-0.93 corr vs official NYSE) + seed committed Unicorn CSVs. NO code change, NO golden re-pin (breadth
+CSVs gitignored). pipeline.ml:103's ~ad_bars:[] is a SEPARATE snapshot-confidence-field path, not the
+CSV-mode strategy path. **PAYOFF (faithful-short deep 2000-2010, A-D-live vs A-D-inert):** (1) the WHOLE
+strategy lifts — long-only +92pp (327→419), -4pp DD, Sharpe 0.90→1.04 (A-D sharpens the MACRO ENTRY GATE,
+biggest effect measured); (2) slow_grind_gate FLIPS from taxes-the-edge (367 vs 475 ungated) to
+BEST-CALMAR (0.745) / BEST-DD (22.9%) — keeps 6 shorts net +$432K vs ungated 25 net +$203K (A-D-lead leg
+selects genuine bear shorts, the separation the rate signal couldn't make). slow_grind now WF-CV-worthy
+(running A-D-live WF-CV). **TWO DECISIONS for user: (A) make A-D-live the DEFAULT basis = commit breadth
+to test_data + re-pin ALL goldens (attended, behavior-changing, well-motivated now); (B) every WF-CV this
+session was A-D-INERT (old basis) — re-run on A-D-live before promotion (neutral likely holds=inert,
+slow_grind clearly changes, arming-speed catch/whipsaw separation may now be possible).** Doing B-for-slow_grind
+first (confirm before re-pin).
+
+**(superseded) THE UNLOCK = BUILD 0 (A-D breadth wiring, Ad_bars.load → pipeline.ml:103).** Two independent pieces of
 this session's evidence point to it: (a) slow_grind over-restricts because its A-D leg is inert; (b)
 arming-speed can't separate the 2020 catch from the 2010/2011 whipsaw with rate alone — the A-D-LEAD is
 the signal that distinguishes crash-that-keeps-falling from dip-that-recovers. Build 0 is behavior-changing
 (re-pins goldens) → attended. After it: re-run slow_grind screen + arming-speed WF-CV. This is the P0 next
 lever. Handoff: next-session-priorities-2026-06-22-EOD.md. Barbell 70/30 grid-passed ([[project_barbell_on_stocks]]).
+
+**UPDATE 2026-06-24:** (1) A-D-live became the DEFAULT basis — decision (A) above shipped via #1725
+(committed synthetic breadth to test_data + re-pinned goldens; confirmation-grid 3/3 PROMOTE) — see
+[[project_ad_default_flip]]. (2) The A-D-live re-runs (decision B) are mostly DONE: slow_grind_gate
+A-D-live WF-CV → NO-promote (regime-dependent, sub-promotable; `dev/backtest/slow-grind-adlive-wfcv-2026-06-22`,
+ledger 2026-06-22-slow-grind-adlive-wfcv); neutral_blocks_shorts stays ≈ungated even A-D-live. The ONLY
+not-yet-done, evidence-backed slice = the **fast_v arming-speed surface on A-D-live** (the fast_v_min_rate
+REJECT named the A-D-lead as the unlock for the catch/whipsaw separation). (3) **DONE 2026-06-24 → NO-promote**
+(`dev/backtest/arming-speed-adlive-wfcv-2026-06-24/`, ledger 2026-06-24-arming-speed-adlive-wfcv). Ran
+`arming-speed-deep-2000-2026.sexp` on the A-D-live deep basis (repo-root `data/` intact — the earlier "data
+gone" was a `trading/data/` vs repo-root path mix-up; 735 syms 1998-2026, breadth populated). RESULT: gate
+FAIL (1/26 Sharpe wins), DSR 0.9999 indistinguishable, frontier-dominant but negligible (+0.005 Sharpe). A-D-live
+narrowed the knob from 4/26 folds (inert) to **2/26**: suppressed the 2011 whipsaw (hypothesis working) BUT also
+dropped the 2018-Q4 catch (same conservatism); KEPT 2020 catch (+2.33pp/-3.46pp DD) + 2010 whipsaw. So the
+A-D breadth lead is a MARGINAL selectivity refinement, NOT the decisive catch-vs-whipsaw separator — the
+fast_v_min_rate-REJECT unlock hope is CLOSED. Binding limit = fast-V crashes (2020) are RARE → aggregate
+footprint ~zero by design. Stays default-off axis (faithful tail-RISK insurance). **The whole decline-character
+program is now exhausted**: classifier + fast-crash stop + faithful shorts + arming-speed all = faithful
+narrow-niche tail tools, none promotable; A-D-live itself (the broad macro-gate sharpening) WAS the one
+promotable outcome and shipped as the #1725 default flip. (Data run inline in MAIN session — repo-root `data/`
+is gitignored, invisible to worktree-isolated agents; EODHD secrets gone but bars already fetched.)
 
 **KEY meta-pattern (both short/crash mechanisms): faithful tail-management tools with narrow regime-specific
 niches and small/regime-dependent aggregate edges — NOT robust standalone alpha.** Consistent with
