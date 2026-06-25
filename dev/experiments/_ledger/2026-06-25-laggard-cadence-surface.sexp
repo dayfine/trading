@@ -1,0 +1,21 @@
+((date 2026-06-25)
+ (slug laggard-cadence-surface)
+ (hypothesis
+  "the optimal lens showed rotation churn (~280 trades vs the optimal's 47) is what exhausts cash so cascade-identified winners go unfunded. Slowing laggard rotation (raising laggard_rotation_config.hysteresis_weeks above the deep-base 2) preserves dry powder WITHOUT cranking single-name variance the way the concentration size-cap does; a distinct capacity/turnover lever")
+ (base_scenario "goldens-sp500-historical/sp500-2000-2026-catstop.sexp")
+ (window_id wfcv-deep-2000-2026-26fold)
+ (baseline_label baseline)
+ (variants
+  (((label hysteresis_weeks=4-DEFAULT)
+    (config_hash laggardhyst-4-catstop10-longonly-deep)
+    (aggregate ((sharpe_mean 0.627) (calmar_mean 1.121) (maxdd_mean 10.21) (return_mean 10.63) (pareto_frontier no) (deflated_sharpe n/a))))
+   ((label hysteresis_weeks=6)
+    (config_hash laggardhyst-6-catstop10-longonly-deep)
+    (aggregate ((sharpe_mean 0.554) (calmar_mean 1.077) (maxdd_mean 10.17) (return_mean 10.35) (pareto_frontier yes) (deflated_sharpe n/a))))
+   ((label hysteresis_weeks=8)
+    (config_hash laggardhyst-8-catstop10-longonly-deep)
+    (aggregate ((sharpe_mean 0.671) (calmar_mean 1.373) (maxdd_mean 10.17) (return_mean 12.36) (pareto_frontier yes) (deflated_sharpe n/a))))))
+ (verdict Inconclusive)
+ (notes
+  "INCONCLUSIVE / no-promote. Curve hysteresis_weeks {2,4,6,8}: Sharpe 0.562->{0.627,0.554,0.671}, Calmar 1.030->{1.121,1.077,1.373}, return 9.30->{10.63,10.35,12.36}, maxdd 9.95->{10.21,10.17,10.17}. WEAK directional support: return + Calmar rise across all of 4/6/8 with only mild DD cost and GENTLER dispersion than the concentration lever (sigma 12.6->{14,16,17} vs concentration's ->27) -- consistent with the thesis that turnover is a distinct, less-variance-cranking capacity lever. BUT Sharpe is NON-MONOTONIC (0.56->0.63->0.55->0.67; hysteresis=6 dips BELOW baseline) and the best cell (8) wins only 17/26 folds -- noisy, modest, no robust promotable value. KEY cross-cutting finding (see also the concentration surface 2026-06-25-capacity-concentration-surface): the deep-base value (hysteresis=2, aggressive rotation) is BELOW the canonical Laggard_rotation default (hysteresis=4) and the DEFAULT BEATS THE BASE (Sharpe 0.627 vs 0.562, Calmar 1.121 vs 1.030). EXACTLY the pattern of the concentration surface, where the deep-base cap 0.14 is below the canonical default 0.30 and the default beats the base. In BOTH capacity surfaces the deep research basis is tuned MORE CAPACITY-SUPPRESSING than production (caps positions tighter + churns faster), and in both the production default is better. IMPLICATION: the optimal-lens 'Insufficient_cash capacity gap' is PARTLY an artifact of the conservative deep-golden basis, not necessarily a gap in the production strategy. Before chasing more capacity levers, RE-PIN the deep goldens to production defaults (max_position_pct_long 0.14->0.30, laggard hysteresis_weeks 2->4) and RE-RUN the optimal lens on the corrected basis; the gap may shrink substantially. Connects to [[project_edge_is_the_fat_tail]] (capacity levers amplify the tail but lumpily) and the concentration-surface no-promote. Surface: /tmp/sweeps/capacity-laggard-cadence-v1. Writeup dev/notes/capacity-levers-deep-basis-recalibration-2026-06-25.md.")
+ )
