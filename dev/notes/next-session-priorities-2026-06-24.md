@@ -45,11 +45,18 @@ stay **local-only** (already fail-on-missing in GHA = intentional signal) and ar
    37.91% (was 49–74), covid-recovery-2020-2024 35.31% (≈ prior), weinstein-2019-top-500
    72.77% (≈ prior). Bands centered on measured point ± file's tolerance scheme.
    These stay GHA-fail-on-missing by design (decision C). 3-gate green.
-2. **Top-3000 cells** (`tier4-broad-1y/10y`, `sp500-30y-capacity-1996`,
-   `weinstein-full-pool`) — STILL BLOCKED on the snapshot memory crash
-   (`project_panel_runner_memory_ceiling`; fork-per-cell / `SNAPSHOT_CACHE_MB`).
-   Separate engineering fix; they carry permissive scaffolding ranges so are not
-   asserting false truth in the meantime.
+2. ~~**Top-3000 cells** — blocked on snapshot memory crash~~ **DONE — PR #1738 MERGED
+   (2026-06-24): the memory-crash blocker is RETIRED.** `tier4-broad-1y` runs clean at
+   full **N=3000** in snapshot mode (cache **evictions=0** at 4 GB cap, PASS −10.41%);
+   `sp500-30y` N=1000 deterministic (1453.6%). The snapshot-format-v2 #1631 fix carries
+   the broad goldens. The real obstacles were a **fixtures-root path bug** (doubled
+   `trading/` prefix → `Sys_error`, ran from dune root with `--fixtures-root
+   trading/test_data/...` instead of `test_data/...`) + **wall-time** (top-3000 × 5y/10y
+   are multi-hour, NOT memory-bound). tier4/30y are scale/scaffolding cells (ranges
+   intentionally wide) → recorded verified provenance, not tightened. FINDINGS:
+   `dev/backtest/broad-golden-top3000-verify-2026-06-24/`. Optional follow-up: multi-hour
+   complete-universe refresh of `weinstein-full-pool` (research baseline) + `tier4-broad-10y`.
+   **Issue #1729 fully addressed.**
 
 The merged flip (#1725) is sound (grid ran vs complete data/; sp500/small re-pins
 consistent-source). This is cleanup, not a flip correction.
@@ -67,11 +74,20 @@ read. Verified: 735 `data.csv`, AAPL 1998-01-02→2026-06-22, delisted LEH prese
 → **A-D-live basis is ready**. (The EODHD `secrets` file is gone but irrelevant — bars
 already fetched.) **Scope:** of P1 the short-gate half is effectively DONE (06-22
 `slow-grind-adlive` WF-CV → NO-promote; `neutral_blocks_shorts` ≈ungated even A-D-live).
-The one not-yet-done, evidence-backed slice = the **fast_v arming-speed surface on
-A-D-live** (the 06-22 `fast_v_min_rate` REJECT named the A-D breadth lead as the unlock).
-RUNNABLE NOW via `arming-speed-deep-2000-2026.sexp` (base `sp500-2000-2026-catstop`,
-axis `fast_v_arm_on_rate_alone {true,false}`, 26 folds) — must run in the MAIN session
-(repo-root `data/` is invisible to worktree-isolated agents).
+The one not-yet-done, evidence-backed slice was the **fast_v arming-speed surface on
+A-D-live** — **DONE 2026-06-24 → NO-promote (PR #1737 MERGED)**, ledger
+`2026-06-24-arming-speed-adlive-wfcv`. Gate FAIL (1/26 Sharpe wins), DSR 0.9999. A-D-live
+narrowed the knob from 4/26 folds to 2/26 (suppressed the 2011 whipsaw = hypothesis
+working, but also dropped the 2018-Q4 catch; kept 2020 catch +2.33pp/−3.46pp DD + the
+2010 whipsaw). The A-D breadth lead is a marginal selectivity refinement, NOT the
+catch-vs-whipsaw separator the `fast_v_min_rate` REJECT hoped — loop closed; binding
+limit = fast-V crashes are rare. Stays default-off tail-RISK-insurance axis.
+
+**⇒ The decline-character program is now EXHAUSTED.** Classifier (#1692) + fast-crash
+stop (#1695) + faithful shorts (#1696) + arming-speed (#1708/#1716) are all faithful
+narrow-niche tail tools, none promotable. The one promotable outcome — A-D-live
+sharpening the macro entry gate broadly — already shipped as the #1725 default flip.
+No further decline-character lever indicated.
 
 ## P2 — barbell weight cert (unchanged) — needs weight mandate.
 
