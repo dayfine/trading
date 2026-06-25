@@ -40,6 +40,18 @@
 ;;
 ;; PINNED_AFTER_FIRST_RUN — leave `expected` ranges wide; first local run
 ;; populates them.
+;;
+;; VERIFIED 2026-06-24 (#1729 sub-task 2): ran clean at FULL N=3000 in snapshot
+;; mode against /tmp/snap_top3000_1998_2026 (PIT top-3000-2022, 3015 syms incl.
+;; index+ETFs) — snapshot cache evictions=0 at the 4 GB cap, NO memory ceiling
+;; (confirms the snapshot-format-v2 #1631 fix; retires project_panel_runner_memory_ceiling
+;; for the broad goldens). Measured: total_return_pct -10.41, total_trades 16,
+;; win_rate 6.25, sharpe -0.855, max_drawdown 19.64, avg_holding_days 40.19,
+;; calmar -0.536, ulcer 10.37, open_positions_value 865,873 (low trade count =
+;; 2022 bear tape, macro gate suppressed entries — expected). Ranges intentionally
+;; LEFT WIDE per the SCAFFOLDING/scale-validation purpose of this cell (it probes the
+;; runtime path at scale, not a return regression). See
+;; dev/backtest/broad-golden-top3000-verify-2026-06-24/FINDINGS.md.
 ((name "tier4-broad-1y")
  (description "Tier-4 release-gate SCALE — full broad universe × 1y mechanic validation (snapshot-mode only)")
  (period ((start_date 2022-01-03) (end_date 2022-12-30)))
