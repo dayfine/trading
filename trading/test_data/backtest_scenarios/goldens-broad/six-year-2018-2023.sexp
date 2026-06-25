@@ -41,7 +41,7 @@
  (universe_size 1000)
  (config_overrides
   (((enable_short_side false))
-   ((portfolio_config ((max_position_pct_long 0.14))))
+   ((portfolio_config ((max_position_pct_long 0.30))))
    ((portfolio_config ((max_long_exposure_pct 0.70))))
    ((portfolio_config ((min_cash_pct 0.30))))
    ((enable_stage3_force_exit true))
@@ -49,9 +49,15 @@
    ((enable_laggard_rotation true))
    ((laggard_rotation_config ((hysteresis_weeks 2))))))
  (expected
-  ((total_return_pct   ((min 15.6) (max 23.3)))
-   (total_trades       ((min 224) (max 336)))
-   (win_rate           ((min 30.7) (max 40.7)))
-   (sharpe_ratio       ((min 0.23) (max 0.34)))
-   (max_drawdown_pct   ((min 17.4) (max 26.1)))
-   (avg_holding_days   ((min 31.7) (max 47.6))))))
+  ;; Concentration=0.30 promotion 2026-06-25 (max_position_pct_long 0.14 -> 0.30, the
+  ;; production default; ledger 2026-06-25-capacity-concentration-broad). Warehouse
+  ;; re-measure. ⚠ 0.30 HURTS this 6y window: ret 19.45 -> 4.02, sharpe 0.28 -> 0.115
+  ;; (concentration is regime-dependent — helps the long/aggregate windows, hurts
+  ;; some short ones; the ACCEPT is a broad-aggregate verdict, not per-window).
+  ;; Wide bands around the near-zero 0.30 actuals (ret 4.02 sharpe 0.115 maxDD 24.70).
+  ((total_return_pct   ((min -8.0)  (max 16.0)))
+   (total_trades       ((min 176)   (max 238)))
+   (win_rate           ((min 33.2)  (max 43.2)))
+   (sharpe_ratio       ((min -0.10) (max 0.33)))
+   (max_drawdown_pct   ((min 19.8)  (max 29.6)))
+   (avg_holding_days   ((min 35.8)  (max 53.7))))))

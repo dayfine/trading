@@ -57,7 +57,7 @@
  ;; MaxDD cut 6.7pp (31 → 24), trade count 3.4x. Tolerances ±15%.
  (config_overrides
   (((enable_short_side false))
-   ((portfolio_config ((max_position_pct_long 0.14))))
+   ((portfolio_config ((max_position_pct_long 0.30))))
    ((portfolio_config ((max_long_exposure_pct 0.70))))
    ((portfolio_config ((min_cash_pct 0.30))))
    ((enable_stage3_force_exit true))
@@ -74,18 +74,22 @@
    (bid_ask_spread_bps 5.0)
    (market_impact_bps_per_pct_adv 0.0)))
  (expected
-  ;; Re-pinned 2026-06-23 for the A-D-live default flip (synthetic breadth tail).
-  ;; ±15% around A-D-live actuals; grid ACCEPT (dev/backtest/ad-grid-2026-06-23).
-  ;; Long-only 2019-2023 fell sharply (ret 66→26): A-D-live's conservative COVID
-  ;; gate, and long-only can't exploit the breadth's short-timing edge.
-  ((total_return_pct   ((min  22.2)        (max  30.0)))
-   (total_trades       ((min 237)          (max 321)))
-   (win_rate           ((min  30.2)        (max  40.8)))
-   (sharpe_ratio       ((min   0.32)       (max   0.43)))
-   (max_drawdown_pct   ((min  26.5)        (max  35.9)))
-   (avg_holding_days   ((min  32.7)        (max  44.2)))
-   (open_positions_value ((min 798000.0)   (max 1080000.0)))
-   (sortino_ratio_annualized ((min 0.37)   (max 0.50)))
-   (calmar_ratio       ((min   0.13)       (max   0.18)))
-   (ulcer_index        ((min  11.1)        (max  15.1)))
+  ;; Re-pinned 2026-06-25 for the concentration=0.30 promotion (max_position_pct_long
+  ;; 0.14 -> 0.30, the production default; broad top-3000 WF-CV ACCEPT, ledger
+  ;; 2026-06-25-capacity-concentration-broad). Measured against test_data (the
+  ;; golden-runs-sp500-15y store), ±15% around 0.30 actuals:
+  ;;   ret 41.13  trades 207  win 37.2  sharpe 0.47  maxDD 38.96  hold 45.86
+  ;;   sortino 0.58  calmar 0.18  ulcer 15.46
+  ;; vs prior 0.14 pin (ret 26 / maxDD 31): 0.30 = the honest production risk profile
+  ;; (higher return AND higher DD); the 0.14 override understated it.
+  ((total_return_pct   ((min  34.9)        (max  47.3)))
+   (total_trades       ((min 176)          (max 238)))
+   (win_rate           ((min  31.6)        (max  42.8)))
+   (sharpe_ratio       ((min   0.40)       (max   0.54)))
+   (max_drawdown_pct   ((min  33.1)        (max  44.8)))
+   (avg_holding_days   ((min  39.0)        (max  52.7)))
+   (open_positions_value ((min 798000.0)   (max 1300000.0)))
+   (sortino_ratio_annualized ((min 0.49)   (max 0.67)))
+   (calmar_ratio       ((min   0.15)       (max   0.21)))
+   (ulcer_index        ((min  13.1)        (max  17.8)))
    (wall_seconds       ((min 100.0)        (max 1500.0))))))

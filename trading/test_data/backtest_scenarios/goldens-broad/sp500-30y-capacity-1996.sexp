@@ -47,7 +47,7 @@
  (config_overrides
   (((universe_cap (1000)))
    ((enable_short_side false))
-   ((portfolio_config ((max_position_pct_long 0.14))))
+   ((portfolio_config ((max_position_pct_long 0.30))))
    ((portfolio_config ((max_long_exposure_pct 0.70))))
    ((portfolio_config ((min_cash_pct 0.30))))
    ((enable_stage3_force_exit true))
@@ -60,6 +60,9 @@
  ;; dev/notes/n1000-30y-capacity-2026-04-30.md and the ranges below
  ;; merely confirm the run finished sanely.
  (expected
+  ;; Concentration=0.30 promotion 2026-06-25 (max_position_pct_long 0.14 -> 0.30, the
+  ;; production default; ledger 2026-06-25-capacity-concentration-broad). Capacity-test
+  ;; sentinel bands; 0.30 measured ret 951.9% / 958 trades / 40.9% win / 33.9% DD (PASS).
   ((total_return_pct   ((min -1000.0)      (max 1000000.0)))
    (total_trades       ((min 0)            (max 100000)))
    (win_rate           ((min 0.0)          (max 100.0)))
