@@ -7,6 +7,26 @@ metadata:
   originSessionId: 6379af08-b68f-4dd7-8742-dff729a8b814
 ---
 
+**UPDATE 2026-06-25 PM (user correction → BROAD re-run, the authoritative result):** the
+SP500-515 surfaces were the WRONG basis (too narrow to exercise the capacity bottleneck).
+Re-ran concentration on BROAD top-3000-2000 2000-2026 (warehouse snapshot, 13×2y folds):
+**CLEAN interior optimum at 0.30 (= the production default)** — Sharpe 0.442→0.508→0.470,
+CAGR 7.2→10.2→9.3% across {0.14,0.30,0.50}, monotonic up to 0.30 then 0.50 declines.
+0.14→0.30 = **+3pp/yr CAGR**, robust 9/13 folds, and LOSES LESS in the worst folds.
+Ledger **2026-06-25-capacity-concentration-broad = ACCEPT** (value 0.30). The SP500
+knife-edge washout was a narrowness artifact; breadth shows the real signal. User
+authorized promoting 0.30 by re-pinning scenarios. **Promotion = goldens re-pin (remove
+the 0.14 override → 0.30), NOT a live flip** (default is already 0.30; production already
+runs it) → the promotion-confirmation grid does not gate it. **⚠ NOT executed: data-store
+provenance landmine** — the SAME golden, config unchanged, gives 23.5% (local data/ CSV)
+vs 49.1% (warehouse) vs ≤30% band (CI test_data); different goldens are pinned vs different
+stores, so re-pinning bands from the wrong store breaks main's postsubmit while user is AFK.
+Re-pin procedure + scope (long-only regression goldens ONLY; NOT experiments/*, NOT
+longshort, NOT catstop bases) in dev/notes/capacity-concentration-broad-2026-06-25.md.
+NEXT P0: resolve which store each golden is pinned against (recommend warehouse), then
+mechanical per-golden re-pin + verify. Below = the original SP500-basis finding, now
+superseded-by-basis for the headline (stands as "SP500 too narrow to show the signal"):
+
 2026-06-25 cross-cutting finding from two WF-CV capacity surfaces (concentration +
 laggard cadence, deep 2000-2026 sp500-PIT, 26 folds). **The deep-golden research
 basis is tuned MORE capacity-suppressing than the canonical production defaults, and
