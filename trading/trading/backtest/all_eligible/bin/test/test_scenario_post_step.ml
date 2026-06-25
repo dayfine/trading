@@ -130,7 +130,8 @@ let test_emit_enabled_writes_four_artefacts _ =
   let data_dir, scenario_dir = _mk_tmpdirs "post_step_on" in
   let scenario_path = _stage_fixture ~data_dir in
   _with_data_dir ~data_dir (fun () ->
-      Post_step.emit ~enabled:true ~scenario_path ~scenario_dir);
+      Post_step.emit ~enabled:true ~scenario_path ~scenario_dir
+        ~warehouse_dir:None);
   let cell =
     Filename.concat (Filename.concat scenario_dir "all_eligible") "grade-C"
   in
@@ -160,7 +161,8 @@ let test_emit_disabled_creates_no_subdir _ =
   let data_dir, scenario_dir = _mk_tmpdirs "post_step_off" in
   let scenario_path = _stage_fixture ~data_dir in
   _with_data_dir ~data_dir (fun () ->
-      Post_step.emit ~enabled:false ~scenario_path ~scenario_dir);
+      Post_step.emit ~enabled:false ~scenario_path ~scenario_dir
+        ~warehouse_dir:None);
   let all_eligible_dir = Filename.concat scenario_dir "all_eligible" in
   assert_that (Sys_unix.file_exists_exn all_eligible_dir) (equal_to false)
 
@@ -176,7 +178,7 @@ let test_emit_swallows_runner_failure _ =
   let raised =
     try
       Post_step.emit ~enabled:true ~scenario_path:bogus_scenario_path
-        ~scenario_dir;
+        ~scenario_dir ~warehouse_dir:None;
       false
     with _ -> true
   in

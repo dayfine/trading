@@ -336,8 +336,16 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
      [all_eligible_runner.exe] invocation. Failures inside the runner are
      logged + swallowed by [Scenario_post_step.emit] so a diagnostic crash
      never aborts the parent scenario. *)
+  (* In snapshot mode, hand the diagnostic the same warehouse the backtest used
+     so it works on broad universes the CSV [data/] store doesn't hold. *)
+  let warehouse_dir =
+    match bar_data_source with
+    | Some (Backtest.Bar_data_source.Snapshot { snapshot_dir; _ }) ->
+        Some snapshot_dir
+    | Some Backtest.Bar_data_source.Csv | None -> None
+  in
   Backtest_all_eligible.Scenario_post_step.emit ~enabled:emit_all_eligible
-    ~scenario_path ~scenario_dir
+    ~scenario_path ~scenario_dir ~warehouse_dir
 
 (* Fork-based worker pool. Scenarios run in parallel child processes up to
    [parallel] at a time. *)

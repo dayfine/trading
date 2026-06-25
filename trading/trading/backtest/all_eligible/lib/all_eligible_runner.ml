@@ -23,7 +23,7 @@ module OT = Backtest_optimal.Optimal_types
 let _index_symbol = "GSPC.INDX"
 let _warmup_days = 210
 let _bar_lookback_weeks = 90
-let _snapshot_cache_mb = 256
+let _snapshot_cache_mb = Backtest.Snapshot_world.default_cache_mb ()
 
 (* ---------------------------------------------------------------- *)
 (* CLI args                                                           *)
@@ -37,6 +37,7 @@ type cli_args = {
   min_grade : Weinstein_types.grade option;
   grade_sweep : bool;
   config_overrides : Sexp.t list;
+  warehouse_dir : string option;
 }
 
 let _usage () =
@@ -52,6 +53,9 @@ let _usage () =
       "  --min-grade <F|D|C|B|A|A+>   Cascade grade floor (default: C).";
       "  --grade-sweep                Run F/D/C/B/A as a sweep; emit one \
        subdir per grade plus a top-level cross-grade summary.";
+      "  --snapshot-dir <warehouse>   Read bars from a pre-built snapshot \
+       warehouse (its manifest.sexp) instead of building from CSV data/. Use \
+       for broad universes (e.g. top-3000) the CSV store doesn't hold.";
       "  --config-overrides <sexp>    Extra config overrides (sexp list, \
        passthrough).";
     ]
@@ -94,6 +98,7 @@ let parse_argv argv =
       min_grade = None;
       grade_sweep = false;
       config_overrides = [];
+      warehouse_dir = None;
     }
   in
   let rec loop acc = function
@@ -107,6 +112,8 @@ let parse_argv argv =
     | "--min-grade" :: v :: rest ->
         loop { acc with min_grade = Some (_parse_grade v) } rest
     | "--grade-sweep" :: rest -> loop { acc with grade_sweep = true } rest
+    | "--snapshot-dir" :: v :: rest ->
+        loop { acc with warehouse_dir = Some v } rest
     | "--config-overrides" :: v :: rest ->
         loop { acc with config_overrides = _parse_overrides v } rest
     | flag :: _ -> _fail_usage (Printf.sprintf "Unknown flag: %s" flag)
@@ -146,31 +153,6 @@ let resolve_config (args : cli_args) : All_eligible.config =
   in
   let min_grade = Option.value args.min_grade ~default:base.min_grade in
   { entry_dollars; return_buckets; min_grade }
-
-(* ---------------------------------------------------------------- *)
-(* Snapshot construction (mirror of optimal-strategy runner's                *)
-(* private helper)                                                            *)
-(* ---------------------------------------------------------------- *)
-
-let _build_snapshot_callbacks ~data_dir_fpath ~universe ~start ~end_ :
-    Snapshot_callbacks.t =
-  let symbols =
-    _index_symbol :: universe |> List.dedup_and_sort ~compare:String.compare
-  in
-  let snapshot_dir, manifest =
-    Backtest.Csv_snapshot_builder.build ~data_dir:data_dir_fpath
-      ~universe:symbols ~start_date:start ~end_date:end_
-  in
-  let panels =
-    match
-      Daily_panels.create ~snapshot_dir ~manifest
-        ~max_cache_mb:_snapshot_cache_mb
-    with
-    | Ok p -> p
-    | Error err ->
-        failwithf "Daily_panels.create failed: %s" (Status.show err) ()
-  in
-  Snapshot_callbacks.of_daily_panels panels
 
 (* ---------------------------------------------------------------- *)
 (* Friday calendar                                                    *)
@@ -421,7 +403,8 @@ let format_summary_md ~scenario_name ~start_date ~end_date
     / [sectors_tbl]. Mirrors the optimal-strategy runner's private
     [_build_world] but without the macro-trend table (this diagnostic doesn't
     consume one — every Friday treats macro as [Neutral]). *)
-let _build_world ~(scenario : Scenario_lib.Scenario.t) ~universe ~sectors_tbl :
+let _build_world ~warehouse_dir ~(scenario : Scenario_lib.Scenario.t) ~universe
+    ~sectors_tbl :
     Snapshot_callbacks.t
     * (string, Screener.sector_context) Hashtbl.t
     * Date.t list =
@@ -432,8 +415,10 @@ let _build_world ~(scenario : Scenario_lib.Scenario.t) ~universe ~sectors_tbl :
     (Date.to_string warmup_start)
     (Date.to_string scenario.period.end_date);
   let snapshot_callbacks =
-    _build_snapshot_callbacks ~data_dir_fpath ~universe ~start:warmup_start
-      ~end_:scenario.period.end_date
+    Backtest.Snapshot_world.build_callbacks ~warehouse_dir
+      ~data_dir:data_dir_fpath ~index_symbol:_index_symbol ~universe
+      ~start:warmup_start ~end_:scenario.period.end_date
+      ~max_cache_mb:_snapshot_cache_mb
   in
   let sector_ctx_map = _build_sector_context_map sectors_tbl in
   let fridays =
@@ -483,7 +468,8 @@ let run_with_args (args : cli_args) : unit =
   Core_unix.mkdir_p out_dir;
   let base_config = resolve_config args in
   let snapshot_callbacks, sector_ctx_map, fridays =
-    _build_world ~scenario ~universe ~sectors_tbl
+    _build_world ~warehouse_dir:args.warehouse_dir ~scenario ~universe
+      ~sectors_tbl
   in
   let scored =
     _scan_and_score ~snapshot_callbacks ~sector_ctx_map ~fridays ~universe
