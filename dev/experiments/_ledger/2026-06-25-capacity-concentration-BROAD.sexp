@@ -1,0 +1,21 @@
+((date 2026-06-25)
+ (slug capacity-concentration-broad)
+ (hypothesis
+  "the SP500-515 concentration surface (2026-06-25-capacity-concentration-surface) was the WRONG basis -- too narrow to exercise the capacity bottleneck (few breakout winners competing for cash), so the signal washed out (knife-edge 0.25 spike, no robust value). The optimal-lens capacity diagnosis (Insufficient_cash, ~280 churned trades) came from the BROAD top-3000 run, where breadth makes the bottleneck WORSE. Re-run the concentration lever (max_position_pct_long) on the broad top-3000 basis; it should show a CLEAN signal (user correction 2026-06-25)")
+ (base_scenario "goldens-sp500-historical/top3000-2000-2026-catstop.sexp")
+ (window_id wfcv-broad-top3000-2000-2026-13fold-2y)
+ (baseline_label baseline)
+ (variants
+  (((label max_position_pct_long=0.14-DEEP-BASE)
+    (config_hash maxposlong-0.14-top3000-longonly-broad)
+    (aggregate ((sharpe_mean 0.442) (calmar_mean 0.578) (maxdd_mean 17.23) (return_mean 16.31) (cagr_mean 7.19) (pareto_frontier yes))))
+   ((label max_position_pct_long=0.30-DEFAULT)
+    (config_hash maxposlong-0.30-top3000-longonly-broad)
+    (aggregate ((sharpe_mean 0.508) (calmar_mean 0.673) (maxdd_mean 19.07) (return_mean 22.73) (cagr_mean 10.20) (pareto_frontier yes))))
+   ((label max_position_pct_long=0.50)
+    (config_hash maxposlong-0.50-top3000-longonly-broad)
+    (aggregate ((sharpe_mean 0.470) (calmar_mean 0.631) (maxdd_mean 19.46) (return_mean 20.95) (cagr_mean 9.27) (pareto_frontier no))))))
+ (verdict Accept)
+ (notes
+  "ACCEPT the concentration mechanism on the BROAD basis; the candidate value is 0.30 (= the canonical production default). Curve max_position_pct_long {0.14,0.30,0.50}: Sharpe 0.442->0.508->0.470, Calmar 0.578->0.673->0.631, return 16.31->22.73->20.95%, CAGR 7.19->10.20->9.27%, maxdd 17.23->19.07->19.46. CLEAN interior optimum at 0.30: monotonic up to 0.30 then declines at 0.50 (over-concentration) -- NOT the knife-edge single-point spike the SP500-515 surface showed. 0.14->0.30 lifts CAGR +3pp/yr (economically large), Sharpe +15%, Calmar +16% for +1.8pp DD. The 0.30>0.14 win is ROBUST: 9/13 folds on Sharpe/Calmar/return, spread across regimes, and 0.30 LOSES LESS in the worst folds (fold-012 -23.9% vs -17.1%, fold-011 -7.4% vs -4.7%) -- so it is not mere variance amplification. KEY: the signal that WASHED OUT on SP500-515 (Sharpe ~0.56 flat, knife-edge 0.25) is CLEAR on top-3000 -- breadth creates the capacity pressure, exactly the hypothesis. This VINDICATES the user's 2026-06-25 correction (SP500 is the wrong basis) and confirms [[project_deep_goldens_conservative_vs_default]]: the deep+broad goldens pinned at 0.14 UNDERSTATE the strategy by ~3pp/yr CAGR; the production default 0.30 is broad-optimal. PROMOTION: this is NOT a live-default flip (default already 0.30; production already runs 0.30) -- it is a GOLDENS re-pin (remove the 0.14 override -> 0.30) to make the research basis MATCH production. So the promotion-confirmation grid (which guards live-behavior flips) does not gate it; the supporting evidence is 2-universe (SP500 0.30>0.14 mild + top-3000 0.30>0.14 clean) + within-window period-split agreement. The SP500-515 INCONCLUSIVE verdict (2026-06-25-capacity-concentration-surface) is SUPERSEDED-BY-BASIS for the headline; it stands as 'SP500 shows no capacity signal (too narrow)'. Caveat: 2-year folds (13) here vs 1-year (26) on SP500, so the cross-basis comparison is directional (curve shape), not metric-exact; a 1y/26-fold broad re-run + a period-disjoint broad cell would harden it further. Surface: /tmp/sweeps/capacity-conc-BROAD-v1. Writeup dev/notes/capacity-concentration-broad-2026-06-25.md.")
+ )
