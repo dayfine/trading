@@ -1,0 +1,35 @@
+;; Short-realism deep acceptance — sp500-515 (PIT-2000) LONG-SHORT, 2000-2026.
+;; This is the MARGIN-ON twin (Reg-T 150% collateral lock on short entry, 25%
+;; maintenance check, 50bps borrow fee). Compare bottom-line + trade
+;; records against the -margin-on twin to measure whether the merged margin
+;; model (issue #859 Phase 1+2) deflates the inflated long-short absolute return
+;; and keeps NAV non-negative. See dev/notes/short-realism-reconcile-2026-06-26.md.
+;;
+;; Config = Cell-E long-short (mirrors cell-e-top3000-1998-longshort.sexp) with
+;; enable_short_side + short_min_price 17; the ONLY diff vs the -on twin is
+;; ((margin_config ((enabled true)))). Universe sp500-historical/sp500-2000-01-01
+;; (515 PIT-2000 symbols), CSV mode (N=515 fits without snapshot mode).
+((name "sr-sp500-2000-longshort-margin-on")
+ (description "sp500-515 PIT-2000 long-short, 2000-2026, Cell-E + short_min_price 17, margin ON (Reg-T collateral + maintenance + borrow fee).")
+ (period ((start_date 2000-01-01) (end_date 2026-04-30)))
+ (universe_path "universes/sp500-historical/sp500-2000-01-01.sexp")
+ (universe_size 515)
+ (config_overrides
+  (((enable_short_side true))
+   ((short_min_price 17.0))
+   ((portfolio_config ((max_position_pct_long 0.14))))
+   ((portfolio_config ((max_long_exposure_pct 0.70))))
+   ((portfolio_config ((min_cash_pct 0.30))))
+   ((enable_stage3_force_exit true))
+   ((stage3_force_exit_config ((hysteresis_weeks 1))))
+   ((enable_laggard_rotation true))
+   ((laggard_rotation_config ((hysteresis_weeks 2))))
+   ((margin_config ((enabled true))))))
+ (cost_model ((per_trade_commission 0.0)(per_share_commission 0.01)(bid_ask_spread_bps 0.0)(market_impact_bps_per_pct_adv 0.0)))
+ (expected
+  ((total_return_pct ((min -100.0)(max 1000000.0)))
+   (total_trades     ((min 0)(max 1000000)))
+   (win_rate         ((min 0.0)(max 100.0)))
+   (sharpe_ratio      ((min -100.0)(max 100.0)))
+   (max_drawdown_pct ((min 0.0)(max 100.0)))
+   (avg_holding_days ((min 0.0)(max 100000.0))))))
