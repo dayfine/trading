@@ -118,6 +118,20 @@ module Laggard_rotation = Laggard_rotation
     {!Weinstein_strategy.config} can reference {!Laggard_rotation.config} and
     {!Laggard_rotation.default_config} without a separate library import. *)
 
+module Liquidity_config = Liquidity_config
+(** Liquidity-realism overlay config ({!Liquidity_config.t}). Re-exposed so
+    callers building a {!Weinstein_strategy.config} can reference
+    {!Liquidity_config.default_config} without a separate library import. *)
+
+module Liquidity_metric = Liquidity_metric
+(** Pure trailing dollar-ADV metric. See {!Liquidity_metric}. *)
+
+module Liquidity_exit_runner = Liquidity_exit_runner
+(** Held-position liquidity-degradation exit runner. Invoked among the special
+    exits (alongside {!Stage3_force_exit_runner} / {!Laggard_rotation_runner}) on
+    Friday ticks when [config.liquidity_config.min_hold_dollar_adv > 0.0]. See
+    {!Liquidity_exit_runner}. *)
+
 module Macro_inputs = Macro_inputs
 (** Sector map + global index assembly from accumulated bar history. Exposes the
     canonical {!Macro_inputs.spdr_sector_etfs} and
@@ -504,6 +518,12 @@ type config = {
           budget in the per-Friday entry walk; default [0.0] is a no-op
           (bit-identical single combined walk). Reserves capital for shorts so
           they are not crowded out by longs at the entry walk. See
+          [Weinstein_strategy_config]. *)
+  liquidity_config : Liquidity_config.t;
+      [@sexp.default Liquidity_config.default_config]
+      (** Liquidity-realism overlay parameters (held-position degradation exit +
+          entry liquidity gate). Default [Liquidity_config.default_config] is a
+          no-op (both thresholds [0.0]) — bit-identical to baseline. See
           [Weinstein_strategy_config]. *)
 }
 [@@deriving sexp]

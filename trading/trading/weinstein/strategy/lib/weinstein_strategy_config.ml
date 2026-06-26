@@ -136,6 +136,14 @@ type config = {
       (** Fraction of portfolio value reserved as a dedicated short-only cash
           budget in the per-Friday entry walk; default [0.0] is a no-op
           (bit-identical single combined walk). See [.mli]. *)
+  liquidity_config : Liquidity_config.t;
+      [@sexp.default Liquidity_config.default_config]
+      (** Liquidity-realism overlay parameters (held-position degradation exit +
+          entry liquidity gate). Default [Liquidity_config.default_config] is a
+          no-op (both thresholds [0.0]) — bit-identical to baseline. Each
+          threshold is an axis (e.g.
+          [((key (liquidity_config min_hold_dollar_adv)) (values (0.0 1e6)))]).
+          See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -185,6 +193,7 @@ let default_config ~universe ~index_symbol =
     enable_harvest_rotate = false;
     harvest_fraction = 0.5;
     short_sleeve_fraction = 0.0;
+    liquidity_config = Liquidity_config.default_config;
   }
 
 let name = "Weinstein"

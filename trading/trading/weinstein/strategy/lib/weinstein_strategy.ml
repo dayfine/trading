@@ -17,6 +17,9 @@ module Harvest_rotate_wiring = Harvest_rotate_wiring
 module Macro_bearish_trim_runner = Macro_bearish_trim_runner
 module Macro_bearish_trim_wiring = Macro_bearish_trim_wiring
 module Laggard_rotation_runner = Laggard_rotation_runner
+module Liquidity_config = Liquidity_config
+module Liquidity_metric = Liquidity_metric
+module Liquidity_exit_runner = Liquidity_exit_runner
 module Stage3_force_exit = Stage3_force_exit
 module Laggard_rotation = Laggard_rotation
 module Ad_bars = Ad_bars
@@ -147,6 +150,19 @@ let _run_laggard_rotation ~config ~positions ~last_stop_out_dates ~bar_reader
          ~label:"laggard_rotation");
   laggard_ts
 
+let _run_liquidity_exit ~config ~positions ~last_stop_out_dates ~bar_reader
+    ~get_price ~is_friday ~skip_ids ~current_date =
+  let liquidity_ts =
+    Liquidity_exit_runner.update ~config:config.liquidity_config
+      ~is_screening_day:is_friday ~positions ~bar_reader ~get_price
+      ~skip_position_ids:skip_ids ~current_date
+  in
+  List.iter liquidity_ts
+    ~f:
+      (_record_force_exit ~last_stop_out_dates ~positions ~current_date
+         ~cooldown_weeks:0 ~label:"liquidity_exit");
+  liquidity_ts
+
 let _run_stage3_force_exit ~config ~positions ~last_stop_out_dates
     ~prior_stage_ma_values ~stage3_streaks ~get_price ~prior_stages ~is_friday
     ~stop_exited_ids ~current_date =
@@ -210,6 +226,21 @@ let _run_special_exits ~config ~positions ~last_stop_out_dates
     Transition_assembly.filter_out_exited_ids laggard_exited_ids force_exit_ts
   in
   emit_audit force_exit_ts;
+  (* Liquidity-degradation exit: emitted last among the special exits and merged
+     into the force-exit channel (same close-fill convention + audit path). Skip
+     any position already exiting via a stop / Stage-3 / laggard / force-liq path
+     this tick. No-op at the default config (min_hold_dollar_adv = 0.0). *)
+  let liquidity_ts =
+    _run_liquidity_exit ~config ~positions ~last_stop_out_dates ~bar_reader
+      ~get_price ~is_friday
+      ~skip_ids:
+        (Set.union
+           (Set.union stop_exited_ids stage3_exited_ids)
+           laggard_exited_ids)
+      ~current_date
+  in
+  emit_audit liquidity_ts;
+  let force_exit_ts = liquidity_ts @ force_exit_ts in
   ( force_exit_ts,
     stage3_ts,
     laggard_ts,

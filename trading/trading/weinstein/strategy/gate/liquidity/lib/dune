@@ -1,0 +1,4 @@
+(library
+ (name liquidity_gate)
+ (public_name weinstein_trading.liquidity_gate)
+ (libraries core weinstein.screener trading.base))

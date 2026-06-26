@@ -458,6 +458,21 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at ~config
       ~buy_candidates:screen_result.Screener.buy_candidates
       ~short_candidates:screen_result.Screener.short_candidates
   in
+  (* Entry liquidity gate: drop candidates (long AND short) whose trailing
+     dollar-ADV is too low to trade into safely. No-op at the default config
+     (min_entry_dollar_adv = 0.0). The dollar-ADV is computed from bars
+     available at [current_date] — no lookahead. *)
+  let combined_candidates =
+    let dollar_adv_for ticker =
+      Liquidity_metric.dollar_adv
+        ~lookback_days:config.liquidity_config.adv_lookback_days
+        (Bar_reader.daily_bars_for bar_reader ~symbol:ticker
+           ~as_of:current_date)
+    in
+    Liquidity_gate.filter
+      ~min_entry_dollar_adv:config.liquidity_config.min_entry_dollar_adv
+      ~dollar_adv_for combined_candidates
+  in
   let entries =
     entries_from_candidates
       ~sector_lookup:(_sector_lookup_of ~sector_map)
