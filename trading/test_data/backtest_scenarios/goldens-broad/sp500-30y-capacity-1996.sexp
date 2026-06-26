@@ -40,7 +40,7 @@
  (universe_path "universes/broad-1000-30y.sexp")
  (universe_size 1000)
  ;; Cell E rollout 2026-05-11: applies the standard Cell E strategy config
- ;; (max_position_pct_long=0.14, max_long_exposure_pct=0.70, min_cash_pct=0.30,
+ ;; (max_position_pct_long=0.30, max_long_exposure_pct=0.70, min_cash_pct=0.30,
  ;; stage3 force-exit h=1, laggard rotation h=2) for consistency with the
  ;; rest of the goldens. Capacity testing isn't affected by the config knobs
  ;; — pin ranges are intentionally wide and tolerate the new shape.

@@ -11,7 +11,7 @@
 ;; because of a regression — see the migration plan for the diagnosis.
 ;;
 ;; enable_short_side stays false (short-side gaps G1-G4, dev/notes/short-side-gaps-2026-04-29.md).
-;; Cell E config (max_position_pct_long=0.14, max_long_exposure_pct=0.70, min_cash_pct=0.30,
+;; Cell E config (max_position_pct_long=0.30, max_long_exposure_pct=0.70, min_cash_pct=0.30,
 ;; stage3 force-exit h=1, laggard rotation h=2).
 ;;
 ;; Measured 2026-06-05 (Cell E, PIT top-1000-2015). Tolerances ±20%

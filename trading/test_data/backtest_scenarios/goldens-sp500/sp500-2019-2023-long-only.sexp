@@ -46,7 +46,7 @@
  (universe_path "universes/sp500.sexp")
  (universe_size 503)
  ;; Cell E rollout 2026-05-11: applies the new standard strategy config
- ;; (max_position_pct_long=0.14, max_long_exposure_pct=0.70, min_cash_pct=0.30,
+ ;; (max_position_pct_long=0.30, max_long_exposure_pct=0.70, min_cash_pct=0.30,
  ;; stage3 force-exit h=1, laggard rotation h=2). Replaces prior 0.30/0.90/0.10
  ;; default-sized baseline (79.74% / 74 trades / 30.8% DD).
  ;; Measured 2026-05-12 (Cell E, post-#1052 force-liq fix + #1053 metric schema):
