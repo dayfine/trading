@@ -138,12 +138,7 @@ type config = {
           (bit-identical single combined walk). See [.mli]. *)
   liquidity_config : Liquidity_config.t;
       [@sexp.default Liquidity_config.default_config]
-      (** Liquidity-realism overlay parameters (held-position degradation exit +
-          entry liquidity gate). Default [Liquidity_config.default_config] is a
-          no-op (both thresholds [0.0]) — bit-identical to baseline. Each
-          threshold is an axis (e.g.
-          [((key (liquidity_config min_hold_dollar_adv)) (values (0.0 1e6)))]).
-          See [.mli]. *)
+      (** See [.mli]. *)
 }
 [@@deriving sexp]
 

@@ -419,6 +419,10 @@ let _run_screener ?membership_at ~config ~(macro_result : Macro.result)
     ~last_stop_out_dates:(Hashtbl.to_alist last_stop_out_dates)
     ()
 
+(* Assemble the final entry-candidate list: merge longs + shorts (short-side
+   gate), then apply the entry liquidity gate ({!Entry_liquidity_gate.apply} —
+   no-op at the default config, no lookahead). *)
+
 (** Screen the universe via the lazy cascade (Phase 1 stage filter → PR-B sector
     pre-filter → Phase 2 full {!Stock_analysis}). Macro-trend gating lives in
     the screener; concatenating [buy_candidates] + [short_candidates] yields the
@@ -429,6 +433,17 @@ let _run_screener ?membership_at ~config ~(macro_result : Macro.result)
     Phase 1 runs. Symbols whose [active_through < fold_start_date] are dropped
     from the per-Friday classification loop, eliminating the Phase-1 cost on
     symbols that cannot contribute to the fold. *)
+let _assemble_candidates ~config ~bar_reader ~current_date
+    (screen_result : Screener.result) =
+  let combined =
+    Short_side_gate.combine ~enable_short_side:config.enable_short_side
+      ~short_min_price:config.short_min_price
+      ~buy_candidates:screen_result.Screener.buy_candidates
+      ~short_candidates:screen_result.Screener.short_candidates
+  in
+  Entry_liquidity_gate.apply ~config:config.liquidity_config ~bar_reader
+    ~current_date combined
+
 let screen_universe ?active_through_for ?fold_start_date ?membership_at ~config
     ~index_view ~(macro_result : Macro.result) ~sector_map ~stop_states
     ~last_stop_out_dates ~(portfolio : Portfolio_view.t) ~get_price ~bar_reader
@@ -453,25 +468,7 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at ~config
       ~stocks ~portfolio ~last_stop_out_dates ~current_date ()
   in
   let combined_candidates =
-    Short_side_gate.combine ~enable_short_side:config.enable_short_side
-      ~short_min_price:config.short_min_price
-      ~buy_candidates:screen_result.Screener.buy_candidates
-      ~short_candidates:screen_result.Screener.short_candidates
-  in
-  (* Entry liquidity gate: drop candidates (long AND short) whose trailing
-     dollar-ADV is too low to trade into safely. No-op at the default config
-     (min_entry_dollar_adv = 0.0). The dollar-ADV is computed from bars
-     available at [current_date] — no lookahead. *)
-  let combined_candidates =
-    let dollar_adv_for ticker =
-      Liquidity_metric.dollar_adv
-        ~lookback_days:config.liquidity_config.adv_lookback_days
-        (Bar_reader.daily_bars_for bar_reader ~symbol:ticker
-           ~as_of:current_date)
-    in
-    Liquidity_gate.filter
-      ~min_entry_dollar_adv:config.liquidity_config.min_entry_dollar_adv
-      ~dollar_adv_for combined_candidates
+    _assemble_candidates ~config ~bar_reader ~current_date screen_result
   in
   let entries =
     entries_from_candidates
