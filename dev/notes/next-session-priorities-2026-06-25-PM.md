@@ -2,8 +2,40 @@
 
 **Supersedes** `next-session-priorities-2026-06-25.md`. This session worked **P1 —
 capacity levers** and, after a key user correction, produced an **ACCEPT for
-concentration = 0.30 on the broad basis**. The promotion (goldens re-pin) is endorsed
-but **was not executed** — blocked on a data-store-provenance landmine (see P0).
+concentration = 0.30 on the broad basis** — then **EXECUTED + MERGED the promotion**
+(goldens re-pin #1753, #1755). The P0 below is DONE; remaining items are follow-ups.
+
+## ✅ DONE 2026-06-26 — concentration=0.30 goldens re-pin (the P0 below, completed)
+- **#1751** broad ACCEPT evidence; **#1753** 8 long-only goldens re-pinned 0.14→0.30,
+  each re-measured against its validator's store (sp500→committed `test_data` via
+  `TRADING_DATA_DIR`; broad→warehouse `--snapshot-dir`), all re-verified PASS, 3 gates
+  green (qc-behavioral score 5); **#1755** stale-comment cleanup. All merged.
+- The "data-store landmine" was a **false alarm** — each golden IS reproducible against
+  ITS store; the earlier failure ran the wrong store (gitignored `data/`).
+- **Honest finding: 0.30 is regime-dependent** — dominates long/multi-regime windows
+  (sp500-2010-2026 340→672% ret, DD 19→18%) + aggregate, but HURTS some short windows
+  (bull-crash 38→10%, six-year 19→4%). The goldens now reflect this honestly.
+  Writeup: `dev/notes/concentration-0.30-goldens-repin-2026-06-25.md`.
+
+## Remaining follow-ups (not blocking)
+- **goldens-small/* smoke variants still at 0.14** — minor consistency follow-up; align
+  to 0.30 for the same reason (they're fast-CI smoke, lower priority). Same per-store
+  re-measure procedure.
+- **Laggard/turnover broad lever** — the broad re-run was stopped ~15% in to free the
+  container for the re-pin. Re-run if the turnover question still matters
+  (`capacity-laggard-BROAD-2000-2026.sexp` spec is committed).
+- **Optional rigor on the broad ACCEPT** — 1y/26-fold broad re-run (match SP500
+  geometry) + a period-disjoint broad cell. The 2y/13-fold result is already a clean
+  optimum; this is belt-and-suspenders.
+- **Re-run the optimal-strategy lens on the 0.30 basis** — the `Insufficient_cash` miss
+  rate should shrink now that the research basis matches production.
+
+---
+
+### (Original P0, now done — kept for context)
+
+This session also produced an **ACCEPT for concentration = 0.30 on the broad basis**.
+The promotion below was the P0; it has since been executed (see the DONE section above).
 
 ## Done this session (2026-06-25 PM)
 - **Capacity lever 1, concentration — SP500-515 surface: INCONCLUSIVE** (#1748, merged).

@@ -7,6 +7,23 @@ metadata:
   originSessionId: 6379af08-b68f-4dd7-8742-dff729a8b814
 ---
 
+**DONE 2026-06-25 PM — concentration=0.30 PROMOTED to the goldens (#1753 merged).** The 8
+long-only regression goldens were re-pinned max_position_pct_long 0.14→0.30 (production
+default), each re-measured against its validator's store (sp500→committed test_data via
+TRADING_DATA_DIR; broad→warehouse `--snapshot-dir`) and verified PASS; 3 gates green
+(qc-behavioral score 5). The "data-store landmine" was a false alarm — each golden is
+reproducible against ITS store (the earlier failure ran the wrong store, gitignored data/).
+Comment cleanup #1755. NOT a live change (default was already 0.30). **Honest per-window
+finding: 0.30 is REGIME-DEPENDENT** — dominates long/multi-regime windows (sp500-2010-2026
+340→672% ret, DD 19→18%) + the aggregate, but HURTS some short windows (bull-crash 38→10%,
+six-year 19→4%); high dispersion = concentration amplifies the fat tail (pays across a
+cycle, stings in a single short window). At 0.14 goldens OVERstated production on short
+windows, UNDERstated on long. Excluded: experiments/* (frozen), *-longshort* (short-side
+cascade rationale), goldens-small/* smoke variants (still 0.14 — minor consistency
+follow-up). Note: dev/notes/concentration-0.30-goldens-repin-2026-06-25.md. Remaining:
+laggard-broad turnover lever (stopped ~15% in, re-run if turnover still of interest);
+optional broad confirmation grid (1y/26-fold + period-disjoint cell).
+
 **UPDATE 2026-06-25 PM (user correction → BROAD re-run, the authoritative result):** the
 SP500-515 surfaces were the WRONG basis (too narrow to exercise the capacity bottleneck).
 Re-ran concentration on BROAD top-3000-2000 2000-2026 (warehouse snapshot, 13×2y folds):
