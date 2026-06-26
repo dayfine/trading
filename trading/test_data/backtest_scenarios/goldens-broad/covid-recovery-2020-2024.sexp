@@ -43,7 +43,7 @@
  (universe_size 1000)
  (config_overrides
   (((enable_short_side false))
-   ((portfolio_config ((max_position_pct_long 0.14))))
+   ((portfolio_config ((max_position_pct_long 0.30))))
    ((portfolio_config ((max_long_exposure_pct 0.70))))
    ((portfolio_config ((min_cash_pct 0.30))))
    ((enable_stage3_force_exit true))
@@ -51,9 +51,13 @@
    ((enable_laggard_rotation true))
    ((laggard_rotation_config ((hysteresis_weeks 2))))))
  (expected
-  ((total_return_pct   ((min  28.2)  (max  42.4)))
-   (total_trades       ((min 222)    (max 332)))
-   (win_rate           ((min  30.7)  (max  40.7)))
-   (sharpe_ratio       ((min   0.38) (max   0.56)))
-   (max_drawdown_pct   ((min  23.8)  (max  35.7)))
-   (avg_holding_days   ((min  31.3)  (max  46.9))))))
+  ;; Concentration=0.30 promotion 2026-06-25 (max_position_pct_long 0.14 -> 0.30, the
+  ;; production default; ledger 2026-06-25-capacity-concentration-broad). Warehouse
+  ;; re-measure, ±20% around 0.30 actuals (ret 52.86 sharpe 0.571 maxDD 34.55).
+  ;; 0.30 lifts this 4y window's return (41->53%) and sharpe (0.46->0.57).
+  ((total_return_pct   ((min  42.3)  (max  63.4)))
+   (total_trades       ((min 187)    (max 281)))
+   (win_rate           ((min  33.9)  (max  43.9)))
+   (sharpe_ratio       ((min   0.46) (max   0.69)))
+   (max_drawdown_pct   ((min  27.6)  (max  41.5)))
+   (avg_holding_days   ((min  34.0)  (max  51.0))))))

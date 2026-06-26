@@ -37,7 +37,7 @@
  ;; Cell E config — identical to sp500-2010-2026.sexp.
  (config_overrides
   (((enable_short_side false))
-   ((portfolio_config ((max_position_pct_long 0.14))))
+   ((portfolio_config ((max_position_pct_long 0.30))))
    ((portfolio_config ((max_long_exposure_pct 0.70))))
    ((portfolio_config ((min_cash_pct 0.30))))
    ((enable_stage3_force_exit true))
@@ -54,6 +54,9 @@
  ;; crashes / NaN sentinels. Tightening per-fold bands is downstream of
  ;; T4.4 (sanity backtest) and T4.5 (sweep harvest).
  (expected
+  ;; Concentration=0.30 promotion 2026-06-25 (max_position_pct_long 0.14 -> 0.30, the
+  ;; production default; ledger 2026-06-25-capacity-concentration-broad). Catch-only
+  ;; sentinel bands; 0.30 measured ret 227.5% / 673 trades / 40.6% win / 28.5% DD (PASS).
   ((total_return_pct  ((min -90.0)  (max 5000.0)))
    (total_trades      ((min   0.0)  (max 100000.0)))
    (win_rate          ((min   0.0)  (max 100.0)))
