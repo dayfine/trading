@@ -83,9 +83,7 @@ let _monday = Date.of_string "2024-04-01" (* Monday *)
 
 (* Healthy liquid history: close ~$100, volume 1M => dollar-ADV ~$100M. *)
 let _healthy_bars ticker =
-  [
-    (ticker, [ make_bar "2024-03-25" ~close:100.0 ~volume:1_000_000 ]);
-  ]
+  [ (ticker, [ make_bar "2024-03-25" ~close:100.0 ~volume:1_000_000 ]) ]
 
 (* Config with the held threshold armed at $1M dollar-ADV, lookback 5d. *)
 let _armed_config =
@@ -112,7 +110,8 @@ let test_default_off_no_exit _ =
   let bar_reader = Bar_reader.of_in_memory_bars bars in
   let result =
     run ~config:Liquidity_config.default_config ~positions ~bar_reader
-      ~get_price:(get_price_of [ ("AAPL", make_bar "2024-03-29" ~close:1.0 ~volume:1) ])
+      ~get_price:
+        (get_price_of [ ("AAPL", make_bar "2024-03-29" ~close:1.0 ~volume:1) ])
       ~current_date:_friday ()
   in
   assert_that (List.length result) (equal_to 0)
@@ -125,17 +124,18 @@ let test_default_off_no_exit _ =
    ~2 shares/day at a junk ~$6.60 close => dollar-ADV ~$13/day, far below the
    $1M hold threshold. The runner must fire on this degradation cycle. *)
 let _degraded_bars =
-  [
-    ("ELCO", [ make_bar "2024-03-29" ~close:6.60 ~volume:2 ]);
-  ]
+  [ ("ELCO", [ make_bar "2024-03-29" ~close:6.60 ~volume:2 ]) ]
 
 let test_elco_degradation_fires_exit _ =
-  let pos = make_holding_pos ~side:Trading_base.Types.Short "ELCO" 6.60 _friday in
+  let pos =
+    make_holding_pos ~side:Trading_base.Types.Short "ELCO" 6.60 _friday
+  in
   let positions = String.Map.singleton "ELCO" pos in
   let bar_reader = Bar_reader.of_in_memory_bars _degraded_bars in
   let result =
     run ~config:_armed_config ~positions ~bar_reader
-      ~get_price:(get_price_of [ ("ELCO", make_bar "2024-03-29" ~close:6.60 ~volume:2) ])
+      ~get_price:
+        (get_price_of [ ("ELCO", make_bar "2024-03-29" ~close:6.60 ~volume:2) ])
       ~current_date:_friday ()
   in
   (* dollar_adv = 6.60 * 2 = 13.2; exit fires at the close (6.60). *)
@@ -185,7 +185,9 @@ let test_liquid_position_not_exited _ =
   let bar_reader = Bar_reader.of_in_memory_bars (_healthy_bars "AAPL") in
   let result =
     run ~config:_armed_config ~positions ~bar_reader
-      ~get_price:(get_price_of [ ("AAPL", make_bar "2024-03-25" ~close:100.0 ~volume:1_000_000) ])
+      ~get_price:
+        (get_price_of
+           [ ("AAPL", make_bar "2024-03-25" ~close:100.0 ~volume:1_000_000) ])
       ~current_date:_friday ()
   in
   assert_that (List.length result) (equal_to 0)
@@ -200,7 +202,8 @@ let test_off_cadence_no_op _ =
   let bar_reader = Bar_reader.of_in_memory_bars _degraded_bars in
   let result =
     run ~is_screening_day:false ~config:_armed_config ~positions ~bar_reader
-      ~get_price:(get_price_of [ ("ELCO", make_bar "2024-03-29" ~close:6.60 ~volume:2) ])
+      ~get_price:
+        (get_price_of [ ("ELCO", make_bar "2024-03-29" ~close:6.60 ~volume:2) ])
       ~current_date:_monday ()
   in
   assert_that (List.length result) (equal_to 0)
@@ -214,9 +217,11 @@ let test_skip_list_collision_no_op _ =
   let positions = String.Map.singleton "ELCO" pos in
   let bar_reader = Bar_reader.of_in_memory_bars _degraded_bars in
   let result =
-    run ~skip_position_ids:(String.Set.singleton "ELCO") ~config:_armed_config
-      ~positions ~bar_reader
-      ~get_price:(get_price_of [ ("ELCO", make_bar "2024-03-29" ~close:6.60 ~volume:2) ])
+    run
+      ~skip_position_ids:(String.Set.singleton "ELCO")
+      ~config:_armed_config ~positions ~bar_reader
+      ~get_price:
+        (get_price_of [ ("ELCO", make_bar "2024-03-29" ~close:6.60 ~volume:2) ])
       ~current_date:_friday ()
   in
   assert_that (List.length result) (equal_to 0)

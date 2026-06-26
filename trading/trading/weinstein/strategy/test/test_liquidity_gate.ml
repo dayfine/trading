@@ -70,8 +70,7 @@ let test_threshold_drops_illiquid_both_sides _ =
   let result =
     Liquidity_gate.filter ~min_entry_dollar_adv:1_000_000.0
       ~dollar_adv_for:
-        (_adv_for
-           [ ("LIQUID", Some 5_000_000.0); ("ILLIQUID", Some 100.0) ])
+        (_adv_for [ ("LIQUID", Some 5_000_000.0); ("ILLIQUID", Some 100.0) ])
       candidates
   in
   assert_that

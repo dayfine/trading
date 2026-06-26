@@ -128,9 +128,9 @@ module Liquidity_metric = Liquidity_metric
 
 module Liquidity_exit_runner = Liquidity_exit_runner
 (** Held-position liquidity-degradation exit runner. Invoked among the special
-    exits (alongside {!Stage3_force_exit_runner} / {!Laggard_rotation_runner}) on
-    Friday ticks when [config.liquidity_config.min_hold_dollar_adv > 0.0]. See
-    {!Liquidity_exit_runner}. *)
+    exits (alongside {!Stage3_force_exit_runner} / {!Laggard_rotation_runner})
+    on Friday ticks when [config.liquidity_config.min_hold_dollar_adv > 0.0].
+    See {!Liquidity_exit_runner}. *)
 
 module Macro_inputs = Macro_inputs
 (** Sector map + global index assembly from accumulated bar history. Exposes the

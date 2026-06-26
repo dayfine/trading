@@ -51,20 +51,18 @@ val update :
     - Returns [[]] when [config.min_hold_dollar_adv <= 0.0] (the no-op default).
     - Returns [[]] when [is_screening_day = false] (weekly cadence only).
     - Returns [[]] when [positions] is empty.
-    - For each held position (long OR short) in a {!Position.Holding} state:
-      1. Reads its trailing daily bars via
-         {!Bar_reader.daily_bars_for} up to [current_date] and computes
-         {!Liquidity_metric.dollar_adv} over [config.adv_lookback_days].
-      2. When the dollar-ADV is [Some adv] with [adv < min_hold_dollar_adv],
-         emits a [TriggerExit] with
-         [exit_reason = StrategySignal { label = "liquidity_exit";
-          detail = Some "dollar_adv=<x>" }] and [exit_price = bar.close_price]
-         from [get_price]. The forensic [dollar_adv] detail surfaces in the
-         [exit_trigger] column of [trades.csv].
-      3. Skips the position (no emit) when: its [position_id] is in
-         [skip_position_ids]; [get_price] returns [None]; or the dollar-ADV is
-         [None] (no liquidity reading — a missing reading must never force a
-         spurious exit) or [>= min_hold_dollar_adv].
+    - For each held position (long OR short) in a {!Position.Holding} state: 1.
+      Reads its trailing daily bars via {!Bar_reader.daily_bars_for} up to
+      [current_date] and computes {!Liquidity_metric.dollar_adv} over
+      [config.adv_lookback_days]. 2. When the dollar-ADV is [Some adv] with
+      [adv < min_hold_dollar_adv], emits a [TriggerExit] with
+      [exit_reason = StrategySignal { label = "liquidity_exit"; detail = Some
+       "dollar_adv=<x>" }] and [exit_price = bar.close_price] from [get_price].
+      The forensic [dollar_adv] detail surfaces in the [exit_trigger] column of
+      [trades.csv]. 3. Skips the position (no emit) when: its [position_id] is
+      in [skip_position_ids]; [get_price] returns [None]; or the dollar-ADV is
+      [None] (no liquidity reading — a missing reading must never force a
+      spurious exit) or [>= min_hold_dollar_adv].
     - Non-[Holding] states are skipped without emitting.
 
     Pure aside from the bar reads; holds no per-symbol state (the threshold

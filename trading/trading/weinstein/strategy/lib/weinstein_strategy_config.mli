@@ -432,9 +432,10 @@ type config = {
           {b Faithfulness} (W1/W2, [.claude/rules/weinstein-faithful-core.md]).
           A risk/realism dial — Weinstein would never hold a name he could not
           trade out of. The spine is untouched (stage framework, Stage-2 entry,
-          volume-confirmed breakout all unchanged); only tradeability-eligibility
-          is narrowed. Each threshold is searchable as a [Variant_matrix] axis,
-          e.g. [((key (liquidity_config min_hold_dollar_adv)) (values (0.0 1e6)))].
+          volume-confirmed breakout all unchanged); only
+          tradeability-eligibility is narrowed. Each threshold is searchable as
+          a [Variant_matrix] axis, e.g.
+          [((key (liquidity_config min_hold_dollar_adv)) (values (0.0 1e6)))].
           Default-off until an experiment-ledger ACCEPT. *)
 }
 [@@deriving sexp]

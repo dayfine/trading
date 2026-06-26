@@ -15,7 +15,5 @@ let dollar_adv ~lookback_days (bars : Types.Daily_price.t list) =
     match window with
     | [] -> None
     | _ ->
-        let total =
-          List.sum (module Float) window ~f:_bar_dollar_volume
-        in
+        let total = List.sum (module Float) window ~f:_bar_dollar_volume in
         Some (total /. Float.of_int (List.length window))
