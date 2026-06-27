@@ -131,3 +131,24 @@ sp500; do WF-CV when evidence strong; note: `dev/notes/barbell-deep-verification
   blend.awk(=my hand-blend). Next build (gated): wire floor_weight 0.20-0.30, confirm
   via real Barbell_runner over the grid. Warehouse /tmp/snap_top3000_1998_2026_v2
   PERSISTS in container (survived 4 days; rebuild via build_snapshots single-dash flags).
+
+---
+**PRODUCTION CONFIRMATION — FLOOR-LEG CRUX 2026-06-27** (ran canonical
+barbell_floor_sweep_runner; ledger 2026-06-27-barbell-floor-sweep, verdict
+Inconclusive; note Part 3):
+- **The hand-blend "beats both legs" is FLOOR-LEG-DEPENDENT.** Production tool uses
+  Spy_only_weinstein 30wk TIMING floor → Sharpe FLAT ~0.488 + Calmar FLAT ~0.168
+  across weights, return drops 721→295% monotonically = pure return-for-DD trade,
+  NO risk-adjusted gain (re-confirms 06-21 'no free lunch'). Timing floor's
+  cash-in-bear is REDUNDANT with engine's own bear defense → only sacrifices return.
+- **Buy-hold SPY floor = the real candidate** (hand-blend, Barbell_blend math
+  confirmed by the timing run): beats both legs (w0.30 monthly 814%/0.572/29.9 vs
+  engine 721/.496/43.8, SPY 629/.459/56.5), ROBUST to rebalance freq (daily 805/
+  monthly 814/qtrly 779 — not a daily artifact), passes the fold grid. Gain = real
+  diversification/vol-harvest premium from 2 anti-correlated +Sharpe assets.
+- **BUT codebase has NO buy-and-hold strategy** (floor hardwired Spy_only_weinstein)
+  → buy-hold variant NOT production-confirmed. NO ledger ACCEPT (avoid proxy
+  overclaim). DECISION DEFERRED (user AFK): A=build buy-hold floor leg→confirm→ACCEPT
+  +gated wire; B=barbell is DD-only overlay=not worth promoting. Faithfulness flag:
+  passive SPY sleeve = portfolio overlay not a Weinstein mechanism (defensible: index
+  in macro spine, but a real scope question). Engine here 0.14 conc; prod default 0.30.

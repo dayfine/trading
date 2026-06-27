@@ -175,3 +175,80 @@ DEEP_RESULTS) inflated shorts via untradeable junk (ELCO/APPB) — stripped here
 the +$554k is the bankable number. The raw-vs-armed gap is the junk magnitude;
 re-running raw for its trade-level junk detail was **deprioritized** (the honest
 number is what matters; raw total is already recorded).
+
+---
+
+## Part 3 — Production-tool confirmation + the floor-leg crux (DECISION POINT)
+
+Ran the canonical `barbell_floor_sweep_runner` (current code, warehouse) on the
+broad engine, floor weights {0,0.2,0.3,0.4}, rebalance 4 weeks, against the
+production **`Spy_only_weinstein` 30wk timing floor** — to confirm the hand-blend
+with production code:
+
+```
+floor_weight, total_return%, sharpe, max_drawdown%, calmar, ulcer%
+0.00,  721.4,  0.4877, 43.75, 0.1705, 14.03
+0.20,  480.1,  0.4883, 36.53, 0.1694, 11.31
+0.30,  380.9,  0.4885, 32.66, 0.1688,  9.94
+0.40,  295.1,  0.4888, 28.60, 0.1681,  8.55
+```
+
+**This contradicts the hand-blend, and the reason is the FLOOR LEG.** With the
+production **timing** floor, Sharpe is **flat (~0.488)** and Calmar **flat
+(~0.168)** across all weights — return drops monotonically, MaxDD falls
+proportionally. It is a pure **return-for-drawdown trade with NO risk-adjusted
+gain** — exactly the 2026-06-21 "no free lunch" finding. The as-built barbell is
+**not a compelling promotion** (you give up half the return to cut DD; Calmar
+doesn't improve; at w=0.4 you're below both SPY and the engine on return).
+
+The hand-blend's "beats both legs / Sharpe ↑" result used a **SPY buy-hold** floor,
+which is a *different, higher-return* leg. Re-checked the buy-hold floor at
+realistic rebalance frequencies (this is just the `Barbell_blend` math, which the
+timing-floor run confirms is correct — only the floor *curve* differs):
+
+```
+buy-hold floor, w=0.30:  daily 805%/0.568/29.4%   monthly 814%/0.572/29.9%   quarterly 779%/0.564/29.6%
+refs (monthly):          engine 721%/0.496/43.8%   SPY 629%/0.459/56.5%      w=0.20 794%/0.552/33.9%
+```
+
+The buy-hold-floor barbell **beats both legs on return + Sharpe + MaxDD and is
+robust to rebalance frequency** (not a daily-rebalance artifact). The gain is a
+genuine **diversification/volatility-harvesting return**: two anti-correlated
+positive-Sharpe assets (engine 0.50, SPY 0.46) blend to 0.57 because the engine
+mean-reverts vs SPY by regime (corr(edge, SPY) = −0.59).
+
+### Why the floor leg flips the verdict
+The **timing** floor goes to cash in bears — but the engine is *already* defensive
+in bears, so the timing floor's bear-defense is **redundant** and it only sacrifices
+return (cash drag), giving a flat-Sharpe DD trade. The **buy-hold** floor stays
+long SPY through bulls (capturing the engine's weakest regime) and its drawdowns
+are absorbed by rebalancing against the engine — delivering the diversification
+premium. **The barbell needs a high-return anti-correlated leg (buy-hold SPY), not
+a low-return defensive one (timing SPY), to lift Sharpe.**
+
+### Verdict + decision point
+- **Barbell AS BUILT (timing floor): no-promote** — production-confirmed
+  return-for-DD trade, flat Calmar, no free lunch (re-confirms 2026-06-21).
+- **Barbell with a buy-hold SPY floor: the real candidate** — beats both legs,
+  Sharpe ↑, DD ↓, rebalance-robust, passes the period × universe fold grid (Part 1).
+  **BUT** the codebase has **no buy-and-hold strategy**; the floor leg is hardwired
+  to `Spy_only_weinstein`. Production-confirming this needs a small **build**: add a
+  buy-and-hold floor leg (a strategy that holds the symbol 100% long, or a
+  raw-symbol buy-hold equity-curve option in the runner) + re-run the sweep.
+
+**This is a decision for the user (deferred — AFK):**
+- **Option A — build the buy-hold floor leg**, production-confirm, then ledger
+  ACCEPT + (gated) wire `Barbell_config` with a buy-hold floor. Highest upside; a
+  small, well-scoped build.
+- **Option B — treat the barbell as a DD-management overlay only** (timing floor),
+  which production says is a no-free-lunch trade → not worth promoting.
+- **Faithfulness flag** (`weinstein-faithful-core`): a passive SPY buy-hold sleeve
+  is a *portfolio-construction overlay*, not a Weinstein stock-selection mechanism.
+  It is defensible (the macro/index is already in the spine, and the overlay
+  allocates between "the Weinstein engine" and "the index"), but it is a genuine
+  scope question worth an explicit decision, not a silent build.
+
+No ledger ACCEPT recorded: the production tool confirmed only the timing floor
+(no-promote); the buy-hold variant is a hand-blend result pending a build +
+production confirmation. Recording a premature ACCEPT off a proxy is the exact
+trap `mechanism-validation-rigor` guards against.
