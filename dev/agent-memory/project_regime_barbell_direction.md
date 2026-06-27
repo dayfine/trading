@@ -104,3 +104,30 @@ DIRECTION:**
   SPY-timing floor) through default-off→WF-CV→bear-inclusive confirmation grid on
   floor-weight {0.2,0.3,0.4}.** Docs shipped: docs/design/margin-safety.md (#7),
   #6 universe-vs-gate liquidity gap audited (always-arm entry gate fix).
+
+---
+**DEEP VERIFICATION + BROAD SHORT CORRECTION 2026-06-27** (user: do broad-3000 not
+sp500; do WF-CV when evidence strong; note: `dev/notes/barbell-deep-verification-2026-06-27.md`):
+- **SHORT LEG CORRECTED — shorts DO make money on BROAD** (sp500-515's −$640k was a
+  survivorship artifact, too few shortable losers). Broad top-3000 liquidity-armed
+  long-short: SHORT 36 trades net **+$554k**; armed LS DOMINATES long-only on ALL 3
+  axes (+774 vs +721%, Sharpe .53 vs .49, MaxDD 41.5 vs 43.8). "Short adds nothing"
+  (DEEP_RESULTS) was return-only framing. Shorts pay BOTH regimes (bear +$205k/bull
+  +$349k) → can't macro-gate (#5 dropped, but KEEP short leg ON). BUT ~100% of net =
+  2 fat-tail crash-rides (MPAC_old +$364k shorted-2007-rode-GFC, AMMB +$194k
+  dot-com); other 34 trades ~$0. = sparse crash-driven tail-hedge not steady alpha
+  ([[project_edge_is_the_fat_tail]]). User's intuition correct; low trade-cnt expected.
+- **BARBELL WF-CV/grid PASSES** (period×universe). Fixed-weight blend = no fitted
+  param → test = per-fold robustness. static-30 beats engine-baseline Sharpe in 5/7
+  rolling-10y + 4-5/6 disjoint folds, NEVER badly dominated; per-fold OPTIMAL weight
+  regime-unstable (0→1) so promote the conservative robust compromise not a "best".
+  Value = RAISING THE FLOOR (worst-fold Sh +0.10 vs engine −0.43), not the ceiling.
+- **Benefit is UNIVERSE-DEPENDENT** (2-cell grid): LARGE on realistic broad/honest
+  engine (Sharpe .49, DD 44% → +.07 Sh, −15pp DD) but small/neutral on survivor
+  sp500 (engine already Sh .75/DD 26%; s20 best, s30+ slightly hurts). Robust
+  cross-universe weight = **~0.20-0.30** (0.20 conservative floor; 0.30 justified on
+  broad). Floor-raising universe-robust (2020-26 fold: s30 +.38 vs engine −.18 both).
+- Existing infra: Barbell_config(floor_weight,default-off)+Barbell_floor_sweep+
+  blend.awk(=my hand-blend). Next build (gated): wire floor_weight 0.20-0.30, confirm
+  via real Barbell_runner over the grid. Warehouse /tmp/snap_top3000_1998_2026_v2
+  PERSISTS in container (survived 4 days; rebuild via build_snapshots single-dash flags).
