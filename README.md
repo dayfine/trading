@@ -35,3 +35,14 @@ long-only + long-short, with the realized-vs-MTM and liquidity caveats), see
 [`dev/backtest/DEEP_RESULTS.md`](dev/backtest/DEEP_RESULTS.md) — the results-of-record,
 each row pinned to its scenario sexp and measurement commit. Those runs are
 experiment-only (reproducible locally against the deep data dir; skipped on GHA).
+
+### Margin & trade-safety model
+
+Short selling and tradeability are modeled against real broker/regulatory rules
+(Reg-T 150% short collateral, FINRA 4210 maintenance, daily borrow fee, a $17
+short-price floor for the 30% maintenance tier, force-liquidation/halt, and a
+default-off liquidity-realism overlay with an entry $-ADV gate + held-degradation
+exit). All controls are **default-off no-ops** — defaults reproduce a frictionless
+long-only engine bit-for-bit. See
+[`docs/design/margin-safety.md`](docs/design/margin-safety.md) for the full mapping
+to broker requirements.
