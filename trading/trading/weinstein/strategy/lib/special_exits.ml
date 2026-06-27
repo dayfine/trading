@@ -100,6 +100,17 @@ let _run_liquidity_special_exit ~config ~record_force_exit ~positions
   emit_audit liquidity_ts;
   liquidity_ts @ force_exit_ts
 
+(* The union of every position-id already exiting this tick via any of the four
+   prior channels (stop, force-liq, Stage-3, laggard) — the liquidity exit's
+   skip set. Stage-3/laggard ids are NOT recoverable from [force_exit_ts] (they
+   were filtered out of it by [_apply_exit_channel]), so the union is assembled
+   from the channel id sets directly. *)
+let _liquidity_skip_ids ~force_exit_ts ~stop_exited_ids ~stage3_exited_ids
+    ~laggard_exited_ids =
+  Set.union
+    (Transition_assembly.trigger_exit_ids_of force_exit_ts)
+    (Set.union stop_exited_ids (Set.union stage3_exited_ids laggard_exited_ids))
+
 (* Build the base force-liquidation channel: run the force-liq runner, then drop
    positions already exiting via a stop this tick. Returns the trimmed channel
    plus the stop-exited id set used to seed the running skip set. *)
@@ -150,20 +161,14 @@ let run ~config ~record_force_exit ~positions ~last_stop_out_dates
     apply_exit_channel laggard_ts ~force_exit_ts
   in
   emit_audit force_exit_ts;
-  (* Skip every position already exiting this tick via any of the four prior
-     channels: stop, force-liq, Stage-3, laggard. Stage-3/laggard ids are NOT
-     recoverable from [force_exit_ts] (they were filtered out of it), so the
-     union must be assembled from the channel id sets directly. *)
-  let liquidity_skip_ids =
-    Set.union
-      (Transition_assembly.trigger_exit_ids_of force_exit_ts)
-      (Set.union stop_exited_ids
-         (Set.union stage3_exited_ids laggard_exited_ids))
+  let skip_ids =
+    _liquidity_skip_ids ~force_exit_ts ~stop_exited_ids ~stage3_exited_ids
+      ~laggard_exited_ids
   in
   let force_exit_ts =
     _run_liquidity_special_exit ~config ~record_force_exit ~positions
       ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit
-      ~skip_ids:liquidity_skip_ids ~force_exit_ts ~current_date
+      ~skip_ids ~force_exit_ts ~current_date
   in
   ( force_exit_ts,
     stage3_ts,
