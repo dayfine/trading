@@ -407,6 +407,36 @@ type config = {
           Default-off until an experiment-ledger ACCEPT (per
           [.claude/rules/experiment-flag-discipline.md] +
           [.claude/rules/promotion-confirmation.md]). *)
+  liquidity_config : Liquidity_config.t;
+      [@sexp.default Liquidity_config.default_config]
+      (** Liquidity-realism overlay parameters — the held-position liquidity
+          degradation exit ({!Liquidity_exit_runner}) and the entry liquidity
+          gate ({!Liquidity_gate}).
+
+          {b Motivation.} A deep broad-universe long-short backtest produced a
+          −48% single-day NAV crash traced to ONE short: a delisted micro-cap
+          (ELCO) trading ~2 shares/day whose stale ~$38 high-tick tripped the
+          short stop's worst-case cover fill. Root cause = trading an
+          illiquid/degraded name, detectable in real time from its collapsing
+          dollar-ADV. The realistic case is a name we {e held} whose liquidity
+          degraded over time (large-cap → thinly-traded micro-cap / delisting);
+          the overlay detects that from data at decision time and exits before
+          the name becomes untradeable.
+
+          {b Semantics.} Default [Liquidity_config.default_config]
+          ([min_entry_dollar_adv = 0.0], [min_hold_dollar_adv = 0.0]) is a no-op
+          — the gate drops nothing and the exit never fires, so every existing
+          golden/baseline replays {b bit-identically}
+          (experiment-flag-discipline R1).
+
+          {b Faithfulness} (W1/W2, [.claude/rules/weinstein-faithful-core.md]).
+          A risk/realism dial — Weinstein would never hold a name he could not
+          trade out of. The spine is untouched (stage framework, Stage-2 entry,
+          volume-confirmed breakout all unchanged); only
+          tradeability-eligibility is narrowed. Each threshold is searchable as
+          a [Variant_matrix] axis, e.g.
+          [((key (liquidity_config min_hold_dollar_adv)) (values (0.0 1e6)))].
+          Default-off until an experiment-ledger ACCEPT. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

@@ -23,6 +23,7 @@
   weinstein.sector
   weinstein.screener
   weinstein_trading.short_side_gate
+  weinstein_trading.liquidity_gate
   weinstein.stock_analysis
   weinstein.continuation
   indicators.types

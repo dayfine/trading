@@ -1,9 +1,53 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-06-19
+## Last updated: 2026-06-26
 
 ## Status
 IN_PROGRESS
+
+## 2026-06-26 — liquidity-realism overlay (default-off) SHIPPED (branch `feat/liquidity-realism-overlay`)
+
+Root cause of a deep broad-universe long-short −48% single-day NAV crash: ONE
+short — delisted micro-cap ELCO trading 0-26 shares/day — was shorted at ~76% of
+capital; a spurious 1-share $38.50 high-tick (close stayed $6.60) tripped the
+short stop's worst-case cover fill → fake −250% / −$1.84M loss. Real cause =
+trading an illiquid/degraded name, detectable in real time from collapsing
+dollar-ADV.
+
+**Overlay (config-driven, default-off, faithful risk/realism dial — spine
+untouched).**
+- **Liquidity metric** (`Liquidity_metric.dollar_adv`): trailing mean of
+  `close × volume` over `adv_lookback_days`, computed from bars at `as_of` (no
+  lookahead).
+- **Held-position degradation EXIT** (`Liquidity_exit_runner`, the PRIMARY ask):
+  each screening cycle, any held position (long OR short) whose trailing
+  dollar-ADV `< min_hold_dollar_adv` gets a `StrategySignal { label =
+  "liquidity_exit"; detail = "dollar_adv=<x>" }` TriggerExit at the close —
+  catching the held-degradation path BEFORE a spurious tick can hit. Wired into
+  `weinstein_strategy._run_special_exits` (merged into the force-exit channel,
+  skips ids already exiting via stop/Stage-3/laggard/force-liq).
+- **Entry GATE** (`Liquidity_gate.filter`): drops long AND short candidates whose
+  dollar-ADV `< min_entry_dollar_adv`; applied in `weinstein_strategy_screening`
+  to `combined_candidates` before the entry walk.
+- **Config** `Weinstein_strategy_config.liquidity_config : Liquidity_config.t`
+  `[@sexp.default Liquidity_config.default_config]` — no-op default
+  (`min_entry_dollar_adv = 0.0`, `min_hold_dollar_adv = 0.0`, `adv_lookback_days
+  = 20`) = bit-identical baseline. Searchable as `Variant_matrix` axis
+  `((key (liquidity_config min_hold_dollar_adv)) (values (0.0 1e6)))` (verified
+  via `Overlay_validator`).
+- **Tool**: `trading/backtest/snapshot_warehouse/dump_snap` — the forensic OHLCV
+  `.snap` dumper that diagnosed the ELCO artifact, shipped as a dev tool.
+
+Tests (TDD, all pass): `test_liquidity_metric` (5), `test_liquidity_gate` (4),
+`test_liquidity_exit_runner` (5 — incl. the ELCO reproducer + default-off
+bit-identity + both-sides). Existing strategy smokes
+(`test_weinstein_strategy_smoke`, `test_spy_only_weinstein_strategy`,
+`test_weinstein_strategy`, `test_sector_rotation_weinstein_strategy`) pass
+unchanged, confirming the default-off path is bit-identical.
+
+**Next:** dispatcher to run the deep broad-cell with `min_hold_dollar_adv` armed
+to confirm the ELCO −48% artifact disappears; then experiment-ledger
+surface/WF-CV per `experiment-flag-discipline.md` before any default flip.
 
 ## 2026-06-19 — reserved short sleeve (default-off) SHIPPED (branch `feat/short-sleeve`)
 

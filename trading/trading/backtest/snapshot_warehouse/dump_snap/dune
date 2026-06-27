@@ -1,0 +1,3 @@
+(executable
+ (name dump_snap)
+ (libraries core trading.data_panel.snapshot status))

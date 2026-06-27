@@ -17,6 +17,10 @@ module Harvest_rotate_wiring = Harvest_rotate_wiring
 module Macro_bearish_trim_runner = Macro_bearish_trim_runner
 module Macro_bearish_trim_wiring = Macro_bearish_trim_wiring
 module Laggard_rotation_runner = Laggard_rotation_runner
+module Special_exits = Special_exits
+module Liquidity_config = Liquidity_config
+module Liquidity_metric = Liquidity_metric
+module Liquidity_exit_runner = Liquidity_exit_runner
 module Stage3_force_exit = Stage3_force_exit
 module Laggard_rotation = Laggard_rotation
 module Ad_bars = Ad_bars
@@ -129,93 +133,6 @@ let _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
   Exit_audit_capture.emit_for_list ~config ~audit_recorder ~prior_macro_result
     ~bar_reader ~prior_stages ~positions exit_transitions;
   (exit_transitions, adjust_transitions)
-
-let _run_laggard_rotation ~config ~positions ~last_stop_out_dates ~bar_reader
-    ~get_price ~laggard_streaks ~is_friday ~skip_ids ~current_date =
-  let laggard_ts =
-    if config.enable_laggard_rotation then
-      Laggard_rotation_runner.update ~config:config.laggard_rotation_config
-        ~benchmark_symbol:config.indices.primary ~is_screening_day:is_friday
-        ~positions ~bar_reader ~get_price ~laggard_streaks
-        ~skip_position_ids:skip_ids ~current_date
-    else []
-  in
-  List.iter laggard_ts
-    ~f:
-      (_record_force_exit ~last_stop_out_dates ~positions ~current_date
-         ~cooldown_weeks:config.laggard_reentry_cooldown_weeks
-         ~label:"laggard_rotation");
-  laggard_ts
-
-let _run_stage3_force_exit ~config ~positions ~last_stop_out_dates
-    ~prior_stage_ma_values ~stage3_streaks ~get_price ~prior_stages ~is_friday
-    ~stop_exited_ids ~current_date =
-  let stage3_ts =
-    if config.enable_stage3_force_exit then
-      Stage3_force_exit_runner.update ~config:config.stage3_force_exit_config
-        ~exit_margin_pct:config.stage3_exit_margin_pct
-        ~prior_stage_ma_values:(Some prior_stage_ma_values)
-        ~is_screening_day:is_friday ~positions ~get_price ~prior_stages
-        ~stage3_streaks ~stop_exit_position_ids:stop_exited_ids ~current_date
-    else []
-  in
-  List.iter stage3_ts
-    ~f:
-      (_record_force_exit ~last_stop_out_dates ~positions ~current_date
-         ~cooldown_weeks:config.stage3_reentry_cooldown_weeks
-         ~label:"stage3_force_exit");
-  stage3_ts
-
-let _run_special_exits ~config ~positions ~last_stop_out_dates
-    ~(portfolio : Portfolio_view.t) ~get_price ~peak_tracker ~audit_recorder
-    ~prior_macro_result ~prior_stages ~prior_stage_ma_values ~stage3_streaks
-    ~laggard_streaks ~bar_reader ~index_view ~exit_transitions ~current_date =
-  let emit_audit =
-    Exit_audit_capture.emit_for_list ~config ~audit_recorder ~prior_macro_result
-      ~bar_reader ~prior_stages ~positions
-  in
-  let raw_force_exit_ts =
-    Force_liquidation_runner.update
-      ~config:config.portfolio_config.force_liquidation ~positions ~get_price
-      ~cash:portfolio.cash ~current_date ~peak_tracker ~audit_recorder
-  in
-  let stop_exited_ids =
-    Transition_assembly.trigger_exit_ids_of exit_transitions
-  in
-  let force_exit_ts =
-    Transition_assembly.filter_out_exited_ids stop_exited_ids raw_force_exit_ts
-  in
-  let is_friday =
-    Weinstein_strategy_screening.is_screening_day_view index_view
-  in
-  let stage3_ts =
-    _run_stage3_force_exit ~config ~positions ~last_stop_out_dates
-      ~prior_stage_ma_values ~stage3_streaks ~get_price ~prior_stages ~is_friday
-      ~stop_exited_ids ~current_date
-  in
-  emit_audit stage3_ts;
-  let stage3_exited_ids = Transition_assembly.trigger_exit_ids_of stage3_ts in
-  let force_exit_ts =
-    Transition_assembly.filter_out_exited_ids stage3_exited_ids force_exit_ts
-  in
-  let laggard_ts =
-    _run_laggard_rotation ~config ~positions ~last_stop_out_dates ~bar_reader
-      ~get_price ~laggard_streaks ~is_friday
-      ~skip_ids:(Set.union stop_exited_ids stage3_exited_ids)
-      ~current_date
-  in
-  emit_audit laggard_ts;
-  let laggard_exited_ids = Transition_assembly.trigger_exit_ids_of laggard_ts in
-  let force_exit_ts =
-    Transition_assembly.filter_out_exited_ids laggard_exited_ids force_exit_ts
-  in
-  emit_audit force_exit_ts;
-  ( force_exit_ts,
-    stage3_ts,
-    laggard_ts,
-    stop_exited_ids,
-    stage3_exited_ids,
-    laggard_exited_ids )
 
 (** Run the late-Stage-2 trailing-stop tightening dial (P1 stage-accuracy). On
     Friday ticks, when [config.enable_late_stage2_stop_tighten = true], raise
@@ -361,10 +278,10 @@ let _process_market_day ~fold_start_date ~config ~ad_series ~stop_states
         stop_exited_ids,
         stage3_exited_ids,
         laggard_exited_ids ) =
-    _run_special_exits ~config ~positions ~last_stop_out_dates ~portfolio
-      ~get_price ~peak_tracker ~audit_recorder ~prior_macro_result ~prior_stages
-      ~prior_stage_ma_values ~stage3_streaks ~laggard_streaks ~bar_reader
-      ~index_view ~exit_transitions ~current_date
+    Special_exits.run ~config ~record_force_exit:_record_force_exit ~positions
+      ~last_stop_out_dates ~portfolio ~get_price ~peak_tracker ~audit_recorder
+      ~prior_macro_result ~prior_stages ~prior_stage_ma_values ~stage3_streaks
+      ~laggard_streaks ~bar_reader ~index_view ~exit_transitions ~current_date
   in
   let is_screening_day =
     Weinstein_strategy_screening.is_screening_day_view index_view
