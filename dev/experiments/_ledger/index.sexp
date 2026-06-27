@@ -233,4 +233,4 @@
  ((config_hash barbell-floor-sweep)
   (base_scenario "broad top-3000 PIT-1998 long-only 1998-2026 (floor sweep)")
   (window_id full-window-1998-2026-floor-sweep-rebalance4wk)
-  (verdict Inconclusive) (entry_slug barbell-floor-sweep)))
+  (verdict Reject) (entry_slug barbell-floor-sweep)))

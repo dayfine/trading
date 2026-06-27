@@ -252,3 +252,22 @@ No ledger ACCEPT recorded: the production tool confirmed only the timing floor
 (no-promote); the buy-hold variant is a hand-blend result pending a build +
 production confirmation. Recording a premature ACCEPT off a proxy is the exact
 trap `mechanism-validation-rigor` guards against.
+
+---
+
+## DECISION (2026-06-27, user): Option B — barbell NOT pursued
+The user chose **Option B**: do **not** build the buy-hold floor leg / do **not**
+add a passive SPY index sleeve. Rationale: a passive index allocation is
+portfolio construction, not a Weinstein stock-selection mechanism
+(`weinstein-faithful-core`). **The barbell direction is closed.** The timing-floor
+variant is no-free-lunch; the buy-hold variant stays a documented-but-declined
+possibility — do not re-propose without a fresh faithfulness decision. Ledger
+`2026-06-27-barbell-floor-sweep` verdict = Reject.
+
+**Net standing conclusion of the whole regime-edge investigation:** the strategy
+is a **regime-conditional crash-protector** (wins bears/recoveries, lags
+melt-ups by structural under-participation). The most promising way to exploit
+that — blending in a passive SPY sleeve — is declined on faithfulness grounds, so
+**no new strategy change is adopted**; the bull-market lag is accepted as the
+cost of the crash-protection mandate. The short leg stays available (default-off
+tail-hedge). Entry/exit-timing levers are dead. This closes the 7-item investigation.

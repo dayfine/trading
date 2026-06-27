@@ -1,5 +1,14 @@
 # Regime-edge synthesis — what's most promising/valuable (2026-06-27)
 
+> **OUTCOME UPDATE (2026-06-27):** the #1 recommendation below (static SPY-blend
+> barbell) was deep-verified (`barbell-deep-verification-2026-06-27.md`) and then
+> **DECLINED by the user (Option B)** — the Sharpe-improving version needs a
+> passive SPY buy-hold sleeve, which is portfolio construction, not a Weinstein
+> mechanism (`weinstein-faithful-core`). **No new strategy change adopted.** The
+> standing conclusion: the strategy is a regime-conditional crash-protector and
+> its bull-lag is accepted as-is. Read the rankings below as the *analysis*; the
+> *decision* is no-change. Ledger: `2026-06-27-barbell-floor-sweep` = Reject.
+
 **Mandate:** go through all four investigation threads
 (`next-session-priorities-2026-06-27.md`), then **synthesize and rank** what's
 most promising. Analysis session — the one recommendation it lands on is stated

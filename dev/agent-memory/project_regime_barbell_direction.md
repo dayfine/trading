@@ -152,3 +152,15 @@ Inconclusive; note Part 3):
   +gated wire; B=barbell is DD-only overlay=not worth promoting. Faithfulness flag:
   passive SPY sleeve = portfolio overlay not a Weinstein mechanism (defensible: index
   in macro spine, but a real scope question). Engine here 0.14 conc; prod default 0.30.
+
+---
+**DECISION 2026-06-27 (user): Option B — BARBELL CLOSED.** User declined to build a
+buy-hold SPY floor leg / add a passive SPY index sleeve (Weinstein-faithfulness: a
+passive index allocation is portfolio construction, not a Weinstein stock-selection
+mechanism). The barbell direction is CLOSED — do NOT re-propose the SPY-blend
+(static or dynamic) without a fresh faithfulness decision. Ledger
+2026-06-27-barbell-floor-sweep verdict=Reject. NET STANDING CONCLUSION of the whole
+regime-edge investigation: the strategy is a regime-conditional crash-protector;
+its bull-market under-participation is ACCEPTED AS-IS; no new strategy change
+adopted. Short leg stays available (default-off tail-hedge); entry/exit-timing
+levers dead. The 7-item investigation is closed.
