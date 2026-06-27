@@ -70,3 +70,37 @@ note: `dev/notes/regime-edge-understanding-2026-06-27.md`):
 - Options menu (NOT a build): bull leg=SPY (cash-gating dead); bear leg=strategy;
   signal candidates {annual SPY-MA / monthly-MA / endogenous macro gate / A-D breadth};
   cadence annual→overstays. Promotion still needs default-off→WF-CV→bear-inclusive grid.
+
+---
+**FULL-THREAD SYNTHESIS 2026-06-27** (all 4 threads run; note:
+`dev/notes/regime-edge-synthesis-2026-06-27.md`). **CONCLUSION CHANGES THE
+DIRECTION:**
+- **TOP LEVER = a STATIC ~30% SPY / 70% engine blend, NOT a dynamic switch.**
+  Apples-to-apples daily price-only blend (engine=+721% broad LO vs SPY price):
+  static30 = +805% / Sharpe .568 / MaxDD 29.4% — BEATS both pure engine (721/.496/43.8)
+  AND pure SPY (629/.459/56.5) in return AND DD AND Sharpe. Sub-window: static30
+  Sharpe ≈.56 crash-decade AND ≈.57 bull-decade = regime-STABLE (legs are each
+  regime-unstable). Genuine diversification (regime anti-correlation), the one
+  Weinstein-faithful lever that diversifies the fat tail instead of taxing it
+  ([[project_edge_is_the_fat_tail]]). Mature infra EXISTS (Barbell_config +
+  floor-weight sweep); static 70/30 already passed a grid ([[project_barbell_on_stocks]]).
+- **DYNAMIC regime-switch DEMOTED (resolves the contradiction).** The 06-26
+  priorities-doc's +1295% annual MA-barbell was a BASIS ARTIFACT (div-adj SPY +
+  per-year compounding); on consistent basis the annual switch = 749/.528, WORSE
+  than static30. Switch value is wildly cadence-fragile (daily 329 dead, monthly
+  1077 great, annual 749 meh = overfit/path-luck). The 2026-06-21 engine-edge
+  FINDINGS ("fixed light floor beats regime-timing the weight") is VINDICATED;
+  consistent with regime-gating-is-dead.
+- **A.2 bear-edge BROAD on independent universe:** sp500-515 LO re-run, all 5
+  down-SPY yrs positive (mean +16pp), corr(edge,SPY)=−0.735. Not a top-3000 artifact.
+- **Thread B = DEAD lever:** give-back 10.3pp (capture only +2.5% of +12.9% peak)
+  but structural fat-tail/stop tax, no knob captures net; cash-rationing 97% of
+  decisions (16,250 Insufficient_cash skips) but allocation ORDER already ~optimal
+  (84% take ≥-top candidate). Binding lever = deployment VOLUME = the barbell.
+- **Thread C = DROP #5:** short leg fired 30× in 26y (sp500), total −$640k; even
+  2008 LOST −$52k; doesn't pay in bears. Macro-conditional long-short precondition
+  FAILS. Keep short mechanics merged, don't pursue as a return lever.
+- **NEXT (validate-not-build): take static ~30% SPY barbell (SPY buy-hold leg, not
+  SPY-timing floor) through default-off→WF-CV→bear-inclusive confirmation grid on
+  floor-weight {0.2,0.3,0.4}.** Docs shipped: docs/design/margin-safety.md (#7),
+  #6 universe-vs-gate liquidity gap audited (always-arm entry gate fix).
