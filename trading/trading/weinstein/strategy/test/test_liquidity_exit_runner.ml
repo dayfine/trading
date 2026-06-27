@@ -226,6 +226,91 @@ let test_skip_list_collision_no_op _ =
   in
   assert_that (List.length result) (equal_to 0)
 
+(* ------------------------------------------------------------------ *)
+(* Special_exits.run integration: a force-liquidated illiquid position  *)
+(* must NOT also receive a liquidity TriggerExit (skip-set seeding)      *)
+(* ------------------------------------------------------------------ *)
+
+(* A weekly_view whose last bar is a Friday so [is_screening_day_view] is true
+   and the liquidity exit's weekly cadence is active. *)
+let _friday_weekly_view : Snapshot_runtime.Snapshot_bar_views.weekly_view =
+  {
+    closes = [| 6.60 |];
+    raw_closes = [| 6.60 |];
+    highs = [| 6.60 |];
+    lows = [| 6.60 |];
+    volumes = [| 2.0 |];
+    dates = [| _friday |];
+    n = 1;
+  }
+
+(* The same position breaches BOTH the force-liquidation threshold (short
+   entered $100, now $160 => 60% loss, default short threshold 15% fires) AND
+   the held-liquidity floor (degraded volume => dollar-ADV far below $1M). The
+   force-liq channel must be the only exit; the liquidity exit skips it because
+   the force-liq id is folded into its skip set. Pre-fix, the liquidity exit
+   emitted a second TriggerExit on the same id (merged into one force_exit
+   channel), which the Position state machine rejects from a non-Holding
+   state. *)
+let test_force_liq_position_skipped_by_liquidity_exit _ =
+  let symbol = "ILQD" in
+  let entry_price = 100.0 in
+  let crash_price = 160.0 in
+  let pos =
+    make_holding_pos ~side:Trading_base.Types.Short symbol entry_price _friday
+  in
+  let pos_id = pos.Trading_strategy.Position.id in
+  let positions = String.Map.singleton symbol pos in
+  (* Bars carry the degraded volume so the liquidity metric sees an illiquid
+     name; the close at the crash price drives the force-liq P&L. *)
+  let crash_bar = make_bar "2024-03-29" ~close:crash_price ~volume:2 in
+  let bar_reader = Bar_reader.of_in_memory_bars [ (symbol, [ crash_bar ]) ] in
+  let get_price s = if String.equal s symbol then Some crash_bar else None in
+  let config =
+    {
+      (Weinstein_strategy_config.default_config ~universe:[ symbol ]
+         ~index_symbol:"INDEX")
+      with
+      liquidity_config = _armed_config;
+    }
+  in
+  let no_op_record_force_exit ~last_stop_out_dates:_ ~positions:_
+      ~current_date:_ ~cooldown_weeks:_ ~label:_ _ =
+    ()
+  in
+  let ( force_exit_ts,
+        _stage3_ts,
+        _laggard_ts,
+        _stop_ids,
+        _stage3_ids,
+        _laggard_ids ) =
+    Special_exits.run ~config ~record_force_exit:no_op_record_force_exit
+      ~positions
+      ~last_stop_out_dates:(Hashtbl.create (module String))
+      ~portfolio:{ cash = 1_000_000.0; positions }
+      ~get_price
+      ~peak_tracker:Portfolio_risk.Force_liquidation.Peak_tracker.(create ())
+      ~audit_recorder:Audit_recorder.noop ~prior_macro_result:(ref None)
+      ~prior_stages:(Hashtbl.create (module String))
+      ~prior_stage_ma_values:(Hashtbl.create (module String))
+      ~stage3_streaks:(Hashtbl.create (module String))
+      ~laggard_streaks:(Hashtbl.create (module String))
+      ~bar_reader ~index_view:_friday_weekly_view ~exit_transitions:[]
+      ~current_date:_friday
+  in
+  (* Exactly one exit for the position — the force-liquidation one — and no
+     duplicate liquidity TriggerExit. *)
+  let exits_for_pos =
+    List.filter force_exit_ts
+      ~f:(fun (t : Trading_strategy.Position.transition) ->
+        String.equal t.position_id pos_id
+        &&
+        match t.kind with
+        | Trading_strategy.Position.TriggerExit _ -> true
+        | _ -> false)
+  in
+  assert_that (List.length exits_for_pos) (equal_to 1)
+
 let () =
   run_test_tt_main
     ("liquidity_exit_runner"
@@ -235,4 +320,6 @@ let () =
            "liquid position not exited" >:: test_liquid_position_not_exited;
            "off-cadence is a no-op" >:: test_off_cadence_no_op;
            "skip-list collision is a no-op" >:: test_skip_list_collision_no_op;
+           "force-liq position skipped by liquidity exit"
+           >:: test_force_liq_position_skipped_by_liquidity_exit;
          ])

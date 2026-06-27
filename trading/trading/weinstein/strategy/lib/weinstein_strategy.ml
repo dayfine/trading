@@ -17,6 +17,7 @@ module Harvest_rotate_wiring = Harvest_rotate_wiring
 module Macro_bearish_trim_runner = Macro_bearish_trim_runner
 module Macro_bearish_trim_wiring = Macro_bearish_trim_wiring
 module Laggard_rotation_runner = Laggard_rotation_runner
+module Special_exits = Special_exits
 module Liquidity_config = Liquidity_config
 module Liquidity_metric = Liquidity_metric
 module Liquidity_exit_runner = Liquidity_exit_runner

@@ -118,6 +118,11 @@ module Laggard_rotation = Laggard_rotation
     {!Weinstein_strategy.config} can reference {!Laggard_rotation.config} and
     {!Laggard_rotation.default_config} without a separate library import. *)
 
+module Special_exits = Special_exits
+(** Post-stops special-exit channels (force-liquidation, Stage-3 force-exit,
+    laggard-rotation, liquidity-degradation). Re-exposed so tests can drive the
+    full {!Special_exits.run} pipeline directly. See {!Special_exits}. *)
+
 module Liquidity_config = Liquidity_config
 (** Liquidity-realism overlay config ({!Liquidity_config.t}). Re-exposed so
     callers building a {!Weinstein_strategy.config} can reference

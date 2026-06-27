@@ -76,13 +76,24 @@ let _apply_exit_channel ~emit_audit ts ~force_exit_ts =
     Transition_assembly.filter_out_exited_ids exited_ids force_exit_ts )
 
 (* Liquidity-degradation exit: emitted last among the special exits and merged
-   into the force-exit channel (same close-fill convention + audit path). Skip
-   any position already exiting via a stop / Stage-3 / laggard / force-liq path
-   this tick. No-op at the default config (min_hold_dollar_adv = 0.0). Returns
-   the force-exit channel with the liquidity exits prepended. *)
+   into the force-exit channel (same close-fill convention + audit path). Skips
+   every position already exiting this tick: [stop_exited_ids] plus every channel
+   merged into [force_exit_ts] (force-liq, Stage-3, laggard). [force_exit_ts]
+   carries those three as [TriggerExit]s; [stop_exited_ids] were filtered out of
+   it, so they are unioned back. Without the force-liq ids in this skip set a
+   force-liquidated illiquid position would also get a liquidity [TriggerExit] —
+   two exits merged into one channel, which the Position state machine rejects
+   from a non-Holding state. No-op at the default config
+   (min_hold_dollar_adv = 0.0). Returns the force-exit channel with the
+   liquidity exits prepended. *)
 let _run_liquidity_special_exit ~config ~record_force_exit ~positions
-    ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit ~skip_ids
-    ~force_exit_ts ~current_date =
+    ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit
+    ~stop_exited_ids ~force_exit_ts ~current_date =
+  let skip_ids =
+    Set.union
+      (Transition_assembly.trigger_exit_ids_of force_exit_ts)
+      stop_exited_ids
+  in
   let liquidity_ts =
     _run_liquidity_exit ~config ~record_force_exit ~positions
       ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~skip_ids
@@ -144,11 +155,7 @@ let run ~config ~record_force_exit ~positions ~last_stop_out_dates
   let force_exit_ts =
     _run_liquidity_special_exit ~config ~record_force_exit ~positions
       ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit
-      ~skip_ids:
-        (Set.union
-           (Set.union stop_exited_ids stage3_exited_ids)
-           laggard_exited_ids)
-      ~force_exit_ts ~current_date
+      ~stop_exited_ids ~force_exit_ts ~current_date
   in
   ( force_exit_ts,
     stage3_ts,
