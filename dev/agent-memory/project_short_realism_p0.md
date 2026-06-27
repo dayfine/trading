@@ -1,6 +1,6 @@
 ---
 name: project_short_realism_p0
-description: "Longshort backtest absolute returns are INFLATED by broken/missing short mechanics (G1-G5, esp G5 no margin model = free leverage); fix realism before banking any longshort number. Next-session P0; concentration tabled. Plan short-side-realism-2026-06-26"
+description: "Short-realism P0 was ALREADY BUILT — 2026-06-26 reconcile found G1/G2/margin-model/Finding-A crash all merged on main (handoff was stale). Acceptance re-run: margin off-vs-on <0.06pp, NAV-safe, but shorts now sparse so weak test. Evidence says inflation is MTM/concentration NOT short leverage. Open: deep-cell acceptance + tiered FINRA maint."
 metadata: 
   node_type: memory
   type: project
@@ -28,10 +28,25 @@ The realism gaps (still open; inflate the numbers):
 - **G2 — round-trip metrics blind to shorts** (legibility; shorts invisible in trades.csv).
 - (later) borrow/locate/carry cost.
 
-**P0 next session:** implement these — plan `dev/plans/short-side-realism-2026-06-26.md`,
-PR sequence G1 → G2 → margin model (G3+G5+G4) → re-pin longshort goldens. Acceptance:
-re-run an inflated longshort number before/after the margin model; expect substantial
-DROP + NAV never negative → longshort absolutes become trustworthy.
+**2026-06-26 RECONCILE (autonomous): the P0 build is ~all already done on main.** Verified
+against cc3c21f5 (handoff was stale per CLAUDE.md verify-claims discipline): G1 short-stop
+(side-aware stage+fill, tests green), G2 short round-trip metrics, AND the whole margin model
+(issue #859 Phase 1+2: Reg-T 150% collateral lock, sizing_cash cap, maintenance check, 50bps
+borrow fee, force_liquidation; wired into simulator+panel_runner; default-off) are MERGED.
+The May Finding-A crash (margin_call same-tick TriggerExit) is FIXED (#1266/#1274 dedup).
+Re-ran the 4 May bear windows × off/on (never done post-fix): dot-com now completes clean,
+NO margin_call exits, NAV never negative, margin Δ <0.06pp, IDENTICAL trade counts off/on.
+Two reframings: (a) identical trade counts ⇒ collateral lock NOT binding capacity — the
+max_long_exposure_pct=0.70 cap already prevents short-proceeds free-leverage, so G5 is
+largely redundant for capacity; (b) current main shorts SPARSELY (dot-com 21→2 shorts since
+A-D-live + faithful-short) so sub-windows are a weak test. Evidence is INCONSISTENT with
+"inflation = free leverage"; points to terminal MTM on concentrated winners
+([[project_broad_universe_790_mtm_inflated]], [[project_trade_realism_liquidity]]).
+Full writeup: dev/notes/short-realism-reconcile-2026-06-26.md.
+**Still genuinely open:** (1) deep-cell acceptance — reproduce the exact 3408% sp500-515
+~1999-2026 longshort cell margin off/on (only thing that settles the inflation question);
+(2) FINRA TIERED maintenance (current flat 25%) + short_min_price≈17; (3) decide if P0 is
+effectively done.
 
 **Concentration TABLED** until shorts are legible. The long-only 0.30 re-pin (#1753) STAYS
 merged (orthogonal, long-only, aligns to the existing 0.30 default — see
