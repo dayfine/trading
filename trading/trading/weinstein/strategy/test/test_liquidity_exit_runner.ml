@@ -311,6 +311,91 @@ let test_force_liq_position_skipped_by_liquidity_exit _ =
   in
   assert_that (List.length exits_for_pos) (equal_to 1)
 
+(* ------------------------------------------------------------------ *)
+(* Special_exits.run integration: a Stage-3 force-exited illiquid       *)
+(* position must NOT also receive a liquidity TriggerExit. This is the  *)
+(* channel the previous skip-set fix missed: [_apply_exit_channel]      *)
+(* FILTERS the Stage-3 id OUT of [force_exit_ts], so reconstructing the *)
+(* liquidity skip set from [force_exit_ts] alone omits it. Without the  *)
+(* Stage-3 id in the skip set the liquidity exit emits a second         *)
+(* TriggerExit on the same id (merged into one force_exit channel),     *)
+(* which the Position state machine rejects from a non-Holding state.   *)
+(* ------------------------------------------------------------------ *)
+
+let test_stage3_force_exit_position_skipped_by_liquidity_exit _ =
+  let symbol = "S3IL" in
+  let price = 100.0 in
+  (* A long position, flat at entry (no force-liq loss), but illiquid: degraded
+     volume drives dollar-ADV far below the $1M hold floor. The Stage-3
+     force-exit channel must be the only exit. *)
+  let pos =
+    make_holding_pos ~side:Trading_base.Types.Long symbol price _friday
+  in
+  let pos_id = pos.Trading_strategy.Position.id in
+  let positions = String.Map.singleton symbol pos in
+  let flat_bar = make_bar "2024-03-29" ~close:price ~volume:2 in
+  let bar_reader = Bar_reader.of_in_memory_bars [ (symbol, [ flat_bar ]) ] in
+  let get_price s = if String.equal s symbol then Some flat_bar else None in
+  (* Arm Stage-3 force-exit and seed the detector so it fires this tick:
+     prior_stages = Stage3, streak 1 => next observe reaches hysteresis (2). *)
+  let prior_stages = Hashtbl.create (module String) in
+  Hashtbl.set prior_stages ~key:symbol
+    ~data:(Weinstein_types.Stage3 { weeks_topping = 1 });
+  let stage3_streaks = Hashtbl.create (module String) in
+  Hashtbl.set stage3_streaks ~key:symbol ~data:1;
+  let config =
+    {
+      (Weinstein_strategy_config.default_config ~universe:[ symbol ]
+         ~index_symbol:"INDEX")
+      with
+      liquidity_config = _armed_config;
+      enable_stage3_force_exit = true;
+    }
+  in
+  let no_op_record_force_exit ~last_stop_out_dates:_ ~positions:_
+      ~current_date:_ ~cooldown_weeks:_ ~label:_ _ =
+    ()
+  in
+  let ( force_exit_ts,
+        stage3_ts,
+        _laggard_ts,
+        _stop_ids,
+        _stage3_ids,
+        _laggard_ids ) =
+    Special_exits.run ~config ~record_force_exit:no_op_record_force_exit
+      ~positions
+      ~last_stop_out_dates:(Hashtbl.create (module String))
+      ~portfolio:{ cash = 1_000_000.0; positions }
+      ~get_price
+      ~peak_tracker:Portfolio_risk.Force_liquidation.Peak_tracker.(create ())
+      ~audit_recorder:Audit_recorder.noop ~prior_macro_result:(ref None)
+      ~prior_stages
+      ~prior_stage_ma_values:(Hashtbl.create (module String))
+      ~stage3_streaks
+      ~laggard_streaks:(Hashtbl.create (module String))
+      ~bar_reader ~index_view:_friday_weekly_view ~exit_transitions:[]
+      ~current_date:_friday
+  in
+  (* Guard: the Stage-3 channel actually fired (otherwise the skip set is not
+     exercised and the test would pass vacuously). *)
+  assert_that (List.length stage3_ts) (equal_to 1);
+  (* The Stage-3 exit lives in [stage3_ts]; the liquidity exit (if it fired)
+     would land in [force_exit_ts]. Both channels are assembled into the
+     strategy's output, so a duplicate shows up as one TriggerExit in EACH.
+     Count TriggerExits for the position across both: pre-fix the liquidity
+     exit adds a second (=> 2); post-fix it is skipped (=> 1). *)
+  let is_trigger_exit_for_pos (t : Trading_strategy.Position.transition) =
+    String.equal t.position_id pos_id
+    &&
+    match t.kind with
+    | Trading_strategy.Position.TriggerExit _ -> true
+    | _ -> false
+  in
+  let exits_for_pos =
+    List.count (stage3_ts @ force_exit_ts) ~f:is_trigger_exit_for_pos
+  in
+  assert_that exits_for_pos (equal_to 1)
+
 let () =
   run_test_tt_main
     ("liquidity_exit_runner"
@@ -322,4 +407,6 @@ let () =
            "skip-list collision is a no-op" >:: test_skip_list_collision_no_op;
            "force-liq position skipped by liquidity exit"
            >:: test_force_liq_position_skipped_by_liquidity_exit;
+           "stage3 force-exit position skipped by liquidity exit"
+           >:: test_stage3_force_exit_position_skipped_by_liquidity_exit;
          ])
