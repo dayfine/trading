@@ -32,10 +32,13 @@ Companion note (Thread-A primitives, per-year table, detectability):
    Give-back is large but structural; cash-allocation *order* is already ~optimal;
    bull-lag is structural under-participation, not bad picks. The only deployment
    lever is *how much* capital/SPY to hold — which is the barbell (#1).
-4. **DROP — macro-conditional long-short (#5).** The short leg does **not** pay in
-   bears: 30 short trades in 26 years, total −$640k; even 2008 lost −$52k. The
-   precondition fails; the short leg is too rare and idiosyncratic to be a regime
-   lever.
+4. **KEEP short leg ON, but DROP the macro-*conditional* framing (#5).**
+   **CORRECTED on broad top-3000** (the sp500-515 result below was a survivorship
+   artifact): shorts net **+$554k** and the armed long-short **dominates long-only
+   on all 3 axes** (return +774 vs +721, Sharpe 0.53 vs 0.49, MaxDD 41.5 vs 43.8).
+   Shorts pay in *both* regimes (bear +$205k, bull +$349k), so you can't macro-gate
+   them — but ~100% of the net is 2 crash-ride fat-tail trades, so it's a sparse
+   tail-hedge, not steady alpha. See `barbell-deep-verification-2026-06-27.md` Part 2.
 
 ---
 
@@ -149,7 +152,16 @@ From the committed `trade_audit.sexp` (1288 trades, MFE/MAE populated):
   concentration), not which name or when. That lever **is** the barbell (#1) — how
   much to hold in the engine vs an offsetting leg. Thread B converges on Thread A.
 
-## Thread C — short leg under the regime lens — DROP (#5)
+## Thread C — short leg under the regime lens
+> **SUPERSEDED — see `barbell-deep-verification-2026-06-27.md` Part 2.** The
+> sp500-515 result below was a **survivorship artifact**. On broad top-3000
+> (the correct universe) shorts net **+$554k** and the armed long-short
+> *dominates* long-only on return + Sharpe + MaxDD; shorts pay in both regimes
+> (bear +$205k / bull +$349k). **Keep the short leg on; drop only the
+> macro-*conditional* framing** (can't gate trades that pay in both regimes and
+> whose wins are crash-rides opened in bulls). The text below is retained for the
+> record but is corrected by the broad run.
+
 sp500-515 long-short (margin-on, re-ran): the short leg fired only **30 times in
 26 years** (vs 901 longs), total P&L **−$640k** (a loss; longs +$12.3M). By regime:
 - **Bears:** 2002 +$35k (4/5 wins) is the *only* paying bear; **2008 LOST −$52k**
@@ -192,9 +204,10 @@ strong directional signal.
   bear defense).
 - **B: drop the dynamic regime-switch direction.** Resolved as a basis
   artifact + cadence overfit; not worth a build.
-- **C: short leg — drop #5.** It doesn't pay in bears and is too rare/idiosyncratic
-  to time. Keep the short mechanics (margin/liquidity realism) as merged; just
-  don't pursue macro-conditional long-short as a return lever.
+- **C: keep short leg ON (corrected on broad).** Armed long-short dominates
+  long-only on return + Sharpe + MaxDD (+$554k, both regimes). It's a sparse
+  fat-tail tail-hedge (~all net = 2 crash-ride trades), not steady alpha — keep it
+  available, don't over-tune it, and drop only the macro-*conditional* (#5) framing.
 - **D: ship the docs** — margin-safety doc + README done; fix the universe-vs-gate
   liquidity consistency (always-arm the entry gate) as a small follow-up.
 
