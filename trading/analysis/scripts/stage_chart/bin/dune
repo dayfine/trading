@@ -8,6 +8,8 @@
   indicators.time_period
   weinstein.stage
   weinstein.types
+  weinstein_trading.stops
+  trading.base
   status
   fpath
   owl
