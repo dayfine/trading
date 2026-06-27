@@ -1,0 +1,17 @@
+{
+  "date": "2026-06-27",
+  "feature": "liquidity-realism-overlay",
+  "branch": "feat/liquidity-realism-overlay",
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": 3,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": ""
+}
