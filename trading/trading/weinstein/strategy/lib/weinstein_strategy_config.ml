@@ -110,6 +110,9 @@ type config = {
       (** Fast-V arming rate threshold (whipsaw-suppression dial); default
           [fast_v_min_rate_no_op] (0.08) reproduces the classifier default. See
           [.mli]. *)
+  reject_declining_ma_long_entry : bool; [@sexp.default false]
+      (** Long-entry faithfulness gate (default-off): drop long candidates whose
+          MA direction is [Declining] at entry. See [.mli]. *)
   enable_late_stage2_stop_tighten : bool; [@sexp.default false]
       (** Master switch for the late-Stage-2 stop-tighten runner; see [.mli]. *)
   late_stage2_stop_buffer_pct : float; [@sexp.default 0.0]
@@ -180,6 +183,7 @@ let default_config ~universe ~index_symbol =
     enable_slow_grind_short_gate = false;
     fast_v_arm_on_rate_alone = false;
     fast_v_min_rate_pct = fast_v_min_rate_no_op;
+    reject_declining_ma_long_entry = false;
     enable_late_stage2_stop_tighten = false;
     late_stage2_stop_buffer_pct = 0.0;
     enable_macro_bearish_exposure_trim = false;

@@ -256,6 +256,29 @@ type config = {
           [((flag fast_v_min_rate_pct) (values (0.08 0.12 0.16)))]). Default
           no-op until an experiment-ledger ACCEPT (per
           [.claude/rules/experiment-flag-discipline.md]). *)
+  reject_declining_ma_long_entry : bool; [@sexp.default false]
+      (** Long-entry faithfulness gate (default-off): when [true], drop any long
+          candidate whose stage-classification MA direction is
+          [Weinstein_types.Declining] at entry. Weinstein Stage 2 is defined as
+          price above a {b rising} 30-week MA; the classifier nonetheless tags a
+          minority of breakouts [Stage2] while the MA is still declining — these
+          are counter-trend bounces in a Stage-4 downtrend (e.g. dead-cat
+          bounces under a prior top), which the broad top-3000 audit shows win
+          only ~13% vs ~34% for rising-MA entries (n=30, avg P&L −0.1% vs
+          +2.6%). Default [false] preserves all baselines bit-for-bit (no
+          candidate is dropped). Shorts are unaffected — a declining MA is
+          correct for a Stage-4 short.
+
+          This keeps the strategy {b spine} intact (it {e tightens} the
+          Stage-2-only buy rule toward the book's rising-MA definition, removing
+          misclassified entries rather than adding any new mechanism). Wired as
+          a real config field, so it is a single-component [Variant_matrix] flag
+          axis
+          ([((flag reject_declining_ma_long_entry) (values (true false)))]).
+          Evidence: the 2026-06-27 drawdown-driver chart review + entry-quality
+          quantification (dev/charts/, the declining-MA bucket). Default-off
+          until an experiment-ledger ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md]). *)
   enable_late_stage2_stop_tighten : bool; [@sexp.default false]
       (** Held-position risk dial (default-off): when [true], the
           {!Late_stage2_stop_runner} tightens the trailing stop of every held

@@ -433,16 +433,6 @@ let _run_screener ?membership_at ~config ~(macro_result : Macro.result)
     Phase 1 runs. Symbols whose [active_through < fold_start_date] are dropped
     from the per-Friday classification loop, eliminating the Phase-1 cost on
     symbols that cannot contribute to the fold. *)
-let _assemble_candidates ~config ~bar_reader ~current_date
-    (screen_result : Screener.result) =
-  let combined =
-    Short_side_gate.combine ~enable_short_side:config.enable_short_side
-      ~short_min_price:config.short_min_price
-      ~buy_candidates:screen_result.Screener.buy_candidates
-      ~short_candidates:screen_result.Screener.short_candidates
-  in
-  Entry_liquidity_gate.apply ~config:config.liquidity_config ~bar_reader
-    ~current_date combined
 
 let screen_universe ?active_through_for ?fold_start_date ?membership_at ~config
     ~index_view ~(macro_result : Macro.result) ~sector_map ~stop_states
@@ -468,7 +458,7 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at ~config
       ~stocks ~portfolio ~last_stop_out_dates ~current_date ()
   in
   let combined_candidates =
-    _assemble_candidates ~config ~bar_reader ~current_date screen_result
+    Entry_assembly.assemble ~config ~bar_reader ~current_date screen_result
   in
   let entries =
     entries_from_candidates
