@@ -467,6 +467,11 @@ type config = {
           {b spine} is untouched — it changes only when the tail-RISK-insurance
           absolute stop arms. [Variant_matrix] float axis. See
           [Weinstein_strategy_config] for full semantics. *)
+  reject_declining_ma_long_entry : bool; [@sexp.default false]
+      (** Long-entry faithfulness gate (default-off): drop long candidates whose
+          stage-classification MA direction is [Declining] at entry (a
+          misclassified Stage-2 / counter-trend bounce). [Variant_matrix] flag
+          axis. See [Weinstein_strategy_config] for full semantics. *)
   enable_late_stage2_stop_tighten : bool; [@sexp.default false]
       (** Held-position risk dial (default-off): when [true], the
           {!Late_stage2_stop_runner} tightens the trailing stop of every held

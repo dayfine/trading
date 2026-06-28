@@ -1,0 +1,10 @@
+(library
+ (name declining_ma_gate)
+ (public_name weinstein_trading.declining_ma_gate)
+ (libraries
+  core
+  weinstein.screener
+  weinstein.stock_analysis
+  weinstein.stage
+  weinstein.types
+  trading.base))
