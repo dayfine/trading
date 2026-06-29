@@ -24,6 +24,12 @@ include module type of Screener_admission
     {!Screener_admission} so callers continue to reference them as
     [Screener.volume_ratio_band], [Screener.passes_score_floor], etc. *)
 
+include module type of Screener_ranking
+(** The {!Screener_ranking.candidate_ranking} mode and the
+    {!Screener_ranking.compare_rankable} total order — re-exported so callers
+    reference them as [Screener.candidate_ranking] / [Screener.Alphabetical] /
+    [Screener.Quality]. *)
+
 type candidate_params = {
   entry_buffer_pct : float;
       (** Fraction above breakout price for the suggested entry. Default: 0.005.
@@ -83,6 +89,20 @@ type config = {
       (** Minimum grade to include in output. Default: C. Used unless
           [min_score_override] is [Some _] — in that case the numeric override
           takes precedence and the grade ladder is bypassed. *)
+  candidate_ranking : candidate_ranking; [@sexp.default Alphabetical]
+      (** Tiebreak ordering among equal-score candidates. Default:
+          [Alphabetical] — bit-identical to the historical ticker-only tiebreak,
+          so the default config (and every golden) is unchanged. [Quality]
+          breaks ties by RS magnitude / earliness / volume instead (see
+          {!candidate_ranking}).
+
+          Default-off ranking axis (issue #1782): reachable from the
+          scenario/strategy override path via
+          [((screening_config ((candidate_ranking Quality))))] — see
+          [Weinstein_strategy.config.screening_config] — so it routes through
+          [Overlay_validator.apply_overrides] and is a [Variant_matrix] [Key]
+          axis. Not wired into any default config until it earns an ACCEPT in
+          the experiment ledger (Phase 2 WF-CV). *)
   min_score_override : int option; [@sexp.default None]
       (** Optional numeric score floor that, when [Some n], replaces the
           {!min_grade} filter with a strict [score >= n] gate on the cascade
@@ -322,6 +342,16 @@ type result = {
           the backtest side without requiring a parallel pass. *)
 }
 (** Screener output. *)
+
+val compare_for_ranking :
+  candidate_ranking -> scored_candidate -> scored_candidate -> int
+(** [compare_for_ranking ranking a b] is the total order the cascade uses to
+    sort and cap candidates: primary key [score] descending, then the [ranking]
+    tiebreak among equal scores. [Alphabetical] tiebreaks by [ticker]
+    (historical behaviour); [Quality] tiebreaks by RS magnitude (descending),
+    then [weeks_advancing] (ascending = earlier), then volume ratio
+    (descending), then [ticker] (ascending). Exposed so the ordering contract is
+    unit-testable in isolation of the cascade pipeline. Pure. *)
 
 val screen :
   config:config ->
