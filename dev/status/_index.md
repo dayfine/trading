@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-06-29 run 3 (orchestrator run 28360487553: **NO-DISPATCH PASS** — 0 open PRs, all tracks data/human/LOCAL-gated). Saturated fast-exit NOT taken: C2 failed (screener.md changed by feature #1786 since run 2) → full pass; dispatched nothing. Since run 2, one maintainer PR merged: #1786 (screener candidate-ranking quality tiebreak, default-off; bit-identical Alphabetical default, Quality axis for Phase-2 WF-CV) → screener row stays MERGED/—/—/—; all other rows unchanged. Main CI not red: latest completed CI run #1785 SUCCESS; #1786 merge CI in-progress with perf-tier1-smoke SUCCESS, none failing. status-integrity + index-size + no-python linters exit 0 live. Stale ci-red **#1772 still STALE** (main green; token lacks `issues:write`). Prior: run 2 (28351591727) NO-DISPATCH PASS (#1781 + #1784 maintainer merges); run 1 (28343933429) NO-DISPATCH PASS.
+Last updated: 2026-06-29 run 4 (orchestrator run 28398842486: **NO-DISPATCH PASS** — 0 open PRs, all tracks data/human/LOCAL-gated). Saturated fast-exit NOT taken: C2 failed (data-foundations.md changed by feature #1790 since run 3) → full pass; dispatched nothing. Since run 3, four maintainer merges landed (all on green main): #1788 (candidate-ranking WF-CV breadth grid → REJECT default-flip; ledger `2026-06-29-candidate-ranking-tiebreak-grid`; stays default-off axis), #1789 (weekly deep health scan: 0 critical, action NO), #1790 (eligible-universe configurable staleness guard + observability, default 0 = bit-identical), #1791 (overnight session handoff docs). Main CI green: latest completed `CI` workflow on HEAD `75cdedbf` SUCCESS. status-integrity + index-size + no-python linters exit 0 live. Stale ci-red **#1772 still STALE** (main green; token lacks `issues:write`). NOTE drift: data-foundations.md per-track heading is READY_FOR_REVIEW but 0 open PRs (stale; #1790 merged) — left IN_PROGRESS here. Prior: run 3 (28360487553) NO-DISPATCH (#1786); run 2 (28351591727) NO-DISPATCH (#1781+#1784); run 1 (28343933429) NO-DISPATCH.
 
 ## Active + complete tracks
 
@@ -50,7 +50,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
 | [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | snapshot fast-input path (#1784) + corrected 5-wk picks (#1781) MERGED; next: large-warehouse multi-week sweep (data-gated); live-cycle human-gated |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
-| [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | Thread-1 (#1589) + eligibility builder (#1594) + live data refresh (#1595) MERGED; next: policy artifact (ADR $-vol human-gated) — largely subsumed by eligibility builder |
+| [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | eligibility builder (#1594) + live refresh (#1595) + staleness guard (#1790) MERGED; next: ADR $-vol policy artifact (human-gated; largely subsumed) |
 
 ## How to use
 
