@@ -3,8 +3,11 @@
  (public_name weinstein_trading.snapshot_gen)
  (libraries
   core
+  status
   weinstein_trading.snapshot
   weinstein_trading.strategy
+  weinstein.snapshot_pipeline
+  weinstein.snapshot_runtime
   weinstein.screener
   weinstein.macro
   weinstein.sector

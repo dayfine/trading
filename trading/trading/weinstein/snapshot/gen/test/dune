@@ -1,5 +1,5 @@
 (tests
- (names test_weekly_snapshot_generator)
+ (names test_weekly_snapshot_generator test_snapshot_warehouse_parity)
  (libraries
   core
   async
@@ -10,6 +10,8 @@
   weinstein.types
   weinstein.data_source
   weinstein.data_source.testing
+  weinstein.snapshot_pipeline
+  trading.data_panel.snapshot
   weinstein_trading.strategy
   weinstein_trading.snapshot
   weinstein_trading.snapshot_gen)
