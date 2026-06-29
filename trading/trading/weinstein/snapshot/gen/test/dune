@@ -7,11 +7,11 @@
   matchers
   status
   types
-  csv
-  scripts.build_runner
   weinstein.types
   weinstein.data_source
   weinstein.data_source.testing
+  weinstein.snapshot_pipeline
+  trading.data_panel.snapshot
   weinstein_trading.strategy
   weinstein_trading.snapshot
   weinstein_trading.snapshot_gen)

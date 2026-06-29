@@ -6,10 +6,15 @@
     reader ([Bar_reader.of_in_memory_bars]) for the same fixture universe +
     as-of date.
 
-    The warehouse is built end-to-end with the real [build_snapshots] build path
-    ([Build_runner.build]) over the same synthetic bars written to a temp CSV
-    store, so the test also exercises the build -> read pipeline the production
-    warehouse will use. *)
+    The warehouse is built in-test from the same synthetic bars using the
+    production warehouse libs the offline [build_snapshots] writer is built on —
+    [Pipeline.build_for_symbol] for the per-day snapshot rows,
+    [Snapshot_columnar.write] for each per-symbol [.snap] file, and
+    [Snapshot_manifest.write] for the directory manifest. This mirrors the
+    [build_snapshots] build path ([Build_runner.build]) row-for-row without
+    depending on [analysis/scripts] — a [trading/trading/**] test must not
+    import from there (architecture A2 import rule). The test still exercises
+    the build -> read pipeline the production warehouse uses. *)
 
 open Core
 open OUnit2
@@ -17,6 +22,10 @@ open Matchers
 open Weinstein_snapshot
 module Bar_reader = Weinstein_strategy.Bar_reader
 module Generator = Weinstein_snapshot_gen.Weekly_snapshot_generator
+module Pipeline = Snapshot_pipeline.Pipeline
+module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
+module Snapshot_columnar = Data_panel_snapshot.Snapshot_columnar
+module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 
 module Snapshot_warehouse_reader =
   Weinstein_snapshot_gen.Snapshot_warehouse_reader
@@ -69,15 +78,6 @@ let _bars_for symbol : Types.Daily_price.t list =
   | Ok bars -> bars
   | Error e -> assert_failure ("get_bars failed: " ^ Status.show e)
 
-(* Write [bars] for [symbol] into the [Csv_storage] layout under [data_dir]. *)
-let _write_csv ~data_dir ~symbol ~bars =
-  match Csv.Csv_storage.create ~data_dir:(Fpath.v data_dir) symbol with
-  | Error e -> assert_failure ("Csv_storage.create failed: " ^ Status.show e)
-  | Ok storage -> (
-      match Csv.Csv_storage.save storage bars with
-      | Ok () -> ()
-      | Error e -> assert_failure ("Csv_storage.save failed: " ^ Status.show e))
-
 let _config : Weinstein_strategy.config =
   let base =
     Weinstein_strategy.default_config
@@ -101,27 +101,62 @@ let _generate ~bar_reader =
    warehouse window is built to match so it holds every fixture bar. *)
 let _warmup_days = 730
 
-(* Build a snapshot warehouse from the CSV store and return a reader over it. *)
-let _warehouse_bar_reader ~csv_data_dir =
+(* Write one symbol's [.snap] file via the production columnar writer and return
+   its manifest entry. Mirrors [Build_runner._build_one_symbol]: build per-day
+   rows with [Pipeline.build_for_symbol], then emit them with
+   [Snapshot_columnar.write] — the same two steps the offline writer uses, minus
+   the CSV-loading + checkpointing scaffolding that lives in [analysis/scripts].
+   The manifest's checksum/mtime metadata is unused by the runtime reader, so
+   placeholder values are fine; [active_through] tracks the bars' delisting
+   marker as the production writer does. *)
+let _write_snapshot ~output_dir ~schema ~symbol ~bars :
+    Snapshot_manifest.file_metadata =
+  let path = Filename.concat output_dir (symbol ^ ".snap") in
+  let rows =
+    match Pipeline.build_for_symbol ~symbol ~bars ~schema () with
+    | Ok rows -> rows
+    | Error e -> assert_failure ("build_for_symbol failed: " ^ Status.show e)
+  in
+  (match Snapshot_columnar.write ~path rows with
+  | Ok () -> ()
+  | Error e ->
+      assert_failure ("Snapshot_columnar.write failed: " ^ Status.show e));
+  let active_through =
+    List.last bars
+    |> Option.bind ~f:(fun (b : Types.Daily_price.t) -> b.active_through)
+  in
+  {
+    Snapshot_manifest.symbol;
+    path;
+    byte_size = 0;
+    payload_md5 = "";
+    csv_mtime = 0.0;
+    active_through;
+  }
+
+(* Build a snapshot warehouse from the fixture bars and return a reader over it.
+   No CSV round-trip: the bars are written straight into per-symbol [.snap]
+   files plus a directory manifest, then read back via the production
+   [Snapshot_warehouse_reader]. *)
+let _warehouse_bar_reader () =
   let warehouse_dir = Stdlib.Filename.temp_dir "weekly_snap_parity_wh" "" in
+  let schema = Snapshot_schema.default in
   let symbols = _index_symbol :: List.map _ticker_sectors ~f:fst in
-  Build_runner.build ~symbols ~csv_data_dir ~output_dir:warehouse_dir
-    ~benchmark_symbol:None
-    ~start_date:(Some (Date.add_days _as_of (-_warmup_days)))
-    ~end_date:(Some _as_of) ~incremental:false
-    ~progress_every:Build_runner.default_progress_every ();
+  let entries =
+    List.map symbols ~f:(fun symbol ->
+        _write_snapshot ~output_dir:warehouse_dir ~schema ~symbol
+          ~bars:(_bars_for symbol))
+  in
+  let manifest_path = Filename.concat warehouse_dir "manifest.sexp" in
+  (match
+     Snapshot_manifest.write ~path:manifest_path
+       (Snapshot_manifest.create ~schema ~entries)
+   with
+  | Ok () -> ()
+  | Error e ->
+      assert_failure ("Snapshot_manifest.write failed: " ^ Status.show e));
   Snapshot_warehouse_reader.build ~warehouse_dir ~as_of:_as_of
     ~warmup_days:_warmup_days ()
-
-(* The fixture's bars written once to a shared temp CSV store, then read two
-   ways. *)
-let _csv_data_dir =
-  lazy
-    (let dir = Stdlib.Filename.temp_dir "weekly_snap_parity_csv" "" in
-     List.iter (_index_symbol :: List.map _ticker_sectors ~f:fst)
-       ~f:(fun symbol ->
-         _write_csv ~data_dir:dir ~symbol ~bars:(_bars_for symbol));
-     dir)
 
 let _in_memory_bar_reader () =
   Bar_reader.of_in_memory_bars
@@ -130,11 +165,8 @@ let _in_memory_bar_reader () =
 
 (* The warehouse-backed snapshot equals the in-memory-CSV snapshot exactly. *)
 let test_warehouse_matches_csv _ =
-  let csv_data_dir = Lazy.force _csv_data_dir in
   let csv_snapshot = _generate ~bar_reader:(_in_memory_bar_reader ()) in
-  let warehouse_snapshot =
-    _generate ~bar_reader:(_warehouse_bar_reader ~csv_data_dir)
-  in
+  let warehouse_snapshot = _generate ~bar_reader:(_warehouse_bar_reader ()) in
   assert_that warehouse_snapshot (equal_to (csv_snapshot : Weekly_snapshot.t))
 
 (* Sanity guard: the parity fixture actually screens a candidate, so the
