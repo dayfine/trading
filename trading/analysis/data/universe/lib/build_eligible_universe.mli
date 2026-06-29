@@ -16,7 +16,12 @@
 
     1. {b Active filter} — keep inventory entries with
     [data_start_date <= date - trailing_window_days] (enough trailing history to
-    score) and [data_end_date >= date] (actively trading).
+    score) and a {b fresh-enough} [data_end_date]: by default
+    [data_end_date >= date] (actively trading through [date]), but a symbol
+    whose last bar is at most [max_staleness_trading_days] trading days before
+    [date] is also kept (see {!config}). A "trading day" here is a weekday
+    (Mon–Fri); market holidays are {b not} modelled, so the budget counts
+    weekdays, not exchange sessions.
 
     2. {b Equity-like filter} — drop ETF / Mutual_fund / Fund / Bond / Index /
     Currency / Commodity via {!Eodhd.Asset_type.is_equity_like}; keeps
@@ -63,6 +68,17 @@ type config = {
       (** Drop symbols whose trailing-window average [close * volume] is
           strictly below this floor. No-op default [0.0]; the spec uses
           [1_000_000.0]. *)
+  max_staleness_trading_days : int;
+      (** How many trading days (weekdays, Mon–Fri) the latest bar
+          ([data_end_date]) may lag [date] and still count the symbol as active.
+          No-op default [0]: a symbol is active only if [data_end_date >= date]
+          (exactly the pre-tolerance behaviour). A positive value keeps symbols
+          whose data is up to that many trading days stale — e.g. [2] keeps a
+          name whose last bar is two trading days before [date], so a partial /
+          lagging data refresh no longer silently shrinks the universe. Market
+          holidays are {b not} modelled; the count is weekdays, not exchange
+          sessions, so the field is named {i trading_days} rather than
+          {i sessions}. *)
   trailing_window_days : int;
       (** Calendar days of trailing data used for the dollar-volume score and
           activity gate. Default [60]. *)
@@ -93,10 +109,11 @@ val default_config :
   inventory_path:string ->
   config
 (** [default_config ...] is the keep-all no-op: [min_price = 0.0],
-    [min_avg_dollar_volume = 0.0], [trailing_window_days = 60],
-    [min_window_bars = 30], [reit_policy = Include],
-    [exclude_preferred = false]. A build through this config keeps every active
-    equity-like symbol (the only drop is the always-on dual-class dedup). *)
+    [min_avg_dollar_volume = 0.0], [max_staleness_trading_days = 0],
+    [trailing_window_days = 60], [min_window_bars = 30],
+    [reit_policy = Include], [exclude_preferred = false]. A build through this
+    config keeps every active equity-like symbol (the only drop is the always-on
+    dual-class dedup). *)
 
 val spec_config :
   bars_root:string ->
@@ -106,7 +123,22 @@ val spec_config :
   config
 (** [spec_config ...] is {!default_config} with the live-universe gates flipped
     on: [min_price = 5.0], [min_avg_dollar_volume = 1_000_000.0],
-    [reit_policy = Exclude], [exclude_preferred = true]. *)
+    [reit_policy = Exclude], [exclude_preferred = true].
+    [max_staleness_trading_days] stays at the no-op [0]. *)
+
+type staleness_report = { excluded_count : int; sample : string list }
+[@@deriving sexp, show, eq]
+(** Observability for the active-filter's freshness gate: how many symbols were
+    excluded {b specifically} because their latest bar is stale — i.e. they
+    passed the trailing-history start gate and are equity-like, but their
+    [data_end_date] is more than [max_staleness_trading_days] trading days
+    before [date]. [excluded_count] is the total such symbols; [sample] is a
+    small, deterministic (inventory-order) prefix of their tickers for logging.
+    A non-zero count is the signal that a partial / lagging data refresh shrank
+    the universe — the silent-shrink this report exists to surface. *)
+
+val staleness_sample_size : int
+(** Maximum number of tickers carried in {!staleness_report.sample}. *)
 
 val build : date:Date.t -> config:config -> Snapshot.t Status.status_or
 (** [build ~date ~config] runs the pipeline in the module docstring and returns
@@ -120,3 +152,13 @@ val build : date:Date.t -> config:config -> Snapshot.t Status.status_or
     - [Ok snapshot] otherwise, with [snapshot.size] equal to the survivor count
       ({b not} truncated) and uniform per-entry weights. Symbols whose
       per-symbol [data.csv] is missing / unreadable are silently dropped. *)
+
+val build_with_staleness_report :
+  date:Date.t ->
+  config:config ->
+  (Snapshot.t * staleness_report) Status.status_or
+(** [build_with_staleness_report ~date ~config] is {!build} paired with the
+    {!staleness_report} computed from the same inventory pass. [build] is
+    exactly [build_with_staleness_report] with the report discarded, so the
+    snapshot is identical. Use this variant when the caller wants to surface how
+    many symbols the freshness gate dropped (the runner logs it to stdout). *)
