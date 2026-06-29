@@ -1,9 +1,35 @@
 # Status: data-foundations
 
-## Last updated: 2026-06-14
+## Last updated: 2026-06-29
 
 ## Status
 READY_FOR_REVIEW
+
+## Completed
+- [x] **2026-06-29 — eligible-universe staleness guard (issue #1783).**
+  `Build_eligible_universe`'s active filter dropped any symbol whose
+  last bar was even one trading day stale (`data_end_date < date`),
+  silently shrinking a screen when a partial data refresh lagged.
+  Added a configurable `max_staleness_trading_days : int`
+  (default `0` = bit-identical to prior behaviour) to
+  `Build_eligible_universe.config`: the end-date gate now also keeps a
+  symbol whose last bar is within that many *trading days* (weekdays;
+  holidays not modelled) of `date`. Added a `staleness_report`
+  (count + ticker sample of symbols dropped specifically for staleness)
+  returned by the new `build_with_staleness_report`; `build` delegates
+  to it (snapshot identical). `build_eligible_universe_runner` gained a
+  `-max-staleness-trading-days` flag and prints
+  `[eligible-universe] N symbols excluded for staleness (sample: …)`
+  when N > 0. Lives in
+  `analysis/data/universe/lib/build_eligible_universe.{ml,mli}` +
+  `analysis/data/universe/bin/build_eligible_universe_runner{,_lib}.{ml,mli}`.
+  Verify: `dune runtest analysis/data/universe/` (3 new tests:
+  default-0 excludes a 1-day-stale symbol = parity; tolerance=2 keeps
+  symbols ≤2 trading days stale; report counts + samples the
+  staleness-excluded set). PR: `feat/eligible-universe-staleness-guard`.
+  Linter rework (2026-06-29): extracted the freshness primitives +
+  `staleness_report` into a sibling `staleness.{ml,mli}` to clear the
+  file-length (304→283) + nesting linters; behaviour unchanged.
 
 ## Blocking Refactors
 - **2026-05-16 Option B pivot — IWV scrape becomes the primary

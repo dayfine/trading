@@ -144,6 +144,90 @@ let _setup ~specs =
   in
   (root, config)
 
+(* ---------------------------------------------------------------------- *)
+(* Staleness-fixture builders                                              *)
+(*                                                                         *)
+(* The active filter keys off the inventory's [data_end_date], so staleness *)
+(* tests need per-symbol end dates. They anchor on a weekday build date so   *)
+(* the trading-day (weekday) count is unambiguous, and write dense bars      *)
+(* (latest close >= the staleness build date) so any symbol that clears the  *)
+(* active filter also clears the price / dollar-volume / min-bars gates.     *)
+(* ---------------------------------------------------------------------- *)
+
+(* A Thursday. Prior trading days: Wed 2020-05-27 (1 day late),
+   Tue 2020-05-26 (2 days late), Mon 2020-05-25 (3 days late). The intervening
+   weekend (Sat 23 / Sun 24) does not count, so Fri 2020-05-22 is also 3 days
+   late — exercising the weekday-only count. *)
+let _staleness_build_date = Date.create_exn ~y:2020 ~m:Month.May ~d:28
+
+(* Write [n_bars] dense daily bars ending on [_staleness_build_date] so the
+   latest close is on the build date (clearing the freshness-of-bars view used
+   by the scoring gates, independent of the inventory end date under test). *)
+let _write_staleness_bars ~root sym =
+  let path = _bars_path ~root sym in
+  let buf = Buffer.create 1024 in
+  Buffer.add_string buf "date,open,high,low,close,adjusted_close,volume\n";
+  List.iter (List.init 60 ~f:Fn.id) ~f:(fun i ->
+      let date = Date.add_days _staleness_build_date (-i) in
+      Buffer.add_string buf
+        (Printf.sprintf "%s,50.00,50.00,50.00,50.00,50.00,1000000\n"
+           (Date.to_string date)));
+  Out_channel.write_all path ~data:(Buffer.contents buf)
+
+let _write_inventory_with_end_dates ~root entries =
+  let path = Filename.concat root "inventory.sexp" in
+  let body_lines =
+    List.map entries ~f:(fun (sym, end_date) ->
+        Printf.sprintf
+          "  ((symbol %s) (data_start_date 2010-01-01) (data_end_date %s))" sym
+          (Date.to_string end_date))
+  in
+  let sexp =
+    "((generated_at 2020-05-30)\n (symbols (\n"
+    ^ String.concat ~sep:"\n" body_lines
+    ^ ")))\n"
+  in
+  Out_channel.write_all path ~data:sexp;
+  path
+
+(* [entries] is [(symbol, asset_type, data_end_date)]. Returns [(root, config)]
+   with the default config plus [max_staleness_trading_days]. *)
+let _setup_staleness ~max_staleness_trading_days ~entries =
+  let root = _make_tmp_dir "stale" in
+  let bars_root = Filename.concat root "bars" in
+  ignore
+    (Stdlib.Sys.command
+       (Printf.sprintf "mkdir -p %s" (Filename.quote bars_root))
+      : int);
+  List.iter entries ~f:(fun (sym, _, _) ->
+      _write_staleness_bars ~root:bars_root sym);
+  let symbol_types_path =
+    _write_symbol_types ~root
+      (List.map entries ~f:(fun (sym, asset_type, _) -> (sym, asset_type)))
+  in
+  let sectors_csv_path =
+    _write_sectors_csv ~root
+      (List.map entries ~f:(fun (sym, _, _) -> (sym, "Tech")))
+  in
+  let inventory_path =
+    _write_inventory_with_end_dates ~root
+      (List.map entries ~f:(fun (sym, _, end_date) -> (sym, end_date)))
+  in
+  let config =
+    {
+      (BEU.default_config ~bars_root ~symbol_types_path ~sectors_csv_path
+         ~inventory_path)
+      with
+      max_staleness_trading_days;
+    }
+  in
+  (root, config)
+
+let _build_staleness_or_fail ~config =
+  match BEU.build_with_staleness_report ~date:_staleness_build_date ~config with
+  | Ok result -> result
+  | Error err -> assert_failure ("build failed: " ^ Status.show err)
+
 let _build_or_fail ~config =
   match BEU.build ~date:_build_date ~config with
   | Ok snapshot -> snapshot
@@ -337,6 +421,69 @@ let test_entry_metadata _ =
          field (fun s -> s.aggregate_period_return) (float_equal 0.0);
        ])
 
+(* Dates relative to the Thursday 2020-05-28 staleness build date. *)
+let _wed = Date.create_exn ~y:2020 ~m:Month.May ~d:27 (* 1 trading day late *)
+let _tue = Date.create_exn ~y:2020 ~m:Month.May ~d:26 (* 2 trading days late *)
+let _mon = Date.create_exn ~y:2020 ~m:Month.May ~d:25 (* 3 trading days late *)
+
+(* Parity: at max_staleness_trading_days = 0 a symbol whose last bar is one
+   trading day stale (Wed, the day before the Thursday build date) is excluded,
+   while a same-day (Thursday) symbol is kept — exactly the pre-tolerance
+   behaviour the default must preserve. *)
+let test_staleness_default_zero_excludes_one_day_stale _ =
+  let entries =
+    [ ("FRESH", _common, _staleness_build_date); ("STALE1D", _common, _wed) ]
+  in
+  let root, config = _setup_staleness ~max_staleness_trading_days:0 ~entries in
+  let snapshot, _report = _build_staleness_or_fail ~config in
+  _cleanup_dir root;
+  assert_that (_symbols snapshot) (elements_are [ equal_to "FRESH" ])
+
+(* Tolerance includes within budget: at max_staleness_trading_days = 2, symbols
+   stale by 1 and 2 trading days survive, while a 3-trading-day-stale symbol is
+   still dropped. Output is rank-ordered by dollar volume (all equal here), so
+   ties fall back to inventory order: FRESH, STALE1D, STALE2D. *)
+let test_staleness_tolerance_includes_within_budget _ =
+  let entries =
+    [
+      ("FRESH", _common, _staleness_build_date);
+      ("STALE1D", _common, _wed);
+      ("STALE2D", _common, _tue);
+      ("STALE3D", _common, _mon);
+    ]
+  in
+  let root, config = _setup_staleness ~max_staleness_trading_days:2 ~entries in
+  let snapshot, _report = _build_staleness_or_fail ~config in
+  _cleanup_dir root;
+  assert_that
+    (List.sort (_symbols snapshot) ~compare:String.compare)
+    (elements_are [ equal_to "FRESH"; equal_to "STALE1D"; equal_to "STALE2D" ])
+
+(* Observability: the staleness report counts symbols excluded specifically for
+   stale data and carries a sample of their tickers, in inventory order. At
+   tolerance 0, STALE1D and STALE3D (both equity-like, both past the budget) are
+   reported; the ETF is junk and not counted as a staleness exclusion. *)
+let test_staleness_report_counts_and_samples _ =
+  let entries =
+    [
+      ("FRESH", _common, _staleness_build_date);
+      ("STALE1D", _common, _wed);
+      ("STALEJUNK", _etf, _tue);
+      ("STALE3D", _common, _mon);
+    ]
+  in
+  let root, config = _setup_staleness ~max_staleness_trading_days:0 ~entries in
+  let _snapshot, report = _build_staleness_or_fail ~config in
+  _cleanup_dir root;
+  assert_that report
+    (all_of
+       [
+         field (fun r -> r.BEU.excluded_count) (equal_to 2);
+         field
+           (fun r -> r.BEU.sample)
+           (elements_are [ equal_to "STALE1D"; equal_to "STALE3D" ]);
+       ])
+
 let suite =
   "Build_eligible_universe"
   >::: [
@@ -350,6 +497,12 @@ let suite =
          "test_empty_universe_is_error" >:: test_empty_universe_is_error;
          "test_determinism" >:: test_determinism;
          "test_entry_metadata" >:: test_entry_metadata;
+         "test_staleness_default_zero_excludes_one_day_stale"
+         >:: test_staleness_default_zero_excludes_one_day_stale;
+         "test_staleness_tolerance_includes_within_budget"
+         >:: test_staleness_tolerance_includes_within_budget;
+         "test_staleness_report_counts_and_samples"
+         >:: test_staleness_report_counts_and_samples;
        ]
 
 let () = run_test_tt_main suite

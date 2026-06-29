@@ -4,10 +4,18 @@ module BR = Composition_bar_reader
 module BFI = Build_from_individuals
 module CP = Composition_policy
 module CPT = Composition_policy_types
+module S = Staleness
 
 (* Defaults documented in [build_eligible_universe.mli]. *)
 let _default_trailing_window_days = 60
 let _default_min_window_bars = 30
+
+(* No-op staleness tolerance: 0 trading days ⇒ a symbol is active only if its
+   last bar is on / after [date] (exactly the pre-tolerance behaviour). *)
+let _default_max_staleness_trading_days = 0
+
+(* Re-exported from {!Staleness} so the public surface stays unchanged. *)
+let staleness_sample_size = S.sample_size
 
 (* Live-universe spec gate values (the spec, not the no-op record default). *)
 let _spec_min_price = 5.0
@@ -20,6 +28,7 @@ let _spec_min_avg_dollar_volume = 1_000_000.0
 type config = {
   min_price : float;
   min_avg_dollar_volume : float;
+  max_staleness_trading_days : int;
   trailing_window_days : int;
   min_window_bars : int;
   reit_policy : CPT.reit_policy;
@@ -31,11 +40,18 @@ type config = {
 }
 [@@deriving sexp]
 
+type staleness_report = S.staleness_report = {
+  excluded_count : int;
+  sample : string list;
+}
+[@@deriving sexp, show, eq]
+
 let default_config ~bars_root ~symbol_types_path ~sectors_csv_path
     ~inventory_path =
   {
     min_price = 0.0;
     min_avg_dollar_volume = 0.0;
+    max_staleness_trading_days = _default_max_staleness_trading_days;
     trailing_window_days = _default_trailing_window_days;
     min_window_bars = _default_min_window_bars;
     reit_policy = CPT.Include;
@@ -62,19 +78,57 @@ let spec_config ~bars_root ~symbol_types_path ~sectors_csv_path ~inventory_path
 (* Active + equity-like filtering                                      *)
 (* ------------------------------------------------------------------ *)
 
-let _is_active ~date ~required_start (entry : CI.inventory_entry) =
+(* A symbol clears the trailing-history start gate (enough lead-in to score). *)
+let _has_enough_history ~required_start (entry : CI.inventory_entry) =
   Date.( <= ) entry.data_start_date required_start
-  && Date.( >= ) entry.data_end_date date
+
+let _is_active ~date ~required_start ~max_staleness_trading_days
+    (entry : CI.inventory_entry) =
+  _has_enough_history ~required_start entry
+  && S.is_fresh_enough ~date ~max_staleness_trading_days entry
+
+let _required_start ~date ~config =
+  Date.add_days date (-config.trailing_window_days)
 
 let _active_symbols ~date ~config (inventory : CI.inventory) =
-  let required_start = Date.add_days date (-config.trailing_window_days) in
+  let required_start = _required_start ~date ~config in
   List.filter_map inventory.symbols ~f:(fun e ->
-      if _is_active ~date ~required_start e then Some e.symbol else None)
+      if
+        _is_active ~date ~required_start
+          ~max_staleness_trading_days:config.max_staleness_trading_days e
+      then Some e.symbol
+      else None)
 
 let _is_equity_like ~equity_like_lookup symbol =
   match Hashtbl.find equity_like_lookup symbol with
   | Some true -> true
   | _ -> false
+
+(* Symbols dropped {b specifically} for staleness: they clear the history start
+   gate and are equity-like, but their last bar is too old for the freshness
+   gate ([data_end_date < date] and beyond [max_staleness_trading_days]). The
+   observability counterpart to the active filter — a non-zero count means a
+   partial data refresh shrank the universe. Inventory order is preserved so the
+   report is deterministic. *)
+let _is_staleness_excluded ~required_start ~date ~config ~equity_like_lookup
+    (e : CI.inventory_entry) =
+  _has_enough_history ~required_start e
+  && (not
+        (S.is_fresh_enough ~date
+           ~max_staleness_trading_days:config.max_staleness_trading_days e))
+  && _is_equity_like ~equity_like_lookup e.symbol
+
+let _staleness_excluded ~date ~config ~equity_like_lookup
+    (inventory : CI.inventory) =
+  let required_start = _required_start ~date ~config in
+  List.filter inventory.symbols
+    ~f:
+      (_is_staleness_excluded ~required_start ~date ~config ~equity_like_lookup)
+  |> List.map ~f:(fun (e : CI.inventory_entry) -> e.symbol)
+
+let _staleness_report ~date ~config ~equity_like_lookup inventory =
+  S.report
+    ~excluded:(_staleness_excluded ~date ~config ~equity_like_lookup inventory)
 
 (* ------------------------------------------------------------------ *)
 (* Per-symbol scoring + eligibility gates                              *)
@@ -208,7 +262,7 @@ let _build_validated ~date ~config ~inventory ~equity_like_lookup
   in
   _make_snapshot ~date ~kept
 
-let build ~date ~config =
+let build_with_staleness_report ~date ~config =
   let open Result.Let_syntax in
   let%bind inventory = CI.load_inventory config.inventory_path in
   let%bind equity_like_lookup =
@@ -218,5 +272,12 @@ let build ~date ~config =
     CI.load_asset_type_lookup config.symbol_types_path
   in
   let%bind sector_lookup = CI.load_sectors config.sectors_csv_path in
-  _build_validated ~date ~config ~inventory ~equity_like_lookup
-    ~asset_type_lookup ~sector_lookup
+  let%bind snapshot =
+    _build_validated ~date ~config ~inventory ~equity_like_lookup
+      ~asset_type_lookup ~sector_lookup
+  in
+  let report = _staleness_report ~date ~config ~equity_like_lookup inventory in
+  Ok (snapshot, report)
+
+let build ~date ~config =
+  Result.map (build_with_staleness_report ~date ~config) ~f:fst
