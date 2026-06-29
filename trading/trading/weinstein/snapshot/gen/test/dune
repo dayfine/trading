@@ -1,5 +1,5 @@
 (tests
- (names test_weekly_snapshot_generator)
+ (names test_weekly_snapshot_generator test_snapshot_warehouse_parity)
  (libraries
   core
   async
@@ -7,6 +7,8 @@
   matchers
   status
   types
+  csv
+  scripts.build_runner
   weinstein.types
   weinstein.data_source
   weinstein.data_source.testing

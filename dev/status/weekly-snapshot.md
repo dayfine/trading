@@ -1,9 +1,28 @@
 # Status: weekly-snapshot
 
-## Last updated: 2026-06-14
+## Last updated: 2026-06-28
 
 ## Status
 IN_PROGRESS
+
+**2026-06-28 (snapshot-warehouse fast input path):** `generate_weekly_snapshot`
+now has a fast bar-source path so a weekly screen runs in seconds instead of the
+prior ~2h20m (the CSV path loads ALL bars into memory via
+`Bar_reader.of_in_memory_bars` every run — unusable for a 26-week sweep). PR
+`feat/weekly-snapshot-mode`. New lib module
+`Weinstein_snapshot_gen.Snapshot_warehouse_reader` opens a pre-built snapshot
+warehouse (`manifest.sexp` + per-symbol `.snap`), builds a real trading-day
+calendar, and returns a `Bar_reader.of_snapshot_views ~calendar` reader — the
+same on-demand LRU-streamed reader the backtest runners use. The bin gains a
+`--bars-snapshot-dir DIR` input flag, mutually exclusive with the existing
+`--bars` CSV path (errors clearly if both/neither given); the CSV path is
+unchanged (back-compat). **TDD parity pin:** a new test builds a tiny warehouse
+end-to-end with the real `build_snapshots` build path (`Build_runner.build`)
+over fixture synthetic bars in a temp CSV store, reads it via
+`Snapshot_warehouse_reader`, and asserts the generated `Weekly_snapshot.t` is
+**identical** to the in-memory-CSV-path snapshot — proving the build→read
+pipeline before we build a large warehouse. 9 tests pass (7 existing + 2 new).
+No screener/strategy logic changed; no core-module changes.
 
 (Owner: feat-weinstein per #778 scope expansion.)
 
@@ -124,6 +143,10 @@ remaining queue:
    Runs the existing screener cascade on cached data, assembles
    `Weekly_snapshot.t`, and `Snapshot_writer.write_to_file`s it to
    `dev/weekly-picks/<version>/<date>.sexp`.
+1b. **[snapshot-mode, DONE]** ~~`--bars-snapshot-dir` fast input path~~ — SHIPPED
+   2026-06-28 (`feat/weekly-snapshot-mode`). Next: build a large warehouse over
+   the live universe with `build_snapshots` and run a real multi-week sweep
+   (the parity test already proved the build→read pipeline on a tiny fixture).
 2. **[M6.6, optional]** generate + commit a first baseline pick record to diff
    future weeks against (the stretch item; deferred — needs a committed
    universe + cached bars to run against, not done in the generator PR).
