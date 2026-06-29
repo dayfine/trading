@@ -1589,6 +1589,159 @@ let test_w_early_stage2_sexp_present_and_roundtrips _ =
       roundtrip.w_early_stage2 )
     (equal_to (true, None, Some 22))
 
+(* ------------------------------------------------------------------ *)
+(* candidate_ranking: tiebreak among equal-score candidates            *)
+(* ------------------------------------------------------------------ *)
+
+(** Build a {!Stock_analysis.t} carrying only the fields the [Quality] tiebreak
+    reads ([rs.current_normalized], [stage.stage]'s [weeks_advancing],
+    [volume.volume_ratio]); everything else is a benign stub. *)
+let ranking_analysis ~ticker ~rs_norm ~weeks_advancing ~volume_ratio :
+    Stock_analysis.t =
+  {
+    ticker;
+    stage =
+      {
+        stage = Stage2 { weeks_advancing; late = false };
+        ma_value = 100.0;
+        ma_direction = Rising;
+        ma_slope_pct = 0.05;
+        transition = None;
+        above_ma_count = 5;
+      };
+    rs =
+      Some
+        {
+          current_rs = 1.0;
+          current_normalized = rs_norm;
+          trend = Positive_rising;
+          history = [];
+        };
+    volume =
+      Some
+        {
+          confirmation = Strong volume_ratio;
+          event_volume = 3000;
+          avg_volume = 1000.0;
+          volume_ratio;
+        };
+    resistance = None;
+    support = None;
+    breakout_price = Some 100.0;
+    breakdown_price = None;
+    prior_stage = Some (Stage1 { weeks_in_base = 10 });
+    continuation = None;
+    as_of_date = as_of;
+  }
+
+(** Build a long {!scored_candidate} with a fixed score and the controllable
+    [Quality]-tiebreak keys. *)
+let ranking_candidate ~ticker ?(score = 75) ?(rs_norm = 1.0)
+    ?(weeks_advancing = 5) ?(volume_ratio = 2.5) () : scored_candidate =
+  {
+    ticker;
+    analysis = ranking_analysis ~ticker ~rs_norm ~weeks_advancing ~volume_ratio;
+    sector = make_sector "Tech";
+    side = Long;
+    grade = A;
+    score;
+    suggested_entry = 100.0;
+    suggested_stop = 92.0;
+    risk_pct = 0.08;
+    swing_target = None;
+    rationale = [];
+  }
+
+(** [sort_tickers ranking candidates] = the ticker order [compare_for_ranking]
+    produces. *)
+let sort_tickers ranking candidates =
+  List.sort candidates ~compare:(compare_for_ranking ranking)
+  |> List.map ~f:(fun (c : scored_candidate) -> c.ticker)
+
+(* Parity: with equal scores, [Alphabetical] reproduces the historical
+   ticker-only tiebreak exactly — input order is irrelevant, output is
+   alphabetical. This is the bit-identical back-compat guarantee. *)
+let test_ranking_alphabetical_is_ticker_order _ =
+  let candidates =
+    [
+      ranking_candidate ~ticker:"ZED" ~rs_norm:9.0 ();
+      ranking_candidate ~ticker:"ABE" ~rs_norm:1.0 ();
+      ranking_candidate ~ticker:"MID" ~rs_norm:5.0 ();
+    ]
+  in
+  assert_that
+    (sort_tickers Alphabetical candidates)
+    (elements_are [ equal_to "ABE"; equal_to "MID"; equal_to "ZED" ])
+
+(* Reorder: with equal scores, [Quality] orders by RS magnitude descending
+   (then earliness), so the highest-RS ticker comes first — the opposite of the
+   alphabetical order for this fixture. *)
+let test_ranking_quality_orders_by_rs _ =
+  let candidates =
+    [
+      ranking_candidate ~ticker:"ABE" ~rs_norm:1.0 ();
+      ranking_candidate ~ticker:"ZED" ~rs_norm:9.0 ();
+      ranking_candidate ~ticker:"MID" ~rs_norm:5.0 ();
+    ]
+  in
+  assert_that
+    (sort_tickers Quality candidates)
+    (elements_are [ equal_to "ZED"; equal_to "MID"; equal_to "ABE" ])
+
+(* Earliness is the second [Quality] key: among equal-score, equal-RS
+   candidates, the smaller [weeks_advancing] (earlier Stage 2) ranks first. *)
+let test_ranking_quality_breaks_rs_ties_by_earliness _ =
+  let candidates =
+    [
+      ranking_candidate ~ticker:"LATE" ~rs_norm:3.0 ~weeks_advancing:12 ();
+      ranking_candidate ~ticker:"EARLY" ~rs_norm:3.0 ~weeks_advancing:2 ();
+    ]
+  in
+  assert_that
+    (sort_tickers Quality candidates)
+    (elements_are [ equal_to "EARLY"; equal_to "LATE" ])
+
+(* Primary key is unchanged: a higher score outranks a stronger RS in either
+   mode — [Quality] only reorders *equal* scores. *)
+let test_ranking_quality_respects_score_primary _ =
+  let candidates =
+    [
+      ranking_candidate ~ticker:"HISCORE" ~score:80 ~rs_norm:1.0 ();
+      ranking_candidate ~ticker:"LOSCORE" ~score:70 ~rs_norm:9.0 ();
+    ]
+  in
+  assert_that
+    (sort_tickers Quality candidates)
+    (elements_are [ equal_to "HISCORE"; equal_to "LOSCORE" ])
+
+(* Axis-ability (experiment-flag-discipline R2): the field is present in the
+   serialized config (so [Overlay_validator] resolves the
+   [screening_config.candidate_ranking] override path) and a [Quality] overlay
+   round-trips. An omitted field deserialises to the [Alphabetical] default. *)
+let test_ranking_field_serializes_and_round_trips _ =
+  let default_str = Sexp.to_string (sexp_of_config default_config) in
+  let quality_cfg =
+    config_of_sexp
+      (Sexp.of_string
+         (String.substr_replace_first default_str
+            ~pattern:"(candidate_ranking Alphabetical)"
+            ~with_:"(candidate_ranking Quality)"))
+  in
+  assert_that
+    ( String.is_substring default_str ~substring:"candidate_ranking",
+      quality_cfg.candidate_ranking )
+    (equal_to (true, Quality))
+
+let test_ranking_omitted_field_defaults_alphabetical _ =
+  let no_ranking =
+    config_of_sexp
+      (Sexp.of_string
+         (String.substr_replace_first
+            (Sexp.to_string (sexp_of_config default_config))
+            ~pattern:"(candidate_ranking Alphabetical)" ~with_:""))
+  in
+  assert_that no_ranking.candidate_ranking (equal_to Alphabetical)
+
 let suite =
   "screener_tests"
   >::: [
@@ -1709,6 +1862,18 @@ let suite =
          "test_pi_filter_consults_as_of" >:: test_pi_filter_consults_as_of;
          "test_pi_filter_composes_with_cooldown"
          >:: test_pi_filter_composes_with_cooldown;
+         "test_ranking_alphabetical_is_ticker_order"
+         >:: test_ranking_alphabetical_is_ticker_order;
+         "test_ranking_quality_orders_by_rs"
+         >:: test_ranking_quality_orders_by_rs;
+         "test_ranking_quality_breaks_rs_ties_by_earliness"
+         >:: test_ranking_quality_breaks_rs_ties_by_earliness;
+         "test_ranking_quality_respects_score_primary"
+         >:: test_ranking_quality_respects_score_primary;
+         "test_ranking_field_serializes_and_round_trips"
+         >:: test_ranking_field_serializes_and_round_trips;
+         "test_ranking_omitted_field_defaults_alphabetical"
+         >:: test_ranking_omitted_field_defaults_alphabetical;
        ]
 
 let () = run_test_tt_main suite

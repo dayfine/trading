@@ -42,6 +42,7 @@ let _permissive_screener_config (config : config) : Screener.config =
     grade_thresholds = config.grade_thresholds;
     candidate_params = config.candidate_params;
     min_grade = F;
+    candidate_ranking = Screener.Alphabetical;
     min_score_override = None;
     max_score_override = None;
     volume_ratio_exclude_range = None;

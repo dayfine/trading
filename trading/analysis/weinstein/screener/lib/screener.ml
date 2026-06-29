@@ -3,6 +3,7 @@ open Core
 open Weinstein_types
 include Screener_scoring
 include Screener_admission
+include Screener_ranking
 
 type candidate_params = {
   entry_buffer_pct : float;
@@ -38,6 +39,7 @@ type config = {
   grade_thresholds : grade_thresholds;
   candidate_params : candidate_params;
   min_grade : grade;
+  candidate_ranking : candidate_ranking; [@sexp.default Alphabetical]
   min_score_override : int option; [@sexp.default None]
   max_score_override : int option; [@sexp.default None]
   volume_ratio_exclude_range : volume_ratio_band option; [@sexp.default None]
@@ -57,6 +59,7 @@ let default_config =
     grade_thresholds = default_grade_thresholds;
     candidate_params = default_candidate_params;
     min_grade = C;
+    candidate_ranking = Alphabetical;
     min_score_override = None;
     max_score_override = None;
     volume_ratio_exclude_range = None;
@@ -220,23 +223,38 @@ let _watchlist_entry ~weights ~thresholds ~buy_candidates (sa, sector) =
 (* Evaluate + sort + cap                                               *)
 (* ------------------------------------------------------------------ *)
 
-let _top_n n lst =
-  (* Secondary sort by ticker breaks score ties deterministically. Without
-     it, [List.sort]'s stability depends on the input ordering — which in
-     turn depends on Hashtbl iteration order, and that diverges between
-     macOS and Linux. A G15-step-3 panel-golden CI failure surfaced this:
-     local regenerated more round_trips than GHA produced, with the diff
-     being a tied-score candidate that landed on either side of a
-     cash-budget boundary depending on its position in the sorted list. *)
-  List.sort lst ~compare:(fun a b ->
-      let by_score = Int.compare b.score a.score in
-      if by_score <> 0 then by_score else String.compare a.ticker b.ticker)
-  |> fun l -> List.sub l ~pos:0 ~len:(min n (List.length l))
+(** Project a {!scored_candidate} onto the {!Screener_ranking.rankable} the
+    comparator needs (score / ticker / analysis). *)
+let _rankable_of_candidate (c : scored_candidate) : Screener_ranking.rankable =
+  { score = c.score; ticker = c.ticker; analysis = c.analysis }
 
-(** Apply [candidate_fn] to each pair, drop [None]s, sort by score, and cap at
-    [max_n]. Shared by the long and short evaluation paths. *)
-let _filter_and_cap ~candidate_fn ~max_n candidates =
-  List.filter_map candidates ~f:candidate_fn |> _top_n max_n
+(** Full ranking comparator: primary [score] descending, then the [ranking]
+    tiebreak among equal scores (see {!Screener_ranking.candidate_ranking}).
+    Adapts each candidate to {!Screener_ranking.rankable} and delegates. Exposed
+    so the ordering contract is unit-testable in isolation of the cascade. *)
+let compare_for_ranking ranking a b =
+  Screener_ranking.compare_rankable ranking (_rankable_of_candidate a)
+    (_rankable_of_candidate b)
+
+let _top_n ~ranking n lst =
+  (* Secondary sort breaks score ties deterministically. Without it,
+     [List.sort]'s stability depends on the input ordering — which in turn
+     depends on Hashtbl iteration order, and that diverges between macOS and
+     Linux. A G15-step-3 panel-golden CI failure surfaced this: local
+     regenerated more round_trips than GHA produced, with the diff being a
+     tied-score candidate that landed on either side of a cash-budget boundary
+     depending on its position in the sorted list. The [Alphabetical] mode
+     (default) preserves the original ticker-only tiebreak bit-for-bit; the
+     [Quality] mode breaks ties by RS magnitude / earliness / volume, falling
+     back to ticker so the order stays fully deterministic. *)
+  List.sort lst ~compare:(compare_for_ranking ranking) |> fun l ->
+  List.sub l ~pos:0 ~len:(min n (List.length l))
+
+(** Apply [candidate_fn] to each pair, drop [None]s, sort by score (tiebroken
+    per [ranking]), and cap at [max_n]. Shared by the long and short evaluation
+    paths. *)
+let _filter_and_cap ~ranking ~candidate_fn ~max_n candidates =
+  List.filter_map candidates ~f:candidate_fn |> _top_n ~ranking max_n
 
 (** Whether the macro tape admits new long entries.
 
@@ -271,8 +289,8 @@ let _shorts_admitted_by_macro ~neutral_blocks_shorts macro_trend =
 (** Filter, score, grade, sort, and cap long candidates. *)
 let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price
-    ~max_buy_candidates ~neutral_blocks_longs ~candidates ~macro_trend :
-    scored_candidate list =
+    ~max_buy_candidates ~neutral_blocks_longs ~ranking ~candidates ~macro_trend
+    : scored_candidate list =
   if not (_longs_admitted_by_macro ~neutral_blocks_longs macro_trend) then []
   else
     let candidate_fn =
@@ -280,7 +298,7 @@ let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~min_score_override
         ~min_score_override ~max_score_override ~volume_ratio_exclude_range
         ~min_price
     in
-    _filter_and_cap ~candidate_fn ~max_n:max_buy_candidates candidates
+    _filter_and_cap ~ranking ~candidate_fn ~max_n:max_buy_candidates candidates
 
 (** Filter, score, grade, sort, and cap short candidates.
 
@@ -297,7 +315,8 @@ let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~min_score_override
 let _evaluate_shorts ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price
     ~max_short_candidates ~neutral_blocks_shorts ~enable_slow_grind_short_gate
-    ~decline_is_slow_grind ~candidates ~macro_trend : scored_candidate list =
+    ~ranking ~decline_is_slow_grind ~candidates ~macro_trend :
+    scored_candidate list =
   let macro_admits =
     _shorts_admitted_by_macro ~neutral_blocks_shorts macro_trend
   in
@@ -311,7 +330,8 @@ let _evaluate_shorts ~weights ~thresholds ~params ~min_grade ~min_score_override
         ~min_score_override ~max_score_override ~volume_ratio_exclude_range
         ~min_price
     in
-    _filter_and_cap ~candidate_fn ~max_n:max_short_candidates candidates
+    _filter_and_cap ~ranking ~candidate_fn ~max_n:max_short_candidates
+      candidates
 
 (** Build watchlist: breakout candidates with grade C/D not in the buy list.
     Empty when buys are inactive (Bearish market). *)
@@ -394,7 +414,8 @@ let _evaluate_candidates ~config ~decline_is_slow_grind ~candidates ~macro_trend
       ~max_score_override:config.max_score_override
       ~volume_ratio_exclude_range:config.volume_ratio_exclude_range
       ~min_price:config.min_price ~max_buy_candidates:config.max_buy_candidates
-      ~neutral_blocks_longs:config.neutral_blocks_longs ~candidates ~macro_trend
+      ~neutral_blocks_longs:config.neutral_blocks_longs
+      ~ranking:config.candidate_ranking ~candidates ~macro_trend
   in
   let short_candidates =
     _evaluate_shorts ~weights:config.weights ~thresholds:config.grade_thresholds
@@ -406,7 +427,8 @@ let _evaluate_candidates ~config ~decline_is_slow_grind ~candidates ~macro_trend
       ~max_short_candidates:config.max_short_candidates
       ~neutral_blocks_shorts:config.neutral_blocks_shorts
       ~enable_slow_grind_short_gate:config.enable_slow_grind_short_gate
-      ~decline_is_slow_grind ~candidates ~macro_trend
+      ~ranking:config.candidate_ranking ~decline_is_slow_grind ~candidates
+      ~macro_trend
   in
   (buy_candidates, short_candidates)
 
