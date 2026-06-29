@@ -27,6 +27,9 @@ READY_FOR_REVIEW
   default-0 excludes a 1-day-stale symbol = parity; tolerance=2 keeps
   symbols ≤2 trading days stale; report counts + samples the
   staleness-excluded set). PR: `feat/eligible-universe-staleness-guard`.
+  Linter rework (2026-06-29): extracted the freshness primitives +
+  `staleness_report` into a sibling `staleness.{ml,mli}` to clear the
+  file-length (304→283) + nesting linters; behaviour unchanged.
 
 ## Blocking Refactors
 - **2026-05-16 Option B pivot — IWV scrape becomes the primary

@@ -4,6 +4,7 @@ module BR = Composition_bar_reader
 module BFI = Build_from_individuals
 module CP = Composition_policy
 module CPT = Composition_policy_types
+module S = Staleness
 
 (* Defaults documented in [build_eligible_universe.mli]. *)
 let _default_trailing_window_days = 60
@@ -13,8 +14,8 @@ let _default_min_window_bars = 30
    last bar is on / after [date] (exactly the pre-tolerance behaviour). *)
 let _default_max_staleness_trading_days = 0
 
-(* Tickers carried in a [staleness_report.sample] (a logging aid, not a gate). *)
-let staleness_sample_size = 10
+(* Re-exported from {!Staleness} so the public surface stays unchanged. *)
+let staleness_sample_size = S.sample_size
 
 (* Live-universe spec gate values (the spec, not the no-op record default). *)
 let _spec_min_price = 5.0
@@ -39,7 +40,10 @@ type config = {
 }
 [@@deriving sexp]
 
-type staleness_report = { excluded_count : int; sample : string list }
+type staleness_report = S.staleness_report = {
+  excluded_count : int;
+  sample : string list;
+}
 [@@deriving sexp, show, eq]
 
 let default_config ~bars_root ~symbol_types_path ~sectors_csv_path
@@ -74,37 +78,14 @@ let spec_config ~bars_root ~symbol_types_path ~sectors_csv_path ~inventory_path
 (* Active + equity-like filtering                                      *)
 (* ------------------------------------------------------------------ *)
 
-(* Whether [d] is a weekday (Mon–Fri). Holidays are not modelled, so a
-   "trading day" here is a weekday — see the [.mli] freshness-gate docs. *)
-let _is_weekday d =
-  match Date.day_of_week d with
-  | Day_of_week.Sat | Day_of_week.Sun -> false
-  | _ -> true
-
-(* Count weekdays strictly after [end_date] up to and including [date] — i.e.
-   how many trading days the last bar ([end_date]) lags [date]. [0] when
-   [end_date >= date] (the symbol is fresh, or ahead). *)
-let _trading_days_late ~end_date ~date =
-  if Date.( >= ) end_date date then 0
-  else
-    Date.dates_between ~min:(Date.add_days end_date 1) ~max:date
-    |> List.count ~f:_is_weekday
-
 (* A symbol clears the trailing-history start gate (enough lead-in to score). *)
 let _has_enough_history ~required_start (entry : CI.inventory_entry) =
   Date.( <= ) entry.data_start_date required_start
 
-(* The last bar is fresh enough: on / after [date], or stale by at most
-   [max_staleness_trading_days] trading days. *)
-let _is_fresh_enough ~date ~max_staleness_trading_days
-    (entry : CI.inventory_entry) =
-  _trading_days_late ~end_date:entry.data_end_date ~date
-  <= max_staleness_trading_days
-
 let _is_active ~date ~required_start ~max_staleness_trading_days
     (entry : CI.inventory_entry) =
   _has_enough_history ~required_start entry
-  && _is_fresh_enough ~date ~max_staleness_trading_days entry
+  && S.is_fresh_enough ~date ~max_staleness_trading_days entry
 
 let _required_start ~date ~config =
   Date.add_days date (-config.trailing_window_days)
@@ -129,27 +110,25 @@ let _is_equity_like ~equity_like_lookup symbol =
    observability counterpart to the active filter — a non-zero count means a
    partial data refresh shrank the universe. Inventory order is preserved so the
    report is deterministic. *)
+let _is_staleness_excluded ~required_start ~date ~config ~equity_like_lookup
+    (e : CI.inventory_entry) =
+  _has_enough_history ~required_start e
+  && (not
+        (S.is_fresh_enough ~date
+           ~max_staleness_trading_days:config.max_staleness_trading_days e))
+  && _is_equity_like ~equity_like_lookup e.symbol
+
 let _staleness_excluded ~date ~config ~equity_like_lookup
     (inventory : CI.inventory) =
   let required_start = _required_start ~date ~config in
-  List.filter_map inventory.symbols ~f:(fun (e : CI.inventory_entry) ->
-      if
-        _has_enough_history ~required_start e
-        && (not
-              (_is_fresh_enough ~date
-                 ~max_staleness_trading_days:config.max_staleness_trading_days e))
-        && _is_equity_like ~equity_like_lookup e.symbol
-      then Some e.symbol
-      else None)
+  List.filter inventory.symbols
+    ~f:
+      (_is_staleness_excluded ~required_start ~date ~config ~equity_like_lookup)
+  |> List.map ~f:(fun (e : CI.inventory_entry) -> e.symbol)
 
 let _staleness_report ~date ~config ~equity_like_lookup inventory =
-  let excluded =
-    _staleness_excluded ~date ~config ~equity_like_lookup inventory
-  in
-  {
-    excluded_count = List.length excluded;
-    sample = List.take excluded staleness_sample_size;
-  }
+  S.report
+    ~excluded:(_staleness_excluded ~date ~config ~equity_like_lookup inventory)
 
 (* ------------------------------------------------------------------ *)
 (* Per-symbol scoring + eligibility gates                              *)
