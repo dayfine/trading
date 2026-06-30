@@ -19,11 +19,21 @@
       ([weeks_advancing]) ascending, then volume-expansion ([volume_ratio])
       descending, with alphabetical ([ticker]) as the final deterministic
       fallback (required for reproducible backtests).
+    - [Quality_earliness]: the same keys as [Quality] but with
+      {b earliness primary} — [weeks_advancing] ascending leads (prefer the
+      freshest Stage-2 breakout), then RS magnitude descending, then volume
+      ratio descending, then ticker. The more faithful reading of "do not buy an
+      extended Stage 2": among ties it picks the earliest setup rather than the
+      highest-RS (= most extended) one. [Quality] (RS-primary) was rejected by
+      the 2026-06-29 breadth grid for tilting toward extended names; this is its
+      forward-directive successor.
 
     RS-for-selection is a Weinstein spine item; avoiding an extended Stage 2 is
     book-sanctioned (weinstein-book-reference.md §Relative Strength, §Stage 2:
-    Advancing). [Quality] does {e not} change the additive score itself. *)
-type candidate_ranking = Alphabetical | Quality [@@deriving sexp, eq]
+    Advancing). Neither [Quality] nor [Quality_earliness] changes the additive
+    score itself; both reorder only among {e identical-score} candidates. *)
+type candidate_ranking = Alphabetical | Quality | Quality_earliness
+[@@deriving sexp, eq]
 
 type rankable = {
   score : int;  (** Primary sort key — additive cascade score. *)

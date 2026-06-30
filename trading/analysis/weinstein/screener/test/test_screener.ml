@@ -1714,6 +1714,75 @@ let test_ranking_quality_respects_score_primary _ =
     (sort_tickers Quality candidates)
     (elements_are [ equal_to "HISCORE"; equal_to "LOSCORE" ])
 
+(* [Quality_earliness] leads with earliness: among equal scores, the freshest
+   Stage 2 (smallest [weeks_advancing]) ranks first EVEN when its RS is lower —
+   the distinguishing behaviour vs [Quality], where the same fixture orders by
+   RS. FRESH has the lowest RS but the smallest [weeks_advancing]. *)
+let test_ranking_earliness_leads_with_earliness _ =
+  let candidates =
+    [
+      ranking_candidate ~ticker:"EXT" ~rs_norm:9.0 ~weeks_advancing:12 ();
+      ranking_candidate ~ticker:"FRESH" ~rs_norm:1.0 ~weeks_advancing:2 ();
+      ranking_candidate ~ticker:"MID" ~rs_norm:5.0 ~weeks_advancing:6 ();
+    ]
+  in
+  assert_that
+    (sort_tickers Quality_earliness candidates)
+    (elements_are [ equal_to "FRESH"; equal_to "MID"; equal_to "EXT" ])
+
+(* The same fixture under [Quality] (RS-primary) orders the OPPOSITE way — pins
+   that the two modes are genuinely distinct, not aliases. *)
+let test_ranking_earliness_inverts_quality_on_rs_extended_fixture _ =
+  let candidates =
+    [
+      ranking_candidate ~ticker:"EXT" ~rs_norm:9.0 ~weeks_advancing:12 ();
+      ranking_candidate ~ticker:"FRESH" ~rs_norm:1.0 ~weeks_advancing:2 ();
+      ranking_candidate ~ticker:"MID" ~rs_norm:5.0 ~weeks_advancing:6 ();
+    ]
+  in
+  assert_that
+    (sort_tickers Quality candidates)
+    (elements_are [ equal_to "EXT"; equal_to "MID"; equal_to "FRESH" ])
+
+(* RS is the second [Quality_earliness] key: among equal-score, equal-earliness
+   candidates, the higher RS magnitude ranks first. *)
+let test_ranking_earliness_breaks_earliness_ties_by_rs _ =
+  let candidates =
+    [
+      ranking_candidate ~ticker:"LORS" ~rs_norm:1.0 ~weeks_advancing:3 ();
+      ranking_candidate ~ticker:"HIRS" ~rs_norm:9.0 ~weeks_advancing:3 ();
+    ]
+  in
+  assert_that
+    (sort_tickers Quality_earliness candidates)
+    (elements_are [ equal_to "HIRS"; equal_to "LORS" ])
+
+(* Primary key unchanged: a higher score outranks a fresher setup —
+   [Quality_earliness] only reorders *equal* scores. *)
+let test_ranking_earliness_respects_score_primary _ =
+  let candidates =
+    [
+      ranking_candidate ~ticker:"HISCORE" ~score:80 ~weeks_advancing:20 ();
+      ranking_candidate ~ticker:"LOSCORE" ~score:70 ~weeks_advancing:1 ();
+    ]
+  in
+  assert_that
+    (sort_tickers Quality_earliness candidates)
+    (elements_are [ equal_to "HISCORE"; equal_to "LOSCORE" ])
+
+(* [Quality_earliness] round-trips through the config sexp — so it is a real
+   [Overlay_validator] axis value (experiment-flag-discipline R2). *)
+let test_ranking_earliness_round_trips _ =
+  let earliness_cfg =
+    config_of_sexp
+      (Sexp.of_string
+         (String.substr_replace_first
+            (Sexp.to_string (sexp_of_config default_config))
+            ~pattern:"(candidate_ranking Alphabetical)"
+            ~with_:"(candidate_ranking Quality_earliness)"))
+  in
+  assert_that earliness_cfg.candidate_ranking (equal_to Quality_earliness)
+
 (* Axis-ability (experiment-flag-discipline R2): the field is present in the
    serialized config (so [Overlay_validator] resolves the
    [screening_config.candidate_ranking] override path) and a [Quality] overlay
@@ -1870,6 +1939,16 @@ let suite =
          >:: test_ranking_quality_breaks_rs_ties_by_earliness;
          "test_ranking_quality_respects_score_primary"
          >:: test_ranking_quality_respects_score_primary;
+         "test_ranking_earliness_leads_with_earliness"
+         >:: test_ranking_earliness_leads_with_earliness;
+         "test_ranking_earliness_inverts_quality_on_rs_extended_fixture"
+         >:: test_ranking_earliness_inverts_quality_on_rs_extended_fixture;
+         "test_ranking_earliness_breaks_earliness_ties_by_rs"
+         >:: test_ranking_earliness_breaks_earliness_ties_by_rs;
+         "test_ranking_earliness_respects_score_primary"
+         >:: test_ranking_earliness_respects_score_primary;
+         "test_ranking_earliness_round_trips"
+         >:: test_ranking_earliness_round_trips;
          "test_ranking_field_serializes_and_round_trips"
          >:: test_ranking_field_serializes_and_round_trips;
          "test_ranking_omitted_field_defaults_alphabetical"
