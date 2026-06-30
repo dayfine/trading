@@ -31,8 +31,23 @@
     RS-for-selection is a Weinstein spine item; avoiding an extended Stage 2 is
     book-sanctioned (weinstein-book-reference.md §Relative Strength, §Stage 2:
     Advancing). Neither [Quality] nor [Quality_earliness] changes the additive
-    score itself; both reorder only among {e identical-score} candidates. *)
-type candidate_ranking = Alphabetical | Quality | Quality_earliness
+    score itself; both reorder only among {e identical-score} candidates.
+
+    {b Diagnostic control modes} — [Reverse_alphabetical], [Symbol_length],
+    [Hash_order] — are deliberately {e uninformative} tiebreaks (NOT for default
+    use). They bracket the {e noise floor} of the equal-score tiebreak: if every
+    uninformative sort performs alike and the informative modes sit inside that
+    band, no sort beats unbiased sampling (project_edge_is_the_fat_tail).
+    [Hash_order] is a deterministic cross-platform FNV-1a order (a reproducible
+    proxy for a random shuffle); all three fall back to [ticker] for
+    reproducibility. *)
+type candidate_ranking =
+  | Alphabetical
+  | Quality
+  | Quality_earliness
+  | Reverse_alphabetical
+  | Symbol_length
+  | Hash_order
 [@@deriving sexp, eq]
 
 type rankable = {
