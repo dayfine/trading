@@ -1,7 +1,13 @@
 open Core
 open Weinstein_types
 
-type candidate_ranking = Alphabetical | Quality | Quality_earliness
+type candidate_ranking =
+  | Alphabetical
+  | Quality
+  | Quality_earliness
+  | Reverse_alphabetical
+  | Symbol_length
+  | Hash_order
 [@@deriving sexp, eq]
 
 type rankable = { score : int; ticker : string; analysis : Stock_analysis.t }
@@ -77,15 +83,58 @@ let _lex keys a b =
       match cmp a b with 0 -> None | c -> Some c)
   |> Option.value ~default:0
 
+(** Cross-platform-stable pseudo-random hash of a ticker — the 32-bit FNV-1a
+    (offset basis [0x811c9dc5], prime [0x01000193], masked to 32 bits each
+    step).
+
+    FNV-1a is used deliberately over a plain rolling [h = h*31 + byte]: the
+    latter is {b monotonic in string length} (each extra byte multiplies by 31,
+    so a 1-char ticker always hashes below any 2-char ticker), which collapses
+    "hash order" into "length order" — observed 2026-06-30 when [Hash_order]
+    produced bit-identical results to [Symbol_length]. FNV-1a's
+    XOR-before-multiply diffuses bits so the value is uniform w.r.t. length,
+    giving a genuine (but reproducible) pseudo-random order. The 32-bit mask
+    keeps it [Core]-polymorphic- hash-free and identical across the macOS/Linux
+    toolchain (the determinism hazard that motivated [Alphabetical], see
+    {!_top_n}); intermediate products stay well under 2^63 (≈2^56) so there is
+    no OCaml-int overflow. Hash collisions fall back to [ticker]. *)
+let _ticker_hash s =
+  String.fold s ~init:0x811c9dc5 ~f:(fun h c ->
+      h lxor Char.to_int c * 0x01000193 land 0xffffffff)
+
+(** Diagnostic {b control} tiebreaks — NOT return-seeking, NOT intended for
+    default use. They are deliberately {e uninformative} sorts (reverse-ticker,
+    symbol length, deterministic pseudo-random hash) used to bracket the
+    {e noise floor} of the equal-score tiebreak: if every uninformative sort
+    performs alike and the informative ones ([Quality] / [Quality_earliness])
+    sit inside that band, then no sort beats unbiased sampling
+    (project_edge_is_the_fat_tail). All deterministic (ticker as final fallback)
+    for reproducible backtests. *)
+let _reverse_alphabetical_cmp a b = String.compare b.ticker a.ticker
+
+let _symbol_length_cmp a b =
+  match Int.compare (String.length a.ticker) (String.length b.ticker) with
+  | 0 -> String.compare a.ticker b.ticker
+  | c -> c
+
+let _hash_order_cmp a b =
+  match Int.compare (_ticker_hash a.ticker) (_ticker_hash b.ticker) with
+  | 0 -> String.compare a.ticker b.ticker
+  | c -> c
+
 (** Tiebreak comparator among equal-score candidates, parameterised by the
     ranking mode. [Alphabetical] is bit-identical to the historical ticker-only
     tiebreak; [Quality] leads with RS magnitude; [Quality_earliness] leads with
-    earliness. *)
+    earliness; the rest are uninformative {!_reverse_alphabetical_cmp} /
+    {!_symbol_length_cmp} / {!_hash_order_cmp} controls. *)
 let _tiebreak ranking a b =
   match ranking with
   | Alphabetical -> String.compare a.ticker b.ticker
   | Quality -> _lex _quality_keys a b
   | Quality_earliness -> _lex _quality_earliness_keys a b
+  | Reverse_alphabetical -> _reverse_alphabetical_cmp a b
+  | Symbol_length -> _symbol_length_cmp a b
+  | Hash_order -> _hash_order_cmp a b
 
 let compare_rankable ranking a b =
   let by_score = Int.compare b.score a.score in

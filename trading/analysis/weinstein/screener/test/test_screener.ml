@@ -1783,6 +1783,74 @@ let test_ranking_earliness_round_trips _ =
   in
   assert_that earliness_cfg.candidate_ranking (equal_to Quality_earliness)
 
+(* Control mode [Reverse_alphabetical]: ties order Z->A (mirror of Alphabetical). *)
+let test_ranking_reverse_alphabetical _ =
+  let candidates =
+    [
+      ranking_candidate ~ticker:"ABE" ();
+      ranking_candidate ~ticker:"ZED" ();
+      ranking_candidate ~ticker:"MID" ();
+    ]
+  in
+  assert_that
+    (sort_tickers Reverse_alphabetical candidates)
+    (elements_are [ equal_to "ZED"; equal_to "MID"; equal_to "ABE" ])
+
+(* Control mode [Symbol_length]: shorter ticker first, then alphabetical. *)
+let test_ranking_symbol_length _ =
+  let candidates =
+    [
+      ranking_candidate ~ticker:"AAAA" ();
+      ranking_candidate ~ticker:"BB" ();
+      ranking_candidate ~ticker:"C" ();
+    ]
+  in
+  assert_that
+    (sort_tickers Symbol_length candidates)
+    (elements_are [ equal_to "C"; equal_to "BB"; equal_to "AAAA" ])
+
+(* Control mode [Hash_order]: deterministic FNV-1a pseudo-random order. For these
+   tickers the 32-bit FNV-1a hashes are ZZ=924325685 < AAA=3061902210 <
+   M=3356228888, so the order is [ZZ; AAA; M] — distinct from BOTH alphabetical
+   [AAA; M; ZZ] AND symbol-length [M; ZZ; AAA], confirming it is a genuine
+   pseudo-random (but reproducible) permutation, not secretly length- or
+   alpha-ordered. *)
+let test_ranking_hash_order_is_deterministic_permutation _ =
+  let candidates =
+    [
+      ranking_candidate ~ticker:"AAA" ();
+      ranking_candidate ~ticker:"M" ();
+      ranking_candidate ~ticker:"ZZ" ();
+    ]
+  in
+  assert_that
+    (sort_tickers Hash_order candidates)
+    (elements_are [ equal_to "ZZ"; equal_to "AAA"; equal_to "M" ])
+
+(* All control modes round-trip through the config sexp (real [Overlay_validator]
+   axis values). *)
+let test_ranking_control_modes_round_trip _ =
+  let cfg_with mode =
+    config_of_sexp
+      (Sexp.of_string
+         (String.substr_replace_first
+            (Sexp.to_string (sexp_of_config default_config))
+            ~pattern:"(candidate_ranking Alphabetical)"
+            ~with_:("(candidate_ranking " ^ mode ^ ")")))
+  in
+  assert_that
+    [
+      (cfg_with "Reverse_alphabetical").candidate_ranking;
+      (cfg_with "Symbol_length").candidate_ranking;
+      (cfg_with "Hash_order").candidate_ranking;
+    ]
+    (elements_are
+       [
+         equal_to Reverse_alphabetical;
+         equal_to Symbol_length;
+         equal_to Hash_order;
+       ])
+
 (* Axis-ability (experiment-flag-discipline R2): the field is present in the
    serialized config (so [Overlay_validator] resolves the
    [screening_config.candidate_ranking] override path) and a [Quality] overlay
@@ -1949,6 +2017,13 @@ let suite =
          >:: test_ranking_earliness_respects_score_primary;
          "test_ranking_earliness_round_trips"
          >:: test_ranking_earliness_round_trips;
+         "test_ranking_reverse_alphabetical"
+         >:: test_ranking_reverse_alphabetical;
+         "test_ranking_symbol_length" >:: test_ranking_symbol_length;
+         "test_ranking_hash_order_is_deterministic_permutation"
+         >:: test_ranking_hash_order_is_deterministic_permutation;
+         "test_ranking_control_modes_round_trip"
+         >:: test_ranking_control_modes_round_trip;
          "test_ranking_field_serializes_and_round_trips"
          >:: test_ranking_field_serializes_and_round_trips;
          "test_ranking_omitted_field_defaults_alphabetical"

@@ -1,0 +1,703 @@
+=== [13:12:54] top500 p=4 START ===
+File ".", line 1, characters 0-0:
+Warning: No dune-project file has been found in directory ".". A default one
+is assumed but the project might break when dune is upgraded. Please create a
+dune-project file.
+Hint: generate the project file with: $ dune init project <name>
+[snapshot-mode] loaded manifest at /workspaces/trading-1/dev/data/snapshots/wfcv-top500-1998/manifest.sexp (schema_hash=060588c0224b7d7e73f367fbd1801084, 327 entries)
+[walk_forward] spec=/workspaces/trading-1/dev/experiments/tiebreak-noise-floor-2026-06-30/spec_top500_hashfix.sexp base=/workspaces/trading-1/dev/experiments/tiebreak-noise-floor-2026-06-30/base_top500.sexp baseline=baseline variants=2 folds=13 parallel=4 bars=snapshot:/workspaces/trading-1/dev/data/snapshots/wfcv-top500-1998
+[walk_forward] running variant=baseline fold=fold-000 [2000-01-01..2001-12-30]
+[walk_forward] running variant=baseline fold=fold-001 [2001-12-31..2003-12-30]
+[walk_forward] running variant=baseline fold=fold-002 [2003-12-31..2005-12-29]
+[walk_forward] running variant=baseline fold=fold-003 [2005-12-30..2007-12-29]
+[walk_forward] running variant=baseline fold=fold-004 [2007-12-30..2009-12-28]
+[walk_forward] running variant=baseline fold=fold-005 [2009-12-29..2011-12-28]
+[walk_forward] running variant=baseline fold=fold-006 [2011-12-29..2013-12-27]
+[walk_forward] running variant=baseline fold=fold-007 [2013-12-28..2015-12-27]
+[walk_forward] running variant=baseline fold=fold-008 [2015-12-28..2017-12-26]
+[walk_forward] running variant=baseline fold=fold-009 [2017-12-27..2019-12-26]
+[walk_forward] running variant=baseline fold=fold-010 [2019-12-27..2021-12-25]
+[walk_forward] running variant=baseline fold=fold-011 [2021-12-26..2023-12-25]
+[walk_forward] running variant=baseline fold=fold-012 [2023-12-26..2025-12-24]
+[walk_forward] running variant=hash_random fold=fold-000 [2000-01-01..2001-12-30]
+[walk_forward] running variant=hash_random fold=fold-001 [2001-12-31..2003-12-30]
+[walk_forward] running variant=hash_random fold=fold-002 [2003-12-31..2005-12-29]
+[walk_forward] running variant=hash_random fold=fold-003 [2005-12-30..2007-12-29]
+[walk_forward] running variant=hash_random fold=fold-004 [2007-12-30..2009-12-28]
+[walk_forward] running variant=hash_random fold=fold-005 [2009-12-29..2011-12-28]
+[walk_forward] running variant=hash_random fold=fold-006 [2011-12-29..2013-12-27]
+[walk_forward] running variant=hash_random fold=fold-007 [2013-12-28..2015-12-27]
+[walk_forward] running variant=hash_random fold=fold-008 [2015-12-28..2017-12-26]
+[walk_forward] running variant=hash_random fold=fold-009 [2017-12-27..2019-12-26]
+[walk_forward] running variant=hash_random fold=fold-010 [2019-12-27..2021-12-25]
+[walk_forward] running variant=hash_random fold=fold-011 [2021-12-26..2023-12-25]
+[walk_forward] running variant=hash_random fold=fold-012 [2023-12-26..2025-12-24]
+Using scenario-provided sector map (500 symbols)...
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Universe: 500 stocks
+Loading AD breadth bars...
+Using scenario-provided sector map (500 symbols)...
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2001-12-31 to 2003-12-30, warmup from 2001-06-04)...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2000-01-01 to 2001-12-30, warmup from 1999-06-05)...
+Panel_runner: simulator window 2001-06-04..2003-12-30 (warmup 210 days, strategy Weinstein)
+Panel_runner: simulator window 1999-06-05..2001-12-30 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot bar reader wired (calendar 670 days) for strategy
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2005-12-30 to 2007-12-29, warmup from 2005-06-03)...
+Panel_runner: simulator window 2005-06-03..2007-12-29 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Total symbols (universe + index + sector ETFs): 515
+Panel_runner: snapshot bar reader wired (calendar 671 days) for strategy
+Running backtest (2003-12-31 to 2005-12-29, warmup from 2003-06-04)...
+Panel_runner: simulator window 2003-06-04..2005-12-29 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+WARN: portfolio rejected fill for BKR (side=Types.Buy qty=4116.0000 price=35.5000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 146159.16, Available: 145050.94910000009, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for BHC (side=Types.Buy qty=7333.0000 price=20.7500): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 152233.08, Available: 152207.23429999978, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for IDXX (side=Types.Buy qty=1777.0000 price=94.0000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 167055.77, Available: 163328.0279, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=266488 misses=547152 evictions=344666 n_symbols=515 misses_per_symbol=1062.43
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2007-12-30 to 2009-12-28, warmup from 2007-06-03)...
+Panel_runner: simulator window 2007-06-03..2009-12-28 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 671 days) for strategy
+Panel_runner: snapshot cache hits=260592 misses=546533 evictions=344047 n_symbols=515 misses_per_symbol=1061.23
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2009-12-29 to 2011-12-28, warmup from 2009-06-02)...
+Panel_runner: simulator window 2009-06-02..2011-12-28 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot cache hits=277734 misses=545501 evictions=343204 n_symbols=515 misses_per_symbol=1059.23
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2011-12-29 to 2013-12-27, warmup from 2011-06-02)...
+Panel_runner: simulator window 2011-06-02..2013-12-27 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot cache hits=292377 misses=546823 evictions=343770 n_symbols=515 misses_per_symbol=1061.79
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2013-12-28 to 2015-12-27, warmup from 2013-06-01)...
+Panel_runner: simulator window 2013-06-01..2015-12-27 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 670 days) for strategy
+WARN: portfolio rejected fill for BA (side=Types.Buy qty=2442.0000 price=65.0100): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 158778.84000000003, Available: 157701.18769999978, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for GSK (side=Types.Buy qty=2808.0000 price=44.9942): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 126371.7936, Available: 126263.53879999994, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for CSGS (side=Types.Buy qty=9655.0000 price=15.7300): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 151969.69999999998, Available: 151390.82939999993, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=248177 misses=546968 evictions=344671 n_symbols=515 misses_per_symbol=1062.07
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2015-12-28 to 2017-12-26, warmup from 2015-06-01)...
+Panel_runner: simulator window 2015-06-01..2017-12-26 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+WARN: portfolio rejected fill for MSI (side=Types.Buy qty=3121.0000 price=60.3800): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 188477.19, Available: 188392.39980000022, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=280587 misses=543964 evictions=341856 n_symbols=515 misses_per_symbol=1056.24
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2017-12-27 to 2019-12-26, warmup from 2017-05-31)...
+Panel_runner: simulator window 2017-05-31..2019-12-26 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot cache hits=289191 misses=546236 evictions=343372 n_symbols=515 misses_per_symbol=1060.65
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2019-12-27 to 2021-12-25, warmup from 2019-05-31)...
+Panel_runner: simulator window 2019-05-31..2021-12-25 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 671 days) for strategy
+Panel_runner: snapshot cache hits=274813 misses=545386 evictions=343089 n_symbols=515 misses_per_symbol=1059.00
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2021-12-26 to 2023-12-25, warmup from 2021-05-30)...
+Panel_runner: simulator window 2021-05-30..2023-12-25 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 671 days) for strategy
+WARN: portfolio rejected fill for KR (side=Types.Buy qty=5100.0000 price=27.7000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 141321., Available: 135935.91000000009, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for INTC (side=Types.Buy qty=3088.0000 price=58.8500): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 181759.68000000002, Available: 177118.45999999993, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for BALL (side=Types.Buy qty=1482.0000 price=56.2300): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 83347.680000000008, Available: 79404.1205000001, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=287703 misses=545307 evictions=343010 n_symbols=515 misses_per_symbol=1058.85
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2023-12-26 to 2025-12-24, warmup from 2023-05-30)...
+Panel_runner: simulator window 2023-05-30..2025-12-24 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot cache hits=288242 misses=545722 evictions=342858 n_symbols=515 misses_per_symbol=1059.65
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2000-01-01 to 2001-12-30, warmup from 1999-06-05)...
+Panel_runner: simulator window 1999-06-05..2001-12-30 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 670 days) for strategy
+Panel_runner: snapshot cache hits=278589 misses=544579 evictions=342282 n_symbols=515 misses_per_symbol=1057.43
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2001-12-31 to 2003-12-30, warmup from 2001-06-04)...
+Panel_runner: simulator window 2001-06-04..2003-12-30 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot cache hits=277458 misses=545204 evictions=342529 n_symbols=515 misses_per_symbol=1058.65
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2003-12-31 to 2005-12-29, warmup from 2003-06-04)...
+Panel_runner: simulator window 2003-06-04..2005-12-29 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+WARN: portfolio rejected fill for SEE (side=Types.Buy qty=1720.0000 price=36.5300): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 62848.799999999996, Available: 59844.302700000044, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=268392 misses=546987 evictions=344501 n_symbols=515 misses_per_symbol=1062.11
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2005-12-30 to 2007-12-29, warmup from 2005-06-03)...
+Panel_runner: simulator window 2005-06-03..2007-12-29 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 671 days) for strategy
+Panel_runner: snapshot cache hits=281634 misses=545271 evictions=342596 n_symbols=515 misses_per_symbol=1058.78
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2007-12-30 to 2009-12-28, warmup from 2007-06-03)...
+Panel_runner: simulator window 2007-06-03..2009-12-28 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 671 days) for strategy
+Panel_runner: snapshot cache hits=260394 misses=546306 evictions=343820 n_symbols=515 misses_per_symbol=1060.79
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2009-12-29 to 2011-12-28, warmup from 2009-06-02)...
+Panel_runner: simulator window 2009-06-02..2011-12-28 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot cache hits=282705 misses=544684 evictions=342387 n_symbols=515 misses_per_symbol=1057.64
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2011-12-29 to 2013-12-27, warmup from 2011-06-02)...
+Panel_runner: simulator window 2011-06-02..2013-12-27 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+WARN: portfolio rejected fill for TXN (side=Types.Buy qty=4398.0000 price=31.8800): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 140252.22, Available: 134136.33719999995, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for DHI (side=Types.Buy qty=5845.0000 price=26.5000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 154950.95, Available: 152903.97979999971, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for COP (side=Types.Buy qty=2309.0000 price=50.0766): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 115649.95939999999, Available: 114019.39749999953, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for VFC (side=Types.Buy qty=2143.0000 price=59.4002): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 127316.05859999999, Available: 126329.09259999989, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=249199 misses=546893 evictions=344596 n_symbols=515 misses_per_symbol=1061.93
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2013-12-28 to 2015-12-27, warmup from 2013-06-01)...
+Panel_runner: simulator window 2013-06-01..2015-12-27 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 670 days) for strategy
+Panel_runner: snapshot cache hits=292946 misses=546462 evictions=343409 n_symbols=515 misses_per_symbol=1061.09
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2015-12-28 to 2017-12-26, warmup from 2015-06-01)...
+Panel_runner: simulator window 2015-06-01..2017-12-26 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot cache hits=280124 misses=543878 evictions=341770 n_symbols=515 misses_per_symbol=1056.07
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2017-12-27 to 2019-12-26, warmup from 2017-05-31)...
+Panel_runner: simulator window 2017-05-31..2019-12-26 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot cache hits=287058 misses=546058 evictions=343194 n_symbols=515 misses_per_symbol=1060.31
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2019-12-27 to 2021-12-25, warmup from 2019-05-31)...
+Panel_runner: simulator window 2019-05-31..2021-12-25 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 671 days) for strategy
+WARN: portfolio rejected fill for KR (side=Types.Buy qty=5100.0000 price=27.7000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 141321., Available: 136613.38999999996, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for AIV (side=Types.Buy qty=3051.0000 price=56.5554): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 172581.0354, Available: 172503.73680000042, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=277365 misses=545670 evictions=343373 n_symbols=515 misses_per_symbol=1059.55
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2021-12-26 to 2023-12-25, warmup from 2021-05-30)...
+Panel_runner: simulator window 2021-05-30..2023-12-25 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 671 days) for strategy
+Panel_runner: snapshot cache hits=286928 misses=545219 evictions=342922 n_symbols=515 misses_per_symbol=1058.68
+Using scenario-provided sector map (500 symbols)...
+Universe: 500 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 515
+Running backtest (2023-12-26 to 2025-12-24, warmup from 2023-05-30)...
+Panel_runner: simulator window 2023-05-30..2025-12-24 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot cache hits=298963 misses=545092 evictions=342228 n_symbols=515 misses_per_symbol=1058.43
+Panel_runner: snapshot cache hits=279277 misses=544668 evictions=342371 n_symbols=515 misses_per_symbol=1057.61
+WARN: portfolio rejected fill for LMT (side=Types.Buy qty=308.0000 price=431.9700): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 133049.84, Available: 130414.85659999985, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=277251 misses=544957 evictions=342282 n_symbols=515 misses_per_symbol=1058.17
+Panel_runner: snapshot cache hits=280591 misses=545257 evictions=342582 n_symbols=515 misses_per_symbol=1058.75
+[walk_forward] wrote /workspaces/trading-1/dev/experiments/tiebreak-noise-floor-2026-06-30/out_top500_hashfix/fold_actuals.sexp
+[walk_forward] wrote /workspaces/trading-1/dev/experiments/tiebreak-noise-floor-2026-06-30/out_top500_hashfix/walk_forward_report.md
+[walk_forward] wrote /workspaces/trading-1/dev/experiments/tiebreak-noise-floor-2026-06-30/out_top500_hashfix/aggregate.sexp
+[walk_forward] done
+=== [14:05:05] top500 DONE exit=0 ===
+=== [14:05:05] top1000 p=3 START ===
+File ".", line 1, characters 0-0:
+Warning: No dune-project file has been found in directory ".". A default one
+is assumed but the project might break when dune is upgraded. Please create a
+dune-project file.
+Hint: generate the project file with: $ dune init project <name>
+[snapshot-mode] loaded manifest at /workspaces/trading-1/dev/data/snapshots/wfcv-top1000-1998/manifest.sexp (schema_hash=060588c0224b7d7e73f367fbd1801084, 527 entries)
+[walk_forward] spec=/workspaces/trading-1/dev/experiments/tiebreak-noise-floor-2026-06-30/spec_top1000_hashfix.sexp base=/workspaces/trading-1/dev/experiments/tiebreak-noise-floor-2026-06-30/base_top1000.sexp baseline=baseline variants=2 folds=13 parallel=3 bars=snapshot:/workspaces/trading-1/dev/data/snapshots/wfcv-top1000-1998
+[walk_forward] running variant=baseline fold=fold-000 [2000-01-01..2001-12-30]
+[walk_forward] running variant=baseline fold=fold-001 [2001-12-31..2003-12-30]
+[walk_forward] running variant=baseline fold=fold-002 [2003-12-31..2005-12-29]
+[walk_forward] running variant=baseline fold=fold-003 [2005-12-30..2007-12-29]
+[walk_forward] running variant=baseline fold=fold-004 [2007-12-30..2009-12-28]
+[walk_forward] running variant=baseline fold=fold-005 [2009-12-29..2011-12-28]
+[walk_forward] running variant=baseline fold=fold-006 [2011-12-29..2013-12-27]
+[walk_forward] running variant=baseline fold=fold-007 [2013-12-28..2015-12-27]
+[walk_forward] running variant=baseline fold=fold-008 [2015-12-28..2017-12-26]
+[walk_forward] running variant=baseline fold=fold-009 [2017-12-27..2019-12-26]
+[walk_forward] running variant=baseline fold=fold-010 [2019-12-27..2021-12-25]
+[walk_forward] running variant=baseline fold=fold-011 [2021-12-26..2023-12-25]
+[walk_forward] running variant=baseline fold=fold-012 [2023-12-26..2025-12-24]
+[walk_forward] running variant=hash_random fold=fold-000 [2000-01-01..2001-12-30]
+[walk_forward] running variant=hash_random fold=fold-001 [2001-12-31..2003-12-30]
+[walk_forward] running variant=hash_random fold=fold-002 [2003-12-31..2005-12-29]
+[walk_forward] running variant=hash_random fold=fold-003 [2005-12-30..2007-12-29]
+[walk_forward] running variant=hash_random fold=fold-004 [2007-12-30..2009-12-28]
+[walk_forward] running variant=hash_random fold=fold-005 [2009-12-29..2011-12-28]
+[walk_forward] running variant=hash_random fold=fold-006 [2011-12-29..2013-12-27]
+[walk_forward] running variant=hash_random fold=fold-007 [2013-12-28..2015-12-27]
+[walk_forward] running variant=hash_random fold=fold-008 [2015-12-28..2017-12-26]
+[walk_forward] running variant=hash_random fold=fold-009 [2017-12-27..2019-12-26]
+[walk_forward] running variant=hash_random fold=fold-010 [2019-12-27..2021-12-25]
+[walk_forward] running variant=hash_random fold=fold-011 [2021-12-26..2023-12-25]
+[walk_forward] running variant=hash_random fold=fold-012 [2023-12-26..2025-12-24]
+Using scenario-provided sector map (1000 symbols)...
+Using scenario-provided sector map (1000 symbols)...
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Universe: 1000 stocks
+Loading AD breadth bars...
+Loading AD breadth bars...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2001-12-31 to 2003-12-30, warmup from 2001-06-04)...
+Panel_runner: simulator window 2001-06-04..2003-12-30 (warmup 210 days, strategy Weinstein)
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2003-12-31 to 2005-12-29, warmup from 2003-06-04)...
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: simulator window 2003-06-04..2005-12-29 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2000-01-01 to 2001-12-30, warmup from 1999-06-05)...
+Panel_runner: simulator window 1999-06-05..2001-12-30 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 670 days) for strategy
+WARN: portfolio rejected fill for UNM (side=Types.Buy qty=5359.0000 price=24.0000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 128669.59, Available: 126292.76550000027, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for CCK (side=Types.Buy qty=18297.0000 price=7.2500): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 132836.22, Available: 131938.32369999983, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for BLDP (side=Types.Buy qty=30712.0000 price=6.5200): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 200549.36, Available: 199542.61896470533, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for BLDP (side=Types.Buy qty=31789.0000 price=6.2500): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 198999.14, Available: 196377.24896470536, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for NYT (side=Types.Buy qty=3042.0000 price=47.7000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 145133.82, Available: 143754.38029999984, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=400968 misses=1084723 evictions=561237 n_symbols=1015 misses_per_symbol=1068.69
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2005-12-30 to 2007-12-29, warmup from 2005-06-03)...
+Panel_runner: simulator window 2005-06-03..2007-12-29 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 671 days) for strategy
+Panel_runner: snapshot cache hits=394082 misses=1084770 evictions=561284 n_symbols=1015 misses_per_symbol=1068.74
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2007-12-30 to 2009-12-28, warmup from 2007-06-03)...
+Panel_runner: simulator window 2007-06-03..2009-12-28 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 671 days) for strategy
+Panel_runner: snapshot cache hits=403859 misses=1083783 evictions=560786 n_symbols=1015 misses_per_symbol=1067.77
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2009-12-29 to 2011-12-28, warmup from 2009-06-02)...
+Panel_runner: simulator window 2009-06-02..2011-12-28 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+WARN: portfolio rejected fill for GR (side=Types.Buy qty=3461.0000 price=358.4000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 1240457.01, Available: 253976.41320000013, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for DXC (side=Types.Buy qty=2821.0000 price=49.6500): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 140090.86, Available: 137533.40680000003, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=375855 misses=1083671 evictions=560674 n_symbols=1015 misses_per_symbol=1067.66
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2011-12-29 to 2013-12-27, warmup from 2011-06-02)...
+Panel_runner: simulator window 2011-06-02..2013-12-27 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot cache hits=419037 misses=1087742 evictions=562789 n_symbols=1015 misses_per_symbol=1071.67
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2013-12-28 to 2015-12-27, warmup from 2013-06-01)...
+Panel_runner: simulator window 2013-06-01..2015-12-27 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 670 days) for strategy
+Panel_runner: snapshot cache hits=404485 misses=1082925 evictions=560417 n_symbols=1015 misses_per_symbol=1066.92
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2015-12-28 to 2017-12-26, warmup from 2015-06-01)...
+Panel_runner: simulator window 2015-06-01..2017-12-26 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+WARN: portfolio rejected fill for GE (side=Types.Buy qty=7816.0000 price=18.0300): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 141000.64, Available: 138343.17190000002, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for AET (side=Types.Buy qty=618.0000 price=129.4900): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 80031., Available: 79861.727500000066, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=422578 misses=1086853 evictions=562389 n_symbols=1015 misses_per_symbol=1070.79
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2017-12-27 to 2019-12-26, warmup from 2017-05-31)...
+Panel_runner: simulator window 2017-05-31..2019-12-26 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot cache hits=413501 misses=1084259 evictions=561262 n_symbols=1015 misses_per_symbol=1068.24
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2019-12-27 to 2021-12-25, warmup from 2019-05-31)...
+Panel_runner: simulator window 2019-05-31..2021-12-25 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 671 days) for strategy
+Panel_runner: snapshot cache hits=405334 misses=1083689 evictions=560692 n_symbols=1015 misses_per_symbol=1067.67
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2021-12-26 to 2023-12-25, warmup from 2021-05-30)...
+Panel_runner: simulator window 2021-05-30..2023-12-25 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 671 days) for strategy
+WARN: portfolio rejected fill for BMY (side=Types.Buy qty=2162.0000 price=64.7400): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 139989.49999999997, Available: 136486.18130000011, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=419075 misses=1086813 evictions=562349 n_symbols=1015 misses_per_symbol=1070.75
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2023-12-26 to 2025-12-24, warmup from 2023-05-30)...
+Panel_runner: simulator window 2023-05-30..2025-12-24 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot cache hits=400730 misses=1083715 evictions=560718 n_symbols=1015 misses_per_symbol=1067.70
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2000-01-01 to 2001-12-30, warmup from 1999-06-05)...
+Panel_runner: simulator window 1999-06-05..2001-12-30 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 670 days) for strategy
+Panel_runner: snapshot cache hits=390186 misses=1085770 evictions=561795 n_symbols=1015 misses_per_symbol=1069.72
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2001-12-31 to 2003-12-30, warmup from 2001-06-04)...
+Panel_runner: simulator window 2001-06-04..2003-12-30 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+WARN: portfolio rejected fill for EQT (side=Types.Buy qty=3369.0000 price=40.1300): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 135231.66, Available: 132113.05849999987, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for CVX (side=Types.Buy qty=781.0000 price=87.3750): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 68247.685, Available: 67870.788500000315, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for NICE (side=Types.Buy qty=611.0000 price=166.7200): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 101872.03, Available: 99549.600699999966, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for DDS (side=Types.Buy qty=9889.0000 price=15.6200): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 154565.07, Available: 152645.57459999979, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for AKR (side=Types.Buy qty=5290.0000 price=20.4000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 107968.89999999998, Available: 105071.66069999993, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=398407 misses=1084719 evictions=561233 n_symbols=1015 misses_per_symbol=1068.69
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2003-12-31 to 2005-12-29, warmup from 2003-06-04)...
+Panel_runner: simulator window 2003-06-04..2005-12-29 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+WARN: portfolio rejected fill for NOK (side=Types.Buy qty=15939.0000 price=6.9750): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 111333.915, Available: 110869.53469999992, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=395811 misses=1084708 evictions=561222 n_symbols=1015 misses_per_symbol=1068.68
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2005-12-30 to 2007-12-29, warmup from 2005-06-03)...
+Panel_runner: simulator window 2005-06-03..2007-12-29 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 671 days) for strategy
+Panel_runner: snapshot cache hits=395851 misses=1086263 evictions=562288 n_symbols=1015 misses_per_symbol=1070.21
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2007-12-30 to 2009-12-28, warmup from 2007-06-03)...
+Panel_runner: simulator window 2007-06-03..2009-12-28 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 671 days) for strategy
+WARN: portfolio rejected fill for GR (side=Types.Buy qty=3173.0000 price=358.4000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 1137234.93, Available: 262321.94249999995, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=406809 misses=1083844 evictions=560847 n_symbols=1015 misses_per_symbol=1067.83
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2009-12-29 to 2011-12-28, warmup from 2009-06-02)...
+Panel_runner: simulator window 2009-06-02..2011-12-28 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot cache hits=376271 misses=1083661 evictions=560664 n_symbols=1015 misses_per_symbol=1067.65
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2011-12-29 to 2013-12-27, warmup from 2011-06-02)...
+Panel_runner: simulator window 2011-06-02..2013-12-27 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot cache hits=420799 misses=1087696 evictions=562743 n_symbols=1015 misses_per_symbol=1071.62
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2013-12-28 to 2015-12-27, warmup from 2013-06-01)...
+Panel_runner: simulator window 2013-06-01..2015-12-27 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 670 days) for strategy
+WARN: portfolio rejected fill for NKTR (side=Types.Buy qty=5316.0000 price=14.5000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 77135.16, Available: 76449.638300000137, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=401176 misses=1083057 evictions=560549 n_symbols=1015 misses_per_symbol=1067.05
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2015-12-28 to 2017-12-26, warmup from 2015-06-01)...
+Panel_runner: simulator window 2015-06-01..2017-12-26 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot cache hits=420729 misses=1087279 evictions=562815 n_symbols=1015 misses_per_symbol=1071.21
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2017-12-27 to 2019-12-26, warmup from 2017-05-31)...
+Panel_runner: simulator window 2017-05-31..2019-12-26 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot cache hits=412180 misses=1084284 evictions=561287 n_symbols=1015 misses_per_symbol=1068.26
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2019-12-27 to 2021-12-25, warmup from 2019-05-31)...
+Panel_runner: simulator window 2019-05-31..2021-12-25 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 671 days) for strategy
+Panel_runner: snapshot cache hits=407578 misses=1083696 evictions=560699 n_symbols=1015 misses_per_symbol=1067.68
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2021-12-26 to 2023-12-25, warmup from 2021-05-30)...
+Panel_runner: simulator window 2021-05-30..2023-12-25 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 671 days) for strategy
+Panel_runner: snapshot cache hits=399648 misses=1083712 evictions=560715 n_symbols=1015 misses_per_symbol=1067.70
+Using scenario-provided sector map (1000 symbols)...
+Universe: 1000 stocks
+Loading AD breadth bars...
+Total symbols (universe + index + sector ETFs): 1015
+Running backtest (2023-12-26 to 2025-12-24, warmup from 2023-05-30)...
+Panel_runner: simulator window 2023-05-30..2025-12-24 (warmup 210 days, strategy Weinstein)
+Panel_runner: snapshot cache cap = 4096 MB (env SNAPSHOT_CACHE_MB)
+Panel_runner: snapshot bar reader wired (calendar 672 days) for strategy
+Panel_runner: snapshot cache hits=419022 misses=1086755 evictions=562291 n_symbols=1015 misses_per_symbol=1070.69
+WARN: portfolio rejected fill for RDN (side=Types.Buy qty=5577.0000 price=23.5000): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 131115.27, Available: 125887.62400000033, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for NKTR (side=Types.Buy qty=89490.0000 price=0.9453): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 85489.796999999991, Available: 84851.354299999832, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+WARN: portfolio rejected fill for VFC (side=Types.Buy qty=6756.0000 price=15.1300): { Status.code = Status.Invalid_argument;
+  message =
+  "Insufficient cash for trade. Required: 102285.84, Available: 100721.14739999973, Unrealized loss drag: 0."
+  }. Stranded position will be reverted for retry (see Cancel_handler).
+Panel_runner: snapshot cache hits=389689 misses=1085834 evictions=561859 n_symbols=1015 misses_per_symbol=1069.79
+Panel_runner: snapshot cache hits=396599 misses=1086440 evictions=562465 n_symbols=1015 misses_per_symbol=1070.38
+[walk_forward] wrote /workspaces/trading-1/dev/experiments/tiebreak-noise-floor-2026-06-30/out_top1000_hashfix/fold_actuals.sexp
+[walk_forward] wrote /workspaces/trading-1/dev/experiments/tiebreak-noise-floor-2026-06-30/out_top1000_hashfix/walk_forward_report.md
+[walk_forward] wrote /workspaces/trading-1/dev/experiments/tiebreak-noise-floor-2026-06-30/out_top1000_hashfix/aggregate.sexp
+[walk_forward] done
+=== [15:40:50] top1000 DONE exit=0 ===
+=== HASHFIX COMPLETE [15:40:50] ===
