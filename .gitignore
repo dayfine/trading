@@ -136,3 +136,6 @@ dev/experiments/bayesian-production-sweep-*/output-11knob*-parallel*/
 # Docker.raw. Created by .devcontainer/setup.sh's do_start. See
 # dev/plans/safe-sweep-infrastructure-2026-05-24.md.
 .sweep-output/
+
+# Live-generator prior-stage bug investigation scratch (2026-07-01) — regenerable
+trading/dev/experiments/weekly-cf/

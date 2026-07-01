@@ -1,0 +1,13 @@
+(executable
+ (name stage_dump)
+ (libraries
+  core
+  types
+  csv
+  indicators.time_period
+  weinstein.stage
+  fpath
+  weinstein.types
+  status)
+ (preprocess
+  (pps ppx_jane)))
