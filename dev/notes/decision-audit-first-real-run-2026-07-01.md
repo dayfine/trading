@@ -73,4 +73,46 @@ names — not yet run.
    (reuse `decision_grading/post_exit`) to test whether the cash-skipped names
    systematically out/under-perform the funded on any captured axis. Null →
    selection faithful, only lever is explicit capacity; non-null on some axis → a
-   real lever. This is the one place outcome legitimately enters.
+   real lever. This is the one place outcome legitimately enters. **← DONE, see below.**
+
+## Phase-2 forward-return counterfactual — RESULT (2026-07-01, #1806)
+
+Built the counterfactual (`decision_audit --snapshot-dir <warehouse> --horizon-weeks 12`)
+and ran it on the same 3 windows, reading 12-week forward bars from the
+`wfcv-top500-1998` warehouse. 12-week signed forward return from the screen date,
+funded vs cash-rejected near-miss:
+
+| window | funded mean/median (n) | near-miss all mean/median (n) | read |
+|---|---|---|---|
+| **bull** (2019 H2) | +0.02 / +0.04 (7) | +0.03 / +0.03 (50) | flat — tie, faithful |
+| **crash** (2020 H1) | −0.02 / −0.00 (10) | **−0.12 / −0.08 (55)** | funded **beat** near-miss by ~10pp — selection was *protective*, not just faithful (worst: `Short_notional_cap` near-miss −0.27) |
+| **recovery** (2023) | +0.02 / +0.02 (15) | **+0.05 / +0.04 (117)** | near-miss ~+3pp higher — but driven by `Insufficient_cash` (the cash line) |
+
+**Verdict: the outcome test confirms selection is faithful — and in the crash,
+actively good.** No window shows funded systematically *under*-returning the
+near-misses in a way a better *sort* would fix:
+- **crash:** funded decisively out-returned the skipped names (−2% vs −12%). We
+  funded the better forward-movers and avoided the worse ones — the opposite of
+  "signal left on the table."
+- **bull:** flat tie.
+- **recovery:** the near-misses *did* forward-return ~3pp higher, but this is the
+  **`Insufficient_cash` line**, i.e. names ranked *below the cash boundary*, not
+  mis-sorted. Funding walks score-desc; these lost to the cash constraint, not to a
+  bad tiebreak. So the recovery gap is the **explicit-capacity** signal (fund more
+  names at smaller size → capture more of these), **not** a faithfulness gap in the
+  sort — exactly the lever `project_capacity_concentration_surface` already names,
+  and exactly what the noise-floor grid predicted. The `Stop_too_wide` near-misses
+  also out-returned in the recovery (+0.12): the >15%-risk stop gate costs upside in
+  a rip-recovery but is protective in the crash (its near-misses were the worst
+  cohort) — a sanctioned risk/return tradeoff, not a bug.
+
+**Calibration (`.claude/rules/mechanism-validation-rigor.md`):** proxy screen, not a
+rejection. Short windows; small funded n (7/10/15); 12-week horizon is one choice;
+and **warehouse coverage drops ~half** the sp500-smoke symbols (funded n 7/10/15 of
+15/27/38; near-miss n 50/55/117 of 115/147/361 — the `wfcv-top500-1998` PIT
+membership ≠ the sp500.sexp smoke universe), so the counterfactual is on the covered
+subset and could carry mild survivorship. Directionally, though, all three windows
+agree with the Phase-1 read: **selection is faithful; the only entry-side lever the
+data points to is explicit capacity, not a better sort.** A cleaner rerun would use a
+warehouse whose membership matches the audit universe (or add CSV-bar support to the
+counterfactual) to lift coverage.
