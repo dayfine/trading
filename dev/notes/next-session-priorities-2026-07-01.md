@@ -4,7 +4,34 @@
 (tip `a8aabb038` #1797). This session closed the candidate-ranking / tiebreak
 thread definitively and re-framed the next lever.
 
-## What this session delivered (all merged)
+## 2026-07-01 session update — P0 (#8) BUILT + MERGED
+
+The faithfulness decision-audit (P0 below) is **done**: **PR #1799** (merged, main
+`c8e4d7333`) + index reconcile **#1800** (`a4393702c`). New `decision-audit` track.
+- **Phase 0** — enriched `Trade_audit.alternative_candidate` with decision-time
+  features (`stage`, `weeks_advancing`, `rs_value`, `volume_ratio`, `sector_name`,
+  `score_components`), sourced in `trade_audit_recorder._alternative_of_event` from
+  each near-miss's own `Screener.scored_candidate` (same reads as the funded path).
+- **Phase 1** — `trading/trading/backtest/decision_audit/{lib,bin,test}/`:
+  `Screen_record.of_audit_records` (group-by-screen, near-miss union/dedup/score-desc,
+  inversion flag) + `Report` (funded-vs-near-miss feature roll-up + per-screen md) +
+  `decision_audit_bin --audit <sexp> [--out <md>]`. 10 tests. Additive, default-off.
+- Gates: qc-structural APPROVED, qc-behavioral APPROVED (5/5), CI green. Fixed a
+  status-file-integrity lint miss (`## Interface stable`) before merge. Closed stale
+  ci-red #1772.
+
+**The report is BUILT but NOT YET RUN on real data — that is now the top pickup.**
+The new `alternative_candidate` fields are *required* (no `[@sexp.default]`), so the
+pre-enrichment `trade_audit.sexp` files on disk (`trading/dev/backtest/scenarios-*`)
+will NOT parse. A real run needs a **fresh CSV-mode audit run built from
+`c8e4d7333`+** (snapshot-mode emits no `trade_audit.sexp`). Cheapest path: a small
+CSV-mode scenario (short window / narrow universe), then
+`decision_audit_bin --audit <fresh sexp> --out report.md`. The payoff question:
+*does any captured feature separate funded from cash-rejected near-misses?* Null →
+selection is faithful, only lever left is explicit capacity (`project_capacity_
+concentration_surface`). Non-null on some axis → a real lever.
+
+## What the PRIOR session delivered (all merged)
 
 - **#1793** — `candidate_ranking = Quality_earliness` (default-off), the 06-29
   forward directive. WF-CV breadth grid (top-500/1000/3000, 2000-2026, 13 folds):
@@ -49,7 +76,8 @@ a measured tradeoff — not a random tiebreak.
 
 ## Open / pick up here
 
-1. **P0 — the faithfulness decision-audit report (#8).** Spec is on main:
+1. **[DONE 2026-07-01 — see session update above; report awaits a fresh CSV-mode
+   audit run] P0 — the faithfulness decision-audit report (#8).** Spec is on main:
    `dev/plans/per-screen-decision-audit-2026-06-30.md`. Recast per user feedback as
    a **faithfulness audit** (are we capturing + *using* the screener signals soundly)
    — NOT an outcome grader (grading picks by return is WAI-poor; we can't predict the
