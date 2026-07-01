@@ -1,9 +1,9 @@
 # Status: data-foundations
 
-## Last updated: 2026-06-29
+## Last updated: 2026-07-01
 
 ## Status
-READY_FOR_REVIEW
+IN_PROGRESS
 
 ## Completed
 - [x] **2026-06-29 — eligible-universe staleness guard (issue #1783).**

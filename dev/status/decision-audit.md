@@ -3,7 +3,7 @@
 ## Last updated: 2026-07-01
 
 ## Status
-READY_FOR_REVIEW
+MERGED
 
 ## Interface stable
 YES
