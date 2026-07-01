@@ -19,17 +19,32 @@
     funded names? Absent [--snapshot-dir], only the Phase-1 faithfulness report
     is emitted (no bar reads needed).
 
+    The lens has two input modes, exactly one of which must be selected:
+
+    - [--audit <trade_audit.sexp>] — the backtest path (above).
+    - [--weekly-picks-dir <dir>] — the {b live} path: every [*.sexp] in [dir] is
+      a {!Weekly_snapshot.t} (a per-Friday live screen), adapted into the same
+      {!Screen_record.t} shape via {!Decision_audit.Weekly_adapter}. The top
+      [--displayed-k] (default 3) long candidates stand in for the "funded"
+      entries; everything below the displayed cut (remaining longs + all shorts)
+      becomes the near-misses. This runs the identical Phase-1 report (and
+      Phase-2 counterfactual, if [--snapshot-dir] is also given) on live picks.
+
     Usage:
     {[
       decision_audit --audit <trade_audit.sexp> [--out report.md]
         [--snapshot-dir <warehouse>] [--horizon-weeks 12]
+      decision_audit --weekly-picks-dir <dir> [--displayed-k 3] [--out report.md]
+        [--snapshot-dir <warehouse>] [--horizon-weeks 12]
     ]}
 
-    [--audit] is required. [--out], when given, writes the markdown there;
+    Exactly one of [--audit] / [--weekly-picks-dir] is required (supplying both
+    or neither is an error). [--out], when given, writes the markdown there;
     otherwise it goes to stdout. [--snapshot-dir] points at the snapshot
     warehouse the run was produced against; when given, the counterfactual
     section is computed and appended. [--horizon-weeks] (default 12) is the
-    forward horizon the counterfactual measures returns over. *)
+    forward horizon the counterfactual measures returns over. [--displayed-k]
+    (default 3) is the displayed-cut for the weekly-picks adapter. *)
 
 open Core
 module TA = Backtest.Trade_audit
@@ -38,10 +53,15 @@ module Bar_reader = Weinstein_strategy.Bar_reader
 module Daily_panels = Snapshot_runtime.Daily_panels
 module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
 module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
+module Snapshot_reader = Weinstein_snapshot.Snapshot_reader
 
 (* Default forward horizon (weeks) for the Phase-2 counterfactual — one quarter,
    matching the [decision_grading] grade horizon. *)
 let _default_horizon_weeks = 12
+
+(* Default displayed-cut for the weekly-picks adapter: the top-N long candidates
+   a human would act on each week stand in for the "funded" entries. *)
+let _default_displayed_k = 3
 
 (* Daily_panels LRU cache budget for the forward-bar reads. Each candidate reads
    a handful of weeks, so a modest cap suffices — same value the
@@ -50,28 +70,36 @@ let _cache_mb = 512
 
 let _usage () =
   eprintf
-    "Usage: decision_audit --audit <trade_audit.sexp> [--out report.md] \
-     [--snapshot-dir <warehouse>] [--horizon-weeks 12]\n";
+    "Usage: decision_audit (--audit <trade_audit.sexp> | --weekly-picks-dir \
+     <dir> [--displayed-k 3]) [--out report.md] [--snapshot-dir <warehouse>] \
+     [--horizon-weeks 12]\n";
   Stdlib.exit 1
 
 type _parse_acc = {
   mutable audit_path : string option;
+  mutable weekly_picks_dir : string option;
+  mutable displayed_k : int option;
   mutable out_path : string option;
   mutable snapshot_dir : string option;
   mutable horizon_weeks : int option;
 }
 
-let _parse_horizon s =
+(** Parse a required-positive int flag, exiting with a clear message otherwise.
+    Shared by [--horizon-weeks] (strictly positive) and [--displayed-k] (which
+    additionally admits 0 — funds no longs — via [~min]). *)
+let _parse_pos_int ~flag ~min s =
   match Or_error.try_with (fun () -> Int.of_string (String.strip s)) with
-  | Ok n when n > 0 -> n
+  | Ok n when n >= min -> n
   | _ ->
-      eprintf "--horizon-weeks requires a positive int, got %S\n" s;
+      eprintf "%s requires an int >= %d, got %S\n" flag min s;
       Stdlib.exit 1
 
 let _parse_flag args =
   let acc =
     {
       audit_path = None;
+      weekly_picks_dir = None;
+      displayed_k = None;
       out_path = None;
       snapshot_dir = None;
       horizon_weeks = None;
@@ -82,6 +110,12 @@ let _parse_flag args =
     | "--audit" :: p :: rest ->
         acc.audit_path <- Some p;
         loop rest
+    | "--weekly-picks-dir" :: p :: rest ->
+        acc.weekly_picks_dir <- Some p;
+        loop rest
+    | "--displayed-k" :: s :: rest ->
+        acc.displayed_k <- Some (_parse_pos_int ~flag:"--displayed-k" ~min:0 s);
+        loop rest
     | "--out" :: p :: rest ->
         acc.out_path <- Some p;
         loop rest
@@ -89,7 +123,8 @@ let _parse_flag args =
         acc.snapshot_dir <- Some p;
         loop rest
     | "--horizon-weeks" :: s :: rest ->
-        acc.horizon_weeks <- Some (_parse_horizon s);
+        acc.horizon_weeks <-
+          Some (_parse_pos_int ~flag:"--horizon-weeks" ~min:1 s);
         loop rest
     | _ -> _usage ()
   in
@@ -102,6 +137,61 @@ let _load_audit_records ~path : TA.audit_record list =
   let sexp = Sexp.load_sexp path in
   try (TA.audit_blob_of_sexp sexp).audit_records
   with _ -> TA.audit_records_of_sexp sexp
+
+(** Read one weekly snapshot from [file], exiting on a parse / schema error so a
+    bad file surfaces immediately rather than being silently dropped. *)
+let _load_snapshot ~file : Weinstein_snapshot.Weekly_snapshot.t =
+  match Snapshot_reader.read_from_file file with
+  | Ok snap -> snap
+  | Error err ->
+      eprintf "decision_audit: cannot read %s: %s\n" file (Status.show err);
+      Stdlib.exit 1
+
+(** Load every [*.sexp] under [dir] as a {!Weekly_snapshot.t}. Exits when [dir]
+    contains no snapshot files (an empty run is almost always a wrong path). *)
+let _load_weekly_snapshots ~dir : Weinstein_snapshot.Weekly_snapshot.t list =
+  let files =
+    Sys_unix.readdir dir |> Array.to_list
+    |> List.filter ~f:(fun f -> String.is_suffix f ~suffix:".sexp")
+    |> List.sort ~compare:String.compare
+    |> List.map ~f:(Filename.concat dir)
+  in
+  (match files with
+  | [] ->
+      eprintf "decision_audit: no *.sexp weekly-picks files under %s\n" dir;
+      Stdlib.exit 1
+  | _ -> ());
+  List.map files ~f:(fun file -> _load_snapshot ~file)
+
+(** Build the {!DA.Screen_record.t} list for whichever input mode was selected.
+    Exits with a usage error unless exactly one of [--audit] /
+    [--weekly-picks-dir] is supplied. *)
+let _screens_of_mode acc : DA.Screen_record.t list =
+  match (acc.audit_path, acc.weekly_picks_dir) with
+  | Some _, Some _ ->
+      eprintf "--audit and --weekly-picks-dir are mutually exclusive\n";
+      _usage ()
+  | None, None ->
+      eprintf "one of --audit / --weekly-picks-dir is required\n";
+      _usage ()
+  | Some audit_path, None ->
+      let records = _load_audit_records ~path:audit_path in
+      let screens = DA.Screen_record.of_audit_records records in
+      eprintf "decision_audit: %d entries across %d screens from %s\n%!"
+        (List.length records) (List.length screens) audit_path;
+      screens
+  | None, Some dir ->
+      let snaps = _load_weekly_snapshots ~dir in
+      let displayed_k =
+        Option.value acc.displayed_k ~default:_default_displayed_k
+      in
+      let screens = DA.Weekly_adapter.of_weekly_snapshots snaps ~displayed_k in
+      eprintf
+        "decision_audit: %d weekly snapshots -> %d screens (displayed_k=%d) \
+         from %s\n\
+         %!"
+        (List.length snaps) (List.length screens) displayed_k dir;
+      screens
 
 (** Build a snapshot-backed {!Bar_reader.t} over [snapshot_dir]. Exits the
     process on a missing/corrupt manifest or panel-open failure (the "warehouse
@@ -148,18 +238,10 @@ let _counterfactual_section ~snapshot_dir ~horizon_weeks screens : string =
 
 let () =
   let acc = _parse_flag (List.tl_exn (Array.to_list (Sys.get_argv ()))) in
-  let audit_path =
-    Option.value_or_thunk acc.audit_path ~default:(fun () ->
-        eprintf "--audit is required\n";
-        _usage ())
-  in
   let horizon_weeks =
     Option.value acc.horizon_weeks ~default:_default_horizon_weeks
   in
-  let records = _load_audit_records ~path:audit_path in
-  let screens = DA.Screen_record.of_audit_records records in
-  eprintf "decision_audit: %d entries across %d screens from %s\n%!"
-    (List.length records) (List.length screens) audit_path;
+  let screens = _screens_of_mode acc in
   let markdown =
     DA.Report.to_markdown screens
     ^ _counterfactual_section ~snapshot_dir:acc.snapshot_dir ~horizon_weeks

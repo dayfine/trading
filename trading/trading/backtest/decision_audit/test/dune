@@ -1,5 +1,9 @@
 (tests
- (names test_screen_record test_report test_counterfactual)
+ (names
+  test_screen_record
+  test_report
+  test_counterfactual
+  test_weekly_adapter)
  (libraries
   ounit2
   core
@@ -8,6 +12,7 @@
   backtest
   types
   trading.base
-  weinstein_trading.strategy)
+  weinstein_trading.strategy
+  weinstein_trading.snapshot)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))
