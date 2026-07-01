@@ -50,7 +50,25 @@ better SORT fixes. Entry-selection is now dead-confirmed on outcomes too; only l
 ~half warehouse coverage (top-500-PIT ≠ sp500-smoke universe drops ~50% of symbols).
 Writeup: `dev/notes/decision-audit-first-real-run-2026-07-01.md` §Phase-2.
 
+**Weekly-picks adapter — BUILT (#1811, 2026-07-01).** `Weekly_adapter.of_weekly_snapshots
+: Weekly_snapshot.t list -> displayed_k:int -> Screen_record.t list` runs the SAME
+Phase-1 + Phase-2 lens on LIVE weekly picks (`dev/weekly-picks/<ver>/*.sexp`), not just
+backtest audit. funded = displayed top-`displayed_k` (default 3); near-miss = rest of
+ranked cohort (`Top_n_cutoff`). Bin flags `--weekly-picks-dir` + `--displayed-k`. Live
+picks lack stage/volume/weeks in the snapshot → stage defaults Stage2(long)/Stage4(short),
+volume/weeks None (documented ceiling); score/grade/rs_vs_spy/sector mapped.
+Applied to the 2026 series `89c2ee2a8` (5 wks, 20 grade-A/score-70 picks, alphabetical):
+funded RS 1.46 vs near-miss 1.50 (display mildly RS-anti-selective — the #1782 gap).
+Phase-2 needs fresh bars: fetched 50 pick small-caps + built a 50-sym warehouse via
+`build_snapshots.exe` (see `dev/notes/decision-audit-weekly-picks-2026-07-01.md` for the
+reproduce cmd). First counterfactual = NOISE (window not elapsed: picks 05-29..06-26,
+only ~1-5wk vs horizon) — pipeline-validation only; matures over time. RS is a DISPLAY/UX
+lever (#1782), NOT a return lever (RS-funding WF-CV-rejected #1788).
+⚠ `dev/experiments/` + `dev/weekly-picks/` NOT gitignored → `jj new`/switch WIPES the
+uncommitted warehouse; regenerate from the fetch cmd (fetch ~1min, warehouse 0.4s).
+
 **Open follow-ups:** (1) RS-coverage harness gap: ~77% of sp500 candidates carry
-`rs_value=None`; investigate before trusting RS-based faithfulness reads. (2) Cleaner
-counterfactual rerun with a warehouse whose membership matches the audit universe (or
-add CSV-bar support to the counterfactual) to lift the ~50% coverage.
+`rs_value=None`; investigate before trusting RS-based faithfulness reads. (2) As 2026
+elapses, re-run the weekly-picks counterfactual (matured window) = the real "did the
+alphabetical display leave return on the table" test. (3) Cleaner backtest-counterfactual
+rerun with a warehouse whose membership matches the audit universe (~50% coverage today).
