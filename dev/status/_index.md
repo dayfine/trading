@@ -24,7 +24,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [data-panels](data-panels.md) | MERGED | — | — | — |
 | [hybrid-tier](hybrid-tier.md) | MERGED | — | — | — |
 | [trade-audit](trade-audit.md) | MERGED | — | — | — |
-| [decision-audit](decision-audit.md) | MERGED | feat-backtest | — | #1799 report + #1806 counterfactual + #1811 weekly-picks adapter MERGED; selection FAITHFUL on outcomes; live 2026 picks pipeline ready (#1812); next: matured weekly counterfactual + RS-coverage gap |
+| [decision-audit](decision-audit.md) | MERGED | feat-backtest | — | #1799/#1806/#1811 MERGED (report+counterfactual+weekly-picks adapter); selection FAITHFUL; live-picks pipeline ready (#1812); next: matured weekly counterfactual |
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — |
