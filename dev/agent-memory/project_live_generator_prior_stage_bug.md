@@ -1,6 +1,6 @@
 ---
 name: project_live_generator_prior_stage_bug
-description: "Live weekly-snapshot generator passes prior_stage:None → resets weeks_advancing to ~1 for every Stage-2 stock → live picks are ~55% extended advancers the ≤4-week gate should reject. Fix validated, awaiting decision."
+description: "Live weekly-snapshot generator passed prior_stage:None → reset weeks_advancing to ~1 for every Stage-2 stock → live picks were ~55% extended advancers the ≤4-week gate should reject. FIXED + MERGED #1818."
 metadata: 
   node_type: memory
   type: project
@@ -21,17 +21,19 @@ should reject.
 **Backtests are UNAFFECTED** — they chain prior_stage via
 `weinstein_trading_state.prior_stages`. This is a **live-generator-only fidelity bug.**
 
-**Fix (validated, NOT yet landed — surfaced as a decision):** chain the stage
+**FIX MERGED (#1818, 2026-07-01, main `4662e768b`):** chain the stage
 classifier in the generator (roll `Stage.classify` over the weekly prefix threading
 prior, feed the chained prior into `analyze`). Re-ran on the 50 pick symbols at
 as-of 2026-05-29: candidates **22 → 10**, dropping exactly the w5–w45 extended names;
 survivors are the genuinely-early breakouts; corrected `weeks_advancing` matches the
-`stage_dump` reference exactly. Held back because it changes live admission ~55%,
-needs 2 generator tests updated (they encode the buggy prior=None behavior — their
-synthetic breakout is 5–8wk stale so the corrected ≤4 gate rejects it), and exposes a
-tuning question: the breakout-*event* window is 8wk but the *admission* gate is ≤4 —
-is ≤4 right now that it actually bites? Decision options: (1) land as correctness fix,
-(2) fix + retune ≤4, (3) validate the corrected set forward-returns better first.
+`stage_dump` reference exactly. Landed via option-1 (correctness fix): the 2 tests
+that encoded the buggy prior=None behavior were re-anchored (as_of 2022-10-07→09-16, a
+w6 stale breakout is now rightly rejected) + a `test_stale_breakout_not_admitted`
+regression pins it. qc-structural + qc-behavioral APPROVED (5/5; faithfulness
+IMPROVEMENT, backtest parity confirmed — backtest chains via trading_state, never calls
+this generator, so no golden re-pin). **OPEN follow-up (deferred):** now that the ≤4
+admission gate actually bites, is ≤4 the right threshold vs the 8wk breakout-event
+window? Separate tuning decision, not yet done.
 
 **Tooling:** `analysis/scripts/stage_dump/` (MERGED #1816) — a prior-chained
 stage-timeline inspector: `stage_dump <data_dir> <sym> <end_date> <from_date>`.
