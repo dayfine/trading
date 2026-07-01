@@ -5,6 +5,33 @@
 but also some of the high-ranking screened-out / missed candidates"* — to reason
 about selection soundness and find better levers.
 
+## Purpose — a FAITHFULNESS audit, not an outcome grader (2026-06-30 refinement)
+
+Per 2026-06-30 user feedback: selection quality *by realized outcome* is expected
+to look "poor" and that is **working as intended** — we cannot predict the future
+and do not want to overfit. Grading picks by their returns is therefore the wrong
+lens; it will always score poorly, correctly.
+
+The useful question this report answers is **faithfulness: are we capturing and
+*using* the screener's relevant signals soundly?** Concretely, per screen it
+compares the **funded** set against the **cash-rejected near-misses** on the
+**captured features** — score components, `rs_value`, `volume_ratio`,
+`weeks_advancing`, `stage`, `sector` — *not* on returns:
+
+- **If funded ≈ near-miss on every captured feature** → the tie is genuinely
+  uninformative; we are faithful (not discarding usable signal). This is the
+  expected/WAI case and the noise-floor grid predicts it.
+- **If a captured feature *does* separate funded from near-miss but we do not fund
+  on it** → a real **faithfulness gap**: a signal we record but ignore. That is the
+  constructive payoff — a candidate lever, tested the usual default-off → WF-CV way.
+- **Counterfactual (the honest "usable signal left on the table" test):** do the
+  cash-skipped names' forward returns differ systematically from the funded? If not,
+  there is no faithful lever being missed; if yes on some captured axis, dig.
+
+So the report is a **capture-completeness + use-completeness audit**. The output
+format below serves *that* question (feature comparison funded-vs-near-miss),
+not per-trade outcome grading.
+
 ## The gap (confirmed by code audit)
 
 The data is **already captured**, but **nothing renders it**:
@@ -59,23 +86,43 @@ near-miss:   ADBE s75 gA  [Insufficient_cash]
 inversion:   none
 ```
 
-Plus a roll-up header: total screens, mean funded/near-miss counts, # screens with
-an inversion, and the **score distribution of funded vs cash-rejected** (the core
-soundness question: are the funded names actually higher-scored than the rejected
-ones, or is it mostly same-score tiebreak churn? — we already know from the grid
-it's the latter, but this makes it auditable per screen).
+Plus a roll-up header (the **faithfulness** summary): total screens, mean
+funded/near-miss counts, # screens with an inversion, and — the core output — the
+**funded-vs-cash-rejected distribution on each captured feature**: score, and
+(after the enrichment below) `rs_value`, `volume_ratio`, `weeks_advancing`,
+`stage`, `sector`. The question each distribution answers: *does this captured
+signal separate the funded from the near-misses?* If no signal separates them, the
+tie is genuinely uninformative and we are faithful; if one does and we are not
+funding on it, that is the lever.
+
+### Data limitation → a Phase-0 audit enrichment
+
+`alternative_candidate` (`trade_audit.mli:75`) currently stores only
+`{symbol; side; score; grade; reason_skipped}` — the near-misses do **not** carry
+`rs_value` / `volume_ratio` / `weeks_advancing`, so out of the box the
+funded-vs-near-miss comparison is limited to **score + grade** (which the
+noise-floor grid already implies is uninformative among ties). To run the *full*
+faithfulness comparison, **Phase 0** enriches `alternative_candidate` with the same
+decision-time features the funded `entry_decision` carries (rs_value, volume_ratio,
+weeks_advancing, stage, sector, score_components). Small, additive, default-on
+capture change (the recorder already has the `scored_candidate` in hand at skip
+time). Without it, ship the score+grade comparison and note the ceiling.
 
 ## Why this is the right lever to expose
 
-It directly tests selection soundness: at each screen, *were the funded ~5 the
-best available, and what did we leave on the table?* It is the entry-side complement
-to the exit-side `decision_grading` lens, and it operationalizes
+It directly tests **faithfulness**: at each screen, do the funded ~5 differ from the
+cash-rejected near-misses on any signal we *capture*? It is the entry-side
+complement to the exit-side `decision_grading` lens, and it operationalizes
 `project_screener_alphabetical_tiebreak` + `project_cascade_selection_inversion`
-(the funded-vs-near-miss score comparison is exactly the cascade-inversion question,
-made per-screen and auditable). Stretch: join each near-miss symbol's forward return
-(reuse `decision_grading/post_exit`) to grade the *counterfactual* — did the names
-we cash-skipped actually outperform the ones we funded? That closes the loop from
-"auditable" to "was the decision good."
+per-screen. **It does not grade picks by outcome** (WAI-poor, see Purpose). The
+counterfactual (stretch) — join each near-miss symbol's forward return (reuse
+`decision_grading/post_exit`) — is the one place outcome enters, and only to test
+"is there *usable captured signal* we are leaving on the table," not to score the
+selection. If that comes back null (expected, per `project_edge_is_the_fat_tail` /
+`accuracy_is_unreachable`), the honest conclusion is: selection is faithful, and the
+only remaining lever is *explicit* diversification/capacity (fund more names/smaller
+= the concentration axis `project_capacity_concentration_surface`), **not** a better
+sort.
 
 ## Scope / sizing
 - Pure lib + CLI + OUnit tests on synthetic `audit_record` lists (~250-350 lines).
