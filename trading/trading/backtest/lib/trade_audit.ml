@@ -24,6 +24,12 @@ type alternative_candidate = {
   score : int;
   grade : Weinstein_types.grade;
   reason_skipped : skip_reason;
+  stage : Weinstein_types.stage;
+  weeks_advancing : int option;
+  rs_value : float option;
+  volume_ratio : float option;
+  sector_name : string;
+  score_components : (string * int) list;
 }
 [@@deriving sexp]
 

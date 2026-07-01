@@ -78,9 +78,41 @@ type alternative_candidate = {
   score : int;
   grade : Weinstein_types.grade;
   reason_skipped : skip_reason;
+  (* Decision-time features, mirroring the funded {!entry_decision} so the
+     per-screen faithfulness audit can compare funded vs cash-rejected
+     near-misses on the same signals — not just [score]/[grade]. Sourced from
+     the near-miss's own [Screener.scored_candidate] at projection time (the
+     same values the funded path reads). See [decision_audit]. *)
+  stage : Weinstein_types.stage;
+      (** Weinstein stage at decision time (from the candidate's
+          [analysis.stage.stage]). *)
+  weeks_advancing : int option;
+      (** [weeks_advancing] when [stage] is [Stage2], else [None]. Redundant
+          with [stage] but surfaced so the report need not re-derive it. *)
+  rs_value : float option;
+      (** Normalized relative-strength value at decision time, or [None] when
+          the candidate carried no RS analysis. Same source as
+          [entry_decision.rs_value]. *)
+  volume_ratio : float option;
+      (** Breakout-bar volume / 4-week average at decision time, or [None] when
+          no breakout volume event was classified. Same source as
+          [entry_decision.volume_ratio]. *)
+  sector_name : string;
+      (** Sector the candidate sat in ([candidate.sector.sector_name]); empty
+          string when unknown. *)
+  score_components : (string * int) list;
+      (** Itemised score breakdown, mirroring
+          [entry_decision.cascade_score_components]. Empty until the screener
+          exposes per-component contributions (same ceiling the funded path has
+          today). *)
 }
 [@@deriving sexp]
-(** A screener candidate that was scored at decision time but not entered. *)
+(** A screener candidate that was scored at decision time but not entered.
+
+    Carries the same decision-time features as the funded {!entry_decision}
+    ([stage], [rs_value], [volume_ratio], [sector_name], ...) so the per-screen
+    faithfulness audit can ask whether any captured signal separates the funded
+    set from the cash-rejected near-misses. *)
 
 (** Whether the installed initial stop sat on a support floor or fell back to a
     fixed-buffer stop below the screener's suggested level. Routed from

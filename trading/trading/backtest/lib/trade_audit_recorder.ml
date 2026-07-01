@@ -16,14 +16,35 @@ let _skip_reason_of_event = function
   | AR.Stop_too_wide -> Trade_audit.Stop_too_wide
   | AR.Sector_exposure_cap -> Trade_audit.Sector_exposure_cap
 
+(** [weeks_advancing] for a [Stage2] classification, [None] otherwise. Surfaced
+    on the near-miss so the audit need not re-derive it from [stage]. *)
+let _weeks_advancing_of_stage : Weinstein_types.stage -> int option = function
+  | Stage2 { weeks_advancing; _ } -> Some weeks_advancing
+  | Stage1 _ | Stage3 _ | Stage4 _ -> None
+
+(** Project a near-miss into a {!Trade_audit.alternative_candidate}, sourcing
+    the same decision-time features the funded {!_entry_decision_of_event} reads
+    from the candidate's [Screener.scored_candidate]. [score_components] mirrors
+    the funded path's [cascade_score_components] ceiling (empty until the
+    screener exposes per-component contributions). *)
 let _alternative_of_event (alt : AR.alternative_input) :
     Trade_audit.alternative_candidate =
+  let cand = alt.candidate in
+  let analysis = cand.analysis in
   {
-    symbol = alt.candidate.ticker;
-    side = alt.candidate.side;
-    score = alt.candidate.score;
-    grade = alt.candidate.grade;
+    symbol = cand.ticker;
+    side = cand.side;
+    score = cand.score;
+    grade = cand.grade;
     reason_skipped = _skip_reason_of_event alt.reason;
+    stage = analysis.stage.stage;
+    weeks_advancing = _weeks_advancing_of_stage analysis.stage.stage;
+    rs_value =
+      Option.map analysis.rs ~f:(fun (r : Rs.result) -> r.current_normalized);
+    volume_ratio =
+      Option.map analysis.volume ~f:(fun (v : Volume.result) -> v.volume_ratio);
+    sector_name = cand.sector.sector_name;
+    score_components = [];
   }
 
 (** Translate one {!AR.entry_event} into a {!Trade_audit.entry_decision}. Pure
