@@ -20,13 +20,28 @@ The faithfulness decision-audit (P0 below) is **done**: **PR #1799** (merged, ma
   status-file-integrity lint miss (`## Interface stable`) before merge. Closed stale
   ci-red #1772.
 
-**The report is BUILT but NOT YET RUN on real data — that is now the top pickup.**
-The new `alternative_candidate` fields are *required* (no `[@sexp.default]`), so the
-pre-enrichment `trade_audit.sexp` files on disk (`trading/dev/backtest/scenarios-*`)
-will NOT parse. A real run needs a **fresh CSV-mode audit run built from
-`c8e4d7333`+** (snapshot-mode emits no `trade_audit.sexp`). Cheapest path: a small
-CSV-mode scenario (short window / narrow universe), then
-`decision_audit_bin --audit <fresh sexp> --out report.md`. The payoff question:
+**RUN ON REAL DATA — DONE (#1803):** `dev/notes/decision-audit-first-real-run-2026-07-01.md`.
+Ran the report on fresh enriched data from 3 sp500 smoke windows (bull/crash/recovery,
+default config). **Finding: selection is FAITHFUL** — no captured feature separates
+funded from cash-rejected near-misses in an exploitable direction (score/volume are
+what we already fund on; earliness separates but was already rejected #1793; rs_value
+underpowered — ~77% `None`). Confirms the noise-floor grid → the only remaining
+entry-side lever is **explicit capacity**, not a better sort. Calibrated as a proxy
+screen, not a rejection.
+
+**Invocation (for reruns):** built runner + report exe, then
+`TRADING_DATA_DIR=…/trading/test_data ./_build/…/backtest_runner.exe --smoke --csv-mode
+--experiment-name <n>` (via `docker exec -d -e TRADING_DATA_DIR=…`; note: env must be
+passed with `-e`/inline — `dune exec` and `nohup … &` drop it), then
+`decision_audit_bin --audit <window>/trade_audit.sexp --out report.md`.
+
+**Next pickups from the run:** (a) **Phase-2 forward-return counterfactual** — the one
+real "usable signal left on the table" test (join near-miss forward returns via
+`decision_grading/post_exit`); (b) **RS-coverage harness gap** — ~77% of candidates
+carry `rs_value=None` in sp500 windows; investigate before trusting any RS-based read.
+
+--- (original P0 framing follows) ---
+The report is BUILT but NOT YET RUN on real data. The payoff question:
 *does any captured feature separate funded from cash-rejected near-misses?* Null →
 selection is faithful, only lever left is explicit capacity (`project_capacity_
 concentration_surface`). Non-null on some axis → a real lever.
