@@ -222,6 +222,19 @@ let test_summary_computed_and_snapshots_sorted _ =
            ];
        ])
 
+(* Grade parser fails loudly on an unknown label — the .mli's advertised guard
+   ("never silently defaults an unknown label"). A silent [| _ -> A] fallback
+   would pass every other test, so pin the raise explicitly. *)
+let test_unknown_grade_raises _ =
+  let snap =
+    _snapshot
+      ~long_candidates:[ _candidate ~symbol:"AAPL" ~score:90.0 ~grade:"Z" () ]
+      ()
+  in
+  match WA.of_weekly_snapshots [ snap ] ~displayed_k:1 with
+  | exception Invalid_argument _ -> ()
+  | _ -> assert_failure "expected Invalid_argument for unknown grade 'Z'"
+
 let suite =
   "Decision_audit.Weekly_adapter"
   >::: [
@@ -234,6 +247,7 @@ let suite =
          >:: test_short_candidate_lands_in_near_misses;
          "summary computed + snapshots sorted"
          >:: test_summary_computed_and_snapshots_sorted;
+         "unknown grade raises" >:: test_unknown_grade_raises;
        ]
 
 let () = run_test_tt_main suite
