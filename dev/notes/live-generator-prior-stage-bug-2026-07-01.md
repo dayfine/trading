@@ -104,14 +104,20 @@ a blanket over-count, it's correct.
    exposes but does not resolve. The fix makes the *configured* gate actually bite;
    the *value* of the gate is now a live question.
 
-## Status / decision
+## Status — FIXED + MERGED (#1818, main `4662e768b`)
 
-Fix is implemented + validated locally. Because it changes live candidate admission
-by ~55%, it is surfaced as a **decision item** rather than silently merged (per the
-repo's "propose strategy changes as decision items" convention). To land: update the
-2 tests to the corrected path + pin a `weeks_advancing`-chaining test, then PR through
-qc-behavioral (domain faithfulness) + CI. The `≤4`-vs-8-week tuning question is a
-follow-up, not part of the correctness fix.
+Landed via option 1 (correctness fix). `_chained_prior_stage` in
+`weekly_snapshot_generator.ml` supplies the chained prior the classifier already
+expects. The 2 tests that encoded the buggy `prior=None` behavior were re-anchored
+(`as_of` 2022-10-07 → 2022-09-16; a w6 stale breakout is now correctly rejected) and a
+`test_stale_breakout_not_admitted` regression pins the corrected behavior.
+qc-structural + qc-behavioral both APPROVED (5/5) — a **faithfulness improvement**, not
+a spine change; **backtest parity confirmed** (the backtest chains via `trading_state`
+and never calls this generator → no golden re-pin).
+
+**OPEN follow-up (deferred, separate decision):** now that the `≤4`-week admission gate
+actually bites, is `≤4` the right threshold vs the 8-week breakout-event window?
+(Item 2 above.)
 
 Diagnostic tool: `analysis/scripts/stage_dump/` (reuses `weinstein.stage` rolling
 classification; the same one the backtest drives). Committed as a reusable
