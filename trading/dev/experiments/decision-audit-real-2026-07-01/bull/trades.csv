@@ -1,0 +1,8 @@
+symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry
+IT,LONG,2019-06-08,2019-07-31,53,155.48,138.50,656,-11138.88,-10.92,,153.20,stop_loss,Stage2,2.6461,0.1134,gap_down,53,65
+DPZ,LONG,2019-06-08,2019-07-17,39,287.47,245.50,306,-12842.82,-14.60,,,stop_loss,Stage2,2.1018,0.1482,gap_down,39,65
+DLR,LONG,2019-08-17,2019-12-13,118,121.03,114.45,590,-3882.20,-5.44,,115.43,stop_loss,Stage2,1.7181,0.1543,gap_down,118,40
+CPB,LONG,2019-06-08,2019-06-11,3,43.19,41.95,6963,-8634.12,-2.87,,,stop_loss,Stage2,3.1727,0.0094,gap_down,3,65
+CIEN,LONG,2019-06-22,2019-08-16,55,44.03,40.60,3289,-11281.27,-7.79,,,stop_loss,Stage2,2.6300,0.1184,gap_down,55,65
+BF-B,LONG,2019-06-08,2019-06-18,10,56.01,55.29,5309,-3822.48,-1.29,,,stop_loss,Stage2,2.1738,0.0255,gap_down,10,65
+AES,LONG,2019-08-03,2019-08-07,4,17.22,15.65,5241,-8228.37,-9.12,,,stop_loss,Stage2,1.5005,0.2007,gap_down,4,40
