@@ -24,7 +24,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [data-panels](data-panels.md) | MERGED | — | — | — |
 | [hybrid-tier](hybrid-tier.md) | MERGED | — | — | — |
 | [trade-audit](trade-audit.md) | MERGED | — | — | — |
-| [decision-audit](decision-audit.md) | MERGED | feat-backtest | — | #1799 MERGED (enrich near-misses + faithfulness report lib/bin/tests, default-off lens); next: run on a real CSV-mode trade_audit.sexp (snapshot-mode emits none) |
+| [decision-audit](decision-audit.md) | MERGED | feat-backtest | — | #1799 report + #1806 Phase-2 counterfactual MERGED + RUN (#1807): selection FAITHFUL on outcomes (crash funded beat near-miss; recovery gap=cash line); next: RS-coverage gap |
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — |

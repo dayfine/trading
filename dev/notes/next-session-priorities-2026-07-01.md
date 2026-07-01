@@ -35,10 +35,21 @@ screen, not a rejection.
 passed with `-e`/inline — `dune exec` and `nohup … &` drop it), then
 `decision_audit_bin --audit <window>/trade_audit.sexp --out report.md`.
 
-**Next pickups from the run:** (a) **Phase-2 forward-return counterfactual** — the one
-real "usable signal left on the table" test (join near-miss forward returns via
-`decision_grading/post_exit`); (b) **RS-coverage harness gap** — ~77% of candidates
-carry `rs_value=None` in sp500 windows; investigate before trusting any RS-based read.
+**Phase-2 counterfactual — also DONE (#1806 built, #1807 run).** Forward-return
+counterfactual on the 3 windows (12w, wfcv-top500-1998): **outcome confirms selection
+is faithful** — crash funded −2% vs near-miss −12% (protective), bull flat, recovery
+near-miss +3pp but driven by `Insufficient_cash` (the cash line = explicit-capacity
+lever, not a sort gap). Entry-selection now dead-confirmed on outcomes too; the only
+entry-side lever is explicit capacity. Writeup:
+`dev/notes/decision-audit-first-real-run-2026-07-01.md` §Phase-2.
+
+**Remaining next pickups:** (a) **RS-coverage harness gap** — ~77% of candidates carry
+`rs_value=None` in sp500 windows; investigate before trusting any RS-based read.
+(b) **Cleaner counterfactual rerun** — the warehouse covered only ~half the smoke
+universe (top-500-PIT ≠ sp500.sexp); rerun with a matched-membership warehouse or add
+CSV-bar support. (c) The frontier conclusion is now firm: **explicit capacity/
+diversification** (`project_capacity_concentration_surface`) is the one live entry-side
+lever left — that's where to spend next.
 
 --- (original P0 framing follows) ---
 The report is BUILT but NOT YET RUN on real data. The payoff question:
