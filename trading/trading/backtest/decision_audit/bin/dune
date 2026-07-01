@@ -1,0 +1,6 @@
+(executable
+ (name decision_audit_bin)
+ (modules decision_audit_bin)
+ (libraries core status backtest decision_audit)
+ (preprocess
+  (pps ppx_sexp_conv)))

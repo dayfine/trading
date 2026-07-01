@@ -1,0 +1,5 @@
+(library
+ (name decision_audit)
+ (libraries core types trading.base backtest)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))

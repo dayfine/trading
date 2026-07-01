@@ -107,13 +107,23 @@ let make_exit ?(symbol = "AAPL") ?(exit_date = _date "2024-04-20")
     weeks_stage_left_2;
   }
 
-let _alt ~symbol ~score ~grade ~reason : TA.alternative_candidate =
+let _alt ~symbol ~score ~grade ~reason
+    ?(stage = Weinstein_types.Stage2 { weeks_advancing = 3; late = false })
+    ?(weeks_advancing = Some 3) ?(rs_value = Some 1.02)
+    ?(volume_ratio = Some 1.8) ?(sector_name = "Information Technology")
+    ?(score_components = []) () : TA.alternative_candidate =
   {
     symbol;
     side = Trading_base.Types.Long;
     score;
     grade;
     reason_skipped = reason;
+    stage;
+    weeks_advancing;
+    rs_value;
+    volume_ratio;
+    sector_name;
+    score_components;
   }
 
 (* Sexp round-trip ------------------------------------------------------- *)
@@ -143,9 +153,17 @@ let test_stop_floor_kind_sexp_round_trip _ =
   assert_that parsed (elements_are (List.map all ~f:equal_to))
 
 let test_alternative_candidate_sexp_round_trip _ =
+  (* Exercise the enriched decision-time fields (stage / weeks_advancing /
+     rs_value / volume_ratio / sector_name / score_components) through the
+     codec, not just the score+grade+reason base. *)
   let alt =
     _alt ~symbol:"MSFT" ~score:62 ~grade:Weinstein_types.B
       ~reason:TA.Insufficient_cash
+      ~stage:(Weinstein_types.Stage2 { weeks_advancing = 6; late = true })
+      ~weeks_advancing:(Some 6) ~rs_value:(Some 0.94) ~volume_ratio:(Some 2.1)
+      ~sector_name:"Health Care"
+      ~score_components:[ ("stage2_breakout", 30); ("strong_volume", 20) ]
+      ()
   in
   let parsed =
     TA.alternative_candidate_of_sexp (TA.sexp_of_alternative_candidate alt)
@@ -158,9 +176,9 @@ let test_entry_decision_sexp_round_trip _ =
       ~alternatives_considered:
         [
           _alt ~symbol:"MSFT" ~score:62 ~grade:Weinstein_types.B
-            ~reason:TA.Insufficient_cash;
+            ~reason:TA.Insufficient_cash ();
           _alt ~symbol:"NVDA" ~score:55 ~grade:Weinstein_types.B
-            ~reason:TA.Sized_to_zero;
+            ~reason:TA.Sized_to_zero ();
         ]
       ()
   in
@@ -278,7 +296,7 @@ let test_collector_round_trips_through_sexp _ =
        ~alternatives_considered:
          [
            _alt ~symbol:"MSFT" ~score:62 ~grade:Weinstein_types.B
-             ~reason:TA.Top_n_cutoff;
+             ~reason:TA.Top_n_cutoff ();
          ]
        ());
   TA.record_exit t (make_exit ());
