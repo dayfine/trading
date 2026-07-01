@@ -130,11 +130,13 @@ let _forward_of_candidate ~bar_reader ~screen_date ~horizon_weeks
     weeks_advancing = c.c_weeks_advancing;
   }
 
+(* Forward-return rows for a single screen's candidates. *)
+let _forwards_of_screen ~bar_reader ~horizon_weeks (s : SR.t) :
+    candidate_forward list =
+  let screen_date = s.SR.screen_date in
+  List.map (_candidates_of_screen s) ~f:(fun c ->
+      _forward_of_candidate ~bar_reader ~screen_date ~horizon_weeks c)
+
 let compute (records : SR.t list) ~bar_reader ~horizon_weeks :
     candidate_forward list =
-  List.concat_map records ~f:(fun (s : SR.t) ->
-      _candidates_of_screen s
-      |> List.map
-           ~f:
-             (_forward_of_candidate ~bar_reader ~screen_date:s.screen_date
-                ~horizon_weeks))
+  List.concat_map records ~f:(_forwards_of_screen ~bar_reader ~horizon_weeks)

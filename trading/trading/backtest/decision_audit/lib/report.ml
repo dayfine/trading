@@ -164,20 +164,22 @@ module CF = Counterfactual
 type forward_stat = { n : int; mean : float option; median : float option }
 [@@deriving sexp]
 
-(* Median of a float list: mean of the two middle elements for even length,
-   the middle element for odd. [None] for the empty list. *)
+(* Median of a non-empty ascending list — the two-middle-element mean for even
+   length, the middle element for odd. *)
+let _median_of_sorted sorted =
+  let n = List.length sorted in
+  let mid = n / 2 in
+  if n % 2 = 1 then List.nth sorted mid
+  else
+    Option.map2
+      (List.nth sorted (mid - 1))
+      (List.nth sorted mid)
+      ~f:(fun a b -> (a +. b) /. 2.0)
+
+(* Median of a float list. [None] for the empty list. *)
 let _median = function
   | [] -> None
-  | xs ->
-      let sorted = List.sort xs ~compare:Float.compare in
-      let n = List.length sorted in
-      let mid = n / 2 in
-      if n % 2 = 1 then List.nth sorted mid
-      else
-        Option.map2
-          (List.nth sorted (mid - 1))
-          (List.nth sorted mid)
-          ~f:(fun a b -> (a +. b) /. 2.0)
+  | xs -> _median_of_sorted (List.sort xs ~compare:Float.compare)
 
 let forward_stat (cs : CF.candidate_forward list) : forward_stat =
   let rs = List.filter_map cs ~f:(fun c -> c.forward_return_pct) in
@@ -212,16 +214,15 @@ let _forward_table (cs : CF.candidate_forward list) : string =
   ^ _forward_row ~label:"near-miss (all)" near
   ^ String.concat reason_rows
 
+let _counterfactual_preamble =
+  "## Forward-return counterfactual (usable signal left on the table)\n\n\
+   The one place outcome enters: do the cash-rejected near-misses' forward \
+   returns differ systematically from the funded names'? Overlapping \
+   distributions (mean/median) = no exploitable signal = selection is faithful \
+   (the expected/WAI case). A systematic gap on some captured axis = a real \
+   lever to dig into.\n\n"
+
 let counterfactual_to_markdown (cs : CF.candidate_forward list) : string =
   match cs with
   | [] -> "## Forward-return counterfactual\n\nNo candidates in audit.\n"
-  | _ ->
-      Printf.sprintf
-        "## Forward-return counterfactual (usable signal left on the table)\n\n\
-         The one place outcome enters: do the cash-rejected near-misses' \
-         forward returns differ systematically from the funded names'? \
-         Overlapping distributions (mean/median) = no exploitable signal = \
-         selection is faithful (the expected/WAI case). A systematic gap on \
-         some captured axis = a real lever to dig into.\n\n\
-         %s\n"
-        (_forward_table cs)
+  | _ -> _counterfactual_preamble ^ _forward_table cs ^ "\n"
