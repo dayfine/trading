@@ -1,6 +1,13 @@
 (executable
  (name decision_audit_bin)
  (modules decision_audit_bin)
- (libraries core status backtest decision_audit)
+ (libraries
+  core
+  status
+  backtest
+  decision_audit
+  weinstein_trading.strategy
+  weinstein.snapshot_runtime
+  weinstein.snapshot_pipeline)
  (preprocess
   (pps ppx_sexp_conv)))

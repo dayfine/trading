@@ -156,3 +156,72 @@ let to_markdown (records : SR.t list) : string =
   match records with
   | [] -> "# Per-screen faithfulness audit\n\nNo entry decisions in audit.\n"
   | _ -> _header records ^ String.concat (List.map records ~f:_screen_section)
+
+(* ---- Phase-2 forward-return counterfactual ---- *)
+
+module CF = Counterfactual
+
+type forward_stat = { n : int; mean : float option; median : float option }
+[@@deriving sexp]
+
+(* Median of a float list: mean of the two middle elements for even length,
+   the middle element for odd. [None] for the empty list. *)
+let _median = function
+  | [] -> None
+  | xs ->
+      let sorted = List.sort xs ~compare:Float.compare in
+      let n = List.length sorted in
+      let mid = n / 2 in
+      if n % 2 = 1 then List.nth sorted mid
+      else
+        Option.map2
+          (List.nth sorted (mid - 1))
+          (List.nth sorted mid)
+          ~f:(fun a b -> (a +. b) /. 2.0)
+
+let forward_stat (cs : CF.candidate_forward list) : forward_stat =
+  let rs = List.filter_map cs ~f:(fun c -> c.forward_return_pct) in
+  { n = List.length rs; mean = _mean rs; median = _median rs }
+
+let _forward_row ~label (cs : CF.candidate_forward list) : string =
+  let s = forward_stat cs in
+  Printf.sprintf "| %s | %s | %s | %d |\n" label (_opt_float s.mean)
+    (_opt_float s.median) s.n
+
+(* Funded-vs-near-miss forward-return rows, then near-miss split by skip reason
+   (Insufficient_cash first — the binding constraint). *)
+let _forward_table (cs : CF.candidate_forward list) : string =
+  let funded, near = List.partition_tf cs ~f:(fun c -> c.is_funded) in
+  let reason_label (c : CF.candidate_forward) =
+    Option.value_map c.reason_skipped ~default:"?" ~f:(fun r ->
+        Sexp.to_string (TA.sexp_of_skip_reason r))
+  in
+  let by_reason =
+    List.map near ~f:(fun c -> (reason_label c, c))
+    |> Map.of_alist_multi (module String)
+    |> Map.to_alist
+    |> List.sort ~compare:(fun (_, a) (_, b) ->
+        Int.compare (List.length b) (List.length a))
+  in
+  let reason_rows =
+    List.map by_reason ~f:(fun (reason, group) ->
+        _forward_row ~label:("near-miss / " ^ reason) group)
+  in
+  "| group | mean | median | n |\n|---|---|---|---|\n"
+  ^ _forward_row ~label:"funded" funded
+  ^ _forward_row ~label:"near-miss (all)" near
+  ^ String.concat reason_rows
+
+let counterfactual_to_markdown (cs : CF.candidate_forward list) : string =
+  match cs with
+  | [] -> "## Forward-return counterfactual\n\nNo candidates in audit.\n"
+  | _ ->
+      Printf.sprintf
+        "## Forward-return counterfactual (usable signal left on the table)\n\n\
+         The one place outcome enters: do the cash-rejected near-misses' \
+         forward returns differ systematically from the funded names'? \
+         Overlapping distributions (mean/median) = no exploitable signal = \
+         selection is faithful (the expected/WAI case). A systematic gap on \
+         some captured axis = a real lever to dig into.\n\n\
+         %s\n"
+        (_forward_table cs)

@@ -17,6 +17,7 @@ type funded_entry = {
 
 type near_miss = {
   symbol : string;
+  side : Trading_base.Types.position_side;
   score : int;
   grade : Weinstein_types.grade;
   reason_skipped : TA.skip_reason;
@@ -63,6 +64,7 @@ let _funded_of_entry (e : TA.entry_decision) : funded_entry =
 let _near_miss_of_alt (a : TA.alternative_candidate) : near_miss =
   {
     symbol = a.symbol;
+    side = a.side;
     score = a.score;
     grade = a.grade;
     reason_skipped = a.reason_skipped;
