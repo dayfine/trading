@@ -38,8 +38,19 @@ default runner is snapshot-mode which emits NO audit → `--csv-mode` required).
 full 10.5k universe that OOMs). Then `decision_audit_bin --audit <win>/trade_audit.sexp
 --out r.md`.
 
-**Open follow-ups:** (1) Phase-2 forward-return counterfactual (join near-miss
-forward returns via `decision_grading/post_exit`) = the one real "usable signal left
-on the table" test — not yet run. (2) RS-coverage harness gap: ~77% of sp500
-candidates carry `rs_value=None`; investigate before trusting RS-based faithfulness
-reads.
+**Phase-2 counterfactual — BUILT + RUN (#1806/#1807, 2026-07-01).** Forward-return
+counterfactual (`decision_audit --snapshot-dir <warehouse> --horizon-weeks 12`):
+12w forward return from screen date, funded vs cash-rejected near-miss, bars from a
+snapshot warehouse. Result (3 sp500 windows, wfcv-top500-1998): **outcome CONFIRMS
+faithful selection** — crash funded −2% vs near-miss −12% (protective!), bull flat,
+recovery near-miss +3pp but driven by `Insufficient_cash` = the cash line = explicit
+capacity lever NOT a sort gap. No window shows funded under-returning in a way a
+better SORT fixes. Entry-selection is now dead-confirmed on outcomes too; only lever
+= explicit capacity (`[[project_capacity_concentration_surface]]`). Caveat: proxy,
+~half warehouse coverage (top-500-PIT ≠ sp500-smoke universe drops ~50% of symbols).
+Writeup: `dev/notes/decision-audit-first-real-run-2026-07-01.md` §Phase-2.
+
+**Open follow-ups:** (1) RS-coverage harness gap: ~77% of sp500 candidates carry
+`rs_value=None`; investigate before trusting RS-based faithfulness reads. (2) Cleaner
+counterfactual rerun with a warehouse whose membership matches the audit universe (or
+add CSV-bar support to the counterfactual) to lift the ~50% coverage.
