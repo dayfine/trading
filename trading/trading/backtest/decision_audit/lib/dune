@@ -1,5 +1,11 @@
 (library
  (name decision_audit)
- (libraries core types trading.base backtest)
+ (libraries
+  core
+  types
+  trading.base
+  backtest
+  decision_grading
+  weinstein_trading.strategy)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))

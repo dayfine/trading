@@ -49,12 +49,33 @@ not "did the picks make money" (which is WAI-poor).
   screen_record + 4 report). Smoke: `dune exec
   trading/backtest/decision_audit/bin/decision_audit_bin.exe -- --audit
   <trade_audit.sexp>`.
+- [x] **Phase 2 — forward-return counterfactual** (`feat/decision-audit-phase2`).
+  New `decision_audit/lib/counterfactual.{ml,mli}` — the one place outcome
+  enters: `Counterfactual.compute records ~bar_reader ~horizon_weeks` produces
+  one `candidate_forward` per candidate (funded ∪ near-miss, dedup toward
+  funded). Base price = close of the first bar at/after the screen date;
+  `forward_return_pct` reuses `Decision_grading.Post_exit.post_exit_metrics`'s
+  `continuation_pct` (signed, side-adjusted) — not re-implemented. `None` when
+  the symbol is absent from the warehouse / has no bar at/after the screen. The
+  pure arithmetic is unit-tested against an in-memory `Bar_reader` (long, short
+  sign-flip, missing symbol, all-bars-before-screen, funded/near-miss partition,
+  dup-symbol dedup). `Report.counterfactual_to_markdown` renders the headline
+  funded-vs-near-miss forward-return **mean + median + n** (per
+  `mechanism-validation-rigor.md`) plus near-miss split by `skip_reason`
+  (Insufficient_cash first), labelled as the "usable signal left on the table"
+  test (null/overlapping = faithful). `decision_audit_bin` gains
+  `--snapshot-dir <warehouse>` (builds a snapshot-backed `Bar_reader` exactly as
+  `decision_grading_bin`) + `--horizon-weeks <N>` (default 12); absent
+  `--snapshot-dir`, behaves as Phase-1 only. Also added `side` to
+  `Screen_record.near_miss` (sourced from `alternative_candidate.side`) so short
+  near-misses sign-adjust. Verify: `dune runtest
+  trading/backtest/decision_audit` (20 tests: 6 screen_record + 8 report + 6
+  counterfactual). Smoke: `dune exec
+  trading/backtest/decision_audit/bin/decision_audit_bin.exe -- --audit
+  <trade_audit.sexp> --snapshot-dir <warehouse> --horizon-weeks 12`.
 
 ## Follow-ups
 
-- **Phase 2 (stretch)** — forward-return counterfactual on the cash-rejected
-  names (reuse `decision_grading/post_exit`), the one place outcome enters, to
-  test whether *usable captured signal* is left on the table. Out of scope here.
 - **score_components** — populate once the screener splits its additive score
   into per-component contributions (would lift the current ceiling for both the
   funded path and near-misses).

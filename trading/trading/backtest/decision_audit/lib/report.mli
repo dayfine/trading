@@ -37,3 +37,30 @@ val to_markdown : Screen_record.t list -> string
     inversion count, the funded-vs-near-miss {!feature_stats} table, and a
     near-miss [skip_reason] breakdown) followed by one section per screen date.
     Emits a graceful "no entry decisions" note when the input is empty. *)
+
+type forward_stat = {
+  n : int;  (** Count of candidates with a forward return present. *)
+  mean : float option;  (** Mean forward return, or [None] when [n = 0]. *)
+  median : float option;  (** Median forward return, or [None] when [n = 0]. *)
+}
+[@@deriving sexp]
+(** Central-tendency summary of forward returns for one group of candidates.
+    Both mean and median are reported so the reader sees the distribution shape,
+    not just a point estimate (per
+    [.claude/rules/mechanism-validation-rigor.md]). [None]-valued forward
+    returns contribute to neither [n] nor the statistics. *)
+
+val forward_stat : Counterfactual.candidate_forward list -> forward_stat
+(** [forward_stat cs] pools the [forward_return_pct] over [cs], dropping
+    [None]s, and returns its count / mean / median. *)
+
+val counterfactual_to_markdown : Counterfactual.candidate_forward list -> string
+(** Render the Phase-2 forward-return counterfactual section: the honest "usable
+    signal left on the table" test.
+
+    Emits the headline {b funded-vs-near-miss} forward-return mean, median, and
+    n (overlapping distributions = no exploitable signal = faithful), then the
+    near-miss group broken out by [skip_reason] (emphasising
+    [Insufficient_cash], the binding constraint). Labels the section as the
+    outcome test and states that a null (overlapping) result means selection is
+    faithful. Emits a graceful "no candidates" note when the input is empty. *)

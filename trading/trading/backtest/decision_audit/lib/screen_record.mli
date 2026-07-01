@@ -32,6 +32,10 @@ type funded_entry = {
 
 type near_miss = {
   symbol : string;
+  side : Trading_base.Types.position_side;
+      (** The candidate's side (long/short) — needed so the Phase-2
+          forward-return counterfactual can sign-adjust a short near-miss. Short
+          near-misses arise via [Short_notional_cap]. *)
   score : int;
   grade : Weinstein_types.grade;
   reason_skipped : Backtest.Trade_audit.skip_reason;
