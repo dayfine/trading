@@ -61,20 +61,32 @@ fork-per-fold, Cell-E long-only). 3 new default-off control modes:
 ## Implications
 
 - **For the candidate-ranking lever:** dead, definitively. Keep `Alphabetical`
-  default — not because it is good, but because it is unbiased and as good as any
-  other arbitrary sort *in expectation*; the informative sorts add nothing.
+  default. **Note (per 2026-06-30 user feedback): "alphabetical wins" is NOT a
+  result to rely on** — it is luck-of-the-draw on one path, and relying on the
+  accidental randomness of a ticker sort is not a plan. The finding is diagnostic,
+  not a recommendation to trust alphabetical.
 - **For the backtest corpus:** results that hinge on the alphabetical tiebreak in
   broad universes carry hidden, un-modelled selection variance (±0.07 to ±0.28
   Sharpe). Single-tiebreak broad backtests are *less robust than they look*; the
   honest comparison is variance-aware (this is why the program leans on WF-CV fold
   *distributions*, not single-window point estimates).
-- **The productive direction is to REDUCE the variance, not re-sort.** The variance
-  comes from concentrating scarce cash into a few tied names. Funding more names /
-  smaller positions (the concentration/capacity axis,
-  `project_capacity_concentration_surface`) would shrink it — looping back to a
-  *tail-preserving* lever, not a winner-picking one. And per-screen auditability
-  (the decision-audit report, `dev/plans/per-screen-decision-audit-2026-06-30.md`)
-  is what lets us see which picks drove the spread.
+- **If diversification / tail-exploration has value, do it EXPLICITLY — don't lean
+  on the tiebreak's accidental draw.** The variance comes from concentrating scarce
+  cash into a *few* tied names. The explicit, already-mapped lever for "spread the
+  bets / visit more of the long tail" is the **concentration/capacity axis**
+  (`project_capacity_concentration_surface`): fund *more names at smaller size* →
+  deliberately reduces dependence on *which* tied names get picked, and (since the
+  cascade score is anti-predictive at the top, `project_cascade_selection_inversion`)
+  the lower-ranked "unvisited tail" is not systematically worse, so widening the
+  funnel is a real choice, not a gamble. **Known tradeoff:** more names dilutes the
+  fat-tail amplification that bigger positions give (return↑ but DD↑ at higher
+  concentration). So it is an explicit knob with a measured tradeoff — the honest
+  lever, evaluated on the capacity surface, *not* a random tiebreak.
+- **The variance is not free alpha to harvest by re-sorting** — no sort captures it
+  (that is finding 1). It is a property to either *reduce* (capacity) or *accept*,
+  explicitly. Per-screen auditability (the faithfulness audit,
+  `dev/plans/per-screen-decision-audit-2026-06-30.md`) shows whether the picks that
+  drove the spread differed on any *captured* signal or were genuinely arbitrary.
 
 ## Bug found + fixed (a finding in itself)
 
