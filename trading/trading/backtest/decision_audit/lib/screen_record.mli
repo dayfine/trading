@@ -79,6 +79,14 @@ type t = {
 [@@deriving sexp]
 (** One record per weekly screen date. *)
 
+val summary_of : funded_entry list -> near_miss list -> summary
+(** [summary_of funded near_misses] computes the per-screen roll-up: [n_funded],
+    [n_near_miss], the [min_funded_score] / [max_nearmiss_score] extrema, and
+    the [inversion] flag (some near-miss scored strictly above the lowest funded
+    entry). Exposed so alternative record producers — e.g. the live weekly-picks
+    adapter {!Weekly_adapter} — reuse the exact same computation rather than
+    duplicating it. *)
+
 val of_audit_records : Backtest.Trade_audit.audit_record list -> t list
 (** Group the entry side of [audit_records] by [entry_date] into one {!t} per
     screen, sorted by [screen_date] ascending.

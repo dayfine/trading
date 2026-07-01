@@ -73,6 +73,31 @@ not "did the picks make money" (which is WAI-poor).
   counterfactual). Smoke: `dune exec
   trading/backtest/decision_audit/bin/decision_audit_bin.exe -- --audit
   <trade_audit.sexp> --snapshot-dir <warehouse> --horizon-weeks 12`.
+- [x] **Weekly-snapshot adapter — live picks → the faithfulness lens**
+  (`feat/decision-audit-weekly`). New
+  `decision_audit/lib/weekly_adapter.{ml,mli}`:
+  `Weekly_adapter.of_weekly_snapshots snaps ~displayed_k` maps each per-Friday
+  `Weinstein_snapshot.Weekly_snapshot.t` to one `Screen_record.t` so the SAME
+  Phase-1 report + Phase-2 counterfactual run on live weekly picks, not just a
+  backtest `trade_audit.sexp`. The displayed cut synthesizes the funded/near-miss
+  split a live snapshot lacks: `funded` = the first `displayed_k` `long_candidates`
+  (score-desc); `near_misses` = the remaining longs (side `Long`) ∪ all
+  `short_candidates` (side `Short`), all tagged `Top_n_cutoff` (the live analog of
+  the backtest cash line). `summary` reuses the newly-exposed
+  `Screen_record.summary_of` (no duplication). Documented ceilings: stage defaults
+  to `Stage2 {weeks_advancing=0; late=false}` for longs / `Stage4 {weeks_declining=0}`
+  for shorts (snapshot carries no stage; faithful by screener construction), and
+  `weeks_advancing` / `volume_ratio` are `None` (not in the snapshot schema — RS +
+  score + grade + sector are what this enables). Grade parsed from the displayed
+  label ("A+"/"A"/…) by an exhaustive `_grade_of_string` that raises
+  `Invalid_argument` on an unknown label (never silently defaults). `decision_audit_bin`
+  gains `--weekly-picks-dir <dir>` (loads every `*.sexp` via
+  `Snapshot_reader.read_from_file`, sorts by date) + `--displayed-k <N>` (default 3),
+  mutually exclusive with `--audit`; `--audit` mode unchanged. Verify: `dune runtest
+  trading/backtest/decision_audit` (25 tests: 6 screen_record + 8 report + 6
+  counterfactual + 5 weekly_adapter). Smoke: `dune exec
+  trading/backtest/decision_audit/bin/decision_audit_bin.exe -- --weekly-picks-dir
+  dev/weekly-picks/<version> --displayed-k 3`.
 
 ## Follow-ups
 

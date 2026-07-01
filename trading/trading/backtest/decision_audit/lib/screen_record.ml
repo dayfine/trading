@@ -87,7 +87,7 @@ let _dedup_near_misses (alts : near_miss list) : near_miss list =
     ~equal:(fun a b -> String.equal a.symbol b.symbol)
   |> List.sort ~compare:(fun a b -> Int.compare b.score a.score)
 
-let _summary_of ~(funded : funded_entry list) ~(near_misses : near_miss list) :
+let summary_of (funded : funded_entry list) (near_misses : near_miss list) :
     summary =
   let min_funded_score =
     List.min_elt funded ~compare:(fun (a : funded_entry) b ->
@@ -120,12 +120,7 @@ let _record_of_screen ~screen_date ~(entries : TA.entry_decision list) : t =
         List.map e.alternatives_considered ~f:_near_miss_of_alt)
   in
   let near_misses = _dedup_near_misses raw_near_misses in
-  {
-    screen_date;
-    funded;
-    near_misses;
-    summary = _summary_of ~funded ~near_misses;
-  }
+  { screen_date; funded; near_misses; summary = summary_of funded near_misses }
 
 let of_audit_records (records : TA.audit_record list) : t list =
   let by_date = Hashtbl.create (module Date) in

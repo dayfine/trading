@@ -3,10 +3,12 @@
  (modules decision_audit_bin)
  (libraries
   core
+  core_unix.sys_unix
   status
   backtest
   decision_audit
   weinstein_trading.strategy
+  weinstein_trading.snapshot
   weinstein.snapshot_runtime
   weinstein.snapshot_pipeline)
  (preprocess
