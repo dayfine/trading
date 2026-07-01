@@ -16,11 +16,16 @@ module Generator = Weinstein_snapshot_gen.Weekly_snapshot_generator
 let run_deferred d = Async.Thread_safe.block_on_async_exn (fun () -> d)
 let _index_symbol = "GSPCX"
 
-(* The Friday on which the 40-week-base breakout (from a 2022-01-01 start) is
-   inside the screener's breakout-event lookback window, so AAPL screens as a
-   Stage-2 long candidate. Confirmed empirically against the synthetic config
-   below; later Fridays age the breakout event out of the window. *)
-let _as_of = Date.of_string "2022-10-07"
+(* A Friday soon after the 40-week-base breakout (from a 2022-01-01 start), so
+   AAPL is a GENUINELY-EARLY Stage-2 long candidate (weeks_advancing <= 4). The
+   generator now chains the stage classifier (see the prior_stage fix in
+   [weekly_snapshot_generator._chained_prior_stage] +
+   [dev/notes/live-generator-prior-stage-bug-2026-07-01.md]); before that fix it
+   passed prior_stage:None, which reset weeks_advancing to ~1 and admitted the
+   breakout at ANY later Friday (this date used to be 2022-10-07, ~6 weeks post
+   breakout = Stage2 w6, which the corrected <=4-week early-breakout gate rightly
+   rejects). Later Fridays now correctly age the candidate out of admission. *)
+let _as_of = Date.of_string "2022-09-16"
 let _system_version = "test-sha-1234"
 
 (* Synthetic config: an AAPL breakout (40-week base then a 3x-volume breakout)
@@ -108,18 +113,21 @@ let _bearish_bar_reader () =
       (_index_symbol, _bars_for ~syn_config:_bearish_syn_config _index_symbol);
     ]
 
-let _inputs ~bar_reader ~ticker_sectors : Generator.inputs =
+let _inputs_at ~as_of ~bar_reader ~ticker_sectors : Generator.inputs =
   {
     config =
       Weinstein_strategy.default_config
         ~universe:(List.map ticker_sectors ~f:fst)
         ~index_symbol:_index_symbol;
     system_version = _system_version;
-    as_of = _as_of;
+    as_of;
     bar_reader;
     ticker_sectors;
     held_positions = [];
   }
+
+let _inputs ~bar_reader ~ticker_sectors : Generator.inputs =
+  _inputs_at ~as_of:_as_of ~bar_reader ~ticker_sectors
 
 let _generate ~bar_reader ~ticker_sectors =
   Generator.generate (_inputs ~bar_reader ~ticker_sectors)
@@ -185,6 +193,26 @@ let test_breakout_stop_below_entry _ =
     |> Option.map ~f:(fun (c : Weekly_snapshot.candidate) -> c.entry -. c.stop)
   in
   assert_that entry_minus_stop (is_some_and (gt (module Float_ord) 0.0))
+
+(* Regression for the prior_stage-chaining fix. The SAME breakout AAPL, screened
+   ~6 weeks later (2022-10-07) is Stage2 w6 under the corrected chained
+   classification, so the <=4-week early-breakout gate rightly rejects it — it is
+   NOT a long candidate. Before the fix (prior_stage:None reset weeks_advancing
+   to ~1) this stale advancer was wrongly surfaced as a fresh pick. See
+   [dev/notes/live-generator-prior-stage-bug-2026-07-01.md]. *)
+let test_stale_breakout_not_admitted _ =
+  let snap =
+    Generator.generate
+      (_inputs_at
+         ~as_of:(Date.of_string "2022-10-07")
+         ~bar_reader:(_breakout_bar_reader ())
+         ~ticker_sectors:[ ("AAPL", "Information Technology") ])
+  in
+  let aapl =
+    List.find (snap : Weekly_snapshot.t).long_candidates
+      ~f:(fun (c : Weekly_snapshot.candidate) -> String.equal c.symbol "AAPL")
+  in
+  assert_that aapl is_none
 
 (* The macro context carries a known regime label and a confidence in [0, 1].
    The regime is matched against the closed set of known labels via [matching]
@@ -267,6 +295,8 @@ let suite =
          "breakout AAPL is a long candidate" >:: test_breakout_is_long_candidate;
          "breakout long stop sits below entry"
          >:: test_breakout_stop_below_entry;
+         "stale (w>4) breakout is not admitted"
+         >:: test_stale_breakout_not_admitted;
          "macro context is present and well-formed"
          >:: test_macro_context_present;
          "bearish macro blocks all long candidates"

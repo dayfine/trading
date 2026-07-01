@@ -32,7 +32,7 @@ module Snapshot_warehouse_reader =
 
 let run_deferred d = Async.Thread_safe.block_on_async_exn (fun () -> d)
 let _index_symbol = "GSPCX"
-let _as_of = Date.of_string "2022-10-07"
+let _as_of = Date.of_string "2022-09-16"
 let _system_version = "parity-sha"
 
 (* Same synthetic shapes the generator's own test uses: an AAPL 40-week-base

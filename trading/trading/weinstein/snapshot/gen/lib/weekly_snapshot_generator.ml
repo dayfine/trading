@@ -51,16 +51,43 @@ let _build_sector_map ~(inputs : inputs) ~index_bars :
     ~f:(_set_sector_ctx_for_etf ~inputs ~index_bars ~by_sector ~sector_map);
   sector_map
 
+(* Reconstruct the chained prior-week stage the way the backtest does: roll the
+   stage classifier over the weekly prefix threading [prior_stage], and return
+   the stage AFTER the second-to-last week. The generator is a one-shot with no
+   cross-week state, so without this it passed [prior_stage:None] and the
+   classifier reset [weeks_advancing] to ~1 for EVERY Stage-2 stock — collapsing
+   the whole Stage-2 lifecycle to "Early Stage2" and admitting extended
+   advancers the <=4-week gate should reject. See
+   [dev/notes/live-generator-prior-stage-bug-2026-07-01.md]. *)
+let _chained_prior_stage ~(stage_config : Stage.config) weekly_bars =
+  let arr = Array.of_list weekly_bars in
+  let n = Array.length arr in
+  if n <= 1 then None
+  else begin
+    let prior = ref None in
+    for i = 0 to n - 2 do
+      let bars = Array.to_list (Array.sub arr ~pos:0 ~len:(i + 1)) in
+      prior :=
+        Some
+          (Stage.classify ~config:stage_config ~bars ~prior_stage:!prior).stage
+    done;
+    !prior
+  end
+
 (* Analyse one ticker. Symbols with no weekly bars are dropped ([None]) — they
    cannot satisfy the screener's breakout / breakdown rules. *)
-let _analyze_ticker ~(inputs : inputs) ~analysis_config ~index_bars ticker :
+let _analyze_ticker ~(inputs : inputs)
+    ~(analysis_config : Stock_analysis.config) ~index_bars ticker :
     Stock_analysis.t option =
   let bars = _weekly_bars ~inputs ticker in
   if List.is_empty bars then None
   else
+    let prior_stage =
+      _chained_prior_stage ~stage_config:analysis_config.stage bars
+    in
     Some
       (Stock_analysis.analyze ~config:analysis_config ~ticker ~bars
-         ~benchmark_bars:index_bars ~prior_stage:None ~as_of_date:inputs.as_of)
+         ~benchmark_bars:index_bars ~prior_stage ~as_of_date:inputs.as_of)
 
 (* Per-stock analysis for the screened universe. *)
 let _analyze_universe ~(inputs : inputs) ~index_bars : Stock_analysis.t list =

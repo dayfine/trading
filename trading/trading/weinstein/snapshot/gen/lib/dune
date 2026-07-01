@@ -11,6 +11,7 @@
   weinstein.screener
   weinstein.macro
   weinstein.sector
+  weinstein.stage
   weinstein.stock_analysis
   weinstein.rs
   weinstein.resistance
