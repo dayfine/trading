@@ -5,6 +5,9 @@
 ## Status
 READY_FOR_REVIEW
 
+## Interface stable
+YES
+
 Per-screen faithfulness decision-audit (spec #8,
 `dev/plans/per-screen-decision-audit-2026-06-30.md`). Additive, default-off
 (read-only lens), no engine/strategy behaviour change. Consumes the
