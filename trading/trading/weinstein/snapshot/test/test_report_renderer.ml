@@ -90,7 +90,7 @@ let test_full_snapshot_contains_all_sections _ =
          _has_substring "- XLK";
          _has_substring "- XLY";
          _has_substring "- XLC";
-         _has_substring "## Long candidates (top 10)";
+         _has_substring "## Long candidates (top 7)";
          (* Pinned candidate row — fully formatted. Risk = (502.13-466.20)/502.13*100 = 7.155... → "7.2%" *)
          _has_substring
            "| 1 | AAPL | A+ | 0.91 | $502.13 | $466.20 | 7.2% | Stage 2 \
@@ -105,7 +105,7 @@ let test_empty_long_candidates_renders_marker _ =
   assert_that md
     (all_of
        [
-         _has_substring "## Long candidates (top 10)\n(none)";
+         _has_substring "## Long candidates (top 7)\n(none)";
          _has_substring "## Short candidates (top 5)\n(none)";
        ])
 
@@ -155,13 +155,12 @@ let test_render_is_deterministic _ =
   let second = Report_renderer.render _full_snapshot in
   assert_that first (equal_to second)
 
-let test_long_candidates_truncated_to_top_10 _ =
-  (* 12 candidates → only first 10 rendered; rank 10 row present, rank 11
-     absent. *)
+(* [n] candidates with the given per-index score. *)
+let _long_snap ~n ~score_of =
   let make_c i =
     {
       Weekly_snapshot.symbol = Printf.sprintf "SYM%02d" i;
-      score = 1.0 -. (Float.of_int i *. 0.01);
+      score = score_of i;
       grade = "B";
       entry = 100.0;
       stop = 90.0;
@@ -171,18 +170,56 @@ let test_long_candidates_truncated_to_top_10 _ =
       resistance_grade = None;
     }
   in
+  { _empty_snapshot with long_candidates = List.init n ~f:(fun i -> make_c i) }
+
+let test_long_candidates_truncated_to_default_7 _ =
+  (* 12 distinctly-scored candidates → first 7 rendered; rank 7 present, rank 8
+     absent; note reports 5 lower-scored hidden (no ties at the cutoff). *)
   let snap =
-    {
-      _empty_snapshot with
-      long_candidates = List.init 12 ~f:(fun i -> make_c (i + 1));
-    }
+    _long_snap ~n:12 ~score_of:(fun i -> 1.0 -. (Float.of_int i *. 0.01))
   in
   let md = Report_renderer.render snap in
   assert_that md
     (all_of
        [
-         _has_substring "| 10 | SYM10 |";
-         not_ ~msg:"row 11 must be truncated" (_has_substring "| 11 | SYM11 |");
+         _has_substring "| 7 | SYM06 |";
+         not_ ~msg:"row 8 must be truncated" (_has_substring "| 8 | SYM07 |");
+         _has_substring "_5 lower-scored candidates not shown._";
+       ])
+
+let test_truncation_note_flags_tied_cutoff _ =
+  (* 12 candidates all tied at score 0.85 → the cut is arbitrary among equals;
+     the note must say 5 more are hidden and all 5 tie the cutoff. *)
+  let snap = _long_snap ~n:12 ~score_of:(fun _ -> 0.85) in
+  let md = Report_renderer.render snap in
+  assert_that md
+    (_has_substring
+       "_5 more candidates not shown; 5 tie the cutoff score (0.85). Among \
+        equal scores the order is alphabetical, not a quality ranking — treat \
+        the tied set as interchangeable._")
+
+let test_no_note_when_not_truncated _ =
+  (* Exactly [long_limit] candidates → no truncation, no note. *)
+  let snap =
+    _long_snap ~n:7 ~score_of:(fun i -> 1.0 -. (Float.of_int i *. 0.01))
+  in
+  let md = Report_renderer.render snap in
+  assert_that md
+    (not_ ~msg:"no note when nothing hidden" (_has_substring "not shown"))
+
+let test_long_limit_override _ =
+  (* Explicit [long_limit:3] tightens the cap and the header echoes it. *)
+  let snap =
+    _long_snap ~n:12 ~score_of:(fun i -> 1.0 -. (Float.of_int i *. 0.01))
+  in
+  let md = Report_renderer.render ~long_limit:3 snap in
+  assert_that md
+    (all_of
+       [
+         _has_substring "## Long candidates (top 3)";
+         _has_substring "| 3 | SYM02 |";
+         not_ ~msg:"row 4 truncated at limit 3" (_has_substring "| 4 | SYM03 |");
+         _has_substring "_9 lower-scored candidates not shown._";
        ])
 
 let suite =
@@ -199,8 +236,12 @@ let suite =
          "bearish_macro_rendered" >:: test_bearish_macro_rendered;
          "risk_pct_formatting" >:: test_risk_pct_formatting;
          "render_is_deterministic" >:: test_render_is_deterministic;
-         "long_candidates_truncated_to_top_10"
-         >:: test_long_candidates_truncated_to_top_10;
+         "long_candidates_truncated_to_default_7"
+         >:: test_long_candidates_truncated_to_default_7;
+         "truncation_note_flags_tied_cutoff"
+         >:: test_truncation_note_flags_tied_cutoff;
+         "no_note_when_not_truncated" >:: test_no_note_when_not_truncated;
+         "long_limit_override" >:: test_long_limit_override;
        ]
 
 let () = run_test_tt_main suite

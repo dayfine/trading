@@ -1,9 +1,13 @@
 open Core
 
-(* Display caps for the candidate tables. Match the section headers
-   ("top 10" / "top 5") to keep header and content in sync. *)
-let _long_display_limit = 10
-let _short_display_limit = 5
+(* Default display caps for the candidate tables. These bound the *human*
+   report only — the underlying snapshot (.sexp) keeps the screener's full
+   capped list, and strategy / backtest selection is unaffected. Callers may
+   override both (see [render]'s optional params) to surface a book-sized list
+   (~5) or the full set. The section header echoes the effective limit so header
+   and content stay in sync. *)
+let default_long_display_limit = 7
+let default_short_display_limit = 5
 
 (* Marker rendered for empty lists / tables so the reader never sees a missing
    section. *)
@@ -25,6 +29,46 @@ let _candidate_row ~rank (c : Weekly_snapshot.candidate) =
   Printf.sprintf "| %d | %s | %s | %.2f | $%.2f | $%.2f | %.1f%% | %s |" rank
     c.symbol c.grade c.score c.entry c.stop risk c.rationale
 
+let _plural n = if n = 1 then "" else "s"
+
+(* Body of the truncation note. [n_tied = 0] means the hidden names all score
+   below the cutoff (a plain "N lower-scored"); [n_tied > 0] means some hidden
+   names tie the cutoff score, so the cut is arbitrary among equals — the note
+   says so to keep a reader from trusting the alphabetical tie-break as a
+   ranking (score is anti-predictive at the top grade; the RS/earliness
+   tie-break was WF-CV-rejected as a return lever). *)
+let _note_body ~n_hidden ~n_tied ~cutoff_score =
+  if n_tied = 0 then
+    Printf.sprintf "_%d lower-scored candidate%s not shown._" n_hidden
+      (_plural n_hidden)
+  else
+    Printf.sprintf
+      "_%d more candidate%s not shown; %d tie the cutoff score (%.2f). Among \
+       equal scores the order is alphabetical, not a quality ranking — treat \
+       the tied set as interchangeable._"
+      n_hidden (_plural n_hidden) n_tied cutoff_score
+
+(* Score of the last shown candidate — the cutoff below which names are hidden.
+   Shown is non-empty whenever a note is produced (the table had rows). *)
+let _cutoff_score shown = (List.last_exn shown).Weekly_snapshot.score
+
+(* How many hidden candidates tie the cutoff score. *)
+let _count_tied ~cutoff hidden =
+  List.count hidden ~f:(fun (c : Weekly_snapshot.candidate) ->
+      Float.equal c.score cutoff)
+
+(* Honesty note appended below a truncated table. Candidates arrive sorted
+   score-descending with an alphabetical tie-break (screener default). [None]
+   when nothing was hidden. *)
+let _truncation_note ~shown ~hidden =
+  if List.is_empty hidden then None
+  else
+    let cutoff = _cutoff_score shown in
+    Some
+      (_note_body ~n_hidden:(List.length hidden)
+         ~n_tied:(_count_tied ~cutoff hidden)
+         ~cutoff_score:cutoff)
+
 let _candidate_table candidates ~limit =
   let header =
     _table_header
@@ -41,12 +85,16 @@ let _candidate_table candidates ~limit =
   in
   match candidates with
   | [] -> _empty_marker
-  | _ ->
-      let truncated = List.take candidates limit in
+  | _ -> (
+      let shown = List.take candidates limit in
+      let hidden = List.drop candidates limit in
       let rows =
-        List.mapi truncated ~f:(fun i c -> _candidate_row ~rank:(i + 1) c)
+        List.mapi shown ~f:(fun i c -> _candidate_row ~rank:(i + 1) c)
       in
-      String.concat ~sep:"\n" (header :: rows)
+      let table = String.concat ~sep:"\n" (header :: rows) in
+      match _truncation_note ~shown ~hidden with
+      | None -> table
+      | Some note -> table ^ "\n\n" ^ note)
 
 let _held_row (h : Weekly_snapshot.held_position) =
   Printf.sprintf "| %s | %s | $%.2f | %s |" h.symbol (Date.to_string h.entered)
@@ -70,7 +118,9 @@ let _macro_section (m : Weekly_snapshot.macro_context) =
 
 let _section ~title body = Printf.sprintf "## %s\n%s" title body
 
-let render (t : Weekly_snapshot.t) : string =
+let render ?(long_limit = default_long_display_limit)
+    ?(short_limit = default_short_display_limit) (t : Weekly_snapshot.t) :
+    string =
   let buf = Buffer.create 1024 in
   Buffer.add_string buf
     (Printf.sprintf "# Weekly Pick Report — %s\n\n" (Date.to_string t.date));
@@ -82,12 +132,14 @@ let render (t : Weekly_snapshot.t) : string =
     (_section ~title:"Strong sectors" (_sector_list t.sectors_strong));
   Buffer.add_string buf "\n\n";
   Buffer.add_string buf
-    (_section ~title:"Long candidates (top 10)"
-       (_candidate_table t.long_candidates ~limit:_long_display_limit));
+    (_section
+       ~title:(Printf.sprintf "Long candidates (top %d)" long_limit)
+       (_candidate_table t.long_candidates ~limit:long_limit));
   Buffer.add_string buf "\n\n";
   Buffer.add_string buf
-    (_section ~title:"Short candidates (top 5)"
-       (_candidate_table t.short_candidates ~limit:_short_display_limit));
+    (_section
+       ~title:(Printf.sprintf "Short candidates (top %d)" short_limit)
+       (_candidate_table t.short_candidates ~limit:short_limit));
   Buffer.add_string buf "\n\n";
   Buffer.add_string buf
     (_section ~title:"Held positions" (_held_table t.held_positions));

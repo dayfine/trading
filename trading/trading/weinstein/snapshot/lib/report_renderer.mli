@@ -11,13 +11,27 @@
     - System version line: [System version: `<sha>`]
     - [## Macro] section: regime in bold + score
     - [## Strong sectors] section: bulleted list (or "(none)" if empty)
-    - [## Long candidates (top 10)]: ranked Markdown table
-    - [## Short candidates (top 5)]: ranked Markdown table
+    - [## Long candidates (top N)]: ranked Markdown table ([N = long_limit])
+    - [## Short candidates (top N)]: ranked Markdown table ([N = short_limit])
     - [## Held positions]: Markdown table
 
     All section headers are always rendered, even when the underlying data list
     is empty — empty tables / lists render as ["(none)"] so a reader never sees
-    a missing section.
+    a missing section. The [top N] in each candidate header echoes the effective
+    limit.
+
+    {1 Display caps and the tie-honesty note}
+
+    The candidate tables are display-only caps on the {e human} report; the
+    underlying {!Weekly_snapshot.t} retains the screener's full capped list and
+    strategy / backtest selection is unaffected. When a table is truncated, an
+    italic note is appended below it stating how many candidates were hidden and
+    — crucially — how many of them {e tie the cutoff score}. Candidates arrive
+    score-descending with an alphabetical tie-break, so names hidden at the
+    cutoff are not "worse" than the last shown when they tie its score: the cut
+    is arbitrary among equals. The note tells a reader funding a book-sized
+    subset to treat the tied set as interchangeable rather than trusting the
+    alphabetical order as a quality ranking.
 
     {1 Determinism}
 
@@ -33,7 +47,17 @@
     (caller is responsible for the sign convention of [entry] and [stop]
     relative to side). *)
 
-val render : Weekly_snapshot.t -> string
-(** [render snapshot] returns the snapshot rendered as a single Markdown string,
-    terminated by a final newline. Always succeeds — every section header is
-    emitted unconditionally. Pure function: no I/O, no exceptions. *)
+val default_long_display_limit : int
+(** Default number of long candidates shown in the report table (7). *)
+
+val default_short_display_limit : int
+(** Default number of short candidates shown in the report table (5). *)
+
+val render : ?long_limit:int -> ?short_limit:int -> Weekly_snapshot.t -> string
+(** [render ?long_limit ?short_limit snapshot] returns the snapshot rendered as
+    a single Markdown string, terminated by a final newline. [long_limit] /
+    [short_limit] cap the respective candidate tables and default to
+    {!default_long_display_limit} / {!default_short_display_limit}; a truncated
+    table gains the tie-honesty note described above. Always succeeds — every
+    section header is emitted unconditionally. Pure function: no I/O, no
+    exceptions. *)
