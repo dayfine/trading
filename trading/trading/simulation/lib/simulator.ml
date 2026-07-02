@@ -221,47 +221,6 @@ let _call_strategy t =
     let%bind output = S.on_market_close ~get_price ~get_indicator ~portfolio in
     Ok output.transitions
 
-(** Find position by symbol and state *)
-let _find_position_by_symbol_state positions ~symbol ~state_match =
-  Map.to_alist positions
-  |> List.find_map ~f:(fun (id, pos) ->
-      if
-        String.equal pos.Trading_strategy.Position.symbol symbol
-        && state_match (Trading_strategy.Position.get_state pos)
-      then Some (id, pos)
-      else None)
-
-let _no_risk_params =
-  Trading_strategy.Position.
-    { stop_loss_price = None; take_profit_price = None; max_hold_days = None }
-
-(** Apply a fill to a position (works for both entry and exit fills). *)
-let _apply_fill ~date ~position ~trade ~is_entry =
-  let open Result.Let_syntax in
-  let open Trading_strategy.Position in
-  let qty = trade.Trading_base.Types.quantity in
-  let price = trade.Trading_base.Types.price in
-  let fill_kind =
-    if is_entry then EntryFill { filled_quantity = qty; fill_price = price }
-    else ExitFill { filled_quantity = qty; fill_price = price }
-  in
-  let fill_trans = { position_id = position.id; date; kind = fill_kind } in
-  let%bind pos = apply_transition position fill_trans in
-  let complete_kind =
-    if is_entry then EntryComplete { risk_params = _no_risk_params }
-    else ExitComplete
-  in
-  let complete_trans = { position_id = pos.id; date; kind = complete_kind } in
-  apply_transition pos complete_trans
-
-let _is_entering_state = function
-  | Trading_strategy.Position.Entering _ -> true
-  | _ -> false
-
-let _is_exiting_state = function
-  | Trading_strategy.Position.Exiting _ -> true
-  | _ -> false
-
 let _is_holding_state = function
   | Trading_strategy.Position.Holding _ -> true
   | _ -> false
@@ -272,32 +231,10 @@ let _count_stop_eligible positions =
   Map.count positions ~f:(fun pos ->
       _is_holding_state (Trading_strategy.Position.get_state pos))
 
-let _find_fill_target acc symbol =
-  let try_find state_match is_entry =
-    _find_position_by_symbol_state acc ~symbol ~state_match
-    |> Option.map ~f:(fun (id, pos) -> (id, pos, is_entry))
-  in
-  match try_find _is_entering_state true with
-  | Some _ as r -> r
-  | None -> try_find _is_exiting_state false
-
-(* Install [data] in [acc] or remove [key] when Closed. Closed positions are
-   strategy-invisible and contribute 0 to valuation; audit trails live in
-   [Trade_audit] / [Stop_log] / [final_portfolio.positions]. *)
-let _set_or_drop_if_closed acc ~key ~data =
-  if Trading_strategy.Position.is_closed data then Map.remove acc key
-  else Map.set acc ~key ~data
-
-(** Update positions from trades. *)
-let _update_positions_from_trades ~date ~positions ~trades =
-  let open Result.Let_syntax in
-  List.fold_result trades ~init:positions ~f:(fun acc trade ->
-      let symbol = trade.Trading_base.Types.symbol in
-      match _find_fill_target acc symbol with
-      | Some (id, pos, is_entry) ->
-          let%bind updated = _apply_fill ~date ~position:pos ~trade ~is_entry in
-          Ok (_set_or_drop_if_closed acc ~key:id ~data:updated)
-      | None -> Ok acc)
+(* Fill routing (which position receives a fill trade, by symbol + state +
+   side) lives in {!Fill_router}. Closed positions are strategy-invisible and
+   contribute 0 to valuation; audit trails live in [Trade_audit] / [Stop_log] /
+   [final_portfolio.positions]. *)
 
 let _apply_trigger_exit acc trans =
   let open Result.Let_syntax in
@@ -305,7 +242,9 @@ let _apply_trigger_exit acc trans =
   | None -> Ok acc
   | Some pos ->
       let%bind updated = Trading_strategy.Position.apply_transition pos trans in
-      Ok (_set_or_drop_if_closed acc ~key:trans.position_id ~data:updated)
+      Ok
+        (Fill_router.set_or_drop_if_closed acc ~key:trans.position_id
+           ~data:updated)
 
 (** Apply transitions to positions. [CancelEntry] is delegated to
     {!Cancel_handler.apply_to_positions}; the rest are inline. *)
@@ -408,7 +347,8 @@ let _process_fills_and_cancels t ~portfolio ~positions =
       portfolio all_trades
   in
   let%bind positions =
-    _update_positions_from_trades ~date:t.current_date ~positions ~trades
+    Fill_router.update_positions_from_trades ~date:t.current_date ~positions
+      ~trades
   in
   let cancel_transitions =
     Cancel_handler.transitions_for_rejected_trades ~date:t.current_date

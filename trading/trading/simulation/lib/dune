@@ -12,6 +12,7 @@
   core)
  (modules
   simulator
+  fill_router
   simulator_metrics
   fill_date_stamp
   split_handler
