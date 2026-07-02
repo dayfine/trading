@@ -121,9 +121,9 @@ Wired into `dune runtest` so CI catches G14-class regressions automatically.
 
 ### M6.5 — Weekly report renderer
 
-`trading/trading/weinstein/snapshot/lib/report_renderer.{ml,mli}` (new). Pure `Weekly_snapshot.t → string` (markdown). Same shape as eventual M6.6 live report.
+`trading/trading/weinstein/snapshot/lib/report_renderer.{ml,mli}`. Pure `Weekly_snapshot.t → string` (markdown). Same shape as eventual M6.6 live report. Display limits are configurable (`render ?long_limit ?short_limit`, default long 7 / short 5); a truncated table appends a tie-honesty note stating how many hidden names tie the cutoff score (#1826). Display-only — the `.sexp` retains the screener's full capped list.
 
-CLI: `render_weekly_report <pick-file>` → stdout.
+CLI: `render_weekly_report <pick-file> [-long-limit N] [-short-limit N]` → stdout.
 
 ### M6.6 — DEFERRED
 
