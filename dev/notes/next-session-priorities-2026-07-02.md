@@ -36,16 +36,34 @@ Apr–Jun); ranked by score not alphabetical; ~62% of picks confirm (stay Stage 
 fwd), failures are clean regime-driven rollovers (not choppy), early-S2 confirms
 (75%) > fresh breakouts (60%). Analysis: `dev/notes/weekly-picks-refresh-analysis-2026-07-01.md`.
 
+## Update — 2026-07-02 (later session): P0 SHIPPED
+
+**P0 is done — merged as #1826** (main `3e067fed`). Display-only tightening of the
+human weekly-pick report (`Report_renderer`): display limits are now configurable
+(`?long_limit`/`?short_limit`, default long **10→7**, short 5), section headers echo
+the effective limit, the render CLI gained `-long-limit`/`-short-limit` flags, and a
+**tie-honesty note** now appends below a truncated table ("N more not shown; M tie the
+cutoff score S — treat the tied set as interchangeable"). The note encodes the
+project's own insight (score is anti-predictive at the top grade; the alphabetical
+tie-break is not a ranking) so a reader funding ~5 of a large tied A+ block knows the
+cut is arbitrary. **No strategy/backtest/schema change** — the `.sexp` still holds the
+screener's full capped list. The committed 26-week 2026-H1 series
+(`dev/weekly-picks/5a2689cb4/`) was re-rendered from the existing `.sexp` (e.g.
+2026-01-16 now shows top-7 + "13 more not shown; 4 tie the cutoff 85.00"). Both QC
+gates APPROVED (behavioral score 5); CI green (one BO-tuner test flaked, passed on
+rerun — unrelated to this PR).
+
+**The frontier is now P1 (capacity/concentration) — the one remaining entry-side
+lever.** Items P2–P6 below are unchanged.
+
 ## Open / pick up here
 
 The frontier for the weekly-picks/live product, in priority order:
 
-1. **P0 — tighten the surfaced list to actionable size.** The screen over-produces
-   ~4× what's executable (~20 longs/week ≈ 60–80/month, 89% non-recurring; a real
-   book funds ~5/week, cash-bound). Now that scores are meaningful, show **top-N by
-   score / A+-first** (e.g. top 5–10), not 20. This is the #1782 "display ordering"
-   thread — cheap (a display/config cap), and directly fixes "too many to act on."
-   Low-risk; do first.
+1. ~~**P0 — tighten the surfaced list to actionable size.**~~ **DONE — #1826** (see
+   the update block above). The tie-honesty note also lays groundwork for P1: it makes
+   the "which ~5 of the tied A+ block to fund" question explicit, which is exactly the
+   capacity decision.
 
 2. **P1 — the capacity/concentration experiment (the real entry-side lever).** With a
    surplus of quality breakouts but ~5 slots: fund **more-smaller vs fewer-larger**,
