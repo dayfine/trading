@@ -3,7 +3,8 @@
 Explore/exploit scale-in — the **reallocation** capital-management lever (P1
 capacity/concentration frontier). Design: `dev/plans/capital-management-scale-in-2026-07-02.md`
 (#1829). A 4-PR build; **v1 BUILT — all 4 PRs merged, default-off** (#1830–#1833; plan
-marked BUILT v1 in #1835). Next is empirical validation before any promotion.
+marked BUILT v1 in #1835). **Empirical validation COMPLETE — two-cell WF-CV surface
+(SP500 + top-3000) → REJECTED for promotion (ledger #1840); default stays off.**
 
 ## Status
 IN_PROGRESS
@@ -35,30 +36,43 @@ dayfine (maintainer, LOCAL sessions). Orchestrator QCs + merges the PRs as they 
   (maintainer LOCAL session, 2026-07-03T04:33Z). Plan marked BUILT v1 in #1835. **v1 build
   complete; nothing changes backtest results until the flag is flipped.**
 
-## Empirical status (2026-07-03)
-- **First WF-CV surface run (SP500, maintainer LOCAL, landed via #1837)** →
-  `dev/experiments/scale-in-wfcv-2026-07-03/out_sp500/walk_forward_report.md`.
-  13 folds. **Both `scale_in_pullback` and `scale_in_either` FAIL the go/no-go
-  gate**: 5/13 Sharpe wins (< 7 required); worst fold (fold-002) trails baseline
-  by Δ1.222 (> 0.30). Scale-in also *lowers* mean return (36.1%→23.4%) and Sharpe
-  (0.92→0.78) vs baseline across the folds. → **v1 not promoted; default stays
-  off** (experiment-flag-discipline R3 / promotion-confirmation). No ledger entry
-  written yet (a formal REJECT entry would close the loop). `out_top3000` not run
-  (spec present; deep warehouse still absent). Next surface must be regime-diverse
-  and/or the mechanism redesigned before re-testing.
+## Empirical status (2026-07-03) — TWO-CELL SURFACE COMPLETE → **REJECTED** (ledger #1840)
+- **Both WF-CV cells run (maintainer LOCAL); formal ledger REJECT written in #1840**
+  (`dev/experiments/_ledger/2026-07-03-scale-in-v1-surface.sexp`; writeup
+  `dev/notes/scale-in-wfcv-2026-07-03.md`; artifacts `dev/experiments/scale-in-wfcv-2026-07-03/`).
+  - **Cell A — SP500-515 PIT-2000, 13 folds** (`out_sp500/`): scale-in is an outright
+    **TAX** — mean Sharpe 0.92→0.78, mean return 36.1%→23.4%; 5/13 Sharpe wins (< 7),
+    worst fold trails by Δ1.22 (> 0.30). Recovery-year monsters get half-sized at entry
+    and never give the pullback that would restore full size.
+  - **Cell B — top-3000 PIT-2000, 13 folds** (`out_top3000/`; the regime-diverse deep
+    warehouse re-test run4 asked for): return dead-flat (~20%) with **mild risk
+    smoothing** (`either_loose` best on every risk metric — DD 15.4→13.9, 2022 bear fold
+    Sharpe −0.42→−0.03), but the +0.065 mean-Sharpe edge does **not** survive deflation
+    (t≈0.5, n_trials≈5). Formal gate FAIL (6/13 Sharpe wins).
+  - **Verdict: REJECT for promotion; mechanism KEEPS default-off axis status.** No default
+    flip (experiment-flag-discipline R3 / promotion-confirmation).
+- **Transferable why (in ledger):** (1) the half-sized initial entry is itself a fat-tail
+  tax — under-sizing unpredictable winners is the same class as trimming them; (2) `Either`
+  is structurally dead at `extension_max_pct=0.15` (breakouts already sit 10-20% above the
+  30w MA) — only at ext≈0.25 does the continuation-add arm live and supply the risk benefit;
+  (3) breadth reverses the sign — narrow SP500 has nowhere to redeploy the freed half so the
+  tax dominates; broad redeploys and nets out (scale-in as designed is a diversifier, not an
+  amplifier). **Validation bonus:** the surface caught the same-symbol-sibling fill mis-routing
+  bug → fixed #1837.
 
 ## Next Steps
-- **Empirical validation (data-gated / LOCAL)** before any promotion, per plan §6:
-  (1) express `enable_scale_in` as a `Variant_matrix` axis; (2) bear-inclusive WF-CV on a
-  deep, regime-diverse warehouse; (3) the §3.4 monster-under-sizing instrumentation;
-  (4) confirmation grid (`promotion-confirmation.md`). Default stays off until a ledger
-  ACCEPT + grid pass. Blocked in GHA: needs the EODHD warehouse (key absent) → maintainer
-  LOCAL / data-gated.
-- Non-blocking reconcile from PR 4: (a) plan §5 `max_adds` no-op default `0` vs impl `1`
-  (inert while default-off) — reconcile if it matters when the axis is searched;
-  (b) `early_new_high`'s ≥2-bar / above-entry clauses pinned only transitively.
+- **Lever REJECTED for return** — stop here on the current v1 shape. Default stays off
+  (axis status retained). No further GHA-runnable code work on this track.
+- **Only open forward path (data-gated / LOCAL, low priority per forward guidance):** if a
+  smoother broad book is ever wanted, revisit the `either_loose` shape (Either + ext≈0.25) as
+  tail-risk-lite — **possibly without the half-sizing** (full initial entries + continuation
+  adds = pure press-the-winner, the un-taxed half of the idea). That is a *fresh surface*, not
+  a re-run of v1; needs the deep/regime-diverse EODHD warehouse (absent in GHA).
+- Non-blocking reconcile from PR 4 (inert while default-off): (a) plan §5 `max_adds` no-op
+  default `0` vs impl `1`; (b) `early_new_high`'s ≥2-bar / above-entry clauses pinned only
+  transitively. Address if/when the axis is ever searched again.
 
 ## Blocked on
-None between tracks (code side complete). The remaining work — empirical scale-in
-axis promotion — is data-gated (deep/regime-diverse WF-CV warehouse; EODHD key absent in
-GHA) and runs as maintainer LOCAL sessions.
+None between tracks (code side complete; v1 REJECTED). Any future work (the un-taxed
+press-the-winner fresh surface) is data-gated (deep/regime-diverse WF-CV warehouse; EODHD
+key absent in GHA) and runs as maintainer LOCAL sessions.
