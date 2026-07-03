@@ -1,6 +1,13 @@
 # Capital-management layer: explore/exploit scale-in — design
 
-**Status:** DESIGN (not built). Product of a 2026-07-02 design session (grill).
+**Status:** BUILT v1 (2026-07-03), **default-off** — merged as #1830 (side-aware
+fill routing), #1831 (per-ticker stop advance), #1832 (config + detector),
+#1833 (runner + wiring). Implementation note: the `Holding → add` transition of
+§4 landed as a **sibling position** (own id/lifecycle, same symbol, shared
+per-ticker stop) — same behavior, no core state-machine change. Validation per
+§6 still pending before any promotion: `Variant_matrix` axis spec,
+bear-inclusive WF-CV, the §3.4 monster-under-sizing instrumentation, and the
+confirmation grid. Design produced 2026-07-02 (grill session).
 **Frame:** *Thinking in Systems* (Meadows) — portfolio as a stock-and-flow system.
 **Scope of v1:** the **reallocation** lever only (see §2). The **envelope** lever
 (gross exposure / `min_cash`) is explicitly out of scope here — separate program.
