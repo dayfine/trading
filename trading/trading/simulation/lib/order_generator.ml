@@ -68,22 +68,34 @@ let _transition_to_order ~id ~positions
   | UpdateRiskParams _ | ExitFill _ | ExitComplete ->
       Ok None
 
-(** Advance the (seq, accumulator) pair with [maybe_order].
+(** Advance the (seq, accumulator) pair with [maybe_order], recording the (order
+    id, position id) link when an order was produced.
 
     [seq] is always incremented even when no order is produced — this keeps IDs
     stable regardless of how transition kinds are reordered in the caller.
     Sequential gaps in IDs are harmless. *)
-let _accumulate_order (seq, acc) maybe_order =
+let _accumulate_order ~position_id (seq, acc, links) maybe_order =
   match maybe_order with
-  | Some order -> Ok (seq + 1, order :: acc)
-  | None -> Ok (seq + 1, acc)
+  | Some order ->
+      ( seq + 1,
+        order :: acc,
+        (order.Trading_orders.Types.id, position_id) :: links )
+  | None -> (seq + 1, acc, links)
+
+(* One fold step: mint the next id, build the order (if any), accumulate. *)
+let _order_step ~current_date ~positions (seq, acc, links) transition =
+  let open Result.Let_syntax in
+  let id = _make_id ~current_date ~seq in
+  let%bind maybe_order = _transition_to_order ~id ~positions transition in
+  Ok
+    (_accumulate_order
+       ~position_id:transition.Trading_strategy.Position.position_id
+       (seq, acc, links) maybe_order)
 
 let transitions_to_orders ~current_date ~positions transitions =
   let open Result.Let_syntax in
-  let%bind _, orders =
-    List.fold_result transitions ~init:(0, []) ~f:(fun (seq, acc) transition ->
-        let id = _make_id ~current_date ~seq in
-        let%bind maybe_order = _transition_to_order ~id ~positions transition in
-        _accumulate_order (seq, acc) maybe_order)
+  let%bind _, orders, links =
+    List.fold_result transitions ~init:(0, [], [])
+      ~f:(_order_step ~current_date ~positions)
   in
-  Ok (List.rev orders)
+  Ok (List.rev orders, List.rev links)

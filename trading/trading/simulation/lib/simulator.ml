@@ -82,6 +82,11 @@ and t = {
   last_known_prices : float String.Table.t;
       (** Per-symbol last-resolved close, used as the third fallback for
           [_resolve_price]. Reference-shared across per-step copies of [t]. *)
+  order_links : string String.Table.t;
+      (** order_id -> position_id for the orders currently in flight (recorded
+          at generation, consumed by {!Fill_router} for exact fill routing).
+          Cleared and repopulated on each generation pass; reference-shared
+          across per-step copies of [t]. *)
   valuation_failure_count : int ref;
       (** Counter for fallback-to-avg-cost valuations; [0] in healthy runs. *)
 }
@@ -115,6 +120,7 @@ let _build_initial_state ~config ~deps =
     positions = String.Map.empty;
     step_history = [];
     last_known_prices = String.Table.create ();
+    order_links = String.Table.create ();
     valuation_failure_count = ref 0;
   }
 
@@ -347,8 +353,8 @@ let _process_fills_and_cancels t ~portfolio ~positions =
       portfolio all_trades
   in
   let%bind positions =
-    Fill_router.update_positions_from_trades ~date:t.current_date ~positions
-      ~trades
+    Fill_router.update_positions_from_trades ~order_links:t.order_links
+      ~date:t.current_date ~positions ~trades ()
   in
   let cancel_transitions =
     Cancel_handler.transitions_for_rejected_trades ~date:t.current_date
@@ -385,10 +391,14 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
       ~today_bars ~date:t.current_date ~strategy_transitions
   in
   let%bind positions = _apply_transitions ~positions ~transitions in
-  let%bind orders =
+  let%bind orders, order_links =
     Order_generator.transitions_to_orders ~current_date:t.current_date
       ~positions transitions
   in
+  (* Day orders: each generation pass replaces the in-flight link set. *)
+  Hashtbl.clear t.order_links;
+  List.iter order_links ~f:(fun (order_id, position_id) ->
+      Hashtbl.set t.order_links ~key:order_id ~data:position_id);
   let portfolio_value =
     Portfolio_valuation.compute ~adapter:t.deps.market_data_adapter
       ~date:t.current_date ~portfolio ~today_bars

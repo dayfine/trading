@@ -132,10 +132,13 @@ let make_partial_exiting_position ?(side = Long) ~position_id ~symbol ~quantity
 
 (* ==================== transitions_to_orders tests ==================== *)
 
+(* Existing assertions pin the ORDERS component; the (order_id, position_id)
+   links added for exact fill routing are dropped here and pinned separately. *)
+let orders_only ~current_date ~positions transitions =
+  Result.map (transitions_to_orders ~current_date ~positions transitions) ~f:fst
+
 let test_empty_transitions_returns_empty_orders _ =
-  let result =
-    transitions_to_orders ~current_date:today ~positions:empty_positions []
-  in
+  let result = orders_only ~current_date:today ~positions:empty_positions [] in
   assert_that result (is_ok_and_holds (elements_are []))
 
 let test_create_entering_generates_buy_order _ =
@@ -146,8 +149,7 @@ let test_create_entering_generates_buy_order _ =
     ]
   in
   let result =
-    transitions_to_orders ~current_date:today ~positions:empty_positions
-      transitions
+    orders_only ~current_date:today ~positions:empty_positions transitions
   in
   assert_that result
     (is_ok_and_holds
@@ -171,8 +173,7 @@ let test_trigger_exit_no_position_returns_empty _ =
     [ make_trigger_exit_transition ~position_id:"AAPL-1" ~exit_price:155.0 ]
   in
   let result =
-    transitions_to_orders ~current_date:today ~positions:empty_positions
-      transitions
+    orders_only ~current_date:today ~positions:empty_positions transitions
   in
   assert_that result (is_ok_and_holds (elements_are []))
 
@@ -187,9 +188,7 @@ let test_trigger_exit_with_position_generates_sell_order _ =
   let transitions =
     [ make_trigger_exit_transition ~position_id:"AAPL-1" ~exit_price:155.0 ]
   in
-  let result =
-    transitions_to_orders ~current_date:today ~positions transitions
-  in
+  let result = orders_only ~current_date:today ~positions transitions in
   assert_that result
     (is_ok_and_holds
        (elements_are
@@ -207,6 +206,34 @@ let test_trigger_exit_with_position_generates_sell_order _ =
                    : order_essentials));
           ]))
 
+let test_links_pair_each_order_with_its_position _ =
+  (* The (order_id, position_id) links drive exact fill routing — one link per
+     order produced, in emission order, ids minted as <date>-<seq>. *)
+  let position =
+    make_exiting_position ~position_id:"AAPL-orig" ~symbol:"AAPL"
+      ~quantity:100.0 ~price:150.0 ~exit_price:155.0 ()
+  in
+  let positions = String.Map.singleton "AAPL-orig" position in
+  let transitions =
+    [
+      make_create_entering_transition ~position_id:"AAPL-add" ~symbol:"AAPL"
+        ~quantity:40.0 ~price:150.0 ();
+      make_trigger_exit_transition ~position_id:"AAPL-orig" ~exit_price:155.0;
+    ]
+  in
+  let result =
+    Result.map
+      (transitions_to_orders ~current_date:today ~positions transitions)
+      ~f:snd
+  in
+  assert_that result
+    (is_ok_and_holds
+       (equal_to
+          [
+            (Date.to_string today ^ "-000", "AAPL-add");
+            (Date.to_string today ^ "-001", "AAPL-orig");
+          ]))
+
 (* A partial exit sizes the sell order at the trim quantity (40), not the full
    held quantity (100). *)
 let test_trigger_partial_exit_sizes_order_at_trim _ =
@@ -221,9 +248,7 @@ let test_trigger_partial_exit_sizes_order_at_trim _ =
         ~exit_price:155.0 ~target_quantity:40.0;
     ]
   in
-  let result =
-    transitions_to_orders ~current_date:today ~positions transitions
-  in
+  let result = orders_only ~current_date:today ~positions transitions in
   assert_that result
     (is_ok_and_holds
        (elements_are
@@ -249,16 +274,14 @@ let test_entry_fill_returns_no_orders _ =
     ]
   in
   let result =
-    transitions_to_orders ~current_date:today ~positions:empty_positions
-      transitions
+    orders_only ~current_date:today ~positions:empty_positions transitions
   in
   assert_that result (is_ok_and_holds (elements_are []))
 
 let test_entry_complete_returns_no_orders _ =
   let transitions = [ make_entry_complete_transition ~position_id:"AAPL-1" ] in
   let result =
-    transitions_to_orders ~current_date:today ~positions:empty_positions
-      transitions
+    orders_only ~current_date:today ~positions:empty_positions transitions
   in
   assert_that result (is_ok_and_holds (elements_are []))
 
@@ -272,8 +295,7 @@ let test_multiple_create_entering_generates_multiple_orders _ =
     ]
   in
   let result =
-    transitions_to_orders ~current_date:today ~positions:empty_positions
-      transitions
+    orders_only ~current_date:today ~positions:empty_positions transitions
   in
   assert_that result
     (is_ok_and_holds
@@ -316,8 +338,7 @@ let test_mixed_transitions_filters_non_order_generating _ =
     ]
   in
   let result =
-    transitions_to_orders ~current_date:today ~positions:empty_positions
-      transitions
+    orders_only ~current_date:today ~positions:empty_positions transitions
   in
   assert_that result
     (is_ok_and_holds
@@ -346,8 +367,7 @@ let test_short_create_entering_generates_sell_order _ =
     ]
   in
   let result =
-    transitions_to_orders ~current_date:today ~positions:empty_positions
-      transitions
+    orders_only ~current_date:today ~positions:empty_positions transitions
   in
   assert_that result
     (is_ok_and_holds
@@ -376,9 +396,7 @@ let test_short_trigger_exit_generates_buy_order _ =
   let transitions =
     [ make_trigger_exit_transition ~position_id:"AAPL-1" ~exit_price:145.0 ]
   in
-  let result =
-    transitions_to_orders ~current_date:today ~positions transitions
-  in
+  let result = orders_only ~current_date:today ~positions transitions in
   assert_that result
     (is_ok_and_holds
        (elements_are
@@ -409,6 +427,8 @@ let suite =
          >:: test_trigger_exit_with_position_generates_sell_order;
          "test_trigger_partial_exit_sizes_order_at_trim"
          >:: test_trigger_partial_exit_sizes_order_at_trim;
+         "links pair each order with its position"
+         >:: test_links_pair_each_order_with_its_position;
          "test_entry_fill_returns_no_orders"
          >:: test_entry_fill_returns_no_orders;
          "test_entry_complete_returns_no_orders"

@@ -90,7 +90,7 @@ let _trade ~symbol ~(side : Trading_base.Types.side) ~quantity ~price :
   }
 
 let _update ~positions ~trades =
-  Fill_router.update_positions_from_trades ~date:_date ~positions ~trades
+  Fill_router.update_positions_from_trades ~date:_date ~positions ~trades ()
   |> _ok_exn ~msg:"update_positions_from_trades"
 
 (* Sibling pair on one symbol: the original Exiting (sell order open) and an
@@ -252,6 +252,83 @@ let test_side_mismatched_fill_is_ignored _ =
             | _ -> None)
           (float_equal 0.0)))
 
+let test_same_state_siblings_route_by_order_link _ =
+  (* The scale-in fold-001 crash shape: BOTH siblings exit on their shared stop
+     in one tick — two same-symbol Exiting-Long positions (targets 7398 and
+     2011) with two sell fills. The (symbol, state, side) heuristic routes the
+     first id-ordered match ("WTW-add" < "WTW-orig") and overflows its target;
+     the order_links table must route each fill to exactly its own position. *)
+  let positions =
+    _positions_of
+      [
+        _exiting ~id:"WTW-orig" ~symbol:"WTW" ~side:Long ~quantity:7398.0
+          ~entry_price:20.0 ~exit_price:25.0;
+        _exiting ~id:"WTW-add" ~symbol:"WTW" ~side:Long ~quantity:2011.0
+          ~entry_price:24.0 ~exit_price:25.0;
+      ]
+  in
+  let order_links = String.Table.create () in
+  Hashtbl.set order_links ~key:"ord-big" ~data:"WTW-orig";
+  Hashtbl.set order_links ~key:"ord-small" ~data:"WTW-add";
+  let trade ~order_id ~quantity =
+    { (_trade ~symbol:"WTW" ~side:Sell ~quantity ~price:25.0) with order_id }
+  in
+  let updated =
+    Fill_router.update_positions_from_trades ~order_links ~date:_date ~positions
+      ~trades:
+        [
+          trade ~order_id:"ord-big" ~quantity:7398.0;
+          trade ~order_id:"ord-small" ~quantity:2011.0;
+        ]
+      ()
+    |> _ok_exn ~msg:"linked routing"
+  in
+  (* Both exits complete: both positions close and drop from the map. *)
+  assert_that (Map.is_empty updated) (equal_to true)
+
+let test_stale_link_to_unfillable_position_falls_back _ =
+  (* Fillability guard: an order_links entry pointing at a HOLDING (non-
+     fillable) position must be ignored — the fill falls back to the
+     (symbol, state, side) heuristic and reaches the Exiting sibling instead
+     of raising an invalid transition on the Holding one. *)
+  let positions =
+    _positions_of
+      [
+        _holding ~id:"AAPL-stale" ~symbol:"AAPL" ~side:Long ~quantity:5.0
+          ~entry_price:100.0;
+        _exiting ~id:"AAPL-exit" ~symbol:"AAPL" ~side:Long ~quantity:10.0
+          ~entry_price:100.0 ~exit_price:95.0;
+      ]
+  in
+  let order_links = String.Table.create () in
+  Hashtbl.set order_links ~key:"ord-1" ~data:"AAPL-stale";
+  let updated =
+    Fill_router.update_positions_from_trades ~order_links ~date:_date ~positions
+      ~trades:
+        [
+          {
+            (_trade ~symbol:"AAPL" ~side:Sell ~quantity:10.0 ~price:95.0) with
+            order_id = "ord-1";
+          };
+        ]
+      ()
+    |> _ok_exn ~msg:"stale-link fallback"
+  in
+  assert_that updated
+    (all_of
+       [
+         field (fun m -> Map.mem m "AAPL-exit") (equal_to false);
+         field
+           (fun m -> Map.find m "AAPL-stale")
+           (is_some_and
+              (matching ~msg:"holding untouched"
+                 (fun (p : t) ->
+                   match get_state p with
+                   | Holding h -> Some h.quantity
+                   | _ -> None)
+                 (float_equal 5.0)));
+       ])
+
 let suite =
   "fill_routing"
   >::: [
@@ -266,6 +343,10 @@ let suite =
          "short_entry_fills_on_sell" >:: test_short_entry_fills_on_sell;
          "side_mismatched_fill_is_ignored"
          >:: test_side_mismatched_fill_is_ignored;
+         "same_state_siblings_route_by_order_link"
+         >:: test_same_state_siblings_route_by_order_link;
+         "stale_link_to_unfillable_position_falls_back"
+         >:: test_stale_link_to_unfillable_position_falls_back;
        ]
 
 let () = run_test_tt_main suite
