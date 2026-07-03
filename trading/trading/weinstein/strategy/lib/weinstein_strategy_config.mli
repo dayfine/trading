@@ -460,6 +460,31 @@ type config = {
           a [Variant_matrix] axis, e.g.
           [((key (liquidity_config min_hold_dollar_adv)) (values (0.0 1e6)))].
           Default-off until an experiment-ledger ACCEPT. *)
+  enable_scale_in : bool; [@sexp.default false]
+      (** Master switch for the explore/exploit scale-in mechanism
+          ([dev/plans/capital-management-scale-in-2026-07-02.md]): initial
+          entries at [scale_in_config.initial_entry_fraction] of the full risk
+          unit (broader survey of fresh Stage-2 breakouts) plus at most
+          [scale_in_config.max_adds] follow-up adds into {e revealed} strength
+          (the first pullback that holds the breakout — Weinstein's ½ + ½, "The
+          Trader's Way"). A
+          {b reallocation inside the existing exposure envelope}: per-symbol
+          notional stays capped at [portfolio_config.max_position_pct_long] and
+          no gross-exposure knob changes.
+
+          Default [false] is a {b no-op} — the entry walk, sizing, and
+          transitions are bit-identical to baseline (experiment-flag-discipline
+          R1); the mechanism is searchable as a flag axis the day it lands (R2).
+      *)
+  scale_in_config : Scale_in_detector.config;
+      [@sexp.default Scale_in_detector.default_config]
+      (** Scale-in knobs — initial-entry fraction, add trigger ([Pullback] v1
+          default / [Early_new_high] / [Either]), pullback proximity, the
+          extension gate (max distance above the 30-week MA), and the not-late
+          gate. Only consulted when [enable_scale_in = true]; each field is
+          addressable as a [Variant_matrix] dot-path axis, e.g.
+          [((key (scale_in_config add_trigger)) (values (Pullback Either)))].
+          See {!Scale_in_detector}. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

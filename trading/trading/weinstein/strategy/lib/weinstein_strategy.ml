@@ -19,6 +19,7 @@ module Macro_bearish_trim_wiring = Macro_bearish_trim_wiring
 module Laggard_rotation_runner = Laggard_rotation_runner
 module Special_exits = Special_exits
 module Liquidity_config = Liquidity_config
+module Scale_in_detector = Scale_in_detector
 module Liquidity_metric = Liquidity_metric
 module Liquidity_exit_runner = Liquidity_exit_runner
 module Stage3_force_exit = Stage3_force_exit

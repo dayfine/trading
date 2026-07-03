@@ -142,9 +142,22 @@ type config = {
   liquidity_config : Liquidity_config.t;
       [@sexp.default Liquidity_config.default_config]
       (** See [.mli]. *)
+  enable_scale_in : bool; [@sexp.default false]
+      (** Master switch for the explore/exploit scale-in mechanism (½-unit
+          initial entries + one pullback add into revealed strength). Default
+          [false] is a no-op — bit-identical to baseline. See [.mli]. *)
+  scale_in_config : Scale_in_detector.config;
+      [@sexp.default Scale_in_detector.default_config]
+      (** Scale-in knobs (initial fraction, add trigger, gates); only consulted
+          when [enable_scale_in = true]. See [.mli]. *)
 }
 [@@deriving sexp]
 
+(* Flat record literal over every config field — exactly one line per field
+   by construction (no logic), growing one line per new default-off
+   experiment knob. OCaml has no partial record literals, so splitting is
+   impossible and extracting field groups would only add indirection.
+   @large-function: flat default-config record literal, one line per field *)
 let default_config ~universe ~index_symbol =
   let indices = { primary = index_symbol; global = [] } in
   {
@@ -193,6 +206,8 @@ let default_config ~universe ~index_symbol =
     harvest_fraction = 0.5;
     short_sleeve_fraction = 0.0;
     liquidity_config = Liquidity_config.default_config;
+    enable_scale_in = false;
+    scale_in_config = Scale_in_detector.default_config;
   }
 
 let name = "Weinstein"
