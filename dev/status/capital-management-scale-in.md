@@ -5,6 +5,11 @@ capacity/concentration frontier). Design: `dev/plans/capital-management-scale-in
 (#1829). A 4-PR build; **v1 BUILT — all 4 PRs merged, default-off** (#1830–#1833; plan
 marked BUILT v1 in #1835). **Empirical validation COMPLETE — two-cell WF-CV surface
 (SP500 + top-3000) → REJECTED for promotion (ledger #1840); default stays off.**
+**Post-REJECT participation measurement (#1843): the v1 add channel never physically
+functioned** (adds emit as zero-width `StopLimit(close,close)` → structurally unfillable).
+A small **add-channel-fix build** (P0, maintainer-LOCAL; plan
+`dev/notes/next-session-priorities-2026-07-04.md` / #1844) is the only path to a *first*
+real test of the designed press-the-winner mechanism.
 
 ## Status
 IN_PROGRESS
@@ -60,9 +65,30 @@ dayfine (maintainer, LOCAL sessions). Orchestrator QCs + merges the PRs as they 
   amplifier). **Validation bonus:** the surface caught the same-symbol-sibling fill mis-routing
   bug → fixed #1837.
 
+## Participation finding (2026-07-03, #1843) — the v1 add channel never functioned
+- Instrumented per-fold participation (`dev/experiments/scale-in-participation-2026-07-03/RESULTS.md`)
+  found the scale-in **add channel is structurally non-functional in v1**: adds emit as
+  zero-width `StopLimit(close, close)` at Friday's close (`Weinstein_order_gen._entry_order`
+  reused verbatim) → a gap-up triggers the stop but the limit can never fill; only adverse
+  retreat-to-close fills are possible. 4/4 observed fills collided with same-day parent exits.
+- **`either_loose`'s broad "risk-smoothing" re-attributed:** it is a Friday cash-reservation
+  throttle (funded-but-unfillable adds deduct ≈$590–736k cumulative/fold from the same-Friday
+  entry budget) + path divergence — **not** continuation-adds. Confirmed via in-fold-011 proof
+  (pullback has more breadth, 120 vs 98 entries, yet ≈ baseline). Ledger amended in-place (#1843).
+- **Consequence:** the v1 REJECT stands, but the "un-taxed press-the-winner" shape was never
+  actually tested — it was blocked by three pinned defects (below), not disproven.
+
 ## Next Steps
-- **Lever REJECTED for return** — stop here on the current v1 shape. Default stays off
-  (axis status retained). No further GHA-runnable code work on this track.
+- **v1 REJECT stands** (default stays off, axis status retained). But per #1843 the designed
+  add channel never functioned, so the press-the-winner shape is *untested*, not disproven.
+- **P0 add-channel-fix build (maintainer-LOCAL, plan #1844 / `next-session-priorities-2026-07-04.md`)** —
+  three concrete, pinned defects, all default-off / no-op for existing paths
+  (experiment-flag-discipline R1): (1) fillable add order type (stop-market above Friday close /
+  market-at-open, not zero-width `StopLimit(close,close)`); (2) explicit `add_fraction` knob in
+  `Scale_in_detector.config`; (3) add/exit-coherence gate (don't emit adds for symbols the same
+  tick is exiting). This is maintainer-LOCAL work per the Ownership line; the orchestrator QCs +
+  merges the PRs as they land (not a feat-agent dispatch). Then: fresh full-size+adds surface
+  through experiment-gap-closing WF-CV (data-gated in GHA).
 - **Only open forward path (data-gated / LOCAL, low priority per forward guidance):** if a
   smoother broad book is ever wanted, revisit the `either_loose` shape (Either + ext≈0.25) as
   tail-risk-lite — **possibly without the half-sizing** (full initial entries + continuation
@@ -73,6 +99,8 @@ dayfine (maintainer, LOCAL sessions). Orchestrator QCs + merges the PRs as they 
   transitively. Address if/when the axis is ever searched again.
 
 ## Blocked on
-None between tracks (code side complete; v1 REJECTED). Any future work (the un-taxed
-press-the-winner fresh surface) is data-gated (deep/regime-diverse WF-CV warehouse; EODHD
-key absent in GHA) and runs as maintainer LOCAL sessions.
+None between tracks. v1 REJECTED; the add-channel-fix P0 build (#1844) is maintainer-LOCAL
+(strategy-core order-translation change + a design choice the maintainer owns per the
+Ownership line — not a feat-agent dispatch). The subsequent fresh full-size+adds WF-CV surface
+is data-gated (deep/regime-diverse warehouse; EODHD key absent in GHA) and runs as maintainer
+LOCAL sessions.
