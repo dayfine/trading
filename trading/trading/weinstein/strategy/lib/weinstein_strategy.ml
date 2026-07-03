@@ -20,6 +20,7 @@ module Laggard_rotation_runner = Laggard_rotation_runner
 module Special_exits = Special_exits
 module Liquidity_config = Liquidity_config
 module Scale_in_detector = Scale_in_detector
+module Scale_in_runner = Scale_in_runner
 module Liquidity_metric = Liquidity_metric
 module Liquidity_exit_runner = Liquidity_exit_runner
 module Stage3_force_exit = Stage3_force_exit
@@ -236,33 +237,63 @@ let _run_macro_and_trim ~config ~ad_series ~positions ~portfolio ~prior_macro
   in
   (macro_result_opt, macro_trim_transitions)
 
-(** Run the held-position dials (late-Stage-2 tighten + harvest-rotate) and the
-    entry walk. Returns [(late_tighten, harvest_rotate, entries)]. Extracted
-    from {!_process_market_day} so that coordinator stays within the
-    function-length limit. *)
+(** Scale-in add pass (default-off). Runs BEFORE the fresh-entry walk; returns
+    the add transitions plus the cash they consume so the entry walk sees a
+    reduced budget — a revealed-strength add outranks an unproven fresh entry
+    for scarce cash (plan §3.3). [([], 0.)] when [enable_scale_in] is off. *)
+let _run_scale_in ~config ~positions ~portfolio ~get_price ~bar_reader
+    ~prior_stages ~prior_stage_ma_values ~stop_states ~scale_in_added
+    ~peak_tracker ~macro_result_opt ~is_screening_day ~current_date =
+  let halted =
+    match
+      Portfolio_risk.Force_liquidation.Peak_tracker.halt_state peak_tracker
+    with
+    | Halted -> true
+    | Active -> false
+  in
+  Scale_in_runner.run ~config ~positions ~portfolio ~get_price ~bar_reader
+    ~prior_stages ~prior_stage_ma_values ~stop_states ~scale_in_added
+    ~macro_result_opt ~is_screening_day ~halted ~current_date
+
+(** Run the held-position dials (late-Stage-2 tighten + harvest-rotate), the
+    scale-in add pass, and the entry walk. Returns
+    [(late_tighten, harvest_rotate, entries)] with the adds prepended to the
+    entries. Extracted from {!_process_market_day} so that coordinator stays
+    within the function-length limit. *)
 let _run_dials_and_entries ~fold_start_date ~config ~stop_states
     ~last_stop_out_dates ~peak_tracker ~bar_reader ~prior_stages
-    ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio ~current_date
-    ~index_view ~audit_recorder ~prior_macro_result ~is_screening_day
-    ~macro_result_opt ~positions =
+    ~prior_stage_ma_values ~scale_in_added ~sector_prior_stages ~ticker_sectors
+    ~get_price ~(portfolio : Portfolio_view.t) ~current_date ~index_view
+    ~audit_recorder ~prior_macro_result ~is_screening_day ~macro_result_opt
+    ~positions =
   let late_tighten_transitions, harvest_rotate_transitions =
     _run_held_position_dials ~config ~positions ~get_price ~prior_stages
       ~index_view ~audit_recorder ~prior_macro_result ~bar_reader ~current_date
   in
+  let scale_in_transitions, scale_in_cash =
+    _run_scale_in ~config ~positions ~portfolio ~get_price ~bar_reader
+      ~prior_stages ~prior_stage_ma_values ~stop_states ~scale_in_added
+      ~peak_tracker ~macro_result_opt ~is_screening_day ~current_date
+  in
+  let entry_portfolio =
+    { portfolio with Portfolio_view.cash = portfolio.cash -. scale_in_cash }
+  in
   let entry_transitions =
     _run_entries ~fold_start_date ~config ~stop_states ~last_stop_out_dates
       ~peak_tracker ~bar_reader ~prior_stages ~sector_prior_stages
-      ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
-      ~audit_recorder ~is_screening_day ~macro_result_opt
+      ~ticker_sectors ~get_price ~portfolio:entry_portfolio ~current_date
+      ~index_view ~audit_recorder ~is_screening_day ~macro_result_opt
   in
-  (late_tighten_transitions, harvest_rotate_transitions, entry_transitions)
+  ( late_tighten_transitions,
+    harvest_rotate_transitions,
+    scale_in_transitions @ entry_transitions )
 
 let _process_market_day ~fold_start_date ~config ~ad_series ~stop_states
     ~last_stop_out_dates ~prior_macro ~prior_macro_result
     ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
-    ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors ~stage3_streaks
-    ~laggard_streaks ~audit_recorder ~get_price ~(portfolio : Portfolio_view.t)
-    ~current_date =
+    ~prior_stage_ma_values ~scale_in_added ~sector_prior_stages ~ticker_sectors
+    ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price
+    ~(portfolio : Portfolio_view.t) ~current_date =
   let positions = portfolio.positions in
   let exit_transitions, adjust_transitions =
     _run_stops_pass ~config ~positions ~stop_states ~bar_reader ~prior_stages
@@ -297,9 +328,10 @@ let _process_market_day ~fold_start_date ~config ~ad_series ~stop_states
   let late_tighten_transitions, harvest_rotate_transitions, entry_transitions =
     _run_dials_and_entries ~fold_start_date ~config ~stop_states
       ~last_stop_out_dates ~peak_tracker ~bar_reader ~prior_stages
-      ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio ~current_date
-      ~index_view ~audit_recorder ~prior_macro_result ~is_screening_day
-      ~macro_result_opt ~positions
+      ~prior_stage_ma_values ~scale_in_added ~sector_prior_stages
+      ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
+      ~audit_recorder ~prior_macro_result ~is_screening_day ~macro_result_opt
+      ~positions
   in
   Transition_assembly.assemble_output ~exit_transitions
     ~stage3_force_exit_transitions ~laggard_rotation_transitions
@@ -310,8 +342,8 @@ let _process_market_day ~fold_start_date ~config ~ad_series ~stop_states
 let _on_market_close ~fold_start_date ~config ~ad_series ~stop_states
     ~last_stop_out_dates ~prior_macro ~prior_macro_result
     ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
-    ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors ~stage3_streaks
-    ~laggard_streaks ~audit_recorder ~get_price ~get_indicator:_
+    ~prior_stage_ma_values ~scale_in_added ~sector_prior_stages ~ticker_sectors
+    ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price ~get_indicator:_
     ~(portfolio : Portfolio_view.t) =
   match get_price config.indices.primary with
   | None -> Ok { Strategy_interface.transitions = [] }
@@ -320,9 +352,9 @@ let _on_market_close ~fold_start_date ~config ~ad_series ~stop_states
       _process_market_day ~fold_start_date ~config ~ad_series ~stop_states
         ~last_stop_out_dates ~prior_macro ~prior_macro_result
         ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
-        ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors
-        ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price ~portfolio
-        ~current_date
+        ~prior_stage_ma_values ~scale_in_added ~sector_prior_stages
+        ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder
+        ~get_price ~portfolio ~current_date
 
 let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
     ?(ticker_sectors = Hashtbl.create (module String)) ?bar_reader
@@ -352,6 +384,12 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
       ~momentum_period:config.macro_config.indicator_thresholds.momentum_period
       weekly_ad_bars
   in
+  (* Scale-in add bookkeeping (symbol -> adds emitted). Closure state like
+     [laggard_streaks]; not persisted (backtests are single-process; the live
+     weekly generator is a one-shot). *)
+  let scale_in_added : int Hashtbl.M(String).t =
+    Hashtbl.create (module String)
+  in
   let module M = struct
     let name = name
 
@@ -359,8 +397,8 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
       _on_market_close ~fold_start_date ~config ~ad_series ~stop_states
         ~last_stop_out_dates ~prior_macro ~prior_macro_result
         ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
-        ~prior_stage_ma_values ~sector_prior_stages ~ticker_sectors
-        ~stage3_streaks ~laggard_streaks ~audit_recorder
+        ~prior_stage_ma_values ~scale_in_added ~sector_prior_stages
+        ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder
   end in
   (module M : Strategy_interface.STRATEGY)
 
@@ -374,7 +412,10 @@ module Internal_for_test = struct
         ~momentum_period:
           config.macro_config.indicator_thresholds.momentum_period ad_bars
     in
-    _on_market_close ~fold_start_date ~config ~ad_series
+    let scale_in_added : int Hashtbl.M(String).t =
+      Hashtbl.create (module String)
+    in
+    _on_market_close ~fold_start_date ~config ~ad_series ~scale_in_added
 
   let maybe_reset_halt = _maybe_reset_halt
   let positions_minus_exited = _positions_minus_exited

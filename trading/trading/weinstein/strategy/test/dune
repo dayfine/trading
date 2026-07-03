@@ -28,6 +28,7 @@
   test_laggard_rotation_runner
   test_stops_runner
   test_scale_in_detector
+  test_scale_in_runner
   test_stops_split_runner
   test_weekly_ma_cache
   test_weinstein_strategy
