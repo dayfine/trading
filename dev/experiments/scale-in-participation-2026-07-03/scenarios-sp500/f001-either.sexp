@@ -1,0 +1,20 @@
+;; Participation-effect measurement: sp500 fold-001 either@0.5 (ext default 0.15,
+;; matching the WF-CV sp500 scale_in_either variant).
+((name "part-sp500-f001-either")
+ (description "Participation measurement: sp500 fold-001 (2001-12-31..2003-12-30) scale-in Either, fraction 0.5, ext 0.15.")
+ (period ((start_date 2001-12-31) (end_date 2003-12-30)))
+ (universe_path "universes/sp500-historical/sp500-2000-01-01.sexp")
+ (universe_size 515)
+ (config_overrides
+  (((enable_short_side false))
+   ((portfolio_config ((max_position_pct_long 0.30))))
+   ((portfolio_config ((max_long_exposure_pct 0.70))))
+   ((portfolio_config ((min_cash_pct 0.30))))
+   ((enable_stage3_force_exit true))
+   ((stage3_force_exit_config ((hysteresis_weeks 1))))
+   ((enable_laggard_rotation true))
+   ((laggard_rotation_config ((hysteresis_weeks 2))))
+   ((enable_scale_in true))
+   ((scale_in_config ((initial_entry_fraction 0.5)(add_trigger Either))))))
+ (cost_model ((per_trade_commission 0.0)(per_share_commission 0.01)(bid_ask_spread_bps 0.0)(market_impact_bps_per_pct_adv 0.0)))
+ (expected ((total_return_pct ((min -100.0)(max 100000.0)))(total_trades ((min 0)(max 1000000)))(win_rate ((min 0.0)(max 100.0)))(sharpe_ratio ((min -100.0)(max 100.0)))(max_drawdown_pct ((min 0.0)(max 100.0)))(avg_holding_days ((min 0.0)(max 100000.0))))))
