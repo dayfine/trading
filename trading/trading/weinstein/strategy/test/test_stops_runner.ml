@@ -25,9 +25,11 @@ let get_price_of bars symbol = List.Assoc.find bars symbol ~equal:String.equal
 
 (** Build a Position.t in the [Holding] state for [ticker] at [price]. Defaults
     to [Long]; pass [~side:Short] for short positions (used by the G1
-    short-stop-direction reproducer tests below). *)
-let make_holding_pos ?(side = Trading_base.Types.Long) ticker price date =
-  let pos_id = ticker in
+    short-stop-direction reproducer tests below). [?id] overrides the position
+    id (defaults to [ticker]) — used by the sibling-position tests, which hold
+    two positions on one ticker. *)
+let make_holding_pos ?(side = Trading_base.Types.Long) ?id ticker price date =
+  let pos_id = Option.value id ~default:ticker in
   let make_trans kind =
     { Trading_strategy.Position.position_id = pos_id; date; kind }
   in
@@ -630,6 +632,130 @@ let test_catastrophic_pct_zero_no_exit _ =
   assert_that exits is_empty
 
 (* ------------------------------------------------------------------ *)
+(* Sibling positions on one ticker (scale-in shape)                     *)
+(*                                                                      *)
+(* Two Holding positions share one ticker and therefore one entry in    *)
+(* stop_states — the shared stop discipline governs both units. The     *)
+(* runner must (a) emit a per-position transition for BOTH siblings     *)
+(* (both exit on a hit; both get UpdateRiskParams on a raise), while    *)
+(* (b) advancing the shared state machine exactly ONCE per tick —       *)
+(* Weinstein_stops.update's contract is one call per period.            *)
+(* ------------------------------------------------------------------ *)
+
+(** Two Long Holdings on [ticker] with distinct position ids. *)
+let _sibling_positions ticker price date =
+  String.Map.of_alist_exn
+    [
+      ( ticker ^ "-orig",
+        make_holding_pos ~id:(ticker ^ "-orig") ticker price date );
+      (ticker ^ "-add", make_holding_pos ~id:(ticker ^ "-add") ticker price date);
+    ]
+
+let _transition_ids (transitions : Trading_strategy.Position.transition list) =
+  List.map transitions ~f:(fun tr -> tr.Trading_strategy.Position.position_id)
+  |> List.sort ~compare:String.compare
+
+let test_sibling_positions_stop_hit_exits_both _ =
+  (* Shared stop breached → one TriggerExit per sibling position. *)
+  let ticker = "AAPL" in
+  let date = Date.of_string "2024-01-05" in
+  let positions = _sibling_positions ticker 100.0 date in
+  let stop_states =
+    ref
+      (String.Map.singleton ticker
+         (Weinstein_stops.Initial { stop_level = 90.0; reference_level = 95.0 }))
+  in
+  let bar = make_bar "2024-01-12" ~close:95.0 ~low:85.0 () in
+  let exits, adjusts =
+    Stops_runner.update ~stops_config:default_cfg
+      ~stage_config:default_stage_cfg ~lookback_bars:52 ~positions
+      ~get_price:(get_price_of [ (ticker, bar) ])
+      ~stop_states ~bar_reader:(Bar_reader.empty ())
+      ~as_of:(Date.of_string "2024-01-12")
+      ~prior_stages:(Hashtbl.create (module String))
+      ()
+  in
+  assert_that adjusts is_empty;
+  assert_that (_transition_ids exits) (equal_to [ "AAPL-add"; "AAPL-orig" ])
+
+(** A Trailing state one recovery-bar away from a raise: a completed ≥8%
+    correction ([last_correction_extreme] 88 vs [last_trend_extreme] 100,
+    [min_correction_pct] = 0.08) with a fresh anchor
+    ([correction_observed_since_reset]), so a close above 100 completes the
+    cycle and raises the stop off the correction low. *)
+let _raise_ready_trailing =
+  Weinstein_stops.Trailing
+    {
+      stop_level = 80.0;
+      last_correction_extreme = 88.0;
+      last_trend_extreme = 100.0;
+      ma_at_last_adjustment = 90.0;
+      correction_count = 1;
+      correction_observed_since_reset = true;
+    }
+
+let test_sibling_positions_raise_adjusts_both _ =
+  (* Shared trailing stop raises → BOTH siblings get an UpdateRiskParams at
+     the same new level. Under a per-position machine advance (the pre-fix
+     behaviour) only the first sibling would see the raise event — the second
+     call re-runs the machine on the already-raised state, so the second
+     position's risk params silently go stale. *)
+  let ticker = "AAPL" in
+  let date = Date.of_string "2024-01-05" in
+  let positions = _sibling_positions ticker 100.0 date in
+  let stop_states = ref (String.Map.singleton ticker _raise_ready_trailing) in
+  let bar = make_bar "2024-01-12" ~close:105.0 ~low:103.0 ~high:106.0 () in
+  let exits, adjusts =
+    Stops_runner.update ~stops_config:default_cfg
+      ~stage_config:default_stage_cfg ~lookback_bars:52 ~positions
+      ~get_price:(get_price_of [ (ticker, bar) ])
+      ~stop_states ~bar_reader:(Bar_reader.empty ())
+      ~as_of:(Date.of_string "2024-01-12")
+      ~prior_stages:(Hashtbl.create (module String))
+      ()
+  in
+  assert_that exits is_empty;
+  let new_levels =
+    List.filter_map adjusts ~f:(fun tr ->
+        match tr.Trading_strategy.Position.kind with
+        | Trading_strategy.Position.UpdateRiskParams { new_risk_params } ->
+            new_risk_params.stop_loss_price
+        | _ -> None)
+  in
+  assert_that (_transition_ids adjusts) (equal_to [ "AAPL-add"; "AAPL-orig" ]);
+  (* Both adjusts carry the same (single-advance) new stop level. *)
+  assert_that new_levels
+    (matching ~msg:"two identical raised levels"
+       (function [ a; b ] when Float.equal a b -> Some a | _ -> None)
+       (gt (module Float_ord) 80.0))
+
+let test_sibling_positions_advance_state_once _ =
+  (* The shared per-ticker state after an update over two siblings must equal
+     the state after the same update over ONE position — the machine advanced
+     once, not once per sibling. *)
+  let ticker = "AAPL" in
+  let date = Date.of_string "2024-01-05" in
+  let bar = make_bar "2024-01-12" ~close:105.0 ~low:103.0 ~high:106.0 () in
+  let run positions =
+    let stop_states = ref (String.Map.singleton ticker _raise_ready_trailing) in
+    let _ =
+      Stops_runner.update ~stops_config:default_cfg
+        ~stage_config:default_stage_cfg ~lookback_bars:52 ~positions
+        ~get_price:(get_price_of [ (ticker, bar) ])
+        ~stop_states ~bar_reader:(Bar_reader.empty ())
+        ~as_of:(Date.of_string "2024-01-12")
+        ~prior_stages:(Hashtbl.create (module String))
+        ()
+    in
+    Map.find_exn !stop_states ticker
+  in
+  let single =
+    run (String.Map.singleton ticker (make_holding_pos ticker 100.0 date))
+  in
+  let sibling = run (_sibling_positions ticker 100.0 date) in
+  assert_that sibling (equal_to single)
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -665,4 +791,10 @@ let () =
            >:: test_weekly_cadence_no_state_advance_when_only_midweek;
            "G11: Weekly cadence still fires trigger on mid-week bar"
            >:: test_weekly_cadence_trigger_fires_on_midweek_bar;
+           "siblings: stop hit exits both positions"
+           >:: test_sibling_positions_stop_hit_exits_both;
+           "siblings: raise adjusts both positions"
+           >:: test_sibling_positions_raise_adjusts_both;
+           "siblings: shared state machine advances once"
+           >:: test_sibling_positions_advance_state_once;
          ])
