@@ -35,6 +35,18 @@ dayfine (maintainer, LOCAL sessions). Orchestrator QCs + merges the PRs as they 
   (maintainer LOCAL session, 2026-07-03T04:33Z). Plan marked BUILT v1 in #1835. **v1 build
   complete; nothing changes backtest results until the flag is flipped.**
 
+## Empirical status (2026-07-03)
+- **First WF-CV surface run (SP500, maintainer LOCAL, landed via #1837)** →
+  `dev/experiments/scale-in-wfcv-2026-07-03/out_sp500/walk_forward_report.md`.
+  13 folds. **Both `scale_in_pullback` and `scale_in_either` FAIL the go/no-go
+  gate**: 5/13 Sharpe wins (< 7 required); worst fold (fold-002) trails baseline
+  by Δ1.222 (> 0.30). Scale-in also *lowers* mean return (36.1%→23.4%) and Sharpe
+  (0.92→0.78) vs baseline across the folds. → **v1 not promoted; default stays
+  off** (experiment-flag-discipline R3 / promotion-confirmation). No ledger entry
+  written yet (a formal REJECT entry would close the loop). `out_top3000` not run
+  (spec present; deep warehouse still absent). Next surface must be regime-diverse
+  and/or the mechanism redesigned before re-testing.
+
 ## Next Steps
 - **Empirical validation (data-gated / LOCAL)** before any promotion, per plan §6:
   (1) express `enable_scale_in` as a `Variant_matrix` axis; (2) bear-inclusive WF-CV on a
