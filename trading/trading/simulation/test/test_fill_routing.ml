@@ -286,6 +286,49 @@ let test_same_state_siblings_route_by_order_link _ =
   (* Both exits complete: both positions close and drop from the map. *)
   assert_that (Map.is_empty updated) (equal_to true)
 
+let test_stale_link_to_unfillable_position_falls_back _ =
+  (* Fillability guard: an order_links entry pointing at a HOLDING (non-
+     fillable) position must be ignored — the fill falls back to the
+     (symbol, state, side) heuristic and reaches the Exiting sibling instead
+     of raising an invalid transition on the Holding one. *)
+  let positions =
+    _positions_of
+      [
+        _holding ~id:"AAPL-stale" ~symbol:"AAPL" ~side:Long ~quantity:5.0
+          ~entry_price:100.0;
+        _exiting ~id:"AAPL-exit" ~symbol:"AAPL" ~side:Long ~quantity:10.0
+          ~entry_price:100.0 ~exit_price:95.0;
+      ]
+  in
+  let order_links = String.Table.create () in
+  Hashtbl.set order_links ~key:"ord-1" ~data:"AAPL-stale";
+  let updated =
+    Fill_router.update_positions_from_trades ~order_links ~date:_date ~positions
+      ~trades:
+        [
+          {
+            (_trade ~symbol:"AAPL" ~side:Sell ~quantity:10.0 ~price:95.0) with
+            order_id = "ord-1";
+          };
+        ]
+      ()
+    |> _ok_exn ~msg:"stale-link fallback"
+  in
+  assert_that updated
+    (all_of
+       [
+         field (fun m -> Map.mem m "AAPL-exit") (equal_to false);
+         field
+           (fun m -> Map.find m "AAPL-stale")
+           (is_some_and
+              (matching ~msg:"holding untouched"
+                 (fun (p : t) ->
+                   match get_state p with
+                   | Holding h -> Some h.quantity
+                   | _ -> None)
+                 (float_equal 5.0)));
+       ])
+
 let suite =
   "fill_routing"
   >::: [
@@ -302,6 +345,8 @@ let suite =
          >:: test_side_mismatched_fill_is_ignored;
          "same_state_siblings_route_by_order_link"
          >:: test_same_state_siblings_route_by_order_link;
+         "stale_link_to_unfillable_position_falls_back"
+         >:: test_stale_link_to_unfillable_position_falls_back;
        ]
 
 let () = run_test_tt_main suite
