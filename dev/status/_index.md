@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-03 (orchestrator run 28633423533: **DISPATCH run — 2 PRs QC'd + 3-gate auto-merged**, advancing the P1 capacity/concentration scale-in build (plan #1829). **#1831** (fix/stops-per-ticker-advance — per-ticker stop advanced once/tick via memo/replay `Stop_transitions`; bit-identical today) and **#1832** (feat/scale-in-config-detector — pure `Scale_in_detector` + default-off config, faithful Weinstein ½+½ dial, no-behavior-change land) both APPROVED by qc-structural + qc-behavioral (4/5 each) and auto-merged (CI + both QC gates green; update-branch'd for behind-main). New track row `capital-management-scale-in` added (PRs 1-3 merged; PR 4 runner pending, maintainer LOCAL). Note: maintainer was force-pushing merge-ups / marker fixes live during the run; reviewed diffs verified byte-identical to merged tips. ops-data/harness/code-health skipped (data-gaps unchanged since 2026-05-03; harness lone `[~]` workflow-PAT-blocked; cleanup backlog drained). status-integrity + index-size + no-python exit 0 live; main CI re-running post-merge (both PRs CI-green individually pre-merge). Prior: 2026-07-02 run 2 (28576023656) NO-DISPATCH full pass.
+Last updated: 2026-07-03 (orchestrator run 28640711416, run 2: **NO-DISPATCH full pass** — 0 open PRs; the scale-in build's PR 4 (#1833 runner + wiring, default-off) + plan-BUILT doc (#1835) merged from a maintainer LOCAL session between runs, completing scale-in **v1 (all of #1830–#1833)**. Reconciled the stale `capital-management-scale-in` row/status file (PR 4 landed; next = empirical WF-CV axis promotion, data-gated). No GHA-dispatchable work: all IN_PROGRESS tracks are data-gated (EODHD key absent) / human-gated / LOCAL / maintainer; harness lone `[~]` workflow-PAT-blocked; cleanup backlog drained; ops-data data-gaps unchanged since 2026-05-03. Main GREEN (HEAD b10979d093 CI + perf-tier1 + both goldens SUCCESS). Prior: run 1 (28633423533) DISPATCH — QC'd + 3-gate auto-merged #1831/#1832.
 
 ## Active + complete tracks
 
@@ -13,7 +13,7 @@ Each row: one line; deeper task detail in the linked status file.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
-| [capital-management-scale-in](capital-management-scale-in.md) | IN_PROGRESS | dayfine | — | PRs 1-3 MERGED (#1830/#1831/#1832; 3-gate auto-merged 07-03); next: PR 4 runner wiring (LOCAL) |
+| [capital-management-scale-in](capital-management-scale-in.md) | IN_PROGRESS | dayfine | — | v1 BUILT default-off (all #1830–#1833; #1835 plan BUILT); next: empirical WF-CV axis promotion (data-gated/LOCAL) |
 | [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | — | readme_toplines top-line numbers MERGED (#1617, 3-gate auto-merge); next: P2 matrix on composition-policy universe (data-gated) |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
