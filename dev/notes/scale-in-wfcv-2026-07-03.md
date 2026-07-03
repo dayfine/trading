@@ -72,6 +72,33 @@ either_loose) does not survive deflation (t ≈ 0.5 over 13 folds, ~5 trials).
   one.
 - Mechanism stays merged, default-off, a searchable axis. No golden churn.
 
+## AMENDMENT 2026-07-03 (participation-effect measurement)
+
+Decision-level measurement (`dev/experiments/scale-in-participation-2026-07-03/RESULTS.md`)
+**contradicts finding (2)'s second half and re-attributes the broad smoothing**:
+
+- **The add channel never functioned anywhere.** "Adds DO fire ~4/fold"
+  counted *funded orders*, not fills. Instrumented f011: pullback 20 funded /
+  **1 filled**; either_loose 22 funded / **1 filled**. Root cause: adds are
+  emitted as zero-width `StopLimit(close, close)` at Friday's close of a
+  stock signalling *strength* — a gap-up can trigger the stop but never meet
+  the limit, so the designed press-the-winner fill is structurally
+  unreachable; the order fills only when price retreats to Friday's close =
+  adverse selection (4/4 observed fills collided with same-day parent exits).
+- **either_loose's risk benefit is therefore NOT continuation-adds.** It is a
+  side-effect bundle: funded-but-unfillable adds reserve cash on the emit
+  Friday (≈$590–736k cumulative per f011 cell on $1M), displacing marginal
+  new entries (helpful in bear tape, costly in bull), plus path divergence.
+- **Confirmed the strong way:** ½-sizing → breadth is near-lossless (79–92%
+  of newly-entered names were baseline's `Insufficient_cash` near-misses;
+  skips-per-Friday flat at ~10 — the cash constraint always binds), and the
+  fat-tail tax is visible per-decision (avg entry ~halves, never restored).
+- **REJECT stands**, but the *tested object* was "½-sizing + breadth + an
+  unfillable-add cash-reservation throttle", not the designed explore/exploit
+  reallocation. Prerequisites before the untested full-size+adds shape:
+  fillable add order type (stop-market above close / market-at-open),
+  add/exit-coherence gate, explicit `add_fraction` knob.
+
 ## Validation bonus
 
 The surface caught a real simulator bug on its first fold: same-state sibling
