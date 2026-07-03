@@ -87,17 +87,39 @@ let set_or_drop_if_closed positions ~key ~data =
 (* Route one fill trade onto the position map: find the (symbol, state, side)
    target, apply the fill, install the updated position (or drop it when
    Closed). A trade whose side matches no open order on its symbol is a no-op. *)
-let _apply_one_trade ~date positions trade =
+(* Exact routing: the position whose transition created this trade's order,
+   per the [order_links] table. Only honoured when that position is currently
+   in a fillable state ([Entering] receives entry fills, [Exiting] exit fills)
+   — otherwise fall through to the heuristic. *)
+let _find_linked_target positions ~order_links ~order_id =
+  let open Option.Let_syntax in
+  let%bind links = order_links in
+  let%bind position_id = Hashtbl.find links order_id in
+  let%bind pos = Map.find positions position_id in
+  match Trading_strategy.Position.get_state pos with
+  | Trading_strategy.Position.Entering _ -> Some (position_id, pos, true)
+  | Trading_strategy.Position.Exiting _ -> Some (position_id, pos, false)
+  | _ -> None
+
+let _apply_one_trade ~date ~order_links positions trade =
   let open Result.Let_syntax in
   let symbol = trade.Trading_base.Types.symbol in
-  match
-    _find_fill_target positions ~symbol
-      ~trade_side:trade.Trading_base.Types.side
-  with
+  let target =
+    match
+      _find_linked_target positions ~order_links
+        ~order_id:trade.Trading_base.Types.order_id
+    with
+    | Some _ as linked -> linked
+    | None ->
+        _find_fill_target positions ~symbol
+          ~trade_side:trade.Trading_base.Types.side
+  in
+  match target with
   | Some (id, pos, is_entry) ->
       let%bind updated = _apply_fill ~date ~position:pos ~trade ~is_entry in
       Ok (set_or_drop_if_closed positions ~key:id ~data:updated)
   | None -> Ok positions
 
-let update_positions_from_trades ~date ~positions ~trades =
-  List.fold_result trades ~init:positions ~f:(_apply_one_trade ~date)
+let update_positions_from_trades ?order_links ~date ~positions ~trades () =
+  List.fold_result trades ~init:positions
+    ~f:(_apply_one_trade ~date ~order_links)

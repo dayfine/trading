@@ -18,8 +18,13 @@ val transitions_to_orders :
   current_date:Core.Date.t ->
   positions:Trading_strategy.Position.t Core.String.Map.t ->
   Trading_strategy.Position.transition list ->
-  Trading_orders.Types.order list Status.status_or
-(** Convert strategy transitions to trading orders.
+  (Trading_orders.Types.order list * (string * string) list) Status.status_or
+(** Convert strategy transitions to trading orders. Returns the orders plus one
+    [(order_id, position_id)] link per order produced — the caller feeds the
+    links to {!Fill_router.update_positions_from_trades} so a fill routes to
+    exactly the position whose transition created its order (required when
+    sibling positions put two same-side orders on one symbol; see
+    {!Fill_router}).
 
     For each transition in the list:
     - [CreateEntering]: Creates a Market Buy order with target_quantity
