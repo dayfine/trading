@@ -131,20 +131,6 @@ let _sleeve_decisions ~held_set ~make_entry ~portfolio_value ~state ~long_cash
   |> List.sort ~compare:(fun (i, _, _) (j, _, _) -> Int.compare i j)
   |> List.map ~f:(fun (_, c, d) -> (c, d))
 
-(* Fresh-entry sizing config. With scale-in enabled, initial entries commit
-   [initial_entry_fraction] of the full risk unit (the explore half — plan
-   §3.1); the pullback add supplies the rest. Flag off → the exact same
-   record, bit-identical sizing. *)
-let _entry_sizing_config (config : config) =
-  if not config.enable_scale_in then config.portfolio_config
-  else
-    {
-      config.portfolio_config with
-      Portfolio_risk.risk_per_trade_pct =
-        config.portfolio_config.Portfolio_risk.risk_per_trade_pct
-        *. config.scale_in_config.Scale_in_detector.initial_entry_fraction;
-    }
-
 let entries_from_candidates ?sector_lookup ~config ~candidates ~stop_states
     ~bar_reader ~(portfolio : Portfolio_view.t) ~get_price ~current_date
     ?(audit_recorder = Audit_recorder.noop) ?macro () =
@@ -155,7 +141,7 @@ let entries_from_candidates ?sector_lookup ~config ~candidates ~stop_states
       ~min_stop_distance_pct:
         (Entry_stop_distance.min_stop_distance_for ~config ~bar_reader
            ~current_date cand)
-      ~portfolio_risk_config:(_entry_sizing_config config)
+      ~portfolio_risk_config:(Scale_in_runner.entry_sizing_config config)
       ~stops_config:config.stops_config
       ~initial_stop_buffer:config.initial_stop_buffer ~stop_states ~bar_reader
       ~portfolio_value ~current_date cand

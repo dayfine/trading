@@ -243,6 +243,51 @@ let test_off_friday_is_no_op _ =
   let transitions, cash = _run ~is_screening_day:false f in
   assert_that (transitions, cash) (equal_to ([], 0.0))
 
+let test_halted_is_no_op _ =
+  let f = _fixture () in
+  let transitions, cash = _run ~halted:true f in
+  assert_that (transitions, cash) (equal_to ([], 0.0))
+
+let test_insufficient_cash_rejects_add_whole _ =
+  (* The arbitration guard (plan §3.3, no partial adds): with only $100 cash
+     the signalled add's full cost cannot fit — the cash gate must reject it
+     outright, consuming zero cash AND zero add budget (the symbol stays
+     add-eligible for a later, funded Friday). *)
+  let f = _fixture () in
+  let portfolio =
+    { f.portfolio with Trading_strategy.Portfolio_view.cash = 100.0 }
+  in
+  let transitions, cash = _run { f with portfolio } in
+  assert_that (transitions, cash) (equal_to ([], 0.0));
+  assert_that (Hashtbl.find f.scale_in_added "AAPL") is_none
+
+let test_stop_at_or_above_price_blocks_add _ =
+  (* No defined risk: a stop at/above the current close blocks the add —
+     sizing off a non-positive stop distance is never attempted (Weinstein
+     spine: risk is defined by the stop). *)
+  let f = _fixture () in
+  let stop_states =
+    ref
+      (String.Map.singleton "AAPL"
+         (Weinstein_stops.Initial
+            { stop_level = 106.0; reference_level = 108.0 }))
+  in
+  let transitions, cash = _run { f with stop_states } in
+  assert_that (transitions, cash) (equal_to ([], 0.0))
+
+let test_per_name_cap_exhausted_sizes_zero _ =
+  (* Existing sibling notional already over max_position_pct_long (500 sh x
+     105 = 52,500 vs cap 0.30 x PV 152,500 = 45,750) -> cap_left = 0 -> zero
+     shares -> no add. *)
+  let f = _fixture () in
+  let pos = _holding_pos ~quantity:500.0 "AAPL" in
+  let positions = String.Map.singleton pos.Trading_strategy.Position.id pos in
+  let portfolio =
+    { Trading_strategy.Portfolio_view.cash = 100_000.0; positions }
+  in
+  let transitions, _ = _run { f with positions; portfolio } in
+  assert_that transitions is_empty
+
 let suite =
   "scale_in_runner"
   >::: [
@@ -258,6 +303,13 @@ let suite =
          "sibling in flight disarms symbol"
          >:: test_sibling_in_flight_disarms_symbol;
          "off-Friday is a no-op" >:: test_off_friday_is_no_op;
+         "halted is a no-op" >:: test_halted_is_no_op;
+         "insufficient cash rejects the add whole"
+         >:: test_insufficient_cash_rejects_add_whole;
+         "stop at/above price blocks add (no defined risk)"
+         >:: test_stop_at_or_above_price_blocks_add;
+         "per-name cap exhausted sizes to zero"
+         >:: test_per_name_cap_exhausted_sizes_zero;
        ]
 
 let () = run_test_tt_main suite

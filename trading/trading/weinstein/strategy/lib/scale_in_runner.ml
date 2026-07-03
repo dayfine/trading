@@ -7,6 +7,20 @@ open Weinstein_strategy_config
 
 let add_reasoning_description = "Weinstein scale-in add (revealed strength)"
 
+(* Fresh-entry sizing config. With scale-in enabled, initial entries commit
+   [initial_entry_fraction] of the full risk unit (the explore half — plan
+   §3.1); the pullback add supplies the rest. Flag off → the exact same
+   record, bit-identical sizing. *)
+let entry_sizing_config (config : config) =
+  if not config.enable_scale_in then config.portfolio_config
+  else
+    {
+      config.portfolio_config with
+      Portfolio_risk.risk_per_trade_pct =
+        config.portfolio_config.Portfolio_risk.risk_per_trade_pct
+        *. config.scale_in_config.Scale_in_detector.initial_entry_fraction;
+    }
+
 (* Same admission rule as the fresh-entry walk: Bearish blocks buys
    unconditionally (the macro gate applies to ANY buy, adds included);
    Neutral admits per [neutral_blocks_longs]. *)

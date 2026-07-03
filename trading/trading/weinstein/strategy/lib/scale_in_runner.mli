@@ -57,6 +57,14 @@ open Trading_strategy
 val add_reasoning_description : string
 (** [entry_reasoning] description marking scale-in adds in audit output. *)
 
+val entry_sizing_config :
+  Weinstein_strategy_config.config -> Portfolio_risk.config
+(** Fresh-entry sizing config for the entry walk. With [enable_scale_in = true],
+    initial entries commit [scale_in_config.initial_entry_fraction] of the full
+    risk unit (the explore half — plan §3.1); the pullback add supplies the
+    rest. With the flag off, returns [config.portfolio_config] {b unchanged}
+    (the identical record), so disabled sizing is bit-identical to baseline. *)
+
 val run :
   config:Weinstein_strategy_config.config ->
   positions:Position.t String.Map.t ->
