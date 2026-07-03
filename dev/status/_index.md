@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-03 (orchestrator run 28640711416, run 2: **NO-DISPATCH full pass** — 0 open PRs; the scale-in build's PR 4 (#1833 runner + wiring, default-off) + plan-BUILT doc (#1835) merged from a maintainer LOCAL session between runs, completing scale-in **v1 (all of #1830–#1833)**. Reconciled the stale `capital-management-scale-in` row/status file (PR 4 landed; next = empirical WF-CV axis promotion, data-gated). No GHA-dispatchable work: all IN_PROGRESS tracks are data-gated (EODHD key absent) / human-gated / LOCAL / maintainer; harness lone `[~]` workflow-PAT-blocked; cleanup backlog drained; ops-data data-gaps unchanged since 2026-05-03. Main GREEN (HEAD b10979d093 CI + perf-tier1 + both goldens SUCCESS). Prior: run 1 (28633423533) DISPATCH — QC'd + 3-gate auto-merged #1831/#1832.
+Last updated: 2026-07-03 (orchestrator run 28648183235, run 3: **NO-DISPATCH full pass** — 1 open PR, maintainer-in-flight. `#1837` (`fix/sim-order-link-routing`, maintainer `dayfine`) fixes same-symbol scale-in sibling fill routing (order→position link); **updated 08:26:44Z, 50s before this run started** → actively being pushed. Content = maintainer self-QC APPROVED (structural `5fdc38b4` + behavioral rework-iter1 `b4695a13`), rebased to tip `905608f6`; NOT mergeable this run (CI `build-and-test` in_progress; `mergeable_state: behind`). Per gha-local-coordination "do not duplicate mid-flight": no orchestrator QC dispatch / no branch-touch — maintainer admin-merges on CI-green (per #1833 pattern) or next idle run picks it up. Reconciled simulation row Open-PR = #1837. No other GHA-dispatchable work: feature tracks data/human/LOCAL-gated; harness `[~]` workflow-PAT-blocked; cleanup drained; ops-data sentinel-skip (data-gaps unchanged since 2026-05-03). Main GREEN (HEAD 8b6feba9 CI + perf-tier1 + both goldens SUCCESS). Prior: run 2 (28640711416) NO-DISPATCH reconcile; run 1 (28633423533) DISPATCH — 3-gate auto-merged #1831/#1832.
 
 ## Active + complete tracks
 
@@ -43,7 +43,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
 | [screener](screener.md) | MERGED | — | — | — |
-| [simulation](simulation.md) | IN_PROGRESS | feat-backtest | — | stale-exit promotion grid now runnable via WF-CV (#1491/#1494); M5 walk-forward + tuner catch-all items |
+| [simulation](simulation.md) | IN_PROGRESS | feat-backtest | #1837 (in-flight) | #1837 (maintainer) fixes same-symbol sibling fill routing (order→position link); stale-exit grid runnable via WF-CV (#1491/#1494) |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
 | [experiment-platform](experiment-platform.md) | IN_PROGRESS | feat-backtest | — | force-exit-off grid REJECTED for promotion (#1503); single-dial surface exhausted; next: continuation-buy recheck on top-3000 (data-gated) |
