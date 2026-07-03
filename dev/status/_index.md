@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-03 (orchestrator run 28648183235, run 3: **NO-DISPATCH full pass** — 1 open PR, maintainer-in-flight. `#1837` (`fix/sim-order-link-routing`, maintainer `dayfine`) fixes same-symbol scale-in sibling fill routing (order→position link); **updated 08:26:44Z, 50s before this run started** → actively being pushed. Content = maintainer self-QC APPROVED (structural `5fdc38b4` + behavioral rework-iter1 `b4695a13`), rebased to tip `905608f6`; NOT mergeable this run (CI `build-and-test` in_progress; `mergeable_state: behind`). Per gha-local-coordination "do not duplicate mid-flight": no orchestrator QC dispatch / no branch-touch — maintainer admin-merges on CI-green (per #1833 pattern) or next idle run picks it up. Reconciled simulation row Open-PR = #1837. No other GHA-dispatchable work: feature tracks data/human/LOCAL-gated; harness `[~]` workflow-PAT-blocked; cleanup drained; ops-data sentinel-skip (data-gaps unchanged since 2026-05-03). Main GREEN (HEAD 8b6feba9 CI + perf-tier1 + both goldens SUCCESS). Prior: run 2 (28640711416) NO-DISPATCH reconcile; run 1 (28633423533) DISPATCH — 3-gate auto-merged #1831/#1832.
+Last updated: 2026-07-03 (orchestrator run 28656836722, run 4: **NO-DISPATCH full pass** — 0 open PRs. `#1837` (`fix/sim-order-link-routing`, maintainer `dayfine`, the fill-routing fix that was in-flight in run 3) **MERGED 08:54:30Z** (HEAD `5aeda071`), as run 3 predicted. Reconciled: simulation row Open-PR `#1837 (in-flight)` → `—`; #1837's branch also landed a **scale-in WF-CV surface** (`dev/experiments/scale-in-wfcv-2026-07-03/out_sp500`) that **FAILED the go/no-go gate** (both `scale_in_pullback`/`either` 5/13 Sharpe wins < 7; worst fold trails by 1.22) → v1 stays default-off, not promoted (experiment-flag R3 / promotion-confirmation). Reconciled scale-in next-task accordingly. No GHA-dispatchable work: feature tracks data/human/LOCAL-gated (EODHD key absent); harness `[~]` workflow-PAT-blocked, rest milestone/human-gated; cleanup drained; ops-data sentinel-skip (data-gaps unchanged since 2026-05-03). Main GREEN (HEAD `5aeda071` CI + perf-tier1 + both 5y/custom goldens SUCCESS; golden-15y in_progress). 0 open ci-red. Prior: run 3 (28648183235) NO-DISPATCH reconcile; run 2 (28640711416) NO-DISPATCH reconcile; run 1 (28633423533) DISPATCH — 3-gate auto-merged #1831/#1832.
 
 ## Active + complete tracks
 
@@ -13,7 +13,7 @@ Each row: one line; deeper task detail in the linked status file.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
-| [capital-management-scale-in](capital-management-scale-in.md) | IN_PROGRESS | dayfine | — | v1 BUILT default-off (all #1830–#1833; #1835 plan BUILT); next: empirical WF-CV axis promotion (data-gated/LOCAL) |
+| [capital-management-scale-in](capital-management-scale-in.md) | IN_PROGRESS | dayfine | — | v1 BUILT default-off; SP500 WF-CV FAILED gate (5/13, #1837 expt) → not promoted; next: regime-diverse re-test/redesign (data-gated) |
 | [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | — | readme_toplines top-line numbers MERGED (#1617, 3-gate auto-merge); next: P2 matrix on composition-policy universe (data-gated) |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
@@ -43,7 +43,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
 | [screener](screener.md) | MERGED | — | — | — |
-| [simulation](simulation.md) | IN_PROGRESS | feat-backtest | #1837 (in-flight) | #1837 (maintainer) fixes same-symbol sibling fill routing (order→position link); stale-exit grid runnable via WF-CV (#1491/#1494) |
+| [simulation](simulation.md) | IN_PROGRESS | feat-backtest | — | #1837 fill-routing fix MERGED (order→position link); next: stale-exit grid via WF-CV (#1491/#1494, data-gated) |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
 | [experiment-platform](experiment-platform.md) | IN_PROGRESS | feat-backtest | — | force-exit-off grid REJECTED for promotion (#1503); single-dial surface exhausted; next: continuation-buy recheck on top-3000 (data-gated) |
