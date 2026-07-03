@@ -134,6 +134,12 @@ module Scale_in_detector = Scale_in_detector
     {!Scale_in_detector.default_config} and the [trigger] variants without a
     separate library import. *)
 
+module Scale_in_runner = Scale_in_runner
+(** Scale-in add runner (default-off). Runs on Friday ticks before the
+    fresh-entry walk when [config.enable_scale_in = true]; emits sibling
+    [CreateEntering] adds into revealed strength and reduces the entry walk's
+    cash budget by their cost. See {!Scale_in_runner}. *)
+
 module Liquidity_metric = Liquidity_metric
 (** Pure trailing dollar-ADV metric. See {!Liquidity_metric}. *)
 

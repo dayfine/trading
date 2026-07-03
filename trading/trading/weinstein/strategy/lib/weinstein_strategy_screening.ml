@@ -141,7 +141,7 @@ let entries_from_candidates ?sector_lookup ~config ~candidates ~stop_states
       ~min_stop_distance_pct:
         (Entry_stop_distance.min_stop_distance_for ~config ~bar_reader
            ~current_date cand)
-      ~portfolio_risk_config:config.portfolio_config
+      ~portfolio_risk_config:(Scale_in_runner.entry_sizing_config config)
       ~stops_config:config.stops_config
       ~initial_stop_buffer:config.initial_stop_buffer ~stop_states ~bar_reader
       ~portfolio_value ~current_date cand
