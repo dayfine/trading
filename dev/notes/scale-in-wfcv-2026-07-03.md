@@ -72,32 +72,32 @@ either_loose) does not survive deflation (t ≈ 0.5 over 13 folds, ~5 trials).
   one.
 - Mechanism stays merged, default-off, a searchable axis. No golden churn.
 
-## AMENDMENT 2026-07-03 (participation-effect measurement)
+## AMENDMENT 2026-07-03, RETRACTED + REPLACED 2026-07-04
 
-Decision-level measurement (`dev/experiments/scale-in-participation-2026-07-03/RESULTS.md`)
-**contradicts finding (2)'s second half and re-attributes the broad smoothing**:
+The amendment merged in #1843 ("the add channel never functioned; adds
+structurally unfillable via `StopLimit(close,close)`; smoothing = cash
+throttle") was **wrong** — it counted adds from `trades.csv`, whose
+round-trip pairing breaks under sibling positions (chimera rows + dropped
+legs in `Metrics.extract_round_trips`). A full pipeline trace shows **adds
+fill routinely** (sp500 f001 pullback 4/4; broad f011 pullback 19/20;
+simulator entry orders are Market, not StopLimit — that shape is the live
+path only). Corrected record: `dev/experiments/scale-in-participation-2026-07-03/RESULTS.md`.
 
-- **The add channel never functioned anywhere.** "Adds DO fire ~4/fold"
-  counted *funded orders*, not fills. Instrumented f011: pullback 20 funded /
-  **1 filled**; either_loose 22 funded / **1 filled**. Root cause: adds are
-  emitted as zero-width `StopLimit(close, close)` at Friday's close of a
-  stock signalling *strength* — a gap-up can trigger the stop but never meet
-  the limit, so the designed press-the-winner fill is structurally
-  unreachable; the order fills only when price retreats to Friday's close =
-  adverse selection (4/4 observed fills collided with same-day parent exits).
-- **either_loose's risk benefit is therefore NOT continuation-adds.** It is a
-  side-effect bundle: funded-but-unfillable adds reserve cash on the emit
-  Friday (≈$590–736k cumulative per f011 cell on $1M), displacing marginal
-  new entries (helpful in bear tape, costly in bull), plus path divergence.
-- **Confirmed the strong way:** ½-sizing → breadth is near-lossless (79–92%
-  of newly-entered names were baseline's `Insufficient_cash` near-misses;
-  skips-per-Friday flat at ~10 — the cash constraint always binds), and the
-  fat-tail tax is visible per-decision (avg entry ~halves, never restored).
-- **REJECT stands**, but the *tested object* was "½-sizing + breadth + an
-  unfillable-add cash-reservation throttle", not the designed explore/exploit
-  reallocation. Prerequisites before the untested full-size+adds shape:
-  fillable add order type (stop-market above close / market-at-open),
-  add/exit-coherence gate, explicit `add_fraction` knob.
+What stands after correction:
+
+- **All three WHYs above stand as originally written**, including (2)'s
+  "adds DO fire ~4/fold" and the Either-arm risk-benefit attribution.
+- **Participation chain measured and confirmed:** 79–92% of newly-entered
+  names were baseline's `Insufficient_cash` near-misses; skips-per-Friday
+  flat (~10, constraint always binds); avg entry ~halves and the fat-tail
+  tax is visible per-decision.
+- **New genuine defects found:** (a) `Metrics.extract_round_trips` sibling
+  chimera bug — trades.csv / win_rate / total_trades / per-trade analyses
+  are wrong for any scale-in run (equity-curve metrics, i.e. this verdict,
+  unaffected); (b) live-path adds would go out as `StopLimit(close, close)`
+  (adverse-selection shape) while the simulator fills at Market — a
+  live/backtest divergence to fix before any promotion; (c) the untested
+  full-size+adds shape still needs an explicit `add_fraction` knob.
 
 ## Validation bonus
 

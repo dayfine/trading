@@ -1,73 +1,80 @@
-# Next-session priorities — 2026-07-04
+# Next-session priorities — 2026-07-04 (rev 2: #1843 root-cause RETRACTED)
 
-**Supersedes** `next-session-priorities-2026-07-03.md`. Main is green; the
-participation-measurement P0 is done and merged (#1843).
+**Supersedes** `next-session-priorities-2026-07-03.md`. Main is green.
 
-## What the 2026-07-03 PM session delivered (merged)
+> **rev 2 note:** the first revision of this doc (merged in #1844) set a P0
+> based on #1843's "add channel never functioned / StopLimit(close,close)"
+> finding. **That finding was retracted** — it was an artifact of a real
+> reporting bug (`Metrics.extract_round_trips` chimeras sibling round-trips).
+> Adds fill routinely (4/4 sp500 f001; 19/20 broad f011). The corrected
+> record is `dev/experiments/scale-in-participation-2026-07-03/RESULTS.md`;
+> the ledger + writeup amendments were replaced in the correction PR.
 
-**P0 participation measurement → a finding bigger than the plan anticipated**
-(`dev/experiments/scale-in-participation-2026-07-03/RESULTS.md`, ledger +
-writeup amended in-place):
+## What 2026-07-03→04 delivered (merged)
 
-- **The scale-in add channel never functioned.** Adds emit as zero-width
-  `StopLimit(close, close)` at Friday's close of a *strength*-signalling
-  stock (`Weinstein_order_gen._entry_order` reused verbatim): gap-up triggers
-  the stop, limit can never fill → press-the-winner is structurally
-  unreachable; only adverse fills (retreat-to-close) are possible. 4/4 fills
-  observed across all cells collided with same-day parent exits. Instrumented
-  f011: 20–22 funded orders per variant, 1 filled each.
-- **either_loose's broad "risk-smoothing" re-attributed:** Friday
-  cash-reservation throttle (funded-but-unfillable adds deduct ≈$590–736k
-  cumulative/fold from the same-Friday entry budget) + path divergence — not
-  continuation-adds. In-fold-011 proof: pullback has more breadth (120
-  entries vs 98) yet ≈ baseline; either_loose delivers the entire improvement.
-- **Confirmed:** ½-sizing→breadth near-lossless (79–92% of new names =
-  baseline `Insufficient_cash` near-misses; skips/Friday flat ~10); fat-tail
-  tax visible per-decision ($169k→$98k avg entry, never restored).
-- REJECT stands; scale-in stays a default-off axis.
+- **#1843** participation measurement: the P0 question is answered and valid
+  — freed cash reaches the near-misses (79–92% linkage), ½-sizing converts
+  size into breadth ~1:1, fat-tail tax visible per-decision. The add-channel
+  "root cause" section of that PR was subsequently retracted (see above);
+  the REJECT verdict and all three original ledger WHYs stand unchanged.
+- **#1844** first revision of this handoff (P0 superseded by rev 2).
+- Correction PR (this one): RESULTS.md rewritten with retraction, ledger +
+  writeup amendments replaced, this doc revised.
 
-## P0 — make the add channel physically testable (small code build)
+## P0 — fix `Metrics.extract_round_trips` for sibling positions (real bug, code)
 
-The "untested promising shape" (full-size entries + continuation adds) is
-blocked on three concrete defects, all now pinned:
+`_pair_trades_for_symbol` pairs each symbol's date-sorted trade stream as
+consecutive (Buy, Sell) with no quantity or position-identity check. Sibling
+positions (scale-in parent + add) produce `B_parent B_add S_parent S_add` →
+B_parent dropped, chimera row (add entry × parent exit), S_add dropped.
+Verified on NPKI (broad f011 pullback).
 
-1. **Fillable add order type.** Adds need stop-market above Friday close (or
-   market-at-open), not zero-width `StopLimit(close, close)`. Scope: either a
-   dedicated translation for `ManualDecision`-reasoned `CreateEntering` in
-   `Weinstein_order_gen`, or an explicit order-type field on the transition.
-   Default-off / no-op for existing paths (experiment-flag-discipline R1).
-2. **Explicit `add_fraction` knob** in `Scale_in_detector.config` (v1 sizes
-   adds as `1 − initial_entry_fraction` → full-size entries get zero-size
-   adds). Default = the current derived value for backward-compat.
-3. **Add/exit-coherence gate:** don't emit adds for symbols the same tick's
-   laggard/stop/stage channels are exiting (all 4 observed fills were these
-   collisions).
+- **Blast radius:** trades.csv, `total_trades`, `win_rate`,
+  `avg_holding_days`, all per-trade analyses for scale-in-enabled runs.
+  Equity-curve metrics unaffected. Scale-in is default-off → goldens and all
+  default runs unaffected.
+- **Fix shape:** quantity-aware pairing (open-entry queue; exit matches the
+  open entry with equal split-adjusted quantity, FIFO fallback) — must be
+  bit-identical for single-position-per-symbol streams. TDD with a sibling
+  interleaving regression test (B B S S; chimera regression pinned).
+- File: `trading/trading/simulation/lib/metrics.ml`. Full code PR gates
+  (CI + qc-structural + qc-behavioral).
 
-Then: fresh surface (full-size + adds via fixed order path) through
-experiment-gap-closing WF-CV. Cheap, well-scoped, high information: it tests
-the *designed* mechanism for the first time.
+## P1 — carried prerequisites for the untested full-size+adds shape
+
+1. **Explicit `add_fraction` knob** (`Scale_in_detector.config`): v1 sizes
+   adds as `1 − initial_entry_fraction`, so full-size entries get zero-size
+   adds. Default = derived legacy value (bit-identical, R1).
+2. **Live add-order shape:** live path emits `StopLimit(close, close)` for
+   adds (`Weinstein_order_gen._entry_order`) = adverse-selection shape; the
+   simulator fills at Market (documented TODO divergence). Needs a fillable
+   live shape (stop-market above close) before any promotion. Live-only —
+   does not affect backtests.
+
+(The "add/exit-coherence gate" from rev 1 is DROPPED — the observed
+"add/exit collisions" were chimera artifacts, not real behavior.)
 
 ## Other open threads (carried)
 
 - **Catastrophic-stop sibling alignment** (#1831 review): inert while
-  `catastrophic_stop_pct = 0.0` + scale-in off; align to memoized pre-advance
-  state if a spec ever arms both.
-- **Docker.raw at 55 GB** (> 30 GB preflight threshold) — recompact via
-  Docker Desktop GUI (user action) before the next multi-hour sweep.
+  `catastrophic_stop_pct = 0.0` + scale-in off.
+- **Docker.raw at 55 GB** — recompact via Docker Desktop GUI (user action)
+  before the next multi-hour sweep.
 - P2/P4 from the 2026-07-02 doc (≤4-week gate tuning; continuous-RS display)
   remain open, unchanged.
 
-## Process notes (this session)
+## Process notes
 
-- jj `@`-left-behind bit again at session start (working copy sat on the
-  pushed handoff commit; experiment files snapshotted into it). Recovered via
-  `jj new main@origin` + `jj restore --from <old-commit> <paths>`. Rule
-  stands: **position `@` first, write second.**
-- After a squash-merge + `jj git fetch`, the local commit is auto-abandoned
-  and the working copy can silently show PRE-merge file content — `jj new
-  main@origin` before trusting disk state.
-- Temp instrumentation (eprintf in a lib) + revert via `jj restore --from
-  main@origin <file>` worked cleanly; instrumented results were bit-identical
-  to uninstrumented (safe pattern for measurement reruns).
-- Killed a 10h orphan `dune build` (dead QC wrapper, jjws-qc1833) holding a
-  worktree; check `ps -o etime` for orphans before long runs.
+- **The retraction lesson (screen-rigor applies to harness data too):** the
+  wrong #1843 conclusion came from trusting trades.csv as ground truth for a
+  sibling-position mechanism. Round-trip-derived artifacts (trades.csv,
+  win_rate, total_trades) are NOT valid for scale-in runs until P0 lands.
+  When measuring a new mechanism, verify the reporting layer handles the
+  mechanism's new structure before reading conclusions off it — trace the
+  pipeline (emit → order → fill) at least once.
+- Instrumented reruns (temp eprintf, revert via `jj restore --from
+  main@origin`) remain bit-identical and cheap — the trace that caught this
+  took one 11-min rerun.
+- jj: after a squash-merge + fetch, the local commit is auto-abandoned and
+  disk can show pre-merge content — `jj new main@origin` before trusting
+  disk state. Position `@` first, write second.
