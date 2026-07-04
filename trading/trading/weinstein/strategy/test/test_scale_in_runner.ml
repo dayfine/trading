@@ -288,6 +288,51 @@ let test_per_name_cap_exhausted_sizes_zero _ =
   let transitions, _ = _run { f with positions; portfolio } in
   assert_that transitions is_empty
 
+(* Rewire the fixture's scale-in knobs (keeps every other gate open). *)
+let _with_scale_in f scale_in_config =
+  { f with config = { f.config with scale_in_config } }
+
+let test_explicit_add_fraction_sizes_full_unit _ =
+  (* v2 shape: full-size initial entries + add_fraction (Some 1.0). PV =
+     100k cash + 10sh x 105 = 101,050. Add risk = 1% x 1.0 x PV = 1010.5;
+     stop distance 10 -> 101 shares @ 105 = $10,605. *)
+  let f = _fixture () in
+  let f =
+    _with_scale_in f
+      {
+        Scale_in_detector.default_config with
+        initial_entry_fraction = 1.0;
+        add_fraction = Some 1.0;
+      }
+  in
+  let transitions, cash = _run f in
+  assert_that cash (float_equal 10605.0);
+  assert_that transitions
+    (elements_are
+       [
+         field
+           (fun (tr : Trading_strategy.Position.transition) -> tr.kind)
+           (matching ~msg:"Expected a full-unit sibling add"
+              (function
+                | Trading_strategy.Position.CreateEntering e ->
+                    Some (e.target_quantity, e.entry_price)
+                | _ -> None)
+              (equal_to (101.0, 105.0)));
+       ])
+
+let test_none_add_fraction_with_full_entries_emits_nothing _ =
+  (* Legacy sizing: add_fraction None derives 1 - initial_entry_fraction = 0
+     -> zero-size add -> no transition (the v1 zero-size-adds coupling the
+     explicit knob exists to fix). *)
+  let f = _fixture () in
+  let f =
+    _with_scale_in f
+      { Scale_in_detector.default_config with initial_entry_fraction = 1.0 }
+  in
+  let transitions, cash = _run f in
+  assert_that cash (float_equal 0.0);
+  assert_that transitions is_empty
+
 let suite =
   "scale_in_runner"
   >::: [
@@ -310,6 +355,10 @@ let suite =
          >:: test_stop_at_or_above_price_blocks_add;
          "per-name cap exhausted sizes to zero"
          >:: test_per_name_cap_exhausted_sizes_zero;
+         "explicit add_fraction sizes a full unit"
+         >:: test_explicit_add_fraction_sizes_full_unit;
+         "None add_fraction with full entries emits nothing"
+         >:: test_none_add_fraction_with_full_entries_emits_nothing;
        ]
 
 let () = run_test_tt_main suite
