@@ -1,6 +1,38 @@
 # Status: simulation
 
-## Last updated: 2026-06-12
+## Last updated: 2026-07-04
+
+### 2026-07-04 — sibling round-trip pairing fix (#1847, OPEN — CI-blocked)
+
+`#1847` (`fix/sibling-round-trip-pairing`, author dayfine) fixes a **reporting**
+bug in `Metrics.extract_round_trips`: sibling positions (scale-in parent + add on
+one symbol) interleave as `Buy, Buy, Sell, Sell`; the old side-only consecutive
+pairing dropped the parent entry, emitted one chimera row, and dropped the add's
+exit. `_pair_trades_for_symbol` now keeps a per-symbol FIFO queue matching exits
+to the open entry by split-adjusted quantity (else oldest). Bit-identical for the
+alternating single-position stream (all default runs). This is the real bug behind
+the retracted #1843 add-channel conclusion (retraction merged as #1846). Blast
+radius: `trades.csv` / `total_trades` / `win_rate` / `avg_holding_days` on
+scale-in-enabled runs only; equity-curve metrics (WF-CV verdict basis) untouched.
+
+**State (2026-07-04 orchestrator run 28717547657):**
+- qc-behavioral: **APPROVED** (posted 19:26Z, quality score 4).
+- qc-structural: not yet run.
+- CI: **`build-and-test` FAILURE** — `FAIL: nesting linter` on
+  `metrics.ml:158 _pair_trades_for_symbol` (max nesting 6 > 5). Real, non-flake.
+  Note: the behavioral APPROVED (19:26Z) predates the CI failure (19:30Z).
+- `mergeable_state: behind` — needs `update-branch` (re-runs CI) before merge.
+- **Not merged, not reworked this run** — fresh maintainer-in-flight PR (opened
+  18:59Z, part of today's #1846+#1847 thread); per run-3 precedent +
+  `gha-local-coordination` collision-avoidance, the orchestrator surfaced the exact
+  blocker + fix on the PR (comment 4883620797) rather than racing a rework commit.
+  Once nesting fix pushes CI green + branch updated, orchestrator runs qc-structural
+  and 3-gate auto-merges.
+
+### 2026-07-03 — fill-routing fix (#1837, MERGED)
+
+`#1837` routes fills by order→position link (fixes stray fill attribution). Merged
+2026-07-03 08:54Z (run 4).
 
 ### 2026-06-12 — exit-fill-reject retry (#1553)
 
