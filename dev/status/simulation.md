@@ -1,8 +1,8 @@
 # Status: simulation
 
-## Last updated: 2026-07-04
+## Last updated: 2026-07-04 (run 2 — #1847 MERGED)
 
-### 2026-07-04 — sibling round-trip pairing fix (#1847, OPEN — CI-blocked)
+### 2026-07-04 — sibling round-trip pairing fix (#1847, MERGED as `761c30cf`)
 
 `#1847` (`fix/sibling-round-trip-pairing`, author dayfine) fixes a **reporting**
 bug in `Metrics.extract_round_trips`: sibling positions (scale-in parent + add on
@@ -15,19 +15,15 @@ the retracted #1843 add-channel conclusion (retraction merged as #1846). Blast
 radius: `trades.csv` / `total_trades` / `win_rate` / `avg_holding_days` on
 scale-in-enabled runs only; equity-curve metrics (WF-CV verdict basis) untouched.
 
-**State (2026-07-04 orchestrator run 28717547657):**
-- qc-behavioral: **APPROVED** (posted 19:26Z, quality score 4).
-- qc-structural: not yet run.
-- CI: **`build-and-test` FAILURE** — `FAIL: nesting linter` on
-  `metrics.ml:158 _pair_trades_for_symbol` (max nesting 6 > 5). Real, non-flake.
-  Note: the behavioral APPROVED (19:26Z) predates the CI failure (19:30Z).
-- `mergeable_state: behind` — needs `update-branch` (re-runs CI) before merge.
-- **Not merged, not reworked this run** — fresh maintainer-in-flight PR (opened
-  18:59Z, part of today's #1846+#1847 thread); per run-3 precedent +
-  `gha-local-coordination` collision-avoidance, the orchestrator surfaced the exact
-  blocker + fix on the PR (comment 4883620797) rather than racing a rework commit.
-  Once nesting fix pushes CI green + branch updated, orchestrator runs qc-structural
-  and 3-gate auto-merges.
+**Resolution (2026-07-04 run 2 — orchestrator run 28721834266):** `#1847`
+**MERGED** to main as `761c30cf` ("fix(simulation): position-faithful round-trip
+pairing for sibling positions"). The maintainer resolved the run-1 nesting-linter
+CI blocker on `_pair_trades_for_symbol` and updated the branch; CI went green and
+the PR merged. Behavioral was APPROVED (19:26Z, score 4). Follow-up docs handoff
+`#1849` marked the round-trip-pairing P0 done. This closes run-1's escalated
+Question 1 ("let the orchestrator finish #1847, or keep it maintainer-LOCAL?") —
+the maintainer completed it. Per-trade analysis of scale-in-enabled runs is now
+trustworthy; the scale-in fresh full-size+adds WF-CV surface remains data-gated.
 
 ### 2026-07-03 — fill-routing fix (#1837, MERGED)
 
