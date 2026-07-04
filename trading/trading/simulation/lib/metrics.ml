@@ -144,6 +144,31 @@ let _pop_matching_entry ~splits ~exit_date ~exit_qty open_entries =
   ( List.nth_exn open_entries idx,
     List.filteri open_entries ~f:(fun i _ -> i <> idx) )
 
+let _opposes (a : Trading_base.Types.trade) (b : Trading_base.Types.trade) =
+  not (Trading_base.Types.equal_side a.side b.side)
+
+(* Close one round-trip: pop the open entry this exit matches and build its
+   metric. Returns the metric and the remaining open entries. *)
+let _close_round_trip ~symbol ~splits ~exit_date ~exit_trade open_entries =
+  let (entry_date, entry), remaining =
+    _pop_matching_entry ~splits ~exit_date
+      ~exit_qty:exit_trade.Trading_base.Types.quantity open_entries
+  in
+  ( _make_trade_metric symbol entry_date entry exit_date exit_trade splits,
+    remaining )
+
+(* One fold step over the trade stream: an opposite-side trade closes a
+   round-trip; a same-side trade joins the open entries. *)
+let _pair_step ~symbol ~splits (open_entries, metrics) ((date, trade) as t) =
+  match open_entries with
+  | (_, head) :: _ when _opposes head trade ->
+      let m, remaining =
+        _close_round_trip ~symbol ~splits ~exit_date:date ~exit_trade:trade
+          open_entries
+      in
+      (remaining, m :: metrics)
+  | _ -> (open_entries @ [ t ], metrics)
+
 (** Pair entry trades with close trades to form round-trips for a single symbol,
     position-faithfully. A trade whose side opposes the open entries is an exit:
     it closes the open entry with the matching (split-adjusted) quantity, or the
@@ -158,22 +183,10 @@ let _pop_matching_entry ~splits ~exit_date ~exit_qty open_entries =
 let _pair_trades_for_symbol symbol
     (trades : (Date.t * Trading_base.Types.trade) list)
     (splits : Trading_portfolio.Split_event.t list) : trade_metrics list =
-  let opposes (a : Trading_base.Types.trade) (b : Trading_base.Types.trade) =
-    not (Trading_base.Types.equal_side a.side b.side)
+  let _, metrics =
+    List.fold trades ~init:([], []) ~f:(_pair_step ~symbol ~splits)
   in
-  let rec pair_trades trades_list open_entries metrics =
-    match (trades_list, open_entries) with
-    | [], _ -> List.rev metrics
-    | (date, trade) :: rest, (_, head) :: _ when opposes head trade ->
-        let (entry_date, entry), remaining =
-          _pop_matching_entry ~splits ~exit_date:date ~exit_qty:trade.quantity
-            open_entries
-        in
-        let m = _make_trade_metric symbol entry_date entry date trade splits in
-        pair_trades rest remaining (m :: metrics)
-    | t :: rest, _ -> pair_trades rest (open_entries @ [ t ]) metrics
-  in
-  pair_trades trades [] []
+  List.rev metrics
 
 (** Group the [splits_applied] across all steps by symbol. Split events are
     detected on the split day and carried on each [step_result], so the trade

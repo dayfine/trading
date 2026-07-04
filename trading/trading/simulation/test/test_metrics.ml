@@ -733,6 +733,51 @@ let test_extract_round_trips_equal_qty_siblings_fifo _ =
            ];
        ])
 
+(** An exit whose quantity matches NO open entry (multiple distinct-size
+    siblings open) falls back to the oldest open entry (FIFO); the unmatched
+    sibling stays open and is dropped as unclosed at the end. Pins the pure
+    FIFO-fallback branch of [_pop_matching_entry]. *)
+let test_extract_round_trips_mismatched_qty_falls_back_to_fifo _ =
+  let steps =
+    [
+      _step_with_trades
+        ~date:(date_of_string "2024-01-02")
+        ~trades:
+          [
+            _make_trade ~id:"b1" ~symbol:"SIB" ~side:Buy ~quantity:100.0
+              ~price:10.0;
+          ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2024-01-09")
+        ~trades:
+          [
+            _make_trade ~id:"b2" ~symbol:"SIB" ~side:Buy ~quantity:50.0
+              ~price:12.0;
+          ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2024-02-06")
+        ~trades:
+          [
+            _make_trade ~id:"s1" ~symbol:"SIB" ~side:Sell ~quantity:70.0
+              ~price:15.0;
+          ]
+        ();
+    ]
+  in
+  let trips = extract_round_trips steps in
+  assert_that trips
+    (elements_are
+       [
+         all_of
+           [
+             field (fun (t : trade_metrics) -> t.entry_price) (float_equal 10.0);
+             field (fun (t : trade_metrics) -> t.quantity) (float_equal 100.0);
+             field (fun (t : trade_metrics) -> t.exit_price) (float_equal 15.0);
+           ];
+       ])
+
 (* ==================== Metric Computer Tests ==================== *)
 
 (* Helper to create a mock step_result *)
@@ -1753,6 +1798,8 @@ let suite =
          >:: test_extract_round_trips_sibling_same_day_exit;
          "extract_round_trips equal-qty siblings FIFO"
          >:: test_extract_round_trips_equal_qty_siblings_fifo;
+         "extract_round_trips mismatched qty falls back to FIFO"
+         >:: test_extract_round_trips_mismatched_qty_falls_back_to_fifo;
          (* Sharpe ratio tests *)
          "sharpe ratio zero with no data"
          >:: test_sharpe_ratio_zero_with_no_data;
