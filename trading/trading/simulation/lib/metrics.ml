@@ -118,37 +118,62 @@ let _make_trade_metric symbol entry_date entry exit_date exit splits =
     pnl_percent;
   }
 
-(** Recognise a paired round-trip by side direction. A long round-trip is
-    Buy→Sell; a short round-trip is Sell→Buy (the entry is the short open, the
-    exit is the buy-to-cover). The pairing is direction-only — quantities are
-    not required to match because the simulator can in principle scale out;
-    callers wanting a quantity-equality invariant assert that separately. *)
-let _is_paired_round_trip entry exit =
-  let open Trading_base.Types in
-  match (entry.side, exit.side) with
-  | Buy, Sell | Sell, Buy -> true
-  | Buy, Buy | Sell, Sell -> false
+(* Whether [entry]'s quantity, restated onto the exit date's post-split basis
+   (the same restatement [_make_trade_metric] applies), equals [exit_qty]. *)
+let _qty_matches_on_exit_basis ~splits ~entry_date ~exit_date ~entry_qty
+    ~exit_qty =
+  let factor = _cumulative_split_factor ~entry_date ~exit_date splits in
+  Float.(abs ((entry_qty *. factor) -. exit_qty) < 1e-6)
 
-(** Pair entry trades with subsequent close trades to form round-trips for a
-    single symbol. Handles both Buy→Sell (long) and Sell→Buy (short) — see
-    {!_is_paired_round_trip}. [splits] is the symbol's split events; each
-    round-trip is corrected for any split straddling its hold via
-    {!_make_trade_metric}. *)
+(* Pick the open entry this exit closes: the one whose (split-adjusted)
+   quantity matches exactly, falling back to the oldest open entry (FIFO).
+   Returns the chosen entry and the remaining open entries. [open_entries] is
+   non-empty by the caller's guard. *)
+let _pop_matching_entry ~splits ~exit_date ~exit_qty open_entries =
+  let matches i =
+    let entry_date, (entry : Trading_base.Types.trade) =
+      List.nth_exn open_entries i
+    in
+    _qty_matches_on_exit_basis ~splits ~entry_date ~exit_date
+      ~entry_qty:entry.quantity ~exit_qty
+  in
+  let idx =
+    List.range 0 (List.length open_entries)
+    |> List.find ~f:matches |> Option.value ~default:0
+  in
+  ( List.nth_exn open_entries idx,
+    List.filteri open_entries ~f:(fun i _ -> i <> idx) )
+
+(** Pair entry trades with close trades to form round-trips for a single symbol,
+    position-faithfully. A trade whose side opposes the open entries is an exit:
+    it closes the open entry with the matching (split-adjusted) quantity, or the
+    oldest open entry when no quantity matches (FIFO). A trade on the same side
+    as the open entries opens another entry — sibling positions (e.g. a scale-in
+    parent + add) interleave as Buy, Buy, Sell, Sell and each leg pairs with its
+    own position's legs. For the alternating single-position stream this reduces
+    to the previous consecutive pairing. Handles both Buy→Sell (long) and
+    Sell→Buy (short: the entry is the short open, the exit the buy-to-cover).
+    [splits] is the symbol's split events; each round-trip is corrected for any
+    split straddling its hold via {!_make_trade_metric}. *)
 let _pair_trades_for_symbol symbol
     (trades : (Date.t * Trading_base.Types.trade) list)
     (splits : Trading_portfolio.Split_event.t list) : trade_metrics list =
-  let rec pair_trades trades_list metrics =
-    match trades_list with
-    | (entry_date, entry) :: (exit_date, exit) :: rest
-      when _is_paired_round_trip entry exit ->
-        let m =
-          _make_trade_metric symbol entry_date entry exit_date exit splits
-        in
-        pair_trades rest (m :: metrics)
-    | _ :: rest -> pair_trades rest metrics
-    | [] -> List.rev metrics
+  let opposes (a : Trading_base.Types.trade) (b : Trading_base.Types.trade) =
+    not (Trading_base.Types.equal_side a.side b.side)
   in
-  pair_trades trades []
+  let rec pair_trades trades_list open_entries metrics =
+    match (trades_list, open_entries) with
+    | [], _ -> List.rev metrics
+    | (date, trade) :: rest, (_, head) :: _ when opposes head trade ->
+        let (entry_date, entry), remaining =
+          _pop_matching_entry ~splits ~exit_date:date ~exit_qty:trade.quantity
+            open_entries
+        in
+        let m = _make_trade_metric symbol entry_date entry date trade splits in
+        pair_trades rest remaining (m :: metrics)
+    | t :: rest, _ -> pair_trades rest (open_entries @ [ t ]) metrics
+  in
+  pair_trades trades [] []
 
 (** Group the [splits_applied] across all steps by symbol. Split events are
     detected on the split day and carried on each [step_result], so the trade

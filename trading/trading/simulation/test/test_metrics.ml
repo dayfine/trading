@@ -548,6 +548,191 @@ let test_extract_round_trips_split_on_entry_date_excluded _ =
            ];
        ])
 
+(** Sibling positions (scale-in parent + add on one symbol) interleave as Buy,
+    Buy, Sell, Sell. Each exit must pair with the open entry of matching
+    quantity — the parent's 100-share exit with the 100-share entry, the add's
+    50-share exit with the 50-share entry. The pre-fix consecutive pairing
+    dropped the parent's entry, emitted one chimera row (add entry × parent
+    exit), and dropped the add's exit. *)
+let test_extract_round_trips_sibling_positions_paired_by_quantity _ =
+  let steps =
+    [
+      _step_with_trades
+        ~date:(date_of_string "2024-01-02")
+        ~trades:
+          [
+            _make_trade ~id:"b1" ~symbol:"SIB" ~side:Buy ~quantity:100.0
+              ~price:10.0;
+          ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2024-01-09")
+        ~trades:
+          [
+            _make_trade ~id:"b2" ~symbol:"SIB" ~side:Buy ~quantity:50.0
+              ~price:12.0;
+          ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2024-02-06")
+        ~trades:
+          [
+            _make_trade ~id:"s1" ~symbol:"SIB" ~side:Sell ~quantity:100.0
+              ~price:15.0;
+          ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2024-02-13")
+        ~trades:
+          [
+            _make_trade ~id:"s2" ~symbol:"SIB" ~side:Sell ~quantity:50.0
+              ~price:16.0;
+          ]
+        ();
+    ]
+  in
+  let trips = extract_round_trips steps in
+  assert_that trips
+    (elements_are
+       [
+         all_of
+           [
+             field (fun (t : trade_metrics) -> t.quantity) (float_equal 100.0);
+             field (fun (t : trade_metrics) -> t.entry_price) (float_equal 10.0);
+             field (fun (t : trade_metrics) -> t.exit_price) (float_equal 15.0);
+             field
+               (fun (t : trade_metrics) -> t.pnl_dollars)
+               (float_equal 500.0);
+             field (fun (t : trade_metrics) -> t.days_held) (equal_to 35);
+           ];
+         all_of
+           [
+             field (fun (t : trade_metrics) -> t.quantity) (float_equal 50.0);
+             field (fun (t : trade_metrics) -> t.entry_price) (float_equal 12.0);
+             field (fun (t : trade_metrics) -> t.exit_price) (float_equal 16.0);
+             field
+               (fun (t : trade_metrics) -> t.pnl_dollars)
+               (float_equal 200.0);
+             field (fun (t : trade_metrics) -> t.days_held) (equal_to 35);
+           ];
+       ])
+
+(** Sibling positions exiting on the SAME day (the shared ticker stop fires once
+    for both) still pair by quantity, not by stream position. *)
+let test_extract_round_trips_sibling_same_day_exit _ =
+  let steps =
+    [
+      _step_with_trades
+        ~date:(date_of_string "2024-01-02")
+        ~trades:
+          [
+            _make_trade ~id:"b1" ~symbol:"SIB" ~side:Buy ~quantity:100.0
+              ~price:10.0;
+          ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2024-01-09")
+        ~trades:
+          [
+            _make_trade ~id:"b2" ~symbol:"SIB" ~side:Buy ~quantity:50.0
+              ~price:12.0;
+          ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2024-02-06")
+        ~trades:
+          [
+            _make_trade ~id:"s1" ~symbol:"SIB" ~side:Sell ~quantity:50.0
+              ~price:8.0;
+            _make_trade ~id:"s2" ~symbol:"SIB" ~side:Sell ~quantity:100.0
+              ~price:8.0;
+          ]
+        ();
+    ]
+  in
+  let trips = extract_round_trips steps in
+  (* Same-date trade ordering is unspecified, so match unordered. *)
+  assert_that trips
+    (unordered_elements_are
+       [
+         all_of
+           [
+             field (fun (t : trade_metrics) -> t.quantity) (float_equal 50.0);
+             field (fun (t : trade_metrics) -> t.entry_price) (float_equal 12.0);
+             field
+               (fun (t : trade_metrics) -> t.pnl_dollars)
+               (float_equal (-200.0));
+           ];
+         all_of
+           [
+             field (fun (t : trade_metrics) -> t.quantity) (float_equal 100.0);
+             field (fun (t : trade_metrics) -> t.entry_price) (float_equal 10.0);
+             field
+               (fun (t : trade_metrics) -> t.pnl_dollars)
+               (float_equal (-200.0));
+           ];
+       ])
+
+(** Equal-quantity siblings cannot be told apart by size; the exit falls back to
+    the OLDEST open entry (FIFO) — which also keeps the alternating
+    single-position stream bit-identical to the pre-fix pairing. *)
+let test_extract_round_trips_equal_qty_siblings_fifo _ =
+  let steps =
+    [
+      _step_with_trades
+        ~date:(date_of_string "2024-01-02")
+        ~trades:
+          [
+            _make_trade ~id:"b1" ~symbol:"SIB" ~side:Buy ~quantity:10.0
+              ~price:100.0;
+          ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2024-01-09")
+        ~trades:
+          [
+            _make_trade ~id:"b2" ~symbol:"SIB" ~side:Buy ~quantity:10.0
+              ~price:105.0;
+          ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2024-02-06")
+        ~trades:
+          [
+            _make_trade ~id:"s1" ~symbol:"SIB" ~side:Sell ~quantity:10.0
+              ~price:110.0;
+          ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2024-02-13")
+        ~trades:
+          [
+            _make_trade ~id:"s2" ~symbol:"SIB" ~side:Sell ~quantity:10.0
+              ~price:112.0;
+          ]
+        ();
+    ]
+  in
+  let trips = extract_round_trips steps in
+  assert_that trips
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (t : trade_metrics) -> t.entry_price)
+               (float_equal 100.0);
+             field (fun (t : trade_metrics) -> t.exit_price) (float_equal 110.0);
+           ];
+         all_of
+           [
+             field
+               (fun (t : trade_metrics) -> t.entry_price)
+               (float_equal 105.0);
+             field (fun (t : trade_metrics) -> t.exit_price) (float_equal 112.0);
+           ];
+       ])
+
 (* ==================== Metric Computer Tests ==================== *)
 
 (* Helper to create a mock step_result *)
@@ -1561,6 +1746,13 @@ let suite =
          >:: test_extract_round_trips_split_on_exit_date_included;
          "extract_round_trips split on entry date excluded"
          >:: test_extract_round_trips_split_on_entry_date_excluded;
+         (* sibling-position (scale-in) pairing tests *)
+         "extract_round_trips sibling positions paired by quantity"
+         >:: test_extract_round_trips_sibling_positions_paired_by_quantity;
+         "extract_round_trips sibling same-day exit"
+         >:: test_extract_round_trips_sibling_same_day_exit;
+         "extract_round_trips equal-qty siblings FIFO"
+         >:: test_extract_round_trips_equal_qty_siblings_fifo;
          (* Sharpe ratio tests *)
          "sharpe ratio zero with no data"
          >:: test_sharpe_ratio_zero_with_no_data;
