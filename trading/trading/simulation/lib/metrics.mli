@@ -78,10 +78,15 @@ val extract_round_trips :
     - {b Short} round-trip: Sell → Buy (the buy covers the short), with
       [side = Sell] in the result.
 
-    Trades are matched in chronological order, with each entry paired with the
-    next opposite-side trade for the same symbol. A trailing entry trade with no
-    matching close (e.g., an open position at the end of the simulation window)
-    is dropped.
+    Trades are matched in chronological order. Same-side trades accumulate as
+    open entries; each opposite-side (closing) trade pairs with the open entry
+    whose split-adjusted quantity matches exactly, falling back to the oldest
+    open entry (FIFO) when none matches. For the common alternating
+    single-position stream this reduces to pairing each entry with the next
+    opposite-side trade; the quantity match matters when sibling positions
+    coexist on one symbol (e.g. a scale-in parent + add), whose legs interleave
+    as Buy, Buy, Sell, Sell. A trailing entry trade with no matching close
+    (e.g., an open position at the end of the simulation window) is dropped.
 
     {b Split adjustment.} Entry and exit fills can sit on different price bases
     when a stock split occurs mid-hold — the exit fill is post-split while the
