@@ -21,24 +21,17 @@
 - Correction PR (this one): RESULTS.md rewritten with retraction, ledger +
   writeup amendments replaced, this doc revised.
 
-## P0 — fix `Metrics.extract_round_trips` for sibling positions (real bug, code)
+## P0 — fix `Metrics.extract_round_trips` for sibling positions — **DONE (#1847, merged 2026-07-04)**
 
-`_pair_trades_for_symbol` pairs each symbol's date-sorted trade stream as
-consecutive (Buy, Sell) with no quantity or position-identity check. Sibling
-positions (scale-in parent + add) produce `B_parent B_add S_parent S_add` →
-B_parent dropped, chimera row (add entry × parent exit), S_add dropped.
-Verified on NPKI (broad f011 pullback).
-
-- **Blast radius:** trades.csv, `total_trades`, `win_rate`,
-  `avg_holding_days`, all per-trade analyses for scale-in-enabled runs.
-  Equity-curve metrics unaffected. Scale-in is default-off → goldens and all
-  default runs unaffected.
-- **Fix shape:** quantity-aware pairing (open-entry queue; exit matches the
-  open entry with equal split-adjusted quantity, FIFO fallback) — must be
-  bit-identical for single-position-per-symbol streams. TDD with a sibling
-  interleaving regression test (B B S S; chimera regression pinned).
-- File: `trading/trading/simulation/lib/metrics.ml`. Full code PR gates
-  (CI + qc-structural + qc-behavioral).
+Shipped as planned: quantity-aware FIFO pairing (`List.fold` + `_pair_step` /
+`_close_round_trip` / `_pop_matching_entry`), bit-identical for
+single-position streams (all goldens / default runs unaffected), TDD'd with 4
+sibling regression tests (qty pairing, same-day unordered exits, equal-qty
+FIFO, mismatched-qty FIFO fallback) + updated `metrics.mli` docstring.
+Gates: CI green + qc-structural + qc-behavioral APPROVED at tip (one rework
+commit for the nesting linter). **Caveat that persists: trades.csv /
+win_rate / total_trades from scale-in runs executed BEFORE #1847 remain
+unreliable — re-run, don't reuse.**
 
 ## P1 — carried prerequisites for the untested full-size+adds shape
 
