@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-05 (orchestrator run 28726311764, run 1: **MAIN-FIX pass**. Main was RED — HEAD `66141546` (#1850 run-2 summary merge) failed `build-and-test`/`dune runtest` because the run-2 Step 5.5 reconcile wrote a non-schema `## Last updated` in `dev/status/simulation.md` (`2026-07-04 (run 2 — #1847 MERGED)`). Shipped `[main-fix]` **#1853** (`e80b2169`, docs-only, CI-green) restoring the bare `YYYY-MM-DD`; **main GREEN**, status-integrity exit 0 on fresh main. No feature dispatch (main-red hard-stop + all tracks data/human/LOCAL-gated, EODHD key absent). One human docs PR **#1852** (continuation-add v2 plan, `behind`) left for maintainer. harness/cleanup/ops sentinel-skipped. Prior: run 2 (28721834266) merged #1847+#1849, reconciled simulation→MERGED; run 1 (28717547657) surfaced #1847 CI-blocker.
+Last updated: 2026-07-05 (orchestrator run 28730917210, run 2: **light coordination pass**. Main GREEN (HEAD `815efafa`/#1856 build-and-test + perf-tier1-smoke SUCCESS; local `dune build` exit 0). **0 open PRs.** Reconciled the scale-in row: since run 1, three human PRs merged — #1852 (continuation-add v2 plan, docs), **#1855** (Consolidation_breakout trigger + explicit `add_fraction`, default-off — the add-channel-fix build), **#1856** (continuation-add v2 surface spec, broad-only top-3000); next for scale-in is running that v2 WF-CV surface, which is **data-gated** (EODHD key absent in GHA). **0 subagents dispatched:** all feature tracks data/human/LOCAL-gated; harness T1 all `[x]` and lone `[~]` (ci.yml ENOSPC #1636) workflow-PAT-blocked; cleanup backlog drained; ops-data sentinel-skip (data-gaps unchanged since #814, 2026-05-03). Deterministic linters clean (status-integrity/index-size/no-python exit 0). Prior: run 1 (28726311764) MAIN-FIX #1853 restored simulation.md bare date → main GREEN.
 
 ## Active + complete tracks
 
@@ -13,7 +13,7 @@ Each row: one line; deeper task detail in the linked status file.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
-| [capital-management-scale-in](capital-management-scale-in.md) | IN_PROGRESS | dayfine | — | v1 REJECTED (#1840); #1843: add channel never fired → maintainer-LOCAL add-channel-fix build #1844, then fresh WF-CV surface (data-gated) |
+| [capital-management-scale-in](capital-management-scale-in.md) | IN_PROGRESS | dayfine | — | add-channel-fix landed (#1855, default-off); v2 surface spec staged (#1856); next: continuation-add v2 WF-CV surface (data-gated) |
 | [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | — | readme_toplines top-line numbers MERGED (#1617, 3-gate auto-merge); next: P2 matrix on composition-policy universe (data-gated) |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
