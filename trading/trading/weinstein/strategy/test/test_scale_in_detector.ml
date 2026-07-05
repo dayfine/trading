@@ -7,7 +7,7 @@ open Core
 open Matchers
 open Weinstein_strategy
 
-let _bar date ~close ?low ?high () =
+let _bar date ~close ?low ?high ?(volume = 1_000_000) () =
   let low = Option.value low ~default:(close *. 0.99) in
   let high = Option.value high ~default:(close *. 1.01) in
   {
@@ -17,7 +17,7 @@ let _bar date ~close ?low ?high () =
     low_price = low;
     close_price = close;
     adjusted_close = close;
-    volume = 1_000_000;
+    volume;
     active_through = None;
   }
 
@@ -120,11 +120,99 @@ let test_either_fires_on_new_high_when_pullback_does_not _ =
   in
   let signal trigger =
     Scale_in_detector.add_signal ~trigger ~proximity_pct:0.03
+      ~consolidation:Scale_in_detector.default_consolidation_config ~ma:100.0
       ~entry_price:_entry ~bars_since_entry:bars
   in
   assert_that
     (signal Scale_in_detector.Pullback, signal Scale_in_detector.Either)
     (equal_to (false, true))
+
+(* ------- consolidation_breakout (the book's continuation buy) ------- *)
+
+(* A textbook continuation: 4 tight weeks near the MA (closes 100..103 with
+   ma = 100), then a breakout bar above the window top on 2x volume. *)
+let _consolidation_then_breakout ~breakout_close ~breakout_volume =
+  [
+    _bar "2024-03-01" ~close:102.0 ();
+    _bar "2024-03-08" ~close:100.0 ();
+    _bar "2024-03-15" ~close:103.0 ();
+    _bar "2024-03-22" ~close:101.0 ();
+    _bar "2024-03-29" ~close:breakout_close ~volume:breakout_volume ();
+  ]
+
+let _cont ?(cfg = Scale_in_detector.default_consolidation_config) ?(ma = 100.0)
+    bars =
+  Scale_in_detector.consolidation_breakout ~consolidation:cfg ~ma
+    ~bars_since_entry:bars
+
+let test_consolidation_breakout_fires _ =
+  let bars =
+    _consolidation_then_breakout ~breakout_close:106.0
+      ~breakout_volume:2_000_000
+  in
+  assert_that (_cont bars) (equal_to true)
+
+let test_consolidation_too_wide_band_does_not_fire _ =
+  (* Window ranges 100 -> 115 (15% > 10% band): a trend, not a consolidation. *)
+  let bars =
+    [
+      _bar "2024-03-01" ~close:100.0 ();
+      _bar "2024-03-08" ~close:108.0 ();
+      _bar "2024-03-15" ~close:115.0 ();
+      _bar "2024-03-22" ~close:112.0 ();
+      _bar "2024-03-29" ~close:118.0 ~volume:2_000_000 ();
+    ]
+  in
+  assert_that (_cont bars) (equal_to false)
+
+let test_consolidation_far_above_ma_does_not_fire _ =
+  (* Same tight window, but the MA sits far below (min close 100 > 80 * 1.1):
+     the stock never "dropped back close to its MA". *)
+  let bars =
+    _consolidation_then_breakout ~breakout_close:106.0
+      ~breakout_volume:2_000_000
+  in
+  assert_that (_cont ~ma:80.0 bars) (equal_to false)
+
+let test_consolidation_no_breakout_does_not_fire _ =
+  (* Current close 102.5 stays inside the window (top 103): no breakout. *)
+  let bars =
+    _consolidation_then_breakout ~breakout_close:102.5
+      ~breakout_volume:2_000_000
+  in
+  assert_that (_cont bars) (equal_to false)
+
+let test_consolidation_weak_volume_does_not_fire _ =
+  (* Breakout in price but volume at the window average (< 1.25x). *)
+  let bars =
+    _consolidation_then_breakout ~breakout_close:106.0
+      ~breakout_volume:1_000_000
+  in
+  assert_that (_cont bars) (equal_to false)
+
+let test_consolidation_needs_min_weeks _ =
+  (* Only 3 completed bars before the breakout (< min_weeks 4). *)
+  let bars =
+    [
+      _bar "2024-03-08" ~close:100.0 ();
+      _bar "2024-03-15" ~close:103.0 ();
+      _bar "2024-03-22" ~close:101.0 ();
+      _bar "2024-03-29" ~close:106.0 ~volume:2_000_000 ();
+    ]
+  in
+  assert_that (_cont bars) (equal_to false)
+
+let test_add_signal_dispatches_consolidation_breakout _ =
+  let bars =
+    _consolidation_then_breakout ~breakout_close:106.0
+      ~breakout_volume:2_000_000
+  in
+  assert_that
+    (Scale_in_detector.add_signal
+       ~trigger:Scale_in_detector.Consolidation_breakout ~proximity_pct:0.03
+       ~consolidation:Scale_in_detector.default_consolidation_config ~ma:100.0
+       ~entry_price:_entry ~bars_since_entry:bars)
+    (equal_to true)
 
 (* ------- extension gate ------- *)
 
@@ -151,6 +239,39 @@ let test_config_defaults_are_no_op _ =
          field
            (fun (c : Scale_in_detector.config) -> c.require_not_late)
            (equal_to true);
+         field
+           (fun (c : Scale_in_detector.config) -> c.add_fraction)
+           (equal_to (None : float option));
+         field
+           (fun (c : Scale_in_detector.config) -> c.consolidation)
+           (equal_to Scale_in_detector.default_consolidation_config);
+       ])
+
+let test_v1_config_sexp_parses_with_new_fields_defaulted _ =
+  (* A v1-era scale_in_config sexp (no add_fraction / consolidation fields)
+     must parse with the new knobs at their no-op defaults — recorded specs
+     and the v1 ledger surface replay unchanged (R1). *)
+  let v1_sexp =
+    Sexplib.Sexp.of_string
+      "((initial_entry_fraction 0.5)(add_trigger Either)(extension_max_pct \
+       0.25))"
+  in
+  assert_that
+    (Scale_in_detector.config_of_sexp v1_sexp)
+    (all_of
+       [
+         field
+           (fun (c : Scale_in_detector.config) -> c.add_fraction)
+           (equal_to (None : float option));
+         field
+           (fun (c : Scale_in_detector.config) -> c.consolidation)
+           (equal_to Scale_in_detector.default_consolidation_config);
+         field
+           (fun (c : Scale_in_detector.config) -> c.initial_entry_fraction)
+           (float_equal 0.5);
+         field
+           (fun (c : Scale_in_detector.config) -> c.add_trigger)
+           (equal_to Scale_in_detector.Either);
        ])
 
 let test_strategy_config_omitted_fields_default_off _ =
@@ -192,8 +313,24 @@ let suite =
          >:: test_early_new_high_not_fired_below_prior_high;
          "add_signal: Either catches gap-and-go that Pullback misses"
          >:: test_either_fires_on_new_high_when_pullback_does_not;
+         "consolidation_breakout: fires on tight window + volume breakout"
+         >:: test_consolidation_breakout_fires;
+         "consolidation_breakout: wide band does not fire"
+         >:: test_consolidation_too_wide_band_does_not_fire;
+         "consolidation_breakout: far above MA does not fire"
+         >:: test_consolidation_far_above_ma_does_not_fire;
+         "consolidation_breakout: no breakout does not fire"
+         >:: test_consolidation_no_breakout_does_not_fire;
+         "consolidation_breakout: weak volume does not fire"
+         >:: test_consolidation_weak_volume_does_not_fire;
+         "consolidation_breakout: needs min_weeks window"
+         >:: test_consolidation_needs_min_weeks;
+         "add_signal: dispatches Consolidation_breakout"
+         >:: test_add_signal_dispatches_consolidation_breakout;
          "extension gate thresholds" >:: test_extended_above_ma;
          "config defaults are no-op" >:: test_config_defaults_are_no_op;
+         "v1 config sexp parses with new fields defaulted"
+         >:: test_v1_config_sexp_parses_with_new_fields_defaulted;
          "strategy config round-trips default-off"
          >:: test_strategy_config_omitted_fields_default_off;
        ]

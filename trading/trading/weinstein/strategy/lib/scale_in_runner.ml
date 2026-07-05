@@ -66,16 +66,25 @@ let _bars_since_entry ~bar_reader ~lookback_bars ~as_of ~entry_date symbol =
   |> List.filter ~f:(fun (b : Types.Daily_price.t) ->
       Date.diff b.date entry_date >= 5)
 
-(* Extension gate: requires a real MA reading (populated by the Friday stops
-   pass earlier in the tick); no MA → no add. *)
-let _not_extended ~(sc : Scale_in_detector.config) ~prior_stage_ma_values
-    ~symbol ~close =
+(* Extension gate + trigger dispatch against one MA reading. The gate applies
+   to ALL triggers uniformly; see the extension_max_pct interplay warning in
+   scale_in_detector.mli. *)
+let _gate_and_signal ~(sc : Scale_in_detector.config) ~ma ~close ~entry_price
+    ~bars =
+  (not
+     (Scale_in_detector.extended_above_ma ~max_pct:sc.extension_max_pct ~close
+        ~ma))
+  && Scale_in_detector.add_signal ~trigger:sc.add_trigger
+       ~proximity_pct:sc.pullback_proximity_pct ~consolidation:sc.consolidation
+       ~ma ~entry_price ~bars_since_entry:bars
+
+(* A real MA reading (populated by the Friday stops pass earlier in the tick)
+   is required — no MA → no add. *)
+let _not_extended_and_signalled ~(sc : Scale_in_detector.config)
+    ~prior_stage_ma_values ~symbol ~close ~entry_price ~bars =
   match Hashtbl.find prior_stage_ma_values symbol with
   | None -> false
-  | Some ma ->
-      not
-        (Scale_in_detector.extended_above_ma ~max_pct:sc.extension_max_pct
-           ~close ~ma)
+  | Some ma -> _gate_and_signal ~sc ~ma ~close ~entry_price ~bars
 
 (* Size the add: the remaining risk fraction (1 - initial_entry_fraction) of a
    full unit, capped so aggregate symbol notional (existing sibling + add)
@@ -85,7 +94,11 @@ let _add_sizing ~(config : config) ~portfolio_value ~existing_notional
     ~entry_price ~stop_price =
   let pc = config.portfolio_config in
   let sc = config.scale_in_config in
-  let add_fraction = Float.max 0.0 (1.0 -. sc.initial_entry_fraction) in
+  let add_fraction =
+    match sc.Scale_in_detector.add_fraction with
+    | Some f -> Float.max 0.0 f
+    | None -> Float.max 0.0 (1.0 -. sc.initial_entry_fraction)
+  in
   let cap_left =
     Float.max 0.0
       (pc.Portfolio_risk.max_position_pct_long
@@ -132,10 +145,8 @@ let _signal_and_gates ~(config : config) ~bar_reader ~prior_stages
       ~as_of:current_date ~entry_date symbol
   in
   _stage_admits ~require_not_late:sc.require_not_late ~prior_stages symbol
-  && _not_extended ~sc ~prior_stage_ma_values ~symbol ~close
-  && Scale_in_detector.add_signal ~trigger:sc.add_trigger
-       ~proximity_pct:sc.pullback_proximity_pct ~entry_price
-       ~bars_since_entry:bars
+  && _not_extended_and_signalled ~sc ~prior_stage_ma_values ~symbol ~close
+       ~entry_price ~bars
 
 (* Size a signalled add and build its transition; [None] when sizing collapses
    to zero shares (risk fraction, remaining per-name cap, or price). *)
