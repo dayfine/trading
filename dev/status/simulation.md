@@ -1,6 +1,6 @@
 # Status: simulation
 
-## Last updated: 2026-07-04 (run 2 — #1847 MERGED)
+## Last updated: 2026-07-04
 
 ### 2026-07-04 — sibling round-trip pairing fix (#1847, MERGED as `761c30cf`)
 
