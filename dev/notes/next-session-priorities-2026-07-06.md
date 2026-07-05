@@ -31,18 +31,24 @@ capital-reallocation variants** (v1, v2, harvest-rotate, laggard-cap,
 macro-trim all dead — the class is exhausted). Mechanisms stay merged,
 default-off, searchable.
 
-## P0 candidate — the envelope pair-sweep (the one reallocation lever never tested)
+## ~~P0 candidate — the envelope pair-sweep~~ — CANCELLED 2026-07-05 (premise false)
 
-Every reallocation rejection shares one root cause: the binding cash
-constraint (`min_cash_pct 0.30` / `max_long_exposure_pct 0.70` — the same 70%
-ceiling from both sides). This pair has NEVER been swept together (single-knob
-sweeps read "inert" because the other side binds —
-`project_capital_mgmt_scale_in_design` §two-orthogonal-levers). A 2-axis
-surface (e.g. min_cash {0.30, 0.20, 0.10} × max_exposure {0.70, 0.80, 0.90},
-coupled cells only) answers whether the strategy is capacity-starved — and is
-the stated precondition for ever revisiting continuation adds. Bear-fold risk
-is the obvious cost; the 13-fold WF-CV prices exactly that. ~9h broad run,
-preflight now clear.
+**Both knobs are dead code in the sim path** — see
+`dev/notes/envelope-knobs-dead-2026-07-05.md`. `min_cash_pct` is consumed only
+by the never-called `check_limits`; `max_long_exposure_pct` is per-position
+min()'d (0.70 vs 0.30 per-position cap → never binds) and its aggregate check
+is also only in `check_limits`. Smoke A/B with `min_cash_pct=0.90` =
+bit-identical on all 3 windows; actual deployment is 89–99% invested. There is
+no 70% ceiling — the sweep would have been 9 bit-identical cells (~9h wasted).
+
+Consequences: the envelope cannot be *loosened* (already ~100%; only margin
+would expand it) → the precondition for revisiting continuation adds is
+unsatisfiable in the current architecture → scale-in stays closed. The only
+buildable envelope experiment is a *tightening* mechanism (working cash-reserve
+flag, default-off) — likely a breadth tax; decision item, not a default next
+step. Also decision item: wire or delete the dead `check_limits` battery
+(`max_positions`, `min_cash_pct`, aggregate exposure, sector counts all
+unwired).
 
 ## Other open threads (carried)
 
