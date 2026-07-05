@@ -53,6 +53,7 @@ let _permissive_screener_config (config : config) : Screener.config =
     neutral_blocks_shorts = false;
     enable_slow_grind_short_gate = false;
     min_price = 0.0;
+    early_stage2_max_weeks = 4;
   }
 
 (** Whether [trend] would have admitted longs at the macro gate. *)

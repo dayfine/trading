@@ -119,12 +119,19 @@ val default_grade_thresholds : grade_thresholds
 (** [default_grade_thresholds] provides the reference thresholds. *)
 
 val score_long :
+  ?early_stage2_max_weeks:int ->
   weights:scoring_weights ->
   sector:sector_context ->
   Stock_analysis.t ->
   int * string list
-(** [score_long ~weights ~sector a] computes the long-side weighted score and
-    rationale list for [a]. *)
+(** [score_long ?early_stage2_max_weeks ~weights ~sector a] computes the
+    long-side weighted score and rationale list for [a].
+
+    [early_stage2_max_weeks] is the early-Stage2 scoring-bonus window (default
+    [4] — bit-identical to the historical hardcoded window). It is the same
+    window {!Stock_analysis.is_breakout_candidate} admits on; the screener
+    threads [Screener.config.early_stage2_max_weeks] into both so the scoring
+    bonus and the admission gate can never drift. *)
 
 val score_short :
   weights:scoring_weights ->

@@ -59,12 +59,16 @@ val count_long_phases :
   max_score_override:int option ->
   volume_ratio_exclude_range:volume_ratio_band option ->
   min_price:float ->
+  early_stage2_max_weeks:int ->
   candidates:(Stock_analysis.t * sector_context) list ->
   int * int * int
 (** Long-side cascade-phase counts [(breakout, sector, grade)] for the
     diagnostics record. Each phase short-circuits (a [false] earlier phase keeps
     later phases [false]) so the triple is monotone non-increasing. The
-    [min_price] liquidity floor folds into the breakout phase. *)
+    [min_price] liquidity floor folds into the breakout phase.
+    [early_stage2_max_weeks] is the early-Stage2 admission window (see
+    [Screener.config.early_stage2_max_weeks]) threaded into both the breakout
+    gate and the score so the diagnostic count tracks the live cascade. *)
 
 val count_short_phases :
   weights:scoring_weights ->

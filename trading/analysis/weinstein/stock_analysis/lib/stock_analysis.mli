@@ -176,16 +176,24 @@ val analyze_with_callbacks :
     [(bars, benchmark_bars)] input by constructing callbacks that index the same
     pre-computed series the bar-list path computes internally. *)
 
-val is_breakout_candidate : t -> bool
-(** [is_breakout_candidate analysis] returns true if the stock shows a potential
-    Stage 2 breakout: transitioning from Stage 1, with rising MA and strong
-    volume.
+val is_breakout_candidate : ?early_stage2_max_weeks:int -> t -> bool
+(** [is_breakout_candidate ?early_stage2_max_weeks analysis] returns true if the
+    stock shows a potential Stage 2 breakout: transitioning from Stage 1, with
+    rising MA and strong volume.
+
+    [early_stage2_max_weeks] is the early-Stage2 admission window: a fresh
+    Stage2 (no observed Stage1→Stage2 transition) qualifies only while
+    [weeks_advancing <= early_stage2_max_weeks]. Defaults to [4] — bit-identical
+    to the historical hardcoded window, so every existing caller is unchanged.
+    The screener threads [Screener.config.early_stage2_max_weeks] here so the
+    window is a tunable axis.
 
     OR-arm (Interpretation B of issue #889): a stock that has [Some r] in
     {!t.continuation} with [r.is_continuation = true] also qualifies, even when
-    the Stage1→Stage2 transition is no longer in scope ([weeks_advancing > 4]).
-    This admits the Weinstein Ch. 3 "continuation buy" pattern as a new-position
-    candidate when [config.continuation = Some _].
+    the Stage1→Stage2 transition is no longer in scope
+    ([weeks_advancing > early_stage2_max_weeks]). This admits the Weinstein Ch.
+    3 "continuation buy" pattern as a new-position candidate when
+    [config.continuation = Some _].
 
     Volume confirmation (Strong / Adequate) and the RS-not-negative-declining
     gate apply to both arms equally.

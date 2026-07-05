@@ -1879,6 +1879,70 @@ let test_ranking_omitted_field_defaults_alphabetical _ =
   in
   assert_that no_ranking.candidate_ranking (equal_to Alphabetical)
 
+(* ------------------------------------------------------------------ *)
+(* early_stage2_max_weeks: early-Stage2 window knob                     *)
+(* ------------------------------------------------------------------ *)
+
+(** A fresh Stage2 analysis with no observed Stage1→Stage2 predecessor, so the
+    early-Stage2 scoring arm (not the Stage1→Stage2 breakout arm) is the one
+    that fires, gated by [early_stage2_max_weeks]. *)
+let early_stage2_analysis ~weeks_advancing : Stock_analysis.t =
+  {
+    (ranking_analysis ~ticker:"X" ~rs_norm:1.0 ~weeks_advancing
+       ~volume_ratio:3.0)
+    with
+    prior_stage = None;
+  }
+
+(** Count of "Early Stage2" labels in a scoring rationale (0 or 1). *)
+let early_stage2_labels rationale =
+  List.count rationale ~f:(String.equal "Early Stage2")
+
+(* Widened window earns the Early-Stage2 signal for a weeks_advancing = 5
+   candidate that the default window (4) does not — one knob drives the scoring
+   bonus, matching the admission gate window. *)
+let test_score_long_window_controls_early_stage2_signal _ =
+  let sector = make_sector "Tech" in
+  let a = early_stage2_analysis ~weeks_advancing:5 in
+  let default_rationale = snd (score_long ~weights:cfg.weights ~sector a) in
+  let widened_rationale =
+    snd (score_long ~early_stage2_max_weeks:8 ~weights:cfg.weights ~sector a)
+  in
+  assert_that
+    ( early_stage2_labels default_rationale,
+      early_stage2_labels widened_rationale )
+    (equal_to (0, 1))
+
+(* Axis-ability (experiment-flag-discipline R2): the field is present in the
+   serialized config (so [Overlay_validator] resolves the
+   [screening_config.early_stage2_max_weeks] override path) and an overlay value
+   round-trips. *)
+let test_early_stage2_max_weeks_serializes_and_round_trips _ =
+  let default_str = Sexp.to_string (sexp_of_config default_config) in
+  let widened_cfg =
+    config_of_sexp
+      (Sexp.of_string
+         (String.substr_replace_first default_str
+            ~pattern:"(early_stage2_max_weeks 4)"
+            ~with_:"(early_stage2_max_weeks 8)"))
+  in
+  assert_that
+    ( String.is_substring default_str ~substring:"early_stage2_max_weeks",
+      widened_cfg.early_stage2_max_weeks )
+    (equal_to (true, 8))
+
+(* An omitted field deserialises to the default 4 — older config sexps that
+   predate this knob round-trip to the historical hardcoded window. *)
+let test_early_stage2_max_weeks_omitted_defaults_4 _ =
+  let no_field =
+    config_of_sexp
+      (Sexp.of_string
+         (String.substr_replace_first
+            (Sexp.to_string (sexp_of_config default_config))
+            ~pattern:"(early_stage2_max_weeks 4)" ~with_:""))
+  in
+  assert_that no_field.early_stage2_max_weeks (equal_to 4)
+
 let suite =
   "screener_tests"
   >::: [
@@ -2028,6 +2092,12 @@ let suite =
          >:: test_ranking_field_serializes_and_round_trips;
          "test_ranking_omitted_field_defaults_alphabetical"
          >:: test_ranking_omitted_field_defaults_alphabetical;
+         "test_score_long_window_controls_early_stage2_signal"
+         >:: test_score_long_window_controls_early_stage2_signal;
+         "test_early_stage2_max_weeks_serializes_and_round_trips"
+         >:: test_early_stage2_max_weeks_serializes_and_round_trips;
+         "test_early_stage2_max_weeks_omitted_defaults_4"
+         >:: test_early_stage2_max_weeks_omitted_defaults_4;
        ]
 
 let () = run_test_tt_main suite
