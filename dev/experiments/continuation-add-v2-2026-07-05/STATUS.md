@@ -1,17 +1,16 @@
-# Continuation-add v2 surface — STATUS
+# Continuation-add v2 surface — STATUS: DONE, verdict REJECT
 
-- **Mechanism:** merged default-off (#1855; plan #1852). REJECT of scale-in v1
-  and its WHYs unaffected — this is the untested full-size+continuation-add
-  shape with the book's actual trigger.
-- **State: READY TO RUN, launch BLOCKED on Docker.raw recompact** (55 GB >
-  30 GB sweep-hygiene preflight; user GUI action). Est. runtime ~8–12 h
-  (13 folds × 4 variants, top-3000 snapshot mode, fork-per-fold).
-- **Launch:** `walk_forward` runner with `spec_top3000.sexp`, snapshot dir
-  `wfcv-top3000-1998`, `--parallel 1`, out-dir under `/tmp/sweeps/` per
-  sweep-hygiene. Nothing else on the container.
-- **First-fold sanity before the full run:** instrument or audit-diff one
-  fold to confirm continuation adds actually emit AND fill (the #1846
-  measurement lesson); verify trades.csv sibling rows look sane (post-#1847
-  pairing).
-- **Verdict:** to the ledger either way, with WHYs (mechanism-validation
-  rigor). No promotion without ACCEPT + confirmation grid.
+- **Mechanism:** merged default-off (#1855; plan #1852); stays a default-off
+  axis. **Verdict: REJECT for promotion** — ledger
+  `2026-07-05-continuation-add-v2-surface`; writeup
+  `dev/notes/continuation-add-v2-wfcv-2026-07-05.md`.
+- Run 2026-07-05: 13 folds × 4 variants, 9h06m, zero failures. Gate FAIL all
+  variants (4/13, 3/13, 4/13 Sharpe wins). Docker.raw preflight resolved
+  non-destructively pre-launch (55→21 GB container /tmp scratch).
+- Pre-run sanity passed: continuation adds emit AND fill (COHU sibling add
+  verified in `sanity/`; trades.csv trustworthy post-#1847).
+- **Scale-in program CLOSED** — both halves tested and rejected (v1
+  ½-sizing tax; v2 flat redistribution). See writeup §Program closure for
+  the forward guidance (no more intra-envelope reallocation variants;
+  revisit only paired with an envelope change).
+- Artifacts: `out_top3000/` (aggregate, fold_actuals, report).
