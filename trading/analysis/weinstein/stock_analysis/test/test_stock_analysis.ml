@@ -113,6 +113,66 @@ let test_breakout_candidate_false_when_no_volume_confirmation _ =
   assert_that (is_breakout_candidate result) (equal_to false)
 
 (* ------------------------------------------------------------------ *)
+(* Early-Stage2 admission window (early_stage2_max_weeks)                *)
+(* ------------------------------------------------------------------ *)
+
+(** A fresh Stage2 analysis (no observed Stage1→Stage2 predecessor) with the
+    given [weeks_advancing], Strong volume, and rising RS — so admission turns
+    solely on the early-Stage2 window arm of [is_breakout_candidate]. *)
+let fresh_stage2 ~weeks_advancing : Stock_analysis.t =
+  {
+    ticker = "X";
+    stage =
+      {
+        stage = Stage2 { weeks_advancing; late = false };
+        ma_value = 100.0;
+        ma_direction = Rising;
+        ma_slope_pct = 0.05;
+        transition = None;
+        above_ma_count = 5;
+      };
+    rs =
+      Some
+        {
+          current_rs = 1.0;
+          current_normalized = 1.0;
+          trend = Positive_rising;
+          history = [];
+        };
+    volume =
+      Some
+        {
+          confirmation = Strong 3.0;
+          event_volume = 3000;
+          avg_volume = 1000.0;
+          volume_ratio = 3.0;
+        };
+    resistance = None;
+    support = None;
+    breakout_price = Some 100.0;
+    breakdown_price = None;
+    prior_stage = None;
+    continuation = None;
+    as_of_date = as_of;
+  }
+
+(* Default window (4): weeks_advancing = 4 is admitted, 5 is rejected — pins the
+   historical hardcoded window bit-for-bit. *)
+let test_default_window_admits_4_rejects_5 _ =
+  assert_that
+    ( is_breakout_candidate (fresh_stage2 ~weeks_advancing:4),
+      is_breakout_candidate (fresh_stage2 ~weeks_advancing:5) )
+    (equal_to (true, false))
+
+(* Widened window (8): the same weeks_advancing = 5 candidate that the default
+   rejects is admitted once the window is widened to 8. *)
+let test_widened_window_admits_5 _ =
+  assert_that
+    (is_breakout_candidate ~early_stage2_max_weeks:8
+       (fresh_stage2 ~weeks_advancing:5))
+    (equal_to true)
+
+(* ------------------------------------------------------------------ *)
 (* Breakdown candidate                                                  *)
 (* ------------------------------------------------------------------ *)
 
@@ -511,6 +571,9 @@ let suite =
          >:: test_breakout_candidate_false_when_stage4;
          "test_breakout_candidate_false_when_no_volume_confirmation"
          >:: test_breakout_candidate_false_when_no_volume_confirmation;
+         "test_default_window_admits_4_rejects_5"
+         >:: test_default_window_admits_4_rejects_5;
+         "test_widened_window_admits_5" >:: test_widened_window_admits_5;
          "test_breakdown_candidate_true_with_stage3_prior"
          >:: test_breakdown_candidate_true_with_stage3_prior;
          "test_breakdown_candidate_false_for_stage2"

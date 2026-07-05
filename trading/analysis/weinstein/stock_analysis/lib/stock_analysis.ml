@@ -410,13 +410,16 @@ let analyze ~(config : config) ~ticker ~bars ~benchmark_bars ~prior_stage
 (* ------------------------------------------------------------------ *)
 
 (** Initial-breakout arm (pre-existing): Stage1→Stage2 transition, or fresh
-    Stage2 with [weeks_advancing ≤ 4]. Mature Stage2 symbols (the cascade's
-    blind spot per dev/notes/capital-recycling-framing-2026-05-06.md) are
-    rejected by this arm but admitted by the continuation arm when enabled. *)
-let _initial_breakout_arm (a : t) : bool =
+    Stage2 with [weeks_advancing ≤ early_stage2_max_weeks]. Mature Stage2
+    symbols (the cascade's blind spot per
+    dev/notes/capital-recycling-framing-2026-05-06.md) are rejected by this arm
+    but admitted by the continuation arm when enabled. [early_stage2_max_weeks]
+    is the early-Stage2 admission window (default 4 at the public boundary). *)
+let _initial_breakout_arm ~early_stage2_max_weeks (a : t) : bool =
   match (a.stage.stage, a.prior_stage) with
   | Stage2 _, Some (Stage1 _) -> true
-  | Stage2 { weeks_advancing; late = false }, _ -> weeks_advancing <= 4
+  | Stage2 { weeks_advancing; late = false }, _ ->
+      weeks_advancing <= early_stage2_max_weeks
   | _ -> false
 
 (** Continuation-buy arm (Interpretation B of issue #889). Active only when
@@ -428,8 +431,10 @@ let _continuation_arm (a : t) : bool =
   | Some { is_continuation = true; _ }, Stage2 _ -> true
   | _ -> false
 
-let is_breakout_candidate (a : t) : bool =
-  let stage_ok = _initial_breakout_arm a || _continuation_arm a in
+let is_breakout_candidate ?(early_stage2_max_weeks = 4) (a : t) : bool =
+  let stage_ok =
+    _initial_breakout_arm ~early_stage2_max_weeks a || _continuation_arm a
+  in
   (* Volume confirmation: at least Adequate *)
   let volume_ok =
     match a.volume with

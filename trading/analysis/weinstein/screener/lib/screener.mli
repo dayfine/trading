@@ -245,6 +245,39 @@ type config = {
           override path via [((screening_config ((min_price 5.0))))] — see
           [Weinstein_strategy.config.screening_config]. Not wired into any
           default config or the automated tuner sweep surface. *)
+  early_stage2_max_weeks : int; [@sexp.default 4]
+      (** Early-Stage2 admission / scoring window, in weeks. A fresh Stage2
+          candidate (no observed Stage1→Stage2 breakout) is admitted as a
+          breakout candidate — and earns the "Early Stage2" scoring bonus — only
+          while [weeks_advancing <= early_stage2_max_weeks]. Default [4] is
+          bit-identical to the historical hardcoded window, so the default
+          config (and every golden) is unchanged.
+
+          One knob feeds both use sites: the admission gate
+          ({!Stock_analysis.is_breakout_candidate}, which drives
+          [is_breakout_candidate] in the cascade) and the scoring bonus
+          ({!Screener_scoring.score_long}'s early-Stage2 signal). They encode
+          the same "early-Stage2 window" concept — a single field keeps them
+          from drifting.
+
+          Default-off tuning axis (P2, deferred from PR #1818): the
+          breakout-*event* lookback is 8 weeks while this admission window is 4,
+          and now that the live gate bites (post-#1818 prior_stage fix) whether
+          [<= 4] is right is a tuning question. Reachable from the
+          scenario/strategy override path via
+          [((screening_config ((early_stage2_max_weeks N))))] — see
+          [Weinstein_strategy.config.screening_config] — so it routes through
+          [Overlay_validator.apply_overrides] and is a [Variant_matrix] [Key]
+          axis.
+
+          {b Why [@sexp.default 4] (not [@sexp.option]):} [Overlay_validator]
+          derives valid override key-paths from the {e serialized} base config,
+          so a field must stay PRESENT in [sexp_of_config] for the axis to
+          resolve (same rationale as [weights.w_early_stage2]).
+          [@sexp.default 4] keeps the field present in the serialized form while
+          parsing a missing field back to [4] (older config sexps round-trip).
+          Not wired into any non-default config until it earns an ACCEPT in the
+          experiment ledger ([.claude/rules/experiment-flag-discipline.md]). *)
 }
 [@@deriving sexp]
 (** Main screener configuration. *)

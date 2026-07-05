@@ -287,6 +287,24 @@ let test_default_screening_min_price_is_zero _ =
   let cfg = _default_config () in
   assert_that cfg.screening_config.min_price (float_equal 0.0)
 
+(** Deep-merge path for [screening_config.early_stage2_max_weeks] — the
+    early-Stage2 admission/scoring window. A scenario's [config_overrides] can
+    widen it (e.g. from 4 to 8) so the axis resolves through
+    [Overlay_validator.apply_overrides] without an unknown-key error. *)
+let test_override_screening_early_stage2_max_weeks _ =
+  let merged =
+    _apply_one_override (_default_config ())
+      (Sexp.of_string "((screening_config ((early_stage2_max_weeks 8))))")
+  in
+  assert_that merged.screening_config.early_stage2_max_weeks (equal_to 8)
+
+(** [4] (the default) is preserved when no override is applied. Pins the
+    bit-identical no-op contract documented in
+    [Screener.config.early_stage2_max_weeks]. *)
+let test_default_screening_early_stage2_max_weeks_is_four _ =
+  let cfg = _default_config () in
+  assert_that cfg.screening_config.early_stage2_max_weeks (equal_to 4)
+
 (** Fold-equivalent helper: applies a list of override sexps the same way
     [Backtest.Runner._apply_overrides] does — sequential deep-merge of each
     overlay into the running sexp, then a single [config_of_sexp] at the end.
@@ -482,6 +500,10 @@ let suite =
          >:: test_override_screening_min_price;
          "default: screening_config.min_price = 0.0"
          >:: test_default_screening_min_price_is_zero;
+         "override: screening_config.early_stage2_max_weeks round-trips \
+          through sexp" >:: test_override_screening_early_stage2_max_weeks;
+         "default: screening_config.early_stage2_max_weeks = 4"
+         >:: test_default_screening_early_stage2_max_weeks_is_four;
          "two overlays targeting same top-level field both apply"
          >:: test_two_overlays_same_top_level_field;
          "unknown top-level overlay key fails loudly (sweep-path linter)"

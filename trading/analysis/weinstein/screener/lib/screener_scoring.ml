@@ -76,12 +76,17 @@ let _early_stage2_weight ~w =
 let _virgin_support_weight ~w =
   match w.w_virgin_support with Some v -> v | None -> w.w_clean_resistance
 
-(** Stage signal for long setups: Stage1→2 transition or early Stage2. *)
-let _stage_long_signal ~w ~(a : Stock_analysis.t) =
+(** Stage signal for long setups: Stage1→2 transition or early Stage2. The
+    early-Stage2 arm fires while [weeks_advancing <= early_stage2_max_weeks]
+    (default 4 at the public boundary — same window
+    {!Stock_analysis.is_breakout_candidate} admits on, threaded from
+    [Screener.config.early_stage2_max_weeks] so the two never drift). *)
+let _stage_long_signal ~early_stage2_max_weeks ~w ~(a : Stock_analysis.t) =
   match (a.stage.stage, a.prior_stage) with
   | Stage2 _, Some (Stage1 _) ->
       [ (w.w_stage2_breakout, "Stage1→Stage2 breakout") ]
-  | Stage2 { weeks_advancing; _ }, _ when weeks_advancing <= 4 ->
+  | Stage2 { weeks_advancing; _ }, _
+    when weeks_advancing <= early_stage2_max_weeks ->
       [ (_early_stage2_weight ~w, "Early Stage2") ]
   | _ -> []
 
@@ -205,12 +210,18 @@ let _tally signals =
 (* Scoring                                                              *)
 (* ------------------------------------------------------------------ *)
 
-(** Compute a long-side score for a stock analysis. *)
-let score_long ~weights ~sector (a : Stock_analysis.t) : int * string list =
+(** Compute a long-side score for a stock analysis. [early_stage2_max_weeks]
+    (default 4) is the early-Stage2 scoring window; supplying it from
+    [Screener.config.early_stage2_max_weeks] keeps the scoring bonus window in
+    lockstep with the {!Stock_analysis.is_breakout_candidate} admission window.
+*)
+let score_long ?(early_stage2_max_weeks = 4) ~weights ~sector
+    (a : Stock_analysis.t) : int * string list =
   let w = weights in
   _tally
-    (_stage_long_signal ~w ~a @ _late_stage2_signal ~w ~a @ _volume_signal ~w ~a
-   @ _rs_long_signal ~w ~a @ _resistance_signal ~w ~a
+    (_stage_long_signal ~early_stage2_max_weeks ~w ~a
+    @ _late_stage2_signal ~w ~a @ _volume_signal ~w ~a @ _rs_long_signal ~w ~a
+    @ _resistance_signal ~w ~a
     @ _sector_long_signal ~w ~sector)
 
 (** Compute a short-side score for a stock analysis. *)
