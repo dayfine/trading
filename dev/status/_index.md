@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-06-run4 (orchestrator run 28809853363: **merge + reconcile + health pass**. Merged advisory weekly deep-scan PR #1870 (docs-only, CI green — 0 critical / 30 warnings / 140 info; warnings are design-doc-drift + QC-audit-trail gaps, **no** code-health fn_length/magic-number findings → no new cleanup backlog items, no code-health dispatch). 0 feature PRs open at run start. Main GREEN: local `dune build` / `dune runtest` / status-integrity all exit 0. **No dispatch** — every feature track LOCAL/data-gated (EODHD absent), harness T1 `[x]`/T3 gated/lone open item human-PAT-blocked, cleanup backlog drained (template placeholder only), ops-data sentinel unchanged since #814. Prior: run 3 (28799012618) reconcile+health, added the cash-reserve row after #1867 merged.
+Last updated: 2026-07-06-run5 (orchestrator run 28828256199: **reconcile + health pass**. 0 open PRs at run start. Since run-4 two LOCAL/docs PRs merged — #1872 (cash-reserve WF-CV REJECT verdict) + #1873 (agent-memory snapshot refresh); both maintainer-driven, no orchestrator dispatch. Reconciled the **cash-reserve** row IN_PROGRESS→MERGED (track closed: mechanism default-off #1867, surface REJECT #1872). Main GREEN: `dune build` / `dune runtest` / status-integrity all exit 0 (fmt_check OK, magic_numbers OK, no FAIL). **No dispatch** — every feature track LOCAL/data-gated (EODHD absent) or human-gated, harness T1 `[x]`/T3 gated/lone open item human-PAT-blocked (#1636), cleanup backlog drained, ops-data sentinel unchanged since #814. Prior: run 4 (28809853363) merged deep-scan PR #1870 + reconcile+health.
 
 ## Active + complete tracks
 
@@ -14,7 +14,7 @@ Each row: one line; deeper task detail in the linked status file.
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
-| [cash-reserve](cash-reserve.md) | IN_PROGRESS | feat-weinstein | — | Mechanism MERGED default-off (#1867 `cash_reserve_pct`); next: WF-CV surface {0,.1,.2,.3} (LOCAL/data-gated) — likely REJECT per fat-tail prior |
+| [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
 | [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | — | readme_toplines top-line numbers MERGED (#1617, 3-gate auto-merge); next: P2 matrix on composition-policy universe (data-gated) |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
