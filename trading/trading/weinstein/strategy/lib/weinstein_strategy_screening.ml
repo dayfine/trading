@@ -131,6 +131,24 @@ let _sleeve_decisions ~held_set ~make_entry ~portfolio_value ~state ~long_cash
   |> List.sort ~compare:(fun (i, _, _) (j, _, _) -> Int.compare i j)
   |> List.map ~f:(fun (_, c, d) -> (c, d))
 
+(* Cash-reserve knob: hold back [cash_reserve_pct] of portfolio value from the
+   per-Friday entry-funding budget. Default [0.0] => [spendable = cash],
+   bit-identical to baseline. The reserve is subtracted once here (off the
+   top-level budget); the sleeve split in [entries_from_candidates] derives
+   from [spendable] so it is never charged twice. Scoped to NEW entries only —
+   exits/covers/stops do not flow through this walk. See
+   [Weinstein_strategy_config.cash_reserve_pct]. *)
+let _reserve_reduced_walk_state ~config ~portfolio ~portfolio_value
+    ~sector_lookup =
+  let spendable =
+    Float.max 0.0
+      (portfolio.Portfolio_view.cash
+      -. (config.cash_reserve_pct *. portfolio_value))
+  in
+  ( spendable,
+    _make_entry_walk_state ~cash:spendable ~config ~portfolio ~portfolio_value
+      ~sector_lookup )
+
 let entries_from_candidates ?sector_lookup ~config ~candidates ~stop_states
     ~bar_reader ~(portfolio : Portfolio_view.t) ~get_price ~current_date
     ?(audit_recorder = Audit_recorder.noop) ?macro () =
@@ -146,19 +164,8 @@ let entries_from_candidates ?sector_lookup ~config ~candidates ~stop_states
       ~initial_stop_buffer:config.initial_stop_buffer ~stop_states ~bar_reader
       ~portfolio_value ~current_date cand
   in
-  (* Cash-reserve knob: hold back [cash_reserve_pct] of portfolio value from the
-     per-Friday entry-funding budget. Default [0.0] => [spendable = cash],
-     bit-identical to baseline. The reserve is subtracted once here (off the
-     top-level budget); the sleeve split below derives from [spendable] so it is
-     never charged twice. Scoped to NEW entries only — exits/covers/stops do not
-     flow through this walk. See [Weinstein_strategy_config.cash_reserve_pct]. *)
-  let spendable =
-    Float.max 0.0
-      (portfolio.Portfolio_view.cash
-      -. (config.cash_reserve_pct *. portfolio_value))
-  in
-  let state =
-    _make_entry_walk_state ~cash:spendable ~config ~portfolio ~portfolio_value
+  let spendable, state =
+    _reserve_reduced_walk_state ~config ~portfolio ~portfolio_value
       ~sector_lookup
   in
   let decisions =
