@@ -35,3 +35,47 @@ let initial_sector_exposures ~(positions : Position.t Map.M(String).t)
           | None -> notional
           | Some v -> v +. notional));
   acc
+
+type entry_walk_state = {
+  remaining_cash : float ref;
+  short_notional_acc : float ref;
+  short_notional_cap : float;
+  sector_exposure_acc : (string, float) Hashtbl.t;
+  max_sector_exposure_pct : float option;
+}
+
+let make_entry_walk_state ~cash ~(config : Weinstein_strategy_config.config)
+    ~(portfolio : Portfolio_view.t) ~portfolio_value ~sector_lookup =
+  let short_notional_acc =
+    ref (initial_short_notional portfolio.Portfolio_view.positions)
+  in
+  let short_notional_cap =
+    portfolio_value
+    *. config.portfolio_config.Portfolio_risk.max_short_notional_fraction
+  in
+  let sector_exposure_acc =
+    match sector_lookup with
+    | None -> Hashtbl.create (module String)
+    | Some lookup ->
+        initial_sector_exposures ~positions:portfolio.Portfolio_view.positions
+          ~sector_lookup:lookup
+  in
+  {
+    remaining_cash = ref cash;
+    short_notional_acc;
+    short_notional_cap;
+    sector_exposure_acc;
+    max_sector_exposure_pct =
+      config.portfolio_config.Portfolio_risk.max_sector_exposure_pct;
+  }
+
+let reserve_reduced_walk_state ~(config : Weinstein_strategy_config.config)
+    ~(portfolio : Portfolio_view.t) ~portfolio_value ~sector_lookup =
+  let spendable =
+    Float.max 0.0
+      (portfolio.Portfolio_view.cash
+      -. (config.cash_reserve_pct *. portfolio_value))
+  in
+  ( spendable,
+    make_entry_walk_state ~cash:spendable ~config ~portfolio ~portfolio_value
+      ~sector_lookup )
