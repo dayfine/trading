@@ -28,7 +28,9 @@ feat-weinstein (LOCAL session, 2026-07-06). Orchestrator QCs + merges.
   entries only — exits/covers/stops never blocked (#1553 lesson). experiment-flag
   R1 (default-off, bit-identical) + R2 (axis-reachable via `Overlay_validator`) PASS.
   Tests: config default/round-trip, behaviour off (3 longs) vs on (0.30 → 2 longs),
-  exit-exempt under reserve 0.9, axis reachability. PR open on `feat/cash-reserve-pct`.
+  exit-exempt under reserve 0.9, axis reachability. **MERGED #1867** (2026-07-06 12:45Z;
+  run-2 behavioral finding — short-sleeve reserve under-honoring + docstring — addressed by
+  the human before merge).
 
 ## Next Steps
 - [non-blocking] WF-CV surface `cash_reserve_pct ∈ {0.0, 0.1, 0.2, 0.3}` (per
