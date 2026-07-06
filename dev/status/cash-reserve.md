@@ -9,15 +9,19 @@ from the CLOSED intra-envelope scale-in reallocation track: this *tightens* depl
 (holds cash), it does not reallocate within a full envelope.
 
 ## Status
-IN_PROGRESS
+MERGED
+
+Track closed: mechanism merged (#1867, default-off); surface verdict REJECT
+(ledger `2026-07-06-cash-reserve-surface`). Envelope program closed both
+directions (loosening impossible per #1861; tightening rejected here).
 
 ## Last updated: 2026-07-06
 
 ## Interface stable
-NO
+YES
 
 ## Ownership
-feat-weinstein (LOCAL session, 2026-07-06). Orchestrator QCs + merges.
+Closed. No dispatchable work — do not dispatch.
 
 ## Completed
 - Mechanism BUILT, default-off (`cash_reserve_pct : float [@sexp.default 0.0]` on
@@ -32,12 +36,19 @@ feat-weinstein (LOCAL session, 2026-07-06). Orchestrator QCs + merges.
   run-2 behavioral finding — short-sleeve reserve under-honoring + docstring — addressed by
   the human before merge).
 
+## Completed (verdict)
+- WF-CV surface `{0.0, 0.1, 0.2, 0.3}` broad top-3000 13×2y: **REJECT all**
+  (gate FAIL 4/6/4 Sharpe wins; 30% reserve = Sharpe 0.441 vs 0.597, worse in
+  the 2022 bear fold). Non-monotonic response (r10 worse than both neighbors;
+  r20 aggregate spike driven by one flipped fold) = path-dependent funding
+  reshuffle, not a risk dial. 10th fat-tail confirmation: monster-fold return
+  cut at every reserve level. Writeup:
+  `dev/notes/cash-reserve-wfcv-2026-07-06.md`.
+
 ## Next Steps
-- [non-blocking] WF-CV surface `cash_reserve_pct ∈ {0.0, 0.1, 0.2, 0.3}` (per
-  `experiment-gap-closing`): does holding 10–30% cash buy enough DD/dispersion relief
-  to justify the return cost? Note the standing prior — the edge is the fat tail
-  (`project_edge_is_the_fat_tail`); a reserve reduces deployment, so expect a return
-  cost. Default stays off pending a ledger ACCEPT + confirmation grid.
+None — track closed. `cash_reserve_pct` stays a searchable axis; no standalone
+re-sweep. Capital-protection lever class of record: barbell overlay
+(`project_barbell_on_stocks`).
 
 ## Follow-up
 None
