@@ -7,14 +7,21 @@ marked BUILT v1 in #1835). **Empirical validation COMPLETE — two-cell WF-CV su
 (SP500 + top-3000) → REJECTED for promotion (ledger #1840); default stays off.**
 **Post-REJECT participation measurement (#1843): the v1 add channel never physically
 functioned** (adds emit as zero-width `StopLimit(close,close)` → structurally unfillable).
-A small **add-channel-fix build** (P0, maintainer-LOCAL; plan
-`dev/notes/next-session-priorities-2026-07-04.md` / #1844) is the only path to a *first*
-real test of the designed press-the-winner mechanism.
+The add-channel-fix + book-faithful continuation-add build then shipped
+(#1852/#1855/#1856, `Consolidation_breakout` trigger + `add_fraction` knob, default-off)
+and its broad-only WF-CV surface was run → **v2 REJECT (#1860, ledger
+`2026-07-05-continuation-add-v2-surface`).** **PROGRAM CLOSED: both halves tested and
+rejected; mechanisms stay merged default-off + searchable. Standing directive — stop
+proposing intra-envelope capital-reallocation variants.**
 
 ## Status
-IN_PROGRESS
+MERGED
 
-## Last updated: 2026-07-03
+<!-- Program CLOSED. Mechanisms merged default-off (v1 #1830–#1833, v2 #1855); both surfaces
+REJECTED (v1 #1840, v2 #1860). No further variants; class exhausted per 2026-07-06 directive. -->
+
+
+## Last updated: 2026-07-06
 
 ## Interface stable
 NO
@@ -78,29 +85,37 @@ dayfine (maintainer, LOCAL sessions). Orchestrator QCs + merges the PRs as they 
 - **Consequence:** the v1 REJECT stands, but the "un-taxed press-the-winner" shape was never
   actually tested — it was blocked by three pinned defects (below), not disproven.
 
+## v2 continuation-add surface (2026-07-05) — **REJECT** (#1860, ledger `2026-07-05-continuation-add-v2-surface`)
+- The add-channel-fix + book-faithful continuation-add build shipped (#1852 plan, #1855
+  `Consolidation_breakout` trigger + `add_fraction` knob, #1856 broad-only WF-CV surface
+  spec) — full-size initial entries + book-faithful adds (Ch. 3 §The Trader's Way),
+  default-off, triple-gated. This *was* the "un-taxed press-the-winner" test #1843 said the
+  v1 REJECT had left undone.
+- **Verdict: REJECT** (writeup `dev/notes/continuation-add-v2-wfcv-2026-07-05.md`): gate FAIL
+  on all variants; the faithful trigger is too rare to matter (5–6/13 folds unchanged);
+  regime-mixed when it fires (f010 +10.7pp vs f007 −15.7pp); a 1.5× volume filter removes
+  both the harm and the edge; full-size adds are financed by *displaced entries* — **breadth
+  is the edge** (9th fat-tail confirmation).
+
 ## Next Steps
-- **v1 REJECT stands** (default stays off, axis status retained). But per #1843 the designed
-  add channel never functioned, so the press-the-winner shape is *untested*, not disproven.
-- **P0 add-channel-fix build (maintainer-LOCAL, plan #1844 / `next-session-priorities-2026-07-04.md`)** —
-  three concrete, pinned defects, all default-off / no-op for existing paths
-  (experiment-flag-discipline R1): (1) fillable add order type (stop-market above Friday close /
-  market-at-open, not zero-width `StopLimit(close,close)`); (2) explicit `add_fraction` knob in
-  `Scale_in_detector.config`; (3) add/exit-coherence gate (don't emit adds for symbols the same
-  tick is exiting). This is maintainer-LOCAL work per the Ownership line; the orchestrator QCs +
-  merges the PRs as they land (not a feat-agent dispatch). Then: fresh full-size+adds surface
-  through experiment-gap-closing WF-CV (data-gated in GHA).
-- **Only open forward path (data-gated / LOCAL, low priority per forward guidance):** if a
-  smoother broad book is ever wanted, revisit the `either_loose` shape (Either + ext≈0.25) as
-  tail-risk-lite — **possibly without the half-sizing** (full initial entries + continuation
-  adds = pure press-the-winner, the un-taxed half of the idea). That is a *fresh surface*, not
-  a re-run of v1; needs the deep/regime-diverse EODHD warehouse (absent in GHA).
-- Non-blocking reconcile from PR 4 (inert while default-off): (a) plan §5 `max_adds` no-op
-  default `0` vs impl `1`; (b) `early_new_high`'s ≥2-bar / above-entry clauses pinned only
-  transitively. Address if/when the axis is ever searched again.
+- **PROGRAM CLOSED — no active work.** Both halves tested + rejected: v1 ½-sizing (fat-tail
+  tax, #1840) and v2 book-faithful continuation adds (flat redistribution, #1860). Mechanisms
+  stay merged, default-off, searchable. Per the 2026-07-06 standing directive
+  (`dev/notes/next-session-priorities-2026-07-06.md`): **stop proposing intra-envelope
+  capital-reallocation variants** (v1, v2, harvest-rotate, laggard-cap, macro-trim — the class
+  is exhausted).
+- **Architectural blocker on any revisit:** the sizing envelope cannot be *loosened* — actual
+  deployment is already 89–99% invested and the `check_limits` battery is dead code in the sim
+  path (`dev/notes/envelope-knobs-dead-2026-07-05.md`, #1861). Continuation adds have no free
+  capital to redeploy into; the precondition for revisiting is unsatisfiable in the current
+  architecture. Any future envelope experiment would be a *tightening* mechanism (working
+  cash-reserve flag, default-off — likely a breadth tax); that is a **decision item**, not a
+  next step.
+- Non-blocking reconcile (inert while default-off, address only if the axis is ever searched
+  again): (a) plan §5 `max_adds` no-op default `0` vs impl `1`; (b) `early_new_high`'s ≥2-bar /
+  above-entry clauses pinned only transitively.
 
 ## Blocked on
-None between tracks. v1 REJECTED; the add-channel-fix P0 build (#1844) is maintainer-LOCAL
-(strategy-core order-translation change + a design choice the maintainer owns per the
-Ownership line — not a feat-agent dispatch). The subsequent fresh full-size+adds WF-CV surface
-is data-gated (deep/regime-diverse warehouse; EODHD key absent in GHA) and runs as maintainer
-LOCAL sessions.
+None. Program closed — no in-flight work. Any revisit is a fresh surface, data-gated
+(deep/regime-diverse EODHD warehouse absent in GHA) + architecturally blocked (unsatisfiable
+loosening precondition), and would run as a maintainer LOCAL decision, not a feat-agent dispatch.
