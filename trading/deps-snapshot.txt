@@ -44,9 +44,9 @@ csv                         2.4
 ctypes                      0.24.0
 ctypes-foreign              0.24.0
 domain-name                 0.5.0
-dune                        3.23.1
-dune-build-info             3.23.1
-dune-configurator           3.23.1
+dune                        3.24.0
+dune-build-info             3.24.0
+dune-configurator           3.24.0
 either                      1.0.0
 expect_test_helpers_core    v0.17.0
 fieldslib                   v0.17.0
@@ -100,7 +100,7 @@ ppx_cold                    v0.17.0
 ppx_compare                 v0.17.0
 ppx_custom_printf           v0.17.0
 ppx_derivers                1.2.1
-ppx_deriving                6.1.1
+ppx_deriving                6.1.2
 ppx_diff                    v0.17.1
 ppx_disable_unused_warnings v0.17.0
 ppx_enumerate               v0.17.0
