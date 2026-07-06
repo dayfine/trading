@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-05 (orchestrator run 28734545226, run 3: **light coordination pass**. Main GREEN (HEAD `2e861844`/#1857 build-and-test + perf-tier1-smoke SUCCESS). Merged the weekly track-pacer report **#1858** (docs-only `dev/reviews/track-pacer-2026-07-05.md`, CI green → QC-skipped per merge-gates); queue now clear. Reconcile: verified all rows vs per-track files — **no drift** (decision-audit index+file both MERGED; track-pacer's reopen suggestion is an owner-intent [info], not drift). **0 subagents dispatched:** all feature tracks data/human/LOCAL-gated (EODHD key absent in GHA); harness T1 all `[x]` + lone `[~]` (ci.yml ENOSPC #1636) workflow-PAT-blocked; cleanup backlog drained; ops-data sentinel-skip (data-gaps unchanged since #814, 2026-05-03). Deterministic linters clean (status-integrity/index-size exit 0). Prior: run 2 (28730917210) reconciled scale-in row after human #1855/#1856.
+Last updated: 2026-07-06 (orchestrator run 28762996511: **light coordination pass**. Main GREEN (HEAD `b1d3e410`/#1862 CI build-and-test + perf-tier1-smoke SUCCESS). **Reconcile:** flipped `capital-management-scale-in` IN_PROGRESS → MERGED/CLOSED — the v2 continuation-add surface it listed as "next" was RUN and REJECTED (#1860, ledger `2026-07-05-continuation-add-v2-surface`); scale-in program closed end to end (v1 #1840 + v2 #1860 both REJECTED, mechanisms merged default-off). Also landed since last run: #1861 (envelope knobs are dead code → P0 pair-sweep cancelled) + #1862 (early-Stage2 ≤4-wk window lifted to config knob; screener stays MERGED). **0 subagents dispatched:** all feature tracks data/human/LOCAL-gated (EODHD key absent in GHA); harness T1 all `[x]` + lone `[~]` (ci.yml ENOSPC #1636) workflow-PAT-blocked, T2 milestone-gated, T3/T4 gated; cleanup backlog drained (only template placeholder); ops-data sentinel-skip (data-gaps unchanged since #814, 2026-05-03). Deterministic linters clean (status-integrity/index-size exit 0). Prior: run 3 (28734545226) merged track-pacer #1858, no drift.
 
 ## Active + complete tracks
 
@@ -13,7 +13,7 @@ Each row: one line; deeper task detail in the linked status file.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
-| [capital-management-scale-in](capital-management-scale-in.md) | IN_PROGRESS | dayfine | — | add-channel-fix landed (#1855, default-off); v2 surface spec staged (#1856); next: continuation-add v2 WF-CV surface (data-gated) |
+| [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | — | readme_toplines top-line numbers MERGED (#1617, 3-gate auto-merge); next: P2 matrix on composition-policy universe (data-gated) |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
