@@ -556,6 +556,12 @@ type config = {
       [@sexp.default Scale_in_detector.default_config]
       (** Scale-in knobs; only consulted when [enable_scale_in = true]. See
           [Weinstein_strategy_config] and {!Scale_in_detector}. *)
+  cash_reserve_pct : float; [@sexp.default 0.0]
+      (** Fraction of current portfolio value held back from NEW entry funding
+          each Friday; default [0.0] is a no-op (bit-identical to baseline). The
+          working replacement for the dead [Portfolio_risk.min_cash_pct]. Scoped
+          to entries only — exits are never blocked. See
+          [Weinstein_strategy_config]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

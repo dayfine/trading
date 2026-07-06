@@ -24,59 +24,10 @@ let held_symbols (portfolio : Portfolio_view.t) =
       | Entering _ | Holding _ | Exiting _ -> Some p.symbol
       | Closed _ -> None)
 
-(* Bundle of per-Friday entry-walk accumulators + caps, seeded from
-   [portfolio] and [config]. Factored out of [entries_from_candidates] to
-   keep that function under the line cap; the accumulators are mutated
-   in-place by the gates inside [Entry_audit_capture.classify_candidate]. *)
-type _entry_walk_state = {
-  remaining_cash : float ref;
-  short_notional_acc : float ref;
-  short_notional_cap : float;
-  sector_exposure_acc : (string, float) Hashtbl.t;
-  max_sector_exposure_pct : float option;
-}
-(** Generate CreateEntering transitions for screener candidates. Tracks
-    remaining cash to avoid generating orders that exceed funds.
-
-    Public (see .mli) so callers running custom screening out-of-band can feed
-    candidates through the same entry pipeline the strategy uses.
-
-    The walk produces a tagged decision list (see
-    {!Entry_audit_capture.candidate_decision}). After the walk, kept candidates
-    are emitted to [audit_recorder.record_entry] with the rivals they outranked
-    — this is the PR-2 entry-capture site. The output transition list (in
-    original screener order) is bit-equivalent to the pre-audit shape: same
-    candidates, same transitions, same side-effects on [stop_states] and
-    [remaining_cash]. *)
-
-let _make_entry_walk_state ~cash ~config ~portfolio ~portfolio_value
-    ~sector_lookup =
-  let short_notional_acc =
-    ref
-      (Screening_notional.initial_short_notional
-         portfolio.Portfolio_view.positions)
-  in
-  let short_notional_cap =
-    portfolio_value *. config.portfolio_config.max_short_notional_fraction
-  in
-  let sector_exposure_acc =
-    match sector_lookup with
-    | None -> Hashtbl.create (module String)
-    | Some lookup ->
-        Screening_notional.initial_sector_exposures
-          ~positions:portfolio.Portfolio_view.positions ~sector_lookup:lookup
-  in
-  {
-    remaining_cash = ref cash;
-    short_notional_acc;
-    short_notional_cap;
-    sector_exposure_acc;
-    max_sector_exposure_pct = config.portfolio_config.max_sector_exposure_pct;
-  }
-
 (** Classify one [candidate] through the entry gates against [state], pairing it
     with its decision. Mutates [state]'s accumulators in-place. *)
-let _classify_one ~held_set ~make_entry ~portfolio_value ~state candidate =
+let _classify_one ~held_set ~make_entry ~portfolio_value
+    ~(state : Screening_notional.entry_walk_state) candidate =
   ( candidate,
     Entry_audit_capture.classify_candidate ~held_set ~make_entry
       ~remaining_cash:state.remaining_cash
@@ -99,8 +50,9 @@ let _classify_candidates ~held_set ~make_entry ~portfolio_value ~state
     shared [short_notional_acc] / [sector_exposure_acc] in [state] so the caps
     apply across both sides. Returns the [(index, candidate, decision)] triples
     keyed by the candidate's position in the original list. *)
-let _walk_side ~held_set ~make_entry ~portfolio_value ~state ~side_cash
-    indexed_candidates =
+let _walk_side ~held_set ~make_entry ~portfolio_value
+    ~(state : Screening_notional.entry_walk_state) ~side_cash indexed_candidates
+    =
   let side_state = { state with remaining_cash = ref side_cash } in
   let decisions =
     _classify_candidates ~held_set ~make_entry ~portfolio_value
@@ -131,6 +83,19 @@ let _sleeve_decisions ~held_set ~make_entry ~portfolio_value ~state ~long_cash
   |> List.sort ~compare:(fun (i, _, _) (j, _, _) -> Int.compare i j)
   |> List.map ~f:(fun (_, c, d) -> (c, d))
 
+(** Generate CreateEntering transitions for screener candidates. Tracks
+    remaining cash to avoid generating orders that exceed funds.
+
+    Public (see .mli) so callers running custom screening out-of-band can feed
+    candidates through the same entry pipeline the strategy uses.
+
+    The walk produces a tagged decision list (see
+    {!Entry_audit_capture.candidate_decision}). After the walk, kept candidates
+    are emitted to [audit_recorder.record_entry] with the rivals they outranked
+    — this is the PR-2 entry-capture site. The output transition list (in
+    original screener order) is bit-equivalent to the pre-audit shape: same
+    candidates, same transitions, same side-effects on [stop_states] and
+    [remaining_cash]. *)
 let entries_from_candidates ?sector_lookup ~config ~candidates ~stop_states
     ~bar_reader ~(portfolio : Portfolio_view.t) ~get_price ~current_date
     ?(audit_recorder = Audit_recorder.noop) ?macro () =
@@ -146,9 +111,9 @@ let entries_from_candidates ?sector_lookup ~config ~candidates ~stop_states
       ~initial_stop_buffer:config.initial_stop_buffer ~stop_states ~bar_reader
       ~portfolio_value ~current_date cand
   in
-  let state =
-    _make_entry_walk_state ~cash:portfolio.Portfolio_view.cash ~config
-      ~portfolio ~portfolio_value ~sector_lookup
+  let spendable, state =
+    Screening_notional.reserve_reduced_walk_state ~config ~portfolio
+      ~portfolio_value ~sector_lookup
   in
   let decisions =
     if Float.( <= ) config.short_sleeve_fraction 0.0 then
@@ -157,12 +122,11 @@ let entries_from_candidates ?sector_lookup ~config ~candidates ~stop_states
       _classify_candidates ~held_set ~make_entry ~portfolio_value ~state
         candidates
     else
-      (* Reserved short sleeve: partition the cash budget between a long and a
-         short walk that share [state]'s notional/sector accumulators. *)
+      (* Reserved short sleeve: partition the (reserve-reduced) cash budget
+         between a long and a short walk that share [state]'s notional/sector
+         accumulators. *)
       let short_budget = portfolio_value *. config.short_sleeve_fraction in
-      let long_cash =
-        Float.max 0.0 (portfolio.Portfolio_view.cash -. short_budget)
-      in
+      let long_cash = Float.max 0.0 (spendable -. short_budget) in
       _sleeve_decisions ~held_set ~make_entry ~portfolio_value ~state ~long_cash
         ~short_budget candidates
   in

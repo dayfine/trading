@@ -485,6 +485,53 @@ type config = {
           addressable as a [Variant_matrix] dot-path axis, e.g.
           [((key (scale_in_config add_trigger)) (values (Pullback Either)))].
           See {!Scale_in_detector}. *)
+  cash_reserve_pct : float; [@sexp.default 0.0]
+      (** Fraction of {e current portfolio value} held back from NEW entry
+          funding on each Friday entry walk
+          ({!Weinstein_strategy.entries_from_candidates}). The per-Friday
+          spendable cash is
+          [max 0 (portfolio.cash - cash_reserve_pct * portfolio_value)]; the
+          reserve is taken off the top-level entry budget exactly once (in the
+          reserved-short-sleeve path the same reduced budget is split between
+          the long and short walks, so it is never charged twice).
+
+          {b The working replacement for the dead
+             [Portfolio_risk.min_cash_pct].} Per
+          [dev/notes/envelope-knobs-dead-2026-07-05.md] (merged #1861),
+          [Portfolio_risk.min_cash_pct] is unwired — its sole consumer
+          [Portfolio_risk.check_limits] has zero production callers, so
+          backtests run at ~89-99% deployment with no cash-reserve mechanism at
+          all. This field is the honest, live-path reserve: it is consumed at
+          the one seam that actually gates entry funding (the entry-walk
+          [remaining_cash]).
+
+          {b Scope — entries only.} The reserve narrows only NEW entry funding.
+          Exits, covers, stop orders, and force-liquidations do not flow through
+          the entry walk and are structurally unaffected, so a reserve can never
+          block an exit (the #1553 exit-fill-reject lesson). A held position
+          always exits on its stop/stage/liquidity signal regardless of the
+          reserve.
+
+          {b Semantics.}
+          - [0.0] (default): {b bit-identical to baseline} —
+            [spendable = portfolio.cash], so every existing golden/baseline
+            replays unchanged (experiment-flag-discipline R1).
+          - [> 0.0]: a candidate whose cost fits within [portfolio.cash] but not
+            within the reduced [spendable] budget is rejected exactly as an
+            [Insufficient_cash] skip; candidates that fit within [spendable] are
+            admitted normally.
+
+          {b Faithfulness} (W1/W2, [.claude/rules/weinstein-faithful-core.md]).
+          A portfolio-risk / capital-preservation dial that {e tightens}
+          deployment — it holds cash back in exactly the spirit of the book's
+          "when in doubt, stay out" caution, without touching any spine item
+          (stage classification, the Stage-2-only buy rule, breakout+volume
+          entry, stops, the macro/sector gate are all unchanged). Searchable as
+          a single-component [Variant_matrix] axis
+          ([((cash_reserve_pct) (values (0.0 0.1 0.2 0.3)))]). Default-off until
+          an experiment-ledger ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md] +
+          [.claude/rules/promotion-confirmation.md]). *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
