@@ -146,9 +146,20 @@ let entries_from_candidates ?sector_lookup ~config ~candidates ~stop_states
       ~initial_stop_buffer:config.initial_stop_buffer ~stop_states ~bar_reader
       ~portfolio_value ~current_date cand
   in
+  (* Cash-reserve knob: hold back [cash_reserve_pct] of portfolio value from the
+     per-Friday entry-funding budget. Default [0.0] => [spendable = cash],
+     bit-identical to baseline. The reserve is subtracted once here (off the
+     top-level budget); the sleeve split below derives from [spendable] so it is
+     never charged twice. Scoped to NEW entries only — exits/covers/stops do not
+     flow through this walk. See [Weinstein_strategy_config.cash_reserve_pct]. *)
+  let spendable =
+    Float.max 0.0
+      (portfolio.Portfolio_view.cash
+      -. (config.cash_reserve_pct *. portfolio_value))
+  in
   let state =
-    _make_entry_walk_state ~cash:portfolio.Portfolio_view.cash ~config
-      ~portfolio ~portfolio_value ~sector_lookup
+    _make_entry_walk_state ~cash:spendable ~config ~portfolio ~portfolio_value
+      ~sector_lookup
   in
   let decisions =
     if Float.( <= ) config.short_sleeve_fraction 0.0 then
@@ -157,12 +168,11 @@ let entries_from_candidates ?sector_lookup ~config ~candidates ~stop_states
       _classify_candidates ~held_set ~make_entry ~portfolio_value ~state
         candidates
     else
-      (* Reserved short sleeve: partition the cash budget between a long and a
-         short walk that share [state]'s notional/sector accumulators. *)
+      (* Reserved short sleeve: partition the (reserve-reduced) cash budget
+         between a long and a short walk that share [state]'s notional/sector
+         accumulators. *)
       let short_budget = portfolio_value *. config.short_sleeve_fraction in
-      let long_cash =
-        Float.max 0.0 (portfolio.Portfolio_view.cash -. short_budget)
-      in
+      let long_cash = Float.max 0.0 (spendable -. short_budget) in
       _sleeve_decisions ~held_set ~make_entry ~portfolio_value ~state ~long_cash
         ~short_budget candidates
   in

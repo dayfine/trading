@@ -769,6 +769,117 @@ let test_short_sleeve_short_notional_cap_binds _ =
     (equal_to 0)
 
 (* ------------------------------------------------------------------ *)
+(* Cash reserve (cash_reserve_pct)                                     *)
+(* ------------------------------------------------------------------ *)
+
+(** Three longs at $100 (each sized to $9k by the 0.30 per-position cap on a
+    $30k portfolio) fed at $30k cash. Shared by the reserve-off and reserve-on
+    tests so they exercise identical inputs, isolating the [cash_reserve_pct]
+    effect on how many entries the walk funds. *)
+let _reserve_candidates () =
+  let long ticker =
+    make_scored_candidate ~ticker ~side:Trading_base.Types.Long ~entry:100.0
+      ~stop:92.0 ~grade:Weinstein_types.C
+  in
+  [ long "LNGA"; long "LNGB"; long "LNGC" ]
+
+let _reserve_portfolio : Trading_strategy.Portfolio_view.t =
+  { cash = 30_000.0; positions = String.Map.empty }
+
+let _reserve_get_price =
+  get_price_of
+    [
+      ("LNGA", make_bar "2024-01-05" 100.0);
+      ("LNGB", make_bar "2024-01-05" 100.0);
+      ("LNGC", make_bar "2024-01-05" 100.0);
+    ]
+
+let _run_reserve_entries cfg =
+  let stop_states = ref String.Map.empty in
+  entries_from_candidates ~config:cfg ~candidates:(_reserve_candidates ())
+    ~stop_states ~bar_reader:(Bar_reader.empty ()) ~portfolio:_reserve_portfolio
+    ~get_price:_reserve_get_price
+    ~current_date:(Date.of_string "2024-01-05")
+    ()
+
+(** Default [cash_reserve_pct = 0.0]: [spendable = cash = $30k], so all three
+    $9k longs fit ($27k < $30k) — bit-identical to the pre-knob entry walk. *)
+let test_cash_reserve_default_admits_all_longs _ =
+  let cfg = default_config ~universe:[ "X" ] ~index_symbol:"GSPCX" in
+  let transitions = _run_reserve_entries cfg in
+  assert_that
+    (_count_entering_side transitions Trading_base.Types.Long)
+    (equal_to 3)
+
+(** [cash_reserve_pct = 0.30] holds back $9k (0.30 * $30k PV), so the walk funds
+    against [spendable = $21k]: two $9k longs fit ($18k) but the third ($27k
+    cumulative) does not — it costs within cash ($30k) yet not within the
+    reduced budget, so it is rejected exactly as an Insufficient_cash skip. Pins
+    the count flip vs the reserve-off baseline. *)
+let test_cash_reserve_active_reduces_admitted_longs _ =
+  let cfg =
+    {
+      (default_config ~universe:[ "X" ] ~index_symbol:"GSPCX") with
+      cash_reserve_pct = 0.30;
+    }
+  in
+  let transitions = _run_reserve_entries cfg in
+  assert_that
+    (_count_entering_side transitions Trading_base.Types.Long)
+    (equal_to 2)
+
+(** A held position that hits its stop still emits a [TriggerExit] under an
+    extreme [cash_reserve_pct = 0.9]. Exits do not flow through the entry walk,
+    so the reserve — which narrows only NEW entry funding — can never block an
+    exit (the #1553 exit-fill-reject lesson). Mirrors
+    [test_stop_hit_emits_trigger_exit] with the reserve dialled to 0.9. *)
+let test_cash_reserve_never_blocks_exit _ =
+  let ticker = "AAPL" in
+  let date = Date.of_string "2024-01-05" in
+  let stop_state =
+    Weinstein_stops.Initial { stop_level = 90.0; reference_level = 95.0 }
+  in
+  let initial_stop_states = String.Map.singleton ticker stop_state in
+  let (module S) =
+    make ~initial_stop_states { cfg with cash_reserve_pct = 0.9 }
+  in
+  let pos = make_holding_pos ticker 100.0 date in
+  let positions = String.Map.singleton ticker pos in
+  let bar =
+    { (make_bar "2024-01-12" 95.0) with Types.Daily_price.low_price = 85.0 }
+  in
+  let result =
+    S.on_market_close
+      ~get_price:
+        (get_price_of
+           [ (ticker, bar); ("GSPCX", make_bar "2024-01-12" 4500.0) ])
+      ~get_indicator:empty_get_indicator
+      ~portfolio:{ cash = 100000.0; positions }
+  in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun o -> o.Trading_strategy.Strategy_interface.transitions)
+          (elements_are
+             [
+               all_of
+                 [
+                   field
+                     (fun (tr : Trading_strategy.Position.transition) ->
+                       tr.position_id)
+                     (equal_to ticker);
+                   field
+                     (fun (tr : Trading_strategy.Position.transition) ->
+                       tr.kind)
+                     (matching
+                        (function
+                          | Trading_strategy.Position.TriggerExit _ -> Some ()
+                          | _ -> None)
+                        (equal_to ()));
+                 ];
+             ])))
+
+(* ------------------------------------------------------------------ *)
 (* Stage 4-5 PR-A: lazy stage filter — survivors_for_screening         *)
 (* ------------------------------------------------------------------ *)
 
@@ -1464,6 +1575,12 @@ let () =
            >:: test_short_sleeve_active_admits_short;
            "short sleeve: short-notional cap still binds"
            >:: test_short_sleeve_short_notional_cap_binds;
+           "cash reserve default (0.0) admits all longs"
+           >:: test_cash_reserve_default_admits_all_longs;
+           "cash reserve active (0.30) reduces admitted longs"
+           >:: test_cash_reserve_active_reduces_admitted_longs;
+           "cash reserve never blocks exit"
+           >:: test_cash_reserve_never_blocks_exit;
            "survivors_for_screening filters by stage"
            >:: test_survivors_for_screening_filters_by_stage;
            "survivors_for_screening drops Stage1 and Stage3"
