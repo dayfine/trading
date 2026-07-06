@@ -21,6 +21,17 @@
    manufactures breadth from staler entries (monotonic bear-fold tax); the
    lever question sharpens to "fresh opportunities or stale entries?"
 
+3. **Cash-reserve experiment RUN AND RESOLVED (user-directed, 2026-07-06):**
+   working `cash_reserve_pct` mechanism (#1867, default 0.0, triple-gated) →
+   broad 13×2y WF-CV surface {0.10, 0.20, 0.30} → **REJECT all** (ledger
+   `2026-07-06-cash-reserve-surface`, writeup
+   `dev/notes/cash-reserve-wfcv-2026-07-06.md`). The asked-about 30% reserve
+   is a clear loss (Sharpe 0.44 vs 0.60, worse in the 2022 bear fold).
+   Response is non-monotonic (funding-reshuffle path-dependence; r20's
+   aggregate spike = one flipped fold, not promotable — knife-edge class).
+   **Envelope program closed BOTH directions.** Capital-protection lever of
+   record: the barbell overlay.
+
 ## Decision items for the human (from the envelope finding)
 
 - **Wire-or-delete `check_limits`** — a limits API that looks load-bearing but
@@ -28,11 +39,9 @@
   wired: it would CHANGE behavior (currently NO aggregate exposure / position
   count / cash floor exists) — that's a strategy change needing its own
   surface. If deleted: dead fields leave the config. Either way, cross-module;
-  needs explicit approval.
-- **Optional cash-reserve tightening experiment** — the only buildable
-  envelope experiment (10–30% working reserve, default-off flag). Fat-tail law
-  predicts breadth tax; would price "value of the marginal entry" directly.
-  Not queued — likely a REJECT; run only if the answer itself is wanted.
+  needs explicit approval. (The cash-floor half is now settled — reserve
+  tested and rejected — so DELETE is the natural resolution unless the
+  aggregate-exposure/position-count checks are wanted for live safety rails.)
 
 ## Open threads (carried, in rough priority order)
 
