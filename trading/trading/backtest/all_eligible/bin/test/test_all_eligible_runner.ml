@@ -231,7 +231,7 @@ let test_trades_csv_has_header_only_when_no_trades _ =
          elements_are
            [
              _has
-               "signal_date,symbol,side,entry_price,exit_date,exit_reason,return_pct,hold_days,entry_dollars,shares,pnl_dollars,cascade_score,passes_macro";
+               "signal_date,symbol,side,entry_price,exit_date,exit_reason,return_pct,hold_days,entry_dollars,shares,pnl_dollars,cascade_score,passes_macro,rs_value,rs_trend,volume_ratio,weeks_advancing,stage2_late,resistance_quality";
            ];
        ])
 

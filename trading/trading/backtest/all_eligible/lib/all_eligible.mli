@@ -136,6 +136,26 @@ type trade_record = {
       (** Whether the macro gate at [signal_date] would have admitted this
           candidate. Records both passes and fails so consumers can split the
           aggregate by macro regime without re-running the scan. *)
+  rs_value : float option; [@sexp.option]
+      (** Normalised relative-strength value at [signal_date] — carried through
+          from [candidate_entry.rs_value]. [None] when RS was not computable.
+          [@sexp.option] so pre-existing artefacts parse (absent → [None]). *)
+  rs_trend : Weinstein_types.rs_trend option; [@sexp.option]
+      (** RS trend at [signal_date] — from [candidate_entry.rs_trend]. [None]
+          when RS was not computable. *)
+  volume_ratio : float option; [@sexp.option]
+      (** Breakout-week volume expansion ratio — from
+          [candidate_entry.volume_ratio]. [None] when no breakout bar was
+          identifiable. *)
+  weeks_advancing : int option; [@sexp.option]
+      (** Weeks advancing in Stage 2 at [signal_date] — from
+          [candidate_entry.weeks_advancing]. [None] when not [Stage2]. *)
+  stage2_late : bool option; [@sexp.option]
+      (** Stage-2 late (MA-deceleration) flag — from
+          [candidate_entry.stage2_late]. [None] when not [Stage2]. *)
+  resistance_quality : Weinstein_types.overhead_quality option; [@sexp.option]
+      (** Overhead-resistance grade — from [candidate_entry.resistance_quality].
+          [None] when no breakout price could be determined. *)
 }
 [@@deriving sexp]
 (** One row per Stage-2 entry signal. Fixed-dollar sized, naturally exited.

@@ -43,6 +43,12 @@ let make_candidate ?(symbol = "AAPL") ?(entry_week = _date "2024-01-19")
     cascade_grade;
     cascade_score;
     passes_macro;
+    rs_value = None;
+    rs_trend = None;
+    volume_ratio = None;
+    weeks_advancing = None;
+    stage2_late = None;
+    resistance_quality = None;
   }
 
 (** Build a synthetic [Daily_price.t] for a weekly bar. The weekly walker only

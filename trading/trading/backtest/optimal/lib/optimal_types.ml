@@ -15,6 +15,12 @@ type candidate_entry = {
   cascade_grade : Weinstein_types.grade;
   cascade_score : int;
   passes_macro : bool;
+  rs_value : float option; [@sexp.option]
+  rs_trend : Weinstein_types.rs_trend option; [@sexp.option]
+  volume_ratio : float option; [@sexp.option]
+  weeks_advancing : int option; [@sexp.option]
+  stage2_late : bool option; [@sexp.option]
+  resistance_quality : Weinstein_types.overhead_quality option; [@sexp.option]
 }
 [@@deriving sexp]
 

@@ -35,7 +35,9 @@ let make_candidate ?(symbol = "AAPL") ?(entry_week = _date "2024-01-19")
     ?(side = Trading_base.Types.Long) ?(entry_price = 100.0)
     ?(suggested_stop = 92.0) ?(risk_pct = 0.08)
     ?(sector = "Information Technology") ?(cascade_grade = Weinstein_types.B)
-    ?(cascade_score = 50) ?(passes_macro = true) () : OT.candidate_entry =
+    ?(cascade_score = 50) ?(passes_macro = true) ?(rs_value = None)
+    ?(rs_trend = None) ?(volume_ratio = None) ?(weeks_advancing = None)
+    ?(stage2_late = None) ?(resistance_quality = None) () : OT.candidate_entry =
   {
     symbol;
     entry_week;
@@ -47,6 +49,12 @@ let make_candidate ?(symbol = "AAPL") ?(entry_week = _date "2024-01-19")
     cascade_grade;
     cascade_score;
     passes_macro;
+    rs_value;
+    rs_trend;
+    volume_ratio;
+    weeks_advancing;
+    stage2_late;
+    resistance_quality;
   }
 
 (** Build a synthetic [scored_candidate] from explicit per-trade outcome fields.
@@ -147,6 +155,73 @@ let test_build_trade_record_short _ =
          field
            (fun (t : AE.trade_record) -> t.exit_reason)
            (equal_to OT.Stop_hit);
+       ])
+
+let test_build_trade_record_threads_features _ =
+  (* The decision-time features on the [candidate_entry] are carried verbatim
+     onto the [trade_record] so downstream multivariate analysis reads them
+     from the flat per-trade row. *)
+  let candidate =
+    make_candidate ~symbol:"AAPL" ~entry_price:100.0 ~suggested_stop:92.0
+      ~rs_value:(Some 0.42) ~rs_trend:(Some Weinstein_types.Positive_rising)
+      ~volume_ratio:(Some 2.1) ~weeks_advancing:(Some 3)
+      ~stage2_late:(Some false)
+      ~resistance_quality:(Some Weinstein_types.Virgin_territory) ()
+  in
+  let scored : OT.scored_candidate =
+    {
+      entry = candidate;
+      exit_week = _date "2024-02-09";
+      exit_price = 130.0;
+      exit_trigger = OT.End_of_run;
+      raw_return_pct = 0.30;
+      hold_weeks = 3;
+      initial_risk_per_share = 8.0;
+      r_multiple = 3.75;
+    }
+  in
+  let trade = AE.build_trade_record ~config:AE.default_config scored in
+  assert_that trade
+    (all_of
+       [
+         field
+           (fun (t : AE.trade_record) -> t.rs_value)
+           (is_some_and (float_equal 0.42));
+         field
+           (fun (t : AE.trade_record) -> t.rs_trend)
+           (is_some_and (equal_to Weinstein_types.Positive_rising));
+         field
+           (fun (t : AE.trade_record) -> t.volume_ratio)
+           (is_some_and (float_equal 2.1));
+         field
+           (fun (t : AE.trade_record) -> t.weeks_advancing)
+           (is_some_and (equal_to 3));
+         field
+           (fun (t : AE.trade_record) -> t.stage2_late)
+           (is_some_and (equal_to false));
+         field
+           (fun (t : AE.trade_record) -> t.resistance_quality)
+           (is_some_and (equal_to Weinstein_types.Virgin_territory));
+       ])
+
+let test_build_trade_record_features_none_default _ =
+  (* When the candidate carries no features (the [make_candidate] default of
+     [None] across the board — the shape of a legacy candidate), the trade
+     record surfaces [None], not a sentinel. *)
+  let scored =
+    make_scored ~exit_week:(_date "2024-02-09") ~exit_price:130.0
+      ~exit_trigger:OT.End_of_run ()
+  in
+  let trade = AE.build_trade_record ~config:AE.default_config scored in
+  assert_that trade
+    (all_of
+       [
+         field (fun (t : AE.trade_record) -> t.rs_value) is_none;
+         field (fun (t : AE.trade_record) -> t.rs_trend) is_none;
+         field (fun (t : AE.trade_record) -> t.volume_ratio) is_none;
+         field (fun (t : AE.trade_record) -> t.weeks_advancing) is_none;
+         field (fun (t : AE.trade_record) -> t.stage2_late) is_none;
+         field (fun (t : AE.trade_record) -> t.resistance_quality) is_none;
        ])
 
 let test_custom_entry_dollars _ =
@@ -789,6 +864,10 @@ let suite =
   >::: [
          "build_trade_record long arithmetic" >:: test_build_trade_record_long;
          "build_trade_record short arithmetic" >:: test_build_trade_record_short;
+         "build_trade_record threads decision-time features"
+         >:: test_build_trade_record_threads_features;
+         "build_trade_record surfaces None features as None"
+         >:: test_build_trade_record_features_none_default;
          "custom entry_dollars sizes shares + pnl" >:: test_custom_entry_dollars;
          "three signals — all taken regardless of cash"
          >:: test_three_signals_all_taken_no_cash_gate;

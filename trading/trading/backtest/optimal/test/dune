@@ -24,6 +24,7 @@
   weinstein.stage
   weinstein.rs
   weinstein.volume
+  weinstein.resistance
   weinstein_trading.stops
   backtest
   backtest_optimal)

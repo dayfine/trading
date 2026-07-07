@@ -61,10 +61,24 @@ let _passes_long_macro = function
   | Weinstein_types.Bullish | Neutral -> true
   | Bearish -> false
 
+(** [(weeks_advancing, late)] of a [Stage2] classification, [(None, None)]
+    otherwise. Mirrors {!Trade_audit_recorder._weeks_advancing_of_stage} — the
+    two Stage2-only fields the counterfactual surfaces for the multivariate
+    screen. *)
+let _stage2_fields : Weinstein_types.stage -> int option * bool option =
+  function
+  | Stage2 { weeks_advancing; late } -> (Some weeks_advancing, Some late)
+  | Stage1 _ | Stage3 _ | Stage4 _ -> (None, None)
+
 (** Project one {!Screener.scored_candidate} (long side) into an
-    {!Optimal_types.candidate_entry}, stamping the actual macro at [date]. *)
+    {!Optimal_types.candidate_entry}, stamping the actual macro at [date] and
+    the decision-time features from [sc.analysis]. The feature projections
+    mirror {!Trade_audit_recorder._entry_decision_of_event} field-for-field so
+    the two audit surfaces read the same values. *)
 let _candidate_of_scored ~date ~passes_macro (sc : Screener.scored_candidate) :
     Optimal_types.candidate_entry =
+  let analysis = sc.analysis in
+  let weeks_advancing, stage2_late = _stage2_fields analysis.stage.stage in
   {
     symbol = sc.ticker;
     entry_week = date;
@@ -76,6 +90,16 @@ let _candidate_of_scored ~date ~passes_macro (sc : Screener.scored_candidate) :
     cascade_grade = sc.grade;
     cascade_score = sc.score;
     passes_macro;
+    rs_value =
+      Option.map analysis.rs ~f:(fun (r : Rs.result) -> r.current_normalized);
+    rs_trend = Option.map analysis.rs ~f:(fun (r : Rs.result) -> r.trend);
+    volume_ratio =
+      Option.map analysis.volume ~f:(fun (v : Volume.result) -> v.volume_ratio);
+    weeks_advancing;
+    stage2_late;
+    resistance_quality =
+      Option.map analysis.resistance ~f:(fun (r : Resistance.result) ->
+          r.quality);
   }
 
 let scan_week ~config (week : week_input) : Optimal_types.candidate_entry list =

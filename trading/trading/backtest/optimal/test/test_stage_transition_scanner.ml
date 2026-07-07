@@ -46,6 +46,7 @@ let make_analysis ?(ticker = "AAPL")
     ?(ma_value = 100.0) ?(ma_direction = Weinstein_types.Rising)
     ?(ma_slope_pct = 0.02) ?(volume_quality = Some (Weinstein_types.Strong 2.5))
     ?(rs_trend = Some Weinstein_types.Positive_rising)
+    ?(resistance : Resistance.result option = None)
     ?(breakout_price = Some 105.0) ?(as_of_date = _date "2024-01-19") () :
     Stock_analysis.t =
   let stage : Stage.result =
@@ -77,7 +78,7 @@ let make_analysis ?(ticker = "AAPL")
     stage;
     rs;
     volume;
-    resistance = None;
+    resistance;
     support = None;
     breakout_price;
     breakdown_price = None;
@@ -128,6 +129,12 @@ let test_candidate_entry_sexp_round_trip _ =
       cascade_grade = A;
       cascade_score = 75;
       passes_macro = true;
+      rs_value = Some 0.5;
+      rs_trend = Some Weinstein_types.Positive_rising;
+      volume_ratio = Some 2.5;
+      weeks_advancing = Some 2;
+      stage2_late = Some false;
+      resistance_quality = Some Weinstein_types.Clean;
     }
   in
   let round = OT.candidate_entry_of_sexp (OT.sexp_of_candidate_entry entry) in
@@ -142,6 +149,24 @@ let test_candidate_entry_sexp_round_trip _ =
            (fun (e : OT.candidate_entry) -> e.cascade_grade)
            (equal_to Weinstein_types.A);
          field (fun (e : OT.candidate_entry) -> e.passes_macro) (equal_to true);
+         field
+           (fun (e : OT.candidate_entry) -> e.rs_value)
+           (is_some_and (float_equal 0.5));
+         field
+           (fun (e : OT.candidate_entry) -> e.rs_trend)
+           (is_some_and (equal_to Weinstein_types.Positive_rising));
+         field
+           (fun (e : OT.candidate_entry) -> e.volume_ratio)
+           (is_some_and (float_equal 2.5));
+         field
+           (fun (e : OT.candidate_entry) -> e.weeks_advancing)
+           (is_some_and (equal_to 2));
+         field
+           (fun (e : OT.candidate_entry) -> e.stage2_late)
+           (is_some_and (equal_to false));
+         field
+           (fun (e : OT.candidate_entry) -> e.resistance_quality)
+           (is_some_and (equal_to Weinstein_types.Clean));
        ])
 
 let test_scored_candidate_sexp_round_trip _ =
@@ -157,6 +182,12 @@ let test_scored_candidate_sexp_round_trip _ =
       cascade_grade = B;
       cascade_score = 60;
       passes_macro = true;
+      rs_value = None;
+      rs_trend = None;
+      volume_ratio = None;
+      weeks_advancing = None;
+      stage2_late = None;
+      resistance_quality = None;
     }
   in
   let scored : OT.scored_candidate =
@@ -526,6 +557,111 @@ let test_scan_week_emits_entry_and_stop_consistent _ =
        ])
 
 (* ------------------------------------------------------------------ *)
+(* Decision-time feature projection                                     *)
+(* ------------------------------------------------------------------ *)
+
+let _single_week_scan ~analysis : OT.candidate_entry list =
+  S.scan_week ~config:default_config
+    {
+      date = _date "2024-01-19";
+      macro_trend = Bullish;
+      analyses = [ analysis ];
+      sector_map =
+        make_sector_map [ ("AAPL", "Information Technology", Strong) ];
+    }
+
+let test_scan_week_projects_all_features _ =
+  (* A Stage2 breakout candidate with RS, volume, and resistance present:
+     every decision-time feature is projected from [sc.analysis]. Stage2
+     with weeks_advancing=3, late=true; RS Positive_rising normalized 0.5;
+     volume Strong 2.5 → volume_ratio 2.5; resistance quality Clean. *)
+  let analysis =
+    make_analysis ~ticker:"AAPL"
+      ~stage_value:(Stage2 { weeks_advancing = 3; late = true })
+      ~volume_quality:(Some (Strong 2.5)) ~rs_trend:(Some Positive_rising)
+      ~resistance:
+        (Some
+           {
+             Resistance.quality = Clean;
+             breakout_price = 105.0;
+             zones_above = [];
+             nearest_zone = None;
+           })
+      ()
+  in
+  assert_that
+    (_single_week_scan ~analysis)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (c : OT.candidate_entry) -> c.rs_value)
+               (is_some_and (float_equal 0.5));
+             field
+               (fun (c : OT.candidate_entry) -> c.rs_trend)
+               (is_some_and (equal_to Weinstein_types.Positive_rising));
+             field
+               (fun (c : OT.candidate_entry) -> c.volume_ratio)
+               (is_some_and (float_equal 2.5));
+             field
+               (fun (c : OT.candidate_entry) -> c.weeks_advancing)
+               (is_some_and (equal_to 3));
+             field
+               (fun (c : OT.candidate_entry) -> c.stage2_late)
+               (is_some_and (equal_to true));
+             field
+               (fun (c : OT.candidate_entry) -> c.resistance_quality)
+               (is_some_and (equal_to Weinstein_types.Clean));
+           ];
+       ])
+
+let test_scan_week_projects_none_when_absent _ =
+  (* RS and resistance are [None] on the analysis (rs_trend:None → rs=None;
+     resistance defaults to None); the projection preserves [None] rather
+     than substituting a sentinel. Volume stays Strong so the candidate is
+     still a breakout (RS None does not disqualify). *)
+  let analysis = make_analysis ~ticker:"AAPL" ~rs_trend:None () in
+  assert_that
+    (_single_week_scan ~analysis)
+    (elements_are
+       [
+         all_of
+           [
+             field (fun (c : OT.candidate_entry) -> c.rs_value) is_none;
+             field (fun (c : OT.candidate_entry) -> c.rs_trend) is_none;
+             field
+               (fun (c : OT.candidate_entry) -> c.resistance_quality)
+               is_none;
+           ];
+       ])
+
+let test_candidate_entry_legacy_sexp_parses _ =
+  (* Backward-compat: a [candidate_entry] sexp written before the feature
+     fields existed (i.e. without rs_value / rs_trend / volume_ratio /
+     weeks_advancing / stage2_late / resistance_quality) must still parse —
+     the absent [@sexp.option] fields default to [None]. *)
+  let legacy_sexp =
+    Sexp.of_string
+      "((symbol AAPL) (entry_week 2024-01-19) (side Long) (entry_price 105.5) \
+       (suggested_stop 97.06) (risk_pct 0.08) (sector \"Information \
+       Technology\") (cascade_grade A) (cascade_score 75) (passes_macro true))"
+  in
+  assert_that
+    (OT.candidate_entry_of_sexp legacy_sexp)
+    (all_of
+       [
+         field (fun (e : OT.candidate_entry) -> e.symbol) (equal_to "AAPL");
+         field (fun (e : OT.candidate_entry) -> e.cascade_score) (equal_to 75);
+         field (fun (e : OT.candidate_entry) -> e.rs_value) is_none;
+         field (fun (e : OT.candidate_entry) -> e.rs_trend) is_none;
+         field (fun (e : OT.candidate_entry) -> e.volume_ratio) is_none;
+         field (fun (e : OT.candidate_entry) -> e.weeks_advancing) is_none;
+         field (fun (e : OT.candidate_entry) -> e.stage2_late) is_none;
+         field (fun (e : OT.candidate_entry) -> e.resistance_quality) is_none;
+       ])
+
+(* ------------------------------------------------------------------ *)
 (* Scanner: scan_panel — multi-week aggregation                         *)
 (* ------------------------------------------------------------------ *)
 
@@ -610,6 +746,12 @@ let suite =
          >:: test_scan_week_empty_analyses;
          "scan_week entry/stop/risk match screener formulas"
          >:: test_scan_week_emits_entry_and_stop_consistent;
+         "scan_week projects all decision-time features"
+         >:: test_scan_week_projects_all_features;
+         "scan_week projects None when RS / resistance absent"
+         >:: test_scan_week_projects_none_when_absent;
+         "candidate_entry legacy sexp (no feature fields) parses"
+         >:: test_candidate_entry_legacy_sexp_parses;
          "scan_panel concatenates per-week output in order"
          >:: test_scan_panel_concatenates_in_order;
          "scan_panel empty weeks → empty output" >:: test_scan_panel_empty_weeks;

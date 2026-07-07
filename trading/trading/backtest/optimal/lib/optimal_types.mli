@@ -63,6 +63,33 @@ type candidate_entry = {
           candidate. The scanner records both passes and fails so the renderer
           can produce two report variants — constrained (macro gate kept) and
           relaxed (macro gate dropped). *)
+  rs_value : float option; [@sexp.option]
+      (** Normalised relative-strength value at [entry_week] — sourced from
+          [analysis.rs.current_normalized] (the {!Rs.result} the cascade
+          computed). [None] when RS was not computable (insufficient benchmark
+          history; see {!Stock_analysis.t.rs}). [@sexp.option] so on-disk
+          artefacts written before this field existed still parse (absent →
+          [None]). *)
+  rs_trend : Weinstein_types.rs_trend option; [@sexp.option]
+      (** Classified RS trend at [entry_week] — [analysis.rs.trend]. [None] when
+          RS was not computable. *)
+  volume_ratio : float option; [@sexp.option]
+      (** Breakout-week volume expansion ratio — [analysis.volume.volume_ratio]
+          (the {!Volume.result} the cascade computed). [None] when no breakout
+          bar was identifiable (see {!Stock_analysis.t.volume}). *)
+  weeks_advancing : int option; [@sexp.option]
+      (** Weeks the stock has been advancing in Stage 2 at [entry_week] — the
+          [weeks_advancing] field of [analysis.stage.stage] when it is a
+          [Stage2]. [None] when the classification is not [Stage2]. *)
+  stage2_late : bool option; [@sexp.option]
+      (** The [late] MA-deceleration flag of [analysis.stage.stage] when it is a
+          [Stage2] (still-hold-but-no-longer-a-buy warning). [None] when the
+          classification is not [Stage2]. *)
+  resistance_quality : Weinstein_types.overhead_quality option; [@sexp.option]
+      (** Overhead-resistance grade above the breakout —
+          [analysis.resistance.quality] (the {!Resistance.result} the cascade
+          computed). [None] when no breakout price could be determined (see
+          {!Stock_analysis.t.resistance}). *)
 }
 [@@deriving sexp]
 (** One row per (symbol, week) where the system's structural breakout condition
