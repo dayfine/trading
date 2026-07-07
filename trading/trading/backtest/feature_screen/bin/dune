@@ -1,0 +1,4 @@
+(executable
+ (name feature_screen_bin)
+ (modules feature_screen_bin)
+ (libraries core backtest_feature_screen))
