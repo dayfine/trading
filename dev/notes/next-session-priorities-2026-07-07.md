@@ -1,80 +1,93 @@
-# Next-session priorities — 2026-07-07
+# Next-session priorities — 2026-07-07 (rev 2)
 
-**Supersedes** `next-session-priorities-2026-07-06.md`. Main green.
+**Supersedes** the morning revision of this file (cash-reserve items now resolved) and `next-session-priorities-2026-07-06.md`. Main green.
 
-## What 2026-07-05→06 delivered (all merged / in this PR)
+## What 2026-07-06→07 added (all merged)
 
-1. **P0 envelope pair-sweep CANCELLED — premise false (#1861).**
-   `min_cash_pct` / `max_long_exposure_pct` / `max_positions` are dead code
-   (`Portfolio_risk.check_limits` has zero production callers); backtests
-   already run **89–99% deployed**. The ~9h sweep would have been 9
-   bit-identical cells. Writeup: `dev/notes/envelope-knobs-dead-2026-07-05.md`.
-   Consequence: the envelope cannot be loosened without margin → the
-   continuation-add revisit precondition is unsatisfiable → **scale-in stays
-   closed, permanently** (within current architecture).
-2. **P2 shipped end-to-end:** `early_stage2_max_weeks` knob (#1862, default 4,
-   both use sites, axis-reachable; triple-gated) → broad 13×2y WF-CV surface
-   {2,4,6,8} → **REJECT alternatives; ≤4 empirically validated** (ledger
-   `2026-07-06-early-stage2-window-surface`, writeup
-   `dev/notes/early-stage2-window-wfcv-2026-07-06.md`). Key transferable
-   finding: **entry-breadth ≠ universe-breadth** — widening admission
-   manufactures breadth from staler entries (monotonic bear-fold tax); the
-   lever question sharpens to "fresh opportunities or stale entries?"
+- **Cash-reserve arc closed** (#1867 mechanism → #1872 REJECT verdict → #1875
+  forensics): 30% reserve = clear loss; response non-monotonic. Forensics
+  pinned the exact mechanism: the flipped 2022 fold was ONE funding slot
+  (TDW re-breakout, 2022-02-05) that only r20 happened to have cash for; r10
+  leaked its freed cash into other entries (D/CBSH/CAH), r30's subtraction
+  priced the slot out. **Envelope program closed both directions.**
+- **Session synthesis (the frame for what follows):** precision is
+  structurally poor (winners ≈ losers at entry; sort is FAITHFUL; all single
+  signals dead) AND candidates oversubscribe capacity ~4:1 (~20 admitted vs
+  ~5 fundable/Friday). Funding-side knobs therefore only rotate lottery
+  tickets. The levers that change the lottery's expected value: more tickets
+  (breadth — have), bigger claim per winner (concentration — have, at 0.30),
+  **not surrendering winners early (holding discipline — GAP)**, orthogonal
+  layers (barbell — passed grid, NOT deployed).
 
-3. **Cash-reserve experiment RUN AND RESOLVED (user-directed, 2026-07-06):**
-   working `cash_reserve_pct` mechanism (#1867, default 0.0, triple-gated) →
-   broad 13×2y WF-CV surface {0.10, 0.20, 0.30} → **REJECT all** (ledger
-   `2026-07-06-cash-reserve-surface`, writeup
-   `dev/notes/cash-reserve-wfcv-2026-07-06.md`). The asked-about 30% reserve
-   is a clear loss (Sharpe 0.44 vs 0.60, worse in the 2022 bear fold).
-   Response is non-monotonic (funding-reshuffle path-dependence; r20's
-   aggregate spike = one flipped fold, not promotable — knife-edge class).
-   **Envelope program closed BOTH directions.** Capital-protection lever of
-   record: the barbell overlay.
+## P0 — weekly-close stop (the unbuilt holding-discipline lever)
 
-## Decision items for the human (from the envelope finding)
+The inventory gap surfaced 2026-07-07: stops fire **intraday on bar.low**;
+the book's L3 rule is **weekly CLOSE**. The stop-lens already measured our
+stops as whipsaw-dominated — forgone upside +30–33% vs disaster dodged −19%
+(`project_weekly_close_stop_lever`, plan `weekly-close-stop-2026-06-19.md`).
+Directly tail-PRESERVING (fewer whipsaw ejections of eventual winners) — the
+favored lever class, and a faithfulness fix at the same time.
 
-- **Wire-or-delete `check_limits`** — a limits API that looks load-bearing but
-  is test-only produced two wrong premises (2026-06-25 misread + the P0). If
-  wired: it would CHANGE behavior (currently NO aggregate exposure / position
-  count / cash floor exists) — that's a strategy change needing its own
-  surface. If deleted: dead fields leave the config. Either way, cross-module;
-  needs explicit approval. (The cash-floor half is now settled — reserve
-  tested and rejected — so DELETE is the natural resolution unless the
-  aggregate-exposure/position-count checks are wanted for live safety rails.)
+Steps (the standard loop):
+1. Build `stop_trigger_mode : Intraday | Weekly_close` (or equivalent) as a
+   default-off config field per `experiment-flag-discipline` (default =
+   current intraday behaviour, bit-identical). Note the catastrophic-stop
+   interaction: the fast-crash absolute stop (#1695) should arguably STAY
+   intraday as the tail-risk insurance while the trailing stop moves to
+   weekly-close — make that split explicit in the design.
+2. Broad top-3000 13×2y WF-CV surface {Intraday=baseline, Weekly_close},
+   possibly × a small stop-buffer axis. ~9h.
+3. Verdict + ledger; confirmation grid only if ACCEPT.
 
-## Open threads (carried, in rough priority order)
+## P1 — the all-eligible multivariate screen (user-directed 2026-07-07)
 
-1. **P4 — continuous-RS scoring (display/UX only).** Spreads the A-tier tie at
-   70 by folding in `rs_vs_spy` magnitude. RS-as-return-lever is WF-CV-rejected
-   (#1788) — scope strictly as live-picks display sharpening, no default
-   change.
-2. **Decision-audit follow-ups:** RS-coverage harness gap (~77%
-   `rs_value=None` in sp500 audits); weekly-picks Phase-2 forward-return
-   counterfactual once a 2026 window matures.
-3. **Faithful per-week universes (M6.6)** — per-week eligibility builder for
-   the historical weekly-picks series. Deferred.
-4. Catastrophic-stop sibling alignment (#1831 review) — inert, unchanged.
-5. Harness gap (small): `write_ledger_entry.exe` doesn't regenerate
-   `index.sexp` (this session hand-appended the row).
+Definitive large-N closure of entry-selection: regress **counterfactual
+outcome** (every eligible ticket ridden through our exit machinery — the
+`all_eligible` lens already computes this) on the **full feature vector
+jointly**, over the 26y broad population (tens of thousands of tickets),
+instead of the one-attribute-at-a-time passes that are all individually dead.
 
-## Strategic context (unchanged, sharpened)
+- **P1a (prerequisite, small harness PR):** fix the RS-coverage gap (~77%
+  `rs_value=None` in audit/all-eligible rows) + audit which other features
+  (sector, liquidity/ADV, stop distance, weeks_advancing, volume ratio,
+  score components) are reliably captured on the all-eligible path.
+- **P1b (read-only screen):** generate the 26y broad all-eligible population
+  (grade-sweep mode), run the multivariate pass. MUST follow `screen-rigor`
+  (7 checks; distribution not point-estimate; verdict calibration — a null
+  here is a *no-build decision* that finally closes entry-selection with
+  power, not another piecemeal null). Prior: low. Value: closure either way;
+  any surviving attribute becomes a default-off axis.
+- Subsumes the old "decision-audit Phase-2 forward counterfactual" thread.
 
-Entry-selection exhausted; intra-envelope reallocation exhausted; envelope
-fixed at ~100% (no loosening without margin); admission window validated at
-the book's value. The remaining evidenced directions: preset bundles
-(trader/investor per `weinstein-faithful-core.md`), the barbell overlay
-(70/30 passed its grid), and product/display work on the live weekly picks.
-Two consecutive surfaces validated book dials (volume-1.5×, ≤4-week window) —
-the Weinstein spine keeps proving load-bearing; arbitrary knob-space remains
-flat.
+## P2 — barbell deployment gates (the passed-but-parked lever)
 
-## Ops notes
+70/30 barbell passed its promotion grid 2026-06-20 — the only lever ever to —
+and has sat since. Remaining gates: (a) breadth-confirm cell (re-run the grid
+cell on the top-3000 basis), (b) a deployable overlay design (how the
+SPY-floor + engine-NAV blend is actually operated live). If both clear, this
+is the first live capital-protection change with ledger evidence behind it.
 
-- `walk_forward_runner` needs `TRADING_DATA_DIR` passed via `docker exec -e`
-  (or exported in the launched shell) — otherwise relative `universe_path` in
-  base scenarios resolves against the wrong data root and the run dies at fold
-  dispatch.
-- Docker.raw 21G / host 89G free at session end; sweep artifacts copied to
-  `dev/experiments/early-stage2-window-2026-07-05/`, `/tmp/sweeps` scratch can
-  be cleaned.
+## Carried / small
+
+- **check_limits wire-or-delete** (human decision; DELETE now natural — the
+  cash-floor half was settled by the reserve REJECT).
+- P4 continuous-RS display (live-picks UX only).
+- Faithful per-week universes (M6.6). Deferred.
+- Harness nits: `write_ledger_entry.exe` doesn't regen `index.sexp`;
+  GH check-attach latency breaks naive merge-wait loops (wait for ≥2
+  COMPLETED, not just zero-pending).
+
+## Suggested session shape
+
+1. Dispatch P0 mechanism build (feat-weinstein) first — it's the long pole
+   (build + QC + ~9h sweep; sweep runs overnight).
+2. While P0's sweep runs: P1a harness fix (small PR), then P1b generation.
+3. P2 breadth-confirm cell fits after the P0 sweep frees the container
+   (no concurrent sweeps per `sweep-hygiene`).
+
+## Standing constraints (unchanged)
+
+Scale-in closed; reallocation class exhausted; envelope closed both
+directions; entry-selection tuning dead (pending P1b's definitive pass);
+no funding-side knobs — they rotate lottery tickets. Weinstein spine stays
+fixed; two consecutive surfaces validated book dials.
