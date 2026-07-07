@@ -8,11 +8,14 @@
   trading.simulation
   types
   weinstein.data_source
+  weinstein.resistance
+  weinstein.rs
   weinstein.screener
   weinstein.snapshot_runtime
   weinstein.stage
   weinstein.stock_analysis
   weinstein.types
+  weinstein.volume
   weinstein_trading.stops
   backtest)
  (preprocess

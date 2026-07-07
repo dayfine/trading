@@ -45,6 +45,12 @@ type trade_record = {
   pnl_dollars : float;
   cascade_score : int;
   passes_macro : bool;
+  rs_value : float option; [@sexp.option]
+  rs_trend : Weinstein_types.rs_trend option; [@sexp.option]
+  volume_ratio : float option; [@sexp.option]
+  weeks_advancing : int option; [@sexp.option]
+  stage2_late : bool option; [@sexp.option]
+  resistance_quality : Weinstein_types.overhead_quality option; [@sexp.option]
 }
 [@@deriving sexp]
 
@@ -92,6 +98,12 @@ let build_trade_record ~(config : config) (sc : OT.scored_candidate) :
     pnl_dollars;
     cascade_score = entry.cascade_score;
     passes_macro = entry.passes_macro;
+    rs_value = entry.rs_value;
+    rs_trend = entry.rs_trend;
+    volume_ratio = entry.volume_ratio;
+    weeks_advancing = entry.weeks_advancing;
+    stage2_late = entry.stage2_late;
+    resistance_quality = entry.resistance_quality;
   }
 
 (* ------------------------------------------------------------------ *)
