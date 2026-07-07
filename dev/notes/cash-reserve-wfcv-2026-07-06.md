@@ -68,3 +68,38 @@ decoration.
 `cash_reserve_pct` stays merged, default 0.0, searchable axis. Do not
 re-sweep standalone. Track file `dev/status/cash-reserve.md` updated to
 CLOSED.
+
+## Addendum (2026-07-07): trade-level forensics of the r20 fold-011 flip
+
+Question: what exactly made r20 +12.7% in the 2022 fold while baseline was
+−10.2% and r30 −15.5%? Re-ran fold-011 as three single scenarios with trades
+output (`dev/experiments/cash-reserve-2026-07-06/forensics-f011/`; reproduces
+−10.2 / +12.7 / −15.5 exactly).
+
+**One Friday's funding decision does most of it.** All three variants took the
+same TDW breakout on 2022-01-29 (~$293k) and the same 3-day stop-out on
+2022-02-01 (−$29.7k). TDW immediately re-broke out, and on Friday
+**2022-02-05** the entry walk had to fund it:
+
+- **baseline** was fully deployed — still holding ATO ($299k, entered
+  2022-01-01) and CAH + RIO (2022-01-29), names the reserve variants never
+  bought — so its cash ran out on BCS ($77k) + BOH ($135k) and the TDW
+  re-entry was skipped (`Insufficient_cash`).
+- **r20**'s reserve had forced it to skip those lower-priority entries in the
+  prior two weeks (took the smaller CRUS instead of ATO on 01-01; skipped
+  CAH/RIO on 01-29), so on 02-05 the freed budget covered a **$151k TDW
+  re-entry → +$61.4k (+40.7%)** — the fold's biggest trade by far.
+- **r30**'s larger reserve subtraction pushed spendable below TDW's cost that
+  same Friday — it bought BCS + BOH and missed the re-entry entirely.
+
+Realized P&L: baseline −$224k, r20 −$72k, r30 −$181k. The TDW re-entry
+(+$61k) plus the dodged baseline-only losers (ATO −$7.5k, BCS −$5.4k, CAH,
+RIO) account for the bulk of the realized gap; the early win also kept r20's
+NAV higher through the Feb–Jun 2022 crash (MaxDD 12.5% vs 23.6%).
+
+**Reading:** the reserve did not win by cushioning — it won because the queue
+reshuffle happened to leave exactly enough cash for one re-breakout monster at
+one cash-boundary slot, which the bigger reserve then missed. Luck of queue
+position, not a mechanism — direct confirmation of the knife-edge verdict
+above, and of the fat-tail law from the funding side: whichever variant
+catches the monster wins the fold.
