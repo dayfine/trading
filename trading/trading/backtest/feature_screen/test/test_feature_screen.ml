@@ -99,6 +99,100 @@ let test_ols_recovers_known _ =
           ]))
 
 (* ---------------------------------------------------------------- *)
+(* OLS HC1-robust standard errors (heteroscedastic residuals)        *)
+(* ---------------------------------------------------------------- *)
+
+(* Hand-computed golden pinning the White HC1-robust SE path (the noise-free
+   test above leaves residuals = 0, so the sandwich is never exercised there).
+   Design: intercept + one centred predictor, so [X'X] is diagonal and the
+   sandwich collapses to a per-coefficient scalar we can compute by hand.
+     x column = [1; -1; 2; -2; 3; -3]   (Σx = 0, Σx² = 28),  n = 6, p = 2
+   True model y = 1 + 2·x + e with residuals e = [-3; -3; 1; 1; 2; 2], chosen
+   to satisfy the OLS normal equations (Σe = 0, Σ x·e = 0) so the fit recovers
+   β = (1, 2) exactly with exactly those (heteroscedastic) residuals:
+     y = [0; -4; 6; -2; 9; -3]
+   HC1: var(β_j) = n/(n-p) · [ bread · (Σ_i e_i² x_i x_iᵀ) · bread ]_jj, with
+   the small-sample factor n/(n-p) = 6/4 = 1.5 and diagonal bread =
+   diag(1/6, 1/28):
+     meat[0,0] = Σ e²   = 9+9+1+1+4+4 = 28
+     meat[1,1] = Σ e²·x² = 9+9+4+4+36+36 = 98
+     var(intercept) = 1.5 · (1/6)²  · 28 = 7/6    → se = √(7/6)  = 1.0801234497
+     var(slope)     = 1.5 · (1/28)² · 98 = 0.1875 → se = √0.1875 = 0.4330127019
+   t-stats = coef/se: intercept 1/√(7/6) = 0.9258200998,
+                      slope     2/√0.1875 = 4.6188021535
+   r² = 1 - Σe²/Σ(y-ȳ)² = 1 - 28/140 = 0.8 *)
+let test_ols_hc1_robust_se _ =
+  let xs = [ 1.; -1.; 2.; -2.; 3.; -3. ] in
+  let ys = [ 0.; -4.; 6.; -2.; 9.; -3. ] in
+  let x = Array.of_list_map xs ~f:(fun v -> [| 1.0; v |]) in
+  let y = Array.of_list ys in
+  assert_that
+    (Result.ok (Reg.ols ~x ~y ~names:[ "intercept"; "slope" ]))
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (r : Reg.ols_result) -> r.r2)
+              (float_equal ~epsilon:1e-9 0.8);
+            field
+              (fun (r : Reg.ols_result) -> r.terms)
+              (elements_are
+                 [
+                   all_of
+                     [
+                       field
+                         (fun t -> t.Reg.coef)
+                         (float_equal ~epsilon:1e-9 1.0);
+                       field
+                         (fun t -> t.Reg.se)
+                         (float_equal ~epsilon:1e-6 1.0801234497);
+                       field
+                         (fun t -> t.Reg.stat)
+                         (float_equal ~epsilon:1e-6 0.9258200998);
+                     ];
+                   all_of
+                     [
+                       field
+                         (fun t -> t.Reg.coef)
+                         (float_equal ~epsilon:1e-9 2.0);
+                       field
+                         (fun t -> t.Reg.se)
+                         (float_equal ~epsilon:1e-6 0.4330127019);
+                       field
+                         (fun t -> t.Reg.stat)
+                         (float_equal ~epsilon:1e-6 4.6188021535);
+                     ];
+                 ]);
+          ]))
+
+(* ---------------------------------------------------------------- *)
+(* Singular-matrix Error paths                                        *)
+(* ---------------------------------------------------------------- *)
+
+let test_solve_singular _ =
+  (* Row 2 = 2·row 1: rank-deficient, no unique solution. *)
+  let a = [| [| 1.0; 2.0 |]; [| 2.0; 4.0 |] |] in
+  let b = [| 1.0; 2.0 |] in
+  assert_that
+    (Result.error (Reg.solve a b))
+    (is_some_and (equal_to "singular matrix"))
+
+let test_ols_singular_column _ =
+  (* Duplicated predictor column ⇒ X'X is singular ⇒ solve's Error propagates. *)
+  let x =
+    [|
+      [| 1.0; 1.0; 1.0 |];
+      [| 1.0; 2.0; 2.0 |];
+      [| 1.0; 3.0; 3.0 |];
+      [| 1.0; 4.0; 4.0 |];
+    |]
+  in
+  let y = [| 1.0; 2.0; 3.0; 4.0 |] in
+  assert_that
+    (Result.error (Reg.ols ~x ~y ~names:[ "intercept"; "x1"; "x1_dup" ]))
+    (is_some_and (equal_to "singular matrix"))
+
+(* ---------------------------------------------------------------- *)
 (* Logistic sign + AUC on separable data                             *)
 (* ---------------------------------------------------------------- *)
 
@@ -206,6 +300,9 @@ let suite =
          "parse_bad_header" >:: test_parse_bad_header;
          "parse_bad_column_count" >:: test_parse_bad_column_count;
          "ols_recovers_known" >:: test_ols_recovers_known;
+         "ols_hc1_robust_se" >:: test_ols_hc1_robust_se;
+         "solve_singular" >:: test_solve_singular;
+         "ols_singular_column" >:: test_ols_singular_column;
          "logistic_separable" >:: test_logistic_separable;
          "one_hot_mapping" >:: test_one_hot_mapping;
          "era_split" >:: test_era_split;
