@@ -37,14 +37,45 @@ are now DONE). Main green.
 - **Directive: no new selection levers.** Any future "better picks" idea
   must beat this null on the same population first.
 
-## P0 — barbell deployment gates (the passed-but-parked lever, was P1)
+## P0 — the floor-quality program (user-directed 2026-07-08; barbell gates PARKED)
 
-The ONLY lever that ever passed a promotion grid (70/30, 2026-06-20), parked
-since. Remaining gates: (a) breadth-confirm cell on the top-3000 basis
-(warehouse is rebuilt and ready), (b) deployable overlay design (how the
-SPY-floor + engine-NAV blend operates live). This is now unambiguously the
-highest-value open thread — everything else in the entry/exit/funding space
-has been closed with evidence.
+**User review of the barbell numbers rejected deploying it as-is.** The 70/30
+blend buys Calmar, not wealth: deep 2000-2026 frontier = pure engine 917.9%/37.3%DD
+vs 70/30 533.6%/17.8% vs pure timed-SPY floor 386.9%/18.8% — every 10pp moved
+to the floor costs ~55pp of 26y return. Worse: the BAH-SPY comparator (394%)
+is RAW CLOSE (no dividends); against total-return SPY the 30wk-MA-timed floor
+lags outright (whipsaw tax + missed dividends in cash). The floor leg is the
+weak component; fix the floor before blending anything.
+
+**P0a — deep re-screen of the faithful short gates (UNBLOCKED, cheap, first).**
+#1696 (`neutral_blocks_shorts` Bearish-only + slow-grind gate) screened
+NEEDS-DEEP-DATA on 2010-26 (gates admit ~0 shorts; benefit case = 2000-02 +
+2008). The blocker was the deep delisted data — **restored 2026-07-07** (2,014
+CSVs re-fetched; warehouse `/tmp/snap_top3000_1998_2026` rebuilt, 2999 syms).
+Read-only screen on the deep window; also re-run Build2 arming-speed
+(`fast_v_arm_on_rate_alone`, #1708) deep re-screen, same unblock.
+
+**P0b — fast circuit-breaker SPY sleeve (design + default-off build + screen).**
+A long-only SPY sleeve gated by FAST signals instead of the slow 30wk MA:
+ingredients already built + individually validated as detection machinery —
+decline-character classifier (Slow_grind/Fast_v, #1692), catastrophic stop
+(#1695), A-D-live breadth (default macro basis; confirmed edge IS short-timing,
+ledger 2026-06-23), factor-lens edge~forward-DD r=−0.79. Success bar
+(standalone, before any blend): **match total-return SPY, cut the left tail**
+— not Calmar. Per `experiment-flag-discipline`: default-off mechanism → lens
+screen vs TOTAL-RETURN SPY (dividends in — do not repeat the raw-close
+comparator mistake) → WF-CV only if promising.
+
+**P0c — only then revisit blending/regime-switching**, with a floor worth
+blending (and/or an effective short sleeve as the offset leg). The
+regime-barbell screen's +1295% single-path number stays a direction, not a
+verdict (2008-concentrated, `project_regime_barbell_direction`).
+
+### Barbell gates (PARKED, was P0)
+70/30 passed its grid on worst-cell Calmar/Sharpe — the wrong scoreboard for
+the program's return-first objective. Do not run the breadth-confirm cell or
+overlay design until P0b produces a better floor; the blend arithmetic is
+post-hoc NAV and can be re-run cheaply whenever the legs improve.
 
 ## Decision items (human)
 
@@ -73,4 +104,8 @@ has been closed with evidence.
 Entry-selection tuning CLOSED (powered joint null, this session); scale-in
 closed; reallocation exhausted; envelope closed; stop-tuning closed;
 funding-side knobs rotate lottery tickets. Weinstein spine fixed. The open
-frontier is exactly: **barbell deployment** + capacity/breadth economics.
+frontier is exactly: **floor quality (fast circuit breaker + effective
+shorts)** → then blending; plus capacity/breadth economics. Scoreboard =
+absolute return + start-date robustness with tail control — NOT Calmar
+(`project_evaluation_methodology_reframe`); benchmark comparators must be
+TOTAL-RETURN (dividends), never raw close.
