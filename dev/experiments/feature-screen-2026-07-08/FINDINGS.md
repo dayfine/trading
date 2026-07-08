@@ -94,9 +94,19 @@ per-ticket mean at flat total — the capacity question, not a selection one.
   robust direction (optimism can only overstate signal, and there is none).
 - **Complete-case**: 26.9% of tickets lack RS (young/short-history names +
   the warmup artifact, `project_rs_warmup_gap` — ~1.6% of a 26y window).
-- **passes_macro degenerate** (all-true): the scanner path ran without
-  breadth/A-D inputs → macro never Bearish. Harness note; does not affect
-  the within-population regressions (it was excluded as constant).
+- **passes_macro ≡ true BY DESIGN, and it survives a robustness check**
+  (correction 2026-07-08, prompted by user review): the all-eligible runner
+  deliberately hardcodes `macro_trend = Neutral` every Friday
+  (`all_eligible_runner.ml:231`; doc comment: "this diagnostic doesn't
+  consume one") — NOT missing breadth data as first written. Consequence:
+  the population includes tickets from macro-Bearish weeks the live gate
+  (spine #6) would veto, so the null was initially answered on the UNGATED
+  population. **Robustness refit** excluding bear stretches (2000-03..2003-06,
+  2007-10..2009-06, 2020-02..2020-06, 2022) as a date-proxy for the gate,
+  n = 78,727: R² = 0.0045, AUC = 0.763, identical signs, same
+  frequency/magnitude tradeoff (Positive_rising +0.50 logit / −11.9
+  return-pp). The closure is not an artifact of pooling bear-week tickets.
+  (`report-grade-F-bullproxy.md`.)
 - **weeks_advancing ≡ 1 by construction** (the scanner fires at the
   Stage1→2 transition) — this population cannot test entry-freshness; that
   axis was separately validated (early_stage2 ≤ 4, 2026-07-06).
