@@ -130,16 +130,20 @@
  ;;   sharpe_ratio 0.77  max_drawdown 27.31  avg_holding_days 39.39
  ;;   open_positions_value 1,472,159  sortino 1.13  calmar 0.42  ulcer 12.57
  (expected
-  ((total_return_pct   ((min  58.2)         (max  87.3)))
-   (total_trades       ((min 210)           (max 314)))
-   (win_rate           ((min  31.1)         (max  42.1)))
-   (sharpe_ratio       ((min   0.61)        (max   0.92)))
-   (max_drawdown_pct   ((min  23.2)         (max  31.4)))
-   (avg_holding_days   ((min  33.5)         (max  45.3)))
-   (open_positions_value ((min 1177727.0)   (max 1766591.0)))
-   (sortino_ratio_annualized ((min  0.90)   (max   1.36)))
-   (calmar_ratio       ((min   0.34)        (max   0.51)))
-   (ulcer_index        ((min  10.1)         (max  15.1)))
+  ;; Re-pinned 2026-07-08 for the warmup 210→364 fix (RS present from the first
+  ;; screen; dev/notes/warmup-364-repin-2026-07-08.md), ±15% around 364 actuals:
+  ;;   ret 102.39  trades 250  win 34.0  sharpe 0.87  maxDD 30.07  hold 41.00
+  ;;   OPV 1,669,042  sortino 1.18  calmar 0.50  ulcer 12.22
+  ((total_return_pct   ((min  87.0)         (max 117.7)))
+   (total_trades       ((min 213)           (max 288)))
+   (win_rate           ((min  28.9)         (max  39.1)))
+   (sharpe_ratio       ((min   0.74)        (max   1.00)))
+   (max_drawdown_pct   ((min  25.6)         (max  34.6)))
+   (avg_holding_days   ((min  34.9)         (max  47.2)))
+   (open_positions_value ((min 1418700.0)   (max 1919400.0)))
+   (sortino_ratio_annualized ((min  1.00)   (max   1.36)))
+   (calmar_ratio       ((min   0.43)        (max   0.58)))
+   (ulcer_index        ((min  10.4)         (max  14.0)))
    ;; wall_seconds wide (CI ~5x local, local ~190s) — catches only
    ;; catastrophic 2x slowdowns per design intent.
    (wall_seconds       ((min 100.0)         (max 1800.0))))))

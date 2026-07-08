@@ -61,11 +61,14 @@
    (market_impact_bps_per_pct_adv 0.0)))
  (expected
   ;; Re-pinned 2026-06-23 for the A-D-live default flip (synthetic breadth tail).
-  ;; ±15% around A-D-live actuals; grid ACCEPT (dev/backtest/ad-grid-2026-06-23).
-  ((total_return_pct   ((min  66.0)        (max  89.4)))
+  ;; Re-centered 2026-07-08 for the warmup 210→364 fix (RS present from first
+  ;; screen; dev/notes/warmup-364-repin-2026-07-08.md). Measured: 79.13% / 321
+  ;; trades / win 38.01 / Sharpe 0.72 / DD 19.05 / hold 40.55 / OPV 1,465,187
+  ;; (was in-band pre-re-pin — re-centered ±15% around the 364 actuals).
+  ((total_return_pct   ((min  67.3)        (max  91.0)))
    (total_trades       ((min 273)          (max 369)))
-   (win_rate           ((min  32.0)        (max  43.3)))
-   (sharpe_ratio       ((min   0.61)       (max   0.82)))
+   (win_rate           ((min  32.3)        (max  43.7)))
+   (sharpe_ratio       ((min   0.61)       (max   0.83)))
    (max_drawdown_pct   ((min  16.2)        (max  21.9)))
-   (avg_holding_days   ((min  34.7)        (max  46.9)))
-   (open_positions_value ((min 1235000.0)  (max 1672000.0))))))
+   (avg_holding_days   ((min  34.5)        (max  46.6)))
+   (open_positions_value ((min 1245000.0)  (max 1685000.0))))))

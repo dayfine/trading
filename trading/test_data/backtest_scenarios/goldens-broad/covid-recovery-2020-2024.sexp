@@ -55,9 +55,14 @@
   ;; production default; ledger 2026-06-25-capacity-concentration-broad). Warehouse
   ;; re-measure, ±20% around 0.30 actuals (ret 52.86 sharpe 0.571 maxDD 34.55).
   ;; 0.30 lifts this 4y window's return (41->53%) and sharpe (0.46->0.57).
-  ((total_return_pct   ((min  42.3)  (max  63.4)))
-   (total_trades       ((min 187)    (max 281)))
-   (win_rate           ((min  33.9)  (max  43.9)))
-   (sharpe_ratio       ((min   0.46) (max   0.69)))
-   (max_drawdown_pct   ((min  27.6)  (max  41.5)))
-   (avg_holding_days   ((min  34.0)  (max  51.0))))))
+  ;; Re-pinned 2026-07-08 for the warmup 210→364 fix (RS present from the first
+  ;; screen; dev/notes/warmup-364-repin-2026-07-08.md), ±20% around 364 actuals
+  ;; vs rebuilt warehouse: ret 134.01  trades 193  win 42.49  sharpe 0.84
+  ;; maxDD 31.50  hold 49.46 (return 53→134% on this window — RS-honest early
+  ;; screens compound the 2020-21 recovery cohort).
+  ((total_return_pct   ((min 107.2)  (max 160.8)))
+   (total_trades       ((min 154)    (max 232)))
+   (win_rate           ((min  34.0)  (max  51.0)))
+   (sharpe_ratio       ((min   0.67) (max   1.00)))
+   (max_drawdown_pct   ((min  25.2)  (max  37.8)))
+   (avg_holding_days   ((min  39.6)  (max  59.4))))))

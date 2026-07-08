@@ -34,6 +34,18 @@
 ;;   sharpe_ratio       0.80   max_drawdown 24.3  avg_holding_days  38
 ;;   open_positions_value 1,634,151
 ;; Return 10x (8 → 81), MaxDD cut 12pp (36 → 24). Tolerances ±15%.
+;;
+;; Re-pinned 2026-07-08 for the warmup 210→364 fix (RS warmup gap,
+;; dev/notes/rs-warmup-gap-2026-07-07.md): the panel now carries 52 weeks of
+;; pre-window history, so rs_value is present from the first screen instead
+;; of None for every symbol in the first 22 weeks. Day-1 candidate ranking
+;; changes, path drifts after. Measured 2026-07-08 against test_data:
+;;   total_return_pct  106.39  total_trades 273   win_rate 38.83
+;;   sharpe_ratio        1.02  max_drawdown 17.67 avg_holding_days 40.54
+;;   open_positions_value 1,540,015
+;; (Pre-change 210-warmup baseline re-measured same day: 78.5% / 283 trades /
+;; DD 23.8 — in-band on all pins except open_positions_value 1,342,622,
+;; which had already drifted below the 2026-05-11 band.) Tolerances ±15%.
 ((name "covid-recovery-2020-2024")
  (description "COVID crash and recovery through 2024 — Cell E config")
  (period ((start_date 2020-01-02) (end_date 2024-12-31)))
@@ -57,10 +69,10 @@
    (bid_ask_spread_bps 5.0)
    (market_impact_bps_per_pct_adv 0.0)))
  (expected
-  ((total_return_pct   ((min  68.0)        (max  93.0)))
-   (total_trades       ((min 238)          (max 322)))
-   (win_rate           ((min  32.0)        (max  44.0)))
-   (sharpe_ratio       ((min   0.68)       (max   0.92)))
-   (max_drawdown_pct   ((min  20.6)        (max  28.0)))
-   (avg_holding_days   ((min  32.0)        (max  44.0)))
-   (open_positions_value ((min 1390000.0)  (max 1880000.0))))))
+  ((total_return_pct   ((min  90.4)        (max 122.3)))
+   (total_trades       ((min 232)          (max 314)))
+   (win_rate           ((min  33.0)        (max  44.7)))
+   (sharpe_ratio       ((min   0.86)       (max   1.17)))
+   (max_drawdown_pct   ((min  15.0)        (max  20.3)))
+   (avg_holding_days   ((min  34.5)        (max  46.6)))
+   (open_positions_value ((min 1309000.0)  (max 1771000.0))))))

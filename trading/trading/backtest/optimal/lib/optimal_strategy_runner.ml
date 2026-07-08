@@ -13,7 +13,7 @@ module OT = Optimal_types
 (* Constants                                                          *)
 (* ---------------------------------------------------------------- *)
 
-let _warmup_days = 210
+let _warmup_days = Backtest.Runner.warmup_days_for Weinstein
 
 (** LRU cache cap for the [Daily_panels.t] backing the strategy bar reads. Reads
     [SNAPSHOT_CACHE_MB] (default 256, sized for the sp500 ≈ 500-symbol working

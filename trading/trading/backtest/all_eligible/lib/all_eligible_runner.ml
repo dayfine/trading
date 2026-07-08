@@ -21,7 +21,7 @@ module OT = Backtest_optimal.Optimal_types
 (* ---------------------------------------------------------------- *)
 
 let _index_symbol = "GSPC.INDX"
-let _warmup_days = 210
+let _warmup_days = Backtest.Runner.warmup_days_for Weinstein
 let _bar_lookback_weeks = 90
 let _snapshot_cache_mb = Backtest.Snapshot_world.default_cache_mb ()
 
