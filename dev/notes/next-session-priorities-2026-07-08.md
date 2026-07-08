@@ -37,7 +37,27 @@ are now DONE). Main green.
 - **Directive: no new selection levers.** Any future "better picks" idea
   must beat this null on the same population first.
 
-## P0 — the floor-quality program (user-directed 2026-07-08; barbell gates PARKED)
+## P0 — warmup 210→364 fix (USER-APPROVED 2026-07-08; land BEFORE the floor program)
+
+The RS warmup gap fix is approved (option A of
+`dev/notes/rs-warmup-gap-2026-07-07.md`). Execute first so every subsequent
+screen/WF-CV runs on the honest RS basis — otherwise the floor-program numbers
+shift when this lands later.
+
+1. `warmup_days_for Weinstein | Spy_only_weinstein : 210 → 364`
+   (`trading/trading/backtest/lib/runner.ml:22`; mirror the Sector_rotation
+   comment's rationale).
+2. Sanity diff on ONE golden first (before/after run, eyeball the divergence
+   shape — expect early-window entry changes only, path drift after).
+3. Re-pin goldens per the validator-store mapping
+   (`concentration-0.30-goldens-repin-2026-06-25.md` procedure: each golden
+   re-measured against ITS store — sp500→test_data, broad→warehouse).
+4. Rebuild warehouses (window start moves ~154d earlier; deep data floor
+   1997-12-31 covers it — verified present after the 2026-07-07 re-fetch).
+5. Ledger note + memory update. Relative verdicts of past experiments stay
+   valid (baseline+variant were equally affected) — no re-litigation.
+
+## P1 — the floor-quality program (user-directed 2026-07-08; barbell gates PARKED)
 
 **User review of the barbell numbers rejected deploying it as-is.** The 70/30
 blend buys Calmar, not wealth: deep 2000-2026 frontier = pure engine 917.9%/37.3%DD
@@ -47,7 +67,7 @@ is RAW CLOSE (no dividends); against total-return SPY the 30wk-MA-timed floor
 lags outright (whipsaw tax + missed dividends in cash). The floor leg is the
 weak component; fix the floor before blending anything.
 
-**P0a — deep re-screen of the faithful short gates (UNBLOCKED, cheap, first).**
+**P1a — deep re-screen of the faithful short gates (UNBLOCKED, cheap, first).**
 #1696 (`neutral_blocks_shorts` Bearish-only + slow-grind gate) screened
 NEEDS-DEEP-DATA on 2010-26 (gates admit ~0 shorts; benefit case = 2000-02 +
 2008). The blocker was the deep delisted data — **restored 2026-07-07** (2,014
@@ -55,7 +75,7 @@ CSVs re-fetched; warehouse `/tmp/snap_top3000_1998_2026` rebuilt, 2999 syms).
 Read-only screen on the deep window; also re-run Build2 arming-speed
 (`fast_v_arm_on_rate_alone`, #1708) deep re-screen, same unblock.
 
-**P0b — fast circuit-breaker SPY sleeve (design + default-off build + screen).**
+**P1b — fast circuit-breaker SPY sleeve (design + default-off build + screen).**
 A long-only SPY sleeve gated by FAST signals instead of the slow 30wk MA:
 ingredients already built + individually validated as detection machinery —
 decline-character classifier (Slow_grind/Fast_v, #1692), catastrophic stop
@@ -66,7 +86,7 @@ ledger 2026-06-23), factor-lens edge~forward-DD r=−0.79. Success bar
 screen vs TOTAL-RETURN SPY (dividends in — do not repeat the raw-close
 comparator mistake) → WF-CV only if promising.
 
-**P0c — only then revisit blending/regime-switching**, with a floor worth
+**P1c — only then revisit blending/regime-switching**, with a floor worth
 blending (and/or an effective short sleeve as the offset leg). The
 regime-barbell screen's +1295% single-path number stays a direction, not a
 verdict (2008-concentrated, `project_regime_barbell_direction`).
@@ -74,16 +94,12 @@ verdict (2008-concentrated, `project_regime_barbell_direction`).
 ### Barbell gates (PARKED, was P0)
 70/30 passed its grid on worst-cell Calmar/Sharpe — the wrong scoreboard for
 the program's return-first objective. Do not run the breadth-confirm cell or
-overlay design until P0b produces a better floor; the blend arithmetic is
+overlay design until P1b produces a better floor; the blend arithmetic is
 post-hoc NAV and can be re-run cheaply whenever the legs improve.
 
 ## Decision items (human)
 
-1. **Warmup 210→364** (`dev/notes/rs-warmup-gap-2026-07-07.md`): fixes RS
-   silently absent for the first 22 weeks of every window/fold (~21% of each
-   2y WF-CV fold screens without spine item 7). One constant; re-pins all
-   goldens + warehouse rebuilds. Recommend A (bump). Relative experiment
-   verdicts stay valid either way.
+1. ~~Warmup 210→364~~ — **APPROVED 2026-07-08**, promoted to P0 above.
 2. **check_limits wire-or-delete** (carried; DELETE now natural).
 
 ## Carried / small
@@ -91,8 +107,10 @@ post-hoc NAV and can be re-run cheaply whenever the legs improve.
 - `feature_screen` nit: constant feature → "singular matrix" failwith;
   should drop-with-warning (bit us on passes_macro/stage2_late/weeks_advancing,
   all constant on this population).
-- Scanner path runs macro without breadth/A-D inputs → passes_macro
-  degenerate all-true. Harness note; fine for within-population regressions.
+- all_eligible runner hardcodes macro=Neutral per Friday (BY DESIGN,
+  all_eligible_runner.ml:231) → passes_macro ≡ true. Null verified robust to
+  this via the bull-proxy refit (#1886); note if a future consumer needs real
+  per-Friday macro on that path.
 - P4 continuous-RS display (live-picks UX only). Note: the screen found
   rs_value is the only both-margins-positive feature — fine for DISPLAY,
   but its ranking use is WF-CV-rejected; don't re-propose.
