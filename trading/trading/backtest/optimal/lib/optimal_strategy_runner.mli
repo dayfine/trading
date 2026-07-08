@@ -14,10 +14,10 @@
       ([Backtest.Result_writer]'s artefact, scoped to the actual run's universe
       — falls back to [Sector_map.load] over [data/sectors.csv] when the file is
       absent), builds an in-process snapshot directory over the universe +
-      benchmark index via {!Backtest.Csv_snapshot_builder.build} (210-day
-      warm-up window before [start_date]), opens a
-      {!Snapshot_runtime.Daily_panels.t} over it, and computes the Friday
-      calendar over the run window.
+      benchmark index via {!Backtest.Csv_snapshot_builder.build} (the Weinstein
+      warm-up window before [start_date] — {!Backtest.Runner.warmup_days_for},
+      364 days), opens a {!Snapshot_runtime.Daily_panels.t} over it, and
+      computes the Friday calendar over the run window.
     - {b Scan and score.} Walks every Friday in the run window, runs
       [Stock_analysis.analyze] per universe symbol over weekly aggregates read
       via {!Snapshot_runtime.Snapshot_bar_views.weekly_bars_for}, feeds the

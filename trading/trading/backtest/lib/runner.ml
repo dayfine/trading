@@ -14,19 +14,20 @@ let initial_cash = 1_000_000.0
 let commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
 
 (** Number of calendar days to prepend before [start_date] when the simulator
-    runs. The Weinstein strategy needs 30 weeks (~210 days) of bar history to
-    classify stages; the Buy-and-Hold benchmark is stateless and would otherwise
-    enter its single position at [warmup_start] instead of [start_date], which
-    corrupts the day-1-entry semantics the BAH baseline is pinned against.
-    Strategy-dispatched (#882) rather than a single constant. *)
+    runs. The RS analyzer needs [rs_ma_period] (52wk default) aligned weekly
+    bars to compute a Mansfield RS score, so every Weinstein-family strategy
+    warms up against the larger of its 30-week stage MA and the 52-week RS
+    window — ~52 weeks = ~364 days. (Was 210 — sized for the stage MA only —
+    which left [analysis.rs = None] for every symbol in the first 22 weeks of
+    every window; see dev/notes/rs-warmup-gap-2026-07-07.md.) The Buy-and-Hold
+    benchmark is stateless and would otherwise enter its single position at
+    [warmup_start] instead of [start_date], which corrupts the day-1-entry
+    semantics the BAH baseline is pinned against. Strategy-dispatched (#882)
+    rather than a single constant. *)
 let warmup_days_for : Strategy_choice.t -> int = function
-  | Weinstein -> 210
+  | Weinstein -> 364
   | Bah_benchmark _ -> 0
-  | Spy_only_weinstein _ -> 210
-  (* The RS analyzer needs [rs_ma_period] (52wk default) aligned weekly bars to
-     compute a ranking score, so the sector-rotation strategy warms up against
-     the larger of its 30-week stage MA and the 52-week RS window — ~52 weeks =
-     ~364 days. *)
+  | Spy_only_weinstein _ -> 364
   | Sector_rotation_weinstein _ -> 364
 
 (* Backwards-compatible internal alias kept so the rest of this module reads as

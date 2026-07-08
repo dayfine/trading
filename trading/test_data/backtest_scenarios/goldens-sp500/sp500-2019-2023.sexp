@@ -79,19 +79,24 @@
    (market_impact_bps_per_pct_adv 0.0)))
  (expected
   ;; Re-pinned 2026-06-23 for the A-D-live default flip (synthetic breadth tail).
-  ;; ±15% around A-D-live actuals; grid ACCEPT (dev/backtest/ad-grid-2026-06-23).
   ;; A-D-live's conservative COVID gate raised risk metrics here (MaxDD 21.6→31.3,
   ;; Calmar 0.46→0.26); return held (in band). Longshort still beats its long-only twin.
-  ((total_return_pct   ((min  40.7)        (max  55.1)))
+  ;; Re-pinned 2026-07-08 for the warmup 210→364 fix (RS present from the first
+  ;; screen; dev/notes/warmup-364-repin-2026-07-08.md), ±15% around 364 actuals:
+  ;;   ret 45.73  trades 274  win 36.50  sharpe 0.56  maxDD 24.90  hold 38.67
+  ;;   OPV 1,180,589  sortino 0.69  calmar 0.31  ulcer 9.67
+  ;; Risk metrics IMPROVED here (DD 31.3→24.9) — the RS-honest early-window
+  ;; cohort holds a less crash-exposed 2019 book into COVID on this window.
+  ((total_return_pct   ((min  38.9)        (max  52.6)))
    (total_trades       ((min 233)          (max 315)))
    (win_rate           ((min  31.0)        (max  42.0)))
-   (sharpe_ratio       ((min   0.46)       (max   0.63)))
-   (max_drawdown_pct   ((min  26.6)        (max  36.0)))
-   (avg_holding_days   ((min  34.6)        (max  46.8)))
-   (open_positions_value ((min 944000.0)   (max 1278000.0)))
-   (sortino_ratio_annualized ((min 0.60)   (max 0.81)))
-   (calmar_ratio       ((min   0.22)       (max   0.30)))
-   (ulcer_index        ((min  10.6)        (max  14.4)))
+   (sharpe_ratio       ((min   0.47)       (max   0.64)))
+   (max_drawdown_pct   ((min  21.2)        (max  28.6)))
+   (avg_holding_days   ((min  32.9)        (max  44.5)))
+   (open_positions_value ((min 1003500.0)  (max 1357700.0)))
+   (sortino_ratio_annualized ((min 0.59)   (max 0.80)))
+   (calmar_ratio       ((min   0.27)       (max   0.36)))
+   (ulcer_index        ((min   8.2)        (max  11.1)))
    ;; wall_seconds pin sized wide (CI ~920s, local parallel ~200s) —
    ;; catches only catastrophic 2x slowdowns per design intent.
    (wall_seconds       ((min 100.0)        (max 1500.0))))))

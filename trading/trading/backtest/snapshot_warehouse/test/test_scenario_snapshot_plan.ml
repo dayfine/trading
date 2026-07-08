@@ -50,10 +50,10 @@ let test_derive _ =
   assert_that plan
     (all_of
        [
-         (* warmup_start = 2020-01-02 - 210 days = 2019-06-06 *)
+         (* warmup_start = 2020-01-02 - 364 days = 2019-01-03 *)
          field
            (fun (p : Plan.t) -> p.warmup_start)
-           (equal_to (Date.of_string "2019-06-06"));
+           (equal_to (Date.of_string "2019-01-03"));
          field
            (fun (p : Plan.t) -> p.end_date)
            (equal_to (Date.of_string "2024-12-31"));

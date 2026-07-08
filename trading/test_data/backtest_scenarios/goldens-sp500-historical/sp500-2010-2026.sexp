@@ -133,14 +133,31 @@
   ;; Over the 16y multi-regime window 0.30 DOMINATES the prior 0.14 pin (ret 340->672,
   ;; sharpe 0.84->0.92, calmar 0.49->0.74) AND lowers DD (19->18) — concentration's
   ;; risk-adjusted win is clear on the long window (vs ~flat on the short 2019-2023).
-  ((total_return_pct   ((min 571.0)         (max 773.0)))
-   (total_trades       ((min 474)           (max  642)))
-   (win_rate           ((min  35.9)         (max  48.6)))
-   (sharpe_ratio       ((min   0.78)        (max   1.06)))
-   (max_drawdown_pct   ((min  15.4)         (max  20.8)))
-   (avg_holding_days   ((min  37.1)         (max  52.0)))
-   (open_positions_value ((min 5200000.0)   (max 7035000.0)))
-   (sortino_ratio_annualized ((min  1.27)   (max   1.71)))
-   (calmar_ratio       ((min   0.63)        (max   0.85)))
-   (ulcer_index        ((min   5.09)        (max   6.89)))
-   (wall_seconds       ((min 300.0)         (max 3600.0))))))
+  ;; Re-pinned 2026-07-08 for the warmup 210→364 fix (RS present from the first
+  ;; screen; dev/notes/warmup-364-repin-2026-07-08.md), ±15% around 364 actuals:
+  ;;   ret 1013.84  trades 410  win 46.34  sharpe 0.54  maxDD 65.83  hold 50.24
+  ;;   OPV 0  sortino 0.81  calmar 0.24  ulcer 33.95  force_liqs 32
+  ;; ⚠ This window now documents the PORTFOLIO-FLOOR/MEME-SQUEEZE PATHOLOGY:
+  ;; the RS-honest basis faithfully catches GME's Sept-2020 Stage-2 breakout
+  ;; (+$7.8M realized, held through the Jan-2021 squeeze). The squeeze's MTM
+  ;; peak ($28.9M) poisons the monotonic Peak_tracker: NAV never recovers above
+  ;; 0.4×peak, so the Portfolio_floor brake fires 2021-02-02 and STERILIZES the
+  ;; remaining 5 years (32 Portfolio_floor liqs, ~zero 2021/2023/2024 entries,
+  ;; OPV 0 at end). The longshort twin (hedged, no floor fire) stays healthy —
+  ;; compare its pins. Floor-brake HWM semantics are a floor-quality-program
+  ;; finding (see dev/notes/warmup-364-repin-2026-07-08.md §Findings), not a
+  ;; reason to unwind the warmup fix.
+  ((total_return_pct   ((min 861.8)         (max 1165.9)))
+   (total_trades       ((min 348)           (max  472)))
+   (win_rate           ((min  39.4)         (max  53.3)))
+   (sharpe_ratio       ((min   0.46)        (max   0.62)))
+   (max_drawdown_pct   ((min  56.0)         (max  75.7)))
+   (avg_holding_days   ((min  42.7)         (max  57.8)))
+   ;; OPV is exactly 0 (floor-halted, all-cash at end); wide absolute band —
+   ;; a small behavior drift that re-opens a position lands ~3M (0.3×NAV).
+   (open_positions_value ((min 0.0)         (max 3500000.0)))
+   (sortino_ratio_annualized ((min  0.69)   (max   0.94)))
+   (calmar_ratio       ((min   0.21)        (max   0.28)))
+   (ulcer_index        ((min  28.9)         (max  39.0)))
+   ;; Floor-halted run does less work — wall floor lowered 300→100.
+   (wall_seconds       ((min 100.0)         (max 3600.0))))))

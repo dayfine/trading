@@ -82,14 +82,21 @@
   ;;   sortino 0.58  calmar 0.18  ulcer 15.46
   ;; vs prior 0.14 pin (ret 26 / maxDD 31): 0.30 = the honest production risk profile
   ;; (higher return AND higher DD); the 0.14 override understated it.
-  ((total_return_pct   ((min  34.9)        (max  47.3)))
-   (total_trades       ((min 176)          (max 238)))
-   (win_rate           ((min  31.6)        (max  42.8)))
-   (sharpe_ratio       ((min   0.40)       (max   0.54)))
-   (max_drawdown_pct   ((min  33.1)        (max  44.8)))
-   (avg_holding_days   ((min  39.0)        (max  52.7)))
-   (open_positions_value ((min 798000.0)   (max 1300000.0)))
-   (sortino_ratio_annualized ((min 0.49)   (max 0.67)))
-   (calmar_ratio       ((min   0.15)       (max   0.21)))
-   (ulcer_index        ((min  13.1)        (max  17.8)))
+  ;; Re-pinned 2026-07-08 for the warmup 210→364 fix (RS present from the first
+  ;; screen; dev/notes/warmup-364-repin-2026-07-08.md), ±15% around 364 actuals:
+  ;;   ret 16.38  trades 203  win 38.42  sharpe 0.26  maxDD 41.69  hold 43.14
+  ;;   OPV 870,207  sortino 0.25  calmar 0.074  ulcer 16.31
+  ;; Return 41→16% while the with-shorts twin held ~46%: on this window the
+  ;; RS-honest early-2019 cohort rides COVID unhedged (DD ~42%) — the known
+  ;; high-dispersion signature of concentration 0.30, now on the honest RS basis.
+  ((total_return_pct   ((min  13.9)        (max  18.8)))
+   (total_trades       ((min 173)          (max 233)))
+   (win_rate           ((min  32.7)        (max  44.2)))
+   (sharpe_ratio       ((min   0.22)       (max   0.30)))
+   (max_drawdown_pct   ((min  35.4)        (max  47.9)))
+   (avg_holding_days   ((min  36.7)        (max  49.6)))
+   (open_positions_value ((min 739700.0)   (max 1000700.0)))
+   (sortino_ratio_annualized ((min 0.21)   (max 0.29)))
+   (calmar_ratio       ((min   0.063)      (max   0.085)))
+   (ulcer_index        ((min  13.9)        (max  18.8)))
    (wall_seconds       ((min 100.0)        (max 1500.0))))))

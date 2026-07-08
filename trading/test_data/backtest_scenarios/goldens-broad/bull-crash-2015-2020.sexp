@@ -53,10 +53,14 @@
   ;; re-measure. ⚠ 0.30 HURTS this 5y window: ret 37.91 -> 10.44, sharpe 0.47 -> 0.184
   ;; (concentration is regime-dependent — helps long/aggregate windows, hurts some
   ;; short ones; the ACCEPT is a broad-aggregate verdict, not per-window).
-  ;; Wide bands around the near-zero 0.30 actuals (ret 10.44 sharpe 0.184 maxDD 22.65).
-  ((total_return_pct   ((min -3.0)  (max 24.0)))
-   (total_trades       ((min 175)   (max 237)))
-   (win_rate           ((min 33.8)  (max 43.8)))
-   (sharpe_ratio       ((min -0.05) (max 0.42)))
-   (max_drawdown_pct   ((min 18.1)  (max 27.2)))
-   (avg_holding_days   ((min 37.7)  (max 56.5))))))
+  ;; Re-pinned 2026-07-08 for the warmup 210→364 fix (RS present from the first
+  ;; screen; dev/notes/warmup-364-repin-2026-07-08.md), ±20% around 364 actuals
+  ;; vs rebuilt warehouse: ret 40.97  trades 205  win 38.54  sharpe 0.45
+  ;; maxDD 12.63  hold 44.77 (RS-honest basis LIFTS this window 10→41% and cuts
+  ;; DD 23→13 — the 0.30-hurts-short-windows picture softens on the new basis).
+  ((total_return_pct   ((min 32.8)  (max 49.2)))
+   (total_trades       ((min 164)   (max 246)))
+   (win_rate           ((min 30.8)  (max 46.2)))
+   (sharpe_ratio       ((min  0.36) (max 0.53)))
+   (max_drawdown_pct   ((min 10.1)  (max 15.2)))
+   (avg_holding_days   ((min 35.8)  (max 53.7))))))

@@ -91,14 +91,21 @@
  ;; parallel-3 in trading-1-dev: 1217.2s; pin sized for GHA/local
  ;; variance.
  (expected
-  ((total_return_pct   ((min 260.0)         (max 360.0)))
-   (total_trades       ((min 640)           (max  800)))
-   (win_rate           ((min  33.6)         (max  45.5)))
-   (sharpe_ratio       ((min   0.56)        (max   0.82)))
-   (max_drawdown_pct   ((min  17.0)         (max  24.6)))
-   (avg_holding_days   ((min  37.7)         (max  51.1)))
-   (open_positions_value ((min 3500000.0)   (max 4600000.0)))
-   (sortino_ratio_annualized ((min  0.86)   (max   1.22)))
-   (calmar_ratio       ((min   0.36)        (max   0.52)))
-   (ulcer_index        ((min   7.00)        (max  10.50)))
-   (wall_seconds       ((min 600.0)         (max 2400.0))))))
+  ;; Re-pinned 2026-07-08 for the warmup 210→364 fix (RS present from the first
+  ;; screen; dev/notes/warmup-364-repin-2026-07-08.md), ±15% around 364 actuals:
+  ;;   ret 362.11  trades 782  win 35.81  sharpe 0.75  maxDD 21.35  hold 45.40
+  ;;   OPV 3,760,365  sortino 1.11  calmar 0.46  ulcer 8.26
+  ;; Unlike the long-only twin (floor-halted by the GME squeeze — see its pin
+  ;; comment), this hedged variant rides the same window healthily.
+  ((total_return_pct   ((min 307.8)         (max 416.4)))
+   (total_trades       ((min 665)           (max  899)))
+   (win_rate           ((min  30.4)         (max  41.2)))
+   (sharpe_ratio       ((min   0.64)        (max   0.86)))
+   (max_drawdown_pct   ((min  18.1)         (max  24.6)))
+   (avg_holding_days   ((min  38.6)         (max  52.2)))
+   (open_positions_value ((min 3196000.0)   (max 4324000.0)))
+   (sortino_ratio_annualized ((min  0.95)   (max   1.28)))
+   (calmar_ratio       ((min   0.39)        (max   0.53)))
+   (ulcer_index        ((min   7.00)        (max   9.50)))
+   ;; Wall floor lowered 600→100 (the 364 run measured ~391s locally).
+   (wall_seconds       ((min 100.0)         (max 2400.0))))))

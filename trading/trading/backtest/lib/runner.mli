@@ -7,12 +7,14 @@ open Core
 val warmup_days_for : Strategy_choice.t -> int
 (** Number of calendar days the runner prepends before a scenario's [start_date]
     when it runs [strategy] — i.e.
-    [warmup_start = start_date - warmup_days_for strategy]. The Weinstein /
-    SPY-only stage classifier needs ~30 weeks (210 days) of bar history;
-    sector-rotation needs ~52 weeks (364 days) for its RS window; the stateless
-    Buy-and-Hold benchmark needs none (0). Exposed (#882-dispatched) so
-    snapshot-warehouse tooling derives the same warmup window the runner uses,
-    rather than copying the magic numbers. *)
+    [warmup_start = start_date - warmup_days_for strategy]. Every
+    Weinstein-family strategy needs ~52 weeks (364 days): the larger of the
+    30-week stage-MA window and the 52-week RS window (was 210 — stage MA only —
+    which starved the RS analyzer for the first 22 weeks of every window; see
+    dev/notes/rs-warmup-gap-2026-07-07.md). The stateless Buy-and-Hold benchmark
+    needs none (0). Exposed (#882-dispatched) so snapshot-warehouse tooling
+    derives the same warmup window the runner uses, rather than copying the
+    magic numbers. *)
 
 val primary_index_symbol : string
 (** The primary index ([GSPC.INDX]) every run loads bars for and feeds into the
