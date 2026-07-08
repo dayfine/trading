@@ -26,7 +26,8 @@
       {!Scenario_lib.Universe_file.load} (Pinned ⇒ exactly those symbols;
       Full_sector_map ⇒ {!Sector_map.load} over [data/sectors.csv]), builds an
       in-process snapshot directory via {!Backtest.Csv_snapshot_builder.build}
-      over the universe + benchmark with a 210-day warm-up window, and opens a
+      over the universe + benchmark with the Weinstein warm-up window
+      ({!Backtest.Runner.warmup_days_for}, 364 days), and opens a
       {!Snapshot_runtime.Daily_panels.t} over it.
     - {b Scan + score.} Walks each Friday running {!Stock_analysis.analyze} per
       symbol, feeds the analyses to
