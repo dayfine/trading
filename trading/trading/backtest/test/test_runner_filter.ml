@@ -311,25 +311,39 @@ let test_round_trips_in_window_no_short_from_warmup_straddle _ =
   in
   let all_steps =
     [
-      (* Warmup step (before start_date): LH long entry — the fill the truncated
-         view drops, orphaning the in-window Sell into a spurious short. *)
+      (* Warmup step (before start_date): LH's original long entry — the fill
+         the truncated view drops, orphaning the in-window Sell into a spurious
+         short. *)
       _make_step_with_trades
         ~date:(date_of_string "1999-12-15")
         ~portfolio
         ~trades:
           [
-            _make_trade ~id:"lh-buy" ~order_id:"lh-o1" ~symbol:"LH"
-              ~side:Trading_base.Types.Buy ~quantity:1280.0 ~price:67.36;
+            _make_trade ~id:"lh-buy1" ~order_id:"lh-o1" ~symbol:"LH"
+              ~side:Trading_base.Types.Buy ~quantity:1280.0 ~price:60.0;
           ]
         ();
-      (* In-window LH laggard exit at a loss (price fell 67.36 -> 65.15). *)
+      (* In-window LH exit of the warmup long (2001-06-13 @ 67.36). *)
       _make_step_with_trades
         ~date:(date_of_string "2001-06-13")
         ~portfolio
         ~trades:
           [
             _make_trade ~id:"lh-sell" ~order_id:"lh-o2" ~symbol:"LH"
-              ~side:Trading_base.Types.Sell ~quantity:1280.0 ~price:65.15;
+              ~side:Trading_base.Types.Sell ~quantity:1280.0 ~price:67.36;
+          ]
+        ();
+      (* In-window LH re-entry (2001-06-16 @ 65.15). In the truncated view the
+         warmup Buy is gone, so this Buy is what CLOSES the orphaned Sell — the
+         (Sell@67.36 -> Buy@65.15) pair the old path mislabels as a SHORT with
+         inverted (+) P&L, matching the observed LH,SHORT,...,67.36,65.15 row. *)
+      _make_step_with_trades
+        ~date:(date_of_string "2001-06-16")
+        ~portfolio
+        ~trades:
+          [
+            _make_trade ~id:"lh-buy2" ~order_id:"lh-o3" ~symbol:"LH"
+              ~side:Trading_base.Types.Buy ~quantity:1280.0 ~price:65.15;
           ]
         ();
       (* A genuinely in-window long that must survive the fix as a LONG. *)
@@ -375,9 +389,9 @@ let test_round_trips_in_window_no_short_from_warmup_straddle _ =
            ];
        ]);
   (* The bug this pins: extracting over the [start_date]-truncated steps (the
-     old behaviour) drops LH's warmup Buy, so the lone in-window Sell orphans
-     into a spurious LH SHORT with inverted (+) P&L. Pin that the truncated path
-     produces exactly that artefact the fix removes. *)
+     old behaviour) drops LH's warmup Buy, so the in-window Sell@67.36 orphans
+     and the re-entry Buy@65.15 closes it into a spurious LH SHORT with inverted
+     (+) P&L — exactly the observed artefact the fix removes. *)
   let truncated_steps =
     List.filter all_steps
       ~f:(fun (s : Trading_simulation_types.Simulator_types.step_result) ->
@@ -395,6 +409,12 @@ let test_round_trips_in_window_no_short_from_warmup_straddle _ =
              field
                (fun (t : Metrics.trade_metrics) -> t.side)
                (equal_to Trading_base.Types.Sell);
+             field
+               (fun (t : Metrics.trade_metrics) -> t.entry_price)
+               (float_equal 67.36);
+             field
+               (fun (t : Metrics.trade_metrics) -> t.exit_price)
+               (float_equal 65.15);
            ];
        ])
 
