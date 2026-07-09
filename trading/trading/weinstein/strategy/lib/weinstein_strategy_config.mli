@@ -156,13 +156,12 @@ type config = {
           through the [Neutral]/[Bullish] bear-rally blips, contributing to the
           false-breakout stop-out churn. Default-off until an experiment-ledger
           ACCEPT (per [.claude/rules/experiment-flag-discipline.md]). *)
-  neutral_blocks_shorts : bool; [@sexp.default false]
-      (** Short-side mirror of {!neutral_blocks_longs} (default-off). When
-          [true], a macro-[Neutral] tape blocks new short entries exactly as a
-          [Bullish] tape does — only a [Bearish] tape admits shorts. Default
-          [false] preserves the historical macro gate bit-equally (shorts
-          admitted under both [Bearish] and [Neutral], blocked only under
-          [Bullish]).
+  neutral_blocks_shorts : bool; [@sexp.default true]
+      (** Short-side mirror of {!neutral_blocks_longs}. When [true] (the
+          default), a macro-[Neutral] tape blocks new short entries exactly as a
+          [Bullish] tape does — only a [Bearish] tape admits shorts. Setting
+          [false] restores the historical macro gate (shorts admitted under both
+          [Bearish] and [Neutral], blocked only under [Bullish]).
 
           This *tightens* the short side to Weinstein's confirmed-bear rule
           (weinstein-book-reference.md §Short-Selling Rules — short only in a
@@ -172,11 +171,21 @@ type config = {
           removes the [Neutral] chop tape (the 2020 V) where shorts are most
           likely squeezed.
 
+          Default flipped [false] -> [true] on 2026-07-09 (user mandate) as a
+          {b faithfulness} flip, not an alpha claim: shorting only a confirmed
+          [Bearish] tape is strictly more Weinstein-faithful than also shorting
+          a [Neutral] tape. Ledger ACCEPT:
+          [2026-06-22-neutral-blocks-shorts-wfcv] (helpful-or-inert on the WF-CV
+          cell; the companion grid [2026-06-22-neutral-blocks-shorts-grid]
+          showed no edge flip). The deep-cell re-attribution (2026-07-09,
+          [dev/notes/p1a-deep-short-screens-364-2026-07-09.md]) found the gate
+          blocked exactly one [Neutral]-tape short in 11 deep years (a loser) so
+          the true edge cost is ~0; blocked [Neutral]-tape shorts are the
+          squeeze-trap class.
+
           Wired by threading into [screening_config.neutral_blocks_shorts] at
           screen time, so the flag is a single-component [Variant_matrix] flag
-          axis ([((flag neutral_blocks_shorts) (values (true false)))]).
-          Default-off until an experiment-ledger ACCEPT (per
-          [.claude/rules/experiment-flag-discipline.md]). *)
+          axis ([((flag neutral_blocks_shorts) (values (true false)))]). *)
   enable_slow_grind_short_gate : bool; [@sexp.default false]
       (** Faithful-short decline-character gate (default-off). When [true],
           shorts are admitted only when the current primary-index decline is a

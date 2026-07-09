@@ -171,9 +171,21 @@ let test_six_year_full_lifecycle _ =
      makes the macro gate live for 2020-2023, admitting one fewer entry in this
      2018-2023 window (29/26, 26 round-trips, 4W/22L vs 30/27, 27, 5W/22L).
      Same 7-symbol set; final value and max-DD still inside their bands. *)
+  (* neutral_blocks_shorts default flip (2026-07-09, false->true; faithfulness
+     flip, user mandate — see weinstein_strategy_config.mli): the flip blocks
+     ONE Neutral-tape short in this window — HD, opened 2018-11-17, covered
+     2019-01-08 during the Q4-2018 correction (a Neutral tape, not a confirmed
+     Bearish one), a -$353 loser. Removing that short round-trip drops one
+     Sell-open + its cover Buy: buys 29->28, sells 26->25, round-trips 26->25,
+     losses 22->21 (wins unchanged at 4). Same 7-symbol set (HD still trades
+     long). Final value 484,438.68 -> 484,753.99 (still in band); realized
+     max drawdown ~5.6% -> ~5.5% (the old "54.25%" pin-comment below is stale
+     from the G15 era; the loose < 0.60 assertion masked it). Delta is small,
+     consistent with the ~0-cost deep-cell attribution
+     (dev/notes/p1a-deep-short-screens-364-2026-07-09.md §Attribution). *)
   assert_that (List.length result.steps) (equal_to 2187);
-  assert_that n_buys (equal_to 29);
-  assert_that n_sells (equal_to 26);
+  assert_that n_buys (equal_to 28);
+  assert_that n_sells (equal_to 25);
   assert_that symbols
     (elements_are
        [
@@ -185,18 +197,20 @@ let test_six_year_full_lifecycle _ =
          equal_to "KO";
          equal_to "MSFT";
        ]);
-  assert_that (List.length round_trips) (equal_to 26);
+  assert_that (List.length round_trips) (equal_to 25);
   assert_that stats
     (is_some_and
        (all_of
           [
             field (fun s -> s.Metrics.win_count) (equal_to 4);
-            field (fun s -> s.Metrics.loss_count) (equal_to 22);
+            field (fun s -> s.Metrics.loss_count) (equal_to 21);
           ]));
-  (* G15 step 3 (2026-05-01): final value $485,285.88; pin ±$3K. *)
+  (* Final value $484,753.99 under the 2026-07-09 flip (was $485,285.88 at the
+     G15 step-3 pin); band kept at ±$3K around the G15 centre, which still
+     contains the new value. *)
   assert_that final_value
     (is_between (module Float_ord) ~low:482_285.88 ~high:488_285.88);
-  (* G15 step 3 (2026-05-01): max drawdown 54.25%; pin loose at < 0.60. *)
+  (* Realized max drawdown ~5.5% under the flip; pin loose at < 0.60. *)
   assert_that max_drawdown_pct (lt (module Float_ord) 0.60)
 
 (* ------------------------------------------------------------------ *)

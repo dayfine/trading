@@ -97,9 +97,10 @@ type config = {
           [Bullish] admits longs); default [false] preserves the historical gate
           where both [Bullish] and [Neutral] admit longs. Threaded into
           [screening_config.neutral_blocks_longs] at screen time. See [.mli]. *)
-  neutral_blocks_shorts : bool; [@sexp.default false]
-      (** Short-side mirror of [neutral_blocks_longs]; default [false] = prior
-          gate (both [Bearish] and [Neutral] admit shorts). See [.mli]. *)
+  neutral_blocks_shorts : bool; [@sexp.default true]
+      (** Short-side mirror of [neutral_blocks_longs]; default [true] admits
+          shorts only under a confirmed [Bearish] tape (2026-07-09 faithfulness
+          flip). See [.mli]. *)
   enable_slow_grind_short_gate : bool; [@sexp.default false]
       (** Admit shorts only in a slow-grind decline; default [false] = no-op.
           See [.mli]. *)
@@ -197,7 +198,7 @@ let default_config ~universe ~index_symbol =
     enable_pi_filter = false;
     margin_config = Trading_portfolio.Margin_config.default_config;
     neutral_blocks_longs = false;
-    neutral_blocks_shorts = false;
+    neutral_blocks_shorts = true;
     enable_slow_grind_short_gate = false;
     fast_v_arm_on_rate_alone = false;
     fast_v_min_rate_pct = fast_v_min_rate_no_op;

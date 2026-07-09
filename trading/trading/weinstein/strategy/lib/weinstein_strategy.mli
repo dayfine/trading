@@ -436,13 +436,15 @@ type config = {
           [screening_config.neutral_blocks_longs] at screen time so it is a
           [Variant_matrix] flag axis. See [Weinstein_strategy_config] for full
           semantics. *)
-  neutral_blocks_shorts : bool; [@sexp.default false]
-      (** Short-side mirror of {!neutral_blocks_longs} (default-off): when
-          [true], a macro-[Neutral] tape blocks new short entries (only
-          [Bearish] admits shorts). Default [false] preserves the historical
-          gate where both [Bearish] and [Neutral] admit shorts. Tightens the
-          short side to Weinstein's confirmed-bear rule; the Stage-4 breakdown
-          criteria and the macro gate are unaffected. Threaded into
+  neutral_blocks_shorts : bool; [@sexp.default true]
+      (** Short-side mirror of {!neutral_blocks_longs}: when [true] (the
+          default), a macro-[Neutral] tape blocks new short entries (only
+          [Bearish] admits shorts). Setting [false] restores the historical gate
+          where both [Bearish] and [Neutral] admit shorts. Tightens the short
+          side to Weinstein's confirmed-bear rule; the Stage-4 breakdown
+          criteria and the macro gate are unaffected. Default flipped [false] ->
+          [true] on 2026-07-09 (user mandate) as a faithfulness flip; ledger
+          ACCEPT [2026-06-22-neutral-blocks-shorts-wfcv]. Threaded into
           [screening_config.neutral_blocks_shorts] at screen time so it is a
           [Variant_matrix] flag axis. See [Weinstein_strategy_config] for full
           semantics. *)
