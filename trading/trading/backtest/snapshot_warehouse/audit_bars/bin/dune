@@ -1,0 +1,11 @@
+(executable
+ (name audit_bars)
+ (libraries
+  core
+  core_unix.command_unix
+  core_unix.sys_unix
+  status
+  trading.data_panel.snapshot
+  audit_bars_detector)
+ (preprocess
+  (pps ppx_jane)))

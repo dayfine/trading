@@ -1,0 +1,5 @@
+(library
+ (name audit_bars_detector)
+ (libraries core)
+ (preprocess
+  (pps ppx_jane)))
