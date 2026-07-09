@@ -97,6 +97,13 @@
   ;;   OPV 3,760,365  sortino 1.11  calmar 0.46  ulcer 8.26
   ;; Unlike the long-only twin (floor-halted by the GME squeeze — see its pin
   ;; comment), this hedged variant rides the same window healthily.
+  ;; Re-verified 2026-07-09 under the neutral_blocks_shorts default flip
+  ;; (false→true, user-mandated faithfulness flip): actuals are BIT-IDENTICAL
+  ;; to the 364 pin above (ret 362.11 / 782 / 35.81 / 0.75 / 21.35 / 45.40 /
+  ;; OPV 3,760,365 / 1.11 / 0.46 / 8.26). This 2010-2026 window took no
+  ;; Neutral-tape short the gate would block, so the flip is inert here —
+  ;; bands unchanged. Confirms the ≈0-cost deep-cell attribution
+  ;; (dev/notes/p1a-deep-short-screens-364-2026-07-09.md §Attribution).
   ((total_return_pct   ((min 307.8)         (max 416.4)))
    (total_trades       ((min 665)           (max  899)))
    (win_rate           ((min  30.4)         (max  41.2)))

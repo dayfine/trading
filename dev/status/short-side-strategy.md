@@ -5,6 +5,32 @@
 ## Status
 IN_PROGRESS
 
+## 2026-07-09 — `neutral_blocks_shorts` default flipped false→true (branch `feat/neutral-blocks-shorts-default`)
+
+User-mandated **faithfulness** flip (not an alpha claim): shorting only a
+confirmed `Bearish` tape is strictly more Weinstein-faithful than also shorting a
+`Neutral` tape (weinstein-book-reference.md §Short-Selling Rules). Flipped the
+`Weinstein_strategy.config.neutral_blocks_shorts` default (`[@sexp.default false]`
+→ `true`) in `weinstein_strategy_config.ml{,i}` + the mirror docstring in
+`weinstein_strategy.mli`.
+
+- **Ledger:** ACCEPT `2026-06-22-neutral-blocks-shorts-wfcv` (helpful-or-inert on
+  the WF-CV cell); companion grid `2026-06-22-neutral-blocks-shorts-grid` showed
+  no edge flip — honestly a faithfulness flip.
+- **Deep re-attribution** (`dev/notes/p1a-deep-short-screens-364-2026-07-09.md`
+  §Attribution): the neutral gate blocked exactly ONE Neutral-tape short in 11
+  deep years (CF Jun-2006, a loser — blocking helped); true edge cost ≈ 0.
+- **Golden impact:** `goldens-sp500-historical/sp500-2010-2026-longshort`
+  re-ran **BIT-IDENTICAL** under the flip (ret 362.11 / 782 tr / 35.81 win /
+  0.75 Sharpe / 21.35 MaxDD) — no Neutral-tape short taken in that window; bands
+  unchanged, pin comment updated. `sp500-2000-2026-longshort` (research-tier,
+  sanity-wide bands, reads the gitignored deep data store — not re-runnable in
+  this env) documented as provably in-band (near-inert flip); no re-pin.
+  All `goldens-broad/*` + `sp500-2019-2023*` are `enable_short_side=false` →
+  unaffected. `experiments/*` frozen — untouched.
+- Strategy + screener unit suites green under the flip (the Screener module keeps
+  its own independent `neutral_blocks_shorts` default — out of scope, untouched).
+
 ## 2026-07-09 — SHORT-leak in `enable_short_side=false` backtest FIXED (branch `feat/fix-short-leak`)
 
 A SHORT trade appeared in the long-only reference arm of the faithful-short deep

@@ -7,6 +7,15 @@
 ;; period here is a default. Reads the gitignored repo-root data/ store (deep
 ;; 1998-2026 bars fetched 2026-06-22). NOT a pinned golden — research-tier,
 ;; sentinel bands only.
+;;
+;; 2026-07-09 neutral_blocks_shorts default flip (false→true, user-mandated
+;; faithfulness flip): not re-run here (the deep data/ store is absent in this
+;; environment). No re-pin needed — the flip is near-inert (the 2010-2026
+;; longshort twin re-ran BIT-IDENTICAL; the 2000-2010 deep screen blocked
+;; exactly one Neutral-tape short over 11y, ≈0 cost — see
+;; dev/notes/p1a-deep-short-screens-364-2026-07-09.md §Attribution) and the
+;; 368% VERIFIED baseline sits deep inside the sanity-wide bands below, which
+;; a near-inert change cannot escape.
 ((name "sp500-2000-2026-longshort-deep")
  (description
    "Deep long-short base (sp500-as-of-2000 PIT, 2000-2026, enable_short_side=true) for the neutral_blocks_shorts WF-CV. Same overlay as sp500-2010-2026-longshort.")
