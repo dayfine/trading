@@ -99,10 +99,8 @@ type config = {
           [screening_config.neutral_blocks_longs] at screen time. See [.mli]. *)
   neutral_blocks_shorts : bool; [@sexp.default true]
       (** Short-side mirror of [neutral_blocks_longs]; default [true] admits
-          shorts only under a confirmed [Bearish] tape (a [Neutral] tape is
-          blocked). Faithfulness flip (user mandate 2026-07-09): shorting only a
-          confirmed bear is strictly more Weinstein-faithful. Ledger ACCEPT:
-          [2026-06-22-neutral-blocks-shorts-wfcv]. See [.mli]. *)
+          shorts only under a confirmed [Bearish] tape (2026-07-09 faithfulness
+          flip). See [.mli]. *)
   enable_slow_grind_short_gate : bool; [@sexp.default false]
       (** Admit shorts only in a slow-grind decline; default [false] = no-op.
           See [.mli]. *)
