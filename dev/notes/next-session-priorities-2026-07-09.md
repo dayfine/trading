@@ -42,13 +42,20 @@ drafted. Main was green at rampup (postsubmits from #1893 in flight).
 
 ## P1 — next (priority order)
 
-1. **catstop deep WF-CV** — `catastrophic_stop_pct {0, 0.10}` axis on the
-   deep 2000-2026 base (the 06-22 arming-speed WF-CV had catstop ON in BOTH
-   arms, so catstop itself has never had its own fold-distribution evidence).
-   The deep screen shows distributed bear-window value (2001-02, 2008) →
-   promotion-grid conversation if the WF-CV confirms (trader-dial, W2 = crash
-   tail-insurance). armon drops priority (deep delta = one sign-unstable 2010
-   event; its 06-22 weak ACCEPT stands as-is).
+1. ~~catstop deep WF-CV~~ **DONE same session — Reject(promotion)**
+   (`_ledger/2026-07-09-catstop-deep-wfcv`,
+   `dev/backtest/catstop-deep-wfcv-2026-07-09/FINDINGS.md`): fold-honest,
+   catstop 0.10 is a WASH (−0.12pp/yr for −0.20pp mean DD; fires 7/26 folds;
+   worst folds untouched). PAYS in declines that keep going (2002 +3.15pp,
+   2008 +2.11pp), COSTS in V-recoveries (2020 −5.24pp, 2003 −2.44pp) — the
+   continue-vs-recover discrimination gap again. The P1a screen's +15.2pp was
+   PATH-COMPOUNDING (methodology lesson: compounded-path screens flatter
+   crash-exit mechanisms; decompose per-fold before believing them). Stays
+   default-off. Parity bonus: first nested `stops_config.*` key-path axis
+   validated (0.10 cell ≡ baseline bit-identical, 26/26).
+   **→ P1b is now unambiguously the next lever**: the breaker design's whole
+   job is the continue-vs-recover discriminator (asymmetric re-entry targets
+   the 2020-shaped cost; slow-grind exit the 2002/2008-shaped pay).
 2. **P1b build mandate (user):** the circuit-breaker sleeve design is drafted;
    build is default-off + behavior-relevant → wants an explicit go. The
    faithful-short screen's forward guidance STRENGTHENS the case (hedge-shaped
