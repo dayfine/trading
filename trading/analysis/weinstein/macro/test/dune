@@ -1,6 +1,14 @@
 (tests
- (names test_macro test_ad_bars_aggregation test_decline_character)
- (modules test_macro test_ad_bars_aggregation test_decline_character)
+ (names
+  test_macro
+  test_ad_bars_aggregation
+  test_decline_character
+  test_index_circuit_breaker)
+ (modules
+  test_macro
+  test_ad_bars_aggregation
+  test_decline_character
+  test_index_circuit_breaker)
  (libraries macro weinstein_types stage types core ounit2 matchers))
 
 (test

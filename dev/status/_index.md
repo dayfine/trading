@@ -54,6 +54,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | snapshot fast-input path (#1784) + corrected 5-wk picks (#1781) MERGED; next: large-warehouse multi-week sweep (data-gated); live-cycle human-gated |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | eligibility builder (#1594) + live refresh (#1595) + staleness guard (#1790) MERGED; next: ADR $-vol policy artifact (human-gated; largely subsumed) |
+| [floor-quality](floor-quality.md) | IN_PROGRESS | feat-weinstein | feat/circuit-breaker-lib | P1b step 1: pure index circuit-breaker lib (default-off, axis-ready, no consumers); next: thin SPY sleeve consumer, then lens screen vs TR-SPY |
 
 ## How to use
 

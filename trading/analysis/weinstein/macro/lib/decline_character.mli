@@ -96,7 +96,7 @@ type config = {
           tail-RISK-insurance exception ([weinstein-faithful-core.md]), not a
           spine change. *)
 }
-[@@deriving sexp]
+[@@deriving show, eq, sexp]
 (** Tunable thresholds for {!classify}. Every threshold is a config field (no
     hardcoded magic numbers) so the signal is gridable as a [Variant_matrix]
     axis once a consumer wires it. Defaults reflect the illustrative thresholds
