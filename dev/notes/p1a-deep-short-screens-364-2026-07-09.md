@@ -47,6 +47,14 @@ Findings:
    the slow-grind gate's 8-week confirmation arrives after the hedge window.
 4. **Gate subsumption:** arm 04 ≡ arm 03 bit-identically — grind-gated shorts
    are already Bearish-tape-only; `neutral_blocks_shorts` adds nothing on top.
+4b. **Year-by-year decomposition (the single-event check that corrected
+   Screen 2) — Screen 1's delta is DISTRIBUTED, two episodes:** ungated-vs-
+   long-only accrues +11.2% through 2001 (dot-com bear: JNS/ISRG/LH) and a
+   second +9pp leg across 2008-09 (GENZ/TEL/PM/SNI), ending +12.7%. The
+   grind-gated arm tracks long-only almost exactly through 2007 (the gate
+   blocked ALL the 2001-style early-bear hedges) and only captures the
+   late-2008 confirmed-cascade shorts. i.e. grind gate ≈ "2008-only shorts" —
+   it misses the entire first bear. Robust shape, verdict unchanged.
 5. **Bug (small, filed):** the shorts-OFF reference logged 1 SHORT trade
    (LH 2001-06-13→16, laggard_rotation exit, +$2.8k). A short leaked past
    `enable_short_side=false` — needs a look at the laggard-rotation path.
@@ -79,28 +87,35 @@ fast_v_arm_on_rate_alone {false, true}.
 | **d2-02 cat10 armon** | **283.1%** | **38.8%** | armon adds +16.5pp on top, DD flat |
 | d2-03 cat0 armon | 251.4% | 40.6% | ≡ baseline exactly (isolation clean) |
 
-Findings:
+Findings (CORRECTED 2026-07-09 after year-by-year decomposition — the first
+version of this section overclaimed "arming speed NOT inert deep"):
 
-1. **Arming speed is NOT inert in the deep window** — contradicts the 06-22
-   expectation ("fast-V-specific, inert in 2008 cascade"). The 2008 cascade
-   (and/or 2000-02 legs) contains rate-detectable fast episodes where the MA
-   confirmation delay costs; rate-alone arming lets the catastrophic stop fire
-   earlier: +16.5pp over catstop-armoff at identical MaxDD.
-2. **catstop 0.10 itself helps deep** (+15.2pp, −1.8pp DD) — consistent with
-   its tail-insurance design (sanctioned winner-touching exception).
+1. **catstop 0.10 is the real deep value, and it is DISTRIBUTED**: year-end
+   equity vs cat0 baseline shows +3.7% through 2001, +5.9% through 2002, a
+   further +3.1% incremental in 2008, +4.3% cumulative by 2010. The stop fired
+   usefully across the deep bears (where the falling-MA precondition was
+   already satisfied → the default arming sufficed). Consistent tail-insurance
+   value, not a single lucky event.
+2. **armon (rate-alone arming) is INERT 2000-2009 — including 2008**:
+   armoff/armon year-end equities are IDENTICAL through 2009. This CONFIRMS
+   the 06-22 WF-CV fold story (fold-008 byte-identical) on the new basis. The
+   entire +16.5pp endpoint gap is ONE divergence in 2010 (+4.5% that year —
+   the May-2010 flash-crash era), and the 06-22 WF-CV's 2010 fold had armon
+   NEGATIVE (−0.77pp whipsaw). Single event, sign-unstable across
+   path/basis → **path-dependent noise, not deep edge.** armon's value case
+   remains exactly what the 06-22 ledger said: fast-V crashes from highs
+   (2020, 2018-Q4), where the MA precondition lags.
 3. **Wiring isolation is clean:** armon without catstop is bit-identical to
    baseline (the flag only routes through stop arming).
 
-**Verdict (calibrated):** promising — this was the missing macro-regime cell
-for the arming-speed mechanism (#1708 already carries a weak WF-CV ACCEPT from
-2026-06-22 + the adlive re-run 06-24). Combined cells now: 2018-21 (helps the
-2020 fast-V), 2013-17 bull (inert), 2000-2010 deep (helps, +2.9pp/yr, DD flat).
-Escalation path per `promotion-confirmation.md`: a deep-window WF-CV (fold
-distribution, not this single path) is the remaining evidence before a
-`catstop=0.10 + armon=true` preset-promotion conversation. Note this is a
-PRESET/tail-insurance promotion (trader-dial), so it also needs the
-`weinstein-faithful-core` W2 citation (book: protect against the crash that
-invalidates the stage read).
+**Verdict (calibrated, corrected):** the deep cell supports **catstop**, not
+armon. catstop 0.10 has never had its own WF-CV axis (the 06-22 arming-speed
+WF-CV had catstop ON in both arms) — the natural next surface is
+`catastrophic_stop_pct {0, 0.10}` WF-CV on the deep base, which would give
+catstop the fold-distribution evidence for a promotion-grid conversation
+(trader-dial, `weinstein-faithful-core` W2: protect against the crash that
+invalidates the stage read). armon keeps its weak 06-22 ACCEPT unchanged and
+drops back to fast-V-specific insurance; no new escalation from this screen.
 
 ## Both screens — basis note
 

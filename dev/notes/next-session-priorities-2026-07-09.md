@@ -25,9 +25,12 @@ drafted. Main was green at rampup (postsubmits from #1893 in flight).
      dominates both gates. WHY: deep short value is **hedge-shaped** (early-
      bear NAV smoothing), and the gates block exactly those hedges (grind's
      8-week confirm too slow). Gates stay default-off axes.
-   - **Arming speed (#1708) NOT inert deep** (contradicts 06-22 expectation):
-     cat10+armon 283.1% vs cat10 266.6% vs base 251.4%, DD flat; isolation arm
-     clean. Promising → see P1-next.
+   - **Arming speed (#1708): deep verdict CORRECTED after decomposition** —
+     armon is inert 2000-2009 incl. 2008 (year-end equity identical,
+     confirming the 06-22 fold story); its whole +16.5pp = ONE 2010
+     divergence whose sign flips vs the 06-22 WF-CV 2010 fold → noise.
+     **catstop 0.10 is the real deep value and it's distributed** (2001-02
+     +5.9%, 2008 +3.1% incremental) → see P1-next.
 3. **P1b design doc**: `dev/plans/fast-circuit-breaker-spy-sleeve-2026-07-08.md`
    — breaker state machine, index-referenced windowed peak (squeeze-immune, the
    GME lesson), asymmetric fast/slow re-entry, eval plan vs TR-SPY.
@@ -39,12 +42,13 @@ drafted. Main was green at rampup (postsubmits from #1893 in flight).
 
 ## P1 — next (priority order)
 
-1. **Arming-speed deep WF-CV** — the screens gave the missing macro-regime
-   cell as a point estimate; run the fold-distribution version (walk-forward
-   spec on the 2000-2010/2000-2026 deep base, axes: catastrophic_stop_pct
-   {0,0.10} × fast_v_arm_on_rate_alone {false,true}) before any
-   `catstop+armon` preset-promotion conversation (promotion-confirmation grid
-   needs it anyway; W2 citation = crash tail-insurance).
+1. **catstop deep WF-CV** — `catastrophic_stop_pct {0, 0.10}` axis on the
+   deep 2000-2026 base (the 06-22 arming-speed WF-CV had catstop ON in BOTH
+   arms, so catstop itself has never had its own fold-distribution evidence).
+   The deep screen shows distributed bear-window value (2001-02, 2008) →
+   promotion-grid conversation if the WF-CV confirms (trader-dial, W2 = crash
+   tail-insurance). armon drops priority (deep delta = one sign-unstable 2010
+   event; its 06-22 weak ACCEPT stands as-is).
 2. **P1b build mandate (user):** the circuit-breaker sleeve design is drafted;
    build is default-off + behavior-relevant → wants an explicit go. The
    faithful-short screen's forward guidance STRENGTHENS the case (hedge-shaped
