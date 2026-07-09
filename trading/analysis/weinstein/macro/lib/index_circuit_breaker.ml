@@ -18,19 +18,14 @@ type action = Hold | Exit of exit_reason | Re_enter
 
 type config = {
   decline_config : Decline_character.config;
-      [@sexp.default
-        {
-          Decline_character.default_config with
-          fast_v_ignores_ma_filter = true;
-        }]
-  fast_exit_rate_pct : float; [@sexp.default 0.08]
-  fast_exit_lookback_bars : int; [@sexp.default 4]
-  grind_confirm_weeks : int; [@sexp.default 3]
-  floor_drop_pct : float; [@sexp.default 0.20]
-  floor_peak_lookback_bars : int; [@sexp.default 52]
-  fast_reentry_recover_pct : float; [@sexp.default 0.05]
-  slow_reentry_ma_weeks : int; [@sexp.default 30]
-  slow_reentry_ma_rising_lookback : int; [@sexp.default 4]
+  fast_exit_rate_pct : float;
+  fast_exit_lookback_bars : int;
+  grind_confirm_weeks : int;
+  floor_drop_pct : float;
+  floor_peak_lookback_bars : int;
+  fast_reentry_recover_pct : float;
+  slow_reentry_ma_weeks : int;
+  slow_reentry_ma_rising_lookback : int;
 }
 [@@deriving show, eq, sexp]
 

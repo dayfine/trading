@@ -5,6 +5,9 @@
 ## Status
 IN_PROGRESS
 
+## Interface stable
+NO
+
 ## Scope
 The floor-quality program (P0 per `memory/project_floor_quality_program`): build
 a better SPY floor sleeve than raw stage-timed SPY — a long-only sleeve with a

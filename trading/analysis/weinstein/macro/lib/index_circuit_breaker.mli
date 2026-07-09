@@ -140,8 +140,9 @@ type config = {
 [@@deriving show, eq, sexp]
 (** Every trigger threshold, all config fields (no hardcoded constants) so the
     breaker is expressible as a [Variant_matrix] axis the day a consumer wires
-    it. Each field carries a [[@sexp.default ...]] so a partial sexp parses
-    against {!default_config}. *)
+    it. Derives [sexp] for round-trip; a full record is expected on parse (the
+    reference values live in {!default_config}), consistent with
+    {!Decline_character.config}. *)
 
 val default_config : config
 (** [default_config] returns the design-doc reference priors (see the field
