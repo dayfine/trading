@@ -285,6 +285,120 @@ let test_summary_metrics_overlay_aligns_with_range_round_trips _ =
        ])
 
 (* -------------------------------------------------------------------- *)
+(* Phase 3b: warmup-straddle round-trip must not mislabel as SHORT       *)
+(* -------------------------------------------------------------------- *)
+
+(** Regression: a SHORT trade surfaced in an [enable_short_side = false]
+    backtest (LH, 2001). Root cause: a position opened during the warmup window
+    has its opening [Buy] fill on a step before [start_date]. Extracting
+    round-trips over the [start_date]-truncated step list drops that [Buy],
+    orphaning the in-window closing [Sell], which
+    {!Trading_simulation.Metrics.extract_round_trips} then reads as a short-open
+    -- mislabeling the warmup-opened long as a SHORT round-trip with inverted
+    P&L (the Sell-at-67.36 then Buy-at-65.15 pair reads +2829 profit instead of
+    the real long's -2829 loss).
+
+    {!Backtest.Runner.round_trips_in_window} extracts over the full
+    (warmup-inclusive) step series, so the warmup [Buy] pairs with its real
+    [Sell] as a correct LONG that the [entry_date >= start_date] filter then
+    drops as out-of-window. A genuinely in-window long (BULL) still pairs and is
+    kept as LONG — the fix drops only the warmup-straddling artefact, not real
+    in-window trades. *)
+let test_round_trips_in_window_no_short_from_warmup_straddle _ =
+  let start_date = date_of_string "2001-01-02" in
+  let portfolio =
+    Trading_portfolio.Portfolio.create ~initial_cash:1_000_000.0 ()
+  in
+  let all_steps =
+    [
+      (* Warmup step (before start_date): LH long entry — the fill the truncated
+         view drops, orphaning the in-window Sell into a spurious short. *)
+      _make_step_with_trades
+        ~date:(date_of_string "1999-12-15")
+        ~portfolio
+        ~trades:
+          [
+            _make_trade ~id:"lh-buy" ~order_id:"lh-o1" ~symbol:"LH"
+              ~side:Trading_base.Types.Buy ~quantity:1280.0 ~price:67.36;
+          ]
+        ();
+      (* In-window LH laggard exit at a loss (price fell 67.36 -> 65.15). *)
+      _make_step_with_trades
+        ~date:(date_of_string "2001-06-13")
+        ~portfolio
+        ~trades:
+          [
+            _make_trade ~id:"lh-sell" ~order_id:"lh-o2" ~symbol:"LH"
+              ~side:Trading_base.Types.Sell ~quantity:1280.0 ~price:65.15;
+          ]
+        ();
+      (* A genuinely in-window long that must survive the fix as a LONG. *)
+      _make_step_with_trades
+        ~date:(date_of_string "2001-03-01")
+        ~portfolio
+        ~trades:
+          [
+            _make_trade ~id:"bull-buy" ~order_id:"bull-o1" ~symbol:"BULL"
+              ~side:Trading_base.Types.Buy ~quantity:10.0 ~price:100.0;
+          ]
+        ();
+      _make_step_with_trades
+        ~date:(date_of_string "2001-03-20")
+        ~portfolio
+        ~trades:
+          [
+            _make_trade ~id:"bull-sell" ~order_id:"bull-o2" ~symbol:"BULL"
+              ~side:Trading_base.Types.Sell ~quantity:10.0 ~price:110.0;
+          ]
+        ();
+    ]
+  in
+  let round_trips =
+    Backtest.Runner.round_trips_in_window all_steps ~start_date
+  in
+  (* Only the in-window BULL long survives: LH's warmup-straddle pairs as a LONG
+     with a warmup entry_date and is dropped — no SHORT is ever emitted. *)
+  assert_that round_trips
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (t : Metrics.trade_metrics) -> t.symbol)
+               (equal_to "BULL");
+             field
+               (fun (t : Metrics.trade_metrics) -> t.side)
+               (equal_to Trading_base.Types.Buy);
+             field
+               (fun (t : Metrics.trade_metrics) -> t.pnl_dollars)
+               (float_equal 100.0);
+           ];
+       ]);
+  (* The bug this pins: extracting over the [start_date]-truncated steps (the
+     old behaviour) drops LH's warmup Buy, so the lone in-window Sell orphans
+     into a spurious LH SHORT with inverted (+) P&L. Pin that the truncated path
+     produces exactly that artefact the fix removes. *)
+  let truncated_steps =
+    List.filter all_steps
+      ~f:(fun (s : Trading_simulation_types.Simulator_types.step_result) ->
+        Date.( >= ) s.date start_date)
+  in
+  let buggy_round_trips = Metrics.extract_round_trips truncated_steps in
+  assert_that
+    (List.filter buggy_round_trips ~f:(fun (t : Metrics.trade_metrics) ->
+         Trading_base.Types.equal_side t.side Trading_base.Types.Sell))
+    (elements_are
+       [
+         all_of
+           [
+             field (fun (t : Metrics.trade_metrics) -> t.symbol) (equal_to "LH");
+             field
+               (fun (t : Metrics.trade_metrics) -> t.side)
+               (equal_to Trading_base.Types.Sell);
+           ];
+       ])
+
+(* -------------------------------------------------------------------- *)
 (* Phase 4: stop_info entry_date filter — drop warmup-window entries     *)
 (* -------------------------------------------------------------------- *)
 
@@ -534,6 +648,8 @@ let suite =
          >:: test_round_trip_extraction_survives_non_trading_day_filter;
          "summary metrics overlay aligns with range-filtered round_trips"
          >:: test_summary_metrics_overlay_aligns_with_range_round_trips;
+         "round_trips_in_window: warmup-straddle never mislabels as SHORT"
+         >:: test_round_trips_in_window_no_short_from_warmup_straddle;
          "filter_stop_infos drops warmup entries"
          >:: test_filter_stop_infos_drops_warmup_entries;
          "filter_stop_infos keeps unstamped (entry_date None) entries"

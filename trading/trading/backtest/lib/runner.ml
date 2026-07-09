@@ -271,12 +271,9 @@ let _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days
     across the [start_date] boundary (warmup-window stop_info comes first by
     [position_id] sort), the warmup stop_info gets attached to the in-window
     round-trip's row, corrupting [entry_stop] / [exit_stop] / [exit_trigger]
-    columns.
-
-    Round-trips from [extract_round_trips steps_in_range] are already filtered
-    by construction (the steps list starts at [start_date]), so this filter is
-    only needed for the [stop_log] surface which has no date-driven extraction
-    API.
+    columns. Round-trips are filtered analogously by {!round_trips_in_window};
+    this [stop_log] filter is the parallel surface with no date-driven
+    extraction API of its own.
 
     Stop_infos with [entry_date = None] are kept (test fixtures that don't drive
     {!Stop_log.set_current_date}). *)
@@ -380,12 +377,19 @@ let _filter_steps ~sim_result ~start_date =
   let steps = List.filter steps_in_range ~f:is_trading_day in
   (steps_in_range, steps)
 
+(* Round-trips over FULL warmup-inclusive [all_steps]; keep in-window entries
+   only. Full rationale (the warmup-orphan SHORT bug) in the .mli. *)
+let round_trips_in_window all_steps ~start_date =
+  Metrics.extract_round_trips all_steps
+  |> List.filter ~f:(fun (t : Metrics.trade_metrics) ->
+      Date.( >= ) t.entry_date start_date)
+
 (** Collect all in-window teardown artefacts (round trips, stop infos, audit
     records, cascade summaries, force liquidations) from the simulation logs.
-    Called inside a [Trace.Teardown] span by [_extract_filtered_logs]. *)
+    [all_steps] is the warmup-inclusive step series ([sim_result.steps]). *)
 let _collect_teardown_artefacts ~stop_log ~trade_audit ~force_liquidation_log
-    ~steps_in_range ~start_date =
-  ( Metrics.extract_round_trips steps_in_range,
+    ~all_steps ~start_date =
+  ( round_trips_in_window all_steps ~start_date,
     filter_stop_infos_in_window (Stop_log.get_stop_infos stop_log) ~start_date,
     filter_audit_records_in_window
       (Trade_audit.get_audit_records trade_audit)
@@ -407,11 +411,11 @@ let _filter_stale_holds ~stale_hold_log ~start_date =
     stop infos, audit records, cascade summaries, force liquidations, and stale
     holds. Wrapped in a [Trace.Teardown] span. *)
 let _extract_filtered_logs ?trace ?gc_trace ~stop_log ~trade_audit
-    ~force_liquidation_log ~stale_hold_log ~steps_in_range ~start_date () =
+    ~force_liquidation_log ~stale_hold_log ~all_steps ~start_date () =
   let round_trips, stop_infos, audit, cascade_summaries, force_liquidations =
     Trace.record ?trace Trace.Phase.Teardown (fun () ->
         _collect_teardown_artefacts ~stop_log ~trade_audit
-          ~force_liquidation_log ~steps_in_range ~start_date)
+          ~force_liquidation_log ~all_steps ~start_date)
   in
   Gc_trace.record ?trace:gc_trace ~phase:"teardown_done" ();
   let stale_holds = _filter_stale_holds ~stale_hold_log ~start_date in
@@ -445,7 +449,9 @@ let _assemble_result ~start_date ~end_date ~deps ~overrides ~sim_result
         force_liquidations,
         stale_holds ) =
     _extract_filtered_logs ?trace ?gc_trace ~stop_log ~trade_audit
-      ~force_liquidation_log ~stale_hold_log ~steps_in_range ~start_date ()
+      ~force_liquidation_log ~stale_hold_log
+      ~all_steps:sim_result.Trading_simulation_types.Simulator_types.steps
+      ~start_date ()
   in
   let summary =
     _make_summary ~start_date ~end_date ~deps ~steps_in_range ~steps
