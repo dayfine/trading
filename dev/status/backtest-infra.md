@@ -19,6 +19,27 @@ moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
 
+## 2026-07-09 — `audit_bars` warehouse corrupt-bar scanner
+
+- [x] **`audit_bars` exe + `audit_bars_detector` lib** — scans a snapshot
+  warehouse for MSZ-class corrupt bars (one-day close spike that reverts the
+  next day, the ELCO/MSZ delisted-micro-cap artifact class) so a deep
+  re-baseline can be data-audited before it is trusted. Implements
+  recommendation #2 of `dev/notes/deep-remeasure-364-2026-07-09.md` §"MaxDD
+  59.4% is an artifact" (the MSZ 2014 1.90→25.36→1.93 spike-reverts that
+  produced a phantom +$3.3M NAV spike and a fake 59.4% MaxDD). Lives at
+  `trading/trading/backtest/snapshot_warehouse/audit_bars/{lib,bin,test}/`,
+  alongside `dump_snap`. Pure detector (`Audit_bars_detector.detect`) is
+  unit-tested (OUnit2 + Matchers): catches the MSZ shape, ignores a
+  sustained/non-reverting move, ignores high-priced names above the ceiling,
+  handles window-edge + last-bar cases. All four thresholds (`--spike-mult`
+  `--median-window` `--revert-frac` `--price-ceiling`) are CLI flags, defaults
+  5.0 / 5 / 0.5 / 5.0. **Verify:** `dune build` +
+  `dune runtest trading/backtest/snapshot_warehouse/audit_bars/`; acceptance run
+  `dune exec .../audit_bars/bin/audit_bars.exe -- /tmp/snap_top3000_1998_2026`
+  finds the known MSZ 2014 bars (2014-08-15, 2014-11-11, 2014-12-26, 2014-12-31,
+  2015-01-06) — 3797 hits across 81 symbols of 2999 scanned.
+
 ## 2026-06-16 — README top-line results module + bin
 
 - [x] **`readme_toplines` lib + bin** — computes four headline numbers over one
