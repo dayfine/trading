@@ -1,8 +1,6 @@
-(* @large-module: portfolio risk primitive — snapshot construction, position
-   sizing, and the limit-check ladder (max_positions / exposure / cash / sector
-   count / sector exposure / risk). Each concern is independently testable but
-   the module's surface is intentionally cohesive — splitting it would scatter
-   the [config] / [check_limits] contract across files. *)
+(* Portfolio risk primitive — snapshot construction and position sizing. Each
+   concern is independently testable, and the module's surface is intentionally
+   cohesive. *)
 open Core
 module Force_liquidation = Force_liquidation
 
@@ -27,17 +25,6 @@ type sizing_result = {
   risk_amount : float;
 }
 [@@deriving show, eq]
-
-type limit_violation =
-  | Max_positions_exceeded of int
-  | Long_exposure_exceeded of float
-  | Short_exposure_exceeded of float
-  | Cash_below_minimum of float
-  | Sector_concentration of string * int
-  | Sector_exposure_exceeded of string * float
-  | Unknown_sector_exceeded of int
-  | Risk_too_high of float
-[@@deriving show]
 
 (* Named defaults for the per-position cap so the [@sexp.default] attributes
    reference bindings rather than bare numeric literals — the magic-number
@@ -301,88 +288,3 @@ let compute_position_size ~config ~portfolio_value ?sizing_cash ~side
   else
     _compute_position_size_finite ~config ~portfolio_value ~sizing_cash ~side
       ~entry_price ~stop_price ~big_winner
-
-(* ---- Limit checks ---- *)
-
-(* Each check returns a (possibly empty) list of violations. check_limits
-   combines them — the monoid is list concatenation over the empty list. *)
-
-let _check_max_positions ~config ~snapshot =
-  if snapshot.position_count >= config.max_positions then
-    [ Max_positions_exceeded snapshot.position_count ]
-  else []
-
-let _check_exposure ~config ~snapshot ~proposed_side ~proposed_value =
-  match proposed_side with
-  | `Long ->
-      let new_pct =
-        (snapshot.long_exposure +. proposed_value) /. snapshot.total_value
-      in
-      if Float.( > ) new_pct config.max_long_exposure_pct then
-        [ Long_exposure_exceeded new_pct ]
-      else []
-  | `Short ->
-      let new_pct =
-        (snapshot.short_exposure +. proposed_value) /. snapshot.total_value
-      in
-      if Float.( > ) new_pct config.max_short_exposure_pct then
-        [ Short_exposure_exceeded new_pct ]
-      else []
-
-let _check_cash ~config ~snapshot ~proposed_value =
-  let cash_pct_after =
-    if Float.( <= ) snapshot.total_value 0.0 then 0.0
-    else (snapshot.cash -. proposed_value) /. snapshot.total_value
-  in
-  if Float.( < ) cash_pct_after config.min_cash_pct then
-    [ Cash_below_minimum cash_pct_after ]
-  else []
-
-let _check_sector ~config ~snapshot ~proposed_sector =
-  let count =
-    List.Assoc.find snapshot.sector_counts ~equal:String.equal proposed_sector
-    |> Option.value ~default:0
-  in
-  let new_count = count + 1 in
-  if String.is_empty proposed_sector then
-    if new_count > config.max_unknown_sector_positions then
-      [ Unknown_sector_exceeded new_count ]
-    else []
-  else if new_count > config.max_sector_concentration then
-    [ Sector_concentration (proposed_sector, new_count) ]
-  else []
-
-(* P1 2026-05-15: per-sector dollar-exposure cap. No-op when
-   [config.max_sector_exposure_pct = None] (the default). For named sectors,
-   project the new exposure as a fraction of [snapshot.total_value] and check
-   against the cap. The empty-string (unknown) sector is exempt — discipline
-   for that bucket comes from the count-cap [max_unknown_sector_positions]. *)
-let _check_sector_exposure ~config ~snapshot ~proposed_sector ~proposed_value =
-  match config.max_sector_exposure_pct with
-  | None -> []
-  | Some _ when String.is_empty proposed_sector -> []
-  | Some cap ->
-      let existing =
-        List.Assoc.find snapshot.sector_exposures ~equal:String.equal
-          proposed_sector
-        |> Option.value ~default:0.0
-      in
-      let projected_value = existing +. proposed_value in
-      let projected_pct =
-        if Float.( <= ) snapshot.total_value 0.0 then 0.0
-        else projected_value /. snapshot.total_value
-      in
-      if Float.( > ) projected_pct cap then
-        [ Sector_exposure_exceeded (proposed_sector, projected_pct) ]
-      else []
-
-let check_limits ~config ~snapshot ~proposed_side ~proposed_value
-    ~proposed_sector =
-  let violations =
-    _check_max_positions ~config ~snapshot
-    @ _check_exposure ~config ~snapshot ~proposed_side ~proposed_value
-    @ _check_cash ~config ~snapshot ~proposed_value
-    @ _check_sector ~config ~snapshot ~proposed_sector
-    @ _check_sector_exposure ~config ~snapshot ~proposed_sector ~proposed_value
-  in
-  match violations with [] -> Result.Ok () | vs -> Result.Error vs

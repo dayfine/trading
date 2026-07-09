@@ -147,12 +147,11 @@ type config = {
           [max_short_notional_fraction * portfolio_value], the short candidate
           is dropped with a [Short_notional_cap] skip reason.
 
-          Differs from [max_short_exposure_pct] (which is consumed by
-          {!check_limits} on a portfolio snapshot at proposal time) by sitting
-          at the strategy's per-Friday entry walk: the gate fires before any
-          cash deduction or [Position.CreateEntering] is emitted, so short-cash
-          inflation of [portfolio_value] doesn't size around the cap. Default:
-          0.30 (30% of portfolio_value). *)
+          Differs from [max_short_exposure_pct] (a snapshot-level exposure cap)
+          by sitting at the strategy's per-Friday entry walk: the gate fires
+          before any cash deduction or [Position.CreateEntering] is emitted, so
+          short-cash inflation of [portfolio_value] doesn't size around the cap.
+          Default: 0.30 (30% of portfolio_value). *)
   min_cash_pct : float;
       (** Minimum cash fraction to maintain (default: 0.10 = 10%).
 
@@ -306,47 +305,3 @@ val compute_position_size :
       final result. Use for high-conviction setups — Stage 2 breakouts with
       strong volume and relative strength — where you want to commit more
       capital. (default: false) *)
-
-(** {1 Limit Checks} *)
-
-(** Reasons a proposed position would violate portfolio risk limits. *)
-type limit_violation =
-  | Max_positions_exceeded of int
-      (** Portfolio already has [n] positions, at maximum *)
-  | Long_exposure_exceeded of float
-      (** Adding this position would push long exposure to [pct] *)
-  | Short_exposure_exceeded of float
-      (** Adding this position would push short exposure to [pct] *)
-  | Cash_below_minimum of float
-      (** After this trade, cash would fall to [pct] of portfolio *)
-  | Sector_concentration of string * int
-      (** Sector [name] would have [n] positions, over limit *)
-  | Sector_exposure_exceeded of string * float
-      (** Sector [name] would have exposure [pct] of portfolio, over
-          [config.max_sector_exposure_pct]. Only emitted for named sectors when
-          [config.max_sector_exposure_pct = Some _]. *)
-  | Unknown_sector_exceeded of int
-      (** Adding this position would push the unknown-sector (empty-string)
-          bucket to [n] positions, over [config.max_unknown_sector_positions].
-      *)
-  | Risk_too_high of float
-      (** Risk amount is [pct] of portfolio, over configured limit *)
-[@@deriving show]
-
-val check_limits :
-  config:config ->
-  snapshot:portfolio_snapshot ->
-  proposed_side:[ `Long | `Short ] ->
-  proposed_value:float ->
-  proposed_sector:string ->
-  (unit, limit_violation list) Result.t
-(** Check whether a proposed position would violate any portfolio risk limits.
-
-    Every limit is evaluated independently — returns [Ok ()] only if all pass,
-    [Error violations] listing every limit that would be exceeded.
-
-    @param config Risk configuration
-    @param snapshot Current portfolio snapshot
-    @param proposed_side Long or short for the proposed position
-    @param proposed_value Dollar value of the proposed position
-    @param proposed_sector Sector of the proposed ticker *)

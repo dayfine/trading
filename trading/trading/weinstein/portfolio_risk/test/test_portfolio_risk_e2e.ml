@@ -364,61 +364,6 @@ let test_position_sizing_respects_risk_budget _ =
        ])
 
 (* ------------------------------------------------------------------ *)
-(* Test 4: Portfolio exposure limits flag over-concentration            *)
-(* ------------------------------------------------------------------ *)
-
-(** Build a portfolio_snapshot for limit-check tests, bypassing the actual
-    Portfolio module so we can set arbitrary sector counts. *)
-let _make_snapshot ?(cash = 80_000.0) ?(long_exp = 15_000.0) ?(short_exp = 0.0)
-    ?(positions = 3) ?(sectors = []) ?(sector_exposures = []) () =
-  let total = cash +. long_exp -. short_exp in
-  {
-    Portfolio_risk.total_value = total;
-    cash;
-    cash_pct = (if Float.( > ) total 0.0 then cash /. total else 0.0);
-    long_exposure = long_exp;
-    long_exposure_pct =
-      (if Float.( > ) total 0.0 then long_exp /. total else 0.0);
-    short_exposure = short_exp;
-    short_exposure_pct =
-      (if Float.( > ) total 0.0 then short_exp /. total else 0.0);
-    position_count = positions;
-    sector_counts = sectors;
-    sector_exposures;
-  }
-
-let test_exposure_limits_flag_over_concentration _ =
-  (* Stuff the unknown-sector bucket up to the cap (default
-     max_unknown_sector_positions = 2). Adding a third unknown-sector
-     position should be rejected with [Unknown_sector_exceeded]. *)
-  let config = Portfolio_risk.default_config in
-  let snap_at_cap = _make_snapshot ~sectors:[ ("", 2) ] () in
-  let over_cap =
-    Portfolio_risk.check_limits ~config ~snapshot:snap_at_cap
-      ~proposed_side:`Long ~proposed_value:5_000.0 ~proposed_sector:""
-  in
-  assert_that over_cap
-    (equal_to (Result.Error [ Portfolio_risk.Unknown_sector_exceeded 3 ]));
-  (* Under the cap — same config, one unknown position — should pass. *)
-  let snap_under_cap = _make_snapshot ~sectors:[ ("", 1) ] () in
-  let under_cap =
-    Portfolio_risk.check_limits ~config ~snapshot:snap_under_cap
-      ~proposed_side:`Long ~proposed_value:5_000.0 ~proposed_sector:""
-  in
-  assert_that under_cap (equal_to (Result.Ok ()));
-  (* Named-sector cap (default max_sector_concentration = 5). Five Tech
-     positions on the books — a sixth should fail with
-     [Sector_concentration]. *)
-  let snap_tech_full = _make_snapshot ~sectors:[ ("Tech", 5) ] () in
-  let tech_sixth =
-    Portfolio_risk.check_limits ~config ~snapshot:snap_tech_full
-      ~proposed_side:`Long ~proposed_value:5_000.0 ~proposed_sector:"Tech"
-  in
-  assert_that tech_sixth
-    (equal_to
-       (Result.Error [ Portfolio_risk.Sector_concentration ("Tech", 6) ]))
-
-(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -432,6 +377,4 @@ let () =
            >:: test_order_generation_for_lifecycle;
            "position sizing respects portfolio risk budget"
            >:: test_position_sizing_respects_risk_budget;
-           "exposure limits flag over-concentration"
-           >:: test_exposure_limits_flag_over_concentration;
          ])

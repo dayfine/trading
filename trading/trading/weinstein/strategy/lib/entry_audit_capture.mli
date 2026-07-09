@@ -211,8 +211,8 @@ val check_sector_exposure_cap :
     [(existing_sector_exposure + (shares * effective_entry_price)) /
      portfolio_value <= pct].
 
-    The empty-string (unknown) sector is exempt — pass-through [Some], same
-    rationale as {!Portfolio_risk.check_limits}'s exemption.
+    The empty-string (unknown) sector is exempt — pass-through [Some]; its
+    discipline comes from the count-cap [max_unknown_sector_positions] instead.
 
     Side-effect on the pass case: bumps [sector_exposure_acc] for the
     candidate's sector by [shares * effective_entry_price] so later candidates
