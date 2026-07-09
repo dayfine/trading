@@ -47,29 +47,41 @@ let _surrounding_median bars ~t ~k =
   |> List.filter_map ~f:(fun j -> if j = t then None else Some bars.(j).close)
   |> _median
 
+(* The three spike-revert predicates, split out so [_check_index] reads as a
+   flat conjunction rather than nested conditionals. *)
+let _below_ceiling ~params ~median = Float.(median < params.price_ceiling)
+
+let _is_spike ~params ~median ~close =
+  Float.(close >= params.spike_mult *. median)
+
+let _reverts ~params ~close ~next_close =
+  Float.(next_close <= params.revert_frac *. close)
+
+(* Build the hit record for a qualifying spike bar [t] (guaranteed to have a
+   successor). [prev_close] is [Float.nan] when [t] is the first bar. *)
+let _make_hit bars ~t ~median =
+  let close = bars.(t).close in
+  {
+    date = bars.(t).date;
+    prev_close = (if t > 0 then bars.(t - 1).close else Float.nan);
+    spike_close = close;
+    next_close = bars.(t + 1).close;
+    ratio = close /. median;
+  }
+
 (* Test bar [t] (guaranteed to have a successor) against the spike-revert
    criteria; returns the hit when it qualifies. *)
 let _check_index bars ~params ~t =
   match _surrounding_median bars ~t ~k:params.median_window with
   | None -> None
-  | Some med ->
-      let close_t = bars.(t).close in
-      let close_next = bars.(t + 1).close in
-      let is_spike =
-        Float.(med < params.price_ceiling)
-        && Float.(close_t >= params.spike_mult *. med)
-        && Float.(close_next <= params.revert_frac *. close_t)
-      in
-      if is_spike then
-        Some
-          {
-            date = bars.(t).date;
-            prev_close = (if t > 0 then bars.(t - 1).close else Float.nan);
-            spike_close = close_t;
-            next_close = close_next;
-            ratio = close_t /. med;
-          }
-      else None
+  | Some median ->
+      let close = bars.(t).close in
+      let next_close = bars.(t + 1).close in
+      Option.some_if
+        (_below_ceiling ~params ~median
+        && _is_spike ~params ~median ~close
+        && _reverts ~params ~close ~next_close)
+        (_make_hit bars ~t ~median)
 
 let detect ~params bars =
   let n = Array.length bars in
