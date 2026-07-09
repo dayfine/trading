@@ -67,8 +67,12 @@ drafted. Main was green at rampup (postsubmits from #1893 in flight).
 1. `check_limits` wire-or-delete (carried; DELETE now natural).
 2. `Portfolio_floor` monotonic-peak semantics (carried; the P1b design shows
    the squeeze-robust alternative — index-referenced windowed peak).
-3. `neutral_blocks_shorts` faithfulness flip: deep cost now quantified
-   (−8.6pp return, +7.8pp MaxDD on 2000-2010). Mandate call.
+3. `neutral_blocks_shorts` faithfulness flip: deep cost RE-ATTRIBUTED
+   (2026-07-09 event-level decomposition) — the gate blocked exactly ONE
+   Neutral-tape short in 11 deep years (CF 2006, a loser; blocking helped);
+   the −8.6pp arm delta is post-divergence path noise, true edge cost ≈ 0.
+   Flip is cheap on faithfulness + squeeze-asymmetry grounds; realized
+   benefit also tiny. Mandate call, analysis complete both ways.
 
 ## Bugs / small follow-ups found this session
 

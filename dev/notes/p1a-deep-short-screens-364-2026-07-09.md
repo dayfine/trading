@@ -37,6 +37,20 @@ Findings:
 2. **But the UN-GATED baseline dominates every gated arm.** Each gate reduces
    return and worsens DD vs ungated (neutral: −8.6pp ret / +7.8pp DD; grind:
    −23.8pp / +5.9pp).
+   **⚠ Attribution correction (2026-07-09, event-level decomposition):** the
+   NEUTRAL arm's delta is NOT mechanism cost. In 11 deep years the neutral
+   gate blocked exactly ONE short — CF Jun-2006, Neutral-tape, a −$31.4k
+   loser in the ungated arm — and blocking it HELPED (neutral arm +3.4%
+   ahead by end-2006). The end-of-window −8.6pp is post-divergence path
+   noise (2008 screening differences: neutral arm caught SMS −$53.0k where
+   ungated caught PM −$4.1k; different recovery-entry timing), and part of
+   its +7.8pp DD is a higher-2007-peak artifact (same GFC trough episode,
+   peak 3% higher). Every 2001-02/2008 hedge (JNS, PRU, GENZ, TEL) had a
+   Bearish tape — the neutral gate touches none of them. **Deep verdict per
+   gate: grind gate = real mechanism cost (blocks the 2001 early-bear
+   hedges); neutral gate = near-inert, noise-sized either way.** This
+   matters for the `neutral_blocks_shorts` faithfulness-flip decision: its
+   true deep edge cost is ≈0, not −8.6pp.
 3. **The WHY is hedge-shaped, not P&L-shaped.** Gated arms have BETTER direct
    short P&L (+$247k on 7 trades vs +$223k on 16) yet lower total return and
    worse DD. The blocked shorts (JNS 2001-02 → +$42k held 10 months, TEL
