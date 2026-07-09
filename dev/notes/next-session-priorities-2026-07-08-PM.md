@@ -67,6 +67,14 @@ on the current floor is the worked example of what NOT to do).**
 **P1c — blending only after P1b produces a floor worth blending.** Barbell
 gates stay PARKED.
 
+**End-of-session overnight run (user-directed 2026-07-08 PM):** launch the
+deep top-3000 re-measure on the NEW 364 basis before closing the session —
+`scenario_runner --dir <staged top3000-2000-2026-catstop> --snapshot-dir
+/tmp/snap_top3000_1998_2026 --no-emit-all-eligible` (~1-2h, nohup per
+sweep-hygiene). Gives the honest new deep topline (old-basis references
+917.9% / +1552% are stale). Read the result at the following session's
+rampup; refresh DEEP_RESULTS/memory then.
+
 ## Decision items (human)
 
 1. **check_limits wire-or-delete** (carried; DELETE now natural).
