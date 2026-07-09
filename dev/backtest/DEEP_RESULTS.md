@@ -13,6 +13,20 @@ names — they are NOT bankable as realized P&L. See the caveats column + the
 liquidity-overlay row. The honest comparison is *vs the index over the same window*
 and *realized vs MTM*, not the raw absolute.
 
+> ⚠ **Warmup-basis warning (2026-07-08):** every block below EXCEPT the
+> "364 basis" section was measured on the pre-#1890 **210-day warmup** basis
+> (RS-starved first 22 weeks). Absolute numbers are NOT comparable to runs made
+> after 2026-07-08. Relative comparisons within a block remain valid.
+
+## Broad — top-3000 PIT-2000, 2000-01-01 .. 2026-04-30 (26.3y), **364 basis**, Cell-E 0.14 + catstop 0.10
+
+First deep re-measure on the RS-honest basis (2026-07-09; full record:
+`dev/notes/deep-remeasure-364-2026-07-09.md`).
+
+| Sleeve / config | Total return (MTM) | Realized-basis | Sharpe | MaxDD | Scenario sexp | Notes |
+|---|---|---|---|---|---|---|
+| **Long-only + catstop 0.10** | **+2062.6%** (12.4%/yr) | **≈ +475%** (6.9%/yr) | 0.417 | 59.4% raw / **50.3% despiked** | `goldens-sp500-historical/top3000-2000-2026-catstop.sexp` | MTM headline = AXTI open position ($15.3M of $20.1M OPV). Raw MaxDD is an **MSZ corrupt-bar artifact** (recurring 13× one-day spike-revert bars in a delisted micro-cap, ELCO-class); despiked DD = real 2021-02→2025-05 underwater. Same-window **SPY TR +686.6% (8.15%/yr)** — realized still below TR-SPY. 0 portfolio-floor liqs; 5 zombie stale holds (stale-exit flag off). |
+
 ## Broad — top-3000 PIT-1998, 1998-01-01 .. 2026-04-30 (28.3y), Cell-E 0.14 concentration
 
 | Sleeve / config | Total return | CAGR | Sharpe | MaxDD | Worst day | Scenario sexp | Notes |
