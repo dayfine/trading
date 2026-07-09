@@ -65,8 +65,15 @@ drafted. Main was green at rampup (postsubmits from #1893 in flight).
 ## Decision items (human)
 
 1. `check_limits` wire-or-delete (carried; DELETE now natural).
-2. `Portfolio_floor` monotonic-peak semantics (carried; the P1b design shows
-   the squeeze-robust alternative — index-referenced windowed peak).
+2. `Portfolio_floor` monotonic-peak semantics — **ablation run 2026-07-09**
+   (`dev/backtest/floor-off-exp-2026-07-09/FINDINGS.md`): on the GME window,
+   floor-OFF dominates every risk-adjusted metric (return 1013.8→2223.3%,
+   Sharpe .538→.610, Ulcer 33.9→23.6; only raw MaxDD "wins" for the floor and
+   that win is hollow — the floor's own bottom-tick liquidation is most of
+   its measured DD). No tested config shows a beneficial portfolio-floor
+   fire. Options in the FINDINGS: (1) port P1b windowed-peak semantics to the
+   engine floor (recommended), (2) default the trigger off (wants more than
+   one window per R3), (3) status quo. User call.
 3. `neutral_blocks_shorts` faithfulness flip: deep cost RE-ATTRIBUTED
    (2026-07-09 event-level decomposition) — the gate blocked exactly ONE
    Neutral-tape short in 11 deep years (CF 2006, a loser; blocking helped);
