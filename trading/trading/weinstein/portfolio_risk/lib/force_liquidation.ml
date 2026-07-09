@@ -19,7 +19,26 @@ let default_config =
        ceiling) while a long can lose at most 100% of cost basis. Per
        Weinstein's short-sale guidance, exit on the first sign of strength. *)
     max_short_unrealized_loss_fraction = 0.15;
-    min_portfolio_value_fraction_of_peak = 0.4;
+    (* Portfolio-floor trigger DISABLED by default (0.0). Old default was 0.4.
+       Flipped 2026-07-09 (user mandate): the sole window where the portfolio
+       floor ever fired (sp500-2010-2026 long-only, the GME meme-squeeze) shows
+       floor-OFF dominates every risk-adjusted metric (return 1013.8->2223.3%,
+       Sharpe .538->.610, Sortino .813->.865, Calmar .242->.271, Ulcer
+       33.9->23.6, 32->0 floor liqs); across every OTHER tested config (deep
+       top-3000 2000-2026 + 28y, sp500 deep windows, longshort twins) it fires
+       ZERO times. There is no observed window where the portfolio floor
+       helped, and its one raw-MaxDD "win" is its own bottom-tick
+       sell-everything measured from an unrealizable MTM peak. The per-position
+       triggers above are the real protection and stay on. Philosophy: we are
+       not trying to time reversals — a brake whose only action is
+       sell-everything-at-max-drawdown + halt-until-macro-flip is
+       reversal-adjacent forced bottom-realization. Honest caveat: the
+       true-death-spiral protective case is untested — it also never occurs in
+       26+y of tested history — so the knob stays config-expressed (an axis);
+       set it > 0.0 to re-enable the floor. See the floor-off ablation
+       (dev/backtest/floor-off-exp-2026-07-09/FINDINGS.md, merged #1903) +
+       ledger 2026-07-09-portfolio-floor-default-off. *)
+    min_portfolio_value_fraction_of_peak = 0.0;
   }
 
 type reason = Per_position | Portfolio_floor [@@deriving show, eq, sexp]

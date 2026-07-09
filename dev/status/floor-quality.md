@@ -16,6 +16,20 @@ while cutting the deep-crash left tail. Design authority:
 `dev/plans/fast-circuit-breaker-spy-sleeve-2026-07-08.md` (P1b).
 
 ## Completed
+- **Portfolio-floor trigger default OFF** (branch
+  `feat/portfolio-floor-default-off`, PR pending; user mandate 2026-07-09):
+  `Force_liquidation.default_config.min_portfolio_value_fraction_of_peak`
+  0.4 -> 0.0 (0.0 = documented disable). The per-position triggers (0.25
+  long / 0.15 short) are unchanged — they are the real protection. Evidence:
+  the floor-off ablation (`dev/backtest/floor-off-exp-2026-07-09/FINDINGS.md`,
+  merged #1903) — on the only window it ever fired (GME meme-squeeze) floor-OFF
+  dominates every risk-adjusted metric (return 1013.8->2223.3%, Sharpe
+  .538->.610, Calmar .242->.271, Ulcer 33.9->23.6, 32->0 floor liqs); zero
+  fires anywhere else in tested history. Re-pinned the sp500-2010-2026 golden
+  floor-OFF; ledger `2026-07-09-portfolio-floor-default-off` (Accept). The
+  true-death-spiral protective case is untested (never occurs in 26+y), so the
+  knob stays config-expressed; the P1b circuit-breaker below is the
+  squeeze-immune re-design if a portfolio brake is wanted back.
 - **P1b step 1 — pure index circuit-breaker lib** (branch
   `feat/circuit-breaker-lib`): new module
   `analysis/weinstein/macro/lib/index_circuit_breaker.{ml,mli}` + OUnit2 tests.

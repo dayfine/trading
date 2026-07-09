@@ -17,7 +17,10 @@
     - {b Portfolio-floor}: total portfolio value drops below
       [min_portfolio_value_fraction_of_peak] of the highest portfolio value
       observed since the strategy started. Force-close ALL positions and halt
-      new entries until macro flips.
+      new entries until macro flips. {b Disabled by default} since 2026-07-09
+      ([min_portfolio_value_fraction_of_peak = 0.0]); it never helped and hurt
+      once (the GME-squeeze pathology). See [default_config] for the rationale.
+      The mechanism is retained and re-enables at any fraction in (0, 1).
 
     {1 Design}
 
@@ -53,9 +56,14 @@ type config = {
           downside is unbounded. Set to [Float.infinity] to disable. *)
   min_portfolio_value_fraction_of_peak : float;
       (** Portfolio-floor trigger: force-close all positions and halt new
-          entries when [portfolio_value < peak * fraction]. Default [0.4] (40%
-          of peak — i.e. 60% drawdown from peak). Set to [0.0] to disable the
-          portfolio trigger. *)
+          entries when [portfolio_value < peak * fraction]. Default [0.0]
+          (DISABLED — the portfolio-floor trigger never fires). [0.0] is the
+          documented disable value. The old default was [0.4] (40% of peak —
+          i.e. 60% drawdown from peak); it was flipped to [0.0] on 2026-07-09
+          (user mandate) because the floor never helped and hurt
+          catastrophically once. Set to a value in (0, 1) to re-enable the floor
+          at that fraction of peak. The per-position triggers above are the real
+          protection and are unchanged. *)
 }
 [@@deriving show, eq, sexp]
 (** All thresholds — nothing hardcoded. *)
@@ -63,7 +71,19 @@ type config = {
 val default_config : config
 (** [{ max_long_unrealized_loss_fraction = 0.25;
      max_short_unrealized_loss_fraction = 0.15;
-     min_portfolio_value_fraction_of_peak = 0.4 }]. *)
+     min_portfolio_value_fraction_of_peak = 0.0 }].
+
+    The portfolio-floor trigger is DISABLED by default ([0.0]); the two
+    per-position triggers stay on. Rationale (user mandate 2026-07-09): the only
+    window where the portfolio floor ever fired (sp500-2010-2026 long-only, the
+    GME meme-squeeze) shows floor-OFF dominating every risk-adjusted metric
+    (return 1013.8->2223.3%, Sharpe .538->.610, Calmar .242->.271, Ulcer
+    33.9->23.6, 32->0 floor liqs); across every other tested config it fires
+    zero times, so there is no observed beneficial fire. The true-death-spiral
+    protective case is untested (also never occurs in 26+y of history), so the
+    knob stays config-expressed as an axis. See the floor-off ablation
+    ([dev/backtest/floor-off-exp-2026-07-09/FINDINGS.md], merged #1903) + ledger
+    entry [2026-07-09-portfolio-floor-default-off]. *)
 
 (** {1 Event} *)
 
