@@ -498,12 +498,12 @@ type config = {
           {b The working replacement for the dead
              [Portfolio_risk.min_cash_pct].} Per
           [dev/notes/envelope-knobs-dead-2026-07-05.md] (merged #1861),
-          [Portfolio_risk.min_cash_pct] is unwired — its sole consumer
-          [Portfolio_risk.check_limits] has zero production callers, so
-          backtests run at ~89-99% deployment with no cash-reserve mechanism at
-          all. This field is the honest, live-path reserve: it is consumed at
-          the one seam that actually gates entry funding (the entry-walk
-          [remaining_cash]).
+          [Portfolio_risk.min_cash_pct] is unwired — it has no production
+          consumer (its only reader, the dead [Portfolio_risk.check_limits], was
+          deleted 2026-07-09), so backtests run at ~89-99% deployment with no
+          cash-reserve mechanism at all. This field is the honest, live-path
+          reserve: it is consumed at the one seam that actually gates entry
+          funding (the entry-walk [remaining_cash]).
 
           {b Scope — entries only.} The reserve narrows only NEW entry funding.
           Exits, covers, stop orders, and force-liquidations do not flow through
