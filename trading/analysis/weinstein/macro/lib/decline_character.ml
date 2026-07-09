@@ -12,7 +12,7 @@ type config = {
   trailing_high_lookback_weeks : int;
   fast_v_ignores_ma_filter : bool; [@sexp.default false]
 }
-[@@deriving sexp]
+[@@deriving show, eq, sexp]
 
 let default_config =
   {
