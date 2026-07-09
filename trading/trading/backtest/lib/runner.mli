@@ -121,6 +121,24 @@ type result = {
           picked). *)
 }
 
+val round_trips_in_window :
+  Trading_simulation_types.Simulator_types.step_result list ->
+  start_date:Date.t ->
+  Trading_simulation.Metrics.trade_metrics list
+(** Extract round-trips from the full (warmup-inclusive) step series, then keep
+    only those whose entry landed in-window ([entry_date >= start_date]).
+
+    Pairing must see the warmup steps: a position opened in the warmup window
+    has its opening fill on a step before [start_date]. Extracting over the
+    [start_date]-truncated step list drops that opening fill, orphaning the
+    in-window closing [Sell], which
+    {!Trading_simulation.Metrics.extract_round_trips} then reads as a short-open
+    (correct for a genuine short, wrong for a warmup-opened long) — producing a
+    spurious SHORT round-trip with inverted P&L even in an
+    [enable_short_side = false] backtest. Pairing over the full series keeps the
+    warmup long a correct LONG, which this filter then drops as out-of-window.
+    Symbols with no warmup position are unaffected. *)
+
 val filter_stop_infos_in_window :
   Stop_log.stop_info list -> start_date:Date.t -> Stop_log.stop_info list
 (** Drop [stop_info]s whose [entry_date] is before [start_date] — i.e. positions

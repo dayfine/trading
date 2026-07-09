@@ -1,9 +1,52 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-06-26
+## Last updated: 2026-07-09
 
 ## Status
 IN_PROGRESS
+
+## 2026-07-09 — SHORT-leak in `enable_short_side=false` backtest FIXED (branch `feat/fix-short-leak`)
+
+A SHORT trade appeared in the long-only reference arm of the faithful-short deep
+screen (`enable_short_side false`, sp500-2000, 2000-2010):
+
+```
+LH,SHORT,2001-06-13,2001-06-16,3,67.36,65.15,1280,2829.51,3.28,,,laggard_rotation,Stage2,2.7455,0.1269,gap_down,3,85
+```
+
+**Diagnosis: mislabel, NOT a flag bypass.** The `enable_short_side` entry gate
+(`Short_side_gate.combine`) is airtight — short candidates never reach the entry
+walk when the flag is off, so no short position is opened. The SHORT is a
+round-trip *pairing artefact*: the tells are `entry_stage=Stage2` (a long-entry
+signal), `exit_trigger=laggard_rotation` (a long-exit channel), and price falling
+over the hold — all consistent with a **long that lost**, which the pairing
+flipped to a SHORT with inverted (+) P&L.
+
+**Root cause.** `Runner._filter_steps` truncated the step series to
+`date >= start_date` *before* `Metrics.extract_round_trips`. A position opened
+during the warmup window has its opening `Buy` fill on a dropped warmup step; its
+in-window closing `Sell` survives as an **orphan**, which `extract_round_trips`
+reads as a short-open (correct for a genuine short, wrong for a warmup-opened
+long) — mislabeling the long as a SHORT and cascading the same off-by-one onto
+every subsequent trade for that symbol. The runner already filters warmup-window
+stop_infos / audit records / force-liqs by `>= start_date`; round-trip extraction
+was the one place that truncated *before* pairing instead of filtering *after*.
+
+**Fix** (`trading/trading/backtest/lib/runner.ml`, scoped): new public
+`round_trips_in_window` extracts over the **full warmup-inclusive**
+`sim_result.steps`, then keeps only round-trips with `entry_date >= start_date`.
+The warmup `Buy` now pairs with its real `Sell` as a correct LONG that the filter
+drops as out-of-window; in-window re-entries pair correctly as LONG. Symbols with
+no warmup position are unaffected (identical pairing). `metrics.ml` is untouched —
+its `Sell→Buy = SHORT` contract is correct for genuine long-short runs and is
+pinned by `test_metrics`.
+
+**Test:** `test_runner_filter.test_round_trips_in_window_no_short_from_warmup_straddle`
+reproduces the LH warmup-straddle (warmup Buy@67.36 + in-window Sell@65.15) and
+pins that (a) the truncated path yields the spurious LH SHORT, (b)
+`round_trips_in_window` yields no SHORT — only the genuinely-in-window LONG.
+
+Whole suite green (`dune build @fmt && dune build && dune runtest`).
 
 ## 2026-06-26 — liquidity-realism overlay (default-off) SHIPPED (branch `feat/liquidity-realism-overlay`)
 
