@@ -15,11 +15,12 @@ long-only 251%/40.6 AND both gated arms (neutral 287.5/38.5, grind 272/36.6;
 both-gates ≡ grind exactly — neutral is subsumed). WHY (transferable): the deep
 value of shorts is **portfolio-level NAV hedging during early-bear bleeds**
 (JNS 2001-02, TEL 01/2008, PM 10/2008), NOT per-trade P&L — gated arms have
-BETTER short P&L on fewer trades yet lower total return. Slow-grind's 8-week
-confirmation misses the hedge window. Combined with 2010-26 (gates admit ~0
-shorts): no window where gates add edge → stay default-off axes, no-flip
-priority on edge grounds; neutral_blocks_shorts faithfulness flip = mandate
-call costing −8.6pp/+7.8pp DD deep. **Forward: crash protection should be
+BETTER short P&L on fewer trades yet lower total return. Per-gate attribution
+(event-level, corrected): **grind gate = real cost** (8-week confirm blocks the
+entire 2001 bear's hedges; grind arm ≈ long-only until 2008); **neutral gate =
+near-inert deep** (blocked exactly 1 short in 11y — CF 2006, a loser, block
+HELPED; the −8.6pp arm delta = post-divergence path noise, true edge cost ≈0
+→ faithfulness flip is cheap both ways, mandate call). **Forward: crash protection should be
 HEDGE-SHAPED (portfolio overlay / circuit breaker), never short-selection
 gates** — feeds P1b ([[project_floor_quality_program]]).
 
