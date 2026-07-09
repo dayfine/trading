@@ -1,4 +1,22 @@
 ;; perf-tier: research
+;;
+;; ⚠⚠ NUMBERS FROM DIRECT RUNS OF THIS FILE ARE ARTIFACTS — DO NOT CITE. ⚠⚠
+;; Two compounding reasons (2026-07-08, after the ~227% "28y deep baseline"
+;; was almost quoted as a real number during the warmup-364 re-pin):
+;;   1. The universe pointer is a T4.1 PLACEHOLDER: the top-3000-1998 PIT
+;;      snapshot held STATIC for 28 years (no per-fold rotation — names age
+;;      out, nothing rotates in).
+;;   2. A direct scenario_runner run resolves bars from the committed
+;;      test_data CSV store, which only holds the survivor subset — most of
+;;      the 3000 names (especially delisted ones) have no bars and are
+;;      silently skipped. The run effectively trades a shrinking survivor
+;;      sliver of a frozen 1998 list.
+;; Honest deep numbers come from warehouse-backed runs (--snapshot-dir over
+;; /tmp/snap_top3000_1998_2026, delisting-complete) — e.g. the 28y contiguous
+;; Cell-E record in dev/agent-memory (realized +1552%, 2026-06-14) or the
+;; walk-forward harness this file exists to scaffold. This file's only jobs:
+;; parse as the 28-fold fixture's base and pass catch-only sentinel bands.
+;;
 ;; perf-tier-rationale: M4 T4.1 SCAFFOLDING ONLY — base scenario for the
 ;; 1998-2026 28-fold walk-forward fixture
 ;; (`trading/test_data/walk_forward/cell_e_full_history_28fold_2026_05_25.sexp`).
