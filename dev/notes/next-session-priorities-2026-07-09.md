@@ -56,15 +56,32 @@ drafted. Main was green at rampup (postsubmits from #1893 in flight).
    **→ P1b is now unambiguously the next lever**: the breaker design's whole
    job is the continue-vs-recover discriminator (asymmetric re-entry targets
    the 2020-shaped cost; slow-grind exit the 2002/2008-shaped pay).
-2. **P1b build mandate (user):** the circuit-breaker sleeve design is drafted;
-   build is default-off + behavior-relevant → wants an explicit go. The
-   faithful-short screen's forward guidance STRENGTHENS the case (hedge-shaped
-   crash protection is the working lever class; per-trade gates are not).
+2. ~~P1b build mandate~~ **GRANTED (user, 2026-07-09) — step 1 MERGED
+   (#1904)**: `Index_circuit_breaker` pure lib in analysis/weinstein/macro —
+   two-state machine, T1 fast-crash / T3 trailing-WINDOW floor / T2
+   slow-grind exits, asymmetric self-contained re-entry, both GME
+   anti-sterilization semantics test-pinned, zero consumers. Track:
+   `dev/status/floor-quality.md`. **NEXT = step 2**: thin SPY sleeve
+   consumer (alongside Spy_only_weinstein, adjusted-close bars) → step 3
+   lens screen vs TR-SPY (per-episode table incl. 2000-02/2008/2020/2022,
+   interventions count, whipsaw dist) → step 4 WF-CV surface + promotion
+   grid. The catstop WF-CV quantified exactly what the breaker must beat:
+   discriminate continue (2002/2008) from recover (2003/2020).
 3. **P1c blending stays PARKED** until P1b produces a floor worth blending.
+4. **Grind-confirm tunability** (user question 2026-07-09): the classifier's
+   `weeks_below_ma_slow_grind` (default 8) is a `Decline_character.config`
+   field but NOT yet exposed as a strategy-config knob (the gate's classify
+   site locks it to default). Queued: small default-off exposure PR (R2),
+   then deep surface `{2,4,6,8}` — hypothesis: 2-4wk confirm catches the
+   JNS-style Feb-2001 hedges the 8wk version misses.
+5. **audit_bars remediation** (new decision input): first warehouse scan =
+   3,797 spike-revert hits / 81 symbols. Choose: clean at warehouse build vs
+   arm liquidity overlay for honest runs vs both. Cheap first step: eyeball
+   the 81-symbol list for concentration in delisted sub-$5 names.
 
 ## Decision items (human)
 
-1. `check_limits` wire-or-delete (carried; DELETE now natural).
+1. ~~check_limits~~ DONE — deleted (#1902, user mandate 2026-07-09).
 2. `Portfolio_floor` monotonic-peak semantics — **ablation run 2026-07-09**
    (`dev/backtest/floor-off-exp-2026-07-09/FINDINGS.md`): on the GME window,
    floor-OFF dominates every risk-adjusted metric (return 1013.8→2223.3%,
@@ -81,17 +98,34 @@ drafted. Main was green at rampup (postsubmits from #1893 in flight).
    Flip is cheap on faithfulness + squeeze-asymmetry grounds; realized
    benefit also tiny. Mandate call, analysis complete both ways.
 
-## Bugs / small follow-ups found this session
+## Bugs / small follow-ups — status after the 2026-07-09 day session
 
-- **Short leaked past `enable_short_side=false`**: LH 2001-06-13→16, SHORT,
-  laggard_rotation exit, in the faithful-short 00 long-only reference run.
-  The laggard-rotation path appears to bypass the short flag. Small but a
-  correctness bug — worth a feat-agent one-shot with a pinning test.
-- **MSZ-class corrupt bars**: mechanical warehouse audit idea — flag ≥5×
-  one-day spike-revert bars in sub-$5 names before the next deep re-baseline.
+- ~~Short leak~~ **FIXED + merged (#1906).** Root cause was a round-trip
+  pairing MISLABEL, not a flag bypass: `_filter_steps` truncated warmup steps
+  before `Metrics.extract_round_trips`, so a warmup-opened long's orphaned
+  in-window Sell read as a short-open (inverted P&L, pairing offset cascades
+  for that symbol). Fix: `Runner.round_trips_in_window` (warmup-inclusive
+  extraction, entry-date filter), pinned synthetically. **Consequence for
+  analysis:** all PRE-#1906 trades.csv outputs contain spurious SHORT rows
+  for warmup-straddling symbols (the faithful-short screen's per-arm short
+  tallies included ~1 such artifact each — LH; portfolio-path conclusions
+  unaffected, equity curves don't depend on labels). Re-runs shift
+  total_trades/win_rate slightly — watch the tight-golden postsubmits; if
+  they trip, re-pin is mechanical and expected.
+- ~~MSZ-class corrupt bars~~ **audit tool BUILT + merged (#1900)**:
+  `audit_bars.exe <warehouse-dir>` — first scan of the deep warehouse found
+  **3,797 spike-revert hits across 81 symbols** (of 2,999). NEXT: decide
+  remediation (drop/patch flagged bars at warehouse build vs arm the
+  liquidity overlay for honest runs) — the hit list is bigger than MSZ.
+- ~~check_limits~~ **DELETED + merged (#1902)** (user mandate; zero callers
+  re-verified; config fields preserved for scenario compat).
 - `write_ledger_entry.exe` doesn't regen `index.sexp` (carried).
 - `feature_screen` constant-feature failwith nit (carried).
 - goldens-small still at 0.14 concentration override (carried, intentional).
+- **Harness:** periodic `cleanup-merged` job reaps agent worktrees whose
+  branch isn't on origin after 1h — wiped two working agents this session.
+  Standing dispatch rule added (WIP push within 30 min); structural fix =
+  make the job honor `git worktree lock` (candidate harness-maintainer item).
 
 ## Standing constraints (unchanged)
 
