@@ -1,6 +1,6 @@
 # Status: floor-quality
 
-## Last updated: 2026-07-09
+## Last updated: 2026-07-10
 
 ## Status
 IN_PROGRESS
@@ -43,15 +43,35 @@ while cutting the deep-crash left tail. Design authority:
   wiring; changes no behaviour anywhere. Encodes the two GME-pathology lessons
   (decaying windowed peak, no halt-until-external-reset) per
   `dev/notes/warmup-364-repin-2026-07-08.md` §Findings.
+- **P1b step 2 — thin breaker sleeve strategy** (branch
+  `feat/breaker-spy-sleeve`, PR pending): new
+  `trading/trading/weinstein/strategy/lib/breaker_spy_strategy.{ml,mli}` +
+  OUnit2 tests, alongside `Spy_only_weinstein_strategy`. Consumes the merged
+  `Index_circuit_breaker` (#1904): long-only, default-in-market (deploys cash
+  into SPY whenever flat + `In_market`, so it buys on the first tradable bar),
+  weekly (Friday) breaker `step` over the symbol's own weekly bars — Exit sells
+  to flat, Re_enter buys all-cash, Hold falls through to deploy. No per-position
+  trailing stop; the only exit is a breaker exit. Macro read for the character
+  classifier is `Macro.analyze` with empty A-D/global inputs (the documented
+  single-instrument degradation → A-D `Neutral`, no breadth lead) +
+  `Macro.default_config` (no new tunable; the breaker's thresholds all route
+  through `config.breaker`). Cadence note: the lib is weekly-bars-only, so
+  daily-cadence fast exits are parked as a future dial (documented in the .mli).
+  **Framing (user steer 2026-07-09, `feedback_no_reversal_timing`): not a
+  reversal timer** — slow-grind exit is doctrine-faithful step-aside; fast
+  exit + fast re-entry are tail-RISK insurance whose whipsaw cost is accepted
+  and measured (that measurement is step 3). Runner wired: additive
+  `Breaker_spy_sleeve of { symbol }` variant in `Strategy_choice.t`
+  (`warmup_days_for` = 364), constructed in `panel_strategy_builder`. Zero
+  behaviour change to existing strategies (new variant, default-off per
+  experiment-flag-discipline — no scenario selects it yet).
 
 ## In Progress
-- (none — awaiting review/merge of P1b step 1)
+- (none — awaiting review/merge of P1b step 2)
 
 ## Next Steps
-1. **P1b step 2 — thin sleeve strategy** consuming the breaker (buy-and-hold SPY
-   + breaker), alongside `Spy_only_weinstein_strategy`, adjusted-close bars for
-   both sleeve and comparator. Follow-up dispatch.
-2. **P1b step 3 — lens screen** vs TR-SPY 2000-2026 (per-episode drawdown
+1. **P1b step 3 — lens screen** vs TR-SPY 2000-2026 (per-episode drawdown
    captured/avoided, days out, intervention count, whipsaw cost distribution).
-3. **P1b step 4 — WF-CV surface** over the breaker thresholds, then a deep
+   Consumes the `Breaker_spy_sleeve` runner variant from step 2.
+2. **P1b step 4 — WF-CV surface** over the breaker thresholds, then a deep
    bear-regime promotion grid (`promotion-confirmation.md`) before any default.

@@ -4,6 +4,7 @@
 open Core
 module Spy_only = Weinstein_strategy.Spy_only_weinstein_strategy
 module Sector_rotation = Weinstein_strategy.Sector_rotation_weinstein_strategy
+module Breaker_spy = Weinstein_strategy.Breaker_spy_strategy
 
 (* The tradable universe for the sector-rotation strategy when it opts into the
    scenario universe: every symbol with a snapshot (the keys of [ticker_sectors])
@@ -59,3 +60,6 @@ let build ~ad_bars ~ticker_sectors ~config ~strategy_choice ~bar_reader
       } ->
       _build_sector_rotation ~ticker_sectors ~bar_reader ~k ~ma_period_weeks
         ~enable_macro_gate ~use_scenario_universe ~sector_cap
+  | Breaker_spy_sleeve { symbol } ->
+      let config = { Breaker_spy.default_config with symbol } in
+      Breaker_spy.make ~config ~bar_reader ()

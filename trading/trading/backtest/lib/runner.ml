@@ -22,17 +22,15 @@ let commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
     every window; see dev/notes/rs-warmup-gap-2026-07-07.md.) The Buy-and-Hold
     benchmark is stateless and would otherwise enter its single position at
     [warmup_start] instead of [start_date], which corrupts the day-1-entry
-    semantics the BAH baseline is pinned against. Strategy-dispatched (#882)
-    rather than a single constant. *)
-let warmup_days_for : Strategy_choice.t -> int = function
-  | Weinstein -> 364
-  | Bah_benchmark _ -> 0
-  | Spy_only_weinstein _ -> 364
-  | Sector_rotation_weinstein _ -> 364
+    semantics the BAH baseline is pinned against. Strategy-dispatched (#882):
+    the shared non-BAH value is named [_weekly_strategy_warmup_days]. *)
+let _weekly_strategy_warmup_days = 364
 
-(* Backwards-compatible internal alias kept so the rest of this module reads as
-   before; [warmup_days_for] is the exported name (see [runner.mli]). *)
-let _warmup_days_for = warmup_days_for
+let warmup_days_for : Strategy_choice.t -> int = function
+  | Bah_benchmark _ -> 0
+  | Weinstein | Spy_only_weinstein _ | Sector_rotation_weinstein _
+  | Breaker_spy_sleeve _ ->
+      _weekly_strategy_warmup_days
 
 (* Public types *)
 
@@ -480,7 +478,7 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     ?bar_data_source ?shared_panels ?progress_emitter ?slippage_bps ?cost_model
     () =
   let deps = _load_deps ?trace ?gc_trace ~overrides ~sector_map_override () in
-  let warmup_days = _warmup_days_for strategy_choice in
+  let warmup_days = warmup_days_for strategy_choice in
   let warmup_start = Date.add_days start_date (-warmup_days) in
   _log_backtest_window ~start_date ~end_date ~warmup_start
     ~all_symbols:deps.all_symbols;
