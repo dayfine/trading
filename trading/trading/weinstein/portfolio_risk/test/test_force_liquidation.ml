@@ -240,13 +240,21 @@ let test_per_position_custom_threshold _ =
 
 (* ---- Portfolio-floor trigger ---- *)
 
+(* The portfolio-floor trigger is DISABLED in [default_config] since 2026-07-09
+   ([min_portfolio_value_fraction_of_peak = 0.0]; user mandate — see
+   force_liquidation.mli). The mechanism itself is retained, so these tests
+   exercise it via an explicit config that re-enables the floor at the old 0.4
+   fraction. *)
+let floor_config =
+  { FL.default_config with min_portfolio_value_fraction_of_peak = 0.4 }
+
 let test_portfolio_floor_first_observation_no_fire _ =
   (* On the first observe, peak starts at 0 and is set to portfolio_value;
      no fire on bar 1 even at very low values — there is no prior peak. *)
   let pt = FL.Peak_tracker.create () in
   let positions = [ make_long () ] in
   let events =
-    FL.check ~config:FL.default_config ~date ~positions ~portfolio_value:100.0
+    FL.check ~config:floor_config ~date ~positions ~portfolio_value:100.0
       ~peak_tracker:pt
   in
   assert_that events (size_is 0)
@@ -257,12 +265,12 @@ let test_portfolio_floor_fires_after_drawdown _ =
   let pt = FL.Peak_tracker.create () in
   let positions = [ make_long (); make_short () ] in
   let _events1 =
-    FL.check ~config:FL.default_config ~date ~positions:[]
+    FL.check ~config:floor_config ~date ~positions:[]
       ~portfolio_value:1_000_000.0 ~peak_tracker:pt
   in
   let events2 =
-    FL.check ~config:FL.default_config ~date ~positions
-      ~portfolio_value:350_000.0 ~peak_tracker:pt
+    FL.check ~config:floor_config ~date ~positions ~portfolio_value:350_000.0
+      ~peak_tracker:pt
   in
   (* Both positions should be force-closed under Portfolio_floor reason *)
   assert_that events2
@@ -283,12 +291,12 @@ let test_portfolio_floor_fires_after_drawdown _ =
 let test_portfolio_floor_marks_halted _ =
   let pt = FL.Peak_tracker.create () in
   let _ =
-    FL.check ~config:FL.default_config ~date ~positions:[]
+    FL.check ~config:floor_config ~date ~positions:[]
       ~portfolio_value:1_000_000.0 ~peak_tracker:pt
   in
   let _ =
-    FL.check ~config:FL.default_config ~date ~positions:[]
-      ~portfolio_value:350_000.0 ~peak_tracker:pt
+    FL.check ~config:floor_config ~date ~positions:[] ~portfolio_value:350_000.0
+      ~peak_tracker:pt
   in
   assert_that (FL.Peak_tracker.halt_state pt) (equal_to FL.Halted)
 
@@ -298,12 +306,12 @@ let test_portfolio_floor_no_fire_under_threshold _ =
   let pt = FL.Peak_tracker.create () in
   let positions = [ make_long () ] in
   let _ =
-    FL.check ~config:FL.default_config ~date ~positions:[]
+    FL.check ~config:floor_config ~date ~positions:[]
       ~portfolio_value:1_000_000.0 ~peak_tracker:pt
   in
   let events =
-    FL.check ~config:FL.default_config ~date ~positions
-      ~portfolio_value:500_000.0 ~peak_tracker:pt
+    FL.check ~config:floor_config ~date ~positions ~portfolio_value:500_000.0
+      ~peak_tracker:pt
   in
   assert_that events (size_is 0)
 
@@ -319,21 +327,21 @@ let test_portfolio_floor_no_refire_while_halted _ =
   let positions = [ make_long () ] in
   (* Observe the peak first. *)
   let _ =
-    FL.check ~config:FL.default_config ~date ~positions:[]
+    FL.check ~config:floor_config ~date ~positions:[]
       ~portfolio_value:1_000_000.0 ~peak_tracker:pt
   in
   (* First breach: fires once for the held position, marks Halted. *)
   let events1 =
-    FL.check ~config:FL.default_config ~date ~positions
-      ~portfolio_value:300_000.0 ~peak_tracker:pt
+    FL.check ~config:floor_config ~date ~positions ~portfolio_value:300_000.0
+      ~peak_tracker:pt
   in
   assert_that events1 (size_is 1);
   assert_that (FL.Peak_tracker.halt_state pt) (equal_to FL.Halted);
   (* Second check with breach still active and same position: should NOT
      re-fire — halt suppresses Portfolio_floor. *)
   let events2 =
-    FL.check ~config:FL.default_config ~date ~positions
-      ~portfolio_value:300_000.0 ~peak_tracker:pt
+    FL.check ~config:floor_config ~date ~positions ~portfolio_value:300_000.0
+      ~peak_tracker:pt
   in
   assert_that events2 (size_is 0)
 
@@ -342,19 +350,19 @@ let test_portfolio_floor_no_refire_while_halted _ =
 let test_per_position_fires_while_halted _ =
   let pt = FL.Peak_tracker.create () in
   let _ =
-    FL.check ~config:FL.default_config ~date ~positions:[]
+    FL.check ~config:floor_config ~date ~positions:[]
       ~portfolio_value:1_000_000.0 ~peak_tracker:pt
   in
   let _ =
-    FL.check ~config:FL.default_config ~date ~positions:[]
-      ~portfolio_value:300_000.0 ~peak_tracker:pt
+    FL.check ~config:floor_config ~date ~positions:[] ~portfolio_value:300_000.0
+      ~peak_tracker:pt
   in
   assert_that (FL.Peak_tracker.halt_state pt) (equal_to FL.Halted);
   (* Now portfolio recovers above the floor BUT a single position has a
      deep unrealized loss. Per_position must still fire. *)
   let loser = make_long ~entry_price:100.0 ~current_price:40.0 () in
   let events =
-    FL.check ~config:FL.default_config ~date ~positions:[ loser ]
+    FL.check ~config:floor_config ~date ~positions:[ loser ]
       ~portfolio_value:900_000.0 ~peak_tracker:pt
   in
   assert_that events
@@ -370,12 +378,12 @@ let test_portfolio_floor_precedence _ =
   let pt = FL.Peak_tracker.create () in
   let positions = [ make_long ~entry_price:100.0 ~current_price:40.0 () ] in
   let _ =
-    FL.check ~config:FL.default_config ~date ~positions:[]
+    FL.check ~config:floor_config ~date ~positions:[]
       ~portfolio_value:1_000_000.0 ~peak_tracker:pt
   in
   let events =
-    FL.check ~config:FL.default_config ~date ~positions
-      ~portfolio_value:300_000.0 ~peak_tracker:pt
+    FL.check ~config:floor_config ~date ~positions ~portfolio_value:300_000.0
+      ~peak_tracker:pt
   in
   assert_that events
     (elements_are
@@ -424,10 +432,31 @@ let test_default_config_values _ =
          field
            (fun c -> c.FL.max_short_unrealized_loss_fraction)
            (float_equal 0.15);
+         (* Portfolio-floor trigger disabled by default since 2026-07-09
+            (user mandate; 0.4 -> 0.0). See force_liquidation.mli. *)
          field
            (fun c -> c.FL.min_portfolio_value_fraction_of_peak)
-           (float_equal 0.4);
+           (float_equal 0.0);
        ])
+
+(* Explicit pin so a silent revert of the 2026-07-09 flip (portfolio-floor
+   default 0.4 -> 0.0) fails deterministically: with [default_config], even a
+   deep portfolio drawdown from an observed peak fires NO Portfolio_floor event.
+   The per-position triggers stay active (covered by the per-position tests). *)
+let test_default_config_portfolio_floor_disabled _ =
+  let pt = FL.Peak_tracker.create () in
+  (* Observe a peak, then drop to 1% of it — a 99% drawdown. *)
+  let _ =
+    FL.check ~config:FL.default_config ~date ~positions:[]
+      ~portfolio_value:1_000_000.0 ~peak_tracker:pt
+  in
+  let events =
+    FL.check ~config:FL.default_config ~date
+      ~positions:[ make_long () ]
+      ~portfolio_value:10_000.0 ~peak_tracker:pt
+  in
+  assert_that events (size_is 0);
+  assert_that (FL.Peak_tracker.halt_state pt) (equal_to FL.Active)
 
 (* ---- Sexp round-trip ---- *)
 
@@ -488,6 +517,8 @@ let suite =
          "zero cost basis does not fire" >:: test_zero_cost_basis_does_not_fire;
          "zero quantity does not fire" >:: test_zero_quantity_does_not_fire;
          "default_config_values" >:: test_default_config_values;
+         "default_config_portfolio_floor_disabled"
+         >:: test_default_config_portfolio_floor_disabled;
          "event_sexp_round_trip" >:: test_event_sexp_round_trip;
        ]
 

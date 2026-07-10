@@ -13,6 +13,14 @@ open Weinstein_strategy
 module Position = Trading_strategy.Position
 module FL = Portfolio_risk.Force_liquidation
 
+(* The portfolio-floor trigger is DISABLED in [FL.default_config] since
+   2026-07-09 ([min_portfolio_value_fraction_of_peak = 0.0]; user mandate — see
+   force_liquidation.mli). The mechanism itself is retained, so the
+   portfolio-floor runner tests exercise it via an explicit config that
+   re-enables the floor at the old 0.4 fraction. *)
+let floor_config =
+  { FL.default_config with min_portfolio_value_fraction_of_peak = 0.4 }
+
 (* ------------------------------------------------------------------ *)
 (* Helpers                                                              *)
 (* ------------------------------------------------------------------ *)
@@ -203,7 +211,7 @@ let test_portfolio_floor_trigger_closes_all _ =
   in
   (* cash: 1M - 10K (AAPL) - 10K (TSLA) = 980K; positions worth 20K → total 1M. *)
   let _ =
-    Force_liquidation_runner.update ~config:FL.default_config ~positions
+    Force_liquidation_runner.update ~config:floor_config ~positions
       ~get_price:get_price_par ~cash:980_000.0
       ~current_date:(_date "2024-01-02") ~peak_tracker ~audit_recorder:recorder
   in
@@ -221,7 +229,7 @@ let test_portfolio_floor_trigger_closes_all _ =
     else None
   in
   let transitions =
-    Force_liquidation_runner.update ~config:FL.default_config ~positions
+    Force_liquidation_runner.update ~config:floor_config ~positions
       ~get_price:get_price_crash ~cash:200_000.0
       ~current_date:(_date "2024-04-29") ~peak_tracker ~audit_recorder:recorder
   in
@@ -417,7 +425,7 @@ let test_two_profitable_shorts_no_portfolio_floor _ =
     else None
   in
   let _ =
-    Force_liquidation_runner.update ~config:FL.default_config ~positions
+    Force_liquidation_runner.update ~config:floor_config ~positions
       ~get_price:get_price_par ~cash:1_200_000.0
       ~current_date:(_date "2024-01-02") ~peak_tracker ~audit_recorder:recorder
   in
@@ -440,7 +448,7 @@ let test_two_profitable_shorts_no_portfolio_floor _ =
     else None
   in
   let _ =
-    Force_liquidation_runner.update ~config:FL.default_config ~positions
+    Force_liquidation_runner.update ~config:floor_config ~positions
       ~get_price:get_price_profit ~cash:1_200_000.0
       ~current_date:(_date "2024-04-29") ~peak_tracker ~audit_recorder:recorder
   in

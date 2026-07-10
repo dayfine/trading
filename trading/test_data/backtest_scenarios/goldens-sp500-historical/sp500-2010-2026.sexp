@@ -125,39 +125,43 @@
  ;; variance. NOTE: this golden is perf-tier 3-historical (NOT in PR CI), so the
  ;; stale pin never surfaced as a CI failure — local goldens drift silently.
  (expected
-  ;; Re-pinned 2026-06-25 for the concentration=0.30 promotion (max_position_pct_long
-  ;; 0.14 -> 0.30, the production default; broad top-3000 WF-CV ACCEPT, ledger
-  ;; 2026-06-25-capacity-concentration-broad). Measured against test_data, ±15% around
-  ;; 0.30 actuals: ret 671.90  trades 558  win 42.29  sharpe 0.92  maxDD 18.07
-  ;;   open_pos 6117646  sortino 1.49  calmar 0.74  ulcer 5.99.
-  ;; Over the 16y multi-regime window 0.30 DOMINATES the prior 0.14 pin (ret 340->672,
-  ;; sharpe 0.84->0.92, calmar 0.49->0.74) AND lowers DD (19->18) — concentration's
-  ;; risk-adjusted win is clear on the long window (vs ~flat on the short 2019-2023).
-  ;; Re-pinned 2026-07-08 for the warmup 210→364 fix (RS present from the first
-  ;; screen; dev/notes/warmup-364-repin-2026-07-08.md), ±15% around 364 actuals:
-  ;;   ret 1013.84  trades 410  win 46.34  sharpe 0.54  maxDD 65.83  hold 50.24
-  ;;   OPV 0  sortino 0.81  calmar 0.24  ulcer 33.95  force_liqs 32
-  ;; ⚠ This window now documents the PORTFOLIO-FLOOR/MEME-SQUEEZE PATHOLOGY:
-  ;; the RS-honest basis faithfully catches GME's Sept-2020 Stage-2 breakout
-  ;; (+$7.8M realized, held through the Jan-2021 squeeze). The squeeze's MTM
-  ;; peak ($28.9M) poisons the monotonic Peak_tracker: NAV never recovers above
-  ;; 0.4×peak, so the Portfolio_floor brake fires 2021-02-02 and STERILIZES the
-  ;; remaining 5 years (32 Portfolio_floor liqs, ~zero 2021/2023/2024 entries,
-  ;; OPV 0 at end). The longshort twin (hedged, no floor fire) stays healthy —
-  ;; compare its pins. Floor-brake HWM semantics are a floor-quality-program
-  ;; finding (see dev/notes/warmup-364-repin-2026-07-08.md §Findings), not a
-  ;; reason to unwind the warmup fix.
-  ((total_return_pct   ((min 861.8)         (max 1165.9)))
-   (total_trades       ((min 348)           (max  472)))
-   (win_rate           ((min  39.4)         (max  53.3)))
-   (sharpe_ratio       ((min   0.46)        (max   0.62)))
-   (max_drawdown_pct   ((min  56.0)         (max  75.7)))
-   (avg_holding_days   ((min  42.7)         (max  57.8)))
-   ;; OPV is exactly 0 (floor-halted, all-cash at end); wide absolute band —
-   ;; a small behavior drift that re-opens a position lands ~3M (0.3×NAV).
-   (open_positions_value ((min 0.0)         (max 3500000.0)))
-   (sortino_ratio_annualized ((min  0.69)   (max   0.94)))
-   (calmar_ratio       ((min   0.21)        (max   0.28)))
-   (ulcer_index        ((min  28.9)         (max  39.0)))
-   ;; Floor-halted run does less work — wall floor lowered 300→100.
+  ;; Re-pinned 2026-07-09 for the PORTFOLIO-FLOOR DEFAULT-OFF flip (user mandate;
+  ;; Force_liquidation.default_config.min_portfolio_value_fraction_of_peak
+  ;; 0.4 -> 0.0). With the portfolio-floor trigger disabled by default this
+  ;; golden now runs floor-OFF. Measured against test_data (this PR, --parallel 1,
+  ;; 364 basis, 0.30 concentration), bit-identical to the floor-off ablation arm
+  ;; (dev/backtest/floor-off-exp-2026-07-09/floor-off-actual.sexp). ±15% around
+  ;; floor-off actuals:
+  ;;   ret 2223.35  trades 588  win 42.86  sharpe 0.61  maxDD 78.29  hold 49.35
+  ;;   OPV 18,142,201  sortino 0.87  calmar 0.27  ulcer 23.56  force_liqs 0
+  ;; The prior floor-ON pin (ret 1013.84 / 410 trades / maxDD 65.83 / OPV 0 /
+  ;; 32 Portfolio_floor liqs, re-pinned 2026-07-08 for warmup-364) is preserved
+  ;; in git history.
+  ;; HISTORY — the PORTFOLIO-FLOOR / MEME-SQUEEZE pathology this window once
+  ;; pinned (now documented, no longer pinned): the RS-honest basis faithfully
+  ;; caught GME's Sept-2020 Stage-2 breakout (+$7.8M realized, held through the
+  ;; Jan-2021 squeeze); the squeeze's MTM peak ($28.9M) poisoned the monotonic
+  ;; Peak_tracker so NAV never recovered above 0.4×peak, the (then default-on)
+  ;; Portfolio_floor brake fired 2021-02-02 and sterilized the remaining 5 years
+  ;; (32 floor liqs, OPV 0 at end). The floor-off ablation showed floor-OFF
+  ;; dominated every risk-adjusted metric on this window (see FINDINGS.md, merged
+  ;; #1903 + ledger 2026-07-09-portfolio-floor-default-off), which drove the
+  ;; default flip. The MaxDD 78.29 here is squeeze-MTM-peak-relative (measured
+  ;; from the same unrealizable $28.9M peak — see FINDINGS §"the MaxDD win is
+  ;; hollow"); the book is kept, keeps trading, and time-underwater (ulcer 23.56
+  ;; vs the floor-on 33.95) is materially better. The longshort twin (hedged,
+  ;; never fired the floor) is unaffected — compare its pins.
+  ((total_return_pct   ((min 1889.8)        (max 2556.9)))
+   (total_trades       ((min 500)           (max  676)))
+   (win_rate           ((min  36.4)         (max  49.3)))
+   (sharpe_ratio       ((min   0.52)        (max   0.70)))
+   (max_drawdown_pct   ((min  66.5)         (max  90.0)))
+   (avg_holding_days   ((min  41.9)         (max  56.8)))
+   ;; OPV is now ~18.1M (floor-off keeps the book; heavy terminal MTM, mostly the
+   ;; GME/monster fat tail — see FINDINGS "MTM-top-heavy" note).
+   (open_positions_value ((min 15420000.0) (max 20864000.0)))
+   (sortino_ratio_annualized ((min  0.73)   (max   0.99)))
+   (calmar_ratio       ((min   0.23)        (max   0.31)))
+   (ulcer_index        ((min  20.0)         (max  27.1)))
+   ;; Floor-off does more work than the halted floor-on run; keep wall band wide.
    (wall_seconds       ((min 100.0)         (max 3600.0))))))
