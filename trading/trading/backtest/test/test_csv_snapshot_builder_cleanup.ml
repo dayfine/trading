@@ -114,10 +114,14 @@ let test_orphan_sweep_removes_old_panel_runner_dirs _ =
   (* Backdate mtime to 1 hour ago. *)
   let one_hour_ago = Core_unix.gettimeofday () -. 3600.0 in
   Core_unix.utimes dir ~access:one_hour_ago ~modif:one_hour_ago;
-  let removed = Builder.startup_orphan_sweep ~max_age_hours:0.001 () in
-  assert_that (Stdlib.Sys.file_exists dir) (equal_to false);
-  (* At least our test dir was removed; other CI residue could push count higher. *)
-  assert_that removed (ge (module Int_ord) 1)
+  let (_ : int) = Builder.startup_orphan_sweep ~max_age_hours:0.001 () in
+  (* The load-bearing postcondition is that OUR backdated dir is gone. We do
+     NOT assert the returned count is >= 1: under parallel dune a concurrent
+     test's sweep can legitimately remove our dir first, so this sweep sees it
+     already gone and returns 0 while [file_exists dir = false] still holds
+     (issue #1884). The count is unassertable across concurrent sweeps sharing
+     [Filename.temp_dir_name]; the dir-absence is the contract. *)
+  assert_that (Stdlib.Sys.file_exists dir) (equal_to false)
 
 let test_orphan_sweep_spares_fresh_panel_runner_dirs _ =
   (* A freshly-created dir (mtime ~now) should be spared by a 1-hour
