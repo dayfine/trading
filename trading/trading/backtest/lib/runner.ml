@@ -25,10 +25,10 @@ let commission = { Trading_engine.Types.per_share = 0.01; minimum = 1.0 }
     semantics the BAH baseline is pinned against. Strategy-dispatched (#882)
     rather than a single constant. *)
 let warmup_days_for : Strategy_choice.t -> int = function
-  | Weinstein -> 364
   | Bah_benchmark _ -> 0
-  | Spy_only_weinstein _ -> 364
-  | Sector_rotation_weinstein _ -> 364
+  | Weinstein | Spy_only_weinstein _ | Sector_rotation_weinstein _
+  | Breaker_spy_sleeve _ ->
+      364
 
 (* Backwards-compatible internal alias kept so the rest of this module reads as
    before; [warmup_days_for] is the exported name (see [runner.mli]). *)

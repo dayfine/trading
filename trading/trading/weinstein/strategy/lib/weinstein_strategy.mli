@@ -52,6 +52,11 @@ module Sector_rotation_weinstein_strategy = Sector_rotation_weinstein_strategy
     the top-[k] strongest Stage-2 sector ETFs by RS vs SPY. See
     {!Sector_rotation_weinstein_strategy}. *)
 
+module Breaker_spy_strategy = Breaker_spy_strategy
+(** Long-only, default-in-market SPY floor sleeve that defers sell/re-buy to the
+    pure {!Index_circuit_breaker} state machine (P1b floor-quality program). See
+    {!Breaker_spy_strategy}. *)
+
 module Stops_runner = Stops_runner
 (** Trailing-stop state machine loop over held positions. See {!Stops_runner}.
 *)

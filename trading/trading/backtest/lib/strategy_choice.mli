@@ -120,6 +120,27 @@ type t =
 
           The strategy spine (Stage-2-only entry, Stage 3/4 exit, stop below
           base, RS for selection) is untouched by all dials. *)
+  | Breaker_spy_sleeve of { symbol : string [@sexp.default "SPY"] }
+      (** Breaker SPY sleeve — a long-only, default-in-market index floor
+          strategy on [symbol] (default [SPY], the [@sexp.default] so a scenario
+          may omit it). Constructs
+          {!Weinstein_strategy.Breaker_spy_strategy.make} with the runner's
+          [bar_reader] (it reads the symbol's own weekly bars for the breaker
+          step). Like {!Bah_benchmark} and {!Spy_only_weinstein}, the runner's
+          universe / sector-map / AD-bars machinery is loaded but unused;
+          [symbol] must be present in the scenario's universe.
+
+          Unlike {!Spy_only_weinstein} (full stage timing on SPY), this sleeve
+          holds SPY buy-and-hold by default and defers every sell/re-buy to the
+          pure {!Index_circuit_breaker} state machine (P1b of the floor-quality
+          program). It is {b not} a reversal timer: the slow-grind exit is the
+          doctrine-faithful step-aside from a distribution top, while the fast
+          exit + fast re-entry are explicit tail-RISK insurance whose whipsaw
+          cost is accepted and measured (lens screen vs total-return SPY, a
+          separate step). Every breaker threshold routes through the strategy's
+          own default {!Index_circuit_breaker.config}, default-off relative to a
+          promoted default per [.claude/rules/experiment-flag-discipline.md].
+          See {!Weinstein_strategy.Breaker_spy_strategy.config}. *)
 [@@deriving sexp, eq, show]
 
 val default : t

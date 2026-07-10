@@ -30,6 +30,9 @@ let default_sector_rotation_use_scenario_universe = false
    uncapped top-k selection, bit-identical to the pre-cap behaviour. *)
 let default_sector_rotation_sector_cap = None
 
+(* Breaker SPY sleeve default instrument (the P1b floor sleeve trades SPY). *)
+let default_breaker_spy_symbol = "SPY"
+
 type t =
   | Weinstein
   | Bah_benchmark of { symbol : string }
@@ -47,6 +50,9 @@ type t =
       use_scenario_universe : bool;
           [@sexp.default default_sector_rotation_use_scenario_universe]
       sector_cap : int option; [@sexp.default default_sector_rotation_sector_cap]
+    }
+  | Breaker_spy_sleeve of {
+      symbol : string; [@sexp.default default_breaker_spy_symbol]
     }
 [@@deriving sexp, eq, show]
 
@@ -81,3 +87,4 @@ let name = function
       } ->
       _sector_rotation_label ~k ~ma_period_weeks ~enable_macro_gate
         ~use_scenario_universe ~sector_cap
+  | Breaker_spy_sleeve { symbol } -> sprintf "Breaker_spy_sleeve(%s)" symbol
