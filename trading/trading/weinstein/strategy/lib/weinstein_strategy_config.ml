@@ -10,6 +10,13 @@ let macro_bearish_no_op_cap = 0.70
    classification) until a spec sets a different fast-V arming rate threshold. *)
 let fast_v_min_rate_no_op = 0.08
 
+(* Default bar-gap (calendar days) after which [stale_exit_after_days] force-
+   sells a stale/delisted held position at its last close. Flipped None ->
+   Some 5 on 2026-07-10 (user mandate) as a REALISM/faithfulness basis change:
+   the simulator must not hold ghosts (IN1 marked at its 2005 close for 20 years
+   inside NAV; 5 zombie positions in the deep run — issue #1484 / flag #1487). *)
+let default_stale_exit_days = 5
+
 type index_config = { primary : string; global : (string * string) list }
 [@@deriving sexp]
 
@@ -125,10 +132,13 @@ type config = {
       [@sexp.default macro_bearish_no_op_cap]
       (** Fraction of portfolio value the trim caps held long exposure at on a
           Bearish tape; default [0.70] is a no-op cap. See [.mli]. *)
-  stale_exit_after_days : int option; [@sexp.default None]
+  stale_exit_after_days : int option;
+      [@sexp.default Some default_stale_exit_days]
       (** [Some n] force-sells a stale/delisted held position at its last close
-          after an [n]-day bar gap; default [None] is a no-op (#1484). Threaded
-          into the simulator's [Stale_hold.config]. See [.mli]. *)
+          after an [n]-day bar gap. Default [Some 5] (2026-07-10 realism flip):
+          the simulator must not hold ghosts. [None] restores the pre-flip no-op
+          (#1484). Threaded into the simulator's [Stale_hold.config]. See
+          [.mli]. *)
   enable_harvest_rotate : bool; [@sexp.default false]
       (** Master switch for the harvest-rotate dial; default [false] is a no-op
           (bit-identical to baseline). See [.mli]. *)
@@ -207,7 +217,7 @@ let default_config ~universe ~index_symbol =
     late_stage2_stop_buffer_pct = 0.0;
     enable_macro_bearish_exposure_trim = false;
     macro_bearish_max_long_exposure_pct = macro_bearish_no_op_cap;
-    stale_exit_after_days = None;
+    stale_exit_after_days = Some default_stale_exit_days;
     enable_harvest_rotate = false;
     harvest_fraction = 0.5;
     short_sleeve_fraction = 0.0;

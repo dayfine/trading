@@ -348,16 +348,28 @@ type config = {
           the normal long-exposure cap, so even with the flag flipped on the
           value defaults to a no-op cap — only a tighter value changes
           behaviour. See {!Macro_bearish_trim_runner}. *)
-  stale_exit_after_days : int option; [@sexp.default None]
+  stale_exit_after_days : int option;
+      [@sexp.default Some default_stale_exit_days]
       (** When [Some n], a held position whose underlying symbol has stopped
           emitting bars for [n] calendar days is force-sold at its last
           available close as a realised trade (instead of being carried open at
           a stale mark indefinitely and counted in terminal NAV — issue #1484).
           The runner threads this into the simulator's
-          [Trading_simulation.Stale_hold.config.stale_exit_after_days]. Default
-          [None] keeps every existing backtest byte-identical (detector still
-          records stale holds; no force-exit). Searchable as a [Variant_matrix]
-          flag axis ([((flag stale_exit_after_days) (values (() (5))))]). *)
+          [Trading_simulation.Stale_hold.config.stale_exit_after_days].
+
+          {b Default flipped [None] -> [Some 5] on 2026-07-10 (user mandate)} as
+          a REALISM / faithfulness basis change, {b not} an alpha promotion —
+          same class as the warmup 210->364 re-pin
+          ([dev/notes/warmup-364-repin-2026-07-08.md]) and the total-return
+          comparator rule. The simulator must not hold ghosts: without the
+          force-exit a delisted name is carried open at its last close forever
+          (IN1 marked at its 2005 close for 20 years inside NAV; 5 zombie
+          positions in the deep top-3000 2000-2026 run — issue #1484 / flag
+          #1487). Set [None] to restore the pre-flip no-op (detector still
+          records stale holds; no force-exit) — the pre-flip behaviour, kept as
+          a searchable [Variant_matrix] flag axis
+          ([((flag stale_exit_after_days) (values (() (5))))]). Ledger:
+          [2026-07-10-realism-defaults-flip]. *)
   enable_harvest_rotate : bool; [@sexp.default false]
       (** Master switch for the harvest-rotate dial ({!Harvest_rotate_runner},
           plan [dev/plans/harvest-rotate-rigorous-test-2026-06-10.md]). When
@@ -456,10 +468,13 @@ type config = {
           the name becomes untradeable.
 
           {b Semantics.} Default [Liquidity_config.default_config]
-          ([min_entry_dollar_adv = 0.0], [min_hold_dollar_adv = 0.0]) is a no-op
-          — the gate drops nothing and the exit never fires, so every existing
-          golden/baseline replays {b bit-identically}
-          (experiment-flag-discipline R1).
+          ([min_entry_dollar_adv = 1_000_000.0] since the 2026-07-10 realism
+          flip, [min_hold_dollar_adv = 0.0]): the entry gate drops sub-$1M-ADV
+          candidates so the simulator never fills entries reality could not
+          fill; the held-position degradation exit still never fires. Set
+          [min_entry_dollar_adv = 0.0] to restore the pre-flip no-op (bit-
+          identical replay). See {!Liquidity_config} for the full flip rationale
+          + estimand caveat (ledger [2026-07-10-realism-defaults-flip]).
 
           {b Faithfulness} (W1/W2, [.claude/rules/weinstein-faithful-core.md]).
           A risk/realism dial — Weinstein would never hold a name he could not
