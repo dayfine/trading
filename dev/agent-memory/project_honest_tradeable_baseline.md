@@ -21,10 +21,21 @@ top3000-2000-2026-catstop (0.14/catstop-0.10, 364 basis, merged main incl.
   capital recycled (IN1 $143k dead 20y), corrupt-bar names excluded; freed
   capital compounds in liquid names where ALL real fat-tail winners live
   (re-derives [[project_trade_realism_liquidity]] from a new angle).
-- **Caveats:** single path (fold-proof next step = WF-CV/rolling-start with
-  `liquidity_config.min_entry_dollar_adv {0,1e6}` axis); terminal MTM still
-  AXTI ($51.7M of $66.8M OPV); overlay+stale-exit stay default-off — arming
-  is a MEASUREMENT convention for record runs (like TOTAL-RETURN
-  comparators), not a promoted default.
-- Supersedes the un-armed topline in [[project_deep_topline_364]] as the
-  number of record.
+- **FOLD-PROOF (2026-07-10 WF-CV, 13 biennial folds, 2×2 decomposition) —
+  MIXED, 3rd path-vs-fold inversion:** the 3.2× bundle path was
+  path-compounding. Fold-honest: **HOLD-EXIT (5e5) ALONE dominates baseline**
+  (Sharpe .654→.753, Calmar .917→1.131, DD −5.6pp, DSR .9999, 8/13 —
+  strongest fold candidate yet; promotion path = neighbor surface + regime
+  grid + fold-008 realizability argument); **ENTRY GATE alone costs
+  Sharpe/Calmar** (estimand caveat: simulator credits fake untradeable
+  profit, so part of the "cost" is fake alpha foregone); bundle < hold-only.
+  Gate FAIL all (fold-008 2016-18 low-ADV monster: baseline +69.7 vs
+  hold-only +23.9 — the tail-tax exhibit). Ledger
+  2026-07-10-liquidity-overlay-wfcv (Reject-promotion).
+- ⭐ row stands as REALISM MEASUREMENT CONVENTION only (fake fills must not
+  count), not an alpha claim; terminal MTM still AXTI ($51.7M of $66.8M
+  OPV); overlay+stale-exit stay default-off.
+- **Standing methodology law (3 confirmations: armon, catstop, overlay):
+  single compounded paths flatter exit/overlay mechanisms — only fold
+  distributions decide.** Supersedes the un-armed topline in
+  [[project_deep_topline_364]] as number of record.
