@@ -85,6 +85,46 @@ let make_holding ~entry_price ~entry_date ~quantity () : Position.t =
           }))
   |> unwrap
 
+let unwrap_pos = function
+  | Ok p -> p
+  | Error e -> OUnit2.assert_failure ("position setup failed: " ^ Status.show e)
+
+(* An [Entering] SPY position (created, not yet filled). *)
+let make_entering ~entry_price ~entry_date ~quantity () : Position.t =
+  let pos_id = symbol ^ "-breaker-spy-sleeve" in
+  Position.create_entering
+    {
+      Position.position_id = pos_id;
+      date = entry_date;
+      kind =
+        Position.CreateEntering
+          {
+            symbol;
+            side = Long;
+            target_quantity = quantity;
+            entry_price;
+            reasoning = Position.ManualDecision { description = "test" };
+          };
+    }
+  |> unwrap_pos
+
+(* An [Exiting] SPY position: a Holding position with a TriggerExit applied. *)
+let make_exiting ~entry_price ~entry_date ~quantity ~exit_date () : Position.t =
+  let pos = make_holding ~entry_price ~entry_date ~quantity () in
+  Position.apply_transition pos
+    {
+      Position.position_id = pos.id;
+      date = exit_date;
+      kind =
+        Position.TriggerExit
+          {
+            exit_reason =
+              Position.StrategySignal { label = "test"; detail = None };
+            exit_price = entry_price;
+          };
+    }
+  |> unwrap_pos
+
 let no_indicator : Strategy_interface.get_indicator_fn = fun _ _ _ _ -> None
 
 let run_once (module M : Strategy_interface.STRATEGY) ~today_bar ~portfolio =
@@ -137,7 +177,18 @@ let flat_then_crash =
   List.init 56 ~f:(fun _ -> 100.0) @ [ 100.0; 96.0; 92.0; 88.0 ]
 
 let crash_then_recover = flat_then_crash @ [ 95.0 ]
+
+(* Crash, then two Fridays that stay well below the fast-reentry threshold (5%
+   off the post-exit low of 88 = 92.4) — the sleeve must remain in cash. *)
+let crash_then_stay_down = flat_then_crash @ [ 89.0; 90.0 ]
 let rising = List.init 60 ~f:(fun i -> 50.0 +. (Float.of_int i *. 1.5))
+
+(* A slow drift whose last four weeks barely move (no fast-V) but whose close
+   sits below 80% of the trailing-window high (100) → the T3 absolute-floor
+   backstop, not a fast-crash. Reused from the lib's own floor fixture. *)
+let floor_breach =
+  List.init 40 ~f:(fun _ -> 100.0)
+  @ [ 95.0; 90.0; 85.0; 80.0; 78.0; 77.0; 76.0; 75.5; 75.2; 75.0 ]
 
 (* A gentle sustained decline (grind) then a sharp recovery. The decline is
    shallow (< 4%/4wk) with the index below a falling 30-week MA for many weeks —
@@ -293,6 +344,86 @@ let test_slow_reentry_above_turning_ma _ =
          field (fun (_, r) -> r) is_long_entry;
        ])
 
+let test_stays_out_after_exit_until_reentry _ =
+  (* The DEFINING safety property: after a breaker exit, [_deploy_if_flat] must
+     return [] while Out_of_market — the sleeve stays in cash across every Friday
+     whose bar does NOT satisfy re-entry, rather than re-deploying instantly. *)
+  let bars = bars_of_closes crash_then_stay_down in
+  let crash_bar =
+    List.nth_exn bars (index_of ~closes:crash_then_stay_down ~offset:2)
+  in
+  let down_bar_1 =
+    List.nth_exn bars (index_of ~closes:crash_then_stay_down ~offset:1)
+  in
+  let down_bar_2 = List.last_exn bars in
+  let pos =
+    make_holding ~entry_price:100.0 ~entry_date:(friday 0) ~quantity:1000.0 ()
+  in
+  let strat = Breaker.make ~bar_reader:(bar_reader_of bars) () in
+  let exit_result =
+    run_once strat ~today_bar:crash_bar
+      ~portfolio:(make_portfolio ~cash:0.0 ~position:pos ())
+  in
+  let flat = make_portfolio ~cash:100_000.0 () in
+  let stay_1 = run_once strat ~today_bar:down_bar_1 ~portfolio:flat in
+  let stay_2 = run_once strat ~today_bar:down_bar_2 ~portfolio:flat in
+  assert_that
+    (exit_result, stay_1, stay_2)
+    (all_of
+       [
+         field (fun (e, _, _) -> e) (is_exit_with_label "breaker_fast_crash");
+         field (fun (_, s, _) -> s) is_no_transitions;
+         field (fun (_, _, s) -> s) is_no_transitions;
+       ])
+
+let test_in_transition_position_emits_nothing _ =
+  (* A position mid-transition ([Entering] awaiting fill / [Exiting] awaiting
+     close) must produce NO signal — no double-enter on a rising Friday, no
+     double-exit on a crash Friday. *)
+  let rising_bars = bars_of_closes rising in
+  let crash_bars = bars_of_closes flat_then_crash in
+  let entering =
+    make_entering ~entry_price:110.0 ~entry_date:(friday 0) ~quantity:100.0 ()
+  in
+  let exiting =
+    make_exiting ~entry_price:100.0 ~entry_date:(friday 0) ~quantity:1000.0
+      ~exit_date:(friday 1) ()
+  in
+  let strat_a = Breaker.make ~bar_reader:(bar_reader_of rising_bars) () in
+  let strat_b = Breaker.make ~bar_reader:(bar_reader_of crash_bars) () in
+  let entering_result =
+    run_once strat_a
+      ~today_bar:(List.last_exn rising_bars)
+      ~portfolio:(make_portfolio ~cash:100_000.0 ~position:entering ())
+  in
+  let exiting_result =
+    run_once strat_b ~today_bar:(List.last_exn crash_bars)
+      ~portfolio:(make_portfolio ~cash:0.0 ~position:exiting ())
+  in
+  assert_that
+    (entering_result, exiting_result)
+    (all_of
+       [
+         field (fun (e, _) -> e) is_no_transitions;
+         field (fun (_, x) -> x) is_no_transitions;
+       ])
+
+let test_absolute_floor_exit_label _ =
+  (* A slow drift that breaches the trailing-window floor (close < 80% of the
+     52-week high) with no fast-V character → the T3 absolute-floor exit, tagged
+     [breaker_absolute_floor] (the one exit-reason arm the other tests miss). *)
+  let bars = bars_of_closes floor_breach in
+  let today = List.last_exn bars in
+  let pos =
+    make_holding ~entry_price:100.0 ~entry_date:(friday 0) ~quantity:1000.0 ()
+  in
+  let strat = Breaker.make ~bar_reader:(bar_reader_of bars) () in
+  let result =
+    run_once strat ~today_bar:today
+      ~portfolio:(make_portfolio ~cash:0.0 ~position:pos ())
+  in
+  assert_that result (is_exit_with_label "breaker_absolute_floor")
+
 let suite =
   "breaker_spy_strategy"
   >::: [
@@ -309,6 +440,11 @@ let suite =
          "slow grind exits after confirm"
          >:: test_slow_grind_exits_after_confirm;
          "slow re-entry above turning MA" >:: test_slow_reentry_above_turning_ma;
+         "stays out after exit until re-entry"
+         >:: test_stays_out_after_exit_until_reentry;
+         "in-transition position emits nothing"
+         >:: test_in_transition_position_emits_nothing;
+         "absolute-floor exit label" >:: test_absolute_floor_exit_label;
        ]
 
 let () = run_test_tt_main suite
