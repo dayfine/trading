@@ -2,9 +2,9 @@
 
     The overlay has two thresholds. The entry gate ([min_entry_dollar_adv]) is
     {b default-on} at [$1M] since the 2026-07-10 realism-defaults flip; the
-    held-position degradation exit ([min_hold_dollar_adv]) remains {b
-    default-off} ([0.0]). Both are real config fields, so each is expressible as
-    a {!Variant_matrix} axis, e.g.
+    held-position degradation exit ([min_hold_dollar_adv]) remains
+    {b default-off} ([0.0]). Both are real config fields, so each is expressible
+    as a {!Variant_matrix} axis, e.g.
     [((key (liquidity_config min_hold_dollar_adv)) (values (0.0 1000000.0)))].
 
     Motivation: a delisted micro-cap held into illiquidity (e.g. ELCO trading ~2

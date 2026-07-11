@@ -110,7 +110,11 @@
    (sharpe_ratio       ((min   0.64)        (max   0.86)))
    (max_drawdown_pct   ((min  18.1)         (max  24.6)))
    (avg_holding_days   ((min  38.6)         (max  52.2)))
-   (open_positions_value ((min 3196000.0)   (max 4324000.0)))
+   ;; OPV re-pinned ~2.18M under the realism-defaults flip (ledger
+   ;; 2026-07-10-realism-defaults-flip): $1M-ADV entry gate + stale-exit 5d
+   ;; lighten the terminal book. Headline metrics stayed in-band (ret 387.5 /
+   ;; 784 / Sharpe 0.777 / DD 21.35). Was ~3.76M pre-flip.
+   (open_positions_value ((min 1857000.0)   (max 2512000.0)))
    (sortino_ratio_annualized ((min  0.95)   (max   1.28)))
    (calmar_ratio       ((min   0.39)        (max   0.53)))
    (ulcer_index        ((min   7.00)        (max   9.50)))

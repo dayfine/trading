@@ -60,6 +60,10 @@
   ;; vs rebuilt warehouse: ret 134.01  trades 193  win 42.49  sharpe 0.84
   ;; maxDD 31.50  hold 49.46 (return 53→134% on this window — RS-honest early
   ;; screens compound the 2020-21 recovery cohort).
+  ;; Verified 2026-07-11 under the realism-defaults flip (ledger
+  ;; 2026-07-10-realism-defaults-flip): BIT-IDENTICAL actuals (134.01 / 193 /
+  ;; 42.49 / 0.84 / 31.50 / 49.46) — no ghost or sub-$1M-ADV fill in this
+  ;; window's path. Bands unchanged.
   ((total_return_pct   ((min 107.2)  (max 160.8)))
    (total_trades       ((min 154)    (max 232)))
    (win_rate           ((min  34.0)  (max  51.0)))
