@@ -45,3 +45,13 @@ top3000-2000-2026-catstop (0.14/catstop-0.10, 364 basis, merged main incl.
   mechanisms — tail-dependent verdicts need a horizon sweep (2y vs 4y+) or
   the rolling-start matrix.** Supersedes the un-armed topline in
   [[project_deep_topline_364]] as number of record.
+- **S1 EXTENDED-END VERIFICATION (07-11, end 2026-06-26, PR #1931): AXTI
+  branch B — STILL HELD.** Trailing stop never advanced past the mid-May
+  pullback; run rode $122→$70 give-back (~$34M MTM from peak). Topline flat
+  +6885.1%, MaxDD 41.3 (AXTI-peak-relative), Sharpe 0.806→0.768 = measured
+  branch-B cost to date. **Realized ≈$17.7M (+1670%, ~11.5%/yr) still beats
+  refreshed SPY TR +700.0% (8.17%/yr).** extension_stop question stays with
+  S2's distribution-level screen (April-28 shakeout would trap
+  single-specimen thresholds). Note:
+  dev/notes/axti-exit-verification-2026-07-11.md; staged scenario committed
+  at test_data/backtest_scenarios/staging-honest-tradeable-ext/.
