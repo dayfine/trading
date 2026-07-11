@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-10 (orchestrator run 29119328181 [**run-6**]: **reconcile + health pass**. Main HEAD `1578e777` (#1918 run-5 summary) **unambiguously GREEN**: `build-and-test`, `perf-tier1-smoke`, `golden-custom-universe`, `golden-sp500-5y` all `success`. Since run-5, only #1918 merged (the run-5 summary + `_index.md` reconcile + budget/health records; no `dev/status/*.md` track-state change). **#1913 unchanged** (tip `a6cc40d5`, CI green, idle since 08:46Z); still maintainer LOCAL, behavioral QC not run → hands-off, surfaced (orchestrator can't run behavioral QC in GHA: LOCAL-only docker `trading-1-dev` + jj `isolation:worktree`). Every other IN_PROGRESS track data-gated (EODHD absent)/human-gated/maintainer LOCAL. Harness lone `[~]` ci.yml ENOSPC #1636 human-PAT-blocked; cleanup drained; ops sentinel unchanged since #814. No orchestrator dispatch / QC / merge. Prior: run-5 (29109291779), run-4 (29098128954), run-3 (29089125256), run-2 (29079815652).
+Last updated: 2026-07-11 (orchestrator run 29135549296 [**2026-07-11 run-1**]: **reconcile + health pass**. Main HEAD `9d099c49` (#1923 docs handoff) **unambiguously GREEN**: `build-and-test`, `perf-tier1-smoke`, `golden-custom-universe`, `golden-sp500-5y` all `success`. **0 open PRs** — since run-6 the maintainer landed the LOCAL day-2 wrap: #1913 (breaker SPY sleeve P1b step2) MERGED 20:05Z, plus #1919 (liquidity-overlay WF-CV), #1920/#1921 (run-6 summary + flaky-test fix), #1922/#1923 (handoffs). Reconciled floor-quality row: #1913 merged → Open-PR `—`, next = P1b step 3 lens screen (S5, deep-warehouse maintainer LOCAL). Every IN_PROGRESS/queued track (S1-S6) is deep-warehouse EODHD-data-gated (absent in GHA) + long-run SOLO-container + LOCAL-only QC/merge. Harness lone `[~]` ci.yml ENOSPC #1636 human-PAT-blocked; cleanup drained; ops sentinel unchanged since #814. No orchestrator dispatch / QC / merge (~16th consecutive structurally-throttled GHA run). Prior: run-6 (29119328181), run-5 (29109291779), run-4 (29098128954).
 
 ## Active + complete tracks
 
@@ -54,7 +54,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | snapshot fast-input path (#1784) + corrected 5-wk picks (#1781) MERGED; next: large-warehouse multi-week sweep (data-gated); live-cycle human-gated |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | eligibility builder (#1594) + live refresh (#1595) + staleness guard (#1790) MERGED; next: ADR $-vol policy artifact (human-gated; largely subsumed) |
-| [floor-quality](floor-quality.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | #1913 | P1b step2 SPY-sleeve consumer OPEN #1913 — CI GREEN (maintainer fixed bare 364); behavioral QC pending; maintainer runs QC + merges LOCAL |
+| [floor-quality](floor-quality.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | P1b step2 SPY-sleeve MERGED #1913; next = step 3 lens screen vs TR-SPY (deep-warehouse, maintainer LOCAL / S5) |
 
 ## How to use
 
