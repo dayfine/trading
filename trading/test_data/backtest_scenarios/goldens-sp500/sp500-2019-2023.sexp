@@ -87,6 +87,14 @@
   ;;   OPV 1,180,589  sortino 0.69  calmar 0.31  ulcer 9.67
   ;; Risk metrics IMPROVED here (DD 31.3→24.9) — the RS-honest early-window
   ;; cohort holds a less crash-exposed 2019 book into COVID on this window.
+  ;; Verified IN-BAND under the 2026-07-11 REALISM-DEFAULTS flip (user mandate;
+  ;; min_entry_dollar_adv 0.0→1e6 + stale_exit_after_days None→Some 5; ledger
+  ;; 2026-07-10-realism-defaults-flip): re-measured against test_data (--parallel 3)
+  ;; = 44.43% / 276 / 35.14 / 0.541 / 24.95 / 40.28 / OPV 1,169,563 / sortino 0.670
+  ;; / calmar 0.306 / ulcer 10.19 / force_liqs 1 — a −2.8% return drift vs the 364
+  ;; center (45.73), all metrics comfortably in-band. SP500 names are liquid, so
+  ;; the entry gate is near-inert here (STOP-rule >20% not triggered). Bands
+  ;; unchanged.
   ((total_return_pct   ((min  38.9)        (max  52.6)))
    (total_trades       ((min 233)          (max 315)))
    (win_rate           ((min  31.0)        (max  42.0)))
