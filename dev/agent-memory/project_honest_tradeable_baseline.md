@@ -35,7 +35,13 @@ top3000-2000-2026-catstop (0.14/catstop-0.10, 364 basis, merged main incl.
 - ⭐ row stands as REALISM MEASUREMENT CONVENTION only (fake fills must not
   count), not an alpha claim; terminal MTM still AXTI ($51.7M of $66.8M
   OPV); overlay+stale-exit stay default-off.
-- **Standing methodology law (3 confirmations: armon, catstop, overlay):
-  single compounded paths flatter exit/overlay mechanisms — only fold
-  distributions decide.** Supersedes the un-armed topline in
+- **4Y-FOLD SENSITIVITY (07-11, user's horizon question): hold-exit's 2y
+  dominance INVERTS at 4y** (Sharpe 0.626 vs baseline 0.719, 2/6, DSR 0.872,
+  off frontier) — the "strongest fold candidate" was a FOLD-HORIZON ARTIFACT;
+  promotion path CLOSED. Entry gate consistent both horizons (realism
+  Sharpe-for-DD trade; flip unaffected).
+- **Standing methodology LAW (4 confirmations: armon, catstop, overlay-path,
+  overlay-fold-horizon): paths flatter compounding; SHORT FOLDS flatter exit
+  mechanisms — tail-dependent verdicts need a horizon sweep (2y vs 4y+) or
+  the rolling-start matrix.** Supersedes the un-armed topline in
   [[project_deep_topline_364]] as number of record.
