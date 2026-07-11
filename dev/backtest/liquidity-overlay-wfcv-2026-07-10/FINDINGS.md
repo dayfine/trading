@@ -55,7 +55,33 @@ cell, snapshot mode, parallel 1.
 - **Methodology (third confirmation, now standing):** single compounded
   paths flatter overlay/exit mechanisms; only fold distributions decide.
 
-Ledger: `dev/experiments/_ledger/2026-07-10-liquidity-overlay-wfcv.sexp`.
-Ops note: v1 of this run died artifact-less to container contention
-(concurrent agent builds; runner writes only at end) — re-run solo. The
-"stuck final fold" scare was a stale watcher process matching the pgrep.
+## 4-YEAR-FOLD SENSITIVITY (2026-07-11 amendment — the user's horizon question)
+
+Re-ran the identical 2×2 at `test_days 1460` (6 folds; artifacts `4y-*` here).
+**The hold-exit verdict INVERTS with the horizon:**
+
+| | 2y folds (13) | 4y folds (6) |
+|---|---|---|
+| baseline Sharpe / Calmar | 0.654 / 0.917 | 0.719 / 0.674 |
+| hold-exit only | **0.753 / 1.131** (frontier, 8/13, DSR 0.9999) | **0.626 / 0.470** (OFF frontier, 2/6, DSR 0.872) |
+| entry-gate only | 0.634 / DD 17.4 | 0.677 / DD 22.2 (frontier — Sharpe-for-DD trade both horizons) |
+| bundle | 0.609 | 0.670 (frontier at 4y) |
+
+At 2y, window truncation hides the cost of force-exiting names whose
+liquidity dips and later recover/run; at 4y the baseline's longer rides
+re-assert and hold-exit lands BELOW baseline. **The "strongest fold candidate"
+was a fold-horizon artifact — its promotion path is CLOSED** (no neighbor
+surface; the fold-008 realizability autopsy is no longer promotion-relevant).
+Entry-gate behaves consistently at both horizons (realism trade, not alpha) —
+the 2026-07-10 realism-defaults flip is unaffected.
+
+**LAW (upgraded, 4th inversion):** compounded paths flatter compounding;
+SHORT FOLDS flatter exit mechanisms. Any tail-dependent mechanism verdict
+requires a horizon sweep (2y vs 4y+) or the rolling-start matrix before it is
+believed.
+
+Ledger: `dev/experiments/_ledger/2026-07-10-liquidity-overlay-wfcv.sexp`
+(notes amended). Ops notes: v1 died artifact-less to container contention
+(runner writes only at end) — long WF runs get a solo container; and twice a
+stale watcher whose own command line matched the pgrep shadowed the
+"still running" check — match on something the watcher's argv cannot contain.
