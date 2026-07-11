@@ -1,6 +1,6 @@
 # Status: floor-quality
 
-## Last updated: 2026-07-10
+## Last updated: 2026-07-11
 
 ## Status
 IN_PROGRESS
@@ -44,7 +44,7 @@ while cutting the deep-crash left tail. Design authority:
   (decaying windowed peak, no halt-until-external-reset) per
   `dev/notes/warmup-364-repin-2026-07-08.md` §Findings.
 - **P1b step 2 — thin breaker sleeve strategy** (branch
-  `feat/breaker-spy-sleeve`, PR pending): new
+  `feat/breaker-spy-sleeve`, **merged #1913** 2026-07-10): new
   `trading/trading/weinstein/strategy/lib/breaker_spy_strategy.{ml,mli}` +
   OUnit2 tests, alongside `Spy_only_weinstein_strategy`. Consumes the merged
   `Index_circuit_breaker` (#1904): long-only, default-in-market (deploys cash
@@ -67,7 +67,9 @@ while cutting the deep-crash left tail. Design authority:
   experiment-flag-discipline — no scenario selects it yet).
 
 ## In Progress
-- (none — awaiting review/merge of P1b step 2)
+- (none in GHA — P1b step 2 merged #1913; step 3 lens screen is the active
+  frontier, run maintainer-LOCAL: deep-warehouse + long run, per S5 in
+  `dev/notes/next-session-priorities-2026-07-10.md`)
 
 ## Next Steps
 1. **P1b step 3 — lens screen** vs TR-SPY 2000-2026 (per-episode drawdown
