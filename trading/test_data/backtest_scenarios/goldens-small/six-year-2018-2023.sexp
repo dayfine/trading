@@ -65,6 +65,11 @@
   ;; screen; dev/notes/warmup-364-repin-2026-07-08.md). Measured: 79.13% / 321
   ;; trades / win 38.01 / Sharpe 0.72 / DD 19.05 / hold 40.55 / OPV 1,465,187
   ;; (was in-band pre-re-pin — re-centered ±15% around the 364 actuals).
+  ;; Verified INERT under the 2026-07-11 REALISM-DEFAULTS flip (user mandate;
+  ;; min_entry_dollar_adv 0.0→1e6 + stale_exit_after_days None→Some 5; ledger
+  ;; 2026-07-10-realism-defaults-flip): re-measured = BIT-IDENTICAL (79.13% / 321 /
+  ;; 38.01 / 0.72 / 19.05 / 40.55 / OPV 1,465,187 / force_liqs 0). Liquid 302-symbol
+  ;; universe → gate + stale-exit no-op. Bands unchanged.
   ((total_return_pct   ((min  67.3)        (max  91.0)))
    (total_trades       ((min 273)          (max 369)))
    (win_rate           ((min  32.3)        (max  43.7)))

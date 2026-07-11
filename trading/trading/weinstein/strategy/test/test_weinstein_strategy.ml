@@ -1531,6 +1531,34 @@ let test_default_config_suppresses_warmup_trading _ =
   assert_that cfg (field (fun c -> c.suppress_warmup_trading) (equal_to true))
 
 (* ------------------------------------------------------------------ *)
+(* realism defaults (2026-07-10 faithfulness flip) — silent-revert guards *)
+(* ------------------------------------------------------------------ *)
+
+(* Pins the user-mandate 2026-07-10 entry-gate flip: the default liquidity
+   config now gates entries at $1M trailing dollar-ADV (was 0.0 = no-op), so
+   the simulator cannot fill entries reality could not fill. A silent revert
+   to 0.0 would restore fake-fill alpha. *)
+let test_default_config_entry_liquidity_gate_on _ =
+  assert_that cfg
+    (field
+       (fun c -> c.liquidity_config.min_entry_dollar_adv)
+       (float_equal 1_000_000.0))
+
+(* The held-position degradation exit is unchanged by the 2026-07-10 flip:
+   [min_hold_dollar_adv] stays at the no-op 0.0 (its promotion is a separate
+   evidence pipeline). *)
+let test_default_config_hold_liquidity_exit_off _ =
+  assert_that cfg
+    (field (fun c -> c.liquidity_config.min_hold_dollar_adv) (float_equal 0.0))
+
+(* Pins the user-mandate 2026-07-10 stale-exit flip: the default now force-sells
+   a held position after a 5-day bar gap (was [None] = no-op), so the simulator
+   does not carry delisted ghosts at a stale mark in terminal NAV. *)
+let test_default_config_stale_exit_5d _ =
+  assert_that cfg
+    (field (fun c -> c.stale_exit_after_days) (is_some_and (equal_to 5)))
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -1540,6 +1568,12 @@ let () =
     >::: [
            "default_config suppresses warmup trading"
            >:: test_default_config_suppresses_warmup_trading;
+           "default_config: entry liquidity gate on ($1M ADV)"
+           >:: test_default_config_entry_liquidity_gate_on;
+           "default_config: hold liquidity exit off (0.0)"
+           >:: test_default_config_hold_liquidity_exit_off;
+           "default_config: stale-exit 5d default-on"
+           >:: test_default_config_stale_exit_5d;
            "record_force_exit: zero cooldown is no-op"
            >:: test_record_force_exit_zero_cooldown_is_noop;
            "record_force_exit: positive cooldown records date"

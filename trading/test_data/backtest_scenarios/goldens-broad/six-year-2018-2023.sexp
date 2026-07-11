@@ -59,9 +59,19 @@
   ;; vs rebuilt warehouse: ret 22.02  trades 159  win 40.25  sharpe 0.34
   ;; maxDD 15.95  hold 50.31 (RS-honest basis LIFTS this window 4→22% and cuts
   ;; DD 25→16 — the 0.30-hurts-short-windows picture softens on the new basis).
-  ((total_return_pct   ((min 17.6)  (max 26.4)))
-   (total_trades       ((min 127)   (max 191)))
-   (win_rate           ((min 32.2)  (max 48.3)))
-   (sharpe_ratio       ((min  0.27) (max 0.40)))
-   (max_drawdown_pct   ((min 12.8)  (max 19.1)))
-   (avg_holding_days   ((min 40.2)  (max 60.4))))))
+  ;; Re-pinned 2026-07-11 for the realism-defaults flip (entry gate $1M ADV +
+  ;; stale-exit 5d default-on; ledger 2026-07-10-realism-defaults-flip), ±20%
+  ;; around flip actuals vs the same 364 warehouse: ret 103.96  trades 254
+  ;; win 40.55  sharpe 0.65  maxDD 27.60  hold 49.87. LARGEST flip move
+  ;; (22→104%): stale-exit recycles ghost-position cash (trades 159→254 — the
+  ;; prior run carried delisted zombies through this window) and the recycled
+  ;; entries compound the 2020-21 recovery. Path divergence on a
+  ;; delisted-heavy window, not an alpha claim; note this window and
+  ;; decade-2014-2023 OVERLAP yet moved opposite directions (funding-path
+  ;; chaos). Covid twin BIT-IDENTICAL.
+  ((total_return_pct   ((min 83.2)  (max 124.8)))
+   (total_trades       ((min 203)   (max 305)))
+   (win_rate           ((min 32.4)  (max 48.7)))
+   (sharpe_ratio       ((min  0.52) (max 0.78)))
+   (max_drawdown_pct   ((min 22.1)  (max 33.1)))
+   (avg_holding_days   ((min 39.9)  (max 59.8))))))

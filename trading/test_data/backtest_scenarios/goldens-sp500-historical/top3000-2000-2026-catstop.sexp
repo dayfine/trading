@@ -23,6 +23,15 @@
    ((stage3_force_exit_config ((hysteresis_weeks 1))))
    ((enable_laggard_rotation true))
    ((laggard_rotation_config ((hysteresis_weeks 2))))))
+ ;; Verified 2026-07-11 under the realism-defaults flip (entry gate $1M ADV +
+ ;; stale-exit 5d default-on; ledger 2026-07-10-realism-defaults-flip), 364
+ ;; warehouse: ret 5729.2%  trades 1109  win 36.5  sharpe 0.79  maxDD 40.6
+ ;; hold 45.9  OPV $54.0M (unrealized $44.9M — MTM-TOP-HEAVY, realized portion
+ ;; is much smaller; do NOT quote the topline as tradeable). vs the un-armed
+ ;; +2063% baseline: stale-exit ghost-cash recycling LIFTS this delisted-heavy
+ ;; deep window (same mechanism as the goldens-broad 07-11 re-pins), most of
+ ;; the honest-tradeable +6889% arming lift — hold-exit (still default-off)
+ ;; was NOT the driver. Sentinel bands unchanged (research-tier).
  (expected ((total_return_pct ((min -90.0) (max 90000.0))) (total_trades ((min 1) (max 90000)))
    (win_rate ((min 0.0) (max 100.0))) (sharpe_ratio ((min -3.0) (max 5.0)))
    (max_drawdown_pct ((min 0.0) (max 90.0))) (avg_holding_days ((min 0.0) (max 800.0)))

@@ -134,6 +134,13 @@
   ;; screen; dev/notes/warmup-364-repin-2026-07-08.md), ±15% around 364 actuals:
   ;;   ret 102.39  trades 250  win 34.0  sharpe 0.87  maxDD 30.07  hold 41.00
   ;;   OPV 1,669,042  sortino 1.18  calmar 0.50  ulcer 12.22
+  ;; Verified INERT under the 2026-07-11 REALISM-DEFAULTS flip (user mandate;
+  ;; min_entry_dollar_adv 0.0→1e6 + stale_exit_after_days None→Some 5; ledger
+  ;; 2026-07-10-realism-defaults-flip): re-measured against test_data (--parallel 3,
+  ;; the survivor subset store per warmup-364 mapping) = BIT-IDENTICAL to the 364
+  ;; pin (102.39% / 250 / 34.0 / 0.87 / 30.07 / 41.00 / OPV 1,669,042 / force_liqs 0).
+  ;; The top-500-by-cap composition is liquid over this window → gate + stale-exit
+  ;; no-op. Bands unchanged.
   ((total_return_pct   ((min  87.0)         (max 117.7)))
    (total_trades       ((min 213)           (max 288)))
    (win_rate           ((min  28.9)         (max  39.1)))

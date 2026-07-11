@@ -55,9 +55,18 @@
   ;; screen; dev/notes/warmup-364-repin-2026-07-08.md), ±20% around 364 actuals
   ;; vs rebuilt warehouse: ret 89.64  trades 324  win 36.73  sharpe 0.52
   ;; maxDD 26.37  hold 52.90 (return down 134→90, DD down 39→26 on this window).
-  ((total_return_pct   ((min 71.7) (max 107.6)))
-   (total_trades       ((min 259) (max 389)))
-   (win_rate           ((min 29.4) (max 44.1)))
-   (sharpe_ratio       ((min 0.42) (max 0.63)))
-   (max_drawdown_pct   ((min 21.1) (max 31.6)))
-   (avg_holding_days   ((min 42.3) (max 63.5))))))
+  ;; Re-pinned 2026-07-11 for the realism-defaults flip (entry gate $1M ADV +
+  ;; stale-exit 5d default-on; ledger 2026-07-10-realism-defaults-flip), ±20%
+  ;; around flip actuals vs the same 364 warehouse: ret 36.86  trades 416
+  ;; win 35.10  sharpe 0.27  maxDD 32.71  hold 49.99. Big move (90→37%) is the
+  ;; flip biting hard on delisted-heavy top-1000 PIT: stale-exit force-exits
+  ;; ghosts and recycles the cash (trades 324→416), the ADV gate drops the
+  ;; illiquid tail of the prior entry set. Some prior "return" here was
+  ;; unrealizable ghost/illiquid MTM the flip exists to remove; the rest is
+  ;; path divergence on a 10y compounding window. Covid twin BIT-IDENTICAL.
+  ((total_return_pct   ((min 29.5) (max 44.2)))
+   (total_trades       ((min 333) (max 499)))
+   (win_rate           ((min 28.1) (max 42.1)))
+   (sharpe_ratio       ((min 0.21) (max 0.32)))
+   (max_drawdown_pct   ((min 26.2) (max 39.3)))
+   (avg_holding_days   ((min 40.0) (max 60.0))))))

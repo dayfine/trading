@@ -66,16 +66,21 @@
    (market_impact_bps_per_pct_adv 0.0)))
  (expected
   ;; Re-pinned 2026-06-23 for the A-D-live default flip (synthetic breadth tail).
-  ;; A-D-live's conservative gate cut bull-window return here (110→59) — expected:
-  ;; the breadth edge is short-timing, which this long-only window can't exploit.
   ;; Re-centered 2026-07-08 for the warmup 210→364 fix (RS present from first
-  ;; screen; dev/notes/warmup-364-repin-2026-07-08.md). Measured: 54.57% / 285
-  ;; trades / win 39.65 / Sharpe 0.61 / DD 19.71 / hold 43.11 / OPV 1,382,427
-  ;; (was in-band pre-re-pin — re-centered ±15% around the 364 actuals).
-  ((total_return_pct   ((min  46.4)        (max  62.8)))
-   (total_trades       ((min 242)          (max 328)))
-   (win_rate           ((min  33.7)        (max  45.6)))
-   (sharpe_ratio       ((min   0.52)       (max   0.70)))
+  ;; screen; dev/notes/warmup-364-repin-2026-07-08.md): 54.57% / 285 trades.
+  ;; Re-pinned 2026-07-11 for the REALISM-DEFAULTS flip (user mandate;
+  ;; liquidity_config.min_entry_dollar_adv 0.0→1e6 + stale_exit_after_days
+  ;; None→Some 5; ledger 2026-07-10-realism-defaults-flip). A faithfulness basis
+  ;; change (no fake fills, no held ghosts), not an alpha claim. This 302-symbol
+  ;; window shifts modestly (54.6→48.7 return) — the entry gate drops a handful
+  ;; of sub-$1M-ADV small-caps this window once bought. Measured against test_data
+  ;; (--parallel 3), ±15% around the flip actuals:
+  ;;   ret 48.72  trades 292  win 36.99  sharpe 0.562  maxDD 19.72  hold 42.25
+  ;;   OPV 1,330,211  sortino 0.72  calmar 0.35  ulcer 6.68  force_liqs 0
+  ((total_return_pct   ((min  41.4)        (max  56.0)))
+   (total_trades       ((min 248)          (max 336)))
+   (win_rate           ((min  31.4)        (max  42.5)))
+   (sharpe_ratio       ((min   0.48)       (max   0.65)))
    (max_drawdown_pct   ((min  16.8)        (max  22.7)))
-   (avg_holding_days   ((min  36.6)        (max  49.6)))
-   (open_positions_value ((min 1175000.0)  (max 1590000.0))))))
+   (avg_holding_days   ((min  35.9)        (max  48.6)))
+   (open_positions_value ((min 1130000.0)  (max 1530000.0))))))

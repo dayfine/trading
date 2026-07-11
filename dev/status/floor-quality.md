@@ -16,6 +16,15 @@ while cutting the deep-crash left tail. Design authority:
 `dev/plans/fast-circuit-breaker-spy-sleeve-2026-07-08.md` (P1b).
 
 ## Completed
+- **Realism-defaults flip = the new measurement basis** (branch
+  `feat/realism-defaults-flip`, PR pending; user mandate 2026-07-10):
+  `liquidity_config.min_entry_dollar_adv` 0.0 -> 1e6 and `stale_exit_after_days`
+  None -> Some 5 are now DEFAULT-ON (`min_hold_dollar_adv` stays 0.0). The two
+  realism dials the honest-tradeable baseline
+  (`dev/notes/honest-tradeable-baseline-2026-07-10.md`) armed as a measurement
+  convention are the default going forward — a faithfulness basis change (no
+  fake fills, no held ghosts), not an alpha promotion. Goldens re-pinned; ledger
+  `2026-07-10-realism-defaults-flip`. Comparators here stay TOTAL-RETURN.
 - **Portfolio-floor trigger default OFF** (branch
   `feat/portfolio-floor-default-off`, PR pending; user mandate 2026-07-09):
   `Force_liquidation.default_config.min_portfolio_value_fraction_of_peak`

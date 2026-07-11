@@ -157,9 +157,12 @@
    (sharpe_ratio       ((min   0.52)        (max   0.70)))
    (max_drawdown_pct   ((min  66.5)         (max  90.0)))
    (avg_holding_days   ((min  41.9)         (max  56.8)))
-   ;; OPV is now ~18.1M (floor-off keeps the book; heavy terminal MTM, mostly the
-   ;; GME/monster fat tail — see FINDINGS "MTM-top-heavy" note).
-   (open_positions_value ((min 15420000.0) (max 20864000.0)))
+   ;; OPV re-pinned ~9.88M under the realism-defaults flip (ledger
+   ;; 2026-07-10-realism-defaults-flip): the $1M-ADV entry gate drops marginal
+   ;; fills and stale-exit 5d clears ghost MTM, so terminal book is lighter.
+   ;; Headline metrics (return/Sharpe/DD/trades) stayed in-band — only the
+   ;; terminal-MTM composition moved. Was ~18.1M floor-off pre-flip.
+   (open_positions_value ((min 8401000.0) (max 11367000.0)))
    (sortino_ratio_annualized ((min  0.73)   (max   0.99)))
    (calmar_ratio       ((min   0.23)        (max   0.31)))
    (ulcer_index        ((min  20.0)         (max  27.1)))

@@ -89,6 +89,11 @@
   ;; Return 41→16% while the with-shorts twin held ~46%: on this window the
   ;; RS-honest early-2019 cohort rides COVID unhedged (DD ~42%) — the known
   ;; high-dispersion signature of concentration 0.30, now on the honest RS basis.
+  ;; Verified INERT under the 2026-07-11 REALISM-DEFAULTS flip (user mandate;
+  ;; min_entry_dollar_adv 0.0→1e6 + stale_exit_after_days None→Some 5; ledger
+  ;; 2026-07-10-realism-defaults-flip): re-measured = BIT-IDENTICAL to the 364 pin
+  ;; (16.38% / 203 / 38.42 / 0.26 / 41.69 / 43.14 / OPV 870,207 / force_liqs 2).
+  ;; SP500 universe is liquid → entry gate + stale-exit no-op. Bands unchanged.
   ((total_return_pct   ((min  13.9)        (max  18.8)))
    (total_trades       ((min 173)          (max 233)))
    (win_rate           ((min  32.7)        (max  44.2)))
