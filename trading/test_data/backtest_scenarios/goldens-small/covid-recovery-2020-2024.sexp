@@ -69,6 +69,14 @@
    (bid_ask_spread_bps 5.0)
    (market_impact_bps_per_pct_adv 0.0)))
  (expected
+  ;; Verified INERT under the 2026-07-11 REALISM-DEFAULTS flip (user mandate;
+  ;; liquidity_config.min_entry_dollar_adv 0.0→1e6 + stale_exit_after_days
+  ;; None→Some 5; ledger 2026-07-10-realism-defaults-flip): re-measured against
+  ;; test_data (--parallel 3) = BIT-IDENTICAL to the 364 pin (106.39% / 273 / 38.83
+  ;; / 1.017 / 17.67 / 40.54 / OPV 1,540,015 / force_liqs 0). This 302-symbol small
+  ;; universe is liquid over this window — no sub-$1M-ADV entry dropped, no delisted
+  ;; ghost realized in-window — so the entry gate + stale-exit are no-ops. Bands
+  ;; unchanged.
   ((total_return_pct   ((min  90.4)        (max 122.3)))
    (total_trades       ((min 232)          (max 314)))
    (win_rate           ((min  33.0)        (max  44.7)))
