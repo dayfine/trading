@@ -34,18 +34,64 @@ issues triaged 2026-07-10.
    cleanup (78 remote branches removed; 5 orphaned budget records batch-landed
    #1917); stale ci-red watchdog #1896 closed.
 
-## P1 — next (priority order)
+## Scoped queue for upcoming sessions (user-agreed 2026-07-10 PM, priority order)
 
-1. **P1b step 3 — sleeve lens screen vs TR-SPY** (read-only after build;
-   the success bar: match TR-SPY, cut left tail; no-reversal-timing framing:
-   if the honest number loses, the answer is hold-through, not better timing).
-2. **Hold-exit promotion path** (from #1919, the strongest fold candidate):
-   neighbor surface `min_hold_dollar_adv {2.5e5, 5e5, 1e6}` WF-CV → macro-
-   regime-diverse confirmation grid → a realizability argument for
-   fold-008-class windows (was that low-ADV monster's +69.7% tradeable?).
-3. **Grind-weeks exposure PR** (carried): expose
-   `weeks_below_ma_slow_grind` as strategy config (default 8 = no-op), then
-   deep surface {2,4,6,8} — catches the JNS-style early-bear hedges.
+**In flight, must land first:**
+- **4y-fold sensitivity** of the overlay decomposition (running; answers the
+  fold-horizon-bias question — does hold-exit's 8/13 dominance shrink at 4y?).
+  On landing: amend ledger `2026-07-10-liquidity-overlay-wfcv` with the read.
+- **Realism-defaults flip PR** (`feat/realism-defaults-flip`, agent holding):
+  entry-gate 1e6 + stale-exit 5d default-on, golden re-pins, ledger basis
+  entry. Gates + merge. min_hold stays default-off.
+
+**S1 — AXTI exit verification (extended window).** Rebuild the deep warehouse
+to 2026-06-26 (bars already in `data/`; ~31 min — ONLY after the flip agent is
+done with the current warehouse), re-run the honest-tradeable scenario with
+`end_date 2026-06-26`, and observe the actual exit: trailing stop (~$90-100 if
+the stop advanced past the mid-May pullback) vs still-holding at $70. Also
+refresh the SPY-TR comparator to the same end. Context: AXTI peaked $140.83
+(May 22 weekly close, 3.45× the 30w MA), fell to $70.15 by Jun 26 with the 30w
+MA still RISING (+3.7%/wk) — the whole collapse is inside Stage 2, so only the
+stop can exit; stage channels are structurally silent
+(`scratchpad/axti_stage.png` rendered; close/MA table in session log).
+
+**S2 — extension-episode event-level screen (read-only, rigor-calibrated).**
+Enumerate every held-position episode across the deep runs where weekly
+close/30wMA ≥ ~2.5-3× (GME, DDD/BFX 2020-21 cohort, AXTI, …). Per event,
+simulate simple high-trail exits (10/15/20/25%) vs the actual hold — PAIRED,
+distributions not means, per `mechanism-validation-rigor`. Key trap already
+identified on AXTI: a 15% trail exits the April-28 shakeout at ~$70 (missing
+96→141); 20% survives April by 2.7pts — shakeouts and the top are the same
+depth, so single-specimen thresholds are hindsight. The screen decides whether
+an `extension_stop` axis (close/MA-triggered high-trail; W2 authority =
+Weinstein's overextension warning, a trader dial) is worth building
+default-off + WF-CV. Feeds S3.
+
+**S3 — trader-preset BUNDLE test** (per `weinstein-faithful-core` W3: presets
+as wholes, never dial-grafts): audit the preset table
+(`dev/plans/weinstein-trader-investor-presets-2026-05-31.md`) for which dials
+are config today vs need default-off exposure (10-week MA, full-size entries,
+exit-as-Stage-3-forms / extension-sensitive exits); build the missing dials;
+deep WF-CV of the trader bundle vs investor baseline; AXTI as the qualitative
+specimen (does the trader preset exit $110-125?).
+
+**S4 — hold-exit promotion pipeline** (strongest fold candidate, #1919):
+fold-008 realizability autopsy (re-run the 2016-17 baseline window with trade
+output; was the low-ADV monster's +69.7% tradeable at size?) → neighbor
+surface `min_hold_dollar_adv {2.5e5, 5e5, 1e6}` → rolling-start matrix as the
+tail-honest arbiter (folds truncate the tail; paths flatter it — the matrix
+keeps full horizon with start dispersion).
+
+**S5 — P1b step 3: sleeve lens screen vs TR-SPY** (sleeve merged #1913): full
+window + per-crash-episode table (2000-02/2008/2011/2015-16/2018Q4/2020/2022),
+interventions count, whipsaw distribution. Bar: match TR-SPY, cut left tail;
+if it loses honestly, the answer is hold-through (no reversal timing).
+
+**S6 (carried) — grind-weeks exposure PR**: `weeks_below_ma_slow_grind` as
+strategy config (default 8 = no-op), deep surface {2,4,6,8}.
+
+Container discipline for all of the above: long runs get a SOLO container;
+one builder agent at a time; every dispatch requires WIP-push within 30 min.
 
 ## Open issues (triaged 2026-07-10)
 
