@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-10 (orchestrator run 29119328181 [**run-6**]: **reconcile + health pass**. Main HEAD `1578e777` (#1918 run-5 summary) **unambiguously GREEN**: `build-and-test`, `perf-tier1-smoke`, `golden-custom-universe`, `golden-sp500-5y` all `success`. Since run-5, only #1918 merged (the run-5 summary + `_index.md` reconcile + budget/health records; no `dev/status/*.md` track-state change). **#1913 unchanged** (tip `a6cc40d5`, CI green, idle since 08:46Z); still maintainer LOCAL, behavioral QC not run → hands-off, surfaced (orchestrator can't run behavioral QC in GHA: LOCAL-only docker `trading-1-dev` + jj `isolation:worktree`). Every other IN_PROGRESS track data-gated (EODHD absent)/human-gated/maintainer LOCAL. Harness lone `[~]` ci.yml ENOSPC #1636 human-PAT-blocked; cleanup drained; ops sentinel unchanged since #814. No orchestrator dispatch / QC / merge. Prior: run-5 (29109291779), run-4 (29098128954), run-3 (29089125256), run-2 (29079815652).
+Last updated: 2026-07-11 (orchestrator run 29160076339 [**2026-07-11 run-3**]: **reconcile + health pass**. Main HEAD advanced to `9aec60a6` (#1928 = run-2 summary auto-merge — the only inflow since run-2, EXEMPT orchestrator-summary commit; no track-state change). Main **unambiguously GREEN**: `build-and-test`, `perf-tier1-smoke`, `golden-custom-universe`, `golden-sp500-5y` all `success` on `9aec60a6`. **1 open PR — draft #1926 `feat/realism-defaults-flip`** (S0: USER-MANDATED realism basis-change, entry-gate $1M + stale-exit 5d default-on), tip `81c778e7` UNCHANGED since run-2 — still draft, DO NOT MERGE until its LOCAL "Remaining re-measures" checklist is empty (goldens + warehouse re-pin need `dune`+data, absent in GHA; 3-gate merge needs LOCAL docker QC). Branch matches no track pattern → no per-track Open-PR cell. No GHA-dispatchable feature/harness/ops/cleanup work; S1-S7 queue deep-warehouse EODHD-data-gated + LOCAL-only QC/merge (runner has no `dune`/`docker`/`EODHD_API_KEY`). No dispatch / QC / merge (~18th consecutive structurally-throttled GHA run). Prior: run-2 (29155047453), run-1 (29135549296), run-6 (29119328181).
 
 ## Active + complete tracks
 
@@ -54,7 +54,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | snapshot fast-input path (#1784) + corrected 5-wk picks (#1781) MERGED; next: large-warehouse multi-week sweep (data-gated); live-cycle human-gated |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | eligibility builder (#1594) + live refresh (#1595) + staleness guard (#1790) MERGED; next: ADR $-vol policy artifact (human-gated; largely subsumed) |
-| [floor-quality](floor-quality.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | #1913 | P1b step2 SPY-sleeve consumer OPEN #1913 — CI GREEN (maintainer fixed bare 364); behavioral QC pending; maintainer runs QC + merges LOCAL |
+| [floor-quality](floor-quality.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | P1b step2 SPY-sleeve MERGED #1913; next = step 3 lens screen vs TR-SPY (deep-warehouse, maintainer LOCAL / S5) |
 
 ## How to use
 
