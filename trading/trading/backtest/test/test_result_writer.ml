@@ -763,6 +763,111 @@ let test_trades_csv_context_falls_back_to_empty_when_no_audit _ =
            ]))
 
 (* ------------------------------------------------------------------ *)
+(* C2 — re-traded symbol: per-position trigger join                     *)
+(* ------------------------------------------------------------------ *)
+
+(** A symbol traded twice must have each row carry {b its own} position's
+    trigger fields. The prior symbol-keyed FIFO pop fed [exit_trigger] /
+    [entry_stop] / [exit_stop] from one stop_info while [stop_trigger_kind]
+    (position-keyed via audit) came from another — producing the blank /
+    contradictory rows validator V5 pins. Both joins now key by position_id, so
+    the first round-trip (stop-loss → intraday) and the second (end-of-period)
+    each render consistent trigger columns. The stop_infos are supplied in
+    reverse of trade order to trip any residual order-dependent join, and the
+    trailing [position_id] column is asserted per row. *)
+let test_retraded_symbol_keys_triggers_by_position_id _ =
+  let entry1_date = _date "2024-01-02" in
+  let exit1_date = _date "2024-02-15" in
+  let entry2_date = _date "2024-03-01" in
+  let exit2_date = _date "2024-04-29" in
+  let trade1 =
+    _make_trade ~symbol:"AAPL" ~entry_date:entry1_date ~exit_date:exit1_date ()
+  in
+  let trade2 =
+    _make_trade ~symbol:"AAPL" ~entry_date:entry2_date ~exit_date:exit2_date ()
+  in
+  let entry1 =
+    _m5_2e_entry ~symbol:"AAPL" ~entry_date:entry1_date
+      ~position_id:"AAPL-wein-1"
+  in
+  let entry2 =
+    _m5_2e_entry ~symbol:"AAPL" ~entry_date:entry2_date
+      ~position_id:"AAPL-wein-2"
+  in
+  let stop1 : Backtest.Stop_log.stop_info =
+    {
+      position_id = "AAPL-wein-1";
+      symbol = "AAPL";
+      entry_date = Some entry1_date;
+      entry_stop = Some 92.0;
+      exit_stop = Some 92.0;
+      exit_trigger =
+        Some
+          (Backtest.Stop_log.Stop_loss
+             { stop_price = 92.0; actual_price = 91.99 });
+    }
+  in
+  let stop2 : Backtest.Stop_log.stop_info =
+    {
+      position_id = "AAPL-wein-2";
+      symbol = "AAPL";
+      entry_date = Some entry2_date;
+      entry_stop = Some 92.0;
+      exit_stop = Some 92.0;
+      exit_trigger = Some Backtest.Stop_log.End_of_period;
+    }
+  in
+  let result : Backtest.Runner.result =
+    {
+      summary = _empty_summary ~start_date:entry1_date ~end_date:exit2_date;
+      round_trips = [ trade1; trade2 ];
+      steps = [];
+      final_portfolio =
+        Trading_portfolio.Portfolio.create ~initial_cash:100_000.0 ();
+      n_stop_eligible_positions = 0;
+      overrides = [];
+      (* Reversed vs trade order — a FIFO pop would mis-assign. *)
+      stop_infos = [ stop2; stop1 ];
+      audit =
+        [ { entry = entry1; exit_ = None }; { entry = entry2; exit_ = None } ];
+      cascade_summaries = [];
+      force_liquidations = [];
+      stale_holds = [];
+      final_prices = [];
+      universe = [];
+    }
+  in
+  _with_writer_output ~result ~prefix:"/tmp/result_writer_retraded_" (fun dir ->
+      let header, rows = _read_trades_csv ~output_dir:dir in
+      let trig_idx = _col_idx header ~name:"exit_trigger" in
+      let kind_idx = _col_idx header ~name:"stop_trigger_kind" in
+      let pid_idx = _col_idx header ~name:"position_id" in
+      assert_that rows
+        (elements_are
+           [
+             all_of
+               [
+                 field (fun c -> List.nth_exn c trig_idx) (equal_to "stop_loss");
+                 field (fun c -> List.nth_exn c kind_idx) (equal_to "intraday");
+                 field
+                   (fun c -> List.nth_exn c pid_idx)
+                   (equal_to "AAPL-wein-1");
+               ];
+             all_of
+               [
+                 field
+                   (fun c -> List.nth_exn c trig_idx)
+                   (equal_to "end_of_period");
+                 field
+                   (fun c -> List.nth_exn c kind_idx)
+                   (equal_to "end_of_period");
+                 field
+                   (fun c -> List.nth_exn c pid_idx)
+                   (equal_to "AAPL-wein-2");
+               ];
+           ]))
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -794,6 +899,8 @@ let suite =
          >:: test_trades_csv_populates_context_from_audit_and_stop_log;
          "trades.csv context falls back to empty when no audit"
          >:: test_trades_csv_context_falls_back_to_empty_when_no_audit;
+         "trades.csv re-traded symbol keys triggers by position_id"
+         >:: test_retraded_symbol_keys_triggers_by_position_id;
        ]
 
 let () = run_test_tt_main suite

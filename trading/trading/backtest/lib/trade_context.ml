@@ -11,6 +11,7 @@ type t = {
   stop_trigger_kind : string option;
   days_to_first_stop_trigger : int option;
   screener_score_at_entry : int option;
+  position_id : string option;
 }
 [@@deriving sexp]
 
@@ -37,6 +38,7 @@ let csv_header_fields =
     "stop_trigger_kind";
     "days_to_first_stop_trigger";
     "screener_score_at_entry";
+    "position_id";
   ]
 
 let _fmt_float4_opt = function Some f -> Printf.sprintf "%.4f" f | None -> ""
@@ -51,6 +53,7 @@ let csv_row_fields (t : t) =
     _fmt_string_opt t.stop_trigger_kind;
     _fmt_int_opt t.days_to_first_stop_trigger;
     _fmt_int_opt t.screener_score_at_entry;
+    _fmt_string_opt t.position_id;
   ]
 
 type precomputed = {
@@ -178,6 +181,20 @@ let _days_to_first_stop_trigger ~(entry_date : Date.t) ~(exit_date : Date.t)
   | Some (Stop_loss _) -> Some (Date.diff exit_date entry_date)
   | _ -> None
 
+(** Position ID for [trade], recovered from the matched audit record. This is
+    the join key that every stop-derived column resolves through — see
+    {!stop_info_for_trade}. *)
+let _position_id_for_trade (pre : precomputed)
+    ~(trade : Trading_simulation.Metrics.trade_metrics) : string option =
+  _lookup_audit_for_trade pre ~symbol:trade.symbol ~entry_date:trade.entry_date
+  |> Option.map ~f:(fun (r : Trade_audit.audit_record) -> r.entry.position_id)
+
+let stop_info_for_trade (pre : precomputed)
+    ~(trade : Trading_simulation.Metrics.trade_metrics) :
+    Stop_log.stop_info option =
+  let position_id = _position_id_for_trade pre ~trade in
+  _stop_info_for ~position_id ~symbol:trade.symbol pre
+
 let of_precomputed (pre : precomputed)
     ~(trade : Trading_simulation.Metrics.trade_metrics) : t =
   let audit_record =
@@ -188,7 +205,7 @@ let of_precomputed (pre : precomputed)
     Option.map audit_record ~f:(fun (r : Trade_audit.audit_record) -> r.entry)
   in
   let position_id = Option.map entry ~f:(fun e -> e.position_id) in
-  let stop_info = _stop_info_for ~position_id ~symbol:trade.symbol pre in
+  let stop_info = stop_info_for_trade pre ~trade in
   let entry_stage = Option.map entry ~f:(fun e -> stage_label e.stage) in
   let entry_volume_ratio = Option.bind entry ~f:(fun e -> e.volume_ratio) in
   let stop_initial_distance_pct =
@@ -220,6 +237,7 @@ let of_precomputed (pre : precomputed)
     stop_trigger_kind;
     days_to_first_stop_trigger;
     screener_score_at_entry;
+    position_id;
   }
 
 (** Convenience wrapper: builds [precomputed] inline. Per-trade callers in a

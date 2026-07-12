@@ -506,9 +506,10 @@ let test_load_missing_trades_csv_raises _ =
 (** Mirror of [Backtest.Result_writer._write_trades]'s post-G2 header. M5.2e
     adds 6 trailing per-trade context columns (entry_stage, entry_volume_ratio,
     stop_initial_distance_pct, stop_trigger_kind, days_to_first_stop_trigger,
-    screener_score_at_entry). *)
+    screener_score_at_entry); the trades.csv export-join fix appends a trailing
+    position_id column (kept last so positional readers stay valid). *)
 let _canonical_post_g2_header =
-  "symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry"
+  "symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry,position_id"
 
 (* AAPL LONG round-trip: bought at 280, sold at 404, +12 400 / +44.20%. *)
 let _post_g2_long_row =

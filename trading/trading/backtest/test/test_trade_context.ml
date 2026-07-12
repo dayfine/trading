@@ -121,6 +121,7 @@ let test_csv_header_fields_pinned _ =
          equal_to "stop_trigger_kind";
          equal_to "days_to_first_stop_trigger";
          equal_to "screener_score_at_entry";
+         equal_to "position_id";
        ])
 
 (* of_audit_and_stop_log: full join ----------------------------------- *)
@@ -157,6 +158,9 @@ let test_of_audit_and_stop_log_populates_all_fields _ =
          field
            (fun (c : TC.t) -> c.screener_score_at_entry)
            (is_some_and (equal_to 75));
+         field
+           (fun (c : TC.t) -> c.position_id)
+           (is_some_and (equal_to "AAPL-wein-1"));
        ])
 
 (* Late Stage2 propagates to entry_stage label. *)
@@ -246,6 +250,7 @@ let test_missing_audit_yields_none_for_audit_fields _ =
          field (fun (c : TC.t) -> c.entry_volume_ratio) is_none;
          field (fun (c : TC.t) -> c.stop_initial_distance_pct) is_none;
          field (fun (c : TC.t) -> c.screener_score_at_entry) is_none;
+         field (fun (c : TC.t) -> c.position_id) is_none;
          field
            (fun (c : TC.t) -> c.stop_trigger_kind)
            (is_some_and (equal_to "intraday"));
@@ -272,6 +277,56 @@ let test_missing_stop_log_yields_none_for_stop_fields _ =
          field (fun (c : TC.t) -> c.days_to_first_stop_trigger) is_none;
        ])
 
+(* stop_info_for_trade: re-traded symbol keys by position_id ---------- *)
+
+(* A symbol traded twice must resolve each round-trip to its OWN stop_info via
+   the audit-recovered position_id, independent of the order the stop_infos are
+   supplied in. This is the join the result writer relies on so exit_trigger
+   stays consistent with stop_trigger_kind on re-traded symbols. *)
+let test_stop_info_for_trade_keys_by_position_id _ =
+  let trade1 =
+    make_trade ~entry_date:(_date "2024-01-15") ~exit_date:(_date "2024-02-20")
+      ()
+  in
+  let trade2 =
+    make_trade ~entry_date:(_date "2024-05-01") ~exit_date:(_date "2024-06-10")
+      ()
+  in
+  let entry1 =
+    make_entry ~entry_date:(_date "2024-01-15") ~position_id:"AAPL-wein-1" ()
+  in
+  let entry2 =
+    make_entry ~entry_date:(_date "2024-05-01") ~position_id:"AAPL-wein-2" ()
+  in
+  let stop1 =
+    make_stop_info ~position_id:"AAPL-wein-1" ~symbol:"AAPL"
+      ~exit_trigger:(SL.Stop_loss { stop_price = 138.0; actual_price = 137.99 })
+      ()
+  in
+  let stop2 =
+    make_stop_info ~position_id:"AAPL-wein-2" ~symbol:"AAPL"
+      ~exit_trigger:SL.End_of_period ()
+  in
+  (* stop_infos deliberately reversed relative to trade order so an
+     order-dependent (FIFO) join would mis-assign. *)
+  let pre =
+    TC.precompute
+      ~audit:[ make_record entry1; make_record entry2 ]
+      ~stop_infos:[ stop2; stop1 ]
+  in
+  assert_that
+    (TC.stop_info_for_trade pre ~trade:trade1)
+    (is_some_and
+       (field
+          (fun (i : SL.stop_info) -> i.position_id)
+          (equal_to "AAPL-wein-1")));
+  assert_that
+    (TC.stop_info_for_trade pre ~trade:trade2)
+    (is_some_and
+       (field
+          (fun (i : SL.stop_info) -> i.position_id)
+          (equal_to "AAPL-wein-2")))
+
 (* csv_row_fields formatting ----------------------------------------- *)
 
 let test_csv_row_fields_formats_correctly _ =
@@ -285,6 +340,7 @@ let test_csv_row_fields_formats_correctly _ =
       stop_trigger_kind = Some "intraday";
       days_to_first_stop_trigger = Some 96;
       screener_score_at_entry = Some 75;
+      position_id = Some "AAPL-wein-1";
     }
   in
   assert_that (TC.csv_row_fields ctx)
@@ -296,6 +352,7 @@ let test_csv_row_fields_formats_correctly _ =
          equal_to "intraday";
          equal_to "96";
          equal_to "75";
+         equal_to "AAPL-wein-1";
        ])
 
 let test_csv_row_fields_renders_none_as_empty _ =
@@ -309,11 +366,13 @@ let test_csv_row_fields_renders_none_as_empty _ =
       stop_trigger_kind = None;
       days_to_first_stop_trigger = None;
       screener_score_at_entry = None;
+      position_id = None;
     }
   in
   assert_that (TC.csv_row_fields ctx)
     (elements_are
        [
+         equal_to "";
          equal_to "";
          equal_to "";
          equal_to "";
@@ -340,6 +399,8 @@ let suite =
          >:: test_missing_audit_yields_none_for_audit_fields;
          "missing stop_log -> stop fields None"
          >:: test_missing_stop_log_yields_none_for_stop_fields;
+         "stop_info_for_trade keys by position_id"
+         >:: test_stop_info_for_trade_keys_by_position_id;
          "csv_row_fields formats correctly"
          >:: test_csv_row_fields_formats_correctly;
          "csv_row_fields renders None as empty"

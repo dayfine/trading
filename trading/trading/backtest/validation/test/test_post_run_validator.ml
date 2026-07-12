@@ -100,6 +100,27 @@ let test_v5 _ =
   in
   assert_that (result ~id:"V5" inputs) (violations_and_pass 1 false)
 
+(* A re-traded symbol whose two round-trips each carry consistent per-position
+   triggers passes V5. This is the post-fix shape of the WSM specimen the
+   trades.csv export-join defect produced (laggard_rotation paired with
+   gap_down; stop_loss paired with non_stop_exit) — both joins now key by
+   position_id so each row is internally consistent. *)
+let test_v5_retraded_symbol_consistent _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"WSM" ~entry_date:"2017-08-01" ~exit_date:"2017-10-14"
+            ~exit_trigger:"laggard_rotation" ~stop_trigger_kind:"non_stop_exit"
+            ();
+          trade ~symbol:"WSM" ~entry_date:"2023-05-01" ~exit_date:"2023-07-01"
+            ~exit_trigger:"stop_loss" ~stop_trigger_kind:"intraday" ();
+        ];
+    }
+  in
+  assert_that (result ~id:"V5" inputs) (violations_and_pass 0 true)
+
 (* ---- V6: rename-twin duplicate positions ------------------------------- *)
 
 let test_v6 _ =
@@ -316,6 +337,7 @@ let suite =
          "v1_stage" >:: test_v1;
          "v2_macro" >:: test_v2;
          "v5_trigger_consistency" >:: test_v5;
+         "v5_retraded_symbol_consistent" >:: test_v5_retraded_symbol_consistent;
          "v6_twin" >:: test_v6;
          "v6_no_twin" >:: test_v6_no_twin;
          "v6_price_noise_twin" >:: test_v6_price_noise_twin;
