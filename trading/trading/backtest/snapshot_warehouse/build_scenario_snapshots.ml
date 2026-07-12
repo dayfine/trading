@@ -60,15 +60,64 @@ let _log_plan (plan : Plan.t) ~scenario_path =
     (Date.to_string plan.end_date)
     plan.benchmark_symbol
 
+(* Load a symbol's windowed adjusted-close series for twin detection. Returns
+   [None] when the CSV is missing / unreadable / empty in-window (that symbol
+   simply cannot be a twin candidate). *)
+let _load_series ~data_dir ~warmup_start ~end_date symbol =
+  let open Option.Let_syntax in
+  let%bind storage = Result.ok (Csv.Csv_storage.create ~data_dir symbol) in
+  let%bind bars = Result.ok (Csv.Csv_storage.get storage ()) in
+  match Bar_window.filter ~start:warmup_start ~end_:end_date bars with
+  | [] -> None
+  | windowed ->
+      let closes =
+        List.map windowed ~f:(fun (b : Types.Daily_price.t) ->
+            (b.date, b.adjusted_close))
+        |> Array.of_list
+      in
+      Array.sort closes ~compare:(fun (d1, _) (d2, _) -> Date.compare d1 d2);
+      let last_date, _ = closes.(Array.length closes - 1) in
+      Some { Twin_detector.symbol; data_end = last_date; closes }
+
+let _write_twin_report ~output_dir report =
+  (if not (Stdlib.Sys.file_exists output_dir) then
+     try Stdlib.Sys.mkdir output_dir 0o755 with _ -> ());
+  let path = Filename.concat output_dir "rename_twin_report.txt" in
+  let text = Twin_detector.render report in
+  (try Out_channel.write_all path ~data:(text ^ "\n")
+   with Sys_error msg -> Printf.eprintf "twin report write failed: %s\n%!" msg);
+  Printf.eprintf "%s\n%!" text
+
+(* When armed, detect rename-twins across [all_symbols] and drop the losing
+   legs; emit the sidecar report. Default-off config → [all_symbols] unchanged,
+   no report. *)
+let _dedupe_symbols ~config ~data_dir ~warmup_start ~end_date ~output_dir
+    all_symbols =
+  if not config.Twin_detector.Config.enabled then all_symbols
+  else begin
+    let series =
+      List.filter_map all_symbols
+        ~f:(_load_series ~data_dir ~warmup_start ~end_date)
+    in
+    let report = Twin_detector.detect config series in
+    _write_twin_report ~output_dir report;
+    Twin_detector.survivors report ~all_symbols
+  end
+
 let main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir ~incremental
-    ~progress_every () =
+    ~progress_every ~twin_config () =
   let scenario = Scenario.load scenario_path in
   let universe =
     _resolve_universe ~fixtures_root ~universe_path:scenario.universe_path
   in
   let plan = Plan.derive ~scenario ~universe in
   _log_plan plan ~scenario_path;
-  Build_runner.build ~symbols:plan.all_symbols ~csv_data_dir ~output_dir
+  let symbols =
+    _dedupe_symbols ~config:twin_config ~data_dir:(Fpath.v csv_data_dir)
+      ~warmup_start:plan.warmup_start ~end_date:plan.end_date ~output_dir
+      plan.all_symbols
+  in
+  Build_runner.build ~symbols ~csv_data_dir ~output_dir
     ~benchmark_symbol:(Some plan.benchmark_symbol)
     ~start_date:(Some plan.warmup_start) ~end_date:(Some plan.end_date)
     ~incremental ~progress_every ()
@@ -103,9 +152,38 @@ let command =
            (Printf.sprintf
               "N Emit progress.sexp every N symbols processed (default %d)"
               Build_runner.default_progress_every)
+     and dedupe_rename_twins =
+       flag "dedupe-rename-twins" no_arg
+         ~doc:
+           "Drop rename-twin duplicate legs (same series under old+new ticker) \
+            before building; writes rename_twin_report.txt. Default off — \
+            existing warehouses stay reproducible."
+     and twin_min_overlap_days =
+       flag "twin-min-overlap-days"
+         (optional_with_default Twin_detector.Config.default.min_overlap_days
+            int)
+         ~doc:"N Min shared trading days for a twin match"
+     and twin_match_fraction =
+       flag "twin-match-fraction"
+         (optional_with_default Twin_detector.Config.default.match_fraction
+            float)
+         ~doc:"F Min fraction of overlapping days with near-identical closes"
+     and twin_close_epsilon =
+       flag "twin-close-epsilon"
+         (optional_with_default Twin_detector.Config.default.close_epsilon float)
+         ~doc:"E Relative tolerance for a single-day close match"
      in
      fun () ->
+       let twin_config =
+         {
+           Twin_detector.Config.enabled = dedupe_rename_twins;
+           min_overlap_days = twin_min_overlap_days;
+           match_fraction = twin_match_fraction;
+           close_epsilon = twin_close_epsilon;
+           prefilter_rel_tol = Twin_detector.Config.default.prefilter_rel_tol;
+         }
+       in
        main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir ~incremental
-         ~progress_every ())
+         ~progress_every ~twin_config ())
 
 let () = Command_unix.run command

@@ -5,6 +5,13 @@
  (preprocess
   (pps ppx_jane)))
 
+(library
+ (name twin_detector)
+ (modules twin_detector)
+ (libraries core)
+ (preprocess
+  (pps ppx_jane)))
+
 (executable
  (name build_scenario_snapshots)
  (modules build_scenario_snapshots)
@@ -14,9 +21,13 @@
   core_unix.command_unix
   fpath
   status
+  types
+  csv
+  scripts.bar_window
   backtest
   scenario_lib
   scripts.build_runner
-  scenario_snapshot_plan)
+  scenario_snapshot_plan
+  twin_detector)
  (preprocess
   (pps ppx_jane)))
