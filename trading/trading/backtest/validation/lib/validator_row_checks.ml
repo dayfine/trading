@@ -75,34 +75,49 @@ let check_v5 inputs = fold_steps inputs.trades ~f:_v5_step
 
 (* ---- V6: rename-twin duplicate positions ------------------------------- *)
 
+(* Same-company ticker renames produce twin rows whose prices differ by feed
+   adjustment noise (NLS 4.72 vs BFX 4.75 at the same dates/quantity) — exact
+   price equality misses them, so twins match within a relative tolerance on
+   price and quantity, keyed by the exact (entry, exit) date pair. *)
+let _twin_tolerance = 0.05
+
 let _twin_key (r : trade_row) =
-  sprintf "%s|%s|%.2f|%.2f"
-    (Date.to_string r.entry_date)
-    (Date.to_string r.exit_date)
-    r.entry_price r.exit_price
+  sprintf "%s|%s" (Date.to_string r.entry_date) (Date.to_string r.exit_date)
+
+let _within_tolerance a b =
+  let denom = Float.max (Float.abs a) (Float.abs b) in
+  Float.(denom = 0.) || Float.(abs (a -. b) /. denom <= _twin_tolerance)
+
+let _is_twin (a : trade_row) (b : trade_row) =
+  (not (String.equal a.symbol b.symbol))
+  && _within_tolerance a.entry_price b.entry_price
+  && _within_tolerance a.exit_price b.exit_price
+  && _within_tolerance a.quantity b.quantity
 
 let _add_twin groups (row : trade_row) =
   let key = _twin_key row in
   let cur = Hashtbl.find groups key |> Option.value ~default:[] in
-  if
-    List.exists cur ~f:(fun (r : trade_row) -> String.equal r.symbol row.symbol)
-  then ()
-  else Hashtbl.set groups ~key ~data:(row :: cur)
+  Hashtbl.set groups ~key ~data:(row :: cur)
 
 let _group_twins trades =
   let groups = Hashtbl.create (module String) in
   List.iter trades ~f:(_add_twin groups);
   groups
 
-let _twin_step (rep : trade_row) data =
+let _twin_partners rows row = List.filter rows ~f:(_is_twin row)
+
+let _twin_step (rep : trade_row) partners =
   let syms =
-    List.map data ~f:(fun (r : trade_row) -> r.symbol)
-    |> List.sort ~compare:String.compare
+    rep.symbol :: List.map partners ~f:(fun (r : trade_row) -> r.symbol)
+    |> List.dedup_and_sort ~compare:String.compare
   in
   Fail (spec rep ("twin positions: " ^ String.concat ~sep:"/" syms))
 
 let _v6_group_step data =
-  match data with rep :: _ :: _ -> _twin_step rep data | _ -> Pass
+  let has_partner r = not (List.is_empty (_twin_partners data r)) in
+  match List.find data ~f:has_partner with
+  | Some rep -> _twin_step rep (_twin_partners data rep)
+  | None -> Pass
 
 let check_v6 inputs =
   Hashtbl.fold (_group_twins inputs.trades) ~init:empty_finding

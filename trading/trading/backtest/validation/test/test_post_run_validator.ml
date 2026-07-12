@@ -125,6 +125,106 @@ let test_v6_no_twin _ =
   in
   assert_that (result ~id:"V6" inputs) (violations_and_pass 0 true)
 
+(* V6 regression: rename twins differ by feed-adjustment price noise (the
+   real NLS/BFX rows: 4.72 vs 4.75 entries, same dates/qty/exit). *)
+let test_v6_price_noise_twin _ =
+  let t symbol entry_price =
+    trade ~symbol ~entry_date:"2020-04-18" ~exit_date:"2021-01-16" ~entry_price
+      ~exit_price:21.0 ()
+  in
+  let inputs =
+    { (Vt.empty_inputs ()) with trades = [ t "NLS" 4.72; t "BFX" 4.75 ] }
+  in
+  assert_that (result ~id:"V6" inputs) (violations_and_pass 1 false)
+
+(* ---- V3/V4: armed-only realism checks ----------------------------------- *)
+
+let with_daily pairs : Vt.bars =
+  {
+    weekly_dates = [||];
+    weekly_closes = [||];
+    daily =
+      Array.of_list_map pairs ~f:(fun (d, c, v) -> (Date.of_string d, c, v));
+  }
+
+let test_v3_armed_flags_thin_adv _ =
+  let config =
+    { Vt.default_config with min_entry_dollar_adv = Some 1_000_000.0 }
+  in
+  let inputs =
+    {
+      (Vt.empty_inputs ~config ()) with
+      trades = [ trade ~symbol:"THIN" ~entry_date:"2020-01-10" () ];
+      bars = bars_of [ ("THIN", with_daily [ ("2020-01-09", 5.0, 1000) ]) ];
+    }
+  in
+  assert_that (result ~id:"V3" inputs) (violations_and_pass 1 false)
+
+let test_v3_unarmed_noop _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades = [ trade ~symbol:"THIN" ~entry_date:"2020-01-10" () ];
+      bars = bars_of [ ("THIN", with_daily [ ("2020-01-09", 5.0, 1000) ]) ];
+    }
+  in
+  assert_that (result ~id:"V3" inputs) (violations_and_pass 0 true)
+
+let test_v4_armed_flags_stale_open _ =
+  let config = { Vt.default_config with stale_exit_after_days = Some 5 } in
+  let op : Vt.open_row =
+    {
+      symbol = "GHOST";
+      side = "LONG";
+      entry_date = Date.of_string "2020-01-10";
+      entry_price = 10.0;
+      quantity = 100.0;
+    }
+  in
+  let inputs =
+    {
+      (Vt.empty_inputs ~config ()) with
+      open_positions = [ op ];
+      bars = bars_of [ ("GHOST", with_daily [ ("2020-02-01", 10.0, 1000) ]) ];
+      run_end = Date.of_string "2020-03-01";
+    }
+  in
+  assert_that (result ~id:"V4" inputs) (violations_and_pass 1 false)
+
+(* ---- V7: Virgin_territory needs enough visible history ------------------ *)
+
+let test_v7_starved_virgin _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades = [ trade ~symbol:"COO" ~entry_date:"2020-05-29" () ];
+      audit =
+        audit_of
+          [
+            ( "COO",
+              ctx ~resistance_quality:(Some Weinstein_types.Virgin_territory) ()
+            );
+          ];
+      bars =
+        bars_of
+          [ ("COO", weekly [ ("2020-05-22", 90.0); ("2020-05-29", 100.0) ]) ];
+    }
+  in
+  assert_that (result ~id:"V7" inputs) (violations_and_pass 1 false)
+
+(* ---- V8: Declining-MA entry -------------------------------------------- *)
+
+let test_v8_declining_ma _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades = [ trade ~symbol:"AIR" ~entry_date:"2020-03-14" () ];
+      audit =
+        audit_of [ ("AIR", ctx ~ma_direction:Weinstein_types.Declining ()) ];
+    }
+  in
+  assert_that (result ~id:"V8" inputs) (violations_and_pass 1 false)
+
 (* ---- V9: entry beneath overhead supply --------------------------------- *)
 
 let test_v9 _ =
@@ -218,6 +318,12 @@ let suite =
          "v5_trigger_consistency" >:: test_v5;
          "v6_twin" >:: test_v6;
          "v6_no_twin" >:: test_v6_no_twin;
+         "v6_price_noise_twin" >:: test_v6_price_noise_twin;
+         "v3_armed_flags_thin_adv" >:: test_v3_armed_flags_thin_adv;
+         "v3_unarmed_noop" >:: test_v3_unarmed_noop;
+         "v4_armed_flags_stale_open" >:: test_v4_armed_flags_stale_open;
+         "v7_starved_virgin" >:: test_v7_starved_virgin;
+         "v8_declining_ma" >:: test_v8_declining_ma;
          "v9_overhead" >:: test_v9;
          "v9_clean" >:: test_v9_clean;
          "v10_spike" >:: test_v10;

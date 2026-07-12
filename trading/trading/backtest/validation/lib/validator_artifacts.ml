@@ -119,20 +119,21 @@ let _same_week d1 d2 =
    the (date, adjusted_close) fields this validator reads — inlined so this
    trading/trading/backtest library carries no analysis/ indicator import
    (architecture rule A2). *)
+let _ends_on_friday (b : Types.Daily_price.t) =
+  Day_of_week.equal (Date.day_of_week b.date) Day_of_week.Fri
+
+(* Drop the trailing week when its last observed day is not a Friday. *)
+let _drop_trailing_partial last_bars =
+  match List.rev last_bars with
+  | last :: rest_rev when not (_ends_on_friday last) -> List.rev rest_rev
+  | _ -> last_bars
+
 let _weekly_last_bars (daily : Types.Daily_price.t list) =
   let groups =
     List.group daily ~break:(fun a b ->
         not (_same_week a.Types.Daily_price.date b.Types.Daily_price.date))
   in
-  let last_bars = List.filter_map groups ~f:List.last in
-  match List.rev last_bars with
-  | last :: rest_rev
-    when not
-           (Day_of_week.equal
-              (Date.day_of_week last.Types.Daily_price.date)
-              Day_of_week.Fri) ->
-      List.rev rest_rev
-  | _ -> last_bars
+  _drop_trailing_partial (List.filter_map groups ~f:List.last)
 
 let _bars_of_daily daily =
   let weekly = _weekly_last_bars daily in
