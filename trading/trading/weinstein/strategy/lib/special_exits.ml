@@ -111,6 +111,44 @@ let _liquidity_skip_ids ~force_exit_ts ~stop_exited_ids ~stage3_exited_ids
     (Transition_assembly.trigger_exit_ids_of force_exit_ts)
     (Set.union stop_exited_ids (Set.union stage3_exited_ids laggard_exited_ids))
 
+(* Extension-stop special exit: emitted last (after the liquidity exit) and
+   merged into the force-exit channel — same close-fill convention + audit path.
+   Skips every position already exiting this tick via ANY prior channel (stop,
+   force-liq, Stage-3, laggard, liquidity): [skip_ids] is the pre-liquidity union
+   and [force_exit_ts] now carries the prepended liquidity exits, so their union
+   is the full skip set. Tighten-only (L2): the extension stop only ADDS a
+   trigger, so an earlier structural exit always wins. No-op at the default
+   config (extension_stop disabled). Returns the force-exit channel with the
+   extension exits prepended. *)
+let _run_extension_stop_exit ~config ~record_force_exit ~positions
+    ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~skip_ids
+    ~current_date =
+  let extension_ts =
+    Extension_stop_runner.update ~config:config.extension_stop_config
+      ~ma_period:config.stage_config.Stage.ma_period ~is_screening_day:is_friday
+      ~positions ~bar_reader ~get_price ~skip_position_ids:skip_ids
+      ~current_date
+  in
+  List.iter extension_ts
+    ~f:
+      (record_force_exit ~last_stop_out_dates ~positions ~current_date
+         ~cooldown_weeks:0 ~label:"extension_stop");
+  extension_ts
+
+let _run_extension_special_exit ~config ~record_force_exit ~positions
+    ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit ~skip_ids
+    ~force_exit_ts ~current_date =
+  let extension_skip_ids =
+    Set.union skip_ids (Transition_assembly.trigger_exit_ids_of force_exit_ts)
+  in
+  let extension_ts =
+    _run_extension_stop_exit ~config ~record_force_exit ~positions
+      ~last_stop_out_dates ~bar_reader ~get_price ~is_friday
+      ~skip_ids:extension_skip_ids ~current_date
+  in
+  emit_audit extension_ts;
+  extension_ts @ force_exit_ts
+
 (* Build the base force-liquidation channel: run the force-liq runner, then drop
    positions already exiting via a stop this tick. Returns the trimmed channel
    plus the stop-exited id set used to seed the running skip set. *)
@@ -167,6 +205,11 @@ let run ~config ~record_force_exit ~positions ~last_stop_out_dates
   in
   let force_exit_ts =
     _run_liquidity_special_exit ~config ~record_force_exit ~positions
+      ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit
+      ~skip_ids ~force_exit_ts ~current_date
+  in
+  let force_exit_ts =
+    _run_extension_special_exit ~config ~record_force_exit ~positions
       ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit
       ~skip_ids ~force_exit_ts ~current_date
   in

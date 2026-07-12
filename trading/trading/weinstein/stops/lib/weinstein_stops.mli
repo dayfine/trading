@@ -44,8 +44,8 @@ module Extension_stop = Extension_stop
 (** Extension stop (default-off, [Extension_stop.config]). A wide tail-INSURANCE
     trail for a held long that has run far above its 30-week WMA (blow-off).
     Pure trigger + trail logic; the strategy-side runner
-    ({!Extension_stop_runner}) feeds it the holding-window series. See the module
-    doc for the contract. *)
+    ({!Extension_stop_runner}) feeds it the holding-window series. See the
+    module doc for the contract. *)
 
 (** {1 Core Functions} *)
 

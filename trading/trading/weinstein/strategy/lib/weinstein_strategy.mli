@@ -154,6 +154,12 @@ module Liquidity_exit_runner = Liquidity_exit_runner
     on Friday ticks when [config.liquidity_config.min_hold_dollar_adv > 0.0].
     See {!Liquidity_exit_runner}. *)
 
+module Extension_stop_runner = Extension_stop_runner
+(** Extension-stop exit runner — the strategy-side arm of the extension
+    tail-insurance stop. Invoked among the special exits on Friday ticks when
+    [config.extension_stop_config] is enabled; LONG-only, weekly-close,
+    tighten-only. See {!Extension_stop_runner}. *)
+
 module Macro_inputs = Macro_inputs
 (** Sector map + global index assembly from accumulated bar history. Exposes the
     canonical {!Macro_inputs.spdr_sector_etfs} and
@@ -548,6 +554,14 @@ type config = {
           (bit-identical single combined walk). Reserves capital for shorts so
           they are not crowded out by longs at the entry walk. See
           [Weinstein_strategy_config]. *)
+  extension_stop_config : Weinstein_stops.Extension_stop.config;
+      [@sexp.default Weinstein_stops.Extension_stop.default_config]
+      (** Extension-stop tail-INSURANCE trail for a held long far above its
+          WMA30; default {!Weinstein_stops.Extension_stop.default_config}
+          ([trigger_ratio = 0.0] / [trail_pct = 0.0]) DISABLES it (bit-identical
+          to baseline). Wired via [Extension_stop_runner] as a special-exit
+          channel (weekly-close, tighten-only). See [Weinstein_strategy_config].
+      *)
   liquidity_config : Liquidity_config.t;
       [@sexp.default Liquidity_config.default_config]
       (** Liquidity-realism overlay parameters (held-position degradation exit +

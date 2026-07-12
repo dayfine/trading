@@ -451,6 +451,55 @@ type config = {
           Default-off until an experiment-ledger ACCEPT (per
           [.claude/rules/experiment-flag-discipline.md] +
           [.claude/rules/promotion-confirmation.md]). *)
+  extension_stop_config : Weinstein_stops.Extension_stop.config;
+      [@sexp.default Weinstein_stops.Extension_stop.default_config]
+      (** Extension-stop parameters — a wide tail-INSURANCE trail for a held
+          long that has run far above its 30-week WMA (a blow-off / parabolic
+          advance). Wired through {!Extension_stop_runner} as a special-exit
+          channel that emits a [TriggerExit] once the weekly close reached
+          [trigger_ratio ×] the WMA30 and has since fallen [trail_pct] below the
+          post-trigger running peak weekly close (weekly-close semantics, L3).
+
+          {b Tail-insurance, not an alpha axis.} A catastrophic-stop-class dial
+          (same class as [stops_config.catastrophic_stop_pct], #1695), NOT a
+          performance knob. Extension events are rare (~0.6-1% of episodes reach
+          [2.0×] WMA30 over a quarter-century), so a walk-forward CV on this
+          axis is structurally powerless; its acceptance basis is the left-tail
+          / dispersion / event-level audit (armed-vs-off record runs + the
+          [analysis/scripts/extension_screen] counterfactual), {b never} fold
+          Sharpe. User-directed insurance build (2026-07-11): "no way we
+          actually sit through 140→70, even if that would take a manual
+          intervention" — an encoded, tested rule beats an untested panic exit
+          ([dev/backtest/extension-screen-2026-07-11/FINDINGS.md] §"What
+          survives").
+
+          {b Default-off.} Default
+          {!Weinstein_stops.Extension_stop.default_config}
+          ([trigger_ratio = 0.0], [trail_pct = 0.0]) DISABLES the mechanism:
+          {!Extension_stop_runner.update} returns [[]], so every existing
+          golden/baseline replays bit-identically
+          ([.claude/rules/experiment-flag-discipline.md] R1). Set e.g.
+          [((trigger_ratio 2.0) (trail_pct 0.25))] to arm it.
+
+          {b Tighten-only (L2).} The runner only ever ADDS an exit trigger and
+          never lowers or replaces the structural trailing stop; a position
+          already exiting this tick via any other channel is skipped, so an
+          earlier structural exit always wins.
+
+          {b Faithfulness (W2).} A faithful {b trader exit-aggressiveness} dial
+          — on a parabolic advance far above the MA a trader takes profits /
+          swing-sells rather than waiting for the MA violation
+          ([docs/design/weinstein-book-reference.md] §5.3 "Trailing Stop —
+          Trader Method"; §Stage 3 detail Ch. 2 "Traders: exit with profits").
+          The spine is untouched. Screen evidence pins the width:
+          [trail_pct 0.25] survives the on-ramp shakeouts (the AXTI April 2025
+          dip, the January chop) and still banks the collapse; tighter
+          [0.10-0.20] trails are on-ramp killers.
+
+          Searchable as a nested {!Walk_forward.Variant_matrix} axis, e.g.
+          [((key (extension_stop_config trigger_ratio)) (values (2.0 2.25)))].
+          Default-off until an experiment-ledger ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md]). *)
   liquidity_config : Liquidity_config.t;
       [@sexp.default Liquidity_config.default_config]
       (** Liquidity-realism overlay parameters — the held-position liquidity
