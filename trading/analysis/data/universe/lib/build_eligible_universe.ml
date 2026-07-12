@@ -35,10 +35,8 @@ type config = {
   reit_policy : CPT.reit_policy;
   exclude_preferred : bool;
   asset_type_blocklist : ATB.t; [@sexp.default ATB.empty]
-      (* Symbol-level exclusion of instruments EODHD mislabels as common stock
-         (bond / equity CEFs, bullion trusts). No-op default [ATB.empty] keeps
-         the build bit-identical; arming it (e.g. [ATB.curated]) is a separate
-         decision. *)
+      (* EODHD-mislabeled non-equities; [ATB.empty] = bit-identical no-op.
+         Documented in build_eligible_universe.mli. *)
   bars_root : string;
   symbol_types_path : string;
   sectors_csv_path : string;
@@ -216,9 +214,8 @@ let _policy_config ~config : CPT.config =
     exclude_preferred = config.exclude_preferred;
   }
 
-(* Drop candidates whose symbol is in the asset-type blocklist (instruments
-   EODHD mislabels as common stock). A no-op when the blocklist is empty (the
-   default), so the pre-blocklist behaviour is preserved bit-for-bit. *)
+(* Drop blocklisted symbols; empty blocklist (the default) is a bit-identical
+   no-op. *)
 let _apply_blocklist ~config (candidates : CPT.candidate list) =
   if ATB.size config.asset_type_blocklist = 0 then candidates
   else
