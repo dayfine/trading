@@ -20,6 +20,7 @@
   test_liquidity_metric
   test_liquidity_gate
   test_liquidity_exit_runner
+  test_extension_stop_runner
   test_spy_only_weinstein_strategy
   test_breaker_spy_strategy
   test_stage3_force_exit_runner

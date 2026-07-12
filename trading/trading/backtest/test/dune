@@ -59,6 +59,7 @@
   trading.strategy
   weinstein_trading.strategy
   weinstein_trading.portfolio_risk
+  weinstein_trading.stops
   weinstein.screener
   types
   status

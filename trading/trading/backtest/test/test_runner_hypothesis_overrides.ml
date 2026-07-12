@@ -497,6 +497,59 @@ let test_cash_reserve_pct_axis_resolves_via_overlay_validator _ =
   in
   assert_that merged.cash_reserve_pct (float_equal 0.30)
 
+(* -------------------------------------------------------------------- *)
+(* extension_stop_config — tail-insurance trail (default-off nested axis) *)
+(* -------------------------------------------------------------------- *)
+
+(** [extension_stop_config] defaults to the no-op ([trigger_ratio = 0.0] /
+    [trail_pct = 0.0]) — the mechanism is disabled, so every existing
+    golden/baseline decodes unchanged
+    ([.claude/rules/experiment-flag-discipline.md] R1). *)
+let test_default_extension_stop_config_is_no_op _ =
+  let cfg = _default_config () in
+  assert_that cfg.extension_stop_config
+    (all_of
+       [
+         field
+           (fun (c : Weinstein_stops.Extension_stop.config) -> c.trigger_ratio)
+           (float_equal 0.0);
+         field
+           (fun (c : Weinstein_stops.Extension_stop.config) -> c.trail_pct)
+           (float_equal 0.0);
+       ])
+
+(** Deep-merge path for the nested [extension_stop_config]: a partial-config
+    overlay lands both sub-fields via the sexp merge. *)
+let test_override_extension_stop_config _ =
+  let merged =
+    _apply_one_override (_default_config ())
+      (Sexp.of_string
+         "((extension_stop_config ((trigger_ratio 2.0) (trail_pct 0.25))))")
+  in
+  assert_that merged.extension_stop_config
+    (all_of
+       [
+         field
+           (fun (c : Weinstein_stops.Extension_stop.config) -> c.trigger_ratio)
+           (float_equal 2.0);
+         field
+           (fun (c : Weinstein_stops.Extension_stop.config) -> c.trail_pct)
+           (float_equal 0.25);
+       ])
+
+(** Axis reachability (experiment-flag-discipline R2): the nested
+    [extension_stop_config] override resolves through the {b real}
+    [Overlay_validator.apply_overrides] (the sweep / WF-CV path) with no
+    unknown-key error, landing a single sub-field — this is what makes
+    [((key (extension_stop_config trigger_ratio)) (values (2.0 2.25)))] a valid
+    [Variant_matrix] axis. *)
+let test_extension_stop_config_axis_resolves_via_overlay_validator _ =
+  let merged =
+    Backtest.Overlay_validator.apply_overrides (_default_config ())
+      [ Sexp.of_string "((extension_stop_config ((trigger_ratio 2.0))))" ]
+  in
+  assert_that merged.extension_stop_config.trigger_ratio (float_equal 2.0)
+
 let suite =
   "Runner_hypothesis_overrides"
   >::: [
@@ -554,6 +607,12 @@ let suite =
          >:: test_override_cash_reserve_pct;
          "cash_reserve_pct axis resolves via Overlay_validator"
          >:: test_cash_reserve_pct_axis_resolves_via_overlay_validator;
+         "default extension_stop_config is no-op"
+         >:: test_default_extension_stop_config_is_no_op;
+         "override extension_stop_config through sexp"
+         >:: test_override_extension_stop_config;
+         "extension_stop_config axis resolves via Overlay_validator"
+         >:: test_extension_stop_config_axis_resolves_via_overlay_validator;
        ]
 
 let () = run_test_tt_main suite
