@@ -50,7 +50,13 @@ Design / evidence: `dev/notes/next-session-priorities-2026-07-12.md` §P0a;
     round-trip cases in `test_runner_hypothesis_overrides.ml`.
 
 ## In Progress
-- PR `feat/extension-stop` open, awaiting QC + CI.
+- **Build MERGED (#1934, 2026-07-12)** via the GHA orchestrator on full-green:
+  qc-structural APPROVED + qc-behavioral APPROVED (quality 5) + CI
+  (build-and-test + perf-tier1-smoke) success. Default-off primitive is now on
+  main; behavior unchanged (experiment-flag-discipline R1). Review:
+  `dev/reviews/extension-stop.md`; audit: `dev/audit/2026-07-12-extension-stop.json`.
+- Remaining track work is the acceptance audit below (LOCAL / deep-warehouse,
+  `[non-blocking]`) — the code build itself is complete.
 
 ## Next Steps
 - **Acceptance audit (post-merge, insurance basis).** Run armed-vs-off record
