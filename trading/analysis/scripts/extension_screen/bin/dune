@@ -1,0 +1,14 @@
+(executable
+ (name extension_screen)
+ (libraries
+  core
+  core_unix.command_unix
+  types
+  csv
+  indicators.time_period
+  indicators.sma
+  indicators.types
+  status
+  fpath)
+ (preprocess
+  (pps ppx_jane)))
