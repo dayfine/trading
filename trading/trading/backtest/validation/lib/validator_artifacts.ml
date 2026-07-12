@@ -109,10 +109,33 @@ let load_audit_lookup path =
   | None -> fun _ -> None
   | Some sexp -> _lookup_of_table (_build_audit_table (_records_of_sexp sexp))
 
-let _bars_of_daily daily =
-  let weekly =
-    Time_period.Conversion.daily_to_weekly ~include_partial_week:false daily
+(* Two dates share an ISO trading week iff (year, week_number) match. *)
+let _same_week d1 d2 =
+  Date.week_number d1 = Date.week_number d2 && Date.year d1 = Date.year d2
+
+(* Last daily bar of each ISO week, dropping a trailing week whose last
+   observed day is not a Friday. Mirrors
+   [Time_period.Conversion.daily_to_weekly ~include_partial_week:false] for
+   the (date, adjusted_close) fields this validator reads — inlined so this
+   trading/trading/backtest library carries no analysis/ indicator import
+   (architecture rule A2). *)
+let _weekly_last_bars (daily : Types.Daily_price.t list) =
+  let groups =
+    List.group daily ~break:(fun a b ->
+        not (_same_week a.Types.Daily_price.date b.Types.Daily_price.date))
   in
+  let last_bars = List.filter_map groups ~f:List.last in
+  match List.rev last_bars with
+  | last :: rest_rev
+    when not
+           (Day_of_week.equal
+              (Date.day_of_week last.Types.Daily_price.date)
+              Day_of_week.Fri) ->
+      List.rev rest_rev
+  | _ -> last_bars
+
+let _bars_of_daily daily =
+  let weekly = _weekly_last_bars daily in
   {
     weekly_dates =
       Array.of_list_map weekly ~f:(fun b -> b.Types.Daily_price.date);
