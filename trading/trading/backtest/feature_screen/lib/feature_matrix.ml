@@ -38,7 +38,13 @@ let _rs_trend_categories =
   ]
 
 let _resistance_categories =
-  [ "Virgin_territory"; "Clean"; "Moderate_resistance"; "Heavy_resistance" ]
+  [
+    "Virgin_territory";
+    "Clean";
+    "Moderate_resistance";
+    "Heavy_resistance";
+    "Insufficient_history";
+  ]
 
 let all_features =
   [

@@ -126,6 +126,39 @@ let test_analyze_matches_callback _ =
   assert_that bar_list_result.quality
     (equal_to (callback_result.quality : overhead_quality))
 
+(* ------------------------------------------------------------------ *)
+(* Insufficient history (min_history_bars degrade) — mirrors resistance *)
+(* ------------------------------------------------------------------ *)
+
+(** Default config (min_history_bars = 0): a starved window still grades as
+    before (Virgin_territory here) — the guard is off, bit-identical. *)
+let test_short_history_default_still_virgin _ =
+  let bars = List.init 5 ~f:(fun _ -> make_bar ~low:80.0 ~high:120.0 100.0) in
+  let result =
+    analyze ~config:cfg ~bars ~breakdown_price:60.0 ~as_of_date:as_of
+  in
+  assert_that result.quality (equal_to (Virgin_territory : overhead_quality))
+
+(** Armed (min_history_bars = 100): the same starved window degrades to
+    Insufficient_history instead of claiming Virgin_territory. *)
+let test_short_history_armed_insufficient _ =
+  let armed_cfg = { cfg with Resistance.min_history_bars = 100 } in
+  let bars = List.init 5 ~f:(fun _ -> make_bar ~low:80.0 ~high:120.0 100.0) in
+  let result =
+    analyze ~config:armed_cfg ~bars ~breakdown_price:60.0 ~as_of_date:as_of
+  in
+  assert_that result.quality
+    (equal_to (Insufficient_history : overhead_quality))
+
+(** Armed but with sufficient history: grades normally (not Insufficient). *)
+let test_sufficient_history_armed_grades_normally _ =
+  let armed_cfg = { cfg with Resistance.min_history_bars = 5 } in
+  let bars = List.init 10 ~f:(fun _ -> make_bar ~low:42.0 ~high:48.0 45.0) in
+  let result =
+    analyze ~config:armed_cfg ~bars ~breakdown_price:50.0 ~as_of_date:as_of
+  in
+  assert_that result.quality (equal_to (Heavy_resistance : overhead_quality))
+
 (* NaN/inf guard regression — see _bucket_idx_below guard. With
    congestion_band_pct = 0.0, band_size becomes 0.0 and the
    (breakdown - mid) / band_size division yields inf, which pre-guard
@@ -147,6 +180,12 @@ let () =
            "no bars below → virgin" >:: test_no_below_history_virgin;
            "old bars below outside virgin window → virgin"
            >:: test_old_below_history_virgin;
+           "short history + default config → virgin (guard off)"
+           >:: test_short_history_default_still_virgin;
+           "short history + armed → insufficient history"
+           >:: test_short_history_armed_insufficient;
+           "sufficient history + armed → grades normally"
+           >:: test_sufficient_history_armed_grades_normally;
            "heavy support below" >:: test_heavy_support_many_bars;
            "moderate support below" >:: test_moderate_support_few_bars;
            "clean: only 1 bar below" >:: test_clean_few_bars_below;
