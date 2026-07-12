@@ -20,6 +20,13 @@
     - [screener_score_at_entry] — cascade score the screener assigned at
       decision time. Links to the [optimal-strategy] oracle for M5.5 ML training
       (per-Friday counterfactual labels).
+    - [position_id] — the strategy position ID resolved for this round-trip
+      (from the matched {!Trade_audit.audit_record}). Surfaced as the trailing
+      [trades.csv] column so downstream consumers (post-run validator, trade
+      audit tooling) can join a trade row back to its {!Trade_audit} /
+      {!Stop_log} record by position rather than by the ambiguous
+      [(symbol, entry_date)] tuple — the latter misaligns on re-traded symbols.
+      [None] when no audit record matched.
 
     Pure projection — no computation beyond simple subtraction / ratio / label
     rendering. The audit + stop-log inputs are joined on [(symbol, entry_date)]
@@ -38,6 +45,7 @@ type t = {
   stop_trigger_kind : string option;
   days_to_first_stop_trigger : int option;
   screener_score_at_entry : int option;
+  position_id : string option;
 }
 [@@deriving sexp]
 (** One per-trade context row, keyed by [(symbol, entry_date)] for join with
@@ -53,14 +61,17 @@ val stop_trigger_kind_label : Stop_log.stop_trigger_kind -> string
     label: [gap_down] / [intraday] / [end_of_period] / [non_stop_exit]. *)
 
 val csv_header_fields : string list
-(** The 6 trailing column names for [trades.csv] in M5.2e order: [entry_stage],
-    [entry_volume_ratio], [stop_initial_distance_pct], [stop_trigger_kind],
-    [days_to_first_stop_trigger], [screener_score_at_entry]. Producers
-    concatenate these onto the legacy 13-column header so consumers can locate
-    columns by name. *)
+(** The 7 trailing column names for [trades.csv]: the 6 M5.2e columns
+    ([entry_stage], [entry_volume_ratio], [stop_initial_distance_pct],
+    [stop_trigger_kind], [days_to_first_stop_trigger],
+    [screener_score_at_entry]) followed by [position_id]. Producers concatenate
+    these onto the legacy 13-column header so consumers can locate columns by
+    name. [position_id] is intentionally last so the fixed base-column indices
+    used by positional readers (e.g. the post-run validator's [exit_trigger]=12,
+    [stop_trigger_kind]=16) stay valid. *)
 
 val csv_row_fields : t -> string list
-(** Render a {!t} as the 6 trailing CSV cells in the same order as
+(** Render a {!t} as the 7 trailing CSV cells in the same order as
     {!csv_header_fields}. Floats render at %.4f, ints as decimal, string labels
     verbatim. [None] renders as the empty cell — consumers must tolerate empty
     cells (the canonical M5.2e missing-data sentinel). *)
@@ -87,6 +98,23 @@ val of_precomputed :
 (** Compute the context row for a single trade against pre-built indexes.
     Field-population semantics match {!of_audit_and_stop_log}. O(log N) per call
     (Map lookups). *)
+
+val stop_info_for_trade :
+  precomputed ->
+  trade:Trading_simulation.Metrics.trade_metrics ->
+  Stop_log.stop_info option
+(** Resolve the {!Stop_log.stop_info} that belongs to [trade], keyed by the
+    position ID recovered from the matched audit record (falling back to the
+    first {!Stop_log.stop_info} for the symbol when no audit record matches).
+
+    This is the {b canonical} trade → stop-info join and the single source of
+    truth for every stop-derived [trades.csv] column: {!of_precomputed} uses it
+    for [stop_trigger_kind] / [days_to_first_stop_trigger], and the result
+    writer uses it for the [entry_stop] / [exit_stop] / [exit_trigger] columns.
+    Routing both through this one function keeps those columns mutually
+    consistent — the previous symbol-keyed FIFO pop in the writer misaligned
+    against this position-keyed lookup on re-traded symbols. O(log N) per call.
+*)
 
 val of_audit_and_stop_log :
   audit:Trade_audit.audit_record list ->

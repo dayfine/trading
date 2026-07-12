@@ -19,6 +19,28 @@ moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
 
+## 2026-07-12 — trades.csv export-join fix (C2)
+
+- [x] **Key `exit_trigger` + `stop_trigger_kind` by position_id** — the
+  trades.csv export sourced `exit_trigger` (and `entry_stop` / `exit_stop`)
+  from a symbol-keyed FIFO pop of `stop_info`s while `stop_trigger_kind`
+  (via `Trade_context`) resolved position-keyed through the audit record.
+  On re-traded symbols the two joins mis-aligned, producing blank and
+  contradictory trigger rows (record run: 129 validator-V5 violations; e.g.
+  WSM 2017-10-14 `exit_trigger=laggard_rotation` vs `stop_trigger_kind=gap_down`).
+  Fix routes both columns through the single position-keyed join
+  `Trade_context.stop_info_for_trade`, and appends a trailing **`position_id`**
+  column to trades.csv (canonical audit id; join key for the validator's
+  audit lookup). No strategy-behaviour change — backtest returns/positions are
+  bit-identical; only trigger columns change on re-traded symbols. `position_id`
+  is appended last so positional readers (validator fixed indices
+  `exit_trigger`=12, `stop_trigger_kind`=16; hold-period/extension analyzers)
+  stay valid. Lives at `trading/trading/backtest/lib/{trade_context,result_writer}.ml`.
+  **Verify:** `dune runtest trading/backtest/test/` (test_trade_context +
+  test_result_writer: new re-traded-symbol per-position join tests) and
+  `dune runtest trading/backtest/validation/` (new V5 re-traded-consistent
+  fixture). PR: `feat/trades-export-join-fix`.
+
 ## 2026-07-09 — `audit_bars` warehouse corrupt-bar scanner
 
 - [x] **`audit_bars` exe + `audit_bars_detector` lib** — scans a snapshot

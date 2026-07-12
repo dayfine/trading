@@ -41,13 +41,6 @@ let _write_params ~output_dir (result : Runner.result) =
   in
   Sexp.save_hum (output_dir ^ "/params.sexp") (Sexp.List with_overrides)
 
-let _build_stop_index (stop_infos : Stop_log.stop_info list) =
-  List.fold stop_infos
-    ~init:(Map.empty (module String))
-    ~f:(fun acc (info : Stop_log.stop_info) ->
-      let existing = Map.find acc info.symbol |> Option.value ~default:[] in
-      Map.set acc ~key:info.symbol ~data:(existing @ [ info ]))
-
 let _exit_trigger_label (trigger : Stop_log.exit_trigger) =
   match trigger with
   | Stop_loss _ -> "stop_loss"
@@ -78,13 +71,6 @@ let _force_liq_label (reason : Portfolio_risk.Force_liquidation.reason) =
   match reason with
   | Per_position -> "force_liquidation_position"
   | Portfolio_floor -> "force_liquidation_portfolio"
-
-let _pop_stop_info stop_index ~symbol =
-  match Map.find !stop_index symbol with
-  | Some (info :: rest) ->
-      stop_index := Map.set !stop_index ~key:symbol ~data:rest;
-      Some info
-  | _ -> None
 
 let _fmt_float_opt = function Some s -> sprintf "%.2f" s | None -> ""
 
@@ -123,9 +109,12 @@ let _trades_csv_header =
   in
   String.concat ~sep:"," (base @ Trade_context.csv_header_fields)
 
-let _write_trade_row oc stop_index force_liq_index ~ctx_pre
-    (t : Metrics.trade_metrics) =
-  let info = _pop_stop_info stop_index ~symbol:t.symbol in
+let _write_trade_row oc force_liq_index ~ctx_pre (t : Metrics.trade_metrics) =
+  (* Resolve the stop_info via the same position-keyed join {!Trade_context}
+     uses for [stop_trigger_kind], so [entry_stop] / [exit_stop] / [exit_trigger]
+     stay consistent with it. The prior symbol-keyed FIFO pop misaligned against
+     that join on re-traded symbols (Nth position got the wrong trigger). *)
+  let info = Trade_context.stop_info_for_trade ctx_pre ~trade:t in
   let entry_stop, exit_stop, base_exit_trigger = _stop_fields info in
   let force_liq_key = t.symbol ^ "|" ^ Date.to_string t.exit_date in
   let exit_trigger =
@@ -161,15 +150,15 @@ let _write_trades ~output_dir ~(round_trips : Metrics.trade_metrics list)
   let path = output_dir ^ "/trades.csv" in
   let oc = Out_channel.create path in
   fprintf oc "%s\n" _trades_csv_header;
-  let stop_index = ref (_build_stop_index stop_infos) in
   let force_liq_index = _build_force_liq_index force_liquidations in
   (* Build the audit + stop-log indexes once, not per row. Without this hoist,
      [Trade_context.of_audit_and_stop_log] rebuilt the audit_idx Map every
      call — turning [trades.csv] writing into O(N²) on Cell E 15 y
-     (~3 700 round-trips × ~3 700 audit records). *)
+     (~3 700 round-trips × ~3 700 audit records). The same [ctx_pre] also backs
+     the per-row stop_info join, so [exit_trigger] and [stop_trigger_kind]
+     resolve against one index. *)
   let ctx_pre = Trade_context.precompute ~audit ~stop_infos in
-  List.iter round_trips
-    ~f:(_write_trade_row oc stop_index force_liq_index ~ctx_pre);
+  List.iter round_trips ~f:(_write_trade_row oc force_liq_index ~ctx_pre);
   Out_channel.close oc
 
 let _write_equity_curve ~output_dir
