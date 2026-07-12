@@ -1,11 +1,40 @@
 # Status: data-foundations
 
-## Last updated: 2026-07-01
+## Last updated: 2026-07-12
 
 ## Status
 IN_PROGRESS
 
 ## Completed
+- [x] **2026-07-12 — asset-type blocklist filter (CEF/trust/SPAC leak, W14;
+  fix #3 of `dev/notes/visual-trade-audit-2026-07-12.md`).** EODHD's
+  exchange-symbol-list `Type` field mislabels bond/equity CEFs and
+  physical-bullion trusts as "Common Stock", so
+  `Build_eligible_universe`'s equity-like filter admitted them — FTHY
+  (bond CEF) surfaced as a top-7 live pick; PHYS/PSLV (bullion trusts)
+  and ~50 CEFs leaked. Added a new pure module
+  `analysis/data/universe/lib/asset_type_blocklist.{ml,mli}`: a
+  symbol→`category` (`Bond_cef | Equity_cef | Bullion_trust | Spac`)
+  blocklist that drops mislabelled instruments independent of the wrong
+  vendor `Type`. Membership from three interchangeable sources —
+  `curated` (embedded checked-in seed, 22 tickers), `load ~path` (sexp
+  file), or `of_entries` (the feed point for a future `General::Type`
+  fundamentals enrichment; `union` merges). Wired into
+  `Build_eligible_universe.config` as a new
+  `asset_type_blocklist : Asset_type_blocklist.t [@sexp.default empty]`
+  field applied before the composition policy; **default `empty` in both
+  `default_config` and `spec_config` keeps the build bit-identical**
+  (experiment-flag-discipline R1) — arming live with `curated` is a
+  separate decision. SPAC coverage intentionally minimal (ephemeral
+  tickers → follow-up: heuristic/fundamentals gate). Tests: 16 in
+  `test/test_asset_type_blocklist.ml` (find/is_blocked/case-insensitive,
+  dup-last-wins, sorted entries, union precedence, curated blocks
+  FTHY/PHYS/PSLV, load from committed fixture
+  `test/data/asset_type_blocklist_sample.sexp`, missing-file error,
+  sexp round-trip) + 2 wiring tests in `test/test_build_eligible_universe.ml`
+  (armed blocklist drops FTHY; empty blocklist is a no-op). Verify:
+  `dune build && dune runtest analysis/data/universe/`. PR:
+  `feat/universe-asset-type-filter`.
 - [x] **2026-06-29 — eligible-universe staleness guard (issue #1783).**
   `Build_eligible_universe`'s active filter dropped any symbol whose
   last bar was even one trading day stale (`data_end_date < date`),
