@@ -1,5 +1,13 @@
 (test
  (name test_scenario_snapshot_plan)
+ (modules test_scenario_snapshot_plan)
  (libraries core ounit2 matchers scenario_lib scenario_snapshot_plan)
+ (preprocess
+  (pps ppx_jane)))
+
+(test
+ (name test_twin_detector)
+ (modules test_twin_detector)
+ (libraries core ounit2 matchers twin_detector)
  (preprocess
   (pps ppx_jane)))
