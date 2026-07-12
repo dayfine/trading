@@ -1,0 +1,6 @@
+(executable
+ (name post_run_validator_cli)
+ (modules post_run_validator_cli)
+ (libraries core core_unix.command_unix post_run_validator)
+ (preprocess
+  (pps ppx_jane)))
