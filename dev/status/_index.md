@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-12 (orchestrator run 29181120162 [**2026-07-12 run-1**]: **QC + auto-merge pass**. Ran the full Step-5 QC pipeline on the sole open PR **#1934 `feat/extension-stop`** (P0a user-directed default-off tail-INSURANCE dial): qc-structural APPROVED (build @fmt / build / runtest all exit 0, experiment-flag-discipline R1/R2/R3 + A1/A2/A3/P6 clean) + qc-behavioral APPROVED (quality 5, all contracts pinned, W1/W2 spine intact) + CI (`build-and-test` + `perf-tier1-smoke`) success → **Step 6.5 auto-merged #1934** (main `9aa0f98a` → `f9d4bc56`). **Correction to run-4's residual claim: QC agents CAN run in GHA** — the docker `trading-1-dev` requirement is LOCAL-only; the runner builds+tests faithfully via `opam env` (same basis run-4 verified for the build gate). New `extension-stop` row added (primitive on main; behavior unchanged — default-off; insurance-basis acceptance audit is LOCAL / `[non-blocking]`). 0 open PRs after merge; main GREEN. Prior: run-4 (29165703817), run-3 (29160076339), run-2 (29155047453).
+Last updated: 2026-07-12 (orchestrator run 29211702843 [**2026-07-12 run-2**]: **QC + auto-merge pass**. Two maintainer-authored ready-for-review PRs QC'd + Step-6.5 auto-merged on full-green: **#1942 `feat/trades-export-join-fix`** (backtest trades.csv position-keyed export-join fix; structural+behavioral APPROVED q5; behaviour bit-identical) → main `8a834791`; **#1941 `feat/resistance-insufficient-history`** (default-off `Insufficient_history` overhead-quality label; R1 parity bit-identical, W1/W2 spine intact; structural+behavioral APPROVED q5) → main `0b5a0a2b`. Both: CI `build-and-test`+`perf-tier1-smoke` success. Main HEAD `468aea7d`/#1940 CI `build-and-test` was RED but confirmed the **known ENOSPC linker infra flake** (0 real `FAIL:` lines; `dune build && dune runtest` exit 0 live-verified on main this run) = harness `[~]` #1636, human-PAT-blocked — NOT a code failure. 0 open PRs after merge; main GREEN. Prior: run-1 (29181120162), run-4 (29165703817), run-3 (29160076339).
 
 ## Active + complete tracks
 
@@ -15,7 +15,7 @@ Each row: one line; deeper task detail in the linked status file.
 |---|---|---|---|---|
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
-| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | — | readme_toplines top-line numbers MERGED (#1617, 3-gate auto-merge); next: P2 matrix on composition-policy universe (data-gated) |
+| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | — | trades.csv export-join fix MERGED (#1942, 3-gate auto-merge); next: P2 matrix on composition-policy universe (data-gated) |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
 | [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | snapshot-format-v2 S4 PROVEN (warehouses v2, top-3000 fits at cache<=1024); S5/v1-cleanup deferred (oversight); next: regime-diverse lenses on v2 (LOCAL) |
@@ -44,7 +44,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
-| [screener](screener.md) | MERGED | — | — | — |
+| [screener](screener.md) | MERGED | — | — | resistance insufficient-history label fix MERGED (#1941, default-off/bit-identical, 3-gate auto-merge 2026-07-12) |
 | [simulation](simulation.md) | IN_PROGRESS | feat-backtest | — | #1847 sibling round-trip pairing fix MERGED (761c30cf); per-trade scale-in reporting now trustworthy. Next: stale-exit grid via WF-CV (data-gated) |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |

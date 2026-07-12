@@ -39,7 +39,7 @@ Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
   **Verify:** `dune runtest trading/backtest/test/` (test_trade_context +
   test_result_writer: new re-traded-symbol per-position join tests) and
   `dune runtest trading/backtest/validation/` (new V5 re-traded-consistent
-  fixture). PR: `feat/trades-export-join-fix`.
+  fixture). PR: `feat/trades-export-join-fix` — MERGED #1942 (3-gate auto-merge, 2026-07-12 run-2).
 
 ## 2026-07-09 — `audit_bars` warehouse corrupt-bar scanner
 
