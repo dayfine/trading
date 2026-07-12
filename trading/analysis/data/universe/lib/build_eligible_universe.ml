@@ -5,6 +5,7 @@ module BFI = Build_from_individuals
 module CP = Composition_policy
 module CPT = Composition_policy_types
 module S = Staleness
+module ATB = Asset_type_blocklist
 
 (* Defaults documented in [build_eligible_universe.mli]. *)
 let _default_trailing_window_days = 60
@@ -33,6 +34,9 @@ type config = {
   min_window_bars : int;
   reit_policy : CPT.reit_policy;
   exclude_preferred : bool;
+  asset_type_blocklist : ATB.t; [@sexp.default ATB.empty]
+      (* EODHD-mislabeled non-equities; [ATB.empty] = bit-identical no-op.
+         Documented in build_eligible_universe.mli. *)
   bars_root : string;
   symbol_types_path : string;
   sectors_csv_path : string;
@@ -56,6 +60,7 @@ let default_config ~bars_root ~symbol_types_path ~sectors_csv_path
     min_window_bars = _default_min_window_bars;
     reit_policy = CPT.Include;
     exclude_preferred = false;
+    asset_type_blocklist = ATB.empty;
     bars_root;
     symbol_types_path;
     sectors_csv_path;
@@ -209,6 +214,14 @@ let _policy_config ~config : CPT.config =
     exclude_preferred = config.exclude_preferred;
   }
 
+(* Drop blocklisted symbols; empty blocklist (the default) is a bit-identical
+   no-op. *)
+let _apply_blocklist ~config (candidates : CPT.candidate list) =
+  if ATB.size config.asset_type_blocklist = 0 then candidates
+  else
+    List.filter candidates ~f:(fun c ->
+        not (ATB.is_blocked config.asset_type_blocklist ~symbol:c.CPT.symbol))
+
 (* ------------------------------------------------------------------ *)
 (* Snapshot assembly                                                   *)
 (* ------------------------------------------------------------------ *)
@@ -256,7 +269,10 @@ let _build_validated ~date ~config ~inventory ~equity_like_lookup
     List.filter active ~f:(_is_equity_like ~equity_like_lookup)
   in
   let eligible = _score_all ~date ~config equity_like in
-  let candidates = _to_candidates ~asset_type_lookup ~sector_lookup eligible in
+  let candidates =
+    _to_candidates ~asset_type_lookup ~sector_lookup eligible
+    |> _apply_blocklist ~config
+  in
   let { CPT.kept; reports = _ } =
     CP.apply ~config:(_policy_config ~config) candidates
   in

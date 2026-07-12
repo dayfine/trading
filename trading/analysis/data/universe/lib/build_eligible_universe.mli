@@ -25,7 +25,11 @@
 
     2. {b Equity-like filter} — drop ETF / Mutual_fund / Fund / Bond / Index /
     Currency / Commodity via {!Eodhd.Asset_type.is_equity_like}; keeps
-    Common_stock / Preferred_stock / ADR / GDR.
+    Common_stock / Preferred_stock / ADR / GDR. Then drop any symbol in the
+    configured {!Asset_type_blocklist} — instruments (bond / equity CEFs,
+    bullion trusts) EODHD {i mis}labels as common stock so the equity-like
+    filter alone lets them through. Empty by default, so this is a no-op unless
+    armed.
 
     3. {b Eligibility gates} (all configurable, see {!config}): drop symbols
     whose latest close is below [min_price], whose trailing-window average
@@ -93,6 +97,16 @@ type config = {
   exclude_preferred : bool;
       (** Passed through to {!Composition_policy}. No-op default [false]; spec
           uses [true]. *)
+  asset_type_blocklist : Asset_type_blocklist.t;
+      (** Symbol-level exclusion of instruments EODHD mislabels as
+          ["Common Stock"] — bond / equity closed-end funds and physical-bullion
+          trusts (see {!Asset_type_blocklist}). Blocked symbols are dropped
+          before the composition policy runs. No-op default
+          {!Asset_type_blocklist.empty} (both {!default_config} and
+          {!spec_config}) keeps the build bit-identical to the pre-blocklist
+          behaviour — per [.claude/rules/experiment-flag-discipline.md] R1,
+          arming the live universe with {!Asset_type_blocklist.curated} is a
+          separate decision. *)
   bars_root : string;
       (** Root of cached bars ([<L1>/<L2>/<symbol>/data.csv]). *)
   symbol_types_path : string;  (** Path to [symbol_types.sexp]. *)
@@ -111,7 +125,8 @@ val default_config :
 (** [default_config ...] is the keep-all no-op: [min_price = 0.0],
     [min_avg_dollar_volume = 0.0], [max_staleness_trading_days = 0],
     [trailing_window_days = 60], [min_window_bars = 30],
-    [reit_policy = Include], [exclude_preferred = false]. A build through this
+    [reit_policy = Include], [exclude_preferred = false],
+    [asset_type_blocklist = Asset_type_blocklist.empty]. A build through this
     config keeps every active equity-like symbol (the only drop is the always-on
     dual-class dedup). *)
 
@@ -124,7 +139,10 @@ val spec_config :
 (** [spec_config ...] is {!default_config} with the live-universe gates flipped
     on: [min_price = 5.0], [min_avg_dollar_volume = 1_000_000.0],
     [reit_policy = Exclude], [exclude_preferred = true].
-    [max_staleness_trading_days] stays at the no-op [0]. *)
+    [max_staleness_trading_days] stays at the no-op [0], and
+    [asset_type_blocklist] stays at the no-op {!Asset_type_blocklist.empty} —
+    arming the live universe against the curated blocklist is a separate
+    decision. *)
 
 type staleness_report = { excluded_count : int; sample : string list }
 [@@deriving sexp, show, eq]

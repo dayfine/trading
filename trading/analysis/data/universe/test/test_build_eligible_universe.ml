@@ -484,6 +484,50 @@ let test_staleness_report_counts_and_samples _ =
            (elements_are [ equal_to "STALE1D"; equal_to "STALE3D" ]);
        ])
 
+(* Asset-type blocklist wiring: when armed with a blocklist containing FTHY, the
+   mislabelled bond-CEF is dropped even though EODHD tags it "Common Stock" and
+   it clears every liquidity gate. The genuine common stock survives. *)
+let test_blocklist_drops_mislabelled_symbol _ =
+  let specs =
+    [
+      _spec "AAPL" ~close:80.0 ~volume:1_000_000 ~asset_type:_common;
+      _spec "FTHY" ~close:20.0 ~volume:1_000_000 ~asset_type:_common;
+    ]
+  in
+  let root, spec_cfg = _setup ~specs in
+  let config =
+    {
+      spec_cfg with
+      BEU.asset_type_blocklist =
+        Universe.Asset_type_blocklist.of_entries
+          [
+            {
+              Universe.Asset_type_blocklist.symbol = "FTHY";
+              category = Universe.Asset_type_blocklist.Bond_cef;
+            };
+          ];
+    }
+  in
+  let snapshot = _build_or_fail ~config in
+  _cleanup_dir root;
+  assert_that (_symbols snapshot) (elements_are [ equal_to "AAPL" ])
+
+(* Empty blocklist (the default) is a no-op: both symbols survive, identical to
+   the pre-blocklist behaviour. *)
+let test_empty_blocklist_is_noop _ =
+  let specs =
+    [
+      _spec "AAA" ~close:80.0 ~volume:1_000_000;
+      _spec "FTHY" ~close:20.0 ~volume:1_000_000;
+    ]
+  in
+  let root, config = _setup ~specs in
+  let snapshot = _build_or_fail ~config in
+  _cleanup_dir root;
+  assert_that
+    (List.sort (_symbols snapshot) ~compare:String.compare)
+    (elements_are [ equal_to "AAA"; equal_to "FTHY" ])
+
 let suite =
   "Build_eligible_universe"
   >::: [
@@ -503,6 +547,9 @@ let suite =
          >:: test_staleness_tolerance_includes_within_budget;
          "test_staleness_report_counts_and_samples"
          >:: test_staleness_report_counts_and_samples;
+         "test_blocklist_drops_mislabelled_symbol"
+         >:: test_blocklist_drops_mislabelled_symbol;
+         "test_empty_blocklist_is_noop" >:: test_empty_blocklist_is_noop;
        ]
 
 let () = run_test_tt_main suite

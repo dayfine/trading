@@ -10,6 +10,7 @@
   composition_inputs
   composition_bar_reader
   composition_policy_types
+  asset_type_blocklist
   dual_class
   composition_policy
   composition_policy_report
