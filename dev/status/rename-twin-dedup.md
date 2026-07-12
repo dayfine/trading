@@ -8,8 +8,10 @@ IN_PROGRESS
 
 ## Interface stable
 
-NO — `Twin_detector.Config` field set may still change when the
-dispatcher-side warehouse rebuild exercises it on real data.
+NO
+
+(`Twin_detector.Config` field set may still change when the
+dispatcher-side warehouse rebuild exercises it on real data.)
 
 ## Owner
 
