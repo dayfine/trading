@@ -119,6 +119,11 @@ let analyze_with_callbacks ~(config : config)
   let quality =
     if Float.(breakdown_price <= 0.0) || callbacks.n_bars <= 0 then
       Virgin_territory
+    else if callbacks.n_bars < config.min_history_bars then
+      (* Mirror of the resistance-side guard: starved history can't support
+         any grade, in particular a false Virgin_territory. Default 0
+         disables this (bit-identical). *)
+      Insufficient_history
     else _quality_for_valid_input ~config ~callbacks ~breakdown_price
   in
   { quality; breakdown_price }

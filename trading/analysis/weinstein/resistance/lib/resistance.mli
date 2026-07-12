@@ -38,6 +38,21 @@ type config = {
   moderate_resistance_bars : int;
       (** Minimum bars in a zone to classify as [Moderate_resistance] (below
           heavy threshold). Default: 3. *)
+  min_history_bars : int;
+      (** Minimum bars of available history required before the mapper will
+          assign an overhead-resistance grade. When the source has fewer than
+          [min_history_bars] bars, {!analyze} / {!analyze_with_callbacks}
+          classify the breakout as [Insufficient_history] rather than risk a
+          false [Virgin_territory] (or any other) label off a starved window —
+          e.g. a 52-bar backtest panel or a ~110-bar live warehouse against the
+          520-bar virgin default.
+
+          Default: 0 — the check is disabled and behaviour is bit-identical to
+          the pre-field mapper (no window ever produces [Insufficient_history]).
+          Arming it (a positive value, typically ≥ [virgin_lookback_bars]) is a
+          separate decision; see the post-run validation harness check V7
+          ([Validator_bar_checks]), which pins the same "Virgin_territory on too
+          little history" defect from the trade-record side. *)
 }
 (** Configuration for resistance analysis. All counts are in bars so callers can
     tune for any time granularity without converting to years or weeks. *)
@@ -46,7 +61,8 @@ val default_config : config
 (** Sensible defaults for weekly bars:
     [{chart_lookback_bars=130; virgin_lookback_bars=520;
      congestion_band_pct=0.05; heavy_resistance_bars=8;
-     moderate_resistance_bars=3}]. *)
+     moderate_resistance_bars=3; min_history_bars=0}]. [min_history_bars=0]
+    keeps the insufficient-history degrade off by default. *)
 
 type resistance_zone = {
   price_low : float;
@@ -126,6 +142,11 @@ val analyze_with_callbacks :
     the indicator-callback shape of {!analyze}. Used by panel-backed callers
     that read bar fields via per-cell closures rather than walking a
     {!Daily_price.t list}.
+
+    When [callbacks.n_bars < config.min_history_bars] the result [quality] is
+    [Insufficient_history] and the virgin / zone-density classification is
+    skipped (the observed [zones_above] are still reported). With the default
+    [min_history_bars = 0] this branch never fires.
 
     Walks two bar windows back from the newest bar (offset 0):
     - the [config.virgin_lookback_bars] tail for the virgin-territory check,

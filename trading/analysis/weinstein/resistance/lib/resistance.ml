@@ -18,6 +18,9 @@ type config = {
       (** Min bars in a zone to classify as Heavy resistance. *)
   moderate_resistance_bars : int;
       (** Min bars in a zone to classify as Moderate resistance. *)
+  min_history_bars : int;
+      (** Minimum bars of history before any grade is assigned; below it the
+          quality degrades to Insufficient_history. 0 disables the check. *)
 }
 
 let default_config =
@@ -29,6 +32,8 @@ let default_config =
     congestion_band_pct = 0.05;
     heavy_resistance_bars = 8;
     moderate_resistance_bars = 3;
+    min_history_bars = 0;
+    (* off by default: bit-identical to the pre-field mapper *)
   }
 
 (* ------------------------------------------------------------------ *)
@@ -209,8 +214,14 @@ let analyze_with_callbacks ~(config : config) ~(callbacks : callbacks)
       ~as_of_date ~limit:chart_limit
   in
   let quality =
-    _classify_quality ~config ~callbacks ~zones:zones_above ~virgin_limit
-      breakout_price
+    (* Starved history can't support any resistance grade (in particular a false
+       Virgin_territory). When armed (min_history_bars > 0) and the source is
+       shorter than the minimum, degrade to Insufficient_history. Default 0
+       disables this, keeping behaviour bit-identical. *)
+    if callbacks.n_bars < config.min_history_bars then Insufficient_history
+    else
+      _classify_quality ~config ~callbacks ~zones:zones_above ~virgin_limit
+        breakout_price
   in
   { quality; breakout_price; zones_above; nearest_zone = List.hd zones_above }
 
