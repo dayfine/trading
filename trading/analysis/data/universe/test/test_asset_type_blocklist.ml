@@ -148,6 +148,14 @@ let test_load_missing_file_is_error _ =
     (ATB.load ~path:"data/does_not_exist.sexp")
     (is_error_with Status.Internal)
 
+(* Pins the decode arm of [load]: a readable file whose sexp does not
+   match the entry-list shape (unknown category variant) must be
+   [Error Internal], not an exception. *)
+let test_load_malformed_sexp_is_error _ =
+  assert_that
+    (ATB.load ~path:"data/asset_type_blocklist_malformed.sexp")
+    (is_error_with Status.Internal)
+
 (* sexp round-trip: to-sexp then of-sexp preserves membership + categories. *)
 let test_sexp_round_trip _ =
   let t = ATB.of_entries _entries in
@@ -179,6 +187,8 @@ let suite =
          "test_curated_categories" >:: test_curated_categories;
          "test_load_parses_fixture" >:: test_load_parses_fixture;
          "test_load_missing_file_is_error" >:: test_load_missing_file_is_error;
+         "test_load_malformed_sexp_is_error"
+         >:: test_load_malformed_sexp_is_error;
          "test_sexp_round_trip" >:: test_sexp_round_trip;
        ]
 
