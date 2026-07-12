@@ -8,6 +8,7 @@ module Stop_split_adjust = Stop_split_adjust
 module Stop_widen = Stop_widen
 module Vol_scaled_stop = Vol_scaled_stop
 module Catastrophic_stop = Catastrophic_stop
+module Extension_stop = Extension_stop
 
 (* Round-number nudging lives in {!Stop_nudge} (extracted to keep this
    coordinator under the file-length cap). This adapts it to the stops config's
