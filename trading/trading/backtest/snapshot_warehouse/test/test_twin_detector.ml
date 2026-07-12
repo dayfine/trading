@@ -23,6 +23,16 @@ let series_of ~symbol closes =
 
 (* A truncated copy sharing the first [n] closes of [closes]. *)
 let truncate_series ~symbol ~n closes = series_of ~symbol (List.take closes n)
+
+(* A series whose i-th close sits on [start + offset + i] days — used to build
+   a twin whose shared window does not begin at date index 0. *)
+let series_from ~symbol ~offset closes =
+  let dated =
+    List.mapi closes ~f:(fun i c -> (Date.add_days start (offset + i), c))
+  in
+  let data_end, _ = List.last_exn dated in
+  { Twin_detector.symbol; data_end; closes = Array.of_list dated }
+
 let ramp ~n ~base = List.init n ~f:(fun i -> base +. Float.of_int i)
 let group_survivor (g : Twin_detector.group) = g.survivor
 let group_dropped (g : Twin_detector.group) = g.dropped
@@ -141,6 +151,46 @@ let test_reported_match_fraction _ =
            (elements_are [ float_equal 1.0 ]);
        ])
 
+(* Tie-break: two twin legs with an IDENTICAL data_end (same full window).
+   With no later-ending leg, the survivor is the lexicographically smallest
+   symbol ([BFX] < [NLS]); the other is dropped. *)
+let test_identical_data_end_tiebreak _ =
+  let closes = ramp ~n:20 ~base:60.0 in
+  let nls = series_of ~symbol:"NLS" closes in
+  let bfx = series_of ~symbol:"BFX" closes in
+  let report = Twin_detector.detect test_config [ nls; bfx ] in
+  assert_that report.groups
+    (elements_are
+       [
+         all_of
+           [
+             field group_survivor (equal_to "BFX");
+             field group_dropped (equal_to [ "NLS" ]);
+           ];
+       ]);
+  assert_that report.dropped_symbols (equal_to [ "NLS" ])
+
+(* Prefilter completeness on an offset shared window: the dropped leg [OLD]
+   starts at day 7 (> stride = min_overlap_days/2 = 2, and 7 is not a multiple
+   of the stride), sharing days 7..26 with [NEW]. The twin must still be
+   detected — i.e. it is not filtered out before the full compare. *)
+let test_offset_window_detected _ =
+  let new_closes = ramp ~n:30 ~base:80.0 in
+  let newco = series_of ~symbol:"NEW" new_closes in
+  (* Closes matching [NEW] on days 7..26 exactly. *)
+  let old_closes = List.init 20 ~f:(fun i -> 80.0 +. Float.of_int (7 + i)) in
+  let oldco = series_from ~symbol:"OLD" ~offset:7 old_closes in
+  let report = Twin_detector.detect test_config [ newco; oldco ] in
+  assert_that report.groups
+    (elements_are
+       [
+         all_of
+           [
+             field group_survivor (equal_to "NEW");
+             field group_dropped (equal_to [ "OLD" ]);
+           ];
+       ])
+
 let suite =
   "twin_detector"
   >::: [
@@ -151,6 +201,8 @@ let suite =
          "disabled_passthrough" >:: test_disabled_passthrough;
          "below_min_overlap_not_twin" >:: test_below_min_overlap_not_twin;
          "reported_match_fraction" >:: test_reported_match_fraction;
+         "identical_data_end_tiebreak" >:: test_identical_data_end_tiebreak;
+         "offset_window_detected" >:: test_offset_window_detected;
        ]
 
 let () = run_test_tt_main suite
