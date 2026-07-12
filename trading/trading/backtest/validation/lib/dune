@@ -1,0 +1,14 @@
+(library
+ (name post_run_validator)
+ (libraries
+  core
+  core_unix.sys_unix
+  csv
+  fpath
+  status
+  types
+  indicators.time_period
+  weinstein.types
+  backtest)
+ (preprocess
+  (pps ppx_jane)))
