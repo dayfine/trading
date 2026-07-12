@@ -53,6 +53,65 @@ let test_old_history_virgin _ =
   assert_that result.quality (equal_to Virgin_territory)
 
 (* ------------------------------------------------------------------ *)
+(* Insufficient history (min_history_bars degrade)                      *)
+(* ------------------------------------------------------------------ *)
+
+(** 52 below-breakout bars: no bar trades above 50, so the virgin check passes →
+    the default (disabled) mapper labels this Virgin_territory even though only
+    52 bars exist against the 520-bar virgin default. This is the false-virgin
+    defect the [min_history_bars] arm exists to correct; it must persist under
+    the default (bit-identical) config. *)
+let short_history_bars =
+  List.init 52 ~f:(fun _ -> make_bar ~low:40.0 ~high:48.0 45.0)
+
+let test_short_history_default_still_virgin _ =
+  let result =
+    analyze ~config:cfg ~bars:short_history_bars ~breakout_price:50.0
+      ~as_of_date:as_of
+  in
+  assert_that result.quality (equal_to Virgin_territory)
+
+let test_short_history_armed_insufficient _ =
+  (* Same starved window, but armed with a 100-bar minimum: 52 < 100 → the
+     mapper refuses the (false) Virgin_territory grade and degrades. *)
+  let armed_cfg = { cfg with min_history_bars = 100 } in
+  let result =
+    analyze ~config:armed_cfg ~bars:short_history_bars ~breakout_price:50.0
+      ~as_of_date:as_of
+  in
+  assert_that result.quality (equal_to Insufficient_history)
+
+let test_sufficient_history_armed_grades_normally _ =
+  (* Armed with a 5-bar minimum and 10 bars available (all in one zone above
+     breakout): history is sufficient, so the normal grade (Heavy) is assigned —
+     never Insufficient_history. *)
+  let armed_cfg = { cfg with min_history_bars = 5 } in
+  let bars = List.init 10 ~f:(fun _ -> make_bar ~low:52.0 ~high:58.0 55.0) in
+  let result =
+    analyze ~config:armed_cfg ~bars ~breakout_price:50.0 ~as_of_date:as_of
+  in
+  assert_that result.quality (equal_to Heavy_resistance)
+
+let test_insufficient_history_zones_still_reported _ =
+  (* Even when the grade degrades to Insufficient_history, the observed zones are
+     still populated from whatever bars exist. *)
+  let armed_cfg = { cfg with min_history_bars = 100 } in
+  let bars = List.init 5 ~f:(fun _ -> make_bar ~low:52.0 ~high:58.0 55.0) in
+  let result =
+    analyze ~config:armed_cfg ~bars ~breakout_price:50.0 ~as_of_date:as_of
+  in
+  assert_that result
+    (all_of
+       [
+         field (fun r -> r.quality) (equal_to Insufficient_history);
+         field (fun r -> r.zones_above) (size_is 1);
+         field
+           (fun r -> r.nearest_zone)
+           (is_some_and
+              (field (fun z -> z.price_low) (ge (module Float_ord) 50.0)));
+       ])
+
+(* ------------------------------------------------------------------ *)
 (* Clean overhead                                                       *)
 (* ------------------------------------------------------------------ *)
 
@@ -226,6 +285,11 @@ let test_parity_moderate_resistance _ =
   let bars = List.init 5 ~f:(fun _ -> make_bar ~low:52.0 ~high:58.0 55.0) in
   assert_parity ~bars ~breakout_price:50.0 ()
 
+let test_parity_insufficient_history _ =
+  let armed_cfg = { cfg with min_history_bars = 100 } in
+  assert_parity ~config:armed_cfg ~bars:short_history_bars ~breakout_price:50.0
+    ()
+
 let test_parity_chart_window_filtering _ =
   let small_cfg =
     { cfg with chart_lookback_bars = 5; virgin_lookback_bars = 15 }
@@ -256,6 +320,14 @@ let suite =
   >::: [
          "test_no_prior_history_virgin" >:: test_no_prior_history_virgin;
          "test_old_history_virgin" >:: test_old_history_virgin;
+         "test_short_history_default_still_virgin"
+         >:: test_short_history_default_still_virgin;
+         "test_short_history_armed_insufficient"
+         >:: test_short_history_armed_insufficient;
+         "test_sufficient_history_armed_grades_normally"
+         >:: test_sufficient_history_armed_grades_normally;
+         "test_insufficient_history_zones_still_reported"
+         >:: test_insufficient_history_zones_still_reported;
          "test_clean_no_resistance_above" >:: test_clean_no_resistance_above;
          "test_heavy_resistance_many_bars" >:: test_heavy_resistance_many_bars;
          "test_moderate_resistance" >:: test_moderate_resistance;
@@ -269,6 +341,7 @@ let suite =
          "test_parity_clean_overhead" >:: test_parity_clean_overhead;
          "test_parity_heavy_resistance" >:: test_parity_heavy_resistance;
          "test_parity_moderate_resistance" >:: test_parity_moderate_resistance;
+         "test_parity_insufficient_history" >:: test_parity_insufficient_history;
          "test_parity_chart_window_filtering"
          >:: test_parity_chart_window_filtering;
          "test_zero_band_size_no_crash" >:: test_zero_band_size_no_crash;

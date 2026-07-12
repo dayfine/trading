@@ -43,6 +43,15 @@ type overhead_quality =
   | Heavy_resistance
       (** Dense trading zone just above breakout. Stock will use up buying power
           working through this zone. *)
+  | Insufficient_history
+      (** Not enough price history to map overhead resistance reliably. Emitted
+          only when the mapper is armed with a positive minimum-history
+          threshold and the available bars are fewer than that minimum. Distinct
+          from {!Virgin_territory}: virgin territory is a positive claim ("no
+          prior trading above this price over a deep lookback"), whereas
+          insufficient-history is the absence of evidence — the window is too
+          short to make any claim. Consumers must NOT treat this as virgin
+          territory. *)
 [@@deriving show, eq, sexp]
 
 (** Relative strength trend vs benchmark. *)

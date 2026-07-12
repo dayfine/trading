@@ -14,6 +14,7 @@ type overhead_quality =
   | Clean
   | Moderate_resistance
   | Heavy_resistance
+  | Insufficient_history
 [@@deriving show, eq, sexp]
 
 type rs_trend =
