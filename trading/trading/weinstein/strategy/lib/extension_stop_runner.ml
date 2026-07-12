@@ -47,43 +47,51 @@ let _holding_window_series ~bar_reader ~ma_period ~symbol ~entry_date
   in
   (closes, wmas)
 
+(* [StrategySignal "extension_stop"] with the trigger/trail config in the
+   detail, for the [exit_trigger] forensic column. *)
+let _exit_reason ~config =
+  let detail =
+    Printf.sprintf "trigger=%.2f,trail=%.2f"
+      config.Weinstein_stops.Extension_stop.trigger_ratio
+      config.Weinstein_stops.Extension_stop.trail_pct
+  in
+  Position.StrategySignal { label = "extension_stop"; detail = Some detail }
+
 (* The [TriggerExit] for a fired extension stop: exit at the current bar's close
-   (weekly-close semantics), tagged [StrategySignal "extension_stop"] with the
-   trigger/trail config for the [exit_trigger] forensic column. *)
+   (weekly-close semantics). *)
 let _make_exit_transition ~(pos : Position.t) ~current_date ~bar ~config =
   let exit_price = bar.Types.Daily_price.close_price in
-  let exit_reason =
-    Position.StrategySignal
-      {
-        label = "extension_stop";
-        detail =
-          Some
-            (Printf.sprintf "trigger=%.2f,trail=%.2f"
-               config.Weinstein_stops.Extension_stop.trigger_ratio
-               config.Weinstein_stops.Extension_stop.trail_pct);
-      }
-  in
   {
     Position.position_id = pos.id;
     date = current_date;
-    kind = Position.TriggerExit { exit_reason; exit_price };
+    kind =
+      Position.TriggerExit { exit_reason = _exit_reason ~config; exit_price };
   }
+
+(* Whether the held long's extension trail has fired on its holding-window
+   weekly series. *)
+let _trail_fired ~config ~ma_period ~bar_reader ~current_date ~entry_date
+    (pos : Position.t) =
+  let closes, wmas =
+    _holding_window_series ~bar_reader ~ma_period ~symbol:pos.symbol ~entry_date
+      ~current_date
+  in
+  Weinstein_stops.Extension_stop.fired config ~closes ~wmas
 
 (* Decide whether a held long's extension trail has fired and, if so, emit its
    exit. Skips the position when it is already exiting this tick or has no
    current bar. *)
 let _exit_for_holding ~config ~ma_period ~bar_reader ~skip_position_ids
     ~get_price ~current_date ~entry_date (pos : Position.t) =
-  if Set.mem skip_position_ids pos.Position.id then None
+  let skipped = Set.mem skip_position_ids pos.Position.id in
+  let fired =
+    (not skipped)
+    && _trail_fired ~config ~ma_period ~bar_reader ~current_date ~entry_date pos
+  in
+  if not fired then None
   else
-    let closes, wmas =
-      _holding_window_series ~bar_reader ~ma_period ~symbol:pos.symbol
-        ~entry_date ~current_date
-    in
-    if Weinstein_stops.Extension_stop.fired config ~closes ~wmas then
-      Option.map (get_price pos.symbol) ~f:(fun bar ->
-          _make_exit_transition ~pos ~current_date ~bar ~config)
-    else None
+    Option.map (get_price pos.symbol) ~f:(fun bar ->
+        _make_exit_transition ~pos ~current_date ~bar ~config)
 
 (* Only held LONG positions are eligible — the extension blow-off is a
    long-side phenomenon. *)

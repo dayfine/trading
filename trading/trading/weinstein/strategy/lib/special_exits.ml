@@ -165,6 +165,20 @@ let _build_force_exit_channel ~config ~positions ~get_price ~cash ~peak_tracker
   ( Transition_assembly.filter_out_exited_ids stop_exited_ids raw_force_exit_ts,
     stop_exited_ids )
 
+(* The two trailing special exits (liquidity, then extension) share the same
+   emit/merge shape; threading them here keeps [run] under the length cap. *)
+let _run_trailing_special_exits ~config ~record_force_exit ~positions
+    ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit ~skip_ids
+    ~force_exit_ts ~current_date =
+  let force_exit_ts =
+    _run_liquidity_special_exit ~config ~record_force_exit ~positions
+      ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit
+      ~skip_ids ~force_exit_ts ~current_date
+  in
+  _run_extension_special_exit ~config ~record_force_exit ~positions
+    ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit ~skip_ids
+    ~force_exit_ts ~current_date
+
 let run ~config ~record_force_exit ~positions ~last_stop_out_dates
     ~(portfolio : Portfolio_view.t) ~get_price ~peak_tracker ~audit_recorder
     ~prior_macro_result ~prior_stages ~prior_stage_ma_values ~stage3_streaks
@@ -204,12 +218,7 @@ let run ~config ~record_force_exit ~positions ~last_stop_out_dates
       ~laggard_exited_ids
   in
   let force_exit_ts =
-    _run_liquidity_special_exit ~config ~record_force_exit ~positions
-      ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit
-      ~skip_ids ~force_exit_ts ~current_date
-  in
-  let force_exit_ts =
-    _run_extension_special_exit ~config ~record_force_exit ~positions
+    _run_trailing_special_exits ~config ~record_force_exit ~positions
       ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit
       ~skip_ids ~force_exit_ts ~current_date
   in
