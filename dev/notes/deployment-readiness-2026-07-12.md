@@ -40,6 +40,9 @@ Robustness that has survived scrutiny:
 | W9 | **Floor/peak pathology** — monotonic MTM peak + floor sterilized a run (GME squeeze) | — | Mitigated | Portfolio_floor default-off (#1910 + ablation); P1b windowed-peak redesign pending. Do NOT re-arm the floor live until P1b lands. |
 | W10 | **Live-pipeline defects found & fixed this cycle** — prior_stage bug (#1821 fix), missing sectors manifest (all-70 alphabetical picks), macro gate on broken breadth data (false Bearish seed) | — | YES — pipeline risk | All three fixed/documented, but they were found by INSPECTION, not by tests failing. Pre-deploy checklist requires a fresh-picks sanity pass every week until a validation harness exists. |
 | W11 | **Screener tie-break skew** — score ties resolve alphabetically at the cap-20 boundary | LOW-MED | YES | Known (#1782): live-UX fix planned; sector-spread restoration (fetch_finviz_sectors) reduces tie mass. Check tie composition in each week's picks. |
+| W12 | **Deep-crash V-bounce entries look alarming and lose big** (8 of the 12 biggest losses) — but two same-night screens proved they are the strategy's STANDARD ticket, feature-identical to the monsters (FARM ≡ TFX class); both gate hypotheses NO-BUILD (net-negative, 22-94% block rates) | — (accepted cost, reframed) | YES — psychology | NOT fixable by entry gating; stops already cap each at −5..−15%. Real fixes that survived: resistance-LABEL data-starvation fix (COO/CWST false "Virgin territory"), declining-MA gate arming for broad (catches the AIR subclass, own WF-CV support). See `dev/notes/visual-trade-audit-2026-07-12.md`. |
+| W13 | **Rename-twin double-count** — ~$2.14M of the record run's $18.0M realized PnL (11.9%) is clone legs (10 confirmed groups, NLS/BFX class); historical PIT snapshots retain stale-leg twins | HIGH (number-of-record accuracy) | Backtest-only (live universe scanned clean) | Haircut the realized headline ~12% (≈$15.6M, ~11.0%/yr — still > SPY TR 8.17%/yr) until twin-dedup lands in the snapshot builders + the run re-pins. Validator V6 detects mechanically (#1937). |
+| W14 | **Non-equity universe leak** — ~55 clear CEFs/trusts (incl. FTHY, a top-7 pick 2026-07-10) + ~27 SPAC shells; EODHD exchange-symbol-list mislabels them "Common Stock" | MEDIUM | YES | Fix at universe build: fundamentals `General::Type` enrichment or curated blocklist + SPAC vol/age gate. Weekly human pass caught it in week 1. |
 
 ## 3. Confidence statement
 
@@ -53,7 +56,13 @@ Robustness that has survived scrutiny:
 - **The live PIPELINE is the least-proven layer** (W10): generation works
   and the 26-week refreshed series is coherent (72% 6-week confirmation),
   but defects to date were caught by hand. Weekly sanity discipline is
-  load-bearing until automated validation exists.
+  load-bearing until automated validation exists — the post-run validation
+  harness (#1937, report-only v1) is the fix path; its first live-week run
+  (2026-07-10 picks) caught a universe-hygiene leak (W14) and a label bug
+  (W12) by hand in the same pass.
+- **The number of record carries a known ~12% overstatement** (W13 twin
+  double-count) pending snapshot de-twinning + re-pin; the de-twinned
+  estimate still beats SPY TR by ~2.8pp/yr.
 
 ## 4. Pre-deployment checklist (proposed)
 
@@ -62,9 +71,11 @@ Robustness that has survived scrutiny:
    tie-break composition) — this session produces the first instance.
 2. [ ] Macro-gate inputs verified non-degenerate (breadth files present,
    GSPC stage sane) before trusting the week's long/short posture.
-3. [ ] Decide the insurance dials for live config and RECORD the decision:
-   extension_stop (arm 2.0/0.25?), catastrophic_stop (armed in record
-   basis), portfolio floor stays OFF until P1b.
+3. [ ] Decide the insurance dials + quality gates for live config and RECORD
+   the decision: extension_stop (arm 2.0/0.25?), catastrophic_stop (armed in
+   record basis), portfolio floor stays OFF until P1b, declining-MA gate
+   (ARM — validated for broad, and live = broad). NO overhead/base-quality
+   gates (screened + killed 2026-07-12, see W12).
 4. [ ] Position-sizing sanity at intended capital (concentration 0.30,
    min_cash 0.30, gate $1M vs intended NAV).
 5. [ ] Paper-trade N weeks with the weekly workflow (generate → review →

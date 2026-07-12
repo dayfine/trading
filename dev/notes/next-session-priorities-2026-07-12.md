@@ -96,6 +96,47 @@ table.
 identified capture loss (static PIT can't see later IPOs — deep run
 literally cannot trade GME). Design + cost first; likely its own plan doc.
 
+## Overnight 07-12 session additions (deployment-readiness program)
+
+Shipped: #1934 extension-stop insurance (merged), #1937 post-run validation
+harness v1 (in gates), fresh 2026-07-10 weekly picks + first sanity pass,
+deployment-readiness doc, trade-audit artifact + agenda, visual audit + two
+gate screens (both NO-BUILD — see
+`dev/notes/visual-trade-audit-2026-07-12.md`; V-bounce losses ≡ monster
+winners, same ticket).
+
+**NEW QUEUE ITEMS (correctness fixes, ordered):**
+
+**C1 — rename-twin dedup + record re-pin (W13).** ~11.9% of the record
+run's realized PnL is clone legs (10 groups). Twin-dedup in the snapshot/
+universe builders (>95%-identical adjusted_close over ≥100 overlapping
+days), rebuild warehouse, re-run + re-pin the honest-tradeable record.
+Until then: haircut headline ~12%.
+
+**C2 — trades.csv export-join fix.** Key `exit_trigger` AND
+`stop_trigger_kind` by position_id (41 blank-trigger rows, 27
+contradictory). Validator V5 pins it.
+
+**C3 — universe asset-type fix (W14).** CEF/trust/SPAC leak (~55 clear,
+FTHY was a top-7 live pick); fundamentals `General::Type` enrichment or
+blocklist at universe build. Validator-adjacent; live-relevant.
+
+**C4 — resistance-mapper window/label fix (W12-surviving).** 520-bar spec
+vs 52-110-bar panels → false Virgin_territory (COO backtest, CWST live).
+Fix label or extend windows (incl. live weekly-review warehouse start).
+NOT a gate. Validator V7 pins it.
+
+**C5 — arm declining-MA gate for broad** (record convention + live config;
+own WF-CV support; catches the AIR subclass).
+
+**C6 — validator follow-ups**: run v1 over the record run (expect V5/V6/V7
+hits, V1-V4 clean), scenario_runner --validate post-step, weekly-picks
+validation reuse.
+
+**CLOSED tonight (do not reopen):** overhead-resistance entry gate;
+base-quality/recent-S4 entry gate (both screened net-negative at every
+threshold — `project_entry_shape_gates_no_build`).
+
 ## Standing constraints
 
 NO reversal timing; entry-selection/scale-in/reallocation/envelope/
