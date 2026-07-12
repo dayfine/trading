@@ -1549,6 +1549,55 @@ let test_w_early_stage2_none_preserves_half _ =
   (* Some 15 reproduces the default (w_stage2_breakout/2 = 15); Some 30 adds 15. *)
   assert_that (s_some15, s_some30 - s_none) (equal_to (s_none, 15))
 
+(* ------------------------------------------------------------------ *)
+(* Insufficient_history scores zero in both scoring catch-alls          *)
+(* ------------------------------------------------------------------ *)
+
+(** [Insufficient_history] must contribute 0 to the long-side resistance signal
+    — identical to having no resistance data, and strictly below a
+    Virgin_territory grade. Pins the [_resistance_signal] catch-all so a future
+    explicit handler cannot silently score starved history as virgin territory
+    (weinstein_types.mli: "Consumers must NOT treat this as virgin territory").
+*)
+let test_insufficient_history_scores_zero_long _ =
+  let sector = make_sector "Tech" in
+  let with_resistance quality =
+    let base = _breakout_analysis () in
+    {
+      base with
+      resistance =
+        Some
+          {
+            Resistance.quality;
+            breakout_price = 100.0;
+            zones_above = [];
+            nearest_zone = None;
+          };
+    }
+  in
+  let score a = fst (score_long ~weights:default_scoring_weights ~sector a) in
+  let insuf = score (with_resistance Insufficient_history) in
+  assert_that insuf
+    (equal_to (score { (_breakout_analysis ()) with resistance = None }));
+  assert_that
+    (score (with_resistance Virgin_territory))
+    (gt (module Int_ord) insuf)
+
+(** Short-side twin: [Insufficient_history] on [support] contributes 0 —
+    identical to no support data, strictly below Clean support below. Pins the
+    [_support_signal] catch-all. *)
+let test_insufficient_history_scores_zero_short _ =
+  let sector = make_sector "Tech" in
+  let bars = declining_bars_with_spike ~n:60 100.0 30.0 ~spike_idx:55 in
+  let base = make_analysis "INSUF" (Some (Stage3 { weeks_topping = 8 })) bars in
+  let with_support quality =
+    { base with support = Some { Support.quality; breakdown_price = 50.0 } }
+  in
+  let score a = fst (score_short ~weights:default_scoring_weights ~sector a) in
+  let insuf = score (with_support Insufficient_history) in
+  assert_that insuf (equal_to (score { base with support = None }));
+  assert_that (score (with_support Clean)) (gt (module Int_ord) insuf)
+
 (** [w_early_stage2] only touches the Early-Stage2 arm: on a confirmed Stage1→2
     breakout, changing it from [None] to [Some 30] leaves the score unchanged.
 *)
@@ -2094,6 +2143,10 @@ let suite =
          >:: test_ranking_omitted_field_defaults_alphabetical;
          "test_score_long_window_controls_early_stage2_signal"
          >:: test_score_long_window_controls_early_stage2_signal;
+         "test_insufficient_history_scores_zero_long"
+         >:: test_insufficient_history_scores_zero_long;
+         "test_insufficient_history_scores_zero_short"
+         >:: test_insufficient_history_scores_zero_short;
          "test_early_stage2_max_weeks_serializes_and_round_trips"
          >:: test_early_stage2_max_weeks_serializes_and_round_trips;
          "test_early_stage2_max_weeks_omitted_defaults_4"
