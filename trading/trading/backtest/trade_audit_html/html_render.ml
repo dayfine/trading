@@ -10,15 +10,19 @@ open Html_data
 
 (* Emit a JS/JSON string literal, escaping the characters that would break the
    surrounding [const DATA=...] object literal. Tickers are [A-Z0-9._-] but we
-   guard quotes/backslash/control chars regardless. Multi-byte UTF-8 (e.g. the
-   [\xc2\xa7] section sign in rule descriptions) passes through as raw bytes,
-   which is valid inside a JS string. *)
+   guard quotes/backslash/control chars regardless. The less-than sign is
+   escaped to a [<] unicode escape so an adversarial string cannot inject a
+   literal script-closing tag that the HTML parser would treat as the end of the
+   inline script (the browser reads [<] back as less-than, so display is
+   unaffected). Multi-byte UTF-8 (e.g. the [\xc2\xa7] section sign in rule
+   descriptions) passes through as raw bytes, valid inside a JS string. *)
 let _js_escape s =
   let b = Buffer.create (String.length s + 2) in
   String.iter s ~f:(fun c ->
       match c with
       | '"' -> Buffer.add_string b "\\\""
       | '\\' -> Buffer.add_string b "\\\\"
+      | '<' -> Buffer.add_string b "\\u003c"
       | '\n' -> Buffer.add_string b "\\n"
       | '\r' -> Buffer.add_string b "\\r"
       | '\t' -> Buffer.add_string b "\\t"

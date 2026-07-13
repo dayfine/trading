@@ -15,6 +15,7 @@ open OUnit2
 open Core
 open Matchers
 module TAR = Trade_audit_report
+module Ratings = Trade_audit_report.Trade_audit_ratings
 module HR = Trade_audit_html.Html_report
 module TA = Backtest.Trade_audit
 
@@ -27,6 +28,14 @@ let _count s ~pattern =
   List.length (String.substr_index_all s ~may_overlap:false ~pattern)
 
 let _has s sub = String.is_substring s ~substring:sub
+
+(* Mirror of [Html_render]'s private quartile label so the passthrough
+   assertions can build the exact emitted fragment. *)
+let _qlabel = function
+  | Ratings.Q1_top -> "Q1 (top)"
+  | Q2 -> "Q2"
+  | Q3 -> "Q3"
+  | Q4_bottom -> "Q4 (bottom)"
 
 (* Fixture writers ------------------------------------------------------- *)
 
@@ -49,7 +58,7 @@ let _write_summary path =
     \ (n_steps 6) (initial_cash 1000000.00) (final_portfolio_value 1200000.00)\n\
     \ (n_round_trips 2) (stale_held_symbols (DELISTED1))\n\
     \ (metrics ((metric_types.metric_type.t.sharperatio 0.99)\n\
-    \  (metric_types.metric_type.t.cagr 11.15)\n\
+    \  (metric_types.metric_type.t.cagr 11.10)\n\
     \  (metric_types.metric_type.t.maxdrawdown 10.10)\n\
     \  (metric_types.metric_type.t.winrate 100.00))))\n"
 
@@ -140,10 +149,12 @@ let _stage_dir () =
   _write_audit (Filename.concat sd "trade_audit.sexp");
   sd
 
-let _render_fixture ?bar_close () =
+let _load_fixture ?bar_close () =
   let scenario_dir = _stage_dir () in
   let report = TAR.load ~scenario_dir () in
-  HR.render (HR.load ?bar_close ~report ~scenario_dir ())
+  (report, HR.render (HR.load ?bar_close ~report ~scenario_dir ()))
+
+let _render_fixture ?bar_close () = snd (_load_fixture ?bar_close ())
 
 (* Tests ----------------------------------------------------------------- *)
 
@@ -165,19 +176,63 @@ let test_structural_invariants _ =
          field (fun s -> _has s "renderTrades()") (equal_to true);
        ])
 
-let test_analysis_panels_populated _ =
+let test_kpi_values_are_data_derived _ =
+  (* The KPI tiles are computed from the fixture (initial 1.0M, final 1.2M,
+     2/2 winners, cagr 11.10, sharpe 0.99, maxdd 10.10), not hardcoded like the
+     hand-built mock. Pin the exact emitted [label,value,sub,hero] tuples. *)
   let html = _render_fixture () in
-  (* AAPL audit matched → analysis is Some → conformance + decision emitted
-     (not the [null] the JS falls back to when analysis is absent). *)
   assert_that html
     (all_of
        [
-         field (fun s -> _has s "\"conformance\":null") (equal_to false);
-         field (fun s -> _has s "\"spirit\":") (equal_to true);
-         field (fun s -> _has s "\"quartiles\":") (equal_to true);
-         (* the AAPL entry's stop_trigger_kind column surfaces in the table *)
-         field (fun s -> _has s "gap_down") (equal_to true);
+         field
+           (fun s ->
+             _has s "[\"Final NAV\",\"$1.20M\",\"cash + marked opens\",1]")
+           (equal_to true);
+         field
+           (fun s ->
+             _has s "[\"MTM return\",\"+20.0%\",\"on initial $1.00M\",0]")
+           (equal_to true);
+         field
+           (fun s -> _has s "[\"Win rate\",\"100.0%\",\"2 / 2\",0]")
+           (equal_to true);
+         field
+           (fun s -> _has s "[\"CAGR\",\"11.1%\",\"annualized\",0]")
+           (equal_to true);
+         field
+           (fun s -> _has s "[\"Sharpe\",\"0.99\",\"MaxDD 10.1%\",0]")
+           (equal_to true);
        ])
+
+let test_analysis_panels_match_report _ =
+  (* AAPL audit matched → analysis is Some → the conformance + decision panels
+     are a verbatim passthrough of [report.analysis]: assert the emitted spirit
+     score and every quartile [label,trades,wins,winrate] tuple equal the loaded
+     report's fields, not just key-presence. *)
+  let report, html = _load_fixture () in
+  let analysis = Option.value_exn report.TAR.analysis in
+  let w = analysis.weinstein in
+  let spirit_str =
+    if Float.is_finite w.spirit_score then sprintf "%.2f" w.spirit_score
+    else "0"
+  in
+  let quartile_frags =
+    List.map analysis.decision_quality.per_quartile
+      ~f:(fun (q : Ratings.cascade_quartile_stat) ->
+        sprintf "[\"%s\",%d,%d,\"%.1f%%\"]" (_qlabel q.quartile) q.trade_count
+          q.win_count q.win_rate_pct)
+  in
+  assert_that html
+    (all_of
+       ([
+          field (fun s -> _has s "\"conformance\":null") (equal_to false);
+          field
+            (fun s -> _has s (sprintf "{\"spirit\":%s" spirit_str))
+            (equal_to true);
+          (* the AAPL entry's stop_trigger_kind column surfaces in the table *)
+          field (fun s -> _has s "gap_down") (equal_to true);
+        ]
+       @ List.map quartile_frags ~f:(fun frag ->
+           field (fun s -> _has s frag) (equal_to true))))
 
 let test_no_snapshot_omits_benchmark_and_util _ =
   let html = _render_fixture () in
@@ -189,16 +244,24 @@ let test_no_snapshot_omits_benchmark_and_util _ =
        ])
 
 let test_bar_close_populates_benchmark_and_util _ =
-  (* A constant close is enough to exercise both series end-to-end: the
-     benchmark indexes flat to initial cash, utilization is nonzero on dates a
-     position covers. *)
+  (* Constant close 100 over the 2-point downsampled curve
+     [(2020-04-24, 1.0M); (2021-03-01, 1.2M)]:
+       - benchmark indexes flat to initial cash (100/100) → 1.0M at both dates,
+         so each curve row is [date, strat, 1000000];
+       - utilization is 0% at 2020-04-24 (no position open yet) and, at
+         2021-03-01, (WMT 200sh + MSFT 200sh) * 100 / 1.2M * 100 = 3.3333%. *)
   let bar_close ~symbol:_ ~as_of:_ = Some 100.0 in
   let html = _render_fixture ~bar_close () in
   assert_that html
     (all_of
        [
          field (fun s -> _has s "\"has_benchmark\":true") (equal_to true);
-         field (fun s -> _has s "\"util\":[") (equal_to true);
+         field
+           (fun s ->
+             _has s
+               "\"curve\":[[\"2020-04-24\",1000000.0000,1000000.0000],[\"2021-03-01\",1200000.0000,1000000.0000]]")
+           (equal_to true);
+         field (fun s -> _has s "\"util\":[0.0000,3.3333]") (equal_to true);
        ])
 
 let _row ~symbol : HR.trade_row =
@@ -218,28 +281,28 @@ let _row ~symbol : HR.trade_row =
     cascade_score = None;
   }
 
+let _data_with_trade ~symbol : HR.data =
+  {
+    scenario_name = "esc";
+    subtitle = "esc fixture";
+    initial_cash = 1_000_000.0;
+    final_nav = 1_000_000.0;
+    curve =
+      [ (_date "2020-01-01", 1_000_000.0); (_date "2020-02-01", 1_100_000.0) ];
+    benchmark = None;
+    benchmark_label = "SPY TR";
+    utilization = None;
+    opens = [];
+    stale_held = [];
+    kpis = [];
+    analysis = None;
+    trades = [ _row ~symbol ];
+  }
+
 let test_symbol_escaping _ =
   (* A symbol with an embedded double-quote must be escaped so it cannot break
      out of its JS string literal; the [/*DATA*/] placeholder is still gone. *)
-  let data : HR.data =
-    {
-      scenario_name = "esc";
-      subtitle = "esc fixture";
-      initial_cash = 1_000_000.0;
-      final_nav = 1_000_000.0;
-      curve =
-        [ (_date "2020-01-01", 1_000_000.0); (_date "2020-02-01", 1_100_000.0) ];
-      benchmark = None;
-      benchmark_label = "SPY TR";
-      utilization = None;
-      opens = [];
-      stale_held = [];
-      kpis = [];
-      analysis = None;
-      trades = [ _row ~symbol:"A\"B" ];
-    }
-  in
-  let html = HR.render data in
+  let html = HR.render (_data_with_trade ~symbol:"A\"B") in
   assert_that html
     (all_of
        [
@@ -248,16 +311,30 @@ let test_symbol_escaping _ =
          field (fun s -> _count s ~pattern:"const DATA=") (equal_to 1);
        ])
 
+let test_script_close_escaping _ =
+  (* A symbol containing a script-closing tag must not inject a real one: the
+     [<] is escaped to [<], so the only [</script>] in the document is the
+     genuine one that terminates the inline script. *)
+  let html = HR.render (_data_with_trade ~symbol:"</script>") in
+  assert_that html
+    (all_of
+       [
+         field (fun s -> _has s "\\u003c/script>") (equal_to true);
+         field (fun s -> _count s ~pattern:"</script>") (equal_to 1);
+       ])
+
 let suite =
   "Trade_audit_html.Html_report"
   >::: [
          "structural invariants" >:: test_structural_invariants;
-         "analysis panels populated" >:: test_analysis_panels_populated;
+         "kpi values are data-derived" >:: test_kpi_values_are_data_derived;
+         "analysis panels match report" >:: test_analysis_panels_match_report;
          "no snapshot omits benchmark and util"
          >:: test_no_snapshot_omits_benchmark_and_util;
          "bar_close populates benchmark and util"
          >:: test_bar_close_populates_benchmark_and_util;
          "symbol escaping" >:: test_symbol_escaping;
+         "script-close escaping" >:: test_script_close_escaping;
        ]
 
 let () = run_test_tt_main suite
