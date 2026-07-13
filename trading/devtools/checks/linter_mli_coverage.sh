@@ -39,11 +39,13 @@ _is_excluded() {
   printf '%s' "$1" | grep -qE "$EXCLUDE_PATTERN"
 }
 
-for ml_file in $(find "$TRADING_DIR" -path "*/lib/*.ml" \
+# Name-anchored prunes + race guard (see no_python_check.sh).
+for ml_file in $(find "$TRADING_DIR" \
+    \( -name '_build' -o -name '.formatted' \) -prune -o \
+    -path "*/lib/*.ml" \
     -not -name "*.mli" \
-    -not -path "*/_build/*" \
-    -not -path "*/.formatted/*" \
-    -not -name "*.pp.ml"); do
+    -not -name "*.pp.ml" \
+    -print 2>/dev/null || true); do
   _is_excluded "$ml_file" && continue
   mli_file="${ml_file%.ml}.mli"
   if [ ! -f "$mli_file" ]; then
