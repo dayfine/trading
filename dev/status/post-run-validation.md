@@ -87,7 +87,7 @@ docker exec trading-1-dev bash -c \
   the bar-dependent V3/V4/V7 are covered structurally but want a golden-run
   integration test.
 
-## Last updated: 2026-07-12 (C6b audit-join fix)
+## Last updated: 2026-07-12
 
 ## Interface stable
 
