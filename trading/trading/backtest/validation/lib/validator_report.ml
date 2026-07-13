@@ -26,9 +26,14 @@ let _failing_invariants report =
       (not c.passed) && equal_severity c.severity Invariant)
 
 let render_md report =
+  let j = report.audit_join in
   let header =
-    sprintf "# Post-run validation report\n\nInvariant checks failing: %d\n\n"
+    sprintf
+      "# Post-run validation report\n\n\
+       Invariant checks failing: %d\n\
+       audit join: %d/%d rows matched\n\n"
       (_failing_invariants report)
+      j.matched j.total
   in
   let body = List.map report.checks ~f:_check_line |> String.concat ~sep:"\n" in
   header ^ body ^ "\n"

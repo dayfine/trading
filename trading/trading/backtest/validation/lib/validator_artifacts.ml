@@ -4,6 +4,7 @@ open Validator_types
 let _date_opt s = try Some (Date.of_string s) with _ -> None
 let _float_opt s = if String.is_empty s then None else Float.of_string_opt s
 let _cell a i = if i < Array.length a then a.(i) else ""
+let _str_opt s = if String.is_empty s then None else Some s
 
 (* trades.csv column indices (see [Result_writer._trades_csv_header]). *)
 let _t_symbol = 0
@@ -16,6 +17,10 @@ let _t_quantity = 7
 let _t_exit_trigger = 12
 let _t_stop_distance = 15
 let _t_stop_kind = 16
+
+(* Trailing [position_id] column (added by #1942); absent on legacy 19-column
+   rows, where [_cell] returns "" and the join falls back to symbol|entry_date. *)
+let _t_position_id = 19
 
 (* open_positions.csv column indices (symbol,side,entry_date,entry_price,qty). *)
 let _o_symbol = 0
@@ -36,6 +41,7 @@ let _mk_trade a =
     exit_trigger = _cell a _t_exit_trigger;
     stop_trigger_kind = _cell a _t_stop_kind;
     stop_initial_distance_pct = _float_opt (_cell a _t_stop_distance);
+    position_id = _str_opt (_cell a _t_position_id);
   }
 
 (* A trades.csv row is well-formed when its date + numeric cells all parse. *)
@@ -86,28 +92,58 @@ let _entry_context_of (e : Backtest.Trade_audit.entry_decision) =
     resistance_quality = e.resistance_quality;
   }
 
-let _audit_key ~symbol ~entry_date = symbol ^ "|" ^ Date.to_string entry_date
+type audit_join_row = {
+  position_id : string;
+  symbol : string;
+  entry_date : Date.t;
+  context : entry_context;
+}
+
+let _sd_key ~symbol ~entry_date = symbol ^ "|" ^ Date.to_string entry_date
 
 let _records_of_sexp sexp =
   try (Backtest.Trade_audit.audit_blob_of_sexp sexp).audit_records
   with _ -> (
     try Backtest.Trade_audit.audit_records_of_sexp sexp with _ -> [])
 
-let _build_audit_table records =
-  let tbl = Hashtbl.create (module String) in
-  List.iter records ~f:(fun (r : Backtest.Trade_audit.audit_record) ->
-      let e = r.entry in
-      let key = _audit_key ~symbol:e.symbol ~entry_date:e.entry_date in
-      Hashtbl.set tbl ~key ~data:(_entry_context_of e));
-  tbl
+(* Audit records are keyed by position_id AND (symbol, entry_date). The latter
+   misses on real runs because the audit entry_date is the SIGNAL Friday while a
+   trades.csv row carries the FILL date (next trading day) — so a row that
+   carries a position_id must join on it, and only legacy rows without one fall
+   back to the symbol|date key. *)
+let _build_audit_tables records =
+  let by_pid = Hashtbl.create (module String) in
+  let by_sd = Hashtbl.create (module String) in
+  List.iter records ~f:(fun (r : audit_join_row) ->
+      Hashtbl.set by_pid ~key:r.position_id ~data:r.context;
+      Hashtbl.set by_sd
+        ~key:(_sd_key ~symbol:r.symbol ~entry_date:r.entry_date)
+        ~data:r.context);
+  (by_pid, by_sd)
 
-let _lookup_of_table tbl (row : trade_row) =
-  Hashtbl.find tbl (_audit_key ~symbol:row.symbol ~entry_date:row.entry_date)
+let _lookup (by_pid, by_sd) (row : trade_row) =
+  match row.position_id with
+  | Some pid -> Hashtbl.find by_pid pid
+  | None ->
+      Hashtbl.find by_sd (_sd_key ~symbol:row.symbol ~entry_date:row.entry_date)
+
+let build_audit_lookup rows = _lookup (_build_audit_tables rows)
+
+let _join_row_of_record (r : Backtest.Trade_audit.audit_record) =
+  let e = r.entry in
+  {
+    position_id = e.position_id;
+    symbol = e.symbol;
+    entry_date = e.entry_date;
+    context = _entry_context_of e;
+  }
 
 let load_audit_lookup path =
   match try Some (Sexp.load_sexp path) with _ -> None with
   | None -> fun _ -> None
-  | Some sexp -> _lookup_of_table (_build_audit_table (_records_of_sexp sexp))
+  | Some sexp ->
+      build_audit_lookup
+        (List.map (_records_of_sexp sexp) ~f:_join_row_of_record)
 
 (* Two dates share an ISO trading week iff (year, week_number) match. *)
 let _same_week d1 d2 =
