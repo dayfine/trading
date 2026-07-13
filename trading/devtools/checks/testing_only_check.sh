@@ -24,7 +24,7 @@ trap 'rm -f "$TMPFILE"' EXIT
 
 # ── Step 1: collect @testing-only library names (internal + public) ───────────
 
-find "$ROOT" -name "dune" | while IFS= read -r dune_file; do
+find "$ROOT" -name '_build' -prune -o -name "dune" -print 2>/dev/null | while IFS= read -r dune_file; do
   awk '
     /; @testing-only/ { annotated = 1; next }
     annotated && /\(library/ { in_lib = 1; next }
@@ -53,7 +53,7 @@ VIOLATIONS=""
 while IFS= read -r lib_name; do
   [ -z "$lib_name" ] && continue
   matches=$(
-    find "$ROOT" -name "dune" | while IFS= read -r f; do
+    find "$ROOT" -name '_build' -prune -o -name "dune" -print 2>/dev/null | while IFS= read -r f; do
       awk -v lib="$lib_name" '
         /^\(library[ \t]/ { in_lib = 1 }
         /^\(tests?[ \t(]/ { in_lib = 0 }
