@@ -4,7 +4,7 @@
 
 IN_PROGRESS
 
-## Last updated: 2026-07-12
+## Last updated: 2026-07-13
 
 ## Interface stable
 
@@ -99,16 +99,23 @@ v2 adds a `basis` axis to `Twin_detector.Config`:
 
 Verify: `dune build && dune runtest trading/trading/backtest/snapshot_warehouse/test/`
 
-## Next task (dispatcher-owned)
+## Rebuild + re-run executed (2026-07-13, dispatcher)
 
-Rebuild the deep warehouse with `-dedupe-rename-twins -twin-basis
-returns`, diff the emitted `rename_twin_report.txt` against the 10 known
-twin groups (NLS/BFX, ISIS/IONS, JW-A/JWA/WLY, COR/ABC(+COR_old),
-BKR/BHI, BLL/BALL, SWM/MATV, TXNM/PNM, NVRI/HSC, SJW/HTO; plus new
-candidate ASB/CDX_old) — returns basis should now catch all 10 —, then
-re-pin the record deep-run goldens on the deduped warehouse and
-re-measure the realized-PnL delta. This is a warehouse rebuild + golden
-re-pin — kept out of these code-only PRs.
+Deep warehouse rebuilt with `-dedupe-rename-twins -twin-basis returns`:
+**83 groups / 91 legs dropped** (2999 → 2908). All 10 known groups caught;
+ASB/CDX_old and BALL/TAP correctly NOT flagged (proven non-twins by
+return-match 0.06); survivors verified to carry full back-history. 28y
+honest-tradeable re-run on the deduped basis: MTM +3407.4%, realized
+$10.37M (+1037%, still > SPY TR +700%), 1171 trades, Sharpe 0.68,
+MaxDD 40.9%. Full writeup + why the haircut exceeds the 12% estimate:
+`dev/notes/dedup-record-rerun-2026-07-13.md`. Validator over the run:
+audit join 1171/1171, V5 PASS, V6 down to its 2 known false positives.
+
+## Next task
+
+None on this track — deduped warehouse is the record basis. Optional:
+V6's trade-level heuristic could consult the builder report to drop its
+2 standing false positives.
 
 ## Follow-ups
 
