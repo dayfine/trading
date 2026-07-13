@@ -23,6 +23,7 @@
   core
   status
   trade_audit_report
+  trade_audit_html
   weinstein_trading.strategy
   weinstein.snapshot_runtime
   weinstein.snapshot_pipeline))

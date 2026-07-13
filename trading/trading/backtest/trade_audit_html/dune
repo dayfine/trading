@@ -1,0 +1,10 @@
+(library
+ (name trade_audit_html)
+ (libraries
+  core
+  core_unix
+  core_unix.sys_unix
+  trade_audit_report
+  weinstein.types)
+ (preprocess
+  (pps ppx_sexp_conv ppx_deriving.eq)))
