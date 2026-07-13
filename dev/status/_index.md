@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-12 (orchestrator run 29211702843 [**2026-07-12 run-2**]: **QC + auto-merge pass**. Two maintainer-authored ready-for-review PRs QC'd + Step-6.5 auto-merged on full-green: **#1942 `feat/trades-export-join-fix`** (backtest trades.csv position-keyed export-join fix; structural+behavioral APPROVED q5; behaviour bit-identical) → main `8a834791`; **#1941 `feat/resistance-insufficient-history`** (default-off `Insufficient_history` overhead-quality label; R1 parity bit-identical, W1/W2 spine intact; structural+behavioral APPROVED q5) → main `0b5a0a2b`. Both: CI `build-and-test`+`perf-tier1-smoke` success. Main HEAD `468aea7d`/#1940 CI `build-and-test` was RED but confirmed the **known ENOSPC linker infra flake** (0 real `FAIL:` lines; `dune build && dune runtest` exit 0 live-verified on main this run) = harness `[~]` #1636, human-PAT-blocked — NOT a code failure. 0 open PRs after merge; main GREEN. Prior: run-1 (29181120162), run-4 (29165703817), run-3 (29160076339).
+Last updated: 2026-07-12 (local session, PM: **C1-C4 correctness sweep — 4 PRs 3-gate merged**. #1939 universe asset-type blocklist (default-off, feat-data), #1940 snapshot-warehouse rename-twin dedup (default-off, new track below), #1941 resistance/support `Insufficient_history` label (default-off; kills false Virgin_territory on starved panels), #1942 trades.csv export-join fix (exit_trigger + stop_trigger_kind keyed by position_id; new trailing `position_id` column). Each passed qc-structural + qc-behavioral at tip + CI; reworks: #1939 L1 decode-test, #1940 CP1/CP4 tests, #1941 support-guard + feature-matrix category + scoring pins, #1942 header-fixture. Validator baseline over the record run: V5=129, V6=12 twins, V9/V10 report-only, V11=261; V1/V2/V7/V8 audit-join DEAD (signal-vs-fill date skew) → C6b dispatched. Twin-detector v1 armed on real data caught 15 exact-feed groups but missed 9/10 known groups (adjustment-basis divergence) → v2 returns-basis PR #1946 open. In flight locally: dedup warehouse rebuild + 28y record re-run + re-pin — do not dispatch. Prior: run-2 (29211702843) — QC pass over #1941/#1942 concurrent with this session, flagged the post-#1940 main-CI RED as the known ENOSPC linker infra flake (0 `FAIL:` lines; later main runs green); run-1 (29181120162) merged #1934 extension-stop.)
 
 ## Active + complete tracks
 
@@ -15,7 +15,8 @@ Each row: one line; deeper task detail in the linked status file.
 |---|---|---|---|---|
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
-| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | — | trades.csv export-join fix MERGED (#1942, 3-gate auto-merge); next: P2 matrix on composition-policy universe (data-gated) |
+| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | — | trades.csv export-join fix MERGED (#1942, position_id column); next: validator audit-join fix (C6b, dispatched) then P2 matrix (data-gated) |
+| [rename-twin-dedup](rename-twin-dedup.md) | IN_PROGRESS | feat-backtest | — | v1 MERGED (#1940); v2 returns-basis PR #1946 OPEN; next: rebuild + record re-pin — in flight locally 2026-07-12, do not dispatch |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
 | [backtest-scale](backtest-scale.md) | MERGED | — | — | — |
 | [backtest-perf](backtest-perf.md) | IN_PROGRESS | feat-backtest | — | snapshot-format-v2 S4 PROVEN (warehouses v2, top-3000 fits at cache<=1024); S5/v1-cleanup deferred (oversight); next: regime-diverse lenses on v2 (LOCAL) |
@@ -44,7 +45,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
-| [screener](screener.md) | MERGED | — | — | resistance insufficient-history label fix MERGED (#1941, default-off/bit-identical, 3-gate auto-merge 2026-07-12) |
+| [screener](screener.md) | MERGED | — | — | resistance Insufficient_history label MERGED (#1941, default-off); next: arm min_history_bars for live weekly-review + record convention |
 | [simulation](simulation.md) | IN_PROGRESS | feat-backtest | — | #1847 sibling round-trip pairing fix MERGED (761c30cf); per-trade scale-in reporting now trustworthy. Next: stale-exit grid via WF-CV (data-gated) |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
@@ -54,7 +55,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
 | [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | snapshot fast-input path (#1784) + corrected 5-wk picks (#1781) MERGED; next: large-warehouse multi-week sweep (data-gated); live-cycle human-gated |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
-| [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | eligibility builder (#1594) + live refresh (#1595) + staleness guard (#1790) MERGED; next: ADR $-vol policy artifact (human-gated; largely subsumed) |
+| [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | asset-type blocklist MERGED (#1939, default-off); next: arm ATB.curated for live universe build + General::Type enrichment feed |
 | [floor-quality](floor-quality.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | P1b step2 SPY-sleeve MERGED #1913; next = step 3 lens screen vs TR-SPY (deep-warehouse, maintainer LOCAL / S5) |
 
 ## How to use
