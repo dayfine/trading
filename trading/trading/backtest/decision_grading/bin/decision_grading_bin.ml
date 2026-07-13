@@ -314,7 +314,7 @@ let () =
   let grade_config =
     { DG.Grade.default_config with grade_horizon_weeks = grade_horizon }
   in
-  let report = TAR.load ~scenario_dir in
+  let report = TAR.load ~scenario_dir () in
   let bar_reader = _bar_reader_of_snapshot ~snapshot_dir in
   let mfe_index = _mfe_index ~scenario_dir in
   let exit_reason_lookup = _exit_reason_lookup ~scenario_dir in

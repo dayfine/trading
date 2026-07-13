@@ -105,7 +105,8 @@ type analysis = {
   weinstein : Trade_audit_ratings.weinstein_aggregate;
       (** Run-level Weinstein-conformance rollup. *)
   decision_quality : Trade_audit_ratings.decision_quality_matrix;
-      (** Cascade-quartile vs outcome matrix (ranked by [r_multiple]). *)
+      (** Cascade-score-quartile vs outcome matrix — does a higher cascade score
+          rank entries by realised win rate? *)
 }
 [@@deriving sexp]
 (** PR-4 analysis layer: per-trade ratings + run-level aggregates. Computed by
@@ -134,6 +135,7 @@ val render :
   ?period_end:Date.t ->
   ?universe_size:int ->
   ?ratings_config:Trade_audit_ratings.config ->
+  ?closes_lookup:Trade_audit_ratings.closes_lookup ->
   trade_audit:Backtest.Trade_audit.audit_record list ->
   trades:Trading_simulation.Metrics.trade_metrics list ->
   unit ->
@@ -152,7 +154,11 @@ val render :
 
     [ratings_config] tunes the PR-4 analysis layer thresholds (over-trading,
     exit-early, R-multiple bounds). Defaults to
-    {!Trade_audit_ratings.default_config}. *)
+    {!Trade_audit_ratings.default_config}.
+
+    [closes_lookup] resolves each entry's pre-entry daily closes so R6
+    (recent-plunge avoidance) can evaluate; defaults to the empty lookup, under
+    which R6 reports N/A exactly as when no bar source is available. *)
 
 val to_markdown : t -> string
 (** Render [t] to a markdown string. Output is deterministic for a given [t] —
@@ -161,7 +167,11 @@ val to_markdown : t -> string
 
 (** {1 Loading from a scenario output directory} *)
 
-val load : scenario_dir:string -> t
+val load :
+  ?closes_lookup:Trade_audit_ratings.closes_lookup ->
+  scenario_dir:string ->
+  unit ->
+  t
 (** Load the trade-audit report from a scenario output directory of the shape
     produced by {!Backtest.Result_writer.write}:
 
@@ -174,5 +184,6 @@ val load : scenario_dir:string -> t
       summary.sexp           — period + universe size (optional)
     v}
 
-    [scenario_name] is taken from the basename of [scenario_dir]. Raises
+    [scenario_name] is taken from the basename of [scenario_dir].
+    [closes_lookup] is forwarded to {!render} (default: empty → R6 N/A). Raises
     [Failure] if [trades.csv] is missing or malformed. *)

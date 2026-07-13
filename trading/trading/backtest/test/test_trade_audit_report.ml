@@ -440,7 +440,7 @@ let test_load_reads_full_directory _ =
   _write_trades_csv (Filename.concat scenario_dir "trades.csv");
   _write_summary_sexp (Filename.concat scenario_dir "summary.sexp");
   _write_audit_sexp (Filename.concat scenario_dir "trade_audit.sexp");
-  let report = TAR.load ~scenario_dir in
+  let report = TAR.load ~scenario_dir () in
   assert_that report
     (all_of
        [
@@ -472,7 +472,7 @@ let test_load_without_audit_file _ =
   Core_unix.mkdir_p scenario_dir;
   _write_trades_csv (Filename.concat scenario_dir "trades.csv");
   _write_summary_sexp (Filename.concat scenario_dir "summary.sexp");
-  let report = TAR.load ~scenario_dir in
+  let report = TAR.load ~scenario_dir () in
   assert_that report
     (all_of
        [
@@ -489,7 +489,7 @@ let test_load_missing_trades_csv_raises _ =
   Core_unix.mkdir_p scenario_dir;
   let result =
     try
-      let _ = TAR.load ~scenario_dir in
+      let _ = TAR.load ~scenario_dir () in
       Ok ()
     with Failure _ -> Error "raised"
   in
@@ -534,7 +534,7 @@ let test_load_post_g2_long_round_trip _ =
   let scenario_dir =
     _stage_post_g2_scenario ~prefix:"post_g2_long" ~rows:[ _post_g2_long_row ]
   in
-  let report = TAR.load ~scenario_dir in
+  let report = TAR.load ~scenario_dir () in
   (* TAR.load builds [per_trade_row]s whose [side] is sourced from the
      trade-audit's [entry.side] when matched, OR defaulted to [Long] when no
      audit is present. With no audit staged, the row's [side] field cannot
@@ -573,7 +573,7 @@ let test_load_post_g2_short_round_trip _ =
   let scenario_dir =
     _stage_post_g2_scenario ~prefix:"post_g2_short" ~rows:[ _post_g2_short_row ]
   in
-  let report = TAR.load ~scenario_dir in
+  let report = TAR.load ~scenario_dir () in
   (* SHORT row produces a positive pnl (covered below entry). The [side] field
      in the parsed [trade_metrics] is [Sell] — see the parallel pin in
      [test_optimal_run_artefacts.ml]. Here we pin the row-level fields surfaced
@@ -613,7 +613,7 @@ let test_load_post_g2_mixed_long_and_short _ =
     _stage_post_g2_scenario ~prefix:"post_g2_mixed"
       ~rows:[ _post_g2_long_row; _post_g2_short_row ]
   in
-  let report = TAR.load ~scenario_dir in
+  let report = TAR.load ~scenario_dir () in
   (* Both rows must parse and surface in entry-date order. *)
   assert_that report
     (all_of
@@ -718,7 +718,7 @@ let test_writer_reader_post_g2_round_trip _ =
   (* Reader parses both rows back. The report aggregates over [trade_metrics]
      where [side] survives intact; we pin via the header counts (both winners)
      and the ordered symbol list. *)
-  let report = TAR.load ~scenario_dir:dir in
+  let report = TAR.load ~scenario_dir:dir () in
   assert_that report
     (all_of
        [
@@ -813,7 +813,7 @@ let test_load_reads_blob_format_audit _ =
   _write_trades_csv (Filename.concat scenario_dir "trades.csv");
   _write_summary_sexp (Filename.concat scenario_dir "summary.sexp");
   _write_blob_audit_sexp (Filename.concat scenario_dir "trade_audit.sexp");
-  let report = TAR.load ~scenario_dir in
+  let report = TAR.load ~scenario_dir () in
   assert_that report
     (field
        (fun (t : TAR.t) ->

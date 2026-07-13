@@ -122,7 +122,7 @@ let _try_load_trade_quality ~dir : Trade_audit_report.t option =
      swallowed: the audit is auxiliary, never a hard requirement. *)
   let trades_path = Filename.concat dir "trades.csv" in
   if not (Sys_unix.file_exists_exn trades_path) then None
-  else try Some (Trade_audit_report.load ~scenario_dir:dir) with _ -> None
+  else try Some (Trade_audit_report.load ~scenario_dir:dir ()) with _ -> None
 
 (* On-disk shape of [optimal_summary.sexp] — mirrors the
    [Optimal_strategy_runner.optimal_summary_artefact] producer. We re-declare

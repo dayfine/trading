@@ -235,10 +235,84 @@ let test_r5_fail_short_not_stage_4 _ =
     (outcome_of_rule_id evals TR.R5_short_stage_4_breakdown)
     (equal_to TR.Fail)
 
-(* -- R6 documented gap (NA until pre-entry bar history is wired) --------- *)
+(* -- R6 recent-plunge (Ch.4 plunge-buy avoidance) ------------------------ *)
 
-let test_r6_na _ =
+(* AIR-2020-shaped: a Long entered 2020-03-14 after price fell ~$45 -> ~$22 in
+   the prior three weeks, the trough landing two days before the entry. *)
+let _air_2020_closes =
+  [
+    (_date "2020-02-20", 45.0);
+    (_date "2020-02-27", 40.0);
+    (_date "2020-03-05", 33.0);
+    (_date "2020-03-12", 22.0);
+  ]
+
+let test_r6_fail_plunge_buy _ =
+  let entry = make_entry ~entry_date:(_date "2020-03-14") () in
+  let evals =
+    TR.evaluate_rules ~pre_entry_closes:_air_2020_closes ~config:cfg
+      (make_record entry)
+  in
+  assert_that
+    (outcome_of_rule_id evals TR.R6_no_recent_plunge)
+    (equal_to TR.Fail)
+
+let test_r6_pass_calm_entry _ =
+  (* Same window shape but a flat/rising run — no >=10% drawdown. *)
+  let calm_closes =
+    [
+      (_date "2020-02-20", 100.0);
+      (_date "2020-02-27", 101.0);
+      (_date "2020-03-05", 102.0);
+      (_date "2020-03-12", 103.0);
+    ]
+  in
+  let entry = make_entry ~entry_date:(_date "2020-03-14") () in
+  let evals =
+    TR.evaluate_rules ~pre_entry_closes:calm_closes ~config:cfg
+      (make_record entry)
+  in
+  assert_that
+    (outcome_of_rule_id evals TR.R6_no_recent_plunge)
+    (equal_to TR.Pass)
+
+let test_r6_pass_when_plunge_is_stale _ =
+  (* A >=10% drop occurred, but its trough recovered well before the entry (the
+     entry is >5d from the trough) — not a plunge-buy. *)
+  let entry = make_entry ~entry_date:(_date "2020-03-14") () in
+  let evals =
+    TR.evaluate_rules
+      ~pre_entry_closes:
+        [
+          (_date "2020-02-20", 45.0);
+          (_date "2020-02-24", 22.0);
+          (_date "2020-03-02", 44.0);
+          (_date "2020-03-12", 46.0);
+        ]
+      ~config:cfg (make_record entry)
+  in
+  assert_that
+    (outcome_of_rule_id evals TR.R6_no_recent_plunge)
+    (equal_to TR.Pass)
+
+let test_r6_na_no_bar_source _ =
+  (* No [pre_entry_closes] supplied (the report path when no snapshot dir is
+     wired) → honest N/A rather than a synthesised verdict. *)
   let evals = TR.evaluate_rules ~config:cfg (make_record (make_entry ())) in
+  assert_that
+    (outcome_of_rule_id evals TR.R6_no_recent_plunge)
+    (equal_to TR.Not_applicable)
+
+let test_r6_na_for_short _ =
+  let entry =
+    make_entry ~side:Trading_base.Types.Short
+      ~stage:(WT.Stage4 { weeks_declining = 4 })
+      ~ma_direction:WT.Declining ~entry_date:(_date "2020-03-14") ()
+  in
+  let evals =
+    TR.evaluate_rules ~pre_entry_closes:_air_2020_closes ~config:cfg
+      (make_record entry)
+  in
   assert_that
     (outcome_of_rule_id evals TR.R6_no_recent_plunge)
     (equal_to TR.Not_applicable)
@@ -414,7 +488,7 @@ let test_over_trading_burst_detection _ =
     ]
   in
   let audit = [ aapl_a; aapl_b; msft ] in
-  let ratings = TR.rate_all ~config:cfg ~audit ~trades in
+  let ratings = TR.rate_all ~config:cfg ~audit ~trades () in
   let m = TR.behavioral_metrics_of ~config:cfg ~ratings ~audit ~trades in
   assert_that m.over_trading
     (all_of
@@ -439,7 +513,9 @@ let test_exit_winners_flagged_when_realized_below_half_mfe _ =
   (* realized 5% < 50% × 30% = 15% → flagged. *)
   let trade = make_trade ~pnl_dollars:500.0 ~pnl_percent:5.0 () in
   let record = make_record ~exit_:(Some exit_) entry in
-  let ratings = TR.rate_all ~config:cfg ~audit:[ record ] ~trades:[ trade ] in
+  let ratings =
+    TR.rate_all ~config:cfg ~audit:[ record ] ~trades:[ trade ] ()
+  in
   let m =
     TR.behavioral_metrics_of ~config:cfg ~ratings ~audit:[ record ]
       ~trades:[ trade ]
@@ -468,7 +544,9 @@ let test_exit_losers_flagged_when_r_multiple_exceeds_threshold _ =
   (* R = -2.0 > 1.5 threshold → flagged. *)
   let trade = make_trade ~pnl_dollars:(-2_000.0) ~pnl_percent:(-20.0) () in
   let record = make_record ~exit_:(Some exit_) entry in
-  let ratings = TR.rate_all ~config:cfg ~audit:[ record ] ~trades:[ trade ] in
+  let ratings =
+    TR.rate_all ~config:cfg ~audit:[ record ] ~trades:[ trade ] ()
+  in
   let m =
     TR.behavioral_metrics_of ~config:cfg ~ratings ~audit:[ record ]
       ~trades:[ trade ]
@@ -511,7 +589,7 @@ let test_exit_losers_stop_discipline_pct _ =
   in
   let audit = [ r1; r2 ] in
   let trades = [ t1; t2 ] in
-  let ratings = TR.rate_all ~config:cfg ~audit ~trades in
+  let ratings = TR.rate_all ~config:cfg ~audit ~trades () in
   let m = TR.behavioral_metrics_of ~config:cfg ~ratings ~audit ~trades in
   assert_that m.exit_losers_too_late.stop_discipline_pct
     (float_equal ~epsilon:1e-9 50.0)
@@ -542,7 +620,7 @@ let test_entering_losers_flags_bottom_quartile_loser _ =
   in
   let audit = List.map pairs ~f:fst in
   let trades = List.map pairs ~f:snd in
-  let ratings = TR.rate_all ~config:cfg ~audit ~trades in
+  let ratings = TR.rate_all ~config:cfg ~audit ~trades () in
   let m = TR.behavioral_metrics_of ~config:cfg ~ratings ~audit ~trades in
   assert_that m.entering_losers_often
     (all_of
@@ -557,38 +635,58 @@ let test_entering_losers_flags_bottom_quartile_loser _ =
 
 (* -- Decision quality matrix --------------------------------------------- *)
 
-let test_decision_quality_matrix _ =
-  let make_pair ~symbol ~r_input ~ed =
+(* Decision quality quartiles trades by cascade SCORE at entry (not by
+   outcome), so the win-rate-by-quartile answers "do higher-scored entries win
+   more?". 8 trades, scores 80..45 desc → quartiles of 2; outcomes chosen so
+   Q1=100% Q2=50% Q3=0% Q4=50%, overall 50%. If this cut were (wrongly) by
+   outcome, every quartile would be tautologically 100/…/0. *)
+let test_decision_quality_matrix_by_score _ =
+  let make_pair ~symbol ~score ~win ~ed =
     let entry =
-      make_entry ~symbol ~entry_date:ed ~initial_risk_dollars:1_000.0 ()
+      make_entry ~symbol ~cascade_score:score ~entry_date:ed
+        ~initial_risk_dollars:1_000.0 ()
     in
+    let pnl = if win then 1_000.0 else -1_000.0 in
     let trade =
-      make_trade ~symbol ~entry_date:ed ~pnl_dollars:(r_input *. 1_000.0)
-        ~pnl_percent:(r_input *. 10.0) ()
+      make_trade ~symbol ~entry_date:ed ~pnl_dollars:pnl ~pnl_percent:10.0 ()
     in
     (make_record entry, trade)
   in
   let pairs =
     [
-      make_pair ~symbol:"A" ~r_input:3.0 ~ed:(_date "2024-01-01");
-      make_pair ~symbol:"B" ~r_input:1.0 ~ed:(_date "2024-02-01");
-      make_pair ~symbol:"C" ~r_input:(-0.5) ~ed:(_date "2024-03-01");
-      make_pair ~symbol:"D" ~r_input:(-2.0) ~ed:(_date "2024-04-01");
+      make_pair ~symbol:"A" ~score:80 ~win:true ~ed:(_date "2024-01-01");
+      make_pair ~symbol:"B" ~score:75 ~win:true ~ed:(_date "2024-02-01");
+      make_pair ~symbol:"C" ~score:70 ~win:true ~ed:(_date "2024-03-01");
+      make_pair ~symbol:"D" ~score:65 ~win:false ~ed:(_date "2024-04-01");
+      make_pair ~symbol:"E" ~score:60 ~win:false ~ed:(_date "2024-05-01");
+      make_pair ~symbol:"F" ~score:55 ~win:false ~ed:(_date "2024-06-01");
+      make_pair ~symbol:"G" ~score:50 ~win:true ~ed:(_date "2024-07-01");
+      make_pair ~symbol:"H" ~score:45 ~win:false ~ed:(_date "2024-08-01");
     ]
   in
   let audit = List.map pairs ~f:fst in
   let trades = List.map pairs ~f:snd in
-  let ratings = TR.rate_all ~config:cfg ~audit ~trades in
-  let m = TR.decision_quality_matrix_of ~ratings in
+  let ratings = TR.rate_all ~config:cfg ~audit ~trades () in
+  let m = TR.decision_quality_matrix_of ~audit ~ratings in
   assert_that m
     (all_of
        [
          field
            (fun (d : TR.decision_quality_matrix) -> d.total_trades)
-           (equal_to 4);
+           (equal_to 8);
          field
            (fun (d : TR.decision_quality_matrix) -> d.overall_win_rate_pct)
            (float_equal ~epsilon:1e-9 50.0);
+         field
+           (fun (d : TR.decision_quality_matrix) ->
+             List.map d.per_quartile ~f:(fun s -> s.win_rate_pct))
+           (elements_are
+              [
+                float_equal ~epsilon:1e-9 100.0;
+                float_equal ~epsilon:1e-9 50.0;
+                float_equal ~epsilon:1e-9 0.0;
+                float_equal ~epsilon:1e-9 50.0;
+              ]);
        ])
 
 (* -- Weinstein aggregate ------------------------------------------------- *)
@@ -607,8 +705,8 @@ let test_weinstein_aggregate_per_rule_counts _ =
       make_trade ~symbol:"FAIL3" ~entry_date:(_date "2024-02-01") ();
     ]
   in
-  let ratings = TR.rate_all ~config:cfg ~audit ~trades in
-  let agg = TR.weinstein_aggregate_of ~config:cfg ~ratings ~audit in
+  let ratings = TR.rate_all ~config:cfg ~audit ~trades () in
+  let agg = TR.weinstein_aggregate_of ~config:cfg ~ratings ~audit () in
   let r3_summary =
     List.find_exn agg.per_rule ~f:(fun (s : TR.rule_violation_summary) ->
         TR.equal_rule_id s.rule TR.R3_no_long_in_stage_4)
@@ -713,7 +811,11 @@ let suite =
          "R4 fail short ma rising" >:: test_r4_fail_short_ma_rising;
          "R5 pass short stage 4" >:: test_r5_pass_short_stage_4;
          "R5 fail short not stage 4" >:: test_r5_fail_short_not_stage_4;
-         "R6 NA documented gap" >:: test_r6_na;
+         "R6 fail plunge buy" >:: test_r6_fail_plunge_buy;
+         "R6 pass calm entry" >:: test_r6_pass_calm_entry;
+         "R6 pass when plunge is stale" >:: test_r6_pass_when_plunge_is_stale;
+         "R6 NA no bar source" >:: test_r6_na_no_bar_source;
+         "R6 NA for short" >:: test_r6_na_for_short;
          "R7 pass long exit stage 4 via stop"
          >:: test_r7_pass_long_exit_in_stage_4_via_stop;
          "R7 fail held through stage 4 via time"
@@ -741,7 +843,8 @@ let suite =
          >:: test_exit_losers_stop_discipline_pct;
          "entering losers flags bottom-quartile loser"
          >:: test_entering_losers_flags_bottom_quartile_loser;
-         "decision quality matrix" >:: test_decision_quality_matrix;
+         "decision quality matrix by score"
+         >:: test_decision_quality_matrix_by_score;
          "weinstein aggregate per-rule counts"
          >:: test_weinstein_aggregate_per_rule_counts;
          "format per-trade extras contains header"

@@ -199,9 +199,11 @@ let _compute_header ~scenario_name ~period_start ~period_end ~universe_size
     total_realized_return_pct;
   }
 
-let _compute_analysis ~config ~trade_audit ~trades : analysis option =
+let _compute_analysis ~config ~closes_lookup ~trade_audit ~trades :
+    analysis option =
   let ratings =
-    Trade_audit_ratings.rate_all ~config ~audit:trade_audit ~trades
+    Trade_audit_ratings.rate_all ~closes_lookup ~config ~audit:trade_audit
+      ~trades ()
   in
   if List.is_empty ratings then None
   else
@@ -210,17 +212,18 @@ let _compute_analysis ~config ~trade_audit ~trades : analysis option =
         ~audit:trade_audit ~trades
     in
     let weinstein =
-      Trade_audit_ratings.weinstein_aggregate_of ~config ~ratings
-        ~audit:trade_audit
+      Trade_audit_ratings.weinstein_aggregate_of ~closes_lookup ~config ~ratings
+        ~audit:trade_audit ()
     in
     let decision_quality =
-      Trade_audit_ratings.decision_quality_matrix_of ~ratings
+      Trade_audit_ratings.decision_quality_matrix_of ~audit:trade_audit ~ratings
     in
     Some { ratings; behavioral; weinstein; decision_quality }
 
 let render ?scenario_name ?period_start ?period_end ?universe_size
-    ?(ratings_config = Trade_audit_ratings.default_config) ~trade_audit ~trades
-    () : t =
+    ?(ratings_config = Trade_audit_ratings.default_config)
+    ?(closes_lookup = fun ~symbol:_ ~as_of:_ -> []) ~trade_audit ~trades () : t
+    =
   let audit_idx = _audit_index trade_audit in
   let rows =
     List.map trades ~f:(_row_of_trade audit_idx)
@@ -232,7 +235,7 @@ let render ?scenario_name ?period_start ?period_end ?universe_size
   in
   let best_worst = _compute_best_worst rows in
   let analysis =
-    _compute_analysis ~config:ratings_config ~trade_audit ~trades
+    _compute_analysis ~config:ratings_config ~closes_lookup ~trade_audit ~trades
   in
   { header; best_worst; rows; analysis }
 
@@ -466,7 +469,7 @@ let _load_summary_meta path : _summary_meta option =
   if not (Sys_unix.file_exists_exn path) then None
   else try Some (_summary_meta_of_sexp (Sexp.load_sexp path)) with _ -> None
 
-let load ~scenario_dir : t =
+let load ?closes_lookup ~scenario_dir () : t =
   let trades_path = Filename.concat scenario_dir "trades.csv" in
   if not (Sys_unix.file_exists_exn trades_path) then
     failwithf "Missing trades.csv in %s" scenario_dir ();
@@ -494,5 +497,5 @@ let load ~scenario_dir : t =
   let period_start = Option.map summary ~f:(fun s -> s.start_date) in
   let period_end = Option.map summary ~f:(fun s -> s.end_date) in
   let universe_size = Option.map summary ~f:(fun s -> s.universe_size) in
-  render ?scenario_name ?period_start ?period_end ?universe_size ~trade_audit
-    ~trades ()
+  render ?scenario_name ?period_start ?period_end ?universe_size ?closes_lookup
+    ~trade_audit ~trades ()
