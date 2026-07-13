@@ -1,6 +1,6 @@
 # Status: trade-audit
 
-## Last updated: 2026-04-28
+## Last updated: 2026-07-13
 
 ## Status
 MERGED
@@ -60,6 +60,42 @@ NO
 ## Open work
 
 (none — track MERGED 2026-04-28)
+
+## Report-side defect fixes (2026-07-13)
+
+Two report-analysis defects found in the 2026-07-13 deduped-record
+audit run (`dev/notes/dedup-record-rerun-2026-07-13.md`), fixed in
+`trading/trading/backtest/trade_audit_report/`:
+
+- [x] **R6 (plunge-buy avoidance) now evaluates.** Was hard-coded to
+      `Not_applicable` (reported `0 / 0` on the 1171-trade run). Root
+      cause: the audit record carries no pre-entry bars, so R6 was
+      stubbed. Fix: `evaluate_rules` / `rate_all` /
+      `weinstein_aggregate_of` take an optional pre-entry-closes lookup;
+      `_recent_plunge_verdict` flags a long entered within
+      `recent_plunge_proximity_days` of the trough of a
+      `>= recent_plunge_min_drop_pct` drawdown inside
+      `recent_plunge_lookback_days`. Default (no bar source) keeps R6
+      N/A — release_report path unchanged. `trade_audit_report_bin`
+      gained `--snapshot-dir` to feed pre-entry daily closes from the
+      warehouse (same allow-listed `Bar_reader`/`Daily_panels` pattern
+      as `decision_grading`). Verify:
+      `dune exec trading/backtest/test/test_trade_audit_ratings.exe`
+      (R6 fail/pass/stale/NA/short cases).
+- [x] **Decision-quality quartiles by cascade score, not outcome.**
+      `decision_quality_matrix_of` bucketed by `r_multiple` (an
+      outcome), making Q1 tautologically 100% / Q4 0%. Now takes
+      `~audit` and quartiles by `cascade_score` (matches behavioural
+      metric (d)). Verify: `test_decision_quality_matrix_by_score`
+      (8 synthetic trades → 100/50/0/50).
+
+Dropped from this PR to keep it bounded (separate validation module):
+
+- [ ] **V6 known-false-positive allowlist** — add
+      `v6_known_false_positive_pairs` to `check_config` in
+      `trading/trading/backtest/validation/lib/validator_row_checks.ml`
+      so proven non-twins (ASB/CDX_old, BALL/TAP) are skipped with a
+      note. Follow-up.
 
 ## Phasing (per plan)
 

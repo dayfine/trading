@@ -215,7 +215,7 @@ let () =
   let snapshot_dir =
     Option.value_or_thunk acc.snapshot_dir ~default:(fun () -> _usage ())
   in
-  let report = TAR.load ~scenario_dir in
+  let report = TAR.load ~scenario_dir () in
   let reasons = _exit_reason_lookup ~scenario_dir in
   let bar_reader = _bar_reader_of_snapshot ~snapshot_dir in
   let is_stop (r : TAR.per_trade_row) =

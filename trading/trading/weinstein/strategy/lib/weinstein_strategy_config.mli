@@ -605,6 +605,46 @@ type config = {
           an experiment-ledger ACCEPT (per
           [.claude/rules/experiment-flag-discipline.md] +
           [.claude/rules/promotion-confirmation.md]). *)
+  resistance_min_history_bars : int; [@sexp.default 0]
+      (** Overhead-resistance history floor threaded into
+          [Stock_analysis.config.resistance.min_history_bars] (and, because
+          [Stock_analysis] reuses the same [Resistance.config] record for the
+          short-side support mirror, into the support side too — see
+          {!Stock_analysis} [_support_result]). When a symbol has fewer than
+          this many bars of history the resistance/support mapper classifies the
+          breakout as [Weinstein_types.Insufficient_history] rather than risk a
+          false [Virgin_territory] (or any other) grade off a starved window (PR
+          #1941).
+
+          {b Semantics.}
+          - [0] (default): {b bit-identical to baseline} — the
+            [min_history_bars] check is disabled exactly as
+            {!Resistance.default_config} leaves it, so the built
+            [Stock_analysis.config] is byte-identical to
+            {!Stock_analysis.default_config} and every existing golden/baseline
+            replays unchanged (experiment-flag-discipline R1).
+          - [> 0] (typically [520], the resistance spec's full virgin-lookback):
+            a symbol with fewer than this many bars produces the
+            [Insufficient_history] grade at screen time instead of a
+            resistance/support label off too little data.
+
+          {b R2 searchability.} Wired as a real config field so it resolves
+          through [Overlay_validator.apply_overrides] and is expressible as a
+          single-component [Variant_matrix] int axis
+          ([((resistance_min_history_bars) (values (0 520)))]) and in scenario
+          [config_overrides] ([((resistance_min_history_bars 520))]). Threaded
+          into the per-screen [Stock_analysis.config] by
+          [_stock_analysis_config_for] (weinstein_strategy_screening.ml).
+
+          {b Faithfulness} (W1/W2, [.claude/rules/weinstein-faithful-core.md]).
+          A data-hygiene / realism dial — it prevents a false
+          overhead-resistance read off a starved window, {e tightening} the
+          breakout-above-resistance entry criterion toward the book's
+          chart-reading intent rather than adding any new mechanism. The spine
+          is untouched (stage framework, the Stage-2-only buy rule,
+          breakout+volume entry, the macro/sector gate, stops are all
+          unchanged). Default-off until an experiment-ledger ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md]). *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

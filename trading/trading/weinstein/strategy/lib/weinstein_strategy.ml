@@ -44,6 +44,7 @@ let held_symbols = S.held_symbols
 let entries_from_candidates = S.entries_from_candidates
 let survivors_for_screening = S.survivors_for_screening
 let prune_universe_by_active_through = S.prune_universe_by_active_through
+let stock_analysis_config_for = S._stock_analysis_config_for
 
 let _positions_minus_exited ~(positions : Position.t Map.M(String).t)
     ~(stop_exit_transitions : Position.transition list) :

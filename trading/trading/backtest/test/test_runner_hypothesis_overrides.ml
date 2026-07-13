@@ -550,6 +550,43 @@ let test_extension_stop_config_axis_resolves_via_overlay_validator _ =
   in
   assert_that merged.extension_stop_config.trigger_ratio (float_equal 2.0)
 
+(* -------------------------------------------------------------------- *)
+(* resistance_min_history_bars — R2 wiring for #1941 (default-off int)    *)
+(* -------------------------------------------------------------------- *)
+
+(** [resistance_min_history_bars] defaults to [0] — the resistance/support
+    [Insufficient_history] floor is disabled, so the built
+    [Stock_analysis.config] is byte-identical to
+    {!Stock_analysis.default_config} and every existing golden/baseline replays
+    unchanged ([.claude/rules/experiment-flag-discipline.md] R1). *)
+let test_default_resistance_min_history_bars_is_zero _ =
+  let cfg = _default_config () in
+  assert_that cfg.resistance_min_history_bars (equal_to 0)
+
+(** Deep-merge path for [resistance_min_history_bars]: a
+    [--override '((resistance_min_history_bars 520))'] round-trips through the
+    sexp merge and lands the explicit value (the resistance spec's full
+    virgin-lookback). *)
+let test_override_resistance_min_history_bars _ =
+  let merged =
+    _apply_one_override (_default_config ())
+      (Sexp.of_string "((resistance_min_history_bars 520))")
+  in
+  assert_that merged.resistance_min_history_bars (equal_to 520)
+
+(** Axis reachability (experiment-flag-discipline R2): the
+    [resistance_min_history_bars] override sexp resolves through the {b real}
+    [Overlay_validator.apply_overrides] (the sweep / WF-CV path) with no
+    unknown-key error, and lands the value — this is what makes
+    [((resistance_min_history_bars 520))] a valid [Variant_matrix] axis and the
+    R2-searchability follow-up to PR #1941. *)
+let test_resistance_min_history_bars_axis_resolves_via_overlay_validator _ =
+  let merged =
+    Backtest.Overlay_validator.apply_overrides (_default_config ())
+      [ Sexp.of_string "((resistance_min_history_bars 520))" ]
+  in
+  assert_that merged.resistance_min_history_bars (equal_to 520)
+
 let suite =
   "Runner_hypothesis_overrides"
   >::: [
@@ -613,6 +650,12 @@ let suite =
          >:: test_override_extension_stop_config;
          "extension_stop_config axis resolves via Overlay_validator"
          >:: test_extension_stop_config_axis_resolves_via_overlay_validator;
+         "default resistance_min_history_bars is zero"
+         >:: test_default_resistance_min_history_bars_is_zero;
+         "override resistance_min_history_bars through sexp"
+         >:: test_override_resistance_min_history_bars;
+         "resistance_min_history_bars axis resolves via Overlay_validator"
+         >:: test_resistance_min_history_bars_axis_resolves_via_overlay_validator;
        ]
 
 let () = run_test_tt_main suite

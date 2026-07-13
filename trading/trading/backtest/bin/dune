@@ -19,4 +19,10 @@
 (executable
  (name trade_audit_report_bin)
  (modules trade_audit_report_bin)
- (libraries core trade_audit_report))
+ (libraries
+  core
+  status
+  trade_audit_report
+  weinstein_trading.strategy
+  weinstein.snapshot_runtime
+  weinstein.snapshot_pipeline))
