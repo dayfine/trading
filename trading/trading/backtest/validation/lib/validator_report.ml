@@ -32,7 +32,8 @@ let render_md report =
       "# Post-run validation report\n\n\
        Invariant checks failing: %d\n\
        audit join: %d/%d rows matched\n\n"
-      (_failing_invariants report) j.matched j.total
+      (_failing_invariants report)
+      j.matched j.total
   in
   let body = List.map report.checks ~f:_check_line |> String.concat ~sep:"\n" in
   header ^ body ^ "\n"

@@ -17,7 +17,8 @@ type audit_join_row = {
 }
 (** A [trade_audit.sexp] entry leg projected to the fields the join needs. *)
 
-val build_audit_lookup : audit_join_row list -> trade_row -> entry_context option
+val build_audit_lookup :
+  audit_join_row list -> trade_row -> entry_context option
 (** [build_audit_lookup rows] returns the {!trade_row} -> {!entry_context}
     lookup. A trade row carrying a [position_id] joins on it — immune to the
     audit's signal-date vs the trade's fill-date entry-date skew that made the
@@ -26,9 +27,9 @@ val build_audit_lookup : audit_join_row list -> trade_row -> entry_context optio
 
 val load_audit_lookup : string -> trade_row -> entry_context option
 (** [load_audit_lookup path] parses [trade_audit.sexp] and returns a lookup from
-    a {!trade_row} to its {!entry_context} via {!build_audit_lookup} (position_id
-    when the row has one, else [(symbol, entry_date)]). Returns an always-[None]
-    lookup when the file cannot be read. *)
+    a {!trade_row} to its {!entry_context} via {!build_audit_lookup}
+    (position_id when the row has one, else [(symbol, entry_date)]). Returns an
+    always-[None] lookup when the file cannot be read. *)
 
 val load_bars : data_dir:string -> run_end:Date.t -> string -> bars option
 (** [load_bars ~data_dir ~run_end] returns a memoised per-symbol bar loader over

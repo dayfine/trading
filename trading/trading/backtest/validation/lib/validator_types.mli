@@ -26,9 +26,9 @@ type trade_row = {
       (** [stop_initial_distance_pct] column; [None] when the cell is empty. *)
   position_id : string option;
       (** [position_id] column (trailing column added by #1942), e.g.
-          ["A-wein-5618"]. [None] for legacy runs whose [trades.csv] predates the
-          column; the audit join falls back to [(symbol, entry_date)] for those.
-      *)
+          ["A-wein-5618"]. [None] for legacy runs whose [trades.csv] predates
+          the column; the audit join falls back to [(symbol, entry_date)] for
+          those. *)
 }
 (** A parsed [trades.csv] round-trip row (only the fields the checks read). *)
 
@@ -110,9 +110,9 @@ type check_result = {
 type audit_join = { matched : int; total : int } [@@deriving sexp]
 (** Audit-join coverage: how many [trades.csv] rows resolved to a
     [trade_audit.sexp] record ([matched]) out of [total] trades. Surfaced in the
-    report so a dead join ([matched = 0], the signal-vs-fill entry_date skew that
-    silently skipped V1/V2/V7/V8 on the record run) can never again masquerade as
-    "PASS (all skipped)". *)
+    report so a dead join ([matched = 0], the signal-vs-fill entry_date skew
+    that silently skipped V1/V2/V7/V8 on the record run) can never again
+    masquerade as "PASS (all skipped)". *)
 
 type report = { checks : check_result list; audit_join : audit_join }
 [@@deriving sexp]

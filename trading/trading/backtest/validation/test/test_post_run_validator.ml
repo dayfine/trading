@@ -9,8 +9,8 @@ module Va = Post_run_validator.Validator_artifacts
 
 let trade ?(side = "LONG") ?(exit_trigger = "") ?(stop_trigger_kind = "")
     ?(entry_price = 100.0) ?(exit_price = 100.0) ?(exit_date = "2020-06-01")
-    ?(stop_initial_distance_pct = None) ?(position_id = None) ~symbol ~entry_date
-    () : Vt.trade_row =
+    ?(stop_initial_distance_pct = None) ?(position_id = None) ~symbol
+    ~entry_date () : Vt.trade_row =
   {
     symbol;
     side;
@@ -336,15 +336,14 @@ let test_join_by_position_id_survives_date_skew _ =
   let lookup =
     Va.build_audit_lookup
       [
-        join_row ~position_id:"A-wein-5618" ~symbol:"A"
-          ~entry_date:"2014-11-28"
+        join_row ~position_id:"A-wein-5618" ~symbol:"A" ~entry_date:"2014-11-28"
           ~context:(ctx ~macro_trend:Weinstein_types.Bearish ())
           ();
       ]
   in
   let row =
-    trade ~symbol:"A" ~entry_date:"2014-11-29"
-      ~position_id:(Some "A-wein-5618") ()
+    trade ~symbol:"A" ~entry_date:"2014-11-29" ~position_id:(Some "A-wein-5618")
+      ()
   in
   assert_that (lookup row)
     (is_some_and

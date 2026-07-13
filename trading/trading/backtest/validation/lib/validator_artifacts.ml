@@ -124,7 +124,8 @@ let _build_audit_tables records =
 let _lookup (by_pid, by_sd) (row : trade_row) =
   match row.position_id with
   | Some pid -> Hashtbl.find by_pid pid
-  | None -> Hashtbl.find by_sd (_sd_key ~symbol:row.symbol ~entry_date:row.entry_date)
+  | None ->
+      Hashtbl.find by_sd (_sd_key ~symbol:row.symbol ~entry_date:row.entry_date)
 
 let build_audit_lookup rows = _lookup (_build_audit_tables rows)
 
@@ -141,7 +142,8 @@ let load_audit_lookup path =
   match try Some (Sexp.load_sexp path) with _ -> None with
   | None -> fun _ -> None
   | Some sexp ->
-      build_audit_lookup (List.map (_records_of_sexp sexp) ~f:_join_row_of_record)
+      build_audit_lookup
+        (List.map (_records_of_sexp sexp) ~f:_join_row_of_record)
 
 (* Two dates share an ISO trading week iff (year, week_number) match. *)
 let _same_week d1 d2 =
