@@ -2,7 +2,13 @@
 
 ## Status
 
-READY_FOR_REVIEW
+IN_PROGRESS
+
+<!-- 2026-07-13 orchestrator reconcile: heading was READY_FOR_REVIEW but v1
+     harness (#1937) + C6b audit-join-by-position_id (#1947) are both MERGED
+     with no open PR. Remaining follow-ups (golden-run V3/V4/V7 integration
+     test, live-side reuse) are data-gated / LOCAL → track stays IN_PROGRESS. -->
+
 
 ## Owner
 
@@ -87,7 +93,7 @@ docker exec trading-1-dev bash -c \
   the bar-dependent V3/V4/V7 are covered structurally but want a golden-run
   integration test.
 
-## Last updated: 2026-07-12
+## Last updated: 2026-07-13
 
 ## Interface stable
 
