@@ -15,6 +15,19 @@
     large-caps that happen to trade near the same price on one day) are {b not}
     twins under this criterion.
 
+    {b Comparison basis (v2).} The detector supports two criteria:
+    - [Levels] (default, v1 behaviour): compares adjusted-close {e levels}.
+      Catches exact-feed duplicates (the two legs carry the same adjustment
+      basis).
+    - [Returns]: compares consecutive {e daily returns}. Catches renames whose
+      two feeds carry {e different} adjustment bases — the levels diverge by a
+      constant or drifting ratio, so [Levels] misses them, but the daily returns
+      stay near-identical. On the real top-3000 warehouse [Levels] found 15
+      exact-feed groups yet missed 9 of the 10 known rename twins (e.g.
+      BLL/BALL, BKR/BHI, TXNM/PNM); those 9 all score 0.95–0.99 under [Returns]
+      while genuine different-company controls (BALL/TAP, ASB/CDX_old) score
+      below 0.06.
+
     The detector is a pure function of [Config.t] + a list of {!series} (no
     filesystem, no bar loading), so it is directly unit-testable.
     {!Build_scenario_snapshots} owns the loading + wiring. *)
@@ -22,6 +35,12 @@
 open Core
 
 module Config : sig
+  type basis =
+    | Levels  (** Compare adjusted-close levels (v1 behaviour). *)
+    | Returns
+        (** Compare consecutive daily returns (adjustment-basis-agnostic). *)
+  [@@deriving sexp, equal]
+
   type t = {
     enabled : bool;
         (** Master switch. Defaults to [false] so the detector is a no-op (empty
@@ -32,24 +51,34 @@ module Config : sig
             this many dates. Guards against short coincidental overlaps being
             called twins. *)
     match_fraction : float;
-        (** A twin requires strictly more than this fraction of the overlapping
-            dates to have near-identical adjusted closes. *)
+        (** A twin requires strictly more than this fraction of the compared
+            units — overlapping dates ([Levels]) or consecutive-date return
+            pairs ([Returns]) — to be near-identical. *)
     close_epsilon : float;
-        (** Relative tolerance for "near-identical" on a single date: two closes
+        (** [Levels] tolerance for "near-identical" on a single date: two closes
             [a] and [b] match when [|a - b| / max |a| |b| <= close_epsilon]. *)
+    basis : basis; [@sexp.default Levels]
+        (** Which comparison criterion to use. Defaults to [Levels] so an
+            un-annotated config sexp is bit-identical to v1. *)
+    ret_epsilon : float; [@sexp.default 1e-3]
+        (** [Returns] tolerance: two consecutive-date returns [ra] and [rb]
+            match when [|ra - rb| <= ret_epsilon] (absolute difference of simple
+            daily returns). Unused under [Levels]. *)
     prefilter_rel_tol : float;
         (** Internal perf knob. The prefilter only emits a candidate pair when
-            two symbols sit within this relative gap on a shared anchor date.
-            Must be [>= close_epsilon] (looser) so genuine twins are never
-            filtered out before the full compare; kept small so near-equal price
-            runs stay short. *)
+            two symbols sit within this gap on a shared anchor date — a
+            {e relative} close gap under [Levels], an {e absolute} return gap
+            under [Returns]. Must be looser than the matching tolerance so
+            genuine twins are never filtered out before the full compare; kept
+            small so near-equal runs stay short. *)
   }
   [@@deriving sexp, equal]
 
   val default : t
   (** Default config: disabled; [min_overlap_days = 100],
-      [match_fraction = 0.95], [close_epsilon = 1e-4],
-      [prefilter_rel_tol = 2e-2] — the criterion the visual audit used. *)
+      [match_fraction = 0.95], [close_epsilon = 1e-4], [basis = Levels],
+      [ret_epsilon = 1e-3], [prefilter_rel_tol = 2e-2] — the criterion the
+      visual audit used. *)
 end
 
 type series = {
@@ -68,8 +97,9 @@ type pair_match = {
   dropped : string;
   overlap_days : int;  (** Number of dates the two series share. *)
   match_fraction : float;
-      (** Fraction of overlapping dates whose closes matched within
-          [close_epsilon]. *)
+      (** Fraction of compared units that matched: overlapping dates within
+          [close_epsilon] ([Levels]), or consecutive-date return pairs within
+          [ret_epsilon] ([Returns]). *)
 }
 [@@deriving sexp_of, equal]
 
@@ -93,10 +123,19 @@ type report = {
 val detect : Config.t -> series list -> report
 (** [detect config series] finds rename-twin groups. When [config.enabled] is
     [false] it returns an empty report (no group, no dropped symbol). Otherwise
-    it prefilters candidate pairs by shared anchor-date price proximity,
-    verifies each with the full overlap/match-fraction criterion, unions
-    verified twin edges into connected components (so triples are one group),
-    and picks the latest-[data_end] leg of each component as the survivor.
+    it prefilters candidate pairs by shared anchor-date proximity, verifies each
+    with the full overlap/match-fraction criterion, unions verified twin edges
+    into connected components (so triples are one group), and picks the
+    latest-[data_end] leg of each component as the survivor.
+
+    {b Prefilter completeness.} Anchors are every [min_overlap_days/2]-th
+    distinct date, so any pair whose dense overlap spans at least
+    [min_overlap_days] dates shares an anchor. Under [Levels] the anchor key is
+    the close; under [Returns] it is the anchor-date return (each leg's close vs
+    its own prior bar). A [Returns] anchor is only usable for a leg that has a
+    prior bar on that date, so a leg's very first bar is skipped — harmless
+    because a dense [>= min_overlap_days] overlap always contains an interior
+    anchor where both legs have a defined, near-identical return.
 
     {b Limitation (v1).} A dropped leg is excluded entirely; any
     genuinely-independent tail it may have outside the survivor's window is

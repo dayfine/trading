@@ -54,15 +54,61 @@ duplicated legs can be dropped before the warehouse is written.
 
 Verify: `dune build && dune runtest trading/trading/backtest/snapshot_warehouse/test/`
 
+## What was built (v2 — returns-basis comparison)
+
+Real-data finding: the v1 level-basis detector, armed on the real
+top-3000 warehouse, found 15 exact-feed rename groups (incl. NLS/BFX)
+but **missed 9 of the 10 known rename-twin groups** — the two feeds
+carry different adjustment bases, so the adjusted-close *levels* diverge
+(constant or drifting ratio) even though it's the same instrument.
+Measured on the CSV store: level match@1e-4 was 0.000–0.831 for those 9
+pairs (all below the 0.95 bar), while their **daily-return** match
+(|ret_a − ret_b| ≤ 1e-3 absolute) was 0.951–0.993 (all above). Controls
+BALL/TAP and ASB/CDX_old (different companies) score 0.055 / 0.061 on
+returns → correctly rejected.
+
+v2 adds a `basis` axis to `Twin_detector.Config`:
+
+- `type basis = Levels | Returns [@@deriving sexp, equal]`;
+  `basis : basis [@sexp.default Levels]` + `ret_epsilon : float
+  [@sexp.default 1e-3]`. `Levels` = exactly the v1 behaviour
+  (bit-identical; existing 9 tests untouched, un-annotated config sexps
+  parse unchanged). `Returns` = twin iff ≥ `min_overlap_days` shared
+  dates AND > `match_fraction` of consecutive-shared-date return pairs
+  have `|ret_a − ret_b| ≤ ret_epsilon` (absolute). Return pairs whose
+  prior close ≤ 0 are skipped (undefined return); fraction is over the
+  valid pairs.
+- **Prefilter is basis-aware** so it stays scale-invariant under
+  `Returns`: anchors on the anchor-date *return* (each leg's close vs
+  its own prior bar) instead of the close, grouping near-equal *returns*
+  (absolute gap) rather than near-equal levels (relative gap). Preserves
+  the documented completeness property — a dense ≥ `min_overlap_days`
+  overlap always contains an interior anchor where both legs have a
+  defined, near-identical return (a leg's first bar has no prior return
+  and is harmlessly skipped). Documented in the `.mli`.
+- CLI: `build_scenario_snapshots` gains `-twin-basis <levels|returns>`
+  (default levels) + `-twin-ret-epsilon` (default 1e-3). Report header
+  now prints `basis=` + `ret_epsilon=`; per-group `match=` fraction is
+  the return-match fraction when basis=returns.
+- Tests (extend `test_twin_detector.ml`, 16 total): scaled twin
+  (×0.78 — levels miss, returns catch), drifting-ratio twin (mid-series
+  2:1 step — returns catch at 38/39=0.974, levels miss), independent
+  same-start-price control (not a twin under returns), scaled/drifting
+  pairs explicitly missed under levels, tie-break + offset-window
+  re-hold under returns.
+
+Verify: `dune build && dune runtest trading/trading/backtest/snapshot_warehouse/test/`
+
 ## Next task (dispatcher-owned)
 
-Rebuild the deep warehouse with `-dedupe-rename-twins`, diff the emitted
-`rename_twin_report.txt` against the 10 known twin groups (NLS/BFX,
-ISIS/IONS, JW-A/JWA/WLY, COR/ABC(+COR_old), BKR/BHI, BLL/BALL, SWM/MATV,
-TXNM/PNM, NVRI/HSC, SJW/HTO; plus new candidate ASB/CDX_old), then re-pin
-the record deep-run goldens on the deduped warehouse and re-measure the
-realized-PnL delta. This is a warehouse rebuild + golden re-pin — kept
-out of this code-only PR.
+Rebuild the deep warehouse with `-dedupe-rename-twins -twin-basis
+returns`, diff the emitted `rename_twin_report.txt` against the 10 known
+twin groups (NLS/BFX, ISIS/IONS, JW-A/JWA/WLY, COR/ABC(+COR_old),
+BKR/BHI, BLL/BALL, SWM/MATV, TXNM/PNM, NVRI/HSC, SJW/HTO; plus new
+candidate ASB/CDX_old) — returns basis should now catch all 10 —, then
+re-pin the record deep-run goldens on the deduped warehouse and
+re-measure the realized-PnL delta. This is a warehouse rebuild + golden
+re-pin — kept out of these code-only PRs.
 
 ## Follow-ups
 
