@@ -3,12 +3,14 @@ open OUnit2
 open Matchers
 module Vt = Post_run_validator.Validator_types
 module Vc = Post_run_validator.Validator_checks
+module Va = Post_run_validator.Validator_artifacts
 
 (* ---- builders ---------------------------------------------------------- *)
 
 let trade ?(side = "LONG") ?(exit_trigger = "") ?(stop_trigger_kind = "")
     ?(entry_price = 100.0) ?(exit_price = 100.0) ?(exit_date = "2020-06-01")
-    ?(stop_initial_distance_pct = None) ~symbol ~entry_date () : Vt.trade_row =
+    ?(stop_initial_distance_pct = None) ?(position_id = None) ~symbol
+    ~entry_date () : Vt.trade_row =
   {
     symbol;
     side;
@@ -20,6 +22,7 @@ let trade ?(side = "LONG") ?(exit_trigger = "") ?(stop_trigger_kind = "")
     exit_trigger;
     stop_trigger_kind;
     stop_initial_distance_pct;
+    position_id;
   }
 
 let ctx ?(stage = Weinstein_types.Stage2 { weeks_advancing = 3; late = false })
@@ -320,6 +323,74 @@ let test_v11 _ =
   in
   assert_that (result ~id:"V11" inputs) (violations_and_pass 1 false)
 
+(* ---- audit join: position_id vs symbol|date ---------------------------- *)
+
+let join_row ?(context = ctx ()) ~position_id ~symbol ~entry_date () :
+    Va.audit_join_row =
+  { position_id; symbol; entry_date = Date.of_string entry_date; context }
+
+(* The audit entry_date is the SIGNAL Friday (2014-11-28); the trades.csv row
+   carries the FILL date (next trading day, 2014-11-29). The old symbol|date join
+   missed 100% of rows on this skew — position_id joins through it. *)
+let test_join_by_position_id_survives_date_skew _ =
+  let lookup =
+    Va.build_audit_lookup
+      [
+        join_row ~position_id:"A-wein-5618" ~symbol:"A" ~entry_date:"2014-11-28"
+          ~context:(ctx ~macro_trend:Weinstein_types.Bearish ())
+          ();
+      ]
+  in
+  let row =
+    trade ~symbol:"A" ~entry_date:"2014-11-29" ~position_id:(Some "A-wein-5618")
+      ()
+  in
+  assert_that (lookup row)
+    (is_some_and
+       (field
+          (fun (c : Vt.entry_context) -> c.macro_trend)
+          (equal_to Weinstein_types.Bearish)))
+
+(* A legacy 19-column row (no position_id) falls back to the symbol|date key,
+   which for legacy runs is the only key available. *)
+let test_join_legacy_falls_back_to_symbol_date _ =
+  let lookup =
+    Va.build_audit_lookup
+      [
+        join_row ~position_id:"B-wein-1" ~symbol:"B" ~entry_date:"2020-02-07" ();
+      ]
+  in
+  let row = trade ~symbol:"B" ~entry_date:"2020-02-07" ~position_id:None () in
+  assert_that (lookup row)
+    (is_some_and
+       (field
+          (fun (c : Vt.entry_context) -> c.macro_trend)
+          (equal_to Weinstein_types.Bullish)))
+
+(* Coverage counts: 2 of 3 trades resolve to an audit record (P9 has none). *)
+let test_audit_join_coverage_counts _ =
+  let lookup =
+    Va.build_audit_lookup
+      [
+        join_row ~position_id:"P1" ~symbol:"A" ~entry_date:"2020-01-03" ();
+        join_row ~position_id:"P2" ~symbol:"B" ~entry_date:"2020-02-07" ();
+      ]
+  in
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"A" ~entry_date:"2020-01-06" ~position_id:(Some "P1") ();
+          trade ~symbol:"B" ~entry_date:"2020-02-10" ~position_id:(Some "P2") ();
+          trade ~symbol:"C" ~entry_date:"2020-03-02" ~position_id:(Some "P9") ();
+        ];
+      audit = lookup;
+    }
+  in
+  assert_that (Vc.validate inputs).audit_join
+    (equal_to ({ matched = 2; total = 3 } : Vt.audit_join))
+
 (* ---- severity + validate wiring ---------------------------------------- *)
 
 let test_severity_default _ =
@@ -351,6 +422,11 @@ let suite =
          "v10_spike" >:: test_v10;
          "v10_calm" >:: test_v10_calm;
          "v11_stop_bounds" >:: test_v11;
+         "join_by_position_id_survives_date_skew"
+         >:: test_join_by_position_id_survives_date_skew;
+         "join_legacy_falls_back_to_symbol_date"
+         >:: test_join_legacy_falls_back_to_symbol_date;
+         "audit_join_coverage_counts" >:: test_audit_join_coverage_counts;
          "severity_default" >:: test_severity_default;
          "validate_runs_all" >:: test_validate_runs_all;
        ]
