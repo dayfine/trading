@@ -159,10 +159,30 @@ val rule_label : rule_id -> string
 val rule_description : rule_id -> string
 (** One-line description of the rule and its book authority. *)
 
-val evaluate_rules : config:config -> TA.audit_record -> rule_evaluation list
+type pre_entry_closes = (Date.t * float) list
+(** Daily [(date, close)] pairs at or before an entry, oldest first. Feeds the
+    R6 plunge-buy check, which the audit record cannot answer on its own (it
+    captures no pre-entry bars). Empty [[]] means "no bar source wired in" — R6
+    then reports {!Not_applicable}. *)
+
+type closes_lookup = symbol:string -> as_of:Date.t -> pre_entry_closes
+(** Resolve the pre-entry closes for a symbol as of a decision date. The report
+    and CLI supply a snapshot-backed lookup so R6 evaluates on the same bars the
+    strategy screened on; callers that pass none get the empty lookup and R6
+    stays {!Not_applicable}. *)
+
+val evaluate_rules :
+  ?pre_entry_closes:pre_entry_closes ->
+  config:config ->
+  TA.audit_record ->
+  rule_evaluation list
 (** Apply all eight rules to a single audit record, returning per-rule outcomes.
     Rules that don't apply (e.g. R5 short-rules on a long trade) yield
-    {!Not_applicable}. The returned list is in {!all_rules} order. *)
+    {!Not_applicable}. The returned list is in {!all_rules} order.
+
+    [pre_entry_closes] supplies the symbol's daily closes at/before the entry so
+    R6 (recent-plunge avoidance) can evaluate; omit it (default [[]]) to keep R6
+    {!Not_applicable} as when no bar source is available. *)
 
 val score_of_rules : rule_evaluation list -> float
 (** Roll up rule outcomes into a per-trade score in [[0, 1]]. [Pass] counts 1,
@@ -173,13 +193,15 @@ val score_of_rules : rule_evaluation list -> float
 (** {1 Per-trade rating} *)
 
 val rate :
+  ?pre_entry_closes:pre_entry_closes ->
   config:config ->
   TA.audit_record ->
   Trading_simulation.Metrics.trade_metrics ->
   rating
 (** Compute the per-trade rating for a single (audit, trade) pair. The trade
     metric supplies the realised P&L sign (Win/Loss); the audit record supplies
-    the initial risk, MFE, MAE, and rule-evaluation inputs. *)
+    the initial risk, MFE, MAE, and rule-evaluation inputs. [pre_entry_closes]
+    feeds R6 into the per-trade [weinstein_score] (default [[]] → R6 N/A). *)
 
 (** {1 Behavioural metrics — the 4 user-requested aggregates} *)
 
@@ -300,9 +322,11 @@ type weinstein_aggregate = {
 
 type decision_quality_matrix = {
   per_quartile : cascade_quartile_stat list;
-      (** Same shape as [entering_losers_often.per_quartile] — duplicated here
-          as the canonical "decision quality" view of the run, ranked by
-          [r_multiple] rather than cascade_score. *)
+      (** Win rate per cascade-score quartile (Q1_top = highest scores) — the
+          canonical "decision quality" view of the run: does the cascade score
+          rank entries by realised win rate? Same quartile basis as
+          [entering_losers_often.per_quartile]; this record adds the run-level
+          [total_trades] / [overall_win_rate_pct] summary. *)
   total_trades : int;
   overall_win_rate_pct : float;
 }
@@ -311,14 +335,18 @@ type decision_quality_matrix = {
 (** {1 Computation entry-points} *)
 
 val rate_all :
+  ?closes_lookup:closes_lookup ->
   config:config ->
   audit:TA.audit_record list ->
   trades:Trading_simulation.Metrics.trade_metrics list ->
+  unit ->
   rating list
 (** Compute one {!rating} per (audit, trade) pair joined by
     [(symbol, entry_date)]. Trades with no matching audit record are skipped —
     the per-trade table in {!Trade_audit_report} retains them for traceability,
-    but ratings need the audit's risk/MFE/MAE inputs to compute. *)
+    but ratings need the audit's risk/MFE/MAE inputs to compute. [closes_lookup]
+    resolves each record's pre-entry closes for R6 (default: no bar source → R6
+    N/A). *)
 
 val behavioral_metrics_of :
   config:config ->
@@ -331,15 +359,21 @@ val behavioral_metrics_of :
     over-trading window; trades supply the period span. *)
 
 val weinstein_aggregate_of :
+  ?closes_lookup:closes_lookup ->
   config:config ->
   ratings:rating list ->
   audit:TA.audit_record list ->
+  unit ->
   weinstein_aggregate
-(** Roll per-trade rule evaluations into per-rule pass-rate + spirit score. *)
+(** Roll per-trade rule evaluations into per-rule pass-rate + spirit score.
+    [closes_lookup] resolves each record's pre-entry closes so R6's per-rule
+    pass-rate is populated (default: no bar source → R6 counts 0 applicable). *)
 
-val decision_quality_matrix_of : ratings:rating list -> decision_quality_matrix
-(** Bucket ratings into [r_multiple]-descending quartiles and compute win rate
-    by quartile. *)
+val decision_quality_matrix_of :
+  audit:TA.audit_record list -> ratings:rating list -> decision_quality_matrix
+(** Bucket ratings into cascade-score-descending quartiles (Q1_top = highest
+    scores) and compute win rate by quartile. Answers "do higher-scored entries
+    win more?" — the score is read from each rating's matching audit record. *)
 
 (** {1 Markdown formatting helpers} *)
 

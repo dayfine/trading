@@ -237,11 +237,64 @@ let _eval_r5 (e : TA.entry_decision) =
   else if _is_stage4 e.stage then Pass
   else Fail
 
-(** R6 needs pre-entry bar history that the audit record does not currently
-    capture (the audit's MAE/MFE fields are hold-period only). Until per-bar
-    pre-entry context is wired in, the rule is reported as N/A; this is honest
-    about the data gap rather than synthesising a verdict. *)
-let _eval_r6 ~config:_ (_ : TA.entry_decision) = Not_applicable
+(* R6 pre-entry price context: daily closes at or before the entry, oldest
+   first. Supplied by the report/bin from a bar source (the audit record itself
+   carries no pre-entry bars). Empty when no bar source was wired in — R6 then
+   reports [Not_applicable] rather than synthesising a verdict. *)
+type pre_entry_closes = (Date.t * float) list
+
+let _no_closes : pre_entry_closes = []
+
+(* Restrict [closes] to the lookback window [entry_date - lookback, entry_date)
+   — bars strictly before the entry, within [lookback] calendar days. *)
+let _closes_in_window ~lookback ~entry_date (closes : pre_entry_closes) =
+  List.filter closes ~f:(fun (d, _) ->
+      let gap = Date.diff entry_date d in
+      gap > 0 && gap <= lookback)
+
+(* Deepest peak-to-trough drop in [closes] plus the trough's date. Scans oldest
+   first tracking the running peak; the max drop is [(peak - close) / peak] at
+   the trough. Returns [None] when there is no positive peak to measure against.
+*)
+let _max_drawdown (closes : pre_entry_closes) : (float * Date.t) option =
+  List.fold closes ~init:(0.0, None) ~f:(fun (peak, best) (d, close) ->
+      let peak = Float.max peak close in
+      if Float.( <= ) peak 0.0 then (peak, best)
+      else
+        let drop = (peak -. close) /. peak in
+        match best with
+        | Some (bd, _) when Float.( >= ) bd drop -> (peak, best)
+        | _ -> (peak, Some (drop, d)))
+  |> snd
+
+(** Weinstein Ch.4 plunge-buy avoidance. A long entry is flagged [Fail] when a
+    drop of at least [config.recent_plunge_min_drop_pct] occurred within
+    [config.recent_plunge_lookback_days] before the entry AND that drop's trough
+    sits within [config.recent_plunge_proximity_days] of the entry — i.e. the
+    strategy bought into a fresh plunge. Otherwise [Pass]. Reports
+    [Not_applicable] when fewer than two in-window closes are available
+    (insufficient pre-entry history to judge). *)
+let _recent_plunge_verdict ~config ~entry_date (closes : pre_entry_closes) =
+  let window =
+    _closes_in_window ~lookback:config.recent_plunge_lookback_days ~entry_date
+      closes
+  in
+  if List.length window < 2 then Not_applicable
+  else
+    match _max_drawdown window with
+    | None -> Not_applicable
+    | Some (drop, trough_date) ->
+        let near_entry =
+          Date.diff entry_date trough_date
+          <= config.recent_plunge_proximity_days
+        in
+        if Float.( >= ) drop config.recent_plunge_min_drop_pct && near_entry
+        then Fail
+        else Pass
+
+let _eval_r6 ~config ~closes (e : TA.entry_decision) =
+  if not (_is_long e) then Not_applicable
+  else _recent_plunge_verdict ~config ~entry_date:e.entry_date closes
 
 (** R7 requires comparing entry-stage to exit-stage. A trade entered in Stage 2
     and exited in Stage 4 without an explicit exit_trigger of Stop_loss /
@@ -269,7 +322,15 @@ let _eval_r8 (e : TA.entry_decision) =
   | Short, WT.Neutral -> Marginal
   | Short, WT.Bullish -> Fail
 
-let evaluate_rules ~config (record : TA.audit_record) : rule_evaluation list =
+(* Look up the pre-entry daily closes for a record's symbol. Defaults to "no
+   bar source" — R6 then reports N/A. The report/bin wires a snapshot-backed
+   lookup so R6 evaluates on the same bars the strategy screened on. *)
+type closes_lookup = symbol:string -> as_of:Date.t -> pre_entry_closes
+
+let _no_closes_lookup : closes_lookup = fun ~symbol:_ ~as_of:_ -> _no_closes
+
+let evaluate_rules ?(pre_entry_closes = _no_closes) ~config
+    (record : TA.audit_record) : rule_evaluation list =
   let e = record.entry in
   let x = record.exit_ in
   [
@@ -278,10 +339,17 @@ let evaluate_rules ~config (record : TA.audit_record) : rule_evaluation list =
     { rule = R3_no_long_in_stage_4; outcome = _eval_r3 e };
     { rule = R4_short_below_30w_ma_flat_or_falling; outcome = _eval_r4 e };
     { rule = R5_short_stage_4_breakdown; outcome = _eval_r5 e };
-    { rule = R6_no_recent_plunge; outcome = _eval_r6 ~config e };
+    {
+      rule = R6_no_recent_plunge;
+      outcome = _eval_r6 ~config ~closes:pre_entry_closes e;
+    };
     { rule = R7_exit_on_stage_3_to_4; outcome = _eval_r7 e x };
     { rule = R8_macro_alignment; outcome = _eval_r8 e };
   ]
+
+(* Resolve the pre-entry closes for a record via [closes_lookup]. *)
+let _closes_for (closes_lookup : closes_lookup) (record : TA.audit_record) =
+  closes_lookup ~symbol:record.entry.symbol ~as_of:record.entry.entry_date
 
 let _outcome_weight = function
   | Pass -> Some 1.0
@@ -317,9 +385,9 @@ let _mfe_mae_of (record : TA.audit_record) =
   | Some x -> (x.max_favorable_excursion_pct, x.max_adverse_excursion_pct)
   | None -> (0.0, 0.0)
 
-let rate ~config (record : TA.audit_record)
+let rate ?(pre_entry_closes = _no_closes) ~config (record : TA.audit_record)
     (trade : Trading_simulation.Metrics.trade_metrics) : rating =
-  let evals = evaluate_rules ~config record in
+  let evals = evaluate_rules ~pre_entry_closes ~config record in
   let mfe, mae = _mfe_mae_of record in
   {
     symbol = record.entry.symbol;
@@ -357,7 +425,7 @@ let _audit_index audit =
     ~f:(fun acc (record : TA.audit_record) ->
       Map.add_multi acc ~key:record.entry.symbol ~data:record)
 
-let rate_all ~config ~audit ~trades =
+let rate_all ?(closes_lookup = _no_closes_lookup) ~config ~audit ~trades () =
   let idx = _audit_index audit in
   List.filter_map trades
     ~f:(fun (t : Trading_simulation.Metrics.trade_metrics) ->
@@ -367,7 +435,10 @@ let rate_all ~config ~audit ~trades =
           _nearest_within ~entry_date:t.entry_date
             ~date_of:(fun (r : TA.audit_record) -> r.entry.entry_date)
             records
-          |> Option.map ~f:(fun record -> rate ~config record t))
+          |> Option.map ~f:(fun record ->
+              rate
+                ~pre_entry_closes:(_closes_for closes_lookup record)
+                ~config record t))
 
 (* Behavioural metric (a) — over-trading ---------------------------------- *)
 
@@ -582,15 +653,6 @@ let _quartile_assignments_by_score ~audit (ratings : rating list) :
   let total = List.length sorted_desc in
   List.mapi sorted_desc ~f:(fun i (r, _) -> (r, _quartile_of_index ~total i))
 
-let _quartile_assignments_by_r (ratings : rating list) :
-    (rating * cascade_quartile) list =
-  let sorted_desc =
-    List.sort ratings ~compare:(fun (a : rating) (b : rating) ->
-        Float.compare b.r_multiple a.r_multiple)
-  in
-  let total = List.length sorted_desc in
-  List.mapi sorted_desc ~f:(fun i r -> (r, _quartile_of_index ~total i))
-
 let _quartile_stats (assignments : (rating * cascade_quartile) list) =
   let bucket_of q (rs : rating list) =
     let n = List.length rs in
@@ -687,8 +749,14 @@ let _critical_violations ~config audit =
             }
       | _ -> None)
 
-let weinstein_aggregate_of ~config ~ratings ~audit : weinstein_aggregate =
-  let evals_per_trade = List.map audit ~f:(evaluate_rules ~config) in
+let weinstein_aggregate_of ?(closes_lookup = _no_closes_lookup) ~config ~ratings
+    ~audit () : weinstein_aggregate =
+  let evals_per_trade =
+    List.map audit ~f:(fun record ->
+        evaluate_rules
+          ~pre_entry_closes:(_closes_for closes_lookup record)
+          ~config record)
+  in
   let per_rule =
     List.map all_rules ~f:(fun r -> _summarise_rule r evals_per_trade)
   in
@@ -711,8 +779,8 @@ let weinstein_aggregate_of ~config ~ratings ~audit : weinstein_aggregate =
 
 (* Decision-quality matrix ------------------------------------------------ *)
 
-let decision_quality_matrix_of ~ratings : decision_quality_matrix =
-  let assignments = _quartile_assignments_by_r ratings in
+let decision_quality_matrix_of ~audit ~ratings : decision_quality_matrix =
+  let assignments = _quartile_assignments_by_score ~audit ratings in
   let per_quartile = _quartile_stats assignments in
   let total = List.length ratings in
   let total_wins =
