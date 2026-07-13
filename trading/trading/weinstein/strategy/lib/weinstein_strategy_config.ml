@@ -172,6 +172,14 @@ type config = {
           each Friday; default [0.0] is a no-op (bit-identical to baseline). The
           working replacement for the dead [Portfolio_risk.min_cash_pct]. See
           [.mli]. *)
+  resistance_min_history_bars : int; [@sexp.default 0]
+      (** Overhead-resistance history floor threaded into
+          [Stock_analysis.config.resistance.min_history_bars] (which also
+          governs the short-side support mirror — same [Resistance.config]
+          record). Default [0] is a no-op (check disabled, bit-identical to
+          baseline); [> 0] (typically [520]) grades starved windows as
+          [Insufficient_history] rather than a false resistance label (PR
+          #1941). See [.mli] for R2-searchability + faithfulness. *)
 }
 [@@deriving sexp]
 
@@ -232,6 +240,7 @@ let default_config ~universe ~index_symbol =
     enable_scale_in = false;
     scale_in_config = Scale_in_detector.default_config;
     cash_reserve_pct = 0.0;
+    resistance_min_history_bars = 0;
   }
 
 let name = "Weinstein"

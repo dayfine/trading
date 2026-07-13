@@ -34,7 +34,8 @@
   test_stops_split_runner
   test_weekly_ma_cache
   test_weinstein_strategy
-  test_weinstein_strategy_smoke)
+  test_weinstein_strategy_smoke
+  test_stock_analysis_config_wiring)
  (libraries
   core
   core_unix
@@ -68,6 +69,7 @@
   weinstein.rs
   weinstein.sector
   weinstein.stock_analysis
+  weinstein.resistance
   weinstein_trading.portfolio_risk
   weinstein_trading.stops
   weinstein.data_source.testing

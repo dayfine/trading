@@ -200,20 +200,43 @@ let _classify_stage_for_screening ~config ~bar_reader ~prior_stages
     in
     Some (ticker, stock_view, prior_stage, stage_result)
 
-(** Build the per-screen-pass [Stock_analysis.config]. Currently differs from
-    {!Stock_analysis.default_config} only by toggling the continuation detector
-    based on [Weinstein_strategy_config.enable_continuation_buys] and threading
-    the strategy's [continuation_config] (defaults to
+(** Build the per-screen-pass [Stock_analysis.config]. Differs from
+    {!Stock_analysis.default_config} only by (a) toggling the continuation
+    detector based on [Weinstein_strategy_config.enable_continuation_buys] and
+    threading the strategy's [continuation_config] (defaults to
     [Continuation.default_config], preserving bit-equality with prior baselines
-    when the field is omitted from a scenario sexp). *)
+    when the field is omitted from a scenario sexp), and (b) overriding the
+    resistance [min_history_bars] when
+    [Weinstein_strategy_config.resistance_min_history_bars] is non-zero.
+
+    The [min_history_bars] override sets [config.resistance.min_history_bars];
+    because {!Stock_analysis} reuses the same [Resistance.config] record for the
+    short-side support mirror ([_support_result] passes [config.resistance] to
+    {!Support.analyze_with_callbacks}), the floor applies to both directions
+    automatically without diverging the two records. Default [0] leaves
+    {!Resistance.default_config}'s disabled check in place, so the built config
+    is byte-identical to {!Stock_analysis.default_config} (PR #1941 semantics;
+    [Weinstein_types.Insufficient_history]). *)
 let _stock_analysis_config_for ~(config : Weinstein_strategy_config.config) :
     Stock_analysis.config =
-  if config.enable_continuation_buys then
+  let base =
+    if config.enable_continuation_buys then
+      {
+        Stock_analysis.default_config with
+        continuation = Some config.continuation_config;
+      }
+    else Stock_analysis.default_config
+  in
+  if config.resistance_min_history_bars = 0 then base
+  else
     {
-      Stock_analysis.default_config with
-      continuation = Some config.continuation_config;
+      base with
+      resistance =
+        {
+          base.resistance with
+          min_history_bars = config.resistance_min_history_bars;
+        };
     }
-  else Stock_analysis.default_config
 
 (** Stage 4-5 PR-A Phase 2: build the full [Stock_analysis.callbacks] bundle
     (Stage / Rs / Volume / Resistance) for a survivor and run
