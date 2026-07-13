@@ -40,7 +40,7 @@ _is_allowed() {
 
 # Find dune files that reference trading.* (trading core libraries)
 VIOLATIONS=$(
-  find "$ANALYSIS_DIR" -name "dune" \
+  find "$ANALYSIS_DIR" -name '_build' -prune -o -name "dune" -print 2>/dev/null \
     | while read -r f; do
         _is_allowed "$f" && continue
         if grep -qE '\btrading\.(portfolio|orders|simulation|engine|strategy|base)\b' "$f"; then

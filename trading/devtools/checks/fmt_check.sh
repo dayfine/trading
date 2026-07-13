@@ -24,12 +24,15 @@ _find_workspace_root() {
 TRADING_DIR="$(_find_workspace_root)"
 VIOLATIONS=""
 
-for f in $(find "$TRADING_DIR" \( -name "*.ml" -o -name "*.mli" \) \
-    -not -path "*/_build/*" \
-    -not -path "*/.formatted/*" \
+# Name-anchored prunes + race guard: -not -path filters still DESCEND into
+# _build, racing dune's concurrent sandbox cleanup (find exits non-zero when a
+# dir vanishes mid-walk). Same pattern as no_python_check.sh.
+for f in $(find "$TRADING_DIR" \
+    \( -name '_build' -o -name '.formatted' -o -name 'ta_ocaml' \) -prune -o \
+    \( -name "*.ml" -o -name "*.mli" \) \
     -not -name "*.pp.ml" \
     -not -name "*.pp.mli" \
-    -not -path "*/ta_ocaml/*"); do
+    -print 2>/dev/null || true); do
   if ! ocamlformat --check "$f" 2>/dev/null; then
     VIOLATIONS="${VIOLATIONS}  ${f}\n"
   fi
