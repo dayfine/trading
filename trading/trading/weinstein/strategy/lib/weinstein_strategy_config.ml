@@ -98,15 +98,15 @@ type config = {
 }
 [@@deriving sexp]
 
+(* Kept top-level so [default_config] stays a flat record literal (the
+   nesting linter caps the file average). *)
+let _default_indices index_symbol = { primary = index_symbol; global = [] }
+
 (* Flat record literal over every config field — exactly one line per field
    by construction (no logic), growing one line per new default-off
    experiment knob. OCaml has no partial record literals, so splitting is
    impossible and extracting field groups would only add indirection.
    @large-function: flat default-config record literal, one line per field *)
-(* Kept top-level so [default_config] stays a flat record literal (the
-   nesting linter caps the file average). *)
-let _default_indices index_symbol = { primary = index_symbol; global = [] }
-
 let default_config ~universe ~index_symbol =
   {
     universe;
