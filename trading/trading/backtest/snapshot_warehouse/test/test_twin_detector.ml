@@ -259,8 +259,10 @@ let test_drifting_ratio_twin_returns _ =
              field
                (fun (g : Twin_detector.group) ->
                  List.map g.matches ~f:(fun m -> m.match_fraction))
-               (elements_are
-                  [ is_between (module Float_ord) ~low:0.95 ~high:1.0 ]);
+               (* Exactly 38/39: the split-boundary day is a genuine return
+                  MISMATCH that the fraction must count — an all-match 1.0
+                  would mean the boundary was silently absorbed. *)
+               (elements_are [ float_equal (38.0 /. 39.0) ]);
            ];
        ])
 
@@ -273,6 +275,32 @@ let test_drifting_ratio_missed_by_levels _ =
   in
   let report = Twin_detector.detect test_config [ newco; oldco ] in
   assert_that report.groups is_empty
+
+(* Corrupt-bar guard — a zero close mid-series (real warehouses carry such
+   rows; MSZ precedent). The pair whose PRIOR close is the zero is skipped
+   rather than counted as a mismatch, so an otherwise-identical twin still
+   reports a full match fraction over the valid pairs. Pins the
+   [_returns_match_fraction] prior-close <= 0 guard. *)
+let test_zero_close_pair_skipped_not_diluted _ =
+  let closes =
+    List.init 30 ~f:(fun i -> if i = 15 then 0.0 else 100.0 +. Float.of_int i)
+  in
+  let newco = series_of ~symbol:"NEWCO" closes in
+  let oldco = truncate_series ~symbol:"OLDCO" ~n:28 closes in
+  let report = Twin_detector.detect returns_config [ newco; oldco ] in
+  assert_that report.groups
+    (elements_are
+       [
+         all_of
+           [
+             field group_survivor (equal_to "NEWCO");
+             field group_dropped (equal_to [ "OLDCO" ]);
+             field
+               (fun (g : Twin_detector.group) ->
+                 List.map g.matches ~f:(fun m -> m.match_fraction))
+               (elements_are [ float_equal 1.0 ]);
+           ];
+       ])
 
 (* (c) Different-instruments control — two series that start at the same price
    but follow independent return paths ([UP] arithmetic +1/day, [GEO] geometric
@@ -344,6 +372,8 @@ let suite =
          "drifting_ratio_twin_returns" >:: test_drifting_ratio_twin_returns;
          "drifting_ratio_missed_by_levels"
          >:: test_drifting_ratio_missed_by_levels;
+         "zero_close_pair_skipped_not_diluted"
+         >:: test_zero_close_pair_skipped_not_diluted;
          "independent_returns_not_twin" >:: test_independent_returns_not_twin;
          "identical_data_end_tiebreak_returns"
          >:: test_identical_data_end_tiebreak_returns;
