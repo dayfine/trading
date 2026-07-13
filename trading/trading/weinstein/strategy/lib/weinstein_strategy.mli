@@ -583,6 +583,15 @@ type config = {
           working replacement for the dead [Portfolio_risk.min_cash_pct]. Scoped
           to entries only — exits are never blocked. See
           [Weinstein_strategy_config]. *)
+  resistance_min_history_bars : int; [@sexp.default 0]
+      (** Overhead-resistance history floor threaded into the per-screen
+          [Stock_analysis.config.resistance.min_history_bars] (and, via the
+          shared [Resistance.config] record, the short-side support mirror).
+          Default [0] disables the check (bit-identical to baseline); [> 0]
+          (typically [520]) grades starved windows as [Insufficient_history]
+          instead of a false resistance label (PR #1941). R2-searchable int
+          axis. See [Weinstein_strategy_config] and
+          {!stock_analysis_config_for}. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
@@ -685,6 +694,27 @@ val survivors_for_screening :
     @param fold_start_date
       Win #4: companion to [?active_through_for]. The fold's first day. When
       omitted, no pre-pruning happens (matches default behaviour). *)
+
+val stock_analysis_config_for : config:config -> Stock_analysis.config
+(** Build the per-screen-pass [Stock_analysis.config] the screener consumes for
+    the given strategy [config]. Applies two strategy-config-driven overrides on
+    top of {!Stock_analysis.default_config}:
+
+    - [enable_continuation_buys] toggles the continuation detector (threading
+      [continuation_config]);
+    - [resistance_min_history_bars], when non-zero, sets
+      [resistance.min_history_bars] — and because [Stock_analysis] reuses the
+      same [Resistance.config] record for the short-side support mirror, the
+      floor applies to both the resistance and support cascades automatically.
+
+    When both overrides are at their no-op defaults
+    ([enable_continuation_buys = false] and [resistance_min_history_bars = 0])
+    the result is byte-identical to {!Stock_analysis.default_config}
+    (experiment-flag-discipline R1).
+
+    Public for testability — lets unit tests pin the R2-searchability threading
+    (default-off bit-identity + the [520] override landing on
+    [resistance.min_history_bars]) without instrumenting the screener loop. *)
 
 val entries_from_candidates :
   ?sector_lookup:(string -> string option) ->

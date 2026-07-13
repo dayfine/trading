@@ -41,139 +41,66 @@ type config = {
   suppress_warmup_trading : bool; [@sexp.default true]  (** See [.mli]. *)
   stop_update_cadence : Stops_runner.stop_update_cadence;
       [@sexp.default Stops_runner.Daily]
-      (** Cadence for trailing-stop trail advancement (G11). [Daily] preserves
-          baselines; [Weekly] gates trail advancement to Friday ticks. *)
+      (** See [.mli]. *)
   stage3_force_exit_config : Stage3_force_exit.config;
       [@sexp.default Stage3_force_exit.default_config]
-      (** Stage-3 force-exit detector parameters (issue #872). *)
-  enable_stage3_force_exit : bool; [@sexp.default false]
-      (** Master switch for the Stage-3 force-exit runner. Default [false]
-          preserves all existing baselines. *)
-  stage3_reentry_cooldown_weeks : int; [@sexp.default 0]
-      (** Cascade re-admission cooldown (#718) for Stage-3 force-exited symbols.
-          Default [0] = no extra cooldown. *)
-  stage3_exit_margin_pct : float; [@sexp.default 0.0]
-      (** Minimum margin (fraction) by which the current bar's close must sit
-          below the 30-week MA before the Stage-3 force-exit runner emits.
-          Default [0.0] preserves the prior detector behaviour. See [.mli]. *)
+      (** See [.mli]. *)
+  enable_stage3_force_exit : bool; [@sexp.default false]  (** See [.mli]. *)
+  stage3_reentry_cooldown_weeks : int; [@sexp.default 0]  (** See [.mli]. *)
+  stage3_exit_margin_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
   laggard_rotation_config : Laggard_rotation.config;
       [@sexp.default Laggard_rotation.default_config]
-      (** Laggard-rotation detector parameters (issue #887). *)
-  enable_laggard_rotation : bool; [@sexp.default false]
-      (** Master switch for the laggard-rotation runner (issue #887). *)
-  laggard_reentry_cooldown_weeks : int; [@sexp.default 0]
-      (** Cascade re-admission cooldown (#718) for laggard-rotation exited
-          symbols. Default [0] = no extra cooldown. *)
-  enable_continuation_buys : bool; [@sexp.default false]
-      (** Master switch for Weinstein Ch. 3 continuation-buy detection
-          (Interpretation B of issue #889). Default [false] preserves baselines.
-      *)
+      (** See [.mli]. *)
+  enable_laggard_rotation : bool; [@sexp.default false]  (** See [.mli]. *)
+  laggard_reentry_cooldown_weeks : int; [@sexp.default 0]  (** See [.mli]. *)
+  enable_continuation_buys : bool; [@sexp.default false]  (** See [.mli]. *)
   continuation_config : Continuation.config;
       [@sexp.default Continuation.default_config]
-      (** Detector parameters; only consulted when
-          [enable_continuation_buys = true]. See [.mli] for tuning context. *)
-  enable_pi_filter : bool; [@sexp.default false]
-      (** Master switch for the screener point-in-time (PI) universe-membership
-          filter. Default [false] preserves all existing baselines: the
-          [Screener.screen_with_cooldown] [?membership_at] callback is left
-          unsupplied and every loaded symbol participates in the cascade.
-
-          When [true], the strategy builds a callback from per-symbol bar reads
-          — a symbol is treated as a member on [as_of] iff its most recent
-          observed bar's [Daily_price.active_through] is either [None] (still
-          trading / unknown delisting status) or [Some d] with [as_of <= d].
-          Symbols delisted before [as_of] are excluded from stage
-          classification, sector resolution, and scoring before the cascade's
-          downstream phases run.
-
-          Authority: [dev/notes/historical-universe-membership-2026-04-30.md]
-          §P5; [dev/notes/historical-universe-status-2026-05-13.md] §1 phase 3
-          action item #2.
-
-          The opt-in default is intentional: enabling the filter changes which
-          symbols the cascade considers and shifts every existing fixture's
-          pinned numbers as the underlying [active_through] column propagates
-          through the snapshot pipeline. Re-pinning goldens is a separate
-          post-merge step. *)
+      (** See [.mli]. *)
+  enable_pi_filter : bool; [@sexp.default false]  (** See [.mli]. *)
   margin_config : Trading_portfolio.Margin_config.t;
       [@sexp.default Trading_portfolio.Margin_config.default_config]
-      (** Phase-2 margin-accounting parameters (issue #859,
-          [dev/plans/short-side-margin-2026-05-13.md] §2). See [.mli]. *)
-  neutral_blocks_longs : bool; [@sexp.default false]
-      (** When [true], a macro-[Neutral] tape blocks new long entries (only
-          [Bullish] admits longs); default [false] preserves the historical gate
-          where both [Bullish] and [Neutral] admit longs. Threaded into
-          [screening_config.neutral_blocks_longs] at screen time. See [.mli]. *)
-  neutral_blocks_shorts : bool; [@sexp.default true]
-      (** Short-side mirror of [neutral_blocks_longs]; default [true] admits
-          shorts only under a confirmed [Bearish] tape (2026-07-09 faithfulness
-          flip). See [.mli]. *)
-  enable_slow_grind_short_gate : bool; [@sexp.default false]
-      (** Admit shorts only in a slow-grind decline; default [false] = no-op.
-          See [.mli]. *)
-  fast_v_arm_on_rate_alone : bool; [@sexp.default false]
-      (** Fast-crash absolute-stop arming-speed dial; default [false] = no-op.
-          See [.mli]. *)
+      (** See [.mli]. *)
+  neutral_blocks_longs : bool; [@sexp.default false]  (** See [.mli]. *)
+  neutral_blocks_shorts : bool; [@sexp.default true]  (** See [.mli]. *)
+  enable_slow_grind_short_gate : bool; [@sexp.default false]  (** See [.mli]. *)
+  fast_v_arm_on_rate_alone : bool; [@sexp.default false]  (** See [.mli]. *)
   fast_v_min_rate_pct : float; [@sexp.default fast_v_min_rate_no_op]
-      (** Fast-V arming rate threshold (whipsaw-suppression dial); default
-          [fast_v_min_rate_no_op] (0.08) reproduces the classifier default. See
-          [.mli]. *)
+      (** See [.mli]. *)
   reject_declining_ma_long_entry : bool; [@sexp.default false]
-      (** Long-entry faithfulness gate (default-off): drop long candidates whose
-          MA direction is [Declining] at entry. See [.mli]. *)
+      (** See [.mli]. *)
   enable_late_stage2_stop_tighten : bool; [@sexp.default false]
-      (** Master switch for the late-Stage-2 stop-tighten runner; see [.mli]. *)
-  late_stage2_stop_buffer_pct : float; [@sexp.default 0.0]
-      (** Buffer below close where the runner raises the stop; see [.mli]. *)
+      (** See [.mli]. *)
+  late_stage2_stop_buffer_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
   enable_macro_bearish_exposure_trim : bool; [@sexp.default false]
-      (** Master switch for the macro-bearish held-exposure trim runner; default
-          [false] is a no-op (bit-identical to baseline). See [.mli]. *)
+      (** See [.mli]. *)
   macro_bearish_max_long_exposure_pct : float;
       [@sexp.default macro_bearish_no_op_cap]
-      (** Fraction of portfolio value the trim caps held long exposure at on a
-          Bearish tape; default [0.70] is a no-op cap. See [.mli]. *)
+      (** See [.mli]. *)
   stale_exit_after_days : int option;
       [@sexp.default Some default_stale_exit_days]
-      (** [Some n] force-sells a stale/delisted held position at its last close
-          after an [n]-day bar gap. Default [Some 5] (2026-07-10 realism flip):
-          the simulator must not hold ghosts. [None] restores the pre-flip no-op
-          (#1484). Threaded into the simulator's [Stale_hold.config]. See
-          [.mli]. *)
-  enable_harvest_rotate : bool; [@sexp.default false]
-      (** Master switch for the harvest-rotate dial; default [false] is a no-op
-          (bit-identical to baseline). See [.mli]. *)
-  harvest_fraction : float; [@sexp.default 0.5]
-      (** Fraction of a held [Stage2 { late }] long trimmed by the
-          harvest-rotate runner; [0.5] = sell half. Only consulted when
-          [enable_harvest_rotate = true]. See [.mli]. *)
-  short_sleeve_fraction : float; [@sexp.default 0.0]
-      (** Fraction of portfolio value reserved as a dedicated short-only cash
-          budget in the per-Friday entry walk; default [0.0] is a no-op
-          (bit-identical single combined walk). See [.mli]. *)
+      (** See [.mli]. *)
+  enable_harvest_rotate : bool; [@sexp.default false]  (** See [.mli]. *)
+  harvest_fraction : float; [@sexp.default 0.5]  (** See [.mli]. *)
+  short_sleeve_fraction : float; [@sexp.default 0.0]  (** See [.mli]. *)
   extension_stop_config : Weinstein_stops.Extension_stop.config;
       [@sexp.default Weinstein_stops.Extension_stop.default_config]
-      (** Extension-stop tail-INSURANCE trail for a held long far above its
-          WMA30; default {!Weinstein_stops.Extension_stop.default_config}
-          ([trigger_ratio = 0.0] / [trail_pct = 0.0]) DISABLES it (bit-identical
-          to baseline). Wired via {!Extension_stop_runner}. See [.mli]. *)
+      (** See [.mli]. *)
   liquidity_config : Liquidity_config.t;
       [@sexp.default Liquidity_config.default_config]
       (** See [.mli]. *)
-  enable_scale_in : bool; [@sexp.default false]
-      (** Master switch for the explore/exploit scale-in mechanism (½-unit
-          initial entries + one pullback add into revealed strength). Default
-          [false] is a no-op — bit-identical to baseline. See [.mli]. *)
+  enable_scale_in : bool; [@sexp.default false]  (** See [.mli]. *)
   scale_in_config : Scale_in_detector.config;
       [@sexp.default Scale_in_detector.default_config]
-      (** Scale-in knobs (initial fraction, add trigger, gates); only consulted
-          when [enable_scale_in = true]. See [.mli]. *)
-  cash_reserve_pct : float; [@sexp.default 0.0]
-      (** Fraction of current portfolio value held back from NEW entry funding
-          each Friday; default [0.0] is a no-op (bit-identical to baseline). The
-          working replacement for the dead [Portfolio_risk.min_cash_pct]. See
-          [.mli]. *)
+      (** See [.mli]. *)
+  cash_reserve_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
+  resistance_min_history_bars : int; [@sexp.default 0]  (** See [.mli]. *)
 }
 [@@deriving sexp]
+
+(* Kept top-level so [default_config] stays a flat record literal (the
+   nesting linter caps the file average). *)
+let _default_indices index_symbol = { primary = index_symbol; global = [] }
 
 (* Flat record literal over every config field — exactly one line per field
    by construction (no logic), growing one line per new default-off
@@ -181,10 +108,9 @@ type config = {
    impossible and extracting field groups would only add indirection.
    @large-function: flat default-config record literal, one line per field *)
 let default_config ~universe ~index_symbol =
-  let indices = { primary = index_symbol; global = [] } in
   {
     universe;
-    indices;
+    indices = _default_indices index_symbol;
     sector_etfs = [];
     stage_config = Stage.default_config;
     macro_config = Macro.default_config;
@@ -232,6 +158,7 @@ let default_config ~universe ~index_symbol =
     enable_scale_in = false;
     scale_in_config = Scale_in_detector.default_config;
     cash_reserve_pct = 0.0;
+    resistance_min_history_bars = 0;
   }
 
 let name = "Weinstein"
