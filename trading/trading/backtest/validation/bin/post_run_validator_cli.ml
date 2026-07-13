@@ -19,6 +19,8 @@ let _run ~run_dir ~data_dir ~config_path ~out =
   let config = Vt.load_config config_path in
   let report = Vr.run ~run_dir ~data_dir ~config ~out in
   List.iter report.checks ~f:(fun r -> printf "%s\n" (_summary_line r));
+  printf "audit join: %d/%d rows matched\n" report.audit_join.matched
+    report.audit_join.total;
   printf "wrote %s.sexp + %s.md\n" out out
 
 let command =

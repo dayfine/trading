@@ -30,7 +30,8 @@ expectations so we never make these kinds of trades again."
 - `trading/trading/backtest/validation/bin/post_run_validator_cli.ml` — CLI
   (`-run-dir -data-dir [-config] -out`).
 - `trading/trading/backtest/validation/test/test_post_run_validator.ml` — unit
-  tests for V1, V2, V5, V6, V9, V10, V11 + severity/validate wiring (12 tests).
+  tests for V1, V2, V5, V6, V9, V10, V11, audit-join + severity/validate wiring
+  (22 tests).
 
 ## Checks (V1-V11)
 
@@ -62,6 +63,20 @@ docker exec trading-1-dev bash -c \
    dune runtest trading/backtest/validation/'
 ```
 
+## Fixes
+
+- [x] **C6b: audit join rekeyed by `position_id`** (feat/validator-audit-join).
+  The join keyed `trade_audit.sexp` records to `trades.csv` rows by
+  `(symbol, entry_date)`, but audit records carry the SIGNAL Friday while rows
+  carry the FILL date — the lookup missed 100% of rows, silently skipping
+  V1/V2/V7/V8 (reported "PASS (N skipped)"). Now `build_audit_lookup` joins on
+  the `position_id` column (#1942, trailing column) when present, falling back
+  to `symbol|entry_date` for legacy 19-column runs. Report + CLI now print
+  `audit join: N/M rows matched` so a dead join can't masquerade as PASS.
+  Verify: `dune runtest trading/backtest/validation/test/` (join tests:
+  `join_by_position_id_survives_date_skew`,
+  `join_legacy_falls_back_to_symbol_date`, `audit_join_coverage_counts`).
+
 ## Follow-ups
 
 - Wire `scenario_runner --validate` post-step (out of scope for v1 per plan).
@@ -72,7 +87,7 @@ docker exec trading-1-dev bash -c \
   the bar-dependent V3/V4/V7 are covered structurally but want a golden-run
   integration test.
 
-## Last updated: 2026-07-12
+## Last updated: 2026-07-12 (C6b audit-join fix)
 
 ## Interface stable
 

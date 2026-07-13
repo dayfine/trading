@@ -45,10 +45,21 @@ let run_check ~id inputs =
   | Some (_, default_sev, fn) ->
       _result_of ~id ~default_sev ~config:inputs.config (fn inputs)
 
+(* How many trades resolved to a trade_audit record. Surfaced in the report so a
+   dead join (matched = 0) can't masquerade as "PASS (all skipped)". *)
+let _audit_join inputs =
+  let matched =
+    List.count inputs.trades ~f:(fun t -> Option.is_some (inputs.audit t))
+  in
+  { matched; total = List.length inputs.trades }
+
 let validate inputs =
   let disabled = inputs.config.disabled_checks in
   let ids =
     List.filter all_check_ids ~f:(fun id ->
         not (List.mem disabled id ~equal:String.equal))
   in
-  { checks = List.map ids ~f:(fun id -> run_check ~id inputs) }
+  {
+    checks = List.map ids ~f:(fun id -> run_check ~id inputs);
+    audit_join = _audit_join inputs;
+  }

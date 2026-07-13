@@ -23,6 +23,7 @@ type trade_row = {
   exit_trigger : string;
   stop_trigger_kind : string;
   stop_initial_distance_pct : float option;
+  position_id : string option;
 }
 
 type open_row = {
@@ -76,7 +77,10 @@ type check_result = {
 }
 [@@deriving sexp]
 
-type report = { checks : check_result list } [@@deriving sexp]
+type audit_join = { matched : int; total : int } [@@deriving sexp]
+
+type report = { checks : check_result list; audit_join : audit_join }
+[@@deriving sexp]
 
 type inputs = {
   trades : trade_row list;
