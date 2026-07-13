@@ -27,10 +27,12 @@ VIOLATIONS=""
 TOTAL=0
 LARGE_COUNT=0
 
-for ml_file in $(find "$TRADING_DIR" -path "*/lib/*.ml" \
-    -not -path "*/_build/*" \
-    -not -path "*/.formatted/*" \
-    -not -name "*.pp.ml"); do
+# Name-anchored prunes + race guard (see no_python_check.sh).
+for ml_file in $(find "$TRADING_DIR" \
+    \( -name '_build' -o -name '.formatted' \) -prune -o \
+    -path "*/lib/*.ml" \
+    -not -name "*.pp.ml" \
+    -print 2>/dev/null || true); do
   TOTAL=$((TOTAL + 1))
   line_count=$(wc -l < "$ml_file")
 

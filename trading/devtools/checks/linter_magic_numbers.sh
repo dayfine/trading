@@ -53,10 +53,12 @@ _is_excluded() {
   printf '%s' "$1" | grep -qE "$EXCLUDE_PATTERN"
 }
 
-for f in $(find "$TRADING_DIR" -path "*/lib/*.ml" \
-    -not -path "*/_build/*" \
-    -not -path "*/.formatted/*" \
-    -not -name "*.pp.ml"); do
+# Name-anchored prunes + race guard (see no_python_check.sh).
+for f in $(find "$TRADING_DIR" \
+    \( -name '_build' -o -name '.formatted' \) -prune -o \
+    -path "*/lib/*.ml" \
+    -not -name "*.pp.ml" \
+    -print 2>/dev/null || true); do
   _is_excluded "$f" && continue
 
   # Track multi-line comment depth across lines. Lines inside an open comment
