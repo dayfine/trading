@@ -3,15 +3,21 @@ open OUnit2
 open Matchers
 
 (* Small thresholds so the tiny fixtures below qualify as twins:
-   >= 5 overlapping days, > 95% near-identical closes. *)
+   >= 5 overlapping days, > 95% near-identical closes. Default [Levels] basis. *)
 let test_config =
   {
     Twin_detector.Config.enabled = true;
     min_overlap_days = 5;
     match_fraction = 0.95;
     close_epsilon = 1e-4;
+    basis = Twin_detector.Config.Levels;
+    ret_epsilon = 1e-3;
     prefilter_rel_tol = 2e-2;
   }
+
+(* Same thresholds under the returns basis. *)
+let returns_config =
+  { test_config with basis = Twin_detector.Config.Returns; ret_epsilon = 1e-3 }
 
 let start = Date.of_string "2020-01-01"
 
@@ -191,6 +197,136 @@ let test_offset_window_detected _ =
            ];
        ])
 
+(* A scaled copy: leg B closes are leg A's closes times [factor]. Different
+   adjustment basis → levels diverge by a constant ratio, returns are identical. *)
+let scaled_series ~symbol ~factor closes =
+  series_of ~symbol (List.map closes ~f:(fun c -> c *. factor))
+
+(* (a) Scaled twin — leg [SML] is leg [BIG] * 0.78 (a constant adjustment-basis
+   ratio). Levels diverge (0.78 gap on every day) so [Levels] misses it; the
+   daily returns are identical so [Returns] catches it. [BIG] < [SML]
+   lexicographically and both share every date, so [BIG] survives. *)
+let test_scaled_twin_returns _ =
+  let closes = ramp ~n:20 ~base:100.0 in
+  let big = series_of ~symbol:"BIG" closes in
+  let small = scaled_series ~symbol:"SML" ~factor:0.78 closes in
+  let report = Twin_detector.detect returns_config [ big; small ] in
+  assert_that report.groups
+    (elements_are
+       [
+         all_of
+           [
+             field group_survivor (equal_to "BIG");
+             field group_dropped (equal_to [ "SML" ]);
+           ];
+       ]);
+  assert_that report.dropped_symbols (equal_to [ "SML" ])
+
+(* (d) The same scaled pair under [Levels] is NOT a twin — the constant 0.78
+   gap exceeds [close_epsilon] on every day. Confirms the levels basis is
+   scale-sensitive (v1 behaviour, unchanged). *)
+let test_scaled_twin_missed_by_levels _ =
+  let closes = ramp ~n:20 ~base:100.0 in
+  let big = series_of ~symbol:"BIG" closes in
+  let small = scaled_series ~symbol:"SML" ~factor:0.78 closes in
+  let report = Twin_detector.detect test_config [ big; small ] in
+  assert_that report.groups is_empty;
+  assert_that report.dropped_symbols is_empty
+
+(* (b) Drifting-ratio twin — [OLDCO] equals [NEWCO] for the first 20 shared days
+   then carries an extra 2:1 adjustment (halved) for the next 20. Returns match
+   on every consecutive pair except the single boundary day (38/39 = 0.974 >
+   0.95), so [Returns] catches it; levels match only half the window so [Levels]
+   misses it. [NEWCO] ends 2 days later, so it survives. *)
+let drifting_closes ~n ~split ~base =
+  List.init n ~f:(fun i ->
+      let c = base +. Float.of_int i in
+      if i < split then c else c *. 0.5)
+
+let test_drifting_ratio_twin_returns _ =
+  let newco = series_of ~symbol:"NEWCO" (ramp ~n:42 ~base:100.0) in
+  let oldco =
+    series_of ~symbol:"OLDCO" (drifting_closes ~n:40 ~split:20 ~base:100.0)
+  in
+  let report = Twin_detector.detect returns_config [ newco; oldco ] in
+  assert_that report.groups
+    (elements_are
+       [
+         all_of
+           [
+             field group_survivor (equal_to "NEWCO");
+             field group_dropped (equal_to [ "OLDCO" ]);
+             field
+               (fun (g : Twin_detector.group) ->
+                 List.map g.matches ~f:(fun m -> m.match_fraction))
+               (elements_are
+                  [ is_between (module Float_ord) ~low:0.95 ~high:1.0 ]);
+           ];
+       ])
+
+(* The same drifting-ratio pair matches only half the shared days on levels,
+   so [Levels] does not call it a twin. *)
+let test_drifting_ratio_missed_by_levels _ =
+  let newco = series_of ~symbol:"NEWCO" (ramp ~n:42 ~base:100.0) in
+  let oldco =
+    series_of ~symbol:"OLDCO" (drifting_closes ~n:40 ~split:20 ~base:100.0)
+  in
+  let report = Twin_detector.detect test_config [ newco; oldco ] in
+  assert_that report.groups is_empty
+
+(* (c) Different-instruments control — two series that start at the same price
+   but follow independent return paths ([UP] arithmetic +1/day, [GEO] geometric
+   +2%/day). Returns differ on every day, so [Returns] does NOT call them
+   twins. Guards against the returns basis over-matching same-priced names. *)
+let test_independent_returns_not_twin _ =
+  let up = series_of ~symbol:"UP" (ramp ~n:30 ~base:100.0) in
+  let geo =
+    series_of ~symbol:"GEO"
+      (List.init 30 ~f:(fun i -> 100.0 *. (1.02 ** Float.of_int i)))
+  in
+  let report = Twin_detector.detect returns_config [ up; geo ] in
+  assert_that report.groups is_empty;
+  assert_that report.dropped_symbols is_empty;
+  assert_that
+    (Twin_detector.survivors report ~all_symbols:[ "UP"; "GEO" ])
+    (equal_to [ "UP"; "GEO" ])
+
+(* (e) Tie-break re-holds under [Returns]: two identical full-window legs have
+   identical returns; with no later-ending leg the survivor is the smaller
+   symbol ([BFX] < [NLS]). *)
+let test_identical_data_end_tiebreak_returns _ =
+  let closes = ramp ~n:20 ~base:60.0 in
+  let nls = series_of ~symbol:"NLS" closes in
+  let bfx = series_of ~symbol:"BFX" closes in
+  let report = Twin_detector.detect returns_config [ nls; bfx ] in
+  assert_that report.groups
+    (elements_are
+       [
+         all_of
+           [
+             field group_survivor (equal_to "BFX");
+             field group_dropped (equal_to [ "NLS" ]);
+           ];
+       ])
+
+(* (e) Offset-window prefilter re-holds under [Returns]: [OLD] starts at day 7
+   (its first bar has no prior return and is skipped by the prefilter) but its
+   interior returns match [NEW] on days 8..26, so the twin is still detected. *)
+let test_offset_window_detected_returns _ =
+  let newco = series_of ~symbol:"NEW" (ramp ~n:30 ~base:80.0) in
+  let old_closes = List.init 20 ~f:(fun i -> 80.0 +. Float.of_int (7 + i)) in
+  let oldco = series_from ~symbol:"OLD" ~offset:7 old_closes in
+  let report = Twin_detector.detect returns_config [ newco; oldco ] in
+  assert_that report.groups
+    (elements_are
+       [
+         all_of
+           [
+             field group_survivor (equal_to "NEW");
+             field group_dropped (equal_to [ "OLD" ]);
+           ];
+       ])
+
 let suite =
   "twin_detector"
   >::: [
@@ -203,6 +339,16 @@ let suite =
          "reported_match_fraction" >:: test_reported_match_fraction;
          "identical_data_end_tiebreak" >:: test_identical_data_end_tiebreak;
          "offset_window_detected" >:: test_offset_window_detected;
+         "scaled_twin_returns" >:: test_scaled_twin_returns;
+         "scaled_twin_missed_by_levels" >:: test_scaled_twin_missed_by_levels;
+         "drifting_ratio_twin_returns" >:: test_drifting_ratio_twin_returns;
+         "drifting_ratio_missed_by_levels"
+         >:: test_drifting_ratio_missed_by_levels;
+         "independent_returns_not_twin" >:: test_independent_returns_not_twin;
+         "identical_data_end_tiebreak_returns"
+         >:: test_identical_data_end_tiebreak_returns;
+         "offset_window_detected_returns"
+         >:: test_offset_window_detected_returns;
        ]
 
 let () = run_test_tt_main suite

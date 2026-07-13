@@ -171,15 +171,37 @@ let command =
      and twin_close_epsilon =
        flag "twin-close-epsilon"
          (optional_with_default Twin_detector.Config.default.close_epsilon float)
-         ~doc:"E Relative tolerance for a single-day close match"
+         ~doc:"E Relative tolerance for a single-day close match (basis=levels)"
+     and twin_basis =
+       flag "twin-basis"
+         (optional_with_default "levels" string)
+         ~doc:
+           "B Comparison basis: levels (default, adjusted-close levels) or \
+            returns (consecutive daily returns — catches renames whose feeds \
+            carry different adjustment bases)"
+     and twin_ret_epsilon =
+       flag "twin-ret-epsilon"
+         (optional_with_default Twin_detector.Config.default.ret_epsilon float)
+         ~doc:
+           "E Absolute tolerance on the daily-return difference (basis=returns)"
      in
      fun () ->
+       let basis =
+         match String.lowercase twin_basis with
+         | "levels" -> Twin_detector.Config.Levels
+         | "returns" -> Twin_detector.Config.Returns
+         | other ->
+             failwithf "unknown -twin-basis %s (expected levels|returns)" other
+               ()
+       in
        let twin_config =
          {
            Twin_detector.Config.enabled = dedupe_rename_twins;
            min_overlap_days = twin_min_overlap_days;
            match_fraction = twin_match_fraction;
            close_epsilon = twin_close_epsilon;
+           basis;
+           ret_epsilon = twin_ret_epsilon;
            prefilter_rel_tol = Twin_detector.Config.default.prefilter_rel_tol;
          }
        in
