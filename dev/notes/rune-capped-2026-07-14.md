@@ -71,10 +71,18 @@ Isolation leg: long-only + cap 1.0 (no shorts), same everything else
   case for `enable_short_side` from this run.
 - Run D remains the record convention. E-capped numbers quotable only with
   the sizing-lottery caveat attached.
-- Follow-ups: (a) throttle surface (cap values) via experiment-gap-closing
-  IF prioritized — small single-path positive, entry-side, tail-preserving;
-  (b) cap-skip date clustering vs drawdown windows (sexp parse) for the
-  mechanism picture.
+- **Throttle verdict (2026-07-14 discussion): NO surface, do not dispatch.**
+  The cap stays a long-short ACCOUNTING convention (armed at 1.0 in
+  long-short runs only), NOT a return lever. Faithfulness (W2): its binding
+  trigger is the portfolio's own P&L (book under water), i.e.
+  equity-curve-conditioned entry suppression — Weinstein modulates exposure
+  off the TAPE (stage / macro climate), never off own P&L; the tape-triggered
+  version of this idea IS the existing macro gate. Same lever class as the
+  rejected macro-bearish-trim / regime-gating. The +591pp is single-path and
+  small. If a future session considers it anyway, it must clear
+  weinstein-faithful-core W2 first.
+- Remaining follow-up: cap-skip date clustering vs drawdown windows (sexp
+  parse) for the mechanism picture — descriptive only.
 - Artifacts: validator + audit reports in container `/tmp/rune_analysis/`
   (`validator_ecap.md`, `audit_ecap.md`); A/B run dir
   `scenarios-2026-07-14-191605/`.
