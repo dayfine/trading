@@ -101,15 +101,25 @@ let _build_bar_reader ~bar_source ~as_of ~ticker_sectors ~config =
       Snapshot_warehouse_reader.build ~warehouse_dir ~as_of
         ~warmup_days:_warmup_days ()
 
-let _config_for ~ticker_sectors ~index_symbol : Weinstein_strategy.config =
+let _config_for ~ticker_sectors ~index_symbol ~config_overrides_path :
+    Weinstein_strategy.config =
   let universe = List.map ticker_sectors ~f:fst in
   let base = Weinstein_strategy.default_config ~universe ~index_symbol in
-  { base with sector_etfs = Weinstein_strategy.Macro_inputs.spdr_sector_etfs }
+  let config =
+    { base with sector_etfs = Weinstein_strategy.Macro_inputs.spdr_sector_etfs }
+  in
+  match config_overrides_path with
+  | None -> config
+  | Some overrides_path ->
+      Snapshot_config_overrides.Config_overrides_loader.load_and_apply
+        ~overrides_path config
 
 let _run ~as_of ~universe_path ~bar_source ~snapshot_dir ~system_version
-    ~index_symbol () =
+    ~index_symbol ~config_overrides_path () =
   let ticker_sectors = _ticker_sectors_of_universe universe_path in
-  let config = _config_for ~ticker_sectors ~index_symbol in
+  let config =
+    _config_for ~ticker_sectors ~index_symbol ~config_overrides_path
+  in
   let bar_reader =
     _build_bar_reader ~bar_source ~as_of ~ticker_sectors ~config
   in
@@ -170,6 +180,14 @@ let command =
        flag "--index-symbol"
          (optional_with_default "GSPC.INDX" string)
          ~doc:"SYM Primary benchmark index symbol (default: GSPC.INDX)"
+     and config_overrides_path =
+       flag "--config-overrides"
+         (optional Filename_unix.arg_type)
+         ~doc:
+           "PATH Sexp file of config overlays (scenario config_overrides \
+            shape) applied onto the default config; unknown keys fail loudly. \
+            The live weekly-review arming config lives at \
+            dev/weekly-picks/live-config-overrides.sexp"
      in
      fun () ->
        let bar_source =
@@ -188,6 +206,6 @@ let command =
              exit 2
        in
        _run ~as_of ~universe_path ~bar_source ~snapshot_dir ~system_version
-         ~index_symbol ())
+         ~index_symbol ~config_overrides_path ())
 
 let () = Command_unix.run command
