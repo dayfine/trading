@@ -10,3 +10,8 @@
 ; reject_declining_ma: #1775 ARM-FOR-BROAD + 07-13 matrix confirming evidence
 ;   (drops Stage-4-bounce "Stage2" longs, AIR-2020 class; validator V8->PASS).
 ((reject_declining_ma_long_entry true))
+; resistance-history feed: 520 weekly bars (~10y) for the resistance/support
+;   mapper only — fixes CWST-class false-virgin live text with real data
+;   (armed-run matrix Run C: the min-hist label floor is NOT armable; feeding
+;   history is the fix). Generator warmup auto-widens to cover the window.
+((resistance_lookback_bars 520))

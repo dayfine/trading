@@ -607,6 +607,15 @@ type config = {
           instead of a false resistance label (PR #1941). R2-searchable int
           axis. See [Weinstein_strategy_config] and
           {!stock_analysis_config_for}. *)
+  resistance_lookback_bars : int; [@sexp.default 0]
+      (** Resistance-history feed: when [> 0] (typically [520]), the Phase-2
+          screen fetches a second, deeper weekly view of this many bars for the
+          resistance/support callbacks only — the real fix for the false-virgin
+          defect (feeding history rather than suppressing output via the
+          [resistance_min_history_bars] label floor, which Run C showed deletes
+          the signal wholesale). Default [0] = resistance reads the standard
+          [lookback_bars] view, bit-identical to baseline. R2-searchable int
+          axis. See [Weinstein_strategy_config.resistance_lookback_bars]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

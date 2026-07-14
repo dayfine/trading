@@ -72,6 +72,7 @@ val resistance_callbacks_of_weekly_view :
 val stock_analysis_callbacks_of_weekly_views :
   ?ma_cache:Weekly_ma_cache.t ->
   ?stock_symbol:string ->
+  ?resistance_stock:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
   config:Stock_analysis.config ->
   stock:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
   benchmark:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
@@ -82,7 +83,15 @@ val stock_analysis_callbacks_of_weekly_views :
     [volumes] arrays for the breakout / peak-volume scans, and threading nested
     {!Stage.callbacks} (over [stock]), {!Rs.callbacks} (over [stock] +
     [benchmark]), {!Volume.callbacks} (over [stock]), and
-    {!Resistance.callbacks} (over [stock]) through the bundle.
+    {!Resistance.callbacks} (over [resistance_stock] when given, else [stock])
+    through the bundle.
+
+    [?resistance_stock] is the resistance-history feed
+    ([Weinstein_strategy_config.resistance_lookback_bars]): a deeper weekly view
+    of the SAME symbol, consumed by the resistance/support mapper only — the
+    520-bar virgin lookback reads real history while stage / RS / volume /
+    breakout detection keep the standard window. Omitted (default) = the
+    resistance callbacks read [stock], bit-identical to the pre-feed behaviour.
 
     As of Stage 4 PR-B, no {!Daily_price.t list} is materialised — every
     sub-callee consumes a callback bundle. *)
