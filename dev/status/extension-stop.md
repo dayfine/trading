@@ -1,6 +1,6 @@
 # Status: extension-stop
 
-## Last updated: 2026-07-12
+## Last updated: 2026-07-14
 
 ## Status
 IN_PROGRESS
@@ -57,13 +57,25 @@ Design / evidence: `dev/notes/next-session-priorities-2026-07-12.md` §P0a;
   `dev/reviews/extension-stop.md`; audit: `dev/audit/2026-07-12-extension-stop.json`.
 - Remaining track work is the acceptance audit below (LOCAL / deep-warehouse,
   `[non-blocking]`) — the code build itself is complete.
+- **Arming package MERGED (#1960, `0a2e4562`, 2026-07-14)** — maintainer LOCAL,
+  auto-merge on full-green CI (build-and-test + perf-tier1-smoke success on the
+  post-#1961 owl-fixed image). Banked the insurance-basis ACCEPT for
+  `extension_stop(2.0, 0.25)` in the ledger
+  (`dev/experiments/_ledger/2026-07-14-extension-stop-insurance-accept.sexp`):
+  8/8 firings banked parabolic tops (AXTI/DDD/BFX + 4 dot-com names), zero
+  premature on-ramp kills, Sharpe 0.68→0.82 / MaxDD 40.9→32.3 on the dedup-v2
+  28y warehouse; plus an sp500-PIT-2000 robustness cell that is bit-identical
+  armed-vs-off (do-no-harm on large-caps). Mechanism stays **default-off /
+  config-armed only** (experiment-flag-discipline R1). Live config-overrides +
+  record-convention staged scenario also landed in #1960.
 
 ## Next Steps
-- **Acceptance audit (post-merge, insurance basis).** Run armed-vs-off record
-  runs on the current-basis deep runs + re-run the `analysis/scripts/extension_screen`
-  counterfactual; judge on left-tail / dispersion / event-level (NOT fold Sharpe).
-  Screen pins the width: `trail_pct 0.25` survives on-ramp shakeouts; `0.10-0.20`
-  are on-ramp killers. `[non-blocking]`.
+- **Acceptance audit — DONE via #1960's ledger insurance-ACCEPT** (see In Progress
+  above). The armed-vs-off event-level record pair judged on left-tail / dispersion
+  (NOT fold Sharpe) is banked; `trail_pct 0.25` confirmed as the surviving width.
+- Only a **default flip** remains, and only on a further insurance-basis ACCEPT
+  (experiment-flag-discipline R3) — default stays off until then. Human-gated
+  decision; no GHA-runnable step.
 - Only after an insurance-basis ACCEPT would a default flip be considered
   (experiment-flag-discipline R3) — default stays off until then.
 
