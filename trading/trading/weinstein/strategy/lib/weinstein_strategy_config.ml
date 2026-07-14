@@ -94,6 +94,7 @@ type config = {
       [@sexp.default Scale_in_detector.default_config]
       (** See [.mli]. *)
   cash_reserve_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
+  max_long_exposure_pct_entry : float; [@sexp.default 0.0]  (** See [.mli]. *)
   resistance_min_history_bars : int; [@sexp.default 0]  (** See [.mli]. *)
 }
 [@@deriving sexp]
@@ -158,6 +159,7 @@ let default_config ~universe ~index_symbol =
     enable_scale_in = false;
     scale_in_config = Scale_in_detector.default_config;
     cash_reserve_pct = 0.0;
+    max_long_exposure_pct_entry = 0.0;
     resistance_min_history_bars = 0;
   }
 

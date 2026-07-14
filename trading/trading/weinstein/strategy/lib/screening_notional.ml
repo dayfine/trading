@@ -14,6 +14,19 @@ let initial_short_notional (positions : Position.t Map.M(String).t) =
   Map.fold positions ~init:0.0 ~f:(fun ~key:_ ~data:pos acc ->
       acc +. _short_holding_notional pos)
 
+(* Entry-price notional for a single [Holding] long position; 0.0 for all
+   other position types. Mirror of [_short_holding_notional] for the long
+   exposure cap; folded over the position map by [initial_long_notional]. *)
+let _long_holding_notional (pos : Position.t) =
+  match (pos.side, pos.state) with
+  | Trading_base.Types.Long, Position.Holding { quantity; entry_price; _ } ->
+      Float.abs quantity *. entry_price
+  | _ -> 0.0
+
+let initial_long_notional (positions : Position.t Map.M(String).t) =
+  Map.fold positions ~init:0.0 ~f:(fun ~key:_ ~data:pos acc ->
+      acc +. _long_holding_notional pos)
+
 (* Entry-price-denominated absolute notional for a single [Holding] position
    (long or short); 0.0 for all other states. Companion to
    [_short_holding_notional] for the sector-exposure cap, which counts long +
@@ -40,6 +53,8 @@ type entry_walk_state = {
   remaining_cash : float ref;
   short_notional_acc : float ref;
   short_notional_cap : float;
+  long_notional_acc : float ref;
+  long_notional_cap : float;
   sector_exposure_acc : (string, float) Hashtbl.t;
   max_sector_exposure_pct : float option;
 }
@@ -53,6 +68,16 @@ let make_entry_walk_state ~cash ~(config : Weinstein_strategy_config.config)
     portfolio_value
     *. config.portfolio_config.Portfolio_risk.max_short_notional_fraction
   in
+  let long_notional_acc =
+    ref (initial_long_notional portfolio.Portfolio_view.positions)
+  in
+  (* [<= 0.0] => infinity so the gate is an exact no-op (every long admits);
+     otherwise [pct * portfolio_value] (mirrors [short_notional_cap]'s
+     fraction-of-value derivation). *)
+  let long_notional_cap =
+    if Float.( <= ) config.max_long_exposure_pct_entry 0.0 then Float.infinity
+    else portfolio_value *. config.max_long_exposure_pct_entry
+  in
   let sector_exposure_acc =
     match sector_lookup with
     | None -> Hashtbl.create (module String)
@@ -64,6 +89,8 @@ let make_entry_walk_state ~cash ~(config : Weinstein_strategy_config.config)
     remaining_cash = ref cash;
     short_notional_acc;
     short_notional_cap;
+    long_notional_acc;
+    long_notional_cap;
     sector_exposure_acc;
     max_sector_exposure_pct =
       config.portfolio_config.Portfolio_risk.max_sector_exposure_pct;

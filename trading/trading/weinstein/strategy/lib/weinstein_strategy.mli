@@ -183,6 +183,12 @@ module Entry_audit_capture = Entry_audit_capture
     strategy file to keep it under the file-length cap. See
     {!Entry_audit_capture}. *)
 
+module Screening_notional = Screening_notional
+(** Per-Friday entry-walk notional / sector-exposure accumulator seeds. Exposed
+    so tests can pin the accumulator-seeding primitives
+    ([initial_short_notional] / [initial_long_notional]) directly. See
+    {!Screening_notional}. *)
+
 module Exit_audit_capture = Exit_audit_capture
 (** Exit-side trade-audit capture. Bridges [TriggerExit] transitions to
     {!Audit_recorder.exit_event}. See {!Exit_audit_capture}. *)
@@ -583,6 +589,14 @@ type config = {
           working replacement for the dead [Portfolio_risk.min_cash_pct]. Scoped
           to entries only — exits are never blocked. See
           [Weinstein_strategy_config]. *)
+  max_long_exposure_pct_entry : float; [@sexp.default 0.0]
+      (** Cap on aggregate NEW long-entry (entry-price-denominated) notional as a
+          fraction of current portfolio value, applied at the Friday entry walk;
+          default [0.0] => [Float.infinity] cap => exact no-op. The working
+          replacement for the dead [Portfolio_risk.max_long_exposure_pct] — it
+          bounds how far the long book may lever on short proceeds at entry time.
+          Scoped to NEW long entries only — exits/covers/stops are never blocked.
+          See [Weinstein_strategy_config.max_long_exposure_pct_entry]. *)
   resistance_min_history_bars : int; [@sexp.default 0]
       (** Overhead-resistance history floor threaded into the per-screen
           [Stock_analysis.config.resistance.min_history_bars] (and, via the

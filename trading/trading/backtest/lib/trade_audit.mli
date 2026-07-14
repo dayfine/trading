@@ -70,6 +70,15 @@ type skip_reason =
           Default-off (cap = [None]) so the variant is never emitted under
           baseline configurations. Authority:
           [dev/notes/next-session-priorities-2026-05-15.md] §P1. *)
+  | Long_exposure_cap
+      (** P0b 2026-07-13: skipped because admitting this long would push
+          aggregate entry-price-denominated long notional past
+          [Weinstein_strategy_config.config.max_long_exposure_pct_entry] of
+          portfolio value — the working replacement for the dead
+          [Portfolio_risk.max_long_exposure_pct]. Bounds how far the long book
+          may lever on short proceeds at entry time. Default-off (field [0.0]
+          => [Float.infinity] cap) so the variant is never emitted under
+          baseline configurations. Only emitted on [Long] candidates. *)
 [@@deriving sexp]
 
 type alternative_candidate = {

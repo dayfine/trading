@@ -34,6 +34,7 @@ module Panel_callbacks = Panel_callbacks
 module Weekly_ma_cache = Weekly_ma_cache
 module Audit_recorder = Audit_recorder
 module Entry_audit_capture = Entry_audit_capture
+module Screening_notional = Screening_notional
 module Exit_audit_capture = Exit_audit_capture
 include Weinstein_strategy_config
 module Weinstein_strategy_macro = Weinstein_strategy_macro
