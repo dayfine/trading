@@ -705,6 +705,42 @@ type config = {
           breakout+volume entry, the macro/sector gate, stops are all
           unchanged). Default-off until an experiment-ledger ACCEPT (per
           [.claude/rules/experiment-flag-discipline.md]). *)
+  resistance_lookback_bars : int; [@sexp.default 0]
+      (** Resistance-specific weekly-history depth: when [> 0], the Phase-2
+          screen fetches a {e second, deeper} weekly view of this many bars for
+          the resistance/support callbacks only — stage / RS / volume / breakout
+          detection keep reading the standard [lookback_bars] view, so screening
+          decisions other than the resistance grade are unaffected.
+
+          {b Why} (armed-run matrix 2026-07-13, Run C): backtest panels carry
+          only ~[lookback_bars] weekly bars, so the resistance mapper's 520-bar
+          virgin lookback claims [Virgin_territory] off a starved window (the
+          CWST-class false-virgin defect, validator V7). The
+          [resistance_min_history_bars] label floor is NOT the fix — arming it
+          marks every name [Insufficient_history] and deletes the signal
+          wholesale (Run C halved the return).
+          {b Feeding real history is the fix}: this field widens the data the
+          mapper sees instead of suppressing its output.
+
+          {b Semantics.}
+          - [0] (default): {b bit-identical to baseline} — resistance callbacks
+            are built from the same weekly view as today
+            (experiment-flag-discipline R1); every existing golden/baseline
+            replays unchanged.
+          - [> 0] (typically [520] = the virgin-lookback spec): resistance and
+            support callbacks read a [resistance_lookback_bars]-deep weekly
+            view. Values [<= lookback_bars] are harmless but pointless (the
+            standard view already covers them).
+
+          {b R2 searchability.} Real config field → resolves through
+          [Overlay_validator.apply_overrides]; expressible as a [Variant_matrix]
+          int axis ([((resistance_lookback_bars) (values (0 520)))]) and in
+          scenario [config_overrides] ([((resistance_lookback_bars 520))]).
+
+          {b Faithfulness} (W1/W2). Pure data-hygiene: gives the book's
+          chart-reading its intended ~10-year window instead of a truncated one.
+          No spine item is touched. Default-off until an experiment-ledger
+          ACCEPT. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

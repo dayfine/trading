@@ -96,6 +96,7 @@ type config = {
   cash_reserve_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
   max_long_exposure_pct_entry : float; [@sexp.default 0.0]  (** See [.mli]. *)
   resistance_min_history_bars : int; [@sexp.default 0]  (** See [.mli]. *)
+  resistance_lookback_bars : int; [@sexp.default 0]  (** See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -161,6 +162,7 @@ let default_config ~universe ~index_symbol =
     cash_reserve_pct = 0.0;
     max_long_exposure_pct_entry = 0.0;
     resistance_min_history_bars = 0;
+    resistance_lookback_bars = 0;
   }
 
 let name = "Weinstein"

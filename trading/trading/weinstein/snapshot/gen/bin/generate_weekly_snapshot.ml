@@ -45,6 +45,14 @@ module Snapshot_warehouse_reader =
    breakout-event windows). *)
 let _warmup_days = 730
 
+(* When the resistance-history feed is armed ([resistance_lookback_bars > 0],
+   typically 520 weekly bars ~= 10y), the warehouse reader must load enough
+   daily history to materialise that deeper weekly view — otherwise the live
+   weekly review keeps producing CWST-class false-virgin text off ~104 weekly
+   bars. 7 calendar days per weekly bar + a small holiday/alignment buffer. *)
+let _warmup_days_for ~(config : Weinstein_strategy.config) =
+  Int.max _warmup_days ((config.resistance_lookback_bars * 7) + 30)
+
 (* Which bar backend to use, parsed from the mutually-exclusive
    [--bars] / [--bars-snapshot-dir] flags. *)
 type bar_source = Csv_dir of string | Warehouse_dir of string
@@ -99,7 +107,7 @@ let _build_bar_reader ~bar_source ~as_of ~ticker_sectors ~config =
   | Csv_dir bars_dir -> _build_csv_bar_reader ~bars_dir ~ticker_sectors ~config
   | Warehouse_dir warehouse_dir ->
       Snapshot_warehouse_reader.build ~warehouse_dir ~as_of
-        ~warmup_days:_warmup_days ()
+        ~warmup_days:(_warmup_days_for ~config) ()
 
 let _config_for ~ticker_sectors ~index_symbol ~config_overrides_path :
     Weinstein_strategy.config =

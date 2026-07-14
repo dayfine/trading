@@ -239,9 +239,11 @@ let _split_factor_of_weekly_view (weekly : Snapshot_bar_views.weekly_view) :
         ~week_offset
 
 let stock_analysis_callbacks_of_weekly_views ?ma_cache ?stock_symbol
-    ~(config : Stock_analysis.config) ~(stock : Snapshot_bar_views.weekly_view)
+    ?resistance_stock ~(config : Stock_analysis.config)
+    ~(stock : Snapshot_bar_views.weekly_view)
     ~(benchmark : Snapshot_bar_views.weekly_view) () : Stock_analysis.callbacks
     =
+  let resistance_view = Option.value resistance_stock ~default:stock in
   {
     get_high = _get_from_float_array stock.highs;
     get_volume = _get_from_float_array stock.volumes;
@@ -251,7 +253,7 @@ let stock_analysis_callbacks_of_weekly_views ?ma_cache ?stock_symbol
         ~config:config.stage ~weekly:stock ();
     rs = rs_callbacks_of_weekly_views ~stock ~benchmark;
     volume = volume_callbacks_of_weekly_view ~weekly:stock;
-    resistance = resistance_callbacks_of_weekly_view ~weekly:stock;
+    resistance = resistance_callbacks_of_weekly_view ~weekly:resistance_view;
   }
 
 (* ------------------------------------------------------------------ *)
