@@ -645,6 +645,64 @@ let test_macro_snapshot_globals_filter_missing _ =
     (List.map snap_cbs.global_index_stages ~f:fst)
     (elements_are [ equal_to "DAX" ])
 
+(* Resistance-history feed ([?resistance_stock]): omitted, the resistance
+   callbacks read the standard [stock] view (bit-identical to pre-feed
+   behaviour); given a deeper view, only the resistance component sees it. *)
+let test_resistance_stock_default_reads_stock_view _ =
+  let stock_bars =
+    make_friday_bars
+      ~start_friday:(Date.of_string "2014-01-03")
+      ~n:600 ~start_price:100.0 ~step:0.1
+  in
+  let cb = build_snapshot_callbacks [ ("AAPL", stock_bars) ] in
+  let as_of = (List.last_exn stock_bars).Types.Daily_price.date in
+  let stock_view =
+    Snapshot_bar_views.weekly_view_for cb ~symbol:"AAPL" ~n:110 ~as_of
+  in
+  let snap_cbs =
+    Panel_callbacks.stock_analysis_callbacks_of_weekly_views
+      ~config:Stock_analysis.default_config ~stock:stock_view
+      ~benchmark:stock_view ()
+  in
+  assert_that snap_cbs.resistance.n_bars (equal_to stock_view.n)
+
+let test_resistance_stock_deep_view_feeds_resistance_only _ =
+  let stock_bars =
+    make_friday_bars
+      ~start_friday:(Date.of_string "2014-01-03")
+      ~n:600 ~start_price:100.0 ~step:0.1
+  in
+  let cb = build_snapshot_callbacks [ ("AAPL", stock_bars) ] in
+  let as_of = (List.last_exn stock_bars).Types.Daily_price.date in
+  let stock_view =
+    Snapshot_bar_views.weekly_view_for cb ~symbol:"AAPL" ~n:110 ~as_of
+  in
+  let deep_view =
+    Snapshot_bar_views.weekly_view_for cb ~symbol:"AAPL" ~n:520 ~as_of
+  in
+  let snap_cbs =
+    Panel_callbacks.stock_analysis_callbacks_of_weekly_views
+      ~resistance_stock:deep_view ~config:Stock_analysis.default_config
+      ~stock:stock_view ~benchmark:stock_view ()
+  in
+  assert_that snap_cbs
+    (all_of
+       [
+         field
+           (fun (c : Stock_analysis.callbacks) -> c.resistance.n_bars)
+           (equal_to deep_view.n);
+         (* Stage / volume components keep the standard window: a probe past
+            the standard depth returns None. *)
+         field
+           (fun (c : Stock_analysis.callbacks) ->
+             c.volume.get_volume ~week_offset:(stock_view.n + 5))
+           is_none;
+         field
+           (fun (c : Stock_analysis.callbacks) ->
+             c.resistance.get_high ~bar_offset:(stock_view.n + 5))
+           (is_some_and (gt (module Float_ord) 0.0));
+       ])
+
 let suite =
   "Panel_callbacks parity"
   >::: [
@@ -662,6 +720,10 @@ let suite =
          >:: test_support_floor_snapshot_views_parity;
          "Snapshot Macro globals filter missing"
          >:: test_macro_snapshot_globals_filter_missing;
+         "Resistance-stock default reads stock view"
+         >:: test_resistance_stock_default_reads_stock_view;
+         "Resistance-stock deep view feeds resistance only"
+         >:: test_resistance_stock_deep_view_feeds_resistance_only;
        ]
 
 let () = run_test_tt_main suite

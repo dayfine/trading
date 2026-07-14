@@ -248,17 +248,28 @@ let _stock_analysis_config_for ~(config : Weinstein_strategy_config.config) :
     Phase 1 captured before any [prior_stages] update — matches the pre-PR-A
     semantics where every per-symbol analysis on a given Friday saw the same
     "previous Friday" snapshot. *)
-let _full_analysis_of_survivor ~stock_analysis_config ~bar_reader ~index_view
+let _full_analysis_of_survivor ~stock_analysis_config ~resistance_lookback_bars
+    ~bar_reader ~index_view
     ( ticker,
       (stock_view : Snapshot_runtime.Snapshot_bar_views.weekly_view),
       prior_stage,
       (_stage_result : Stage.result) ) =
   let as_of_date = stock_view.dates.(stock_view.n - 1) in
+  (* Resistance-history feed: when armed (> 0), fetch a second, deeper weekly
+     view for the resistance/support callbacks only. Survivors-only, so the
+     extra view is fetched for the small Phase-1-surviving fraction. *)
+  let resistance_stock =
+    if resistance_lookback_bars <= 0 then None
+    else
+      Some
+        (Bar_reader.weekly_view_for bar_reader ~symbol:ticker
+           ~n:resistance_lookback_bars ~as_of:as_of_date)
+  in
   let callbacks =
     Panel_callbacks.stock_analysis_callbacks_of_weekly_views
       ?ma_cache:(Bar_reader.ma_cache bar_reader)
-      ~stock_symbol:ticker ~config:stock_analysis_config ~stock:stock_view
-      ~benchmark:index_view ()
+      ?resistance_stock ~stock_symbol:ticker ~config:stock_analysis_config
+      ~stock:stock_view ~benchmark:index_view ()
   in
   Stock_analysis.analyze_with_callbacks ~config:stock_analysis_config ~ticker
     ~callbacks ~prior_stage ~as_of_date
@@ -434,7 +445,9 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at ~config
   let stock_analysis_config = _stock_analysis_config_for ~config in
   (* Bind Phase-2 closure outside the pipeline (depth-5 ceiling). *)
   let analyze =
-    _full_analysis_of_survivor ~stock_analysis_config ~bar_reader ~index_view
+    _full_analysis_of_survivor ~stock_analysis_config
+      ~resistance_lookback_bars:config.resistance_lookback_bars ~bar_reader
+      ~index_view
   in
   let stocks =
     classified |> List.filter ~f:_phase1_of
