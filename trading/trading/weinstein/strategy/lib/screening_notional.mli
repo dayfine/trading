@@ -11,6 +11,19 @@ val initial_short_notional : Position.t Map.M(String).t -> float
     (entry-price-denominated so the cap measures committed-at-entry exposure).
 *)
 
+val initial_long_notional : Position.t Map.M(String).t -> float
+(** Sum entry-price-denominated long notional across all open [Holding] longs.
+    Mirror of {!initial_short_notional}; seeds the per-Friday long-notional
+    accumulator before the entry walk begins.
+
+    Entry-price-denominated ([shares * entry_price], NOT marked value) is
+    deliberate: the P0b long-exposure cap targets entries funded
+    {e beyond NAV at entry time} (the 2026-07-13 Run-E artifact — the long book
+    levering on short proceeds). Marked exposure above 100% of NAV from
+    unrealized appreciation of held winners is legitimate (not leverage) and
+    must not trigger the cap. Entry-denominated also stays symmetric with the
+    short cap and avoids threading a [get_price] mark into the walk. *)
+
 val initial_sector_exposures :
   positions:Position.t Map.M(String).t ->
   sector_lookup:(string -> string option) ->
@@ -25,6 +38,16 @@ type entry_walk_state = {
   remaining_cash : float ref;
   short_notional_acc : float ref;
   short_notional_cap : float;
+  long_notional_acc : float ref;
+      (** Running entry-price-denominated long notional, seeded from held
+          [Holding] longs via {!initial_long_notional} and bumped by each funded
+          long entry. Checked against {!long_notional_cap} by
+          [Entry_audit_capture.check_long_notional_cap]. *)
+  long_notional_cap : float;
+      (** Absolute cap on aggregate long entry notional: [Float.infinity] when
+          [config.max_long_exposure_pct_entry <= 0.0] (the default no-op — every
+          long admits), else
+          [config.max_long_exposure_pct_entry * portfolio_value]. *)
   sector_exposure_acc : (string, float) Hashtbl.t;
   max_sector_exposure_pct : float option;
 }
@@ -42,8 +65,11 @@ val make_entry_walk_state :
   entry_walk_state
 (** Seed an {!entry_walk_state}: [remaining_cash] starts at [cash], the
     short-notional accumulator at the portfolio's open [Holding] short notional,
-    and the sector-exposure accumulator at held positions' notional (empty when
-    [sector_lookup] is [None]). Caps come from [config.portfolio_config]. *)
+    the long-notional accumulator at the open [Holding] long notional
+    ({!initial_long_notional}), and the sector-exposure accumulator at held
+    positions' notional (empty when [sector_lookup] is [None]). The short/sector
+    caps come from [config.portfolio_config]; the long cap comes from
+    [config.max_long_exposure_pct_entry] ([Float.infinity] when [<= 0.0]). *)
 
 val reserve_reduced_walk_state :
   config:Weinstein_strategy_config.config ->

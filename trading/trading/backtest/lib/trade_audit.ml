@@ -16,6 +16,7 @@ type skip_reason =
   | Short_notional_cap
   | Stop_too_wide
   | Sector_exposure_cap
+  | Long_exposure_cap
 [@@deriving sexp]
 
 type alternative_candidate = {

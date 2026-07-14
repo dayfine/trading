@@ -50,6 +50,14 @@ type skip_reason =
           no-op. Named sectors only — empty-string (unknown) bucket is exempt
           and its discipline comes from
           [Portfolio_risk.config.max_unknown_sector_positions]. *)
+  | Long_exposure_cap
+      (** P0b 2026-07-13: LONG candidate dropped because admitting it would push
+          aggregate entry-price-denominated long notional past
+          [Weinstein_strategy_config.config.max_long_exposure_pct_entry] of
+          portfolio value. The working replacement for the dead
+          [Portfolio_risk.max_long_exposure_pct]. Only fires when the config
+          field is [> 0.0] (default [0.0] => [Float.infinity] cap => no-op).
+          Only emitted for [Long] candidates. *)
 
 type alternative_input = {
   candidate : Screener.scored_candidate;

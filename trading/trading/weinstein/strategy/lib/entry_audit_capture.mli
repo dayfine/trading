@@ -194,6 +194,27 @@ val check_short_notional_cap :
     pass case so later candidates in the same entry walk see the up-to-date
     running total. *)
 
+val check_long_notional_cap :
+  long_notional_acc:float ref ->
+  long_notional_cap:float ->
+  Trading_strategy.Position.transition * entry_meta ->
+  Screener.scored_candidate ->
+  (Trading_strategy.Position.transition * entry_meta) option
+(** P0b 2026-07-13: aggregate long-notional cap. Mirror of
+    {!check_short_notional_cap} for the long side. For [Short] candidates:
+    pass-through [Some]. For [Long] candidates: returns [Some] only when
+    [!long_notional_acc + (shares * effective_entry_price) <= long_notional_cap];
+    otherwise [None]. Bumps [long_notional_acc] on the pass case so later
+    candidates in the same entry walk see the up-to-date running total.
+
+    The default [long_notional_cap = Float.infinity] (config field [<= 0.0])
+    makes every long admit — an exact no-op that preserves all long-only
+    goldens. The cap is entry-price-denominated (committed-at-entry notional),
+    NOT marked value, so unrealized appreciation of held winners can push marked
+    exposure over 100% of NAV without tripping the gate — only entries funded
+    beyond the cap at entry time are rejected (the 2026-07-13 Run-E artifact).
+    See [Weinstein_strategy_config.max_long_exposure_pct_entry]. *)
+
 val check_sector_exposure_cap :
   sector_exposure_acc:(string, float) Core.Hashtbl.t ->
   max_sector_exposure_pct:float option ->
@@ -224,18 +245,24 @@ val classify_candidate :
   remaining_cash:float ref ->
   short_notional_acc:float ref ->
   short_notional_cap:float ->
+  long_notional_acc:float ref ->
+  long_notional_cap:float ->
   sector_exposure_acc:(string, float) Core.Hashtbl.t ->
   max_sector_exposure_pct:float option ->
   portfolio_value:float ->
   Screener.scored_candidate ->
   candidate_decision
-(** Classify one candidate as [Kept] or [Skipped reason]. The five skip reasons
-    match {!Audit_recorder.skip_reason}: held, sized to zero, rejected by the
-    running cash check, rejected by the running short-notional cap, or rejected
-    by the running sector-exposure cap. Order: held-check, sizing via
-    [make_entry], cash check, short-notional cap, then sector-exposure cap.
+(** Classify one candidate as [Kept] or [Skipped reason]. The skip reasons match
+    {!Audit_recorder.skip_reason}: held, sized to zero, rejected by the running
+    cash check, rejected by the running short-notional cap, rejected by the
+    running long-notional cap, or rejected by the running sector-exposure cap.
+    Order: held-check, sizing via [make_entry], cash check, short-notional cap,
+    long-notional cap, then sector-exposure cap.
 
-    The cash check tentatively deducts before the short-notional and
-    sector-exposure gates; on a [Short_notional_cap] or [Sector_exposure_cap]
-    rejection the deducted cash is refunded into [remaining_cash] so subsequent
-    candidates see the correct balance. *)
+    The cash check tentatively deducts before the notional and sector-exposure
+    gates; on a [Short_notional_cap], [Long_exposure_cap], or
+    [Sector_exposure_cap] rejection the deducted cash is refunded into
+    [remaining_cash] so subsequent candidates see the correct balance. The
+    long-notional cap is a no-op ([long_notional_cap = Float.infinity]) under
+    the default config, so ordering it before the sector gate does not perturb
+    baseline behaviour. *)

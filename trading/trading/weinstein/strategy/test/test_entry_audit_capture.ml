@@ -748,6 +748,196 @@ let test_sector_exposure_cap_accumulates_across_candidates _ =
     (Hashtbl.find_exn sector_exposure_acc "Test")
     (float_equal 20_000.0)
 
+(* ------------------------------------------------------------------ *)
+(* P0b 2026-07-13: long-exposure cap gate                               *)
+(* ------------------------------------------------------------------ *)
+
+(** Default no-op: [long_notional_cap = Float.infinity] (config field [<= 0.0])
+    admits any long regardless of accumulator state — a $60K long against a $0
+    accumulator passes. The accumulator still advances so cross-candidate
+    bookkeeping stays consistent. *)
+let test_long_notional_cap_off_passes_through _ =
+  let long_notional_acc = ref 0.0 in
+  let trans, meta =
+    _stub_trans_and_meta ~side:Trading_base.Types.Long ~shares:600
+      ~effective_entry_price:100.0
+  in
+  let cand =
+    _long_candidate ~ticker:"STUB" ~suggested_entry:100.0 ~suggested_stop:90.0
+      ~as_of_date:(Date.of_string "2024-06-14")
+  in
+  let result =
+    Entry_audit_capture.check_long_notional_cap ~long_notional_acc
+      ~long_notional_cap:Float.infinity (trans, meta) cand
+  in
+  assert_that result
+    (is_some_and
+       (field
+          (fun (_, (m : Entry_audit_capture.entry_meta)) -> m.shares)
+          (equal_to 600)));
+  assert_that !long_notional_acc (float_equal 60_000.0)
+
+(** Portfolio at $100K with 66% existing long notional ($66K) and a 70% cap. A
+    fresh $6K long → 72% > 70% → must skip; accumulator unchanged on rejection.
+*)
+let test_long_notional_cap_skips_at_72pct _ =
+  let long_notional_acc = ref 66_000.0 in
+  let long_notional_cap = 100_000.0 *. 0.70 in
+  let trans, meta =
+    _stub_trans_and_meta ~side:Trading_base.Types.Long ~shares:60
+      ~effective_entry_price:100.0
+  in
+  let cand =
+    _long_candidate ~ticker:"STUB" ~suggested_entry:100.0 ~suggested_stop:90.0
+      ~as_of_date:(Date.of_string "2024-06-14")
+  in
+  let result =
+    Entry_audit_capture.check_long_notional_cap ~long_notional_acc
+      ~long_notional_cap (trans, meta) cand
+  in
+  assert_that result is_none;
+  assert_that !long_notional_acc (float_equal 66_000.0)
+
+(** 66% existing + $4K long → 70% = cap → admitted (cap is inclusive);
+    accumulator advances to $70K. *)
+let test_long_notional_cap_admits_at_cap _ =
+  let long_notional_acc = ref 66_000.0 in
+  let long_notional_cap = 100_000.0 *. 0.70 in
+  let trans, meta =
+    _stub_trans_and_meta ~side:Trading_base.Types.Long ~shares:40
+      ~effective_entry_price:100.0
+  in
+  let cand =
+    _long_candidate ~ticker:"STUB" ~suggested_entry:100.0 ~suggested_stop:90.0
+      ~as_of_date:(Date.of_string "2024-06-14")
+  in
+  let result =
+    Entry_audit_capture.check_long_notional_cap ~long_notional_acc
+      ~long_notional_cap (trans, meta) cand
+  in
+  assert_that result
+    (is_some_and
+       (field
+          (fun (_, (m : Entry_audit_capture.entry_meta)) -> m.shares)
+          (equal_to 40)));
+  assert_that !long_notional_acc (float_equal 70_000.0)
+
+(** Short candidate is a no-op for the long cap: even with a $0 cap and a $50K
+    short, the long-cap gate passes it through and does not bump the long
+    accumulator. *)
+let test_long_notional_cap_does_not_block_shorts _ =
+  let long_notional_acc = ref 25_000.0 in
+  let trans, meta =
+    _stub_trans_and_meta ~side:Trading_base.Types.Short ~shares:500
+      ~effective_entry_price:100.0
+  in
+  let cand =
+    _short_candidate ~ticker:"STUB" ~suggested_entry:100.0 ~suggested_stop:115.0
+      ~as_of_date:(Date.of_string "2024-06-14")
+  in
+  let result =
+    Entry_audit_capture.check_long_notional_cap ~long_notional_acc
+      ~long_notional_cap:0.0 (trans, meta) cand
+  in
+  assert_that result
+    (is_some_and
+       (field
+          (fun (_, (m : Entry_audit_capture.entry_meta)) -> m.shares)
+          (equal_to 500)));
+  assert_that !long_notional_acc (float_equal 25_000.0)
+
+(** End-to-end through [classify_candidate]: a long whose $60K entry notional
+    breaches the $50K cap is tagged [Skipped Long_exposure_cap], and the cash
+    tentatively deducted by the cash gate is refunded (the exit-safety
+    contract). *)
+let test_long_exposure_cap_classify_skips_and_refunds _ =
+  let remaining_cash = ref 100_000.0 in
+  let long_notional_acc = ref 0.0 in
+  let make_entry _ =
+    let trans, meta =
+      _stub_trans_and_meta ~side:Trading_base.Types.Long ~shares:600
+        ~effective_entry_price:100.0
+    in
+    Entry_audit_capture.Entry_ok (trans, meta)
+  in
+  let cand =
+    _long_candidate ~ticker:"STUB" ~suggested_entry:100.0 ~suggested_stop:90.0
+      ~as_of_date:(Date.of_string "2024-06-14")
+  in
+  let decision =
+    Entry_audit_capture.classify_candidate ~held_set:String.Set.empty
+      ~make_entry ~remaining_cash ~short_notional_acc:(ref 0.0)
+      ~short_notional_cap:Float.infinity ~long_notional_acc
+      ~long_notional_cap:(100_000.0 *. 0.50)
+      ~sector_exposure_acc:(Hashtbl.create (module String))
+      ~max_sector_exposure_pct:None ~portfolio_value:100_000.0 cand
+  in
+  assert_that decision
+    (matching ~msg:"expected Skipped Long_exposure_cap"
+       (function Entry_audit_capture.Skipped r -> Some r | _ -> None)
+       (equal_to
+          (Audit_recorder.Long_exposure_cap : Audit_recorder.skip_reason)));
+  assert_that !remaining_cash (float_equal 100_000.0)
+
+(** Build a [Holding] {!Position.t} for [ticker] at [entry] with [qty] shares on
+    [side]. Mirrors the helper in [test_harvest_rotate_runner.ml]; used to seed
+    the long-notional accumulator. *)
+let _make_holding ?(side = Trading_base.Types.Long) ~ticker ~qty ~entry () :
+    Position.t =
+  let date = Date.of_string "2024-06-14" in
+  let make_trans kind = { Position.position_id = ticker; date; kind } in
+  let unwrap = function
+    | Ok p -> p
+    | Error _ -> OUnit2.assert_failure "position setup failed"
+  in
+  let open Position in
+  let p =
+    create_entering
+      (make_trans
+         (CreateEntering
+            {
+              symbol = ticker;
+              side;
+              target_quantity = qty;
+              entry_price = entry;
+              reasoning = ManualDecision { description = "test" };
+            }))
+    |> unwrap
+  in
+  let p =
+    apply_transition p
+      (make_trans (EntryFill { filled_quantity = qty; fill_price = entry }))
+    |> unwrap
+  in
+  apply_transition p
+    (make_trans
+       (EntryComplete
+          {
+            risk_params =
+              {
+                stop_loss_price = None;
+                take_profit_price = None;
+                max_hold_days = None;
+              };
+          }))
+  |> unwrap
+
+(** [initial_long_notional] seeds only from [Holding] LONGS at entry price: a
+    100-share $50 long contributes $5K; a co-held short contributes nothing. *)
+let test_initial_long_notional_seeds_from_long_holdings _ =
+  let positions =
+    String.Map.of_alist_exn
+      [
+        ("LONGA", _make_holding ~ticker:"LONGA" ~qty:100.0 ~entry:50.0 ());
+        ( "SHORTB",
+          _make_holding ~side:Trading_base.Types.Short ~ticker:"SHORTB"
+            ~qty:40.0 ~entry:100.0 () );
+      ]
+  in
+  assert_that
+    (Screening_notional.initial_long_notional positions)
+    (float_equal 5_000.0)
+
 let () =
   run_test_tt_main
     ("entry_audit_capture"
@@ -787,4 +977,16 @@ let () =
            >:: test_sector_exposure_cap_exempts_empty_sector;
            "P1: sector exposure cap accumulates across candidates"
            >:: test_sector_exposure_cap_accumulates_across_candidates;
+           "P0b: long notional cap off passes through"
+           >:: test_long_notional_cap_off_passes_through;
+           "P0b: long notional cap skips at 72%"
+           >:: test_long_notional_cap_skips_at_72pct;
+           "P0b: long notional cap admits at cap"
+           >:: test_long_notional_cap_admits_at_cap;
+           "P0b: long notional cap does not block shorts"
+           >:: test_long_notional_cap_does_not_block_shorts;
+           "P0b: classify emits Long_exposure_cap + refunds cash"
+           >:: test_long_exposure_cap_classify_skips_and_refunds;
+           "P0b: initial_long_notional seeds from long holdings"
+           >:: test_initial_long_notional_seeds_from_long_holdings;
          ])

@@ -33,6 +33,8 @@ let _classify_one ~held_set ~make_entry ~portfolio_value
       ~remaining_cash:state.remaining_cash
       ~short_notional_acc:state.short_notional_acc
       ~short_notional_cap:state.short_notional_cap
+      ~long_notional_acc:state.long_notional_acc
+      ~long_notional_cap:state.long_notional_cap
       ~sector_exposure_acc:state.sector_exposure_acc
       ~max_sector_exposure_pct:state.max_sector_exposure_pct ~portfolio_value
       candidate )

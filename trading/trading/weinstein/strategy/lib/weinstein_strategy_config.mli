@@ -605,6 +605,66 @@ type config = {
           an experiment-ledger ACCEPT (per
           [.claude/rules/experiment-flag-discipline.md] +
           [.claude/rules/promotion-confirmation.md]). *)
+  max_long_exposure_pct_entry : float; [@sexp.default 0.0]
+      (** Cap on aggregate NEW long-entry notional as a fraction of
+          {e current portfolio value}, applied at the Friday entry walk
+          ({!Weinstein_strategy.entries_from_candidates}).
+          Entry-price-denominated committed-at-entry notional across held
+          [Holding] longs plus the candidates funded this walk may not exceed
+          [max_long_exposure_pct_entry * portfolio_value].
+
+          {b The working replacement for the dead
+             [Portfolio_risk.max_long_exposure_pct].} Per
+          [memory/project_envelope_knobs_dead] (the envelope knobs were unwired
+          when [Portfolio_risk.check_limits] was deleted 2026-07-09),
+          [Portfolio_risk.max_long_exposure_pct] has no production consumer — a
+          scenario override of it does nothing. The 2026-07-13 Run-E long-short
+          matrix showed the long book {e levering on short proceeds} (marked
+          long exposure > NAV in 269 sampled weeks, peak 158%) with that dead
+          knob set to 0.70 and ignored. This field is the honest, live-path cap:
+          it is consumed at the one seam that actually gates entry funding (the
+          entry-walk long-notional accumulator), mirroring
+          {!check_short_notional_cap}'s machinery exactly.
+
+          {b Basis — entry-price-denominated notional, NOT marked value.} The
+          cap counts [shares * entry_price] committed at entry, matching the
+          short cap ([max_short_notional_fraction]). Marked exposure exceeding
+          100% of NAV purely from {e unrealized appreciation} of held winners is
+          legitimate (it is not leverage) and must NOT trigger the cap; only
+          entries funded beyond the cap {e at entry time} are the Run-E artifact
+          this gate targets. Entry-denominated also keeps the long and short
+          caps symmetric and avoids threading a [get_price] mark into the walk.
+
+          {b Margin convention for long-short runs.} Short proceeds credit cash
+          (existing behaviour, unchanged); NEW long entries are then capped at
+          [max_long_exposure_pct_entry * portfolio_value] of committed-at-entry
+          notional — i.e. shorts can fund longs, but only up to this cap. This
+          is THE margin convention for long-short backtests: it bounds how far
+          the long book may lever on short proceeds.
+
+          {b Scope — NEW entries only.} The cap narrows only new long entry
+          funding. Exits, covers, stop orders, and force-liquidations do not
+          flow through the entry walk and are structurally unaffected, so the
+          cap can never block an exit (the #1553 exit-fill-reject lesson).
+
+          {b Semantics.}
+          - [<= 0.0] (default [0.0]): {b EXACT no-op} — the long-notional cap is
+            [Float.infinity], so every long candidate passes the gate and every
+            existing long-only golden/baseline replays bit-identically
+            (experiment-flag-discipline R1).
+          - [> 0.0]: a long candidate whose entry notional would push the
+            running long total past [pct * portfolio_value] is rejected as a
+            [Long_exposure_cap] skip; short candidates are unaffected.
+
+          {b Faithfulness} (W1/W2, [.claude/rules/weinstein-faithful-core.md]).
+          A portfolio-risk / exposure dial that {e tightens} deployment without
+          touching any spine item (stage classification, Stage-2-only buys,
+          breakout+volume entry, stops, macro/sector gate all unchanged).
+          Searchable as a single-component [Variant_matrix] axis
+          ([((max_long_exposure_pct_entry) (values (0.0 0.7 1.0)))]).
+          Default-off until an experiment-ledger ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md] +
+          [.claude/rules/promotion-confirmation.md]). *)
   resistance_min_history_bars : int; [@sexp.default 0]
       (** Overhead-resistance history floor threaded into
           [Stock_analysis.config.resistance.min_history_bars] (and, because
