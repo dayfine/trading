@@ -55,3 +55,15 @@ top3000-2000-2026-catstop (0.14/catstop-0.10, 364 basis, merged main incl.
   single-specimen thresholds). Note:
   dev/notes/axti-exit-verification-2026-07-11.md; staged scenario committed
   at test_data/backtest_scenarios/staging-honest-tradeable-ext/.
+
+**BASIS CHANGE 2026-07-13 (dedup-v2) — new record numbers.** Returns-basis
+twin dedup ([[rename-twin-dedup-returns-basis]]) removed 83 duplicate-feed
+groups (91 legs, 2999→2908) from the warehouse; 28y re-run on the deduped
+basis: **MTM +3407.4% ($35.07M), realized $10.37M (+1037%, 14.4% CAGR) vs
+SPY TR +700% (8.17%/yr)**, 1171 trades, Sharpe 0.68, MaxDD 40.9%, 92% of
+terminal NAV in 4 open positions (AXTI dominant, still held). Pre-dedup
++6885%/+1670% SUPERSEDED — clones counted double in both realized and MTM,
+and the 12% haircut estimate was measured on only 10 of the real 83 groups.
+Validator at full coverage on this run (audit join 1171/1171, V5/V6 clean,
+V7=100 false-Virgin entries pending min_history_bars arming). Note:
+dev/notes/dedup-record-rerun-2026-07-13.md.
