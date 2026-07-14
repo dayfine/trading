@@ -17,12 +17,12 @@ val initial_long_notional : Position.t Map.M(String).t -> float
     accumulator before the entry walk begins.
 
     Entry-price-denominated ([shares * entry_price], NOT marked value) is
-    deliberate: the P0b long-exposure cap targets entries funded {e beyond NAV
-    at entry time} (the 2026-07-13 Run-E artifact — the long book levering on
-    short proceeds). Marked exposure above 100% of NAV from unrealized
-    appreciation of held winners is legitimate (not leverage) and must not
-    trigger the cap. Entry-denominated also stays symmetric with the short cap
-    and avoids threading a [get_price] mark into the walk. *)
+    deliberate: the P0b long-exposure cap targets entries funded
+    {e beyond NAV at entry time} (the 2026-07-13 Run-E artifact — the long book
+    levering on short proceeds). Marked exposure above 100% of NAV from
+    unrealized appreciation of held winners is legitimate (not leverage) and
+    must not trigger the cap. Entry-denominated also stays symmetric with the
+    short cap and avoids threading a [get_price] mark into the walk. *)
 
 val initial_sector_exposures :
   positions:Position.t Map.M(String).t ->
@@ -44,9 +44,9 @@ type entry_walk_state = {
           long entry. Checked against {!long_notional_cap} by
           [Entry_audit_capture.check_long_notional_cap]. *)
   long_notional_cap : float;
-      (** Absolute cap on aggregate long entry notional:
-          [Float.infinity] when [config.max_long_exposure_pct_entry <= 0.0] (the
-          default no-op — every long admits), else
+      (** Absolute cap on aggregate long entry notional: [Float.infinity] when
+          [config.max_long_exposure_pct_entry <= 0.0] (the default no-op — every
+          long admits), else
           [config.max_long_exposure_pct_entry * portfolio_value]. *)
   sector_exposure_acc : (string, float) Hashtbl.t;
   max_sector_exposure_pct : float option;

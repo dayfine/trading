@@ -76,9 +76,9 @@ type skip_reason =
           [Weinstein_strategy_config.config.max_long_exposure_pct_entry] of
           portfolio value — the working replacement for the dead
           [Portfolio_risk.max_long_exposure_pct]. Bounds how far the long book
-          may lever on short proceeds at entry time. Default-off (field [0.0]
-          => [Float.infinity] cap) so the variant is never emitted under
-          baseline configurations. Only emitted on [Long] candidates. *)
+          may lever on short proceeds at entry time. Default-off (field [0.0] =>
+          [Float.infinity] cap) so the variant is never emitted under baseline
+          configurations. Only emitted on [Long] candidates. *)
 [@@deriving sexp]
 
 type alternative_candidate = {

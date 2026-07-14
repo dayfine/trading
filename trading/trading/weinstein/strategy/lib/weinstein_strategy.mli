@@ -590,13 +590,14 @@ type config = {
           to entries only — exits are never blocked. See
           [Weinstein_strategy_config]. *)
   max_long_exposure_pct_entry : float; [@sexp.default 0.0]
-      (** Cap on aggregate NEW long-entry (entry-price-denominated) notional as a
-          fraction of current portfolio value, applied at the Friday entry walk;
-          default [0.0] => [Float.infinity] cap => exact no-op. The working
-          replacement for the dead [Portfolio_risk.max_long_exposure_pct] — it
-          bounds how far the long book may lever on short proceeds at entry time.
-          Scoped to NEW long entries only — exits/covers/stops are never blocked.
-          See [Weinstein_strategy_config.max_long_exposure_pct_entry]. *)
+      (** Cap on aggregate NEW long-entry (entry-price-denominated) notional as
+          a fraction of current portfolio value, applied at the Friday entry
+          walk; default [0.0] => [Float.infinity] cap => exact no-op. The
+          working replacement for the dead
+          [Portfolio_risk.max_long_exposure_pct] — it bounds how far the long
+          book may lever on short proceeds at entry time. Scoped to NEW long
+          entries only — exits/covers/stops are never blocked. See
+          [Weinstein_strategy_config.max_long_exposure_pct_entry]. *)
   resistance_min_history_bars : int; [@sexp.default 0]
       (** Overhead-resistance history floor threaded into the per-screen
           [Stock_analysis.config.resistance.min_history_bars] (and, via the

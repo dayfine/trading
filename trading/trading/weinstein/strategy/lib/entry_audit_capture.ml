@@ -161,8 +161,8 @@ let check_short_notional_cap ~short_notional_acc ~short_notional_cap
         short_notional_acc := projected;
         Some (trans, meta))
 
-(** P0b 2026-07-13: aggregate long-notional cap evaluated at entry-decision time.
-    Mirror of {!check_short_notional_cap} for the long side.
+(** P0b 2026-07-13: aggregate long-notional cap evaluated at entry-decision
+    time. Mirror of {!check_short_notional_cap} for the long side.
 
     Shorts are a no-op pass-through. For [Long] candidates, accumulates
     entry-price-denominated notional into [long_notional_acc] (seeded by the
@@ -284,9 +284,9 @@ let _apply_notional_cap_gate ~remaining_cash ~short_notional_acc
       emit "Short_notional_cap";
       Skipped Short_notional_cap
 
-(** Apply the cash, short-notional-cap, and sector-exposure-cap gates to an
-    [Entry_ok] result. Returns [Kept] on all-pass or the appropriate [Skipped]
-    variant. *)
+(** Apply the cash, short-notional-cap, long-notional-cap, and
+    sector-exposure-cap gates (in that order) to an [Entry_ok] result. Returns
+    [Kept] on all-pass or the appropriate [Skipped] variant. *)
 let _apply_entry_ok_gates ~remaining_cash ~short_notional_acc
     ~short_notional_cap ~long_notional_acc ~long_notional_cap
     ~sector_exposure_acc ~max_sector_exposure_pct ~portfolio_value ~emit
@@ -298,8 +298,8 @@ let _apply_entry_ok_gates ~remaining_cash ~short_notional_acc
   | Some (trans, meta) ->
       _apply_notional_cap_gate ~remaining_cash ~short_notional_acc
         ~short_notional_cap ~long_notional_acc ~long_notional_cap
-        ~sector_exposure_acc ~max_sector_exposure_pct ~portfolio_value ~emit cand
-        trans meta
+        ~sector_exposure_acc ~max_sector_exposure_pct ~portfolio_value ~emit
+        cand trans meta
 
 let classify_candidate ~held_set ~make_entry ~remaining_cash ~short_notional_acc
     ~short_notional_cap ~long_notional_acc ~long_notional_cap

@@ -778,7 +778,8 @@ let test_long_notional_cap_off_passes_through _ =
   assert_that !long_notional_acc (float_equal 60_000.0)
 
 (** Portfolio at $100K with 66% existing long notional ($66K) and a 70% cap. A
-    fresh $6K long → 72% > 70% → must skip; accumulator unchanged on rejection. *)
+    fresh $6K long → 72% > 70% → must skip; accumulator unchanged on rejection.
+*)
 let test_long_notional_cap_skips_at_72pct _ =
   let long_notional_acc = ref 66_000.0 in
   let long_notional_cap = 100_000.0 *. 0.70 in
@@ -874,7 +875,8 @@ let test_long_exposure_cap_classify_skips_and_refunds _ =
   assert_that decision
     (matching ~msg:"expected Skipped Long_exposure_cap"
        (function Entry_audit_capture.Skipped r -> Some r | _ -> None)
-       (equal_to (Audit_recorder.Long_exposure_cap : Audit_recorder.skip_reason)));
+       (equal_to
+          (Audit_recorder.Long_exposure_cap : Audit_recorder.skip_reason)));
   assert_that !remaining_cash (float_equal 100_000.0)
 
 (** Build a [Holding] {!Position.t} for [ticker] at [entry] with [qty] shares on
