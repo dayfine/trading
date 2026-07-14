@@ -18,6 +18,28 @@ and *realized vs MTM*, not the raw absolute.
 > (RS-starved first 22 weeks). Absolute numbers are NOT comparable to runs made
 > after 2026-07-08. Relative comparisons within a block remain valid.
 
+## ⭐ RECORD OF RECORD — Run D, armed record convention, dedup-v2 basis (2026-07-14)
+
+**The official long-only record basis** (user-committed 2026-07-14): the
+staged scenario `staging-record-convention/top3000-2000-2026-record-convention.sexp`
+(honest-tradeable dials + extension_stop 2.0/0.25 + reject_declining_ma; ledger
+`2026-07-14-extension-stop-insurance-accept`) on the **dedup-v2 warehouse**
+(`/tmp/snap_top3000_1998_2026_dedup_v2`), top-3000 PIT-2000,
+2000-01-01 .. 2026-06-26. Supersedes the pre-dedup ⭐ row below (83 twin-feed
+groups double-counted there).
+
+| Run | MTM | Realized | Sharpe | CAGR | MaxDD | Trades | Run dir (gitignored) |
+|---|---:|---:|---:|---:|---:|---:|---|
+| **Run D (RECORD)** | **+7,914%** | **$70.9M** | **0.83** | **18.0%** | **32.3%** | 1,187 | `scenarios-2026-07-13-194522/…ALLARMED` |
+| baseline (dials off) | +3,407% | $10.4M | 0.68 | 14.4% | 40.9% | 1,171 | `scenarios-2026-07-13-052958/…` |
+| E-capped (D + shorts + cap 1.0) | +13,730% | $126.0M | 0.893 | — | 31.6% | 1,287 | `scenarios-2026-07-14-172246/…` — NOT the record: sizing-lottery flattered (same AXTI entry, 1.7× ticket from 26y path divergence; shorts direct $0.4M). See `dev/notes/rune-capped-2026-07-14.md` |
+| old Run E (uncapped) | (+22,097%) | ($183.9M) | (0.97) | — | (30.6%) | 1,285 | ARTIFACT — free leverage (committed-long/NAV > 1 in 24/26 yrs, peak 1.27); never quote |
+
+Standing caveats: single path; terminal MTM concentrated (AXTI banked $59.0M
+realized by the armed ext-stop, 8/8 firings on parabolic tops); comparators
+TOTAL-RETURN (same-window SPY TR +706%). Levered long-short is PLANNED, not
+measured — `dev/plans/levered-longshort-margin-realism-2026-07-14.md`.
+
 ## Broad — top-3000 PIT-2000, 2000-01-01 .. 2026-04-30 (26.3y), **364 basis**, Cell-E 0.14 + catstop 0.10
 
 First deep re-measure on the RS-honest basis (2026-07-09; full record:
