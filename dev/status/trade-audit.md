@@ -89,6 +89,37 @@ audit run (`dev/notes/dedup-record-rerun-2026-07-13.md`), fixed in
       metric (d)). Verify: `test_decision_quality_matrix_by_score`
       (8 synthetic trades → 100/50/0/50).
 
+## Interactive HTML report (2026-07-13)
+
+- [x] **`--html <path>` self-contained interactive report.**
+      `trade_audit_report_bin` gained `--html` (alongside `--out`):
+      emits a single self-contained HTML file (inline CSS/JS, no
+      external requests — renders under a strict CSP) with a KPI tile
+      row, a NAV-vs-benchmark log-scale SVG chart with crosshair
+      tooltip, a capital-utilization area chart, an end-of-run
+      open-positions table, behavioural + Weinstein-conformance +
+      decision-quality panels, and a sortable/filterable full-trade
+      table. New library
+      `trading/trading/backtest/trade_audit_html/`
+      (`html_report.{ml,mli}` + `html_template.{ml,mli}`): `render`
+      is pure (`data -> string`, template constant with a `/*DATA*/`
+      placeholder filled by a hand-emitted JS object literal); `load`
+      reuses the markdown path's aggregates (rows, behavioural,
+      conformance, decision-quality from `Trade_audit_report.t`) and
+      adds only the extra on-disk series (equity_curve.csv,
+      open_positions.csv, final_prices.csv, summary KPIs, per-row
+      qty/stop_kind from trades.csv). KPI numbers are computed from the
+      run data, never hardcoded. Benchmark (`--benchmark-symbol`,
+      default SPY) and capital-utilization series need a bar source:
+      supplied when `--snapshot-dir` is given, omitted gracefully
+      otherwise. Verify:
+      `dune exec trading/backtest/test/test_trade_audit_html_report.exe`
+      (5 tests: structural invariants, analysis panels, benchmark/util
+      present-vs-omitted, symbol JS-escaping). Smoke: `--html` on a
+      443-trade run → 91 KB (no snapshot) / 103 KB (with snapshot;
+      benchmark + utilization series), `const DATA=` ×1, no placeholder
+      residue.
+
 Dropped from this PR to keep it bounded (separate validation module):
 
 - [ ] **V6 known-false-positive allowlist** — add
