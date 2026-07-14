@@ -32,6 +32,8 @@ val render : data -> string
 
 val load :
   ?bar_close:(symbol:string -> as_of:Date.t -> float option) ->
+  ?weekly_series:
+    (symbol:string -> n:int -> as_of:Date.t -> (Date.t * float) array) ->
   ?benchmark_symbol:string ->
   ?benchmark_label:string ->
   report:Trade_audit_report.t ->
@@ -51,4 +53,11 @@ val load :
     date (last-known ≤ date). When supplied, the benchmark and capital-
     utilization series are computed; when omitted, both are dropped and the HTML
     renders strategy-only. [benchmark_symbol] defaults to ["SPY"],
-    [benchmark_label] to ["SPY TR"]. *)
+    [benchmark_label] to ["SPY TR"].
+
+    [weekly_series ~symbol ~n ~as_of] returns up to [n] weekly [(date, close)]
+    bars ending at/before [as_of] (the {!Weinstein_strategy.Bar_reader}
+    weekly-view shape). When supplied, every trade row carries a
+    {!Html_data.trade_series} (price + WMA30 + stop levels, entry−1y → exit+6mo)
+    and the HTML renders an expandable per-trade chart; when omitted, [series]
+    is [None] and rows render chart-less. *)

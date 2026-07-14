@@ -279,6 +279,8 @@ let _row ~symbol : HR.trade_row =
     stage = "Stage2";
     stop_kind = "";
     cascade_score = None;
+    quality = None;
+    series = None;
   }
 
 let _data_with_trade ~symbol : HR.data =
@@ -323,10 +325,52 @@ let test_script_close_escaping _ =
          field (fun s -> _count s ~pattern:"</script>") (equal_to 1);
        ])
 
+let test_quality_and_series_emitted _ =
+  (* A row carrying a quality score + chart series emits both objects in the
+     trades JSON: the grade chip payload, the stop level, and a JSON [null] in
+     the WMA warmup gap (NaN must not collapse to 0 for the chart). *)
+  let series : HR.trade_series =
+    {
+      dates = [ _date "2020-01-03"; _date "2020-01-10"; _date "2020-01-17" ];
+      closes = [ 1.0; 1.1; 1.2 ];
+      wma30 = [ Float.nan; 1.05; 1.15 ];
+      entry_idx = 1;
+      exit_idx = 2;
+      entry_stop = Some 0.9;
+      exit_stop = None;
+    }
+  in
+  let quality : TAR.Trade_score.t =
+    {
+      score = 90.0;
+      grade = "A+";
+      capture = 1.0;
+      risk_reward = 0.75;
+      pain = 1.0;
+      conformance = 1.0;
+    }
+  in
+  let base = _data_with_trade ~symbol:"AAPL" in
+  let row =
+    { (_row ~symbol:"AAPL") with quality = Some quality; series = Some series }
+  in
+  let html = HR.render { base with trades = [ row ] } in
+  assert_that html
+    (all_of
+       [
+         field (fun s -> _has s "\"grade\":\"A+\"") (equal_to true);
+         field (fun s -> _has s "\"score\":90.0000") (equal_to true);
+         field (fun s -> _has s "\"es\":0.9000") (equal_to true);
+         field (fun s -> _has s "\"xs\":null") (equal_to true);
+         field (fun s -> _has s "\"m\":[null,1.0500,1.1500]") (equal_to true);
+         field (fun s -> _has s "\"ei\":1") (equal_to true);
+       ])
+
 let suite =
   "Trade_audit_html.Html_report"
   >::: [
          "structural invariants" >:: test_structural_invariants;
+         "quality + series emitted" >:: test_quality_and_series_emitted;
          "kpi values are data-derived" >:: test_kpi_values_are_data_derived;
          "analysis panels match report" >:: test_analysis_panels_match_report;
          "no snapshot omits benchmark and util"

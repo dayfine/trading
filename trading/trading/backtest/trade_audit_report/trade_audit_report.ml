@@ -10,6 +10,9 @@ module Trade_audit_ratings = Trade_audit_ratings
     suppresses the auto-generated alias when a same-named entry module exists,
     so we re-export here explicitly. *)
 
+module Trade_score = Trade_score
+(** Same re-export treatment for the composite trade-quality score. *)
+
 (* Types ------------------------------------------------------------------ *)
 
 type scenario_header = {

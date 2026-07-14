@@ -8,6 +8,7 @@
   test_trade_audit_report
   test_trade_audit_ratings
   test_trade_audit_html_report
+  test_trade_score
   test_trade_context
   test_result_writer
   test_runner_hypothesis_overrides

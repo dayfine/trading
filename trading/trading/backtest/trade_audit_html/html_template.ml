@@ -83,6 +83,25 @@ let markup =
   .panel th, .panel td { padding: 3px 8px; border-bottom: 1px solid var(--line); }
   .footnote { color: var(--ink-3); font-size: 12px; margin-top: 8px; }
   .hidden { display: none; }
+
+  tr.traderow { cursor: pointer; }
+  tr.detailrow > td { background: var(--surface-2); padding: 0; }
+  .tradedetail { padding: 12px 14px; }
+  .tdhead { font-size: 13px; margin-bottom: 8px; color: var(--ink-2); }
+  .tradecv { width: 100%; height: 260px; display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+  .gradechip { display: inline-block; min-width: 46px; text-align: center; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; border: 1px solid var(--line); }
+  .grade-Ap { background: rgba(46,160,67,.25); color: var(--good); }
+  .grade-A { background: rgba(46,160,67,.15); color: var(--good); }
+  .grade-B { background: rgba(210,153,34,.18); color: #d29922; }
+  .grade-C { background: var(--surface-2); color: var(--ink-2); }
+  .grade-D { background: rgba(248,81,73,.12); color: var(--bad); }
+  .grade-F { background: rgba(248,81,73,.22); color: var(--bad); }
+  .qbars { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 18px; margin-top: 10px; }
+  .qbar { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-2); }
+  .qbar span { width: 82px; }
+  .qbar b { width: 38px; text-align: right; }
+  .qtrack { flex: 1; height: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .qfill { height: 100%; background: var(--strat); }
 </style>
 </head>
 <body>

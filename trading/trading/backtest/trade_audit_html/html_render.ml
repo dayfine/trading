@@ -118,6 +118,43 @@ let _emit_opens b opens =
           _jnum b x);
       Buffer.add_char b ']')
 
+(* Like [_jnum] but NaN emits JSON [null] (the chart reads null as a gap in the
+   WMA warmup region) instead of collapsing to 0. *)
+let _jnum_or_null b f =
+  Buffer.add_string b (if Float.is_finite f then sprintf "%.4f" f else "null")
+
+let _emit_opt_num b = function
+  | Some v -> _jnum b v
+  | None -> Buffer.add_string b "null"
+
+let _emit_series b = function
+  | None -> Buffer.add_string b "null"
+  | Some (s : trade_series) ->
+      _obj b
+        [
+          ( "d",
+            fun () -> _arr b s.dates ~f:(fun d -> _jstr b (Date.to_string d)) );
+          ("c", fun () -> _arr b s.closes ~f:(_jnum b));
+          ("m", fun () -> _arr b s.wma30 ~f:(_jnum_or_null b));
+          ("ei", fun () -> _jint b s.entry_idx);
+          ("xi", fun () -> _jint b s.exit_idx);
+          ("es", fun () -> _emit_opt_num b s.entry_stop);
+          ("xs", fun () -> _emit_opt_num b s.exit_stop);
+        ]
+
+let _emit_quality b = function
+  | None -> Buffer.add_string b "null"
+  | Some (q : TAR.Trade_score.t) ->
+      _obj b
+        [
+          ("score", fun () -> _jnum b q.score);
+          ("grade", fun () -> _jstr b q.grade);
+          ("capture", fun () -> _jnum_or_null b q.capture);
+          ("rr", fun () -> _jnum_or_null b q.risk_reward);
+          ("pain", fun () -> _jnum_or_null b q.pain);
+          ("conf", fun () -> _jnum_or_null b q.conformance);
+        ]
+
 let _emit_trade b (t : trade_row) =
   Buffer.add_char b '[';
   _jstr b t.symbol;
@@ -139,6 +176,10 @@ let _emit_trade b (t : trade_row) =
   (match t.cascade_score with
   | Some s -> _jint b s
   | None -> Buffer.add_string b "null");
+  Buffer.add_char b ',';
+  _emit_quality b t.quality;
+  Buffer.add_char b ',';
+  _emit_series b t.series;
   Buffer.add_char b ']'
 
 let _emit_trades b trades = _arr b trades ~f:(_emit_trade b)

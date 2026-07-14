@@ -21,6 +21,23 @@ type open_position = {
 [@@deriving sexp]
 (** One end-of-run open position, marked at its final price. *)
 
+type trade_series = {
+  dates : Date.t list;  (** Weekly bar dates, entry−52w .. exit+26w. *)
+  closes : float list;  (** Adjusted weekly closes, aligned to [dates]. *)
+  wma30 : float list;
+      (** 30-bar linearly-weighted MA of [closes] (the Weinstein weekly WMA30),
+          aligned to [dates]; [Float.nan] where fewer than 30 prior bars exist
+          (rendered as a gap). *)
+  entry_idx : int;  (** Index into [dates] of the first bar >= entry date. *)
+  exit_idx : int;  (** Index into [dates] of the first bar >= exit date. *)
+  entry_stop : float option;  (** Initial stop from trades.csv, when present. *)
+  exit_stop : float option;  (** Stop level at exit, when present. *)
+}
+[@@deriving sexp]
+(** Per-trade weekly chart series: enough to draw the price line, the WMA30
+    trend line, the stop levels, and the shaded holding window from one year
+    before entry to six months after exit. *)
+
 type trade_row = {
   symbol : string;
   entry_date : Date.t;
@@ -36,11 +53,17 @@ type trade_row = {
   stop_kind : string;
       (** [stop_trigger_kind] from trades.csv; empty when none. *)
   cascade_score : int option;
+  quality : Trade_audit_report.Trade_score.t option;
+      (** Composite trade-quality score (0-100 + grade + components). [None]
+          when the trade has no matching audit rating. *)
+  series : trade_series option;
+      (** Chart series; [None] when no bar source was supplied. *)
 }
 [@@deriving sexp]
 (** One enriched row for the interactive trade table — the report's per-trade
     row plus the [quantity] and [stop_trigger_kind] columns that live only in
-    [trades.csv]. *)
+    [trades.csv], the composite quality score, and the per-trade chart series.
+*)
 
 type kpi_tile = { label : string; value : string; sub : string; hero : bool }
 [@@deriving sexp]

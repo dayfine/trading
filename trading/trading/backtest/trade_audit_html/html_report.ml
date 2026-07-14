@@ -70,23 +70,26 @@ type _interval = {
   i_qty : float;
 }
 
-let _qty_of extras ~sym ~entry ~exit_ =
+let _no_extra : Html_sources.trade_extra =
+  { qty = 0.0; stop_kind = ""; entry_stop = None; exit_stop = None }
+
+let _extra_of extras ~sym ~entry ~exit_ : Html_sources.trade_extra =
   let key =
     Html_sources.key sym (Date.to_string entry) (Date.to_string exit_)
   in
-  Option.value (Map.find extras key) ~default:(0.0, "")
+  Option.value (Map.find extras key) ~default:_no_extra
 
 let _intervals (report : TAR.t) extras (opens : open_position list) =
   let rts =
     List.map report.rows ~f:(fun (r : TAR.per_trade_row) ->
-        let qty, _ =
-          _qty_of extras ~sym:r.symbol ~entry:r.entry_date ~exit_:r.exit_date
+        let extra =
+          _extra_of extras ~sym:r.symbol ~entry:r.entry_date ~exit_:r.exit_date
         in
         {
           i_sym = r.symbol;
           i_lo = r.entry_date;
           i_hi = Some r.exit_date;
-          i_qty = qty;
+          i_qty = extra.qty;
         })
   in
   let ops =
@@ -138,10 +141,115 @@ let _stage_label = function
       | Stage3 _ -> "Stage3"
       | Stage4 _ -> "Stage4")
 
-let _trade_rows (report : TAR.t) extras =
+(* Per-trade quality: join the report's ratings to rows by symbol + nearest
+   entry date, then fold through {!TAR.Trade_score.compute}. The rating carries
+   the audit record's Friday DECISION date while the row carries the actual
+   fill date, so the join needs the same date tolerance the report's own
+   row/audit join uses. *)
+let _audit_join_tolerance_days = 7
+
+let _quality_map (report : TAR.t) =
+  let ratings =
+    Option.value_map report.analysis ~default:[] ~f:(fun a -> a.TAR.ratings)
+  in
+  List.map ratings ~f:(fun (rt : TAR.Trade_audit_ratings.rating) ->
+      (rt.symbol, rt))
+  |> Map.of_alist_multi (module String)
+
+let _quality_of qmap ~sym ~entry ~pnl_percent =
+  Map.find qmap sym
+  |> Option.bind ~f:(fun rts ->
+      List.filter_map rts ~f:(fun (rt : TAR.Trade_audit_ratings.rating) ->
+          let gap = Int.abs (Date.diff rt.entry_date entry) in
+          if gap <= _audit_join_tolerance_days then Some (gap, rt) else None)
+      |> List.min_elt ~compare:(fun (a, _) (b, _) -> Int.compare a b)
+      |> Option.map ~f:snd)
+  |> Option.map ~f:(fun rating ->
+      TAR.Trade_score.compute ~rating ~pnl_percent ())
+
+(* 30-bar linearly-weighted MA (the Weinstein weekly WMA30) over [closes];
+   [Float.nan] at indices with fewer than [_wma_window] prior bars. Kept
+   inline: the analysis-side MA kernels are out of reach per the layering
+   rules, and the linear-weight fold is small enough to own here. *)
+let _wma_window = 30
+
+let _wma30 closes =
+  let n = Array.length closes in
+  Array.init n ~f:(fun i ->
+      if i + 1 < _wma_window then Float.nan
+      else
+        let num = ref 0.0 and den = ref 0.0 in
+        for k = 0 to _wma_window - 1 do
+          let w = Float.of_int (_wma_window - k) in
+          num := !num +. (w *. closes.(i - k));
+          den := !den +. w
+        done;
+        !num /. !den)
+
+(* Chart window around a round trip, in weekly bars. *)
+let _pre_entry_weeks = 52
+let _post_exit_weeks = 26
+
+let _first_idx_on_or_after dates d =
+  match Array.findi dates ~f:(fun _ x -> Date.( >= ) x d) with
+  | Some (i, _) -> i
+  | None -> Array.length dates - 1
+
+(* Build the per-trade weekly series: fetch [_pre_entry_weeks] + holding +
+   [_post_exit_weeks] bars (plus the WMA warmup) as of [exit + 26w], compute
+   the WMA over the full fetch, then slice the warmup off the front so the
+   chart's first visible bar still has a valid trend line. *)
+let _series ~weekly_series ~(extra : Html_sources.trade_extra) ~sym ~entry
+    ~exit_ : trade_series option =
+  let as_of = Date.add_days exit_ (_post_exit_weeks * 7) in
+  let span_weeks =
+    Date.diff
+      (Date.add_days exit_ (_post_exit_weeks * 7))
+      (Date.add_days entry (-_pre_entry_weeks * 7))
+    / 7
+    + 1
+  in
+  let n = span_weeks + _wma_window in
+  let bars = weekly_series ~symbol:sym ~n ~as_of in
+  if Array.length bars <= _wma_window then None
+  else
+    let dates = Array.map bars ~f:fst in
+    let closes = Array.map bars ~f:snd in
+    let wma = _wma30 closes in
+    let visible_from =
+      Int.max 0
+        (Int.min
+           (_first_idx_on_or_after dates entry - _pre_entry_weeks)
+           (Array.length dates - 1))
+    in
+    let slice a =
+      Array.to_list
+        (Array.sub a ~pos:visible_from ~len:(Array.length a - visible_from))
+    in
+    let dates_v = slice dates in
+    let entry_idx = _first_idx_on_or_after (Array.of_list dates_v) entry in
+    let exit_idx = _first_idx_on_or_after (Array.of_list dates_v) exit_ in
+    Some
+      {
+        dates = dates_v;
+        closes = slice closes;
+        wma30 = slice wma;
+        entry_idx;
+        exit_idx;
+        entry_stop = extra.entry_stop;
+        exit_stop = extra.exit_stop;
+      }
+
+let _trade_rows ?weekly_series (report : TAR.t) extras =
+  let qmap = _quality_map report in
   List.map report.rows ~f:(fun (r : TAR.per_trade_row) ->
-      let qty, stop_kind =
-        _qty_of extras ~sym:r.symbol ~entry:r.entry_date ~exit_:r.exit_date
+      let extra =
+        _extra_of extras ~sym:r.symbol ~entry:r.entry_date ~exit_:r.exit_date
+      in
+      let series =
+        Option.bind weekly_series ~f:(fun weekly_series ->
+            _series ~weekly_series ~extra ~sym:r.symbol ~entry:r.entry_date
+              ~exit_:r.exit_date)
       in
       ({
          symbol = r.symbol;
@@ -150,13 +258,17 @@ let _trade_rows (report : TAR.t) extras =
          days_held = r.days_held;
          entry_price = r.entry_price;
          exit_price = r.exit_price;
-         quantity = qty;
+         quantity = extra.qty;
          pnl_dollars = r.pnl_dollars;
          pnl_percent = r.pnl_percent;
          exit_trigger = r.exit_trigger;
          stage = _stage_label r.entry_stage;
-         stop_kind;
+         stop_kind = extra.stop_kind;
          cascade_score = r.cascade_score;
+         quality =
+           _quality_of qmap ~sym:r.symbol ~entry:r.entry_date
+             ~pnl_percent:r.pnl_percent;
+         series;
        }
         : trade_row))
 
@@ -165,8 +277,8 @@ let _trade_rows (report : TAR.t) extras =
 let _extras_map extras =
   Map.of_alist_reduce (module String) extras ~f:(fun a _ -> a)
 
-let load ?bar_close ?(benchmark_symbol = "SPY") ?(benchmark_label = "SPY TR")
-    ~(report : TAR.t) ~scenario_dir () : data =
+let load ?bar_close ?weekly_series ?(benchmark_symbol = "SPY")
+    ?(benchmark_label = "SPY TR") ~(report : TAR.t) ~scenario_dir () : data =
   let path f = Filename.concat scenario_dir f in
   let curve =
     _downsample ~every:5
@@ -218,5 +330,5 @@ let load ?bar_close ?(benchmark_symbol = "SPY") ?(benchmark_label = "SPY TR")
       Html_kpis.of_run ~report ~metrics:summary.metrics ~initial_cash ~final_nav
         ~benchmark ~benchmark_label;
     analysis = report.analysis;
-    trades = _trade_rows report extras;
+    trades = _trade_rows ?weekly_series report extras;
   }

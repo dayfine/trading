@@ -64,6 +64,13 @@ let read_open_positions path =
 
 let key sym entry exit_ = String.concat ~sep:"|" [ sym; entry; exit_ ]
 
+type trade_extra = {
+  qty : float;
+  stop_kind : string;
+  entry_stop : float option;
+  exit_stop : float option;
+}
+
 let read_trade_extras path =
   match _read_lines path with
   | [] | [ _ ] -> []
@@ -76,13 +83,20 @@ let read_trade_extras path =
             let get = _cell idx cells in
             match (get "symbol", get "entry_date", get "exit_date") with
             | Some s, Some e, Some x ->
-                let qty =
-                  Option.bind (get "quantity") ~f:(fun q ->
-                      try Some (Float.of_string q) with _ -> None)
-                  |> Option.value ~default:0.0
+                let float_of name =
+                  Option.bind (get name) ~f:(fun v ->
+                      try Some (Float.of_string v) with _ -> None)
                 in
+                let qty = Option.value (float_of "quantity") ~default:0.0 in
                 let sk = Option.value (get "stop_trigger_kind") ~default:"" in
-                Some (key s e x, (qty, sk))
+                Some
+                  ( key s e x,
+                    {
+                      qty;
+                      stop_kind = sk;
+                      entry_stop = float_of "entry_stop";
+                      exit_stop = float_of "exit_stop";
+                    } )
             | _ -> None)
 
 type summary = {

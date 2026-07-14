@@ -23,10 +23,19 @@ val key : string -> string -> string -> string
     {!read_trade_extras} and by {!Html_report}'s row/interval joins. Dates are
     the CSV / {!Core.Date.to_string} form. *)
 
-val read_trade_extras : string -> (string * (float * string)) list
-(** [({!key} symbol entry exit, (quantity, stop_trigger_kind))] from
-    [trades.csv], via header-name lookup (robust to the trailing schema columns
-    trades.csv has accrued). *)
+type trade_extra = {
+  qty : float;
+  stop_kind : string;
+  entry_stop : float option;
+  exit_stop : float option;
+}
+(** The per-round-trip columns that live only in [trades.csv]: quantity,
+    [stop_trigger_kind], and the entry/exit stop levels ([None] when the column
+    is absent or unparseable). *)
+
+val read_trade_extras : string -> (string * trade_extra) list
+(** [({!key} symbol entry exit, extra)] from [trades.csv], via header-name
+    lookup (robust to the trailing schema columns trades.csv has accrued). *)
 
 type summary = {
   initial_cash : float option;
