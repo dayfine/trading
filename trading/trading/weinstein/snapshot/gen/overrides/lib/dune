@@ -1,0 +1,9 @@
+; Private lib: bridges the (private) backtest Overlay_validator into the
+; weekly-snapshot CLI. Kept out of weinstein_trading.snapshot_gen because that
+; lib is public and dune forbids public -> private deps.
+
+(library
+ (name snapshot_config_overrides)
+ (libraries core backtest weinstein_trading.strategy)
+ (preprocess
+  (pps ppx_sexp_conv)))
