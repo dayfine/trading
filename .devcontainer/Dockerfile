@@ -109,6 +109,22 @@ COPY --chown=opam:opam trading/ /workspaces/trading-1/trading/
 RUN opam repository set-url default https://opam.ocaml.org && opam update
 
 # -----------------------------------------------------------------------------
+# owl portable SIMD flags (issue #1955)
+# -----------------------------------------------------------------------------
+# owl's configure defaults to -march=native on x86_64 (owl.1.2
+# src/owl/config/configure.ml), so its C stubs inherit the IMAGE-BUILD host's
+# ISA. When the weekly image rebuild lands on an AVX-512 runner, dllowl_stubs.so
+# embeds AVX-512 instructions and every owl-linked test binary SIGILLs on the
+# (majority) non-AVX512 CI runners — the ~50-90% build-and-test "rerun lottery"
+# of 2026-07-13. Same failure class and same fix as ta-lib above (#1129):
+# pin -march=x86-64-v2 -mtune=generic. OWL_CFLAGS fully REPLACES owl's default
+# flag list, so this mirrors the default set with only the arch pinned.
+# Must be set before ANY opam layer that may build owl (the deps-only loop
+# below can pull it in, not just the pinned install).
+# -----------------------------------------------------------------------------
+ENV OWL_CFLAGS="-g -O3 -march=x86-64-v2 -mtune=generic -mfpmath=sse -msse2 -funroll-loops -fno-math-errno -fno-rounding-math -fno-signaling-nans -fexcess-precision=fast -DSFMT_MEXP=19937 -fno-strict-aliasing"
+
+# -----------------------------------------------------------------------------
 # OCaml Dependencies
 # -----------------------------------------------------------------------------
 # Iterate every *.opam file in the source and install its --deps-only.
@@ -135,6 +151,21 @@ RUN opam install --yes \
     ppx_deriving ppx_jane ppx_let \
     sexplib sexp_pretty \
     uri yojson
+
+# -----------------------------------------------------------------------------
+# Verify owl stubs are AVX-512-free (issue #1955) — fail the IMAGE build (the
+# only place the bad binary can be produced) rather than lottery-failing CI.
+# Mirrors the ci.yml ta-lib objdump check (#1129).
+# -----------------------------------------------------------------------------
+RUN OWL_SO=$(find /home/opam/.opam -name 'dllowl_stubs.so' -type f | head -1) && \
+    test -n "$OWL_SO" && \
+    echo "owl stubs found at: $OWL_SO" && \
+    if objdump -d "$OWL_SO" 2>/dev/null | grep -q 'zmm\|evex\|knc'; then \
+        echo "FAIL: dllowl_stubs.so contains AVX-512 instructions — will SIGILL on non-AVX512 runners"; \
+        exit 1; \
+    else \
+        echo "OK: dllowl_stubs.so contains no AVX-512 instructions"; \
+    fi
 
 # -----------------------------------------------------------------------------
 # memtrace — Jane Street's Gc.Memprof-based statistical OCaml allocation
