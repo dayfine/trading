@@ -1,4 +1,11 @@
 (tests
- (names test_resistance)
- (modules test_resistance)
- (libraries resistance weinstein_types types core ounit2 matchers))
+ (names test_resistance test_resistance_supply)
+ (modules test_resistance test_resistance_supply)
+ (libraries
+  resistance
+  weinstein_types
+  types
+  core
+  ounit2
+  matchers
+  weinstein.snapshot_pipeline))
