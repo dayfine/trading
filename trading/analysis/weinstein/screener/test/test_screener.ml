@@ -1621,6 +1621,58 @@ let test_w_overhead_supply_scoring_branch _ =
       score ~w:(Some 15) (Some (make_supply 0.5)) - base )
     (equal_to (0, 0, 15, 0, 8))
 
+(** A Virgin_territory binary grade (the binary path scores
+    [w_clean_resistance = 15]). *)
+let _virgin_resistance : Resistance.result =
+  {
+    quality = Virgin_territory;
+    breakout_price = 100.0;
+    zones_above = [];
+    nearest_zone = None;
+  }
+
+(** Replace-not-add on the PRODUCTION armed shape. [analyze_with_callbacks]
+    populates BOTH [resistance] (binary grade) AND [supply] (continuous score),
+    so the armed branch of [_resistance_signal] must REPLACE the binary grade
+    points, never sum them (docstring: "not additive — that would double-count
+    overhead"). With a Virgin_territory grade present (binary path earns
+    [w_clean_resistance = 15]) AND a continuous supply score under
+    [w_overhead_supply = w], the long overhead contribution must be
+    [round (w * (1 - score))] ONLY: an additive regression would show [15 + w]
+    (55 here) for [score 0] instead of [w] (40) — exactly the virgin-preference
+    double-count the resistance-v2 dial guards against. The scoring_branch test
+    forces [resistance = None], so it cannot distinguish REPLACE from ADD; this
+    test carries a populated binary grade to pin the replace semantics. *)
+let test_w_overhead_supply_replaces_not_adds _ =
+  let sector = make_sector "Tech" in
+  let score ?(w = None) ?(resistance = None) ?(supply = None) () =
+    fst
+      (score_long
+         ~weights:{ default_scoring_weights with w_overhead_supply = w }
+         ~sector
+         { (_breakout_analysis ()) with resistance; supply })
+  in
+  (* Baseline: no overhead signal at all (resistance None, supply None). *)
+  let baseline = score () in
+  (* Binary-only Virgin (weight unset): the binary path scores 15. *)
+  let binary_virgin = score ~resistance:(Some _virgin_resistance) () in
+  (* Armed with the SAME Virgin grade present PLUS a continuous supply score:
+     the binary 15 is dropped; only round(w*(1-score)) remains. score 0 -> full
+     w = 40 (an additive bug would show 55); score 1 -> 0. *)
+  let armed_full =
+    score ~w:(Some 40) ~resistance:(Some _virgin_resistance)
+      ~supply:(Some (make_supply 0.0))
+      ()
+  in
+  let armed_heavy =
+    score ~w:(Some 40) ~resistance:(Some _virgin_resistance)
+      ~supply:(Some (make_supply 1.0))
+      ()
+  in
+  assert_that
+    (binary_virgin - baseline, armed_full - baseline, armed_heavy - baseline)
+    (equal_to (15, 40, 0))
+
 (** [w_overhead_supply] must appear in the serialized default config (so
     [Overlay_validator] can target it as a [Variant_matrix] axis), a config sexp
     that omits the field parses to [None] (older sexps round-trip), and an
@@ -2212,6 +2264,8 @@ let suite =
          >:: test_insufficient_history_scores_zero_long;
          "test_w_overhead_supply_scoring_branch"
          >:: test_w_overhead_supply_scoring_branch;
+         "test_w_overhead_supply_replaces_not_adds"
+         >:: test_w_overhead_supply_replaces_not_adds;
          "test_w_overhead_supply_sexp_present_and_roundtrips"
          >:: test_w_overhead_supply_sexp_present_and_roundtrips;
          "test_insufficient_history_scores_zero_short"

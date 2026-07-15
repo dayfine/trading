@@ -31,6 +31,7 @@ module Ad_bars = Ad_bars
 module Ad_series_cache = Ad_series_cache
 module Macro_inputs = Macro_inputs
 module Panel_callbacks = Panel_callbacks
+module Resistance_sketch_reader = Resistance_sketch_reader
 module Weekly_ma_cache = Weekly_ma_cache
 module Audit_recorder = Audit_recorder
 module Entry_audit_capture = Entry_audit_capture

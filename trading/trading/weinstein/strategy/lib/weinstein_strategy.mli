@@ -169,6 +169,11 @@ module Panel_callbacks = Panel_callbacks
 (** Panel-shaped callback bundle constructors for the strategy's callees. See
     {!Panel_callbacks}. *)
 
+module Resistance_sketch_reader = Resistance_sketch_reader
+(** Reads a resistance-v2 {!Resistance_supply.sketch} out of the warehouse
+    snapshot columns for the overhead-supply score. See
+    {!Resistance_sketch_reader}. *)
+
 module Weekly_ma_cache = Weekly_ma_cache
 (** Per-symbol weekly MA cache (Stage 4 PR-D). Memoises Stage / Macro / Sector /
     Stops MA reads keyed by [(symbol, ma_type, period)]. *)
