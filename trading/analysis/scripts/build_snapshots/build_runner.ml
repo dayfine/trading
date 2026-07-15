@@ -7,6 +7,13 @@ module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 
 let default_progress_every = 50
 
+(* Calendar-day span of extra history loaded BEFORE the window start to feed the
+   resistance sketch's weekly prefix (resistance-v2 §D4). 3650 days ~ 520
+   trading weeks (the deepest [Res_max_high_520w] horizon + [Res_bars_seen]
+   cap), so a symbol that traded through the whole span is never a false virgin
+   at the scenario start. CLIs surface this as [--sketch-deep-days]. *)
+let default_sketch_deep_days = 3650
+
 type progress = {
   symbols_total : int;
   symbols_done : int;
@@ -43,6 +50,29 @@ let _load_windowed_bars ~data_dir ~start_date ~end_date ~symbol =
   match _load_bars ~data_dir ~symbol with
   | Error _ as err -> err
   | Ok bars -> Ok (_window_bars ~start_date ~end_date bars)
+
+(* Deep-history slice [[start_date - sketch_deep_days, start_date)] that feeds
+   ONLY the resistance sketch (resistance-v2 §D4). Empty when [start_date] is
+   [None] (full-history build already carries all bars in the window). The
+   inclusive [end_ = start - 1 day] keeps the slice strictly before the window,
+   so it never overlaps [_window_bars ~start_date]. *)
+let _deep_bars ~sketch_deep_days ~start_date bars =
+  match start_date with
+  | None -> []
+  | Some start ->
+      let deep_start = Date.add_days start (-sketch_deep_days) in
+      let deep_end = Date.add_days start (-1) in
+      Bar_window.filter ~start:deep_start ~end_:deep_end bars
+
+(* Load a symbol once, split into (deep_bars, window_bars): rows are emitted for
+   [window_bars] only, while [deep_bars] widen the sketch's weekly prefix. *)
+let _load_split_bars ~data_dir ~start_date ~end_date ~sketch_deep_days ~symbol =
+  match _load_bars ~data_dir ~symbol with
+  | Error e -> Error e
+  | Ok bars ->
+      Ok
+        ( _deep_bars ~sketch_deep_days ~start_date bars,
+          _window_bars ~start_date ~end_date bars )
 
 let _file_path ~output_dir ~symbol =
   Filename.concat output_dir (symbol ^ ".snap")
@@ -91,11 +121,14 @@ let _write_and_checksum ~symbol ~path ~csv_mtime ~active_through rows =
   | Error err -> Error err
   | Ok () -> Ok (_file_metadata ~symbol ~path ~csv_mtime ~active_through)
 
-let _build_one_symbol ~symbol ~bars ~schema ~benchmark_bars ~output_dir
-    ~csv_mtime =
+let _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
+    ~output_dir ~csv_mtime =
   let path = _file_path ~output_dir ~symbol in
   let active_through = _active_through_of_bars bars in
-  match Pipeline.build_for_symbol ~symbol ~bars ~schema ?benchmark_bars () with
+  match
+    Pipeline.build_for_symbol ~symbol ~bars ~deep_bars ~schema ?benchmark_bars
+      ()
+  with
   | Error err -> Error err
   | Ok rows -> _write_and_checksum ~symbol ~path ~csv_mtime ~active_through rows
 
@@ -113,11 +146,11 @@ let _checkpoint_manifest ~manifest_path ~schema entry =
       Printf.eprintf "manifest checkpoint failed for %s: %s\n%!"
         entry.Snapshot_manifest.symbol (Status.show err)
 
-let _build_or_log ~symbol ~bars ~schema ~benchmark_bars ~output_dir ~csv_mtime
-    ~manifest_path ~checkpoint =
+let _build_or_log ~symbol ~bars ~deep_bars ~schema ~benchmark_bars ~output_dir
+    ~csv_mtime ~manifest_path ~checkpoint =
   match
-    _build_one_symbol ~symbol ~bars ~schema ~benchmark_bars ~output_dir
-      ~csv_mtime
+    _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
+      ~output_dir ~csv_mtime
   with
   | Error err ->
       Printf.eprintf "skip %s: build: %s\n%!" symbol (Status.show err);
@@ -126,18 +159,21 @@ let _build_or_log ~symbol ~bars ~schema ~benchmark_bars ~output_dir ~csv_mtime
       if checkpoint then _checkpoint_manifest ~manifest_path ~schema entry;
       Some entry
 
-let _try_build_and_checkpoint ~data_dir ~start_date ~end_date ~schema
-    ~benchmark_bars ~output_dir ~manifest_path ~checkpoint ~csv_mtime symbol =
-  match _load_windowed_bars ~data_dir ~start_date ~end_date ~symbol with
+let _try_build_and_checkpoint ~data_dir ~start_date ~end_date ~sketch_deep_days
+    ~schema ~benchmark_bars ~output_dir ~manifest_path ~checkpoint ~csv_mtime
+    symbol =
+  match
+    _load_split_bars ~data_dir ~start_date ~end_date ~sketch_deep_days ~symbol
+  with
   | Error err ->
       Printf.eprintf "skip %s: load: %s\n%!" symbol (Status.show err);
       None
-  | Ok bars ->
-      _build_or_log ~symbol ~bars ~schema ~benchmark_bars ~output_dir ~csv_mtime
-        ~manifest_path ~checkpoint
+  | Ok (deep_bars, bars) ->
+      _build_or_log ~symbol ~bars ~deep_bars ~schema ~benchmark_bars ~output_dir
+        ~csv_mtime ~manifest_path ~checkpoint
 
-let _process_symbol ~data_dir ~start_date ~end_date ~schema ~benchmark_bars
-    ~output_dir ~existing ~manifest_path ~checkpoint symbol =
+let _process_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
+    ~benchmark_bars ~output_dir ~existing ~manifest_path ~checkpoint symbol =
   match _csv_mtime ~data_dir ~symbol with
   | None ->
       Printf.eprintf "skip %s: no CSV\n%!" symbol;
@@ -146,9 +182,9 @@ let _process_symbol ~data_dir ~start_date ~end_date ~schema ~benchmark_bars
       if _should_skip ~existing ~symbol ~csv_mtime ~schema then
         _maybe_reuse ~existing ~symbol
       else
-        _try_build_and_checkpoint ~data_dir ~start_date ~end_date ~schema
-          ~benchmark_bars ~output_dir ~manifest_path ~checkpoint ~csv_mtime
-          symbol
+        _try_build_and_checkpoint ~data_dir ~start_date ~end_date
+          ~sketch_deep_days ~schema ~benchmark_bars ~output_dir ~manifest_path
+          ~checkpoint ~csv_mtime symbol
 
 let _load_benchmark_bars ~data_dir ~start_date ~end_date sym =
   match _load_windowed_bars ~data_dir ~start_date ~end_date ~symbol:sym with
@@ -225,12 +261,13 @@ let _write_final_manifest ~manifest_path ~schema ~entries ~elapsed =
       Printf.eprintf "manifest write failed: %s\n%!" (Status.show err);
       exit 1
 
-let _fold_symbol ~data_dir ~start_date ~end_date ~schema ~benchmark_bars
-    ~output_dir ~existing ~manifest_path ~progress_every ~symbols_total
-    ~started_at i acc symbol =
+let _fold_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
+    ~benchmark_bars ~output_dir ~existing ~manifest_path ~progress_every
+    ~symbols_total ~started_at i acc symbol =
   match
-    _process_symbol ~data_dir ~start_date ~end_date ~schema ~benchmark_bars
-      ~output_dir ~existing ~manifest_path ~checkpoint:true symbol
+    _process_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
+      ~benchmark_bars ~output_dir ~existing ~manifest_path ~checkpoint:true
+      symbol
   with
   | None -> acc
   | Some entry ->
@@ -240,7 +277,7 @@ let _fold_symbol ~data_dir ~start_date ~end_date ~schema ~benchmark_bars
       acc @ [ entry ]
 
 let build ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
-    ~end_date ~incremental ~progress_every () =
+    ~end_date ~sketch_deep_days ~incremental ~progress_every () =
   _ensure_dir output_dir;
   let schema = Snapshot_schema.default in
   let symbols_total = List.length symbols in
@@ -255,9 +292,9 @@ let build ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
   let entries =
     List.foldi symbols ~init:[]
       ~f:
-        (_fold_symbol ~data_dir ~start_date ~end_date ~schema ~benchmark_bars
-           ~output_dir ~existing ~manifest_path ~progress_every ~symbols_total
-           ~started_at)
+        (_fold_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
+           ~benchmark_bars ~output_dir ~existing ~manifest_path ~progress_every
+           ~symbols_total ~started_at)
   in
   let elapsed = Time_ns.diff (Time_ns.now ()) t0 in
   _write_final_manifest ~manifest_path ~schema ~entries ~elapsed;

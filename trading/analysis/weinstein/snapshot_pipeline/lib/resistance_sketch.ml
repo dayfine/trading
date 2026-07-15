@@ -142,3 +142,27 @@ let compute ~(weekly_prefix : Weekly_prefix.t)
   in
   _fill_histograms t ~weekly_prefix ~bars_arr;
   t
+
+(* Take the trailing [len] days of every sketch column, dropping the leading
+   [offset] deep-history days so the result aligns to the window bars. *)
+let _slice_to_window (full : t) ~offset ~len =
+  let slice arr = Array.sub arr ~pos:offset ~len in
+  {
+    max_high_130w = slice full.max_high_130w;
+    max_high_260w = slice full.max_high_260w;
+    max_high_520w = slice full.max_high_520w;
+    bars_seen = slice full.bars_seen;
+    hist = Array.map full.hist ~f:slice;
+  }
+
+let compute_windowed ~(deep_bars : Types.Daily_price.t array)
+    ~(bars_arr : Types.Daily_price.t array) =
+  if Array.is_empty deep_bars then
+    compute ~weekly_prefix:(Weekly_prefix.build bars_arr) ~bars_arr
+  else
+    let combined = Array.append deep_bars bars_arr in
+    let full =
+      compute ~weekly_prefix:(Weekly_prefix.build combined) ~bars_arr:combined
+    in
+    _slice_to_window full ~offset:(Array.length deep_bars)
+      ~len:(Array.length bars_arr)

@@ -200,7 +200,7 @@ let _compute_weekly_arrays ~bars_arr ~weekly_prefix ~benchmark_bars =
   done;
   (stage, rs, macro)
 
-let _compute_precomputed ~bars_arr ~benchmark_bars =
+let _compute_precomputed ~bars_arr ~deep_arr ~benchmark_bars =
   let closes =
     Array.map bars_arr ~f:(fun (b : Types.Daily_price.t) -> b.adjusted_close)
   in
@@ -218,26 +218,62 @@ let _compute_precomputed ~bars_arr ~benchmark_bars =
   let stage, rs, macro =
     _compute_weekly_arrays ~bars_arr ~weekly_prefix ~benchmark_bars
   in
-  let sketch = Resistance_sketch.compute ~weekly_prefix ~bars_arr in
+  (* Only the sketch columns see [deep_arr] (resistance-v2 §D4); the 13 warmup-
+     windowed columns above are computed from [bars_arr] alone, so a deep feed
+     never perturbs them. *)
+  let sketch =
+    Resistance_sketch.compute_windowed ~deep_bars:deep_arr ~bars_arr
+  in
   { ema; sma; atr; rsi; stage; rs; macro; sketch }
 
 (* Build snapshot rows for a non-empty [bars_arr]. Extracted from
    [build_for_symbol] to eliminate the nested-else. *)
-let _build_rows ~symbol ~bars_arr ~schema ~benchmark_bars =
+let _build_rows ~symbol ~bars_arr ~deep_arr ~schema ~benchmark_bars =
   let n = Array.length bars_arr in
   if n = 0 then Ok []
   else
-    let precomputed = _compute_precomputed ~bars_arr ~benchmark_bars in
+    let precomputed =
+      _compute_precomputed ~bars_arr ~deep_arr ~benchmark_bars
+    in
     let rows =
       List.init n ~f:(fun i ->
           _row_for_day ~symbol ~schema ~precomputed ~bars_arr ~i)
     in
     Result.all rows
 
-let build_for_symbol ~symbol ~bars ~schema ?benchmark_bars () =
+(* The (last-deep, first-bar) date pair whose ordering the boundary check
+   compares, or [None] when either side is empty (nothing to validate). *)
+let _deep_boundary ~deep_arr ~bars_arr =
+  if Array.is_empty deep_arr || Array.is_empty bars_arr then None
+  else
+    Some
+      ( deep_arr.(Array.length deep_arr - 1).Types.Daily_price.date,
+        bars_arr.(0).Types.Daily_price.date )
+
+let _deep_overlap_error ~last_deep ~first_bar =
+  Status.error_invalid_argument
+    (Printf.sprintf
+       "Snapshot_pipeline.build_for_symbol: deep_bars must end strictly before \
+        bars (deep ends %s, bars start %s)"
+       (Date.to_string last_deep) (Date.to_string first_bar))
+
+(* [deep_bars] must end strictly before [bars] begins (no overlap). This is the
+   boundary check; internal disorder within the concatenation is still caught by
+   {!Weekly_prefix.build} raising. *)
+let _validate_deep_precedes ~deep_arr ~bars_arr =
+  match _deep_boundary ~deep_arr ~bars_arr with
+  | None -> Ok ()
+  | Some (last_deep, first_bar) when Date.( < ) last_deep first_bar -> Ok ()
+  | Some (last_deep, first_bar) -> _deep_overlap_error ~last_deep ~first_bar
+
+let build_for_symbol ~symbol ~bars ~schema ?(deep_bars = []) ?benchmark_bars ()
+    =
   if String.is_empty symbol then
     Status.error_invalid_argument
       "Snapshot_pipeline.build_for_symbol: empty symbol"
   else
     let bars_arr = Array.of_list bars in
-    _build_rows ~symbol ~bars_arr ~schema ~benchmark_bars
+    let deep_arr = Array.of_list deep_bars in
+    match _validate_deep_precedes ~deep_arr ~bars_arr with
+    | Error e -> Error e
+    | Ok () -> _build_rows ~symbol ~bars_arr ~deep_arr ~schema ~benchmark_bars

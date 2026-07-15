@@ -104,8 +104,8 @@ let _dedupe_symbols ~config ~data_dir ~warmup_start ~end_date ~output_dir
     Twin_detector.survivors report ~all_symbols
   end
 
-let main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir ~incremental
-    ~progress_every ~twin_config () =
+let main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
+    ~sketch_deep_days ~incremental ~progress_every ~twin_config () =
   let scenario = Scenario.load scenario_path in
   let universe =
     _resolve_universe ~fixtures_root ~universe_path:scenario.universe_path
@@ -120,7 +120,7 @@ let main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir ~incremental
   Build_runner.build ~symbols ~csv_data_dir ~output_dir
     ~benchmark_symbol:(Some plan.benchmark_symbol)
     ~start_date:(Some plan.warmup_start) ~end_date:(Some plan.end_date)
-    ~incremental ~progress_every ()
+    ~sketch_deep_days ~incremental ~progress_every ()
 
 let command =
   Command.basic
@@ -141,6 +141,15 @@ let command =
      and output_dir =
        flag "output-dir" (required string)
          ~doc:"PATH Directory where snapshot files + manifest are written"
+     and sketch_deep_days =
+       flag "sketch-deep-days"
+         (optional_with_default Build_runner.default_sketch_deep_days int)
+         ~doc:
+           (Printf.sprintf
+              "N Calendar days of extra pre-warmup history fed only to the \
+               resistance sketch columns (resistance-v2 deep feed; the 13 \
+               warmup-windowed columns are unchanged). Default %d."
+              Build_runner.default_sketch_deep_days)
      and incremental =
        flag "incremental" no_arg
          ~doc:
@@ -205,7 +214,7 @@ let command =
            prefilter_rel_tol = Twin_detector.Config.default.prefilter_rel_tol;
          }
        in
-       main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir ~incremental
-         ~progress_every ~twin_config ())
+       main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
+         ~sketch_deep_days ~incremental ~progress_every ~twin_config ())
 
 let () = Command_unix.run command

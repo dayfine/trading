@@ -15,6 +15,11 @@ val default_progress_every : int
 (** Default [progress.sexp] emission cadence: write a progress checkpoint after
     every 50 symbols. CLIs surface this as the [--progress-every] default. *)
 
+val default_sketch_deep_days : int
+(** Default calendar-day span of extra pre-window history loaded to feed the
+    resistance sketch (resistance-v2 §D4): 3650 (~520 trading weeks, the deepest
+    sketch horizon). CLIs surface this as the [--sketch-deep-days] default. *)
+
 val build :
   symbols:string list ->
   csv_data_dir:string ->
@@ -22,6 +27,7 @@ val build :
   benchmark_symbol:string option ->
   start_date:Core.Date.t option ->
   end_date:Core.Date.t option ->
+  sketch_deep_days:int ->
   incremental:bool ->
   progress_every:int ->
   unit ->
@@ -45,6 +51,14 @@ val build :
       (not its [start_date]) as [start_date] — indicators warm up over in-window
       bars only, exactly as {!Csv_snapshot_builder} is invoked with
       [~warmup_start]. [None] on either bound means full history on that side.
+    - [sketch_deep_days] — calendar-day span of extra history loaded {e before}
+      [start_date] and fed only to the resistance-sketch columns
+      ([Res_max_high_*], [Res_bars_seen], [Res_hist]) via
+      {!Snapshot_pipeline.Pipeline.build_for_symbol}'s [deep_bars]
+      (resistance-v2 §D4). The 13 warmup-windowed columns and the benchmark stay
+      windowed to [start_date], so this never changes them; symbols with no
+      pre-window data behave exactly as before. Ignored when [start_date] is
+      [None] (full-history build). See {!default_sketch_deep_days}.
     - [incremental] — when [true], symbols whose source CSV mtime is [<=] the
       existing manifest's recorded [csv_mtime] are reused rather than rebuilt.
     - [progress_every] — emit [progress.sexp] every N symbols processed.

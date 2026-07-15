@@ -41,6 +41,48 @@ let _compute bars =
   let weekly_prefix = Weekly_prefix.build bars_arr in
   (Resistance_sketch.compute ~weekly_prefix ~bars_arr, weekly_prefix, bars_arr)
 
+(* Count index positions where two float arrays differ in their IEEE-754 bit
+   pattern (so [nan] matches [nan] and [-0.0] differs from [0.0]) — the
+   bit-exact do-no-harm / split-parity gate. Length mismatch is [Int.max_value]
+   so it never reads as 0. *)
+let _bit_mismatches a b =
+  if Array.length a <> Array.length b then Int.max_value
+  else
+    Array.foldi a ~init:0 ~f:(fun i acc x ->
+        if Int64.equal (Int64.bits_of_float x) (Int64.bits_of_float b.(i)) then
+          acc
+        else acc + 1)
+
+let _sketch_bit_mismatches (a : Resistance_sketch.t) (b : Resistance_sketch.t) =
+  let cols =
+    [
+      (a.max_high_130w, b.max_high_130w);
+      (a.max_high_260w, b.max_high_260w);
+      (a.max_high_520w, b.max_high_520w);
+      (a.bars_seen, b.bars_seen);
+    ]
+  in
+  let col_mm =
+    List.sum (module Int) cols ~f:(fun (x, y) -> _bit_mismatches x y)
+  in
+  let hist_mm =
+    Array.foldi a.hist ~init:0 ~f:(fun k acc row ->
+        acc + _bit_mismatches row b.hist.(k))
+  in
+  col_mm + hist_mm
+
+(* Trailing-window slice of a full-series sketch — the independent oracle
+   [compute_windowed] must reproduce. *)
+let _slice_sketch (s : Resistance_sketch.t) ~offset ~len : Resistance_sketch.t =
+  let slice arr = Array.sub arr ~pos:offset ~len in
+  {
+    Resistance_sketch.max_high_130w = slice s.max_high_130w;
+    max_high_260w = slice s.max_high_260w;
+    max_high_520w = slice s.max_high_520w;
+    bars_seen = slice s.bars_seen;
+    hist = Array.map s.hist ~f:slice;
+  }
+
 (* Reference max over the trailing [lookback] weekly bars at [day_idx],
    straight from [Weekly_prefix.window_for_day] — the independent oracle the
    deque-based sliding max must agree with. *)
@@ -217,6 +259,152 @@ let test_pipeline_populates_sketch_columns _ =
             field (fun (_, b) -> b) (is_some_and (float_equal 110.0));
           ]))
 
+(* Split-parity: splitting a series into (deep, window) then feeding both to
+   [compute_windowed] reproduces the full-series sketch sliced to the window,
+   bit-for-bit. The split is Wednesday of week 20 (raw index 5*20+2) so the deep
+   tail and the window head share one ISO week — the boundary re-merge is
+   exercised, not just a clean week edge. *)
+let test_split_parity_bit_identical _ =
+  let bars =
+    _weeks_bars ~n_weeks:200 ~week_shape:(fun w ->
+        if w = 5 then Some (50.0, 40.0) else None)
+  in
+  let full_arr = Array.of_list bars in
+  let split = (5 * 20) + 2 in
+  let deep = Array.sub full_arr ~pos:0 ~len:split in
+  let window =
+    Array.sub full_arr ~pos:split ~len:(Array.length full_arr - split)
+  in
+  let windowed =
+    Resistance_sketch.compute_windowed ~deep_bars:deep ~bars_arr:window
+  in
+  let full_sketch =
+    Resistance_sketch.compute
+      ~weekly_prefix:(Weekly_prefix.build full_arr)
+      ~bars_arr:full_arr
+  in
+  let expected =
+    _slice_sketch full_sketch ~offset:split ~len:(Array.length window)
+  in
+  assert_that (_sketch_bit_mismatches windowed expected) (equal_to 0)
+
+(* bars_seen honesty: with 550 weeks of deep history before the window, the
+   first emitted row reports the capped true depth (520), not the window-relative
+   count (1) it would report with no deep feed. *)
+let test_deep_bars_seen_honesty _ =
+  let full = _weeks_bars ~n_weeks:600 ~week_shape:(fun _ -> None) in
+  let full_arr = Array.of_list full in
+  let split = 5 * 550 in
+  let deep = Array.sub full_arr ~pos:0 ~len:split in
+  let window =
+    Array.sub full_arr ~pos:split ~len:(Array.length full_arr - split)
+  in
+  let with_deep =
+    Resistance_sketch.compute_windowed ~deep_bars:deep ~bars_arr:window
+  in
+  let without_deep =
+    Resistance_sketch.compute_windowed ~deep_bars:[||] ~bars_arr:window
+  in
+  assert_that
+    (with_deep.bars_seen.(0), without_deep.bars_seen.(0))
+    (all_of
+       [
+         field (fun (a, _) -> a) (float_equal 520.0);
+         field (fun (_, b) -> b) (float_equal 1.0);
+       ])
+
+(* The 13 non-sketch columns are the do-no-harm gate: supplying deep_bars must
+   leave every EMA/SMA/ATR/RSI/Stage/RS/Macro/OHLCV/Adjusted cell bit-identical
+   to the no-deep build (a golden drift here is a rejected PR). *)
+let _basis_fields =
+  Snapshot_schema.
+    [
+      EMA_50;
+      SMA_50;
+      ATR_14;
+      RSI_14;
+      Stage;
+      RS_line;
+      Macro_composite;
+      Open;
+      High;
+      Low;
+      Close;
+      Volume;
+      Adjusted_close;
+    ]
+
+let _row_basis_mismatches r1 r2 =
+  List.count _basis_fields ~f:(fun field ->
+      match (Snapshot.get r1 field, Snapshot.get r2 field) with
+      | Some a, Some b ->
+          not (Int64.equal (Int64.bits_of_float a) (Int64.bits_of_float b))
+      | None, None -> false
+      | _ -> true)
+
+let _rows_basis_mismatches r1s r2s =
+  if List.length r1s <> List.length r2s then Int.max_value
+  else
+    List.fold2_exn r1s r2s ~init:0 ~f:(fun acc r1 r2 ->
+        acc + _row_basis_mismatches r1 r2)
+
+let test_deep_bars_basis_guard _ =
+  let window_start = Date.of_string "2010-01-04" in
+  let window =
+    List.init 260 ~f:(fun i ->
+        _bar
+          ~date:(Date.add_days window_start i)
+          ~close:(100.0 +. Float.of_int (i mod 11))
+          ())
+  in
+  let deep =
+    List.init 520 ~f:(fun i ->
+        _bar
+          ~date:(Date.add_days (Date.of_string "2007-01-01") i)
+          ~close:(80.0 +. Float.of_int (i mod 7))
+          ())
+  in
+  let benchmark =
+    List.init 260 ~f:(fun i ->
+        _bar
+          ~date:(Date.add_days window_start i)
+          ~close:(200.0 +. Float.of_int (i mod 5))
+          ())
+  in
+  let with_deep =
+    Pipeline.build_for_symbol ~symbol:"FOO" ~bars:window ~deep_bars:deep
+      ~schema:Snapshot_schema.default ~benchmark_bars:benchmark ()
+  in
+  let expected_rows =
+    match
+      Pipeline.build_for_symbol ~symbol:"FOO" ~bars:window
+        ~schema:Snapshot_schema.default ~benchmark_bars:benchmark ()
+    with
+    | Ok rows -> rows
+    | Error err -> failwith (Status.show err)
+  in
+  assert_that with_deep
+    (is_ok_and_holds
+       (field
+          (fun rows -> _rows_basis_mismatches rows expected_rows)
+          (equal_to 0)))
+
+(* Deep whose last bar lands ON the window's first day overlaps -> Error. *)
+let test_deep_overlap_errors _ =
+  let window =
+    List.init 20 ~f:(fun i ->
+        _bar ~date:(Date.add_days (Date.of_string "2010-01-04") i) ())
+  in
+  let deep =
+    List.init 20 ~f:(fun i ->
+        _bar ~date:(Date.add_days (Date.of_string "2009-12-16") i) ())
+  in
+  let rows =
+    Pipeline.build_for_symbol ~symbol:"FOO" ~bars:window ~deep_bars:deep
+      ~schema:Snapshot_schema.default ()
+  in
+  assert_that rows is_error
+
 let suite =
   "Resistance_sketch tests"
   >::: [
@@ -228,6 +416,10 @@ let suite =
          "virgin parity with v1 mapper" >:: test_virgin_parity_with_v1_mapper;
          "pipeline populates sketch columns"
          >:: test_pipeline_populates_sketch_columns;
+         "split parity bit-identical" >:: test_split_parity_bit_identical;
+         "deep bars_seen honesty" >:: test_deep_bars_seen_honesty;
+         "deep bars basis guard (13 columns)" >:: test_deep_bars_basis_guard;
+         "deep overlap errors" >:: test_deep_overlap_errors;
        ]
 
 let () = run_test_tt_main suite
