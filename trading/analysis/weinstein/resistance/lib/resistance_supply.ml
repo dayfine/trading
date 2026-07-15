@@ -50,19 +50,20 @@ let _sketch_is_finite (s : sketch) =
   && Float.is_finite s.anchor_close
   && Float.(s.anchor_close > 0.0)
 
+(* Bucket index for a breakout/anchor ratio: ceil(n * log2 ratio), clamped
+   at 0; a non-finite result (degenerate ratio) degrades to bucket 0. *)
+let _bucket_of_ratio ~n_buckets ~ratio =
+  let raw =
+    Float.round_up (Float.of_int n_buckets *. Float.log ratio /. Float.log 2.0)
+  in
+  if Float.is_finite raw then Int.max 0 (Int.of_float raw) else 0
+
 (* First histogram bucket whose whole band sits at or above the breakout.
    Bucket [k] spans [anchor * 2^(k/n), ...): k_min = ceil(n * log2(B / C)),
    clamped at 0 (a breakout below the anchor sees every bucket). *)
 let _first_bucket ~n_buckets ~anchor ~breakout =
   if Float.(breakout <= anchor) then 0
-  else
-    let raw =
-      Float.round_up
-        (Float.of_int n_buckets
-        *. Float.log (breakout /. anchor)
-        /. Float.log 2.0)
-    in
-    if Float.is_finite raw then Int.max 0 (Int.of_float raw) else 0
+  else _bucket_of_ratio ~n_buckets ~ratio:(breakout /. anchor)
 
 (* Proximity-weighted bar mass and max single-bucket count over buckets
    [k_min ..]: weight decays multiplicatively per bucket above [k_min]. *)
