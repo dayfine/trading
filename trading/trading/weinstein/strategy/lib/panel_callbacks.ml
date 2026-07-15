@@ -239,7 +239,7 @@ let _split_factor_of_weekly_view (weekly : Snapshot_bar_views.weekly_view) :
         ~week_offset
 
 let stock_analysis_callbacks_of_weekly_views ?ma_cache ?stock_symbol
-    ?resistance_stock ~(config : Stock_analysis.config)
+    ?resistance_stock ?snapshot_cb ~(config : Stock_analysis.config)
     ~(stock : Snapshot_bar_views.weekly_view)
     ~(benchmark : Snapshot_bar_views.weekly_view) () : Stock_analysis.callbacks
     =
@@ -248,6 +248,8 @@ let stock_analysis_callbacks_of_weekly_views ?ma_cache ?stock_symbol
     get_high = _get_from_float_array stock.highs;
     get_volume = _get_from_float_array stock.volumes;
     get_split_factor = _split_factor_of_weekly_view stock;
+    get_sketch =
+      Resistance_sketch_reader.closure ?snapshot_cb ?stock_symbol ~stock ();
     stage =
       stage_callbacks_of_weekly_view ?ma_cache ?symbol:stock_symbol
         ~config:config.stage ~weekly:stock ();
@@ -445,8 +447,8 @@ let stock_analysis_callbacks_of_snapshot_views ?ma_cache
   let benchmark =
     Snapshot_bar_views.weekly_view_for cb ~symbol:benchmark_symbol ~n ~as_of
   in
-  stock_analysis_callbacks_of_weekly_views ?ma_cache ~stock_symbol ~config
-    ~stock ~benchmark ()
+  stock_analysis_callbacks_of_weekly_views ?ma_cache ~stock_symbol
+    ~snapshot_cb:cb ~config ~stock ~benchmark ()
 
 let sector_callbacks_of_snapshot_views ?ma_cache ~(config : Sector.config)
     ~(cb : Snapshot_callbacks.t) ~sector_symbol ~benchmark_symbol ~n ~as_of () :

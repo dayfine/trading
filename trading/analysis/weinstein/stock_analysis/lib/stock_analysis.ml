@@ -27,6 +27,9 @@ type config = {
   continuation : Continuation.config option;
       (** When [Some cfg], the continuation-buy detector runs; when [None]
           (default), it is skipped. See .mli for full semantics. *)
+  overhead_supply : Resistance_supply.config option; [@sexp.default None]
+      (** Continuous overhead-supply score (resistance-v2); [None] = off. See
+          .mli. *)
 }
 
 let default_config =
@@ -39,6 +42,7 @@ let default_config =
     base_lookback_weeks = 52;
     base_end_offset_weeks = 8;
     continuation = None;
+    overhead_supply = None;
   }
 
 type t = {
@@ -52,6 +56,13 @@ type t = {
   breakdown_price : float option;
   prior_stage : stage option;
   continuation : Continuation.result option;
+  supply : Resistance_supply.result option;
+      (** Continuous overhead-supply score from the precomputed resistance
+          sketch (resistance-v2). [None] when [config.overhead_supply = None]
+          (default — feature off) OR when the callback bundle's [get_sketch]
+          returned [None] OR when no breakout price could be determined.
+          [Some r] carries [r.score] in [0, 1] (0 = virgin, 1 = heavy recent
+          supply) consumed by the screener's long-side scoring weight. *)
   as_of_date : Date.t;
 }
 
@@ -70,6 +81,10 @@ type callbacks = {
   get_split_factor : week_offset:int -> float option;
       (** Per-bar [adjusted_close / close_price]; see [stock_analysis.mli] for
           the truncation semantics. [None] disables truncation. *)
+  get_sketch : unit -> Resistance_supply.sketch option;
+      (** Warehouse resistance sketch for (symbol, as_of); [None] off the
+          snapshot path. See .mli. Consumed only when [overhead_supply] armed.
+      *)
   stage : Stage.callbacks;  (** Nested Stage callbacks. *)
   rs : Rs.callbacks;  (** Nested RS callbacks. *)
   volume : Volume.callbacks;  (** Nested Volume callbacks. *)
@@ -268,6 +283,8 @@ let callbacks_from_bars ~(config : config) ~(bars : Daily_price.t list)
     get_high = _make_get_high_from_bars bars_arr;
     get_volume = _make_get_volume_from_bars bars_arr;
     get_split_factor = _make_get_split_factor_from_bars bars_arr;
+    (* Bar-list / live CSV path has no warehouse sketch (stays v1). *)
+    get_sketch = (fun () -> None);
     stage = Stage.callbacks_from_bars ~config:config.stage ~bars;
     rs = Rs.callbacks_from_bars ~stock_bars:bars ~benchmark_bars;
     volume = Volume.callbacks_from_bars ~bars;
@@ -327,6 +344,27 @@ let _continuation_result ~(config : config) ~(callbacks : callbacks) :
       Continuation.analyze_with_callbacks ~config:cont_cfg
         ~callbacks:cont_callbacks)
 
+(** Score a sketch when both a sketch and a breakout price are present. Split
+    out of {!_supply_result} to keep each match shallow (nesting linter). *)
+let _supply_of_sketch ~supply_config ~(callbacks : callbacks) ~breakout_price :
+    Resistance_supply.result option =
+  match (callbacks.get_sketch (), breakout_price) with
+  | Some sketch, Some bp ->
+      Some
+        (Resistance_supply.analyze ~config:supply_config ~sketch
+           ~breakout_price:bp)
+  | _ -> None
+
+(** Continuous overhead-supply score (resistance-v2). [Some] only when armed AND
+    the callbacks supply a sketch AND a breakout price exists; else [None],
+    bit-equal to pre-feature. [get_sketch] is only called when armed. *)
+let _supply_result ~(config : config) ~(callbacks : callbacks) ~breakout_price :
+    Resistance_supply.result option =
+  match config.overhead_supply with
+  | None -> None
+  | Some supply_config ->
+      _supply_of_sketch ~supply_config ~callbacks ~breakout_price
+
 (* ------------------------------------------------------------------ *)
 (* Main analyzer — callback shape                                       *)
 (* ------------------------------------------------------------------ *)
@@ -382,6 +420,7 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
       ~as_of_date ~breakdown_price
   in
   let continuation = _continuation_result ~config ~callbacks in
+  let supply = _supply_result ~config ~callbacks ~breakout_price in
   {
     ticker;
     stage = stage_result;
@@ -393,6 +432,7 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
     breakdown_price;
     prior_stage;
     continuation;
+    supply;
     as_of_date;
   }
 

@@ -169,6 +169,11 @@ module Panel_callbacks = Panel_callbacks
 (** Panel-shaped callback bundle constructors for the strategy's callees. See
     {!Panel_callbacks}. *)
 
+module Resistance_sketch_reader = Resistance_sketch_reader
+(** Reads a resistance-v2 {!Resistance_supply.sketch} out of the warehouse
+    snapshot columns for the overhead-supply score. See
+    {!Resistance_sketch_reader}. *)
+
 module Weekly_ma_cache = Weekly_ma_cache
 (** Per-symbol weekly MA cache (Stage 4 PR-D). Memoises Stage / Macro / Sector /
     Stops MA reads keyed by [(symbol, ma_type, period)]. *)
@@ -616,6 +621,15 @@ type config = {
           the signal wholesale). Default [0] = resistance reads the standard
           [lookback_bars] view, bit-identical to baseline. R2-searchable int
           axis. See [Weinstein_strategy_config.resistance_lookback_bars]. *)
+  overhead_supply : Resistance_supply.config option; [@sexp.default None]
+      (** Continuous overhead-supply score (resistance-v2). When [Some cfg], the
+          strategy copies [cfg] into the per-screen [Stock_analysis.config] and
+          the panel adapter reads the warehouse sketch columns, populating
+          [Stock_analysis.t.supply] for the screener's [w_overhead_supply]
+          scoring weight. Default [None] = [supply] always [None], binary grade
+          fallback, no sketch reads (bit-identical to baseline). Pairs with the
+          screener weight; live CSV path stays v1. See
+          [Weinstein_strategy_config.overhead_supply]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

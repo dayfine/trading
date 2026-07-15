@@ -84,6 +84,7 @@ let make_analysis ?(ticker = "AAPL")
     breakdown_price = None;
     prior_stage;
     continuation = None;
+    supply = None;
     as_of_date;
   }
 

@@ -26,6 +26,7 @@
   weinstein_trading.declining_ma_gate
   weinstein_trading.liquidity_gate
   weinstein.stock_analysis
+  weinstein.resistance
   weinstein.continuation
   indicators.types
   indicators.sma

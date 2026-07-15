@@ -4,6 +4,7 @@
  (libraries
   screener
   stock_analysis
+  resistance
   weinstein_types
   stage
   rs

@@ -22,6 +22,7 @@ type scoring_weights = {
   w_positive_rs : int;
   w_bullish_rs_crossover : int;
   w_clean_resistance : int;
+  w_overhead_supply : int option; [@sexp.default None]
   w_virgin_support : int option; [@sexp.default None]
   w_sector_strong : int;
   w_late_stage2_penalty : int;
@@ -44,6 +45,7 @@ let default_scoring_weights =
     w_positive_rs = 20;
     w_bullish_rs_crossover = 10;
     w_clean_resistance = 15;
+    w_overhead_supply = None;
     w_virgin_support = Some _default_virgin_support;
     w_sector_strong = 10;
     w_late_stage2_penalty = -15;
@@ -142,8 +144,10 @@ let _rs_short_signal ~w ~(a : Stock_analysis.t) =
       [ (w.w_positive_rs / 2, "RS negative") ]
   | _ -> []
 
-(** Overhead resistance signal. *)
-let _resistance_signal ~w ~(a : Stock_analysis.t) =
+(** Binary (v1) overhead-resistance signal: the pre-resistance-v2 grade-based
+    points. Used as the fallback whenever the continuous supply weight is unset
+    or no continuous supply score is present. *)
+let _binary_resistance_signal ~w ~(a : Stock_analysis.t) =
   match a.resistance with
   | Some { quality = Virgin_territory; _ } ->
       [ (w.w_clean_resistance, "Virgin territory") ]
@@ -151,6 +155,24 @@ let _resistance_signal ~w ~(a : Stock_analysis.t) =
   | Some { quality = Moderate_resistance; _ } ->
       [ (w.w_clean_resistance / 2, "Moderate resistance") ]
   | _ -> []
+
+(** Continuous overhead-supply points (resistance-v2):
+    [round(weight * (1 - score))] so a virgin breakout ([score = 0]) earns the
+    full [weight] and a heavy-supply breakout ([score = 1]) earns 0. Replaces —
+    never adds to — the binary grade points. *)
+let _continuous_supply_points ~weight ~(r : Resistance_supply.result) =
+  Int.of_float (Float.round_nearest (Float.of_int weight *. (1.0 -. r.score)))
+
+(** Overhead resistance signal. When [w_overhead_supply = Some weight] AND the
+    analysis carries a continuous supply score ([a.supply = Some r]), the
+    continuous score REPLACES the binary virgin/clean grade points (not additive
+    — that would double-count overhead). Either being absent falls back to the
+    bit-identical binary path. *)
+let _resistance_signal ~w ~(a : Stock_analysis.t) =
+  match (w.w_overhead_supply, a.supply) with
+  | Some weight, Some r ->
+      [ (_continuous_supply_points ~weight ~r, "Overhead supply (continuous)") ]
+  | _ -> _binary_resistance_signal ~w ~a
 
 (** Below-breakdown clean-space signal for short setups. Mirror of
     [_resistance_signal] for the short-side cascade. Per Weinstein, the Short

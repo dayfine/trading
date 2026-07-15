@@ -741,6 +741,33 @@ type config = {
           chart-reading its intended ~10-year window instead of a truncated one.
           No spine item is touched. Default-off until an experiment-ledger
           ACCEPT. *)
+  overhead_supply : Resistance_supply.config option; [@sexp.default None]
+      (** Continuous overhead-supply score (resistance-v2 PR-D). When
+          [Some cfg], the strategy copies [cfg] into the per-screen
+          [Stock_analysis.config] ([overhead_supply]); the snapshot-backed panel
+          adapter reads the precomputed warehouse sketch columns and populates
+          [Stock_analysis.t.supply], which the screener's [w_overhead_supply]
+          scoring weight then consumes in place of the binary virgin/clean
+          grade.
+
+          {b Semantics.}
+          - [None] (default): {b bit-identical to baseline} —
+            [Stock_analysis.t.supply] is always [None], the screener falls back
+            to the binary grade, no sketch reads occur
+            (experiment-flag-discipline R1).
+          - [Some cfg]: the continuous score runs for survivors whose panel
+            carries the sketch columns. Pairs with the screener weight
+            [Screener.scoring_weights.w_overhead_supply] (both must be armed for
+            the mechanism to change any score); the live CSV report path has no
+            warehouse sketch and stays on the v1 binary grade until a follow-up.
+
+          {b R2 searchability.} Real config field → resolves through
+          [Overlay_validator.apply_overrides]; expressible as an option axis
+          over the [Resistance_supply.config] sub-fields.
+
+          {b Faithfulness} (W1/W2). Ranking weight only, not an entry gate — the
+          Stage-2-only buy rule, breakout+volume entry, macro/sector gate and
+          stops are untouched. Default-off until an experiment-ledger ACCEPT. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

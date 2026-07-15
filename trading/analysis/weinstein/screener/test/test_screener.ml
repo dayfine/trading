@@ -1583,6 +1583,122 @@ let test_insufficient_history_scores_zero_long _ =
     (score (with_resistance Virgin_territory))
     (gt (module Int_ord) insuf)
 
+(* ------------------------------------------------------------------ *)
+(* Continuous overhead-supply scoring weight (resistance-v2 PR-D)       *)
+(* ------------------------------------------------------------------ *)
+
+(** Build a [Resistance_supply.result] carrying a chosen [score]; the other
+    fields are benign (only [score] drives [_resistance_signal]). *)
+let make_supply score : Resistance_supply.result =
+  { score; recent_weighted_bars = 0.0; quality = Clean }
+
+(** An analysis with NO binary resistance signal (so its long score isolates the
+    continuous-supply contribution) and a chosen continuous [supply]. *)
+let _supply_analysis supply =
+  { (_breakout_analysis ()) with resistance = None; supply }
+
+(** [w_overhead_supply] semantics: with the binary resistance signal zeroed
+    ([resistance = None]), the long score gains exactly
+    [round (weight * (1 - score))] when BOTH the weight is [Some] AND a
+    continuous supply score is present. Either being absent leaves the score at
+    the binary baseline. Cases: (weight None) unchanged; (weight Some, supply
+    None) binary fallback; (weight Some, supply Some score 0) = full weight;
+    (score 1) = 0; (score 0.5, w 15) = 8 (round-nearest). *)
+let test_w_overhead_supply_scoring_branch _ =
+  let sector = make_sector "Tech" in
+  let score ?(w = None) supply =
+    fst
+      (score_long
+         ~weights:{ default_scoring_weights with w_overhead_supply = w }
+         ~sector (_supply_analysis supply))
+  in
+  let base = score None in
+  assert_that
+    ( score ~w:None (Some (make_supply 0.5)) - base,
+      score ~w:(Some 15) None - base,
+      score ~w:(Some 15) (Some (make_supply 0.0)) - base,
+      score ~w:(Some 15) (Some (make_supply 1.0)) - base,
+      score ~w:(Some 15) (Some (make_supply 0.5)) - base )
+    (equal_to (0, 0, 15, 0, 8))
+
+(** A Virgin_territory binary grade (the binary path scores
+    [w_clean_resistance = 15]). *)
+let _virgin_resistance : Resistance.result =
+  {
+    quality = Virgin_territory;
+    breakout_price = 100.0;
+    zones_above = [];
+    nearest_zone = None;
+  }
+
+(** Replace-not-add on the PRODUCTION armed shape. [analyze_with_callbacks]
+    populates BOTH [resistance] (binary grade) AND [supply] (continuous score),
+    so the armed branch of [_resistance_signal] must REPLACE the binary grade
+    points, never sum them (docstring: "not additive — that would double-count
+    overhead"). With a Virgin_territory grade present (binary path earns
+    [w_clean_resistance = 15]) AND a continuous supply score under
+    [w_overhead_supply = w], the long overhead contribution must be
+    [round (w * (1 - score))] ONLY: an additive regression would show [15 + w]
+    (55 here) for [score 0] instead of [w] (40) — exactly the virgin-preference
+    double-count the resistance-v2 dial guards against. The scoring_branch test
+    forces [resistance = None], so it cannot distinguish REPLACE from ADD; this
+    test carries a populated binary grade to pin the replace semantics. *)
+let test_w_overhead_supply_replaces_not_adds _ =
+  let sector = make_sector "Tech" in
+  let score ?(w = None) ?(resistance = None) ?(supply = None) () =
+    fst
+      (score_long
+         ~weights:{ default_scoring_weights with w_overhead_supply = w }
+         ~sector
+         { (_breakout_analysis ()) with resistance; supply })
+  in
+  (* Baseline: no overhead signal at all (resistance None, supply None). *)
+  let baseline = score () in
+  (* Binary-only Virgin (weight unset): the binary path scores 15. *)
+  let binary_virgin = score ~resistance:(Some _virgin_resistance) () in
+  (* Armed with the SAME Virgin grade present PLUS a continuous supply score:
+     the binary 15 is dropped; only round(w*(1-score)) remains. score 0 -> full
+     w = 40 (an additive bug would show 55); score 1 -> 0. *)
+  let armed_full =
+    score ~w:(Some 40) ~resistance:(Some _virgin_resistance)
+      ~supply:(Some (make_supply 0.0))
+      ()
+  in
+  let armed_heavy =
+    score ~w:(Some 40) ~resistance:(Some _virgin_resistance)
+      ~supply:(Some (make_supply 1.0))
+      ()
+  in
+  assert_that
+    (binary_virgin - baseline, armed_full - baseline, armed_heavy - baseline)
+    (equal_to (15, 40, 0))
+
+(** [w_overhead_supply] must appear in the serialized default config (so
+    [Overlay_validator] can target it as a [Variant_matrix] axis), a config sexp
+    that omits the field parses to [None] (older sexps round-trip), and an
+    explicit [Some] round-trips. Mirrors [test_w_early_stage2_sexp_...]. *)
+let test_w_overhead_supply_sexp_present_and_roundtrips _ =
+  let default_str =
+    Sexp.to_string (sexp_of_scoring_weights default_scoring_weights)
+  in
+  let parsed_missing =
+    scoring_weights_of_sexp
+      (Sexp.of_string
+         "((w_stage2_breakout 30)(w_strong_volume 20)(w_adequate_volume \
+          10)(w_positive_rs 20)(w_bullish_rs_crossover 10)(w_clean_resistance \
+          15)(w_sector_strong 10)(w_late_stage2_penalty -15))")
+  in
+  let roundtrip =
+    scoring_weights_of_sexp
+      (sexp_of_scoring_weights
+         { default_scoring_weights with w_overhead_supply = Some 18 })
+  in
+  assert_that
+    ( String.is_substring default_str ~substring:"w_overhead_supply",
+      parsed_missing.w_overhead_supply,
+      roundtrip.w_overhead_supply )
+    (equal_to (true, None, Some 18))
+
 (** Short-side twin: [Insufficient_history] on [support] contributes 0 —
     identical to no support data, strictly below Clean support below. Pins the
     [_support_signal] catch-all. *)
@@ -1680,6 +1796,7 @@ let ranking_analysis ~ticker ~rs_norm ~weeks_advancing ~volume_ratio :
     breakdown_price = None;
     prior_stage = Some (Stage1 { weeks_in_base = 10 });
     continuation = None;
+    supply = None;
     as_of_date = as_of;
   }
 
@@ -2145,6 +2262,12 @@ let suite =
          >:: test_score_long_window_controls_early_stage2_signal;
          "test_insufficient_history_scores_zero_long"
          >:: test_insufficient_history_scores_zero_long;
+         "test_w_overhead_supply_scoring_branch"
+         >:: test_w_overhead_supply_scoring_branch;
+         "test_w_overhead_supply_replaces_not_adds"
+         >:: test_w_overhead_supply_replaces_not_adds;
+         "test_w_overhead_supply_sexp_present_and_roundtrips"
+         >:: test_w_overhead_supply_sexp_present_and_roundtrips;
          "test_insufficient_history_scores_zero_short"
          >:: test_insufficient_history_scores_zero_short;
          "test_early_stage2_max_weeks_serializes_and_round_trips"
