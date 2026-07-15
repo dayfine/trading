@@ -153,6 +153,40 @@ let test_corrupt_close_degrades_to_nan _ =
       Float.is_nan sketch.max_high_130w.(1) )
     (equal_to (true, true, true, false))
 
+(* Virgin parity against the v1 AUTHORITY ([Resistance.analyze]) over the
+   same weekly window: v1 is virgin iff no weekly high strictly exceeds the
+   breakout, so the sketch-derived test [breakout >= max_high_520w] must
+   agree at breakouts below, exactly AT (the tie), and above the window max. *)
+let test_virgin_parity_with_v1_mapper _ =
+  let spike = 130.0 in
+  let week_shape w = if w = 10 then Some (spike, 100.0) else None in
+  let sketch, weekly_prefix, bars_arr =
+    _compute (_weeks_bars ~n_weeks:60 ~week_shape)
+  in
+  let last = Array.length bars_arr - 1 in
+  let weekly_window =
+    Weekly_prefix.window_for_day weekly_prefix ~day_idx:last ~lookback:520
+  in
+  let as_of_date = bars_arr.(last).Types.Daily_price.date in
+  let breakouts = [ spike -. 10.0; spike; spike +. 10.0 ] in
+  let agreements =
+    List.count breakouts ~f:(fun breakout_price ->
+        let v1 =
+          Resistance.analyze ~config:Resistance.default_config
+            ~bars:weekly_window ~breakout_price ~as_of_date
+        in
+        let v1_virgin =
+          match v1.quality with
+          | Weinstein_types.Virgin_territory -> true
+          | _ -> false
+        in
+        let sketch_virgin =
+          Float.(breakout_price >= sketch.max_high_520w.(last))
+        in
+        Bool.equal v1_virgin sketch_virgin)
+  in
+  assert_that agreements (equal_to (List.length breakouts))
+
 (* End-to-end: the default schema's sketch columns are populated by
    [Pipeline.build_for_symbol]. 10 consecutive calendar days from Tue
    2024-01-02 span ISO weeks 1-2, so the last row has 2 weekly bars. *)
@@ -191,6 +225,7 @@ let suite =
          "bars_seen counts weeks" >:: test_bars_seen_counts_weeks;
          "histogram buckets" >:: test_histogram_buckets;
          "corrupt close degrades to NaN" >:: test_corrupt_close_degrades_to_nan;
+         "virgin parity with v1 mapper" >:: test_virgin_parity_with_v1_mapper;
          "pipeline populates sketch columns"
          >:: test_pipeline_populates_sketch_columns;
        ]

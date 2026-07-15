@@ -7,8 +7,11 @@
     day [i] is the finalized weeks strictly before [i]'s week plus the
     partial week through day [i] — exactly the window the v1 resistance
     mapper sees at a Friday screening, so the sketch-derived virgin test
-    ([breakout > max_high]) is bit-equal to v1's [_is_virgin_territory]
-    over the same span.
+    [breakout >= max_high] is bit-equal to v1's [_is_virgin_territory] over
+    the same span (v1: virgin iff no high STRICTLY exceeds the breakout, so
+    the derived test must be [>=], preserving the [max_high = breakout]
+    tie). Pinned against [Resistance.analyze] directly by the parity test in
+    [test_resistance_sketch.ml].
 
     Field semantics (single source of truth is
     {!Data_panel_snapshot.Snapshot_schema}'s docstring):

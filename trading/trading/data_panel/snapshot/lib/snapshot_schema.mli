@@ -71,8 +71,11 @@
     - {!Res_max_high_130w} / {!Res_max_high_260w} / {!Res_max_high_520w}:
       maximum raw weekly high over the trailing 130/260/520 weekly bars
       (including the current partial week), matching the v1 resistance
-      mapper's raw-high basis. A breakout price above [Res_max_high_520w] is
-      exactly v1's [Virgin_territory] test over a 520-week window.
+      mapper's raw-high basis. [breakout >= Res_max_high_520w] is exactly
+      v1's [Virgin_territory] test over the same 520-weekly-bar window (v1:
+      virgin iff no bar's high strictly exceeds the breakout, i.e.
+      [max_high <= breakout] — the derived test must use [>=], not [>], to
+      preserve the tie case [max_high = breakout]).
     - {!Res_bars_seen}: true count of weekly bars available up to the row's
       day, capped at 520 — the honest [Insufficient_history] input (a
       window-starved warehouse can no longer masquerade as virgin history).
