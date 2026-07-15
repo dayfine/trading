@@ -37,6 +37,10 @@
       from the input {!Types.Daily_price.t} for the row's bar.
     - {!Volume}: input [int] volume cast to [float] (Float64 schema; integer
       counts up to ~2^53 round-trip exactly).
+    - {!Res_max_high_130w} / {!Res_max_high_260w} / {!Res_max_high_520w} /
+      {!Res_bars_seen} / [Res_hist k]: per-day resistance sketches computed by
+      {!Resistance_sketch.compute} over the same weekly prefix the Stage column
+      uses (see that module + the schema docstring for semantics).
 
     {2 Cross-symbol Macro_composite}
 

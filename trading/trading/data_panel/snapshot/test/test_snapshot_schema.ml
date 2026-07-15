@@ -29,24 +29,29 @@ let test_default_schema_locks_in_canonical_fields _ =
   let open Snapshot_schema in
   assert_that default.fields
     (elements_are
-       [
-         equal_to EMA_50;
-         equal_to SMA_50;
-         equal_to ATR_14;
-         equal_to RSI_14;
-         equal_to Stage;
-         equal_to RS_line;
-         equal_to Macro_composite;
-         equal_to Open;
-         equal_to High;
-         equal_to Low;
-         equal_to Close;
-         equal_to Volume;
-         equal_to Adjusted_close;
-       ])
+       ([
+          equal_to EMA_50;
+          equal_to SMA_50;
+          equal_to ATR_14;
+          equal_to RSI_14;
+          equal_to Stage;
+          equal_to RS_line;
+          equal_to Macro_composite;
+          equal_to Open;
+          equal_to High;
+          equal_to Low;
+          equal_to Close;
+          equal_to Volume;
+          equal_to Adjusted_close;
+          equal_to Res_max_high_130w;
+          equal_to Res_max_high_260w;
+          equal_to Res_max_high_520w;
+          equal_to Res_bars_seen;
+        ]
+       @ List.init n_hist_buckets ~f:(fun k -> equal_to (Res_hist k))))
 
 let test_default_schema_n_fields _ =
-  assert_that (Snapshot_schema.n_fields Snapshot_schema.default) (equal_to 13)
+  assert_that (Snapshot_schema.n_fields Snapshot_schema.default) (equal_to 37)
 
 (* The Phase A → Phase A.1 OHLCV addition deliberately bumps the schema hash —
    it is content-addressable, set-sensitive by construction. Pin both the
@@ -80,21 +85,27 @@ let test_field_name_round_trip _ =
   in
   assert_that names
     (elements_are
-       [
-         equal_to "EMA_50";
-         equal_to "SMA_50";
-         equal_to "ATR_14";
-         equal_to "RSI_14";
-         equal_to "Stage";
-         equal_to "RS_line";
-         equal_to "Macro_composite";
-         equal_to "Open";
-         equal_to "High";
-         equal_to "Low";
-         equal_to "Close";
-         equal_to "Volume";
-         equal_to "Adjusted_close";
-       ])
+       ([
+          equal_to "EMA_50";
+          equal_to "SMA_50";
+          equal_to "ATR_14";
+          equal_to "RSI_14";
+          equal_to "Stage";
+          equal_to "RS_line";
+          equal_to "Macro_composite";
+          equal_to "Open";
+          equal_to "High";
+          equal_to "Low";
+          equal_to "Close";
+          equal_to "Volume";
+          equal_to "Adjusted_close";
+          equal_to "Res_max_high_130w";
+          equal_to "Res_max_high_260w";
+          equal_to "Res_max_high_520w";
+          equal_to "Res_bars_seen";
+        ]
+       @ List.init Snapshot_schema.n_hist_buckets ~f:(fun k ->
+           equal_to (Printf.sprintf "Res_hist_%02d" k))))
 
 let suite =
   "Snapshot_schema tests"
@@ -105,7 +116,7 @@ let suite =
          >:: test_compute_hash_field_set_sensitive;
          "default schema locks in canonical fields"
          >:: test_default_schema_locks_in_canonical_fields;
-         "default schema n_fields = 13" >:: test_default_schema_n_fields;
+         "default schema n_fields = 37" >:: test_default_schema_n_fields;
          "default schema hash differs from pre-OHLCV"
          >:: test_default_schema_hash_pinned_for_canonical_set;
          "index_of present and absent" >:: test_index_of_present_and_absent;

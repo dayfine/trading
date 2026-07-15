@@ -1,5 +1,9 @@
 (tests
- (names test_snapshot_pipeline test_snapshot_manifest test_snapshot_verifier)
+ (names
+  test_snapshot_pipeline
+  test_snapshot_manifest
+  test_snapshot_verifier
+  test_resistance_sketch)
  (libraries
   core
   core_unix
@@ -9,6 +13,8 @@
   status
   trading.data_panel.snapshot
   weinstein.snapshot_pipeline
+  weinstein.resistance
+  weinstein_types
   types)
  (preprocess
   (pps ppx_sexp_conv)))

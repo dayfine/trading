@@ -14,7 +14,14 @@ type field =
   | Close
   | Volume
   | Adjusted_close
+  | Res_max_high_130w
+  | Res_max_high_260w
+  | Res_max_high_520w
+  | Res_bars_seen
+  | Res_hist of int
 [@@deriving sexp, compare, equal, show]
+
+let n_hist_buckets = 20
 
 let all_fields =
   [
@@ -31,7 +38,12 @@ let all_fields =
     Close;
     Volume;
     Adjusted_close;
+    Res_max_high_130w;
+    Res_max_high_260w;
+    Res_max_high_520w;
+    Res_bars_seen;
   ]
+  @ List.init n_hist_buckets ~f:(fun k -> Res_hist k)
 
 let field_name = function
   | EMA_50 -> "EMA_50"
@@ -47,6 +59,11 @@ let field_name = function
   | Close -> "Close"
   | Volume -> "Volume"
   | Adjusted_close -> "Adjusted_close"
+  | Res_max_high_130w -> "Res_max_high_130w"
+  | Res_max_high_260w -> "Res_max_high_260w"
+  | Res_max_high_520w -> "Res_max_high_520w"
+  | Res_bars_seen -> "Res_bars_seen"
+  | Res_hist k -> Printf.sprintf "Res_hist_%02d" k
 
 (* Canonical sexp form drives the hash. We use [Sexp.to_string] (not
    [to_string_hum]) because the compact form omits whitespace entirely, so

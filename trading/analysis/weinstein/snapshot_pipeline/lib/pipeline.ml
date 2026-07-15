@@ -121,7 +121,15 @@ type _precomputed = {
   stage : float array;
   rs : float array;
   macro : float array;
+  sketch : Resistance_sketch.t;
 }
+
+(* Out-of-range [Res_hist k] (a schema not built from
+   [Snapshot_schema.all_fields]) reads as NaN rather than raising — the
+   canonical default schema never produces one. *)
+let _hist_value (sketch : Resistance_sketch.t) ~k ~i =
+  if k >= 0 && k < Array.length sketch.hist then sketch.hist.(k).(i)
+  else Float.nan
 
 let _value_for_field ~field ~precomputed ~bars_arr ~i =
   match (field : Snapshot_schema.field) with
@@ -138,6 +146,11 @@ let _value_for_field ~field ~precomputed ~bars_arr ~i =
   | Close -> bars_arr.(i).Types.Daily_price.close_price
   | Volume -> Float.of_int bars_arr.(i).Types.Daily_price.volume
   | Adjusted_close -> bars_arr.(i).Types.Daily_price.adjusted_close
+  | Res_max_high_130w -> precomputed.sketch.max_high_130w.(i)
+  | Res_max_high_260w -> precomputed.sketch.max_high_260w.(i)
+  | Res_max_high_520w -> precomputed.sketch.max_high_520w.(i)
+  | Res_bars_seen -> precomputed.sketch.bars_seen.(i)
+  | Res_hist k -> _hist_value precomputed.sketch ~k ~i
 
 let _row_for_day ~symbol ~schema ~precomputed ~bars_arr ~i =
   let date = bars_arr.(i).Types.Daily_price.date in
@@ -205,7 +218,8 @@ let _compute_precomputed ~bars_arr ~benchmark_bars =
   let stage, rs, macro =
     _compute_weekly_arrays ~bars_arr ~weekly_prefix ~benchmark_bars
   in
-  { ema; sma; atr; rsi; stage; rs; macro }
+  let sketch = Resistance_sketch.compute ~weekly_prefix ~bars_arr in
+  { ema; sma; atr; rsi; stage; rs; macro; sketch }
 
 (* Build snapshot rows for a non-empty [bars_arr]. Extracted from
    [build_for_symbol] to eliminate the nested-else. *)
