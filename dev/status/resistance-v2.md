@@ -47,7 +47,7 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
   now reflects true weekly depth (capped 520). No warehouse rebuild in this PR
   (sketch columns still unconsumed). Verify: `dune runtest
   analysis/weinstein/snapshot_pipeline`.
-- **PR-D #1983 (OPEN, `feat/resistance-v2-wiring`)** — screener wiring, default-off.
+- **PR-D #1983 (MERGED)** — screener wiring, default-off.
   `Resistance_supply.config` gains `[@@deriving sexp]` (ppx_sexp_conv added to
   resistance pps). `Stock_analysis.config` += `overhead_supply` option,
   `callbacks` += `get_sketch`, `t` += `supply`; `analyze_with_callbacks`
@@ -73,8 +73,11 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
 
 ## Next steps
 
-1. **PR-D merge** — #1983 open, QC in flight; merge on 3 gates.
-2. **Warehouse rebuild** (B2 shipped #1982): dedup-v2 top-3000 28y + sp500 test
+1. **Warehouse rebuild** — LAUNCHED 07-15 end-of-session (in-container,
+   detached): `/tmp/snap_top3000_dedup_v3_sketch`, dedup flags + sketch
+   columns + deep feed; log `/tmp/wh_rebuild.log` (`exit:0` marker = done).
+   Verify per `dev/notes/next-session-priorities-2026-07-16.md` §P0.1-2.
+   Also still needed: sp500 test
    warehouses — schema-hash gate rejects the old ones. Container long runs
    solo (no concurrent agent dispatches).
 3. **PR-E — WF-CV score-weight surface** (incl. weight = 0 = today), record
