@@ -1,5 +1,9 @@
 (tests
- (names test_snapshot_pipeline test_snapshot_manifest test_snapshot_verifier)
+ (names
+  test_snapshot_pipeline
+  test_snapshot_manifest
+  test_snapshot_verifier
+  test_resistance_sketch)
  (libraries
   core
   core_unix

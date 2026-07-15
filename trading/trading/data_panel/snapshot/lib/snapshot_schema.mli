@@ -58,7 +58,34 @@
     set-sensitive by design) — see {!compute_hash}. Pre-existing on-disk
     snapshots become unreadable under the new {!default}; the manifest's
     [schema_hash] gate will surface the mismatch loudly. This is the intended
-    behaviour for a content-addressable schema fingerprint, not a regression. *)
+    behaviour for a content-addressable schema fingerprint, not a regression.
+
+    {2 Resistance sketch columns (resistance-v2)}
+
+    Precomputed point-in-time overhead-supply sketches, appended after
+    [Adjusted_close] (same append discipline as the OHLCV addition; schema
+    width grows from 13 to 37). All values are weekly-cadence aggregates
+    computed causally from bars up to and including the row's day — see
+    [dev/plans/resistance-v2-supply-sketches-2026-07-15.md] §D1-D4:
+
+    - {!Res_max_high_130w} / {!Res_max_high_260w} / {!Res_max_high_520w}:
+      maximum raw weekly high over the trailing 130/260/520 weekly bars
+      (including the current partial week), matching the v1 resistance
+      mapper's raw-high basis. A breakout price above [Res_max_high_520w] is
+      exactly v1's [Virgin_territory] test over a 520-week window.
+    - {!Res_bars_seen}: true count of weekly bars available up to the row's
+      day, capped at 520 — the honest [Insufficient_history] input (a
+      window-starved warehouse can no longer masquerade as virgin history).
+    - {!Res_hist k} for [k = 0 .. n_hist_buckets - 1]: trailing 130-weekly-bar
+      log-price histogram anchored at the row's raw close [C]. Bucket [k]
+      counts weekly bars whose mid-price [(high + low) / 2] falls in
+      [C * 2^(k/20), C * 2^((k+1)/20)) and whose high exceeds [C] — i.e.
+      supply sitting 0..100% above the row's price, ~3.5% per band. Bars
+      more than 2x above [C] are dropped (proximity-negligible; the max-high
+      family still detects non-virgin at any distance).
+
+    Sketch cells are [Float.nan] when the row's raw close is non-positive or
+    non-finite (corrupt bar guard). *)
 type field =
   | EMA_50
   | SMA_50
@@ -73,7 +100,17 @@ type field =
   | Close
   | Volume
   | Adjusted_close
+  | Res_max_high_130w
+  | Res_max_high_260w
+  | Res_max_high_520w
+  | Res_bars_seen
+  | Res_hist of int
 [@@deriving sexp, compare, equal, show]
+
+val n_hist_buckets : int
+(** [n_hist_buckets] is the number of {!Res_hist} bucket columns in the
+    canonical schema (20). [Res_hist k] is canonical only for
+    [0 <= k < n_hist_buckets]; {!all_fields} enumerates exactly that range. *)
 
 val all_fields : field list
 (** [all_fields] enumerates every variant of {!field} in declaration order. Used
@@ -104,9 +141,9 @@ val create : fields:field list -> t
     well-defined) but produces a schema that no real snapshot can match. *)
 
 val default : t
-(** [default] is the canonical 13-field schema: every variant of {!field} in
-    declaration order ({!all_fields}). The single source of truth for snapshots
-    produced by the offline pipeline. *)
+(** [default] is the canonical 37-field schema: every field in {!all_fields}
+    order. The single source of truth for snapshots produced by the offline
+    pipeline. *)
 
 val compute_hash : field list -> string
 (** [compute_hash fields] returns a deterministic hex fingerprint of the ordered
