@@ -59,6 +59,29 @@ type scoring_weights = {
   w_clean_resistance : int;
       (** Weight for Virgin_territory or Clean overhead (long side), and for
           Clean support below a breakdown (short side). Default: 15. *)
+  w_overhead_supply : int option; [@sexp.default None]
+      (** Long-side weight for the {b continuous} overhead-supply score
+          (resistance-v2). When [Some weight] AND the analysis carries a
+          continuous supply score ([Stock_analysis.t.supply = Some r]), the
+          long-side overhead points become [round (weight * (1 - r.score))] — a
+          virgin breakout ([score = 0]) earns the full [weight], a heavy-supply
+          breakout ([score = 1]) earns 0 — {b replacing} (not adding to) the
+          binary virgin/clean grade points. When [None] (default), OR when no
+          continuous supply score is present (feature off upstream, or the panel
+          had no sketch), the score falls back to the bit-identical binary
+          [w_clean_resistance] path. Affects {b only} the long path;
+          [_support_signal] (short side) is unchanged.
+
+          {b Why [@sexp.default None] and not [@sexp.option]:} same reason as
+          [w_early_stage2] / [w_virgin_support] — [Overlay_validator] derives
+          valid override key-paths from the serialized base config, so a
+          [None]-omitted field cannot be a [Variant_matrix] axis.
+          [@sexp.default None] keeps the field present in the serialized form
+          (axis resolves) while parsing a missing field to [None] (older config
+          sexps round-trip). Default-off per
+          [.claude/rules/experiment-flag-discipline.md]; the strategy arms it
+          via [Weinstein_strategy_config.overhead_supply] (the upstream config
+          that makes [Stock_analysis.t.supply] non-[None]). *)
   w_virgin_support : int option; [@sexp.default None]
       (** Short-side weight for {b Virgin_territory support below} a breakdown —
           no prior buyers waiting below to cushion the fall, the most explosive
@@ -95,6 +118,7 @@ type scoring_weights = {
     - [w_positive_rs]
     - [w_bullish_rs_crossover]
     - [w_clean_resistance]
+    - [w_overhead_supply]
     - [w_virgin_support]
     - [w_sector_strong]
     - [w_late_stage2_penalty]

@@ -200,6 +200,46 @@ let test_macro_bearish_trim_axes_expand _ =
               "enable_macro_bearish_exposure_trim=false__macro_bearish_max_long_exposure_pct=0.35");
        ])
 
+(* Proves R2 (experiment-flag-discipline) for the resistance-v2 continuous
+   overhead-supply scoring weight: [w_overhead_supply] is a real
+   [Screener.scoring_weights] field reached via the nested
+   [screening_config.weights] path, and — critically — it is serialized with
+   [@sexp.default None] (NOT [@sexp.option]), so [Overlay_validator] finds the
+   key in the base config and the axis expands to the expected nested override
+   sexps ([int option] value [(N)] = [Some N]). This is the "axis the day it
+   lands" gate for PR-D. *)
+let test_w_overhead_supply_weight_axis_expands _ =
+  let axis =
+    VM.Key
+      {
+        path = [ "screening_config"; "weights"; "w_overhead_supply" ];
+        values = Sexp.[ List [ Atom "10" ]; List [ Atom "20" ] ];
+      }
+  in
+  let t = { VM.axes = [ axis ]; expansion = VM.Cartesian } in
+  assert_that (VM.expand t)
+    (elements_are
+       [
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string
+                     "((screening_config ((weights ((w_overhead_supply \
+                      (10)))))))");
+              ]);
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string
+                     "((screening_config ((weights ((w_overhead_supply \
+                      (20)))))))");
+              ]);
+       ])
+
 (* Proves R2 (experiment-flag-discipline) for the [short_min_price] short-entry
    gate: it is a real top-level float key on [Weinstein_strategy.config] (same
    mechanism as [stage3_exit_margin_pct]), so the axis expands and passes
@@ -481,6 +521,8 @@ let suite =
          >:: test_macro_bearish_trim_axes_expand;
          "short_min_price float axis expands"
          >:: test_short_min_price_axis_expands;
+         "w_overhead_supply nested weight axis expands + validates"
+         >:: test_w_overhead_supply_weight_axis_expands;
          "short_sleeve_fraction flag axis expands"
          >:: test_short_sleeve_fraction_axis_expands;
          "suppress_warmup_trading flag axis expands"

@@ -616,6 +616,15 @@ type config = {
           the signal wholesale). Default [0] = resistance reads the standard
           [lookback_bars] view, bit-identical to baseline. R2-searchable int
           axis. See [Weinstein_strategy_config.resistance_lookback_bars]. *)
+  overhead_supply : Resistance_supply.config option; [@sexp.default None]
+      (** Continuous overhead-supply score (resistance-v2). When [Some cfg], the
+          strategy copies [cfg] into the per-screen [Stock_analysis.config] and
+          the panel adapter reads the warehouse sketch columns, populating
+          [Stock_analysis.t.supply] for the screener's [w_overhead_supply]
+          scoring weight. Default [None] = [supply] always [None], binary grade
+          fallback, no sketch reads (bit-identical to baseline). Pairs with the
+          screener weight; live CSV path stays v1. See
+          [Weinstein_strategy_config.overhead_supply]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

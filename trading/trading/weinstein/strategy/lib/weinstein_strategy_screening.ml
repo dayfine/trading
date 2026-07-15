@@ -229,6 +229,11 @@ let _stock_analysis_config_for ~(config : Weinstein_strategy_config.config) :
       }
     else Stock_analysis.default_config
   in
+  (* Thread the continuous overhead-supply config (resistance-v2). [None]
+     (default) leaves [base] bit-identical to {!Stock_analysis.default_config},
+     so [Stock_analysis.t.supply] stays [None] and the screener uses the binary
+     grade. *)
+  let base = { base with overhead_supply = config.overhead_supply } in
   if config.resistance_min_history_bars = 0 then base
   else
     {
@@ -268,8 +273,9 @@ let _full_analysis_of_survivor ~stock_analysis_config ~resistance_lookback_bars
   let callbacks =
     Panel_callbacks.stock_analysis_callbacks_of_weekly_views
       ?ma_cache:(Bar_reader.ma_cache bar_reader)
-      ?resistance_stock ~stock_symbol:ticker ~config:stock_analysis_config
-      ~stock:stock_view ~benchmark:index_view ()
+      ?resistance_stock ~stock_symbol:ticker
+      ~snapshot_cb:(Bar_reader.snapshot_callbacks bar_reader)
+      ~config:stock_analysis_config ~stock:stock_view ~benchmark:index_view ()
   in
   Stock_analysis.analyze_with_callbacks ~config:stock_analysis_config ~ticker
     ~callbacks ~prior_stage ~as_of_date

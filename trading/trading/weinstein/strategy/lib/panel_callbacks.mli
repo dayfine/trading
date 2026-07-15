@@ -73,6 +73,7 @@ val stock_analysis_callbacks_of_weekly_views :
   ?ma_cache:Weekly_ma_cache.t ->
   ?stock_symbol:string ->
   ?resistance_stock:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
+  ?snapshot_cb:Snapshot_runtime.Snapshot_callbacks.t ->
   config:Stock_analysis.config ->
   stock:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
   benchmark:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
@@ -85,6 +86,16 @@ val stock_analysis_callbacks_of_weekly_views :
     [benchmark]), {!Volume.callbacks} (over [stock]), and
     {!Resistance.callbacks} (over [resistance_stock] when given, else [stock])
     through the bundle.
+
+    [?snapshot_cb] wires the resistance-v2 [get_sketch] closure: when supplied
+    together with [?stock_symbol] (and [stock] is non-empty), [get_sketch] reads
+    the warehouse sketch columns ([Res_max_high_130/260/520w], [Res_bars_seen],
+    [Res_hist k] for [k = 0 .. n_hist_buckets - 1], and [Close] as the anchor)
+    at [(stock_symbol, as_of = stock's last bar date)] via
+    [Snapshot_callbacks.read_field]; any failed read yields [None]. Omitted (the
+    bar-list / non-snapshot path), [get_sketch] is [fun () -> None] so
+    [Stock_analysis.t.supply] stays [None] and the continuous overhead-supply
+    score never runs.
 
     [?resistance_stock] is the resistance-history feed
     ([Weinstein_strategy_config.resistance_lookback_bars]): a deeper weekly view

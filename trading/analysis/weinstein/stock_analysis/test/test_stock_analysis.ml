@@ -153,6 +153,7 @@ let fresh_stage2 ~weeks_advancing : Stock_analysis.t =
     breakdown_price = None;
     prior_stage = None;
     continuation = None;
+    supply = None;
     as_of_date = as_of;
   }
 
@@ -558,6 +559,58 @@ let test_continuation_enabled_admits_mature_stage2 _ =
            (equal_to true);
        ])
 
+(* ------------------------------------------------------------------ *)
+(* Overhead-supply (resistance-v2) — gated by config + callback         *)
+(* ------------------------------------------------------------------ *)
+
+let armed_supply_cfg =
+  { cfg with overhead_supply = Some Resistance_supply.default_config }
+
+(** A sketch proving overhead exists above the breakout (max-high above the
+    breakout, empty histogram) — [Resistance_supply.analyze] yields a finite
+    score in [0, 1] regardless of the exact breakout price the bars produce. *)
+let make_sketch () : Resistance_supply.sketch =
+  {
+    max_high_130w = 200.0;
+    max_high_260w = 200.0;
+    max_high_520w = 200.0;
+    bars_seen = 200.0;
+    hist = Array.create ~len:20 0.0;
+    anchor_close = 100.0;
+  }
+
+(** Run [analyze_with_callbacks] over rising bars (which yield a breakout price)
+    with [config] and a [get_sketch] closure returning [sketch_opt]. Returns the
+    resulting [supply] field. *)
+let supply_of ~config ~sketch_opt =
+  let bars = rising_bars ~n:35 50.0 100.0 in
+  let base = callbacks_from_bars ~config ~bars ~benchmark_bars:[] in
+  let callbacks = { base with get_sketch = (fun () -> sketch_opt) } in
+  (analyze_with_callbacks ~config ~ticker:"X" ~callbacks ~prior_stage:None
+     ~as_of_date:as_of)
+    .supply
+
+(** Armed config AND a present sketch: [supply] is [Some] with a score in
+    [0, 1]. *)
+let test_supply_present_when_armed_and_sketch _ =
+  assert_that
+    (supply_of ~config:armed_supply_cfg ~sketch_opt:(Some (make_sketch ())))
+    (is_some_and
+       (field
+          (fun (r : Resistance_supply.result) -> r.score)
+          (is_between (module Float_ord) ~low:0.0 ~high:1.0)))
+
+(** Armed config but the callback returns no sketch: [supply] is [None]. *)
+let test_supply_none_when_sketch_absent _ =
+  assert_that (supply_of ~config:armed_supply_cfg ~sketch_opt:None) is_none
+
+(** Feature off (default config) even with a present sketch: [supply] is [None]
+    — bit-identical to pre-feature behaviour. *)
+let test_supply_none_when_config_off _ =
+  assert_that
+    (supply_of ~config:cfg ~sketch_opt:(Some (make_sketch ())))
+    is_none
+
 let suite =
   "stock_analysis_tests"
   >::: [
@@ -600,6 +653,11 @@ let suite =
          >:: test_continuation_default_off_keeps_existing_rejection;
          "continuation enabled admits mature stage2"
          >:: test_continuation_enabled_admits_mature_stage2;
+         "supply present when armed and sketch"
+         >:: test_supply_present_when_armed_and_sketch;
+         "supply none when sketch absent"
+         >:: test_supply_none_when_sketch_absent;
+         "supply none when config off" >:: test_supply_none_when_config_off;
        ]
 
 let () = run_test_tt_main suite

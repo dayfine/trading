@@ -30,6 +30,17 @@ type config = {
           callers (strategy / screener) can enable continuation buys via
           [Weinstein_strategy_config.enable_continuation_buys] without touching
           tests that rely on bit-equal screener output. *)
+  overhead_supply : Resistance_supply.config option; [@sexp.default None]
+      (** When [Some cfg], the continuous overhead-supply score
+          ({!Resistance_supply}) runs for a survivor whose callback bundle
+          supplies a sketch and whose breakout price is known, populating
+          {!t.supply}. When [None] (default), {!t.supply} is always [None] —
+          bit-identical to pre-feature behaviour. Gated at this level (mirroring
+          [continuation]) so the strategy can arm it via
+          [Weinstein_strategy_config.overhead_supply] without perturbing tests
+          that rely on bit-equal screener output. The [@sexp.default None]
+          attribute is inert here (this config does not derive sexp) but marks
+          the field as an additive, default-off option. *)
 }
 (** Configuration bundling all sub-module configs. *)
 
@@ -68,6 +79,15 @@ type t = {
           [r.is_continuation = true] indicates the bar matches Weinstein's Ch. 3
           continuation pattern and feeds the OR-arm in {!is_breakout_candidate}.
       *)
+  supply : Resistance_supply.result option;
+      (** Continuous overhead-supply score (resistance-v2). [None] when
+          [config.overhead_supply = None] (default — feature off), when the
+          callback bundle's [get_sketch] returned [None] (no warehouse sketch, a
+          read error, or the bar-list / live CSV path), or when no breakout
+          price could be determined. [Some r] carries [r.score] in [0, 1] (0 =
+          virgin territory, 1 = heavy recent supply just above the breakout),
+          consumed by the screener's long-side [w_overhead_supply] scoring
+          weight in place of the binary virgin/clean grade. *)
   as_of_date : Core.Date.t;  (** The date this analysis was computed. *)
 }
 (** The full per-stock analysis. *)
@@ -91,6 +111,14 @@ type callbacks = {
           [close_price] is non-positive, or when the panel doesn't carry both
           raw and adjusted close (in which case truncation is a no-op and the
           caller falls through to the original full-window scan). *)
+  get_sketch : unit -> Resistance_supply.sketch option;
+      (** Returns the precomputed resistance sketch for this analysis's (symbol,
+          as_of), read from the warehouse sketch columns by the panel adapter.
+          [None] when the panel doesn't carry the sketch columns, any sketch
+          field read fails, or the caller is the bar-list / live CSV path
+          ({!callbacks_from_bars}, which returns [fun () -> None]). Invoked only
+          when [config.overhead_supply] is armed — so when the feature is off
+          this closure is never called and the panel does no extra reads. *)
   stage : Stage.callbacks;
       (** Nested Stage callbacks. {!Stage.callbacks_from_bars} or a panel
           adapter constructs this. *)

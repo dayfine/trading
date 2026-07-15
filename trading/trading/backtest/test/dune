@@ -64,6 +64,7 @@
   weinstein_trading.portfolio_risk
   weinstein_trading.stops
   weinstein.screener
+  weinstein.resistance
   types
   status
   matchers)

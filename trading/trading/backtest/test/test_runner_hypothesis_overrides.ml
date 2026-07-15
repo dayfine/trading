@@ -430,6 +430,73 @@ let test_known_nested_overlay_key_succeeds _ =
   in
   assert_that merged.screening_config.weights.w_clean_resistance (equal_to 30)
 
+(** resistance-v2 PR-D: the continuous overhead-supply scoring weight
+    [screening_config.weights.w_overhead_supply] ([int option]) resolves and
+    deep-merges — [(15)] parses to [Some 15]. Pins R2 searchability of the
+    weight through the same deep-merge path [Overlay_validator] uses. *)
+let test_override_screening_weights_w_overhead_supply _ =
+  let merged =
+    _apply_one_override (_default_config ())
+      (Sexp.of_string
+         "((screening_config ((weights ((w_overhead_supply (15)))))))")
+  in
+  assert_that merged.screening_config.weights.w_overhead_supply
+    (equal_to (Some 15))
+
+(** resistance-v2 PR-D default is off end-to-end: the strategy-level
+    [overhead_supply] and the screener weight [w_overhead_supply] are both
+    [None] in the default config, so [Stock_analysis.t.supply] is never computed
+    and the screener keeps the binary grade (experiment-flag-discipline R1). *)
+let test_overhead_supply_defaults_off _ =
+  let cfg = _default_config () in
+  assert_that cfg
+    (all_of
+       [
+         field
+           (fun (c : Weinstein_strategy.config) -> c.overhead_supply)
+           is_none;
+         field
+           (fun (c : Weinstein_strategy.config) ->
+             c.screening_config.weights.w_overhead_supply)
+           is_none;
+       ])
+
+(** Back-compat: a strategy config sexp written before PR-D (with no
+    [overhead_supply] field at all) still parses — the missing field defaults to
+    [None] via [@sexp.default None]. We prove this by stripping the field from
+    the serialized default config and parsing the result. *)
+let test_strategy_config_parses_with_overhead_supply_absent _ =
+  let base = Weinstein_strategy.sexp_of_config (_default_config ()) in
+  let stripped =
+    match base with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List [ Sexp.Atom "overhead_supply"; _ ] -> false
+            | _ -> true))
+    | other -> other
+  in
+  assert_that
+    (Weinstein_strategy.config_of_sexp stripped)
+    (field (fun (c : Weinstein_strategy.config) -> c.overhead_supply) is_none)
+
+(** The strategy-level [overhead_supply] round-trips when armed ([Some cfg]) —
+    proving the [Resistance_supply.config] [[@@deriving sexp]] added in PR-D
+    composes correctly inside [Weinstein_strategy.config]'s sexp derivation. *)
+let test_overhead_supply_some_roundtrips _ =
+  let cfg =
+    {
+      (_default_config ()) with
+      overhead_supply = Some Resistance_supply.default_config;
+    }
+  in
+  let roundtripped =
+    Weinstein_strategy.config_of_sexp (Weinstein_strategy.sexp_of_config cfg)
+  in
+  assert_that roundtripped.overhead_supply
+    (is_some_and
+       (equal_to (Resistance_supply.default_config : Resistance_supply.config)))
+
 (** The error message must include the index of the offending overlay (0-based)
     so operators can map back to the specific [--override] flag. When the second
     overlay is invalid and the first is valid, the index must report [#1] (not
@@ -636,6 +703,14 @@ let suite =
          >:: test_unknown_nested_overlay_key_fails;
          "known nested overlay key still applies (linter happy path)"
          >:: test_known_nested_overlay_key_succeeds;
+         "override screening_config.weights.w_overhead_supply"
+         >:: test_override_screening_weights_w_overhead_supply;
+         "overhead_supply defaults off (strategy + weight)"
+         >:: test_overhead_supply_defaults_off;
+         "strategy config parses with overhead_supply absent"
+         >:: test_strategy_config_parses_with_overhead_supply_absent;
+         "overhead_supply Some round-trips"
+         >:: test_overhead_supply_some_roundtrips;
          "error message reports overlay index for multi-overlay runs"
          >:: test_unknown_key_error_reports_overlay_index;
          "default cash_reserve_pct is zero"

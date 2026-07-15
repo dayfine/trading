@@ -55,6 +55,11 @@ type config = {
           classifies as [Heavy_resistance] (mirrors v1). *)
   moderate_resistance_bars : int;  (** Same for [Moderate_resistance]. *)
 }
+[@@deriving sexp]
+(** [@@deriving sexp] so this config can be nested (as an [option]) inside
+    [Weinstein_strategy_config.config] and [Stock_analysis.config] and still
+    round-trip through the backtest scenario / [Overlay_validator] sexp surface
+    (PR-D wiring). *)
 
 val default_config : config
 (** No-op-adjacent defaults: decay 0.7, saturation 8 bars, floors 0.4 / 0.25 /

@@ -10,9 +10,9 @@ IN_PROGRESS
 
 NO
 
-(PR-D will extend `Stock_analysis.config`/`callbacks`/`t`,
+(PR-D extended `Stock_analysis.config`/`callbacks`/`t`,
 `Screener_scoring.scoring_weights`, and `Weinstein_strategy_config` — all
-additive, default-off.)
+additive, default-off. Interface settles once PR-E's WF-CV verdict lands.)
 
 **Owner:** local-session (2026-07-15)
 
@@ -30,12 +30,12 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
   incl. the tie (qc-behavioral rework, parity-pinned). Schema-hash bump —
   **all local warehouses are stale and need rebuild before any snapshot-mode
   run** (dedup-v2 28y top-3000 included). No consumers read the columns yet.
-- **PR-C #1979 (OPEN)** — `Resistance_supply` pure module: continuous score
+- **PR-C #1979 (MERGED)** — `Resistance_supply` pure module: continuous score
   in [0,1] (proximity-weighted histogram mass saturated at 8 bars; horizon
   floors 0.4/0.25/0.1 when the histogram is blind; virgin = 0;
   Insufficient_history = 0.5 so unknown ≠ virgin). Letter grade derivable
   (score/display split). No consumers.
-- **PR-B2 #1982 (OPEN)** — deep-history sketch feed
+- **PR-B2 #1982 (MERGED)** — deep-history sketch feed
   (plan §D4). `Resistance_sketch.compute_windowed ~deep_bars ~bars_arr` builds
   a combined weekly prefix over `deep_bars @ bars_arr`, computes the sketch,
   and returns the trailing window slice; `Pipeline.build_for_symbol` gains
@@ -47,50 +47,37 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
   now reflects true weekly depth (capped 520). No warehouse rebuild in this PR
   (sketch columns still unconsumed). Verify: `dune runtest
   analysis/weinstein/snapshot_pipeline`.
+- **PR-D #1983 (OPEN, `feat/resistance-v2-wiring`)** — screener wiring, default-off.
+  `Resistance_supply.config` gains `[@@deriving sexp]` (ppx_sexp_conv added to
+  resistance pps). `Stock_analysis.config` += `overhead_supply` option,
+  `callbacks` += `get_sketch`, `t` += `supply`; `analyze_with_callbacks`
+  computes `supply` only when armed AND a sketch is present AND a breakout
+  price exists. `Panel_callbacks.stock_analysis_callbacks_of_weekly_views`
+  gains `?snapshot_cb` and reads the sketch columns
+  (`Res_max_high_{130,260,520}w`, `Res_bars_seen`, `Res_hist 0..19`, `Close`)
+  at (symbol, view's last date); the bar-list / live CSV path stays
+  `fun () -> None` (v1 binary grade). `Screener_scoring.scoring_weights` +=
+  `w_overhead_supply : int option [@sexp.default None]`; `_resistance_signal`
+  long side uses `round(w * (1 - score))` REPLACING the binary points when
+  both weight and supply are present (either absent → binary path
+  bit-identical); short-side `_support_signal` untouched.
+  `Weinstein_strategy_config`/`.mli`/`weinstein_strategy.mli` += `overhead_supply`
+  option; `_stock_analysis_config_for` copies it in. All default-off →
+  bit-identical to baseline. Tests: scoring branch (None/None, Some/None,
+  score 0 = full w, score 1 = 0, score 0.5 w15 = 8), stock_analysis supply
+  gating (armed+sketch → Some; sketch None → None; config off → None),
+  Variant_matrix axis `(screening_config weights w_overhead_supply)` expands +
+  validates, strategy-config back-compat parse (field absent → None) + Some
+  round-trip.
+>>>>>>> conflict 1 of 2 ends
 
 ## Next steps
 
-1. **PR-D — screener wiring (default-off)** `[blocking: local session shepherds]`
-   Design (pinned during 07-15 session):
-   - `Resistance_supply.config` gains `[@@deriving sexp]` (add
-     `ppx_sexp_conv` to resistance lib pps).
-   - `Stock_analysis.config` += `overhead_supply : Resistance_supply.config
-     option [@sexp.default None]` (None = never compute — bit-identical).
-   - `Stock_analysis.callbacks` += `get_sketch : unit ->
-     Resistance_supply.sketch option`; `analyze_with_callbacks` fills new
-     `Stock_analysis.t` field `supply : Resistance_supply.result option`
-     when config armed AND sketch present.
-   - `Panel_callbacks.stock_analysis_callbacks_of_weekly_views` builds
-     `get_sketch` from `Snapshot_callbacks.read_field` (24 reads at
-     (symbol, as_of = last bar date), O(1) each; NaN row → None →
-     Insufficient handled inside Resistance_supply). Bar-list constructor
-     (`Stock_analysis.callbacks_from_bars`, live CSV path) sets
-     `get_sketch = fun () -> None` — live report stays v1 until a follow-up.
-   - `Screener_scoring.scoring_weights` += `w_overhead_supply : int option
-     [@sexp.default None]` (MUST be `[@sexp.default None]`, NOT
-     `[@sexp.option]` — Overlay_validator serialization rule, see
-     screener_scoring.mli w_early_stage2 precedent). `_resistance_signal`
-     long side: when `Some w` AND `a.supply = Some r`, points =
-     `Float.round_nearest (w × (1 − r.score))`, REPLACING the binary
-     virgin/clean points (not additive — double-count). Either None → binary
-     path bit-identical. Short-side `_support_signal` untouched.
-   - `Weinstein_strategy_config` += `overhead_supply :
-     Resistance_supply.config option [@sexp.default None]`;
-     `_stock_analysis_config_for` copies it into the stock-analysis config.
-   - Tests: scoring branch (None/None, Some/None, Some/Some incl. score 0 =
-     full w and score 1 = 0 points); stock_analysis supply computation gated
-     by config; axis-expansion test `((key (screening_config weights
-     w_overhead_supply)) (values (…)))` through Variant_matrix/
-     Overlay_validator; weight-None do-no-harm (existing goldens unchanged).
-   - Split D1 (stock_analysis + panel_callbacks) / D2 (scoring + strategy
-     config + axis) if > 500 lines.
-2. **PR-B2 — deep-history feed (plan §D4)** — SHIPPED (#1982). Pipeline
-   `?deep_bars` + `Build_runner` deep-load split landed; existing 13 columns
-   bit-identical (basis-guard pinned).
-3. **Warehouse rebuild** (after B2): dedup-v2 top-3000 28y + sp500 test
+1. **PR-D merge** — #1983 open, QC in flight; merge on 3 gates.
+2. **Warehouse rebuild** (B2 shipped #1982): dedup-v2 top-3000 28y + sp500 test
    warehouses — schema-hash gate rejects the old ones. Container long runs
    solo (no concurrent agent dispatches).
-4. **PR-E — WF-CV score-weight surface** (incl. weight = 0 = today), record
+3. **PR-E — WF-CV score-weight surface** (incl. weight = 0 = today), record
    convention, fold-honest answer to "were the false virgins luck or
    structure". Ledger entry either way. Perf acceptance: armed wall ≈
    unarmed (~1.5h not ~5h).

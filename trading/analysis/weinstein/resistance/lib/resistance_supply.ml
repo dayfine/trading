@@ -21,6 +21,7 @@ type config = {
   heavy_resistance_bars : int;
   moderate_resistance_bars : int;
 }
+[@@deriving sexp]
 
 let default_config =
   {
