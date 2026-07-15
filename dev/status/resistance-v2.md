@@ -4,7 +4,7 @@
 
 IN_PROGRESS
 
-## Last updated: 2026-07-15
+## Last updated: 2026-07-16
 
 ## Interface stable
 
@@ -69,21 +69,24 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
   Variant_matrix axis `(screening_config weights w_overhead_supply)` expands +
   validates, strategy-config back-compat parse (field absent → None) + Some
   round-trip.
->>>>>>> conflict 1 of 2 ends
 
 ## Next steps
 
-1. **Warehouse rebuild** — LAUNCHED 07-15 end-of-session (in-container,
-   detached): `/tmp/snap_top3000_dedup_v3_sketch`, dedup flags + sketch
-   columns + deep feed; log `/tmp/wh_rebuild.log` (`exit:0` marker = done).
-   Verify per `dev/notes/next-session-priorities-2026-07-16.md` §P0.1-2.
-   Also still needed: sp500 test
-   warehouses — schema-hash gate rejects the old ones. Container long runs
-   solo (no concurrent agent dispatches).
-3. **PR-E — WF-CV score-weight surface** (incl. weight = 0 = today), record
-   convention, fold-honest answer to "were the false virgins luck or
-   structure". Ledger entry either way. Perf acceptance: armed wall ≈
-   unarmed (~1.5h not ~5h).
+1. **PR-E RAN 2026-07-16 — verdict Inconclusive (promising, unpowered,
+   boundary winner; no promotion).** Monotone improvement with positive
+   weight (baseline Sharpe .691 → w15 .787 → w30 .860; MaxDD 16.6 → 14.0;
+   w30 also wins return); prefer-overhead (w=−15) refuted; w=0 ≈ neutral.
+   **The false virgins were LUCK** (path-sizing lottery), not structure.
+   Ledger `2026-07-16-resistance-supply-weight-surface.sexp`; note
+   `dev/notes/resistance-supply-wfcv-2026-07-16.md`. Warehouse of record:
+   `/tmp/snap_top3000_dedup_v3_sketch` (dedup-v3, 37-col, deep feed;
+   rebuilt 07-15, 2908 symbols, verified).
+2. **Follow-up surface** `[non-blocking]`: extend weight axis {45, 60}
+   (winner on boundary) + `min_history_bars`/`insufficient_score` axes;
+   same spec pattern
+   (`test_data/walk_forward/resistance-supply-weight-BROAD-2000-2026.sexp`).
+   sp500 test warehouses still need a rebuild pass when next used
+   (schema-hash gate). Container long runs solo.
 
 ## Standing constraints honored
 
