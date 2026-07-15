@@ -23,6 +23,10 @@ module Trade_audit_ratings = Trade_audit_ratings
 (** Re-exported per-trade rating + analysis library so callers reach it via
     [Trade_audit_report.Trade_audit_ratings]. *)
 
+module Trade_score = Trade_score
+(** Re-exported composite trade-quality score so callers reach it via
+    [Trade_audit_report.Trade_score]. *)
+
 (** {1 Document model}
 
     The rendered document has three sections — a scenario header, an aggregate

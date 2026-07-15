@@ -164,28 +164,98 @@ if (DATA.conformance || DATA.behavioral.length || DATA.decision) {
 }
 
 /* ---- Sortable / filterable trades table ---- */
-document.getElementById('tradenote').textContent = `click a column header to sort · ${DATA.trades.length.toLocaleString()} trades`;
+const HAS_SERIES = DATA.trades.some(t => t[14]);
+document.getElementById('tradenote').textContent =
+  `click a column header to sort${HAS_SERIES ? ' · click a row for its chart' : ''} · ${DATA.trades.length.toLocaleString()} trades`;
 const COLS = [
   ['Symbol',0,'s'],['Entry',1,'s'],['Exit',2,'s'],['Days',3,'n'],['Entry px',4,'n'],['Exit px',5,'n'],
-  ['Qty',6,'n'],['PnL $',7,'n'],['PnL %',8,'n'],['Exit trigger',9,'s'],['Stage',10,'s'],['Stop kind',11,'s'],['Score',12,'n']];
+  ['Qty',6,'n'],['PnL $',7,'n'],['PnL %',8,'n'],['Exit trigger',9,'s'],['Stage',10,'s'],['Stop kind',11,'s'],['Score',12,'n'],['Quality',13,'q']];
 let sortCol = 1, sortDir = 1, rows = DATA.trades.slice();
 const tbl = document.getElementById('trades');
 const trigSel = document.getElementById('ftrig');
 [...new Set(DATA.trades.map(t=>t[9]).filter(Boolean))].sort().forEach(v => trigSel.insertAdjacentHTML('beforeend', `<option>${v}</option>`));
+const gradeCls = g => 'grade-' + (g||'F').replace('+','p');
+const qualCell = q => q === null ? '—'
+  : `<span class="gradechip ${gradeCls(q.grade)}" title="capture ${q.capture===null?'n/a':Math.round(q.capture*100)+'%'} · R/R ${q.rr===null?'n/a':Math.round(q.rr*100)+'%'} · pain ${q.pain===null?'n/a':Math.round(q.pain*100)+'%'} · rules ${q.conf===null?'n/a':Math.round(q.conf*100)+'%'}">${q.grade} ${q.score.toFixed(0)}</span>`;
+const qKey = q => q === null ? -1 : q.score;
+
+/* ---- per-trade chart (price + WMA30 + stops), drawn on row expand ---- */
+function drawTradeChart(cv, t) {
+  const S = t[14]; if (!S) return;
+  const ctx = cv.getContext('2d'), W = cv.width = cv.clientWidth * devicePixelRatio, H = cv.height = 260 * devicePixelRatio;
+  const mL = 54*devicePixelRatio, mR = 14*devicePixelRatio, mT = 12*devicePixelRatio, mB = 24*devicePixelRatio;
+  const n = S.c.length, pw = W-mL-mR, ph = H-mT-mB;
+  const stops = [S.es, S.xs].filter(v => v !== null);
+  let lo = Math.min(...S.c, ...stops), hi = Math.max(...S.c, ...stops);
+  for (const v of S.m) if (v !== null) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  const pad = 0.06 * (hi - lo || 1); lo -= pad; hi += pad;
+  const x = i => mL + pw * i / (n - 1 || 1);
+  const y = v => mT + ph * (1 - (v - lo) / (hi - lo || 1));
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888';
+  ctx.font = `${11*devicePixelRatio}px system-ui`;
+  /* holding window shading */
+  ctx.fillStyle = t[7] >= 0 ? 'rgba(46,160,67,0.10)' : 'rgba(248,81,73,0.10)';
+  ctx.fillRect(x(S.ei), mT, Math.max(2, x(S.xi)-x(S.ei)), ph);
+  /* y grid: 4 lines */
+  ctx.strokeStyle = css('--line'); ctx.fillStyle = css('--ink-3'); ctx.lineWidth = 1;
+  for (let k = 0; k <= 3; k++) {
+    const v = lo + (hi-lo)*k/3, yy = y(v);
+    ctx.beginPath(); ctx.moveTo(mL, yy); ctx.lineTo(W-mR, yy); ctx.stroke();
+    ctx.textAlign = 'right'; ctx.fillText('$'+v.toFixed(v<10?2:v<100?1:0), mL-6*devicePixelRatio, yy+4*devicePixelRatio);
+  }
+  /* x labels: ~5 dates */
+  ctx.textAlign = 'center';
+  for (let k = 0; k < 5; k++) { const i = Math.round((n-1)*k/4); ctx.fillText(S.d[i], x(i), H-8*devicePixelRatio); }
+  const line = (vals, color, width, dash) => {
+    ctx.strokeStyle = color; ctx.lineWidth = width*devicePixelRatio; ctx.setLineDash(dash||[]);
+    ctx.beginPath(); let started = false;
+    vals.forEach((v, i) => { if (v === null) { started = false; return; }
+      if (!started) { ctx.moveTo(x(i), y(v)); started = true; } else ctx.lineTo(x(i), y(v)); });
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+  line(S.m, css('--bench'), 1.6);                       /* WMA30 trend line */
+  line(S.c, css('--strat'), 1.8);                       /* weekly close */
+  if (S.es !== null) {                                  /* stop levels */
+    ctx.strokeStyle = '#f85149'; ctx.lineWidth = 1.4*devicePixelRatio; ctx.setLineDash([6,4]);
+    ctx.beginPath(); ctx.moveTo(x(S.ei), y(S.es)); ctx.lineTo(x(S.xi), y(S.es)); ctx.stroke();
+  }
+  if (S.xs !== null && S.xs !== S.es) {
+    ctx.strokeStyle = '#f0883e'; ctx.lineWidth = 1.4*devicePixelRatio; ctx.setLineDash([2,3]);
+    ctx.beginPath(); ctx.moveTo(x((S.ei+S.xi)/2), y(S.xs)); ctx.lineTo(x(S.xi), y(S.xs)); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  const mark = (i, color) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x(i), y(S.c[i]), 4.5*devicePixelRatio, 0, 7); ctx.fill();
+    ctx.strokeStyle = css('--surface'); ctx.lineWidth = 2*devicePixelRatio; ctx.stroke(); };
+  mark(S.ei, '#2ea043'); mark(S.xi, '#f85149');
+}
+function detailHtml(t) {
+  const q = t[13];
+  const bars = q === null ? '' : [['capture',q.capture],['risk/reward',q.rr],['pain',q.pain],['rules',q.conf]].map(([lbl,v]) =>
+    `<div class="qbar"><span>${lbl}</span><div class="qtrack"><div class="qfill" style="width:${v===null?0:Math.round(v*100)}%"></div></div><b>${v===null?'n/a':Math.round(v*100)+'%'}</b></div>`).join('');
+  return `<div class="tradedetail"><div class="tdhead">` +
+    `<b>${t[0]}</b> ${t[1]} → ${t[2]} · ${t[3]}d · <span class="${t[7]>=0?'pos':'neg'}">${fmt$(t[7])} (${pct(t[8])})</span>` +
+    (q===null?'':` · quality <b>${q.grade} ${q.score.toFixed(0)}</b>`) +
+    `<span class="note" style="float:right">price · <span style="color:var(--bench)">WMA30</span> · <span style="color:#f85149">stop</span> · shaded = holding</span></div>` +
+    (t[14] ? `<canvas class="tradecv"></canvas>` : `<div class="note">no bar source — chart unavailable</div>`) +
+    `<div class="qbars">${bars}</div></div>`;
+}
 function renderTrades() {
   const fs = document.getElementById('fsym').value.trim().toUpperCase();
   const ft = trigSel.value, fw = document.getElementById('fwin').value;
   rows = DATA.trades.filter(t =>
     (!fs || t[0].toUpperCase().includes(fs)) && (!ft || t[9]===ft) &&
     (!fw || (fw==='w' ? t[7]>0 : t[7]<=0)));
-  rows.sort((a,b) => { const x=a[sortCol], z=b[sortCol]; return (x<z?-1:x>z?1:0)*sortDir; });
+  rows.sort((a,b) => {
+    const x = sortCol===13 ? qKey(a[13]) : a[sortCol], z = sortCol===13 ? qKey(b[13]) : b[sortCol];
+    return (x<z?-1:x>z?1:0)*sortDir; });
   const head = '<thead><tr>' + COLS.map(c =>
-    `<th class="${c[2]==='n'?'num':''}" data-i="${c[1]}">${c[0]}<span class="arrow">${sortCol===c[1]?(sortDir>0?'▲':'▼'):''}</span></th>`).join('') + '</tr></thead>';
-  const body = '<tbody>' + rows.map(t =>
-    `<tr><td><b>${t[0]}</b></td><td>${t[1]}</td><td>${t[2]}</td><td class="num">${t[3]}</td>` +
+    `<th class="${c[2]!=='s'?'num':''}" data-i="${c[1]}">${c[0]}<span class="arrow">${sortCol===c[1]?(sortDir>0?'▲':'▼'):''}</span></th>`).join('') + '</tr></thead>';
+  const body = '<tbody>' + rows.map((t, ri) =>
+    `<tr class="traderow" data-r="${ri}"><td><b>${t[0]}</b></td><td>${t[1]}</td><td>${t[2]}</td><td class="num">${t[3]}</td>` +
     `<td class="num">$${t[4].toFixed(2)}</td><td class="num">$${t[5].toFixed(2)}</td><td class="num">${t[6].toLocaleString()}</td>` +
     `<td class="num ${t[7]>=0?'pos':'neg'}">${fmt$(t[7])}</td><td class="num ${t[8]>=0?'pos':'neg'}">${pct(t[8])}</td>` +
-    `<td><span class="chip">${t[9]||'—'}</span></td><td>${t[10]||'—'}</td><td>${t[11]||'—'}</td><td class="num">${t[12]===null?'—':t[12]}</td></tr>`).join('') + '</tbody>';
+    `<td><span class="chip">${t[9]||'—'}</span></td><td>${t[10]||'—'}</td><td>${t[11]||'—'}</td><td class="num">${t[12]===null?'—':t[12]}</td>` +
+    `<td class="num">${qualCell(t[13])}</td></tr>`).join('') + '</tbody>';
   tbl.innerHTML = head + body;
   const sumP = rows.reduce((s,t)=>s+t[7],0), w = rows.filter(t=>t[7]>0).length;
   document.getElementById('count').textContent =
@@ -194,6 +264,15 @@ function renderTrades() {
     const i = +th.dataset.i;
     if (sortCol === i) sortDir = -sortDir; else { sortCol = i; sortDir = 1; }
     renderTrades();
+  });
+  tbl.querySelectorAll('tr.traderow').forEach(tr => tr.onclick = () => {
+    const open = tr.nextElementSibling && tr.nextElementSibling.classList.contains('detailrow');
+    tbl.querySelectorAll('tr.detailrow').forEach(e => e.remove());
+    if (open) return;
+    const t = rows[+tr.dataset.r];
+    tr.insertAdjacentHTML('afterend', `<tr class="detailrow"><td colspan="${COLS.length}">${detailHtml(t)}</td></tr>`);
+    const cv = tr.nextElementSibling.querySelector('canvas.tradecv');
+    if (cv) drawTradeChart(cv, t);
   });
 }
 for (const id of ['fsym','ftrig','fwin']) document.getElementById(id).addEventListener('input', renderTrades);

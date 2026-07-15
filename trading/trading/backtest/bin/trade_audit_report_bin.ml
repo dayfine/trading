@@ -134,6 +134,13 @@ let _closes_lookup_of_reader reader :
   Array.to_list
     (Array.zip_exn view.Snapshot_bar_views.dates view.Snapshot_bar_views.closes)
 
+(* Weekly [(date, close)] bars for the per-trade HTML chart series: up to [n]
+   weekly bars ending at/before [as_of], straight off the snapshot weekly view.
+   Feeds [Html_report.load ?weekly_series]. *)
+let _weekly_series_of_reader reader ~symbol ~n ~as_of =
+  let view = Bar_reader.weekly_view_for reader ~symbol ~n ~as_of in
+  Array.zip_exn view.Snapshot_bar_views.dates view.Snapshot_bar_views.closes
+
 (* Last adjusted close at/before [as_of] for [symbol], or [None] when the
    warehouse has no bar within the lookback window. Feeds the HTML benchmark and
    utilization series. *)
@@ -168,7 +175,11 @@ let () =
       let bar_close =
         Option.map reader ~f:(fun reader -> _bar_close_of_reader reader)
       in
+      let weekly_series =
+        Option.map reader ~f:(fun reader -> _weekly_series_of_reader reader)
+      in
       let data =
-        Html_report.load ?bar_close ~benchmark_symbol ~report ~scenario_dir ()
+        Html_report.load ?bar_close ?weekly_series ~benchmark_symbol ~report
+          ~scenario_dir ()
       in
       _write ~path (Html_report.render data))

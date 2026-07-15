@@ -15,6 +15,17 @@ type open_position = {
 }
 [@@deriving sexp]
 
+type trade_series = {
+  dates : Date.t list;
+  closes : float list;
+  wma30 : float list;
+  entry_idx : int;
+  exit_idx : int;
+  entry_stop : float option;
+  exit_stop : float option;
+}
+[@@deriving sexp]
+
 type trade_row = {
   symbol : string;
   entry_date : Date.t;
@@ -29,6 +40,8 @@ type trade_row = {
   stage : string;
   stop_kind : string;
   cascade_score : int option;
+  quality : Trade_audit_report.Trade_score.t option;
+  series : trade_series option;
 }
 [@@deriving sexp]
 
