@@ -35,6 +35,18 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
   floors 0.4/0.25/0.1 when the histogram is blind; virgin = 0;
   Insufficient_history = 0.5 so unknown ≠ virgin). Letter grade derivable
   (score/display split). No consumers.
+- **PR-B2 #1982 (OPEN)** — deep-history sketch feed
+  (plan §D4). `Resistance_sketch.compute_windowed ~deep_bars ~bars_arr` builds
+  a combined weekly prefix over `deep_bars @ bars_arr`, computes the sketch,
+  and returns the trailing window slice; `Pipeline.build_for_symbol` gains
+  `?deep_bars` (default `[]`, bit-identical) fed ONLY to the sketch columns —
+  the 13 warmup-windowed columns stay bit-identical (basis-guard pinned).
+  `Build_runner` / both bins split the per-symbol load into
+  `(deep = [start − sketch_deep_days, start), window)`; named constant
+  `default_sketch_deep_days = 3650` + CLI `-sketch-deep-days`. `Res_bars_seen`
+  now reflects true weekly depth (capped 520). No warehouse rebuild in this PR
+  (sketch columns still unconsumed). Verify: `dune runtest
+  analysis/weinstein/snapshot_pipeline`.
 
 ## Next steps
 
@@ -72,12 +84,9 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
      Overlay_validator; weight-None do-no-harm (existing goldens unchanged).
    - Split D1 (stock_analysis + panel_callbacks) / D2 (scoring + strategy
      config + axis) if > 500 lines.
-2. **PR-B2 — deep-history feed (plan §D4)** `[non-blocking]` — pipeline
-   `?deep_bars` (bars strictly before the scenario window, sketch columns
-   only — existing 13 columns MUST stay bit-identical), `Build_runner` /
-   `Scenario_snapshot_plan` widen the per-symbol bar LOAD window (rows
-   emitted unchanged). Without it sketches see the warmup-windowed slice
-   (same starved data as today — mechanism lands, honesty arrives with B2).
+2. **PR-B2 — deep-history feed (plan §D4)** — SHIPPED (#1982). Pipeline
+   `?deep_bars` + `Build_runner` deep-load split landed; existing 13 columns
+   bit-identical (basis-guard pinned).
 3. **Warehouse rebuild** (after B2): dedup-v2 top-3000 28y + sp500 test
    warehouses — schema-hash gate rejects the old ones. Container long runs
    solo (no concurrent agent dispatches).

@@ -53,10 +53,10 @@ let _load_universe ~universe_path =
       exit 1
 
 let main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
-    ~end_date ~incremental ~progress_every () =
+    ~end_date ~sketch_deep_days ~incremental ~progress_every () =
   let symbols = _load_universe ~universe_path in
   Build_runner.build ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol
-    ~start_date ~end_date ~incremental ~progress_every ()
+    ~start_date ~end_date ~sketch_deep_days ~incremental ~progress_every ()
 
 (* Flag [~doc] strings are hoisted to top-level bindings so the [Command.basic]
    flag block below stays flat (one line per flag) — the multi-line doc text is
@@ -87,6 +87,14 @@ let doc_end_date =
   "YYYY-MM-DD Optional inclusive upper bound: drop each symbol's bars after \
    this date before building (default: full history)."
 
+let doc_sketch_deep_days =
+  Printf.sprintf
+    "N Calendar days of extra pre-START-DATE history fed only to the \
+     resistance sketch columns (resistance-v2 deep feed; the 13 \
+     warmup-windowed columns stay windowed to START-DATE). Ignored without \
+     --start-date. Default %d."
+    Build_runner.default_sketch_deep_days
+
 let doc_incremental =
   "Skip symbols whose CSV mtime <= the existing manifest's csv_mtime"
 
@@ -108,6 +116,10 @@ let command =
        flag "benchmark-symbol" (optional string) ~doc:doc_benchmark_symbol
      and start_date = flag "start-date" date_arg ~doc:doc_start_date
      and end_date = flag "end-date" date_arg ~doc:doc_end_date
+     and sketch_deep_days =
+       flag "sketch-deep-days"
+         (optional_with_default Build_runner.default_sketch_deep_days int)
+         ~doc:doc_sketch_deep_days
      and incremental = flag "incremental" no_arg ~doc:doc_incremental
      and progress_every =
        flag "progress-every"
@@ -116,6 +128,6 @@ let command =
      in
      fun () ->
        main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol
-         ~start_date ~end_date ~incremental ~progress_every ())
+         ~start_date ~end_date ~sketch_deep_days ~incremental ~progress_every ())
 
 let () = Command_unix.run command

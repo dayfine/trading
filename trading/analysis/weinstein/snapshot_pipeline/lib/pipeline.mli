@@ -60,24 +60,37 @@ val build_for_symbol :
   symbol:string ->
   bars:Types.Daily_price.t list ->
   schema:Data_panel_snapshot.Snapshot_schema.t ->
+  ?deep_bars:Types.Daily_price.t list ->
   ?benchmark_bars:Types.Daily_price.t list ->
   unit ->
   Data_panel_snapshot.Snapshot.t list Status.status_or
-(** [build_for_symbol ~symbol ~bars ~schema ?benchmark_bars ()] returns one
-    {!Snapshot.t} per bar in [bars] (chronological order, oldest first), with
-    indicator values computed causally up to that bar's date.
+(** [build_for_symbol ~symbol ~bars ~schema ?deep_bars ?benchmark_bars ()]
+    returns one {!Snapshot.t} per bar in [bars] (chronological order, oldest
+    first), with indicator values computed causally up to that bar's date.
 
     @param symbol Universe ticker stamped on every produced row.
     @param bars
       Daily bars for the symbol, sorted chronologically. Must be non-empty for a
-      non-empty result; an empty input list returns [Ok []].
+      non-empty result; an empty input list returns [Ok []]. Rows are emitted
+      only for these bars.
     @param schema
       Schema controlling field set + column layout. Every produced {!Snapshot.t}
       carries this schema.
+    @param deep_bars
+      Earlier daily history lying strictly {e before} [bars]'s first day, fed
+      only to the {!Res_max_high_130w} / {!Res_max_high_260w} /
+      {!Res_max_high_520w} / {!Res_bars_seen} / [Res_hist] resistance-sketch
+      columns via {!Resistance_sketch.compute_windowed} so those columns reflect
+      true weekly depth rather than the warmup-windowed slice (resistance-v2
+      §D4). Default [[]] — bit-identical to today. The 13 EMA/SMA/ATR/RSI/Stage/
+      RS/Macro/OHLCV/Adjusted columns are computed from [bars] alone and are
+      never affected by [deep_bars]. Returns [Error Invalid_argument] when
+      [deep_bars] overlaps or is not strictly before [bars].
     @param benchmark_bars
       Daily bars for the macro benchmark (e.g. ["SPY"]). When [None] (default),
       the {!RS_line} and {!Macro_composite} columns are filled with [Float.nan].
-      When [Some], they are computed from the benchmark.
+      When [Some], they are computed from the benchmark. Unaffected by
+      [deep_bars].
 
     Returns [Error Invalid_argument] when [symbol] is empty.
 

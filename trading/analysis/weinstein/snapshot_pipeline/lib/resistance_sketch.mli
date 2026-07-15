@@ -53,3 +53,31 @@ val compute :
 (** [compute ~weekly_prefix ~bars_arr] computes every sketch column in one
     forward pass over the days. [weekly_prefix] must have been built from
     [bars_arr] (same indexing). Pure function. *)
+
+val compute_windowed :
+  deep_bars:Types.Daily_price.t array -> bars_arr:Types.Daily_price.t array -> t
+(** [compute_windowed ~deep_bars ~bars_arr] computes the sketch for the days in
+    [bars_arr] but lets the weekly prefix — rolling maxima, histogram window and
+    [bars_seen] — also see [deep_bars], the earlier history lying strictly
+    before [bars_arr]'s first day. This is the resistance-v2 §D4 false-virgin
+    fix: without deep history a symbol that has traded for decades looks virgin
+    at the scenario start because the warmup-windowed slice starves the sketch.
+
+    The result arrays stay aligned to [bars_arr] indices. Internally the
+    combined array [Array.append deep_bars bars_arr] is aggregated once and
+    every sketch column is sliced to its trailing [Array.length bars_arr] days,
+    so for every column [c] and window day [i]:
+    {[
+    (compute_windowed ~deep_bars ~bars_arr).c.(i)
+    = (let full = Array.append deep_bars bars_arr in
+       compute ~weekly_prefix:(Weekly_prefix.build full) ~bars_arr:full)
+        .c.(i + Array.length deep_bars)
+    ]}
+    (split-parity, pinned in [test_resistance_sketch.ml]).
+
+    [deep_bars = [||]] is bit-identical to
+    [compute ~weekly_prefix:(Weekly_prefix.build bars_arr) ~bars_arr] — the
+    no-deep-history default. The caller must supply [deep_bars] that precede
+    [bars_arr] chronologically with no overlap; the combined aggregation raises
+    [Invalid_argument] on out-of-order input (same contract as
+    {!Weekly_prefix.build}). Pure function. *)
