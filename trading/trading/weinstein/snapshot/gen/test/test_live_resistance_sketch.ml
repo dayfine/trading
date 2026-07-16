@@ -36,6 +36,7 @@ let _make_bars ~weeks ~high_at ~low_at ~close_at : Types.Daily_price.t list =
    weekly high (110) clears the 120 anchor. *)
 let _spike_idx = 7
 let _last_idx = 19
+
 let _bars_4w =
   _make_bars ~weeks:4
     ~high_at:(fun i -> if i = _spike_idx then 150.0 else 110.0)

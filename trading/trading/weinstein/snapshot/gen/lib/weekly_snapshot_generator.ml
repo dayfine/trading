@@ -130,8 +130,9 @@ let _analyze_ticker ~(inputs : inputs)
    keeps the analysis bit-identical to the binary-grade behaviour. *)
 let _analyze_universe ~(inputs : inputs) ~index_bars : Stock_analysis.t list =
   let analysis_config =
-    { Stock_analysis.default_config with
-      overhead_supply = inputs.config.overhead_supply
+    {
+      Stock_analysis.default_config with
+      overhead_supply = inputs.config.overhead_supply;
     }
   in
   List.filter_map inputs.ticker_sectors ~f:(fun (ticker, _sector) ->

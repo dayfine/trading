@@ -306,8 +306,7 @@ let test_default_resistance_grade_is_v1 _ =
 let test_armed_resistance_grade_shows_v2_score _ =
   let snap =
     Generator.generate
-      (_armed_inputs ~as_of:_as_of
-         ~bar_reader:(_breakout_bar_reader ())
+      (_armed_inputs ~as_of:_as_of ~bar_reader:(_breakout_bar_reader ())
          ~ticker_sectors:[ ("AAPL", "Information Technology") ])
   in
   assert_that
