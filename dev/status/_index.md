@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-15 (orchestrator run 29455916122 — run-6: main GREEN at `1f39ab79`; no dispatch. Since run-5: **#1983 (PR-D screener wiring) MERGED** + **#1985 (session close-out docs)** — the maintainer's LOCAL session shipped the entire resistance-v2 code track (6 PRs, all 3-gate merged) and closed out with a 07-16 handoff. **0 open PRs.** resistance-v2 row reconciled: Open PR #1983 → merged; next is PR-E WF-CV score-weight surface (maintainer-LOCAL, needs the rebuilt deep warehouse — data-gated). Every other track deep-warehouse-data-gated (EODHD_API_KEY absent) / human-gated (M6.6) / active-LOCAL. Nothing orchestrator-dispatchable: harness backlog all milestone/human/PAT-gated, cleanup backlog empty, ops-data blocked (no API key). Prior: run-5 (29445579168) no dispatch; run-4 (29421382522) no dispatch.)
+Last updated: 2026-07-16 (orchestrator run 29529012458 — first run of 07-16: main GREEN at `7c986a9e`; no dispatch. Since run-6 the maintainer's LOCAL session shipped 4 more PRs — **#1987 (resistance-v2 PR-E WF-CV verdict: Inconclusive, no promotion — false virgins were luck)**, **#1988 (PR-E harness/WF spec)**, **#1990 (margin-realism M1a buying-power + priced interest, default-off)**, **#1989 (live resistance sketch)** — all 3-gate merged. **0 open PRs.** Reconciled: resistance-v2 next → extend weight axis {45,60} (LOCAL); added margin-realism row (M1a MERGED, next M1b, LOCAL). Every track deep-warehouse-data-gated (EODHD_API_KEY absent) / human-gated (M6.6) / active-LOCAL. Nothing orchestrator-dispatchable: harness backlog milestone/human/PAT-gated, cleanup backlog empty, ops-data blocked (no API key). Prior: run-6 (29455916122) no dispatch; run-5 (29445579168) no dispatch.)
 
 ## Active + complete tracks
 
@@ -13,7 +13,8 @@ Each row: one line; deeper task detail in the linked status file.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
-| [resistance-v2](resistance-v2.md) | IN_PROGRESS | local-session (2026-07-15) | — | PR-D wiring MERGED (#1983, default-off) — code track shipped end-to-end (6 PRs); next PR-E WF-CV score-weight surface — in flight locally, do not dispatch |
+| [resistance-v2](resistance-v2.md) | IN_PROGRESS | local-session (2026-07-16) | — | PR-E WF-CV RAN 07-16 (#1987/8/9): Inconclusive, no promotion (false virgins=luck); next: extend weight axis {45,60} — LOCAL/data-gated |
+| [margin-realism](margin-realism.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | M1a buying-power ceiling + priced margin interest MERGED (#1990, default-off); next: M1b leverage-live then M2–M4 — LOCAL |
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
 | [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | — | trades.csv export-join fix MERGED (#1942, position_id column); next: validator audit-join fix (C6b, dispatched) then P2 matrix (data-gated) |
