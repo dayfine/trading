@@ -70,6 +70,29 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
   validates, strategy-config back-compat parse (field absent → None) + Some
   round-trip.
 
+- **PR-live-path (this PR, feat/resistance-v2-live-path)** — the live
+  bar-list path (`Stock_analysis.callbacks_from_bars`) now gets a real
+  sketch, closing the PR-D documented gap. New `Live_resistance_sketch`
+  adapter (`snapshot/gen/lib`) bridges a symbol's FULL in-memory daily
+  history to a `Resistance_supply.sketch` via
+  `Snapshot_pipeline.Resistance_sketch.compute_windowed ~deep_bars:[||]`,
+  extracting the analysis-Friday (last) day; `bars_seen` honestly reflects
+  a shallow (<520w) fetched window rather than fabricating history.
+  `Weekly_snapshot_generator` computes it from `Bar_reader.daily_bars_for`
+  when `overhead_supply` is armed and injects the `get_sketch` thunk via
+  `callbacks_from_bars` + `analyze_with_callbacks` (the two steps
+  `Stock_analysis.analyze` wraps — no `Stock_analysis` signature change,
+  so its ~18 callers are untouched); threads `overhead_supply` into the
+  per-stock analysis config. Display split: `_resistance_grade` renders
+  the v2 grade + continuous score ("`<quality> (0.NN)`") when
+  `analysis.supply` is `Some`, else the v1 label. All gated by the SAME
+  default-off `overhead_supply` config → byte-identical output when
+  disarmed. Ranking already wired via PR-D's `w_overhead_supply` (left
+  off here, so arming display alone doesn't change candidate selection).
+  Tests: `Live_resistance_sketch` direct unit tests (known cells / shallow
+  honesty / empty=None); generator display gating (default=v1 label,
+  armed=v2 score). Verify: `dune runtest trading/weinstein/snapshot/gen`.
+
 ## Next steps
 
 1. **PR-E RAN 2026-07-16 — verdict Inconclusive (promising, unpowered,
@@ -92,5 +115,8 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
 
 - `resistance_lookback_bars` stays OFF in backtest conventions until PR-E's
   verdict; live keeps it armed for text honesty (07-15 priorities §constraints).
+  With PR-live-path merged, arming `overhead_supply` in the live weekly-review
+  config additionally switches the displayed resistance grade to the v2
+  sketch-derived grade+score (still default-off; disarmed = v1 label, unchanged).
 - Ranking weight, not an entry gate (trend-context gate class CLOSED).
 - Default-off everywhere until a ledger ACCEPT + confirmation grid.
