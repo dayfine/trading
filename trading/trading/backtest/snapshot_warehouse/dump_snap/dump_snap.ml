@@ -24,11 +24,20 @@ let () =
   match Sc.with_reader ~path ~f:(fun r -> Sc.read_range r ~from ~until) with
   | Error e -> eprintf "ERROR: %s\n" (Status.show e)
   | Ok rows ->
-      printf "date,open,high,low,close,adj_close,volume\n";
+      printf
+        "date,open,high,low,close,adj_close,volume,res_bars_seen,res_max_520w,res_hist_sum\n";
       List.iter rows ~f:(fun row ->
-          printf "%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.0f\n"
+          let hist_sum =
+            List.init Schema.n_hist_buckets ~f:(fun k ->
+                get row (Schema.Res_hist k))
+            |> List.fold ~init:0.0 ~f:( +. )
+          in
+          printf "%s,%.4f,%.4f,%.4f,%.4f,%.4f,%.0f,%.0f,%.4f,%.1f\n"
             (Date.to_string row.Snap.date)
             (get row Schema.Open) (get row Schema.High) (get row Schema.Low)
             (get row Schema.Close)
             (get row Schema.Adjusted_close)
-            (get row Schema.Volume))
+            (get row Schema.Volume)
+            (get row Schema.Res_bars_seen)
+            (get row Schema.Res_max_high_520w)
+            hist_sum)
