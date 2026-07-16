@@ -74,8 +74,35 @@ let _chained_prior_stage ~(stage_config : Stage.config) weekly_bars =
     !prior
   end
 
+(* Resistance-v2 sketch thunk for one ticker (§D4-D6, live bar-list path).
+   When the overhead-supply score is armed ([overhead_supply = Some]), compute
+   the sketch from the ticker's FULL daily history — the live path fetches the
+   whole daily series ([daily_bars_for] has no lookback cap), which IS the deep
+   history, so one Friday costs O(bars) (seconds), not the backtest 5h wall. A
+   fetched window shorter than 520 weeks yields an honestly shallow sketch
+   ([bars_seen] reflects it) rather than a fabricated one. Disarmed →
+   [fun () -> None], bit-identical to the pre-feature bar-list path. *)
+let _sketch_thunk ~(inputs : inputs) ~(analysis_config : Stock_analysis.config)
+    ticker : unit -> Resistance_supply.sketch option =
+  match analysis_config.overhead_supply with
+  | None -> fun () -> None
+  | Some _ ->
+      let daily =
+        Bar_reader.daily_bars_for inputs.bar_reader ~symbol:ticker
+          ~as_of:inputs.as_of
+      in
+      let sketch = Live_resistance_sketch.of_daily_bars daily in
+      fun () -> sketch
+
 (* Analyse one ticker. Symbols with no weekly bars are dropped ([None]) — they
-   cannot satisfy the screener's breakout / breakdown rules. *)
+   cannot satisfy the screener's breakout / breakdown rules.
+
+   Uses the callback shape directly ([callbacks_from_bars] +
+   [analyze_with_callbacks], the same two steps [Stock_analysis.analyze] wraps)
+   so the resistance-v2 [get_sketch] thunk can be injected. When the sketch is
+   disarmed the thunk is [fun () -> None] — identical to the value
+   [callbacks_from_bars] already installs, so the result is bit-identical to
+   [Stock_analysis.analyze]. *)
 let _analyze_ticker ~(inputs : inputs)
     ~(analysis_config : Stock_analysis.config) ~index_bars ticker :
     Stock_analysis.t option =
@@ -85,22 +112,50 @@ let _analyze_ticker ~(inputs : inputs)
     let prior_stage =
       _chained_prior_stage ~stage_config:analysis_config.stage bars
     in
+    let get_sketch = _sketch_thunk ~inputs ~analysis_config ticker in
+    let callbacks =
+      let base =
+        Stock_analysis.callbacks_from_bars ~config:analysis_config ~bars
+          ~benchmark_bars:index_bars
+      in
+      { base with get_sketch }
+    in
     Some
-      (Stock_analysis.analyze ~config:analysis_config ~ticker ~bars
-         ~benchmark_bars:index_bars ~prior_stage ~as_of_date:inputs.as_of)
+      (Stock_analysis.analyze_with_callbacks ~config:analysis_config ~ticker
+         ~callbacks ~prior_stage ~as_of_date:inputs.as_of)
 
-(* Per-stock analysis for the screened universe. *)
+(* Per-stock analysis for the screened universe. Threads the strategy config's
+   [overhead_supply] (resistance-v2) into the per-stock analysis config so the
+   continuous supply score runs on the live path when armed; [None] (default)
+   keeps the analysis bit-identical to the binary-grade behaviour. *)
 let _analyze_universe ~(inputs : inputs) ~index_bars : Stock_analysis.t list =
-  let analysis_config = Stock_analysis.default_config in
+  let analysis_config =
+    { Stock_analysis.default_config with
+      overhead_supply = inputs.config.overhead_supply
+    }
+  in
   List.filter_map inputs.ticker_sectors ~f:(fun (ticker, _sector) ->
       _analyze_ticker ~inputs ~analysis_config ~index_bars ticker)
 
 let _rs_vs_spy (analysis : Stock_analysis.t) : float option =
   Option.map analysis.rs ~f:(fun (r : Rs.result) -> r.current_normalized)
 
+(* Resistance grade for the snapshot display (score/display split, §D5). When
+   the overhead-supply score is armed AND populated ([analysis.supply = Some]),
+   render the v2 sketch-derived grade with its continuous score, e.g.
+   "Heavy_resistance (0.82)"; otherwise fall back to the v1 binary grade.
+   [analysis.supply] is [None] whenever [overhead_supply] is disarmed, so the
+   default-off output is byte-identical to today's v1 grade string. *)
 let _resistance_grade (analysis : Stock_analysis.t) : string option =
-  Option.map analysis.resistance ~f:(fun (r : Resistance.result) ->
-      Weinstein_types.show_overhead_quality r.quality)
+  match analysis.supply with
+  | Some (s : Resistance_supply.result) ->
+      Some
+        (Printf.sprintf "%s (%.2f)"
+           (Weinstein_types.show_overhead_quality s.quality)
+           s.score)
+  | None ->
+      Option.map analysis.resistance ~f:(fun (r : Resistance.result) ->
+          Weinstein_types.show_overhead_quality r.quality)
 
 (* Map one screener candidate to the decoupled snapshot shape. The snapshot
    schema is independent of [scored_candidate] (see weekly_snapshot.mli §Design),

@@ -4,6 +4,7 @@
  (libraries
   core
   status
+  types
   weinstein_trading.snapshot
   weinstein_trading.strategy
   weinstein.snapshot_pipeline
