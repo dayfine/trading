@@ -71,12 +71,16 @@ let make_entry_walk_state ~cash ~(config : Weinstein_strategy_config.config)
   let long_notional_acc =
     ref (initial_long_notional portfolio.Portfolio_view.positions)
   in
-  (* [<= 0.0] => infinity so the gate is an exact no-op (every long admits);
-     otherwise [pct * portfolio_value] (mirrors [short_notional_cap]'s
-     fraction-of-value derivation). *)
+  (* Buying-power ceiling: [min] of the #1965 exposure term and the M1a
+     leverage term. At the defaults ([max_long_exposure_pct_entry = 0.0],
+     [initial_long_margin_req = 1.0]) both terms are [Float.infinity], so the
+     gate is an exact no-op (every long admits) — byte-identical to the prior
+     inline computation. See {!Long_buying_power.long_notional_ceiling}. *)
   let long_notional_cap =
-    if Float.( <= ) config.max_long_exposure_pct_entry 0.0 then Float.infinity
-    else portfolio_value *. config.max_long_exposure_pct_entry
+    Long_buying_power.long_notional_ceiling
+      ~max_long_exposure_pct_entry:config.max_long_exposure_pct_entry
+      ~initial_long_margin_req:config.initial_long_margin_req
+      ~equity:portfolio_value
   in
   let sector_exposure_acc =
     match sector_lookup with

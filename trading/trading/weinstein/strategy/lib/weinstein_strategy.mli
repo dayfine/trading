@@ -194,6 +194,12 @@ module Screening_notional = Screening_notional
     ([initial_short_notional] / [initial_long_notional]) directly. See
     {!Screening_notional}. *)
 
+module Long_buying_power = Long_buying_power
+(** Long-side buying-power model (M1a): the buying-power ceiling that
+    generalizes [max_long_exposure_pct_entry] and the priced margin-interest
+    primitives. Exposed so tests can pin the pure ceiling / interest math
+    directly. See {!Long_buying_power}. *)
+
 module Exit_audit_capture = Exit_audit_capture
 (** Exit-side trade-audit capture. Bridges [TriggerExit] transitions to
     {!Audit_recorder.exit_event}. See {!Exit_audit_capture}. *)
@@ -603,6 +609,19 @@ type config = {
           book may lever on short proceeds at entry time. Scoped to NEW long
           entries only — exits/covers/stops are never blocked. See
           [Weinstein_strategy_config.max_long_exposure_pct_entry]. *)
+  initial_long_margin_req : float; [@sexp.default 1.0]
+      (** Long-side initial-margin requirement — the leverage dial that
+          generalizes [max_long_exposure_pct_entry] into a buying-power ceiling
+          ([min exposure_term (equity / req)], via
+          [Long_buying_power.long_notional_ceiling]). [1.0] (default) = cash
+          account = no explicit equity ceiling => exact no-op (R1); [0.5] =
+          Reg-T 2x buying power. See
+          [Weinstein_strategy_config.initial_long_margin_req]. *)
+  long_margin_rate_annual_pct : float; [@sexp.default 0.0]
+      (** Annualized interest on a long-margin debit balance, priced per trading
+          day as [debit * annual / 252]. Default [0.0] => no charge => exact
+          no-op (R1). See
+          [Weinstein_strategy_config.long_margin_rate_annual_pct]. *)
   resistance_min_history_bars : int; [@sexp.default 0]
       (** Overhead-resistance history floor threaded into the per-screen
           [Stock_analysis.config.resistance.min_history_bars] (and, via the

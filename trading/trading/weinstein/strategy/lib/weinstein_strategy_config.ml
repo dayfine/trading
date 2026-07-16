@@ -95,6 +95,8 @@ type config = {
       (** See [.mli]. *)
   cash_reserve_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
   max_long_exposure_pct_entry : float; [@sexp.default 0.0]  (** See [.mli]. *)
+  initial_long_margin_req : float; [@sexp.default 1.0]  (** See [.mli]. *)
+  long_margin_rate_annual_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
   resistance_min_history_bars : int; [@sexp.default 0]  (** See [.mli]. *)
   resistance_lookback_bars : int; [@sexp.default 0]  (** See [.mli]. *)
   overhead_supply : Resistance_supply.config option; [@sexp.default None]
@@ -163,6 +165,8 @@ let default_config ~universe ~index_symbol =
     scale_in_config = Scale_in_detector.default_config;
     cash_reserve_pct = 0.0;
     max_long_exposure_pct_entry = 0.0;
+    initial_long_margin_req = 1.0;
+    long_margin_rate_annual_pct = 0.0;
     resistance_min_history_bars = 0;
     resistance_lookback_bars = 0;
     overhead_supply = None;

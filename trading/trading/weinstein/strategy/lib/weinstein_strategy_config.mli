@@ -665,6 +665,72 @@ type config = {
           Default-off until an experiment-ledger ACCEPT (per
           [.claude/rules/experiment-flag-discipline.md] +
           [.claude/rules/promotion-confirmation.md]). *)
+  initial_long_margin_req : float; [@sexp.default 1.0]
+      (** Long-side initial-margin requirement — the leverage dial that
+          generalizes {!max_long_exposure_pct_entry} into a buying-power model
+          (levered long-short realism, M1a). [1.0] = cash account / Reg-T 100%
+          requirement; [0.5] = Reg-T 2× buying power. The entry-walk long
+          ceiling becomes [min exposure_term margin_term] via
+          {!Long_buying_power.long_notional_ceiling}, where
+          [margin_term = portfolio_value /. initial_long_margin_req] for a
+          fractional requirement.
+
+          {b Semantics.}
+          - [>= 1.0] (default [1.0], cash account): {b EXACT no-op} — the
+            buying-power term is [Float.infinity], so it imposes no explicit
+            equity ceiling and the combined ceiling is governed solely by
+            {!max_long_exposure_pct_entry} (also disabled at its default). Every
+            existing golden/baseline replays bit-identically
+            (experiment-flag-discipline R1). The reachable [portfolio_value]
+            ceiling of a strict cash account is the explicit
+            [max_long_exposure_pct_entry = 1.0] opt-in, NOT this default: the
+            pre-M1 default had no explicit long ceiling (new long funding was
+            bounded only by the implicit available-cash gate), and imposing an
+            [equity] ceiling by default would newly cap the legitimate
+            held-winner-appreciation-above-NAV and short-proceeds cases #1965
+            deliberately leaves to that opt-in.
+          - [0.0 < req < 1.0]: leverage opted in — the buying-power ceiling
+            rises to [portfolio_value /. req] (e.g. [0.5] →
+            [2.0 *. portfolio_value]).
+
+          {b Scope (M1a).} This field sets the ceiling only. The entry-walk
+          cash-gate relaxation that actually funds longs beyond available cash
+          (creating a debit balance) and the per-tick interest accrual are M1b;
+          until then a fractional requirement is inert (the available-cash gate
+          binds first). See {!Long_buying_power} and
+          [dev/plans/levered-longshort-margin-realism-2026-07-14.md] §M1.
+
+          {b R2 searchability.} A real config field resolved by
+          [Overlay_validator.apply_overrides]; expressible as a single-component
+          [Variant_matrix] float axis
+          ([((initial_long_margin_req) (values (1.0 0.75 0.5)))]). Default-off
+          until an experiment-ledger ACCEPT. *)
+  long_margin_rate_annual_pct : float; [@sexp.default 0.0]
+      (** Annualized interest rate charged on a long-margin debit balance
+          (borrowed cash funding the long book beyond equity), the
+          priced-leverage companion to
+          [margin_config.short_borrow_fee_annual_pct] (levered long-short
+          realism, M1a). Accrued per trading day as
+          [debit_balance *. annual /. 252] via
+          {!Long_buying_power.long_margin_interest_charge}, the same 252
+          day-count the short borrow fee uses.
+
+          {b Semantics.}
+          - [0.0] (default): {b EXACT no-op} — no interest accrues on any
+            balance (experiment-flag-discipline R1). Prices old-Run-E "free
+            leverage" as free, exactly as pre-M1.
+          - [> 0.0]: a positive debit balance carries this financing cost, so a
+            levered long book pays for the leverage.
+
+          {b Scope (M1a).} This field defines the {e priced-debit convention};
+          the per-tick simulator accrual and the cash-gate relaxation that
+          creates a nonzero debit balance are M1b. Until then the charge is
+          always [0.0] (no debit is ever created). See {!Long_buying_power}.
+
+          {b R2 searchability.} A real config field; expressible as a
+          single-component [Variant_matrix] float axis
+          ([((long_margin_rate_annual_pct) (values (0.0 0.08 0.10)))]).
+          Default-off until an experiment-ledger ACCEPT. *)
   resistance_min_history_bars : int; [@sexp.default 0]
       (** Overhead-resistance history floor threaded into
           [Stock_analysis.config.resistance.min_history_bars] (and, because
