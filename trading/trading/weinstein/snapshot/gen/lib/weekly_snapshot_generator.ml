@@ -147,16 +147,19 @@ let _rs_vs_spy (analysis : Stock_analysis.t) : float option =
    "Heavy_resistance (0.82)"; otherwise fall back to the v1 binary grade.
    [analysis.supply] is [None] whenever [overhead_supply] is disarmed, so the
    default-off output is byte-identical to today's v1 grade string. *)
+let _v2_grade_string (s : Resistance_supply.result) : string =
+  Printf.sprintf "%s (%.2f)"
+    (Weinstein_types.show_overhead_quality s.quality)
+    s.score
+
+let _v1_grade_string (analysis : Stock_analysis.t) : string option =
+  Option.map analysis.resistance ~f:(fun (r : Resistance.result) ->
+      Weinstein_types.show_overhead_quality r.quality)
+
 let _resistance_grade (analysis : Stock_analysis.t) : string option =
   match analysis.supply with
-  | Some (s : Resistance_supply.result) ->
-      Some
-        (Printf.sprintf "%s (%.2f)"
-           (Weinstein_types.show_overhead_quality s.quality)
-           s.score)
-  | None ->
-      Option.map analysis.resistance ~f:(fun (r : Resistance.result) ->
-          Weinstein_types.show_overhead_quality r.quality)
+  | Some s -> Some (_v2_grade_string s)
+  | None -> _v1_grade_string analysis
 
 (* Map one screener candidate to the decoupled snapshot shape. The snapshot
    schema is independent of [scored_candidate] (see weekly_snapshot.mli §Design),
