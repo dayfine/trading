@@ -2,7 +2,8 @@
  (names
   test_weekly_snapshot_generator
   test_snapshot_warehouse_parity
-  test_config_overrides_loader)
+  test_config_overrides_loader
+  test_live_resistance_sketch)
  (libraries
   core
   async
@@ -12,6 +13,7 @@
   status
   types
   weinstein.types
+  weinstein.resistance
   weinstein.data_source
   weinstein.data_source.testing
   weinstein.snapshot_pipeline
