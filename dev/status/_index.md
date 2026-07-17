@@ -13,7 +13,7 @@ Each row: one line; deeper task detail in the linked status file.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
-| [resistance-v2](resistance-v2.md) | IN_PROGRESS | local-session (2026-07-16) | — | PR-E WF-CV RAN 07-16 (#1987/8/9): Inconclusive, no promotion (false virgins=luck); next: extend weight axis {45,60} — LOCAL/data-gated |
+| [resistance-v2](resistance-v2.md) | IN_PROGRESS | local-session (2026-07-17) | — | Grid 3/3 CONFIRM 07-17: mechanism ACCEPT, robust w=30; next: HUMAN promotion decision (terminal-wealth flag) + designed levers — see track file |
 | [margin-realism](margin-realism.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | M1a buying-power ceiling + priced margin interest MERGED (#1990, default-off); next: M1b leverage-live then M2–M4 — LOCAL |
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |

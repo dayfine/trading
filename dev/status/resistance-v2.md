@@ -4,7 +4,7 @@
 
 IN_PROGRESS
 
-## Last updated: 2026-07-16
+## Last updated: 2026-07-17
 
 ## Interface stable
 
@@ -70,7 +70,7 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
   validates, strategy-config back-compat parse (field absent → None) + Some
   round-trip.
 
-- **PR-live-path (this PR, feat/resistance-v2-live-path)** — the live
+- **PR-live-path #1989 (MERGED)** — the live
   bar-list path (`Stock_analysis.callbacks_from_bars`) now gets a real
   sketch, closing the PR-D documented gap. New `Live_resistance_sketch`
   adapter (`snapshot/gen/lib`) bridges a symbol's FULL in-memory daily
@@ -95,21 +95,32 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
 
 ## Next steps
 
-1. **PR-E RAN 2026-07-16 — verdict Inconclusive (promising, unpowered,
-   boundary winner; no promotion).** Monotone improvement with positive
-   weight (baseline Sharpe .691 → w15 .787 → w30 .860; MaxDD 16.6 → 14.0;
-   w30 also wins return); prefer-overhead (w=−15) refuted; w=0 ≈ neutral.
-   **The false virgins were LUCK** (path-sizing lottery), not structure.
-   Ledger `2026-07-16-resistance-supply-weight-surface.sexp`; note
-   `dev/notes/resistance-supply-wfcv-2026-07-16.md`. Warehouse of record:
-   `/tmp/snap_top3000_dedup_v3_sketch` (dedup-v3, 37-col, deep feed;
-   rebuilt 07-15, 2908 symbols, verified).
-2. **Follow-up surface** `[non-blocking]`: extend weight axis {45, 60}
-   (winner on boundary) + `min_history_bars`/`insufficient_score` axes;
-   same spec pattern
-   (`test_data/walk_forward/resistance-supply-weight-BROAD-2000-2026.sexp`).
-   sp500 test warehouses still need a rebuild pass when next used
-   (schema-hash gate). Container long runs solo.
+1. **CONFIRMATION GRID 3/3 — mechanism ACCEPT (2026-07-17).** Home curve is
+   a concave hump peaking w≈45 (.691→.897→.772 at 60); sp500 cell confirms
+   on a different universe+geometry (w15 .623 / w30 .552 vs .396); 2011
+   period cell confirms (w30 .825 vs .619, fold-σ collapse .566→.223).
+   Cross-grid robust value **w=30** (3/3, never dominated); w=15 the
+   conservative alternative. Ledger
+   `2026-07-17-resistance-supply-confirmation-grid.sexp`; note
+   `dev/notes/resistance-supply-grid-2026-07-17.md`.
+2. **PROMOTION DECISION — HUMAN-GATED (R3), with the terminal-wealth flag.**
+   28y single-path: w30 +1,991% vs baseline +7,914% (identical 1,187
+   trades, better DD 29.0 vs 32.3) — the penalty excludes the
+   crash-recovery monster cohort (AXTI forensic: correct score at entry;
+   virgin at $11-17 later but stale-inadmissible). Promotion needs the
+   rolling-start terminal-wealth distribution lens, and plausibly the
+   virgin-crossing lever (below) built first. Do NOT flip any default
+   without the user.
+3. **Designed levers (default-off, in order):** (a) virgin-crossing
+   re-admission — Stage-2 name crossing its 520w max on volume = fresh
+   admissible breakout (AXTI-class access restored; book-faithful);
+   (b) regime softener `w × (1 − k·index_supply)` — STATE-based modulators
+   only (user 07-16: no reversal/bottom calls), k ∈ {0,.5,1}, deep-grid
+   testable only; (c) `stale_old_floor` axis {0,.1,.3}; (d) RS-slope
+   laggard metric (loser-touching class); (e) supply-located stop
+   tightening (insurance class, ext-stop precedent).
+4. dedup-v2 warehouse deletable (v3 certified bit-identical:
+   `scenarios-2026-07-16-131756` baseline = Run D to 13 decimals).
 
 ## Standing constraints honored
 
