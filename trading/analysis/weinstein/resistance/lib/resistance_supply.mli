@@ -134,12 +134,16 @@ val is_clear_of_supply : sketch:sketch -> bool
     [Snapshot_pipeline.Resistance_sketch] and its .mli — the source of truth).
     This is exactly the recent-overhead mass {!analyze} scores as its histogram
     component, so a clear sketch has zero recent supply above the breakout
-    (though {!analyze} may still apply a horizon floor for older overhead beyond
-    the 130-week window — this predicate ignores that by design, asking only "is
-    the recent overhead mass empty?"). It is therefore a mid-price mass measure,
-    NOT a closing-price test: a wick (high above the close, close below it) IS
-    counted when its mid sits at/above the close, and a prior weekly bar that
-    closed above the current close is NOT counted when its mid falls below it.
+    (though {!analyze} may still return a nonzero score via a horizon floor
+    whenever the breakout sits at or below a horizon max — [max_high_130w] /
+    [max_high_260w] / [max_high_520w] — including recent within-130-week
+    overhead the mid-price histogram does not count: a wick whose mid falls
+    below the close, or a bar whose mid lands at or above [2 * close]. This
+    predicate ignores those floors by design, asking only "is the recent
+    overhead mass empty?"). It is therefore a mid-price mass measure, NOT a
+    closing-price test: a wick (high above the close, close below it) IS counted
+    when its mid sits at/above the close, and a prior weekly bar that closed
+    above the current close is NOT counted when its mid falls below it.
 
     {b Why this exists alongside {!is_virgin}.} The sketch's [max_high_520w] is
     a per-day rolling max over the trailing window that INCLUDES the current
