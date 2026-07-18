@@ -85,6 +85,7 @@ let make_analysis ?(ticker = "AAPL")
     prior_stage;
     continuation = None;
     supply = None;
+    virgin_readmission = false;
     as_of_date;
   }
 

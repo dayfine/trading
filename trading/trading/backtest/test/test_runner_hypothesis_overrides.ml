@@ -497,6 +497,43 @@ let test_overhead_supply_some_roundtrips _ =
     (is_some_and
        (equal_to (Resistance_supply.default_config : Resistance_supply.config)))
 
+(** resistance-v2 lever (a): [virgin_crossing_readmission] defaults to [false]
+    (experiment-flag-discipline R1 — default-off, bit-identical to baseline). *)
+let test_virgin_crossing_readmission_defaults_off _ =
+  assert_that (_default_config ()).virgin_crossing_readmission (equal_to false)
+
+(** Back-compat: a strategy config sexp written before this lever (no
+    [virgin_crossing_readmission] field) still parses — the missing field
+    defaults to [false] via [@sexp.default false]. Proved by stripping the field
+    from the serialized default config and parsing the result. *)
+let test_strategy_config_parses_with_virgin_readmission_absent _ =
+  let base = Weinstein_strategy.sexp_of_config (_default_config ()) in
+  let stripped =
+    match base with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List [ Sexp.Atom "virgin_crossing_readmission"; _ ] -> false
+            | _ -> true))
+    | other -> other
+  in
+  assert_that
+    (Weinstein_strategy.config_of_sexp stripped)
+    (field
+       (fun (c : Weinstein_strategy.config) -> c.virgin_crossing_readmission)
+       (equal_to false))
+
+(** R2 searchability: the top-level [virgin_crossing_readmission] flag resolves
+    and deep-merges through the same [Overlay_validator] path a [Variant_matrix]
+    [(flag virgin_crossing_readmission)] axis emits —
+    [(virgin_crossing_readmission true)] lands [true]. *)
+let test_override_virgin_crossing_readmission _ =
+  let merged =
+    _apply_one_override (_default_config ())
+      (Sexp.of_string "((virgin_crossing_readmission true))")
+  in
+  assert_that merged.virgin_crossing_readmission (equal_to true)
+
 (** The error message must include the index of the offending overlay (0-based)
     so operators can map back to the specific [--override] flag. When the second
     overlay is invalid and the first is valid, the index must report [#1] (not
@@ -711,6 +748,12 @@ let suite =
          >:: test_strategy_config_parses_with_overhead_supply_absent;
          "overhead_supply Some round-trips"
          >:: test_overhead_supply_some_roundtrips;
+         "virgin_crossing_readmission defaults off"
+         >:: test_virgin_crossing_readmission_defaults_off;
+         "strategy config parses with virgin_crossing_readmission absent"
+         >:: test_strategy_config_parses_with_virgin_readmission_absent;
+         "override virgin_crossing_readmission flag"
+         >:: test_override_virgin_crossing_readmission;
          "error message reports overlay index for multi-overlay runs"
          >:: test_unknown_key_error_reports_overlay_index;
          "default cash_reserve_pct is zero"

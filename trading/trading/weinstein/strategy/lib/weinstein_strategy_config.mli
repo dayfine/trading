@@ -834,6 +834,41 @@ type config = {
           {b Faithfulness} (W1/W2). Ranking weight only, not an entry gate — the
           Stage-2-only buy rule, breakout+volume entry, macro/sector gate and
           stops are untouched. Default-off until an experiment-ledger ACCEPT. *)
+  virgin_crossing_readmission : bool; [@sexp.default false]
+      (** resistance-v2 lever (a): virgin-crossing re-admission. When [true],
+          the strategy sets [Stock_analysis.config.virgin_crossing_readmission],
+          so a Stage-2 survivor that has crossed into virgin territory (above
+          its 520-week max high) on volume is re-admitted by
+          [Stock_analysis.is_breakout_candidate] even when it is past the
+          [early_stage2_max_weeks] early-Stage-2 window. This restores access to
+          the crash-recovery "redeemed monster" cohort the [overhead_supply]
+          penalty correctly demotes at their supplied breakout but which becomes
+          genuinely virgin later (the AXTI post-mortem,
+          [dev/notes/resistance-supply-divergence-forensic-2026-07-17.md]).
+
+          {b Semantics.}
+          - [false] (default): {b bit-identical to baseline} —
+            [Stock_analysis.t.virgin_readmission] is always [false] and the
+            early-Stage-2 staleness rejection is unchanged
+            (experiment-flag-discipline R1).
+          - [true]: a stale Stage-2 survivor is re-admitted iff its warehouse
+            sketch is present AND the breakout is virgin
+            ([Resistance_supply.is_virgin]); sketch absent → no re-admission (no
+            fabrication). Independent of [overhead_supply] — the virgin test
+            needs only the sketch, not the scoring config.
+
+          {b R2 searchability.} Real top-level [bool] field → resolves through
+          [Overlay_validator.apply_overrides]; expressible as a [Variant_matrix]
+          [((flag virgin_crossing_readmission) (values (true false)))] axis.
+
+          {b Faithfulness} (W1/W2). This is the book's "new high ground"
+          breakout — a fresh breakout into virgin territory with volume is a
+          valid Stage-2 entry regardless of how long ago the Stage-2 transition
+          happened (weinstein-book-reference.md §Buy Criteria). Spine intact:
+          still Stage-2-only, still breakout + volume + RS gates, macro/sector
+          gates and stops untouched — it only widens which Stage-2 names clear
+          the early-window staleness cut. Default-off until an experiment-ledger
+          ACCEPT. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

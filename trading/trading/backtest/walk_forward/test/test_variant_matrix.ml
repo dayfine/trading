@@ -344,6 +344,38 @@ let test_suppress_warmup_trading_flag_axis_expands _ =
               [ equal_to (Sexp.of_string "((suppress_warmup_trading false))") ]);
        ])
 
+(* Proves R2 (experiment-flag-discipline) for resistance-v2 lever (a): the
+   [virgin_crossing_readmission] re-admission flag is a real top-level bool on
+   [Weinstein_strategy.config], so its [(flag ...)] axis expands to the expected
+   single-component override sexps (validation of the resolved path is pinned in
+   test_runner_hypothesis_overrides). "Axis the day it lands." *)
+let test_virgin_crossing_readmission_flag_axis_expands _ =
+  let axis =
+    VM.Flag
+      {
+        name = "virgin_crossing_readmission";
+        values = Sexp.[ Atom "true"; Atom "false" ];
+      }
+  in
+  let t = { VM.axes = [ axis ]; expansion = VM.Cartesian } in
+  assert_that (VM.expand t)
+    (elements_are
+       [
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to (Sexp.of_string "((virgin_crossing_readmission true))");
+              ]);
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string "((virgin_crossing_readmission false))");
+              ]);
+       ])
+
 (* Proves R2 (experiment-flag-discipline) for the NS1 cash-floor closing-trade
    exemption (#1557#3): [exempt_closing_trades_from_cash_floor] is a real bool
    field on [Portfolio_risk.config], which is the [portfolio_config] field of
@@ -527,6 +559,8 @@ let suite =
          >:: test_short_sleeve_fraction_axis_expands;
          "suppress_warmup_trading flag axis expands"
          >:: test_suppress_warmup_trading_flag_axis_expands;
+         "virgin_crossing_readmission flag axis expands"
+         >:: test_virgin_crossing_readmission_flag_axis_expands;
          "cash-floor exemption nested axis expands + validates"
          >:: test_cash_floor_exemption_nested_axis_expands;
          "vol-scaled stop nested axis expands + validates"

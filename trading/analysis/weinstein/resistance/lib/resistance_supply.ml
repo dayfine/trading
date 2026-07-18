@@ -135,3 +135,12 @@ let analyze ~(config : config) ~(sketch : sketch) ~breakout_price =
     || Float.(sketch.bars_seen < Float.of_int config.min_history_bars)
   then _insufficient ~config
   else _scored ~config ~sketch ~breakout_price
+
+(* The virgin verdict in isolation: the same finiteness guards [analyze] applies
+   before scoring, plus the [>=] test [_quality_of] uses for [Virgin_territory].
+   No scoring config, no insufficient-history degradation — the whole question
+   is "new high ground over the 520-week window?". *)
+let is_virgin ~(sketch : sketch) ~breakout_price =
+  _sketch_is_finite sketch
+  && Float.is_finite breakout_price
+  && Float.(breakout_price >= sketch.max_high_520w)

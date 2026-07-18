@@ -41,6 +41,19 @@ type config = {
           that rely on bit-equal screener output. The [@sexp.default None]
           attribute is inert here (this config does not derive sexp) but marks
           the field as an additive, default-off option. *)
+  virgin_crossing_readmission : bool; [@sexp.default false]
+      (** resistance-v2 lever (a): when [true], a Stage-2 survivor that has
+          crossed into virgin territory (above its 520-week max high) on volume
+          is re-admitted by {!is_breakout_candidate} even when
+          [early_stage2_max_weeks] would otherwise reject it as stale — the
+          book's "new high ground" breakout (weinstein-book-reference.md §Buy
+          Criteria). The virgin test needs only a sketch from
+          [callbacks.get_sketch]; sketch absent → [t.virgin_readmission = false]
+          (no fabrication). Independent of [overhead_supply] — virginity does
+          not depend on the scoring config. [false] (default) is bit-identical
+          to pre-feature behaviour. The [@sexp.default false] attribute is inert
+          here (this config does not derive sexp) but marks the field as an
+          additive, default-off option. *)
 }
 (** Configuration bundling all sub-module configs. *)
 
@@ -88,6 +101,15 @@ type t = {
           virgin territory, 1 = heavy recent supply just above the breakout),
           consumed by the screener's long-side [w_overhead_supply] scoring
           weight in place of the binary virgin/clean grade. *)
+  virgin_readmission : bool;
+      (** resistance-v2 lever (a) eligibility. [true] iff
+          [config.virgin_crossing_readmission] is armed AND
+          [callbacks.get_sketch] returned a sketch AND a breakout price exists
+          AND the breakout is virgin ([Resistance_supply.is_virgin] — crosses
+          the 520-week max high). Read by {!is_breakout_candidate}'s
+          re-admission arm to bypass the [early_stage2_max_weeks] staleness
+          rejection for a genuine new-high breakout. [false] whenever the flag
+          is off — bit-identical to pre-feature behaviour. *)
   as_of_date : Core.Date.t;  (** The date this analysis was computed. *)
 }
 (** The full per-stock analysis. *)
@@ -116,9 +138,10 @@ type callbacks = {
           as_of), read from the warehouse sketch columns by the panel adapter.
           [None] when the panel doesn't carry the sketch columns, any sketch
           field read fails, or the caller is the bar-list / live CSV path
-          ({!callbacks_from_bars}, which returns [fun () -> None]). Invoked only
-          when [config.overhead_supply] is armed — so when the feature is off
-          this closure is never called and the panel does no extra reads. *)
+          ({!callbacks_from_bars}, which returns [fun () -> None]). Invoked when
+          [config.overhead_supply] OR [config.virgin_crossing_readmission] is
+          armed — so when both features are off this closure is never called and
+          the panel does no extra reads. *)
   stage : Stage.callbacks;
       (** Nested Stage callbacks. {!Stage.callbacks_from_bars} or a panel
           adapter constructs this. *)
@@ -223,8 +246,17 @@ val is_breakout_candidate : ?early_stage2_max_weeks:int -> t -> bool
     3 "continuation buy" pattern as a new-position candidate when
     [config.continuation = Some _].
 
+    Virgin-crossing re-admission arm (resistance-v2 lever (a)): a Stage-2 stock
+    with [t.virgin_readmission = true] (the [virgin_crossing_readmission] flag
+    is armed AND the stock has crossed into virgin territory) also qualifies,
+    even when [weeks_advancing > early_stage2_max_weeks]. This is the book's
+    "new high ground" breakout — a fresh breakout into virgin territory is a
+    valid Stage-2 entry regardless of how long ago the Stage-2 transition
+    happened. [false] (default) when the flag is off, so admission is
+    bit-identical to pre-feature.
+
     Volume confirmation (Strong / Adequate) and the RS-not-negative-declining
-    gate apply to both arms equally.
+    gate apply to all arms equally.
 
     Uses the sub-analysis results directly — no additional I/O. *)
 
