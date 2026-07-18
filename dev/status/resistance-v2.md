@@ -127,8 +127,10 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
   breakout is `close <= own high <= max_520w` — structurally unsatisfiable
   except on an exact high-tick tie (AXTI 2026-01-06: close 20.17, max 20.345,
   hist_sum 0). Fix: new `Resistance_supply.is_clear_of_supply ~sketch` (finite ∧
-  `bars_seen > 0` ∧ every `hist` bin 0 = no weekly bar at/above the current
-  close, closing-basis new-high-ground); `Stock_analysis_supply._virgin_readmission`
+  `bars_seen > 0` ∧ every `hist` bin 0 = zero recent overhead mass: no prior
+  weekly bar with high above the current close whose mid-price is at/above it —
+  the same histogram mass `analyze` scores);
+  `Stock_analysis_supply._virgin_readmission`
   now ORs `is_virgin || is_clear_of_supply`. No new config field, flag unchanged,
   still default-off (R1/R2 untouched). Tests: `is_clear_of_supply` truth table +
   own-week-high divergence; compute-path AXTI shape (max above breakout, hist

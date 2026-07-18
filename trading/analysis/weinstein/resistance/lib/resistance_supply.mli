@@ -126,11 +126,20 @@ val is_virgin : sketch:sketch -> breakout_price:float -> bool
 
 val is_clear_of_supply : sketch:sketch -> bool
 (** [is_clear_of_supply ~sketch] is [true] iff the sketch is finite,
-    [bars_seen > 0], and EVERY [hist] bin is [0] — i.e. no weekly bar in the
-    trailing histogram window sits at or above the current close. This is "new
-    high ground on a CLOSING basis" (the histogram is close-anchored; every bin
-    spans prices at/above the anchoring close), which is how Weinstein reads
-    resistance — off weekly closes, not intraweek high ticks.
+    [bars_seen > 0], and EVERY [hist] bin is [0] — i.e. zero measured overhead
+    mass: no prior (finalized) weekly bar in the trailing 130-week histogram
+    window has a high above the current close whose mid-price
+    ([(high + low) / 2]) falls at or above it. The histogram producer gates on
+    [weekly_high > anchor] and buckets by the mid-price (see
+    [Snapshot_pipeline.Resistance_sketch] and its .mli — the source of truth).
+    This is exactly the recent-overhead mass {!analyze} scores as its histogram
+    component, so a clear sketch has zero recent supply above the breakout
+    (though {!analyze} may still apply a horizon floor for older overhead beyond
+    the 130-week window — this predicate ignores that by design, asking only "is
+    the recent overhead mass empty?"). It is therefore a mid-price mass measure,
+    NOT a closing-price test: a wick (high above the close, close below it) IS
+    counted when its mid sits at/above the close, and a prior weekly bar that
+    closed above the current close is NOT counted when its mid falls below it.
 
     {b Why this exists alongside {!is_virgin}.} The sketch's [max_high_520w] is
     a per-day rolling max over the trailing window that INCLUDES the current
