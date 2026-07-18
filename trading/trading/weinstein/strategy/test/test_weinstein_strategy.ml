@@ -568,6 +568,7 @@ let make_scored_candidate ~ticker ~side ~entry ~stop ~grade =
       prior_stage = Some (Stage3 { weeks_topping = 8 });
       continuation = None;
       supply = None;
+      virgin_readmission = false;
       as_of_date = Date.of_string "2024-01-05";
     }
   in

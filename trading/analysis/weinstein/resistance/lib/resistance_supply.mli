@@ -105,3 +105,21 @@ val analyze : config:config -> sketch:sketch -> breakout_price:float -> result
     the gap is at most one bucket.
 
     Pure function. *)
+
+val is_virgin : sketch:sketch -> breakout_price:float -> bool
+(** [is_virgin ~sketch ~breakout_price] is the v1 virgin-territory predicate in
+    isolation: [true] iff the sketch cells are finite (positive anchor) and the
+    breakout is at or above the 520-week max high
+    ([breakout_price >= max_high_520w], ties inclusive — bit-equal to the
+    [quality = Virgin_territory] branch of {!analyze} and to the v1
+    {!Resistance} bar-walk, both of which void virginity only on a high STRICTLY
+    above the breakout). Unlike {!analyze} it carries no scoring config and
+    applies no insufficient-history degradation — it answers only "is this new
+    high ground over the 520-week window?".
+
+    [false] when the sketch cells are non-finite — no fabrication of virginity
+    from missing data. Consumed by the virgin-crossing re-admission lever
+    ({!Stock_analysis.is_breakout_candidate}, gated by
+    [Weinstein_strategy_config.virgin_crossing_readmission]): a Stage-2 name
+    that crosses into virgin territory on volume is a fresh admissible breakout
+    even when the early-Stage2 window would otherwise mark it stale. *)

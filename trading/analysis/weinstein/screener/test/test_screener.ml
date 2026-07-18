@@ -1797,6 +1797,7 @@ let ranking_analysis ~ticker ~rs_norm ~weeks_advancing ~volume_ratio :
     prior_stage = Some (Stage1 { weeks_in_base = 10 });
     continuation = None;
     supply = None;
+    virgin_readmission = false;
     as_of_date = as_of;
   }
 

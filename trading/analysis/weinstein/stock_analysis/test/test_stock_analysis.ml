@@ -119,7 +119,8 @@ let test_breakout_candidate_false_when_no_volume_confirmation _ =
 (** A fresh Stage2 analysis (no observed Stage1→Stage2 predecessor) with the
     given [weeks_advancing], Strong volume, and rising RS — so admission turns
     solely on the early-Stage2 window arm of [is_breakout_candidate]. *)
-let fresh_stage2 ~weeks_advancing : Stock_analysis.t =
+let fresh_stage2 ?(virgin_readmission = false) ~weeks_advancing () :
+    Stock_analysis.t =
   {
     ticker = "X";
     stage =
@@ -154,6 +155,7 @@ let fresh_stage2 ~weeks_advancing : Stock_analysis.t =
     prior_stage = None;
     continuation = None;
     supply = None;
+    virgin_readmission;
     as_of_date = as_of;
   }
 
@@ -161,8 +163,8 @@ let fresh_stage2 ~weeks_advancing : Stock_analysis.t =
    historical hardcoded window bit-for-bit. *)
 let test_default_window_admits_4_rejects_5 _ =
   assert_that
-    ( is_breakout_candidate (fresh_stage2 ~weeks_advancing:4),
-      is_breakout_candidate (fresh_stage2 ~weeks_advancing:5) )
+    ( is_breakout_candidate (fresh_stage2 ~weeks_advancing:4 ()),
+      is_breakout_candidate (fresh_stage2 ~weeks_advancing:5 ()) )
     (equal_to (true, false))
 
 (* Widened window (8): the same weeks_advancing = 5 candidate that the default
@@ -170,8 +172,36 @@ let test_default_window_admits_4_rejects_5 _ =
 let test_widened_window_admits_5 _ =
   assert_that
     (is_breakout_candidate ~early_stage2_max_weeks:8
-       (fresh_stage2 ~weeks_advancing:5))
+       (fresh_stage2 ~weeks_advancing:5 ()))
     (equal_to true)
+
+(* ------------------------------------------------------------------ *)
+(* Virgin-crossing re-admission arm (resistance-v2 lever (a))            *)
+(* ------------------------------------------------------------------ *)
+
+(* A stale Stage-2 survivor (weeks_advancing = 8, well past the default 4-week
+   window) that has crossed into virgin territory ([virgin_readmission = true])
+   is re-admitted by the re-admission arm — the book's "new high ground"
+   breakout. Without the flag the same stale survivor is rejected. Pins that the
+   arm bypasses ONLY the staleness cut (the pair differs solely in the flag). *)
+let test_stale_virgin_readmitted_only_when_armed _ =
+  assert_that
+    ( is_breakout_candidate
+        (fresh_stage2 ~weeks_advancing:8 ~virgin_readmission:true ()),
+      is_breakout_candidate
+        (fresh_stage2 ~weeks_advancing:8 ~virgin_readmission:false ()) )
+    (equal_to (true, false))
+
+(* Fresh (non-stale) Stage-2 candidates are admitted by the initial-breakout arm
+   regardless of the re-admission flag — the flag never rejects, so a fresh
+   candidate is unaffected either way. *)
+let test_fresh_candidate_unaffected_by_readmission_flag _ =
+  assert_that
+    ( is_breakout_candidate
+        (fresh_stage2 ~weeks_advancing:4 ~virgin_readmission:true ()),
+      is_breakout_candidate
+        (fresh_stage2 ~weeks_advancing:4 ~virgin_readmission:false ()) )
+    (equal_to (true, true))
 
 (* ------------------------------------------------------------------ *)
 (* Breakdown candidate                                                  *)
@@ -611,6 +641,62 @@ let test_supply_none_when_config_off _ =
     (supply_of ~config:cfg ~sketch_opt:(Some (make_sketch ())))
     is_none
 
+(* ------------------------------------------------------------------ *)
+(* Virgin-crossing re-admission (resistance-v2 lever (a)) — compute path *)
+(* ------------------------------------------------------------------ *)
+
+let armed_readmission_cfg = { cfg with virgin_crossing_readmission = true }
+
+(** A virgin sketch: every max-high below any plausible breakout price the
+    rising bars produce (>=~50), so [Resistance_supply.is_virgin] is true. *)
+let virgin_sketch () : Resistance_supply.sketch =
+  {
+    (make_sketch ()) with
+    max_high_130w = 1.0;
+    max_high_260w = 1.0;
+    max_high_520w = 1.0;
+  }
+
+(** Run [analyze_with_callbacks] over rising bars with [config] and a
+    [get_sketch] closure returning [sketch_opt]; return [t.virgin_readmission].
+*)
+let virgin_readmission_of ~config ~sketch_opt =
+  let bars = rising_bars ~n:35 50.0 100.0 in
+  let base = callbacks_from_bars ~config ~bars ~benchmark_bars:[] in
+  let callbacks = { base with get_sketch = (fun () -> sketch_opt) } in
+  (analyze_with_callbacks ~config ~ticker:"X" ~callbacks ~prior_stage:None
+     ~as_of_date:as_of)
+    .virgin_readmission
+
+(** Armed AND a present virgin sketch: [virgin_readmission] is [true]. *)
+let test_readmission_true_when_armed_and_virgin _ =
+  assert_that
+    (virgin_readmission_of ~config:armed_readmission_cfg
+       ~sketch_opt:(Some (virgin_sketch ())))
+    (equal_to true)
+
+(** Armed but the sketch shows overhead (non-virgin, [make_sketch]'s max-high
+    200 sits above the breakout): [virgin_readmission] is [false]. *)
+let test_readmission_false_when_armed_and_not_virgin _ =
+  assert_that
+    (virgin_readmission_of ~config:armed_readmission_cfg
+       ~sketch_opt:(Some (make_sketch ())))
+    (equal_to false)
+
+(** Armed but the callback returns no sketch: [virgin_readmission] is [false] —
+    no fabrication of virginity from missing data. *)
+let test_readmission_false_when_sketch_absent _ =
+  assert_that
+    (virgin_readmission_of ~config:armed_readmission_cfg ~sketch_opt:None)
+    (equal_to false)
+
+(** Feature off (default) even with a present virgin sketch:
+    [virgin_readmission] is [false] — bit-identical to pre-feature behaviour. *)
+let test_readmission_false_when_config_off _ =
+  assert_that
+    (virgin_readmission_of ~config:cfg ~sketch_opt:(Some (virgin_sketch ())))
+    (equal_to false)
+
 let suite =
   "stock_analysis_tests"
   >::: [
@@ -627,6 +713,10 @@ let suite =
          "test_default_window_admits_4_rejects_5"
          >:: test_default_window_admits_4_rejects_5;
          "test_widened_window_admits_5" >:: test_widened_window_admits_5;
+         "stale virgin readmitted only when armed"
+         >:: test_stale_virgin_readmitted_only_when_armed;
+         "fresh candidate unaffected by readmission flag"
+         >:: test_fresh_candidate_unaffected_by_readmission_flag;
          "test_breakdown_candidate_true_with_stage3_prior"
          >:: test_breakdown_candidate_true_with_stage3_prior;
          "test_breakdown_candidate_false_for_stage2"
@@ -658,6 +748,14 @@ let suite =
          "supply none when sketch absent"
          >:: test_supply_none_when_sketch_absent;
          "supply none when config off" >:: test_supply_none_when_config_off;
+         "readmission true when armed and virgin"
+         >:: test_readmission_true_when_armed_and_virgin;
+         "readmission false when armed and not virgin"
+         >:: test_readmission_false_when_armed_and_not_virgin;
+         "readmission false when sketch absent"
+         >:: test_readmission_false_when_sketch_absent;
+         "readmission false when config off"
+         >:: test_readmission_false_when_config_off;
        ]
 
 let () = run_test_tt_main suite
