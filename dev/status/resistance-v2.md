@@ -131,19 +131,28 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
    `2026-07-17-resistance-supply-confirmation-grid.sexp`; note
    `dev/notes/resistance-supply-grid-2026-07-17.md`.
 2. **PROMOTION DECISION — HUMAN-GATED (R3), with the terminal-wealth flag.**
-   28y single-path: w30 +1,991% vs baseline +7,914% (identical 1,187
-   trades, better DD 29.0 vs 32.3) — the penalty excludes the
-   crash-recovery monster cohort (AXTI forensic: correct score at entry;
-   virgin at $11-17 later but stale-inadmissible). Promotion needs the
-   rolling-start terminal-wealth distribution lens, and plausibly the
-   virgin-crossing lever (below) built first. Do NOT flip any default
-   without the user.
+   28y single-path: w30 +1,991% vs baseline +7,914% (same trade COUNT —
+   but per the 07-17 divergence forensic the books differ: 367/1,187
+   tickets shared, AXTI = $62.6M of the $64.7M forfeited cohort; note
+   `dev/notes/resistance-supply-divergence-forensic-2026-07-17.md`).
+   **Decision input #1 DONE (07-18): rolling-start distribution**
+   (`dev/notes/resistance-supply-rolling-start-2026-07-18.md`): w30 wins
+   9/12 paired starts (median +1.15pp CAGR/yr, MaxDD better on every
+   path) but the 3 losses are −5.8..−8.5pp/yr and are exactly the
+   post-crash-recovery-window starts (2000/2008/2010) — a systematic
+   regime-conditional left tail, not one-draw luck. **Decision input #2
+   IN FLIGHT: 28y vc pair** (w30+vc, vc-only;
+   `test_data/backtest_scenarios/staging-vc-pair/`, results
+   `/tmp/sweeps/vc-pair/`) — does #1997 re-admit AXTI at redemption and
+   repair the recovery-window paths? Standing recommendation: if yes,
+   promote the PAIR (w30 + virgin-crossing), not bare w30. Do NOT flip
+   any default without the user.
 3. **Designed levers (default-off, in order):** (a) virgin-crossing
    re-admission — Stage-2 name crossing its 520w max on volume = fresh
    admissible breakout (AXTI-class access restored; book-faithful) —
-   **BUILT, default-off, PR `feat/virgin-crossing-readmission` open (see
-   Shipped)**; next = WF-CV it as a paired axis with `overhead_supply=w30`
-   on the deep grid;
+   **MERGED #1997 (2026-07-18), default-off, QC 5/5**; next = 28y vc pair
+   (in flight, see 2.) then WF-CV as a paired axis with
+   `overhead_supply=w30` on the deep grid;
    (b) regime softener `w × (1 − k·index_supply)` — STATE-based modulators
    only (user 07-16: no reversal/bottom calls), k ∈ {0,.5,1}, deep-grid
    testable only; (c) `stale_old_floor` axis {0,.1,.3}; (d) RS-slope
