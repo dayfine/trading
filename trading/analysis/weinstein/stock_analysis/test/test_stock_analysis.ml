@@ -657,6 +657,14 @@ let virgin_sketch () : Resistance_supply.sketch =
     max_high_520w = 1.0;
   }
 
+(** A genuine-overhead sketch: max-high 200 above the breakout (so [is_virgin]
+    is false) AND a non-zero histogram bin (so [is_clear_of_supply] is false).
+    Neither new-high-ground arm fires → no re-admission. *)
+let overhead_sketch () : Resistance_supply.sketch =
+  let hist = Array.create ~len:20 0.0 in
+  hist.(0) <- 5.0;
+  { (make_sketch ()) with hist }
+
 (** Run [analyze_with_callbacks] over rising bars with [config] and a
     [get_sketch] closure returning [sketch_opt]; return [t.virgin_readmission].
 *)
@@ -675,12 +683,24 @@ let test_readmission_true_when_armed_and_virgin _ =
        ~sketch_opt:(Some (virgin_sketch ())))
     (equal_to true)
 
-(** Armed but the sketch shows overhead (non-virgin, [make_sketch]'s max-high
-    200 sits above the breakout): [virgin_readmission] is [false]. *)
-let test_readmission_false_when_armed_and_not_virgin _ =
+(** The AXTI own-week-high case: [make_sketch]'s max-high (200) sits ABOVE the
+    breakout (so [is_virgin] is false — the own-week-high artifact) but its
+    histogram is empty (no overhead on a closing basis). The
+    [is_clear_of_supply] arm admits it: armed → [virgin_readmission] is [true].
+*)
+let test_readmission_true_when_armed_and_clear_of_supply _ =
   assert_that
     (virgin_readmission_of ~config:armed_readmission_cfg
        ~sketch_opt:(Some (make_sketch ())))
+    (equal_to true)
+
+(** Armed but the sketch shows genuine overhead (max-high above the breakout AND
+    a non-zero histogram bin): neither new-high-ground arm fires →
+    [virgin_readmission] is [false]. *)
+let test_readmission_false_when_armed_and_overhead _ =
+  assert_that
+    (virgin_readmission_of ~config:armed_readmission_cfg
+       ~sketch_opt:(Some (overhead_sketch ())))
     (equal_to false)
 
 (** Armed but the callback returns no sketch: [virgin_readmission] is [false] —
@@ -750,8 +770,10 @@ let suite =
          "supply none when config off" >:: test_supply_none_when_config_off;
          "readmission true when armed and virgin"
          >:: test_readmission_true_when_armed_and_virgin;
-         "readmission false when armed and not virgin"
-         >:: test_readmission_false_when_armed_and_not_virgin;
+         "readmission true when armed and clear of supply"
+         >:: test_readmission_true_when_armed_and_clear_of_supply;
+         "readmission false when armed and overhead"
+         >:: test_readmission_false_when_armed_and_overhead;
          "readmission false when sketch absent"
          >:: test_readmission_false_when_sketch_absent;
          "readmission false when config off"

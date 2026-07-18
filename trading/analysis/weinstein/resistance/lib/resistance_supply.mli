@@ -123,3 +123,40 @@ val is_virgin : sketch:sketch -> breakout_price:float -> bool
     [Weinstein_strategy_config.virgin_crossing_readmission]): a Stage-2 name
     that crosses into virgin territory on volume is a fresh admissible breakout
     even when the early-Stage2 window would otherwise mark it stale. *)
+
+val is_clear_of_supply : sketch:sketch -> bool
+(** [is_clear_of_supply ~sketch] is [true] iff the sketch is finite,
+    [bars_seen > 0], and EVERY [hist] bin is [0] — i.e. zero measured overhead
+    mass: no prior (finalized) weekly bar in the trailing 130-week histogram
+    window has a high above the current close whose mid-price
+    ([(high + low) / 2]) falls at or above it. The histogram producer gates on
+    [weekly_high > anchor] and buckets by the mid-price (see
+    [Snapshot_pipeline.Resistance_sketch] and its .mli — the source of truth).
+    This is exactly the recent-overhead mass {!analyze} scores as its histogram
+    component, so a clear sketch has zero recent supply above the breakout
+    (though {!analyze} may still return a nonzero score via a horizon floor
+    whenever the breakout sits at or below a horizon max — [max_high_130w] /
+    [max_high_260w] / [max_high_520w] — including recent within-130-week
+    overhead the mid-price histogram does not count: a wick whose mid falls
+    below the close, or a bar whose mid lands at or above [2 * close]. This
+    predicate ignores those floors by design, asking only "is the recent
+    overhead mass empty?"). It is therefore a mid-price mass measure, NOT a
+    closing-price test: a wick (high above the close, close below it) IS counted
+    when its mid sits at/above the close, and a prior weekly bar that closed
+    above the current close is NOT counted when its mid falls below it.
+
+    {b Why this exists alongside {!is_virgin}.} The sketch's [max_high_520w] is
+    a per-day rolling max over the trailing window that INCLUDES the current
+    week's own high. For a stock climbing into new high ground on a
+    close-anchored breakout price, [close <= own weekly high <= max_high_520w],
+    so [is_virgin] ([breakout >= max_high_520w]) is structurally unsatisfiable
+    except on an exact tie at the weekly high tick. Concrete case — AXTI in its
+    2025-26 redemption: on 2026-01-06 the close was 20.17, [max_high_520w] was
+    20.345 (set by that very week's own high), and [res_hist_sum] was 0 (zero
+    weekly bars above price in the whole window). [is_virgin] fails every week;
+    [is_clear_of_supply] correctly reports new high ground. The re-admission
+    lever ORs the two so the own-week-high artifact no longer suppresses genuine
+    breakouts into clear space.
+
+    [false] when any bin is non-zero (genuine overhead), when [bars_seen = 0],
+    or when the sketch is non-finite — no fabrication from missing data. *)
