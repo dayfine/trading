@@ -29,7 +29,8 @@ let held_symbols (portfolio : Portfolio_view.t) =
 let _classify_one ~held_set ~make_entry ~portfolio_value
     ~(state : Screening_notional.entry_walk_state) candidate =
   ( candidate,
-    Entry_audit_capture.classify_candidate ~held_set ~make_entry
+    Entry_audit_capture.classify_candidate
+      ~leverage_enabled:state.leverage_enabled ~held_set ~make_entry
       ~remaining_cash:state.remaining_cash
       ~short_notional_acc:state.short_notional_acc
       ~short_notional_cap:state.short_notional_cap

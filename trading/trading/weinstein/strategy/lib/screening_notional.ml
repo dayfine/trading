@@ -57,7 +57,10 @@ type entry_walk_state = {
   long_notional_cap : float;
   sector_exposure_acc : (string, float) Hashtbl.t;
   max_sector_exposure_pct : float option;
+  leverage_enabled : bool;
 }
+
+let borrowed_balance state = Float.max 0.0 (-. !(state.remaining_cash))
 
 let make_entry_walk_state ~cash ~(config : Weinstein_strategy_config.config)
     ~(portfolio : Portfolio_view.t) ~portfolio_value ~sector_lookup =
@@ -98,6 +101,12 @@ let make_entry_walk_state ~cash ~(config : Weinstein_strategy_config.config)
     sector_exposure_acc;
     max_sector_exposure_pct =
       config.portfolio_config.Portfolio_risk.max_sector_exposure_pct;
+    (* M1b: leverage engages only for a fractional margin requirement
+       ([initial_long_margin_req < 1.0]). At the default cash-account setting
+       (1.0) this is [false] and the entry-walk cash gate is byte-identical to
+       pre-M1b (R1). When [true], the [long_notional_cap] leverage term is
+       finite ([equity / req]), so the buying-power ceiling always binds. *)
+    leverage_enabled = Float.( < ) config.initial_long_margin_req 1.0;
   }
 
 let reserve_reduced_walk_state ~(config : Weinstein_strategy_config.config)

@@ -50,11 +50,30 @@ type entry_walk_state = {
           [config.max_long_exposure_pct_entry * portfolio_value]. *)
   sector_exposure_acc : (string, float) Hashtbl.t;
   max_sector_exposure_pct : float option;
+  leverage_enabled : bool;
+      (** M1b long-margin leverage switch: [true] iff
+          [config.initial_long_margin_req < 1.0] (a fractional Reg-T
+          requirement, e.g. [0.5] = 2x buying power). When [true], the
+          entry-walk cash gate ([Entry_audit_capture.check_cash_and_deduct]) may
+          fund a long beyond available cash — driving [remaining_cash] negative
+          (a debit / borrowed balance) — with the buying-power ceiling
+          ([long_notional_cap]) the sole bound. When [false] (the default
+          cash-account setting [1.0]) the cash gate is byte-identical to
+          pre-M1b: a long costing more than [remaining_cash] is rejected (R1).
+      *)
 }
 (** Bundle of per-Friday entry-walk accumulators + caps, seeded from the
     portfolio and config. The accumulators are mutated in-place by the gates
     inside [Entry_audit_capture.classify_candidate] as the walk funds
     candidates. *)
+
+val borrowed_balance : entry_walk_state -> float
+(** The long-margin debit accrued so far in this walk:
+    [max 0 (-remaining_cash)]. [remaining_cash] only goes negative when
+    [leverage_enabled] lets a long draw beyond available cash, so this derives
+    the borrowed balance directly. Returns [0.0] whenever the walk stayed within
+    cash (always so at the default cash-account setting, where
+    [leverage_enabled = false]). *)
 
 val make_entry_walk_state :
   cash:float ->
