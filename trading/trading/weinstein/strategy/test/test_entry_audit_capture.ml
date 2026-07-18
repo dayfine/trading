@@ -939,6 +939,180 @@ let test_initial_long_notional_seeds_from_long_holdings _ =
     (Screening_notional.initial_long_notional positions)
     (float_equal 5_000.0)
 
+(* ------------------------------------------------------------------ *)
+(* M1b-1 2026-07-17: entry-walk cash-gate leverage relaxation           *)
+(* ------------------------------------------------------------------ *)
+
+(** R1 default-off: with [leverage_enabled = false] (the cash-account setting),
+    a $10K long against $5K [remaining_cash] is rejected ([None]) and the cash
+    balance is untouched — byte-identical to the pre-M1b gate. *)
+let test_cash_gate_default_rejects_long_over_cash _ =
+  let remaining_cash = ref 5_000.0 in
+  let trans, meta =
+    _stub_trans_and_meta ~side:Trading_base.Types.Long ~shares:100
+      ~effective_entry_price:100.0
+  in
+  let result =
+    Entry_audit_capture.check_cash_and_deduct ~leverage_enabled:false
+      ~remaining_cash (trans, meta)
+  in
+  assert_that result is_none;
+  assert_that !remaining_cash (float_equal 5_000.0)
+
+(** M1b leverage: with [leverage_enabled = true], the same $10K long is funded
+    beyond the $5K cash — [remaining_cash] goes to [-$5K] (the debit / borrowed
+    balance) and the entry is admitted. *)
+let test_cash_gate_leverage_funds_long_over_cash _ =
+  let remaining_cash = ref 5_000.0 in
+  let trans, meta =
+    _stub_trans_and_meta ~side:Trading_base.Types.Long ~shares:100
+      ~effective_entry_price:100.0
+  in
+  let result =
+    Entry_audit_capture.check_cash_and_deduct ~leverage_enabled:true
+      ~remaining_cash (trans, meta)
+  in
+  assert_that result
+    (is_some_and
+       (field
+          (fun (_, (m : Entry_audit_capture.entry_meta)) -> m.shares)
+          (equal_to 100)));
+  assert_that !remaining_cash (float_equal (-5_000.0))
+
+(** Leverage is long-only: with [leverage_enabled = true], a $10K SHORT against
+    $5K cash is still rejected ([None]) and cash untouched. Long-margin buying
+    power must not relax the short side. *)
+let test_cash_gate_leverage_does_not_relax_shorts _ =
+  let remaining_cash = ref 5_000.0 in
+  let trans, meta =
+    _stub_trans_and_meta ~side:Trading_base.Types.Short ~shares:100
+      ~effective_entry_price:100.0
+  in
+  let result =
+    Entry_audit_capture.check_cash_and_deduct ~leverage_enabled:true
+      ~remaining_cash (trans, meta)
+  in
+  assert_that result is_none;
+  assert_that !remaining_cash (float_equal 5_000.0)
+
+(** End-to-end through [classify_candidate] with leverage: a $10K long against
+    $5K cash and a $50K buying-power ceiling is [Kept] (funded on margin) and
+    the debit persists — [remaining_cash] settles at [-$5K]. *)
+let test_leverage_funds_long_under_ceiling_keeps_debit _ =
+  let remaining_cash = ref 5_000.0 in
+  let long_notional_acc = ref 0.0 in
+  let make_entry _ =
+    let trans, meta =
+      _stub_trans_and_meta ~side:Trading_base.Types.Long ~shares:100
+        ~effective_entry_price:100.0
+    in
+    Entry_audit_capture.Entry_ok (trans, meta)
+  in
+  let cand =
+    _long_candidate ~ticker:"STUB" ~suggested_entry:100.0 ~suggested_stop:90.0
+      ~as_of_date:(Date.of_string "2024-06-14")
+  in
+  let decision =
+    Entry_audit_capture.classify_candidate ~leverage_enabled:true
+      ~held_set:String.Set.empty ~make_entry ~remaining_cash
+      ~short_notional_acc:(ref 0.0) ~short_notional_cap:Float.infinity
+      ~long_notional_acc ~long_notional_cap:(100_000.0 *. 0.50)
+      ~sector_exposure_acc:(Hashtbl.create (module String))
+      ~max_sector_exposure_pct:None ~portfolio_value:100_000.0 cand
+  in
+  assert_that decision
+    (matching ~msg:"expected Kept"
+       (function Entry_audit_capture.Kept (t, m) -> Some (t, m) | _ -> None)
+       (field
+          (fun (_, (m : Entry_audit_capture.entry_meta)) -> m.shares)
+          (equal_to 100)));
+  assert_that !remaining_cash (float_equal (-5_000.0))
+
+(** The buying-power ceiling still binds under leverage: a $60K long borrowed
+    against a $50K ceiling is [Skipped Long_exposure_cap], and the tentatively
+    borrowed cash is refunded so no debit persists ([remaining_cash] back to
+    $5K). This is what bounds the debit to [equity / initial_long_margin_req].
+*)
+let test_leverage_ceiling_binds_and_refunds _ =
+  let remaining_cash = ref 5_000.0 in
+  let long_notional_acc = ref 0.0 in
+  let make_entry _ =
+    let trans, meta =
+      _stub_trans_and_meta ~side:Trading_base.Types.Long ~shares:600
+        ~effective_entry_price:100.0
+    in
+    Entry_audit_capture.Entry_ok (trans, meta)
+  in
+  let cand =
+    _long_candidate ~ticker:"STUB" ~suggested_entry:100.0 ~suggested_stop:90.0
+      ~as_of_date:(Date.of_string "2024-06-14")
+  in
+  let decision =
+    Entry_audit_capture.classify_candidate ~leverage_enabled:true
+      ~held_set:String.Set.empty ~make_entry ~remaining_cash
+      ~short_notional_acc:(ref 0.0) ~short_notional_cap:Float.infinity
+      ~long_notional_acc ~long_notional_cap:(100_000.0 *. 0.50)
+      ~sector_exposure_acc:(Hashtbl.create (module String))
+      ~max_sector_exposure_pct:None ~portfolio_value:100_000.0 cand
+  in
+  assert_that decision
+    (matching ~msg:"expected Skipped Long_exposure_cap"
+       (function Entry_audit_capture.Skipped r -> Some r | _ -> None)
+       (equal_to
+          (Audit_recorder.Long_exposure_cap : Audit_recorder.skip_reason)));
+  assert_that !remaining_cash (float_equal 5_000.0)
+
+(** [make_entry_walk_state] derives [leverage_enabled] from the config's
+    [initial_long_margin_req]: a fractional requirement ([0.5], leverage opted
+    in) → [true]; the default cash account ([1.0]) and an over-100% requirement
+    ([2.0]) → [false] (R1: the default engages no leverage). *)
+let test_walk_state_leverage_enabled_from_config _ =
+  let portfolio =
+    {
+      Trading_strategy.Portfolio_view.cash = 5_000.0;
+      positions = String.Map.empty;
+    }
+  in
+  let mk req =
+    Screening_notional.make_entry_walk_state ~cash:5_000.0
+      ~config:
+        {
+          (Weinstein_strategy_config.default_config ~universe:[ "AAPL" ]
+             ~index_symbol:"SPY")
+          with
+          initial_long_margin_req = req;
+        }
+      ~portfolio ~portfolio_value:100_000.0 ~sector_lookup:None
+  in
+  assert_that (mk 1.0).leverage_enabled (equal_to false);
+  assert_that (mk 0.5).leverage_enabled (equal_to true);
+  assert_that (mk 2.0).leverage_enabled (equal_to false)
+
+(** [borrowed_balance] derives the debit as [max 0 (-remaining_cash)]: [0.0]
+    while the walk stays within cash, then the shortfall once [remaining_cash]
+    is driven negative by a levered long. *)
+let test_borrowed_balance_derives_from_debit _ =
+  let portfolio =
+    {
+      Trading_strategy.Portfolio_view.cash = 5_000.0;
+      positions = String.Map.empty;
+    }
+  in
+  let state =
+    Screening_notional.make_entry_walk_state ~cash:5_000.0
+      ~config:
+        {
+          (Weinstein_strategy_config.default_config ~universe:[ "AAPL" ]
+             ~index_symbol:"SPY")
+          with
+          initial_long_margin_req = 0.5;
+        }
+      ~portfolio ~portfolio_value:100_000.0 ~sector_lookup:None
+  in
+  assert_that (Screening_notional.borrowed_balance state) (float_equal 0.0);
+  state.remaining_cash := -3_000.0;
+  assert_that (Screening_notional.borrowed_balance state) (float_equal 3_000.0)
+
 let () =
   run_test_tt_main
     ("entry_audit_capture"
@@ -990,4 +1164,18 @@ let () =
            >:: test_long_exposure_cap_classify_skips_and_refunds;
            "P0b: initial_long_notional seeds from long holdings"
            >:: test_initial_long_notional_seeds_from_long_holdings;
+           "M1b-1: cash gate default rejects long over cash"
+           >:: test_cash_gate_default_rejects_long_over_cash;
+           "M1b-1: leverage funds long over cash (debit)"
+           >:: test_cash_gate_leverage_funds_long_over_cash;
+           "M1b-1: leverage does not relax shorts"
+           >:: test_cash_gate_leverage_does_not_relax_shorts;
+           "M1b-1: leverage funds long under ceiling, keeps debit"
+           >:: test_leverage_funds_long_under_ceiling_keeps_debit;
+           "M1b-1: leverage ceiling binds and refunds"
+           >:: test_leverage_ceiling_binds_and_refunds;
+           "M1b-1: walk-state leverage_enabled from config"
+           >:: test_walk_state_leverage_enabled_from_config;
+           "M1b-1: borrowed_balance derives from debit"
+           >:: test_borrowed_balance_derives_from_debit;
          ])

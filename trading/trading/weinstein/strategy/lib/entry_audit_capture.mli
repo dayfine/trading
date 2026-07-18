@@ -174,12 +174,24 @@ val make_entry_transition :
     still keys off the final installed [stop_level]. *)
 
 val check_cash_and_deduct :
+  leverage_enabled:bool ->
   remaining_cash:float ref ->
   Trading_strategy.Position.transition * entry_meta ->
   (Trading_strategy.Position.transition * entry_meta) option
 (** Check that the transition's cost ([target_quantity * entry_price]) fits in
     [remaining_cash]. Deducts and returns [Some] when it does, returns [None]
-    otherwise. Pass-through for non-[CreateEntering] transitions. *)
+    otherwise. Pass-through for non-[CreateEntering] transitions.
+
+    M1b long-margin leverage: when [leverage_enabled = true] (the config's
+    [initial_long_margin_req < 1.0]) a [Long] transition is funded even when its
+    cost exceeds [remaining_cash] — [remaining_cash] is driven negative (the
+    debit / borrowed balance) and [Some] is always returned. The buying-power
+    ceiling is enforced downstream by {!check_long_notional_cap} against
+    [long_notional_cap], which is finite whenever leverage is engaged, so the
+    debit is bounded by [equity / initial_long_margin_req]. When
+    [leverage_enabled = false] (the default cash-account setting) and for every
+    [Short], this is byte-identical to the pre-M1b gate: a cost over
+    [remaining_cash] returns [None] (R1). *)
 
 val check_short_notional_cap :
   short_notional_acc:float ref ->
@@ -240,6 +252,7 @@ val check_sector_exposure_cap :
     in the same entry walk see the up-to-date running total. *)
 
 val classify_candidate :
+  ?leverage_enabled:bool ->
   held_set:Core.String.Set.t ->
   make_entry:(Screener.scored_candidate -> entry_attempt_result) ->
   remaining_cash:float ref ->
@@ -258,6 +271,12 @@ val classify_candidate :
     running long-notional cap, or rejected by the running sector-exposure cap.
     Order: held-check, sizing via [make_entry], cash check, short-notional cap,
     long-notional cap, then sector-exposure cap.
+
+    [?leverage_enabled] (default [false]) is threaded into the cash gate
+    ({!check_cash_and_deduct}) for M1b long-margin leverage. At the default
+    ([false], the cash-account setting) the cash gate is byte-identical to
+    pre-M1b; when [true] a [Long] may be funded beyond [remaining_cash] with the
+    buying-power ceiling ([long_notional_cap]) as the sole bound.
 
     The cash check tentatively deducts before the notional and sector-exposure
     gates; on a [Short_notional_cap], [Long_exposure_cap], or

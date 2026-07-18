@@ -129,15 +129,34 @@ let make_entry_transition ?(min_stop_distance_pct = 0.0) ~portfolio_risk_config
       ~current_date ~effective_entry ~initial_stop ~stop_floor_kind ~id
       ~stop_distance_pct ~max_stop_distance_pct cand
 
-let check_cash_and_deduct ~remaining_cash
+(* Decide + apply the cash draw for a [CreateEntering] of [side] costing [cost].
+   [borrow_ok] is [true] when long-margin leverage is engaged ([leverage_enabled],
+   i.e. [initial_long_margin_req < 1.0]) for a LONG — it lets the candidate be
+   funded beyond available cash, driving [remaining_cash] negative (the debit /
+   borrowed balance). The total is bounded downstream by [check_long_notional_cap]
+   against [long_notional_cap = min(exposure_term, equity/req)], which is finite
+   whenever leverage is engaged, so the buying-power ceiling always binds. At the
+   default cash-account setting ([leverage_enabled = false]) and for every short,
+   [borrow_ok] is [false] and the pre-M1b gate applies verbatim: a cost over
+   [remaining_cash] returns [None] (R1). *)
+let _admit_and_deduct ~leverage_enabled ~remaining_cash ~side ~cost pair =
+  let is_long =
+    Trading_base.Types.equal_position_side side Trading_base.Types.Long
+  in
+  let borrow_ok = leverage_enabled && is_long in
+  let admit = borrow_ok || Float.( <= ) cost !remaining_cash in
+  if admit then (
+    remaining_cash := !remaining_cash -. cost;
+    Some pair)
+  else None
+
+let check_cash_and_deduct ~leverage_enabled ~remaining_cash
     ((trans : Position.transition), (meta : entry_meta)) =
   match trans.kind with
   | Position.CreateEntering e ->
-      let cost = e.target_quantity *. e.entry_price in
-      if Float.( > ) cost !remaining_cash then None
-      else (
-        remaining_cash := !remaining_cash -. cost;
-        Some (trans, meta))
+      _admit_and_deduct ~leverage_enabled ~remaining_cash ~side:e.side
+        ~cost:(e.target_quantity *. e.entry_price)
+        (trans, meta)
   | _ -> Some (trans, meta)
 
 (** G15 step 2: aggregate short-notional cap evaluated at entry-decision time.
@@ -287,11 +306,13 @@ let _apply_notional_cap_gate ~remaining_cash ~short_notional_acc
 (** Apply the cash, short-notional-cap, long-notional-cap, and
     sector-exposure-cap gates (in that order) to an [Entry_ok] result. Returns
     [Kept] on all-pass or the appropriate [Skipped] variant. *)
-let _apply_entry_ok_gates ~remaining_cash ~short_notional_acc
+let _apply_entry_ok_gates ~leverage_enabled ~remaining_cash ~short_notional_acc
     ~short_notional_cap ~long_notional_acc ~long_notional_cap
     ~sector_exposure_acc ~max_sector_exposure_pct ~portfolio_value ~emit
     ~(cand : Screener.scored_candidate) trans meta : candidate_decision =
-  match check_cash_and_deduct ~remaining_cash (trans, meta) with
+  match
+    check_cash_and_deduct ~leverage_enabled ~remaining_cash (trans, meta)
+  with
   | None ->
       emit "Insufficient_cash";
       Skipped Insufficient_cash
@@ -301,10 +322,10 @@ let _apply_entry_ok_gates ~remaining_cash ~short_notional_acc
         ~sector_exposure_acc ~max_sector_exposure_pct ~portfolio_value ~emit
         cand trans meta
 
-let classify_candidate ~held_set ~make_entry ~remaining_cash ~short_notional_acc
-    ~short_notional_cap ~long_notional_acc ~long_notional_cap
-    ~sector_exposure_acc ~max_sector_exposure_pct ~portfolio_value
-    (c : Screener.scored_candidate) : candidate_decision =
+let classify_candidate ?(leverage_enabled = false) ~held_set ~make_entry
+    ~remaining_cash ~short_notional_acc ~short_notional_cap ~long_notional_acc
+    ~long_notional_cap ~sector_exposure_acc ~max_sector_exposure_pct
+    ~portfolio_value (c : Screener.scored_candidate) : candidate_decision =
   let emit decision =
     Entry_audit_helpers.emit_decision_trace ~ticker:c.ticker ~side:c.side
       ~decision ~remaining_cash:!remaining_cash
@@ -322,10 +343,10 @@ let classify_candidate ~held_set ~make_entry ~remaining_cash ~short_notional_acc
         emit "Sized_to_zero";
         Skipped Sized_to_zero
     | Entry_ok (trans, meta) ->
-        _apply_entry_ok_gates ~remaining_cash ~short_notional_acc
-          ~short_notional_cap ~long_notional_acc ~long_notional_cap
-          ~sector_exposure_acc ~max_sector_exposure_pct ~portfolio_value ~emit
-          ~cand:c trans meta
+        _apply_entry_ok_gates ~leverage_enabled ~remaining_cash
+          ~short_notional_acc ~short_notional_cap ~long_notional_acc
+          ~long_notional_cap ~sector_exposure_acc ~max_sector_exposure_pct
+          ~portfolio_value ~emit ~cand:c trans meta
 
 let _alternative_of_decision ~exclude_position_id (candidate, decision) :
     Audit_recorder.alternative_input option =
