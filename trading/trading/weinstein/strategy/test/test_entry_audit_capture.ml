@@ -63,6 +63,7 @@ let _stock_analysis ~ticker ~as_of_date : Stock_analysis.t =
     prior_stage = None;
     continuation = None;
     supply = None;
+    virgin_readmission = false;
     as_of_date;
   }
 

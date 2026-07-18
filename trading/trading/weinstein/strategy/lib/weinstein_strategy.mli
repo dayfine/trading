@@ -649,6 +649,16 @@ type config = {
           fallback, no sketch reads (bit-identical to baseline). Pairs with the
           screener weight; live CSV path stays v1. See
           [Weinstein_strategy_config.overhead_supply]. *)
+  virgin_crossing_readmission : bool; [@sexp.default false]
+      (** resistance-v2 lever (a): virgin-crossing re-admission. When [true], a
+          stale Stage-2 survivor that has crossed into virgin territory (above
+          its 520-week max high) on volume is re-admitted by
+          [Stock_analysis.is_breakout_candidate] despite being past the
+          [early_stage2_max_weeks] early-Stage-2 window (the book's "new high
+          ground" breakout). Default [false] = bit-identical to baseline; needs
+          a warehouse sketch (absent → no re-admission). Independent of
+          [overhead_supply]. See
+          [Weinstein_strategy_config.virgin_crossing_readmission]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

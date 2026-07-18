@@ -101,6 +101,7 @@ type config = {
   resistance_lookback_bars : int; [@sexp.default 0]  (** See [.mli]. *)
   overhead_supply : Resistance_supply.config option; [@sexp.default None]
       (** See [.mli]. *)
+  virgin_crossing_readmission : bool; [@sexp.default false]  (** See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -170,6 +171,7 @@ let default_config ~universe ~index_symbol =
     resistance_min_history_bars = 0;
     resistance_lookback_bars = 0;
     overhead_supply = None;
+    virgin_crossing_readmission = false;
   }
 
 let name = "Weinstein"

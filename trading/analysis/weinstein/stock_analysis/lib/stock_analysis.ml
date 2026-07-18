@@ -30,6 +30,8 @@ type config = {
   overhead_supply : Resistance_supply.config option; [@sexp.default None]
       (** Continuous overhead-supply score (resistance-v2); [None] = off. See
           .mli. *)
+  virgin_crossing_readmission : bool; [@sexp.default false]
+      (** resistance-v2 lever (a); [false] = off (bit-identical). See .mli. *)
 }
 
 let default_config =
@@ -43,6 +45,7 @@ let default_config =
     base_end_offset_weeks = 8;
     continuation = None;
     overhead_supply = None;
+    virgin_crossing_readmission = false;
   }
 
 type t = {
@@ -63,6 +66,7 @@ type t = {
           returned [None] OR when no breakout price could be determined.
           [Some r] carries [r.score] in [0, 1] (0 = virgin, 1 = heavy recent
           supply) consumed by the screener's long-side scoring weight. *)
+  virgin_readmission : bool;  (** resistance-v2 lever (a); see .mli. *)
   as_of_date : Date.t;
 }
 
@@ -344,27 +348,6 @@ let _continuation_result ~(config : config) ~(callbacks : callbacks) :
       Continuation.analyze_with_callbacks ~config:cont_cfg
         ~callbacks:cont_callbacks)
 
-(** Score a sketch when both a sketch and a breakout price are present. Split
-    out of {!_supply_result} to keep each match shallow (nesting linter). *)
-let _supply_of_sketch ~supply_config ~(callbacks : callbacks) ~breakout_price :
-    Resistance_supply.result option =
-  match (callbacks.get_sketch (), breakout_price) with
-  | Some sketch, Some bp ->
-      Some
-        (Resistance_supply.analyze ~config:supply_config ~sketch
-           ~breakout_price:bp)
-  | _ -> None
-
-(** Continuous overhead-supply score (resistance-v2). [Some] only when armed AND
-    the callbacks supply a sketch AND a breakout price exists; else [None],
-    bit-equal to pre-feature. [get_sketch] is only called when armed. *)
-let _supply_result ~(config : config) ~(callbacks : callbacks) ~breakout_price :
-    Resistance_supply.result option =
-  match config.overhead_supply with
-  | None -> None
-  | Some supply_config ->
-      _supply_of_sketch ~supply_config ~callbacks ~breakout_price
-
 (* ------------------------------------------------------------------ *)
 (* Main analyzer — callback shape                                       *)
 (* ------------------------------------------------------------------ *)
@@ -388,6 +371,9 @@ let _breakout_and_breakdown_prices ~(config : config) ~(callbacks : callbacks) :
   in
   (breakout, breakdown)
 
+(* @large-function: record-assembly coordinator — threads the 8 sub-analysis
+   results into the single 14-field [t]; splitting scatters the one-shot
+   assembly with no readability gain. *)
 let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
     ~prior_stage ~as_of_date : t =
   let stage_result =
@@ -420,7 +406,11 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
       ~as_of_date ~breakdown_price
   in
   let continuation = _continuation_result ~config ~callbacks in
-  let supply = _supply_result ~config ~callbacks ~breakout_price in
+  let supply, virgin_readmission =
+    Stock_analysis_supply.results ~overhead_supply:config.overhead_supply
+      ~virgin_crossing_readmission:config.virgin_crossing_readmission
+      ~get_sketch:callbacks.get_sketch ~breakout_price
+  in
   {
     ticker;
     stage = stage_result;
@@ -433,6 +423,7 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
     prior_stage;
     continuation;
     supply;
+    virgin_readmission;
     as_of_date;
   }
 
@@ -471,9 +462,17 @@ let _continuation_arm (a : t) : bool =
   | Some { is_continuation = true; _ }, Stage2 _ -> true
   | _ -> false
 
+(** Virgin-crossing re-admission arm (resistance-v2 lever (a), Weinstein's "new
+    high ground" breakout): a Stage-2 survivor past the staleness window is
+    re-admitted when [a.virgin_readmission] is set (armed AND virgin). See .mli.
+*)
+let _virgin_readmission_arm (a : t) : bool =
+  match a.stage.stage with Stage2 _ -> a.virgin_readmission | _ -> false
+
 let is_breakout_candidate ?(early_stage2_max_weeks = 4) (a : t) : bool =
   let stage_ok =
-    _initial_breakout_arm ~early_stage2_max_weeks a || _continuation_arm a
+    _initial_breakout_arm ~early_stage2_max_weeks a
+    || _continuation_arm a || _virgin_readmission_arm a
   in
   (* Volume confirmation: at least Adequate *)
   let volume_ok =

@@ -252,6 +252,45 @@ let test_virgin_parity_with_v1 _ =
   in
   assert_that agreements (equal_to (List.length breakouts))
 
+(* [is_virgin] is the standalone virgin predicate: at/above the 520-week max
+   (99.0) is virgin (ties inclusive), below is not, and a non-finite sketch is
+   never virgin (no fabrication). *)
+let test_is_virgin_predicate _ =
+  let nan_sketch = { _virgin_sketch with max_high_520w = Float.nan } in
+  assert_that
+    [
+      Resistance_supply.is_virgin ~sketch:_virgin_sketch ~breakout_price:100.0;
+      Resistance_supply.is_virgin ~sketch:_virgin_sketch ~breakout_price:99.0;
+      Resistance_supply.is_virgin ~sketch:_virgin_sketch ~breakout_price:98.0;
+      Resistance_supply.is_virgin ~sketch:nan_sketch ~breakout_price:100.0;
+    ]
+    (elements_are
+       [
+         equal_to true; (* tie *) equal_to true; equal_to false; equal_to false;
+       ])
+
+(* [is_virgin] agrees with [analyze]'s [quality = Virgin_territory] verdict on
+   the same cells (single source of truth for the virgin test). *)
+let test_is_virgin_agrees_with_analyze _ =
+  let quality_virgin ~breakout_price =
+    match
+      (Resistance_supply.analyze ~config:_config ~sketch:_virgin_sketch
+         ~breakout_price)
+        .quality
+    with
+    | Weinstein_types.Virgin_territory -> true
+    | _ -> false
+  in
+  let agree ~breakout_price =
+    Bool.equal
+      (Resistance_supply.is_virgin ~sketch:_virgin_sketch ~breakout_price)
+      (quality_virgin ~breakout_price)
+  in
+  assert_that
+    (List.count [ 100.0; 99.0; 98.0 ] ~f:(fun breakout_price ->
+         agree ~breakout_price))
+    (equal_to 3)
+
 let suite =
   "Resistance_supply tests"
   >::: [
@@ -267,6 +306,8 @@ let suite =
          "NaN sketch degrades to insufficient"
          >:: test_nan_sketch_degrades_to_insufficient;
          "virgin parity with v1" >:: test_virgin_parity_with_v1;
+         "is_virgin predicate" >:: test_is_virgin_predicate;
+         "is_virgin agrees with analyze" >:: test_is_virgin_agrees_with_analyze;
        ]
 
 let () = run_test_tt_main suite

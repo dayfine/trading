@@ -93,6 +93,33 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
   honesty / empty=None); generator display gating (default=v1 label,
   armed=v2 score). Verify: `dune runtest trading/weinstein/snapshot/gen`.
 
+- **PR-lever-a `feat/virgin-crossing-readmission` (OPEN)** — virgin-crossing
+  re-admission, default-off (lever (a) below). New top-level flag
+  `Weinstein_strategy_config.virgin_crossing_readmission : bool
+  [@sexp.default false]` (threaded like `overhead_supply`), so it resolves
+  through `Overlay_validator` and is a `Variant_matrix`
+  `(flag virgin_crossing_readmission)` axis. New pure predicate
+  `Resistance_supply.is_virgin ~sketch ~breakout_price` (the v1 `>=
+  max_high_520w` test in isolation, finite-guarded, single source of truth for
+  virginity — pinned bit-equal to `analyze`'s `Virgin_territory` branch).
+  `Stock_analysis.config` += `virgin_crossing_readmission`, `t` +=
+  `virgin_readmission` (computed = armed ∧ sketch present ∧ virgin, via
+  `get_sketch` — independent of `overhead_supply`; sketch absent → false, no
+  fabrication); `is_breakout_candidate` gains a `_virgin_readmission_arm` in the
+  OR-chain (Stage-2 ∧ `virgin_readmission`) that bypasses the
+  `early_stage2_max_weeks` staleness cut while keeping volume+RS gates. Mirrors
+  the `continuation` precedent — no Screener/param threading.
+  `_stock_analysis_config_for` copies the flag in. Restores access to the
+  crash-recovery "redeemed monster" cohort the `overhead_supply` penalty
+  correctly demotes at their supplied breakout but which turns genuinely virgin
+  later (AXTI post-mortem). Default-off = bit-identical to baseline. Tests:
+  `is_virgin` predicate + agreement-with-`analyze`; readmission arm (stale
+  virgin admitted only when armed; fresh unaffected); compute path (armed+virgin
+  → true, non-virgin → false, sketch absent → false, off → false); strategy
+  back-compat parse (field absent → false) + override resolves; variant-matrix
+  flag-axis expansion. Verify: `dune runtest analysis/weinstein/resistance/test
+  analysis/weinstein/stock_analysis/test trading/backtest/walk_forward/test`.
+
 ## Next steps
 
 1. **CONFIRMATION GRID 3/3 — mechanism ACCEPT (2026-07-17).** Home curve is
@@ -113,7 +140,10 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
    without the user.
 3. **Designed levers (default-off, in order):** (a) virgin-crossing
    re-admission — Stage-2 name crossing its 520w max on volume = fresh
-   admissible breakout (AXTI-class access restored; book-faithful);
+   admissible breakout (AXTI-class access restored; book-faithful) —
+   **BUILT, default-off, PR `feat/virgin-crossing-readmission` open (see
+   Shipped)**; next = WF-CV it as a paired axis with `overhead_supply=w30`
+   on the deep grid;
    (b) regime softener `w × (1 − k·index_supply)` — STATE-based modulators
    only (user 07-16: no reversal/bottom calls), k ∈ {0,.5,1}, deep-grid
    testable only; (c) `stale_old_floor` axis {0,.1,.3}; (d) RS-slope

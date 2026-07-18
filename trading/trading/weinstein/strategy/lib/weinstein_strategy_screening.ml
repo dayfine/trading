@@ -207,9 +207,11 @@ let _classify_stage_for_screening ~config ~bar_reader ~prior_stages
     detector based on [Weinstein_strategy_config.enable_continuation_buys] and
     threading the strategy's [continuation_config] (defaults to
     [Continuation.default_config], preserving bit-equality with prior baselines
-    when the field is omitted from a scenario sexp), and (b) overriding the
+    when the field is omitted from a scenario sexp), (b) overriding the
     resistance [min_history_bars] when
-    [Weinstein_strategy_config.resistance_min_history_bars] is non-zero.
+    [Weinstein_strategy_config.resistance_min_history_bars] is non-zero, and (c)
+    threading the resistance-v2 [overhead_supply] +
+    [virgin_crossing_readmission] knobs (both default off, bit-identical).
 
     The [min_history_bars] override sets [config.resistance.min_history_bars];
     because {!Stock_analysis} reuses the same [Resistance.config] record for the
@@ -222,18 +224,15 @@ let _classify_stage_for_screening ~config ~bar_reader ~prior_stages
 let _stock_analysis_config_for ~(config : Weinstein_strategy_config.config) :
     Stock_analysis.config =
   let base =
-    if config.enable_continuation_buys then
-      {
-        Stock_analysis.default_config with
-        continuation = Some config.continuation_config;
-      }
-    else Stock_analysis.default_config
+    {
+      Stock_analysis.default_config with
+      continuation =
+        (if config.enable_continuation_buys then Some config.continuation_config
+         else None);
+      overhead_supply = config.overhead_supply;
+      virgin_crossing_readmission = config.virgin_crossing_readmission;
+    }
   in
-  (* Thread the continuous overhead-supply config (resistance-v2). [None]
-     (default) leaves [base] bit-identical to {!Stock_analysis.default_config},
-     so [Stock_analysis.t.supply] stays [None] and the screener uses the binary
-     grade. *)
-  let base = { base with overhead_supply = config.overhead_supply } in
   if config.resistance_min_history_bars = 0 then base
   else
     {
