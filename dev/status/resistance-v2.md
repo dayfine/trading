@@ -93,7 +93,7 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
   honesty / empty=None); generator display gating (default=v1 label,
   armed=v2 score). Verify: `dune runtest trading/weinstein/snapshot/gen`.
 
-- **PR-lever-a `feat/virgin-crossing-readmission` (OPEN)** — virgin-crossing
+- **PR-lever-a `feat/virgin-crossing-readmission` (MERGED #1997)** — virgin-crossing
   re-admission, default-off (lever (a) below). New top-level flag
   `Weinstein_strategy_config.virgin_crossing_readmission : bool
   [@sexp.default false]` (threaded like `overhead_supply`), so it resolves
@@ -119,6 +119,21 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
   back-compat parse (field absent → false) + override resolves; variant-matrix
   flag-axis expansion. Verify: `dune runtest analysis/weinstein/resistance/test
   analysis/weinstein/stock_analysis/test trading/backtest/walk_forward/test`.
+
+- **PR-lever-a-fix `feat/virgin-crossing-hist-empty` (OPEN)** — the 28y w30+vc
+  re-run showed the lever NEVER fired on the AXTI redemption it was designed
+  for: `is_virgin` requires `breakout >= max_high_520w`, but the sketch's
+  `max_high_520w` INCLUDES the current week's own high, so a close-anchored
+  breakout is `close <= own high <= max_520w` — structurally unsatisfiable
+  except on an exact high-tick tie (AXTI 2026-01-06: close 20.17, max 20.345,
+  hist_sum 0). Fix: new `Resistance_supply.is_clear_of_supply ~sketch` (finite ∧
+  `bars_seen > 0` ∧ every `hist` bin 0 = no weekly bar at/above the current
+  close, closing-basis new-high-ground); `Stock_analysis_supply._virgin_readmission`
+  now ORs `is_virgin || is_clear_of_supply`. No new config field, flag unchanged,
+  still default-off (R1/R2 untouched). Tests: `is_clear_of_supply` truth table +
+  own-week-high divergence; compute-path AXTI shape (max above breakout, hist
+  empty) → readmission true, genuine overhead (nonzero bin) → false. 28y w30+vc
+  re-run happens post-merge.
 
 ## Next steps
 

@@ -123,3 +123,27 @@ val is_virgin : sketch:sketch -> breakout_price:float -> bool
     [Weinstein_strategy_config.virgin_crossing_readmission]): a Stage-2 name
     that crosses into virgin territory on volume is a fresh admissible breakout
     even when the early-Stage2 window would otherwise mark it stale. *)
+
+val is_clear_of_supply : sketch:sketch -> bool
+(** [is_clear_of_supply ~sketch] is [true] iff the sketch is finite,
+    [bars_seen > 0], and EVERY [hist] bin is [0] — i.e. no weekly bar in the
+    trailing histogram window sits at or above the current close. This is "new
+    high ground on a CLOSING basis" (the histogram is close-anchored; every bin
+    spans prices at/above the anchoring close), which is how Weinstein reads
+    resistance — off weekly closes, not intraweek high ticks.
+
+    {b Why this exists alongside {!is_virgin}.} The sketch's [max_high_520w] is
+    a per-day rolling max over the trailing window that INCLUDES the current
+    week's own high. For a stock climbing into new high ground on a
+    close-anchored breakout price, [close <= own weekly high <= max_high_520w],
+    so [is_virgin] ([breakout >= max_high_520w]) is structurally unsatisfiable
+    except on an exact tie at the weekly high tick. Concrete case — AXTI in its
+    2025-26 redemption: on 2026-01-06 the close was 20.17, [max_high_520w] was
+    20.345 (set by that very week's own high), and [res_hist_sum] was 0 (zero
+    weekly bars above price in the whole window). [is_virgin] fails every week;
+    [is_clear_of_supply] correctly reports new high ground. The re-admission
+    lever ORs the two so the own-week-high artifact no longer suppresses genuine
+    breakouts into clear space.
+
+    [false] when any bin is non-zero (genuine overhead), when [bars_seen = 0],
+    or when the sketch is non-finite — no fabrication from missing data. *)

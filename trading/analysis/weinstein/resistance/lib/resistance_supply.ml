@@ -144,3 +144,13 @@ let is_virgin ~(sketch : sketch) ~breakout_price =
   _sketch_is_finite sketch
   && Float.is_finite breakout_price
   && Float.(breakout_price >= sketch.max_high_520w)
+
+(* Closing-basis "new high ground": no weekly bar in the trailing histogram
+   window sits at/above the current close (every [hist] bin is 0). Robust to
+   the own-week-high artifact that makes [is_virgin] unsatisfiable on a
+   close-anchored breakout price (see .mli — AXTI 2026-01-06). A non-finite bin
+   fails the [= 0.0] test, so no explicit finiteness check on [hist] is needed. *)
+let is_clear_of_supply ~(sketch : sketch) =
+  _sketch_is_finite sketch
+  && Float.(sketch.bars_seen > 0.0)
+  && Array.for_all sketch.hist ~f:(fun count -> Float.(count = 0.0))

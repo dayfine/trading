@@ -21,9 +21,13 @@ val results :
       breakout price exists; else [None], bit-equal to pre-feature.
     - [virgin_readmission] (resistance-v2 lever (a)): [true] only when
       [virgin_crossing_readmission] AND [get_sketch ()] returns a sketch AND a
-      breakout price exists AND the breakout is virgin
-      ({!Resistance_supply.is_virgin} — crosses the 520-week max high).
-      Independent of [overhead_supply]: the virgin test needs only the sketch.
+      breakout price exists AND the breakout is into new high ground —
+      {!Resistance_supply.is_virgin} (breakout >= 520-week max high) OR
+      {!Resistance_supply.is_clear_of_supply} (no weekly bar at/above the
+      current close). The [is_clear_of_supply] arm closes the own-week-high
+      artifact that makes [is_virgin] structurally unsatisfiable on a
+      close-anchored breakout price (see its docstring — AXTI 2026-01-06).
+      Independent of [overhead_supply]: the test needs only the sketch.
 
     [get_sketch] is read at most once per armed feature — off = no panel read,
     and no fabrication of a score / virginity when the sketch is absent. *)

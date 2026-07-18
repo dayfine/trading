@@ -291,6 +291,43 @@ let test_is_virgin_agrees_with_analyze _ =
          agree ~breakout_price))
     (equal_to 3)
 
+(* [is_clear_of_supply]: closing-basis new high ground. All-zero hist with
+   [bars_seen > 0] is clear even when [max_high_520w] sits ABOVE the close (the
+   AXTI own-week-high shape); a non-zero bin, [bars_seen = 0], or a non-finite
+   sketch are all not clear (no fabrication). *)
+let test_is_clear_of_supply _ =
+  let axti_shape = { _virgin_sketch with max_high_520w = 105.0 } in
+  let zero_bars = { _virgin_sketch with bars_seen = 0.0 } in
+  let nan_sketch = { _virgin_sketch with anchor_close = Float.nan } in
+  assert_that
+    [
+      Resistance_supply.is_clear_of_supply ~sketch:_virgin_sketch;
+      Resistance_supply.is_clear_of_supply ~sketch:axti_shape;
+      Resistance_supply.is_clear_of_supply ~sketch:(_with_hist [ (0, 8.0) ]);
+      Resistance_supply.is_clear_of_supply ~sketch:zero_bars;
+      Resistance_supply.is_clear_of_supply ~sketch:nan_sketch;
+    ]
+    (elements_are
+       [
+         equal_to true;
+         equal_to true;
+         equal_to false;
+         equal_to false;
+         equal_to false;
+       ])
+
+(* The own-week-high divergence: on a cell whose [max_high_520w] (105) sits above
+   the breakout (100) — set by the current week's own high — yet has zero
+   overhead in the histogram, [is_virgin] is FALSE but [is_clear_of_supply] is
+   TRUE. The OR of the two in the re-admission predicate is what admits the
+   genuine breakout (AXTI 2026-01-06: close 20.17, max 20.345, hist_sum 0). *)
+let test_own_week_high_divergence _ =
+  let axti_shape = { _virgin_sketch with max_high_520w = 105.0 } in
+  assert_that
+    ( Resistance_supply.is_virgin ~sketch:axti_shape ~breakout_price:100.0,
+      Resistance_supply.is_clear_of_supply ~sketch:axti_shape )
+    (equal_to (false, true))
+
 let suite =
   "Resistance_supply tests"
   >::: [
@@ -308,6 +345,8 @@ let suite =
          "virgin parity with v1" >:: test_virgin_parity_with_v1;
          "is_virgin predicate" >:: test_is_virgin_predicate;
          "is_virgin agrees with analyze" >:: test_is_virgin_agrees_with_analyze;
+         "is_clear_of_supply" >:: test_is_clear_of_supply;
+         "own-week-high divergence" >:: test_own_week_high_divergence;
        ]
 
 let () = run_test_tt_main suite
