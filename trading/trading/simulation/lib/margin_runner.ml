@@ -97,16 +97,21 @@ let dedup_strategy_exits_for_margin ~strategy_transitions ~margin_trans =
         | Position.TriggerExit _ -> not (Set.mem margin_exit_ids t.position_id)
         | _ -> true)
 
-let tick ~margin_config ~long_margin_rate_annual_pct ~portfolio ~positions
-    ~today_bars ~date ~strategy_transitions =
+let tick ~margin_config ~long_margin_rate_annual_pct ~maintenance_long_pct
+    ~portfolio ~positions ~today_bars ~date ~strategy_transitions =
   let prices = mark_prices today_bars in
   let portfolio = accrue_borrow_fee ~margin_config ~portfolio ~prices in
   let portfolio =
     accrue_long_margin_interest ~long_margin_rate_annual_pct ~portfolio
   in
-  let margin_trans =
+  let short_cover_trans =
     margin_call_transitions ~margin_config ~portfolio ~positions ~prices ~date
   in
+  let long_reduce_trans =
+    Long_maintenance.maintenance_reduce_transitions ~maintenance_long_pct
+      ~portfolio ~positions ~prices ~date
+  in
+  let margin_trans = short_cover_trans @ long_reduce_trans in
   let strategy_transitions =
     dedup_strategy_exits_for_margin ~strategy_transitions ~margin_trans
   in

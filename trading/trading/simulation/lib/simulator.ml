@@ -21,6 +21,7 @@ type dependencies = {
   initial_long_margin_req : float;  (** See .mli. Margin M1b-2 leverage dial. *)
   long_margin_rate_annual_pct : float;
       (** See .mli. Margin M1b-2 debit rate. *)
+  maintenance_long_pct : float;  (** See .mli. Margin M2 long maintenance. *)
   exempt_closing_trades_from_cash_floor : bool;  (** See .mli. *)
   on_trade_fill : (Trading_base.Types.trade -> Trading_base.Types.trade) option;
   active_through_for : (string -> Core.Date.t option) option;  (** See .mli. *)
@@ -32,6 +33,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?stale_hold_log ?(slippage_bps = 0)
     ?(margin_config = Trading_portfolio.Margin_config.default_config)
     ?(initial_long_margin_req = 1.0) ?(long_margin_rate_annual_pct = 0.0)
+    ?(maintenance_long_pct = 0.0)
     ?(exempt_closing_trades_from_cash_floor = false) ?on_trade_fill
     ?active_through_for () =
   let engine_config = { Trading_engine.Types.commission; slippage_bps } in
@@ -59,6 +61,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     margin_config;
     initial_long_margin_req;
     long_margin_rate_annual_pct;
+    maintenance_long_pct;
     exempt_closing_trades_from_cash_floor;
     on_trade_fill;
     active_through_for;
@@ -397,8 +400,9 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
   in
   let portfolio, transitions =
     Margin_runner.tick ~margin_config:t.deps.margin_config
-      ~long_margin_rate_annual_pct:t.deps.long_margin_rate_annual_pct ~portfolio
-      ~positions ~today_bars ~date:t.current_date ~strategy_transitions
+      ~long_margin_rate_annual_pct:t.deps.long_margin_rate_annual_pct
+      ~maintenance_long_pct:t.deps.maintenance_long_pct ~portfolio ~positions
+      ~today_bars ~date:t.current_date ~strategy_transitions
   in
   let%bind positions = _apply_transitions ~positions ~transitions in
   let%bind orders, order_links =

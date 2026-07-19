@@ -96,6 +96,7 @@ val dedup_strategy_exits_for_margin :
 val tick :
   margin_config:Margin_config.t ->
   long_margin_rate_annual_pct:float ->
+  maintenance_long_pct:float ->
   portfolio:Portfolio.t ->
   positions:Position.t String.Map.t ->
   today_bars:Trading_engine.Types.price_bar list ->
@@ -104,12 +105,16 @@ val tick :
   Portfolio.t * Position.transition list
 (** One simulator-tick worth of margin mechanics: accrue daily short borrow fee,
     capitalize daily long-margin interest ([long_margin_rate_annual_pct], margin
-    M1b-2), then append any maintenance-margin-breach exits to
-    [strategy_transitions]. No-op on portfolio state when
-    [margin_config.enabled = false] and [long_margin_rate_annual_pct = 0.0]
-    (preserves baselines bit-equal).
+    M1b-2), then append two families of forced exits to [strategy_transitions] —
+    short-side maintenance force-covers ({!margin_call_transitions}) and
+    long-side maintenance force-reduces ([maintenance_long_pct], margin M2, via
+    {!Long_maintenance.maintenance_reduce_transitions}, weekly-close cadence).
+    No-op on portfolio state and transitions when
+    [margin_config.enabled = false], [long_margin_rate_annual_pct = 0.0], and
+    [maintenance_long_pct = 0.0] (preserves baselines bit-equal).
 
     Resolves same-tick same-position [TriggerExit] collisions between the
     strategy and margin sources via {!dedup_strategy_exits_for_margin}: margin
-    transitions win, strategy exits for the same position-id are dropped. See
-    issue #1266 for the dotcom-2000-2002 crash this prevents. *)
+    transitions (short covers and long reduces) win, strategy exits for the same
+    position-id are dropped. See issue #1266 for the dotcom-2000-2002 crash this
+    prevents. *)

@@ -104,7 +104,52 @@ and M1b (follow-up).
     ordering, N-tick interest, disarmed rejection, no-debit/zero-rate no-ops);
     `test_margin_runner.ml` (+2 — end-to-end levered run funds+prices the debit
     with honest NAV, and the `accrue_long_margin_interest` wrapper).
-- **M2** — long-side maintenance / force-reduce (documented sell ordering).
+- [x] **M2 — long-side maintenance force-reduce (default-off).** Branch
+  `feat/margin-m2-maintenance`. Marked-basis maintenance check for the LONG book:
+  when `equity / marked_long_exposure < maintenance_long_pct` on a weekly (Friday)
+  close, held longs are force-reduced weakest-first until the ratio is restored.
+  - New pure module `Long_maintenance`
+    (`trading/trading/simulation/lib/long_maintenance.{ml,mli}`), the long-book
+    mirror of the short-side force-cover. `equity = equity_cash + marked_long_exposure`
+    where `equity_cash = current_cash - long_margin_debit` (M1b-2), so only a
+    levered book (debit > 0 pushing equity_cash down) can ever breach — an
+    unlevered book has ratio ≥ 1.0.
+  - **Sell ORDERING (the design center; Portfolio_floor bottom-tick lesson).**
+    Weakest-first = **ascending unrealized return since entry** (`mark/entry - 1`),
+    ties by symbol for determinism. Deliberately NOT the laggard-rotation metric
+    (RS-vs-benchmark needs benchmark history + a `Bar_reader`, neither available at
+    the margin seam; a margin reduce wants the position closest to underwater).
+    Selling at the mark leaves equity unchanged and only shrinks the denominator,
+    so ordering decides which names the book *keeps* — shedding losers keeps the
+    let-winners-run tail. **Incremental, whole-position** (mirrors the short-side
+    force-cover which closes whole flagged shorts): sheds one at a time until
+    `equity / marked_long_exposure ≥ maintenance_long_pct*(1 + restore_buffer_pct)`
+    (buffer 0.02, so mark noise doesn't re-trigger next tick), then stops —
+    stronger positions untouched. Never a whole-book sweep unless equity ≤ 0
+    (insolvent → liquidate). Every forced sale carries
+    `exit_reason = StrategySignal { label = "maintenance_reduce" }` so forensics
+    separate margin reduces from strategy exits; proceeds pay down
+    `long_margin_debit` first (M1b-2), which is what restores the ratio.
+  - **Cadence:** weekly-close (Friday) only, gated in
+    `Long_maintenance.maintenance_reduce_transitions`, invoked from
+    `Margin_runner.tick` alongside the short-side force-cover (dedup via the
+    existing `dedup_strategy_exits_for_margin`: margin wins). Bar-cadence caveat
+    (intraweek gap-through-maintenance) documented in the `.mli` as M3/M4 territory.
+  - Config: `maintenance_long_pct` `[@sexp.default 0.0]` on
+    `weinstein_strategy_config` (+ the re-declared `weinstein_strategy.mli` record).
+    R1 no-op at 0.0 (a cash account has no maintenance requirement); R2
+    Overlay_validator float axis (`test_variant_matrix.ml` +
+    `test_maintenance_long_pct_axis_expands`). Threaded
+    `Weinstein config → Simulator.create_deps → Margin_runner.tick` (panel_runner),
+    same path as `long_margin_rate_annual_pct`.
+  - Tests: `test_long_maintenance.ml` (10 — R1 default-never-fires, no-breach,
+    weakest-first ORDER on a 3-position fixture, incremental restore, equity-wiped
+    full liquidation, Friday-gate no-op on Monday, `maintenance_reduce` exit tag,
+    unlevered/no-debit no-op, no-positions no-op) + `test_long_buying_power.ml`
+    config round-trip / back-compat / default-no-op extended to `maintenance_long_pct`.
+  - Also fixed a #2005 QC follow-up: `portfolio_summary.mli` / `metric_types.mli`
+    now qualify the `portfolio_value - current_cash` identity as cash-account-only
+    (a long-margin debit shifts the split by `+ long_margin_debit`).
 - **M3** — short-side squeeze robustness (borrow availability, HTB tiers, buy-in).
 - **M4** — validation protocol (parity gates, squeeze stress cells, leverage
   surface via experiment-gap-closing + confirmation grid). No default flips and no

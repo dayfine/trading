@@ -731,6 +731,51 @@ type config = {
           single-component [Variant_matrix] float axis
           ([((long_margin_rate_annual_pct) (values (0.0 0.08 0.10)))]).
           Default-off until an experiment-ledger ACCEPT. *)
+  maintenance_long_pct : float; [@sexp.default 0.0]
+      (** Long-side maintenance-margin requirement — the marked-basis loan-call
+          threshold for a levered long book (levered long-short realism, M2).
+          When the book's equity erodes so that
+          [equity /. marked_long_exposure < maintenance_long_pct] on a weekly
+          (Friday) close, {!Trading_simulation.Long_maintenance} force-reduces
+          held longs — weakest first (ascending unrealized return since entry) —
+          until the ratio is restored above
+          [maintenance_long_pct *. (1 + buffer)], then stops. Here
+          [equity = current_cash - long_margin_debit + marked_long_exposure] and
+          [marked_long_exposure] sums [quantity *. close] over held longs priced
+          today (margin M1b-2 [equity_cash]). Each forced sale's proceeds pay
+          down [long_margin_debit] first, which is what lifts the ratio.
+
+          {b Semantics.}
+          - [0.0] (default): {b EXACT no-op} — a cash account has no maintenance
+            requirement, so the reduce never fires and every existing
+            golden/baseline replays bit-identically (experiment-flag-discipline
+            R1). An unlevered book (no debit) never fires even at a positive
+            value, since [equity >= marked_long_exposure] keeps the ratio
+            [>= 1.0].
+          - [> 0.0] (e.g. [0.25]): a levered long book whose equity falls below
+            [maintenance_long_pct] of its marked long exposure is deleveraged
+            incrementally on the next weekly close. Only leverage
+            ([long_margin_debit > 0]) can breach the ratio.
+
+          {b Scope — the long book.} The numerator is the long-account equity
+          (cash net of the long debit plus long market value); the short book's
+          marked P&L is excluded — it has its own maintenance surface
+          ([margin_config.maintenance_margin_pct] via
+          {!Trading_portfolio.Portfolio_margin.check_maintenance_margin}). The
+          reduce closes whole weakest longs (never the whole book unless equity
+          is fully wiped) and is scoped to a forced sale — it can never block an
+          exit (the #1553 lesson). {b Cadence caveat:} daily-close marks cannot
+          see an intraweek gap-through-maintenance move; those gap paths are
+          M3/M4 stress-path territory, documented in
+          {!Trading_simulation.Long_maintenance}.
+
+          {b R2 searchability.} A real config field resolved by
+          [Overlay_validator.apply_overrides]; expressible as a single-component
+          [Variant_matrix] float axis
+          ([((maintenance_long_pct) (values (0.0 0.25 0.35)))]). Default-off
+          until an experiment-ledger ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md] +
+          [.claude/rules/promotion-confirmation.md]). *)
   resistance_min_history_bars : int; [@sexp.default 0]
       (** Overhead-resistance history floor threaded into
           [Stock_analysis.config.resistance.min_history_bars] (and, because

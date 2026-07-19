@@ -55,6 +55,13 @@ type dependencies = {
           {!Margin_runner.tick} capitalizes one trading day's interest onto
           [long_margin_debit] each step. Threaded from
           [config.long_margin_rate_annual_pct]. *)
+  maintenance_long_pct : float;
+      (** Long-side maintenance-margin requirement (margin M2). [0.0] (the
+          default, a cash account) never fires — a levered long book whose
+          equity falls below this fraction of its marked long exposure is
+          force-reduced weakest-first on the weekly (Friday) close by
+          {!Long_maintenance.maintenance_reduce_transitions}, invoked from
+          {!Margin_runner.tick}. Threaded from [config.maintenance_long_pct]. *)
   exempt_closing_trades_from_cash_floor : bool;
       (** NS1 (#1557#3): passed to [Portfolio.create] when the run's portfolio
           is built. When [true], the cash floor skips the reducing portion of a
@@ -104,6 +111,7 @@ val create_deps :
   ?margin_config:Trading_portfolio.Margin_config.t ->
   ?initial_long_margin_req:float ->
   ?long_margin_rate_annual_pct:float ->
+  ?maintenance_long_pct:float ->
   ?exempt_closing_trades_from_cash_floor:bool ->
   ?on_trade_fill:(Trading_base.Types.trade -> Trading_base.Types.trade) ->
   ?active_through_for:(string -> Core.Date.t option) ->
@@ -149,6 +157,10 @@ val create_deps :
       Annualized interest rate on the long-margin debit (margin M1b-2). Default
       [0.0] — no interest is charged, baselines bit-equal. See the field doc on
       {!dependencies.long_margin_rate_annual_pct}.
+    @param maintenance_long_pct
+      Long-side maintenance-margin requirement (margin M2). Default [0.0] — the
+      weekly force-reduce never fires, baselines bit-equal. See the field doc on
+      {!dependencies.maintenance_long_pct}.
     @param exempt_closing_trades_from_cash_floor
       NS1 (#1557#3) cash-floor closing-trade exemption, passed to
       [Portfolio.create]. Default [false] — the floor faces every full trade
