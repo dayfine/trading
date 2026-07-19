@@ -19,7 +19,8 @@ type dependencies = {
   stale_hold_log : Stale_hold.Log.t;
   margin_config : Trading_portfolio.Margin_config.t;  (** See .mli. *)
   initial_long_margin_req : float;  (** See .mli. Margin M1b-2 leverage dial. *)
-  long_margin_rate_annual_pct : float;  (** See .mli. Margin M1b-2 debit rate. *)
+  long_margin_rate_annual_pct : float;
+      (** See .mli. Margin M1b-2 debit rate. *)
   exempt_closing_trades_from_cash_floor : bool;  (** See .mli. *)
   on_trade_fill : (Trading_base.Types.trade -> Trading_base.Types.trade) option;
   active_through_for : (string -> Core.Date.t option) option;  (** See .mli. *)

@@ -113,14 +113,14 @@ val check_maintenance_margin :
     whose cost exceeds available cash borrows the shortfall into
     [Portfolio.long_margin_debit] instead of being rejected by the cash floor,
     and the debit is priced with per-tick interest. Gated by
-    [initial_long_margin_req]: at a cash account ([req >= 1.0]) every entry point
-    here is a bit-equal pass-through to the corresponding [Portfolio] API, so the
-    default is byte-identical to pre-M1b behaviour. *)
+    [initial_long_margin_req]: at a cash account ([req >= 1.0]) every entry
+    point here is a bit-equal pass-through to the corresponding [Portfolio] API,
+    so the default is byte-identical to pre-M1b behaviour. *)
 
 val apply_single_trade_with_long_margin :
   initial_long_margin_req:float -> Portfolio.t -> trade -> Portfolio.t status_or
-(** Long-margin-aware single-trade application, routed at the simulator fill seam
-    ([Cancel_handler]).
+(** Long-margin-aware single-trade application, routed at the simulator fill
+    seam ([Cancel_handler]).
 
     {b When [initial_long_margin_req >= 1.0]} (cash account / leverage
     disarmed): bit-equal to [Portfolio.apply_single_trade]. [long_margin_debit]
@@ -159,5 +159,5 @@ val accrue_daily_long_margin_interest :
     lives).
 
     No-op when [rate_annual_pct <= 0.0] (the default) or when there is no debit,
-    so a cash account and the default rate leave the portfolio unchanged. Mirrors
-    {!accrue_daily_borrow_fee} for the short side. *)
+    so a cash account and the default rate leave the portfolio unchanged.
+    Mirrors {!accrue_daily_borrow_fee} for the short side. *)

@@ -132,8 +132,7 @@ let apply_trades_best_effort ?on_trade_fill ?(initial_long_margin_req = 1.0)
     portfolio trades =
   let hook = Option.value on_trade_fill ~default:Fn.id in
   let portfolio, accepted_rev, rejected_rev =
-    List.fold trades
-      ~init:(portfolio, [], [])
+    List.fold trades ~init:(portfolio, [], [])
       ~f:(_bucket_trade ~hook ~initial_long_margin_req)
   in
   (portfolio, List.rev accepted_rev, List.rev rejected_rev)

@@ -451,6 +451,197 @@ let test_sum_short_notional_combines_positions _ =
     (float_equal 11_500.0)
 
 (* ========================================================================== *)
+(* Long-margin (levered long) accounting — margin M1b-2                       *)
+(* ========================================================================== *)
+
+(* Armed leverage: initial_long_margin_req = 0.5 (2x buying power), interest
+   10%/yr. The disarmed default is req = 1.0 (a cash account). *)
+let armed_req = 0.5
+let armed_rate = 0.10
+
+let apply_long_margin_exn ?(initial_long_margin_req = armed_req) portfolio trade
+    ~error_msg =
+  match
+    apply_single_trade_with_long_margin ~initial_long_margin_req portfolio trade
+  with
+  | Ok v -> v
+  | Error err -> assert_failure (error_msg ^ ": " ^ Status.show err)
+
+(* Levered long entry funding the shortfall into long_margin_debit. cash $1000,
+   buy 20 @ $100 → cost $2000, borrow $1000. *)
+let _levered_buy_portfolio () =
+  apply_long_margin_exn
+    (create ~initial_cash:1_000.0 ())
+    (make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy ~quantity:20.0
+       ~price:100.0 ())
+    ~error_msg:"levered buy"
+
+let test_disarmed_over_cash_buy_still_rejected _ =
+  (* req = 1.0 (cash account): a buy exceeding cash is rejected exactly like the
+     base apply — the cash floor is untouched, no debit is funded. *)
+  let portfolio = create ~initial_cash:1_000.0 () in
+  let trade =
+    make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy ~quantity:20.0
+      ~price:100.0 ()
+  in
+  assert_that
+    (apply_single_trade_with_long_margin ~initial_long_margin_req:1.0 portfolio
+       trade)
+    is_error
+
+let test_disarmed_sequence_bit_equal_to_legacy _ =
+  (* Parity pin: the long-margin apply at req = 1.0 over a mixed buy/sell
+     sequence is bit-equal to the legacy [apply_trades] (long_margin_debit stays
+     0.0, captured by whole-record equality). *)
+  let cash = 100_000.0 in
+  let trades =
+    [
+      make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy
+        ~quantity:100.0 ~price:150.0 ~commission:1.0 ();
+      make_trade ~id:"t2" ~order_id:"o2" ~symbol:"MSFT" ~side:Buy ~quantity:50.0
+        ~price:200.0 ~commission:1.0 ();
+      make_trade ~id:"t3" ~order_id:"o3" ~symbol:"AAPL" ~side:Sell
+        ~quantity:30.0 ~price:160.0 ~commission:1.0 ();
+    ]
+  in
+  let legacy =
+    apply_trades_exn (create ~initial_cash:cash ()) trades ~error_msg:"legacy"
+  in
+  let via_margin =
+    List.fold trades ~init:(create ~initial_cash:cash ()) ~f:(fun acc tr ->
+        apply_long_margin_exn ~initial_long_margin_req:1.0 acc tr
+          ~error_msg:"disarmed")
+  in
+  assert_that via_margin (equal_to (legacy : t))
+
+let test_levered_buy_creates_debit _ =
+  (* Armed: cash $1000, buy 20 @ $100 = $2000. Own cash spent to $0, $1000
+     borrowed into long_margin_debit; equity_cash = 0 - 1000 = -1000. *)
+  assert_that
+    (_levered_buy_portfolio ())
+    (all_of
+       [
+         field (fun p -> p.current_cash) (float_equal 0.0);
+         field (fun p -> p.long_margin_debit) (float_equal 1_000.0);
+         field (fun p -> equity_cash p) (float_equal (-1_000.0));
+       ])
+
+let test_levered_buy_equity_subtracts_debit _ =
+  (* NAV honesty: marked at the entry price, portfolio value on equity_cash =
+     -1000 + 20*100 = $1000 — exactly the $1000 of own capital, no phantom gain
+     from the borrowed cash. *)
+  let after = _levered_buy_portfolio () in
+  assert_that
+    (Trading_portfolio.Calculations.portfolio_value after.positions
+       (equity_cash after)
+       [ ("AAPL", 100.0) ])
+    (is_ok_and_holds (float_equal 1_000.0))
+
+let test_levered_buy_within_cash_takes_no_debit _ =
+  (* Armed but the buy fits within available cash: no borrow, byte-identical to
+     the base apply (debit stays 0). cash $10000, buy 20 @ $100 = $2000. *)
+  let after =
+    apply_long_margin_exn
+      (create ~initial_cash:10_000.0 ())
+      (make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy
+         ~quantity:20.0 ~price:100.0 ())
+      ~error_msg:"within-cash buy"
+  in
+  assert_that after
+    (all_of
+       [
+         field (fun p -> p.current_cash) (float_equal 8_000.0);
+         field (fun p -> p.long_margin_debit) (float_equal 0.0);
+       ])
+
+let test_armed_short_open_does_not_fund_debit _ =
+  (* Leverage relaxes long buys only. A Sell opening a short under armed req
+     takes the base apply path — no long_margin_debit. *)
+  let after =
+    apply_long_margin_exn
+      (create ~initial_cash:10_000.0 ())
+      (make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Sell
+         ~quantity:100.0 ~price:50.0 ())
+      ~error_msg:"short open"
+  in
+  assert_that after
+    (all_of
+       [
+         field (fun p -> p.current_cash) (float_equal 15_000.0);
+         field (fun p -> p.long_margin_debit) (float_equal 0.0);
+       ])
+
+let test_levered_exit_clears_debit_then_cash _ =
+  (* Exit pays down the debit first. From (cash 0, debit 1000, 20 sh @ 100),
+     sell 20 @ $120 → proceeds $2400; paydown min(1000,2400)=1000 → debit 0,
+     cash 2400-1000=1400. *)
+  let after =
+    apply_long_margin_exn
+      (_levered_buy_portfolio ())
+      (make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Sell
+         ~quantity:20.0 ~price:120.0 ())
+      ~error_msg:"exit clears debit"
+  in
+  assert_that after
+    (all_of
+       [
+         field (fun p -> p.current_cash) (float_equal 1_400.0);
+         field (fun p -> p.long_margin_debit) (float_equal 0.0);
+       ])
+
+let test_levered_exit_partial_proceeds_leaves_residual_debit _ =
+  (* Proceeds below the debit: cash stays $0, debit only partly paid. From
+     (cash 0, debit 1000, 20 sh @ 100), sell 20 @ $40 → proceeds $800; paydown
+     min(1000,800)=800 → cash 0, debit 200. *)
+  let after =
+    apply_long_margin_exn
+      (_levered_buy_portfolio ())
+      (make_trade ~id:"t2" ~order_id:"o2" ~symbol:"AAPL" ~side:Sell
+         ~quantity:20.0 ~price:40.0 ())
+      ~error_msg:"exit residual debit"
+  in
+  assert_that after
+    (all_of
+       [
+         field (fun p -> p.current_cash) (float_equal 0.0);
+         field (fun p -> p.long_margin_debit) (float_equal 200.0);
+       ])
+
+let test_long_margin_interest_n_ticks _ =
+  (* N days of interest capitalize onto the debit:
+     debit_N = debit_0 * (1 + rate/252)^N. Checked at N=3 against the same math
+     as Long_buying_power.long_margin_interest_charge. *)
+  let daily = armed_rate /. Margin_config.trading_days_per_year in
+  let after =
+    List.init 3 ~f:(fun _ -> ())
+    |> List.fold ~init:(_levered_buy_portfolio ()) ~f:(fun acc () ->
+        accrue_daily_long_margin_interest ~rate_annual_pct:armed_rate acc)
+  in
+  let expected = 1_000.0 *. ((1.0 +. daily) ** 3.0) in
+  assert_that after.long_margin_debit (float_equal ~epsilon:1e-9 expected)
+
+let test_long_margin_interest_zero_rate_noop _ =
+  let p0 = _levered_buy_portfolio () in
+  assert_that
+    (accrue_daily_long_margin_interest ~rate_annual_pct:0.0 p0)
+    (equal_to (p0 : t))
+
+let test_long_margin_interest_no_debit_noop _ =
+  (* Positive rate but no debit (cash account): unchanged. *)
+  let p0 =
+    apply_trades_exn
+      (create ~initial_cash:10_000.0 ())
+      [
+        make_trade ~id:"t1" ~order_id:"o1" ~symbol:"AAPL" ~side:Buy
+          ~quantity:20.0 ~price:100.0 ();
+      ]
+      ~error_msg:"cash buy"
+  in
+  assert_that
+    (accrue_daily_long_margin_interest ~rate_annual_pct:armed_rate p0)
+    (equal_to (p0 : t))
+
+(* ========================================================================== *)
 (* Default config sanity                                                      *)
 (* ========================================================================== *)
 
@@ -505,6 +696,27 @@ let suite =
          >:: test_borrow_fee_zero_when_no_shorts;
          "test_sum_short_notional_combines_positions"
          >:: test_sum_short_notional_combines_positions;
+         "test_disarmed_over_cash_buy_still_rejected"
+         >:: test_disarmed_over_cash_buy_still_rejected;
+         "test_disarmed_sequence_bit_equal_to_legacy"
+         >:: test_disarmed_sequence_bit_equal_to_legacy;
+         "test_levered_buy_creates_debit" >:: test_levered_buy_creates_debit;
+         "test_levered_buy_equity_subtracts_debit"
+         >:: test_levered_buy_equity_subtracts_debit;
+         "test_levered_buy_within_cash_takes_no_debit"
+         >:: test_levered_buy_within_cash_takes_no_debit;
+         "test_armed_short_open_does_not_fund_debit"
+         >:: test_armed_short_open_does_not_fund_debit;
+         "test_levered_exit_clears_debit_then_cash"
+         >:: test_levered_exit_clears_debit_then_cash;
+         "test_levered_exit_partial_proceeds_leaves_residual_debit"
+         >:: test_levered_exit_partial_proceeds_leaves_residual_debit;
+         "test_long_margin_interest_n_ticks"
+         >:: test_long_margin_interest_n_ticks;
+         "test_long_margin_interest_zero_rate_noop"
+         >:: test_long_margin_interest_zero_rate_noop;
+         "test_long_margin_interest_no_debit_noop"
+         >:: test_long_margin_interest_no_debit_noop;
          "test_default_config_is_disabled" >:: test_default_config_is_disabled;
          "test_default_config_factor_matches_book"
          >:: test_default_config_factor_matches_book;

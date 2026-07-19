@@ -50,10 +50,11 @@ type dependencies = {
           buying-power ceiling ([equity /. req]) enforced upstream by the entry
           walk. Threaded from [config.initial_long_margin_req]. *)
   long_margin_rate_annual_pct : float;
-      (** Annualized interest rate on the long-margin debit (margin M1b-2). [0.0]
-          (the default) charges nothing; when positive, {!Margin_runner.tick}
-          capitalizes one trading day's interest onto [long_margin_debit] each
-          step. Threaded from [config.long_margin_rate_annual_pct]. *)
+      (** Annualized interest rate on the long-margin debit (margin M1b-2).
+          [0.0] (the default) charges nothing; when positive,
+          {!Margin_runner.tick} capitalizes one trading day's interest onto
+          [long_margin_debit] each step. Threaded from
+          [config.long_margin_rate_annual_pct]. *)
   exempt_closing_trades_from_cash_floor : bool;
       (** NS1 (#1557#3): passed to [Portfolio.create] when the run's portfolio
           is built. When [true], the cash floor skips the reducing portion of a
@@ -141,9 +142,9 @@ val create_deps :
       simulator's per-step margin code paths are no-ops and existing baselines
       are bit-equal.
     @param initial_long_margin_req
-      Long-side leverage dial (margin M1b-2). Default [1.0] (cash account) —
-      the fill seam is bit-equal to [Portfolio.apply_single_trade]. See the
-      field doc on {!dependencies.initial_long_margin_req}.
+      Long-side leverage dial (margin M1b-2). Default [1.0] (cash account) — the
+      fill seam is bit-equal to [Portfolio.apply_single_trade]. See the field
+      doc on {!dependencies.initial_long_margin_req}.
     @param long_margin_rate_annual_pct
       Annualized interest rate on the long-margin debit (margin M1b-2). Default
       [0.0] — no interest is charged, baselines bit-equal. See the field doc on
