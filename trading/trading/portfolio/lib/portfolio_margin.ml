@@ -4,6 +4,20 @@ open Status
 open Trading_base.Types
 open Types
 
+(* available_cash = current_cash net of pledged short collateral. Strategy code
+   should read this rather than current_cash when sizing new entries. Lives here
+   (not on [Portfolio]) so that module stays under the file-length hard limit. *)
+let available_cash (portfolio : Portfolio.t) : cash_value =
+  portfolio.current_cash -. portfolio.locked_collateral
+
+(* equity_cash = the cash component of portfolio equity net of borrowed
+   long-margin debt (margin M1b-2). Equity = equity_cash + marked position
+   value; every NAV / drawdown read must use this so the borrowed cash does not
+   inflate reported wealth. Equals [current_cash] under a cash account (where
+   [long_margin_debit = 0.0]), so all pre-M1b valuations are bit-identical. *)
+let equity_cash (portfolio : Portfolio.t) : cash_value =
+  portfolio.current_cash -. portfolio.long_margin_debit
+
 (* Classify a Sell or Buy trade against the current position into one of four
    margin-relevant cases. Phase 1 only treats opening short / closing short
    specially; long-side cases pass straight through. *)
@@ -66,7 +80,7 @@ let _apply_short_open ~(margin_config : Margin_config.t)
     error_invalid_argument
       ("Insufficient cash for short collateral. Required lock: "
      ^ Float.to_string lock ^ ", available_cash before: "
-      ^ Float.to_string (Portfolio.available_cash portfolio_after))
+      ^ Float.to_string (available_cash portfolio_after))
   else return { portfolio_after with locked_collateral = new_locked }
 
 (* Release collateral proportional to the covered fraction of a short. *)
@@ -247,7 +261,7 @@ let apply_single_trade_with_long_margin ~(initial_long_margin_req : float)
     let existing_qty = _existing_qty portfolio trade.symbol in
     match trade.side with
     | Buy when Float.O.(existing_qty >= 0.0) ->
-        let available = Portfolio.available_cash portfolio in
+        let available = available_cash portfolio in
         if Float.O.(_long_buy_cost trade > available) then
           _apply_long_leveraged_buy ~portfolio ~trade ~available
         else Portfolio.apply_single_trade portfolio trade

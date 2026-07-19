@@ -334,7 +334,8 @@ let _build_step_result t ~portfolio ~portfolio_value ~trades ~orders ~today_bars
   let portfolio_summary =
     Trading_simulation_types.Portfolio_summary.of_portfolio portfolio
       ~position_value_total:
-        (portfolio_value -. Trading_portfolio.Portfolio.equity_cash portfolio)
+        (portfolio_value
+        -. Trading_portfolio.Portfolio_margin.equity_cash portfolio)
   in
   {
     date = t.current_date;

@@ -106,7 +106,7 @@ let compute ~adapter ~date ~portfolio ~today_bars ~last_known_prices
        to [current_cash] under a cash account, so pre-M1b NAV is bit-identical. *)
     Trading_portfolio.Calculations.portfolio_value
       portfolio.Trading_portfolio.Portfolio.positions
-      (Trading_portfolio.Portfolio.equity_cash portfolio)
+      (Trading_portfolio.Portfolio_margin.equity_cash portfolio)
       prices
   with
   | Ok value -> value

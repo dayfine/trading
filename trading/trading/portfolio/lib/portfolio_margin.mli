@@ -18,6 +18,24 @@
 
 open Trading_base.Types
 open Status
+open Types
+
+val available_cash : Portfolio.t -> cash_value
+(** Spendable cash net of locked short collateral:
+    [current_cash -. locked_collateral]. Equals [current_cash] under the legacy
+    semantics (where [locked_collateral = 0.0]). Strategy code that needs to
+    size new entries against actually-spendable cash should consume this rather
+    than [current_cash] directly. Lives here (not on {!Portfolio}) to keep that
+    module under the file-length hard limit — it reads the [locked_collateral]
+    field this module maintains. *)
+
+val equity_cash : Portfolio.t -> cash_value
+(** Cash component of portfolio equity net of borrowed long-margin debt:
+    [current_cash -. long_margin_debit] (margin M1b-2). Portfolio equity is
+    [equity_cash + marked position value]; NAV / drawdown / metric reads must
+    consume this so a levered book's borrowed cash does not inflate reported
+    wealth. Equals [current_cash] under a cash account (where
+    [long_margin_debit = 0.0]), so all pre-M1b valuations are bit-identical. *)
 
 val apply_single_trade_with_margin :
   margin_config:Margin_config.t -> Portfolio.t -> trade -> Portfolio.t status_or

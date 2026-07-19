@@ -494,21 +494,7 @@ let validate portfolio =
   in
   combine_status_list validations
 
-(* ========================================================================== *)
-(* Margin accounting helpers (issue #859 Phase 1)                             *)
-(* ========================================================================== *)
-
-(* available_cash = current_cash net of pledged short collateral. Strategy
-   code should read this rather than current_cash when sizing new entries.
-   The rest of the margin surface lives in [Portfolio_margin] to keep this
-   module under the file-length linter's hard limit. *)
-let available_cash portfolio =
-  portfolio.current_cash -. portfolio.locked_collateral
-
-(* equity_cash = the cash component of portfolio equity net of borrowed
-   long-margin debt (margin M1b-2). Equity = equity_cash + marked position
-   value; every NAV / drawdown read must use this so the borrowed cash does not
-   inflate reported wealth. Equals [current_cash] under a cash account (where
-   [long_margin_debit = 0.0]), so all pre-M1b valuations are bit-identical. *)
-let equity_cash portfolio =
-  portfolio.current_cash -. portfolio.long_margin_debit
+(* Margin-cash accessors ([available_cash], [equity_cash]) live in
+   [Portfolio_margin] to keep this module under the file-length hard limit —
+   they read the margin bookkeeping fields ([locked_collateral],
+   [long_margin_debit]) that [Portfolio_margin] alone maintains. *)

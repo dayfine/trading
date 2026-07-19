@@ -60,8 +60,9 @@ type t = {
       M1b-2, Option A). [0.0] under a cash account and whenever leverage is
       disarmed. Written only by the long-margin-aware apply in
       {!Portfolio_margin} ([apply_single_trade_with_long_margin]); every NAV /
-      equity read subtracts it via {!equity_cash}, so borrowed cash never
-      inflates reported wealth. Strategy-agnostic (a broker mechanic). *)
+      equity read subtracts it via [Portfolio_margin.equity_cash], so borrowed
+      cash never inflates reported wealth. Strategy-agnostic (a broker
+      mechanic). *)
 
 val create :
   ?accounting_method:accounting_method ->
@@ -145,26 +146,10 @@ val validate : t -> status
     fields are mark-to-market / margin-mode state, not derivable from trade
     history alone, so they are excluded from this check. *)
 
-(** {1 Margin accounting (issue #859 Phase 1)}
+(** {1 Margin accounting (issue #859 Phase 1, margin M1b-2)}
 
     [Portfolio.t] carries the margin-mode bookkeeping fields
-    ([locked_collateral] and [accrued_borrow_fee] in the record), but the
-    margin-aware trade APIs live in {!Portfolio_margin} to keep this module
-    under the file-length linter's hard limit. Only [available_cash] is exposed
-    here because it is consumed by general (non-margin) callers that need the
-    spendable balance. *)
-
-val available_cash : t -> cash_value
-(** Spendable cash net of locked short collateral:
-    [current_cash -. locked_collateral]. Equals [current_cash] under the legacy
-    semantics (where [locked_collateral = 0.0]). Strategy code that needs to
-    size new entries against actually-spendable cash should consume this rather
-    than [current_cash] directly. *)
-
-val equity_cash : t -> cash_value
-(** Cash component of portfolio equity net of borrowed long-margin debt:
-    [current_cash -. long_margin_debit] (margin M1b-2). Portfolio equity is
-    [equity_cash + marked position value]; NAV / drawdown / metric reads must
-    consume this so a levered book's borrowed cash does not inflate reported
-    wealth. Equals [current_cash] under a cash account (where
-    [long_margin_debit = 0.0]), so all pre-M1b valuations are bit-identical. *)
+    ([locked_collateral], [accrued_borrow_fee], [long_margin_debit] in the
+    record), but the margin-aware trade APIs and the margin-cash accessors
+    ([available_cash], [equity_cash]) live in {!Portfolio_margin} to keep this
+    module under the file-length linter's hard limit. *)
