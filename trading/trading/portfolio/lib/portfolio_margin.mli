@@ -18,6 +18,24 @@
 
 open Trading_base.Types
 open Status
+open Types
+
+val available_cash : Portfolio.t -> cash_value
+(** Spendable cash net of locked short collateral:
+    [current_cash -. locked_collateral]. Equals [current_cash] under the legacy
+    semantics (where [locked_collateral = 0.0]). Strategy code that needs to
+    size new entries against actually-spendable cash should consume this rather
+    than [current_cash] directly. Lives here (not on {!Portfolio}) to keep that
+    module under the file-length hard limit — it reads the [locked_collateral]
+    field this module maintains. *)
+
+val equity_cash : Portfolio.t -> cash_value
+(** Cash component of portfolio equity net of borrowed long-margin debt:
+    [current_cash -. long_margin_debit] (margin M1b-2). Portfolio equity is
+    [equity_cash + marked position value]; NAV / drawdown / metric reads must
+    consume this so a levered book's borrowed cash does not inflate reported
+    wealth. Equals [current_cash] under a cash account (where
+    [long_margin_debit = 0.0]), so all pre-M1b valuations are bit-identical. *)
 
 val apply_single_trade_with_margin :
   margin_config:Margin_config.t -> Portfolio.t -> trade -> Portfolio.t status_or
@@ -106,3 +124,58 @@ val check_maintenance_margin :
     {b Note}: the function is a pure check — it does not mutate the portfolio or
     fire any trade. The caller (strategy / simulator) is responsible for routing
     flagged symbols through the standard force-cover audit path. *)
+
+(** {1 Long-margin (levered long) accounting — margin M1b-2 (Option A)}
+
+    The long-side mirror of the short collateral surface: a levered long BUY
+    whose cost exceeds available cash borrows the shortfall into
+    [Portfolio.long_margin_debit] instead of being rejected by the cash floor,
+    and the debit is priced with per-tick interest. Gated by
+    [initial_long_margin_req]: at a cash account ([req >= 1.0]) every entry
+    point here is a bit-equal pass-through to the corresponding [Portfolio] API,
+    so the default is byte-identical to pre-M1b behaviour. *)
+
+val apply_single_trade_with_long_margin :
+  initial_long_margin_req:float -> Portfolio.t -> trade -> Portfolio.t status_or
+(** Long-margin-aware single-trade application, routed at the simulator fill
+    seam ([Cancel_handler]).
+
+    {b When [initial_long_margin_req >= 1.0]} (cash account / leverage
+    disarmed): bit-equal to [Portfolio.apply_single_trade]. [long_margin_debit]
+    is untouched (stays [0.0]).
+
+    {b When [0.0 < initial_long_margin_req < 1.0]} (leverage armed):
+    - {b Long BUY} (Buy with [existing_qty >= 0.0]) whose cost
+      ([qty *. price +. commission]) exceeds [available_cash]: own cash is spent
+      first and the shortfall is borrowed into [long_margin_debit].
+      [current_cash] never goes negative — Option A funds the debit as a
+      dedicated liability rather than relaxing the cash floor, whose semantics
+      stay byte-identical. A BUY that fits within available cash takes the base
+      apply path unchanged.
+    - {b Long SELL} (Sell reducing a long) with a positive prior debit: the sale
+      proceeds pay down [long_margin_debit] to [0.0] before any remainder is
+      added to [current_cash].
+    - {b Everything else} (shorts, covers, unlevered buys): identical to
+      [Portfolio.apply_single_trade].
+
+    {b Bound.} The buying-power ceiling ([equity /. initial_long_margin_req]) is
+    enforced upstream by the strategy entry walk (M1a/M1b-1); this fill-seam
+    function honours the sized order and does not re-derive the ceiling (no
+    marks are available at the fill seam — mirrors the short side, whose
+    collateral lock is likewise not re-checked at the sim fill). *)
+
+val accrue_daily_long_margin_interest :
+  rate_annual_pct:float -> Portfolio.t -> Portfolio.t
+(** Capitalize one trading day of interest on the outstanding
+    [long_margin_debit] into the debit balance (a levered book finances its own
+    carry, so [current_cash] is not touched — it may be [0.0] on a fully-levered
+    book). The charge equals
+    [long_margin_debit *. (rate_annual_pct /. trading_days_per_year)] — the same
+    252 day-count and quantity as
+    [Long_buying_power.long_margin_interest_charge], computed here at the
+    portfolio layer (which cannot depend on the strategy layer where that helper
+    lives).
+
+    No-op when [rate_annual_pct <= 0.0] (the default) or when there is no debit,
+    so a cash account and the default rate leave the portfolio unchanged.
+    Mirrors {!accrue_daily_borrow_fee} for the short side. *)

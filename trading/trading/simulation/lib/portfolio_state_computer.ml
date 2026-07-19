@@ -33,13 +33,20 @@ type state = {
     [portfolio_value = cash] is trivially correct. When there are open
     positions, [portfolio_value] should differ measurably from cash — the
     simulator's cache + avg-cost fallback in [_resolve_price] now guarantees
-    every held position is priced, so a step where they coincide indicates an
-    edge case (e.g., avg cost equals zero, or no positions remain after
-    end-of-day) that the metric computers should still skip. *)
+    every held position is priced, so a step where the marked position value is
+    ~0 despite open positions indicates the cash-only-collapse edge case that
+    the metric computers should still skip.
+
+    Keyed off [position_value_total] (the debit-free marked position value)
+    rather than [portfolio_value - current_cash]: once margin M1b-2 makes
+    [portfolio_value] debit-net, [portfolio_value - cash] equals
+    [Σqty*close - long_margin_debit], which can collapse to ~0 for a
+    highly-levered book (positions ≈ debit) and spuriously classify a real
+    marked step as unmarked. At the default cash account (debit 0) the two are
+    equivalent. *)
 let _is_marked_to_market (step : Simulator_types.step_result) =
-  let cash = step.portfolio.current_cash in
   let has_positions = Portfolio_summary.positions_count step.portfolio > 0 in
-  (not has_positions) || Float.(abs (step.portfolio_value -. cash) > 1e-2)
+  (not has_positions) || Float.(abs step.portfolio.position_value_total > 1e-2)
 
 let _trade_frequency ~total_trades ~start_date ~end_date =
   let days = Float.of_int (Date.diff end_date start_date) in
@@ -53,9 +60,14 @@ let _trade_frequency ~total_trades ~start_date ~end_date =
 let _metrics_from_step ~(position_step : Simulator_types.step_result)
     ~(marked_step : Simulator_types.step_result) ~total_trades ~start_date
     ~end_date =
-  let open_positions_value =
-    marked_step.portfolio_value -. marked_step.portfolio.current_cash
-  in
+  (* OpenPositionsValue is the marked value of held positions (Σ qty*close),
+     carried debit-free on the skinny summary as [position_value_total]. Deriving
+     it as [portfolio_value - current_cash] would be wrong once margin M1b-2 makes
+     [portfolio_value] debit-net (it would yield Σqty*close - long_margin_debit);
+     [position_value_total] is already the pure position value the simulator
+     computes. At the default cash account (debit 0) the two coincide, so
+     pre-M1b metrics are bit-identical. *)
+  let open_positions_value = marked_step.portfolio.position_value_total in
   let cost_basis =
     Portfolio_summary.position_cost_basis_total marked_step.portfolio
   in

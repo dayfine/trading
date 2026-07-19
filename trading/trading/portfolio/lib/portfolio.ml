@@ -29,6 +29,12 @@ type t = {
       (* NS1 (#1557#3): when true, the cash floor exempts the reducing portion of
          a closing trade. A plain bool so core Portfolio stays strategy-agnostic.
          Default false ⇒ byte-identical to prior behaviour. See .mli + create. *)
+  long_margin_debit : cash_value;
+      (* Borrowed cash funding levered long positions (margin M1b-2). 0.0 under a
+         cash account and whenever leverage is disarmed; the long-margin-aware
+         apply in [Portfolio_margin] is the sole writer. Equity subtracts it:
+         [equity_cash = current_cash -. long_margin_debit]. Strategy-agnostic —
+         any strategy engaging leverage benefits. *)
 }
 [@@deriving show, eq, sexp]
 
@@ -44,6 +50,7 @@ let create ?(accounting_method = AverageCost)
     locked_collateral = 0.0;
     accrued_borrow_fee = 0.0;
     exempt_closing_trades_from_cash_floor;
+    long_margin_debit = 0.0;
   }
 
 let _find_position_in_list positions symbol =
@@ -487,13 +494,7 @@ let validate portfolio =
   in
   combine_status_list validations
 
-(* ========================================================================== *)
-(* Margin accounting helpers (issue #859 Phase 1)                             *)
-(* ========================================================================== *)
-
-(* available_cash = current_cash net of pledged short collateral. Strategy
-   code should read this rather than current_cash when sizing new entries.
-   The rest of the margin surface lives in [Portfolio_margin] to keep this
-   module under the file-length linter's hard limit. *)
-let available_cash portfolio =
-  portfolio.current_cash -. portfolio.locked_collateral
+(* Margin-cash accessors ([available_cash], [equity_cash]) live in
+   [Portfolio_margin] to keep this module under the file-length hard limit —
+   they read the margin bookkeeping fields ([locked_collateral],
+   [long_margin_debit]) that [Portfolio_margin] alone maintains. *)

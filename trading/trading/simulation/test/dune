@@ -394,6 +394,18 @@
   simulation_test_helpers))
 
 (test
+ (name test_long_maintenance)
+ (modules test_long_maintenance)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.base
+  trading.portfolio
+  trading.strategy
+  matchers))
+
+(test
  (name test_cancel_handler)
  (modules test_cancel_handler)
  (libraries

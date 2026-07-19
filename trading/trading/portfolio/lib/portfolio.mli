@@ -14,6 +14,7 @@ type t = {
   locked_collateral : cash_value;
   accrued_borrow_fee : cash_value;
   exempt_closing_trades_from_cash_floor : bool;
+  long_margin_debit : cash_value;
 }
 [@@deriving show, eq, sexp]
 (** Portfolio type. All fields are accessible for pattern matching and direct
@@ -54,7 +55,14 @@ type t = {
       (the [create] default) reproduces the prior behaviour exactly. A plain
       bool so this module stays strategy-agnostic; the strategy layer sets it
       from [Portfolio_risk.config.exempt_closing_trades_from_cash_floor]. See
-      [apply_single_trade] for the exact semantics. *)
+      [apply_single_trade] for the exact semantics.
+    - [long_margin_debit]: borrowed cash funding levered long positions (margin
+      M1b-2, Option A). [0.0] under a cash account and whenever leverage is
+      disarmed. Written only by the long-margin-aware apply in
+      {!Portfolio_margin} ([apply_single_trade_with_long_margin]); every NAV /
+      equity read subtracts it via [Portfolio_margin.equity_cash], so borrowed
+      cash never inflates reported wealth. Strategy-agnostic (a broker
+      mechanic). *)
 
 val create :
   ?accounting_method:accounting_method ->
@@ -138,18 +146,10 @@ val validate : t -> status
     fields are mark-to-market / margin-mode state, not derivable from trade
     history alone, so they are excluded from this check. *)
 
-(** {1 Margin accounting (issue #859 Phase 1)}
+(** {1 Margin accounting (issue #859 Phase 1, margin M1b-2)}
 
     [Portfolio.t] carries the margin-mode bookkeeping fields
-    ([locked_collateral] and [accrued_borrow_fee] in the record), but the
-    margin-aware trade APIs live in {!Portfolio_margin} to keep this module
-    under the file-length linter's hard limit. Only [available_cash] is exposed
-    here because it is consumed by general (non-margin) callers that need the
-    spendable balance. *)
-
-val available_cash : t -> cash_value
-(** Spendable cash net of locked short collateral:
-    [current_cash -. locked_collateral]. Equals [current_cash] under the legacy
-    semantics (where [locked_collateral = 0.0]). Strategy code that needs to
-    size new entries against actually-spendable cash should consume this rather
-    than [current_cash] directly. *)
+    ([locked_collateral], [accrued_borrow_fee], [long_margin_debit] in the
+    record), but the margin-aware trade APIs and the margin-cash accessors
+    ([available_cash], [equity_cash]) live in {!Portfolio_margin} to keep this
+    module under the file-length linter's hard limit. *)

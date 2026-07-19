@@ -91,9 +91,16 @@ let revert_rejected_exits ~date ~positions ~rejected_trades =
       _revert_one ~date ~acc ~symbol:trade.Trading_base.Types.symbol)
 
 (* Apply one trade to the portfolio; tag it accepted (portfolio booked it) or
-   rejected (carrying the rejection [err] for the WARN). *)
-let _try_apply_trade portfolio trade =
-  match Trading_portfolio.Portfolio.apply_single_trade portfolio trade with
+   rejected (carrying the rejection [err] for the WARN). Routed through the
+   long-margin-aware apply so a levered long BUY funds its cash shortfall into
+   [long_margin_debit] instead of being floor-rejected. At the default cash
+   account ([initial_long_margin_req >= 1.0]) this is bit-equal to
+   [Portfolio.apply_single_trade] (margin M1b-2). *)
+let _try_apply_trade ~initial_long_margin_req portfolio trade =
+  match
+    Trading_portfolio.Portfolio_margin.apply_single_trade_with_long_margin
+      ~initial_long_margin_req portfolio trade
+  with
   | Ok p -> (p, `Accepted trade)
   | Error err -> (portfolio, `Rejected (trade, err))
 
@@ -112,17 +119,20 @@ let _warn_rejected_trade (trade : Trading_base.Types.trade) err =
 (* One fold step: apply [trade] (after the [hook]) and bucket it accepted /
    rejected, warning loudly on rejection. Extracted to keep the fold body flat
    (nesting linter). *)
-let _bucket_trade ~hook (portfolio, accepted, rejected) trade =
+let _bucket_trade ~hook ~initial_long_margin_req (portfolio, accepted, rejected)
+    trade =
   let trade = hook trade in
-  match _try_apply_trade portfolio trade with
+  match _try_apply_trade ~initial_long_margin_req portfolio trade with
   | portfolio, `Accepted t -> (portfolio, t :: accepted, rejected)
   | portfolio, `Rejected (t, err) ->
       _warn_rejected_trade t err;
       (portfolio, accepted, t :: rejected)
 
-let apply_trades_best_effort ?on_trade_fill portfolio trades =
+let apply_trades_best_effort ?on_trade_fill ?(initial_long_margin_req = 1.0)
+    portfolio trades =
   let hook = Option.value on_trade_fill ~default:Fn.id in
   let portfolio, accepted_rev, rejected_rev =
-    List.fold trades ~init:(portfolio, [], []) ~f:(_bucket_trade ~hook)
+    List.fold trades ~init:(portfolio, [], [])
+      ~f:(_bucket_trade ~hook ~initial_long_margin_req)
   in
   (portfolio, List.rev accepted_rev, List.rev rejected_rev)

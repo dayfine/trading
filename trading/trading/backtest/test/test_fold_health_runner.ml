@@ -52,6 +52,7 @@ let _make_portfolio ~positions : Trading_portfolio.Portfolio.t =
     locked_collateral = 0.0;
     accrued_borrow_fee = 0.0;
     exempt_closing_trades_from_cash_floor = false;
+    long_margin_debit = 0.0;
   }
 
 let _empty_summary : Backtest.Summary.t =

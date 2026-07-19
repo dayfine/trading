@@ -18,6 +18,10 @@ type dependencies = {
   stale_hold_policy : Stale_hold.config;
   stale_hold_log : Stale_hold.Log.t;
   margin_config : Trading_portfolio.Margin_config.t;  (** See .mli. *)
+  initial_long_margin_req : float;  (** See .mli. Margin M1b-2 leverage dial. *)
+  long_margin_rate_annual_pct : float;
+      (** See .mli. Margin M1b-2 debit rate. *)
+  maintenance_long_pct : float;  (** See .mli. Margin M2 long maintenance. *)
   exempt_closing_trades_from_cash_floor : bool;  (** See .mli. *)
   on_trade_fill : (Trading_base.Types.trade -> Trading_base.Types.trade) option;
   active_through_for : (string -> Core.Date.t option) option;  (** See .mli. *)
@@ -28,6 +32,8 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?market_data_adapter ?(stale_hold_policy = Stale_hold.default_config)
     ?stale_hold_log ?(slippage_bps = 0)
     ?(margin_config = Trading_portfolio.Margin_config.default_config)
+    ?(initial_long_margin_req = 1.0) ?(long_margin_rate_annual_pct = 0.0)
+    ?(maintenance_long_pct = 0.0)
     ?(exempt_closing_trades_from_cash_floor = false) ?on_trade_fill
     ?active_through_for () =
   let engine_config = { Trading_engine.Types.commission; slippage_bps } in
@@ -53,6 +59,9 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     stale_hold_policy;
     stale_hold_log;
     margin_config;
+    initial_long_margin_req;
+    long_margin_rate_annual_pct;
+    maintenance_long_pct;
     exempt_closing_trades_from_cash_floor;
     on_trade_fill;
     active_through_for;
@@ -327,7 +336,9 @@ let _build_step_result t ~portfolio ~portfolio_value ~trades ~orders ~today_bars
     ~split_events =
   let portfolio_summary =
     Trading_simulation_types.Portfolio_summary.of_portfolio portfolio
-      ~position_value_total:(portfolio_value -. portfolio.current_cash)
+      ~position_value_total:
+        (portfolio_value
+        -. Trading_portfolio.Portfolio_margin.equity_cash portfolio)
   in
   {
     date = t.current_date;
@@ -350,7 +361,8 @@ let _process_fills_and_cancels t ~portfolio ~positions =
   let all_trades = _extract_trades ~date:t.current_date execution_reports in
   let portfolio, trades, rejected_trades =
     Cancel_handler.apply_trades_best_effort ?on_trade_fill:t.deps.on_trade_fill
-      portfolio all_trades
+      ~initial_long_margin_req:t.deps.initial_long_margin_req portfolio
+      all_trades
   in
   let%bind positions =
     Fill_router.update_positions_from_trades ~order_links:t.order_links
@@ -387,7 +399,9 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
     _call_strategy { t with portfolio; positions }
   in
   let portfolio, transitions =
-    Margin_runner.tick ~margin_config:t.deps.margin_config ~portfolio ~positions
+    Margin_runner.tick ~margin_config:t.deps.margin_config
+      ~long_margin_rate_annual_pct:t.deps.long_margin_rate_annual_pct
+      ~maintenance_long_pct:t.deps.maintenance_long_pct ~portfolio ~positions
       ~today_bars ~date:t.current_date ~strategy_transitions
   in
   let%bind positions = _apply_transitions ~positions ~transitions in

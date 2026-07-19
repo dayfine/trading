@@ -59,6 +59,9 @@ let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
       ~market_data_adapter ~stale_hold_log ?slippage_bps
       ~stale_hold_policy:(_stale_hold_policy input.config)
       ~margin_config:input.config.margin_config
+      ~initial_long_margin_req:input.config.initial_long_margin_req
+      ~long_margin_rate_annual_pct:input.config.long_margin_rate_annual_pct
+      ~maintenance_long_pct:input.config.maintenance_long_pct
       ~exempt_closing_trades_from_cash_floor:
         input.config.portfolio_config.exempt_closing_trades_from_cash_floor
       ?on_trade_fill ?active_through_for ()

@@ -56,21 +56,29 @@ val apply_to_positions :
 
 val apply_trades_best_effort :
   ?on_trade_fill:(Trading_base.Types.trade -> Trading_base.Types.trade) ->
+  ?initial_long_margin_req:float ->
   Trading_portfolio.Portfolio.t ->
   Trading_base.Types.trade list ->
   Trading_portfolio.Portfolio.t
   * Trading_base.Types.trade list
   * Trading_base.Types.trade list
-(** [apply_trades_best_effort ?on_trade_fill portfolio trades] applies each
-    trade to [portfolio] via [Portfolio.apply_single_trade], returning the
-    resulting [(portfolio, accepted, rejected)] triple (both lists in input
-    order). A portfolio-rejected fill is dropped from the portfolio and bucketed
-    into [rejected] — and a loud per-trade [WARN] (symbol / side / qty / price /
-    reason) is printed to stderr so the rejection is never silent (#1553). The
-    optional [on_trade_fill] hook transforms each trade before it is applied
-    (e.g. fill-date stamping). The caller routes [rejected] through
+(** [apply_trades_best_effort ?on_trade_fill ?initial_long_margin_req portfolio
+     trades] applies each trade to [portfolio] via
+    {!Trading_portfolio.Portfolio_margin.apply_single_trade_with_long_margin},
+    returning the resulting [(portfolio, accepted, rejected)] triple (both lists
+    in input order). A portfolio-rejected fill is dropped from the portfolio and
+    bucketed into [rejected] — and a loud per-trade [WARN] (symbol / side / qty
+    / price / reason) is printed to stderr so the rejection is never silent
+    (#1553). The optional [on_trade_fill] hook transforms each trade before it
+    is applied (e.g. fill-date stamping). The caller routes [rejected] through
     {!transitions_for_rejected_trades} (entry side) and {!revert_rejected_exits}
-    (exit side) to keep stranded positions from sticking. *)
+    (exit side) to keep stranded positions from sticking.
+
+    [initial_long_margin_req] (default [1.0], a cash account) is the long-side
+    leverage dial (margin M1b-2): when [< 1.0] a levered long BUY funds its cash
+    shortfall into [Portfolio.long_margin_debit] instead of being
+    floor-rejected. At the default the apply is bit-equal to
+    [Portfolio.apply_single_trade]. *)
 
 val revert_rejected_exits :
   date:Date.t ->

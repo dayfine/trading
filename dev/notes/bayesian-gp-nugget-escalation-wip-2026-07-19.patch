@@ -1,0 +1,102 @@
+diff --git a/trading/trading/backtest/tuner/lib/bayesian_opt.ml b/trading/trading/backtest/tuner/lib/bayesian_opt.ml
+index 010be0fd..c84ebaae 100644
+--- a/trading/trading/backtest/tuner/lib/bayesian_opt.ml
++++ b/trading/trading/backtest/tuner/lib/bayesian_opt.ml
+@@ -142,6 +142,67 @@ let _kernel_vector ~length_scales ~signal_variance observations_x x_star =
+   Mat.init_2d n 1 (fun i _ ->
+       rbf_kernel ~length_scales ~signal_variance observations_x.(i) x_star)
+ 
++(** {2 Adaptive-nugget Cholesky retry}
++
++    LAPACK's [potrf] occasionally reports the GP kernel matrix as not
++    positive-definite ([Failure "LAPACKE: <n>"], n > 0) when observations are
++    duplicated or near-duplicated in the [0, 1]-scaled input space — a rare
++    numerical edge case, not a modeling error. Rather than let [fit_gp] crash,
++    we retry with an escalating diagonal jitter ("nugget") until the
++    factorisation succeeds or attempts are exhausted, in which case we
++    re-raise the original failure. *)
++
++(** Maximum number of Cholesky attempts (the first at the caller's
++    [noise_variance] plus escalating retries). *)
++let _chol_retry_max_attempts = 6
++
++(** Floor for the first added jitter on retry, used when [noise_variance] is
++    smaller than this (e.g. exactly 0). *)
++let _chol_retry_initial_jitter = 1e-9
++
++(** Multiplier applied to the added jitter after each failed retry. *)
++let _chol_retry_jitter_growth = 10.0
++
++(** Upper bound on the added jitter, expressed as a fraction of
++    [signal_variance] (the kernel's overall scale), so escalation cannot
++    swamp the kernel even after several retries. *)
++let _chol_retry_max_relative_jitter = 1e-2
++
++(** [true] iff [exn] is the LAPACKE non-positive-definite failure that
++    [Linalg.chol] raises via [Owl_lapacke.check_lapack_error] (a bare
++    [Failure "LAPACKE: <n>"] for [n > 0]). Any other exception (including
++    [Invalid_argument] for LAPACK argument errors, [n < 0]) is not ours to
++    retry. *)
++let _is_lapack_non_pd_failure = function
++  | Failure msg -> String.is_prefix msg ~prefix:"LAPACKE: "
++  | _ -> false
++
++(** Factor [k] (in place) via Cholesky, escalating an additive diagonal
++    jitter only after catching a non-PD LAPACKE failure. The first attempt
++    runs on [k] exactly as built by the caller — when it succeeds (every
++    currently-passing run), this is bit-identical to a bare
++    [Linalg.chol ~upper:false k]. Only on repeated failure do we add jitter,
++    starting at [max(noise_variance, _chol_retry_initial_jitter)] and growing
++    by [_chol_retry_jitter_growth] per retry, capped at
++    [_chol_retry_max_relative_jitter *. signal_variance]. Re-raises the
++    original exception if [_chol_retry_max_attempts] is exhausted. *)
++let _chol_with_nugget_escalation k ~n ~noise_variance ~signal_variance =
++  let max_added_jitter = _chol_retry_max_relative_jitter *. signal_variance in
++  let rec attempt jitter attempts_left =
++    try Linalg.chol ~upper:false k
++    with exn when _is_lapack_non_pd_failure exn ->
++      if attempts_left <= 0 then raise exn
++      else begin
++        let added = Float.min jitter max_added_jitter in
++        for i = 0 to n - 1 do
++          Mat.set k i i (Mat.get k i i +. added)
++        done;
++        attempt (jitter *. _chol_retry_jitter_growth) (attempts_left - 1)
++      end
++  in
++  let initial_jitter = Float.max noise_variance _chol_retry_initial_jitter in
++  attempt initial_jitter (_chol_retry_max_attempts - 1)
++
+ let fit_gp ~length_scales ~signal_variance ~noise_variance ~observations_x
+     ~observations_y =
+   let n = _validate_gp_inputs ~length_scales ~observations_x ~observations_y in
+@@ -153,7 +214,7 @@ let fit_gp ~length_scales ~signal_variance ~noise_variance ~observations_x
+   for i = 0 to n - 1 do
+     Mat.set k i i (Mat.get k i i +. noise_variance)
+   done;
+-  let l = Linalg.chol ~upper:false k in
++  let l = _chol_with_nugget_escalation k ~n ~noise_variance ~signal_variance in
+   let l_t = Mat.transpose l in
+   (* Solve L L^T α = y_centered  →  L z = y_centered, then L^T α = z. *)
+   let y_col = Mat.of_array y_centered n 1 in
+diff --git a/trading/trading/backtest/tuner/lib/bayesian_opt.mli b/trading/trading/backtest/tuner/lib/bayesian_opt.mli
+index 4ef3dbd2..4dc474b0 100644
+--- a/trading/trading/backtest/tuner/lib/bayesian_opt.mli
++++ b/trading/trading/backtest/tuner/lib/bayesian_opt.mli
+@@ -218,7 +218,15 @@ val fit_gp :
+     lengths disagree.
+ 
+     Numerical: adds [noise_variance · I] to the kernel matrix before Cholesky.
+-    Use [noise_variance ~ 1e-6] for jitter on noise-free objectives. *)
++    Use [noise_variance ~ 1e-6] for jitter on noise-free objectives.
++
++    Adaptive-nugget escalation: on a rare non-positive-definite kernel matrix
++    (duplicate or near-duplicate observations can trigger this), the
++    Cholesky factorisation is retried with an escalating additive diagonal
++    jitter (nugget) instead of raising immediately. The first attempt is
++    unmodified from the [noise_variance · I] kernel above, so behavior is
++    unchanged whenever that attempt succeeds. Only after repeated failures is
++    the original exception re-raised. *)
+ 
+ val expected_improvement :
+   posterior:gp_posterior -> f_best:float -> float array -> float

@@ -4,6 +4,20 @@ open Status
 open Trading_base.Types
 open Types
 
+(* available_cash = current_cash net of pledged short collateral. Strategy code
+   should read this rather than current_cash when sizing new entries. Lives here
+   (not on [Portfolio]) so that module stays under the file-length hard limit. *)
+let available_cash (portfolio : Portfolio.t) : cash_value =
+  portfolio.current_cash -. portfolio.locked_collateral
+
+(* equity_cash = the cash component of portfolio equity net of borrowed
+   long-margin debt (margin M1b-2). Equity = equity_cash + marked position
+   value; every NAV / drawdown read must use this so the borrowed cash does not
+   inflate reported wealth. Equals [current_cash] under a cash account (where
+   [long_margin_debit = 0.0]), so all pre-M1b valuations are bit-identical. *)
+let equity_cash (portfolio : Portfolio.t) : cash_value =
+  portfolio.current_cash -. portfolio.long_margin_debit
+
 (* Classify a Sell or Buy trade against the current position into one of four
    margin-relevant cases. Phase 1 only treats opening short / closing short
    specially; long-side cases pass straight through. *)
@@ -66,7 +80,7 @@ let _apply_short_open ~(margin_config : Margin_config.t)
     error_invalid_argument
       ("Insufficient cash for short collateral. Required lock: "
      ^ Float.to_string lock ^ ", available_cash before: "
-      ^ Float.to_string (Portfolio.available_cash portfolio_after))
+      ^ Float.to_string (available_cash portfolio_after))
   else return { portfolio_after with locked_collateral = new_locked }
 
 (* Release collateral proportional to the covered fraction of a short. *)
@@ -174,3 +188,96 @@ let check_maintenance_margin ~(margin_config : Margin_config.t)
     List.filter_map portfolio.positions
       ~f:(_maintenance_flagged_symbol ~margin_config ~price_map)
     |> List.sort ~compare:String.compare
+
+(* ========================================================================== *)
+(* Long-margin (levered long) accounting — margin M1b-2 (Option A)            *)
+(* ========================================================================== *)
+
+(* Total cash a Buy consumes: (quantity * price) + commission — the magnitude of
+   [Portfolio._calculate_cash_change]'s Buy branch. *)
+let _long_buy_cost (trade : trade) : float =
+  (trade.quantity *. trade.price) +. trade.commission
+
+(* Non-positive sum of paper losses across marked positions. Mirrors
+   [Portfolio._negative_unrealized_pnl_total] (that helper is private); used only
+   to size the temporary cash cushion that lets the base cash floor pass for a
+   borrowed buy. *)
+let _negative_unrealized_pnl_total (portfolio : Portfolio.t) : float =
+  List.fold portfolio.unrealized_pnl_per_position ~init:0.0
+    ~f:(fun acc (_symbol, pnl) -> acc +. Float.min 0.0 pnl)
+
+(* Fund a long BUY whose cost exceeds available cash by borrowing the shortfall
+   into [long_margin_debit]. Own cash is spent first; the remainder is the debit,
+   so [current_cash] never goes negative (Option A — the cash floor's semantics
+   are untouched; we route *around* it here rather than relaxing it). The base
+   [apply_single_trade] is run on a portfolio whose cash is temporarily credited
+   by [borrow +. |paper-loss drag|] purely so its floor check passes; the
+   position / history updates it performs are cash-independent, so [current_cash]
+   and [long_margin_debit] are then overwritten from the pre-trade values. *)
+let _apply_long_leveraged_buy ~(portfolio : Portfolio.t) ~(trade : trade)
+    ~(available : float) : Portfolio.t status_or =
+  let cost = _long_buy_cost trade in
+  let borrow = Float.max 0.0 (cost -. available) in
+  let cash_spent = cost -. borrow in
+  let drag = Float.abs (_negative_unrealized_pnl_total portfolio) in
+  let inflated =
+    { portfolio with current_cash = portfolio.current_cash +. borrow +. drag }
+  in
+  let%bind after = Portfolio.apply_single_trade inflated trade in
+  return
+    {
+      after with
+      current_cash = portfolio.current_cash -. cash_spent;
+      long_margin_debit = portfolio.long_margin_debit +. borrow;
+    }
+
+(* Route a long exit's proceeds against the outstanding debit first, then to
+   cash. Reached only with a positive prior debit. *)
+let _apply_long_exit_paydown ~(portfolio : Portfolio.t) ~(trade : trade) :
+    Portfolio.t status_or =
+  let%bind after = Portfolio.apply_single_trade portfolio trade in
+  let proceeds = after.current_cash -. portfolio.current_cash in
+  let paydown =
+    Float.min portfolio.long_margin_debit (Float.max 0.0 proceeds)
+  in
+  return
+    {
+      after with
+      current_cash = after.current_cash -. paydown;
+      long_margin_debit = portfolio.long_margin_debit -. paydown;
+    }
+
+let _existing_qty (portfolio : Portfolio.t) symbol : float =
+  match Portfolio.get_position portfolio symbol with
+  | None -> 0.0
+  | Some p -> Calculations.position_quantity p
+
+let apply_single_trade_with_long_margin ~(initial_long_margin_req : float)
+    (portfolio : Portfolio.t) (trade : trade) : Portfolio.t status_or =
+  if Float.O.(initial_long_margin_req >= 1.0) then
+    (* Cash account / leverage disarmed: byte-identical to the base apply. *)
+    Portfolio.apply_single_trade portfolio trade
+  else
+    let existing_qty = _existing_qty portfolio trade.symbol in
+    match trade.side with
+    | Buy when Float.O.(existing_qty >= 0.0) ->
+        let available = available_cash portfolio in
+        if Float.O.(_long_buy_cost trade > available) then
+          _apply_long_leveraged_buy ~portfolio ~trade ~available
+        else Portfolio.apply_single_trade portfolio trade
+    | Sell
+      when Float.O.(existing_qty > 0.0)
+           && Float.O.(portfolio.long_margin_debit > 0.0) ->
+        _apply_long_exit_paydown ~portfolio ~trade
+    | _ -> Portfolio.apply_single_trade portfolio trade
+
+let accrue_daily_long_margin_interest ~(rate_annual_pct : float)
+    (portfolio : Portfolio.t) : Portfolio.t =
+  if
+    Float.O.(rate_annual_pct <= 0.0)
+    || Float.O.(portfolio.long_margin_debit <= 0.0)
+  then portfolio
+  else
+    let daily = rate_annual_pct /. Margin_config.trading_days_per_year in
+    let charge = portfolio.long_margin_debit *. daily in
+    { portfolio with long_margin_debit = portfolio.long_margin_debit +. charge }

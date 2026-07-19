@@ -101,8 +101,12 @@ let compute ~adapter ~date ~portfolio ~today_bars ~last_known_prices
       ~last_known_prices ~valuation_failure_count
   in
   match
+    (* Equity nets borrowed long-margin debt (margin M1b-2): NAV / drawdown must
+       see [equity_cash = current_cash - long_margin_debit], not raw cash. Equal
+       to [current_cash] under a cash account, so pre-M1b NAV is bit-identical. *)
     Trading_portfolio.Calculations.portfolio_value
-      portfolio.Trading_portfolio.Portfolio.positions portfolio.current_cash
+      portfolio.Trading_portfolio.Portfolio.positions
+      (Trading_portfolio.Portfolio_margin.equity_cash portfolio)
       prices
   with
   | Ok value -> value

@@ -1,6 +1,6 @@
 # Status: margin-realism
 
-## Last updated: 2026-07-17
+## Last updated: 2026-07-19
 
 ## Status
 IN_PROGRESS
@@ -69,25 +69,87 @@ and M1b (follow-up).
   walk-state-flag-from-config, borrowed_balance-derives-from-debit.
   Verify: `dune runtest trading/weinstein/strategy/test` (container path
   `/workspaces/trading-1/.claude/worktrees/<ws>/trading`).
-- **M1b-2 — make the debit persist + priced (default-off).** M1b-1 changes only
-  the strategy-layer entry decision; the resulting levered buys are still
-  rejected by the **portfolio cash floor** (`Portfolio_cash_floor.check` requires
-  `current_cash + cash_change + neg_pnl >= 0`, applied at every fill via
-  `Cancel_handler._try_apply_trade → Portfolio.apply_single_trade`). To make the
-  debit persist and be priced, M1b-2 needs: (a) a portfolio-side debit mechanism
-  — either a dedicated `long_margin_debit` field on `Portfolio.t` written by a
-  long-margin-aware apply routed at the `Cancel_handler` fill seam (mirroring the
-  short-side `Portfolio_margin.apply_single_trade_with_margin`), or a relaxation
-  of the cash floor to permit negative cash bounded by the buying-power headroom;
-  (b) per-tick interest accrual of `Long_buying_power.long_margin_interest_charge`
-  on the outstanding debit, mirroring how `Margin_runner.tick` invokes
-  `Portfolio_margin.accrue_daily_borrow_fee` from the simulator; (c) exits pay
-  down the debit before free cash; (d) thread `long_margin_rate_annual_pct` from
-  the Weinstein config into the simulator deps. **This is the A1 structural piece
-  — it modifies core `Portfolio` / simulator beyond the sanctioned accrual mirror,
-  so it needs a decision-item review (coordinate with feat-weinstein).** Kept out
-  of M1b-1 to keep that PR strategy-scoped and <500 LOC. `[non-blocking]`.
-- **M2** — long-side maintenance / force-reduce (documented sell ordering).
+- [x] **M1b-2 — make the debit persist + priced (default-off).** Branch
+  `feat/margin-m1b2-portfolio-debit`. Shipped **Option A** (dedicated debit field
+  on core `Portfolio`, mirroring the short-side precedent) — **user-approved
+  decision item 2026-07-19**; the rejected Option B (relaxing
+  `Portfolio_cash_floor` to allow negative cash) was NOT implemented, so the cash
+  floor's semantics stay byte-identical for all non-levered paths.
+  - `Portfolio.t += long_margin_debit : float` (default 0.0); the margin-cash
+    accessors `available_cash` / `equity_cash` (`current_cash - long_margin_debit`)
+    relocated into `Portfolio_margin` (portfolio.ml was at the 500-line hard
+    limit; the accessors read margin fields that module maintains).
+  - `Portfolio_margin.apply_single_trade_with_long_margin ~initial_long_margin_req`
+    routes at the `Cancel_handler` fill seam: a levered long BUY
+    (`req < 1.0`) whose cost exceeds available cash funds the shortfall into
+    `long_margin_debit` (own cash spent first, `current_cash` never negative)
+    instead of being floor-rejected; a long SELL pays the debit down before cash.
+    At `req >= 1.0` (default cash account) it is bit-equal to
+    `Portfolio.apply_single_trade`.
+  - Equity honesty: `Portfolio_valuation.compute` (and the step's
+    `position_value_total`) now read `equity_cash`, so NAV / drawdown / every
+    metric subtract the debit — borrowed cash yields no phantom equity.
+  - Per-tick interest: `Margin_runner.tick` calls
+    `Portfolio_margin.accrue_daily_long_margin_interest ~rate_annual_pct`, which
+    capitalizes `debit * (rate/252)` onto the debit each step (same quantity as
+    `Long_buying_power.long_margin_interest_charge`, computed at the portfolio
+    layer which cannot depend on the strategy layer). Rate 0.0 (default) → no-op.
+  - Config threading: `initial_long_margin_req` + `long_margin_rate_annual_pct`
+    flow `Weinstein config → Simulator.create_deps → fill seam / tick` (panel_runner),
+    same path as `margin_config`. No new config fields (M1a's two suffice; R2 met).
+  - R1: at defaults (`req = 1.0`, `rate = 0.0`) `long_margin_debit` stays 0, the
+    floor is untouched, and every existing portfolio/simulator test passes
+    unchanged. Tests: `test_margin_accounting.ml` (+10 long-margin unit tests —
+    parity pin, levered-fill debit, equity-subtracts-debit, exit paydown
+    ordering, N-tick interest, disarmed rejection, no-debit/zero-rate no-ops);
+    `test_margin_runner.ml` (+2 — end-to-end levered run funds+prices the debit
+    with honest NAV, and the `accrue_long_margin_interest` wrapper).
+- [x] **M2 — long-side maintenance force-reduce (default-off).** Branch
+  `feat/margin-m2-maintenance`. Marked-basis maintenance check for the LONG book:
+  when `equity / marked_long_exposure < maintenance_long_pct` on a weekly (Friday)
+  close, held longs are force-reduced weakest-first until the ratio is restored.
+  - New pure module `Long_maintenance`
+    (`trading/trading/simulation/lib/long_maintenance.{ml,mli}`), the long-book
+    mirror of the short-side force-cover. `equity = equity_cash + marked_long_exposure`
+    where `equity_cash = current_cash - long_margin_debit` (M1b-2), so only a
+    levered book (debit > 0 pushing equity_cash down) can ever breach — an
+    unlevered book has ratio ≥ 1.0.
+  - **Sell ORDERING (the design center; Portfolio_floor bottom-tick lesson).**
+    Weakest-first = **ascending unrealized return since entry** (`mark/entry - 1`),
+    ties by symbol for determinism. Deliberately NOT the laggard-rotation metric
+    (RS-vs-benchmark needs benchmark history + a `Bar_reader`, neither available at
+    the margin seam; a margin reduce wants the position closest to underwater).
+    Selling at the mark leaves equity unchanged and only shrinks the denominator,
+    so ordering decides which names the book *keeps* — shedding losers keeps the
+    let-winners-run tail. **Incremental, whole-position** (mirrors the short-side
+    force-cover which closes whole flagged shorts): sheds one at a time until
+    `equity / marked_long_exposure ≥ maintenance_long_pct*(1 + restore_buffer_pct)`
+    (buffer 0.02, so mark noise doesn't re-trigger next tick), then stops —
+    stronger positions untouched. Never a whole-book sweep unless equity ≤ 0
+    (insolvent → liquidate). Every forced sale carries
+    `exit_reason = StrategySignal { label = "maintenance_reduce" }` so forensics
+    separate margin reduces from strategy exits; proceeds pay down
+    `long_margin_debit` first (M1b-2), which is what restores the ratio.
+  - **Cadence:** weekly-close (Friday) only, gated in
+    `Long_maintenance.maintenance_reduce_transitions`, invoked from
+    `Margin_runner.tick` alongside the short-side force-cover (dedup via the
+    existing `dedup_strategy_exits_for_margin`: margin wins). Bar-cadence caveat
+    (intraweek gap-through-maintenance) documented in the `.mli` as M3/M4 territory.
+  - Config: `maintenance_long_pct` `[@sexp.default 0.0]` on
+    `weinstein_strategy_config` (+ the re-declared `weinstein_strategy.mli` record).
+    R1 no-op at 0.0 (a cash account has no maintenance requirement); R2
+    Overlay_validator float axis (`test_variant_matrix.ml` +
+    `test_maintenance_long_pct_axis_expands`). Threaded
+    `Weinstein config → Simulator.create_deps → Margin_runner.tick` (panel_runner),
+    same path as `long_margin_rate_annual_pct`.
+  - Tests: `test_long_maintenance.ml` (10 — R1 default-never-fires, no-breach,
+    weakest-first ORDER on a 3-position fixture, incremental restore, equity-wiped
+    full liquidation, Friday-gate no-op on Monday, `maintenance_reduce` exit tag,
+    unlevered/no-debit no-op, no-positions no-op) + `test_long_buying_power.ml`
+    config round-trip / back-compat / default-no-op extended to `maintenance_long_pct`.
+  - Also fixed a #2005 QC follow-up: `portfolio_summary.mli` / `metric_types.mli`
+    now qualify the `portfolio_value - current_cash` identity as cash-account-only
+    (a long-margin debit shifts the split by `+ long_margin_debit`).
 - **M3** — short-side squeeze robustness (borrow availability, HTB tiers, buy-in).
 - **M4** — validation protocol (parity gates, squeeze stress cells, leverage
   surface via experiment-gap-closing + confirmation grid). No default flips and no
