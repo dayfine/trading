@@ -1,6 +1,6 @@
 # Status: margin-realism
 
-## Last updated: 2026-07-17
+## Last updated: 2026-07-19
 
 ## Status
 IN_PROGRESS
@@ -69,24 +69,41 @@ and M1b (follow-up).
   walk-state-flag-from-config, borrowed_balance-derives-from-debit.
   Verify: `dune runtest trading/weinstein/strategy/test` (container path
   `/workspaces/trading-1/.claude/worktrees/<ws>/trading`).
-- **M1b-2 — make the debit persist + priced (default-off).** M1b-1 changes only
-  the strategy-layer entry decision; the resulting levered buys are still
-  rejected by the **portfolio cash floor** (`Portfolio_cash_floor.check` requires
-  `current_cash + cash_change + neg_pnl >= 0`, applied at every fill via
-  `Cancel_handler._try_apply_trade → Portfolio.apply_single_trade`). To make the
-  debit persist and be priced, M1b-2 needs: (a) a portfolio-side debit mechanism
-  — either a dedicated `long_margin_debit` field on `Portfolio.t` written by a
-  long-margin-aware apply routed at the `Cancel_handler` fill seam (mirroring the
-  short-side `Portfolio_margin.apply_single_trade_with_margin`), or a relaxation
-  of the cash floor to permit negative cash bounded by the buying-power headroom;
-  (b) per-tick interest accrual of `Long_buying_power.long_margin_interest_charge`
-  on the outstanding debit, mirroring how `Margin_runner.tick` invokes
-  `Portfolio_margin.accrue_daily_borrow_fee` from the simulator; (c) exits pay
-  down the debit before free cash; (d) thread `long_margin_rate_annual_pct` from
-  the Weinstein config into the simulator deps. **This is the A1 structural piece
-  — it modifies core `Portfolio` / simulator beyond the sanctioned accrual mirror,
-  so it needs a decision-item review (coordinate with feat-weinstein).** Kept out
-  of M1b-1 to keep that PR strategy-scoped and <500 LOC. `[non-blocking]`.
+- [x] **M1b-2 — make the debit persist + priced (default-off).** Branch
+  `feat/margin-m1b2-portfolio-debit`. Shipped **Option A** (dedicated debit field
+  on core `Portfolio`, mirroring the short-side precedent) — **user-approved
+  decision item 2026-07-19**; the rejected Option B (relaxing
+  `Portfolio_cash_floor` to allow negative cash) was NOT implemented, so the cash
+  floor's semantics stay byte-identical for all non-levered paths.
+  - `Portfolio.t += long_margin_debit : float` (default 0.0); the margin-cash
+    accessors `available_cash` / `equity_cash` (`current_cash - long_margin_debit`)
+    relocated into `Portfolio_margin` (portfolio.ml was at the 500-line hard
+    limit; the accessors read margin fields that module maintains).
+  - `Portfolio_margin.apply_single_trade_with_long_margin ~initial_long_margin_req`
+    routes at the `Cancel_handler` fill seam: a levered long BUY
+    (`req < 1.0`) whose cost exceeds available cash funds the shortfall into
+    `long_margin_debit` (own cash spent first, `current_cash` never negative)
+    instead of being floor-rejected; a long SELL pays the debit down before cash.
+    At `req >= 1.0` (default cash account) it is bit-equal to
+    `Portfolio.apply_single_trade`.
+  - Equity honesty: `Portfolio_valuation.compute` (and the step's
+    `position_value_total`) now read `equity_cash`, so NAV / drawdown / every
+    metric subtract the debit — borrowed cash yields no phantom equity.
+  - Per-tick interest: `Margin_runner.tick` calls
+    `Portfolio_margin.accrue_daily_long_margin_interest ~rate_annual_pct`, which
+    capitalizes `debit * (rate/252)` onto the debit each step (same quantity as
+    `Long_buying_power.long_margin_interest_charge`, computed at the portfolio
+    layer which cannot depend on the strategy layer). Rate 0.0 (default) → no-op.
+  - Config threading: `initial_long_margin_req` + `long_margin_rate_annual_pct`
+    flow `Weinstein config → Simulator.create_deps → fill seam / tick` (panel_runner),
+    same path as `margin_config`. No new config fields (M1a's two suffice; R2 met).
+  - R1: at defaults (`req = 1.0`, `rate = 0.0`) `long_margin_debit` stays 0, the
+    floor is untouched, and every existing portfolio/simulator test passes
+    unchanged. Tests: `test_margin_accounting.ml` (+10 long-margin unit tests —
+    parity pin, levered-fill debit, equity-subtracts-debit, exit paydown
+    ordering, N-tick interest, disarmed rejection, no-debit/zero-rate no-ops);
+    `test_margin_runner.ml` (+2 — end-to-end levered run funds+prices the debit
+    with honest NAV, and the `accrue_long_margin_interest` wrapper).
 - **M2** — long-side maintenance / force-reduce (documented sell ordering).
 - **M3** — short-side squeeze robustness (borrow availability, HTB tiers, buy-in).
 - **M4** — validation protocol (parity gates, squeeze stress cells, leverage
