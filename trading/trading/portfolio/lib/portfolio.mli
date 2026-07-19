@@ -14,6 +14,7 @@ type t = {
   locked_collateral : cash_value;
   accrued_borrow_fee : cash_value;
   exempt_closing_trades_from_cash_floor : bool;
+  long_margin_debit : cash_value;
 }
 [@@deriving show, eq, sexp]
 (** Portfolio type. All fields are accessible for pattern matching and direct
@@ -54,7 +55,13 @@ type t = {
       (the [create] default) reproduces the prior behaviour exactly. A plain
       bool so this module stays strategy-agnostic; the strategy layer sets it
       from [Portfolio_risk.config.exempt_closing_trades_from_cash_floor]. See
-      [apply_single_trade] for the exact semantics. *)
+      [apply_single_trade] for the exact semantics.
+    - [long_margin_debit]: borrowed cash funding levered long positions (margin
+      M1b-2, Option A). [0.0] under a cash account and whenever leverage is
+      disarmed. Written only by the long-margin-aware apply in
+      {!Portfolio_margin} ([apply_single_trade_with_long_margin]); every NAV /
+      equity read subtracts it via {!equity_cash}, so borrowed cash never
+      inflates reported wealth. Strategy-agnostic (a broker mechanic). *)
 
 val create :
   ?accounting_method:accounting_method ->
@@ -153,3 +160,11 @@ val available_cash : t -> cash_value
     semantics (where [locked_collateral = 0.0]). Strategy code that needs to
     size new entries against actually-spendable cash should consume this rather
     than [current_cash] directly. *)
+
+val equity_cash : t -> cash_value
+(** Cash component of portfolio equity net of borrowed long-margin debt:
+    [current_cash -. long_margin_debit] (margin M1b-2). Portfolio equity is
+    [equity_cash + marked position value]; NAV / drawdown / metric reads must
+    consume this so a levered book's borrowed cash does not inflate reported
+    wealth. Equals [current_cash] under a cash account (where
+    [long_margin_debit = 0.0]), so all pre-M1b valuations are bit-identical. *)

@@ -43,6 +43,7 @@ let test_create_portfolio _ accounting_method =
       locked_collateral = 0.0;
       accrued_borrow_fee = 0.0;
       exempt_closing_trades_from_cash_floor = false;
+      long_margin_debit = 0.0;
     }
   in
   assert_equal expected portfolio ~msg:"Portfolio should match expected state"

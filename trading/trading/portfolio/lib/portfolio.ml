@@ -29,6 +29,12 @@ type t = {
       (* NS1 (#1557#3): when true, the cash floor exempts the reducing portion of
          a closing trade. A plain bool so core Portfolio stays strategy-agnostic.
          Default false ⇒ byte-identical to prior behaviour. See .mli + create. *)
+  long_margin_debit : cash_value;
+      (* Borrowed cash funding levered long positions (margin M1b-2). 0.0 under a
+         cash account and whenever leverage is disarmed; the long-margin-aware
+         apply in [Portfolio_margin] is the sole writer. Equity subtracts it:
+         [equity_cash = current_cash -. long_margin_debit]. Strategy-agnostic —
+         any strategy engaging leverage benefits. *)
 }
 [@@deriving show, eq, sexp]
 
@@ -44,6 +50,7 @@ let create ?(accounting_method = AverageCost)
     locked_collateral = 0.0;
     accrued_borrow_fee = 0.0;
     exempt_closing_trades_from_cash_floor;
+    long_margin_debit = 0.0;
   }
 
 let _find_position_in_list positions symbol =
@@ -497,3 +504,11 @@ let validate portfolio =
    module under the file-length linter's hard limit. *)
 let available_cash portfolio =
   portfolio.current_cash -. portfolio.locked_collateral
+
+(* equity_cash = the cash component of portfolio equity net of borrowed
+   long-margin debt (margin M1b-2). Equity = equity_cash + marked position
+   value; every NAV / drawdown read must use this so the borrowed cash does not
+   inflate reported wealth. Equals [current_cash] under a cash account (where
+   [long_margin_debit = 0.0]), so all pre-M1b valuations are bit-identical. *)
+let equity_cash portfolio =
+  portfolio.current_cash -. portfolio.long_margin_debit
