@@ -622,6 +622,13 @@ type config = {
           day as [debit * annual / 252]. Default [0.0] => no charge => exact
           no-op (R1). See
           [Weinstein_strategy_config.long_margin_rate_annual_pct]. *)
+  maintenance_long_pct : float; [@sexp.default 0.0]
+      (** Long-side maintenance-margin requirement (margin M2). When
+          [equity /. marked_long_exposure < maintenance_long_pct] on a weekly
+          (Friday) close, {!Trading_simulation.Long_maintenance} force-reduces
+          held longs weakest-first until the ratio is restored. Default [0.0]
+          (cash account, no requirement) => exact no-op (R1); an unlevered book
+          never fires. See [Weinstein_strategy_config.maintenance_long_pct]. *)
   resistance_min_history_bars : int; [@sexp.default 0]
       (** Overhead-resistance history floor threaded into the per-screen
           [Stock_analysis.config.resistance.min_history_bars] (and, via the

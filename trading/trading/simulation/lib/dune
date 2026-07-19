@@ -38,6 +38,7 @@
   portfolio_valuation
   stale_hold
   stale_exit_runner
-  margin_runner)
+  margin_runner
+  long_maintenance)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))
