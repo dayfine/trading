@@ -198,6 +198,18 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
    bump + one full warehouse rebuild. Gate to build: lever (c)'s floor
    surface first; build (f) only if the floor verdict shows the mechanism
    wants real age structure (e.g. optimal floors regime-unstable).
+   **CODE LANDED 2026-07-19 (PR `feat/resistance-v2-age-bands`, default-off):**
+   schema `Res_hist` is now 80 band-major cells (4 age bands × 20 price
+   buckets, `Snapshot_schema.n_age_bands`/`n_hist_cells`); the pipeline
+   accumulates the 520-week histogram into age bands; `Resistance_supply`
+   collapses bands via four `config.band_weight_*` fields
+   (`[@sexp.default 1/1/1/0]`, Overlay_validator axes) at score time — default
+   weights `[1;1;1;0]` reproduce the pre-lever-f age-blind 130w histogram
+   bit-identically (pinned by `test_default_collapse_sums_recent_bands`). The
+   warehouse reader detects v3 (20-column) vs v4 (80-column) width and packs
+   v3 into the youngest band, so **existing v3 warehouses keep scoring
+   identically with NO rebuild** (`hist_bands_of_legacy`). The v4 warehouse
+   rebuild is DEFERRED pending the bundle verdict — no rebuild in this PR.
 4. dedup-v2 warehouse deletable (v3 certified bit-identical:
    `scenarios-2026-07-16-131756` baseline = Run D to 13 decimals).
 

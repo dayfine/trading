@@ -66,11 +66,12 @@ let test_sketch_pins_known_cells _ =
               (fun (s : Resistance_supply.sketch) -> s.anchor_close)
               (float_equal 120.0);
             field
-              (fun (s : Resistance_supply.sketch) -> s.hist.(0))
+              (fun (s : Resistance_supply.sketch) -> s.hist_bands.(0).(0))
               (float_equal 1.0);
             field
               (fun (s : Resistance_supply.sketch) ->
-                Array.fold s.hist ~init:0.0 ~f:( +. ))
+                Array.fold s.hist_bands ~init:0.0 ~f:(fun acc band ->
+                    acc +. Array.fold band ~init:0.0 ~f:( +. )))
               (float_equal 1.0);
             field
               (fun (s : Resistance_supply.sketch) -> s.bars_seen)

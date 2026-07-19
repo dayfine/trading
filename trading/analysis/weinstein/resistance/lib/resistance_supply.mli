@@ -18,15 +18,33 @@ type sketch = {
   max_high_260w : float;  (** Same, 260 weekly bars. *)
   max_high_520w : float;  (** Same, 520 weekly bars. *)
   bars_seen : float;  (** True weekly-bar count available (capped 520). *)
-  hist : float array;
-      (** Trailing-130w histogram: [hist.(k)] counts weekly bars whose
-          mid-price lies in [anchor * 2^(k/n), anchor * 2^((k+1)/n)) where
-          [n = Array.length hist] buckets span one doubling. *)
+  hist_bands : float array array;
+      (** Age-banded histogram (lever f): [hist_bands.(b).(k)] counts weekly
+          bars of age band [b] (0..{!n_age_bands}-1, youngest first —
+          [0-26w / 26-78w / 78-130w / 130-520w]) whose mid-price lies in
+          [anchor * 2^(k/n), anchor * 2^((k+1)/n)) where [n] is the per-band
+          bucket count. {!analyze} collapses the bands into one effective
+          histogram via the [config] band weights at score time. A v3 warehouse
+          / age-blind histogram maps to the youngest band with the rest zero —
+          see {!hist_bands_of_legacy}. *)
   anchor_close : float;
       (** The raw close the histogram was anchored at (the sketch row's own
           close). *)
 }
 (** One symbol-day's sketch cells, as stored in the warehouse columns. *)
+
+val n_age_bands : int
+(** [n_age_bands] is the number of {!sketch.hist_bands} age bands (4). Locked to
+    [Snapshot_schema.n_age_bands] (the pure scoring layer cannot depend on the
+    snapshot layer, so the two are pinned equal by test). *)
+
+val hist_bands_of_legacy : float array -> float array array
+(** [hist_bands_of_legacy flat] packs a legacy age-blind histogram (the v3
+    warehouse / pre-lever-f 130-week shape) into the {!n_age_bands}-band layout:
+    all mass in the youngest band, the remaining bands zero. Under
+    {!default_config} band weights ([1;1;1;0]) the effective histogram
+    {!analyze} collapses equals [flat] bit-for-bit, so a v3 warehouse scores
+    identically to before lever f. *)
 
 type config = {
   proximity_decay : float;
@@ -54,6 +72,21 @@ type config = {
       (** Grade derivation: max single-bucket count at/above the breakout that
           classifies as [Heavy_resistance] (mirrors v1). *)
   moderate_resistance_bars : int;  (** Same for [Moderate_resistance]. *)
+  band_weight_0_26w : float; [@sexp.default 1.0]
+      (** Lever f: score-time weight for the 0-26w age band. Defaults to 1.0
+          (the pre-lever-f no-op). *)
+  band_weight_26_78w : float; [@sexp.default 1.0]
+      (** Score-time weight for the 26-78w age band. Default 1.0. *)
+  band_weight_78_130w : float; [@sexp.default 1.0]
+      (** Score-time weight for the 78-130w age band. Default 1.0. *)
+  band_weight_130_520w : float; [@sexp.default 0.0]
+      (** Score-time weight for the 130-520w age band. Defaults to 0.0 so the
+          band is inert; the three 0-130w bands at weight 1.0 reproduce the
+          pre-lever-f age-blind 130w histogram exactly. Each band weight is an
+          [Overlay_validator] axis (a real [config] sub-field), so the age decay
+          is searchable without a warehouse rebuild (experiment-flag-discipline
+          R1/R2). The four fields carry [@sexp.default]s so a config sexp
+          written before lever f (without them) still round-trips. *)
 }
 [@@deriving sexp]
 (** [@@deriving sexp] so this config can be nested (as an [option]) inside
@@ -64,7 +97,8 @@ type config = {
 val default_config : config
 (** No-op-adjacent defaults: decay 0.7, saturation 8 bars, floors 0.4 / 0.25 /
     0.1, [min_history_bars = 0], insufficient score 0.5, grade thresholds 8 / 3
-    (v1 parity). All searchable; none hardcoded at use sites. *)
+    (v1 parity), age-band weights 1 / 1 / 1 / 0 (collapses to the pre-lever-f
+    age-blind 130w histogram). All searchable; none hardcoded at use sites. *)
 
 type result = {
   score : float;
@@ -85,9 +119,12 @@ val analyze : config:config -> sketch:sketch -> breakout_price:float -> result
 (** [analyze ~config ~sketch ~breakout_price] scores the overhead supply a
     breakout at [breakout_price] faces.
 
-    Score composition (plan §D5):
-    - recent component: proximity-weighted histogram mass at/above the breakout,
-      saturated at [saturation_bars];
+    Score composition (plan §D5). The age bands are first collapsed into one
+    effective per-bucket histogram by the [config] band weights
+    ([effective.(k) = Σ_b w_b * hist_bands.(b).(k)]); the rest scores that
+    effective histogram exactly as before lever f:
+    - recent component: proximity-weighted effective-histogram mass at/above the
+      breakout, saturated at [saturation_bars];
     - horizon floors: ONLY when the histogram holds no mass at/above the
       breakout but a max-high proves overhead exists, the score falls back to
       [recent_far_floor] / [stale_mid_floor] / [stale_old_floor] by the age of
@@ -126,10 +163,14 @@ val is_virgin : sketch:sketch -> breakout_price:float -> bool
 
 val is_clear_of_supply : sketch:sketch -> bool
 (** [is_clear_of_supply ~sketch] is [true] iff the sketch is finite,
-    [bars_seen > 0], and EVERY [hist] bin is [0] — i.e. zero measured overhead
-    mass: no prior (finalized) weekly bar in the trailing 130-week histogram
-    window has a high above the current close whose mid-price
-    ([(high + low) / 2]) falls at or above it. The histogram producer gates on
+    [bars_seen > 0], and EVERY bin of the {b 0-130w age bands} (bands [0..2],
+    which union to the trailing-130w window) is [0] — i.e. zero measured
+    overhead mass: no prior (finalized) weekly bar in the trailing 130-week
+    histogram window has a high above the current close whose mid-price
+    ([(high + low) / 2]) falls at or above it. The 130-520w band is ignored so
+    this predicate keeps its exact pre-lever-f 130w semantics (and a v3
+    warehouse, whose mass all lands in band 0, gives the same answer);
+    weight-independent by design. The histogram producer gates on
     [weekly_high > anchor] and buckets by the mid-price (see
     [Snapshot_pipeline.Resistance_sketch] and its .mli — the source of truth).
     This is exactly the recent-overhead mass {!analyze} scores as its histogram

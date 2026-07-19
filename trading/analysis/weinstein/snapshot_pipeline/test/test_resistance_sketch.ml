@@ -170,15 +170,52 @@ let test_histogram_buckets _ =
   in
   let sketch, _, _ = _compute bars in
   let last = (5 * 5) - 1 in
+  (* All five weeks are age < 130 at the final day, so per-bucket the SUM over
+     age bands reproduces the pre-lever-f age-blind histogram. *)
   let counts =
-    List.init Snapshot_schema.n_hist_buckets ~f:(fun k ->
-        sketch.hist.(k).(last))
+    List.init Snapshot_schema.n_hist_buckets ~f:(fun bucket ->
+        List.sum
+          (module Float)
+          (List.init Snapshot_schema.n_age_bands ~f:Fn.id)
+          ~f:(fun band ->
+            sketch.hist.((band * Snapshot_schema.n_hist_buckets) + bucket).(last)))
   in
   let expected =
     List.init Snapshot_schema.n_hist_buckets ~f:(fun k ->
         if k = 0 || k = 4 then float_equal 1.0 else float_equal 0.0)
   in
   assert_that counts (elements_are expected)
+
+(* Age banding (lever f): a resistance spike at week 0 of a 200-week series is
+   ~200 weeks old at the final day, so it lands in the 130-520w age band (band
+   3) — the histogram now MEASURES old supply the pre-lever-f 130w window
+   dropped. Non-spike weeks have high = close (5), so they are gated out
+   ([weekly_high > anchor] fails). Recent bands (0-2) are therefore empty and
+   band 3 holds exactly the one spike bar. *)
+let test_age_bands_separate_old_supply _ =
+  let week_shape w =
+    if w = 0 then Some (7.0, 6.0) (* mid 6.5 over anchor 5 -> bucket 7 *)
+    else Some (5.0, 4.0)
+    (* high = anchor -> not counted *)
+  in
+  let sketch, _, bars_arr = _compute (_weeks_bars ~n_weeks:200 ~week_shape) in
+  let last = Array.length bars_arr - 1 in
+  let n_buckets = Snapshot_schema.n_hist_buckets in
+  let band_total band =
+    List.sum
+      (module Float)
+      (List.init n_buckets ~f:Fn.id)
+      ~f:(fun bucket -> sketch.hist.((band * n_buckets) + bucket).(last))
+  in
+  let recent_total = List.sum (module Float) [ 0; 1; 2 ] ~f:band_total in
+  assert_that
+    (recent_total, band_total 3, sketch.hist.((3 * n_buckets) + 7).(last))
+    (all_of
+       [
+         field (fun (r, _, _) -> r) (float_equal 0.0);
+         field (fun (_, s, _) -> s) (float_equal 1.0);
+         field (fun (_, _, b) -> b) (float_equal 1.0);
+       ])
 
 let test_corrupt_close_degrades_to_nan _ =
   let bars =
@@ -412,6 +449,7 @@ let suite =
          >:: test_rolling_max_windows_and_eviction;
          "bars_seen counts weeks" >:: test_bars_seen_counts_weeks;
          "histogram buckets" >:: test_histogram_buckets;
+         "age bands separate old supply" >:: test_age_bands_separate_old_supply;
          "corrupt close degrades to NaN" >:: test_corrupt_close_degrades_to_nan;
          "virgin parity with v1 mapper" >:: test_virgin_parity_with_v1_mapper;
          "pipeline populates sketch columns"
