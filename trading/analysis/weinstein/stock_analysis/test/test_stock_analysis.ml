@@ -605,7 +605,8 @@ let make_sketch () : Resistance_supply.sketch =
     max_high_260w = 200.0;
     max_high_520w = 200.0;
     bars_seen = 200.0;
-    hist = Array.create ~len:20 0.0;
+    hist_bands =
+      Resistance_supply.hist_bands_of_legacy (Array.create ~len:20 0.0);
     anchor_close = 100.0;
   }
 
@@ -663,7 +664,10 @@ let virgin_sketch () : Resistance_supply.sketch =
 let overhead_sketch () : Resistance_supply.sketch =
   let hist = Array.create ~len:20 0.0 in
   hist.(0) <- 5.0;
-  { (make_sketch ()) with hist }
+  {
+    (make_sketch ()) with
+    hist_bands = Resistance_supply.hist_bands_of_legacy hist;
+  }
 
 (** Run [analyze_with_callbacks] over rising bars with [config] and a
     [get_sketch] closure returning [sketch_opt]; return [t.virgin_readmission].

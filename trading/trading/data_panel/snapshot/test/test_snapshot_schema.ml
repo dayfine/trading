@@ -48,10 +48,19 @@ let test_default_schema_locks_in_canonical_fields _ =
           equal_to Res_max_high_520w;
           equal_to Res_bars_seen;
         ]
-       @ List.init n_hist_buckets ~f:(fun k -> equal_to (Res_hist k))))
+       @ List.init n_hist_cells ~f:(fun k -> equal_to (Res_hist k))))
 
 let test_default_schema_n_fields _ =
-  assert_that (Snapshot_schema.n_fields Snapshot_schema.default) (equal_to 37)
+  assert_that (Snapshot_schema.n_fields Snapshot_schema.default) (equal_to 97)
+
+(* The age-banded histogram (lever f) is 4 age bands x 20 price buckets = 80
+   Res_hist columns, laid out band-major. *)
+let test_hist_layout_constants _ =
+  assert_that
+    ( Snapshot_schema.n_hist_buckets,
+      Snapshot_schema.n_age_bands,
+      Snapshot_schema.n_hist_cells )
+    (equal_to (20, 4, 80))
 
 (* The Phase A → Phase A.1 OHLCV addition deliberately bumps the schema hash —
    it is content-addressable, set-sensitive by construction. Pin both the
@@ -104,7 +113,7 @@ let test_field_name_round_trip _ =
           equal_to "Res_max_high_520w";
           equal_to "Res_bars_seen";
         ]
-       @ List.init Snapshot_schema.n_hist_buckets ~f:(fun k ->
+       @ List.init Snapshot_schema.n_hist_cells ~f:(fun k ->
            equal_to (Printf.sprintf "Res_hist_%02d" k))))
 
 let suite =
@@ -116,7 +125,8 @@ let suite =
          >:: test_compute_hash_field_set_sensitive;
          "default schema locks in canonical fields"
          >:: test_default_schema_locks_in_canonical_fields;
-         "default schema n_fields = 37" >:: test_default_schema_n_fields;
+         "default schema n_fields = 97" >:: test_default_schema_n_fields;
+         "hist layout constants (20/4/80)" >:: test_hist_layout_constants;
          "default schema hash differs from pre-OHLCV"
          >:: test_default_schema_hash_pinned_for_canonical_set;
          "index_of present and absent" >:: test_index_of_present_and_absent;

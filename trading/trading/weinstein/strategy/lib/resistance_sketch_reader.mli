@@ -14,11 +14,21 @@ val read_sketch :
   as_of:Core.Date.t ->
   Resistance_supply.sketch option
 (** [read_sketch ~cb ~symbol ~as_of] reads the sketch columns
-    ([Res_max_high_130/260/520w], [Res_bars_seen], [Res_hist k] for
-    [k = 0 .. n_hist_buckets - 1], and [Close] as the histogram anchor) at
-    [(symbol, as_of)]. Returns [None] if ANY required cell read fails (missing
-    row, a schema without the sketch columns, or a decode error) — a partial
-    read never fabricates a sketch. *)
+    ([Res_max_high_130/260/520w], [Res_bars_seen], the [Res_hist] histogram, and
+    [Close] as the histogram anchor) at [(symbol, as_of)]. Returns [None] if ANY
+    required scalar cell read fails (missing row, a schema without the sketch
+    columns, or a decode error) — a partial read never fabricates a sketch.
+
+    {b Warehouse-width detection (v3 back-compat).} A v4 (age-banded) warehouse
+    carries [Snapshot_schema.n_hist_cells] histogram columns; the reader reads
+    all of them and reshapes into the {!Resistance_supply.sketch.hist_bands}
+    age-band matrix. An older v3 warehouse carries only the [n_hist_buckets]
+    age-blind columns (the trailing [Res_hist] cells are absent, so a probe read
+    of the last v4 cell fails); the reader falls back to reading those
+    [n_hist_buckets] cells and packs them into the youngest age band via
+    {!Resistance_supply.hist_bands_of_legacy}, which under default band weights
+    scores bit-identically to before lever f. Existing v3 warehouses therefore
+    keep working with no rebuild. *)
 
 val closure :
   ?snapshot_cb:Snapshot_callbacks.t ->

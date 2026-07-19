@@ -22,6 +22,8 @@ type field =
 [@@deriving sexp, compare, equal, show]
 
 let n_hist_buckets = 20
+let n_age_bands = 4
+let n_hist_cells = n_age_bands * n_hist_buckets
 
 let all_fields =
   [
@@ -43,7 +45,7 @@ let all_fields =
     Res_max_high_520w;
     Res_bars_seen;
   ]
-  @ List.init n_hist_buckets ~f:(fun k -> Res_hist k)
+  @ List.init n_hist_cells ~f:(fun k -> Res_hist k)
 
 let field_name = function
   | EMA_50 -> "EMA_50"

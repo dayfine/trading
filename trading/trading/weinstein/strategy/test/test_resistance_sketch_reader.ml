@@ -5,9 +5,10 @@
     bypass by injecting [get_sketch] directly:
 
     - [read_sketch]: every required cell [Ok] -> [Some] sketch with the read
-      field values ([anchor_close] from the raw [Close] column; [hist] length
-      [= Snapshot_schema.n_hist_buckets]); ANY required cell read failing
-      (scalar or a histogram bucket via [Option.all]) -> [None] — a partial read
+      field values ([anchor_close] from the raw [Close] column; the age-banded
+      histogram reshaped into [n_age_bands] bands of [n_hist_buckets], with the
+      v3-width fallback packing the 20 age-blind columns into the youngest
+      band); ANY required scalar cell read failing -> [None] — a partial read
       never fabricates a sketch (the read-layer expression of "a window-starved
       warehouse can no longer masquerade as virgin").
     - [closure]: a [fun () -> None] thunk when [snapshot_cb] / [stock_symbol] is
@@ -36,14 +37,23 @@ let stub_value : Snapshot_schema.field -> float = function
   | _ -> 0.0
 
 (* A stub [Snapshot_callbacks.t] whose [read_field] returns [Ok (stub_value
-   field)], except any field in [fail_on] returns [Error NotFound]. The two
-   remaining closures are unused by [read_sketch] and fail loudly if touched. *)
-let stub_cb ?(fail_on = []) () : Snapshot_callbacks.t =
+   field)], except any field in [fail_on] returns [Error NotFound]. [hist_width]
+   models a warehouse's [Res_hist] column count: reads of [Res_hist k] for
+   [k >= hist_width] return [Error] (a v3 warehouse has [hist_width =
+   n_hist_buckets], a v4 has [n_hist_cells]). The two remaining closures are
+   unused by [read_sketch] and fail loudly if touched. *)
+let stub_cb ?(fail_on = []) ?(hist_width = Snapshot_schema.n_hist_cells) () :
+    Snapshot_callbacks.t =
   {
     Snapshot_callbacks.read_field =
       (fun ~symbol:_ ~date:_ ~field ->
-        if List.mem fail_on field ~equal:Snapshot_schema.equal_field then
-          Status.error_not_found "stub: field forced to fail"
+        let absent =
+          match field with
+          | Snapshot_schema.Res_hist k -> k >= hist_width
+          | _ -> false
+        in
+        if absent || List.mem fail_on field ~equal:Snapshot_schema.equal_field
+        then Status.error_not_found "stub: field forced to fail"
         else Ok (stub_value field));
     read_field_history =
       (fun ~symbol:_ ~from:_ ~until:_ ~field:_ ->
@@ -73,8 +83,10 @@ let empty_view : Snapshot_bar_views.weekly_view =
     n = 0;
   }
 
-(* Happy path: all cells Ok -> Some sketch whose fields equal the stubbed reads,
-   incl. anchor_close from the raw Close column and hist length = n_hist_buckets. *)
+(* Happy path (v4 warehouse): all 80 cells Ok -> Some sketch whose fields equal
+   the stubbed reads. The band-major histogram reshapes into [n_age_bands] bands
+   of [n_hist_buckets] each: cell [k] -> band [k / 20], bucket [k mod 20], so
+   [hist_bands.(0).(3)] = cell 3 = 3.0 and [hist_bands.(1).(0)] = cell 20 = 20. *)
 let test_read_sketch_all_ok_reads_fields _ =
   assert_that
     (Reader.read_sketch ~cb:(stub_cb ()) ~symbol:"AAPL" ~as_of)
@@ -97,11 +109,50 @@ let test_read_sketch_all_ok_reads_fields _ =
               (fun (s : Resistance_supply.sketch) -> s.anchor_close)
               (float_equal 150.0);
             field
-              (fun (s : Resistance_supply.sketch) -> Array.length s.hist)
+              (fun (s : Resistance_supply.sketch) -> Array.length s.hist_bands)
+              (equal_to Snapshot_schema.n_age_bands);
+            field
+              (fun (s : Resistance_supply.sketch) ->
+                Array.length s.hist_bands.(0))
               (equal_to Snapshot_schema.n_hist_buckets);
             field
-              (fun (s : Resistance_supply.sketch) -> s.hist.(3))
+              (fun (s : Resistance_supply.sketch) -> s.hist_bands.(0).(3))
               (float_equal 3.0);
+            field
+              (fun (s : Resistance_supply.sketch) -> s.hist_bands.(1).(0))
+              (float_equal 20.0);
+            field
+              (fun (s : Resistance_supply.sketch) -> s.hist_bands.(3).(0))
+              (float_equal 60.0);
+          ]))
+
+(* v3 back-compat: a warehouse with only the 20 age-blind [Res_hist] columns
+   (the trailing v4 cells absent) reads via the width-detection fallback — the
+   20 cells pack into the youngest age band, the rest zero. [hist_bands.(0).(3)]
+   = cell 3 = 3.0; the older bands are empty (a NaN/absent cell never
+   fabricated). This is the "v3-shaped sketch reads with no rebuild" gate. *)
+let test_read_sketch_v3_width_packs_youngest_band _ =
+  assert_that
+    (Reader.read_sketch
+       ~cb:(stub_cb ~hist_width:Snapshot_schema.n_hist_buckets ())
+       ~symbol:"AAPL" ~as_of)
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (s : Resistance_supply.sketch) -> Array.length s.hist_bands)
+              (equal_to Snapshot_schema.n_age_bands);
+            field
+              (fun (s : Resistance_supply.sketch) -> s.hist_bands.(0).(3))
+              (float_equal 3.0);
+            field
+              (fun (s : Resistance_supply.sketch) ->
+                Array.count s.hist_bands.(1) ~f:(fun c -> Float.(c <> 0.0)))
+              (equal_to 0);
+            field
+              (fun (s : Resistance_supply.sketch) ->
+                Array.count s.hist_bands.(3) ~f:(fun c -> Float.(c <> 0.0)))
+              (equal_to 0);
           ]))
 
 (* A failing scalar cell collapses the whole read to None. *)
@@ -154,8 +205,10 @@ let test_closure_reads_sketch_at_last_bar _ =
 let suite =
   "Resistance_sketch_reader"
   >::: [
-         "read_sketch all Ok reads fields"
+         "read_sketch all Ok reads fields (v4)"
          >:: test_read_sketch_all_ok_reads_fields;
+         "read_sketch v3 width packs youngest band"
+         >:: test_read_sketch_v3_width_packs_youngest_band;
          "read_sketch scalar cell error -> None"
          >:: test_read_sketch_scalar_cell_error_none;
          "read_sketch hist cell error -> None"
