@@ -40,6 +40,16 @@ val accrue_borrow_fee :
     Returns [portfolio] unchanged when [margin_config.enabled = false] or when
     the portfolio holds no short positions. *)
 
+val accrue_long_margin_interest :
+  long_margin_rate_annual_pct:float -> portfolio:Portfolio.t -> Portfolio.t
+(** Capitalize one trading day of long-margin interest onto the portfolio's
+    outstanding [long_margin_debit] (margin M1b-2). Thin wrapper over
+    {!Trading_portfolio.Portfolio_margin.accrue_daily_long_margin_interest}.
+
+    Returns [portfolio] unchanged at the default rate ([0.0]) or with no debit,
+    so long-only / cash-account baselines stay bit-equal. Gated by the rate, not
+    [Margin_config.enabled] — long leverage is a separate dial. *)
+
 val margin_call_transitions :
   margin_config:Margin_config.t ->
   portfolio:Portfolio.t ->
@@ -85,15 +95,19 @@ val dedup_strategy_exits_for_margin :
 
 val tick :
   margin_config:Margin_config.t ->
+  long_margin_rate_annual_pct:float ->
   portfolio:Portfolio.t ->
   positions:Position.t String.Map.t ->
   today_bars:Trading_engine.Types.price_bar list ->
   date:Date.t ->
   strategy_transitions:Position.transition list ->
   Portfolio.t * Position.transition list
-(** One simulator-tick worth of margin mechanics: accrue daily borrow fee, then
-    append any maintenance-margin-breach exits to [strategy_transitions]. No-op
-    when [margin_config.enabled = false] (preserves baselines bit-equal).
+(** One simulator-tick worth of margin mechanics: accrue daily short borrow fee,
+    capitalize daily long-margin interest ([long_margin_rate_annual_pct], margin
+    M1b-2), then append any maintenance-margin-breach exits to
+    [strategy_transitions]. No-op on portfolio state when
+    [margin_config.enabled = false] and [long_margin_rate_annual_pct = 0.0]
+    (preserves baselines bit-equal).
 
     Resolves same-tick same-position [TriggerExit] collisions between the
     strategy and margin sources via {!dedup_strategy_exits_for_margin}: margin

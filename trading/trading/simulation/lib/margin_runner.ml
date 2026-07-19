@@ -19,6 +19,15 @@ let mark_prices (today_bars : Trading_engine.Types.price_bar list) :
 let accrue_borrow_fee ~(margin_config : Margin_config.t) ~portfolio ~prices =
   Portfolio_margin.accrue_daily_borrow_fee ~margin_config portfolio prices
 
+(* Capitalize one trading day of long-margin interest onto the outstanding
+   [long_margin_debit] (margin M1b-2). No-op at the default rate (0.0) or with no
+   debit, so cash accounts / long-only baselines stay bit-equal. Gated by the
+   rate rather than [margin_config.enabled] — long leverage is a distinct dial
+   from the short-side margin surface. *)
+let accrue_long_margin_interest ~long_margin_rate_annual_pct ~portfolio =
+  Portfolio_margin.accrue_daily_long_margin_interest
+    ~rate_annual_pct:long_margin_rate_annual_pct portfolio
+
 (* Find the strategy-side Position.t for a flagged symbol. Match only
    positions currently in Holding state — Entering/Exiting are mid-flight
    under the regular order machinery and reissuing a TriggerExit on top
@@ -88,10 +97,13 @@ let dedup_strategy_exits_for_margin ~strategy_transitions ~margin_trans =
         | Position.TriggerExit _ -> not (Set.mem margin_exit_ids t.position_id)
         | _ -> true)
 
-let tick ~margin_config ~portfolio ~positions ~today_bars ~date
-    ~strategy_transitions =
+let tick ~margin_config ~long_margin_rate_annual_pct ~portfolio ~positions
+    ~today_bars ~date ~strategy_transitions =
   let prices = mark_prices today_bars in
   let portfolio = accrue_borrow_fee ~margin_config ~portfolio ~prices in
+  let portfolio =
+    accrue_long_margin_interest ~long_margin_rate_annual_pct ~portfolio
+  in
   let margin_trans =
     margin_call_transitions ~margin_config ~portfolio ~positions ~prices ~date
   in

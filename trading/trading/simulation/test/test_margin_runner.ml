@@ -22,6 +22,7 @@ module Margin_config = Trading_portfolio.Margin_config
 module Portfolio = Trading_portfolio.Portfolio
 module Position = Trading_strategy.Position
 module Strategy_interface = Trading_strategy.Strategy_interface
+module Metric_types = Trading_simulation_types.Metric_types
 
 (* Local epsilon for cash / fee asserts. 1 cent is plenty for fee math
    accumulated over a few days; tests that go a full trading year use the
@@ -114,14 +115,16 @@ let _long_strategy ~symbol ~quantity =
 (* Common scenario runner                                              *)
 (* ------------------------------------------------------------------ *)
 
-let _run_with_margin ~test_name ~symbols_with_data ~strategy ~margin_config
-    ~config =
+let _run_with_margin ?(initial_long_margin_req = 1.0)
+    ?(long_margin_rate_annual_pct = 0.0) ?metric_suite ~test_name
+    ~symbols_with_data ~strategy ~margin_config ~config () =
   let result_ref = ref None in
   with_test_data test_name symbols_with_data ~f:(fun data_dir ->
       let symbols = List.map symbols_with_data ~f:fst in
       let deps =
         create_deps ~symbols ~data_dir ~strategy ~commission:config.commission
-          ~margin_config ()
+          ?metric_suite ~margin_config ~initial_long_margin_req
+          ~long_margin_rate_annual_pct ()
       in
       let sim = create_exn ~config ~deps in
       match run sim with
@@ -218,13 +221,13 @@ let test_default_off_long_only_bit_equal _ =
     _run_with_margin ~test_name:"margin_default_off"
       ~symbols_with_data:[ ("AAPL", _aapl_flat_50) ]
       ~strategy:(_long_strategy ~symbol:"AAPL" ~quantity:50.0)
-      ~margin_config:Margin_config.default_config ~config
+      ~margin_config:Margin_config.default_config ~config ()
   in
   let r_on_no_shorts =
     _run_with_margin ~test_name:"margin_on_long_only"
       ~symbols_with_data:[ ("AAPL", _aapl_flat_50) ]
       ~strategy:(_long_strategy ~symbol:"AAPL" ~quantity:50.0)
-      ~margin_config:_on_config ~config
+      ~margin_config:_on_config ~config ()
   in
   (* Both runs must agree exactly on the equity-relevant state: long-only
      flow touches neither [accrue_daily_borrow_fee] nor maintenance-margin
@@ -261,7 +264,7 @@ let test_borrow_fee_accrual_multi_day _ =
     _run_with_margin ~test_name:"margin_borrow_fee"
       ~symbols_with_data:[ ("AAPL", _aapl_flat_50) ]
       ~strategy:(_short_strategy ~symbol:"AAPL" ~quantity:100.0)
-      ~margin_config:_on_config ~config
+      ~margin_config:_on_config ~config ()
   in
   (* Count post-entry steps: those where the short is held at the START
      of the tick, i.e. the short exists in the previous step's portfolio.
@@ -347,7 +350,7 @@ let test_maintenance_margin_force_cover _ =
     _run_with_margin ~test_name:"margin_maintenance"
       ~symbols_with_data:[ ("AAPL", _aapl_rising_50_to_70) ]
       ~strategy:(_short_strategy ~symbol:"AAPL" ~quantity:100.0)
-      ~margin_config:_on_config ~config
+      ~margin_config:_on_config ~config ()
   in
   let aapl_trade_sides =
     List.concat_map result.steps ~f:(fun s -> s.trades)
@@ -389,13 +392,13 @@ let test_flag_on_long_only_bit_equal _ =
     _run_with_margin ~test_name:"margin_long_off"
       ~symbols_with_data:[ ("AAPL", _aapl_flat_50) ]
       ~strategy:(_long_strategy ~symbol:"AAPL" ~quantity:50.0)
-      ~margin_config:Margin_config.default_config ~config
+      ~margin_config:Margin_config.default_config ~config ()
   in
   let r_on =
     _run_with_margin ~test_name:"margin_long_on"
       ~symbols_with_data:[ ("AAPL", _aapl_flat_50) ]
       ~strategy:(_long_strategy ~symbol:"AAPL" ~quantity:50.0)
-      ~margin_config:_on_config ~config
+      ~margin_config:_on_config ~config ()
   in
   (* Long-only: fee accrual is 0 (no shorts) and maintenance check is a
      no-op. Equity-state projections must be bit-equal across the two
@@ -403,6 +406,98 @@ let test_flag_on_long_only_bit_equal _ =
   assert_that
     (_equity_state_of_portfolio r_off.final_portfolio)
     (equal_to (_equity_state_of_portfolio r_on.final_portfolio : _equity_state))
+
+(* ------------------------------------------------------------------ *)
+(* Long-margin (levered long) simulator wiring — margin M1b-2          *)
+(* ------------------------------------------------------------------ *)
+
+let _make_trade ~id ~symbol ~side ~quantity ~price =
+  {
+    Trading_base.Types.id;
+    order_id = id ^ "-o";
+    symbol;
+    side;
+    quantity;
+    price;
+    commission = 0.0;
+    timestamp = Time_ns_unix.now ();
+  }
+
+(* End-to-end config threading: [initial_long_margin_req] / [long_margin_rate]
+   travel through [create_deps] into the fill seam and the per-tick accrual.
+   A long entry of 300 @ $50 = $15,000 exceeds the $10,000 cash; at armed req
+   0.5 the $5,000 shortfall funds [long_margin_debit] instead of being
+   floor-rejected, and 10%/yr interest then capitalizes onto the debit each
+   tick. NAV subtracts the debit, so the borrowed cash yields no phantom
+   equity and the interest is a real drag. *)
+let test_levered_long_run_funds_and_prices_debit _ =
+  let config =
+    _config_for ~start_date:(_date "2024-01-02") ~end_date:(_date "2024-01-15")
+      ~initial_cash:10_000.0
+  in
+  let result =
+    _run_with_margin ~initial_long_margin_req:0.5
+      ~long_margin_rate_annual_pct:0.10
+      ~metric_suite:
+        {
+          Trading_simulation_types.Simulator_types.computers =
+            [ Trading_simulation.Metric_computers.portfolio_state_computer () ];
+          derived = [];
+        }
+      ~test_name:"margin_levered_long"
+      ~symbols_with_data:[ ("AAPL", _aapl_flat_50) ]
+      ~strategy:(_long_strategy ~symbol:"AAPL" ~quantity:300.0)
+      ~margin_config:Margin_config.default_config ~config ()
+  in
+  (* Debit funded ($5,000 borrow) and grown by capitalized interest (> $5,000
+     proves the per-tick accrual ran). *)
+  assert_that result.final_portfolio.long_margin_debit
+    (gt (module Float_ord) 5_000.0);
+  (* NAV honesty: flat price + no P&L, so equity is $10,000 less the accrued
+     interest — strictly below the starting equity and far above zero. The last
+     step's [portfolio_value] is the debit-subtracted NAV. *)
+  let final_nav =
+    (List.last_exn result.steps)
+      .Trading_simulation_types.Simulator_types.portfolio_value
+  in
+  assert_that final_nav
+    (is_between (module Float_ord) ~low:9_900.0 ~high:9_999.9);
+  (* Metric honesty: OpenPositionsValue is the debit-free marked position value
+     (300 sh * $50 = $15,000), NOT the debit-net [portfolio_value - cash]; and
+     UnrealizedPnl = $15,000 - cost_basis $15,000 = $0 (bought and held flat at
+     $50). This pins the QC-finding fix — the metric reads [position_value_total],
+     not [portfolio_value - current_cash]. *)
+  assert_that result.metrics
+    (map_includes
+       [
+         (Metric_types.OpenPositionsValue, float_equal 15_000.0);
+         (Metric_types.UnrealizedPnl, float_equal 0.0);
+       ])
+
+(* The simulation-layer wrapper capitalizes one trading day of interest onto an
+   existing long-margin debit (mirrors [accrue_borrow_fee]). *)
+let test_accrue_long_margin_interest_wrapper _ =
+  let levered =
+    match
+      Trading_portfolio.Portfolio_margin.apply_single_trade_with_long_margin
+        ~initial_long_margin_req:0.5
+        (Portfolio.create ~initial_cash:1_000.0 ())
+        (_make_trade ~id:"t1" ~symbol:"AAPL" ~side:Trading_base.Types.Buy
+           ~quantity:20.0 ~price:100.0)
+    with
+    | Ok p -> p
+    | Error err -> assert_failure ("levered buy: " ^ Status.show err)
+  in
+  (* Debit $1,000; one day at 10%/yr → debit *= (1 + 0.10/252). *)
+  let expected =
+    1_000.0 *. (1.0 +. (0.10 /. Margin_config.trading_days_per_year))
+  in
+  assert_that
+    (Trading_simulation.Margin_runner.accrue_long_margin_interest
+       ~long_margin_rate_annual_pct:0.10 ~portfolio:levered)
+    (field
+       (fun p -> p.Portfolio.long_margin_debit)
+       (float_equal ~epsilon:1e-9 expected))
 
 (* ------------------------------------------------------------------ *)
 (* T5: Same-tick TriggerExit dedup (issue #1266)                       *)
@@ -622,7 +717,7 @@ let test_e2e_strategy_exit_collides_with_margin_call _ =
       ~strategy:
         (_short_then_stop_strategy ~symbol:"AAPL" ~quantity:100.0
            ~position_id:"AAPL-short" ~stop_trigger_price:60.0)
-      ~margin_config:_on_config ~config
+      ~margin_config:_on_config ~config ()
   in
   (* The run completed (no "Invalid transition" raise) and the position
      was closed. Pre-fix this assertion never executes because [run]
@@ -639,6 +734,10 @@ let suite =
          "maintenance_margin_force_cover"
          >:: test_maintenance_margin_force_cover;
          "flag_on_long_only_bit_equal" >:: test_flag_on_long_only_bit_equal;
+         "levered_long_run_funds_and_prices_debit"
+         >:: test_levered_long_run_funds_and_prices_debit;
+         "accrue_long_margin_interest_wrapper"
+         >:: test_accrue_long_margin_interest_wrapper;
          "dedup_drops_strategy_exit_when_margin_collides"
          >:: test_dedup_drops_strategy_exit_when_margin_collides;
          "dedup_preserves_non_exit_strategy_transitions"
