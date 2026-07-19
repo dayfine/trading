@@ -158,12 +158,18 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
    path) but the 3 losses are −5.8..−8.5pp/yr and are exactly the
    post-crash-recovery-window starts (2000/2008/2010) — a systematic
    regime-conditional left tail, not one-draw luck. **Decision input #2
-   IN FLIGHT: 28y vc pair** (w30+vc, vc-only;
-   `test_data/backtest_scenarios/staging-vc-pair/`, results
-   `/tmp/sweeps/vc-pair/`) — does #1997 re-admit AXTI at redemption and
-   repair the recovery-window paths? Standing recommendation: if yes,
-   promote the PAIR (w30 + virgin-crossing), not bare w30. Do NOT flip
-   any default without the user.
+   DONE + all follow-on surfaces DONE (07-19)** — see the promotion
+   memo `dev/notes/resistance-supply-promotion-memo-2026-07-19.md`
+   (six lenses, options, recommendation = test-then-promote the
+   BUNDLE w30 + vc + floors-zero). Ledger 07-19: vc-flag surface
+   REJECT (inert 9/13 folds — fold resets under-power rare
+   long-memory admission levers); floor-axis surface
+   Inconclusive-promising (floors-zero recovers +5.2pp return at
+   equal DD, 10/13 Sharpe wins — the floor staircase was the
+   redeemed-cohort tax; plain w30 keeps best mean Sharpe 0.860 vs
+   bundle 0.827). Missing before any flip: bundle confirmation grid
+   (sp500 + 2011 cells) + bundle rolling-start (recovery-window
+   repair check). Do NOT flip any default without the user.
 3. **Designed levers (default-off, in order):** (a) virgin-crossing
    re-admission — Stage-2 name crossing its 520w max on volume = fresh
    admissible breakout (AXTI-class access restored; book-faithful) —
@@ -174,7 +180,24 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
    only (user 07-16: no reversal/bottom calls), k ∈ {0,.5,1}, deep-grid
    testable only; (c) `stale_old_floor` axis {0,.1,.3}; (d) RS-slope
    laggard metric (loser-touching class); (e) supply-located stop
-   tightening (insurance class, ext-stop precedent).
+   tightening (insurance class, ext-stop precedent);
+   (f) **age-banded histogram (sketch v3)** — designed 2026-07-19 with the
+   user. Motivation: supply should decay with AGE (old bag-holders
+   capitulate), and separate prior tops should carry separate discounts;
+   today's hist is age-blind within 130w and invisible beyond (only the
+   3-step horizon-max floors, which the AXTI case showed can be set by a
+   name's OWN rally). Design: replace `Res_hist int × 20` with **20 price
+   buckets × 4 age bands** (0-26w / 26-78 / 78-130 / 130-520) = 80 int
+   columns; decay applied at SCORE time as per-band config weights (an
+   Overlay_validator axis family — a decay half-life baked at build time
+   would make the axis a warehouse parameter, one rebuild per value, R2
+   hostile). Per-bar accumulation separates multiple tops naturally
+   (price × age clusters), handles same-price different-era tops, and the
+   130-520w band makes old supply MEASURED — horizon floors retire except
+   for genuinely blind (insufficient-history) sketches. Cost: schema-hash
+   bump + one full warehouse rebuild. Gate to build: lever (c)'s floor
+   surface first; build (f) only if the floor verdict shows the mechanism
+   wants real age structure (e.g. optimal floors regime-unstable).
 4. dedup-v2 warehouse deletable (v3 certified bit-identical:
    `scenarios-2026-07-16-131756` baseline = Run D to 13 decimals).
 
