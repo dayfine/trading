@@ -5,26 +5,43 @@ session executed the entire resistance-v2 promotion-evidence program,
 built margin M1b (both halves) + M2, and specced the tax lens. Main
 green; PRs #1997/#1998/#2001/#2002/#2004/#2005/#2010 all merged.
 
-## P0 — the bundle studies (user-endorsed path B of the promotion memo)
+## P0 — the bundle studies (USER GREEN-LIT 2026-07-19; chain LAUNCHED same night)
 
-`dev/notes/resistance-supply-promotion-memo-2026-07-19.md` — the
-promotion candidate is the BUNDLE (w_overhead_supply=30 +
-virgin_crossing_readmission + floors 0/0/0). Two studies gate it:
+`dev/notes/resistance-supply-promotion-memo-2026-07-19.md` option B —
+candidate = BUNDLE (w_overhead_supply + virgin_crossing_readmission +
+floors 0/0/0). **Chain launched 07-19 ~20:00 EDT** (detached; markers
+in `/tmp/sweeps/bundle-studies/status.log`; first launch aborted on a
+wedged-dune lock — five stale dunes killed, `_build/.db` reset,
+relaunched clean; stage-1 banner verified: variants=3, folds=26):
 
-1. **Bundle confirmation grid** — sp500 cell (weights {15,30} adapted
-   for breadth) + broad 2011-26 cell, bundle vs baseline. Specs follow
-   the merged floor-axis spec pattern; warehouses of record are
-   `/tmp/snap_top3000_dedup_v3_sketch` + `/tmp/snap_sp500_2000_2026_v3_sketch`.
-   ~1 overnight chain (~10-14h serial).
-2. **Bundle rolling-start** — 13 paired biennial starts, bundle vs
-   baseline (`rolling_start_eval`, same grid as 07-18 run). THE
-   question: do the 2000/2008/2010 recovery-window paths repair?
-   (~15h; can pair with #1 back-to-back or on alternate nights.)
+1. sp500 grid cell (`bundle-grid-SP500-2000-2026.sexp`, weights {15,30},
+   26×1y, catstop-golden base) → `/tmp/sweeps/bundle-sp500/` (~4-6h);
+2. broad 2011-26 cell (`bundle-grid-BROAD-2011-2026.sexp`, 7×2y, record
+   convention base) → `/tmp/sweeps/bundle-2011/` (~4-5h);
+3. bundle rolling-start
+   (`staging-rolling-start/top3000-2000-2026-rc-bundle.sexp`, stride-730
+   paired grid, parallel 2) → `/tmp/sweeps/bundle-rolling/` (~9h). THE
+   question: do the 2000/2008/2010 recovery-window paths repair? Compare
+   against the 07-18 baseline/w30 reports in
+   `.sweep-output/rolling-start-promo/`.
 
-If both confirm → promotion PR for the bundle (single unit). If the
-rolling-start still shows recovery-window losses → keep axes, route to
-lever (f) (age-banded histogram, designed in `dev/status/resistance-v2.md`
-§Next steps 3(f); moderate supporting signal from the floor surface).
+Next session: read all three → both confirm ⇒ draft the bundle
+promotion PR (flip the three defaults together as ONE unit, citing
+ledger + grid + rolling-start + this chain). Recovery windows don't
+repair ⇒ keep axes; lever (f) becomes the escalation.
+
+## P0b — lever (f) CODE build (user-directed 07-19: "closely follows")
+
+Build the age-banded-histogram CODE PR early next session, parallel to
+reading the studies: `Res_hist int×20` → 20 price buckets × 4 age bands
+(0-26w / 26-78 / 78-130 / 130-520) = 80 int columns in
+`Snapshot_pipeline` (schema-hash bump), score-time per-band weights in
+`Resistance_supply` (Overlay_validator axis — NOT a baked decay
+half-life, which would be a warehouse parameter and R2-hostile).
+Default = bit-identical to current semantics on merge. The WAREHOUSE
+REBUILD (v4) + (f) surfaces stay gated on the bundle verdict — do NOT
+rebuild while the bundle evidence basis is v3. Design:
+`dev/status/resistance-v2.md` §Next steps 3(f).
 
 ## P1 — margin M3 (after M2's merge, per the levered-realism plan)
 
