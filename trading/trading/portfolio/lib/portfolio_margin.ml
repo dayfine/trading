@@ -135,13 +135,34 @@ let sum_short_notional (portfolio : Portfolio.t) market_prices : float =
         | Some price -> acc +. (Float.abs qty *. price)
       else acc)
 
+(* One short position's daily borrow fee at its marked price. Uses the
+   price-tiered daily rate (M3a); with an empty tier table every price resolves
+   to the flat rate, so the per-position sum equals the legacy
+   [sum_short_notional * flat_daily_rate] bit-for-bit (distributivity). Longs
+   and shorts absent from the price list contribute nothing. *)
+let _short_daily_borrow_fee ~(margin_config : Margin_config.t) ~price_map
+    (p : portfolio_position) : float =
+  let qty = Calculations.position_quantity p in
+  if Float.O.(qty >= 0.0) then 0.0
+  else
+    match Map.find price_map p.symbol with
+    | None -> 0.0
+    | Some price ->
+        let notional = Float.abs qty *. price in
+        notional *. Margin_config.daily_borrow_rate_for_price margin_config ~price
+
 let accrue_daily_borrow_fee ~(margin_config : Margin_config.t)
     (portfolio : Portfolio.t) (market_prices : (symbol * price) list) :
     Portfolio.t =
   if not margin_config.enabled then portfolio
   else
-    let notional = sum_short_notional portfolio market_prices in
-    let fee = notional *. Margin_config.daily_borrow_rate margin_config in
+    let price_map = Map.of_alist_exn (module String) market_prices in
+    let fee =
+      List.sum
+        (module Float)
+        portfolio.positions
+        ~f:(_short_daily_borrow_fee ~margin_config ~price_map)
+    in
     {
       portfolio with
       current_cash = portfolio.current_cash -. fee;
@@ -166,8 +187,13 @@ let _short_breaches_maintenance ~(margin_config : Margin_config.t)
   let ratio =
     _short_equity_ratio ~margin_config ~entry_avg_cost ~current_price
   in
-  if Float.O.(ratio < margin_config.maintenance_margin_pct) then Some p.symbol
-  else None
+  (* Price-tiered maintenance threshold (M3a): supersedes the flat
+     [maintenance_margin_pct] when [short_maintenance_tiers] is armed; an empty
+     table resolves to the flat threshold, so this is bit-identical to pre-M3a. *)
+  let threshold =
+    Margin_config.maintenance_pct_for_price margin_config ~price:current_price
+  in
+  if Float.O.(ratio < threshold) then Some p.symbol else None
 
 (* Per-position maintenance check. Long positions and shorts with no price in
    the mark list are ignored. *)
