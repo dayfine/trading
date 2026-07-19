@@ -1383,18 +1383,21 @@ let test_portfolio_state_with_trades _ =
   in
   let computer = portfolio_state_computer () in
   let metrics = run_computers ~computers:[ computer ] ~config ~steps in
-  (* 3 total trades across 2 steps. The portfolio passed into each step is
-     the empty-positions fixture (no held positions), so OpenPositionsValue
-     collapses to [portfolio_value - cash = 50.0] and UnrealizedPnl collapses
-     to the same value (cost basis sum is 0 when no positions are held). *)
+  (* 3 total trades across 2 steps. The portfolio passed into each step is the
+     empty-positions fixture (no held positions, [position_value_total = 0]), so
+     OpenPositionsValue reads the summary's [position_value_total = 0.0] and
+     UnrealizedPnl is 0.0 (cost-basis sum is 0 with no positions). The pre-M1b
+     derivation ([portfolio_value - cash]) read 50.0 off this deliberately
+     inconsistent fixture — an artifact of that formula, not a real open value;
+     reading [position_value_total] is the correct debit-honest source. *)
   assert_that
     (Map.find metrics TradeFrequency)
     (is_some_and (gt (module Float_ord) 0.0));
   assert_that
     (Map.find metrics OpenPositionCount)
     (is_some_and (float_equal 0.0));
-  assert_that metrics (contains_entry OpenPositionsValue (float_equal 50.0));
-  assert_that metrics (contains_entry UnrealizedPnl (float_equal 50.0))
+  assert_that metrics (contains_entry OpenPositionsValue (float_equal 0.0));
+  assert_that metrics (contains_entry UnrealizedPnl (float_equal 0.0))
 
 (** Build a portfolio with one open long position by applying a buy trade. *)
 let _portfolio_with_open_position ~symbol ~quantity ~price =
@@ -1576,6 +1579,71 @@ let test_portfolio_state_long_unrealized_pnl _ =
          (OpenPositionCount, float_equal 1.0);
          (OpenPositionsValue, float_equal 13_000.0);
          (UnrealizedPnl, float_equal 3_000.0);
+       ])
+
+(** Margin M1b-2: under armed leverage a held position carries a
+    [long_margin_debit], so [portfolio_value] is debit-net and
+    [portfolio_value - current_cash] no longer equals the marked position value.
+    OpenPositionsValue must read the debit-free [position_value_total]. Fixture:
+    cash $1,000 buys 20 @ $100 = $2,000 (borrow $1,000); marked flat at $100 →
+    positions $2,000, debit $1,000, cash $0, so debit-net NAV = $1,000.
+    - correct OpenPositionsValue = position_value_total = $2,000 (Σqty*close)
+    - the pre-fix [portfolio_value - cash] would read $1,000 (debit leaked in)
+    - UnrealizedPnl = $2,000 - cost_basis $2,000 = $0 (pre-fix: -$1,000). *)
+let test_portfolio_state_levered_open_value_is_debit_free _ =
+  let config = make_config () in
+  let base = Trading_portfolio.Portfolio.create ~initial_cash:1000.0 () in
+  let buy =
+    {
+      Trading_base.Types.id = "t1";
+      order_id = "o1";
+      symbol = "LEV";
+      side = Buy;
+      quantity = 20.0;
+      price = 100.0;
+      commission = 0.0;
+      timestamp = Time_ns_unix.now ();
+    }
+  in
+  let full_portfolio =
+    match
+      Trading_portfolio.Portfolio_margin.apply_single_trade_with_long_margin
+        ~initial_long_margin_req:0.5 base buy
+    with
+    | Ok p -> p
+    | Error err ->
+        OUnit2.assert_failure ("failed levered buy: " ^ Status.show err)
+  in
+  let position_value = 20.0 *. 100.0 in
+  let equity_cash =
+    full_portfolio.current_cash -. full_portfolio.long_margin_debit
+  in
+  let portfolio =
+    Trading_simulation_types.Portfolio_summary.of_portfolio full_portfolio
+      ~position_value_total:position_value
+  in
+  let steps =
+    [
+      {
+        date = date_of_string "2024-01-05";
+        portfolio;
+        portfolio_value = equity_cash +. position_value;
+        trades = [];
+        orders_submitted = [];
+        splits_applied = [];
+        benchmark_return = None;
+        had_market_bars = true;
+      };
+    ]
+  in
+  let computer = portfolio_state_computer () in
+  let metrics = run_computers ~computers:[ computer ] ~config ~steps in
+  assert_that metrics
+    (map_includes
+       [
+         (OpenPositionCount, float_equal 1.0);
+         (OpenPositionsValue, float_equal 2_000.0);
+         (UnrealizedPnl, float_equal 0.0);
        ])
 
 (** Build a portfolio with one open short position by applying a sell trade.
@@ -1854,6 +1922,8 @@ let suite =
          >:: test_portfolio_state_uses_last_step_when_all_trading_days;
          "portfolio state long unrealized pnl"
          >:: test_portfolio_state_long_unrealized_pnl;
+         "portfolio state levered open value is debit free"
+         >:: test_portfolio_state_levered_open_value_is_debit_free;
          "portfolio state short unrealized pnl"
          >:: test_portfolio_state_short_unrealized_pnl;
          "portfolio state mixed unrealized pnl"

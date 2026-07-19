@@ -22,6 +22,7 @@ module Margin_config = Trading_portfolio.Margin_config
 module Portfolio = Trading_portfolio.Portfolio
 module Position = Trading_strategy.Position
 module Strategy_interface = Trading_strategy.Strategy_interface
+module Metric_types = Trading_simulation_types.Metric_types
 
 (* Local epsilon for cash / fee asserts. 1 cent is plenty for fee math
    accumulated over a few days; tests that go a full trading year use the
@@ -115,15 +116,15 @@ let _long_strategy ~symbol ~quantity =
 (* ------------------------------------------------------------------ *)
 
 let _run_with_margin ?(initial_long_margin_req = 1.0)
-    ?(long_margin_rate_annual_pct = 0.0) ~test_name ~symbols_with_data ~strategy
-    ~margin_config ~config () =
+    ?(long_margin_rate_annual_pct = 0.0) ?metric_suite ~test_name
+    ~symbols_with_data ~strategy ~margin_config ~config () =
   let result_ref = ref None in
   with_test_data test_name symbols_with_data ~f:(fun data_dir ->
       let symbols = List.map symbols_with_data ~f:fst in
       let deps =
         create_deps ~symbols ~data_dir ~strategy ~commission:config.commission
-          ~margin_config ~initial_long_margin_req ~long_margin_rate_annual_pct
-          ()
+          ?metric_suite ~margin_config ~initial_long_margin_req
+          ~long_margin_rate_annual_pct ()
       in
       let sim = create_exn ~config ~deps in
       match run sim with
@@ -436,7 +437,14 @@ let test_levered_long_run_funds_and_prices_debit _ =
   in
   let result =
     _run_with_margin ~initial_long_margin_req:0.5
-      ~long_margin_rate_annual_pct:0.10 ~test_name:"margin_levered_long"
+      ~long_margin_rate_annual_pct:0.10
+      ~metric_suite:
+        {
+          Trading_simulation_types.Simulator_types.computers =
+            [ Trading_simulation.Metric_computers.portfolio_state_computer () ];
+          derived = [];
+        }
+      ~test_name:"margin_levered_long"
       ~symbols_with_data:[ ("AAPL", _aapl_flat_50) ]
       ~strategy:(_long_strategy ~symbol:"AAPL" ~quantity:300.0)
       ~margin_config:Margin_config.default_config ~config ()
@@ -453,7 +461,18 @@ let test_levered_long_run_funds_and_prices_debit _ =
       .Trading_simulation_types.Simulator_types.portfolio_value
   in
   assert_that final_nav
-    (is_between (module Float_ord) ~low:9_900.0 ~high:9_999.9)
+    (is_between (module Float_ord) ~low:9_900.0 ~high:9_999.9);
+  (* Metric honesty: OpenPositionsValue is the debit-free marked position value
+     (300 sh * $50 = $15,000), NOT the debit-net [portfolio_value - cash]; and
+     UnrealizedPnl = $15,000 - cost_basis $15,000 = $0 (bought and held flat at
+     $50). This pins the QC-finding fix — the metric reads [position_value_total],
+     not [portfolio_value - current_cash]. *)
+  assert_that result.metrics
+    (map_includes
+       [
+         (Metric_types.OpenPositionsValue, float_equal 15_000.0);
+         (Metric_types.UnrealizedPnl, float_equal 0.0);
+       ])
 
 (* The simulation-layer wrapper capitalizes one trading day of interest onto an
    existing long-margin debit (mirrors [accrue_borrow_fee]). *)
