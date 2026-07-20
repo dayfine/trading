@@ -10,14 +10,13 @@ open Core
 type tier = { price_below : float; value : float } [@@deriving show, eq, sexp]
 
 let _covers ~price tier = Float.O.(price < tier.price_below)
+let _by_price_below a b = Float.compare a.price_below b.price_below
 
 let tier_value ~(tiers : tier list) ~(flat_fallback : float) ~(price : float) :
     float =
-  match List.filter tiers ~f:(_covers ~price) with
-  | [] -> flat_fallback
-  | covering ->
-      let tightest =
-        List.min_elt covering ~compare:(fun a b ->
-            Float.compare a.price_below b.price_below)
-      in
-      (Option.value_exn tightest).value
+  (* Tightest covering band = the smallest [price_below] still above [price];
+     [List.min_elt] returns [None] for the empty / no-cover case → fallback. *)
+  let covering = List.filter tiers ~f:(_covers ~price) in
+  match List.min_elt covering ~compare:_by_price_below with
+  | None -> flat_fallback
+  | Some tightest -> tightest.value

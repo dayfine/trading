@@ -4,17 +4,11 @@ open Status
 open Trading_base.Types
 open Types
 
-(* available_cash = current_cash net of pledged short collateral. Strategy code
-   should read this rather than current_cash when sizing new entries. Lives here
-   (not on [Portfolio]) so that module stays under the file-length hard limit. *)
+(* Spendable cash net of pledged short collateral (full contract in [.mli]). *)
 let available_cash (portfolio : Portfolio.t) : cash_value =
   portfolio.current_cash -. portfolio.locked_collateral
 
-(* equity_cash = the cash component of portfolio equity net of borrowed
-   long-margin debt (margin M1b-2). Equity = equity_cash + marked position
-   value; every NAV / drawdown read must use this so the borrowed cash does not
-   inflate reported wealth. Equals [current_cash] under a cash account (where
-   [long_margin_debit = 0.0]), so all pre-M1b valuations are bit-identical. *)
+(* Equity cash net of borrowed long-margin debt, margin M1b-2 (see [.mli]). *)
 let equity_cash (portfolio : Portfolio.t) : cash_value =
   portfolio.current_cash -. portfolio.long_margin_debit
 
@@ -135,22 +129,18 @@ let sum_short_notional (portfolio : Portfolio.t) market_prices : float =
         | Some price -> acc +. (Float.abs qty *. price)
       else acc)
 
-(* One short position's daily borrow fee at its marked price. Uses the
-   price-tiered daily rate (M3a); with an empty tier table every price resolves
-   to the flat rate, so the per-position sum equals the legacy
-   [sum_short_notional * flat_daily_rate] bit-for-bit (distributivity). Longs
-   and shorts absent from the price list contribute nothing. *)
-let _short_daily_borrow_fee ~(margin_config : Margin_config.t) ~price_map
-    (p : portfolio_position) : float =
+(* Price-tiered daily borrow fee for one position (M3a); an empty tier table →
+   flat rate, so the per-position sum equals [sum_short_notional * flat_daily]
+   bit-for-bit (distributivity). Longs / unpriced shorts contribute nothing. *)
+let _short_daily_borrow_fee ~(margin_config : Margin_config.t) ~price_map p :
+    float =
   let qty = Calculations.position_quantity p in
   if Float.O.(qty >= 0.0) then 0.0
   else
-    match Map.find price_map p.symbol with
-    | None -> 0.0
-    | Some price ->
-        let notional = Float.abs qty *. price in
-        notional
-        *. Margin_config.daily_borrow_rate_for_price margin_config ~price
+    Map.find price_map p.symbol
+    |> Option.value_map ~default:0.0 ~f:(fun price ->
+        Float.abs qty *. price
+        *. Margin_config.daily_borrow_rate_for_price margin_config ~price)
 
 let accrue_daily_borrow_fee ~(margin_config : Margin_config.t)
     (portfolio : Portfolio.t) (market_prices : (symbol * price) list) :
@@ -188,9 +178,8 @@ let _short_breaches_maintenance ~(margin_config : Margin_config.t)
   let ratio =
     _short_equity_ratio ~margin_config ~entry_avg_cost ~current_price
   in
-  (* Price-tiered maintenance threshold (M3a): supersedes the flat
-     [maintenance_margin_pct] when [short_maintenance_tiers] is armed; an empty
-     table resolves to the flat threshold, so this is bit-identical to pre-M3a. *)
+  (* Price-tiered threshold (M3a); empty [short_maintenance_tiers] → flat
+     [maintenance_margin_pct], i.e. bit-identical to pre-M3a. *)
   let threshold =
     Margin_config.maintenance_pct_for_price margin_config ~price:current_price
   in
