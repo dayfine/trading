@@ -34,8 +34,10 @@ let _holdings = [ _hold ~id:"CHEAP" ~mark:3.0; _hold ~id:"RICH" ~mark:50.0 ]
 let _prices = [ ("CHEAP", 3.0); ("RICH", 50.0) ]
 let _ids buyins = List.map buyins ~f:(fun h -> h.Short_buyin.position_id)
 
-(* Build a Position.t short in the Holding state (mirrors the M2 test helper). *)
-let _make_short ~id ~entry ~qty =
+(* Build a Position.t in the Holding state (mirrors the M2 test helper).
+   [side] parametrizes short vs long so the same builder covers the buy-in
+   candidates (shorts) and the non-short skip guard (longs). *)
+let _make_position ~side ~id ~entry ~qty =
   let make_trans kind = { Position.position_id = id; date = _friday; kind } in
   let unwrap = function
     | Ok p -> p
@@ -48,7 +50,7 @@ let _make_short ~id ~entry ~qty =
          (CreateEntering
             {
               symbol = id;
-              side = Trading_base.Types.Short;
+              side;
               target_quantity = qty;
               entry_price = entry;
               reasoning = ManualDecision { description = "test" };
@@ -72,6 +74,8 @@ let _make_short ~id ~entry ~qty =
               };
           }))
   |> unwrap
+
+let _make_short = _make_position ~side:Trading_base.Types.Short
 
 let _positions_map ids =
   List.map ids ~f:(fun id -> (id, _make_short ~id ~entry:10.0 ~qty:100.0))
@@ -178,6 +182,25 @@ let test_no_positions_no_op _ =
        ~prices:_prices ~date:_friday)
     (size_is 0)
 
+(* A LONG marked below the HTB threshold is never a buy-in candidate — the
+   [_holding_of_position] projection skips non-short positions, so buy-in only
+   ever touches shorts (longs are never covered). *)
+let test_long_below_threshold_never_covered _ =
+  let positions =
+    Map.of_alist_exn
+      (module String)
+      [
+        ( "LONGCHEAP",
+          _make_position ~side:Trading_base.Types.Long ~id:"LONGCHEAP"
+            ~entry:10.0 ~qty:100.0 );
+      ]
+  in
+  assert_that
+    (Short_buyin.buyin_stress_transitions ~margin_config:_armed ~positions
+       ~prices:[ ("LONGCHEAP", 3.0) ]
+       ~date:_friday)
+    (size_is 0)
+
 let suite =
   "short_buyin"
   >::: [
@@ -191,6 +214,8 @@ let suite =
          >:: test_armed_non_friday_no_op;
          "unmarked short => skipped" >:: test_unmarked_short_skipped;
          "no positions => no-op" >:: test_no_positions_no_op;
+         "long below threshold => never covered"
+         >:: test_long_below_threshold_never_covered;
        ]
 
 let () = run_test_tt_main suite
