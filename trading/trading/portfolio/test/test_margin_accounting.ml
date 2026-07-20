@@ -495,9 +495,12 @@ let test_borrow_fee_tiered_charges_per_price _ =
        (fun p -> p.accrued_borrow_fee)
        (float_equal ~epsilon:1e-12 expected_fee))
 
-let test_borrow_fee_empty_tiers_bit_equal_flat _ =
+let test_borrow_fee_empty_tiers_numerically_identical_flat _ =
   (* Empty tier table (the default) → every short pays the flat rate, so the
-     per-position sum equals the legacy sum_short_notional * flat_daily_rate. *)
+     per-position sum equals the legacy sum_short_notional * flat_daily_rate
+     numerically identically (to within 1e-12). It is NOT bit-for-bit IEEE:
+     the per-position accrual reassociates the multiply-then-sum
+     ((Σnᵢ)·r → Σ(nᵢ·r)); goldens are unchanged. *)
   let portfolio = _two_price_shorts () in
   let prices = [ ("CHEAP", 10.0); ("RICH", 50.0) ] in
   let expected_fee = _expected_daily_fee 6_000.0 on_config in
@@ -560,11 +563,40 @@ let test_margin_config_round_trip_preserves_tiers _ =
             value = 0.83;
           };
         ];
+      (* M3b buy-in stress fields also survive the sexp round-trip. *)
+      Margin_config.short_buyin_stress_mode = true;
+      Margin_config.short_buyin_htb_price_below = 5.0;
     }
   in
   assert_that
     (Margin_config.t_of_sexp (Margin_config.sexp_of_t armed))
     (equal_to (armed : Margin_config.t))
+
+(* margin M3b: [is_buyin_htb] fires only when the mode is armed AND the mark is
+   strictly below a positive threshold; disarmed / default is always [false]. *)
+let test_is_buyin_htb_gates_on_mode_and_threshold _ =
+  let armed =
+    {
+      Margin_config.default_config with
+      Margin_config.short_buyin_stress_mode = true;
+      Margin_config.short_buyin_htb_price_below = 5.0;
+    }
+  in
+  assert_that
+    [
+      (* below threshold, armed → HTB *)
+      Margin_config.is_buyin_htb armed ~price:4.99;
+      (* at / above threshold → not HTB *)
+      Margin_config.is_buyin_htb armed ~price:5.0;
+      (* mode off (default) → never HTB even below the threshold *)
+      Margin_config.is_buyin_htb
+        { armed with Margin_config.short_buyin_stress_mode = false }
+        ~price:4.99;
+      (* armed but 0.0 threshold → nothing qualifies *)
+      Margin_config.is_buyin_htb Margin_config.default_config ~price:1.0;
+    ]
+    (elements_are
+       [ equal_to true; equal_to false; equal_to false; equal_to false ])
 
 let test_pre_m3a_margin_config_sexp_parses_with_empty_tiers _ =
   (* A pre-M3a margin_config sexp (no tier fields) must decode with empty
@@ -830,14 +862,16 @@ let suite =
          >:: test_sum_short_notional_combines_positions;
          "test_borrow_fee_tiered_charges_per_price"
          >:: test_borrow_fee_tiered_charges_per_price;
-         "test_borrow_fee_empty_tiers_bit_equal_flat"
-         >:: test_borrow_fee_empty_tiers_bit_equal_flat;
+         "test_borrow_fee_empty_tiers_numerically_identical_flat"
+         >:: test_borrow_fee_empty_tiers_numerically_identical_flat;
          "test_maintenance_flat_does_not_flag_cheap_short"
          >:: test_maintenance_flat_does_not_flag_cheap_short;
          "test_maintenance_tiered_flags_cheap_short"
          >:: test_maintenance_tiered_flags_cheap_short;
          "test_margin_config_round_trip_preserves_tiers"
          >:: test_margin_config_round_trip_preserves_tiers;
+         "test_is_buyin_htb_gates_on_mode_and_threshold"
+         >:: test_is_buyin_htb_gates_on_mode_and_threshold;
          "test_pre_m3a_margin_config_sexp_parses_with_empty_tiers"
          >:: test_pre_m3a_margin_config_sexp_parses_with_empty_tiers;
          "test_disarmed_over_cash_buy_still_rejected"

@@ -204,10 +204,67 @@ and M1b (follow-up).
   - Verify: `dune runtest trading/portfolio/test trading/weinstein/strategy/test
     trading/backtest/walk_forward/test` (container path
     `/workspaces/trading-1/.claude/worktrees/<ws>/trading`).
-- **M3b** — buy-in stress mode (PENDING follow-up): probabilistic forced cover
-  on HTB names (config-gated, default-off) OR a stress-path mode for the
-  promotion grid, including gap-through-maintenance scenarios (bar-cadence marks
-  can't see intraweek gap squeezes — the documented M3a seam).
+- [x] **M3b — buy-in stress mode (deterministic stress-path, default-off).**
+  Branch `feat/margin-m3b-buyin-stress`. Closes the remaining half of M3's
+  short-side squeeze robustness. Chose the **deterministic stress-path** branch
+  over the probabilistic forced-cover: the M4 promotion grid wants the single
+  worst-case path (every HTB borrow recalled), not sampled paths, and every
+  analysis function must stay pure/reproducible (CLAUDE.md). No randomness.
+  - **Mechanism** — new pure module `Short_buyin`
+    (`trading/trading/simulation/lib/short_buyin.{ml,mli}`), the short-side
+    mirror of the M2 `Long_maintenance` runner. When armed, {b every} held short
+    that is hard-to-borrow at its current mark is force-covered at the next
+    weekly (Friday) close — the deterministic upper bound on buy-in cost for the
+    M4 stress cells. `select_buyins` (pure HTB filter) +
+    `buyin_stress_transitions` (Friday-gated transition builder). Each forced
+    cover carries a distinguishable `exit_reason = StrategySignal { label =
+    "buyin_stress" }` at the mark, so forensics separate buy-ins from strategy
+    exits, short maintenance covers (`margin_call`) and long reduces
+    (`maintenance_reduce`).
+  - **HTB definition** — a short marked strictly below a positive
+    `short_buyin_htb_price_below` is HTB. Chose a **dedicated threshold** on
+    `Margin_config` over reusing an M3a tier band: buy-in (share recall) is a
+    distinct broker event from a maintenance breach (a lender can recall a name
+    above its maintenance requirement), so the stress cell's "which shorts get
+    bought in" is decoupled from the leverage/maintenance dials and the M4 grid
+    can vary them orthogonally. `Margin_config.is_buyin_htb ~price` is the gate.
+  - **Config (R1 no-op)** — `Margin_config` gains
+    `short_buyin_stress_mode : bool [@sexp.default false]` +
+    `short_buyin_htb_price_below : float [@sexp.default 0.0]`. Placing them on
+    `Margin_config` (already threaded to `Margin_runner.tick`) needs **zero new
+    simulator/panel_runner threading** — they ride the existing `margin_config`.
+    At the defaults nothing is ever HTB (mode off, and no positive mark is below
+    0.0), so `tick` stays bit-equal; goldens unchanged, no re-pin.
+  - **Wiring + collision handling** — `Margin_runner.tick` now appends buy-in
+    covers alongside the short force-cover and M2 long-reduce (same Friday
+    cadence + `dedup_strategy_exits_for_margin` seam). A short flagged by both
+    the maintenance check and the buy-in mode is covered once —
+    `_drop_buyins_colliding_with_covers` keeps the `margin_call` (richer detail),
+    drops the duplicate `buyin_stress`.
+  - **Bar-cadence caveat** documented in `short_buyin.mli` + the `Margin_config`
+    field docs: daily-close marks cannot see an intraweek gap-through-recall; a
+    Monday-to-Thursday squeeze is only covered at Friday's close — M4 stress-path
+    gap scenarios extend this.
+  - **R2 axes** — `margin_config.short_buyin_stress_mode` +
+    `margin_config.short_buyin_htb_price_below` resolve through
+    `Overlay_validator`; axis-expansion tests
+    (`test_short_buyin_stress_mode_axis_expands`,
+    `test_short_buyin_htb_price_below_axis_expands`) in `test_variant_matrix.ml`.
+  - **M3a QC drive-bys closed** — (1) added the symmetric
+    `test_short_borrow_rate_tiers_axis_expands` (the M3a axis was proven only via
+    its structurally-identical `short_maintenance_tiers` sibling); (2) corrected
+    the borrow-fee disarmed-parity wording from "bit-for-bit" to "numerically
+    identical (1e-12)" in `portfolio_margin.mli` + the renamed
+    `test_borrow_fee_empty_tiers_numerically_identical_flat` (the M3a per-position
+    reassociation `(Σnᵢ)·r → Σ(nᵢ·r)` is not IEEE-bit-identical; goldens hold).
+  - Tests: `test_short_buyin.ml` (8 — R1 default/disarmed no-ops, armed selects
+    only HTB, zero-threshold no-op, Friday-armed tagged cover, weekly-cadence
+    Monday no-op, unmarked-short skip, no-positions no-op) +
+    `test_margin_accounting.ml` (+1 `is_buyin_htb` gate + round-trip extended to
+    the buy-in fields).
+  - Verify: `dune runtest trading/simulation/test/test_short_buyin.ml
+    trading/portfolio/test trading/backtest/walk_forward/test` (container path
+    `/workspaces/trading-1/.claude/worktrees/<ws>/trading`).
 - **M4** — validation protocol (parity gates, squeeze stress cells, leverage
   surface via experiment-gap-closing + confirmation grid). No default flips and no
   levered number is quoted until M4.

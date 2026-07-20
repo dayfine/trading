@@ -55,14 +55,56 @@ type t = {
           [dev/notes/long-short-margin-mechanics-2026-06-12.md] §1. Searchable
           via the nested overlay key [margin_config.short_maintenance_tiers]
           ([.claude/rules/experiment-flag-discipline.md] R2). *)
+  short_buyin_stress_mode : bool; [@sexp.default false]
+      (** Deterministic buy-in {b stress-path} mode (margin M3b), default
+          [false] (R1 no-op). When [true], every held short that is
+          hard-to-borrow at its current mark (see
+          {!short_buyin_htb_price_below}) is force-covered at the next weekly
+          (Friday) close — modelling the {b worst case} that the lender recalls
+          every HTB borrow. This is a deterministic upper bound on buy-in cost
+          for the M4 promotion-grid stress cells, {b not} a probabilistic
+          forced-cover: no randomness, so the same portfolio + config always
+          yield the same covers. See {!Trading_simulation.Short_buyin} for the
+          runner.
+
+          Bar-cadence caveat: marks are daily closes, so this cannot see an
+          intraweek gap-through-recall; a Monday-to-Thursday squeeze is only
+          covered at Friday's close (M4 stress-path gap scenarios extend this).
+          Gated by this flag alone, independent of {!enabled} (a stress cell can
+          exercise buy-ins without full Reg-T margin accounting). Searchable via
+          the nested overlay key [margin_config.short_buyin_stress_mode]
+          ([.claude/rules/experiment-flag-discipline.md] R2). *)
+  short_buyin_htb_price_below : float; [@sexp.default 0.0]
+      (** HTB price threshold for {!short_buyin_stress_mode} (margin M3b),
+          default [0.0] (R1 no-op — no positive mark is strictly below [0.0], so
+          nothing is HTB even with the mode armed). A short marked strictly
+          below this price is treated as hard-to-borrow, hence buy-in-exposed.
+
+          Intentionally a {b dedicated} threshold rather than reusing a
+          {!short_maintenance_tiers} / {!short_borrow_rate_tiers} band: buy-in
+          (share recall) is a distinct broker event from a maintenance breach —
+          a lender can recall a name sitting comfortably above its maintenance
+          requirement — so the stress cell's "which shorts get bought in" is
+          decoupled from the leverage / maintenance dials and the M4 grid can
+          vary them orthogonally. That low-priced names are the hard-to-borrow
+          ones mirrors the M3a price-tier philosophy. Searchable via the nested
+          overlay key [margin_config.short_buyin_htb_price_below] (R2). *)
 }
 [@@deriving show, eq, sexp]
 
+val is_buyin_htb : t -> price:float -> bool
+(** [is_buyin_htb cfg ~price] is [true] iff {!short_buyin_stress_mode} is armed
+    and [price] is strictly below a positive {!short_buyin_htb_price_below}.
+    Always [false] at the defaults ([stress_mode = false],
+    [htb_price_below = 0.0]), so a disarmed config never marks any short as
+    buy-in-exposed (margin M3b). Pure. *)
+
 val default_config : t
 (** Default config: margin off, 50% initial extra, 25% maintenance, 50bps annual
-    borrow fee, {b empty} borrow-rate and maintenance tier tables. With
-    [enabled = false] the other fields are dormant; with the tier tables empty
-    the tiered lookups fall back to the flat rates (M3a is default-off). *)
+    borrow fee, {b empty} borrow-rate and maintenance tier tables, buy-in
+    stress-path mode off with a [0.0] HTB threshold. With [enabled = false] the
+    other fields are dormant; with the tier tables empty the tiered lookups fall
+    back to the flat rates (M3a is default-off). *)
 
 val trading_days_per_year : float
 (** Conventional trading-day count (252) used to convert annual borrow fee to a

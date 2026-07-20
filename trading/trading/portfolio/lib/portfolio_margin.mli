@@ -88,9 +88,12 @@ val accrue_daily_borrow_fee :
     [margin_config.short_borrow_rate_tiers] is empty (the default) every price
     resolves to the flat {!Margin_config.daily_borrow_rate}, so the per-position
     sum equals the legacy [sum_of_short_notional *. daily_borrow_rate]
-    bit-for-bit. Symbols missing from the price list are treated as zero-fee
-    (the caller is expected to mark every short on each trading-day tick — same
-    convention as [Portfolio.mark_to_market]). *)
+    {b numerically identically (to within 1e-12)}: the per-position accrual
+    reassociates the multiply-then-sum ([(Σnᵢ)·r → Σ(nᵢ·r)]), so it is not
+    bit-for-bit IEEE-identical, but every golden is unchanged. Symbols missing
+    from the price list are treated as zero-fee (the caller is expected to mark
+    every short on each trading-day tick — same convention as
+    [Portfolio.mark_to_market]). *)
 
 val sum_short_notional : Portfolio.t -> (symbol * price) list -> float
 (** Sum of [|qty *. price|] across all currently-open short positions whose

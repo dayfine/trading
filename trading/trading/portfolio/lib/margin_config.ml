@@ -14,6 +14,8 @@ type t = {
   short_borrow_fee_annual_pct : float;
   short_borrow_rate_tiers : Short_margin_tiers.tier list; [@sexp.default []]
   short_maintenance_tiers : Short_margin_tiers.tier list; [@sexp.default []]
+  short_buyin_stress_mode : bool; [@sexp.default false]
+  short_buyin_htb_price_below : float; [@sexp.default 0.0]
 }
 [@@deriving show, eq, sexp]
 
@@ -21,6 +23,8 @@ let default_enabled = false
 let default_initial_margin_pct = 0.50
 let default_maintenance_margin_pct = 0.25
 let default_short_borrow_fee_annual_pct = 0.005
+let default_short_buyin_stress_mode = false
+let default_short_buyin_htb_price_below = 0.0
 let trading_days_per_year = 252.0
 
 let default_config =
@@ -31,9 +35,20 @@ let default_config =
     short_borrow_fee_annual_pct = default_short_borrow_fee_annual_pct;
     short_borrow_rate_tiers = [];
     short_maintenance_tiers = [];
+    short_buyin_stress_mode = default_short_buyin_stress_mode;
+    short_buyin_htb_price_below = default_short_buyin_htb_price_below;
   }
 
 let total_collateral_factor (cfg : t) : float = 1.0 +. cfg.initial_margin_pct
+
+(* A held short is buy-in-exposed (hard-to-borrow) when the stress-path mode is
+   armed and its mark sits strictly below the positive HTB threshold. At the
+   defaults (mode off, threshold 0.0) this is always [false] — a disarmed
+   config never marks any short as HTB (margin M3b). *)
+let is_buyin_htb (cfg : t) ~(price : float) : bool =
+  cfg.short_buyin_stress_mode
+  && Float.( > ) cfg.short_buyin_htb_price_below 0.0
+  && Float.( < ) price cfg.short_buyin_htb_price_below
 
 (* Annual borrow fee for a short marked at [price]: the price-tiered rate when
    [short_borrow_rate_tiers] is armed, else the flat
