@@ -16,6 +16,7 @@
   test_sector_rotation_weinstein_strategy
   test_short_side_bear_window
   test_short_min_price_gate
+  test_short_borrow_gate
   test_declining_ma_gate
   test_short_side_gate
   test_liquidity_metric

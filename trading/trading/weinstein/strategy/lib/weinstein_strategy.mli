@@ -200,6 +200,11 @@ module Long_buying_power = Long_buying_power
     primitives. Exposed so tests can pin the pure ceiling / interest math
     directly. See {!Long_buying_power}. *)
 
+module Short_borrow_gate = Short_borrow_gate
+(** Short-side borrow-availability entry gate (margin M3a): drops short
+    candidates whose trailing dollar-ADV is below the borrow-supply floor.
+    Exposed so tests can pin the pure {!Short_borrow_gate.filter} directly. *)
+
 module Exit_audit_capture = Exit_audit_capture
 (** Exit-side trade-audit capture. Bridges [TriggerExit] transitions to
     {!Audit_recorder.exit_event}. See {!Exit_audit_capture}. *)
