@@ -30,9 +30,9 @@ type t = {
   short_borrow_fee_annual_pct : float;
       (** Annualized borrow fee charged on short notional (default [0.005] = 50
           bps — liquid SP500 reference rate per issue #859). Accrued daily as
-          [notional * rate / trading_days_per_year]. This is the {b flat
-          fallback}: consulted for any short whose marked price is not covered
-          by a {!short_borrow_rate_tiers} band. *)
+          [notional * rate / trading_days_per_year]. This is the
+          {b flat fallback}: consulted for any short whose marked price is not
+          covered by a {!short_borrow_rate_tiers} band. *)
   short_borrow_rate_tiers : Short_margin_tiers.tier list;
       (** Hard-to-borrow price-tiered {b annual borrow rate} table (margin M3a),
           default [[]] (empty). When empty, every short pays the flat
@@ -82,8 +82,8 @@ val daily_borrow_rate : t -> float
     {!daily_borrow_rate_for_price}. *)
 
 val borrow_fee_annual_for_price : t -> price:float -> float
-(** Annual borrow-fee fraction for a short marked at [price] (margin M3a):
-    the price-tiered rate from {!short_borrow_rate_tiers} when a band covers
+(** Annual borrow-fee fraction for a short marked at [price] (margin M3a): the
+    price-tiered rate from {!short_borrow_rate_tiers} when a band covers
     [price], else the flat {!short_borrow_fee_annual_pct}. An empty tier table
     always returns the flat rate, so a disarmed config is bit-identical to
     pre-M3a. *)

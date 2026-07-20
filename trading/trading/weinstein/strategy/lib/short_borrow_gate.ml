@@ -12,7 +12,9 @@ let _short_has_borrow ~min_dollar_adv ~dollar_adv_for
 let filter ~min_dollar_adv ~dollar_adv_for
     (candidates : Screener.scored_candidate list) =
   if Float.( <= ) min_dollar_adv 0.0 then candidates
-  else List.filter candidates ~f:(_short_has_borrow ~min_dollar_adv ~dollar_adv_for)
+  else
+    List.filter candidates
+      ~f:(_short_has_borrow ~min_dollar_adv ~dollar_adv_for)
 
 let apply ~min_dollar_adv ~lookback_days ~bar_reader ~current_date candidates =
   if Float.( <= ) min_dollar_adv 0.0 then candidates

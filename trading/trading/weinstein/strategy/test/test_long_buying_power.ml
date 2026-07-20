@@ -125,7 +125,8 @@ let test_short_borrow_adv_round_trip _ =
   in
   let gated = { base with short_borrow_min_dollar_adv = 2_000_000.0 } in
   assert_that
-    (Weinstein_strategy.config_of_sexp (Weinstein_strategy.sexp_of_config gated))
+    (Weinstein_strategy.config_of_sexp
+       (Weinstein_strategy.sexp_of_config gated))
     (field
        (fun (c : Weinstein_strategy.config) -> c.short_borrow_min_dollar_adv)
        (float_equal 2_000_000.0))

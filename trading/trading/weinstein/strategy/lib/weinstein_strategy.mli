@@ -323,8 +323,8 @@ type config = {
       (** Borrow-availability floor for short candidates (margin M3a): shorts
           whose trailing dollar-ADV (no-lookahead, over {!liquidity_config}'s
           lookback) is below this value are dropped as "no borrow available"
-          before the entry walk; longs are never affected. Default [0.0] =
-          no-op (bit-identical). A default-off, searchable
+          before the entry walk; longs are never affected. Default [0.0] = no-op
+          (bit-identical). A default-off, searchable
           {!Walk_forward.Variant_matrix} axis; see
           {!Weinstein_strategy_config.short_borrow_min_dollar_adv} and
           {!Short_borrow_gate}. *)

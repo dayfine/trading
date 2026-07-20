@@ -38,8 +38,7 @@ type config = {
   full_compute_tail_days : int option;
   enable_short_side : bool; [@sexp.default true]
   short_min_price : float; [@sexp.default 0.0]  (** See [.mli]. *)
-  short_borrow_min_dollar_adv : float; [@sexp.default 0.0]
-      (** See [.mli]. *)
+  short_borrow_min_dollar_adv : float; [@sexp.default 0.0]  (** See [.mli]. *)
   suppress_warmup_trading : bool; [@sexp.default true]  (** See [.mli]. *)
   stop_update_cadence : Stops_runner.stop_update_cadence;
       [@sexp.default Stops_runner.Daily]

@@ -365,14 +365,15 @@ let test_short_borrow_min_dollar_adv_axis_expands _ =
          field
            (fun (v : WFR.variant) -> v.overrides)
            (elements_are
-              [ equal_to (Sexp.of_string "((short_borrow_min_dollar_adv 0.0))") ]);
+              [
+                equal_to (Sexp.of_string "((short_borrow_min_dollar_adv 0.0))");
+              ]);
          field
            (fun (v : WFR.variant) -> v.overrides)
            (elements_are
               [
                 equal_to
-                  (Sexp.of_string
-                     "((short_borrow_min_dollar_adv 1000000.0))");
+                  (Sexp.of_string "((short_borrow_min_dollar_adv 1000000.0))");
               ]);
        ])
 
@@ -389,8 +390,7 @@ let test_short_maintenance_tiers_axis_expands _ =
       {
         path = [ "margin_config"; "short_maintenance_tiers" ];
         values =
-          Sexp.
-            [ List []; of_string "(((price_below 17.0) (value 1.0)))" ];
+          Sexp.[ List []; of_string "(((price_below 17.0) (value 1.0)))" ];
       }
   in
   let t = { VM.axes = [ axis ]; expansion = VM.Cartesian } in
@@ -402,7 +402,8 @@ let test_short_maintenance_tiers_axis_expands _ =
            (elements_are
               [
                 equal_to
-                  (Sexp.of_string "((margin_config ((short_maintenance_tiers ()))))");
+                  (Sexp.of_string
+                     "((margin_config ((short_maintenance_tiers ()))))");
               ]);
          field
            (fun (v : WFR.variant) -> v.overrides)

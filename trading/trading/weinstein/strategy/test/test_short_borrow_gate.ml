@@ -1,4 +1,5 @@
-(** Unit tests for the [short_borrow_availability] short-entry gate (margin M3a).
+(** Unit tests for the [short_borrow_availability] short-entry gate (margin
+    M3a).
 
     Pins the no-op-default contract and the gating behaviour of
     {!Weinstein_strategy.Short_borrow_gate.filter}:

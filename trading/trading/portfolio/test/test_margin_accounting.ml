@@ -460,7 +460,12 @@ let htb_borrow_config =
   {
     on_config with
     Margin_config.short_borrow_rate_tiers =
-      [ { Trading_portfolio.Short_margin_tiers.price_below = 17.0; value = 0.50 } ];
+      [
+        {
+          Trading_portfolio.Short_margin_tiers.price_below = 17.0;
+          value = 0.50;
+        };
+      ];
   }
 
 (* Two shorts at $10 (HTB tier) and $50 (flat fallback). Each position pays its
@@ -486,7 +491,9 @@ let test_borrow_fee_tiered_charges_per_price _ =
   in
   assert_that
     (accrue_daily_borrow_fee ~margin_config:htb_borrow_config portfolio prices)
-    (field (fun p -> p.accrued_borrow_fee) (float_equal ~epsilon:1e-12 expected_fee))
+    (field
+       (fun p -> p.accrued_borrow_fee)
+       (float_equal ~epsilon:1e-12 expected_fee))
 
 let test_borrow_fee_empty_tiers_bit_equal_flat _ =
   (* Empty tier table (the default) → every short pays the flat rate, so the
@@ -496,7 +503,9 @@ let test_borrow_fee_empty_tiers_bit_equal_flat _ =
   let expected_fee = _expected_daily_fee 6_000.0 on_config in
   assert_that
     (accrue_daily_borrow_fee ~margin_config:on_config portfolio prices)
-    (field (fun p -> p.accrued_borrow_fee) (float_equal ~epsilon:1e-12 expected_fee))
+    (field
+       (fun p -> p.accrued_borrow_fee)
+       (float_equal ~epsilon:1e-12 expected_fee))
 
 (* A short 100 @ $10, marked $10: equity_ratio = (1.5*10 - 10)/10 = 0.5. Above
    the flat 25% (not flagged), but below a 100% sub-$17 tier (flagged). *)
@@ -521,7 +530,10 @@ let test_maintenance_tiered_flags_cheap_short _ =
       on_config with
       Margin_config.short_maintenance_tiers =
         [
-          { Trading_portfolio.Short_margin_tiers.price_below = 17.0; value = 1.0 };
+          {
+            Trading_portfolio.Short_margin_tiers.price_below = 17.0;
+            value = 1.0;
+          };
         ];
     }
   in
@@ -535,10 +547,18 @@ let test_margin_config_round_trip_preserves_tiers _ =
     {
       Margin_config.default_config with
       Margin_config.short_borrow_rate_tiers =
-        [ { Trading_portfolio.Short_margin_tiers.price_below = 5.0; value = 1.0 } ];
+        [
+          {
+            Trading_portfolio.Short_margin_tiers.price_below = 5.0;
+            value = 1.0;
+          };
+        ];
       Margin_config.short_maintenance_tiers =
         [
-          { Trading_portfolio.Short_margin_tiers.price_below = 17.0; value = 0.83 };
+          {
+            Trading_portfolio.Short_margin_tiers.price_below = 17.0;
+            value = 0.83;
+          };
         ];
     }
   in

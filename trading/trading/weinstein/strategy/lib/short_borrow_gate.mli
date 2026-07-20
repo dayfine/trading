@@ -1,13 +1,13 @@
 (** The [short_borrow_availability] short-entry gate (margin M3a).
 
     A faithful Weinstein short-side eligibility "dial" (default-off axis per
-    [.claude/rules/experiment-flag-discipline.md]) modelling {b borrow
-    availability}: a short can only be opened if shares are locatable to borrow.
-    We have no locate feed, so borrow supply is proxied by {b trailing
-    dollar-ADV} — a thinly-traded name has little float circulating and is the
-    canonical hard-to-borrow / no-locate case. Short candidates whose dollar-ADV
-    is below the floor are dropped ("no borrow available"); long candidates are
-    never affected (borrow is a short-only concern).
+    [.claude/rules/experiment-flag-discipline.md]) modelling
+    {b borrow availability}: a short can only be opened if shares are locatable
+    to borrow. We have no locate feed, so borrow supply is proxied by
+    {b trailing dollar-ADV} — a thinly-traded name has little float circulating
+    and is the canonical hard-to-borrow / no-locate case. Short candidates whose
+    dollar-ADV is below the floor are dropped ("no borrow available"); long
+    candidates are never affected (borrow is a short-only concern).
 
     The spine is untouched ([.claude/rules/weinstein-faithful-core.md] W1): this
     only narrows which {e short} candidates are eligible, exactly as
@@ -42,7 +42,8 @@ val filter :
 
     No-op when [min_dollar_adv <= 0.0] (the default): returns [candidates]
     unchanged (bit-identical), so every existing golden/baseline replays
-    unchanged. Pure. See [Weinstein_strategy_config.short_borrow_min_dollar_adv]. *)
+    unchanged. Pure. See
+    [Weinstein_strategy_config.short_borrow_min_dollar_adv]. *)
 
 val apply :
   min_dollar_adv:float ->

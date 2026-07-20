@@ -44,8 +44,8 @@ type config = {
           minimum trailing dollar-ADV a name must trade for its shares to be
           considered locatable-to-borrow. Short candidates whose dollar-ADV
           (computed from bars available at the screen date, no lookahead, over
-          {!liquidity_config}'s [adv_lookback_days]) is strictly below this value
-          are dropped as "no borrow available" before the entry walk; long
+          {!liquidity_config}'s [adv_lookback_days]) is strictly below this
+          value are dropped as "no borrow available" before the entry walk; long
           candidates are never affected (borrow is a short-only concern).
 
           Default [0.0] = no gating: {!Short_borrow_gate.filter} short-circuits
@@ -55,9 +55,9 @@ type config = {
 
           We have no locate feed; dollar-ADV is the practical borrow-supply
           proxy per [dev/notes/long-short-margin-mechanics-2026-06-12.md] §4
-          item 6 (a thinly-traded name is the canonical hard-to-borrow case).
-          A default-off, searchable {!Walk_forward.Variant_matrix} axis; not
-          wired into any default config or preset. Bar-cadence caveat (intraweek
+          item 6 (a thinly-traded name is the canonical hard-to-borrow case). A
+          default-off, searchable {!Walk_forward.Variant_matrix} axis; not wired
+          into any default config or preset. Bar-cadence caveat (intraweek
           borrow recall / gap squeeze invisible; stress paths are M3b/M4) is
           documented in {!Short_borrow_gate}. *)
   suppress_warmup_trading : bool; [@sexp.default true]

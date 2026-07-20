@@ -149,7 +149,8 @@ let _short_daily_borrow_fee ~(margin_config : Margin_config.t) ~price_map
     | None -> 0.0
     | Some price ->
         let notional = Float.abs qty *. price in
-        notional *. Margin_config.daily_borrow_rate_for_price margin_config ~price
+        notional
+        *. Margin_config.daily_borrow_rate_for_price margin_config ~price
 
 let accrue_daily_borrow_fee ~(margin_config : Margin_config.t)
     (portfolio : Portfolio.t) (market_prices : (symbol * price) list) :

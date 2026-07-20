@@ -12,7 +12,6 @@ let example_tiers =
   ]
 
 let flat_fallback = 0.30
-
 let lookup price = Tiers.tier_value ~tiers:example_tiers ~flat_fallback ~price
 
 let test_empty_table_returns_fallback _ =
@@ -47,10 +46,13 @@ let test_order_independent _ =
 let suite =
   "short_margin_tiers"
   >::: [
-         "test_empty_table_returns_fallback" >:: test_empty_table_returns_fallback;
-         "test_tightest_band_wins_low_price" >:: test_tightest_band_wins_low_price;
+         "test_empty_table_returns_fallback"
+         >:: test_empty_table_returns_fallback;
+         "test_tightest_band_wins_low_price"
+         >:: test_tightest_band_wins_low_price;
          "test_middle_band" >:: test_middle_band;
-         "test_uncovered_price_uses_fallback" >:: test_uncovered_price_uses_fallback;
+         "test_uncovered_price_uses_fallback"
+         >:: test_uncovered_price_uses_fallback;
          "test_price_at_boundary_excludes_band"
          >:: test_price_at_boundary_excludes_band;
          "test_order_independent" >:: test_order_independent;
