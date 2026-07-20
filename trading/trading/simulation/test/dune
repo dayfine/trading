@@ -406,6 +406,18 @@
   matchers))
 
 (test
+ (name test_short_buyin)
+ (modules test_short_buyin)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.base
+  trading.portfolio
+  trading.strategy
+  matchers))
+
+(test
  (name test_cancel_handler)
  (modules test_cancel_handler)
  (libraries

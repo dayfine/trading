@@ -105,16 +105,23 @@ val tick :
   Portfolio.t * Position.transition list
 (** One simulator-tick worth of margin mechanics: accrue daily short borrow fee,
     capitalize daily long-margin interest ([long_margin_rate_annual_pct], margin
-    M1b-2), then append two families of forced exits to [strategy_transitions] —
-    short-side maintenance force-covers ({!margin_call_transitions}) and
+    M1b-2), then append three families of forced exits to [strategy_transitions]
+    — short-side maintenance force-covers ({!margin_call_transitions}),
     long-side maintenance force-reduces ([maintenance_long_pct], margin M2, via
-    {!Long_maintenance.maintenance_reduce_transitions}, weekly-close cadence).
-    No-op on portfolio state and transitions when
-    [margin_config.enabled = false], [long_margin_rate_annual_pct = 0.0], and
-    [maintenance_long_pct = 0.0] (preserves baselines bit-equal).
+    {!Long_maintenance.maintenance_reduce_transitions}), and short-side buy-in
+    stress covers ([margin_config.short_buyin_stress_mode], margin M3b, via
+    {!Short_buyin.buyin_stress_transitions}) — all on the weekly-close (Friday)
+    cadence. No-op on portfolio state and transitions when
+    [margin_config.enabled = false], [long_margin_rate_annual_pct = 0.0],
+    [maintenance_long_pct = 0.0], and
+    [margin_config.short_buyin_stress_mode = false] (preserves baselines
+    bit-equal).
 
     Resolves same-tick same-position [TriggerExit] collisions between the
     strategy and margin sources via {!dedup_strategy_exits_for_margin}: margin
-    transitions (short covers and long reduces) win, strategy exits for the same
-    position-id are dropped. See issue #1266 for the dotcom-2000-2002 crash this
-    prevents. *)
+    transitions (short covers, long reduces, buy-ins) win, strategy exits for
+    the same position-id are dropped. See issue #1266 for the dotcom-2000-2002
+    crash this prevents. Within the margin sources, a short flagged by both the
+    maintenance check and the buy-in mode is covered once — the maintenance
+    [margin_call] wins (richer forensic detail), the duplicate [buyin_stress] is
+    dropped. *)

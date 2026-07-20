@@ -416,6 +416,110 @@ let test_short_maintenance_tiers_axis_expands _ =
               ]);
        ])
 
+(* Proves R2 (experiment-flag-discipline) for the M3a short borrow-rate tier
+   TABLE (symmetric to [test_short_maintenance_tiers_axis_expands]):
+   [short_borrow_rate_tiers] is a real field on the nested [margin_config]
+   record, reached via the [margin_config.short_borrow_rate_tiers] path, with a
+   sexp-valued tier list. The axis expands and passes [Overlay_validator]
+   validation with no overlay-validator change. *)
+let test_short_borrow_rate_tiers_axis_expands _ =
+  let axis =
+    VM.Key
+      {
+        path = [ "margin_config"; "short_borrow_rate_tiers" ];
+        values = Sexp.[ List []; of_string "(((price_below 5.0) (value 1.0)))" ];
+      }
+  in
+  let t = { VM.axes = [ axis ]; expansion = VM.Cartesian } in
+  assert_that (VM.expand t)
+    (elements_are
+       [
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string
+                     "((margin_config ((short_borrow_rate_tiers ()))))");
+              ]);
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string
+                     "((margin_config ((short_borrow_rate_tiers (((price_below \
+                      5.0) (value 1.0)))))))");
+              ]);
+       ])
+
+(* Proves R2 for the M3b buy-in stress FLAG: [short_buyin_stress_mode] is a real
+   bool field on the nested [margin_config] record, reached via the
+   [margin_config.short_buyin_stress_mode] path, so the mode is an axis the day
+   it lands (default-off / experimental-on on the same axis). *)
+let test_short_buyin_stress_mode_axis_expands _ =
+  let axis =
+    VM.Key
+      {
+        path = [ "margin_config"; "short_buyin_stress_mode" ];
+        values = Sexp.[ Atom "true"; Atom "false" ];
+      }
+  in
+  let t = { VM.axes = [ axis ]; expansion = VM.Cartesian } in
+  assert_that (VM.expand t)
+    (elements_are
+       [
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string
+                     "((margin_config ((short_buyin_stress_mode true))))");
+              ]);
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string
+                     "((margin_config ((short_buyin_stress_mode false))))");
+              ]);
+       ])
+
+(* Proves R2 for the M3b HTB price threshold: [short_buyin_htb_price_below] is a
+   real float field on the nested [margin_config] record, searchable via the
+   [margin_config.short_buyin_htb_price_below] path. *)
+let test_short_buyin_htb_price_below_axis_expands _ =
+  let axis =
+    VM.Key
+      {
+        path = [ "margin_config"; "short_buyin_htb_price_below" ];
+        values = Sexp.[ Atom "0.0"; Atom "5.0" ];
+      }
+  in
+  let t = { VM.axes = [ axis ]; expansion = VM.Cartesian } in
+  assert_that (VM.expand t)
+    (elements_are
+       [
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string
+                     "((margin_config ((short_buyin_htb_price_below 0.0))))");
+              ]);
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string
+                     "((margin_config ((short_buyin_htb_price_below 5.0))))");
+              ]);
+       ])
+
 (* Proves R2 (experiment-flag-discipline) for the [suppress_warmup_trading]
    warmup-trading gate (#1549 A2): it is a real top-level bool flag on
    [Weinstein_strategy.config] (same mechanism as [neutral_blocks_longs]), so
@@ -659,6 +763,12 @@ let suite =
          >:: test_short_borrow_min_dollar_adv_axis_expands;
          "short_maintenance_tiers axis expands"
          >:: test_short_maintenance_tiers_axis_expands;
+         "short_borrow_rate_tiers axis expands"
+         >:: test_short_borrow_rate_tiers_axis_expands;
+         "short_buyin_stress_mode axis expands"
+         >:: test_short_buyin_stress_mode_axis_expands;
+         "short_buyin_htb_price_below axis expands"
+         >:: test_short_buyin_htb_price_below_axis_expands;
          "short_sleeve_fraction flag axis expands"
          >:: test_short_sleeve_fraction_axis_expands;
          "maintenance_long_pct axis expands"

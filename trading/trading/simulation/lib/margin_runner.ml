@@ -97,6 +97,22 @@ let dedup_strategy_exits_for_margin ~strategy_transitions ~margin_trans =
         | Position.TriggerExit _ -> not (Set.mem margin_exit_ids t.position_id)
         | _ -> true)
 
+(* A short can be flagged for cover on the same Friday by BOTH the maintenance
+   check ([margin_call]) and the buy-in stress mode ([buyin_stress]). The
+   [Position.t] state machine accepts [Holding -> TriggerExit] only once per
+   position, so keep the maintenance cover (richer forensic detail) and drop the
+   colliding buy-in duplicate. Long-side reduces never collide (disjoint side).*)
+let _drop_buyins_colliding_with_covers ~short_cover_trans ~buyin_trans =
+  let cover_ids =
+    List.map short_cover_trans ~f:(fun (t : Position.transition) ->
+        t.position_id)
+    |> Set.of_list (module String)
+  in
+  if Set.is_empty cover_ids then buyin_trans
+  else
+    List.filter buyin_trans ~f:(fun (t : Position.transition) ->
+        not (Set.mem cover_ids t.position_id))
+
 let tick ~margin_config ~long_margin_rate_annual_pct ~maintenance_long_pct
     ~portfolio ~positions ~today_bars ~date ~strategy_transitions =
   let prices = mark_prices today_bars in
@@ -111,7 +127,12 @@ let tick ~margin_config ~long_margin_rate_annual_pct ~maintenance_long_pct
     Long_maintenance.maintenance_reduce_transitions ~maintenance_long_pct
       ~portfolio ~positions ~prices ~date
   in
-  let margin_trans = short_cover_trans @ long_reduce_trans in
+  let buyin_trans =
+    Short_buyin.buyin_stress_transitions ~margin_config ~positions ~prices ~date
+    |> fun buyin_trans ->
+    _drop_buyins_colliding_with_covers ~short_cover_trans ~buyin_trans
+  in
+  let margin_trans = short_cover_trans @ long_reduce_trans @ buyin_trans in
   let strategy_transitions =
     dedup_strategy_exits_for_margin ~strategy_transitions ~margin_trans
   in
