@@ -167,9 +167,19 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
    Inconclusive-promising (floors-zero recovers +5.2pp return at
    equal DD, 10/13 Sharpe wins — the floor staircase was the
    redeemed-cohort tax; plain w30 keeps best mean Sharpe 0.860 vs
-   bundle 0.827). Missing before any flip: bundle confirmation grid
-   (sp500 + 2011 cells) + bundle rolling-start (recovery-window
-   repair check). Do NOT flip any default without the user.
+   bundle 0.827). **Bundle studies DONE (07-20)** — note
+   `dev/notes/bundle-studies-results-2026-07-20.md`, ledger
+   `2026-07-20-bundle-promotion-studies` (Inconclusive-pending-human):
+   sp500 cell CONFIRMS (bundle-w15 .737 / w30 .570 vs .396, both above
+   the w-only cell); broad-2011 cell REGRESSES to wash (bundle-w30
+   .599±.674 vs baseline .619 — vs w-only's .825±.223: floors are
+   regime-dependent); rolling-start REPAIRS the motivating tail
+   (2000/2008/2010 starts: w30 −5.8/−6.7/−8.5 → bundle +0.4/+0.2/−1.9
+   pp/yr vs baseline; 9/12 wins, median +2.08; worst-start realized
+   edge +7.79% = best of all three configs; MaxDD compression kept).
+   Human gate options: A promote BUNDLE (recommended — decisive-lens
+   argument), B keep axes pending lever (f), C bare w30 (not
+   recommended). Do NOT flip any default without the user.
 3. **Designed levers (default-off, in order):** (a) virgin-crossing
    re-admission — Stage-2 name crossing its 520w max on volume = fresh
    admissible breakout (AXTI-class access restored; book-faithful) —
