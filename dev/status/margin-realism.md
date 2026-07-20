@@ -150,7 +150,64 @@ and M1b (follow-up).
   - Also fixed a #2005 QC follow-up: `portfolio_summary.mli` / `metric_types.mli`
     now qualify the `portfolio_value - current_cash` identity as cash-account-only
     (a long-margin debit shifts the split by `+ long_margin_debit`).
-- **M3** — short-side squeeze robustness (borrow availability, HTB tiers, buy-in).
+- [x] **M3a — borrow availability + HTB/maintenance tier tables (default-off).**
+  Branch `feat/margin-m3a-borrow-htb`. The deterministic half of M3's short-side
+  squeeze robustness: three default-off mechanisms, each R1 no-op at its default,
+  each an R2-searchable axis. Bit-identical to pre-M3a at every default (parity
+  pinned by unit tests, no golden re-pin needed).
+  - **Tier-table primitive** — new pure module `Short_margin_tiers`
+    (`trading/trading/portfolio/lib/short_margin_tiers.{ml,mli}`): a
+    price-banded, order-independent, piecewise-constant lookup (`tier_value
+    ~tiers ~flat_fallback ~price` picks the tightest band strictly covering the
+    price, else the flat fallback). An empty table is a bit-identical no-op.
+    Thresholds live in tests / example configs, not baked in code.
+  - **HTB tiered borrow rate** — `Margin_config` gains
+    `short_borrow_rate_tiers : Short_margin_tiers.tier list [@sexp.default []]` +
+    helpers `borrow_fee_annual_for_price` / `daily_borrow_rate_for_price`.
+    `Portfolio_margin.accrue_daily_borrow_fee` now accrues {b per short position}
+    at its marked price using the tiered daily rate; empty table → every price
+    resolves to the flat 50bps → per-position sum equals the legacy
+    `sum_short_notional * flat_daily_rate` bit-for-bit (distributivity).
+  - **Maintenance tier table** — `Margin_config` gains
+    `short_maintenance_tiers : Short_margin_tiers.tier list [@sexp.default []]` +
+    `maintenance_pct_for_price`. `Portfolio_margin.check_maintenance_margin` uses
+    the price-tiered threshold (sub-$5 → 100%, ~$5-17 → ≈83%, ≥ ~$17 → 30% base
+    per the 2026-06-12 mechanics note) so low-priced HTB shorts flag for
+    force-cover sooner; empty table → flat 25% → bit-identical.
+  - **Borrow-availability entry gate** — new module `Short_borrow_gate`
+    (`trading/trading/weinstein/strategy/lib/short_borrow_gate.{ml,mli}`, pure
+    `filter` + bar-reader adapter `apply`), re-exported on `Weinstein_strategy`.
+    Drops SHORT candidates whose trailing dollar-ADV (no-lookahead) is below the
+    borrow-supply floor; longs untouched; missing reading never drops. Wired as
+    the last gate in `Entry_assembly.assemble`. Config field
+    `short_borrow_min_dollar_adv : float [@sexp.default 0.0]` on
+    `weinstein_strategy_config` (+ re-declared `weinstein_strategy.mli` record).
+    Dollar-ADV is the borrow-supply proxy (we have no locate feed).
+  - **R2 axes** — top-level `short_borrow_min_dollar_adv` + nested
+    `margin_config.short_{borrow_rate,maintenance}_tiers` all resolve through
+    `Overlay_validator`; axis-expansion tests
+    (`test_short_borrow_min_dollar_adv_axis_expands`,
+    `test_short_maintenance_tiers_axis_expands`) in `test_variant_matrix.ml`.
+  - **Bar-cadence caveat** documented in `short_borrow_gate.mli` + the tier
+    `.mli`s: weekly-close marks cannot see an intraweek borrow recall / gap
+    squeeze. Probabilistic buy-in / gap-through-maintenance stress paths are
+    **M3b** territory (a documented seam, not built here).
+  - Tests: `test_short_margin_tiers.ml` (6 — lookup: empty→fallback,
+    tightest-band, middle band, uncovered→fallback, exclusive boundary,
+    order-independence); `test_margin_accounting.ml` (+6 — tiered borrow fee
+    per-price, empty-tiers flat parity, tiered maintenance flags a cheap short
+    the flat 25% doesn't + flat-parity, config round-trip + pre-M3a back-compat
+    parse); `test_short_borrow_gate.ml` (4 — zero-floor no-op, drops illiquid
+    short / keeps liquid, never drops longs, missing-reading keeps); extended
+    `test_long_buying_power.ml` (config default no-op + round-trip + pre-M3a
+    parse for `short_borrow_min_dollar_adv`).
+  - Verify: `dune runtest trading/portfolio/test trading/weinstein/strategy/test
+    trading/backtest/walk_forward/test` (container path
+    `/workspaces/trading-1/.claude/worktrees/<ws>/trading`).
+- **M3b** — buy-in stress mode (PENDING follow-up): probabilistic forced cover
+  on HTB names (config-gated, default-off) OR a stress-path mode for the
+  promotion grid, including gap-through-maintenance scenarios (bar-cadence marks
+  can't see intraweek gap squeezes — the documented M3a seam).
 - **M4** — validation protocol (parity gates, squeeze stress cells, leverage
   surface via experiment-gap-closing + confirmation grid). No default flips and no
   levered number is quoted until M4.

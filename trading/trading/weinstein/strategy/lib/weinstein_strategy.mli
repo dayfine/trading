@@ -200,6 +200,11 @@ module Long_buying_power = Long_buying_power
     primitives. Exposed so tests can pin the pure ceiling / interest math
     directly. See {!Long_buying_power}. *)
 
+module Short_borrow_gate = Short_borrow_gate
+(** Short-side borrow-availability entry gate (margin M3a): drops short
+    candidates whose trailing dollar-ADV is below the borrow-supply floor.
+    Exposed so tests can pin the pure {!Short_borrow_gate.filter} directly. *)
+
 module Exit_audit_capture = Exit_audit_capture
 (** Exit-side trade-audit capture. Bridges [TriggerExit] transitions to
     {!Audit_recorder.exit_event}. See {!Exit_audit_capture}. *)
@@ -314,6 +319,15 @@ type config = {
           ([dev/notes/long-short-margin-mechanics-2026-06-12.md]) as a
           default-off, searchable {!Walk_forward.Variant_matrix} axis. Not wired
           into any default config or preset. *)
+  short_borrow_min_dollar_adv : float; [@sexp.default 0.0]
+      (** Borrow-availability floor for short candidates (margin M3a): shorts
+          whose trailing dollar-ADV (no-lookahead, over {!liquidity_config}'s
+          lookback) is below this value are dropped as "no borrow available"
+          before the entry walk; longs are never affected. Default [0.0] = no-op
+          (bit-identical). A default-off, searchable
+          {!Walk_forward.Variant_matrix} axis; see
+          {!Weinstein_strategy_config.short_borrow_min_dollar_adv} and
+          {!Short_borrow_gate}. *)
   suppress_warmup_trading : bool; [@sexp.default true]
       (** When [true] (the default), the backtest runner suppresses all new
           position entries (long and short) before the measurement [start_date],

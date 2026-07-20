@@ -344,6 +344,78 @@ let test_maintenance_long_pct_axis_expands _ =
               [ equal_to (Sexp.of_string "((maintenance_long_pct 0.25))") ]);
        ])
 
+(* Proves R2 (experiment-flag-discipline) for the M3a short borrow-availability
+   gate: [short_borrow_min_dollar_adv] is a real top-level float key on
+   [Weinstein_strategy.config] (same mechanism as [short_min_price]), so the
+   axis expands and passes [Overlay_validator] validation with no
+   overlay-validator change. The no-op default [0.0] and a positive ADV floor
+   sit on one axis. *)
+let test_short_borrow_min_dollar_adv_axis_expands _ =
+  let axis =
+    VM.Key
+      {
+        path = [ "short_borrow_min_dollar_adv" ];
+        values = Sexp.[ Atom "0.0"; Atom "1000000.0" ];
+      }
+  in
+  let t = { VM.axes = [ axis ]; expansion = VM.Cartesian } in
+  assert_that (VM.expand t)
+    (elements_are
+       [
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to (Sexp.of_string "((short_borrow_min_dollar_adv 0.0))");
+              ]);
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string "((short_borrow_min_dollar_adv 1000000.0))");
+              ]);
+       ])
+
+(* Proves R2 (experiment-flag-discipline) for the M3a short maintenance tier
+   TABLE: [short_maintenance_tiers] is a real field on the nested
+   [margin_config] record, reached via the [margin_config.short_maintenance_tiers]
+   path, and its value is a sexp-valued tier list (mirrors the nested
+   record-valued [screening_config.weights.w_overhead_supply] axis). The axis
+   expands and passes [Overlay_validator] validation with no overlay-validator
+   change — the tier table is searchable the day it lands. *)
+let test_short_maintenance_tiers_axis_expands _ =
+  let axis =
+    VM.Key
+      {
+        path = [ "margin_config"; "short_maintenance_tiers" ];
+        values =
+          Sexp.[ List []; of_string "(((price_below 17.0) (value 1.0)))" ];
+      }
+  in
+  let t = { VM.axes = [ axis ]; expansion = VM.Cartesian } in
+  assert_that (VM.expand t)
+    (elements_are
+       [
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string
+                     "((margin_config ((short_maintenance_tiers ()))))");
+              ]);
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string
+                     "((margin_config ((short_maintenance_tiers (((price_below \
+                      17.0) (value 1.0)))))))");
+              ]);
+       ])
+
 (* Proves R2 (experiment-flag-discipline) for the [suppress_warmup_trading]
    warmup-trading gate (#1549 A2): it is a real top-level bool flag on
    [Weinstein_strategy.config] (same mechanism as [neutral_blocks_longs]), so
@@ -583,6 +655,10 @@ let suite =
          >:: test_short_min_price_axis_expands;
          "w_overhead_supply nested weight axis expands + validates"
          >:: test_w_overhead_supply_weight_axis_expands;
+         "short_borrow_min_dollar_adv axis expands"
+         >:: test_short_borrow_min_dollar_adv_axis_expands;
+         "short_maintenance_tiers axis expands"
+         >:: test_short_maintenance_tiers_axis_expands;
          "short_sleeve_fraction flag axis expands"
          >:: test_short_sleeve_fraction_axis_expands;
          "maintenance_long_pct axis expands"

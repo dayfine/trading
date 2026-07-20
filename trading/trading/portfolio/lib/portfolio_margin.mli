@@ -82,12 +82,15 @@ val accrue_daily_borrow_fee :
     [accrued_borrow_fee]. No-op when [margin_config.enabled = false] or when the
     portfolio holds no short positions.
 
-    The fee is computed against current marked notional:
-    [sum_of_short_notional *. daily_borrow_rate], where
-    [daily_borrow_rate = short_borrow_fee_annual_pct /. trading_days_per_year]
-    (see {!Margin_config.daily_borrow_rate}). Symbols missing from the price
-    list are treated as zero-fee (the caller is expected to mark every short on
-    each trading-day tick — same convention as [Portfolio.mark_to_market]). *)
+    The fee is accrued {b per short position} at its marked price using the
+    price-tiered daily rate {!Margin_config.daily_borrow_rate_for_price} (margin
+    M3a): low-priced hard-to-borrow names can carry a higher rate. When
+    [margin_config.short_borrow_rate_tiers] is empty (the default) every price
+    resolves to the flat {!Margin_config.daily_borrow_rate}, so the per-position
+    sum equals the legacy [sum_of_short_notional *. daily_borrow_rate]
+    bit-for-bit. Symbols missing from the price list are treated as zero-fee
+    (the caller is expected to mark every short on each trading-day tick — same
+    convention as [Portfolio.mark_to_market]). *)
 
 val sum_short_notional : Portfolio.t -> (symbol * price) list -> float
 (** Sum of [|qty *. price|] across all currently-open short positions whose
@@ -110,8 +113,12 @@ val check_maintenance_margin :
     {[
     equity_ratio = (((1.0 +. initial_margin_pct) *. c0) -. p) /. p
     ]}
-    A position is flagged when
-    [equity_ratio < margin_config.maintenance_margin_pct].
+    A position is flagged when [equity_ratio < threshold], where [threshold] is
+    the price-tiered {!Margin_config.maintenance_pct_for_price} for the short's
+    marked price (margin M3a) — so low-priced HTB shorts are flagged sooner.
+    When [margin_config.short_maintenance_tiers] is empty (the default) the
+    threshold resolves to the flat [maintenance_margin_pct], bit-identical to
+    pre-M3a.
 
     Equivalent trigger price:
     [p_trigger = c0 *. (1.0 +. initial_margin_pct) /. (1.0 +.
