@@ -218,7 +218,15 @@ val fit_gp :
     lengths disagree.
 
     Numerical: adds [noise_variance · I] to the kernel matrix before Cholesky.
-    Use [noise_variance ~ 1e-6] for jitter on noise-free objectives. *)
+    Use [noise_variance ~ 1e-6] for jitter on noise-free objectives.
+
+    Adaptive-nugget escalation: on a rare non-positive-definite kernel matrix
+    (duplicate or near-duplicate observations can trigger this), the Cholesky
+    factorisation is retried with an escalating additive diagonal jitter
+    (nugget) — see {!Bayesian_opt_cholesky} — instead of raising immediately.
+    The first attempt is unmodified from the [noise_variance · I] kernel above,
+    so behavior is unchanged whenever that attempt succeeds. Only after repeated
+    failures is the original exception re-raised. *)
 
 val expected_improvement :
   posterior:gp_posterior -> f_best:float -> float array -> float

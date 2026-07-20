@@ -153,7 +153,10 @@ let fit_gp ~length_scales ~signal_variance ~noise_variance ~observations_x
   for i = 0 to n - 1 do
     Mat.set k i i (Mat.get k i i +. noise_variance)
   done;
-  let l = Linalg.chol ~upper:false k in
+  let l =
+    Bayesian_opt_cholesky.chol_with_nugget_escalation k ~n ~noise_variance
+      ~signal_variance
+  in
   let l_t = Mat.transpose l in
   (* Solve L L^T α = y_centered  →  L z = y_centered, then L^T α = z. *)
   let y_col = Mat.of_array y_centered n 1 in
