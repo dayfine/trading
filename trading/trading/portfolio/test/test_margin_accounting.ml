@@ -451,6 +451,118 @@ let test_sum_short_notional_combines_positions _ =
     (float_equal 11_500.0)
 
 (* ========================================================================== *)
+(* Flag-on: HTB tiered borrow rate + tiered maintenance (margin M3a)          *)
+(* ========================================================================== *)
+
+(* A HTB borrow-rate table: sub-$17 names pay 50%/yr, everything else the flat
+   50bps fallback. Sits in the test, not baked into code (R1). *)
+let htb_borrow_config =
+  {
+    on_config with
+    Margin_config.short_borrow_rate_tiers =
+      [ { Trading_portfolio.Short_margin_tiers.price_below = 17.0; value = 0.50 } ];
+  }
+
+(* Two shorts at $10 (HTB tier) and $50 (flat fallback). Each position pays its
+   own price-tiered rate; the total is their sum. *)
+let _two_price_shorts () =
+  apply_trades_with_margin_exn ~margin_config:on_config
+    (create ~initial_cash:30_000.0 ())
+    [
+      make_trade ~id:"t1" ~order_id:"o1" ~symbol:"CHEAP" ~side:Sell
+        ~quantity:100.0 ~price:10.0 ();
+      make_trade ~id:"t2" ~order_id:"o2" ~symbol:"RICH" ~side:Sell
+        ~quantity:100.0 ~price:50.0 ();
+    ]
+    ~error_msg:"two shorts"
+
+let test_borrow_fee_tiered_charges_per_price _ =
+  let portfolio = _two_price_shorts () in
+  let prices = [ ("CHEAP", 10.0); ("RICH", 50.0) ] in
+  (* CHEAP: notional 1000 at 50%/yr; RICH: notional 5000 at flat 50bps. *)
+  let expected_fee =
+    (1_000.0 *. (0.50 /. Margin_config.trading_days_per_year))
+    +. (5_000.0 *. (0.005 /. Margin_config.trading_days_per_year))
+  in
+  assert_that
+    (accrue_daily_borrow_fee ~margin_config:htb_borrow_config portfolio prices)
+    (field (fun p -> p.accrued_borrow_fee) (float_equal ~epsilon:1e-12 expected_fee))
+
+let test_borrow_fee_empty_tiers_bit_equal_flat _ =
+  (* Empty tier table (the default) → every short pays the flat rate, so the
+     per-position sum equals the legacy sum_short_notional * flat_daily_rate. *)
+  let portfolio = _two_price_shorts () in
+  let prices = [ ("CHEAP", 10.0); ("RICH", 50.0) ] in
+  let expected_fee = _expected_daily_fee 6_000.0 on_config in
+  assert_that
+    (accrue_daily_borrow_fee ~margin_config:on_config portfolio prices)
+    (field (fun p -> p.accrued_borrow_fee) (float_equal ~epsilon:1e-12 expected_fee))
+
+(* A short 100 @ $10, marked $10: equity_ratio = (1.5*10 - 10)/10 = 0.5. Above
+   the flat 25% (not flagged), but below a 100% sub-$17 tier (flagged). *)
+let _cheap_short () =
+  apply_trades_with_margin_exn ~margin_config:on_config
+    (create ~initial_cash:10_000.0 ())
+    [
+      make_trade ~id:"t1" ~order_id:"o1" ~symbol:"CHEAP" ~side:Sell
+        ~quantity:100.0 ~price:10.0 ();
+    ]
+    ~error_msg:"cheap short"
+
+let test_maintenance_flat_does_not_flag_cheap_short _ =
+  assert_that
+    (check_maintenance_margin ~margin_config:on_config (_cheap_short ())
+       [ ("CHEAP", 10.0) ])
+    (elements_are [])
+
+let test_maintenance_tiered_flags_cheap_short _ =
+  let tiered_config =
+    {
+      on_config with
+      Margin_config.short_maintenance_tiers =
+        [
+          { Trading_portfolio.Short_margin_tiers.price_below = 17.0; value = 1.0 };
+        ];
+    }
+  in
+  assert_that
+    (check_maintenance_margin ~margin_config:tiered_config (_cheap_short ())
+       [ ("CHEAP", 10.0) ])
+    (elements_are [ equal_to "CHEAP" ])
+
+let test_margin_config_round_trip_preserves_tiers _ =
+  let armed =
+    {
+      Margin_config.default_config with
+      Margin_config.short_borrow_rate_tiers =
+        [ { Trading_portfolio.Short_margin_tiers.price_below = 5.0; value = 1.0 } ];
+      Margin_config.short_maintenance_tiers =
+        [
+          { Trading_portfolio.Short_margin_tiers.price_below = 17.0; value = 0.83 };
+        ];
+    }
+  in
+  assert_that
+    (Margin_config.t_of_sexp (Margin_config.sexp_of_t armed))
+    (equal_to (armed : Margin_config.t))
+
+let test_pre_m3a_margin_config_sexp_parses_with_empty_tiers _ =
+  (* A pre-M3a margin_config sexp (no tier fields) must decode with empty
+     tables — the [@sexp.default []] back-compat contract. *)
+  let sexp =
+    Sexp.of_string
+      "((enabled true) (initial_margin_pct 0.5) (maintenance_margin_pct 0.25) \
+       (short_borrow_fee_annual_pct 0.005))"
+  in
+  assert_that
+    (Margin_config.t_of_sexp sexp)
+    (all_of
+       [
+         field (fun c -> c.Margin_config.short_borrow_rate_tiers) (size_is 0);
+         field (fun c -> c.Margin_config.short_maintenance_tiers) (size_is 0);
+       ])
+
+(* ========================================================================== *)
 (* Long-margin (levered long) accounting — margin M1b-2                       *)
 (* ========================================================================== *)
 
@@ -696,6 +808,18 @@ let suite =
          >:: test_borrow_fee_zero_when_no_shorts;
          "test_sum_short_notional_combines_positions"
          >:: test_sum_short_notional_combines_positions;
+         "test_borrow_fee_tiered_charges_per_price"
+         >:: test_borrow_fee_tiered_charges_per_price;
+         "test_borrow_fee_empty_tiers_bit_equal_flat"
+         >:: test_borrow_fee_empty_tiers_bit_equal_flat;
+         "test_maintenance_flat_does_not_flag_cheap_short"
+         >:: test_maintenance_flat_does_not_flag_cheap_short;
+         "test_maintenance_tiered_flags_cheap_short"
+         >:: test_maintenance_tiered_flags_cheap_short;
+         "test_margin_config_round_trip_preserves_tiers"
+         >:: test_margin_config_round_trip_preserves_tiers;
+         "test_pre_m3a_margin_config_sexp_parses_with_empty_tiers"
+         >:: test_pre_m3a_margin_config_sexp_parses_with_empty_tiers;
          "test_disarmed_over_cash_buy_still_rejected"
          >:: test_disarmed_over_cash_buy_still_rejected;
          "test_disarmed_sequence_bit_equal_to_legacy"

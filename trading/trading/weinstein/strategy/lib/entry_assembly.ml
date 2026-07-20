@@ -12,5 +12,11 @@ let assemble ~config ~bar_reader ~current_date (screen_result : Screener.result)
     Declining_ma_gate.filter ~reject:config.reject_declining_ma_long_entry
       combined
   in
-  Entry_liquidity_gate.apply ~config:config.liquidity_config ~bar_reader
+  let combined =
+    Entry_liquidity_gate.apply ~config:config.liquidity_config ~bar_reader
+      ~current_date combined
+  in
+  Short_borrow_gate.apply
+    ~min_dollar_adv:config.short_borrow_min_dollar_adv
+    ~lookback_days:config.liquidity_config.adv_lookback_days ~bar_reader
     ~current_date combined

@@ -13,6 +13,10 @@
   (pps ppx_test_matcher)))
 
 (test
+ (name test_short_margin_tiers)
+ (libraries core ounit2 trading.portfolio matchers))
+
+(test
  (name test_margin_accounting)
  (libraries
   core

@@ -314,6 +314,15 @@ type config = {
           ([dev/notes/long-short-margin-mechanics-2026-06-12.md]) as a
           default-off, searchable {!Walk_forward.Variant_matrix} axis. Not wired
           into any default config or preset. *)
+  short_borrow_min_dollar_adv : float; [@sexp.default 0.0]
+      (** Borrow-availability floor for short candidates (margin M3a): shorts
+          whose trailing dollar-ADV (no-lookahead, over {!liquidity_config}'s
+          lookback) is below this value are dropped as "no borrow available"
+          before the entry walk; longs are never affected. Default [0.0] =
+          no-op (bit-identical). A default-off, searchable
+          {!Walk_forward.Variant_matrix} axis; see
+          {!Weinstein_strategy_config.short_borrow_min_dollar_adv} and
+          {!Short_borrow_gate}. *)
   suppress_warmup_trading : bool; [@sexp.default true]
       (** When [true] (the default), the backtest runner suppresses all new
           position entries (long and short) before the measurement [start_date],
