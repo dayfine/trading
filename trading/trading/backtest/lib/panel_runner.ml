@@ -157,13 +157,26 @@ let _build_calendar ~start ~end_ : Date.t array =
    Refs: closes the regression on Bar_reader.of_snapshot_views (the
    [~calendar] plumbing on the snapshot views that this constructor now
    consumes was introduced in a separate prior PR). *)
-let _build_snapshot_bar_reader ~daily_panels ~calendar =
+let _build_snapshot_bar_reader ~daily_panels ~calendar ~snapshot_dir ~manifest =
   let callbacks = Snapshot_callbacks.of_daily_panels daily_panels in
   eprintf
     "Panel_runner: snapshot bar reader wired (calendar %d days) for strategy\n\
      %!"
     (Array.length calendar);
-  Weinstein_strategy.Bar_reader.of_snapshot_views ~calendar callbacks
+  (* Sketch-v5 activation: when the warehouse carries per-symbol [.weekly]
+     side-tables (manifest [weekly_sidetable_format_hash = Some _]), the loader
+     supplies them so {!Panel_callbacks.stock_analysis_callbacks_of_weekly_views}
+     takes the v5 read path; a warehouse without side-tables ([None] hash) reads
+     the dense [Res_*] columns, bit-identical to the pre-v5 behaviour. A
+     mismatched hash raises (loud staleness refusal). *)
+  let weekly_sidetable_loader =
+    Weinstein_strategy.Weekly_sidetable_reader.loader_for
+      ~snapshot_dir
+      ~manifest_format_hash:
+        manifest.Snapshot_pipeline.Snapshot_manifest.weekly_sidetable_format_hash
+  in
+  Weinstein_strategy.Bar_reader.of_snapshot_views ~calendar
+    ~weekly_sidetable_loader callbacks
 
 let _create_panels ~snapshot_dir ~manifest =
   Daily_panels.create ~snapshot_dir ~manifest
@@ -210,7 +223,9 @@ let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
     ~shared_panels ~warmup_start ~end_date ~audit_recorder ?fold_start_date () =
   let daily_panels = _resolve_panels ~shared_panels ~snapshot_dir ~manifest in
   let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
-  let bar_reader = _build_snapshot_bar_reader ~daily_panels ~calendar in
+  let bar_reader =
+    _build_snapshot_bar_reader ~daily_panels ~calendar ~snapshot_dir ~manifest
+  in
   let strategy =
     Panel_strategy_builder.build ~ad_bars:input.ad_bars
       ~ticker_sectors:input.ticker_sectors ~config:input.config ~strategy_choice
