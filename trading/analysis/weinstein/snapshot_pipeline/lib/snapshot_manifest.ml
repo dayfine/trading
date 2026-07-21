@@ -15,11 +15,20 @@ type t = {
   schema_hash : string;
   schema : Snapshot_schema.t;
   entries : file_metadata list;
+  weekly_sidetable_format_hash : string option; [@sexp.option]
 }
 [@@deriving sexp]
 
 let create ~schema ~entries =
-  { schema_hash = schema.Snapshot_schema.schema_hash; schema; entries }
+  {
+    schema_hash = schema.Snapshot_schema.schema_hash;
+    schema;
+    entries;
+    weekly_sidetable_format_hash = None;
+  }
+
+let set_weekly_sidetable_format_hash t hash =
+  { t with weekly_sidetable_format_hash = Some hash }
 
 let write ~path manifest =
   try

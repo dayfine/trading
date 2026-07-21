@@ -210,6 +210,39 @@ let test_update_for_symbol_rejects_schema_mismatch _ =
   in
   assert_that result (is_error_with Status.Internal)
 
+(* Sketch-v5: [create] leaves [weekly_sidetable_format_hash] as [None], and the
+   [@sexp.option] field is omitted from the serialized manifest — so a warehouse
+   built without side-tables has a byte-identical manifest to before the field
+   landed (R1). *)
+let test_create_omits_weekly_hash _ =
+  let manifest = _sample_manifest () in
+  let s = Sexp.to_string_hum (Snapshot_manifest.sexp_of_t manifest) in
+  assert_that
+    (String.is_substring s ~substring:"weekly_sidetable")
+    (equal_to false)
+
+let test_create_leaves_weekly_hash_none _ =
+  assert_that (_sample_manifest ()).weekly_sidetable_format_hash is_none
+
+(* [set_weekly_sidetable_format_hash] stamps the hash and it survives a sexp
+   round-trip — the writer records it on the final manifest under
+   [--emit-weekly-sidetable]. *)
+let test_set_weekly_hash_round_trips _ =
+  let path = _tmp_path () in
+  let manifest =
+    Snapshot_manifest.set_weekly_sidetable_format_hash (_sample_manifest ())
+      "abc123"
+  in
+  let result =
+    Result.bind (Snapshot_manifest.write ~path manifest) ~f:(fun () ->
+        Snapshot_manifest.read ~path)
+  in
+  assert_that result
+    (is_ok_and_holds
+       (field
+          (fun (m : Snapshot_manifest.t) -> m.weekly_sidetable_format_hash)
+          (is_some_and (equal_to "abc123"))))
+
 let suite =
   "Snapshot_manifest tests"
   >::: [
@@ -231,6 +264,10 @@ let suite =
          >:: test_update_for_symbol_appends_incrementally;
          "update_for_symbol rejects schema mismatch"
          >:: test_update_for_symbol_rejects_schema_mismatch;
+         "create omits weekly hash from sexp" >:: test_create_omits_weekly_hash;
+         "create leaves weekly hash none"
+         >:: test_create_leaves_weekly_hash_none;
+         "set weekly hash round trips" >:: test_set_weekly_hash_round_trips;
        ]
 
 let () = run_test_tt_main suite

@@ -60,6 +60,14 @@ type t = {
   entries : file_metadata list;
       (** One entry per universe symbol that has a snapshot file in this
           directory. Order is the order the writer enumerated symbols. *)
+  weekly_sidetable_format_hash : string option; [@sexp.option]
+      (** Sketch-v5 weekly side-table format hash
+          ({!Data_panel_snapshot.Weekly_sidetable.format_hash}) when the build
+          emitted [SYMBOL.weekly] side-files, else [None]. Lets a reader detect
+          + gate side-tables produced under a different format. Serialized with
+            [@sexp.option] so it is omitted when [None] — a warehouse built
+            without side-tables has a byte-identical manifest to before this
+            field landed. *)
 }
 [@@deriving sexp]
 (** Directory manifest. *)
@@ -70,7 +78,14 @@ val create :
   t
 (** [create ~schema ~entries] constructs a manifest. The [schema_hash] field is
     set from [schema.schema_hash]; the [entries] are stored in the order given.
-*)
+    [weekly_sidetable_format_hash] is [None] — set it via
+    {!set_weekly_sidetable_format_hash}. *)
+
+val set_weekly_sidetable_format_hash : t -> string -> t
+(** [set_weekly_sidetable_format_hash t hash] returns [t] with its
+    [weekly_sidetable_format_hash] set to [Some hash]. Pure. The snapshot writer
+    calls this on the final manifest when [-emit-weekly-sidetable] is on,
+    passing {!Data_panel_snapshot.Weekly_sidetable.format_hash}. *)
 
 val write : path:string -> t -> unit Status.status_or
 (** [write ~path manifest] serializes [manifest] to [path] using
