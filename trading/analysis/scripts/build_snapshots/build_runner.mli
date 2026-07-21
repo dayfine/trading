@@ -30,6 +30,7 @@ val build :
   sketch_deep_days:int ->
   incremental:bool ->
   progress_every:int ->
+  ?emit_weekly_sidetable:bool ->
   unit ->
   unit
 (** [build ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
@@ -62,6 +63,16 @@ val build :
     - [incremental] — when [true], symbols whose source CSV mtime is [<=] the
       existing manifest's recorded [csv_mtime] are reused rather than rebuilt.
     - [progress_every] — emit [progress.sexp] every N symbols processed.
+    - [emit_weekly_sidetable] — sketch-v5 (PR 1). When [true], also writes one
+      sparse [<symbol>.weekly] side-table next to each [<symbol>.snap]
+      ({!Data_panel_snapshot.Weekly_sidetable}), built from the same weekly
+      aggregation the resistance sketch consumes
+      ({!Snapshot_pipeline.Weekly_sidetable_builder}), and records
+      {!Data_panel_snapshot.Weekly_sidetable.format_hash} on the final manifest.
+      Defaults to [false] — the warehouse output (files + manifest) is then
+      byte-identical to a pre-sketch-v5 build. A side-table write failure is
+      logged, not fatal. Note: incremental-skipped symbols do not (re)write
+      their side-table; a full (non-incremental) build emits one per symbol.
 
     Exits the process non-zero on manifest-write or verification failure (the
     historical [build_snapshots] semantics). *)

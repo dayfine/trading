@@ -3,7 +3,8 @@
   test_snapshot_pipeline
   test_snapshot_manifest
   test_snapshot_verifier
-  test_resistance_sketch)
+  test_resistance_sketch
+  test_weekly_sidetable_builder)
  (libraries
   core
   core_unix
@@ -15,6 +16,7 @@
   weinstein.snapshot_pipeline
   weinstein.resistance
   weinstein_types
-  types)
+  types
+  indicators.time_period)
  (preprocess
   (pps ppx_sexp_conv)))

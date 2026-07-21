@@ -53,10 +53,12 @@ let _load_universe ~universe_path =
       exit 1
 
 let main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
-    ~end_date ~sketch_deep_days ~incremental ~progress_every () =
+    ~end_date ~sketch_deep_days ~incremental ~progress_every
+    ~emit_weekly_sidetable () =
   let symbols = _load_universe ~universe_path in
   Build_runner.build ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol
-    ~start_date ~end_date ~sketch_deep_days ~incremental ~progress_every ()
+    ~start_date ~end_date ~sketch_deep_days ~incremental ~progress_every
+    ~emit_weekly_sidetable ()
 
 (* Flag [~doc] strings are hoisted to top-level bindings so the [Command.basic]
    flag block below stays flat (one line per flag) — the multi-line doc text is
@@ -102,6 +104,10 @@ let doc_progress_every =
   Printf.sprintf "N Emit progress.sexp every N symbols processed (default %d)"
     Build_runner.default_progress_every
 
+let doc_emit_weekly_sidetable =
+  "Also emit one sparse SYMBOL.weekly resistance side-table per symbol (sketch \
+   v5); default off, warehouse output is byte-identical without it"
+
 let date_arg = Command.Param.optional (Command.Arg_type.create Date.of_string)
 
 let command =
@@ -125,9 +131,12 @@ let command =
        flag "progress-every"
          (optional_with_default Build_runner.default_progress_every int)
          ~doc:doc_progress_every
+     and emit_weekly_sidetable =
+       flag "emit-weekly-sidetable" no_arg ~doc:doc_emit_weekly_sidetable
      in
      fun () ->
        main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol
-         ~start_date ~end_date ~sketch_deep_days ~incremental ~progress_every ())
+         ~start_date ~end_date ~sketch_deep_days ~incremental ~progress_every
+         ~emit_weekly_sidetable ())
 
 let () = Command_unix.run command
