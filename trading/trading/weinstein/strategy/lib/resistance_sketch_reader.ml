@@ -2,6 +2,7 @@ open Core
 module Snapshot_bar_views = Snapshot_runtime.Snapshot_bar_views
 module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
+module Weekly_sidetable = Data_panel_snapshot.Weekly_sidetable
 
 (* Reshape a flat band-major cell vector ([band * n_buckets + bucket]) into the
    [Resistance_supply.sketch.hist_bands] age-band matrix. *)
@@ -54,10 +55,31 @@ let read_sketch ~(cb : Snapshot_callbacks.t) ~symbol ~as_of :
       anchor_close;
     }
 
-let closure ?snapshot_cb ?stock_symbol ~(stock : Snapshot_bar_views.weekly_view)
-    () : unit -> Resistance_supply.sketch option =
+(* v5 leaf: derive the sketch from the loaded side-table, anchored at the row's
+   raw [Close] (still a dense column — only the [Res_*] histogram columns are
+   retired by v5). A failed [Close] read collapses to [None], the same
+   partial-read discipline [read_sketch] applies. *)
+let _read_sketch_v5 ~(cb : Snapshot_callbacks.t) ~symbol ~as_of ~entries =
+  match
+    cb.Snapshot_callbacks.read_field ~symbol ~date:as_of
+      ~field:Snapshot_schema.Close
+  with
+  | Ok close ->
+      Some (Weekly_sidetable_reader.sketch_of_entries ~entries ~as_of ~close)
+  | Error _ -> None
+
+let read ~(cb : Snapshot_callbacks.t) ~symbol ~as_of
+    ?(weekly_sidetable : Weekly_sidetable.entry list option) () :
+    Resistance_supply.sketch option =
+  match weekly_sidetable with
+  | Some entries -> _read_sketch_v5 ~cb ~symbol ~as_of ~entries
+  | None -> read_sketch ~cb ~symbol ~as_of
+
+let closure ?snapshot_cb ?stock_symbol ?weekly_sidetable
+    ~(stock : Snapshot_bar_views.weekly_view) () :
+    unit -> Resistance_supply.sketch option =
   match (snapshot_cb, stock_symbol) with
   | Some cb, Some symbol when stock.n > 0 ->
       let as_of = stock.dates.(stock.n - 1) in
-      fun () -> read_sketch ~cb ~symbol ~as_of
+      fun () -> read ~cb ~symbol ~as_of ?weekly_sidetable ()
   | _ -> fun () -> None
