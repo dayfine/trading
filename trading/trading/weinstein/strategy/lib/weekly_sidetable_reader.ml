@@ -136,6 +136,18 @@ let sketch_of_entries ~(entries : Weekly_sidetable.entry list) ~as_of ~close :
 let _weekly_path ~snapshot_dir ~symbol =
   Filename.concat snapshot_dir (symbol ^ ".weekly")
 
+(* Load the side-file for a symbol whose warehouse advertises a matching format
+   hash: an absent file means this symbol simply has no side-table (fall back to
+   the dense columns), a present file is decoded. Extracted from [load_gated] so
+   that function stays a flat 3-arm match (nesting linter). *)
+let _load_present ~snapshot_dir ~symbol :
+    Weekly_sidetable.entry list option Status.status_or =
+  let path = _weekly_path ~snapshot_dir ~symbol in
+  if not (Stdlib.Sys.file_exists path) then Ok None
+  else
+    Result.map (Weekly_sidetable.read_file ~path) ~f:(fun entries ->
+        Some entries)
+
 let load_gated ~snapshot_dir ~symbol ~manifest_format_hash :
     Weekly_sidetable.entry list option Status.status_or =
   match manifest_format_hash with
@@ -145,9 +157,4 @@ let load_gated ~snapshot_dir ~symbol ~manifest_format_hash :
         (Printf.sprintf
            "weekly side-table format hash mismatch: manifest %s, reader %s" h
            Weekly_sidetable.format_hash)
-  | Some _ ->
-      let path = _weekly_path ~snapshot_dir ~symbol in
-      if not (Stdlib.Sys.file_exists path) then Ok None
-      else
-        Result.map (Weekly_sidetable.read_file ~path) ~f:(fun entries ->
-            Some entries)
+  | Some _ -> _load_present ~snapshot_dir ~symbol
