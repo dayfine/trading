@@ -72,6 +72,14 @@ let test_truncated_rejected _ =
 let test_short_of_header_rejected _ =
   assert_that (Weekly_sidetable.decode (Stdlib.Bytes.create 4)) is_error
 
+(* The format_version int32 sits at byte offset 8 (immediately after the 8-byte
+   magic). Corrupting it to an unsupported value must make decode reject loudly —
+   this is the PR-2+ format-evolution guard the module doc promises. *)
+let test_unsupported_version_rejected _ =
+  let b = Weekly_sidetable.encode (_entries 3) in
+  Stdlib.Bytes.set_int32_le b 8 99l;
+  assert_that (Weekly_sidetable.decode b) is_error
+
 (* ----- format hash: pinned literal guards a version bump ----- *)
 
 let test_format_hash_pinned _ =
@@ -89,6 +97,7 @@ let suite =
          "bad magic rejected" >:: test_bad_magic_rejected;
          "truncated rejected" >:: test_truncated_rejected;
          "shorter than header rejected" >:: test_short_of_header_rejected;
+         "unsupported version rejected" >:: test_unsupported_version_rejected;
          "format hash pinned" >:: test_format_hash_pinned;
        ]
 
