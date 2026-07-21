@@ -174,6 +174,11 @@ module Resistance_sketch_reader = Resistance_sketch_reader
     snapshot columns for the overhead-supply score. See
     {!Resistance_sketch_reader}. *)
 
+module Weekly_sidetable_reader = Weekly_sidetable_reader
+(** Sketch-v5 read path: derive the resistance sketch from the per-symbol weekly
+    side-table by score-time bucketing (+ the manifest-gated loader). See
+    {!Weekly_sidetable_reader}. *)
+
 module Weekly_ma_cache = Weekly_ma_cache
 (** Per-symbol weekly MA cache (Stage 4 PR-D). Memoises Stage / Macro / Sector /
     Stops MA reads keyed by [(symbol, ma_type, period)]. *)

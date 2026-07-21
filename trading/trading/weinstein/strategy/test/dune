@@ -12,6 +12,7 @@
   test_macro_inputs
   test_panel_callbacks
   test_resistance_sketch_reader
+  test_weekly_sidetable_reader
   test_pi_filter_wiring
   test_sector_rotation_weinstein_strategy
   test_short_side_bear_window

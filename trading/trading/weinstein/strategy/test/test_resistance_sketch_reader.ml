@@ -1,6 +1,7 @@
 (** Direct unit tests for {!Weinstein_strategy.Resistance_sketch_reader}.
 
-    Pins the two documented guards ({!Resistance_sketch_reader.read_sketch} and
+    Pins the documented guards ({!Resistance_sketch_reader.read_sketch},
+    {!Resistance_sketch_reader.read} three-generation dispatch, and
     {!Resistance_sketch_reader.closure}) that the [Stock_analysis]-layer tests
     bypass by injecting [get_sketch] directly:
 
@@ -11,6 +12,10 @@
       band); ANY required scalar cell read failing -> [None] — a partial read
       never fabricates a sketch (the read-layer expression of "a window-starved
       warehouse can no longer masquerade as virgin").
+    - [read]: a [Some] side-table selects the v5 score-time derivation (anchored
+      at the [Close] read); a [None] side-table falls through to the v4/v3
+      dense-column path; a failed [Close] read on the v5 path collapses to
+      [None].
     - [closure]: a [fun () -> None] thunk when [snapshot_cb] / [stock_symbol] is
       absent or the [stock] view is empty ([n = 0]); the happy path reads at the
       view's last-bar date. *)
@@ -19,9 +24,11 @@ open OUnit2
 open Core
 open Matchers
 module Reader = Weinstein_strategy.Resistance_sketch_reader
+module Weekly_sidetable_reader = Weinstein_strategy.Weekly_sidetable_reader
 module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
 module Snapshot_bar_views = Snapshot_runtime.Snapshot_bar_views
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
+module Weekly_sidetable = Data_panel_snapshot.Weekly_sidetable
 
 let as_of = Date.of_string "2024-06-07"
 
@@ -82,6 +89,17 @@ let empty_view : Snapshot_bar_views.weekly_view =
     dates = [||];
     n = 0;
   }
+
+(* A tiny side-table with one week above the [Close] anchor (150). *)
+let sidetable_entries =
+  [
+    {
+      Weekly_sidetable.week_end_date = Date.of_string "2024-05-31";
+      mid = 160.0;
+      high = 165.0;
+    };
+    { Weekly_sidetable.week_end_date = as_of; mid = 152.0; high = 158.0 };
+  ]
 
 (* Happy path (v4 warehouse): all 80 cells Ok -> Some sketch whose fields equal
    the stubbed reads. The band-major histogram reshapes into [n_age_bands] bands
@@ -171,6 +189,55 @@ let test_read_sketch_hist_cell_error_none _ =
        ~symbol:"AAPL" ~as_of)
     is_none
 
+(* Dispatch: [Some] side-table selects v5 — the returned sketch equals the pure
+   [sketch_of_entries] derivation anchored at the read [Close] (150), NOT the v4
+   stub columns (which would give max_high_520w = 220). *)
+let test_read_v5_selects_sidetable _ =
+  let expected =
+    Weekly_sidetable_reader.sketch_of_entries ~entries:sidetable_entries ~as_of
+      ~close:150.0
+  in
+  assert_that
+    (Reader.read ~cb:(stub_cb ()) ~symbol:"AAPL" ~as_of
+       ~weekly_sidetable:sidetable_entries ())
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (s : Resistance_supply.sketch) -> s.max_high_520w)
+              (float_equal expected.max_high_520w);
+            field
+              (fun (s : Resistance_supply.sketch) -> s.bars_seen)
+              (float_equal expected.bars_seen);
+            field
+              (fun (s : Resistance_supply.sketch) -> s.anchor_close)
+              (float_equal 150.0);
+            (* both weeks (highs 165, 158 > anchor 150) are age < 26 -> band 0 *)
+            field
+              (fun (s : Resistance_supply.sketch) ->
+                Array.sum (module Float) s.hist_bands.(0) ~f:Fn.id)
+              (float_equal 2.0);
+          ]))
+
+(* Dispatch: [None] side-table falls through to the v4 dense columns
+   ([max_high_520w] = the stubbed 220, not a side-table value). *)
+let test_read_none_falls_through_to_v4 _ =
+  assert_that
+    (Reader.read ~cb:(stub_cb ()) ~symbol:"AAPL" ~as_of ())
+    (is_some_and
+       (field
+          (fun (s : Resistance_supply.sketch) -> s.max_high_520w)
+          (float_equal 220.0)))
+
+(* Dispatch: on the v5 path a failed [Close] read collapses to None (the same
+   partial-read discipline as read_sketch). *)
+let test_read_v5_close_error_none _ =
+  assert_that
+    (Reader.read
+       ~cb:(stub_cb ~fail_on:[ Snapshot_schema.Close ] ())
+       ~symbol:"AAPL" ~as_of ~weekly_sidetable:sidetable_entries ())
+    is_none
+
 (* closure with no snapshot_cb -> None thunk. *)
 let test_closure_missing_cb_none _ =
   let thunk = Reader.closure ~stock_symbol:"AAPL" ~stock:one_bar_view () in
@@ -202,6 +269,22 @@ let test_closure_reads_sketch_at_last_bar _ =
           (fun (s : Resistance_supply.sketch) -> s.anchor_close)
           (float_equal 150.0)))
 
+(* closure with a side-table routes the thunk through the v5 path. *)
+let test_closure_with_sidetable_uses_v5 _ =
+  let thunk =
+    Reader.closure ~snapshot_cb:(stub_cb ()) ~stock_symbol:"AAPL"
+      ~weekly_sidetable:sidetable_entries ~stock:one_bar_view ()
+  in
+  let expected =
+    Weekly_sidetable_reader.sketch_of_entries ~entries:sidetable_entries ~as_of
+      ~close:150.0
+  in
+  assert_that (thunk ())
+    (is_some_and
+       (field
+          (fun (s : Resistance_supply.sketch) -> s.max_high_520w)
+          (float_equal expected.max_high_520w)))
+
 let suite =
   "Resistance_sketch_reader"
   >::: [
@@ -213,11 +296,16 @@ let suite =
          >:: test_read_sketch_scalar_cell_error_none;
          "read_sketch hist cell error -> None"
          >:: test_read_sketch_hist_cell_error_none;
+         "read v5 selects side-table" >:: test_read_v5_selects_sidetable;
+         "read None falls through to v4" >:: test_read_none_falls_through_to_v4;
+         "read v5 close error -> None" >:: test_read_v5_close_error_none;
          "closure missing cb -> None" >:: test_closure_missing_cb_none;
          "closure missing symbol -> None" >:: test_closure_missing_symbol_none;
          "closure empty view -> None" >:: test_closure_empty_view_none;
          "closure reads sketch at last bar"
          >:: test_closure_reads_sketch_at_last_bar;
+         "closure with side-table uses v5"
+         >:: test_closure_with_sidetable_uses_v5;
        ]
 
 let () = run_test_tt_main suite
