@@ -105,7 +105,8 @@ let _dedupe_symbols ~config ~data_dir ~warmup_start ~end_date ~output_dir
   end
 
 let main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
-    ~sketch_deep_days ~incremental ~progress_every ~twin_config () =
+    ~sketch_deep_days ~incremental ~progress_every ~emit_weekly_sidetable
+    ~twin_config () =
   let scenario = Scenario.load scenario_path in
   let universe =
     _resolve_universe ~fixtures_root ~universe_path:scenario.universe_path
@@ -120,7 +121,7 @@ let main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
   Build_runner.build ~symbols ~csv_data_dir ~output_dir
     ~benchmark_symbol:(Some plan.benchmark_symbol)
     ~start_date:(Some plan.warmup_start) ~end_date:(Some plan.end_date)
-    ~sketch_deep_days ~incremental ~progress_every ()
+    ~sketch_deep_days ~incremental ~progress_every ~emit_weekly_sidetable ()
 
 let command =
   Command.basic
@@ -161,6 +162,12 @@ let command =
            (Printf.sprintf
               "N Emit progress.sexp every N symbols processed (default %d)"
               Build_runner.default_progress_every)
+     and emit_weekly_sidetable =
+       flag "emit-weekly-sidetable" no_arg
+         ~doc:
+           "Also emit one sparse SYMBOL.weekly resistance side-table per \
+            symbol (sketch v5); default off, warehouse output is \
+            byte-identical without it"
      and dedupe_rename_twins =
        flag "dedupe-rename-twins" no_arg
          ~doc:
@@ -215,6 +222,7 @@ let command =
          }
        in
        main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
-         ~sketch_deep_days ~incremental ~progress_every ~twin_config ())
+         ~sketch_deep_days ~incremental ~progress_every ~emit_weekly_sidetable
+         ~twin_config ())
 
 let () = Command_unix.run command

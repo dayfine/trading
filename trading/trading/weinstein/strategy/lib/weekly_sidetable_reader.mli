@@ -89,6 +89,6 @@ val loader_for :
     manifest format hash and returns a per-[symbol] loader. On the [load_gated]
     [Ok] path it returns the option verbatim ([None] = no side-table for this
     symbol / no side-table warehouse -> the dense read path); on the [Error]
-    path (a present-but-mismatched manifest format hash) it {b raises}
-    [Failure] — the loud staleness refusal, so a warehouse whose side-tables
-    were produced under a different format is never silently read. *)
+    path (a present-but-mismatched manifest format hash) it {b raises} [Failure]
+    — the loud staleness refusal, so a warehouse whose side-tables were produced
+    under a different format is never silently read. *)

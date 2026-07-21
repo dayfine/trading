@@ -170,10 +170,10 @@ let _build_snapshot_bar_reader ~daily_panels ~calendar ~snapshot_dir ~manifest =
      the dense [Res_*] columns, bit-identical to the pre-v5 behaviour. A
      mismatched hash raises (loud staleness refusal). *)
   let weekly_sidetable_loader =
-    Weinstein_strategy.Weekly_sidetable_reader.loader_for
-      ~snapshot_dir
+    Weinstein_strategy.Weekly_sidetable_reader.loader_for ~snapshot_dir
       ~manifest_format_hash:
-        manifest.Snapshot_pipeline.Snapshot_manifest.weekly_sidetable_format_hash
+        manifest
+          .Snapshot_pipeline.Snapshot_manifest.weekly_sidetable_format_hash
   in
   Weinstein_strategy.Bar_reader.of_snapshot_views ~calendar
     ~weekly_sidetable_loader callbacks
