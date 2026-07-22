@@ -158,3 +158,11 @@ let load_gated ~snapshot_dir ~symbol ~manifest_format_hash :
            "weekly side-table format hash mismatch: manifest %s, reader %s" h
            Weekly_sidetable.format_hash)
   | Some _ -> _load_present ~snapshot_dir ~symbol
+
+let loader_for ~snapshot_dir ~manifest_format_hash ~symbol =
+  match load_gated ~snapshot_dir ~symbol ~manifest_format_hash with
+  | Ok entries -> entries
+  | Error err ->
+      failwithf
+        "Weekly_sidetable_reader.loader_for: side-table load failed for %s: %s"
+        symbol (Status.show err) ()

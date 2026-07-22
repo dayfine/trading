@@ -74,6 +74,7 @@ val stock_analysis_callbacks_of_weekly_views :
   ?stock_symbol:string ->
   ?resistance_stock:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
   ?snapshot_cb:Snapshot_runtime.Snapshot_callbacks.t ->
+  ?weekly_sidetable:Data_panel_snapshot.Weekly_sidetable.entry list ->
   config:Stock_analysis.config ->
   stock:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
   benchmark:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
@@ -96,6 +97,16 @@ val stock_analysis_callbacks_of_weekly_views :
     bar-list / non-snapshot path), [get_sketch] is [fun () -> None] so
     [Stock_analysis.t.supply] stays [None] and the continuous overhead-supply
     score never runs.
+
+    [?weekly_sidetable] activates the sketch-v5 read path: when [Some entries]
+    (the per-symbol side-table supplied by {!Bar_reader.weekly_sidetable_for}),
+    [get_sketch] derives the sketch at score time from the weekly series via
+    {!Resistance_sketch_reader.sketch_of_entries} (anchored at the row's raw
+    [Close], still read from [snapshot_cb]) instead of reading the dense [Res_*]
+    columns. Omitted / [None] keeps the dense-column path, bit-identical to the
+    pre-v5 behaviour. The PRESENCE of the side-table is the switch — there is no
+    config flag; the manifest format hash gates staleness at load time
+    ({!Bar_reader.weekly_sidetable_for}).
 
     [?resistance_stock] is the resistance-history feed
     ([Weinstein_strategy_config.resistance_lookback_bars]): a deeper weekly view

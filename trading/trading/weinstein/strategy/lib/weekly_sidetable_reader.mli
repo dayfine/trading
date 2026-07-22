@@ -77,3 +77,18 @@ val load_gated :
     - [Some h] matching, file present -> [Ok (Some entries)] via
       {!Weekly_sidetable.read_file} (any decode failure surfaces as its
       [Error Internal]). *)
+
+val loader_for :
+  snapshot_dir:string ->
+  manifest_format_hash:string option ->
+  symbol:string ->
+  Weekly_sidetable.entry list option
+(** [loader_for ~snapshot_dir ~manifest_format_hash] is the partially-applied,
+    raising form of {!load_gated} used to build the [weekly_sidetable_loader]
+    threaded into {!Bar_reader.of_snapshot_views}: it fixes the warehouse dir +
+    manifest format hash and returns a per-[symbol] loader. On the [load_gated]
+    [Ok] path it returns the option verbatim ([None] = no side-table for this
+    symbol / no side-table warehouse -> the dense read path); on the [Error]
+    path (a present-but-mismatched manifest format hash) it {b raises} [Failure]
+    — the loud staleness refusal, so a warehouse whose side-tables were produced
+    under a different format is never silently read. *)

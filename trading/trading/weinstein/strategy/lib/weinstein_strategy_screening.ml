@@ -274,6 +274,8 @@ let _full_analysis_of_survivor ~stock_analysis_config ~resistance_lookback_bars
     Panel_callbacks.stock_analysis_callbacks_of_weekly_views
       ?ma_cache:(Bar_reader.ma_cache bar_reader)
       ?resistance_stock ~stock_symbol:ticker
+      ?weekly_sidetable:
+        (Bar_reader.weekly_sidetable_for bar_reader ~symbol:ticker)
       ~snapshot_cb:(Bar_reader.snapshot_callbacks bar_reader)
       ~config:stock_analysis_config ~stock:stock_view ~benchmark:index_view ()
   in
