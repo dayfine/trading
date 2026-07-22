@@ -25,33 +25,48 @@ let test_compute_hash_field_set_sensitive _ =
   let h_long = compute_hash [ EMA_50; SMA_50; ATR_14 ] in
   assert_that (String.equal h_short h_long) (equal_to false)
 
+(* Sketch-v5 PR 4: the canonical schema is the 13 indicator + OHLCV columns; the
+   dense resistance-sketch columns were retired (they live in the [field] type
+   for decode only, pinned by [test_retired_res_constructors_still_decode]). *)
 let test_default_schema_locks_in_canonical_fields _ =
   let open Snapshot_schema in
   assert_that default.fields
     (elements_are
-       ([
-          equal_to EMA_50;
-          equal_to SMA_50;
-          equal_to ATR_14;
-          equal_to RSI_14;
-          equal_to Stage;
-          equal_to RS_line;
-          equal_to Macro_composite;
-          equal_to Open;
-          equal_to High;
-          equal_to Low;
-          equal_to Close;
-          equal_to Volume;
-          equal_to Adjusted_close;
-          equal_to Res_max_high_130w;
-          equal_to Res_max_high_260w;
-          equal_to Res_max_high_520w;
-          equal_to Res_bars_seen;
-        ]
-       @ List.init n_hist_cells ~f:(fun k -> equal_to (Res_hist k))))
+       [
+         equal_to EMA_50;
+         equal_to SMA_50;
+         equal_to ATR_14;
+         equal_to RSI_14;
+         equal_to Stage;
+         equal_to RS_line;
+         equal_to Macro_composite;
+         equal_to Open;
+         equal_to High;
+         equal_to Low;
+         equal_to Close;
+         equal_to Volume;
+         equal_to Adjusted_close;
+       ])
 
 let test_default_schema_n_fields _ =
-  assert_that (Snapshot_schema.n_fields Snapshot_schema.default) (equal_to 97)
+  assert_that (Snapshot_schema.n_fields Snapshot_schema.default) (equal_to 13)
+
+(* The retired resistance-sketch constructors are still in the [field] type and
+   still name + index correctly, so the three-generation reader can decode a
+   legacy v4-shaped schema (built from an explicit field list) even though the
+   canonical [default] no longer emits them. *)
+let test_retired_res_constructors_still_decode _ =
+  let open Snapshot_schema in
+  let legacy =
+    create ~fields:(all_fields @ [ Res_max_high_130w; Res_hist 0 ])
+  in
+  assert_that
+    ( field_name Res_max_high_130w,
+      field_name (Res_hist 0),
+      index_of legacy Res_max_high_130w,
+      index_of legacy (Res_hist 0),
+      index_of default Res_max_high_130w )
+    (equal_to ("Res_max_high_130w", "Res_hist_00", Some 13, Some 14, None))
 
 (* The age-banded histogram (lever f) is 4 age bands x 20 price buckets = 80
    Res_hist columns, laid out band-major. *)
@@ -94,27 +109,21 @@ let test_field_name_round_trip _ =
   in
   assert_that names
     (elements_are
-       ([
-          equal_to "EMA_50";
-          equal_to "SMA_50";
-          equal_to "ATR_14";
-          equal_to "RSI_14";
-          equal_to "Stage";
-          equal_to "RS_line";
-          equal_to "Macro_composite";
-          equal_to "Open";
-          equal_to "High";
-          equal_to "Low";
-          equal_to "Close";
-          equal_to "Volume";
-          equal_to "Adjusted_close";
-          equal_to "Res_max_high_130w";
-          equal_to "Res_max_high_260w";
-          equal_to "Res_max_high_520w";
-          equal_to "Res_bars_seen";
-        ]
-       @ List.init Snapshot_schema.n_hist_cells ~f:(fun k ->
-           equal_to (Printf.sprintf "Res_hist_%02d" k))))
+       [
+         equal_to "EMA_50";
+         equal_to "SMA_50";
+         equal_to "ATR_14";
+         equal_to "RSI_14";
+         equal_to "Stage";
+         equal_to "RS_line";
+         equal_to "Macro_composite";
+         equal_to "Open";
+         equal_to "High";
+         equal_to "Low";
+         equal_to "Close";
+         equal_to "Volume";
+         equal_to "Adjusted_close";
+       ])
 
 let suite =
   "Snapshot_schema tests"
@@ -125,7 +134,9 @@ let suite =
          >:: test_compute_hash_field_set_sensitive;
          "default schema locks in canonical fields"
          >:: test_default_schema_locks_in_canonical_fields;
-         "default schema n_fields = 97" >:: test_default_schema_n_fields;
+         "default schema n_fields = 13" >:: test_default_schema_n_fields;
+         "retired Res constructors still decode"
+         >:: test_retired_res_constructors_still_decode;
          "hist layout constants (20/4/80)" >:: test_hist_layout_constants;
          "default schema hash differs from pre-OHLCV"
          >:: test_default_schema_hash_pinned_for_canonical_set;

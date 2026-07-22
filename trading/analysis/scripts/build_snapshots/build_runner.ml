@@ -127,24 +127,24 @@ let _write_and_checksum ~symbol ~path ~csv_mtime ~active_through rows =
   | Error err -> Error err
   | Ok () -> Ok (_file_metadata ~symbol ~path ~csv_mtime ~active_through)
 
-(* Sketch-v5 (PR 1): behind [--emit-weekly-sidetable], write the sparse weekly
-   side-table next to the [.snap] from the SAME weekly aggregation the sketch
-   consumes. Best-effort — a side-table write failure is logged, not fatal, so
-   it never aborts the [.snap] warehouse build. No-op when the flag is off, so
-   the default warehouse output is byte-identical. *)
-let _maybe_write_weekly ~emit_weekly_sidetable ~output_dir ~symbol ~deep_bars
-    ~bars =
-  if emit_weekly_sidetable then
-    let path = _weekly_path ~output_dir ~symbol in
-    let entries = Weekly_sidetable_builder.of_bars ~deep_bars ~bars in
-    match Weekly_sidetable.write_file ~path entries with
-    | Ok () -> ()
-    | Error err ->
-        Printf.eprintf "weekly side-table write failed for %s: %s\n%!" symbol
-          (Status.show err)
+(* Sketch-v5 PR 4: ALWAYS write the sparse [SYMBOL.weekly] side-table next to
+   the [.snap], built from the SAME weekly aggregation the retired dense sketch
+   used to consume. It is now the ONLY overhead-supply representation the reader
+   has (the dense [Res_*] columns were dropped from the canonical schema), so
+   emission is unconditional rather than behind the old [--emit-weekly-sidetable]
+   flag. Best-effort — a side-table write failure is logged, not fatal, so it
+   never aborts the [.snap] warehouse build. *)
+let _write_weekly ~output_dir ~symbol ~deep_bars ~bars =
+  let path = _weekly_path ~output_dir ~symbol in
+  let entries = Weekly_sidetable_builder.of_bars ~deep_bars ~bars in
+  match Weekly_sidetable.write_file ~path entries with
+  | Ok () -> ()
+  | Error err ->
+      Printf.eprintf "weekly side-table write failed for %s: %s\n%!" symbol
+        (Status.show err)
 
 let _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
-    ~output_dir ~csv_mtime ~emit_weekly_sidetable =
+    ~output_dir ~csv_mtime =
   let path = _file_path ~output_dir ~symbol in
   let active_through = _active_through_of_bars bars in
   match
@@ -153,8 +153,7 @@ let _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
   with
   | Error err -> Error err
   | Ok rows ->
-      _maybe_write_weekly ~emit_weekly_sidetable ~output_dir ~symbol ~deep_bars
-        ~bars;
+      _write_weekly ~output_dir ~symbol ~deep_bars ~bars;
       _write_and_checksum ~symbol ~path ~csv_mtime ~active_through rows
 
 let _maybe_reuse ~existing ~symbol =
@@ -172,10 +171,10 @@ let _checkpoint_manifest ~manifest_path ~schema entry =
         entry.Snapshot_manifest.symbol (Status.show err)
 
 let _build_or_log ~symbol ~bars ~deep_bars ~schema ~benchmark_bars ~output_dir
-    ~csv_mtime ~manifest_path ~checkpoint ~emit_weekly_sidetable =
+    ~csv_mtime ~manifest_path ~checkpoint =
   match
     _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
-      ~output_dir ~csv_mtime ~emit_weekly_sidetable
+      ~output_dir ~csv_mtime
   with
   | Error err ->
       Printf.eprintf "skip %s: build: %s\n%!" symbol (Status.show err);
@@ -186,7 +185,7 @@ let _build_or_log ~symbol ~bars ~deep_bars ~schema ~benchmark_bars ~output_dir
 
 let _try_build_and_checkpoint ~data_dir ~start_date ~end_date ~sketch_deep_days
     ~schema ~benchmark_bars ~output_dir ~manifest_path ~checkpoint ~csv_mtime
-    ~emit_weekly_sidetable symbol =
+    symbol =
   match
     _load_split_bars ~data_dir ~start_date ~end_date ~sketch_deep_days ~symbol
   with
@@ -195,11 +194,10 @@ let _try_build_and_checkpoint ~data_dir ~start_date ~end_date ~sketch_deep_days
       None
   | Ok (deep_bars, bars) ->
       _build_or_log ~symbol ~bars ~deep_bars ~schema ~benchmark_bars ~output_dir
-        ~csv_mtime ~manifest_path ~checkpoint ~emit_weekly_sidetable
+        ~csv_mtime ~manifest_path ~checkpoint
 
 let _process_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
-    ~benchmark_bars ~output_dir ~existing ~manifest_path ~checkpoint
-    ~emit_weekly_sidetable symbol =
+    ~benchmark_bars ~output_dir ~existing ~manifest_path ~checkpoint symbol =
   match _csv_mtime ~data_dir ~symbol with
   | None ->
       Printf.eprintf "skip %s: no CSV\n%!" symbol;
@@ -210,7 +208,7 @@ let _process_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
       else
         _try_build_and_checkpoint ~data_dir ~start_date ~end_date
           ~sketch_deep_days ~schema ~benchmark_bars ~output_dir ~manifest_path
-          ~checkpoint ~csv_mtime ~emit_weekly_sidetable symbol
+          ~checkpoint ~csv_mtime symbol
 
 let _load_benchmark_bars ~data_dir ~start_date ~end_date sym =
   match _load_windowed_bars ~data_dir ~start_date ~end_date ~symbol:sym with
@@ -276,16 +274,14 @@ let _emit_final_progress ~output_dir ~symbols_total ~entries ~started_at =
     ~progress:
       (_make_progress ~symbols_total ~symbols_done ~last_completed ~started_at)
 
-(* When [weekly_sidetable_hash] is [Some h] (the [--emit-weekly-sidetable] run),
-   stamp it on the final manifest so a reader can gate the [.weekly] files. When
-   [None] the manifest is byte-identical to a pre-sketch-v5 build. *)
-let _write_final_manifest ~manifest_path ~schema ~entries ~weekly_sidetable_hash
-    ~elapsed =
+(* Sketch-v5 PR 4: side-tables are always emitted, so the final manifest always
+   stamps the side-table format hash — a reader gates the [.weekly] files on it
+   ({!Weekly_sidetable_reader.load_gated}). *)
+let _write_final_manifest ~manifest_path ~schema ~entries ~elapsed =
   let manifest = Snapshot_manifest.create ~schema ~entries in
   let manifest =
-    match weekly_sidetable_hash with
-    | Some h -> Snapshot_manifest.set_weekly_sidetable_format_hash manifest h
-    | None -> manifest
+    Snapshot_manifest.set_weekly_sidetable_format_hash manifest
+      Weekly_sidetable.format_hash
   in
   match Snapshot_manifest.write ~path:manifest_path manifest with
   | Ok () ->
@@ -298,11 +294,11 @@ let _write_final_manifest ~manifest_path ~schema ~entries ~weekly_sidetable_hash
 
 let _fold_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
     ~benchmark_bars ~output_dir ~existing ~manifest_path ~progress_every
-    ~symbols_total ~started_at ~emit_weekly_sidetable i acc symbol =
+    ~symbols_total ~started_at i acc symbol =
   match
     _process_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
       ~benchmark_bars ~output_dir ~existing ~manifest_path ~checkpoint:true
-      ~emit_weekly_sidetable symbol
+      symbol
   with
   | None -> acc
   | Some entry ->
@@ -312,8 +308,7 @@ let _fold_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
       acc @ [ entry ]
 
 let build ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
-    ~end_date ~sketch_deep_days ~incremental ~progress_every
-    ?(emit_weekly_sidetable = false) () =
+    ~end_date ~sketch_deep_days ~incremental ~progress_every () =
   _ensure_dir output_dir;
   let schema = Snapshot_schema.default in
   let symbols_total = List.length symbols in
@@ -330,13 +325,9 @@ let build ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
       ~f:
         (_fold_symbol ~data_dir ~start_date ~end_date ~sketch_deep_days ~schema
            ~benchmark_bars ~output_dir ~existing ~manifest_path ~progress_every
-           ~symbols_total ~started_at ~emit_weekly_sidetable)
+           ~symbols_total ~started_at)
   in
   let elapsed = Time_ns.diff (Time_ns.now ()) t0 in
-  let weekly_sidetable_hash =
-    if emit_weekly_sidetable then Some Weekly_sidetable.format_hash else None
-  in
-  _write_final_manifest ~manifest_path ~schema ~entries ~weekly_sidetable_hash
-    ~elapsed;
+  _write_final_manifest ~manifest_path ~schema ~entries ~elapsed;
   _emit_final_progress ~output_dir ~symbols_total ~entries ~started_at;
   _verify_or_warn ~manifest_path
