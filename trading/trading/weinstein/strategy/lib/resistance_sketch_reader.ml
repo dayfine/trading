@@ -68,18 +68,41 @@ let _read_sketch_v5 ~(cb : Snapshot_callbacks.t) ~symbol ~as_of ~entries =
       Some (Weekly_sidetable_reader.sketch_of_entries ~entries ~as_of ~close)
   | Error _ -> None
 
+(* Sketch-v5 PR 4: a NEW-schema (13-col) warehouse retired the dense [Res_*]
+   columns, so [read_sketch] returns [None] on it. If resistance scoring is
+   [armed] and the symbol also has NO side-table, silently returning [None] would
+   change armed backtest results invisibly (the score just drops the supply
+   term). Fail LOUD instead — a thin (v5) warehouse must carry a [SYMBOL.weekly]
+   side-table for every scored symbol. Unarmed configs never consult the sketch,
+   so a thin warehouse with a missing side-table is fully valid for them; an OLD
+   dense warehouse always resolves via [read_sketch], so this never fires there. *)
+let _dense_fallback_or_raise ~symbol ~armed :
+    Resistance_supply.sketch option -> Resistance_supply.sketch option =
+  function
+  | Some _ as s -> s
+  | None when armed ->
+      failwithf
+        "Resistance_sketch_reader: resistance scoring is armed but symbol %s \
+         has no weekly side-table and no readable dense resistance columns — a \
+         thin (sketch-v5) warehouse must carry a SYMBOL.weekly side-table for \
+         every scored symbol (the dense Res_* columns were retired; see \
+         sketch-v5 PR 4)"
+        symbol ()
+  | None -> None
+
 let read ~(cb : Snapshot_callbacks.t) ~symbol ~as_of
-    ?(weekly_sidetable : Weekly_sidetable.entry list option) () :
-    Resistance_supply.sketch option =
+    ?(weekly_sidetable : Weekly_sidetable.entry list option) ?(armed = false) ()
+    : Resistance_supply.sketch option =
   match weekly_sidetable with
   | Some entries -> _read_sketch_v5 ~cb ~symbol ~as_of ~entries
-  | None -> read_sketch ~cb ~symbol ~as_of
+  | None ->
+      _dense_fallback_or_raise ~symbol ~armed (read_sketch ~cb ~symbol ~as_of)
 
-let closure ?snapshot_cb ?stock_symbol ?weekly_sidetable
+let closure ?snapshot_cb ?stock_symbol ?weekly_sidetable ?(armed = false)
     ~(stock : Snapshot_bar_views.weekly_view) () :
     unit -> Resistance_supply.sketch option =
   match (snapshot_cb, stock_symbol) with
   | Some cb, Some symbol when stock.n > 0 ->
       let as_of = stock.dates.(stock.n - 1) in
-      fun () -> read ~cb ~symbol ~as_of ?weekly_sidetable ()
+      fun () -> read ~cb ~symbol ~as_of ?weekly_sidetable ~armed ()
   | _ -> fun () -> None

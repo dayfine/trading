@@ -53,12 +53,10 @@ let _load_universe ~universe_path =
       exit 1
 
 let main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol ~start_date
-    ~end_date ~sketch_deep_days ~incremental ~progress_every
-    ~emit_weekly_sidetable () =
+    ~end_date ~sketch_deep_days ~incremental ~progress_every () =
   let symbols = _load_universe ~universe_path in
   Build_runner.build ~symbols ~csv_data_dir ~output_dir ~benchmark_symbol
-    ~start_date ~end_date ~sketch_deep_days ~incremental ~progress_every
-    ~emit_weekly_sidetable ()
+    ~start_date ~end_date ~sketch_deep_days ~incremental ~progress_every ()
 
 (* Flag [~doc] strings are hoisted to top-level bindings so the [Command.basic]
    flag block below stays flat (one line per flag) — the multi-line doc text is
@@ -92,9 +90,9 @@ let doc_end_date =
 let doc_sketch_deep_days =
   Printf.sprintf
     "N Calendar days of extra pre-START-DATE history fed only to the \
-     resistance sketch columns (resistance-v2 deep feed; the 13 \
-     warmup-windowed columns stay windowed to START-DATE). Ignored without \
-     --start-date. Default %d."
+     SYMBOL.weekly side-table's weekly aggregation (resistance-v2 deep feed; \
+     the 13 warmup-windowed .snap columns stay windowed to START-DATE). \
+     Ignored without --start-date. Default %d."
     Build_runner.default_sketch_deep_days
 
 let doc_incremental =
@@ -105,8 +103,9 @@ let doc_progress_every =
     Build_runner.default_progress_every
 
 let doc_emit_weekly_sidetable =
-  "Also emit one sparse SYMBOL.weekly resistance side-table per symbol (sketch \
-   v5); default off, warehouse output is byte-identical without it"
+  "DEPRECATED no-op (sketch-v5 PR 4): the SYMBOL.weekly side-table is now \
+   always emitted (it is the only overhead-supply representation), so this \
+   flag has no effect; accepted for invocation-script back-compat"
 
 let date_arg = Command.Param.optional (Command.Arg_type.create Date.of_string)
 
@@ -131,12 +130,11 @@ let command =
        flag "progress-every"
          (optional_with_default Build_runner.default_progress_every int)
          ~doc:doc_progress_every
-     and emit_weekly_sidetable =
+     and _emit_weekly_sidetable =
        flag "emit-weekly-sidetable" no_arg ~doc:doc_emit_weekly_sidetable
      in
      fun () ->
        main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol
-         ~start_date ~end_date ~sketch_deep_days ~incremental ~progress_every
-         ~emit_weekly_sidetable ())
+         ~start_date ~end_date ~sketch_deep_days ~incremental ~progress_every ())
 
 let () = Command_unix.run command

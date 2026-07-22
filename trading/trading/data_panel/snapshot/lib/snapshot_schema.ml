@@ -25,6 +25,17 @@ let n_hist_buckets = 20
 let n_age_bands = 4
 let n_hist_cells = n_age_bands * n_hist_buckets
 
+(* Sketch-v5 PR 4: the dense resistance-sketch columns ([Res_max_high_*],
+   [Res_bars_seen], [Res_hist]) are retired from the canonical schema. They were
+   ~350x redundant with the per-symbol weekly series they derive from, and
+   materializing them for every trading day blew the Docker VM's RAM budget on a
+   top-3000 warehouse even on the v5 read path (the panel cache materializes whole
+   [.snap] files, so the untouched dense columns still cost memory). The sketch is
+   now reconstructed on demand from the sparse [SYMBOL.weekly] side-table
+   ({!Data_panel_snapshot.Weekly_sidetable}). The [field] constructors above are
+   deliberately KEPT so the three-generation runtime reader still decodes older v3
+   (37-col) and v4 (97-col) warehouses via their own per-file manifest schemas —
+   only the canonical [all_fields] / [default] no longer emit them. *)
 let all_fields =
   [
     EMA_50;
@@ -40,12 +51,7 @@ let all_fields =
     Close;
     Volume;
     Adjusted_close;
-    Res_max_high_130w;
-    Res_max_high_260w;
-    Res_max_high_520w;
-    Res_bars_seen;
   ]
-  @ List.init n_hist_cells ~f:(fun k -> Res_hist k)
 
 let field_name = function
   | EMA_50 -> "EMA_50"

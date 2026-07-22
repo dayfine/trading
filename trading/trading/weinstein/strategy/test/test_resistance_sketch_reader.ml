@@ -229,6 +229,45 @@ let test_read_none_falls_through_to_v4 _ =
           (fun (s : Resistance_supply.sketch) -> s.max_high_520w)
           (float_equal 220.0)))
 
+(* [true] iff [f ()] raises [Failure] — the armed loud-fail signature. *)
+let raises_failure f =
+  try
+    ignore (f () : Resistance_supply.sketch option);
+    false
+  with Failure _ -> true
+
+(* Sketch-v5 PR 4 loud-fail: a thin (13-col) warehouse retired the dense [Res_*]
+   columns, so [read_sketch] returns None (modelled by forcing the first sketch
+   column absent). With NO side-table AND [armed], [read] must RAISE rather than
+   silently drop the supply term. *)
+let test_read_armed_thin_no_sidetable_raises _ =
+  assert_that
+    (raises_failure (fun () ->
+         Reader.read
+           ~cb:(stub_cb ~fail_on:[ Snapshot_schema.Res_max_high_130w ] ())
+           ~symbol:"AAPL" ~as_of ~armed:true ()))
+    (equal_to true)
+
+(* Same thin/no-side-table situation but UNARMED: the sketch is never consulted,
+   so [read] returns None harmlessly (no raise). *)
+let test_read_unarmed_thin_no_sidetable_none _ =
+  assert_that
+    (Reader.read
+       ~cb:(stub_cb ~fail_on:[ Snapshot_schema.Res_max_high_130w ] ())
+       ~symbol:"AAPL" ~as_of ())
+    is_none
+
+(* Armed but the side-table IS present (the normal v5 case): the v5 path resolves
+   the sketch, so no raise. *)
+let test_read_armed_with_sidetable_no_raise _ =
+  assert_that
+    (Reader.read ~cb:(stub_cb ()) ~symbol:"AAPL" ~as_of
+       ~weekly_sidetable:sidetable_entries ~armed:true ())
+    (is_some_and
+       (field
+          (fun (s : Resistance_supply.sketch) -> s.anchor_close)
+          (float_equal 150.0)))
+
 (* Dispatch: on the v5 path a failed [Close] read collapses to None (the same
    partial-read discipline as read_sketch). *)
 let test_read_v5_close_error_none _ =
@@ -298,6 +337,12 @@ let suite =
          >:: test_read_sketch_hist_cell_error_none;
          "read v5 selects side-table" >:: test_read_v5_selects_sidetable;
          "read None falls through to v4" >:: test_read_none_falls_through_to_v4;
+         "read armed + thin + no side-table raises"
+         >:: test_read_armed_thin_no_sidetable_raises;
+         "read unarmed + thin + no side-table -> None"
+         >:: test_read_unarmed_thin_no_sidetable_none;
+         "read armed + side-table present -> no raise"
+         >:: test_read_armed_with_sidetable_no_raise;
          "read v5 close error -> None" >:: test_read_v5_close_error_none;
          "closure missing cb -> None" >:: test_closure_missing_cb_none;
          "closure missing symbol -> None" >:: test_closure_missing_symbol_none;
