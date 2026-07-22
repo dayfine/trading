@@ -220,6 +220,19 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
    v3 into the youngest band, so **existing v3 warehouses keep scoring
    identically with NO rebuild** (`hist_bands_of_legacy`). The v4 warehouse
    rebuild is DEFERRED pending the bundle verdict — no rebuild in this PR.
+   **SURFACES RUN + VERDICT (2026-07-22): the age lever is a ledger
+   REJECT** (`2026-07-22-leverf-age-band-surface`, note
+   `dev/notes/leverf-v5-results-2026-07-22.md`): broad home grid
+   monotone harm (.827 → .766 → .708 with old-band weight; recent-decay
+   .755); sp500 U-shape does not transfer. Default band weights 1/1/1/0
+   stay; the age axis is CLOSED. Byproduct: **sketch v5** (user-designed
+   sparse per-symbol weekly side-table, PRs #2026/#2027/#2032/#2038)
+   replaces the dense columns — warehouse 8.4G → 1.3G, broad folds
+   runnable again (~11 min), all sketch geometry now score-time config;
+   certified bit-identical at unit, 6-fold, and full-13-fold scale
+   (bundle row .827 reproduced to every decimal on the thin warehouse).
+   Warehouses of record: `/tmp/snap_top3000_dedup_v5thin` +
+   `/tmp/snap_sp500_2000_2026_v5thin`.
 4. dedup-v2 warehouse deletable (v3 certified bit-identical:
    `scenarios-2026-07-16-131756` baseline = Run D to 13 decimals).
 
