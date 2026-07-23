@@ -16,10 +16,11 @@ val read :
   as_of:Core.Date.t ->
   ?weekly_sidetable:Weekly_sidetable.entry list ->
   ?armed:bool ->
+  ?sketch_warehouse:bool ->
   unit ->
   Resistance_supply.sketch option
-(** [read ~cb ~symbol ~as_of ?weekly_sidetable ?armed ()] is the
-    three-generation sketch dispatch, in priority order:
+(** [read ~cb ~symbol ~as_of ?weekly_sidetable ?armed ?sketch_warehouse ()] is
+    the three-generation sketch dispatch, in priority order:
 
     + {b v5 (side-table)} — when [weekly_sidetable] is [Some entries] the sketch
       is derived by {!Weekly_sidetable_reader.sketch_of_entries} at score time,
@@ -31,19 +32,32 @@ val read :
       [weekly_sidetable] is [None] the read falls through to {!read_sketch},
       which itself width-detects between a v4 and a v3 warehouse.
 
-    {b Armed loud-fail (sketch-v5 PR 4).} [armed] (default [false]) states
-    whether resistance scoring is active for this run
+    {b Armed loud-fail (sketch-v5 PR 4, gated by [sketch_warehouse]).} [armed]
+    (default [false]) states whether resistance scoring is active for this run
     ([Screener.scoring_weights.w_overhead_supply] set OR
-    [virgin_crossing_readmission] on). When [armed] is [true] and BOTH the
-    side-table is [None] AND the dense fallback ({!read_sketch}) returns [None]
-    — the signature of a NEW 13-col (thin) warehouse that retired the dense
-    [Res_*] columns yet has no [SYMBOL.weekly] side-table for this symbol — this
-    {b raises} [Failure] rather than returning [None]. A silent [None] would
-    drop the overhead-supply term from an armed score invisibly; the raise makes
-    the missing side-table a hard build/run error. When [armed] is [false] the
-    sketch is never consulted, so the same situation returns [None] harmlessly.
-    An OLD dense (v3/v4) warehouse always resolves via {!read_sketch}, so the
-    raise never fires there regardless of [armed].
+    [virgin_crossing_readmission] on). [sketch_warehouse] (default [false])
+    states whether the run reads through a genuine sketch warehouse — one whose
+    manifest advertises per-symbol side-tables
+    ([weekly_sidetable_format_hash = Some _]). When [armed] AND
+    [sketch_warehouse] are BOTH [true] and BOTH the side-table is [None] AND the
+    dense fallback ({!read_sketch}) returns [None] — the signature of a NEW
+    13-col (thin) warehouse that retired the dense [Res_*] columns yet has no
+    [SYMBOL.weekly] side-table for this symbol — this {b raises} [Failure]
+    rather than returning [None]. A silent [None] would drop the overhead-supply
+    term from an armed sketch-warehouse score invisibly; the raise makes the
+    missing side-table a hard build/run error (#2038).
+
+    {b Graceful degradation off a sketch warehouse (2026-07-23 bundle
+       promotion).} When [sketch_warehouse] is [false] — an in-process CSV
+    snapshot / panel-mode run that has no side-tables and no dense [Res_*]
+    columns at all — the same [None] situation returns [None] harmlessly (the
+    score degrades to the v1 binary grade). This is required because the bundle
+    promotion arms resistance scoring by DEFAULT, so [armed] is now [true] even
+    on CSV/panel runs that were never sketch warehouses; only a warehouse that
+    advertises side-tables must carry one for every scored symbol. When [armed]
+    is [false] the sketch is never consulted either way. An OLD dense (v3/v4)
+    warehouse always resolves via {!read_sketch}, so the raise never fires there
+    regardless.
 
     {b Consistency guard.} A [Some] side-table takes precedence over the dense
     columns unconditionally; the caller ({!Weekly_sidetable_reader.load_gated})
@@ -80,19 +94,22 @@ val closure :
   ?stock_symbol:string ->
   ?weekly_sidetable:Weekly_sidetable.entry list ->
   ?armed:bool ->
+  ?sketch_warehouse:bool ->
   stock:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
   unit ->
   unit ->
   Resistance_supply.sketch option
-(** [closure ?snapshot_cb ?stock_symbol ?weekly_sidetable ?armed ~stock ()]
-    builds the [get_sketch] thunk for a {!Stock_analysis.callbacks} bundle. It
-    reads at [as_of = stock]'s last bar date via {!read}, so passing
-    [weekly_sidetable] activates the v5 side-table path and omitting it keeps
-    the v4 / v3 dense-column path. [armed] (default [false]) is threaded
-    straight into {!read} — the caller ({!Panel_callbacks}) sets it from whether
-    the screen's resistance scoring is active, so the loud-fail on a thin
-    warehouse with a missing side-table only fires when the score would actually
-    have used the sketch. Requires BOTH a snapshot shim and the stock symbol
-    (and a non-empty [stock] view); missing either yields a [fun () -> None]
-    thunk — the panel simply has no sketch to offer, so [Stock_analysis] leaves
-    [supply = None]. *)
+(** [closure ?snapshot_cb ?stock_symbol ?weekly_sidetable ?armed
+     ?sketch_warehouse ~stock ()] builds the [get_sketch] thunk for a
+    {!Stock_analysis.callbacks} bundle. It reads at [as_of = stock]'s last bar
+    date via {!read}, so passing [weekly_sidetable] activates the v5 side-table
+    path and omitting it keeps the v4 / v3 dense-column path. [armed] (default
+    [false]) and [sketch_warehouse] (default [false]) are threaded straight into
+    {!read} — the caller ({!Panel_callbacks}) sets [armed] from whether the
+    screen's resistance scoring is active and [sketch_warehouse] from whether
+    the run reads a real sketch warehouse, so the loud-fail on a thin warehouse
+    with a missing side-table only fires when the score would actually have used
+    the sketch AND the warehouse advertises side-tables. Requires BOTH a
+    snapshot shim and the stock symbol (and a non-empty [stock] view); missing
+    either yields a [fun () -> None] thunk — the panel simply has no sketch to
+    offer, so [Stock_analysis] leaves [supply = None]. *)

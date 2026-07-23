@@ -95,10 +95,19 @@ type config = {
     (PR-D wiring). *)
 
 val default_config : config
-(** No-op-adjacent defaults: decay 0.7, saturation 8 bars, floors 0.4 / 0.25 /
-    0.1, [min_history_bars = 0], insufficient score 0.5, grade thresholds 8 / 3
-    (v1 parity), age-band weights 1 / 1 / 1 / 0 (collapses to the pre-lever-f
-    age-blind 130w histogram). All searchable; none hardcoded at use sites. *)
+(** Defaults: decay 0.7, saturation 8 bars, floors 0.0 / 0.0 / 0.0,
+    [min_history_bars = 0], insufficient score 0.5, grade thresholds 8 / 3 (v1
+    parity), age-band weights 1 / 1 / 1 / 0 (collapses to the pre-lever-f
+    age-blind 130w histogram). All searchable; none hardcoded at use sites.
+
+    The horizon floors are 0.0 as of the 2026-07-23 bundle promotion
+    (user-approved, R3): the 07-19 floor-axis surface found the horizon-floor
+    staircase (previously 0.4 / 0.25 / 0.1) was the redeemed-cohort tax — it
+    priced a name whose recent histogram is empty but whose older max-high
+    proves stale overhead, forfeiting the crash-recovery monster cohort. At
+    zero, such a breakout scores 0 (same as virgin); in-band recent mass still
+    scores via the saturation path. Ledger
+    [2026-07-20-bundle-promotion-studies]. *)
 
 type result = {
   score : float;

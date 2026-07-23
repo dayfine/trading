@@ -238,23 +238,36 @@ let raises_failure f =
 
 (* Sketch-v5 PR 4 loud-fail: a thin (13-col) warehouse retired the dense [Res_*]
    columns, so [read_sketch] returns None (modelled by forcing the first sketch
-   column absent). With NO side-table AND [armed], [read] must RAISE rather than
-   silently drop the supply term. *)
+   column absent). With NO side-table AND [armed] AND [sketch_warehouse] (a
+   genuine sketch warehouse — manifest advertises side-tables), [read] must RAISE
+   rather than silently drop the supply term. *)
 let test_read_armed_thin_no_sidetable_raises _ =
   assert_that
     (raises_failure (fun () ->
          Reader.read
            ~cb:(stub_cb ~fail_on:[ Snapshot_schema.Res_max_high_130w ] ())
-           ~symbol:"AAPL" ~as_of ~armed:true ()))
+           ~symbol:"AAPL" ~as_of ~armed:true ~sketch_warehouse:true ()))
     (equal_to true)
 
+(* 2026-07-23 bundle promotion (armed by default): the SAME thin/no-side-table
+   situation but NOT a sketch warehouse ([sketch_warehouse = false], the default)
+   — an in-process CSV / panel-mode snapshot. Even when [armed], [read] must
+   DEGRADE to None (the v1 binary grade) rather than crash; only a genuine sketch
+   warehouse must carry a side-table for every scored symbol. *)
+let test_read_armed_thin_no_sidetable_csv_degrades _ =
+  assert_that
+    (Reader.read
+       ~cb:(stub_cb ~fail_on:[ Snapshot_schema.Res_max_high_130w ] ())
+       ~symbol:"AAPL" ~as_of ~armed:true ())
+    is_none
+
 (* Same thin/no-side-table situation but UNARMED: the sketch is never consulted,
-   so [read] returns None harmlessly (no raise). *)
+   so [read] returns None harmlessly (no raise) regardless of [sketch_warehouse]. *)
 let test_read_unarmed_thin_no_sidetable_none _ =
   assert_that
     (Reader.read
        ~cb:(stub_cb ~fail_on:[ Snapshot_schema.Res_max_high_130w ] ())
-       ~symbol:"AAPL" ~as_of ())
+       ~symbol:"AAPL" ~as_of ~sketch_warehouse:true ())
     is_none
 
 (* Armed but the side-table IS present (the normal v5 case): the v5 path resolves
@@ -337,8 +350,10 @@ let suite =
          >:: test_read_sketch_hist_cell_error_none;
          "read v5 selects side-table" >:: test_read_v5_selects_sidetable;
          "read None falls through to v4" >:: test_read_none_falls_through_to_v4;
-         "read armed + thin + no side-table raises"
+         "read armed + thin + no side-table + sketch warehouse raises"
          >:: test_read_armed_thin_no_sidetable_raises;
+         "read armed + thin + no side-table + CSV (not sketch warehouse) -> \
+          None" >:: test_read_armed_thin_no_sidetable_csv_degrades;
          "read unarmed + thin + no side-table -> None"
          >:: test_read_unarmed_thin_no_sidetable_none;
          "read armed + side-table present -> no raise"

@@ -147,7 +147,31 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
    conservative alternative. Ledger
    `2026-07-17-resistance-supply-confirmation-grid.sexp`; note
    `dev/notes/resistance-supply-grid-2026-07-17.md`.
-2. **PROMOTION DECISION — HUMAN-GATED (R3), with the terminal-wealth flag.**
+2. **PROMOTION EXECUTED (2026-07-23) — PR `feat/promote-bundle-defaults`.**
+   The user approved option A (R3) and the BUNDLE is now the default: the
+   strategy `default_config` arms `overhead_supply = Some
+   Resistance_supply.default_config` + `screening_config.weights.w_overhead_supply
+   = Some 30` + `virgin_crossing_readmission = true`, and
+   `Resistance_supply.default_config` floors are zeroed (0/0/0). Band weights
+   stay 1/1/1/0 (lever-f REJECT). The `[@sexp.default None/false]` field
+   annotations are unchanged so a pre-promotion config sexp still deserializes
+   disarmed (back-compat). A required companion fix gates the #2038 armed
+   sketch-reader loud-fail on `sketch_warehouse` (manifest side-table hash
+   present), so CSV/panel-mode runs — which have no sketch data — degrade to the
+   v1 binary grade instead of crashing now that arming is the default; genuine
+   sketch warehouses still fail loud on a missing scored-symbol side-table. No
+   committed golden re-pins were required (all `dune runtest` / perf-tier1 /
+   golden-runs scenarios run CSV/panel mode where `get_sketch -> None` keeps the
+   three levers inert = bit-identical); only default-config-pinning tests + the
+   live-generator display test re-pinned. Evidence chain in the PR body: ledgers
+   `2026-07-17-resistance-supply-confirmation-grid` (3/3),
+   `2026-07-20-bundle-promotion-studies` (sp500 CONFIRM / 2011 wash /
+   rolling-start REPAIR), `2026-07-22-leverf-age-band-surface` (REJECT). Known
+   accepted cost: bull-era broad windows ≈ wash vs baseline (~0.2 Sharpe below
+   bare w30 on 2011-26 cells); the regime softener (lever b) stays a designed
+   default-off axis. Superseded historical decision record below:
+
+   **PROMOTION DECISION — HUMAN-GATED (R3), with the terminal-wealth flag.**
    28y single-path: w30 +1,991% vs baseline +7,914% (same trade COUNT —
    but per the 07-17 divergence forensic the books differ: 367/1,187
    tickets shared, AXTI = $62.6M of the $64.7M forfeited cohort; note
