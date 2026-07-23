@@ -17,6 +17,14 @@ let fast_v_min_rate_no_op = 0.08
    inside NAV; 5 zombie positions in the deep run — issue #1484 / flag #1487). *)
 let default_stale_exit_days = 5
 
+(* Grid-robust continuous overhead-supply ranking weight, armed into the default
+   screening weights by the 2026-07-23 bundle promotion (user-approved, R3).
+   w=30 was robust across the 3-cell confirmation grid (ledger
+   [2026-07-17-resistance-supply-confirmation-grid]) and the bundle studies
+   (ledger [2026-07-20-bundle-promotion-studies]); it replaces the binary
+   virgin/clean grade points when the continuous supply score is present. *)
+let bundle_w_overhead_supply = 30
+
 type index_config = { primary : string; global : (string * string) list }
 [@@deriving sexp]
 
@@ -111,6 +119,22 @@ type config = {
    nesting linter caps the file average). *)
 let _default_indices index_symbol = { primary = index_symbol; global = [] }
 
+(* Screening config for the promoted bundle (2026-07-23): the standard screener
+   defaults with the continuous overhead-supply ranking weight armed. Pairs with
+   [overhead_supply = Some Resistance_supply.default_config] in [default_config]
+   — both must be armed for the continuous score to replace the binary grade
+   points (either absent falls back to the bit-identical binary path). Kept
+   top-level so [default_config] stays a flat one-line-per-field literal. *)
+let _default_screening_config =
+  {
+    Screener.default_config with
+    weights =
+      {
+        Screener.default_config.weights with
+        w_overhead_supply = Some bundle_w_overhead_supply;
+      };
+  }
+
 (* Flat record literal over every config field — exactly one line per field
    by construction (no logic), growing one line per new default-off
    experiment knob. OCaml has no partial record literals, so splitting is
@@ -123,7 +147,7 @@ let default_config ~universe ~index_symbol =
     sector_etfs = [];
     stage_config = Stage.default_config;
     macro_config = Macro.default_config;
-    screening_config = Screener.default_config;
+    screening_config = _default_screening_config;
     portfolio_config = Portfolio_risk.default_config;
     stops_config = Weinstein_stops.default_config;
     initial_stop_buffer = 1.02;
@@ -174,8 +198,8 @@ let default_config ~universe ~index_symbol =
     maintenance_long_pct = 0.0;
     resistance_min_history_bars = 0;
     resistance_lookback_bars = 0;
-    overhead_supply = None;
-    virgin_crossing_readmission = false;
+    overhead_supply = Some Resistance_supply.default_config;
+    virgin_crossing_readmission = true;
   }
 
 let name = "Weinstein"

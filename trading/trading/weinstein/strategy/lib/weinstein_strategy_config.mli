@@ -882,16 +882,36 @@ type config = {
           scoring weight then consumes in place of the binary virgin/clean
           grade.
 
+          {b Default flipped [None] -> [Some Resistance_supply.default_config]
+             on 2026-07-23} by the BUNDLE promotion (user-approved, R3): part of
+          the three-default bundle
+          [overhead_supply armed + w_overhead_supply=30 +
+           virgin_crossing_readmission], with [Resistance_supply.default_config]
+          floors also zeroed. Evidence: mechanism ACCEPT (ledger
+          [2026-07-17-resistance-supply-confirmation-grid], 3/3) + bundle
+          studies (ledger [2026-07-20-bundle-promotion-studies]: sp500 CONFIRM,
+          rolling-start REPAIRS the recovery-window tail) + lever-f REJECT
+          (ledger [2026-07-22-leverf-age-band-surface], age axis closed). See
+          [dev/notes/resistance-supply-promotion-memo-2026-07-19.md].
+
           {b Semantics.}
-          - [None] (default): {b bit-identical to baseline} —
-            [Stock_analysis.t.supply] is always [None], the screener falls back
-            to the binary grade, no sketch reads occur
-            (experiment-flag-discipline R1).
-          - [Some cfg]: the continuous score runs for survivors whose panel
-            carries the sketch columns. Pairs with the screener weight
-            [Screener.scoring_weights.w_overhead_supply] (both must be armed for
-            the mechanism to change any score); the live CSV report path has no
-            warehouse sketch and stays on the v1 binary grade until a follow-up.
+          - [Some cfg] (new default): the continuous score runs for survivors
+            whose panel carries the sketch columns; it pairs with the armed
+            screener weight [Screener.scoring_weights.w_overhead_supply]. The
+            live CSV report path has no warehouse sketch
+            ([Stock_analysis.callbacks_from_bars] sets
+            [get_sketch = fun () -> None]), so [Stock_analysis.t.supply] is
+            [None] there and the screener degrades gracefully to the
+            bit-identical v1 binary grade (the live weekly-review generator
+            computes a real sketch from the bar history, so its displayed grade
+            switches to the v2 score — the score/display split, PR-live-path
+            #1989).
+          - [None] (the [[@sexp.default None]] deserialization fallback):
+            {b bit-identical to baseline} — [Stock_analysis.t.supply] is always
+            [None], the screener falls back to the binary grade, no sketch reads
+            occur. This is the value a config sexp written {e before} the
+            promotion (omitting the field) parses to, so an old saved config
+            stays disarmed; it is also the explicit disarm escape hatch.
 
           {b R2 searchability.} Real config field → resolves through
           [Overlay_validator.apply_overrides]; expressible as an option axis
@@ -899,7 +919,7 @@ type config = {
 
           {b Faithfulness} (W1/W2). Ranking weight only, not an entry gate — the
           Stage-2-only buy rule, breakout+volume entry, macro/sector gate and
-          stops are untouched. Default-off until an experiment-ledger ACCEPT. *)
+          stops are untouched. *)
   virgin_crossing_readmission : bool; [@sexp.default false]
       (** resistance-v2 lever (a): virgin-crossing re-admission. When [true],
           the strategy sets [Stock_analysis.config.virgin_crossing_readmission],
@@ -912,16 +932,26 @@ type config = {
           genuinely virgin later (the AXTI post-mortem,
           [dev/notes/resistance-supply-divergence-forensic-2026-07-17.md]).
 
+          {b Default flipped [false] -> [true] on 2026-07-23} by the BUNDLE
+          promotion (user-approved, R3) — see [overhead_supply] for the full
+          evidence chain. This is the lever that repairs bare-w30's
+          recovery-window left tail (the 2000/2008/2010 rolling starts) in the
+          bundle studies.
+
           {b Semantics.}
-          - [false] (default): {b bit-identical to baseline} —
+          - [true] (new default): a stale Stage-2 survivor is re-admitted iff
+            its warehouse sketch is present AND the breakout is into new high
+            ground ([Resistance_supply.is_virgin] or [is_clear_of_supply]);
+            sketch absent → no re-admission (no fabrication). Independent of
+            [overhead_supply] — the virgin test needs only the sketch, not the
+            scoring config.
+          - [false] (the [[@sexp.default false]] deserialization fallback):
+            {b bit-identical to baseline} —
             [Stock_analysis.t.virgin_readmission] is always [false] and the
-            early-Stage-2 staleness rejection is unchanged
-            (experiment-flag-discipline R1).
-          - [true]: a stale Stage-2 survivor is re-admitted iff its warehouse
-            sketch is present AND the breakout is virgin
-            ([Resistance_supply.is_virgin]); sketch absent → no re-admission (no
-            fabrication). Independent of [overhead_supply] — the virgin test
-            needs only the sketch, not the scoring config.
+            early-Stage-2 staleness rejection is unchanged. A config sexp
+            written {e before} the lever (omitting the field) parses to [false]
+            so an old saved config keeps the staleness cut; also the disarm
+            escape hatch.
 
           {b R2 searchability.} Real top-level [bool] field → resolves through
           [Overlay_validator.apply_overrides]; expressible as a [Variant_matrix]
@@ -933,8 +963,7 @@ type config = {
           happened (weinstein-book-reference.md §Buy Criteria). Spine intact:
           still Stage-2-only, still breakout + volume + RS gates, macro/sector
           gates and stops untouched — it only widens which Stage-2 names clear
-          the early-window staleness cut. Default-off until an experiment-ledger
-          ACCEPT. *)
+          the early-window staleness cut. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
