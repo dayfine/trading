@@ -169,14 +169,21 @@ let _build_snapshot_bar_reader ~daily_panels ~calendar ~snapshot_dir ~manifest =
      takes the v5 read path; a warehouse without side-tables ([None] hash) reads
      the dense [Res_*] columns, bit-identical to the pre-v5 behaviour. A
      mismatched hash raises (loud staleness refusal). *)
+  let manifest_format_hash =
+    manifest.Snapshot_pipeline.Snapshot_manifest.weekly_sidetable_format_hash
+  in
   let weekly_sidetable_loader =
     Weinstein_strategy.Weekly_sidetable_reader.loader_for ~snapshot_dir
-      ~manifest_format_hash:
-        manifest
-          .Snapshot_pipeline.Snapshot_manifest.weekly_sidetable_format_hash
+      ~manifest_format_hash
   in
+  (* A warehouse advertises sketch side-tables iff its manifest carries a format
+     hash. This gates the armed sketch-reader loud-fail (2026-07-23 promotion): a
+     genuine sketch warehouse must carry a side-table for every scored symbol,
+     but an in-process CSV / non-sketch snapshot ([None] hash) degrades to the v1
+     grade instead of crashing when resistance scoring is armed by default. *)
+  let sketch_warehouse = Option.is_some manifest_format_hash in
   Weinstein_strategy.Bar_reader.of_snapshot_views ~calendar
-    ~weekly_sidetable_loader callbacks
+    ~weekly_sidetable_loader ~sketch_warehouse callbacks
 
 let _create_panels ~snapshot_dir ~manifest =
   Daily_panels.create ~snapshot_dir ~manifest

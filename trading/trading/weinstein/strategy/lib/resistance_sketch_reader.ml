@@ -75,12 +75,23 @@ let _read_sketch_v5 ~(cb : Snapshot_callbacks.t) ~symbol ~as_of ~entries =
    term). Fail LOUD instead — a thin (v5) warehouse must carry a [SYMBOL.weekly]
    side-table for every scored symbol. Unarmed configs never consult the sketch,
    so a thin warehouse with a missing side-table is fully valid for them; an OLD
-   dense warehouse always resolves via [read_sketch], so this never fires there. *)
-let _dense_fallback_or_raise ~symbol ~armed :
+   dense warehouse always resolves via [read_sketch], so this never fires there.
+
+   [sketch_warehouse] gates the loud-fail to a genuine sketch warehouse (2026-07-23
+   bundle promotion, which arms resistance scoring by DEFAULT). Before the
+   promotion, "armed" implied a deliberate sketch-warehouse run, so the loud-fail
+   was safe. With arming now the default, an in-process CSV snapshot / panel-mode
+   run (no side-tables AND no dense [Res_*] columns, [sketch_warehouse = false])
+   also reaches here — it must DEGRADE to [None] (the v1 binary grade), not crash.
+   Only a warehouse that advertises side-tables (manifest
+   [weekly_sidetable_format_hash = Some _], [sketch_warehouse = true]) still fails
+   loud when a scored symbol's side-table is absent — the #2038 data-integrity
+   guard, preserved exactly. *)
+let _dense_fallback_or_raise ~symbol ~armed ~sketch_warehouse :
     Resistance_supply.sketch option -> Resistance_supply.sketch option =
   function
   | Some _ as s -> s
-  | None when armed ->
+  | None when armed && sketch_warehouse ->
       failwithf
         "Resistance_sketch_reader: resistance scoring is armed but symbol %s \
          has no weekly side-table and no readable dense resistance columns — a \
@@ -91,18 +102,20 @@ let _dense_fallback_or_raise ~symbol ~armed :
   | None -> None
 
 let read ~(cb : Snapshot_callbacks.t) ~symbol ~as_of
-    ?(weekly_sidetable : Weekly_sidetable.entry list option) ?(armed = false) ()
-    : Resistance_supply.sketch option =
+    ?(weekly_sidetable : Weekly_sidetable.entry list option) ?(armed = false)
+    ?(sketch_warehouse = false) () : Resistance_supply.sketch option =
   match weekly_sidetable with
   | Some entries -> _read_sketch_v5 ~cb ~symbol ~as_of ~entries
   | None ->
-      _dense_fallback_or_raise ~symbol ~armed (read_sketch ~cb ~symbol ~as_of)
+      _dense_fallback_or_raise ~symbol ~armed ~sketch_warehouse
+        (read_sketch ~cb ~symbol ~as_of)
 
 let closure ?snapshot_cb ?stock_symbol ?weekly_sidetable ?(armed = false)
-    ~(stock : Snapshot_bar_views.weekly_view) () :
+    ?(sketch_warehouse = false) ~(stock : Snapshot_bar_views.weekly_view) () :
     unit -> Resistance_supply.sketch option =
   match (snapshot_cb, stock_symbol) with
   | Some cb, Some symbol when stock.n > 0 ->
       let as_of = stock.dates.(stock.n - 1) in
-      fun () -> read ~cb ~symbol ~as_of ?weekly_sidetable ~armed ()
+      fun () ->
+        read ~cb ~symbol ~as_of ?weekly_sidetable ~armed ~sketch_warehouse ()
   | _ -> fun () -> None

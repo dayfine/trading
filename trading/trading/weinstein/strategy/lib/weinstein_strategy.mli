@@ -671,9 +671,14 @@ type config = {
           strategy copies [cfg] into the per-screen [Stock_analysis.config] and
           the panel adapter reads the warehouse sketch columns, populating
           [Stock_analysis.t.supply] for the screener's [w_overhead_supply]
-          scoring weight. Default [None] = [supply] always [None], binary grade
-          fallback, no sketch reads (bit-identical to baseline). Pairs with the
-          screener weight; live CSV path stays v1. See
+          scoring weight. {b Armed by default}
+          ([Some Resistance_supply.default_config]) as of the 2026-07-23 bundle
+          promotion (user-approved, R3). The [[@sexp.default None]]
+          deserialization fallback keeps a pre-promotion config sexp (omitting
+          the field) disarmed and is the explicit disarm escape hatch; when
+          disarmed [supply] is always [None] (binary grade fallback, no sketch
+          reads, bit-identical to baseline). Pairs with the screener weight;
+          live CSV path degrades to v1. See
           [Weinstein_strategy_config.overhead_supply]. *)
   virgin_crossing_readmission : bool; [@sexp.default false]
       (** resistance-v2 lever (a): virgin-crossing re-admission. When [true], a
@@ -681,8 +686,11 @@ type config = {
           its 520-week max high) on volume is re-admitted by
           [Stock_analysis.is_breakout_candidate] despite being past the
           [early_stage2_max_weeks] early-Stage-2 window (the book's "new high
-          ground" breakout). Default [false] = bit-identical to baseline; needs
-          a warehouse sketch (absent → no re-admission). Independent of
+          ground" breakout). {b Default [true]} as of the 2026-07-23 bundle
+          promotion (user-approved, R3). The [[@sexp.default false]]
+          deserialization fallback keeps a pre-lever config sexp disarmed
+          (bit-identical to baseline) and is the disarm escape hatch; needs a
+          warehouse sketch (absent → no re-admission). Independent of
           [overhead_supply]. See
           [Weinstein_strategy_config.virgin_crossing_readmission]. *)
 }

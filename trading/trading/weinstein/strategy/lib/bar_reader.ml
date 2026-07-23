@@ -41,11 +41,13 @@ type t = {
   ma_cache : Weekly_ma_cache.t option;
   snapshot_callbacks : Snapshot_callbacks.t;
   weekly_sidetable_for : symbol:string -> Weekly_sidetable.entry list option;
+  sketch_warehouse : bool;
 }
 
 let ma_cache t = t.ma_cache
 let snapshot_callbacks t = t.snapshot_callbacks
 let weekly_sidetable_for t = t.weekly_sidetable_for
+let sketch_warehouse t = t.sketch_warehouse
 
 (* Memoize the per-symbol sketch-v5 side-table load: the [.weekly] file for a
    symbol is read (and manifest-format-hash-gated) at most once per reader, then
@@ -114,6 +116,7 @@ let empty () =
        {!Snapshot_bar_views}'s NotFound-to-empty fold. *)
     snapshot_callbacks = _empty_snapshot_callbacks;
     weekly_sidetable_for = _memoized_sidetable_for None;
+    sketch_warehouse = false;
   }
 
 (* {1 Snapshot-backed constructor (Phase F.2 PR 2)}
@@ -170,7 +173,7 @@ let _snapshot_daily_view_for ?calendar cb ~symbol ~as_of ~lookback =
   Snapshot_bar_views.daily_view_for cb ~symbol ~as_of ~lookback ~calendar
 
 let of_snapshot_views ?calendar ?weekly_sidetable_loader
-    (cb : Snapshot_runtime.Snapshot_callbacks.t) =
+    ?(sketch_warehouse = false) (cb : Snapshot_runtime.Snapshot_callbacks.t) =
   {
     daily_bars_for = _snapshot_daily_bars_for cb;
     weekly_bars_for = _snapshot_weekly_bars_for cb;
@@ -183,6 +186,12 @@ let of_snapshot_views ?calendar ?weekly_sidetable_loader
        re-routing through the bar_reader's panel-shaped views. *)
     snapshot_callbacks = cb;
     weekly_sidetable_for = _memoized_sidetable_for weekly_sidetable_loader;
+    (* [true] only when the warehouse advertises per-symbol side-tables (manifest
+       [weekly_sidetable_format_hash = Some _]); gates the armed sketch-reader
+       loud-fail so an in-process CSV / panel-mode snapshot (no side-tables) with
+       resistance scoring armed-by-default degrades to the v1 grade instead of
+       crashing. See {!Resistance_sketch_reader.read} (2026-07-23 promotion). *)
+    sketch_warehouse;
   }
 
 (* {1 In-memory-bars constructor (Phase F.3.a-1)}

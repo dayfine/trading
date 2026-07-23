@@ -45,8 +45,8 @@ module Weinstein_strategy_macro = Weinstein_strategy_macro
 module Weinstein_strategy_config = Weinstein_strategy_config
 module S = Weinstein_strategy_screening
 
-let held_symbols = S.held_symbols
-let entries_from_candidates = S.entries_from_candidates
+let held_symbols = Entry_walk.held_symbols
+let entries_from_candidates = Entry_walk.entries_from_candidates
 let survivors_for_screening = S.survivors_for_screening
 let prune_universe_by_active_through = S.prune_universe_by_active_through
 let stock_analysis_config_for = S._stock_analysis_config_for
