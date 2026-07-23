@@ -126,18 +126,13 @@ let _inputs_at ~as_of ~bar_reader ~ticker_sectors : Generator.inputs =
     held_positions = [];
   }
 
-(* [_inputs_at] with the resistance-v2 overhead-supply score armed (the
-   [w_overhead_supply] ranking weight stays off, so only the display changes). *)
-let _armed_inputs ~as_of ~bar_reader ~ticker_sectors : Generator.inputs =
+(* [_inputs_at] with the resistance-v2 overhead-supply score DISARMED
+   ([overhead_supply = None]) — the explicit escape hatch that reverts the
+   live display to the v1 binary grade after the 2026-07-23 bundle promotion
+   armed it by default. *)
+let _disarmed_inputs ~as_of ~bar_reader ~ticker_sectors : Generator.inputs =
   let base = _inputs_at ~as_of ~bar_reader ~ticker_sectors in
-  {
-    base with
-    config =
-      {
-        base.config with
-        overhead_supply = Some Resistance_supply.default_config;
-      };
-  }
+  { base with config = { base.config with overhead_supply = None } }
 
 let _inputs ~bar_reader ~ticker_sectors : Generator.inputs =
   _inputs_at ~as_of:_as_of ~bar_reader ~ticker_sectors
@@ -281,11 +276,12 @@ let _aapl_resistance_grade (snap : Weekly_snapshot.t) : string option =
       String.equal c.symbol "AAPL")
   |> Option.bind ~f:(fun (c : Weekly_snapshot.candidate) -> c.resistance_grade)
 
-(* Default (overhead_supply disarmed): the resistance grade is the v1 binary
-   quality label (e.g. "Virgin_territory") — no continuous score suffix. The "("
-   in the v2 "Grade (0.NN)" form is absent, so the display is byte-identical to
-   the pre-feature v1 grade. *)
-let test_default_resistance_grade_is_v1 _ =
+(* Default (overhead_supply armed by the 2026-07-23 bundle promotion): the
+   live generator computes a real sketch from the bar history, so the resistance
+   grade renders the v2 sketch-derived form "<quality> (<score>)" — the
+   continuous score alongside the letter grade (score/display split, §D5). This
+   is the user-visible live-review change the promotion intends. *)
+let test_default_resistance_grade_is_v2 _ =
   let snap =
     _generate ~bar_reader:(_breakout_bar_reader ())
       ~ticker_sectors:[ ("AAPL", "Information Technology") ]
@@ -293,28 +289,28 @@ let test_default_resistance_grade_is_v1 _ =
   assert_that
     (_aapl_resistance_grade snap)
     (is_some_and
-       (matching ~msg:"v1 grade carries no continuous score suffix"
+       (matching ~msg:"v2 grade renders a parenthesized continuous score"
           (fun grade ->
-            if String.is_substring grade ~substring:"(" then None else Some ())
+            if String.is_substring grade ~substring:" (" then Some () else None)
           (equal_to ())))
 
-(* Armed (overhead_supply = Some): the resistance grade switches to the
-   v2 sketch-derived form "<quality> (<score>)" — the continuous score is
-   rendered alongside the letter grade (score/display split, §D5). Arming only
-   [overhead_supply] (not the [w_overhead_supply] ranking weight) changes the
-   display, not the candidate set — AAPL is still the same long candidate. *)
-let test_armed_resistance_grade_shows_v2_score _ =
+(* Disarmed escape hatch ([overhead_supply = None]): the resistance grade
+   degrades to the v1 binary quality label (e.g. "Virgin_territory") — no
+   continuous score suffix. The "(" of the v2 "Grade (0.NN)" form is absent, so
+   the display is byte-identical to the pre-promotion v1 grade. Pins the
+   graceful-degradation fallback (consequence 2b of the bundle promotion). *)
+let test_disarmed_resistance_grade_is_v1 _ =
   let snap =
     Generator.generate
-      (_armed_inputs ~as_of:_as_of ~bar_reader:(_breakout_bar_reader ())
+      (_disarmed_inputs ~as_of:_as_of ~bar_reader:(_breakout_bar_reader ())
          ~ticker_sectors:[ ("AAPL", "Information Technology") ])
   in
   assert_that
     (_aapl_resistance_grade snap)
     (is_some_and
-       (matching ~msg:"v2 grade renders a parenthesized continuous score"
+       (matching ~msg:"v1 grade carries no continuous score suffix"
           (fun grade ->
-            if String.is_substring grade ~substring:" (" then Some () else None)
+            if String.is_substring grade ~substring:"(" then None else Some ())
           (equal_to ())))
 
 (* The snapshot survives a writer -> reader round-trip unchanged. *)
@@ -356,10 +352,10 @@ let suite =
          >:: test_macro_context_present;
          "bearish macro blocks all long candidates"
          >:: test_bearish_macro_blocks_longs;
-         "default resistance grade is the v1 label"
-         >:: test_default_resistance_grade_is_v1;
-         "armed resistance grade shows the v2 score"
-         >:: test_armed_resistance_grade_shows_v2_score;
+         "default resistance grade shows the v2 score (armed by default)"
+         >:: test_default_resistance_grade_is_v2;
+         "disarmed resistance grade degrades to the v1 label"
+         >:: test_disarmed_resistance_grade_is_v1;
          "snapshot round-trips through writer/reader" >:: test_round_trips;
          "empty universe yields no candidates"
          >:: test_empty_universe_no_candidates;
