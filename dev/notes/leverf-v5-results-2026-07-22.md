@@ -60,3 +60,15 @@ REPAIRS the recovery tail (note `bundle-studies-results-2026-07-20.md`)
 Candidate of record: **the BUNDLE at default band weights** — exactly
 the configuration whose grid+rolling-start evidence was gathered.
 R3: user decides.
+
+## Addendum (07-23) — 28y path-level corroboration
+
+Contiguous 26.5y record-convention arms (top-3000, v5thin): promoted
+bundle (bands 1/1/1/0) +8,689% / DD 30.3% remains the best arm —
+old-band 0.25 → +8,096% / DD 44.3; old-band 0.5 → +4,820% / DD 38.2;
+age-decay → +8,176% / DD 27.3. The fold-level REJECT holds at the
+path/monster-cohort lens too (no vc-style fold-vs-path tension).
+Footnote: the age-decay arm is a mild insurance-shaped trade (−500pp
+return, −3pp DD single-path) — recorded, not pursued (fold-level loss
+.755 vs .827). Runs: /tmp/sweeps/leverf-28y{,-rerun}; scenarios
+staging-leverf-28y{,-rerun}/.
