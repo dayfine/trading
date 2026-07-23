@@ -19,6 +19,36 @@ moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
 
+## 2026-07-23 — deep-results headline block (rendered from pinned records)
+
+- [x] **`readme_toplines` deep-headline block + `Deep_headline` module** —
+  extends the README regenerator with a SECOND marker-delimited block
+  (`<!-- deep-headline:start/end -->`) that renders the heavy multi-decade
+  broad-universe results-of-record. Per dispatcher decision, the tool does
+  **NOT** recompute these (top-3000 uses an out-of-repo warehouse CI can't
+  reach); it renders from a checked-in pinned sexp,
+  `dev/backtest/deep_headline_records.sexp` (machine-readable mirror of
+  `DEEP_RESULTS.md`). New promoted-bundle 28y record is now the README
+  headline: **+8,689% / DD 30.3% / 1,170 trades / 38.4% win / 2000→2026-06-26**,
+  scenario `staging-leverf-28y/top3000-2000-2026-rcb-f000.sexp` @ commit
+  `6a2d9b426` (PR #2047); Run-D +7,914% row kept as superseded; SPY-TR +706%
+  comparator. Standing MTM / realized-vs-MTM / liquidity caveat rendered inline.
+  - **Where:** `Deep_headline.{ml,mli}` (records type + sexp load + renderer),
+    `Readme_block` refactored to expose generic `render_between`/`upsert_between`
+    (the light-block `render`/`upsert` now specialise them — behaviour of the
+    light block is unchanged, existing tests untouched), bin renders + upserts
+    both blocks (deep above light), all under
+    `trading/trading/backtest/readme_toplines/`. Records file + DEEP_RESULTS row
+    updated.
+  - **Missing-file behaviour:** absent records sexp → deep block skipped with a
+    stderr warning (README's existing block untouched), never a crash; a present
+    but malformed sexp raises (checked-in data defect). Unit-tested.
+  - **Verify:** `dune runtest trading/backtest/readme_toplines/` (8 new
+    `test_deep_headline` cases: render/format, marker upsert isolation,
+    optional-field dash, load round-trip, missing-file→None, malformed→raise);
+    regenerate with `dune exec backtest/readme_toplines/bin/readme_toplines.exe
+    -- --readme README.md`.
+
 ## 2026-07-12 — trades.csv export-join fix (C2)
 
 - [x] **Key `exit_trigger` + `stop_trigger_kind` by position_id** — the

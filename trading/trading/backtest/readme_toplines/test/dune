@@ -1,5 +1,5 @@
 (tests
- (names test_coverage test_readme_block)
+ (names test_coverage test_readme_block test_deep_headline)
  (libraries core ounit2 matchers readme_toplines)
  (preprocess
   (pps ppx_compare ppx_deriving.eq ppx_sexp_conv)))

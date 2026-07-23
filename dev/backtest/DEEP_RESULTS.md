@@ -18,9 +18,30 @@ and *realized vs MTM*, not the raw absolute.
 > (RS-starved first 22 weeks). Absolute numbers are NOT comparable to runs made
 > after 2026-07-08. Relative comparisons within a block remain valid.
 
-## ⭐ RECORD OF RECORD — Run D, armed record convention, dedup-v2 basis (2026-07-14)
+## ⭐ RECORD OF RECORD — promoted bundle, top-3000 28y (2026-07-23)
 
-**The official long-only record basis** (user-committed 2026-07-14): the
+**The current long-only record basis** (promoted 2026-07-23, PR #2047): the
+resistance-v2 bundle flipped default-on (`w30` + virgin-crossing + floors-zero)
+on the top-3000 PIT-2000 warehouse, 2000-01-01 .. 2026-06-26. **Supersedes the
+Run-D record-of-record below.**
+
+| Run | Total return (MTM) | MaxDD | Trades | Win rate | Scenario sexp | Basis |
+|---|---:|---:|---:|---:|---|---|
+| **Promoted bundle (RECORD)** | **+8,689%** | **30.3%** | 1,170 | 38.4% | `staging-leverf-28y/top3000-2000-2026-rcb-f000.sexp` (out-of-repo staging) | commit `6a2d9b426` (PR #2047) |
+| Pre-bundle (Run D, superseded) | +7,914% | 32.3% | 1,187 | — | `staging-record-convention/top3000-2000-2026-record-convention.sexp` | commit `0a2e4562d` (PR #1960) |
+
+Same-window comparator: **SPY total return +706%** (dividend-adjusted). Standing
+caveats as in the Run-D block below: single path; terminal MTM concentrated on a
+few fat-tail winners; MTM ≠ realized; broad universe includes untradeable
+illiquid names. These rows are mirrored, machine-readable, in
+`dev/backtest/deep_headline_records.sexp` — the source the README deep-headline
+block renders from (via `trading/backtest/readme_toplines`). When adding a
+record, update both this table and that sexp, in the same order.
+
+## ⭐ RECORD OF RECORD — Run D, armed record convention, dedup-v2 basis (2026-07-14) — SUPERSEDED 2026-07-23
+
+**The prior long-only record basis** (user-committed 2026-07-14; superseded by
+the promoted bundle above): the
 staged scenario `staging-record-convention/top3000-2000-2026-record-convention.sexp`
 (honest-tradeable dials + extension_stop 2.0/0.25 + reject_declining_ma; ledger
 `2026-07-14-extension-stop-insurance-accept`) on the **dedup-v2 warehouse**
