@@ -33,13 +33,15 @@ val of_snapshot_views :
   ?calendar:Date.t array ->
   ?weekly_sidetable_loader:
     (symbol:string -> Data_panel_snapshot.Weekly_sidetable.entry list option) ->
+  ?sketch_warehouse:bool ->
   Snapshot_runtime.Snapshot_callbacks.t ->
   t
-(** [of_snapshot_views ?calendar ?weekly_sidetable_loader cb] produces a reader
-    backed by {!Snapshot_runtime.Snapshot_bar_views} over [cb]. Reads fan out
-    through {!Snapshot_runtime.Snapshot_callbacks.read_field_history}
-    (LRU-bounded via {!Snapshot_runtime.Daily_panels}); per-call cost is
-    O(window-size) plus an at-most-one-symbol disk read on cache miss.
+(** [of_snapshot_views ?calendar ?weekly_sidetable_loader ?sketch_warehouse cb]
+    produces a reader backed by {!Snapshot_runtime.Snapshot_bar_views} over
+    [cb]. Reads fan out through
+    {!Snapshot_runtime.Snapshot_callbacks.read_field_history} (LRU-bounded via
+    {!Snapshot_runtime.Daily_panels}); per-call cost is O(window-size) plus an
+    at-most-one-symbol disk read on cache miss.
 
     [?weekly_sidetable_loader] is the sketch-v5 side-table source (see
     {!weekly_sidetable_for}): a raw, already-format-hash-gated per-symbol loader
@@ -48,6 +50,15 @@ val of_snapshot_views :
     it per symbol. Omitted (every test / in-memory construction) -> the reader
     has no side-table to offer, so the resistance sketch stays on the
     dense-column read path, bit-identical to the pre-v5 behaviour.
+
+    [?sketch_warehouse] (default [false]) states whether this reader is backed
+    by a genuine sketch warehouse — one whose manifest advertises per-symbol
+    side-tables ([weekly_sidetable_format_hash = Some _]). It is threaded to
+    {!Resistance_sketch_reader.read} (via {!Panel_callbacks}) to gate the armed
+    loud-fail: only a real sketch warehouse must carry a side-table for every
+    scored symbol, so an in-process CSV / panel-mode snapshot ([false]) with
+    resistance scoring armed-by-default degrades to the v1 grade instead of
+    crashing (2026-07-23 bundle promotion). See {!sketch_warehouse}.
 
     The [?calendar] parameter is the trading-day calendar (Mon–Fri including
     holidays) the production runner uses. When supplied, [daily_view_for] walks
@@ -152,6 +163,17 @@ val weekly_sidetable_for :
     produced under a different format makes the loader raise rather than
     silently read stale data. Each symbol is loaded at most once and cached on
     the reader (each table is ≤ ~20KB). *)
+
+val sketch_warehouse : t -> bool
+(** [sketch_warehouse t] is [true] iff this reader is backed by a warehouse that
+    advertises per-symbol side-tables (manifest
+    [weekly_sidetable_format_hash = Some _]). Threaded into
+    {!Panel_callbacks.stock_analysis_callbacks_of_weekly_views} →
+    {!Resistance_sketch_reader} to gate the armed loud-fail: only on a real
+    sketch warehouse is a missing scored-symbol side-table a hard error; an
+    in-process CSV / panel-mode snapshot ([false]) with resistance scoring
+    armed-by-default degrades to the v1 grade (2026-07-23 bundle promotion).
+    [false] for {!empty} and {!of_in_memory_bars}. *)
 
 val daily_bars_for :
   t -> symbol:string -> as_of:Date.t -> Types.Daily_price.t list

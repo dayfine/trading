@@ -60,9 +60,16 @@ let build ~warehouse_dir ~as_of ~warmup_days
   (* Sketch-v5 side-table loader gated on the manifest's format hash: [None]
      hash (non-v5 warehouse) -> every symbol reads the dense columns; a
      mismatched hash raises (loud staleness refusal). *)
+  let manifest_format_hash =
+    manifest.Snapshot_manifest.weekly_sidetable_format_hash
+  in
   let weekly_sidetable_loader =
     Weekly_sidetable_reader.loader_for ~snapshot_dir:warehouse_dir
-      ~manifest_format_hash:
-        manifest.Snapshot_manifest.weekly_sidetable_format_hash
+      ~manifest_format_hash
   in
-  Bar_reader.of_snapshot_views ~calendar ~weekly_sidetable_loader callbacks
+  (* A sketch warehouse advertises side-tables (manifest hash [Some _]); this
+     gates the armed sketch-reader loud-fail so a real v5 warehouse still fails
+     loud on a missing scored-symbol side-table (2026-07-23 promotion). *)
+  let sketch_warehouse = Option.is_some manifest_format_hash in
+  Bar_reader.of_snapshot_views ~calendar ~weekly_sidetable_loader
+    ~sketch_warehouse callbacks
