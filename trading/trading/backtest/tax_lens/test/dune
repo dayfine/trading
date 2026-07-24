@@ -1,0 +1,5 @@
+(tests
+ (names test_tax_model test_diagnostics)
+ (libraries ounit2 core matchers tax_lens)
+ (preprocess
+  (pps ppx_jane)))
