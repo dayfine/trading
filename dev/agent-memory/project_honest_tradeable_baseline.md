@@ -67,3 +67,12 @@ and the 12% haircut estimate was measured on only 10 of the real 83 groups.
 Validator at full coverage on this run (audit join 1171/1171, V5/V6 clean,
 V7=100 false-Virgin entries pending min_history_bars arming). Note:
 dev/notes/dedup-record-rerun-2026-07-13.md.
+
+**2026-07-14 — RECORD COMMITTED = RUN D (armed record convention, dedup-v2):**
++7,914% MTM / $70.9M realized / Sharpe 0.83 / CAGR 18.0% / MaxDD 32.3% / 1,187
+trades (scenario `staging-record-convention/top3000-2000-2026-record-convention.sexp`;
+DEEP_RESULTS §"RECORD OF RECORD"). E-capped long-short (+13,730%) is honest but
+sizing-lottery-flattered (same AXTI entry, 1.7× ticket) — NOT the record; old
+uncapped E (+22,097%) = free-leverage artifact (committed/NAV >1 in 24/26 yrs).
+Levered long-short: planned only
+([[levered-longshort-margin-realism plan]], dev/plans/…2026-07-14.md).
