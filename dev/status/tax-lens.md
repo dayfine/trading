@@ -3,7 +3,7 @@
 ## Last updated: 2026-07-24
 
 ## Status
-READY_FOR_REVIEW
+MERGED
 
 ## Interface stable
 YES
@@ -12,7 +12,7 @@ YES
 feat-backtest
 
 ## Open PR(s)
-feat/tax-lens (#2006 Phase 1)
+— (Phase 1 merged 2026-07-24 as #2066; Phase 2 wash-sale / in-sim April outflows deferred, user-gated per issue #2006)
 
 ## Scope
 After-tax performance lens (issue #2006) — a pure post-run report layer over an
