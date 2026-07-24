@@ -10,7 +10,19 @@ picks follow-ups SHIPPED** (#2067 renderer grade column + prefix strip;
 #2065 sectors.csv + manifest — no 3h scrape was needed, cache was warm);
 memory snapshot refreshed (#2069); stale ci-red watchdog #2031 closed.
 
-## P0 — leverage-dawn surface design (USER DECISION REQUIRED first)
+> **07-24 PM user decisions (same day):** (1) leverage-dawn **BUILD
+> green-lit** — mechanism build dispatched (`feat/leverage-dawn`,
+> default-off + WF spec; surface run after merge); (2) tax Phase 2
+> **parked**; (3) v3 warehouses **deleted** (~4.2G freed); (4) 07-10
+> picks backfill **done** (`dev/weekly-picks/7827bd6f1/2026-07-10.*`,
+> Bullish, 20 tied longs, 0 shorts) **+ new picks-execution program
+> launched**: portfolio state file + fixed-risk sized trade
+> instructions (`feat/picks-protocol`, Phase A+B in flight; Phase C =
+> HTML report with per-candidate SVG charts, next PR). Sizing protocol
+> answer of record: orders are NOT equal-sized — fixed-risk 1% per
+> trade via `Portfolio_risk.compute_position_size`, capped 30%/position.
+
+## ~~P0 — leverage-dawn surface design~~ decided: BUILD (see above)
 
 The P1b memo's verdict: regime-conditional leverage is the ONLY payload
 earning a designed WF-CV surface (realistic lagging dawn label keeps

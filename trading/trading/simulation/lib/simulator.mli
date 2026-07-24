@@ -95,6 +95,27 @@ type dependencies = {
           Default [None] preserves bit-equal baselines: no pruning, every symbol
           participates in every step's bar-fetch loop. Authority:
           [dev/plans/v7-sweep-speedup-2026-05-26.md] §Win #4. *)
+  on_transitions : (Trading_strategy.Position.transition list -> unit) option;
+      (** Optional per-step observer, invoked once per step with the final list
+          of [Position.transition]s that step will apply — the strategy's own
+          transitions plus any margin-driven transitions appended by
+          {!Margin_runner.tick} (after same-tick collision dedup). Invoked
+          unconditionally every step, including steps where
+          [_should_call_strategy] is false but the margin runner still fires
+          (margin checks are not gated by the strategy cadence). [None] (the
+          default) is a no-op — purely observational, never influences
+          [portfolio], [positions], fills, or any simulated number.
+
+          Strategy-agnostic hook (mirrors [on_trade_fill]) so the simulator does
+          not depend on the higher-layer [Backtest.Stop_log] / [Trade_audit]
+          observers. The backtest layer wires this to
+          [Stop_log.record_transitions] so that margin-driven exit reasons
+          (["margin_call"], ["buyin_stress"], ["maintenance_reduce"]) reach
+          [trades.csv]'s [exit_trigger] column with the same fidelity as
+          strategy-emitted [StrategySignal] exits — closing the gap where margin
+          transitions, generated after the strategy's own [on_market_close] call
+          returns, were invisible to any transition observer wired only at the
+          strategy-call boundary. See issue #2057. *)
 }
 
 val create_deps :
@@ -115,6 +136,7 @@ val create_deps :
   ?exempt_closing_trades_from_cash_floor:bool ->
   ?on_trade_fill:(Trading_base.Types.trade -> Trading_base.Types.trade) ->
   ?active_through_for:(string -> Core.Date.t option) ->
+  ?on_transitions:(Trading_strategy.Position.transition list -> unit) ->
   unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and
@@ -177,7 +199,10 @@ val create_deps :
       Optional per-symbol [active_through] lookup driving universe pruning at
       {!create} time. Default [None] preserves baselines — no pruning. See the
       field doc on {!dependencies.active_through_for} for the domain rationale
-      (point-in-time pruning, NOT survivor bias). *)
+      (point-in-time pruning, NOT survivor bias).
+    @param on_transitions
+      Optional per-step transition observer. Default [None] — no observer, zero
+      overhead. See the field doc on {!dependencies.on_transitions}. *)
 
 val prune_symbols_by_active_through :
   symbols:string list ->
