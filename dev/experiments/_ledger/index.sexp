@@ -1,4 +1,9 @@
-(((config_hash realism-defaults-flip)
+(((config_hash margin-m4-leverage-surface)
+  (base_scenario
+   "staging-record-convention/top3000-2000-2026-record-convention (promoted-bundle defaults, v5thin)")
+  (window_id margin-m4-broad-13x2y-2000-2026)
+  (verdict Reject) (entry_slug margin-m4-leverage-surface))
+ ((config_hash realism-defaults-flip)
   (base_scenario "goldens-small/bull-crash-2015-2020.sexp (representative shift cell)")
   (window_id realism-defaults-flip-2026-07-10)
   (verdict Accept) (entry_slug realism-defaults-flip))
