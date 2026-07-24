@@ -1,9 +1,22 @@
 # Status: weekly-snapshot
 
-## Last updated: 2026-06-28
+## Last updated: 2026-07-24
 
 ## Status
 IN_PROGRESS
+
+**2026-07-24 (report rendering fixes, P1 #2050 follow-up):** Two display-only
+fixes to the weekly report (PR `feat/picks-render-fixes`). (1)
+`Report_renderer.render` now renders each candidate's `resistance_grade` in a
+new Markdown `Resistance` column (long + short candidate tables); it was
+sexp-only before. `None` renders as `-`. (2) `weekly_snapshot_generator` strips
+the module-qualified `Weinstein_types.` prefix that `[@@deriving show]` emits —
+grade strings are now the bare quality label (e.g. `Heavy_resistance (0.82)`)
+via a small explicit `_overhead_quality_label` (mirrors `_regime_label`; the
+`[@@deriving show]` on the type is untouched). No scoring/analysis/default
+changes. Tests: new renderer + generator assertions pin the clean unprefixed
+string and the `None -> "-"` cell; `dune runtest trading/weinstein/snapshot`
+passes, `@fmt` clean.
 
 **2026-06-28 (snapshot-warehouse fast input path):** `generate_weekly_snapshot`
 now has a fast bar-source path so a weekly screen runs in seconds instead of the
