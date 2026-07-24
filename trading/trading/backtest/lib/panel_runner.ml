@@ -55,7 +55,11 @@ let _stale_hold_policy (config : Weinstein_strategy.config) : Stale_hold.config
    re-recording the same transition, so the two paths overlapping on
    strategy-only days is harmless; on a same-tick collision the later
    [on_transitions] call correctly overwrites the wrapper's stale
-   strategy-side trigger with the winning margin one. *)
+   strategy-side trigger with the winning margin one — pinned by
+   [test_margin_exit_observability.ml:test_stop_log_records_margin_call_on_strategy_collision].
+   This is the correct outcome, not a race: [Margin_runner.dedup_strategy_exits_for_margin]
+   drops the strategy's colliding [TriggerExit] before [_apply_transitions]
+   runs, so only margin's exit actually executes. *)
 let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
     ~warmup_start ~end_date ~initial_cash ~commission ?slippage_bps
     ?on_trade_fill ?active_through_for ~strategy ~market_data_adapter () =

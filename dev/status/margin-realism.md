@@ -289,7 +289,8 @@ and M1b (follow-up).
 ## Follow-ups (post-M4)
 
 - [x] **#2057 — margin exit labels now reach `trades.csv` / `Stop_log`
-  (observability-only fix).** Branch `feat/margin-realism-exit-labels`.
+  (observability-only fix; `trade_audit.sexp` half tracked separately as
+  #2076).** Branch `feat/margin-realism-exit-labels`.
   Root cause: `Backtest.Strategy_wrapper.wrap` (the only place that fed
   `Stop_log.record_transitions`) intercepts transitions at the strategy's own
   `on_market_close` call boundary — but `Margin_runner.tick`'s
@@ -309,7 +310,16 @@ and M1b (follow-up).
     collision the later `on_transitions` call correctly overwrites the
     wrapper's stale strategy-side trigger with the winning margin one (a
     latent staleness bug the old design had on collision days, fixed as a
-    side effect).
+    side effect). **This collision-overwrite claim is now pinned by a test**
+    (QC rework, see below): `test_stop_log_records_margin_call_on_strategy_collision`
+    reuses the `_short_then_stop_strategy` collision fixture from
+    `test_margin_runner.ml` and asserts the final `Stop_log` label is
+    `margin_call`, not the strategy's `Stop_loss`. This is the *correct*
+    semantic, not a misattribution: `Margin_runner.dedup_strategy_exits_for_margin`
+    drops the strategy's colliding `TriggerExit` from `strategy_transitions`
+    before `_apply_transitions` runs, so the strategy's stop-loss never
+    actually executes — only margin's `TriggerExit` does — and `Stop_log`
+    should (and now does) reflect what actually closed the position.
   - `trade_audit.sexp` scope note: investigated and found that its exit-side
     enrichment (`Exit_audit_capture.emit_for_list`, wired from
     `weinstein_strategy.ml`'s stops pass) already only covers
@@ -322,19 +332,24 @@ and M1b (follow-up).
     macro/stage/rs context Margin_runner architecturally cannot have, or a
     materially larger cross-cutting feature (giving `Trade_audit` visibility
     into every externally-generated exit source) — out of scope for an
-    observability-only bugfix. Flagged as a candidate follow-up, not filed as
-    a new issue (would need its own design).
+    observability-only bugfix. **Filed as #2076** (QC rework — the prior
+    revision only flagged this in prose with no tracked artifact, which
+    would have let `Closes #2057` auto-close an issue whose title names this
+    still-broken sink). PR body now reads "Partially addresses #2057" with
+    #2076 cross-referenced instead of `Closes #2057`.
   - No behavior change: `on_transitions` is a pure read-only observer: it
     never touches `portfolio`/`positions`/fills — same numbers, same PnL.
   - Tests: `test_margin_runner.ml` (+3 — `on_transitions_observes_margin_call`
     / `_buyin_stress` / `_maintenance_reduce`, at the `Simulator` layer,
-    pinning the raw transition list) and new
-    `test_margin_exit_observability.ml` (+3 — same three labels, one layer up,
-    using the exact `Stop_log.record_transitions` composition `Panel_runner`
-    wires in production, asserting on `Stop_log.get_stop_infos`'s
-    `exit_trigger` — the value `Result_writer` reads for `trades.csv`). All 6
-    verified to FAIL before the fix (temporarily disabled the
-    `on_transitions` call site) and PASS after.
+    pinning the raw transition list) and `test_margin_exit_observability.ml`
+    (+3 — same three labels, one layer up, using the exact
+    `Stop_log.record_transitions` composition `Panel_runner` wires in
+    production, asserting on `Stop_log.get_stop_infos`'s `exit_trigger` — the
+    value `Result_writer` reads for `trades.csv`; +1 more, the collision test
+    above, added in QC rework). All 6 original assertions verified to FAIL
+    before the fix (temporarily disabled the `on_transitions` call site) and
+    PASS after; the collision test's correctness follows directly from
+    `dedup_strategy_exits_for_margin`'s documented `.mli` contract.
   - Verify: `dune runtest trading/simulation/test/test_margin_runner.ml
     trading/backtest/test/test_margin_exit_observability.ml`.
 - #2059 — LH phantom-short leak + duplicated trades.csv row (record basis,

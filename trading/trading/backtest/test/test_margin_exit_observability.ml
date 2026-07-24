@@ -15,7 +15,13 @@
     screener panels) is not needed to pin this: the bug is in the plumbing
     between the simulator and the collector, not in the Weinstein strategy or
     the margin math themselves (both already independently tested — see
-    [test_margin_runner.ml] and [test_long_maintenance.ml]). *)
+    [test_margin_runner.ml] and [test_long_maintenance.ml]).
+
+    Also pins the same-tick strategy/margin collision case (QC rework, PR
+    #2074): [test_stop_log_records_margin_call_on_strategy_collision] proves the
+    later [on_transitions] call overwrites the wrapper's stale strategy-side
+    trigger with the winning margin label — see that test's header comment for
+    why last-writer-wins is the correct semantic here, not a misattribution. *)
 
 open OUnit2
 open Core
@@ -245,6 +251,117 @@ let test_stop_log_records_maintenance_reduce _ =
   _assert_strategy_signal_label ~position_id:"AAPL-long"
     ~expected_label:"maintenance_reduce" stop_log
 
+(* ------------------------------------------------------------------ *)
+(* Collision regression (QC rework, PR #2074): the PR body / a         *)
+(* [panel_runner.ml] comment claim that on a same-tick strategy/margin *)
+(* collision, the later [on_transitions] call correctly overwrites the *)
+(* [Strategy_wrapper]-recorded stale strategy-side trigger with the     *)
+(* winning margin label. That claim had zero test coverage — this test *)
+(* pins it through the exact [Stop_log.record_transitions] composition *)
+(* [Panel_runner] wires, reusing the collision fixture from             *)
+(* [test_margin_runner.ml:_short_then_stop_strategy] /                  *)
+(* [test_e2e_strategy_exit_collides_with_margin_call].                  *)
+(*                                                                      *)
+(* Why margin winning is the CORRECT semantic, not a misattribution:    *)
+(* [Margin_runner.dedup_strategy_exits_for_margin] drops the strategy's *)
+(* colliding [TriggerExit] from [strategy_transitions] entirely before  *)
+(* [_apply_transitions] runs — so the strategy's stop-loss never        *)
+(* executes; only margin's [TriggerExit] does. [Stop_log]'s exit_trigger*)
+(* must reflect what actually closed the position, so the margin label  *)
+(* overwriting the wrapper's premature (never-applied) strategy label   *)
+(* is the right outcome, not a race. *)
+
+(* Short entered at $50 on day 1; emits a stop-loss [TriggerExit] once
+   price crosses [stop_trigger_price]. [stop_trigger_price = 60.0] is
+   exactly the maintenance-margin trigger for a $50 short under default
+   config (50% IM / 25% MM), so on the rising fixture (50->70) both the
+   strategy's stop-loss and margin's maintenance call fire on the same
+   bar (day 4, close $65). Mirrors
+   [test_margin_runner.ml:_short_then_stop_strategy]. *)
+let _short_then_stop_strategy ~symbol ~quantity ~position_id ~stop_trigger_price
+    : (module Strategy_interface.STRATEGY) =
+  let entered = ref false in
+  let exited = ref false in
+  let module S : Strategy_interface.STRATEGY = struct
+    let name = "ShortThenStop"
+
+    let on_market_close ~get_price ~get_indicator:_ ~portfolio:_ =
+      match get_price symbol with
+      | None -> Ok { Strategy_interface.transitions = [] }
+      | Some (bar : Types.Daily_price.t) ->
+          if not !entered then (
+            entered := true;
+            let open Position in
+            let trans =
+              {
+                position_id;
+                date = bar.date;
+                kind =
+                  CreateEntering
+                    {
+                      symbol;
+                      side = Position.Short;
+                      target_quantity = quantity;
+                      entry_price = bar.close_price;
+                      reasoning =
+                        TechnicalSignal
+                          {
+                            indicator = "margin-exit-observability-collision";
+                            description = "short for collision test";
+                          };
+                    };
+              }
+            in
+            Ok { Strategy_interface.transitions = [ trans ] })
+          else if (not !exited) && Float.(bar.close_price >= stop_trigger_price)
+          then (
+            exited := true;
+            let open Position in
+            let trans =
+              {
+                position_id;
+                date = bar.date;
+                kind =
+                  TriggerExit
+                    {
+                      exit_reason =
+                        StopLoss
+                          {
+                            stop_price = stop_trigger_price;
+                            actual_price = bar.close_price;
+                            loss_percent =
+                              (stop_trigger_price -. bar.close_price)
+                              /. stop_trigger_price *. 100.0;
+                          };
+                      exit_price = bar.close_price;
+                    };
+              }
+            in
+            Ok { Strategy_interface.transitions = [ trans ] })
+          else Ok { Strategy_interface.transitions = [] }
+  end
+  in
+  (module S)
+
+let test_stop_log_records_margin_call_on_strategy_collision _ =
+  let config =
+    _config_for ~start_date:(_date "2024-01-02") ~end_date:(_date "2024-01-11")
+      ~initial_cash:50_000.0
+  in
+  let strategy =
+    _short_then_stop_strategy ~symbol:"AAPL" ~quantity:100.0
+      ~position_id:"AAPL-short" ~stop_trigger_price:60.0
+  in
+  let stop_log =
+    _run_and_collect_stop_log ~test_name:"stop_log_margin_strategy_collide"
+      ~symbols_with_data:[ ("AAPL", _aapl_rising_50_to_70) ]
+      ~strategy ~margin_config:_on_config ~config ()
+  in
+  (* Must be the margin label, NOT [Stop_loss] — proving [on_transitions]'s
+     later call overwrote the wrapper's stale strategy-side trigger. *)
+  _assert_strategy_signal_label ~position_id:"AAPL-short"
+    ~expected_label:"margin_call" stop_log
+
 let suite =
   "margin_exit_observability"
   >::: [
@@ -252,6 +369,9 @@ let suite =
          "stop_log records buyin_stress" >:: test_stop_log_records_buyin_stress;
          "stop_log records maintenance_reduce"
          >:: test_stop_log_records_maintenance_reduce;
+         "stop_log records margin_call on strategy collision (overwrites stale \
+          strategy trigger)"
+         >:: test_stop_log_records_margin_call_on_strategy_collision;
        ]
 
 let () = run_test_tt_main suite
