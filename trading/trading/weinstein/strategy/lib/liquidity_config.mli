@@ -7,6 +7,11 @@
     as a {!Variant_matrix} axis, e.g.
     [((key (liquidity_config min_hold_dollar_adv)) (values (0.0 1000000.0)))].
 
+    It also carries the {b measurement basis} both thresholds are compared
+    against — [adv_lookback_days] (window length), [adv_aggregation] (how the
+    window is reduced to one number) and [adv_trim_pct]. The same basis is used
+    by the entry gate, the held-position exit and {!Short_borrow_gate}.
+
     Motivation: a delisted micro-cap held into illiquidity (e.g. ELCO trading ~2
     shares/day) produced a fake −48% single-day NAV crash when a spurious
     high-tick tripped the short stop's worst-case cover fill. The fix is to
@@ -31,9 +36,10 @@
 
 type t = {
   adv_lookback_days : int;
-      (** Trailing window (in daily bars) over which dollar-ADV is averaged. A
-          harmless positive default (e.g. 20) — it is only consulted when one of
-          the thresholds below is positive. *)
+      (** Trailing window (in daily bars) over which dollar-ADV is aggregated
+          (how it is aggregated is [adv_aggregation]). A harmless positive
+          default (e.g. 20) — it is only consulted when one of the thresholds
+          below is positive. *)
   min_entry_dollar_adv : float;
       (** Entry gate: drop a long/short candidate whose trailing dollar-ADV is
           below this. Default [1_000_000.0] (2026-07-10 realism flip): a
@@ -48,19 +54,19 @@ type t = {
           Its promotion is a separate evidence pipeline (leading WF-CV
           candidate; not this change). *)
   adv_aggregation : Liquidity_metric.aggregation;
-      (** How the trailing window of daily dollar volumes is aggregated into
-          the dollar-ADV reading every threshold above is compared against.
-          Default [Mean] — the pre-#2060 arithmetic mean, bit-identical to the
-          previous behaviour. [Median] / [Trimmed_mean] are the spoof-robust
+      (** How the trailing window of daily dollar volumes is aggregated into the
+          dollar-ADV reading every threshold above is compared against. Default
+          [Mean] — the pre-#2060 arithmetic mean, bit-identical to the previous
+          behaviour. [Median] / [Trimmed_mean] are the spoof-robust
           alternatives: a single block-cross print inflates the mean past the
           entry floor (LINK 2026-05-11, issue #2060), and neither of those two
-          is moved by one observation. {b Default-off and unpromoted} — there
-          is no ledger ACCEPT for a non-[Mean] aggregation; it lands as a
+          is moved by one observation. {b Default-off and unpromoted} — there is
+          no ledger ACCEPT for a non-[Mean] aggregation; it lands as a
           searchable axis only. *)
   adv_trim_pct : float;
       (** Fraction trimmed from {i each} tail of the sorted window when
-          [adv_aggregation = Trimmed_mean]. {b Ignored} for [Mean] and
-          [Median]. Default {!Liquidity_metric.default_trim_pct} ([0.1]). *)
+          [adv_aggregation = Trimmed_mean]. {b Ignored} for [Mean] and [Median].
+          Default {!Liquidity_metric.default_trim_pct} ([0.1]). *)
 }
 [@@deriving sexp]
 
@@ -69,12 +75,12 @@ val default_config : t
     (entry gate default-on since 2026-07-10), [min_hold_dollar_adv = 0.0] (exit
     default-off), [adv_aggregation = Mean] and
     [adv_trim_pct = Liquidity_metric.default_trim_pct] (robust aggregation
-    default-off). The entry gate drops sub-$1M-ADV candidates; the
-    held-position exit never fires; dollar-ADV is the plain arithmetic mean. To
-    reproduce pre-flip behaviour bit-for-bit, set [min_entry_dollar_adv = 0.0].
+    default-off). The entry gate drops sub-$1M-ADV candidates; the held-position
+    exit never fires; dollar-ADV is the plain arithmetic mean. To reproduce
+    pre-flip behaviour bit-for-bit, set [min_entry_dollar_adv = 0.0].
 
     Both new fields are real config fields, so each is expressible as a
-    {!Variant_matrix} axis:
-    [((key (liquidity_config adv_aggregation)) (values (Mean Median Trimmed_mean)))]
-    crossed with
-    [((key (liquidity_config adv_trim_pct)) (values (0.05 0.1 0.2)))]. *)
+    {!Variant_matrix} axis (searchability, experiment-flag-discipline R2):
+    - [((key (liquidity_config adv_aggregation)) (values (Mean Median
+       Trimmed_mean)))]
+    - [((key (liquidity_config adv_trim_pct)) (values (0.05 0.1 0.2)))] *)

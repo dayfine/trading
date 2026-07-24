@@ -14,32 +14,32 @@
     becomes untradeable, rather than cleaning the data after the fact.
 
     {b Aggregation is configurable ({!aggregation}) because the arithmetic mean
-    is spoofable} — see issue #2060. A single block-cross or bad print inflates
-    the trailing mean past an entry floor a name never honestly clears: LINK on
-    2026-05-11 printed 4,608,300 shares ($15.4M) with zero price impact against
-    a ~$250k/day honest baseline, which lifted its 20-day mean dollar-ADV to
-    ~$1.0M and cleared the armed $1M entry gate. The resulting $8.9M position
-    stopped out five days later at −17.7%. {!Median} and {!Trimmed_mean} are
-    robust to that single spike; {!Mean} (the default) is not. *)
+       is spoofable} — see issue #2060. A single block-cross or bad print
+    inflates the trailing mean past an entry floor a name never honestly clears:
+    LINK on 2026-05-11 printed 4,608,300 shares ($15.4M) with zero price impact
+    against a ~$250k/day honest baseline, which lifted its 20-day mean
+    dollar-ADV to ~$1.0M and cleared the armed $1M entry gate. The resulting
+    $8.9M position stopped out five days later at −17.7%. {!Median} and
+    {!Trimmed_mean} are robust to that single spike; {!Mean} (the default) is
+    not. *)
 
 type aggregation =
   | Mean
-      (** Arithmetic mean of the window's daily dollar volumes. The default —
-          it reproduces the pre-#2060 behaviour bit-for-bit. Spoofable: one
-          block print in the window moves the reading by [spike / n]. *)
+      (** Arithmetic mean of the window's daily dollar volumes. The default — it
+          reproduces the pre-#2060 behaviour bit-for-bit. Spoofable: one block
+          print in the window moves the reading by [spike / n]. *)
   | Median
       (** Median of the window's daily dollar volumes: the middle observation
-          for an odd-length window, the mean of the two central observations
-          for an even-length one. Unaffected by any single spike, and the
-          honest reading for a name whose volume distribution is right-skewed
-          (which most thin names' are). *)
+          for an odd-length window, the mean of the two central observations for
+          an even-length one. Unaffected by any single spike, and the honest
+          reading for a name whose volume distribution is right-skewed (which
+          most thin names' are). *)
   | Trimmed_mean
       (** Symmetric trimmed mean: drop the [trim_pct] fraction of observations
           from {i each} tail of the sorted window, then take the mean of what
-          remains. Between {!Mean} and {!Median} in robustness — it discards
-          the extremes but still averages the body. The trim fraction is the
-          [trim_pct] argument of {!dollar_adv} (default
-          {!default_trim_pct}). *)
+          remains. Between {!Mean} and {!Median} in robustness — it discards the
+          extremes but still averages the body. The trim fraction is the
+          [trim_pct] argument of {!dollar_adv} (default {!default_trim_pct}). *)
 [@@deriving sexp, equal, compare]
 
 val default_trim_pct : float

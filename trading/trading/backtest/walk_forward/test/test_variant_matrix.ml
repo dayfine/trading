@@ -741,6 +741,69 @@ let test_empty_axes_raises _ =
   let t = { VM.axes = []; expansion = VM.Cartesian } in
   assert_that (_raises_failure (fun () -> VM.expand t)) (equal_to true)
 
+(* Proves R2 (experiment-flag-discipline) for the spoof-robust dollar-ADV
+   aggregation (issue #2060): [adv_aggregation] and [adv_trim_pct] are real
+   fields on [Liquidity_config.t] reached via the nested [liquidity_config]
+   path, so the crossed axis expands and passes [Overlay_validator] validation
+   with no overlay-validator change. Both take ATOM values, so the generated
+   labels stay filename-safe (they feed [Walk_forward_runner]'s scenario
+   name). *)
+let test_adv_aggregation_axes_expand _ =
+  let aggregation_axis =
+    VM.Key
+      {
+        path = [ "liquidity_config"; "adv_aggregation" ];
+        values = Sexp.[ Atom "Mean"; Atom "Median"; Atom "Trimmed_mean" ];
+      }
+  in
+  let trim_axis =
+    VM.Key
+      {
+        path = [ "liquidity_config"; "adv_trim_pct" ];
+        values = Sexp.[ Atom "0.05"; Atom "0.1" ];
+      }
+  in
+  let t =
+    { VM.axes = [ aggregation_axis; trim_axis ]; expansion = VM.Cartesian }
+  in
+  (* 3 aggregations * 2 trim fractions = 6 cells; first axis varies slowest. *)
+  assert_that (VM.expand t)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (v : WFR.variant) -> v.label)
+               (equal_to "adv_aggregation=Mean__adv_trim_pct=0.05");
+             field
+               (fun (v : WFR.variant) -> v.overrides)
+               (elements_are
+                  [
+                    equal_to
+                      (Sexp.of_string
+                         "((liquidity_config ((adv_aggregation Mean))))");
+                    equal_to
+                      (Sexp.of_string
+                         "((liquidity_config ((adv_trim_pct 0.05))))");
+                  ]);
+           ];
+         field
+           (fun (v : WFR.variant) -> v.label)
+           (equal_to "adv_aggregation=Mean__adv_trim_pct=0.1");
+         field
+           (fun (v : WFR.variant) -> v.label)
+           (equal_to "adv_aggregation=Median__adv_trim_pct=0.05");
+         field
+           (fun (v : WFR.variant) -> v.label)
+           (equal_to "adv_aggregation=Median__adv_trim_pct=0.1");
+         field
+           (fun (v : WFR.variant) -> v.label)
+           (equal_to "adv_aggregation=Trimmed_mean__adv_trim_pct=0.05");
+         field
+           (fun (v : WFR.variant) -> v.label)
+           (equal_to "adv_aggregation=Trimmed_mean__adv_trim_pct=0.1");
+       ])
+
 let suite =
   "Walk_forward_variant_matrix"
   >::: [
@@ -792,6 +855,8 @@ let suite =
          "bad nested axis key raises at expansion time"
          >:: test_bad_nested_key_raises;
          "empty axes raises" >:: test_empty_axes_raises;
+         "adv_aggregation + adv_trim_pct nested axes expand + validate"
+         >:: test_adv_aggregation_axes_expand;
        ]
 
 let () = run_test_tt_main suite
