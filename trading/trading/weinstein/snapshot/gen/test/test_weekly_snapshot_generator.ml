@@ -223,6 +223,60 @@ let test_live_portfolio_populates_held _ =
            (equal_to 0);
        ])
 
+(* No-resident-bars graceful degradation for a held position (CP4 pin): a held
+   symbol ABSENT from the bar reader must fall back to its entry price (zero
+   unrealized) and carry no recomputed stop, per the documented fallbacks in
+   [_current_price] / [_unrealized_pct] / [_recommended_stop]. *)
+let test_held_without_bars_degrades_gracefully _ =
+  let position : Weinstein_snapshot_gen.Live_portfolio.position =
+    {
+      symbol = "GHOST";
+      shares = 7;
+      entry_price = 42.0;
+      entry_date = Date.of_string "2022-01-03";
+      stop_price = 40.0;
+    }
+  in
+  let base =
+    _inputs_at ~as_of:_as_of ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  let inputs =
+    {
+      base with
+      live_portfolio =
+        {
+          Weinstein_snapshot_gen.Live_portfolio.cash = 50_000.0;
+          as_of = _as_of;
+          positions = [ position ];
+        };
+      portfolio_is_placeholder = false;
+    }
+  in
+  let snap = Generator.generate inputs in
+  assert_that snap
+    (field
+       (fun (s : Weekly_snapshot.t) -> s.held_positions)
+       (elements_are
+          [
+            all_of
+              [
+                field
+                  (fun (h : Weekly_snapshot.held_position) -> h.symbol)
+                  (equal_to "GHOST");
+                field
+                  (fun (h : Weekly_snapshot.held_position) -> h.current_price)
+                  (float_equal 42.0);
+                field
+                  (fun (h : Weekly_snapshot.held_position) -> h.unrealized_pct)
+                  (float_equal 0.0);
+                field
+                  (fun (h : Weekly_snapshot.held_position) ->
+                    h.recommended_stop)
+                  is_none;
+              ];
+          ]))
+
 (* The breakout AAPL surfaces as a ranked long candidate with a populated
    entry / score / rationale (T4: domain outcome, not just "no error"). *)
 let test_breakout_is_long_candidate _ =
@@ -428,6 +482,8 @@ let suite =
          "metadata stamped onto the snapshot" >:: test_metadata_stamped;
          "live portfolio populates held positions"
          >:: test_live_portfolio_populates_held;
+         "held symbol without bars degrades gracefully"
+         >:: test_held_without_bars_degrades_gracefully;
          "breakout AAPL is a long candidate" >:: test_breakout_is_long_candidate;
          "breakout long stop sits below entry"
          >:: test_breakout_stop_below_entry;
