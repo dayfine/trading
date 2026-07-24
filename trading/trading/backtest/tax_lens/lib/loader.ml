@@ -16,18 +16,23 @@ let _realized_trade ~symbol ~side ~exit_date ~days_held ~pnl : T.realized_trade
     pnl = Float.of_string pnl;
   }
 
-(* trades.csv: 0 symbol, 1 side, 3 exit_date, 4 days_held, 8 pnl_dollars. *)
-let _trade_of_line line : T.realized_trade option =
+(* trades.csv: 0 symbol, 1 side, 3 exit_date, 4 days_held, 8 pnl_dollars. A row
+   with fewer than 9 fields is malformed and raises — it is never silently
+   dropped, so [load_exn]'s "raises on malformed input" contract holds for
+   short rows, not just rows with bad field content. *)
+let _trade_of_line line : T.realized_trade =
   match _fields line with
   | symbol :: side :: _entry :: exit_date :: days_held :: _entry_p :: _exit_p
     :: _qty :: pnl :: _ ->
-      Some (_realized_trade ~symbol ~side ~exit_date ~days_held ~pnl)
-  | _ -> None
+      _realized_trade ~symbol ~side ~exit_date ~days_held ~pnl
+  | fields ->
+      failwithf "malformed trades.csv row (expected >= 9 fields, got %d): %s"
+        (List.length fields) line ()
 
 let _load_trades path =
   match In_channel.read_lines path with
   | [] -> []
-  | _header :: rows -> List.filter_map rows ~f:_trade_of_line
+  | _header :: rows -> List.map rows ~f:_trade_of_line
 
 let _equity_row line =
   match _fields line with
