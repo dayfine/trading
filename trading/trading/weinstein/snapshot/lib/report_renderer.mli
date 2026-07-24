@@ -20,6 +20,11 @@
     a missing section. The [top N] in each candidate header echoes the effective
     limit.
 
+    Each candidate table carries a [Resistance] column rendering the candidate's
+    [resistance_grade] (the v2 sketch-derived ["<quality> (<score>)"] string, or
+    the v1 binary quality label). A candidate whose grade was not computed
+    ([resistance_grade = None]) renders as ["-"] so the column is never blank.
+
     {1 Display caps and the tie-honesty note}
 
     The candidate tables are display-only caps on the {e human} report; the

@@ -141,20 +141,32 @@ let _analyze_universe ~(inputs : inputs) ~index_bars : Stock_analysis.t list =
 let _rs_vs_spy (analysis : Stock_analysis.t) : float option =
   Option.map analysis.rs ~f:(fun (r : Rs.result) -> r.current_normalized)
 
+(* Clean quality label. [Weinstein_types.show_overhead_quality] (the derived
+   [@@deriving show] printer) module-qualifies the constructor, e.g.
+   "Weinstein_types.Heavy_resistance"; the display strings want the bare label
+   (mirrors [_regime_label] below, which strips the same prefix for the macro
+   regime). *)
+let _overhead_quality_label : Weinstein_types.overhead_quality -> string =
+  function
+  | Virgin_territory -> "Virgin_territory"
+  | Clean -> "Clean"
+  | Moderate_resistance -> "Moderate_resistance"
+  | Heavy_resistance -> "Heavy_resistance"
+  | Insufficient_history -> "Insufficient_history"
+
 (* Resistance grade for the snapshot display (score/display split, §D5). When
    the overhead-supply score is armed AND populated ([analysis.supply = Some]),
    render the v2 sketch-derived grade with its continuous score, e.g.
    "Heavy_resistance (0.82)"; otherwise fall back to the v1 binary grade.
    [analysis.supply] is [None] whenever [overhead_supply] is disarmed, so the
-   default-off output is byte-identical to today's v1 grade string. *)
+   disarmed v2 output stays byte-identical to the v1 grade string (both route
+   through [_overhead_quality_label]). *)
 let _v2_grade_string (s : Resistance_supply.result) : string =
-  Printf.sprintf "%s (%.2f)"
-    (Weinstein_types.show_overhead_quality s.quality)
-    s.score
+  Printf.sprintf "%s (%.2f)" (_overhead_quality_label s.quality) s.score
 
 let _v1_grade_string (analysis : Stock_analysis.t) : string option =
   Option.map analysis.resistance ~f:(fun (r : Resistance.result) ->
-      Weinstein_types.show_overhead_quality r.quality)
+      _overhead_quality_label r.quality)
 
 let _resistance_grade (analysis : Stock_analysis.t) : string option =
   match analysis.supply with
