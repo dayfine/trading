@@ -8,7 +8,8 @@ type inputs = {
   as_of : Date.t;
   bar_reader : Bar_reader.t;
   ticker_sectors : (string * string) list;
-  held_positions : Weekly_snapshot.held_position list;
+  live_portfolio : Live_portfolio.t;
+  portfolio_is_placeholder : bool;
 }
 
 (* Weekly bars for one symbol as of [as_of], using the strategy's own
@@ -188,6 +189,13 @@ let _candidate_of_scored (c : Screener.scored_candidate) :
     rationale = String.concat ~sep:"; " c.rationale;
     rs_vs_spy = _rs_vs_spy c.analysis;
     resistance_grade = _resistance_grade c.analysis;
+    (* Unsized defaults — overwritten for longs by [_size_long]; shorts keep
+       these (short entries are default-off in the live strategy). *)
+    sized_shares = 0;
+    sized_position_value = 0.0;
+    sized_position_pct = 0.0;
+    sized_risk_amount = 0.0;
+    sizing_note = None;
   }
 
 (* Clean regime label (the [@@deriving show] form is module-qualified, e.g.
@@ -227,18 +235,94 @@ let _sectors_by_rating ~(inputs : inputs) ~index_bars wanted =
     ~f:(_sector_name_if_rated ~inputs ~index_bars ~wanted)
   |> List.dedup_and_sort ~compare:String.compare
 
+(* Current close for a held symbol as of the run date: the last daily bar's
+   close. Falls back to the entry price when the symbol has no resident bars, so
+   an un-priced position still renders a sensible (zero-unrealized) row. *)
+let _current_price ~(inputs : inputs) ~entry_price symbol =
+  let daily =
+    Bar_reader.daily_bars_for inputs.bar_reader ~symbol ~as_of:inputs.as_of
+  in
+  match List.last daily with
+  | Some (bar : Types.Daily_price.t) -> (bar.close_price, daily)
+  | None -> (entry_price, daily)
+
+let _unrealized_pct ~entry_price ~current_price =
+  if Float.equal entry_price 0.0 then 0.0
+  else (current_price -. entry_price) /. entry_price *. 100.0
+
+(* This week's recomputed Weinstein support-floor stop for a held long, shown
+   beside the trader's current stop so the reader sees the delta. Reuses the
+   existing stop primitive — no new stop logic — and is [None] when the symbol
+   has no bars to derive a floor from. The full trailing state machine is not
+   threaded here (Phase C). *)
+let _recommended_stop ~(inputs : inputs) ~current_price ~daily =
+  if List.is_empty daily then None
+  else
+    let state =
+      Weinstein_stops.compute_initial_stop_with_floor
+        ~config:inputs.config.stops_config ~side:Trading_base.Types.Long
+        ~entry_price:current_price ~bars:daily ~as_of:inputs.as_of
+        ~fallback_buffer:inputs.config.initial_stop_buffer
+    in
+    Some (Weinstein_stops.get_stop_level state)
+
+(* Enrich one live holding into a report-ready held-position row: price it,
+   compute its unrealized return, and recompute its Weinstein stop. *)
+let _enrich_held ~(inputs : inputs) (p : Live_portfolio.position) :
+    Weekly_snapshot.held_position =
+  let current_price, daily =
+    _current_price ~inputs ~entry_price:p.entry_price p.symbol
+  in
+  {
+    symbol = p.symbol;
+    entered = p.entry_date;
+    stop = p.stop_price;
+    status = "Holding";
+    shares = p.shares;
+    entry_price = p.entry_price;
+    current_price;
+    unrealized_pct = _unrealized_pct ~entry_price:p.entry_price ~current_price;
+    recommended_stop = _recommended_stop ~inputs ~current_price ~daily;
+  }
+
+(* Long market value of the held book at current prices. *)
+let _long_market_value held =
+  List.sum
+    (module Float)
+    held
+    ~f:(fun (h : Weekly_snapshot.held_position) ->
+      Float.of_int h.shares *. h.current_price)
+
+(* Size a long candidate against the live portfolio, mirroring the backtest's
+   fixed-risk sizing. Shorts are left unsized (short entries are default-off in
+   the live strategy); they keep the schema defaults. *)
+let _size_long ~(inputs : inputs) ~portfolio_value ~sizing_cash candidate =
+  Trade_sizing.size_candidate ~risk_config:inputs.config.portfolio_config
+    ~portfolio_value ~sizing_cash ~side:`Long
+    ~placeholder:inputs.portfolio_is_placeholder candidate
+
 let generate (inputs : inputs) : Weekly_snapshot.t =
   let index_bars = _weekly_bars ~inputs inputs.config.indices.primary in
   let macro = _macro_result ~inputs ~index_bars in
   let sector_map = _build_sector_map ~inputs ~index_bars in
   let stocks = _analyze_universe ~inputs ~index_bars in
+  let held_positions =
+    List.map inputs.live_portfolio.positions ~f:(_enrich_held ~inputs)
+  in
   let held_tickers =
-    List.map inputs.held_positions
-      ~f:(fun (h : Weekly_snapshot.held_position) -> h.symbol)
+    List.map held_positions ~f:(fun (h : Weekly_snapshot.held_position) ->
+        h.symbol)
   in
   let result =
     Screener.screen ~config:inputs.config.screening_config
       ~macro_trend:macro.trend ~sector_map ~stocks ~held_tickers
+  in
+  let sizing_cash = inputs.live_portfolio.cash in
+  let portfolio_value = sizing_cash +. _long_market_value held_positions in
+  let long_candidates =
+    List.map result.buy_candidates ~f:(fun c ->
+        _size_long ~inputs ~portfolio_value ~sizing_cash
+          (_candidate_of_scored c))
   in
   {
     schema_version = Weekly_snapshot.current_schema_version;
@@ -247,7 +331,7 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
     macro = _macro_context macro;
     sectors_strong = _sectors_by_rating ~inputs ~index_bars Screener.Strong;
     sectors_weak = _sectors_by_rating ~inputs ~index_bars Screener.Weak;
-    long_candidates = List.map result.buy_candidates ~f:_candidate_of_scored;
+    long_candidates;
     short_candidates = List.map result.short_candidates ~f:_candidate_of_scored;
-    held_positions = inputs.held_positions;
+    held_positions;
   }

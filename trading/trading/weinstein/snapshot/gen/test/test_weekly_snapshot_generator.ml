@@ -123,7 +123,13 @@ let _inputs_at ~as_of ~bar_reader ~ticker_sectors : Generator.inputs =
     as_of;
     bar_reader;
     ticker_sectors;
-    held_positions = [];
+    live_portfolio =
+      {
+        Weinstein_snapshot_gen.Live_portfolio.cash = 100_000.0;
+        as_of;
+        positions = [];
+      };
+    portfolio_is_placeholder = true;
   }
 
 (* [_inputs_at] with the resistance-v2 overhead-supply score DISARMED
@@ -157,6 +163,64 @@ let test_metadata_stamped _ =
            (equal_to _system_version);
          field (fun (s : Weekly_snapshot.t) -> s.date) (equal_to _as_of);
          field (fun (s : Weekly_snapshot.t) -> s.held_positions) (size_is 0);
+       ])
+
+(* With a live portfolio holding AAPL, the generator prices it into a held row
+   (shares + current price + unrealized %) AND excludes it from the candidate
+   output (held tickers are not re-recommended). *)
+let test_live_portfolio_populates_held _ =
+  let position : Weinstein_snapshot_gen.Live_portfolio.position =
+    {
+      symbol = "AAPL";
+      shares = 10;
+      entry_price = 150.0;
+      entry_date = Date.of_string "2022-01-03";
+      stop_price = 140.0;
+    }
+  in
+  let base =
+    _inputs_at ~as_of:_as_of ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  let inputs =
+    {
+      base with
+      live_portfolio =
+        {
+          Weinstein_snapshot_gen.Live_portfolio.cash = 50_000.0;
+          as_of = _as_of;
+          positions = [ position ];
+        };
+      portfolio_is_placeholder = false;
+    }
+  in
+  let snap = Generator.generate inputs in
+  assert_that snap
+    (all_of
+       [
+         field
+           (fun (s : Weekly_snapshot.t) -> s.held_positions)
+           (elements_are
+              [
+                all_of
+                  [
+                    field
+                      (fun (h : Weekly_snapshot.held_position) -> h.symbol)
+                      (equal_to "AAPL");
+                    field
+                      (fun (h : Weekly_snapshot.held_position) -> h.shares)
+                      (equal_to 10);
+                    field
+                      (fun (h : Weekly_snapshot.held_position) ->
+                        h.current_price)
+                      (gt (module Float_ord) 0.0);
+                  ];
+              ]);
+         field
+           (fun (s : Weekly_snapshot.t) ->
+             List.count s.long_candidates ~f:(fun c ->
+                 String.equal c.symbol "AAPL"))
+           (equal_to 0);
        ])
 
 (* The breakout AAPL surfaces as a ranked long candidate with a populated
@@ -362,6 +426,8 @@ let suite =
   "weekly_snapshot_generator"
   >::: [
          "metadata stamped onto the snapshot" >:: test_metadata_stamped;
+         "live portfolio populates held positions"
+         >:: test_live_portfolio_populates_held;
          "breakout AAPL is a long candidate" >:: test_breakout_is_long_candidate;
          "breakout long stop sits below entry"
          >:: test_breakout_stop_below_entry;

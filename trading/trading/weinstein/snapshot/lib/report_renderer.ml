@@ -32,12 +32,34 @@ let _resistance_cell : string option -> string = function
   | None -> "-"
   | Some g -> g
 
+(* Executable order instruction for one candidate, formatted from the
+   generator-computed [sized_*] / [sizing_note] fields (fixed-risk sizing,
+   mirroring the backtest). A [0]-share unsized candidate (e.g. a short, which
+   the live strategy leaves unsized) renders "-"; a [0]-share result WITH a note
+   renders the note (cash / caps exhausted, invalid stop). A placeholder-sized
+   candidate prefixes the note so the size reads as provisional. *)
+let _instruction_cell (c : Weekly_snapshot.candidate) =
+  let order =
+    Printf.sprintf
+      "BUY STOP %d sh @ $%.2f (~$%.0f, %.1f%% of book, risk $%.0f); on fill \
+       place SELL STOP @ $%.2f, GTC; cancel if unfilled by Friday close"
+      c.sized_shares c.entry c.sized_position_value
+      (c.sized_position_pct *. 100.0)
+      c.sized_risk_amount c.stop
+  in
+  match (c.sized_shares, c.sizing_note) with
+  | 0, None -> "-"
+  | 0, Some note -> note
+  | _, None -> order
+  | _, Some note -> Printf.sprintf "%s: %s" note order
+
 let _candidate_row ~rank (c : Weekly_snapshot.candidate) =
   let risk = _risk_pct ~entry:c.entry ~stop:c.stop in
-  Printf.sprintf "| %d | %s | %s | %.2f | $%.2f | $%.2f | %.1f%% | %s | %s |"
-    rank c.symbol c.grade c.score c.entry c.stop risk
+  Printf.sprintf
+    "| %d | %s | %s | %.2f | $%.2f | $%.2f | %.1f%% | %s | %s | %s |" rank
+    c.symbol c.grade c.score c.entry c.stop risk
     (_resistance_cell c.resistance_grade)
-    c.rationale
+    c.rationale (_instruction_cell c)
 
 let _plural n = if n = 1 then "" else "s"
 
@@ -92,6 +114,7 @@ let _candidate_table candidates ~limit =
         "Risk %";
         "Resistance";
         "Rationale";
+        "Instruction";
       ]
   in
   match candidates with
@@ -107,12 +130,34 @@ let _candidate_table candidates ~limit =
       | None -> table
       | Some note -> table ^ "\n\n" ^ note)
 
+(* Recommended-stop cell: this week's recomputed Weinstein support-floor stop
+   shown with its delta vs the current stop, so the reader sees whether to raise
+   it (Weinstein never lowers a stop). [None] (not recomputed) renders "-". *)
+let _suggested_stop_cell ~current_stop = function
+  | None -> "-"
+  | Some r -> Printf.sprintf "$%.2f (%+0.2f)" r (r -. current_stop)
+
 let _held_row (h : Weekly_snapshot.held_position) =
-  Printf.sprintf "| %s | %s | $%.2f | %s |" h.symbol (Date.to_string h.entered)
-    h.stop h.status
+  Printf.sprintf "| %s | %d | $%.2f | $%.2f | %.1f%% | $%.2f | %s | %s | %s |"
+    h.symbol h.shares h.entry_price h.current_price h.unrealized_pct h.stop
+    (_suggested_stop_cell ~current_stop:h.stop h.recommended_stop)
+    (Date.to_string h.entered) h.status
 
 let _held_table positions =
-  let header = _table_header [ "Symbol"; "Entered"; "Stop"; "Status" ] in
+  let header =
+    _table_header
+      [
+        "Symbol";
+        "Shares";
+        "Entry";
+        "Current";
+        "Unrealized %";
+        "Stop";
+        "Suggested stop";
+        "Entered";
+        "Status";
+      ]
+  in
   match positions with
   | [] -> _empty_marker
   | _ ->

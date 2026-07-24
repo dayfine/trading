@@ -5,6 +5,29 @@
 ## Status
 IN_PROGRESS
 
+**2026-07-24 (live execution protocol — Phase A+B, PR `feat/picks-protocol`):**
+Weekly picks are now executable end-to-end and held positions thread week to
+week. **Phase A (portfolio state):** new `Weinstein_snapshot_gen.Live_portfolio`
+module — a human-editable sexp file (`cash`, `as_of`, `positions` of
+`{symbol; shares; entry_price; entry_date; stop_price}`); template committed at
+`dev/weekly-picks/portfolio.sexp` (user must set real `cash`). The generator
+gains `--portfolio PATH`: it prices each held position via the same `Bar_reader`
+(current close as-of the run date), computes unrealized %, and recomputes the
+Weinstein support-floor stop (`Weinstein_stops.compute_initial_stop_with_floor`,
+shown beside the current stop with the delta — no new stop logic; full trailing
+state machine deferred to Phase C). Held tickers are excluded from candidate
+output. **Phase B (sized instructions):** each long candidate is sized via the
+existing `Portfolio_risk.compute_position_size` (fixed-risk sizing, MIRRORING the
+backtest — risk-normalized, NOT equal-sized; a tighter stop earns more shares).
+The report gains an `Instruction` column (`BUY STOP <n> sh @ $<entry> … place
+SELL STOP @ $<stop>, GTC …`); 0-share results render their reason; without
+`--portfolio` candidates size against a $100k template and are stamped `UNSIZED`.
+New `Trade_sizing` helper module. Schema: `candidate` + `held_position` gained
+additive `[@sexp.default]` fields (no version bump) — old snapshots still load
+(pinned test + verified on committed `7f24f2c8d/2026-07-17.sexp`). Plan:
+`dev/plans/weekly-picks-execution-protocol-2026-07-24.md`. All weinstein tests +
+full build green, `@fmt` clean.
+
 **2026-07-24 (report rendering fixes, P1 #2050 follow-up):** Two display-only
 fixes to the weekly report (PR `feat/picks-render-fixes`). (1)
 `Report_renderer.render` now renders each candidate's `resistance_grade` in a
