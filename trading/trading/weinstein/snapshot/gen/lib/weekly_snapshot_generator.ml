@@ -139,75 +139,6 @@ let _analyze_universe ~(inputs : inputs) ~index_bars : Stock_analysis.t list =
   List.filter_map inputs.ticker_sectors ~f:(fun (ticker, _sector) ->
       _analyze_ticker ~inputs ~analysis_config ~index_bars ticker)
 
-let _rs_vs_spy (analysis : Stock_analysis.t) : float option =
-  Option.map analysis.rs ~f:(fun (r : Rs.result) -> r.current_normalized)
-
-(* Clean quality label. [Weinstein_types.show_overhead_quality] (the derived
-   [@@deriving show] printer) module-qualifies the constructor, e.g.
-   "Weinstein_types.Heavy_resistance"; the display strings want the bare label
-   (mirrors [_regime_label] below, which strips the same prefix for the macro
-   regime). *)
-let _overhead_quality_label : Weinstein_types.overhead_quality -> string =
-  function
-  | Virgin_territory -> "Virgin_territory"
-  | Clean -> "Clean"
-  | Moderate_resistance -> "Moderate_resistance"
-  | Heavy_resistance -> "Heavy_resistance"
-  | Insufficient_history -> "Insufficient_history"
-
-(* Resistance grade for the snapshot display (score/display split, §D5). When
-   the overhead-supply score is armed AND populated ([analysis.supply = Some]),
-   render the v2 sketch-derived grade with its continuous score, e.g.
-   "Heavy_resistance (0.82)"; otherwise fall back to the v1 binary grade.
-   [analysis.supply] is [None] whenever [overhead_supply] is disarmed, so the
-   disarmed v2 output stays byte-identical to the v1 grade string (both route
-   through [_overhead_quality_label]). *)
-let _v2_grade_string (s : Resistance_supply.result) : string =
-  Printf.sprintf "%s (%.2f)" (_overhead_quality_label s.quality) s.score
-
-let _v1_grade_string (analysis : Stock_analysis.t) : string option =
-  Option.map analysis.resistance ~f:(fun (r : Resistance.result) ->
-      _overhead_quality_label r.quality)
-
-let _resistance_grade (analysis : Stock_analysis.t) : string option =
-  match analysis.supply with
-  | Some s -> Some (_v2_grade_string s)
-  | None -> _v1_grade_string analysis
-
-(* Map one screener candidate to the decoupled snapshot shape. The snapshot
-   schema is independent of [scored_candidate] (see weekly_snapshot.mli §Design),
-   so this is a deliberate field-by-field copy. *)
-let _candidate_of_scored (c : Screener.scored_candidate) :
-    Weekly_snapshot.candidate =
-  {
-    symbol = c.ticker;
-    score = Float.of_int c.score;
-    grade = Weinstein_types.grade_to_string c.grade;
-    entry = c.suggested_entry;
-    stop = c.suggested_stop;
-    sector = c.sector.sector_name;
-    rationale = String.concat ~sep:"; " c.rationale;
-    rs_vs_spy = _rs_vs_spy c.analysis;
-    resistance_grade = _resistance_grade c.analysis;
-    (* Unsized defaults — overwritten for longs by [_size_long]; shorts keep
-       these (short entries are default-off in the live strategy). *)
-    sized_shares = 0;
-    sized_position_value = 0.0;
-    sized_position_pct = 0.0;
-    sized_risk_amount = 0.0;
-    sizing_note = None;
-  }
-
-(* Clean regime label (the [@@deriving show] form is module-qualified, e.g.
-   "Weinstein_types.Bullish"; the snapshot schema documents the bare label). *)
-let _regime_label : Weinstein_types.market_trend -> string = function
-  | Bullish -> "Bullish"
-  | Bearish -> "Bearish"
-  | Neutral -> "Neutral"
-
-let _macro_context (macro : Macro.result) : Weekly_snapshot.macro_context =
-  { regime = _regime_label macro.trend; score = macro.confidence }
-
 (* Rating of one sector ETF, or [None] when it has no bars. *)
 let _etf_rating ~(inputs : inputs) ~index_bars (etf, sector_name) =
   let bars = _weekly_bars ~inputs etf in
@@ -322,16 +253,17 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
   let long_candidates =
     List.map result.buy_candidates ~f:(fun c ->
         _size_long ~inputs ~portfolio_value ~sizing_cash
-          (_candidate_of_scored c))
+          (Snapshot_display.candidate_of_scored c))
   in
   {
     schema_version = Weekly_snapshot.current_schema_version;
     system_version = inputs.system_version;
     date = inputs.as_of;
-    macro = _macro_context macro;
+    macro = Snapshot_display.macro_context macro;
     sectors_strong = _sectors_by_rating ~inputs ~index_bars Screener.Strong;
     sectors_weak = _sectors_by_rating ~inputs ~index_bars Screener.Weak;
     long_candidates;
-    short_candidates = List.map result.short_candidates ~f:_candidate_of_scored;
+    short_candidates =
+      List.map result.short_candidates ~f:Snapshot_display.candidate_of_scored;
     held_positions;
   }
