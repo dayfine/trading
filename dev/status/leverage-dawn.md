@@ -18,7 +18,9 @@ confirmation grid are a separate scheduled step (post-merge), NOT this PR.
 ## Last updated: 2026-07-24
 
 ## Interface stable
-YES — three `Weinstein_strategy.config` fields (`dawn_leverage_enabled`,
+YES
+
+Surface: three `Weinstein_strategy.config` fields (`dawn_leverage_enabled`,
 `dawn_initial_long_margin_req`, `dawn_max_ma_flip_age_weeks`) + the
 `Weinstein_strategy.Leverage_dawn` module (`is_dawn` / `flip_age_weeks` /
 `effective_initial_long_margin_req` / `dawn_active` / `dawn_effective_config` /

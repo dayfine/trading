@@ -19,29 +19,28 @@ let _rising_at ~get_ma ~slope_lookback ~slope_threshold ~offset =
       Some (Float.( >= ) ((now -. past) /. past) slope_threshold)
   | _ -> None
 
+(* Walk back while rising. The flip is the boundary where an older week is NOT
+   rising: the first non-rising week at offset [k] means offsets [0..k-1] are
+   the consecutive rising run, so the flip (first rising week) is at offset
+   [k-1] = [k-1] weeks ago. Cap the search at [max_flip_age_weeks + 1]: a
+   longer run means the flip predates the window (not dawn). A data boundary
+   ([None]) reached before a non-rising week is inconclusive -> not dawn
+   (conservative). *)
+let rec _flip_search ~rising ~max_flip_age_weeks ~offset =
+  if offset > max_flip_age_weeks + 1 then None
+  else
+    match rising offset with
+    | Some true -> _flip_search ~rising ~max_flip_age_weeks ~offset:(offset + 1)
+    | Some false -> Some (offset - 1)
+    | None -> None
+
 let flip_age_weeks ~get_ma ~slope_lookback ~slope_threshold ~max_flip_age_weeks
     =
   let rising offset =
     _rising_at ~get_ma ~slope_lookback ~slope_threshold ~offset
   in
   match rising 0 with
-  | Some true ->
-      (* Walk back while rising. The flip is the boundary where an older week is
-         NOT rising: the first non-rising week at offset [k] means offsets
-         [0..k-1] are the consecutive rising run, so the flip (first rising week)
-         is at offset [k-1] = [k-1] weeks ago. Cap the search at
-         [max_flip_age_weeks + 1]: a longer run means the flip predates the
-         window (not dawn). A data boundary ([None]) reached before a non-rising
-         week is inconclusive -> not dawn (conservative). *)
-      let rec loop offset =
-        if offset > max_flip_age_weeks + 1 then None
-        else
-          match rising offset with
-          | Some true -> loop (offset + 1)
-          | Some false -> Some (offset - 1)
-          | None -> None
-      in
-      loop 1
+  | Some true -> _flip_search ~rising ~max_flip_age_weeks ~offset:1
   | Some false | None -> None
 
 let is_dawn ~get_ma ~slope_lookback ~slope_threshold ~max_flip_age_weeks =
@@ -75,25 +74,34 @@ let dawn_active ~(config : Config.config) ~bar_reader ~current_date =
   is_dawn ~get_ma:cbs.Stage.get_ma ~slope_lookback:stage_config.slope_lookback
     ~slope_threshold:stage_config.slope_threshold ~max_flip_age_weeks
 
+(* The armed path of [dawn_effective_config]: evaluate the signal and swap the
+   requirement only when it actually changes (avoids a needless record copy). *)
+let _dawn_req_config (config : Config.config) ~bar_reader ~current_date =
+  let active = dawn_active ~config ~bar_reader ~current_date in
+  let req = effective_initial_long_margin_req ~config ~dawn_active:active in
+  if Float.equal req config.initial_long_margin_req then config
+  else { config with initial_long_margin_req = req }
+
 let dawn_effective_config (config : Config.config) ~bar_reader ~current_date =
   if not config.dawn_leverage_enabled then config
-  else
-    let active = dawn_active ~config ~bar_reader ~current_date in
-    let req = effective_initial_long_margin_req ~config ~dawn_active:active in
-    if Float.equal req config.initial_long_margin_req then config
-    else { config with initial_long_margin_req = req }
+  else _dawn_req_config config ~bar_reader ~current_date
+
+let _validate_margin_armed (config : Config.config) =
+  if not config.margin_config.Margin_config.enabled then
+    failwith
+      "Leverage_dawn: dawn_leverage_enabled=true requires \
+       margin_config.enabled=true (dawn leverage runs margin-armed)"
+
+let _validate_req_in_range req =
+  if Float.( <= ) req 0.0 || Float.( > ) req 1.0 then
+    failwith
+      (Printf.sprintf
+         "Leverage_dawn: dawn_initial_long_margin_req must be in (0.0, 1.0]; \
+          got %f"
+         req)
 
 let validate (config : Config.config) =
   if config.dawn_leverage_enabled then begin
-    if not config.margin_config.Margin_config.enabled then
-      failwith
-        "Leverage_dawn: dawn_leverage_enabled=true requires \
-         margin_config.enabled=true (dawn leverage runs margin-armed)";
-    let req = config.dawn_initial_long_margin_req in
-    if Float.( <= ) req 0.0 || Float.( > ) req 1.0 then
-      failwith
-        (Printf.sprintf
-           "Leverage_dawn: dawn_initial_long_margin_req must be in (0.0, 1.0]; \
-            got %f"
-           req)
+    _validate_margin_armed config;
+    _validate_req_in_range config.dawn_initial_long_margin_req
   end
