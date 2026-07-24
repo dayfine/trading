@@ -1,6 +1,6 @@
 # Status: margin-realism
 
-## Last updated: 2026-07-19
+## Last updated: 2026-07-24
 
 ## Status
 IN_PROGRESS
@@ -288,8 +288,55 @@ and M1b (follow-up).
 
 ## Follow-ups (post-M4)
 
-- #2057 — propagate margin exit-reason labels to round-trip outputs (unblocks
-  per-event ordering forensics at path level).
+- [x] **#2057 — margin exit labels now reach `trades.csv` / `Stop_log`
+  (observability-only fix).** Branch `feat/margin-realism-exit-labels`.
+  Root cause: `Backtest.Strategy_wrapper.wrap` (the only place that fed
+  `Stop_log.record_transitions`) intercepts transitions at the strategy's own
+  `on_market_close` call boundary — but `Margin_runner.tick`'s
+  margin-driven transitions (`margin_call` / `buyin_stress` /
+  `maintenance_reduce`, all `Position.StrategySignal`) are generated in
+  `Simulator._process_step_day` *after* the strategy call returns, and margin
+  runs unconditionally every step regardless of strategy cadence — so no
+  observer was ever wired to see them.
+  - Fix: new `Simulator.dependencies.on_transitions` hook (mirrors the
+    existing `on_trade_fill` strategy-agnostic-hook pattern), invoked once per
+    step with the FINAL post-dedup transition list (strategy's surviving
+    transitions + margin's), right after `Margin_runner.tick` returns.
+    `Backtest.Panel_runner._make_simulator` wires it to
+    `Stop_log.record_transitions stop_log`, alongside (not replacing) the
+    existing `Strategy_wrapper` interception — `record_transitions` is
+    idempotent w.r.t. re-recording, and on a same-tick strategy/margin
+    collision the later `on_transitions` call correctly overwrites the
+    wrapper's stale strategy-side trigger with the winning margin one (a
+    latent staleness bug the old design had on collision days, fixed as a
+    side effect).
+  - `trade_audit.sexp` scope note: investigated and found that its exit-side
+    enrichment (`Exit_audit_capture.emit_for_list`, wired from
+    `weinstein_strategy.ml`'s stops pass) already only covers
+    `Stops_runner`-triggered exits — it has NEVER captured any other
+    `StrategySignal`-labeled exit (`stage3_force_exit`, `laggard_rotation`,
+    `extension_stop`, `harvest_rotate`, `macro_bearish_trim` all reach
+    `trades.csv` but not `trade_audit.sexp` today). Margin exits landing in
+    the same gap is consistent pre-existing behavior, not a margin-specific
+    regression, and fixing it would require either fabricating
+    macro/stage/rs context Margin_runner architecturally cannot have, or a
+    materially larger cross-cutting feature (giving `Trade_audit` visibility
+    into every externally-generated exit source) — out of scope for an
+    observability-only bugfix. Flagged as a candidate follow-up, not filed as
+    a new issue (would need its own design).
+  - No behavior change: `on_transitions` is a pure read-only observer: it
+    never touches `portfolio`/`positions`/fills — same numbers, same PnL.
+  - Tests: `test_margin_runner.ml` (+3 — `on_transitions_observes_margin_call`
+    / `_buyin_stress` / `_maintenance_reduce`, at the `Simulator` layer,
+    pinning the raw transition list) and new
+    `test_margin_exit_observability.ml` (+3 — same three labels, one layer up,
+    using the exact `Stop_log.record_transitions` composition `Panel_runner`
+    wires in production, asserting on `Stop_log.get_stop_infos`'s
+    `exit_trigger` — the value `Result_writer` reads for `trades.csv`). All 6
+    verified to FAIL before the fix (temporarily disabled the
+    `on_transitions` call site) and PASS after.
+  - Verify: `dune runtest trading/simulation/test/test_margin_runner.ml
+    trading/backtest/test/test_margin_exit_observability.ml`.
 - #2059 — LH phantom-short leak + duplicated trades.csv row (record basis,
   −$607k/0.85% immaterial but real).
 - #2060 — mean-ADV liquidity gate spoofable by single block-print day (LINK
