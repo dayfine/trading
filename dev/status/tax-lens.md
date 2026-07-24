@@ -13,7 +13,10 @@ feat-backtest
 
 ## Open PR(s)
 - #2073 — test-only: pins `Loader.load_exn` error-path contract (Phase-1
-  qc-behavioral CP4 follow-up). Not yet merged.
+  qc-behavioral CP4 follow-up). Reworked 2026-07-24 (iteration 1) to fix a
+  qc-behavioral NEEDS_REWORK finding: `_equity_row` silently dropped
+  malformed non-first `equity_curve.csv` rows instead of raising. Not yet
+  merged.
 - (Phase 1 merged 2026-07-24 as #2066; Phase 2 wash-sale / in-sim April outflows deferred, user-gated per issue #2006)
 
 ## Scope
@@ -63,6 +66,34 @@ changes; no core-module edits. Surface lives at
   instead of raising; fixed with the smallest change (`filter_map` → `map` +
   explicit `failwithf` on non-matching rows) in `loader.ml`. No `.mli` change
   needed. Verify: `dune runtest trading/backtest/tax_lens/`.
+
+## Completed (2026-07-24) — Phase 1 follow-up (qc-behavioral rework, iteration 1)
+
+- **[x] `_equity_row` now raises on any malformed row, not just the first** —
+  PR #2073. qc-behavioral found the twin defect to the CP4 `trades.csv` fix
+  above: `_load_equity` parsed all `equity_curve.csv` data rows via
+  `List.filter_map ~f:_equity_row`, and `_equity_row` returned `None`
+  (silently dropped) for any row that didn't split into >= 2 fields — only
+  the *first* data row was separately guarded via `Option.value_exn`. A
+  malformed row at position 2+ was silently excluded from
+  `equity_year_ends`/span computation instead of raising, contradicting the
+  `.mli`'s unqualified "Raises if either file is missing or malformed."
+  Fixed by making `_equity_row` raise directly (`failwithf`, mirroring
+  `_trade_of_line`) and switching `_load_equity` from `List.filter_map` to
+  `List.map`; `_load_equity` now derives the first row from `List.hd_exn
+  parsed` instead of re-parsing it via a separate `Option.value_exn` guard.
+  Added `test_load_exn_raises_on_malformed_non_first_equity_row` (valid
+  first row, garbage second row, valid third row — pins the exact
+  counterexample from the finding) and
+  `test_load_exn_tolerates_trailing_newline` (pins that a normal
+  single-trailing-`\n` file, the common real-world shape, is NOT treated as
+  an extra malformed row — `In_channel.read_lines` does not synthesize a
+  phantom empty final line, verified no regression here). Updated
+  `test_load_exn_raises_on_malformed_equity_row`'s expected message
+  substring (`"unparseable first equity row"` → `"malformed
+  equity_curve.csv row"`) to match the new symmetric error path. 8 tests
+  total in `test_loader.ml` (was 6). Verify:
+  `dune runtest trading/backtest/tax_lens/`.
 
 ## Follow-ups
 - **Baseline-dir delta — RESOLVED (2026-07-24):** on

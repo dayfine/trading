@@ -34,10 +34,17 @@ let _load_trades path =
   | [] -> []
   | _header :: rows -> List.map rows ~f:_trade_of_line
 
-let _equity_row line =
+(* equity_curve.csv: 0 date, 1 portfolio_value. A row with fewer than 2 fields
+   is malformed and raises — it is never silently dropped, mirroring
+   [_trade_of_line]'s contract for trades.csv, so [load_exn]'s "raises on
+   malformed input" contract holds for every data row, not just the first. *)
+let _equity_row line : Date.t * float =
   match _fields line with
-  | date :: value :: _ -> Some (Date.of_string date, Float.of_string value)
-  | _ -> None
+  | date :: value :: _ -> (Date.of_string date, Float.of_string value)
+  | fields ->
+      failwithf
+        "malformed equity_curve.csv row (expected >= 2 fields, got %d): %s"
+        (List.length fields) line ()
 
 (* Last equity value per year, ascending by year. Rows are date-ascending, so
    the last-seen value per year wins. *)
@@ -48,16 +55,15 @@ let _year_ends parsed =
   |> List.sort ~compare:(fun (a, _) (b, _) -> Int.compare a b)
 
 (* equity_curve.csv: date, portfolio_value. Returns (year-end values, initial,
-   first date, last date). *)
+   first date, last date). [rows] is non-empty here (the [[] | [ _ ]] case
+   above already handled the "no data rows" case), so [List.hd_exn] is
+   safe. *)
 let _load_equity path =
   match In_channel.read_lines path with
   | [] | [ _ ] -> failwithf "empty equity curve: %s" path ()
-  | _header :: (first :: _ as rows) ->
-      let parsed = List.filter_map rows ~f:_equity_row in
-      let first_date, initial =
-        _equity_row first
-        |> Option.value_exn ~message:"unparseable first equity row"
-      in
+  | _header :: rows ->
+      let parsed = List.map rows ~f:_equity_row in
+      let first_date, initial = List.hd_exn parsed in
       let last_date =
         List.last parsed |> Option.value_map ~default:first_date ~f:fst
       in

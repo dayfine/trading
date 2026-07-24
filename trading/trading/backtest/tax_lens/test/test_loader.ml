@@ -150,17 +150,53 @@ let test_load_exn_raises_on_malformed_trades_row _ =
     (is_some_and (contains_substring "malformed trades.csv row"))
 
 (* Case 5: an equity_curve.csv whose first data row doesn't parse (here: wrong
-   field count — a lone date with no value column). [Loader._load_equity]
-   parses the first row separately via [Option.value_exn
-   ~message:"unparseable first equity row"], so this is deterministic
-   regardless of how later rows are handled. *)
+   field count — a lone date with no value column). [Loader._equity_row] now
+   raises directly on any malformed row (first or not) instead of returning
+   [None] via [Option.value_exn] on just the first — see loader.ml for the
+   fix (mirrors the [_trade_of_line] fix for trades.csv). *)
 let test_load_exn_raises_on_malformed_equity_row _ =
   let dir = Filename_unix.temp_dir "loader_test" "" in
   _write_file dir "trades.csv" _trades_csv;
   _write_file dir "equity_curve.csv" "date,portfolio_value\n2021-01-01\n";
   assert_that
     (_raised_message (fun () -> Loader.load_exn dir))
-    (is_some_and (contains_substring "unparseable first equity row"))
+    (is_some_and (contains_substring "malformed equity_curve.csv row"))
+
+(* Case 6 (QC #2073 CP1 follow-up): a malformed row at a *non-first* position
+   in equity_curve.csv. Before this fix, [_load_equity] parsed all rows via
+   [List.filter_map] and only guarded the first row explicitly — any
+   malformed row at position 2+ was silently dropped rather than raising,
+   contradicting the [.mli] "raises if malformed" contract with no
+   qualifier limiting it to the first row. Valid first row, garbage second
+   row (no comma), valid third row: the fixed loader must raise, not
+   silently drop the garbage row and succeed. *)
+let test_load_exn_raises_on_malformed_non_first_equity_row _ =
+  let dir = Filename_unix.temp_dir "loader_test" "" in
+  _write_file dir "trades.csv" _trades_csv;
+  _write_file dir "equity_curve.csv"
+    "date,portfolio_value\n\
+     2021-01-01,1000.00\n\
+     garbage_no_comma\n\
+     2022-01-01,1300.00\n";
+  assert_that
+    (_raised_message (fun () -> Loader.load_exn dir))
+    (is_some_and (contains_substring "malformed equity_curve.csv row"))
+
+(* Trailing newline pinning (QC #2073 follow-up): both [_trades_csv] and
+   [_equity_csv] above already end in a single trailing "\n", which is how
+   every real file written by a text editor / [Out_channel] looks — this is
+   NOT an extra blank data row. [In_channel.read_lines] does not synthesize
+   a phantom empty final line for a trailing newline, so this must load
+   successfully; a regression here (e.g. treating the trailing newline as
+   an extra malformed row) would break every real scenario dir, which is
+   worse than the bug this rework fixes. Pinned as its own case so a future
+   change to the trailing-newline handling shows up as a distinct failure. *)
+let test_load_exn_tolerates_trailing_newline _ =
+  let dir = Filename_unix.temp_dir "loader_test" "" in
+  _write_file dir "trades.csv" _trades_csv;
+  _write_file dir "equity_curve.csv" _equity_csv;
+  assert_that (Loader.load_exn dir)
+    (field (fun (r : TT.run_data) -> List.length r.trades) (equal_to 2))
 
 let suite =
   "loader"
@@ -176,6 +212,10 @@ let suite =
          >:: test_load_exn_raises_on_malformed_trades_row;
          "load_exn_raises_on_malformed_equity_row"
          >:: test_load_exn_raises_on_malformed_equity_row;
+         "load_exn_raises_on_malformed_non_first_equity_row"
+         >:: test_load_exn_raises_on_malformed_non_first_equity_row;
+         "load_exn_tolerates_trailing_newline"
+         >:: test_load_exn_tolerates_trailing_newline;
        ]
 
 let () = run_test_tt_main suite
