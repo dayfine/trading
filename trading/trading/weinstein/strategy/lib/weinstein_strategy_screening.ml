@@ -336,11 +336,19 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at ~config
   let combined_candidates =
     Entry_assembly.assemble ~config ~bar_reader ~current_date screen_result
   in
+  (* Regime-conditional long leverage (P1b, default-off): on a "dawn" week lower
+     the effective long initial-margin requirement for THIS entry walk only. A
+     no-op (returns [config] unchanged, no fetch) when
+     [config.dawn_leverage_enabled = false]. See {!Leverage_dawn}. *)
+  let entry_config =
+    Leverage_dawn.dawn_effective_config config ~bar_reader ~current_date
+  in
   let entries =
     Entry_walk.entries_from_candidates
       ~sector_lookup:(_sector_lookup_of ~sector_map)
-      ~config ~candidates:combined_candidates ~stop_states ~bar_reader
-      ~portfolio ~get_price ~current_date ~audit_recorder ~macro:macro_result ()
+      ~config:entry_config ~candidates:combined_candidates ~stop_states
+      ~bar_reader ~portfolio ~get_price ~current_date ~audit_recorder
+      ~macro:macro_result ()
   in
   (* Per-Friday cascade-rejection capture. Fires after the entry walk so the
      [entered] count reflects actual transitions emitted, not just the

@@ -1,0 +1,99 @@
+open Core
+module Config = Weinstein_strategy_config
+module Margin_config = Trading_portfolio.Margin_config
+
+(* Extra weeks of MA history fetched beyond the flip-search window, so the
+   [get_ma ~week_offset:(offset + slope_lookback)] read at the deepest searched
+   offset stays inside the available MA depth. *)
+let _flip_search_margin_weeks = 8
+
+(* Rising test at [offset]: the stage classifier's Rising direction — the MA
+   slope over [slope_lookback] weeks is at least [slope_threshold]. [None] when
+   the MA is unavailable at either end of the slope window (data boundary) or the
+   older anchor is non-positive (degenerate — cannot form a slope fraction). *)
+let _rising_at ~get_ma ~slope_lookback ~slope_threshold ~offset =
+  match
+    (get_ma ~week_offset:offset, get_ma ~week_offset:(offset + slope_lookback))
+  with
+  | Some now, Some past when Float.( > ) past 0.0 ->
+      Some (Float.( >= ) ((now -. past) /. past) slope_threshold)
+  | _ -> None
+
+let flip_age_weeks ~get_ma ~slope_lookback ~slope_threshold ~max_flip_age_weeks
+    =
+  let rising offset =
+    _rising_at ~get_ma ~slope_lookback ~slope_threshold ~offset
+  in
+  match rising 0 with
+  | Some true ->
+      (* Walk back while rising. The flip is the boundary where an older week is
+         NOT rising: the first non-rising week at offset [k] means offsets
+         [0..k-1] are the consecutive rising run, so the flip (first rising week)
+         is at offset [k-1] = [k-1] weeks ago. Cap the search at
+         [max_flip_age_weeks + 1]: a longer run means the flip predates the
+         window (not dawn). A data boundary ([None]) reached before a non-rising
+         week is inconclusive -> not dawn (conservative). *)
+      let rec loop offset =
+        if offset > max_flip_age_weeks + 1 then None
+        else
+          match rising offset with
+          | Some true -> loop (offset + 1)
+          | Some false -> Some (offset - 1)
+          | None -> None
+      in
+      loop 1
+  | Some false | None -> None
+
+let is_dawn ~get_ma ~slope_lookback ~slope_threshold ~max_flip_age_weeks =
+  Option.is_some
+    (flip_age_weeks ~get_ma ~slope_lookback ~slope_threshold ~max_flip_age_weeks)
+
+let effective_initial_long_margin_req ~(config : Config.config) ~dawn_active =
+  if config.dawn_leverage_enabled && dawn_active then
+    config.dawn_initial_long_margin_req
+  else config.initial_long_margin_req
+
+(* Weeks of primary-index weekly history to fetch for the flip search: enough MA
+   depth for offsets [0 .. max_flip_age + 1] plus the [slope_lookback] anchor and
+   the [ma_period] warmup the MA kernel consumes, plus slack. *)
+let _deep_n ~(stage_config : Stage.config) ~max_flip_age_weeks =
+  stage_config.ma_period + max_flip_age_weeks + stage_config.slope_lookback
+  + _flip_search_margin_weeks
+
+let dawn_active ~(config : Config.config) ~bar_reader ~current_date =
+  let stage_config = config.stage_config in
+  let max_flip_age_weeks = config.dawn_max_ma_flip_age_weeks in
+  let n = _deep_n ~stage_config ~max_flip_age_weeks in
+  let weekly =
+    Bar_reader.weekly_view_for bar_reader ~symbol:config.indices.primary ~n
+      ~as_of:current_date
+  in
+  let cbs =
+    Panel_callbacks.stage_callbacks_of_weekly_view ~config:stage_config ~weekly
+      ()
+  in
+  is_dawn ~get_ma:cbs.Stage.get_ma ~slope_lookback:stage_config.slope_lookback
+    ~slope_threshold:stage_config.slope_threshold ~max_flip_age_weeks
+
+let dawn_effective_config (config : Config.config) ~bar_reader ~current_date =
+  if not config.dawn_leverage_enabled then config
+  else
+    let active = dawn_active ~config ~bar_reader ~current_date in
+    let req = effective_initial_long_margin_req ~config ~dawn_active:active in
+    if Float.equal req config.initial_long_margin_req then config
+    else { config with initial_long_margin_req = req }
+
+let validate (config : Config.config) =
+  if config.dawn_leverage_enabled then begin
+    if not config.margin_config.Margin_config.enabled then
+      failwith
+        "Leverage_dawn: dawn_leverage_enabled=true requires \
+         margin_config.enabled=true (dawn leverage runs margin-armed)";
+    let req = config.dawn_initial_long_margin_req in
+    if Float.( <= ) req 0.0 || Float.( > ) req 1.0 then
+      failwith
+        (Printf.sprintf
+           "Leverage_dawn: dawn_initial_long_margin_req must be in (0.0, 1.0]; \
+            got %f"
+           req)
+  end

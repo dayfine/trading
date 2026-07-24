@@ -205,6 +205,12 @@ module Long_buying_power = Long_buying_power
     primitives. Exposed so tests can pin the pure ceiling / interest math
     directly. See {!Long_buying_power}. *)
 
+module Leverage_dawn = Leverage_dawn
+(** Regime-conditional long-leverage "dawn" signal (P1b, default-off): lowers
+    the effective long-side initial-margin requirement in young post-bear
+    uptrends (weekly-MA-flip-age label). Exposed so tests can pin the pure
+    flip-age / dawn logic. See {!Leverage_dawn}. *)
+
 module Short_borrow_gate = Short_borrow_gate
 (** Short-side borrow-availability entry gate (margin M3a): drops short
     candidates whose trailing dollar-ADV is below the borrow-supply floor.
@@ -693,6 +699,27 @@ type config = {
           warehouse sketch (absent → no re-admission). Independent of
           [overhead_supply]. See
           [Weinstein_strategy_config.virgin_crossing_readmission]. *)
+  dawn_leverage_enabled : bool; [@sexp.default false]
+      (** Master switch for the regime-conditional long-leverage "dawn"
+          mechanism ({!Leverage_dawn}). When [true] and the primary index is in
+          a young post-bear "dawn" (weekly MA rising, most recent neg->pos slope
+          flip no more than [dawn_max_ma_flip_age_weeks] weeks ago), that
+          Friday's entry walk uses [dawn_initial_long_margin_req] in place of
+          [initial_long_margin_req]. {b Default [false] = EXACT no-op}
+          (experiment-flag-discipline R1). A deployment-intensity dial off a
+          trailing (lagging, never forward-looking) regime label; the spine is
+          untouched. See [Weinstein_strategy_config.dawn_leverage_enabled]. *)
+  dawn_initial_long_margin_req : float; [@sexp.default 1.0]
+      (** Long-side initial-margin requirement applied on a "dawn" week when
+          [dawn_leverage_enabled = true] ([1.0] cash / [0.75] 1.33x / [0.5] 2x).
+          Default [1.0] is a no-op even with the mechanism enabled. Constrained
+          to the interval 0.0 < req <= 1.0 by [Leverage_dawn.validate]. See
+          [Weinstein_strategy_config.dawn_initial_long_margin_req]. *)
+  dawn_max_ma_flip_age_weeks : int; [@sexp.default 78]
+      (** Max age (weeks) of the primary index's most recent neg->pos weekly-MA
+          slope flip for the "dawn" label to be active. Default [78] (~1.5y).
+          Inert while [dawn_leverage_enabled = false]. See
+          [Weinstein_strategy_config.dawn_max_ma_flip_age_weeks]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
