@@ -265,6 +265,32 @@ and M1b (follow-up).
   - Verify: `dune runtest trading/simulation/test/test_short_buyin.ml
     trading/portfolio/test trading/backtest/walk_forward/test` (container path
     `/workspaces/trading-1/.claude/worktrees/<ws>/trading`).
-- **M4** — validation protocol (parity gates, squeeze stress cells, leverage
-  surface via experiment-gap-closing + confirmation grid). No default flips and no
-  levered number is quoted until M4.
+- [x] **M4 — validation protocol COMPLETE (2026-07-23/24), verdict: leverage REJECT.**
+  Full record: `dev/notes/margin-m4-validation-2026-07-23.md`; ledger
+  `2026-07-24-margin-m4-leverage-surface` (Reject).
+  - Stage 1 parity gates: ALL PASS bit-identical (margin-off ≡ baseline
+    cross-commit vs the 07-22 +8,689% record arm; explicit no-op threading ≡
+    absent-field; req=1.0/rate=0 ≡ E-capped on the shorts-on path). New
+    unlevered E-capped anchor on the promoted bundle: +10,589% / Sharpe .906 /
+    DD 31.1.
+  - Stage 2 squeeze cells (dot-com/GFC/meme, tiers + buy-in armed): PASS —
+    do-no-harm (zero spurious events on faithful paths; stops always fire
+    before tiered maintenance is reachable), engagement + timing proven on a
+    forced-threshold cell (33/33 covers ~1 tick after breach). Harness gap
+    filed: margin exit labels don't propagate to trades.csv/trade_audit
+    (issue #2057).
+  - Stage 3 leverage surface (broad 13×2y, priced 8%/yr + M2 maintenance 0.30
+    + tier tables): all six cells FAIL the fold gate. req=0.75 → Sharpe
+    .827→.56, DD 14→50; req=0.5 → .34, DD 89 (ruined folds, less raw return
+    than 1.33×). Cash-account long-short .883 (6/13) = only faint positive,
+    not gate-robust. Armed-margin no-op corner fold-identical to baseline
+    13/13 ✓. No promotion, no grid, no default flips.
+
+## Follow-ups (post-M4)
+
+- #2057 — propagate margin exit-reason labels to round-trip outputs (unblocks
+  per-event ordering forensics at path level).
+- #2059 — LH phantom-short leak + duplicated trades.csv row (record basis,
+  −$607k/0.85% immaterial but real).
+- #2060 — mean-ADV liquidity gate spoofable by single block-print day (LINK
+  −$1.58M specimen; median/k-of-N candidates, default-off).
