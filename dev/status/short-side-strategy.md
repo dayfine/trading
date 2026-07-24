@@ -1,9 +1,58 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-07-09
+## Last updated: 2026-07-24
 
 ## Status
 IN_PROGRESS
+
+## 2026-07-24 — spoof-robust dollar-ADV aggregation, default-off (#2060, branch `feat/liquidity-adv-robust`)
+
+**Defect.** `Liquidity_metric.dollar_adv` computed a plain arithmetic **mean** of
+`close *. volume` over the trailing window, so one block-cross / bad print
+defeats the armed `min_entry_dollar_adv = 1e6` entry gate. Audit of the top-10
+%-losses of `scenarios-2026-07-23-162636/m4p-baseline`: **LINK** entry
+2026-06-06, 1,714,117 sh @ $5.21 = **$8.9M**, stopped 5 days later at **−17.7%
+(−$1.58M)** — the largest June-2026 loser. LINK honestly trades ~$250k/day; its
+2026-05-11 bar printed 4,608,300 sh ($15.4M) with **zero** price impact, which
+alone lifted the 20-day mean to ~$1.0M. PLUG 2013 (loser #5) is the same class.
+Liquidity-overlay case #3 (MSZ corrupt-bar despike was #2).
+
+**Fix (direction 1 of the issue — metric, not gate-shape).**
+`Liquidity_metric.aggregation = Mean | Median | Trimmed_mean` plus a
+`trim_pct`, surfaced as two `Liquidity_config` fields (`adv_aggregation`,
+`adv_trim_pct`). Chosen over direction 2 ("floor holds on ≥k of last N days")
+because the defect is in *how dollar-ADV is measured*, and one metric change
+fixes all three consumers at once — entry gate, held-position degradation exit,
+and short-borrow gate — whereas a k-of-N gate reshapes only the entry gate and
+would leave the other two reading a spoofed number. It also keeps the single
+scalar reading that `liquidity_exit`'s `dollar_adv=<x>` forensic detail carries.
+Direction 3 (cap position at a multiple of honest ADV) explicitly **not** done —
+out of scope, interacts with the accepted trade-realism finding.
+
+- **R1 (default-off):** default is `Mean`, computed by the same left-fold sum in
+  the same order → **bit-identical**, zero backtest change. Pinned by
+  `test_default_aggregation_is_bit_identical_to_mean` (exact structural equality
+  on `float option`, six inputs incl. both degenerate cases) and by the retained
+  legacy value pins.
+- **R2 (searchable):** both are real config fields;
+  `((key (liquidity_config adv_aggregation)) (values (Mean Median Trimmed_mean)))`
+  crossed with `((key (liquidity_config adv_trim_pct)) (values (0.05 0.1 0.2)))`
+  expands + validates through `Overlay_validator`
+  (`test_adv_aggregation_axes_expand`). Atom values keep labels filename-safe.
+- **R3 (no promotion):** default stays `Mean`. **No ledger ACCEPT exists** for a
+  robust aggregation — a WF-CV surface decides whether it promotes.
+- `Short_borrow_gate.apply` now takes `~liquidity_config` instead of
+  `~lookback_days` so borrow supply is measured on the same basis as the entry
+  gate (an inconsistency here would be a latent bug once either is armed).
+
+**Next step (not this PR):** run the `adv_aggregation` × `adv_trim_pct` surface
+under WF-CV on the deep top-3000 window, with the estimand caveat from
+`dev/backtest/liquidity-overlay-wfcv-2026-07-10/FINDINGS.md` carried forward —
+the WF metric CREDITS untradeable fake fills as alpha, so it cannot arbitrate
+realizability. A robust aggregation is expected to *reduce* measured Sharpe for
+the same reason the entry-gate flip did; promotion, if any, is on faithfulness
+grounds. Also open: LINK/PLUG-style single-print despiking at the bar-audit
+layer is a complementary (not alternative) fix.
 
 ## 2026-07-09 — `neutral_blocks_shorts` default flipped false→true (branch `feat/neutral-blocks-shorts-default`)
 
@@ -87,7 +136,8 @@ dollar-ADV.
 untouched).**
 - **Liquidity metric** (`Liquidity_metric.dollar_adv`): trailing mean of
   `close × volume` over `adv_lookback_days`, computed from bars at `as_of` (no
-  lookahead).
+  lookahead). *(Superseded 2026-07-24 — the mean is now the `Mean` case of a
+  configurable `adv_aggregation`; see the #2060 entry above. Default unchanged.)*
 - **Held-position degradation EXIT** (`Liquidity_exit_runner`, the PRIMARY ask):
   each screening cycle, any held position (long OR short) whose trailing
   dollar-ADV `< min_hold_dollar_adv` gets a `StrategySignal { label =
