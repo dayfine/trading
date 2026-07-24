@@ -88,7 +88,8 @@ let _healthy_bars ticker =
 (* Config with the held threshold armed at $1M dollar-ADV, lookback 5d. *)
 let _armed_config =
   {
-    Liquidity_config.adv_lookback_days = 5;
+    Liquidity_config.default_config with
+    adv_lookback_days = 5;
     min_entry_dollar_adv = 0.0;
     min_hold_dollar_adv = 1_000_000.0;
   }

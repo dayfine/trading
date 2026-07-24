@@ -15,10 +15,23 @@ let default_adv_lookback_days = 20
    model (documented follow-up, not this change). See the [.mli]. *)
 let default_min_entry_dollar_adv = 1_000_000.0
 
+(* Default dollar-ADV aggregation: the arithmetic mean, i.e. exactly the
+   pre-#2060 behaviour. The spoof-robust alternatives (Median / Trimmed_mean)
+   are default-OFF and searchable per experiment-flag-discipline R1/R2 — no
+   ledger ACCEPT exists for them yet. *)
+let default_adv_aggregation = Liquidity_metric.Mean
+
+(* Default trim fraction, consulted only when [adv_aggregation] is
+   [Trimmed_mean]. Single source of truth lives with the metric. *)
+let default_adv_trim_pct = Liquidity_metric.default_trim_pct
+
 type t = {
   adv_lookback_days : int;
   min_entry_dollar_adv : float;
   min_hold_dollar_adv : float;
+  adv_aggregation : Liquidity_metric.aggregation;
+      [@sexp.default default_adv_aggregation]
+  adv_trim_pct : float; [@sexp.default default_adv_trim_pct]
 }
 [@@deriving sexp]
 
@@ -27,4 +40,6 @@ let default_config =
     adv_lookback_days = default_adv_lookback_days;
     min_entry_dollar_adv = default_min_entry_dollar_adv;
     min_hold_dollar_adv = 0.0;
+    adv_aggregation = default_adv_aggregation;
+    adv_trim_pct = default_adv_trim_pct;
   }

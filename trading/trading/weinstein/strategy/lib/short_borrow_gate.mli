@@ -47,12 +47,18 @@ val filter :
 
 val apply :
   min_dollar_adv:float ->
-  lookback_days:int ->
+  liquidity_config:Liquidity_config.t ->
   bar_reader:Bar_reader.t ->
   current_date:Date.t ->
   Screener.scored_candidate list ->
   Screener.scored_candidate list
 (** Strategy-side adapter: builds the [dollar_adv_for] lookup from [bar_reader]
-    via {!Liquidity_metric.dollar_adv} over [lookback_days] of bars available at
-    [current_date] (no lookahead), then delegates to {!filter}. No-op at
-    [min_dollar_adv <= 0.0]. *)
+    via {!Liquidity_metric.dollar_adv} over
+    [liquidity_config.adv_lookback_days] of bars available at [current_date] (no
+    lookahead), then delegates to {!filter}. No-op at [min_dollar_adv <= 0.0].
+
+    Takes the whole {!Liquidity_config.t} rather than a bare lookback so this
+    gate measures dollar-ADV on {b exactly the same basis} as the entry gate and
+    the held-position exit — [adv_lookback_days], [adv_aggregation] and
+    [adv_trim_pct] all travel together. Measuring borrow supply with a different
+    aggregation than the entry gate would be a latent inconsistency. *)

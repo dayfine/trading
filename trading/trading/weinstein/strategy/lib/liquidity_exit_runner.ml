@@ -47,6 +47,8 @@ let _exit_for_holding ~config ~bar_reader ~skip_position_ids ~get_price
   in
   match
     Liquidity_metric.dollar_adv
+      ~aggregation:config.Liquidity_config.adv_aggregation
+      ~trim_pct:config.Liquidity_config.adv_trim_pct
       ~lookback_days:config.Liquidity_config.adv_lookback_days bars
   with
   | None -> None
