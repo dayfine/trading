@@ -1,0 +1,5 @@
+(executable
+ (name tax_lens_bin)
+ (libraries core core_unix.command_unix tax_lens)
+ (preprocess
+  (pps ppx_jane)))
