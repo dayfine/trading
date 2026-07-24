@@ -5,6 +5,9 @@
 ## Status
 READY_FOR_REVIEW
 
+## Interface stable
+YES
+
 ## Owner
 feat-backtest
 
@@ -43,12 +46,12 @@ changes; no core-module edits. Surface lives at
   boundary delta **$7.38M** (path-scaled ≈ $2.7M, as noted in the issue).
 
 ## Follow-ups
-- **Baseline-dir delta (flagged for maintainer):** on
-  `scenarios-2026-07-23-162636/.../m4p-baseline` the same validated method gives
-  **$87.89M → $31.18M**, not the issue's later approximate **$26.9M**. The model
-  reproduces all three published Run-D numbers bit-exactly, so this is the
-  issue's 07-23 "essentially unchanged" eyeball, not a model error — the extra
-  final-year AXTI gain compounds more capital before the year-end tax, so
-  after-tax rises above Run D's terminal. Confirm the intended baseline target.
+- **Baseline-dir delta — RESOLVED (2026-07-24):** on
+  `scenarios-2026-07-23-162636/.../m4p-baseline` the exe gives
+  **$87.89M → $31.18M**; an independent dispatcher-side awk re-derivation gives
+  $31.15M on the same dir. The issue's earlier **$26.9M** reference was the
+  erroneous number (an "essentially unchanged vs Run D" eyeball); correction
+  posted on issue #2006. Corrected headline: pre-tax $87.9M → after-tax ≈$31.2M
+  (CAGR 18.4% → ~13.9%).
 - **Wash-sale adjustment:** deferred to a Phase-2 follow-up (optional per the
   issue). Not modeled here.

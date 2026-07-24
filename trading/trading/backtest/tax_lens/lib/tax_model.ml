@@ -56,19 +56,23 @@ let _gains_by_year (trades : T.realized_trade list) ~lt_days =
       Hashtbl.set tbl ~key:tr.exit_year ~data:(st, lt));
   tbl
 
+(* ST/LT gain attributed to [year]: the year's MTM equity change under
+   [Mtm_flat], the realized exit-year net under [Realized_st_lt]. *)
+let _year_gains (config : Tax_config.t) by_year ~year ~pt_prev ~pt_end =
+  match config.mode with
+  | Tax_config.Mtm_flat -> (pt_end -. pt_prev, 0.)
+  | Tax_config.Realized_st_lt ->
+      Hashtbl.find by_year year |> Option.value ~default:(0., 0.)
+
 (* Per-year [(year, pt_start, pt_end, st_gain, lt_gain)], pt_start threaded. *)
 let _per_year (config : Tax_config.t) (rd : T.run_data) =
   let by_year = _gains_by_year rd.trades ~lt_days:config.lt_days in
+  let step (pt_prev, acc) (year, pt_end) =
+    let st, lt = _year_gains config by_year ~year ~pt_prev ~pt_end in
+    (pt_end, (year, pt_prev, pt_end, st, lt) :: acc)
+  in
   let _, rev =
-    List.fold rd.equity_year_ends ~init:(rd.initial_capital, [])
-      ~f:(fun (pt_prev, acc) (year, pt_end) ->
-        let st, lt =
-          match config.mode with
-          | Tax_config.Mtm_flat -> (pt_end -. pt_prev, 0.)
-          | Tax_config.Realized_st_lt ->
-              Hashtbl.find by_year year |> Option.value ~default:(0., 0.)
-        in
-        (pt_end, (year, pt_prev, pt_end, st, lt) :: acc))
+    List.fold rd.equity_year_ends ~init:(rd.initial_capital, []) ~f:step
   in
   List.rev rev
 
