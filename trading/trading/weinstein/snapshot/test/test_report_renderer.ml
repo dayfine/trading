@@ -91,9 +91,10 @@ let test_full_snapshot_contains_all_sections _ =
          _has_substring "- XLY";
          _has_substring "- XLC";
          _has_substring "## Long candidates (top 7)";
-         (* Pinned candidate row — fully formatted. Risk = (502.13-466.20)/502.13*100 = 7.155... → "7.2%" *)
+         (* Pinned candidate row — fully formatted. Risk = (502.13-466.20)/502.13*100 = 7.155... → "7.2%".
+            Resistance column shows the candidate's [resistance_grade] ("A"). *)
          _has_substring
-           "| 1 | AAPL | A+ | 0.91 | $502.13 | $466.20 | 7.2% | Stage 2 \
+           "| 1 | AAPL | A+ | 0.91 | $502.13 | $466.20 | 7.2% | A | Stage 2 \
             breakout, 2.1x volume |";
          _has_substring "## Short candidates (top 5)";
          _has_substring "## Held positions";
@@ -147,8 +148,45 @@ let test_risk_pct_formatting _ =
     }
   in
   let md = Report_renderer.render snap in
+  (* [resistance_grade = None] → the Resistance column renders "-". *)
   assert_that md
-    (_has_substring "| 1 | TEST | B | 0.50 | $100.00 | $90.00 | 10.0% | test |")
+    (_has_substring
+       "| 1 | TEST | B | 0.50 | $100.00 | $90.00 | 10.0% | - | test |")
+
+let test_resistance_grade_column_rendered _ =
+  (* The candidate table gains a Resistance column header, and a candidate whose
+     [resistance_grade] is the v2 sketch-derived form renders it verbatim — a
+     clean "<quality> (<score>)" string with no module-qualified prefix. *)
+  let snap =
+    {
+      _empty_snapshot with
+      long_candidates =
+        [
+          {
+            symbol = "TEST";
+            score = 0.5;
+            grade = "B";
+            entry = 100.0;
+            stop = 90.0;
+            sector = "XLK";
+            rationale = "test";
+            rs_vs_spy = None;
+            resistance_grade = Some "Heavy_resistance (0.82)";
+          };
+        ];
+    }
+  in
+  let md = Report_renderer.render snap in
+  assert_that md
+    (all_of
+       [
+         _has_substring "| Resistance | Rationale |";
+         _has_substring
+           "| 1 | TEST | B | 0.50 | $100.00 | $90.00 | 10.0% | \
+            Heavy_resistance (0.82) | test |";
+         not_ ~msg:"grade string must carry no module-qualified prefix"
+           (_has_substring "Weinstein_types.");
+       ])
 
 let test_render_is_deterministic _ =
   let first = Report_renderer.render _full_snapshot in
@@ -235,6 +273,8 @@ let suite =
          >:: test_empty_strong_sectors_renders_marker;
          "bearish_macro_rendered" >:: test_bearish_macro_rendered;
          "risk_pct_formatting" >:: test_risk_pct_formatting;
+         "resistance_grade_column_rendered"
+         >:: test_resistance_grade_column_rendered;
          "render_is_deterministic" >:: test_render_is_deterministic;
          "long_candidates_truncated_to_default_7"
          >:: test_long_candidates_truncated_to_default_7;

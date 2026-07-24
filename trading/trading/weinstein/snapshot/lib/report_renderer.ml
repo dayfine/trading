@@ -24,10 +24,20 @@ let _table_header columns =
   in
   header ^ "\n" ^ sep
 
+(* Resistance-grade cell for the candidate table. [None] (grade not computed
+   for this candidate) renders as a dash so the column is never blank. The grade
+   is the v2 sketch-derived form "<quality> (<score>)" or the v1 binary quality
+   label, produced upstream by the snapshot generator. *)
+let _resistance_cell : string option -> string = function
+  | None -> "-"
+  | Some g -> g
+
 let _candidate_row ~rank (c : Weekly_snapshot.candidate) =
   let risk = _risk_pct ~entry:c.entry ~stop:c.stop in
-  Printf.sprintf "| %d | %s | %s | %.2f | $%.2f | $%.2f | %.1f%% | %s |" rank
-    c.symbol c.grade c.score c.entry c.stop risk c.rationale
+  Printf.sprintf "| %d | %s | %s | %.2f | $%.2f | $%.2f | %.1f%% | %s | %s |"
+    rank c.symbol c.grade c.score c.entry c.stop risk
+    (_resistance_cell c.resistance_grade)
+    c.rationale
 
 let _plural n = if n = 1 then "" else "s"
 
@@ -80,6 +90,7 @@ let _candidate_table candidates ~limit =
         "Entry";
         "Stop";
         "Risk %";
+        "Resistance";
         "Rationale";
       ]
   in

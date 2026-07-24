@@ -313,6 +313,25 @@ let test_disarmed_resistance_grade_is_v1 _ =
             if String.is_substring grade ~substring:"(" then None else Some ())
           (equal_to ())))
 
+(* The displayed grade carries no module-qualified prefix. The derived
+   [@@deriving show] printer emits "Weinstein_types.<Constructor>"; the display
+   path strips it so the reader sees the bare quality label (P1 #2050
+   follow-up). Applies to both v2 and v1 grade strings — both route through
+   [_overhead_quality_label]. *)
+let test_resistance_grade_has_no_module_prefix _ =
+  let snap =
+    _generate ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  assert_that
+    (_aapl_resistance_grade snap)
+    (is_some_and
+       (matching ~msg:"grade must not carry a module-qualified prefix"
+          (fun grade ->
+            if String.is_substring grade ~substring:"Weinstein_types." then None
+            else Some ())
+          (equal_to ())))
+
 (* The snapshot survives a writer -> reader round-trip unchanged. *)
 let test_round_trips _ =
   let snap =
@@ -356,6 +375,8 @@ let suite =
          >:: test_default_resistance_grade_is_v2;
          "disarmed resistance grade degrades to the v1 label"
          >:: test_disarmed_resistance_grade_is_v1;
+         "resistance grade carries no module-qualified prefix"
+         >:: test_resistance_grade_has_no_module_prefix;
          "snapshot round-trips through writer/reader" >:: test_round_trips;
          "empty universe yields no candidates"
          >:: test_empty_universe_no_candidates;
