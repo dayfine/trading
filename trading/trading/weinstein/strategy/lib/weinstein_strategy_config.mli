@@ -964,10 +964,114 @@ type config = {
           still Stage-2-only, still breakout + volume + RS gates, macro/sector
           gates and stops untouched — it only widens which Stage-2 names clear
           the early-window staleness cut. *)
+  dawn_leverage_enabled : bool; [@sexp.default false]
+      (** Master switch for the regime-conditional long-leverage "dawn"
+          mechanism ({!Leverage_dawn}, P1b memo
+          [dev/notes/regime-dependency-evaluation-2026-07-24.md] §1/§3 +
+          [dev/notes/margin-m4-validation-2026-07-23.md] §Addendum, user
+          green-lit 2026-07-24). When [true] AND the primary index is in a young
+          post-bear "dawn" (its weekly MA is currently rising and the most
+          recent negative->positive slope flip happened no more than
+          [dawn_max_ma_flip_age_weeks] weeks ago), that Friday's entry walk
+          sizes against the levered [dawn_initial_long_margin_req]; on a
+          non-dawn week the entry walk is {b raised} to a cash account — i.e.
+          the long book runs levered only in label-visible young uptrends,
+          cash-account otherwise.
+
+          {b Permissive-funding / gated-sizing design (B1 fix, 2026-07-24).} The
+          entry walk only {e sizes} the position; the {e funding} authority is
+          the simulator, which is constructed once at the {e base}
+          [initial_long_margin_req] ([Backtest.Panel_runner] ->
+          [Simulator.create_deps]) and cannot track the per-Friday dawn value.
+          So an armed cell must set the base [initial_long_margin_req] to a
+          value at least as permissive (numerically [<=]) as
+          [dawn_initial_long_margin_req] — the simulator then funds any levered
+          fill into [long_margin_debit] (priced by [long_margin_rate_annual_pct]
+          \+ [maintenance_long_pct]), while the entry-walk requirement decides
+          {e when} to request leverage. {!Leverage_dawn.validate} enforces the
+          [base <= dawn] constraint. See {!Leverage_dawn.dawn_effective_config}.
+
+          {b Default [false] = EXACT no-op} (experiment-flag-discipline R1). The
+          wiring ({!Leverage_dawn.dawn_effective_config}) short-circuits to the
+          unchanged config before any bar fetch or signal computation when this
+          flag is [false], so merging the mechanism changes no backtest result
+          and every existing golden/baseline replays bit-identically (a scenario
+          is bit-identical with the field absent and with it explicitly
+          [false]).
+
+          {b Faithfulness} (W1/W2, [.claude/rules/weinstein-faithful-core.md]).
+          A {b deployment-intensity dial} — how much buying power the long
+          engine deploys, conditioned on a {b trailing} (never forward-looking)
+          regime label off the weekly MA (the book's central instrument). The
+          spine is untouched: stage classification, the Stage-2-only buy rule,
+          breakout+volume entry, stops, and the macro/sector gate are all
+          unchanged. Not reversal timing — the MA-flip-age signal is lagging by
+          construction (it errs late, never early). Weinstein deploys
+          aggressively in confirmed young uptrends and defensively otherwise.
+
+          {b Margin-armed convention.} Dawn leverage runs margin-armed
+          ([margin_config.enabled = true]) so borrowed dollars are priced and
+          maintenance applies; {!Leverage_dawn.validate} (called at
+          {!Weinstein_strategy.make}) raises when [dawn_leverage_enabled = true]
+          with [margin_config] disarmed or [dawn_initial_long_margin_req]
+          outside the interval 0.0 < req <= 1.0.
+
+          {b R2 searchability.} A real config field resolved by
+          [Overlay_validator.apply_overrides]; expressible as a single-component
+          [Variant_matrix] flag axis
+          ([((flag dawn_leverage_enabled) (values (true false)))]). Default-off
+          until a promotion-confirmation grid ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md] +
+          [.claude/rules/promotion-confirmation.md]). *)
+  dawn_initial_long_margin_req : float; [@sexp.default 1.0]
+      (** The long-side initial-margin requirement the {b entry walk} sizes
+          against during a "dawn" week when [dawn_leverage_enabled = true] — the
+          leverage dial (see {!initial_long_margin_req} for the buying-power
+          semantics). [1.0] = cash account (no leverage); [0.75] = Reg-T 1.33x;
+          [0.5] = Reg-T 2x buying power.
+
+          {b Default [1.0] = no-op}: even with [dawn_leverage_enabled = true],
+          the dawn week sizes cash-account (bit-identical to the base
+          [initial_long_margin_req = 1.0] default) until a spec sets a
+          fractional value. Only consulted on dawn weeks with the mechanism
+          enabled; a non-dawn week raises the entry-walk requirement to a cash
+          account (see {!dawn_leverage_enabled}).
+
+          {b Armed cells must set the base [initial_long_margin_req] to match (or
+          be more permissive than) this value} — the simulator funds fills at the
+          base requirement, so a base of [1.0] (cash account) would floor-reject
+          a levered [0.75] dawn entry rather than fund it. {!Leverage_dawn.validate}
+          enforces [initial_long_margin_req <= dawn_initial_long_margin_req] (and
+          the interval 0.0 < req <= 1.0) when the mechanism is enabled. In the
+          shipped surface spec the base is fixed at the most-permissive rung
+          swept ([0.75]) while this dawn axis sweeps
+          {[[0.90; 0.85; 0.75]]} — the base [0.75] funds any of them.
+
+          R2: real config field → single-component [Variant_matrix] float axis
+          ([((dawn_initial_long_margin_req) (values (0.9 0.85 0.75)))]). *)
+  dawn_max_ma_flip_age_weeks : int;
+      [@sexp.default default_dawn_max_flip_age_weeks]
+      (** Maximum age (in weeks) of the primary index's most recent
+          negative->positive weekly-MA slope flip for the "dawn" label to be
+          active. Default [78] (~1.5y) matches the P1b memo's lagging-label
+          definition (catches 2002-03 back-half, 2010/2012/2016/2020 post-bear
+          dawns — and, by construction of a lagging label, also the 2024
+          melt-up-lag false positive, the named WF-CV falsifier).
+
+          Larger = a longer post-bear window counts as "dawn" (more levered
+          weeks); [0] = only the exact flip week qualifies. Inert while
+          [dawn_leverage_enabled = false]. R2: real config field →
+          single-component [Variant_matrix] int axis
+          ([((dawn_max_ma_flip_age_weeks) (values (52 78)))]). *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
     backtesting. *)
+
+val default_dawn_max_flip_age_weeks : int
+(** Default value for {!config.dawn_max_ma_flip_age_weeks} (78 weeks ~= 1.5y),
+    the P1b-memo lagging dawn-label window. Exposed as the named no-op so the
+    sexp default and the {!config} literal share one source of truth. *)
 
 val default_config : universe:string list -> index_symbol:string -> config
 (** Build a default config with Weinstein book values. *)
