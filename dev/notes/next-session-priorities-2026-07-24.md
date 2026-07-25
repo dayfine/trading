@@ -82,3 +82,45 @@ convention.
   auto-merge on the SLOW PR first, or expect an extra update cycle.
 - QC agents ran git-only (explicit NO-JJ briefs) with no .jj incidents;
   4 QC verdicts + 1 re-verify delivered clean.
+
+---
+
+## Session-close addendum (07-24 PM) — state at handoff
+
+**Merged today (PM half):** #2075 (07-10 backfill + decision record),
+#2079 (ranked-mode LIVE arming — the #1782 code already existed on main
+with grids REJECTing a backtest default-flip; #2079 arms
+`(candidate_ranking Quality)` in live overrides only, fixing the
+zero-overlap alphabetical artifact). #2078 (picks Phase A+B: portfolio
+state + sized instructions) is **auto-merge armed with all three gates
+green** (structural APPROVED after an A2 false-positive was overruled
+with provenance evidence; behavioral APPROVED at tip b4256740e after a
+dispatcher-added no-bars-fallback test) — should land on its CI cycle.
+
+**P0 for next session — leverage-dawn B1 rework (iteration 1, in
+flight, INTERRUPTED):** qc-behavioral on #2077 found the mechanism
+never FUNDS (entry walk sizes levered but the simulator is constructed
+at base req 1.0 and floor-rejects the increment — nothing ever hits
+`long_margin_debit`, so interest/maintenance never price). The
+endorsed fix: permissive-funding inversion (simulator at the levered
+req for armed cells; dawn gates the ENTRY WALK, raising its req to 1.0
+on non-dawn weeks). The rework agent hit its session limit mid-task;
+its UNVERIFIED WIP (324 insertions, the redesign + tests) is salvaged
+on branch `wip/leverage-dawn-b1-rework` (top of #2077's tip
+d1416a0ee). Next session: inspect, verify (fmt/build/runtest + the
+required end-to-end `long_margin_debit > 0` dawn-week pin), push to
+`feat/leverage-dawn`, behavioral re-verify. Do NOT run the WF surface
+until B1 is verified funded — the surface would measure a non-functional
+mechanism.
+
+**After #2077 lands:** user must edit `dev/weekly-picks/portfolio.sexp`
+real cash (ships $100k placeholder, from #2078); then Phase C (HTML
+report + per-candidate SVG charts, planned in
+`dev/plans/weekly-picks-execution-protocol-2026-07-24.md`); then the
+leverage-dawn WF surface run (~8-9h, sweep-hygiene applies).
+
+**Ops notes (PM):** GHA runner disk-exhaustion flakes recurred (2×
+#2067, cleared on rerun); QC false-positive precedent — A2 must check
+diff-introduced deps, not the file's full dep list; agent session-limit
+death is a new failure mode — salvage protocol = commit worktree WIP to
+a `wip/*` branch + document on the PR.
