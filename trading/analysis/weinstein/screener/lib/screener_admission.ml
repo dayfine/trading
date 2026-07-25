@@ -69,9 +69,11 @@ let count_long_failed_breakouts ~tolerance_pct ~early_stage2_max_weeks
 let _long_admission ~weights ~thresholds ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price
     ~failed_breakout_tolerance_pct ~early_stage2_max_weeks (a, sector) =
-  (* Volume-band exclusion and the min-price liquidity floor are folded into the
-     breakout phase: keeps the cascade-diagnostics record stable (no new
-     counter) while gating downstream counts. The long-side setup price is
+  (* Volume-band exclusion, the min-price liquidity floor, and the
+     failed-breakout re-validation all fold into the breakout phase: the
+     admitted chain stays a three-phase monotone triple while every gate still
+     suppresses downstream counts. (The failed-breakout DROP count is reported
+     separately by [count_long_failed_breakouts].) The long-side setup price is
      [breakout_price]. [early_stage2_max_weeks] is threaded into both the
      breakout gate and the score so this diagnostic count tracks the same
      early-Stage2 window the live cascade admits on. *)
