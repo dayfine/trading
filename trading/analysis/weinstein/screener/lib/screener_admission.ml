@@ -27,15 +27,48 @@ let passes_price_floor ~min_price ~price =
   if Float.(min_price <= 0.0) then true
   else match price with Some p -> Float.(p >= min_price) | None -> false
 
+let failed_breakout_reason ~tolerance_pct ~breakout_price ~current_close =
+  (* Failed-breakout re-validation (weinstein-book-reference.md §Buy Criteria):
+     a close back below the breakout level after the breakout week means the
+     breakout failed. Disabled when [tolerance_pct <= 0.0] (the default no-op).
+     A missing breakout price or a missing close is "unknown", never evidence of
+     failure — absence of data must not invalidate a candidate. *)
+  if Float.(tolerance_pct <= 0.0) then None
+  else
+    match (breakout_price, current_close) with
+    | None, _ | _, None -> None
+    | Some bp, Some close ->
+        let floor_price = bp *. (1.0 -. tolerance_pct) in
+        if Float.(close >= floor_price) then None
+        else
+          Some
+            (Printf.sprintf
+               "Failed breakout: close %.2f below breakout %.2f - %.1f%% (%.2f)"
+               close bp (tolerance_pct *. 100.0) floor_price)
+
+let passes_failed_breakout ~tolerance_pct ~breakout_price ~current_close =
+  Option.is_none
+    (failed_breakout_reason ~tolerance_pct ~breakout_price ~current_close)
+
+let _long_passes_failed_breakout ~tolerance_pct (a : Stock_analysis.t) =
+  passes_failed_breakout ~tolerance_pct ~breakout_price:a.breakout_price
+    ~current_close:a.current_close
+
 let rs_blocks_short = function
   | Some { Rs.trend = Positive_rising | Positive_flat | Bullish_crossover; _ }
     ->
       true
   | _ -> false
 
+let count_long_failed_breakouts ~tolerance_pct ~early_stage2_max_weeks
+    ~candidates =
+  List.count candidates ~f:(fun ((a : Stock_analysis.t), _sector) ->
+      Stock_analysis.is_breakout_candidate ~early_stage2_max_weeks a
+      && not (_long_passes_failed_breakout ~tolerance_pct a))
+
 let _long_admission ~weights ~thresholds ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price
-    ~early_stage2_max_weeks (a, sector) =
+    ~failed_breakout_tolerance_pct ~early_stage2_max_weeks (a, sector) =
   (* Volume-band exclusion and the min-price liquidity floor are folded into the
      breakout phase: keeps the cascade-diagnostics record stable (no new
      counter) while gating downstream counts. The long-side setup price is
@@ -45,6 +78,8 @@ let _long_admission ~weights ~thresholds ~min_grade ~min_score_override
   let passes_breakout =
     passes_price_floor ~min_price ~price:a.Stock_analysis.breakout_price
     && Stock_analysis.is_breakout_candidate ~early_stage2_max_weeks a
+    && _long_passes_failed_breakout ~tolerance_pct:failed_breakout_tolerance_pct
+         a
     && passes_volume_band ~excl:volume_ratio_exclude_range a
   in
   let passes_sector =
@@ -63,13 +98,13 @@ let _bump n b = if b then n + 1 else n
 
 let count_long_phases ~weights ~thresholds ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price
-    ~early_stage2_max_weeks ~candidates =
+    ~failed_breakout_tolerance_pct ~early_stage2_max_weeks ~candidates =
   List.fold candidates ~init:(0, 0, 0)
     ~f:(fun (breakout, sector_ok, grade_ok) pair ->
       let pb, ps, pg =
         _long_admission ~weights ~thresholds ~min_grade ~min_score_override
           ~max_score_override ~volume_ratio_exclude_range ~min_price
-          ~early_stage2_max_weeks pair
+          ~failed_breakout_tolerance_pct ~early_stage2_max_weeks pair
       in
       (_bump breakout pb, _bump sector_ok ps, _bump grade_ok pg))
 

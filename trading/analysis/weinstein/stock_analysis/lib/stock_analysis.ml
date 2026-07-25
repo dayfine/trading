@@ -67,6 +67,8 @@ type t = {
           [Some r] carries [r.score] in [0, 1] (0 = virgin, 1 = heavy recent
           supply) consumed by the screener's long-side scoring weight. *)
   virgin_readmission : bool;  (** resistance-v2 lever (a); see .mli. *)
+  current_close : float option;
+      (** Most recent (offset-0) weekly close; see .mli. *)
   as_of_date : Date.t;
 }
 
@@ -424,6 +426,7 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
     continuation;
     supply;
     virgin_readmission;
+    current_close = callbacks.stage.get_close ~week_offset:0;
     as_of_date;
   }
 

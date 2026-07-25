@@ -1798,6 +1798,7 @@ let ranking_analysis ~ticker ~rs_norm ~weeks_advancing ~volume_ratio :
     continuation = None;
     supply = None;
     virgin_readmission = false;
+    current_close = None;
     as_of_date = as_of;
   }
 

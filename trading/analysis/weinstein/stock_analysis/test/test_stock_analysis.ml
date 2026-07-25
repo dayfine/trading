@@ -156,6 +156,7 @@ let fresh_stage2 ?(virgin_readmission = false) ~weeks_advancing () :
     continuation = None;
     supply = None;
     virgin_readmission;
+    current_close = None;
     as_of_date = as_of;
   }
 

@@ -110,6 +110,17 @@ type t = {
           re-admission arm to bypass the [early_stage2_max_weeks] staleness
           rejection for a genuine new-high breakout. [false] whenever the flag
           is off — bit-identical to pre-feature behaviour. *)
+  current_close : float option;
+      (** The most recent weekly close (offset 0), read from
+          [callbacks.stage.get_close]. [None] when the callback bundle has no
+          bar at offset 0 (empty / truncated history).
+
+          Purely additive: no existing analysis path reads it. It exists so the
+          screener can re-validate a breakout candidate against the *current*
+          price — a close back below the breakout level after the breakout week
+          is a failed breakout (weinstein-book-reference.md §Buy Criteria). See
+          {!Screener_admission.failed_breakout_reason}. Consumers must treat
+          [None] as "unknown", never as evidence of a failed breakout. *)
   as_of_date : Core.Date.t;  (** The date this analysis was computed. *)
 }
 (** The full per-stock analysis. *)
