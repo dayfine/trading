@@ -592,7 +592,11 @@ let _entry ~entry_date ~position_id ~symbol :
 
 let _audit_record ~entry_date ~position_id ~symbol :
     Backtest.Trade_audit.audit_record =
-  { entry = _entry ~entry_date ~position_id ~symbol; exit_ = None }
+  {
+    entry = _entry ~entry_date ~position_id ~symbol;
+    exit_ = None;
+    external_exit = None;
+  }
 
 let test_filter_audit_records_drops_warmup _ =
   let start_date = date_of_string "2019-01-02" in

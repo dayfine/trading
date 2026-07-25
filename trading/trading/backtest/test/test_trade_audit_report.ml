@@ -97,7 +97,8 @@ let make_exit_decision ?(symbol = "AAPL") ?(exit_date = _date "2024-04-20")
     weeks_stage_left_2 = 1;
   }
 
-let make_record entry exit_ : TA.audit_record = { entry; exit_ = Some exit_ }
+let make_record entry exit_ : TA.audit_record =
+  { entry; exit_ = Some exit_; external_exit = None }
 
 (* --- Header computation ------------------------------------------------- *)
 

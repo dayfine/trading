@@ -32,7 +32,8 @@
   test_csv_snapshot_builder_cleanup
   test_fold_health
   test_fold_health_runner
-  test_margin_exit_observability)
+  test_margin_exit_observability
+  test_trade_audit_external_exits)
  (libraries
   ounit2
   core
