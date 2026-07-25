@@ -192,7 +192,7 @@ let test_exit_decision_sexp_round_trip _ =
 
 let test_audit_record_sexp_round_trip _ =
   let record : TA.audit_record =
-    { entry = make_entry (); exit_ = Some (make_exit ()) }
+    { entry = make_entry (); exit_ = Some (make_exit ()); external_exit = None }
   in
   let parsed = TA.audit_record_of_sexp (TA.sexp_of_audit_record record) in
   assert_that parsed (equal_to record)
@@ -200,12 +200,17 @@ let test_audit_record_sexp_round_trip _ =
 let test_audit_records_sexp_round_trip_through_top_level_codec _ =
   let records : TA.audit_record list =
     [
-      { entry = make_entry (); exit_ = Some (make_exit ()) };
+      {
+        entry = make_entry ();
+        exit_ = Some (make_exit ());
+        external_exit = None;
+      };
       {
         entry =
           make_entry ~symbol:"MSFT" ~position_id:"MSFT-wein-1"
             ~entry_date:(_date "2024-02-01") ();
         exit_ = None;
+        external_exit = None;
       };
     ]
   in

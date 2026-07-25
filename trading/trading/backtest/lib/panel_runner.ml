@@ -59,9 +59,19 @@ let _stale_hold_policy (config : Weinstein_strategy.config) : Stale_hold.config
    [test_margin_exit_observability.ml:test_stop_log_records_margin_call_on_strategy_collision].
    This is the correct outcome, not a race: [Margin_runner.dedup_strategy_exits_for_margin]
    drops the strategy's colliding [TriggerExit] before [_apply_transitions]
-   runs, so only margin's exit actually executes. *)
-let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
-    ~warmup_start ~end_date ~initial_cash ~commission ?slippage_bps
+   runs, so only margin's exit actually executes.
+
+   [Simulator.dependencies.on_transitions] is a single optional slot, so the
+   two observers that need it ([Stop_log.record_transitions] above, and
+   [Trade_audit.record_transitions] — #2076, the [trade_audit.sexp] sink for
+   the same externally-generated exits [Stop_log] already covers) are composed
+   into one closure below rather than each getting their own hook. *)
+let _on_transitions ~stop_log ~trade_audit ts =
+  Stop_log.record_transitions stop_log ts;
+  Trade_audit.record_transitions trade_audit ts
+
+let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
+    ~start_date ~warmup_start ~end_date ~initial_cash ~commission ?slippage_bps
     ?on_trade_fill ?active_through_for ~strategy ~market_data_adapter () =
   (* Default-off [Warmup_trade_gate] (#1549 A2); identity unless the flag is on. *)
   let strategy =
@@ -82,7 +92,7 @@ let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
       ~exempt_closing_trades_from_cash_floor:
         input.config.portfolio_config.exempt_closing_trades_from_cash_floor
       ?on_trade_fill ?active_through_for
-      ~on_transitions:(Stop_log.record_transitions stop_log)
+      ~on_transitions:(_on_transitions ~stop_log ~trade_audit)
       ()
   in
   let config =
@@ -329,10 +339,11 @@ let _build_sim input ~r ~start_date ~warmup_start ~end_date ~initial_cash
     engine_costs_with_overlay ~default_commission:commission
       ?default_slippage_bps:slippage_bps ?cost_model ()
   in
-  _make_simulator input ~stop_log:r.stop_log ~stale_hold_log:r.stale_hold_log
-    ~start_date ~warmup_start ~end_date ~initial_cash
-    ~commission:effective_commission ?slippage_bps:effective_slippage_bps
-    ?on_trade_fill ?active_through_for ~strategy ~market_data_adapter ()
+  _make_simulator input ~stop_log:r.stop_log ~trade_audit:r.trade_audit
+    ~stale_hold_log:r.stale_hold_log ~start_date ~warmup_start ~end_date
+    ~initial_cash ~commission:effective_commission
+    ?slippage_bps:effective_slippage_bps ?on_trade_fill ?active_through_for
+    ~strategy ~market_data_adapter ()
 
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     ~commission ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
