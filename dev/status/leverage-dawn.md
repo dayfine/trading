@@ -10,12 +10,24 @@ barbell-shaped fold table. Deployment-intensity dial off the weekly MA — spine
 untouched, not reversal timing (the label errs late by construction).
 
 ## Status
-READY_FOR_REVIEW
+MERGED
 
-Mechanism BUILT default-off (PR `feat/leverage-dawn`). The WF-CV surface run +
-confirmation grid are a separate scheduled step (post-merge), NOT this PR.
+Mechanism BUILT default-off and MERGED as #2077 (squashed to `c76c170d`,
+2026-07-25). The WF-CV surface run + confirmation grid are a separate scheduled
+step and have **NOT** been run — per `promotion-confirmation.md` the default flip
+(R3) additionally needs a robustness-grid ACCEPT, not just a single surface.
 
-## Last updated: 2026-07-24
+Merged after one qc-behavioral rework iteration. The first pass shipped a
+mechanism that **never funded**: the dawn req was swapped only on the entry-walk
+*sizing* config while the simulator's fill-funding path stayed pinned at base
+req 1.0 (the cash-account branch), which floor-rejected the levered buy. Closed
+by the permissive-funding inversion — base req set permissively in armed WF-spec
+cells only, entry walk's dawn gate raising its own req to 1.0 on non-dawn weeks,
+`Leverage_dawn.validate` enforcing `base <= dawn` so a mis-armed cell fails fast.
+Pinned end-to-end by `test_dawn_week_funds_levered_entry` (`long_margin_debit >
+0`), a non-dawn control, and a root-cause pin asserting the old base req rejects.
+
+## Last updated: 2026-07-25
 
 ## behavioral_qc
 - 2026-07-24 rework (QC iteration 1, PR #2077): addressed B1 — the dawn leverage
