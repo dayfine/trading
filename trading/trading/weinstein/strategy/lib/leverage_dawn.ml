@@ -7,6 +7,13 @@ module Margin_config = Trading_portfolio.Margin_config
    offset stays inside the available MA depth. *)
 let _flip_search_margin_weeks = 8
 
+(* Cash-account initial-margin requirement (Reg-T 100%): the entry-walk
+   requirement forced OUTSIDE a dawn week so no NEW long borrowing is initiated
+   off-dawn. Distinct from the base [config.initial_long_margin_req], which the
+   simulator funds fills at (see [dawn_effective_config] in the .mli for the
+   permissive-funding / gated-sizing design). *)
+let _cash_account_margin_req = 1.0
+
 (* Rising test at [offset]: the stage classifier's Rising direction — the MA
    slope over [slope_lookback] weeks is at least [slope_threshold]. [None] when
    the MA is unavailable at either end of the slope window (data boundary) or the
@@ -48,9 +55,9 @@ let is_dawn ~get_ma ~slope_lookback ~slope_threshold ~max_flip_age_weeks =
     (flip_age_weeks ~get_ma ~slope_lookback ~slope_threshold ~max_flip_age_weeks)
 
 let effective_initial_long_margin_req ~(config : Config.config) ~dawn_active =
-  if config.dawn_leverage_enabled && dawn_active then
-    config.dawn_initial_long_margin_req
-  else config.initial_long_margin_req
+  if not config.dawn_leverage_enabled then config.initial_long_margin_req
+  else if dawn_active then config.dawn_initial_long_margin_req
+  else _cash_account_margin_req
 
 (* Weeks of primary-index weekly history to fetch for the flip search: enough MA
    depth for offsets [0 .. max_flip_age + 1] plus the [slope_lookback] anchor and
@@ -92,16 +99,36 @@ let _validate_margin_armed (config : Config.config) =
       "Leverage_dawn: dawn_leverage_enabled=true requires \
        margin_config.enabled=true (dawn leverage runs margin-armed)"
 
+let _req_range_error req =
+  Printf.sprintf
+    "Leverage_dawn: dawn_initial_long_margin_req must be in (0.0, 1.0]; got %f"
+    req
+
 let _validate_req_in_range req =
   if Float.( <= ) req 0.0 || Float.( > ) req 1.0 then
-    failwith
-      (Printf.sprintf
-         "Leverage_dawn: dawn_initial_long_margin_req must be in (0.0, 1.0]; \
-          got %f"
-         req)
+    failwith (_req_range_error req)
+
+let _base_gt_dawn_error ~base ~dawn =
+  Printf.sprintf
+    "Leverage_dawn: initial_long_margin_req (%f) must be <= \
+     dawn_initial_long_margin_req (%f) so the simulator funds the dawn-week \
+     levered entry instead of floor-rejecting it"
+    base dawn
+
+(* The simulator funds fills at the base [initial_long_margin_req] (permissive
+   funding); the dawn-week entry walk sizes against [dawn_initial_long_margin_req].
+   For a dawn-week levered entry to actually fund into [long_margin_debit], the
+   base requirement must be at least as permissive (numerically <=) as the dawn
+   rung — otherwise the simulator's cash-account branch floor-rejects the levered
+   increment (the B1 misconfiguration). *)
+let _validate_base_at_most_dawn_req (config : Config.config) =
+  let base = config.initial_long_margin_req in
+  let dawn = config.dawn_initial_long_margin_req in
+  if Float.( > ) base dawn then failwith (_base_gt_dawn_error ~base ~dawn)
 
 let validate (config : Config.config) =
   if config.dawn_leverage_enabled then begin
     _validate_margin_armed config;
-    _validate_req_in_range config.dawn_initial_long_margin_req
+    _validate_req_in_range config.dawn_initial_long_margin_req;
+    _validate_base_at_most_dawn_req config
   end

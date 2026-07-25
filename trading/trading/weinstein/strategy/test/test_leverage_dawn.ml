@@ -68,6 +68,9 @@ let dawn_enabled_config : Config.config =
   {
     base_config with
     dawn_leverage_enabled = true;
+    (* Base = the permissive rung the simulator funds at; must be <= the dawn
+       rung so [validate] passes and a levered dawn entry actually funds. *)
+    initial_long_margin_req = 0.75;
     dawn_initial_long_margin_req = 0.75;
     dawn_max_ma_flip_age_weeks = 52;
   }
@@ -135,6 +138,17 @@ let test_validate_req_above_one_raises _ =
 let test_validate_req_zero_raises _ =
   let cfg =
     armed_margin { dawn_enabled_config with dawn_initial_long_margin_req = 0.0 }
+  in
+  assert_that
+    (raises_failure (fun () -> Leverage_dawn.validate cfg))
+    (equal_to true)
+
+let test_validate_base_exceeds_dawn_req_raises _ =
+  (* Base req = 1.0 (cash account) is more restrictive than the dawn rung 0.75:
+     the simulator would fund at 1.0 and floor-reject the levered dawn entry (the
+     B1 misconfiguration). validate must catch base > dawn. *)
+  let cfg =
+    armed_margin { dawn_enabled_config with initial_long_margin_req = 1.0 }
   in
   assert_that
     (raises_failure (fun () -> Leverage_dawn.validate cfg))
@@ -258,6 +272,111 @@ let test_effect_disabled_unchanged _ =
        (fun (c : Config.config) -> c.initial_long_margin_req)
        (float_equal 1.0))
 
+(* ------------------------------------------------------------------ *)
+(* End-to-end funding (B1): the dawn signal SIZES the entry walk, and  *)
+(* the permissive BASE req FUNDS the fill. On a dawn week a levered     *)
+(* entry actually funds into long_margin_debit; off-dawn no new debit.  *)
+(* Exercises both readers of initial_long_margin_req the .mli names:    *)
+(* dawn_effective_config (sizing) + apply_single_trade_with_long_margin *)
+(* at the base req (funding, what Panel_runner feeds the simulator).    *)
+(* ------------------------------------------------------------------ *)
+
+module Portfolio = Trading_portfolio.Portfolio
+module Portfolio_margin = Trading_portfolio.Portfolio_margin
+module Tb = Trading_base.Types
+
+(* An armed dawn config whose BASE initial_long_margin_req is the permissive dawn
+   rung (0.75) — the value the simulator funds fills at. The dawn-week entry walk
+   requests the same rung; off-dawn it is raised to a cash account. *)
+let armed_funding_config ~enabled : Config.config =
+  {
+    base_config with
+    stage_config = fast_stage_config base_config.stage_config;
+    dawn_leverage_enabled = enabled;
+    initial_long_margin_req = 0.75;
+    dawn_initial_long_margin_req = 0.75;
+    dawn_max_ma_flip_age_weeks = 52;
+    margin_config =
+      { base_config.margin_config with Margin_config.enabled = true };
+  }
+
+let _funding_equity = 10_000.0
+let _funding_price = 100.0
+
+(* Size a BUY to the effective entry-walk ceiling for [closes] (equity/req when a
+   fractional req is in force on a dawn week, the cash gate otherwise), then fund
+   it through the simulator fill seam at the permissive base req. Returns the
+   resulting long_margin_debit. *)
+let debit_after_dawn_entry closes ~enabled =
+  let cfg = armed_funding_config ~enabled in
+  let reader, as_of = weekly_bar_reader closes in
+  let eff =
+    Leverage_dawn.dawn_effective_config cfg ~bar_reader:reader
+      ~current_date:as_of
+  in
+  let target_notional =
+    if Float.( < ) eff.initial_long_margin_req 1.0 then
+      _funding_equity /. eff.initial_long_margin_req
+    else _funding_equity
+  in
+  let quantity = Float.round_down (target_notional /. _funding_price) in
+  let trade : Tb.trade =
+    {
+      id = "t1";
+      order_id = "o1";
+      symbol = "AAA";
+      side = Tb.Buy;
+      quantity;
+      price = _funding_price;
+      commission = 0.0;
+      timestamp = Time_ns_unix.now ();
+    }
+  in
+  let portfolio = Portfolio.create ~initial_cash:_funding_equity () in
+  match
+    Portfolio_margin.apply_single_trade_with_long_margin
+      ~initial_long_margin_req:cfg.initial_long_margin_req portfolio trade
+  with
+  | Ok (p : Portfolio.t) -> p.long_margin_debit
+  | Error err -> assert_failure ("dawn entry funding: " ^ Status.show err)
+
+let test_dawn_week_funds_levered_entry _ =
+  (* v-shape dawn tape: entry walk sizes at 0.75 (1.33x = $13,300 > $10,000
+     cash), the base-req funding path borrows the shortfall into the debit. *)
+  assert_that
+    (debit_after_dawn_entry v_shape_closes ~enabled:true)
+    (gt (module Float_ord) 0.0)
+
+let test_non_dawn_week_no_new_debit _ =
+  (* Monotone decline (not dawn): entry walk is raised to a cash account, so the
+     order fits cash and the base-req funding path creates no new debit. *)
+  assert_that
+    (debit_after_dawn_entry monotone_decline_closes ~enabled:true)
+    (float_equal 0.0)
+
+let test_base_cash_account_req_would_reject _ =
+  (* B1 root-cause pin: had the simulator kept the OLD base req = 1.0 (cash
+     account), the same dawn-week levered order is floor-rejected — no funding.
+     The fix is exactly to run the simulator at the permissive base req. *)
+  let trade : Tb.trade =
+    {
+      id = "t1";
+      order_id = "o1";
+      symbol = "AAA";
+      side = Tb.Buy;
+      quantity = 133.0;
+      price = _funding_price;
+      commission = 0.0;
+      timestamp = Time_ns_unix.now ();
+    }
+  in
+  assert_that
+    (Portfolio_margin.apply_single_trade_with_long_margin
+       ~initial_long_margin_req:1.0
+       (Portfolio.create ~initial_cash:_funding_equity ())
+       trade)
+    is_error
+
 let suite =
   "leverage_dawn"
   >::: [
@@ -280,6 +399,8 @@ let suite =
          "validate_enabled_armed_ok" >:: test_validate_enabled_armed_ok;
          "validate_req_above_one_raises" >:: test_validate_req_above_one_raises;
          "validate_req_zero_raises" >:: test_validate_req_zero_raises;
+         "validate_base_exceeds_dawn_req_raises"
+         >:: test_validate_base_exceeds_dawn_req_raises;
          "defaults_are_noop" >:: test_defaults_are_noop;
          "sexp_round_trip_preserves_dawn_fields"
          >:: test_sexp_round_trip_preserves_dawn_fields;
@@ -287,6 +408,10 @@ let suite =
          "effect_non_dawn_tape_unchanged"
          >:: test_effect_non_dawn_tape_unchanged;
          "effect_disabled_unchanged" >:: test_effect_disabled_unchanged;
+         "dawn_week_funds_levered_entry" >:: test_dawn_week_funds_levered_entry;
+         "non_dawn_week_no_new_debit" >:: test_non_dawn_week_no_new_debit;
+         "base_cash_account_req_would_reject"
+         >:: test_base_cash_account_req_would_reject;
        ]
 
 let () = run_test_tt_main suite

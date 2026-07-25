@@ -23,8 +23,17 @@
 ; so the borrowed long debit is priced (8%/yr), long maintenance 0.30 is armed
 ; (M2 force-reduce), and the short-side margin model is on with the FINRA/HTB tier
 ; tables. With margin_config.enabled short proceeds are locked (150% collateral).
-; The base initial_long_margin_req stays 1.0 (cash account) on non-dawn weeks —
-; the dawn axis modulates ONLY the dawn-week requirement.
+;
+; PERMISSIVE FUNDING / GATED SIZING (B1 fix, 2026-07-24). The simulator funds
+; fills at the BASE initial_long_margin_req (Panel_runner -> Simulator.create_deps,
+; fixed for the whole run), NOT the dawn-week value; the dawn signal only gates
+; the ENTRY WALK's sizing requirement. So the base is fixed here at 0.75 — the
+; most-permissive rung the dawn axis sweeps — so the simulator can fund a levered
+; dawn-week fill into long_margin_debit (priced 8%/yr + maintenance 0.30) for ANY
+; dawn rung in {0.90, 0.85, 0.75}. Off-dawn the entry walk raises its requirement
+; to a cash account, so no NEW borrowing starts even though the sim funds at 0.75
+; (a cash-fitting order takes the base apply path, no new debit). Leverage_dawn.
+; validate enforces base (0.75) <= dawn rung on every cell.
 ;
 ; Bar (promotion): a dawn cell must clear the UNLEVERED frontier on risk-adjusted
 ; fold terms (Sharpe gate + DSR), continuously scored across fold boundaries (the
@@ -48,6 +57,7 @@
  (axes
   ((axes
     (((flag dawn_leverage_enabled) (values (true)))
+     ((key (initial_long_margin_req)) (values (0.75)))
      ((key (dawn_initial_long_margin_req)) (values (0.90 0.85 0.75)))
      ((key (dawn_max_ma_flip_age_weeks)) (values (52 78)))
      ((flag enable_short_side) (values (false)))

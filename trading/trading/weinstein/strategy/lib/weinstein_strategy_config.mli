@@ -972,11 +972,24 @@ type config = {
           green-lit 2026-07-24). When [true] AND the primary index is in a young
           post-bear "dawn" (its weekly MA is currently rising and the most
           recent negative->positive slope flip happened no more than
-          [dawn_max_ma_flip_age_weeks] weeks ago), the effective long-side
-          initial-margin requirement for that Friday's entry walk is lowered
-          from [initial_long_margin_req] to [dawn_initial_long_margin_req] —
-          i.e. the long book runs levered only in label-visible young uptrends,
+          [dawn_max_ma_flip_age_weeks] weeks ago), that Friday's entry walk
+          sizes against the levered [dawn_initial_long_margin_req]; on a
+          non-dawn week the entry walk is {b raised} to a cash account — i.e.
+          the long book runs levered only in label-visible young uptrends,
           cash-account otherwise.
+
+          {b Permissive-funding / gated-sizing design (B1 fix, 2026-07-24).} The
+          entry walk only {e sizes} the position; the {e funding} authority is
+          the simulator, which is constructed once at the {e base}
+          [initial_long_margin_req] ([Backtest.Panel_runner] ->
+          [Simulator.create_deps]) and cannot track the per-Friday dawn value.
+          So an armed cell must set the base [initial_long_margin_req] to a
+          value at least as permissive (numerically [<=]) as
+          [dawn_initial_long_margin_req] — the simulator then funds any levered
+          fill into [long_margin_debit] (priced by [long_margin_rate_annual_pct]
+          \+ [maintenance_long_pct]), while the entry-walk requirement decides
+          {e when} to request leverage. {!Leverage_dawn.validate} enforces the
+          [base <= dawn] constraint. See {!Leverage_dawn.dawn_effective_config}.
 
           {b Default [false] = EXACT no-op} (experiment-flag-discipline R1). The
           wiring ({!Leverage_dawn.dawn_effective_config}) short-circuits to the
@@ -1011,22 +1024,30 @@ type config = {
           [.claude/rules/experiment-flag-discipline.md] +
           [.claude/rules/promotion-confirmation.md]). *)
   dawn_initial_long_margin_req : float; [@sexp.default 1.0]
-      (** The long-side initial-margin requirement applied during a "dawn" week
-          when [dawn_leverage_enabled = true]; the leverage dial the mechanism
-          swaps in for [initial_long_margin_req] (see {!initial_long_margin_req}
-          for the buying-power semantics). [1.0] = cash account (no leverage);
-          [0.75] = Reg-T 1.33x; [0.5] = Reg-T 2x buying power.
+      (** The long-side initial-margin requirement the {b entry walk} sizes
+          against during a "dawn" week when [dawn_leverage_enabled = true] — the
+          leverage dial (see {!initial_long_margin_req} for the buying-power
+          semantics). [1.0] = cash account (no leverage); [0.75] = Reg-T 1.33x;
+          [0.5] = Reg-T 2x buying power.
 
           {b Default [1.0] = no-op}: even with [dawn_leverage_enabled = true],
-          the dawn week runs cash-account (bit-identical to the base
+          the dawn week sizes cash-account (bit-identical to the base
           [initial_long_margin_req = 1.0] default) until a spec sets a
           fractional value. Only consulted on dawn weeks with the mechanism
-          enabled; a non-dawn week always uses the base
-          [initial_long_margin_req].
+          enabled; a non-dawn week raises the entry-walk requirement to a cash
+          account (see {!dawn_leverage_enabled}).
 
-          Constrained to the interval 0.0 < req <= 1.0 by
-          {!Leverage_dawn.validate} when the mechanism is enabled. R2: real
-          config field → single-component [Variant_matrix] float axis
+          {b Armed cells must set the base [initial_long_margin_req] to match (or
+          be more permissive than) this value} — the simulator funds fills at the
+          base requirement, so a base of [1.0] (cash account) would floor-reject
+          a levered [0.75] dawn entry rather than fund it. {!Leverage_dawn.validate}
+          enforces [initial_long_margin_req <= dawn_initial_long_margin_req] (and
+          the interval 0.0 < req <= 1.0) when the mechanism is enabled. In the
+          shipped surface spec the base is fixed at the most-permissive rung
+          swept ([0.75]) while this dawn axis sweeps
+          {[[0.90; 0.85; 0.75]]} — the base [0.75] funds any of them.
+
+          R2: real config field → single-component [Variant_matrix] float axis
           ([((dawn_initial_long_margin_req) (values (0.9 0.85 0.75)))]). *)
   dawn_max_ma_flip_age_weeks : int;
       [@sexp.default default_dawn_max_flip_age_weeks]
