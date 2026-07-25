@@ -148,6 +148,28 @@ let _strategy_signal_trigger_exit ?(position_id = "AAPL-wein-1")
         { exit_reason = Position.StrategySignal { label; detail }; exit_price };
   }
 
+(** A [TriggerPartialExit] transition carrying a [StrategySignal] exit reason —
+    what a partial trim (e.g. [harvest_rotate]) looks like on the
+    [Position.transition] list [record_transitions] observes. Structurally
+    adjacent to {!_strategy_signal_trigger_exit} (same [exit_reason] shape)
+    except for [kind], so it genuinely discriminates [record_transitions]'s
+    "only [TriggerExit], not [TriggerPartialExit]" behavior — unlike
+    [UpdateRiskParams], which has no [exit_reason] field at all. *)
+let _strategy_signal_trigger_partial_exit ?(position_id = "AAPL-wein-1")
+    ?(date = _date "2024-04-20") ?(label = "harvest_rotate") ?(detail = None)
+    ?(exit_price = 137.20) ?(target_quantity = 50.0) () : Position.transition =
+  {
+    position_id;
+    date;
+    kind =
+      Position.TriggerPartialExit
+        {
+          exit_reason = Position.StrategySignal { label; detail };
+          exit_price;
+          target_quantity;
+        };
+  }
+
 (* Sexp round-trip ------------------------------------------------------- *)
 
 let test_skip_reason_sexp_round_trip _ =
@@ -409,6 +431,21 @@ let test_record_transitions_ignores_non_trigger_exit_kinds _ =
   TA.record_transitions t [ update_risk_params ];
   assert_that (_external_exit_of t ~position_id:"AAPL-wein-1") is_none
 
+let test_record_transitions_ignores_partial_exit _ =
+  let t = TA.create () in
+  TA.record_entry t (make_entry ());
+  TA.record_transitions t
+    [
+      _strategy_signal_trigger_partial_exit ~label:"harvest_rotate"
+        ~target_quantity:50.0 ();
+    ];
+  (* A partial trim does not close the position, so [record_transitions]
+     must not synthesize an [external_exit] for it — confirmed against the
+     wildcard match arm in [_process_transition_for_external_exit]. *)
+  assert_that (_external_exit_of t ~position_id:"AAPL-wein-1") is_none;
+  assert_that (TA.get_audit_records t)
+    (elements_are [ field (fun (r : TA.audit_record) -> r.exit_) is_none ])
+
 let test_record_entry_overwrites_same_position_id _ =
   let t = TA.create () in
   let first = make_entry ~cascade_score:50 () in
@@ -579,6 +616,8 @@ let suite =
          >:: test_record_transitions_without_entry_is_dropped;
          "record_transitions ignores non-TriggerExit transition kinds"
          >:: test_record_transitions_ignores_non_trigger_exit_kinds;
+         "record_transitions ignores TriggerPartialExit"
+         >:: test_record_transitions_ignores_partial_exit;
          "record_entry overwrites same position_id"
          >:: test_record_entry_overwrites_same_position_id;
          "get_audit_records sorts by position_id"
