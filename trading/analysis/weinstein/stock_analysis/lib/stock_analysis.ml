@@ -98,98 +98,6 @@ type callbacks = {
 }
 
 (* ------------------------------------------------------------------ *)
-(* Callback-shaped breakout-price scan                                  *)
-(* ------------------------------------------------------------------ *)
-
-(** Combine a running maximum with a fresh sample. *)
-let _max_opt (best : float option) (h : float) : float option =
-  match best with None -> Some h | Some b -> Some (Float.max b h)
-
-(** Combine a running minimum with a fresh sample. Mirror of [_max_opt]. *)
-let _min_opt (best : float option) (l : float) : float option =
-  match best with None -> Some l | Some b -> Some (Float.min b l)
-
-(** Per-bar split-jump threshold: the smallest [factor_at_off / factor_at_off-1]
-    ratio (in either direction) that we treat as a split rather than a dividend
-    / continuous-adjustment drift. A split causes a discrete multiplicative jump
-    in [adjusted_close / close_price] between consecutive bars (e.g., a forward
-    four-for-one split creates a 4x jump; a five-for- four reverse split creates
-    a 1.25x jump); dividends create only gradual drift. The smallest real-world
-    split is around 5:4 (a one-quarter jump); the largest dividend drift over a
-    couple of weeks is well under one- twentieth. The threshold below sits
-    safely between the two. *)
-let _split_jump_threshold = 0.20
-
-(** [true] when bars at [off] and [off-1] sit in the same price space — i.e.,
-    the per-bar split factor didn't jump by more than [_split_jump_threshold].
-    Used to truncate the breakout / breakdown scans at the most recent split
-    boundary: a [false] here means a split occurred between [off] (older) and
-    [off-1] (newer), so any further-back bars belong to the pre-split price
-    space and would leak into the scan. When either factor is unavailable the
-    comparison is a no-op (returns [true] — keep walking) so that fixtures
-    without raw / adjusted-close metadata behave as before. *)
-let _no_split_between ~get_split_factor ~off : bool =
-  if off <= 0 then true
-  else
-    match
-      ( get_split_factor ~week_offset:off,
-        get_split_factor ~week_offset:(off - 1) )
-    with
-    | None, _ | _, None -> true
-    | Some f_old, Some f_new
-      when Float.( <= ) f_old 0.0 || Float.( <= ) f_new 0.0 ->
-        true
-    | Some f_old, Some f_new ->
-        Float.( < ) (Float.abs ((f_old /. f_new) -. 1.0)) _split_jump_threshold
-
-(** Walk back from [week_offset = base_end_offset .. base_lookback - 1] reading
-    [get_high] at each offset. Returns the maximum defined high. Stops the walk
-    at the first [None] (treated as "no more bars") OR at the first offset whose
-    per-bar split factor jumps materially relative to its more-recent neighbour
-    (a split occurred between [off] and [off-1]; everything older belongs to the
-    pre-split price space). Returns [None] when the range is empty or no bar
-    produced a defined high. *)
-let _scan_max_high_callback ~get_high ~get_split_factor ~base_end_offset
-    ~base_lookback : float option =
-  if base_end_offset >= base_lookback then None
-  else
-    let rec loop off best =
-      if off >= base_lookback then best
-      else if not (_no_split_between ~get_split_factor ~off) then best
-      else
-        match get_high ~week_offset:off with
-        | None -> best
-        | Some h -> loop (off + 1) (_max_opt best h)
-    in
-    loop base_end_offset None
-
-(** Mirror of {!_scan_max_high_callback} for the short-side cascade: walks
-    [bar_offset = base_end_offset .. base_lookback - 1] reading [get_low] at
-    each offset and returns the {b minimum} defined low. The base low is the
-    short-side analogue of the breakout price.
-
-    Note: [get_low] is consumed via the Resistance callback bundle, which uses
-    [~bar_offset] rather than [~week_offset]. Both indexing conventions mean
-    "offset from the newest bar"; only the labelled-arg name differs.
-
-    Same split-boundary truncation as the max-high scan: stops at the first
-    offset whose [get_split_factor] jumps relative to its more-recent neighbour.
-*)
-let _scan_min_low_callback ~get_low ~get_split_factor ~base_end_offset
-    ~base_lookback : float option =
-  if base_end_offset >= base_lookback then None
-  else
-    let rec loop off best =
-      if off >= base_lookback then best
-      else if not (_no_split_between ~get_split_factor ~off) then best
-      else
-        match get_low ~bar_offset:off with
-        | None -> best
-        | Some l -> loop (off + 1) (_min_opt best l)
-    in
-    loop base_end_offset None
-
-(* ------------------------------------------------------------------ *)
 (* Callback-shaped peak-volume scan                                     *)
 (* ------------------------------------------------------------------ *)
 
@@ -360,13 +268,13 @@ let _continuation_result ~(config : config) ~(callbacks : callbacks) :
 let _breakout_and_breakdown_prices ~(config : config) ~(callbacks : callbacks) :
     float option * float option =
   let breakout =
-    _scan_max_high_callback ~get_high:callbacks.get_high
+    Stock_analysis_scans.scan_max_high ~get_high:callbacks.get_high
       ~get_split_factor:callbacks.get_split_factor
       ~base_end_offset:config.base_end_offset_weeks
       ~base_lookback:config.base_lookback_weeks
   in
   let breakdown =
-    _scan_min_low_callback ~get_low:callbacks.resistance.get_low
+    Stock_analysis_scans.scan_min_low ~get_low:callbacks.resistance.get_low
       ~get_split_factor:callbacks.get_split_factor
       ~base_end_offset:config.base_end_offset_weeks
       ~base_lookback:config.base_lookback_weeks
@@ -374,7 +282,7 @@ let _breakout_and_breakdown_prices ~(config : config) ~(callbacks : callbacks) :
   (breakout, breakdown)
 
 (* @large-function: record-assembly coordinator — threads the 8 sub-analysis
-   results into the single 14-field [t]; splitting scatters the one-shot
+   results into the single 15-field [t]; splitting scatters the one-shot
    assembly with no readability gain. *)
 let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
     ~prior_stage ~as_of_date : t =

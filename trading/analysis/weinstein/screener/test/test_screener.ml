@@ -2111,6 +2111,230 @@ let test_early_stage2_max_weeks_omitted_defaults_4 _ =
   in
   assert_that no_field.early_stage2_max_weeks (equal_to 4)
 
+(* ------------------------------------------------------------------ *)
+(* Failed-breakout invalidation (#2084 Finding 1)                       *)
+(* ------------------------------------------------------------------ *)
+
+(** A clean Stage-2 breakout candidate whose breakout price and current close
+    are both controllable. Everything else is the minimal setup that clears
+    {!Stock_analysis.is_breakout_candidate}: Stage2 fresh off Stage1, Strong
+    volume, non-declining RS. *)
+let breakout_analysis ~ticker ~breakout_price ~current_close : Stock_analysis.t
+    =
+  {
+    ticker;
+    stage =
+      {
+        stage = Stage2 { weeks_advancing = 2; late = false };
+        ma_value = 90.0;
+        ma_direction = Rising;
+        ma_slope_pct = 0.05;
+        transition = None;
+        above_ma_count = 5;
+      };
+    rs =
+      Some
+        {
+          current_rs = 1.0;
+          current_normalized = 1.0;
+          trend = Positive_rising;
+          history = [];
+        };
+    volume =
+      Some
+        {
+          confirmation = Strong 2.5;
+          event_volume = 3000;
+          avg_volume = 1000.0;
+          volume_ratio = 2.5;
+        };
+    resistance = None;
+    support = None;
+    breakout_price;
+    breakdown_price = None;
+    prior_stage = Some (Stage1 { weeks_in_base = 10 });
+    continuation = None;
+    supply = None;
+    virgin_readmission = false;
+    current_close;
+    as_of_date = as_of;
+  }
+
+(** Screen a single long candidate under a given tolerance. *)
+let screen_one ~failed_breakout_tolerance_pct analysis =
+  screen
+    ~config:{ cfg with failed_breakout_tolerance_pct }
+    ~macro_trend:Bullish ~sector_map:(empty_sector_map ()) ~stocks:[ analysis ]
+    ~held_tickers:[]
+
+(* The FTH specimen from #2084: breakout at 36.93, collapse back to 28 inside
+   the base. Armed at k = 5%, the candidate is invalidated: dropped from the buy
+   list, demoted onto the watchlist with its drop reason, and counted in the
+   cascade diagnostics. *)
+let test_failed_breakout_armed_drops_candidate _ =
+  let result =
+    screen_one ~failed_breakout_tolerance_pct:0.05
+      (breakout_analysis ~ticker:"FTH" ~breakout_price:(Some 36.93)
+         ~current_close:(Some 28.0))
+  in
+  assert_that result
+    (all_of
+       [
+         field (fun (r : result) -> r.buy_candidates) is_empty;
+         field
+           (fun (r : result) ->
+             r.cascade_diagnostics.long_failed_breakout_dropped)
+           (equal_to 1);
+         field
+           (fun (r : result) -> r.cascade_diagnostics.long_breakout_admitted)
+           (equal_to 0);
+         field
+           (fun (r : result) -> List.map r.watchlist ~f:fst)
+           (elements_are [ equal_to "FTH" ]);
+         field
+           (fun (r : result) ->
+             List.exists r.watchlist ~f:(fun (_, reason) ->
+                 String.is_substring reason ~substring:"Failed breakout"))
+           (equal_to true);
+       ])
+
+(* A close that has pulled back but still sits at/above the k-threshold is
+   untouched: the breakout still stands. 36.93 * 0.95 = 35.08; 35.5 clears it. *)
+let test_failed_breakout_armed_keeps_holding_candidate _ =
+  let result =
+    screen_one ~failed_breakout_tolerance_pct:0.05
+      (breakout_analysis ~ticker:"OK" ~breakout_price:(Some 36.93)
+         ~current_close:(Some 35.5))
+  in
+  assert_that result
+    (all_of
+       [
+         field
+           (fun (r : result) ->
+             List.map r.buy_candidates ~f:(fun c -> c.ticker))
+           (elements_are [ equal_to "OK" ]);
+         field
+           (fun (r : result) ->
+             r.cascade_diagnostics.long_failed_breakout_dropped)
+           (equal_to 0);
+       ])
+
+(* Data absence is NOT evidence of a failed breakout: an unknown current close
+   must never invalidate a candidate. *)
+let test_failed_breakout_none_close_not_invalidated _ =
+  let result =
+    screen_one ~failed_breakout_tolerance_pct:0.05
+      (breakout_analysis ~ticker:"NOCLOSE" ~breakout_price:(Some 36.93)
+         ~current_close:None)
+  in
+  assert_that result
+    (all_of
+       [
+         field
+           (fun (r : result) ->
+             List.map r.buy_candidates ~f:(fun c -> c.ticker))
+           (elements_are [ equal_to "NOCLOSE" ]);
+         field
+           (fun (r : result) ->
+             r.cascade_diagnostics.long_failed_breakout_dropped)
+           (equal_to 0);
+       ])
+
+(* Same for an unknown breakout price — there is no level to have fallen below. *)
+let test_failed_breakout_none_breakout_price_not_invalidated _ =
+  let result =
+    screen_one ~failed_breakout_tolerance_pct:0.05
+      (breakout_analysis ~ticker:"NOBO" ~breakout_price:None
+         ~current_close:(Some 1.0))
+  in
+  assert_that result
+    (field
+       (fun (r : result) -> List.map r.buy_candidates ~f:(fun c -> c.ticker))
+       (elements_are [ equal_to "NOBO" ]))
+
+(* R1: at the default (0.0) the gate is inert. The very candidate that IS
+   invalidated when armed still emits, the watchlist is unchanged, and the drop
+   counter stays 0. *)
+let test_failed_breakout_default_is_inert _ =
+  let collapsed =
+    breakout_analysis ~ticker:"FTH" ~breakout_price:(Some 36.93)
+      ~current_close:(Some 28.0)
+  in
+  let result = screen_one ~failed_breakout_tolerance_pct:0.0 collapsed in
+  assert_that result
+    (all_of
+       [
+         field
+           (fun (r : result) ->
+             List.map r.buy_candidates ~f:(fun c -> c.ticker))
+           (elements_are [ equal_to "FTH" ]);
+         field
+           (fun (r : result) ->
+             r.cascade_diagnostics.long_failed_breakout_dropped)
+           (equal_to 0);
+         field (fun (r : result) -> r.watchlist) is_empty;
+       ])
+
+(* The default config really is the no-op value, and a negative value is treated
+   as disabled too (same convention as [min_price]). *)
+let test_failed_breakout_default_config_is_zero _ =
+  assert_that default_config.failed_breakout_tolerance_pct (float_equal 0.0)
+
+let test_failed_breakout_reason_disabled_at_or_below_zero _ =
+  assert_that
+    (failed_breakout_reason ~tolerance_pct:0.0 ~breakout_price:(Some 100.0)
+       ~current_close:(Some 1.0))
+    is_none
+
+(* The reason string names the level the close fell below, so the report row is
+   self-explanatory. *)
+let test_failed_breakout_reason_mentions_prices _ =
+  assert_that
+    (failed_breakout_reason ~tolerance_pct:0.05 ~breakout_price:(Some 36.93)
+       ~current_close:(Some 28.0))
+    (is_some_and
+       (matching ~msg:"reason names close and breakout"
+          (fun r ->
+            if
+              String.is_substring r ~substring:"28.00"
+              && String.is_substring r ~substring:"36.93"
+            then Some ()
+            else None)
+          (equal_to ())))
+
+(* The boolean gate is exactly the negation of "a reason exists" — they cannot
+   drift. *)
+let test_failed_breakout_boolean_agrees_with_reason _ =
+  let cases =
+    [ (Some 100.0, Some 90.0); (Some 100.0, Some 99.0); (None, Some 1.0) ]
+  in
+  assert_that
+    (List.map cases ~f:(fun (breakout_price, current_close) ->
+         Bool.equal
+           (passes_failed_breakout ~tolerance_pct:0.05 ~breakout_price
+              ~current_close)
+           (Option.is_none
+              (failed_breakout_reason ~tolerance_pct:0.05 ~breakout_price
+                 ~current_close))))
+    (elements_are [ equal_to true; equal_to true; equal_to true ])
+
+(* The knob round-trips through the config sexp, and an omitted field
+   deserialises to the 0.0 no-op — older config sexps that predate this knob
+   keep their behaviour. *)
+let test_failed_breakout_tolerance_sexp_round_trips _ =
+  let armed = { default_config with failed_breakout_tolerance_pct = 0.05 } in
+  let omitted =
+    config_of_sexp
+      (Sexp.of_string
+         (String.substr_replace_first
+            (Sexp.to_string (sexp_of_config default_config))
+            ~pattern:"(failed_breakout_tolerance_pct 0)" ~with_:""))
+  in
+  assert_that
+    ( (config_of_sexp (sexp_of_config armed)).failed_breakout_tolerance_pct,
+      omitted.failed_breakout_tolerance_pct )
+    (equal_to (0.05, 0.0))
+
 let suite =
   "screener_tests"
   >::: [
@@ -2276,6 +2500,26 @@ let suite =
          >:: test_early_stage2_max_weeks_serializes_and_round_trips;
          "test_early_stage2_max_weeks_omitted_defaults_4"
          >:: test_early_stage2_max_weeks_omitted_defaults_4;
+         "test_failed_breakout_armed_drops_candidate"
+         >:: test_failed_breakout_armed_drops_candidate;
+         "test_failed_breakout_armed_keeps_holding_candidate"
+         >:: test_failed_breakout_armed_keeps_holding_candidate;
+         "test_failed_breakout_none_close_not_invalidated"
+         >:: test_failed_breakout_none_close_not_invalidated;
+         "test_failed_breakout_none_breakout_price_not_invalidated"
+         >:: test_failed_breakout_none_breakout_price_not_invalidated;
+         "test_failed_breakout_default_is_inert"
+         >:: test_failed_breakout_default_is_inert;
+         "test_failed_breakout_default_config_is_zero"
+         >:: test_failed_breakout_default_config_is_zero;
+         "test_failed_breakout_reason_disabled_at_or_below_zero"
+         >:: test_failed_breakout_reason_disabled_at_or_below_zero;
+         "test_failed_breakout_reason_mentions_prices"
+         >:: test_failed_breakout_reason_mentions_prices;
+         "test_failed_breakout_boolean_agrees_with_reason"
+         >:: test_failed_breakout_boolean_agrees_with_reason;
+         "test_failed_breakout_tolerance_sexp_round_trips"
+         >:: test_failed_breakout_tolerance_sexp_round_trips;
        ]
 
 let () = run_test_tt_main suite

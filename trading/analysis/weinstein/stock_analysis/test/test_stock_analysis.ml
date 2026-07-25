@@ -722,6 +722,29 @@ let test_readmission_false_when_config_off _ =
     (virgin_readmission_of ~config:cfg ~sketch_opt:(Some (virgin_sketch ())))
     (equal_to false)
 
+(* ------------------------------------------------------------------ *)
+(* current_close                                                        *)
+(* ------------------------------------------------------------------ *)
+
+(* [current_close] is the offset-0 (most recent) weekly close — the anchor the
+   screener re-validates a breakout candidate against. *)
+let test_current_close_is_last_bar_close _ =
+  let bars = rising_bars ~n:40 50.0 100.0 in
+  let result =
+    analyze ~config:cfg ~ticker:"AAPL" ~bars ~benchmark_bars:[]
+      ~prior_stage:None ~as_of_date:as_of
+  in
+  assert_that result.current_close (is_some_and (float_equal 100.0))
+
+(* Empty history: no offset-0 bar, so the close is unknown rather than fabricated
+   — consumers must not read [None] as a failed breakout. *)
+let test_current_close_none_without_bars _ =
+  let result =
+    analyze ~config:cfg ~ticker:"AAPL" ~bars:[] ~benchmark_bars:[]
+      ~prior_stage:None ~as_of_date:as_of
+  in
+  assert_that result.current_close is_none
+
 let suite =
   "stock_analysis_tests"
   >::: [
@@ -783,6 +806,10 @@ let suite =
          >:: test_readmission_false_when_sketch_absent;
          "readmission false when config off"
          >:: test_readmission_false_when_config_off;
+         "current_close is the last bar close"
+         >:: test_current_close_is_last_bar_close;
+         "current_close is None without bars"
+         >:: test_current_close_none_without_bars;
        ]
 
 let () = run_test_tt_main suite

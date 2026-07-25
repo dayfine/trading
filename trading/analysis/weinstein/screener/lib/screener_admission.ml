@@ -27,24 +27,35 @@ let passes_price_floor ~min_price ~price =
   if Float.(min_price <= 0.0) then true
   else match price with Some p -> Float.(p >= min_price) | None -> false
 
-let failed_breakout_reason ~tolerance_pct ~breakout_price ~current_close =
-  (* Failed-breakout re-validation (weinstein-book-reference.md §Buy Criteria):
-     a close back below the breakout level after the breakout week means the
-     breakout failed. Disabled when [tolerance_pct <= 0.0] (the default no-op).
-     A missing breakout price or a missing close is "unknown", never evidence of
-     failure — absence of data must not invalidate a candidate. *)
+(** [Some (close, breakout, floor)] when the failed-breakout gate is armed and
+    both prices are known; [None] when the gate is disabled
+    ([tolerance_pct <= 0.0], the default no-op) or either price is unknown —
+    absence of data must never invalidate a candidate. *)
+let _failed_breakout_levels ~tolerance_pct ~breakout_price ~current_close =
   if Float.(tolerance_pct <= 0.0) then None
   else
     match (breakout_price, current_close) with
     | None, _ | _, None -> None
-    | Some bp, Some close ->
-        let floor_price = bp *. (1.0 -. tolerance_pct) in
-        if Float.(close >= floor_price) then None
-        else
-          Some
-            (Printf.sprintf
-               "Failed breakout: close %.2f below breakout %.2f - %.1f%% (%.2f)"
-               close bp (tolerance_pct *. 100.0) floor_price)
+    | Some bp, Some close -> Some (close, bp, bp *. (1.0 -. tolerance_pct))
+
+let _failed_breakout_message ~close ~breakout ~tolerance_pct ~floor_price =
+  Printf.sprintf
+    "Failed breakout: close %.2f below breakout %.2f - %.1f%% (%.2f)" close
+    breakout (tolerance_pct *. 100.0) floor_price
+
+(* Failed-breakout re-validation (weinstein-book-reference.md §Buy Criteria): a
+   close back below the breakout level after the breakout week means the
+   breakout failed. *)
+let failed_breakout_reason ~tolerance_pct ~breakout_price ~current_close =
+  match
+    _failed_breakout_levels ~tolerance_pct ~breakout_price ~current_close
+  with
+  | None -> None
+  | Some (close, breakout, floor_price) ->
+      if Float.(close >= floor_price) then None
+      else
+        Some
+          (_failed_breakout_message ~close ~breakout ~tolerance_pct ~floor_price)
 
 let passes_failed_breakout ~tolerance_pct ~breakout_price ~current_close =
   Option.is_none
