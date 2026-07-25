@@ -1,9 +1,11 @@
 # Status: screener
 
-## Last updated: 2026-07-24
+## Last updated: 2026-07-25
 
 ## Status
-MERGED
+READY_FOR_REVIEW
+
+**2026-07-25**: `feat(screener): failed-breakout invalidation, default-off (#2084 F1)` (branch `feat/screener-failed-breakout`, PR #2087 OPEN) — fixes **Finding 1 of issue #2084**: a rank-1 live BUY pick (FTH, 07-17 report) carried an entry 30%+ above market because nothing in the cascade re-validated the candidate against the *current* close. `_build_candidate` derives `suggested_entry` from `a.breakout_price`; combined with the <=4-week early-Stage-2 admission window, a name whose one-week spike to ~37 collapsed back into its 28-31 shelf stayed eligible for weeks. Adds `Screener.config.failed_breakout_tolerance_pct : float [@sexp.default 0.0]` — the knob *k*: a long candidate is invalidated iff `current_close < breakout_price *. (1. -. k)`. Requires a current close, which `Stock_analysis.t` did not carry: added `current_close : float option`, populated additively from the existing `callbacks.stage.get_close ~week_offset:0` (no new panel callback). Gate helpers live in `Screener_admission` (`failed_breakout_reason` returning the drop-reason string, `passes_failed_breakout` = `Option.is_none` of it so gate and reason cannot drift, `count_long_failed_breakouts`) — same placement precedent as `passes_price_floor`. **Drop + demote:** an invalidated candidate leaves `buy_candidates` and lands on the watchlist carrying its drop reason, and `cascade_diagnostics.long_failed_breakout_dropped` counts it, satisfying the issue's "emit the drop reason for report visibility". Weinstein authority: a close back below the breakout level after the breakout week is a failed breakout (weinstein-book-reference.md §Buy Criteria) — a **faithful dial**, a tightening of spine item 3 (entry on breakout above resistance), not a new entry condition. **R1:** `0.0` short-circuits before any price is read, so `_long_candidate`, `_long_admission`, the watchlist, and the counter (always 0) all reproduce pre-change behaviour on every input — **zero goldens move, zero backtest results change**, pinned by an explicit default-is-inert test. **R2:** reachable as `((screening_config ((failed_breakout_tolerance_pct 0.05))))` through the **real** `Overlay_validator.apply_overrides` (test present), so it is a valid `Variant_matrix` axis — same threading pattern as `min_price`. **R3:** no default flipped; promotion needs a ledger ACCEPT + confirmation grid. Two forced code-health extractions (per `code-health-discipline.md`, extract rather than bump): `Screener_watchlist.{ml,mli}` (screener.ml was at 498/500 → now 483) and `Stock_analysis_scans.{ml,mli}` (stock_analysis.ml would have hit 502/500 → now 410; verbatim move of the split-aware prior-base max-high / min-low scans). Tests: 10 new `test_screener.ml` cases + 2 `test_stock_analysis.ml` + 3 override tests. Files: `screener/lib/{screener.ml,screener.mli,screener_admission.ml,screener_admission.mli,screener_cascade_diagnostics.ml,screener_cascade_diagnostics.mli,screener_watchlist.ml,screener_watchlist.mli}`, `stock_analysis/lib/{stock_analysis.ml,stock_analysis.mli,stock_analysis_scans.ml,stock_analysis_scans.mli}`, `backtest/optimal/lib/stage_transition_scanner.ml` (one full-record `Screener.config` literal), + tests. **Finding 2 of #2084 (naive `entry * 0.92` structural stop) is explicitly out of scope** — it lives in the weekly-snapshot generator and is owned separately; the two findings do not interact (this gate decides *whether* a candidate is emitted, Finding 2 decides *what stop* an emitted candidate carries).
 
 **2026-07-24**: `feat(screener): ranked candidate mode, default-off — arm live (#1782)` (branch `feat/screener-ranked-mode`, PR OPEN) — the **live-arming + docs-reconcile** step for issue #1782. The ranked-candidate *mechanism* was already fully built and merged: `Screener.config.candidate_ranking` (`Alphabetical` default / `Quality` RS-primary / `Quality_earliness` earliness-primary / diagnostic controls) in `Screener_ranking` (#1786), the earliness-primary successor (#1793), and noise-floor control tiebreaks (#1795). Its Phase-2 evaluation is also **done**: both breadth grids **REJECT a backtest default-flip** — `2026-06-29-candidate-ranking-tiebreak-grid` (RS-primary `Quality` lowers Calmar in all 3 breadth cells, dominated in top-500) and `2026-06-30-earliness-ranking-tiebreak-grid` (`Quality_earliness` Pareto-dominated in all 3). Transferable why: **no equal-score entry-feature tiebreak adds return** — RS-primary tilts toward extended names (taxes the fat tail), earliness toward unconfirmed (taxes Sharpe more); both lose to unbiased alphabetical (third confirmation of `project_edge_is_the_fat_tail`). Backtest code default therefore **stays `Alphabetical`** (unchanged; no golden moves, no R3 promotion). This PR arms `((screening_config ((candidate_ranking Quality))))` in the live overrides **data file** `dev/weekly-picks/live-config-overrides.sexp` only — a **live-UX + Weinstein-faithful RS-selection** fix (spine item 7) for the weekly-pick generator, NOT a return lever. It resolves the #1782 artifact where the cap-20 selection was the alphabetically-first 20 grade-A breakouts and consecutive weeks' pick lists shared ~0 symbols. Verified end-to-end: the actual armed file loads through the production `Config_overrides_loader` → `Overlay_validator.apply_overrides` path against a real `Weinstein_strategy.default_config` and yields `candidate_ranking=Quality` (pre-existing `extension_stop`/`reject_declining_ma` overrides still resolve — no regression). No code/snapshot-gen change needed (path already existed; `Screener.screen ~config:config.screening_config`). Files: `dev/weekly-picks/live-config-overrides.sexp` (data), `dev/status/screener.md`. Supersedes the 2026-06-28 "Follow-up: Phase 2 WF-CV" below — that phase completed (REJECT-for-default-flip).
 
@@ -68,6 +70,24 @@ Total: 87 new tests across 9 modules, all passing.
   separate follow-up.
 
 ## Followup / Known Improvements
+
+### Failed-breakout gate: short-side mirror
+PR #2087 implements the long-side re-validation only. The symmetric short-side
+case — a candidate whose close has rebounded back *above* `breakdown_price *
+(1 + k)` is a failed breakdown — is not implemented. `Stock_analysis.t` already
+carries both `breakdown_price` and the new `current_close`, so the mirror is a
+small addition to `Screener_admission` plus threading through
+`_short_candidate` / `_short_admission`. Deferred to keep #2087 single-sided
+and reviewable.
+
+### Failed-breakout gate: arming
+`failed_breakout_tolerance_pct` ships default-off (`0.0`). Arming it needs
+(a) a WF-CV surface over `k` in ~{0.03, 0.05, 0.08} with a ledger verdict, and
+(b) for the live weekly-pick path, a decision on whether to arm it directly in
+`dev/weekly-picks/live-config-overrides.sexp` as a signal-validity fix (the
+`candidate_ranking Quality` precedent) rather than as a return lever. The live
+case is the motivating defect (#2084), so it may not need to wait on the
+backtest surface.
 
 ### Cascade post-stop-out — re-base detection
 PR #718 lands a time-based cooldown only. The findings note flags that
