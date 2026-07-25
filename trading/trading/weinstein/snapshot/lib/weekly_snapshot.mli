@@ -81,10 +81,33 @@ type candidate = {
   resistance_grade : string option;
       (** Resistance quality grade (e.g. ["A"], ["Virgin_territory"]). [None] if
           not computed. *)
+  sized_shares : int; [@sexp.default 0]
+      (** Order size for this candidate under the live portfolio, computed with
+          {!Portfolio_risk.compute_position_size} (fixed-risk sizing, min of the
+          risk-based / per-position / side-exposure / spendable-cash caps). [0]
+          when the candidate was not sized (short candidates, or [0]-share
+          results — see [sizing_note]). Additive field: old snapshots without it
+          parse as [0]. *)
+  sized_position_value : float; [@sexp.default 0.0]
+      (** Dollar notional of the sized order ([sized_shares * entry]). *)
+  sized_position_pct : float; [@sexp.default 0.0]
+      (** Sized order as a fraction of portfolio value [0.0, 1.0]. *)
+  sized_risk_amount : float; [@sexp.default 0.0]
+      (** Dollar risk to the stop if filled and stopped out
+          ([sized_shares * |entry - stop|]). *)
+  sizing_note : string option; [@sexp.default None]
+      (** [None] when the candidate was sized normally. [Some msg] carries a
+          human-readable qualifier — either the placeholder label
+          (["UNSIZED — set portfolio.sexp"], emitted when the generator had no
+          live portfolio and sized against the template default) or the reason a
+          [0]-share result occurred (cash / caps exhausted, invalid stop
+          direction). *)
 }
 [@@deriving sexp, eq, show]
 (** A single ranked candidate. Same shape for long and short candidates — the
-    list it lives in determines side. *)
+    list it lives in determines side. The [sized_*] / [sizing_note] fields are
+    populated for long candidates by the generator when it has a live portfolio;
+    they default to the unsized values so pre-sizing snapshots round-trip. *)
 
 type held_position = {
   symbol : string;  (** Ticker of the held position. *)
@@ -93,10 +116,29 @@ type held_position = {
   status : string;
       (** Status label (e.g. ["Holding"], ["Exiting"]). Stored as string — see
           [macro_context.regime] for the rationale. *)
+  shares : int; [@sexp.default 0]
+      (** Share count held. [0] for a pre-enrichment snapshot (old format). *)
+  entry_price : float; [@sexp.default 0.0]
+      (** Fill price the position was opened at. *)
+  current_price : float; [@sexp.default 0.0]
+      (** Close price as of this snapshot's date, from the same bar reader the
+          screener uses. [0.0] when not priced (old format / no bars). *)
+  unrealized_pct : float; [@sexp.default 0.0]
+      (** Unrealized return [(current_price - entry_price) / entry_price * 100],
+          long convention. [0.0] when not priced. *)
+  recommended_stop : float option; [@sexp.default None]
+      (** This week's recomputed Weinstein support-floor stop level (via
+          {!Weinstein_stops.compute_initial_stop_with_floor}), shown alongside
+          [stop] so the reader sees the delta. [None] when not recomputed (old
+          format / insufficient bars). The full trailing state machine is not
+          threaded here — that is deferred to Phase C. *)
 }
 [@@deriving sexp, eq, show]
-(** A held position carried into this Friday. Captures only what's needed for
-    the report; full position state lives in [Position.t]. *)
+(** A held position carried into this Friday. Captures what the weekly report
+    needs to render an execution-ready row (size, entry, current price,
+    unrealized %, current + recommended stop); full position state lives in
+    [Position.t]. The fields below [status] are additive and default to the
+    un-enriched values so pre-enrichment snapshots round-trip. *)
 
 type t = {
   schema_version : int;
