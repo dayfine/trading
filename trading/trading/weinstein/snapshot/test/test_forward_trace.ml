@@ -38,6 +38,11 @@ let _candidate ?(score = 0.9) ?(grade = "A+") ?(sector = "XLK")
     rationale;
     rs_vs_spy;
     resistance_grade;
+    sized_shares = 0;
+    sized_position_value = 0.0;
+    sized_position_pct = 0.0;
+    sized_risk_amount = 0.0;
+    sizing_note = None;
   }
 
 let _snapshot ~date ~candidates : Weekly_snapshot.t =
