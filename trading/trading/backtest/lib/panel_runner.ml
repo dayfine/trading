@@ -43,6 +43,23 @@ let _stale_hold_policy (config : Weinstein_strategy.config) : Stale_hold.config
     stale_exit_after_days = config.stale_exit_after_days;
   }
 
+(* Two [stop_log] recording paths, both needed (#2057): [Strategy_wrapper]
+   intercepts the strategy's own [on_market_close] result (fires only on
+   strategy-call days, before margin dedup); [Simulator.on_transitions]
+   observes the FINAL per-step transition list — the strategy's transitions
+   plus any margin-driven ones from [Margin_runner.tick], after same-tick
+   collision dedup — on EVERY step, since margin runs unconditionally
+   regardless of strategy cadence. Without the latter, margin-driven exit
+   reasons ([margin_call] / [buyin_stress] / [maintenance_reduce]) never reach
+   [stop_log] at all. [Stop_log.record_transitions] is idempotent w.r.t.
+   re-recording the same transition, so the two paths overlapping on
+   strategy-only days is harmless; on a same-tick collision the later
+   [on_transitions] call correctly overwrites the wrapper's stale
+   strategy-side trigger with the winning margin one — pinned by
+   [test_margin_exit_observability.ml:test_stop_log_records_margin_call_on_strategy_collision].
+   This is the correct outcome, not a race: [Margin_runner.dedup_strategy_exits_for_margin]
+   drops the strategy's colliding [TriggerExit] before [_apply_transitions]
+   runs, so only margin's exit actually executes. *)
 let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
     ~warmup_start ~end_date ~initial_cash ~commission ?slippage_bps
     ?on_trade_fill ?active_through_for ~strategy ~market_data_adapter () =
@@ -64,7 +81,9 @@ let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
       ~maintenance_long_pct:input.config.maintenance_long_pct
       ~exempt_closing_trades_from_cash_floor:
         input.config.portfolio_config.exempt_closing_trades_from_cash_floor
-      ?on_trade_fill ?active_through_for ()
+      ?on_trade_fill ?active_through_for
+      ~on_transitions:(Stop_log.record_transitions stop_log)
+      ()
   in
   let config =
     Simulator.

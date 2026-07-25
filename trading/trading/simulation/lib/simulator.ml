@@ -25,6 +25,8 @@ type dependencies = {
   exempt_closing_trades_from_cash_floor : bool;  (** See .mli. *)
   on_trade_fill : (Trading_base.Types.trade -> Trading_base.Types.trade) option;
   active_through_for : (string -> Core.Date.t option) option;  (** See .mli. *)
+  on_transitions : (Trading_strategy.Position.transition list -> unit) option;
+      (** See .mli. *)
 }
 
 let create_deps ~symbols ~data_dir ~strategy ~commission
@@ -35,7 +37,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(initial_long_margin_req = 1.0) ?(long_margin_rate_annual_pct = 0.0)
     ?(maintenance_long_pct = 0.0)
     ?(exempt_closing_trades_from_cash_floor = false) ?on_trade_fill
-    ?active_through_for () =
+    ?active_through_for ?on_transitions () =
   let engine_config = { Trading_engine.Types.commission; slippage_bps } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
@@ -65,6 +67,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     exempt_closing_trades_from_cash_floor;
     on_trade_fill;
     active_through_for;
+    on_transitions;
   }
 
 (* See .mli. Win #4 point-in-time pruning. *)
@@ -384,6 +387,15 @@ let _process_fills_and_cancels t ~portfolio ~positions =
   in
   Ok (portfolio, positions, trades)
 
+(* Notify the optional [on_transitions] observer with this step's final
+   transition list (the strategy's surviving transitions plus any margin-
+   driven ones from [Margin_runner.tick], post same-tick dedup). Margin runs
+   unconditionally every step regardless of strategy cadence, so this is the
+   only point in the pipeline where every transition that will actually be
+   applied is visible in one place. See issue #2057. *)
+let _notify_transitions ~on_transitions transitions =
+  Option.iter on_transitions ~f:(fun observe -> observe transitions)
+
 (** Process one day: execute pending orders, call strategy, generate new orders,
     and assemble the [step_result]. Returns the next simulator state paired with
     this day's [step_result]. *)
@@ -404,6 +416,7 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
       ~maintenance_long_pct:t.deps.maintenance_long_pct ~portfolio ~positions
       ~today_bars ~date:t.current_date ~strategy_transitions
   in
+  _notify_transitions ~on_transitions:t.deps.on_transitions transitions;
   let%bind positions = _apply_transitions ~positions ~transitions in
   let%bind orders, order_links =
     Order_generator.transitions_to_orders ~current_date:t.current_date

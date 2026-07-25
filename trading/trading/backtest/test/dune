@@ -31,7 +31,8 @@
   test_macro_trend_writer
   test_csv_snapshot_builder_cleanup
   test_fold_health
-  test_fold_health_runner)
+  test_fold_health_runner
+  test_margin_exit_observability)
  (libraries
   ounit2
   core
@@ -67,7 +68,8 @@
   weinstein.resistance
   types
   status
-  matchers)
+  matchers
+  simulation_test_helpers)
  (preprocess
   (pps ppx_sexp_conv ppx_deriving.eq ppx_deriving.show)))
 
