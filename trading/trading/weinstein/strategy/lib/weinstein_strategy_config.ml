@@ -25,6 +25,12 @@ let default_stale_exit_days = 5
    virgin/clean grade points when the continuous supply score is present. *)
 let bundle_w_overhead_supply = 30
 
+(* Default lagging dawn-label window (weeks) for [dawn_max_ma_flip_age_weeks]:
+   78 weeks ~= 1.5y per the P1b memo
+   ([dev/notes/regime-dependency-evaluation-2026-07-24.md]). Named so the sexp
+   default and the [default_config] literal share one source of truth. *)
+let default_dawn_max_flip_age_weeks = 78
+
 type index_config = { primary : string; global : (string * string) list }
 [@@deriving sexp]
 
@@ -112,6 +118,11 @@ type config = {
   overhead_supply : Resistance_supply.config option; [@sexp.default None]
       (** See [.mli]. *)
   virgin_crossing_readmission : bool; [@sexp.default false]  (** See [.mli]. *)
+  dawn_leverage_enabled : bool; [@sexp.default false]  (** See [.mli]. *)
+  dawn_initial_long_margin_req : float; [@sexp.default 1.0]  (** See [.mli]. *)
+  dawn_max_ma_flip_age_weeks : int;
+      [@sexp.default default_dawn_max_flip_age_weeks]
+      (** See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -200,6 +211,9 @@ let default_config ~universe ~index_symbol =
     resistance_lookback_bars = 0;
     overhead_supply = Some Resistance_supply.default_config;
     virgin_crossing_readmission = true;
+    dawn_leverage_enabled = false;
+    dawn_initial_long_margin_req = 1.0;
+    dawn_max_ma_flip_age_weeks = default_dawn_max_flip_age_weeks;
   }
 
 let name = "Weinstein"
