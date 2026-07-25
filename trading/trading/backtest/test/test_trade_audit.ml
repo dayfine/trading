@@ -5,12 +5,18 @@
     - collector accumulates correctly across record_entry / record_exit
     - exits are dropped when no matching entry was recorded
     - get_audit_records returns position-id-sorted output
-    - empty collector returns [] *)
+    - empty collector returns []
+    - [record_transitions] (issue #2076): reason-only [external_exit] capture
+      for [TriggerExit]s that never go through the strategy's own [record_exit]
+      path (margin exits, and other [StrategySignal] exits) — enriched [exit_]
+      always wins, no-entry transitions are dropped, and only [TriggerExit] (not
+      [TriggerPartialExit]) is handled. *)
 
 open OUnit2
 open Core
 open Matchers
 module TA = Backtest.Trade_audit
+module Position = Trading_strategy.Position
 
 (* Builders --------------------------------------------------------------- *)
 
@@ -126,6 +132,22 @@ let _alt ~symbol ~score ~grade ~reason
     score_components;
   }
 
+(** A [TriggerExit] transition carrying a [StrategySignal] exit reason — what
+    margin exits ([margin_call] / [buyin_stress] / [maintenance_reduce]) and the
+    other externally-generated [StrategySignal] exits ([stage3_force_exit],
+    [laggard_rotation], ...) look like on the [Position.transition] list
+    [record_transitions] observes. *)
+let _strategy_signal_trigger_exit ?(position_id = "AAPL-wein-1")
+    ?(date = _date "2024-04-20") ?(label = "margin_call") ?(detail = None)
+    ?(exit_price = 137.20) () : Position.transition =
+  {
+    position_id;
+    date;
+    kind =
+      Position.TriggerExit
+        { exit_reason = Position.StrategySignal { label; detail }; exit_price };
+  }
+
 (* Sexp round-trip ------------------------------------------------------- *)
 
 let test_skip_reason_sexp_round_trip _ =
@@ -189,6 +211,22 @@ let test_exit_decision_sexp_round_trip _ =
   let exit_ = make_exit () in
   let parsed = TA.exit_decision_of_sexp (TA.sexp_of_exit_decision exit_) in
   assert_that parsed (equal_to exit_)
+
+let test_external_exit_decision_sexp_round_trip _ =
+  let ext : TA.external_exit_decision =
+    {
+      symbol = "AAPL";
+      exit_date = _date "2024-04-20";
+      position_id = "AAPL-wein-1";
+      exit_trigger =
+        Backtest.Stop_log.Strategy_signal
+          { label = "margin_call"; detail = Some "avg_cost=50.00" };
+    }
+  in
+  let parsed =
+    TA.external_exit_decision_of_sexp (TA.sexp_of_external_exit_decision ext)
+  in
+  assert_that parsed (equal_to ext)
 
 let test_audit_record_sexp_round_trip _ =
   let record : TA.audit_record =
@@ -260,6 +298,116 @@ let test_record_exit_without_entry_is_dropped _ =
   let t = TA.create () in
   TA.record_exit t (make_exit ~position_id:"ORPHAN-1" ());
   assert_that (TA.get_audit_records t) is_empty
+
+(* record_transitions (#2076) --------------------------------------------- *)
+
+let _external_exit_of t ~position_id =
+  TA.get_audit_records t
+  |> List.find ~f:(fun (r : TA.audit_record) ->
+      String.equal r.entry.position_id position_id)
+  |> Option.bind ~f:(fun (r : TA.audit_record) -> r.external_exit)
+
+let test_record_transitions_captures_margin_call_as_external_exit _ =
+  let t = TA.create () in
+  TA.record_entry t (make_entry ());
+  TA.record_transitions t
+    [
+      _strategy_signal_trigger_exit ~label:"margin_call"
+        ~detail:(Some "avg_cost=50.00") ~date:(_date "2024-05-01")
+        ~exit_price:65.0 ();
+    ];
+  assert_that
+    (_external_exit_of t ~position_id:"AAPL-wein-1")
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (e : TA.external_exit_decision) -> e.symbol)
+              (equal_to "AAPL");
+            field
+              (fun (e : TA.external_exit_decision) -> e.exit_date)
+              (equal_to (_date "2024-05-01"));
+            field
+              (fun (e : TA.external_exit_decision) -> e.position_id)
+              (equal_to "AAPL-wein-1");
+            field
+              (fun (e : TA.external_exit_decision) -> e.exit_trigger)
+              (equal_to
+                 (Backtest.Stop_log.Strategy_signal
+                    { label = "margin_call"; detail = Some "avg_cost=50.00" }));
+          ]));
+  (* No enriched exit_ was ever recorded — this position's exit is
+     reason-only. *)
+  assert_that (TA.get_audit_records t)
+    (elements_are [ field (fun (r : TA.audit_record) -> r.exit_) is_none ])
+
+(* Extra credit (#2076): the SAME generic path also fixes the other
+   [StrategySignal] exit sources that never routed through
+   [Weinstein_strategy.Exit_audit_capture] — no per-label special-casing was
+   needed to cover [stage3_force_exit] alongside [margin_call]. *)
+let test_record_transitions_captures_any_strategy_signal_label _ =
+  let t = TA.create () in
+  TA.record_entry t (make_entry ());
+  TA.record_transitions t
+    [ _strategy_signal_trigger_exit ~label:"stage3_force_exit" ~detail:None () ];
+  assert_that
+    (_external_exit_of t ~position_id:"AAPL-wein-1")
+    (is_some_and
+       (field
+          (fun (e : TA.external_exit_decision) -> e.exit_trigger)
+          (equal_to
+             (Backtest.Stop_log.Strategy_signal
+                { label = "stage3_force_exit"; detail = None }))))
+
+let test_record_transitions_enriched_exit_wins_no_overwrite _ =
+  let t = TA.create () in
+  let enriched_exit = make_exit () in
+  TA.record_entry t (make_entry ());
+  TA.record_exit t enriched_exit;
+  (* A same-position TriggerExit arriving afterwards (as [on_transitions]
+     would, one step later than the strategy's own enriched-path recording)
+     must NOT touch [exit_] or populate [external_exit] — enriched always
+     wins. *)
+  TA.record_transitions t [ _strategy_signal_trigger_exit () ];
+  assert_that (TA.get_audit_records t)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (r : TA.audit_record) -> r.exit_)
+               (is_some_and (equal_to enriched_exit));
+             field (fun (r : TA.audit_record) -> r.external_exit) is_none;
+           ];
+       ])
+
+let test_record_transitions_without_entry_is_dropped _ =
+  let t = TA.create () in
+  TA.record_transitions t
+    [ _strategy_signal_trigger_exit ~position_id:"ORPHAN-1" () ];
+  assert_that (TA.get_audit_records t) is_empty
+
+let test_record_transitions_ignores_non_trigger_exit_kinds _ =
+  let t = TA.create () in
+  TA.record_entry t (make_entry ());
+  let update_risk_params : Position.transition =
+    {
+      position_id = "AAPL-wein-1";
+      date = _date "2024-04-20";
+      kind =
+        Position.UpdateRiskParams
+          {
+            new_risk_params =
+              {
+                stop_loss_price = Some 145.0;
+                take_profit_price = None;
+                max_hold_days = None;
+              };
+          };
+    }
+  in
+  TA.record_transitions t [ update_risk_params ];
+  assert_that (_external_exit_of t ~position_id:"AAPL-wein-1") is_none
 
 let test_record_entry_overwrites_same_position_id _ =
   let t = TA.create () in
@@ -410,6 +558,8 @@ let suite =
          "entry_decision sexp round-trip"
          >:: test_entry_decision_sexp_round_trip;
          "exit_decision sexp round-trip" >:: test_exit_decision_sexp_round_trip;
+         "external_exit_decision sexp round-trip"
+         >:: test_external_exit_decision_sexp_round_trip;
          "audit_record sexp round-trip" >:: test_audit_record_sexp_round_trip;
          "audit_records list sexp round-trip"
          >:: test_audit_records_sexp_round_trip_through_top_level_codec;
@@ -419,6 +569,16 @@ let suite =
          >:: test_record_exit_attaches_to_existing_entry;
          "record_exit without entry is dropped"
          >:: test_record_exit_without_entry_is_dropped;
+         "record_transitions captures margin_call as external_exit"
+         >:: test_record_transitions_captures_margin_call_as_external_exit;
+         "record_transitions captures any StrategySignal label"
+         >:: test_record_transitions_captures_any_strategy_signal_label;
+         "record_transitions: enriched exit wins, no overwrite"
+         >:: test_record_transitions_enriched_exit_wins_no_overwrite;
+         "record_transitions without entry is dropped"
+         >:: test_record_transitions_without_entry_is_dropped;
+         "record_transitions ignores non-TriggerExit transition kinds"
+         >:: test_record_transitions_ignores_non_trigger_exit_kinds;
          "record_entry overwrites same position_id"
          >:: test_record_entry_overwrites_same_position_id;
          "get_audit_records sorts by position_id"
