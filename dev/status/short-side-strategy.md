@@ -1,6 +1,6 @@
 # Status: short-side-strategy
 
-## Last updated: 2026-07-24
+## Last updated: 2026-07-26
 
 ## Status
 IN_PROGRESS
@@ -44,6 +44,31 @@ out of scope, interacts with the accepted trade-realism finding.
 - `Short_borrow_gate.apply` now takes `~liquidity_config` instead of
   `~lookback_days` so borrow supply is measured on the same basis as the entry
   gate (an inconsistency here would be a latent bug once either is armed).
+
+**QC rework iteration 1 (2026-07-26).** qc-behavioral NEEDS_REWORK on #2081 with
+one finding (CP1): the consumer rewiring was documented in three `.mli` files but
+pinned by no test — `Mean` is the default and bit-identical to the old code, so
+reverting `~aggregation:` in any one consumer was invisible to the whole suite.
+That also left R2 only half-pinned (the axis parsed into the config, but nothing
+showed it changed a decision). Added a **consumer-level discriminating test at
+each of the three seams**, each asserting the same bars + same threshold give
+opposite outcomes under `Mean` vs `Median`:
+
+- `Entry_liquidity_gate.apply` — the #2060 60-bar LINK spoof through a real
+  `Bar_reader`: candidate KEPT under `Mean` ($1,007,500), DROPPED under `Median`
+  ($250k). This is the PR's headline behavioural claim and the R2 pin.
+- `Short_borrow_gate.apply` — pins the "same basis as the entry gate" contract
+  that justified taking the whole `Liquidity_config.t`.
+- `Liquidity_exit_runner.update` — spoofed holding survives under `Mean`, fires
+  `liquidity_exit` under `Median`.
+
+Each was mutation-verified: de-threading `~aggregation:`/`~trim_pct:` in the
+consumer under test turns exactly that test red. Test-only change plus a two-line
+re-export of `Entry_liquidity_gate` from `weinstein_strategy.ml{,i}` (the module
+was not reachable from the wrapped library's alias file, so no test could call
+it; same precedent as the existing `Short_borrow_gate` export). No
+implementation logic, default, or config value changed — `Mean` remains the
+default and remains bit-identical.
 
 **Next step (not this PR):** run the `adv_aggregation` × `adv_trim_pct` surface
 under WF-CV on the deep top-3000 window, with the estimand caveat from

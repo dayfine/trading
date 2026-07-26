@@ -11,7 +11,10 @@
       fires at the close.
     - Both sides (long AND short) are eligible — illiquidity is untradeable
       regardless of direction.
-    - Off-cadence (non-screening-day) and skip-list collisions are no-ops. *)
+    - Off-cadence (non-screening-day) and skip-list collisions are no-ops.
+    - The runner measures dollar-ADV on the basis carried by
+      {!Liquidity_config}: the same spoofed holding survives under [Mean] and
+      fires under [Median]. *)
 
 open OUnit2
 open Core
@@ -397,6 +400,82 @@ let test_stage3_force_exit_position_skipped_by_liquidity_exit _ =
   in
   assert_that exits_for_pos (equal_to 1)
 
+(* ------------------------------------------------------------------ *)
+(* Consumer-level: the runner measures on the config's aggregation      *)
+(*                                                                      *)
+(* A held name that is near-dead ($100/day) except for one block print   *)
+(* ($10M) inside the 5-bar window. Under [Mean] the reading is           *)
+(* $2,000,080 — above the $1M hold floor, so the position survives.      *)
+(* Under [Median] it is the honest $100 and the liquidity exit fires.    *)
+(* Only [adv_aggregation] differs between the two runs, so de-threading  *)
+(* it from the runner turns the second assertion red.                    *)
+(* ------------------------------------------------------------------ *)
+
+let _spoof_close = 10.0
+let _spoof_honest_volume = 10 (* 10 shares x $10 = $100/day *)
+let _spoof_block_volume = 1_000_000 (* one $10M block print *)
+
+let _spoof_bars_for ticker =
+  [
+    ( ticker,
+      [
+        make_bar "2024-03-25" ~close:_spoof_close ~volume:_spoof_honest_volume;
+        make_bar "2024-03-26" ~close:_spoof_close ~volume:_spoof_honest_volume;
+        make_bar "2024-03-27" ~close:_spoof_close ~volume:_spoof_block_volume;
+        make_bar "2024-03-28" ~close:_spoof_close ~volume:_spoof_honest_volume;
+        make_bar "2024-03-29" ~close:_spoof_close ~volume:_spoof_honest_volume;
+      ] );
+  ]
+
+let _run_spoofed_holding aggregation =
+  let ticker = "SPOOF" in
+  let pos = make_holding_pos ticker _spoof_close _friday in
+  let positions = String.Map.singleton ticker pos in
+  let bars = _spoof_bars_for ticker in
+  let bar_reader = Bar_reader.of_in_memory_bars bars in
+  let config = { _armed_config with adv_aggregation = aggregation } in
+  run ~config ~positions ~bar_reader
+    ~get_price:
+      (get_price_of
+         [
+           ( ticker,
+             make_bar "2024-03-29" ~close:_spoof_close
+               ~volume:_spoof_honest_volume );
+         ])
+    ~current_date:_friday ()
+
+(** [Mean] is spoofed above the hold floor: the position is left alone. *)
+let test_spoofed_holding_survives_under_mean _ =
+  assert_that (_run_spoofed_holding Liquidity_metric.Mean) (elements_are [])
+
+(** [Median] reads the honest $100/day: the liquidity exit fires. *)
+let test_spoofed_holding_exits_under_median _ =
+  assert_that
+    (_run_spoofed_holding Liquidity_metric.Median)
+    (elements_are
+       [
+         field
+           (fun (t : Trading_strategy.Position.transition) -> t.kind)
+           (matching ~msg:"Expected TriggerExit with liquidity_exit label"
+              (function
+                | Trading_strategy.Position.TriggerExit
+                    {
+                      exit_reason =
+                        Trading_strategy.Position.StrategySignal
+                          { label; detail };
+                      _;
+                    } ->
+                    Some (label, detail)
+                | _ -> None)
+              (all_of
+                 [
+                   field (fun (l, _) -> l) (equal_to "liquidity_exit");
+                   field
+                     (fun (_, d) -> d)
+                     (is_some_and (equal_to "dollar_adv=100.0"));
+                 ]));
+       ])
+
 let () =
   run_test_tt_main
     ("liquidity_exit_runner"
@@ -410,4 +489,8 @@ let () =
            >:: test_force_liq_position_skipped_by_liquidity_exit;
            "stage3 force-exit position skipped by liquidity exit"
            >:: test_stage3_force_exit_position_skipped_by_liquidity_exit;
+           "spoofed holding survives under Mean"
+           >:: test_spoofed_holding_survives_under_mean;
+           "spoofed holding exits under Median"
+           >:: test_spoofed_holding_exits_under_median;
          ])

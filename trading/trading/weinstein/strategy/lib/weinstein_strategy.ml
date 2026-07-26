@@ -23,6 +23,7 @@ module Liquidity_config = Liquidity_config
 module Scale_in_detector = Scale_in_detector
 module Scale_in_runner = Scale_in_runner
 module Liquidity_metric = Liquidity_metric
+module Entry_liquidity_gate = Entry_liquidity_gate
 module Liquidity_exit_runner = Liquidity_exit_runner
 module Extension_stop_runner = Extension_stop_runner
 module Stage3_force_exit = Stage3_force_exit
