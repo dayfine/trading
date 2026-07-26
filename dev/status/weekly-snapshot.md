@@ -49,7 +49,7 @@ both halves of its own semantics — `Spike_bar_gate.flag_candidates` (flag a
 candidate list) and `Sparse_tail_gate.partition` (split tickers into eligible +
 warnings, a pure code move) — and the held-book enrichment moved verbatim into
 a new `Held_position_row` module (`enrich` / `long_market_value`; it concerns
-the held book, not the screener cascade). Generator 299 -> 258 lines, so the
+the held book, not the screener cascade). Generator 299 -> 261 lines, so the
 file has real headroom again. No behaviour change in either move; all
 dune-wired linters green (file-length, nesting, fn-length, mli-coverage,
 magic-numbers, fmt).
@@ -57,15 +57,19 @@ magic-numbers, fmt).
 Tests: `test_spike_bar_gate.ml` (12 unit tests — disabled/negative no-op, +58%
 SNSE-shaped spike, quiet bar, downward spike reporting the absolute move,
 inclusive threshold boundary, gapped series comparing the prior *resident* bar,
-<2 bars, no bars, zero prior close, both `warning` branches); 4 new
+<2 bars, no bars, zero prior close, both `warning` branches); 6 new
 generator-level tests pinned at the **`generate` seam** (default-config
 disabled; disabled run bit-identical on a spiked fixture; armed+spike flags AND
-keeps the candidate + warns; armed on a quiet dense fixture stays clean); 2
-renderer tests (marker + footnote present / absent); `test_round_trip` pins the
-additive-field back-compat default. Five mutations run, each turning **exactly
-one** new test red: (A) call site bypassed, (B) `~threshold_pct:0.0`, (C) drop
-instead of flag, (D) `_symbol_cell` marker removed, (E) footnote legend
-removed. `dune build @fmt` + `dune build` exit 0. Full `dune runtest` exits 1
+keeps the candidate + warns; armed on a quiet dense fixture stays clean; the
+**short**-side flag+keep+warn on a spiked `SHRT` fixture; and a two-candidate
+list where only one spikes, pinning same-length/same-order plus the non-spiking
+row byte-identical to its disabled-run self); 2 renderer tests (marker +
+footnote present / absent); `test_round_trip` pins the additive-field
+back-compat default. Six mutations run, each turning **exactly one** new test
+red: (A) long call site bypassed, (B) `~threshold_pct:0.0`, (C) drop instead of
+flag, (D) `_symbol_cell` marker removed, (E) footnote legend removed, (F) the
+SHORT call site bypassed (`let shorts, short_warnings = (shorts, [])`) — (F)
+fails only the new short-side seam test (QC rework 1). `dune build @fmt` + `dune build` exit 0. Full `dune runtest` exits 1
 ONLY on the pre-existing `Tuner.Bayesian_opt` LAPACKE GP-Cholesky failures
 (`Failure("LAPACKE: 9")` in `bayesian_opt_cholesky.ml`; maintainer-owned fix PR
 #2009, stalled since 07-19) — unrelated to this diff, which touches no tuner
