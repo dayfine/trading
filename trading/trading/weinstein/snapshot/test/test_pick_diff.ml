@@ -28,6 +28,7 @@ let _candidate ?(score = 0.5) ?(grade = "B") ?(entry = 100.0) ?(stop = 90.0)
     sized_position_pct = 0.0;
     sized_risk_amount = 0.0;
     sizing_note = None;
+    stop_is_structural = false;
   }
 
 let _snapshot ?(system_version = "v1") ?(date = _common_date)

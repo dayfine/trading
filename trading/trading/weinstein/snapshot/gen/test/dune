@@ -16,6 +16,8 @@
   matchers
   status
   types
+  trading.base
+  weinstein_trading.stops
   weinstein.types
   weinstein.resistance
   weinstein.data_source

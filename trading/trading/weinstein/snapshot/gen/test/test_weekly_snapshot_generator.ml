@@ -372,6 +372,81 @@ let test_breakout_stop_below_entry _ =
   in
   assert_that entry_minus_stop (is_some_and (gt (module Float_ord) 0.0))
 
+(* Issue #2084 Finding 2: on the default breakout fixture, AAPL's basing noise
+   (+/-2%, [_breakout_basing_noise] in [Synthetic_source]) never reaches the
+   8% [min_correction_pct] threshold, so no qualifying support floor exists in
+   the daily lookback window -> the generator's overlay falls back. But that
+   fallback value is NOT the screener's raw fixed-8% proxy
+   ([entry * (1 - 0.08)] = [entry * 0.92]) -- it is
+   [Weinstein_stops.compute_initial_stop_with_floor]'s OWN fallback formula
+   ([entry * initial_stop_buffer], then the state machine's
+   [min_correction_pct / 2] haircut and round-number nudge), using the SAME
+   config the live strategy's real entry path applies. This pins that the
+   generator's overlay actually ran, not a no-op pass-through of
+   [Screener.scored_candidate.suggested_stop].
+
+   Mutation check: removing the [_overlay_structural_stop] call from
+   [generate] (or replacing it with [Fn.id]) makes [c.stop] equal exactly
+   [c.entry *. 0.92] and [is_structural_and_stop_diverges] below goes red. *)
+let test_fallback_stop_differs_from_screener_flat_proxy _ =
+  let snap =
+    _generate ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  let aapl =
+    List.find (snap : Weekly_snapshot.t).long_candidates
+      ~f:(fun (c : Weekly_snapshot.candidate) -> String.equal c.symbol "AAPL")
+  in
+  assert_that aapl
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (c : Weekly_snapshot.candidate) -> c.stop_is_structural)
+              (equal_to false);
+            field
+              (fun (c : Weekly_snapshot.candidate) ->
+                Float.abs ((c.stop -. (c.entry *. 0.92)) /. c.entry))
+              (gt (module Float_ord) 0.01);
+          ]))
+
+(* Issue #2084 Finding 2 (sizing consequence): [sized_risk_amount] must be
+   computed from the DISPLAYED (post-overlay) stop, not the screener's
+   pre-overlay proxy. If a wiring-order bug applied sizing BEFORE the overlay
+   (or overlaid AFTER sizing ran), [sized_risk_amount] would reflect a
+   DIFFERENT stop distance than the one [c.stop] displays, and this equality
+   would fail.
+
+   Mutation check: swap the [|>] pipe order in [generate] so
+   [_size_long] runs before [_overlay_structural_stop] -- [sized_risk_amount]
+   is then computed from the screener's pre-overlay [suggested_stop], while
+   [c.stop] displays the post-overlay value; the two diverge and this test
+   goes red. *)
+let test_sizing_uses_overlaid_stop_distance _ =
+  let snap =
+    _generate ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  let aapl =
+    List.find (snap : Weekly_snapshot.t).long_candidates
+      ~f:(fun (c : Weekly_snapshot.candidate) -> String.equal c.symbol "AAPL")
+  in
+  assert_that aapl
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (c : Weekly_snapshot.candidate) -> c.sized_shares)
+              (gt (module Int_ord) 0);
+            field
+              (fun (c : Weekly_snapshot.candidate) ->
+                Float.abs
+                  (c.sized_risk_amount
+                  -. Float.of_int c.sized_shares
+                     *. Float.abs (c.entry -. c.stop)))
+              (float_equal ~epsilon:0.01 0.0);
+          ]))
+
 (* Regression for the prior_stage-chaining fix. The SAME breakout AAPL, screened
    ~6 weeks later (2022-10-07) is Stage2 w6 under the corrected chained
    classification, so the <=4-week early-breakout gate rightly rejects it — it is
@@ -652,6 +727,10 @@ let suite =
          "breakout AAPL is a long candidate" >:: test_breakout_is_long_candidate;
          "breakout long stop sits below entry"
          >:: test_breakout_stop_below_entry;
+         "fallback stop differs from the screener's flat 8% proxy"
+         >:: test_fallback_stop_differs_from_screener_flat_proxy;
+         "sizing uses the overlaid (post-structural-stop) distance"
+         >:: test_sizing_uses_overlaid_stop_distance;
          "stale (w>4) breakout is not admitted"
          >:: test_stale_breakout_not_admitted;
          "macro context is present and well-formed"

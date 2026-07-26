@@ -34,6 +34,7 @@ let _full_snapshot : Weekly_snapshot.t =
           sized_position_pct = 0.025;
           sized_risk_amount = 179.65;
           sizing_note = None;
+          stop_is_structural = true;
         };
         {
           symbol = "MSFT";
@@ -50,6 +51,7 @@ let _full_snapshot : Weekly_snapshot.t =
           sized_position_pct = 0.0;
           sized_risk_amount = 0.0;
           sizing_note = Some "0 sh — cash / caps exhausted";
+          stop_is_structural = true;
         };
       ];
     short_candidates = [];
@@ -199,6 +201,7 @@ let test_risk_pct_formatting _ =
             sized_position_pct = 0.0;
             sized_risk_amount = 0.0;
             sizing_note = None;
+            stop_is_structural = true;
           };
         ];
     }
@@ -233,6 +236,7 @@ let test_resistance_grade_column_rendered _ =
             sized_position_pct = 0.0;
             sized_risk_amount = 0.0;
             sizing_note = None;
+            stop_is_structural = true;
           };
         ];
     }
@@ -249,10 +253,13 @@ let test_resistance_grade_column_rendered _ =
            (_has_substring "Weinstein_types.");
        ])
 
-(* Candidate builder with the sizing fields exposed as optional params. *)
+(* Candidate builder with the sizing fields exposed as optional params.
+   [stop_is_structural] defaults to [true] (unmarked Stop cell) so the
+   existing instruction-cell tests, which don't care about the stop-source
+   marker, keep pinning a plain "$90.00" with no trailing asterisk. *)
 let _sized_cand ?(sized_shares = 0) ?(sized_position_value = 0.0)
     ?(sized_position_pct = 0.0) ?(sized_risk_amount = 0.0) ?(sizing_note = None)
-    () : Weekly_snapshot.candidate =
+    ?(stop_is_structural = true) () : Weekly_snapshot.candidate =
   {
     symbol = "TEST";
     score = 0.5;
@@ -268,6 +275,7 @@ let _sized_cand ?(sized_shares = 0) ?(sized_position_value = 0.0)
     sized_position_pct;
     sized_risk_amount;
     sizing_note;
+    stop_is_structural;
   }
 
 let test_instruction_cell_rendered _ =
@@ -348,6 +356,7 @@ let _long_snap ~n ~score_of =
       sized_position_pct = 0.0;
       sized_risk_amount = 0.0;
       sizing_note = None;
+      stop_is_structural = true;
     }
   in
   { _empty_snapshot with long_candidates = List.init n ~f:(fun i -> make_c i) }
@@ -402,6 +411,37 @@ let test_long_limit_override _ =
          _has_substring "_9 lower-scored candidates not shown._";
        ])
 
+(* Issue #2084 Finding 2: a fallback (non-structural) stop is marked with a
+   trailing asterisk in the Stop cell, and the table gains an explanatory
+   footnote below it. *)
+let test_fallback_stop_marked_with_asterisk_and_note _ =
+  let snap =
+    {
+      _empty_snapshot with
+      long_candidates = [ _sized_cand ~stop_is_structural:false () ];
+    }
+  in
+  let md = Report_renderer.render snap in
+  assert_that md
+    (all_of
+       [
+         _has_substring "| 1 | TEST | B | 0.50 | $100.00 | $90.00* | 10.0% |";
+         _has_substring "fallback stop";
+       ])
+
+(* A structural stop renders with no asterisk and no footnote — the default
+   [_sized_cand] shape (see its docstring). *)
+let test_structural_stop_has_no_asterisk_or_note _ =
+  let snap = { _empty_snapshot with long_candidates = [ _sized_cand () ] } in
+  let md = Report_renderer.render snap in
+  assert_that md
+    (all_of
+       [
+         _has_substring "| 1 | TEST | B | 0.50 | $100.00 | $90.00 | 10.0% |";
+         not_ ~msg:"no fallback-stop note when every shown stop is structural"
+           (_has_substring "fallback stop");
+       ])
+
 let suite =
   "report_renderer"
   >::: [
@@ -422,6 +462,10 @@ let suite =
          "instruction_cell_rendered" >:: test_instruction_cell_rendered;
          "zero_share_reason_rendered" >:: test_zero_share_reason_rendered;
          "unsized_placeholder_rendered" >:: test_unsized_placeholder_rendered;
+         "fallback_stop_marked_with_asterisk_and_note"
+         >:: test_fallback_stop_marked_with_asterisk_and_note;
+         "structural_stop_has_no_asterisk_or_note"
+         >:: test_structural_stop_has_no_asterisk_or_note;
          "render_is_deterministic" >:: test_render_is_deterministic;
          "long_candidates_truncated_to_default_7"
          >:: test_long_candidates_truncated_to_default_7;

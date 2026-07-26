@@ -43,6 +43,7 @@ let _candidate ?(score = 0.9) ?(grade = "A+") ?(sector = "XLK")
     sized_position_pct = 0.0;
     sized_risk_amount = 0.0;
     sizing_note = None;
+    stop_is_structural = false;
   }
 
 let _snapshot ~date ~candidates : Weekly_snapshot.t =

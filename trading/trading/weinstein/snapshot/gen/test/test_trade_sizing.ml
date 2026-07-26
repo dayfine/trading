@@ -23,6 +23,7 @@ let _candidate : Weekly_snapshot.candidate =
     sized_position_pct = 0.0;
     sized_risk_amount = 0.0;
     sizing_note = None;
+    stop_is_structural = false;
   }
 
 let _size ?(placeholder = false) ?(entry = 100.0) ?(stop = 90.0) () =
