@@ -154,3 +154,39 @@ Steps 1 and 2 are independent — can parallelize. Step 3 gates on both.
 - Local `dune runtest trading/backtest/scenarios/test/` completes under 60s on the full suite.
 - A golden-small scenario fits in <1 GB Docker memory; a golden-broad scenario fits in <6 GB.
 - Trace output shows where any future memory blow-up lives within 30 seconds of reproducing.
+
+## Appendix: `trading/trading/backtest/` subdirectory inventory
+
+This plan predates most of what now lives under `trading/trading/backtest/` —
+only steps 1-3 above (universe tiering, tracing, tiered loading) were in scope
+in 2026-04-17. The tree has since grown a couple dozen more subdirectories via
+later, separately-planned work (experiment ledger, walk-forward CV, tuner,
+trade audits, etc.). This is a **point-in-time inventory, not a living spec**:
+accurate as of main `c37a9e65` (2026-07-26); re-derive from each dir's `.mli`
+doc-comments rather than trusting this list if it looks stale.
+
+| Subdir | What it does |
+|---|---|
+| `all_eligible/` | Fixed-dollar all-eligible trade-grading diagnostic — allocates a fixed amount to every cascade-admissible Stage-2 signal, bypassing portfolio-level rejections, to measure opportunity cost. |
+| `barbell/` | Pure blend core for the deployable barbell overlay — two capital sleeves (FLOOR/ENGINE) rebalanced on a configurable cadence to a target NAV split. |
+| `bin/` | The backtest executables: `backtest_runner.exe` (CLI runner), `release_perf_report.exe` (batch-vs-batch perf comparison), `trade_audit_report_bin.exe` (per-scenario markdown/HTML audit). |
+| `cost_model/` | Cost-model overlay — per-trade commission, per-share commission, bid-ask spread, and other fill-cost components, each independently parameterized per scenario. |
+| `decision_audit/` | Per-screen decision-audit ("faithfulness lens") — reports whether any captured screener feature separates funded entries from cash-rejected near-misses. |
+| `decision_grading/` | Exit-decision grading — turns post-exit price movement into a verdict (`Premature` vs `Good_exit`) on each exit decision. |
+| `experiment_ledger/` | Append-only ledger of every backtest experiment + verdict, keyed by config-hash, so a matrix run can skip re-testing an already-rejected config. |
+| `feature_screen/` | Read-only, in-sample multivariate regression screen over the all-eligible `trades.csv`, testing whether a joint entry-selection signal survives that univariate screens missed. |
+| `fork_pool/` | Generic fork-based worker pool for CPU-bound, embarrassingly-parallel backtest jobs (walk-forward folds, Bayesian-opt evals) — sidesteps per-call heap residue in a long-lived parent process. |
+| `optimal/` | Optimal-strategy counterfactual — compares the actual run's round-trips against Constrained/Score_picked/Relaxed_macro variants and renders the comparison as markdown. |
+| `readme_toplines/` | Idempotent comment-delimited block replacement, used to regenerate README topline results mechanically without disturbing the rest of the file. |
+| `release_report/` | Release perf report — compares two batches of scenario runs (current vs. prior release-gate run) and emits a markdown report. |
+| `rolling_start/` | Rolling-start factor-decomposition lens — reads precomputed snapshot-warehouse cells and computes dispersion/convexity stats across many simulated start dates. |
+| `runner_args/` | CLI argument parsing for `backtest_runner.exe`, extracted into its own library so parsing is unit-testable independent of the executable's `main`. |
+| `snapshot_warehouse/` | Pure derivation of the snapshot-warehouse build parameters (warmup-windowed date range + complete symbol set) a scenario needs to run correctly in snapshot mode; includes `audit_bars`/twin-detector sub-libraries. |
+| `stats/` | Statistical primitives shared across the backtest tree — Deflated Sharpe Ratio (Bailey/Lopez de Prado), normal-distribution helpers. |
+| `sweep_weekly_start/` | Weekly-start sweep — for each Monday in a trailing window, runs a Buy-and-Hold simulation through `end_date` and collects the resulting return/drawdown/Sharpe dispersion. |
+| `trade_audit_html/` | Pure serializer rendering a scenario's trade-audit data into a complete, self-contained interactive HTML document. |
+| `trade_audit_report/` | Trade-audit markdown renderer — joins the per-trade decision trail with round-trip P&L records and summarizes what the strategy decided on each entry. |
+| `tuner/` | Bayesian-optimization tuner — each BO iteration drives the walk-forward CV harness once per suggestion and scores the cell. |
+| `validation/` | The 11 post-run invariant/expectation checks (V1-V11) + their driver, each a pure function over parsed rows and injected lookups. |
+| `walk_forward/` | On-disk spec + fold-gate consumed by `walk_forward_runner.exe` — the walk-forward CV harness. |
+| `warmup_gate/` | Default-off gate suppressing new position entries before the measurement `start_date`, preventing a warmup-built portfolio from leaking into the measurement window. |
