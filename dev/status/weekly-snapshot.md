@@ -41,6 +41,19 @@ Engineering data-hygiene flag, **not** a Weinstein book rule: no
 is untouched — no change to stage classification, the Stage-2-only buy rule,
 volume confirmation, entry, stop or sizing.
 
+Code health (same PR, second commit): the new wiring pushed
+`weekly_snapshot_generator.ml` past the 300-line file-length limit. Fixed by
+**extraction**, not a limit bump or an `@large-module` marker
+(`.claude/rules/code-health-discipline.md`): each #2083 gate module now owns
+both halves of its own semantics — `Spike_bar_gate.flag_candidates` (flag a
+candidate list) and `Sparse_tail_gate.partition` (split tickers into eligible +
+warnings, a pure code move) — and the held-book enrichment moved verbatim into
+a new `Held_position_row` module (`enrich` / `long_market_value`; it concerns
+the held book, not the screener cascade). Generator 299 -> 258 lines, so the
+file has real headroom again. No behaviour change in either move; all
+dune-wired linters green (file-length, nesting, fn-length, mli-coverage,
+magic-numbers, fmt).
+
 Tests: `test_spike_bar_gate.ml` (12 unit tests — disabled/negative no-op, +58%
 SNSE-shaped spike, quiet bar, downward spike reporting the absolute move,
 inclusive threshold boundary, gapped series comparing the prior *resident* bar,
@@ -52,7 +65,11 @@ renderer tests (marker + footnote present / absent); `test_round_trip` pins the
 additive-field back-compat default. Five mutations run, each turning **exactly
 one** new test red: (A) call site bypassed, (B) `~threshold_pct:0.0`, (C) drop
 instead of flag, (D) `_symbol_cell` marker removed, (E) footnote legend
-removed. `dune build @fmt` / `dune build` / `dune runtest` all exit 0.
+removed. `dune build @fmt` + `dune build` exit 0. Full `dune runtest` exits 1
+ONLY on the pre-existing `Tuner.Bayesian_opt` LAPACKE GP-Cholesky failures
+(`Failure("LAPACKE: 9")` in `bayesian_opt_cholesky.ml`; maintainer-owned fix PR
+#2009, stalled since 07-19) — unrelated to this diff, which touches no tuner
+code. Every weinstein/snapshot test and every dune-wired linter is green.
 
 **2026-07-26 (structural stop for weekly-pick candidates, issue #2084 Finding
 2, PR `feat/screener-structural-stop`):** Fixes the second finding from the
