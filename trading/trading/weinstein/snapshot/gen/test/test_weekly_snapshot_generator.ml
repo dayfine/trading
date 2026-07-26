@@ -716,9 +716,87 @@ let test_empty_universe_no_candidates _ =
            (equal_to _system_version);
        ])
 
+(* Minimal candidate literal for direct {!Stop_recompute.for_candidate} tests.
+   [stop] is deliberately seeded LONG-shaped (below entry) so a short-side
+   overlay that forgot the side would leave a below-entry stop behind. *)
+let _mk_candidate ~symbol ~entry ~stop : Weekly_snapshot.candidate =
+  {
+    symbol;
+    score = 85.0;
+    grade = "A";
+    entry;
+    stop;
+    sector = "Test";
+    rationale = "test";
+    rs_vs_spy = None;
+    resistance_grade = None;
+    sized_shares = 0;
+    sized_position_value = 0.0;
+    sized_position_pct = 0.0;
+    sized_risk_amount = 0.0;
+    sizing_note = None;
+    stop_is_structural = false;
+  }
+
+let _stops_cfg () =
+  let cfg =
+    Weinstein_strategy.default_config ~universe:[ "SHRT" ]
+      ~index_symbol:_index_symbol
+  in
+  (cfg.stops_config, cfg.initial_stop_buffer)
+
+(* CP1 / L1-short: the short-side overlay places the recomputed stop ABOVE
+   entry — the book's symmetric rule (stop above the prior rally high for
+   shorts). The seeded long-shaped stop (below entry) must not survive; a
+   side-mixup in the overlay would leave it below. *)
+let test_short_candidate_stop_recomputed_above_entry _ =
+  let stops_config, initial_stop_buffer = _stops_cfg () in
+  let bars = _bars_for ~syn_config:_bearish_syn_config _index_symbol in
+  let bar_reader = Bar_reader.of_in_memory_bars [ ("SHRT", bars) ] in
+  let entry =
+    List.last bars
+    |> Option.value_map ~default:100.0 ~f:(fun (b : Types.Daily_price.t) ->
+        b.close_price)
+  in
+  let c =
+    Weinstein_snapshot_gen.Stop_recompute.for_candidate ~stops_config
+      ~initial_stop_buffer ~bar_reader ~as_of:_as_of
+      ~side:Trading_base.Types.Short
+      (_mk_candidate ~symbol:"SHRT" ~entry ~stop:(entry *. 0.92))
+  in
+  assert_that c
+    (field
+       (fun (c : Weekly_snapshot.candidate) -> c.stop)
+       (gt (module Float_ord) entry))
+
+(* CP4: [for_candidate]'s documented "no resident daily bars -> candidate
+   returned unchanged" guard — [stop] and [stop_is_structural] untouched. *)
+let test_candidate_without_bars_unchanged _ =
+  let stops_config, initial_stop_buffer = _stops_cfg () in
+  let c =
+    Weinstein_snapshot_gen.Stop_recompute.for_candidate ~stops_config
+      ~initial_stop_buffer ~bar_reader:(Bar_reader.empty ()) ~as_of:_as_of
+      ~side:Trading_base.Types.Long
+      (_mk_candidate ~symbol:"GHOST" ~entry:50.0 ~stop:46.0)
+  in
+  assert_that c
+    (all_of
+       [
+         field
+           (fun (c : Weekly_snapshot.candidate) -> c.stop)
+           (float_equal 46.0);
+         field
+           (fun (c : Weekly_snapshot.candidate) -> c.stop_is_structural)
+           (equal_to false);
+       ])
+
 let suite =
   "weekly_snapshot_generator"
   >::: [
+         "short candidate stop recomputed above entry"
+         >:: test_short_candidate_stop_recomputed_above_entry;
+         "candidate without bars returned unchanged"
+         >:: test_candidate_without_bars_unchanged;
          "metadata stamped onto the snapshot" >:: test_metadata_stamped;
          "live portfolio populates held positions"
          >:: test_live_portfolio_populates_held;
