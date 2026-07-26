@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-26 (orchestrator run 30193812434 — 3 PRs merged (#2088, #2022, #2009), 2 feature PRs QC-APPROVED after 1 rework each and auto-merge armed (#2087, #2081). Deterministic gates on `a559c1ed`: build 0, runtest 0, status_file_integrity 0, index_size_linter 0. `[critical]`: 9 consecutive scheduled orchestrator runs failed 07-25/07-26 — see the daily summary.)
+Last updated: 2026-07-26 run2 (orchestrator run 30210792734 — #2091 auto-merged at its pre-rework tip while behavioral QC was NEEDS_REWORK; the orphaned fix was recovered onto #2094 (QC APPROVED 5/5 + 4/5, auto-merge armed). Gates on `96c4c5ff`: build 0, runtest 0, status_file_integrity 0, index_size_linter 0. `[critical]`: GitHub auto-merge bypasses the QC gates — see the daily summary.)
 
 ## Active + complete tracks
 
@@ -35,7 +35,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — |
-| [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | #2081 | #2081 robust dollar-ADV (#2060) QC-APPROVED after 1 rework, auto-merge armed; next: short-leg regime-P&L decomposition (LOCAL) |
+| [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | #2081 robust dollar-ADV (#2060) MERGED `9670e49a`; next: short-leg regime-P&L decomposition (LOCAL) |
 | [extension-stop](extension-stop.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | arming + insurance-ACCEPT MERGED (#1960, ext_stop 2.0/0.25, default-off); next: default-flip only on further insurance-ACCEPT (R3, human-gated) |
 | [decline-character](decline-character.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | All builds + A-D flip merged; arming-speed A-D-live WF-CV REJECTED (#1729 ledger 06-24); decline mechanisms stay default-off axes; exhausted (#1739) |
 | [spy-only-reference](spy-only-reference.md) | IN_PROGRESS | feat-weinstein | — | WF-CV on sector-rotation testbed; top-1000 bankability gate; long-short verification (human session) |
@@ -45,11 +45,11 @@ Each row: one line; deeper task detail in the linked status file.
 | [sector-data](sector-data.md) | MERGED | — | — | — |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | LAPACKE GP-Cholesky nugget fix MERGED (#2009); no dispatchable T1/T3 left; ci.yml ENOSPC fix (#1636) BLOCKED on human `workflow`-scoped PAT |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | Phase 1 stable (PR-D'c #1332 merged); Phase 2 deferred; no outstanding work |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | backlog refreshed from the 2026-07-20 deep scan (#2022 merged): 4 open items; next: restore `Current milestone:` line so linter-expiry can evaluate |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | #2096 | #2096 backtest/ subdir inventory (docs-only, armed); 3 open items left, 2 of them need a human-chosen value; next: eng-design-2 drift |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
-| [screener](screener.md) | IN_PROGRESS | feat-weinstein | #2087 | #2087 failed-breakout invalidation (#2084 F1, default-off) QC-APPROVED after 1 rework, auto-merge armed; next: #2084 F2 naive structural stop |
+| [screener](screener.md) | IN_PROGRESS | feat-weinstein | — | #2084 fully closed: F1 invalidation MERGED `26be1e36` (#2087), F2 structural stop MERGED `2bcf5b33` (#2091); next: none queued |
 | [simulation](simulation.md) | IN_PROGRESS | feat-backtest | — | #1847 sibling round-trip pairing fix MERGED (761c30cf); per-trade scale-in reporting now trustworthy. Next: stale-exit grid via WF-CV (data-gated) |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
@@ -57,7 +57,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
-| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | snapshot fast-input path (#1784) + corrected 5-wk picks (#1781) MERGED; next: large-warehouse multi-week sweep (data-gated); live-cycle human-gated |
+| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | #2083 F1 sparse-tail gate MERGED `96c4c5ff`; short-seam guard recovered + MERGED `a54fcebe` (#2094); next: #2083 F2 rename tracking on fetch |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
 | [tax-lens](tax-lens.md) | MERGED | feat-backtest | — | Phase 1 #2066 + CP4 loader error-path contract #2073 MERGED; Phase 2 wash-sale / April outflows deferred, user-gated (#2006) |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | asset-type blocklist MERGED (#1939, default-off); next: arm ATB.curated for live universe build + General::Type enrichment feed |
