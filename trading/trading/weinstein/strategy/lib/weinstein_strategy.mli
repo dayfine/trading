@@ -148,6 +148,13 @@ module Scale_in_runner = Scale_in_runner
 module Liquidity_metric = Liquidity_metric
 (** Pure trailing dollar-ADV metric. See {!Liquidity_metric}. *)
 
+module Entry_liquidity_gate = Entry_liquidity_gate
+(** Strategy-side adapter for the entry arm of the liquidity-realism overlay:
+    builds the dollar-ADV lookup from a {!Bar_reader} on the basis carried by
+    {!Liquidity_config}, then delegates to [Liquidity_gate.filter]. Exposed so
+    tests can pin the adapter's measurement basis end-to-end. See
+    {!Entry_liquidity_gate}. *)
+
 module Liquidity_exit_runner = Liquidity_exit_runner
 (** Held-position liquidity-degradation exit runner. Invoked among the special
     exits (alongside {!Stage3_force_exit_runner} / {!Laggard_rotation_runner})
