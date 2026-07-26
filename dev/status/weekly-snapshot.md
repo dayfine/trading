@@ -62,7 +62,7 @@ through `Screener.screen` into `result.short_candidates`. It asserts
 `stop_is_structural = true` (the first such assertion on either side — the
 prior tests only covered the fallback branch) and that the stop sits in
 `[rally_high, rally_high * 1.10]`, i.e. just above the prior counter-rally
-high per §5.1. Mutation-verified: reverting the short overlay to a bare
+high per §6.3. Mutation-verified: reverting the short overlay to a bare
 `List.map … candidate_of_scored` → red; flipping `~side:Short` to `~side:Long`
 at the same call site → red (stop lands at `63.875`, the long-side correction
 low, outside the band).

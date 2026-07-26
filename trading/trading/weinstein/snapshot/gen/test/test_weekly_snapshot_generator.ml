@@ -882,7 +882,7 @@ let test_short_candidate_stop_recomputed_above_entry _ =
      ~4% BELOW the trough instead of ~4% above the rally high — the band
      matcher fails.
 
-   Weinstein §5.1: a short's initial stop sits above the prior counter-rally
+   Weinstein §6.3: a short's initial stop sits above the prior counter-rally
    high. The band is [rally_high, rally_high * 1.10]: the primitive returns the
    rally high, [compute_initial_stop] adds [min_correction_pct / 2] (4%), and
    the round-number nudge moves it at most $0.125 further. *)
