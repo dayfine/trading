@@ -1,0 +1,17 @@
+{
+  "date": "2026-07-26",
+  "feature": "weekly-snapshot",
+  "branch": "feat/weekly-snapshot-spike-flag",
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 1
+  },
+  "consecutive_rework_count": 0,
+  "notes": "PR #2097 (#2083 F3 spike-bar data-suspect flag). 1 rework iteration. Base tip ad11fb7f: structural APPROVED 5/5, behavioral NEEDS_REWORK 3/5 (CP4 FAIL - short-side flagging at weekly_snapshot_generator.ml:220 unpinned; mutation (shorts,[]) left suite green). Rework tip 5454d9f1: both APPROVED (structural 5/5, behavioral 4/5), all 4 findings CLOSED; delta test-only, generator byte-identical (orchestrator-verified). Merged 089116bc with all 3 gates green. Carried non-blocking nit: flagged candidate's own field-invariance holds by construction, unpinned. Verdicts read from PR review comments; record_qc_audit.sh --pr-number mode unusable (gh absent in orchestrator container)."
+}
