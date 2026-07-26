@@ -1063,6 +1063,34 @@ type config = {
           [dawn_leverage_enabled = false]. R2: real config field →
           single-component [Variant_matrix] int axis
           ([((dawn_max_ma_flip_age_weeks) (values (52 78)))]). *)
+  sparse_tail_min_bars : int; [@sexp.default 0]
+      (** Sparse-tail eligibility gate (issue #2083 fix 1) — minimum number of
+          daily bars a candidate ticker must have within the trailing
+          [sparse_tail_window_trading_days] trading days ending at the
+          screener's as-of date. Engineering data-hygiene gate, {b not} a
+          Weinstein book rule: it closes a "zombie feed" hole where a
+          delisted/renamed ticker's data source keeps serving occasional stale
+          bars under the dead symbol, so the series reads current at the
+          right-hand edge (data_end = as_of) while the middle is almost empty —
+          the 2026-07-17 SNSE/FTH incident, where 6 bars over ~15 trading days
+          included one anomalous spike the screener picked up as a breakout.
+          Default [0] = gate disabled (no-op, R1): every candidate is eligible
+          regardless of tail density, bit-identical to pre-#2083-fix1 behaviour.
+          Consumed only by [Weekly_snapshot_generator.generate] via
+          [Sparse_tail_gate.check] — the backtest/live strategy path
+          ([on_market_close]) never reads this field, so arming it cannot move a
+          backtest number. Paired with [sparse_tail_window_trading_days]; both
+          must be [> 0] to activate. R2: real config field → resolves through
+          [Backtest.Overlay_validator.apply_overrides], armed today via
+          [dev/weekly-picks/live-config-overrides.sexp]. *)
+  sparse_tail_window_trading_days : int; [@sexp.default 0]
+      (** Trailing window width, in trading days per the bar reader's own
+          calendar (real holiday calendar in production; synthesized Mon-Fri
+          weekdays for tests / in-memory readers — see
+          [Bar_reader.of_snapshot_views]), that [sparse_tail_min_bars] is
+          checked against. Default [0] = gate disabled (no-op, matches
+          [sparse_tail_min_bars]'s default). See [sparse_tail_min_bars] for the
+          full rationale. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

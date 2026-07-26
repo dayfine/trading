@@ -5,7 +5,8 @@
   test_config_overrides_loader
   test_live_resistance_sketch
   test_live_portfolio
-  test_trade_sizing)
+  test_trade_sizing
+  test_sparse_tail_gate)
  (libraries
   core
   core_unix

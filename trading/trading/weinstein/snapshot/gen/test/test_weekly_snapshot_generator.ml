@@ -113,6 +113,58 @@ let _bearish_bar_reader () =
       (_index_symbol, _bars_for ~syn_config:_bearish_syn_config _index_symbol);
     ]
 
+(* Sparse-tail eligibility gate fixture helper (issue #2083 fix 1). Drops all
+   but every [stride]-th bar within the trailing [window] bars ending at (and
+   including) [as_of]'s bar, always keeping the very last (as_of) bar — whose
+   close/high are bumped, mirroring the SNSE incident's anomalous spike bar on
+   an otherwise-dead feed. The bars BEFORE the window are left fully dense, so
+   this simulates a real "long healthy history, sparse recent zombie tail"
+   series rather than a globally-thin one. Requires [as_of] to be present in
+   [bars] (the synthetic generator emits one bar per weekday). *)
+let _sparsify_tail bars ~as_of ~window ~stride : Types.Daily_price.t list =
+  match
+    List.findi bars ~f:(fun _ (b : Types.Daily_price.t) ->
+        Date.equal b.date as_of)
+  with
+  | None -> bars
+  | Some (idx, _) ->
+      let window_start = max 0 (idx - window + 1) in
+      let before = List.take bars window_start in
+      let tail =
+        List.sub bars ~pos:window_start ~len:(idx - window_start + 1)
+      in
+      let last_i = List.length tail - 1 in
+      let kept =
+        List.filteri tail ~f:(fun i _ -> i mod stride = 0 || i = last_i)
+      in
+      let spike (b : Types.Daily_price.t) =
+        {
+          b with
+          close_price = b.close_price *. 1.3;
+          adjusted_close = b.adjusted_close *. 1.3;
+          high_price = b.high_price *. 1.35;
+        }
+      in
+      let n_kept = List.length kept in
+      let spiked =
+        List.mapi kept ~f:(fun i b -> if i = n_kept - 1 then spike b else b)
+      in
+      before @ spiked
+
+(* 15-trading-day sparse tail ending at [_as_of], stride 3 -> 6 bars present in
+   the window (the "6 bars in ~15 trading days" SNSE shape), dense history
+   before it. Only AAPL's tail is sparsified; the index stays fully dense
+   (the macro gate is not this gate's concern). *)
+let _sparse_tail_bar_reader () =
+  Bar_reader.of_in_memory_bars
+    [
+      ( "AAPL",
+        _sparsify_tail
+          (_bars_for ~syn_config:_syn_config "AAPL")
+          ~as_of:_as_of ~window:15 ~stride:3 );
+      (_index_symbol, _bars_for ~syn_config:_syn_config _index_symbol);
+    ]
+
 let _inputs_at ~as_of ~bar_reader ~ticker_sectors : Generator.inputs =
   {
     config =
@@ -388,6 +440,119 @@ let test_bearish_macro_blocks_longs _ =
          field (fun (s : Weekly_snapshot.t) -> s.long_candidates) is_empty;
        ])
 
+(* ---- Sparse-tail eligibility gate (issue #2083 fix 1) ---- *)
+
+let _sparse_tail_inputs ~sparse_tail_min_bars ~sparse_tail_window_trading_days :
+    Generator.inputs =
+  let base =
+    _inputs_at ~as_of:_as_of
+      ~bar_reader:(_sparse_tail_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  {
+    base with
+    config =
+      { base.config with sparse_tail_min_bars; sparse_tail_window_trading_days };
+  }
+
+let _is_aapl_long_candidate (snap : Weekly_snapshot.t) =
+  List.count snap.long_candidates ~f:(fun (c : Weekly_snapshot.candidate) ->
+      String.equal c.symbol "AAPL")
+
+(* R1 (experiment-flag-discipline): [Weinstein_strategy.default_config] itself
+   — not just an explicit override — carries the gate disabled. This is the
+   config every caller gets unless it opts into
+   [dev/weekly-picks/live-config-overrides.sexp] or an equivalent overlay. *)
+let test_default_config_has_gate_disabled _ =
+  let inputs =
+    _inputs_at ~as_of:_as_of ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  assert_that inputs.config
+    (all_of
+       [
+         field
+           (fun (c : Weinstein_strategy.config) -> c.sparse_tail_min_bars)
+           (equal_to 0);
+         field
+           (fun (c : Weinstein_strategy.config) ->
+             c.sparse_tail_window_trading_days)
+           (equal_to 0);
+       ])
+
+(* Default (disabled, [sparse_tail_min_bars = 0] / [..window_trading_days = 0])
+   is an EXACT no-op (experiment-flag-discipline R1): on a fixture whose tail
+   is sparse enough to be dropped if the gate were armed, AAPL still surfaces
+   as a long candidate exactly as the un-sparsified breakout fixture does, and
+   no warning is emitted. *)
+let test_default_disabled_gate_is_bit_identical _ =
+  let snap =
+    Generator.generate
+      (_sparse_tail_inputs ~sparse_tail_min_bars:0
+         ~sparse_tail_window_trading_days:0)
+  in
+  assert_that snap
+    (all_of
+       [
+         field _is_aapl_long_candidate (equal_to 1);
+         field (fun (s : Weekly_snapshot.t) -> s.warnings) is_empty;
+       ])
+
+(* Armed + sparse tail: with the same fixture, arming the gate at (min_bars=10,
+   window=15) — the exact values [dev/weekly-picks/live-config-overrides.sexp]
+   uses — drops AAPL from candidate consideration and surfaces a warning
+   naming it. This is the direct regression test for issue #2083: without this
+   gate AAPL (standing in for SNSE) would have been picked off its sparse,
+   spike-laden tail. *)
+let test_armed_sparse_tail_drops_candidate_and_warns _ =
+  let snap =
+    Generator.generate
+      (_sparse_tail_inputs ~sparse_tail_min_bars:10
+         ~sparse_tail_window_trading_days:15)
+  in
+  assert_that snap
+    (all_of
+       [
+         field _is_aapl_long_candidate (equal_to 0);
+         field
+           (fun (s : Weekly_snapshot.t) -> s.warnings)
+           (elements_are
+              [
+                matching ~msg:"warning names AAPL"
+                  (fun w ->
+                    if String.is_substring w ~substring:"AAPL" then Some ()
+                    else None)
+                  (equal_to ());
+              ]);
+       ])
+
+(* Armed + DENSE tail: the same (min_bars=10, window=15) arming, but on the
+   unmodified (fully dense) breakout fixture, still retains AAPL as a long
+   candidate — proving the gate is not just dropping everything once armed. *)
+let test_armed_dense_tail_retains_candidate _ =
+  let base =
+    _inputs_at ~as_of:_as_of ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  let inputs =
+    {
+      base with
+      config =
+        {
+          base.config with
+          sparse_tail_min_bars = 10;
+          sparse_tail_window_trading_days = 15;
+        };
+    }
+  in
+  let snap = Generator.generate inputs in
+  assert_that snap
+    (all_of
+       [
+         field _is_aapl_long_candidate (equal_to 1);
+         field (fun (s : Weekly_snapshot.t) -> s.warnings) is_empty;
+       ])
+
 (* AAPL's [resistance_grade] display string from a generated snapshot. *)
 let _aapl_resistance_grade (snap : Weekly_snapshot.t) : string option =
   List.find snap.long_candidates ~f:(fun (c : Weekly_snapshot.candidate) ->
@@ -493,6 +658,14 @@ let suite =
          >:: test_macro_context_present;
          "bearish macro blocks all long candidates"
          >:: test_bearish_macro_blocks_longs;
+         "default_config has the sparse-tail gate disabled"
+         >:: test_default_config_has_gate_disabled;
+         "default (disabled) sparse-tail gate is bit-identical"
+         >:: test_default_disabled_gate_is_bit_identical;
+         "armed sparse tail drops candidate and warns"
+         >:: test_armed_sparse_tail_drops_candidate_and_warns;
+         "armed dense tail retains candidate"
+         >:: test_armed_dense_tail_retains_candidate;
          "default resistance grade shows the v2 score (armed by default)"
          >:: test_default_resistance_grade_is_v2;
          "disarmed resistance grade degrades to the v1 label"

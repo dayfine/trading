@@ -123,6 +123,8 @@ type config = {
   dawn_max_ma_flip_age_weeks : int;
       [@sexp.default default_dawn_max_flip_age_weeks]
       (** See [.mli]. *)
+  sparse_tail_min_bars : int; [@sexp.default 0]  (** See [.mli]. *)
+  sparse_tail_window_trading_days : int; [@sexp.default 0]  (** See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -214,6 +216,8 @@ let default_config ~universe ~index_symbol =
     dawn_leverage_enabled = false;
     dawn_initial_long_margin_req = 1.0;
     dawn_max_ma_flip_age_weeks = default_dawn_max_flip_age_weeks;
+    sparse_tail_min_bars = 0;
+    sparse_tail_window_trading_days = 0;
   }
 
 let name = "Weinstein"

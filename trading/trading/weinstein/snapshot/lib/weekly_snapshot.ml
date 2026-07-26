@@ -46,5 +46,6 @@ type t = {
   long_candidates : candidate list;
   short_candidates : candidate list;
   held_positions : held_position list;
+  warnings : string list; [@sexp.default []]
 }
 [@@deriving sexp, eq, show]

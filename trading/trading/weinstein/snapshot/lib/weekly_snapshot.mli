@@ -8,7 +8,9 @@
     - the set of strong / weak sectors,
     - the ranked long and short candidates (with score, grade, suggested entry,
       suggested stop, sector, rationale),
-    - the held positions that survived this Friday's update.
+    - the held positions that survived this Friday's update,
+    - data-quality warnings for any ticker dropped from consideration (e.g. a
+      sparse trailing bar series, issue #2083 fix 1).
 
     These artifacts are written under
     [dev/weekly-picks/<system-version>/<date>.sexp] and consumed by the
@@ -162,6 +164,12 @@ type t = {
       (** Ranked short candidates, score-descending. May be empty. *)
   held_positions : held_position list;
       (** Positions held into this Friday. May be empty. *)
+  warnings : string list; [@sexp.default []]
+      (** Human-readable data-quality warnings for tickers dropped from
+          candidate consideration this run (e.g. the sparse-tail eligibility
+          gate, issue #2083 fix 1 — see [Sparse_tail_gate]). One line per
+          dropped ticker; empty when no gate fired. Additive field: old
+          snapshots without it parse as [[]]. *)
 }
 [@@deriving sexp, eq, show]
 (** A complete weekly snapshot. *)

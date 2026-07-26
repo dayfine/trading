@@ -38,6 +38,20 @@
     - An empty / too-short primary index degrades the macro gate to
       {!Weinstein_types.Neutral} (both long and short candidates remain
       eligible), matching {!Weinstein_strategy.make}'s no-index behaviour.
+    - {b Sparse-tail eligibility gate} (issue #2083 fix 1, data hygiene, not a
+      Weinstein rule): a symbol whose {i current} bars are sparse — fewer than
+      [config.sparse_tail_min_bars] present among the trailing
+      [config.sparse_tail_window_trading_days] trading days ending at [as_of] —
+      is dropped from candidate consideration even though it has {e some} bars
+      (so it would otherwise pass the "too few weekly bars" check above). This
+      closes the "zombie feed" hole where a delisted/renamed ticker's data
+      source keeps serving stale bars under the dead symbol, reading current at
+      the right-hand edge while the middle is nearly empty (the 2026-07-17
+      SNSE/FTH incident). Each drop is recorded as a line in
+      {!Weekly_snapshot.t.warnings} via {!Sparse_tail_gate.warning} — the
+      candidate does not just silently vanish. Default
+      ([sparse_tail_window_trading_days = 0]) disables the gate: bit-identical
+      to pre-#2083-fix1 behaviour. See {!Sparse_tail_gate}.
 
     All bar reads route through a {!Weinstein_strategy.Bar_reader.t} so the
     weekly-aggregation + as-of slicing is bit-identical to the strategy's own.
