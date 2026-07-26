@@ -15,6 +15,11 @@ type candidate = {
   rationale : string;
   rs_vs_spy : float option;
   resistance_grade : string option;
+  sized_shares : int; [@sexp.default 0]
+  sized_position_value : float; [@sexp.default 0.0]
+  sized_position_pct : float; [@sexp.default 0.0]
+  sized_risk_amount : float; [@sexp.default 0.0]
+  sizing_note : string option; [@sexp.default None]
 }
 [@@deriving sexp, eq, show]
 
@@ -23,6 +28,11 @@ type held_position = {
   entered : Date.t;
   stop : float;
   status : string;
+  shares : int; [@sexp.default 0]
+  entry_price : float; [@sexp.default 0.0]
+  current_price : float; [@sexp.default 0.0]
+  unrealized_pct : float; [@sexp.default 0.0]
+  recommended_stop : float option; [@sexp.default None]
 }
 [@@deriving sexp, eq, show]
 

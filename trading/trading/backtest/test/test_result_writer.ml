@@ -647,7 +647,7 @@ let test_trades_csv_populates_context_from_audit_and_stop_log _ =
     _m5_2e_entry ~symbol:"AAPL" ~entry_date ~position_id:"AAPL-wein-1"
   in
   let audit : Backtest.Trade_audit.audit_record list =
-    [ { entry; exit_ = None } ]
+    [ { entry; exit_ = None; external_exit = None } ]
   in
   let stop_info : Backtest.Stop_log.stop_info =
     {
@@ -830,7 +830,10 @@ let test_retraded_symbol_keys_triggers_by_position_id _ =
       (* Reversed vs trade order — a FIFO pop would mis-assign. *)
       stop_infos = [ stop2; stop1 ];
       audit =
-        [ { entry = entry1; exit_ = None }; { entry = entry2; exit_ = None } ];
+        [
+          { entry = entry1; exit_ = None; external_exit = None };
+          { entry = entry2; exit_ = None; external_exit = None };
+        ];
       cascade_summaries = [];
       force_liquidations = [];
       stale_holds = [];

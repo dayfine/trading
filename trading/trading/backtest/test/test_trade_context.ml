@@ -79,7 +79,8 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     alternatives_considered = [];
   }
 
-let make_record ?exit_ entry : TA.audit_record = { entry; exit_ }
+let make_record ?exit_ entry : TA.audit_record =
+  { entry; exit_; external_exit = None }
 
 let make_stop_info ~position_id ~symbol
     ?(entry_date = Some (_date "2024-01-15")) ?(entry_stop = Some 138.0)

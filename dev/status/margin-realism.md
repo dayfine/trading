@@ -1,6 +1,6 @@
 # Status: margin-realism
 
-## Last updated: 2026-07-24
+## Last updated: 2026-07-25
 
 ## Status
 IN_PROGRESS
@@ -352,6 +352,26 @@ and M1b (follow-up).
     `dedup_strategy_exits_for_margin`'s documented `.mli` contract.
   - Verify: `dune runtest trading/simulation/test/test_margin_runner.ml
     trading/backtest/test/test_margin_exit_observability.ml`.
+- [x] **#2076 — `trade_audit.sexp` visibility for margin (and other
+  externally-generated) exits — fixed.** Branch
+  `feat/trade-audit-external-exits` (PR #2085). Same seam as #2057's fix
+  above (`Simulator.dependencies.on_transitions`), now also driving
+  `Trade_audit.record_transitions` (mirrors `Stop_log.record_transitions`):
+  fills in a reason-only `external_exit_decision` (`symbol`, `exit_date`,
+  `position_id`, `exit_trigger` — no macro/stage/RS, which the observer
+  cannot fabricate at this layer) on `audit_record` for any `TriggerExit`
+  whose position has no enriched `exit_` yet. Enriched always wins (safe
+  by construction — the strategy's own enriched-path recording always
+  completes before `on_transitions` fires for the same step).
+  `Panel_runner._make_simulator` composes both `Stop_log.record_transitions`
+  and `Trade_audit.record_transitions` into the single `on_transitions`
+  closure. Also fixes the pre-existing (non-margin) gap for
+  `stage3_force_exit` / `laggard_rotation` / `extension_stop` /
+  `macro_bearish_trim` for free (same generic path, no per-label
+  special-casing); `harvest_rotate` stays out of scope (it's a partial
+  trim, `TriggerPartialExit`, not a round-trip close). Full writeup:
+  `dev/status/trade-audit.md` §"Externally-generated exits (2026-07-25,
+  issue #2076)".
 - #2059 — LH phantom-short leak + duplicated trades.csv row (record basis,
   −$607k/0.85% immaterial but real).
 - #2060 — mean-ADV liquidity gate spoofable by single block-print day (LINK

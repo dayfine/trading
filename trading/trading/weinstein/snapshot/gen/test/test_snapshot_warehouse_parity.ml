@@ -94,7 +94,13 @@ let _generate ~bar_reader =
       as_of = _as_of;
       bar_reader;
       ticker_sectors = _ticker_sectors;
-      held_positions = [];
+      live_portfolio =
+        {
+          Weinstein_snapshot_gen.Live_portfolio.cash = 100_000.0;
+          as_of = _as_of;
+          positions = [];
+        };
+      portfolio_is_placeholder = true;
     }
 
 (* The same warmup the bin passes to [Snapshot_warehouse_reader.build]; the

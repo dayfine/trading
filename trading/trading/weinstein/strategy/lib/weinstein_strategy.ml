@@ -39,6 +39,7 @@ module Audit_recorder = Audit_recorder
 module Entry_audit_capture = Entry_audit_capture
 module Screening_notional = Screening_notional
 module Long_buying_power = Long_buying_power
+module Leverage_dawn = Leverage_dawn
 module Short_borrow_gate = Short_borrow_gate
 module Exit_audit_capture = Exit_audit_capture
 include Weinstein_strategy_config
@@ -368,6 +369,10 @@ let _on_market_close ~fold_start_date ~config ~ad_series ~stop_states
 let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
     ?(ticker_sectors = Hashtbl.create (module String)) ?bar_reader
     ?(audit_recorder = Audit_recorder.noop) ?fold_start_date config =
+  (* Fail loudly on an inconsistent dawn-leverage config (margin must be armed;
+     the dawn requirement must be a fractional (0,1] requirement). No-op when
+     [dawn_leverage_enabled = false]. *)
+  Leverage_dawn.validate config;
   let bar_reader =
     match bar_reader with Some r -> r | None -> Bar_reader.empty ()
   in

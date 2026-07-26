@@ -141,6 +141,11 @@ let _phantom_long_candidate : Weekly_snapshot.candidate =
     rationale = "should not appear";
     rs_vs_spy = None;
     resistance_grade = None;
+    sized_shares = 0;
+    sized_position_value = 0.0;
+    sized_position_pct = 0.0;
+    sized_risk_amount = 0.0;
+    sizing_note = None;
   }
 
 let test_aapl_2020_split_phantom_pick_fails _ =

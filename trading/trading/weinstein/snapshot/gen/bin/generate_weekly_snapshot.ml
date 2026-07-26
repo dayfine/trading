@@ -39,6 +39,8 @@ module Weekly_snapshot_generator =
 module Snapshot_warehouse_reader =
   Weinstein_snapshot_gen.Snapshot_warehouse_reader
 
+module Live_portfolio = Weinstein_snapshot_gen.Live_portfolio
+
 (* Daily-history warmup the snapshot-backed reader's trading-day calendar must
    span before [as_of]. Two trading years comfortably covers the screener's
    longest daily lookback (the 30-week MA over daily bars plus the base /
@@ -122,14 +124,37 @@ let _config_for ~ticker_sectors ~index_symbol ~config_overrides_path :
       Snapshot_config_overrides.Config_overrides_loader.load_and_apply
         ~overrides_path config
 
+(* Default cash for the template portfolio used when no --portfolio file is
+   given: candidates are still sized (so the report shows an executable shape)
+   but stamped UNSIZED. Matches the committed template's placeholder cash. *)
+let _template_cash = 100_000.0
+
+(* The live portfolio to size + report against, plus whether it is the template
+   placeholder. With --portfolio, load the file (a parse error aborts). Without
+   it, use an empty template book at [_template_cash] and flag it placeholder. *)
+let _live_portfolio ~portfolio_path ~as_of : Live_portfolio.t * bool =
+  match portfolio_path with
+  | None ->
+      ({ Live_portfolio.cash = _template_cash; as_of; positions = [] }, true)
+  | Some path -> (
+      match Live_portfolio.load ~path with
+      | Ok p -> (p, false)
+      | Error err ->
+          eprintf "Failed to load portfolio %s: %s\n" path
+            (Error.to_string_hum err);
+          exit 2)
+
 let _run ~as_of ~universe_path ~bar_source ~snapshot_dir ~system_version
-    ~index_symbol ~config_overrides_path () =
+    ~index_symbol ~config_overrides_path ~portfolio_path () =
   let ticker_sectors = _ticker_sectors_of_universe universe_path in
   let config =
     _config_for ~ticker_sectors ~index_symbol ~config_overrides_path
   in
   let bar_reader =
     _build_bar_reader ~bar_source ~as_of ~ticker_sectors ~config
+  in
+  let live_portfolio, portfolio_is_placeholder =
+    _live_portfolio ~portfolio_path ~as_of
   in
   let snapshot =
     Weekly_snapshot_generator.generate
@@ -139,7 +164,8 @@ let _run ~as_of ~universe_path ~bar_source ~snapshot_dir ~system_version
         as_of;
         bar_reader;
         ticker_sectors;
-        held_positions = [];
+        live_portfolio;
+        portfolio_is_placeholder;
       }
   in
   match
@@ -196,6 +222,15 @@ let command =
             shape) applied onto the default config; unknown keys fail loudly. \
             The live weekly-review arming config lives at \
             dev/weekly-picks/live-config-overrides.sexp"
+     and portfolio_path =
+       flag "--portfolio"
+         (optional Filename_unix.arg_type)
+         ~doc:
+           "PATH Live-portfolio sexp (Live_portfolio.t: cash + held \
+            positions). When given, held positions are priced + reported and \
+            long candidates are sized against real cash/exposure. Without it, \
+            candidates are sized against a $100k template book and stamped \
+            UNSIZED. Template: dev/weekly-picks/portfolio.sexp"
      in
      fun () ->
        let bar_source =
@@ -214,6 +249,6 @@ let command =
              exit 2
        in
        _run ~as_of ~universe_path ~bar_source ~snapshot_dir ~system_version
-         ~index_symbol ~config_overrides_path ())
+         ~index_symbol ~config_overrides_path ~portfolio_path ())
 
 let () = Command_unix.run command

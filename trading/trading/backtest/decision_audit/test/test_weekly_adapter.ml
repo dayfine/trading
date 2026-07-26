@@ -28,6 +28,11 @@ let _candidate ?(entry = 100.0) ?(stop = 92.0) ?(rationale = "Stage2 breakout")
     rationale;
     rs_vs_spy;
     resistance_grade;
+    sized_shares = 0;
+    sized_position_value = 0.0;
+    sized_position_pct = 0.0;
+    sized_risk_amount = 0.0;
+    sizing_note = None;
   }
 
 (** A minimal snapshot: only the fields the adapter reads carry test data; the

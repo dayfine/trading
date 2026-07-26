@@ -422,6 +422,22 @@ let test_fit_gp_row_dim_mismatch_raises _ =
        "Bayesian_opt.fit_gp: observation dim disagrees with length_scales")
     f
 
+let test_fit_gp_near_duplicate_observations_does_not_raise _ =
+  (* Near-duplicate observations_x rows push the kernel matrix to the edge of
+     positive-definiteness and can trigger the rare LAPACKE non-PD Cholesky
+     failure this module retries against (Bayesian_opt_cholesky). With
+     noise_variance = 0.0 (no jitter from the caller) the first Cholesky
+     attempt is the most likely to hit the non-PD path; fit_gp must still
+     return a well-formed posterior rather than raising. *)
+  let xs = [| [| 0.3 |]; [| 0.3 +. 1e-13 |]; [| 0.7 |] |] in
+  let ys = [| 1.0; 1.000001; 3.0 |] in
+  let posterior =
+    BO.fit_gp ~length_scales:[| 0.25 |] ~signal_variance:1.0 ~noise_variance:0.0
+      ~observations_x:xs ~observations_y:ys
+  in
+  let m = posterior.mean [| 0.5 |] in
+  assert_that m (is_between (module Float_ord) ~low:(-1e6) ~high:1e6)
+
 let test_expected_improvement_zero_at_constant_posterior _ =
   (* If the posterior σ² is ~0 everywhere (i.e. the test point is essentially
      pinned by an observation), EI should be ~0. *)
@@ -687,6 +703,8 @@ let suite =
          >:: test_fit_gp_y_length_mismatch_raises;
          "fit_gp: row dim mismatch raises"
          >:: test_fit_gp_row_dim_mismatch_raises;
+         "fit_gp: near-duplicate observations does not raise"
+         >:: test_fit_gp_near_duplicate_observations_does_not_raise;
          "expected_improvement: zero at constant posterior"
          >:: test_expected_improvement_zero_at_constant_posterior;
          "ucb: increases with beta" >:: test_ucb_increases_with_beta;

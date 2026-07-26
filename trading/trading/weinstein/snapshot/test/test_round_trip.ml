@@ -32,6 +32,12 @@ let _full_snapshot : Weekly_snapshot.t =
           rationale = "Stage2 breakout above 30wk MA, 2.1x volume confirmation";
           rs_vs_spy = Some 1.34;
           resistance_grade = Some "A";
+          (* Non-default sizing fields, so the round-trip exercises them. *)
+          sized_shares = 5;
+          sized_position_value = 2510.65;
+          sized_position_pct = 0.025;
+          sized_risk_amount = 179.65;
+          sizing_note = None;
         };
         {
           symbol = "MSFT";
@@ -43,6 +49,11 @@ let _full_snapshot : Weekly_snapshot.t =
           rationale = "Continuation breakout";
           rs_vs_spy = Some 1.18;
           resistance_grade = None;
+          sized_shares = 0;
+          sized_position_value = 0.0;
+          sized_position_pct = 0.0;
+          sized_risk_amount = 0.0;
+          sizing_note = Some "0 sh — cash / caps exhausted";
         };
       ];
     short_candidates = [];
@@ -53,6 +64,11 @@ let _full_snapshot : Weekly_snapshot.t =
           entered = _date "2020-06-19";
           stop = 1365.00;
           status = "Holding";
+          shares = 3;
+          entry_price = 1400.00;
+          current_price = 1500.00;
+          unrealized_pct = 7.14;
+          recommended_stop = Some 1420.00;
         };
       ];
   }
@@ -101,6 +117,63 @@ let test_re_serialize_identity _ =
     (Snapshot_reader.parse bytes)
     (is_ok_and_holds
        (field (fun t -> Snapshot_writer.serialize t) (equal_to bytes)))
+
+(* An OLD-format snapshot — written before the Phase A/B sizing + held-enrichment
+   fields existed — still parses: the new candidate / held_position fields carry
+   [@sexp.default] so missing fields resolve to their unsized values. This pins
+   the back-compat contract that yesterday's committed picks (e.g.
+   dev/weekly-picks/7f24f2c8d/2026-07-17.sexp) keep loading unchanged. *)
+let _old_format_snapshot =
+  "((schema_version 1) (system_version old) (date 2026-07-17)\n\
+  \ (macro ((regime Bullish) (score 1)))\n\
+  \ (sectors_strong ()) (sectors_weak ())\n\
+  \ (long_candidates\n\
+  \  (((symbol ACAD) (score 100) (grade A+) (entry 28.49) (stop 26.21)\n\
+  \    (sector \"Health Care\") (rationale test)\n\
+  \    (rs_vs_spy (0.99)) (resistance_grade (Clean)))))\n\
+  \ (short_candidates ())\n\
+  \ (held_positions\n\
+  \  (((symbol GOOG) (entered 2020-06-19) (stop 1365) (status Holding)))))"
+
+let test_old_format_parses_with_defaults _ =
+  assert_that
+    (Snapshot_reader.parse _old_format_snapshot)
+    (is_ok_and_holds
+       (all_of
+          [
+            field
+              (fun (t : Weekly_snapshot.t) -> t.long_candidates)
+              (elements_are
+                 [
+                   all_of
+                     [
+                       field
+                         (fun (c : Weekly_snapshot.candidate) -> c.symbol)
+                         (equal_to "ACAD");
+                       field
+                         (fun (c : Weekly_snapshot.candidate) -> c.sized_shares)
+                         (equal_to 0);
+                       field
+                         (fun (c : Weekly_snapshot.candidate) -> c.sizing_note)
+                         is_none;
+                     ];
+                 ]);
+            field
+              (fun (t : Weekly_snapshot.t) -> t.held_positions)
+              (elements_are
+                 [
+                   all_of
+                     [
+                       field
+                         (fun (h : Weekly_snapshot.held_position) -> h.shares)
+                         (equal_to 0);
+                       field
+                         (fun (h : Weekly_snapshot.held_position) ->
+                           h.recommended_stop)
+                         is_none;
+                     ];
+                 ]);
+          ]))
 
 (* ------- Schema-version handling ------- *)
 
@@ -183,6 +256,8 @@ let suite =
          "unknown_schema_version_rejected"
          >:: test_unknown_schema_version_rejected;
          "invalid_sexp_rejected" >:: test_invalid_sexp_rejected;
+         "old_format_parses_with_defaults"
+         >:: test_old_format_parses_with_defaults;
          "path_for_layout" >:: test_path_for_layout;
          "path_lex_order_matches_chronological"
          >:: test_path_lex_order_matches_chronological;
