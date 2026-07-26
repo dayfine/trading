@@ -64,6 +64,7 @@ let _stock_analysis ~ticker ~as_of_date : Stock_analysis.t =
     continuation = None;
     supply = None;
     virgin_readmission = false;
+    current_close = None;
     as_of_date;
   }
 

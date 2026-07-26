@@ -699,6 +699,46 @@ let test_resistance_min_history_bars_axis_resolves_via_overlay_validator _ =
   in
   assert_that merged.resistance_min_history_bars (equal_to 520)
 
+(* -------------------------------------------------------------------- *)
+(* screening_config.failed_breakout_tolerance_pct — failed-breakout gate  *)
+(* -------------------------------------------------------------------- *)
+
+(** [0.0] (the default) is the no-op: the failed-breakout re-validation gate is
+    disabled, so screener output is bit-identical to pre-feature behaviour
+    ([.claude/rules/experiment-flag-discipline.md] R1). *)
+let test_default_screening_failed_breakout_tolerance_is_zero _ =
+  let cfg = _default_config () in
+  assert_that cfg.screening_config.failed_breakout_tolerance_pct
+    (float_equal 0.0)
+
+(** Deep-merge path: a scenario's [config_overrides] can arm the gate at k =
+    3-5%, invalidating long candidates whose close collapsed back below the
+    breakout level (issue #2084 Finding 1). *)
+let test_override_screening_failed_breakout_tolerance _ =
+  let merged =
+    _apply_one_override (_default_config ())
+      (Sexp.of_string
+         "((screening_config ((failed_breakout_tolerance_pct 0.05))))")
+  in
+  assert_that merged.screening_config.failed_breakout_tolerance_pct
+    (float_equal 0.05)
+
+(** Axis reachability (experiment-flag-discipline R2): the override sexp
+    resolves through the {b real} [Overlay_validator.apply_overrides] (the sweep
+    / WF-CV path) with no unknown-key error, and lands the value — this is what
+    makes [((screening_config ((failed_breakout_tolerance_pct 0.05))))] a valid
+    [Variant_matrix] axis. *)
+let test_failed_breakout_tolerance_axis_resolves_via_overlay_validator _ =
+  let merged =
+    Backtest.Overlay_validator.apply_overrides (_default_config ())
+      [
+        Sexp.of_string
+          "((screening_config ((failed_breakout_tolerance_pct 0.03))))";
+      ]
+  in
+  assert_that merged.screening_config.failed_breakout_tolerance_pct
+    (float_equal 0.03)
+
 let suite =
   "Runner_hypothesis_overrides"
   >::: [
@@ -782,6 +822,12 @@ let suite =
          >:: test_override_resistance_min_history_bars;
          "resistance_min_history_bars axis resolves via Overlay_validator"
          >:: test_resistance_min_history_bars_axis_resolves_via_overlay_validator;
+         "default screening_config.failed_breakout_tolerance_pct is zero"
+         >:: test_default_screening_failed_breakout_tolerance_is_zero;
+         "override screening_config.failed_breakout_tolerance_pct through sexp"
+         >:: test_override_screening_failed_breakout_tolerance;
+         "failed_breakout_tolerance_pct axis resolves via Overlay_validator"
+         >:: test_failed_breakout_tolerance_axis_resolves_via_overlay_validator;
        ]
 
 let () = run_test_tt_main suite

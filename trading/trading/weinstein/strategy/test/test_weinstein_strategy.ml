@@ -569,6 +569,7 @@ let make_scored_candidate ~ticker ~side ~entry ~stop ~grade =
       continuation = None;
       supply = None;
       virgin_readmission = false;
+      current_close = None;
       as_of_date = Date.of_string "2024-01-05";
     }
   in

@@ -7,6 +7,7 @@ type t = {
   macro_trend : market_trend;
   long_macro_admitted : int;
   long_breakout_admitted : int;
+  long_failed_breakout_dropped : int;
   long_sector_admitted : int;
   long_grade_admitted : int;
   long_top_n_admitted : int;
@@ -20,7 +21,7 @@ type t = {
 [@@deriving sexp]
 
 let build ~total_stocks ~candidates_after_held ~macro_trend ~long_phases
-    ~short_phases ~long_top_n ~short_top_n =
+    ~long_failed_breakout_dropped ~short_phases ~long_top_n ~short_top_n =
   let long_breakout, long_sector, long_grade = long_phases in
   let short_breakdown, short_sector, short_rs, short_grade = short_phases in
   let long_macro_admitted =
@@ -40,6 +41,8 @@ let build ~total_stocks ~candidates_after_held ~macro_trend ~long_phases
     macro_trend;
     long_macro_admitted;
     long_breakout_admitted = zero_if long_macro_admitted long_breakout;
+    long_failed_breakout_dropped =
+      zero_if long_macro_admitted long_failed_breakout_dropped;
     long_sector_admitted = zero_if long_macro_admitted long_sector;
     long_grade_admitted = zero_if long_macro_admitted long_grade;
     long_top_n_admitted = long_top_n;

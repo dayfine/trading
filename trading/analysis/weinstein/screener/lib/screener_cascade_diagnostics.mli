@@ -13,6 +13,13 @@ type t = {
   macro_trend : market_trend;
   long_macro_admitted : int;
   long_breakout_admitted : int;
+  long_failed_breakout_dropped : int;
+      (** How many long candidates the failed-breakout re-validation gate
+          dropped this cascade (see
+          {!Screener_admission.count_long_failed_breakouts}). Always [0] when
+          the gate is disabled
+          ([Screener.config.failed_breakout_tolerance_pct <= 0.0], the default)
+          and when the macro gate closed the long side. *)
   long_sector_admitted : int;
   long_grade_admitted : int;
   long_top_n_admitted : int;
@@ -30,6 +37,7 @@ val build :
   candidates_after_held:int ->
   macro_trend:market_trend ->
   long_phases:int * int * int ->
+  long_failed_breakout_dropped:int ->
   short_phases:int * int * int * int ->
   long_top_n:int ->
   short_top_n:int ->
