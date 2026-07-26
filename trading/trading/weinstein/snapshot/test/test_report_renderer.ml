@@ -67,6 +67,7 @@ let _full_snapshot : Weekly_snapshot.t =
           recommended_stop = Some 1420.00;
         };
       ];
+    warnings = [];
   }
 
 let _empty_snapshot : Weekly_snapshot.t =
@@ -80,6 +81,7 @@ let _empty_snapshot : Weekly_snapshot.t =
     long_candidates = [];
     short_candidates = [];
     held_positions = [];
+    warnings = [];
   }
 
 (* Substring matcher built on top of the [matching] combinator. Keeps tests in
@@ -140,6 +142,32 @@ let test_empty_held_positions_renders_marker _ =
 let test_empty_strong_sectors_renders_marker _ =
   let md = Report_renderer.render _empty_snapshot in
   assert_that md (_has_substring "## Strong sectors\n(none)")
+
+let test_empty_warnings_renders_marker _ =
+  let md = Report_renderer.render _empty_snapshot in
+  assert_that md (_has_substring "## Warnings\n(none)")
+
+let test_warnings_rendered_as_bullets _ =
+  let snap =
+    {
+      _empty_snapshot with
+      warnings =
+        [
+          "SNSE: dropped from candidate consideration — sparse tail (6/15 \
+           bars, need >= 10; see issue #2083)";
+          "FTH: dropped from candidate consideration — sparse tail (3/15 bars, \
+           need >= 10; see issue #2083)";
+        ];
+    }
+  in
+  let md = Report_renderer.render snap in
+  assert_that md
+    (all_of
+       [
+         _has_substring "## Warnings";
+         _has_substring "- SNSE: dropped from candidate consideration";
+         _has_substring "- FTH: dropped from candidate consideration";
+       ])
 
 let test_bearish_macro_rendered _ =
   let snap =
@@ -385,6 +413,8 @@ let suite =
          >:: test_empty_held_positions_renders_marker;
          "empty_strong_sectors_renders_marker"
          >:: test_empty_strong_sectors_renders_marker;
+         "empty_warnings_renders_marker" >:: test_empty_warnings_renders_marker;
+         "warnings_rendered_as_bullets" >:: test_warnings_rendered_as_bullets;
          "bearish_macro_rendered" >:: test_bearish_macro_rendered;
          "risk_pct_formatting" >:: test_risk_pct_formatting;
          "resistance_grade_column_rendered"

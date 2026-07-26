@@ -128,16 +128,38 @@ let _analyze_ticker ~(inputs : inputs)
 (* Per-stock analysis for the screened universe. Threads the strategy config's
    [overhead_supply] (resistance-v2) into the per-stock analysis config so the
    continuous supply score runs on the live path when armed; [None] (default)
-   keeps the analysis bit-identical to the binary-grade behaviour. *)
-let _analyze_universe ~(inputs : inputs) ~index_bars : Stock_analysis.t list =
+   keeps the analysis bit-identical to the binary-grade behaviour.
+   [eligible_tickers] is pre-filtered by the sparse-tail gate (see
+   [_sparse_tail_verdicts]) — this function no longer walks
+   [inputs.ticker_sectors] directly. *)
+let _analyze_universe ~(inputs : inputs) ~index_bars ~eligible_tickers :
+    Stock_analysis.t list =
   let analysis_config =
     {
       Stock_analysis.default_config with
       overhead_supply = inputs.config.overhead_supply;
     }
   in
-  List.filter_map inputs.ticker_sectors ~f:(fun (ticker, _sector) ->
+  List.filter_map eligible_tickers ~f:(fun ticker ->
       _analyze_ticker ~inputs ~analysis_config ~index_bars ticker)
+
+(* Sparse-tail eligibility gate (issue #2083 fix 1): data hygiene, not a
+   Weinstein rule (see [Sparse_tail_gate]'s .mli for the full rationale).
+   [None] when [ticker] is eligible (includes the disabled-gate case,
+   [config.sparse_tail_window_trading_days = 0]); [Some warning] when the
+   gate dropped it. *)
+let _sparse_tail_warning ~(inputs : inputs) ticker : string option =
+  Sparse_tail_gate.check inputs.bar_reader ~symbol:ticker ~as_of:inputs.as_of
+    ~min_bars:inputs.config.sparse_tail_min_bars
+    ~window_trading_days:inputs.config.sparse_tail_window_trading_days
+  |> Sparse_tail_gate.warning ~symbol:ticker
+
+(* One (ticker, warning option) pair per universe entry. [None] tickers are
+   sparse-tail-eligible; [Some _] tickers were dropped, carrying the warning
+   line to surface in the snapshot. *)
+let _sparse_tail_verdicts ~(inputs : inputs) : (string * string option) list =
+  List.map inputs.ticker_sectors ~f:(fun (ticker, _sector) ->
+      (ticker, _sparse_tail_warning ~inputs ticker))
 
 (* Rating of one sector ETF, or [None] when it has no bars. *)
 let _etf_rating ~(inputs : inputs) ~index_bars (etf, sector_name) =
@@ -236,7 +258,13 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
   let index_bars = _weekly_bars ~inputs inputs.config.indices.primary in
   let macro = _macro_result ~inputs ~index_bars in
   let sector_map = _build_sector_map ~inputs ~index_bars in
-  let stocks = _analyze_universe ~inputs ~index_bars in
+  let sparse_tail_verdicts = _sparse_tail_verdicts ~inputs in
+  let eligible_tickers =
+    List.filter_map sparse_tail_verdicts ~f:(fun (ticker, warning) ->
+        match warning with None -> Some ticker | Some _ -> None)
+  in
+  let warnings = List.filter_map sparse_tail_verdicts ~f:snd in
+  let stocks = _analyze_universe ~inputs ~index_bars ~eligible_tickers in
   let held_positions =
     List.map inputs.live_portfolio.positions ~f:(_enrich_held ~inputs)
   in
@@ -266,4 +294,5 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
     short_candidates =
       List.map result.short_candidates ~f:Snapshot_display.candidate_of_scored;
     held_positions;
+    warnings;
   }

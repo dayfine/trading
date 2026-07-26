@@ -49,6 +49,7 @@ let _snapshot ?(date = _date "2024-03-01") ?(long_candidates = [])
     long_candidates;
     short_candidates;
     held_positions = [];
+    warnings = [];
   }
 
 (* Funded cut ------------------------------------------------------------ *)

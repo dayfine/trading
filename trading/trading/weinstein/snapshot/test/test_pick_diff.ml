@@ -44,6 +44,7 @@ let _snapshot ?(system_version = "v1") ?(date = _common_date)
     long_candidates;
     short_candidates = [];
     held_positions = [];
+    warnings = [];
   }
 
 (* ------- Tests ------- *)

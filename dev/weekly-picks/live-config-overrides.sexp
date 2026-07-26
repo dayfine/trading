@@ -29,3 +29,15 @@
 ;   return, cf. project_edge_is_the_fat_tail). The backtest code default stays
 ;   Alphabetical; this reorders only the human-facing weekly picks.
 ((screening_config ((candidate_ranking Quality))))
+; sparse-tail eligibility gate: issue #2083 fix 1 — the 2026-07-17 report's
+;   rank-1 pick "SNSE" did not exist at the broker (Sensei Biotherapeutics had
+;   renamed to Faeth Therapeutics, SNSE->FTH, on 2026-06-16). The feed kept
+;   serving occasional stale bars under the dead ticker (6 bars across ~15
+;   trading days, one anomalous spike) and the existing "too few bars" check
+;   never fired because the series was current at the right-hand edge and
+;   merely sparse in the middle. Requiring >=10 of the last 15 trading days
+;   (the issue's own suggested threshold) would have dropped this pick
+;   regardless of rename knowledge. Engineering data hygiene, NOT a Weinstein
+;   rule or a return lever — the spine (stage/breakout/volume/macro/sector) is
+;   untouched; see [Weinstein_snapshot_gen.Sparse_tail_gate].
+((sparse_tail_min_bars 10) (sparse_tail_window_trading_days 15))

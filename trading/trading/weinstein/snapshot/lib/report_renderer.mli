@@ -14,6 +14,7 @@
     - [## Long candidates (top N)]: ranked Markdown table ([N = long_limit])
     - [## Short candidates (top N)]: ranked Markdown table ([N = short_limit])
     - [## Held positions]: Markdown table
+    - [## Warnings]: bulleted list of data-quality warnings (or ["(none)"])
 
     All section headers are always rendered, even when the underlying data list
     is empty — empty tables / lists render as ["(none)"] so a reader never sees
@@ -40,6 +41,14 @@
     and a [Suggested stop] cell showing this week's recomputed Weinstein
     support-floor stop with its delta vs the current stop (["-"] when not
     recomputed).
+
+    The [Warnings] section renders one bullet per entry in
+    [Weekly_snapshot.t.warnings] verbatim (e.g. a candidate dropped by the
+    sparse-tail eligibility gate, issue #2083 fix 1 — see
+    [Weinstein_snapshot_gen.Sparse_tail_gate]), or ["(none)"] when the list is
+    empty. This is the human-visible half of "drop candidate + emit a warning":
+    a candidate that vanished from the tables above is explained here rather
+    than silently missing.
 
     {1 Display caps and the tie-honesty note}
 

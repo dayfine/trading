@@ -71,6 +71,7 @@ let _full_snapshot : Weekly_snapshot.t =
           recommended_stop = Some 1420.00;
         };
       ];
+    warnings = [ "SNSE: dropped from candidate consideration — sparse tail" ];
   }
 
 (** A fully-empty snapshot — verifies empty data sections render correctly (no
@@ -86,6 +87,7 @@ let _empty_snapshot : Weekly_snapshot.t =
     long_candidates = [];
     short_candidates = [];
     held_positions = [];
+    warnings = [];
   }
 
 (* ------- Round-trip ------- *)
@@ -173,6 +175,166 @@ let test_old_format_parses_with_defaults _ =
                          is_none;
                      ];
                  ]);
+            (* [warnings] (issue #2083 fix 1) is additive: an old snapshot with
+               no [warnings] field parses with the empty-list default. *)
+            field (fun (t : Weekly_snapshot.t) -> t.warnings) is_empty;
+          ]))
+
+(* The verbatim content of the actual committed regression file
+   [dev/weekly-picks/7f24f2c8d/2026-07-17.sexp] — the report at the center of
+   issue #2083 (rank-1 "SNSE" pick that did not exist at the broker; see the
+   [Sparse_tail_gate] .mli). Written before the [warnings] field existed. This
+   pins that the real committed bytes — not just a synthetic stand-in — still
+   parse after adding [warnings], and that [Snapshot_reader.parse] does not
+   itself apply the (opt-in, disabled-by-default) sparse-tail gate: this old
+   snapshot was produced by an unarmed run, so SNSE is present in
+   [long_candidates] exactly as it was written; [warnings] parses to []. *)
+let _committed_2026_07_17_snapshot =
+  {|((schema_version 1) (system_version 7f24f2c8d) (date 2026-07-17)
+ (macro ((regime Bullish) (score 1)))
+ (sectors_strong
+  ("Consumer Staples" Financials "Health Care" Industrials
+   "Information Technology" Materials "Real Estate" Utilities))
+ (sectors_weak ("Communication Services"))
+ (long_candidates
+  (((symbol ACAD) (score 100) (grade A+) (entry 28.49) (stop 26.2108)
+    (sector "Health Care")
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Strong volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (0.99667305842511389))
+    (resistance_grade ("Weinstein_types.Virgin_territory (0.00)")))
+   ((symbol COGT) (score 100) (grade A+) (entry 43.95)
+    (stop 40.434000000000005) (sector "Health Care")
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Strong volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (1.2191952277722209))
+    (resistance_grade ("Weinstein_types.Virgin_territory (0.00)")))
+   ((symbol ENTA) (score 100) (grade A+) (entry 17.24) (stop 15.8608)
+    (sector "Health Care")
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Strong volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (1.0318044550304823))
+    (resistance_grade ("Weinstein_types.Clean (0.00)")))
+   ((symbol HIPO) (score 100) (grade A+) (entry 39.17) (stop 36.0364)
+    (sector Financials)
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Strong volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (0.898632516844866))
+    (resistance_grade ("Weinstein_types.Virgin_territory (0.00)")))
+   ((symbol NBBK) (score 100) (grade A+) (entry 22.97) (stop 21.1324)
+    (sector Financials)
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Strong volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (0.99415019911156788))
+    (resistance_grade ("Weinstein_types.Virgin_territory (0.00)")))
+   ((symbol PESI) (score 100) (grade A+) (entry 16.58)
+    (stop 15.253599999999999) (sector Industrials)
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Strong volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (1.3047617760274572))
+    (resistance_grade ("Weinstein_types.Clean (0.00)")))
+   ((symbol SNDX) (score 100) (grade A+) (entry 25.72) (stop 23.6624)
+    (sector "Health Care")
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Strong volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (1.0985269706978031))
+    (resistance_grade ("Weinstein_types.Virgin_territory (0.00)")))
+   ((symbol SNSE) (score 100) (grade A+) (entry 36.94) (stop 33.9848)
+    (sector "Health Care")
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Strong volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (1.473931483971608))
+    (resistance_grade ("Weinstein_types.Clean (0.00)")))
+   ((symbol STC) (score 100) (grade A+) (entry 79) (stop 72.68)
+    (sector Financials)
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Strong volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (0.97503891147342825))
+    (resistance_grade ("Weinstein_types.Virgin_territory (0.00)")))
+   ((symbol AII) (score 90) (grade A+) (entry 26.49) (stop 24.3708)
+    (sector Financials)
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Adequate volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (0.9035379102270007))
+    (resistance_grade ("Weinstein_types.Virgin_territory (0.00)")))
+   ((symbol BALL) (score 90) (grade A+) (entry 68.63) (stop 63.1396)
+    (sector Materials)
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Adequate volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (1.0432791102122678))
+    (resistance_grade ("Weinstein_types.Clean (0.00)")))
+   ((symbol CALM) (score 90) (grade A+) (entry 118.04)
+    (stop 108.59680000000002) (sector "Consumer Staples")
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Adequate volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (0.94615288747363169))
+    (resistance_grade ("Weinstein_types.Clean (0.00)")))
+   ((symbol CNA) (score 90) (grade A+) (entry 50.97) (stop 46.8924)
+    (sector Financials)
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Adequate volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (1.0491252683261))
+    (resistance_grade ("Weinstein_types.Clean (0.00)")))
+   ((symbol ESNT) (score 90) (grade A+) (entry 67.43)
+    (stop 62.035600000000009) (sector Financials)
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Adequate volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (1.0079342597877079))
+    (resistance_grade ("Weinstein_types.Clean (0.00)")))
+   ((symbol FBK) (score 90) (grade A+) (entry 62.68)
+    (stop 57.665600000000005) (sector Financials)
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Adequate volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (1.0170009813215131))
+    (resistance_grade ("Weinstein_types.Virgin_territory (0.00)")))
+   ((symbol HRTG) (score 90) (grade A+) (entry 32.14)
+    (stop 29.568800000000003) (sector Financials)
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Adequate volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (0.96976933827468681))
+    (resistance_grade ("Weinstein_types.Virgin_territory (0.00)")))
+   ((symbol MBI) (score 90) (grade A+) (entry 8.3) (stop 7.636000000000001)
+    (sector Financials)
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Adequate volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (0.90435403190026487))
+    (resistance_grade ("Weinstein_types.Virgin_territory (0.00)")))
+   ((symbol MEDP) (score 90) (grade A+) (entry 632.06) (stop 581.4952)
+    (sector "Health Care")
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Adequate volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (0.9768174691554552))
+    (resistance_grade ("Weinstein_types.Virgin_territory (0.00)")))
+   ((symbol NMIH) (score 90) (grade A+) (entry 42.49) (stop 39.0908)
+    (sector Financials)
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Adequate volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (1.0266122912537363))
+    (resistance_grade ("Weinstein_types.Clean (0.00)")))
+   ((symbol NNI) (score 90) (grade A+) (entry 145.1) (stop 133.492)
+    (sector Financials)
+    (rationale
+     "Stage1\226\134\146Stage2 breakout; Adequate volume; RS positive; Overhead supply (continuous); Strong sector")
+    (rs_vs_spy (0.95345653431494692))
+    (resistance_grade ("Weinstein_types.Virgin_territory (0.00)")))))
+ (short_candidates ()) (held_positions ()))|}
+
+let test_committed_2026_07_17_snapshot_still_parses _ =
+  assert_that
+    (Snapshot_reader.parse _committed_2026_07_17_snapshot)
+    (is_ok_and_holds
+       (all_of
+          [
+            field
+              (fun (t : Weekly_snapshot.t) -> t.system_version)
+              (equal_to "7f24f2c8d");
+            field
+              (fun (t : Weekly_snapshot.t) ->
+                List.count t.long_candidates
+                  ~f:(fun (c : Weekly_snapshot.candidate) ->
+                    String.equal c.symbol "SNSE"))
+              (equal_to 1);
+            field (fun (t : Weekly_snapshot.t) -> t.warnings) is_empty;
           ]))
 
 (* ------- Schema-version handling ------- *)
@@ -258,6 +420,8 @@ let suite =
          "invalid_sexp_rejected" >:: test_invalid_sexp_rejected;
          "old_format_parses_with_defaults"
          >:: test_old_format_parses_with_defaults;
+         "committed_2026_07_17_snapshot_still_parses"
+         >:: test_committed_2026_07_17_snapshot_still_parses;
          "path_for_layout" >:: test_path_for_layout;
          "path_lex_order_matches_chronological"
          >:: test_path_lex_order_matches_chronological;

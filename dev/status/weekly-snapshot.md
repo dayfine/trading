@@ -1,9 +1,51 @@
 # Status: weekly-snapshot
 
-## Last updated: 2026-07-24
+## Last updated: 2026-07-26
 
 ## Status
 IN_PROGRESS
+
+**2026-07-26 (sparse-tail eligibility gate, issue #2083 fix 1, PR
+`feat/weekly-snapshot-sparse-tail`):** Closes the data-hygiene hole behind the
+2026-07-17 report's rank-1 "SNSE" pick, a ticker that did not exist at the
+broker (Sensei Biotherapeutics had renamed to Faeth Therapeutics, SNSE->FTH,
+on 2026-06-16). The feed kept serving occasional stale bars under the dead
+symbol (6 bars across ~15 trading days, one anomalous spike near the right
+edge) and the existing "too few bars" check never fired because the series
+read current at `as_of` and was merely sparse in the middle. New module
+`Weinstein_snapshot_gen.Sparse_tail_gate` (`trading/trading/weinstein/snapshot/gen/lib/sparse_tail_gate.{ml,mli}`):
+`check` counts bars actually present in the trailing `window_trading_days`
+**trading days** (via `Bar_reader.daily_view_for`'s calendar-walk, so weekends
+never count as "missing") ending at `as_of`; fewer than `min_bars` ->
+`Sparse_tail`. Two new flat fields on `Weinstein_strategy.config`
+(`sparse_tail_min_bars`, `sparse_tail_window_trading_days`, both
+`[@sexp.default 0]` — default disabled, exact no-op) resolve through the real
+`Config_overrides_loader` -> `Overlay_validator.apply_overrides` path (same
+mechanism as `resistance_lookback_bars` / `candidate_ranking`), so they are
+consumed **only** by `Weekly_snapshot_generator.generate` — the backtest/live
+strategy path never reads them, so arming cannot move a backtest number.
+Wired into `generate`: a dropped ticker is excluded from candidate
+consideration and a warning line is emitted (not a silent drop). Schema:
+`Weekly_snapshot.t` gains an additive `warnings : string list [@sexp.default
+[]]` field (no version bump; pinned that the actual committed
+`dev/weekly-picks/7f24f2c8d/2026-07-17.sexp` — the file at the center of the
+incident — still parses). `Report_renderer` gains a `## Warnings` section
+(bulleted, `(none)` when empty). Armed in
+`dev/weekly-picks/live-config-overrides.sexp` at the issue's own suggested
+threshold (`min_bars=10`, `window_trading_days=15`). Out of scope (per issue
+#2083): fix 2 (rename tracking on fetch) and fix 3 (spike-bar "data-suspect"
+flag) — separate, larger changes. Tests: `Sparse_tail_gate` unit tests
+(disabled/armed/dense/sparse/no-bars/warning-text, incl. an explicit
+"~6 bars in ~15 trading days with a spike near the edge" SNSE-shaped
+regression fixture) + generator-level tests (default-config carries the gate
+disabled; disabled run is bit-identical on a fixture that would be dropped if
+armed; armed+sparse drops + warns; armed+dense retains) + an overrides-loader
+test proving the arming path resolves through the genuine loader/validator.
+Every new assertion was mutation-tested (break the implementation, confirm
+red, restore) — see PR body for the per-test mutation log. `dune build @fmt`
++ `dune build` + full `dune runtest` all green (a nesting-linter violation in
+the first draft of `Sparse_tail_gate` was fixed by splitting the disabled/
+armed branches and the message-formatting body into named helpers).
 
 **2026-07-24 (live execution protocol — Phase A+B, PR `feat/picks-protocol`):**
 Weekly picks are now executable end-to-end and held positions thread week to

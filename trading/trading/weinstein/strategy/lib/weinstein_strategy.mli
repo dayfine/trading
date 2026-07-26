@@ -740,6 +740,15 @@ type config = {
           slope flip for the "dawn" label to be active. Default [78] (~1.5y).
           Inert while [dawn_leverage_enabled = false]. See
           [Weinstein_strategy_config.dawn_max_ma_flip_age_weeks]. *)
+  sparse_tail_min_bars : int; [@sexp.default 0]
+      (** Sparse-tail eligibility gate (issue #2083 fix 1) — data hygiene, not a
+          strategy rule. Default [0] = disabled, no-op. Consumed only by
+          [Weekly_snapshot_generator.generate]. See
+          [Weinstein_strategy_config.sparse_tail_min_bars]. *)
+  sparse_tail_window_trading_days : int; [@sexp.default 0]
+      (** Trailing window (trading days) [sparse_tail_min_bars] is checked
+          against. Default [0] = disabled. See
+          [Weinstein_strategy_config.sparse_tail_window_trading_days]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

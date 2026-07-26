@@ -56,6 +56,7 @@ let _snapshot ~date ~candidates : Weekly_snapshot.t =
     long_candidates = candidates;
     short_candidates = [];
     held_positions = [];
+    warnings = [];
   }
 
 (* ---------- Fixture 1: known historical pick (entry fills, +1% horizon) ---- *)

@@ -172,6 +172,13 @@ let _sector_list sectors =
 let _macro_section (m : Weekly_snapshot.macro_context) =
   Printf.sprintf "**%s** (score %.2f)" m.regime m.score
 
+(* Data-quality warnings (issue #2083 fix 1): one bullet per dropped ticker so
+   a candidate that vanished from the tables is explained, not just missing. *)
+let _warnings_list warnings =
+  match warnings with
+  | [] -> _empty_marker
+  | _ -> String.concat ~sep:"\n" (List.map warnings ~f:(fun w -> "- " ^ w))
+
 let _section ~title body = Printf.sprintf "## %s\n%s" title body
 
 let render ?(long_limit = default_long_display_limit)
@@ -199,5 +206,7 @@ let render ?(long_limit = default_long_display_limit)
   Buffer.add_string buf "\n\n";
   Buffer.add_string buf
     (_section ~title:"Held positions" (_held_table t.held_positions));
+  Buffer.add_string buf "\n\n";
+  Buffer.add_string buf (_section ~title:"Warnings" (_warnings_list t.warnings));
   Buffer.add_string buf "\n";
   Buffer.contents buf
