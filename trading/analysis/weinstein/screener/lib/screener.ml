@@ -50,6 +50,7 @@ type config = {
   neutral_blocks_shorts : bool; [@sexp.default false]
   enable_slow_grind_short_gate : bool; [@sexp.default false]
   min_price : float; [@sexp.default 0.0]
+  failed_breakout_tolerance_pct : float; [@sexp.default 0.0]
   early_stage2_max_weeks : int; [@sexp.default 4]
 }
 [@@deriving sexp]
@@ -71,6 +72,7 @@ let default_config =
     neutral_blocks_shorts = false;
     enable_slow_grind_short_gate = false;
     min_price = 0.0;
+    failed_breakout_tolerance_pct = 0.0;
     early_stage2_max_weeks = 4;
   }
 
@@ -94,6 +96,7 @@ type cascade_diagnostics = Screener_cascade_diagnostics.t = {
   macro_trend : market_trend;
   long_macro_admitted : int;
   long_breakout_admitted : int;
+  long_failed_breakout_dropped : int;
   long_sector_admitted : int;
   long_grade_admitted : int;
   long_top_n_admitted : int;
@@ -174,11 +177,17 @@ let _score_and_build ~weights ~thresholds ~params ~min_grade ~min_score_override
     score floor. *)
 let _long_candidate ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price
-    ~early_stage2_max_weeks (a, sector) =
+    ~failed_breakout_tolerance_pct ~early_stage2_max_weeks (a, sector) =
   if not (passes_price_floor ~min_price ~price:a.Stock_analysis.breakout_price)
   then None
   else if equal_sector_rating sector.rating Weak then None
   else if not (Stock_analysis.is_breakout_candidate ~early_stage2_max_weeks a)
+  then None
+  else if
+    not
+      (passes_failed_breakout ~tolerance_pct:failed_breakout_tolerance_pct
+         ~breakout_price:a.Stock_analysis.breakout_price
+         ~current_close:a.Stock_analysis.current_close)
   then None
   else if not (passes_volume_band ~excl:volume_ratio_exclude_range a) then None
   else
@@ -200,32 +209,6 @@ let _short_candidate ~weights ~thresholds ~params ~min_grade ~min_score_override
   else
     _score_and_build ~weights ~thresholds ~params ~min_grade ~min_score_override
       ~max_score_override ~is_short:true ~scorer:score_short ~sector a
-
-(** Check watchlist eligibility after the breakout gate. Returns [None] if the
-    ticker is already in [buy_candidates] or the grade is above C/D. *)
-let _check_watchlist_grade ~thresholds ~buy_candidates ~score
-    (sa : Stock_analysis.t) =
-  let grade = grade_of_score ~thresholds score in
-  let in_buy_list =
-    List.exists buy_candidates ~f:(fun c -> String.(c.ticker = sa.ticker))
-  in
-  if in_buy_list then None
-  else if equal_grade grade C || equal_grade grade D then
-    Some
-      ( sa.ticker,
-        Printf.sprintf "Grade %s, score %d" (grade_to_string grade) score )
-  else None
-
-(** Evaluate one (analysis, sector) pair as a watchlist entry. Included when it
-    is a grade-C or grade-D breakout candidate not already in [buy_candidates].
-*)
-let _watchlist_entry ~weights ~thresholds ~early_stage2_max_weeks
-    ~buy_candidates (sa, sector) =
-  if not (Stock_analysis.is_breakout_candidate ~early_stage2_max_weeks sa) then
-    None
-  else
-    let score, _ = score_long ~early_stage2_max_weeks ~weights ~sector sa in
-    _check_watchlist_grade ~thresholds ~buy_candidates ~score sa
 
 (* ------------------------------------------------------------------ *)
 (* Evaluate + sort + cap                                               *)
@@ -297,14 +280,15 @@ let _shorts_admitted_by_macro ~neutral_blocks_shorts macro_trend =
 (** Filter, score, grade, sort, and cap long candidates. *)
 let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price
-    ~early_stage2_max_weeks ~max_buy_candidates ~neutral_blocks_longs ~ranking
-    ~candidates ~macro_trend : scored_candidate list =
+    ~failed_breakout_tolerance_pct ~early_stage2_max_weeks ~max_buy_candidates
+    ~neutral_blocks_longs ~ranking ~candidates ~macro_trend :
+    scored_candidate list =
   if not (_longs_admitted_by_macro ~neutral_blocks_longs macro_trend) then []
   else
     let candidate_fn =
       _long_candidate ~weights ~thresholds ~params ~min_grade
         ~min_score_override ~max_score_override ~volume_ratio_exclude_range
-        ~min_price ~early_stage2_max_weeks
+        ~min_price ~failed_breakout_tolerance_pct ~early_stage2_max_weeks
     in
     _filter_and_cap ~ranking ~candidate_fn ~max_n:max_buy_candidates candidates
 
@@ -341,17 +325,6 @@ let _evaluate_shorts ~weights ~thresholds ~params ~min_grade ~min_score_override
     _filter_and_cap ~ranking ~candidate_fn ~max_n:max_short_candidates
       candidates
 
-(** Build watchlist: breakout candidates with grade C/D not in the buy list.
-    Empty when buys are inactive (Bearish market). *)
-let _build_watchlist ~weights ~thresholds ~early_stage2_max_weeks ~candidates
-    ~buy_candidates ~buys_active : (string * string) list =
-  if not buys_active then []
-  else
-    List.filter_map candidates
-      ~f:
-        (_watchlist_entry ~weights ~thresholds ~early_stage2_max_weeks
-           ~buy_candidates)
-
 (* ------------------------------------------------------------------ *)
 (* Main screener                                                        *)
 (* ------------------------------------------------------------------ *)
@@ -371,12 +344,18 @@ let _resolve_sector ~sector_map ticker =
     [screen] so the latter stays within the 50-line linter cap. *)
 let _diagnostics_for_screen ~weights ~grade_thresholds ~min_grade
     ~min_score_override ~max_score_override ~volume_ratio_exclude_range
-    ~min_price ~early_stage2_max_weeks ~total_stocks ~candidates_after_held
-    ~macro_trend ~candidates ~buy_candidates ~short_candidates =
+    ~min_price ~failed_breakout_tolerance_pct ~early_stage2_max_weeks
+    ~total_stocks ~candidates_after_held ~macro_trend ~candidates
+    ~buy_candidates ~short_candidates =
   let long_phases =
     count_long_phases ~weights ~thresholds:grade_thresholds ~min_grade
       ~min_score_override ~max_score_override ~volume_ratio_exclude_range
-      ~min_price ~early_stage2_max_weeks ~candidates
+      ~min_price ~failed_breakout_tolerance_pct ~early_stage2_max_weeks
+      ~candidates
+  in
+  let long_failed_breakout_dropped =
+    count_long_failed_breakouts ~tolerance_pct:failed_breakout_tolerance_pct
+      ~early_stage2_max_weeks ~candidates
   in
   let short_phases =
     count_short_phases ~weights ~thresholds:grade_thresholds ~min_grade
@@ -384,7 +363,7 @@ let _diagnostics_for_screen ~weights ~grade_thresholds ~min_grade
       ~min_price ~candidates
   in
   Screener_cascade_diagnostics.build ~total_stocks ~candidates_after_held
-    ~macro_trend ~long_phases ~short_phases
+    ~macro_trend ~long_phases ~long_failed_breakout_dropped ~short_phases
     ~long_top_n:(List.length buy_candidates)
     ~short_top_n:(List.length short_candidates)
 
@@ -424,6 +403,7 @@ let _evaluate_candidates ~config ~decline_is_slow_grind ~candidates ~macro_trend
       ~max_score_override:config.max_score_override
       ~volume_ratio_exclude_range:config.volume_ratio_exclude_range
       ~min_price:config.min_price
+      ~failed_breakout_tolerance_pct:config.failed_breakout_tolerance_pct
       ~early_stage2_max_weeks:config.early_stage2_max_weeks
       ~max_buy_candidates:config.max_buy_candidates
       ~neutral_blocks_longs:config.neutral_blocks_longs
@@ -463,10 +443,14 @@ let _screen ~config ~decline_is_slow_grind ~macro_trend ~sector_map ~stocks
     buy_candidates;
     short_candidates;
     watchlist =
-      _build_watchlist ~weights:config.weights
+      Screener_watchlist.build ~weights:config.weights
         ~thresholds:config.grade_thresholds
-        ~early_stage2_max_weeks:config.early_stage2_max_weeks ~candidates
-        ~buy_candidates ~buys_active;
+        ~early_stage2_max_weeks:config.early_stage2_max_weeks
+        ~failed_breakout_tolerance_pct:config.failed_breakout_tolerance_pct
+        ~candidates
+        ~buy_tickers:
+          (String.Set.of_list (List.map buy_candidates ~f:(fun c -> c.ticker)))
+        ~buys_active;
     macro_trend;
     cascade_diagnostics =
       _diagnostics_for_screen ~weights:config.weights
@@ -475,6 +459,7 @@ let _screen ~config ~decline_is_slow_grind ~macro_trend ~sector_map ~stocks
         ~max_score_override:config.max_score_override
         ~volume_ratio_exclude_range:config.volume_ratio_exclude_range
         ~min_price:config.min_price
+        ~failed_breakout_tolerance_pct:config.failed_breakout_tolerance_pct
         ~early_stage2_max_weeks:config.early_stage2_max_weeks ~total_stocks
         ~candidates_after_held ~macro_trend ~candidates ~buy_candidates
         ~short_candidates;

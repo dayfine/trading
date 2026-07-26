@@ -245,6 +245,43 @@ type config = {
           override path via [((screening_config ((min_price 5.0))))] — see
           [Weinstein_strategy.config.screening_config]. Not wired into any
           default config or the automated tuner sweep surface. *)
+  failed_breakout_tolerance_pct : float; [@sexp.default 0.0]
+      (** Failed-breakout invalidation tolerance [k], as a fraction. [0.0]
+          (default) disables the gate — screener output is bit-identical to
+          pre-feature behaviour on every input, so merging this moves no goldens
+          and changes no backtest result.
+
+          When [k > 0.0], a long candidate whose current close has fallen back
+          below [breakout_price *. (1. -. k)] is dropped from [buy_candidates]
+          and {b demoted to the watchlist} carrying the drop reason from
+          {!Screener_admission.failed_breakout_reason}. A candidate with an
+          unknown breakout price or an unknown current close is never
+          invalidated — absence of data is not evidence of failure.
+
+          {b Engineering adaptation, not a book-quoted rule.} The reference doc
+          states no "close back below the breakout level invalidates the
+          candidate" rule. This gate enforces spine item 3 against {b current}
+          data: §4.1 requirement 1 (breakout above resistance and above the
+          30-week MA) read as a condition that must still hold at evaluation
+          time, not only on the breakout bar; §4.6 "greater risk of false
+          breakout"; §5.2 "IF whipsaw ... acceptable to re-buy" (an invalidated
+          candidate is dropped, never barred from re-entry). Without this
+          re-validation the early-Stage2 admission window keeps a collapsed
+          breakout eligible for weeks, emitting an entry far above the market
+          (issue #2084, Finding 1).
+
+          [k] must not be set small: §Stage 2 (Ch. 2) treats a pullback "close
+          to the breakout point" as a {b second chance to buy}, and [k] is
+          exactly what separates that healthy pullback from a genuine failure.
+          Typical settings are 0.03-0.05.
+
+          Long side only: the short-side breakdown mirror is not implemented.
+
+          Default-off dial reachable from the scenario/strategy override path
+          via [((screening_config ((failed_breakout_tolerance_pct 0.05))))] —
+          see [Weinstein_strategy.config.screening_config]. Not wired into any
+          default config; awaits a surface-sweep ACCEPT per the experiment-flag
+          discipline. *)
   early_stage2_max_weeks : int; [@sexp.default 4]
       (** Early-Stage2 admission / scoring window, in weeks. A fresh Stage2
           candidate (no observed Stage1→Stage2 breakout) is admitted as a
@@ -325,7 +362,14 @@ type cascade_diagnostics = {
           macro gate is binary across all candidates per side. *)
   long_breakout_admitted : int;
       (** Of [long_macro_admitted], how many satisfied
-          [Stock_analysis.is_breakout_candidate]. *)
+          [Stock_analysis.is_breakout_candidate] and survived the
+          failed-breakout re-validation. *)
+  long_failed_breakout_dropped : int;
+      (** How many otherwise-valid breakout candidates the failed-breakout gate
+          invalidated (see {!config.failed_breakout_tolerance_pct}). Always [0]
+          when the gate is disabled (the default) or when the macro gate closed
+          the long side. Not part of the monotone admitted chain — it counts
+          drops, not survivors. *)
   long_sector_admitted : int;
       (** Of [long_breakout_admitted], how many sat in a sector that was not
           [Weak]. *)
@@ -365,8 +409,10 @@ type result = {
   buy_candidates : scored_candidate list;  (** Ranked by score descending. *)
   short_candidates : scored_candidate list;  (** Ranked by score descending. *)
   watchlist : (string * string) list;
-      (** Tickers with grade C that passed the filter but missed top-N.
-          [(ticker, reason)]. *)
+      (** [(ticker, reason)] rows for names worth watching but not buying:
+          grade-C/D near-misses, plus failed-breakout demotions when
+          {!config.failed_breakout_tolerance_pct} is armed. See
+          {!Screener_watchlist}. *)
   macro_trend : Weinstein_types.market_trend;
       (** The macro trend used by the cascade gate. *)
   cascade_diagnostics : cascade_diagnostics;
