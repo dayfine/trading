@@ -121,15 +121,7 @@ type _precomputed = {
   stage : float array;
   rs : float array;
   macro : float array;
-  sketch : Resistance_sketch.t;
 }
-
-(* Out-of-range [Res_hist k] (a schema not built from
-   [Snapshot_schema.all_fields]) reads as NaN rather than raising — the
-   canonical default schema never produces one. *)
-let _hist_value (sketch : Resistance_sketch.t) ~k ~i =
-  if k >= 0 && k < Array.length sketch.hist then sketch.hist.(k).(i)
-  else Float.nan
 
 let _value_for_field ~field ~precomputed ~bars_arr ~i =
   match (field : Snapshot_schema.field) with
@@ -146,11 +138,13 @@ let _value_for_field ~field ~precomputed ~bars_arr ~i =
   | Close -> bars_arr.(i).Types.Daily_price.close_price
   | Volume -> Float.of_int bars_arr.(i).Types.Daily_price.volume
   | Adjusted_close -> bars_arr.(i).Types.Daily_price.adjusted_close
-  | Res_max_high_130w -> precomputed.sketch.max_high_130w.(i)
-  | Res_max_high_260w -> precomputed.sketch.max_high_260w.(i)
-  | Res_max_high_520w -> precomputed.sketch.max_high_520w.(i)
-  | Res_bars_seen -> precomputed.sketch.bars_seen.(i)
-  | Res_hist k -> _hist_value precomputed.sketch ~k ~i
+  (* Sketch-v5 PR 4: the dense resistance-sketch columns are retired from the
+     canonical schema (reconstructed from the [SYMBOL.weekly] side-table on
+     read). This pipeline no longer materializes them; if a legacy dense schema
+     is passed in, these cells read as NaN rather than raising. *)
+  | Res_max_high_130w | Res_max_high_260w | Res_max_high_520w | Res_bars_seen
+  | Res_hist _ ->
+      Float.nan
 
 let _row_for_day ~symbol ~schema ~precomputed ~bars_arr ~i =
   let date = bars_arr.(i).Types.Daily_price.date in
@@ -200,7 +194,7 @@ let _compute_weekly_arrays ~bars_arr ~weekly_prefix ~benchmark_bars =
   done;
   (stage, rs, macro)
 
-let _compute_precomputed ~bars_arr ~deep_arr ~benchmark_bars =
+let _compute_precomputed ~bars_arr ~benchmark_bars =
   let closes =
     Array.map bars_arr ~f:(fun (b : Types.Daily_price.t) -> b.adjusted_close)
   in
@@ -218,23 +212,17 @@ let _compute_precomputed ~bars_arr ~deep_arr ~benchmark_bars =
   let stage, rs, macro =
     _compute_weekly_arrays ~bars_arr ~weekly_prefix ~benchmark_bars
   in
-  (* Only the sketch columns see [deep_arr] (resistance-v2 §D4); the 13 warmup-
-     windowed columns above are computed from [bars_arr] alone, so a deep feed
-     never perturbs them. *)
-  let sketch =
-    Resistance_sketch.compute_windowed ~deep_bars:deep_arr ~bars_arr
-  in
-  { ema; sma; atr; rsi; stage; rs; macro; sketch }
+  { ema; sma; atr; rsi; stage; rs; macro }
 
 (* Build snapshot rows for a non-empty [bars_arr]. Extracted from
-   [build_for_symbol] to eliminate the nested-else. *)
-let _build_rows ~symbol ~bars_arr ~deep_arr ~schema ~benchmark_bars =
+   [build_for_symbol] to eliminate the nested-else. The 13 canonical columns are
+   computed from [bars_arr] alone; [deep_bars] no longer feeds any column (the
+   dense sketch is retired) — it is only boundary-validated by the caller. *)
+let _build_rows ~symbol ~bars_arr ~schema ~benchmark_bars =
   let n = Array.length bars_arr in
   if n = 0 then Ok []
   else
-    let precomputed =
-      _compute_precomputed ~bars_arr ~deep_arr ~benchmark_bars
-    in
+    let precomputed = _compute_precomputed ~bars_arr ~benchmark_bars in
     let rows =
       List.init n ~f:(fun i ->
           _row_for_day ~symbol ~schema ~precomputed ~bars_arr ~i)
@@ -276,4 +264,4 @@ let build_for_symbol ~symbol ~bars ~schema ?(deep_bars = []) ?benchmark_bars ()
     let deep_arr = Array.of_list deep_bars in
     match _validate_deep_precedes ~deep_arr ~bars_arr with
     | Error e -> Error e
-    | Ok () -> _build_rows ~symbol ~bars_arr ~deep_arr ~schema ~benchmark_bars
+    | Ok () -> _build_rows ~symbol ~bars_arr ~schema ~benchmark_bars

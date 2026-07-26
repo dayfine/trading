@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-20 (orchestrator run 29748583702 — run-3 of 07-20: main GREEN, HEAD `0e6430cb` (#2019 = run-2 daily-summary merge, docs-only). GHA CI on `0e6430cb` build-and-test + perf-tier1-smoke = success (both branch-protection-required) + golden-custom-universe success (golden-sp500-5y cancelled — concurrency, non-fatal). status_file_integrity exit 0; index_size exit 0 (10460/20480). Since run-2's summary (#2019): NOTHING landed on main — HEAD is #2019 itself, so the code tree is byte-identical to run-2's verified-green state. **1 open PR — maintainer-authored active-LOCAL, unchanged** — #2009 (`harness/bayesian-gp-nugget-escalation`, LAPACKE GP-Cholesky nugget fix, self-COMMENTED, head `1de25b47`, unchanged since 07-19T14:27Z); orchestrator does NOT engage active-LOCAL per gha-local-coordination collision-avoidance. ZERO dispatches: every feature track deep-warehouse-data-gated [no EODHD_API_KEY] / human-gated / active-LOCAL; harness backlog otherwise done/milestone/PAT-gated (#1636 workflow-PAT); cleanup §Backlog 0 real `[ ]` (07-13 deep scan Action-required NO); ops-data no API key + data-gaps.md unchanged since #814. No `[drift]`, no still-real `[critical]`. All table rows accurate from run-1 reconcile; no track drift → no row edits.)
+Last updated: 2026-07-25 (orchestrator run 30139534129 — run-1 of 07-25: **2 tracks dispatched, 1 merged, 1 auto-merge armed, 1 rework cycle.** Took over the P0 handed off in #2082's session-close addendum: **#2077 leverage-dawn MERGED** (`c76c170d`) after verifying + landing the salvaged `wip/leverage-dawn-b1-rework` WIP and closing qc-behavioral's B1 "mechanism never funds" finding via the permissive-funding inversion; QC structural+behavioral APPROVED 4/5. **#2085 trade_audit external-exit capture** (#2076) QC-APPROVED 4/5 after one rework closing a CP4 gap; auto-merge armed. Deterministic gates on main `46b3a8d0`: build 0, runtest 0, status_file_integrity 0, index_size_linter 0. No `[drift]`, no `[critical]`. Root-caused the recurring agent Finish-Protocol violation: the Bash tool's 120s default timeout. Prior index entry: run-6 of 07-24 — **2 tracks dispatched, 2 PRs, 2 rework cycles, 1 auto-merged.** Ends a 27-run zero-dispatch streak — re-audit of the P1 queue in `next-session-priorities-2026-07-24.md` found two items that were neither data-gated nor user-gated. **#2073 tax-lens `Loader.load_exn` contract MERGED** (found + fixed a real silent-drop defect; rework closed a second instance in `_load_equity`; QC 4/5). **#2074 margin-realism #2057 exit-label observability** — root cause `Margin_runner` transitions never reached any observer; new strategy-agnostic `Simulator.on_transitions` hook; QC structural+behavioral APPROVED at `1eaa6806` (A1 judged PASS), auto-merge armed. Follow-up **#2076** filed for the deferred `trade_audit.sexp` half so #2057 does not auto-close half-fixed. Deterministic gates: status_file_integrity exit 0, index_size_linter exit 0. No `[drift]`, no `[critical]`.)
 
 ## Active + complete tracks
 
@@ -13,8 +13,9 @@ Each row: one line; deeper task detail in the linked status file.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
-| [resistance-v2](resistance-v2.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | grid 3/3 ACCEPT robust w=30; memo #2012 + bundle #2013 + lever f #2015 (default-off) MERGED; R3 default-flip human-gated; WF-CV vs w30 data-gated |
-| [margin-realism](margin-realism.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | M1a/M1b-1/M1b-2+M2(#2010)+M3a borrow-avail(#2016)+M3b buy-in-stress(#2017) all MERGED default-off; next: M4 (default-off; maintainer LOCAL) |
+| [resistance-v2](resistance-v2.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | grid 3/3 ACCEPT w=30; BUNDLE PROMOTED default-on #2047 (R3 human-approved 07-23); next: WF-CV vs w30 (data-gated) + lever-b axis |
+| [margin-realism](margin-realism.md) | IN_PROGRESS | dayfine (maintainer LOCAL) + feat-backtest | — | M4 MERGED #2063; #2057 exit labels MERGED #2074; trade_audit half MERGED #2085; #2076 open (report-layer rendering out of scope) |
+| [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
 | [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | — | trades.csv export-join fix MERGED (#1942, position_id column); next: validator audit-join fix (C6b, dispatched) then P2 matrix (data-gated) |
@@ -29,12 +30,12 @@ Each row: one line; deeper task detail in the linked status file.
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
 | [hybrid-tier](hybrid-tier.md) | MERGED | — | — | — |
-| [trade-audit](trade-audit.md) | MERGED | — | — | — |
+| [trade-audit](trade-audit.md) | IN_PROGRESS | feat-backtest | #2085 | external-exit capture via `Simulator.on_transitions` QC-APPROVED, auto-merge armed; #2076 stays open (report-layer rendering out of scope) |
 | [decision-audit](decision-audit.md) | MERGED | feat-backtest | — | #1799/#1806/#1811 MERGED (report+counterfactual+weekly-picks adapter); selection FAITHFUL; live-picks pipeline ready (#1812); next: matured weekly counterfactual |
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — |
-| [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | #1760 liquidity overlay MERGED (default-off); #1659 short-sleeve MERGED; next: short-leg regime-P&L decomposition (Thread C, LOCAL/data-gated) |
+| [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein + dayfine (LOCAL) | #2081 | #1760 liquidity overlay MERGED; #2081 robust dollar-ADV (#2060) OPEN maintainer-LOCAL; next: short-leg regime-P&L decomposition (LOCAL) |
 | [extension-stop](extension-stop.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | arming + insurance-ACCEPT MERGED (#1960, ext_stop 2.0/0.25, default-off); next: default-flip only on further insurance-ACCEPT (R3, human-gated) |
 | [decline-character](decline-character.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | All builds + A-D flip merged; arming-speed A-D-live WF-CV REJECTED (#1729 ledger 06-24); decline mechanisms stay default-off axes; exhausted (#1739) |
 | [spy-only-reference](spy-only-reference.md) | IN_PROGRESS | feat-weinstein | — | WF-CV on sector-rotation testbed; top-1000 bankability gate; long-short verification (human session) |
@@ -58,6 +59,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
 | [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | snapshot fast-input path (#1784) + corrected 5-wk picks (#1781) MERGED; next: large-warehouse multi-week sweep (data-gated); live-cycle human-gated |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
+| [tax-lens](tax-lens.md) | MERGED | feat-backtest | — | Phase 1 #2066 + CP4 loader error-path contract #2073 MERGED; Phase 2 wash-sale / April outflows deferred, user-gated (#2006) |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | asset-type blocklist MERGED (#1939, default-off); next: arm ATB.curated for live universe build + General::Type enrichment feed |
 | [floor-quality](floor-quality.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | P1b step2 SPY-sleeve MERGED #1913; next = step 3 lens screen vs TR-SPY (deep-warehouse, maintainer LOCAL / S5) |
 

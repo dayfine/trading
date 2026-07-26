@@ -60,13 +60,27 @@
     [schema_hash] gate will surface the mismatch loudly. This is the intended
     behaviour for a content-addressable schema fingerprint, not a regression.
 
-    {2 Resistance sketch columns (resistance-v2)}
+    {2 Resistance sketch columns (resistance-v2) — RETIRED from the canonical
+       schema in sketch-v5 PR 4}
+
+    These constructors ([Res_max_high_130w] / [Res_max_high_260w] /
+    [Res_max_high_520w] / [Res_bars_seen] / [Res_hist]) are {b retained in the
+    [field] type for decode only}: the three-generation runtime reader still reads
+    older v3 (37-col) and v4 (97-col) warehouses via their own per-file manifest
+    schemas, which enumerate these fields. The canonical {!all_fields} / {!default}
+    NO LONGER include them (schema width back to the 13 pre-resistance columns), so
+    freshly built warehouses omit the dense sketch entirely. The overhead-supply
+    sketch is reconstructed on demand from the sparse [SYMBOL.weekly] side-table
+    ({!Data_panel_snapshot.Weekly_sidetable}) — see
+    [dev/plans/resistance-v2-supply-sketches-2026-07-15.md] and the sketch-v5
+    chain. The v4 semantics below still describe how a {b legacy} warehouse's dense
+    columns are laid out (what the decode path reads):
 
     Precomputed point-in-time overhead-supply sketches, appended after
-    [Adjusted_close] (same append discipline as the OHLCV addition; schema
-    width grows from 13 to 97: 4 scalar sketch columns + [n_hist_cells = 80]
-    age-banded histogram columns). All values are weekly-cadence aggregates
-    computed causally from bars up to and including the row's day — see
+    [Adjusted_close] (same append discipline as the OHLCV addition; a v4 warehouse
+    is 97 columns: 4 scalar sketch columns + [n_hist_cells = 80] age-banded
+    histogram columns). All values are weekly-cadence aggregates computed causally
+    from bars up to and including the row's day — see
     [dev/plans/resistance-v2-supply-sketches-2026-07-15.md] §D1-D4 and the
     age-banded histogram (lever f, sketch v3):
 
@@ -139,9 +153,11 @@ val n_hist_cells : int
     enumerates exactly that range. *)
 
 val all_fields : field list
-(** [all_fields] enumerates every variant of {!field} in declaration order. Used
-    by tests and by [Snapshot_schema.default] to construct the canonical Phase-A
-    schema. *)
+(** [all_fields] is the canonical column set: the 13 indicator + OHLCV fields,
+    in declaration order. It does {b not} include the retired resistance-sketch
+    constructors ([Res_*]) — those remain in the {!field} type for decoding
+    legacy warehouses only (see the type docstring). Used by tests and by
+    {!default} to construct the canonical schema. *)
 
 val field_name : field -> string
 (** [field_name f] returns the canonical short string name (e.g. ["EMA_50"]).
@@ -167,9 +183,10 @@ val create : fields:field list -> t
     well-defined) but produces a schema that no real snapshot can match. *)
 
 val default : t
-(** [default] is the canonical 97-field schema: every field in {!all_fields}
-    order. The single source of truth for snapshots produced by the offline
-    pipeline. *)
+(** [default] is the canonical 13-field schema: every field in {!all_fields}
+    order (the dense resistance-sketch columns were retired in sketch-v5 PR 4).
+    The single source of truth for snapshots produced by the offline pipeline.
+*)
 
 val compute_hash : field list -> string
 (** [compute_hash fields] returns a deterministic hex fingerprint of the ordered

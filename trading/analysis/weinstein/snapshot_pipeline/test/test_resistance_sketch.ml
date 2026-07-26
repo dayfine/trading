@@ -266,10 +266,11 @@ let test_virgin_parity_with_v1_mapper _ =
   in
   assert_that agreements (equal_to (List.length breakouts))
 
-(* End-to-end: the default schema's sketch columns are populated by
-   [Pipeline.build_for_symbol]. 10 consecutive calendar days from Tue
-   2024-01-02 span ISO weeks 1-2, so the last row has 2 weekly bars. *)
-let test_pipeline_populates_sketch_columns _ =
+(* Sketch-v5 PR 4: the canonical [default] schema no longer carries the dense
+   resistance-sketch columns, so [Pipeline.build_for_symbol] emits rows in which
+   [Res_bars_seen] / [Res_max_high_520w] are ABSENT ([Snapshot.get = None]),
+   while a retained 13-column field ([Close]) is still populated. *)
+let test_pipeline_omits_retired_sketch_columns _ =
   let dates = List.init 10 ~f:(Date.add_days (Date.of_string "2024-01-02")) in
   let bars =
     List.mapi dates ~f:(fun i d ->
@@ -286,14 +287,16 @@ let test_pipeline_populates_sketch_columns _ =
         | Some r ->
             Ok
               ( Snapshot.get r Snapshot_schema.Res_bars_seen,
-                Snapshot.get r Snapshot_schema.Res_max_high_520w ))
+                Snapshot.get r Snapshot_schema.Res_max_high_520w,
+                Snapshot.get r Snapshot_schema.Close ))
   in
   assert_that last_row_fields
     (is_ok_and_holds
        (all_of
           [
-            field (fun (a, _) -> a) (is_some_and (float_equal 2.0));
-            field (fun (_, b) -> b) (is_some_and (float_equal 110.0));
+            field (fun (a, _, _) -> a) is_none;
+            field (fun (_, b, _) -> b) is_none;
+            field (fun (_, _, c) -> c) (is_some_and (float_equal 109.0));
           ]))
 
 (* Split-parity: splitting a series into (deep, window) then feeding both to
@@ -452,8 +455,8 @@ let suite =
          "age bands separate old supply" >:: test_age_bands_separate_old_supply;
          "corrupt close degrades to NaN" >:: test_corrupt_close_degrades_to_nan;
          "virgin parity with v1 mapper" >:: test_virgin_parity_with_v1_mapper;
-         "pipeline populates sketch columns"
-         >:: test_pipeline_populates_sketch_columns;
+         "pipeline omits retired sketch columns"
+         >:: test_pipeline_omits_retired_sketch_columns;
          "split parity bit-identical" >:: test_split_parity_bit_identical;
          "deep bars_seen honesty" >:: test_deep_bars_seen_honesty;
          "deep bars basis guard (13 columns)" >:: test_deep_bars_basis_guard;

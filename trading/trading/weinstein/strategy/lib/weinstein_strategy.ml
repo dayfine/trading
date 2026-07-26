@@ -32,11 +32,13 @@ module Ad_series_cache = Ad_series_cache
 module Macro_inputs = Macro_inputs
 module Panel_callbacks = Panel_callbacks
 module Resistance_sketch_reader = Resistance_sketch_reader
+module Weekly_sidetable_reader = Weekly_sidetable_reader
 module Weekly_ma_cache = Weekly_ma_cache
 module Audit_recorder = Audit_recorder
 module Entry_audit_capture = Entry_audit_capture
 module Screening_notional = Screening_notional
 module Long_buying_power = Long_buying_power
+module Leverage_dawn = Leverage_dawn
 module Short_borrow_gate = Short_borrow_gate
 module Exit_audit_capture = Exit_audit_capture
 include Weinstein_strategy_config
@@ -44,8 +46,8 @@ module Weinstein_strategy_macro = Weinstein_strategy_macro
 module Weinstein_strategy_config = Weinstein_strategy_config
 module S = Weinstein_strategy_screening
 
-let held_symbols = S.held_symbols
-let entries_from_candidates = S.entries_from_candidates
+let held_symbols = Entry_walk.held_symbols
+let entries_from_candidates = Entry_walk.entries_from_candidates
 let survivors_for_screening = S.survivors_for_screening
 let prune_universe_by_active_through = S.prune_universe_by_active_through
 let stock_analysis_config_for = S._stock_analysis_config_for
@@ -366,6 +368,10 @@ let _on_market_close ~fold_start_date ~config ~ad_series ~stop_states
 let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
     ?(ticker_sectors = Hashtbl.create (module String)) ?bar_reader
     ?(audit_recorder = Audit_recorder.noop) ?fold_start_date config =
+  (* Fail loudly on an inconsistent dawn-leverage config (margin must be armed;
+     the dawn requirement must be a fractional (0,1] requirement). No-op when
+     [dawn_leverage_enabled = false]. *)
+  Leverage_dawn.validate config;
   let bar_reader =
     match bar_reader with Some r -> r | None -> Bar_reader.empty ()
   in

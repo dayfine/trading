@@ -1,6 +1,6 @@
 # Status: margin-realism
 
-## Last updated: 2026-07-19
+## Last updated: 2026-07-25
 
 ## Status
 IN_PROGRESS
@@ -265,6 +265,114 @@ and M1b (follow-up).
   - Verify: `dune runtest trading/simulation/test/test_short_buyin.ml
     trading/portfolio/test trading/backtest/walk_forward/test` (container path
     `/workspaces/trading-1/.claude/worktrees/<ws>/trading`).
-- **M4** — validation protocol (parity gates, squeeze stress cells, leverage
-  surface via experiment-gap-closing + confirmation grid). No default flips and no
-  levered number is quoted until M4.
+- [x] **M4 — validation protocol COMPLETE (2026-07-23/24), verdict: leverage REJECT.**
+  Full record: `dev/notes/margin-m4-validation-2026-07-23.md`; ledger
+  `2026-07-24-margin-m4-leverage-surface` (Reject).
+  - Stage 1 parity gates: ALL PASS bit-identical (margin-off ≡ baseline
+    cross-commit vs the 07-22 +8,689% record arm; explicit no-op threading ≡
+    absent-field; req=1.0/rate=0 ≡ E-capped on the shorts-on path). New
+    unlevered E-capped anchor on the promoted bundle: +10,589% / Sharpe .906 /
+    DD 31.1.
+  - Stage 2 squeeze cells (dot-com/GFC/meme, tiers + buy-in armed): PASS —
+    do-no-harm (zero spurious events on faithful paths; stops always fire
+    before tiered maintenance is reachable), engagement + timing proven on a
+    forced-threshold cell (33/33 covers ~1 tick after breach). Harness gap
+    filed: margin exit labels don't propagate to trades.csv/trade_audit
+    (issue #2057).
+  - Stage 3 leverage surface (broad 13×2y, priced 8%/yr + M2 maintenance 0.30
+    + tier tables): all six cells FAIL the fold gate. req=0.75 → Sharpe
+    .827→.56, DD 14→50; req=0.5 → .34, DD 89 (ruined folds, less raw return
+    than 1.33×). Cash-account long-short .883 (6/13) = only faint positive,
+    not gate-robust. Armed-margin no-op corner fold-identical to baseline
+    13/13 ✓. No promotion, no grid, no default flips.
+
+## Follow-ups (post-M4)
+
+- [x] **#2057 — margin exit labels now reach `trades.csv` / `Stop_log`
+  (observability-only fix; `trade_audit.sexp` half tracked separately as
+  #2076).** Branch `feat/margin-realism-exit-labels`.
+  Root cause: `Backtest.Strategy_wrapper.wrap` (the only place that fed
+  `Stop_log.record_transitions`) intercepts transitions at the strategy's own
+  `on_market_close` call boundary — but `Margin_runner.tick`'s
+  margin-driven transitions (`margin_call` / `buyin_stress` /
+  `maintenance_reduce`, all `Position.StrategySignal`) are generated in
+  `Simulator._process_step_day` *after* the strategy call returns, and margin
+  runs unconditionally every step regardless of strategy cadence — so no
+  observer was ever wired to see them.
+  - Fix: new `Simulator.dependencies.on_transitions` hook (mirrors the
+    existing `on_trade_fill` strategy-agnostic-hook pattern), invoked once per
+    step with the FINAL post-dedup transition list (strategy's surviving
+    transitions + margin's), right after `Margin_runner.tick` returns.
+    `Backtest.Panel_runner._make_simulator` wires it to
+    `Stop_log.record_transitions stop_log`, alongside (not replacing) the
+    existing `Strategy_wrapper` interception — `record_transitions` is
+    idempotent w.r.t. re-recording, and on a same-tick strategy/margin
+    collision the later `on_transitions` call correctly overwrites the
+    wrapper's stale strategy-side trigger with the winning margin one (a
+    latent staleness bug the old design had on collision days, fixed as a
+    side effect). **This collision-overwrite claim is now pinned by a test**
+    (QC rework, see below): `test_stop_log_records_margin_call_on_strategy_collision`
+    reuses the `_short_then_stop_strategy` collision fixture from
+    `test_margin_runner.ml` and asserts the final `Stop_log` label is
+    `margin_call`, not the strategy's `Stop_loss`. This is the *correct*
+    semantic, not a misattribution: `Margin_runner.dedup_strategy_exits_for_margin`
+    drops the strategy's colliding `TriggerExit` from `strategy_transitions`
+    before `_apply_transitions` runs, so the strategy's stop-loss never
+    actually executes — only margin's `TriggerExit` does — and `Stop_log`
+    should (and now does) reflect what actually closed the position.
+  - `trade_audit.sexp` scope note: investigated and found that its exit-side
+    enrichment (`Exit_audit_capture.emit_for_list`, wired from
+    `weinstein_strategy.ml`'s stops pass) already only covers
+    `Stops_runner`-triggered exits — it has NEVER captured any other
+    `StrategySignal`-labeled exit (`stage3_force_exit`, `laggard_rotation`,
+    `extension_stop`, `harvest_rotate`, `macro_bearish_trim` all reach
+    `trades.csv` but not `trade_audit.sexp` today). Margin exits landing in
+    the same gap is consistent pre-existing behavior, not a margin-specific
+    regression, and fixing it would require either fabricating
+    macro/stage/rs context Margin_runner architecturally cannot have, or a
+    materially larger cross-cutting feature (giving `Trade_audit` visibility
+    into every externally-generated exit source) — out of scope for an
+    observability-only bugfix. **Filed as #2076** (QC rework — the prior
+    revision only flagged this in prose with no tracked artifact, which
+    would have let `Closes #2057` auto-close an issue whose title names this
+    still-broken sink). PR body now reads "Partially addresses #2057" with
+    #2076 cross-referenced instead of `Closes #2057`.
+  - No behavior change: `on_transitions` is a pure read-only observer: it
+    never touches `portfolio`/`positions`/fills — same numbers, same PnL.
+  - Tests: `test_margin_runner.ml` (+3 — `on_transitions_observes_margin_call`
+    / `_buyin_stress` / `_maintenance_reduce`, at the `Simulator` layer,
+    pinning the raw transition list) and `test_margin_exit_observability.ml`
+    (+3 — same three labels, one layer up, using the exact
+    `Stop_log.record_transitions` composition `Panel_runner` wires in
+    production, asserting on `Stop_log.get_stop_infos`'s `exit_trigger` — the
+    value `Result_writer` reads for `trades.csv`; +1 more, the collision test
+    above, added in QC rework). All 6 original assertions verified to FAIL
+    before the fix (temporarily disabled the `on_transitions` call site) and
+    PASS after; the collision test's correctness follows directly from
+    `dedup_strategy_exits_for_margin`'s documented `.mli` contract.
+  - Verify: `dune runtest trading/simulation/test/test_margin_runner.ml
+    trading/backtest/test/test_margin_exit_observability.ml`.
+- [x] **#2076 — `trade_audit.sexp` visibility for margin (and other
+  externally-generated) exits — fixed.** Branch
+  `feat/trade-audit-external-exits` (PR #2085). Same seam as #2057's fix
+  above (`Simulator.dependencies.on_transitions`), now also driving
+  `Trade_audit.record_transitions` (mirrors `Stop_log.record_transitions`):
+  fills in a reason-only `external_exit_decision` (`symbol`, `exit_date`,
+  `position_id`, `exit_trigger` — no macro/stage/RS, which the observer
+  cannot fabricate at this layer) on `audit_record` for any `TriggerExit`
+  whose position has no enriched `exit_` yet. Enriched always wins (safe
+  by construction — the strategy's own enriched-path recording always
+  completes before `on_transitions` fires for the same step).
+  `Panel_runner._make_simulator` composes both `Stop_log.record_transitions`
+  and `Trade_audit.record_transitions` into the single `on_transitions`
+  closure. Also fixes the pre-existing (non-margin) gap for
+  `stage3_force_exit` / `laggard_rotation` / `extension_stop` /
+  `macro_bearish_trim` for free (same generic path, no per-label
+  special-casing); `harvest_rotate` stays out of scope (it's a partial
+  trim, `TriggerPartialExit`, not a round-trip close). Full writeup:
+  `dev/status/trade-audit.md` §"Externally-generated exits (2026-07-25,
+  issue #2076)".
+- #2059 — LH phantom-short leak + duplicated trades.csv row (record basis,
+  −$607k/0.85% immaterial but real).
+- #2060 — mean-ADV liquidity gate spoofable by single block-print day (LINK
+  −$1.58M specimen; median/k-of-N candidates, default-off).

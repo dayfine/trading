@@ -90,9 +90,9 @@ let doc_end_date =
 let doc_sketch_deep_days =
   Printf.sprintf
     "N Calendar days of extra pre-START-DATE history fed only to the \
-     resistance sketch columns (resistance-v2 deep feed; the 13 \
-     warmup-windowed columns stay windowed to START-DATE). Ignored without \
-     --start-date. Default %d."
+     SYMBOL.weekly side-table's weekly aggregation (resistance-v2 deep feed; \
+     the 13 warmup-windowed .snap columns stay windowed to START-DATE). \
+     Ignored without --start-date. Default %d."
     Build_runner.default_sketch_deep_days
 
 let doc_incremental =
@@ -101,6 +101,11 @@ let doc_incremental =
 let doc_progress_every =
   Printf.sprintf "N Emit progress.sexp every N symbols processed (default %d)"
     Build_runner.default_progress_every
+
+let doc_emit_weekly_sidetable =
+  "DEPRECATED no-op (sketch-v5 PR 4): the SYMBOL.weekly side-table is now \
+   always emitted (it is the only overhead-supply representation), so this \
+   flag has no effect; accepted for invocation-script back-compat"
 
 let date_arg = Command.Param.optional (Command.Arg_type.create Date.of_string)
 
@@ -125,6 +130,8 @@ let command =
        flag "progress-every"
          (optional_with_default Build_runner.default_progress_every int)
          ~doc:doc_progress_every
+     and _emit_weekly_sidetable =
+       flag "emit-weekly-sidetable" no_arg ~doc:doc_emit_weekly_sidetable
      in
      fun () ->
        main ~universe_path ~csv_data_dir ~output_dir ~benchmark_symbol

@@ -147,7 +147,31 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
    conservative alternative. Ledger
    `2026-07-17-resistance-supply-confirmation-grid.sexp`; note
    `dev/notes/resistance-supply-grid-2026-07-17.md`.
-2. **PROMOTION DECISION — HUMAN-GATED (R3), with the terminal-wealth flag.**
+2. **PROMOTION EXECUTED (2026-07-23) — PR `feat/promote-bundle-defaults`.**
+   The user approved option A (R3) and the BUNDLE is now the default: the
+   strategy `default_config` arms `overhead_supply = Some
+   Resistance_supply.default_config` + `screening_config.weights.w_overhead_supply
+   = Some 30` + `virgin_crossing_readmission = true`, and
+   `Resistance_supply.default_config` floors are zeroed (0/0/0). Band weights
+   stay 1/1/1/0 (lever-f REJECT). The `[@sexp.default None/false]` field
+   annotations are unchanged so a pre-promotion config sexp still deserializes
+   disarmed (back-compat). A required companion fix gates the #2038 armed
+   sketch-reader loud-fail on `sketch_warehouse` (manifest side-table hash
+   present), so CSV/panel-mode runs — which have no sketch data — degrade to the
+   v1 binary grade instead of crashing now that arming is the default; genuine
+   sketch warehouses still fail loud on a missing scored-symbol side-table. No
+   committed golden re-pins were required (all `dune runtest` / perf-tier1 /
+   golden-runs scenarios run CSV/panel mode where `get_sketch -> None` keeps the
+   three levers inert = bit-identical); only default-config-pinning tests + the
+   live-generator display test re-pinned. Evidence chain in the PR body: ledgers
+   `2026-07-17-resistance-supply-confirmation-grid` (3/3),
+   `2026-07-20-bundle-promotion-studies` (sp500 CONFIRM / 2011 wash /
+   rolling-start REPAIR), `2026-07-22-leverf-age-band-surface` (REJECT). Known
+   accepted cost: bull-era broad windows ≈ wash vs baseline (~0.2 Sharpe below
+   bare w30 on 2011-26 cells); the regime softener (lever b) stays a designed
+   default-off axis. Superseded historical decision record below:
+
+   **PROMOTION DECISION — HUMAN-GATED (R3), with the terminal-wealth flag.**
    28y single-path: w30 +1,991% vs baseline +7,914% (same trade COUNT —
    but per the 07-17 divergence forensic the books differ: 367/1,187
    tickets shared, AXTI = $62.6M of the $64.7M forfeited cohort; note
@@ -167,9 +191,19 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
    Inconclusive-promising (floors-zero recovers +5.2pp return at
    equal DD, 10/13 Sharpe wins — the floor staircase was the
    redeemed-cohort tax; plain w30 keeps best mean Sharpe 0.860 vs
-   bundle 0.827). Missing before any flip: bundle confirmation grid
-   (sp500 + 2011 cells) + bundle rolling-start (recovery-window
-   repair check). Do NOT flip any default without the user.
+   bundle 0.827). **Bundle studies DONE (07-20)** — note
+   `dev/notes/bundle-studies-results-2026-07-20.md`, ledger
+   `2026-07-20-bundle-promotion-studies` (Inconclusive-pending-human):
+   sp500 cell CONFIRMS (bundle-w15 .737 / w30 .570 vs .396, both above
+   the w-only cell); broad-2011 cell REGRESSES to wash (bundle-w30
+   .599±.674 vs baseline .619 — vs w-only's .825±.223: floors are
+   regime-dependent); rolling-start REPAIRS the motivating tail
+   (2000/2008/2010 starts: w30 −5.8/−6.7/−8.5 → bundle +0.4/+0.2/−1.9
+   pp/yr vs baseline; 9/12 wins, median +2.08; worst-start realized
+   edge +7.79% = best of all three configs; MaxDD compression kept).
+   Human gate options: A promote BUNDLE (recommended — decisive-lens
+   argument), B keep axes pending lever (f), C bare w30 (not
+   recommended). Do NOT flip any default without the user.
 3. **Designed levers (default-off, in order):** (a) virgin-crossing
    re-admission — Stage-2 name crossing its 520w max on volume = fresh
    admissible breakout (AXTI-class access restored; book-faithful) —
@@ -210,6 +244,19 @@ load-bearing; binary grade → searchable weight; kill the 5h armed-run wall).
    v3 into the youngest band, so **existing v3 warehouses keep scoring
    identically with NO rebuild** (`hist_bands_of_legacy`). The v4 warehouse
    rebuild is DEFERRED pending the bundle verdict — no rebuild in this PR.
+   **SURFACES RUN + VERDICT (2026-07-22): the age lever is a ledger
+   REJECT** (`2026-07-22-leverf-age-band-surface`, note
+   `dev/notes/leverf-v5-results-2026-07-22.md`): broad home grid
+   monotone harm (.827 → .766 → .708 with old-band weight; recent-decay
+   .755); sp500 U-shape does not transfer. Default band weights 1/1/1/0
+   stay; the age axis is CLOSED. Byproduct: **sketch v5** (user-designed
+   sparse per-symbol weekly side-table, PRs #2026/#2027/#2032/#2038)
+   replaces the dense columns — warehouse 8.4G → 1.3G, broad folds
+   runnable again (~11 min), all sketch geometry now score-time config;
+   certified bit-identical at unit, 6-fold, and full-13-fold scale
+   (bundle row .827 reproduced to every decimal on the thin warehouse).
+   Warehouses of record: `/tmp/snap_top3000_dedup_v5thin` +
+   `/tmp/snap_sp500_2000_2026_v5thin`.
 4. dedup-v2 warehouse deletable (v3 certified bit-identical:
    `scenarios-2026-07-16-131756` baseline = Run D to 13 decimals).
 

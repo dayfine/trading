@@ -123,21 +123,22 @@ let _inputs_at ~as_of ~bar_reader ~ticker_sectors : Generator.inputs =
     as_of;
     bar_reader;
     ticker_sectors;
-    held_positions = [];
+    live_portfolio =
+      {
+        Weinstein_snapshot_gen.Live_portfolio.cash = 100_000.0;
+        as_of;
+        positions = [];
+      };
+    portfolio_is_placeholder = true;
   }
 
-(* [_inputs_at] with the resistance-v2 overhead-supply score armed (the
-   [w_overhead_supply] ranking weight stays off, so only the display changes). *)
-let _armed_inputs ~as_of ~bar_reader ~ticker_sectors : Generator.inputs =
+(* [_inputs_at] with the resistance-v2 overhead-supply score DISARMED
+   ([overhead_supply = None]) — the explicit escape hatch that reverts the
+   live display to the v1 binary grade after the 2026-07-23 bundle promotion
+   armed it by default. *)
+let _disarmed_inputs ~as_of ~bar_reader ~ticker_sectors : Generator.inputs =
   let base = _inputs_at ~as_of ~bar_reader ~ticker_sectors in
-  {
-    base with
-    config =
-      {
-        base.config with
-        overhead_supply = Some Resistance_supply.default_config;
-      };
-  }
+  { base with config = { base.config with overhead_supply = None } }
 
 let _inputs ~bar_reader ~ticker_sectors : Generator.inputs =
   _inputs_at ~as_of:_as_of ~bar_reader ~ticker_sectors
@@ -163,6 +164,118 @@ let test_metadata_stamped _ =
          field (fun (s : Weekly_snapshot.t) -> s.date) (equal_to _as_of);
          field (fun (s : Weekly_snapshot.t) -> s.held_positions) (size_is 0);
        ])
+
+(* With a live portfolio holding AAPL, the generator prices it into a held row
+   (shares + current price + unrealized %) AND excludes it from the candidate
+   output (held tickers are not re-recommended). *)
+let test_live_portfolio_populates_held _ =
+  let position : Weinstein_snapshot_gen.Live_portfolio.position =
+    {
+      symbol = "AAPL";
+      shares = 10;
+      entry_price = 150.0;
+      entry_date = Date.of_string "2022-01-03";
+      stop_price = 140.0;
+    }
+  in
+  let base =
+    _inputs_at ~as_of:_as_of ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  let inputs =
+    {
+      base with
+      live_portfolio =
+        {
+          Weinstein_snapshot_gen.Live_portfolio.cash = 50_000.0;
+          as_of = _as_of;
+          positions = [ position ];
+        };
+      portfolio_is_placeholder = false;
+    }
+  in
+  let snap = Generator.generate inputs in
+  assert_that snap
+    (all_of
+       [
+         field
+           (fun (s : Weekly_snapshot.t) -> s.held_positions)
+           (elements_are
+              [
+                all_of
+                  [
+                    field
+                      (fun (h : Weekly_snapshot.held_position) -> h.symbol)
+                      (equal_to "AAPL");
+                    field
+                      (fun (h : Weekly_snapshot.held_position) -> h.shares)
+                      (equal_to 10);
+                    field
+                      (fun (h : Weekly_snapshot.held_position) ->
+                        h.current_price)
+                      (gt (module Float_ord) 0.0);
+                  ];
+              ]);
+         field
+           (fun (s : Weekly_snapshot.t) ->
+             List.count s.long_candidates ~f:(fun c ->
+                 String.equal c.symbol "AAPL"))
+           (equal_to 0);
+       ])
+
+(* No-resident-bars graceful degradation for a held position (CP4 pin): a held
+   symbol ABSENT from the bar reader must fall back to its entry price (zero
+   unrealized) and carry no recomputed stop, per the documented fallbacks in
+   [_current_price] / [_unrealized_pct] / [_recommended_stop]. *)
+let test_held_without_bars_degrades_gracefully _ =
+  let position : Weinstein_snapshot_gen.Live_portfolio.position =
+    {
+      symbol = "GHOST";
+      shares = 7;
+      entry_price = 42.0;
+      entry_date = Date.of_string "2022-01-03";
+      stop_price = 40.0;
+    }
+  in
+  let base =
+    _inputs_at ~as_of:_as_of ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  let inputs =
+    {
+      base with
+      live_portfolio =
+        {
+          Weinstein_snapshot_gen.Live_portfolio.cash = 50_000.0;
+          as_of = _as_of;
+          positions = [ position ];
+        };
+      portfolio_is_placeholder = false;
+    }
+  in
+  let snap = Generator.generate inputs in
+  assert_that snap
+    (field
+       (fun (s : Weekly_snapshot.t) -> s.held_positions)
+       (elements_are
+          [
+            all_of
+              [
+                field
+                  (fun (h : Weekly_snapshot.held_position) -> h.symbol)
+                  (equal_to "GHOST");
+                field
+                  (fun (h : Weekly_snapshot.held_position) -> h.current_price)
+                  (float_equal 42.0);
+                field
+                  (fun (h : Weekly_snapshot.held_position) -> h.unrealized_pct)
+                  (float_equal 0.0);
+                field
+                  (fun (h : Weekly_snapshot.held_position) ->
+                    h.recommended_stop)
+                  is_none;
+              ];
+          ]))
 
 (* The breakout AAPL surfaces as a ranked long candidate with a populated
    entry / score / rationale (T4: domain outcome, not just "no error"). *)
@@ -281,14 +394,34 @@ let _aapl_resistance_grade (snap : Weekly_snapshot.t) : string option =
       String.equal c.symbol "AAPL")
   |> Option.bind ~f:(fun (c : Weekly_snapshot.candidate) -> c.resistance_grade)
 
-(* Default (overhead_supply disarmed): the resistance grade is the v1 binary
-   quality label (e.g. "Virgin_territory") — no continuous score suffix. The "("
-   in the v2 "Grade (0.NN)" form is absent, so the display is byte-identical to
-   the pre-feature v1 grade. *)
-let test_default_resistance_grade_is_v1 _ =
+(* Default (overhead_supply armed by the 2026-07-23 bundle promotion): the
+   live generator computes a real sketch from the bar history, so the resistance
+   grade renders the v2 sketch-derived form "<quality> (<score>)" — the
+   continuous score alongside the letter grade (score/display split, §D5). This
+   is the user-visible live-review change the promotion intends. *)
+let test_default_resistance_grade_is_v2 _ =
   let snap =
     _generate ~bar_reader:(_breakout_bar_reader ())
       ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  assert_that
+    (_aapl_resistance_grade snap)
+    (is_some_and
+       (matching ~msg:"v2 grade renders a parenthesized continuous score"
+          (fun grade ->
+            if String.is_substring grade ~substring:" (" then Some () else None)
+          (equal_to ())))
+
+(* Disarmed escape hatch ([overhead_supply = None]): the resistance grade
+   degrades to the v1 binary quality label (e.g. "Virgin_territory") — no
+   continuous score suffix. The "(" of the v2 "Grade (0.NN)" form is absent, so
+   the display is byte-identical to the pre-promotion v1 grade. Pins the
+   graceful-degradation fallback (consequence 2b of the bundle promotion). *)
+let test_disarmed_resistance_grade_is_v1 _ =
+  let snap =
+    Generator.generate
+      (_disarmed_inputs ~as_of:_as_of ~bar_reader:(_breakout_bar_reader ())
+         ~ticker_sectors:[ ("AAPL", "Information Technology") ])
   in
   assert_that
     (_aapl_resistance_grade snap)
@@ -298,23 +431,23 @@ let test_default_resistance_grade_is_v1 _ =
             if String.is_substring grade ~substring:"(" then None else Some ())
           (equal_to ())))
 
-(* Armed (overhead_supply = Some): the resistance grade switches to the
-   v2 sketch-derived form "<quality> (<score>)" — the continuous score is
-   rendered alongside the letter grade (score/display split, §D5). Arming only
-   [overhead_supply] (not the [w_overhead_supply] ranking weight) changes the
-   display, not the candidate set — AAPL is still the same long candidate. *)
-let test_armed_resistance_grade_shows_v2_score _ =
+(* The displayed grade carries no module-qualified prefix. The derived
+   [@@deriving show] printer emits "Weinstein_types.<Constructor>"; the display
+   path strips it so the reader sees the bare quality label (P1 #2050
+   follow-up). Applies to both v2 and v1 grade strings — both route through
+   [_overhead_quality_label]. *)
+let test_resistance_grade_has_no_module_prefix _ =
   let snap =
-    Generator.generate
-      (_armed_inputs ~as_of:_as_of ~bar_reader:(_breakout_bar_reader ())
-         ~ticker_sectors:[ ("AAPL", "Information Technology") ])
+    _generate ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
   in
   assert_that
     (_aapl_resistance_grade snap)
     (is_some_and
-       (matching ~msg:"v2 grade renders a parenthesized continuous score"
+       (matching ~msg:"grade must not carry a module-qualified prefix"
           (fun grade ->
-            if String.is_substring grade ~substring:" (" then Some () else None)
+            if String.is_substring grade ~substring:"Weinstein_types." then None
+            else Some ())
           (equal_to ())))
 
 (* The snapshot survives a writer -> reader round-trip unchanged. *)
@@ -347,6 +480,10 @@ let suite =
   "weekly_snapshot_generator"
   >::: [
          "metadata stamped onto the snapshot" >:: test_metadata_stamped;
+         "live portfolio populates held positions"
+         >:: test_live_portfolio_populates_held;
+         "held symbol without bars degrades gracefully"
+         >:: test_held_without_bars_degrades_gracefully;
          "breakout AAPL is a long candidate" >:: test_breakout_is_long_candidate;
          "breakout long stop sits below entry"
          >:: test_breakout_stop_below_entry;
@@ -356,10 +493,12 @@ let suite =
          >:: test_macro_context_present;
          "bearish macro blocks all long candidates"
          >:: test_bearish_macro_blocks_longs;
-         "default resistance grade is the v1 label"
-         >:: test_default_resistance_grade_is_v1;
-         "armed resistance grade shows the v2 score"
-         >:: test_armed_resistance_grade_shows_v2_score;
+         "default resistance grade shows the v2 score (armed by default)"
+         >:: test_default_resistance_grade_is_v2;
+         "disarmed resistance grade degrades to the v1 label"
+         >:: test_disarmed_resistance_grade_is_v1;
+         "resistance grade carries no module-qualified prefix"
+         >:: test_resistance_grade_has_no_module_prefix;
          "snapshot round-trips through writer/reader" >:: test_round_trips;
          "empty universe yields no candidates"
          >:: test_empty_universe_no_candidates;

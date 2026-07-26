@@ -3,9 +3,12 @@
   test_weekly_snapshot_generator
   test_snapshot_warehouse_parity
   test_config_overrides_loader
-  test_live_resistance_sketch)
+  test_live_resistance_sketch
+  test_live_portfolio
+  test_trade_sizing)
  (libraries
   core
+  core_unix
   async
   core_unix.filename_unix
   ounit2
@@ -21,6 +24,7 @@
   weinstein_trading.strategy
   weinstein_trading.snapshot
   weinstein_trading.snapshot_gen
+  weinstein_trading.portfolio_risk
   snapshot_config_overrides)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq ppx_sexp_conv)))

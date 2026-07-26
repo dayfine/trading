@@ -443,22 +443,28 @@ let test_override_screening_weights_w_overhead_supply _ =
   assert_that merged.screening_config.weights.w_overhead_supply
     (equal_to (Some 15))
 
-(** resistance-v2 PR-D default is off end-to-end: the strategy-level
-    [overhead_supply] and the screener weight [w_overhead_supply] are both
-    [None] in the default config, so [Stock_analysis.t.supply] is never computed
-    and the screener keeps the binary grade (experiment-flag-discipline R1). *)
-let test_overhead_supply_defaults_off _ =
+(** Bundle promotion (2026-07-23, user-approved R3): the strategy default arms
+    the continuous overhead-supply mechanism end-to-end — the strategy-level
+    [overhead_supply] is [Some Resistance_supply.default_config] AND the
+    screener weight [w_overhead_supply] is [Some 30]. Both must be armed for the
+    continuous score to replace the binary grade points. (Under CSV / on-the-fly
+    panel mode the panel adapter's [get_sketch] returns [None], so the mechanism
+    still degrades to the bit-identical binary path; the arming bites only in
+    snapshot-warehouse mode with sketch columns present.) *)
+let test_overhead_supply_defaults_armed _ =
   let cfg = _default_config () in
   assert_that cfg
     (all_of
        [
          field
            (fun (c : Weinstein_strategy.config) -> c.overhead_supply)
-           is_none;
+           (is_some_and
+              (equal_to
+                 (Resistance_supply.default_config : Resistance_supply.config)));
          field
            (fun (c : Weinstein_strategy.config) ->
              c.screening_config.weights.w_overhead_supply)
-           is_none;
+           (equal_to (Some 30));
        ])
 
 (** Back-compat: a strategy config sexp written before PR-D (with no
@@ -497,10 +503,12 @@ let test_overhead_supply_some_roundtrips _ =
     (is_some_and
        (equal_to (Resistance_supply.default_config : Resistance_supply.config)))
 
-(** resistance-v2 lever (a): [virgin_crossing_readmission] defaults to [false]
-    (experiment-flag-discipline R1 — default-off, bit-identical to baseline). *)
-let test_virgin_crossing_readmission_defaults_off _ =
-  assert_that (_default_config ()).virgin_crossing_readmission (equal_to false)
+(** Bundle promotion (2026-07-23, user-approved R3):
+    [virgin_crossing_readmission] defaults to [true] — the lever that repairs
+    bare-w30's recovery-window left tail in the bundle studies (ledger
+    [2026-07-20-bundle-promotion-studies]). *)
+let test_virgin_crossing_readmission_defaults_on _ =
+  assert_that (_default_config ()).virgin_crossing_readmission (equal_to true)
 
 (** Back-compat: a strategy config sexp written before this lever (no
     [virgin_crossing_readmission] field) still parses — the missing field
@@ -742,14 +750,14 @@ let suite =
          >:: test_known_nested_overlay_key_succeeds;
          "override screening_config.weights.w_overhead_supply"
          >:: test_override_screening_weights_w_overhead_supply;
-         "overhead_supply defaults off (strategy + weight)"
-         >:: test_overhead_supply_defaults_off;
+         "overhead_supply defaults armed (strategy + weight)"
+         >:: test_overhead_supply_defaults_armed;
          "strategy config parses with overhead_supply absent"
          >:: test_strategy_config_parses_with_overhead_supply_absent;
          "overhead_supply Some round-trips"
          >:: test_overhead_supply_some_roundtrips;
-         "virgin_crossing_readmission defaults off"
-         >:: test_virgin_crossing_readmission_defaults_off;
+         "virgin_crossing_readmission defaults on"
+         >:: test_virgin_crossing_readmission_defaults_on;
          "strategy config parses with virgin_crossing_readmission absent"
          >:: test_strategy_config_parses_with_virgin_readmission_absent;
          "override virgin_crossing_readmission flag"

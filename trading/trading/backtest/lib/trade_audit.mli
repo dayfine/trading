@@ -207,10 +207,42 @@ type exit_decision = {
 [@@deriving sexp]
 (** State captured at exit. *)
 
-type audit_record = { entry : entry_decision; exit_ : exit_decision option }
+type external_exit_decision = {
+  symbol : string;
+  exit_date : Date.t;
+  position_id : string;
+  exit_trigger : Stop_log.exit_trigger;
+}
+[@@deriving sexp]
+(** Reason-only exit record for a position closed by an exit source outside the
+    strategy's own audit-recorder stream — margin-driven exits ([margin_call] /
+    [buyin_stress] / [maintenance_reduce]) and other [StrategySignal] exits
+    ([stage3_force_exit], [laggard_rotation], [extension_stop],
+    [macro_bearish_trim]) that never route through
+    {!Weinstein_strategy.Exit_audit_capture}.
+
+    Carries only what a {!Trading_strategy.Position.transition} exposes — no
+    macro / stage / RS snapshot. The observer that populates this
+    ({!record_transitions}) lives in [trading/trading/backtest/], strictly below
+    the Weinstein-specific analysis layer, and architecturally cannot fabricate
+    that context; recording an explicitly-partial record is preferred over a
+    fabricated-context one. See issue #2076. *)
+
+type audit_record = {
+  entry : entry_decision;
+  exit_ : exit_decision option;
+  external_exit : external_exit_decision option; [@sexp.option]
+      (** Populated by {!record_transitions} only when [exit_] is [None] — a
+          fully-enriched [exit_] always takes precedence and this field is left
+          [None] alongside it. [@sexp.option] makes the field absent (rather
+          than an explicit [()]) in the persisted sexp when [None], so
+          [trade_audit.sexp] files written before this field existed still parse
+          via {!audit_records_of_sexp} / {!audit_blob_of_sexp}. *)
+}
 [@@deriving sexp]
 (** A paired entry + exit record. [exit_] is [None] for positions that were
-    still open at end-of-run.
+    still open at end-of-run, OR for positions closed by an exit source
+    {!record_transitions} covers instead — check [external_exit] in that case.
 
     Field name [exit_] (rather than [exit]) avoids shadowing [Stdlib.exit]. *)
 
@@ -283,6 +315,31 @@ val record_exit : t -> exit_decision -> unit
     [decision.position_id]; if no entry was previously recorded for that id the
     exit is dropped (the strategy never entered the position via this audit
     surface). *)
+
+val record_transitions : t -> Trading_strategy.Position.transition list -> unit
+(** Observe a batch of transitions — the same final, post-margin-dedup list
+    {!Stop_log.record_transitions} observes, from
+    {!Trading_simulation.Simulator.dependencies.on_transitions} — and fill in a
+    reason-only {!external_exit_decision} for any [TriggerExit] whose position
+    has an [entry] on record but no [exit_] yet.
+
+    For each [TriggerExit { exit_reason; _ }] transition, looks up the bucket by
+    [position_id]:
+    - No bucket (no entry ever recorded for this id) — dropped, mirrors
+      {!record_exit}'s existing no-entry contract.
+    - Bucket has [exit_ = Some _] (an enriched exit was already recorded via
+      {!record_exit}, e.g. a [Stops_runner]-triggered exit captured by
+      {!Weinstein_strategy.Exit_audit_capture}) — a deliberate no-op. Enriched
+      always wins; safe by construction because the strategy's own
+      [on_market_close] call (and its enriched-path recording) completes before
+      [on_transitions] fires for the same step.
+    - Bucket has [exit_ = None] — sets [external_exit] from the transition
+      ([symbol] from the recorded [entry], [exit_trigger] via
+      {!Stop_log.exit_trigger_of_reason}).
+
+    [TriggerPartialExit] transitions are ignored — a partial trim (e.g.
+    [harvest_rotate]) does not close the position, so it has no round-trip
+    [exit_decision] / [external_exit_decision] to record. *)
 
 val record_cascade_summary : t -> cascade_summary -> unit
 (** Append a per-Friday cascade summary. Append-only — recording two summaries

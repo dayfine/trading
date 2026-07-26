@@ -39,9 +39,17 @@ let default_config =
     proximity_decay = 0.7;
     saturation_bars = 8.0;
     (* v1 heavy-zone bar count *)
-    recent_far_floor = 0.4;
-    stale_mid_floor = 0.25;
-    stale_old_floor = 0.1;
+    (* Horizon floors zeroed by the 2026-07-23 bundle promotion (user-approved,
+       R3). The 07-19 floor-axis surface found the horizon-floor staircase was
+       the redeemed-cohort tax: a name whose recent histogram is empty but whose
+       older max-high proves stale overhead was priced at 0.4/0.25/0.1 and lost
+       the cap-20 race, forfeiting the crash-recovery monster cohort (AXTI). At
+       zero, a breakout the recent histogram sees as clear scores 0 (same as
+       virgin); in-band mass still speaks for itself via the saturation path.
+       Ledger [2026-07-20-bundle-promotion-studies]. *)
+    recent_far_floor = 0.0;
+    stale_mid_floor = 0.0;
+    stale_old_floor = 0.0;
     min_history_bars = 0;
     insufficient_score = 0.5;
     heavy_resistance_bars = 8;

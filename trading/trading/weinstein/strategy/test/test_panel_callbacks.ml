@@ -27,6 +27,9 @@ module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
 module Snapshot_bar_views = Snapshot_runtime.Snapshot_bar_views
 module Daily_panels = Snapshot_runtime.Daily_panels
 module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
+module Weekly_sidetable = Data_panel_snapshot.Weekly_sidetable
+module Weekly_sidetable_builder = Snapshot_pipeline.Weekly_sidetable_builder
+module Weekly_sidetable_reader = Weinstein_strategy.Weekly_sidetable_reader
 
 (* ------------------------------------------------------------------ *)
 (* Synthetic bar builders                                               *)
@@ -703,6 +706,107 @@ let test_resistance_stock_deep_view_feeds_resistance_only _ =
            (is_some_and (gt (module Float_ord) 0.0));
        ])
 
+(* ------------------------------------------------------------------ *)
+(* Sketch-v5 threading: presence of a weekly side-table selects the v5   *)
+(* read path; absence keeps the dense-column path (PR 3).                *)
+(* ------------------------------------------------------------------ *)
+
+(* Mon-anchored weeks so calendar weeks align with ISO weeks. Each day of a
+   week carries the same (close, high, low) so the weekly aggregate equals the
+   override exactly. *)
+let _v5_week_start = Date.of_string "2000-01-03"
+let _v5_day ~w ~d = Date.add_days _v5_week_start ((7 * w) + d)
+
+let _v5_bar ~date ~close ~high ~low =
+  {
+    Types.Daily_price.date;
+    open_price = close;
+    high_price = high;
+    low_price = low;
+    close_price = close;
+    adjusted_close = close;
+    volume = 1_000;
+    active_through = None;
+  }
+
+let _v5_weeks_bars ~n_weeks ~shape =
+  List.init n_weeks ~f:(fun w ->
+      let close, high, low = shape w in
+      List.init 5 ~f:(fun d -> _v5_bar ~date:(_v5_day ~w ~d) ~close ~high ~low))
+  |> List.concat
+
+(* Anchor 10; a couple of weeks put supply above the anchor so the derived
+   sketch has populated hist bands (a meaningful, non-degenerate record). *)
+let _v5_shape w =
+  match w with
+  | 5 -> (10.0, 11.0, 10.0)
+  | 20 -> (10.0, 13.0, 12.0)
+  | _ -> (10.0, 9.0, 8.0)
+
+(* A snapshot shim that resolves ONLY [Close] (the v5 anchor + the dense path's
+   histogram anchor); every other field errors. Under this cb the dense
+   [read_sketch] path returns [None] (its first [Res_*] probe fails), so a
+   [Some] sketch can only come from the v5 side-table path — the switch under
+   test. *)
+let _close_only_cb ~close : Snapshot_callbacks.t =
+  {
+    read_field =
+      (fun ~symbol:_ ~date:_ ~field ->
+        match field with
+        | Snapshot_schema.Close -> Ok close
+        | _ -> Error (Status.not_found_error "close-only cb: no dense column"));
+    read_field_history =
+      (fun ~symbol:_ ~from:_ ~until:_ ~field:_ ->
+        Error (Status.not_found_error "close-only cb: no history"));
+    active_through_for = (fun ~symbol:_ -> None);
+  }
+
+let _minimal_weekly_view ~date ~price : Snapshot_bar_views.weekly_view =
+  {
+    closes = [| price |];
+    raw_closes = [| price |];
+    highs = [| price |];
+    lows = [| price |];
+    volumes = [| 1.0 |];
+    dates = [| date |];
+    n = 1;
+  }
+
+(* Presence of a side-table -> v5 read path: [get_sketch ()] yields exactly the
+   sketch [Weekly_sidetable_reader.sketch_of_entries] derives at the row's raw
+   close. Absence -> dense path, which under the close-only cb returns None. *)
+let test_weekly_sidetable_threading _ =
+  let bars = _v5_weeks_bars ~n_weeks:40 ~shape:_v5_shape in
+  let entries = Weekly_sidetable_builder.of_bars ~deep_bars:[] ~bars in
+  let as_of = _v5_day ~w:39 ~d:4 in
+  let close = 10.0 in
+  let cb = _close_only_cb ~close in
+  let view = _minimal_weekly_view ~date:as_of ~price:close in
+  let config = Stock_analysis.default_config in
+  let cbs_v5 : Stock_analysis.callbacks =
+    Panel_callbacks.stock_analysis_callbacks_of_weekly_views ~snapshot_cb:cb
+      ~stock_symbol:"AAA" ~weekly_sidetable:entries ~config ~stock:view
+      ~benchmark:view ()
+  in
+  let cbs_dense : Stock_analysis.callbacks =
+    Panel_callbacks.stock_analysis_callbacks_of_weekly_views ~snapshot_cb:cb
+      ~stock_symbol:"AAA" ~config ~stock:view ~benchmark:view ()
+  in
+  assert_that
+    (cbs_v5.get_sketch (), cbs_dense.get_sketch ())
+    (all_of
+       [
+         (* v5 path active: the derived sketch, bit-for-bit. *)
+         field
+           (fun (v5, _) -> v5)
+           (is_some_and
+              (equal_to
+                 (Weekly_sidetable_reader.sketch_of_entries ~entries ~as_of
+                    ~close)));
+         (* dense path selected when the side-table is absent -> no columns. *)
+         field (fun (_, dense) -> dense) is_none;
+       ])
+
 let suite =
   "Panel_callbacks parity"
   >::: [
@@ -724,6 +828,8 @@ let suite =
          >:: test_resistance_stock_default_reads_stock_view;
          "Resistance-stock deep view feeds resistance only"
          >:: test_resistance_stock_deep_view_feeds_resistance_only;
+         "Sketch-v5 side-table threading selects v5 vs dense"
+         >:: test_weekly_sidetable_threading;
        ]
 
 let () = run_test_tt_main suite

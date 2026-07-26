@@ -8,6 +8,7 @@ module Pipeline = Snapshot_pipeline.Pipeline
 module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
 module Snapshot_format = Data_panel_snapshot.Snapshot_format
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
+module Weekly_sidetable = Data_panel_snapshot.Weekly_sidetable
 
 (* Closure-based representation: each constructor captures its backing's read
    primitives and packages them as same-shape closures. The strategy's hot
@@ -39,10 +40,27 @@ type t = {
     Snapshot_bar_views.daily_view;
   ma_cache : Weekly_ma_cache.t option;
   snapshot_callbacks : Snapshot_callbacks.t;
+  weekly_sidetable_for : symbol:string -> Weekly_sidetable.entry list option;
+  sketch_warehouse : bool;
 }
 
 let ma_cache t = t.ma_cache
 let snapshot_callbacks t = t.snapshot_callbacks
+let weekly_sidetable_for t = t.weekly_sidetable_for
+let sketch_warehouse t = t.sketch_warehouse
+
+(* Memoize the per-symbol sketch-v5 side-table load: the [.weekly] file for a
+   symbol is read (and manifest-format-hash-gated) at most once per reader, then
+   cached alongside it. [None] loader (every non-warehouse constructor) -> the
+   accessor always returns [None], keeping the dense-column read path — the v5
+   sketch never activates. The PRESENCE of a [Some] side-table here is the switch
+   that turns the v5 read path on in production; there is no config flag. *)
+let _memoized_sidetable_for = function
+  | None -> fun ~symbol:_ -> None
+  | Some loader ->
+      let memo = String.Table.create () in
+      fun ~symbol ->
+        Hashtbl.find_or_add memo symbol ~default:(fun () -> loader ~symbol)
 
 (* Sentinel cb for readers that have no underlying snapshot directory
    ({!empty}). Every [read_field] / [read_field_history] call returns
@@ -97,6 +115,8 @@ let empty () =
        closures above's "every read returns empty" semantics through
        {!Snapshot_bar_views}'s NotFound-to-empty fold. *)
     snapshot_callbacks = _empty_snapshot_callbacks;
+    weekly_sidetable_for = _memoized_sidetable_for None;
+    sketch_warehouse = false;
   }
 
 (* {1 Snapshot-backed constructor (Phase F.2 PR 2)}
@@ -152,7 +172,8 @@ let _snapshot_daily_view_for ?calendar cb ~symbol ~as_of ~lookback =
   in
   Snapshot_bar_views.daily_view_for cb ~symbol ~as_of ~lookback ~calendar
 
-let of_snapshot_views ?calendar (cb : Snapshot_runtime.Snapshot_callbacks.t) =
+let of_snapshot_views ?calendar ?weekly_sidetable_loader
+    ?(sketch_warehouse = false) (cb : Snapshot_runtime.Snapshot_callbacks.t) =
   {
     daily_bars_for = _snapshot_daily_bars_for cb;
     weekly_bars_for = _snapshot_weekly_bars_for cb;
@@ -164,6 +185,13 @@ let of_snapshot_views ?calendar (cb : Snapshot_runtime.Snapshot_callbacks.t) =
        snapshot directly via [Macro_inputs.*_of_snapshot_views] without
        re-routing through the bar_reader's panel-shaped views. *)
     snapshot_callbacks = cb;
+    weekly_sidetable_for = _memoized_sidetable_for weekly_sidetable_loader;
+    (* [true] only when the warehouse advertises per-symbol side-tables (manifest
+       [weekly_sidetable_format_hash = Some _]); gates the armed sketch-reader
+       loud-fail so an in-process CSV / panel-mode snapshot (no side-tables) with
+       resistance scoring armed-by-default degrades to the v1 grade instead of
+       crashing. See {!Resistance_sketch_reader.read} (2026-07-23 promotion). *)
+    sketch_warehouse;
   }
 
 (* {1 In-memory-bars constructor (Phase F.3.a-1)}

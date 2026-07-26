@@ -36,11 +36,13 @@
     - {!Open} / {!High} / {!Low} / {!Close} / {!Adjusted_close}: copied verbatim
       from the input {!Types.Daily_price.t} for the row's bar.
     - {!Volume}: input [int] volume cast to [float] (Float64 schema; integer
-      counts up to ~2^53 round-trip exactly).
-    - {!Res_max_high_130w} / {!Res_max_high_260w} / {!Res_max_high_520w} /
-      {!Res_bars_seen} / [Res_hist k]: per-day resistance sketches computed by
-      {!Resistance_sketch.compute} over the same weekly prefix the Stage column
-      uses (see that module + the schema docstring for semantics).
+      counts up to ~2^53 round-trip exactly). The dense resistance-sketch
+      columns ([Res_max_high_*], [Res_bars_seen], [Res_hist]) were retired from
+      the canonical schema in sketch-v5 PR 4: they are no longer materialized by
+      this pipeline (the overhead-supply sketch is reconstructed on demand from
+      the [SYMBOL.weekly] side-table). Under the canonical
+      {!Snapshot_schema.default} they are simply absent; if a legacy dense
+      schema is passed in, those cells are emitted as [Float.nan].
 
     {2 Cross-symbol Macro_composite}
 
@@ -77,14 +79,13 @@ val build_for_symbol :
       Schema controlling field set + column layout. Every produced {!Snapshot.t}
       carries this schema.
     @param deep_bars
-      Earlier daily history lying strictly {e before} [bars]'s first day, fed
-      only to the {!Res_max_high_130w} / {!Res_max_high_260w} /
-      {!Res_max_high_520w} / {!Res_bars_seen} / [Res_hist] resistance-sketch
-      columns via {!Resistance_sketch.compute_windowed} so those columns reflect
-      true weekly depth rather than the warmup-windowed slice (resistance-v2
-      §D4). Default [[]] — bit-identical to today. The 13 EMA/SMA/ATR/RSI/Stage/
-      RS/Macro/OHLCV/Adjusted columns are computed from [bars] alone and are
-      never affected by [deep_bars]. Returns [Error Invalid_argument] when
+      Earlier daily history lying strictly {e before} [bars]'s first day.
+      Sketch-v5 PR 4 retired the dense resistance columns, so [deep_bars] no
+      longer feeds any produced column — the 13 canonical columns are computed
+      from [bars] alone and are never affected by it. It is retained only so the
+      caller's strict-precedence boundary is validated here ([Build_runner]
+      consumes the same [deep_bars] for the [SYMBOL.weekly] side-table's honest
+      weekly depth). Default [[]]. Returns [Error Invalid_argument] when
       [deep_bars] overlaps or is not strictly before [bars].
     @param benchmark_bars
       Daily bars for the macro benchmark (e.g. ["SPY"]). When [None] (default),

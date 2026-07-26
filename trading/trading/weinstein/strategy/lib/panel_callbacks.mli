@@ -74,6 +74,8 @@ val stock_analysis_callbacks_of_weekly_views :
   ?stock_symbol:string ->
   ?resistance_stock:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
   ?snapshot_cb:Snapshot_runtime.Snapshot_callbacks.t ->
+  ?weekly_sidetable:Data_panel_snapshot.Weekly_sidetable.entry list ->
+  ?sketch_warehouse:bool ->
   config:Stock_analysis.config ->
   stock:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
   benchmark:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
@@ -96,6 +98,25 @@ val stock_analysis_callbacks_of_weekly_views :
     bar-list / non-snapshot path), [get_sketch] is [fun () -> None] so
     [Stock_analysis.t.supply] stays [None] and the continuous overhead-supply
     score never runs.
+
+    [?weekly_sidetable] activates the sketch-v5 read path: when [Some entries]
+    (the per-symbol side-table supplied by {!Bar_reader.weekly_sidetable_for}),
+    [get_sketch] derives the sketch at score time from the weekly series via
+    {!Resistance_sketch_reader.sketch_of_entries} (anchored at the row's raw
+    [Close], still read from [snapshot_cb]) instead of reading the dense [Res_*]
+    columns. Omitted / [None] keeps the dense-column path, bit-identical to the
+    pre-v5 behaviour. The PRESENCE of the side-table is the switch — there is no
+    config flag; the manifest format hash gates staleness at load time
+    ({!Bar_reader.weekly_sidetable_for}).
+
+    [?sketch_warehouse] (default [false]) is threaded to
+    {!Resistance_sketch_reader.closure}: it states whether the run reads a real
+    sketch warehouse (manifest [weekly_sidetable_format_hash = Some _]). The
+    armed sketch loud-fail (a scored symbol with no side-table and no dense
+    columns) only fires when BOTH the score is armed AND [sketch_warehouse] is
+    [true]. An in-process CSV / panel-mode snapshot ([false]) with resistance
+    scoring armed-by-default degrades to the v1 grade instead of crashing
+    (2026-07-23 bundle promotion). Supplied from {!Bar_reader.sketch_warehouse}.
 
     [?resistance_stock] is the resistance-history feed
     ([Weinstein_strategy_config.resistance_lookback_bars]): a deeper weekly view

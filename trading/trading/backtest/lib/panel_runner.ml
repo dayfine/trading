@@ -43,8 +43,35 @@ let _stale_hold_policy (config : Weinstein_strategy.config) : Stale_hold.config
     stale_exit_after_days = config.stale_exit_after_days;
   }
 
-let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
-    ~warmup_start ~end_date ~initial_cash ~commission ?slippage_bps
+(* Two [stop_log] recording paths, both needed (#2057): [Strategy_wrapper]
+   intercepts the strategy's own [on_market_close] result (fires only on
+   strategy-call days, before margin dedup); [Simulator.on_transitions]
+   observes the FINAL per-step transition list — the strategy's transitions
+   plus any margin-driven ones from [Margin_runner.tick], after same-tick
+   collision dedup — on EVERY step, since margin runs unconditionally
+   regardless of strategy cadence. Without the latter, margin-driven exit
+   reasons ([margin_call] / [buyin_stress] / [maintenance_reduce]) never reach
+   [stop_log] at all. [Stop_log.record_transitions] is idempotent w.r.t.
+   re-recording the same transition, so the two paths overlapping on
+   strategy-only days is harmless; on a same-tick collision the later
+   [on_transitions] call correctly overwrites the wrapper's stale
+   strategy-side trigger with the winning margin one — pinned by
+   [test_margin_exit_observability.ml:test_stop_log_records_margin_call_on_strategy_collision].
+   This is the correct outcome, not a race: [Margin_runner.dedup_strategy_exits_for_margin]
+   drops the strategy's colliding [TriggerExit] before [_apply_transitions]
+   runs, so only margin's exit actually executes.
+
+   [Simulator.dependencies.on_transitions] is a single optional slot, so the
+   two observers that need it ([Stop_log.record_transitions] above, and
+   [Trade_audit.record_transitions] — #2076, the [trade_audit.sexp] sink for
+   the same externally-generated exits [Stop_log] already covers) are composed
+   into one closure below rather than each getting their own hook. *)
+let _on_transitions ~stop_log ~trade_audit ts =
+  Stop_log.record_transitions stop_log ts;
+  Trade_audit.record_transitions trade_audit ts
+
+let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
+    ~start_date ~warmup_start ~end_date ~initial_cash ~commission ?slippage_bps
     ?on_trade_fill ?active_through_for ~strategy ~market_data_adapter () =
   (* Default-off [Warmup_trade_gate] (#1549 A2); identity unless the flag is on. *)
   let strategy =
@@ -64,7 +91,9 @@ let _make_simulator (input : input) ~stop_log ~stale_hold_log ~start_date
       ~maintenance_long_pct:input.config.maintenance_long_pct
       ~exempt_closing_trades_from_cash_floor:
         input.config.portfolio_config.exempt_closing_trades_from_cash_floor
-      ?on_trade_fill ?active_through_for ()
+      ?on_trade_fill ?active_through_for
+      ~on_transitions:(_on_transitions ~stop_log ~trade_audit)
+      ()
   in
   let config =
     Simulator.
@@ -157,13 +186,33 @@ let _build_calendar ~start ~end_ : Date.t array =
    Refs: closes the regression on Bar_reader.of_snapshot_views (the
    [~calendar] plumbing on the snapshot views that this constructor now
    consumes was introduced in a separate prior PR). *)
-let _build_snapshot_bar_reader ~daily_panels ~calendar =
+let _build_snapshot_bar_reader ~daily_panels ~calendar ~snapshot_dir ~manifest =
   let callbacks = Snapshot_callbacks.of_daily_panels daily_panels in
   eprintf
     "Panel_runner: snapshot bar reader wired (calendar %d days) for strategy\n\
      %!"
     (Array.length calendar);
-  Weinstein_strategy.Bar_reader.of_snapshot_views ~calendar callbacks
+  (* Sketch-v5 activation: when the warehouse carries per-symbol [.weekly]
+     side-tables (manifest [weekly_sidetable_format_hash = Some _]), the loader
+     supplies them so {!Panel_callbacks.stock_analysis_callbacks_of_weekly_views}
+     takes the v5 read path; a warehouse without side-tables ([None] hash) reads
+     the dense [Res_*] columns, bit-identical to the pre-v5 behaviour. A
+     mismatched hash raises (loud staleness refusal). *)
+  let manifest_format_hash =
+    manifest.Snapshot_pipeline.Snapshot_manifest.weekly_sidetable_format_hash
+  in
+  let weekly_sidetable_loader =
+    Weinstein_strategy.Weekly_sidetable_reader.loader_for ~snapshot_dir
+      ~manifest_format_hash
+  in
+  (* A warehouse advertises sketch side-tables iff its manifest carries a format
+     hash. This gates the armed sketch-reader loud-fail (2026-07-23 promotion): a
+     genuine sketch warehouse must carry a side-table for every scored symbol,
+     but an in-process CSV / non-sketch snapshot ([None] hash) degrades to the v1
+     grade instead of crashing when resistance scoring is armed by default. *)
+  let sketch_warehouse = Option.is_some manifest_format_hash in
+  Weinstein_strategy.Bar_reader.of_snapshot_views ~calendar
+    ~weekly_sidetable_loader ~sketch_warehouse callbacks
 
 let _create_panels ~snapshot_dir ~manifest =
   Daily_panels.create ~snapshot_dir ~manifest
@@ -210,7 +259,9 @@ let _setup_hybrid (input : input) ~strategy_choice ~snapshot_dir ~manifest
     ~shared_panels ~warmup_start ~end_date ~audit_recorder ?fold_start_date () =
   let daily_panels = _resolve_panels ~shared_panels ~snapshot_dir ~manifest in
   let calendar = _build_calendar ~start:warmup_start ~end_:end_date in
-  let bar_reader = _build_snapshot_bar_reader ~daily_panels ~calendar in
+  let bar_reader =
+    _build_snapshot_bar_reader ~daily_panels ~calendar ~snapshot_dir ~manifest
+  in
   let strategy =
     Panel_strategy_builder.build ~ad_bars:input.ad_bars
       ~ticker_sectors:input.ticker_sectors ~config:input.config ~strategy_choice
@@ -288,10 +339,11 @@ let _build_sim input ~r ~start_date ~warmup_start ~end_date ~initial_cash
     engine_costs_with_overlay ~default_commission:commission
       ?default_slippage_bps:slippage_bps ?cost_model ()
   in
-  _make_simulator input ~stop_log:r.stop_log ~stale_hold_log:r.stale_hold_log
-    ~start_date ~warmup_start ~end_date ~initial_cash
-    ~commission:effective_commission ?slippage_bps:effective_slippage_bps
-    ?on_trade_fill ?active_through_for ~strategy ~market_data_adapter ()
+  _make_simulator input ~stop_log:r.stop_log ~trade_audit:r.trade_audit
+    ~stale_hold_log:r.stale_hold_log ~start_date ~warmup_start ~end_date
+    ~initial_cash ~commission:effective_commission
+    ?slippage_bps:effective_slippage_bps ?on_trade_fill ?active_through_for
+    ~strategy ~market_data_adapter ()
 
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     ~commission ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace

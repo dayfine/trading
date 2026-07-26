@@ -72,7 +72,8 @@ let _entry ?(entry_date = _date "2024-03-01") ?(symbol = "AAPL")
     alternatives_considered = alternatives;
   }
 
-let _record entry : TA.audit_record = { entry; exit_ = None }
+let _record entry : TA.audit_record =
+  { entry; exit_ = None; external_exit = None }
 
 (* Grouping -------------------------------------------------------------- *)
 

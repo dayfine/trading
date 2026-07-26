@@ -239,8 +239,8 @@ let _split_factor_of_weekly_view (weekly : Snapshot_bar_views.weekly_view) :
         ~week_offset
 
 let stock_analysis_callbacks_of_weekly_views ?ma_cache ?stock_symbol
-    ?resistance_stock ?snapshot_cb ~(config : Stock_analysis.config)
-    ~(stock : Snapshot_bar_views.weekly_view)
+    ?resistance_stock ?snapshot_cb ?weekly_sidetable ?(sketch_warehouse = false)
+    ~(config : Stock_analysis.config) ~(stock : Snapshot_bar_views.weekly_view)
     ~(benchmark : Snapshot_bar_views.weekly_view) () : Stock_analysis.callbacks
     =
   let resistance_view = Option.value resistance_stock ~default:stock in
@@ -249,7 +249,19 @@ let stock_analysis_callbacks_of_weekly_views ?ma_cache ?stock_symbol
     get_volume = _get_from_float_array stock.volumes;
     get_split_factor = _split_factor_of_weekly_view stock;
     get_sketch =
-      Resistance_sketch_reader.closure ?snapshot_cb ?stock_symbol ~stock ();
+      (* Sketch-v5 PR 4: [armed] tells the reader whether the overhead-supply
+         sketch is actually consumed by this screen ([w_overhead_supply] set or
+         virgin-crossing readmission on). [sketch_warehouse] tells it whether the
+         run reads a real sketch warehouse. Only when BOTH hold does a thin (v5)
+         warehouse with a missing side-table fail loud; a CSV / panel-mode run
+         (not a sketch warehouse) degrades to the v1 grade even when armed by
+         default (2026-07-23 promotion). *)
+      Resistance_sketch_reader.closure ?snapshot_cb ?stock_symbol
+        ?weekly_sidetable ~sketch_warehouse
+        ~armed:
+          (Option.is_some config.Stock_analysis.overhead_supply
+          || config.Stock_analysis.virgin_crossing_readmission)
+        ~stock ();
     stage =
       stage_callbacks_of_weekly_view ?ma_cache ?symbol:stock_symbol
         ~config:config.stage ~weekly:stock ();

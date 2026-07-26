@@ -68,10 +68,20 @@ type inputs = {
           expand sector-ETF ratings to individual tickers. The screened universe
           is the list of tickers here (it overrides [config.universe] so the
           caller need not keep the two in sync). *)
-  held_positions : Weekly_snapshot.held_position list;
-      (** Held positions to record in the snapshot. Empty for a fresh generate;
-          the live cycle threads real trading-state positions here. The held
-          tickers are also excluded from the screener candidate output. *)
+  live_portfolio : Live_portfolio.t;
+      (** The trader's live holdings + cash. {!generate} prices each position
+          (via [bar_reader] at [as_of]), recomputes its Weinstein stop, records
+          the enriched rows as the snapshot's [held_positions], excludes the
+          held tickers from candidate output, and sizes each long candidate
+          against [cash + long market value] (mirroring the backtest's
+          fixed-risk sizing). For a fresh generate with no live book, pass a
+          template portfolio (empty positions, placeholder cash) with
+          [portfolio_is_placeholder = true]. *)
+  portfolio_is_placeholder : bool;
+      (** [true] when [live_portfolio] is the template default (no [--portfolio]
+          file was supplied): each sized long candidate is stamped with the
+          ["UNSIZED — set portfolio.sexp"] note so the reader knows the size is
+          a placeholder. [false] for a real live book. *)
 }
 (** Everything {!generate} needs to assemble one snapshot. *)
 

@@ -89,7 +89,7 @@ let make_exit ?(symbol = "AAPL") ?(exit_date = _date "2024-04-20")
   }
 
 let make_record ?(exit_ = Some (make_exit ())) entry : TA.audit_record =
-  { entry; exit_ }
+  { entry; exit_; external_exit = None }
 
 let make_trade ?(symbol = "AAPL") ?(side = Trading_base.Types.Buy)
     ?(entry_date = _date "2024-01-15") ?(exit_date = _date "2024-04-20")

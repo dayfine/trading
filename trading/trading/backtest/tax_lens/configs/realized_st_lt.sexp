@@ -1,0 +1,7 @@
+((mode Realized_st_lt)
+ (flat_rate 0.35)
+ (st_rate 0.35)
+ (lt_rate 0.238)
+ (lt_days 365)
+ (carryforward true)
+ (top_winners 15))
