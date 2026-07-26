@@ -143,23 +143,16 @@ let _analyze_universe ~(inputs : inputs) ~index_bars ~eligible_tickers :
   List.filter_map eligible_tickers ~f:(fun ticker ->
       _analyze_ticker ~inputs ~analysis_config ~index_bars ticker)
 
-(* Sparse-tail eligibility gate (issue #2083 fix 1): data hygiene, not a
-   Weinstein rule (see [Sparse_tail_gate]'s .mli for the full rationale).
-   [None] when [ticker] is eligible (includes the disabled-gate case,
-   [config.sparse_tail_window_trading_days = 0]); [Some warning] when the
-   gate dropped it. *)
-let _sparse_tail_warning ~(inputs : inputs) ticker : string option =
-  Sparse_tail_gate.check inputs.bar_reader ~symbol:ticker ~as_of:inputs.as_of
+(* Sparse-tail eligibility gate (issue #2083 fix 1): the eligible tickers plus
+   one warning line per dropped one. Data hygiene, not a Weinstein rule — see
+   [Sparse_tail_gate]'s .mli. Disabled by default
+   ([config.sparse_tail_window_trading_days = 0] -> everything eligible, no
+   warnings). *)
+let _eligible_tickers ~(inputs : inputs) =
+  Sparse_tail_gate.partition inputs.bar_reader ~as_of:inputs.as_of
     ~min_bars:inputs.config.sparse_tail_min_bars
     ~window_trading_days:inputs.config.sparse_tail_window_trading_days
-  |> Sparse_tail_gate.warning ~symbol:ticker
-
-(* One (ticker, warning option) pair per universe entry. [None] tickers are
-   sparse-tail-eligible; [Some _] tickers were dropped, carrying the warning
-   line to surface in the snapshot. *)
-let _sparse_tail_verdicts ~(inputs : inputs) : (string * string option) list =
-  List.map inputs.ticker_sectors ~f:(fun (ticker, _sector) ->
-      (ticker, _sparse_tail_warning ~inputs ticker))
+    (List.map inputs.ticker_sectors ~f:fst)
 
 (* Rating of one sector ETF, or [None] when it has no bars. *)
 let _etf_rating ~(inputs : inputs) ~index_bars (etf, sector_name) =
@@ -250,33 +243,13 @@ let _overlay_structural_stop ~(inputs : inputs) ~side candidate =
     ~initial_stop_buffer:inputs.config.initial_stop_buffer
     ~bar_reader:inputs.bar_reader ~as_of:inputs.as_of ~side candidate
 
-(* Spike-bar data-suspect flag (issue #2083 fix 3): report hygiene, not a
-   Weinstein rule (see [Spike_bar_gate]'s .mli). Unlike the sparse-tail gate
-   this FLAGS rather than drops — the candidate keeps its rank, entry, stop and
-   size; only [data_suspect] plus a warning line change. Returns the (possibly
-   flagged) candidate and its warning ([None] when clean, which includes the
-   disabled-flag case, [config.spike_bar_threshold_pct = 0.0]). *)
-let _flag_if_spiked ~(inputs : inputs) (c : Weekly_snapshot.candidate) =
-  let verdict =
-    Spike_bar_gate.check inputs.bar_reader ~symbol:c.symbol ~as_of:inputs.as_of
-      ~threshold_pct:inputs.config.spike_bar_threshold_pct
-  in
-  match Spike_bar_gate.warning ~symbol:c.symbol verdict with
-  | None -> (c, None)
-  | Some w -> ({ c with data_suspect = true }, Some w)
-
-(* [_flag_if_spiked] over a candidate list: the flagged candidates (same order,
-   same length — nothing is dropped) plus the warning lines they produced. *)
-let _flag_spikes ~(inputs : inputs) candidates =
-  let flagged, warnings =
-    List.map candidates ~f:(_flag_if_spiked ~inputs) |> List.unzip
-  in
-  (flagged, List.filter_opt warnings)
-
 (* Ranked long / short candidate lists, fully decorated: structural stop overlay
    (#2084 F2), fixed-risk sizing (longs only), and the spike-bar data-suspect
-   flag (#2083 F3). Returns [(longs, shorts, spike_warnings)]. Split out of
-   {!generate} so that function stays inside the function-length cap. *)
+   flag (#2083 F3 — report hygiene, not a Weinstein rule; it FLAGS rather than
+   drops, so both lists come back at their original length and order, and it is
+   disabled by default at [spike_bar_threshold_pct = 0.0]). Returns
+   [(longs, shorts, spike_warnings)]. Split out of {!generate} so that function
+   stays inside the function-length cap. *)
 let _build_candidates ~(inputs : inputs) ~(result : Screener.result)
     ~portfolio_value ~sizing_cash =
   let longs =
@@ -290,20 +263,19 @@ let _build_candidates ~(inputs : inputs) ~(result : Screener.result)
         Snapshot_display.candidate_of_scored c
         |> _overlay_structural_stop ~inputs ~side:Trading_base.Types.Short)
   in
-  let longs, long_warnings = _flag_spikes ~inputs longs in
-  let shorts, short_warnings = _flag_spikes ~inputs shorts in
+  let flag_spikes =
+    Spike_bar_gate.flag_candidates inputs.bar_reader ~as_of:inputs.as_of
+      ~threshold_pct:inputs.config.spike_bar_threshold_pct
+  in
+  let longs, long_warnings = flag_spikes longs in
+  let shorts, short_warnings = flag_spikes shorts in
   (longs, shorts, long_warnings @ short_warnings)
 
 let generate (inputs : inputs) : Weekly_snapshot.t =
   let index_bars = _weekly_bars ~inputs inputs.config.indices.primary in
   let macro = _macro_result ~inputs ~index_bars in
   let sector_map = _build_sector_map ~inputs ~index_bars in
-  let sparse_tail_verdicts = _sparse_tail_verdicts ~inputs in
-  let eligible_tickers =
-    List.filter_map sparse_tail_verdicts ~f:(fun (ticker, warning) ->
-        match warning with None -> Some ticker | Some _ -> None)
-  in
-  let sparse_warnings = List.filter_map sparse_tail_verdicts ~f:snd in
+  let eligible_tickers, sparse_warnings = _eligible_tickers ~inputs in
   let stocks = _analyze_universe ~inputs ~index_bars ~eligible_tickers in
   let held_positions =
     List.map inputs.live_portfolio.positions ~f:(_enrich_held ~inputs)

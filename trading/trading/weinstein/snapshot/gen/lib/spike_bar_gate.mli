@@ -79,6 +79,24 @@ val check :
     prints one outsized bar is exactly the case this flags. Pure: same inputs ->
     same output ([bar_reader] is read-only). *)
 
+val flag_candidates :
+  Weinstein_strategy.Bar_reader.t ->
+  as_of:Date.t ->
+  threshold_pct:float ->
+  Weinstein_snapshot.Weekly_snapshot.candidate list ->
+  Weinstein_snapshot.Weekly_snapshot.candidate list * string list
+(** [flag_candidates bar_reader ~as_of ~threshold_pct candidates] applies
+    {!check} to each candidate's symbol and returns [(candidates', warnings)].
+
+    {b Flag, do not drop}: [candidates'] has the same length and order as
+    [candidates] — a {!Data_suspect} candidate simply comes back with
+    {!Weekly_snapshot.candidate.data_suspect}[ = true]; its rank, entry, stop
+    and sizing are untouched. [warnings] carries one {!warning} line per flagged
+    candidate, in the same order.
+
+    With the flag disabled ([threshold_pct <= 0.0], the default) this is the
+    identity on [candidates] with [warnings = []]. Pure. *)
+
 val warning : symbol:string -> verdict -> string option
 (** [warning ~symbol verdict] is [None] for {!Clean}. For {!Data_suspect} it is
     [Some msg], a human-readable single line naming the symbol, the observed

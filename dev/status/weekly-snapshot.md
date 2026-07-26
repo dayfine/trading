@@ -5,6 +5,55 @@
 ## Status
 IN_PROGRESS
 
+**2026-07-26 (spike-bar "data-suspect" flag, issue #2083 Finding 3, PR #2097
+`feat/weekly-snapshot-spike-flag`):** Closes the last of the three 07-17
+report-review findings. F1 (sparse-tail gate) and F2 (rename tracking, still
+unbuilt) attack the data source; F3 is the **report-hygiene backstop**: even
+when a spike bar is genuine and the ticker alive, a candidate whose signal
+rests on a single outsized bar gets a visible caveat on the ticket. New module
+`Weinstein_snapshot_gen.Spike_bar_gate`
+(`trading/trading/weinstein/snapshot/gen/lib/spike_bar_gate.{ml,mli}`, mirrors
+the sibling `Sparse_tail_gate` shape): `check` compares the last daily bar
+at/before `as_of` against the prior **resident** bar's close (on a zombie feed
+that is not the prior trading day — that is the point) and reports the
+**absolute** percentage move; `>= threshold_pct` -> `Data_suspect { move_pct;
+threshold_pct; bar_date }`.
+
+**Flag, do not drop** (unlike F1): the candidate keeps its rank, entry, stop
+and size. `Weekly_snapshot.candidate` gains an additive `data_suspect : bool
+[@sexp.default false]` (the `stop_is_structural` precedent from #2091);
+`Report_renderer` marks the Symbol cell `TEST (!)` plus an explanatory footnote
+(same treatment as the fallback-stop asterisk); a warning line stating the
+candidate was **kept** is appended to `Weekly_snapshot.t.warnings`. Wired into
+`Weekly_snapshot_generator` beside the `_sparse_tail_*` helpers, applied to
+long AND short candidates (`generate`'s candidate assembly was extracted into
+`_build_candidates` to stay inside the function-length cap).
+
+Default-off per `experiment-flag-discipline.md` R1/R2: one new field
+`spike_bar_threshold_pct : float [@sexp.default 0.0]` on
+`Weinstein_strategy_config.config`; `<= 0.0` disables (same convention as
+`sparse_tail_window_trading_days = 0`), so an unarmed run is bit-identical.
+Real config field -> resolves through `Overlay_validator.apply_overrides` and
+is expressible as a `Variant_matrix` axis. **Default NOT flipped and NOT armed
+in `live-config-overrides.sexp`** — that needs a ledger ACCEPT (R3).
+Engineering data-hygiene flag, **not** a Weinstein book rule: no
+`weinstein-book-reference.md` section is cited (none supports it) and the spine
+is untouched — no change to stage classification, the Stage-2-only buy rule,
+volume confirmation, entry, stop or sizing.
+
+Tests: `test_spike_bar_gate.ml` (12 unit tests — disabled/negative no-op, +58%
+SNSE-shaped spike, quiet bar, downward spike reporting the absolute move,
+inclusive threshold boundary, gapped series comparing the prior *resident* bar,
+<2 bars, no bars, zero prior close, both `warning` branches); 4 new
+generator-level tests pinned at the **`generate` seam** (default-config
+disabled; disabled run bit-identical on a spiked fixture; armed+spike flags AND
+keeps the candidate + warns; armed on a quiet dense fixture stays clean); 2
+renderer tests (marker + footnote present / absent); `test_round_trip` pins the
+additive-field back-compat default. Five mutations run, each turning **exactly
+one** new test red: (A) call site bypassed, (B) `~threshold_pct:0.0`, (C) drop
+instead of flag, (D) `_symbol_cell` marker removed, (E) footnote legend
+removed. `dune build @fmt` / `dune build` / `dune runtest` all exit 0.
+
 **2026-07-26 (structural stop for weekly-pick candidates, issue #2084 Finding
 2, PR `feat/screener-structural-stop`):** Fixes the second finding from the
 same 07-17 report review: the displayed AND live-instructed stop for a
@@ -292,6 +341,16 @@ remaining queue:
    universe + cached bars to run against, not done in the generator PR).
 3. **[M6.6, deferred]** live `DATA_SOURCE` impl, cron wrapper, alert dispatch,
    trading-state durability (see §Out of scope).
+4. **[#2083 F2, OPEN]** rename tracking on fetch — the remaining unbuilt
+   finding from the 07-17 report review (F1 shipped #2090, F3 shipped #2097).
+   Separate, larger dispatch: detect a delisted/renamed ticker at fetch time
+   and re-pin the universe, rather than annotating downstream.
+5. **[#2083 F3 follow-up]** decide an arming threshold for
+   `spike_bar_threshold_pct` and arm it in
+   `dev/weekly-picks/live-config-overrides.sexp` (the flag ships default-off;
+   the incident bar was +58%, a 25-30% threshold is the obvious first
+   candidate). Requires one live-report dry run to check the false-positive
+   rate on genuine gap-up breakouts before arming.
 
 ## Parallelism
 M6 work runs in parallel with `experiments` track M5.2 — no shared source files.

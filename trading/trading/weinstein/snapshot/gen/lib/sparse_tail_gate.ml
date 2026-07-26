@@ -38,3 +38,21 @@ let warning ~symbol = function
   | Eligible -> None
   | Sparse_tail { bars_present; min_bars; window_trading_days } ->
       Some (_message ~symbol ~bars_present ~min_bars ~window_trading_days)
+
+(* [(ticker, warning option)] — [None] for an eligible ticker. *)
+let _verdict_of bar_reader ~as_of ~min_bars ~window_trading_days ticker =
+  ( ticker,
+    check bar_reader ~symbol:ticker ~as_of ~min_bars ~window_trading_days
+    |> warning ~symbol:ticker )
+
+let partition bar_reader ~as_of ~min_bars ~window_trading_days tickers =
+  let verdicts =
+    List.map tickers
+      ~f:(_verdict_of bar_reader ~as_of ~min_bars ~window_trading_days)
+  in
+  let eligible =
+    List.filter_map verdicts ~f:(function
+      | ticker, None -> Some ticker
+      | _, Some _ -> None)
+  in
+  (eligible, List.filter_map verdicts ~f:snd)

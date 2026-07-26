@@ -1,5 +1,6 @@
 open Core
 module Bar_reader = Weinstein_strategy.Bar_reader
+module Weekly_snapshot = Weinstein_snapshot.Weekly_snapshot
 
 type verdict =
   | Clean
@@ -53,3 +54,18 @@ let warning ~symbol = function
   | Clean -> None
   | Data_suspect { move_pct; threshold_pct; bar_date } ->
       Some (_message ~symbol ~move_pct ~threshold_pct ~bar_date)
+
+(* One candidate plus its warning ([None] when clean). Flag, do not drop: the
+   candidate is returned either way. *)
+let _flag_one bar_reader ~as_of ~threshold_pct (c : Weekly_snapshot.candidate) =
+  let verdict = check bar_reader ~symbol:c.symbol ~as_of ~threshold_pct in
+  match warning ~symbol:c.symbol verdict with
+  | None -> (c, None)
+  | Some w -> ({ c with data_suspect = true }, Some w)
+
+let flag_candidates bar_reader ~as_of ~threshold_pct candidates =
+  let flagged, warnings =
+    List.map candidates ~f:(_flag_one bar_reader ~as_of ~threshold_pct)
+    |> List.unzip
+  in
+  (flagged, List.filter_opt warnings)
