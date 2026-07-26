@@ -716,6 +716,101 @@ let test_empty_universe_no_candidates _ =
            (equal_to _system_version);
        ])
 
+(* ------------------------------------------------------------------ *)
+(* Short-side candidate fixture (generate-seam overlay wiring)          *)
+(* ------------------------------------------------------------------ *)
+
+let _short_symbol = "SHRT"
+
+(* SHRT starts LATER than the index (which runs from 2022-01-01) so that at
+   [_as_of] only ~33 weekly bars exist: its 30-week MA has just become
+   computable and has only just turned down, leaving the stock in EARLY Stage 4
+   ([weeks_declining = 3]) — the window
+   [Stock_analysis.is_breakdown_candidate] admits as a breakdown setup. Starting
+   4 weeks earlier ages it past the <=4-week window and no short candidate is
+   produced; starting 4 weeks later leaves no MA at all. *)
+let _short_start_date = Date.of_string "2022-02-01"
+
+let _short_syn_config : Synthetic_source.config =
+  {
+    start_date = _short_start_date;
+    symbols =
+      [
+        ( _short_symbol,
+          Declining
+            { start_price = 300.0; weekly_loss_pct = 0.04; volume = 20_000_000 }
+        );
+      ];
+  }
+
+(* Counter-rally spliced onto SHRT's final bars: 9 bars at +1.5%/bar is a ~13%
+   rally off the trough, comfortably clearing the 8% [min_correction_pct] the
+   short-side support-floor primitive requires. *)
+let _rally_bars = 9
+let _rally_daily_gain = 0.015
+
+(* Volume expansion on the breakdown leg (the 15 bars ending at the trough), so
+   the weekly volume ratio reads [Strong] and the short candidate clears the
+   default grade-C score floor. Weinstein does not require volume on a
+   breakdown, but it is the strongest confirmation when present. *)
+let _breakdown_volume_bars = 15
+let _breakdown_volume_mult = 3
+
+let _reprice (b : Types.Daily_price.t) price =
+  {
+    b with
+    open_price = price *. 0.995;
+    high_price = price *. 1.01;
+    low_price = price *. 0.99;
+    close_price = price;
+    adjusted_close = price;
+  }
+
+(* SHRT's daily bars: the synthetic decline truncated at [_as_of], with a volume
+   spike on the final breakdown leg and its last [_rally_bars] bars re-priced
+   into a counter-rally off the trough. The trough (the last bar of the pure
+   decline) is then the lowest low of the 90-bar support-floor window, and the
+   rally that follows it clears [min_correction_pct] — so
+   [Support_floor.find_recent_level ~side:Short] finds a REAL resistance ceiling
+   and the overlay reports [stop_is_structural = true]. *)
+let _short_bars () =
+  let bars =
+    _bars_for ~syn_config:_short_syn_config _short_symbol
+    |> List.filter ~f:(fun (b : Types.Daily_price.t) -> Date.(b.date <= _as_of))
+  in
+  let first_rally = List.length bars - _rally_bars in
+  let trough =
+    List.nth bars (first_rally - 1)
+    |> Option.value_map ~default:0.0 ~f:(fun (b : Types.Daily_price.t) ->
+        b.close_price)
+  in
+  List.mapi bars ~f:(fun i b ->
+      if i < first_rally - _breakdown_volume_bars then b
+      else if i < first_rally then
+        { b with volume = b.volume * _breakdown_volume_mult }
+      else
+        _reprice b
+          (trough
+          *. ((1.0 +. _rally_daily_gain) ** Float.of_int (i - first_rally + 1))
+          ))
+
+(* The counter-rally high: the [as_of] bar's high, which is the maximum high
+   after the trough and therefore the resistance ceiling the short-side
+   support-floor primitive returns. *)
+let _short_rally_high () =
+  List.last (_short_bars ())
+  |> Option.value_map ~default:0.0 ~f:(fun (b : Types.Daily_price.t) ->
+      b.high_price)
+
+(* SHRT plus the declining index, so the macro tape reads [Bearish] — the regime
+   that unconditionally admits shorts. *)
+let _short_bar_reader () =
+  Bar_reader.of_in_memory_bars
+    [
+      (_short_symbol, _short_bars ());
+      (_index_symbol, _bars_for ~syn_config:_bearish_syn_config _index_symbol);
+    ]
+
 (* Minimal candidate literal for direct {!Stop_recompute.for_candidate} tests.
    [stop] is deliberately seeded LONG-shaped (below entry) so a short-side
    overlay that forgot the side would leave a below-entry stop behind. *)
@@ -769,6 +864,53 @@ let test_short_candidate_stop_recomputed_above_entry _ =
        (fun (c : Weekly_snapshot.candidate) -> c.stop)
        (gt (module Float_ord) entry))
 
+(* Issue #2084 Finding 2, SHORT side, pinned at the [generate] SEAM (not at the
+   [Stop_recompute.for_candidate] primitive): a real short candidate produced by
+   the screener cascade must carry the structural stop the short-side overlay
+   computes, not the screener's flat [entry * (1 + short_stop_pct)] proxy.
+
+   The two assertions are chosen so that BOTH mutations of the overlay call site
+   in [weekly_snapshot_generator.generate] turn this test red:
+
+   - Dropping [_overlay_structural_stop] (bare
+     [List.map result.short_candidates ~f:Snapshot_display.candidate_of_scored]):
+     [stop_is_structural] stays [false] and [stop] becomes [entry * 1.08]
+     (~329 here, far outside the asserted band) — the first matcher fails.
+   - Passing [~side:Long] instead of [~side:Short]: the long branch still finds
+     a qualifying counter-move (so [stop_is_structural] stays [true]), but it
+     returns the CORRECTION LOW rather than the rally high, placing the stop
+     ~4% BELOW the trough instead of ~4% above the rally high — the band
+     matcher fails.
+
+   Weinstein §5.1: a short's initial stop sits above the prior counter-rally
+   high. The band is [rally_high, rally_high * 1.10]: the primitive returns the
+   rally high, [compute_initial_stop] adds [min_correction_pct / 2] (4%), and
+   the round-number nudge moves it at most $0.125 further. *)
+let test_short_candidate_overlay_applied_at_generate_seam _ =
+  let rally_high = _short_rally_high () in
+  let snap =
+    _generate ~bar_reader:(_short_bar_reader ())
+      ~ticker_sectors:[ (_short_symbol, "Information Technology") ]
+  in
+  let shrt =
+    List.find (snap : Weekly_snapshot.t).short_candidates
+      ~f:(fun (c : Weekly_snapshot.candidate) ->
+        String.equal c.symbol _short_symbol)
+  in
+  assert_that shrt
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (c : Weekly_snapshot.candidate) -> c.stop_is_structural)
+              (equal_to true);
+            field
+              (fun (c : Weekly_snapshot.candidate) -> c.stop)
+              (is_between
+                 (module Float_ord)
+                 ~low:rally_high ~high:(rally_high *. 1.10));
+          ]))
+
 (* CP4: [for_candidate]'s documented "no resident daily bars -> candidate
    returned unchanged" guard — [stop] and [stop_is_structural] untouched. *)
 let test_candidate_without_bars_unchanged _ =
@@ -795,6 +937,8 @@ let suite =
   >::: [
          "short candidate stop recomputed above entry"
          >:: test_short_candidate_stop_recomputed_above_entry;
+         "short candidate overlay applied at the generate seam"
+         >:: test_short_candidate_overlay_applied_at_generate_seam;
          "candidate without bars returned unchanged"
          >:: test_candidate_without_bars_unchanged;
          "metadata stamped onto the snapshot" >:: test_metadata_stamped;
