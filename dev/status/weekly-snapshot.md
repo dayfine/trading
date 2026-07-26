@@ -53,6 +53,20 @@ renders neither). Every new assertion mutation-tested (overlay call removed,
 overlay/sizing pipe order swapped, `is_structural` forced `true`, stop-cell /
 footnote logic stubbed) and confirmed to go red.
 
+QC rework iteration 2 added the missing **short-side `generate`-seam** pin:
+`test_short_candidate_overlay_applied_at_generate_seam` builds a synthetic
+early-Stage-4 breakdown fixture (`SHRT`, a decline whose 30-week MA has just
+turned down, with volume expansion on the breakdown leg and a ~13%
+counter-rally spliced onto its final bars) so a real short candidate flows
+through `Screener.screen` into `result.short_candidates`. It asserts
+`stop_is_structural = true` (the first such assertion on either side — the
+prior tests only covered the fallback branch) and that the stop sits in
+`[rally_high, rally_high * 1.10]`, i.e. just above the prior counter-rally
+high per §6.3. Mutation-verified: reverting the short overlay to a bare
+`List.map … candidate_of_scored` → red; flipping `~side:Short` to `~side:Long`
+at the same call site → red (stop lands at `63.875`, the long-side correction
+low, outside the band).
+
 **2026-07-26 (sparse-tail eligibility gate, issue #2083 fix 1, PR
 `feat/weekly-snapshot-sparse-tail`):** Closes the data-hygiene hole behind the
 2026-07-17 report's rank-1 "SNSE" pick, a ticker that did not exist at the
