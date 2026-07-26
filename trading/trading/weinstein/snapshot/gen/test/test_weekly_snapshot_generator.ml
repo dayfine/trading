@@ -1222,6 +1222,211 @@ let test_candidate_without_bars_unchanged _ =
            (equal_to false);
        ])
 
+(* ---- Live rename detection (issue #2083 fix 2) ---- *)
+
+(* Thin the trailing [window] bars to every [stride]-th (the last always kept).
+   Unlike [_sparsify_tail] this applies NO spike: a rename fixture needs the
+   predecessor's surviving prints to still track the successor's returns
+   exactly, which a bumped last bar would destroy. *)
+let _thin_tail bars ~as_of ~window ~stride : Types.Daily_price.t list =
+  match
+    List.findi bars ~f:(fun _ (b : Types.Daily_price.t) ->
+        Date.equal b.date as_of)
+  with
+  | None -> bars
+  | Some (idx, _) ->
+      let window_start = max 0 (idx - window + 1) in
+      let tail =
+        List.sub bars ~pos:window_start ~len:(idx - window_start + 1)
+      in
+      let last_i = List.length tail - 1 in
+      List.take bars window_start
+      @ List.filteri tail ~f:(fun i _ -> i mod stride = 0 || i = last_i)
+
+(* The successor's leg: the last [window] bars at or before [as_of], on a 1.37x
+   adjustment basis. Different LEVELS, identical RETURNS — the signature the
+   detector scores. The [as_of] truncation matters: the synthetic source emits
+   bars well past the as-of date, so taking the tail of the raw list would place
+   the whole leg in the future. *)
+let _successor_leg bars ~as_of ~window : Types.Daily_price.t list =
+  let upto =
+    List.filter bars ~f:(fun (b : Types.Daily_price.t) ->
+        Date.( <= ) b.date as_of)
+  in
+  List.drop upto (max 0 (List.length upto - window))
+  |> List.map ~f:(fun (b : Types.Daily_price.t) ->
+      { b with adjusted_close = b.adjusted_close *. 1.37 })
+
+let _rename_window = 15
+
+(* AAPL (dense, unrelated control) + ZOMB (AAPL's series with a 22-day zombie
+   tail) + ZOMBN (ZOMB's successor) + the index. ZOMB -> ZOMBN is the only
+   succession present: AAPL and the index are dense, so neither can be a
+   predecessor, and ZOMB/AAPL start on the same day, so neither can succeed the
+   other. *)
+let _rename_bar_reader () =
+  let aapl = _bars_for ~syn_config:_syn_config "AAPL" in
+  Bar_reader.of_in_memory_bars
+    [
+      ("AAPL", aapl);
+      ("ZOMB", _thin_tail aapl ~as_of:_as_of ~window:_rename_window ~stride:3);
+      ("ZOMBN", _successor_leg aapl ~as_of:_as_of ~window:_rename_window);
+      (_index_symbol, _bars_for ~syn_config:_syn_config _index_symbol);
+    ]
+
+let _rename_inputs ~rename_detect_min_overlap_days ~rename_detect_match_fraction
+    : Generator.inputs =
+  let base =
+    _inputs_at ~as_of:_as_of ~bar_reader:(_rename_bar_reader ())
+      ~ticker_sectors:
+        [
+          ("AAPL", "Information Technology");
+          ("ZOMB", "Information Technology");
+          ("ZOMBN", "Information Technology");
+        ]
+  in
+  {
+    base with
+    config =
+      {
+        base.config with
+        rename_detect_min_overlap_days;
+        rename_detect_match_fraction;
+      };
+  }
+
+let _long_symbols (snap : Weekly_snapshot.t) =
+  List.map snap.long_candidates ~f:(fun (c : Weekly_snapshot.candidate) ->
+      c.symbol)
+
+(* R1 (experiment-flag-discipline): [Weinstein_strategy.default_config] carries
+   rename detection disabled — the config every caller gets unless it opts into
+   an overlay. Both knobs must sit at their no-op value. *)
+let test_default_config_has_rename_detect_disabled _ =
+  let inputs =
+    _inputs_at ~as_of:_as_of ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  assert_that inputs.config
+    (all_of
+       [
+         field
+           (fun (c : Weinstein_strategy.config) ->
+             c.rename_detect_min_overlap_days)
+           (equal_to 0);
+         field
+           (fun (c : Weinstein_strategy.config) ->
+             c.rename_detect_match_fraction)
+           (float_equal 0.0);
+       ])
+
+(* Disabled (the default) is an EXACT no-op on a fixture that WOULD be caught if
+   armed: the superseded ZOMB still surfaces as a long candidate beside AAPL,
+   and no warning is emitted. *)
+let test_disabled_rename_detect_is_bit_identical _ =
+  let snap =
+    Generator.generate
+      (_rename_inputs ~rename_detect_min_overlap_days:0
+         ~rename_detect_match_fraction:0.0)
+  in
+  assert_that snap
+    (all_of
+       [
+         field _long_symbols (elements_are [ equal_to "AAPL"; equal_to "ZOMB" ]);
+         field (fun (s : Weekly_snapshot.t) -> s.warnings) is_empty;
+       ])
+
+(* Armed: the SAME fixture now drops the superseded ZOMB, KEEPS the unrelated
+   AAPL, and emits one warning naming both the dead ticker and its successor.
+   Both halves are pinned — asserting the exact candidate list fails if the
+   wrong symbol is dropped or if nothing is. This is the direct regression test
+   for issue #2083 Finding 2. *)
+let test_armed_rename_detect_drops_predecessor_and_warns _ =
+  let snap =
+    Generator.generate
+      (_rename_inputs ~rename_detect_min_overlap_days:5
+         ~rename_detect_match_fraction:0.95)
+  in
+  assert_that snap
+    (all_of
+       [
+         field _long_symbols (elements_are [ equal_to "AAPL" ]);
+         field
+           (fun (s : Weekly_snapshot.t) -> s.warnings)
+           (elements_are
+              [
+                matching ~msg:"warning naming ZOMB and its successor ZOMBN"
+                  (fun w ->
+                    if
+                      String.is_substring w ~substring:"ZOMB"
+                      && String.is_substring w ~substring:"ZOMBN"
+                    then Some ()
+                    else None)
+                  (equal_to ());
+              ]);
+       ])
+
+(* ORDER: rename detection must run BEFORE the sparse-tail gate. The zombie tail
+   that identifies a superseded ticker is exactly what the sparse-tail gate
+   removes, so running second would erase the evidence.
+
+   With both armed on the rename fixture, ZOMB is sparse enough for either stage
+   to drop it, but only one of them names the successor. Rename-first ->
+   exactly one warning, naming ZOMBN. Sparse-first -> a sparse-tail warning that
+   never mentions ZOMBN, because by then ZOMB is no longer in the list to be
+   matched against it. *)
+let test_rename_detect_runs_before_the_sparse_tail_gate _ =
+  let base =
+    _rename_inputs ~rename_detect_min_overlap_days:5
+      ~rename_detect_match_fraction:0.95
+  in
+  let snap =
+    Generator.generate
+      {
+        base with
+        config =
+          {
+            base.config with
+            sparse_tail_min_bars = 10;
+            sparse_tail_window_trading_days = 15;
+          };
+      }
+  in
+  assert_that snap.warnings
+    (elements_are
+       [
+         matching ~msg:"the surviving warning is the rename one (names ZOMBN)"
+           (fun w ->
+             if String.is_substring w ~substring:"ZOMBN" then Some () else None)
+           (equal_to ());
+       ])
+
+(* Armed on a universe with nothing renamed leaves the run untouched — the
+   detector is not simply dropping whatever it is pointed at once enabled. *)
+let test_armed_rename_detect_on_clean_universe_is_a_no_op _ =
+  let base =
+    _inputs_at ~as_of:_as_of ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  let snap =
+    Generator.generate
+      {
+        base with
+        config =
+          {
+            base.config with
+            rename_detect_min_overlap_days = 5;
+            rename_detect_match_fraction = 0.95;
+          };
+      }
+  in
+  assert_that snap
+    (all_of
+       [
+         field _long_symbols (elements_are [ equal_to "AAPL" ]);
+         field (fun (s : Weekly_snapshot.t) -> s.warnings) is_empty;
+       ])
+
 let suite =
   "weekly_snapshot_generator"
   >::: [
@@ -1257,6 +1462,16 @@ let suite =
          >:: test_armed_sparse_tail_drops_candidate_and_warns;
          "armed dense tail retains candidate"
          >:: test_armed_dense_tail_retains_candidate;
+         "default_config has rename detection disabled"
+         >:: test_default_config_has_rename_detect_disabled;
+         "default (disabled) rename detection is bit-identical"
+         >:: test_disabled_rename_detect_is_bit_identical;
+         "armed rename detection drops the predecessor and warns"
+         >:: test_armed_rename_detect_drops_predecessor_and_warns;
+         "rename detection runs before the sparse-tail gate"
+         >:: test_rename_detect_runs_before_the_sparse_tail_gate;
+         "armed rename detection on a clean universe is a no-op"
+         >:: test_armed_rename_detect_on_clean_universe_is_a_no_op;
          "default_config has the spike-bar flag disabled"
          >:: test_default_config_has_spike_flag_disabled;
          "default (disabled) spike flag is bit-identical"

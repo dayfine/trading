@@ -146,11 +146,21 @@ let _analyze_universe ~(inputs : inputs) ~index_bars ~eligible_tickers :
 (* Sparse-tail eligibility gate (issue #2083 fix 1, data hygiene not a Weinstein
    rule): the eligible tickers plus one warning line per dropped one. Disabled by
    default. See [Sparse_tail_gate.partition]. *)
-let _eligible_tickers ~(inputs : inputs) =
+let _eligible_tickers ~(inputs : inputs) tickers =
   Sparse_tail_gate.partition inputs.bar_reader ~as_of:inputs.as_of
     ~min_bars:inputs.config.sparse_tail_min_bars
-    ~window_trading_days:inputs.config.sparse_tail_window_trading_days
-    (List.map inputs.ticker_sectors ~f:fst)
+    ~window_trading_days:inputs.config.sparse_tail_window_trading_days tickers
+
+(* Live ticker-rename detection (issue #2083 fix 2, data hygiene not a Weinstein
+   rule): the surviving tickers plus one warning line per detected succession,
+   naming the successor so a dropped pick is actionable rather than merely
+   absent. Runs BEFORE the sparse-tail gate, on the full ticker list — the
+   zombie tail that identifies a superseded ticker is exactly what that gate
+   removes. Disabled by default. See [Rename_gate.partition]. *)
+let _live_tickers ~(inputs : inputs) tickers =
+  Rename_gate.partition inputs.bar_reader ~as_of:inputs.as_of
+    ~min_overlap_days:inputs.config.rename_detect_min_overlap_days
+    ~match_fraction:inputs.config.rename_detect_match_fraction tickers
 
 (* Rating of one sector ETF, or [None] when it has no bars. *)
 let _etf_rating ~(inputs : inputs) ~index_bars (etf, sector_name) =
@@ -224,7 +234,12 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
   let index_bars = _weekly_bars ~inputs inputs.config.indices.primary in
   let macro = _macro_result ~inputs ~index_bars in
   let sector_map = _build_sector_map ~inputs ~index_bars in
-  let eligible_tickers, sparse_warnings = _eligible_tickers ~inputs in
+  let live_tickers, rename_warnings =
+    _live_tickers ~inputs (List.map inputs.ticker_sectors ~f:fst)
+  in
+  let eligible_tickers, sparse_warnings =
+    _eligible_tickers ~inputs live_tickers
+  in
   let stocks = _analyze_universe ~inputs ~index_bars ~eligible_tickers in
   let held_positions =
     List.map inputs.live_portfolio.positions
@@ -257,5 +272,5 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
     long_candidates;
     short_candidates;
     held_positions;
-    warnings = sparse_warnings @ spike_warnings;
+    warnings = rename_warnings @ sparse_warnings @ spike_warnings;
   }
