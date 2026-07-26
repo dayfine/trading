@@ -1234,6 +1234,9 @@ let test_diagnostics_bearish_macro_blocks_longs _ =
            (fun (d : cascade_diagnostics) -> d.long_grade_admitted)
            (equal_to 0);
          field
+           (fun (d : cascade_diagnostics) -> d.long_failed_breakout_dropped)
+           (equal_to 0);
+         field
            (fun (d : cascade_diagnostics) -> d.long_top_n_admitted)
            (equal_to 0);
        ])
@@ -2280,11 +2283,69 @@ let test_failed_breakout_default_is_inert _ =
 let test_failed_breakout_default_config_is_zero _ =
   assert_that default_config.failed_breakout_tolerance_pct (float_equal 0.0)
 
+(* Both halves of the [<= 0.0] branch are pinned: the 0.0 default AND a negative
+   value. Without the negative case a regression to [Float.equal tolerance_pct
+   0.0] would arm the gate for every negative k with the suite still green. *)
 let test_failed_breakout_reason_disabled_at_or_below_zero _ =
   assert_that
     (failed_breakout_reason ~tolerance_pct:0.0 ~breakout_price:(Some 100.0)
        ~current_close:(Some 1.0))
     is_none
+
+let test_failed_breakout_reason_disabled_at_negative_tolerance _ =
+  assert_that
+    (failed_breakout_reason ~tolerance_pct:(-1.0) ~breakout_price:(Some 100.0)
+       ~current_close:(Some 1.0))
+    is_none
+
+(* The [zero_if long_macro_admitted] wrapper on [long_failed_breakout_dropped]
+   is load-bearing here, not incidentally satisfied: k is ARMED and the FTH
+   specimen WOULD be counted (the raw count runs over the macro-independent
+   candidate list), so only the wrapper forces the reported 0. Deleting the
+   wrapper turns this red. *)
+let test_failed_breakout_dropped_is_zero_when_macro_closes_longs _ =
+  let result =
+    screen
+      ~config:{ cfg with failed_breakout_tolerance_pct = 0.05 }
+      ~macro_trend:Bearish ~sector_map:(empty_sector_map ())
+      ~stocks:
+        [
+          breakout_analysis ~ticker:"FTH" ~breakout_price:(Some 36.93)
+            ~current_close:(Some 28.0);
+        ]
+      ~held_tickers:[]
+  in
+  assert_that result.cascade_diagnostics
+    (all_of
+       [
+         field
+           (fun (d : cascade_diagnostics) -> d.long_macro_admitted)
+           (equal_to 0);
+         field
+           (fun (d : cascade_diagnostics) -> d.long_failed_breakout_dropped)
+           (equal_to 0);
+       ])
+
+(* End-to-end: a negative k leaves the whole cascade inert, exactly like 0.0. *)
+let test_failed_breakout_negative_tolerance_is_inert _ =
+  let result =
+    screen_one ~failed_breakout_tolerance_pct:(-0.05)
+      (breakout_analysis ~ticker:"FTH" ~breakout_price:(Some 36.93)
+         ~current_close:(Some 28.0))
+  in
+  assert_that result
+    (all_of
+       [
+         field
+           (fun (r : result) ->
+             List.map r.buy_candidates ~f:(fun c -> c.ticker))
+           (elements_are [ equal_to "FTH" ]);
+         field
+           (fun (r : result) ->
+             r.cascade_diagnostics.long_failed_breakout_dropped)
+           (equal_to 0);
+         field (fun (r : result) -> r.watchlist) is_empty;
+       ])
 
 (* The reason string names the level the close fell below, so the report row is
    self-explanatory. *)
@@ -2514,6 +2575,12 @@ let suite =
          >:: test_failed_breakout_default_config_is_zero;
          "test_failed_breakout_reason_disabled_at_or_below_zero"
          >:: test_failed_breakout_reason_disabled_at_or_below_zero;
+         "test_failed_breakout_reason_disabled_at_negative_tolerance"
+         >:: test_failed_breakout_reason_disabled_at_negative_tolerance;
+         "test_failed_breakout_dropped_is_zero_when_macro_closes_longs"
+         >:: test_failed_breakout_dropped_is_zero_when_macro_closes_longs;
+         "test_failed_breakout_negative_tolerance_is_inert"
+         >:: test_failed_breakout_negative_tolerance_is_inert;
          "test_failed_breakout_reason_mentions_prices"
          >:: test_failed_breakout_reason_mentions_prices;
          "test_failed_breakout_boolean_agrees_with_reason"

@@ -117,8 +117,10 @@ type t = {
 
           Purely additive: no existing analysis path reads it. It exists so the
           screener can re-validate a breakout candidate against the *current*
-          price — a close back below the breakout level after the breakout week
-          is a failed breakout (weinstein-book-reference.md §Buy Criteria). See
+          price — an engineering adaptation that enforces
+          weinstein-book-reference.md §4.1 requirement 1 (breakout above
+          resistance) at evaluation time rather than only on the breakout bar;
+          it is not a book-quoted rule. See
           {!Screener_admission.failed_breakout_reason}. Consumers must treat
           [None] as "unknown", never as evidence of a failed breakout. *)
   as_of_date : Core.Date.t;  (** The date this analysis was computed. *)

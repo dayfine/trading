@@ -258,13 +258,22 @@ type config = {
           unknown breakout price or an unknown current close is never
           invalidated — absence of data is not evidence of failure.
 
-          Faithful tightening of Weinstein's entry rule, not a new one: the buy
-          is a breakout above resistance, and "a close back below the breakout
-          level after the breakout week" means the breakout failed and the base
-          did not hold (weinstein-book-reference.md §Buy Criteria). Without this
+          {b Engineering adaptation, not a book-quoted rule.} The reference doc
+          states no "close back below the breakout level invalidates the
+          candidate" rule. This gate enforces spine item 3 against {b current}
+          data: §4.1 requirement 1 (breakout above resistance and above the
+          30-week MA) read as a condition that must still hold at evaluation
+          time, not only on the breakout bar; §4.6 "greater risk of false
+          breakout"; §5.2 "IF whipsaw ... acceptable to re-buy" (an invalidated
+          candidate is dropped, never barred from re-entry). Without this
           re-validation the early-Stage2 admission window keeps a collapsed
           breakout eligible for weeks, emitting an entry far above the market
-          (issue #2084, Finding 1). Typical settings are 0.03-0.05.
+          (issue #2084, Finding 1).
+
+          [k] must not be set small: §Stage 2 (Ch. 2) treats a pullback "close
+          to the breakout point" as a {b second chance to buy}, and [k] is
+          exactly what separates that healthy pullback from a genuine failure.
+          Typical settings are 0.03-0.05.
 
           Long side only: the short-side breakdown mirror is not implemented.
 

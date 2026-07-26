@@ -43,9 +43,10 @@ let _failed_breakout_message ~close ~breakout ~tolerance_pct ~floor_price =
     "Failed breakout: close %.2f below breakout %.2f - %.1f%% (%.2f)" close
     breakout (tolerance_pct *. 100.0) floor_price
 
-(* Failed-breakout re-validation (weinstein-book-reference.md §Buy Criteria): a
-   close back below the breakout level after the breakout week means the
-   breakout failed. *)
+(* Failed-breakout re-validation. Engineering adaptation, not a book-quoted
+   rule: it enforces §4.1 requirement 1 (breakout above resistance) as a
+   condition that must still hold at evaluation time. See the .mli for the full
+   authority note, including why tolerance_pct must not be set small. *)
 let failed_breakout_reason ~tolerance_pct ~breakout_price ~current_close =
   match
     _failed_breakout_levels ~tolerance_pct ~breakout_price ~current_close

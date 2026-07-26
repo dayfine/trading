@@ -49,10 +49,24 @@ val failed_breakout_reason :
   breakout_price:float option ->
   current_close:float option ->
   string option
-(** Failed-breakout re-validation for long candidates
-    (weinstein-book-reference.md §Buy Criteria: a close back below the breakout
-    level after the breakout week is a failed breakout — the base has not held
-    and the entry is no longer valid).
+(** Failed-breakout re-validation for long candidates.
+
+    {b Authority — engineering adaptation, not a book-quoted rule.}
+    weinstein-book-reference.md states no rule that "a close back below the
+    breakout level invalidates the candidate". What this gate does is enforce
+    spine item 3 (entry on a breakout above resistance) against {b current}
+    data: §4.1 requirement 1 ("stock breaks out above resistance AND above the
+    30-week MA") read as a condition that must still hold at {b evaluation}
+    time, not only on the breakout bar. §4.6 notes the "greater risk of false
+    breakout", and §5.2 handles the failure case downstream ("IF whipsaw (stock
+    later breaks out again): acceptable to re-buy") — so an invalidated
+    candidate is dropped from the buy list, never barred from re-entry.
+
+    {b Why [tolerance_pct] must not be set small.} The §Stage 2 detail (Ch. 2)
+    says the usual post-breakout pullback "close to the breakout point" is a
+    {b second chance to buy}. [tolerance_pct] is precisely what separates that
+    healthy pullback from a genuine failure — too small a value de-lists
+    candidates the book would have you buy.
 
     Returns [Some reason] when the candidate is invalidated: a human-readable
     drop reason for the watchlist / report. Returns [None] when the candidate

@@ -8,9 +8,12 @@
     - {b demoted failed breakouts} — candidates the failed-breakout
       re-validation gate removed from the buy list. Their entry carries the drop
       reason from {!Screener_admission.failed_breakout_reason} so the report
-      shows why a would-be buy disappeared (weinstein-book-reference.md §Buy
-      Criteria: a close back below the breakout level after the breakout week is
-      a failed breakout).
+      shows why a would-be buy disappeared. Demotion (rather than deletion) is
+      what keeps the gate consistent with §5.2's "IF whipsaw ... acceptable to
+      re-buy": the name stays visible for a genuine re-breakout. See
+      {!Screener_admission.failed_breakout_reason} for the full authority note —
+      the gate is an engineering adaptation enforcing §4.1 requirement 1 at
+      evaluation time, not a book-quoted rule.
 
     Extracted from {!Screener} to keep the cascade coordinator within the
     declared-large file-length cap. All functions are pure. *)
