@@ -28,7 +28,14 @@
 ;   do-no-harm-FAIL on return-adjusted metrics — no equal-score tiebreak adds
 ;   return, cf. project_edge_is_the_fat_tail). The backtest code default stays
 ;   Alphabetical; this reorders only the human-facing weekly picks.
-((screening_config ((candidate_ranking Quality))))
+; failed_breakout_tolerance_pct=0.05: issue #2084 fix 1 (armed 2026-07-26) —
+;   invalidates a long candidate whose current close has collapsed back below
+;   breakout_price x (1 - 0.05) after the breakout week (a failed breakout per
+;   the book; the FTH/SNSE 07-17 rank-1 specimen closed ~30% below its own
+;   breakout level and still emitted with entry $36.94). Merged into the same
+;   screening_config overlay as candidate_ranking so neither arming clobbers
+;   the other. Backtest code default stays 0.0 (off) per experiment-flag R1.
+((screening_config ((candidate_ranking Quality) (failed_breakout_tolerance_pct 0.05))))
 ; sparse-tail eligibility gate: issue #2083 fix 1 — the 2026-07-17 report's
 ;   rank-1 pick "SNSE" did not exist at the broker (Sensei Biotherapeutics had
 ;   renamed to Faeth Therapeutics, SNSE->FTH, on 2026-06-16). The feed kept
