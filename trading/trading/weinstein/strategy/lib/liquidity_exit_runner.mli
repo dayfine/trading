@@ -54,7 +54,8 @@ val update :
     - For each held position (long OR short) in a {!Position.Holding} state: 1.
       Reads its trailing daily bars via {!Bar_reader.daily_bars_for} up to
       [current_date] and computes {!Liquidity_metric.dollar_adv} over
-      [config.adv_lookback_days]. 2. When the dollar-ADV is [Some adv] with
+      [config.adv_lookback_days], reduced by [config.adv_aggregation] /
+      [config.adv_trim_pct]. 2. When the dollar-ADV is [Some adv] with
       [adv < min_hold_dollar_adv], emits a [TriggerExit] with
       [exit_reason = StrategySignal { label = "liquidity_exit"; detail = Some
        "dollar_adv=<x>" }] and [exit_price = bar.close_price] from [get_price].

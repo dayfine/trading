@@ -16,11 +16,14 @@ let filter ~min_dollar_adv ~dollar_adv_for
     List.filter candidates
       ~f:(_short_has_borrow ~min_dollar_adv ~dollar_adv_for)
 
-let apply ~min_dollar_adv ~lookback_days ~bar_reader ~current_date candidates =
+let apply ~min_dollar_adv ~(liquidity_config : Liquidity_config.t) ~bar_reader
+    ~current_date candidates =
   if Float.( <= ) min_dollar_adv 0.0 then candidates
   else
     let dollar_adv_for ticker =
-      Liquidity_metric.dollar_adv ~lookback_days
+      Liquidity_metric.dollar_adv ~aggregation:liquidity_config.adv_aggregation
+        ~trim_pct:liquidity_config.adv_trim_pct
+        ~lookback_days:liquidity_config.adv_lookback_days
         (Bar_reader.daily_bars_for bar_reader ~symbol:ticker ~as_of:current_date)
     in
     filter ~min_dollar_adv ~dollar_adv_for candidates

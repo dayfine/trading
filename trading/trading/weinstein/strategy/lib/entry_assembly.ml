@@ -17,5 +17,4 @@ let assemble ~config ~bar_reader ~current_date (screen_result : Screener.result)
       ~current_date combined
   in
   Short_borrow_gate.apply ~min_dollar_adv:config.short_borrow_min_dollar_adv
-    ~lookback_days:config.liquidity_config.adv_lookback_days ~bar_reader
-    ~current_date combined
+    ~liquidity_config:config.liquidity_config ~bar_reader ~current_date combined

@@ -9,12 +9,21 @@
       existing golden/baseline replays unchanged.
     - A positive floor drops {b short} candidates whose dollar-ADV is below it
       ("no borrow available"); long candidates are never affected.
-    - A [None] dollar-ADV reading never drops a candidate. *)
+    - A [None] dollar-ADV reading never drops a candidate.
+
+    Plus the strategy-side adapter {!Short_borrow_gate.apply}: that it measures
+    borrow supply on {b exactly the same basis} as the entry gate — i.e. it
+    honours [liquidity_config.adv_aggregation] — which is the contract that
+    justified passing the whole {!Liquidity_config.t} rather than a bare
+    lookback. *)
 
 open OUnit2
 open Core
 open Matchers
 open Weinstein_types
+module Bar_reader = Weinstein_strategy.Bar_reader
+module Liquidity_config = Weinstein_strategy.Liquidity_config
+module Liquidity_metric = Weinstein_strategy.Liquidity_metric
 module Short_borrow_gate = Weinstein_strategy.Short_borrow_gate
 
 let _make_candidate ~ticker ~side : Screener.scored_candidate =
@@ -86,6 +95,68 @@ let test_missing_reading_keeps_short _ =
           ~dollar_adv_for:adv_for candidates))
     (equal_to 1)
 
+(* ---------------------------------------------------------------------- *)
+(* Consumer-level: [apply] measures on the entry gate's basis               *)
+(*                                                                         *)
+(* [filter] takes the dollar-ADV reading as GIVEN. These tests pin the      *)
+(* adapter's measurement basis: the same spoofed bar history is read as     *)
+(* $2,000,080 under [Mean] (borrow "available", short kept) and $100 under  *)
+(* [Median] (no borrow, short dropped). Only [adv_aggregation] differs, so  *)
+(* de-threading it from [apply] turns both assertions red.                  *)
+(* ---------------------------------------------------------------------- *)
+
+let _borrow_floor = 1_000_000.0
+let _spoof_lookback = 5
+let _spoof_close = 10.0
+let _spoof_start = Date.of_string "2024-03-25"
+let _spoof_bar_count = 5
+let _spoof_spike_index = 2
+let _honest_dollar_volume = 100.0
+let _spoof_dollar_volume = 10_000_000.0
+
+(* 5 bars of a near-dead name plus one block print. mean = (4*100 + 10M)/5 =
+   2,000,080 (clears the $1M floor); median = 100 (fails it). *)
+let _spoof_bar i : Types.Daily_price.t =
+  let dollar_volume =
+    if i = _spoof_spike_index then _spoof_dollar_volume
+    else _honest_dollar_volume
+  in
+  {
+    date = Date.add_days _spoof_start i;
+    open_price = _spoof_close;
+    high_price = _spoof_close;
+    low_price = _spoof_close;
+    close_price = _spoof_close;
+    adjusted_close = _spoof_close;
+    volume = Float.to_int (dollar_volume /. _spoof_close);
+    active_through = None;
+  }
+
+let _spoof_bars = List.init _spoof_bar_count ~f:_spoof_bar
+let _spoof_as_of = Date.add_days _spoof_start (_spoof_bar_count - 1)
+
+let _apply_survivors aggregation =
+  let liquidity_config =
+    {
+      Liquidity_config.default_config with
+      adv_lookback_days = _spoof_lookback;
+      adv_aggregation = aggregation;
+    }
+  in
+  let bar_reader = Bar_reader.of_in_memory_bars [ ("SPOOF", _spoof_bars) ] in
+  tickers
+    (Short_borrow_gate.apply ~min_dollar_adv:_borrow_floor ~liquidity_config
+       ~bar_reader ~current_date:_spoof_as_of
+       [ _short ~ticker:"SPOOF" ])
+
+let test_apply_mean_keeps_spoofed_short _ =
+  assert_that
+    (_apply_survivors Liquidity_metric.Mean)
+    (elements_are [ equal_to "SPOOF" ])
+
+let test_apply_median_drops_spoofed_short _ =
+  assert_that (_apply_survivors Liquidity_metric.Median) (elements_are [])
+
 let () =
   run_test_tt_main
     ("short_borrow_gate"
@@ -95,4 +166,8 @@ let () =
            >:: test_floor_drops_illiquid_short_keeps_liquid;
            "floor never drops longs" >:: test_floor_never_drops_longs;
            "missing reading keeps short" >:: test_missing_reading_keeps_short;
+           "apply: Mean keeps the spoofed short"
+           >:: test_apply_mean_keeps_spoofed_short;
+           "apply: Median drops the spoofed short"
+           >:: test_apply_median_drops_spoofed_short;
          ])
