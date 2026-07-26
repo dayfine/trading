@@ -5,6 +5,112 @@
 ## Status
 IN_PROGRESS
 
+**2026-07-26 (live rename tracking, issue #2083 Finding 2, branch
+`feat/universe-rename-tracking`):** The last of the three 07-17 findings, and
+the only one that attacks the ROOT cause rather than a symptom. F1
+(`Sparse_tail_gate`, #2090) refuses a candidate whose recent tail is too sparse;
+F3 (`Spike_bar_gate`, #2097) annotates one whose signal rests on a single bar.
+Neither knows *why* the feed went bad. F2 detects the rename itself: Sensei
+Biotherapeutics -> Faeth Therapeutics, SNSE -> FTH, 2026-06-16.
+
+Issue #2083 proposes two mechanisms for F2 — the EODHD symbol-change feed, or
+"the existing returns-basis twin matcher run live". **`EODHD_API_KEY` is not
+available in the GHA container, so the vendor-feed half could not be built or
+exercised even once and is explicitly OUT OF SCOPE here** (see §Follow-up). This
+PR builds the second, which needs no vendor feed and is fully testable offline.
+
+New pure module `Weinstein_snapshot_gen.Rename_detector`
+(`trading/trading/weinstein/snapshot/gen/lib/rename_detector.{ml,mli}`): given
+`symbol -> daily adjusted-close series` plus an `as_of`, it returns candidate
+`(old_symbol, new_symbol)` pairs with the evidence that justified each —
+changeover date, overlap length, returns-similarity score, per-side tail-bar
+counts. Pure: no filesystem, no `Bar_reader`; the caller owns loading, exactly
+as `Twin_detector` does. Its trading-day calendar is derived from the union of
+the input's own dates.
+
+**Reuse, not reimplementation.** The returns-similarity score comes from calling
+`Twin_detector.detect` on the two-series pair with `basis = Returns` and
+`min_overlap_days = 2` (which makes its anchor stride 1, so its prefilter is
+exhaustive over a two-series input and cannot drop a genuine match); the
+resulting `pair_match` supplies `overlap_days` / `match_fraction`. Not one line
+of similarity arithmetic is duplicated. `Config.default` inherits
+`Twin_detector`'s own calibrated `match_fraction = 0.95` / `ret_epsilon = 1e-3`
+(its top-3000 audit: real rename twins score 0.95-0.99 on the returns basis,
+different-company controls below 0.06).
+
+**What is new over `Twin_detector` is SUCCESSION, not concurrency.**
+`Twin_detector` answers "which series here are near-duplicates of each other,
+concurrently?" and reports a dual listing the same way it reports a rename. A
+rename additionally requires a handover: the predecessor goes sparse at the
+right-hand edge (tail density <= `max_predecessor_tail_density`) while a younger
+leg becomes dense (>= `min_successor_tail_density`), with matching returns over
+whatever they share. Two fully-overlapping dense series are NOT reported.
+
+New adapter `Weinstein_snapshot_gen.Rename_gate` (`series_for` / `partition`)
+reads the series out of a `Bar_reader` and returns the same
+`(eligible, warnings)` pair `Sparse_tail_gate.partition` does, so the two #2083
+eligibility stages compose uniformly. Wired into
+`Weekly_snapshot_generator.generate` **before** the sparse-tail gate, on the
+full ticker list — the zombie tail that identifies a superseded ticker is
+exactly what that gate removes, so running second would erase the evidence
+(pinned by a test that arms both). A detected predecessor is dropped from
+candidate consideration and a warning line naming the successor is appended to
+`Weekly_snapshot.t.warnings`, so the pick disappears with an explanation and an
+actionable alternative ticker rather than silently.
+
+Default-off per `experiment-flag-discipline.md` R1/R2: two additive fields on
+`Weinstein_strategy_config.config`, `rename_detect_min_overlap_days : int
+[@sexp.default 0]` and `rename_detect_match_fraction : float [@sexp.default
+0.0]` (the `sparse_tail_min_bars` / `sparse_tail_window_trading_days` pair is
+the precedent). Either at its default disables detection, and
+`Rename_gate.partition` returns before any series is read — an unarmed run is
+bit-identical AND pays no extra load cost. Real config fields, so they resolve
+through `Config_overrides_loader -> Overlay_validator.apply_overrides` and are
+expressible as a `Variant_matrix` axis (R2; pinned by an overrides-loader test).
+**Default NOT flipped and NOT armed in
+`dev/weekly-picks/live-config-overrides.sexp`** — that needs a ledger ACCEPT
+(R3) plus a false-positive dry run.
+
+Engineering data-hygiene mechanism, **not** a Weinstein book rule: no
+`weinstein-book-reference.md` section is cited because none supports it, and the
+spine is untouched — no change to stage classification, the Stage-2-only buy
+rule, volume confirmation, macro/sector gating, entry, stop or sizing.
+
+Code health: the wiring first pushed `weekly_snapshot_generator.ml` to 303 lines
+(limit 300) and tripped the nesting linter on three functions. Both fixed by
+**extraction**, not a limit bump / `@large-module` marker / exception entry
+(`code-health-discipline.md`): the adapter moved into its own `Rename_gate`
+module (generator back to 276 lines) and three helper bodies were named
+(`_rename_record`, `_warning_line`, `_report_for`).
+
+Tests: `test_rename_detector.ml` (22 unit tests) + `test_rename_gate.ml` (7
+adapter/seam tests) + 5 `generate`-seam tests + 1 overrides-loader test. Covers
+the true positive (SNSE-shaped succession, right direction, right evidence), the
+level-lookalike true negative (two companies within ~2% on price whose returns
+differ — pins that the Returns basis does the work), the near-miss negative (a
+*concurrent* twin that clears every other criterion and is rejected only by the
+handover), the sparse-successor negative, default-off at every layer, and both
+sides of the drop (predecessor removed AND successor/unrelated symbols kept,
+asserted as exact lists). Full `dune build @fmt` + `dune build` + `dune runtest`
+all exit 0.
+
+**Production lines NOT pinned by a test** (stated rather than hidden): (a) the
+`changeover > old.last` fast-path in `Rename_detector._succession` and (b) the
+`if not config.enabled` short-circuit in `Rename_gate.partition` are both
+*performance* guards — removing either yields identical output (the scoring path
+rejects a zero-overlap pair; `Rename_detector.detect` returns an empty report on
+a disabled config), so no test can distinguish them. (c) `prefilter_rel_tol =
+Float.infinity` in `Rename_detector._returns_score` is a robustness choice;
+`Twin_detector`'s default 2e-2 also passes on every current fixture, so the
+fixtures do not force it. Every other new line was mutation-checked: 17
+mutations run, each turning at least one test red (detector: stale/fresh density
+filters, old/new direction swap, `min_predecessor_bars`, `min_overlap_days`,
+`Returns`->`Levels`, loosened `ret_epsilon`, `enabled` guard, `Config.armed`
+predicate, `_better` tie-break, tail-window width, `survivors`; gate:
+`survivors` bypass, warnings suppression, `adjusted_close`->`close_price`;
+generator: whole stage bypassed, survivors ignored, warnings dropped, stage
+order flipped).
+
 **QC (PR #2097, mirrored by the orchestrator — the QC agents were fenced
 read-only on a shared working tree and could not write here):**
 `structural_qc: APPROVED` (5/5) and `behavioral_qc: APPROVED` (4/5), both at
@@ -377,10 +483,35 @@ remaining queue:
    universe + cached bars to run against, not done in the generator PR).
 3. **[M6.6, deferred]** live `DATA_SOURCE` impl, cron wrapper, alert dispatch,
    trading-state durability (see §Out of scope).
-4. **[#2083 F2, OPEN]** rename tracking on fetch — the remaining unbuilt
-   finding from the 07-17 report review (F1 shipped #2090, F3 shipped #2097).
-   Separate, larger dispatch: detect a delisted/renamed ticker at fetch time
-   and re-pin the universe, rather than annotating downstream.
+4. **[#2083 F2, detection SHIPPED; application OPEN]** rename tracking. The
+   returns-basis detector + its default-off pipeline wiring landed on
+   `feat/universe-rename-tracking` (see the 2026-07-26 entry above). What
+   remains, in priority order:
+   a. **EODHD symbol-change feed** — the other half of the issue's proposal.
+      Needs `EODHD_API_KEY`, which the GHA container does not have; a
+      maintainer-local or ops-data task. It is the only mechanism that catches
+      a clean cut-over with zero overlap between the two legs.
+   b. **Bar-store-wide scan + universe re-pin** — the detector only sees the
+      symbols it is handed, and in the actual incident FTH was absent from the
+      bar store entirely, so a run over the 07-17 pinned universe would NOT
+      have caught SNSE -> FTH. Closing that needs a scan of the whole store and
+      a re-pin, which is maintainer judgement over real data.
+   c. **Carry history under the new ticker** (merge/rename the on-disk series) —
+      deliberately untouched; the detector emits the mapping, applying it is a
+      separate, destructive operation.
+   d. **Arm it** — pick `rename_detect_min_overlap_days` /
+      `rename_detect_match_fraction` from one live dry run over the real
+      universe (false-positive check against spin-offs and dual listings),
+      record a ledger ACCEPT, then add them to
+      `dev/weekly-picks/live-config-overrides.sexp` (R3).
+
+4b. **[decision item, for review]** `Rename_detector` scores a pair by calling
+   `Twin_detector.detect` on it. Cleaner long-term would be to extract
+   `Twin_detector`'s `_returns_match_fraction` into a shared scoring module both
+   detectors call. Not done unilaterally (CLAUDE.md: propose, don't execute,
+   refactors of existing working modules). The only change made to
+   `snapshot_warehouse` was giving `twin_detector` a `public_name` so a public
+   library may depend on it — packaging only, no code change.
 5. **[#2083 F3 follow-up]** decide an arming threshold for
    `spike_bar_threshold_pct` and arm it in
    `dev/weekly-picks/live-config-overrides.sexp` (the flag ships default-off;

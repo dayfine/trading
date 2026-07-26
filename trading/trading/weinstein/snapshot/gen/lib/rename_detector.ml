@@ -132,21 +132,24 @@ let _returns_score (config : Config.t) old_leg new_leg =
   | [ { matches = [ m ]; _ } ] -> Some (m.overlap_days, m.match_fraction)
   | _ -> None
 
+let _rename_record ~window_days old_leg new_leg ~overlap_days ~match_fraction =
+  {
+    old_symbol = old_leg.leg_symbol;
+    new_symbol = new_leg.leg_symbol;
+    changeover = new_leg.leg_first;
+    overlap_days;
+    match_fraction;
+    old_tail_bars = old_leg.leg_tail_bars;
+    new_tail_bars = new_leg.leg_tail_bars;
+    tail_window_trading_days = window_days;
+  }
+
 let _rename_of_score (config : Config.t) ~window_days old_leg new_leg
     (overlap_days, match_fraction) =
   if overlap_days < config.min_overlap_days then None
   else
     Some
-      {
-        old_symbol = old_leg.leg_symbol;
-        new_symbol = new_leg.leg_symbol;
-        changeover = new_leg.leg_first;
-        overlap_days;
-        match_fraction;
-        old_tail_bars = old_leg.leg_tail_bars;
-        new_tail_bars = new_leg.leg_tail_bars;
-        tail_window_trading_days = window_days;
-      }
+      (_rename_record ~window_days old_leg new_leg ~overlap_days ~match_fraction)
 
 (* The succession shape (S1/S2) plus the returns score (S4). The tail-density
    half of the handover (S3) is applied by [detect] when it splits the legs into
@@ -228,12 +231,13 @@ let _describe r =
     r.overlap_days r.match_fraction r.old_tail_bars r.tail_window_trading_days
     r.new_tail_bars r.tail_window_trading_days
 
-let warnings report =
-  List.map report.renames ~f:(fun r ->
-      Printf.sprintf
-        "rename detected: %s; %s dropped from candidate consideration — screen \
-         %s instead"
-        (_describe r) r.old_symbol r.new_symbol)
+let _warning_line r =
+  Printf.sprintf
+    "rename detected: %s; %s dropped from candidate consideration — screen %s \
+     instead"
+    (_describe r) r.old_symbol r.new_symbol
+
+let warnings report = List.map report.renames ~f:_warning_line
 
 let render report =
   let c = report.config in

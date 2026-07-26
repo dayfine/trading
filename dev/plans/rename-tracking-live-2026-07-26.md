@@ -115,6 +115,16 @@ val warnings   : report -> string list
 val render     : report -> string
 ```
 
+**Plan revision (during implementation).** `weinstein_snapshot_gen` is a
+*public* dune library and `twin_detector` was *private*, so dune refuses the
+dependency ("Library "twin_detector" is private, it cannot be a dependency of a
+public library"). Resolved with a one-line addition of
+`(public_name trading.backtest.twin_detector)` to the existing
+`trading/trading/backtest/snapshot_warehouse/dune`. This is a packaging-only
+change under an already-declared package — no code, no behaviour, no opam
+package added — and is the minimal alternative to the extraction this plan
+explicitly declined to do unilaterally. Recorded here rather than done silently.
+
 ### 2.2 Wiring — `Weekly_snapshot_generator`, default-off
 
 `generate` currently does:
@@ -139,9 +149,14 @@ consideration and a warning line naming `OLD -> NEW (changeover, overlap,
 match)` is appended to `Weekly_snapshot.t.warnings`, so the pick disappears
 *with an explanation and an actionable successor ticker* rather than silently.
 
-A tiny adapter in the generator (`_rename_series`) turns
-`Bar_reader.daily_bars_for` output into `Rename_detector.series`. The detector
-stays filesystem-free.
+**Plan revision (during implementation).** The adapter was first written inline
+in `weekly_snapshot_generator.ml`, which pushed that file to 303 lines — past
+the 300-line hard limit. Per `code-health-discipline.md` the fix is extraction,
+not a limit bump: the adapter now lives in its own small module
+`Rename_gate` (`series_for` + `partition`), whose `partition` returns the same
+`(eligible, warnings)` shape as `Sparse_tail_gate.partition`, so the two #2083
+eligibility stages compose uniformly. The generator is back to 276 lines and
+`Rename_detector` stays filesystem-free.
 
 ### 2.3 Config — R1/R2
 
@@ -211,6 +226,9 @@ trustworthy enough to screen at all*.
 | `trading/trading/weinstein/snapshot/gen/lib/rename_detector.mli` | new — full doc surface |
 | `trading/trading/weinstein/snapshot/gen/lib/rename_detector.ml` | new — implementation |
 | `trading/trading/weinstein/snapshot/gen/lib/dune` | add `twin_detector` to `libraries` |
+| `trading/trading/backtest/snapshot_warehouse/dune` | give `twin_detector` a `public_name` (packaging only, see §2.1) |
+| `trading/trading/weinstein/snapshot/gen/lib/rename_gate.{ml,mli}` | new — the `Bar_reader` adapter (see §2.2) |
+| `trading/trading/weinstein/snapshot/gen/test/test_rename_gate.ml` | new — adapter/seam tests |
 | `trading/trading/weinstein/snapshot/gen/test/test_rename_detector.ml` | new — unit tests |
 | `trading/trading/weinstein/snapshot/gen/test/dune` | register the test |
 | `trading/trading/weinstein/strategy/lib/weinstein_strategy_config.ml` | two new fields + defaults |
