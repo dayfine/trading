@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-25 (orchestrator run 30139534129 — run-1 of 07-25: **2 tracks dispatched, 1 merged, 1 auto-merge armed, 1 rework cycle.** Took over the P0 handed off in #2082's session-close addendum: **#2077 leverage-dawn MERGED** (`c76c170d`) after verifying + landing the salvaged `wip/leverage-dawn-b1-rework` WIP and closing qc-behavioral's B1 "mechanism never funds" finding via the permissive-funding inversion; QC structural+behavioral APPROVED 4/5. **#2085 trade_audit external-exit capture** (#2076) QC-APPROVED 4/5 after one rework closing a CP4 gap; auto-merge armed. Deterministic gates on main `46b3a8d0`: build 0, runtest 0, status_file_integrity 0, index_size_linter 0. No `[drift]`, no `[critical]`. Root-caused the recurring agent Finish-Protocol violation: the Bash tool's 120s default timeout. Prior index entry: run-6 of 07-24 — **2 tracks dispatched, 2 PRs, 2 rework cycles, 1 auto-merged.** Ends a 27-run zero-dispatch streak — re-audit of the P1 queue in `next-session-priorities-2026-07-24.md` found two items that were neither data-gated nor user-gated. **#2073 tax-lens `Loader.load_exn` contract MERGED** (found + fixed a real silent-drop defect; rework closed a second instance in `_load_equity`; QC 4/5). **#2074 margin-realism #2057 exit-label observability** — root cause `Margin_runner` transitions never reached any observer; new strategy-agnostic `Simulator.on_transitions` hook; QC structural+behavioral APPROVED at `1eaa6806` (A1 judged PASS), auto-merge armed. Follow-up **#2076** filed for the deferred `trade_audit.sexp` half so #2057 does not auto-close half-fixed. Deterministic gates: status_file_integrity exit 0, index_size_linter exit 0. No `[drift]`, no `[critical]`.)
+Last updated: 2026-07-26 (orchestrator run 30193812434 — 3 PRs merged (#2088, #2022, #2009), 2 feature PRs QC-APPROVED after 1 rework each and auto-merge armed (#2087, #2081). Deterministic gates on `a559c1ed`: build 0, runtest 0, status_file_integrity 0, index_size_linter 0. `[critical]`: 9 consecutive scheduled orchestrator runs failed 07-25/07-26 — see the daily summary.)
 
 ## Active + complete tracks
 
@@ -30,12 +30,12 @@ Each row: one line; deeper task detail in the linked status file.
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
 | [hybrid-tier](hybrid-tier.md) | MERGED | — | — | — |
-| [trade-audit](trade-audit.md) | IN_PROGRESS | feat-backtest | #2085 | external-exit capture via `Simulator.on_transitions` QC-APPROVED, auto-merge armed; #2076 stays open (report-layer rendering out of scope) |
+| [trade-audit](trade-audit.md) | IN_PROGRESS | feat-backtest | — | external-exit capture MERGED (#2085); next: report-layer rendering of `external_exit` (#2076, still open by design) |
 | [decision-audit](decision-audit.md) | MERGED | feat-backtest | — | #1799/#1806/#1811 MERGED (report+counterfactual+weekly-picks adapter); selection FAITHFUL; live-picks pipeline ready (#1812); next: matured weekly counterfactual |
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
 | [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — |
-| [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein + dayfine (LOCAL) | #2081 | #1760 liquidity overlay MERGED; #2081 robust dollar-ADV (#2060) OPEN maintainer-LOCAL; next: short-leg regime-P&L decomposition (LOCAL) |
+| [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | #2081 | #2081 robust dollar-ADV (#2060) QC-APPROVED after 1 rework, auto-merge armed; next: short-leg regime-P&L decomposition (LOCAL) |
 | [extension-stop](extension-stop.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | arming + insurance-ACCEPT MERGED (#1960, ext_stop 2.0/0.25, default-off); next: default-flip only on further insurance-ACCEPT (R3, human-gated) |
 | [decline-character](decline-character.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | All builds + A-D flip merged; arming-speed A-D-live WF-CV REJECTED (#1729 ledger 06-24); decline mechanisms stay default-off axes; exhausted (#1739) |
 | [spy-only-reference](spy-only-reference.md) | IN_PROGRESS | feat-weinstein | — | WF-CV on sector-rotation testbed; top-1000 bankability gate; long-short verification (human session) |
@@ -43,13 +43,13 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | #2009 | LAPACKE GP-Cholesky nugget fix OPEN #2009 (maintainer LOCAL, from run-1 WIP); ci.yml ENOSPC fix (#1636) BLOCKED on human `workflow`-scoped PAT |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | LAPACKE GP-Cholesky nugget fix MERGED (#2009); no dispatchable T1/T3 left; ci.yml ENOSPC fix (#1636) BLOCKED on human `workflow`-scoped PAT |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | Phase 1 stable (PR-D'c #1332 merged); Phase 2 deferred; no outstanding work |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | no active backlog; next finding via weekly deep scan or Step 2e |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | backlog refreshed from the 2026-07-20 deep scan (#2022 merged): 4 open items; next: restore `Current milestone:` line so linter-expiry can evaluate |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
-| [screener](screener.md) | MERGED | — | — | resistance Insufficient_history label MERGED (#1941, default-off); next: arm min_history_bars for live weekly-review + record convention |
+| [screener](screener.md) | IN_PROGRESS | feat-weinstein | #2087 | #2087 failed-breakout invalidation (#2084 F1, default-off) QC-APPROVED after 1 rework, auto-merge armed; next: #2084 F2 naive structural stop |
 | [simulation](simulation.md) | IN_PROGRESS | feat-backtest | — | #1847 sibling round-trip pairing fix MERGED (761c30cf); per-trade scale-in reporting now trustworthy. Next: stale-exit grid via WF-CV (data-gated) |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
