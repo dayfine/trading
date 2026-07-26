@@ -65,4 +65,9 @@ let candidate_of_scored (c : Screener.scored_candidate) :
        proxy) so a caller that skips the overlay step degrades honestly rather
        than fabricating a structural claim. *)
     stop_is_structural = false;
+    (* Overwritten by [Weekly_snapshot_generator._flag_if_spiked] when the
+       spike-bar flag is armed (issue #2083 fix 3). Starts [false] — a caller
+       that skips the flagging pass shows an unflagged (not falsely suspect)
+       candidate. *)
+    data_suspect = false;
   }

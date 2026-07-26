@@ -125,6 +125,7 @@ type config = {
       (** See [.mli]. *)
   sparse_tail_min_bars : int; [@sexp.default 0]  (** See [.mli]. *)
   sparse_tail_window_trading_days : int; [@sexp.default 0]  (** See [.mli]. *)
+  spike_bar_threshold_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -218,6 +219,7 @@ let default_config ~universe ~index_symbol =
     dawn_max_ma_flip_age_weeks = default_dawn_max_flip_age_weeks;
     sparse_tail_min_bars = 0;
     sparse_tail_window_trading_days = 0;
+    spike_bar_threshold_pct = 0.0;
   }
 
 let name = "Weinstein"

@@ -121,6 +121,20 @@ type candidate = {
           Additive field: old snapshots without it parse as [false]
           (conservative — treats un-labeled historical stops as non-structural).
       *)
+  data_suspect : bool; [@sexp.default false]
+      (** [true] when this candidate's most recent daily bar is a single
+          outsized move vs the prior bar's close — at or above
+          [config.spike_bar_threshold_pct] percentage points, per
+          {!Weinstein_snapshot_gen.Spike_bar_gate.check}. An engineering
+          data-hygiene flag, {b not} a Weinstein book rule: the candidate is
+          {e flagged, not dropped}, its entry / stop / size are unchanged, and
+          the report marks the row plus emits a line in {!t.warnings} (issue
+          #2083 Finding 3 — the 2026-07-17 SNSE pick whose breakout was a single
+          [+58%] zombie-feed print). [false] when the flag is disabled
+          ([spike_bar_threshold_pct <= 0.0], the default), when the symbol has
+          fewer than two resident bars, or when the last move is under the
+          threshold. Additive field: old snapshots without it parse as [false].
+      *)
 }
 [@@deriving sexp, eq, show]
 (** A single ranked candidate. Same shape for long and short candidates — the
@@ -182,11 +196,13 @@ type t = {
   held_positions : held_position list;
       (** Positions held into this Friday. May be empty. *)
   warnings : string list; [@sexp.default []]
-      (** Human-readable data-quality warnings for tickers dropped from
-          candidate consideration this run (e.g. the sparse-tail eligibility
-          gate, issue #2083 fix 1 — see [Sparse_tail_gate]). One line per
-          dropped ticker; empty when no gate fired. Additive field: old
-          snapshots without it parse as [[]]. *)
+      (** Human-readable data-quality warnings for this run: one line per ticker
+          dropped from candidate consideration (the sparse-tail eligibility
+          gate, issue #2083 fix 1 — see [Sparse_tail_gate]) and one per
+          candidate flagged but KEPT (the spike-bar data-suspect flag, issue
+          #2083 fix 3 — see [Spike_bar_gate]; the line says so explicitly, so a
+          reader does not go looking for a missing row). Empty when no gate
+          fired. Additive field: old snapshots without it parse as [[]]. *)
 }
 [@@deriving sexp, eq, show]
 (** A complete weekly snapshot. *)

@@ -39,6 +39,7 @@ let _full_snapshot : Weekly_snapshot.t =
           sized_risk_amount = 179.65;
           sizing_note = None;
           stop_is_structural = true;
+          data_suspect = false;
         };
         {
           symbol = "MSFT";
@@ -56,6 +57,7 @@ let _full_snapshot : Weekly_snapshot.t =
           sized_risk_amount = 0.0;
           sizing_note = Some "0 sh — cash / caps exhausted";
           stop_is_structural = false;
+          data_suspect = false;
         };
       ];
     short_candidates = [];
@@ -160,6 +162,11 @@ let test_old_format_parses_with_defaults _ =
                        field
                          (fun (c : Weekly_snapshot.candidate) -> c.sizing_note)
                          is_none;
+                       (* Additive #2083-fix3 field: a snapshot written before
+                          it existed parses as unflagged. *)
+                       field
+                         (fun (c : Weekly_snapshot.candidate) -> c.data_suspect)
+                         (equal_to false);
                      ];
                  ]);
             field

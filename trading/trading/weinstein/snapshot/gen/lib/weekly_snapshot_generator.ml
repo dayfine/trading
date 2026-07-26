@@ -250,6 +250,50 @@ let _overlay_structural_stop ~(inputs : inputs) ~side candidate =
     ~initial_stop_buffer:inputs.config.initial_stop_buffer
     ~bar_reader:inputs.bar_reader ~as_of:inputs.as_of ~side candidate
 
+(* Spike-bar data-suspect flag (issue #2083 fix 3): report hygiene, not a
+   Weinstein rule (see [Spike_bar_gate]'s .mli). Unlike the sparse-tail gate
+   this FLAGS rather than drops — the candidate keeps its rank, entry, stop and
+   size; only [data_suspect] plus a warning line change. Returns the (possibly
+   flagged) candidate and its warning ([None] when clean, which includes the
+   disabled-flag case, [config.spike_bar_threshold_pct = 0.0]). *)
+let _flag_if_spiked ~(inputs : inputs) (c : Weekly_snapshot.candidate) =
+  let verdict =
+    Spike_bar_gate.check inputs.bar_reader ~symbol:c.symbol ~as_of:inputs.as_of
+      ~threshold_pct:inputs.config.spike_bar_threshold_pct
+  in
+  match Spike_bar_gate.warning ~symbol:c.symbol verdict with
+  | None -> (c, None)
+  | Some w -> ({ c with data_suspect = true }, Some w)
+
+(* [_flag_if_spiked] over a candidate list: the flagged candidates (same order,
+   same length — nothing is dropped) plus the warning lines they produced. *)
+let _flag_spikes ~(inputs : inputs) candidates =
+  let flagged, warnings =
+    List.map candidates ~f:(_flag_if_spiked ~inputs) |> List.unzip
+  in
+  (flagged, List.filter_opt warnings)
+
+(* Ranked long / short candidate lists, fully decorated: structural stop overlay
+   (#2084 F2), fixed-risk sizing (longs only), and the spike-bar data-suspect
+   flag (#2083 F3). Returns [(longs, shorts, spike_warnings)]. Split out of
+   {!generate} so that function stays inside the function-length cap. *)
+let _build_candidates ~(inputs : inputs) ~(result : Screener.result)
+    ~portfolio_value ~sizing_cash =
+  let longs =
+    List.map result.buy_candidates ~f:(fun c ->
+        Snapshot_display.candidate_of_scored c
+        |> _overlay_structural_stop ~inputs ~side:Trading_base.Types.Long
+        |> _size_long ~inputs ~portfolio_value ~sizing_cash)
+  in
+  let shorts =
+    List.map result.short_candidates ~f:(fun c ->
+        Snapshot_display.candidate_of_scored c
+        |> _overlay_structural_stop ~inputs ~side:Trading_base.Types.Short)
+  in
+  let longs, long_warnings = _flag_spikes ~inputs longs in
+  let shorts, short_warnings = _flag_spikes ~inputs shorts in
+  (longs, shorts, long_warnings @ short_warnings)
+
 let generate (inputs : inputs) : Weekly_snapshot.t =
   let index_bars = _weekly_bars ~inputs inputs.config.indices.primary in
   let macro = _macro_result ~inputs ~index_bars in
@@ -259,7 +303,7 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
     List.filter_map sparse_tail_verdicts ~f:(fun (ticker, warning) ->
         match warning with None -> Some ticker | Some _ -> None)
   in
-  let warnings = List.filter_map sparse_tail_verdicts ~f:snd in
+  let sparse_warnings = List.filter_map sparse_tail_verdicts ~f:snd in
   let stocks = _analyze_universe ~inputs ~index_bars ~eligible_tickers in
   let held_positions =
     List.map inputs.live_portfolio.positions ~f:(_enrich_held ~inputs)
@@ -274,16 +318,8 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
   in
   let sizing_cash = inputs.live_portfolio.cash in
   let portfolio_value = sizing_cash +. _long_market_value held_positions in
-  let long_candidates =
-    List.map result.buy_candidates ~f:(fun c ->
-        Snapshot_display.candidate_of_scored c
-        |> _overlay_structural_stop ~inputs ~side:Trading_base.Types.Long
-        |> _size_long ~inputs ~portfolio_value ~sizing_cash)
-  in
-  let short_candidates =
-    List.map result.short_candidates ~f:(fun c ->
-        Snapshot_display.candidate_of_scored c
-        |> _overlay_structural_stop ~inputs ~side:Trading_base.Types.Short)
+  let long_candidates, short_candidates, spike_warnings =
+    _build_candidates ~inputs ~result ~portfolio_value ~sizing_cash
   in
   {
     schema_version = Weekly_snapshot.current_schema_version;
@@ -295,5 +331,5 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
     long_candidates;
     short_candidates;
     held_positions;
-    warnings;
+    warnings = sparse_warnings @ spike_warnings;
   }
