@@ -2,8 +2,10 @@ open Core
 module Pipeline = Snapshot_pipeline.Pipeline
 module Snapshot_manifest = Snapshot_pipeline.Snapshot_manifest
 module Snapshot_verifier = Snapshot_pipeline.Snapshot_verifier
+module Weekly_sidetable_builder = Snapshot_pipeline.Weekly_sidetable_builder
 module Snapshot_columnar = Data_panel_snapshot.Snapshot_columnar
 module Snapshot_schema = Data_panel_snapshot.Snapshot_schema
+module Weekly_sidetable = Data_panel_snapshot.Weekly_sidetable
 
 let default_progress_every = 50
 
@@ -77,6 +79,10 @@ let _load_split_bars ~data_dir ~start_date ~end_date ~sketch_deep_days ~symbol =
 let _file_path ~output_dir ~symbol =
   Filename.concat output_dir (symbol ^ ".snap")
 
+(* Sketch-v5 weekly side-table file, next to the symbol's [.snap]. *)
+let _weekly_path ~output_dir ~symbol =
+  Filename.concat output_dir (symbol ^ ".weekly")
+
 let _existing_manifest ~output_dir =
   let path = Filename.concat output_dir "manifest.sexp" in
   match Snapshot_manifest.read ~path with Ok m -> Some m | Error _ -> None
@@ -121,6 +127,22 @@ let _write_and_checksum ~symbol ~path ~csv_mtime ~active_through rows =
   | Error err -> Error err
   | Ok () -> Ok (_file_metadata ~symbol ~path ~csv_mtime ~active_through)
 
+(* Sketch-v5 PR 4: ALWAYS write the sparse [SYMBOL.weekly] side-table next to
+   the [.snap], built from the SAME weekly aggregation the retired dense sketch
+   used to consume. It is now the ONLY overhead-supply representation the reader
+   has (the dense [Res_*] columns were dropped from the canonical schema), so
+   emission is unconditional rather than behind the old [--emit-weekly-sidetable]
+   flag. Best-effort — a side-table write failure is logged, not fatal, so it
+   never aborts the [.snap] warehouse build. *)
+let _write_weekly ~output_dir ~symbol ~deep_bars ~bars =
+  let path = _weekly_path ~output_dir ~symbol in
+  let entries = Weekly_sidetable_builder.of_bars ~deep_bars ~bars in
+  match Weekly_sidetable.write_file ~path entries with
+  | Ok () -> ()
+  | Error err ->
+      Printf.eprintf "weekly side-table write failed for %s: %s\n%!" symbol
+        (Status.show err)
+
 let _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
     ~output_dir ~csv_mtime =
   let path = _file_path ~output_dir ~symbol in
@@ -130,7 +152,9 @@ let _build_one_symbol ~symbol ~bars ~deep_bars ~schema ~benchmark_bars
       ()
   with
   | Error err -> Error err
-  | Ok rows -> _write_and_checksum ~symbol ~path ~csv_mtime ~active_through rows
+  | Ok rows ->
+      _write_weekly ~output_dir ~symbol ~deep_bars ~bars;
+      _write_and_checksum ~symbol ~path ~csv_mtime ~active_through rows
 
 let _maybe_reuse ~existing ~symbol =
   match existing with
@@ -250,8 +274,15 @@ let _emit_final_progress ~output_dir ~symbols_total ~entries ~started_at =
     ~progress:
       (_make_progress ~symbols_total ~symbols_done ~last_completed ~started_at)
 
+(* Sketch-v5 PR 4: side-tables are always emitted, so the final manifest always
+   stamps the side-table format hash — a reader gates the [.weekly] files on it
+   ({!Weekly_sidetable_reader.load_gated}). *)
 let _write_final_manifest ~manifest_path ~schema ~entries ~elapsed =
   let manifest = Snapshot_manifest.create ~schema ~entries in
+  let manifest =
+    Snapshot_manifest.set_weekly_sidetable_format_hash manifest
+      Weekly_sidetable.format_hash
+  in
   match Snapshot_manifest.write ~path:manifest_path manifest with
   | Ok () ->
       Printf.printf "wrote %d entries to %s in %.2fs\n%!" (List.length entries)

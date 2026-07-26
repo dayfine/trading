@@ -6,11 +6,33 @@ A semi-automated trading system implementing Stan Weinstein's stage-analysis
 methodology. See `docs/design/` for the system design and the Weinstein book
 reference.
 
-The headline numbers below are regenerated mechanically by
-`trading/backtest/readme_toplines` — the period is derived from actual bar
-coverage in the CSV store, and the two Weinstein figures come from running the
-reference strategies end-to-end. The block between the markers is overwritten on
-each regeneration; do not hand-edit it.
+The results below are regenerated mechanically by
+`trading/backtest/readme_toplines`. Two marker-delimited blocks are maintained,
+each overwritten on regeneration — do not hand-edit between the markers:
+
+- the **deep-headline** block — the heavy multi-decade broad-universe
+  results-of-record, rendered from the pinned records in
+  [`dev/backtest/deep_headline_records.sexp`](dev/backtest/deep_headline_records.sexp)
+  (these runs use an out-of-repo warehouse and are **not** recomputed by CI);
+- the **light-reference** block — recomputed by running the reference strategies
+  end-to-end (period derived from actual bar coverage in the CSV store).
+
+<!-- deep-headline:start -->
+### Deep multi-decade headline (results-of-record)
+
+| Result | Total return | Max DD | Trades | Win rate | Period |
+|---|---|---|---|---|---|
+| Weinstein top-3000 (promoted config) | +8,689% | 30.3% | 1,170 | 38.4% | 2000-01-01 -> 2026-06-26 |
+| SPY total return (same window, comparator) | +706% | — | — | — | 2000-01-01 -> 2026-06-26 |
+| Pre-bundle record (superseded) | +7,914% | 32.3% | 1,187 | — | 2000-01-01 -> 2026-06-26 |
+
+Provenance (scenario / commit / date):
+- **Weinstein top-3000 (promoted config)** — `test_data/backtest_scenarios/staging-leverf-28y/top3000-2000-2026-rcb-f000.sexp` @ 6a2d9b426 (PR #2047 — promoted bundle: w30 + virgin-crossing + floors-zero) (2026-07-23)
+- **SPY total return (same window, comparator)** — `n/a — dividend-adjusted SPY buy & hold` @ DEEP_RESULTS.md record-of-record standing comparator (2026-07-14)
+- **Pre-bundle record (superseded)** — `test_data/backtest_scenarios/staging-record-convention/top3000-2000-2026-record-convention.sexp` @ 0a2e4562d (PR #1960, Run D, dedup-v2 warehouse; DEEP_RESULTS record-of-record 2026-07-14) (2026-07-14)
+
+_Basis: mark-to-market, including open-position marks on a few concentrated fat-tail winners and (unless a liquidity overlay is armed) untradeable illiquid names — NOT bankable as realized P&L. The honest read is vs the index over the same window and realized-vs-MTM. Full pins + caveats: [`dev/backtest/DEEP_RESULTS.md`](dev/backtest/DEEP_RESULTS.md)._
+<!-- deep-headline:end -->
 
 <!-- toplines:start -->
 ## Top-line results

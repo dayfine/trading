@@ -20,6 +20,7 @@ open Matchers
 open Test_helpers
 module Margin_config = Trading_portfolio.Margin_config
 module Portfolio = Trading_portfolio.Portfolio
+module Portfolio_margin = Trading_portfolio.Portfolio_margin
 module Position = Trading_strategy.Position
 module Strategy_interface = Trading_strategy.Strategy_interface
 module Metric_types = Trading_simulation_types.Metric_types
@@ -116,15 +117,16 @@ let _long_strategy ~symbol ~quantity =
 (* ------------------------------------------------------------------ *)
 
 let _run_with_margin ?(initial_long_margin_req = 1.0)
-    ?(long_margin_rate_annual_pct = 0.0) ?metric_suite ~test_name
-    ~symbols_with_data ~strategy ~margin_config ~config () =
+    ?(long_margin_rate_annual_pct = 0.0) ?(maintenance_long_pct = 0.0)
+    ?metric_suite ?on_transitions ~test_name ~symbols_with_data ~strategy
+    ~margin_config ~config () =
   let result_ref = ref None in
   with_test_data test_name symbols_with_data ~f:(fun data_dir ->
       let symbols = List.map symbols_with_data ~f:fst in
       let deps =
         create_deps ~symbols ~data_dir ~strategy ~commission:config.commission
           ?metric_suite ~margin_config ~initial_long_margin_req
-          ~long_margin_rate_annual_pct ()
+          ~long_margin_rate_annual_pct ~maintenance_long_pct ?on_transitions ()
       in
       let sim = create_exn ~config ~deps in
       match run sim with
@@ -725,6 +727,266 @@ let test_e2e_strategy_exit_collides_with_margin_call _ =
   assert_that result.final_portfolio
     (field (fun (p : Portfolio.t) -> Portfolio.get_position p "AAPL") is_none)
 
+(* ------------------------------------------------------------------ *)
+(* T7: Buy-in stress vs maintenance cover collision (margin M3b).      *)
+(*                                                                    *)
+(* When the short-side maintenance check AND the buy-in stress mode    *)
+(* both flag the same short on the same Friday, [tick] must emit       *)
+(* exactly ONE cover for it — the maintenance [margin_call] (richer    *)
+(* forensic detail), with the duplicate [buyin_stress] dropped by      *)
+(* [_drop_buyins_colliding_with_covers]. A second short that is HTB    *)
+(* but NOT maintenance-breached still gets its own [buyin_stress]      *)
+(* cover in the same tick. This pins the internal-dedup half of the    *)
+(* [tick] .mli contract (the strategy-vs-margin dedup is pinned by T5).*)
+(* ------------------------------------------------------------------ *)
+
+(* Engine price bar for [mark_prices]. *)
+let _engine_bar ~symbol ~close =
+  {
+    Trading_engine.Types.symbol;
+    open_price = close;
+    high_price = close;
+    low_price = close;
+    close_price = close;
+  }
+
+(* Buy-in armed on top of the maintenance-enabled [_on_config]: shorts marked
+   strictly below $20 are hard-to-borrow (buy-in-exposed). *)
+let _buyin_armed_config =
+  {
+    _on_config with
+    Margin_config.short_buyin_stress_mode = true;
+    short_buyin_htb_price_below = 20.0;
+  }
+
+(* Portfolio holding two shorts entered at $10 (maintenance check reads the
+   entry cost). Under default 50% IM / 25% MM the $10 short's cover trigger is
+   $12: a $15 mark breaches (collision), a $5 mark does not (buy-in only). *)
+let _two_shorts_portfolio () =
+  match
+    Portfolio_margin.apply_trades_with_margin ~margin_config:_on_config
+      (Portfolio.create ~initial_cash:30_000.0 ())
+      [
+        _make_trade ~id:"c" ~symbol:"COLLIDE" ~side:Trading_base.Types.Sell
+          ~quantity:100.0 ~price:10.0;
+        _make_trade ~id:"b" ~symbol:"BUYONLY" ~side:Trading_base.Types.Sell
+          ~quantity:100.0 ~price:10.0;
+      ]
+  with
+  | Ok p -> p
+  | Error err -> assert_failure ("two-shorts portfolio: " ^ Status.show err)
+
+(* Holding short Position.t; map key = symbol = position_id. *)
+let _holding_short ~symbol ~entry ~qty =
+  let make_trans kind =
+    { Position.position_id = symbol; date = _date_2024_01_05; kind }
+  in
+  let unwrap = function
+    | Ok p -> p
+    | Error _ -> assert_failure "short setup failed"
+  in
+  let open Position in
+  let p =
+    create_entering
+      (make_trans
+         (CreateEntering
+            {
+              symbol;
+              side = Position.Short;
+              target_quantity = qty;
+              entry_price = entry;
+              reasoning =
+                TechnicalSignal
+                  { indicator = "m3b-collision"; description = "short" };
+            }))
+    |> unwrap
+  in
+  let p =
+    apply_transition p
+      (make_trans (EntryFill { filled_quantity = qty; fill_price = entry }))
+    |> unwrap
+  in
+  apply_transition p
+    (make_trans
+       (EntryComplete
+          {
+            risk_params =
+              {
+                stop_loss_price = None;
+                take_profit_price = None;
+                max_hold_days = None;
+              };
+          }))
+  |> unwrap
+
+(* Matcher: a TriggerExit for [position_id] tagged with StrategySignal [label]. *)
+let _is_exit_tagged ~position_id ~label =
+  all_of
+    [
+      field
+        (fun (t : Position.transition) -> t.position_id)
+        (equal_to position_id);
+      field
+        (fun (t : Position.transition) -> t.kind)
+        (matching ~msg:("TriggerExit " ^ label)
+           (function
+             | Position.TriggerExit
+                 { exit_reason = Position.StrategySignal { label = l; _ }; _ }
+               when String.equal l label ->
+                 Some ()
+             | _ -> None)
+           (equal_to ()));
+    ]
+
+let test_buyin_collides_with_margin_call _ =
+  let positions =
+    Map.of_alist_exn
+      (module String)
+      [
+        ("COLLIDE", _holding_short ~symbol:"COLLIDE" ~entry:10.0 ~qty:100.0);
+        ("BUYONLY", _holding_short ~symbol:"BUYONLY" ~entry:10.0 ~qty:100.0);
+      ]
+  in
+  let today_bars =
+    [
+      _engine_bar ~symbol:"COLLIDE" ~close:15.0;
+      _engine_bar ~symbol:"BUYONLY" ~close:5.0;
+    ]
+  in
+  let _portfolio, transitions =
+    Trading_simulation.Margin_runner.tick ~margin_config:_buyin_armed_config
+      ~long_margin_rate_annual_pct:0.0 ~maintenance_long_pct:0.0
+      ~portfolio:(_two_shorts_portfolio ()) ~positions ~today_bars
+      ~date:_date_2024_01_05 ~strategy_transitions:[]
+  in
+  (* Exactly two covers: COLLIDE covered ONCE as [margin_call] (the buy-in
+     duplicate dropped); BUYONLY, HTB but not breached, covered as
+     [buyin_stress]. The 2-element [elements_are] proves COLLIDE is not
+     double-covered. *)
+  assert_that transitions
+    (elements_are
+       [
+         _is_exit_tagged ~position_id:"COLLIDE" ~label:"margin_call";
+         _is_exit_tagged ~position_id:"BUYONLY" ~label:"buyin_stress";
+       ])
+
+(* ------------------------------------------------------------------ *)
+(* T8: [on_transitions] observer sees margin-driven exit labels         *)
+(* end-to-end through the full simulator (issue #2057).                *)
+(*                                                                    *)
+(* Before the fix, [Backtest.Strategy_wrapper] only intercepted the    *)
+(* transitions the strategy's own [on_market_close] returned; margin-  *)
+(* driven transitions are generated later in [_process_step_day], by   *)
+(* [Margin_runner.tick], entirely outside the strategy call, so no     *)
+(* observer ever saw them — [trades.csv]'s [exit_trigger] column came  *)
+(* out blank for force-covered / force-reduced positions.              *)
+(* [Simulator.dependencies.on_transitions] now observes the FINAL      *)
+(* per-step transition list (post margin dedup) every step, closing    *)
+(* that gap. These tests pin the fix at the [Simulator] layer directly *)
+(* (no Weinstein-specific harness needed); [Backtest.Panel_runner]     *)
+(* wires the same hook to [Stop_log.record_transitions] so [trades.csv]*)
+(* carries the label end-to-end. *)
+(* ------------------------------------------------------------------ *)
+
+let _capture_transitions () =
+  let captured = ref [] in
+  let observe ts = captured := ts @ !captured in
+  (captured, observe)
+
+(* Count of [TriggerExit]s for [position_id] tagged with StrategySignal
+   [label] across every captured per-step transition list. *)
+let _count_exit_tagged ~position_id ~label ts =
+  List.count ts ~f:(fun (t : Position.transition) ->
+      match t.kind with
+      | Position.TriggerExit
+          { exit_reason = Position.StrategySignal { label = l; _ }; _ } ->
+          String.equal t.position_id position_id && String.equal l label
+      | _ -> false)
+
+(* T8a: short-side maintenance breach ("margin_call") reaches
+   [on_transitions]. Reuses the T3 rising-price fixture, which force-covers
+   the short on day 4 (2024-01-05, close $65). *)
+let test_on_transitions_observes_margin_call _ =
+  let config =
+    _config_for ~start_date:(_date "2024-01-02") ~end_date:(_date "2024-01-11")
+      ~initial_cash:50_000.0
+  in
+  let captured, observe = _capture_transitions () in
+  let (_ : run_result) =
+    _run_with_margin ~test_name:"margin_call_on_transitions"
+      ~symbols_with_data:[ ("AAPL", _aapl_rising_50_to_70) ]
+      ~strategy:(_short_strategy ~symbol:"AAPL" ~quantity:100.0)
+      ~margin_config:_on_config ~on_transitions:observe ~config ()
+  in
+  assert_that
+    (_count_exit_tagged ~position_id:"AAPL-short" ~label:"margin_call" !captured)
+    (equal_to 1)
+
+(* T8b: buy-in stress mode ("buyin_stress") reaches [on_transitions].
+   [enabled] stays [false] (the default) so [margin_call_transitions] is a
+   no-op — isolates buy-in stress from any maintenance-breach collision. *)
+let _buyin_only_config =
+  {
+    Margin_config.default_config with
+    Margin_config.short_buyin_stress_mode = true;
+    short_buyin_htb_price_below = 20.0;
+  }
+
+let _aapl_flat_10 =
+  List.map
+    [
+      "2024-01-02";
+      "2024-01-03";
+      "2024-01-04";
+      "2024-01-05";
+      "2024-01-08";
+      "2024-01-09";
+      "2024-01-10";
+    ] ~f:(fun d -> _make_bar ~date:(_date d) ~close:10.0)
+
+let test_on_transitions_observes_buyin_stress _ =
+  let config =
+    _config_for ~start_date:(_date "2024-01-02") ~end_date:(_date "2024-01-10")
+      ~initial_cash:50_000.0
+  in
+  let captured, observe = _capture_transitions () in
+  let (_ : run_result) =
+    _run_with_margin ~test_name:"buyin_stress_on_transitions"
+      ~symbols_with_data:[ ("AAPL", _aapl_flat_10) ]
+      ~strategy:(_short_strategy ~symbol:"AAPL" ~quantity:100.0)
+      ~margin_config:_buyin_only_config ~on_transitions:observe ~config ()
+  in
+  assert_that
+    (_count_exit_tagged ~position_id:"AAPL-short" ~label:"buyin_stress"
+       !captured)
+    (equal_to 1)
+
+(* T8c: long-side maintenance breach ("maintenance_reduce") reaches
+   [on_transitions]. A levered long (req 0.5) buying 300 sh @ $50 = $15,000
+   against $10,000 cash funds a $5,000 debit; equity/exposure sits around
+   0.667 — well below the aggressive [maintenance_long_pct = 0.9] threshold —
+   so the very first Friday check (2024-01-05) force-reduces the position.
+   [Long_maintenance] sheds at whole-position granularity, so the single
+   holding closes via a full [TriggerExit], not a partial exit. *)
+let test_on_transitions_observes_maintenance_reduce _ =
+  let config =
+    _config_for ~start_date:(_date "2024-01-02") ~end_date:(_date "2024-01-15")
+      ~initial_cash:10_000.0
+  in
+  let captured, observe = _capture_transitions () in
+  let (_ : run_result) =
+    _run_with_margin ~initial_long_margin_req:0.5 ~maintenance_long_pct:0.9
+      ~test_name:"maintenance_reduce_on_transitions"
+      ~symbols_with_data:[ ("AAPL", _aapl_flat_50) ]
+      ~strategy:(_long_strategy ~symbol:"AAPL" ~quantity:300.0)
+      ~margin_config:Margin_config.default_config ~on_transitions:observe
+      ~config ()
+  in
+  assert_that
+    (_count_exit_tagged ~position_id:"AAPL-long" ~label:"maintenance_reduce"
+       !captured)
+    (equal_to 1)
+
 let suite =
   "margin_runner"
   >::: [
@@ -748,6 +1010,14 @@ let suite =
          >:: test_dedup_noop_when_margin_trans_empty;
          "e2e_strategy_exit_collides_with_margin_call"
          >:: test_e2e_strategy_exit_collides_with_margin_call;
+         "buyin_collides_with_margin_call"
+         >:: test_buyin_collides_with_margin_call;
+         "on_transitions_observes_margin_call"
+         >:: test_on_transitions_observes_margin_call;
+         "on_transitions_observes_buyin_stress"
+         >:: test_on_transitions_observes_buyin_stress;
+         "on_transitions_observes_maintenance_reduce"
+         >:: test_on_transitions_observes_maintenance_reduce;
        ]
 
 let () = run_test_tt_main suite

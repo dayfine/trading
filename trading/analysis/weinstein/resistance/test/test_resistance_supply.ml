@@ -6,6 +6,13 @@ module Resistance_sketch = Snapshot_pipeline.Resistance_sketch
 
 let _config = Resistance_supply.default_config
 let _n_buckets = 20
+let _n_bands = Resistance_supply.n_age_bands
+
+(* A single 20-bucket price histogram with [counts] placed. *)
+let _band counts =
+  let a = Array.create ~len:_n_buckets 0.0 in
+  List.iter counts ~f:(fun (k, c) -> a.(k) <- c);
+  a
 
 (* A sketch with no overhead anywhere: every max-high below the breakout. *)
 let _virgin_sketch =
@@ -14,19 +21,28 @@ let _virgin_sketch =
     max_high_260w = 95.0;
     max_high_520w = 99.0;
     bars_seen = 520.0;
-    hist = Array.create ~len:_n_buckets 0.0;
+    hist_bands = Resistance_supply.hist_bands_of_legacy (_band []);
     anchor_close = 100.0;
   }
 
+(* Legacy age-blind histogram (all mass in the youngest band) at [max_high]. *)
 let _with_hist ?(max_high = 150.0) counts =
-  let hist = Array.create ~len:_n_buckets 0.0 in
-  List.iter counts ~f:(fun (k, c) -> hist.(k) <- c);
   {
     _virgin_sketch with
     max_high_130w = max_high;
     max_high_260w = max_high;
     max_high_520w = max_high;
-    hist;
+    hist_bands = Resistance_supply.hist_bands_of_legacy (_band counts);
+  }
+
+(* A sketch with an explicit 4-band histogram (each element a 20-bucket band). *)
+let _with_bands ?(max_high = 150.0) bands =
+  {
+    _virgin_sketch with
+    max_high_130w = max_high;
+    max_high_260w = max_high;
+    max_high_520w = max_high;
+    hist_bands = bands;
   }
 
 let test_virgin_scores_zero _ =
@@ -216,6 +232,7 @@ let _v2_quality bars ~breakout_price =
   let weekly_prefix = Weekly_prefix.build bars_arr in
   let sketch = Resistance_sketch.compute ~weekly_prefix ~bars_arr in
   let i = Array.length bars_arr - 1 in
+  let n_buckets = Array.length sketch.hist / _n_bands in
   let result =
     Resistance_supply.analyze ~config:_config
       ~sketch:
@@ -224,7 +241,10 @@ let _v2_quality bars ~breakout_price =
           max_high_260w = sketch.max_high_260w.(i);
           max_high_520w = sketch.max_high_520w.(i);
           bars_seen = sketch.bars_seen.(i);
-          hist = Array.map sketch.hist ~f:(fun row -> row.(i));
+          hist_bands =
+            Array.init _n_bands ~f:(fun b ->
+                Array.init n_buckets ~f:(fun bucket ->
+                    sketch.hist.((b * n_buckets) + bucket).(i)));
           anchor_close = bars_arr.(i).Types.Daily_price.close_price;
         }
       ~breakout_price
@@ -328,6 +348,112 @@ let test_own_week_high_divergence _ =
       Resistance_supply.is_clear_of_supply ~sketch:axti_shape )
     (equal_to (false, true))
 
+(* ------------------------------------------------------------------ *)
+(* Age-banded histogram (lever f): default bit-identical + the lever.  *)
+(* ------------------------------------------------------------------ *)
+
+(* Default parity: at default weights ([1;1;1;0]) the effective histogram is the
+   SUM of the three 0-130w bands. 3 bars in bucket 0 split one-per-recent-band
+   score identically to the same 3 bars packed into the youngest band (the v3
+   layout) — both the moderate 3/8 score. This is the "v3-shaped sketch scores
+   identically" parity: summing bands 0-2 = the pre-lever-f age-blind hist. *)
+let test_default_collapse_sums_recent_bands _ =
+  let split =
+    [| _band [ (0, 1.0) ]; _band [ (0, 1.0) ]; _band [ (0, 1.0) ]; _band [] |]
+  in
+  let legacy = Resistance_supply.hist_bands_of_legacy (_band [ (0, 3.0) ]) in
+  let r_split =
+    Resistance_supply.analyze ~config:_config ~sketch:(_with_bands split)
+      ~breakout_price:100.0
+  in
+  let r_legacy =
+    Resistance_supply.analyze ~config:_config ~sketch:(_with_bands legacy)
+      ~breakout_price:100.0
+  in
+  assert_that (r_split, r_legacy)
+    (all_of
+       [
+         field
+           (fun ((s : Resistance_supply.result), _) -> s.score)
+           (float_equal 0.375);
+         field
+           (fun (_, (l : Resistance_supply.result)) -> l.score)
+           (float_equal 0.375);
+         field
+           (fun ((s : Resistance_supply.result), _) -> s.quality)
+           (equal_to Weinstein_types.Moderate_resistance);
+       ])
+
+(* Default inert 130-520w band: 8 bars living ONLY in the stale band contribute
+   nothing to the effective histogram (weight 0), so the score falls to the
+   horizon floor proven by the max-highs, not the saturated 1.0. *)
+let test_stale_band_inert_at_default _ =
+  let bands = [| _band []; _band []; _band []; _band [ (0, 8.0) ] |] in
+  let result =
+    Resistance_supply.analyze ~config:_config ~sketch:(_with_bands bands)
+      ~breakout_price:100.0
+  in
+  assert_that result
+    (all_of
+       [
+         field
+           (fun (r : Resistance_supply.result) -> r.recent_weighted_bars)
+           (float_equal 0.0);
+         field
+           (fun (r : Resistance_supply.result) -> r.score)
+           (float_equal _config.recent_far_floor);
+       ])
+
+(* The lever works: arming the 130-520w band weight makes its 8 bars saturate
+   the score to 1.0 (Heavy), proving the age decay is a real score-time knob. *)
+let test_stale_band_weight_activates _ =
+  let bands = [| _band []; _band []; _band []; _band [ (0, 8.0) ] |] in
+  let config = { _config with band_weight_130_520w = 1.0 } in
+  let result =
+    Resistance_supply.analyze ~config ~sketch:(_with_bands bands)
+      ~breakout_price:100.0
+  in
+  assert_that result
+    (all_of
+       [
+         field (fun (r : Resistance_supply.result) -> r.score) (float_equal 1.0);
+         field
+           (fun (r : Resistance_supply.result) -> r.quality)
+           (equal_to Weinstein_types.Heavy_resistance);
+       ])
+
+(* R1/R2 sexp back-compat: a config sexp written before lever f (lacking the
+   four band-weight fields) still parses, the [@sexp.default]s filling in the
+   no-op weights (1 / 1 / 1 / 0). *)
+let test_config_parses_without_band_weights _ =
+  let stripped =
+    match Resistance_supply.sexp_of_config _config with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List (Sexp.Atom k :: _) ->
+                not (String.is_prefix k ~prefix:"band_weight")
+            | _ -> true))
+    | other -> other
+  in
+  let parsed = Resistance_supply.config_of_sexp stripped in
+  assert_that
+    (parsed.band_weight_0_26w, parsed.band_weight_130_520w)
+    (all_of
+       [
+         field (fun (a, _) -> a) (float_equal 1.0);
+         field (fun (_, b) -> b) (float_equal 0.0);
+       ])
+
+(* [is_clear_of_supply] ignores the 130-520w band: mass there alone is still
+   "clear" (recent overhead empty), keeping the virgin-readmission lever's 130w
+   semantics unchanged. *)
+let test_is_clear_ignores_stale_band _ =
+  let bands = [| _band []; _band []; _band []; _band [ (0, 8.0) ] |] in
+  assert_that
+    (Resistance_supply.is_clear_of_supply ~sketch:(_with_bands bands))
+    (equal_to true)
+
 let suite =
   "Resistance_supply tests"
   >::: [
@@ -347,6 +473,13 @@ let suite =
          "is_virgin agrees with analyze" >:: test_is_virgin_agrees_with_analyze;
          "is_clear_of_supply" >:: test_is_clear_of_supply;
          "own-week-high divergence" >:: test_own_week_high_divergence;
+         "default collapse sums recent bands"
+         >:: test_default_collapse_sums_recent_bands;
+         "stale band inert at default" >:: test_stale_band_inert_at_default;
+         "stale band weight activates" >:: test_stale_band_weight_activates;
+         "config parses without band weights"
+         >:: test_config_parses_without_band_weights;
+         "is_clear ignores stale band" >:: test_is_clear_ignores_stale_band;
        ]
 
 let () = run_test_tt_main suite

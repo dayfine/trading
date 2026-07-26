@@ -39,6 +39,27 @@ type config = {
           carry 83–362% maintenance margin) as a default-off, searchable
           {!Walk_forward.Variant_matrix} axis. Not wired into any default config
           or preset. *)
+  short_borrow_min_dollar_adv : float; [@sexp.default 0.0]
+      (** Borrow-availability floor for short candidates (margin M3a): the
+          minimum trailing dollar-ADV a name must trade for its shares to be
+          considered locatable-to-borrow. Short candidates whose dollar-ADV
+          (computed from bars available at the screen date, no lookahead, over
+          {!liquidity_config}'s [adv_lookback_days]) is strictly below this
+          value are dropped as "no borrow available" before the entry walk; long
+          candidates are never affected (borrow is a short-only concern).
+
+          Default [0.0] = no gating: {!Short_borrow_gate.filter} short-circuits
+          to the identity when [short_borrow_min_dollar_adv <= 0.0], so the
+          candidate list is bit-identical to prior behaviour and every existing
+          golden/baseline replays unchanged.
+
+          We have no locate feed; dollar-ADV is the practical borrow-supply
+          proxy per [dev/notes/long-short-margin-mechanics-2026-06-12.md] §4
+          item 6 (a thinly-traded name is the canonical hard-to-borrow case). A
+          default-off, searchable {!Walk_forward.Variant_matrix} axis; not wired
+          into any default config or preset. Bar-cadence caveat (intraweek
+          borrow recall / gap squeeze invisible; stress paths are M3b/M4) is
+          documented in {!Short_borrow_gate}. *)
   suppress_warmup_trading : bool; [@sexp.default true]
       (** When [true] (the default), the backtest runner suppresses all new
           position entries (long and short) before the measurement [start_date],
@@ -731,6 +752,51 @@ type config = {
           single-component [Variant_matrix] float axis
           ([((long_margin_rate_annual_pct) (values (0.0 0.08 0.10)))]).
           Default-off until an experiment-ledger ACCEPT. *)
+  maintenance_long_pct : float; [@sexp.default 0.0]
+      (** Long-side maintenance-margin requirement — the marked-basis loan-call
+          threshold for a levered long book (levered long-short realism, M2).
+          When the book's equity erodes so that
+          [equity /. marked_long_exposure < maintenance_long_pct] on a weekly
+          (Friday) close, {!Trading_simulation.Long_maintenance} force-reduces
+          held longs — weakest first (ascending unrealized return since entry) —
+          until the ratio is restored above
+          [maintenance_long_pct *. (1 + buffer)], then stops. Here
+          [equity = current_cash - long_margin_debit + marked_long_exposure] and
+          [marked_long_exposure] sums [quantity *. close] over held longs priced
+          today (margin M1b-2 [equity_cash]). Each forced sale's proceeds pay
+          down [long_margin_debit] first, which is what lifts the ratio.
+
+          {b Semantics.}
+          - [0.0] (default): {b EXACT no-op} — a cash account has no maintenance
+            requirement, so the reduce never fires and every existing
+            golden/baseline replays bit-identically (experiment-flag-discipline
+            R1). An unlevered book (no debit) never fires even at a positive
+            value, since [equity >= marked_long_exposure] keeps the ratio
+            [>= 1.0].
+          - [> 0.0] (e.g. [0.25]): a levered long book whose equity falls below
+            [maintenance_long_pct] of its marked long exposure is deleveraged
+            incrementally on the next weekly close. Only leverage
+            ([long_margin_debit > 0]) can breach the ratio.
+
+          {b Scope — the long book.} The numerator is the long-account equity
+          (cash net of the long debit plus long market value); the short book's
+          marked P&L is excluded — it has its own maintenance surface
+          ([margin_config.maintenance_margin_pct] via
+          {!Trading_portfolio.Portfolio_margin.check_maintenance_margin}). The
+          reduce closes whole weakest longs (never the whole book unless equity
+          is fully wiped) and is scoped to a forced sale — it can never block an
+          exit (the #1553 lesson). {b Cadence caveat:} daily-close marks cannot
+          see an intraweek gap-through-maintenance move; those gap paths are
+          M3/M4 stress-path territory, documented in
+          {!Trading_simulation.Long_maintenance}.
+
+          {b R2 searchability.} A real config field resolved by
+          [Overlay_validator.apply_overrides]; expressible as a single-component
+          [Variant_matrix] float axis
+          ([((maintenance_long_pct) (values (0.0 0.25 0.35)))]). Default-off
+          until an experiment-ledger ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md] +
+          [.claude/rules/promotion-confirmation.md]). *)
   resistance_min_history_bars : int; [@sexp.default 0]
       (** Overhead-resistance history floor threaded into
           [Stock_analysis.config.resistance.min_history_bars] (and, because
@@ -816,16 +882,36 @@ type config = {
           scoring weight then consumes in place of the binary virgin/clean
           grade.
 
+          {b Default flipped [None] -> [Some Resistance_supply.default_config]
+             on 2026-07-23} by the BUNDLE promotion (user-approved, R3): part of
+          the three-default bundle
+          [overhead_supply armed + w_overhead_supply=30 +
+           virgin_crossing_readmission], with [Resistance_supply.default_config]
+          floors also zeroed. Evidence: mechanism ACCEPT (ledger
+          [2026-07-17-resistance-supply-confirmation-grid], 3/3) + bundle
+          studies (ledger [2026-07-20-bundle-promotion-studies]: sp500 CONFIRM,
+          rolling-start REPAIRS the recovery-window tail) + lever-f REJECT
+          (ledger [2026-07-22-leverf-age-band-surface], age axis closed). See
+          [dev/notes/resistance-supply-promotion-memo-2026-07-19.md].
+
           {b Semantics.}
-          - [None] (default): {b bit-identical to baseline} —
-            [Stock_analysis.t.supply] is always [None], the screener falls back
-            to the binary grade, no sketch reads occur
-            (experiment-flag-discipline R1).
-          - [Some cfg]: the continuous score runs for survivors whose panel
-            carries the sketch columns. Pairs with the screener weight
-            [Screener.scoring_weights.w_overhead_supply] (both must be armed for
-            the mechanism to change any score); the live CSV report path has no
-            warehouse sketch and stays on the v1 binary grade until a follow-up.
+          - [Some cfg] (new default): the continuous score runs for survivors
+            whose panel carries the sketch columns; it pairs with the armed
+            screener weight [Screener.scoring_weights.w_overhead_supply]. The
+            live CSV report path has no warehouse sketch
+            ([Stock_analysis.callbacks_from_bars] sets
+            [get_sketch = fun () -> None]), so [Stock_analysis.t.supply] is
+            [None] there and the screener degrades gracefully to the
+            bit-identical v1 binary grade (the live weekly-review generator
+            computes a real sketch from the bar history, so its displayed grade
+            switches to the v2 score — the score/display split, PR-live-path
+            #1989).
+          - [None] (the [[@sexp.default None]] deserialization fallback):
+            {b bit-identical to baseline} — [Stock_analysis.t.supply] is always
+            [None], the screener falls back to the binary grade, no sketch reads
+            occur. This is the value a config sexp written {e before} the
+            promotion (omitting the field) parses to, so an old saved config
+            stays disarmed; it is also the explicit disarm escape hatch.
 
           {b R2 searchability.} Real config field → resolves through
           [Overlay_validator.apply_overrides]; expressible as an option axis
@@ -833,7 +919,7 @@ type config = {
 
           {b Faithfulness} (W1/W2). Ranking weight only, not an entry gate — the
           Stage-2-only buy rule, breakout+volume entry, macro/sector gate and
-          stops are untouched. Default-off until an experiment-ledger ACCEPT. *)
+          stops are untouched. *)
   virgin_crossing_readmission : bool; [@sexp.default false]
       (** resistance-v2 lever (a): virgin-crossing re-admission. When [true],
           the strategy sets [Stock_analysis.config.virgin_crossing_readmission],
@@ -846,16 +932,26 @@ type config = {
           genuinely virgin later (the AXTI post-mortem,
           [dev/notes/resistance-supply-divergence-forensic-2026-07-17.md]).
 
+          {b Default flipped [false] -> [true] on 2026-07-23} by the BUNDLE
+          promotion (user-approved, R3) — see [overhead_supply] for the full
+          evidence chain. This is the lever that repairs bare-w30's
+          recovery-window left tail (the 2000/2008/2010 rolling starts) in the
+          bundle studies.
+
           {b Semantics.}
-          - [false] (default): {b bit-identical to baseline} —
+          - [true] (new default): a stale Stage-2 survivor is re-admitted iff
+            its warehouse sketch is present AND the breakout is into new high
+            ground ([Resistance_supply.is_virgin] or [is_clear_of_supply]);
+            sketch absent → no re-admission (no fabrication). Independent of
+            [overhead_supply] — the virgin test needs only the sketch, not the
+            scoring config.
+          - [false] (the [[@sexp.default false]] deserialization fallback):
+            {b bit-identical to baseline} —
             [Stock_analysis.t.virgin_readmission] is always [false] and the
-            early-Stage-2 staleness rejection is unchanged
-            (experiment-flag-discipline R1).
-          - [true]: a stale Stage-2 survivor is re-admitted iff its warehouse
-            sketch is present AND the breakout is virgin
-            ([Resistance_supply.is_virgin]); sketch absent → no re-admission (no
-            fabrication). Independent of [overhead_supply] — the virgin test
-            needs only the sketch, not the scoring config.
+            early-Stage-2 staleness rejection is unchanged. A config sexp
+            written {e before} the lever (omitting the field) parses to [false]
+            so an old saved config keeps the staleness cut; also the disarm
+            escape hatch.
 
           {b R2 searchability.} Real top-level [bool] field → resolves through
           [Overlay_validator.apply_overrides]; expressible as a [Variant_matrix]
@@ -867,12 +963,115 @@ type config = {
           happened (weinstein-book-reference.md §Buy Criteria). Spine intact:
           still Stage-2-only, still breakout + volume + RS gates, macro/sector
           gates and stops untouched — it only widens which Stage-2 names clear
-          the early-window staleness cut. Default-off until an experiment-ledger
-          ACCEPT. *)
+          the early-window staleness cut. *)
+  dawn_leverage_enabled : bool; [@sexp.default false]
+      (** Master switch for the regime-conditional long-leverage "dawn"
+          mechanism ({!Leverage_dawn}, P1b memo
+          [dev/notes/regime-dependency-evaluation-2026-07-24.md] §1/§3 +
+          [dev/notes/margin-m4-validation-2026-07-23.md] §Addendum, user
+          green-lit 2026-07-24). When [true] AND the primary index is in a young
+          post-bear "dawn" (its weekly MA is currently rising and the most
+          recent negative->positive slope flip happened no more than
+          [dawn_max_ma_flip_age_weeks] weeks ago), that Friday's entry walk
+          sizes against the levered [dawn_initial_long_margin_req]; on a
+          non-dawn week the entry walk is {b raised} to a cash account — i.e.
+          the long book runs levered only in label-visible young uptrends,
+          cash-account otherwise.
+
+          {b Permissive-funding / gated-sizing design (B1 fix, 2026-07-24).} The
+          entry walk only {e sizes} the position; the {e funding} authority is
+          the simulator, which is constructed once at the {e base}
+          [initial_long_margin_req] ([Backtest.Panel_runner] ->
+          [Simulator.create_deps]) and cannot track the per-Friday dawn value.
+          So an armed cell must set the base [initial_long_margin_req] to a
+          value at least as permissive (numerically [<=]) as
+          [dawn_initial_long_margin_req] — the simulator then funds any levered
+          fill into [long_margin_debit] (priced by [long_margin_rate_annual_pct]
+          \+ [maintenance_long_pct]), while the entry-walk requirement decides
+          {e when} to request leverage. {!Leverage_dawn.validate} enforces the
+          [base <= dawn] constraint. See {!Leverage_dawn.dawn_effective_config}.
+
+          {b Default [false] = EXACT no-op} (experiment-flag-discipline R1). The
+          wiring ({!Leverage_dawn.dawn_effective_config}) short-circuits to the
+          unchanged config before any bar fetch or signal computation when this
+          flag is [false], so merging the mechanism changes no backtest result
+          and every existing golden/baseline replays bit-identically (a scenario
+          is bit-identical with the field absent and with it explicitly
+          [false]).
+
+          {b Faithfulness} (W1/W2, [.claude/rules/weinstein-faithful-core.md]).
+          A {b deployment-intensity dial} — how much buying power the long
+          engine deploys, conditioned on a {b trailing} (never forward-looking)
+          regime label off the weekly MA (the book's central instrument). The
+          spine is untouched: stage classification, the Stage-2-only buy rule,
+          breakout+volume entry, stops, and the macro/sector gate are all
+          unchanged. Not reversal timing — the MA-flip-age signal is lagging by
+          construction (it errs late, never early). Weinstein deploys
+          aggressively in confirmed young uptrends and defensively otherwise.
+
+          {b Margin-armed convention.} Dawn leverage runs margin-armed
+          ([margin_config.enabled = true]) so borrowed dollars are priced and
+          maintenance applies; {!Leverage_dawn.validate} (called at
+          {!Weinstein_strategy.make}) raises when [dawn_leverage_enabled = true]
+          with [margin_config] disarmed or [dawn_initial_long_margin_req]
+          outside the interval 0.0 < req <= 1.0.
+
+          {b R2 searchability.} A real config field resolved by
+          [Overlay_validator.apply_overrides]; expressible as a single-component
+          [Variant_matrix] flag axis
+          ([((flag dawn_leverage_enabled) (values (true false)))]). Default-off
+          until a promotion-confirmation grid ACCEPT (per
+          [.claude/rules/experiment-flag-discipline.md] +
+          [.claude/rules/promotion-confirmation.md]). *)
+  dawn_initial_long_margin_req : float; [@sexp.default 1.0]
+      (** The long-side initial-margin requirement the {b entry walk} sizes
+          against during a "dawn" week when [dawn_leverage_enabled = true] — the
+          leverage dial (see {!initial_long_margin_req} for the buying-power
+          semantics). [1.0] = cash account (no leverage); [0.75] = Reg-T 1.33x;
+          [0.5] = Reg-T 2x buying power.
+
+          {b Default [1.0] = no-op}: even with [dawn_leverage_enabled = true],
+          the dawn week sizes cash-account (bit-identical to the base
+          [initial_long_margin_req = 1.0] default) until a spec sets a
+          fractional value. Only consulted on dawn weeks with the mechanism
+          enabled; a non-dawn week raises the entry-walk requirement to a cash
+          account (see {!dawn_leverage_enabled}).
+
+          {b Armed cells must set the base [initial_long_margin_req] to match (or
+          be more permissive than) this value} — the simulator funds fills at the
+          base requirement, so a base of [1.0] (cash account) would floor-reject
+          a levered [0.75] dawn entry rather than fund it. {!Leverage_dawn.validate}
+          enforces [initial_long_margin_req <= dawn_initial_long_margin_req] (and
+          the interval 0.0 < req <= 1.0) when the mechanism is enabled. In the
+          shipped surface spec the base is fixed at the most-permissive rung
+          swept ([0.75]) while this dawn axis sweeps
+          {[[0.90; 0.85; 0.75]]} — the base [0.75] funds any of them.
+
+          R2: real config field → single-component [Variant_matrix] float axis
+          ([((dawn_initial_long_margin_req) (values (0.9 0.85 0.75)))]). *)
+  dawn_max_ma_flip_age_weeks : int;
+      [@sexp.default default_dawn_max_flip_age_weeks]
+      (** Maximum age (in weeks) of the primary index's most recent
+          negative->positive weekly-MA slope flip for the "dawn" label to be
+          active. Default [78] (~1.5y) matches the P1b memo's lagging-label
+          definition (catches 2002-03 back-half, 2010/2012/2016/2020 post-bear
+          dawns — and, by construction of a lagging label, also the 2024
+          melt-up-lag false positive, the named WF-CV falsifier).
+
+          Larger = a longer post-bear window counts as "dawn" (more levered
+          weeks); [0] = only the exact flip week qualifies. Inert while
+          [dawn_leverage_enabled = false]. R2: real config field →
+          single-component [Variant_matrix] int axis
+          ([((dawn_max_ma_flip_age_weeks) (values (52 78)))]). *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
     backtesting. *)
+
+val default_dawn_max_flip_age_weeks : int
+(** Default value for {!config.dawn_max_ma_flip_age_weeks} (78 weeks ~= 1.5y),
+    the P1b-memo lagging dawn-label window. Exposed as the named no-op so the
+    sexp default and the {!config} literal share one source of truth. *)
 
 val default_config : universe:string list -> index_symbol:string -> config
 (** Build a default config with Weinstein book values. *)

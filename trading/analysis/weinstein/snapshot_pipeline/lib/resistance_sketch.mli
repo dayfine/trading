@@ -20,12 +20,19 @@
       130/260/520 weekly bars ending at day [i] (partial week included).
     - [bars_seen].(i): true weekly-bar count available at day [i], capped at
       520 — the honest [Insufficient_history] input.
-    - [hist].(k).(i): count of weekly bars among the trailing 130 whose
-      mid-price [(high + low) / 2] lies in the log band
-      [C * 2^(k/20), C * 2^((k+1)/20)) above the day's raw close [C], and
-      whose high exceeds [C]. Buckets past
-      [Snapshot_schema.n_hist_buckets - 1] (supply more than 2x above [C])
-      are dropped.
+    - [hist].(cell).(i): {b age-banded} count at daily index [i]. The
+      [Snapshot_schema.n_hist_cells] rows are band-major: cell
+      [band * n_hist_buckets + bucket] holds age band [band] and price bucket
+      [bucket]. The four age bands cover a weekly bar's age relative to day [i]
+      (age 0 = the partial current week, age 1 = the most recent finalized
+      week, ...): [0-26w / 26-78w / 78-130w / 130-520w] (half-open). Within a
+      band, [bucket] counts weekly bars whose mid-price [(high + low) / 2] lies
+      in the log band [C * 2^(bucket/20), C * 2^((bucket+1)/20)) above the day's
+      raw close [C] and whose high exceeds [C]. Bucket indices past
+      [Snapshot_schema.n_hist_buckets - 1] (supply more than 2x above [C]) are
+      dropped. Summing the three 0-130w bands reproduces the pre-lever-f
+      age-blind trailing-130w histogram exactly; the 130-520w band measures
+      older supply the horizon max-highs previously only floored.
 
     Corrupt-bar guard: when day [i]'s raw close is non-positive or
     non-finite, every sketch cell at [i] is [Float.nan].
@@ -41,9 +48,10 @@ type t = {
   max_high_520w : float array;
   bars_seen : float array;
   hist : float array array;
-      (** [hist.(k).(i)] = bucket [k]'s count at daily index [i]; the first
-          dimension has {!Data_panel_snapshot.Snapshot_schema.n_hist_buckets}
-          rows. *)
+      (** [hist.(cell).(i)] = band-major cell [cell]'s count at daily index [i];
+          the first dimension has
+          {!Data_panel_snapshot.Snapshot_schema.n_hist_cells} rows (cell
+          [band * n_hist_buckets + bucket]). *)
 }
 (** Per-day sketch arrays, each aligned to the daily bar array (index [i] = day
     [i]). *)

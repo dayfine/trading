@@ -29,6 +29,11 @@ let _full_snapshot : Weekly_snapshot.t =
           rationale = "Stage 2 breakout, 2.1x volume";
           rs_vs_spy = Some 1.34;
           resistance_grade = Some "A";
+          sized_shares = 5;
+          sized_position_value = 2510.65;
+          sized_position_pct = 0.025;
+          sized_risk_amount = 179.65;
+          sizing_note = None;
         };
         {
           symbol = "MSFT";
@@ -40,6 +45,11 @@ let _full_snapshot : Weekly_snapshot.t =
           rationale = "Continuation breakout";
           rs_vs_spy = Some 1.18;
           resistance_grade = None;
+          sized_shares = 0;
+          sized_position_value = 0.0;
+          sized_position_pct = 0.0;
+          sized_risk_amount = 0.0;
+          sizing_note = Some "0 sh — cash / caps exhausted";
         };
       ];
     short_candidates = [];
@@ -50,6 +60,11 @@ let _full_snapshot : Weekly_snapshot.t =
           entered = _date "2020-06-19";
           stop = 1365.00;
           status = "Holding";
+          shares = 3;
+          entry_price = 1400.00;
+          current_price = 1500.00;
+          unrealized_pct = 7.14;
+          recommended_stop = Some 1420.00;
         };
       ];
   }
@@ -91,13 +106,22 @@ let test_full_snapshot_contains_all_sections _ =
          _has_substring "- XLY";
          _has_substring "- XLC";
          _has_substring "## Long candidates (top 7)";
-         (* Pinned candidate row — fully formatted. Risk = (502.13-466.20)/502.13*100 = 7.155... → "7.2%" *)
+         (* Pinned candidate row — fully formatted. Risk = (502.13-466.20)/502.13*100 = 7.155... → "7.2%".
+            Resistance column shows the candidate's [resistance_grade] ("A"). *)
          _has_substring
-           "| 1 | AAPL | A+ | 0.91 | $502.13 | $466.20 | 7.2% | Stage 2 \
-            breakout, 2.1x volume |";
+           "| 1 | AAPL | A+ | 0.91 | $502.13 | $466.20 | 7.2% | A | Stage 2 \
+            breakout, 2.1x volume | BUY STOP 5 sh @ $502.13";
+         (* Instruction cell carries the executable order end-to-end. *)
+         _has_substring
+           "on fill place SELL STOP @ $466.20, GTC; cancel if unfilled by \
+            Friday close";
          _has_substring "## Short candidates (top 5)";
          _has_substring "## Held positions";
-         _has_substring "| GOOG | 2020-06-19 | $1365.00 | Holding |";
+         (* Held row: shares, entry, current, unrealized %, current + suggested
+            stop (with delta vs current). *)
+         _has_substring
+           "| GOOG | 3 | $1400.00 | $1500.00 | 7.1% | $1365.00 | $1420.00 \
+            (+55.00) | 2020-06-19 | Holding |";
        ])
 
 let test_empty_long_candidates_renders_marker _ =
@@ -142,13 +166,136 @@ let test_risk_pct_formatting _ =
             rationale = "test";
             rs_vs_spy = None;
             resistance_grade = None;
+            sized_shares = 0;
+            sized_position_value = 0.0;
+            sized_position_pct = 0.0;
+            sized_risk_amount = 0.0;
+            sizing_note = None;
+          };
+        ];
+    }
+  in
+  let md = Report_renderer.render snap in
+  (* [resistance_grade = None] → the Resistance column renders "-". *)
+  assert_that md
+    (_has_substring
+       "| 1 | TEST | B | 0.50 | $100.00 | $90.00 | 10.0% | - | test |")
+
+let test_resistance_grade_column_rendered _ =
+  (* The candidate table gains a Resistance column header, and a candidate whose
+     [resistance_grade] is the v2 sketch-derived form renders it verbatim — a
+     clean "<quality> (<score>)" string with no module-qualified prefix. *)
+  let snap =
+    {
+      _empty_snapshot with
+      long_candidates =
+        [
+          {
+            symbol = "TEST";
+            score = 0.5;
+            grade = "B";
+            entry = 100.0;
+            stop = 90.0;
+            sector = "XLK";
+            rationale = "test";
+            rs_vs_spy = None;
+            resistance_grade = Some "Heavy_resistance (0.82)";
+            sized_shares = 0;
+            sized_position_value = 0.0;
+            sized_position_pct = 0.0;
+            sized_risk_amount = 0.0;
+            sizing_note = None;
           };
         ];
     }
   in
   let md = Report_renderer.render snap in
   assert_that md
-    (_has_substring "| 1 | TEST | B | 0.50 | $100.00 | $90.00 | 10.0% | test |")
+    (all_of
+       [
+         _has_substring "| Resistance | Rationale |";
+         _has_substring
+           "| 1 | TEST | B | 0.50 | $100.00 | $90.00 | 10.0% | \
+            Heavy_resistance (0.82) | test |";
+         not_ ~msg:"grade string must carry no module-qualified prefix"
+           (_has_substring "Weinstein_types.");
+       ])
+
+(* Candidate builder with the sizing fields exposed as optional params. *)
+let _sized_cand ?(sized_shares = 0) ?(sized_position_value = 0.0)
+    ?(sized_position_pct = 0.0) ?(sized_risk_amount = 0.0) ?(sizing_note = None)
+    () : Weekly_snapshot.candidate =
+  {
+    symbol = "TEST";
+    score = 0.5;
+    grade = "B";
+    entry = 100.0;
+    stop = 90.0;
+    sector = "XLK";
+    rationale = "test";
+    rs_vs_spy = None;
+    resistance_grade = None;
+    sized_shares;
+    sized_position_value;
+    sized_position_pct;
+    sized_risk_amount;
+    sizing_note;
+  }
+
+let test_instruction_cell_rendered _ =
+  (* A normally-sized long renders an executable BUY STOP order. *)
+  let snap =
+    {
+      _empty_snapshot with
+      long_candidates =
+        [
+          _sized_cand ~sized_shares:10 ~sized_position_value:1000.0
+            ~sized_position_pct:0.05 ~sized_risk_amount:100.0 ();
+        ];
+    }
+  in
+  let md = Report_renderer.render snap in
+  assert_that md
+    (_has_substring
+       "BUY STOP 10 sh @ $100.00 (~$1000, 5.0% of book, risk $100); on fill \
+        place SELL STOP @ $90.00, GTC; cancel if unfilled by Friday close")
+
+let test_zero_share_reason_rendered _ =
+  (* A 0-share result renders its reason, not an order. *)
+  let snap =
+    {
+      _empty_snapshot with
+      long_candidates =
+        [ _sized_cand ~sizing_note:(Some "0 sh — cash / caps exhausted") () ];
+    }
+  in
+  let md = Report_renderer.render snap in
+  assert_that md
+    (all_of
+       [
+         _has_substring
+           "| 0.50 | $100.00 | $90.00 | 10.0% | - | test | 0 sh — cash / caps \
+            exhausted |";
+         not_ ~msg:"a 0-share result must not render an order"
+           (_has_substring "BUY STOP");
+       ])
+
+let test_unsized_placeholder_rendered _ =
+  (* A placeholder-sized long prefixes the UNSIZED note before the order. *)
+  let snap =
+    {
+      _empty_snapshot with
+      long_candidates =
+        [
+          _sized_cand ~sized_shares:10 ~sized_position_value:1000.0
+            ~sized_position_pct:0.05 ~sized_risk_amount:100.0
+            ~sizing_note:(Some "UNSIZED — set portfolio.sexp") ();
+        ];
+    }
+  in
+  let md = Report_renderer.render snap in
+  assert_that md
+    (_has_substring "UNSIZED — set portfolio.sexp: BUY STOP 10 sh @ $100.00")
 
 let test_render_is_deterministic _ =
   let first = Report_renderer.render _full_snapshot in
@@ -168,6 +315,11 @@ let _long_snap ~n ~score_of =
       rationale = "r";
       rs_vs_spy = None;
       resistance_grade = None;
+      sized_shares = 0;
+      sized_position_value = 0.0;
+      sized_position_pct = 0.0;
+      sized_risk_amount = 0.0;
+      sizing_note = None;
     }
   in
   { _empty_snapshot with long_candidates = List.init n ~f:(fun i -> make_c i) }
@@ -235,6 +387,11 @@ let suite =
          >:: test_empty_strong_sectors_renders_marker;
          "bearish_macro_rendered" >:: test_bearish_macro_rendered;
          "risk_pct_formatting" >:: test_risk_pct_formatting;
+         "resistance_grade_column_rendered"
+         >:: test_resistance_grade_column_rendered;
+         "instruction_cell_rendered" >:: test_instruction_cell_rendered;
+         "zero_share_reason_rendered" >:: test_zero_share_reason_rendered;
+         "unsized_placeholder_rendered" >:: test_unsized_placeholder_rendered;
          "render_is_deterministic" >:: test_render_is_deterministic;
          "long_candidates_truncated_to_default_7"
          >:: test_long_candidates_truncated_to_default_7;

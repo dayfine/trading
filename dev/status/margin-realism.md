@@ -1,6 +1,6 @@
 # Status: margin-realism
 
-## Last updated: 2026-07-19
+## Last updated: 2026-07-25
 
 ## Status
 IN_PROGRESS
@@ -104,8 +104,275 @@ and M1b (follow-up).
     ordering, N-tick interest, disarmed rejection, no-debit/zero-rate no-ops);
     `test_margin_runner.ml` (+2 — end-to-end levered run funds+prices the debit
     with honest NAV, and the `accrue_long_margin_interest` wrapper).
-- **M2** — long-side maintenance / force-reduce (documented sell ordering).
-- **M3** — short-side squeeze robustness (borrow availability, HTB tiers, buy-in).
-- **M4** — validation protocol (parity gates, squeeze stress cells, leverage
-  surface via experiment-gap-closing + confirmation grid). No default flips and no
-  levered number is quoted until M4.
+- [x] **M2 — long-side maintenance force-reduce (default-off).** Branch
+  `feat/margin-m2-maintenance`. Marked-basis maintenance check for the LONG book:
+  when `equity / marked_long_exposure < maintenance_long_pct` on a weekly (Friday)
+  close, held longs are force-reduced weakest-first until the ratio is restored.
+  - New pure module `Long_maintenance`
+    (`trading/trading/simulation/lib/long_maintenance.{ml,mli}`), the long-book
+    mirror of the short-side force-cover. `equity = equity_cash + marked_long_exposure`
+    where `equity_cash = current_cash - long_margin_debit` (M1b-2), so only a
+    levered book (debit > 0 pushing equity_cash down) can ever breach — an
+    unlevered book has ratio ≥ 1.0.
+  - **Sell ORDERING (the design center; Portfolio_floor bottom-tick lesson).**
+    Weakest-first = **ascending unrealized return since entry** (`mark/entry - 1`),
+    ties by symbol for determinism. Deliberately NOT the laggard-rotation metric
+    (RS-vs-benchmark needs benchmark history + a `Bar_reader`, neither available at
+    the margin seam; a margin reduce wants the position closest to underwater).
+    Selling at the mark leaves equity unchanged and only shrinks the denominator,
+    so ordering decides which names the book *keeps* — shedding losers keeps the
+    let-winners-run tail. **Incremental, whole-position** (mirrors the short-side
+    force-cover which closes whole flagged shorts): sheds one at a time until
+    `equity / marked_long_exposure ≥ maintenance_long_pct*(1 + restore_buffer_pct)`
+    (buffer 0.02, so mark noise doesn't re-trigger next tick), then stops —
+    stronger positions untouched. Never a whole-book sweep unless equity ≤ 0
+    (insolvent → liquidate). Every forced sale carries
+    `exit_reason = StrategySignal { label = "maintenance_reduce" }` so forensics
+    separate margin reduces from strategy exits; proceeds pay down
+    `long_margin_debit` first (M1b-2), which is what restores the ratio.
+  - **Cadence:** weekly-close (Friday) only, gated in
+    `Long_maintenance.maintenance_reduce_transitions`, invoked from
+    `Margin_runner.tick` alongside the short-side force-cover (dedup via the
+    existing `dedup_strategy_exits_for_margin`: margin wins). Bar-cadence caveat
+    (intraweek gap-through-maintenance) documented in the `.mli` as M3/M4 territory.
+  - Config: `maintenance_long_pct` `[@sexp.default 0.0]` on
+    `weinstein_strategy_config` (+ the re-declared `weinstein_strategy.mli` record).
+    R1 no-op at 0.0 (a cash account has no maintenance requirement); R2
+    Overlay_validator float axis (`test_variant_matrix.ml` +
+    `test_maintenance_long_pct_axis_expands`). Threaded
+    `Weinstein config → Simulator.create_deps → Margin_runner.tick` (panel_runner),
+    same path as `long_margin_rate_annual_pct`.
+  - Tests: `test_long_maintenance.ml` (10 — R1 default-never-fires, no-breach,
+    weakest-first ORDER on a 3-position fixture, incremental restore, equity-wiped
+    full liquidation, Friday-gate no-op on Monday, `maintenance_reduce` exit tag,
+    unlevered/no-debit no-op, no-positions no-op) + `test_long_buying_power.ml`
+    config round-trip / back-compat / default-no-op extended to `maintenance_long_pct`.
+  - Also fixed a #2005 QC follow-up: `portfolio_summary.mli` / `metric_types.mli`
+    now qualify the `portfolio_value - current_cash` identity as cash-account-only
+    (a long-margin debit shifts the split by `+ long_margin_debit`).
+- [x] **M3a — borrow availability + HTB/maintenance tier tables (default-off).**
+  Branch `feat/margin-m3a-borrow-htb`. The deterministic half of M3's short-side
+  squeeze robustness: three default-off mechanisms, each R1 no-op at its default,
+  each an R2-searchable axis. Bit-identical to pre-M3a at every default (parity
+  pinned by unit tests, no golden re-pin needed).
+  - **Tier-table primitive** — new pure module `Short_margin_tiers`
+    (`trading/trading/portfolio/lib/short_margin_tiers.{ml,mli}`): a
+    price-banded, order-independent, piecewise-constant lookup (`tier_value
+    ~tiers ~flat_fallback ~price` picks the tightest band strictly covering the
+    price, else the flat fallback). An empty table is a bit-identical no-op.
+    Thresholds live in tests / example configs, not baked in code.
+  - **HTB tiered borrow rate** — `Margin_config` gains
+    `short_borrow_rate_tiers : Short_margin_tiers.tier list [@sexp.default []]` +
+    helpers `borrow_fee_annual_for_price` / `daily_borrow_rate_for_price`.
+    `Portfolio_margin.accrue_daily_borrow_fee` now accrues {b per short position}
+    at its marked price using the tiered daily rate; empty table → every price
+    resolves to the flat 50bps → per-position sum equals the legacy
+    `sum_short_notional * flat_daily_rate` bit-for-bit (distributivity).
+  - **Maintenance tier table** — `Margin_config` gains
+    `short_maintenance_tiers : Short_margin_tiers.tier list [@sexp.default []]` +
+    `maintenance_pct_for_price`. `Portfolio_margin.check_maintenance_margin` uses
+    the price-tiered threshold (sub-$5 → 100%, ~$5-17 → ≈83%, ≥ ~$17 → 30% base
+    per the 2026-06-12 mechanics note) so low-priced HTB shorts flag for
+    force-cover sooner; empty table → flat 25% → bit-identical.
+  - **Borrow-availability entry gate** — new module `Short_borrow_gate`
+    (`trading/trading/weinstein/strategy/lib/short_borrow_gate.{ml,mli}`, pure
+    `filter` + bar-reader adapter `apply`), re-exported on `Weinstein_strategy`.
+    Drops SHORT candidates whose trailing dollar-ADV (no-lookahead) is below the
+    borrow-supply floor; longs untouched; missing reading never drops. Wired as
+    the last gate in `Entry_assembly.assemble`. Config field
+    `short_borrow_min_dollar_adv : float [@sexp.default 0.0]` on
+    `weinstein_strategy_config` (+ re-declared `weinstein_strategy.mli` record).
+    Dollar-ADV is the borrow-supply proxy (we have no locate feed).
+  - **R2 axes** — top-level `short_borrow_min_dollar_adv` + nested
+    `margin_config.short_{borrow_rate,maintenance}_tiers` all resolve through
+    `Overlay_validator`; axis-expansion tests
+    (`test_short_borrow_min_dollar_adv_axis_expands`,
+    `test_short_maintenance_tiers_axis_expands`) in `test_variant_matrix.ml`.
+  - **Bar-cadence caveat** documented in `short_borrow_gate.mli` + the tier
+    `.mli`s: weekly-close marks cannot see an intraweek borrow recall / gap
+    squeeze. Probabilistic buy-in / gap-through-maintenance stress paths are
+    **M3b** territory (a documented seam, not built here).
+  - Tests: `test_short_margin_tiers.ml` (6 — lookup: empty→fallback,
+    tightest-band, middle band, uncovered→fallback, exclusive boundary,
+    order-independence); `test_margin_accounting.ml` (+6 — tiered borrow fee
+    per-price, empty-tiers flat parity, tiered maintenance flags a cheap short
+    the flat 25% doesn't + flat-parity, config round-trip + pre-M3a back-compat
+    parse); `test_short_borrow_gate.ml` (4 — zero-floor no-op, drops illiquid
+    short / keeps liquid, never drops longs, missing-reading keeps); extended
+    `test_long_buying_power.ml` (config default no-op + round-trip + pre-M3a
+    parse for `short_borrow_min_dollar_adv`).
+  - Verify: `dune runtest trading/portfolio/test trading/weinstein/strategy/test
+    trading/backtest/walk_forward/test` (container path
+    `/workspaces/trading-1/.claude/worktrees/<ws>/trading`).
+- [x] **M3b — buy-in stress mode (deterministic stress-path, default-off).**
+  Branch `feat/margin-m3b-buyin-stress`. Closes the remaining half of M3's
+  short-side squeeze robustness. Chose the **deterministic stress-path** branch
+  over the probabilistic forced-cover: the M4 promotion grid wants the single
+  worst-case path (every HTB borrow recalled), not sampled paths, and every
+  analysis function must stay pure/reproducible (CLAUDE.md). No randomness.
+  - **Mechanism** — new pure module `Short_buyin`
+    (`trading/trading/simulation/lib/short_buyin.{ml,mli}`), the short-side
+    mirror of the M2 `Long_maintenance` runner. When armed, {b every} held short
+    that is hard-to-borrow at its current mark is force-covered at the next
+    weekly (Friday) close — the deterministic upper bound on buy-in cost for the
+    M4 stress cells. `select_buyins` (pure HTB filter) +
+    `buyin_stress_transitions` (Friday-gated transition builder). Each forced
+    cover carries a distinguishable `exit_reason = StrategySignal { label =
+    "buyin_stress" }` at the mark, so forensics separate buy-ins from strategy
+    exits, short maintenance covers (`margin_call`) and long reduces
+    (`maintenance_reduce`).
+  - **HTB definition** — a short marked strictly below a positive
+    `short_buyin_htb_price_below` is HTB. Chose a **dedicated threshold** on
+    `Margin_config` over reusing an M3a tier band: buy-in (share recall) is a
+    distinct broker event from a maintenance breach (a lender can recall a name
+    above its maintenance requirement), so the stress cell's "which shorts get
+    bought in" is decoupled from the leverage/maintenance dials and the M4 grid
+    can vary them orthogonally. `Margin_config.is_buyin_htb ~price` is the gate.
+  - **Config (R1 no-op)** — `Margin_config` gains
+    `short_buyin_stress_mode : bool [@sexp.default false]` +
+    `short_buyin_htb_price_below : float [@sexp.default 0.0]`. Placing them on
+    `Margin_config` (already threaded to `Margin_runner.tick`) needs **zero new
+    simulator/panel_runner threading** — they ride the existing `margin_config`.
+    At the defaults nothing is ever HTB (mode off, and no positive mark is below
+    0.0), so `tick` stays bit-equal; goldens unchanged, no re-pin.
+  - **Wiring + collision handling** — `Margin_runner.tick` now appends buy-in
+    covers alongside the short force-cover and M2 long-reduce (same Friday
+    cadence + `dedup_strategy_exits_for_margin` seam). A short flagged by both
+    the maintenance check and the buy-in mode is covered once —
+    `_drop_buyins_colliding_with_covers` keeps the `margin_call` (richer detail),
+    drops the duplicate `buyin_stress`.
+  - **Bar-cadence caveat** documented in `short_buyin.mli` + the `Margin_config`
+    field docs: daily-close marks cannot see an intraweek gap-through-recall; a
+    Monday-to-Thursday squeeze is only covered at Friday's close — M4 stress-path
+    gap scenarios extend this.
+  - **R2 axes** — `margin_config.short_buyin_stress_mode` +
+    `margin_config.short_buyin_htb_price_below` resolve through
+    `Overlay_validator`; axis-expansion tests
+    (`test_short_buyin_stress_mode_axis_expands`,
+    `test_short_buyin_htb_price_below_axis_expands`) in `test_variant_matrix.ml`.
+  - **M3a QC drive-bys closed** — (1) added the symmetric
+    `test_short_borrow_rate_tiers_axis_expands` (the M3a axis was proven only via
+    its structurally-identical `short_maintenance_tiers` sibling); (2) corrected
+    the borrow-fee disarmed-parity wording from "bit-for-bit" to "numerically
+    identical (1e-12)" in `portfolio_margin.mli` + the renamed
+    `test_borrow_fee_empty_tiers_numerically_identical_flat` (the M3a per-position
+    reassociation `(Σnᵢ)·r → Σ(nᵢ·r)` is not IEEE-bit-identical; goldens hold).
+  - Tests: `test_short_buyin.ml` (8 — R1 default/disarmed no-ops, armed selects
+    only HTB, zero-threshold no-op, Friday-armed tagged cover, weekly-cadence
+    Monday no-op, unmarked-short skip, no-positions no-op) +
+    `test_margin_accounting.ml` (+1 `is_buyin_htb` gate + round-trip extended to
+    the buy-in fields).
+  - Verify: `dune runtest trading/simulation/test/test_short_buyin.ml
+    trading/portfolio/test trading/backtest/walk_forward/test` (container path
+    `/workspaces/trading-1/.claude/worktrees/<ws>/trading`).
+- [x] **M4 — validation protocol COMPLETE (2026-07-23/24), verdict: leverage REJECT.**
+  Full record: `dev/notes/margin-m4-validation-2026-07-23.md`; ledger
+  `2026-07-24-margin-m4-leverage-surface` (Reject).
+  - Stage 1 parity gates: ALL PASS bit-identical (margin-off ≡ baseline
+    cross-commit vs the 07-22 +8,689% record arm; explicit no-op threading ≡
+    absent-field; req=1.0/rate=0 ≡ E-capped on the shorts-on path). New
+    unlevered E-capped anchor on the promoted bundle: +10,589% / Sharpe .906 /
+    DD 31.1.
+  - Stage 2 squeeze cells (dot-com/GFC/meme, tiers + buy-in armed): PASS —
+    do-no-harm (zero spurious events on faithful paths; stops always fire
+    before tiered maintenance is reachable), engagement + timing proven on a
+    forced-threshold cell (33/33 covers ~1 tick after breach). Harness gap
+    filed: margin exit labels don't propagate to trades.csv/trade_audit
+    (issue #2057).
+  - Stage 3 leverage surface (broad 13×2y, priced 8%/yr + M2 maintenance 0.30
+    + tier tables): all six cells FAIL the fold gate. req=0.75 → Sharpe
+    .827→.56, DD 14→50; req=0.5 → .34, DD 89 (ruined folds, less raw return
+    than 1.33×). Cash-account long-short .883 (6/13) = only faint positive,
+    not gate-robust. Armed-margin no-op corner fold-identical to baseline
+    13/13 ✓. No promotion, no grid, no default flips.
+
+## Follow-ups (post-M4)
+
+- [x] **#2057 — margin exit labels now reach `trades.csv` / `Stop_log`
+  (observability-only fix; `trade_audit.sexp` half tracked separately as
+  #2076).** Branch `feat/margin-realism-exit-labels`.
+  Root cause: `Backtest.Strategy_wrapper.wrap` (the only place that fed
+  `Stop_log.record_transitions`) intercepts transitions at the strategy's own
+  `on_market_close` call boundary — but `Margin_runner.tick`'s
+  margin-driven transitions (`margin_call` / `buyin_stress` /
+  `maintenance_reduce`, all `Position.StrategySignal`) are generated in
+  `Simulator._process_step_day` *after* the strategy call returns, and margin
+  runs unconditionally every step regardless of strategy cadence — so no
+  observer was ever wired to see them.
+  - Fix: new `Simulator.dependencies.on_transitions` hook (mirrors the
+    existing `on_trade_fill` strategy-agnostic-hook pattern), invoked once per
+    step with the FINAL post-dedup transition list (strategy's surviving
+    transitions + margin's), right after `Margin_runner.tick` returns.
+    `Backtest.Panel_runner._make_simulator` wires it to
+    `Stop_log.record_transitions stop_log`, alongside (not replacing) the
+    existing `Strategy_wrapper` interception — `record_transitions` is
+    idempotent w.r.t. re-recording, and on a same-tick strategy/margin
+    collision the later `on_transitions` call correctly overwrites the
+    wrapper's stale strategy-side trigger with the winning margin one (a
+    latent staleness bug the old design had on collision days, fixed as a
+    side effect). **This collision-overwrite claim is now pinned by a test**
+    (QC rework, see below): `test_stop_log_records_margin_call_on_strategy_collision`
+    reuses the `_short_then_stop_strategy` collision fixture from
+    `test_margin_runner.ml` and asserts the final `Stop_log` label is
+    `margin_call`, not the strategy's `Stop_loss`. This is the *correct*
+    semantic, not a misattribution: `Margin_runner.dedup_strategy_exits_for_margin`
+    drops the strategy's colliding `TriggerExit` from `strategy_transitions`
+    before `_apply_transitions` runs, so the strategy's stop-loss never
+    actually executes — only margin's `TriggerExit` does — and `Stop_log`
+    should (and now does) reflect what actually closed the position.
+  - `trade_audit.sexp` scope note: investigated and found that its exit-side
+    enrichment (`Exit_audit_capture.emit_for_list`, wired from
+    `weinstein_strategy.ml`'s stops pass) already only covers
+    `Stops_runner`-triggered exits — it has NEVER captured any other
+    `StrategySignal`-labeled exit (`stage3_force_exit`, `laggard_rotation`,
+    `extension_stop`, `harvest_rotate`, `macro_bearish_trim` all reach
+    `trades.csv` but not `trade_audit.sexp` today). Margin exits landing in
+    the same gap is consistent pre-existing behavior, not a margin-specific
+    regression, and fixing it would require either fabricating
+    macro/stage/rs context Margin_runner architecturally cannot have, or a
+    materially larger cross-cutting feature (giving `Trade_audit` visibility
+    into every externally-generated exit source) — out of scope for an
+    observability-only bugfix. **Filed as #2076** (QC rework — the prior
+    revision only flagged this in prose with no tracked artifact, which
+    would have let `Closes #2057` auto-close an issue whose title names this
+    still-broken sink). PR body now reads "Partially addresses #2057" with
+    #2076 cross-referenced instead of `Closes #2057`.
+  - No behavior change: `on_transitions` is a pure read-only observer: it
+    never touches `portfolio`/`positions`/fills — same numbers, same PnL.
+  - Tests: `test_margin_runner.ml` (+3 — `on_transitions_observes_margin_call`
+    / `_buyin_stress` / `_maintenance_reduce`, at the `Simulator` layer,
+    pinning the raw transition list) and `test_margin_exit_observability.ml`
+    (+3 — same three labels, one layer up, using the exact
+    `Stop_log.record_transitions` composition `Panel_runner` wires in
+    production, asserting on `Stop_log.get_stop_infos`'s `exit_trigger` — the
+    value `Result_writer` reads for `trades.csv`; +1 more, the collision test
+    above, added in QC rework). All 6 original assertions verified to FAIL
+    before the fix (temporarily disabled the `on_transitions` call site) and
+    PASS after; the collision test's correctness follows directly from
+    `dedup_strategy_exits_for_margin`'s documented `.mli` contract.
+  - Verify: `dune runtest trading/simulation/test/test_margin_runner.ml
+    trading/backtest/test/test_margin_exit_observability.ml`.
+- [x] **#2076 — `trade_audit.sexp` visibility for margin (and other
+  externally-generated) exits — fixed.** Branch
+  `feat/trade-audit-external-exits` (PR #2085). Same seam as #2057's fix
+  above (`Simulator.dependencies.on_transitions`), now also driving
+  `Trade_audit.record_transitions` (mirrors `Stop_log.record_transitions`):
+  fills in a reason-only `external_exit_decision` (`symbol`, `exit_date`,
+  `position_id`, `exit_trigger` — no macro/stage/RS, which the observer
+  cannot fabricate at this layer) on `audit_record` for any `TriggerExit`
+  whose position has no enriched `exit_` yet. Enriched always wins (safe
+  by construction — the strategy's own enriched-path recording always
+  completes before `on_transitions` fires for the same step).
+  `Panel_runner._make_simulator` composes both `Stop_log.record_transitions`
+  and `Trade_audit.record_transitions` into the single `on_transitions`
+  closure. Also fixes the pre-existing (non-margin) gap for
+  `stage3_force_exit` / `laggard_rotation` / `extension_stop` /
+  `macro_bearish_trim` for free (same generic path, no per-label
+  special-casing); `harvest_rotate` stays out of scope (it's a partial
+  trim, `TriggerPartialExit`, not a round-trip close). Full writeup:
+  `dev/status/trade-audit.md` §"Externally-generated exits (2026-07-25,
+  issue #2076)".
+- #2059 — LH phantom-short leak + duplicated trades.csv row (record basis,
+  −$607k/0.85% immaterial but real).
+- #2060 — mean-ADV liquidity gate spoofable by single block-print day (LINK
+  −$1.58M specimen; median/k-of-N candidates, default-off).

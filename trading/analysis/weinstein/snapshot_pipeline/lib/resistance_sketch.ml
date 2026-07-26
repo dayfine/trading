@@ -15,9 +15,30 @@ type t = {
 let _horizon_130_weeks = 130
 let _horizon_260_weeks = 260
 let _horizon_520_weeks = 520
-let _hist_lookback_weeks = 130
+
+(* Age-banded histogram (lever f): the histogram now looks back the full 520
+   weekly bars, split into four age bands by a weekly bar's age relative to the
+   row (the partial current week is age 0, the most recent finalized week age 1,
+   ...). Band boundaries are half-open: [0,26) / [26,78) / [78,130) / [130,520).
+   The three 0-130w bands union to the pre-lever-f trailing-130w window, so
+   summing them reproduces the old age-blind histogram exactly. *)
+let _hist_lookback_weeks = 520
+let _age_break_26_weeks = 26
+let _age_break_78_weeks = 78
+let _age_break_130_weeks = 130
 let _bars_seen_cap = 520
 let _ln2 = Float.log 2.0
+
+(* Age band index (0..n_age_bands-1) for a weekly bar of [age] weeks. *)
+let _age_band_of ~age =
+  if age < _age_break_26_weeks then 0
+  else if age < _age_break_78_weeks then 1
+  else if age < _age_break_130_weeks then 2
+  else 3
+
+(* Column index of price bucket [bucket] within age band [band] in the
+   band-major [Res_hist] layout (matches [Snapshot_schema] cell ordering). *)
+let _cell_index ~band ~bucket = (band * Snapshot_schema.n_hist_buckets) + bucket
 
 (* Pop deque entries whose high is <= the incoming one, then push [j].
    Keeps [dq] a decreasing-highs monotonic deque of finalized indices. *)
@@ -71,15 +92,17 @@ let _bucket_of ~anchor ~mid =
   in
   if Float.is_finite k then Some (Int.of_float k) else None
 
-(* Count one weekly bar into [hist] at day [i] when it sits above [anchor]
-   and its mid lands in a canonical bucket. Mirrors the v1 mapper's
-   accumulation rule: [high > breakout] gates, the mid-price buckets. *)
-let _accumulate_hist ~hist ~i ~anchor ~weekly_high ~weekly_low =
+(* Count one weekly bar of age [band] into [hist] at day [i] when it sits above
+   [anchor] and its mid lands in a canonical bucket. Mirrors the v1 mapper's
+   accumulation rule: [high > breakout] gates, the mid-price buckets; the age
+   band selects which of the four band-major column groups the count lands in. *)
+let _accumulate_hist ~hist ~i ~band ~anchor ~weekly_high ~weekly_low =
   if Float.(weekly_high > anchor) then
     let mid = (weekly_high +. weekly_low) /. 2.0 in
     match _bucket_of ~anchor ~mid with
-    | Some k when k >= 0 && k < Snapshot_schema.n_hist_buckets ->
-        hist.(k).(i) <- hist.(k).(i) +. 1.0
+    | Some bucket when bucket >= 0 && bucket < Snapshot_schema.n_hist_buckets ->
+        let cell = _cell_index ~band ~bucket in
+        hist.(cell).(i) <- hist.(cell).(i) +. 1.0
     | _ -> ()
 
 let _hist_for_day ~hist ~(weekly_prefix : Weekly_prefix.t) ~i ~anchor =
@@ -87,12 +110,16 @@ let _hist_for_day ~hist ~(weekly_prefix : Weekly_prefix.t) ~i ~anchor =
   let fc = weekly_prefix.finalized_count_at_day.(i) in
   let m_fin = Int.min (_hist_lookback_weeks - 1) fc in
   for j = fc - m_fin to fc - 1 do
-    _accumulate_hist ~hist ~i ~anchor
+    (* Finalized week [j] is [fc - j] weeks before the current partial week. *)
+    let band = _age_band_of ~age:(fc - j) in
+    _accumulate_hist ~hist ~i ~band ~anchor
       ~weekly_high:fin.(j).Types.Daily_price.high_price
       ~weekly_low:fin.(j).Types.Daily_price.low_price
   done;
+  (* The partial (current) week is age 0 -> youngest band. *)
   let p = weekly_prefix.partial_per_day.(i) in
-  _accumulate_hist ~hist ~i ~anchor ~weekly_high:p.Types.Daily_price.high_price
+  _accumulate_hist ~hist ~i ~band:0 ~anchor
+    ~weekly_high:p.Types.Daily_price.high_price
     ~weekly_low:p.Types.Daily_price.low_price
 
 (* Corrupt-anchor day: every sketch cell for day [i] degrades to NaN. *)
@@ -119,8 +146,7 @@ let _bars_seen_column ~fc_at_day =
       Float.of_int (Int.min (fc + 1) _bars_seen_cap))
 
 let _empty_hist ~n =
-  Array.init Snapshot_schema.n_hist_buckets ~f:(fun _ ->
-      Array.create ~len:n 0.0)
+  Array.init Snapshot_schema.n_hist_cells ~f:(fun _ -> Array.create ~len:n 0.0)
 
 let compute ~(weekly_prefix : Weekly_prefix.t)
     ~(bars_arr : Types.Daily_price.t array) =

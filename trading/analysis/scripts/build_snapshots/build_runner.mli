@@ -52,16 +52,27 @@ val build :
       bars only, exactly as {!Csv_snapshot_builder} is invoked with
       [~warmup_start]. [None] on either bound means full history on that side.
     - [sketch_deep_days] — calendar-day span of extra history loaded {e before}
-      [start_date] and fed only to the resistance-sketch columns
-      ([Res_max_high_*], [Res_bars_seen], [Res_hist]) via
-      {!Snapshot_pipeline.Pipeline.build_for_symbol}'s [deep_bars]
-      (resistance-v2 §D4). The 13 warmup-windowed columns and the benchmark stay
-      windowed to [start_date], so this never changes them; symbols with no
-      pre-window data behave exactly as before. Ignored when [start_date] is
-      [None] (full-history build). See {!default_sketch_deep_days}.
+      [start_date] and fed (as [deep_bars]) into the [<symbol>.weekly]
+      side-table's weekly aggregation so its trailing max-high / bars-seen depth
+      is honest rather than the warmup-windowed slice (resistance-v2 §D4). The
+      13 warmup-windowed [.snap] columns and the benchmark stay windowed to
+      [start_date], so this never changes them; symbols with no pre-window data
+      behave exactly as before. Ignored when [start_date] is [None]
+      (full-history build). See {!default_sketch_deep_days}.
     - [incremental] — when [true], symbols whose source CSV mtime is [<=] the
       existing manifest's recorded [csv_mtime] are reused rather than rebuilt.
+      Note: incremental-skipped symbols do not (re)write their side-table; a
+      full (non-incremental) build emits one per symbol.
     - [progress_every] — emit [progress.sexp] every N symbols processed.
+
+    Sketch-v5 PR 4: the sparse [<symbol>.weekly] side-table
+    ({!Data_panel_snapshot.Weekly_sidetable}) is {b always} written next to each
+    [<symbol>.snap] (built by {!Snapshot_pipeline.Weekly_sidetable_builder} from
+    the same weekly aggregation), and
+    {!Data_panel_snapshot.Weekly_sidetable.format_hash} is always stamped on the
+    final manifest — it is now the only overhead-supply representation the
+    reader has (the dense [Res_*] columns were retired from the canonical
+    schema). A side-table write failure is logged, not fatal.
 
     Exits the process non-zero on manifest-write or verification failure (the
     historical [build_snapshots] semantics). *)

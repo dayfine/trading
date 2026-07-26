@@ -23,6 +23,11 @@ let _candidate ?(score = 0.5) ?(grade = "B") ?(entry = 100.0) ?(stop = 90.0)
     rationale;
     rs_vs_spy;
     resistance_grade;
+    sized_shares = 0;
+    sized_position_value = 0.0;
+    sized_position_pct = 0.0;
+    sized_risk_amount = 0.0;
+    sizing_note = None;
   }
 
 let _snapshot ?(system_version = "v1") ?(date = _common_date)

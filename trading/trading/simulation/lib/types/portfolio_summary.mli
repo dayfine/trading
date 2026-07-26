@@ -37,8 +37,12 @@ type t = {
   position_value_total : float;
       (** Sum of position market values at this step's mark-to-market prices,
           forward-filled per [Simulator._compute_portfolio_value]. Equals
-          [step_result.portfolio_value -. current_cash] on bar-bearing days; may
-          be 0 on weekends/holidays when the simulator falls back to cash-only
+          [step_result.portfolio_value -. current_cash] on bar-bearing days
+          {b for a cash account}; under a long-margin debit (margin M1b-2)
+          [portfolio_value] reads
+          [equity_cash = current_cash -. long_margin_debit], so the identity
+          becomes [portfolio_value -. current_cash +. long_margin_debit]. May be
+          0 on weekends/holidays when the simulator falls back to cash-only
           valuation. Carried explicitly here to avoid re-deriving it downstream.
       *)
 }

@@ -108,7 +108,50 @@ let test_default_config_no_op_values _ =
            (fun (c : Weinstein_strategy.config) ->
              c.long_margin_rate_annual_pct)
            (float_equal 0.0);
+         field
+           (fun (c : Weinstein_strategy.config) -> c.maintenance_long_pct)
+           (float_equal 0.0);
+         field
+           (fun (c : Weinstein_strategy.config) ->
+             c.short_borrow_min_dollar_adv)
+           (float_equal 0.0);
        ])
+
+let test_short_borrow_adv_round_trip _ =
+  (* The M3a borrow-availability floor survives sexp round-trip (R2 overlay
+     path). *)
+  let base =
+    Weinstein_strategy.default_config ~universe:[ "AAPL" ] ~index_symbol:"SPY"
+  in
+  let gated = { base with short_borrow_min_dollar_adv = 2_000_000.0 } in
+  assert_that
+    (Weinstein_strategy.config_of_sexp
+       (Weinstein_strategy.sexp_of_config gated))
+    (field
+       (fun (c : Weinstein_strategy.config) -> c.short_borrow_min_dollar_adv)
+       (float_equal 2_000_000.0))
+
+let test_pre_m3a_sexp_parses_short_borrow_default _ =
+  (* A config sexp without short_borrow_min_dollar_adv must parse with the no-op
+     default 0.0 (experiment-flag-discipline R1). *)
+  let base =
+    Weinstein_strategy.default_config ~universe:[ "AAPL" ] ~index_symbol:"SPY"
+  in
+  let stripped =
+    match Weinstein_strategy.sexp_of_config base with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List (Sexp.Atom k :: _) ->
+                not (String.equal k "short_borrow_min_dollar_adv")
+            | _ -> true))
+    | other -> other
+  in
+  assert_that
+    (Weinstein_strategy.config_of_sexp stripped)
+    (field
+       (fun (c : Weinstein_strategy.config) -> c.short_borrow_min_dollar_adv)
+       (float_equal 0.0))
 
 let test_config_round_trip_preserves_values _ =
   (* A non-default levered config survives sexp round-trip (R2 overlay path). *)
@@ -120,6 +163,7 @@ let test_config_round_trip_preserves_values _ =
       base with
       initial_long_margin_req = 0.5;
       long_margin_rate_annual_pct = 0.08;
+      maintenance_long_pct = 0.25;
     }
   in
   let round_tripped =
@@ -136,12 +180,16 @@ let test_config_round_trip_preserves_values _ =
            (fun (c : Weinstein_strategy.config) ->
              c.long_margin_rate_annual_pct)
            (float_equal 0.08);
+         field
+           (fun (c : Weinstein_strategy.config) -> c.maintenance_long_pct)
+           (float_equal 0.25);
        ])
 
 let test_pre_m1_sexp_parses_with_defaults _ =
-  (* A config sexp that predates M1 (no initial_long_margin_req /
-     long_margin_rate_annual_pct fields) must parse with the no-op defaults —
-     old scenario sexps replay bit-identically (experiment-flag-discipline R1). *)
+  (* A config sexp that predates the margin work (no initial_long_margin_req /
+     long_margin_rate_annual_pct / maintenance_long_pct fields) must parse with
+     the no-op defaults — old scenario sexps replay bit-identically
+     (experiment-flag-discipline R1). *)
   let base =
     Weinstein_strategy.default_config ~universe:[ "AAPL" ] ~index_symbol:"SPY"
   in
@@ -154,7 +202,8 @@ let test_pre_m1_sexp_parses_with_defaults _ =
             | Sexp.List (Sexp.Atom k :: _) ->
                 not
                   (String.equal k "initial_long_margin_req"
-                  || String.equal k "long_margin_rate_annual_pct")
+                  || String.equal k "long_margin_rate_annual_pct"
+                  || String.equal k "maintenance_long_pct")
             | _ -> true))
     | other -> other
   in
@@ -168,6 +217,9 @@ let test_pre_m1_sexp_parses_with_defaults _ =
          field
            (fun (c : Weinstein_strategy.config) ->
              c.long_margin_rate_annual_pct)
+           (float_equal 0.0);
+         field
+           (fun (c : Weinstein_strategy.config) -> c.maintenance_long_pct)
            (float_equal 0.0);
        ])
 
@@ -194,6 +246,10 @@ let suite =
          >:: test_config_round_trip_preserves_values;
          "config: pre-M1 sexp parses with defaults"
          >:: test_pre_m1_sexp_parses_with_defaults;
+         "config: short_borrow_adv round-trip"
+         >:: test_short_borrow_adv_round_trip;
+         "config: pre-M3a sexp parses short_borrow default"
+         >:: test_pre_m3a_sexp_parses_short_borrow_default;
        ]
 
 let () = run_test_tt_main suite

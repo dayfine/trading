@@ -27,7 +27,11 @@ module Metric_type : sig
             simulation: [Σ position_quantity(p) * current_close(p)] across each
             held position. Positive sum dominated by long mark-to-market;
             negative when shorts dominate. Equal to
-            [portfolio_value - current_cash] on a marked-to-market step. NOT
+            [portfolio_value - current_cash] on a marked-to-market step
+            {b for a cash account}; under a long-margin debit (margin M1b-2)
+            [portfolio_value] uses
+            [equity_cash = current_cash -. long_margin_debit], so the identity
+            is [portfolio_value - current_cash + long_margin_debit]. NOT
             unrealized P&L — that requires subtracting cost basis (see
             [UnrealizedPnl]). *)
     | UnrealizedPnl

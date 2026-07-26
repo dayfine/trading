@@ -87,7 +87,19 @@ type exit_decision = {
 }
 [@@deriving sexp]
 
-type audit_record = { entry : entry_decision; exit_ : exit_decision option }
+type external_exit_decision = {
+  symbol : string;
+  exit_date : Date.t;
+  position_id : string;
+  exit_trigger : Stop_log.exit_trigger;
+}
+[@@deriving sexp]
+
+type audit_record = {
+  entry : entry_decision;
+  exit_ : exit_decision option;
+  external_exit : external_exit_decision option; [@sexp.option]
+}
 [@@deriving sexp]
 
 type cascade_summary = {
@@ -121,9 +133,13 @@ type audit_blob = {
 type _bucket = {
   bucket_entry : entry_decision;
   mutable bucket_exit : exit_decision option;
+  mutable bucket_external_exit : external_exit_decision option;
 }
 (** Internal mutable bucket. [exit_] is added to a record when the matching
-    entry has already been recorded; otherwise the exit is dropped. *)
+    entry has already been recorded; otherwise the exit is dropped.
+    [external_exit] is filled in by {!record_transitions} only when
+    [bucket_exit] is still [None] — see that function's doc for why enriched
+    always wins. *)
 
 type t = {
   records : (string, _bucket) Hashtbl.t;
@@ -142,7 +158,8 @@ let create () =
 
 let record_entry t (entry : entry_decision) =
   Hashtbl.set t.records ~key:entry.position_id
-    ~data:{ bucket_entry = entry; bucket_exit = None }
+    ~data:
+      { bucket_entry = entry; bucket_exit = None; bucket_external_exit = None }
 
 let record_exit t (exit_ : exit_decision) =
   match Hashtbl.find t.records exit_.position_id with
@@ -152,8 +169,45 @@ let record_exit t (exit_ : exit_decision) =
 let record_cascade_summary t (summary : cascade_summary) =
   Queue.enqueue t.cascade_summaries summary
 
+(* Build an [external_exit_decision] from a [TriggerExit] transition and the
+   bucket's already-recorded entry (for [symbol]). *)
+let _external_exit_of_transition (bucket : _bucket)
+    (trans : Trading_strategy.Position.transition) ~exit_reason :
+    external_exit_decision =
+  {
+    symbol = bucket.bucket_entry.symbol;
+    exit_date = trans.date;
+    position_id = trans.position_id;
+    exit_trigger = Stop_log.exit_trigger_of_reason exit_reason;
+  }
+
+(* Fill in [bucket.bucket_external_exit] from [trans] iff no enriched exit_ is
+   already recorded — enriched always wins, see [record_transitions]'s doc. *)
+let _fill_in_external_exit (bucket : _bucket)
+    (trans : Trading_strategy.Position.transition) ~exit_reason =
+  if Option.is_none bucket.bucket_exit then
+    bucket.bucket_external_exit <-
+      Some (_external_exit_of_transition bucket trans ~exit_reason)
+
+let _process_transition_for_external_exit t
+    (trans : Trading_strategy.Position.transition) =
+  match trans.kind with
+  | Trading_strategy.Position.TriggerExit { exit_reason; _ } -> (
+      match Hashtbl.find t.records trans.position_id with
+      | None -> ()
+      | Some bucket -> _fill_in_external_exit bucket trans ~exit_reason)
+  | _ -> ()
+
+let record_transitions t
+    (transitions : Trading_strategy.Position.transition list) =
+  List.iter transitions ~f:(_process_transition_for_external_exit t)
+
 let _bucket_to_record (bucket : _bucket) : audit_record =
-  { entry = bucket.bucket_entry; exit_ = bucket.bucket_exit }
+  {
+    entry = bucket.bucket_entry;
+    exit_ = bucket.bucket_exit;
+    external_exit = bucket.bucket_external_exit;
+  }
 
 let _compare_by_position_id (a : audit_record) (b : audit_record) =
   String.compare a.entry.position_id b.entry.position_id

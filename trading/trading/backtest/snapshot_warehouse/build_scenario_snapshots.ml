@@ -147,8 +147,9 @@ let command =
          ~doc:
            (Printf.sprintf
               "N Calendar days of extra pre-warmup history fed only to the \
-               resistance sketch columns (resistance-v2 deep feed; the 13 \
-               warmup-windowed columns are unchanged). Default %d."
+               SYMBOL.weekly side-table's weekly aggregation (resistance-v2 \
+               deep feed; the 13 warmup-windowed .snap columns are unchanged). \
+               Default %d."
               Build_runner.default_sketch_deep_days)
      and incremental =
        flag "incremental" no_arg
@@ -161,6 +162,13 @@ let command =
            (Printf.sprintf
               "N Emit progress.sexp every N symbols processed (default %d)"
               Build_runner.default_progress_every)
+     and _emit_weekly_sidetable =
+       flag "emit-weekly-sidetable" no_arg
+         ~doc:
+           "DEPRECATED no-op (sketch-v5 PR 4): the SYMBOL.weekly side-table is \
+            now always emitted (it is the only overhead-supply \
+            representation), so this flag has no effect; accepted for \
+            invocation-script back-compat"
      and dedupe_rename_twins =
        flag "dedupe-rename-twins" no_arg
          ~doc:

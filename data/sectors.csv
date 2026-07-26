@@ -5,6 +5,7 @@ AAA,Financials
 AAAA,Financials
 AAAC,Financials
 AAAU,Financials
+AABA,Communication Services
 AACB,Financials
 AACG,Consumer Staples
 AADR,Financials
@@ -51,6 +52,7 @@ ABLG,Financials
 ABLS,Financials
 ABLV,Consumer Discretionary
 ABM,Industrials
+ABMD,Health Care
 ABNB,Consumer Discretionary
 ABNG,Financials
 ABNY,Financials
@@ -223,6 +225,7 @@ AGM,Financials
 AGMB,Health Care
 AGMH,Information Technology
 AGMI,Financials
+AGN,Health Care
 AGNC,Financials
 AGNG,Financials
 AGO,Financials
@@ -363,6 +366,7 @@ ALTY,Financials
 ALV,Consumer Discretionary
 ALVO,Health Care
 ALX,Real Estate
+ALXN,Health Care
 ALXO,Health Care
 ALZN,Health Care
 AM,Energy
@@ -455,6 +459,7 @@ ANPA,Industrials
 ANRO,Health Care
 ANSC,Financials
 ANTA,Financials
+ANTM,Health Care
 ANTX,Health Care
 ANVS,Health Care
 ANY,Financials
@@ -671,6 +676,7 @@ ATRC,Health Care
 ATRO,Industrials
 ATS,Industrials
 ATTR,Financials
+ATVI,Communication Services
 ATXG,Industrials
 ATYR,Health Care
 AU,Materials
@@ -1537,6 +1543,7 @@ CBOO,Financials
 CBOY,Financials
 CBRE,Real Estate
 CBRL,Consumer Discretionary
+CBS,Communication Services
 CBSE,Financials
 CBSH,Financials
 CBT,Materials
@@ -1621,6 +1628,7 @@ CEFZ,Financials
 CEG,Utilities
 CEGX,Financials
 CELC,Health Care
+CELG,Health Care
 CELH,Consumer Staples
 CELU,Health Care
 CELZ,Health Care
@@ -1636,6 +1644,7 @@ CEPS,Financials
 CEPT,Financials
 CEPU,Utilities
 CEPV,Financials
+CERN,Health Care
 CERS,Health Care
 CERT,Health Care
 CERY,Financials
@@ -1710,6 +1719,7 @@ CHGG,Consumer Staples
 CHGX,Financials
 CHH,Consumer Discretionary
 CHIQ,Financials
+CHK,Energy
 CHKP,Information Technology
 CHMG,Financials
 CHMI,Real Estate
@@ -1904,6 +1914,7 @@ COM,Financials
 COMB,Financials
 COMD,Financials
 COMP,Real Estate
+COMS,Information Technology
 COMT,Financials
 CON,Health Care
 CONI,Financials
@@ -1934,6 +1945,7 @@ COST,Consumer Staples
 COTG,Financials
 COTY,Consumer Staples
 COUR,Consumer Staples
+COV,Health Care
 COWG,Financials
 COWZ,Financials
 COYA,Health Care
@@ -3007,6 +3019,7 @@ ETHO,Financials
 ETHT,Financials
 ETHU,Financials
 ETHV,Financials
+ETM,Communication Services
 ETN,Industrials
 ETON,Health Care
 ETOR,Financials
@@ -3354,6 +3367,7 @@ FIS,Financials
 FISI,Financials
 FISR,Financials
 FISV,Financials
+FIT,Information Technology
 FITB,Financials
 FITE,Financials
 FIVA,Financials
@@ -5417,6 +5431,7 @@ LBRT,Energy
 LBRX,Health Care
 LBTYA,Communication Services
 LBTYK,Communication Services
+LB_old,Consumer Discretionary
 LC,Financials
 LCAP,Financials
 LCCC,Financials
@@ -5546,10 +5561,12 @@ LKQ,Consumer Discretionary
 LKSP,Financials
 LLDR,Financials
 LLII,Financials
+LLL,Industrials
 LLY,Health Care
 LLYVA,Communication Services
 LLYVK,Communication Services
 LLYX,Financials
+LM,Financials
 LMAT,Health Care
 LMB,Industrials
 LMBO,Financials
@@ -5951,6 +5968,7 @@ MITK,Information Technology
 MITQ,Information Technology
 MITT,Real Estate
 MJ,Financials
+MJN,Consumer Staples
 MJSC,Financials
 MKAM,Financials
 MKC,Consumer Staples
@@ -6011,6 +6029,7 @@ MNBD,Financials
 MNDO,Information Technology
 MNDR,Health Care
 MNDY,Information Technology
+MNK,Health Care
 MNKD,Health Care
 MNOV,Health Care
 MNPR,Health Care
@@ -6039,6 +6058,7 @@ MOGU,Consumer Discretionary
 MOH,Health Care
 MOLN,Health Care
 MOMO,Communication Services
+MON,Materials
 MOO,Financials
 MOOD,Financials
 MORN,Financials
@@ -6286,6 +6306,7 @@ NBIS,Information Technology
 NBIX,Health Care
 NBIZ,Financials
 NBJP,Financials
+NBL,Energy
 NBN,Financials
 NBOS,Financials
 NBP,Health Care
@@ -7005,6 +7026,7 @@ PCT,Industrials
 PCTY,Industrials
 PCVX,Health Care
 PCY,Financials
+PCYC,Health Care
 PCYO,Utilities
 PD,Information Technology
 PDBA,Financials
@@ -7634,6 +7656,7 @@ RAC,Financials
 RACE,Consumer Discretionary
 RADX,Health Care
 RAFE,Financials
+RAI,Consumer Staples
 RAIL,Industrials
 RAIN,Industrials
 RAL,Information Technology
@@ -7683,6 +7706,7 @@ RCTR,Financials
 RCUS,Health Care
 RDAC,Financials
 RDAG,Financials
+RDC,Energy
 RDCM,Communication Services
 RDDT,Communication Services
 RDFI,Financials
@@ -8128,6 +8152,7 @@ SCOR,Information Technology
 SCPQ,Financials
 SCSB,Financials
 SCSC,Information Technology
+SCTY,Industrials
 SCUB,Financials
 SCUS,Financials
 SCVL,Consumer Discretionary
@@ -8728,6 +8753,7 @@ STHO,Real Estate
 STI,Industrials
 STIM,Health Care
 STIP,Financials
+STJ,Health Care
 STKE,Financials
 STKH,Consumer Staples
 STKL,Consumer Staples
@@ -8835,6 +8861,7 @@ SYFI,Financials
 SYK,Health Care
 SYLD,Financials
 SYM,Industrials
+SYMC,Information Technology
 SYNA,Information Technology
 SYNX,Information Technology
 SYPR,Consumer Discretionary
@@ -9293,6 +9320,7 @@ TSMY,Financials
 TSMZ,Financials
 TSN,Consumer Staples
 TSNF,Financials
+TSO,Energy
 TSOL,Financials
 TSPA,Financials
 TSPX,Financials
@@ -9356,6 +9384,8 @@ TWM,Financials
 TWO,Financials
 TWOX,Financials
 TWST,Health Care
+TWTR,Communication Services
+TWX,Communication Services
 TX,Materials
 TXBC,Financials
 TXG,Health Care
@@ -9374,6 +9404,7 @@ TXXI,Financials
 TXXS,Financials
 TY,Financials
 TYA,Financials
+TYC,Industrials
 TYD,Financials
 TYG,Financials
 TYGO,Information Technology
@@ -9593,6 +9624,7 @@ UTSI,Information Technology
 UTSL,Financials
 UTWO,Financials
 UTWY,Financials
+UTX,Industrials
 UTZ,Consumer Staples
 UUP,Financials
 UUU,Industrials
@@ -9631,6 +9663,7 @@ VALQ,Financials
 VALU,Financials
 VAMO,Financials
 VANI,Health Care
+VAR,Health Care
 VATE,Industrials
 VAVX,Financials
 VB,Financials
@@ -9833,6 +9866,7 @@ VRT,Industrials
 VRTL,Financials
 VRTS,Financials
 VRTX,Health Care
+VRX,Health Care
 VS,Information Technology
 VSA,Consumer Staples
 VSAT,Information Technology
@@ -9990,6 +10024,7 @@ WFC,Financials
 WFCF,Industrials
 WFF,Industrials
 WFG,Materials
+WFM,Consumer Staples
 WFRD,Energy
 WGMI,Financials
 WGO,Consumer Discretionary
@@ -10005,6 +10040,7 @@ WHWK,Health Care
 WILC,Consumer Staples
 WIMA,Financials
 WIMI,Communication Services
+WIN,Communication Services
 WINA,Consumer Discretionary
 WING,Consumer Discretionary
 WINN,Financials
@@ -10027,6 +10063,7 @@ WLFC,Industrials
 WLII,Financials
 WLK,Materials
 WLKP,Materials
+WLP,Health Care
 WLTG,Financials
 WLTH,Information Technology
 WLY,Communication Services
@@ -10209,6 +10246,7 @@ XLI,Industrials
 XLII,Financials
 XLK,Information Technology
 XLKI,Financials
+XLNX,Information Technology
 XLO,Health Care
 XLP,Consumer Staples
 XLRE,Real Estate
@@ -10471,43 +10509,3 @@ ZVRA,Health Care
 ZWS,Industrials
 ZYBT,Health Care
 ZYME,Health Care
-AABA,Communication Services
-TWTR,Communication Services
-CELG,Health Care
-ANTM,Health Care
-AGN,Health Care
-ATVI,Communication Services
-CBS,Communication Services
-CERN,Health Care
-ABMD,Health Care
-ALXN,Health Care
-XLNX,Information Technology
-CHK,Energy
-FIT,Information Technology
-SCTY,Industrials
-TWX,Communication Services
-COV,Health Care
-LM,Financials
-MJN,Consumer Staples
-MNK,Health Care
-NBL,Energy
-RAI,Consumer Staples
-STJ,Health Care
-SYMC,Information Technology
-TYC,Industrials
-UTX,Industrials
-VAR,Health Care
-VRX,Health Care
-WFM,Consumer Staples
-WIN,Communication Services
-WLP,Health Care
-PCYC,Health Care
-TSO,Energy
-SNDK,Information Technology
-LLL,Industrials
-ETM,Communication Services
-RDC,Energy
-MON,Materials
-COTY,Consumer Staples
-COMS,Information Technology
-LB_old,Consumer Discretionary

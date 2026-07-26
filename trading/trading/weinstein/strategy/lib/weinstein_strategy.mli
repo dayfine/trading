@@ -174,6 +174,11 @@ module Resistance_sketch_reader = Resistance_sketch_reader
     snapshot columns for the overhead-supply score. See
     {!Resistance_sketch_reader}. *)
 
+module Weekly_sidetable_reader = Weekly_sidetable_reader
+(** Sketch-v5 read path: derive the resistance sketch from the per-symbol weekly
+    side-table by score-time bucketing (+ the manifest-gated loader). See
+    {!Weekly_sidetable_reader}. *)
+
 module Weekly_ma_cache = Weekly_ma_cache
 (** Per-symbol weekly MA cache (Stage 4 PR-D). Memoises Stage / Macro / Sector /
     Stops MA reads keyed by [(symbol, ma_type, period)]. *)
@@ -199,6 +204,17 @@ module Long_buying_power = Long_buying_power
     generalizes [max_long_exposure_pct_entry] and the priced margin-interest
     primitives. Exposed so tests can pin the pure ceiling / interest math
     directly. See {!Long_buying_power}. *)
+
+module Leverage_dawn = Leverage_dawn
+(** Regime-conditional long-leverage "dawn" signal (P1b, default-off): lowers
+    the effective long-side initial-margin requirement in young post-bear
+    uptrends (weekly-MA-flip-age label). Exposed so tests can pin the pure
+    flip-age / dawn logic. See {!Leverage_dawn}. *)
+
+module Short_borrow_gate = Short_borrow_gate
+(** Short-side borrow-availability entry gate (margin M3a): drops short
+    candidates whose trailing dollar-ADV is below the borrow-supply floor.
+    Exposed so tests can pin the pure {!Short_borrow_gate.filter} directly. *)
 
 module Exit_audit_capture = Exit_audit_capture
 (** Exit-side trade-audit capture. Bridges [TriggerExit] transitions to
@@ -314,6 +330,15 @@ type config = {
           ([dev/notes/long-short-margin-mechanics-2026-06-12.md]) as a
           default-off, searchable {!Walk_forward.Variant_matrix} axis. Not wired
           into any default config or preset. *)
+  short_borrow_min_dollar_adv : float; [@sexp.default 0.0]
+      (** Borrow-availability floor for short candidates (margin M3a): shorts
+          whose trailing dollar-ADV (no-lookahead, over {!liquidity_config}'s
+          lookback) is below this value are dropped as "no borrow available"
+          before the entry walk; longs are never affected. Default [0.0] = no-op
+          (bit-identical). A default-off, searchable
+          {!Walk_forward.Variant_matrix} axis; see
+          {!Weinstein_strategy_config.short_borrow_min_dollar_adv} and
+          {!Short_borrow_gate}. *)
   suppress_warmup_trading : bool; [@sexp.default true]
       (** When [true] (the default), the backtest runner suppresses all new
           position entries (long and short) before the measurement [start_date],
@@ -622,6 +647,13 @@ type config = {
           day as [debit * annual / 252]. Default [0.0] => no charge => exact
           no-op (R1). See
           [Weinstein_strategy_config.long_margin_rate_annual_pct]. *)
+  maintenance_long_pct : float; [@sexp.default 0.0]
+      (** Long-side maintenance-margin requirement (margin M2). When
+          [equity /. marked_long_exposure < maintenance_long_pct] on a weekly
+          (Friday) close, {!Trading_simulation.Long_maintenance} force-reduces
+          held longs weakest-first until the ratio is restored. Default [0.0]
+          (cash account, no requirement) => exact no-op (R1); an unlevered book
+          never fires. See [Weinstein_strategy_config.maintenance_long_pct]. *)
   resistance_min_history_bars : int; [@sexp.default 0]
       (** Overhead-resistance history floor threaded into the per-screen
           [Stock_analysis.config.resistance.min_history_bars] (and, via the
@@ -645,9 +677,14 @@ type config = {
           strategy copies [cfg] into the per-screen [Stock_analysis.config] and
           the panel adapter reads the warehouse sketch columns, populating
           [Stock_analysis.t.supply] for the screener's [w_overhead_supply]
-          scoring weight. Default [None] = [supply] always [None], binary grade
-          fallback, no sketch reads (bit-identical to baseline). Pairs with the
-          screener weight; live CSV path stays v1. See
+          scoring weight. {b Armed by default}
+          ([Some Resistance_supply.default_config]) as of the 2026-07-23 bundle
+          promotion (user-approved, R3). The [[@sexp.default None]]
+          deserialization fallback keeps a pre-promotion config sexp (omitting
+          the field) disarmed and is the explicit disarm escape hatch; when
+          disarmed [supply] is always [None] (binary grade fallback, no sketch
+          reads, bit-identical to baseline). Pairs with the screener weight;
+          live CSV path degrades to v1. See
           [Weinstein_strategy_config.overhead_supply]. *)
   virgin_crossing_readmission : bool; [@sexp.default false]
       (** resistance-v2 lever (a): virgin-crossing re-admission. When [true], a
@@ -655,10 +692,47 @@ type config = {
           its 520-week max high) on volume is re-admitted by
           [Stock_analysis.is_breakout_candidate] despite being past the
           [early_stage2_max_weeks] early-Stage-2 window (the book's "new high
-          ground" breakout). Default [false] = bit-identical to baseline; needs
-          a warehouse sketch (absent → no re-admission). Independent of
+          ground" breakout). {b Default [true]} as of the 2026-07-23 bundle
+          promotion (user-approved, R3). The [[@sexp.default false]]
+          deserialization fallback keeps a pre-lever config sexp disarmed
+          (bit-identical to baseline) and is the disarm escape hatch; needs a
+          warehouse sketch (absent → no re-admission). Independent of
           [overhead_supply]. See
           [Weinstein_strategy_config.virgin_crossing_readmission]. *)
+  dawn_leverage_enabled : bool; [@sexp.default false]
+      (** Master switch for the regime-conditional long-leverage "dawn"
+          mechanism ({!Leverage_dawn}). When [true] and the primary index is in
+          a young post-bear "dawn" (weekly MA rising, most recent neg->pos slope
+          flip no more than [dawn_max_ma_flip_age_weeks] weeks ago), that
+          Friday's entry walk {b sizes} against [dawn_initial_long_margin_req]
+          in place of [initial_long_margin_req]; a non-dawn week raises the
+          entry walk to a cash account. {b Two functional readers} of
+          [initial_long_margin_req] — this entry-walk sizing ceiling AND the
+          simulator's fill-funding path, fixed at the {e base}
+          [initial_long_margin_req] for the whole run — so an armed cell must
+          set the base [<=] [dawn_initial_long_margin_req] or the simulator
+          floor-rejects the levered dawn entry instead of funding it into
+          [long_margin_debit]; {!Leverage_dawn.validate} enforces this.
+          {b Default [false] = EXACT no-op} (experiment-flag-discipline R1). A
+          deployment-intensity dial off a trailing (lagging, never
+          forward-looking) regime label; the spine is untouched. See
+          [Weinstein_strategy_config.dawn_leverage_enabled] and
+          {!Leverage_dawn.dawn_effective_config} for the full permissive-funding
+          / gated-sizing design. *)
+  dawn_initial_long_margin_req : float; [@sexp.default 1.0]
+      (** Long-side initial-margin requirement the entry walk {b sizes} against
+          on a "dawn" week when [dawn_leverage_enabled = true] ([1.0] cash /
+          [0.75] 1.33x / [0.5] 2x). Default [1.0] is a no-op even with the
+          mechanism enabled. Constrained to the interval 0.0 < req <= 1.0, and
+          to [initial_long_margin_req <= dawn_initial_long_margin_req] (base
+          must be at least as permissive as the dawn rung — see
+          {!dawn_leverage_enabled}), by [Leverage_dawn.validate]. See
+          [Weinstein_strategy_config.dawn_initial_long_margin_req]. *)
+  dawn_max_ma_flip_age_weeks : int; [@sexp.default 78]
+      (** Max age (weeks) of the primary index's most recent neg->pos weekly-MA
+          slope flip for the "dawn" label to be active. Default [78] (~1.5y).
+          Inert while [dawn_leverage_enabled = false]. See
+          [Weinstein_strategy_config.dawn_max_ma_flip_age_weeks]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

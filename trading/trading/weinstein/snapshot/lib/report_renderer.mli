@@ -20,6 +20,27 @@
     a missing section. The [top N] in each candidate header echoes the effective
     limit.
 
+    Each candidate table carries a [Resistance] column rendering the candidate's
+    [resistance_grade] (the v2 sketch-derived ["<quality> (<score>)"] string, or
+    the v1 binary quality label). A candidate whose grade was not computed
+    ([resistance_grade = None]) renders as ["-"] so the column is never blank.
+
+    Each candidate table also carries an [Instruction] column: an executable
+    order derived from the generator-computed [sized_*] fields (fixed-risk
+    sizing, mirroring the backtest) — e.g.
+    ["BUY STOP 55 sh @ $28.49 (~$1567, 1.6% of book, risk $126); on fill place
+     SELL STOP @ $26.21, GTC; cancel if unfilled by Friday close"]. A [0]-share
+    unsized candidate renders ["-"]; a [0]-share result with a [sizing_note]
+    renders that reason (cash / caps exhausted, invalid stop); a
+    placeholder-sized candidate prefixes the ["UNSIZED — set portfolio.sexp"]
+    note.
+
+    The [Held positions] table renders one execution-ready row per held
+    position: shares, entry price, current price, unrealized %, current stop,
+    and a [Suggested stop] cell showing this week's recomputed Weinstein
+    support-floor stop with its delta vs the current stop (["-"] when not
+    recomputed).
+
     {1 Display caps and the tie-honesty note}
 
     The candidate tables are display-only caps on the {e human} report; the

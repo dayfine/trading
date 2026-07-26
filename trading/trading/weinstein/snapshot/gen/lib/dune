@@ -5,8 +5,11 @@
   core
   status
   types
+  trading.base
   weinstein_trading.snapshot
   weinstein_trading.strategy
+  weinstein_trading.portfolio_risk
+  weinstein_trading.stops
   weinstein.snapshot_pipeline
   weinstein.snapshot_runtime
   weinstein.screener

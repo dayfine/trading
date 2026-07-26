@@ -4,7 +4,8 @@
   test_snapshot
   test_snapshot_format
   test_snapshot_columnar
-  test_snapshot_io)
+  test_snapshot_io
+  test_weekly_sidetable)
  (libraries
   core
   core_unix

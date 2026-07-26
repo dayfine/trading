@@ -60,13 +60,29 @@
     [schema_hash] gate will surface the mismatch loudly. This is the intended
     behaviour for a content-addressable schema fingerprint, not a regression.
 
-    {2 Resistance sketch columns (resistance-v2)}
+    {2 Resistance sketch columns (resistance-v2) — RETIRED from the canonical
+       schema in sketch-v5 PR 4}
+
+    These constructors ([Res_max_high_130w] / [Res_max_high_260w] /
+    [Res_max_high_520w] / [Res_bars_seen] / [Res_hist]) are {b retained in the
+    [field] type for decode only}: the three-generation runtime reader still reads
+    older v3 (37-col) and v4 (97-col) warehouses via their own per-file manifest
+    schemas, which enumerate these fields. The canonical {!all_fields} / {!default}
+    NO LONGER include them (schema width back to the 13 pre-resistance columns), so
+    freshly built warehouses omit the dense sketch entirely. The overhead-supply
+    sketch is reconstructed on demand from the sparse [SYMBOL.weekly] side-table
+    ({!Data_panel_snapshot.Weekly_sidetable}) — see
+    [dev/plans/resistance-v2-supply-sketches-2026-07-15.md] and the sketch-v5
+    chain. The v4 semantics below still describe how a {b legacy} warehouse's dense
+    columns are laid out (what the decode path reads):
 
     Precomputed point-in-time overhead-supply sketches, appended after
-    [Adjusted_close] (same append discipline as the OHLCV addition; schema
-    width grows from 13 to 37). All values are weekly-cadence aggregates
-    computed causally from bars up to and including the row's day — see
-    [dev/plans/resistance-v2-supply-sketches-2026-07-15.md] §D1-D4:
+    [Adjusted_close] (same append discipline as the OHLCV addition; a v4 warehouse
+    is 97 columns: 4 scalar sketch columns + [n_hist_cells = 80] age-banded
+    histogram columns). All values are weekly-cadence aggregates computed causally
+    from bars up to and including the row's day — see
+    [dev/plans/resistance-v2-supply-sketches-2026-07-15.md] §D1-D4 and the
+    age-banded histogram (lever f, sketch v3):
 
     - {!Res_max_high_130w} / {!Res_max_high_260w} / {!Res_max_high_520w}:
       maximum raw weekly high over the trailing 130/260/520 weekly bars
@@ -79,13 +95,24 @@
     - {!Res_bars_seen}: true count of weekly bars available up to the row's
       day, capped at 520 — the honest [Insufficient_history] input (a
       window-starved warehouse can no longer masquerade as virgin history).
-    - {!Res_hist k} for [k = 0 .. n_hist_buckets - 1]: trailing 130-weekly-bar
-      log-price histogram anchored at the row's raw close [C]. Bucket [k]
-      counts weekly bars whose mid-price [(high + low) / 2] falls in
-      [C * 2^(k/20), C * 2^((k+1)/20)) and whose high exceeds [C] — i.e.
-      supply sitting 0..100% above the row's price, ~3.5% per band. Bars
-      more than 2x above [C] are dropped (proximity-negligible; the max-high
-      family still detects non-virgin at any distance).
+    - {!Res_hist k} for [k = 0 .. n_hist_cells - 1]: {b age-banded}
+      log-price histogram anchored at the row's raw close [C]. The [n_hist_cells]
+      columns are laid out band-major: cell [k] holds age band
+      [k / n_hist_buckets] and price bucket [k mod n_hist_buckets]. The four
+      age bands (youngest first) cover a weekly-bar age relative to the row of
+      [0-26w / 26-78w / 78-130w / 130-520w] (half-open; the partial current week
+      is age 0). Within every band price bucket [b] counts weekly bars whose
+      mid-price [(high + low) / 2] falls in
+      [C * 2^(b/20), C * 2^((b+1)/20)) and whose high exceeds [C] — i.e. supply
+      sitting 0..100% above the row's price, ~3.5% per band. Bars more than 2x
+      above [C] are dropped (proximity-negligible; the max-high family still
+      detects non-virgin at any distance). Age decay is applied at SCORE time
+      by [Resistance_supply] per-band config weights, NOT baked in at build
+      time, so the decay is an [Overlay_validator] axis family (no warehouse
+      rebuild per value). Summing the three 0-130w bands reproduces the
+      pre-lever-f age-blind 130-weekly-bar histogram exactly, and the 130-520w
+      band makes older supply MEASURED rather than only floored by the max-high
+      horizons.
 
     Sketch cells are [Float.nan] when the row's raw close is non-positive or
     non-finite (corrupt bar guard). *)
@@ -111,14 +138,26 @@ type field =
 [@@deriving sexp, compare, equal, show]
 
 val n_hist_buckets : int
-(** [n_hist_buckets] is the number of {!Res_hist} bucket columns in the
-    canonical schema (20). [Res_hist k] is canonical only for
-    [0 <= k < n_hist_buckets]; {!all_fields} enumerates exactly that range. *)
+(** [n_hist_buckets] is the number of log-price buckets per age band in the
+    {!Res_hist} histogram (20). *)
+
+val n_age_bands : int
+(** [n_age_bands] is the number of weekly-bar age bands the {!Res_hist}
+    histogram is split into (4): [0-26w / 26-78w / 78-130w / 130-520w]. *)
+
+val n_hist_cells : int
+(** [n_hist_cells = n_age_bands * n_hist_buckets] is the total number of
+    {!Res_hist} columns in the canonical schema (80). [Res_hist k] is canonical
+    only for [0 <= k < n_hist_cells], laid out band-major (cell [k] is age band
+    [k / n_hist_buckets], price bucket [k mod n_hist_buckets]); {!all_fields}
+    enumerates exactly that range. *)
 
 val all_fields : field list
-(** [all_fields] enumerates every variant of {!field} in declaration order. Used
-    by tests and by [Snapshot_schema.default] to construct the canonical Phase-A
-    schema. *)
+(** [all_fields] is the canonical column set: the 13 indicator + OHLCV fields,
+    in declaration order. It does {b not} include the retired resistance-sketch
+    constructors ([Res_*]) — those remain in the {!field} type for decoding
+    legacy warehouses only (see the type docstring). Used by tests and by
+    {!default} to construct the canonical schema. *)
 
 val field_name : field -> string
 (** [field_name f] returns the canonical short string name (e.g. ["EMA_50"]).
@@ -144,9 +183,10 @@ val create : fields:field list -> t
     well-defined) but produces a schema that no real snapshot can match. *)
 
 val default : t
-(** [default] is the canonical 37-field schema: every field in {!all_fields}
-    order. The single source of truth for snapshots produced by the offline
-    pipeline. *)
+(** [default] is the canonical 13-field schema: every field in {!all_fields}
+    order (the dense resistance-sketch columns were retired in sketch-v5 PR 4).
+    The single source of truth for snapshots produced by the offline pipeline.
+*)
 
 val compute_hash : field list -> string
 (** [compute_hash fields] returns a deterministic hex fingerprint of the ordered
