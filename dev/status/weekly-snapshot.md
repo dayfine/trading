@@ -5,6 +5,21 @@
 ## Status
 IN_PROGRESS
 
+**QC (PR #2097, mirrored by the orchestrator — the QC agents were fenced
+read-only on a shared working tree and could not write here):**
+`structural_qc: APPROVED` (5/5) and `behavioral_qc: APPROVED` (4/5), both at
+tip `5454d9f1`; `overall_qc: APPROVED`. One rework iteration: at base tip
+`ad11fb7f` behavioral returned NEEDS_REWORK (3/5) on a CP4 gap — short-side
+spike flagging at `weekly_snapshot_generator.ml:220` was claimed in the `.mli`,
+the PR body and this file but pinned by nothing, and the mutation
+`(shorts, [])` left the whole suite green. Closed by
+`test_armed_spike_flags_short_candidate_and_warns` at the `generate` seam.
+Merged `089116bc` with all three gates green. Full verdicts are PR review
+comments on #2097; audit record `dev/audit/2026-07-26-weekly-snapshot.json`.
+One non-blocking nit carried: the *flagged* candidate's own
+rank/entry/stop/sizing invariance holds by construction
+(`{ c with data_suspect = true }`) but is not pinned at the seam.
+
 **2026-07-26 (spike-bar "data-suspect" flag, issue #2083 Finding 3, PR #2097
 `feat/weekly-snapshot-spike-flag`):** Closes the last of the three 07-17
 report-review findings. F1 (sparse-tail gate) and F2 (rename tracking, still

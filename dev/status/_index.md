@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-26 run2 (orchestrator run 30210792734 — #2091 auto-merged at its pre-rework tip while behavioral QC was NEEDS_REWORK; the orphaned fix was recovered onto #2094 (QC APPROVED 5/5 + 4/5, auto-merge armed). Gates on `96c4c5ff`: build 0, runtest 0, status_file_integrity 0, index_size_linter 0. `[critical]`: GitHub auto-merge bypasses the QC gates — see the daily summary.)
+Last updated: 2026-07-26 run3 (orchestrator run 30217413854 — #2083 F3 spike-bar data-suspect flag MERGED `089116bc` (#2097) after 1 rework iteration, all three gates verified green immediately before merge; #2093 + #2096 (docs-only, both stalled `behind` main with auto-merge armed) merged. Gates on `96e72c12`: build 0, status_file_integrity 0, index_size_linter 0, **runtest exit 1** — 2 deterministic `Tuner.Bayesian_opt` `LAPACKE: 9` errors, unrelated to any dispatched PR; #2009's merged fix does NOT close them. See the daily summary `[critical]`.)
 
 ## Active + complete tracks
 
@@ -45,7 +45,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [sector-data](sector-data.md) | MERGED | — | — | — |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | LAPACKE GP-Cholesky nugget fix MERGED (#2009); no dispatchable T1/T3 left; ci.yml ENOSPC fix (#1636) BLOCKED on human `workflow`-scoped PAT |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | Phase 1 stable (PR-D'c #1332 merged); Phase 2 deferred; no outstanding work |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | #2096 | #2096 backtest/ subdir inventory (docs-only, armed); 3 open items left, 2 of them need a human-chosen value; next: eng-design-2 drift |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2096 MERGED `c695f24b`; 5 open items (2 filed by run 3: support_floor.mli citation defect, LAPACKE test-gap); next: support_floor.mli §5.1/§6.3 citation split |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
@@ -57,7 +57,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
-| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | #2083 F1 sparse-tail gate MERGED `96c4c5ff`; short-seam guard recovered + MERGED `a54fcebe` (#2094); next: #2083 F2 rename tracking on fetch |
+| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | #2083 F1 MERGED `96c4c5ff`, F3 spike-bar flag MERGED `089116bc` (#2097, default-off); next: #2083 F2 rename tracking on fetch |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
 | [tax-lens](tax-lens.md) | MERGED | feat-backtest | — | Phase 1 #2066 + CP4 loader error-path contract #2073 MERGED; Phase 2 wash-sale / April outflows deferred, user-gated (#2006) |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | asset-type blocklist MERGED (#1939, default-off); next: arm ATB.curated for live universe build + General::Type enrichment feed |
