@@ -38,6 +38,7 @@ let _full_snapshot : Weekly_snapshot.t =
           sized_position_pct = 0.025;
           sized_risk_amount = 179.65;
           sizing_note = None;
+          stop_is_structural = true;
         };
         {
           symbol = "MSFT";
@@ -54,6 +55,7 @@ let _full_snapshot : Weekly_snapshot.t =
           sized_position_pct = 0.0;
           sized_risk_amount = 0.0;
           sizing_note = Some "0 sh — cash / caps exhausted";
+          stop_is_structural = false;
         };
       ];
     short_candidates = [];

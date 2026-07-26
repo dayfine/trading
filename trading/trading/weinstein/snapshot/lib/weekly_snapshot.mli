@@ -104,6 +104,23 @@ type candidate = {
           live portfolio and sized against the template default) or the reason a
           [0]-share result occurred (cash / caps exhausted, invalid stop
           direction). *)
+  stop_is_structural : bool; [@sexp.default false]
+      (** [true] when [stop] was derived from a real support floor — the prior
+          correction low (long) or counter-rally high (short) found by
+          {!Weinstein_stops.Support_floor.find_recent_level} in the symbol's
+          daily bar history (weinstein-book-reference.md §5.1 "Initial Stop
+          Placement": "Place below the significant support floor (prior
+          correction low) BEFORE the breakout"). [false] when no qualifying
+          counter-move exists in the lookback window (or the symbol has no
+          resident daily bars), in which case [stop] falls back to the fixed
+          [entry * initial_stop_buffer] proxy. The generator computes this via
+          {!Weinstein_stops.compute_initial_stop_with_floor} — the same
+          primitive the live strategy uses to install the ACTUAL stop at fill
+          time (issue #2084 Finding 2: this candidate-level [stop] used to be a
+          flat 8% proxy divorced from chart structure, unlike the real entry).
+          Additive field: old snapshots without it parse as [false]
+          (conservative — treats un-labeled historical stops as non-structural).
+      *)
 }
 [@@deriving sexp, eq, show]
 (** A single ranked candidate. Same shape for long and short candidates — the

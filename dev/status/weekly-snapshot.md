@@ -5,6 +5,54 @@
 ## Status
 IN_PROGRESS
 
+**2026-07-26 (structural stop for weekly-pick candidates, issue #2084 Finding
+2, PR `feat/screener-structural-stop`):** Fixes the second finding from the
+same 07-17 report review: the displayed AND live-instructed stop for a
+candidate pick (e.g. rank-1 FTH, `$33.98`) was `entry * (1 - 8%)` — a flat
+percentage divorced from chart structure, unlike the backtest's actual entry
+stop (which already derives a real support floor via
+`Weinstein_stops.compute_initial_stop_with_floor`). Since PR #2078 wired the
+sized instruction line ("on fill place SELL STOP @ $<stop>"), this was also a
+live/sim divergence: the same symbol's backtest entry installs a structural
+stop while the live instruction told the trader to place the naive one; sizing
+was also wrong (always assumed an 8% stop distance).
+
+New module `Weinstein_snapshot_gen.Stop_recompute`
+(`trading/trading/weinstein/snapshot/gen/lib/stop_recompute.{ml,mli}`)
+consolidates two call sites that both wrap `compute_initial_stop_with_floor`:
+`for_candidate` (new — overlays the real structural stop onto a screener
+candidate before sizing/display) and `for_held_long` (moved out of
+`weekly_snapshot_generator.ml` verbatim — pre-existing held-position
+"recommended stop" logic, unchanged behavior). `Weekly_snapshot.candidate`
+gains an additive `stop_is_structural : bool [@sexp.default false]` field;
+`Report_renderer` marks a fallback (non-structural) stop with a trailing `*`
+plus an explanatory footnote so a reader can tell the two apart without
+cross-referencing the chart.
+
+Deliberately does **not** touch `Screener.scored_candidate.suggested_stop`,
+`screener_scoring.ml`, or `screener.ml` — the pure cascade library has no
+daily-bar access, and its `suggested_stop` value still feeds
+`trading/backtest/optimal/lib/stage_transition_scanner.ml` (the
+optimal-strategy counterfactual tool) unchanged; that tool's own tests
+(`test_stage_transition_scanner.ml`, pinning `suggested_stop = 92.46` under
+the flat-8% formula) still pass untouched, confirming no backtest/golden path
+was moved. Per `.claude/rules/experiment-flag-discipline.md`, this landed
+**on by default** (no new config field) — see
+`dev/plans/screener-structural-stop-2026-07-26.md` for the empirical
+default-branch check (grepped every `suggested_stop` / candidate-stop
+consumer; ran full `dune runtest` before/after). This is a
+display/instruction-path correctness fix restoring
+`.claude/rules/weinstein-faithful-core.md` spine item 5 to the live path, not
+a new strategy mechanism.
+
+Tests: `test_weekly_snapshot_generator` (fallback stop differs from the
+screener's raw flat-8% proxy — proves the overlay ran; sizing keys off the
+post-overlay stop distance — proves overlay-before-sizing ordering) and
+`test_report_renderer` (fallback stop renders `*` + footnote; structural stop
+renders neither). Every new assertion mutation-tested (overlay call removed,
+overlay/sizing pipe order swapped, `is_structural` forced `true`, stop-cell /
+footnote logic stubbed) and confirmed to go red.
+
 **2026-07-26 (sparse-tail eligibility gate, issue #2083 fix 1, PR
 `feat/weekly-snapshot-sparse-tail`):** Closes the data-hygiene hole behind the
 2026-07-17 report's rank-1 "SNSE" pick, a ticker that did not exist at the

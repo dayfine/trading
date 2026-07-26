@@ -372,6 +372,81 @@ let test_breakout_stop_below_entry _ =
   in
   assert_that entry_minus_stop (is_some_and (gt (module Float_ord) 0.0))
 
+(* Issue #2084 Finding 2: on the default breakout fixture, AAPL's basing noise
+   (+/-2%, [_breakout_basing_noise] in [Synthetic_source]) never reaches the
+   8% [min_correction_pct] threshold, so no qualifying support floor exists in
+   the daily lookback window -> the generator's overlay falls back. But that
+   fallback value is NOT the screener's raw fixed-8% proxy
+   ([entry * (1 - 0.08)] = [entry * 0.92]) -- it is
+   [Weinstein_stops.compute_initial_stop_with_floor]'s OWN fallback formula
+   ([entry * initial_stop_buffer], then the state machine's
+   [min_correction_pct / 2] haircut and round-number nudge), using the SAME
+   config the live strategy's real entry path applies. This pins that the
+   generator's overlay actually ran, not a no-op pass-through of
+   [Screener.scored_candidate.suggested_stop].
+
+   Mutation check: removing the [_overlay_structural_stop] call from
+   [generate] (or replacing it with [Fn.id]) makes [c.stop] equal exactly
+   [c.entry *. 0.92] and [is_structural_and_stop_diverges] below goes red. *)
+let test_fallback_stop_differs_from_screener_flat_proxy _ =
+  let snap =
+    _generate ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  let aapl =
+    List.find (snap : Weekly_snapshot.t).long_candidates
+      ~f:(fun (c : Weekly_snapshot.candidate) -> String.equal c.symbol "AAPL")
+  in
+  assert_that aapl
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (c : Weekly_snapshot.candidate) -> c.stop_is_structural)
+              (equal_to false);
+            field
+              (fun (c : Weekly_snapshot.candidate) ->
+                Float.abs ((c.stop -. (c.entry *. 0.92)) /. c.entry))
+              (gt (module Float_ord) 0.01);
+          ]))
+
+(* Issue #2084 Finding 2 (sizing consequence): [sized_risk_amount] must be
+   computed from the DISPLAYED (post-overlay) stop, not the screener's
+   pre-overlay proxy. If a wiring-order bug applied sizing BEFORE the overlay
+   (or overlaid AFTER sizing ran), [sized_risk_amount] would reflect a
+   DIFFERENT stop distance than the one [c.stop] displays, and this equality
+   would fail.
+
+   Mutation check: swap the [|>] pipe order in [generate] so
+   [_size_long] runs before [_overlay_structural_stop] -- [sized_risk_amount]
+   is then computed from the screener's pre-overlay [suggested_stop], while
+   [c.stop] displays the post-overlay value; the two diverge and this test
+   goes red. *)
+let test_sizing_uses_overlaid_stop_distance _ =
+  let snap =
+    _generate ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  let aapl =
+    List.find (snap : Weekly_snapshot.t).long_candidates
+      ~f:(fun (c : Weekly_snapshot.candidate) -> String.equal c.symbol "AAPL")
+  in
+  assert_that aapl
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (c : Weekly_snapshot.candidate) -> c.sized_shares)
+              (gt (module Int_ord) 0);
+            field
+              (fun (c : Weekly_snapshot.candidate) ->
+                Float.abs
+                  (c.sized_risk_amount
+                  -. Float.of_int c.sized_shares
+                     *. Float.abs (c.entry -. c.stop)))
+              (float_equal ~epsilon:0.01 0.0);
+          ]))
+
 (* Regression for the prior_stage-chaining fix. The SAME breakout AAPL, screened
    ~6 weeks later (2022-10-07) is Stage2 w6 under the corrected chained
    classification, so the <=4-week early-breakout gate rightly rejects it — it is
@@ -641,9 +716,87 @@ let test_empty_universe_no_candidates _ =
            (equal_to _system_version);
        ])
 
+(* Minimal candidate literal for direct {!Stop_recompute.for_candidate} tests.
+   [stop] is deliberately seeded LONG-shaped (below entry) so a short-side
+   overlay that forgot the side would leave a below-entry stop behind. *)
+let _mk_candidate ~symbol ~entry ~stop : Weekly_snapshot.candidate =
+  {
+    symbol;
+    score = 85.0;
+    grade = "A";
+    entry;
+    stop;
+    sector = "Test";
+    rationale = "test";
+    rs_vs_spy = None;
+    resistance_grade = None;
+    sized_shares = 0;
+    sized_position_value = 0.0;
+    sized_position_pct = 0.0;
+    sized_risk_amount = 0.0;
+    sizing_note = None;
+    stop_is_structural = false;
+  }
+
+let _stops_cfg () =
+  let cfg =
+    Weinstein_strategy.default_config ~universe:[ "SHRT" ]
+      ~index_symbol:_index_symbol
+  in
+  (cfg.stops_config, cfg.initial_stop_buffer)
+
+(* CP1 / L1-short: the short-side overlay places the recomputed stop ABOVE
+   entry — the book's symmetric rule (stop above the prior rally high for
+   shorts). The seeded long-shaped stop (below entry) must not survive; a
+   side-mixup in the overlay would leave it below. *)
+let test_short_candidate_stop_recomputed_above_entry _ =
+  let stops_config, initial_stop_buffer = _stops_cfg () in
+  let bars = _bars_for ~syn_config:_bearish_syn_config _index_symbol in
+  let bar_reader = Bar_reader.of_in_memory_bars [ ("SHRT", bars) ] in
+  let entry =
+    List.last bars
+    |> Option.value_map ~default:100.0 ~f:(fun (b : Types.Daily_price.t) ->
+        b.close_price)
+  in
+  let c =
+    Weinstein_snapshot_gen.Stop_recompute.for_candidate ~stops_config
+      ~initial_stop_buffer ~bar_reader ~as_of:_as_of
+      ~side:Trading_base.Types.Short
+      (_mk_candidate ~symbol:"SHRT" ~entry ~stop:(entry *. 0.92))
+  in
+  assert_that c
+    (field
+       (fun (c : Weekly_snapshot.candidate) -> c.stop)
+       (gt (module Float_ord) entry))
+
+(* CP4: [for_candidate]'s documented "no resident daily bars -> candidate
+   returned unchanged" guard — [stop] and [stop_is_structural] untouched. *)
+let test_candidate_without_bars_unchanged _ =
+  let stops_config, initial_stop_buffer = _stops_cfg () in
+  let c =
+    Weinstein_snapshot_gen.Stop_recompute.for_candidate ~stops_config
+      ~initial_stop_buffer ~bar_reader:(Bar_reader.empty ()) ~as_of:_as_of
+      ~side:Trading_base.Types.Long
+      (_mk_candidate ~symbol:"GHOST" ~entry:50.0 ~stop:46.0)
+  in
+  assert_that c
+    (all_of
+       [
+         field
+           (fun (c : Weekly_snapshot.candidate) -> c.stop)
+           (float_equal 46.0);
+         field
+           (fun (c : Weekly_snapshot.candidate) -> c.stop_is_structural)
+           (equal_to false);
+       ])
+
 let suite =
   "weekly_snapshot_generator"
   >::: [
+         "short candidate stop recomputed above entry"
+         >:: test_short_candidate_stop_recomputed_above_entry;
+         "candidate without bars returned unchanged"
+         >:: test_candidate_without_bars_unchanged;
          "metadata stamped onto the snapshot" >:: test_metadata_stamped;
          "live portfolio populates held positions"
          >:: test_live_portfolio_populates_held;
@@ -652,6 +805,10 @@ let suite =
          "breakout AAPL is a long candidate" >:: test_breakout_is_long_candidate;
          "breakout long stop sits below entry"
          >:: test_breakout_stop_below_entry;
+         "fallback stop differs from the screener's flat 8% proxy"
+         >:: test_fallback_stop_differs_from_screener_flat_proxy;
+         "sizing uses the overlaid (post-structural-stop) distance"
+         >:: test_sizing_uses_overlaid_stop_distance;
          "stale (w>4) breakout is not admitted"
          >:: test_stale_breakout_not_admitted;
          "macro context is present and well-formed"

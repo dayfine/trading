@@ -16,6 +16,27 @@ let _empty_marker = "(none)"
 let _risk_pct ~entry ~stop =
   if Float.equal entry 0.0 then 0.0 else (entry -. stop) /. entry *. 100.0
 
+(* Issue #2084 Finding 2: a candidate's [stop] can be a real structural level
+   (support floor / resistance ceiling) or the fixed-buffer fallback proxy —
+   see [Weekly_snapshot.candidate.stop_is_structural]. A fallback stop is
+   marked with a trailing asterisk so the reader can tell it apart from a
+   structural one at a glance, without having to cross-reference the chart. *)
+let _stop_cell (c : Weekly_snapshot.candidate) =
+  if c.stop_is_structural then Printf.sprintf "$%.2f" c.stop
+  else Printf.sprintf "$%.2f*" c.stop
+
+let _stop_fallback_note =
+  "_* fallback stop: no qualifying support floor (prior correction low / rally \
+   high) was found in this symbol's recent bar history, so the stop shown is \
+   the fixed entry x initial_stop_buffer proxy rather than a real structural \
+   level — verify it against the chart before placing the order._"
+
+(* Whether any candidate in [shown] carries a fallback (non-structural)
+   stop — gates whether {!_stop_fallback_note} is appended below the table. *)
+let _any_fallback_stop shown =
+  List.exists shown ~f:(fun (c : Weekly_snapshot.candidate) ->
+      not c.stop_is_structural)
+
 (* Header line plus separator for a Markdown table. *)
 let _table_header columns =
   let header = "| " ^ String.concat ~sep:" | " columns ^ " |" in
@@ -55,9 +76,8 @@ let _instruction_cell (c : Weekly_snapshot.candidate) =
 
 let _candidate_row ~rank (c : Weekly_snapshot.candidate) =
   let risk = _risk_pct ~entry:c.entry ~stop:c.stop in
-  Printf.sprintf
-    "| %d | %s | %s | %.2f | $%.2f | $%.2f | %.1f%% | %s | %s | %s |" rank
-    c.symbol c.grade c.score c.entry c.stop risk
+  Printf.sprintf "| %d | %s | %s | %.2f | $%.2f | %s | %.1f%% | %s | %s | %s |"
+    rank c.symbol c.grade c.score c.entry (_stop_cell c) risk
     (_resistance_cell c.resistance_grade)
     c.rationale (_instruction_cell c)
 
@@ -101,6 +121,21 @@ let _truncation_note ~shown ~hidden =
          ~n_tied:(_count_tied ~cutoff hidden)
          ~cutoff_score:cutoff)
 
+(* Appends the truncation note (if any candidates were hidden) and the
+   fallback-stop legend (if any shown candidate carries a non-structural
+   stop) below [table]. Split out of {!_candidate_table} to keep that
+   function's nesting under the linter cap — each note is an independent,
+   flat append rather than a nested match/if chain. *)
+let _append_table_notes ~shown ~hidden table =
+  let with_truncation =
+    match _truncation_note ~shown ~hidden with
+    | None -> table
+    | Some note -> table ^ "\n\n" ^ note
+  in
+  match _any_fallback_stop shown with
+  | false -> with_truncation
+  | true -> with_truncation ^ "\n\n" ^ _stop_fallback_note
+
 let _candidate_table candidates ~limit =
   let header =
     _table_header
@@ -119,16 +154,14 @@ let _candidate_table candidates ~limit =
   in
   match candidates with
   | [] -> _empty_marker
-  | _ -> (
+  | _ ->
       let shown = List.take candidates limit in
       let hidden = List.drop candidates limit in
       let rows =
         List.mapi shown ~f:(fun i c -> _candidate_row ~rank:(i + 1) c)
       in
-      let table = String.concat ~sep:"\n" (header :: rows) in
-      match _truncation_note ~shown ~hidden with
-      | None -> table
-      | Some note -> table ^ "\n\n" ^ note)
+      String.concat ~sep:"\n" (header :: rows)
+      |> _append_table_notes ~shown ~hidden
 
 (* Recommended-stop cell: this week's recomputed Weinstein support-floor stop
    shown with its delta vs the current stop, so the reader sees whether to raise

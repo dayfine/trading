@@ -59,4 +59,10 @@ let candidate_of_scored (c : Screener.scored_candidate) :
     sized_position_pct = 0.0;
     sized_risk_amount = 0.0;
     sizing_note = None;
+    (* Overwritten by [Weekly_snapshot_generator._overlay_structural_stop] for
+       both long and short candidates before this record is rendered. Starts
+       [false] here (the un-overlaid stop is the screener's fixed-percentage
+       proxy) so a caller that skips the overlay step degrades honestly rather
+       than fabricating a structural claim. *)
+    stop_is_structural = false;
   }

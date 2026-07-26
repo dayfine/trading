@@ -26,6 +26,15 @@
     the v1 binary quality label). A candidate whose grade was not computed
     ([resistance_grade = None]) renders as ["-"] so the column is never blank.
 
+    The [Stop] cell renders the candidate's structural stop
+    ([Weekly_snapshot.candidate.stop]) as [$<price>]; when
+    [stop_is_structural = false] (no qualifying support floor was found for this
+    symbol, so [stop] falls back to the fixed [entry * initial_stop_buffer]
+    proxy) the cell carries a trailing [*] and the table gains a one-line italic
+    note below it explaining the fallback — so a reader can tell a real
+    structural stop apart from the proxy without cross-referencing the chart
+    (issue #2084 Finding 2).
+
     Each candidate table also carries an [Instruction] column: an executable
     order derived from the generator-computed [sized_*] fields (fixed-risk
     sizing, mirroring the backtest) — e.g.

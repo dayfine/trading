@@ -203,24 +203,9 @@ let _unrealized_pct ~entry_price ~current_price =
   if Float.equal entry_price 0.0 then 0.0
   else (current_price -. entry_price) /. entry_price *. 100.0
 
-(* This week's recomputed Weinstein support-floor stop for a held long, shown
-   beside the trader's current stop so the reader sees the delta. Reuses the
-   existing stop primitive — no new stop logic — and is [None] when the symbol
-   has no bars to derive a floor from. The full trailing state machine is not
-   threaded here (Phase C). *)
-let _recommended_stop ~(inputs : inputs) ~current_price ~daily =
-  if List.is_empty daily then None
-  else
-    let state =
-      Weinstein_stops.compute_initial_stop_with_floor
-        ~config:inputs.config.stops_config ~side:Trading_base.Types.Long
-        ~entry_price:current_price ~bars:daily ~as_of:inputs.as_of
-        ~fallback_buffer:inputs.config.initial_stop_buffer
-    in
-    Some (Weinstein_stops.get_stop_level state)
-
 (* Enrich one live holding into a report-ready held-position row: price it,
-   compute its unrealized return, and recompute its Weinstein stop. *)
+   compute its unrealized return, and recompute its Weinstein stop (this
+   week's support-floor stop — see [Stop_recompute.for_held_long]). *)
 let _enrich_held ~(inputs : inputs) (p : Live_portfolio.position) :
     Weekly_snapshot.held_position =
   let current_price, daily =
@@ -235,7 +220,10 @@ let _enrich_held ~(inputs : inputs) (p : Live_portfolio.position) :
     entry_price = p.entry_price;
     current_price;
     unrealized_pct = _unrealized_pct ~entry_price:p.entry_price ~current_price;
-    recommended_stop = _recommended_stop ~inputs ~current_price ~daily;
+    recommended_stop =
+      Stop_recompute.for_held_long ~stops_config:inputs.config.stops_config
+        ~initial_stop_buffer:inputs.config.initial_stop_buffer
+        ~entry_price:current_price ~bars:daily ~as_of:inputs.as_of;
   }
 
 (* Long market value of the held book at current prices. *)
@@ -253,6 +241,14 @@ let _size_long ~(inputs : inputs) ~portfolio_value ~sizing_cash candidate =
   Trade_sizing.size_candidate ~risk_config:inputs.config.portfolio_config
     ~portfolio_value ~sizing_cash ~side:`Long
     ~placeholder:inputs.portfolio_is_placeholder candidate
+
+(* Issue #2084 Finding 2: overlays the real structural stop onto a screener
+   candidate, replacing its fixed-8% [suggested_stop] proxy — see
+   [Stop_recompute]. *)
+let _overlay_structural_stop ~(inputs : inputs) ~side candidate =
+  Stop_recompute.for_candidate ~stops_config:inputs.config.stops_config
+    ~initial_stop_buffer:inputs.config.initial_stop_buffer
+    ~bar_reader:inputs.bar_reader ~as_of:inputs.as_of ~side candidate
 
 let generate (inputs : inputs) : Weekly_snapshot.t =
   let index_bars = _weekly_bars ~inputs inputs.config.indices.primary in
@@ -280,8 +276,14 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
   let portfolio_value = sizing_cash +. _long_market_value held_positions in
   let long_candidates =
     List.map result.buy_candidates ~f:(fun c ->
-        _size_long ~inputs ~portfolio_value ~sizing_cash
-          (Snapshot_display.candidate_of_scored c))
+        Snapshot_display.candidate_of_scored c
+        |> _overlay_structural_stop ~inputs ~side:Trading_base.Types.Long
+        |> _size_long ~inputs ~portfolio_value ~sizing_cash)
+  in
+  let short_candidates =
+    List.map result.short_candidates ~f:(fun c ->
+        Snapshot_display.candidate_of_scored c
+        |> _overlay_structural_stop ~inputs ~side:Trading_base.Types.Short)
   in
   {
     schema_version = Weekly_snapshot.current_schema_version;
@@ -291,8 +293,7 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
     sectors_strong = _sectors_by_rating ~inputs ~index_bars Screener.Strong;
     sectors_weak = _sectors_by_rating ~inputs ~index_bars Screener.Weak;
     long_candidates;
-    short_candidates =
-      List.map result.short_candidates ~f:Snapshot_display.candidate_of_scored;
+    short_candidates;
     held_positions;
     warnings;
   }
