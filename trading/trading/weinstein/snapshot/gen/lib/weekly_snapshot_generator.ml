@@ -130,7 +130,7 @@ let _analyze_ticker ~(inputs : inputs)
    continuous supply score runs on the live path when armed; [None] (default)
    keeps the analysis bit-identical to the binary-grade behaviour.
    [eligible_tickers] is pre-filtered by the sparse-tail gate (see
-   [_sparse_tail_verdicts]) — this function no longer walks
+   [_eligible_tickers]) — this function no longer walks
    [inputs.ticker_sectors] directly. *)
 let _analyze_universe ~(inputs : inputs) ~index_bars ~eligible_tickers :
     Stock_analysis.t list =
@@ -143,23 +143,14 @@ let _analyze_universe ~(inputs : inputs) ~index_bars ~eligible_tickers :
   List.filter_map eligible_tickers ~f:(fun ticker ->
       _analyze_ticker ~inputs ~analysis_config ~index_bars ticker)
 
-(* Sparse-tail eligibility gate (issue #2083 fix 1): data hygiene, not a
-   Weinstein rule (see [Sparse_tail_gate]'s .mli for the full rationale).
-   [None] when [ticker] is eligible (includes the disabled-gate case,
-   [config.sparse_tail_window_trading_days = 0]); [Some warning] when the
-   gate dropped it. *)
-let _sparse_tail_warning ~(inputs : inputs) ticker : string option =
-  Sparse_tail_gate.check inputs.bar_reader ~symbol:ticker ~as_of:inputs.as_of
+(* Sparse-tail eligibility gate (issue #2083 fix 1, data hygiene not a Weinstein
+   rule): the eligible tickers plus one warning line per dropped one. Disabled by
+   default. See [Sparse_tail_gate.partition]. *)
+let _eligible_tickers ~(inputs : inputs) =
+  Sparse_tail_gate.partition inputs.bar_reader ~as_of:inputs.as_of
     ~min_bars:inputs.config.sparse_tail_min_bars
     ~window_trading_days:inputs.config.sparse_tail_window_trading_days
-  |> Sparse_tail_gate.warning ~symbol:ticker
-
-(* One (ticker, warning option) pair per universe entry. [None] tickers are
-   sparse-tail-eligible; [Some _] tickers were dropped, carrying the warning
-   line to surface in the snapshot. *)
-let _sparse_tail_verdicts ~(inputs : inputs) : (string * string option) list =
-  List.map inputs.ticker_sectors ~f:(fun (ticker, _sector) ->
-      (ticker, _sparse_tail_warning ~inputs ticker))
+    (List.map inputs.ticker_sectors ~f:fst)
 
 (* Rating of one sector ETF, or [None] when it has no bars. *)
 let _etf_rating ~(inputs : inputs) ~index_bars (etf, sector_name) =
@@ -188,52 +179,6 @@ let _sectors_by_rating ~(inputs : inputs) ~index_bars wanted =
     ~f:(_sector_name_if_rated ~inputs ~index_bars ~wanted)
   |> List.dedup_and_sort ~compare:String.compare
 
-(* Current close for a held symbol as of the run date: the last daily bar's
-   close. Falls back to the entry price when the symbol has no resident bars, so
-   an un-priced position still renders a sensible (zero-unrealized) row. *)
-let _current_price ~(inputs : inputs) ~entry_price symbol =
-  let daily =
-    Bar_reader.daily_bars_for inputs.bar_reader ~symbol ~as_of:inputs.as_of
-  in
-  match List.last daily with
-  | Some (bar : Types.Daily_price.t) -> (bar.close_price, daily)
-  | None -> (entry_price, daily)
-
-let _unrealized_pct ~entry_price ~current_price =
-  if Float.equal entry_price 0.0 then 0.0
-  else (current_price -. entry_price) /. entry_price *. 100.0
-
-(* Enrich one live holding into a report-ready held-position row: price it,
-   compute its unrealized return, and recompute its Weinstein stop (this
-   week's support-floor stop — see [Stop_recompute.for_held_long]). *)
-let _enrich_held ~(inputs : inputs) (p : Live_portfolio.position) :
-    Weekly_snapshot.held_position =
-  let current_price, daily =
-    _current_price ~inputs ~entry_price:p.entry_price p.symbol
-  in
-  {
-    symbol = p.symbol;
-    entered = p.entry_date;
-    stop = p.stop_price;
-    status = "Holding";
-    shares = p.shares;
-    entry_price = p.entry_price;
-    current_price;
-    unrealized_pct = _unrealized_pct ~entry_price:p.entry_price ~current_price;
-    recommended_stop =
-      Stop_recompute.for_held_long ~stops_config:inputs.config.stops_config
-        ~initial_stop_buffer:inputs.config.initial_stop_buffer
-        ~entry_price:current_price ~bars:daily ~as_of:inputs.as_of;
-  }
-
-(* Long market value of the held book at current prices. *)
-let _long_market_value held =
-  List.sum
-    (module Float)
-    held
-    ~f:(fun (h : Weekly_snapshot.held_position) ->
-      Float.of_int h.shares *. h.current_price)
-
 (* Size a long candidate against the live portfolio, mirroring the backtest's
    fixed-risk sizing. Shorts are left unsized (short entries are default-off in
    the live strategy); they keep the schema defaults. *)
@@ -250,19 +195,42 @@ let _overlay_structural_stop ~(inputs : inputs) ~side candidate =
     ~initial_stop_buffer:inputs.config.initial_stop_buffer
     ~bar_reader:inputs.bar_reader ~as_of:inputs.as_of ~side candidate
 
+(* Ranked long / short candidate lists, fully decorated — structural stop
+   overlay (#2084 F2), fixed-risk sizing (longs only), spike-bar data-suspect
+   flag (#2083 F3, which flags rather than drops) — plus the spike warnings:
+   [(longs, shorts, spike_warnings)]. See [Spike_bar_gate.flag_candidates]. *)
+let _build_candidates ~(inputs : inputs) ~(result : Screener.result)
+    ~portfolio_value ~sizing_cash =
+  let longs =
+    List.map result.buy_candidates ~f:(fun c ->
+        Snapshot_display.candidate_of_scored c
+        |> _overlay_structural_stop ~inputs ~side:Trading_base.Types.Long
+        |> _size_long ~inputs ~portfolio_value ~sizing_cash)
+  in
+  let shorts =
+    List.map result.short_candidates ~f:(fun c ->
+        Snapshot_display.candidate_of_scored c
+        |> _overlay_structural_stop ~inputs ~side:Trading_base.Types.Short)
+  in
+  let flag_spikes =
+    Spike_bar_gate.flag_candidates inputs.bar_reader ~as_of:inputs.as_of
+      ~threshold_pct:inputs.config.spike_bar_threshold_pct
+  in
+  let longs, long_warnings = flag_spikes longs in
+  let shorts, short_warnings = flag_spikes shorts in
+  (longs, shorts, long_warnings @ short_warnings)
+
 let generate (inputs : inputs) : Weekly_snapshot.t =
   let index_bars = _weekly_bars ~inputs inputs.config.indices.primary in
   let macro = _macro_result ~inputs ~index_bars in
   let sector_map = _build_sector_map ~inputs ~index_bars in
-  let sparse_tail_verdicts = _sparse_tail_verdicts ~inputs in
-  let eligible_tickers =
-    List.filter_map sparse_tail_verdicts ~f:(fun (ticker, warning) ->
-        match warning with None -> Some ticker | Some _ -> None)
-  in
-  let warnings = List.filter_map sparse_tail_verdicts ~f:snd in
+  let eligible_tickers, sparse_warnings = _eligible_tickers ~inputs in
   let stocks = _analyze_universe ~inputs ~index_bars ~eligible_tickers in
   let held_positions =
-    List.map inputs.live_portfolio.positions ~f:(_enrich_held ~inputs)
+    List.map inputs.live_portfolio.positions
+      ~f:
+        (Held_position_row.enrich inputs.bar_reader ~config:inputs.config
+           ~as_of:inputs.as_of)
   in
   let held_tickers =
     List.map held_positions ~f:(fun (h : Weekly_snapshot.held_position) ->
@@ -273,17 +241,11 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
       ~macro_trend:macro.trend ~sector_map ~stocks ~held_tickers
   in
   let sizing_cash = inputs.live_portfolio.cash in
-  let portfolio_value = sizing_cash +. _long_market_value held_positions in
-  let long_candidates =
-    List.map result.buy_candidates ~f:(fun c ->
-        Snapshot_display.candidate_of_scored c
-        |> _overlay_structural_stop ~inputs ~side:Trading_base.Types.Long
-        |> _size_long ~inputs ~portfolio_value ~sizing_cash)
+  let portfolio_value =
+    sizing_cash +. Held_position_row.long_market_value held_positions
   in
-  let short_candidates =
-    List.map result.short_candidates ~f:(fun c ->
-        Snapshot_display.candidate_of_scored c
-        |> _overlay_structural_stop ~inputs ~side:Trading_base.Types.Short)
+  let long_candidates, short_candidates, spike_warnings =
+    _build_candidates ~inputs ~result ~portfolio_value ~sizing_cash
   in
   {
     schema_version = Weekly_snapshot.current_schema_version;
@@ -295,5 +257,5 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
     long_candidates;
     short_candidates;
     held_positions;
-    warnings;
+    warnings = sparse_warnings @ spike_warnings;
   }

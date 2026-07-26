@@ -35,6 +35,15 @@
     structural stop apart from the proxy without cross-referencing the chart
     (issue #2084 Finding 2).
 
+    A candidate carrying [data_suspect = true] (its most recent bar is a single
+    outsized move vs the prior bar's close — see
+    [Weinstein_snapshot_gen.Spike_bar_gate]) renders its [Symbol] cell with a
+    trailing ["(!)"] marker, and the table gains a one-line italic note below it
+    explaining the marker. The candidate is {e flagged, not dropped}: it keeps
+    its rank, entry, stop, and instruction (issue #2083 Finding 3). The
+    corresponding warning line in the [Warnings] section carries the observed
+    move and threshold.
+
     Each candidate table also carries an [Instruction] column: an executable
     order derived from the generator-computed [sized_*] fields (fixed-risk
     sizing, mirroring the backtest) — e.g.
@@ -57,7 +66,9 @@
     [Weinstein_snapshot_gen.Sparse_tail_gate]), or ["(none)"] when the list is
     empty. This is the human-visible half of "drop candidate + emit a warning":
     a candidate that vanished from the tables above is explained here rather
-    than silently missing.
+    than silently missing. Spike-flagged candidates (issue #2083 fix 3) also
+    contribute a line here — one that says explicitly that the candidate was
+    kept, so a reader does not go hunting for a missing row.
 
     {1 Display caps and the tie-honesty note}
 

@@ -1091,6 +1091,24 @@ type config = {
           checked against. Default [0] = gate disabled (no-op, matches
           [sparse_tail_min_bars]'s default). See [sparse_tail_min_bars] for the
           full rationale. *)
+  spike_bar_threshold_pct : float; [@sexp.default 0.0]
+      (** Spike-bar "data-suspect" report-hygiene flag (issue #2083 fix 3) —
+          minimum absolute single-bar move, in percentage points vs the prior
+          bar's close, that marks a candidate's last bar as anomalous.
+          Engineering data-hygiene flag, {b not} a Weinstein book rule (no book
+          section is cited): it neither admits nor rejects a candidate and moves
+          no entry / stop / size. A flagged candidate STAYS in the ranked list
+          with [Weekly_snapshot.candidate.data_suspect = true] plus a warning
+          line, so the weekly report can mark the row — the 2026-07-17 SNSE/FTH
+          incident, whose rank-1 pick's breakout was a single [+58%] zombie-feed
+          print. Default [0.0] = flag disabled (no-op, R1): every candidate
+          carries [data_suspect = false] and no spike warning is emitted,
+          bit-identical to pre-#2083-fix3 behaviour. Consumed only by
+          [Weekly_snapshot_generator.generate] via [Spike_bar_gate.check] — the
+          backtest/live strategy path ([on_market_close]) never reads this
+          field, so arming it cannot move a backtest number. R2: real config
+          field → resolves through [Backtest.Overlay_validator.apply_overrides],
+          armable via [dev/weekly-picks/live-config-overrides.sexp]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

@@ -37,6 +37,26 @@ let _any_fallback_stop shown =
   List.exists shown ~f:(fun (c : Weekly_snapshot.candidate) ->
       not c.stop_is_structural)
 
+(* Issue #2083 Finding 3: a candidate whose last bar is a single outsized move
+   vs the prior bar's close is FLAGGED, not dropped — see
+   [Weekly_snapshot.candidate.data_suspect]. The symbol cell carries a "(!)"
+   marker so the row reads as suspect at a glance. *)
+let _symbol_cell (c : Weekly_snapshot.candidate) =
+  if c.data_suspect then c.symbol ^ " (!)" else c.symbol
+
+let _data_suspect_note =
+  "_(!) data-suspect: this candidate's most recent bar moved more than the \
+   configured spike threshold vs the prior bar's close, so its signal may rest \
+   on a single anomalous print (stale / renamed-ticker feed, unadjusted split, \
+   or a genuine but outsized gap) — verify the last bar against an independent \
+   quote before placing the order. See the Warnings section for the observed \
+   move._"
+
+(* Whether any candidate in [shown] is spike-flagged — gates whether
+   {!_data_suspect_note} is appended below the table. *)
+let _any_data_suspect shown =
+  List.exists shown ~f:(fun (c : Weekly_snapshot.candidate) -> c.data_suspect)
+
 (* Header line plus separator for a Markdown table. *)
 let _table_header columns =
   let header = "| " ^ String.concat ~sep:" | " columns ^ " |" in
@@ -77,7 +97,7 @@ let _instruction_cell (c : Weekly_snapshot.candidate) =
 let _candidate_row ~rank (c : Weekly_snapshot.candidate) =
   let risk = _risk_pct ~entry:c.entry ~stop:c.stop in
   Printf.sprintf "| %d | %s | %s | %.2f | $%.2f | %s | %.1f%% | %s | %s | %s |"
-    rank c.symbol c.grade c.score c.entry (_stop_cell c) risk
+    rank (_symbol_cell c) c.grade c.score c.entry (_stop_cell c) risk
     (_resistance_cell c.resistance_grade)
     c.rationale (_instruction_cell c)
 
@@ -121,20 +141,24 @@ let _truncation_note ~shown ~hidden =
          ~n_tied:(_count_tied ~cutoff hidden)
          ~cutoff_score:cutoff)
 
-(* Appends the truncation note (if any candidates were hidden) and the
-   fallback-stop legend (if any shown candidate carries a non-structural
-   stop) below [table]. Split out of {!_candidate_table} to keep that
-   function's nesting under the linter cap — each note is an independent,
-   flat append rather than a nested match/if chain. *)
+let _append_note table = function
+  | None -> table
+  | Some note -> table ^ "\n\n" ^ note
+
+(* Appends, in order, the truncation note (if any candidates were hidden), the
+   fallback-stop legend (if any shown candidate carries a non-structural stop),
+   and the data-suspect legend (if any shown candidate is spike-flagged) below
+   [table]. Split out of {!_candidate_table} to keep that function's nesting
+   under the linter cap — each note is an independent, flat append rather than a
+   nested match/if chain. *)
 let _append_table_notes ~shown ~hidden table =
-  let with_truncation =
-    match _truncation_note ~shown ~hidden with
-    | None -> table
-    | Some note -> table ^ "\n\n" ^ note
-  in
-  match _any_fallback_stop shown with
-  | false -> with_truncation
-  | true -> with_truncation ^ "\n\n" ^ _stop_fallback_note
+  let legend flag note = if flag then Some note else None in
+  [
+    _truncation_note ~shown ~hidden;
+    legend (_any_fallback_stop shown) _stop_fallback_note;
+    legend (_any_data_suspect shown) _data_suspect_note;
+  ]
+  |> List.fold ~init:table ~f:_append_note
 
 let _candidate_table candidates ~limit =
   let header =

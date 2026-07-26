@@ -628,6 +628,210 @@ let test_armed_dense_tail_retains_candidate _ =
          field (fun (s : Weekly_snapshot.t) -> s.warnings) is_empty;
        ])
 
+(* ---- Spike-bar data-suspect flag (issue #2083 fix 3) ---- *)
+
+(* The spike fixture is [_sparse_tail_bar_reader]'s series: its LAST bar's close
+   is bumped 1.3x (see [_sparsify_tail]'s [spike]) relative to a prior bar three
+   trading days earlier, so the last-bar move vs the prior RESIDENT bar is well
+   above 30% — the SNSE shape. The sparse-tail gate stays DISABLED here (both
+   its fields keep their [0] default), so nothing is dropped and this fixture
+   isolates the spike flag: existing
+   [test_default_disabled_gate_is_bit_identical] already pins that AAPL is a
+   long candidate on it. *)
+let _spike_inputs ~spike_bar_threshold_pct : Generator.inputs =
+  let base =
+    _inputs_at ~as_of:_as_of
+      ~bar_reader:(_sparse_tail_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  { base with config = { base.config with spike_bar_threshold_pct } }
+
+(* [(kept?, flagged?)] for AAPL in a generated snapshot: the count of AAPL long
+   candidates (1 = kept, 0 = dropped) and whether it carries [data_suspect]. *)
+let _aapl_data_suspect (snap : Weekly_snapshot.t) =
+  List.find snap.long_candidates ~f:(fun (c : Weekly_snapshot.candidate) ->
+      String.equal c.symbol "AAPL")
+  |> Option.value_map ~default:false ~f:(fun (c : Weekly_snapshot.candidate) ->
+      c.data_suspect)
+
+(* R1 (experiment-flag-discipline): [Weinstein_strategy.default_config] carries
+   the spike flag disabled ([spike_bar_threshold_pct = 0.0]) — the config every
+   caller gets unless it opts into an overlay. *)
+let test_default_config_has_spike_flag_disabled _ =
+  let inputs =
+    _inputs_at ~as_of:_as_of ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  assert_that inputs.config
+    (field
+       (fun (c : Weinstein_strategy.config) -> c.spike_bar_threshold_pct)
+       (float_equal 0.0))
+
+(* Default (disabled, [spike_bar_threshold_pct = 0.0]) is an EXACT no-op (R1):
+   on a fixture whose last bar IS a 30% spike, AAPL surfaces as an unflagged
+   long candidate and no warning is emitted. *)
+let test_disabled_spike_flag_is_bit_identical _ =
+  let snap = Generator.generate (_spike_inputs ~spike_bar_threshold_pct:0.0) in
+  assert_that snap
+    (all_of
+       [
+         field _is_aapl_long_candidate (equal_to 1);
+         field _aapl_data_suspect (equal_to false);
+         field (fun (s : Weekly_snapshot.t) -> s.warnings) is_empty;
+       ])
+
+(* Armed + spiked last bar, pinned at the [generate] SEAM (not at the
+   {!Spike_bar_gate.check} primitive): arming the flag at 8% on the spike
+   fixture FLAGS AAPL — it is still a ranked long candidate (flag, do not drop:
+   count stays 1, unlike the sparse-tail gate) but carries
+   [data_suspect = true], and a warning line naming it is surfaced.
+
+   Mutation checks (each turns THIS test red and no other):
+   - Deleting the LONG [flag_spikes] call from [_build_candidates] (i.e.
+     [let longs, long_warnings = (longs, [])]): [data_suspect] stays [false] and
+     [warnings] is empty. (The SHORT call is pinned separately by
+     [test_armed_spike_flags_short_candidate_and_warns].)
+   - Passing [~threshold_pct:0.0] (the disabled value) instead of
+     [inputs.config.spike_bar_threshold_pct] to [Spike_bar_gate.flag_candidates]
+     in [_build_candidates]: same two failures.
+   - Dropping instead of flagging (filtering out suspects): the count matcher
+     goes from 1 to 0. *)
+let test_armed_spike_flags_candidate_and_warns _ =
+  let snap = Generator.generate (_spike_inputs ~spike_bar_threshold_pct:8.0) in
+  assert_that snap
+    (all_of
+       [
+         field _is_aapl_long_candidate (equal_to 1);
+         field _aapl_data_suspect (equal_to true);
+         field
+           (fun (s : Weekly_snapshot.t) -> s.warnings)
+           (elements_are
+              [
+                matching ~msg:"warning names AAPL and says it was kept"
+                  (fun w ->
+                    if
+                      String.is_substring w ~substring:"AAPL"
+                      && String.is_substring w ~substring:"kept"
+                    then Some ()
+                    else None)
+                  (equal_to ());
+              ]);
+       ])
+
+(* Armed + NO spike: the same 8% arming on the unmodified (dense, smoothly
+   advancing) breakout fixture leaves AAPL unflagged with no warning — proving
+   the flag is not marking every candidate once armed. *)
+let test_armed_quiet_series_leaves_candidate_clean _ =
+  let base =
+    _inputs_at ~as_of:_as_of ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  let snap =
+    Generator.generate
+      { base with config = { base.config with spike_bar_threshold_pct = 8.0 } }
+  in
+  assert_that snap
+    (all_of
+       [
+         field _is_aapl_long_candidate (equal_to 1);
+         field _aapl_data_suspect (equal_to false);
+         field (fun (s : Weekly_snapshot.t) -> s.warnings) is_empty;
+       ])
+
+(* A second breakout name with the SAME pattern as AAPL's, whose series is left
+   untouched (dense, no spike bar). Pairing it with the spiked AAPL gives the
+   flagging pass a TWO-candidate list — the shape needed to pin
+   {!Spike_bar_gate.flag_candidates}'s "same length and order ... rank, entry,
+   stop and sizing untouched" contract, which a single-candidate list satisfies
+   trivially. *)
+let _quiet_long_symbol = "MSFT"
+
+let _quiet_long_syn_config : Synthetic_source.config =
+  {
+    _syn_config with
+    symbols =
+      [
+        ( _quiet_long_symbol,
+          Breakout
+            {
+              base_price = 150.0;
+              base_weeks = 40;
+              weekly_gain_pct = 0.02;
+              breakout_volume_mult = 3.0;
+              base_volume = 50_000_000;
+            } );
+      ];
+  }
+
+(* The spike fixture's AAPL (sparsified tail, spiked last bar) plus the quiet
+   MSFT and the trending index. *)
+let _two_long_bar_reader () =
+  Bar_reader.of_in_memory_bars
+    [
+      ( "AAPL",
+        _sparsify_tail
+          (_bars_for ~syn_config:_syn_config "AAPL")
+          ~as_of:_as_of ~window:15 ~stride:3 );
+      ( _quiet_long_symbol,
+        _bars_for ~syn_config:_quiet_long_syn_config _quiet_long_symbol );
+      (_index_symbol, _bars_for ~syn_config:_syn_config _index_symbol);
+    ]
+
+let _two_long_inputs ~spike_bar_threshold_pct : Generator.inputs =
+  let base =
+    _inputs_at ~as_of:_as_of ~bar_reader:(_two_long_bar_reader ())
+      ~ticker_sectors:
+        [
+          ("AAPL", "Information Technology");
+          (_quiet_long_symbol, "Information Technology");
+        ]
+  in
+  { base with config = { base.config with spike_bar_threshold_pct } }
+
+let _long_symbols (snap : Weekly_snapshot.t) =
+  List.map snap.long_candidates ~f:(fun (c : Weekly_snapshot.candidate) ->
+      c.symbol)
+
+let _quiet_long_row (snap : Weekly_snapshot.t) =
+  List.find snap.long_candidates ~f:(fun (c : Weekly_snapshot.candidate) ->
+      String.equal c.symbol _quiet_long_symbol)
+
+(* The quiet row, or a hard test failure — so a fixture regression that stopped
+   admitting MSFT surfaces as a failure rather than silently making the
+   two-candidate assertions vacuous. *)
+let _quiet_long_row_exn snap =
+  match _quiet_long_row snap with
+  | Some c -> c
+  | None -> assert_failure "fixture regression: MSFT is not a long candidate"
+
+(* CP4: the flagging pass is "flag, do not drop" for the WHOLE list, not just
+   for the one suspect row. On a two-candidate list where only AAPL spikes,
+   arming the flag at 8% leaves the candidate list the same LENGTH and ORDER as
+   the disabled run, marks exactly ONE row suspect, and leaves the non-spiking
+   MSFT row byte-identical to its disabled-run self (rank position, entry, stop,
+   sizing and all). A pass that dropped, reordered or re-decorated rows — or one
+   that flagged indiscriminately — fails one of the three matchers. *)
+let test_armed_spike_leaves_other_candidates_untouched _ =
+  let disabled =
+    Generator.generate (_two_long_inputs ~spike_bar_threshold_pct:0.0)
+  in
+  let armed =
+    Generator.generate (_two_long_inputs ~spike_bar_threshold_pct:8.0)
+  in
+  let quiet_before = _quiet_long_row_exn disabled in
+  assert_that armed
+    (all_of
+       [
+         field (fun (s : Weekly_snapshot.t) -> s.long_candidates) (size_is 2);
+         field _long_symbols (equal_to (_long_symbols disabled));
+         field
+           (fun (s : Weekly_snapshot.t) ->
+             List.count s.long_candidates
+               ~f:(fun (c : Weekly_snapshot.candidate) -> c.data_suspect))
+           (equal_to 1);
+         field _quiet_long_row (is_some_and (equal_to quiet_before));
+       ])
+
 (* AAPL's [resistance_grade] display string from a generated snapshot. *)
 let _aapl_resistance_grade (snap : Weekly_snapshot.t) : string option =
   List.find snap.long_candidates ~f:(fun (c : Weekly_snapshot.candidate) ->
@@ -831,6 +1035,7 @@ let _mk_candidate ~symbol ~entry ~stop : Weekly_snapshot.candidate =
     sized_risk_amount = 0.0;
     sizing_note = None;
     stop_is_structural = false;
+    data_suspect = false;
   }
 
 let _stops_cfg () =
@@ -911,6 +1116,91 @@ let test_short_candidate_overlay_applied_at_generate_seam _ =
                  ~low:rally_high ~high:(rally_high *. 1.10));
           ]))
 
+(* ---- Spike-bar flag, SHORT side (issue #2083 fix 3) ---- *)
+
+(* SHRT's series with its LAST bar's close bumped 1.3x (the same [_sparsify_tail]
+   spike shape the long fixture uses), so the last-bar move vs the prior bar is
+   ~30% — well above the 8% arming below. The bump stays far under the (much
+   higher) 30-week MA, so SHRT remains the early-Stage-4 breakdown candidate
+   [_short_bars] was built to produce; only the spike flag's input changes. *)
+let _short_spike_bars () =
+  match List.rev (_short_bars ()) with
+  | [] -> []
+  | (last : Types.Daily_price.t) :: rest ->
+      List.rev
+        ({
+           last with
+           close_price = last.close_price *. 1.3;
+           adjusted_close = last.adjusted_close *. 1.3;
+           high_price = last.high_price *. 1.35;
+         }
+        :: rest)
+
+let _short_spike_bar_reader () =
+  Bar_reader.of_in_memory_bars
+    [
+      (_short_symbol, _short_spike_bars ());
+      (_index_symbol, _bars_for ~syn_config:_bearish_syn_config _index_symbol);
+    ]
+
+let _short_spike_inputs ~spike_bar_threshold_pct : Generator.inputs =
+  let base =
+    _inputs_at ~as_of:_as_of
+      ~bar_reader:(_short_spike_bar_reader ())
+      ~ticker_sectors:[ (_short_symbol, "Information Technology") ]
+  in
+  { base with config = { base.config with spike_bar_threshold_pct } }
+
+(* Number of SHRT rows among the snapshot's short candidates (1 = kept,
+   0 = dropped) and the SHRT row itself, for the flag / immutability matchers. *)
+let _shrt_short_count (snap : Weekly_snapshot.t) =
+  List.count snap.short_candidates ~f:(fun (c : Weekly_snapshot.candidate) ->
+      String.equal c.symbol _short_symbol)
+
+let _shrt_short_row (snap : Weekly_snapshot.t) =
+  List.find snap.short_candidates ~f:(fun (c : Weekly_snapshot.candidate) ->
+      String.equal c.symbol _short_symbol)
+
+(* CP1 / CP4, SHORT side, pinned at the [generate] SEAM: the .mli's "Applied to
+   long and short candidates alike" claim. Arming the flag at 8% on a SHRT
+   series whose last bar spikes ~30% FLAGS the short candidate — it is still a
+   ranked short candidate (flag, do not drop: the count stays 1) but carries
+   [data_suspect = true], and a warning naming SHRT and stating it was kept is
+   surfaced.
+
+   Mutation check (turns THIS test red and no other): replacing
+   [let shorts, short_warnings = flag_spikes shorts] with [(shorts, [])] in
+   [_build_candidates] — [data_suspect] stays [false] and the warning
+   disappears. The long-side seam test cannot see that mutation, which is why
+   this test exists. *)
+let test_armed_spike_flags_short_candidate_and_warns _ =
+  let snap =
+    Generator.generate (_short_spike_inputs ~spike_bar_threshold_pct:8.0)
+  in
+  assert_that snap
+    (all_of
+       [
+         field _shrt_short_count (equal_to 1);
+         field _shrt_short_row
+           (is_some_and
+              (field
+                 (fun (c : Weekly_snapshot.candidate) -> c.data_suspect)
+                 (equal_to true)));
+         field
+           (fun (s : Weekly_snapshot.t) -> s.warnings)
+           (elements_are
+              [
+                matching ~msg:"warning names SHRT and says it was kept"
+                  (fun w ->
+                    if
+                      String.is_substring w ~substring:_short_symbol
+                      && String.is_substring w ~substring:"kept"
+                    then Some ()
+                    else None)
+                  (equal_to ());
+              ]);
+       ])
+
 (* CP4: [for_candidate]'s documented "no resident daily bars -> candidate
    returned unchanged" guard — [stop] and [stop_is_structural] untouched. *)
 let test_candidate_without_bars_unchanged _ =
@@ -967,6 +1257,19 @@ let suite =
          >:: test_armed_sparse_tail_drops_candidate_and_warns;
          "armed dense tail retains candidate"
          >:: test_armed_dense_tail_retains_candidate;
+         "default_config has the spike-bar flag disabled"
+         >:: test_default_config_has_spike_flag_disabled;
+         "default (disabled) spike flag is bit-identical"
+         >:: test_disabled_spike_flag_is_bit_identical;
+         "armed spike flags candidate (kept) and warns"
+         >:: test_armed_spike_flags_candidate_and_warns;
+         "armed quiet series leaves candidate clean"
+         >:: test_armed_quiet_series_leaves_candidate_clean;
+         "armed spike leaves the other candidate untouched \
+          (length/order/fields)"
+         >:: test_armed_spike_leaves_other_candidates_untouched;
+         "armed spike flags SHORT candidate (kept) and warns"
+         >:: test_armed_spike_flags_short_candidate_and_warns;
          "default resistance grade shows the v2 score (armed by default)"
          >:: test_default_resistance_grade_is_v2;
          "disarmed resistance grade degrades to the v1 label"

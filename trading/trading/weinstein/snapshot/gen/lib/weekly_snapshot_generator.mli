@@ -52,6 +52,16 @@
       candidate does not just silently vanish. Default
       ([sparse_tail_window_trading_days = 0]) disables the gate: bit-identical
       to pre-#2083-fix1 behaviour. See {!Sparse_tail_gate}.
+    - {b Spike-bar data-suspect flag} (issue #2083 fix 3, report hygiene, not a
+      Weinstein rule): a candidate whose last daily bar moved at least
+      [config.spike_bar_threshold_pct] percentage points (absolute) vs the prior
+      bar's close is {e flagged, not dropped} — it keeps its rank, entry, stop
+      and size, gains {!Weekly_snapshot.candidate.data_suspect}[ = true], and
+      contributes a line to {!Weekly_snapshot.t.warnings} via
+      {!Spike_bar_gate.warning} so the rendered report marks the row and
+      explains the marker. Applied to long and short candidates alike. Default
+      ([spike_bar_threshold_pct = 0.0]) disables the flag: bit-identical to
+      pre-#2083-fix3 behaviour. See {!Spike_bar_gate}.
 
     All bar reads route through a {!Weinstein_strategy.Bar_reader.t} so the
     weekly-aggregation + as-of slicing is bit-identical to the strategy's own.

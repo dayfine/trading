@@ -74,6 +74,19 @@ val check :
     possible tail. Pure: same inputs -> same output ([bar_reader] is read-only).
 *)
 
+val partition :
+  Weinstein_strategy.Bar_reader.t ->
+  as_of:Date.t ->
+  min_bars:int ->
+  window_trading_days:int ->
+  string list ->
+  string list * string list
+(** [partition bar_reader ~as_of ~min_bars ~window_trading_days tickers] applies
+    {!check} to each ticker and returns [(eligible, warnings)]: the tickers that
+    passed (order preserved) and one {!warning} line per ticker the gate
+    dropped. With the gate disabled ([window_trading_days <= 0], the default)
+    this returns [(tickers, [])]. Pure. *)
+
 val warning : symbol:string -> verdict -> string option
 (** [warning ~symbol verdict] is [None] for {!Eligible}. For {!Sparse_tail} it
     is [Some msg], a human-readable single line naming the symbol, the actual

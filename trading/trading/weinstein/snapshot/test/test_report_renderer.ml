@@ -35,6 +35,7 @@ let _full_snapshot : Weekly_snapshot.t =
           sized_risk_amount = 179.65;
           sizing_note = None;
           stop_is_structural = true;
+          data_suspect = false;
         };
         {
           symbol = "MSFT";
@@ -52,6 +53,7 @@ let _full_snapshot : Weekly_snapshot.t =
           sized_risk_amount = 0.0;
           sizing_note = Some "0 sh — cash / caps exhausted";
           stop_is_structural = true;
+          data_suspect = false;
         };
       ];
     short_candidates = [];
@@ -202,6 +204,7 @@ let test_risk_pct_formatting _ =
             sized_risk_amount = 0.0;
             sizing_note = None;
             stop_is_structural = true;
+            data_suspect = false;
           };
         ];
     }
@@ -237,6 +240,7 @@ let test_resistance_grade_column_rendered _ =
             sized_risk_amount = 0.0;
             sizing_note = None;
             stop_is_structural = true;
+            data_suspect = false;
           };
         ];
     }
@@ -256,10 +260,13 @@ let test_resistance_grade_column_rendered _ =
 (* Candidate builder with the sizing fields exposed as optional params.
    [stop_is_structural] defaults to [true] (unmarked Stop cell) so the
    existing instruction-cell tests, which don't care about the stop-source
-   marker, keep pinning a plain "$90.00" with no trailing asterisk. *)
+   marker, keep pinning a plain "$90.00" with no trailing asterisk.
+   [data_suspect] defaults to [false] (unmarked Symbol cell) for the same
+   reason — those tests pin a plain "| TEST |". *)
 let _sized_cand ?(sized_shares = 0) ?(sized_position_value = 0.0)
     ?(sized_position_pct = 0.0) ?(sized_risk_amount = 0.0) ?(sizing_note = None)
-    ?(stop_is_structural = true) () : Weekly_snapshot.candidate =
+    ?(stop_is_structural = true) ?(data_suspect = false) () :
+    Weekly_snapshot.candidate =
   {
     symbol = "TEST";
     score = 0.5;
@@ -276,6 +283,7 @@ let _sized_cand ?(sized_shares = 0) ?(sized_position_value = 0.0)
     sized_risk_amount;
     sizing_note;
     stop_is_structural;
+    data_suspect;
   }
 
 let test_instruction_cell_rendered _ =
@@ -357,6 +365,7 @@ let _long_snap ~n ~score_of =
       sized_risk_amount = 0.0;
       sizing_note = None;
       stop_is_structural = true;
+      data_suspect = false;
     }
   in
   { _empty_snapshot with long_candidates = List.init n ~f:(fun i -> make_c i) }
@@ -442,6 +451,42 @@ let test_structural_stop_has_no_asterisk_or_note _ =
            (_has_substring "fallback stop");
        ])
 
+(* Issue #2083 Finding 3: a spike-flagged candidate is marked with a trailing
+   "(!)" in the Symbol cell and the table gains an explanatory footnote — but
+   the row is still THERE (rank, entry, stop, instruction unchanged): the flag
+   annotates, it does not drop.
+
+   Mutation checks: reverting [_symbol_cell] to plain [c.symbol] fails the first
+   matcher; dropping the [_data_suspect_note] legend from [_append_table_notes]
+   fails the second. *)
+let test_data_suspect_marked_with_marker_and_note _ =
+  let snap =
+    {
+      _empty_snapshot with
+      long_candidates = [ _sized_cand ~data_suspect:true () ];
+    }
+  in
+  let md = Report_renderer.render snap in
+  assert_that md
+    (all_of
+       [
+         _has_substring "| 1 | TEST (!) | B | 0.50 | $100.00 | $90.00 | 10.0% |";
+         _has_substring "data-suspect";
+       ])
+
+(* An unflagged candidate renders with no marker and no footnote — the default
+   [_sized_cand] shape (see its docstring). *)
+let test_clean_candidate_has_no_marker_or_note _ =
+  let snap = { _empty_snapshot with long_candidates = [ _sized_cand () ] } in
+  let md = Report_renderer.render snap in
+  assert_that md
+    (all_of
+       [
+         _has_substring "| 1 | TEST | B | 0.50 | $100.00 | $90.00 | 10.0% |";
+         not_ ~msg:"no data-suspect note when no shown candidate is flagged"
+           (_has_substring "data-suspect");
+       ])
+
 let suite =
   "report_renderer"
   >::: [
@@ -466,6 +511,10 @@ let suite =
          >:: test_fallback_stop_marked_with_asterisk_and_note;
          "structural_stop_has_no_asterisk_or_note"
          >:: test_structural_stop_has_no_asterisk_or_note;
+         "data_suspect_marked_with_marker_and_note"
+         >:: test_data_suspect_marked_with_marker_and_note;
+         "clean_candidate_has_no_marker_or_note"
+         >:: test_clean_candidate_has_no_marker_or_note;
          "render_is_deterministic" >:: test_render_is_deterministic;
          "long_candidates_truncated_to_default_7"
          >:: test_long_candidates_truncated_to_default_7;
