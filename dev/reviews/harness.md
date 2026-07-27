@@ -1,4 +1,4 @@
-Reviewed SHA: 1bb26c522a89fe82b6170f72939e9a2da4dd77e5
+Reviewed SHA: fd41ed6a
 
 ## Structural Checklist — harness POSIX shell portability linter (PR #493, 2026-04-22)
 
@@ -335,3 +335,155 @@ Reviewed SHA (consolidate_day): 6f2255639cb326745aad06f755de1839a9fe3847
 APPROVED
 
 Behavioral review: N/A — harness/orchestrator-plumbing PR; no domain logic.
+
+---
+
+## PR #2123 — `harness/audit-filename-collision` (H-AUDIT-COLLISION)
+
+Reviewed at `fd41ed6a`. Orchestrator run 30262098532 (2026-07-27 run 3).
+
+Fixes real, recurring data loss: `dev/audit/<date>-<feature>.json` silently clobbered a
+same-day second QC of the same track (on 2026-07-27, run 2's record for
+`feat/picks-phase-c-v2` overwrote run 1's for `feat/picks-phase-c`). New scheme:
+`<date>-<branch-sanitized>-<feature>.json`, branch `/` → `-`, falling back to the old form
+when `--branch` is empty. Implemented in `write_audit.sh` (where `OUTPUT_FILE` is actually
+constructed; `record_qc_audit.sh` only extracts verdicts and delegates).
+
+structural_qc: APPROVED
+behavioral_qc: NEEDS_REWORK
+overall_qc: NEEDS_REWORK (behavioral)
+
+Rework iterations: 1 (dispatched this run).
+
+### Structural — APPROVED (4/5)
+
+Independently re-enumerated **every** `dev/audit/` reader rather than accepting the author's
+claim:
+
+1. `write_audit.sh:171` — `consecutive_rework_count` scan: `ls -1 "$AUDIT_DIR"/*-"$FEATURE".json`
+2. `deep_scan/check_06_qc_calibration.sh:101` — `for audit_file in …/dev/audit/*-"${feature}".json`
+
+Both glob by **suffix**, so inserting the branch segment *between* date and feature (rather
+than appending it) leaves both patterns matching. Claim holds. Sanitization checked against
+every documented branch convention (`feat/screener`, `feat/screener/sma`, `harness/…`,
+`cleanup/…`) — all use only alphanumerics, hyphens and `/`, so `/` → `-` is sufficient.
+POSIX clean (57 scripts). 8/8 scenarios pass. Scope exactly 3 files.
+
+File list from the REST API per the A3 provenance requirement: `dev/status/harness.md`,
+`trading/devtools/checks/record_qc_audit_test.sh`, `trading/devtools/checks/write_audit.sh`.
+
+### Behavioral — NEEDS_REWORK (2/5)
+
+**This is the case that justifies running both gates.** Structural correctly verified the
+glob claim; behavioral found the fix introduced a *different* regression the glob analysis
+could not surface.
+
+**F1 — `consecutive_rework_count` ordering is now broken.** The glob is fine; the **ordering**
+is not. Pre-fix, one date produced exactly one file, so `ls -1 … | sort -r` was a *total
+chronological* order. Post-fix, multiple same-date records coexist and sort by **branch name
+descending**, unrelated to write order. The scan `break`s on the first non-`NEEDS_REWORK` it
+meets, so same-day records are consulted out of chronological order. Reproduced **in both
+directions** on scratch `REPO_ROOT`s, one date, three records:
+
+- `zzz=NEEDS_REWORK → aaa=APPROVED → mmm=NEEDS_REWORK` — correct 1, got **2** (over-count)
+- `zzz=APPROVED → aaa=NEEDS_REWORK → mmm=NEEDS_REWORK` — correct 2, got **1** (under-count)
+
+This lands on a live signal: the escalation policy fires at `>= 3` (`write_audit.sh:29-30`).
+It is **not** a regression against pre-fix behaviour (pre-fix the record was destroyed
+outright, which is worse), but it contradicts the PR body's "consumers preserved … unchanged"
+framing.
+
+**F2 (CP4) — the empty-`--branch` fallback has no test**, and it is the only remaining path
+that can still clobber. Reachable three ways, including `record_qc_audit.sh <feature> "" <date>`
+— three positional args satisfy the arity check, so an unset `$BRANCH` in the orchestrator's
+own documented fallback invocation silently takes it.
+
+**F3 (CP1) — three stale docstrings.** `write_audit.sh:4` and `record_qc_audit.sh:6` still
+state the old filename; `record_qc_audit.sh:42` says idempotency is keyed on "same
+date+feature" — **that sentence now describes the bug**.
+
+### What the reviewer verified positively
+
+- **Pre-existing old-format records are still discovered** — a seeded `2026-07-20-myfeat.json`
+  (NEEDS_REWORK) before a new-format write yields `consecutive_rework_count=2`.
+- **Scenario 7b asserts file *count***, not just content: `find … | wc -l` == 2, with A
+  rewritten to `q=2` and sibling B untouched at `q=5`. A duplicate would fail it.
+- **The new tests are genuine pins, not tautologies** — run against the pre-fix
+  `write_audit.sh` (`fd41ed6a~1`), 7a and 7b both FAIL (`audit_count=0`).
+
+### Orchestrator-owned follow-up
+
+`.claude/agents/lead-orchestrator.md:1361,1415` also document the old filename path. The
+author's edit there was blocked by the harness as "sensitive", correctly — the orchestrator
+owns that file and updates it once the scheme lands.
+
+### Rework iteration 1 — `fd41ed6a..7a6e9c34` — still NEEDS_REWORK (2/5)
+
+**F2 CLOSED, F3 CLOSED, F1 OPEN.** The rework cap (2/run) is now reached; **#2123 is not merged**
+and carries to the next run. Main is unaffected — the defect lives only on the branch.
+
+**The F1 fix was a better design than the one suggested, and the reviewer endorsed the
+rejection.** The orchestrator brief proposed `ls -1t` (mtime). The author declined, on the
+grounds that `dev/audit/*.json` are **committed to git**, so a fresh CI checkout stamps every
+file with checkout time — mtime carries zero write-order information across exactly the boundary
+every orchestrator run crosses. (The same mtime assumption broke the orchestrator's own
+"most recent daily summary" lookup in run 2.) It instead embeds `recorded_at_ns` at write time
+and sorts on that. The reviewer independently confirmed this reasoning is right.
+
+**But the implementation introduced a defect worse than the one it fixed.** `write_audit.sh:209`,
+under `set -euo pipefail`:
+
+```sh
+f_recorded_at=$(grep -o '"recorded_at_ns": *[0-9]*' "$f" 2>/dev/null | head -1 | sed 's/.*: *//')
+[ -z "$f_recorded_at" ] && f_recorded_at=0      # dead code — never reached
+```
+
+`grep` exits 1 on a legacy record → `pipefail` → `set -e` kills the script, so the intended
+default-to-zero **can never execute**. Reproduced against the branch's own `dev/audit/`:
+**0 of 76 committed records carry the field**; `record_qc_audit.sh portfolio-stops feat/bar
+2026-07-27` → `rc=1`, **no record written and no error message**. It fires *only* on the
+`NEEDS_REWORK` path (APPROVED skips the block), so it silently destroys precisely the records
+feeding the `>= 3` escalation signal that F1 existed to protect. `write_audit.sh:63` asserts the
+opposite of the observed behaviour (CP1 FAIL). **One-line fix (`|| true`) verified working.**
+
+**The design underneath is sound.** With the crash patched, legacy records tie at `0` and GNU
+`sort -rn` falls back to a reversed whole-line comparison → filename-descending = date-descending,
+so legacy-only histories keep correct ordering (verified: 4 legacy records with a mid-sequence
+APPROVED → correct count of 2). Legacy always sorts after new, which is chronologically right.
+So this is a one-line defect, not a design flaw.
+
+**Scenario 8 is a genuine pin, verified not assumed.** The reviewer extracted `write_audit.sh`
+at both SHAs and ran the identical three-write sequence: `fd41ed6a` → `consecutive_rework_count: 2`
+(the over-count from its own prior repro); `7a6e9c34` → `1` (correct).
+
+Two further non-blocking findings:
+
+- **N2** — `WRITE_AUDIT_RECORDED_AT_NS` is unvalidated and interpolated **unquoted**:
+  `WRITE_AUDIT_RECORDED_AT_NS=oops` yields `"recorded_at_ns": oops,` — malformed JSON in a
+  committed artefact. **It can leak into production writes.**
+- **N3 (nit)** — `date -u +%s%N` is GNU-only; BSD/macOS emits a literal `N`, reaching the same
+  invalid-JSON path.
+
+**Format blast radius clean:** `check_06_qc_calibration.sh:101` globs by filename only with no
+field-wise parse; the only field-wise reader is `write_audit.sh` itself, which is where the
+defect lives.
+
+**On F2 the reviewer explicitly endorsed pinning-not-fixing:** the scope boundary is real
+(disambiguating an empty branch is new design), the gap is now named in three places, and
+scenario 7c is a genuine change-detector. A test documenting a known-broken path is acceptable
+when the contract names the gap.
+
+structural_qc: APPROVED
+behavioral_qc: NEEDS_REWORK
+overall_qc: NEEDS_REWORK (behavioral)
+
+Rework iterations: 1 of 2 used; **cap reached, not re-dispatched**. Next run resumes from here —
+the remaining work is the one-line `|| true`, plus N2/N3 hardening.
+
+## Quality Score
+
+2
+
+## Verdict
+
+NEEDS_REWORK

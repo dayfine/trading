@@ -1,4 +1,4 @@
-Reviewed SHA: b36b4f9c
+Reviewed SHA: a007d5503
 
 # QC review — weekly-snapshot track
 
@@ -284,6 +284,155 @@ authoritative file list, returned **APPROVED (4/5)** and did not re-raise it.
 ## Quality Score
 
 5
+
+## Verdict
+
+APPROVED
+
+---
+
+## PR #2117 — `feat/record-fill-cli` (item 4c.a)
+
+Reviewed at `25e1965b`. Orchestrator run 30262098532 (2026-07-27 run 3).
+
+**Provenance:** dispatched by orchestrator run 30250031315 (08:28Z), which pushed the plan
+commit and then died without writing a summary, leaving a plan-only draft PR. Run 3 adopted
+the orphan and implemented it.
+
+A CLI to edit `dev/weekly-picks/portfolio.sexp` programmatically **so `cash` cannot drift out
+of sync with the position list** — that invariant is the whole justification for the feature.
+Three subcommands (`record` / `close` / `adjust`) over a new pure `Portfolio_edit` module,
+with `save` / `to_file_contents` added to `Live_portfolio`. 28 tests.
+
+structural_qc: NEEDS_REWORK
+behavioral_qc: NEEDS_REWORK
+overall_qc: NEEDS_REWORK
+
+Rework iterations: 1 (dispatched this run).
+
+### Structural — NEEDS_REWORK (3/5)
+
+Design and layering praised. `Portfolio_edit` confirmed **pure**, all I/O at the CLI edge; no
+wall-clock reads (`--as-of` is explicit); `save` and `to_file_contents` correctly layered so
+`--dry-run` shares the exact write-path formatting. All **six** author-declared plan
+deviations verified sound, including that the nesting-linter failures were fixed by
+**extracting `_check_*` helpers rather than adding a marker or bumping a limit** — the
+behaviour `.claude/rules/code-health-discipline.md` asks for.
+
+**Blocking (P6):** `test_live_portfolio.ml` ~:72 and ~:80 discard a `Result` via
+`let _ = Live_portfolio.save …`. `.claude/rules/test-patterns.md` sub-rule 2 requires it be
+asserted. The tests would still fail *indirectly* (a later read fails), but the failure must
+be explicit.
+
+### Behavioral — NEEDS_REWORK (3/5)
+
+**Verified genuinely pinned** (invariant → test, with values):
+
+| operation | cash movement | pinning test | value |
+|---|---|---|---|
+| `record` | `-= shares * entry_price` | `record_appends_and_debits` | 100@180 → 82,000 |
+| `close` | `+= shares_held * exit_price` | `close_credits_and_removes` | 100@200 → 120,000 |
+| `adjust --stop-price` | none | `adjust_stop_only` | 100,000 unchanged |
+| `adjust --trim` | `+= trim.shares * trim.price` | `adjust_trim_credits_and_reduces` | 40@200 → 108,000, 60 held |
+| both | credit + stop | `adjust_trim_and_stop` | 108,000, 60 held, stop 175 |
+
+Also confirmed end-to-end against a copy of the committed `portfolio.sexp`
+(100,000 → 82,000 → 90,000 → 102,000, exactly conserved), and with `dune runtest --force`
+(not cached).
+
+- **`>=` trim boundary — correct and genuinely pinned.** Called "the strongest part of the PR":
+  relaxing `<` to `<=` turns `adjust_rejects_full_trim` RED, and the test sits exactly on the
+  equality point (100 of 100). Verified by mutation, not by eye.
+- **Round-trip and `--dry-run` pinned.** `load (save t) = Ok t` on the whole value;
+  `--dry-run` fidelity is **structural** (`save` is literally
+  `write_all ~data:(to_file_contents t)`, so one formatting function exists), confirmed by
+  diffing a live `--dry-run` against the committed file.
+- **The author's three mutation re-runs hold up.** Spot-checked all three; each builds and goes
+  red on the assertion rather than the compiler (M2 → 2 RED, M5 → 1 RED, M9 → 3 RED). The
+  author's own correction of its false-red mutants was sound.
+- **`--entry-date` concern closed** — it does not mis-date back-dated fills; the flag is
+  honoured whenever supplied and documented in `~doc` and plan §6.4.
+
+**Blocking — three mutations SURVIVED with 20/20 green.** The implementations are correct; the
+regression fences are missing (~15 lines):
+
+1. `record` blank symbol — would append an empty-ticker ghost position *and* debit cash.
+2. **`trim.shares` positivity — `--trim-shares -10 --trim-price 200` would mint 10 shares and
+   move 2,000 of cash.** Flagged as the **#2059 phantom-position class**, in the one operation
+   this feature exists to make safe. #2059 cost five runs to find.
+3. `trim.price` positivity.
+
+Plus `adjust`'s symbol normalization is unpinned — mutation M8 mutates the *shared* helper, so
+the `adjust` call site merely *reads* as covered.
+
+**Non-blocking:** `adjust --stop-price` accepts a *lowered* stop with no documented decision
+(4c.b trailing-stop territory — note it, don't implement a ratchet); `Live_portfolio.header`
+can silently drift from the schema it documents (currently byte-identical,
+`harness_gap: LINTER_CANDIDATE`).
+
+### Rework iteration 1 — `25e1965b..a007d550` — both gates APPROVED; MERGED `72e593e2`
+
+**structural APPROVED (4/5)** — P6 CLOSED at both sites (`save` Results now bound and asserted via
+an `_outcome` helper, so a failed write reports its own error text instead of surfacing as a
+downstream read failure). The 18 new tests are themselves pattern-clean against all three
+`test-patterns.md` sub-rules. No marker or limit bumps; `dev/status/_index.md` untouched.
+
+**behavioral APPROVED (4/5)** — F2.1–F2.4 all CLOSED. The reviewer **re-ran 3 of the 5 mutations
+itself** rather than accepting the author's table:
+
+- Dropped `String.strip` from `_normalize_symbol` → 1 red, `record_rejects_blank_symbol`, sole
+  red. Confirms the whitespace-only ticker choice is genuinely stronger, and that this test is the
+  **only** pin on the strip anywhere in the suite.
+- Deleted `_check_positive_int ~name:"trim-shares"` → 1 red; then instrumented the assertion to
+  inspect the `Ok` value under mutation: the operation **succeeds**, cash goes to 98,000 (**a
+  2,000 debit from a sell**) with **110 shares from a 100-share holding**. The mint hazard and the
+  "`_check_trim_fits` does not catch it" claim are both verified empirically.
+- Deleted the `_normalize_symbol` binding from `adjust` only → 1 red, still compiles,
+  `record`/`close` stay green. Call-site-specific — exactly the discrimination the original M8
+  lacked.
+
+**No implementation logic changed** — `git diff 25e1965b..a007d550 -- portfolio_edit.ml
+live_portfolio.ml` is **empty**. The delta is tests, one `.mli` paragraph, and two status files.
+The reviewer called this "the strongest single signal in the rework": a real test gap, not logic
+bent to fit mutations.
+
+**Both orchestrator questions answered:**
+- Plain `""` **is** fenced — `_check_symbol` runs *post*-normalization and `_normalize_symbol "" = ""`,
+  so `""` and `"   "` reduce to one identical predicate. Whitespace subsumes it and adds a strip pin.
+- Negative trim price **is** fenced by the same `> 0.0` predicate; `0.0` is the *better* test value
+  because it pins the `>` vs `>=` boundary, which a negative would not.
+
+**Two non-blocking flags:**
+- **FLAG-A** — the new `.mli` "lowering is permitted" claim is unpinned: all three stop tests use
+  raises (195/175/175 against a held 168), so adding a ratchet would survive the whole suite. Not
+  treated as a CP1 FAIL because the sentence disclaims its own permanence and names 4c.b as owner.
+- **FLAG-B** — the PR body was stale (28 tests / 10 mutations vs the actual 32 / 15). It
+  *undercounted*, so no CP2 failure, but the body is the durable evidence record on the merge.
+  **Corrected before merging.**
+
+**Domain note (L2).** "Trailing stop rises, never lowered" is the one Weinstein authority row this
+delta genuinely touches. The reviewer **passed** it, reasoning that a manual data-entry CLI must
+let a trader fix a typo'd stop and that the ratchet invariant belongs to the 4c.b state machine —
+but flagged it as a judgement call, now documented in the `.mli` with a named owner rather than
+left implicit. Worth the human's eye when 4c.b lands.
+
+### Merge note
+
+Final commit `574a8da8` merges `origin/main` to resolve a `dev/status/cleanup.md` §Backlog
+conflict — this PR added the `schema_drift` entry while #2113 and #2121 flipped others on main.
+Resolved by keeping this PR's new entry and taking main's **resolved** `[x] citation_gap` (dropping
+this branch's stale `[ ]` copy). All **seven** reviewed code files verified byte-identical to the
+QC-approved tip `a007d550` through that merge, so both verdicts carried without re-review.
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+Rework iterations: 1.
+
+## Quality Score
+
+4
 
 ## Verdict
 
