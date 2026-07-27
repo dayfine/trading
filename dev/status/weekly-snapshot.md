@@ -5,6 +5,83 @@
 ## Status
 IN_PROGRESS
 
+**2026-07-27 (Picks Phase C — entry reconciliation, issue #2103, branch
+`feat/picks-entry-reconciliation`, PR #2107, stacked on #2105):** The
+correctness half of Phase C, and an instruction-level bug rather than a
+cosmetic one. `candidate.entry` is the breakout level from the *transition*
+week; the `<=4`-week early-Stage-2 window admits a name for weeks afterwards,
+and nothing reconciled that level against the current price. On the 2026-07-24
+report MBX printed `BUY STOP 651 sh @ $46.08 ... risk $784` while MBX traded
+~$62 — a resting stop under the market *is* a market order, so the real fill
+was ~$62, the notional 34% larger than sized, and the risk against the $44.88
+stop ~$11k: **14x the displayed figure**. Three of that day's picks were >15%
+past entry (CRNX +43.7%, MBX +34.5%, SAFT +26.0%), six were 1-15% past.
+
+Two new modules plus a schema field:
+
+- `Entry_reconciliation` (`snapshot/lib/`) — the pure classifier. A side-signed
+  *overshoot* (`(close - entry)/entry` for longs, its mirror for shorts, so
+  positive always means "already past the entry") against two thresholds:
+  `Valid_stop` (today's resting ticket) / `Through_entry` (re-anchor to a
+  MARKET fill at the close and **re-size on it**) / `Extended` (suppress the
+  ticket with a do-not-chase reason, keep the row for watch) / `Not_reconciled`
+  (the disarmed no-op).
+- `Entry_reconcile` (`snapshot/gen/lib/`) — the bar-reader-backed pass, wired
+  into `_build_candidates` for **both** the long and the short arm, between the
+  structural-stop overlay and the sizing pass.
+- `Weekly_snapshot.candidate.reconciliation` — additive,
+  `[@sexp.default Not_reconciled]`, no schema bump, plus
+  `Weekly_snapshot.expected_fill_price` as the **single source of truth** for
+  what the order will fill at. `Trade_sizing` and both renderers call it, so
+  the arithmetic and the printed price cannot drift — that disagreement *was*
+  the bug.
+
+**The invariant: sizing is always on the expected FILL price, never the
+historical breakout level.** Everything else is presentation of that.
+
+**Config + defaults (experiment-flag R1/R2).** `entry_through_band_pct` and
+`entry_extension_max_pct` are real `Weinstein_strategy.config` fields, so they
+resolve through `Overlay_validator` and are `Variant_matrix`-expressible.
+`entry_extension_max_pct > 0.0` is the arming switch; at the `0.0` default the
+pass is skipped entirely and output is bit-identical to before. Defaults were
+kept no-op deliberately even though this is a bug fix — the fields are read
+only by `Weekly_snapshot_generator.generate`, never by `on_market_close`, so a
+default flip could not fix a backtest number; the four sibling report-hygiene
+gates (#2083 F1/F2/F3, #2084 F1) all ship this way; and the danger is fixed
+regardless because the same PR arms
+`dev/weekly-picks/live-config-overrides.sexp` at the issue's own boundaries
+(1.0 / 15.0 percentage points).
+
+**Weinstein authority (W1).** Suppressing an over-extended entry follows
+`weinstein-book-reference.md` §1 "Stage 2 detail (Ch. 2)" — the breakout point
+(and the pullback back to it) is the buy, and a name that has run on is "still
+a 'hold' but no longer a buy; reward/risk has shifted against you". No
+admission rule changes and **no pullback-timing mechanic** is implemented; the
+no-reversal-timing rule stands.
+
+**Evidence.** Every production branch added is pinned by a test that dies when
+it breaks — verified by mutation, 8/8 red: dropping the short-arm reconcile;
+flipping the short arm to `~side:Long` (sign-flips the overshoot); sizing on
+`c.entry` instead of the fill; removing the `Extended` unsized arm; removing
+the `Extended` suppression from the instruction; reverting the market ticket to
+a resting stop; dropping the HTML chip cell; and collapsing
+`expected_fill_price`. The re-sizing arithmetic is pinned **numerically**
+against a hand computation (fill $107.30, stop $90.00, $100k book, 1% risk →
+57 sh / $6116.10 / risk $986.10, where the stale-entry path would have given
+100 sh / $10,000 / $1,000), because a label-only test would not have caught the
+original bug.
+
+**Known gaps, disclosed:** the structural stop is *not* re-derived at the new
+fill price (correct for a real support floor, conservative for a fixed-buffer
+fallback); short candidates remain unsized (short entries are default-off), so
+a through-entry short's Instruction cell still renders `-` — shorts do get
+classified, and an extended short does get the suppression text; the
+zero-share `sizing_note` reason text is not pinned for a through-entry
+candidate; and the 2026-07-24 artifact is not regenerated here (it needs a live
+data pull).
+
+Plan: `dev/plans/picks-entry-reconciliation-2026-07-27.md`.
+
 **2026-07-27 (Picks Phase C — HTML report + SVG charts, branch
 `feat/picks-phase-c`, PR #2105):** The presentation half of Phase C
 (`dev/plans/weekly-picks-execution-protocol-2026-07-24.md` §Phase C bullets 1-2;

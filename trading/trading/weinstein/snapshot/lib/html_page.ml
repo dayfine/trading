@@ -99,7 +99,8 @@ let _chip_style =
   [
     ".chip { border-radius: 3px; display: inline-block; font-size: 11px;";
     "        padding: 1px 5px; white-space: nowrap; }";
-    ".chip-valid-stop { background: var(--surface-alt); color: var(--ink-soft); }";
+    ".chip-valid-stop { background: var(--surface-alt); color: \
+     var(--ink-soft); }";
     ".chip-through-entry { background: var(--band); color: var(--ink); }";
     ".chip-extended { background: var(--band); color: var(--flag);";
     "                 font-weight: 600; }";

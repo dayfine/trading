@@ -83,32 +83,36 @@ let _append_table_notes ~shown ~hidden table =
   |> List.map ~f:(Option.map ~f:_italic)
   |> List.fold ~init:table ~f:_append_note
 
+(* Hoisted out of {!_candidate_table} so that function stays a flat match — the
+   inline list literal counted against the nesting cap. Mirrors the HTML
+   renderer's [_candidate_columns], and the two must stay in the same order so
+   the reports read alike. *)
+let _candidate_columns =
+  [
+    "Rank";
+    "Symbol";
+    "Grade";
+    "Score";
+    "Entry";
+    "Close vs entry";
+    "Stop";
+    "Risk %";
+    "Resistance";
+    "Rationale";
+    "Instruction";
+  ]
+
+let _candidate_rows shown =
+  List.mapi shown ~f:(fun i c -> _candidate_row ~rank:(i + 1) c)
+
 let _candidate_table candidates ~limit =
-  let header =
-    _table_header
-      [
-        "Rank";
-        "Symbol";
-        "Grade";
-        "Score";
-        "Entry";
-        "Close vs entry";
-        "Stop";
-        "Risk %";
-        "Resistance";
-        "Rationale";
-        "Instruction";
-      ]
-  in
   match candidates with
   | [] -> _empty_marker
   | _ ->
       let shown = List.take candidates limit in
       let hidden = List.drop candidates limit in
-      let rows =
-        List.mapi shown ~f:(fun i c -> _candidate_row ~rank:(i + 1) c)
-      in
-      String.concat ~sep:"\n" (header :: rows)
+      String.concat ~sep:"\n"
+        (_table_header _candidate_columns :: _candidate_rows shown)
       |> _append_table_notes ~shown ~hidden
 
 (* Recommended-stop cell: this week's recomputed Weinstein support-floor stop

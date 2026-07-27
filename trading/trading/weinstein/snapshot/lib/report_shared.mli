@@ -35,8 +35,9 @@ val instruction : Weekly_snapshot.candidate -> string
     The ticket shape follows [c.reconciliation] (issue #2103 — see
     {!Entry_reconciliation}):
 
-    - {!Entry_reconciliation.Not_reconciled} / {!Entry_reconciliation.Valid_stop}
-      — a resting stop at the entry level, e.g.
+    - {!Entry_reconciliation.Not_reconciled} /
+      {!Entry_reconciliation.Valid_stop} — a resting stop at the entry level,
+      e.g.
       ["BUY STOP 55 sh @ $28.49 (~$1567, 1.6% of book, risk $126); on fill place
        SELL STOP @ $26.21, GTC; cancel if unfilled by Friday close"].
     - {!Entry_reconciliation.Through_entry} — a MARKET buy at the current close,
@@ -57,9 +58,10 @@ val instruction : Weekly_snapshot.candidate -> string
 val close_vs_entry : Weekly_snapshot.candidate -> string
 (** Cell text for the "Close vs entry" column: the current close and the
     side-signed overshoot past the entry level, tagged with the class —
-    ["$62.00 (+34.5% EXTENDED)"], ["$25.44 (+7.3% through)"], ["$135.78
-    (-3.9%)"]. ["-"] when the candidate is {!Entry_reconciliation.Not_reconciled}
-    (mechanism disarmed, or no resident bar to price it against). *)
+    ["$62.00 (+34.5% EXTENDED)"], ["$25.44 (+7.3% through)"],
+    ["$135.78 (-3.9%)"]. ["-"] when the candidate is
+    {!Entry_reconciliation.Not_reconciled} (mechanism disarmed, or no resident
+    bar to price it against). *)
 
 val entry_reconciliation : string
 (** Explains the "Close vs entry" column, the ["through"] / ["EXTENDED"] tags

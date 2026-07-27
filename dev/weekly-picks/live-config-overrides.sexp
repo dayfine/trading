@@ -48,3 +48,25 @@
 ;   rule or a return lever — the spine (stage/breakout/volume/macro/sector) is
 ;   untouched; see [Weinstein_snapshot_gen.Sparse_tail_gate].
 ((sparse_tail_min_bars 10) (sparse_tail_window_trading_days 15))
+; entry reconciliation: issue #2103 (armed 2026-07-27) — candidate.entry is the
+;   breakout level from the TRANSITION week, and the <=4-week early-Stage-2
+;   window admits a name for weeks afterwards, so the printed ticket can be a
+;   resting buy-stop far under the market. On the 2026-07-24 list MBX printed
+;   "BUY STOP 651 sh @ $46.08 ... risk $784" while MBX traded ~$62: a stop
+;   under the market IS a market order, so the real fill was ~$62, the notional
+;   34% larger than sized, and the risk against the $44.88 stop ~$11k — 14x the
+;   displayed figure. Armed at the issue's own boundaries: a 1-point de-minimis
+;   band (a stop resting a few cents under the market fills at the stop, so
+;   re-anchoring inside the band buys nothing) and a 15-point chase cap (3 of
+;   that day's 20 picks were past it: CRNX +43.7%, MBX +34.5%, SAFT +26.0%).
+;   Through-entry names re-anchor to a MARKET fill at the close and are RE-SIZED
+;   on it (mirrors the backtest's Entry_walk); extended names lose their ticket
+;   with a do-not-chase reason and keep their row for watch. Execution
+;   correctness for the human artifact, NOT a return lever: the fields are read
+;   only by Weekly_snapshot_generator.generate, never by on_market_close, so
+;   arming them cannot move a backtest number. The suppression follows
+;   weinstein-book-reference.md §1 "Stage 2 detail (Ch. 2)" — the breakout point
+;   (and the pullback back to it) is the buy, and a name that has run on is "no
+;   longer a buy; reward/risk has shifted against you". Code defaults stay 0.0
+;   (off) per experiment-flag R1. See [Weinstein_snapshot.Entry_reconciliation].
+((entry_through_band_pct 1.0) (entry_extension_max_pct 15.0))

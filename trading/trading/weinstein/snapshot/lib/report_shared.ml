@@ -8,8 +8,8 @@ let risk_pct ~entry ~stop =
    there. *)
 let _stop_order (c : Weekly_snapshot.candidate) =
   Printf.sprintf
-    "BUY STOP %d sh @ $%.2f (~$%.0f, %.1f%% of book, risk $%.0f); on fill place \
-     SELL STOP @ $%.2f, GTC; cancel if unfilled by Friday close"
+    "BUY STOP %d sh @ $%.2f (~$%.0f, %.1f%% of book, risk $%.0f); on fill \
+     place SELL STOP @ $%.2f, GTC; cancel if unfilled by Friday close"
     c.sized_shares c.entry c.sized_position_value
     (c.sized_position_pct *. 100.0)
     c.sized_risk_amount c.stop
@@ -35,9 +35,9 @@ let _market_order (c : Weekly_snapshot.candidate)
 let _do_not_chase (c : Weekly_snapshot.candidate)
     (l : Entry_reconciliation.levels) =
   Printf.sprintf
-    "NO ORDER — do not chase: %+.1f%% past the $%.2f entry level (close $%.2f). \
-     Reward/risk has shifted against a fresh entry here; keep it on the watch \
-     list for a pullback toward the entry level."
+    "NO ORDER — do not chase: %+.1f%% past the $%.2f entry level (close \
+     $%.2f). Reward/risk has shifted against a fresh entry here; keep it on \
+     the watch list for a pullback toward the entry level."
     l.overshoot_pct c.entry l.close
 
 (* The ticket body for a candidate that still has one, before the 0-share /
@@ -66,7 +66,8 @@ let close_vs_entry (c : Weekly_snapshot.candidate) =
   | Valid_stop l -> Printf.sprintf "$%.2f (%+.1f%%)" l.close l.overshoot_pct
   | Through_entry l ->
       Printf.sprintf "$%.2f (%+.1f%% through)" l.close l.overshoot_pct
-  | Extended l -> Printf.sprintf "$%.2f (%+.1f%% EXTENDED)" l.close l.overshoot_pct
+  | Extended l ->
+      Printf.sprintf "$%.2f (%+.1f%% EXTENDED)" l.close l.overshoot_pct
 
 let entry_reconciliation =
   "close vs entry: the Entry column is the BREAKOUT level from the week the \

@@ -252,7 +252,8 @@ let test_long_candidate_row_cells _ =
     (all_of
        [
          _has_substring
-           "<thead><tr><th>Rank</th><th>Symbol</th><th>Grade</th><th>Score</th><th>Entry</th><th>Stop</th><th>Risk \
+           "<thead><tr><th>Rank</th><th>Symbol</th><th>Grade</th><th>Score</th><th>Entry</th><th>Close \
+            vs entry</th><th>Stop</th><th>Risk \
             %</th><th>Resistance</th><th>Rationale</th><th>Instruction</th><th>Chart</th></tr></thead>";
          _has_substring
            "<tr><td class=\"num\">1</td><td class=\"\">LONGA</td><td \
@@ -617,9 +618,108 @@ let test_render_is_deterministic _ =
 let test_no_bars_is_the_empty_source _ =
   assert_that (Html_report_renderer.no_bars ~symbol:"LONGA") (elements_are [])
 
+(* ------------------------------------------------------------------ *)
+(* Entry reconciliation (issue #2103)                                   *)
+(* ------------------------------------------------------------------ *)
+
+(* A through-entry LONG and an extended SHORT, so both rendering arms carry a
+   chip and neither arm's assertion can be satisfied by the other's row. *)
+let _reconciled_snapshot =
+  {
+    _full_snapshot with
+    long_candidates =
+      [
+        {
+          _long_candidate with
+          reconciliation =
+            Entry_reconciliation.Through_entry
+              { close = 107.3; overshoot_pct = 7.3 };
+          sized_shares = 57;
+          sized_position_value = 6116.10;
+          sized_position_pct = 0.061161;
+          sized_risk_amount = 986.10;
+        };
+      ];
+    short_candidates =
+      [
+        {
+          _short_candidate with
+          reconciliation =
+            Entry_reconciliation.Extended { close = 65.5; overshoot_pct = 34.5 };
+        };
+      ];
+  }
+
+(* The class rides as a tag chip with a per-class CSS modifier, and the chip's
+   text is the SAME string the Markdown column shows — both come from
+   [Report_shared.close_vs_entry], so the two formats cannot drift. *)
+let test_through_entry_chip_rendered_on_the_long_arm _ =
+  let html = Html_report_renderer.render _reconciled_snapshot in
+  assert_that html
+    (all_of
+       [
+         _has_substring
+           "<td class=\"num\"><span class=\"chip chip-through-entry\">$107.30 \
+            (+7.3% through)</span></td>";
+         _has_substring
+           "<td class=\"instruction\">BUY MARKET 57 sh @ ~$107.30 (~$6116, \
+            6.1% of book, risk $986)";
+         _has_substring "close vs entry:";
+       ])
+
+(* The SHORT arm gets the mirrored treatment: an over-extended short carries the
+   EXTENDED chip and its ticket is suppressed. Mutating the short-side reconcile
+   wiring to a no-op leaves [Not_reconciled], which renders a plain "-" cell and
+   fails the first matcher. *)
+let test_extended_chip_and_suppression_on_the_short_arm _ =
+  let html = Html_report_renderer.render _reconciled_snapshot in
+  assert_that html
+    (all_of
+       [
+         _has_substring
+           "<td class=\"num\"><span class=\"chip chip-extended\">$65.50 \
+            (+34.5% EXTENDED)</span></td>";
+         _has_substring
+           "<td class=\"instruction\">NO ORDER — do not chase: +34.5% past the";
+       ])
+
+(* The chip classes are actually styled — a chip with no CSS rule would render
+   as undifferentiated text. *)
+let test_chip_styles_present_in_stylesheet _ =
+  let html = Html_report_renderer.render _reconciled_snapshot in
+  assert_that html
+    (all_of
+       [
+         _has_substring ".chip-through-entry";
+         _has_substring ".chip-extended";
+         _has_substring ".chip-valid-stop";
+       ])
+
+(* An unreconciled table (the disarmed default) renders a plain dash cell, no
+   chip and no legend. *)
+let test_unreconciled_rows_render_plain_cells _ =
+  let html = Html_report_renderer.render _full_snapshot in
+  assert_that html
+    (all_of
+       [
+         _has_substring "<td class=\"num\">-</td>";
+         not_ ~msg:"no chip when nothing was reconciled"
+           (_has_substring "class=\"chip");
+         not_ ~msg:"no reconciliation legend when nothing was re-anchored"
+           (_has_substring "close vs entry:");
+       ])
+
 let suite =
   "html_report_renderer"
   >::: [
+         "through_entry_chip_rendered_on_the_long_arm"
+         >:: test_through_entry_chip_rendered_on_the_long_arm;
+         "extended_chip_and_suppression_on_the_short_arm"
+         >:: test_extended_chip_and_suppression_on_the_short_arm;
+         "chip_styles_present_in_stylesheet"
+         >:: test_chip_styles_present_in_stylesheet;
+         "unreconciled_rows_render_plain_cells"
+         >:: test_unreconciled_rows_render_plain_cells;
          "document_is_self_contained" >:: test_document_is_self_contained;
          "header_and_macro" >:: test_header_and_macro;
          "bearish_macro_rendered" >:: test_bearish_macro_rendered;

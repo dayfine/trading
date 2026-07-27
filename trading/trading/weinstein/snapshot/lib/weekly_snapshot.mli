@@ -141,12 +141,11 @@ type candidate = {
           breakout level from the transition week, which the <=4-week
           early-Stage-2 admission window lets a pick outrun by weeks (issue
           #2103). Computed at generate time by
-          {!Weinstein_snapshot_gen.Entry_reconcile}; see
-          {!Entry_reconciliation} for the classification and its Weinstein
-          authority.
+          {!Weinstein_snapshot_gen.Entry_reconcile}; see {!Entry_reconciliation}
+          for the classification and its Weinstein authority.
 
-          Drives {!expected_fill_price}, and through it the [sized_*] fields
-          and the rendered order ticket: a {!Entry_reconciliation.Through_entry}
+          Drives {!expected_fill_price}, and through it the [sized_*] fields and
+          the rendered order ticket: a {!Entry_reconciliation.Through_entry}
           candidate is sized on its close (the price it would actually fill at),
           and an {!Entry_reconciliation.Extended} one is not sized at all
           because its ticket is suppressed. Additive field defaulting to

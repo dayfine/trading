@@ -11,11 +11,11 @@
     below it (short).
 
     Nothing used to reconcile the two. On the 2026-07-24 weekly report MBX
-    printed ["BUY STOP 651 sh @ $46.08 … risk $784"] while MBX traded at ~$62:
-    a resting buy-stop under the market is already triggered, so the order
-    fills at ~$62 as a market order. The real risk against the $44.88 stop was
-    ~$11k — {b 14x the displayed figure} — and the notional was 34% larger than
-    the sizer intended.
+    printed ["BUY STOP 651 sh @ $46.08 … risk $784"] while MBX traded at ~$62: a
+    resting buy-stop under the market is already triggered, so the order fills
+    at ~$62 as a market order. The real risk against the $44.88 stop was ~$11k —
+    {b 14x the displayed figure} — and the notional was 34% larger than the
+    sizer intended.
 
     {1 The classification}
 
@@ -28,9 +28,9 @@
     so a positive overshoot always means "price is already past the entry",
     whichever side the candidate is on. Against two thresholds:
 
-    - {!Valid_stop} — [overshoot <= through_band_pct]. The resting stop order
-      is still the right ticket. The band is a de-minimis tolerance: a stop
-      resting a few cents under the market fills essentially at the stop, so
+    - {!Valid_stop} — [overshoot <= through_band_pct]. The resting stop order is
+      still the right ticket. The band is a de-minimis tolerance: a stop resting
+      a few cents under the market fills essentially at the stop, so
       re-anchoring buys nothing.
     - {!Through_entry} — [through_band_pct < overshoot <= extension_max_pct].
       Price is through the trigger: the order would fill at the market, so the
@@ -38,12 +38,12 @@
       mirrors the backtest's [Entry_walk], which fills at the price observed on
       signal evaluation and sizes at that fill.
     - {!Extended} — [overshoot > extension_max_pct]. Too far past the breakout
-      to buy: the ticket is suppressed with a do-not-chase reason and the row
-      is kept for watch purposes.
+      to buy: the ticket is suppressed with a do-not-chase reason and the row is
+      kept for watch purposes.
 
-    {b Weinstein authority}: [docs/design/weinstein-book-reference.md] §1
-    "Stage 2 detail (Ch. 2)" — "After initial rally, usually at least one
-    pullback close to the breakout point — this is a second chance to buy […]
+    {b Weinstein authority}: [docs/design/weinstein-book-reference.md] §1 "Stage
+    2 detail (Ch. 2)" — "After initial rally, usually at least one pullback
+    close to the breakout point — this is a second chance to buy […]
     {b Late Stage 2 warning:} … still a 'hold' but no longer a buy; reward/risk
     has shifted against you." The book names the breakout point as the buy and
     says explicitly that a name which has run on is no longer one.
@@ -57,15 +57,16 @@ type levels = {
       (** The candidate's current close — the price the reconciliation was
           computed against, and the expected fill for a {!Through_entry}. *)
   overshoot_pct : float;
-      (** Side-signed distance past the entry level, in percentage points of
-          the entry. Positive = price is already past the entry in the trade's
+      (** Side-signed distance past the entry level, in percentage points of the
+          entry. Positive = price is already past the entry in the trade's
           direction; negative = the entry has not been reached (the ordinary
           resting-stop case). *)
 }
 [@@deriving sexp, eq, show]
-(** Price context carried by every reconciled class, so a renderer can show
-    both the close and the overshoot without re-deriving either. *)
+(** Price context carried by every reconciled class, so a renderer can show both
+    the close and the overshoot without re-deriving either. *)
 
+(** Reconciliation class of one candidate. *)
 type t =
   | Not_reconciled
       (** No reconciliation was performed: the mechanism is disarmed
@@ -78,20 +79,20 @@ type t =
           order, unchanged. *)
   | Through_entry of levels
       (** Price is past the entry but within the extension cap: the ticket
-          re-anchors to a market order at [levels.close] and is re-sized on
-          that fill. *)
+          re-anchors to a market order at [levels.close] and is re-sized on that
+          fill. *)
   | Extended of levels
       (** Price is past the extension cap: the ticket is suppressed
           (do-not-chase) and the row kept for watch purposes. *)
 [@@deriving sexp, eq, show]
-(** Reconciliation class of one candidate. *)
 
 val overshoot_pct :
   side:[ `Long | `Short ] -> entry:float -> close:float -> float
 (** [overshoot_pct ~side ~entry ~close] is the side-signed distance of [close]
-    past [entry], in percentage points of [entry] — [(close - entry) / entry *
-    100] for a long and its mirror [(entry - close) / entry * 100] for a short,
-    so positive always means "already past the entry".
+    past [entry], in percentage points of [entry] —
+    [(close - entry) / entry * 100] for a long and its mirror
+    [(entry - close) / entry * 100] for a short, so positive always means
+    "already past the entry".
 
     [0.0] for a non-positive [entry] rather than a division by zero. *)
 
@@ -105,21 +106,21 @@ val classify :
 (** [classify ~side ~entry ~close ~through_band_pct ~extension_max_pct] is the
     reconciliation class per the table above.
 
-    {b Disarmed by default.} [extension_max_pct <= 0.0] is the arming switch:
-    it returns {!Not_reconciled} unconditionally, so the default configuration
+    {b Disarmed by default.} [extension_max_pct <= 0.0] is the arming switch: it
+    returns {!Not_reconciled} unconditionally, so the default configuration
     reproduces pre-#2103 behaviour exactly (experiment-flag-discipline R1). A
     non-positive [entry] also returns {!Not_reconciled} (the overshoot is
     undefined).
 
     Both boundaries are {b inclusive of the lower class}: an overshoot exactly
     equal to [through_band_pct] is {!Valid_stop}, and one exactly equal to
-    [extension_max_pct] is {!Through_entry}. [through_band_pct] may be [0.0]
-    (no de-minimis tolerance — any overshoot at all re-anchors the ticket). *)
+    [extension_max_pct] is {!Through_entry}. [through_band_pct] may be [0.0] (no
+    de-minimis tolerance — any overshoot at all re-anchors the ticket). *)
 
 val label : t -> string option
-(** Short display label for the class — [None] for {!Not_reconciled} (nothing
-    to show), ["valid-stop"] / ["through-entry"] / ["EXTENDED"] otherwise. Used
-    for the HTML tag chip and its CSS modifier. *)
+(** Short display label for the class — [None] for {!Not_reconciled} (nothing to
+    show), ["valid-stop"] / ["through-entry"] / ["EXTENDED"] otherwise. Used for
+    the HTML tag chip and its CSS modifier. *)
 
 val levels_of : t -> levels option
 (** [levels_of t] is the price context of a reconciled class, [None] for

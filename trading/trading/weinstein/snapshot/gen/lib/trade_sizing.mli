@@ -46,11 +46,11 @@ val size_candidate :
       {!Weekly_snapshot.expected_fill_price} [c] — [c.entry] for an unreconciled
       or valid-stop candidate, and the {b current close} for one whose price is
       already through its entry (issue #2103).
-    - An {!Entry_reconciliation.Extended} candidate is returned {b explicitly
-      unsized} ([sized_shares = 0], all [sized_*] zeroed, [sizing_note = None]):
-      its ticket is suppressed with a do-not-chase reason, so there is no order
-      to size. The candidate itself is returned unchanged otherwise — the row is
-      kept for watch purposes, never dropped.
+    - An {!Entry_reconciliation.Extended} candidate is returned
+      {b explicitly unsized} ([sized_shares = 0], all [sized_*] zeroed,
+      [sizing_note = None]): its ticket is suppressed with a do-not-chase
+      reason, so there is no order to size. The candidate itself is returned
+      unchanged otherwise — the row is kept for watch purposes, never dropped.
     - [placeholder = true] stamps [sizing_note] with the
       ["UNSIZED — set portfolio.sexp"] label (the generator had no live
       portfolio and sized against the template default); the numeric fields are

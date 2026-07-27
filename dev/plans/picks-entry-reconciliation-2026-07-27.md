@@ -176,7 +176,8 @@ reasons:
    make one of five sibling gates behave differently for no structural reason.
 3. **The danger is fixed in this PR regardless**, because the same PR arms the
    thresholds in `live-config-overrides.sexp` at the issue's own boundaries
-   (1% band / 15% extension cap). The next live run emits corrected tickets;
+   (`entry_through_band_pct 1.0` / `entry_extension_max_pct 15.0`, both in
+   percentage points). The next live run emits corrected tickets;
    code defaults stay honest no-ops. This is the arming file's stated purpose:
    "Code defaults stay no-op (experiment-flag R1); arming happens here."
 
