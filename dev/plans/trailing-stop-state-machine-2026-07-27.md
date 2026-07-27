@@ -272,8 +272,10 @@ dispatch's own instruction ("land the state machine + persistence first and
 thread it into the report in a follow-up increment; say so in the plan"):
 
 - **Write-back**: a `generate_weekly_snapshot --update-stops` flag that saves
-  the advanced portfolio after a run. Until it lands, a track is set by the
-  `record_fill` CLI / by hand, and `advance` runs read-only inside the report.
+  the advanced portfolio after a run. Until it lands, `advance` runs read-only
+  inside the report and a track is only created by hand-editing
+  `portfolio.sexp` — `record` deliberately seeds `None` (§3.3), and `adjust`
+  only ratchets a track that already exists.
 - **Report surfacing of the history**: a `held_position.stop_state_label`
   schema field rendering `Trailing (2 raises)` in the Markdown and HTML
   reports. This PR changes what the *stop value* means; the label change
@@ -281,3 +283,34 @@ thread it into the report in a follow-up increment; say so in the plan"):
 - Short-side held positions (the live held book is long-only today).
 - Any change to `Weinstein_stops` itself, to the snapshot schema, or to the
   backtest path.
+
+## 9. Deviations from the plan as written
+
+Recorded rather than revised silently.
+
+1. **`Stop_track` gained `state_name`, and `with_level` stayed private.** The
+   §3.1 sketch listed only `level` / `label` / `ratchet`. `state_name` is
+   needed by `label`, by `Held_position_row`, and by the tests that assert the
+   arm without depending on the payload; `with_level` is an implementation
+   detail of `ratchet` and is not exported, so `ratchet` remains the only way
+   to change a stop level and therefore the only place the never-lower rule can
+   be bypassed.
+2. **`advance` reads `Weinstein_strategy.config.stage_config`.** §3.4 said the
+   per-week stage comes from `Stage.classify` "the way the generator already
+   derives a chained stage"; the generator uses
+   `Stock_analysis.default_config.stage`, but the strategy config carries a
+   `stage_config` field directly, which is the more honest source for a
+   held-position pass and is what `Held_position_row` threads through.
+3. **§8's write-back note was inaccurate as first written** and has been
+   corrected in place: `record_fill` cannot create a track (`record` seeds
+   `None` by design, §3.3), so until the write-back flag lands the only
+   producer is a hand edit. This makes the follow-up more clearly load-bearing
+   than the plan first implied.
+4. **`Held_position_row` surfaces the state through `status`, not a new schema
+   field.** §3.5 said the track would be reported as `recommended_stop`; it is,
+   and additionally the free-form `status` string now carries
+   `Stop_track.label` (or the STOP HIT line). This was not in the plan and is
+   strictly more than it promised — but it is the cheapest way to get the
+   *history* into both reports, and it needs no `current_schema_version` bump
+   and no renderer change, so the §8 deferral of the schema-field label still
+   holds.

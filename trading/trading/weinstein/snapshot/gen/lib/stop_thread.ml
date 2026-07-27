@@ -72,16 +72,22 @@ let _week ~config ~stage_config ~prior_stage ~(track : Stop_track.t) ~prefix
 
 let rec _walk ~config ~stage_config ~prefix_rev ~prior_stage ~track = function
   | [] -> Holding track
-  | bar :: rest -> (
+  | bar :: rest ->
       let prefix_rev = bar :: prefix_rev in
       let prior_stage, outcome =
         _week ~config ~stage_config ~prior_stage ~track
           ~prefix:(List.rev prefix_rev) ~bar
       in
-      match outcome with
-      | Triggered _ -> outcome
-      | Holding track ->
-          _walk ~config ~stage_config ~prefix_rev ~prior_stage ~track rest)
+      _continue ~config ~stage_config ~prefix_rev ~prior_stage ~outcome rest
+
+(* A triggered week ends the replay; a held week recurses with the advanced
+   track. Split out of [_walk] so neither function nests a match inside a
+   match. *)
+and _continue ~config ~stage_config ~prefix_rev ~prior_stage ~outcome rest =
+  match outcome with
+  | Triggered _ -> outcome
+  | Holding track ->
+      _walk ~config ~stage_config ~prefix_rev ~prior_stage ~track rest
 
 let advance ~stops_config ~stage_config ~weekly_bars ~prior =
   _walk

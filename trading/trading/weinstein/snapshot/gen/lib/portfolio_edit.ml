@@ -114,14 +114,17 @@ let _check_stop_not_lowered ~allow_lower ~new_stop ~current =
         (which also resets the stop state)."
        new_stop current)
 
-let _validate_stop ~(held : Live_portfolio.position) ~allow_lower stop_price =
-  Option.value_map stop_price ~default:(Ok ()) ~f:(fun new_stop ->
-      Or_error.combine_errors_unit
-        [
-          _check_positive_float ~name:"stop-price" new_stop;
-          _check_stop_not_lowered ~allow_lower ~new_stop
-            ~current:held.stop_price;
-        ])
+let _validate_stop_value ~(held : Live_portfolio.position) ~allow_lower new_stop
+    =
+  Or_error.combine_errors_unit
+    [
+      _check_positive_float ~name:"stop-price" new_stop;
+      _check_stop_not_lowered ~allow_lower ~new_stop ~current:held.stop_price;
+    ]
+
+let _validate_stop ~held ~allow_lower stop_price =
+  Option.value_map stop_price ~default:(Ok ())
+    ~f:(_validate_stop_value ~held ~allow_lower)
 
 (* Keep the carried stop state in step with a manual raise, so next week's
    [Stop_thread.advance] resumes from the stop actually in force rather than

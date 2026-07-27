@@ -15,36 +15,17 @@ let label t =
     (Date.to_string t.updated)
 
 (* Rewrite the stop level inside whichever arm the state holds, leaving that
-   arm's other bookkeeping untouched. The arms are matched explicitly rather
-   than via a shared accessor: [stop_state]'s payloads are inline records, so
-   there is no cross-arm field to update generically, and an exhaustive match
-   means a future fourth arm is a compile error here rather than a silent
-   no-op. *)
+   arm's other bookkeeping untouched. [stop_state]'s payloads are inline
+   records, so there is no cross-arm field to update generically; each arm is
+   named, which also means a future fourth arm is a compile error here rather
+   than a silent no-op. Private: [ratchet] is the only way to move a stop
+   level, so it is the only place the never-lower rule can be bypassed. *)
 let _with_level (state : Weinstein_stops.stop_state) stop_level :
     Weinstein_stops.stop_state =
   match state with
-  | Initial { reference_level; stop_level = _ } ->
-      Initial { stop_level; reference_level }
-  | Trailing
-      {
-        stop_level = _;
-        last_correction_extreme;
-        last_trend_extreme;
-        ma_at_last_adjustment;
-        correction_count;
-        correction_observed_since_reset;
-      } ->
-      Trailing
-        {
-          stop_level;
-          last_correction_extreme;
-          last_trend_extreme;
-          ma_at_last_adjustment;
-          correction_count;
-          correction_observed_since_reset;
-        }
-  | Tightened { stop_level = _; last_correction_extreme; reason } ->
-      Tightened { stop_level; last_correction_extreme; reason }
+  | Initial r -> Initial { r with stop_level }
+  | Trailing r -> Trailing { r with stop_level }
+  | Tightened r -> Tightened { r with stop_level }
 
 let ratchet t ~to_ =
   if Float.( < ) to_ (level t) then None
