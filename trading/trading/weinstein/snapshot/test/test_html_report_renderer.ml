@@ -56,6 +56,7 @@ let _long_candidate : Weekly_snapshot.candidate =
     sizing_note = None;
     stop_is_structural = true;
     data_suspect = false;
+    reconciliation = Entry_reconciliation.Not_reconciled;
   }
 
 (* Deliberately the opposite of [_long_candidate] on every rendered flag: a
@@ -77,6 +78,7 @@ let _short_candidate : Weekly_snapshot.candidate =
     sized_risk_amount = 0.0;
     stop_is_structural = false;
     data_suspect = true;
+    reconciliation = Entry_reconciliation.Not_reconciled;
   }
 
 let _held : Weekly_snapshot.held_position =
@@ -243,26 +245,37 @@ let test_sectors_and_warnings_render_as_bullets _ =
    the Entry and Stop cells inside [_candidate_row] leaves both "$100.00" and
    "$90.00" present somewhere in the document, so the page renders
    "Entry $90.00 / Stop $100.00" under headers saying the opposite while every
-   substring assertion still holds. Risk % = (100 - 90) / 100 * 100. *)
+   substring assertion still holds. Risk % = (100 - 90) / 100 * 100.
+
+   The row carries TWELVE cells: the reconciliation "Close vs entry" cell sits
+   at position 6, between Entry and Stop, matching [_candidate_columns] and the
+   Markdown renderer's identical order (issue #2103). LONGA is
+   [Not_reconciled], so that cell is a bare "-" with no chip span, and
+   [expected_fill_price] returns the entry — which is why Risk % is still
+   10.0% here and NOT re-anchored. The reconciled-row chip and its fill-based
+   Risk % are pinned separately in
+   [test_through_entry_chip_rendered_on_the_long_arm]. *)
 let test_long_candidate_row_cells _ =
   let html = Html_report_renderer.render _full_snapshot in
   assert_that html
     (all_of
        [
          _has_substring
-           "<thead><tr><th>Rank</th><th>Symbol</th><th>Grade</th><th>Score</th><th>Entry</th><th>Stop</th><th>Risk \
+           "<thead><tr><th>Rank</th><th>Symbol</th><th>Grade</th><th>Score</th><th>Entry</th><th>Close \
+            vs entry</th><th>Stop</th><th>Risk \
             %</th><th>Resistance</th><th>Rationale</th><th>Instruction</th><th>Chart</th></tr></thead>";
          _has_substring
            "<tr><td class=\"num\">1</td><td class=\"\">LONGA</td><td \
             class=\"\">A+</td><td class=\"num\">0.91</td><td \
-            class=\"num\">$100.00</td><td class=\"num\">$90.00</td><td \
-            class=\"num\">10.0%</td><td class=\"\">Virgin_territory \
-            (0.95)</td><td class=\"rationale\">Stage 2 breakout, 2.1x \
-            volume</td><td class=\"instruction\">BUY STOP 10 sh @ $100.00 \
-            (~$1000, 5.0% of book, risk $100); on fill place SELL STOP @ \
-            $90.00, GTC; cancel if unfilled by Friday close</td><td \
-            class=\"chart\" data-chart=\"long:LONGA\"><span \
-            class=\"nochart\">no chart data</span></td></tr>";
+            class=\"num\">$100.00</td><td class=\"num\">-</td><td \
+            class=\"num\">$90.00</td><td class=\"num\">10.0%</td><td \
+            class=\"\">Virgin_territory (0.95)</td><td \
+            class=\"rationale\">Stage 2 breakout, 2.1x volume</td><td \
+            class=\"instruction\">BUY STOP 10 sh @ $100.00 (~$1000, 5.0% of \
+            book, risk $100); on fill place SELL STOP @ $90.00, GTC; cancel if \
+            unfilled by Friday close</td><td class=\"chart\" \
+            data-chart=\"long:LONGA\"><span class=\"nochart\">no chart \
+            data</span></td></tr>";
        ])
 
 let test_short_candidate_row_is_rendered_in_its_own_table _ =
@@ -279,12 +292,17 @@ let test_short_candidate_row_is_rendered_in_its_own_table _ =
             pinned by the whole <tr>. Every cell here differs from the long
             fixture's — flagged symbol, fallback stop, negative risk, no
             grade, unsized instruction — so this cannot be satisfied by the
-            long table's output. *)
+            long table's output.
+
+            Twelve cells, with the reconciliation cell at position 6 exactly as
+            on the long arm. SHRTB is [Not_reconciled] too, so it is a bare "-"
+            and Risk % stays entry-based at (50 - 55) / 50 = -10.0%. *)
          "<tr><td class=\"num\">1</td><td class=\"\">SHRTB <span \
           class=\"flag\">(!)</span></td><td class=\"\">B</td><td \
           class=\"num\">0.77</td><td class=\"num\">$50.00</td><td \
-          class=\"num\">$55.00*</td><td class=\"num\">-10.0%</td><td \
-          class=\"\">-</td><td class=\"rationale\">Stage 4 breakdown</td><td \
+          class=\"num\">-</td><td class=\"num\">$55.00*</td><td \
+          class=\"num\">-10.0%</td><td class=\"\">-</td><td \
+          class=\"rationale\">Stage 4 breakdown</td><td \
           class=\"instruction\">-</td><td class=\"chart\" \
           data-chart=\"short:SHRTB\"><span class=\"nochart\">no chart \
           data</span></td></tr>";
@@ -615,9 +633,127 @@ let test_render_is_deterministic _ =
 let test_no_bars_is_the_empty_source _ =
   assert_that (Html_report_renderer.no_bars ~symbol:"LONGA") (elements_are [])
 
+(* ------------------------------------------------------------------ *)
+(* Entry reconciliation (issue #2103)                                   *)
+(* ------------------------------------------------------------------ *)
+
+(* A through-entry LONG and an extended SHORT, so both rendering arms carry a
+   chip and neither arm's assertion can be satisfied by the other's row. *)
+let _reconciled_snapshot =
+  {
+    _full_snapshot with
+    long_candidates =
+      [
+        {
+          _long_candidate with
+          reconciliation =
+            Entry_reconciliation.Through_entry
+              { close = 107.3; overshoot_pct = 7.3 };
+          sized_shares = 57;
+          sized_position_value = 6116.10;
+          sized_position_pct = 0.061161;
+          sized_risk_amount = 986.10;
+        };
+      ];
+    short_candidates =
+      [
+        {
+          _short_candidate with
+          reconciliation =
+            Entry_reconciliation.Extended { close = 65.5; overshoot_pct = 34.5 };
+        };
+      ];
+  }
+
+(* The class rides as a tag chip with a per-class CSS modifier, and the chip's
+   text is the SAME string the Markdown column shows — both come from
+   [Report_shared.close_vs_entry], so the two formats cannot drift.
+
+   The Risk % cell is asserted here too. The first version of this test had NO
+   Risk % assertion on a reconciled row, which is exactly why the HTML side of
+   the stale-risk defect survived eight mutations invisibly (review round 1):
+   (107.30 - 90.00) / 107.30 = 16.1% at the fill, where the entry-based figure
+   reads 10.0%. Same number the Markdown renderer pins, so the two formats are
+   held to one arithmetic. *)
+let test_through_entry_chip_rendered_on_the_long_arm _ =
+  let html = Html_report_renderer.render _reconciled_snapshot in
+  assert_that html
+    (all_of
+       [
+         _has_substring
+           "<td class=\"num\"><span class=\"chip chip-through-entry\">$107.30 \
+            (+7.3% through)</span></td>";
+         _has_substring "<td class=\"num\">16.1%</td>";
+         not_
+           ~msg:"Risk % must not be quoted against the already-breached entry"
+           (_has_substring "<td class=\"num\">10.0%</td>");
+         _has_substring
+           "<td class=\"instruction\">BUY MARKET 57 sh @ ~$107.30 (~$6116, \
+            6.1% of book, risk $986)";
+         _has_substring "close vs entry:";
+       ])
+
+(* The SHORT arm gets the mirrored treatment: an over-extended short carries the
+   EXTENDED chip and its ticket is suppressed. Mutating the short-side reconcile
+   wiring to a no-op leaves [Not_reconciled], which renders a plain "-" cell and
+   fails the first matcher.
+
+   Risk % for an EXTENDED row stays quoted against the ENTRY, because there is
+   no order and therefore no fill to price: this short is entry $50.00 / stop
+   $55.00, so (50 - 55) / 50 = -10.0%. Re-anchoring every reconciled class to
+   the close indiscriminately would give (65.50 - 55) / 65.50 = 16.0% instead,
+   so this matcher separates "risk at the expected fill" from "risk at the
+   close". *)
+let test_extended_chip_and_suppression_on_the_short_arm _ =
+  let html = Html_report_renderer.render _reconciled_snapshot in
+  assert_that html
+    (all_of
+       [
+         _has_substring
+           "<td class=\"num\"><span class=\"chip chip-extended\">$65.50 \
+            (+34.5% EXTENDED)</span></td>";
+         _has_substring "<td class=\"num\">-10.0%</td>";
+         _has_substring
+           "<td class=\"instruction\">NO ORDER — do not chase: +34.5% past the";
+       ])
+
+(* The chip classes are actually styled — a chip with no CSS rule would render
+   as undifferentiated text. *)
+let test_chip_styles_present_in_stylesheet _ =
+  let html = Html_report_renderer.render _reconciled_snapshot in
+  assert_that html
+    (all_of
+       [
+         _has_substring ".chip-through-entry";
+         _has_substring ".chip-extended";
+         _has_substring ".chip-valid-stop";
+       ])
+
+(* An unreconciled table (the disarmed default) renders a plain dash cell, no
+   chip and no legend. *)
+let test_unreconciled_rows_render_plain_cells _ =
+  let html = Html_report_renderer.render _full_snapshot in
+  assert_that html
+    (all_of
+       [
+         _has_substring "<td class=\"num\">-</td>";
+         not_ ~msg:"no chip when nothing was reconciled"
+           (_has_substring "class=\"chip");
+         not_ ~msg:"no reconciliation legend when nothing was re-anchored"
+           (_has_substring "close vs entry:");
+       ])
+
 let suite =
   "html_report_renderer"
   >::: [
+         "through_entry_chip_rendered_on_the_long_arm"
+         >:: test_through_entry_chip_rendered_on_the_long_arm;
+         "extended_chip_and_suppression_on_the_short_arm"
+         >:: test_extended_chip_and_suppression_on_the_short_arm;
+         "chip_styles_present_in_stylesheet"
+         >:: test_chip_styles_present_in_stylesheet;
+         "unreconciled_rows_render_plain_cells"
+         >:: test_unreconciled_rows_render_plain_cells;
          "document_is_self_contained" >:: test_document_is_self_contained;
          "header_and_macro" >:: test_header_and_macro;
          "bearish_macro_rendered" >:: test_bearish_macro_rendered;

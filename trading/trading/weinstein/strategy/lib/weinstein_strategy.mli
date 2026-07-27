@@ -767,6 +767,21 @@ type config = {
       (** Returns-match threshold the rename detector requires. Default [0.0] =
           disabled. See
           [Weinstein_strategy_config.rename_detect_match_fraction]. *)
+  entry_through_band_pct : float; [@sexp.default 0.0]
+      (** Entry reconciliation (issue #2103) — de-minimis overshoot band, in
+          percentage points of the entry level, inside which a candidate keeps
+          today's resting stop ticket. Execution correctness for the weekly
+          report, not a strategy rule; it moves no admission decision. Inert
+          unless [entry_extension_max_pct > 0.0]. Consumed only by
+          [Weekly_snapshot_generator.generate]. See
+          [Weinstein_strategy_config.entry_through_band_pct]. *)
+  entry_extension_max_pct : float; [@sexp.default 0.0]
+      (** Entry reconciliation (issue #2103) — maximum overshoot past the
+          breakout entry at which an order is still issued; beyond it the ticket
+          is suppressed (do-not-chase) and the row kept for watch. Default [0.0]
+          = reconciliation disabled, no-op: sizing uses [entry] as before.
+          Consumed only by [Weekly_snapshot_generator.generate]. See
+          [Weinstein_strategy_config.entry_extension_max_pct]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

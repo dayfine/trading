@@ -45,6 +45,7 @@ let _candidate ?(score = 0.9) ?(grade = "A+") ?(sector = "XLK")
     sizing_note = None;
     stop_is_structural = false;
     data_suspect = false;
+    reconciliation = Entry_reconciliation.Not_reconciled;
   }
 
 let _snapshot ~date ~candidates : Weekly_snapshot.t =

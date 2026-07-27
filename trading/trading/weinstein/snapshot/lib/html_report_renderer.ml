@@ -104,6 +104,32 @@ let _resistance_td = function
   | None -> _text_td ~cls:"" "-"
   | Some g -> _text_td ~cls:"" g
 
+(* Issue #2103: the reconciliation class rides as a tag chip (the Phase-C design
+   spec's chip treatment), with a per-class CSS modifier so "EXTENDED" reads as
+   a warning rather than as one more number. An unreconciled candidate gets a
+   plain cell — there is no class to chip. The cell TEXT comes from
+   [Report_shared] so it is character-identical to the Markdown column. *)
+let _close_vs_entry_td (c : Weekly_snapshot.candidate) =
+  let text = Report_shared.close_vs_entry c in
+  match Entry_reconciliation.label c.reconciliation with
+  | None -> _num_td text
+  | Some cls ->
+      _td ~cls:"num"
+        (Printf.sprintf "<span class=\"chip chip-%s\">%s</span>"
+           (_e (String.lowercase cls))
+           (_e text))
+
+(* Risk % against the EXPECTED FILL, never the entry level — see the matching
+   comment in {!Report_renderer._candidate_row} (issue #2103, review round 1).
+   The two renderers must agree cell for cell. *)
+let _risk_td (c : Weekly_snapshot.candidate) =
+  let risk =
+    Report_shared.risk_pct
+      ~entry:(Weekly_snapshot.expected_fill_price c)
+      ~stop:c.stop
+  in
+  _num_td (Printf.sprintf "%.1f%%" risk)
+
 let _candidate_row ~arm ~bars_for ~rank (c : Weekly_snapshot.candidate) =
   [
     _num_td (Int.to_string rank);
@@ -111,10 +137,9 @@ let _candidate_row ~arm ~bars_for ~rank (c : Weekly_snapshot.candidate) =
     _text_td ~cls:"" c.grade;
     _num_td (Printf.sprintf "%.2f" c.score);
     _num_td (Printf.sprintf "$%.2f" c.entry);
+    _close_vs_entry_td c;
     _stop_td c;
-    _num_td
-      (Printf.sprintf "%.1f%%"
-         (Report_shared.risk_pct ~entry:c.entry ~stop:c.stop));
+    _risk_td c;
     _resistance_td c.resistance_grade;
     _text_td ~cls:"rationale" c.rationale;
     _text_td ~cls:"instruction" (Report_shared.instruction c);
@@ -130,6 +155,9 @@ let _append_table_notes ~shown ~hidden table =
     Report_shared.truncation ~shown ~hidden;
     legend (Report_shared.any_fallback_stop shown) Report_shared.stop_fallback;
     legend (Report_shared.any_data_suspect shown) Report_shared.data_suspect;
+    legend
+      (Report_shared.any_reconciled shown)
+      Report_shared.entry_reconciliation;
   ]
   |> List.filter_map ~f:Fn.id
   |> List.fold ~init:table ~f:(fun acc n -> acc ^ "\n" ^ _note n)
@@ -141,6 +169,7 @@ let _candidate_columns =
     "Grade";
     "Score";
     "Entry";
+    "Close vs entry";
     "Stop";
     "Risk %";
     "Resistance";

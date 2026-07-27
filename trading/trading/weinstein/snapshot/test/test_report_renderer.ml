@@ -36,6 +36,7 @@ let _full_snapshot : Weekly_snapshot.t =
           sizing_note = None;
           stop_is_structural = true;
           data_suspect = false;
+          reconciliation = Entry_reconciliation.Not_reconciled;
         };
         {
           symbol = "MSFT";
@@ -54,6 +55,7 @@ let _full_snapshot : Weekly_snapshot.t =
           sizing_note = Some "0 sh — cash / caps exhausted";
           stop_is_structural = true;
           data_suspect = false;
+          reconciliation = Entry_reconciliation.Not_reconciled;
         };
       ];
     short_candidates = [];
@@ -115,8 +117,8 @@ let test_full_snapshot_contains_all_sections _ =
          (* Pinned candidate row — fully formatted. Risk = (502.13-466.20)/502.13*100 = 7.155... → "7.2%".
             Resistance column shows the candidate's [resistance_grade] ("A"). *)
          _has_substring
-           "| 1 | AAPL | A+ | 0.91 | $502.13 | $466.20 | 7.2% | A | Stage 2 \
-            breakout, 2.1x volume | BUY STOP 5 sh @ $502.13";
+           "| 1 | AAPL | A+ | 0.91 | $502.13 | - | $466.20 | 7.2% | A | Stage \
+            2 breakout, 2.1x volume | BUY STOP 5 sh @ $502.13";
          (* Instruction cell carries the executable order end-to-end. *)
          _has_substring
            "on fill place SELL STOP @ $466.20, GTC; cancel if unfilled by \
@@ -205,6 +207,7 @@ let test_risk_pct_formatting _ =
             sizing_note = None;
             stop_is_structural = true;
             data_suspect = false;
+            reconciliation = Entry_reconciliation.Not_reconciled;
           };
         ];
     }
@@ -213,7 +216,7 @@ let test_risk_pct_formatting _ =
   (* [resistance_grade = None] → the Resistance column renders "-". *)
   assert_that md
     (_has_substring
-       "| 1 | TEST | B | 0.50 | $100.00 | $90.00 | 10.0% | - | test |")
+       "| 1 | TEST | B | 0.50 | $100.00 | - | $90.00 | 10.0% | - | test |")
 
 let test_resistance_grade_column_rendered _ =
   (* The candidate table gains a Resistance column header, and a candidate whose
@@ -241,6 +244,7 @@ let test_resistance_grade_column_rendered _ =
             sizing_note = None;
             stop_is_structural = true;
             data_suspect = false;
+            reconciliation = Entry_reconciliation.Not_reconciled;
           };
         ];
     }
@@ -251,7 +255,7 @@ let test_resistance_grade_column_rendered _ =
        [
          _has_substring "| Resistance | Rationale |";
          _has_substring
-           "| 1 | TEST | B | 0.50 | $100.00 | $90.00 | 10.0% | \
+           "| 1 | TEST | B | 0.50 | $100.00 | - | $90.00 | 10.0% | \
             Heavy_resistance (0.82) | test |";
          not_ ~msg:"grade string must carry no module-qualified prefix"
            (_has_substring "Weinstein_types.");
@@ -265,7 +269,8 @@ let test_resistance_grade_column_rendered _ =
    reason — those tests pin a plain "| TEST |". *)
 let _sized_cand ?(sized_shares = 0) ?(sized_position_value = 0.0)
     ?(sized_position_pct = 0.0) ?(sized_risk_amount = 0.0) ?(sizing_note = None)
-    ?(stop_is_structural = true) ?(data_suspect = false) () :
+    ?(stop_is_structural = true) ?(data_suspect = false)
+    ?(reconciliation = Entry_reconciliation.Not_reconciled) () :
     Weekly_snapshot.candidate =
   {
     symbol = "TEST";
@@ -284,6 +289,7 @@ let _sized_cand ?(sized_shares = 0) ?(sized_position_value = 0.0)
     sizing_note;
     stop_is_structural;
     data_suspect;
+    reconciliation;
   }
 
 let test_instruction_cell_rendered _ =
@@ -318,8 +324,8 @@ let test_zero_share_reason_rendered _ =
     (all_of
        [
          _has_substring
-           "| 0.50 | $100.00 | $90.00 | 10.0% | - | test | 0 sh — cash / caps \
-            exhausted |";
+           "| 0.50 | $100.00 | - | $90.00 | 10.0% | - | test | 0 sh — cash / \
+            caps exhausted |";
          not_ ~msg:"a 0-share result must not render an order"
            (_has_substring "BUY STOP");
        ])
@@ -366,6 +372,7 @@ let _long_snap ~n ~score_of =
       sizing_note = None;
       stop_is_structural = true;
       data_suspect = false;
+      reconciliation = Entry_reconciliation.Not_reconciled;
     }
   in
   { _empty_snapshot with long_candidates = List.init n ~f:(fun i -> make_c i) }
@@ -434,7 +441,8 @@ let test_fallback_stop_marked_with_asterisk_and_note _ =
   assert_that md
     (all_of
        [
-         _has_substring "| 1 | TEST | B | 0.50 | $100.00 | $90.00* | 10.0% |";
+         _has_substring
+           "| 1 | TEST | B | 0.50 | $100.00 | - | $90.00* | 10.0% |";
          _has_substring "fallback stop";
        ])
 
@@ -446,7 +454,7 @@ let test_structural_stop_has_no_asterisk_or_note _ =
   assert_that md
     (all_of
        [
-         _has_substring "| 1 | TEST | B | 0.50 | $100.00 | $90.00 | 10.0% |";
+         _has_substring "| 1 | TEST | B | 0.50 | $100.00 | - | $90.00 | 10.0% |";
          not_ ~msg:"no fallback-stop note when every shown stop is structural"
            (_has_substring "fallback stop");
        ])
@@ -470,7 +478,8 @@ let test_data_suspect_marked_with_marker_and_note _ =
   assert_that md
     (all_of
        [
-         _has_substring "| 1 | TEST (!) | B | 0.50 | $100.00 | $90.00 | 10.0% |";
+         _has_substring
+           "| 1 | TEST (!) | B | 0.50 | $100.00 | - | $90.00 | 10.0% |";
          _has_substring "data-suspect";
        ])
 
@@ -482,14 +491,149 @@ let test_clean_candidate_has_no_marker_or_note _ =
   assert_that md
     (all_of
        [
-         _has_substring "| 1 | TEST | B | 0.50 | $100.00 | $90.00 | 10.0% |";
+         _has_substring "| 1 | TEST | B | 0.50 | $100.00 | - | $90.00 | 10.0% |";
          not_ ~msg:"no data-suspect note when no shown candidate is flagged"
            (_has_substring "data-suspect");
+       ])
+
+(* ------------------------------------------------------------------ *)
+(* Entry reconciliation (issue #2103)                                   *)
+(* ------------------------------------------------------------------ *)
+
+let _reconciled_snap ~reconciliation ~sized_shares ~sized_position_value
+    ~sized_position_pct ~sized_risk_amount =
+  {
+    _empty_snapshot with
+    long_candidates =
+      [
+        _sized_cand ~sized_shares ~sized_position_value ~sized_position_pct
+          ~sized_risk_amount ~reconciliation ();
+      ];
+  }
+
+(* A THROUGH-ENTRY row: the Close-vs-entry column carries the close and the
+   overshoot tagged "through", and the Instruction cell is a MARKET order at the
+   close — not a resting BUY STOP at the (already-breached) $100.00 level. The
+   sizes quoted are the fill-based ones the sizer produced (57 sh / $6116 /
+   risk $986); the pre-fix ticket would have said "BUY STOP 100 sh @ $100.00
+   … risk $1000". The legend explaining the column appears below the table.
+
+   {b Risk % is quoted against the FILL}: (107.30 - 90.00) / 107.30 = 16.1%,
+   which agrees with the instruction's own $986.10 / $6116.10 = 16.12%. The
+   entry-based figure reads 10.0%, and the FIRST version of this test pinned
+   exactly that — locking in a row whose Risk % cell contradicted the ticket
+   printed beside it (review round 1). A row that disagrees with itself is issue
+   #2103 in miniature, so the two numbers are now asserted together and a
+   regression on either turns this red. *)
+let test_through_entry_row_renders_market_order _ =
+  let md =
+    Report_renderer.render
+      (_reconciled_snap
+         ~reconciliation:
+           (Entry_reconciliation.Through_entry
+              { close = 107.3; overshoot_pct = 7.3 })
+         ~sized_shares:57 ~sized_position_value:6116.10
+         ~sized_position_pct:0.061161 ~sized_risk_amount:986.10)
+  in
+  assert_that md
+    (all_of
+       [
+         _has_substring
+           "| 1 | TEST | B | 0.50 | $100.00 | $107.30 (+7.3% through) | $90.00 \
+            | 16.1% |";
+         _has_substring
+           "BUY MARKET 57 sh @ ~$107.30 (~$6116, 6.1% of book, risk $986) — \
+            price is 7.3% through the $100.00 entry level, so the order fills \
+            at the market; sized on the expected fill, not the entry level; on \
+            fill place SELL STOP @ $90.00, GTC";
+         not_ ~msg:"a through-entry ticket must not be a resting stop"
+           (_has_substring "BUY STOP");
+         _has_substring "close vs entry:";
+       ])
+
+(* An EXTENDED row KEEPS its place in the table (the issue is explicit about
+   watch value) but carries NO executable order — only the do-not-chase reason,
+   naming the overshoot, the entry level and the close. This is the MBX shape
+   from the 2026-07-24 report. *)
+let test_extended_row_is_kept_but_ticket_suppressed _ =
+  let md =
+    Report_renderer.render
+      (_reconciled_snap
+         ~reconciliation:
+           (Entry_reconciliation.Extended
+              { close = 134.5; overshoot_pct = 34.5 })
+         ~sized_shares:0 ~sized_position_value:0.0 ~sized_position_pct:0.0
+         ~sized_risk_amount:0.0)
+  in
+  assert_that md
+    (all_of
+       [
+         _has_substring
+           "| 1 | TEST | B | 0.50 | $100.00 | $134.50 (+34.5% EXTENDED) | \
+            $90.00 | 10.0% |";
+         _has_substring
+           "NO ORDER — do not chase: +34.5% past the $100.00 entry level \
+            (close $134.50).";
+         not_ ~msg:"an extended candidate must emit no buy order"
+           (_has_substring "BUY ");
+         _has_substring "close vs entry:";
+       ])
+
+(* A VALID-STOP row shows the close and a NEGATIVE overshoot, keeps today's
+   resting-stop ticket, and needs no legend — the reconciliation changed
+   nothing, so explaining it would be noise. *)
+let test_valid_stop_row_keeps_resting_ticket_and_needs_no_legend _ =
+  let md =
+    Report_renderer.render
+      (_reconciled_snap
+         ~reconciliation:
+           (Entry_reconciliation.Valid_stop
+              { close = 96.0; overshoot_pct = -4.0 })
+         ~sized_shares:100 ~sized_position_value:10_000.0
+         ~sized_position_pct:0.10 ~sized_risk_amount:1000.0)
+  in
+  assert_that md
+    (all_of
+       [
+         _has_substring
+           "| 1 | TEST | B | 0.50 | $100.00 | $96.00 (-4.0%) | $90.00 | 10.0% |";
+         _has_substring "BUY STOP 100 sh @ $100.00";
+         not_ ~msg:"no reconciliation legend when nothing was re-anchored"
+           (_has_substring "close vs entry:");
+       ])
+
+(* The disarmed default (R1): the column renders "-", the ticket is exactly
+   today's resting stop, and no legend appears. *)
+let test_unreconciled_row_renders_dash_and_todays_ticket _ =
+  let md =
+    Report_renderer.render
+      (_reconciled_snap ~reconciliation:Entry_reconciliation.Not_reconciled
+         ~sized_shares:100 ~sized_position_value:10_000.0
+         ~sized_position_pct:0.10 ~sized_risk_amount:1000.0)
+  in
+  assert_that md
+    (all_of
+       [
+         _has_substring "| 1 | TEST | B | 0.50 | $100.00 | - | $90.00 | 10.0% |";
+         _has_substring
+           "BUY STOP 100 sh @ $100.00 (~$10000, 10.0% of book, risk $1000); on \
+            fill place SELL STOP @ $90.00, GTC; cancel if unfilled by Friday \
+            close";
+         not_ ~msg:"no reconciliation legend on an unreconciled table"
+           (_has_substring "close vs entry:");
        ])
 
 let suite =
   "report_renderer"
   >::: [
+         "through_entry_row_renders_market_order"
+         >:: test_through_entry_row_renders_market_order;
+         "extended_row_is_kept_but_ticket_suppressed"
+         >:: test_extended_row_is_kept_but_ticket_suppressed;
+         "valid_stop_row_keeps_resting_ticket_and_needs_no_legend"
+         >:: test_valid_stop_row_keeps_resting_ticket_and_needs_no_legend;
+         "unreconciled_row_renders_dash_and_todays_ticket"
+         >:: test_unreconciled_row_renders_dash_and_todays_ticket;
          "full_snapshot_contains_all_sections"
          >:: test_full_snapshot_contains_all_sections;
          "empty_long_candidates_renders_marker"

@@ -22,8 +22,15 @@ type candidate = {
   sizing_note : string option; [@sexp.default None]
   stop_is_structural : bool; [@sexp.default false]
   data_suspect : bool; [@sexp.default false]
+  reconciliation : Entry_reconciliation.t;
+      [@sexp.default Entry_reconciliation.Not_reconciled]
 }
 [@@deriving sexp, eq, show]
+
+let expected_fill_price c =
+  match c.reconciliation with
+  | Entry_reconciliation.Through_entry { close; _ } -> close
+  | Not_reconciled | Valid_stop _ | Extended _ -> c.entry
 
 type held_position = {
   symbol : string;

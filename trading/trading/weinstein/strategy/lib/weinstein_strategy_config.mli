@@ -1144,6 +1144,53 @@ type config = {
           [0.95] is the natural armed value. Default [0.0] = detection disabled
           (no-op, matches [rename_detect_min_overlap_days]'s default). See
           [rename_detect_min_overlap_days] for the full rationale. *)
+  entry_through_band_pct : float; [@sexp.default 0.0]
+      (** Entry reconciliation (issue #2103) — the de-minimis band, in
+          percentage points of the entry level, within which a candidate whose
+          close has edged past its breakout entry still gets today's resting
+          stop ticket. A stop order resting a few cents under the market fills
+          essentially at the stop, so re-anchoring inside the band buys nothing.
+          Above it the ticket re-anchors to a market fill at the close and is
+          {b re-sized on that fill}. See [Entry_reconciliation.classify].
+
+          Paired with [entry_extension_max_pct], which is the arming switch —
+          this field alone activates nothing. [1.0] (one percentage point) is
+          the armed value, from the issue's own bucketing of the 2026-07-24
+          list. R2: real config field → resolves through
+          [Backtest.Overlay_validator.apply_overrides], armed via
+          [dev/weekly-picks/live-config-overrides.sexp]. *)
+  entry_extension_max_pct : float; [@sexp.default 0.0]
+      (** Entry reconciliation (issue #2103) — the maximum overshoot past the
+          breakout entry, in percentage points of the entry level, at which the
+          system will still issue an order. Beyond it the ticket is
+          {b suppressed} with a do-not-chase reason and the row is kept for
+          watch purposes.
+
+          Execution correctness, not a new strategy mechanic:
+          [Weekly_snapshot.candidate.entry] is the breakout level from the
+          {e transition} week, and the <=4-week early-Stage-2 window admits a
+          name for weeks afterwards, so a printed "BUY STOP @ $46.08" on a stock
+          trading $62 is an instantly-filling market order whose displayed risk
+          understated the real risk 14x (the 2026-07-24 MBX specimen). The
+          suppression above the cap follows
+          [docs/design/weinstein-book-reference.md] §1 "Stage 2 detail (Ch. 2)",
+          which locates the buy at the breakout or on "at least one pullback
+          close to the breakout point — this is a second chance to buy": a name
+          trading far above its breakout is at neither, so there is no Weinstein
+          buy point to write a ticket against. No admission rule changes, and no
+          pullback-timing mechanic is implied — see [Entry_reconciliation] for
+          why the section's "Late Stage 2 warning" is deliberately NOT the
+          citation here.
+
+          {b Default [0.0] = reconciliation disabled} (no-op, R1): every
+          candidate carries [Entry_reconciliation.Not_reconciled], sizing uses
+          [entry] exactly as before, and the reports render unchanged. [15.0]
+          (fifteen percentage points) is the armed value from the issue.
+          Consumed only by [Weekly_snapshot_generator.generate] — the
+          backtest/live strategy path ([on_market_close]) never reads this
+          field, so arming it cannot move a backtest number. R2: real config
+          field → resolves through [Backtest.Overlay_validator.apply_overrides],
+          armed via [dev/weekly-picks/live-config-overrides.sexp]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

@@ -49,10 +49,24 @@ let _resistance_cell : string option -> string = function
   | None -> "-"
   | Some g -> g
 
+(* Risk % is computed against the EXPECTED FILL, not the entry level (issue
+   #2103, review round 1). A through-entry candidate fills at the close, so
+   quoting the risk of a fill that will not happen restates the very defect this
+   feature exists to fix — on the armed 15%-cap boundary the entry-based figure
+   reads 10.0% where the real risk at the fill is 21.7%, a 2.2x understatement
+   in a column named "Risk %". For every other class the fill IS the entry, so
+   this is identical to the previous behaviour. *)
 let _candidate_row ~rank (c : Weekly_snapshot.candidate) =
-  let risk = Report_shared.risk_pct ~entry:c.entry ~stop:c.stop in
-  Printf.sprintf "| %d | %s | %s | %.2f | $%.2f | %s | %.1f%% | %s | %s | %s |"
-    rank (_symbol_cell c) c.grade c.score c.entry (_stop_cell c) risk
+  let risk =
+    Report_shared.risk_pct
+      ~entry:(Weekly_snapshot.expected_fill_price c)
+      ~stop:c.stop
+  in
+  Printf.sprintf
+    "| %d | %s | %s | %.2f | $%.2f | %s | %s | %.1f%% | %s | %s | %s |" rank
+    (_symbol_cell c) c.grade c.score c.entry
+    (Report_shared.close_vs_entry c)
+    (_stop_cell c) risk
     (_resistance_cell c.resistance_grade)
     c.rationale
     (Report_shared.instruction c)
@@ -73,35 +87,43 @@ let _append_table_notes ~shown ~hidden table =
     Report_shared.truncation ~shown ~hidden;
     legend (Report_shared.any_fallback_stop shown) Report_shared.stop_fallback;
     legend (Report_shared.any_data_suspect shown) Report_shared.data_suspect;
+    legend
+      (Report_shared.any_reconciled shown)
+      Report_shared.entry_reconciliation;
   ]
   |> List.map ~f:(Option.map ~f:_italic)
   |> List.fold ~init:table ~f:_append_note
 
+(* Hoisted out of {!_candidate_table} so that function stays a flat match — the
+   inline list literal counted against the nesting cap. Mirrors the HTML
+   renderer's [_candidate_columns], and the two must stay in the same order so
+   the reports read alike. *)
+let _candidate_columns =
+  [
+    "Rank";
+    "Symbol";
+    "Grade";
+    "Score";
+    "Entry";
+    "Close vs entry";
+    "Stop";
+    "Risk %";
+    "Resistance";
+    "Rationale";
+    "Instruction";
+  ]
+
+let _candidate_rows shown =
+  List.mapi shown ~f:(fun i c -> _candidate_row ~rank:(i + 1) c)
+
 let _candidate_table candidates ~limit =
-  let header =
-    _table_header
-      [
-        "Rank";
-        "Symbol";
-        "Grade";
-        "Score";
-        "Entry";
-        "Stop";
-        "Risk %";
-        "Resistance";
-        "Rationale";
-        "Instruction";
-      ]
-  in
   match candidates with
   | [] -> _empty_marker
   | _ ->
       let shown = List.take candidates limit in
       let hidden = List.drop candidates limit in
-      let rows =
-        List.mapi shown ~f:(fun i c -> _candidate_row ~rank:(i + 1) c)
-      in
-      String.concat ~sep:"\n" (header :: rows)
+      String.concat ~sep:"\n"
+        (_table_header _candidate_columns :: _candidate_rows shown)
       |> _append_table_notes ~shown ~hidden
 
 (* Recommended-stop cell: this week's recomputed Weinstein support-floor stop

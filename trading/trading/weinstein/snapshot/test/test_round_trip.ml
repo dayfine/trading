@@ -40,6 +40,7 @@ let _full_snapshot : Weekly_snapshot.t =
           sizing_note = None;
           stop_is_structural = true;
           data_suspect = false;
+          reconciliation = Entry_reconciliation.Not_reconciled;
         };
         {
           symbol = "MSFT";
@@ -58,6 +59,7 @@ let _full_snapshot : Weekly_snapshot.t =
           sizing_note = Some "0 sh — cash / caps exhausted";
           stop_is_structural = false;
           data_suspect = false;
+          reconciliation = Entry_reconciliation.Not_reconciled;
         };
       ];
     short_candidates = [];

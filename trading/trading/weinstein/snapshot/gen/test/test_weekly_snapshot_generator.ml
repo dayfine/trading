@@ -1036,6 +1036,7 @@ let _mk_candidate ~symbol ~entry ~stop : Weekly_snapshot.candidate =
     sizing_note = None;
     stop_is_structural = false;
     data_suspect = false;
+    reconciliation = Entry_reconciliation.Not_reconciled;
   }
 
 let _stops_cfg () =
@@ -1427,9 +1428,163 @@ let test_armed_rename_detect_on_clean_universe_is_a_no_op _ =
          field (fun (s : Weekly_snapshot.t) -> s.warnings) is_empty;
        ])
 
+(* ------------------------------------------------------------------ *)
+(* Entry reconciliation at the generate seam (issue #2103)              *)
+(* ------------------------------------------------------------------ *)
+
+let _armed_inputs ~bar_reader ~ticker_sectors ~through_band_pct
+    ~extension_max_pct : Generator.inputs =
+  let base = _inputs ~bar_reader ~ticker_sectors in
+  {
+    base with
+    config =
+      {
+        base.config with
+        entry_through_band_pct = through_band_pct;
+        entry_extension_max_pct = extension_max_pct;
+      };
+  }
+
+(* The close the reconciliation must pick up, read through the SAME reader the
+   generator uses (so this is data, not a re-implementation). *)
+let _reader_close bar_reader symbol =
+  Bar_reader.daily_bars_for bar_reader ~symbol ~as_of:_as_of
+  |> List.last
+  |> Option.value_map ~default:0.0 ~f:(fun (b : Types.Daily_price.t) ->
+      b.close_price)
+
+let _find_candidate candidates symbol =
+  List.find candidates ~f:(fun (c : Weekly_snapshot.candidate) ->
+      String.equal c.symbol symbol)
+
+let _class_label (c : Weekly_snapshot.candidate) =
+  Entry_reconciliation.label c.reconciliation
+
+let _overshoot (c : Weekly_snapshot.candidate) =
+  Option.map (Entry_reconciliation.levels_of c.reconciliation)
+    ~f:(fun (l : Entry_reconciliation.levels) -> l.overshoot_pct)
+
+(* Thresholds wide enough to force [Through_entry] whichever side of its entry
+   the synthetic fixture's close happens to sit on: a band below any achievable
+   overshoot and a cap above one. The exact close of a [Synthetic_source]
+   breakout is a property of that generator, not of this feature, so forcing the
+   class keeps the assertion about the WIRING rather than about the fixture. *)
+let _wide_band = -1000.0
+let _wide_cap = 1000.0
+
+(* LONG arm at the generate seam. Two independent claims:
+
+   1. the pass ran at all — the candidate carries a real class, where a
+      no-op wiring would leave [Not_reconciled] and no levels;
+   2. {b sizing is anchored to the reconciled fill}, which is the actual #2103
+      defect: [sized_position_value] equals [sized_shares * close]. Under the
+      pre-fix code it equalled [sized_shares * entry], and the guard matcher
+      below asserts those two are genuinely different for this fixture, so the
+      test cannot pass by coincidence. *)
+let test_long_candidate_reconciled_and_sized_on_the_fill _ =
+  let bar_reader = _breakout_bar_reader () in
+  let close = _reader_close bar_reader "AAPL" in
+  let snap =
+    Generator.generate
+      (_armed_inputs ~bar_reader
+         ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+         ~through_band_pct:_wide_band ~extension_max_pct:_wide_cap)
+  in
+  assert_that
+    (_find_candidate (snap : Weekly_snapshot.t).long_candidates "AAPL")
+    (is_some_and
+       (all_of
+          [
+            field _class_label (is_some_and (equal_to "through-entry"));
+            field
+              (fun (c : Weekly_snapshot.candidate) ->
+                Weekly_snapshot.expected_fill_price c)
+              (float_equal close);
+            field
+              (fun (c : Weekly_snapshot.candidate) -> c.sized_shares)
+              (gt (module Int_ord) 0);
+            field
+              (fun (c : Weekly_snapshot.candidate) ->
+                c.sized_position_value -. (Float.of_int c.sized_shares *. close))
+              (float_equal 0.0);
+            (* Guard: entry and close differ, so "sized on the fill" and "sized
+               on the entry" are distinguishable outcomes here. *)
+            field
+              (fun (c : Weekly_snapshot.candidate) ->
+                Float.abs (c.entry -. close))
+              (gt (module Float_ord) 0.01);
+          ]))
+
+(* R1 no-op: with the default config (both thresholds [0.0]) the same fixture
+   produces an UNRECONCILED candidate sized on its entry level — bit-identical
+   to pre-#2103 behaviour. *)
+let test_default_config_leaves_candidates_unreconciled _ =
+  let snap =
+    _generate ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  assert_that
+    (_find_candidate (snap : Weekly_snapshot.t).long_candidates "AAPL")
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (c : Weekly_snapshot.candidate) -> c.reconciliation)
+              (equal_to Entry_reconciliation.Not_reconciled);
+            field _class_label is_none;
+            field
+              (fun (c : Weekly_snapshot.candidate) ->
+                c.sized_position_value
+                -. (Float.of_int c.sized_shares *. c.entry))
+              (float_equal 0.0);
+          ]))
+
+(* SHORT arm at the generate seam — the mirror.
+
+   Mutation checks, both of which this single test catches:
+
+   - dropping [_reconcile_entry] from the short pipeline in
+     [weekly_snapshot_generator._build_candidates] leaves [Not_reconciled], so
+     the class matcher and the overshoot matcher both fail;
+   - passing [~side:`Long] instead of [~side:`Short] flips the SIGN of the
+     overshoot (the long form is [(close - entry) / entry], the short form its
+     mirror), so the overshoot matcher fails. The guard matcher pins that entry
+     and close differ here, which is what makes the two signs distinguishable. *)
+let test_short_candidate_reconciled_at_generate_seam _ =
+  let bar_reader = _short_bar_reader () in
+  let close = _reader_close bar_reader _short_symbol in
+  let snap =
+    Generator.generate
+      (_armed_inputs ~bar_reader
+         ~ticker_sectors:[ (_short_symbol, "Information Technology") ]
+         ~through_band_pct:_wide_band ~extension_max_pct:_wide_cap)
+  in
+  assert_that
+    (_find_candidate (snap : Weekly_snapshot.t).short_candidates _short_symbol)
+    (is_some_and
+       (all_of
+          [
+            field _class_label (is_some_and (equal_to "through-entry"));
+            field
+              (fun (c : Weekly_snapshot.candidate) ->
+                Option.value (_overshoot c) ~default:0.0
+                -. ((c.entry -. close) /. c.entry *. 100.0))
+              (float_equal 0.0);
+            field
+              (fun (c : Weekly_snapshot.candidate) ->
+                Float.abs (c.entry -. close))
+              (gt (module Float_ord) 0.01);
+          ]))
+
 let suite =
   "weekly_snapshot_generator"
   >::: [
+         "long candidate reconciled and sized on the fill"
+         >:: test_long_candidate_reconciled_and_sized_on_the_fill;
+         "default config leaves candidates unreconciled"
+         >:: test_default_config_leaves_candidates_unreconciled;
+         "short candidate reconciled at the generate seam"
+         >:: test_short_candidate_reconciled_at_generate_seam;
          "short candidate stop recomputed above entry"
          >:: test_short_candidate_stop_recomputed_above_entry;
          "short candidate overlay applied at the generate seam"

@@ -135,12 +135,41 @@ type candidate = {
           fewer than two resident bars, or when the last move is under the
           threshold. Additive field: old snapshots without it parse as [false].
       *)
+  reconciliation : Entry_reconciliation.t;
+      [@sexp.default Entry_reconciliation.Not_reconciled]
+      (** How this candidate's CURRENT close stands against [entry] — the
+          breakout level from the transition week, which the <=4-week
+          early-Stage-2 admission window lets a pick outrun by weeks (issue
+          #2103). Computed at generate time by
+          {!Weinstein_snapshot_gen.Entry_reconcile}; see {!Entry_reconciliation}
+          for the classification and its Weinstein authority.
+
+          Drives {!expected_fill_price}, and through it the [sized_*] fields and
+          the rendered order ticket: a {!Entry_reconciliation.Through_entry}
+          candidate is sized on its close (the price it would actually fill at),
+          and an {!Entry_reconciliation.Extended} one is not sized at all
+          because its ticket is suppressed. Additive field defaulting to
+          {!Entry_reconciliation.Not_reconciled}: old snapshots — and any run
+          with the mechanism disarmed — parse and behave exactly as before the
+          fix. *)
 }
 [@@deriving sexp, eq, show]
 (** A single ranked candidate. Same shape for long and short candidates — the
     list it lives in determines side. The [sized_*] / [sizing_note] fields are
     populated for long candidates by the generator when it has a live portfolio;
     they default to the unsized values so pre-sizing snapshots round-trip. *)
+
+val expected_fill_price : candidate -> float
+(** The price this candidate would actually fill at — the close for a
+    {!Entry_reconciliation.Through_entry} candidate (whose resting stop order is
+    already triggered, so it fills at the market), and [entry] for every other
+    class.
+
+    {b The single source of truth for sizing and for display.} Issue #2103 was
+    exactly the two disagreeing: the ticket showed a $46.08 breakout level while
+    the stock traded at $62, so the displayed risk understated the real risk by
+    14x. Both {!Weinstein_snapshot_gen.Trade_sizing} and the report renderers
+    call this, so the arithmetic and the printed price cannot drift apart. *)
 
 type held_position = {
   symbol : string;  (** Ticker of the held position. *)

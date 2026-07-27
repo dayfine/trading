@@ -148,6 +148,7 @@ let _phantom_long_candidate : Weekly_snapshot.candidate =
     sizing_note = None;
     stop_is_structural = false;
     data_suspect = false;
+    reconciliation = Entry_reconciliation.Not_reconciled;
   }
 
 let test_aapl_2020_split_phantom_pick_fails _ =
