@@ -274,6 +274,26 @@
  (action
   (run sh %{dep:deep_scan_drift_coverage_check.sh})))
 
+; Deep scan follow-up/open-item counter (H-FOLLOWUP-COUNT): change-detector
+; test. Unlike the structural smoke tests above, this actually invokes
+; check_05_followup_items.sh and check_08_trends.sh against a synthetic
+; fixture tree (via the REPO_ROOT env-var override) with a known-correct
+; answer — it pins the "- [ ]"-only filter, heading-unscoped counting, and
+; the Check 5 -> Check 8 sidecar handoff. Deps list the two underlying
+; check scripts + deep_scan/_lib.sh explicitly (not just _check_lib.sh) so
+; dune's cache invalidates when their logic changes, not only when this
+; test file changes.
+
+(rule
+ (alias runtest)
+ (deps
+  _check_lib.sh
+  deep_scan/_lib.sh
+  deep_scan/check_05_followup_items.sh
+  deep_scan/check_08_trends.sh)
+ (action
+  (run sh %{dep:deep_scan_followup_count_check.sh})))
+
 ; Same-day summary consolidation smoke test: generates a 3-run fixture in /tmp/,
 ; runs dev/lib/consolidate_day.sh, and verifies deduped output sections.
 ; Does NOT touch real dev/daily/ files.
