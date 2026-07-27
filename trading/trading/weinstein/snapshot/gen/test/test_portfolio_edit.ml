@@ -104,6 +104,18 @@ let test_record_rejects_non_positive_shares _ =
   assert_that (_msg result)
     (is_some_and (contains_substring "shares must be positive"))
 
+(* A blank ticker is rejected rather than booked: without this guard a typo'd
+   [--symbol] would append an empty-ticker ghost position *and* debit the cash
+   to pay for it. Whitespace-only rather than [""] so the check also pins the
+   strip in the symbol normalisation — [" "] must count as blank. *)
+let test_record_rejects_blank_symbol _ =
+  let result =
+    Portfolio_edit.record _empty ~as_of:_as_of
+      ~position:{ _aapl with symbol = "   " }
+  in
+  assert_that (_msg result)
+    (is_some_and (contains_substring "symbol must not be blank"))
+
 (* --- close -------------------------------------------------------------- *)
 
 (* A full exit credits 100 * 200.0 = 20_000.0 and drops the holding. *)
@@ -245,6 +257,49 @@ let test_adjust_rejects_unheld_symbol _ =
   in
   assert_that (_msg result) (is_some_and (contains_substring "is not held"))
 
+(* A negative trim is the phantom-position hazard this whole feature exists to
+   prevent: unguarded, [--trim-shares -10 --trim-price 200] would *mint* ten
+   shares and move 2_000.0 of cash the wrong way. *)
+let test_adjust_rejects_negative_trim_shares _ =
+  let result =
+    Portfolio_edit.adjust _held ~as_of:_as_of ~symbol:"AAPL"
+      ~trim:{ shares = -10; price = 200.0 }
+      ()
+  in
+  assert_that (_msg result)
+    (is_some_and (contains_substring "trim-shares must be positive"))
+
+(* A zero/negative trim price would credit nothing (or debit) for shares that
+   nonetheless leave the book. *)
+let test_adjust_rejects_non_positive_trim_price _ =
+  let result =
+    Portfolio_edit.adjust _held ~as_of:_as_of ~symbol:"AAPL"
+      ~trim:{ shares = 10; price = 0.0 }
+      ()
+  in
+  assert_that (_msg result)
+    (is_some_and (contains_substring "trim-price must be positive"))
+
+(* Normalisation is pinned at the [adjust] call site specifically: [record] and
+   [close] each have their own case test, so mutating the shared helper fails
+   those — only this test fails if [adjust] alone stops normalising and starts
+   reporting a held symbol as "not held". *)
+let test_adjust_normalizes_symbol _ =
+  assert_that
+    (Result.ok
+       (Portfolio_edit.adjust _held ~as_of:_as_of ~symbol:"aapl"
+          ~stop_price:175.0 ()))
+    (is_some_and
+       (field _positions
+          (elements_are
+             [
+               all_of
+                 [
+                   field _symbol (equal_to "AAPL");
+                   field _stop (float_equal 175.0);
+                 ];
+             ])))
+
 let test_adjust_rejects_non_positive_stop _ =
   let result =
     Portfolio_edit.adjust _held ~as_of:_as_of ~symbol:"AAPL" ~stop_price:0.0 ()
@@ -286,6 +341,7 @@ let suite =
          >:: test_record_rejects_stop_above_entry;
          "record_rejects_non_positive_shares"
          >:: test_record_rejects_non_positive_shares;
+         "record_rejects_blank_symbol" >:: test_record_rejects_blank_symbol;
          "close_credits_and_removes" >:: test_close_credits_and_removes;
          "close_normalizes_symbol" >:: test_close_normalizes_symbol;
          "close_twice_rejects" >:: test_close_twice_rejects;
@@ -300,6 +356,11 @@ let suite =
          "adjust_rejects_full_trim" >:: test_adjust_rejects_full_trim;
          "adjust_rejects_no_op" >:: test_adjust_rejects_no_op;
          "adjust_rejects_unheld_symbol" >:: test_adjust_rejects_unheld_symbol;
+         "adjust_rejects_negative_trim_shares"
+         >:: test_adjust_rejects_negative_trim_shares;
+         "adjust_rejects_non_positive_trim_price"
+         >:: test_adjust_rejects_non_positive_trim_price;
+         "adjust_normalizes_symbol" >:: test_adjust_normalizes_symbol;
          "adjust_rejects_non_positive_stop"
          >:: test_adjust_rejects_non_positive_stop;
          "adjust_leaves_other_positions_alone"

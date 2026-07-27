@@ -89,6 +89,9 @@ val adjust :
     - [?stop_price] sets the working stop; no cash moves. Unlike {!record} this
       does {b not} require the stop to sit below [entry_price]: a trailing stop
       legitimately rises past the entry once the position is in profit.
+      {b Lowering} a stop is currently permitted as well; whether a ratchet
+      should be enforced is deferred to the trailing-stop state-machine work
+      (weekly-snapshot item 4c.b), which owns that policy.
     - [?trim] sells part of the holding, crediting [shares * price] to cash and
       reducing the position's share count.
 

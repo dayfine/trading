@@ -42,10 +42,32 @@ the initial-stop rule on every adjustment would reject correct trailing-stop
 updates. Item 4c.b (automating that trail across weeks) remains a separate PR —
 this CLI only lets the user *set* the field.
 
-28 tests; **10 mutations, 10 red**, each naming the test that caught it. Cash
+32 tests; **15 mutations, 15 red**, each naming the test that caught it. Cash
 arithmetic is pinned numerically on every happy path. The nesting linter failed
 three functions on the first draft; fixed by extracting named `_check_*`
 helpers, not by a marker or a limit bump.
+
+*Rework iteration 1 (both QC gates NEEDS_REWORK).* Structural: two
+`let _ = Live_portfolio.save …` discarded a `Result`, so a failed write would
+have surfaced only indirectly as a confusing failure in the read that followed
+— both now assert the outcome. Behavioral: three `.mli`-documented guards were
+correct but **unfenced**, and mutating them left the suite green. Fenced now:
+`record`'s blank-symbol check (a typo'd ticker would otherwise book a ghost
+position *and* debit cash for it); `trim.shares` positivity — the serious one,
+since `--trim-shares -10 --trim-price 200` would have *minted* ten shares and
+moved 2_000.0 the wrong way, i.e. the #2059 phantom-position class in the one
+operation this CLI exists to make safe; and `trim.price` positivity. A fourth
+test pins symbol normalisation at the **`adjust` call site specifically** —
+`record` and `close` each already had one, so mutating the shared helper failed
+those and left `adjust` only *reading* as covered. All four verified red against
+their mutation. Implementation was already correct; these were missing tests,
+and no logic changed.
+
+Two findings recorded rather than fixed: `adjust --stop-price` accepts a
+*lowered* stop, now noted in the `.mli` as deferred to item 4c.b (the
+trailing-stop state machine owns ratchet policy); and `Live_portfolio.header`
+can drift from the schema it documents, filed to `dev/status/cleanup.md`
+§Backlog as a `LINTER_CANDIDATE`.
 
 **2026-07-27 (Picks Phase C v2 — HTML report to the committed design reference,
 branch `feat/picks-phase-c-v2`):** #2105 shipped the presentation half of Phase
