@@ -18,6 +18,34 @@
 - **Sector Analyzer** — new: `analysis/weinstein/sector/`
 - **Screener** — new: `analysis/weinstein/screener/`
 
+**Added after the initial design** (capital-recycling + entry-pattern detectors,
+and the daily-snapshot streaming pipeline — see each module's `.mli` for full
+detail):
+
+- **Support Mapper** — new: `analysis/weinstein/support/` — short-side mirror of
+  the Resistance Mapper: grades trapped-long support below a breakdown price
+  using the same four-value `overhead_quality` scale, side-flipped.
+- **Continuation-Buy Detector** — new: `analysis/weinstein/continuation/` —
+  detects the late-Stage-2 "pull back to the 30-week MA, consolidate, break out
+  again" re-entry pattern for symbols not already held.
+- **Laggard Rotation** — new: `analysis/weinstein/laggard_rotation/` — capital
+  recycling: flags a held long position as a rotation candidate once its 13-week
+  relative strength vs. the benchmark has been negative for a configurable
+  number of consecutive weekly observations.
+- **Stage-3 Force Exit** — new: `analysis/weinstein/stage3_force_exit/` —
+  capital recycling: force-exits a held long position once `Stage.classify` has
+  read `Stage3` for a configurable number of consecutive weekly observations,
+  rather than waiting for Stage 4 or a stop to trigger.
+- **Snapshot Pipeline** — new: `analysis/weinstein/snapshot_pipeline/` — Phase B
+  of the daily-snapshot streaming pipeline
+  (`dev/plans/daily-snapshot-streaming-2026-04-27.md`): builds one
+  causally-consistent, column-aligned indicator row per (symbol, day) from daily
+  CSV bars, reusing the same analyzer modules the runtime strategy consumes.
+- **Snapshot Runtime** — new: `analysis/weinstein/snapshot_runtime/` — Phase C
+  of the same pipeline: a per-symbol LRU snapshot cache (mmap'd v2 columnar
+  files or decoded v1 fallback) plus a thin field-accessor shim that lets the
+  strategy/screener read precomputed indicator values without re-deriving bars.
+
 ## 2.2 Requirements
 
 **Functional:**
