@@ -29,8 +29,22 @@
 #   The escalation policy (harness-engineering-plan.md) triggers human
 #   review when consecutive_rework_count >= 3 for any feature.
 #
-# This script is idempotent: re-running with the same --date and
-# --feature overwrites the previous record.
+# This script is idempotent: re-running with the same --date, --branch,
+# and --feature overwrites the previous record (see H-AUDIT-COLLISION,
+# dev/status/harness.md).
+#
+# Filename key: dev/audit/<date>-<branch-sanitized>-<feature>.json. The
+# branch segment exists because <date>-<feature>.json alone collided
+# whenever a track got a second QC review on the same day (a second PR,
+# a -v2 branch, 2-4 orchestrator runs/day) -- the second write silently
+# clobbered the first. --branch is always supplied by the orchestrator's
+# record_qc_audit.sh call; when it is omitted (bare direct invocation)
+# the filename falls back to the original <date>-<feature>.json shape.
+# The branch segment sits BETWEEN date and feature (not appended after)
+# so the filename still ENDS with "-<feature>.json" -- both dev/audit
+# consumers (the consecutive_rework_count scan below and
+# deep_scan/check_06_qc_calibration.sh) glob on that suffix and must not
+# need to change shape.
 
 set -euo pipefail
 
@@ -128,6 +142,18 @@ AUDIT_DIR="$REPO_ROOT/dev/audit"
 # Create audit directory if it does not exist
 mkdir -p "$AUDIT_DIR"
 
+# --- Compute output filename ---
+#
+# Sanitize the branch for filesystem safety (git branch names commonly
+# contain "/", e.g. "feat/picks-phase-c"; replace with "-").
+if [ -n "$BRANCH" ]; then
+  BRANCH_SAFE="$(printf '%s' "$BRANCH" | tr '/' '-')"
+  OUTPUT_FILE="$AUDIT_DIR/${DATE}-${BRANCH_SAFE}-${FEATURE}.json"
+else
+  OUTPUT_FILE="$AUDIT_DIR/${DATE}-${FEATURE}.json"
+fi
+OUTPUT_BASENAME="$(basename "$OUTPUT_FILE")"
+
 # --- Compute consecutive_rework_count ---
 #
 # Look at prior audit records for this feature, sorted by date descending.
@@ -145,9 +171,11 @@ if [ "$OVERALL" = "NEEDS_REWORK" ]; then
   prior_files=$(ls -1 "$AUDIT_DIR"/*-"$FEATURE".json 2>/dev/null | sort -r || true)
 
   for f in $prior_files; do
-    # Skip the file we are about to write (same date+feature)
+    # Skip the file we are about to write (same date+branch+feature --
+    # this is what makes re-running for the SAME review idempotent
+    # rather than counting itself as a prior NEEDS_REWORK).
     basename_f="$(basename "$f")"
-    if [ "$basename_f" = "${DATE}-${FEATURE}.json" ]; then
+    if [ "$basename_f" = "$OUTPUT_BASENAME" ]; then
       continue
     fi
 
@@ -164,8 +192,9 @@ if [ "$OVERALL" = "NEEDS_REWORK" ]; then
 fi
 
 # --- Write JSON ---
-
-OUTPUT_FILE="$AUDIT_DIR/${DATE}-${FEATURE}.json"
+#
+# OUTPUT_FILE was computed earlier (before the consecutive_rework_count
+# scan) so that scan could skip its own about-to-be-written record.
 
 # Escape strings for JSON (handle double quotes and backslashes)
 _json_str() {

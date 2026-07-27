@@ -88,16 +88,17 @@ EOF
 
 out=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE1}" "feat/dummy" "2026-05-25" 2>&1) && rc=0 || rc=$?
-if (( rc == 0 )) && [[ -f "${TMP_REPO}/dev/audit/2026-05-25-${FEATURE1}.json" ]] \
-   && grep -q '"structural_qc": *"APPROVED"' "${TMP_REPO}/dev/audit/2026-05-25-${FEATURE1}.json" \
-   && grep -q '"behavioral_qc": *"APPROVED"' "${TMP_REPO}/dev/audit/2026-05-25-${FEATURE1}.json" \
-   && grep -q '"quality_score": *4' "${TMP_REPO}/dev/audit/2026-05-25-${FEATURE1}.json"; then
+JSON1="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE1}.json"
+if (( rc == 0 )) && [[ -f "${JSON1}" ]] \
+   && grep -q '"structural_qc": *"APPROVED"' "${JSON1}" \
+   && grep -q '"behavioral_qc": *"APPROVED"' "${JSON1}" \
+   && grep -q '"quality_score": *4' "${JSON1}"; then
   pass "scenario 1 — file-mode regression: APPROVED+APPROVED+score 4 extracted"
 else
   fail "scenario 1 — file-mode regression: expected APPROVED+APPROVED+4; got rc=${rc}, output:"
   echo "${out}" | sed 's/^/      /'
-  [[ -f "${TMP_REPO}/dev/audit/2026-05-25-${FEATURE1}.json" ]] && \
-    echo "      json: $(cat "${TMP_REPO}/dev/audit/2026-05-25-${FEATURE1}.json")"
+  [[ -f "${JSON1}" ]] && \
+    echo "      json: $(cat "${JSON1}")"
 fi
 
 # ---------------------------------------------------------------------------
@@ -132,7 +133,7 @@ make_gh_mock "${S2_DIR}" "${S2_DIR}/reviews.jsonl"
 out=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S2_DIR}/gh" \
         bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE2}" "feat/dummy" "2026-05-25" --pr-number 1234 2>&1) && rc=0 || rc=$?
-JSON2="${TMP_REPO}/dev/audit/2026-05-25-${FEATURE2}.json"
+JSON2="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE2}.json"
 if (( rc == 0 )) && [[ -f "${JSON2}" ]] \
    && grep -q '"structural_qc": *"APPROVED"' "${JSON2}" \
    && grep -q '"behavioral_qc": *"APPROVED"' "${JSON2}" \
@@ -178,7 +179,7 @@ make_gh_mock "${S3_DIR}" "${S3_DIR}/reviews.jsonl"
 out=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S3_DIR}/gh" \
         bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE3}" "feat/dummy" "2026-05-25" --pr-number 1235 2>&1) && rc=0 || rc=$?
-JSON3="${TMP_REPO}/dev/audit/2026-05-25-${FEATURE3}.json"
+JSON3="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE3}.json"
 if (( rc == 0 )) && [[ -f "${JSON3}" ]] \
    && grep -q '"structural_qc": *"APPROVED"' "${JSON3}" \
    && grep -q '"behavioral_qc": *"NEEDS_REWORK"' "${JSON3}" \
@@ -237,7 +238,7 @@ make_gh_mock "${S5_DIR}" "${S5_DIR}/reviews.jsonl"
 out=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S5_DIR}/gh" \
         bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE5}" "feat/dummy" "2026-05-25" --pr-number 1236 2>&1) && rc=0 || rc=$?
-JSON5="${TMP_REPO}/dev/audit/2026-05-25-${FEATURE5}.json"
+JSON5="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE5}.json"
 if (( rc == 0 )) && [[ -f "${JSON5}" ]] \
    && grep -q '"structural_qc": *"APPROVED"' "${JSON5}" \
    && grep -q '"behavioral_qc": *"NEEDS_REWORK"' "${JSON5}" \
@@ -282,7 +283,7 @@ EOF
 out=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S6_DIR}/gh" \
         bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE6}" "feat/dummy" "2026-05-25" --pr-number 1237 2>&1) && rc=0 || rc=$?
-JSON6="${TMP_REPO}/dev/audit/2026-05-25-${FEATURE6}.json"
+JSON6="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE6}.json"
 if (( rc == 0 )) && [[ -f "${JSON6}" ]] \
    && grep -q '"structural_qc": *"APPROVED"' "${JSON6}" \
    && grep -q '"behavioral_qc": *"APPROVED"' "${JSON6}" \
@@ -293,6 +294,88 @@ else
   fail "scenario 6 — expected file-fallback APPROVED+APPROVED+5; got rc=${rc}, output:"
   echo "${out}" | sed 's/^/      /'
   [[ -f "${JSON6}" ]] && echo "      json: $(cat "${JSON6}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 7 — H-AUDIT-COLLISION regression: two branches reviewing the same
+# feature/track on the same date must produce two DISTINCT audit files
+# (not one clobbering the other), while re-invoking for the SAME branch
+# stays idempotent (overwrites its own record, does not accumulate a
+# duplicate).
+# ---------------------------------------------------------------------------
+FEATURE7="weekly-snapshot"
+cat > "${TMP_REPO}/dev/reviews/${FEATURE7}.md" <<'EOF'
+Reviewed SHA: run1sha
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+4 — clean implementation
+EOF
+
+out=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE7}" "feat/picks-phase-c" "2026-07-27" 2>&1) && rc=0 || rc=$?
+JSON7A="${TMP_REPO}/dev/audit/2026-07-27-feat-picks-phase-c-${FEATURE7}.json"
+
+# Second review, different branch ("-v2"), same feature + same date.
+cat > "${TMP_REPO}/dev/reviews/${FEATURE7}.md" <<'EOF'
+Reviewed SHA: run2sha
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+5 — exemplary
+EOF
+out2=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE7}" "feat/picks-phase-c-v2" "2026-07-27" 2>&1) && rc2=0 || rc2=$?
+JSON7B="${TMP_REPO}/dev/audit/2026-07-27-feat-picks-phase-c-v2-${FEATURE7}.json"
+
+if (( rc == 0 )) && (( rc2 == 0 )) \
+   && [[ -f "${JSON7A}" ]] && [[ -f "${JSON7B}" ]] \
+   && [[ "${JSON7A}" != "${JSON7B}" ]] \
+   && grep -q '"quality_score": *4' "${JSON7A}" \
+   && grep -q '"quality_score": *5' "${JSON7B}"; then
+  pass "scenario 7a — two branches, same feature+date → two distinct audit files (H-AUDIT-COLLISION fix)"
+else
+  fail "scenario 7a — expected two distinct files (q=4 and q=5); got rc=${rc}, rc2=${rc2}"
+  echo "${out}" | sed 's/^/      /'
+  echo "${out2}" | sed 's/^/      /'
+  [[ -f "${JSON7A}" ]] && echo "      json A: $(cat "${JSON7A}")"
+  [[ -f "${JSON7B}" ]] && echo "      json B: $(cat "${JSON7B}")"
+fi
+
+# Re-invoke for the FIRST branch again (idempotency check): must overwrite
+# its own record, not create a third file, and JSON7B (the sibling branch's
+# record) must survive untouched.
+cat > "${TMP_REPO}/dev/reviews/${FEATURE7}.md" <<'EOF'
+Reviewed SHA: run1sha-rerun
+
+structural_qc: APPROVED
+behavioral_qc: NEEDS_REWORK
+overall_qc: NEEDS_REWORK
+
+## Quality Score
+2 — rerun found an issue
+EOF
+out3=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE7}" "feat/picks-phase-c" "2026-07-27" 2>&1) && rc3=0 || rc3=$?
+
+audit_count="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "2026-07-27-*-${FEATURE7}.json" | wc -l | tr -d ' ')"
+
+if (( rc3 == 0 )) && [[ -f "${JSON7A}" ]] && [[ -f "${JSON7B}" ]] \
+   && [[ "${audit_count}" == "2" ]] \
+   && grep -q '"quality_score": *2' "${JSON7A}" \
+   && grep -q '"quality_score": *5' "${JSON7B}"; then
+  pass "scenario 7b — re-invoking same branch overwrites its own record (idempotent, no duplicate)"
+else
+  fail "scenario 7b — expected exactly 2 audit files for ${FEATURE7} on 2026-07-27, JSON7A rewritten to q=2, JSON7B untouched at q=5; got rc=${rc3}, audit_count=${audit_count}"
+  echo "${out3}" | sed 's/^/      /'
+  [[ -f "${JSON7A}" ]] && echo "      json A: $(cat "${JSON7A}")"
+  [[ -f "${JSON7B}" ]] && echo "      json B: $(cat "${JSON7B}")"
 fi
 
 # ---------------------------------------------------------------------------
