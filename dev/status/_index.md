@@ -57,7 +57,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
-| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | #2083 F1 `96c4c5ff` + F3 `089116bc` MERGED; F2 live rename detection MERGED `060ea11b` (#2100, default-off) — #2083 closed by code; next: bar-store-wide scan + universe re-pin (maintainer-local, needs real data) |
+| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | #2083 closed by code (F1 `96c4c5ff`, F3 `089116bc`, F2 `060ea11b`, default-off); next: bar-store-wide rename scan + universe re-pin (maintainer-local) |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
 | [tax-lens](tax-lens.md) | MERGED | feat-backtest | — | Phase 1 #2066 + CP4 loader error-path contract #2073 MERGED; Phase 2 wash-sale / April outflows deferred, user-gated (#2006) |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | asset-type blocklist MERGED (#1939, default-off); next: arm ATB.curated for live universe build + General::Type enrichment feed |
