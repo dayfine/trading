@@ -516,7 +516,15 @@ let _reconciled_snap ~reconciliation ~sized_shares ~sized_position_value
    close — not a resting BUY STOP at the (already-breached) $100.00 level. The
    sizes quoted are the fill-based ones the sizer produced (57 sh / $6116 /
    risk $986); the pre-fix ticket would have said "BUY STOP 100 sh @ $100.00
-   … risk $1000". The legend explaining the column appears below the table. *)
+   … risk $1000". The legend explaining the column appears below the table.
+
+   {b Risk % is quoted against the FILL}: (107.30 - 90.00) / 107.30 = 16.1%,
+   which agrees with the instruction's own $986.10 / $6116.10 = 16.12%. The
+   entry-based figure reads 10.0%, and the FIRST version of this test pinned
+   exactly that — locking in a row whose Risk % cell contradicted the ticket
+   printed beside it (review round 1). A row that disagrees with itself is issue
+   #2103 in miniature, so the two numbers are now asserted together and a
+   regression on either turns this red. *)
 let test_through_entry_row_renders_market_order _ =
   let md =
     Report_renderer.render
@@ -532,7 +540,7 @@ let test_through_entry_row_renders_market_order _ =
        [
          _has_substring
            "| 1 | TEST | B | 0.50 | $100.00 | $107.30 (+7.3% through) | $90.00 \
-            | 10.0% |";
+            | 16.1% |";
          _has_substring
            "BUY MARKET 57 sh @ ~$107.30 (~$6116, 6.1% of book, risk $986) — \
             price is 7.3% through the $100.00 entry level, so the order fills \

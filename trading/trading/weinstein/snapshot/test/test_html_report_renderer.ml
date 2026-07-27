@@ -652,7 +652,14 @@ let _reconciled_snapshot =
 
 (* The class rides as a tag chip with a per-class CSS modifier, and the chip's
    text is the SAME string the Markdown column shows — both come from
-   [Report_shared.close_vs_entry], so the two formats cannot drift. *)
+   [Report_shared.close_vs_entry], so the two formats cannot drift.
+
+   The Risk % cell is asserted here too. The first version of this test had NO
+   Risk % assertion on a reconciled row, which is exactly why the HTML side of
+   the stale-risk defect survived eight mutations invisibly (review round 1):
+   (107.30 - 90.00) / 107.30 = 16.1% at the fill, where the entry-based figure
+   reads 10.0%. Same number the Markdown renderer pins, so the two formats are
+   held to one arithmetic. *)
 let test_through_entry_chip_rendered_on_the_long_arm _ =
   let html = Html_report_renderer.render _reconciled_snapshot in
   assert_that html
@@ -661,6 +668,10 @@ let test_through_entry_chip_rendered_on_the_long_arm _ =
          _has_substring
            "<td class=\"num\"><span class=\"chip chip-through-entry\">$107.30 \
             (+7.3% through)</span></td>";
+         _has_substring "<td class=\"num\">16.1%</td>";
+         not_
+           ~msg:"Risk % must not be quoted against the already-breached entry"
+           (_has_substring "<td class=\"num\">10.0%</td>");
          _has_substring
            "<td class=\"instruction\">BUY MARKET 57 sh @ ~$107.30 (~$6116, \
             6.1% of book, risk $986)";
@@ -670,7 +681,14 @@ let test_through_entry_chip_rendered_on_the_long_arm _ =
 (* The SHORT arm gets the mirrored treatment: an over-extended short carries the
    EXTENDED chip and its ticket is suppressed. Mutating the short-side reconcile
    wiring to a no-op leaves [Not_reconciled], which renders a plain "-" cell and
-   fails the first matcher. *)
+   fails the first matcher.
+
+   Risk % for an EXTENDED row stays quoted against the ENTRY, because there is
+   no order and therefore no fill to price: this short is entry $50.00 / stop
+   $55.00, so (50 - 55) / 50 = -10.0%. Re-anchoring every reconciled class to
+   the close indiscriminately would give (65.50 - 55) / 65.50 = 16.0% instead,
+   so this matcher separates "risk at the expected fill" from "risk at the
+   close". *)
 let test_extended_chip_and_suppression_on_the_short_arm _ =
   let html = Html_report_renderer.render _reconciled_snapshot in
   assert_that html
@@ -679,6 +697,7 @@ let test_extended_chip_and_suppression_on_the_short_arm _ =
          _has_substring
            "<td class=\"num\"><span class=\"chip chip-extended\">$65.50 \
             (+34.5% EXTENDED)</span></td>";
+         _has_substring "<td class=\"num\">-10.0%</td>";
          _has_substring
            "<td class=\"instruction\">NO ORDER — do not chase: +34.5% past the";
        ])

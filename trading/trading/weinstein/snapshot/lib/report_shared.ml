@@ -16,8 +16,14 @@ let _stop_order (c : Weekly_snapshot.candidate) =
 
 (* Re-anchored market ticket (issue #2103): price is already through the entry,
    so a resting stop there is an instantly-filling market order. The ticket says
-   so, quotes the fill it is sized on, and names the overshoot — the numbers
-   here come from [expected_fill_price], not from the stale [c.entry]. *)
+   so, quotes the fill it is sized on, and names the overshoot.
+
+   The quoted price comes from {!Weekly_snapshot.expected_fill_price} — the same
+   accessor [Trade_sizing] sizes on — and NOT from [l.close], which merely
+   happens to hold the same value. Sourcing it structurally is what makes the
+   single-source-of-truth claim in [weekly_snapshot.mli] true rather than
+   coincidentally true (review round 1). [l] remains the source of the
+   overshoot, which only the class carries. *)
 let _market_order (c : Weekly_snapshot.candidate)
     (l : Entry_reconciliation.levels) =
   Printf.sprintf
@@ -25,7 +31,9 @@ let _market_order (c : Weekly_snapshot.candidate)
      %.1f%% through the $%.2f entry level, so the order fills at the market; \
      sized on the expected fill, not the entry level; on fill place SELL STOP \
      @ $%.2f, GTC"
-    c.sized_shares l.close c.sized_position_value
+    c.sized_shares
+    (Weekly_snapshot.expected_fill_price c)
+    c.sized_position_value
     (c.sized_position_pct *. 100.0)
     c.sized_risk_amount l.overshoot_pct c.entry c.stop
 

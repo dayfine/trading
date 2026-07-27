@@ -42,11 +42,17 @@
       kept for watch purposes.
 
     {b Weinstein authority}: [docs/design/weinstein-book-reference.md] §1 "Stage
-    2 detail (Ch. 2)" — "After initial rally, usually at least one pullback
-    close to the breakout point — this is a second chance to buy […]
-    {b Late Stage 2 warning:} … still a 'hold' but no longer a buy; reward/risk
-    has shifted against you." The book names the breakout point as the buy and
-    says explicitly that a name which has run on is no longer one.
+    2 detail (Ch. 2)" — "Begins when stock breaks out above the top of the
+    resistance zone […] After initial rally, usually at least one pullback close
+    to the breakout point — this is a second chance to buy."
+
+    That clause is the whole support for the cap: the book locates the buy
+    {e at} the breakout, or on a pullback back {e close to} it. A name trading
+    far above its breakout is at neither, so there is no Weinstein buy point to
+    write a ticket against. (The section's "Late Stage 2 warning" reads
+    similarly but is {b not} cited here: it is conditioned on the stock sagging
+    toward its MA with the MA's ascent flattening, which is a different
+    predicate from distance past the breakout.)
 
     This module changes no admission rule and schedules no re-entry: it
     describes the executable ticket attached to an already-admitted candidate.

@@ -49,8 +49,19 @@ let _resistance_cell : string option -> string = function
   | None -> "-"
   | Some g -> g
 
+(* Risk % is computed against the EXPECTED FILL, not the entry level (issue
+   #2103, review round 1). A through-entry candidate fills at the close, so
+   quoting the risk of a fill that will not happen restates the very defect this
+   feature exists to fix — on the armed 15%-cap boundary the entry-based figure
+   reads 10.0% where the real risk at the fill is 21.7%, a 2.2x understatement
+   in a column named "Risk %". For every other class the fill IS the entry, so
+   this is identical to the previous behaviour. *)
 let _candidate_row ~rank (c : Weekly_snapshot.candidate) =
-  let risk = Report_shared.risk_pct ~entry:c.entry ~stop:c.stop in
+  let risk =
+    Report_shared.risk_pct
+      ~entry:(Weekly_snapshot.expected_fill_price c)
+      ~stop:c.stop
+  in
   Printf.sprintf
     "| %d | %s | %s | %.2f | $%.2f | %s | %s | %.1f%% | %s | %s | %s |" rank
     (_symbol_cell c) c.grade c.score c.entry

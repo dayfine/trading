@@ -119,6 +119,17 @@ let _close_vs_entry_td (c : Weekly_snapshot.candidate) =
            (_e (String.lowercase cls))
            (_e text))
 
+(* Risk % against the EXPECTED FILL, never the entry level — see the matching
+   comment in {!Report_renderer._candidate_row} (issue #2103, review round 1).
+   The two renderers must agree cell for cell. *)
+let _risk_td (c : Weekly_snapshot.candidate) =
+  let risk =
+    Report_shared.risk_pct
+      ~entry:(Weekly_snapshot.expected_fill_price c)
+      ~stop:c.stop
+  in
+  _num_td (Printf.sprintf "%.1f%%" risk)
+
 let _candidate_row ~arm ~bars_for ~rank (c : Weekly_snapshot.candidate) =
   [
     _num_td (Int.to_string rank);
@@ -128,9 +139,7 @@ let _candidate_row ~arm ~bars_for ~rank (c : Weekly_snapshot.candidate) =
     _num_td (Printf.sprintf "$%.2f" c.entry);
     _close_vs_entry_td c;
     _stop_td c;
-    _num_td
-      (Printf.sprintf "%.1f%%"
-         (Report_shared.risk_pct ~entry:c.entry ~stop:c.stop));
+    _risk_td c;
     _resistance_td c.resistance_grade;
     _text_td ~cls:"rationale" c.rationale;
     _text_td ~cls:"instruction" (Report_shared.instruction c);

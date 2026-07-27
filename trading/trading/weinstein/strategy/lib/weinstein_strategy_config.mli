@@ -1173,11 +1173,14 @@ type config = {
           trading $62 is an instantly-filling market order whose displayed risk
           understated the real risk 14x (the 2026-07-24 MBX specimen). The
           suppression above the cap follows
-          [docs/design/weinstein-book-reference.md] §1 "Stage 2 detail (Ch. 2)":
-          the breakout point (and the pullback back to it) is the buy, and a
-          name that has run on is "no longer a buy; reward/risk has shifted
-          against you". No admission rule changes, and no pullback-timing
-          mechanic is implied — see [Entry_reconciliation].
+          [docs/design/weinstein-book-reference.md] §1 "Stage 2 detail (Ch. 2)",
+          which locates the buy at the breakout or on "at least one pullback
+          close to the breakout point — this is a second chance to buy": a name
+          trading far above its breakout is at neither, so there is no Weinstein
+          buy point to write a ticket against. No admission rule changes, and no
+          pullback-timing mechanic is implied — see [Entry_reconciliation] for
+          why the section's "Late Stage 2 warning" is deliberately NOT the
+          citation here.
 
           {b Default [0.0] = reconciliation disabled} (no-op, R1): every
           candidate carries [Entry_reconciliation.Not_reconciled], sizing uses

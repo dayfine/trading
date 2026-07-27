@@ -53,23 +53,44 @@ regardless because the same PR arms
 (1.0 / 15.0 percentage points).
 
 **Weinstein authority (W1).** Suppressing an over-extended entry follows
-`weinstein-book-reference.md` §1 "Stage 2 detail (Ch. 2)" — the breakout point
-(and the pullback back to it) is the buy, and a name that has run on is "still
-a 'hold' but no longer a buy; reward/risk has shifted against you". No
-admission rule changes and **no pullback-timing mechanic** is implemented; the
+`weinstein-book-reference.md` §1 "Stage 2 detail (Ch. 2)", which locates the buy
+at the breakout or on "at least one pullback close to the breakout point — this
+is a second chance to buy". A name trading far above its breakout is at neither,
+so there is no Weinstein buy point to write a ticket against. The section's
+"Late Stage 2 warning" reads similarly but is deliberately **not** the citation:
+it is conditioned on the stock sagging toward its MA, a different predicate from
+distance past the breakout (narrowed in review round 1). No admission rule
+changes and **no pullback-timing mechanic** is implemented; the
 no-reversal-timing rule stands.
 
 **Evidence.** Every production branch added is pinned by a test that dies when
-it breaks — verified by mutation, 8/8 red: dropping the short-arm reconcile;
-flipping the short arm to `~side:Long` (sign-flips the overshoot); sizing on
-`c.entry` instead of the fill; removing the `Extended` unsized arm; removing
-the `Extended` suppression from the instruction; reverting the market ticket to
-a resting stop; dropping the HTML chip cell; and collapsing
-`expected_fill_price`. The re-sizing arithmetic is pinned **numerically**
-against a hand computation (fill $107.30, stop $90.00, $100k book, 1% risk →
-57 sh / $6116.10 / risk $986.10, where the stale-entry path would have given
-100 sh / $10,000 / $1,000), because a label-only test would not have caught the
-original bug.
+it breaks — verified by mutation, **10/10 red**: dropping the short-arm
+reconcile; flipping the short arm to `~side:Long` (sign-flips the overshoot);
+sizing on `c.entry` instead of the fill; removing the `Extended` unsized arm;
+removing the `Extended` suppression from the instruction; reverting the market
+ticket to a resting stop; dropping the HTML chip cell; collapsing
+`expected_fill_price`; and — added in review round 1 — reverting Risk % to the
+stale entry level in *each* renderer independently. The re-sizing arithmetic is
+pinned **numerically** against a hand computation (fill $107.30, stop $90.00,
+$100k book, 1% risk → 57 sh / $6116.10 / risk $986.10, where the stale-entry
+path would have given 100 sh / $10,000 / $1,000), because a label-only test
+would not have caught the original bug.
+
+**Review round 1 (qc-behavioral CP1 FAIL, PR #2107).** Both renderers computed
+the Risk % column off `c.entry` rather than the expected fill, so a through-entry
+row contradicted the ticket printed beside it — the Markdown fixture read
+`10.0%` next to an instruction quoting `risk $986` on `$6116` (16.1%), and at
+the armed 15.0 cap the column understates real risk **2.2×** (10.0% vs 21.7%).
+That is issue #2103 again, one column over, and it falsified the
+single-source-of-truth claim in `weekly_snapshot.mli`. Worse, the round-0 test
+*pinned the wrong number* inside its row substring, so a correct implementation
+would have failed the suite — a reminder that a strong assertion locks in
+whatever the implementation emits, correct or not. Fixed by routing both
+renderers (and `_market_order`'s quoted price) through
+`Weekly_snapshot.expected_fill_price`, adding the missing HTML Risk %
+assertion — reconciled rows had none, which is why the HTML side was invisible
+to the round-0 mutations — and pinning the Risk % cell together with the
+instruction so the two can no longer disagree.
 
 **Known gaps, disclosed:** the structural stop is *not* re-derived at the new
 fill price (correct for a real support floor, conservative for a fixed-buffer
@@ -77,8 +98,22 @@ fallback); short candidates remain unsized (short entries are default-off), so
 a through-entry short's Instruction cell still renders `-` — shorts do get
 classified, and an extended short does get the suppression text; the
 zero-share `sizing_note` reason text is not pinned for a through-entry
-candidate; and the 2026-07-24 artifact is not regenerated here (it needs a live
-data pull).
+candidate; the `_market_order` price now reads through `expected_fill_price`
+rather than `l.close`, but that change is **not independently
+mutation-testable** — the two are equal by construction for `Through_entry`, so
+it buys structural honesty, not new behaviour coverage; and the 2026-07-24
+artifact is not regenerated here (it needs a live data pull).
+
+## Follow-up
+
+- **F4 + F5 close together with one test.** The 07-24 specimen is not
+  regenerated (F4) and "old snapshots without the field parse" is unpinned (F5).
+  A single test that reads `dev/weekly-picks/2bcf5b335/2026-07-24.sexp` — which
+  predates the `reconciliation` field — through `Snapshot_reader` would pin the
+  `[@sexp.default]` round-trip against a real historical artifact *and* give the
+  regeneration a reference point. Cheap, and it covers both gaps at once.
+  (Raised by qc-behavioral on PR #2107; not done there to keep the rework
+  scoped.)
 
 Plan: `dev/plans/picks-entry-reconciliation-2026-07-27.md`.
 
