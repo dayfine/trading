@@ -27,8 +27,28 @@ let _fold_week week : Types.Daily_price.t =
       (List.sum (module Int) week ~f:(fun b -> b.Types.Daily_price.volume))
     ~adjusted_close:last.Types.Daily_price.adjusted_close ()
 
+(* Rescale one daily bar onto the split/dividend-adjusted basis: every price
+   field is multiplied by (adjusted_close / close_price), so the whole series
+   is on the same scale as the adjusted-basis entry/stop levels the chart
+   draws. Without this a split inside the window renders as a fake cliff
+   (issue #2133: CLMB's 4:1 on 2026-03-23 drew 131 → 20 against post-split
+   level lines). A non-positive or NaN raw close admits no factor: the bar
+   keeps its O/H/L unscaled and takes [adjusted_close] as its close — a bad
+   bar must not blank the chart. Volume is left nominal: the strip is
+   recessive and share-count rescaling adds no reading value. *)
+let _to_adjusted_basis (b : Types.Daily_price.t) : Types.Daily_price.t =
+  let f =
+    if Float.is_nan b.close_price || Float.( <= ) b.close_price 0.0 then 1.0
+    else b.adjusted_close /. b.close_price
+  in
+  Types.Daily_price.make ~date:b.date ~open_price:(b.open_price *. f)
+    ~high_price:(b.high_price *. f) ~low_price:(b.low_price *. f)
+    ~close_price:b.adjusted_close ~volume:b.volume
+    ~adjusted_close:b.adjusted_close ()
+
 let weekly_bars bars =
-  List.group bars ~break:(fun (a : Types.Daily_price.t) b ->
+  List.map bars ~f:_to_adjusted_basis
+  |> List.group ~break:(fun (a : Types.Daily_price.t) b ->
       not (Date.equal (_monday a.date) (_monday b.date)))
   |> List.map ~f:_fold_week
 
