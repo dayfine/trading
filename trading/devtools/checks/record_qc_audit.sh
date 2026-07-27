@@ -3,7 +3,8 @@
 #
 # Extracts structural/behavioral verdicts and quality score from a completed
 # dev/reviews/<feature>.md, then calls write_audit.sh to persist the record to
-# dev/audit/YYYY-MM-DD-<feature>.json.
+# dev/audit/<date>-<branch-sanitized>-<feature>.json (or
+# dev/audit/YYYY-MM-DD-<feature>.json when <branch> is empty).
 #
 # Usage:
 #   bash trading/devtools/checks/record_qc_audit.sh <feature> <branch> <date> [--pr-number N]
@@ -39,7 +40,11 @@
 #     used (behavioral takes precedence over structural). Defaults to null.
 #
 # The call is idempotent: re-running overwrites any prior record for the same
-# date+feature. Errors from write_audit.sh propagate to the caller.
+# date+branch+feature (a different branch on the same date+feature produces a
+# DISTINCT record -- see H-AUDIT-COLLISION, dev/status/harness.md -- unless
+# <branch> is empty, which still falls back to the collision-prone
+# date+feature-only shape; see write_audit.sh). Errors from write_audit.sh
+# propagate to the caller.
 
 set -euo pipefail
 

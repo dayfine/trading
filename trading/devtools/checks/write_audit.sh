@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # write_audit.sh — Audit trail writer for QC review outcomes (T3-D).
 #
-# Writes a structured JSON record to dev/audit/YYYY-MM-DD-<feature>.json.
-# Designed to be called by the lead-orchestrator after QC agents complete,
-# or manually during development.
+# Writes a structured JSON record to
+# dev/audit/<date>-<branch-sanitized>-<feature>.json (or
+# dev/audit/YYYY-MM-DD-<feature>.json when --branch is omitted/empty --
+# see the H-AUDIT-COLLISION note below). Designed to be called by the
+# lead-orchestrator after QC agents complete, or manually during
+# development.
 #
 # Usage:
 #   sh write_audit.sh \
@@ -29,8 +32,40 @@
 #   The escalation policy (harness-engineering-plan.md) triggers human
 #   review when consecutive_rework_count >= 3 for any feature.
 #
-# This script is idempotent: re-running with the same --date and
-# --feature overwrites the previous record.
+# This script is idempotent: re-running with the same --date, --branch,
+# and --feature overwrites the previous record (see H-AUDIT-COLLISION,
+# dev/status/harness.md).
+#
+# Filename key: dev/audit/<date>-<branch-sanitized>-<feature>.json. The
+# branch segment exists because <date>-<feature>.json alone collided
+# whenever a track got a second QC review on the same day (a second PR,
+# a -v2 branch, 2-4 orchestrator runs/day) -- the second write silently
+# clobbered the first. --branch is always supplied by the orchestrator's
+# record_qc_audit.sh call; when it is omitted (bare direct invocation)
+# the filename falls back to the original <date>-<feature>.json shape.
+# The branch segment sits BETWEEN date and feature (not appended after)
+# so the filename still ENDS with "-<feature>.json" -- both dev/audit
+# consumers (the consecutive_rework_count scan below and
+# deep_scan/check_06_qc_calibration.sh) glob on that suffix and must not
+# need to change shape.
+#
+# Chronological ordering (recorded_at_ns): allowing multiple same-day
+# records per feature (above) means the consecutive_rework_count scan
+# below can no longer assume "one file per day == one record per day
+# in write order". Each record embeds "recorded_at_ns" (epoch
+# nanoseconds at write time) so the scan can sort candidates by true
+# write order. This is deliberately NOT derived from the filename
+# (lexicographic sort orders same-day records by branch name, which is
+# unrelated to write order) nor from file mtime (dev/audit/*.json files
+# are committed to git; a fresh checkout stamps every file with
+# checkout time, not original write time -- mtime-based ordering is
+# unreliable across a checkout boundary). Records written before this
+# field existed have no "recorded_at_ns" and sort as oldest -- the
+# extraction below is written to degrade to 0 rather than abort under
+# `set -euo pipefail` when grep finds no match (a bare failing `grep`
+# in a pipeline makes the whole pipeline's exit status non-zero, which
+# would otherwise kill the script before it ever writes the record;
+# regression-tested in record_qc_audit_test.sh scenario 9).
 
 set -euo pipefail
 
@@ -128,9 +163,68 @@ AUDIT_DIR="$REPO_ROOT/dev/audit"
 # Create audit directory if it does not exist
 mkdir -p "$AUDIT_DIR"
 
+# --- Compute output filename ---
+#
+# Sanitize the branch for filesystem safety (git branch names commonly
+# contain "/", e.g. "feat/picks-phase-c"; replace with "-").
+if [ -n "$BRANCH" ]; then
+  BRANCH_SAFE="$(printf '%s' "$BRANCH" | tr '/' '-')"
+  OUTPUT_FILE="$AUDIT_DIR/${DATE}-${BRANCH_SAFE}-${FEATURE}.json"
+else
+  OUTPUT_FILE="$AUDIT_DIR/${DATE}-${FEATURE}.json"
+fi
+OUTPUT_BASENAME="$(basename "$OUTPUT_FILE")"
+
+# --- Compute this record's write-order timestamp ---
+#
+# epoch nanoseconds, fixed-width (19 digits until year ~2286) so plain
+# lexicographic `sort` on the raw value is also a correct numeric sort.
+# Override via WRITE_AUDIT_RECORDED_AT_NS for deterministic tests.
+#
+# RECORDED_AT_NS is interpolated unquoted into the JSON body below (it is
+# a JSON number, not a string), so it MUST be validated as a plain
+# nonnegative integer before use -- an unvalidated value here writes
+# malformed JSON straight into a committed audit record.
+_is_nonneg_int() {
+  case "$1" in
+    '' | *[!0-9]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+if [ -n "${WRITE_AUDIT_RECORDED_AT_NS:-}" ]; then
+  # Test-only override. A bad value here is a caller/fixture bug, not a
+  # platform quirk -- fail loudly rather than silently substituting a
+  # different value a test might not notice.
+  if _is_nonneg_int "$WRITE_AUDIT_RECORDED_AT_NS"; then
+    RECORDED_AT_NS="$WRITE_AUDIT_RECORDED_AT_NS"
+  else
+    echo "FAIL: WRITE_AUDIT_RECORDED_AT_NS must be a nonnegative integer, got: $WRITE_AUDIT_RECORDED_AT_NS" >&2
+    exit 1
+  fi
+else
+  # `date -u +%s%N` is GNU-only; BSD/macOS date does not understand %N and
+  # emits it as a literal "N" (e.g. "1785315600N"), which would otherwise
+  # land directly in the JSON body as an invalid numeric literal. This is
+  # a platform quirk, not a caller error, so degrade gracefully instead of
+  # failing: fall back to whole-second resolution scaled up to the same
+  # magnitude as a real nanosecond timestamp (seconds * 10^9), which keeps
+  # the "fixed-width, lexicographically sortable" property intact at the
+  # cost of sub-second ordering precision on such platforms.
+  RAW_NS="$(date -u +%s%N 2>/dev/null || true)"
+  if _is_nonneg_int "$RAW_NS"; then
+    RECORDED_AT_NS="$RAW_NS"
+  else
+    FALLBACK_SECONDS="$(date -u +%s)"
+    RECORDED_AT_NS=$((FALLBACK_SECONDS * 1000000000))
+  fi
+fi
+
 # --- Compute consecutive_rework_count ---
 #
-# Look at prior audit records for this feature, sorted by date descending.
+# Look at prior audit records for this feature, sorted by write order
+# (recorded_at_ns) descending -- NOT by filename or mtime; see the
+# "Chronological ordering" note near the top of this file for why.
 # Count how many consecutive NEEDS_REWORK verdicts precede this one.
 # If the current verdict is NEEDS_REWORK, the count includes this record.
 # If APPROVED, the streak resets to 0.
@@ -141,15 +235,37 @@ if [ "$OVERALL" = "NEEDS_REWORK" ]; then
   # Start at 1 (this record is itself a NEEDS_REWORK)
   CONSECUTIVE=1
 
-  # Find prior audit files for this feature, sorted newest-first
-  prior_files=$(ls -1 "$AUDIT_DIR"/*-"$FEATURE".json 2>/dev/null | sort -r || true)
-
-  for f in $prior_files; do
-    # Skip the file we are about to write (same date+feature)
+  # Build "<recorded_at_ns>\t<file>" pairs for every prior audit file of
+  # this feature, then sort by recorded_at_ns descending (true write
+  # order). Records predating this field have no recorded_at_ns and
+  # default to 0 (oldest).
+  candidate_pairs=""
+  for f in $(ls -1 "$AUDIT_DIR"/*-"$FEATURE".json 2>/dev/null || true); do
+    # Skip the file we are about to write (same date+branch+feature --
+    # this is what makes re-running for the SAME review idempotent
+    # rather than counting itself as a prior NEEDS_REWORK).
     basename_f="$(basename "$f")"
-    if [ "$basename_f" = "${DATE}-${FEATURE}.json" ]; then
+    if [ "$basename_f" = "$OUTPUT_BASENAME" ]; then
       continue
     fi
+
+    # `|| true` is load-bearing: under `set -euo pipefail`, `grep` finding
+    # no "recorded_at_ns" field in a legacy record (the expected case for
+    # every record written before this field existed) exits 1, which makes
+    # the whole pipeline's status non-zero and would otherwise abort this
+    # script before it ever writes the current record. `|| true` lets the
+    # pipeline fail closed into an empty $f_recorded_at instead, which the
+    # next line then defaults to 0 as documented above.
+    f_recorded_at=$(grep -o '"recorded_at_ns": *[0-9]*' "$f" 2>/dev/null | head -1 | sed 's/.*: *//' || true)
+    [ -z "$f_recorded_at" ] && f_recorded_at=0
+    candidate_pairs="${candidate_pairs}${f_recorded_at}	${f}
+"
+  done
+
+  ordered_files=$(printf '%s' "$candidate_pairs" | sort -rn | cut -f2-)
+
+  for f in $ordered_files; do
+    [ -n "$f" ] || continue
 
     # Extract overall_qc from the JSON (simple grep — no jq dependency)
     prev_verdict=$(grep -o '"overall_qc": *"[^"]*"' "$f" 2>/dev/null | head -1 | sed 's/.*: *"//;s/"//')
@@ -164,8 +280,9 @@ if [ "$OVERALL" = "NEEDS_REWORK" ]; then
 fi
 
 # --- Write JSON ---
-
-OUTPUT_FILE="$AUDIT_DIR/${DATE}-${FEATURE}.json"
+#
+# OUTPUT_FILE was computed earlier (before the consecutive_rework_count
+# scan) so that scan could skip its own about-to-be-written record.
 
 # Escape strings for JSON (handle double quotes and backslashes)
 _json_str() {
@@ -184,6 +301,7 @@ cat > "$OUTPUT_FILE" <<ENDJSON
   "date": "$DATE",
   "feature": "$(_json_str "$FEATURE")",
   "branch": "$(_json_str "$BRANCH")",
+  "recorded_at_ns": $RECORDED_AT_NS,
   "structural_qc": "$STRUCTURAL",
   "behavioral_qc": "$BEHAVIORAL",
   "overall_qc": "$OVERALL",

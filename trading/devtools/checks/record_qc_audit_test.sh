@@ -88,16 +88,17 @@ EOF
 
 out=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE1}" "feat/dummy" "2026-05-25" 2>&1) && rc=0 || rc=$?
-if (( rc == 0 )) && [[ -f "${TMP_REPO}/dev/audit/2026-05-25-${FEATURE1}.json" ]] \
-   && grep -q '"structural_qc": *"APPROVED"' "${TMP_REPO}/dev/audit/2026-05-25-${FEATURE1}.json" \
-   && grep -q '"behavioral_qc": *"APPROVED"' "${TMP_REPO}/dev/audit/2026-05-25-${FEATURE1}.json" \
-   && grep -q '"quality_score": *4' "${TMP_REPO}/dev/audit/2026-05-25-${FEATURE1}.json"; then
+JSON1="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE1}.json"
+if (( rc == 0 )) && [[ -f "${JSON1}" ]] \
+   && grep -q '"structural_qc": *"APPROVED"' "${JSON1}" \
+   && grep -q '"behavioral_qc": *"APPROVED"' "${JSON1}" \
+   && grep -q '"quality_score": *4' "${JSON1}"; then
   pass "scenario 1 — file-mode regression: APPROVED+APPROVED+score 4 extracted"
 else
   fail "scenario 1 — file-mode regression: expected APPROVED+APPROVED+4; got rc=${rc}, output:"
   echo "${out}" | sed 's/^/      /'
-  [[ -f "${TMP_REPO}/dev/audit/2026-05-25-${FEATURE1}.json" ]] && \
-    echo "      json: $(cat "${TMP_REPO}/dev/audit/2026-05-25-${FEATURE1}.json")"
+  [[ -f "${JSON1}" ]] && \
+    echo "      json: $(cat "${JSON1}")"
 fi
 
 # ---------------------------------------------------------------------------
@@ -132,7 +133,7 @@ make_gh_mock "${S2_DIR}" "${S2_DIR}/reviews.jsonl"
 out=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S2_DIR}/gh" \
         bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE2}" "feat/dummy" "2026-05-25" --pr-number 1234 2>&1) && rc=0 || rc=$?
-JSON2="${TMP_REPO}/dev/audit/2026-05-25-${FEATURE2}.json"
+JSON2="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE2}.json"
 if (( rc == 0 )) && [[ -f "${JSON2}" ]] \
    && grep -q '"structural_qc": *"APPROVED"' "${JSON2}" \
    && grep -q '"behavioral_qc": *"APPROVED"' "${JSON2}" \
@@ -178,7 +179,7 @@ make_gh_mock "${S3_DIR}" "${S3_DIR}/reviews.jsonl"
 out=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S3_DIR}/gh" \
         bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE3}" "feat/dummy" "2026-05-25" --pr-number 1235 2>&1) && rc=0 || rc=$?
-JSON3="${TMP_REPO}/dev/audit/2026-05-25-${FEATURE3}.json"
+JSON3="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE3}.json"
 if (( rc == 0 )) && [[ -f "${JSON3}" ]] \
    && grep -q '"structural_qc": *"APPROVED"' "${JSON3}" \
    && grep -q '"behavioral_qc": *"NEEDS_REWORK"' "${JSON3}" \
@@ -237,7 +238,7 @@ make_gh_mock "${S5_DIR}" "${S5_DIR}/reviews.jsonl"
 out=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S5_DIR}/gh" \
         bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE5}" "feat/dummy" "2026-05-25" --pr-number 1236 2>&1) && rc=0 || rc=$?
-JSON5="${TMP_REPO}/dev/audit/2026-05-25-${FEATURE5}.json"
+JSON5="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE5}.json"
 if (( rc == 0 )) && [[ -f "${JSON5}" ]] \
    && grep -q '"structural_qc": *"APPROVED"' "${JSON5}" \
    && grep -q '"behavioral_qc": *"NEEDS_REWORK"' "${JSON5}" \
@@ -282,7 +283,7 @@ EOF
 out=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S6_DIR}/gh" \
         bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE6}" "feat/dummy" "2026-05-25" --pr-number 1237 2>&1) && rc=0 || rc=$?
-JSON6="${TMP_REPO}/dev/audit/2026-05-25-${FEATURE6}.json"
+JSON6="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE6}.json"
 if (( rc == 0 )) && [[ -f "${JSON6}" ]] \
    && grep -q '"structural_qc": *"APPROVED"' "${JSON6}" \
    && grep -q '"behavioral_qc": *"APPROVED"' "${JSON6}" \
@@ -293,6 +294,308 @@ else
   fail "scenario 6 — expected file-fallback APPROVED+APPROVED+5; got rc=${rc}, output:"
   echo "${out}" | sed 's/^/      /'
   [[ -f "${JSON6}" ]] && echo "      json: $(cat "${JSON6}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 7 — H-AUDIT-COLLISION regression: two branches reviewing the same
+# feature/track on the same date must produce two DISTINCT audit files
+# (not one clobbering the other), while re-invoking for the SAME branch
+# stays idempotent (overwrites its own record, does not accumulate a
+# duplicate).
+# ---------------------------------------------------------------------------
+FEATURE7="weekly-snapshot"
+cat > "${TMP_REPO}/dev/reviews/${FEATURE7}.md" <<'EOF'
+Reviewed SHA: run1sha
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+4 — clean implementation
+EOF
+
+out=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE7}" "feat/picks-phase-c" "2026-07-27" 2>&1) && rc=0 || rc=$?
+JSON7A="${TMP_REPO}/dev/audit/2026-07-27-feat-picks-phase-c-${FEATURE7}.json"
+
+# Second review, different branch ("-v2"), same feature + same date.
+cat > "${TMP_REPO}/dev/reviews/${FEATURE7}.md" <<'EOF'
+Reviewed SHA: run2sha
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+5 — exemplary
+EOF
+out2=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE7}" "feat/picks-phase-c-v2" "2026-07-27" 2>&1) && rc2=0 || rc2=$?
+JSON7B="${TMP_REPO}/dev/audit/2026-07-27-feat-picks-phase-c-v2-${FEATURE7}.json"
+
+if (( rc == 0 )) && (( rc2 == 0 )) \
+   && [[ -f "${JSON7A}" ]] && [[ -f "${JSON7B}" ]] \
+   && [[ "${JSON7A}" != "${JSON7B}" ]] \
+   && grep -q '"quality_score": *4' "${JSON7A}" \
+   && grep -q '"quality_score": *5' "${JSON7B}"; then
+  pass "scenario 7a — two branches, same feature+date → two distinct audit files (H-AUDIT-COLLISION fix)"
+else
+  fail "scenario 7a — expected two distinct files (q=4 and q=5); got rc=${rc}, rc2=${rc2}"
+  echo "${out}" | sed 's/^/      /'
+  echo "${out2}" | sed 's/^/      /'
+  [[ -f "${JSON7A}" ]] && echo "      json A: $(cat "${JSON7A}")"
+  [[ -f "${JSON7B}" ]] && echo "      json B: $(cat "${JSON7B}")"
+fi
+
+# Re-invoke for the FIRST branch again (idempotency check): must overwrite
+# its own record, not create a third file, and JSON7B (the sibling branch's
+# record) must survive untouched.
+cat > "${TMP_REPO}/dev/reviews/${FEATURE7}.md" <<'EOF'
+Reviewed SHA: run1sha-rerun
+
+structural_qc: APPROVED
+behavioral_qc: NEEDS_REWORK
+overall_qc: NEEDS_REWORK
+
+## Quality Score
+2 — rerun found an issue
+EOF
+out3=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE7}" "feat/picks-phase-c" "2026-07-27" 2>&1) && rc3=0 || rc3=$?
+
+audit_count="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "2026-07-27-*-${FEATURE7}.json" | wc -l | tr -d ' ')"
+
+if (( rc3 == 0 )) && [[ -f "${JSON7A}" ]] && [[ -f "${JSON7B}" ]] \
+   && [[ "${audit_count}" == "2" ]] \
+   && grep -q '"quality_score": *2' "${JSON7A}" \
+   && grep -q '"quality_score": *5' "${JSON7B}"; then
+  pass "scenario 7b — re-invoking same branch overwrites its own record (idempotent, no duplicate)"
+else
+  fail "scenario 7b — expected exactly 2 audit files for ${FEATURE7} on 2026-07-27, JSON7A rewritten to q=2, JSON7B untouched at q=5; got rc=${rc3}, audit_count=${audit_count}"
+  echo "${out3}" | sed 's/^/      /'
+  [[ -f "${JSON7A}" ]] && echo "      json A: $(cat "${JSON7A}")"
+  [[ -f "${JSON7B}" ]] && echo "      json B: $(cat "${JSON7B}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 7c — empty --branch fallback: `record_qc_audit.sh <feature> "" <date>`
+# satisfies the 3-positional-arg arity check (an unset $BRANCH in the
+# orchestrator's documented fallback invocation silently takes this path).
+# write_audit.sh's `[ -n "$BRANCH" ]` guard treats "" the same as "omitted",
+# falling back to the pre-fix dev/audit/<date>-<feature>.json shape, which
+# DOES still clobber same-day sibling reviews of the same feature.
+#
+# This is a KNOWN, documented gap -- NOT fixed by this change (out of scope
+# for the H-AUDIT-COLLISION fix, which requires a real branch value to
+# disambiguate). This test pins the current (still-clobbering) behavior so
+# a future change to this fallback path doesn't silently regress it further
+# without updating this test.
+# ---------------------------------------------------------------------------
+FEATURE7C="empty-branch-fallback"
+cat > "${TMP_REPO}/dev/reviews/${FEATURE7C}.md" <<'EOF'
+Reviewed SHA: run1sha
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+4 — first run, empty branch
+EOF
+
+out7c_1=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE7C}" "" "2026-07-27" 2>&1) && rc7c_1=0 || rc7c_1=$?
+JSON7C="${TMP_REPO}/dev/audit/2026-07-27-${FEATURE7C}.json"
+
+cat > "${TMP_REPO}/dev/reviews/${FEATURE7C}.md" <<'EOF'
+Reviewed SHA: run2sha
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+5 — second run, different track, still empty branch
+EOF
+out7c_2=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE7C}" "" "2026-07-27" 2>&1) && rc7c_2=0 || rc7c_2=$?
+
+audit_count_7c="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "2026-07-27-*${FEATURE7C}.json" | wc -l | tr -d ' ')"
+
+if (( rc7c_1 == 0 )) && (( rc7c_2 == 0 )) && [[ -f "${JSON7C}" ]] \
+   && [[ "${audit_count_7c}" == "1" ]] \
+   && grep -q '"quality_score": *5' "${JSON7C}"; then
+  pass "scenario 7c — empty --branch reaches the no-branch fallback and still clobbers (KNOWN gap, pinned not fixed)"
+else
+  fail "scenario 7c — expected exactly 1 file (second run wins, q=5); got rc=${rc7c_1}/${rc7c_2}, audit_count=${audit_count_7c}"
+  echo "${out7c_1}" | sed 's/^/      /'
+  echo "${out7c_2}" | sed 's/^/      /'
+  [[ -f "${JSON7C}" ]] && echo "      json: $(cat "${JSON7C}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 8 — chronological ordering regression (F1 rework fix): the
+# consecutive_rework_count scan in write_audit.sh must consult same-day
+# prior records in TRUE write order (recorded_at_ns), not by filename
+# (branch-name) lexicographic order. Three same-date records for one
+# feature, written in this order:
+#   1. branch "feat/zzz" -> NEEDS_REWORK   (oldest)
+#   2. branch "feat/aaa" -> APPROVED       (breaks the streak)
+#   3. branch "feat/mmm" -> NEEDS_REWORK   (current record under test)
+#
+# Correct consecutive_rework_count for record 3 is 1 (the streak is broken
+# by the APPROVED record 2 immediately preceding it in write order). The
+# pre-fix `ls | sort -r` ordered these same-date records by FILENAME
+# descending -- "zzz" > "mmm" > "aaa" alphabetically -- so it consulted
+# "zzz" (NEEDS_REWORK) as if it immediately preceded "mmm", overcounting
+# to 2. WRITE_AUDIT_RECORDED_AT_NS pins write order deterministically
+# instead of relying on real wall-clock gaps between the three calls.
+# ---------------------------------------------------------------------------
+FEATURE8="ordering-regression"
+WRITE_AUDIT="${TMP_REPO}/trading/devtools/checks/write_audit.sh"
+
+out8_1=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=1000000000000000000 \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-27 --feature "${FEATURE8}" --branch "feat/zzz" \
+    --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK 2>&1) && rc8_1=0 || rc8_1=$?
+
+out8_2=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=2000000000000000000 \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-27 --feature "${FEATURE8}" --branch "feat/aaa" \
+    --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1) && rc8_2=0 || rc8_2=$?
+
+out8_3=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=3000000000000000000 \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-27 --feature "${FEATURE8}" --branch "feat/mmm" \
+    --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK 2>&1) && rc8_3=0 || rc8_3=$?
+
+JSON8="${TMP_REPO}/dev/audit/2026-07-27-feat-mmm-${FEATURE8}.json"
+
+if (( rc8_1 == 0 )) && (( rc8_2 == 0 )) && (( rc8_3 == 0 )) \
+   && [[ -f "${JSON8}" ]] \
+   && grep -q '"consecutive_rework_count": *1' "${JSON8}" \
+   && echo "${out8_3}" | grep -q 'consecutive_rework_count=1'; then
+  pass "scenario 8 — same-day records consulted in write order (recorded_at_ns), not filename order (F1 rework fix)"
+else
+  fail "scenario 8 — expected consecutive_rework_count=1 for feat/mmm record (streak broken by feat/aaa=APPROVED immediately preceding in write order); got rc=${rc8_1}/${rc8_2}/${rc8_3}"
+  echo "${out8_1}" | sed 's/^/      /'
+  echo "${out8_2}" | sed 's/^/      /'
+  echo "${out8_3}" | sed 's/^/      /'
+  [[ -f "${JSON8}" ]] && echo "      json: $(cat "${JSON8}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 9 — legacy-record crash regression (F1 rework-2 fix): a prior
+# audit record with NO "recorded_at_ns" field (i.e. written before that
+# field existed, or by any tool that doesn't set it) must NOT abort the
+# script when the current call is on the NEEDS_REWORK path. Pre-fix, the
+# `grep -o ... | head -1 | sed ...` pipeline extracting recorded_at_ns
+# exited 1 (no match) under `set -euo pipefail`, which killed the whole
+# script before it ever wrote the current record -- silently, with no
+# error message, destroying exactly the write that was supposed to extend
+# the consecutive_rework_count streak. This seeds a legacy-shaped record
+# (no recorded_at_ns key at all) and asserts the current call still
+# succeeds, still writes its own record, and still counts the legacy
+# record into the streak (defaulting its write-order to 0 / oldest, per
+# the docstring above the extraction).
+# ---------------------------------------------------------------------------
+FEATURE9="legacy-no-recorded-at-ns"
+mkdir -p "${TMP_REPO}/dev/audit"
+cat > "${TMP_REPO}/dev/audit/2026-07-20-harness-old-${FEATURE9}.json" <<EOF
+{
+  "date": "2026-07-20",
+  "feature": "${FEATURE9}",
+  "branch": "harness/old",
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": null,
+  "findings_count": { "PASS": 1, "FAIL": 1, "FLAG": 0 },
+  "consecutive_rework_count": 1,
+  "notes": ""
+}
+EOF
+
+out9=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=4000000000000000000 \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-27 --feature "${FEATURE9}" --branch "harness/new" \
+    --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK 2>&1) && rc9=0 || rc9=$?
+JSON9="${TMP_REPO}/dev/audit/2026-07-27-harness-new-${FEATURE9}.json"
+
+if (( rc9 == 0 )) && [[ -f "${JSON9}" ]] \
+   && grep -q '"consecutive_rework_count": *2' "${JSON9}" \
+   && echo "${out9}" | grep -q 'consecutive_rework_count=2'; then
+  pass "scenario 9 — legacy record with no recorded_at_ns does not abort the script (F1 rework-2 fix)"
+else
+  fail "scenario 9 — expected rc=0, record written, consecutive_rework_count=2; got rc=${rc9}"
+  echo "${out9}" | sed 's/^/      /'
+  [[ -f "${JSON9}" ]] && echo "      json: $(cat "${JSON9}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 10 — N2 rework-2 fix: a non-numeric WRITE_AUDIT_RECORDED_AT_NS
+# override must never reach the JSON body unquoted (which would write
+# invalid JSON straight into a committed audit record). The override is a
+# test-only knob, so a bad value is treated as a caller/fixture bug: hard
+# fail with a clear message and write nothing, rather than silently
+# substituting some other value.
+# ---------------------------------------------------------------------------
+FEATURE10="bad-override-rejected"
+audit_count_before_10="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE10}.json" | wc -l | tr -d ' ')"
+
+out10=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=oops \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-27 --feature "${FEATURE10}" --branch "harness/x" \
+    --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1) && rc10=0 || rc10=$?
+audit_count_after_10="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE10}.json" | wc -l | tr -d ' ')"
+
+if (( rc10 == 1 )) && [[ "${audit_count_before_10}" == "0" ]] && [[ "${audit_count_after_10}" == "0" ]] \
+   && echo "${out10}" | grep -q 'must be a nonnegative integer'; then
+  pass "scenario 10 — non-numeric WRITE_AUDIT_RECORDED_AT_NS rejected, no record written (N2 fix)"
+else
+  fail "scenario 10 — expected rc=1, no file written, 'must be a nonnegative integer' message; got rc=${rc10}, before=${audit_count_before_10}, after=${audit_count_after_10}"
+  echo "${out10}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 11 — N3 rework-2 fix: a BSD/macOS-style `date` that does not
+# support %N (emits the literal suffix "N" instead of nanoseconds, e.g.
+# "1753660800N") must not let that literal "N" reach the JSON body as an
+# invalid numeric literal. Simulated via a mock `date` shim prepended to
+# PATH; the real `date -u +%s` (used for the graceful-degrade fallback)
+# is still available on PATH under its real name via an absolute-path
+# passthrough in the shim.
+# ---------------------------------------------------------------------------
+FEATURE11="bsd-date-no-percent-n"
+S11_DIR="${TMP_REPO}/s11-bin"
+mkdir -p "${S11_DIR}"
+REAL_DATE="$(command -v date)"
+cat > "${S11_DIR}/date" <<EOF
+#!/bin/sh
+if [ "\$1" = "-u" ] && [ "\$2" = "+%s%N" ]; then
+  echo "\$(${REAL_DATE} -u +%s)N"
+else
+  exec ${REAL_DATE} "\$@"
+fi
+EOF
+chmod +x "${S11_DIR}/date"
+
+out11=$(REPO_ROOT="${TMP_REPO}" PATH="${S11_DIR}:${PATH}" \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-27 --feature "${FEATURE11}" --branch "harness/x" \
+    --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1) && rc11=0 || rc11=$?
+JSON11="${TMP_REPO}/dev/audit/2026-07-27-harness-x-${FEATURE11}.json"
+
+if (( rc11 == 0 )) && [[ -f "${JSON11}" ]] \
+   && grep -qE '"recorded_at_ns": [0-9]+,' "${JSON11}" \
+   && ! grep -q 'N,' "${JSON11}"; then
+  pass "scenario 11 — BSD-style date lacking %N degrades to a valid numeric timestamp, not a literal N (N3 fix)"
+else
+  fail "scenario 11 — expected rc=0, recorded_at_ns to be a plain integer with no literal N; got rc=${rc11}"
+  echo "${out11}" | sed 's/^/      /'
+  [[ -f "${JSON11}" ]] && echo "      json: $(cat "${JSON11}")"
 fi
 
 # ---------------------------------------------------------------------------
