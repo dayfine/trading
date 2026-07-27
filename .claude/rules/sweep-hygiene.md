@@ -23,6 +23,44 @@ Before launching any sweep that will run > 1 hour:
 - [ ] **`/tmp/sweeps/` is bind-mounted to host** — verify with `docker inspect trading-1-dev | grep -A1 '/tmp/sweeps'`. If not bind-mounted, recreate the container via `.devcontainer/setup.sh rebuild && .devcontainer/setup.sh start`.
 - [ ] **No locked worktrees > 24h old** — `ls -lt .claude/worktrees/` and remove any whose owning agent has long since completed.
 
+## Pinned-worktree builds (mandatory since 2026-07-27)
+
+Chain scripts MUST NOT build or run from the parent working copy. The
+2026-07-26 leverage-dawn surface ran from the parent tree while that
+workspace was mutated mid-run (picks commits, jj snapshots, git-head
+import) — baseline folds 000-008 came out silently wrong and
+irreproducible (issue #2108). The "no concurrent jj ops" rule below was
+violated precisely because the run and the interactive session shared
+one tree.
+
+Required pattern:
+
+```bash
+# On the HOST, before launching the chain:
+SHA=$(git rev-parse --short origin/main)   # or the pinned run commit
+git worktree add --detach .claude/worktrees/sweep-<name> "$SHA"
+# The chain script then cds into the WORKTREE's trading/, exports
+# TRADING_DATA_DIR=<worktree>/trading/test_data, builds there, runs there.
+# After the sweep completes and results are archived:
+git worktree remove --force .claude/worktrees/sweep-<name>
+```
+
+Chain-preamble invariants (in addition to the flock + disk guard):
+
+- Log `HEAD=$(git rev-parse --short HEAD)` **of the run tree** (the
+  worktree, not the parent) — a parent-tree HEAD label is meaningless
+  when jj's working copy tracks a different commit than git HEAD (the
+  07-26 chain logged `HEAD=96c4c5ff8` while the files on disk were a
+  different tree).
+- Abort if the run tree is dirty: `[ -z "$(git status --porcelain)" ]`.
+- The worktree lives under `.claude/worktrees/` (repo-local) so the
+  container sees it; `/tmp` paths are host-only per
+  `worktree-isolation.md`.
+
+With a pinned worktree, parent-workspace jj/git activity during the
+sweep is no longer fatal — but the "no concurrent jj ops" rule below
+still applies to any sweep whose output path lives near the parent tree.
+
 ## During-sweep rules
 
 - **Sweep output path:** ALWAYS launch with `--out-dir /tmp/sweeps/<sweep-name>` (matches the bind-mount). NEVER use a repo-relative output path — gitignore alone won't protect against jj-tree-state issues per `feedback_jj_restore_killed_sweep.md`.
