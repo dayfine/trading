@@ -773,9 +773,253 @@ let test_extract_round_trips_mismatched_qty_falls_back_to_fifo _ =
          all_of
            [
              field (fun (t : trade_metrics) -> t.entry_price) (float_equal 10.0);
-             field (fun (t : trade_metrics) -> t.quantity) (float_equal 100.0);
+             field (fun (t : trade_metrics) -> t.quantity) (float_equal 70.0);
              field (fun (t : trade_metrics) -> t.exit_price) (float_equal 15.0);
            ];
+       ])
+
+(** Full-row matcher for one expected round-trip. Every reported field is pinned
+    (side, both dates, both prices, quantity, P&L), so a test using it asserts
+    an exact row multiset rather than a row count — the standard issue #2059's
+    duplicate-row defect demands. *)
+let _row ~side ~entry_date ~exit_date ~entry_price ~exit_price ~quantity ~pnl =
+  all_of
+    [
+      field
+        (fun (t : trade_metrics) -> t.side)
+        (equal_to (side : Trading_base.Types.side));
+      field
+        (fun (t : trade_metrics) -> Date.to_string t.entry_date)
+        (equal_to entry_date);
+      field
+        (fun (t : trade_metrics) -> Date.to_string t.exit_date)
+        (equal_to exit_date);
+      field (fun (t : trade_metrics) -> t.entry_price) (float_equal entry_price);
+      field (fun (t : trade_metrics) -> t.exit_price) (float_equal exit_price);
+      field (fun (t : trade_metrics) -> t.quantity) (float_equal quantity);
+      field (fun (t : trade_metrics) -> t.pnl_dollars) (float_equal pnl);
+    ]
+
+(* ---------- Issue #2059: partial exits must not fabricate SHORT round-trips
+   ---------- *)
+
+(** The exact LH trade stream behind issue #2059, in real prices and dates.
+
+    A single long entry ([Buy 1934 @ 139.44] on 2001-06-09), LabCorp's 2-for-1
+    split on 2001-06-12 (portfolio holds 3868), a stop-out that sells 1934 on
+    the split day and the remaining 1934 the next day, and an unrelated re-entry
+    Buy in Aug 2024. {b No short trade exists anywhere in this stream} — the run
+    that produced it had [enable_short_side = false].
+
+    Before the residual-tracking fix this printed [LONG 3868 @ 69.72 -> 68.30]
+    (full entry quantity booked against a partial exit) followed by
+    [SHORT 1934 @ 67.40 -> 224.30, 8459 days]: the orphaned second sell opened a
+    phantom short in the pairing fold, and the 2024 re-entry Buy closed it. Both
+    rows are reproduced field-for-field by issue #2059. *)
+let test_extract_round_trips_partial_exit_across_split_no_phantom_short _ =
+  let steps =
+    [
+      _step_with_trades
+        ~date:(date_of_string "2001-06-09")
+        ~trades:
+          [
+            _make_trade ~id:"b1" ~symbol:"LH" ~side:Buy ~quantity:1934.0
+              ~price:139.44;
+          ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2001-06-12")
+        ~splits:
+          [
+            _split ~symbol:"LH" ~date:(date_of_string "2001-06-12") ~factor:2.0;
+          ]
+        ~trades:
+          [
+            _make_trade ~id:"s1" ~symbol:"LH" ~side:Sell ~quantity:1934.0
+              ~price:68.30;
+          ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2001-06-13")
+        ~trades:
+          [
+            _make_trade ~id:"s2" ~symbol:"LH" ~side:Sell ~quantity:1934.0
+              ~price:67.40;
+          ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2024-08-10")
+        ~trades:
+          [
+            _make_trade ~id:"b2" ~symbol:"LH" ~side:Buy ~quantity:1934.0
+              ~price:224.30;
+          ]
+        ();
+    ]
+  in
+  let trips = extract_round_trips steps in
+  (* Two LONG legs of the one position, each carrying its own consumed
+     quantity restated onto the post-split basis. The 2024 re-entry stays open
+     and is dropped as unclosed. *)
+  assert_that trips
+    (elements_are
+       [
+         _row ~side:Buy ~entry_date:"2001-06-09" ~exit_date:"2001-06-12"
+           ~entry_price:69.72 ~exit_price:68.30 ~quantity:1934.0
+           ~pnl:((68.30 -. 69.72) *. 1934.0);
+         _row ~side:Buy ~entry_date:"2001-06-09" ~exit_date:"2001-06-13"
+           ~entry_price:69.72 ~exit_price:67.40 ~quantity:1934.0
+           ~pnl:((67.40 -. 69.72) *. 1934.0);
+       ])
+
+(** Two orphaned sells used to produce two byte-identical phantom SHORT rows —
+    issue #2059's duplicate-row defect, which double-counted the loss in
+    realized P&L aggregation.
+
+    Here the same LH stream carries a third sell of 1934, i.e. the portfolio
+    genuinely over-sold and flipped short. After the fix the two long legs are
+    reported once each and exactly {b one} short round-trip survives (the real
+    over-sell), instead of two identical phantoms. The assertion is on the exact
+    row multiset, so a re-introduced duplicate fails it. *)
+let test_extract_round_trips_over_sell_reports_one_short_not_a_duplicate _ =
+  let sell ~id ~price =
+    _make_trade ~id ~symbol:"LH" ~side:Sell ~quantity:1934.0 ~price
+  in
+  let steps =
+    [
+      _step_with_trades
+        ~date:(date_of_string "2001-06-09")
+        ~trades:
+          [
+            _make_trade ~id:"b1" ~symbol:"LH" ~side:Buy ~quantity:1934.0
+              ~price:139.44;
+          ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2001-06-12")
+        ~splits:
+          [
+            _split ~symbol:"LH" ~date:(date_of_string "2001-06-12") ~factor:2.0;
+          ]
+        ~trades:[ sell ~id:"s1" ~price:68.30 ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2001-06-13")
+        ~trades:[ sell ~id:"s2" ~price:67.40; sell ~id:"s3" ~price:67.40 ]
+        ();
+      (* Two 2024 re-entry legs (scale-in parent + add). Pre-fix each one closed
+         one of the two phantom shorts, printing the byte-identical pair issue
+         #2059 quotes. *)
+      _step_with_trades
+        ~date:(date_of_string "2024-08-10")
+        ~trades:
+          [
+            _make_trade ~id:"b2" ~symbol:"LH" ~side:Buy ~quantity:1934.0
+              ~price:224.30;
+            _make_trade ~id:"b3" ~symbol:"LH" ~side:Buy ~quantity:1934.0
+              ~price:224.30;
+          ]
+        ();
+    ]
+  in
+  let trips = extract_round_trips steps in
+  assert_that trips
+    (elements_are
+       [
+         _row ~side:Buy ~entry_date:"2001-06-09" ~exit_date:"2001-06-12"
+           ~entry_price:69.72 ~exit_price:68.30 ~quantity:1934.0
+           ~pnl:((68.30 -. 69.72) *. 1934.0);
+         _row ~side:Buy ~entry_date:"2001-06-09" ~exit_date:"2001-06-13"
+           ~entry_price:69.72 ~exit_price:67.40 ~quantity:1934.0
+           ~pnl:((67.40 -. 69.72) *. 1934.0);
+         _row ~side:Sell ~entry_date:"2001-06-13" ~exit_date:"2024-08-10"
+           ~entry_price:67.40 ~exit_price:224.30 ~quantity:1934.0
+           ~pnl:((67.40 -. 224.30) *. 1934.0);
+       ])
+
+(** A partial exit consumes only its own quantity; the residual stays open and
+    pairs with the next closing trade. Pins the residual arithmetic with no
+    split in play, so a regression cannot hide behind the restatement factor. *)
+let test_extract_round_trips_partial_exit_splits_into_two_legs _ =
+  let steps =
+    [
+      _step_with_trades
+        ~date:(date_of_string "2024-01-02")
+        ~trades:
+          [
+            _make_trade ~id:"b1" ~symbol:"TRM" ~side:Buy ~quantity:100.0
+              ~price:10.0;
+          ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2024-01-09")
+        ~trades:
+          [
+            _make_trade ~id:"s1" ~symbol:"TRM" ~side:Sell ~quantity:40.0
+              ~price:12.0;
+          ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2024-01-16")
+        ~trades:
+          [
+            _make_trade ~id:"s2" ~symbol:"TRM" ~side:Sell ~quantity:60.0
+              ~price:15.0;
+          ]
+        ();
+    ]
+  in
+  let trips = extract_round_trips steps in
+  assert_that trips
+    (elements_are
+       [
+         _row ~side:Buy ~entry_date:"2024-01-02" ~exit_date:"2024-01-09"
+           ~entry_price:10.0 ~exit_price:12.0 ~quantity:40.0 ~pnl:80.0;
+         _row ~side:Buy ~entry_date:"2024-01-02" ~exit_date:"2024-01-16"
+           ~entry_price:10.0 ~exit_price:15.0 ~quantity:60.0 ~pnl:300.0;
+       ])
+
+(** A closing trade larger than every open entry closes what it can and opens a
+    position on its own side with the excess — the portfolio really does flip
+    direction on an over-close. Pins the leftover branch arm, which the
+    partial-exit tests never reach. *)
+let test_extract_round_trips_over_close_opens_leftover_on_closing_side _ =
+  let steps =
+    [
+      _step_with_trades
+        ~date:(date_of_string "2024-01-02")
+        ~trades:
+          [
+            _make_trade ~id:"b1" ~symbol:"FLP" ~side:Buy ~quantity:50.0
+              ~price:10.0;
+          ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2024-01-09")
+        ~trades:
+          [
+            _make_trade ~id:"s1" ~symbol:"FLP" ~side:Sell ~quantity:80.0
+              ~price:12.0;
+          ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2024-01-16")
+        ~trades:
+          [
+            _make_trade ~id:"b2" ~symbol:"FLP" ~side:Buy ~quantity:30.0
+              ~price:9.0;
+          ]
+        ();
+    ]
+  in
+  let trips = extract_round_trips steps in
+  assert_that trips
+    (elements_are
+       [
+         _row ~side:Buy ~entry_date:"2024-01-02" ~exit_date:"2024-01-09"
+           ~entry_price:10.0 ~exit_price:12.0 ~quantity:50.0 ~pnl:100.0;
+         _row ~side:Sell ~entry_date:"2024-01-09" ~exit_date:"2024-01-16"
+           ~entry_price:12.0 ~exit_price:9.0 ~quantity:30.0 ~pnl:90.0;
        ])
 
 (* ==================== Metric Computer Tests ==================== *)
@@ -1868,6 +2112,14 @@ let suite =
          >:: test_extract_round_trips_equal_qty_siblings_fifo;
          "extract_round_trips mismatched qty falls back to FIFO"
          >:: test_extract_round_trips_mismatched_qty_falls_back_to_fifo;
+         "extract_round_trips partial exit across split emits no phantom SHORT"
+         >:: test_extract_round_trips_partial_exit_across_split_no_phantom_short;
+         "extract_round_trips over-sell reports one SHORT, not a duplicate"
+         >:: test_extract_round_trips_over_sell_reports_one_short_not_a_duplicate;
+         "extract_round_trips partial exit splits into two legs"
+         >:: test_extract_round_trips_partial_exit_splits_into_two_legs;
+         "extract_round_trips over-close opens leftover on closing side"
+         >:: test_extract_round_trips_over_close_opens_leftover_on_closing_side;
          (* Sharpe ratio tests *)
          "sharpe ratio zero with no data"
          >:: test_sharpe_ratio_zero_with_no_data;
