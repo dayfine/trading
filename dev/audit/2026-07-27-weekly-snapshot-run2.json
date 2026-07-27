@@ -1,0 +1,17 @@
+{
+  "date": "2026-07-27",
+  "feature": "weekly-snapshot",
+  "branch": "feat/picks-phase-c-v2",
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "run 2 of 2026-07-27 (PR #2114, Phase C v2). Filed under a -run2 suffix because record_qc_audit.sh keys on <date>-<feature>, which collided with run 1's record for feat/picks-phase-c (#2105/#2107) on the same date+track."
+}

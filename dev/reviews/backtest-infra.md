@@ -523,3 +523,166 @@ Both prior NEEDS_REWORK blockers (U6 at 005a514, F1 at 8ccc8c8) are resolved; th
 overall_qc: **APPROVED**
 structural_qc: APPROVED (SHA e59f8d2)
 behavioral_qc: APPROVED (SHA e59f8d2)
+
+---
+
+## PR #2113 — `fix/lapacke-gp-cholesky` (2026-07-27 run 2)
+
+**Format note (do not "pretty up"):** `record_qc_audit.sh` matches
+`^(structural|behavioral|overall)_qc: (APPROVED|NEEDS_REWORK)` at column 0 and
+takes the **last** occurrence, plus the bare integer under the last
+`## Quality Score`. Note the older section above writes
+`overall_qc: **APPROVED**` — the `**` means that line does **not** match, which
+is exactly the silently-wrong-record failure mode documented on 2026-07-26.
+Keep the fields below unadorned.
+
+Root-causes and fixes a `dune runtest` failure that bounced across four
+orchestrator runs as an unreproducible "host-dependent flake".
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+Rework iterations: 1.
+
+### What it actually was
+
+Not a flake, and not a numerical-conditioning problem. **The distro OpenBLAS
+mis-detects the runner CPU.** On the `Intel Xeon 6973P-C` GHA runners,
+`OPENBLAS_VERBOSE=2` prints `Core: Cooperlake` — I confirmed this myself,
+directly — and OpenBLAS then dispatches AVX-512 kernels that compute **wrong
+results** on that part. `dpotrf` returns a spurious `info=9` on a perfectly
+well-conditioned matrix: at the failure point the kernel matrix has
+`nonfinite = 0`, `asymmetry = 0`, every diagonal `1.0111`, and a pure-OCaml
+unblocked Cholesky factors it cleanly with min pivot `0.0118`.
+
+The wider measured behaviour is the alarming part: `chol ~upper:false (4·I)`
+fails for every 33≤n≤63 with `info = n/4+1`; **`chol ~upper:true` returns
+`info=0` with a silently WRONG factor** (5–7% relative for n≥33, 98% at n=120);
+square `dgemm` is wrong by 19.5 absolute at n=120; and `Linalg.inv` at n=120
+**aborts with `double free or corruption`**. `n ≤ 32` is correct because it
+stays in OpenBLAS's unblocked base case — which is precisely why only the two
+tests that drive the GP past 33 observations ever failed.
+
+The author explicitly **rejected the cheap fix** (switch `uplo`, transpose)
+because `~upper:true` succeeds with a wrong factor: it would have turned both
+tests green while silently corrupting every GP posterior on affected hosts.
+That judgement is the most valuable decision in the PR.
+
+### Verification I ran myself, non-vacuously
+
+My first attempt was cached and I discarded it — dune had marked the targets
+up to date, so both a scoped and a full `runtest` returned exit 0 against
+6-line logs. Re-verified with `--force` and by executing the binaries directly:
+
+| | before (`main @ 047f1837`) | after |
+|---|---|---|
+| `./test_bayesian_opt.exe` direct, 3 runs | exit 1, **44 tests, 2 Errors**, 3/3 | exit 0, **46 tests, OK**, 3/3 |
+| `dune runtest trading/backtest/tuner/ --force` | exit 1 | exit 0 (10 suites, 0 `Error:`) |
+| `dune runtest --force` (full repo) | exit 1 | **exit 0, 364 suites, 0 `Error:`/`FAIL:`** |
+
+### Structural (APPROVED, 4/5 base; APPROVED 4/5 delta)
+
+No violations. Functions ≤50 lines; numeric constants named; `.mli` complete
+with `@raise` documentation and an unchanged public signature; `bayesian_opt.ml`
+genuinely absent from the diff. The nesting linter tripped on the first draft of
+the retry loop and was fixed by **extraction** (`escalation` record plus
+`_escalate`/`_attempt`) — no limit bumped, no `@large-` marker, no
+`linter_exceptions.conf` change. The reviewer independently confirmed the
+load-bearing test claim: reference computations are **plain OCaml loops**
+(`acc := !acc +. (Mat.get l i p *. Mat.get l j p)`), never Owl matmul, so a
+wrong BLAS cannot validate a wrong answer against an equally-wrong reference.
+Delta re-review confirmed the rework is **test + docs only** — production files
+untouched between `fc92168e` and `569790e9`.
+
+### Behavioral (base NEEDS_REWORK 3 findings → re-review APPROVED, 5/5)
+
+The reviewer decomposed the author's "6 of 8 new cases fail pre-fix" claim
+rather than accepting it: **2 errors + 4 failures**, and — more informative than
+the raw count — **4 of the 6 fail on *any* host**, which is the durable
+regression value; the other 2 are host-conditional by construction. It verified
+the unblocked recurrence against `dpotf2` (diagonal, off-diagonal, column
+ordering, triangle referenced) and identified that the up-front non-finite guard
+is **load-bearing for correctness, not merely diagnostics**: `nan <= 0.0` is
+false in IEEE, so a `nan` pivot would slip past the non-positive-pivot test; it
+cannot arise only because the guard keeps the diagonal finite.
+
+Three findings, all closed in one rework iteration:
+
+1. **Certified `n` range stopped short of the reachable one.** The `.mli` named
+   n=100 as reachable (confirmed: `(total_budget 100)` in
+   `bayesian-multi-param-2026-05-16.sexp:72`) while every test stopped at 64.
+   Under a defect the PR itself proves is **discontinuous in n**, certifying the
+   bottom two-thirds is not certification. Closed by extending both size lists
+   to 100 with a comment giving the reason for the ceiling. The reviewer then
+   checked the new n=100 cases are **non-vacuous**: the SPD fixture has
+   `λ_min ≈ 1.69` so escalation correctly does not fire, and the interpolation
+   fixture's length scale equals its point spacing, making `κ ≈ 69` independent
+   of n.
+2. **A regression test sitting on the epsilon boundary.**
+   `test_input_matrix_is_not_modified` compared one of nine entries, and its
+   pre-fix margin was `1e-9` against `float_equal`'s default `epsilon = 1e-9` —
+   detection decided by rounding (~1 ulp), not by contract. It was one of only
+   four host-independent tests, so it carried disproportionate weight. Closed
+   with `noise_variance:1e-4` and `elements_are` over all n² entries: margin now
+   `1.000000 → 1.000100`, five orders above epsilon.
+3. **The blast-radius inventory was factually false.** The claim that
+   `analysis/technical/trend/lib/{segmentation,visualization}.ml` use
+   `Owl.Linalg.S` appeared in the PR body, the plan §Risks, the plan
+   §Out-of-scope, `dev/status/backtest-infra.md` and `dev/status/cleanup.md`.
+   Both files declare `module Linalg = Owl.Linalg.S` and **never call it**; their
+   only Owl use is `Mat.of_array _ 1 n` row vectors. The follow-up was pointing
+   `harness-maintainer` at dead aliases. Closed in all five places; a repo-wide
+   grep now shows **exactly four live Owl-linalg call sites, all in
+   `bayesian_opt.ml`** (`:124`, `:125`, `:169`, `:177`), so the inventory is
+   exhaustive rather than merely corrected.
+
+### An orchestrator finding, and how it resolved
+
+I flagged that the fix replaces the *factorisation* but leaves
+`Linalg.triangular_solve` (including `~upper:true`, the uplo measured as
+silently wrong for `chol`) at `bayesian_opt.ml:124-125`, on the same hot path
+and the same BLAS. The reviewer defused it on evidence: `dtrtrs` was separately
+probed clean to 6e-16 through n=120, and
+`test_fit_gp_interpolates_at_every_observation_count` pins the **whole chain**
+(chol → both solves → `Mat.dot`) against `Float.sin` to 1e-6. The rework then
+closed it properly — by extending that end-to-end test to n=100 rather than by
+adding a prose assurance. A probe goes stale; a test does not.
+
+The author also re-measured the gemm shapes `fit_gp` actually issues —
+`(1×n)·(n×1)` clean to 2.66e-15 through n=400 — establishing that the n≥120
+square-kernel breakage is on a path the GP never takes. The reviewer
+corroborated the mechanism (m=n=1 routes through the small-matrix path, the same
+reason n≤32 is clean) and confirmed by repo-wide grep that **no square
+`(n×n)·(n×n)` `Mat.dot` exists anywhere in the repo**.
+
+### Non-blocking FLAGs carried
+
+Precision defects in the write-up, not the code: the PR body says the gemm-shape
+probe "closes the `triangular_solve` question" (it does not — `dtrtrs` is a
+different routine; the conclusion is right on two other grounds, and the plan
+file states it correctly); `(n×n)·(n×1)` is listed among shapes `fit_gp` issues
+when no such call site exists; a "≤6e-16" bullet disagrees with its own table
+(≤2.7e-15); `_well_conditioned_spd`'s "strictly diagonally dominant"
+justification goes stale at n=100 though the matrix is still PD; and a bullet
+headed "**Removed** an epsilon-boundary regression test" describes a test that
+was strengthened, not removed. Filed to `dev/status/cleanup.md`.
+
+### The unfixable residue
+
+The OpenBLAS defect itself is a distro binary
+(`/lib/x86_64-linux-gnu/libopenblas.so.0`) and is not fixable in-repo. The
+mitigation recommended to `harness-maintainer` — set `OPENBLAS_CORETYPE=Haswell`
+(verified to repair every probe to 1e-15) and turn `ci.yml`'s existing CPU-flag
+smoke step into an actual **numerical** self-check (`chol(4·I)` at n=33 and
+`dgemm`-vs-naive at n=120 are one line each) — is carried as an escalation,
+because editing `.github/workflows/` needs a `workflow`-scoped PAT the
+orchestrator does not have.
+
+## Quality Score
+
+5
+
+## Verdict
+
+APPROVED

@@ -145,3 +145,146 @@ Risk % finding is closed** — arming a report whose Risk % column understates b
 ## Verdict
 
 APPROVED
+
+---
+
+## PR #2114 — `feat/picks-phase-c-v2` (2026-07-27 run 2)
+
+**Format note:** `record_qc_audit.sh` matches the `*_qc:` fields at column 0 and
+takes the **last** occurrence, plus the bare integer under the last
+`## Quality Score`. Keep them unadorned.
+
+Closes the remaining half of **P0**: the gap between the merged HTML weekly
+report (#2105, a table with sparklines) and the design reference the maintainer
+committed ~40 minutes after #2105 was dispatched
+(`dev/notes/weekly-report-design-reference-2026-07-27.html`, a **card** report).
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+Rework iterations: 1.
+
+### What landed
+
+21 files, +2338/−609 on the base tip. New modules `chip`, `report_card`,
+`candidate_card`, `report_masthead`, `svg_labels` (and `svg_series` in the
+rework); `html_report_renderer` 277 → **199**; `svg_chart` 171 → 260;
+`html_page` 144 → 227. Card layout replacing both the candidate and held tables,
+tag chips, a 30-week MA computed from the supplied bars (**no schema change** —
+the `?bars_for` lookup pattern was kept), collision-nudged right labels,
+per-symbol TradingView links, an order-ticket line, masthead + counts strip, and
+`render_weekly_report -html-out PATH` (the deferred #2105 item).
+
+Caveats the author volunteered rather than hid: the chart window is 90 weekly
+marks ≈ **21 months, not the ~24 the reference implies** (documented as 21
+instead of overclaimed); entry/stop dashes keep #2105's CVD-validated blue/red
+rather than the reference's unvalidated green/rust; sizing/data-hygiene
+**numbers** are deliberately not printed because the renderer is not handed that
+config and plausible-looking values would be fabricated; no bottom date axis.
+
+### The displayed-number contracts — the highest-risk surface, verified clean
+
+This renderer prints broker-facing order instructions and risk figures, and on
+this track a display path silently disagreed with the sizing arithmetic **twice**
+this week (#2103, then its recurrence in the Risk % column, caught by QC).
+qc-behavioral verified from source, not from the PR body:
+
+- `candidate_card.ml`'s `_footer` **calls** `Report_shared.instruction c`
+  (escaped) — `report_shared.ml` is not in the diff, so Markdown output stays
+  byte-identical. `ticket_is_the_shared_instruction` builds its expected
+  substring by calling the same function, so a drifting lookalike goes red.
+- `_risk_value` uses `Report_shared.risk_pct ~entry:(Weekly_snapshot.expected_fill_price c)`
+  — the *same expression* as `report_renderer.ml:60-63`. **`c.entry` is never the
+  risk denominator.** Pinned positively and negatively (16.1% present, 10.0%
+  absent). `Extended` correctly stays entry-based (there is no fill to price),
+  with card + ticket-strip marking pinned on the opposite arm.
+
+### The one real finding, and its rework
+
+**CP1 FAIL (base tip):** `svg_chart.mli` promised that a **non-positive**
+`?ma_period` is "no overlay, and the output is byte-identical to the
+pre-`?ma_period` renderer". The *omitted* half held; the *non-positive* half did
+not. `_sma` correctly yielded all-`None`, but `_aria_label` matched the option as
+a plain `Some p` and emitted `"; %d-period moving average"` — so `~ma_period:0`
+rendered `aria-label="… ; 0-period moving average"`, announcing an average that
+is not drawn. Untested. It mattered beyond the letter because that byte-identical
+guarantee is the author's own justification for leaving every pre-existing
+coordinate assertion in `test_svg_chart.ml` un-re-pinned.
+
+**Closed by making the code match the doc** (the stronger of the two options
+offered): `render` normalises with `Option.filter ~f:(fun period -> period > 0)`
+as its first statement, so the leak is closed at the single point
+`_ma_over_window` and `_aria_label` share, not patched at one of them. The new
+test asserts **whole-render equality** (`render ~ma_period:0 () = render ()`, and
+again for `-5`) — the right instrument precisely because the leak satisfied every
+negative substring one would think to write. Mutation-verified: reverting to
+`Fn.id` reddens only that test.
+
+**Consequential extraction, handled correctly.** The fix pushed `svg_chart.ml` to
+305 lines, over the 300 soft limit. Per `code-health-discipline.md` the author
+**extracted** rather than trimming a comment to squeak under: series preparation
+(weekly aggregation + the SMA) moved to a new **`Svg_series`** (43 lines),
+leaving `Svg_chart` as the pure geometry its docstring always claimed, at **260**.
+The four `weekly_bars` tests moved **verbatim** — qc-behavioral compared fixtures
+and assertions against their base-tip versions and confirmed nothing was
+loosened. The move also **newly pins the `sma` alignment contract** (same length
+as input, `None` until `period` values are behind a position), which the
+coordinate tests had been assuming implicitly.
+
+### The golden — the #2105 argument, finally synthesised
+
+#2105's full-`<tr>` pins broke twice in two days (most sharply when a rebase that
+was textually clean met an added 12th cell). The #2105 reviewer had proposed a
+**body-only** golden after the author objected that a full-document golden would
+be ~90/110 lines of CSS and get promoted blind. This PR builds exactly that: 17
+lines, `<header>`→`</footer>`, no `<style>`/DOCTYPE, wired via
+`(deps (glob_files_rec fixtures/*))`, with the regeneration path documented in
+both the test docstring and the failure message.
+
+It earns its place: **M15 (dropping the legend) is caught by the golden and
+nothing else** — qc-behavioral confirmed by grep that the four legend-adjacent
+assertions in `test_html_report_renderer.ml` are all negative assertions about
+*notes*, and `section_order` omits the legend entirely. When the rework added the
+held-section legend, the regenerated golden diff was **exactly one added line,
+zero deletions, zero modifications**, byte-identical to the two legends already
+present — inspected before promotion.
+
+Known limitation, recorded rather than papered over: the golden renders with an
+empty bar source, so all three chart slots are `no chart data`. It does **not**
+protect chart composition; `test_svg_chart.ml`'s exact-coordinate pins do.
+
+### Evidence
+
+20 mutations, 20 red, each naming the specific test that reddens (qc-behavioral
+verified all 20 name tests that exist and would go red). Arm separability
+preserved — `data-chart="<arm>:<symbol>"` moved from the row onto `div.chart`, so
+long / short / held remain separately assertable; this is the F4 defect shape
+from #2105, handled. Degradation paths (unknown regime, unrecognised clauses,
+missing bar data, the mixed-store case) all still pinned. Both Weinstein
+citations verify verbatim against `weinstein-book-reference.md` §1 and §5.2, and
+`_held_stop_line` never suggests lowering a stop — the L2 spine property holds.
+
+### An orchestrator correction, recorded because it must not recur
+
+qc-structural's **base-tip** verdict was NEEDS_REWORK (3/5) on a single blocker:
+that the author had modified `dev/status/_index.md` and must revert the row.
+**That was false.** I verified three ways — the REST file list (21 files, no
+`_index.md`), `git diff --stat` on that path (empty), and a byte comparison of
+the file at `origin/main` versus the branch (**identical**). I posted a public
+correction on the PR rejecting the finding, and instructed the author explicitly
+not to act on it.
+
+This is the **A3 ancestry-walk false positive** that
+`.claude/rules/qc-structural-authority.md` documents by name (PR #687), and the
+review's dispatch prompt restated the rule in its own words. Second recorded
+instance; filed as an escalation. The delta re-review, re-briefed with the
+authoritative file list, returned **APPROVED (4/5)** and did not re-raise it.
+
+## Quality Score
+
+5
+
+## Verdict
+
+APPROVED
