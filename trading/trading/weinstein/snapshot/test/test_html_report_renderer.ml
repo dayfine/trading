@@ -245,7 +245,16 @@ let test_sectors_and_warnings_render_as_bullets _ =
    the Entry and Stop cells inside [_candidate_row] leaves both "$100.00" and
    "$90.00" present somewhere in the document, so the page renders
    "Entry $90.00 / Stop $100.00" under headers saying the opposite while every
-   substring assertion still holds. Risk % = (100 - 90) / 100 * 100. *)
+   substring assertion still holds. Risk % = (100 - 90) / 100 * 100.
+
+   The row carries TWELVE cells: the reconciliation "Close vs entry" cell sits
+   at position 6, between Entry and Stop, matching [_candidate_columns] and the
+   Markdown renderer's identical order (issue #2103). LONGA is
+   [Not_reconciled], so that cell is a bare "-" with no chip span, and
+   [expected_fill_price] returns the entry — which is why Risk % is still
+   10.0% here and NOT re-anchored. The reconciled-row chip and its fill-based
+   Risk % are pinned separately in
+   [test_through_entry_chip_rendered_on_the_long_arm]. *)
 let test_long_candidate_row_cells _ =
   let html = Html_report_renderer.render _full_snapshot in
   assert_that html
@@ -258,14 +267,15 @@ let test_long_candidate_row_cells _ =
          _has_substring
            "<tr><td class=\"num\">1</td><td class=\"\">LONGA</td><td \
             class=\"\">A+</td><td class=\"num\">0.91</td><td \
-            class=\"num\">$100.00</td><td class=\"num\">$90.00</td><td \
-            class=\"num\">10.0%</td><td class=\"\">Virgin_territory \
-            (0.95)</td><td class=\"rationale\">Stage 2 breakout, 2.1x \
-            volume</td><td class=\"instruction\">BUY STOP 10 sh @ $100.00 \
-            (~$1000, 5.0% of book, risk $100); on fill place SELL STOP @ \
-            $90.00, GTC; cancel if unfilled by Friday close</td><td \
-            class=\"chart\" data-chart=\"long:LONGA\"><span \
-            class=\"nochart\">no chart data</span></td></tr>";
+            class=\"num\">$100.00</td><td class=\"num\">-</td><td \
+            class=\"num\">$90.00</td><td class=\"num\">10.0%</td><td \
+            class=\"\">Virgin_territory (0.95)</td><td \
+            class=\"rationale\">Stage 2 breakout, 2.1x volume</td><td \
+            class=\"instruction\">BUY STOP 10 sh @ $100.00 (~$1000, 5.0% of \
+            book, risk $100); on fill place SELL STOP @ $90.00, GTC; cancel if \
+            unfilled by Friday close</td><td class=\"chart\" \
+            data-chart=\"long:LONGA\"><span class=\"nochart\">no chart \
+            data</span></td></tr>";
        ])
 
 let test_short_candidate_row_is_rendered_in_its_own_table _ =
@@ -282,12 +292,17 @@ let test_short_candidate_row_is_rendered_in_its_own_table _ =
             pinned by the whole <tr>. Every cell here differs from the long
             fixture's — flagged symbol, fallback stop, negative risk, no
             grade, unsized instruction — so this cannot be satisfied by the
-            long table's output. *)
+            long table's output.
+
+            Twelve cells, with the reconciliation cell at position 6 exactly as
+            on the long arm. SHRTB is [Not_reconciled] too, so it is a bare "-"
+            and Risk % stays entry-based at (50 - 55) / 50 = -10.0%. *)
          "<tr><td class=\"num\">1</td><td class=\"\">SHRTB <span \
           class=\"flag\">(!)</span></td><td class=\"\">B</td><td \
           class=\"num\">0.77</td><td class=\"num\">$50.00</td><td \
-          class=\"num\">$55.00*</td><td class=\"num\">-10.0%</td><td \
-          class=\"\">-</td><td class=\"rationale\">Stage 4 breakdown</td><td \
+          class=\"num\">-</td><td class=\"num\">$55.00*</td><td \
+          class=\"num\">-10.0%</td><td class=\"\">-</td><td \
+          class=\"rationale\">Stage 4 breakdown</td><td \
           class=\"instruction\">-</td><td class=\"chart\" \
           data-chart=\"short:SHRTB\"><span class=\"nochart\">no chart \
           data</span></td></tr>";
