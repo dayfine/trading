@@ -4,6 +4,7 @@ open Core
 open OUnit2
 open Matchers
 module Live_portfolio = Weinstein_snapshot_gen.Live_portfolio
+module Stop_track = Weinstein_snapshot_gen.Stop_track
 
 let _date d = Date.of_string d
 
@@ -25,6 +26,7 @@ let _sample : Live_portfolio.t =
           entry_price = 180.0;
           entry_date = _date "2026-06-13";
           stop_price = 168.0;
+          stop_state = None;
         };
       ];
   }
@@ -95,10 +97,87 @@ let test_save_unwritable_path _ =
   let saved = Live_portfolio.save _sample ~path:"/nonexistent/dir/p.sexp" in
   assert_that (Result.ok saved) is_none
 
+(* --- stop_state back-compat + round-trip (item 4c.b) --------------------- *)
+
+(* The exact shape every [portfolio.sexp] written before item 4c.b has: a
+   position record with NO [stop_state] field. Written as a literal string on
+   purpose — round-tripping the new type would serialise the field and never
+   exercise the [@sexp.default None] that makes those files keep loading. *)
+let _pre_4cb_sexp =
+  "((cash 82000.0) (as_of 2026-07-24) (positions (((symbol AAPL) (shares 100) \
+   (entry_price 180.0) (entry_date 2026-06-13) (stop_price 168.0)))))"
+
+let test_pre_4cb_file_still_loads _ =
+  assert_that
+    (Live_portfolio.t_of_sexp (Sexp.of_string _pre_4cb_sexp))
+    (all_of
+       [
+         field (fun (p : Live_portfolio.t) -> p.cash) (float_equal 82_000.0);
+         field
+           (fun (p : Live_portfolio.t) -> p.positions)
+           (elements_are
+              [
+                all_of
+                  [
+                    field
+                      (fun (p : Live_portfolio.position) -> p.stop_price)
+                      (float_equal 168.0);
+                    field
+                      (fun (p : Live_portfolio.position) -> p.stop_state)
+                      is_none;
+                  ];
+              ]);
+       ])
+
+(* A populated track survives serialize -> parse, state arm and all. *)
+let test_stop_state_round_trips _ =
+  let track : Stop_track.t =
+    {
+      state =
+        Trailing
+          {
+            stop_level = 172.5;
+            last_correction_extreme = 175.0;
+            last_trend_extreme = 195.0;
+            ma_at_last_adjustment = 170.0;
+            correction_count = 2;
+            correction_observed_since_reset = true;
+          };
+      updated = _date "2026-07-24";
+      raises = 3;
+    }
+  in
+  let sample =
+    {
+      _sample with
+      positions =
+        List.map _sample.positions ~f:(fun (p : Live_portfolio.position) ->
+            { p with stop_state = Some track });
+    }
+  in
+  assert_that
+    (Live_portfolio.t_of_sexp (Live_portfolio.sexp_of_t sample))
+    (equal_to sample)
+
+(* The schema-drift obligation (dev/status/cleanup.md §Backlog): [header] is a
+   hand-written comment block with nothing tying it to [type position], so a new
+   field must be documented in the same change or the file's own documentation
+   silently goes stale. *)
+let test_header_documents_stop_state _ =
+  assert_that Live_portfolio.header
+    (all_of
+       [
+         contains_substring "stop_state";
+         contains_substring "--allow-lower-stop";
+       ])
+
 let suite =
   "live_portfolio"
   >::: [
          "round_trip" >:: test_round_trip;
+         "pre_4cb_file_still_loads" >:: test_pre_4cb_file_still_loads;
+         "stop_state_round_trips" >:: test_stop_state_round_trips;
+         "header_documents_stop_state" >:: test_header_documents_stop_state;
          "template_parses" >:: test_template_parses;
          "load_from_file" >:: test_load_from_file;
          "load_missing_file" >:: test_load_missing_file;

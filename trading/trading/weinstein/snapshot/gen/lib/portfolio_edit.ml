@@ -100,9 +100,53 @@ let _check_trim_fits ~shares ~held_shares =
         full exit"
        shares held_shares)
 
-let _validate_stop stop_price =
-  Option.value_map stop_price ~default:(Ok ())
-    ~f:(_check_positive_float ~name:"stop-price")
+(* Weinstein's never-lower rule (weinstein-book-reference.md §5.2 "Continue
+   moving the sell-stop up as the MA advances"; §5.4 "Don't hold hoping it will
+   come back"). Compared against [stop_price] — the trader's actual working
+   broker order, which is the field this subcommand edits. Equality passes, so
+   re-running the same command is idempotent rather than an error. *)
+let _check_stop_not_lowered ~allow_lower ~new_stop ~current =
+  _check
+    (allow_lower || Float.(new_stop >= current))
+    (sprintf
+       "stop-price (%.4f) is below the stop in force (%.4f); a Weinstein \
+        trailing stop is never lowered. Pass --allow-lower-stop to override \
+        (which also resets the stop state)."
+       new_stop current)
+
+let _validate_stop ~(held : Live_portfolio.position) ~allow_lower stop_price =
+  Option.value_map stop_price ~default:(Ok ()) ~f:(fun new_stop ->
+      Or_error.combine_errors_unit
+        [
+          _check_positive_float ~name:"stop-price" new_stop;
+          _check_stop_not_lowered ~allow_lower ~new_stop
+            ~current:held.stop_price;
+        ])
+
+(* Keep the carried stop state in step with a manual raise, so next week's
+   [Stop_thread.advance] resumes from the stop actually in force rather than
+   resurrecting a stale machine level. A refusal from {!Stop_track.ratchet}
+   means the machine's own stop already sits higher, in which case leaving the
+   track alone is what the never-lower rule requires. *)
+let _ratchet_track track ~to_ =
+  Option.map track ~f:(fun t ->
+      Option.value (Stop_track.ratchet t ~to_) ~default:t)
+
+(* A deliberate [--allow-lower-stop] override drops the track: the machine's
+   accumulated state is no longer a truthful description of a position whose
+   stop the trader has moved against it, so the next advance re-seeds honestly
+   from bars instead of carrying state that has been contradicted. *)
+let _apply_stop (held : Live_portfolio.position) ~allow_lower ~stop_price =
+  match stop_price with
+  | None -> held
+  | Some new_stop when allow_lower && Float.(new_stop < held.stop_price) ->
+      { held with stop_price = new_stop; stop_state = None }
+  | Some new_stop ->
+      {
+        held with
+        stop_price = new_stop;
+        stop_state = _ratchet_track held.stop_state ~to_:new_stop;
+      }
 
 let _validate_trim_value ~held_shares { shares; price } =
   Or_error.combine_errors_unit
@@ -121,15 +165,16 @@ let _check_not_a_no_op ~stop_price ~trim =
     "adjust needs --stop-price and/or --trim-shares with --trim-price"
 
 (* The adjusted position plus the cash it frees (zero for a stop-only edit). *)
-let _adjusted (held : Live_portfolio.position) ~stop_price ~trim =
-  let stop_price = Option.value stop_price ~default:held.stop_price in
+let _adjusted held ~allow_lower ~stop_price ~trim =
+  let held = _apply_stop held ~allow_lower ~stop_price in
   match trim with
-  | None -> ({ held with stop_price }, 0.0)
+  | None -> (held, 0.0)
   | Some { shares; price } ->
-      ( { held with shares = held.shares - shares; stop_price },
+      ( { held with Live_portfolio.shares = held.shares - shares },
         _proceeds ~shares ~price )
 
-let adjust (t : Live_portfolio.t) ~as_of ~symbol ?stop_price ?trim () =
+let adjust (t : Live_portfolio.t) ~as_of ~symbol ?stop_price
+    ?(allow_lower = false) ?trim () =
   let symbol = _normalize_symbol symbol in
   let open Or_error.Let_syntax in
   let%bind held = _require_held t ~symbol in
@@ -137,10 +182,11 @@ let adjust (t : Live_portfolio.t) ~as_of ~symbol ?stop_price ?trim () =
   let%map () =
     Or_error.combine_errors_unit
       [
-        _validate_stop stop_price; _validate_trim ~held_shares:held.shares trim;
+        _validate_stop ~held ~allow_lower stop_price;
+        _validate_trim ~held_shares:held.shares trim;
       ]
   in
-  let position, credit = _adjusted held ~stop_price ~trim in
+  let position, credit = _adjusted held ~allow_lower ~stop_price ~trim in
   {
     Live_portfolio.cash = t.cash +. credit;
     as_of;

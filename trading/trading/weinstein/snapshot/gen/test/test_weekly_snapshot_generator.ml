@@ -228,6 +228,7 @@ let test_live_portfolio_populates_held _ =
       entry_price = 150.0;
       entry_date = Date.of_string "2022-01-03";
       stop_price = 140.0;
+      stop_state = None;
     }
   in
   let base =
@@ -287,6 +288,7 @@ let test_held_without_bars_degrades_gracefully _ =
       entry_price = 42.0;
       entry_date = Date.of_string "2022-01-03";
       stop_price = 40.0;
+      stop_state = None;
     }
   in
   let base =

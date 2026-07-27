@@ -6,6 +6,7 @@ type position = {
   entry_price : float;
   entry_date : Date.t;
   stop_price : float;
+  stop_state : Stop_track.t option; [@sexp.default None]
 }
 [@@deriving sexp, eq, show]
 
@@ -42,6 +43,13 @@ let _header_lines =
     ";     entry_price : float — fill price";
     ";     entry_date  : date  — date opened (YYYY-MM-DD)";
     ";     stop_price  : float — the working stop";
+    ";     stop_state  : optional — the trailing-stop state machine's carried";
+    ";                   state for this holding. OMIT IT: the tooling writes";
+    ";                   and updates it, and a file without it loads fine.";
+    ";                   Weinstein never lowers a stop, so `record_fill adjust";
+    ";                   --stop-price` refuses to move a stop DOWN unless you";
+    ";                   also pass --allow-lower-stop (which resets this \
+     state).";
     ";";
     "; Example position (delete when you record real fills):";
     ";   ((symbol AAPL) (shares 100) (entry_price 180.0)";

@@ -11,7 +11,9 @@
   test_spike_bar_gate
   test_rename_detector
   test_rename_gate
-  test_entry_reconcile)
+  test_entry_reconcile
+  test_stop_track
+  test_stop_thread)
  (libraries
   core
   core_unix
