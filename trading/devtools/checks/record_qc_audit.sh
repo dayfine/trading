@@ -156,6 +156,23 @@ OVERALL=""
 QUALITY_SCORE=""
 
 if [ -n "$PR_NUMBER" ]; then
+  # --pr-number was explicitly requested, so a missing `gh` binary must be a
+  # loud failure, not a silent slide into the file-mode fallback below. Before
+  # this check, a missing `gh` made the query below produce empty $BODIES
+  # indistinguishable from "PR legitimately has no reviews yet" (scenario 6),
+  # and the fallback then read dev/reviews/<feature>.md -- which can belong to
+  # an entirely different PR/run for the same feature name and silently write
+  # its (wrong) verdict as this PR's audit record. Observed in production: a
+  # NEEDS_REWORK PR got recorded as APPROVED this way, resetting the
+  # consecutive_rework_count streak #2123 exists to protect. See H-QC-SCALE
+  # follow-up (dev/status/harness.md).
+  if ! command -v "$GH_BIN" >/dev/null 2>&1; then
+    echo "FAIL: --pr-number $PR_NUMBER was given but '$GH_BIN' is not available on PATH." >&2
+    echo "  Refusing to silently fall back to dev/reviews/${FEATURE}.md -- it may belong to a different PR/run." >&2
+    echo "  Install gh, or omit --pr-number to explicitly use file mode." >&2
+    exit 1
+  fi
+
   # One gh call: render reviews into a STATE/body/ENDBODY frame, one per review.
   BODIES="$("$GH_BIN" pr view "$PR_NUMBER" --json reviews \
     --jq '.reviews[] | "STATE:\(.state)\n\(.body)\nENDBODY"' 2>/dev/null || true)"
@@ -211,13 +228,19 @@ if [ -n "$PR_NUMBER" ]; then
     BEHAVIORAL="$(_resolve_verdict "$BEHAVIORAL_STATE" "$BEHAVIORAL_BODY")"
 
     # Quality score from PR bodies (last "## Quality Score" wins).
+    #
+    # Capture the FULL leading digit run (not just a single [1-5] char) so an
+    # out-of-range value (e.g. "6", "10", "0") is captured as-is instead of
+    # being silently discarded by a narrow acceptance regex -- the range check
+    # below then fails loudly on it rather than the record quietly ending up
+    # with no quality_score at all. See H-QC-SCALE (dev/status/harness.md).
     QUALITY_SCORE="$(echo "$BODIES" | awk '
       /^## Quality Score|^### Quality Score/ { in_qs=1; next }
       in_qs && /^[[:space:]]*$/ { next }
       in_qs {
         line=$0
         gsub(/^\*\*/, "", line)
-        if (line ~ /^[1-5]/) last_score=substr(line, 1, 1)
+        if (match(line, /^[0-9]+/)) last_score=substr(line, RSTART, RLENGTH)
         in_qs=0
       }
       END { if (last_score != "") print last_score }')"
@@ -294,6 +317,11 @@ fi
 # The LAST such section in the file is used (behavioral takes precedence).
 #
 # Note: awk {n,m} quantifiers are not portable; use explicit alternation instead.
+#
+# Capture the FULL leading digit run (not just a single [1-5] char) so an
+# out-of-range value (e.g. "6", "10", "0") is captured as-is rather than
+# silently discarded by a narrow acceptance regex -- the range check below
+# then fails loudly on it. See H-QC-SCALE (dev/status/harness.md).
 
 # Only run the file-mode quality-score extractor if PR-mode didn't already
 # populate QUALITY_SCORE. Otherwise the awk would run against a missing
@@ -306,13 +334,28 @@ if [ -z "$QUALITY_SCORE" ]; then
     in_qs {
       line=$0
       gsub(/^\*\*/, "", line)
-      if (line ~ /^[1-5]/) {
-        last_score=substr(line, 1, 1)
+      if (match(line, /^[0-9]+/)) {
+        last_score=substr(line, RSTART, RLENGTH)
       }
       in_qs=0
     }
     END { if (last_score != "") print last_score }
   ' "$REVIEW_FILE" 2>/dev/null || true)
+fi
+
+# --- Validate quality score is an integer in 1..5 ---
+#
+# Both extraction paths above intentionally capture the raw leading integer
+# (not restricted to 1-5) precisely so an out-of-range or malformed score is
+# caught here explicitly, rather than silently discarded upstream and treated
+# as "no score present". H-QC-SCALE: a QC agent posted an inverted score (1
+# meaning "excellent") that happened to be in-range and so passed through
+# silently; a genuinely out-of-range value must not pass through the same way.
+if [ -n "$QUALITY_SCORE" ] && ! echo "$QUALITY_SCORE" | grep -qE '^[1-5]$'; then
+  SCORE_SOURCE="$REVIEW_FILE"
+  [ -n "$PR_NUMBER" ] && SCORE_SOURCE="PR #$PR_NUMBER review comments"
+  echo "FAIL: parsed quality score '$QUALITY_SCORE' is not an integer in 1..5 (source: $SCORE_SOURCE)" >&2
+  exit 1
 fi
 
 # --- Call write_audit.sh ---

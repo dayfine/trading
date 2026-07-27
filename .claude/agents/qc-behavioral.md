@@ -79,11 +79,15 @@ Fill the **Contract Pinning Checklist** (CP1–CP4) first — it applies to ever
 
 ### Step 4: Assign a quality score
 
-After filling the checklist, assign a quality score (1–5) with a brief rationale. The score is a trend-tracking signal for code quality over time — it does NOT affect the verdict (APPROVED/NEEDS_REWORK is derived mechanically from the checklist).
+After filling the checklist, assign a quality score (1–5) with a brief rationale. The score is a trend-tracking signal for code quality over time — it does NOT affect the verdict (APPROVED/NEEDS_REWORK is derived mechanically from the checklist). **Polarity: 1 = worst, 5 = best.** The rationale's adjective must agree with the digit — check against the rubric below before posting; never write a low number with a positive adjective or vice versa.
 
 ---
 
 ## Quality Score Rubric
+
+**Polarity: 1 = worst → 5 = best.** PR #2115 posted score 1 captioned "Excellent" — an
+inverted read (H-QC-SCALE); the audit record was only correct by luck because
+`record_qc_audit.sh` takes the *last* score in the file. Never repeat that pairing.
 
 | Score | Label | Meaning |
 |-------|-------|---------|
@@ -152,7 +156,10 @@ Put the authority document reference in the Notes column for every non-NA item.
 **Output contract:** The integer must appear on the first non-blank line after the
 `## Quality Score` heading, formatted as `N — <rationale>` (bare digit, not bold).
 Example: `4 — Clean implementation with minor style nits.`
-The `record_qc_audit.sh` script reads this line to populate `dev/audit/` records.
+The `record_qc_audit.sh` script reads this line to populate `dev/audit/` records and
+now rejects (non-zero exit) any parsed value outside `1..5` rather than writing a
+malformed record — but it cannot detect an in-range value with inverted polarity, so
+getting the digit right here is still on you.
 Use `## Quality Score` (level-2 heading) — not `### Quality Score` — for new reviews.
 
 ## Verdict

@@ -599,6 +599,113 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 12 — H-QC-SCALE hardening: an out-of-range quality score parsed
+# from a dev/reviews/<feature>.md file (file-mode) must be rejected loudly
+# rather than silently dropped or written into a malformed audit record.
+# Before this fix, the extraction regex only matched a leading [1-5] char,
+# so a value like "7" simply failed to match and quality_score silently came
+# out as null -- no error, no record of the fact that the review posted a
+# bogus score. Now the extractor captures the full leading digit run and an
+# explicit range check fails the whole script when it is out of 1..5.
+# ---------------------------------------------------------------------------
+FEATURE12="out-of-range-score-file-mode"
+cat > "${TMP_REPO}/dev/reviews/${FEATURE12}.md" <<'EOF'
+Reviewed SHA: outofrange1
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+7 — inverted or bogus score
+EOF
+
+audit_count_before_12="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE12}.json" | wc -l | tr -d ' ')"
+
+out12=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE12}" "feat/dummy" "2026-05-25" 2>&1) && rc12=0 || rc12=$?
+
+audit_count_after_12="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE12}.json" | wc -l | tr -d ' ')"
+
+if (( rc12 == 1 )) && [[ "${audit_count_before_12}" == "0" ]] && [[ "${audit_count_after_12}" == "0" ]] \
+   && echo "${out12}" | grep -q "quality score '7' is not an integer in 1..5"; then
+  pass "scenario 12 — out-of-range quality score (file-mode) rejected with exit 1, no record written (H-QC-SCALE)"
+else
+  fail "scenario 12 — expected rc=1, no file written, message naming '7'; got rc=${rc12}, before=${audit_count_before_12}, after=${audit_count_after_12}"
+  echo "${out12}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 13 — H-QC-SCALE hardening, second consumer: write_audit.sh itself
+# rejects an out-of-range --quality-score even when called directly (the
+# fallback path documented in lead-orchestrator.md when record_qc_audit.sh
+# is bypassed). This is the last line of defense before a malformed
+# quality_score reaches the committed JSON body.
+# ---------------------------------------------------------------------------
+FEATURE13="out-of-range-score-direct"
+audit_count_before_13="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE13}.json" | wc -l | tr -d ' ')"
+
+out13=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
+  --date 2026-07-27 --feature "${FEATURE13}" --branch "harness/y" \
+  --structural APPROVED --behavioral APPROVED --overall APPROVED \
+  --quality-score 0 2>&1) && rc13=0 || rc13=$?
+
+audit_count_after_13="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE13}.json" | wc -l | tr -d ' ')"
+
+if (( rc13 == 1 )) && [[ "${audit_count_before_13}" == "0" ]] && [[ "${audit_count_after_13}" == "0" ]] \
+   && echo "${out13}" | grep -q "must be an integer 1..5" \
+   && echo "${out13}" | grep -q "got: '0'"; then
+  pass "scenario 13 — write_audit.sh rejects out-of-range --quality-score directly, no record written (H-QC-SCALE)"
+else
+  fail "scenario 13 — expected rc=1, no file written, message naming '0'; got rc=${rc13}, before=${audit_count_before_13}, after=${audit_count_after_13}"
+  echo "${out13}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 14 — H-AUDIT-GH-FALLBACK: a missing `gh` binary with --pr-number
+# set must refuse loudly, not silently fall back to dev/reviews/<feature>.md
+# (which may belong to an entirely different PR/run for the same feature
+# name). Before this fix, a missing `gh` produced empty $BODIES -- identical
+# in shape to "PR legitimately has no reviews yet" (scenario 6) -- and the
+# script read whatever unrelated review file happened to sit at that path,
+# writing its verdict as this PR's audit record with exit 0. Observed in
+# production: a NEEDS_REWORK PR got recorded as APPROVED this way, resetting
+# the consecutive_rework_count streak.
+#
+# The fixture review file below deliberately holds an APPROVED verdict (the
+# WRONG answer this PR's real reviews say NEEDS_REWORK) to prove the fallback
+# is refused rather than silently consumed.
+# ---------------------------------------------------------------------------
+FEATURE14="gh-missing-refuses-file-fallback"
+cat > "${TMP_REPO}/dev/reviews/${FEATURE14}.md" <<'EOF'
+Reviewed SHA: unrelatedsha
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+5 — this file belongs to a different run and must NOT be used
+EOF
+
+audit_count_before_14="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE14}.json" | wc -l | tr -d ' ')"
+
+out14=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="/nonexistent/gh-binary-that-does-not-exist" \
+  bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+  "${FEATURE14}" "feat/dummy" "2026-05-25" --pr-number 2129 2>&1) && rc14=0 || rc14=$?
+
+audit_count_after_14="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE14}.json" | wc -l | tr -d ' ')"
+
+if (( rc14 == 1 )) && [[ "${audit_count_before_14}" == "0" ]] && [[ "${audit_count_after_14}" == "0" ]] \
+   && echo "${out14}" | grep -q "not available on PATH" \
+   && echo "${out14}" | grep -q "dev/reviews/${FEATURE14}.md"; then
+  pass "scenario 14 — missing gh binary with --pr-number refuses file-mode fallback, no record written (H-AUDIT-GH-FALLBACK)"
+else
+  fail "scenario 14 — expected rc=1, no file written, message naming missing gh + review path; got rc=${rc14}, before=${audit_count_before_14}, after=${audit_count_after_14}"
+  echo "${out14}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
