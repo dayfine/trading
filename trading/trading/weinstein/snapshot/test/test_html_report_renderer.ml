@@ -125,6 +125,18 @@ let _has_substring substring : string matcher =
     (fun s -> if String.is_substring s ~substring then Some () else None)
     __
 
+let _starts_with prefix : string matcher =
+  matching
+    ~msg:(Printf.sprintf "Expected prefix %S" prefix)
+    (fun s -> if String.is_prefix s ~prefix then Some () else None)
+    __
+
+let _ends_with suffix : string matcher =
+  matching
+    ~msg:(Printf.sprintf "Expected suffix %S" suffix)
+    (fun s -> if String.is_suffix s ~suffix then Some () else None)
+    __
+
 (* Asserts the needles appear in the given order, each after the previous. *)
 let _in_order needles : string matcher =
   matching
@@ -150,7 +162,12 @@ let test_document_is_self_contained _ =
   assert_that html
     (all_of
        [
-         _has_substring "<!DOCTYPE html>";
+         (* Prefix AND suffix, not substrings: the .mli claims a "complete
+            HTML document ... terminated by a final newline", and a truncated
+            format string that drops the closing tags satisfies every
+            substring assertion while emitting unterminated markup. *)
+         _starts_with "<!DOCTYPE html>\n<html lang=\"en\">\n";
+         _ends_with "\n</body>\n</html>\n";
          _has_substring "<meta charset=\"utf-8\">";
          _has_substring "<title>Weekly Pick Report — 2020-08-28</title>";
          _has_substring "<style>";
@@ -221,6 +238,12 @@ let test_sectors_and_warnings_render_as_bullets _ =
 
 (* ------- Candidate rows ------- *)
 
+(* The header row and the body row are pinned COMPLETE and adjacent, because
+   only the pair fixes column ORDER. Loose per-cell substrings do not: swapping
+   the Entry and Stop cells inside [_candidate_row] leaves both "$100.00" and
+   "$90.00" present somewhere in the document, so the page renders
+   "Entry $90.00 / Stop $100.00" under headers saying the opposite while every
+   substring assertion still holds. Risk % = (100 - 90) / 100 * 100. *)
 let test_long_candidate_row_cells _ =
   let html = Html_report_renderer.render _full_snapshot in
   assert_that html
@@ -229,16 +252,17 @@ let test_long_candidate_row_cells _ =
          _has_substring
            "<thead><tr><th>Rank</th><th>Symbol</th><th>Grade</th><th>Score</th><th>Entry</th><th>Stop</th><th>Risk \
             %</th><th>Resistance</th><th>Rationale</th><th>Instruction</th><th>Chart</th></tr></thead>";
-         _has_substring "<td class=\"num\">1</td><td class=\"\">LONGA</td>";
-         _has_substring "<td class=\"num\">0.91</td>";
-         _has_substring "<td class=\"num\">$100.00</td>";
-         (* Risk % = (100 - 90) / 100 * 100. *)
-         _has_substring "<td class=\"num\">10.0%</td>";
-         _has_substring "<td class=\"\">Virgin_territory (0.95)</td>";
          _has_substring
-           "<td class=\"instruction\">BUY STOP 10 sh @ $100.00 (~$1000, 5.0% \
-            of book, risk $100); on fill place SELL STOP @ $90.00, GTC; cancel \
-            if unfilled by Friday close</td>";
+           "<tr><td class=\"num\">1</td><td class=\"\">LONGA</td><td \
+            class=\"\">A+</td><td class=\"num\">0.91</td><td \
+            class=\"num\">$100.00</td><td class=\"num\">$90.00</td><td \
+            class=\"num\">10.0%</td><td class=\"\">Virgin_territory \
+            (0.95)</td><td class=\"rationale\">Stage 2 breakout, 2.1x \
+            volume</td><td class=\"instruction\">BUY STOP 10 sh @ $100.00 \
+            (~$1000, 5.0% of book, risk $100); on fill place SELL STOP @ \
+            $90.00, GTC; cancel if unfilled by Friday close</td><td \
+            class=\"chart\" data-chart=\"long:LONGA\"><span \
+            class=\"nochart\">no chart data</span></td></tr>";
        ])
 
 let test_short_candidate_row_is_rendered_in_its_own_table _ =
@@ -251,9 +275,19 @@ let test_short_candidate_row_is_rendered_in_its_own_table _ =
     (_in_order
        [
          "<h2>Short candidates (top 5)</h2>";
-         "<td class=\"num\">1</td><td class=\"\">SHRTB <span \
-          class=\"flag\">(!)</span></td>";
-         "<td class=\"num\">-10.0%</td>";
+         (* Complete row, same reason as the long arm: cell ORDER is only
+            pinned by the whole <tr>. Every cell here differs from the long
+            fixture's — flagged symbol, fallback stop, negative risk, no
+            grade, unsized instruction — so this cannot be satisfied by the
+            long table's output. *)
+         "<tr><td class=\"num\">1</td><td class=\"\">SHRTB <span \
+          class=\"flag\">(!)</span></td><td class=\"\">B</td><td \
+          class=\"num\">0.77</td><td class=\"num\">$50.00</td><td \
+          class=\"num\">$55.00*</td><td class=\"num\">-10.0%</td><td \
+          class=\"\">-</td><td class=\"rationale\">Stage 4 breakdown</td><td \
+          class=\"instruction\">-</td><td class=\"chart\" \
+          data-chart=\"short:SHRTB\"><span class=\"nochart\">no chart \
+          data</span></td></tr>";
        ])
 
 let test_structural_stop_has_no_asterisk _ =
