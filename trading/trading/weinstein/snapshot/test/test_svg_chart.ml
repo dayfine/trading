@@ -511,6 +511,71 @@ let test_defaults_are_the_documented_dimensions _ =
           (Printf.sprintf "viewBox=\"0 0 %d %d\"" Svg_chart.default_width
              Svg_chart.default_height)))
 
+(* Issue #2133: [Svg_series.weekly_bars] rescales onto the adjusted basis, so
+   a 4:1 split inside the window (raw 100 → 25 with a continuous adjusted
+   series at 25) folds to a FLAT weekly close series instead of a fake cliff,
+   and the pre-split bar's high/low are scaled by the same factor. Two bars a
+   week apart so each folds to its own weekly bar. *)
+let test_weekly_bars_rescale_to_adjusted_basis _ =
+  let pre_split =
+    Types.Daily_price.make ~date:_base_date ~open_price:100.0 ~high_price:104.0
+      ~low_price:96.0 ~close_price:100.0 ~volume:100 ~adjusted_close:25.0 ()
+  in
+  let post_split =
+    Types.Daily_price.make
+      ~date:(Date.add_days _base_date 7)
+      ~open_price:25.0 ~high_price:25.0 ~low_price:25.0 ~close_price:25.0
+      ~volume:100 ~adjusted_close:25.0 ()
+  in
+  assert_that
+    (Weinstein_snapshot.Svg_series.weekly_bars [ pre_split; post_split ])
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (b : Types.Daily_price.t) -> b.close_price)
+               (float_equal 25.0);
+             field
+               (fun (b : Types.Daily_price.t) -> b.high_price)
+               (float_equal 26.0);
+             field
+               (fun (b : Types.Daily_price.t) -> b.low_price)
+               (float_equal 24.0);
+           ];
+         field
+           (fun (b : Types.Daily_price.t) -> b.close_price)
+           (float_equal 25.0);
+       ])
+
+(* The bad-bar guard: a NaN or non-positive raw close admits no rescale
+   factor, so the bar keeps its O/H/L unscaled and takes [adjusted_close] as
+   its close — the chart degrades to slightly-wrong scale for that bar rather
+   than blanking or emitting NaN coordinates. One bar per week so each is its
+   own weekly fold. *)
+let test_weekly_bars_bad_raw_close_keeps_ohl_and_adjusted_close _ =
+  let bad ~day ~close =
+    Types.Daily_price.make
+      ~date:(Date.add_days _base_date day)
+      ~open_price:40.0 ~high_price:44.0 ~low_price:36.0 ~close_price:close
+      ~volume:100 ~adjusted_close:10.0 ()
+  in
+  let pin =
+    all_of
+      [
+        field (fun (b : Types.Daily_price.t) -> b.open_price) (float_equal 40.0);
+        field (fun (b : Types.Daily_price.t) -> b.high_price) (float_equal 44.0);
+        field (fun (b : Types.Daily_price.t) -> b.low_price) (float_equal 36.0);
+        field
+          (fun (b : Types.Daily_price.t) -> b.close_price)
+          (float_equal 10.0);
+      ]
+  in
+  assert_that
+    (Weinstein_snapshot.Svg_series.weekly_bars
+       [ bad ~day:0 ~close:Float.nan; bad ~day:7 ~close:0.0 ])
+    (elements_are [ pin; pin ])
+
 let suite =
   "svg_chart"
   >::: [
@@ -563,6 +628,10 @@ let suite =
          "render_is_deterministic" >:: test_render_is_deterministic;
          "defaults_are_the_documented_dimensions"
          >:: test_defaults_are_the_documented_dimensions;
+         "weekly_bars_rescale_to_adjusted_basis"
+         >:: test_weekly_bars_rescale_to_adjusted_basis;
+         "weekly_bars_bad_raw_close_keeps_ohl_and_adjusted_close"
+         >:: test_weekly_bars_bad_raw_close_keeps_ohl_and_adjusted_close;
        ]
 
 let () = run_test_tt_main suite
