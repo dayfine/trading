@@ -98,7 +98,14 @@
     relative to side). *)
 
 val default_long_display_limit : int
-(** Default number of long candidates shown in the report table (7). *)
+(** Default number of long candidates shown in the report table (20).
+
+    Deliberately equal to the screener's own candidate cap
+    ([Screener.default_config.max_buy_candidates]), so a default render shows
+    every pick the screener produced rather than hiding most of them. The two
+    constants are coupled by convention only: architecture rule A2 forbids this
+    library depending on [analysis/], so the value cannot be shared directly —
+    if the screener cap moves, move this with it. *)
 
 val default_short_display_limit : int
 (** Default number of short candidates shown in the report table (5). *)

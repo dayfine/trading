@@ -942,6 +942,20 @@ let test_extended_card_moves_to_watch_section _ =
            __;
        ])
 
+(* Sharing the watch section does not mean sharing an arm tag: the extended
+   SHORT's chart cell must still be addressed "short:SHRTB". Tagging every watch
+   card "long" would make a short's chart indistinguishable from a long's to any
+   consumer keying off [data-chart]. *)
+let test_watch_card_keeps_its_own_arm_tag _ =
+  assert_that
+    (Html_report_renderer.render _reconciled_snapshot)
+    (all_of
+       [
+         _has_substring "data-chart=\"short:SHRTB\"";
+         not_ ~msg:"an extended short must not be tagged as a long"
+           (_has_substring "data-chart=\"long:SHRTB\"");
+       ])
+
 let test_no_watch_section_without_extended _ =
   assert_that
     (Html_report_renderer.render _full_snapshot)
@@ -1031,6 +1045,8 @@ let suite =
          >:: test_extended_chip_and_suppression_on_the_short_arm;
          "extended_card_moves_to_watch_section"
          >:: test_extended_card_moves_to_watch_section;
+         "watch_card_keeps_its_own_arm_tag"
+         >:: test_watch_card_keeps_its_own_arm_tag;
          "no_watch_section_without_extended"
          >:: test_no_watch_section_without_extended;
          "unreconciled_cards_are_plain" >:: test_unreconciled_cards_are_plain;
