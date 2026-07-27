@@ -1,9 +1,30 @@
 # Status: trade-audit
 
-## Last updated: 2026-07-25
+## Last updated: 2026-07-27
 
 ## Status
 MERGED
+
+### 2026-07-27 — `trades.csv` phantom SHORT / duplicate rows (issue #2059)
+
+Fixed on branch `fix/lh-phantom-short`; full diagnosis in
+`dev/status/simulation.md` §2026-07-27 and
+`dev/plans/lh-phantom-short-2026-07-27.md`. Two consumer-facing consequences
+for anyone reading `trades.csv`:
+
+- [x] **A `SHORT` row can no longer be manufactured from a long-only trade
+      stream.** `Metrics.extract_round_trips` dropped the residual of a partial
+      exit, so the next closing `Sell` was re-read as a short open. Pre-fix, any
+      `trades.csv` from a run containing partial exits may carry phantom SHORT
+      rows (with inverted P&L and absurd `days_held`) plus over-stated LONG
+      quantities. Re-derive rather than trust archived per-trade forensics —
+      longest-hold, worst-loss-%, and short-side attribution are the affected
+      statistics.
+- [ ] **`position_id` is not a trustworthy grouping key.** `Trade_context`
+      resolves it by a 7-calendar-day backward window over audit records for the
+      symbol, not by a real position link, so distinct round-trips entered within
+      a week of one entry decision all carry that decision's id. Filed in
+      `dev/status/simulation.md`; not fixed here.
 
 All five phased PRs from the plan landed 2026-04-28, plus one cascade-
 rejection extension to PR-2:
