@@ -5,38 +5,11 @@ type bar_source = symbol:string -> Types.Daily_price.t list
 let no_bars ~symbol:_ = []
 let _e = Html_page.escape
 
-(* Rendered in place of an empty table / list so the reader never sees a
-   missing section — the HTML counterpart of the Markdown "(none)". *)
+(* Rendered in place of an empty section so the reader never sees a missing
+   one — the HTML counterpart of the Markdown "(none)". *)
 let _empty_marker = "<p class=\"empty\">(none)</p>"
-
-(* Rendered in place of a sparkline when the caller had no bars for the symbol
-   (fewer than two, or no bar source at all). The row stays complete. *)
-let _no_chart_marker = "<span class=\"nochart\">no chart data</span>"
 let _note note = Printf.sprintf "<p class=\"note\">%s</p>" (_e note)
 let _section ~title body = Printf.sprintf "<h2>%s</h2>\n%s" (_e title) body
-
-(* ---- Table primitives ---- *)
-
-let _td ~cls body = Printf.sprintf "<td class=\"%s\">%s</td>" cls body
-let _text_td ~cls body = _td ~cls (_e body)
-
-(* Numeric cells share one class so the stylesheet can right-align them and
-   apply tabular figures in one place. *)
-let _num_td body = _text_td ~cls:"num" body
-
-let _table ~columns ~rows =
-  let head =
-    String.concat ~sep:""
-      (List.map columns ~f:(fun c -> Printf.sprintf "<th>%s</th>" (_e c)))
-  in
-  let body =
-    String.concat ~sep:"\n"
-      (List.map rows ~f:(fun r ->
-           Printf.sprintf "<tr>%s</tr>" (String.concat ~sep:"" r)))
-  in
-  Printf.sprintf
-    "<table>\n<thead><tr>%s</tr></thead>\n<tbody>\n%s\n</tbody>\n</table>" head
-    body
 
 let _bullet_list items =
   match items with
@@ -48,22 +21,33 @@ let _bullet_list items =
 
 (* ---- Charts ---- *)
 
+(* Card-width chart: wide enough for [Svg_chart.max_bars] weekly marks plus the
+   right-hand label gutter [Svg_chart.render ~annotate] reserves. *)
+let _chart_width = 860
+let _chart_height = 150
+
+(* Weinstein's weekly trend line. Stage analysis is defined against the 30-week
+   moving average — "The stage is determined by the relationship between price
+   and the 30-week moving average (MA), the slope of the MA, and the prior stage
+   context" (weinstein-book-reference.md §1 "The Four Stages") — so a chart a
+   reader is meant to check a Stage-2 entry against has to show it.
+
+   Computed from the bars the caller supplies, never stored: the snapshot schema
+   stays decoupled from analysis types. *)
+let _ma_period_weeks = 30
+
 let _price_level ~label ~price ~kind =
   { Svg_chart.label = Printf.sprintf "%s $%.2f" label price; price; kind }
 
-(* Chart cell for one row. [arm] ("long" / "short" / "held") is emitted in the
-   [data-chart] attribute so each of the three rendering arms is separable by
-   anything reading the page programmatically. *)
-let _chart_td ~arm ~symbol svg =
-  Printf.sprintf "<td class=\"chart\" data-chart=\"%s:%s\">%s</td>" arm
-    (_e symbol)
-    (Option.value svg ~default:_no_chart_marker)
-
-(* Entry-to-stop band plus the two dashed level lines. Shared by candidates and
-   held positions — the only difference is what "entry" means (breakout trigger
-   vs fill price). *)
-let _sparkline ~bars ~entry ~entry_label ~stop =
-  Svg_chart.render ~bars ~band:(entry, stop)
+(* One card's chart: the weekly close line with its 30-week average, the
+   entry-to-stop band, and the two dashed level lines named in the right
+   gutter. Weekly rather than daily because that is the cadence the stage
+   framework is defined on, and because the same span in dailies is more marks
+   than a card-scale chart can distinguish. *)
+let _chart ~(bars_for : bar_source) ~symbol ~entry ~entry_label ~stop =
+  Svg_chart.render ~width:_chart_width ~height:_chart_height ~band:(entry, stop)
+    ~ma_period:_ma_period_weeks ~annotate:true
+    ~bars:(Svg_series.weekly_bars (bars_for ~symbol))
     ~levels:
       [
         _price_level ~label:entry_label ~price:entry ~kind:Svg_chart.Entry;
@@ -71,85 +55,24 @@ let _sparkline ~bars ~entry ~entry_label ~stop =
       ]
     ()
 
-let _candidate_chart_td ~arm ~(bars_for : bar_source)
-    (c : Weekly_snapshot.candidate) =
-  _sparkline
-    ~bars:(bars_for ~symbol:c.symbol)
-    ~entry:c.entry ~entry_label:"entry" ~stop:c.stop
-  |> _chart_td ~arm ~symbol:c.symbol
+(* ---- Candidate sections ---- *)
 
-let _held_chart_td ~(bars_for : bar_source) (h : Weekly_snapshot.held_position)
-    =
-  _sparkline
-    ~bars:(bars_for ~symbol:h.symbol)
-    ~entry:h.entry_price ~entry_label:"fill" ~stop:h.stop
-  |> _chart_td ~arm:"held" ~symbol:h.symbol
-
-(* ---- Candidate table ---- *)
-
-(* Issue #2084 Finding 2: a fallback (non-structural) stop carries a trailing
-   asterisk so it is distinguishable from a real support floor at a glance. *)
-let _stop_td (c : Weekly_snapshot.candidate) =
-  if c.stop_is_structural then _num_td (Printf.sprintf "$%.2f" c.stop)
-  else _num_td (Printf.sprintf "$%.2f*" c.stop)
-
-(* Issue #2083 Finding 3: a spike-flagged candidate is annotated, not dropped —
-   the "(!)" marker rides beside the symbol and the row is otherwise intact. *)
-let _symbol_td (c : Weekly_snapshot.candidate) =
-  if c.data_suspect then
-    _td ~cls:"" (_e c.symbol ^ " <span class=\"flag\">(!)</span>")
-  else _text_td ~cls:"" c.symbol
-
-let _resistance_td = function
-  | None -> _text_td ~cls:"" "-"
-  | Some g -> _text_td ~cls:"" g
-
-(* Issue #2103: the reconciliation class rides as a tag chip (the Phase-C design
-   spec's chip treatment), with a per-class CSS modifier so "EXTENDED" reads as
-   a warning rather than as one more number. An unreconciled candidate gets a
-   plain cell — there is no class to chip. The cell TEXT comes from
-   [Report_shared] so it is character-identical to the Markdown column. *)
-let _close_vs_entry_td (c : Weekly_snapshot.candidate) =
-  let text = Report_shared.close_vs_entry c in
-  match Entry_reconciliation.label c.reconciliation with
-  | None -> _num_td text
-  | Some cls ->
-      _td ~cls:"num"
-        (Printf.sprintf "<span class=\"chip chip-%s\">%s</span>"
-           (_e (String.lowercase cls))
-           (_e text))
-
-(* Risk % against the EXPECTED FILL, never the entry level — see the matching
-   comment in {!Report_renderer._candidate_row} (issue #2103, review round 1).
-   The two renderers must agree cell for cell. *)
-let _risk_td (c : Weekly_snapshot.candidate) =
-  let risk =
-    Report_shared.risk_pct
-      ~entry:(Weekly_snapshot.expected_fill_price c)
+let _candidate_card ~arm ~bars_for ~rank (c : Weekly_snapshot.candidate) =
+  let chart =
+    _chart ~bars_for ~symbol:c.symbol ~entry:c.entry ~entry_label:"entry"
       ~stop:c.stop
   in
-  _num_td (Printf.sprintf "%.1f%%" risk)
+  Candidate_card.render ~arm ~rank ~chart c
 
-let _candidate_row ~arm ~bars_for ~rank (c : Weekly_snapshot.candidate) =
-  [
-    _num_td (Int.to_string rank);
-    _symbol_td c;
-    _text_td ~cls:"" c.grade;
-    _num_td (Printf.sprintf "%.2f" c.score);
-    _num_td (Printf.sprintf "$%.2f" c.entry);
-    _close_vs_entry_td c;
-    _stop_td c;
-    _risk_td c;
-    _resistance_td c.resistance_grade;
-    _text_td ~cls:"rationale" c.rationale;
-    _text_td ~cls:"instruction" (Report_shared.instruction c);
-    _candidate_chart_td ~arm ~bars_for c;
-  ]
+let _candidate_cards ~arm ~bars_for shown =
+  List.mapi shown ~f:(fun i c -> _candidate_card ~arm ~bars_for ~rank:(i + 1) c)
+  |> String.concat ~sep:"\n"
 
 (* Truncation note, then the fallback-stop legend, then the data-suspect
-   legend — each an independent flat append, matching the Markdown renderer's
-   order so the two reports read the same way. *)
-let _append_table_notes ~shown ~hidden table =
+   legend, then the reconciliation legend — each an independent flat append,
+   matching the Markdown renderer's order so the two reports read the same
+   way. *)
+let _append_notes ~shown ~hidden body =
   let legend flag note = if flag then Some note else None in
   [
     Report_shared.truncation ~shown ~hidden;
@@ -160,111 +83,117 @@ let _append_table_notes ~shown ~hidden table =
       Report_shared.entry_reconciliation;
   ]
   |> List.filter_map ~f:Fn.id
-  |> List.fold ~init:table ~f:(fun acc n -> acc ^ "\n" ^ _note n)
+  |> List.fold ~init:body ~f:(fun acc n -> acc ^ "\n" ^ _note n)
 
-let _candidate_columns =
-  [
-    "Rank";
-    "Symbol";
-    "Grade";
-    "Score";
-    "Entry";
-    "Close vs entry";
-    "Stop";
-    "Risk %";
-    "Resistance";
-    "Rationale";
-    "Instruction";
-    "Chart";
-  ]
-
-let _candidate_rows ~arm ~bars_for shown =
-  List.mapi shown ~f:(fun i c -> _candidate_row ~arm ~bars_for ~rank:(i + 1) c)
-
-let _candidate_table ~arm ~bars_for candidates ~limit =
+let _candidate_list ~arm ~bars_for candidates ~limit =
   match candidates with
   | [] -> _empty_marker
   | _ ->
       let shown = List.take candidates limit in
       let hidden = List.drop candidates limit in
-      _table ~columns:_candidate_columns
-        ~rows:(_candidate_rows ~arm ~bars_for shown)
-      |> _append_table_notes ~shown ~hidden
+      Printf.sprintf "%s\n<div class=\"cands\">%s</div>"
+        (Report_masthead.chart_legend ~ma_period:_ma_period_weeks)
+        (_candidate_cards ~arm ~bars_for shown)
+      |> _append_notes ~shown ~hidden
 
 (* One display-capped candidate section. The header echoes the effective limit
    so header and content stay in sync. *)
 let _candidate_section ~arm ~label ~bars_for candidates ~limit =
   _section
     ~title:(Printf.sprintf "%s (top %d)" label limit)
-    (_candidate_table ~arm ~bars_for candidates ~limit)
+    (_candidate_list ~arm ~bars_for candidates ~limit)
 
-(* ---- Held-position table ---- *)
+(* ---- Held positions ---- *)
 
-(* This week's recomputed support-floor stop with its delta vs the stop in
-   force, so the reader sees whether to raise it (Weinstein never lowers a
-   stop). [None] (not recomputed) renders "-". *)
-let _suggested_stop_td ~current_stop = function
-  | None -> _num_td "-"
-  | Some r -> _num_td (Printf.sprintf "$%.2f (%+0.2f)" r (r -. current_stop))
-
-let _held_row ~bars_for (h : Weekly_snapshot.held_position) =
+let _held_chips (h : Weekly_snapshot.held_position) =
   [
-    _text_td ~cls:"" h.symbol;
-    _num_td (Int.to_string h.shares);
-    _num_td (Printf.sprintf "$%.2f" h.entry_price);
-    _num_td (Printf.sprintf "$%.2f" h.current_price);
-    _num_td (Printf.sprintf "%.1f%%" h.unrealized_pct);
-    _num_td (Printf.sprintf "$%.2f" h.stop);
-    _suggested_stop_td ~current_stop:h.stop h.recommended_stop;
-    _text_td ~cls:"" (Date.to_string h.entered);
-    _text_td ~cls:"" h.status;
-    _held_chart_td ~bars_for h;
+    Chip.make ~modifier:"status" h.status;
+    Chip.make (Printf.sprintf "entered %s" (Date.to_string h.entered));
   ]
 
-let _held_columns =
+let _held_nums (h : Weekly_snapshot.held_position) =
   [
-    "Symbol";
-    "Shares";
-    "Entry";
-    "Current";
-    "Unrealized %";
-    "Stop";
-    "Suggested stop";
-    "Entered";
-    "Status";
-    "Chart";
+    Report_card.num ~label:"Shares" (Int.to_string h.shares);
+    Report_card.num ~modifier:"entry" ~label:"Fill"
+      (Printf.sprintf "$%.2f" h.entry_price);
+    Report_card.num ~label:"Current" (Printf.sprintf "$%.2f" h.current_price);
+    Report_card.num ~label:"Unrealized"
+      (Printf.sprintf "%.1f%%" h.unrealized_pct);
+    Report_card.num ~modifier:"stop" ~label:"Stop"
+      (Printf.sprintf "$%.2f" h.stop);
   ]
 
-let _held_table ~bars_for positions =
+(* This week's recomputed support floor against the stop in force. Weinstein's
+   investor trailing method ratchets the sell-stop UP as the MA advances and
+   leaves it alone otherwise (weinstein-book-reference.md §5.2 "Trailing Stop —
+   Investor Method"), so a recomputed floor below the stop in force is not a
+   reason to lower anything. The full state machine is not threaded here; this
+   line reports the delta and says which way it points. *)
+let _held_stop_line (h : Weekly_snapshot.held_position) =
+  match h.recommended_stop with
+  | None ->
+      Printf.sprintf
+        "Stop in force $%.2f. No support floor was recomputed this week." h.stop
+  | Some r when Float.( > ) r h.stop ->
+      Printf.sprintf
+        "Stop in force $%.2f; this week's support floor is $%.2f (%+0.2f) — \
+         raise the stop to it."
+        h.stop r (r -. h.stop)
+  | Some r ->
+      Printf.sprintf
+        "Stop in force $%.2f; this week's support floor is $%.2f (%+0.2f), \
+         below the stop in force — leave the stop where it is."
+        h.stop r (r -. h.stop)
+
+let _held_card ~bars_for (h : Weekly_snapshot.held_position) =
+  Report_card.render
+    {
+      modifier = None;
+      arm = "held";
+      rank = None;
+      symbol = h.symbol;
+      chips = _held_chips h;
+      nums = _held_nums h;
+      chart =
+        _chart ~bars_for ~symbol:h.symbol ~entry:h.entry_price
+          ~entry_label:"fill" ~stop:h.stop;
+      footer = Some (Report_card.footer (_e (_held_stop_line h)));
+    }
+
+(* Held cards draw the same marks as candidate cards — weekly close, the 30-week
+   average, the two dashed levels, the last-close marker — so this section
+   carries the same legend. A reader who scrolls straight here would otherwise
+   meet the marks with no key. *)
+let _held_list ~bars_for positions =
   match positions with
   | [] -> _empty_marker
   | _ ->
-      _table ~columns:_held_columns
-        ~rows:(List.map positions ~f:(_held_row ~bars_for))
+      Printf.sprintf "%s\n<div class=\"cands\">%s</div>"
+        (Report_masthead.chart_legend ~ma_period:_ma_period_weeks)
+        (String.concat ~sep:"\n" (List.map positions ~f:(_held_card ~bars_for)))
 
 (* ---- Page ---- *)
 
-let _macro_section (m : Weekly_snapshot.macro_context) =
-  Printf.sprintf "<p class=\"macro\"><strong>%s</strong> (score %.2f)</p>"
-    (_e m.regime) m.score
-
-let _header (t : Weekly_snapshot.t) ~title =
-  Printf.sprintf
-    "<h1>%s</h1>\n<p class=\"subtitle\">System version: <code>%s</code></p>"
-    (_e title) (_e t.system_version)
+let _sector_list sectors =
+  match sectors with
+  | [] -> _empty_marker
+  | _ ->
+      Chip.group ~cls:"sectors"
+        (List.map sectors ~f:(Chip.make ~modifier:"sector"))
 
 let _body (t : Weekly_snapshot.t) ~title ~long_limit ~short_limit ~bars_for =
   String.concat ~sep:"\n"
     [
-      _header t ~title;
-      _section ~title:"Macro" (_macro_section t.macro);
-      _section ~title:"Strong sectors" (_bullet_list t.sectors_strong);
+      Report_masthead.header t ~title;
+      Report_masthead.counts_strip t;
+      _section ~title:"Strong sectors" (_sector_list t.sectors_strong);
       _candidate_section ~arm:"long" ~label:"Long candidates" ~bars_for
         t.long_candidates ~limit:long_limit;
       _candidate_section ~arm:"short" ~label:"Short candidates" ~bars_for
         t.short_candidates ~limit:short_limit;
-      _section ~title:"Held positions" (_held_table ~bars_for t.held_positions);
+      _section ~title:"Held positions" (_held_list ~bars_for t.held_positions);
       _section ~title:"Warnings" (_bullet_list t.warnings);
+      Report_masthead.closing_notes;
     ]
 
 let render ?(long_limit = Report_renderer.default_long_display_limit)
