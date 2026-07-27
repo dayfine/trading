@@ -55,7 +55,7 @@ shows, on this host:
 | `Mat.dot` (dgemm) | correct to 3e-15 for `n ≤ 64`; **wrong by 19.5 absolute** at `n = 120`, 29.3 at `n = 200` |
 | `Linalg.inv` at `n = 120` | aborts the process with `double free or corruption (!prev)` — heap corruption |
 | `Linalg.triangular_solve` (dtrtrs) | correct to 6e-16 for all tested `n` up to 120 |
-| `Mat.dot` at the shapes `fit_gp` actually uses — `(1×n)·(n×1)` inner products and `(n×n)·(n×1)` matrix–vector | correct to ≤2.7e-15 at every `n` tested (8, 32, 33, 64, 100, 120, 200, 400). The `n = 120` breakage above is the **square** `(n×n)·(n×n)` kernel only. |
+| `Mat.dot` at the shapes `fit_gp` actually uses — `(1×n)·(n×1)` inner products (`Mat.dot (transpose k_star) alpha`, `Mat.dot (transpose v) v`; `fit_gp` issues no other `Mat.dot` shape) | correct to ≤2.7e-15 at every `n` tested (8, 32, 33, 64, 100, 120, 200, 400). The `n = 120` breakage above is the **square** `(n×n)·(n×n)` kernel only. |
 | `OPENBLAS_NUM_THREADS=1` | does not fix it; only moves the band (`n ≥ 64` now fails too) — so it is not a thread race |
 
 The mechanism: `OPENBLAS_VERBOSE=2` reports `Core: Cooperlake`. OpenBLAS
@@ -94,11 +94,13 @@ Justification:
 
 - The only broken primitive in `fit_gp` is `dpotrf`. Its other LAPACK/BLAS
   calls were probed **at the shapes it actually issues** — `triangular_solve`
-  (`bayesian_opt.ml:124-125`), the `(1×n)·(n×1)` inner products
-  (`Mat.dot (transpose k_star) alpha`, `Mat.dot (transpose v) v`), and the
-  `(n×n)·(n×1)` matrix–vector products — and all are correct to ≤6e-16 at every
-  `n` up to 200+. The square-`gemm` breakage at `n ≥ 120` is a different kernel
-  path that `fit_gp` never takes. So nothing else needs to move.
+  (`bayesian_opt.ml:124-125`), correct to ≤6e-16 for every tested `n` up to
+  120; and the `(1×n)·(n×1)` inner products (`Mat.dot (transpose k_star)
+  alpha`, `Mat.dot (transpose v) v` — the only two `Mat.dot` shapes `fit_gp`
+  issues), correct to ≤2.7e-15 for every tested `n` up to 400. The
+  square-`gemm` breakage at `n ≥ 120` is a different kernel path (the
+  `(n×n)·(n×n)` product) that `fit_gp` never takes. So nothing else needs to
+  move.
 - `n` is the number of BO observations, bounded by `total_budget` (largest
   value in any committed spec: 100, `trading/test_data/tuner/bayesian-multi-param-2026-05-16.sexp`).
   An O(n³/3) OCaml factorisation at n = 100 is ~3.3e5 flops (sub-millisecond),
