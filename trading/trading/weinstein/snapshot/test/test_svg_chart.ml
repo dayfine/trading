@@ -49,6 +49,21 @@ let _has_substring substring : string matcher =
     (fun s -> if String.is_substring s ~substring then Some () else None)
     __
 
+(* Asserts the needles appear in the given order, each after the previous. *)
+let _in_order needles : string matcher =
+  matching
+    ~msg:
+      (Printf.sprintf "Expected in order: %s"
+         (String.concat ~sep:" < " needles))
+    (fun s ->
+      let positions =
+        List.map needles ~f:(fun n -> String.substr_index s ~pattern:n)
+      in
+      match Option.all positions with
+      | Some ps when List.is_sorted_strictly ps ~compare:Int.compare -> Some ()
+      | _ -> None)
+    __
+
 (* Number of non-overlapping occurrences of [needle] in [s]. *)
 let _count_occurrences s ~needle =
   List.length (String.substr_index_all s ~may_overlap:false ~pattern:needle)
@@ -266,6 +281,294 @@ let test_window_truncated_to_the_most_recent_max_bars _ =
     (_count_occurrences svg ~needle:"class=\"vol\"")
     (equal_to Svg_chart.max_bars)
 
+(* ------- Weekly aggregation ------- *)
+
+(* [_base_date] is 2020-01-01, a Wednesday. Bars are addressed by absolute date
+   here rather than by offset, because which WEEK a bar lands in is the thing
+   under test. *)
+let _dated ?(volume = 100) ?high ?low date price : Types.Daily_price.t =
+  Types.Daily_price.make ~date:(Date.of_string date) ~open_price:price
+    ~high_price:(Option.value high ~default:price)
+    ~low_price:(Option.value low ~default:price)
+    ~close_price:price ~volume ~adjusted_close:price ()
+
+let _bar_date (b : Types.Daily_price.t) = b.date
+let _bar_open (b : Types.Daily_price.t) = b.open_price
+let _bar_high (b : Types.Daily_price.t) = b.high_price
+let _bar_low (b : Types.Daily_price.t) = b.low_price
+let _bar_close (b : Types.Daily_price.t) = b.close_price
+let _bar_volume (b : Types.Daily_price.t) = b.volume
+
+let test_weekly_bars_of_empty_is_empty _ =
+  assert_that (Svg_chart.weekly_bars []) (elements_are [])
+
+let test_weekly_bars_folds_one_trading_week _ =
+  (* Mon 2020-01-06 .. Fri 2020-01-10. Open comes from Monday, close from
+     Friday, the extremes from the whole week, volume is the sum, and the bar is
+     DATED at the Friday — not at the Monday, so a Friday-close series ends on
+     its own Friday. *)
+  let week =
+    [
+      _dated ~volume:1 "2020-01-06" 10.0;
+      _dated ~volume:2 ~high:25.0 "2020-01-07" 20.0;
+      _dated ~volume:4 ~low:3.0 "2020-01-08" 15.0;
+      _dated ~volume:8 "2020-01-09" 12.0;
+      _dated ~volume:16 "2020-01-10" 18.0;
+    ]
+  in
+  assert_that
+    (Svg_chart.weekly_bars week)
+    (elements_are
+       [
+         all_of
+           [
+             field _bar_date (equal_to (Date.of_string "2020-01-10"));
+             field _bar_open (float_equal 10.0);
+             field _bar_high (float_equal 25.0);
+             field _bar_low (float_equal 3.0);
+             field _bar_close (float_equal 18.0);
+             field _bar_volume (equal_to 31);
+           ];
+       ])
+
+let test_weekly_bars_split_across_the_weekend _ =
+  (* Fri + Sat + Sun belong to the SAME ISO week (the week's Monday is
+     2020-01-06); the following Monday opens a new one. *)
+  let bars =
+    [
+      _dated "2020-01-10" 10.0;
+      _dated "2020-01-11" 11.0;
+      _dated "2020-01-12" 12.0;
+      _dated "2020-01-13" 13.0;
+    ]
+  in
+  assert_that
+    (Svg_chart.weekly_bars bars)
+    (elements_are
+       [
+         field _bar_close (float_equal 12.0);
+         field _bar_close (float_equal 13.0);
+       ])
+
+let test_weekly_bars_keep_a_year_straddling_week_together _ =
+  (* Mon 2019-12-30 .. Thu 2020-01-02 are one ISO week. Keying on a
+     (year, week-number) pair would split them; keying on the week's Monday does
+     not. *)
+  let bars =
+    [
+      _dated "2019-12-30" 10.0;
+      _dated "2019-12-31" 11.0;
+      _dated "2020-01-01" 12.0;
+      _dated "2020-01-02" 13.0;
+      _dated "2020-01-06" 14.0;
+    ]
+  in
+  assert_that
+    (Svg_chart.weekly_bars bars)
+    (elements_are
+       [
+         field _bar_close (float_equal 13.0);
+         field _bar_close (float_equal 14.0);
+       ])
+
+(* ------- Moving average ------- *)
+
+(* Height 59 makes the price panel exactly 30 units tall (59 - 2*4 - 3 - 18), so
+   every projected y below is exact at one decimal. *)
+let _ma_height = 59
+
+let _rising =
+  [
+    _bar ~day:0 ~price:10.0 ();
+    _bar ~day:1 ~price:20.0 ();
+    _bar ~day:2 ~price:30.0 ();
+  ]
+
+let test_moving_average_polyline_pinned _ =
+  (* Closes 10 / 20 / 30 over a domain of [10, 30]: y(10) = 34, y(20) = 19,
+     y(30) = 4. A 2-bar average is undefined at index 0 and equals 15 / 25 at
+     indices 1 / 2 — y(15) = 26.5, y(25) = 11.5. *)
+  assert_that
+    (Svg_chart.render ~width:_test_width ~height:_ma_height ~ma_period:2
+       ~bars:_rising ~levels:[] ())
+    (is_some_and
+       (all_of
+          [
+            _has_substring
+              "<polyline class=\"px\" points=\"20.0,34.0 52.0,19.0 84.0,4.0\"/>";
+            _has_substring
+              "<polyline class=\"ma\" points=\"52.0,26.5 84.0,11.5\"/>";
+            _has_substring
+              "aria-label=\"price and volume sparkline, 3 bars; 2-period \
+               moving average\"";
+          ]))
+
+let test_no_ma_period_emits_no_average _ =
+  assert_that
+    (Svg_chart.render ~width:_test_width ~height:_ma_height ~bars:_rising
+       ~levels:[] ())
+    (is_some_and
+       (all_of
+          [
+            not_ ~msg:"no average polyline without ?ma_period"
+              (_has_substring "class=\"ma\"");
+            not_ ~msg:"no average in the aria-label either"
+              (_has_substring "moving average");
+          ]))
+
+let test_ma_period_longer_than_the_series_emits_no_polyline _ =
+  (* Three bars, period 3: exactly one point is defined, and one point is not a
+     line. *)
+  assert_that
+    (Svg_chart.render ~width:_test_width ~height:_ma_height ~ma_period:3
+       ~bars:_rising ~levels:[] ())
+    (is_some_and
+       (not_ ~msg:"a single defined point is not a polyline"
+          (_has_substring "class=\"ma\"")))
+
+let test_ma_is_computed_over_the_whole_series_not_the_window _ =
+  (* 92 bars with [max_bars] = 90: the window drops the first two. A 3-bar
+     average computed over the WINDOW would be undefined for its first two
+     marks and start at x = 6.7; computed over the whole series it is defined at
+     the window's very first mark, x = 4.5 — the same x the price line starts
+     at. That difference is the whole point of the contract. *)
+  let bars =
+    List.init 92 ~f:(fun i -> _bar ~day:i ~price:(Float.of_int i) ())
+  in
+  let svg =
+    Option.value_exn
+      (Svg_chart.render ~width:_test_width ~height:_ma_height ~ma_period:3 ~bars
+         ~levels:[] ())
+  in
+  assert_that svg
+    (all_of
+       [
+         _has_substring "<polyline class=\"px\" points=\"4.5,";
+         _has_substring "<polyline class=\"ma\" points=\"4.5,";
+       ])
+
+let test_ma_widens_the_domain _ =
+  (* Because the average is computed over the WHOLE series, its value at the
+     window's left edge can carry pre-window closes far outside the window's own
+     price range. 92 bars: the first two at 1000, the remaining 90 at 10. The
+     window is those last 90 — a flat series at 10 — but the 3-bar average at
+     its first mark is (1000 + 1000 + 10) / 3 = 670. Unless the domain absorbs
+     the average, that mark is drawn outside the viewBox. With it, 670 is the
+     domain ceiling (y = 4, the panel top) and 10 the floor (y = 34). *)
+  let bars =
+    List.init 92 ~f:(fun i ->
+        _bar ~day:i ~price:(if i < 2 then 1000.0 else 10.0) ())
+  in
+  assert_that
+    (Svg_chart.render ~width:_test_width ~height:_ma_height ~ma_period:3 ~bars
+       ~levels:[] ())
+    (is_some_and
+       (all_of
+          [
+            _has_substring "<polyline class=\"ma\" points=\"4.5,4.0 ";
+            _has_substring "<polyline class=\"px\" points=\"4.5,34.0 ";
+          ]))
+
+(* ------- Annotations ------- *)
+
+(* Width 156 leaves a 36-unit plot once the 112-unit label gutter is reserved
+   (156 - 2*4 - 112), so with 3 bars the column centres are 10 / 22 / 34 and the
+   labels start at x = 4 + 36 + 6 = 46. *)
+let _annotate_width = 156
+
+let _annotate ?(levels = []) bars =
+  Svg_chart.render ~width:_annotate_width ~height:_ma_height ~annotate:true
+    ~bars ~levels ()
+
+let _tight_levels =
+  [
+    { Svg_chart.label = "entry"; price = 20.0; kind = Entry };
+    { Svg_chart.label = "stop"; price = 19.0; kind = Stop };
+  ]
+
+let test_annotate_nudges_colliding_labels_apart _ =
+  (* Domain [10, 20] over a 30-unit panel: y(20) = 4.0, y(19) = 7.0. Natural
+     baselines are 7.5 and 10.5 — 3 units apart, which overprints. The stop is
+     pushed to 7.5 + 12 = 19.5. The entry, being first, is untouched. *)
+  assert_that
+    (_annotate ~levels:_tight_levels _three_bars)
+    (is_some_and
+       (all_of
+          [
+            _has_substring
+              "<text class=\"lvl-label lvl-label-entry\" x=\"46.0\" \
+               y=\"7.5\">entry</text>";
+            _has_substring
+              "<text class=\"lvl-label lvl-label-stop\" x=\"46.0\" \
+               y=\"19.5\">stop</text>";
+          ]))
+
+let test_annotate_leaves_well_separated_labels_alone _ =
+  (* Same chart, stop at 10 instead of 19: y(10) = 34.0, baseline 37.5, which
+     already clears the entry's 7.5 by far more than the minimum gap. *)
+  let levels =
+    [
+      { Svg_chart.label = "entry"; price = 20.0; kind = Entry };
+      { Svg_chart.label = "stop"; price = 10.0; kind = Stop };
+    ]
+  in
+  assert_that
+    (_annotate ~levels _three_bars)
+    (is_some_and
+       (all_of
+          [
+            _has_substring "lvl-label-entry\" x=\"46.0\" y=\"7.5\"";
+            _has_substring "lvl-label-stop\" x=\"46.0\" y=\"37.5\"";
+          ]))
+
+let test_annotate_emits_the_last_close_marker _ =
+  (* Last bar closes at 15 on 2020-01-03 (day 2 from [_base_date]); x is the
+     last column centre, y(15) = 19.0. *)
+  assert_that (_annotate _three_bars)
+    (is_some_and
+       (_has_substring
+          "<circle class=\"last\" cx=\"34.0\" cy=\"19.0\" \
+           r=\"3.5\"><title>last close 15.00 (2020-01-03)</title></circle>"))
+
+let test_annotate_labels_keep_the_callers_level_order _ =
+  (* The stop is nudged BELOW the entry in y, but the markup order still follows
+     the caller's list — a reader diffing the output sees a stable document. *)
+  assert_that
+    (_annotate ~levels:_tight_levels _three_bars)
+    (is_some_and (_in_order [ "lvl-label-entry"; "lvl-label-stop" ]))
+
+let test_annotate_labels_are_escaped _ =
+  let levels =
+    [ { Svg_chart.label = "<b>entry</b>"; price = 20.0; kind = Entry } ]
+  in
+  assert_that
+    (_annotate ~levels _three_bars)
+    (is_some_and
+       (all_of
+          [
+            _has_substring ">&lt;b&gt;entry&lt;/b&gt;</text>";
+            not_ ~msg:"no raw markup from a level label"
+              (_has_substring "<b>entry</b>");
+          ]))
+
+let test_default_is_unannotated _ =
+  (* The default leaves both the geometry and the output exactly as they were
+     before ?annotate existed: no gutter (the plot still spans the full width,
+     so the column centres are 20 / 52 / 84 rather than the annotated ones), no
+     labels, no marker. *)
+  let levels = [ { Svg_chart.label = "entry"; price = 20.0; kind = Entry } ] in
+  assert_that
+    (Svg_chart.render ~width:_test_width ~height:_ma_height ~bars:_three_bars
+       ~levels ())
+    (is_some_and
+       (all_of
+          [
+            _has_substring "points=\"20.0,34.0";
+            not_ ~msg:"no level labels by default" (_has_substring "lvl-label");
+            not_ ~msg:"no last-close marker by default"
+              (_has_substring "class=\"last\"");
+          ]))
+
 (* ------- Determinism ------- *)
 
 let test_render_is_deterministic _ =
@@ -311,6 +614,31 @@ let suite =
          >:: test_zero_volume_renders_no_volume_rects;
          "window_truncated_to_the_most_recent_max_bars"
          >:: test_window_truncated_to_the_most_recent_max_bars;
+         "weekly_bars_of_empty_is_empty" >:: test_weekly_bars_of_empty_is_empty;
+         "weekly_bars_folds_one_trading_week"
+         >:: test_weekly_bars_folds_one_trading_week;
+         "weekly_bars_split_across_the_weekend"
+         >:: test_weekly_bars_split_across_the_weekend;
+         "weekly_bars_keep_a_year_straddling_week_together"
+         >:: test_weekly_bars_keep_a_year_straddling_week_together;
+         "moving_average_polyline_pinned"
+         >:: test_moving_average_polyline_pinned;
+         "no_ma_period_emits_no_average" >:: test_no_ma_period_emits_no_average;
+         "ma_period_longer_than_the_series_emits_no_polyline"
+         >:: test_ma_period_longer_than_the_series_emits_no_polyline;
+         "ma_is_computed_over_the_whole_series_not_the_window"
+         >:: test_ma_is_computed_over_the_whole_series_not_the_window;
+         "ma_widens_the_domain" >:: test_ma_widens_the_domain;
+         "annotate_nudges_colliding_labels_apart"
+         >:: test_annotate_nudges_colliding_labels_apart;
+         "annotate_leaves_well_separated_labels_alone"
+         >:: test_annotate_leaves_well_separated_labels_alone;
+         "annotate_emits_the_last_close_marker"
+         >:: test_annotate_emits_the_last_close_marker;
+         "annotate_labels_keep_the_callers_level_order"
+         >:: test_annotate_labels_keep_the_callers_level_order;
+         "annotate_labels_are_escaped" >:: test_annotate_labels_are_escaped;
+         "default_is_unannotated" >:: test_default_is_unannotated;
          "render_is_deterministic" >:: test_render_is_deterministic;
          "defaults_are_the_documented_dimensions"
          >:: test_defaults_are_the_documented_dimensions;

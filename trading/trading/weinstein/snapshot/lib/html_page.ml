@@ -32,9 +32,12 @@ let _palette =
     "  --px: #52514e;";
     "  --entry: #2a78d6;";
     "  --stop: #e34948;";
+    "  --ma: #4a6fa5;";
     "  --vol: #d0cfc9;";
     "  --band: #eceae4;";
     "  --flag: #b4451f;";
+    "  --good: #1e6b52;";
+    "  --good-tint: #e7f0ec;";
     "}";
     "@media (prefers-color-scheme: dark) {";
     "  :root {";
@@ -46,9 +49,12 @@ let _palette =
     "    --px: #c3c2b7;";
     "    --entry: #3987e5;";
     "    --stop: #e66767;";
+    "    --ma: #7ea3d8;";
     "    --vol: #45443f;";
     "    --band: #2b2b28;";
     "    --flag: #f0925f;";
+    "    --good: #63b394;";
+    "    --good-tint: #22322c;";
     "  }";
     "}";
   ]
@@ -66,39 +72,99 @@ let _layout =
     "h1 { font-size: 22px; margin: 0 0 4px; }";
     "h2 { border-bottom: 1px solid var(--rule); font-size: 16px;";
     "     margin: 32px 0 8px; padding-bottom: 4px; }";
-    ".subtitle { color: var(--ink-soft); margin: 0 0 8px; }";
-    ".macro { font-size: 16px; }";
     ".note { color: var(--ink-soft); font-size: 12px; font-style: italic;";
     "        margin: 6px 0 0; }";
     ".empty { color: var(--ink-soft); font-style: italic; }";
-    ".flag { color: var(--flag); font-weight: 600; }";
     "ul { margin: 4px 0; padding-left: 20px; }";
   ]
 
-let _table_style =
+(* Masthead, counts strip and the closing notes. *)
+let _masthead_style =
   [
-    "table { border-collapse: collapse; font-size: 13px; width: 100%; }";
-    "th, td { border-bottom: 1px solid var(--rule); padding: 6px 8px;";
-    "         text-align: left; vertical-align: top; }";
-    "th { color: var(--ink-soft); font-size: 11px; letter-spacing: .04em;";
-    "     text-transform: uppercase; }";
-    "tbody tr:nth-child(even) { background: var(--surface-alt); }";
-    "td.num { font-variant-numeric: tabular-nums; text-align: right;";
-    "         white-space: nowrap; }";
-    "td.rationale { color: var(--ink-soft); }";
-    "td.instruction { font-size: 12px; }";
-    "td.chart { width: 268px; }";
-    "td.chart .nochart { color: var(--ink-soft); font-size: 11px;";
-    "                    font-style: italic; }";
+    "header { border-bottom: 3px double var(--ink); margin-bottom: 18px;";
+    "         padding-bottom: 14px; }";
+    ".mast-top { align-items: baseline; display: flex; flex-wrap: wrap;";
+    "            gap: 12px; justify-content: space-between; }";
+    ".asof { color: var(--ink-soft); font-size: 13px; }";
+    ".mast-meta { display: flex; flex-wrap: wrap; gap: 8px;";
+    "             margin-top: 10px; }";
+    ".strip { background: var(--rule); border: 1px solid var(--rule);";
+    "         border-radius: 4px; display: grid; gap: 1px; margin-bottom: 8px;";
+    "         grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));";
+    "         overflow: hidden; }";
+    ".stat { background: var(--surface); padding: 8px 12px; }";
+    ".stat .label { color: var(--ink-soft); font-size: 11px;";
+    "               letter-spacing: .05em; text-transform: uppercase; }";
+    ".stat b { display: block; font-size: 20px;";
+    "          font-variant-numeric: tabular-nums; }";
+    "footer { border-top: 1px solid var(--rule); color: var(--ink-soft);";
+    "         font-size: 12px; margin-top: 32px; padding-top: 12px; }";
+    "footer p { max-width: 76ch; }";
   ]
 
-(* Reconciliation-class tag chips (issue #2103). A valid-stop row is the
-   ordinary case and stays recessive; "through" and "EXTENDED" escalate, so
-   identity never rests on colour alone the label text carries the class too. *)
+(* Cards. One [.cand] per candidate or held position: an identity row, the
+   chart, then the executable line. *)
+let _card_style =
+  [
+    ".cands { display: flex; flex-direction: column; gap: 10px;";
+    "         margin-top: 10px; }";
+    ".cand { background: var(--surface); border: 1px solid var(--rule);";
+    "        border-radius: 4px; overflow: hidden; }";
+    ".cand-extended { border-color: var(--flag); }";
+    ".cand-main { align-items: center; display: flex; flex-wrap: wrap;";
+    "             gap: 12px; padding: 8px 12px; }";
+    ".rank { color: var(--ink-soft); font-variant-numeric: tabular-nums; }";
+    "a.sym { border-bottom: 1px dashed var(--ink-soft); color: var(--ink);";
+    "        font-size: 16px; font-weight: 700; text-decoration: none; }";
+    "a.sym:hover, a.sym:focus { border-bottom-color: var(--entry);";
+    "                           color: var(--entry); }";
+    ".chips { display: flex; flex-wrap: wrap; gap: 5px; }";
+    ".sectors { display: flex; flex-wrap: wrap; gap: 6px; }";
+    ".nums { display: flex; flex-wrap: wrap; gap: 14px;";
+    "        font-variant-numeric: tabular-nums; margin-left: auto; }";
+    ".nums i { color: var(--ink-soft); display: block; font-size: 10px;";
+    "          font-style: normal; letter-spacing: .06em;";
+    "          text-transform: uppercase; }";
+    ".num-value-entry { color: var(--entry); font-weight: 600; }";
+    ".num-value-stop { color: var(--stop); font-weight: 600; }";
+    ".chart { border-top: 1px dashed var(--rule); padding: 2px 12px 4px; }";
+    ".nochart { color: var(--ink-soft); font-size: 11px;";
+    "           font-style: italic; }";
+    ".ticket { background: var(--surface-alt); border-top: 1px solid \
+     var(--rule);";
+    "          font-size: 12px; padding: 7px 12px; }";
+    ".ticket-suppressed { color: var(--flag); }";
+    ".legend { color: var(--ink-soft); display: flex; flex-wrap: wrap;";
+    "          font-size: 12px; gap: 14px; margin: 6px 0 0; }";
+    ".legend .sw { border-top: 2.5px solid; display: inline-block;";
+    "              height: 0; margin-right: 5px; vertical-align: middle;";
+    "              width: 20px; }";
+    ".sw-px { border-color: var(--px); }";
+    ".sw-ma { border-color: var(--ma); }";
+    ".sw-entry { border-color: var(--entry); border-top-style: dashed; }";
+    ".sw-stop { border-color: var(--stop); border-top-style: dashed; }";
+  ]
+
+(* Tag chips. Most facts are recessive; only the ones that change what a reader
+   should DO escalate. Identity never rests on colour alone — every chip's text
+   spells out what its colour is saying. *)
 let _chip_style =
   [
-    ".chip { border-radius: 3px; display: inline-block; font-size: 11px;";
-    "        padding: 1px 5px; white-space: nowrap; }";
+    ".chip { border: 1px solid var(--rule); border-radius: 3px;";
+    "        display: inline-block; font-size: 11px; padding: 1px 6px;";
+    "        white-space: nowrap; }";
+    ".chip-score { font-variant-numeric: tabular-nums; font-weight: 600; }";
+    (* Recessive facts: true, worth stating, not worth escalating. *)
+    ".chip-vol-ok, .chip-rs, .chip-breakout, .chip-early, .chip-supply,";
+    ".chip-resistance, .chip-status, .chip-neutral {";
+    "  background: var(--surface-alt); border-color: transparent; }";
+    ".chip-vol-strong, .chip-structural, .chip-sector, .chip-bullish {";
+    "  background: var(--good-tint); border-color: transparent;";
+    "  color: var(--good); }";
+    ".chip-virgin { background: var(--band); border-color: transparent; }";
+    ".chip-fallback, .chip-suspect, .chip-bearish {";
+    "  background: var(--band); border-color: transparent;";
+    "  color: var(--flag); font-weight: 600; }";
     ".chip-valid-stop { background: var(--surface-alt); color: \
      var(--ink-soft); }";
     ".chip-through-entry { background: var(--band); color: var(--ink); }";
@@ -110,20 +176,37 @@ let _chip_style =
    never rests on colour alone. *)
 let _chart_style =
   [
-    "svg.spark { display: block; height: auto; width: 260px; }";
+    "svg.spark { display: block; height: auto; max-width: 100%; }";
     "svg.spark .band { fill: var(--band); }";
     "svg.spark .vol { fill: var(--vol); }";
     "svg.spark .px { fill: none; stroke: var(--px); stroke-width: 1.5px;";
     "                stroke-linejoin: round; }";
+    "svg.spark .ma { fill: none; stroke: var(--ma); stroke-width: 1.5px;";
+    "                stroke-linejoin: round; }";
+    "svg.spark .last { fill: var(--px); stroke: var(--surface);";
+    "                  stroke-width: 1.5px; }";
     "svg.spark .lvl { stroke-width: 1.5px; }";
     "svg.spark .lvl-entry { stroke: var(--entry); stroke-dasharray: 5 3; }";
     "svg.spark .lvl-stop { stroke: var(--stop); stroke-dasharray: 2 2; }";
     "svg.spark .lvl-ref { stroke: var(--ink-soft); stroke-dasharray: 1 3; }";
+    "svg.spark .lvl-label { font-size: 10.5px;";
+    "                       font-variant-numeric: tabular-nums; }";
+    "svg.spark .lvl-label-entry { fill: var(--entry); }";
+    "svg.spark .lvl-label-stop { fill: var(--stop); }";
+    "svg.spark .lvl-label-ref { fill: var(--ink-soft); }";
   ]
 
 let css =
   String.concat ~sep:"\n"
-    (List.concat [ _palette; _layout; _table_style; _chip_style; _chart_style ])
+    (List.concat
+       [
+         _palette;
+         _layout;
+         _masthead_style;
+         _card_style;
+         _chip_style;
+         _chart_style;
+       ])
 
 let document ~title ~body =
   Printf.sprintf

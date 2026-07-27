@@ -5,6 +5,72 @@
 ## Status
 IN_PROGRESS
 
+**2026-07-27 (Picks Phase C v2 — HTML report to the committed design reference,
+branch `feat/picks-phase-c-v2`):** #2105 shipped the presentation half of Phase
+C as *a table report with per-row sparklines*. ~40 minutes after that PR was
+dispatched the maintainer committed a hand-built design reference,
+`dev/notes/weekly-report-design-reference-2026-07-27.html`, which is a **card**
+report. This closes the gap between the two.
+
+Implemented, measured element by element against the reference: per-candidate
+**card layout** (`div.cand` > `cand-main` / `chart` / `ticket`) replacing the
+candidate and held tables; **tag chips** (score, rationale clauses, resistance,
+structural-vs-fallback stop, data-suspect, reconciliation class); a **30-week
+moving average** on every chart; **weekly** closes rather than daily; a
+**last-close marker**; **collision-nudged right-hand level labels**; a
+**TradingView link** per symbol; a per-section **chart legend**; a masthead with
+the macro-regime chip; a counts strip; and closing notes. The Warnings section
+already was the reference's drop-reasons section and is unchanged.
+
+**Chip text is snapshot text, never a re-labelling.** `candidate.rationale` is a
+`"; "`-joined signal list (`"Early Stage2; Strong volume; RS positive; …"`);
+each clause becomes one chip carrying that clause *verbatim*, and only the CSS
+variant is derived from a small recognised vocabulary. The reference's
+shorthand ("3x volume" for `Strong volume`) is deliberately NOT reproduced:
+printing a measurement the snapshot does not contain would be a fabrication. An
+unrecognised clause still renders, as a plain chip — pinned by a test.
+
+**Module split decided up front, not in reaction to the linter** (plan
+`dev/plans/picks-phase-c-v2-2026-07-27.md` §2.1): new `Chip`, `Report_card`,
+`Candidate_card`, `Report_masthead`, plus `Svg_labels` extracted mid-execution
+when `svg_chart.ml` crossed the 300-line soft limit. No limit was bumped and no
+`@large-module` marker was added. Every `lib/*.ml` is under 300 lines.
+
+**Contracts preserved.** `Report_shared` is untouched, so the Markdown report is
+byte-identical *by construction* — `test_report_renderer.ml` is unchanged and
+green. No `current_schema_version` bump, no new `Weekly_snapshot.t` field: the
+30-week average is computed from the bars the existing `?bars_for` lookup
+already supplies. No new `analysis/` dependency (A2) — weekly aggregation and
+the SMA are ~25 lines of local arithmetic in `Svg_chart`. All `Svg_chart`
+additions are opt-in (`?ma_period`, `?annotate`), so every pre-existing pinned
+coordinate in `test_svg_chart.ml` is unchanged.
+
+**Assertion strategy changed, deliberately.** #2105's full-`<tr>` cell pins broke
+twice in two days: #2107 added a cell, the rebase was textually clean, and only
+CI caught it. Those are replaced by (a) **one body-only golden**
+(`test/fixtures/html_report_body.golden` — body only, because ~90 of a
+full-document golden's lines would be CSS and would be promoted blind), plus
+(b) targeted semantic pins for what a golden cannot explain: arm separability,
+the ticket being `Report_shared.instruction` *asserted by calling it*, risk
+quoted against `expected_fill_price`, the chart being weekly with a 30-week
+average, and every degradation path. **20 mutations, 20 red**, each naming the
+test that caught it.
+
+**Deliberately out of scope / disclosed:** the chart window is
+`Svg_chart.max_bars` = 90 **weekly** marks, i.e. ~21 months rather than the
+reference's "~2y" — bumping a public constant and re-pinning its tests for a 13%
+visual difference was not worth it, and the docs say ~21 months rather than
+overclaiming. The reference's per-run sizing/data-hygiene numbers (book size,
+risk fraction, per-position cap) are NOT printed: they are configuration this
+renderer is not handed, and plausible-looking values would be fabricated. The
+bottom date axis on each chart is not drawn (the card's figures and the masthead
+carry the dates). `forward_trace.ml:173` (F7 on #2107) is untouched.
+
+`render_weekly_report` gains `-html-out PATH` — the deferred #2105 item — so one
+invocation can produce the `.md` and the `.html` without shell redirection.
+
+Plan: `dev/plans/picks-phase-c-v2-2026-07-27.md`.
+
 **2026-07-27 (Picks Phase C — entry reconciliation, issue #2103, branch
 `feat/picks-entry-reconciliation`, PR #2107, stacked on #2105):** The
 correctness half of Phase C, and an instruction-level bug rather than a
@@ -113,7 +179,8 @@ artifact is not regenerated here (it needs a live data pull).
   `[@sexp.default]` round-trip against a real historical artifact *and* give the
   regeneration a reference point. Cheap, and it covers both gaps at once.
   (Raised by qc-behavioral on PR #2107; not done there to keep the rework
-  scoped.)
+  scoped, and **still open** after `feat/picks-phase-c-v2` — that PR is a
+  presentation change and taking the reader test would have widened it.)
 
 Plan: `dev/plans/picks-entry-reconciliation-2026-07-27.md`.
 

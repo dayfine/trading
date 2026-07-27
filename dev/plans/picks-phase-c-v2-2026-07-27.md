@@ -72,7 +72,8 @@ written:
 | `Candidate_card` (new) | `Weekly_snapshot.candidate` → chips + nums + ticket → `Report_card`. The only module that knows how a candidate becomes chips. | ~140 |
 | `Report_masthead` (new) | Masthead (title, as-of, system version, regime chip), the stat strip, the chart legend, the sizing + data-hygiene footer notes. | ~110 |
 | `Html_report_renderer` (edit) | Composes the above + the held-position cards + Warnings. Table primitives deleted. | ~170 |
-| `Svg_chart` (edit) | `+ weekly_bars`, `?ma_period`, `?annotate` (right labels + last-close marker). | 171 → ~265 |
+| `Svg_chart` (edit) | `+ weekly_bars`, `?ma_period`, `?annotate` (right labels + last-close marker). | 171 → 294 |
+| `Svg_labels` (new) | **Added during execution.** The label collision-avoidance rule. `Svg_chart` landed at 321 lines — over the 300 soft limit — so the label layout was extracted rather than the limit bumped, exactly as §4 anticipated. | ~32 |
 | `Html_page` (edit) | Card / chip / masthead / strip / legend / footer CSS; chart classes for MA + marker + labels. | 144 → ~215 |
 
 Rejected alternative: keep one growing `html_report_renderer.ml` and add an
@@ -119,7 +120,11 @@ disappearing.
 
 Chip set per candidate, in order:
 
-1. `score` — `"<grade> <score:%.2f>"`, modifier `score` (+ `score-top` at grade `A+`).
+1. `score` — `"<grade> <score:%.2f>"`, modifier `score`. (The plan floated a
+   `score-top` variant keyed on grade `A+`; dropped on execution — `grade` is a
+   free-form snapshot string and hard-coding one of its values to drive styling
+   is exactly the kind of derived-from-untrusted-text class name §2.3 rules out
+   elsewhere. The number itself carries the distinction.)
 2. rationale clauses, verbatim, one chip each.
 3. resistance grade, when `Some` (modifier `virgin` when it starts `Virgin_territory`).
 4. stop kind — `structural stop` / `fallback stop` from `stop_is_structural`.
@@ -204,9 +209,13 @@ shell redirection. Default behaviour unchanged.
 - `svg_chart.{ml,mli}` — `weekly_bars`, `?ma_period`, `?annotate`.
 - `html_page.{ml,mli}` — card / chip / masthead / legend / footer CSS + new chart classes.
 - `html_report_renderer.{ml,mli}` — table primitives out, card composition in.
-- `report_shared.{ml,mli}` — the two footer notes (sizing placeholder,
-  data-hygiene) live here so the formats cannot drift if the Markdown report
-  ever grows them. **No change to any existing string** → Markdown byte-identical.
+- `report_shared.{ml,mli}` — **not changed after all.** The plan put the two
+  closing notes here; on execution they went to `Report_masthead` instead,
+  because the Markdown report has no masthead and therefore nothing for them to
+  drift against. `Report_shared` is for prose BOTH formats print; putting
+  HTML-only prose there would have misrepresented the invariant. Net effect:
+  `Report_shared` is untouched, so the Markdown output is byte-identical by
+  construction rather than by inspection.
 
 **Edited (bin):** `render_weekly_report.ml` — `-html-out PATH`.
 
@@ -241,6 +250,10 @@ shell redirection. Default behaviour unchanged.
 
 - [ ] Every element in the §1 table is either implemented or has a written
       reason in the PR body.
+- [ ] The chart window is described honestly. `Svg_chart.max_bars` stays at 90,
+      so the weekly chart spans ~21 months, not the reference's "~2y". Bumping a
+      public constant (and re-pinning its tests) for a 13% visual difference was
+      not worth it; the docs say ~21 months rather than overclaiming.
 - [ ] `Report_renderer` (Markdown) output byte-identical: `test_report_renderer.ml`
       unchanged and green.
 - [ ] No `current_schema_version` bump; no new `Weekly_snapshot.t` field;

@@ -1,12 +1,46 @@
-(** Tests for {!Html_report_renderer} — self-contained HTML weekly report.
+(** Tests for {!Html_report_renderer} — the self-contained HTML weekly report.
 
-    Fixture design note: the long candidate, the short candidate and the held
-    position carry {b distinguishable} symbols, prices, flags and bar series.
-    That is deliberate — a fixture whose arms are interchangeable lets a whole
-    rendering arm be deleted with the suite still green. Here every arm is
-    asserted by its own symbol and its own price levels, so mutating (say) the
-    short-candidate chart call to {!Html_report_renderer.no_bars} turns a test
-    red. *)
+    {1 Assertion strategy}
+
+    Two layers, deliberately.
+
+    {b A body-only golden.} [test_body_matches_golden] renders the full fixture
+    and compares the whole [<body>] against [fixtures/html_report_body.golden].
+    That is what pins element ORDER, nesting, chip order, card composition and
+    every literal string at once — the surface the previous revision tried to
+    hold with hand-written full-row substrings. Those broke twice in two days: a
+    PR added one cell, the rebase was textually clean, and only CI noticed. A
+    golden cannot suffer that: the shape change IS the diff.
+
+    It is the [<body>] and not the document because ~90 of a full-document
+    golden's ~130 lines would be CSS, regenerated on every palette tweak and
+    therefore promoted without being read. The [<style>] block has its own
+    targeted assertions instead.
+
+    {b Targeted semantic pins} for everything a golden states but does not
+    EXPLAIN: which arm a card belongs to, that the ticket is
+    {!Report_shared.instruction} rather than a lookalike, that risk is quoted
+    against the expected fill, that the chart is weekly with a 30-week average,
+    and every degradation path. Each is written so that mutating the production
+    branch it covers turns exactly that test red.
+
+    A golden alone would be promoted blind; targeted pins alone rot on shape
+    churn. Together, a layout change costs one regeneration plus a semantic
+    read, and a BEHAVIOUR change still turns a named test red.
+
+    {1 Regenerating the golden}
+
+    Run the suite; on mismatch it writes the actual body next to the test binary
+    ([_build/default/trading/weinstein/snapshot/test/html_report_body.actual])
+    and names the path in the failure. Read the diff, and if the change is
+    intended copy that file over [test/fixtures/html_report_body.golden].
+
+    {1 Fixture design}
+
+    The long candidate, the short candidate and the held position carry
+    {b distinguishable} symbols, prices, flags and bar series. That is
+    deliberate: a fixture whose arms are interchangeable lets a whole rendering
+    arm be deleted with the suite still green. *)
 
 open Core
 open OUnit2
@@ -15,16 +49,22 @@ open Weinstein_snapshot
 
 let _date d = Date.of_string d
 
-let _bar ~day ~price : Types.Daily_price.t =
+(* Weekly bars are what the report charts, so the fixture series is one bar per
+   week — [_series n] yields [n] weekly-spaced bars, hence [n] weekly bars after
+   aggregation. [_ma_bars] is long enough for the 30-week average to be defined
+   at more than one point, which is what makes the average visible at all. *)
+let _week_anchor = _date "2019-10-07"
+
+let _bar ~week ~price : Types.Daily_price.t =
   Types.Daily_price.make
-    ~date:(Date.add_days (_date "2020-08-01") day)
+    ~date:(Date.add_days _week_anchor (week * 7))
     ~open_price:price ~high_price:price ~low_price:price ~close_price:price
     ~volume:1000 ~adjusted_close:price ()
 
-(* Three bars per symbol, each series scaled to that symbol's own price area so
-   the three charts are not interchangeable. *)
-let _series base =
-  List.init 3 ~f:(fun i -> _bar ~day:i ~price:(base +. Float.of_int i))
+let _ma_bars = 40
+
+let _series ?(n = _ma_bars) base =
+  List.init n ~f:(fun i -> _bar ~week:i ~price:(base +. Float.of_int i))
 
 let _bars_table = [ ("LONGA", _series 98.0); ("SHRTB", _series 48.0) ]
 
@@ -38,6 +78,9 @@ let _bars_for ~symbol =
 let _held_bars_for ~symbol =
   if String.equal symbol "GOOG" then _series 1398.0 else []
 
+let _all_bars_for ~symbol =
+  if String.equal symbol "GOOG" then _series 1398.0 else _bars_for ~symbol
+
 let _long_candidate : Weekly_snapshot.candidate =
   {
     symbol = "LONGA";
@@ -46,7 +89,7 @@ let _long_candidate : Weekly_snapshot.candidate =
     entry = 100.0;
     stop = 90.0;
     sector = "XLK";
-    rationale = "Stage 2 breakout, 2.1x volume";
+    rationale = "Stage1 to Stage2 breakout; Strong volume; RS positive";
     rs_vs_spy = Some 1.34;
     resistance_grade = Some "Virgin_territory (0.95)";
     sized_shares = 10;
@@ -60,8 +103,8 @@ let _long_candidate : Weekly_snapshot.candidate =
   }
 
 (* Deliberately the opposite of [_long_candidate] on every rendered flag: a
-   fallback stop, spike-flagged, no resistance grade, unsized, and a stop ABOVE
-   the entry (short convention). *)
+   fallback stop, spike-flagged, no resistance grade, unsized, different
+   rationale vocabulary, and a stop ABOVE the entry (short convention). *)
 let _short_candidate : Weekly_snapshot.candidate =
   {
     _long_candidate with
@@ -70,7 +113,7 @@ let _short_candidate : Weekly_snapshot.candidate =
     grade = "B";
     entry = 50.0;
     stop = 55.0;
-    rationale = "Stage 4 breakdown";
+    rationale = "Stage 4 breakdown; Adequate volume";
     resistance_grade = None;
     sized_shares = 0;
     sized_position_value = 0.0;
@@ -157,6 +200,44 @@ let _in_order needles : string matcher =
 let _count s ~needle =
   List.length (String.substr_index_all s ~may_overlap:false ~pattern:needle)
 
+(* ------- Body golden ------- *)
+
+let _golden_path = "fixtures/html_report_body.golden"
+let _actual_path = "html_report_body.actual"
+let _body_open = "<body>\n"
+let _body_close = "\n</body>"
+
+(* The document between its body tags. The renderer's own shell assertions pin
+   that those tags exist; this only has to find them. *)
+let _body_of html =
+  match String.substr_index html ~pattern:_body_open with
+  | None -> html
+  | Some i -> (
+      let start = i + String.length _body_open in
+      match String.substr_index html ~pattern:_body_close with
+      | None -> String.subo html ~pos:start
+      | Some j -> String.sub html ~pos:start ~len:(j - start))
+
+(* Best-effort: the regeneration aid must never turn a legible golden mismatch
+   into an opaque Sys_error if the test's working directory is read-only. *)
+let _try_write_actual actual =
+  try Out_channel.write_all _actual_path ~data:actual with Sys_error _ -> ()
+
+let test_body_matches_golden _ =
+  let actual = _body_of (Html_report_renderer.render _full_snapshot) in
+  let expected = In_channel.read_all _golden_path in
+  if not (String.equal actual expected) then _try_write_actual actual;
+  assert_that actual
+    (matching
+       ~msg:
+         (Printf.sprintf
+            "Rendered body differs from %s. Actual written to %s (relative to \
+             the test's _build directory); copy it over the golden if the \
+             change is intended."
+            _golden_path _actual_path)
+       (fun s -> if String.equal s expected then Some () else None)
+       __)
+
 (* ------- Document shell ------- *)
 
 let test_document_is_self_contained _ =
@@ -173,45 +254,101 @@ let test_document_is_self_contained _ =
          _has_substring "<meta charset=\"utf-8\">";
          _has_substring "<title>Weekly Pick Report — 2020-08-28</title>";
          _has_substring "<style>";
-         _has_substring "svg.spark .lvl-stop";
          not_ ~msg:"no external stylesheet" (_has_substring "<link");
          not_ ~msg:"no script tag" (_has_substring "<script");
+         (* A TradingView link is a link, not an asset: it fetches nothing. *)
+         _has_substring "https://www.tradingview.com/chart/?symbol=LONGA";
        ])
 
-let test_header_and_macro _ =
+(* Every mark the charts and the chips draw must actually be styled — an
+   unstyled class renders as undifferentiated text or an invisible line. *)
+let test_new_marks_are_styled _ =
+  let html = Html_report_renderer.render _full_snapshot in
+  assert_that html
+    (all_of
+       [
+         _has_substring "svg.spark .ma";
+         _has_substring "svg.spark .last";
+         _has_substring "svg.spark .lvl-label-entry";
+         _has_substring "svg.spark .lvl-stop";
+         _has_substring ".chip-structural";
+         _has_substring ".chip-fallback";
+         _has_substring ".chip-through-entry";
+         _has_substring ".chip-extended";
+         _has_substring ".cand-extended";
+         _has_substring ".ticket-suppressed";
+       ])
+
+let test_masthead _ =
   let html = Html_report_renderer.render _full_snapshot in
   assert_that html
     (all_of
        [
          _has_substring "<h1>Weekly Pick Report — 2020-08-28</h1>";
          _has_substring
-           "<p class=\"subtitle\">System version: <code>c93bf39d</code></p>";
-         _has_substring
-           "<p class=\"macro\"><strong>Bullish</strong> (score 0.72)</p>";
+           "<div class=\"asof\">as-of 2020-08-28 close &middot; system \
+            <code>c93bf39d</code></div>";
+         _has_substring "<span class=\"chip chip-bullish\">Bullish 0.72</span>";
        ])
 
-let test_bearish_macro_rendered _ =
+let test_bearish_regime_gets_its_own_variant _ =
   let snap =
     { _empty_snapshot with macro = { regime = "Bearish"; score = -0.45 } }
   in
   assert_that
     (Html_report_renderer.render snap)
-    (_has_substring "<strong>Bearish</strong> (score -0.45)")
+    (_has_substring "<span class=\"chip chip-bearish\">Bearish -0.45</span>")
 
-let test_section_order_matches_markdown_report _ =
+(* An unknown regime label still prints — only its colour is dropped. A class
+   name is never derived from free-form snapshot text. *)
+let test_unknown_regime_renders_a_plain_chip _ =
+  let snap =
+    { _empty_snapshot with macro = { regime = "Sideways"; score = 0.1 } }
+  in
+  assert_that
+    (Html_report_renderer.render snap)
+    (_has_substring "<span class=\"chip\">Sideways 0.10</span>")
+
+let test_counts_strip_counts_the_full_lists _ =
+  (* 12 longs under the default cap of 7: the strip says 12, so a reader can
+     tell "7 shown of 12 found" from "7 found". *)
+  let snap =
+    {
+      _full_snapshot with
+      long_candidates =
+        List.init 12 ~f:(fun i ->
+            { _long_candidate with symbol = Printf.sprintf "SYM%02d" i });
+    }
+  in
+  assert_that
+    (Html_report_renderer.render snap)
+    (all_of
+       [
+         _has_substring
+           "<div class=\"stat\"><span class=\"label\">Long \
+            candidates</span><b>12</b></div>";
+         _has_substring
+           "<div class=\"stat\"><span class=\"label\">Held \
+            positions</span><b>1</b></div>";
+         _has_substring
+           "<div class=\"stat\"><span \
+            class=\"label\">Warnings</span><b>1</b></div>";
+       ])
+
+let test_section_order _ =
   assert_that
     (Html_report_renderer.render _full_snapshot)
     (_in_order
        [
-         "<h2>Macro</h2>";
+         "<header>";
+         "<div class=\"strip\">";
          "<h2>Strong sectors</h2>";
          "<h2>Long candidates (top 7)</h2>";
          "<h2>Short candidates (top 5)</h2>";
          "<h2>Held positions</h2>";
          "<h2>Warnings</h2>";
+         "<footer>";
        ])
-
-(* ------- Empty sections ------- *)
 
 let test_every_empty_section_renders_the_none_marker _ =
   let html = Html_report_renderer.render _empty_snapshot in
@@ -227,149 +364,164 @@ let test_every_empty_section_renders_the_none_marker _ =
          _has_substring "<h2>Warnings</h2>\n<p class=\"empty\">(none)</p>";
        ])
 
-(* ------- Lists ------- *)
-
-let test_sectors_and_warnings_render_as_bullets _ =
+let test_sectors_are_chips_and_warnings_are_bullets _ =
   let html = Html_report_renderer.render _full_snapshot in
   assert_that html
     (all_of
        [
-         _has_substring "<ul><li>XLK</li><li>XLY</li></ul>";
+         _has_substring
+           "<span class=\"sectors\"><span class=\"chip \
+            chip-sector\">XLK</span><span class=\"chip \
+            chip-sector\">XLY</span></span>";
          _has_substring "<li>SNSE: dropped — sparse tail (6/15 bars)</li>";
        ])
 
-(* ------- Candidate rows ------- *)
+(* ------- Candidate cards ------- *)
 
-(* The header row and the body row are pinned COMPLETE and adjacent, because
-   only the pair fixes column ORDER. Loose per-cell substrings do not: swapping
-   the Entry and Stop cells inside [_candidate_row] leaves both "$100.00" and
-   "$90.00" present somewhere in the document, so the page renders
-   "Entry $90.00 / Stop $100.00" under headers saying the opposite while every
-   substring assertion still holds. Risk % = (100 - 90) / 100 * 100.
-
-   The row carries TWELVE cells: the reconciliation "Close vs entry" cell sits
-   at position 6, between Entry and Stop, matching [_candidate_columns] and the
-   Markdown renderer's identical order (issue #2103). LONGA is
-   [Not_reconciled], so that cell is a bare "-" with no chip span, and
-   [expected_fill_price] returns the entry — which is why Risk % is still
-   10.0% here and NOT re-anchored. The reconciled-row chip and its fill-based
-   Risk % are pinned separately in
-   [test_through_entry_chip_rendered_on_the_long_arm]. *)
-let test_long_candidate_row_cells _ =
+let test_long_candidate_card _ =
   let html = Html_report_renderer.render _full_snapshot in
   assert_that html
     (all_of
        [
          _has_substring
-           "<thead><tr><th>Rank</th><th>Symbol</th><th>Grade</th><th>Score</th><th>Entry</th><th>Close \
-            vs entry</th><th>Stop</th><th>Risk \
-            %</th><th>Resistance</th><th>Rationale</th><th>Instruction</th><th>Chart</th></tr></thead>";
+           "<span class=\"rank\">1</span><a class=\"sym\" \
+            href=\"https://www.tradingview.com/chart/?symbol=LONGA\" \
+            target=\"_blank\" rel=\"noopener\">LONGA</a>";
+         (* Chips, in order and complete: score, the three rationale clauses
+            verbatim, the resistance grade, the stop kind. A dropped or
+            re-labelled chip fails here. *)
          _has_substring
-           "<tr><td class=\"num\">1</td><td class=\"\">LONGA</td><td \
-            class=\"\">A+</td><td class=\"num\">0.91</td><td \
-            class=\"num\">$100.00</td><td class=\"num\">-</td><td \
-            class=\"num\">$90.00</td><td class=\"num\">10.0%</td><td \
-            class=\"\">Virgin_territory (0.95)</td><td \
-            class=\"rationale\">Stage 2 breakout, 2.1x volume</td><td \
-            class=\"instruction\">BUY STOP 10 sh @ $100.00 (~$1000, 5.0% of \
-            book, risk $100); on fill place SELL STOP @ $90.00, GTC; cancel if \
-            unfilled by Friday close</td><td class=\"chart\" \
-            data-chart=\"long:LONGA\"><span class=\"nochart\">no chart \
-            data</span></td></tr>";
+           "<span class=\"chips\"><span class=\"chip chip-score\">A+ \
+            0.91</span><span class=\"chip chip-breakout\">Stage1 to Stage2 \
+            breakout</span><span class=\"chip chip-vol-strong\">Strong \
+            volume</span><span class=\"chip chip-rs\">RS positive</span><span \
+            class=\"chip chip-virgin\">Virgin_territory (0.95)</span><span \
+            class=\"chip chip-structural\">structural stop</span></span>";
+         (* Figures, in order. Risk = (100 - 90) / 100. *)
+         _has_substring
+           "<span class=\"nums\"><span class=\"num\"><i>Entry</i><span \
+            class=\"num-value num-value-entry\">$100.00</span></span><span \
+            class=\"num\"><i>Stop</i><span class=\"num-value \
+            num-value-stop\">$90.00</span></span><span \
+            class=\"num\"><i>Risk</i><span \
+            class=\"num-value\">10.0%</span></span></span>";
        ])
 
-let test_short_candidate_row_is_rendered_in_its_own_table _ =
-  (* The short arm is a separate table with its own rank-1 row. Its risk cell
-     is negative — the long-convention formula applied to a stop above entry —
-     which no long fixture can produce, so this cell cannot be satisfied by the
-     long table. *)
+(* The broker-facing text is [Report_shared.instruction] itself, asserted by
+   CALLING it: a renderer that formatted its own lookalike sentence would drift
+   from the Markdown report silently, and this cannot be satisfied by any
+   string this test hard-codes. *)
+let test_ticket_is_the_shared_instruction _ =
+  let ticket c =
+    Printf.sprintf "<div class=\"ticket\">%s</div>"
+      (Html_page.escape (Report_shared.instruction c))
+  in
+  assert_that
+    (Html_report_renderer.render _full_snapshot)
+    (all_of
+       [
+         _has_substring (ticket _long_candidate);
+         (* The unsized short's ticket is the shared "-" — not omitted. *)
+         _has_substring (ticket _short_candidate);
+       ])
+
+let test_short_candidate_card_is_its_own_arm _ =
+  (* Every assertion here is on a value only the SHORT fixture produces: the
+     fallback-stop chip, the suspect chip, the asterisked stop and a NEGATIVE
+     risk (the long-convention formula applied to a stop above entry). None can
+     be satisfied by the long card. *)
   assert_that
     (Html_report_renderer.render _full_snapshot)
     (_in_order
        [
          "<h2>Short candidates (top 5)</h2>";
-         (* Complete row, same reason as the long arm: cell ORDER is only
-            pinned by the whole <tr>. Every cell here differs from the long
-            fixture's — flagged symbol, fallback stop, negative risk, no
-            grade, unsized instruction — so this cannot be satisfied by the
-            long table's output.
-
-            Twelve cells, with the reconciliation cell at position 6 exactly as
-            on the long arm. SHRTB is [Not_reconciled] too, so it is a bare "-"
-            and Risk % stays entry-based at (50 - 55) / 50 = -10.0%. *)
-         "<tr><td class=\"num\">1</td><td class=\"\">SHRTB <span \
-          class=\"flag\">(!)</span></td><td class=\"\">B</td><td \
-          class=\"num\">0.77</td><td class=\"num\">$50.00</td><td \
-          class=\"num\">-</td><td class=\"num\">$55.00*</td><td \
-          class=\"num\">-10.0%</td><td class=\"\">-</td><td \
-          class=\"rationale\">Stage 4 breakdown</td><td \
-          class=\"instruction\">-</td><td class=\"chart\" \
-          data-chart=\"short:SHRTB\"><span class=\"nochart\">no chart \
-          data</span></td></tr>";
+         "?symbol=SHRTB";
+         (* The COMPLETE chips span: an unrecognised clause degrades to a plain
+            chip, and the absent resistance grade emits nothing at all — both
+            pinned by exhaustion rather than by a negative substring. *)
+         "<span class=\"chips\"><span class=\"chip chip-score\">B \
+          0.77</span><span class=\"chip\">Stage 4 breakdown</span><span \
+          class=\"chip chip-vol-ok\">Adequate volume</span><span class=\"chip \
+          chip-fallback\">fallback stop</span><span class=\"chip \
+          chip-suspect\">(!) data-suspect</span></span>";
+         "<span class=\"num-value num-value-stop\">$55.00*</span>";
+         "<span class=\"num-value\">-10.0%</span>";
        ])
 
-let test_structural_stop_has_no_asterisk _ =
-  let snap = { _empty_snapshot with long_candidates = [ _long_candidate ] } in
-  let html = Html_report_renderer.render snap in
-  assert_that html
+let test_unrecognised_rationale_clause_degrades_to_a_plain_chip _ =
+  (* Screener vocabulary evolves. An unknown clause must still be printed —
+     dropping it would silently lose a signal the screener recorded. *)
+  let snap =
+    {
+      _empty_snapshot with
+      long_candidates =
+        [ { _long_candidate with rationale = "Some brand new signal" } ];
+    }
+  in
+  assert_that
+    (Html_report_renderer.render snap)
+    (_has_substring "<span class=\"chip\">Some brand new signal</span>")
+
+let test_structural_and_fallback_stops_are_chipped_and_explained _ =
+  let render c =
+    Html_report_renderer.render { _empty_snapshot with long_candidates = [ c ] }
+  in
+  assert_that (render _long_candidate)
     (all_of
        [
-         _has_substring "<td class=\"num\">$90.00</td>";
+         _has_substring
+           "<span class=\"chip chip-structural\">structural stop</span>";
          not_ ~msg:"no fallback legend when every shown stop is structural"
-           (_has_substring "fallback stop");
-       ])
-
-let test_fallback_stop_marked_and_explained _ =
-  let snap = { _empty_snapshot with long_candidates = [ _short_candidate ] } in
-  let html = Html_report_renderer.render snap in
-  assert_that html
+           (_has_substring "* fallback stop:");
+       ]);
+  assert_that (render _short_candidate)
     (all_of
        [
-         _has_substring "<td class=\"num\">$55.00*</td>";
+         _has_substring
+           "<span class=\"chip chip-fallback\">fallback stop</span>";
          _has_substring "<p class=\"note\">* fallback stop:";
        ])
 
-let test_clean_candidate_has_no_flag_marker _ =
-  let snap = { _empty_snapshot with long_candidates = [ _long_candidate ] } in
-  let html = Html_report_renderer.render snap in
-  assert_that html
+let test_data_suspect_is_chipped_and_explained _ =
+  let clean =
+    Html_report_renderer.render
+      { _empty_snapshot with long_candidates = [ _long_candidate ] }
+  in
+  let flagged =
+    Html_report_renderer.render
+      { _empty_snapshot with short_candidates = [ _short_candidate ] }
+  in
+  assert_that clean
+    (not_ ~msg:"no data-suspect legend when nothing is flagged"
+       (_has_substring "(!) data-suspect:"));
+  assert_that flagged
     (all_of
        [
-         _has_substring "<td class=\"\">LONGA</td>";
-         not_ ~msg:"no data-suspect legend when nothing is flagged"
-           (_has_substring "data-suspect");
-       ])
-
-let test_data_suspect_marked_and_explained_on_the_short_arm _ =
-  (* Pins the marker + legend through the SHORT table specifically — three of
-     the last four defects on this track were an unpinned secondary arm. *)
-  let snap = { _empty_snapshot with short_candidates = [ _short_candidate ] } in
-  let html = Html_report_renderer.render snap in
-  assert_that html
-    (all_of
-       [
-         _has_substring "SHRTB <span class=\"flag\">(!)</span>";
+         _has_substring
+           "<span class=\"chip chip-suspect\">(!) data-suspect</span>";
          _has_substring "<p class=\"note\">(!) data-suspect:";
        ])
 
-let test_missing_resistance_grade_renders_a_dash _ =
-  let snap = { _empty_snapshot with long_candidates = [ _short_candidate ] } in
+let test_resistance_grade_chip_variants _ =
+  (* Virgin territory — no overhead supply at all — is the one resistance grade
+     that changes what a reader does, so it escalates; every other grade is
+     recessive. A missing grade emits NO chip, which the complete chips span in
+     [test_short_candidate_card_is_its_own_arm] pins by exhaustion. *)
+  let render grade =
+    Html_report_renderer.render
+      {
+        _empty_snapshot with
+        long_candidates = [ { _long_candidate with resistance_grade = grade } ];
+      }
+  in
   assert_that
-    (Html_report_renderer.render snap)
-    (_has_substring "<td class=\"\">-</td>")
+    (render (Some "Clean (0.12)"))
+    (_has_substring "<span class=\"chip chip-resistance\">Clean (0.12)</span>");
+  assert_that (render None)
+    (not_ ~msg:"no resistance chip when the grade was not computed"
+       (_has_substring "chip-resistance\">"))
 
-let test_zero_share_candidate_renders_a_dash_instruction _ =
-  let snap = { _empty_snapshot with long_candidates = [ _short_candidate ] } in
-  assert_that
-    (Html_report_renderer.render snap)
-    (all_of
-       [
-         _has_substring "<td class=\"instruction\">-</td>";
-         not_ ~msg:"an unsized candidate must not render an order"
-           (_has_substring "BUY STOP");
-       ])
-
-let test_zero_share_reason_rendered _ =
+let test_zero_share_reason_is_the_ticket _ =
   let snap =
     {
       _empty_snapshot with
@@ -384,8 +536,13 @@ let test_zero_share_reason_rendered _ =
   in
   assert_that
     (Html_report_renderer.render snap)
-    (_has_substring
-       "<td class=\"instruction\">0 sh — cash / caps exhausted</td>")
+    (all_of
+       [
+         _has_substring
+           "<div class=\"ticket\">0 sh — cash / caps exhausted</div>";
+         not_ ~msg:"an unsized candidate must not render an order"
+           (_has_substring "BUY STOP");
+       ])
 
 (* ------- Truncation ------- *)
 
@@ -397,7 +554,7 @@ let _n_candidates ~n ~score_of =
         score = score_of i;
       })
 
-let test_long_table_truncated_with_tie_honest_note _ =
+let test_long_section_truncated_with_tie_honest_note _ =
   let snap =
     {
       _empty_snapshot with
@@ -408,17 +565,16 @@ let test_long_table_truncated_with_tie_honest_note _ =
   assert_that html
     (all_of
        [
-         _has_substring "<td class=\"\">SYM06</td>";
-         not_ ~msg:"row 8 truncated"
-           (_has_substring "<td class=\"\">SYM07</td>");
+         _has_substring "?symbol=SYM06";
+         not_ ~msg:"card 8 truncated" (_has_substring "?symbol=SYM07");
          _has_substring
            "<p class=\"note\">5 more candidates not shown; 5 tie the cutoff \
             score (0.85).";
        ])
 
-let test_short_table_truncated_at_its_own_limit _ =
-  (* The short table's cap is independent of the long one: 8 shorts under the
-     default short limit of 5 hides 3. *)
+let test_short_section_truncated_at_its_own_limit _ =
+  (* The short cap is independent of the long one: 8 shorts under the default
+     short limit of 5 hides 3. *)
   let snap =
     {
       _empty_snapshot with
@@ -430,9 +586,8 @@ let test_short_table_truncated_at_its_own_limit _ =
     (Html_report_renderer.render snap)
     (all_of
        [
-         _has_substring "<td class=\"\">SYM04</td>";
-         not_ ~msg:"short row 6 truncated"
-           (_has_substring "<td class=\"\">SYM05</td>");
+         _has_substring "?symbol=SYM04";
+         not_ ~msg:"short card 6 truncated" (_has_substring "?symbol=SYM05");
          _has_substring "<p class=\"note\">3 lower-scored candidates not shown.";
        ])
 
@@ -457,7 +612,7 @@ let test_limit_overrides_are_honoured _ =
            "<p class=\"note\">10 lower-scored candidates not shown.";
        ])
 
-let test_untruncated_table_has_no_note _ =
+let test_untruncated_section_has_no_note _ =
   let snap = { _empty_snapshot with long_candidates = [ _long_candidate ] } in
   assert_that
     (Html_report_renderer.render snap)
@@ -465,68 +620,88 @@ let test_untruncated_table_has_no_note _ =
 
 (* ------- Held positions ------- *)
 
-let test_held_row_cells _ =
+let test_held_card _ =
   let html = Html_report_renderer.render _full_snapshot in
   assert_that html
     (all_of
        [
+         (* No rank cell on an unranked arm. *)
          _has_substring
-           "<thead><tr><th>Symbol</th><th>Shares</th><th>Entry</th><th>Current</th><th>Unrealized \
-            %</th><th>Stop</th><th>Suggested \
-            stop</th><th>Entered</th><th>Status</th><th>Chart</th></tr></thead>";
+           "<div class=\"cand-main\"><a class=\"sym\" \
+            href=\"https://www.tradingview.com/chart/?symbol=GOOG\" \
+            target=\"_blank\" rel=\"noopener\">GOOG</a>";
          _has_substring
-           "<td class=\"\">GOOG</td><td class=\"num\">3</td><td \
-            class=\"num\">$1400.00</td><td class=\"num\">$1500.00</td><td \
-            class=\"num\">7.1%</td><td class=\"num\">$1365.00</td><td \
-            class=\"num\">$1420.00 (+55.00)</td><td \
-            class=\"\">2020-06-19</td><td class=\"\">Holding</td>";
+           "<span class=\"chip chip-status\">Holding</span><span \
+            class=\"chip\">entered 2020-06-19</span>";
+         _has_substring
+           "<span class=\"num\"><i>Shares</i><span \
+            class=\"num-value\">3</span></span><span \
+            class=\"num\"><i>Fill</i><span class=\"num-value \
+            num-value-entry\">$1400.00</span></span><span \
+            class=\"num\"><i>Current</i><span \
+            class=\"num-value\">$1500.00</span></span><span \
+            class=\"num\"><i>Unrealized</i><span \
+            class=\"num-value\">7.1%</span></span><span \
+            class=\"num\"><i>Stop</i><span class=\"num-value \
+            num-value-stop\">$1365.00</span></span>";
        ])
 
-let test_held_row_without_recomputed_stop_renders_a_dash _ =
-  let snap =
-    {
-      _empty_snapshot with
-      held_positions = [ { _held with recommended_stop = None } ];
-    }
+(* Weinstein's investor trailing method ratchets the sell-stop UP as the MA
+   advances and leaves it alone otherwise (weinstein-book-reference.md §5.2
+   "Trailing Stop — Investor Method"). All three arms of that guidance are
+   pinned: raise, hold, and nothing recomputed. *)
+let test_held_stop_line_says_which_way_it_points _ =
+  let render recommended_stop =
+    Html_report_renderer.render
+      {
+        _empty_snapshot with
+        held_positions = [ { _held with recommended_stop } ];
+      }
   in
-  assert_that
-    (Html_report_renderer.render snap)
-    (all_of
-       [
-         _has_substring
-           "<td class=\"num\">$1365.00</td><td class=\"num\">-</td>";
-         not_ ~msg:"no delta when nothing was recomputed"
-           (_has_substring "(+55.00)");
-       ])
+  assert_that (render (Some 1420.00))
+    (_has_substring
+       "Stop in force $1365.00; this week&#39;s support floor is $1420.00 \
+        (+55.00) — raise the stop to it.");
+  assert_that (render (Some 1300.00))
+    (_has_substring
+       "Stop in force $1365.00; this week&#39;s support floor is $1300.00 \
+        (-65.00), below the stop in force — leave the stop where it is.");
+  assert_that (render None)
+    (_has_substring
+       "Stop in force $1365.00. No support floor was recomputed this week.")
 
 (* ------- Charts, per arm ------- *)
 
-let test_long_candidate_chart_rendered _ =
-  let html = Html_report_renderer.render ~bars_for:_bars_for _full_snapshot in
+let test_all_three_arms_chart_independently _ =
+  (* One render, one bar source covering every symbol: exactly three charts,
+     one per arm. A missing arm shows up as a count of 2. *)
+  let html =
+    Html_report_renderer.render ~bars_for:_all_bars_for _full_snapshot
+  in
+  assert_that (_count html ~needle:"<svg class=\"spark\"") (equal_to 3);
   assert_that html
     (all_of
        [
          _has_substring "data-chart=\"long:LONGA\"><svg class=\"spark\"";
-         _has_substring "<title>entry $100.00</title>";
-         _has_substring "<title>stop $90.00</title>";
+         _has_substring "data-chart=\"short:SHRTB\"><svg class=\"spark\"";
+         _has_substring "data-chart=\"held:GOOG\"><svg class=\"spark\"";
        ])
 
-let test_short_candidate_chart_rendered _ =
-  (* Mutating the short arm's chart call to [no_bars] — or dropping the Chart
-     cell from the short table — fails here. The levels are the SHORT
-     candidate's own prices, which no other arm produces. *)
+let test_candidate_charts_carry_their_own_levels _ =
   let html = Html_report_renderer.render ~bars_for:_bars_for _full_snapshot in
   assert_that html
     (all_of
        [
-         _has_substring "data-chart=\"short:SHRTB\"><svg class=\"spark\"";
+         _has_substring "<title>entry $100.00</title>";
+         _has_substring "<title>stop $90.00</title>";
+         (* The short arm's own prices, which no other arm produces. *)
          _has_substring "<title>entry $50.00</title>";
          _has_substring "<title>stop $55.00</title>";
        ])
 
-let test_held_position_chart_rendered _ =
-  (* Held charts use the FILL price and the CURRENT stop. [_held_bars_for]
-     supplies bars for GOOG only, so a candidate chart cannot satisfy this. *)
+let test_held_chart_uses_the_fill_and_the_current_stop _ =
+  (* [_held_bars_for] supplies bars for GOOG only, so a candidate chart cannot
+     satisfy this. *)
   let html =
     Html_report_renderer.render ~bars_for:_held_bars_for _full_snapshot
   in
@@ -538,32 +713,37 @@ let test_held_position_chart_rendered _ =
          _has_substring "<title>stop $1365.00</title>";
        ])
 
-let test_chart_carries_band_and_volume _ =
+let test_charts_are_weekly_with_the_30_week_average _ =
+  (* The aria-label names the average, the [.ma] polyline draws it, and the
+     right-hand labels plus the last-close marker are on. Dropping [~ma_period],
+     [~annotate], or the [weekly_bars] aggregation fails one of these. *)
+  let html = Html_report_renderer.render ~bars_for:_bars_for _full_snapshot in
+  assert_that html
+    (all_of
+       [
+         (* 40 weekly bars in, 40 marks out: a daily series would report 40 too,
+            so the aggregation is pinned by the marker date below instead. *)
+         _has_substring
+           "aria-label=\"price and volume sparkline, 40 bars; 30-period moving \
+            average; levels: entry $100.00, stop $90.00\"";
+         _has_substring "<polyline class=\"ma\"";
+         _has_substring "<text class=\"lvl-label lvl-label-entry\"";
+         _has_substring "<text class=\"lvl-label lvl-label-stop\"";
+         (* The last WEEKLY bar's date and close. The 40th weekly bar of a
+            series anchored at 2019-10-07 ends 39 weeks later. *)
+         _has_substring "<title>last close 137.00 (2020-07-06)</title>";
+       ])
+
+let test_band_and_volume_survive _ =
   let html = Html_report_renderer.render ~bars_for:_bars_for _full_snapshot in
   assert_that html
     (all_of [ _has_substring "class=\"band\""; _has_substring "class=\"vol\"" ])
 
-let test_all_three_arms_chart_independently _ =
-  (* One render, one bar source covering every symbol: exactly three charts,
-     one per arm. A missing arm shows up as a count of 2. *)
-  let bars_for ~symbol =
-    if String.equal symbol "GOOG" then _series 1398.0 else _bars_for ~symbol
-  in
-  let html = Html_report_renderer.render ~bars_for _full_snapshot in
-  assert_that (_count html ~needle:"<svg class=\"spark\"") (equal_to 3);
-  assert_that html
-    (all_of
-       [
-         _has_substring "data-chart=\"long:LONGA\"><svg";
-         _has_substring "data-chart=\"short:SHRTB\"><svg";
-         _has_substring "data-chart=\"held:GOOG\"><svg";
-       ])
-
 (* ------- Graceful degradation ------- *)
 
-let test_default_bar_source_degrades_every_chart_cell _ =
-  (* No bar source at all: the page is still complete — headers, rows, notes —
-     and every chart cell carries the marker instead of an svg. *)
+let test_default_bar_source_degrades_every_chart _ =
+  (* No bar source at all: the page is still complete — masthead, cards, notes —
+     and every chart strip carries the marker instead of an svg. *)
   let html = Html_report_renderer.render _full_snapshot in
   assert_that html
     (all_of
@@ -573,12 +753,13 @@ let test_default_bar_source_degrades_every_chart_cell _ =
             data</span>";
          _has_substring "data-chart=\"short:SHRTB\"><span class=\"nochart\">";
          _has_substring "data-chart=\"held:GOOG\"><span class=\"nochart\">";
-         _has_substring "<td class=\"num\">$100.00</td>";
+         _has_substring
+           "<span class=\"num-value num-value-entry\">$100.00</span>";
          _has_substring "<li>SNSE: dropped — sparse tail (6/15 bars)</li>";
          not_ ~msg:"no svg without bars" (_has_substring "<svg class=\"spark\"");
        ])
 
-let test_partial_bar_coverage_degrades_only_the_uncovered_row _ =
+let test_partial_bar_coverage_degrades_only_the_uncovered_card _ =
   (* [_bars_for] knows LONGA and SHRTB but not GOOG. *)
   let html = Html_report_renderer.render ~bars_for:_bars_for _full_snapshot in
   assert_that html
@@ -588,11 +769,19 @@ let test_partial_bar_coverage_degrades_only_the_uncovered_row _ =
          _has_substring "data-chart=\"held:GOOG\"><span class=\"nochart\">";
        ])
 
-let test_single_bar_symbol_degrades _ =
-  (* One bar is below [Svg_chart]'s two-bar floor — the row degrades rather
-     than emitting a degenerate chart. *)
+let test_single_weekly_bar_degrades _ =
+  (* Five DAILY bars inside one calendar week aggregate to ONE weekly bar, which
+     is below the chart's two-mark floor. The card degrades rather than emitting
+     a degenerate chart — and this also proves the renderer charts weekly bars,
+     because five daily bars would have been chartable. *)
   let bars_for ~symbol =
-    if String.equal symbol "LONGA" then [ _bar ~day:0 ~price:100.0 ] else []
+    if String.equal symbol "LONGA" then
+      List.init 5 ~f:(fun i ->
+          Types.Daily_price.make
+            ~date:(Date.add_days (_date "2020-08-03") i)
+            ~open_price:100.0 ~high_price:100.0 ~low_price:100.0
+            ~close_price:100.0 ~volume:10 ~adjusted_close:100.0 ())
+    else []
   in
   assert_that
     (Html_report_renderer.render ~bars_for _full_snapshot)
@@ -607,7 +796,13 @@ let test_snapshot_text_is_escaped _ =
       macro = { regime = "<b>Bull</b>"; score = 0.1 };
       sectors_strong = [ "X&Y" ];
       long_candidates =
-        [ { _long_candidate with rationale = "<script>alert(1)</script>" } ];
+        [
+          {
+            _long_candidate with
+            symbol = "\"><script>x</script>";
+            rationale = "<script>alert(1)</script>";
+          };
+        ];
       warnings = [ "AT&T: dropped" ];
     }
   in
@@ -616,9 +811,13 @@ let test_snapshot_text_is_escaped _ =
     (all_of
        [
          _has_substring "&lt;script&gt;alert(1)&lt;/script&gt;";
-         _has_substring "<strong>&lt;b&gt;Bull&lt;/b&gt;</strong>";
-         _has_substring "<li>X&amp;Y</li>";
+         _has_substring "&lt;b&gt;Bull&lt;/b&gt; 0.10";
+         _has_substring "<span class=\"chip chip-sector\">X&amp;Y</span>";
          _has_substring "<li>AT&amp;T: dropped</li>";
+         (* The symbol reaches an href AND a data attribute; neither may be
+            broken out of. *)
+         _has_substring
+           "href=\"https://www.tradingview.com/chart/?symbol=&quot;&gt;&lt;script&gt;x&lt;/script&gt;\"";
          not_ ~msg:"no raw script element from snapshot text"
            (_has_substring "<script>");
        ])
@@ -638,7 +837,7 @@ let test_no_bars_is_the_empty_source _ =
 (* ------------------------------------------------------------------ *)
 
 (* A through-entry LONG and an extended SHORT, so both rendering arms carry a
-   chip and neither arm's assertion can be satisfied by the other's row. *)
+   chip and neither arm's assertion can be satisfied by the other's card. *)
 let _reconciled_snapshot =
   {
     _full_snapshot with
@@ -665,144 +864,138 @@ let _reconciled_snapshot =
       ];
   }
 
-(* The class rides as a tag chip with a per-class CSS modifier, and the chip's
-   text is the SAME string the Markdown column shows — both come from
-   [Report_shared.close_vs_entry], so the two formats cannot drift.
+(* The class rides as a chip whose TEXT is the same string the Markdown column
+   shows — both come from [Report_shared.close_vs_entry], so the two formats
+   cannot drift.
 
-   The Risk % cell is asserted here too. The first version of this test had NO
-   Risk % assertion on a reconciled row, which is exactly why the HTML side of
-   the stale-risk defect survived eight mutations invisibly (review round 1):
-   (107.30 - 90.00) / 107.30 = 16.1% at the fill, where the entry-based figure
-   reads 10.0%. Same number the Markdown renderer pins, so the two formats are
-   held to one arithmetic. *)
-let test_through_entry_chip_rendered_on_the_long_arm _ =
+   Risk is asserted here too. The first version of this suite had NO risk
+   assertion on a reconciled row, which is why the HTML side of the stale-risk
+   defect survived eight mutations invisibly: (107.30 - 90.00) / 107.30 = 16.1%
+   at the fill, where the entry-based figure reads 10.0%. *)
+let test_through_entry_chip_on_the_long_arm _ =
   let html = Html_report_renderer.render _reconciled_snapshot in
   assert_that html
     (all_of
        [
          _has_substring
-           "<td class=\"num\"><span class=\"chip chip-through-entry\">$107.30 \
-            (+7.3% through)</span></td>";
-         _has_substring "<td class=\"num\">16.1%</td>";
-         not_
-           ~msg:"Risk % must not be quoted against the already-breached entry"
-           (_has_substring "<td class=\"num\">10.0%</td>");
+           "<span class=\"chip chip-through-entry\">$107.30 (+7.3% \
+            through)</span>";
+         _has_substring "<span class=\"num-value\">16.1%</span>";
+         not_ ~msg:"Risk must not be quoted against the already-breached entry"
+           (_has_substring "<span class=\"num-value\">10.0%</span>");
+         (* The observed close appears as its own figure only when a
+            reconciliation supplied one. *)
+         _has_substring "<i>Last</i><span class=\"num-value\">$107.30</span>";
          _has_substring
-           "<td class=\"instruction\">BUY MARKET 57 sh @ ~$107.30 (~$6116, \
-            6.1% of book, risk $986)";
+           "<div class=\"ticket\">BUY MARKET 57 sh @ ~$107.30 (~$6116, 6.1% of \
+            book, risk $986)";
          _has_substring "close vs entry:";
        ])
 
 (* The SHORT arm gets the mirrored treatment: an over-extended short carries the
-   EXTENDED chip and its ticket is suppressed. Mutating the short-side reconcile
-   wiring to a no-op leaves [Not_reconciled], which renders a plain "-" cell and
-   fails the first matcher.
+   EXTENDED chip, its card and its ticket strip are marked, and its ticket is
+   suppressed.
 
-   Risk % for an EXTENDED row stays quoted against the ENTRY, because there is
-   no order and therefore no fill to price: this short is entry $50.00 / stop
-   $55.00, so (50 - 55) / 50 = -10.0%. Re-anchoring every reconciled class to
-   the close indiscriminately would give (65.50 - 55) / 65.50 = 16.0% instead,
-   so this matcher separates "risk at the expected fill" from "risk at the
-   close". *)
+   Risk for an EXTENDED row stays quoted against the ENTRY, because there is no
+   order and therefore no fill to price: entry $50.00 / stop $55.00, so
+   (50 - 55) / 50 = -10.0%. Re-anchoring every reconciled class to the close
+   indiscriminately would give (65.50 - 55) / 65.50 = 16.0% instead. *)
 let test_extended_chip_and_suppression_on_the_short_arm _ =
   let html = Html_report_renderer.render _reconciled_snapshot in
   assert_that html
     (all_of
        [
          _has_substring
-           "<td class=\"num\"><span class=\"chip chip-extended\">$65.50 \
-            (+34.5% EXTENDED)</span></td>";
-         _has_substring "<td class=\"num\">-10.0%</td>";
+           "<span class=\"chip chip-extended\">$65.50 (+34.5% EXTENDED)</span>";
+         _has_substring "<span class=\"num-value\">-10.0%</span>";
+         _has_substring "<div class=\"cand cand-extended\">";
          _has_substring
-           "<td class=\"instruction\">NO ORDER — do not chase: +34.5% past the";
+           "<div class=\"ticket ticket-suppressed\">NO ORDER — do not chase: \
+            +34.5% past the";
        ])
 
-(* The chip classes are actually styled — a chip with no CSS rule would render
-   as undifferentiated text. *)
-let test_chip_styles_present_in_stylesheet _ =
-  let html = Html_report_renderer.render _reconciled_snapshot in
-  assert_that html
-    (all_of
-       [
-         _has_substring ".chip-through-entry";
-         _has_substring ".chip-extended";
-         _has_substring ".chip-valid-stop";
-       ])
-
-(* An unreconciled table (the disarmed default) renders a plain dash cell, no
-   chip and no legend. *)
-let test_unreconciled_rows_render_plain_cells _ =
+(* An unreconciled snapshot (the disarmed default) carries no chip, no Last
+   figure and no legend. *)
+let test_unreconciled_cards_are_plain _ =
   let html = Html_report_renderer.render _full_snapshot in
   assert_that html
     (all_of
        [
-         _has_substring "<td class=\"num\">-</td>";
-         not_ ~msg:"no chip when nothing was reconciled"
-           (_has_substring "class=\"chip");
+         not_ ~msg:"no reconciliation chip when nothing was reconciled"
+           (_has_substring "chip-through-entry\">");
+         not_ ~msg:"no Last figure without an observed close"
+           (_has_substring "<i>Last</i>");
          not_ ~msg:"no reconciliation legend when nothing was re-anchored"
            (_has_substring "close vs entry:");
+         not_ ~msg:"an ordinary card is not marked extended"
+           (_has_substring "cand-extended\">");
        ])
 
 let suite =
   "html_report_renderer"
   >::: [
-         "through_entry_chip_rendered_on_the_long_arm"
-         >:: test_through_entry_chip_rendered_on_the_long_arm;
-         "extended_chip_and_suppression_on_the_short_arm"
-         >:: test_extended_chip_and_suppression_on_the_short_arm;
-         "chip_styles_present_in_stylesheet"
-         >:: test_chip_styles_present_in_stylesheet;
-         "unreconciled_rows_render_plain_cells"
-         >:: test_unreconciled_rows_render_plain_cells;
+         "body_matches_golden" >:: test_body_matches_golden;
          "document_is_self_contained" >:: test_document_is_self_contained;
-         "header_and_macro" >:: test_header_and_macro;
-         "bearish_macro_rendered" >:: test_bearish_macro_rendered;
-         "section_order_matches_markdown_report"
-         >:: test_section_order_matches_markdown_report;
+         "new_marks_are_styled" >:: test_new_marks_are_styled;
+         "masthead" >:: test_masthead;
+         "bearish_regime_gets_its_own_variant"
+         >:: test_bearish_regime_gets_its_own_variant;
+         "unknown_regime_renders_a_plain_chip"
+         >:: test_unknown_regime_renders_a_plain_chip;
+         "counts_strip_counts_the_full_lists"
+         >:: test_counts_strip_counts_the_full_lists;
+         "section_order" >:: test_section_order;
          "every_empty_section_renders_the_none_marker"
          >:: test_every_empty_section_renders_the_none_marker;
-         "sectors_and_warnings_render_as_bullets"
-         >:: test_sectors_and_warnings_render_as_bullets;
-         "long_candidate_row_cells" >:: test_long_candidate_row_cells;
-         "short_candidate_row_is_rendered_in_its_own_table"
-         >:: test_short_candidate_row_is_rendered_in_its_own_table;
-         "structural_stop_has_no_asterisk"
-         >:: test_structural_stop_has_no_asterisk;
-         "fallback_stop_marked_and_explained"
-         >:: test_fallback_stop_marked_and_explained;
-         "clean_candidate_has_no_flag_marker"
-         >:: test_clean_candidate_has_no_flag_marker;
-         "data_suspect_marked_and_explained_on_the_short_arm"
-         >:: test_data_suspect_marked_and_explained_on_the_short_arm;
-         "missing_resistance_grade_renders_a_dash"
-         >:: test_missing_resistance_grade_renders_a_dash;
-         "zero_share_candidate_renders_a_dash_instruction"
-         >:: test_zero_share_candidate_renders_a_dash_instruction;
-         "zero_share_reason_rendered" >:: test_zero_share_reason_rendered;
-         "long_table_truncated_with_tie_honest_note"
-         >:: test_long_table_truncated_with_tie_honest_note;
-         "short_table_truncated_at_its_own_limit"
-         >:: test_short_table_truncated_at_its_own_limit;
+         "sectors_are_chips_and_warnings_are_bullets"
+         >:: test_sectors_are_chips_and_warnings_are_bullets;
+         "long_candidate_card" >:: test_long_candidate_card;
+         "ticket_is_the_shared_instruction"
+         >:: test_ticket_is_the_shared_instruction;
+         "short_candidate_card_is_its_own_arm"
+         >:: test_short_candidate_card_is_its_own_arm;
+         "unrecognised_rationale_clause_degrades_to_a_plain_chip"
+         >:: test_unrecognised_rationale_clause_degrades_to_a_plain_chip;
+         "structural_and_fallback_stops_are_chipped_and_explained"
+         >:: test_structural_and_fallback_stops_are_chipped_and_explained;
+         "data_suspect_is_chipped_and_explained"
+         >:: test_data_suspect_is_chipped_and_explained;
+         "resistance_grade_chip_variants"
+         >:: test_resistance_grade_chip_variants;
+         "zero_share_reason_is_the_ticket"
+         >:: test_zero_share_reason_is_the_ticket;
+         "long_section_truncated_with_tie_honest_note"
+         >:: test_long_section_truncated_with_tie_honest_note;
+         "short_section_truncated_at_its_own_limit"
+         >:: test_short_section_truncated_at_its_own_limit;
          "limit_overrides_are_honoured" >:: test_limit_overrides_are_honoured;
-         "untruncated_table_has_no_note" >:: test_untruncated_table_has_no_note;
-         "held_row_cells" >:: test_held_row_cells;
-         "held_row_without_recomputed_stop_renders_a_dash"
-         >:: test_held_row_without_recomputed_stop_renders_a_dash;
-         "long_candidate_chart_rendered" >:: test_long_candidate_chart_rendered;
-         "short_candidate_chart_rendered"
-         >:: test_short_candidate_chart_rendered;
-         "held_position_chart_rendered" >:: test_held_position_chart_rendered;
-         "chart_carries_band_and_volume" >:: test_chart_carries_band_and_volume;
+         "untruncated_section_has_no_note"
+         >:: test_untruncated_section_has_no_note;
+         "held_card" >:: test_held_card;
+         "held_stop_line_says_which_way_it_points"
+         >:: test_held_stop_line_says_which_way_it_points;
          "all_three_arms_chart_independently"
          >:: test_all_three_arms_chart_independently;
-         "default_bar_source_degrades_every_chart_cell"
-         >:: test_default_bar_source_degrades_every_chart_cell;
-         "partial_bar_coverage_degrades_only_the_uncovered_row"
-         >:: test_partial_bar_coverage_degrades_only_the_uncovered_row;
-         "single_bar_symbol_degrades" >:: test_single_bar_symbol_degrades;
+         "candidate_charts_carry_their_own_levels"
+         >:: test_candidate_charts_carry_their_own_levels;
+         "held_chart_uses_the_fill_and_the_current_stop"
+         >:: test_held_chart_uses_the_fill_and_the_current_stop;
+         "charts_are_weekly_with_the_30_week_average"
+         >:: test_charts_are_weekly_with_the_30_week_average;
+         "band_and_volume_survive" >:: test_band_and_volume_survive;
+         "default_bar_source_degrades_every_chart"
+         >:: test_default_bar_source_degrades_every_chart;
+         "partial_bar_coverage_degrades_only_the_uncovered_card"
+         >:: test_partial_bar_coverage_degrades_only_the_uncovered_card;
+         "single_weekly_bar_degrades" >:: test_single_weekly_bar_degrades;
          "snapshot_text_is_escaped" >:: test_snapshot_text_is_escaped;
          "render_is_deterministic" >:: test_render_is_deterministic;
          "no_bars_is_the_empty_source" >:: test_no_bars_is_the_empty_source;
+         "through_entry_chip_on_the_long_arm"
+         >:: test_through_entry_chip_on_the_long_arm;
+         "extended_chip_and_suppression_on_the_short_arm"
+         >:: test_extended_chip_and_suppression_on_the_short_arm;
+         "unreconciled_cards_are_plain" >:: test_unreconciled_cards_are_plain;
        ]
 
 let () = run_test_tt_main suite
