@@ -1,9 +1,49 @@
 # Status: weekly-snapshot
 
-## Last updated: 2026-07-26
+## Last updated: 2026-07-27
 
 ## Status
 IN_PROGRESS
+
+**2026-07-27 (Picks Phase C — HTML report + SVG charts, branch
+`feat/picks-phase-c`, PR #2105):** The presentation half of Phase C
+(`dev/plans/weekly-picks-execution-protocol-2026-07-24.md` §Phase C bullets 1-2;
+plan `dev/plans/picks-phase-c-2026-07-27.md`). Four new modules under
+`trading/trading/weinstein/snapshot/lib/`:
+
+- `Html_report_renderer` — pure `Weekly_snapshot.t -> string`, a self-contained
+  HTML page (inline CSS, inline SVG, no external asset, no JS). Renders
+  ALONGSIDE the Markdown renderer, same section order; neither replaces the
+  other.
+- `Svg_chart` — pure price/volume sparkline: shaded entry-to-stop band, volume
+  strip, close polyline, dashed entry + stop level lines. Returns `None` below
+  two bars.
+- `Html_page` — escaping, the inline stylesheet, the document shell.
+- `Report_shared` — the legend prose, the tie-honesty truncation note,
+  `risk_pct` and the executable `instruction` sentence, shared by both
+  renderers so the two formats cannot drift. Markdown output is byte-identical
+  to before.
+
+**Chart-data design decision.** `Weekly_snapshot.t` carries no bar series, by
+design (`weekly_snapshot.mli` §Design: the on-disk schema stays decoupled from
+analysis types). Rather than bloat the frozen record and bump
+`current_schema_version`, `render` takes an explicit
+`?bars_for:(symbol:string -> Types.Daily_price.t list)` lookup. The schema is
+untouched, `render` stays pure, and a symbol with fewer than two bars degrades
+to a `no chart data` marker — a snapshot rendered with no bar source at all
+still produces a complete, readable page.
+
+Every candidate row (long AND short) and every held-position row carries a
+chart cell tagged `data-chart="<arm>:<symbol>"`, so the three rendering arms
+are separately assertable; the test fixtures give each arm distinct symbols,
+prices and bar series, and mutating either secondary arm's chart call to
+`no_bars` turns a dedicated test red. `render_weekly_report` gains `-html` and
+`-data-dir PATH` (bars from the CSV price store, read on demand); Markdown
+remains the default so the existing invocation is unchanged.
+
+Carried across from the Markdown contract: the structural-vs-fallback stop tag,
+the `data_suspect` "(!)" marker, the drop-reasons Warnings section, and the
+tie-honesty note on truncated tables.
 
 **2026-07-26 (live rename tracking, issue #2083 Finding 2, branch
 `feat/universe-rename-tracking`):** The last of the three 07-17 findings, and
@@ -512,6 +552,18 @@ remaining queue:
    refactors of existing working modules). The only change made to
    `snapshot_warehouse` was giving `twin_detector` a `public_name` so a public
    library may depend on it — packaging only, no code change.
+4c. **[Phase C, remaining]** the two Phase C bullets NOT in PR #2105, each its
+   own PR because each is a behavioural change rather than presentation:
+   a. `record_fill` CLI that edits `dev/weekly-picks/portfolio.sexp` so the user
+      does not hand-edit sexp (plan §Phase C bullet 3).
+   b. Full trailing-stop state machine threaded across weeks (persist
+      `stop_state` per held position) rather than the recomputed-floor
+      side-by-side Phase A uses (plan §Phase C bullet 4). This is the one that
+      changes what the report *says*, not how it looks.
+   Also deferred from #2105: writing the HTML report to disk alongside the
+   `.md` in the weekly pipeline (today `-html` prints to stdout, so the caller
+   redirects), and a `sectors_weak` section (Markdown has none either — parity
+   was kept deliberately).
 5. **[#2083 F3 follow-up]** decide an arming threshold for
    `spike_bar_threshold_pct` and arm it in
    `dev/weekly-picks/live-config-overrides.sexp` (the flag ships default-off;

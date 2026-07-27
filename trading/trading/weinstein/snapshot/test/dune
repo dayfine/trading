@@ -4,7 +4,9 @@
   test_forward_trace
   test_split_replay
   test_pick_diff
-  test_report_renderer)
+  test_report_renderer
+  test_svg_chart
+  test_html_report_renderer)
  (libraries
   weinstein_trading.snapshot
   status
