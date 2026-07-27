@@ -7,7 +7,9 @@
   test_live_portfolio
   test_trade_sizing
   test_sparse_tail_gate
-  test_spike_bar_gate)
+  test_spike_bar_gate
+  test_rename_detector
+  test_rename_gate)
  (libraries
   core
   core_unix

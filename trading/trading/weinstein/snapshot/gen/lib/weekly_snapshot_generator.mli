@@ -38,6 +38,22 @@
     - An empty / too-short primary index degrades the macro gate to
       {!Weinstein_types.Neutral} (both long and short candidates remain
       eligible), matching {!Weinstein_strategy.make}'s no-index behaviour.
+    - {b Live rename detection} (issue #2083 fix 2, data hygiene, not a
+      Weinstein rule): a symbol whose price series has been {e superseded} — it
+      goes sparse at the right-hand edge while a younger symbol in the same run
+      takes over with matching daily returns — is dropped from candidate
+      consideration, and a line naming the successor ticker is added to
+      {!Weekly_snapshot.t.warnings}. This attacks the root cause of the
+      2026-07-17 SNSE/FTH incident (nothing in the pipeline knew the rename had
+      happened) rather than its symptoms. It runs {b before} the sparse-tail
+      gate below, on the full ticker list, because the zombie tail that
+      identifies a superseded ticker is exactly what that gate removes. Default
+      ([rename_detect_min_overlap_days = 0]) disables detection, and the
+      disabled branch short-circuits before any series is loaded: bit-identical
+      to pre-#2083-fix2 behaviour, at no extra cost. Detection only sees symbols
+      present in this run, so a successor absent from the universe and bar store
+      cannot be found — see {!Rename_detector} §"Known coverage limit". See
+      {!Rename_detector}.
     - {b Sparse-tail eligibility gate} (issue #2083 fix 1, data hygiene, not a
       Weinstein rule): a symbol whose {i current} bars are sparse — fewer than
       [config.sparse_tail_min_bars] present among the trailing
