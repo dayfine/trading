@@ -9,8 +9,15 @@
 #       Buckets: 1-5 / 6-10 / >10. Plus top-5 highest-CC functions today.
 #
 # Dependency on Check 5: reads FOLLOWUP_PER_FILE data from the sidecar file
-# at <findings_file>.followup (orchestrated mode) or <report_file>.followup
-# (standalone mode). Check 5 must run before Check 8.
+# at "$(dirname <findings_file_or_report_file>)/followup_per_file.sidecar" —
+# i.e. the fixed-name sidecar in the SAME DIRECTORY Check 5 wrote to. Do
+# not key this off the findings-file's own basename (e.g.
+# "<findings_file>.followup"): main.sh gives Check 5 and Check 8 distinct
+# per-check-number findings files (05.findings vs 08.findings) that share
+# one directory, so a basename-keyed path here computes a DIFFERENT file
+# than the one Check 5 wrote — this was H-FOLLOWUP-COUNT defect 3 (Warnings
+# and Trends disagreeing because this reader silently found nothing).
+# Check 5 must run before Check 8.
 #
 # Degrades gracefully when no baseline exists ("no baseline").
 # CC JSON generation requires the cc_linter binary to be built; if not
@@ -29,8 +36,11 @@ FINDINGS_FILE="${2:-}"
 
 TRENDS_CONTENT=""
 
-# Read FOLLOWUP_PER_FILE from the sidecar written by Check 5.
-FOLLOWUP_SIDECAR="${FINDINGS_FILE:-"$REPORT_FILE"}.followup"
+# Read FOLLOWUP_PER_FILE from the sidecar written by Check 5. Keyed off the
+# shared findings directory + a fixed filename — see the header comment for
+# why this must NOT be derived from this check's own findings-file basename.
+FOLLOWUP_SIDECAR_DIR="$(dirname "${FINDINGS_FILE:-$REPORT_FILE}")"
+FOLLOWUP_SIDECAR="${FOLLOWUP_SIDECAR_DIR}/followup_per_file.sidecar"
 FOLLOWUP_PER_FILE=""
 if [ -f "$FOLLOWUP_SIDECAR" ]; then
   FOLLOWUP_PER_FILE="$(cat "$FOLLOWUP_SIDECAR")"
