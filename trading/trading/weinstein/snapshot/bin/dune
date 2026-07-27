@@ -4,6 +4,7 @@
   core
   core_unix.command_unix
   csv
+  fpath
   status
   types
   weinstein_trading.snapshot)

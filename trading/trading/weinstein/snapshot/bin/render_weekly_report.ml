@@ -1,17 +1,42 @@
-(** [render_weekly_report] CLI — render a weekly snapshot as Markdown.
+(** [render_weekly_report] CLI — render a weekly snapshot as Markdown or HTML.
 
-    Usage: [render_weekly_report <pick-file> [-long-limit N] [-short-limit N]]
+    Usage:
+    [render_weekly_report <pick-file> [-html] [-data-dir PATH] [-long-limit N]
+     [-short-limit N]]
 
-    Reads a single weekly snapshot from disk, renders it via
-    {!Report_renderer.render}, and prints the Markdown to stdout. The optional
-    [-long-limit] / [-short-limit] flags cap the candidate tables (default
-    {!Report_renderer.default_long_display_limit} /
+    Reads a single weekly snapshot from disk, renders it, and prints the result
+    to stdout.
+
+    Markdown ({!Report_renderer.render}) is the default, so the pre-existing
+    invocation is unchanged. [-html] switches to the self-contained HTML page
+    ({!Html_report_renderer.render}) — inline CSS, inline SVG charts, no
+    external assets.
+
+    [-data-dir PATH] points at the CSV price store so the HTML charts have bars
+    to draw; each shown symbol is read on demand via
+    {!Csv_storage.create}/{!Csv_storage.get}. Without it (or for a symbol with
+    no resident CSV) the charts degrade to a "no chart data" marker and the rest
+    of the page renders normally. The flag has no effect on Markdown output,
+    which has no charts.
+
+    The optional [-long-limit] / [-short-limit] flags cap the candidate tables
+    (default {!Report_renderer.default_long_display_limit} /
     {!Report_renderer.default_short_display_limit}) — e.g. [-long-limit 5] to
     surface a book-sized list. Exits non-zero on read or schema-version errors,
     or [2] on a usage error. *)
 
 open Core
 open Weinstein_snapshot
+
+type _flags = {
+  html : bool;
+  data_dir : string option;
+  long_limit : int option;
+  short_limit : int option;
+}
+
+let _no_flags =
+  { html = false; data_dir = None; long_limit = None; short_limit = None }
 
 let _read_snapshot path : Weekly_snapshot.t =
   match Snapshot_reader.read_from_file path with
@@ -20,31 +45,54 @@ let _read_snapshot path : Weekly_snapshot.t =
       eprintf "Failed to read snapshot %s: %s\n" path (Status.show err);
       exit 1
 
-let _run pick_path ~long_limit ~short_limit =
-  let snap = _read_snapshot pick_path in
-  print_string (Report_renderer.render ?long_limit ?short_limit snap)
+(* Bars for one symbol out of the CSV price store. Every failure mode — no
+   store for this symbol, unreadable CSV — degrades to the empty list, which
+   the renderer turns into a chart-less cell. A missing chart must never take
+   the whole report down. *)
+let _bars_from_store ~data_dir ~symbol =
+  let open Result in
+  ( Csv.Csv_storage.create ~data_dir:(Fpath.v data_dir) symbol >>= fun store ->
+    Csv.Csv_storage.get store () )
+  |> function
+  | Ok bars -> bars
+  | Error _ -> []
+
+let _bar_source = function
+  | None -> Html_report_renderer.no_bars
+  | Some data_dir -> fun ~symbol -> _bars_from_store ~data_dir ~symbol
+
+let _render (flags : _flags) snap =
+  if flags.html then
+    Html_report_renderer.render ?long_limit:flags.long_limit
+      ?short_limit:flags.short_limit
+      ~bars_for:(_bar_source flags.data_dir)
+      snap
+  else
+    Report_renderer.render ?long_limit:flags.long_limit
+      ?short_limit:flags.short_limit snap
 
 let _usage () =
   eprintf
-    "Usage: render_weekly_report <pick-file> [-long-limit N] [-short-limit N]\n";
+    "Usage: render_weekly_report <pick-file> [-html] [-data-dir PATH] \
+     [-long-limit N] [-short-limit N]\n";
   exit 2
 
-(* Parse [-long-limit N] / [-short-limit N] from the args after the positional
-   pick-file. Any unrecognised flag or missing value is a usage error. *)
-let rec _parse_flags args ~long_limit ~short_limit =
+(* Parse the flags following the positional pick-file. Any unrecognised flag or
+   missing value is a usage error. *)
+let rec _parse_flags args (acc : _flags) =
   match args with
-  | [] -> (long_limit, short_limit)
+  | [] -> acc
+  | "-html" :: rest -> _parse_flags rest { acc with html = true }
+  | "-data-dir" :: d :: rest -> _parse_flags rest { acc with data_dir = Some d }
   | "-long-limit" :: n :: rest ->
-      _parse_flags rest ~long_limit:(Some (Int.of_string n)) ~short_limit
+      _parse_flags rest { acc with long_limit = Some (Int.of_string n) }
   | "-short-limit" :: n :: rest ->
-      _parse_flags rest ~long_limit ~short_limit:(Some (Int.of_string n))
+      _parse_flags rest { acc with short_limit = Some (Int.of_string n) }
   | _ -> _usage ()
 
 let () =
   match Sys.get_argv () |> Array.to_list with
   | _ :: pick_path :: flags ->
-      let long_limit, short_limit =
-        _parse_flags flags ~long_limit:None ~short_limit:None
-      in
-      _run pick_path ~long_limit ~short_limit
+      let flags = _parse_flags flags _no_flags in
+      print_string (_render flags (_read_snapshot pick_path))
   | _ -> _usage ()
