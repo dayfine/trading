@@ -181,20 +181,46 @@ let _sector_list sectors =
       Chip.group ~cls:"sectors"
         (List.map sectors ~f:(Chip.make ~modifier:"sector"))
 
+(* Extended candidates carry no ticket (do-not-chase), so they render in their
+   own watch section instead of consuming actionable display slots. The section
+   is omitted when nothing is extended. Chart cells keep their side's arm tag —
+   an extended name is still a long (or short) candidate. *)
+let _watch_body ~bars_for extended =
+  _candidate_list ~arm:"long" ~bars_for extended ~limit:(List.length extended)
+
+let _watch_section ~bars_for extended =
+  match extended with
+  | [] -> None
+  | _ ->
+      let body = _watch_body ~bars_for extended in
+      Some (_section ~title:Report_shared.watch_section_title body)
+
 let _body (t : Weekly_snapshot.t) ~title ~long_limit ~short_limit ~bars_for =
-  String.concat ~sep:"\n"
+  let long_actionable, long_extended =
+    Report_shared.partition_extended t.long_candidates
+  in
+  let short_actionable, short_extended =
+    Report_shared.partition_extended t.short_candidates
+  in
+  List.filter_opt
     [
-      Report_masthead.header t ~title;
-      Report_masthead.counts_strip t;
-      _section ~title:"Strong sectors" (_sector_list t.sectors_strong);
-      _candidate_section ~arm:"long" ~label:"Long candidates" ~bars_for
-        t.long_candidates ~limit:long_limit;
-      _candidate_section ~arm:"short" ~label:"Short candidates" ~bars_for
-        t.short_candidates ~limit:short_limit;
-      _section ~title:"Held positions" (_held_list ~bars_for t.held_positions);
-      _section ~title:"Warnings" (_bullet_list t.warnings);
-      Report_masthead.closing_notes;
+      Some (Report_masthead.header t ~title);
+      Some (Report_masthead.counts_strip t);
+      Some (_section ~title:"Strong sectors" (_sector_list t.sectors_strong));
+      Some
+        (_candidate_section ~arm:"long" ~label:"Long candidates" ~bars_for
+           long_actionable ~limit:long_limit);
+      Some
+        (_candidate_section ~arm:"short" ~label:"Short candidates" ~bars_for
+           short_actionable ~limit:short_limit);
+      _watch_section ~bars_for (long_extended @ short_extended);
+      Some
+        (_section ~title:"Held positions"
+           (_held_list ~bars_for t.held_positions));
+      Some (_section ~title:"Warnings" (_bullet_list t.warnings));
+      Some Report_masthead.closing_notes;
     ]
+  |> String.concat ~sep:"\n"
 
 let render ?(long_limit = Report_renderer.default_long_display_limit)
     ?(short_limit = Report_renderer.default_short_display_limit)
