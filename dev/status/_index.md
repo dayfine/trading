@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-27 run6 (orchestrator run 30300054307 — main green throughout; 3 PRs merged: #2136 `1a91ee94` and #2135 `ed816d4f`, both **orphaned by the killed run 30287137763** and adopted here, plus #2138 `f3a80c46`. #2140 opened, QC not yet run. Numbered run6 because the killed run had already self-numbered run5 — see that run's §Escalations.)
+Last updated: 2026-07-27 run7 (orchestrator run 30311344891 — main green on `70cd1c8d` throughout, verified via CI on the exact HEAD. #2140 QC'd: structural APPROVED, behavioral NEEDS_REWORK, rework 1/2 in flight. #2139 arrived CI-red claiming a green suite — 8 nesting violations — refactored clean in `36e403bf`. `gh` found to be absent from this container, which is why QC reviews stopped self-posting; see run7 §Escalations.)
 
 ## Active + complete tracks
 
@@ -43,7 +43,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2140 | H-QC-SCALE + H-AUDIT-GH-FALLBACK MERGED `ed816d4f` (#2135); #2140 open (H-FOLLOWUP-COUNT, no QC yet); next: QC #2140, then H-PREV-VERDICT-PIPEFAIL + H-AUDIT-ATOMIC-WRITE together |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2140 | #2140 QC'd run7: structural APPROVED q4, behavioral NEEDS_REWORK q2 (Step 2b `>threshold` branch untested); rework 1/2 + H-RUNENV-WORKTREE-BLIND fix in flight |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | Phase 1 stable (PR-D'c #1332 merged); Phase 2 deferred; no outstanding work |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2138 MERGED `f3a80c46` — schema_drift pinned by deriving field names from `sexp_of_t`; 7 open; next: test_pin on `test_bayesian_opt_cholesky.ml` |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
@@ -57,7 +57,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
-| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | #2139 | #2136 MERGED `1a91ee94` — F1-F3 closed, CLI now executed by a test; #2139 open (maintainer, picks-validator v1); next: 4c.c write-back |
+| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | #2139 | #2139 arrived CI-red (8 nesting violations) despite claiming green; refactored clean in `36e403bf`, zero @nesting-ok markers; QC in flight; next: 4c.c write-back |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
 | [tax-lens](tax-lens.md) | MERGED | feat-backtest | — | Phase 1 #2066 + CP4 loader error-path contract #2073 MERGED; Phase 2 wash-sale / April outflows deferred, user-gated (#2006) |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | asset-type blocklist MERGED (#1939, default-off); next: arm ATB.curated for live universe build + General::Type enrichment feed |
