@@ -29,6 +29,29 @@ type position = {
   entry_price : float;  (** Fill price the position was opened at. *)
   entry_date : Date.t;  (** Date the position was opened. *)
   stop_price : float;  (** Current stop price the trader has working. *)
+  stop_state : Stop_track.t option; [@sexp.default None]
+      (** The trailing-stop state machine's carried state for this holding
+          (weekly-snapshot item 4c.b), or [None] for a holding that has not been
+          threaded yet.
+
+          {b Optional by design.} Every [portfolio.sexp] written before 4c.b
+          lacks the field, and the [@sexp.default None] makes those files load
+          unchanged. A holding without it renders from the stateless recomputed
+          floor ({!Stop_recompute.for_held_long}) exactly as it did before 4c.b,
+          so an un-threaded book is not a degraded one.
+
+          {b Nothing writes this field yet.} {!Stop_thread.seed} exists to
+          derive a starting track from bars, but it has no production caller,
+          and the generator never saves [portfolio.sexp] back — persisting the
+          advanced track is weekly-snapshot item 4c.c. Until that lands the only
+          way a [stop_state] reaches this file is a hand edit, and
+          {!Portfolio_edit.adjust} maintains one that is already there rather
+          than creating it.
+
+          Distinct from [stop_price], which stays the trader's actual working
+          broker order and stays authoritative for the report's "Stop" column.
+          This is the machine's view of the same position; the two are kept in
+          step by {!Portfolio_edit.adjust}. *)
 }
 [@@deriving sexp, eq, show]
 (** One live holding. *)
