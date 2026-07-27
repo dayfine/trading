@@ -72,6 +72,33 @@ let test_applies_sparse_tail_gate_overlay _ =
            (equal_to 15);
        ])
 
+(* Arming path for live rename detection (issue #2083 fix 2). Same requirement
+   as the sparse-tail gate above: R2 (experiment-flag-discipline) says the knobs
+   must be real config fields that resolve through the genuine loader /
+   validator, which is also what makes them expressible as a [Variant_matrix]
+   axis. A typo'd field name would raise here rather than silently no-op. *)
+let test_applies_rename_detect_overlay _ =
+  let path =
+    _write_tmp_overrides
+      "((rename_detect_min_overlap_days 5) (rename_detect_match_fraction 0.95))\n"
+  in
+  let config =
+    Config_overrides_loader.load_and_apply ~overrides_path:path
+      (_base_config ())
+  in
+  assert_that config
+    (all_of
+       [
+         field
+           (fun (c : Weinstein_strategy.config) ->
+             c.rename_detect_min_overlap_days)
+           (equal_to 5);
+         field
+           (fun (c : Weinstein_strategy.config) ->
+             c.rename_detect_match_fraction)
+           (float_equal 0.95);
+       ])
+
 let test_empty_file_is_identity _ =
   let path = _write_tmp_overrides "" in
   let base = _base_config () in
@@ -106,6 +133,7 @@ let suite =
          "applies overlays from file" >:: test_applies_overlays_from_file;
          "applies sparse-tail-gate overlay"
          >:: test_applies_sparse_tail_gate_overlay;
+         "applies rename-detect overlay" >:: test_applies_rename_detect_overlay;
          "empty file is identity" >:: test_empty_file_is_identity;
          "unknown key raises" >:: test_unknown_key_raises;
          "missing file raises" >:: test_missing_file_raises;

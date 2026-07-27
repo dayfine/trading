@@ -1091,6 +1091,59 @@ type config = {
           checked against. Default [0] = gate disabled (no-op, matches
           [sparse_tail_min_bars]'s default). See [sparse_tail_min_bars] for the
           full rationale. *)
+  spike_bar_threshold_pct : float; [@sexp.default 0.0]
+      (** Spike-bar "data-suspect" report-hygiene flag (issue #2083 fix 3) —
+          minimum absolute single-bar move, in percentage points vs the prior
+          bar's close, that marks a candidate's last bar as anomalous.
+          Engineering data-hygiene flag, {b not} a Weinstein book rule (no book
+          section is cited): it neither admits nor rejects a candidate and moves
+          no entry / stop / size. A flagged candidate STAYS in the ranked list
+          with [Weekly_snapshot.candidate.data_suspect = true] plus a warning
+          line, so the weekly report can mark the row — the 2026-07-17 SNSE/FTH
+          incident, whose rank-1 pick's breakout was a single [+58%] zombie-feed
+          print. Default [0.0] = flag disabled (no-op, R1): every candidate
+          carries [data_suspect = false] and no spike warning is emitted,
+          bit-identical to pre-#2083-fix3 behaviour. Consumed only by
+          [Weekly_snapshot_generator.generate] via [Spike_bar_gate.check] — the
+          backtest/live strategy path ([on_market_close]) never reads this
+          field, so arming it cannot move a backtest number. R2: real config
+          field → resolves through [Backtest.Overlay_validator.apply_overrides],
+          armable via [dev/weekly-picks/live-config-overrides.sexp]. *)
+  rename_detect_min_overlap_days : int; [@sexp.default 0]
+      (** Live ticker-rename detection (issue #2083 fix 2) — minimum number of
+          dates a stale ticker and a candidate successor must share before their
+          daily returns are compared. Engineering data-hygiene mechanism,
+          {b not} a Weinstein book rule (no book section is cited; none supports
+          it): it neither admits nor rejects a candidate on any strategy
+          criterion and moves no entry / stop / size.
+
+          Closes the root cause of the 2026-07-17 incident, where the report's
+          rank-1 pick "SNSE" did not exist at the broker — Sensei
+          Biotherapeutics had renamed to Faeth Therapeutics (SNSE -> FTH) on
+          2026-06-16 and nothing in the pipeline knew. When armed,
+          [Weekly_snapshot_generator.generate] looks for a {e succession} — a
+          ticker that goes sparse at the right-hand edge while a younger ticker
+          takes over with matching returns — drops the dead predecessor from
+          candidate consideration and emits a warning naming the successor. See
+          [Rename_detector].
+
+          Default [0] = detection disabled (no-op, R1): the generator does not
+          even load the series, so an unarmed run is bit-identical to
+          pre-#2083-fix2 behaviour. Paired with [rename_detect_match_fraction];
+          both must be [> 0] to activate. Consumed only by
+          [Weekly_snapshot_generator.generate] — the backtest/live strategy path
+          ([on_market_close]) never reads this field, so arming it cannot move a
+          backtest number. R2: real config field → resolves through
+          [Backtest.Overlay_validator.apply_overrides], armable via
+          [dev/weekly-picks/live-config-overrides.sexp]. *)
+  rename_detect_match_fraction : float; [@sexp.default 0.0]
+      (** Fraction of the shared-date return pairs that must agree (within
+          [Rename_detector.Config.default.ret_epsilon]) for a succession to be
+          reported. [Twin_detector]'s top-3000 calibration puts real rename
+          twins at 0.95-0.99 and different-company controls below 0.06, so
+          [0.95] is the natural armed value. Default [0.0] = detection disabled
+          (no-op, matches [rename_detect_min_overlap_days]'s default). See
+          [rename_detect_min_overlap_days] for the full rationale. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

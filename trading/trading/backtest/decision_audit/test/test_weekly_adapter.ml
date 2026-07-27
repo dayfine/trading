@@ -34,6 +34,7 @@ let _candidate ?(entry = 100.0) ?(stop = 92.0) ?(rationale = "Stage2 breakout")
     sized_risk_amount = 0.0;
     sizing_note = None;
     stop_is_structural = false;
+    data_suspect = false;
   }
 
 (** A minimal snapshot: only the fields the adapter reads carry test data; the

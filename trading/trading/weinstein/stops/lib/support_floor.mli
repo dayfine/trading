@@ -1,13 +1,14 @@
 (** Support/resistance primitive: derives the prior correction extreme from a
     daily bar history.
 
-    Weinstein, Ch. 6 §5.1 ("Initial Stop Placement"):
+    Weinstein, Ch. 6 §5.1 ("Initial Stop Placement") for the long rule, and Ch.
+    7 §6.3 ("Short Stop (Buy-Stop) Rules") for the short rule:
 
     {v
       Long:  Place BELOW the significant support floor (prior correction low)
-             BEFORE the breakout.
+             BEFORE the breakout. (§5.1)
       Short: Place ABOVE the significant resistance ceiling (prior
-             counter-rally high) BEFORE the breakdown.
+             counter-rally high) BEFORE the breakdown. (§6.3)
     v}
 
     Callers pipe the output into {!Weinstein_stops.compute_initial_stop}'s

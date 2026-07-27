@@ -21,6 +21,7 @@ type candidate = {
   sized_risk_amount : float; [@sexp.default 0.0]
   sizing_note : string option; [@sexp.default None]
   stop_is_structural : bool; [@sexp.default false]
+  data_suspect : bool; [@sexp.default false]
 }
 [@@deriving sexp, eq, show]
 

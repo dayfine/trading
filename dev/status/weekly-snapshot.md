@@ -5,6 +5,197 @@
 ## Status
 IN_PROGRESS
 
+**2026-07-26 (live rename tracking, issue #2083 Finding 2, branch
+`feat/universe-rename-tracking`):** The last of the three 07-17 findings, and
+the only one that attacks the ROOT cause rather than a symptom. F1
+(`Sparse_tail_gate`, #2090) refuses a candidate whose recent tail is too sparse;
+F3 (`Spike_bar_gate`, #2097) annotates one whose signal rests on a single bar.
+Neither knows *why* the feed went bad. F2 detects the rename itself: Sensei
+Biotherapeutics -> Faeth Therapeutics, SNSE -> FTH, 2026-06-16.
+
+Issue #2083 proposes two mechanisms for F2 — the EODHD symbol-change feed, or
+"the existing returns-basis twin matcher run live". **`EODHD_API_KEY` is not
+available in the GHA container, so the vendor-feed half could not be built or
+exercised even once and is explicitly OUT OF SCOPE here** (see §Follow-up). This
+PR builds the second, which needs no vendor feed and is fully testable offline.
+
+New pure module `Weinstein_snapshot_gen.Rename_detector`
+(`trading/trading/weinstein/snapshot/gen/lib/rename_detector.{ml,mli}`): given
+`symbol -> daily adjusted-close series` plus an `as_of`, it returns candidate
+`(old_symbol, new_symbol)` pairs with the evidence that justified each —
+changeover date, overlap length, returns-similarity score, per-side tail-bar
+counts. Pure: no filesystem, no `Bar_reader`; the caller owns loading, exactly
+as `Twin_detector` does. Its trading-day calendar is derived from the union of
+the input's own dates.
+
+**Reuse, not reimplementation.** The returns-similarity score comes from calling
+`Twin_detector.detect` on the two-series pair with `basis = Returns` and
+`min_overlap_days = 2` (which makes its anchor stride 1, so its prefilter is
+exhaustive over a two-series input and cannot drop a genuine match); the
+resulting `pair_match` supplies `overlap_days` / `match_fraction`. Not one line
+of similarity arithmetic is duplicated. `Config.default` inherits
+`Twin_detector`'s own calibrated `match_fraction = 0.95` / `ret_epsilon = 1e-3`
+(its top-3000 audit: real rename twins score 0.95-0.99 on the returns basis,
+different-company controls below 0.06).
+
+**What is new over `Twin_detector` is SUCCESSION, not concurrency.**
+`Twin_detector` answers "which series here are near-duplicates of each other,
+concurrently?" and reports a dual listing the same way it reports a rename. A
+rename additionally requires a handover: the predecessor goes sparse at the
+right-hand edge (tail density <= `max_predecessor_tail_density`) while a younger
+leg becomes dense (>= `min_successor_tail_density`), with matching returns over
+whatever they share. Two fully-overlapping dense series are NOT reported.
+
+New adapter `Weinstein_snapshot_gen.Rename_gate` (`series_for` / `partition`)
+reads the series out of a `Bar_reader` and returns the same
+`(eligible, warnings)` pair `Sparse_tail_gate.partition` does, so the two #2083
+eligibility stages compose uniformly. Wired into
+`Weekly_snapshot_generator.generate` **before** the sparse-tail gate, on the
+full ticker list — the zombie tail that identifies a superseded ticker is
+exactly what that gate removes, so running second would erase the evidence
+(pinned by a test that arms both). A detected predecessor is dropped from
+candidate consideration and a warning line naming the successor is appended to
+`Weekly_snapshot.t.warnings`, so the pick disappears with an explanation and an
+actionable alternative ticker rather than silently.
+
+Default-off per `experiment-flag-discipline.md` R1/R2: two additive fields on
+`Weinstein_strategy_config.config`, `rename_detect_min_overlap_days : int
+[@sexp.default 0]` and `rename_detect_match_fraction : float [@sexp.default
+0.0]` (the `sparse_tail_min_bars` / `sparse_tail_window_trading_days` pair is
+the precedent). Either at its default disables detection, and
+`Rename_gate.partition` returns before any series is read — an unarmed run is
+bit-identical AND pays no extra load cost. Real config fields, so they resolve
+through `Config_overrides_loader -> Overlay_validator.apply_overrides` and are
+expressible as a `Variant_matrix` axis (R2; pinned by an overrides-loader test).
+**Default NOT flipped and NOT armed in
+`dev/weekly-picks/live-config-overrides.sexp`** — that needs a ledger ACCEPT
+(R3) plus a false-positive dry run.
+
+Engineering data-hygiene mechanism, **not** a Weinstein book rule: no
+`weinstein-book-reference.md` section is cited because none supports it, and the
+spine is untouched — no change to stage classification, the Stage-2-only buy
+rule, volume confirmation, macro/sector gating, entry, stop or sizing.
+
+Code health: the wiring first pushed `weekly_snapshot_generator.ml` to 303 lines
+(limit 300) and tripped the nesting linter on three functions. Both fixed by
+**extraction**, not a limit bump / `@large-module` marker / exception entry
+(`code-health-discipline.md`): the adapter moved into its own `Rename_gate`
+module (generator back to 276 lines) and three helper bodies were named
+(`_rename_record`, `_warning_line`, `_report_for`).
+
+Tests: `test_rename_detector.ml` (22 unit tests) + `test_rename_gate.ml` (7
+adapter/seam tests) + 5 `generate`-seam tests + 1 overrides-loader test. Covers
+the true positive (SNSE-shaped succession, right direction, right evidence), the
+level-lookalike true negative (two companies within ~2% on price whose returns
+differ — pins that the Returns basis does the work), the near-miss negative (a
+*concurrent* twin that clears every other criterion and is rejected only by the
+handover), the sparse-successor negative, default-off at every layer, and both
+sides of the drop (predecessor removed AND successor/unrelated symbols kept,
+asserted as exact lists). Full `dune build @fmt` + `dune build` + `dune runtest`
+all exit 0.
+
+**Production lines NOT pinned by a test** (stated rather than hidden): (a) the
+`changeover > old.last` fast-path in `Rename_detector._succession` and (b) the
+`if not config.enabled` short-circuit in `Rename_gate.partition` are both
+*performance* guards — removing either yields identical output (the scoring path
+rejects a zero-overlap pair; `Rename_detector.detect` returns an empty report on
+a disabled config), so no test can distinguish them. (c) `prefilter_rel_tol =
+Float.infinity` in `Rename_detector._returns_score` is a robustness choice;
+`Twin_detector`'s default 2e-2 also passes on every current fixture, so the
+fixtures do not force it. Every other new line was mutation-checked: 17
+mutations run, each turning at least one test red (detector: stale/fresh density
+filters, old/new direction swap, `min_predecessor_bars`, `min_overlap_days`,
+`Returns`->`Levels`, loosened `ret_epsilon`, `enabled` guard, `Config.armed`
+predicate, `_better` tie-break, tail-window width, `survivors`; gate:
+`survivors` bypass, warnings suppression, `adjusted_close`->`close_price`;
+generator: whole stage bypassed, survivors ignored, warnings dropped, stage
+order flipped).
+
+**QC (PR #2097, mirrored by the orchestrator — the QC agents were fenced
+read-only on a shared working tree and could not write here):**
+`structural_qc: APPROVED` (5/5) and `behavioral_qc: APPROVED` (4/5), both at
+tip `5454d9f1`; `overall_qc: APPROVED`. One rework iteration: at base tip
+`ad11fb7f` behavioral returned NEEDS_REWORK (3/5) on a CP4 gap — short-side
+spike flagging at `weekly_snapshot_generator.ml:220` was claimed in the `.mli`,
+the PR body and this file but pinned by nothing, and the mutation
+`(shorts, [])` left the whole suite green. Closed by
+`test_armed_spike_flags_short_candidate_and_warns` at the `generate` seam.
+Merged `089116bc` with all three gates green. Full verdicts are PR review
+comments on #2097; audit record `dev/audit/2026-07-26-weekly-snapshot.json`.
+One non-blocking nit carried: the *flagged* candidate's own
+rank/entry/stop/sizing invariance holds by construction
+(`{ c with data_suspect = true }`) but is not pinned at the seam.
+
+**2026-07-26 (spike-bar "data-suspect" flag, issue #2083 Finding 3, PR #2097
+`feat/weekly-snapshot-spike-flag`):** Closes the last of the three 07-17
+report-review findings. F1 (sparse-tail gate) and F2 (rename tracking, still
+unbuilt) attack the data source; F3 is the **report-hygiene backstop**: even
+when a spike bar is genuine and the ticker alive, a candidate whose signal
+rests on a single outsized bar gets a visible caveat on the ticket. New module
+`Weinstein_snapshot_gen.Spike_bar_gate`
+(`trading/trading/weinstein/snapshot/gen/lib/spike_bar_gate.{ml,mli}`, mirrors
+the sibling `Sparse_tail_gate` shape): `check` compares the last daily bar
+at/before `as_of` against the prior **resident** bar's close (on a zombie feed
+that is not the prior trading day — that is the point) and reports the
+**absolute** percentage move; `>= threshold_pct` -> `Data_suspect { move_pct;
+threshold_pct; bar_date }`.
+
+**Flag, do not drop** (unlike F1): the candidate keeps its rank, entry, stop
+and size. `Weekly_snapshot.candidate` gains an additive `data_suspect : bool
+[@sexp.default false]` (the `stop_is_structural` precedent from #2091);
+`Report_renderer` marks the Symbol cell `TEST (!)` plus an explanatory footnote
+(same treatment as the fallback-stop asterisk); a warning line stating the
+candidate was **kept** is appended to `Weekly_snapshot.t.warnings`. Wired into
+`Weekly_snapshot_generator` beside the `_sparse_tail_*` helpers, applied to
+long AND short candidates (`generate`'s candidate assembly was extracted into
+`_build_candidates` to stay inside the function-length cap).
+
+Default-off per `experiment-flag-discipline.md` R1/R2: one new field
+`spike_bar_threshold_pct : float [@sexp.default 0.0]` on
+`Weinstein_strategy_config.config`; `<= 0.0` disables (same convention as
+`sparse_tail_window_trading_days = 0`), so an unarmed run is bit-identical.
+Real config field -> resolves through `Overlay_validator.apply_overrides` and
+is expressible as a `Variant_matrix` axis. **Default NOT flipped and NOT armed
+in `live-config-overrides.sexp`** — that needs a ledger ACCEPT (R3).
+Engineering data-hygiene flag, **not** a Weinstein book rule: no
+`weinstein-book-reference.md` section is cited (none supports it) and the spine
+is untouched — no change to stage classification, the Stage-2-only buy rule,
+volume confirmation, entry, stop or sizing.
+
+Code health (same PR, second commit): the new wiring pushed
+`weekly_snapshot_generator.ml` past the 300-line file-length limit. Fixed by
+**extraction**, not a limit bump or an `@large-module` marker
+(`.claude/rules/code-health-discipline.md`): each #2083 gate module now owns
+both halves of its own semantics — `Spike_bar_gate.flag_candidates` (flag a
+candidate list) and `Sparse_tail_gate.partition` (split tickers into eligible +
+warnings, a pure code move) — and the held-book enrichment moved verbatim into
+a new `Held_position_row` module (`enrich` / `long_market_value`; it concerns
+the held book, not the screener cascade). Generator 299 -> 261 lines, so the
+file has real headroom again. No behaviour change in either move; all
+dune-wired linters green (file-length, nesting, fn-length, mli-coverage,
+magic-numbers, fmt).
+
+Tests: `test_spike_bar_gate.ml` (12 unit tests — disabled/negative no-op, +58%
+SNSE-shaped spike, quiet bar, downward spike reporting the absolute move,
+inclusive threshold boundary, gapped series comparing the prior *resident* bar,
+<2 bars, no bars, zero prior close, both `warning` branches); 6 new
+generator-level tests pinned at the **`generate` seam** (default-config
+disabled; disabled run bit-identical on a spiked fixture; armed+spike flags AND
+keeps the candidate + warns; armed on a quiet dense fixture stays clean; the
+**short**-side flag+keep+warn on a spiked `SHRT` fixture; and a two-candidate
+list where only one spikes, pinning same-length/same-order plus the non-spiking
+row byte-identical to its disabled-run self); 2 renderer tests (marker +
+footnote present / absent); `test_round_trip` pins the additive-field
+back-compat default. Six mutations run, each turning **exactly one** new test
+red: (A) long call site bypassed, (B) `~threshold_pct:0.0`, (C) drop instead of
+flag, (D) `_symbol_cell` marker removed, (E) footnote legend removed, (F) the
+SHORT call site bypassed (`let shorts, short_warnings = (shorts, [])`) — (F)
+fails only the new short-side seam test (QC rework 1). `dune build @fmt` + `dune build` exit 0. Full `dune runtest` exits 1
+ONLY on the pre-existing `Tuner.Bayesian_opt` LAPACKE GP-Cholesky failures
+(`Failure("LAPACKE: 9")` in `bayesian_opt_cholesky.ml`; maintainer-owned fix PR
+#2009, stalled since 07-19) — unrelated to this diff, which touches no tuner
+code. Every weinstein/snapshot test and every dune-wired linter is green.
+
 **2026-07-26 (structural stop for weekly-pick candidates, issue #2084 Finding
 2, PR `feat/screener-structural-stop`):** Fixes the second finding from the
 same 07-17 report review: the displayed AND live-instructed stop for a
@@ -292,6 +483,41 @@ remaining queue:
    universe + cached bars to run against, not done in the generator PR).
 3. **[M6.6, deferred]** live `DATA_SOURCE` impl, cron wrapper, alert dispatch,
    trading-state durability (see §Out of scope).
+4. **[#2083 F2, detection SHIPPED; application OPEN]** rename tracking. The
+   returns-basis detector + its default-off pipeline wiring landed on
+   `feat/universe-rename-tracking` (see the 2026-07-26 entry above). What
+   remains, in priority order:
+   a. **EODHD symbol-change feed** — the other half of the issue's proposal.
+      Needs `EODHD_API_KEY`, which the GHA container does not have; a
+      maintainer-local or ops-data task. It is the only mechanism that catches
+      a clean cut-over with zero overlap between the two legs.
+   b. **Bar-store-wide scan + universe re-pin** — the detector only sees the
+      symbols it is handed, and in the actual incident FTH was absent from the
+      bar store entirely, so a run over the 07-17 pinned universe would NOT
+      have caught SNSE -> FTH. Closing that needs a scan of the whole store and
+      a re-pin, which is maintainer judgement over real data.
+   c. **Carry history under the new ticker** (merge/rename the on-disk series) —
+      deliberately untouched; the detector emits the mapping, applying it is a
+      separate, destructive operation.
+   d. **Arm it** — pick `rename_detect_min_overlap_days` /
+      `rename_detect_match_fraction` from one live dry run over the real
+      universe (false-positive check against spin-offs and dual listings),
+      record a ledger ACCEPT, then add them to
+      `dev/weekly-picks/live-config-overrides.sexp` (R3).
+
+4b. **[decision item, for review]** `Rename_detector` scores a pair by calling
+   `Twin_detector.detect` on it. Cleaner long-term would be to extract
+   `Twin_detector`'s `_returns_match_fraction` into a shared scoring module both
+   detectors call. Not done unilaterally (CLAUDE.md: propose, don't execute,
+   refactors of existing working modules). The only change made to
+   `snapshot_warehouse` was giving `twin_detector` a `public_name` so a public
+   library may depend on it — packaging only, no code change.
+5. **[#2083 F3 follow-up]** decide an arming threshold for
+   `spike_bar_threshold_pct` and arm it in
+   `dev/weekly-picks/live-config-overrides.sexp` (the flag ships default-off;
+   the incident bar was +58%, a 25-30% threshold is the obvious first
+   candidate). Requires one live-report dry run to check the false-positive
+   rate on genuine gap-up breakouts before arming.
 
 ## Parallelism
 M6 work runs in parallel with `experiments` track M5.2 — no shared source files.

@@ -147,6 +147,7 @@ let _phantom_long_candidate : Weekly_snapshot.candidate =
     sized_risk_amount = 0.0;
     sizing_note = None;
     stop_is_structural = false;
+    data_suspect = false;
   }
 
 let test_aapl_2020_split_phantom_pick_fails _ =

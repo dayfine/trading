@@ -749,6 +749,24 @@ type config = {
       (** Trailing window (trading days) [sparse_tail_min_bars] is checked
           against. Default [0] = disabled. See
           [Weinstein_strategy_config.sparse_tail_window_trading_days]. *)
+  spike_bar_threshold_pct : float; [@sexp.default 0.0]
+      (** Spike-bar "data-suspect" report-hygiene flag (issue #2083 fix 3) —
+          data hygiene, not a strategy rule; it flags a candidate rather than
+          dropping it, and moves no entry / stop / size. Default [0.0] =
+          disabled, no-op. Consumed only by
+          [Weekly_snapshot_generator.generate]. See
+          [Weinstein_strategy_config.spike_bar_threshold_pct]. *)
+  rename_detect_min_overlap_days : int; [@sexp.default 0]
+      (** Live ticker-rename detection (issue #2083 fix 2) — data hygiene, not a
+          strategy rule; it drops a ticker whose price series has been
+          superseded by a renamed successor, and moves no entry / stop / size.
+          Default [0] = disabled, no-op. Consumed only by
+          [Weekly_snapshot_generator.generate]. See
+          [Weinstein_strategy_config.rename_detect_min_overlap_days]. *)
+  rename_detect_match_fraction : float; [@sexp.default 0.0]
+      (** Returns-match threshold the rename detector requires. Default [0.0] =
+          disabled. See
+          [Weinstein_strategy_config.rename_detect_match_fraction]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
