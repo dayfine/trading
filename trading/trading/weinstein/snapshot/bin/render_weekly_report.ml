@@ -27,6 +27,12 @@
     data" marker and the rest of the page renders normally. Neither flag affects
     Markdown output, which has no charts.
 
+    Passing both source flags is a usage error (exit [2]), reported up front —
+    before any snapshot is read or rendered — so a Markdown-only run that would
+    never build a chart still rejects the contradictory invocation. A
+    [-bars-snapshot-dir] that cannot be opened at all (wrong path, no manifest)
+    is a hard error (exit [1]) rather than a page of blank charts.
+
     The optional [-long-limit] / [-short-limit] flags cap the candidate tables
     (default {!Report_renderer.default_long_display_limit} /
     {!Report_renderer.default_short_display_limit}) — e.g. [-long-limit 5] to
@@ -83,28 +89,51 @@ let _bars_from_store ~data_dir ~symbol =
    Fresh universe members often exist only in the warehouse, not the CSV store
    (#2122), so this source charts exactly the symbols the CSV path misses. The
    reader is built once per run; a symbol absent from the warehouse degrades to
-   the empty list like every other chart failure mode. *)
+   the empty list like every other chart failure mode.
+
+   An unopenable warehouse (wrong path, no manifest) is a different failure
+   class from a missing symbol: the caller named a source that does not exist,
+   so every chart would blank at once. [Snapshot_warehouse_reader.build]
+   surfaces that as an exception — turn it into a diagnosable message + exit 1
+   rather than an uncaught stack trace. *)
 let _bars_from_warehouse ~warehouse_dir ~(as_of : Date.t) =
   let reader =
-    Weinstein_snapshot_gen.Snapshot_warehouse_reader.build ~warehouse_dir ~as_of
-      ~warmup_days:_chart_history_calendar_days ()
+    try
+      Weinstein_snapshot_gen.Snapshot_warehouse_reader.build ~warehouse_dir
+        ~as_of ~warmup_days:_chart_history_calendar_days ()
+    with exn ->
+      eprintf "Failed to open bars snapshot warehouse %s: %s\n" warehouse_dir
+        (Exn.to_string exn);
+      exit 1
   in
   fun ~symbol ->
     Weinstein_strategy.Bar_reader.daily_bars_for reader ~symbol ~as_of
 
-let _bar_source (flags : _flags) ~(as_of : Date.t) =
-  match (flags.data_dir, flags.bars_snapshot_dir) with
-  | None, None -> Html_report_renderer.no_bars
-  | Some data_dir, None -> fun ~symbol -> _bars_from_store ~data_dir ~symbol
-  | None, Some warehouse_dir -> _bars_from_warehouse ~warehouse_dir ~as_of
-  | Some _, Some _ ->
-      eprintf "-data-dir and -bars-snapshot-dir are mutually exclusive\n";
-      exit 2
+(* Which of the two mutually-exclusive chart sources the flags select. Kept as a
+   total, side-effect-free function so the "both flags given" usage error can be
+   resolved once up front — including for a Markdown-only run that never builds
+   a chart, where deferring the check to chart construction would let the
+   contradictory invocation succeed silently. *)
+type _bar_source_spec = No_bars | Csv_store of string | Warehouse of string
 
-let _render_html (flags : _flags) snap =
+let _bar_source_spec (flags : _flags) : (_bar_source_spec, string) Result.t =
+  match (flags.data_dir, flags.bars_snapshot_dir) with
+  | None, None -> Ok No_bars
+  | Some data_dir, None -> Ok (Csv_store data_dir)
+  | None, Some warehouse_dir -> Ok (Warehouse warehouse_dir)
+  | Some _, Some _ ->
+      Error "-data-dir and -bars-snapshot-dir are mutually exclusive"
+
+let _bar_source spec ~(as_of : Date.t) =
+  match spec with
+  | No_bars -> Html_report_renderer.no_bars
+  | Csv_store data_dir -> fun ~symbol -> _bars_from_store ~data_dir ~symbol
+  | Warehouse warehouse_dir -> _bars_from_warehouse ~warehouse_dir ~as_of
+
+let _render_html (flags : _flags) spec snap =
   Html_report_renderer.render ?long_limit:flags.long_limit
     ?short_limit:flags.short_limit
-    ~bars_for:(_bar_source flags ~as_of:snap.Weekly_snapshot.date)
+    ~bars_for:(_bar_source spec ~as_of:snap.Weekly_snapshot.date)
     snap
 
 let _render_md (flags : _flags) snap =
@@ -121,13 +150,14 @@ let _write_file path data =
     eprintf "Failed to write %s: %s\n" path msg;
     exit 1
 
-let _emit (flags : _flags) snap =
+let _emit (flags : _flags) spec snap =
   match flags.html_out with
   | None ->
       print_string
-        (if flags.html then _render_html flags snap else _render_md flags snap)
+        (if flags.html then _render_html flags spec snap
+         else _render_md flags snap)
   | Some path ->
-      _write_file path (_render_html flags snap);
+      _write_file path (_render_html flags spec snap);
       print_string (_render_md flags snap)
 
 let _usage () =
@@ -156,7 +186,14 @@ let rec _parse_flags args (acc : _flags) =
 
 let () =
   match Sys.get_argv () |> Array.to_list with
-  | _ :: pick_path :: flags ->
-      let flags = _parse_flags flags _no_flags in
-      _emit flags (_read_snapshot pick_path)
+  | _ :: pick_path :: args ->
+      let flags = _parse_flags args _no_flags in
+      let spec =
+        match _bar_source_spec flags with
+        | Ok spec -> spec
+        | Error msg ->
+            eprintf "%s\n" msg;
+            exit 2
+      in
+      _emit flags spec (_read_snapshot pick_path)
   | _ -> _usage ()
