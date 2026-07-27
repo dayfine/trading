@@ -149,18 +149,25 @@ let _candidate_columns =
     "Chart";
   ]
 
+let _candidate_rows ~arm ~bars_for shown =
+  List.mapi shown ~f:(fun i c -> _candidate_row ~arm ~bars_for ~rank:(i + 1) c)
+
 let _candidate_table ~arm ~bars_for candidates ~limit =
   match candidates with
   | [] -> _empty_marker
   | _ ->
       let shown = List.take candidates limit in
       let hidden = List.drop candidates limit in
-      let rows =
-        List.mapi shown ~f:(fun i c ->
-            _candidate_row ~arm ~bars_for ~rank:(i + 1) c)
-      in
-      _table ~columns:_candidate_columns ~rows
+      _table ~columns:_candidate_columns
+        ~rows:(_candidate_rows ~arm ~bars_for shown)
       |> _append_table_notes ~shown ~hidden
+
+(* One display-capped candidate section. The header echoes the effective limit
+   so header and content stay in sync. *)
+let _candidate_section ~arm ~label ~bars_for candidates ~limit =
+  _section
+    ~title:(Printf.sprintf "%s (top %d)" label limit)
+    (_candidate_table ~arm ~bars_for candidates ~limit)
 
 (* ---- Held-position table ---- *)
 
@@ -223,14 +230,10 @@ let _body (t : Weekly_snapshot.t) ~title ~long_limit ~short_limit ~bars_for =
       _header t ~title;
       _section ~title:"Macro" (_macro_section t.macro);
       _section ~title:"Strong sectors" (_bullet_list t.sectors_strong);
-      _section
-        ~title:(Printf.sprintf "Long candidates (top %d)" long_limit)
-        (_candidate_table ~arm:"long" ~bars_for t.long_candidates
-           ~limit:long_limit);
-      _section
-        ~title:(Printf.sprintf "Short candidates (top %d)" short_limit)
-        (_candidate_table ~arm:"short" ~bars_for t.short_candidates
-           ~limit:short_limit);
+      _candidate_section ~arm:"long" ~label:"Long candidates" ~bars_for
+        t.long_candidates ~limit:long_limit;
+      _candidate_section ~arm:"short" ~label:"Short candidates" ~bars_for
+        t.short_candidates ~limit:short_limit;
       _section ~title:"Held positions" (_held_table ~bars_for t.held_positions);
       _section ~title:"Warnings" (_bullet_list t.warnings);
     ]

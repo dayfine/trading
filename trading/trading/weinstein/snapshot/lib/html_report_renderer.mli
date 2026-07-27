@@ -42,11 +42,9 @@
       {!Report_shared.data_suspect}. The candidate is {e flagged, not dropped}:
       rank, entry, stop and instruction are unchanged (issue #2083 Finding 3).
     - {b Drop reasons.} The [Warnings] section renders one bullet per entry in
-      [Weekly_snapshot.t.warnings] — the human-visible half of "drop candidate
-
-    + emit a warning", so a candidate missing from the tables above is explained
-      rather than silently absent.
-
+      [Weekly_snapshot.t.warnings] — the human-visible half of the drop-and-warn
+      rule, so a candidate missing from the tables above is explained rather
+      than silently absent.
     - {b Tie-honesty note.} A display-capped table gains
       {!Report_shared.truncation}, stating how many candidates were hidden and
       how many of them tie the cutoff score.
