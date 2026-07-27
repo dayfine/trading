@@ -24,10 +24,27 @@ val enrich :
     Graceful degradation for a symbol with no resident daily bars:
     [current_price] falls back to the position's [entry_price] (so
     [unrealized_pct = 0.0]) and [recommended_stop] is [None] — an un-priced
-    holding still renders a sensible row rather than vanishing. [status] is
-    always ["Holding"]; the full trailing stop state machine is not threaded
-    here (deferred to Phase C). Pure with respect to [bar_reader] (read-only).
-*)
+    holding still renders a sensible row rather than vanishing. Pure with
+    respect to [bar_reader] (read-only).
+
+    {1 Two stop views, decided by [position.stop_state] (item 4c.b)}
+
+    - [None] — the pre-4c.b path, unchanged: [status] is ["Holding"] and
+      [recommended_stop] is a support floor recomputed fresh from this week's
+      bars ({!Stop_recompute.for_held_long}). Every [portfolio.sexp] written
+      before item 4c.b takes this branch, so an un-threaded book renders exactly
+      as it did before.
+    - [Some prior] — the threaded path: the carried state is advanced through
+      the weeks since it was last updated ({!Stop_thread.advance}).
+      [recommended_stop] is the state machine's stop {e in force}, and [status]
+      is {!Stop_track.label} — the state arm plus the number of times the stop
+      has ratcheted, which is the history a per-week recomputation cannot
+      express. A weekly close through the stop instead reports
+      ["STOP HIT <date> (weekly close below $<level>)"].
+
+    No snapshot-schema field is added for this: [status] is already a free-form
+    string both renderers print, so the machine's description reaches the report
+    without a [current_schema_version] bump. *)
 
 val long_market_value :
   Weinstein_snapshot.Weekly_snapshot.held_position list -> float

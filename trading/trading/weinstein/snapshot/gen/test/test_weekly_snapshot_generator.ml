@@ -1578,9 +1578,89 @@ let test_short_candidate_reconciled_at_generate_seam _ =
               (gt (module Float_ord) 0.01);
           ]))
 
+(* --- threaded trailing stop at the generate seam (item 4c.b) ------------- *)
+
+(* A held AAPL carrying a stop track last advanced several weeks before the run
+   date, so [generate] has real weeks to replay. *)
+let _held_with_track ~level =
+  let track : Weinstein_snapshot_gen.Stop_track.t =
+    {
+      state = Initial { stop_level = level; reference_level = level +. 5.0 };
+      updated = Date.of_string "2022-08-05";
+      raises = 0;
+    }
+  in
+  {
+    Weinstein_snapshot_gen.Live_portfolio.symbol = "AAPL";
+    shares = 10;
+    entry_price = 150.0;
+    entry_date = Date.of_string "2022-01-03";
+    stop_price = 140.0;
+    stop_state = Some track;
+  }
+
+let _generate_holding position =
+  let base =
+    _inputs_at ~as_of:_as_of ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  Generator.generate
+    {
+      base with
+      live_portfolio =
+        {
+          Weinstein_snapshot_gen.Live_portfolio.cash = 50_000.0;
+          as_of = _as_of;
+          positions = [ position ];
+        };
+      portfolio_is_placeholder = false;
+    }
+
+let _held_row (s : Weekly_snapshot.t) = s.held_positions
+let _status (h : Weekly_snapshot.held_position) = h.status
+let _recommended (h : Weekly_snapshot.held_position) = h.recommended_stop
+
+(* A holding WITHOUT a track keeps the pre-4c.b status line, so every
+   portfolio.sexp on disk today renders exactly as it did before. *)
+let test_held_without_track_keeps_the_recomputed_view _ =
+  assert_that
+    (_generate_holding
+       { (_held_with_track ~level:50.0) with stop_state = None })
+    (field _held_row (elements_are [ field _status (equal_to "Holding") ]))
+
+(* WITH a track, the status line is the state machine's own description — which
+   arm and how many ratchets — and the recommended stop is the level in force,
+   not a fresh recomputation. *)
+let test_held_with_track_reports_the_threaded_stop _ =
+  assert_that
+    (_generate_holding (_held_with_track ~level:50.0))
+    (field _held_row
+       (elements_are
+          [
+            all_of
+              [
+                field _status (contains_substring "raises, through");
+                field _recommended (is_some_and (ge (module Float_ord) 50.0));
+              ];
+          ]))
+
+(* A track whose stop sits above the market exits on the first replayed weekly
+   close, and the report says so instead of quietly recommending a stop. *)
+let test_held_with_triggered_stop_reports_the_exit _ =
+  assert_that
+    (_generate_holding (_held_with_track ~level:10_000.0))
+    (field _held_row
+       (elements_are [ field _status (contains_substring "STOP HIT") ]))
+
 let suite =
   "weekly_snapshot_generator"
   >::: [
+         "held without track keeps the recomputed view"
+         >:: test_held_without_track_keeps_the_recomputed_view;
+         "held with track reports the threaded stop"
+         >:: test_held_with_track_reports_the_threaded_stop;
+         "held with triggered stop reports the exit"
+         >:: test_held_with_triggered_stop_reports_the_exit;
          "long candidate reconciled and sized on the fill"
          >:: test_long_candidate_reconciled_and_sized_on_the_fill;
          "default config leaves candidates unreconciled"
