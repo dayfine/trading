@@ -16,10 +16,15 @@ module Mat = Owl.Mat
 (* ---------- Fixtures and plain-OCaml matrix helpers ---------- *)
 
 (** Sizes spanning the band in which the vendored LAPACK [dpotrf] was measured
-    wrong on an [Intel Xeon 6973P-C] runner (33..63), plus one below it and one
-    above. A regression in the factorisation shows up as one of these failing
-    while the small case still passes. *)
-let _broken_band_sizes = [ 4; 32; 33; 40; 63; 64 ]
+    wrong on an [Intel Xeon 6973P-C] runner (33..63), plus one below it, one
+    above, and 100 — the largest matrix order reachable in production, since
+    [total_budget] bounds the observation count and the largest value in any
+    committed spec is [(total_budget 100)]. The defect is discontinuous in n
+    (correct at n <= 32, wrong from 33), so coverage has to reach the top of the
+    reachable range rather than stop at a convenient size. A regression in the
+    factorisation shows up as one of these failing while the small case still
+    passes. *)
+let _certified_sizes = [ 4; 32; 33; 40; 63; 64; 100 ]
 
 (** Largest absolute deviation of [L * L^T] from [k], computed without BLAS. *)
 let _reconstruction_error l ~k ~n =
@@ -64,7 +69,7 @@ let test_reconstructs_input_across_sizes _ =
   (* L * L^T must reproduce the input at every order, including the band where
      the vendored LAPACK dpotrf silently returned a ~5-7% wrong factor. *)
   let errors =
-    List.map _broken_band_sizes ~f:(fun n ->
+    List.map _certified_sizes ~f:(fun n ->
         let k = _well_conditioned_spd ~n in
         _reconstruction_error (_factor k ~n) ~k ~n)
   in
@@ -77,13 +82,30 @@ let test_factor_is_lower_triangular _ =
   assert_that (_max_above_diagonal l ~n) (float_equal 0.0)
 
 let test_input_matrix_is_not_modified _ =
-  (* The contract says k is left untouched; escalation runs on a copy. Use a
-     near-singular input so the escalation path actually fires. *)
+  (* The contract says k is left untouched; escalation runs on a copy. An
+     all-ones kernel is rank 1, so the escalation path is guaranteed to fire and
+     the pre-fix implementation would widen the diagonal in place.
+
+     noise_variance is 1e-4 rather than the 0.0 the other tests use, so the
+     first escalation increment is 1e-4 — five orders of magnitude above
+     Matchers' default float_equal epsilon of 1e-9. With 0.0 the increment is
+     exactly 1e-9 and whether this test detects the mutation would be decided by
+     one ulp of rounding rather than by the contract. Every entry is checked,
+     not just the first, since escalation touches the whole diagonal. *)
   let n = 3 in
   let k = Mat.init_2d n n (fun _ _ -> 1.0) in
-  let before = Mat.get k 0 0 in
-  let _ = _factor k ~n in
-  assert_that (Mat.get k 0 0) (float_equal before)
+  let before =
+    Array.init (n * n) ~f:(fun idx -> Mat.get k (idx / n) (idx % n))
+  in
+  let _ =
+    Chol.chol_with_nugget_escalation k ~n ~noise_variance:1e-4
+      ~signal_variance:1.0
+  in
+  let after =
+    Array.init (n * n) ~f:(fun idx -> Mat.get k (idx / n) (idx % n))
+  in
+  assert_that (Array.to_list after)
+    (elements_are (List.map (Array.to_list before) ~f:(fun v -> float_equal v)))
 
 (* ---------- Nugget escalation ---------- *)
 

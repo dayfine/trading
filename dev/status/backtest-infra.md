@@ -57,15 +57,31 @@ Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
 
 ### Follow-up (not this PR) — the OpenBLAS defect is wider than the tuner
 
-`Owl.Linalg.S` is also used by
-`trading/analysis/technical/trend/lib/{segmentation,visualization}.ml`, and any
-code path reaching `Mat.dot` at `n >= ~120` or `Linalg.inv` on an affected
-runner is at risk of wrong results or a heap-corruption abort. Owner:
-`harness-maintainer` (CI workflows + `.devcontainer/` are out of scope for this
-track). Suggested mitigation: export `OPENBLAS_CORETYPE=Haswell` (or pin a
-runner image with a known-good OpenBLAS) and extend the existing `ci.yml` CPU-flag
-smoke step into an actual numerical BLAS self-check (`chol(4*I)` at `n = 33` and
-a `dgemm`-vs-naive comparison at `n = 120` are both one-liners that catch it).
+Any code path reaching **square** `Mat.dot` at `n >= ~120` or `Linalg.inv` on an
+affected runner risks wrong results or a heap-corruption abort. The in-repo
+exposure today is small — grepped call sites, not module aliases:
+
+- `trading/trading/backtest/tuner/lib/bayesian_opt.ml` — the only genuinely live
+  Owl-linalg consumer. After this PR its remaining calls are
+  `Linalg.triangular_solve` (`:124-125`) and the `Mat.dot` inner products in
+  `fit_gp`. Both were probed **at the shapes actually issued** — `(1 x n).(n x 1)`
+  and `(n x n).(n x 1)` — and are correct to <=2.7e-15 at every n up to 200+.
+  The `n >= 120` breakage is the *square* `(n x n).(n x n)` kernel, which
+  `fit_gp` never takes. Live, but measured clean.
+- `trading/analysis/technical/trend/lib/segmentation.ml` — declares
+  `module Linalg = Owl.Linalg.S` and **never calls it**; zero `Linalg.`/`Mat.`/
+  `Arr.` call sites beyond the alias. Dead alias, not an exposure.
+- `trading/analysis/technical/trend/lib/visualization.ml` — same dead `Linalg`
+  alias; its only Owl use is `Mat.of_array _ 1 n` row vectors (`:51-53, 61-62,
+  67-68`) feeding `Owl_plplot`. No factorisation, no `inv`, nothing at n >= 33.
+
+So this follow-up is about CI trustworthiness and *future* exposure, not a
+currently-broken in-repo call site. Owner: `harness-maintainer` (CI workflows +
+`.devcontainer/` are out of scope for this track). Suggested mitigation: export
+`OPENBLAS_CORETYPE=Haswell` (or pin a runner image with a known-good OpenBLAS)
+and extend the existing `ci.yml` CPU-flag smoke step into an actual numerical
+BLAS self-check — `chol(4*I)` at `n = 33` and a square-`dgemm`-vs-naive
+comparison at `n = 120` are both one-liners that catch it.
 
 ## 2026-07-23 — deep-results headline block (rendered from pinned records)
 

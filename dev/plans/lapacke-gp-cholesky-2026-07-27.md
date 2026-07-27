@@ -55,6 +55,7 @@ shows, on this host:
 | `Mat.dot` (dgemm) | correct to 3e-15 for `n ≤ 64`; **wrong by 19.5 absolute** at `n = 120`, 29.3 at `n = 200` |
 | `Linalg.inv` at `n = 120` | aborts the process with `double free or corruption (!prev)` — heap corruption |
 | `Linalg.triangular_solve` (dtrtrs) | correct to 6e-16 for all tested `n` up to 120 |
+| `Mat.dot` at the shapes `fit_gp` actually uses — `(1×n)·(n×1)` inner products and `(n×n)·(n×1)` matrix–vector | correct to ≤2.7e-15 at every `n` tested (8, 32, 33, 64, 100, 120, 200, 400). The `n = 120` breakage above is the **square** `(n×n)·(n×n)` kernel only. |
 | `OPENBLAS_NUM_THREADS=1` | does not fix it; only moves the band (`n ≥ 64` now fails too) — so it is not a thread race |
 
 The mechanism: `OPENBLAS_VERBOSE=2` reports `Core: Cooperlake`. OpenBLAS
@@ -91,9 +92,13 @@ its nugget-escalation semantics unchanged.
 
 Justification:
 
-- The only broken primitive in `fit_gp` is `dpotrf`. `triangular_solve` and
-  the matrix–vector `Mat.dot` calls that `fit_gp` uses were probed and are
-  correct on this host, so nothing else needs to move.
+- The only broken primitive in `fit_gp` is `dpotrf`. Its other LAPACK/BLAS
+  calls were probed **at the shapes it actually issues** — `triangular_solve`
+  (`bayesian_opt.ml:124-125`), the `(1×n)·(n×1)` inner products
+  (`Mat.dot (transpose k_star) alpha`, `Mat.dot (transpose v) v`), and the
+  `(n×n)·(n×1)` matrix–vector products — and all are correct to ≤6e-16 at every
+  `n` up to 200+. The square-`gemm` breakage at `n ≥ 120` is a different kernel
+  path that `fit_gp` never takes. So nothing else needs to move.
 - `n` is the number of BO observations, bounded by `total_budget` (largest
   value in any committed spec: 100, `trading/test_data/tuner/bayesian-multi-param-2026-05-16.sexp`).
   An O(n³/3) OCaml factorisation at n = 100 is ~3.3e5 flops (sub-millisecond),
@@ -149,10 +154,27 @@ strategy or stop-machine code.
   order gives differences at the 1e-16 level, which can in principle change a
   BO `argmax` tie-break. BO runs are already only reproducible per-seed within a
   build; no committed golden pins GP posterior values. Accepted.
-- **The broader OpenBLAS defect is not fixed.** `Mat.dot` at n ≥ 120 and
-  `Linalg.inv` remain wrong/unsafe on this host class. `Owl.Linalg.S` is also
-  used by `trading/analysis/technical/trend/lib/{segmentation,visualization}.ml`,
-  which this PR does not touch. Flagged as a follow-up with the
+- **The broader OpenBLAS defect is not fixed.** Square `Mat.dot` at n ≥ 120 and
+  `Linalg.inv` remain wrong/unsafe on this host class.
+
+  The in-repo exposure is **small and was mis-stated in an earlier draft of this
+  plan**. Grepped call sites, not just module aliases:
+
+  - `trading/trading/backtest/tuner/lib/bayesian_opt.ml` — the only genuinely
+    live exposure. After this PR its remaining LAPACK/BLAS calls are
+    `Linalg.triangular_solve` (`:124-125`) and the `Mat.dot` inner products in
+    `fit_gp`; all were probed at their real shapes and are correct here (table
+    above). Live, but measured clean.
+  - `trading/analysis/technical/trend/lib/segmentation.ml` — declares
+    `module Linalg = Owl.Linalg.S` and **never calls it**. Zero
+    `Linalg.` / `Mat.` / `Arr.` call sites beyond the alias. A dead alias.
+  - `trading/analysis/technical/trend/lib/visualization.ml` — same dead
+    `Linalg` alias; its only Owl use is `Mat.of_array _ 1 n` row vectors
+    (`:51-53, 61-62, 67-68`) feeding `Owl_plplot`. No factorisation, no `inv`,
+    no product at n ≥ 33.
+
+  So the follow-up is about *future* exposure and about CI trustworthiness, not
+  about a currently-broken in-repo call site. Flagged with the
   `OPENBLAS_CORETYPE` mitigation.
 
 ## Acceptance criteria
@@ -173,6 +195,7 @@ strategy or stop-machine code.
 - Changing CI workflows, `.devcontainer/`, or any environment variable
   (`harness-maintainer` owns those).
 - Fixing or replacing the vendored OpenBLAS.
-- Auditing / repairing `Owl.Linalg.S` use in `analysis/technical/trend/`.
+- Removing the dead `Owl.Linalg.S` aliases in `analysis/technical/trend/`
+  (they are unused, so they are a tidiness item, not a correctness one).
 - Any change to `weinstein_strategy.ml` or stop-machine code.
 - Any change to `dev/status/_index.md` (orchestrator reconciles it).

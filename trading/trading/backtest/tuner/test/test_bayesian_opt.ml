@@ -440,11 +440,18 @@ let test_fit_gp_near_duplicate_observations_does_not_raise _ =
 
 (** Observation counts spanning the band in which the vendored LAPACK [dpotrf]
     was measured wrong on an [Intel Xeon 6973P-C] runner (33..63), plus one
-    below and one above. This is the degenerate input class that made
-    [suggest_next] fail with [Failure "LAPACKE: 9"] on some hosts and pass on
-    others: nothing about the data was degenerate — only the order of the kernel
-    matrix mattered. *)
-let _gp_sizes_spanning_lapack_broken_band = [ 8; 33; 40; 64 ]
+    below, one above, and the largest count actually reachable in production.
+    This is the degenerate input class that made [suggest_next] fail with
+    [Failure "LAPACKE: 9"] on some hosts and pass on others: nothing about the
+    data was degenerate — only the order of the kernel matrix mattered.
+
+    The defect is {e discontinuous} in n (correct at n <= 32, wrong from 33), so
+    coverage has to reach the top of the reachable range rather than stop at a
+    convenient size. 100 is that top: [total_budget] bounds the observation
+    count, and the largest value in any committed spec is [(total_budget 100)]
+    in [test_data/tuner/bayesian-multi-param-2026-05-16.sexp]. Raise this list
+    if a spec ever raises that budget. *)
+let _gp_sizes_spanning_lapack_broken_band = [ 8; 33; 40; 64; 100 ]
 
 let test_fit_gp_interpolates_at_every_observation_count _ =
   (* fit_gp must interpolate its training points at every order. With a small
