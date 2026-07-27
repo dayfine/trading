@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-27 run1 (orchestrator run 30231043807 — 4 PRs merged: #2105 Picks Phase C HTML+SVG renderer `101d4418` (QC struct 5/5 + behav 4/5 after 1 rework), #2106 screener design-doc subdirs `e86d3e85`, plus the two stuck PRs unblocked: #2102 leverage-dawn REJECT ledger `ec28cc1f` and #2101 run-4 summary `6d2038e4` (was failing CI on a 294-char row here). #2107 entry reconciliation (#2103) OPEN — behavioral NEEDS_REWORK, Risk % still off stale entry; must not merge until closed. Gates on `060ea11b`: build 0, **runtest 0** (359 binaries, Bayesian_opt 44/44), status_file_integrity 0, index_size_linter 0. NOTE: #2105 predates the committed design reference (#2104) — no chips/cards/MA/TradingView; delta is additive.)
+Last updated: 2026-07-27 run2 (orchestrator run 30239958068 — 3 PRs merged: #2112 `19b8c8a2` citation, #2115 `5ff998d9` #2059 phantom-short, #2114 `9e9f0ad5` Picks Phase C v2. #2113 LAPACKE fix QC-APPROVED but HELD: GitHub never created a check-suite for its branch across 3 SHAs, a PR open/reopen and a PAT push. Gates on `047f1837`: build 0, runtest **1** (2 LAPACKE errors, host-dependent), status_file_integrity 0, index_size_linter 0.)
 
 ## Active + complete tracks
 
@@ -18,7 +18,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
-| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) | — | trades.csv export-join fix MERGED (#1942, position_id column); next: validator audit-join fix (C6b, dispatched) then P2 matrix (data-gated) |
+| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) + feat-backtest | #2113 | LAPACKE root-caused (OpenBLAS mis-detects Xeon 6973P-C); fix QC-APPROVED but HELD — CI never triggered on the branch |
 | [rename-twin-dedup](rename-twin-dedup.md) | IN_PROGRESS | feat-backtest | — | v1(#1940)+v2(#1946) MERGED; dedup warehouse rebuilt + 28y record re-run landed (#1949, 83 groups/91 legs dropped); next: none (optional V6 report-consult tweak) |
 | [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | v1 harness (#1937) + C6b audit-join-by-position_id (#1947) MERGED; next: golden-run integration test for V3/V4/V7 (data-gated) |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
@@ -30,7 +30,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
 | [hybrid-tier](hybrid-tier.md) | MERGED | — | — | — |
-| [trade-audit](trade-audit.md) | IN_PROGRESS | feat-backtest | — | external-exit capture MERGED (#2085); next: report-layer rendering of `external_exit` (#2076, still open by design) |
+| [trade-audit](trade-audit.md) | IN_PROGRESS | feat-backtest | — | #2115 fixed the trades.csv duplicate/phantom rows; next: position_id join is date-proximity derived and suspect for forensics; #2076 report-layer rendering still open |
 | [decision-audit](decision-audit.md) | MERGED | feat-backtest | — | #1799/#1806/#1811 MERGED (report+counterfactual+weekly-picks adapter); selection FAITHFUL; live-picks pipeline ready (#1812); next: matured weekly counterfactual |
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
@@ -43,21 +43,21 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | no dispatchable T1/T3 (re-verified run 4); LAPACKE GP-Cholesky flake is host-dependent, NOT closed by #2009 — refiled to cleanup; #1636 BLOCKED on human `workflow`-scoped PAT |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | no dispatchable T1/T3 (re-verified run 2); NEW: set OPENBLAS_CORETYPE + add a numerical CI self-check (needs workflow-scoped PAT, as does #1636) |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | Phase 1 stable (PR-D'c #1332 merged); Phase 2 deferred; no outstanding work |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2106 MERGED `e86d3e85` (6 undocumented `analysis/weinstein/*` subdirs); 8 open items; next: uncited 8% `min_pullback_pct` claim in support_floor.mli |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2112 MERGED `19b8c8a2` (min_pullback_pct §5.2 citation); 8 open; next: 6th citation defect in stop_types.mli L63/L88 (uncited 8% rule) |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
 | [screener](screener.md) | IN_PROGRESS | feat-weinstein | — | #2084 fully closed: F1 invalidation MERGED `26be1e36` (#2087), F2 structural stop MERGED `2bcf5b33` (#2091); next: none queued |
-| [simulation](simulation.md) | IN_PROGRESS | feat-backtest | — | #1847 sibling round-trip pairing fix MERGED (761c30cf); per-trade scale-in reporting now trustworthy. Next: stale-exit grid via WF-CV (data-gated) |
+| [simulation](simulation.md) | IN_PROGRESS | feat-backtest | — | #2115 MERGED `5ff998d9` — #2059 phantom-short root-caused to non-quantity-faithful round-trip pairing; next: sign-flip invariant (filed, default-off) |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
 | [experiment-platform](experiment-platform.md) | IN_PROGRESS | feat-backtest | — | force-exit-off grid REJECTED for promotion (#1503); single-dial surface exhausted; next: continuation-buy recheck on top-3000 (data-gated) |
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
-| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | #2105 | Phase C HTML+SVG renderer #2105; #2103 entry reconciliation stacked; next: close #2105 gap vs committed design reference |
+| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | Phase C v2 MERGED `9e9f0ad5` (#2114, card report to the committed design reference); next: F4+F5 round-trip pin, record_fill CLI, trailing-stop state machine |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
 | [tax-lens](tax-lens.md) | MERGED | feat-backtest | — | Phase 1 #2066 + CP4 loader error-path contract #2073 MERGED; Phase 2 wash-sale / April outflows deferred, user-gated (#2006) |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | asset-type blocklist MERGED (#1939, default-off); next: arm ATB.curated for live universe build + General::Type enrichment feed |

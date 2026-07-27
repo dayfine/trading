@@ -10,7 +10,7 @@ open Core
 
 (** {1 Trade Metrics Types} *)
 
-type trade_metrics = {
+type trade_metrics = Round_trip_pairing.trade_metrics = {
   symbol : string;  (** The traded symbol *)
   side : Trading_base.Types.side;
       (** Direction of the round-trip's {b entry} leg. [Buy] means a long
@@ -69,36 +69,9 @@ type summary_stats = {
 val extract_round_trips :
   Trading_simulation_types.Simulator_types.step_result list ->
   trade_metrics list
-(** Extract round-trip trades from simulation step results.
-
-    A round-trip is identified by pairing an entry trade with the next close
-    trade for the same symbol. Two directions are paired:
-
-    - {b Long} round-trip: Buy → Sell, with [side = Buy] in the result.
-    - {b Short} round-trip: Sell → Buy (the buy covers the short), with
-      [side = Sell] in the result.
-
-    Trades are matched in chronological order. Same-side trades accumulate as
-    open entries; each opposite-side (closing) trade pairs with the open entry
-    whose split-adjusted quantity matches exactly, falling back to the oldest
-    open entry (FIFO) when none matches. For the common alternating
-    single-position stream this reduces to pairing each entry with the next
-    opposite-side trade; the quantity match matters when sibling positions
-    coexist on one symbol (e.g. a scale-in parent + add), whose legs interleave
-    as Buy, Buy, Sell, Sell. A trailing entry trade with no matching close
-    (e.g., an open position at the end of the simulation window) is dropped.
-
-    {b Split adjustment.} Entry and exit fills can sit on different price bases
-    when a stock split occurs mid-hold — the exit fill is post-split while the
-    raw entry fill is pre-split. To keep per-trade P&L meaningful, each
-    round-trip's entry leg is restated onto the exit's (post-split) basis using
-    the [splits_applied] carried on each step: [entry_price] is divided by, and
-    [quantity] multiplied by, the product of all split factors with
-    [entry_date < split_date <= exit_date]. Dollar exposure is preserved, so a
-    split-straddling winner is no longer mis-booked as a ~−50% loss. Holds with
-    no straddling split are unaffected. This corrects only the trade-level
-    metrics; portfolio NAV is already split-adjusted upstream by
-    [Split_handler].
+(** Re-export of {!Round_trip_pairing.extract_round_trips}, which carries the
+    full pairing contract (long/short direction, sibling-position quantity
+    matching, partial-exit residual tracking, split restatement).
 
     @param steps List of step results from simulator run
     @return List of trade metrics for completed round-trips *)

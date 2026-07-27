@@ -11,6 +11,9 @@ let max_bars = 90
 let _pad = 4.0
 let _volume_strip_height = 18.0
 
+(* Radius of the last-close marker. *)
+let _marker_radius = 3.5
+
 (* Vertical gap between the price panel and the volume strip. *)
 let _panel_gap = 3.0
 
@@ -41,10 +44,10 @@ type _geom = {
   n : int;  (** Number of bars drawn. *)
 }
 
-let _geometry ~width ~height ~lo ~span ~n =
+let _geometry ~width ~height ~lo ~span ~n ~gutter =
   let w = Float.of_int width and h = Float.of_int height in
   let price_h = h -. (2.0 *. _pad) -. _panel_gap -. _volume_strip_height in
-  let plot_w = w -. (2.0 *. _pad) in
+  let plot_w = w -. (2.0 *. _pad) -. gutter in
   {
     x0 = _pad;
     plot_w;
@@ -73,13 +76,13 @@ let _c v = Printf.sprintf "%.1f" v
    both band bounds — so a level outside the visible price range is still drawn
    inside the viewBox rather than clipped away. A zero-width domain (flat
    series, single price) is padded so [span] is never zero. *)
-let _domain ~bars ~levels ~band =
+let _domain ~bars ~levels ~band ~extra =
   let of_bar (b : Types.Daily_price.t) = [ b.high_price; b.low_price ] in
   let of_band = match band with None -> [] | Some (a, b) -> [ a; b ] in
   let prices =
     List.concat_map bars ~f:of_bar
     @ List.map levels ~f:(fun l -> l.price)
-    @ of_band
+    @ of_band @ extra
   in
   let lo = List.reduce_exn prices ~f:Float.min in
   let hi = List.reduce_exn prices ~f:Float.max in
@@ -122,6 +125,44 @@ let _price_polyline g bars =
   Printf.sprintf "<polyline class=\"px\" points=\"%s\"/>"
     (String.concat ~sep:" " (List.mapi bars ~f:point))
 
+(* Moving-average overlay across the same x-slots as the price line. Only the
+   defined suffix is drawn — the leading [None]s (fewer than [period] closes
+   behind them) have no value to plot. Fewer than two defined points is not a
+   line, so nothing is emitted. *)
+let _ma_polyline g values =
+  let point i = function
+    | None -> None
+    | Some v ->
+        Some (Printf.sprintf "%s,%s" (_c (_bar_x g i)) (_c (_price_y g v)))
+  in
+  match List.filter_mapi values ~f:point with
+  | [] | [ _ ] -> []
+  | points ->
+      [
+        Printf.sprintf "<polyline class=\"ma\" points=\"%s\"/>"
+          (String.concat ~sep:" " points);
+      ]
+
+(* The value and its date spelled out, so the chart is readable without
+   cross-referencing the surrounding card. *)
+let _marker_title (b : Types.Daily_price.t) =
+  Printf.sprintf "last close %.2f (%s)" b.close_price (Date.to_string b.date)
+  |> Html_page.escape
+
+let _marker g ~i (b : Types.Daily_price.t) =
+  Printf.sprintf
+    "<circle class=\"last\" cx=\"%s\" cy=\"%s\" \
+     r=\"%s\"><title>%s</title></circle>"
+    (_c (_bar_x g i))
+    (_c (_price_y g b.close_price))
+    (_c _marker_radius) (_marker_title b)
+
+(* Marker on the most recent close. *)
+let _last_marker g bars =
+  match List.last bars with
+  | None -> []
+  | Some b -> [ _marker g ~i:(List.length bars - 1) b ]
+
 let _level_class = function
   | Entry -> "lvl lvl-entry"
   | Stop -> "lvl lvl-stop"
@@ -136,11 +177,32 @@ let _level_line g l =
     (_c (g.x0 +. g.plot_w))
     y (Html_page.escape l.label)
 
-(* Screen-reader summary: the mark count plus every level by name, so the chart
-   is not information the page carries only visually. *)
-let _aria_label ~n ~levels =
+let _level_label_class = function
+  | Entry -> "lvl-label lvl-label-entry"
+  | Stop -> "lvl-label lvl-label-stop"
+  | Reference -> "lvl-label lvl-label-ref"
+
+(* Right-margin text labels naming each level. {!Svg_labels} owns the
+   collision-avoidance rule; this only projects each level's price to its target
+   baseline and hands the set over. *)
+let _level_labels g levels =
+  List.map levels ~f:(fun l ->
+      {
+        Svg_labels.cls = _level_label_class l.kind;
+        text = l.label;
+        y = _price_y g l.price +. Svg_labels.baseline_offset;
+      })
+  |> Svg_labels.render ~x:(g.x0 +. g.plot_w +. Svg_labels.inset)
+
+(* Screen-reader summary: the mark count, the moving average if one is drawn,
+   plus every level by name — so the chart is not information the page carries
+   only visually. *)
+let _aria_label ~n ~levels ~ma_period =
   let names = List.map levels ~f:(fun l -> l.label) in
-  Printf.sprintf "price and volume sparkline, %d bars%s" n
+  Printf.sprintf "price and volume sparkline, %d bars%s%s" n
+    (match ma_period with
+    | None -> ""
+    | Some p -> Printf.sprintf "; %d-period moving average" p)
     (match names with
     | [] -> ""
     | _ -> "; levels: " ^ String.concat ~sep:", " names)
@@ -152,20 +214,47 @@ let _svg ~width ~height ~aria ~children =
     width height width height (Html_page.escape aria)
     (String.concat ~sep:"" children)
 
-let render ?(width = default_width) ?(height = default_height) ?band ~bars
-    ~levels () =
-  let bars = List.drop bars (Int.max 0 (List.length bars - max_bars)) in
-  let n = List.length bars in
+(* The moving average over the WHOLE supplied series, restricted to the drawn
+   window. Computing over the whole series and then windowing (rather than
+   computing over the window alone) means a caller who supplies history beyond
+   the window gets an average defined across the full width of the chart. *)
+let _ma_over_window ~period ~all ~dropped =
+  Svg_series.sma ~period
+    (List.map all ~f:(fun (b : Types.Daily_price.t) -> b.close_price))
+  |> fun values -> List.drop values dropped
+
+(* A non-positive period asks for an average of nothing, which is the same
+   request as omitting [?ma_period] entirely. Normalising it HERE — rather than
+   relying on {!Svg_series.sma}, which already yields all-[None] — makes the two
+   requests indistinguishable in the OUTPUT: the aria-label is built from this
+   value too, and [Some 0] would otherwise announce a "0-period moving average"
+   that is never drawn. *)
+let _requested_ma = Option.filter ~f:(fun period -> period > 0)
+
+let render ?(width = default_width) ?(height = default_height) ?band ?ma_period
+    ?(annotate = false) ~bars ~levels () =
+  let ma_period = _requested_ma ma_period in
+  let dropped = Int.max 0 (List.length bars - max_bars) in
+  let window = List.drop bars dropped in
+  let n = List.length window in
   if n < _min_bars then None
   else
-    let lo, span = _domain ~bars ~levels ~band in
-    let g = _geometry ~width ~height ~lo ~span ~n in
-    let band_children =
-      match band with None -> [] | Some pair -> [ _band_rect g pair ]
+    let ma =
+      Option.map ma_period ~f:(fun period ->
+          _ma_over_window ~period ~all:bars ~dropped)
     in
+    let extra = Option.value_map ma ~default:[] ~f:List.filter_opt in
+    let lo, span = _domain ~bars:window ~levels ~band ~extra in
+    let gutter = if annotate then Svg_labels.gutter else 0.0 in
+    let g = _geometry ~width ~height ~lo ~span ~n ~gutter in
+    let optional flag children = if flag then children else [] in
     let children =
-      band_children @ _volume_rects g bars
-      @ [ _price_polyline g bars ]
+      Option.value_map band ~default:[] ~f:(fun pair -> [ _band_rect g pair ])
+      @ _volume_rects g window
+      @ Option.value_map ma ~default:[] ~f:(_ma_polyline g)
+      @ [ _price_polyline g window ]
       @ List.map levels ~f:(_level_line g)
+      @ optional annotate (_level_labels g levels @ _last_marker g window)
     in
-    Some (_svg ~width ~height ~aria:(_aria_label ~n ~levels) ~children)
+    Some
+      (_svg ~width ~height ~aria:(_aria_label ~n ~levels ~ma_period) ~children)

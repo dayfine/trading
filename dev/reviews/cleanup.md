@@ -1,6 +1,10 @@
-Reviewed SHA: 5bb2b749
+Reviewed SHA: 0fe23db05189efe19382c495751950d8b7b1db5d
 
 # QC review — cleanup track
+
+Most recent review is at the **bottom** of this file. `record_qc_audit.sh` takes
+the **last** occurrence of each `*_qc:` field and the **last** `## Quality Score`
+section, so new entries must be appended, never prepended.
 
 ## PR #2099 — `cleanup/support-floor-citation` (MERGED `aca88729`)
 
@@ -77,6 +81,98 @@ context and is not mechanizable.
 convention). Correctly targeted, independently verifiable fix with an honest
 status note; held off 5 by the derived "BEFORE the breakdown" clause and the
 uncited 8% claim remaining in the same file.
+
+## Verdict
+
+APPROVED
+
+---
+
+## PR #2112 — `cleanup/min-pullback-citation` (2026-07-27 run 2)
+
+Adds the missing `(§5.2)` citation to the `min_pullback_pct` doc-comment in
+`trading/trading/weinstein/stops/lib/support_floor.mli`, which previously
+asserted "Weinstein's book default is 8%" with no section token — the **fifth**
+instance of the citation-defect family found in four days, and itself a finding
+raised by qc-behavioral on #2099 above. Doc-comment only; 2 files, +5/-2 (the
+second file flips the `dev/status/cleanup.md` backlog entry to `[x]`).
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+Rework iterations: 0.
+
+### Structural (APPROVED, 4/5)
+
+H1/H2 PASS (`@fmt` clean, `dune build` exit 0). H3 PASS **with a pre-existing
+unrelated failure**: full `dune runtest` exits 1 solely on
+`Tuner.Bayesian_opt:11`/`:17` (`Failure("LAPACKE: 9")`), present on base `main`
+and touching no file in this diff; scoped `dune runtest trading/weinstein/stops/`
+green (7 binaries, 113 tests). P1–P6 NA — doc-comment-only; no functions,
+constants, config fields or test files in the diff. A1 NA (`weinstein/stops/` is
+not on the core-module watch-list). A2 NA (no dune files). A3 PASS — exactly the
+2 files in the PR file list, sibling `citation_precision` backlog entry correctly
+untouched, `dev/status/_index.md` correctly not edited.
+
+### Behavioral (APPROVED, 4/5)
+
+The reviewer **independently re-derived** the §5.2 support from primary source
+rather than accepting the author's reasoning, and concluded the author had if
+anything *under*-cited:
+
+- §5.2 `STATE: TRAILING` (L250-252) states the identity outright — "AFTER each
+  correction (8-10%+) + recovery back near prior peak: new_stop =
+  below(min(correction_low, MA))" — making the 8-10%+ depth the qualifier on the
+  correction whose low becomes the stop reference. That is exactly
+  `find_recent_level`'s contract: same quantity, not a number coincidence. The
+  author quoted the weaker `STATE: INITIAL` block instead, whose two lines
+  strictly concern two *different* corrections.
+- The "waiting before buying" alternative reading is **refuted**: §5.2 is titled
+  *"Trailing Stop — Investor Method"* and is a post-entry state machine; nothing
+  in it concerns entry. The document's actual second-entry rule (L155) is
+  quantified by volume contraction 75%+, not by depth — so no depth threshold
+  exists anywhere in the entry rules to conflate with.
+- An independent percentage sweep (not the author's grep) confirms §5.2 is the
+  only candidate. §5.3's 4-6% is correctly excluded, and for a sharper reason
+  than the author gave: L278 reads "Use 4-6% initial stop **if no nearby prior
+  peak**" — i.e. it governs precisely the branch where `find_recent_level`
+  returns `None`. The two are complementary branches of one decision, so citing
+  §5.3 would have been a real error.
+- Quotes verbatim; no paraphrase drift (the failure mode of the four prior
+  defects). Stated default matches code: `stop_types.ml:56`
+  `min_correction_pct = 0.08` → `weinstein_stops.ml:82`.
+
+Non-blocking residual (recorded, not failed): the retained topic sentence
+"Weinstein's book default is [0.08]" is still marginally over-claimed — the book
+gives a *range* and prescribes no default — but the appended clause discloses
+exactly that, so the sentence read whole is self-qualifying. Citing rather than
+correcting was the right call, because real support exists.
+
+### New finding raised by this review — a sixth instance, one module over
+
+`trading/trading/weinstein/stops/lib/stop_types.mli` line 88 asserts
+"(Weinstein's 8% rule)" and line 63 documents the same depth — **neither carries
+a `§N.N` token**. Identical detection-evading shape. Filed to
+`dev/status/cleanup.md` §Backlog.
+
+This makes the family **six-for-six** and strengthens the standing
+`harness_gap: LINTER_CANDIDATE`: a check flagging book-provenance docstrings
+that lack an adjacent `§` token would catch the whole class mechanically. Six
+manual catches in four days is the argument for mechanizing it.
+
+### Delivery note
+
+Both verdicts are PR review comments on #2112 (the authoritative channel per
+`.claude/rules/pr-merge-gates.md`). **`gh` is not installed in this runner**:
+qc-behavioral discovered this and posted via the REST API with curl on its own
+initiative; qc-structural reported it could not post, and the orchestrator
+posted its verdict on its behalf (review id 4784003592). Dispatch prompts should
+name curl rather than `gh` — recorded as an escalation.
+
+## Quality Score
+
+4
 
 ## Verdict
 

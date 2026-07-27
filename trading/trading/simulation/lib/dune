@@ -19,6 +19,7 @@
   cancel_handler
   order_generator
   metrics
+  round_trip_pairing
   metric_computers
   metric_computer_utils
   summary_computer

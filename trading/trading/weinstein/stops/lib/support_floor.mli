@@ -65,7 +65,10 @@ val find_recent_level :
     - [side] — [Long] returns a support floor (correction low); [Short] returns
       a resistance ceiling (rally high).
     - [min_pullback_pct] — minimum counter-move depth required to qualify.
-      Weinstein's book default is [0.08] (8%).
+      Weinstein's book default is [0.08] (8%): §5.2's STATE: INITIAL block pairs
+      "stop = below prior correction low" (the §5.1 rule this function
+      implements) with the qualifying depth "WAIT for first substantial
+      correction (8-10%+)" — [0.08] is the lower bound of that range.
     - [lookback_bars] — maximum window size (in bars, not calendar days). Chosen
       to capture the most recent counter-move without reaching back into an
       older regime.

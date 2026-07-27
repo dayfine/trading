@@ -1,6 +1,91 @@
 # Status: simulation
 
-## Last updated: 2026-07-04
+## Last updated: 2026-07-27
+
+### 2026-07-27 — LH phantom SHORT + duplicated `trades.csv` rows (issue #2059)
+
+Plan: `dev/plans/lh-phantom-short-2026-07-27.md`. Branch
+`fix/lh-phantom-short`.
+
+**Root cause (single, shared by all three reported defects).**
+`Metrics.extract_round_trips` was not quantity-faithful: `_pair_step` popped an
+*entire* open entry for *any* opposing trade regardless of its quantity. A
+**partial** exit therefore (a) booked the **full entry quantity** against the
+**partial exit price**, over-stating that row's P&L, and (b) silently dropped
+the residual shares — so the **next** closing `Sell` found `open_entries` empty
+and fell into the "open a new entry" arm, i.e. it was re-read as a **short
+open**. That phantom short lives only inside the pairing fold (never in the
+portfolio, never in any strategy position map), which is exactly why no exit
+channel ever re-evaluated it; it is eventually "covered" by an unrelated later
+re-entry `Buy`, printing a multi-decade SHORT row with inverted P&L in a run
+with `enable_short_side = false`. Two orphaned sells produce two byte-identical
+rows, so realized-PnL aggregation double-counts.
+
+The LH numbers in #2059 are reproduced field-for-field from a **pure-long**
+trade stream: `Buy 1934 @ 139.44` (2001-06-09), LabCorp's 2-for-1 split on
+**2001-06-12** (the LONG row's exit date), a stop-out selling 1934 on the split
+day and the remaining 1934 the next day, and an ordinary Aug-2024 re-entry.
+Split restatement turns the entry into the reported `3868 @ 69.72`; the orphaned
+second sell becomes `SHORT 1934 @ 67.40 -> 224.30, 8459 days`. The shared
+`position_id` on all three rows is **not** evidence of a shared position record —
+`Trade_context._position_id_for_trade` joins by `(symbol, entry_date)` with a
+7-calendar-day backward window, so the phantom (4 days later) inherits the
+LONG's audit id. It says only that the strategy never decided to open a short.
+
+**Fix (this PR).** `Metrics` now tracks unconsumed quantity per open entry
+(`_open_entry.remaining`, entry-date share basis). A closing trade consumes
+`min(remaining, exit_qty / split_factor)` from the selected entry, emits one
+round-trip per entry leg touched carrying the **consumed** quantity, and repeats
+with what is left of the exit. Entry selection is unchanged (exact
+split-adjusted quantity match, else FIFO). Only a genuine **over-close** (exit
+larger than every open entry) opens an entry on the closing side — the correct
+reading, since `Portfolio` really does flip direction there. Bit-identical for
+the alternating full-exit stream, the sibling scale-in stream (#1847), and every
+split-straddling full exit; only partial-exit streams change, and those are the
+ones that were wrong.
+
+- [x] **Defect 1 (SHORT in a long-only run) — CLOSED.**
+- [x] **Defect 2 (8,459-day zombie) — CLOSED.** Never a portfolio zombie; the
+      row was manufactured by the fold.
+- [x] **Defect 3 (exact duplicate rows) — CLOSED for the orphan cause.** Each
+      orphan produced its own phantom short; orphans are no longer produced.
+
+Verify: `dune runtest trading/simulation/test` — tests 26-29 of
+`test_metrics.ml` (`partial exit across split emits no phantom SHORT`,
+`over-sell reports one SHORT, not a duplicate`, `partial exit splits into two
+legs`, `over-close opens leftover on closing side`). Test 27 asserts the exact
+row multiset and prints #2059's literal 1-LONG + 2-identical-SHORT shape before
+the fix. Blast radius: `trades.csv` / `n_round_trips` / `total_pnl` /
+`win_rate` / `avg_holding_days` on runs containing partial exits (trim,
+maintenance-reduce, harvest-rotate, split-day stop fills); equity-curve metrics
+untouched.
+
+#### Filed, not fixed — for review by `feat-weinstein` / a follow-up
+
+1. **Can a single fill flip a position's sign?** If the real 2001-06-13 LH
+   stream contained a genuine over-sell (two `Sell 1934` against 1934 held), one
+   SHORT row survives the fix — correctly, because the portfolio genuinely
+   flipped short (`Portfolio` has an explicit "Direction changed" branch when a
+   trade crosses zero). Proposed invariant: **no single fill may flip an
+   existing position from long to short or back.** Opening a short from flat
+   stays legal; a reversal in one fill is never intended by any channel.
+   Cheapest enforcement point that is *not* a core module:
+   `Cancel_handler.apply_trades_best_effort` (simulation layer, already the
+   single funnel every fill passes through), as a rejected-fill + loud `WARN`
+   alongside the existing cash-floor rejection path. Deliberately **not** done
+   here: it changes simulation behaviour, wants its own default-off flag + a
+   regression pass, and the artefacts needed to confirm an over-sell actually
+   occurred are not present in this container. Not attempted in
+   `weinstein_strategy.ml` or the stop machine (`dev/decisions.md`).
+2. **`position_id` in `trades.csv` is not a reliable forensic key.**
+   `Trade_context._position_id_for_trade` resolves it via a 7-day backward
+   window over audit records *for the symbol*, so any round-trip whose entry
+   lands within a week of a real entry decision inherits that decision's id even
+   when it belongs to a different (or non-existent) position. This is what made
+   #2059's three rows look like one position. Any per-trade forensic that groups
+   by `position_id` should be re-checked. The fix would be to thread the real
+   position link through `Fill_router`'s order links into the round-trip rather
+   than re-deriving it by date proximity.
 
 ### 2026-07-04 — sibling round-trip pairing fix (#1847, MERGED as `761c30cf`)
 

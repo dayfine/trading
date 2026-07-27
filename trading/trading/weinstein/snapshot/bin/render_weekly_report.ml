@@ -1,8 +1,8 @@
 (** [render_weekly_report] CLI — render a weekly snapshot as Markdown or HTML.
 
     Usage:
-    [render_weekly_report <pick-file> [-html] [-data-dir PATH] [-long-limit N]
-     [-short-limit N]]
+    [render_weekly_report <pick-file> [-html] [-html-out PATH] [-data-dir PATH]
+     [-long-limit N] [-short-limit N]]
 
     Reads a single weekly snapshot from disk, renders it, and prints the result
     to stdout.
@@ -11,6 +11,11 @@
     invocation is unchanged. [-html] switches to the self-contained HTML page
     ({!Html_report_renderer.render}) — inline CSS, inline SVG charts, no
     external assets.
+
+    [-html-out PATH] implies [-html] and writes the page to [PATH] instead of
+    stdout, so a caller can produce the [.md] and the [.html] in one run without
+    shell redirection. A path that cannot be written is a hard error (exit 1),
+    not a silent drop.
 
     [-data-dir PATH] points at the CSV price store so the HTML charts have bars
     to draw; each shown symbol is read on demand via
@@ -30,13 +35,20 @@ open Weinstein_snapshot
 
 type _flags = {
   html : bool;
+  html_out : string option;
   data_dir : string option;
   long_limit : int option;
   short_limit : int option;
 }
 
 let _no_flags =
-  { html = false; data_dir = None; long_limit = None; short_limit = None }
+  {
+    html = false;
+    html_out = None;
+    data_dir = None;
+    long_limit = None;
+    short_limit = None;
+  }
 
 let _read_snapshot path : Weekly_snapshot.t =
   match Snapshot_reader.read_from_file path with
@@ -71,10 +83,23 @@ let _render (flags : _flags) snap =
     Report_renderer.render ?long_limit:flags.long_limit
       ?short_limit:flags.short_limit snap
 
+(* [-html-out] writes the HTML beside whatever stdout is carrying, so one
+   invocation can produce both forms without shell redirection. An unwritable
+   path is a hard error: silently dropping the report the caller asked to keep
+   would be worse than failing. *)
+let _emit (flags : _flags) rendered =
+  match flags.html_out with
+  | None -> print_string rendered
+  | Some path -> (
+      try Out_channel.write_all path ~data:rendered
+      with Sys_error msg ->
+        eprintf "Failed to write %s: %s\n" path msg;
+        exit 1)
+
 let _usage () =
   eprintf
-    "Usage: render_weekly_report <pick-file> [-html] [-data-dir PATH] \
-     [-long-limit N] [-short-limit N]\n";
+    "Usage: render_weekly_report <pick-file> [-html] [-html-out PATH] \
+     [-data-dir PATH] [-long-limit N] [-short-limit N]\n";
   exit 2
 
 (* Parse the flags following the positional pick-file. Any unrecognised flag or
@@ -83,6 +108,8 @@ let rec _parse_flags args (acc : _flags) =
   match args with
   | [] -> acc
   | "-html" :: rest -> _parse_flags rest { acc with html = true }
+  | "-html-out" :: p :: rest ->
+      _parse_flags rest { acc with html = true; html_out = Some p }
   | "-data-dir" :: d :: rest -> _parse_flags rest { acc with data_dir = Some d }
   | "-long-limit" :: n :: rest ->
       _parse_flags rest { acc with long_limit = Some (Int.of_string n) }
@@ -94,5 +121,5 @@ let () =
   match Sys.get_argv () |> Array.to_list with
   | _ :: pick_path :: flags ->
       let flags = _parse_flags flags _no_flags in
-      print_string (_render flags (_read_snapshot pick_path))
+      _emit flags (_render flags (_read_snapshot pick_path))
   | _ -> _usage ()
