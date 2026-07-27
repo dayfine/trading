@@ -284,6 +284,25 @@
  (action
   (run sh %{dep:consolidate_day_check.sh})))
 
+; Regression test for H-RUNENV-WORKTREE-BLIND: dev/lib/run-in-env.sh's
+; in-container path used to pin PROJECT_ROOT to ${GITHUB_WORKSPACE}/trading
+; unconditionally, ignoring the invoker's cwd -- an agent running from a git
+; worktree would silently build+test the MAIN checkout and report a false
+; green. Builds two throwaway git trees in mktemp and asserts the worktree
+; case, the normal-GHA case, the devcontainer fallback, and the disagreement
+; case (loud failure) all resolve correctly. Does NOT touch the real repo's
+; dune-workspace or opam env. Requires bash + git; skips cleanly otherwise.
+; dev/lib/run-in-env.sh lives outside the dune workspace root (above
+; trading/); the check reads it via repo_root() in _check_lib.sh. No glob
+; dep needed for the real file: cache invalidates when the check script
+; itself changes (same pattern as consolidate_day_check.sh above).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh run_in_env_root_check.sh)
+ (action
+  (run sh %{dep:run_in_env_root_check.sh})))
+
 ; Rule promotion check (T3-F): verify every Lifecycle: enforced rule in
 ; docs/design/dependency-rules.md has a corresponding check script that
 ; exists on disk and is referenced by this dune file.
