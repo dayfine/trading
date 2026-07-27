@@ -175,6 +175,23 @@ else
 fi
 OUTPUT_BASENAME="$(basename "$OUTPUT_FILE")"
 
+# --- Validate quality score is an integer in 1..5 ---
+#
+# "null" / empty means "no score" and is fine (pre-T1-Q reviews, or a verdict
+# path where behavioral didn't run). Anything else must be exactly one digit
+# 1-5 -- fail loudly and write nothing rather than let an out-of-range value
+# (or non-numeric garbage) reach the JSON body below. See H-QC-SCALE
+# (dev/status/harness.md): a QC agent posted an inverted-polarity score that
+# happened to be in-range and so was accepted by construction, not by luck;
+# a value outside 1..5 must not be accepted the same silent way.
+if [ "$QUALITY_SCORE" != "null" ] && [ -n "$QUALITY_SCORE" ]; then
+  if ! echo "$QUALITY_SCORE" | grep -qE '^[1-5]$'; then
+    echo "FAIL: --quality-score must be an integer 1..5 (1=worst, 5=best), got: '$QUALITY_SCORE'" >&2
+    echo "  Target record: $OUTPUT_FILE" >&2
+    exit 1
+  fi
+fi
+
 # --- Compute this record's write-order timestamp ---
 #
 # epoch nanoseconds, fixed-width (19 digits until year ~2286) so plain
