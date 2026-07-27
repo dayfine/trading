@@ -1,5 +1,5 @@
-(executable
- (name generate_weekly_snapshot)
+(executables
+ (names generate_weekly_snapshot record_fill)
  (libraries
   core
   core_unix.command_unix
