@@ -195,3 +195,151 @@ Per `.claude/rules/qc-behavioral-authority.md`: "For pure infrastructure / libra
 APPROVED
 
 (Derived mechanically: CP1 NA, CP2 PASS, CP3 NA, CP4 NA, V1-V6 PASS, all domain rows NA. No FAILs.)
+
+---
+
+## PR #2115 — `fix/lh-phantom-short` (2026-07-27 run 2) — MERGED `5ff998d9`
+
+**Format note:** `record_qc_audit.sh` matches `^(structural|behavioral|overall)_qc: (APPROVED|NEEDS_REWORK)`
+at column 0 and takes the **last** occurrence, plus the bare integer under the
+last `## Quality Score`. Keep these unadorned; a "prettier" rendering parses to
+`SKIPPED / null` while exiting 0.
+
+Closes issue **#2059** — a `bug`-labelled correctness defect that sat **unowned
+across five consecutive orchestrator runs**. First agent dispatched on it.
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+Rework iterations: 0.
+
+### The bug, and the single root cause behind all three symptoms
+
+A long-only record run (`enable_short_side false`) emitted, in `trades.csv`:
+a LONG round trip, then a **phantom SHORT** held **8,459 days** (2001→2024),
+**duplicated byte-for-byte**, double-counting −$303,450 twice against $71.7M net
+realized.
+
+`Metrics.extract_round_trips` was **not quantity-faithful**. `_pair_step` popped
+an *entire* open entry for *any* opposing trade regardless of quantity, so a
+**partial exit** (a) booked the **full entry quantity** at the **partial exit
+price**, and (b) silently dropped the residual shares — leaving the *next*
+closing `Sell` with no open entry, whereupon it fell into the "open a new entry"
+arm and became a **SHORT open**. One cause, all three symptoms:
+
+| defect | disposition | mechanism |
+|---|---|---|
+| 1 — SHORT with short-side disabled | CLOSED | orphaned residual `Sell` re-read as a short *open* |
+| 2 — 8,459-day zombie | CLOSED | *same emission*; never a portfolio zombie — the position exists only inside the pairing fold, which is precisely **why** no exit channel ever re-evaluated it |
+| 3 — exact duplicate row | CLOSED for the orphan cause; genuine-over-sell variant characterised-and-filed | each orphaned `Sell` opens its own phantom short; two orphans with identical date/price/qty produce byte-identical rows |
+
+### The reconstruction — and why it is more than a plausible story
+
+**The record warehouse does not exist in the GHA container**, so neither author
+nor reviewer could reproduce from the original run. The fix is justified by a
+reconstruction, which makes verifying that reconstruction the whole review.
+
+qc-behavioral hand-traced the pre-fix code against the reported stream and
+reproduced **all nine fields of both rows**, not a subset:
+
+- LONG row: `_pop_matching_entry` compares `entry.quantity * factor` (3868)
+  against `exit_qty` (1934), fails to match, FIFO-pops the entire entry;
+  `_make_trade_metric` then uses `entry.quantity *. factor` → `qty 3868`,
+  `entry 69.72`, `exit 68.30`, `days_held = Date.diff 2001-06-12 2001-06-09 = 3`,
+  `pnl −5482.5`, `pct −2.03`.
+- SHORT row: the next `Sell` hits `open_entries = []` → the `| _ ->` arm → short
+  open. `days_held 8459` independently recomputed (8401 to 2024-06-13 including
+  six leap days, +58); `pnl −303450.4`, `pct −232.80`. Exact.
+
+Two constraints make it forced rather than fitted: **`3868 = 2 × 1934`** is
+compelled by LabCorp's real 2-for-1 split effective **2001-06-12** — exactly the
+LONG row's `exit_date`, i.e. landing precisely on the `split_date <= exit_date`
+boundary; and the phantom's quantity being exactly half the LONG's is a
+**prediction** of the residual mechanism, not an input to it.
+
+**A premise in my own dispatch brief was wrong, and the author corrected it.** I
+told the agent the shared `position_id` (`LH-wein-536`) was "the single strongest
+clue — it says these are the same position record". It is the opposite:
+`Trade_context._position_id_for_trade` matches `(symbol, entry_date)` over a
+**7-day backward window**, so the phantom (4 days later) merely *inherits* the
+id. It proves the short has **no audit record** — the strategy never decided to
+open it. `extract_round_trips` never reads portfolio state at all; it
+reconstructs positions purely by folding `step.trades`, so a SHORT row implies
+nothing whatsoever about the portfolio.
+
+### The changed existing test — correction, not weakening
+
+`mismatched_qty_falls_back_to_fifo` asserted `quantity = 100` for a 70-share
+sell; it is now `70`. This is the exact shape of an illegitimate test weakening,
+so it got the sharpest scrutiny. qc-behavioral judged it a correction on three
+independent grounds: (1) the old expectation booked `(15−10)×100 = $500` on a
+**70-share** sale with the 30-share residual silently dropped — an uncompensated
+over-count, not an alternative convention; (2) the test's actual purpose (FIFO
+*selection*) is pinned by `entry_price = 10.0`, retained unchanged, as is the row
+count; (3) **the new expectation is strictly stronger** — mutation M4 emits 100,
+which the old assertion would have *passed* and the new one kills. It adds
+mutation coverage, the opposite of the weakening signature.
+
+### No new leak
+
+A retained-but-unclosed residual is not new: pre-fix those shares also went
+unreported (consumed whole, vanished from the fold); only the over-count is gone.
+`sum(take_i × factor_i)` telescopes exactly to the exit quantity, `remaining` is
+monotone decreasing, and the `unconsumed > 0` return is reachable only from the
+`| [] ->` arm — which is what keeps `_pair_step`'s head-only `_opposes` guard
+sound. Downstream consumers (`summary_computer.ml`,
+`trade_aggregates_computer.ml`) are per-row folds with no one-row-per-position
+assumption.
+
+### Structural
+
+`metrics.ml` crossed the 300-line limit, so the pairing logic was **extracted**
+into a new `Round_trip_pairing` module per `code-health-discipline.md` — no
+`@large-module` marker, no limit bump, no `linter_exceptions.conf` change.
+`metrics.ml` 287 → 119; `round_trip_pairing.ml` 248 with a 110-line `.mli`.
+`Metrics` re-exports the type as a **type equality**, so field access and
+`[@@deriving]` output are unchanged and no consumer changed — qc-structural
+confirmed this is a true type abbreviation rather than a fresh nominal type,
+which is the difference between "no consumer changed" and a silent break. All
+functions ≤23 lines. `weinstein_strategy.ml`, the core stop-machine, `Portfolio`,
+`Position`, `Orders` and `Engine` are all untouched, per `dev/decisions.md`.
+
+Mutations, 4 run, each red: M1 whole-entry consumption (pre-fix behaviour) →
+tests 25–28; M2 drop the over-close leftover → 29; M3 FIFO → LIFO → 25; M4
+full-entry quantity in `_make_trade_metric` → 25–29.
+
+### Non-blocking FLAGs carried to `dev/status/cleanup.md`
+
+1. **Defect-1 closure is understated.** The reconstruction that explains defect 3
+   *requires* a genuine over-sell (two byte-identical orphans cannot arise from
+   one 3868-share position otherwise) — and under a genuine over-sell **one SHORT
+   row still prints post-fix**, correctly, because `Portfolio` has an explicit
+   direction-change branch and the portfolio really would be short. This is
+   disclosed in the PR body, test 27's docstring and `dev/status/simulation.md`,
+   but the disposition table says "CLOSED" unqualified and `Fixes #2059`
+   auto-closes the issue. **The caveat should be carried into the issue-closing
+   comment.**
+2. Stale docstring on the updated FIFO test (cites `_pop_matching_entry`, now
+   `_select_entry_index`; omits the 30-share residual from its end-state).
+3. `_residual_qty_epsilon`'s sliver guard is unpinned — every split factor in the
+   suite divides exactly, so mutating the epsilon to `0.0` reddens nothing.
+
+### Deliberately not done
+
+A "no single fill may flip a position's sign" invariant was **filed, not
+executed**: it changes simulation behaviour, wants its own default-off flag per
+`experiment-flag-discipline.md`, and could not be confirmed from this container.
+The proposed non-core enforcement point (`Cancel_handler.apply_trades_best_effort`,
+already the single fill funnel) is recorded in `dev/status/simulation.md`. The
+`position_id` join is also filed: any per-trade forensic grouping by
+`position_id` is suspect until it threads the real position link instead of
+re-deriving by date proximity.
+
+## Quality Score
+
+4
+
+## Verdict
+
+APPROVED
