@@ -60,7 +60,12 @@
 # are committed to git; a fresh checkout stamps every file with
 # checkout time, not original write time -- mtime-based ordering is
 # unreliable across a checkout boundary). Records written before this
-# field existed have no "recorded_at_ns" and sort as oldest.
+# field existed have no "recorded_at_ns" and sort as oldest -- the
+# extraction below is written to degrade to 0 rather than abort under
+# `set -euo pipefail` when grep finds no match (a bare failing `grep`
+# in a pipeline makes the whole pipeline's exit status non-zero, which
+# would otherwise kill the script before it ever writes the record;
+# regression-tested in record_qc_audit_test.sh scenario 9).
 
 set -euo pipefail
 
@@ -175,7 +180,45 @@ OUTPUT_BASENAME="$(basename "$OUTPUT_FILE")"
 # epoch nanoseconds, fixed-width (19 digits until year ~2286) so plain
 # lexicographic `sort` on the raw value is also a correct numeric sort.
 # Override via WRITE_AUDIT_RECORDED_AT_NS for deterministic tests.
-RECORDED_AT_NS="${WRITE_AUDIT_RECORDED_AT_NS:-$(date -u +%s%N)}"
+#
+# RECORDED_AT_NS is interpolated unquoted into the JSON body below (it is
+# a JSON number, not a string), so it MUST be validated as a plain
+# nonnegative integer before use -- an unvalidated value here writes
+# malformed JSON straight into a committed audit record.
+_is_nonneg_int() {
+  case "$1" in
+    '' | *[!0-9]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+if [ -n "${WRITE_AUDIT_RECORDED_AT_NS:-}" ]; then
+  # Test-only override. A bad value here is a caller/fixture bug, not a
+  # platform quirk -- fail loudly rather than silently substituting a
+  # different value a test might not notice.
+  if _is_nonneg_int "$WRITE_AUDIT_RECORDED_AT_NS"; then
+    RECORDED_AT_NS="$WRITE_AUDIT_RECORDED_AT_NS"
+  else
+    echo "FAIL: WRITE_AUDIT_RECORDED_AT_NS must be a nonnegative integer, got: $WRITE_AUDIT_RECORDED_AT_NS" >&2
+    exit 1
+  fi
+else
+  # `date -u +%s%N` is GNU-only; BSD/macOS date does not understand %N and
+  # emits it as a literal "N" (e.g. "1785315600N"), which would otherwise
+  # land directly in the JSON body as an invalid numeric literal. This is
+  # a platform quirk, not a caller error, so degrade gracefully instead of
+  # failing: fall back to whole-second resolution scaled up to the same
+  # magnitude as a real nanosecond timestamp (seconds * 10^9), which keeps
+  # the "fixed-width, lexicographically sortable" property intact at the
+  # cost of sub-second ordering precision on such platforms.
+  RAW_NS="$(date -u +%s%N 2>/dev/null || true)"
+  if _is_nonneg_int "$RAW_NS"; then
+    RECORDED_AT_NS="$RAW_NS"
+  else
+    FALLBACK_SECONDS="$(date -u +%s)"
+    RECORDED_AT_NS=$((FALLBACK_SECONDS * 1000000000))
+  fi
+fi
 
 # --- Compute consecutive_rework_count ---
 #
@@ -206,7 +249,14 @@ if [ "$OVERALL" = "NEEDS_REWORK" ]; then
       continue
     fi
 
-    f_recorded_at=$(grep -o '"recorded_at_ns": *[0-9]*' "$f" 2>/dev/null | head -1 | sed 's/.*: *//')
+    # `|| true` is load-bearing: under `set -euo pipefail`, `grep` finding
+    # no "recorded_at_ns" field in a legacy record (the expected case for
+    # every record written before this field existed) exits 1, which makes
+    # the whole pipeline's status non-zero and would otherwise abort this
+    # script before it ever writes the current record. `|| true` lets the
+    # pipeline fail closed into an empty $f_recorded_at instead, which the
+    # next line then defaults to 0 as documented above.
+    f_recorded_at=$(grep -o '"recorded_at_ns": *[0-9]*' "$f" 2>/dev/null | head -1 | sed 's/.*: *//' || true)
     [ -z "$f_recorded_at" ] && f_recorded_at=0
     candidate_pairs="${candidate_pairs}${f_recorded_at}	${f}
 "

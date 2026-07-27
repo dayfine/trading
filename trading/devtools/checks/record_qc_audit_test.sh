@@ -486,6 +486,119 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 9 — legacy-record crash regression (F1 rework-2 fix): a prior
+# audit record with NO "recorded_at_ns" field (i.e. written before that
+# field existed, or by any tool that doesn't set it) must NOT abort the
+# script when the current call is on the NEEDS_REWORK path. Pre-fix, the
+# `grep -o ... | head -1 | sed ...` pipeline extracting recorded_at_ns
+# exited 1 (no match) under `set -euo pipefail`, which killed the whole
+# script before it ever wrote the current record -- silently, with no
+# error message, destroying exactly the write that was supposed to extend
+# the consecutive_rework_count streak. This seeds a legacy-shaped record
+# (no recorded_at_ns key at all) and asserts the current call still
+# succeeds, still writes its own record, and still counts the legacy
+# record into the streak (defaulting its write-order to 0 / oldest, per
+# the docstring above the extraction).
+# ---------------------------------------------------------------------------
+FEATURE9="legacy-no-recorded-at-ns"
+mkdir -p "${TMP_REPO}/dev/audit"
+cat > "${TMP_REPO}/dev/audit/2026-07-20-harness-old-${FEATURE9}.json" <<EOF
+{
+  "date": "2026-07-20",
+  "feature": "${FEATURE9}",
+  "branch": "harness/old",
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": null,
+  "findings_count": { "PASS": 1, "FAIL": 1, "FLAG": 0 },
+  "consecutive_rework_count": 1,
+  "notes": ""
+}
+EOF
+
+out9=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=4000000000000000000 \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-27 --feature "${FEATURE9}" --branch "harness/new" \
+    --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK 2>&1) && rc9=0 || rc9=$?
+JSON9="${TMP_REPO}/dev/audit/2026-07-27-harness-new-${FEATURE9}.json"
+
+if (( rc9 == 0 )) && [[ -f "${JSON9}" ]] \
+   && grep -q '"consecutive_rework_count": *2' "${JSON9}" \
+   && echo "${out9}" | grep -q 'consecutive_rework_count=2'; then
+  pass "scenario 9 — legacy record with no recorded_at_ns does not abort the script (F1 rework-2 fix)"
+else
+  fail "scenario 9 — expected rc=0, record written, consecutive_rework_count=2; got rc=${rc9}"
+  echo "${out9}" | sed 's/^/      /'
+  [[ -f "${JSON9}" ]] && echo "      json: $(cat "${JSON9}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 10 — N2 rework-2 fix: a non-numeric WRITE_AUDIT_RECORDED_AT_NS
+# override must never reach the JSON body unquoted (which would write
+# invalid JSON straight into a committed audit record). The override is a
+# test-only knob, so a bad value is treated as a caller/fixture bug: hard
+# fail with a clear message and write nothing, rather than silently
+# substituting some other value.
+# ---------------------------------------------------------------------------
+FEATURE10="bad-override-rejected"
+audit_count_before_10="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE10}.json" | wc -l | tr -d ' ')"
+
+out10=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=oops \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-27 --feature "${FEATURE10}" --branch "harness/x" \
+    --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1) && rc10=0 || rc10=$?
+audit_count_after_10="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE10}.json" | wc -l | tr -d ' ')"
+
+if (( rc10 == 1 )) && [[ "${audit_count_before_10}" == "0" ]] && [[ "${audit_count_after_10}" == "0" ]] \
+   && echo "${out10}" | grep -q 'must be a nonnegative integer'; then
+  pass "scenario 10 — non-numeric WRITE_AUDIT_RECORDED_AT_NS rejected, no record written (N2 fix)"
+else
+  fail "scenario 10 — expected rc=1, no file written, 'must be a nonnegative integer' message; got rc=${rc10}, before=${audit_count_before_10}, after=${audit_count_after_10}"
+  echo "${out10}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 11 — N3 rework-2 fix: a BSD/macOS-style `date` that does not
+# support %N (emits the literal suffix "N" instead of nanoseconds, e.g.
+# "1753660800N") must not let that literal "N" reach the JSON body as an
+# invalid numeric literal. Simulated via a mock `date` shim prepended to
+# PATH; the real `date -u +%s` (used for the graceful-degrade fallback)
+# is still available on PATH under its real name via an absolute-path
+# passthrough in the shim.
+# ---------------------------------------------------------------------------
+FEATURE11="bsd-date-no-percent-n"
+S11_DIR="${TMP_REPO}/s11-bin"
+mkdir -p "${S11_DIR}"
+REAL_DATE="$(command -v date)"
+cat > "${S11_DIR}/date" <<EOF
+#!/bin/sh
+if [ "\$1" = "-u" ] && [ "\$2" = "+%s%N" ]; then
+  echo "\$(${REAL_DATE} -u +%s)N"
+else
+  exec ${REAL_DATE} "\$@"
+fi
+EOF
+chmod +x "${S11_DIR}/date"
+
+out11=$(REPO_ROOT="${TMP_REPO}" PATH="${S11_DIR}:${PATH}" \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-27 --feature "${FEATURE11}" --branch "harness/x" \
+    --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1) && rc11=0 || rc11=$?
+JSON11="${TMP_REPO}/dev/audit/2026-07-27-harness-x-${FEATURE11}.json"
+
+if (( rc11 == 0 )) && [[ -f "${JSON11}" ]] \
+   && grep -qE '"recorded_at_ns": [0-9]+,' "${JSON11}" \
+   && ! grep -q 'N,' "${JSON11}"; then
+  pass "scenario 11 — BSD-style date lacking %N degrades to a valid numeric timestamp, not a literal N (N3 fix)"
+else
+  fail "scenario 11 — expected rc=0, recorded_at_ns to be a plain integer with no literal N; got rc=${rc11}"
+  echo "${out11}" | sed 's/^/      /'
+  [[ -f "${JSON11}" ]] && echo "      json: $(cat "${JSON11}")"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
