@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # write_audit.sh — Audit trail writer for QC review outcomes (T3-D).
 #
-# Writes a structured JSON record to dev/audit/YYYY-MM-DD-<feature>.json.
-# Designed to be called by the lead-orchestrator after QC agents complete,
-# or manually during development.
+# Writes a structured JSON record to
+# dev/audit/<date>-<branch-sanitized>-<feature>.json (or
+# dev/audit/YYYY-MM-DD-<feature>.json when --branch is omitted/empty --
+# see the H-AUDIT-COLLISION note below). Designed to be called by the
+# lead-orchestrator after QC agents complete, or manually during
+# development.
 #
 # Usage:
 #   sh write_audit.sh \
@@ -45,6 +48,19 @@
 # consumers (the consecutive_rework_count scan below and
 # deep_scan/check_06_qc_calibration.sh) glob on that suffix and must not
 # need to change shape.
+#
+# Chronological ordering (recorded_at_ns): allowing multiple same-day
+# records per feature (above) means the consecutive_rework_count scan
+# below can no longer assume "one file per day == one record per day
+# in write order". Each record embeds "recorded_at_ns" (epoch
+# nanoseconds at write time) so the scan can sort candidates by true
+# write order. This is deliberately NOT derived from the filename
+# (lexicographic sort orders same-day records by branch name, which is
+# unrelated to write order) nor from file mtime (dev/audit/*.json files
+# are committed to git; a fresh checkout stamps every file with
+# checkout time, not original write time -- mtime-based ordering is
+# unreliable across a checkout boundary). Records written before this
+# field existed have no "recorded_at_ns" and sort as oldest.
 
 set -euo pipefail
 
@@ -154,9 +170,18 @@ else
 fi
 OUTPUT_BASENAME="$(basename "$OUTPUT_FILE")"
 
+# --- Compute this record's write-order timestamp ---
+#
+# epoch nanoseconds, fixed-width (19 digits until year ~2286) so plain
+# lexicographic `sort` on the raw value is also a correct numeric sort.
+# Override via WRITE_AUDIT_RECORDED_AT_NS for deterministic tests.
+RECORDED_AT_NS="${WRITE_AUDIT_RECORDED_AT_NS:-$(date -u +%s%N)}"
+
 # --- Compute consecutive_rework_count ---
 #
-# Look at prior audit records for this feature, sorted by date descending.
+# Look at prior audit records for this feature, sorted by write order
+# (recorded_at_ns) descending -- NOT by filename or mtime; see the
+# "Chronological ordering" note near the top of this file for why.
 # Count how many consecutive NEEDS_REWORK verdicts precede this one.
 # If the current verdict is NEEDS_REWORK, the count includes this record.
 # If APPROVED, the streak resets to 0.
@@ -167,10 +192,12 @@ if [ "$OVERALL" = "NEEDS_REWORK" ]; then
   # Start at 1 (this record is itself a NEEDS_REWORK)
   CONSECUTIVE=1
 
-  # Find prior audit files for this feature, sorted newest-first
-  prior_files=$(ls -1 "$AUDIT_DIR"/*-"$FEATURE".json 2>/dev/null | sort -r || true)
-
-  for f in $prior_files; do
+  # Build "<recorded_at_ns>\t<file>" pairs for every prior audit file of
+  # this feature, then sort by recorded_at_ns descending (true write
+  # order). Records predating this field have no recorded_at_ns and
+  # default to 0 (oldest).
+  candidate_pairs=""
+  for f in $(ls -1 "$AUDIT_DIR"/*-"$FEATURE".json 2>/dev/null || true); do
     # Skip the file we are about to write (same date+branch+feature --
     # this is what makes re-running for the SAME review idempotent
     # rather than counting itself as a prior NEEDS_REWORK).
@@ -178,6 +205,17 @@ if [ "$OVERALL" = "NEEDS_REWORK" ]; then
     if [ "$basename_f" = "$OUTPUT_BASENAME" ]; then
       continue
     fi
+
+    f_recorded_at=$(grep -o '"recorded_at_ns": *[0-9]*' "$f" 2>/dev/null | head -1 | sed 's/.*: *//')
+    [ -z "$f_recorded_at" ] && f_recorded_at=0
+    candidate_pairs="${candidate_pairs}${f_recorded_at}	${f}
+"
+  done
+
+  ordered_files=$(printf '%s' "$candidate_pairs" | sort -rn | cut -f2-)
+
+  for f in $ordered_files; do
+    [ -n "$f" ] || continue
 
     # Extract overall_qc from the JSON (simple grep — no jq dependency)
     prev_verdict=$(grep -o '"overall_qc": *"[^"]*"' "$f" 2>/dev/null | head -1 | sed 's/.*: *"//;s/"//')
@@ -213,6 +251,7 @@ cat > "$OUTPUT_FILE" <<ENDJSON
   "date": "$DATE",
   "feature": "$(_json_str "$FEATURE")",
   "branch": "$(_json_str "$BRANCH")",
+  "recorded_at_ns": $RECORDED_AT_NS,
   "structural_qc": "$STRUCTURAL",
   "behavioral_qc": "$BEHAVIORAL",
   "overall_qc": "$OVERALL",

@@ -379,6 +379,113 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 7c — empty --branch fallback: `record_qc_audit.sh <feature> "" <date>`
+# satisfies the 3-positional-arg arity check (an unset $BRANCH in the
+# orchestrator's documented fallback invocation silently takes this path).
+# write_audit.sh's `[ -n "$BRANCH" ]` guard treats "" the same as "omitted",
+# falling back to the pre-fix dev/audit/<date>-<feature>.json shape, which
+# DOES still clobber same-day sibling reviews of the same feature.
+#
+# This is a KNOWN, documented gap -- NOT fixed by this change (out of scope
+# for the H-AUDIT-COLLISION fix, which requires a real branch value to
+# disambiguate). This test pins the current (still-clobbering) behavior so
+# a future change to this fallback path doesn't silently regress it further
+# without updating this test.
+# ---------------------------------------------------------------------------
+FEATURE7C="empty-branch-fallback"
+cat > "${TMP_REPO}/dev/reviews/${FEATURE7C}.md" <<'EOF'
+Reviewed SHA: run1sha
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+4 — first run, empty branch
+EOF
+
+out7c_1=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE7C}" "" "2026-07-27" 2>&1) && rc7c_1=0 || rc7c_1=$?
+JSON7C="${TMP_REPO}/dev/audit/2026-07-27-${FEATURE7C}.json"
+
+cat > "${TMP_REPO}/dev/reviews/${FEATURE7C}.md" <<'EOF'
+Reviewed SHA: run2sha
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+5 — second run, different track, still empty branch
+EOF
+out7c_2=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE7C}" "" "2026-07-27" 2>&1) && rc7c_2=0 || rc7c_2=$?
+
+audit_count_7c="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "2026-07-27-*${FEATURE7C}.json" | wc -l | tr -d ' ')"
+
+if (( rc7c_1 == 0 )) && (( rc7c_2 == 0 )) && [[ -f "${JSON7C}" ]] \
+   && [[ "${audit_count_7c}" == "1" ]] \
+   && grep -q '"quality_score": *5' "${JSON7C}"; then
+  pass "scenario 7c — empty --branch reaches the no-branch fallback and still clobbers (KNOWN gap, pinned not fixed)"
+else
+  fail "scenario 7c — expected exactly 1 file (second run wins, q=5); got rc=${rc7c_1}/${rc7c_2}, audit_count=${audit_count_7c}"
+  echo "${out7c_1}" | sed 's/^/      /'
+  echo "${out7c_2}" | sed 's/^/      /'
+  [[ -f "${JSON7C}" ]] && echo "      json: $(cat "${JSON7C}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 8 — chronological ordering regression (F1 rework fix): the
+# consecutive_rework_count scan in write_audit.sh must consult same-day
+# prior records in TRUE write order (recorded_at_ns), not by filename
+# (branch-name) lexicographic order. Three same-date records for one
+# feature, written in this order:
+#   1. branch "feat/zzz" -> NEEDS_REWORK   (oldest)
+#   2. branch "feat/aaa" -> APPROVED       (breaks the streak)
+#   3. branch "feat/mmm" -> NEEDS_REWORK   (current record under test)
+#
+# Correct consecutive_rework_count for record 3 is 1 (the streak is broken
+# by the APPROVED record 2 immediately preceding it in write order). The
+# pre-fix `ls | sort -r` ordered these same-date records by FILENAME
+# descending -- "zzz" > "mmm" > "aaa" alphabetically -- so it consulted
+# "zzz" (NEEDS_REWORK) as if it immediately preceded "mmm", overcounting
+# to 2. WRITE_AUDIT_RECORDED_AT_NS pins write order deterministically
+# instead of relying on real wall-clock gaps between the three calls.
+# ---------------------------------------------------------------------------
+FEATURE8="ordering-regression"
+WRITE_AUDIT="${TMP_REPO}/trading/devtools/checks/write_audit.sh"
+
+out8_1=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=1000000000000000000 \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-27 --feature "${FEATURE8}" --branch "feat/zzz" \
+    --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK 2>&1) && rc8_1=0 || rc8_1=$?
+
+out8_2=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=2000000000000000000 \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-27 --feature "${FEATURE8}" --branch "feat/aaa" \
+    --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1) && rc8_2=0 || rc8_2=$?
+
+out8_3=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=3000000000000000000 \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-27 --feature "${FEATURE8}" --branch "feat/mmm" \
+    --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK 2>&1) && rc8_3=0 || rc8_3=$?
+
+JSON8="${TMP_REPO}/dev/audit/2026-07-27-feat-mmm-${FEATURE8}.json"
+
+if (( rc8_1 == 0 )) && (( rc8_2 == 0 )) && (( rc8_3 == 0 )) \
+   && [[ -f "${JSON8}" ]] \
+   && grep -q '"consecutive_rework_count": *1' "${JSON8}" \
+   && echo "${out8_3}" | grep -q 'consecutive_rework_count=1'; then
+  pass "scenario 8 — same-day records consulted in write order (recorded_at_ns), not filename order (F1 rework fix)"
+else
+  fail "scenario 8 — expected consecutive_rework_count=1 for feat/mmm record (streak broken by feat/aaa=APPROVED immediately preceding in write order); got rc=${rc8_1}/${rc8_2}/${rc8_3}"
+  echo "${out8_1}" | sed 's/^/      /'
+  echo "${out8_2}" | sed 's/^/      /'
+  echo "${out8_3}" | sed 's/^/      /'
+  [[ -f "${JSON8}" ]] && echo "      json: $(cat "${JSON8}")"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
