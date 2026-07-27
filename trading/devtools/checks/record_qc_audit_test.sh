@@ -706,6 +706,137 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 15 — H-QC-SCALE boundary: quality score '0' (file-mode) rejected.
+# record_qc_audit.sh's own range check (`^[1-5]$`) must refuse 0, not just
+# out-of-range values above 5 (scenario 12 only pins the upper side, via
+# '7'). Asserts on record_qc_audit.sh's OWN failure message ("... is not an
+# integer in 1..5") specifically, so a mutation that widens ITS range check
+# to accept 0 (e.g. `^[0-5]$`) shows up here even though write_audit.sh's
+# independent check would otherwise catch the bad value downstream with a
+# different message and mask the regression.
+# ---------------------------------------------------------------------------
+FEATURE15="zero-score-file-mode"
+cat > "${TMP_REPO}/dev/reviews/${FEATURE15}.md" <<'EOF'
+Reviewed SHA: zeroscore1
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+0 — bogus zero score
+EOF
+
+audit_count_before_15="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE15}.json" | wc -l | tr -d ' ')"
+
+out15=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE15}" "feat/dummy" "2026-05-25" 2>&1) && rc15=0 || rc15=$?
+
+audit_count_after_15="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE15}.json" | wc -l | tr -d ' ')"
+
+if (( rc15 == 1 )) && [[ "${audit_count_before_15}" == "0" ]] && [[ "${audit_count_after_15}" == "0" ]] \
+   && echo "${out15}" | grep -q "quality score '0' is not an integer in 1..5"; then
+  pass "scenario 15 — zero quality score (file-mode) rejected with exit 1, no record written (H-QC-SCALE lower bound)"
+else
+  fail "scenario 15 — expected rc=1, no file written, message naming '0'; got rc=${rc15}, before=${audit_count_before_15}, after=${audit_count_after_15}"
+  echo "${out15}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 16 — H-QC-SCALE boundary: double-digit quality score '10'
+# (file-mode) rejected, AND pins that the extractor captures the FULL
+# leading digit run rather than truncating to a single character. Before
+# the extractor was widened (see the H-QC-SCALE comment above the
+# extraction logic), a score of "10" would have been silently truncated to
+# "1" -- an in-range but WRONG value, accepted with exit 0. This scenario
+# is the demonstrated production-shaped escape: it fails only if BOTH the
+# multi-digit capture holds AND the range check's end-anchor rejects the
+# resulting "10" outright (a dropped end anchor lets "10" match a leading
+# "1" and pass).
+# ---------------------------------------------------------------------------
+FEATURE16="ten-score-file-mode"
+cat > "${TMP_REPO}/dev/reviews/${FEATURE16}.md" <<'EOF'
+Reviewed SHA: tenscore1
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+10 — double-digit bogus score
+EOF
+
+audit_count_before_16="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE16}.json" | wc -l | tr -d ' ')"
+
+out16=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE16}" "feat/dummy" "2026-05-25" 2>&1) && rc16=0 || rc16=$?
+
+audit_count_after_16="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE16}.json" | wc -l | tr -d ' ')"
+
+if (( rc16 == 1 )) && [[ "${audit_count_before_16}" == "0" ]] && [[ "${audit_count_after_16}" == "0" ]] \
+   && echo "${out16}" | grep -q "quality score '10' is not an integer in 1..5"; then
+  pass "scenario 16 — double-digit quality score '10' (file-mode) rejected, pins multi-digit capture + end-anchored range check"
+else
+  fail "scenario 16 — expected rc=1, no file written, message naming '10'; got rc=${rc16}, before=${audit_count_before_16}, after=${audit_count_after_16}"
+  echo "${out16}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 17 — H-QC-SCALE boundary: write_audit.sh's OWN --quality-score
+# range check refuses '6' when called directly (the fallback path per
+# lead-orchestrator.md when record_qc_audit.sh is bypassed). Mirrors
+# scenario 13 (which pins '0' on this path); this pins the upper boundary
+# so a widened range (e.g. `^[1-6]$`, accepting 6 as if it were still
+# "1..5") is caught even though nothing upstream calls this path with an
+# already-invalid value to filter first.
+# ---------------------------------------------------------------------------
+FEATURE17="six-score-direct"
+audit_count_before_17="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE17}.json" | wc -l | tr -d ' ')"
+
+out17=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
+  --date 2026-07-27 --feature "${FEATURE17}" --branch "harness/y" \
+  --structural APPROVED --behavioral APPROVED --overall APPROVED \
+  --quality-score 6 2>&1) && rc17=0 || rc17=$?
+
+audit_count_after_17="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE17}.json" | wc -l | tr -d ' ')"
+
+if (( rc17 == 1 )) && [[ "${audit_count_before_17}" == "0" ]] && [[ "${audit_count_after_17}" == "0" ]] \
+   && echo "${out17}" | grep -q "must be an integer 1..5" \
+   && echo "${out17}" | grep -q "got: '6'"; then
+  pass "scenario 17 — write_audit.sh rejects --quality-score 6 directly, no record written (H-QC-SCALE upper bound)"
+else
+  fail "scenario 17 — expected rc=1, no file written, message naming '6'; got rc=${rc17}, before=${audit_count_before_17}, after=${audit_count_after_17}"
+  echo "${out17}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 18 — H-QC-SCALE boundary: write_audit.sh's OWN --quality-score
+# range check refuses non-integer garbage ('3.5') on the direct path,
+# independent of record_qc_audit.sh's extraction (bypassed entirely here).
+# The end-anchored `^[1-5]$` is what rejects this -- a mutation that drops
+# the end anchor lets "3.5" match a leading "3" and pass through as a
+# non-integer value baked into the committed audit JSON.
+# ---------------------------------------------------------------------------
+FEATURE18="decimal-score-direct"
+audit_count_before_18="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE18}.json" | wc -l | tr -d ' ')"
+
+out18=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
+  --date 2026-07-27 --feature "${FEATURE18}" --branch "harness/y" \
+  --structural APPROVED --behavioral APPROVED --overall APPROVED \
+  --quality-score 3.5 2>&1) && rc18=0 || rc18=$?
+
+audit_count_after_18="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE18}.json" | wc -l | tr -d ' ')"
+
+if (( rc18 == 1 )) && [[ "${audit_count_before_18}" == "0" ]] && [[ "${audit_count_after_18}" == "0" ]] \
+   && echo "${out18}" | grep -q "must be an integer 1..5" \
+   && echo "${out18}" | grep -q "got: '3.5'"; then
+  pass "scenario 18 — write_audit.sh rejects --quality-score 3.5 directly, no record written (H-QC-SCALE non-integer)"
+else
+  fail "scenario 18 — expected rc=1, no file written, message naming '3.5'; got rc=${rc18}, before=${audit_count_before_18}, after=${audit_count_after_18}"
+  echo "${out18}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
