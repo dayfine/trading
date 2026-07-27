@@ -2,6 +2,7 @@
  (names
   test_grid_search
   test_bayesian_opt
+  test_bayesian_opt_cholesky
   test_proxy_calibration_lib
   test_bo_checkpoint_reader
   test_holdout_eval
