@@ -438,6 +438,57 @@ let test_fit_gp_near_duplicate_observations_does_not_raise _ =
   let m = posterior.mean [| 0.5 |] in
   assert_that m (is_between (module Float_ord) ~low:(-1e6) ~high:1e6)
 
+(** Observation counts spanning the band in which the vendored LAPACK [dpotrf]
+    was measured wrong on an [Intel Xeon 6973P-C] runner (33..63), plus one
+    below and one above. This is the degenerate input class that made
+    [suggest_next] fail with [Failure "LAPACKE: 9"] on some hosts and pass on
+    others: nothing about the data was degenerate — only the order of the kernel
+    matrix mattered. *)
+let _gp_sizes_spanning_lapack_broken_band = [ 8; 33; 40; 64 ]
+
+let test_fit_gp_interpolates_at_every_observation_count _ =
+  (* fit_gp must interpolate its training points at every order. With a small
+     noise term the posterior mean at an observed x sits essentially on the
+     observed y; a wrong Cholesky factor breaks this by percent-level amounts,
+     which is exactly how the vendored LAPACK failure would have gone silent had
+     the fix simply switched the factorisation to `~upper:true`. *)
+  let worst_error n =
+    (* Points evenly spaced over [0, 1) with the length scale set to the point
+       spacing keeps the Gram matrix well conditioned at every n, so a correct
+       factorisation interpolates to ~1e-9 and the assertion is about the
+       factorisation rather than about GP conditioning. *)
+    let count = Float.of_int n in
+    let xs = Array.init n ~f:(fun i -> [| Float.of_int i /. count |]) in
+    let ys =
+      Array.init n ~f:(fun i ->
+          Float.sin (2.0 *. Float.pi *. Float.of_int i /. count))
+    in
+    let posterior =
+      BO.fit_gp
+        ~length_scales:[| 1.0 /. count |]
+        ~signal_variance:1.0 ~noise_variance:1e-8 ~observations_x:xs
+        ~observations_y:ys
+    in
+    Array.foldi xs ~init:0.0 ~f:(fun i acc x ->
+        Float.max acc (Float.abs (posterior.mean x -. ys.(i))))
+  in
+  assert_that
+    (List.map _gp_sizes_spanning_lapack_broken_band ~f:worst_error)
+    (each (fun e -> assert_that e (le (module Float_ord) 1e-6)))
+
+let test_suggest_next_gp_phase_survives_broken_band _ =
+  (* End-to-end guard on the reported failure: driving the GP phase past 33
+     observations must not raise. Before the fix this raised
+     Failure "LAPACKE: 9" from _suggest_via_gp on affected hosts. *)
+  let bo =
+    BO.create
+      (BO.create_config
+         ~bounds:[ ("x", (0.0, 1.0)) ]
+         ~initial_random:2 ~rng:(_make_rng 77) ())
+  in
+  let final = _run_bo bo _parabola_1d ~budget:40 in
+  assert_that (List.length (BO.all_observations final)) (equal_to 40)
+
 let test_expected_improvement_zero_at_constant_posterior _ =
   (* If the posterior σ² is ~0 everywhere (i.e. the test point is essentially
      pinned by an observation), EI should be ~0. *)
@@ -705,6 +756,10 @@ let suite =
          >:: test_fit_gp_row_dim_mismatch_raises;
          "fit_gp: near-duplicate observations does not raise"
          >:: test_fit_gp_near_duplicate_observations_does_not_raise;
+         "fit_gp: interpolates at every observation count"
+         >:: test_fit_gp_interpolates_at_every_observation_count;
+         "suggest_next: GP phase survives the LAPACK-broken band"
+         >:: test_suggest_next_gp_phase_survives_broken_band;
          "expected_improvement: zero at constant posterior"
          >:: test_expected_improvement_zero_at_constant_posterior;
          "ucb: increases with beta" >:: test_ucb_increases_with_beta;
