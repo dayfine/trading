@@ -60,7 +60,11 @@ type config = {
   round_number_nudge : float;
       (** Distance from round number that triggers a nudge (default: 0.125). *)
   min_correction_pct : float;
-      (** Minimum pullback to qualify as a correction (default: 0.08 = 8%).
+      (** Minimum pullback to qualify as a correction (default: 0.08 = 8%;
+          §5.2's STATE: INITIAL block pairs "stop = below prior correction low"
+          (the §5.1 rule this threshold gates) with the qualifying depth "WAIT
+          for first substantial correction (8-10%+)" — 0.08 is the lower bound
+          of that range).
 
           Future improvement: derive this threshold from the security's
           historical or implied volatility rather than using a fixed value. A
@@ -85,7 +89,8 @@ type config = {
           bars ≈ 4.5 months). Large enough to capture a recent correction,
           narrow enough to avoid reaching into a prior regime. Used by
           {!Weinstein_stops.compute_initial_stop_with_floor}; depth threshold is
-          shared with [min_correction_pct] (Weinstein's 8% rule). *)
+          shared with [min_correction_pct] (§5.2's 8-10%+ correction-depth
+          threshold; see that field's doc for the exact quote). *)
   max_stop_distance_pct : float;
       (** G15 step 3: maximum allowed distance between entry price and the
           installed initial stop, as a fraction of entry price (default: 0.15 =

@@ -1,4 +1,4 @@
-Reviewed SHA: 0fe23db05189efe19382c495751950d8b7b1db5d
+Reviewed SHA: 1fbb08ddfe8c97dd8112af66dbbd980e37b00ad3
 
 # QC review — cleanup track
 
@@ -169,6 +169,110 @@ qc-behavioral discovered this and posted via the REST API with curl on its own
 initiative; qc-structural reported it could not post, and the orchestrator
 posted its verdict on its behalf (review id 4784003592). Dispatch prompts should
 name curl rather than `gh` — recorded as an escalation.
+
+## Quality Score
+
+4
+
+## Verdict
+
+APPROVED
+
+---
+
+## PR #2121 — `cleanup/stop-types-citation` (MERGED `6676ff8e`)
+
+Reviewed at `1fbb08dd`. Orchestrator run 30262098532 (2026-07-27 run 3).
+The **sixth** defect in the citation family — the one #2112's review filed.
+
+Two files, +8/-3: `trading/trading/weinstein/stops/lib/stop_types.mli`
+(comment-only) and the `dev/status/cleanup.md` backlog flip. Default
+`min_correction_pct = 0.08` unchanged; no signature, exported name, or code
+token touched.
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+Rework iterations: 0.
+
+### Structural
+
+File list from the REST API (`/pulls/2121/files`) per the A3 provenance
+requirement, **not** a git-log ancestry walk: exactly `dev/status/cleanup.md`
+and `stop_types.mli`. Behaviour-free confirmed; `dev/status/_index.md`
+untouched per the reconcile contract. H1–H3 / P1–P6 NA (doc-only).
+
+### Behavioral — independently re-derived
+
+The reviewer re-derived the citation from the primary source rather than
+auditing the author's chain, and enumerated **every** percentage in the
+reference doc (13 `%`-bearing lines, plus a check for spelled-out `percent`
+forms, so the enumeration is exhaustive).
+
+- **Site 1 — `min_correction_pct` (`:62-72`) → §5.2 correct, exactly.** The
+  field's contract is "minimum pullback to qualify as a correction (default
+  0.08)"; §5.2 states the qualifying depth as `8-10%+` in three state blocks
+  (book-ref :239, :242, :251). `0.08` is the literal lower bound — same
+  quantity, not a numeric coincidence.
+- **Site 2 — `support_floor_lookback_bars` (`:87-93`) → §5.2 correct and
+  correctly scoped.** Checked separately because this field documents a
+  *lookback window*, not a depth. The citation attaches narrowly to "depth
+  threshold is shared with `min_correction_pct`", and **the sharing is real in
+  code**: `weinstein_stops.ml:75` passes `~lookback_bars:…` and `:82` passes
+  `~min_pullback_pct:…` into the same `Support_floor` call. It does not
+  overreach onto the adjacent claims §5.2 would not support — the 90-bar window
+  keeps its engineering rationale with no book claim, and the support-floor
+  concept is §5.1, already cited at `support_floor.mli:4,9`.
+- **Near-misses confirmed distinct:** §5.1's ">15% risk" (entry-risk cap on
+  `max_stop_distance_pct`) and §5.3's "4-6% initial stop" (the **trader**-method
+  stop *size*, not the **investor**-method correction-qualification *depth*).
+
+### FLAG-A (non-blocking) — exhaustiveness claim partially refuted, immaterially
+
+The PR body claims no other percentage-qualified correction/pullback language
+exists. Two lines were missed: book-ref:155 ("On pullback: volume should
+contract by 75%+") and book-ref:336 ("Only ~50% of breakdowns pull back").
+Neither expresses a **depth** — one is a volume quantity, one a frequency — so
+neither competes as a citation and the conclusion stands: §5.2 is uniquely the
+correction-depth authority. The *commit message* states the tighter, correct
+form; only the PR body over-generalises.
+
+**This matters for the standing `LINTER_CANDIDATE`:** a naive `%`-adjacency
+heuristic will hit both of these lines. The linter needs a depth-vs-quantity
+discriminator, not just proximity.
+
+### FLAG-B (non-blocking, out of scope) — possible defects seven and eight
+
+`stop_types.mli:36` and `:114` cite "book §Stop-Loss Rules" — a `§` token that
+is **not** `§N.N`-numbered. Correctly left alone here (the backlog item named
+lines 63/88, which carried no `§` at all), but the proposed linter must decide
+whether a *named*-section `§` satisfies the rule. If not, these are the next two
+in the family.
+
+### Verification
+
+`dune build @fmt` exit 0, `dune build` exit 0,
+`dune runtest trading/weinstein/stops` exit 0 (41+6+9+10 tests). CP1 PASS — the
+annotated pre-existing contract is pinned by `test_weinstein_stops.ml:473`
+(4.5% < 8% → no ratchet). CP2 PASS; CP3/CP4 NA. Domain L1–L4 NA: comment-only,
+no stop behaviour can regress.
+
+### Merge note
+
+Merged after a branch update (base had advanced past #2113 and #2118).
+`stop_types.mli` verified **byte-identical** to the reviewed tip through the
+merge, and `dev/status/cleanup.md` verified to carry both this PR's entry flip
+**and** #2113's `flake_root_cause` flip independently — so the verdicts carried
+and no re-review was needed.
+
+### Process note (author-declared)
+
+The author initially made the edit in the shared parent checkout rather than its
+own worktree, caught it immediately, reverted with `git checkout --` before
+staging anything, verified clean, and redid the work in `/tmp/ws-citation`. No
+contamination reached the shared tree. Recorded because it is the second
+worktree-discipline near-miss in two runs.
 
 ## Quality Score
 

@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-06-14
+## Last updated: 2026-07-27
 
 ## Status
 IN_PROGRESS
@@ -18,6 +18,70 @@ landed 2026-04-25. Continuous perf monitoring + benchmark-suite work
 moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
+
+## 2026-07-27 — LAPACKE GP-Cholesky failure root-caused and fixed
+
+- [x] **`Bayesian_opt_cholesky` no longer calls LAPACK** — `Tuner.Bayesian_opt:11`
+  / `:17` failed with `Failure("LAPACKE: 9")` on some CI runner hosts and passed
+  on others, unresolved across four orchestrator runs. Root cause established by
+  direct measurement on a reproducing host: the vendored OpenBLAS
+  (`/lib/x86_64-linux-gnu/libopenblas.so.0`) mis-detects an
+  `Intel Xeon 6973P-C` runner as `Cooperlake` (`OPENBLAS_VERBOSE=2` prints
+  `Core: Cooperlake`) and dispatches AVX-512 kernels that are wrong on that
+  part. Nothing about the kernel matrix was degenerate — at the failure point it
+  had **0 non-finite entries, exact symmetry, and a minimum Cholesky pivot of
+  1.18e-2**; a textbook OCaml factorisation of the very same matrix succeeded.
+  - **Measured defect surface on that host:** `dpotrf ~upper:false` reports a
+    spurious non-PD failure for every `33 <= n <= 63` (info code exactly
+    `n/4 + 1`, verified across the whole band) — including on `4*I`;
+    `dpotrf ~upper:true` returns `info = 0` with a **silently wrong factor**
+    (`|LL^T - A| / |A|` ≈ 5-7% for `n >= 33`, 98% at `n = 120`); `dgemm` is wrong
+    by 19.5 absolute at `n = 120`; `Linalg.inv` at `n = 120` aborts with
+    `double free or corruption`. `OPENBLAS_NUM_THREADS=1` does not fix it (only
+    moves the band), but `OPENBLAS_CORETYPE=Haswell|SkylakeX|Zen|Nehalem`
+    repairs every probe.
+  - **Fix:** the GP Cholesky is now a pure-OCaml unblocked factorisation (same
+    recurrence as LAPACK `dpotf2`) inside `bayesian_opt_cholesky.ml`. Switching
+    `uplo` was rejected — it would have turned a red test into silent garbage.
+    Public signature and the nugget-escalation schedule are unchanged; `k` is no
+    longer mutated; failures now name the offending pivot index/value or the
+    non-finite entry position instead of surfacing `LAPACKE: <n>`.
+  - **Where:** `trading/trading/backtest/tuner/lib/bayesian_opt_cholesky.{ml,mli}`,
+    new `trading/trading/backtest/tuner/test/test_bayesian_opt_cholesky.ml`
+    (8 cases; 6 fail against the pre-fix implementation on the reproducing host),
+    2 new cases in `test_bayesian_opt.ml`. Plan +
+    full evidence: `dev/plans/lapacke-gp-cholesky-2026-07-27.md`.
+  - **Verify:** `dev/lib/run-in-env.sh dune runtest trading/backtest/tuner/` —
+    exits 0 on the host where it previously exited 1, with both originally
+    failing tests keeping their assertions intact.
+
+### Follow-up (not this PR) — the OpenBLAS defect is wider than the tuner
+
+Any code path reaching **square** `Mat.dot` at `n >= ~120` or `Linalg.inv` on an
+affected runner risks wrong results or a heap-corruption abort. The in-repo
+exposure today is small — grepped call sites, not module aliases:
+
+- `trading/trading/backtest/tuner/lib/bayesian_opt.ml` — the only genuinely live
+  Owl-linalg consumer. After this PR its remaining calls are
+  `Linalg.triangular_solve` (`:124-125`) and the `Mat.dot` inner products in
+  `fit_gp`. Both were probed **at the shapes actually issued** — `(1 x n).(n x 1)`
+  and `(n x n).(n x 1)` — and are correct to <=2.7e-15 at every n up to 200+.
+  The `n >= 120` breakage is the *square* `(n x n).(n x n)` kernel, which
+  `fit_gp` never takes. Live, but measured clean.
+- `trading/analysis/technical/trend/lib/segmentation.ml` — declares
+  `module Linalg = Owl.Linalg.S` and **never calls it**; zero `Linalg.`/`Mat.`/
+  `Arr.` call sites beyond the alias. Dead alias, not an exposure.
+- `trading/analysis/technical/trend/lib/visualization.ml` — same dead `Linalg`
+  alias; its only Owl use is `Mat.of_array _ 1 n` row vectors (`:51-53, 61-62,
+  67-68`) feeding `Owl_plplot`. No factorisation, no `inv`, nothing at n >= 33.
+
+So this follow-up is about CI trustworthiness and *future* exposure, not a
+currently-broken in-repo call site. Owner: `harness-maintainer` (CI workflows +
+`.devcontainer/` are out of scope for this track). Suggested mitigation: export
+`OPENBLAS_CORETYPE=Haswell` (or pin a runner image with a known-good OpenBLAS)
+and extend the existing `ci.yml` CPU-flag smoke step into an actual numerical
+BLAS self-check — `chol(4*I)` at `n = 33` and a square-`dgemm`-vs-naive
+comparison at `n = 120` are both one-liners that catch it.
 
 ## 2026-07-23 — deep-results headline block (rendered from pinned records)
 

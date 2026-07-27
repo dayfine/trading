@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-27 run2 (orchestrator run 30239958068 — 3 PRs merged: #2112 `19b8c8a2` citation, #2115 `5ff998d9` #2059 phantom-short, #2114 `9e9f0ad5` Picks Phase C v2. #2113 LAPACKE fix QC-APPROVED but HELD: GitHub never created a check-suite for its branch across 3 SHAs, a PR open/reopen and a PAT push. Gates on `047f1837`: build 0, runtest **1** (2 LAPACKE errors, host-dependent), status_file_integrity 0, index_size_linter 0.)
+Last updated: 2026-07-27 run3 (orchestrator run 30262098532 — main was RED on `50112fb9` with the LAPACKE failure; 4 PRs merged: #2113 `757abdf2` (un-redded main), #2118 `950462e0`, #2121 `6676ff8e`, #2117 `72e593e2`. #2123 open at the rework cap. Same-commit A/B settled the OpenBLAS discriminator: AMD EPYC green, Xeon 6973P-C red.)
 
 ## Active + complete tracks
 
@@ -18,7 +18,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
-| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) + feat-backtest | #2113 | LAPACKE root-caused (OpenBLAS mis-detects Xeon 6973P-C); fix QC-APPROVED but HELD — CI never triggered on the branch |
+| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) + feat-backtest | — | LAPACKE fix MERGED `757abdf2` (#2113) — un-redded main; CI hold self-resolved once a merge commit triggered a check-suite; next: none queued |
 | [rename-twin-dedup](rename-twin-dedup.md) | IN_PROGRESS | feat-backtest | — | v1(#1940)+v2(#1946) MERGED; dedup warehouse rebuilt + 28y record re-run landed (#1949, 83 groups/91 legs dropped); next: none (optional V6 report-consult tweak) |
 | [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | v1 harness (#1937) + C6b audit-join-by-position_id (#1947) MERGED; next: golden-run integration test for V3/V4/V7 (data-gated) |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
@@ -43,9 +43,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | no dispatchable T1/T3 (re-verified run 2); NEW: set OPENBLAS_CORETYPE + add a numerical CI self-check (needs workflow-scoped PAT, as does #1636) |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2123 | H-AUDIT-COLLISION #2123 hit the rework cap — fix crashes on legacy records (one-line `|| true`); resume next run |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | Phase 1 stable (PR-D'c #1332 merged); Phase 2 deferred; no outstanding work |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2112 MERGED `19b8c8a2` (min_pullback_pct §5.2 citation); 8 open; next: 6th citation defect in stop_types.mli L63/L88 (uncited 8% rule) |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2121 MERGED `6676ff8e` (6th citation defect, stop_types.mli §5.2); 9 open; next: possible defects 7+8 — stop_types.mli L36/L114 cite a non-numbered `§` |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
@@ -57,7 +57,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
-| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | Phase C v2 MERGED `9e9f0ad5` (#2114, card report to the committed design reference); next: F4+F5 round-trip pin, record_fill CLI, trailing-stop state machine |
+| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | record_fill CLI 4c.a MERGED `72e593e2` (#2117); next: trailing-stop state machine (4c.b), F4+F5 round-trip pin |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
 | [tax-lens](tax-lens.md) | MERGED | feat-backtest | — | Phase 1 #2066 + CP4 loader error-path contract #2073 MERGED; Phase 2 wash-sale / April outflows deferred, user-gated (#2006) |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | asset-type blocklist MERGED (#1939, default-off); next: arm ATB.curated for live universe build + General::Type enrichment feed |

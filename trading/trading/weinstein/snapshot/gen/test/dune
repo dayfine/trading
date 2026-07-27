@@ -5,6 +5,7 @@
   test_config_overrides_loader
   test_live_resistance_sketch
   test_live_portfolio
+  test_portfolio_edit
   test_trade_sizing
   test_sparse_tail_gate
   test_spike_bar_gate
