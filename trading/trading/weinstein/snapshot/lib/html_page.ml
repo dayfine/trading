@@ -92,6 +92,19 @@ let _table_style =
     "                    font-style: italic; }";
   ]
 
+(* Reconciliation-class tag chips (issue #2103). A valid-stop row is the
+   ordinary case and stays recessive; "through" and "EXTENDED" escalate, so
+   identity never rests on colour alone the label text carries the class too. *)
+let _chip_style =
+  [
+    ".chip { border-radius: 3px; display: inline-block; font-size: 11px;";
+    "        padding: 1px 5px; white-space: nowrap; }";
+    ".chip-valid-stop { background: var(--surface-alt); color: var(--ink-soft); }";
+    ".chip-through-entry { background: var(--band); color: var(--ink); }";
+    ".chip-extended { background: var(--band); color: var(--flag);";
+    "                 font-weight: 600; }";
+  ]
+
 (* Mark specs: thin strokes, recessive volume, dashed level lines so identity
    never rests on colour alone. *)
 let _chart_style =
@@ -109,7 +122,7 @@ let _chart_style =
 
 let css =
   String.concat ~sep:"\n"
-    (List.concat [ _palette; _layout; _table_style; _chart_style ])
+    (List.concat [ _palette; _layout; _table_style; _chip_style; _chart_style ])
 
 let document ~title ~body =
   Printf.sprintf

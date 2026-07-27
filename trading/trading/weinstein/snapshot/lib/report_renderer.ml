@@ -51,8 +51,11 @@ let _resistance_cell : string option -> string = function
 
 let _candidate_row ~rank (c : Weekly_snapshot.candidate) =
   let risk = Report_shared.risk_pct ~entry:c.entry ~stop:c.stop in
-  Printf.sprintf "| %d | %s | %s | %.2f | $%.2f | %s | %.1f%% | %s | %s | %s |"
-    rank (_symbol_cell c) c.grade c.score c.entry (_stop_cell c) risk
+  Printf.sprintf
+    "| %d | %s | %s | %.2f | $%.2f | %s | %s | %.1f%% | %s | %s | %s |" rank
+    (_symbol_cell c) c.grade c.score c.entry
+    (Report_shared.close_vs_entry c)
+    (_stop_cell c) risk
     (_resistance_cell c.resistance_grade)
     c.rationale
     (Report_shared.instruction c)
@@ -73,6 +76,9 @@ let _append_table_notes ~shown ~hidden table =
     Report_shared.truncation ~shown ~hidden;
     legend (Report_shared.any_fallback_stop shown) Report_shared.stop_fallback;
     legend (Report_shared.any_data_suspect shown) Report_shared.data_suspect;
+    legend
+      (Report_shared.any_reconciled shown)
+      Report_shared.entry_reconciliation;
   ]
   |> List.map ~f:(Option.map ~f:_italic)
   |> List.fold ~init:table ~f:_append_note
@@ -86,6 +92,7 @@ let _candidate_table candidates ~limit =
         "Grade";
         "Score";
         "Entry";
+        "Close vs entry";
         "Stop";
         "Risk %";
         "Resistance";

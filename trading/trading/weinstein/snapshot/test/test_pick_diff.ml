@@ -30,6 +30,7 @@ let _candidate ?(score = 0.5) ?(grade = "B") ?(entry = 100.0) ?(stop = 90.0)
     sizing_note = None;
     stop_is_structural = false;
     data_suspect = false;
+    reconciliation = Entry_reconciliation.Not_reconciled;
   }
 
 let _snapshot ?(system_version = "v1") ?(date = _common_date)

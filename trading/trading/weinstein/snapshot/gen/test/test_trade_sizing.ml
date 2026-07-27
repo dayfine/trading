@@ -25,6 +25,7 @@ let _candidate : Weekly_snapshot.candidate =
     sizing_note = None;
     stop_is_structural = false;
     data_suspect = false;
+    reconciliation = Entry_reconciliation.Not_reconciled;
   }
 
 let _size ?(placeholder = false) ?(entry = 100.0) ?(stop = 90.0) () =

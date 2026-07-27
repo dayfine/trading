@@ -56,6 +56,7 @@ let _long_candidate : Weekly_snapshot.candidate =
     sizing_note = None;
     stop_is_structural = true;
     data_suspect = false;
+    reconciliation = Entry_reconciliation.Not_reconciled;
   }
 
 (* Deliberately the opposite of [_long_candidate] on every rendered flag: a
@@ -77,6 +78,7 @@ let _short_candidate : Weekly_snapshot.candidate =
     sized_risk_amount = 0.0;
     stop_is_structural = false;
     data_suspect = true;
+    reconciliation = Entry_reconciliation.Not_reconciled;
   }
 
 let _held : Weekly_snapshot.held_position =

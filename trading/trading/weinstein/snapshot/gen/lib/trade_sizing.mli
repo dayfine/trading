@@ -9,7 +9,21 @@
 
     Pure function — no I/O. The generator calls it per long candidate and stamps
     the result onto the {!Weekly_snapshot.candidate}'s [sized_*] / [sizing_note]
-    fields; the renderer formats the instruction cell from those fields. *)
+    fields; the renderer formats the instruction cell from those fields.
+
+    {1 Sizing is always on the expected FILL price (issue #2103)}
+
+    The entry price fed to {!Portfolio_risk.compute_position_size} is
+    {!Weekly_snapshot.expected_fill_price}, {b never} [c.entry] directly.
+    [c.entry] is the breakout level from the transition week; a candidate whose
+    price has already run through it fills at the market, not at the level. The
+    2026-07-24 MBX pick was sized 651 shares against a $46.08 entry with the
+    stock at $62 — a 34% larger notional than intended and, against the $44.88
+    stop, {b 14x the displayed dollar risk}. Sizing on the reconciled fill
+    closes that gap; it also matches the backtest's [Entry_walk], which fills
+    and sizes at the price observed on signal evaluation.
+
+    Run {!Entry_reconcile} before this pass so the class is available. *)
 
 open Weinstein_snapshot
 
@@ -28,7 +42,15 @@ val size_candidate :
 
     - [portfolio_value] drives the risk-pct and %-cap math; [sizing_cash] bounds
       the spendable-cash cap (pass the portfolio's cash).
-    - Entry and stop are read from [c.entry] / [c.stop].
+    - The stop is read from [c.stop]; the entry price is
+      {!Weekly_snapshot.expected_fill_price} [c] — [c.entry] for an unreconciled
+      or valid-stop candidate, and the {b current close} for one whose price is
+      already through its entry (issue #2103).
+    - An {!Entry_reconciliation.Extended} candidate is returned {b explicitly
+      unsized} ([sized_shares = 0], all [sized_*] zeroed, [sizing_note = None]):
+      its ticket is suppressed with a do-not-chase reason, so there is no order
+      to size. The candidate itself is returned unchanged otherwise — the row is
+      kept for watch purposes, never dropped.
     - [placeholder = true] stamps [sizing_note] with the
       ["UNSIZED — set portfolio.sexp"] label (the generator had no live
       portfolio and sized against the template default); the numeric fields are

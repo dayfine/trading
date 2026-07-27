@@ -1036,6 +1036,7 @@ let _mk_candidate ~symbol ~entry ~stop : Weekly_snapshot.candidate =
     sizing_note = None;
     stop_is_structural = false;
     data_suspect = false;
+    reconciliation = Entry_reconciliation.Not_reconciled;
   }
 
 let _stops_cfg () =

@@ -71,4 +71,10 @@ let candidate_of_scored (c : Screener.scored_candidate) :
        that skips the flagging pass shows an unflagged (not falsely suspect)
        candidate. *)
     data_suspect = false;
+    (* Overwritten by [Weekly_snapshot_generator._reconcile_entry] for both long
+       and short candidates when entry reconciliation is armed (issue #2103).
+       Starts [Not_reconciled] — a caller that skips the pass gets exactly the
+       pre-#2103 behaviour (sizing and ticket anchored to [entry]) rather than a
+       fabricated claim about where this candidate would fill. *)
+    reconciliation = Entry_reconciliation.Not_reconciled;
   }

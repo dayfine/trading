@@ -30,15 +30,48 @@ val risk_pct : entry:float -> stop:float -> float
 val instruction : Weekly_snapshot.candidate -> string
 (** [instruction c] is the executable order for [c], formatted from the
     generator-computed [sized_*] / [sizing_note] fields (fixed-risk sizing,
-    mirroring the backtest) — e.g.
-    ["BUY STOP 55 sh @ $28.49 (~$1567, 1.6% of book, risk $126); on fill place
-     SELL STOP @ $26.21, GTC; cancel if unfilled by Friday close"].
+    mirroring the backtest).
+
+    The ticket shape follows [c.reconciliation] (issue #2103 — see
+    {!Entry_reconciliation}):
+
+    - {!Entry_reconciliation.Not_reconciled} / {!Entry_reconciliation.Valid_stop}
+      — a resting stop at the entry level, e.g.
+      ["BUY STOP 55 sh @ $28.49 (~$1567, 1.6% of book, risk $126); on fill place
+       SELL STOP @ $26.21, GTC; cancel if unfilled by Friday close"].
+    - {!Entry_reconciliation.Through_entry} — a MARKET buy at the current close,
+      quoting the overshoot and stating that the size is on the expected fill
+      rather than the entry level. A resting stop below the market {e is} a
+      market order, so the ticket says so instead of pretending otherwise.
+    - {!Entry_reconciliation.Extended} — {b no order at all}: a do-not-chase
+      line naming the overshoot, the entry level and the close. This arm takes
+      precedence over every [sized_*] fallback below, because an extended
+      candidate is deliberately left unsized by {!Trade_sizing}.
 
     A [0]-share candidate with no note (e.g. a short, which the live strategy
     leaves unsized) renders ["-"]; a [0]-share result {e with} a note renders
     that reason (cash / caps exhausted, invalid stop direction); a
     placeholder-sized candidate prefixes the ["UNSIZED — set portfolio.sexp"]
     note so the size reads as provisional. *)
+
+val close_vs_entry : Weekly_snapshot.candidate -> string
+(** Cell text for the "Close vs entry" column: the current close and the
+    side-signed overshoot past the entry level, tagged with the class —
+    ["$62.00 (+34.5% EXTENDED)"], ["$25.44 (+7.3% through)"], ["$135.78
+    (-3.9%)"]. ["-"] when the candidate is {!Entry_reconciliation.Not_reconciled}
+    (mechanism disarmed, or no resident bar to price it against). *)
+
+val entry_reconciliation : string
+(** Explains the "Close vs entry" column, the ["through"] / ["EXTENDED"] tags
+    and why an extended row carries no order. Rendered below a candidate table
+    iff {!any_reconciled} holds for the shown rows. *)
+
+val any_reconciled : Weekly_snapshot.candidate list -> bool
+(** [any_reconciled shown] is [true] when at least one {e displayed} candidate
+    is {!Entry_reconciliation.Through_entry} or {!Entry_reconciliation.Extended}
+    — i.e. when the reconciliation actually changed a ticket. A table of
+    valid-stop (or unreconciled) rows needs no legend. Gates
+    {!entry_reconciliation}. *)
 
 val stop_fallback : string
 (** Explains the trailing [*] marker on a non-structural (fixed-buffer) stop

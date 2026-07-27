@@ -128,6 +128,8 @@ type config = {
   spike_bar_threshold_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
   rename_detect_min_overlap_days : int; [@sexp.default 0]  (** See [.mli]. *)
   rename_detect_match_fraction : float; [@sexp.default 0.0]  (** See [.mli]. *)
+  entry_through_band_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
+  entry_extension_max_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -224,6 +226,8 @@ let default_config ~universe ~index_symbol =
     spike_bar_threshold_pct = 0.0;
     rename_detect_min_overlap_days = 0;
     rename_detect_match_fraction = 0.0;
+    entry_through_band_pct = 0.0;
+    entry_extension_max_pct = 0.0;
   }
 
 let name = "Weinstein"

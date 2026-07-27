@@ -205,22 +205,38 @@ let _overlay_structural_stop ~(inputs : inputs) ~side candidate =
     ~initial_stop_buffer:inputs.config.initial_stop_buffer
     ~bar_reader:inputs.bar_reader ~as_of:inputs.as_of ~side candidate
 
+(* Issue #2103: classifies the candidate's CURRENT close against its (possibly
+   weeks-stale) breakout entry — see [Entry_reconcile]. Must run BEFORE
+   [_size_long]: the class decides [Weekly_snapshot.expected_fill_price], which
+   is what the sizing pass sizes on. Disabled by default. *)
+let _reconcile_entry ~(inputs : inputs) ~side candidate =
+  Entry_reconcile.for_candidate inputs.bar_reader ~as_of:inputs.as_of ~side
+    ~through_band_pct:inputs.config.entry_through_band_pct
+    ~extension_max_pct:inputs.config.entry_extension_max_pct candidate
+
 (* Ranked long / short candidate lists, fully decorated — structural stop
-   overlay (#2084 F2), fixed-risk sizing (longs only), spike-bar data-suspect
-   flag (#2083 F3, which flags rather than drops) — plus the spike warnings:
-   [(longs, shorts, spike_warnings)]. See [Spike_bar_gate.flag_candidates]. *)
+   overlay (#2084 F2), entry reconciliation (#2103, BOTH sides), fixed-risk
+   sizing (longs only), spike-bar data-suspect flag (#2083 F3, which flags
+   rather than drops) — plus the spike warnings:
+   [(longs, shorts, spike_warnings)]. See [Spike_bar_gate.flag_candidates].
+
+   Reconciliation sits between the stop overlay and sizing on purpose: the stop
+   it reconciles against must already be the structural one, and the class it
+   produces is what sizing anchors the fill price to. *)
 let _build_candidates ~(inputs : inputs) ~(result : Screener.result)
     ~portfolio_value ~sizing_cash =
   let longs =
     List.map result.buy_candidates ~f:(fun c ->
         Snapshot_display.candidate_of_scored c
         |> _overlay_structural_stop ~inputs ~side:Trading_base.Types.Long
+        |> _reconcile_entry ~inputs ~side:`Long
         |> _size_long ~inputs ~portfolio_value ~sizing_cash)
   in
   let shorts =
     List.map result.short_candidates ~f:(fun c ->
         Snapshot_display.candidate_of_scored c
-        |> _overlay_structural_stop ~inputs ~side:Trading_base.Types.Short)
+        |> _overlay_structural_stop ~inputs ~side:Trading_base.Types.Short
+        |> _reconcile_entry ~inputs ~side:`Short)
   in
   let flag_spikes =
     Spike_bar_gate.flag_candidates inputs.bar_reader ~as_of:inputs.as_of
