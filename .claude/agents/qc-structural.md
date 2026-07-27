@@ -133,7 +133,12 @@ Use `$PR_FILES` as the file list for all downstream checklist items (P6, A1, A2,
 
 ### Step 4: Fill in the structural checklist
 
-Work through each item below. Use Grep and Glob to verify claims — do not guess.
+Work through each item below. Use Grep and Glob to verify claims — do not guess. After
+filling the checklist, assign a quality score (1–5) with a one-sentence rationale
+(see the Quality Score Rubric below). **Polarity: 1 = worst, 5 = best.** The rationale's
+adjective must agree with the digit — PR #2115 posted score 1 captioned "Excellent"
+(H-QC-SCALE), an inversion that was correct in the audit record only by luck. Double-check
+the number against the rubric before posting.
 
 ### Step 5: Pin the reviewed SHA
 
@@ -152,6 +157,22 @@ Reviewed SHA: <sha>
 This line is the idempotency sentinel. The lead-orchestrator reads it from the PR review
 comments (via `gh pr view <N> --json reviews`) to skip re-QC when the branch hasn't advanced.
 Do not omit it even on NEEDS_REWORK — the orchestrator needs it regardless of verdict.
+
+---
+
+## Quality Score Rubric
+
+**Polarity: 1 = worst → 5 = best.** PR #2115 posted score 1 captioned "Excellent" — an
+inverted read (H-QC-SCALE); the audit record was only correct by luck because
+`record_qc_audit.sh` takes the *last* score in the file. Never repeat that pairing.
+
+| Score | Label | Meaning |
+|-------|-------|---------|
+| 5 | Exemplary | All gates pass, clean patterns, no FLAGs |
+| 4 | Good | All gates pass, only minor style nits |
+| 3 | Acceptable | Passes with FLAGs (e.g. A1), no structural violations |
+| 2 | Below standard | NEEDS_REWORK, fixable structural issues |
+| 1 | Significant issues | Build/test failures or fundamental structural violations |
 
 ---
 
@@ -175,6 +196,22 @@ Do not use freeform narrative in the Status column — put detail in the Notes c
 | P4 | Public-symbol export hygiene — covered by language-specific linter (e.g. `.mli` coverage in OCaml) | PASS/NA | If H3 passed, this is clean. If H3 failed, check the relevant linter output. |
 | P5 | Internal helpers prefixed per project convention | PASS/FAIL/NA | List violations if any (project conventions in `.claude/rules/` + project authority file) |
 | (project-specific rows) | See `.claude/rules/qc-structural-authority.md` — append the rows it specifies (e.g. test-pattern conformance, core-module modification flags, dependency-direction rules) | | |
+
+## Quality Score
+
+<1–5> — <one-sentence rationale>
+
+(Does not affect verdict. Tracked for quality trends over time. **Polarity: 1 = worst,
+5 = best** — see the Quality Score Rubric above; the adjective in the rationale must
+match the digit.)
+
+**Output contract:** The integer must appear on the first non-blank line after the
+`## Quality Score` heading, formatted as `N — <rationale>` (bare digit, not bold).
+Example: `4 — Clean implementation with minor style nits.`
+The `record_qc_audit.sh` script reads this line to populate `dev/audit/` records and
+rejects (non-zero exit) any parsed value outside `1..5` rather than writing a malformed
+record — but it cannot detect an in-range value with inverted polarity.
+Use `## Quality Score` (level-2 heading) — not `### Quality Score` — for new reviews.
 
 ## Verdict
 
@@ -219,7 +256,7 @@ Reviewed SHA: <sha captured in Step 5>
 
 ## Structural QC — <feature-name>
 
-<filled structural checklist + any NEEDS_REWORK items>
+<filled structural checklist + Quality Score + any NEEDS_REWORK items>
 EOF
 )"
 ```
@@ -238,7 +275,7 @@ in your return value: "PR_NUMBER unavailable — verdict in return text only unt
 
 ### Return value
 
-Return the overall verdict (APPROVED / NEEDS_REWORK) and a one-line summary of any blockers. The lead-orchestrator reads this to decide whether to spawn qc-behavioral.
+Return the overall verdict (APPROVED / NEEDS_REWORK), the quality score (1–5), and a one-line summary of any blockers. The lead-orchestrator reads this to decide whether to spawn qc-behavioral.
 
 ---
 
@@ -265,6 +302,10 @@ the rows the current Weinstein Trading System project appends (P6, A1–A3).
 | A1 | Core module modifications | PASS | No modifications to project-defined core modules |
 | A2 | Dependency-direction rules respected | PASS | |
 | A3 | No unnecessary existing module modifications | PASS | |
+
+## Quality Score
+
+2 — Magic number bypassing config is a fixable but real structural violation; otherwise clean.
 
 ## Verdict
 
