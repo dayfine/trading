@@ -101,10 +101,16 @@ let _bars_before bars ~date =
   Array.count bars ~f:(fun (d, _) -> Date.( < ) d date)
 
 (* Returns-basis similarity for one pair, delegated wholesale to
-   [Twin_detector] so no similarity arithmetic is duplicated here. The
-   [prefilter_rel_tol] is infinite because the input is exactly two series:
-   every anchor-date run must contain both legs, so the prefilter can never
-   drop a genuine match. [close_epsilon] is unused under [Returns]. *)
+   [Twin_detector] so no similarity arithmetic is duplicated here.
+
+   Two settings make its prefilter exhaustive over the pair, and BOTH are
+   required (see the [.mli]): [min_overlap_days = 2] sets the anchor stride to
+   1 so every shared date is an anchor, and [prefilter_rel_tol = infinity]
+   stops the anchor's key-sorted actives from being split into separate runs —
+   the legs of a real rename can differ on the anchor-date return by more than
+   the stock 2e-2, which would drop the pair before it is ever scored.
+
+   [close_epsilon] is unused under [Returns]. *)
 let _returns_score (config : Config.t) old_leg new_leg =
   let twin_config =
     {

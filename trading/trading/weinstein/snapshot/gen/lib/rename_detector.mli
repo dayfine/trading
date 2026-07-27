@@ -233,12 +233,25 @@ val detect : Config.t -> as_of:Date.t -> series list -> report
     opposite ways, at most one ordering of a pair can qualify.
 
     {b Scoring reuse.} The last criterion is evaluated by calling
-    {!Twin_detector.detect} on the two-series pair with [basis = Returns],
-    [min_overlap_days = 2] (which makes its anchor stride [1], so its prefilter
-    is exhaustive over the pair and cannot drop a genuine match) and this
-    module's [match_fraction] / [ret_epsilon]; the resulting [pair_match]
+    {!Twin_detector.detect} on the two-series pair with [basis = Returns] and
+    this module's [match_fraction] / [ret_epsilon]; the resulting [pair_match]
     supplies [overlap_days] and [match_fraction]. No similarity arithmetic is
     duplicated here.
+
+    Making that prefilter exhaustive over the pair takes {b two} settings, both
+    of which are correctness preconditions rather than tuning choices — with
+    either at [Twin_detector.Config.default]'s value a genuine rename pair can
+    be dropped before it is ever scored:
+
+    - [min_overlap_days = 2], which sets the anchor stride to [1], so {e every}
+      shared date is an anchor date and the pair cannot miss each other by
+      landing between anchors;
+    - [prefilter_rel_tol = infinity], because sharing an anchor date is not
+      enough: the prefilter additionally splits the anchor's active series into
+      runs of {e near-equal anchor keys}, which under [Returns] is the return on
+      that date. At the stock [2e-2] a real rename pair whose returns differ at
+      the shared anchor by more than that tolerance would be split into separate
+      runs and never paired.
 
     Pure: same inputs -> same output, in a deterministic order. *)
 

@@ -87,6 +87,18 @@ is modified.
 S1/S2 are cheap and run first as a prefilter; S3 is cheap; only surviving
 pairs pay for S4's `Twin_detector.detect` call.
 
+**Plan revision (during implementation).** S2's second clause — "`b`'s last
+bar date `>= a`'s last bar date (the successor is the surviving leg)" — was
+**dropped**; the shipped `_succession` tests only `D <= a`'s last bar date.
+The clause is wrong for the very shape this module targets: a zombie feed can
+print on the *very last session* and still be the dead leg, which would make
+the predecessor the "surviving leg" and reject the pair. Direction is instead
+decided entirely by S3's tail-density pair, which is the evidence that
+actually distinguishes the dead leg from the live one. Because the two density
+tests point opposite ways, at most one ordering of a pair can still qualify,
+so dropping the clause costs no determinism. Documented as the "Direction"
+paragraph on `Rename_detector.detect`.
+
 **Trading-day calendar.** The module derives its calendar from the input
 itself: the sorted union of every date appearing in any input series. Over a
 whole universe this *is* the trading calendar; it needs no `Bar_reader` and

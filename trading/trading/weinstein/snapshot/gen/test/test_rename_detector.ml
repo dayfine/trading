@@ -110,7 +110,73 @@ let _shallow_series =
   _series ~symbol:"SHALLOW" ~path:_path
     (_range 150 (_changeover_idx - 1) @ _zombie_indices)
 
+(* --- Successor ranking (highest match fraction wins) --------------- *)
+
+(* The main fixture's overlap is 6 dates -> 5 return pairs, so under a 0.95
+   threshold the ONLY admissible score is a perfect 1.0 and two successors can
+   never differ. This predecessor stays dense for 7 bars past the changeover
+   before going zombie, giving an 11-date overlap (10 return pairs) so that
+   intermediate scores exist; [_ranked] lowers the threshold to admit one. *)
+let _ranked_predecessor_indices =
+  _range 0 (_changeover_idx - 1)
+  @ _range _changeover_idx (_changeover_idx + 6)
+  @ [ 187; 191; 195; 199 ]
+
+let _ranked_predecessor =
+  _series ~symbol:"PRED" ~path:_path _ranked_predecessor_indices
+
+(* Interior overlap bar to displace. Both its neighbours are shared dates, so
+   moving it breaks exactly the two return pairs that touch it. *)
+let _nicked_idx = _changeover_idx + 2
+
+(* [_rebased] with that one bar moved 5% — far beyond [ret_epsilon] — so 8 of
+   the 10 overlap return pairs still match: a match fraction of 0.8. *)
+let _nicked ~symbol indices : Detector.series =
+  {
+    symbol;
+    closes =
+      Array.of_list_map indices ~f:(fun i ->
+          let nick = if i = _nicked_idx then 1.05 else 1.0 in
+          (_date i, _path.(i) *. 1.37 *. nick));
+  }
+
+let _weaker_successor = _nicked ~symbol:"ALPHACO" _successor_indices
+let _stronger_successor = _rebased ~symbol:"ZETACO" _successor_indices
+
+(* --- [as_of] truncation ------------------------------------------- *)
+
+(* A second succession, complete well before the end of the calendar, so the
+   legs can be extended PAST the as-of date. Same shape as the main fixture:
+   dense predecessor, changeover, zombie tail, dense successor. *)
+let _trunc_changeover_idx = 128
+let _trunc_as_of_idx = 149
+let _trunc_as_of = _date _trunc_as_of_idx
+let _trunc_zombie_indices = [ 128; 132; 136; 140; 144; 148 ]
+
+let _trunc_old_indices =
+  _range 0 (_trunc_changeover_idx - 1) @ _trunc_zombie_indices
+
+let _trunc_old = _series ~symbol:"TRUNCOLD" ~path:_path _trunc_old_indices
+
+let _trunc_new =
+  _rebased ~symbol:"TRUNCNEW" (_range _trunc_changeover_idx _trunc_as_of_idx)
+
+(* The same two legs, each continuing densely past [_trunc_as_of]. The
+   predecessor's continuation is what makes the truncation load-bearing: read
+   whole, it is dense right through the final session and stops being the
+   stale leg at all. *)
+let _future_indices = _range (_trunc_as_of_idx + 1) (_bars_total - 1)
+
+let _trunc_old_extended =
+  _series ~symbol:"TRUNCOLD" ~path:_path (_trunc_old_indices @ _future_indices)
+
+let _trunc_new_extended =
+  _rebased ~symbol:"TRUNCNEW" (_range _trunc_changeover_idx (_bars_total - 1))
+
 let _armed = Detector.Config.armed ~min_overlap_days:5 ~match_fraction:0.95
+
+(* Admits a partially-matching successor, which the 0.95 default cannot. *)
+let _ranked = Detector.Config.armed ~min_overlap_days:5 ~match_fraction:0.5
 
 let _detect ?(config = _armed) series =
   Detector.detect config ~as_of:_as_of series
@@ -372,12 +438,118 @@ let test_successor_must_be_younger _ =
 
 (* One predecessor, two equally-good successors: the mapping must stay a
    function, and the tie must break deterministically on the smaller successor
-   symbol. *)
+   symbol. Pins the EQUAL-fraction arm of the ranking only — see below for the
+   ordering arm. *)
 let test_one_entry_per_predecessor _ =
   let alt = _rebased ~symbol:"ALTCO" _successor_indices in
   let report = _detect [ _old_series; _new_series; alt ] in
   assert_that (Detector.mapping report)
     (elements_are [ equal_to ("OLDCO", "ALTCO") ])
+
+(* The ORDERING arm: two qualifying successors with DIFFERENT match fractions,
+   arranged so the two arms of the ranking disagree — [ZETACO] scores 1.0 and
+   [ALPHACO] 0.8, but [ALPHACO] is the lexicographically smaller symbol. Only
+   "highest fraction wins" yields [ZETACO]; both "lowest wins" and a
+   tie-break-only rule yield [ALPHACO]. *)
+let test_highest_match_fraction_wins _ =
+  let report =
+    _detect ~config:_ranked
+      [ _ranked_predecessor; _weaker_successor; _stronger_successor ]
+  in
+  assert_that report.renames
+    (elements_are
+       [
+         all_of
+           [
+             field (fun (r : Detector.rename) -> r.old_symbol) (equal_to "PRED");
+             field
+               (fun (r : Detector.rename) -> r.new_symbol)
+               (equal_to "ZETACO");
+             field
+               (fun (r : Detector.rename) -> r.match_fraction)
+               (float_equal 1.0);
+           ];
+       ])
+
+(* The premise of the test above: the loser genuinely qualifies on its own, at
+   the lower score. Without this, the ranking test could pass because
+   [ALPHACO] was never a candidate at all. *)
+let test_weaker_successor_qualifies_on_its_own _ =
+  let report =
+    _detect ~config:_ranked [ _ranked_predecessor; _weaker_successor ]
+  in
+  assert_that report.renames
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (r : Detector.rename) -> r.new_symbol)
+               (equal_to "ALPHACO");
+             field (fun (r : Detector.rename) -> r.overlap_days) (equal_to 11);
+             field
+               (fun (r : Detector.rename) -> r.match_fraction)
+               (float_equal 0.8);
+           ];
+       ])
+
+(* ------------------------------------------------------------------ *)
+(* [as_of] truncation                                                  *)
+(* ------------------------------------------------------------------ *)
+
+(* Bars dated after [as_of] must not reach ANY part of the verdict. Both legs
+   here run dense to the end of the calendar, 50 trading days past [as_of]:
+
+   - read whole, the predecessor is dense through the final session, so the
+     trailing window no longer sees a zombie tail and NOTHING is reported;
+   - counted whole, the overlap is 56 shared dates rather than 6.
+
+   So the asserted record fails if the truncation is dropped from either the
+   trailing-window calendar or the per-leg bar filter. *)
+let test_bars_after_as_of_are_ignored _ =
+  let report =
+    Detector.detect _armed ~as_of:_trunc_as_of
+      [ _trunc_old_extended; _trunc_new_extended ]
+  in
+  assert_that report.renames
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (r : Detector.rename) -> r.old_symbol)
+               (equal_to "TRUNCOLD");
+             field
+               (fun (r : Detector.rename) -> r.new_symbol)
+               (equal_to "TRUNCNEW");
+             field
+               (fun (r : Detector.rename) -> r.changeover)
+               (equal_to (_date _trunc_changeover_idx));
+             field (fun (r : Detector.rename) -> r.overlap_days) (equal_to 6);
+             field
+               (fun (r : Detector.rename) -> r.match_fraction)
+               (float_equal 1.0);
+             field (fun (r : Detector.rename) -> r.old_tail_bars) (equal_to 4);
+             field (fun (r : Detector.rename) -> r.new_tail_bars) (equal_to 15);
+             field
+               (fun (r : Detector.rename) -> r.tail_window_trading_days)
+               (equal_to 15);
+           ];
+       ])
+
+(* ...and the stronger statement: feeding the extended series is INDISTINGUISH-
+   ABLE from feeding series already cut at [as_of]. *)
+let test_as_of_matches_pre_truncated_input _ =
+  let cut =
+    Detector.detect _armed ~as_of:_trunc_as_of [ _trunc_old; _trunc_new ]
+  in
+  let extended =
+    Detector.detect _armed ~as_of:_trunc_as_of
+      [ _trunc_old_extended; _trunc_new_extended ]
+  in
+  assert_that extended.renames
+    (elements_are
+       (List.map cut.renames ~f:(fun r -> equal_to ~cmp:Detector.equal_rename r)))
 
 let suite =
   "rename_detector"
@@ -417,6 +589,12 @@ let suite =
          >:: test_shallow_predecessor_is_rejected;
          "successor must be younger" >:: test_successor_must_be_younger;
          "one entry per predecessor" >:: test_one_entry_per_predecessor;
+         "highest match fraction wins" >:: test_highest_match_fraction_wins;
+         "weaker successor qualifies on its own"
+         >:: test_weaker_successor_qualifies_on_its_own;
+         "bars after as_of are ignored" >:: test_bars_after_as_of_are_ignored;
+         "as_of result matches pre-truncated input"
+         >:: test_as_of_matches_pre_truncated_input;
        ]
 
 let () = run_test_tt_main suite

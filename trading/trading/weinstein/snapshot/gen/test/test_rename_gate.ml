@@ -184,6 +184,28 @@ let test_series_for_unknown_symbol_is_empty _ =
   let s = Gate.series_for (_bar_reader ()) ~as_of:_as_of ~symbol:"NOSUCH" in
   assert_that (Array.length s.closes) (equal_to 0)
 
+(* The other half of that contract: the empty series the line above produces is
+   then IGNORED by the detector. [partition] maps over every ticker in the
+   universe, so a universe symbol with no resident bars reaches [detect] on the
+   live path; without the empty-bars guard, reading its first bar date raises
+   and the whole weekly run dies. Asserting the exact survivor list also pins
+   that the bar-less symbol neither disappears nor blocks the ZOMB -> ZOMBN
+   detection happening alongside it. *)
+let test_symbol_without_bars_is_ignored _ =
+  let survivors, warnings =
+    Gate.partition (_bar_reader ()) ~as_of:_as_of ~min_overlap_days:5
+      ~match_fraction:0.95
+      [ "MARKET"; "NOBARS"; "ZOMB"; "ZOMBN" ]
+  in
+  assert_that (survivors, warnings)
+    (all_of
+       [
+         field fst
+           (elements_are
+              [ equal_to "MARKET"; equal_to "NOBARS"; equal_to "ZOMBN" ]);
+         field snd (size_is 1);
+       ])
+
 let suite =
   "rename_gate"
   >::: [
@@ -201,6 +223,8 @@ let suite =
          >:: test_series_for_reads_the_resident_bars;
          "series_for on an unknown symbol is empty"
          >:: test_series_for_unknown_symbol_is_empty;
+         "a symbol without bars is ignored"
+         >:: test_symbol_without_bars_is_ignored;
        ]
 
 let () = run_test_tt_main suite
