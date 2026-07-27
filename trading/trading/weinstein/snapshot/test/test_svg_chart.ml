@@ -281,96 +281,6 @@ let test_window_truncated_to_the_most_recent_max_bars _ =
     (_count_occurrences svg ~needle:"class=\"vol\"")
     (equal_to Svg_chart.max_bars)
 
-(* ------- Weekly aggregation ------- *)
-
-(* [_base_date] is 2020-01-01, a Wednesday. Bars are addressed by absolute date
-   here rather than by offset, because which WEEK a bar lands in is the thing
-   under test. *)
-let _dated ?(volume = 100) ?high ?low date price : Types.Daily_price.t =
-  Types.Daily_price.make ~date:(Date.of_string date) ~open_price:price
-    ~high_price:(Option.value high ~default:price)
-    ~low_price:(Option.value low ~default:price)
-    ~close_price:price ~volume ~adjusted_close:price ()
-
-let _bar_date (b : Types.Daily_price.t) = b.date
-let _bar_open (b : Types.Daily_price.t) = b.open_price
-let _bar_high (b : Types.Daily_price.t) = b.high_price
-let _bar_low (b : Types.Daily_price.t) = b.low_price
-let _bar_close (b : Types.Daily_price.t) = b.close_price
-let _bar_volume (b : Types.Daily_price.t) = b.volume
-
-let test_weekly_bars_of_empty_is_empty _ =
-  assert_that (Svg_chart.weekly_bars []) (elements_are [])
-
-let test_weekly_bars_folds_one_trading_week _ =
-  (* Mon 2020-01-06 .. Fri 2020-01-10. Open comes from Monday, close from
-     Friday, the extremes from the whole week, volume is the sum, and the bar is
-     DATED at the Friday — not at the Monday, so a Friday-close series ends on
-     its own Friday. *)
-  let week =
-    [
-      _dated ~volume:1 "2020-01-06" 10.0;
-      _dated ~volume:2 ~high:25.0 "2020-01-07" 20.0;
-      _dated ~volume:4 ~low:3.0 "2020-01-08" 15.0;
-      _dated ~volume:8 "2020-01-09" 12.0;
-      _dated ~volume:16 "2020-01-10" 18.0;
-    ]
-  in
-  assert_that
-    (Svg_chart.weekly_bars week)
-    (elements_are
-       [
-         all_of
-           [
-             field _bar_date (equal_to (Date.of_string "2020-01-10"));
-             field _bar_open (float_equal 10.0);
-             field _bar_high (float_equal 25.0);
-             field _bar_low (float_equal 3.0);
-             field _bar_close (float_equal 18.0);
-             field _bar_volume (equal_to 31);
-           ];
-       ])
-
-let test_weekly_bars_split_across_the_weekend _ =
-  (* Fri + Sat + Sun belong to the SAME ISO week (the week's Monday is
-     2020-01-06); the following Monday opens a new one. *)
-  let bars =
-    [
-      _dated "2020-01-10" 10.0;
-      _dated "2020-01-11" 11.0;
-      _dated "2020-01-12" 12.0;
-      _dated "2020-01-13" 13.0;
-    ]
-  in
-  assert_that
-    (Svg_chart.weekly_bars bars)
-    (elements_are
-       [
-         field _bar_close (float_equal 12.0);
-         field _bar_close (float_equal 13.0);
-       ])
-
-let test_weekly_bars_keep_a_year_straddling_week_together _ =
-  (* Mon 2019-12-30 .. Thu 2020-01-02 are one ISO week. Keying on a
-     (year, week-number) pair would split them; keying on the week's Monday does
-     not. *)
-  let bars =
-    [
-      _dated "2019-12-30" 10.0;
-      _dated "2019-12-31" 11.0;
-      _dated "2020-01-01" 12.0;
-      _dated "2020-01-02" 13.0;
-      _dated "2020-01-06" 14.0;
-    ]
-  in
-  assert_that
-    (Svg_chart.weekly_bars bars)
-    (elements_are
-       [
-         field _bar_close (float_equal 13.0);
-         field _bar_close (float_equal 14.0);
-       ])
-
 (* ------- Moving average ------- *)
 
 (* Height 59 makes the price panel exactly 30 units tall (59 - 2*4 - 3 - 18), so
@@ -415,6 +325,22 @@ let test_no_ma_period_emits_no_average _ =
             not_ ~msg:"no average in the aria-label either"
               (_has_substring "moving average");
           ]))
+
+(* The .mli promises a non-positive period is EXACTLY the omitted case — same
+   bytes, aria-label included. Whole-render EQUALITY is the assertion that makes
+   that the pinned claim: leaving the period in the aria-label (which announced
+   a "0-period moving average" that was never drawn, because [_sma] suppressed
+   the polyline while [_aria_label] did not) satisfies every negative substring
+   one would think to write, and fails this. It also pins the byte-identity that
+   justifies leaving every pre-existing coordinate assertion in this file
+   un-re-pinned. *)
+let test_non_positive_ma_period_is_exactly_the_omitted_case _ =
+  let render ?ma_period () =
+    Svg_chart.render ~width:_test_width ~height:_ma_height ?ma_period
+      ~bars:_rising ~levels:[] ()
+  in
+  assert_that (render ~ma_period:0 ()) (equal_to (render ()));
+  assert_that (render ~ma_period:(-5) ()) (equal_to (render ()))
 
 let test_ma_period_longer_than_the_series_emits_no_polyline _ =
   (* Three bars, period 3: exactly one point is defined, and one point is not a
@@ -614,16 +540,11 @@ let suite =
          >:: test_zero_volume_renders_no_volume_rects;
          "window_truncated_to_the_most_recent_max_bars"
          >:: test_window_truncated_to_the_most_recent_max_bars;
-         "weekly_bars_of_empty_is_empty" >:: test_weekly_bars_of_empty_is_empty;
-         "weekly_bars_folds_one_trading_week"
-         >:: test_weekly_bars_folds_one_trading_week;
-         "weekly_bars_split_across_the_weekend"
-         >:: test_weekly_bars_split_across_the_weekend;
-         "weekly_bars_keep_a_year_straddling_week_together"
-         >:: test_weekly_bars_keep_a_year_straddling_week_together;
          "moving_average_polyline_pinned"
          >:: test_moving_average_polyline_pinned;
          "no_ma_period_emits_no_average" >:: test_no_ma_period_emits_no_average;
+         "non_positive_ma_period_is_exactly_the_omitted_case"
+         >:: test_non_positive_ma_period_is_exactly_the_omitted_case;
          "ma_period_longer_than_the_series_emits_no_polyline"
          >:: test_ma_period_longer_than_the_series_emits_no_polyline;
          "ma_is_computed_over_the_whole_series_not_the_window"

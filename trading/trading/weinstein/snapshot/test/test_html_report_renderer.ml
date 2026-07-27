@@ -715,14 +715,19 @@ let test_held_chart_uses_the_fill_and_the_current_stop _ =
 
 let test_charts_are_weekly_with_the_30_week_average _ =
   (* The aria-label names the average, the [.ma] polyline draws it, and the
-     right-hand labels plus the last-close marker are on. Dropping [~ma_period],
-     [~annotate], or the [weekly_bars] aggregation fails one of these. *)
+     right-hand labels plus the last-close marker are on. Dropping [~ma_period]
+     or [~annotate] fails one of these.
+
+     It does NOT catch dropping the [weekly_bars] aggregation: this fixture's
+     bars are already one per week, so aggregating them is the identity and the
+     rendered bytes are the same either way. That arm is pinned by
+     [test_single_weekly_bar_degrades], whose fixture is five DAILY bars inside
+     one week — chartable as dailies, a single mark as weeklies. *)
   let html = Html_report_renderer.render ~bars_for:_bars_for _full_snapshot in
   assert_that html
     (all_of
        [
-         (* 40 weekly bars in, 40 marks out: a daily series would report 40 too,
-            so the aggregation is pinned by the marker date below instead. *)
+         (* 40 weekly bars in, 40 marks out. *)
          _has_substring
            "aria-label=\"price and volume sparkline, 40 bars; 30-period moving \
             average; levels: entry $100.00, stop $90.00\"";

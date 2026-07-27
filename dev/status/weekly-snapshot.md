@@ -32,9 +32,12 @@ unrecognised clause still renders, as a plain chip — pinned by a test.
 
 **Module split decided up front, not in reaction to the linter** (plan
 `dev/plans/picks-phase-c-v2-2026-07-27.md` §2.1): new `Chip`, `Report_card`,
-`Candidate_card`, `Report_masthead`, plus `Svg_labels` extracted mid-execution
-when `svg_chart.ml` crossed the 300-line soft limit. No limit was bumped and no
-`@large-module` marker was added. Every `lib/*.ml` is under 300 lines.
+`Candidate_card`, `Report_masthead`, plus two extractions taken when
+`svg_chart.ml` crossed the 300-line soft limit — `Svg_labels` (label
+collision-avoidance) during execution, and `Svg_series` (weekly aggregation +
+the simple moving average, i.e. series preparation as distinct from geometry)
+during review rework. No limit was bumped and no `@large-module` marker was
+added. Every `lib/*.ml` is under 300 lines.
 
 **Contracts preserved.** `Report_shared` is untouched, so the Markdown report is
 byte-identical *by construction* — `test_report_renderer.ml` is unchanged and

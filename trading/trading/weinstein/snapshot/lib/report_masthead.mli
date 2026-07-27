@@ -29,13 +29,15 @@ val counts_strip : Weekly_snapshot.t -> string
     difference. *)
 
 val chart_legend : ma_period:int -> string
-(** [chart_legend ~ma_period] names each mark a candidate chart draws: the close
+(** [chart_legend ~ma_period] names each mark a card's chart draws: the close
     line, the [ma_period]-period moving average, the dashed entry and stop
     levels, and the fact that a symbol is a TradingView link.
 
-    One legend per candidate section rather than one per chart: the marks are
-    identical on every card, and a section that renders on its own still carries
-    the key to its own charts. *)
+    One legend per chart-bearing section — long candidates, short candidates
+    {b and} held positions — rather than one per chart. The marks are identical
+    on every card, so repeating the key per chart would be noise; but every
+    section that draws them carries it, so a reader who scrolls straight to one
+    section never meets the marks without a key. *)
 
 val closing_notes : string
 (** How to read the report, and what its figures do and do not promise: the

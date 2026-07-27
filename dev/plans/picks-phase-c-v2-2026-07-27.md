@@ -72,8 +72,9 @@ written:
 | `Candidate_card` (new) | `Weekly_snapshot.candidate` → chips + nums + ticket → `Report_card`. The only module that knows how a candidate becomes chips. | ~140 |
 | `Report_masthead` (new) | Masthead (title, as-of, system version, regime chip), the stat strip, the chart legend, the sizing + data-hygiene footer notes. | ~110 |
 | `Html_report_renderer` (edit) | Composes the above + the held-position cards + Warnings. Table primitives deleted. | ~170 |
-| `Svg_chart` (edit) | `+ weekly_bars`, `?ma_period`, `?annotate` (right labels + last-close marker). | 171 → 294 |
-| `Svg_labels` (new) | **Added during execution.** The label collision-avoidance rule. `Svg_chart` landed at 321 lines — over the 300 soft limit — so the label layout was extracted rather than the limit bumped, exactly as §4 anticipated. | ~32 |
+| `Svg_chart` (edit) | `?ma_period`, `?annotate` (right labels + last-close marker). | 171 → 260 |
+| `Svg_labels` (new) | **Added during execution.** The label collision-avoidance rule. `Svg_chart` landed at 321 lines — over the 300 soft limit — so the label layout was extracted rather than the limit bumped, exactly as §4 anticipated. | 32 |
+| `Svg_series` (new) | **Added during review rework.** Weekly aggregation + the simple moving average. The `?ma_period` fix pushed `svg_chart.ml` to 305, over the limit again; rather than trim a comment to squeak under, the *series-preparation* half was split from the *geometry* half — which is what `Svg_chart`'s own docstring has always claimed it is. `Svg_chart.weekly_bars` moved here; the one call site and its four tests moved with it. | 43 |
 | `Html_page` (edit) | Card / chip / masthead / strip / legend / footer CSS; chart classes for MA + marker + labels. | 144 → ~215 |
 
 Rejected alternative: keep one growing `html_report_renderer.ml` and add an

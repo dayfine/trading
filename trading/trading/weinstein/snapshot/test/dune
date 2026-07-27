@@ -6,6 +6,7 @@
   test_pick_diff
   test_report_renderer
   test_svg_chart
+  test_svg_series
   test_html_report_renderer
   test_entry_reconciliation)
  (libraries

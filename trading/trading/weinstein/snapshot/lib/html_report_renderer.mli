@@ -24,10 +24,15 @@
     - [Long candidates (top N)] — the chart legend, then one {!Candidate_card}
       per shown candidate ([N = long_limit]).
     - [Short candidates (top N)] — the same, [N = short_limit].
-    - [Held positions] — one card per position.
-    - [Warnings] — [<ul>] of data-quality warnings (or ["(none)"]). This is the
-      report's drop-reasons section: a ticker missing from the lists above is
-      explained here rather than silently absent.
+    - [Held positions] — the same chart legend, then one card per position.
+    - [Warnings] — one [<li>] per entry in [Weekly_snapshot.t.warnings], in the
+      snapshot's own order (or ["(none)"]). This is the report's drop-reasons
+      section,
+      {b but the property that a dropped ticker is explained rather than
+         silently absent belongs to the generator}, not to this renderer:
+      whether a drop produced a warning line is decided by
+      [Weinstein_snapshot_gen]'s gates when the snapshot is written. All this
+      function guarantees is that whatever is on file is displayed, unfiltered.
     - [<footer>] — {!Report_masthead.closing_notes}.
 
     Every section header is emitted unconditionally; empty data renders as
@@ -65,10 +70,10 @@
 
     Each card carries an inline {!Svg_chart}: the most recent
     {!Svg_chart.max_bars} {b weekly} closes — ~21 months, aggregated from the
-    supplied dailies by {!Svg_chart.weekly_bars} — the 30-week moving average, a
-    shaded entry-to-stop band, dashed entry and stop lines named in a right-hand
-    gutter, and a marker on the last close. Held positions chart their fill
-    price and their {e current} stop.
+    supplied dailies by {!Svg_series.weekly_bars} — the 30-week moving average,
+    a shaded entry-to-stop band, dashed entry and stop lines named in a
+    right-hand gutter, and a marker on the last close. Held positions chart
+    their fill price and their {e current} stop.
 
     The 30-week average is the trend line stage analysis is defined against
     (weinstein-book-reference.md §1 "The Four Stages"), which is why a chart

@@ -74,23 +74,6 @@ val max_bars : int
     recent {!max_bars} bars — a weekly report's sparkline is about the current
     base, and more points than this are indistinguishable at report scale. *)
 
-val weekly_bars : Types.Daily_price.t list -> Types.Daily_price.t list
-(** [weekly_bars bars] aggregates a chronological daily series into weekly bars,
-    one per ISO week: [open_price] of the week's first bar, the extremes of its
-    [high_price] / [low_price], the [close_price] and [adjusted_close] of its
-    last bar, and the sum of its volume.
-
-    Each weekly bar is {b dated at its last daily bar}, not at the week's Monday
-    — so a series ending on a Friday close ends on that Friday, which is what a
-    weekly report's right-hand edge should read.
-
-    Weeks are keyed by the Monday of each date's ISO week, so a week straddling
-    a year boundary stays one bucket. Input must be chronological (oldest
-    first); [[]] maps to [[]]. Pure function.
-
-    Provided here rather than taken from [analysis/technical/indicators] because
-    the snapshot library deliberately carries no [analysis/] dependency. *)
-
 val render :
   ?width:int ->
   ?height:int ->
@@ -107,9 +90,10 @@ val render :
     chart-less cell.
 
     [bars] must be in chronological order (oldest first), as returned by
-    [Bar_reader.daily_bars_for] or by {!weekly_bars}. Only the most recent
-    {!max_bars} are drawn. The module is cadence-agnostic: it draws whatever
-    series it is handed.
+    [Bar_reader.daily_bars_for] or by {!Svg_series.weekly_bars}. Only the most
+    recent {!max_bars} are drawn. The module is cadence-agnostic: it draws
+    whatever series it is handed — preparing that series (weekly aggregation) is
+    {!Svg_series}'s job.
 
     [?band] shades the region between two prices across the full plot width
     (order of the pair is irrelevant). Omit it for an unshaded chart.
@@ -120,8 +104,13 @@ val render :
     yields an average defined across the full chart width rather than one that
     only begins [ma_period] marks in. Positions with fewer than [ma_period]
     values behind them are simply not plotted; fewer than two plotted points
-    emits no polyline at all. Omitted (or non-positive) → no overlay, and the
-    output is byte-identical to the pre-[?ma_period] renderer.
+    emits no polyline at all.
+
+    A non-positive [ma_period] is treated as {b exactly} the omitted case — same
+    bytes out, aria-label included, not merely the same drawn marks — so
+    [render ~ma_period:0 …] and [render …] are indistinguishable. With it
+    omitted (or non-positive) the whole fragment is byte-identical to what this
+    function produced before [?ma_period] existed.
 
     [?annotate] (default [false]) makes the chart readable standalone: it
     reserves a right-hand gutter and emits one [text.lvl-label] per level plus a

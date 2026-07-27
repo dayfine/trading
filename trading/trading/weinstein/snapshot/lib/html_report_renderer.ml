@@ -47,7 +47,7 @@ let _price_level ~label ~price ~kind =
 let _chart ~(bars_for : bar_source) ~symbol ~entry ~entry_label ~stop =
   Svg_chart.render ~width:_chart_width ~height:_chart_height ~band:(entry, stop)
     ~ma_period:_ma_period_weeks ~annotate:true
-    ~bars:(Svg_chart.weekly_bars (bars_for ~symbol))
+    ~bars:(Svg_series.weekly_bars (bars_for ~symbol))
     ~levels:
       [
         _price_level ~label:entry_label ~price:entry ~kind:Svg_chart.Entry;
@@ -160,11 +160,16 @@ let _held_card ~bars_for (h : Weekly_snapshot.held_position) =
       footer = Some (Report_card.footer (_e (_held_stop_line h)));
     }
 
+(* Held cards draw the same marks as candidate cards — weekly close, the 30-week
+   average, the two dashed levels, the last-close marker — so this section
+   carries the same legend. A reader who scrolls straight here would otherwise
+   meet the marks with no key. *)
 let _held_list ~bars_for positions =
   match positions with
   | [] -> _empty_marker
   | _ ->
-      Printf.sprintf "<div class=\"cands\">%s</div>"
+      Printf.sprintf "%s\n<div class=\"cands\">%s</div>"
+        (Report_masthead.chart_legend ~ma_period:_ma_period_weeks)
         (String.concat ~sep:"\n" (List.map positions ~f:(_held_card ~bars_for)))
 
 (* ---- Page ---- *)
