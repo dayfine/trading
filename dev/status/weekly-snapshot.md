@@ -5,6 +5,37 @@
 ## Status
 IN_PROGRESS
 
+**2026-07-27 (follow-up to #2129, branch `fix/report-watch-qc-followup`):**
+closed the three qc-behavioral findings from #2129's review. #2129 merged before
+the rework landed, so these were live defects on main rather than unmerged-PR
+findings — F1 in particular meant `report_renderer.mli` shipped publishing a
+false default.
+
+- **F1** — `Report_renderer.default_long_display_limit`'s docstring still said
+  "(7)" after the value moved to 20. Corrected; the docstring now also names the
+  `Screener.default_config.max_buy_candidates` coupling that rule A2 keeps it
+  from expressing as a real dependency.
+- **F2 + F3** — nothing in the repo executed `render_weekly_report`, so its
+  output routing and flag validation were unpinned: deleting the Markdown
+  emission from `_emit` reproduced the #2122 bug with a green suite, and
+  deleting the `-data-dir` / `-bars-snapshot-dir` guard broke nothing. New
+  `test_render_weekly_report_cli.ml` runs the real binary in a temp dir and
+  asserts exit code, stdout, stderr, and the files written (11 tests). Both
+  mutations are now red. Testing the executable — rather than extracting a pure
+  planner — is what the finding required: the bug lives in the driver, so only
+  executing the driver pins it.
+- The mutual-exclusion guard also moved **ahead** of rendering
+  (`_bar_source_spec`, a total function returning a `result`). It previously sat
+  inside chart construction, so a Markdown-only run passing both flags succeeded
+  silently.
+- An unopenable `-bars-snapshot-dir` now exits 1 with a message instead of an
+  uncaught stack trace.
+- **FLAG-B** (non-blocking) taken: the watch section tagged every card
+  `arm:"long"`, so an extended short's chart cell read `data-chart="long:SYM"`,
+  contradicting its own comment. Each side now keeps its own tag; pinned.
+- **FLAG-A** (non-blocking) left as-is — the duplicated `20` is architecturally
+  forced by A2; documented at both ends instead.
+
 **2026-07-27 (Phase C item 4c.b — trailing-stop state machine threaded across
 weeks, branch `feat/trailing-stop-state-machine`, PR #2125):** Phase A showed a
 **recomputed** stop floor beside the trader's working stop — a fresh support

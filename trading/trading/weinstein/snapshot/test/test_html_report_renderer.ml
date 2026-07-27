@@ -343,7 +343,7 @@ let test_section_order _ =
          "<header>";
          "<div class=\"strip\">";
          "<h2>Strong sectors</h2>";
-         "<h2>Long candidates (top 7)</h2>";
+         "<h2>Long candidates (top 20)</h2>";
          "<h2>Short candidates (top 5)</h2>";
          "<h2>Held positions</h2>";
          "<h2>Warnings</h2>";
@@ -357,7 +357,7 @@ let test_every_empty_section_renders_the_none_marker _ =
        [
          _has_substring "<h2>Strong sectors</h2>\n<p class=\"empty\">(none)</p>";
          _has_substring
-           "<h2>Long candidates (top 7)</h2>\n<p class=\"empty\">(none)</p>";
+           "<h2>Long candidates (top 20)</h2>\n<p class=\"empty\">(none)</p>";
          _has_substring
            "<h2>Short candidates (top 5)</h2>\n<p class=\"empty\">(none)</p>";
          _has_substring "<h2>Held positions</h2>\n<p class=\"empty\">(none)</p>";
@@ -561,7 +561,7 @@ let test_long_section_truncated_with_tie_honest_note _ =
       long_candidates = _n_candidates ~n:12 ~score_of:(fun _ -> 0.85);
     }
   in
-  let html = Html_report_renderer.render snap in
+  let html = Html_report_renderer.render ~long_limit:7 snap in
   assert_that html
     (all_of
        [
@@ -919,6 +919,49 @@ let test_extended_chip_and_suppression_on_the_short_arm _ =
             +34.5% past the";
        ])
 
+(* Extended candidates leave the actionable sections: the short arm's only
+   candidate is EXTENDED, so the Short section renders the empty marker and
+   the extended card renders below the watch heading instead (2026-07-27 user
+   feedback: extended names must not consume actionable display slots). *)
+let test_extended_card_moves_to_watch_section _ =
+  let html = Html_report_renderer.render _reconciled_snapshot in
+  let watch_at =
+    String.substr_index_exn html
+      ~pattern:"<h2>Watch — extended, do not chase</h2>"
+  in
+  let card_at =
+    String.substr_index_exn html ~pattern:"<div class=\"cand cand-extended\">"
+  in
+  assert_that html
+    (all_of
+       [
+         _has_substring
+           "<h2>Short candidates (top 5)</h2>\n<p class=\"empty\">(none)</p>";
+         matching ~msg:"the extended card must render inside the watch section"
+           (fun _ -> if card_at > watch_at then Some () else None)
+           __;
+       ])
+
+(* Sharing the watch section does not mean sharing an arm tag: the extended
+   SHORT's chart cell must still be addressed "short:SHRTB". Tagging every watch
+   card "long" would make a short's chart indistinguishable from a long's to any
+   consumer keying off [data-chart]. *)
+let test_watch_card_keeps_its_own_arm_tag _ =
+  assert_that
+    (Html_report_renderer.render _reconciled_snapshot)
+    (all_of
+       [
+         _has_substring "data-chart=\"short:SHRTB\"";
+         not_ ~msg:"an extended short must not be tagged as a long"
+           (_has_substring "data-chart=\"long:SHRTB\"");
+       ])
+
+let test_no_watch_section_without_extended _ =
+  assert_that
+    (Html_report_renderer.render _full_snapshot)
+    (not_ ~msg:"watch section only exists when something is extended"
+       (_has_substring "Watch — extended"))
+
 (* An unreconciled snapshot (the disarmed default) carries no chip, no Last
    figure and no legend. *)
 let test_unreconciled_cards_are_plain _ =
@@ -1000,6 +1043,12 @@ let suite =
          >:: test_through_entry_chip_on_the_long_arm;
          "extended_chip_and_suppression_on_the_short_arm"
          >:: test_extended_chip_and_suppression_on_the_short_arm;
+         "extended_card_moves_to_watch_section"
+         >:: test_extended_card_moves_to_watch_section;
+         "watch_card_keeps_its_own_arm_tag"
+         >:: test_watch_card_keeps_its_own_arm_tag;
+         "no_watch_section_without_extended"
+         >:: test_no_watch_section_without_extended;
          "unreconciled_cards_are_plain" >:: test_unreconciled_cards_are_plain;
        ]
 

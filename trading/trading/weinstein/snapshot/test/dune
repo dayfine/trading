@@ -8,7 +8,8 @@
   test_svg_chart
   test_svg_series
   test_html_report_renderer
-  test_entry_reconciliation)
+  test_entry_reconciliation
+  test_render_weekly_report_cli)
  (libraries
   weinstein_trading.snapshot
   status
@@ -21,4 +22,8 @@
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq))
  (deps
-  (glob_files_rec fixtures/*)))
+  (glob_files_rec fixtures/*)
+  ; test_render_weekly_report_cli runs the real CLI binary as a subprocess
+  ; (nothing else in the repo executes it, so its output routing and flag
+  ; validation would otherwise be unpinned — see #2122).
+  %{exe:../bin/render_weekly_report.exe}))

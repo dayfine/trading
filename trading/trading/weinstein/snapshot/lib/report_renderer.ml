@@ -5,8 +5,10 @@ open Core
    capped list, and strategy / backtest selection is unaffected. Callers may
    override both (see [render]'s optional params) to surface a book-sized list
    (~5) or the full set. The section header echoes the effective limit so header
-   and content stay in sync. *)
-let default_long_display_limit = 7
+   and content stay in sync. The long default matches the screener's candidate
+   cap, so a default render shows every pick (2026-07-27 user feedback: the
+   earlier cap of 7 hid 13 of 20 candidates). *)
+let default_long_display_limit = 20
 let default_short_display_limit = 5
 
 (* Marker rendered for empty lists / tables so the reader never sees a missing
@@ -190,16 +192,31 @@ let render ?(long_limit = default_long_display_limit)
   Buffer.add_string buf
     (_section ~title:"Strong sectors" (_sector_list t.sectors_strong));
   Buffer.add_string buf "\n\n";
+  let long_actionable, long_extended =
+    Report_shared.partition_extended t.long_candidates
+  in
+  let short_actionable, short_extended =
+    Report_shared.partition_extended t.short_candidates
+  in
+  let extended = long_extended @ short_extended in
   Buffer.add_string buf
     (_section
        ~title:(Printf.sprintf "Long candidates (top %d)" long_limit)
-       (_candidate_table t.long_candidates ~limit:long_limit));
+       (_candidate_table long_actionable ~limit:long_limit));
   Buffer.add_string buf "\n\n";
   Buffer.add_string buf
     (_section
        ~title:(Printf.sprintf "Short candidates (top %d)" short_limit)
-       (_candidate_table t.short_candidates ~limit:short_limit));
+       (_candidate_table short_actionable ~limit:short_limit));
   Buffer.add_string buf "\n\n";
+  (* Extended candidates carry no ticket (do-not-chase), so they live in their
+     own watch section instead of consuming actionable display slots. Omitted
+     entirely when nothing is extended. *)
+  if not (List.is_empty extended) then (
+    Buffer.add_string buf
+      (_section ~title:Report_shared.watch_section_title
+         (_candidate_table extended ~limit:(List.length extended)));
+    Buffer.add_string buf "\n\n");
   Buffer.add_string buf
     (_section ~title:"Held positions" (_held_table t.held_positions));
   Buffer.add_string buf "\n\n";

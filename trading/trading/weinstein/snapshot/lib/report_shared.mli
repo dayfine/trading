@@ -110,3 +110,23 @@ val truncation :
 
     Requires [shown] to be non-empty whenever [hidden] is non-empty (a truncated
     table has rows); raises otherwise. *)
+
+val is_extended : Weekly_snapshot.candidate -> bool
+(** [is_extended c] is [true] iff [c]'s reconciliation class is
+    {!Entry_reconciliation.Extended} — its close has outrun the entry level past
+    the do-not-chase threshold, so its ticket is suppressed. *)
+
+val partition_extended :
+  Weekly_snapshot.candidate list ->
+  Weekly_snapshot.candidate list * Weekly_snapshot.candidate list
+(** [partition_extended cs] splits candidates into [(actionable, extended)],
+    both preserving the incoming rank order. Actionable = every
+    non-{!is_extended} candidate (valid-stop, through-entry, and not-reconciled
+    legacy records). Extended candidates carry no order ticket, so they are
+    rendered in their own watch section rather than consuming actionable display
+    slots (2026-07-27 user feedback: the 07-24 v2 report spent 2 of 7 visible
+    rows on suppressed EXTENDED names). *)
+
+val watch_section_title : string
+(** Section title both renderers use for the extended watch list — shared so the
+    Markdown and HTML reports cannot drift. *)

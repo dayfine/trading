@@ -149,3 +149,13 @@ let truncation ~shown ~hidden =
       (_note_body ~n_hidden:(List.length hidden)
          ~n_tied:(_count_tied ~cutoff hidden)
          ~cutoff_score:cutoff)
+
+let is_extended (c : Weekly_snapshot.candidate) =
+  match c.reconciliation with
+  | Entry_reconciliation.Extended _ -> true
+  | Not_reconciled | Valid_stop _ | Through_entry _ -> false
+
+let partition_extended candidates =
+  List.partition_tf candidates ~f:(Fn.non is_extended)
+
+let watch_section_title = "Watch — extended, do not chase"
