@@ -581,3 +581,17 @@ M6 work runs in parallel with `experiments` track M5.2 — no shared source file
 - Trading-state persistence across process restart (M6.6).
 - Mid-week stop monitor (M6.6).
 - Real-time intraday updates — we trade weekly.
+
+**2026-07-27 (Next-Steps for orchestrator):**
+- [non-blocking] Issue #2103 entry reconciliation (valid-stop /
+  through-entry / EXTENDED classes; re-size on expected fill; suppress
+  extended tickets) — correctness half of Phase C; spec + specimens in the
+  issue. Do FIRST.
+- Phase C: CLAIMED by GHA (branch feat/picks-phase-c, 2026-07-27 02:13Z) —
+  design reference committed at
+  `dev/notes/weekly-report-design-reference-2026-07-27.html`; include #2103
+  reconciliation (see issue comment).
+  — design reference committed at
+  `dev/notes/weekly-report-design-reference-2026-07-27.html`; plan §Phase C
+- Fence: if a local session claims either item it will mark this file per
+  the takeover protocol.

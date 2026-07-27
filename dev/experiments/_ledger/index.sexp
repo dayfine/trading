@@ -1,4 +1,9 @@
-(((config_hash margin-m4-leverage-surface)
+( ((config_hash leverage-dawn-surface)
+  (base_scenario
+   "staging-record-convention/top3000-2000-2026-record-convention (promoted-bundle defaults, v5thin, HEAD 96c4c5f)")
+  (window_id margin-m4-broad-13x2y-2000-2026)
+  (verdict Reject) (entry_slug leverage-dawn-surface))
+((config_hash margin-m4-leverage-surface)
   (base_scenario
    "staging-record-convention/top3000-2000-2026-record-convention (promoted-bundle defaults, v5thin)")
   (window_id margin-m4-broad-13x2y-2000-2026)
