@@ -71,11 +71,6 @@ for status_file in "${REPO_ROOT}"/dev/status/*.md; do
   while IFS= read -r line; do
     case "$line" in
       "- [ ]"*)
-        # Skip struck-through-but-still-unchecked items (cancelled but not
-        # re-checked), e.g. "- [ ] ~~cancelled idea~~".
-        if echo "$line" | grep -q '^- \[ \] ~~.*~~'; then
-          continue
-        fi
         FOLLOWUP_COUNT=$((FOLLOWUP_COUNT + 1))
         file_count=$((file_count + 1))
         ;;

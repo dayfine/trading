@@ -147,6 +147,58 @@ if ! grep -E '\| `track-b\.md` \| 1 \|' "$DETAIL_FILE" > /dev/null; then
   fail "Check 8 Trends detail does not show track-b.md with count 1"
 fi
 
+# ── Step 3: threshold-crossing fixture — pins the W: warning branch ──
+#
+# The 3-item fixture above only ever exercises the `elif` info branch
+# (check_05_followup_items.sh:92); the `if [ "$FOLLOWUP_COUNT" -gt 10 ]`
+# warning branch (:90) is the ACTUAL signal the orchestrator's Step 2b
+# maintenance-cycle decision reads, and it went unpinned in the original
+# version of this test — inverting `-gt` to `-lt` would leave the suite
+# green while flipping that signal backwards. Use a separate fixture root
+# so this doesn't disturb the sidecar Step 2 above already validated.
+
+FAKE_ROOT_WARN="$(mktemp -d)"
+FINDINGS_DIR_WARN="$(mktemp -d)"
+DETAIL_FILE_WARN="$(mktemp)"
+trap 'rm -rf "$FAKE_ROOT" "$FINDINGS_DIR" "$DETAIL_FILE" "$FAKE_ROOT_WARN" "$FINDINGS_DIR_WARN" "$DETAIL_FILE_WARN"' EXIT
+
+mkdir -p "${FAKE_ROOT_WARN}/dev/status"
+
+{
+  echo "## Backlog"
+  echo
+  i=1
+  while [ "$i" -le 11 ]; do
+    echo "- [ ] open item number ${i}, crosses the threshold=10 warning"
+    i=$((i + 1))
+  done
+} > "${FAKE_ROOT_WARN}/dev/status/track-warn.md"
+
+FINDINGS_WARN="${FINDINGS_DIR_WARN}/05.findings"
+: > "$FINDINGS_WARN"
+REPO_ROOT="$FAKE_ROOT_WARN" sh "$CHECK_05" "$DETAIL_FILE_WARN" "$FINDINGS_WARN"
+
+METRIC_LINE_WARN="$(grep '^M: FOLLOWUP_COUNT=' "$FINDINGS_WARN" || true)"
+if [ "$METRIC_LINE_WARN" != "M: FOLLOWUP_COUNT=11" ]; then
+  fail "expected 'M: FOLLOWUP_COUNT=11' in Check 5 findings for the threshold fixture, got: '${METRIC_LINE_WARN:-<missing>}'"
+fi
+
+# Pin the W: wording, the count, and the "see 'Followup Count Detail' below"
+# pointer — this is the whole point of the fixture, not just "a W: line
+# exists somewhere."
+WARN_LINE="$(grep '^W: Open item accumulation:' "$FINDINGS_WARN" || true)"
+case "$WARN_LINE" in
+  "W: Open item accumulation: 11 open"*"(threshold: 10)"*"see 'Followup Count Detail' below"*)
+    ;;
+  *)
+    fail "expected a W: warning line for 11 open items crossing threshold=10 with the 'Followup Count Detail' pointer, got: '${WARN_LINE:-<missing>}'"
+    ;;
+esac
+
+if grep -q '^I: Open items:' "$FINDINGS_WARN"; then
+  fail "11 open items crosses the threshold=10; should emit W:, not also I:"
+fi
+
 if [ "$FAIL_COUNT" -gt 0 ]; then
   echo "FAIL: deep_scan_followup_count_check — ${FAIL_COUNT} assertion(s) failed" >&2
   exit 1
