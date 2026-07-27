@@ -18,15 +18,31 @@
     mirror cannot be fed back into {!Weinstein_stops.update} without a lossy
     conversion.
 
-    {1 The one invariant: never lowered}
+    {1 The invariant: never lowered}
 
-    {!ratchet} is the single implementation of the never-lower rule
-    (weinstein-book-reference.md §5.2 "Trailing Stop — Investor Method":
-    "Continue moving the sell-stop up as the MA advances"; §5.4 "Don't hold
-    hoping it will come back"). Both the manual-edit path
-    ({!Portfolio_edit.adjust}) and the seeding path ({!Stop_thread.seed}) go
-    through it, so there is exactly one monotonicity check to test and exactly
-    one to break.
+    Weinstein's trailing stop moves up as the MA advances and is never moved
+    against the position (weinstein-book-reference.md §5.2 "Trailing Stop —
+    Investor Method": "Continue moving the sell-stop up as the MA advances";
+    §5.4 "Don't hold hoping it will come back").
+
+    The rule is enforced in {b two} places, because there are two different
+    numbers to guard:
+
+    - {!ratchet} guards this track's [state] — the {e machine's} stop level. It
+      returns [None] rather than lowering, and is the only way to move that
+      level, so it is the only place the rule can be bypassed for the machine.
+      Its callers are {!Portfolio_edit.adjust} (on a manual raise) and
+      {!Stop_thread.seed} (so seeding cannot drop below the working stop).
+    - [Portfolio_edit._check_stop_not_lowered] guards
+      [Live_portfolio.position.stop_price] — the {e trader's} working broker
+      order, which is the field the [record_fill adjust] CLI edits.
+
+    They are deliberately not merged. The CLI check has to name the offending
+    values in an error message and has to be overridable by [--allow-lower-stop]
+    for a mistyped stop; an [option]-returning ratchet can express neither, and
+    making it try would put CLI wording in this module. Each has its own test —
+    [ratchet_refuses_a_lower_level] here, [adjust_rejects_lowered_stop] in
+    [test_portfolio_edit].
 
     Long-only, as the live held book is. *)
 

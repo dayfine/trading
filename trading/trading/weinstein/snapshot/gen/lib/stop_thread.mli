@@ -13,9 +13,22 @@
     What this module adds is {b continuity}: {!seed} derives the machine's
     starting state from real bar history, {!advance} folds
     {!Weinstein_stops.update} over the weeks that have elapsed since the state
-    was last carried forward, and {!Stop_track} persists the result. The report
-    can then say what the stop {e is}, and how many times it has ratcheted,
-    rather than what a fresh recomputation {e would be}.
+    was last carried forward, and {!Stop_track} is the shape that state is
+    carried in. The report can then say what the stop {e is}, and how many times
+    it has ratcheted, rather than what a fresh recomputation {e would be}.
+
+    {1 What is wired, and what is not}
+
+    {!advance} is live: {!Held_position_row.enrich} calls it for every holding
+    that carries a {!Stop_track.t}.
+
+    {!seed} is {b not} wired — no production code calls it, only its tests.
+    Nothing writes a track back to [portfolio.sexp] either, so a holding that
+    has no track never acquires one on its own; it renders from
+    {!Stop_recompute.for_held_long} as it did before 4c.b. Seeding un-threaded
+    holdings and persisting the advanced track are both weekly-snapshot item
+    4c.c. {!seed} lands here, tested, because it is the piece 4c.c calls; read
+    it as a component with no caller yet, not as a step the weekly run performs.
 
     {1 Purity}
 
@@ -67,9 +80,12 @@ val seed :
   Stop_track.t
 (** [seed ~stops_config ~initial_stop_buffer ~entry_price ~working_stop
      ~daily_bars ~as_of] builds the starting track for a holding that has none —
-    every position recorded before item 4c.b, and every fresh
-    {!Portfolio_edit.record} (which is bar-free by design, so seeding happens
-    here where the bars are).
+    a position recorded before item 4c.b, or a fresh {!Portfolio_edit.record}
+    (which is bar-free by design, so seeding belongs here where the bars are).
+
+    {b No production caller yet} (see "What is wired, and what is not" above):
+    item 4c.c is what invokes this and saves the result. Calling it today
+    produces a track that nothing would persist.
 
     The [Initial] stop comes from
     {!Weinstein_stops.compute_initial_stop_with_floor}: the prior correction low

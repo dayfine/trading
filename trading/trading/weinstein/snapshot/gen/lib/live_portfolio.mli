@@ -36,8 +36,17 @@ type position = {
 
           {b Optional by design.} Every [portfolio.sexp] written before 4c.b
           lacks the field, and the [@sexp.default None] makes those files load
-          unchanged. The tooling owns the value — a human editing this file
-          should leave it out and let {!Stop_thread.seed} derive it.
+          unchanged. A holding without it renders from the stateless recomputed
+          floor ({!Stop_recompute.for_held_long}) exactly as it did before 4c.b,
+          so an un-threaded book is not a degraded one.
+
+          {b Nothing writes this field yet.} {!Stop_thread.seed} exists to
+          derive a starting track from bars, but it has no production caller,
+          and the generator never saves [portfolio.sexp] back — persisting the
+          advanced track is weekly-snapshot item 4c.c. Until that lands the only
+          way a [stop_state] reaches this file is a hand edit, and
+          {!Portfolio_edit.adjust} maintains one that is already there rather
+          than creating it.
 
           Distinct from [stop_price], which stays the trader's actual working
           broker order and stays authoritative for the report's "Stop" column.

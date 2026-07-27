@@ -309,6 +309,89 @@ let test_advance_never_lowers_the_stop _ =
     (matching ~msg:"Holding" _holding
        (field Stop_track.level (ge (module Float_ord) 50.0)))
 
+(* --- advance: the level TRAILS, over several cycles (L2) ----------------- *)
+
+(* Everything above pins the bookkeeping AROUND the stop — which arm, how many
+   raises, which week. None of it pins the number the whole item exists to
+   move. Freeze [stop_level] and let the arms, events and [raises] advance
+   normally, and every test above still passes while the report prints
+   "Trailing (2 raises, ...)" beside a stop that has not budged.
+
+   Book §5.2's worked example trails the stop through THREE correction cycles
+   (its points E, G and I), so one cycle is not enough either: a single raise
+   cannot distinguish a stop that trails from a stop that moved once and then
+   stuck. *)
+
+let _cycles = 3
+let _cycle_weeks = 3
+let _base_weeks = _weeks - (_cycles * _cycle_weeks)
+
+(* Start the replay several weeks INSIDE the base rather than at the first dip.
+   [Initial -> Trailing] seeds [last_trend_extreme] from the first replayed
+   bar's close, so a replay starting on a dip week would anchor the trend to the
+   bottom of that dip and never measure a [min_correction_pct] pullback. *)
+let _replay_from = _base_weeks - 6
+let _prior_level = 50.0
+
+(* One cycle: two weeks falling well past [min_correction_pct] below [peak],
+   then a week closing back above it. The recovery close is the next cycle's
+   peak, so each cycle starts from a higher trend extreme than the last — which
+   is why the raises are strictly increasing rather than merely repeated. *)
+let _cycle_bars ~peak ~first_week =
+  [
+    _bar ~close:(peak *. 0.90) (_week_end first_week);
+    _bar ~close:(peak *. 0.88) (_week_end (first_week + 1));
+    _bar ~close:(peak *. 1.04) (_week_end (first_week + 2));
+  ]
+
+let _three_cycle_series () =
+  let base = _uptrend ~n:_base_weeks () in
+  List.fold (List.init _cycles ~f:Fn.id) ~init:base ~f:(fun bars c ->
+      bars
+      @ _cycle_bars ~peak:(_last_close bars)
+          ~first_week:(_base_weeks + (c * _cycle_weeks)))
+
+let _holding_exn outcome =
+  match _holding outcome with
+  | Some track -> track
+  | None ->
+      assert_failure "expected Holding; the fixture stopped the position out"
+
+(* Advance ONE cycle at a time, keeping the track after each. Replaying the
+   whole series in a single call would only expose the final level; the claim
+   under test is that the level moves on every cycle. Each call is handed the
+   bar prefix ending at that cycle's recovery week and the previous call's
+   track, which is exactly how the weekly report resumes week to week. *)
+let _tracks_across_cycles () =
+  let bars = _three_cycle_series () in
+  let prior = _track ~level:_prior_level ~updated:(_week_end _replay_from) in
+  List.folding_map (List.init _cycles ~f:Fn.id) ~init:prior ~f:(fun track c ->
+      let weekly_bars =
+        List.take bars (_base_weeks + ((c + 1) * _cycle_weeks))
+      in
+      let advanced = _holding_exn (_advance ~weekly_bars ~prior:track) in
+      (advanced, advanced))
+
+(* How many steps of [_prior_level, l0, l1, l2] were strictly upward. A frozen
+   stop scores zero here however faithfully the arms and [raises] advance
+   around it; a stop that trails once and then sticks scores one. *)
+let _strict_rises ~from levels =
+  List.zip_exn (from :: List.drop_last_exn levels) levels
+  |> List.count ~f:(fun (prev, next) -> Float.( > ) next prev)
+
+let test_advance_raises_the_stop_level_on_every_cycle _ =
+  assert_that
+    (_strict_rises ~from:_prior_level
+       (List.map (_tracks_across_cycles ()) ~f:Stop_track.level))
+    (equal_to _cycles)
+
+(* And the ratchet history the report prints agrees with the level: one raise
+   per cycle, so [label]'s "N raises" is not counting something else. *)
+let test_advance_records_one_raise_per_cycle _ =
+  assert_that
+    (List.last_exn (_tracks_across_cycles ()))
+    (field (fun (t : Stop_track.t) -> t.raises) (equal_to _cycles))
+
 let suite =
   "stop_thread"
   >::: [
@@ -338,6 +421,10 @@ let suite =
          "advance_counts_a_completed_correction_cycle"
          >:: test_advance_counts_a_completed_correction_cycle;
          "advance_never_lowers_the_stop" >:: test_advance_never_lowers_the_stop;
+         "advance_raises_the_stop_level_on_every_cycle"
+         >:: test_advance_raises_the_stop_level_on_every_cycle;
+         "advance_records_one_raise_per_cycle"
+         >:: test_advance_records_one_raise_per_cycle;
        ]
 
 let () = run_test_tt_main suite

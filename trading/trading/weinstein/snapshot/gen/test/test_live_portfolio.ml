@@ -171,6 +171,21 @@ let test_header_documents_stop_state _ =
          contains_substring "--allow-lower-stop";
        ])
 
+(* The header ships to the trader, so what it promises has to be what the code
+   does. Two claims are pinned here because both were wrong before this test
+   existed: the header told the trader "the tooling writes and updates it" when
+   nothing writes the field at all (item 4c.c), and it described
+   [--allow-lower-stop] as resetting the state without saying that nothing then
+   recreates it. Both now say so, and the words appear in [header] itself rather
+   than only in a doc-comment the trader never sees. *)
+let test_header_does_not_promise_an_unwired_write_back _ =
+  assert_that Live_portfolio.header
+    (all_of
+       [
+         contains_substring "Nothing writes this field yet";
+         contains_substring "nothing recreates it";
+       ])
+
 let suite =
   "live_portfolio"
   >::: [
@@ -178,6 +193,8 @@ let suite =
          "pre_4cb_file_still_loads" >:: test_pre_4cb_file_still_loads;
          "stop_state_round_trips" >:: test_stop_state_round_trips;
          "header_documents_stop_state" >:: test_header_documents_stop_state;
+         "header_does_not_promise_an_unwired_write_back"
+         >:: test_header_does_not_promise_an_unwired_write_back;
          "template_parses" >:: test_template_parses;
          "load_from_file" >:: test_load_from_file;
          "load_missing_file" >:: test_load_missing_file;

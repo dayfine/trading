@@ -44,12 +44,17 @@ let _header_lines =
     ";     entry_date  : date  — date opened (YYYY-MM-DD)";
     ";     stop_price  : float — the working stop";
     ";     stop_state  : optional — the trailing-stop state machine's carried";
-    ";                   state for this holding. OMIT IT: the tooling writes";
-    ";                   and updates it, and a file without it loads fine.";
+    ";                   state for this holding. LEAVE IT OUT: a file without";
+    ";                   it loads fine, and the report then recomputes the stop";
+    ";                   floor from bars each week, exactly as it did before.";
+    ";                   Nothing writes this field yet: the generator reads it";
+    ";                   when present but never saves this file back, so today";
+    ";                   the only way one gets here is a hand edit.";
     ";                   Weinstein never lowers a stop, so `record_fill adjust";
     ";                   --stop-price` refuses to move a stop DOWN unless you";
-    ";                   also pass --allow-lower-stop (which resets this \
-     state).";
+    ";                   also pass --allow-lower-stop. That override DELETES";
+    ";                   any stop_state here and nothing recreates it, so the";
+    ";                   ratchet history is lost until you write one by hand.";
     ";";
     "; Example position (delete when you record real fills):";
     ";   ((symbol AAPL) (shares 100) (entry_price 180.0)";

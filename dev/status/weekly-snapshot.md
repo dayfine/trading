@@ -22,9 +22,13 @@ candidate side. 4c.b adds **continuity** around it:
 
 - **`Stop_track`** — the persisted per-holding record: the machine's own
   `stop_state` stored **verbatim** (not mirrored), the week it was last
-  advanced through, and a count of `Stop_raised` events. `ratchet` is the
-  single implementation of the never-lower rule; both the manual-edit path and
-  the seeding path go through it, so there is exactly one monotonicity check.
+  advanced through, and a count of `Stop_raised` events. `ratchet` is the only
+  way to move the track's level, and both the manual-edit path and the seeding
+  path go through it. It is **not** the subsystem's only monotonicity check —
+  `Portfolio_edit._check_stop_not_lowered` independently guards the trader's
+  `stop_price`, because that one must emit a CLI error naming
+  `--allow-lower-stop` and be overridable by it. Two numbers, two guards, one
+  book rule, one test each.
 - **`Stop_thread`** — the pure driver (bar lists in, no `Bar_reader`, no I/O).
   `seed` derives the `Initial` stop from real bar history via
   `compute_initial_stop_with_floor` (book §5.1 — below the base, not an
@@ -89,8 +93,42 @@ track. Also deferred: a `held_position` schema field rendering the state label
 as its own column in both reports, and short-side held positions (the live held
 book is long-only).
 
-Plan: `dev/plans/trailing-stop-state-machine-2026-07-27.md` (§9 records four
-deviations).
+`Stop_thread.seed` ships here **with no production caller** — it is the piece
+4c.c invokes, and calling it today would build a track nothing persists. Every
+doc-comment that implied otherwise was corrected in rework 1 (below).
+
+**Rework 1 (QC behavioral NEEDS_REWORK, 2026-07-27), both findings closed:**
+
+- **The stop-level *rise* is now pinned.** Every prior `advance` test asserted
+  the bookkeeping *around* the level — which arm, how many `raises`, which
+  week — so freezing `stop_level` while letting all of that advance left the
+  whole suite green, and the report would have printed `Trailing (2 raises, …)`
+  beside a stop that never moved. That is L2, the invariant the whole item
+  exists to enforce. `advance_raises_the_stop_level_on_every_cycle` replays
+  book §5.2's three-cycle shape (its points E, G, I) one cycle at a time and
+  counts strict rises in the level itself. Verified by mutation: freeze the
+  level in `_step` → that test alone fails (16 tests, 1 failure); revert →
+  green. It is now a non-negotiable row in the plan's §6 mutation list, where
+  it was missing.
+- **Four texts asserted a wiring that does not exist, and are now true.** The
+  `portfolio.sexp` header block shipped to the trader said "OMIT IT: the
+  tooling writes and updates it"; `live_portfolio.mli` said to "let
+  `Stop_thread.seed` derive it"; `stop_thread.mli` read as though `seed` were a
+  live step and `Stop_track` "persists"; `portfolio_edit.{ml,mli}` said a
+  cleared track means "the next advance re-seeds from bars". None of that is
+  what the code does. Fixed as docs, not by wiring `seed` — a caller with no
+  persistence would build a track that is immediately discarded, which is 4c.c's
+  job. The operator-facing header correction is pinned by
+  `header_does_not_promise_an_unwired_write_back` so it cannot silently regress.
+- **`--allow-lower-stop` is a one-way trapdoor**, now documented in
+  `portfolio_edit.mli`, the plan §3.3, and the `portfolio.sexp` header: it
+  clears the track and, with `seed` unwired, nothing recreates one. The ratchet
+  history is lost until someone hand-writes a `stop_state` back. The working
+  stop is unaffected and the report stays correct, only stateless. Closing the
+  trapdoor properly means wiring `seed` — 4c.c.
+
+Plan: `dev/plans/trailing-stop-state-machine-2026-07-27.md` (§9 records seven
+deviations, three of them from rework 1).
 
 **2026-07-27 (Phase C item 4c.a — `record_fill` CLI, branch
 `feat/record-fill-cli`, PR #2117):** `dev/weekly-picks/portfolio.sexp` was only
@@ -903,8 +941,11 @@ remaining queue:
       explicit `--allow-lower-stop` override that clears the track).
    c. Write-back + report label, deferred out of 4c.b for PR size:
       (i) `generate_weekly_snapshot --update-stops` to persist the advanced
-      portfolio after a run — until this lands the only producer of a track is
-      a hand edit, so 4c.b's threading is read-only in practice; (ii) a
+      portfolio after a run, **and the call to `Stop_thread.seed` that gives an
+      un-threaded holding its first track** — `seed` shipped in 4c.b unwired,
+      so until this lands the only producer of a track is a hand edit, 4c.b's
+      threading is read-only in practice, and `--allow-lower-stop` is a one-way
+      trapdoor (it clears a track nothing can recreate); (ii) a
       `held_position` schema field rendering the state label as its own column
       in the Markdown + HTML reports (today it rides on the free-form
       `status` string); (iii) short-side held positions.

@@ -137,8 +137,9 @@ let _ratchet_track track ~to_ =
 
 (* A deliberate [--allow-lower-stop] override drops the track: the machine's
    accumulated state is no longer a truthful description of a position whose
-   stop the trader has moved against it, so the next advance re-seeds honestly
-   from bars instead of carrying state that has been contradicted. *)
+   stop the trader has moved against it, so the holding falls back to the
+   stateless recomputed floor rather than carrying state that has been
+   contradicted. One-way until item 4c.c wires seeding — see the .mli. *)
 let _apply_stop (held : Live_portfolio.position) ~allow_lower ~stop_price =
   match stop_price with
   | None -> held

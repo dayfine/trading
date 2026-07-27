@@ -73,11 +73,20 @@ of a three-constructor variant with six fields in one arm is a drift bug
 waiting to happen, and the machine's own type is the only thing that can be fed
 back into `Weinstein_stops.update` without a lossy conversion.
 
-`ratchet` is the single implementation of **L2** — it returns `None` for a
-target below the level in force, and otherwise returns the track with the
-level raised *inside its existing constructor* (so `Trailing`'s correction
-bookkeeping survives a manual raise). Both the manual-edit path (§3.3) and the
-seeding path (§3.4) call it, so there is exactly one monotonicity check.
+`ratchet` is the single way to move the *track's* level for **L2** — it returns
+`None` for a target below the level in force, and otherwise returns the track
+with the level raised *inside its existing constructor* (so `Trailing`'s
+correction bookkeeping survives a manual raise). Both the manual-edit path
+(§3.3) and the seeding path (§3.4) call it.
+
+It is **not** the only monotonicity check in the subsystem, and the first draft
+of this plan said otherwise. `ratchet` guards the *machine's* level;
+`Portfolio_edit._check_stop_not_lowered` independently guards the *trader's*
+`stop_price`, because that one has to emit a CLI error naming
+`--allow-lower-stop` and has to be overridable by it — neither of which an
+`option`-returning ratchet can express. Two numbers, two guards, one book rule;
+each has its own test (`ratchet_refuses_a_lower_level`,
+`adjust_rejects_lowered_stop`).
 
 `raises` is what lets the report say "trailing up for N cycles" rather than
 "the floor happens to be here" — the history the recomputed-floor design cannot
@@ -128,12 +137,21 @@ the **same commit** as the field, and the PR body calls this out.
   - a raise ratchets the track's level up via `Stop_track.ratchet`;
   - a `--allow-lower-stop` lower **clears** the track (`None`). The machine's
     invariant was deliberately overridden, so its accumulated state is no
-    longer a truthful description of the position; the next `advance` re-seeds
-    honestly from bars rather than carrying a state the trader has contradicted.
+    longer a truthful description of the position; the holding falls back to
+    the stateless recomputed floor rather than carrying a state the trader has
+    contradicted.
   - `--trim-shares` does not touch the track (share count is not stop state).
 
+**Clearing is one-way in this increment.** `Stop_thread.seed` is unwired (§8),
+so nothing recreates a cleared track and the ratchet history is lost until
+someone hand-writes a `stop_state` back into `portfolio.sexp`. The working stop
+is unaffected and the report stays correct, only stateless — but an operator
+reaching for `--allow-lower-stop` on a long-held position should know this. It
+is documented in `portfolio_edit.mli` and in the `portfolio.sexp` header block
+the trader actually reads. Wiring `seed` (4c.c) closes the trapdoor.
+
 `record` still seeds `stop_state = None`: `Portfolio_edit` is pure and bar-free
-by design, so the first `advance` does the seeding where the bars are.
+by design, so seeding belongs where the bars are (§3.4) — which 4c.c wires.
 
 ### 3.4 `Stop_thread` (new, `snapshot/gen/lib/stop_thread.{ml,mli}`)
 
@@ -245,6 +263,10 @@ goes in the PR body. Non-negotiable rows:
 - `advance` not stopping at `Stop_hit` → red.
 - `Held_position_row` ignoring the track → red.
 - A literal pre-4c.b portfolio sexp string fails to parse → red.
+- **`_step` freezing `stop_level` while the arm, the event and `raises` advance
+  normally → red.** Added after rework 1: this row was missing, and without it
+  the suite could not tell a trailing stop from a frozen one. Only
+  `advance_raises_the_stop_level_on_every_cycle` catches it.
 
 ## 7. Acceptance criteria
 
@@ -276,6 +298,11 @@ thread it into the report in a follow-up increment; say so in the plan"):
   inside the report and a track is only created by hand-editing
   `portfolio.sexp` — `record` deliberately seeds `None` (§3.3), and `adjust`
   only ratchets a track that already exists.
+- **Seeding `Stop_thread.seed` from the generator.** `seed` ships here, tested,
+  with **no production caller** — it is the piece the write-back increment
+  calls, and calling it today would build a track nothing persists. It is the
+  same 4c.c increment as the write-back and is called out separately only
+  because the doc-comments now have to say so explicitly (§9.5).
 - **Report surfacing of the history**: a `held_position.stop_state_label`
   schema field rendering `Trailing (2 raises)` in the Markdown and HTML
   reports. This PR changes what the *stop value* means; the label change
@@ -314,3 +341,31 @@ Recorded rather than revised silently.
    *history* into both reports, and it needs no `current_schema_version` bump
    and no renderer change, so the §8 deferral of the schema-field label still
    holds.
+
+### Rework 1 (QC behavioral, 2026-07-27)
+
+5. **Four texts asserted a wiring that does not exist, and are now true.**
+   `Stop_thread.seed` has no production caller, but the `portfolio.sexp`
+   header block told the trader "the tooling writes and updates it",
+   `live_portfolio.mli` said to "let `Stop_thread.seed` derive it",
+   `stop_thread.mli`'s module doc said `Stop_track` "persists the result" and
+   its `seed` doc read as a live step, and `portfolio_edit.{ml,mli}` said a
+   cleared track means "the next advance re-seeds from bars". All five now say
+   what the code does: nothing writes the field, `advance` is the only wired
+   entry point, and an un-threaded holding falls back to `Stop_recompute`.
+   Chosen over wiring `seed` because a caller with no persistence would build a
+   track that is discarded — that is 4c.c's job, not a rework's. The header
+   correction is pinned by `header_does_not_promise_an_unwired_write_back`, so
+   the operator-facing text cannot silently regress.
+6. **`--allow-lower-stop` is a one-way trapdoor and now says so** (§3.3).
+   Documented, not redesigned: closing it properly means wiring `seed`, which
+   is 4c.c.
+7. **The stop-level *rise* is now pinned across three cycles.** Every prior
+   `advance` test asserted the bookkeeping around the level — the arm, the
+   `raises` count, the week — so freezing `stop_level` while letting all of
+   that advance left the whole suite green, and the report would have printed
+   `Trailing (2 raises, …)` beside a stop that never moved. §5's mutation list
+   did not cover it. `advance_raises_the_stop_level_on_every_cycle` replays
+   book §5.2's three-cycle shape (its points E, G, I) one cycle at a time and
+   counts strict rises in the level itself; it fails under that freeze and is
+   the only test that does.

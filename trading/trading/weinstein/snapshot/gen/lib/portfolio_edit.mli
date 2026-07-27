@@ -115,8 +115,17 @@ val adjust :
       alone — that is the never-lower rule applied to the track itself.
     - an [allow_lower] lowering {b clears} the track ([None]). The machine's
       accumulated state no longer describes a position whose stop has been moved
-      against it, so the next advance re-seeds from bars.
+      against it, so the holding falls back to the stateless recomputed floor
+      ({!Stop_recompute.for_held_long}) the report used before item 4c.b.
     - [?trim] does not touch the track: a share count is not stop state.
+
+    {b Clearing is a one-way trapdoor today.} {!Stop_thread.seed} can derive a
+    fresh track from bars, but it has no production caller and nothing writes
+    [portfolio.sexp] back (both are item 4c.c), so no later run recreates a
+    cleared track — the ratchet history is gone until someone writes a
+    [stop_state] into the file by hand. The working stop itself is unaffected
+    and the report stays correct, only stateless. Worth knowing before reaching
+    for [--allow-lower-stop] on a long-held position.
 
     Errors when the symbol is not held, when neither [stop_price] nor [trim] is
     supplied (a no-op edit is a mistake worth reporting), when [stop_price] is
