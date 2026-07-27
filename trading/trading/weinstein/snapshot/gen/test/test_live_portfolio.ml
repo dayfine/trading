@@ -186,6 +186,38 @@ let test_header_does_not_promise_an_unwired_write_back _ =
          contains_substring "nothing recreates it";
        ])
 
+(* Extracts the top-level field names of a record's derived sexp, without
+   recursing into nested substructure. Sexplib renders a record as a list of
+   [(field_name value)] pairs, so each field is a 2-element [List (Atom name ::
+   _)]; the payload itself is opaque here on purpose — recursing into it would
+   also surface e.g. [Stop_track.t]'s internal field names, which [header]
+   never claims to document. *)
+let _record_field_names (sexp : Sexp.t) : string list =
+  match sexp with
+  | Sexp.List items ->
+      List.filter_map items ~f:(function
+        | Sexp.List (Sexp.Atom name :: _) -> Some name
+        | _ -> None)
+  | Sexp.Atom _ -> []
+
+(* Ties [header]'s field list to the ACTUAL fields of [type t] / [type
+   position], via their derived sexp representations, rather than to a second
+   hand-maintained list in this test: renaming or adding a field changes what
+   [sexp_of_t]/[sexp_of_position] emit, so this catches the drift the schema-
+   drift finding (dev/status/cleanup.md §Backlog) describes without touching
+   live_portfolio.ml/.mli. *)
+let test_header_names_every_schema_field _ =
+  let t_fields = _record_field_names (Live_portfolio.sexp_of_t _sample) in
+  let position_fields =
+    _record_field_names
+      (Live_portfolio.sexp_of_position (List.hd_exn _sample.positions))
+  in
+  let undocumented =
+    List.filter (t_fields @ position_fields) ~f:(fun name ->
+        not (String.is_substring Live_portfolio.header ~substring:name))
+  in
+  assert_that undocumented (size_is 0)
+
 let suite =
   "live_portfolio"
   >::: [
@@ -195,6 +227,8 @@ let suite =
          "header_documents_stop_state" >:: test_header_documents_stop_state;
          "header_does_not_promise_an_unwired_write_back"
          >:: test_header_does_not_promise_an_unwired_write_back;
+         "header_names_every_schema_field"
+         >:: test_header_names_every_schema_field;
          "template_parses" >:: test_template_parses;
          "load_from_file" >:: test_load_from_file;
          "load_missing_file" >:: test_load_missing_file;
