@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-26 run3 (orchestrator run 30217413854 — #2083 F3 spike-bar data-suspect flag MERGED `089116bc` (#2097) after 1 rework iteration, all three gates verified green immediately before merge; #2093 + #2096 (docs-only, both stalled `behind` main with auto-merge armed) merged. Gates on `96e72c12`: build 0, status_file_integrity 0, index_size_linter 0, **runtest exit 1** — 2 deterministic `Tuner.Bayesian_opt` `LAPACKE: 9` errors, unrelated to any dispatched PR; #2009's merged fix does NOT close them. See the daily summary `[critical]`.)
+Last updated: 2026-07-26 run4 (orchestrator run 30223449311 — #2099 support_floor.mli citation split MERGED `aca88729`; #2100 #2083 F2 live rename detection QC-APPROVED after 1 rework iteration. Gates on `62f53e29`: build 0, **runtest 0**, status_file_integrity 0, index_size_linter 0. Run 3's `[critical]` main-is-red did NOT reproduce — Bayesian_opt 44/44 pass, 3/3 direct re-runs; downgraded to [medium] host-dependent flake.)
 
 ## Active + complete tracks
 
@@ -43,9 +43,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | LAPACKE GP-Cholesky nugget fix MERGED (#2009); no dispatchable T1/T3 left; ci.yml ENOSPC fix (#1636) BLOCKED on human `workflow`-scoped PAT |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | no dispatchable T1/T3 (re-verified run 4); LAPACKE GP-Cholesky flake is host-dependent, NOT closed by #2009 — refiled to cleanup; #1636 BLOCKED on human `workflow`-scoped PAT |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | Phase 1 stable (PR-D'c #1332 merged); Phase 2 deferred; no outstanding work |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2096 MERGED `c695f24b`; 5 open items (2 filed by run 3: support_floor.mli citation defect, LAPACKE test-gap); next: support_floor.mli §5.1/§6.3 citation split |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2099 MERGED `aca88729` (support_floor.mli §5.1/§6.3 citation split); 9 open items; next: uncited 8% `min_pullback_pct` claim in the same file |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
@@ -57,7 +57,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
-| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | #2083 F1 MERGED `96c4c5ff`, F3 spike-bar flag MERGED `089116bc` (#2097, default-off); next: #2083 F2 rename tracking on fetch |
+| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | #2083 F1 `96c4c5ff` + F3 `089116bc` MERGED; F2 live rename detection MERGED `060ea11b` (#2100, default-off) — #2083 closed by code; next: bar-store-wide scan + universe re-pin (maintainer-local, needs real data) |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
 | [tax-lens](tax-lens.md) | MERGED | feat-backtest | — | Phase 1 #2066 + CP4 loader error-path contract #2073 MERGED; Phase 2 wash-sale / April outflows deferred, user-gated (#2006) |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | asset-type blocklist MERGED (#1939, default-off); next: arm ATB.curated for live universe build + General::Type enrichment feed |

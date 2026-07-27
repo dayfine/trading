@@ -1,7 +1,7 @@
 {
   "date": "2026-07-26",
-  "feature": "weekly-snapshot",
-  "branch": "feat/universe-rename-tracking",
+  "feature": "cleanup",
+  "branch": "cleanup/support-floor-citation",
   "structural_qc": "APPROVED",
   "behavioral_qc": "APPROVED",
   "overall_qc": "APPROVED",
