@@ -5,6 +5,48 @@
 ## Status
 IN_PROGRESS
 
+**2026-07-27 (Phase C item 4c.a — `record_fill` CLI, branch
+`feat/record-fill-cli`, PR #2117):** `dev/weekly-picks/portfolio.sexp` was only
+editable by hand: append a `position` record and remember to debit `cash`,
+delete one and remember to credit it. The failure mode is silent — a portfolio
+whose cash no longer matches its holdings still parses, still generates a
+report, and sizes every subsequent pick against the wrong number.
+
+Shipped as **three named operations, not one signed delta**: `record` (append,
+debit), `close` (credit, remove — the only path that removes a holding), and
+`adjust` (move the stop, and/or trim part of a position, never closing it).
+Each carries an invariant the other two do not — must *not* already be held /
+must be held / must stay open — so each is one named check with one named test
+instead of three branches of a shared function. The book-keeping is a new pure
+`Portfolio_edit`; the CLI is flag parsing plus the read/write at the edges.
+
+**`record` rejects a duplicate symbol outright** rather than merging. That is
+not a weighted-average scale-in: `Live_portfolio.position` is one row and one
+`entry_price` per symbol, so a merge would invent portfolio behaviour nothing
+else in the system shares. Re-running the CLI therefore cannot silently double
+a position, and re-running `close` reports "not held" rather than crediting the
+proceeds twice.
+
+**`--as-of` is required on every subcommand**, never `Date.today` — the library
+functions take the date, so they are reproducible; the CLI asks for it.
+**`--dry-run` prints the exact bytes** a real write would produce
+(`Live_portfolio.to_file_contents`, which `save` itself calls), so the two
+cannot drift. `Live_portfolio` also gained `header`, re-emitted verbatim on
+every rewrite: sexp parsing drops comments, so a naive write would have deleted
+the file's own schema documentation.
+
+**Validation asymmetry, deliberately:** `record` requires the stop below the
+entry (book-reference §5.1); `adjust --stop-price` does not, because a trailing
+stop legitimately rises past the entry once a position is in profit. Enforcing
+the initial-stop rule on every adjustment would reject correct trailing-stop
+updates. Item 4c.b (automating that trail across weeks) remains a separate PR —
+this CLI only lets the user *set* the field.
+
+28 tests; **10 mutations, 10 red**, each naming the test that caught it. Cash
+arithmetic is pinned numerically on every happy path. The nesting linter failed
+three functions on the first draft; fixed by extracting named `_check_*`
+helpers, not by a marker or a limit bump.
+
 **2026-07-27 (Picks Phase C v2 — HTML report to the committed design reference,
 branch `feat/picks-phase-c-v2`):** #2105 shipped the presentation half of Phase
 C as *a table report with per-row sparklines*. ~40 minutes after that PR was
@@ -736,8 +778,12 @@ remaining queue:
    library may depend on it — packaging only, no code change.
 4c. **[Phase C, remaining]** the two Phase C bullets NOT in PR #2105, each its
    own PR because each is a behavioural change rather than presentation:
-   a. `record_fill` CLI that edits `dev/weekly-picks/portfolio.sexp` so the user
-      does not hand-edit sexp (plan §Phase C bullet 3).
+   a. **[DONE]** ~~`record_fill` CLI that edits
+      `dev/weekly-picks/portfolio.sexp`~~ — PR #2117 (`feat/record-fill-cli`),
+      plan `dev/plans/record-fill-cli-2026-07-27.md`. Three subcommands
+      (`record` / `close` / `adjust`) over a new pure `Portfolio_edit` module,
+      plus `Live_portfolio.save` / `to_file_contents` / `header`. Cash moves
+      with the position list in every operation, so the two cannot drift apart.
    b. Full trailing-stop state machine threaded across weeks (persist
       `stop_state` per held position) rather than the recomputed-floor
       side-by-side Phase A uses (plan §Phase C bullet 4). This is the one that

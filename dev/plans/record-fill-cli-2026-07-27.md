@@ -144,7 +144,8 @@ New:
 
 Modified:
 - `trading/trading/weinstein/snapshot/gen/lib/live_portfolio.{ml,mli}` — add
-  `header : string` and `save : t -> path:string -> unit Or_error.t`.
+  `header : string`, `to_file_contents : t -> string`, and
+  `save : t -> path:string -> unit Or_error.t`.
 - `trading/trading/weinstein/snapshot/gen/test/test_live_portfolio.ml` — add
   `save` / `header` round-trip tests.
 - `trading/trading/weinstein/snapshot/gen/bin/dune` — new `record_fill`
@@ -185,7 +186,51 @@ it already only *reads* `portfolio.sexp` via `Live_portfolio.load`).
 - [ ] Mutation evidence in the PR body: for each validation branch, name the
       test that goes RED when it's removed/inverted.
 
-## 6. Out of scope
+## 6. Implementation notes — where the code differs from §2/§3
+
+Recorded during implementation (2026-07-27). The design in §2 stands; these are
+signature-level choices §2 left open, plus one addition.
+
+1. **`record` takes the whole position record, not six loose arguments.**
+   `record : t -> as_of:Date.t -> position:Live_portfolio.position -> …` rather
+   than `~symbol ~shares ~entry_price ~entry_date ~stop_price`. The schema
+   already names exactly that tuple of fields, so re-listing them would have
+   put the function at seven parameters (CLAUDE.md's stated ceiling) and
+   duplicated a record that has to stay in sync anyway. Symbol normalisation
+   happens inside, so the caller cannot forget it.
+
+2. **`trim` is one record, not two independent optionals.** §2.1 says
+   `--trim-shares` and `--trim-price` "must be given together";
+   `Portfolio_edit.adjust` takes `?trim:{ shares; price }`, which makes
+   "shares without a price" unrepresentable in the library rather than a
+   runtime check. The CLI keeps the two flags and does the pairing check
+   (`--trim-shares and --trim-price must be given together`) at the edge,
+   where the flags actually exist.
+
+3. **`Live_portfolio.to_file_contents` added** (not in the original §3 list).
+   §4 risk 3 wants `--dry-run` and the real write to share one formatting
+   path; exposing the byte-producing function and having `save` call it makes
+   that structural rather than a convention. The dry run prints exactly what
+   `save` would write — pinned by
+   `test_live_portfolio.ml:to_file_contents_matches_saved_bytes`.
+
+4. **`record --entry-date` is optional, defaulting to `--as-of`.** §2 does not
+   mention `entry_date`, but the schema requires it. Defaulting it to the
+   supplied `--as-of` covers the common case (recording a fill the day it
+   happened) without reintroducing a wall-clock read, which §2.3 rules out.
+
+5. **`ppx_let` added to the `gen/lib` preprocess list** so the validation
+   chains can use `let%bind` / `let%map` per `.claude/rules/ocaml-patterns.md`
+   ("Monadic Composition"). It was already in the sibling `gen/bin` stanza.
+
+6. **Validation split into named `_check_*` functions.** The first draft
+   composed `Or_error.combine_errors_unit` over inline `_check cond (sprintf
+   …)` expressions; the nesting linter failed three functions on it
+   (`_validate_trim` avg 4.67 / max 8, `_apply_trim` 3.77, `_validate_new`
+   3.15). Fixed by extraction, not by an `@nesting-ok` marker or a limit bump
+   (`.claude/rules/code-health-discipline.md`).
+
+## 7. Out of scope
 
 - The trailing-stop state machine threaded automatically across weeks (item
   4c.b, separate PR).
