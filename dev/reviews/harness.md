@@ -487,3 +487,82 @@ the remaining work is the one-line `|| true`, plus N2/N3 hardening.
 ## Verdict
 
 NEEDS_REWORK
+
+### Rework iteration 2 — `7a6e9c34..4d1efcae` — APPROVED (both gates)
+
+Orchestrator run 30273061906 (2026-07-27 run 4). Reviewed SHA `4d1efcae`, carried to
+`bf07b639` after a branch update (all four reviewed files verified **byte-identical**;
+the update brought only main's commits).
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+Rework iterations: 1 this run (2 cumulative across runs 3-4).
+
+**F1 CLOSED, N2 CLOSED, N3 CLOSED.** The fix distinguishes two error classes rather than
+treating them alike: an invalid `WRITE_AUDIT_RECORDED_AT_NS` is a *caller* bug and
+hard-fails with a named message, while a BSD/macOS `date` lacking `%N` is a *platform*
+quirk and degrades to `seconds * 10^9`. Both paths are validated by one
+`_is_nonneg_int()` before anything reaches the JSON body.
+
+**I reproduced the two defects myself before dispatching**, so the brief carried measured
+evidence rather than a restated review: on a scratch `REPO_ROOT` with one legacy record,
+the NEEDS_REWORK path exited **1 with no record and no error message**; with `|| true`
+appended it exited **0** and wrote `consecutive_rework_count=2`. `WRITE_AUDIT_RECORDED_AT_NS=oops`
+produced `"recorded_at_ns": oops,` — confirmed invalid by `json.load`.
+
+**Structural — APPROVED (5/5).** Quoted the REST-derived file list per the A3 provenance
+rule. Independently ran all three new scenarios against `7a6e9c34` and confirmed each
+FAILS there and passes at head — so 9/10/11 are genuine change-detectors, not tautologies.
+Verified `_is_nonneg_int()`'s `*[!0-9]*` case glob is POSIX and that the script passes both
+`bash -n` and `sh -n`.
+
+**Behavioral — APPROVED (4/5), with a new pre-existing finding.** This is the reviewer that
+produced the decisive finding on both prior iterations, and it did the ordering work rather
+than accepting the script's own comment:
+
+- **Ties.** Three legacy records tying at `0` sort filename-descending = date-descending.
+  It established this is *documented* behaviour (POSIX mandates whole-line last-resort
+  comparison absent `-s`; GNU coreutils documents it) rather than an implementation
+  accident — the distinction the script's comment was asserting without support.
+- **The adversarial interleave.** One legacy plus three new records written
+  `zzz`(NR) → `aaa`(APPROVED) → `mmm`(NR), chosen so alphabetical order *contradicts*
+  write order. Correct answer 2; a filename sort yields 3; head produced **2**.
+- **BSD fallback magnitude** orders correctly against real-ns and legacy `0`.
+
+**N4 — new, real, pre-existing, non-blocking.** The author excluded the `prev_verdict`
+extraction from scope, arguing `overall_qc` is required on every record (I confirmed
+**81/81** current records carry it). The reviewer found the hole: `cat > "$OUTPUT_FILE" <<ENDJSON`
+**truncates before filling**, so a run interrupted mid-write (SIGTERM on a cancelled CI job,
+or the ENOSPC that `sweep-hygiene.md` documents as recurring here) leaves a record with
+`recorded_at_ns` but no `overall_qc`. Seeded with one, the NEEDS_REWORK path exits 1 with
+empty output and writes nothing — *the identical asymmetric shape as F1, eight lines below
+it*. One such record permanently and silently disables audit writes for that feature on the
+escalation path.
+
+It then verified the same unguarded line exists on `main` at `fd41ed6a~1:write_audit.sh:155`,
+so this is **not a regression** — this PR only marginally widens exposure. Held to
+follow-up rather than forcing a fourth iteration, and for a stated reason beyond
+proportionality: the one-line `|| true` is easy, but the *direction* is not obvious. An
+empty `prev_verdict` breaks the streak, which **under**-counts and suppresses escalation —
+the unsafe direction. That is a decision, not a patch, and it should not be bolted on under
+time pressure. Same call it made on F2 last iteration, same reasoning, and right both times.
+
+Also folded in: `|| true` swallows grep exit **2** (unreadable target) as well as no-match —
+blast radius strictly smaller than N4's, filed with it.
+
+**Method note worth carrying forward.** `_repo_root()` prefers `$0`'s `.git`/`.claude`
+ancestor over `$REPO_ROOT`, so probing `write_audit.sh` from inside a repo worktree silently
+exercises *that worktree's* `dev/audit/`, not the scratch one. The reviewer hit this on its
+first pass and redid the harness from a neutral `/tmp` path. Anyone re-verifying this PR
+should do the same. (My own repro was unaffected — `/tmp/f1repro` has no repo ancestor — and
+its numbers match the reviewer's independently.)
+
+## Quality Score
+
+4
+
+## Verdict
+
+APPROVED

@@ -949,6 +949,15 @@ remaining queue:
       `held_position` schema field rendering the state label as its own column
       in the Markdown + HTML reports (today it rides on the free-form
       `status` string); (iii) short-side held positions.
+   (iv) **Wording precision, filed 2026-07-27 run 4 (qc-behavioral, #2125,
+      non-blocking):** "writes" is used where "creates" is meant in four of the
+      corrected `stop_state` paragraphs. `record_fill adjust --stop-price
+      <higher>` *does* persist a ratcheted `stop_state`, so "nothing writes this
+      field yet" is over-broad read standalone. Not a defect — every conclusion
+      drawn from it is true and verified, `live_portfolio.mli` discloses the
+      exception in the same paragraph, and the imprecision **under-promises**
+      the tooling, which is the safe direction. Tighten when 4c.c rewrites
+      these paragraphs rather than churning the trader-facing `header` twice.
    Also deferred from #2105: writing the HTML report to disk alongside the
    `.md` in the weekly pipeline (today `-html` prints to stdout, so the caller
    redirects), and a `sectors_weak` section (Markdown has none either — parity
