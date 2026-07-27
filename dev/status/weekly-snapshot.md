@@ -5,6 +5,131 @@
 ## Status
 IN_PROGRESS
 
+**2026-07-27 (Phase C item 4c.b — trailing-stop state machine threaded across
+weeks, branch `feat/trailing-stop-state-machine`, PR #2125):** Phase A showed a
+**recomputed** stop floor beside the trader's working stop — a fresh support
+floor derived every week from the current bars. Stateless, so the report could
+say "this week's floor is $x" but never "the stop has ratcheted up through
+three correction cycles and now sits at $x", and nothing carried the ratchet
+forward between runs.
+
+**No new state machine was written.** `Weinstein_stops` already is the
+Weinstein trailing-stop machine (`Initial → Trailing → Tightened`, the
+never-lower rule, correction-cycle bookkeeping), and it is what the
+live/backtest strategy runs. A second one for the weekly report would fork the
+domain logic — the exact divergence `Stop_recompute` was built to close on the
+candidate side. 4c.b adds **continuity** around it:
+
+- **`Stop_track`** — the persisted per-holding record: the machine's own
+  `stop_state` stored **verbatim** (not mirrored), the week it was last
+  advanced through, and a count of `Stop_raised` events. `ratchet` is the only
+  way to move the track's level, and both the manual-edit path and the seeding
+  path go through it. It is **not** the subsystem's only monotonicity check —
+  `Portfolio_edit._check_stop_not_lowered` independently guards the trader's
+  `stop_price`, because that one must emit a CLI error naming
+  `--allow-lower-stop` and be overridable by it. Two numbers, two guards, one
+  book rule, one test each.
+- **`Stop_thread`** — the pure driver (bar lists in, no `Bar_reader`, no I/O).
+  `seed` derives the `Initial` stop from real bar history via
+  `compute_initial_stop_with_floor` (book §5.1 — below the base, not an
+  arbitrary percentage) and never seeds below the stop already resting at the
+  broker. `advance` folds `Weinstein_stops.update` over the weeks strictly
+  after `updated`, taking each week's `ma_value` / `ma_direction` / `stage`
+  from `Stage.classify` on the weekly prefix with the prior week's stage
+  threaded in. Idempotent: re-running a week applies nothing.
+- **L3 is enforced, not inherited.** `advance` runs the machine with
+  `trigger_on_weekly_close = true`, overriding the config default (`false`,
+  kept so backtest goldens replay unchanged). The bars are *weekly*, so the
+  default would fire on an intra-**week** wick; Weinstein's rule is a weekly
+  **close**. A week that dips through the stop and closes back above it does
+  not exit — pinned, and the mutation back to the default is red.
+
+**The `adjust --stop-price` policy deferred from 4c.a is decided: a lowered
+stop is REJECTED.** Authority §5.2 ("continue moving the sell-stop up as the MA
+advances") and §5.4 ("don't hold hoping it will come back") — lowering a stop
+converts a defined loss into an open-ended one. Equality is allowed, so
+re-running a command is idempotent. `?allow_lower` (CLI `--allow-lower-stop`)
+overrides it for the one legitimate case, a mistyped stop, and must be passed
+deliberately; the refusal message names the flag. The carried track is kept in
+step: a raise ratchets it up (preserving the state arm and its correction
+bookkeeping), a forced lowering **clears** it, and a trim does not touch it.
+
+**Schema.** `Live_portfolio.position` gains `stop_state : Stop_track.t option
+[@sexp.default None]`. Pinned by parsing a **literal pre-4c.b sexp string** — a
+round-trip of the new type would serialise the field and never exercise the
+default. `Live_portfolio.header` is updated in the **same commit**, discharging
+the `schema_drift: live_portfolio.ml` obligation in `dev/status/cleanup.md`
+§Backlog (`header` is hand-written and re-emitted verbatim by `save`, with
+nothing tying it to `type position`; adding a field silently would have
+worsened that filed defect). No `Weekly_snapshot` schema change and no
+`current_schema_version` bump.
+
+**What the report now says.** `Held_position_row.enrich` branches on
+`stop_state`: `None` (every portfolio.sexp on disk today) keeps the
+recomputed-floor view byte-identical with status `"Holding"`; `Some` advances
+the machine and reports the stop **in force** plus `Stop_track.label` as the
+status (`"Trailing (2 raises, through 2026-07-24)"`), or
+`"STOP HIT <date> (weekly close below $<level>)"`. `status` is already a
+free-form string both renderers print, so the history reaches the report with
+no schema field and no renderer change.
+
+**Evidence: 11 mutations, 11 red**, each naming the test that caught it —
+ratchet monotonicity; the `adjust` refusal; `allow_lower` failing to clear the
+track; a raise failing to ratchet the track; `trigger_on_weekly_close` reverted
+to the config default (2 tests); `seed` ignoring the working stop; replay
+continuing past `Stop_hit`; the replay window off by one week (idempotence);
+`raises` never incrementing; the held row ignoring the track; `[@sexp.default
+None]` dropped; and `header` no longer documenting the field. All mutations
+were binding-preserving — an unused-binding mutation fails the *build*, which
+is a false red (the #2117 author's own correction).
+
+**Deliberately deferred to 4c.c** (per the dispatch's own sizing instruction,
+recorded in the plan §8): the write-back — a `generate_weekly_snapshot
+--update-stops` flag that saves the advanced portfolio after a run. Until it
+lands `advance` runs read-only inside the report and a track is created only by
+hand-editing `portfolio.sexp`, because `record` seeds `None` by design
+(`Portfolio_edit` is pure and bar-free) and `adjust` only ratchets an existing
+track. Also deferred: a `held_position` schema field rendering the state label
+as its own column in both reports, and short-side held positions (the live held
+book is long-only).
+
+`Stop_thread.seed` ships here **with no production caller** — it is the piece
+4c.c invokes, and calling it today would build a track nothing persists. Every
+doc-comment that implied otherwise was corrected in rework 1 (below).
+
+**Rework 1 (QC behavioral NEEDS_REWORK, 2026-07-27), both findings closed:**
+
+- **The stop-level *rise* is now pinned.** Every prior `advance` test asserted
+  the bookkeeping *around* the level — which arm, how many `raises`, which
+  week — so freezing `stop_level` while letting all of that advance left the
+  whole suite green, and the report would have printed `Trailing (2 raises, …)`
+  beside a stop that never moved. That is L2, the invariant the whole item
+  exists to enforce. `advance_raises_the_stop_level_on_every_cycle` replays
+  book §5.2's three-cycle shape (its points E, G, I) one cycle at a time and
+  counts strict rises in the level itself. Verified by mutation: freeze the
+  level in `_step` → that test alone fails (16 tests, 1 failure); revert →
+  green. It is now a non-negotiable row in the plan's §6 mutation list, where
+  it was missing.
+- **Four texts asserted a wiring that does not exist, and are now true.** The
+  `portfolio.sexp` header block shipped to the trader said "OMIT IT: the
+  tooling writes and updates it"; `live_portfolio.mli` said to "let
+  `Stop_thread.seed` derive it"; `stop_thread.mli` read as though `seed` were a
+  live step and `Stop_track` "persists"; `portfolio_edit.{ml,mli}` said a
+  cleared track means "the next advance re-seeds from bars". None of that is
+  what the code does. Fixed as docs, not by wiring `seed` — a caller with no
+  persistence would build a track that is immediately discarded, which is 4c.c's
+  job. The operator-facing header correction is pinned by
+  `header_does_not_promise_an_unwired_write_back` so it cannot silently regress.
+- **`--allow-lower-stop` is a one-way trapdoor**, now documented in
+  `portfolio_edit.mli`, the plan §3.3, and the `portfolio.sexp` header: it
+  clears the track and, with `seed` unwired, nothing recreates one. The ratchet
+  history is lost until someone hand-writes a `stop_state` back. The working
+  stop is unaffected and the report stays correct, only stateless. Closing the
+  trapdoor properly means wiring `seed` — 4c.c.
+
+Plan: `dev/plans/trailing-stop-state-machine-2026-07-27.md` (§9 records seven
+deviations, three of them from rework 1).
+
 **2026-07-27 (Phase C item 4c.a — `record_fill` CLI, branch
 `feat/record-fill-cli`, PR #2117):** `dev/weekly-picks/portfolio.sexp` was only
 editable by hand: append a `position` record and remember to debit `cash`,
@@ -806,10 +931,24 @@ remaining queue:
       (`record` / `close` / `adjust`) over a new pure `Portfolio_edit` module,
       plus `Live_portfolio.save` / `to_file_contents` / `header`. Cash moves
       with the position list in every operation, so the two cannot drift apart.
-   b. Full trailing-stop state machine threaded across weeks (persist
-      `stop_state` per held position) rather than the recomputed-floor
-      side-by-side Phase A uses (plan §Phase C bullet 4). This is the one that
-      changes what the report *says*, not how it looks.
+   b. **[DONE]** ~~Full trailing-stop state machine threaded across weeks
+      (persist `stop_state` per held position)~~ — PR #2125
+      (`feat/trailing-stop-state-machine`), plan
+      `dev/plans/trailing-stop-state-machine-2026-07-27.md`. New `Stop_track`
+      (persisted state, the single never-lower `ratchet`) + `Stop_thread`
+      (pure `seed` / `advance` over `Weinstein_stops.update`); the deferred
+      `adjust --stop-price` lowered-stop policy is decided (rejected, with an
+      explicit `--allow-lower-stop` override that clears the track).
+   c. Write-back + report label, deferred out of 4c.b for PR size:
+      (i) `generate_weekly_snapshot --update-stops` to persist the advanced
+      portfolio after a run, **and the call to `Stop_thread.seed` that gives an
+      un-threaded holding its first track** — `seed` shipped in 4c.b unwired,
+      so until this lands the only producer of a track is a hand edit, 4c.b's
+      threading is read-only in practice, and `--allow-lower-stop` is a one-way
+      trapdoor (it clears a track nothing can recreate); (ii) a
+      `held_position` schema field rendering the state label as its own column
+      in the Markdown + HTML reports (today it rides on the free-form
+      `status` string); (iii) short-side held positions.
    Also deferred from #2105: writing the HTML report to disk alongside the
    `.md` in the weekly pipeline (today `-html` prints to stdout, so the caller
    redirects), and a `sectors_weak` section (Markdown has none either — parity

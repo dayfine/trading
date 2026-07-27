@@ -10,6 +10,7 @@ open OUnit2
 open Matchers
 module Live_portfolio = Weinstein_snapshot_gen.Live_portfolio
 module Portfolio_edit = Weinstein_snapshot_gen.Portfolio_edit
+module Stop_track = Weinstein_snapshot_gen.Stop_track
 
 let _date d = Date.of_string d
 let _as_of = _date "2026-07-31"
@@ -21,6 +22,7 @@ let _aapl : Live_portfolio.position =
     entry_price = 180.0;
     entry_date = _date "2026-06-13";
     stop_price = 168.0;
+    stop_state = None;
   }
 
 (* 100k cash, one 100-share AAPL position. *)
@@ -316,6 +318,7 @@ let test_adjust_leaves_other_positions_alone _ =
       entry_price = 400.0;
       entry_date = _date "2026-06-20";
       stop_price = 370.0;
+      stop_state = None;
     }
   in
   let two = { _held with positions = [ _aapl; msft ] } in
@@ -326,6 +329,128 @@ let test_adjust_leaves_other_positions_alone _ =
     (is_some_and
        (field _positions
           (elements_are [ field _stop (float_equal 175.0); equal_to msft ])))
+
+(* --- adjust: the never-lower rule (item 4c.b) ---------------------------- *)
+
+(* A holding whose carried stop state sits at [level] — the shape a threaded
+   position has once [Stop_thread] has seeded it. *)
+let _with_track ~level =
+  let track : Stop_track.t =
+    {
+      state = Initial { stop_level = level; reference_level = level +. 4.0 };
+      updated = _date "2026-07-24";
+      raises = 2;
+    }
+  in
+  { _held with positions = [ { _aapl with stop_state = Some track } ] }
+
+let _track (p : Live_portfolio.position) = p.stop_state
+let _track_level t = Stop_track.level t
+let _track_raises (t : Stop_track.t) = t.raises
+
+(* Weinstein's trailing stop is never lowered (book §5.2 / §5.4): a stop below
+   the one in force is refused, and the message names the override flag. *)
+let test_adjust_rejects_lowered_stop _ =
+  let result =
+    Portfolio_edit.adjust _held ~as_of:_as_of ~symbol:"AAPL" ~stop_price:160.0
+      ()
+  in
+  assert_that (_msg result)
+    (is_some_and
+       (all_of
+          [
+            contains_substring "never lowered";
+            contains_substring "--allow-lower-stop";
+          ]))
+
+(* Setting the stop already in force is idempotent, not an error — re-running
+   the same command must not fail. *)
+let test_adjust_allows_unchanged_stop _ =
+  assert_that
+    (Result.ok
+       (Portfolio_edit.adjust _held ~as_of:_as_of ~symbol:"AAPL"
+          ~stop_price:168.0 ()))
+    (is_some_and
+       (field _positions (elements_are [ field _stop (float_equal 168.0) ])))
+
+(* The deliberate override lowers the stop AND clears the carried state: the
+   machine's accumulated ratchet no longer describes a position whose stop has
+   been moved against it. *)
+let test_adjust_allow_lower_clears_track _ =
+  assert_that
+    (Result.ok
+       (Portfolio_edit.adjust (_with_track ~level:168.0) ~as_of:_as_of
+          ~symbol:"AAPL" ~stop_price:160.0 ~allow_lower:true ()))
+    (is_some_and
+       (field _positions
+          (elements_are
+             [
+               all_of [ field _stop (float_equal 160.0); field _track is_none ];
+             ])))
+
+(* A manual raise carries the track up with it, so next week's advance resumes
+   from the stop actually in force. The state arm and the ratchet history are
+   preserved — a manual edit is not a correction cycle. *)
+let test_adjust_raise_ratchets_track _ =
+  assert_that
+    (Result.ok
+       (Portfolio_edit.adjust (_with_track ~level:168.0) ~as_of:_as_of
+          ~symbol:"AAPL" ~stop_price:175.0 ()))
+    (is_some_and
+       (field _positions
+          (elements_are
+             [
+               field _track
+                 (is_some_and
+                    (all_of
+                       [
+                         field _track_level (float_equal 175.0);
+                         field _track_raises (equal_to 2);
+                         field
+                           (fun t -> Stop_track.state_name t.Stop_track.state)
+                           (equal_to "Initial");
+                       ]));
+             ])))
+
+(* The never-lower rule applies to the track itself: when the machine's own
+   stop already sits above the new working stop, the track is left alone rather
+   than dragged down to it. *)
+let test_adjust_raise_leaves_higher_track_alone _ =
+  assert_that
+    (Result.ok
+       (Portfolio_edit.adjust (_with_track ~level:180.0) ~as_of:_as_of
+          ~symbol:"AAPL" ~stop_price:175.0 ()))
+    (is_some_and
+       (field _positions
+          (elements_are
+             [
+               all_of
+                 [
+                   field _stop (float_equal 175.0);
+                   field _track
+                     (is_some_and (field _track_level (float_equal 180.0)));
+                 ];
+             ])))
+
+(* A trim is a share-count change, not a stop change: the track survives it. *)
+let test_adjust_trim_preserves_track _ =
+  assert_that
+    (Result.ok
+       (Portfolio_edit.adjust (_with_track ~level:168.0) ~as_of:_as_of
+          ~symbol:"AAPL"
+          ~trim:{ shares = 40; price = 200.0 }
+          ()))
+    (is_some_and
+       (field _positions
+          (elements_are
+             [
+               all_of
+                 [
+                   field _shares (equal_to 60);
+                   field _track
+                     (is_some_and (field _track_level (float_equal 168.0)));
+                 ];
+             ])))
 
 let suite =
   "portfolio_edit"
@@ -365,6 +490,14 @@ let suite =
          >:: test_adjust_rejects_non_positive_stop;
          "adjust_leaves_other_positions_alone"
          >:: test_adjust_leaves_other_positions_alone;
+         "adjust_rejects_lowered_stop" >:: test_adjust_rejects_lowered_stop;
+         "adjust_allows_unchanged_stop" >:: test_adjust_allows_unchanged_stop;
+         "adjust_allow_lower_clears_track"
+         >:: test_adjust_allow_lower_clears_track;
+         "adjust_raise_ratchets_track" >:: test_adjust_raise_ratchets_track;
+         "adjust_raise_leaves_higher_track_alone"
+         >:: test_adjust_raise_leaves_higher_track_alone;
+         "adjust_trim_preserves_track" >:: test_adjust_trim_preserves_track;
        ]
 
 let () = run_test_tt_main suite
