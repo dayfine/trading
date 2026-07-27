@@ -1,5 +1,26 @@
 open Core
 
+let risk_pct ~entry ~stop =
+  if Float.equal entry 0.0 then 0.0 else (entry -. stop) /. entry *. 100.0
+
+(* Executable order instruction for one candidate. Kept here rather than in a
+   renderer because it is the artifact the user copies into their broker: the
+   Markdown and HTML reports must carry character-identical order text. *)
+let instruction (c : Weekly_snapshot.candidate) =
+  let order =
+    Printf.sprintf
+      "BUY STOP %d sh @ $%.2f (~$%.0f, %.1f%% of book, risk $%.0f); on fill \
+       place SELL STOP @ $%.2f, GTC; cancel if unfilled by Friday close"
+      c.sized_shares c.entry c.sized_position_value
+      (c.sized_position_pct *. 100.0)
+      c.sized_risk_amount c.stop
+  in
+  match (c.sized_shares, c.sizing_note) with
+  | 0, None -> "-"
+  | 0, Some note -> note
+  | _, None -> order
+  | _, Some note -> Printf.sprintf "%s: %s" note order
+
 let stop_fallback =
   "* fallback stop: no qualifying support floor (prior correction low / rally \
    high) was found in this symbol's recent bar history, so the stop shown is \

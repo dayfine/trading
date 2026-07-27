@@ -13,9 +13,6 @@ let default_short_display_limit = 5
    section. *)
 let _empty_marker = "(none)"
 
-let _risk_pct ~entry ~stop =
-  if Float.equal entry 0.0 then 0.0 else (entry -. stop) /. entry *. 100.0
-
 (* Issue #2084 Finding 2: a candidate's [stop] can be a real structural level
    (support floor / resistance ceiling) or the fixed-buffer fallback proxy —
    see [Weekly_snapshot.candidate.stop_is_structural]. A fallback stop is
@@ -32,7 +29,7 @@ let _stop_cell (c : Weekly_snapshot.candidate) =
 let _symbol_cell (c : Weekly_snapshot.candidate) =
   if c.data_suspect then c.symbol ^ " (!)" else c.symbol
 
-(* Markdown emphasis wrapper for a {!Report_notes} legend / footnote. The note
+(* Markdown emphasis wrapper for a {!Report_shared} legend / footnote. The note
    prose itself is shared with the HTML renderer; only the wrapping differs. *)
 let _italic note = "_" ^ note ^ "_"
 
@@ -52,33 +49,13 @@ let _resistance_cell : string option -> string = function
   | None -> "-"
   | Some g -> g
 
-(* Executable order instruction for one candidate, formatted from the
-   generator-computed [sized_*] / [sizing_note] fields (fixed-risk sizing,
-   mirroring the backtest). A [0]-share unsized candidate (e.g. a short, which
-   the live strategy leaves unsized) renders "-"; a [0]-share result WITH a note
-   renders the note (cash / caps exhausted, invalid stop). A placeholder-sized
-   candidate prefixes the note so the size reads as provisional. *)
-let _instruction_cell (c : Weekly_snapshot.candidate) =
-  let order =
-    Printf.sprintf
-      "BUY STOP %d sh @ $%.2f (~$%.0f, %.1f%% of book, risk $%.0f); on fill \
-       place SELL STOP @ $%.2f, GTC; cancel if unfilled by Friday close"
-      c.sized_shares c.entry c.sized_position_value
-      (c.sized_position_pct *. 100.0)
-      c.sized_risk_amount c.stop
-  in
-  match (c.sized_shares, c.sizing_note) with
-  | 0, None -> "-"
-  | 0, Some note -> note
-  | _, None -> order
-  | _, Some note -> Printf.sprintf "%s: %s" note order
-
 let _candidate_row ~rank (c : Weekly_snapshot.candidate) =
-  let risk = _risk_pct ~entry:c.entry ~stop:c.stop in
+  let risk = Report_shared.risk_pct ~entry:c.entry ~stop:c.stop in
   Printf.sprintf "| %d | %s | %s | %.2f | $%.2f | %s | %.1f%% | %s | %s | %s |"
     rank (_symbol_cell c) c.grade c.score c.entry (_stop_cell c) risk
     (_resistance_cell c.resistance_grade)
-    c.rationale (_instruction_cell c)
+    c.rationale
+    (Report_shared.instruction c)
 
 let _append_note table = function
   | None -> table
@@ -93,9 +70,9 @@ let _append_note table = function
 let _append_table_notes ~shown ~hidden table =
   let legend flag note = if flag then Some note else None in
   [
-    Report_notes.truncation ~shown ~hidden;
-    legend (Report_notes.any_fallback_stop shown) Report_notes.stop_fallback;
-    legend (Report_notes.any_data_suspect shown) Report_notes.data_suspect;
+    Report_shared.truncation ~shown ~hidden;
+    legend (Report_shared.any_fallback_stop shown) Report_shared.stop_fallback;
+    legend (Report_shared.any_data_suspect shown) Report_shared.data_suspect;
   ]
   |> List.map ~f:(Option.map ~f:_italic)
   |> List.fold ~init:table ~f:_append_note

@@ -1,8 +1,13 @@
-(** Shared legend / footnote prose for the weekly-report renderers.
+(** Text and derived values shared by the two weekly-report renderers.
 
     {!Report_renderer} (Markdown) and {!Html_report_renderer} (HTML) render the
-    same weekly snapshot in two formats. Both must explain the same three things
-    below a candidate table:
+    same weekly snapshot in two formats. Anything a reader would notice
+    differing between the two — the executable order instruction, the risk
+    percentage, the footnote prose — is computed here, once, so the formats
+    cannot drift. Presentation that is genuinely format-specific (table syntax,
+    emphasis, markup) stays in each renderer.
+
+    Both renderers must explain the same three things below a candidate table:
 
     - a {b fallback stop} — the candidate's [stop] is the fixed
       [entry * initial_stop_buffer] proxy rather than a real structural level
@@ -12,10 +17,28 @@
     - a {b truncated table} — how many candidates were hidden and how many of
       them tie the cutoff score.
 
-    The prose lives here, once, so the two renderers cannot drift. Each string
-    is returned {b unwrapped} — no Markdown emphasis, no HTML tags. The caller
-    supplies its own wrapping ([_..._] for Markdown, [<p class="note">] for
-    HTML). *)
+    Every string here is returned {b unwrapped} — no Markdown emphasis, no HTML
+    tags, no escaping. The caller supplies its own wrapping and, for HTML, its
+    own escaping. *)
+
+val risk_pct : entry:float -> stop:float -> float
+(** [risk_pct ~entry ~stop] is the percentage of the entry price at risk to the
+    stop, [(entry - stop) / entry * 100] (long convention). [0.0] for a zero
+    entry price rather than a division by zero. Callers are responsible for the
+    sign convention of [entry] / [stop] relative to side. *)
+
+val instruction : Weekly_snapshot.candidate -> string
+(** [instruction c] is the executable order for [c], formatted from the
+    generator-computed [sized_*] / [sizing_note] fields (fixed-risk sizing,
+    mirroring the backtest) — e.g.
+    ["BUY STOP 55 sh @ $28.49 (~$1567, 1.6% of book, risk $126); on fill place
+     SELL STOP @ $26.21, GTC; cancel if unfilled by Friday close"].
+
+    A [0]-share candidate with no note (e.g. a short, which the live strategy
+    leaves unsized) renders ["-"]; a [0]-share result {e with} a note renders
+    that reason (cash / caps exhausted, invalid stop direction); a
+    placeholder-sized candidate prefixes the ["UNSIZED — set portfolio.sexp"]
+    note so the size reads as provisional. *)
 
 val stop_fallback : string
 (** Explains the trailing [*] marker on a non-structural (fixed-buffer) stop
