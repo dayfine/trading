@@ -75,17 +75,26 @@ IN_PROGRESS
   per PR #1108. Phase 1.1 is parked indefinitely. Full reasoning in
   `dev/notes/vendor-comparison-historical-universe-2026-05-16.md`.
 
-  Phase 1.1 verification checklist — outcome:
-  - [x] Confirm current EODHD plan tier includes Fundamentals —
+  Phase 1.1 verification checklist — outcome. **PARKED: these are not
+  dispatchable work items.** They are the closed-out checklist of a
+  phase that FAILED verification and was parked indefinitely by the
+  2026-05-16 Option B pivot (`dev/decisions.md` §Direction Changes).
+  Reviving any of them requires first purchasing an EODHD tier upgrade,
+  which that decision explicitly rejected — so they are gated on a
+  human commercial decision, not on engineering work. Checkbox syntax
+  was deliberately removed on 2026-07-27 so the orchestrator's Step 2a
+  blocking-refactor scan stops re-reporting them as open work every run
+  (five consecutive runs skipped them by judgement).
+  - **DONE** Confirm current EODHD plan tier includes Fundamentals —
     **FAIL** (EOD-only tier; HTTP 403 across 10 URL variants per PR
     #1106).
-  - [ ] Spot-check 5 known SP500 events (LEH 2008-09-15 / KODK 2009-12
-    / FB 2013-12-23 / TSLA 2020-12-21 / GE 2018-06-26) —
+  - **PARKED** Spot-check 5 known SP500 events (LEH 2008-09-15 / KODK
+    2009-12 / FB 2013-12-23 / TSLA 2020-12-21 / GE 2018-06-26) —
     **NOT_RUN** (blocked on tier 403).
-  - [ ] Confirm `IsDelisted` symbols include OHLCV history in our
+  - **PARKED** Confirm `IsDelisted` symbols include OHLCV history in our
     existing EODHD price subscription — **NOT_RUN** (blocked on tier
     403).
-  - [ ] Verify the JSON path: `HistoricalTickerComponents` vs
+  - **PARKED** Verify the JSON path: `HistoricalTickerComponents` vs
     `Components` — **NOT_RUN** (blocked on tier 403; vendor public
     docs hedge between the two shapes per
     `dev/notes/phase1.1-eodhd-verification-2026-05-16.md` §"Schema

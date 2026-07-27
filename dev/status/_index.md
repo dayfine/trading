@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-26 run4 (orchestrator run 30223449311 — #2099 support_floor.mli citation split MERGED `aca88729`; #2100 #2083 F2 live rename detection QC-APPROVED after 1 rework iteration. Gates on `62f53e29`: build 0, **runtest 0**, status_file_integrity 0, index_size_linter 0. Run 3's `[critical]` main-is-red did NOT reproduce — Bayesian_opt 44/44 pass, 3/3 direct re-runs; downgraded to [medium] host-dependent flake.)
+Last updated: 2026-07-27 run1 (orchestrator run 30231043807 — 4 PRs merged: #2105 Picks Phase C HTML+SVG renderer `101d4418` (QC struct 5/5 + behav 4/5 after 1 rework), #2106 screener design-doc subdirs `e86d3e85`, plus the two stuck PRs unblocked: #2102 leverage-dawn REJECT ledger `ec28cc1f` and #2101 run-4 summary `6d2038e4` (was failing CI on a 294-char row here). #2107 entry reconciliation (#2103) OPEN — behavioral NEEDS_REWORK, Risk % still off stale entry; must not merge until closed. Gates on `060ea11b`: build 0, **runtest 0** (359 binaries, Bayesian_opt 44/44), status_file_integrity 0, index_size_linter 0. NOTE: #2105 predates the committed design reference (#2104) — no chips/cards/MA/TradingView; delta is additive.)
 
 ## Active + complete tracks
 
@@ -45,7 +45,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [sector-data](sector-data.md) | MERGED | — | — | — |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | no dispatchable T1/T3 (re-verified run 4); LAPACKE GP-Cholesky flake is host-dependent, NOT closed by #2009 — refiled to cleanup; #1636 BLOCKED on human `workflow`-scoped PAT |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | Phase 1 stable (PR-D'c #1332 merged); Phase 2 deferred; no outstanding work |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2099 MERGED `aca88729` (support_floor.mli §5.1/§6.3 citation split); 9 open items; next: uncited 8% `min_pullback_pct` claim in the same file |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2106 MERGED `e86d3e85` (6 undocumented `analysis/weinstein/*` subdirs); 8 open items; next: uncited 8% `min_pullback_pct` claim in support_floor.mli |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
@@ -57,7 +57,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
-| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | #2083 closed by code (F1 `96c4c5ff`, F3 `089116bc`, F2 `060ea11b`, default-off); next: bar-store-wide rename scan + universe re-pin (maintainer-local) |
+| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | #2105 | Phase C HTML+SVG renderer #2105; #2103 entry reconciliation stacked; next: close #2105 gap vs committed design reference |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
 | [tax-lens](tax-lens.md) | MERGED | feat-backtest | — | Phase 1 #2066 + CP4 loader error-path contract #2073 MERGED; Phase 2 wash-sale / April outflows deferred, user-gated (#2006) |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | asset-type blocklist MERGED (#1939, default-off); next: arm ATB.curated for live universe build + General::Type enrichment feed |
