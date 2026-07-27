@@ -81,8 +81,13 @@ Corrections and consequences:
   clean region (009-012), so the verdict very likely stands; the 3-4/13 gate
   counts lean on tainted folds.
 - A hygienic full re-run (pinned worktree at 96c4c5f, flock, idle container)
-  launched 2026-07-27 → `/tmp/sweeps/leverage-dawn-v2-clean/`. Ledger addendum
-  entry to follow on completion; the P1b closure is re-certified (or revised)
-  on that clean evidence.
+  launched 2026-07-27 → `/tmp/sweeps/leverage-dawn-v2-clean/`. **COMPLETED
+  2026-07-27 10:33Z — REJECT RE-CERTIFIED** (ledger
+  `2026-07-27-leverage-dawn-clean-rerun`): baseline 13/13 bit-identical to M4
+  (.827/36.17/14.05 — parity restored); dawn Sharpe monotone .616→.437 with
+  MaxDD 22.7→44.9; best gate cell 5/13 (need ≥7), all FAIL; falsifier
+  fold-012 fires in all arms; fold-010 loses risk-adjusted everywhere. Every
+  qualitative claim of this memo survives; cite the clean-rerun numbers, not
+  this run's dawn-cell aggregates.
 - Hardening: chain scripts now build + run from a pinned worktree, never the
   parent working copy — `sweep-hygiene.md` §"Pinned-worktree builds".
