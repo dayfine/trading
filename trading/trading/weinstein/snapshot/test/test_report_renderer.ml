@@ -113,7 +113,7 @@ let test_full_snapshot_contains_all_sections _ =
          _has_substring "- XLK";
          _has_substring "- XLY";
          _has_substring "- XLC";
-         _has_substring "## Long candidates (top 7)";
+         _has_substring "## Long candidates (top 20)";
          (* Pinned candidate row — fully formatted. Risk = (502.13-466.20)/502.13*100 = 7.155... → "7.2%".
             Resistance column shows the candidate's [resistance_grade] ("A"). *)
          _has_substring
@@ -137,7 +137,7 @@ let test_empty_long_candidates_renders_marker _ =
   assert_that md
     (all_of
        [
-         _has_substring "## Long candidates (top 7)\n(none)";
+         _has_substring "## Long candidates (top 20)\n(none)";
          _has_substring "## Short candidates (top 5)\n(none)";
        ])
 
@@ -377,13 +377,30 @@ let _long_snap ~n ~score_of =
   in
   { _empty_snapshot with long_candidates = List.init n ~f:(fun i -> make_c i) }
 
-let test_long_candidates_truncated_to_default_7 _ =
-  (* 12 distinctly-scored candidates → first 7 rendered; rank 7 present, rank 8
-     absent; note reports 5 lower-scored hidden (no ties at the cutoff). *)
+let test_default_limit_shows_full_screener_cap _ =
+  (* The default long limit matches the screener's 20-candidate cap, so a
+     default render hides nothing: 20 distinctly-scored candidates → rank 20
+     rendered, no truncation note. *)
+  let snap =
+    _long_snap ~n:20 ~score_of:(fun i -> 1.0 -. (Float.of_int i *. 0.01))
+  in
+  let md = Report_renderer.render snap in
+  assert_that md
+    (all_of
+       [
+         _has_substring "| 20 | SYM19 |";
+         not_ ~msg:"nothing hidden at the default limit"
+           (_has_substring "not shown");
+       ])
+
+let test_long_candidates_truncated_at_limit _ =
+  (* 12 distinctly-scored candidates at an explicit limit of 7 → rank 7
+     present, rank 8 absent; note reports 5 lower-scored hidden (no ties at
+     the cutoff). *)
   let snap =
     _long_snap ~n:12 ~score_of:(fun i -> 1.0 -. (Float.of_int i *. 0.01))
   in
-  let md = Report_renderer.render snap in
+  let md = Report_renderer.render ~long_limit:7 snap in
   assert_that md
     (all_of
        [
@@ -393,10 +410,11 @@ let test_long_candidates_truncated_to_default_7 _ =
        ])
 
 let test_truncation_note_flags_tied_cutoff _ =
-  (* 12 candidates all tied at score 0.85 → the cut is arbitrary among equals;
-     the note must say 5 more are hidden and all 5 tie the cutoff. *)
+  (* 12 candidates all tied at score 0.85, limit 7 → the cut is arbitrary
+     among equals; the note must say 5 more are hidden and all 5 tie the
+     cutoff. *)
   let snap = _long_snap ~n:12 ~score_of:(fun _ -> 0.85) in
-  let md = Report_renderer.render snap in
+  let md = Report_renderer.render ~long_limit:7 snap in
   assert_that md
     (_has_substring
        "_5 more candidates not shown; 5 tie the cutoff score (0.85). Among \
@@ -408,7 +426,7 @@ let test_no_note_when_not_truncated _ =
   let snap =
     _long_snap ~n:7 ~score_of:(fun i -> 1.0 -. (Float.of_int i *. 0.01))
   in
-  let md = Report_renderer.render snap in
+  let md = Report_renderer.render ~long_limit:7 snap in
   assert_that md
     (not_ ~msg:"no note when nothing hidden" (_has_substring "not shown"))
 
@@ -551,10 +569,63 @@ let test_through_entry_row_renders_market_order _ =
          _has_substring "close vs entry:";
        ])
 
-(* An EXTENDED row KEEPS its place in the table (the issue is explicit about
+(* Extended candidates leave the actionable table entirely: a mixed snapshot
+   renders the valid candidate under "Long candidates" and the extended one
+   under the watch section, each ranked within its own table (2026-07-27 user
+   feedback: extended names must not consume actionable display slots). *)
+let test_extended_candidate_moves_to_watch_section _ =
+  let snap =
+    _long_snap ~n:2 ~score_of:(fun i -> 1.0 -. (Float.of_int i *. 0.01))
+  in
+  let snap =
+    {
+      snap with
+      long_candidates =
+        List.mapi snap.long_candidates ~f:(fun i c ->
+            if i = 1 then
+              {
+                c with
+                reconciliation =
+                  Entry_reconciliation.Extended
+                    { close = 134.5; overshoot_pct = 34.5 };
+              }
+            else c);
+    }
+  in
+  let md = Report_renderer.render snap in
+  let watch_at =
+    String.substr_index_exn md ~pattern:"## Watch — extended, do not chase"
+  in
+  let sym01_at = String.substr_index_exn md ~pattern:"| SYM01 |" in
+  assert_that md
+    (all_of
+       [
+         _has_substring "| 1 | SYM00 |";
+         (* The extended candidate ranks 1 within the watch table, not 2 in
+            the actionable table. *)
+         _has_substring "| 1 | SYM01 |";
+         not_ ~msg:"extended must not hold an actionable rank"
+           (_has_substring "| 2 | SYM01 |");
+         (* And its row sits below the watch heading. *)
+         matching ~msg:"SYM01 must render inside the watch section"
+           (fun _ -> if sym01_at > watch_at then Some () else None)
+           __;
+       ])
+
+let test_no_watch_section_without_extended _ =
+  let snap =
+    _long_snap ~n:2 ~score_of:(fun i -> 1.0 -. (Float.of_int i *. 0.01))
+  in
+  assert_that
+    (Report_renderer.render snap)
+    (not_ ~msg:"watch section only exists when something is extended"
+       (_has_substring "Watch — extended"))
+
+(* An EXTENDED row KEEPS its place in the report (the issue is explicit about
    watch value) but carries NO executable order — only the do-not-chase reason,
    naming the overshoot, the entry level and the close. This is the MBX shape
-   from the 2026-07-24 report. *)
+   from the 2026-07-24 report. Since the watch-section split it renders under
+   "Watch — extended, do not chase" rather than the actionable table. *)
 let test_extended_row_is_kept_but_ticket_suppressed _ =
   let md =
     Report_renderer.render
@@ -628,6 +699,10 @@ let suite =
   >::: [
          "through_entry_row_renders_market_order"
          >:: test_through_entry_row_renders_market_order;
+         "extended_candidate_moves_to_watch_section"
+         >:: test_extended_candidate_moves_to_watch_section;
+         "no_watch_section_without_extended"
+         >:: test_no_watch_section_without_extended;
          "extended_row_is_kept_but_ticket_suppressed"
          >:: test_extended_row_is_kept_but_ticket_suppressed;
          "valid_stop_row_keeps_resting_ticket_and_needs_no_legend"
@@ -660,8 +735,10 @@ let suite =
          "clean_candidate_has_no_marker_or_note"
          >:: test_clean_candidate_has_no_marker_or_note;
          "render_is_deterministic" >:: test_render_is_deterministic;
-         "long_candidates_truncated_to_default_7"
-         >:: test_long_candidates_truncated_to_default_7;
+         "default_limit_shows_full_screener_cap"
+         >:: test_default_limit_shows_full_screener_cap;
+         "long_candidates_truncated_at_limit"
+         >:: test_long_candidates_truncated_at_limit;
          "truncation_note_flags_tied_cutoff"
          >:: test_truncation_note_flags_tied_cutoff;
          "no_note_when_not_truncated" >:: test_no_note_when_not_truncated;
