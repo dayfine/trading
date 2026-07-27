@@ -86,7 +86,14 @@ let _record_command =
      fun () ->
        let entry_date = Option.value entry_date ~default:as_of in
        let position : Live_portfolio.position =
-         { symbol; shares; entry_price; entry_date; stop_price }
+         {
+           symbol;
+           shares;
+           entry_price;
+           entry_date;
+           stop_price;
+           stop_state = None;
+         }
        in
        _commit ~path ~dry_run
          (Portfolio_edit.record (_read path) ~as_of ~position))
@@ -126,6 +133,12 @@ let _adjust_command =
      and stop_price =
        flag _stop_price_flag (optional float)
          ~doc:"Y New working stop (may sit above the entry once in profit)"
+     and allow_lower =
+       flag "--allow-lower-stop" no_arg
+         ~doc:
+           " Permit a stop BELOW the one in force. Weinstein never lowers a \
+            stop; use this only to correct a mistyped one. Resets the carried \
+            stop state."
      and trim_shares =
        flag "--trim-shares" (optional int)
          ~doc:"N Shares to sell; must be fewer than those held"
@@ -138,7 +151,7 @@ let _adjust_command =
        | Ok trim ->
            _commit ~path ~dry_run
              (Portfolio_edit.adjust (_read path) ~as_of ~symbol ?stop_price
-                ?trim ()))
+                ~allow_lower ?trim ()))
 
 let command =
   Command.group

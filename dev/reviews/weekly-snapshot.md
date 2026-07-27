@@ -437,3 +437,178 @@ Rework iterations: 1.
 ## Verdict
 
 APPROVED
+
+---
+
+## PR #2125 — `feat/trailing-stop-state-machine` (item 4c.b)
+
+Reviewed at `629c523b`. Orchestrator run 30273061906 (2026-07-27 run 4).
+
+structural_qc: APPROVED
+behavioral_qc: NEEDS_REWORK
+overall_qc: NEEDS_REWORK (behavioral)
+
+### The design decision, and why both reviewers endorsed it
+
+The brief asked for "the full trailing-stop state machine". **The author did not write one**, and
+that was the right call: `Weinstein_stops` already *is* the Weinstein machine
+(`Initial → Trailing → Tightened`) and is what live and backtest run, so a second one built for
+the report would fork the domain logic — the exact divergence `Stop_recompute` exists to close.
+4c.b instead adds *continuity* around it: `Stop_track` (persisted state), `Stop_thread` (pure
+`seed`/`advance`), and a ratchet policy on manual edits.
+
+**qc-behavioral verified this claim rather than accepting it.** It traced the fold and confirmed
+`_step` takes `Weinstein_stops.update`'s returned `stop_state` **verbatim**; the only additions
+are a report-only `raises` counter (never fed back) and the `trigger_on_weekly_close = true`
+override. `_walk`/`_week`/`_continue` decide only *which* weeks to replay and *when* to stop; no
+stop level, arm, or correction bookkeeping is computed outside `Weinstein_stops`. **W1 spine
+intact.**
+
+It also confirmed **L3 is load-bearing rather than inherited**: `Weinstein_stops.update` genuinely
+reads `config.trigger_on_weekly_close` (`weinstein_stops.ml:246,475` → `check_stop_hit ~on_close`),
+so the override matters, and flipping it turns two tests red. This is a real correctness point —
+the config default is `false` (kept for golden stability) and the bars are *weekly*, so without
+the override the stop would fire on an intra-week wick.
+
+### Structural — APPROVED (5/5)
+
+Build/fmt/tests re-run and verified **non-vacuously**: 144 tests executed in the subtree, with
+`test_stop_track` (10), `test_stop_thread` (14), `test_live_portfolio` (11, 4 new),
+`test_portfolio_edit` (30) and `test_weekly_snapshot_generator` (39, 3 new) all confirmed as
+actually executing rather than cache-served. P6 clean across ~800 lines of new test code. The
+three nesting-linter fixes were verified as **genuine extractions** (`_with_level`'s inline-record
+update; `_step`/`_week`/`_continue` split out of `_walk`) — no `@large-module` marker, no limit
+bump, no `linter_exceptions.conf` entry. REST-derived file list quoted per the A3 provenance rule.
+
+### Behavioral — NEEDS_REWORK (3/5) — two findings
+
+**F1 (T3) — nothing pins that the trailing stop level actually RISES.** The reviewer mutated
+`_step` to **freeze the stop level** while letting arms, events and `raises` advance normally —
+**the entire suite stayed GREEN**. The report would then print `Trailing (2 raises, …)` above a
+stop that never moved: exactly the failure 4c.b exists to eliminate, and a direct miss on **L2**,
+the invariant the whole item is for. Root cause is fixture shape — no fixture runs more than one
+correction cycle, while the book's §5.2 worked example is three (points E, G, I). Per **T3**,
+stop tests must verify trailing across *multiple* advances.
+
+**F2 (CP1) — four texts assert things that are not true.** `Stop_thread.seed` has **no production
+caller** (only the test file), yet: the `portfolio.sexp` `header` block *shipped to the trader*
+says of `stop_state` "OMIT IT: the tooling writes and updates it"; `live_portfolio.mli` says to
+"let `Stop_thread.seed` derive it"; `stop_thread.mli`'s `seed` doc says the same; and
+`stop_track.mli` claims "exactly one monotonicity check to test and exactly one to break" —
+contradicted by **the author's own mutation table**, where #1 breaks `ratchet` and #2 breaks the
+independent `_check_stop_not_lowered`. Worse, `test_header_documents_stop_state` now **pins the
+false statement in place**. No behaviour change is required; the texts must be made true.
+
+### What the reviewer checked that the author's own mutation table could not
+
+The author reported 11 mutations, 11 red. The reviewer ran **five of its own, three of them not on
+the author's list**:
+
+| Mutation | Author-listed? | Result |
+|---|---|---|
+| A: `ratchet` `<` → `<=` (reject equality) | no | RED |
+| B: `_check_stop_not_lowered` ignores `allow_lower` | no | RED |
+| **C: freeze the stop level, arms/events advance** | **no** | **GREEN — the finding** |
+| D: `Entered_tightening` bumps `raises` | disclosed unpinned | GREEN (disclosure accurate) |
+| E: `_weekly_close_config` → `false` | yes (#4) | RED (2 tests) |
+
+The author's disclosure of two deliberately-unpinned lines was confirmed accurate by D. The
+lesson from C is that a mutation table is only as good as the mutations chosen — 11 red says
+nothing about the axis nobody mutated.
+
+### Orchestrator note — my own verification was weaker than the reviewer's
+
+Before dispatching QC I spot-checked the headline claims and reported "single ratchet
+implementation confirmed" on the strength of `grep -c ratchet` across the three consumers. That
+grep **cannot see a differently-named check**, and `Portfolio_edit._check_stop_not_lowered`
+(`portfolio_edit.ml:108`, its own `Float.(new_stop >= current)`) is exactly that. The reviewer
+caught what I missed; I re-verified both halves of F2 directly afterwards and both hold. Recorded
+because the orchestrator spot-check should not be mistaken for a review.
+
+### Disclosure quality — assessed and passed
+
+The write-back is deferred to 4c.c, so `advance` runs read-only and a track is created only by
+hand-editing `portfolio.sexp`. The reviewer judged the PR body, plan §8/§9.3 and status file to
+state this **plainly**, and specifically credited §9.3 for correcting an earlier inaccurate
+version of itself. It also established the deferral costs **correctness nothing** — the replay
+recomputes from `prior.updated` every run, so this is persistence, not semantics. The problem is
+confined to the `.mli` and `header` texts, which is why it is CP1 and not a disclosure failure.
+
+Flagged for the operator: while `seed` is unwired, `--allow-lower-stop` is a **one-way trapdoor**
+— it clears the track and nothing can recreate one without a hand edit.
+
+## Quality Score
+
+3
+
+## Verdict
+
+NEEDS_REWORK
+
+### Rework iteration 1 — `629c523b..68916668` — APPROVED (both gates)
+
+Reviewed SHA `68916668`, carried to `2360b39f` after a branch update (all **17** reviewed code and
+test files verified byte-identical; the update brought only main's commits). **MERGED `e5726315`.**
+
+structural_qc: APPROVED (5/5)
+behavioral_qc: APPROVED (4/5)
+overall_qc: APPROVED
+
+**F1 CLOSED.** The reviewer **re-ran mutation C itself** rather than accept the author's report,
+"since I am the one who found it green": frozen level → **RED** on
+`advance_raises_the_stop_level_on_every_cycle` (`Cases: 16 … Failures: 1`); reverted → **GREEN**.
+The diagnostic detail it drew out is the finding restated as a passing artifact — under the
+mutation the sibling `advance_records_one_raise_per_cycle` **still passed**, which is exactly the
+bookkeeping that masked a frozen stop.
+
+It then instrumented the fixture rather than trusting its shape (debug removed, tree verified
+clean): 40 bars, 31 base weeks + 3×3-week cycles; peaks `160 → 166.4 → 173.056 → 179.978` each
+strictly higher; dips of 10%/12% against `min_correction_pct = 0.08`; levels
+`137.998 → 143.375 → 149.259`; all three outcomes `Holding`. The assertion is on `Stop_track.level`
+with strict `Float.( > )` and three rises required, so a stop that raises once and sticks scores 1
+and fails. It also confirmed the author's `_replay_from` anchoring comment is accurate —
+`weinstein_stops.ml:221` does seed `last_trend_extreme` from the first replayed bar's close.
+
+**F2 CLOSED.** Every claim traced to code: `seed`'s only non-doc reference is
+`test_stop_thread.ml:91`; `generate_weekly_snapshot.ml:140` calls `load` only (the sole `save`
+caller is `record_fill.ml:43`); `enrich` falls back to `Stop_recompute.for_held_long` on `None`.
+The misleading "OMIT IT: the tooling writes and updates it" is gone, and the correction is pinned
+in `header` itself — **the bytes the trader reads** — not only in a doc-comment.
+
+**The author corrected the reviewer on one detail, and was right.**
+`test_header_documents_stop_state` did not literally assert the false sentence; it checked the
+substrings `"stop_state"` and `"--allow-lower-stop"`, both still true. The real problem was the
+*absence* of any test on the false claim — so it added
+`header_does_not_promise_an_unwired_write_back` rather than editing the old test.
+
+**Document-don't-merge judged real, not a rationalisation.** Two genuinely different fields on
+different types: `ratchet` guards `Stop_track.t.state.stop_level`; `_check_stop_not_lowered` guards
+`Live_portfolio.position.stop_price`. They demonstrably diverge (`_ratchet_track` handles the
+machine-sits-higher case, and `seed` exists to reconcile the two), and an `option`-returning
+ratchet can neither name offending values in a CLI error nor express `--allow-lower-stop`. Each is
+pinned by its own named test (`test_stop_track.ml:85`, `test_portfolio_edit.ml:353`).
+
+**Why the author chose docs over wiring** — better than "smaller diff": wiring `seed` would give it
+a caller whose result nothing persists, so a seeded track would be rebuilt every run with `raises`
+permanently zero. The report would *look* threaded while carrying no continuity — worse than no
+caller. Persisting is 4c.c; the two belong in one increment.
+
+**New-defect sweep: none.** The two touched `.ml` files contain **zero executable change** —
+`live_portfolio.ml` (+13) is entirely string literals in `_header_lines`, `portfolio_edit.ml` (+5)
+entirely inside one comment. I verified this independently before merging, along with
+`stop_thread.ml` being byte-identical (the F1 mutation fully reverted). The risk flagged in the
+brief did not materialise.
+
+**Non-blocking follow-up (filed):** "writes" is used where "creates" is meant in four places —
+`record_fill adjust --stop-price <higher>` *does* persist a ratcheted `stop_state`, so "nothing
+writes this field yet" is over-broad standalone. Not a FAIL: every conclusion drawn from it is true
+and verified, `live_portfolio.mli` discloses the exception in the same paragraph, and the
+imprecision **under-promises** the tooling, which is the safe direction.
+
+## Quality Score
+
+4
+
+## Verdict
+
+APPROVED
