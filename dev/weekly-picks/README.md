@@ -14,11 +14,11 @@ as-of date; consumed by `trace_picks` / `diff_picks` / `render_weekly_report`.
   reconciliation classes. v2 is the same as-of/universe/warehouse/overrides
   regenerated post-#2107: 3 EXTENDED (CRNX/MBX/SAFT, tickets suppressed),
   6 through-entry (re-anchored to market fill, sized on expected fill),
-  11 valid-stop. The v1 record is kept for the audit trail. Known v2 gaps
-  (tracked #2122): 7 candidates render chart-less (bars only in the weekly
-  warehouse, not the CSV store the renderer reads), and the `.md` was
-  rendered in a separate invocation because `-html-out` currently swallows
-  stdout.
+  11 valid-stop. The v1 record is kept for the audit trail. Re-rendered
+  post-#2129: all 20 picks shown (display cap now matches the screener cap),
+  the 3 EXTENDED names sit in a trailing "Watch — extended, do not chase"
+  section instead of actionable slots, and every card has a chart
+  (`-bars-snapshot-dir` reads the weekly warehouse, closing #2122 finding 1).
 
 ## Live arming config
 
