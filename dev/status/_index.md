@@ -44,7 +44,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2143 MERGED `916825fb` (H-RUNENV-WORKTREE-BLIND false-green); next: H-CHECK-CACHE-BLIND — ~25 checks lack `(universe)` |
-| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | Phase 1 stable (PR-D'c #1332 merged); Phase 2 deferred; no outstanding work |
+| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | Phase 1 stable; 3 open: A-BUDGET-ORPHAN (31 budget records off main), A-SUMMARY-STALE-FALLBACK (gate reads another run's file), PR-D'c |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2146 MERGED `d37f94a8` — `Current milestone: M5` marker re-arms check_11_linter_expiry; 9 open; next: test_pin on `test_bayesian_opt_cholesky.ml` |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
