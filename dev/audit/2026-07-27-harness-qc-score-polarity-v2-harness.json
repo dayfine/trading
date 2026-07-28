@@ -1,0 +1,18 @@
+{
+  "date": "2026-07-27",
+  "feature": "harness",
+  "branch": "harness/qc-score-polarity-v2",
+  "recorded_at_ns": 1785185307297907343,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "PR #2135 (H-QC-SCALE + H-AUDIT-GH-FALLBACK). Rework iteration 1 from the killed run 30287137763 re-reviewed this run: structural 4791273321 q4, behavioral 4791048567 q4, both @dd029ae8. Merged ed816d4f."
+}

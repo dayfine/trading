@@ -1,0 +1,18 @@
+{
+  "date": "2026-07-27",
+  "feature": "weekly-snapshot",
+  "branch": "fix/report-watch-qc-followup",
+  "recorded_at_ns": 1785183761224782897,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "PR #2136; QC APPROVED at 1819417a (structural review 4790394218 q4, behavioral 4790477557 q4); merged 1a91ee94 after branch update to 4e4537bd with all 7 reviewed files verified byte-identical. Re-QC not required: update brought only main's commits."
+}
