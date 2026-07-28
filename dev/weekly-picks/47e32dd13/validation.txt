@@ -1,0 +1,1 @@
+WARN CLMB split_in_window: raw/adjusted ratio steps inside the bar window (split or equivalent) — resistance grade and structural floor are basis-suspect until the grading is verified split-safe (issue #2133)
