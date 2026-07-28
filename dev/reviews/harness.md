@@ -1,4 +1,4 @@
-Reviewed SHA: fd41ed6a
+Reviewed SHA: 1b3f809b04d184d1b335def771a3e1a1dca022b1
 
 ## Structural Checklist — harness POSIX shell portability linter (PR #493, 2026-04-22)
 
@@ -566,3 +566,74 @@ its numbers match the reviewer's independently.)
 ## Verdict
 
 APPROVED
+
+## PR #2148 — `harness/check-universe-deps` (MERGED `751de67d`)
+
+Closes `H-CHECK-CACHE-BLIND`, the systemic form of PR #2143's qc-behavioral N1 finding.
+A dune `(deps ...)` entry cannot name a path above the workspace root, so a check script
+reading one via `repo_root()` has an incomplete dependency set: a warm `_build` skips the
+rule and `dune runtest` returns green while the guarded file regressed.
+
+Measured scope before dispatch: **25** scripts call `repo_root()`; the directory's `dune`
+had 35 rules of which **3** declared `(universe)`; **23** scripts were exposed — including
+`status_file_integrity.sh`, `index_size_linter.sh`, `no_python_check.sh` and
+`posix_sh_check.sh`, all load-bearing CI gates.
+
+Delivered: `(universe)` added to 20 rules, 3 proven exempt with evidence recorded in both
+inline `dune` comments and `universe_deps_exceptions.conf`, plus a mechanical guard
+(`check_universe_deps.sh`) and a fixture-isolated self-test (5/5). The guard declares
+`(universe)` for itself.
+
+**The warm-build pair was independently reproduced by the reviewer with a negative
+control** — the evidence that distinguishes a real fix from a decorative one:
+
+| direction | setup | result |
+|---|---|---|
+| negative control | `(universe)` stripped; warm build cached a clean PASS; then a real outside-workspace `.py` created with nothing dune-tracked touched | **zero invocation lines** for `no_python_check.sh`; `dune` exit **0** with a live violation on disk — the #2143 bug class, live |
+| positive | `(universe)` present, same warm `_build`, same file | rule **re-executed**; `FAIL: no-python check -- unexpected *.py files found`; exit 1 |
+
+Mutation ledger: M1 (strip `(universe)` from `status_file_integrity.sh`'s rule) → KILLED,
+exit 1, names the script. M3 (strip it from the **guard's own** rule) → KILLED by the guard
+itself, confirming self-coverage is pinned rather than merely present. M2 and M4 survived
+by design and are recorded as FLAGs below.
+
+Three non-blocking FLAGs, both survivors being prospective gaps with **zero live
+instances**:
+
+1. **`universe_deps_exceptions.conf` is unconstrained** — one bare filename disables the
+   guard for any script, permanently, and the format has no `review_at` field even though
+   the conf's own header cites `.claude/rules/code-health-discipline.md`, which requires
+   one. The repo already expiry-checks the analogous `linter_exceptions.conf`. The filed
+   residual `H-CHECK-EXEMPTION-DRIFT` covers the three *existing* entries going stale but
+   not unbounded future additions.
+2. **The candidate scan is non-recursive** (`./*.sh`), so `deep_scan/*.sh` is uncovered.
+   Two live callers exist (`deep_scan/_lib.sh:28`, `deep_scan/main.sh:23`); neither is
+   mis-covered today — one is an explicit dep of the exempted rule, the other is not
+   dune-wired at all. Undisclosed by the PR; one-line fix.
+3. Doc nit: the awk `RS`-ordering comment credits assertion 5; assertion 1 is what
+   actually fails under that mutation.
+
+Status quo was 23 exposed rules; this leaves **0 exposed among currently-wired top-level
+rules**.
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+Rework iterations: 0.
+
+Full verdicts are PR review comments on #2148 (the authoritative channel per PR-D'a):
+structural `4801707730` (quality 4), behavioral `4801827392` (quality 4). Both were posted
+at tip `1b3f809b`; the branch was then `update-branch`d to `47151062` (a merge of main, PR
+content unchanged) and CI re-verified green there immediately before merging.
+
+Note the structural reviewer **withheld its verdict** rather than approving while
+`build-and-test` was still running, and recorded all structural gates as PASS. That is the
+behaviour the standing `[medium]` escalation asks for.
+
+## Quality Score
+
+4 — Well-evidenced infra work whose load-bearing warm-build claim reproduced exactly in
+both directions, with a self-covering guard; two prospective coverage gaps keep it off 5.
+
+Reviewed SHA: 1b3f809b04d184d1b335def771a3e1a1dca022b1
