@@ -17,11 +17,19 @@
 # Method: parse trading/devtools/checks/dune into per-rule blocks (each
 # rule is blank-line-delimited and starts with "(rule" at column 0 — true
 # for every current rule in this file; see the parser's own self-check in
-# check_universe_deps_test.sh). For every candidate script (one whose body
-# contains the substring "repo_root"), find the rule that runs it (its
+# check_universe_deps_test.sh). Candidate scripts are found RECURSIVELY
+# under trading/devtools/checks/ (any *.sh whose body contains the
+# substring "repo_root"), not just at the top level — see the CANDIDATES
+# scan below. For every candidate, find the rule that runs it (its
 # %{dep:...} run-target) or, if it is never itself a run-target, the rule
 # that lists it as a dep. FAIL if that rule lacks "(universe)" and the
 # script is not listed in universe_deps_exceptions.conf.
+#
+# universe_deps_exceptions.conf entries must each carry a "# review_at:
+# <value>" annotation (never / M1-M7 / YYYY-MM-DD, same convention as
+# linter_exceptions.conf); an entry with no parseable review_at is itself
+# a FAIL from this script (#2148 FLAG-1 — an unconstrained exceptions list
+# silently disables the guard forever for whatever script it lists).
 #
 # This rule's OWN dune wiring declares (universe) — a cache-blindness
 # linter that is itself cache-blind (i.e. whose own PASS/FAIL could go
@@ -45,16 +53,26 @@ EXCEPTIONS_FILE="${CHECKS_DIR}/universe_deps_exceptions.conf"
 
 [ -f "$DUNE_FILE" ] || die "check_universe_deps: $DUNE_FILE not found"
 
-# --- Candidate scripts: any *.sh (excluding _check_lib.sh itself, which
-# defines the helper but is never a dune run-target) whose body contains
-# an actual repo_root call site: "$(repo_root)" / "(repo_root)" or the
-# private-reimplementation form "$(_repo_root)" / "(_repo_root)" — i.e.
-# "repo_root" immediately followed by a closing paren. This deliberately
-# does NOT match on the bare substring "repo_root" (a false-positive risk
-# proven by check_universe_deps_test.sh assertion 5: a script that merely
-# mentions another script's filename like "helper_with_repo_root.sh" in
-# a comment or echo string must NOT be treated as a repo_root() caller).
-CANDIDATES=$(cd "$CHECKS_DIR" && grep -lE 'repo_root\)' ./*.sh 2>/dev/null \
+# --- Candidate scripts: any *.sh anywhere under CHECKS_DIR, RECURSIVELY
+# (excluding _check_lib.sh itself, which defines the helper but is never a
+# dune run-target) whose body contains an actual repo_root call site:
+# "$(repo_root)" / "(repo_root)" or the private-reimplementation form
+# "$(_repo_root)" / "(_repo_root)" — i.e. "repo_root" immediately followed
+# by a closing paren. This deliberately does NOT match on the bare
+# substring "repo_root" (a false-positive risk proven by
+# check_universe_deps_test.sh assertion 5: a script that merely mentions
+# another script's filename like "helper_with_repo_root.sh" in a comment
+# or echo string must NOT be treated as a repo_root() caller).
+#
+# Recursive via `find -exec` (not a `./*.sh ./*/*.sh` glob list) so scripts
+# at any subdirectory depth are covered, not just one level down — this
+# closes the #2148 FLAG-2 residual (the previous top-level-only glob
+# missed deep_scan/_lib.sh and deep_scan/main.sh). Candidate names below
+# the top level come back path-qualified, e.g. "deep_scan/_lib.sh" — the
+# awk dep-matching and exceptions-list lookup below both already accept
+# '/' in script names (see the depsonly character class and the plain
+# string-equality allow-list check).
+CANDIDATES=$(cd "$CHECKS_DIR" && find . -name '*.sh' -type f -exec grep -lE 'repo_root\)' {} + 2>/dev/null \
   | sed 's#^\./##' | grep -v '^_check_lib\.sh$' || true)
 
 if [ -z "$CANDIDATES" ]; then
@@ -85,17 +103,54 @@ BEGIN {
   # newline-delimited exceptions/candidates files FIRST under the
   # default RS="\n", THEN switch to paragraph mode ("") for the main
   # dune-file input below. Getting this order backwards was caught by
-  # check_universe_deps_test.sh assertion 5 in development: with RS=""
+  # check_universe_deps_test.sh assertion 1 in development: with RS=""
   # active during the getline loops, the whole candidates file was read
-  # as one blank-line-delimited "record" instead of one filename per line.
+  # as one blank-line-delimited "record" instead of one filename per line,
+  # so no candidate resolved and the guard exited 0 silently instead of
+  # failing on sample_check.sh missing (universe) -- see #2148 review
+  # FLAG-3 (the comment previously mis-credited "assertion 5").
   RS = "\n"
 
+  # Each exceptions entry must carry a "# review_at: <value>" annotation
+  # (same trailing-comment convention as linter_exceptions.conf) with a
+  # value of "never", an M1-M7 milestone, or a YYYY-MM-DD date -- see
+  # .claude/rules/code-health-discipline.md and #2148 review FLAG-1
+  # (an exceptions list with no review_at field is unconstrained forever;
+  # this makes a missing/unparseable review_at a hard FAIL, not a silent
+  # skip). Actual expiry (has the milestone/date passed) is checked
+  # separately by the weekly deep_scan/check_11_linter_expiry.sh, which
+  # already owns that cadence for the sibling linter_exceptions.conf file.
   nallow = 0
+  nbadreviewat = 0
   if (exceptions != "") {
-    while ((getline aline < exceptions) > 0) {
+    while ((getline eline < exceptions) > 0) {
+      gsub(/^[ \t]+|[ \t]+$/, "", eline)
+      if (eline == "" || eline ~ /^#/) continue
+
+      review_at = ""
+      if (match(eline, /#[ \t]*review_at:[ \t]*.*/)) {
+        review_at = substr(eline, RSTART, RLENGTH)
+        sub(/^#[ \t]*review_at:[ \t]*/, "", review_at)
+        gsub(/[ \t]+$/, "", review_at)
+      }
+
+      aline = eline
       sub(/#.*/, "", aline)
-      gsub(/^[ \t]+|[ \t]+$/, "", aline)
-      if (aline != "") { nallow++; allow[aline] = 1 }
+      gsub(/[ \t]+$/, "", aline)
+      if (aline == "") continue
+
+      nallow++
+      allow[aline] = 1
+
+      valid_review_at = 0
+      if (review_at ~ /^never([ \t(]|$)/) valid_review_at = 1
+      else if (review_at ~ /^M[1-7]([ \t(]|$)/) valid_review_at = 1
+      else if (review_at ~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/) valid_review_at = 1
+
+      if (!valid_review_at) {
+        nbadreviewat++
+        badreviewat[nbadreviewat] = aline
+      }
     }
     close(exceptions)
   }
@@ -137,6 +192,10 @@ BEGIN {
 }
 END {
   fail = 0
+  for (i = 1; i <= nbadreviewat; i++) {
+    print "FAIL: universe_deps_exceptions.conf entry \"" badreviewat[i] "\" has no parseable \"# review_at: <value>\" annotation (expected \"never\", an M1-M7 milestone, or a YYYY-MM-DD date, same convention as linter_exceptions.conf) -- an exception with no review_at silently disables this guard for that script forever; see .claude/rules/code-health-discipline.md"
+    fail++
+  }
   for (c = 1; c <= ncand; c++) {
     s = cand[c]
     if (s in allow) {
@@ -165,7 +224,7 @@ END {
       }
     }
     if (!found) {
-      print "FAIL: " s " calls repo_root() but is not referenced by any runtest rule in dune -- audit by hand"
+      print "FAIL: " s " calls repo_root() but is not referenced by any runtest rule in dune -- audit by hand. If this script is intentionally never a dune run-target or dep (e.g. an orchestrator-invoked entrypoint run outside `dune runtest` by construction), add it to universe_deps_exceptions.conf with that evidence rather than wiring it into dune just to silence this check."
       fail++
       continue
     }
