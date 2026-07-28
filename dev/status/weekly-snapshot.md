@@ -5,6 +5,41 @@
 ## Status
 IN_PROGRESS
 
+**2026-07-28 (qc-behavioral rework 1 on `feat/sketch-adjusted-basis`, PR #2145):**
+the reviewer ran 8 mutations; 6 were caught, 2 survived. **Tests + doc wording
+only; no production logic changed.** Both survivors are now red:
+
+- **M3 — the corrupt/NaN raw-close guard in `Adjusted_basis` had zero coverage.**
+  Deleting it left all four affected test dirs green. New
+  `test_adjusted_basis.ml` (7 tests) pins NaN / `0.0` / negative raw close =>
+  factor `1.0`, the 4:1 split rescale, idempotence, and — bitwise, via
+  `Int64.bits_of_float` — the factor-1.0 identity across seven magnitudes.
+  Mutation re-run: exit 0 -> exit 1 (3 failures).
+- **M4 — the `Bar_reader` -> `Panel_callbacks` -> `Resistance_sketch_reader`
+  basis threading had no end-to-end pin.** Dropping `~sidetable_basis` at the
+  sole production call site (`weinstein_strategy_screening.ml:144`) left the
+  suite green. `test_panel_callbacks.ml` now drives
+  `Internal_for_test.on_market_close` over a side-table-backed reader and
+  records every `read_field` the run issues for the scored symbol —
+  `Resistance_sketch_reader` is the only caller of that primitive, so the
+  recorded field *is* the anchor column the chain selected (`Adjusted_close`
+  under `Adjusted`, `Close` under `Raw`). Mutation re-run: exit 0 -> exit 1.
+- **The "split-free" precondition was wrong in the direction that matters.**
+  The real no-op condition is `adjusted_close = close_price`; a dividend-only
+  adjustment already moves every O/H/L bit, so `compute_windowed` /
+  `of_daily_bars` output changes for essentially every real dividend payer
+  (intended). Corrected in `resistance_sketch.{ml,mli}` and
+  `live_resistance_sketch.mli`, and R1's conclusion restated on its actual
+  basis: existing warehouses are safe because the default is `Raw` and prebuilt
+  artifacts are not recomputed — not because the rescale is a no-op. A
+  dividend-only fixture now pins the corrected wording (every other fixture in
+  these suites sets `adjusted_close = close_price`, which is why the suite could
+  not expose it — the same shape as the `Float.abs` finding on #2139).
+- `adjusted_basis.mli` now states plainly that the guard is **one-sided**: a
+  corrupt `adjusted_close` is unguarded and degrades silently. Fixing that, and
+  de-duplicating `Svg_series._to_adjusted_basis` against the shared helper, are
+  filed as follow-ups rather than grown into this PR.
+
 **2026-07-28 (CI fix on `feat/sketch-adjusted-basis`, PR #2145):** the nesting
 linter flagged the two functions added by that PR —
 `Weekly_sidetable_reader.basis_for` (avg 3.73, max 6) and `load_gated` (max 6).

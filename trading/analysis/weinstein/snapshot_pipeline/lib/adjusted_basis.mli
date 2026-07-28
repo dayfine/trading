@@ -18,6 +18,18 @@ val to_adjusted_basis : Types.Daily_price.t -> Types.Daily_price.t
 
     A non-positive or NaN raw [close_price] admits no factor ([f = 1.0]): the
     O/H/L keep their raw values and [close_price] takes [adjusted_close] — a
-    corrupt bar must not blow up the rescale. Idempotent: on an already-adjusted
-    bar ([close_price = adjusted_close]) the factor is [1.0], so re-applying is
-    a no-op. Pure function. *)
+    corrupt raw close must not blow up the rescale. {b The guard is one-sided:}
+    only [close_price] corruption is handled. A corrupt [adjusted_close] is
+    unguarded and poisons the whole bar ([nan] -> all-NaN, [0.0] -> zeroed,
+    negative -> negative prices), and it degrades silently downstream — a NaN
+    weekly high never compares above the anchor, so that week's supply is simply
+    dropped from the histogram. Callers must not feed bars with a corrupt
+    [adjusted_close].
+
+    Bit-identity holds exactly when [adjusted_close = close_price] (factor
+    [1.0]) — not merely on split-free data, since a dividend-only adjustment
+    already moves every O/H/L bit. Idempotent for the same reason: an
+    already-adjusted bar has [close_price = adjusted_close], so re-applying is a
+    bitwise no-op. Pure function.
+
+    Pinned by [test_adjusted_basis.ml]. *)

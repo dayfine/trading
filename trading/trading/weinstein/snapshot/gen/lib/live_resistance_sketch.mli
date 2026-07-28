@@ -25,10 +25,14 @@ val of_daily_bars : Types.Daily_price.t list -> Resistance_supply.sketch option
     sketch is computed, so a split inside the fetched history no longer hides or
     fabricates supply. The histogram anchor is therefore the last bar's
     {e adjusted} close — matching an adjusted-basis warehouse's [Adjusted_close]
-    column, which the side-table reader anchors on. For split-free history this
-    is a no-op (factor 1.0), so the result stays bit-equal to
+    column, which the side-table reader anchors on. The rescale is bit-identity
+    exactly when [adjusted_close = close_price] (factor 1.0), NOT merely on
+    split-free history — a dividend-only adjustment already moves every O/H/L
+    bit, so this path's output {e does} change for essentially every real
+    dividend payer (intended: #2133). The result stays bit-equal to
     [Snapshot_pipeline.Resistance_sketch.compute_windowed ~deep_bars:[||]
-     ~bars_arr] read at its last index.
+     ~bars_arr] read at its last index in every case, since that path applies
+    the same unconditional rescale.
 
     Returns [None] when [daily_bars] is empty (no bar to anchor the sketch).
     Pure function. *)

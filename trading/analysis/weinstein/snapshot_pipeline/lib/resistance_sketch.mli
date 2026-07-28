@@ -93,10 +93,15 @@ val compute_windowed :
     {b Basis (#2133).} [compute_windowed] rescales both [deep_bars] and
     [bars_arr] onto the split/dividend-adjusted basis
     ({!Adjusted_basis.to_adjusted_basis}) before aggregating, so a split inside
-    the window no longer hides or fabricates supply. The rescale is a no-op for
-    split-free data (factor 1.0), so split-free callers are bit-unchanged; the
-    histogram anchor is the rescaled day's close, keeping the from-bars path
-    self-consistent (no basis hash needed).
+    the window no longer hides or fabricates supply. The rescale is bit-identity
+    exactly when [adjusted_close = close_price] (factor 1.0) — typically only
+    the most recent unadjusted segment — NOT merely when the data is split-free:
+    a dividend-only adjustment already moves every O/H/L bit. Since the rescale
+    is unconditional, [compute_windowed] output {e does} change for
+    dividend-adjusted history, i.e. for essentially every real dividend payer.
+    That is intended, and is why #2133's follow-up warehouse rebuild + golden
+    re-pin is required. The histogram anchor is the rescaled day's close,
+    keeping the from-bars path self-consistent (no basis hash needed).
 
     [deep_bars = [||]] is bit-identical to calling {!compute} on the
     adjusted-basis rescaling of [bars_arr] — the no-deep-history default. The

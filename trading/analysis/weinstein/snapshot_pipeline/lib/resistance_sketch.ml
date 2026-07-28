@@ -187,9 +187,13 @@ let compute_windowed ~(deep_bars : Types.Daily_price.t array)
      both the deep history and the window bars so the histogram anchor (the day's
      close) and the folded weekly highs are on one continuous scale. Self-
      consistent — the anchor is computed from the same rescaled bars — so no hash
-     gate is needed here. Rescaling is a no-op for split-free data (factor 1.0),
-     so it does not change existing dense-column warehouses or split-free goldens;
-     it does change future dense-column REBUILDS, which is intended. *)
+     gate is needed here. Rescaling is bit-identity exactly when
+     [adjusted_close = close_price] (factor 1.0), NOT merely on split-free data —
+     a dividend-only adjustment already moves every O/H/L bit, so this path's
+     output DOES change for essentially every real dividend payer. Existing
+     dense-column warehouses are unaffected because prebuilt artifacts are not
+     recomputed, not because the rescale is a no-op; future dense-column REBUILDS
+     do change, which is intended. *)
   let deep_bars = Array.map deep_bars ~f:Adjusted_basis.to_adjusted_basis in
   let bars_arr = Array.map bars_arr ~f:Adjusted_basis.to_adjusted_basis in
   if Array.is_empty deep_bars then

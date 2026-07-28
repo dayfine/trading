@@ -30,6 +30,9 @@ module Snapshot_callbacks = Snapshot_runtime.Snapshot_callbacks
 module Weekly_sidetable = Data_panel_snapshot.Weekly_sidetable
 module Weekly_sidetable_builder = Snapshot_pipeline.Weekly_sidetable_builder
 module Weekly_sidetable_reader = Weinstein_strategy.Weekly_sidetable_reader
+module Bar_reader = Weinstein_strategy.Bar_reader
+module Internal_for_test = Weinstein_strategy.Internal_for_test
+module FL = Portfolio_risk.Force_liquidation
 
 (* ------------------------------------------------------------------ *)
 (* Synthetic bar builders                                               *)
@@ -807,6 +810,139 @@ let test_weekly_sidetable_threading _ =
          field (fun (_, dense) -> dense) is_none;
        ])
 
+(* ------------------------------------------------------------------ *)
+(* #2133 — side-table basis threading, observed through the production  *)
+(* screening path (Bar_reader -> screening -> Panel_callbacks ->        *)
+(* Resistance_sketch_reader).                                           *)
+(* ------------------------------------------------------------------ *)
+
+let _thread_index_symbol = "GSPCX"
+let _thread_stock_symbol = "SKETCHY"
+
+(* One bar per calendar day; the weekly aggregator buckets them. A steadily
+   rising series drives the index to a Bullish macro and the stock to Stage 2,
+   so the stock survives Phase 1 and pays the full [Stock_analysis] cost — which
+   is where [get_sketch] (and therefore the anchor read) fires. *)
+let _thread_daily_bars ~start_date ~n ~start_price ~step =
+  List.init n ~f:(fun i ->
+      let price = start_price +. (Float.of_int i *. step) in
+      {
+        Types.Daily_price.date = Date.add_days start_date i;
+        open_price = price;
+        high_price = price *. 1.01;
+        low_price = price *. 0.99;
+        close_price = price;
+        adjusted_close = price;
+        volume = 1_000_000;
+        active_through = None;
+      })
+
+(* Wrap [inner], recording every [read_field] issued for [watch].
+   {!Weinstein_strategy.Resistance_sketch_reader} is the ONLY caller of
+   [Snapshot_callbacks.read_field] in the tree (every bar / view read goes
+   through [read_field_history]), so the recorded fields are exactly the sketch
+   anchor column the run selected. *)
+let _recording_cb ~watch ~(inner : Snapshot_callbacks.t) =
+  let seen = ref [] in
+  let cb : Snapshot_callbacks.t =
+    {
+      read_field =
+        (fun ~symbol ~date ~field ->
+          if String.equal symbol watch then seen := field :: !seen;
+          inner.read_field ~symbol ~date ~field);
+      read_field_history = inner.read_field_history;
+      active_through_for = inner.active_through_for;
+    }
+  in
+  (cb, seen)
+
+let _drive_screen_tick ~bar_reader ~config ~current_date =
+  Internal_for_test.on_market_close ~fold_start_date:None ~config ~ad_bars:[]
+    ~stop_states:(ref String.Map.empty)
+    ~last_stop_out_dates:(Hashtbl.create (module String))
+    ~prior_macro:(ref Weinstein_types.Neutral)
+    ~prior_macro_result:(ref None)
+    ~prior_decline_character:(ref Decline_character.Not_declining)
+    ~peak_tracker:(FL.Peak_tracker.create ())
+    ~bar_reader
+    ~prior_stages:(Hashtbl.create (module String))
+    ~prior_stage_ma_values:(Hashtbl.create (module String))
+    ~sector_prior_stages:(Hashtbl.create (module String))
+    ~ticker_sectors:(Hashtbl.create (module String))
+    ~stage3_streaks:(Hashtbl.create (module String))
+    ~laggard_streaks:(Hashtbl.create (module String))
+    ~audit_recorder:Weinstein_strategy.Audit_recorder.noop
+    ~get_price:(fun symbol ->
+      List.last
+        (Bar_reader.daily_bars_for bar_reader ~symbol ~as_of:current_date))
+    ~get_indicator:(fun _ _ _ _ -> None)
+    ~portfolio:
+      ({ cash = 1_000_000.0; positions = String.Map.empty }
+        : Trading_strategy.Portfolio_view.t)
+
+(* Run one production screening Friday against a side-table-backed reader
+   constructed on [sidetable_basis]; return the tick result plus the distinct
+   fields the sketch reader asked for. *)
+let _anchor_fields_read_by_screen ~sidetable_basis =
+  let current_date = Date.of_string "2024-04-26" in
+  let n_days = 400 in
+  let start_date = Date.add_days current_date (-(n_days - 1)) in
+  let index_bars =
+    _thread_daily_bars ~start_date ~n:n_days ~start_price:100.0 ~step:1.0
+  in
+  let stock_bars =
+    _thread_daily_bars ~start_date ~n:n_days ~start_price:50.0 ~step:0.5
+  in
+  let backing =
+    Bar_reader.of_in_memory_bars
+      [ (_thread_index_symbol, index_bars); (_thread_stock_symbol, stock_bars) ]
+  in
+  let cb, seen =
+    _recording_cb ~watch:_thread_stock_symbol
+      ~inner:(Bar_reader.snapshot_callbacks backing)
+  in
+  let entries =
+    Weekly_sidetable_builder.of_bars ~deep_bars:[] ~bars:stock_bars
+  in
+  let bar_reader =
+    Bar_reader.of_snapshot_views
+      ~weekly_sidetable_loader:(fun ~symbol:_ -> Some entries)
+      ~sidetable_basis cb
+  in
+  let config =
+    Weinstein_strategy.default_config ~universe:[ _thread_stock_symbol ]
+      ~index_symbol:_thread_index_symbol
+  in
+  let result = _drive_screen_tick ~bar_reader ~config ~current_date in
+  (result, List.dedup_and_sort !seen ~compare:Poly.compare)
+
+(** The basis a {!Bar_reader} carries must reach
+    {!Weinstein_strategy.Resistance_sketch_reader} through the real screening
+    call chain, not merely be accepted by {!Panel_callbacks} in isolation. An
+    [Adjusted]-basis warehouse anchors the sketch at [Adjusted_close]; the [Raw]
+    default keeps the pre-migration [Close] anchor. Dropping the basis anywhere
+    on that chain silently re-anchors an adjusted-basis side-table on raw
+    [Close] — exactly the raw/adjusted mixing #2133 exists to eliminate — and
+    the unit-level tests in [test_resistance_sketch_reader.ml] cannot see it. *)
+let test_sidetable_basis_threads_through_screening _ =
+  let adjusted_result, adjusted_fields =
+    _anchor_fields_read_by_screen
+      ~sidetable_basis:Weekly_sidetable_reader.Adjusted
+  in
+  let raw_result, raw_fields =
+    _anchor_fields_read_by_screen ~sidetable_basis:Weekly_sidetable_reader.Raw
+  in
+  assert_that
+    (adjusted_result, raw_result)
+    (all_of [ field fst is_ok; field snd is_ok ]);
+  assert_that
+    (adjusted_fields, raw_fields)
+    (all_of
+       [
+         field fst (elements_are [ equal_to Snapshot_schema.Adjusted_close ]);
+         field snd (elements_are [ equal_to Snapshot_schema.Close ]);
+       ])
+
 let suite =
   "Panel_callbacks parity"
   >::: [
@@ -830,6 +966,8 @@ let suite =
          >:: test_resistance_stock_deep_view_feeds_resistance_only;
          "Sketch-v5 side-table threading selects v5 vs dense"
          >:: test_weekly_sidetable_threading;
+         "Side-table basis threads through the screening path"
+         >:: test_sidetable_basis_threads_through_screening;
        ]
 
 let () = run_test_tt_main suite

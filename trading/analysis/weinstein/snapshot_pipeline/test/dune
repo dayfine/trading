@@ -4,7 +4,8 @@
   test_snapshot_manifest
   test_snapshot_verifier
   test_resistance_sketch
-  test_weekly_sidetable_builder)
+  test_weekly_sidetable_builder
+  test_adjusted_basis)
  (libraries
   core
   core_unix

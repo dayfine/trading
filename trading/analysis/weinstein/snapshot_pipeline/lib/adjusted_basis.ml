@@ -3,7 +3,9 @@ open Core
 (* Split/dividend factor for one bar: [adjusted_close /. close_price], the same
    ratio {!Weinstein_snapshot.Svg_series._to_adjusted_basis} applies chart-side.
    A non-positive / NaN raw close admits no factor -> [1.0] (the O/H/L stay raw
-   and the close takes [adjusted_close]); a corrupt bar must not blow up. *)
+   and the close takes [adjusted_close]); a corrupt raw close must not blow up.
+   The guard is one-sided (inherited from the chart-side copy): a corrupt
+   [adjusted_close] is NOT guarded — see the .mli. *)
 let _factor (b : Types.Daily_price.t) : float =
   if Float.is_nan b.close_price || Float.( <= ) b.close_price 0.0 then 1.0
   else b.adjusted_close /. b.close_price
