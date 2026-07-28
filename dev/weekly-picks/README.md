@@ -8,7 +8,17 @@ as-of date; consumed by `trace_picks` / `diff_picks` / `render_weekly_report`.
 
 ## Superseded records
 
-- **2026-07-24: use `ab53f8a6f/` (v2), not `2bcf5b335/`.** The original
+- **2026-07-24: use `47e32dd13/` (v3, validated).** Regenerated on the
+  #2139 main (validator + all report fixes) with the same inputs. The sexp
+  is **bit-identical to `ab53f8a6f/` modulo the version stamp** — the first
+  live demonstration of the reproducibility property (#2122 slice c). The
+  record carries its own `validation.txt` (`validate_weekly_snapshot` with
+  warehouse bars + $1,000 risk budget): **zero errors**; one warning —
+  CLMB `split_in_window`, i.e. its resistance grade and structural floor
+  are basis-suspect until the split-safe sketch rebuild lands (#2133).
+  Charts are split-adjusted (#2134); extended names (CRNX/MBX/SAFT) sit in
+  the watch section; all 20 picks shown.
+- **`ab53f8a6f/` (v2), not `2bcf5b335/`.** The original
   2bcf5b335 record predates entry reconciliation (#2103/#2107): its tickets
   size on the stale breakout level (MBX mis-sized 14×) and it has no
   reconciliation classes. v2 is the same as-of/universe/warehouse/overrides

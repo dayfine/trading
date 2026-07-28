@@ -186,7 +186,7 @@ cat >> "$OUTPUT_FILE" <<METRICS_EOF
 - Design doc drift items: ${DRIFT_COUNT}
 - TODO/FIXME/HACK annotations: ${TOTAL_ANNOTATIONS} (TODO: ${TODO_COUNT}, FIXME: ${FIXME_COUNT}, HACK: ${HACK_COUNT})
 - Files >300 lines: ${SIZE_VIOLATION_COUNT}
-- Open follow-up items: ${FOLLOWUP_COUNT} (maintenance threshold: 10)
+- Open items (\`- [ ]\` in dev/status/*.md, unscoped by heading): ${FOLLOWUP_COUNT} (maintenance threshold: 10)
 - QC calibration findings: ${QC_CAL_COUNT} (dune available: ${DUNE_AVAILABLE})
 - Architecture graph violations (monitored): ${ARCH_GRAPH_VIOLATION_COUNT}
 - Status file template violations (forbidden ## Recent Commits): ${RECENT_COMMITS_COUNT}
