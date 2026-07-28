@@ -1,0 +1,18 @@
+{
+  "date": "2026-07-28",
+  "feature": "harness",
+  "branch": "harness/run-in-env-worktree-root",
+  "recorded_at_ns": 1785230004968815430,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "PR #2143 rework iteration 1 of 2 -> APPROVED. Behavioral re-QC review 4795655365 at ada932ea reproduced the decisive rt1/rt2 experiment: pre-fix run-in-env.sh + warm _build now exits 1 with 5 of 6 assertions RED, where at 64e47713 the identical sequence exited 0 with zero output (rule never executed). rt0b independently proved the rule re-runs on a warm build. Test 6 (GITHUB_WORKSPACE fallback) mutation-verified: deleting only the elif branch reddens exactly test 6 on resolved-path identity. Structural APPROVED q5 transfers on byte-identical evidence. Supersedes the NEEDS_REWORK record earlier this run."
+}
