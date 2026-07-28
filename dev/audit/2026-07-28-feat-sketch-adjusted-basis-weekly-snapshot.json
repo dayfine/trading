@@ -2,17 +2,17 @@
   "date": "2026-07-28",
   "feature": "weekly-snapshot",
   "branch": "feat/sketch-adjusted-basis",
-  "recorded_at_ns": 1785230679290095057,
+  "recorded_at_ns": 1785258676457367737,
   "structural_qc": "APPROVED",
-  "behavioral_qc": "NEEDS_REWORK",
-  "overall_qc": "NEEDS_REWORK",
-  "harness_gap": "NONE",
-  "quality_score": 2,
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
   "findings_count": {
     "PASS": 0,
     "FAIL": 0,
     "FLAG": 0
   },
-  "consecutive_rework_count": 2,
-  "notes": "PR #2145 (adjusted-basis sketch migration, 28 files). Nesting-linter rework ae52b3f1 dispatched this run cleared a RED build-and-test (2 violations in functions the PR adds). Structural APPROVED q4 (review 4795521335) BUT the reviewer could not complete H2/H3 due to container contention and approved on H1+inspection; CI build-and-test SUCCESS on ae52b3f1 is what actually covers the build surface. Behavioral NEEDS_REWORK q2 (review 4795688051): 8 mutations, 6 caught, 2 survived - M3 corrupt/NaN raw-close guard has zero coverage (CP4), M4 sidetable_basis threading untested end-to-end (CP1). R1 bit-identity verified bitwise exact via Int64.bits_of_float, but the stated precondition 'split-free' is wrong: real condition is adjusted_close = close_price, and every fixture sets them equal so the suite cannot expose the gap for dividend payers. Rework iteration 1 of 2 dispatched."
+  "consecutive_rework_count": 0,
+  "notes": "PR #2145 MERGED 790d23a0. Re-QC after rework iteration 1 at tip 77e5b57b (rework eaba3891 + clean merge of main). Structural re-review 4799919475 APPROVED q4 - scoped delta review; production delta across the rework is doc-comment-only (verified byte-level by the orchestrator), executable delta is test-only (+296 lines); H1-H3 marked PASS on completed CI evidence for the exact tip (build-and-test + perf-tier1-smoke SUCCESS, run 30367458897) and stated as verified rather than predicted; no P6 findings; new test_adjusted_basis confirmed genuinely wired into the runtest alias. Behavioral re-review 4799994353 APPROVED q4 - 7 mutations re-run independently, 6 killed 1 surviving (N5 Bar_reader Raw default, FLAG only: unobservable because both production consumers resolve basis from the manifest hash and pass it explicitly). Prior survivors M3 and M4 both dead. N1/N2 show each guard disjunct independently pinned; N3 (1e-15 drift) proves the bit-identity assertion is genuinely bitwise rather than epsilon-tolerant. Reviewer retracted two of its own prior-round prescriptions as defective: the prescribed M4 fix would not have killed M4 (14/15 tests passed under M4 including the exact prescribed shape), and finding 3 mis-scoped a third wording site that never existed. Author's pushback upheld."
 }
