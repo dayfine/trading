@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-27 run7 (orchestrator run 30311344891 — main green on `70cd1c8d` throughout, verified via CI on the exact HEAD. #2140 QC'd: structural APPROVED, behavioral NEEDS_REWORK, rework 1/2 in flight. #2139 arrived CI-red claiming a green suite — 8 nesting violations — refactored clean in `36e403bf`. `gh` found to be absent from this container, which is why QC reviews stopped self-posting; see run7 §Escalations.)
+Last updated: 2026-07-28 run1 (orchestrator run 30340958135 — main green throughout, verified via CI on the exact HEAD `e34474e5`. Merged this run: #2143 (H-RUNENV-WORKTREE-BLIND — the false-green that had been invalidating worktree verification repo-wide), #2146 (Current-milestone marker, re-arming the linter-expiry subsystem). #2145 reworked off a red CI, then behavioral NEEDS_REWORK q2 on two surviving mutations; rework 1/2 in flight.)
 
 ## Active + complete tracks
 
@@ -43,9 +43,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2140 | #2140 QC'd run7: structural APPROVED q4, behavioral NEEDS_REWORK q2 (Step 2b `>threshold` branch untested); rework 1/2 + H-RUNENV-WORKTREE-BLIND fix in flight |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2143 MERGED `916825fb` (H-RUNENV-WORKTREE-BLIND false-green); next: H-CHECK-CACHE-BLIND — ~25 checks lack `(universe)` |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | Phase 1 stable (PR-D'c #1332 merged); Phase 2 deferred; no outstanding work |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2138 MERGED `f3a80c46` — schema_drift pinned by deriving field names from `sexp_of_t`; 7 open; next: test_pin on `test_bayesian_opt_cholesky.ml` |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2146 MERGED `d37f94a8` — `Current milestone: M5` marker re-arms check_11_linter_expiry; 9 open; next: test_pin on `test_bayesian_opt_cholesky.ml` |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
@@ -57,7 +57,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
-| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | #2139 | #2139 arrived CI-red (8 nesting violations) despite claiming green; refactored clean in `36e403bf`, zero @nesting-ok markers; QC in flight; next: 4c.c write-back |
+| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | #2145 | #2139 MERGED `47e32dd1`; #2145 (adjusted-basis sketch, #2133 defect 2) structural APPROVED q4, behavioral NEEDS_REWORK q2 — rework 1/2 in flight |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
 | [tax-lens](tax-lens.md) | MERGED | feat-backtest | — | Phase 1 #2066 + CP4 loader error-path contract #2073 MERGED; Phase 2 wash-sale / April outflows deferred, user-gated (#2006) |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | asset-type blocklist MERGED (#1939, default-off); next: arm ATB.curated for live universe build + General::Type enrichment feed |
