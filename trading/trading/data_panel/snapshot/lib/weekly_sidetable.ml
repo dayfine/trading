@@ -22,8 +22,23 @@ let _count_off = magic_len + C.int32_bytes
 let _mid_off = C.int32_bytes
 let _high_off = C.int32_bytes + C.float64_bytes
 
-let format_hash =
+(* Raw-basis format hash: the value stamped by warehouses built BEFORE the
+   #2133 basis migration, when the builder folded RAW weekly high/mid into each
+   entry. Kept exported so the reader still recognizes those existing warehouses
+   and anchors their sketch at the raw [Close] column (back-compat). *)
+let format_hash_raw_basis =
   Printf.sprintf "%s/v%d" magic format_version
+  |> Stdlib.Digest.string |> Stdlib.Digest.to_hex
+
+(* Adjusted-basis format hash (#2133): the value stamped by warehouses built
+   AFTER the basis migration, when the builder rescales bars onto the
+   split/dividend-adjusted basis ({!Snapshot_pipeline.Adjusted_basis}) before
+   folding weekly high/mid. Deliberately distinct from [format_hash_raw_basis]
+   (a suffix on the hashed content) so a reader can tell the two bases apart and
+   anchor the sketch at the matching close column — raw [Close] for the raw
+   basis, [Adjusted_close] for the adjusted basis. *)
+let format_hash =
+  Printf.sprintf "%s/v%d-adjusted-basis-v2" magic format_version
   |> Stdlib.Digest.string |> Stdlib.Digest.to_hex
 
 (* ----- byte helpers ----------------------------------------------------- *)

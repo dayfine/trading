@@ -1,5 +1,6 @@
 open Core
 module Resistance_sketch = Snapshot_pipeline.Resistance_sketch
+module Adjusted_basis = Snapshot_pipeline.Adjusted_basis
 
 (* Transpose day [i]'s band-major histogram columns [arrays.hist.(cell).(i)]
    (cell [band * n_buckets + bucket]) into the [Resistance_supply.sketch]
@@ -13,8 +14,10 @@ let _hist_bands_at ~(arrays : Resistance_sketch.t) ~i =
       Array.init n_buckets ~f:(fun bucket -> cell ~band ~bucket))
 
 (* Extract one day's scalar sketch (day index [i]) from the per-day sketch
-   columns. The anchor is the bar's raw close (the same value the snapshot
-   [Close] column stores — see [Resistance_sketch_reader]). *)
+   columns. [bars] is already on the split/dividend-adjusted basis (#2133 — see
+   [of_daily_bars]), so the anchor is the bar's ADJUSTED close: the same value an
+   adjusted-basis warehouse's [Adjusted_close] column stores, which the
+   adjusted-basis side-table reader anchors on. *)
 let _sketch_at ~(arrays : Resistance_sketch.t)
     ~(bars : Types.Daily_price.t array) ~i : Resistance_supply.sketch =
   {
@@ -28,7 +31,12 @@ let _sketch_at ~(arrays : Resistance_sketch.t)
 
 let of_daily_bars (daily_bars : Types.Daily_price.t list) :
     Resistance_supply.sketch option =
-  let bars = Array.of_list daily_bars in
+  (* Rescale to the adjusted basis (#2133) up front so BOTH the sketch columns
+     (via [compute_windowed], which rescales too — idempotent) AND the anchor
+     [_sketch_at] reads from the last bar's close are on the adjusted scale. *)
+  let bars =
+    Array.of_list (List.map daily_bars ~f:Adjusted_basis.to_adjusted_basis)
+  in
   let n = Array.length bars in
   if n = 0 then None
   else

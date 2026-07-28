@@ -40,6 +40,9 @@ let stub_value : Snapshot_schema.field -> float = function
   | Snapshot_schema.Res_max_high_520w -> 220.0
   | Snapshot_schema.Res_bars_seen -> 300.0
   | Snapshot_schema.Close -> 150.0
+  (* Distinct from [Close] (#2133) so the anchor-column selection is observable:
+     a Raw-basis side-table anchors at 150, an Adjusted-basis one at 140. *)
+  | Snapshot_schema.Adjusted_close -> 140.0
   | Snapshot_schema.Res_hist k -> Float.of_int k
   | _ -> 0.0
 
@@ -219,6 +222,30 @@ let test_read_v5_selects_sidetable _ =
               (float_equal 2.0);
           ]))
 
+(* Basis (#2133): the default [Raw] side-table anchors at the raw [Close] (150) —
+   bit-identical to legacy behaviour (already pinned by the test above). An
+   [Adjusted]-basis side-table instead anchors at [Adjusted_close] (140), so the
+   adjusted weekly high/mid and the anchor share one scale. *)
+let test_read_v5_adjusted_basis_anchors_at_adjusted_close _ =
+  let expected =
+    Weekly_sidetable_reader.sketch_of_entries ~entries:sidetable_entries ~as_of
+      ~close:140.0
+  in
+  assert_that
+    (Reader.read ~cb:(stub_cb ()) ~symbol:"AAPL" ~as_of
+       ~weekly_sidetable:sidetable_entries
+       ~sidetable_basis:Weekly_sidetable_reader.Adjusted ())
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (s : Resistance_supply.sketch) -> s.anchor_close)
+              (float_equal 140.0);
+            field
+              (fun (s : Resistance_supply.sketch) -> s.bars_seen)
+              (float_equal expected.bars_seen);
+          ]))
+
 (* Dispatch: [None] side-table falls through to the v4 dense columns
    ([max_high_520w] = the stubbed 220, not a side-table value). *)
 let test_read_none_falls_through_to_v4 _ =
@@ -349,6 +376,8 @@ let suite =
          "read_sketch hist cell error -> None"
          >:: test_read_sketch_hist_cell_error_none;
          "read v5 selects side-table" >:: test_read_v5_selects_sidetable;
+         "read v5 adjusted basis anchors at Adjusted_close"
+         >:: test_read_v5_adjusted_basis_anchors_at_adjusted_close;
          "read None falls through to v4" >:: test_read_none_falls_through_to_v4;
          "read armed + thin + no side-table + sketch warehouse raises"
          >:: test_read_armed_thin_no_sidetable_raises;

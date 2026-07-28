@@ -60,7 +60,14 @@ val compute :
   weekly_prefix:Weekly_prefix.t -> bars_arr:Types.Daily_price.t array -> t
 (** [compute ~weekly_prefix ~bars_arr] computes every sketch column in one
     forward pass over the days. [weekly_prefix] must have been built from
-    [bars_arr] (same indexing). Pure function. *)
+    [bars_arr] (same indexing). Pure function.
+
+    {b Basis.} [compute] measures on whatever basis [bars_arr] / [weekly_prefix]
+    carry — it does {e not} rescale. Callers wanting the split/dividend-adjusted
+    basis (#2133) must pass adjusted bars, or use {!compute_windowed}, which
+    rescales for them. Only tests call [compute] directly today; the production
+    from-bars caller ({!Weinstein_snapshot_gen.Live_resistance_sketch}) goes
+    through {!compute_windowed}. *)
 
 val compute_windowed :
   deep_bars:Types.Daily_price.t array -> bars_arr:Types.Daily_price.t array -> t
@@ -83,9 +90,22 @@ val compute_windowed :
     ]}
     (split-parity, pinned in [test_resistance_sketch.ml]).
 
-    [deep_bars = [||]] is bit-identical to
-    [compute ~weekly_prefix:(Weekly_prefix.build bars_arr) ~bars_arr] — the
-    no-deep-history default. The caller must supply [deep_bars] that precede
-    [bars_arr] chronologically with no overlap; the combined aggregation raises
-    [Invalid_argument] on out-of-order input (same contract as
-    {!Weekly_prefix.build}). Pure function. *)
+    {b Basis (#2133).} [compute_windowed] rescales both [deep_bars] and
+    [bars_arr] onto the split/dividend-adjusted basis
+    ({!Adjusted_basis.to_adjusted_basis}) before aggregating, so a split inside
+    the window no longer hides or fabricates supply. The rescale is bit-identity
+    exactly when [adjusted_close = close_price] (factor 1.0) — typically only
+    the most recent unadjusted segment — NOT merely when the data is split-free:
+    a dividend-only adjustment already moves every O/H/L bit. Since the rescale
+    is unconditional, [compute_windowed] output {e does} change for
+    dividend-adjusted history, i.e. for essentially every real dividend payer.
+    That is intended, and is why #2133's follow-up warehouse rebuild + golden
+    re-pin is required. The histogram anchor is the rescaled day's close,
+    keeping the from-bars path self-consistent (no basis hash needed).
+
+    [deep_bars = [||]] is bit-identical to calling {!compute} on the
+    adjusted-basis rescaling of [bars_arr] — the no-deep-history default. The
+    caller must supply [deep_bars] that precede [bars_arr] chronologically with
+    no overlap; the combined aggregation raises [Invalid_argument] on
+    out-of-order input (same contract as {!Weekly_prefix.build}). Pure function.
+*)

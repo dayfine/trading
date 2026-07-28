@@ -44,7 +44,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2143 MERGED `916825fb` (H-RUNENV-WORKTREE-BLIND false-green); next: H-CHECK-CACHE-BLIND — ~25 checks lack `(universe)` |
-| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | Phase 1 stable (PR-D'c #1332 merged); Phase 2 deferred; no outstanding work |
+| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | Phase 1 stable; 4 open: A-BUDGET-ORPHAN, A-SUMMARY-STALE-FALLBACK, A-GIT-SAFE-DIRECTORY (git exit 128 at every run start), PR-D'c |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2146 MERGED `d37f94a8` — `Current milestone: M5` marker re-arms check_11_linter_expiry; 9 open; next: test_pin on `test_bayesian_opt_cholesky.ml` |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
@@ -57,7 +57,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
-| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | #2145 | #2139 MERGED `47e32dd1`; #2145 (adjusted-basis sketch, #2133 defect 2) structural APPROVED q4, behavioral NEEDS_REWORK q2 — rework 1/2 in flight |
+| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | #2145 MERGED `790d23a0` (adjusted-basis sketch, #2133 defect 2; both QC gates APPROVED q4); next: #2133 follow-up warehouse rebuild + golden re-pin |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
 | [tax-lens](tax-lens.md) | MERGED | feat-backtest | — | Phase 1 #2066 + CP4 loader error-path contract #2073 MERGED; Phase 2 wash-sale / April outflows deferred, user-gated (#2006) |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | asset-type blocklist MERGED (#1939, default-off); next: arm ATB.curated for live universe build + General::Type enrichment feed |

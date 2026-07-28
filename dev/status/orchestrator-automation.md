@@ -1,6 +1,6 @@
 # Status: Orchestrator Automation
 
-## Last updated: 2026-06-21
+## Last updated: 2026-07-28
 
 ## Status
 IN_PROGRESS
@@ -480,6 +480,116 @@ convention above is the cheap mitigation.
   + `.claude/rules/qc-*-authority.md` in the orchestrator's dispatch
   prompt, or (b) maintainer-direct implementation since the work is
   small (~50 LOC, 4 files).
+
+### A-BUDGET-ORPHAN — budget records are orphaned whenever a run has no summary PR
+
+- [ ] **A-BUDGET-ORPHAN — the "Bundle budget" step silently strands the measured
+  cost of any run that did not open its own `ops/daily-*` PR.** Owner:
+  harness-maintainer. `.github/workflows/orchestrator.yml:423-453` looks up an
+  **open** PR whose head branch starts with `ops/daily-$(date +%F)`. If there is
+  none — because the orchestrator exited before its Step 8, *or* because a prior
+  run's summary PR has already merged — it pushes the JSON to a standalone
+  `ops/budget-<date>-<run_id>` branch and, by explicit design (workflow comment
+  line 384), **does not open a PR for it**. Nothing else ever merges those
+  branches.
+
+  **Measured impact (2026-07-28 run 2):** 31 such branches had accumulated since
+  2026-07-14, holding **$283.31** of measured spend that never reached `main`.
+  Every daily total computed from `dev/budget/*.json` since then was understated,
+  including the `[high]` budget escalation raised in `dev/daily/2026-07-28.md`
+  — whose 2026-07-27 figure of `$405.30` (203% of cap) is really **$463.74
+  (232%)**, and whose 2026-07-26 figure of `$107.77` (54%) is really **$191.91
+  (96%)**. The escalation was directionally right and numerically too low, which
+  is the worst combination for a metric whose whole job is to detect overrun.
+
+  The 31 records were backfilled onto main in that run's summary PR, so the
+  *history* is repaired; this item is the *mechanism*. Fix options, cheapest
+  first: (a) open a PR for the fallback branch instead of only annotating —
+  one `curl -X POST /pulls` next to the existing push, and it becomes visible in
+  the same queue as everything else; (b) commit the record directly to `main`
+  (it is additive, append-only data with no code); (c) have the step fall back to
+  the *most recent merged* `ops/daily-*` PR's branch and reopen it. Verify by
+  forcing a run that writes no summary and confirming its `dev/budget/` record
+  reaches main without human action.
+
+### A-SUMMARY-STALE-FALLBACK — a run with no summary silently inherits another run's
+
+- [ ] **A-SUMMARY-STALE-FALLBACK — `publish-summary` falls back to a previous
+  run's already-merged summary, and the escalation gate then judges the wrong
+  run.** Owner: harness-maintainer. `orchestrator.yml:332` resolves
+  `SUMMARY="$(ls -t dev/daily/${DATE}.md dev/daily/${DATE}-run*.md | head -n 1)"`.
+  When the orchestrator produces no summary of its own, this does not fail — it
+  silently selects the newest summary already on disk, which is typically a
+  *different, already-merged* run's file. Two consequences, both observed on
+  2026-07-28 in runs `30353290609` and `30366079322`:
+
+  1. `$GITHUB_STEP_SUMMARY` and the `summary_path` output describe a run that is
+     not the one that just executed. Both runs logged
+     `Using daily summary: dev/daily/2026-07-28.md` — run 1's file.
+  2. The **`Fail on escalations` gate** (`orchestrator.yml:543+`) greps that same
+     `$SUMMARY`. So a run that wrote nothing is graded on another run's
+     escalations, and a run that *did* raise a `[critical]` but died before
+     writing it is graded on a clean file and reports success. The gate's
+     guarantee is void in exactly the circumstances it exists for.
+
+  Both runs exited `success` having produced no summary, no merged budget record,
+  and — between them — **$21.03** of spend and one live mutation of PR #2145
+  (a branch update at 14:15:17Z) that no artefact records. Fix: if no summary
+  file was created **during this run** (compare mtime against the step start, or
+  have the orchestrator emit its path to `$GITHUB_OUTPUT`), fail the job loudly
+  rather than substituting a stale file. Pairs with A-BUDGET-ORPHAN — the same
+  two runs triggered both.
+
+  **Upstream cause — measured, and it is NOT wall-clock exhaustion.** Both runs
+  reported `"is_error": false` with `"num_turns": 33` and `51` against a
+  `--max-turns 200` cap, in 8 and 13 minutes. They ended *voluntarily*, having
+  written nothing. Nor did either take the Step 0.5 no-op path: that path writes
+  a `**Mode:** NO-OP` summary file, which `publish-summary` would then have
+  selected (it is newer) — instead both selected run 1's file, so no summary file
+  was created at all.
+
+  **The most likely trigger is A-GIT-SAFE-DIRECTORY below.** Both runs logged
+  `ShellError: Failed with exit code 128` roughly 10 s after start — the exact
+  signature of git's `detected dubious ownership` refusal, which this run also hit
+  on its very first `git` call. An orchestrator whose `git` is dead cannot run
+  Step 0.5 Conditions 2/4 (`git log --since`), Step 1b, Step 5.5, or Step 8's
+  push. Not proven — the agent's turn-level reasoning is not in the workflow log —
+  but it is the one defect both silent runs demonstrably hit, and it is
+  independently worth fixing.
+
+### A-GIT-SAFE-DIRECTORY — `git` is dead on arrival in the orchestrator container
+
+- [ ] **A-GIT-SAFE-DIRECTORY — every orchestrator run begins with `git`
+  completely unusable, and each agent has to discover and fix it itself.** Owner:
+  harness-maintainer. The job runs `options: --user 0` with `HOME: /home/opam`
+  (`orchestrator.yml:127-129`), so the checkout is owned by a uid that does not
+  match the repo's, and git refuses every command:
+
+  ```
+  fatal: detected dubious ownership in repository at '/__w/trading/trading'
+  ```
+
+  `actions/checkout` does run `git config --global --add safe.directory
+  /__w/trading/trading`, but that entry does not reach the agent: measured on
+  2026-07-28 run 2, `git config --global --get-all safe.directory` returned
+  **exactly one** entry — the one the orchestrator added itself mid-run. Before
+  that, `/home/opam/.gitconfig` carried none and `/root/.gitconfig` did not
+  exist.
+
+  **Blast radius.** Until some agent happens to run the `git config` incantation,
+  *every* `git` call in the run exits 128: Step 0.5 Conditions 2 and 4
+  (`git log --since`), Step 1b's drift cross-reference, Step 5.5's merge-base
+  reasoning, and Step 8's branch push. The two runs on 2026-07-28 that produced
+  no summary at all (`30353290609`, `30366079322`) both logged
+  `ShellError: Failed with exit code 128` ~10 s after start. Every dispatched
+  subagent hits it independently too.
+
+  **Fix:** add `git config --global --add safe.directory "$GITHUB_WORKSPACE"`
+  (and `.../trading`) as an explicit workflow step running under the same `HOME`
+  as the agent, before the `claude-code-action` step. One line. Alternatively set
+  `GIT_CONFIG_GLOBAL` consistently, or drop `--user 0` if the Actions post-step
+  bookkeeping no longer needs it. Verify: a run whose first `git status` succeeds
+  without the agent configuring anything.
 
 ## Completed work
 
