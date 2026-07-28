@@ -8,7 +8,16 @@ as-of date; consumed by `trace_picks` / `diff_picks` / `render_weekly_report`.
 
 ## Superseded records
 
-- **2026-07-24: use `47e32dd13/` (v3, validated).** Regenerated on the
+- **2026-07-24: use `790d23a06/` (v4, split-safe grading).** Regenerated
+  after the #2145 split-safe resistance basis + the weekly-review warehouse
+  rebuild (adjusted-basis side-tables, format hash `128e4c1e…`). **The only
+  candidate change vs v3: CLMB (rank 2, score 86) drops out entirely** —
+  its "Clean (0.12)" grade was a split artifact hiding a real $25–34
+  supply wall (#2133) — **and PH (score 75, Virgin_territory) enters** in
+  the freed slot. All 19 other candidates and grades identical. Classes
+  3 EXTENDED / 5 through / 12 valid. `validation.txt`: **OK, no findings**
+  (the v3 split-suspect warning is gone with its subject).
+- **`47e32dd13/` (v3, validated).** Regenerated on the
   #2139 main (validator + all report fixes) with the same inputs. The sexp
   is **bit-identical to `ab53f8a6f/` modulo the version stamp** — the first
   live demonstration of the reproducibility property (#2122 slice c). The
