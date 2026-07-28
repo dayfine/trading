@@ -87,8 +87,10 @@ let _manifest_entry ~snap_path : Snapshot_manifest.file_metadata =
 
 (* Source warehouse: TSYM.snap over the window bars, an old-basis TSYM.weekly
    (same week skeleton the adjusted rebuild must preserve), and a manifest
-   stamped with the RAW-basis side-table format hash. *)
-let _write_warehouse ~warehouse_dir =
+   stamped with the RAW-basis side-table format hash. [extra_entries] lets a
+   test append manifest entries with no backing [.snap] file (the per-symbol
+   abort path). *)
+let _write_warehouse ?(extra_entries = []) ~warehouse_dir () =
   let snap_path = Filename.concat warehouse_dir (_symbol ^ ".snap") in
   _ok_or_fail ~what:"snap write"
     (Snapshot_columnar.write ~path:snap_path (_snap_rows ()));
@@ -103,7 +105,7 @@ let _write_warehouse ~warehouse_dir =
   let manifest =
     Snapshot_manifest.set_weekly_sidetable_format_hash
       (Snapshot_manifest.create ~schema:Snapshot_schema.default
-         ~entries:[ _manifest_entry ~snap_path ])
+         ~entries:(_manifest_entry ~snap_path :: extra_entries))
       Weekly_sidetable.format_hash_raw_basis
   in
   _ok_or_fail ~what:"manifest write"
@@ -113,11 +115,11 @@ let _write_warehouse ~warehouse_dir =
 
 (* One migrate run over a fresh fixture; [mutate_csv] shapes the CSV store's
    bars relative to the true history (identity = unchanged since the build). *)
-let _migrate ?(mutate_csv = fun bars -> Some bars) () =
+let _migrate ?(mutate_csv = fun bars -> Some bars) ?(extra_entries = []) () =
   let warehouse_dir = _tmp_dir () in
   let csv_dir = _tmp_dir () in
   let output_dir = Filename.concat (_tmp_dir ()) "clone" in
-  _write_warehouse ~warehouse_dir;
+  _write_warehouse ~extra_entries ~warehouse_dir ();
   (match mutate_csv (_all_bars ()) with
   | Some bars -> _write_csv ~csv_dir bars
   | None -> ());
@@ -331,6 +333,29 @@ let test_fallback_unstable_basis _ =
   in
   assert_that summary (is_ok_and_holds (_reports_matcher [ report_matcher ]))
 
+(* A manifest entry whose [.snap] is unreadable must abort the whole run with
+   [Error] and leave NO clone manifest behind — the .mli's "a partial clone
+   must not masquerade as a full one" guarantee. The ghost entry sorts after
+   TSYM in manifest order, so the abort fires mid-run with TSYM's files
+   already written: exactly the partial state that must stay manifest-less. *)
+let test_partial_clone_aborts_without_manifest _ =
+  (* The recorded path only needs to be absent; any absolute path works. *)
+  let entry : Snapshot_manifest.file_metadata =
+    {
+      symbol = "GHOST";
+      path = Filename.concat (_tmp_dir ()) "GHOST.snap";
+      byte_size = 0;
+      payload_md5 = "";
+      csv_mtime = 0.0;
+      active_through = None;
+    }
+  in
+  let _, output_dir, summary = _migrate ~extra_entries:[ entry ] () in
+  assert_that summary is_error;
+  assert_that
+    (Stdlib.Sys.file_exists (Filename.concat output_dir "manifest.sexp"))
+    (equal_to false)
+
 let suite =
   "sidetable_migrator"
   >::: [
@@ -344,6 +369,8 @@ let suite =
          "rounded rebase still stable" >:: test_rounded_rebase_still_stable;
          "fallback: no csv" >:: test_fallback_no_csv;
          "fallback: unstable basis" >:: test_fallback_unstable_basis;
+         "partial clone aborts without manifest"
+         >:: test_partial_clone_aborts_without_manifest;
        ]
 
 let () = run_test_tt_main suite
