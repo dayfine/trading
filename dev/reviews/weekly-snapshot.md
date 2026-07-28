@@ -1,6 +1,56 @@
-Reviewed SHA: a007d5503
+Reviewed SHA: 77e5b57b12a9a934bc18440649650b659f0f44c5
 
 # QC review — weekly-snapshot track
+
+## PR #2145 — `feat/sketch-adjusted-basis` (split-safe sketch basis, #2133 defect 2)
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+Rework iterations: 1 (of a cap of 2). **MERGED `790d23a0`** on 2026-07-28 run 2.
+
+Full verdicts are PR review comments on #2145 — structural `4799919475`,
+behavioral `4799994353`, both at `77e5b57b`. Written here by the **orchestrator**,
+not the QC agents: this run's dispatch briefs explicitly told both agents not to
+write `dev/reviews/*`, anticipating PR-D'c
+(`dev/status/orchestrator-automation.md` §Open work), which proposes dropping the
+dual-write entirely. Until PR-D'c lands, the `Reviewed SHA:` line is still parsed
+by Step 1.5 and Step 0.5 Condition 1, so leaving it stale would silently corrupt
+the next run's dispatch guard — hence this entry.
+
+### Round 2 (this run) — tip `77e5b57b` = rework `eaba3891` + clean merge of main
+
+- **structural: APPROVED, quality 4.** Scoped *delta* re-review, and says so in
+  its own body. The orchestrator established byte-level that the rework's
+  production delta is doc-comment-only, so the round-1 APPROVED at `ae52b3f1`
+  covers the production code; the uncovered surface was ~296 lines of new test
+  code. No P6 violations. Confirmed the new `test_adjusted_basis` is genuinely
+  attached to the `runtest` alias (the failure mode #2143 shipped with). H1–H3
+  PASS on **completed** CI for the exact tip (run 30367458897), stated as
+  verified, not predicted.
+- **behavioral: APPROVED, quality 4.** Seven mutations re-run independently;
+  6 killed, 1 surviving (N5, `Bar_reader` `Raw` default — FLAG only: both
+  production consumers resolve the basis from the manifest hash and pass it
+  explicitly, so the default is never consulted). Round-1's two survivors, M3
+  (corrupt-close guard) and M4 (`sidetable_basis` threading), are both dead.
+  N1/N2 show each guard disjunct is independently pinned; N3 (1e-15 relative
+  drift) proves the R1 bit-identity assertion is genuinely bitwise rather than
+  epsilon-tolerant.
+- **The reviewer retracted two of its own round-1 prescriptions.** Its required
+  fix for M4 ("add a test calling `stock_analysis_callbacks_of_weekly_views`
+  … that kills M4") does **not** kill M4 — under M4, 14 of 15 tests passed,
+  including the pre-existing test in exactly that shape. The implementer had
+  disputed it and was right. Its finding 3 also mis-scoped a third wording site
+  in `weekly_sidetable_builder.ml` that never carried the claim. Recorded as
+  review defects rather than quietly absorbed.
+
+### Round 1 — tip `ae52b3f1` (2026-07-28 run 1)
+
+- structural: APPROVED q4 (review `4795521335`) — could not complete H2/H3 under
+  container contention; approved on H1 + inspection.
+- behavioral: **NEEDS_REWORK** q2 (review `4795688051`) — 8 mutations, 6 caught,
+  2 survived.
 
 ## PR #2105 — `feat/picks-phase-c` (Picks Phase C: HTML report + SVG charts)
 
