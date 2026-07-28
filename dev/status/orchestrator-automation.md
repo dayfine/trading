@@ -540,13 +540,56 @@ convention above is the cheap mitigation.
   rather than substituting a stale file. Pairs with A-BUDGET-ORPHAN — the same
   two runs triggered both.
 
-  **Suspected upstream cause, worth confirming:** run `30366079322` triggered
-  `update-branch` on #2145 at 14:15:17Z and its orchestrator step ended at
-  ~14:16:51Z. Step 6.5's merge gate polls CI for **up to 15 minutes** *before*
-  Step 7 writes the summary and Step 8 pushes it, so a run that enters that poll
-  near its wall-clock limit loses everything downstream. Consider writing the
-  summary **before** the merge-gate poll, or bounding the poll by remaining run
-  time.
+  **Upstream cause — measured, and it is NOT wall-clock exhaustion.** Both runs
+  reported `"is_error": false` with `"num_turns": 33` and `51` against a
+  `--max-turns 200` cap, in 8 and 13 minutes. They ended *voluntarily*, having
+  written nothing. Nor did either take the Step 0.5 no-op path: that path writes
+  a `**Mode:** NO-OP` summary file, which `publish-summary` would then have
+  selected (it is newer) — instead both selected run 1's file, so no summary file
+  was created at all.
+
+  **The most likely trigger is A-GIT-SAFE-DIRECTORY below.** Both runs logged
+  `ShellError: Failed with exit code 128` roughly 10 s after start — the exact
+  signature of git's `detected dubious ownership` refusal, which this run also hit
+  on its very first `git` call. An orchestrator whose `git` is dead cannot run
+  Step 0.5 Conditions 2/4 (`git log --since`), Step 1b, Step 5.5, or Step 8's
+  push. Not proven — the agent's turn-level reasoning is not in the workflow log —
+  but it is the one defect both silent runs demonstrably hit, and it is
+  independently worth fixing.
+
+### A-GIT-SAFE-DIRECTORY — `git` is dead on arrival in the orchestrator container
+
+- [ ] **A-GIT-SAFE-DIRECTORY — every orchestrator run begins with `git`
+  completely unusable, and each agent has to discover and fix it itself.** Owner:
+  harness-maintainer. The job runs `options: --user 0` with `HOME: /home/opam`
+  (`orchestrator.yml:127-129`), so the checkout is owned by a uid that does not
+  match the repo's, and git refuses every command:
+
+  ```
+  fatal: detected dubious ownership in repository at '/__w/trading/trading'
+  ```
+
+  `actions/checkout` does run `git config --global --add safe.directory
+  /__w/trading/trading`, but that entry does not reach the agent: measured on
+  2026-07-28 run 2, `git config --global --get-all safe.directory` returned
+  **exactly one** entry — the one the orchestrator added itself mid-run. Before
+  that, `/home/opam/.gitconfig` carried none and `/root/.gitconfig` did not
+  exist.
+
+  **Blast radius.** Until some agent happens to run the `git config` incantation,
+  *every* `git` call in the run exits 128: Step 0.5 Conditions 2 and 4
+  (`git log --since`), Step 1b's drift cross-reference, Step 5.5's merge-base
+  reasoning, and Step 8's branch push. The two runs on 2026-07-28 that produced
+  no summary at all (`30353290609`, `30366079322`) both logged
+  `ShellError: Failed with exit code 128` ~10 s after start. Every dispatched
+  subagent hits it independently too.
+
+  **Fix:** add `git config --global --add safe.directory "$GITHUB_WORKSPACE"`
+  (and `.../trading`) as an explicit workflow step running under the same `HOME`
+  as the agent, before the `claude-code-action` step. One line. Alternatively set
+  `GIT_CONFIG_GLOBAL` consistently, or drop `--user 0` if the Actions post-step
+  bookkeeping no longer needs it. Verify: a run whose first `git status` succeeds
+  without the agent configuring anything.
 
 ## Completed work
 
