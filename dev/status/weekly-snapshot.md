@@ -5,6 +5,33 @@
 ## Status
 IN_PROGRESS
 
+**2026-07-27 (picks validator v1, branch `feat/picks-validator-v1`, PR #2139 —
+issue #2122):** `Snapshot_validator` makes the weekly artifact's obvious
+invariants mechanical instead of eyeballed: positive/finite prices, side-aware
+stop placement, the reconciliation overshoot + class, EXTENDED suppression, the
+risk identity, duplicate symbols, macro regime, and (with a bar source) chart
+coverage + split-in-window.
+
+qc-behavioral rework iteration 1 closed the gap between the claimed and the
+actual coverage — the PR said "each invariant has a red-path test" while four
+mutations of the implementation left the suite green. **Tests only; no
+production logic changed.** Each mutation is now red:
+
+- **positive/finite prices** and **non-empty macro regime** had no red-path test
+  at all — the candidate builder never produced a non-positive or NaN price and
+  the snapshot builder hardcoded a regime. Added a `?macro` builder parameter
+  and one test each.
+- **The `abs` in the risk identity was unpinned** because every sized candidate
+  in the suite was a long, where `fill - stop` is already positive. A short's
+  stop sits *above* its fill (book §6.3), so the un-absoluted formula yields a
+  negative expected risk and a spurious `risk_consistency` error. Latent today
+  (`sized_*` is populated for longs) but the module's contract is side-aware, so
+  a sized-short test now pins it.
+- **The class-boundary convention** ("both boundaries fall to the lower class")
+  matched `Entry_reconciliation._class_of` but was neither stated in the `.mli`
+  nor tested, so the two could drift silently. Now documented at the validator
+  end and pinned on both edges.
+
 **2026-07-27 (follow-up to #2129, branch `fix/report-watch-qc-followup`):**
 closed the three qc-behavioral findings from #2129's review. #2129 merged before
 the rework landed, so these were live defects on main rather than unmerged-PR

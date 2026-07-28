@@ -14,7 +14,12 @@
       agrees with (close vs entry), and the class matches the thresholds
       ([through_band_pct] / [extension_max_pct] — pass the armed live values;
       defaults mirror dev/weekly-picks/live-config-overrides.sexp as of
-      2026-07-27: 1.0 / 15.0).
+      2026-07-27: 1.0 / 15.0). Both boundaries fall to the LOWER class,
+      mirroring {!Entry_reconciliation}: an overshoot exactly at
+      [through_band_pct] is still [Valid_stop], and one exactly at
+      [extension_max_pct] is still [Through_entry]. The conventions must stay in
+      lockstep — a stricter comparison here would flag a legitimate boundary
+      artifact as a [reconciliation_class] error.
     - [extended_not_suppressed] — an EXTENDED candidate must carry no sized
       ticket (#2103).
     - [risk_consistency] — [sized_risk_amount = shares x |expected fill - stop|]
