@@ -34,11 +34,12 @@ val of_snapshot_views :
   ?weekly_sidetable_loader:
     (symbol:string -> Data_panel_snapshot.Weekly_sidetable.entry list option) ->
   ?sketch_warehouse:bool ->
+  ?sidetable_basis:Weekly_sidetable_reader.basis ->
   Snapshot_runtime.Snapshot_callbacks.t ->
   t
-(** [of_snapshot_views ?calendar ?weekly_sidetable_loader ?sketch_warehouse cb]
-    produces a reader backed by {!Snapshot_runtime.Snapshot_bar_views} over
-    [cb]. Reads fan out through
+(** [of_snapshot_views ?calendar ?weekly_sidetable_loader ?sketch_warehouse
+     ?sidetable_basis cb] produces a reader backed by
+    {!Snapshot_runtime.Snapshot_bar_views} over [cb]. Reads fan out through
     {!Snapshot_runtime.Snapshot_callbacks.read_field_history} (LRU-bounded via
     {!Snapshot_runtime.Daily_panels}); per-call cost is O(window-size) plus an
     at-most-one-symbol disk read on cache miss.
@@ -59,6 +60,13 @@ val of_snapshot_views :
     scored symbol, so an in-process CSV / panel-mode snapshot ([false]) with
     resistance scoring armed-by-default degrades to the v1 grade instead of
     crashing (2026-07-23 bundle promotion). See {!sketch_warehouse}.
+
+    [?sidetable_basis] (default {!Weekly_sidetable_reader.Raw}) is the price
+    basis of this warehouse's side-tables (#2133), resolved by the caller from
+    the manifest format hash via {!Weekly_sidetable_reader.basis_for}. It is
+    threaded to {!Resistance_sketch_reader} (via {!Panel_callbacks}) so an
+    adjusted-basis side-table anchors the sketch at [Adjusted_close]; [Raw]
+    keeps the pre-migration [Close] anchor. See {!sidetable_basis}.
 
     The [?calendar] parameter is the trading-day calendar (Mon–Fri including
     holidays) the production runner uses. When supplied, [daily_view_for] walks
@@ -174,6 +182,15 @@ val sketch_warehouse : t -> bool
     in-process CSV / panel-mode snapshot ([false]) with resistance scoring
     armed-by-default degrades to the v1 grade (2026-07-23 bundle promotion).
     [false] for {!empty} and {!of_in_memory_bars}. *)
+
+val sidetable_basis : t -> Weekly_sidetable_reader.basis
+(** [sidetable_basis t] is the price basis of this reader's weekly side-tables
+    (#2133), as passed to {!of_snapshot_views}. Threaded into
+    {!Panel_callbacks.stock_analysis_callbacks_of_weekly_views} →
+    {!Resistance_sketch_reader} so an adjusted-basis side-table anchors the
+    sketch at [Adjusted_close]. {!Weekly_sidetable_reader.Raw} (the
+    pre-migration behaviour) for {!empty}, {!of_in_memory_bars}, and any
+    warehouse whose manifest carries no side-table format hash. *)
 
 val daily_bars_for :
   t -> symbol:string -> as_of:Date.t -> Types.Daily_price.t list

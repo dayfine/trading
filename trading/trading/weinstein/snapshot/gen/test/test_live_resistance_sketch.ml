@@ -95,6 +95,28 @@ let test_shallow_history_is_honest _ =
           (fun (s : Resistance_supply.sketch) -> s.bars_seen)
           (is_between (module Float_ord) ~low:1.0 ~high:2.0)))
 
+(* Adjusted-basis anchor (#2133): when the raw close and [adjusted_close] differ
+   (a split / dividend adjustment), [of_daily_bars] rescales onto the adjusted
+   basis, so the histogram anchor is the ADJUSTED close (30), never the raw close
+   (120). Without the rescale the sketch would bucket real supply against a
+   4x-inflated anchor. *)
+let _bars_split : Types.Daily_price.t list =
+  List.concat_map (List.range 0 2) ~f:(fun w ->
+      List.map (List.range 0 5) ~f:(fun d ->
+          let date = Date.add_days _monday ((7 * w) + d) in
+          (* raw ~120, adjusted 30 -> factor 0.25 *)
+          Types.Daily_price.make ~date ~open_price:110.0 ~high_price:130.0
+            ~low_price:110.0 ~close_price:120.0 ~volume:1_000_000
+            ~adjusted_close:30.0 ()))
+
+let test_split_anchor_is_adjusted_close _ =
+  assert_that
+    (Live_sketch.of_daily_bars _bars_split)
+    (is_some_and
+       (field
+          (fun (s : Resistance_supply.sketch) -> s.anchor_close)
+          (float_equal 30.0)))
+
 (* Empty history has no bar to anchor the sketch on → [None]. *)
 let test_empty_bars_is_none _ =
   assert_that (Live_sketch.of_daily_bars []) is_none
@@ -104,6 +126,8 @@ let suite =
   >::: [
          "sketch pins known cells" >:: test_sketch_pins_known_cells;
          "shallow history is honest" >:: test_shallow_history_is_honest;
+         "split anchor is adjusted close"
+         >:: test_split_anchor_is_adjusted_close;
          "empty bars is none" >:: test_empty_bars_is_none;
        ]
 

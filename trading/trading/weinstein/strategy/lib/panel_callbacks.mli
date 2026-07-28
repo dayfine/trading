@@ -76,6 +76,7 @@ val stock_analysis_callbacks_of_weekly_views :
   ?snapshot_cb:Snapshot_runtime.Snapshot_callbacks.t ->
   ?weekly_sidetable:Data_panel_snapshot.Weekly_sidetable.entry list ->
   ?sketch_warehouse:bool ->
+  ?sidetable_basis:Weekly_sidetable_reader.basis ->
   config:Stock_analysis.config ->
   stock:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
   benchmark:Snapshot_runtime.Snapshot_bar_views.weekly_view ->
@@ -102,11 +103,12 @@ val stock_analysis_callbacks_of_weekly_views :
     [?weekly_sidetable] activates the sketch-v5 read path: when [Some entries]
     (the per-symbol side-table supplied by {!Bar_reader.weekly_sidetable_for}),
     [get_sketch] derives the sketch at score time from the weekly series via
-    {!Resistance_sketch_reader.sketch_of_entries} (anchored at the row's raw
-    [Close], still read from [snapshot_cb]) instead of reading the dense [Res_*]
-    columns. Omitted / [None] keeps the dense-column path, bit-identical to the
-    pre-v5 behaviour. The PRESENCE of the side-table is the switch — there is no
-    config flag; the manifest format hash gates staleness at load time
+    {!Resistance_sketch_reader.sketch_of_entries} (anchored at the row's close
+    on [sidetable_basis] — raw [Close] or [Adjusted_close], still read from
+    [snapshot_cb]) instead of reading the dense [Res_*] columns. Omitted /
+    [None] keeps the dense-column path, bit-identical to the pre-v5 behaviour.
+    The PRESENCE of the side-table is the switch — there is no config flag; the
+    manifest format hash gates staleness at load time
     ({!Bar_reader.weekly_sidetable_for}).
 
     [?sketch_warehouse] (default [false]) is threaded to
@@ -117,6 +119,12 @@ val stock_analysis_callbacks_of_weekly_views :
     [true]. An in-process CSV / panel-mode snapshot ([false]) with resistance
     scoring armed-by-default degrades to the v1 grade instead of crashing
     (2026-07-23 bundle promotion). Supplied from {!Bar_reader.sketch_warehouse}.
+
+    [?sidetable_basis] (default {!Weekly_sidetable_reader.Raw}) is the price
+    basis of the side-table (#2133), threaded to
+    {!Resistance_sketch_reader.closure} to select the sketch anchor column: raw
+    [Close] for [Raw], [Adjusted_close] for [Adjusted]. Supplied from
+    {!Bar_reader.sidetable_basis}.
 
     [?resistance_stock] is the resistance-history feed
     ([Weinstein_strategy_config.resistance_lookback_bars]): a deeper weekly view
