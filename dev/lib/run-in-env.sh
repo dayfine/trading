@@ -12,11 +12,38 @@
 # runs natively (cd + opam env, no docker wrapping).
 #
 # Project root resolution (in-container path):
-#   GHA:   ${GITHUB_WORKSPACE}/trading  — repo checks out at GITHUB_WORKSPACE;
-#          the dune workspace root is one level deeper at trading/.
-#   Local container / other: resolve relative to this script's location.
-#          The script lives at <repo-root>/dev/lib/; climb two levels to reach
-#          the repo root, then descend into trading/ (the dune workspace root).
+#   Two INDEPENDENT candidates are derived and cross-checked — H-RUNENV-WORKTREE-BLIND
+#   (fixed 2026-07-27): a prior version pinned PROJECT_ROOT to
+#   ${GITHUB_WORKSPACE}/trading unconditionally in GHA mode, ignoring the
+#   invoker's cwd entirely. An agent working inside a git worktree (e.g. a
+#   feat-agent or harness-maintainer checked out at /tmp/agent-XYZ) would run
+#   `dune build && dune runtest`, silently build+test the MAIN checkout instead
+#   of its own tree, and report a false green for code it never compiled. See
+#   dev/status/harness.md "H-RUNENV-WORKTREE-BLIND" for the incident record
+#   (PR #2139 shipped with this exact signature: PR body claimed "green",
+#   CI was red on the same SHA).
+#
+#   cwd candidate:    `git rev-parse --show-toplevel` from the invoker's
+#                     current directory, +/trading. Correct whenever the
+#                     invoker's shell is actually positioned inside the tree
+#                     they mean to build — the normal case for every agent,
+#                     worktree or not.
+#   script candidate: resolved relative to this script's own on-disk location
+#                     (the script lives at <repo-root>/dev/lib/; climb two
+#                     levels to the repo root, then descend into trading/).
+#                     Correct for the devcontainer fallback and the ordinary
+#                     GHA case (invoker's cwd IS the main checkout) — but
+#                     WRONG if an agent working in a worktree invokes the
+#                     MAIN checkout's copy of this script by absolute path:
+#                     cwd is the worktree, yet the script resolves to main.
+#
+#   Resolution: prefer the cwd candidate when it names a valid dune workspace.
+#   ${GITHUB_WORKSPACE}/trading is used only as a last-resort fallback when
+#   cwd isn't inside any git tree with a trading/dune-workspace (e.g. an
+#   unusual invocation cwd). If the cwd candidate AND the script candidate
+#   both resolve to a valid dune workspace but DISAGREE, the script refuses to
+#   guess: it prints both candidates to stderr and exits non-zero. A loud
+#   failure here is strictly better than a silent false green.
 #
 # The in-container path verifies dune-workspace exists at the resolved root and
 # fails loudly if it doesn't — catches path mismatches rather than silently
@@ -24,6 +51,12 @@
 # path resolution to a docker-inspect query against the container's mount table
 # (see "Worktree path resolution" below), with a fallback that emits a stderr
 # warning if the inspect returns empty.
+#
+# Testability seam: set RUN_IN_ENV_PRINT_ROOT=1 to print the resolved
+# PROJECT_ROOT and exit 0 (or the disagreement error and exit 1), without
+# cd'ing, sourcing opam env, or exec'ing a command. Used only by
+# trading/devtools/checks/run_in_env_root_check.sh — never set this in normal
+# operation.
 #
 # Docker liveness probe (local path only):
 #   Before running the user command, the script verifies the container is
@@ -52,17 +85,47 @@ fi
 
 if [ -n "${TRADING_IN_CONTAINER:-}" ]; then
   # --- In-container path (GHA or devcontainer) ---
+  # See "Project root resolution (in-container path)" in the header comment
+  # for the full rationale (H-RUNENV-WORKTREE-BLIND).
 
-  if [ -n "${GITHUB_WORKSPACE:-}" ]; then
-    # GHA: the repo is checked out at $GITHUB_WORKSPACE (e.g. /__w/trading/trading).
-    # The dune workspace root is one level deeper at trading/.
+  _cwd_git_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  _cwd_candidate=""
+  if [ -n "$_cwd_git_root" ] && [ -f "${_cwd_git_root}/trading/dune-workspace" ]; then
+    _cwd_candidate="${_cwd_git_root}/trading"
+  fi
+
+  _script_dir="$(cd "$(dirname "$0")" && pwd)"
+  _script_candidate="$(cd "${_script_dir}/../.." && pwd)/trading"
+
+  if [ -n "$_cwd_candidate" ]; then
+    PROJECT_ROOT="$_cwd_candidate"
+
+    # Disagreement check: only meaningful if the script-location candidate
+    # ALSO resolves to a real dune workspace (otherwise it's just "this
+    # script's own tree has no trading/ yet", not a genuine second answer).
+    if [ -f "${_script_candidate}/dune-workspace" ] && [ "$_cwd_candidate" != "$_script_candidate" ]; then
+      echo "run-in-env.sh: PROJECT_ROOT is ambiguous — refusing to guess." >&2
+      echo "  cwd-derived root:             ${_cwd_candidate}" >&2
+      echo "  script-location-derived root: ${_script_candidate}" >&2
+      echo "  This usually means you invoked a DIFFERENT checkout's copy of" >&2
+      echo "  run-in-env.sh (e.g. the main checkout's absolute path) while" >&2
+      echo "  your cwd is inside a worktree. Invoke the copy that lives" >&2
+      echo "  inside the tree you intend to build/test." >&2
+      exit 1
+    fi
+  elif [ -n "${GITHUB_WORKSPACE:-}" ]; then
+    # Last-resort fallback: cwd isn't inside a git tree with a trading/
+    # dune-workspace. Use GHA's known checkout location.
     PROJECT_ROOT="${GITHUB_WORKSPACE}/trading"
   else
-    # Devcontainer / fallback: resolve relative to this script's location.
-    # The script lives at <repo-root>/dev/lib/run-in-env.sh.
-    # Climb two levels to reach the repo root, then descend into trading/.
-    script_dir="$(cd "$(dirname "$0")" && pwd)"
-    PROJECT_ROOT="$(cd "${script_dir}/../.." && pwd)/trading"
+    # Devcontainer / final fallback: resolve relative to this script's own
+    # on-disk location.
+    PROJECT_ROOT="$_script_candidate"
+  fi
+
+  if [ -n "${RUN_IN_ENV_PRINT_ROOT:-}" ]; then
+    echo "$PROJECT_ROOT"
+    exit 0
   fi
 
   # Fail loudly rather than run dune in the wrong directory.
