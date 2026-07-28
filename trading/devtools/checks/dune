@@ -124,7 +124,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:agent_compliance_check.sh})))
 
@@ -134,7 +134,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh agent_compliance_check.sh)
+ (deps _check_lib.sh agent_compliance_check.sh (universe))
  (action
   (run sh %{dep:agent_compliance_test.sh})))
 
@@ -146,7 +146,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:jj_workspace_smoke.sh})))
 
@@ -161,7 +161,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:status_file_integrity.sh})))
 
@@ -173,7 +173,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:index_size_linter.sh})))
 
@@ -187,7 +187,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:orchestrator_plan_check.sh})))
 
@@ -211,7 +211,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:deep_scan_trends_check.sh})))
 
@@ -223,7 +223,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:deep_scan_arch_graph_check.sh})))
 
@@ -235,7 +235,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:deep_scan_recent_commits_check.sh})))
 
@@ -247,7 +247,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:deep_scan_linter_expiry_check.sh})))
 
@@ -258,7 +258,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:deep_scan_stale_bookmarks_check.sh})))
 
@@ -270,7 +270,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:deep_scan_drift_coverage_check.sh})))
 
@@ -283,6 +283,15 @@
 ; check scripts + deep_scan/_lib.sh explicitly (not just _check_lib.sh) so
 ; dune's cache invalidates when their logic changes, not only when this
 ; test file changes.
+;
+; H-CHECK-CACHE-BLIND exemption: this script's own repo_root() call
+; (REPO_ROOT_REAL) resolves only deep_scan/check_05_followup_items.sh and
+; deep_scan/check_08_trends.sh -- both already declared as explicit deps
+; above, so their content IS tracked despite the absolute-path read
+; escaping the sandbox. The two check scripts are always invoked with
+; REPO_ROOT overridden to a synthetic fixture tree, never a real
+; outside-workspace file. See universe_deps_exceptions.conf for the
+; recorded evidence; no (universe) needed.
 
 (rule
  (alias runtest)
@@ -300,7 +309,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:consolidate_day_check.sh})))
 
@@ -341,7 +350,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:rule_promotion_check.sh})))
 
@@ -360,7 +369,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:budget_rollup_check.sh})))
 
@@ -378,7 +387,8 @@
  (alias runtest)
  (deps
   _check_lib.sh
-  (glob_files_rec %{workspace_root}/*.sh))
+  (glob_files_rec %{workspace_root}/*.sh)
+  (universe))
  (action
   (run sh %{dep:posix_sh_check.sh})))
 
@@ -404,7 +414,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:no_python_check.sh})))
 
@@ -416,7 +426,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:extract_metrics_gate_smoke.sh})))
 
@@ -428,7 +438,7 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:sweep_worktrees_smoke.sh})))
 
@@ -441,6 +451,15 @@
 ; declared as deps so the cache key invalidates when either changes.
 ; Uses `bash` (not `sh`) because the test script uses set -euo pipefail
 ; and bash-specific constructs (intentional — see #!/usr/bin/env bash shebang).
+;
+; H-CHECK-CACHE-BLIND exemption: record_qc_audit.sh and write_audit.sh
+; each define a private _repo_root() (same walk-up-for-.git/.claude logic
+; as _check_lib.sh's repo_root()) and use it to locate dev/reviews/ and
+; dev/audit/ -- real outside-workspace paths. But record_qc_audit_test.sh
+; ALWAYS invokes both scripts with REPO_ROOT explicitly overridden to a
+; freshly-created temp fixture repo (see the REPO_ROOT="${TMP_REPO}" ...
+; invocations throughout the test), so no real dev/reviews/ or dev/audit/
+; content is ever read by this rule. See universe_deps_exceptions.conf.
 
 (rule
  (alias runtest)
@@ -481,9 +500,44 @@
 
 (rule
  (alias runtest)
- (deps _check_lib.sh)
+ (deps _check_lib.sh (universe))
  (action
   (setenv
    PERF_CATALOG_CHECK_STRICT
    1
    (run sh %{dep:perf_catalog_check.sh}))))
+
+; H-CHECK-CACHE-BLIND mechanical guard: verifies every script in this
+; directory that calls repo_root() has its owning dune rule declare
+; (universe), or is recorded with evidence in
+; universe_deps_exceptions.conf. See check_universe_deps.sh for the full
+; rationale and parsing method, and universe_deps_exceptions.conf for the
+; three scripts (record_qc_audit.sh, write_audit.sh,
+; deep_scan_followup_count_check.sh) proven exempt.
+;
+; Declares (universe) for itself: a cache-blindness linter whose own
+; PASS/FAIL could go stale on a warm build would defeat its own purpose
+; (the exact failure #2143's reviewer caught).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:check_universe_deps.sh})))
+
+; Self-test for check_universe_deps.sh: pins the parser + decision logic
+; (rule-block parsing, run-target vs dep-only resolution, exceptions-list
+; skip, and the repo_root-vs-filename-substring false-positive guard) using
+; a synthetic fixture tree via the REPO_ROOT override, independent of
+; whatever the real dune file currently contains.
+;
+; Also declares (universe): its fixture heredocs embed repo_root()
+; call-site text (used to exercise the guard under test) that check_
+; universe_deps.sh's own candidate-detection would otherwise flag on this
+; file.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh check_universe_deps.sh (universe))
+ (action
+  (run sh %{dep:check_universe_deps_test.sh})))
