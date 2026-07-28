@@ -1,9 +1,17 @@
 # Status: weekly-snapshot
 
-## Last updated: 2026-07-27
+## Last updated: 2026-07-28
 
 ## Status
 IN_PROGRESS
+
+**2026-07-28 (CI fix on `feat/sketch-adjusted-basis`, PR #2145):** the nesting
+linter flagged the two functions added by that PR —
+`Weekly_sidetable_reader.basis_for` (avg 3.73, max 6) and `load_gated` (max 6).
+Both inner bodies are now top-level `_`-prefixed helpers
+(`_unrecognized_hash_failure`, `_hash_mismatch_error`), so each match arm is a
+single application. Pure readability refactor: identical return values and
+identical error strings, no `@nesting-ok` markers added.
 
 **2026-07-27 (picks validator v1, branch `feat/picks-validator-v1`, PR #2139 —
 issue #2122):** `Snapshot_validator` makes the weekly artifact's obvious

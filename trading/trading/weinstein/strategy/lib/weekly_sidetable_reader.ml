@@ -143,18 +143,24 @@ let _basis_of_format_hash h =
   else if String.equal h Weekly_sidetable.format_hash_raw_basis then Some Raw
   else None
 
+(* Loud staleness on an unknown side-table format hash: the price basis is not
+   inferable, and guessing it would silently mix raw and adjusted prices.
+   Extracted from [basis_for] so that function stays a flat match (nesting
+   linter). *)
+let _unrecognized_hash_failure h =
+  failwithf
+    "Weekly_sidetable_reader.basis_for: unrecognized weekly side-table format \
+     hash %s (neither the raw-basis nor the adjusted-basis format) — refusing \
+     to guess the price basis"
+    h ()
+
 let basis_for ~manifest_format_hash : basis =
   match manifest_format_hash with
   | None -> Raw
   | Some h -> (
       match _basis_of_format_hash h with
       | Some b -> b
-      | None ->
-          failwithf
-            "Weekly_sidetable_reader.basis_for: unrecognized weekly side-table \
-             format hash %s (neither the raw-basis nor the adjusted-basis \
-             format) — refusing to guess the price basis"
-            h ())
+      | None -> _unrecognized_hash_failure h)
 
 let _weekly_path ~snapshot_dir ~symbol =
   Filename.concat snapshot_dir (symbol ^ ".weekly")
@@ -171,18 +177,22 @@ let _load_present ~snapshot_dir ~symbol :
     Result.map (Weekly_sidetable.read_file ~path) ~f:(fun entries ->
         Some entries)
 
+(* Neither the raw-basis nor the adjusted-basis (#2133) format hash — a loud
+   refusal to read a side-table produced under an unknown format. Extracted from
+   [load_gated] so that function stays a flat 3-arm match (nesting linter). *)
+let _hash_mismatch_error h =
+  Status.error_internal
+    (Printf.sprintf
+       "weekly side-table format hash mismatch: manifest %s, reader accepts %s \
+        (adjusted) or %s (raw)"
+       h Weekly_sidetable.format_hash Weekly_sidetable.format_hash_raw_basis)
+
 let load_gated ~snapshot_dir ~symbol ~manifest_format_hash :
     Weekly_sidetable.entry list option Status.status_or =
   match manifest_format_hash with
   | None -> Ok None
   | Some h when Option.is_none (_basis_of_format_hash h) ->
-      (* Neither the raw-basis nor the adjusted-basis (#2133) format hash — a
-         loud refusal to read a side-table produced under an unknown format. *)
-      Status.error_internal
-        (Printf.sprintf
-           "weekly side-table format hash mismatch: manifest %s, reader \
-            accepts %s (adjusted) or %s (raw)"
-           h Weekly_sidetable.format_hash Weekly_sidetable.format_hash_raw_basis)
+      _hash_mismatch_error h
   | Some _ -> _load_present ~snapshot_dir ~symbol
 
 let loader_for ~snapshot_dir ~manifest_format_hash ~symbol =
