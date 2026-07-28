@@ -1,6 +1,6 @@
 # Status: Orchestrator Automation
 
-## Last updated: 2026-06-21
+## Last updated: 2026-07-28
 
 ## Status
 IN_PROGRESS
@@ -480,6 +480,73 @@ convention above is the cheap mitigation.
   + `.claude/rules/qc-*-authority.md` in the orchestrator's dispatch
   prompt, or (b) maintainer-direct implementation since the work is
   small (~50 LOC, 4 files).
+
+### A-BUDGET-ORPHAN — budget records are orphaned whenever a run has no summary PR
+
+- [ ] **A-BUDGET-ORPHAN — the "Bundle budget" step silently strands the measured
+  cost of any run that did not open its own `ops/daily-*` PR.** Owner:
+  harness-maintainer. `.github/workflows/orchestrator.yml:423-453` looks up an
+  **open** PR whose head branch starts with `ops/daily-$(date +%F)`. If there is
+  none — because the orchestrator exited before its Step 8, *or* because a prior
+  run's summary PR has already merged — it pushes the JSON to a standalone
+  `ops/budget-<date>-<run_id>` branch and, by explicit design (workflow comment
+  line 384), **does not open a PR for it**. Nothing else ever merges those
+  branches.
+
+  **Measured impact (2026-07-28 run 2):** 31 such branches had accumulated since
+  2026-07-14, holding **$283.31** of measured spend that never reached `main`.
+  Every daily total computed from `dev/budget/*.json` since then was understated,
+  including the `[high]` budget escalation raised in `dev/daily/2026-07-28.md`
+  — whose 2026-07-27 figure of `$405.30` (203% of cap) is really **$463.74
+  (232%)**, and whose 2026-07-26 figure of `$107.77` (54%) is really **$191.91
+  (96%)**. The escalation was directionally right and numerically too low, which
+  is the worst combination for a metric whose whole job is to detect overrun.
+
+  The 31 records were backfilled onto main in that run's summary PR, so the
+  *history* is repaired; this item is the *mechanism*. Fix options, cheapest
+  first: (a) open a PR for the fallback branch instead of only annotating —
+  one `curl -X POST /pulls` next to the existing push, and it becomes visible in
+  the same queue as everything else; (b) commit the record directly to `main`
+  (it is additive, append-only data with no code); (c) have the step fall back to
+  the *most recent merged* `ops/daily-*` PR's branch and reopen it. Verify by
+  forcing a run that writes no summary and confirming its `dev/budget/` record
+  reaches main without human action.
+
+### A-SUMMARY-STALE-FALLBACK — a run with no summary silently inherits another run's
+
+- [ ] **A-SUMMARY-STALE-FALLBACK — `publish-summary` falls back to a previous
+  run's already-merged summary, and the escalation gate then judges the wrong
+  run.** Owner: harness-maintainer. `orchestrator.yml:332` resolves
+  `SUMMARY="$(ls -t dev/daily/${DATE}.md dev/daily/${DATE}-run*.md | head -n 1)"`.
+  When the orchestrator produces no summary of its own, this does not fail — it
+  silently selects the newest summary already on disk, which is typically a
+  *different, already-merged* run's file. Two consequences, both observed on
+  2026-07-28 in runs `30353290609` and `30366079322`:
+
+  1. `$GITHUB_STEP_SUMMARY` and the `summary_path` output describe a run that is
+     not the one that just executed. Both runs logged
+     `Using daily summary: dev/daily/2026-07-28.md` — run 1's file.
+  2. The **`Fail on escalations` gate** (`orchestrator.yml:543+`) greps that same
+     `$SUMMARY`. So a run that wrote nothing is graded on another run's
+     escalations, and a run that *did* raise a `[critical]` but died before
+     writing it is graded on a clean file and reports success. The gate's
+     guarantee is void in exactly the circumstances it exists for.
+
+  Both runs exited `success` having produced no summary, no merged budget record,
+  and — between them — **$21.03** of spend and one live mutation of PR #2145
+  (a branch update at 14:15:17Z) that no artefact records. Fix: if no summary
+  file was created **during this run** (compare mtime against the step start, or
+  have the orchestrator emit its path to `$GITHUB_OUTPUT`), fail the job loudly
+  rather than substituting a stale file. Pairs with A-BUDGET-ORPHAN — the same
+  two runs triggered both.
+
+  **Suspected upstream cause, worth confirming:** run `30366079322` triggered
+  `update-branch` on #2145 at 14:15:17Z and its orchestrator step ended at
+  ~14:16:51Z. Step 6.5's merge gate polls CI for **up to 15 minutes** *before*
+  Step 7 writes the summary and Step 8 pushes it, so a run that enters that poll
+  near its wall-clock limit loses everything downstream. Consider writing the
+  summary **before** the merge-gate poll, or bounding the poll by remaining run
+  time.
 
 ## Completed work
 
