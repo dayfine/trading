@@ -312,14 +312,25 @@
 ; case, the normal-GHA case, the devcontainer fallback, and the disagreement
 ; case (loud failure) all resolve correctly. Does NOT touch the real repo's
 ; dune-workspace or opam env. Requires bash + git; skips cleanly otherwise.
+;
 ; dev/lib/run-in-env.sh lives outside the dune workspace root (above
-; trading/); the check reads it via repo_root() in _check_lib.sh. No glob
-; dep needed for the real file: cache invalidates when the check script
-; itself changes (same pattern as consolidate_day_check.sh above).
+; trading/), and the check reads it via repo_root() in _check_lib.sh at
+; RUN TIME (a shell function call, not a dune dep) -- a plain (deps ...)
+; entry cannot express that path, since dune deps are resolved relative
+; to this directory and cannot reach above the workspace root. Without
+; (universe), a warm _build treats this rule as fully determined by
+; _check_lib.sh + run_in_env_root_check.sh; editing ONLY run-in-env.sh
+; leaves the cached PASS result in place and the rule never re-runs,
+; silently defeating the regression test it exists to be (confirmed:
+; reverting run-in-env.sh to the pre-fix buggy version with a warm
+; _build produced exit 0 / zero output -- see PR #2143 review). Any
+; check whose script reads a file outside the dune workspace root via
+; repo_root() must declare (universe) for the same reason
+; (H-CHECK-CACHE-BLIND, dev/status/harness.md).
 
 (rule
  (alias runtest)
- (deps _check_lib.sh run_in_env_root_check.sh)
+ (deps _check_lib.sh run_in_env_root_check.sh (universe))
  (action
   (run sh %{dep:run_in_env_root_check.sh})))
 

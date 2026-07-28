@@ -25,6 +25,10 @@
 #      picking one.
 #   5. A resolved root that itself lacks a dune-workspace still fails
 #      loudly (pre-existing behavior, must not regress).
+#   6. The GITHUB_WORKSPACE last-resort fallback (cwd outside any git tree
+#      with trading/dune-workspace, GITHUB_WORKSPACE set) resolves to
+#      ${GITHUB_WORKSPACE}/trading. This branch bypasses the disagreement
+#      guard, so it is exercised explicitly rather than left as a gap.
 #
 # Uses RUN_IN_ENV_PRINT_ROOT=1 (a seam added alongside the fix) to observe
 # the resolved PROJECT_ROOT without requiring a real dune workspace / opam
@@ -94,8 +98,7 @@ make_tree "$TREE_B"
 # invoke treeA's OWN copy of the script. Must resolve to treeA, never treeB.
 # ---------------------------------------------------------------------------
 OUT1=$(cd "$TREE_A" && TRADING_IN_CONTAINER=1 GITHUB_WORKSPACE="$TREE_B" \
-  RUN_IN_ENV_PRINT_ROOT=1 bash "${TREE_A}/dev/lib/run-in-env.sh" true 2>&1)
-CODE1=$?
+  RUN_IN_ENV_PRINT_ROOT=1 bash "${TREE_A}/dev/lib/run-in-env.sh" true 2>&1) && CODE1=0 || CODE1=$?
 if [ "$CODE1" -eq 0 ] && [ "$OUT1" = "${TREE_A}/trading" ]; then
   ok "run_in_env_root_check — worktree invocation resolves to its own tree, not \$GITHUB_WORKSPACE (H-RUNENV-WORKTREE-BLIND)"
 else
@@ -107,8 +110,7 @@ fi
 # ${GITHUB_WORKSPACE}/trading, unchanged from prior behavior.
 # ---------------------------------------------------------------------------
 OUT2=$(cd "$TREE_B" && TRADING_IN_CONTAINER=1 GITHUB_WORKSPACE="$TREE_B" \
-  RUN_IN_ENV_PRINT_ROOT=1 bash "${TREE_B}/dev/lib/run-in-env.sh" true 2>&1)
-CODE2=$?
+  RUN_IN_ENV_PRINT_ROOT=1 bash "${TREE_B}/dev/lib/run-in-env.sh" true 2>&1) && CODE2=0 || CODE2=$?
 if [ "$CODE2" -eq 0 ] && [ "$OUT2" = "${TREE_B}/trading" ]; then
   ok "run_in_env_root_check — normal GHA case (cwd == GITHUB_WORKSPACE) still resolves correctly"
 else
@@ -120,8 +122,7 @@ fi
 # tree. Must resolve relative to the script's own on-disk location.
 # ---------------------------------------------------------------------------
 OUT3=$(cd /tmp && TRADING_IN_CONTAINER=1 GITHUB_WORKSPACE="" \
-  RUN_IN_ENV_PRINT_ROOT=1 bash "${TREE_A}/dev/lib/run-in-env.sh" true 2>&1)
-CODE3=$?
+  RUN_IN_ENV_PRINT_ROOT=1 bash "${TREE_A}/dev/lib/run-in-env.sh" true 2>&1) && CODE3=0 || CODE3=$?
 if [ "$CODE3" -eq 0 ] && [ "$OUT3" = "${TREE_A}/trading" ]; then
   ok "run_in_env_root_check — devcontainer fallback (no GITHUB_WORKSPACE, cwd outside any git tree) unregressed"
 else
@@ -161,6 +162,23 @@ if [ "$CODE5" -ne 0 ] && echo "$OUT5" | grep -qF "no dune-workspace at"; then
   ok "run_in_env_root_check — missing dune-workspace at resolved root still fails loudly"
 else
   fail "run_in_env_root_check — expected non-zero exit + 'no dune-workspace at' message, got exit=${CODE5} output='${OUT5}'"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 6: GITHUB_WORKSPACE last-resort fallback — cwd outside any git tree
+# (or inside one lacking trading/dune-workspace) AND GITHUB_WORKSPACE set.
+# Must resolve to ${GITHUB_WORKSPACE}/trading, exercising the `elif`
+# branch none of tests 1/2/4 (cwd branch) or 3/5 (no GITHUB_WORKSPACE)
+# reach. This branch bypasses the disagreement guard, so it is the one
+# remaining path that can silently resolve to a root other than the
+# invoker's tree; documented here rather than left untested.
+# ---------------------------------------------------------------------------
+OUT6=$(cd /tmp && TRADING_IN_CONTAINER=1 GITHUB_WORKSPACE="$TREE_B" \
+  RUN_IN_ENV_PRINT_ROOT=1 bash "${TREE_A}/dev/lib/run-in-env.sh" true 2>&1) && CODE6=0 || CODE6=$?
+if [ "$CODE6" -eq 0 ] && [ "$OUT6" = "${TREE_B}/trading" ]; then
+  ok "run_in_env_root_check — GITHUB_WORKSPACE last-resort fallback (cwd outside any git tree) resolves to \$GITHUB_WORKSPACE/trading"
+else
+  fail "run_in_env_root_check — expected PROJECT_ROOT=${TREE_B}/trading, got exit=${CODE6} output='${OUT6}'"
 fi
 
 cleanup
