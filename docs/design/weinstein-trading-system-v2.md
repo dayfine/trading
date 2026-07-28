@@ -457,6 +457,18 @@ tuning:
 
 Milestones mark the points where you gain new capability — not just "code compiles" but "I can do something I couldn't before."
 
+**Current milestone: M5** (Historical Backtesting, §Milestone 5 below — reached
+and substantially extended: walk-forward CV, the Bayesian tuner, and the
+experiment ledger are all live per `dev/status/_index.md`). M6 as originally
+scoped here (§Milestone 6, cron-driven live cycle) is not yet reached — the
+redefined M6.1-M6.5 sub-milestones below are in progress but M6.6 "true live
+cycle" is explicitly deferred, and M7 (`M7.0`/`M7.1`) is only partially
+started. Keep this conservative — bump only when the *next* milestone's
+capability (not a sub-milestone) is genuinely live. This line is machine-read
+by `trading/devtools/checks/deep_scan/check_11_linter_expiry.sh` to resolve
+`review_at: M<n>` annotations in `linter_exceptions.conf` — do not delete it
+as redundant prose; update it in place as milestones advance.
+
 ### Milestone 1: Single-Stock Analyst (after P1)
 
 **You can:** Run `weinstein analyze AAPL.US` and get back a complete analysis of any individual stock — its current stage, whether it's near a breakout, volume confirmation quality, relative strength vs the market, overhead resistance grade, and suggested stop level.
