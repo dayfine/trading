@@ -1,0 +1,23 @@
+(library
+ (name sidetable_migrator)
+ (public_name scripts.sidetable_migrator)
+ (modules sidetable_migrator)
+ (libraries
+  core
+  core_unix
+  status
+  types
+  fpath
+  trading.data_panel.snapshot
+  bar_window
+  weinstein.snapshot_pipeline
+  csv)
+ (preprocess
+  (pps ppx_jane)))
+
+(executable
+ (name rebuild_weekly_sidetables)
+ (modules rebuild_weekly_sidetables)
+ (libraries core core_unix core_unix.command_unix status sidetable_migrator)
+ (preprocess
+  (pps ppx_jane)))
