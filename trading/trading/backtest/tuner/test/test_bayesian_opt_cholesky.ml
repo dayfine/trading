@@ -52,9 +52,17 @@ let _max_above_diagonal l ~n =
   done;
   !worst
 
-(** A symmetric, strictly diagonally dominant (hence positive-definite),
-    well-conditioned [n x n] matrix. Built entrywise from a deterministic
-    formula so the fixture is identical on every host and needs no RNG. *)
+(** A symmetric, well-conditioned [n x n] matrix. Built entrywise from a
+    deterministic formula so the fixture is identical on every host and needs no
+    RNG.
+
+    Not diagonally dominant beyond the smallest certified size: from n=32 on,
+    some rows' off-diagonal sum exceeds the diagonal, which cycles through 2, 3,
+    4 (worst case n=100: 61/100 rows violate it, with an off-diagonal row sum of
+    ~3.5 in the middle rows against a diagonal of 2-4). Positive-definiteness is
+    instead confirmed directly: a pure-OCaml (no-BLAS) power-iteration estimate
+    of the smallest eigenvalue holds steady at ~1.83, comfortably bounded away
+    from 0, at every size in [_certified_sizes]. *)
 let _well_conditioned_spd ~n =
   Mat.init_2d n n (fun i j ->
       if i = j then 2.0 +. Float.of_int (i % 3)
