@@ -1051,3 +1051,9 @@ M6 work runs in parallel with `experiments` track M5.2 — no shared source file
   `dev/notes/weekly-report-design-reference-2026-07-27.html`; plan §Phase C
 - Fence: if a local session claims either item it will mark this file per
   the takeover protocol.
+
+**2026-07-28:** Split-safe resistance sketch basis (#2133 defect 2) landed
+(PR #2145): weekly side-tables + the sketch reader/compute now measure on the
+split/dividend-adjusted basis, hash-gated (old raw-basis warehouses stay
+bit-identical). Follow-up: warehouse rebuild + golden re-pin impact assessment
+(#2133) is separate and NOT done here.

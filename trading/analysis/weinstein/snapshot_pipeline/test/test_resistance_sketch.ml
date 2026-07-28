@@ -429,6 +429,58 @@ let test_deep_bars_basis_guard _ =
           (fun rows -> _rows_basis_mismatches rows expected_rows)
           (equal_to 0)))
 
+(* Adjusted-basis (#2133): [compute_windowed] rescales onto the adjusted basis, so
+   a split inside the window no longer fabricates or hides supply. Pre-split raw
+   highs (4x the adjusted level) collapse onto the same scale as the recent
+   anchor, and the max-high / histogram measure the adjusted supply, not the raw
+   one. *)
+let _split_bar ~date ~close ~high ~low ~adjusted_close () : Types.Daily_price.t
+    =
+  {
+    Types.Daily_price.date;
+    open_price = close;
+    high_price = high;
+    low_price = low;
+    close_price = close;
+    volume = 1_000;
+    adjusted_close;
+    active_through = None;
+  }
+
+let test_compute_windowed_split_uses_adjusted_supply _ =
+  (* Week 0 is a pre-split spike: raw high 140 / low 132 / close 140 with
+     adjusted_close 35 (a 4:1 split, factor 0.25) -> rescaled high 35, low 33,
+     mid 34. Weeks 1..14 sit at the adjusted level 30 (raw = adjusted, high =
+     anchor, so gated out). The last day's anchor is the adjusted close 30, so
+     the pre-split supply at mid 34 sits just above it and IS bucketed — on the
+     RAW basis it would be mid 136, dropped from the histogram entirely. *)
+  let week ~w ~close ~high ~low ~adj =
+    List.init 5 ~f:(fun d ->
+        _split_bar ~date:(_day ~w ~d) ~close ~high ~low ~adjusted_close:adj ())
+  in
+  let bars =
+    week ~w:0 ~close:140.0 ~high:140.0 ~low:132.0 ~adj:35.0
+    @ List.concat_map (List.range 1 15) ~f:(fun w ->
+        week ~w ~close:30.0 ~high:30.0 ~low:30.0 ~adj:30.0)
+  in
+  let sketch =
+    Resistance_sketch.compute_windowed ~deep_bars:[||]
+      ~bars_arr:(Array.of_list bars)
+  in
+  let last = List.length bars - 1 in
+  let hist_total =
+    Array.fold sketch.hist ~init:0.0 ~f:(fun acc row -> acc +. row.(last))
+  in
+  assert_that
+    (sketch.max_high_520w.(last), hist_total)
+    (all_of
+       [
+         (* the ADJUSTED max (35), not the raw 140 *)
+         field (fun (m, _) -> m) (float_equal 35.0);
+         (* the pre-split supply is visible above the anchor (raw basis: none) *)
+         field (fun (_, h) -> h) (float_equal 1.0);
+       ])
+
 (* Deep whose last bar lands ON the window's first day overlaps -> Error. *)
 let test_deep_overlap_errors _ =
   let window =
@@ -460,6 +512,8 @@ let suite =
          "split parity bit-identical" >:: test_split_parity_bit_identical;
          "deep bars_seen honesty" >:: test_deep_bars_seen_honesty;
          "deep bars basis guard (13 columns)" >:: test_deep_bars_basis_guard;
+         "compute_windowed split uses adjusted supply"
+         >:: test_compute_windowed_split_uses_adjusted_supply;
          "deep overlap errors" >:: test_deep_overlap_errors;
        ]
 

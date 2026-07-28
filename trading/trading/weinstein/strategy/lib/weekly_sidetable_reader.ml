@@ -133,6 +133,29 @@ let sketch_of_entries ~(entries : Weekly_sidetable.entry list) ~as_of ~close :
 (* Side-table load + manifest-format-hash gate                          *)
 (* ------------------------------------------------------------------ *)
 
+type basis = Raw | Adjusted [@@deriving sexp, compare, equal]
+
+(* Map a manifest side-table format hash to its price basis. [None] when the
+   hash is not one of the two recognized side-table formats — the loud-staleness
+   signal used by [load_gated] / [basis_for]. *)
+let _basis_of_format_hash h =
+  if String.equal h Weekly_sidetable.format_hash then Some Adjusted
+  else if String.equal h Weekly_sidetable.format_hash_raw_basis then Some Raw
+  else None
+
+let basis_for ~manifest_format_hash : basis =
+  match manifest_format_hash with
+  | None -> Raw
+  | Some h -> (
+      match _basis_of_format_hash h with
+      | Some b -> b
+      | None ->
+          failwithf
+            "Weekly_sidetable_reader.basis_for: unrecognized weekly side-table \
+             format hash %s (neither the raw-basis nor the adjusted-basis \
+             format) — refusing to guess the price basis"
+            h ())
+
 let _weekly_path ~snapshot_dir ~symbol =
   Filename.concat snapshot_dir (symbol ^ ".weekly")
 
@@ -152,11 +175,14 @@ let load_gated ~snapshot_dir ~symbol ~manifest_format_hash :
     Weekly_sidetable.entry list option Status.status_or =
   match manifest_format_hash with
   | None -> Ok None
-  | Some h when not (String.equal h Weekly_sidetable.format_hash) ->
+  | Some h when Option.is_none (_basis_of_format_hash h) ->
+      (* Neither the raw-basis nor the adjusted-basis (#2133) format hash — a
+         loud refusal to read a side-table produced under an unknown format. *)
       Status.error_internal
         (Printf.sprintf
-           "weekly side-table format hash mismatch: manifest %s, reader %s" h
-           Weekly_sidetable.format_hash)
+           "weekly side-table format hash mismatch: manifest %s, reader \
+            accepts %s (adjusted) or %s (raw)"
+           h Weekly_sidetable.format_hash Weekly_sidetable.format_hash_raw_basis)
   | Some _ -> _load_present ~snapshot_dir ~symbol
 
 let loader_for ~snapshot_dir ~manifest_format_hash ~symbol =

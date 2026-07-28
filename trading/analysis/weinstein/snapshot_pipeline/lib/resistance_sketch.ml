@@ -183,6 +183,15 @@ let _slice_to_window (full : t) ~offset ~len =
 
 let compute_windowed ~(deep_bars : Types.Daily_price.t array)
     ~(bars_arr : Types.Daily_price.t array) =
+  (* Pin the from-bars path to the split/dividend-adjusted basis (#2133): rescale
+     both the deep history and the window bars so the histogram anchor (the day's
+     close) and the folded weekly highs are on one continuous scale. Self-
+     consistent — the anchor is computed from the same rescaled bars — so no hash
+     gate is needed here. Rescaling is a no-op for split-free data (factor 1.0),
+     so it does not change existing dense-column warehouses or split-free goldens;
+     it does change future dense-column REBUILDS, which is intended. *)
+  let deep_bars = Array.map deep_bars ~f:Adjusted_basis.to_adjusted_basis in
+  let bars_arr = Array.map bars_arr ~f:Adjusted_basis.to_adjusted_basis in
   if Array.is_empty deep_bars then
     compute ~weekly_prefix:(Weekly_prefix.build bars_arr) ~bars_arr
   else

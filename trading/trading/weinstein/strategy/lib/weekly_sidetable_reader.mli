@@ -58,6 +58,26 @@ val sketch_of_entries :
     is [Float.nan] (mirroring the v4 corrupt-bar row), with [anchor_close = close]
     verbatim. Pure function. *)
 
+(** Price basis of a warehouse's weekly side-tables (#2133). [Raw] side-tables
+    (pre-migration, {!Weekly_sidetable.format_hash_raw_basis}) carry raw weekly
+    high/mid and are anchored at the row's raw [Close]; [Adjusted] side-tables
+    ({!Weekly_sidetable.format_hash}) carry split/dividend-adjusted high/mid and
+    are anchored at [Adjusted_close]. The basis is a whole-warehouse property
+    (all its side-tables share one format hash), not per-symbol. *)
+type basis = Raw | Adjusted [@@deriving sexp, compare, equal]
+
+val basis_for : manifest_format_hash:string option -> basis
+(** [basis_for ~manifest_format_hash] resolves the whole-warehouse side-table
+    basis from the manifest's recorded format hash:
+
+    - [None] (no side-table warehouse) -> [Raw] (the pre-migration default; the
+      value is inert because such a warehouse has no side-tables to anchor);
+    - [Some h] equal to {!Weekly_sidetable.format_hash} -> [Adjusted];
+    - [Some h] equal to {!Weekly_sidetable.format_hash_raw_basis} -> [Raw];
+    - [Some h] matching neither -> {b raises} [Failure] — the same loud
+      staleness refusal {!loader_for} applies, so an unknown format never
+      silently picks a basis. *)
+
 val load_gated :
   snapshot_dir:string ->
   symbol:string ->
@@ -69,12 +89,15 @@ val load_gated :
     ({!Snapshot_pipeline.Snapshot_manifest.weekly_sidetable_format_hash}):
 
     - [manifest_format_hash = None] (no side-table warehouse) -> [Ok None];
-    - [Some h] with [h <> Weekly_sidetable.format_hash] -> [Error Internal] — a
-      loud refusal to read a side-table produced under a different format, the
-      same discipline the runtime applies to a snapshot schema-hash skew;
-    - [Some h] matching, file absent -> [Ok None] (this symbol has no side-file;
-      the caller falls back to the dense columns);
-    - [Some h] matching, file present -> [Ok (Some entries)] via
+    - [Some h] matching neither {!Weekly_sidetable.format_hash} (adjusted basis,
+      #2133) nor {!Weekly_sidetable.format_hash_raw_basis} (raw basis) ->
+      [Error Internal] — a loud refusal to read a side-table produced under an
+      unknown format, the same discipline the runtime applies to a snapshot
+      schema-hash skew. BOTH the raw and adjusted hashes are accepted; the basis
+      itself is surfaced by {!basis_for};
+    - [Some h] matching either, file absent -> [Ok None] (this symbol has no
+      side-file; the caller falls back to the dense columns);
+    - [Some h] matching either, file present -> [Ok (Some entries)] via
       {!Weekly_sidetable.read_file} (any decode failure surfaces as its
       [Error Internal]). *)
 

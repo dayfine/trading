@@ -18,12 +18,17 @@ val of_daily_bars : Types.Daily_price.t list -> Resistance_supply.sketch option
     family, trailing histogram, bars-seen), so the result is point-in-time and
     only as deep as the fetched history. When that history is shorter than 520
     weeks the sketch is honestly shallow — [bars_seen] reflects the true weekly
-    depth (capped at 520) rather than fabricating history. The result is
-    bit-equal to
+    depth (capped at 520) rather than fabricating history.
+
+    {b Basis (#2133).} The bars are rescaled onto the split/dividend-adjusted
+    basis ({!Snapshot_pipeline.Adjusted_basis.to_adjusted_basis}) before the
+    sketch is computed, so a split inside the fetched history no longer hides or
+    fabricates supply. The histogram anchor is therefore the last bar's
+    {e adjusted} close — matching an adjusted-basis warehouse's [Adjusted_close]
+    column, which the side-table reader anchors on. For split-free history this
+    is a no-op (factor 1.0), so the result stays bit-equal to
     [Snapshot_pipeline.Resistance_sketch.compute_windowed ~deep_bars:[||]
-     ~bars_arr] read at its last index, with the histogram anchor taken from the
-    last bar's raw [close_price] (matching {!Resistance_sketch_reader}, which
-    anchors on the snapshot [Close] column).
+     ~bars_arr] read at its last index.
 
     Returns [None] when [daily_bars] is empty (no bar to anchor the sketch).
     Pure function. *)

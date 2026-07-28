@@ -55,14 +55,24 @@ let read_sketch ~(cb : Snapshot_callbacks.t) ~symbol ~as_of :
       anchor_close;
     }
 
+(* Anchor column for a side-table basis (#2133): a Raw-basis side-table buckets
+   against the row's raw [Close] (bit-identical to pre-migration behaviour); an
+   Adjusted-basis one buckets against [Adjusted_close], so its adjusted weekly
+   high/mid and the anchor share one continuous scale. *)
+let _anchor_field_of_basis :
+    Weekly_sidetable_reader.basis -> Snapshot_schema.field = function
+  | Weekly_sidetable_reader.Raw -> Snapshot_schema.Close
+  | Weekly_sidetable_reader.Adjusted -> Snapshot_schema.Adjusted_close
+
 (* v5 leaf: derive the sketch from the loaded side-table, anchored at the row's
-   raw [Close] (still a dense column — only the [Res_*] histogram columns are
-   retired by v5). A failed [Close] read collapses to [None], the same
-   partial-read discipline [read_sketch] applies. *)
-let _read_sketch_v5 ~(cb : Snapshot_callbacks.t) ~symbol ~as_of ~entries =
+   close on the side-table's [basis] (still a dense column — only the [Res_*]
+   histogram columns are retired by v5). A failed anchor read collapses to
+   [None], the same partial-read discipline [read_sketch] applies. *)
+let _read_sketch_v5 ~(cb : Snapshot_callbacks.t) ~symbol ~as_of ~entries ~basis
+    =
   match
     cb.Snapshot_callbacks.read_field ~symbol ~date:as_of
-      ~field:Snapshot_schema.Close
+      ~field:(_anchor_field_of_basis basis)
   with
   | Ok close ->
       Some (Weekly_sidetable_reader.sketch_of_entries ~entries ~as_of ~close)
@@ -102,20 +112,24 @@ let _dense_fallback_or_raise ~symbol ~armed ~sketch_warehouse :
   | None -> None
 
 let read ~(cb : Snapshot_callbacks.t) ~symbol ~as_of
-    ?(weekly_sidetable : Weekly_sidetable.entry list option) ?(armed = false)
+    ?(weekly_sidetable : Weekly_sidetable.entry list option)
+    ?(sidetable_basis = Weekly_sidetable_reader.Raw) ?(armed = false)
     ?(sketch_warehouse = false) () : Resistance_supply.sketch option =
   match weekly_sidetable with
-  | Some entries -> _read_sketch_v5 ~cb ~symbol ~as_of ~entries
+  | Some entries ->
+      _read_sketch_v5 ~cb ~symbol ~as_of ~entries ~basis:sidetable_basis
   | None ->
       _dense_fallback_or_raise ~symbol ~armed ~sketch_warehouse
         (read_sketch ~cb ~symbol ~as_of)
 
-let closure ?snapshot_cb ?stock_symbol ?weekly_sidetable ?(armed = false)
+let closure ?snapshot_cb ?stock_symbol ?weekly_sidetable
+    ?(sidetable_basis = Weekly_sidetable_reader.Raw) ?(armed = false)
     ?(sketch_warehouse = false) ~(stock : Snapshot_bar_views.weekly_view) () :
     unit -> Resistance_supply.sketch option =
   match (snapshot_cb, stock_symbol) with
   | Some cb, Some symbol when stock.n > 0 ->
       let as_of = stock.dates.(stock.n - 1) in
       fun () ->
-        read ~cb ~symbol ~as_of ?weekly_sidetable ~armed ~sketch_warehouse ()
+        read ~cb ~symbol ~as_of ?weekly_sidetable ~sidetable_basis ~armed
+          ~sketch_warehouse ()
   | _ -> fun () -> None

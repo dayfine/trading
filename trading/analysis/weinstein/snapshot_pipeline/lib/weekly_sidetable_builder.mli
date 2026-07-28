@@ -9,9 +9,13 @@
     weekly series the sketch buckets. This is what makes the point-in-time
     invariants hold {e by construction}:
 
-    - {b raw (unadjusted) basis}: [high] is the weekly bar's raw high, [mid] is
-      [(high +. low) /. 2.0] of the raw weekly bar — matching the v1 resistance
-      mapper (never the adjusted close);
+    - {b split/dividend-adjusted basis} (#2133): the daily bars are rescaled
+      onto the adjusted basis ({!Adjusted_basis.to_adjusted_basis}) before the
+      weekly fold, so [high] / [mid] lie on the continuous [adjusted_close]
+      scale and a split inside the lookback window no longer hides or fabricates
+      supply. The warehouse stamps
+      {!Data_panel_snapshot.Weekly_sidetable.format_hash} (the adjusted-basis
+      hash) so the reader anchors these entries at [Adjusted_close];
     - {b partial current week}: the trailing entry is the current (possibly
       partial) week aggregated through the last daily bar, since
       {!Weekly_prefix} includes the partial week. *)

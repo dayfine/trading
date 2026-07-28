@@ -71,5 +71,11 @@ let build ~warehouse_dir ~as_of ~warmup_days
      gates the armed sketch-reader loud-fail so a real v5 warehouse still fails
      loud on a missing scored-symbol side-table (2026-07-23 promotion). *)
   let sketch_warehouse = Option.is_some manifest_format_hash in
+  (* Side-table price basis (#2133): resolved from the manifest format hash so
+     the reader anchors the sketch at [Close] (raw) or [Adjusted_close]
+     (adjusted). An unrecognized hash raises (loud staleness). *)
+  let sidetable_basis =
+    Weekly_sidetable_reader.basis_for ~manifest_format_hash
+  in
   Bar_reader.of_snapshot_views ~calendar ~weekly_sidetable_loader
-    ~sketch_warehouse callbacks
+    ~sketch_warehouse ~sidetable_basis callbacks
