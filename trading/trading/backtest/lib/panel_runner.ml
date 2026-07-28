@@ -211,8 +211,15 @@ let _build_snapshot_bar_reader ~daily_panels ~calendar ~snapshot_dir ~manifest =
      but an in-process CSV / non-sketch snapshot ([None] hash) degrades to the v1
      grade instead of crashing when resistance scoring is armed by default. *)
   let sketch_warehouse = Option.is_some manifest_format_hash in
+  (* Side-table price basis (#2133): the manifest format hash decides whether the
+     warehouse's side-tables are raw or adjusted; the reader anchors the sketch
+     at [Close] (raw) or [Adjusted_close] (adjusted) accordingly. An unrecognized
+     hash raises (loud staleness). *)
+  let sidetable_basis =
+    Weinstein_strategy.Weekly_sidetable_reader.basis_for ~manifest_format_hash
+  in
   Weinstein_strategy.Bar_reader.of_snapshot_views ~calendar
-    ~weekly_sidetable_loader ~sketch_warehouse callbacks
+    ~weekly_sidetable_loader ~sketch_warehouse ~sidetable_basis callbacks
 
 let _create_panels ~snapshot_dir ~manifest =
   Daily_panels.create ~snapshot_dir ~manifest

@@ -240,6 +240,7 @@ let _split_factor_of_weekly_view (weekly : Snapshot_bar_views.weekly_view) :
 
 let stock_analysis_callbacks_of_weekly_views ?ma_cache ?stock_symbol
     ?resistance_stock ?snapshot_cb ?weekly_sidetable ?(sketch_warehouse = false)
+    ?(sidetable_basis = Weekly_sidetable_reader.Raw)
     ~(config : Stock_analysis.config) ~(stock : Snapshot_bar_views.weekly_view)
     ~(benchmark : Snapshot_bar_views.weekly_view) () : Stock_analysis.callbacks
     =
@@ -257,7 +258,7 @@ let stock_analysis_callbacks_of_weekly_views ?ma_cache ?stock_symbol
          (not a sketch warehouse) degrades to the v1 grade even when armed by
          default (2026-07-23 promotion). *)
       Resistance_sketch_reader.closure ?snapshot_cb ?stock_symbol
-        ?weekly_sidetable ~sketch_warehouse
+        ?weekly_sidetable ~sidetable_basis ~sketch_warehouse
         ~armed:
           (Option.is_some config.Stock_analysis.overhead_supply
           || config.Stock_analysis.virgin_crossing_readmission)

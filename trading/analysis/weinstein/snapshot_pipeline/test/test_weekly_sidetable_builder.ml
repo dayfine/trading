@@ -104,6 +104,62 @@ let test_trailing_partial_week_included _ =
           (fun (e : Weekly_sidetable.entry) -> e.week_end_date)
           (equal_to (_day ~w:1 ~d:1))))
 
+(* ----- adjusted basis: a split inside the window lands on one scale (#2133) -----
+
+   A raw-close bar with a distinct [adjusted_close]. A 4:1 forward split means
+   pre-split raw prices are 4x the adjusted; the builder rescales onto the
+   adjusted basis, so pre-split weekly high/mid land on the SAME scale as the
+   post-split weeks (not 4x above them). *)
+let _adj_bar ~date ~close ~high ~low ~adjusted_close () : Types.Daily_price.t =
+  {
+    Types.Daily_price.date;
+    open_price = close;
+    high_price = high;
+    low_price = low;
+    close_price = close;
+    volume = 1_000;
+    adjusted_close;
+    active_through = None;
+  }
+
+let test_split_rescaled_to_adjusted_basis _ =
+  (* Week 0 pre-split: raw ~100-104, adjusted_close 25 (factor 0.25) -> rescaled
+     weekly high 26, mid 25. Week 1 post-split: raw ~25-26, adjusted_close 25
+     (factor 1) -> weekly high 26, mid 25. Without the rescale, week 0's entry
+     high would be the raw 104 — a phantom supply wall 4x above the real one. *)
+  let week ~w ~raw_close ~raw_high ~raw_low ~adj =
+    List.init 5 ~f:(fun d ->
+        _adj_bar ~date:(_day ~w ~d) ~close:raw_close ~high:raw_high ~low:raw_low
+          ~adjusted_close:adj ())
+  in
+  let bars =
+    week ~w:0 ~raw_close:100.0 ~raw_high:104.0 ~raw_low:96.0 ~adj:25.0
+    @ week ~w:1 ~raw_close:25.0 ~raw_high:26.0 ~raw_low:24.0 ~adj:25.0
+  in
+  assert_that
+    (Weekly_sidetable_builder.of_bars ~deep_bars:[] ~bars)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (e : Weekly_sidetable.entry) -> e.high)
+               (float_equal 26.0);
+             field
+               (fun (e : Weekly_sidetable.entry) -> e.mid)
+               (float_equal 25.0);
+           ];
+         all_of
+           [
+             field
+               (fun (e : Weekly_sidetable.entry) -> e.high)
+               (float_equal 26.0);
+             field
+               (fun (e : Weekly_sidetable.entry) -> e.mid)
+               (float_equal 25.0);
+           ];
+       ])
+
 (* ----- empty input ----- *)
 
 let test_empty _ =
@@ -119,6 +175,8 @@ let suite =
          "matches daily_to_weekly (with deep)"
          >:: test_matches_daily_to_weekly_with_deep;
          "raw high + mid basis" >:: test_raw_high_and_mid_basis;
+         "split rescaled to adjusted basis"
+         >:: test_split_rescaled_to_adjusted_basis;
          "trailing partial week included"
          >:: test_trailing_partial_week_included;
          "empty input" >:: test_empty;

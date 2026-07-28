@@ -1,9 +1,13 @@
 open Core
 module Weekly_sidetable = Data_panel_snapshot.Weekly_sidetable
 
-(* One weekly bar -> one side-table entry, raw (unadjusted) basis: [high] is the
-   weekly raw high, [mid] the raw [(H + L) / 2] — mirrors [Resistance_sketch]'s
-   [_accumulate_hist] mid/high, which gate + bucket off the same raw fields. *)
+(* One weekly bar -> one side-table entry, split/dividend-ADJUSTED basis (#2133):
+   [high] is the weekly high, [mid] the [(H + L) / 2], both taken after the daily
+   bars are rescaled onto the adjusted basis by {!Adjusted_basis.to_adjusted_basis}
+   below. A split inside the lookback window therefore no longer hides real supply
+   (forward split) or fabricates phantom supply (reverse split). The manifest
+   stamps [Weekly_sidetable.format_hash] (the adjusted-basis hash) so the reader
+   anchors these entries at the row's [Adjusted_close] column. *)
 let _entry_of_weekly (b : Types.Daily_price.t) : Weekly_sidetable.entry =
   {
     week_end_date = b.date;
@@ -12,7 +16,12 @@ let _entry_of_weekly (b : Types.Daily_price.t) : Weekly_sidetable.entry =
   }
 
 let of_bars ~deep_bars ~bars : Weekly_sidetable.entry list =
-  let combined = Array.of_list (deep_bars @ bars) in
+  (* Pin the weekly aggregation to the adjusted basis BEFORE folding weeks, so
+     the entry high/mid are on the same continuous scale as [Adjusted_close]. *)
+  let combined =
+    List.map (deep_bars @ bars) ~f:Adjusted_basis.to_adjusted_basis
+    |> Array.of_list
+  in
   let n = Array.length combined in
   if n = 0 then []
   else

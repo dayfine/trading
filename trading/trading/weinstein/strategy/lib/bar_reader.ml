@@ -42,12 +42,14 @@ type t = {
   snapshot_callbacks : Snapshot_callbacks.t;
   weekly_sidetable_for : symbol:string -> Weekly_sidetable.entry list option;
   sketch_warehouse : bool;
+  sidetable_basis : Weekly_sidetable_reader.basis;
 }
 
 let ma_cache t = t.ma_cache
 let snapshot_callbacks t = t.snapshot_callbacks
 let weekly_sidetable_for t = t.weekly_sidetable_for
 let sketch_warehouse t = t.sketch_warehouse
+let sidetable_basis t = t.sidetable_basis
 
 (* Memoize the per-symbol sketch-v5 side-table load: the [.weekly] file for a
    symbol is read (and manifest-format-hash-gated) at most once per reader, then
@@ -117,6 +119,7 @@ let empty () =
     snapshot_callbacks = _empty_snapshot_callbacks;
     weekly_sidetable_for = _memoized_sidetable_for None;
     sketch_warehouse = false;
+    sidetable_basis = Weekly_sidetable_reader.Raw;
   }
 
 (* {1 Snapshot-backed constructor (Phase F.2 PR 2)}
@@ -173,7 +176,8 @@ let _snapshot_daily_view_for ?calendar cb ~symbol ~as_of ~lookback =
   Snapshot_bar_views.daily_view_for cb ~symbol ~as_of ~lookback ~calendar
 
 let of_snapshot_views ?calendar ?weekly_sidetable_loader
-    ?(sketch_warehouse = false) (cb : Snapshot_runtime.Snapshot_callbacks.t) =
+    ?(sketch_warehouse = false) ?(sidetable_basis = Weekly_sidetable_reader.Raw)
+    (cb : Snapshot_runtime.Snapshot_callbacks.t) =
   {
     daily_bars_for = _snapshot_daily_bars_for cb;
     weekly_bars_for = _snapshot_weekly_bars_for cb;
@@ -192,6 +196,12 @@ let of_snapshot_views ?calendar ?weekly_sidetable_loader
        resistance scoring armed-by-default degrades to the v1 grade instead of
        crashing. See {!Resistance_sketch_reader.read} (2026-07-23 promotion). *)
     sketch_warehouse;
+    (* The price basis of this warehouse's side-tables (#2133), resolved from the
+       manifest format hash by the caller. Threaded to
+       {!Resistance_sketch_reader} so an adjusted-basis side-table anchors at
+       [Adjusted_close]; [Raw] (the default) keeps the pre-migration [Close]
+       anchor. *)
+    sidetable_basis;
   }
 
 (* {1 In-memory-bars constructor (Phase F.3.a-1)}

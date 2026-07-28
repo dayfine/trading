@@ -313,6 +313,47 @@ let test_load_gated_absent_file_none _ =
            ~manifest_format_hash:(Some Weekly_sidetable.format_hash))
         (is_ok_and_holds is_none))
 
+(* ---- basis gating (#2133): the reader accepts BOTH the raw-basis and the
+   adjusted-basis format hashes and surfaces which basis a warehouse uses. ---- *)
+
+(* An OLD raw-basis warehouse's hash is still accepted (loads the side-table),
+   so pre-migration warehouses keep working with no rebuild. *)
+let test_load_gated_raw_basis_hash_loads _ =
+  _with_temp_dir (fun dir ->
+      _write_sidetable ~dir ~symbol:"AAA";
+      assert_that
+        (Reader.load_gated ~snapshot_dir:dir ~symbol:"AAA"
+           ~manifest_format_hash:(Some Weekly_sidetable.format_hash_raw_basis))
+        (is_ok_and_holds
+           (is_some_and
+              (elements_are (List.map _sample_entries ~f:(fun e -> equal_to e))))))
+
+(* basis_for maps each recognized hash to its basis; None defaults to Raw. *)
+let test_basis_for_recognized_hashes _ =
+  assert_that
+    ( Reader.basis_for ~manifest_format_hash:(Some Weekly_sidetable.format_hash),
+      Reader.basis_for
+        ~manifest_format_hash:(Some Weekly_sidetable.format_hash_raw_basis),
+      Reader.basis_for ~manifest_format_hash:None )
+    (all_of
+       [
+         field (fun (adj, _, _) -> adj) (equal_to Reader.Adjusted);
+         field (fun (_, raw, _) -> raw) (equal_to Reader.Raw);
+         field (fun (_, _, none) -> none) (equal_to Reader.Raw);
+       ])
+
+(* An unrecognized hash raises (loud staleness) rather than guessing a basis. *)
+let test_basis_for_unknown_hash_raises _ =
+  let raised =
+    match
+      Result.try_with (fun () ->
+          Reader.basis_for ~manifest_format_hash:(Some "not-a-known-hash"))
+    with
+    | Ok _ -> false
+    | Error _ -> true
+  in
+  assert_that raised (equal_to true)
+
 let suite =
   "Weekly_sidetable_reader"
   >::: [
@@ -326,6 +367,10 @@ let suite =
          >:: test_load_gated_hash_mismatch_errors;
          "load_gated no hash None" >:: test_load_gated_no_hash_none;
          "load_gated absent file None" >:: test_load_gated_absent_file_none;
+         "load_gated raw-basis hash loads"
+         >:: test_load_gated_raw_basis_hash_loads;
+         "basis_for recognized hashes" >:: test_basis_for_recognized_hashes;
+         "basis_for unknown hash raises" >:: test_basis_for_unknown_hash_raises;
        ]
 
 let () = run_test_tt_main suite

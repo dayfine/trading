@@ -32,11 +32,21 @@
     {2 Semantics (built by [Weekly_sidetable_builder], consumed by the PR 2
     reader)}
 
-    Each entry is one weekly bar of the symbol's history, {b raw (unadjusted)}
-    basis matching the v1 resistance mapper:
+    Each entry is one weekly bar of the symbol's history:
     - [week_end_date]: the date of the last daily bar in that ISO week;
     - [mid = (weekly_high +. weekly_low) /. 2.0];
-    - [high = weekly_high] (raw, not adjusted).
+    - [high = weekly_high].
+
+    {b Basis (#2133).} The [mid] / [high] price basis is recorded by the
+    warehouse manifest's [weekly_sidetable_format_hash], not by this format: a
+    warehouse stamped with {!format_hash_raw_basis} carries RAW weekly high/mid
+    (the pre-migration builder, matching the v1 resistance mapper), while one
+    stamped with {!format_hash} carries split/dividend-ADJUSTED high/mid (the
+    #2133 builder rescales onto the adjusted basis so a split inside the
+    lookback window no longer hides or fabricates supply). The reader anchors
+    the sketch at the raw [Close] column for the raw basis and at
+    [Adjusted_close] for the adjusted basis; the on-disk byte layout is
+    identical for both.
 
     The trailing entry is the current (possibly partial) week as of the last
     daily bar — the same [include_partial_week:true] aggregation the resistance
@@ -58,11 +68,19 @@ val magic : string
 val format_version : int
 (** On-disk format version this module writes and accepts (1). *)
 
+val format_hash_raw_basis : string
+(** The pre-#2133 hash, stamped by warehouses whose side-table entries carry RAW
+    weekly high/mid. Retained so the reader still recognizes and correctly
+    anchors (at the raw [Close] column) side-tables produced before the basis
+    migration. Never stamped on new builds — the builder stamps {!format_hash}.
+*)
+
 val format_hash : string
-(** Stable hex hash over ([magic], [format_version]). Recorded in the warehouse
-    manifest so a reader can detect and gate a side-table produced under a
-    different format. Changes iff {!magic} or {!format_version} changes — a
-    version bump is therefore loud (the manifest hash moves). *)
+(** Stable hex hash identifying the {b adjusted-basis} (#2133) side-table
+    format. Recorded in the warehouse manifest so a reader can detect the basis
+    and gate a side-table produced under an unrecognized format. Distinct from
+    {!format_hash_raw_basis} (the hashed content carries an adjusted-basis
+    suffix); a {!format_version} bump moves both hashes (loud). *)
 
 val encode : entry list -> bytes
 (** [encode entries] serializes [entries] to the binary layout above, in list

@@ -84,7 +84,20 @@ let test_unsupported_version_rejected _ =
 
 let test_format_hash_pinned _ =
   assert_that Weekly_sidetable.format_hash
-    (equal_to "90f2e86aef383e4da1cd4117ce360833")
+    (equal_to "128e4c1ec66f14b08398cbdda0e9a367")
+
+(* The raw-basis (#2133 pre-migration) hash is a distinct pinned literal — the
+   two bases must never collide, else the reader could not tell them apart. *)
+let test_format_hash_raw_basis_pinned _ =
+  assert_that
+    (Weekly_sidetable.format_hash_raw_basis, Weekly_sidetable.format_hash)
+    (all_of
+       [
+         field
+           (fun (raw, _) -> raw)
+           (equal_to "90f2e86aef383e4da1cd4117ce360833");
+         field (fun (raw, adj) -> String.equal raw adj) (equal_to false);
+       ])
 
 let suite =
   "weekly_sidetable"
@@ -99,6 +112,7 @@ let suite =
          "shorter than header rejected" >:: test_short_of_header_rejected;
          "unsupported version rejected" >:: test_unsupported_version_rejected;
          "format hash pinned" >:: test_format_hash_pinned;
+         "format hash raw-basis pinned" >:: test_format_hash_raw_basis_pinned;
        ]
 
 let () = run_test_tt_main suite
