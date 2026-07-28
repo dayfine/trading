@@ -30,6 +30,16 @@ Run-D record-of-record below.**
 | **Promoted bundle (RECORD)** | **+8,689%** | **30.3%** | 1,170 | 38.4% | `staging-leverf-28y/top3000-2000-2026-rcb-f000.sexp` (out-of-repo staging) | commit `6a2d9b426` (PR #2047) |
 | Pre-bundle (Run D, superseded) | +7,914% | 32.3% | 1,187 | — | `staging-record-convention/top3000-2000-2026-record-convention.sexp` | commit `0a2e4562d` (PR #1960) |
 
+> ⚠ **Split-basis caveat (2026-07-28):** this row was measured on
+> **split-blind** resistance side-tables (#2133). On the split-safe clone of
+> the same warehouse the same scenario measures **+8,366.8% / MaxDD 37.1% /
+> 1,122 trades** (raw control reproduced this row exactly) — the return
+> flattering is mild (−322pp) but the **MaxDD was flattered by 6.8pp**.
+> Ledger `2026-07-28-split-basis-blast-radius`; memo
+> `dev/notes/split-basis-blast-radius-2026-07-28.md`. Re-pinning the record
+> to the honest numbers is a pending user decision; the fold-level promotion
+> evidence for the bundle is not yet re-certified on the honest basis.
+
 Same-window comparator: **SPY total return +706%** (dividend-adjusted). Standing
 caveats as in the Run-D block below: single path; terminal MTM concentrated on a
 few fat-tail winners; MTM ≠ realized; broad universe includes untradeable
