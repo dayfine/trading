@@ -2,7 +2,7 @@
   "date": "2026-07-27",
   "feature": "weekly-snapshot",
   "branch": "feat/picks-validator-v1",
-  "recorded_at_ns": 1785195978728041165,
+  "recorded_at_ns": 1785197074703804728,
   "structural_qc": "APPROVED",
   "behavioral_qc": "NEEDS_REWORK",
   "overall_qc": "NEEDS_REWORK",
