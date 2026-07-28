@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-28 run1 (orchestrator run 30340958135 — main green throughout, verified via CI on the exact HEAD `e34474e5`. Merged this run: #2143 (H-RUNENV-WORKTREE-BLIND — the false-green that had been invalidating worktree verification repo-wide), #2146 (Current-milestone marker, re-arming the linter-expiry subsystem). #2145 reworked off a red CI, then behavioral NEEDS_REWORK q2 on two surviving mutations; rework 1/2 in flight.)
+Last updated: 2026-07-28 run3 (orchestrator run 30393663268 — main green throughout, verified via CI on the exact HEAD `9f50de92`. Merged this run: #2149 (run 2's stranded summary + 31 recovered budget records), #2152 (cholesky SPD docstring; the originating finding's own numbers were wrong), and #2148 (H-CHECK-CACHE-BLIND closed — 23 exposed rules → 0). Run 2's workflow FAILED at the bundling step — diagnosed and filed as A-WORKTREE-BLOCKS-BUNDLE; its lost $36.82 cost record was reconstructed from the job log.)
 
 ## Active + complete tracks
 
@@ -43,9 +43,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2143 MERGED `916825fb` (H-RUNENV-WORKTREE-BLIND false-green); next: H-CHECK-CACHE-BLIND — ~25 checks lack `(universe)` |
-| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | Phase 1 stable; 4 open: A-BUDGET-ORPHAN, A-SUMMARY-STALE-FALLBACK, A-GIT-SAFE-DIRECTORY (git exit 128 at every run start), PR-D'c |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2146 MERGED `d37f94a8` — `Current milestone: M5` marker re-arms check_11_linter_expiry; 9 open; next: test_pin on `test_bayesian_opt_cholesky.ml` |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2148 MERGED `751de67d` — H-CHECK-CACHE-BLIND closed: 20 rules gain `(universe)`, 3 proven exempt, self-covering guard; next: H-CHECK-SETE-DIAGNOSTICS audit |
+| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 5 open; A-WORKTREE-BLOCKS-BUNDLE is new (run 2 failed outright, cost record destroyed); then A-GIT-SAFE-DIRECTORY, A-BUDGET-ORPHAN |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2152 MERGED `14270b57` — cholesky SPD docstring; the finding's own numbers were wrong (λ_min 1.83, not 1.69); 10 open; next: linter_exception_expired |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |

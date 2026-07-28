@@ -1,0 +1,28 @@
+{
+  "run_id": "2026-07-28-30380136239",
+  "timestamp": "2026-07-28T17:28:25Z",
+  "commit_sha": "16d28ed4da2fca4e4f9ed896e69788366c581d1c",
+  "measurement_source": "claude-code-action execution_file (total_cost_usd from SDKResultMessage) — RECONSTRUCTED from workflow job log by orchestrator run 30393663268",
+  "fallback_branch": "1b",
+  "notes": "total_cost_usd covers entire orchestrator run including all internally-spawned subagents (Agent tool calls). Per-subagent breakdown not available from action output — see dev/status/cost-tracking.md for limitation details. RECONSTRUCTION NOTE: run 30380136239's 'Bundle budget into daily summary and auto-merge' step failed with 'fatal: ops/daily-2026-07-28-run2 is already checked out at /tmp/ops-run2' (exit 128) AFTER its git checkout had already removed the generated dev/budget/2026-07-28-30380136239.json from the working tree, so this record was never committed to any branch — not even to the ops/budget-* orphan fallback. The value below is transcribed verbatim from the 'Capture run cost from execution file' step output in job 90345668781 (total_cost_usd: 36.8157645, num_turns: 125, duration_ms: 2018105). Filed as A-WORKTREE-BLOCKS-BUNDLE in dev/status/orchestrator-automation.md.",
+  "subagents": [
+    {
+      "name": "orchestrator-total",
+      "model": "sonnet",
+      "input_tokens": null,
+      "output_tokens": null,
+      "cache_read_input_tokens": null,
+      "cache_creation_input_tokens": null,
+      "estimated_cost_usd": null,
+      "note": "Per-subagent breakdown not available from claude-code-action. total_cost_usd in totals covers all spawned subagents."
+    }
+  ],
+  "totals": {
+    "input_tokens": null,
+    "output_tokens": null,
+    "cache_read_input_tokens": null,
+    "cache_creation_input_tokens": null,
+    "total_cost_usd": 36.8157645,
+    "measurement": "measured from claude-code-action execution_file total_cost_usd; reconstructed from job log after the bundling step lost the generated file"
+  }
+}

@@ -1,4 +1,4 @@
-Reviewed SHA: 1fbb08ddfe8c97dd8112af66dbbd980e37b00ad3
+Reviewed SHA: 7d818fd772e2f62fff73081d94cab2f3f898840d
 
 # QC review — cleanup track
 
@@ -281,3 +281,62 @@ worktree-discipline near-miss in two runs.
 ## Verdict
 
 APPROVED
+
+## PR #2152 — `cleanup/cholesky-spd-justification` (MERGED `14270b57`)
+
+Rewrote the docstring on `_well_conditioned_spd` in
+`trading/trading/backtest/tuner/test/test_bayesian_opt_cholesky.ml`. The old text
+claimed the fixture was "strictly diagonally dominant (hence positive-definite)";
+that justification is false. Comment-only — `dune runtest` exit code unchanged,
+8/8 tests in `test_bayesian_opt_cholesky.exe` pass identically.
+
+**The originating finding's numbers were themselves wrong**, and the review caught
+it. The finding (2026-07-27 run 2 qc-behavioral FLAG-A on PR #2113) claimed
+dominance broke at n=100 with λ_min ≈ 1.69. Three independent measurements — the
+implementer's pure-OCaml power iteration, the orchestrator's Python power
+iteration, and the behavioral reviewer's LDL^T negative-pivot count with bisection
+(a *certificate* via Sylvester's law of inertia, not an estimate) — agree instead:
+
+| n | rows violating dominance | worst margin | λ_min |
+|---|---|---|---|
+| 4 | 0/4 | +1.4583 | 1.8691 |
+| 32 | 9/32 | −0.4101 | 1.8289 |
+| 100 | 61/100 | −1.5086 | 1.8278 |
+
+Dominance first fails at **n=32** among `_certified_sizes` (n=21 in absolute
+terms), not n=100. λ_min ≈ **1.83**, not 1.69. The reviewer diagnosed the origin of
+the wrong figure: 1.69 is within rounding of `1 + ln 2 = 1.6931`, the Toeplitz-symbol
+lower bound for this matrix — **a valid lower bound reported as if it were the
+eigenvalue**. Recorded because it is a repeatable failure mode: the number looked
+plausible precisely because it was a correct bound for a different question.
+
+Note Gershgorin cannot settle this fixture: for a symmetric matrix its lower bound
+*is* the diagonal-dominance margin, which is negative here. That is exactly why the
+old docstring's reasoning failed, and the orchestrator's initial suggestion to use
+Gershgorin was withdrawn mid-review for the same reason.
+
+Two non-blocking FLAGs on wording, neither materially misleading: "from n=32 on" is
+scoped to certified sizes (absolute first failure is n=21), and "~1.83 at every
+size" rounds to 1.87 at n=4. "Well-conditioned" was confirmed rather than assumed:
+κ = λ_max/λ_min ranges 2.21–3.54.
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+Rework iterations: 0.
+
+Full verdicts are PR review comments on #2152 (the authoritative channel per
+PR-D'a): structural `4801535251` (quality 5), behavioral `4801657407` (quality 4).
+
+Both reviews were posted at tip `7d818fd7`. The branch was then `update-branch`d to
+`46ff6510` (a merge of main, PR content byte-unchanged) before merging as `14270b57`;
+CI was re-verified green on `46ff6510` immediately before the merge.
+
+## Quality Score
+
+4 — Correct, minimal, and the review upgraded it from "replaces a stale claim" to
+"replaces a stale claim with an independently triple-verified one, and explains why
+the original was wrong."
+
+Reviewed SHA: 7d818fd772e2f62fff73081d94cab2f3f898840d

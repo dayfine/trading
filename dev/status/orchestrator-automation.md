@@ -591,6 +591,79 @@ convention above is the cheap mitigation.
   bookkeeping no longer needs it. Verify: a run whose first `git status` succeeds
   without the agent configuring anything.
 
+### A-WORKTREE-BLOCKS-BUNDLE — the orchestrator's own Step 8 worktree makes the bundling step fail, and the failure destroys the cost record
+
+- [ ] **A-WORKTREE-BLOCKS-BUNDLE — a worktree left on the `ops/daily-*` branch
+  makes `Bundle budget into daily summary and auto-merge` exit 128, which strands
+  the summary PR, skips the escalation gate, and permanently loses the run's
+  budget record.** Owner: harness-maintainer. **This is the first observed
+  orchestrator run to fail outright** (`30380136239`, 2026-07-28 run 2,
+  `conclusion: failure`); the five runs before it that day all reported `success`.
+
+  **Root cause, verbatim from job `90345668781`:**
+
+  ```
+  Found ops/daily-* PR #2149 on branch ops/daily-2026-07-28-run2; bundling budget JSON.
+  HEAD is now at 16d28ed4 ops: daily orchestrator summary 2026-07-28 (#2147)
+  Removing dev/budget/2026-07-28-30380136239.json
+   * branch              ops/daily-2026-07-28-run2 -> FETCH_HEAD
+  fatal: 'ops/daily-2026-07-28-run2' is already checked out at '/tmp/ops-run2'
+  ##[error]Process completed with exit code 128.
+  ```
+
+  The orchestrator agent had created a worktree at `/tmp/ops-run2` for its Step 8
+  push and left it in place at exit. Git refuses to check out a branch that is
+  already checked out in another worktree, so the workflow's checkout-based
+  bundling step cannot proceed.
+
+  **Why the damage exceeds the failure.** Note the ordering: `Removing
+  dev/budget/2026-07-28-30380136239.json` executes *before* the fatal. The step's
+  `git checkout` had already deleted the freshly-generated record from the working
+  tree; the fatal then aborted before anything was committed. The record therefore
+  reached **neither** the PR **nor** the `ops/budget-*` orphan fallback that
+  A-BUDGET-ORPHAN describes — it was destroyed outright. Confirmed: no
+  `ops/budget-2026-07-28-30380136239` branch exists, while all four other runs
+  that day have one. The value (`$36.82`, 125 turns, 33.6 min) was recoverable
+  only by transcribing it out of the job log, which run 3 did; it is reconstructed
+  at `dev/budget/2026-07-28-30380136239.json` with provenance recorded in its
+  `measurement_source`. **A-BUDGET-ORPHAN under-describes the risk: records are not
+  merely stranded, they can be lost.**
+
+  **Second-order damage.** `Fail on escalations` (step 10) is `skipped` when step 9
+  fails, so the escalation gate did not run for this run at all — the same
+  unsoundness A-SUMMARY-STALE-FALLBACK describes, reached by a different path. And
+  PR #2149 sat unmerged until the next run merged it by hand, which also delayed
+  the 31-record budget backfill it carried.
+
+  **Why this is systemic, not a one-off slip.** Step 4's GHA guidance
+  (`git checkout -b` in the shared tree) is wrong and corrupts
+  `/__w/trading/trading`, so every recent run has overridden it with `git worktree
+  add` — runs 1, 2 and 3 all did, and all said so in their summaries. The workflow's
+  bundling step was written against the *original* checkout-based assumption. So the
+  workaround for one defect now triggers another: the more faithfully an
+  orchestrator follows current best practice, the more likely its run fails at
+  step 9. Any run that leaves a worktree on its own summary branch is exposed.
+
+  **Fix — any one of these closes it; (a) is cheapest and most robust:**
+  (a) make the bundling step worktree-proof: `git worktree prune` plus an explicit
+      `git worktree remove` for any worktree holding the target branch, or avoid
+      checkout entirely by pushing the budget file via the Contents API / a
+      detached `git fetch` + `git commit-tree` path;
+  (b) commit the budget record *before* any checkout that can remove it, so a later
+      fatal cannot destroy it — this alone converts total loss into the milder
+      A-BUDGET-ORPHAN case;
+  (c) fix Step 4's GHA guidance so agents stop needing worktrees (does not help
+      until the spec write-block is lifted, and does not protect against agents that
+      use worktrees anyway).
+
+  **Interim mitigation, applicable now with no workflow change:** the orchestrator
+  must `git worktree remove` any worktree on its `ops/daily-*` branch before
+  exiting. Run 3 avoided the failure by pushing its summary without leaving a
+  worktree on the branch.
+
+  Verify: a run that creates a worktree on its summary branch, removes it, and
+  reaches `Fail on escalations` with the budget record committed to the PR.
+
 ## Completed work
 
 ### Orchestrator idempotency — Step 1.5 dispatch guard + structured summary format
