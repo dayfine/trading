@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-28 run3 (orchestrator run 30393663268 — main green throughout, verified via CI on the exact HEAD `9f50de92`. Merged this run: #2149 (run 2's stranded summary + 31 recovered budget records), #2152 (cholesky SPD docstring; the originating finding's own numbers were wrong), and #2148 (H-CHECK-CACHE-BLIND closed — 23 exposed rules → 0). Run 2's workflow FAILED at the bundling step — diagnosed and filed as A-WORKTREE-BLOCKS-BUNDLE; its lost $36.82 cost record was reconstructed from the job log.)
+Last updated: 2026-07-28 run4 (orchestrator run 30405186411 — main green throughout, verified on the exact starting HEAD `6f89d1b0` and again on the merged tip `14e14b24`. Merged this run: #2155 (closes the three FLAG residuals qc-behavioral raised on #2148 — recursive candidate scan + `review_at` required on `universe_deps_exceptions.conf`; both gates APPROVED q5/q5, zero rework iterations). Step 0.5's saturated-queue fast-exit passed all four conditions but was overridden: Condition 1 passes vacuously on an empty queue — filed as A-FASTEXIT-VACUOUS. Maintainer landed #2156 (the #2133 blast-radius ledger) mid-run.)
 
 ## Active + complete tracks
 
@@ -43,8 +43,8 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2148 MERGED `751de67d` — H-CHECK-CACHE-BLIND closed: 20 rules gain `(universe)`, 3 proven exempt, self-covering guard; next: H-CHECK-SETE-DIAGNOSTICS audit |
-| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 5 open; A-WORKTREE-BLOCKS-BUNDLE is new (run 2 failed outright, cost record destroyed); then A-GIT-SAFE-DIRECTORY, A-BUDGET-ORPHAN |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2155 MERGED `14e14b24` — #2148's three FLAG residuals closed (recursive scan; `review_at` enforced); 22 open; next: H-CHECK-SETE-DIAGNOSTICS repo-wide audit |
+| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 7 open; A-FASTEXIT-VACUOUS + A-FINISH-PROTOCOL-BACKGROUND new; the three workflow-edit items still blocked on a `workflow`-scoped token |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2152 MERGED `14270b57` — cholesky SPD docstring; the finding's own numbers were wrong (λ_min 1.83, not 1.69); 10 open; next: linter_exception_expired |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |

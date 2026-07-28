@@ -1,0 +1,18 @@
+{
+  "date": "2026-07-28",
+  "feature": "harness",
+  "branch": "harness/check-universe-deps-residuals",
+  "recorded_at_ns": 1785282354331944223,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 2
+  },
+  "consecutive_rework_count": 0,
+  "notes": "PR #2155, merged 14e14b24. Closes the three FLAG residuals qc-behavioral raised on #2148: FLAG-1 (universe_deps_exceptions.conf unconstrained -> review_at now required, hard-FAIL per-PR + weekly expiry via check_11_linter_expiry.sh), FLAG-2 (candidate scan non-recursive -> now find-based; deep_scan/_lib.sh + deep_scan/main.sh resolved via exceptions with dune-verified evidence), FLAG-3 (doc nit). Zero rework iterations. Reviews 4802689287 (structural q5) + 4802708124 (behavioral q5) posted at d74a4952; branch update-branch'd to 40ba0564 (merge of main, content byte-unchanged), CI re-verified green there before merge. Behavioral ran 12 mutations incl. a negative control reproducing the FLAG-2 blind spot pre-fix; 1 non-blocking survivor (shape-only date regex accepts 2026-13-45), mirrors pre-existing linter_exceptions.conf laxity."
+}
