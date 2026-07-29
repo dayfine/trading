@@ -1,6 +1,8 @@
 open Core
 open Trading_base.Types
 
+type anchor_mode = Wick | Close [@@deriving show, eq, sexp]
+
 (* ---- Callback bundle ---- *)
 
 type callbacks = {
@@ -60,17 +62,25 @@ let callbacks_from_bars ~bars ~as_of ~lookback_bars =
 
 (* ---- Side-specific extractors ---- *)
 
-(* Anchor extreme reader for the given side:
-   Long  → callbacks.get_high (the peak high we anchor to).
-   Short → callbacks.get_low  (the trough low we anchor to). *)
-let _anchor_reader ~side ~callbacks =
-  match side with Long -> callbacks.get_high | Short -> callbacks.get_low
+(* Anchor extreme reader for the given side/mode:
+   Wick  → Long: callbacks.get_high (peak high); Short: callbacks.get_low.
+   Close → callbacks.get_close for both sides (the anchoring peak/trough is
+           measured on the close instead of the intraday extreme). *)
+let _anchor_reader ~mode ~side ~callbacks =
+  match mode with
+  | Close -> callbacks.get_close
+  | Wick -> (
+      match side with Long -> callbacks.get_high | Short -> callbacks.get_low)
 
-(* Counter-move extreme reader for the given side:
-   Long  → callbacks.get_low  (the correction low after the peak).
-   Short → callbacks.get_high (the rally high after the trough). *)
-let _counter_reader ~side ~callbacks =
-  match side with Long -> callbacks.get_low | Short -> callbacks.get_high
+(* Counter-move extreme reader for the given side/mode:
+   Wick  → Long: callbacks.get_low (correction low); Short: callbacks.get_high.
+   Close → callbacks.get_close for both sides (the correction low / rally high
+           is measured on the close, so a lone intraday wick is ignored). *)
+let _counter_reader ~mode ~side ~callbacks =
+  match mode with
+  | Close -> callbacks.get_close
+  | Wick -> (
+      match side with Long -> callbacks.get_low | Short -> callbacks.get_high)
 
 (* Anchor offset on day-offset axis: smallest offset (= latest date) whose
    anchor extreme ties the window's extremum.
@@ -79,8 +89,8 @@ let _counter_reader ~side ~callbacks =
    indices and taking the last tying index with [>=]. In day-offset space
    the latest date is offset 0, so we walk offsets 0 → n_days-1 and take
    the FIRST tying offset (the one closest to today). *)
-let _anchor_offset ~side ~callbacks =
-  let read = _anchor_reader ~side ~callbacks in
+let _anchor_offset ~mode ~side ~callbacks =
+  let read = _anchor_reader ~mode ~side ~callbacks in
   let init, better =
     match side with
     | Long -> (Float.neg_infinity, Float.( > ))
@@ -128,10 +138,10 @@ let rec _scan_counter ~read ~better ~off ~end_off ((_, _) as state) =
    separate from [acc] so a legitimately infinite extreme — pathological
    but not impossible in synthetic inputs — does not collide with the
    sentinel. *)
-let _counter_extreme_in_range ~side ~callbacks ~start_off ~end_off =
+let _counter_extreme_in_range ~mode ~side ~callbacks ~start_off ~end_off =
   if start_off > end_off then None
   else
-    let read = _counter_reader ~side ~callbacks in
+    let read = _counter_reader ~mode ~side ~callbacks in
     let better = _counter_better side in
     match _scan_counter ~read ~better ~off:start_off ~end_off (false, 0.0) with
     | true, acc -> Some acc
@@ -156,10 +166,10 @@ let _depth_pct ~side ~anchor ~counter =
    "Post-anchor" in chronological terms means offsets newer than the anchor,
    i.e. day_offsets [0, anchor_off - 1]. When [anchor_off = 0] the range is
    empty and no counter-move can exist. *)
-let _qualifying_level_for_anchor ~side ~callbacks ~min_pullback_pct ~anchor_off
-    ~anchor =
+let _qualifying_level_for_anchor ~mode ~side ~callbacks ~min_pullback_pct
+    ~anchor_off ~anchor =
   match
-    _counter_extreme_in_range ~side ~callbacks ~start_off:0
+    _counter_extreme_in_range ~mode ~side ~callbacks ~start_off:0
       ~end_off:(anchor_off - 1)
   with
   | None -> None
@@ -168,15 +178,22 @@ let _qualifying_level_for_anchor ~side ~callbacks ~min_pullback_pct ~anchor_off
         Some counter
       else None
 
-let find_recent_level_with_callbacks ~callbacks ~side ~min_pullback_pct =
+let find_recent_level_with_callbacks ?(anchor_mode = Wick) ~callbacks ~side
+    ~min_pullback_pct () =
   if callbacks.n_days <= 0 then None
   else
-    match _anchor_offset ~side ~callbacks with
+    match _anchor_offset ~mode:anchor_mode ~side ~callbacks with
     | None -> None
     | Some (anchor_off, anchor) ->
-        _qualifying_level_for_anchor ~side ~callbacks ~min_pullback_pct
-          ~anchor_off ~anchor
+        _qualifying_level_for_anchor ~mode:anchor_mode ~side ~callbacks
+          ~min_pullback_pct ~anchor_off ~anchor
 
+(* Bar-list convenience wrapper. Wick-only: the [anchor_mode] dial is exposed on
+   the callback path ({!find_recent_level_with_callbacks}), which is the path the
+   production stop ({!Weinstein_stops.compute_initial_stop_with_floor}) and the
+   panel-backed callers use. Keeping this wrapper's signature unchanged avoids an
+   unerasable-optional warning (all its arguments are labelled) and churning its
+   many call sites. *)
 let find_recent_level ~bars ~as_of ~side ~min_pullback_pct ~lookback_bars =
   let callbacks = callbacks_from_bars ~bars ~as_of ~lookback_bars in
-  find_recent_level_with_callbacks ~callbacks ~side ~min_pullback_pct
+  find_recent_level_with_callbacks ~callbacks ~side ~min_pullback_pct ()

@@ -33,8 +33,10 @@ type candidate_decision =
 let classify_stop_floor_kind ~stops_config ~callbacks ~side :
     Audit_recorder.stop_floor_kind =
   match
-    Weinstein_stops.Support_floor.find_recent_level_with_callbacks ~callbacks
-      ~side ~min_pullback_pct:stops_config.Weinstein_stops.min_correction_pct
+    Weinstein_stops.Support_floor.find_recent_level_with_callbacks
+      ~anchor_mode:stops_config.Weinstein_stops.support_floor_anchor_mode
+      ~callbacks ~side
+      ~min_pullback_pct:stops_config.Weinstein_stops.min_correction_pct ()
   with
   | Some _ -> Support_floor
   | None -> Buffer_fallback

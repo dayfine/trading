@@ -186,6 +186,32 @@ type config = {
           unchanged. Default-off experiment axis per
           [.claude/rules/experiment-flag-discipline.md]; promoted only on a
           ledger ACCEPT. *)
+  support_floor_anchor_mode : Support_floor.anchor_mode;
+      [@sexp.default Support_floor.Wick]
+      (** Which price field the support-floor primitive anchors the correction
+          low / rally high on (default [Wick] = the historical intraday-extreme
+          basis). Threaded into
+          {!Weinstein_stops.compute_initial_stop_with_floor} via
+          {!Support_floor.find_recent_level_with_callbacks}'s [~anchor_mode].
+
+          Under [Close] the correction low (long) / rally high (short) is
+          measured on the bar {b close} rather than the intraday [low_price] /
+          [high_price], so a lone capitulation wick that undercuts (long) or
+          overshoots (short) every surrounding close no longer pulls the
+          structural floor to the wick extreme — which otherwise inflates the
+          entry-to-stop distance and forces a tiny position (the CLMB 2026-04-30
+          case: floor $14.64 = the wick, ~4% below neighbouring closes, → 42.5%
+          stop distance).
+
+          Faithful-core: a numeric-threshold-class
+          {b initial-stop-placement dial} (book §Stop-Loss Rules — "stop below
+          the prior correction low", which the book does not tie to the intraday
+          extreme). Spine item 5 (stop below the base) holds under either
+          reading; see [.claude/rules/weinstein-faithful-core.md]. Default
+          [Wick] is an exact no-op so every existing golden replays unchanged.
+          Default-off experiment axis per
+          [.claude/rules/experiment-flag-discipline.md]; promoted only on a
+          ledger ACCEPT. *)
 }
 [@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable

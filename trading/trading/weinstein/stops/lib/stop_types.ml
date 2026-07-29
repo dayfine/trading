@@ -47,6 +47,8 @@ type config = {
   vol_scaled_stop_atr_period : int;
       [@sexp.default default_vol_scaled_stop_atr_period]
   catastrophic_stop_pct : float; [@sexp.default 0.0]
+  support_floor_anchor_mode : Support_floor.anchor_mode;
+      [@sexp.default Support_floor.Wick]
 }
 [@@deriving show, eq, sexp]
 
@@ -64,4 +66,5 @@ let default_config =
     vol_scaled_stop_atr_mult = 0.0;
     vol_scaled_stop_atr_period = default_vol_scaled_stop_atr_period;
     catastrophic_stop_pct = 0.0;
+    support_floor_anchor_mode = Support_floor.Wick;
   }
