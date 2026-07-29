@@ -1,4 +1,9 @@
-( ((config_hash split-basis-fold-recert)
+( ((config_hash split-basis-sp500-cell)
+  (base_scenario
+   "goldens-sp500-historical/sp500-2000-2026-catstop, raw sp500 v5thin vs split-safe clone (promoted-bundle defaults, pinned worktree @9f50de9)")
+  (window_id contiguous-sp500-2000-2026)
+  (verdict Inconclusive) (entry_slug split-basis-sp500-cell))
+((config_hash split-basis-fold-recert)
   (base_scenario
    "staging-record-convention/top3000-2000-2026-record-convention on split-safe v5thin clone (promoted-bundle defaults, pinned worktree @9f50de9)")
   (window_id margin-m4-broad-13x2y-2000-2026)
