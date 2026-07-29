@@ -41,6 +41,9 @@ module Snapshot_warehouse_reader =
 
 module Live_portfolio = Weinstein_snapshot_gen.Live_portfolio
 
+module Snapshot_validation_report =
+  Weinstein_snapshot_gen.Snapshot_validation_report
+
 (* Daily-history warmup the snapshot-backed reader's trading-day calendar must
    span before [as_of]. Two trading years comfortably covers the screener's
    longest daily lookback (the 30-week MA over daily bars plus the base /
@@ -144,8 +147,27 @@ let _live_portfolio ~portfolio_path ~as_of : Live_portfolio.t * bool =
             (Error.to_string_hum err);
           exit 2)
 
+(* After writing, run {!Snapshot_validator} over the just-produced snapshot.
+   Warn-first: findings print to stderr and the run exits 0 by default; with
+   [strict], any finding escalates to a non-zero exit so a Friday run cannot
+   emit a defective report silently (#2122 slice a). The validator reads bars
+   from the same reader the screener cascade ran against; the reconciliation
+   thresholds are the armed config values so it judges the artifact under the
+   config that produced it. *)
+let _validate_snapshot ~strict ~bar_reader ~as_of
+    ~(config : Weinstein_strategy.config) snapshot =
+  let bars_for ~symbol = Bar_reader.daily_bars_for bar_reader ~symbol ~as_of in
+  let findings =
+    Snapshot_validator.validate ~through_band_pct:config.entry_through_band_pct
+      ~extension_max_pct:config.entry_extension_max_pct ~bars_for snapshot
+  in
+  let outcome = Snapshot_validation_report.evaluate ~strict findings in
+  Out_channel.output_string Out_channel.stderr outcome.report;
+  Out_channel.flush Out_channel.stderr;
+  if outcome.exit_code <> 0 then exit outcome.exit_code
+
 let _run ~as_of ~universe_path ~bar_source ~snapshot_dir ~system_version
-    ~index_symbol ~config_overrides_path ~portfolio_path () =
+    ~index_symbol ~config_overrides_path ~portfolio_path ~validate_strict () =
   let ticker_sectors = _ticker_sectors_of_universe universe_path in
   let config =
     _config_for ~ticker_sectors ~index_symbol ~config_overrides_path
@@ -171,7 +193,10 @@ let _run ~as_of ~universe_path ~bar_source ~snapshot_dir ~system_version
   match
     Snapshot_writer.write_to_file ~root:snapshot_dir ~system_version snapshot
   with
-  | Ok path -> printf "Wrote %s\n" path
+  | Ok path ->
+      printf "Wrote %s\n" path;
+      _validate_snapshot ~strict:validate_strict ~bar_reader ~as_of ~config
+        snapshot
   | Error err ->
       eprintf "Failed to write snapshot: %s\n" (Status.show err);
       exit 1
@@ -231,6 +256,12 @@ let command =
             long candidates are sized against real cash/exposure. Without it, \
             candidates are sized against a $100k template book and stamped \
             UNSIZED. Template: dev/weekly-picks/portfolio.sexp"
+     and validate_strict =
+       flag "-validate-strict" no_arg
+         ~doc:
+           " Escalate any Snapshot_validator finding over the just-written \
+            snapshot to a non-zero exit (fail-loud). Default: warn to stderr \
+            and exit 0 (#2122)."
      in
      fun () ->
        let bar_source =
@@ -249,6 +280,7 @@ let command =
              exit 2
        in
        _run ~as_of ~universe_path ~bar_source ~snapshot_dir ~system_version
-         ~index_symbol ~config_overrides_path ~portfolio_path ())
+         ~index_symbol ~config_overrides_path ~portfolio_path ~validate_strict
+         ())
 
 let () = Command_unix.run command
