@@ -17,23 +17,29 @@ let _verdict ~strict =
     "snapshot-validator: warn-first (exit 0). Re-run with -validate-strict to \
      fail on findings.\n"
 
+let _summary_line findings =
+  let total = List.length findings in
+  let errors = List.count findings ~f:_is_error in
+  Printf.sprintf "%d finding(s): %d error(s), %d warning(s)\n" total errors
+    (total - errors)
+
+let _findings_report ~strict findings =
+  String.concat
+    [
+      _delim;
+      "\n";
+      _summary_line findings;
+      Snapshot_validator.to_report findings;
+      _delim;
+      "\n";
+      _verdict ~strict;
+    ]
+
 let evaluate ~strict findings =
   match findings with
   | [] -> { report = "snapshot-validator: OK — no findings.\n"; exit_code = 0 }
   | _ ->
-      let total = List.length findings in
-      let errors = List.count findings ~f:_is_error in
-      let report =
-        String.concat
-          [
-            _delim;
-            "\n";
-            Printf.sprintf "%d finding(s): %d error(s), %d warning(s)\n" total
-              errors (total - errors);
-            Snapshot_validator.to_report findings;
-            _delim;
-            "\n";
-            _verdict ~strict;
-          ]
-      in
-      { report; exit_code = (if strict then 1 else 0) }
+      {
+        report = _findings_report ~strict findings;
+        exit_code = (if strict then 1 else 0);
+      }
