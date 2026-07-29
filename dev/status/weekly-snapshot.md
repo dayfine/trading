@@ -5,6 +5,23 @@
 ## Status
 IN_PROGRESS
 
+**2026-07-29 (validator wired into the generator, branch
+`feat/validator-wire-warn` — issue #2122 slice a):** `generate_weekly_snapshot`
+now runs `Snapshot_validator` over the snapshot it just wrote. **Warn-first
+default:** findings print to stderr as a delimited block (count header + one
+finding per line + a one-line verdict), and the run still exits 0; the new
+`-validate-strict` flag escalates *any* finding (error or warning — so the
+chart-coverage gap, defect 1, can fail a Friday run) to exit 1. Zero findings =>
+one quiet `snapshot-validator: OK` line. The packaging decision (what to print,
+whether to fail) is a pure seam, `Snapshot_validation_report.evaluate`, in
+`gen/lib`, pinned by `test_snapshot_validation_report.ml` (5 tests). Bars come
+from the same `Bar_reader` the cascade screened with, and the reconciliation
+thresholds are the armed `config.entry_through_band_pct` /
+`entry_extension_max_pct` so the validator judges the artifact under the config
+that produced it. **Gap noted:** no `~risk_budget` upper-bound is wired (the
+generator has no single portfolio-level risk scalar in hand) — the risk-identity
+arithmetic check still runs, only the budget ceiling is skipped.
+
 **2026-07-28 (qc-behavioral rework 1 on `feat/sketch-adjusted-basis`, PR #2145):**
 the reviewer ran 8 mutations; 6 were caught, 2 survived. **Tests + doc wording
 only; no production logic changed.** Both survivors are now red:
