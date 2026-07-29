@@ -35,7 +35,13 @@ let _fold_week week : Types.Daily_price.t =
    level lines). A non-positive or NaN raw close admits no factor: the bar
    keeps its O/H/L unscaled and takes [adjusted_close] as its close — a bad
    bar must not blank the chart. Volume is left nominal: the strip is
-   recessive and share-count rescaling adds no reading value. *)
+   recessive and share-count rescaling adds no reading value.
+
+   This is the same formula as Adjusted_basis.to_adjusted_basis in
+   analysis/weinstein/snapshot_pipeline, kept as a private, intentional
+   duplicate rather than a shared call: this library (Weinstein_snapshot)
+   deliberately carries no analysis/ dependency (see the .mli), so it cannot
+   depend on that module. Keep both in sync by hand if this formula changes. *)
 let _to_adjusted_basis (b : Types.Daily_price.t) : Types.Daily_price.t =
   let f =
     if Float.is_nan b.close_price || Float.( <= ) b.close_price 0.0 then 1.0
