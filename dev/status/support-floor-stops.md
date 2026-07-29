@@ -104,6 +104,21 @@ State machine itself (Initial → Trailing → Tightened) unchanged.
 ## Follow-ups
 
 - Round-number shading (§5.1): if computed stop lands near a round or half-point boundary, shade slightly below. New helper, probably `Support_floor.round_to_support` or inline in `Stops`.
+- **[from qc-behavioral on #2167, 2026-07-29 — must close BEFORE `Close` is ever
+  promoted default-on]** `snapshot/gen/lib/stop_recompute.ml:15` computes the
+  display-only `stop_is_structural` flag via the Wick-only bar-list
+  `find_recent_level`, while the same function's stop *level* is Close-aware
+  (callbacks path). Under `Close` mode flag and level can disagree, silently
+  falsifying the `stop_recompute.mli` "iff … same as the compute call reads
+  internally" contract. Benign at merge (default `Wick`; flag only renders the
+  `*` fallback marker in the weekly report, never a trade decision). Fix =
+  thread `support_floor_anchor_mode` into that classifier, mirroring the
+  entry-audit classifier fix in the same PR. Review comment:
+  https://github.com/dayfine/trading/pull/2167#issuecomment-5122542444
+- **[A2 decision item, recorded in the 07-29 addendum]** split-safe floors
+  (raw lows) need `Adjusted_basis`, which lives in analysis/ — direct import
+  into stops violates A2. Options: feed basis-corrected lows from the caller
+  layer, or move the helper to a canonical shared lib. Needs human/review call.
 
 ## QC
 
