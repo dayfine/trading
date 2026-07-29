@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-28 run4 (orchestrator run 30405186411 — main green throughout, verified on the exact starting HEAD `6f89d1b0` and again on the merged tip `14e14b24`. Merged this run: #2155 (closes the three FLAG residuals qc-behavioral raised on #2148 — recursive candidate scan + `review_at` required on `universe_deps_exceptions.conf`; both gates APPROVED q5/q5, zero rework iterations). Step 0.5's saturated-queue fast-exit passed all four conditions but was overridden: Condition 1 passes vacuously on an empty queue — filed as A-FASTEXIT-VACUOUS. Maintainer landed #2156 (the #2133 blast-radius ledger) mid-run.)
+Last updated: 2026-07-29 run1 (orchestrator run 30458563291 — main green throughout, verified on the starting HEAD `3da122db` and re-verified on each PR tip before merge. Merged: #2162 (adjusted-basis duplication documented; dedupe correctly declined on A2) and #2163 (`set -e` diagnostic-loss audit; 1 rework iteration after qc-behavioral caught a false-green regression in a merge-gating linter). Step 0.5's fast-exit passed all four conditions and was overridden for the second consecutive run — four earlier runs today took it, spending $43.53 for zero output; see A-FASTEXIT-VACUOUS. Five orphaned budget records recovered; new item A-NOOP-BUDGET-ORPHAN.)
 
 ## Active + complete tracks
 
@@ -43,9 +43,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2155 MERGED `14e14b24` — #2148's three FLAG residuals closed (recursive scan; `review_at` enforced); 22 open; next: H-CHECK-SETE-DIAGNOSTICS repo-wide audit |
-| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 7 open; A-FASTEXIT-VACUOUS + A-FINISH-PROTOCOL-BACKGROUND new; the three workflow-edit items still blocked on a `workflow`-scoped token |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2152 MERGED `14270b57` — cholesky SPD docstring; the finding's own numbers were wrong (λ_min 1.83, not 1.69); 10 open; next: linter_exception_expired |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2163 MERGED `182485aa` — `set -e` diagnostic-loss audit, 22 candidates, 3 fixed + guard; 21 open; next: H-AUDIT-ATOMIC-WRITE (temp-file+mv) |
+| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 8 open; A-NOOP-BUDGET-ORPHAN new (5 records recovered); A-FASTEXIT-VACUOUS now has measured cost; six items share the `workflow`-token blocker |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2162 MERGED `de34c507` — dedupe declined on A2, duplication documented; 10 open; next: adjusted_basis_sync_pin (re-filed from a closed entry) |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |

@@ -1,4 +1,4 @@
-Reviewed SHA: d74a49525ae4c4052f5c6e3876c68411bc9b280d
+Reviewed SHA: f37379e0bc0d6d7a31c79d5de5dab7bf47b5a035
 
 ## Combined QC — PR #2155 `harness/check-universe-deps-residuals` (2026-07-28, orchestrator run 4)
 
@@ -686,3 +686,90 @@ behaviour the standing `[medium]` escalation asks for.
 both directions, with a self-covering guard; two prospective coverage gaps keep it off 5.
 
 Reviewed SHA: 1b3f809b04d184d1b335def771a3e1a1dca022b1
+
+
+## Combined QC — PR #2163 `harness/sete-diagnostics-audit` (2026-07-29, orchestrator run 30458563291)
+
+**overall_qc: APPROVED** — **one rework iteration**, and the rework is the story.
+
+| Gate | Iteration 0 (`eacbfb01`) | Iteration 1 (`be62f248`) |
+|---|---|---|
+| qc-structural | APPROVED, q5 (4809514994) | APPROVED, q5 (4809876066) |
+| qc-behavioral | **NEEDS_REWORK, q2** (4809600822) | APPROVED, q4 (4809889502) |
+| CI | — | re-verified green on the post-`update-branch` tip before merge |
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+Rework iterations: 1.
+
+Scope: closes **H-CHECK-SETE-DIAGNOSTICS** (under `set -e`, `VAR=$(cmd); CODE=$?`
+aborts before `CODE=$?`, so a real failure emits *no* diagnostic — the exact
+signature `pr-merge-gates.md` lists as an admissible infra-flake exception, so
+the hazard is a genuine regression being misfiled as a sandbox race). 22
+candidates classified, 3 genuine defects fixed
+(`jj_workspace_smoke.sh`, `linter_file_length.sh`, `linter_magic_numbers.sh`),
+new `sete_diagnostics_check.sh` guard wired into `dune runtest`. Also folds in
+the **H-WRITE-AUDIT-SHEBANG-MISMATCH** usage-comment half.
+
+### Why iteration 0 was rejected — the fix introduced a worse bug than the one it fixed
+
+The first pass guarded the two linters' reads with `|| continue`, which collapses
+*vanished* and *unreadable-but-present* into one silent skip. qc-behavioral built
+the discriminating case — a 350-line **violating** `lib/*.ml` made unreadable —
+and measured:
+
+- pre-fix: **exit 2** (loud, correct, unhelpfully shaped)
+- post-fix: `OK: all lib/*.ml files within limits`, **exit 0**
+
+That is a **false green in a merge-gating linter**, and it falsified the PR's own
+claim that no existing file's pass/fail verdict changed. Note the asymmetry that
+made this a blocker rather than a FLAG: the original bug produced a *correct
+failure with a bad shape*; the regression produced a *silent wrong pass*. It also
+proved the new guard pinned only **1 of 3** fixes — reverting both linter fixes
+left it green 2/2.
+
+### Why iteration 1 was accepted
+
+Both blockers were re-tested under the **same mutations that found them**, by the
+same reviewer:
+
+- **Unreadable-but-present** → both linters exit 1 with a diagnostic naming the
+  file. The decision is a *second* `[ -e ]` evaluated **after** the read fails,
+  not the racy bare pre-check; `linter_magic_numbers.sh` probes with `cat` rather
+  than trusting the `while … done < "$f"` compound's exit status.
+- **Vanished file still tolerated** → fake `find` reporting a nonexistent
+  `ghost.ml`: both linters exit 0 and skip quietly, and a ghost *followed by* a
+  real violation still reports the violation. No flaky gate was traded for the
+  false green — that second direction is what distinguishes a fix from an
+  over-correction.
+- **Guard coverage 3 of 3** → reverting each fix *alone* turns the guard red
+  every time (7 assertions; 6-passed-1-failed in each case).
+
+### Worth keeping — the fixture is better than the one that found the bug
+
+The author's reproduction uses a **directory masquerading as a `.ml` file**
+rather than the reviewer's `chmod 000`. The reviewer flagged this upward itself:
+`chmod 000` only reproduces under an unprivileged user and would have **silently
+passed under a root-running CI job**, which is exactly how this container runs.
+Rationale is recorded in-tree citing `access(2)`.
+
+### Open FLAG (non-blocking)
+
+`write_audit.sh`'s bash-only choice is now pinned by an assertion (verified
+load-bearing: replacing `set -euo pipefail` with `set -eu` turns it red), but
+*why not* POSIX-clean is still unwritten, given the affected pipelines already
+carry `|| true`. One clause would close it. The orchestrator-spec half of
+**H-WRITE-AUDIT-SHEBANG-MISMATCH** — Step 5 Stage 4's `sh write_audit.sh`
+invocation in `.claude/agents/lead-orchestrator.md` — remains correctly open and
+escalated; that file is behind the agent write block.
+
+Cosmetic residuals noted and correctly not reworked: `FIX3_*`/`FIX4_*` absent
+from the `trap`; `cp`-vs-`die` asymmetry on missing deps;
+`linter_magic_numbers.sh` now reads each file twice (correct, small I/O cost).
+
+## Quality Score
+
+4 — exemplary rework method; the digit reflects that iteration 0 shipped a
+false-green regression into review, not the quality of the recovery.
