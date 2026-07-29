@@ -8,7 +8,8 @@
         --universe path/to/universe.sexp \
         --bars path/to/bars-dir \
         --snapshot-dir dev/weekly-picks \
-        [--system-version <tag>]
+        [--system-version <tag>] \
+        [--no-validate]
     ]}
 
     Loads the pinned universe, runs the existing Weinstein screener cascade via
@@ -16,6 +17,28 @@
     {!Weekly_snapshot.t} to [<snapshot-dir>/<system-version>/<as-of>.sexp] via
     {!Snapshot_writer.write_to_file}. Prints the written path on success; exits
     non-zero on any I/O or universe error.
+
+    {1 Self-check (issue #2122 slice a, warn-first)}
+
+    Unless [--no-validate] is passed, the assembled record is run through
+    {!Snapshot_validator} and the findings are printed {b on stderr}. This is
+    {b observation only}:
+
+    - the exit code is unchanged — an [Error]-level finding still exits 0,
+    - the written artifact is unchanged — validation reads, never edits,
+    - {b stdout is unchanged} — it still carries only the written path, because
+      callers pipe it.
+
+    Escalating an [Error] finding to a non-zero exit is a deliberate later
+    decision, not an oversight: the first honest live run needs the checks
+    {e visible} before they are allowed to fail a run.
+
+    Thresholds come from the {b same} config the generator screened with (i.e.
+    from [--config-overrides]), never from the validator's own defaults — a
+    validator judging the artifact under thresholds other than the ones that
+    produced it emits confident wrong findings. The bar-dependent checks run
+    against the generator's own bar reader. The optional [risk_budget] check is
+    {b not} run (see [_validation_skipped_note]).
 
     The bar source is selected by exactly one of two mutually-exclusive flags:
 
@@ -144,8 +167,40 @@ let _live_portfolio ~portfolio_path ~as_of : Live_portfolio.t * bool =
             (Error.to_string_hum err);
           exit 2)
 
+(* ---- Self-check (issue #2122 slice a) ---------------------------------- *)
+
+(* The risk-budget check needs the per-run risk budget (risk_per_trade_pct x
+   portfolio_value). [portfolio_value] is computed inside
+   [Weekly_snapshot_generator.generate] and is not returned, so re-deriving it
+   here would duplicate the generator's own formula and could silently drift
+   from it. Not running the check and saying so is honest; running it against a
+   re-derived budget is not. Tracked in dev/status/weekly-snapshot.md. *)
+let _validation_skipped_note =
+  "snapshot self-check: risk_budget check NOT RUN (the sizing portfolio_value \
+   is internal to the generator; re-deriving it here could drift).\n"
+
+let _validation_header ~(config : Weinstein_strategy.config) =
+  Printf.sprintf
+    "snapshot self-check (warn-first, #2122): thresholds band=%.2f max=%.2f \
+     (from the screening config); bar-dependent checks ON.\n"
+    config.entry_through_band_pct config.entry_extension_max_pct
+
+(* Run every {!Snapshot_validator} check over the assembled record and print the
+   findings on stderr. Returns unit: the exit code and the written artifact are
+   deliberately untouched (warn-first). stdout is never written to here. *)
+let _validate_and_report ~(config : Weinstein_strategy.config) ~bar_reader
+    ~as_of snapshot =
+  let bars_for ~symbol = Bar_reader.daily_bars_for bar_reader ~symbol ~as_of in
+  let findings =
+    Snapshot_validator.validate ~through_band_pct:config.entry_through_band_pct
+      ~extension_max_pct:config.entry_extension_max_pct ~bars_for snapshot
+  in
+  eprintf "%s" (_validation_header ~config);
+  eprintf "%s" (Snapshot_validator.to_report findings);
+  eprintf "%s" _validation_skipped_note
+
 let _run ~as_of ~universe_path ~bar_source ~snapshot_dir ~system_version
-    ~index_symbol ~config_overrides_path ~portfolio_path () =
+    ~index_symbol ~config_overrides_path ~portfolio_path ~validate () =
   let ticker_sectors = _ticker_sectors_of_universe universe_path in
   let config =
     _config_for ~ticker_sectors ~index_symbol ~config_overrides_path
@@ -168,6 +223,7 @@ let _run ~as_of ~universe_path ~bar_source ~snapshot_dir ~system_version
         portfolio_is_placeholder;
       }
   in
+  if validate then _validate_and_report ~config ~bar_reader ~as_of snapshot;
   match
     Snapshot_writer.write_to_file ~root:snapshot_dir ~system_version snapshot
   with
@@ -231,6 +287,15 @@ let command =
             long candidates are sized against real cash/exposure. Without it, \
             candidates are sized against a $100k template book and stamped \
             UNSIZED. Template: dev/weekly-picks/portfolio.sexp"
+     and no_validate =
+       flag "--no-validate" no_arg
+         ~doc:
+           " Skip the post-generate Snapshot_validator self-check. The check \
+            is ON by default and prints findings on stderr WITHOUT changing \
+            the exit code, stdout, or the written artifact; this flag exists \
+            as an escape hatch for bulk sweeps (the bar-dependent checks \
+            re-read bars per candidate) and for the case where the validator \
+            itself misbehaves on a live Friday."
      in
      fun () ->
        let bar_source =
@@ -249,6 +314,7 @@ let command =
              exit 2
        in
        _run ~as_of ~universe_path ~bar_source ~snapshot_dir ~system_version
-         ~index_symbol ~config_overrides_path ~portfolio_path ())
+         ~index_symbol ~config_overrides_path ~portfolio_path
+         ~validate:(not no_validate) ())
 
 let () = Command_unix.run command
