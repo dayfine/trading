@@ -39,12 +39,30 @@ for ml_file in $(find "$TRADING_DIR" \
   # (the same sandbox-cleanup race documented in no_python_check.sh, e.g. a
   # concurrent dune sandbox teardown), the redirect fails, the assignment's
   # own exit status trips `set -e`, and the WHOLE script dies silently --
-  # zero output, no FAIL: line (H-CHECK-SETE-DIAGNOSTICS). Guard it the same
-  # way the `find ... || true` above already treats the race: skip the
-  # vanished file rather than crash. This does not change the verdict for
-  # any real file-length violation -- a file that still exists is read and
-  # checked exactly as before.
-  line_count=$(wc -l < "$ml_file" 2>/dev/null) || continue
+  # zero output, no FAIL: line (H-CHECK-SETE-DIAGNOSTICS).
+  #
+  # Two DISTINCT failure shapes must not be collapsed into one blanket
+  # `|| continue` (2026-07-29 qc-behavioral rework, FINDING-1): (a) the file
+  # vanished before we got to it -- a genuine TOCTOU race, not a violation,
+  # safe to skip; (b) the file still EXISTS but the read failed (permission
+  # denied, a directory masquerading as a `*.ml` path, an I/O error) -- this
+  # must remain a hard, diagnosed failure, because silently skipping it
+  # would let a file that actually violates the length limit slip through
+  # as a false green in this merge-gating linter. `[ -e ]` is checked both
+  # before the attempt (fast path for the common "already gone" case) and
+  # again only if the read fails (to distinguish "still there, unreadable"
+  # from "vanished mid-read") -- never a bare `2>/dev/null || continue`.
+  if [ ! -e "$ml_file" ]; then
+    continue
+  fi
+  if line_count=$(wc -l < "$ml_file" 2>/dev/null); then
+    : # fall through to the length checks below
+  else
+    if [ -e "$ml_file" ]; then
+      VIOLATIONS="${VIOLATIONS}${ml_file}: could not read file to count lines (exists but the read failed -- permission, I/O, or type error; H-CHECK-SETE-DIAGNOSTICS FINDING-1)\n"
+    fi
+    continue
+  fi
 
   if grep -q "@large-module" "$ml_file"; then
     LARGE_COUNT=$((LARGE_COUNT + 1))
