@@ -53,7 +53,18 @@ if ! jj -R "$REPO" workspace add "$AGENT_WS" --name "$AGENT_ID" -r "main@origin"
 fi
 
 # --- Step 2: assert jj workspace list shows the new entry ---
-WS_LIST=$(jj -R "$REPO" workspace list 2>&1)
+# WS_LIST=$(...) is wrapped in `&& ... || ...` (never a bare assignment) so a
+# genuine `jj workspace list` failure doesn't die under `set -e` before this
+# script can print a FAIL: line naming it. A bare `VAR=$(cmd); CODE=$?` here
+# would abort silently -- the failing command substitution itself trips
+# `set -e` before `CODE=$?` is ever reached (H-CHECK-SETE-DIAGNOSTICS; see
+# sete_diagnostics_check.sh for the negative-control regression test).
+WS_LIST=$(jj -R "$REPO" workspace list 2>&1) && WS_LIST_CODE=0 || WS_LIST_CODE=$?
+if [ "$WS_LIST_CODE" -ne 0 ]; then
+  echo "FAIL: ${LABEL} — 'jj workspace list' failed (exit ${WS_LIST_CODE}):"
+  echo "$WS_LIST" | sed 's/^/    /'
+  exit 1
+fi
 if ! echo "$WS_LIST" | grep -qF "$AGENT_ID"; then
   echo "FAIL: ${LABEL} — 'jj workspace list' does not include '$AGENT_ID' after workspace add."
   echo "  workspace list output:"

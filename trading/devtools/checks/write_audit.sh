@@ -8,8 +8,11 @@
 # lead-orchestrator after QC agents complete, or manually during
 # development.
 #
-# Usage:
-#   sh write_audit.sh \
+# Usage (this script requires bash — set -o pipefail is not POSIX sh/dash;
+# invoking it as `sh write_audit.sh` fails immediately with
+# "set: Illegal option -o pipefail" under a dash /bin/sh, before writing
+# anything; see H-WRITE-AUDIT-SHEBANG-MISMATCH, dev/status/harness.md):
+#   bash write_audit.sh \
 #     --date       2026-04-14 \
 #     --feature    screener \
 #     --branch     feat/screener \

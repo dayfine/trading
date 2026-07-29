@@ -142,7 +142,15 @@ for f in $(find "$TRADING_DIR" \
           ;;
       esac
     done
-  done < "$f"
+  # `done < "$f"` opens $f for the loop's stdin. If $f vanishes between
+  # `find` printing it and this open (the same sandbox-cleanup race
+  # documented in no_python_check.sh), the redirect fails, and -- since this
+  # is a bare compound command under `set -e` -- the WHOLE script would die
+  # silently: zero output, no FAIL: line (H-CHECK-SETE-DIAGNOSTICS). `||
+  # continue` treats a vanished file as a race to skip, matching the
+  # `find ... || true` guard already used above; it does not change the
+  # verdict for any file that still exists.
+  done < "$f" || continue
 done
 
 if [ -n "$VIOLATIONS" ]; then

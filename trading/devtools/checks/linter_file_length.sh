@@ -34,7 +34,17 @@ for ml_file in $(find "$TRADING_DIR" \
     -not -name "*.pp.ml" \
     -print 2>/dev/null || true); do
   TOTAL=$((TOTAL + 1))
-  line_count=$(wc -l < "$ml_file")
+  # `wc -l < "$ml_file"` is a bare command-substitution assignment under
+  # `set -e`: if $ml_file vanishes between `find` printing it and this read
+  # (the same sandbox-cleanup race documented in no_python_check.sh, e.g. a
+  # concurrent dune sandbox teardown), the redirect fails, the assignment's
+  # own exit status trips `set -e`, and the WHOLE script dies silently --
+  # zero output, no FAIL: line (H-CHECK-SETE-DIAGNOSTICS). Guard it the same
+  # way the `find ... || true` above already treats the race: skip the
+  # vanished file rather than crash. This does not change the verdict for
+  # any real file-length violation -- a file that still exists is read and
+  # checked exactly as before.
+  line_count=$(wc -l < "$ml_file" 2>/dev/null) || continue
 
   if grep -q "@large-module" "$ml_file"; then
     LARGE_COUNT=$((LARGE_COUNT + 1))
