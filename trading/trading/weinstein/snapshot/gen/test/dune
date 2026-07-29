@@ -12,6 +12,7 @@
   test_rename_detector
   test_rename_gate
   test_entry_reconcile
+  test_snapshot_validation_report
   test_stop_track
   test_stop_thread)
  (libraries
