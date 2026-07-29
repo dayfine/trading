@@ -116,9 +116,13 @@ defaults, run against the split-safe clone from the same pinned worktree:
 - Not settled: bundle-vs-**alternatives** honest margin (pre-bundle / w15 /
   floors arms were never run adjusted). If the R3 record re-pin wants that
   margin, it's a further comparison grid.
-- sp500 cell (universe-diversity leg of the grid): raw-vs-adjusted arms on
-  `sp500-2000-2026-catstop` queued the same night; results land in
-  `/tmp/sweeps/basis-sp500-{raw,adj}.log`.
+- sp500 cell (universe-diversity leg — landed 07-29, ledger
+  `2026-07-29-split-basis-sp500-cell`): raw +1,476.6% / MaxDD 30.5 / 1,183
+  trades vs honest +1,289.9% / MaxDD 28.8 / 1,102 trades. Return flattering
+  proportionally LARGER than broad (−12.6% rel vs −3.7%), but MaxDD
+  **improves** 1.7pp — the DD flattering is a broad-universe marginal-cohort
+  composition effect, not universal. Honest grading costs return everywhere;
+  risk direction is universe-dependent. Grid complete for the R3 decision.
 
 Spec (worktree-local, reproducible): `basis-recert-BROAD-2000-2026.sexp` —
 record-convention base, Rolling 13×730d 2000-01-01..2026-04-30, single no-op
