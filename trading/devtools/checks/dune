@@ -150,6 +150,19 @@
  (action
   (run sh %{dep:jj_workspace_smoke.sh})))
 
+; Regression test for H-CHECK-SETE-DIAGNOSTICS: negative-control proof that
+; the pre-fix `VAR=$(cmd); CODE=$?` shape under `set -e` dies silently when
+; the command fails, and that jj_workspace_smoke.sh's current
+; `&& CODE=0 || CODE=$?` shape survives the same failure with a diagnostic.
+; Invokes jj_workspace_smoke.sh with a fake `jj` on PATH; declares it as an
+; explicit dep so the cache invalidates when that script's logic changes.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh jj_workspace_smoke.sh (universe))
+ (action
+  (run sh %{dep:sete_diagnostics_check.sh})))
+
 ; Status file integrity: each dev/status/*.md must declare Status, Last updated,
 ; and (for feature files) Interface stable. Invoked by health-scanner fast scan.
 ; dev/status/ lives at the repo root (above trading/), outside the dune

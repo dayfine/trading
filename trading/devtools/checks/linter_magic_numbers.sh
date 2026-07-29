@@ -61,6 +61,34 @@ for f in $(find "$TRADING_DIR" \
     -print 2>/dev/null || true); do
   _is_excluded "$f" && continue
 
+  # `done < "$f"` below opens $f for the loop's stdin. If $f vanishes
+  # between `find` printing it and this open (the sandbox-cleanup race
+  # documented in no_python_check.sh), the redirect fails and -- since this
+  # is a bare compound command under `set -e` -- the WHOLE script would die
+  # silently: zero output, no FAIL: line (H-CHECK-SETE-DIAGNOSTICS).
+  #
+  # Two DISTINCT failure shapes must not be collapsed into one blanket
+  # `|| continue` (2026-07-29 qc-behavioral rework, FINDING-1): (a) the file
+  # vanished before we got to it -- a genuine TOCTOU race, safe to skip;
+  # (b) the file still EXISTS but can't be read (permission denied, a
+  # directory masquerading as a `*.ml` path, an I/O error) -- this must
+  # remain a hard, diagnosed failure, because silently skipping it would
+  # let a file that actually contains a magic number slip through as a
+  # false green in this merge-gating linter. Probe readability with `cat`
+  # up front (a `while ... done < file` compound's own exit status is not a
+  # reliable signal -- it reflects the LAST command run in the loop body on
+  # a normal pass, not just the redirection) so vanished-vs-unreadable is
+  # decided BEFORE the real scanning loop runs, not conflated with it.
+  if [ ! -e "$f" ]; then
+    continue
+  fi
+  if ! cat "$f" >/dev/null 2>/dev/null; then
+    if [ -e "$f" ]; then
+      VIOLATIONS="${VIOLATIONS}${f}: could not read file to scan for magic numbers (exists but the read failed -- permission, I/O, or type error; H-CHECK-SETE-DIAGNOSTICS FINDING-1)\n"
+    fi
+    continue
+  fi
+
   # Track multi-line comment depth across lines. Lines inside an open comment
   # block were previously flagged as violations on numerics. Now count opens
   # and closes per line and skip lines whose start-of-line depth is positive.
@@ -142,7 +170,13 @@ for f in $(find "$TRADING_DIR" \
           ;;
       esac
     done
-  done < "$f"
+  # The `cat` probe above already distinguished vanished (skip) from
+  # unreadable-but-present (FAIL); `|| continue` here is only a last-resort
+  # guard for the sub-millisecond TOCTOU window between that probe and this
+  # redirection -- by that point the file has already been proven readable
+  # once, so a failure here is overwhelmingly the same vanish-mid-scan race,
+  # not a masked violation.
+  done < "$f" || continue
 done
 
 if [ -n "$VIOLATIONS" ]; then
