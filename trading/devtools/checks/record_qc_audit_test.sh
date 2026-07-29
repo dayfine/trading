@@ -837,6 +837,94 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 19 — H-AUDIT-ATOMIC-WRITE: an interruption between finishing the
+# temp-file write and the atomic rename must leave a pre-existing target
+# record BYTE-IDENTICAL, never truncated or partially overwritten. Before
+# this fix, `cat > "$OUTPUT_FILE" <<ENDJSON` truncated the target the
+# instant the redirect opened -- an interruption at that point (SIGTERM on
+# a cancelled CI job, ENOSPC) left a partial/empty record with
+# recorded_at_ns but no overall_qc, which is exactly the trigger
+# H-PREV-VERDICT-PIPEFAIL describes. This scenario:
+#   1. Writes a real record (rc=0, content A).
+#   2. Re-invokes write_audit.sh for the SAME date/branch/feature (so it
+#      targets the SAME $OUTPUT_FILE) with a different quality-score
+#      (content B) AND WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME=1 set, which
+#      makes the script exit 1 right after finishing the temp file but
+#      before the `mv`.
+#   3. Asserts the second call failed (rc=1) AND the target file on disk is
+#      still byte-identical to content A -- proving the interrupted write
+#      never touched the committed record. A test that only checked "a
+#      valid record is produced" on the happy path would not distinguish
+#      this fix from the pre-fix truncate-on-open bug; this scenario
+#      specifically exercises the failure window the fix closes.
+#   4. Asserts no stray temp file is left in dev/audit/ matching the
+#      *-<feature>.json glob both dev/audit consumers use (the
+#      consecutive_rework_count scan in write_audit.sh itself, and
+#      deep_scan/check_06_qc_calibration.sh) -- the EXIT trap must have
+#      cleaned it up.
+# ---------------------------------------------------------------------------
+FEATURE19="atomic-write-interrupted"
+
+out19_1=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
+  --date 2026-07-29 --feature "${FEATURE19}" --branch "harness/atomic" \
+  --structural APPROVED --behavioral APPROVED --overall APPROVED \
+  --quality-score 4 --notes "content A" 2>&1) && rc19_1=0 || rc19_1=$?
+JSON19="${TMP_REPO}/dev/audit/2026-07-29-harness-atomic-${FEATURE19}.json"
+
+if [[ ! -f "${JSON19}" ]]; then
+  fail "scenario 19 — setup: first write did not produce ${JSON19} (rc=${rc19_1})"
+  echo "${out19_1}" | sed 's/^/      /'
+else
+  CONTENT_A="$(cat "${JSON19}")"
+
+  out19_2=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME=1 \
+    bash "${WRITE_AUDIT}" \
+      --date 2026-07-29 --feature "${FEATURE19}" --branch "harness/atomic" \
+      --structural APPROVED --behavioral APPROVED --overall APPROVED \
+      --quality-score 1 --notes "content B - must never land" 2>&1) && rc19_2=0 || rc19_2=$?
+
+  CONTENT_AFTER="$(cat "${JSON19}" 2>/dev/null || echo "MISSING")"
+  stray_tmp_count="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE19}.json.??????" | wc -l | tr -d ' ')"
+
+  if (( rc19_2 != 0 )) \
+     && [[ "${CONTENT_AFTER}" == "${CONTENT_A}" ]] \
+     && [[ "${stray_tmp_count}" == "0" ]] \
+     && echo "${out19_2}" | grep -q "simulating interruption before rename"; then
+    pass "scenario 19 — interrupted write leaves pre-existing target byte-identical, temp file cleaned up (H-AUDIT-ATOMIC-WRITE)"
+  else
+    fail "scenario 19 — expected rc2!=0, target unchanged (content A), no stray temp file; got rc2=${rc19_2}, stray_tmp_count=${stray_tmp_count}"
+    echo "${out19_2}" | sed 's/^/      /'
+    echo "      content A: ${CONTENT_A}"
+    echo "      content after: ${CONTENT_AFTER}"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 20 — H-AUDIT-ATOMIC-WRITE happy path: a normal (uninterrupted)
+# write still produces exactly one file at $OUTPUT_FILE with the new
+# content, and no leftover ".XXXXXX"-suffixed temp file — proving the
+# temp-file+rename plumbing doesn't regress the ordinary case.
+# ---------------------------------------------------------------------------
+FEATURE20="atomic-write-happy-path"
+
+out20=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
+  --date 2026-07-29 --feature "${FEATURE20}" --branch "harness/atomic" \
+  --structural APPROVED --behavioral APPROVED --overall APPROVED \
+  --quality-score 5 2>&1) && rc20=0 || rc20=$?
+JSON20="${TMP_REPO}/dev/audit/2026-07-29-harness-atomic-${FEATURE20}.json"
+stray_tmp_count_20="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE20}.json.??????" | wc -l | tr -d ' ')"
+
+if (( rc20 == 0 )) && [[ -f "${JSON20}" ]] \
+   && grep -q '"quality_score": *5' "${JSON20}" \
+   && [[ "${stray_tmp_count_20}" == "0" ]]; then
+  pass "scenario 20 — uninterrupted write still produces exactly the target record, no leftover temp file"
+else
+  fail "scenario 20 — expected rc=0, record at ${JSON20} with score 5, no stray temp file; got rc=${rc20}, stray_tmp_count=${stray_tmp_count_20}"
+  echo "${out20}" | sed 's/^/      /'
+  [[ -f "${JSON20}" ]] && echo "      json: $(cat "${JSON20}")"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
