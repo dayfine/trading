@@ -1,4 +1,9 @@
-( ((config_hash split-basis-blast-radius)
+( ((config_hash split-basis-fold-recert)
+  (base_scenario
+   "staging-record-convention/top3000-2000-2026-record-convention on split-safe v5thin clone (promoted-bundle defaults, pinned worktree @9f50de9)")
+  (window_id margin-m4-broad-13x2y-2000-2026)
+  (verdict Inconclusive) (entry_slug split-basis-fold-recert))
+((config_hash split-basis-blast-radius)
   (base_scenario
    "staging-record-convention/top3000-2000-2026-record-convention (promoted-bundle defaults, raw v5thin vs split-safe clone, pinned worktree @9f50de9)")
   (window_id contiguous-top3000-2000-2026)
