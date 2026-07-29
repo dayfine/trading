@@ -1,0 +1,17 @@
+(tests
+ (names test_sidetable_migrator)
+ (libraries
+  core
+  core_unix
+  core_unix.filename_unix
+  fpath
+  matchers
+  ounit2
+  status
+  csv
+  trading.data_panel.snapshot
+  types
+  weinstein.snapshot_pipeline
+  sidetable_migrator)
+ (preprocess
+  (pps ppx_jane)))
