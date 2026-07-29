@@ -664,6 +664,97 @@ convention above is the cheap mitigation.
   Verify: a run that creates a worktree on its summary branch, removes it, and
   reaches `Fail on escalations` with the budget record committed to the PR.
 
+### A-FASTEXIT-VACUOUS — Step 0.5's Condition 1 passes vacuously on an *empty* queue, so a maximally productive run guarantees a no-op successor
+
+- [ ] **A-FASTEXIT-VACUOUS — the saturated-queue fast-exit fires hardest when
+  there is nothing in the queue at all.** Step 0.5 exists, in its own words, for
+  when "the review queue is fully saturated (all PRs are under human review with
+  no new commits, no status drift)" — a state in which dispatching is pointless.
+  Its Condition 1 is written as a universally-quantified loop:
+
+  ```
+  FOR each track with N > 0 open PRs:
+    IF tip_sha != last_review_sha: CONDITION_1 = FAIL
+  ```
+
+  When **zero** orchestrator-dispatched tracks have open PRs, that loop body never
+  executes and Condition 1 passes **vacuously**. But zero open PRs is the exact
+  *opposite* of a saturated queue — it is maximum dispatch capacity.
+
+  **Observed live, run 4 on 2026-07-28.** Run 3 had merged all three of its PRs
+  and left a detailed six-item handoff. One hour later run 4 found: zero
+  orchestrator PRs open (C1 vacuous PASS), no status commits except run 3's own
+  exempted summary merge (C2 PASS), no drift because run 3's table was clean
+  (C3 PASS), and no backlog change for the same reason (C4 PASS). **All four
+  conditions passed precisely because the previous run had been successful and
+  complete**, and the spec's prescription was to write a no-op summary and exit —
+  while the top item of run 3's own handoff sat unstarted and verified-real.
+  Run 4 overrode the fast-exit, dispatched it, and merged it as #2155.
+
+  The perverse incentive is structural: **the cleaner a run finishes, the more
+  likely its successor is told to do nothing.** A run that leaves drift or an
+  unreviewed PR forces a full pass; a run that leaves a tidy state does not.
+
+  **Fix options** (any one closes it; (a) is the smallest):
+  - **(a)** Make Condition 1 non-vacuous — require at least one open
+    orchestrator-dispatched PR for the fast-exit to be eligible at all. Reword as
+    "there is >= 1 open PR AND every open PR has tip_sha == last_review_sha".
+  - **(b)** Add a fifth condition: "no unstarted actionable item exists in the
+    prior summary's hand-off list, `dev/status/harness.md`, or
+    `dev/status/cleanup.md`." Stronger, but needs an actionability predicate,
+    which is the same unresolved semantics question as H-FOLLOWUP-THRESHOLD-RETUNE.
+  - **(c)** Treat the fast-exit as advisory: emit the four-condition result into
+    the summary but let dispatch eligibility decide, i.e. delete the early exit.
+
+  Note this interacts with the cost story: the fast-exit's stated motivation is
+  saving quota, and run 4 began the day already at 84% of the `$200` backstop, so
+  a no-op was *defensible on budget grounds*. But budget and queue-saturation are
+  different questions and Step 0.5 conflates them — the check should say what it
+  measures. (source: 2026-07-28 lead-orchestrator run 4, observed directly)
+
+### A-FINISH-PROTOCOL-BACKGROUND — agents end their turn on a backgrounded build; stronger prompting does not fix it, removing the long task does
+
+- [ ] **A-FINISH-PROTOCOL-BACKGROUND — 4 of 4 dispatched agents across runs 3 and
+  4 ended their turn while a verification build ran in the background, leaving
+  nothing pushed.** `.claude/rules/worktree-isolation.md` §"Finish Protocol"
+  documents this (a prior session lost three agents' commits to it), and every one
+  of the four briefs stated it explicitly. Run 4 escalated the wording to a
+  dedicated section naming the failure, quoting the prior run's 2-for-2 record,
+  and explaining *why* the pull exists. **Both agents dispatched after that
+  escalation still did it** — the harness worker and qc-structural, verbatim
+  ("I'll stop polling now and wait for that notification before proceeding").
+
+  So the prompt-strength hypothesis is dead: four increasingly emphatic briefings,
+  four failures. The pull is structural. The harness rewards "pause rather than
+  poll" whenever a background task will notify you, and that heuristic is right
+  almost everywhere — it is wrong *only* for the final verify-commit-push
+  sequence, where ending the turn strands the work rather than parking it.
+
+  **What actually worked, first time, run 4:** qc-behavioral was dispatched with
+  the long task **removed from its critical path** — "CI already ran the full
+  suite green on this exact SHA and that is authoritative; you do not need a full
+  `dune runtest`; your mutations are seconds-to-minutes." It completed in one
+  turn with no resume. Same model, same harness, same session; the difference was
+  that it had no 10-to-20-minute job to be tempted to background.
+
+  **Recommended fixes, in order of leverage:**
+  - **(a)** Stop asking agents to re-run the full suite when CI has already run it
+    green on the reviewed SHA. Give them the CI conclusion and require only
+    fast direct-invocation checks. This removes the temptation rather than
+    forbidding the behaviour, and it is the only intervention observed to work.
+  - **(b)** If a long build genuinely must run agent-side, instruct: push a WIP
+    commit *before* starting it, so a stranded turn costs a rerun rather than the
+    work.
+  - **(c)** Dispatcher-side backstop (already effective, but costs a round-trip):
+    the orchestrator polls `git ls-remote` for the branch and resumes the agent
+    with an explicit "nothing is pushed" message. Both run-4 resumes recovered
+    fully.
+
+  Worth reflecting (a) into `.claude/rules/worktree-isolation.md` §"Finish
+  Protocol" and into the QC agent definitions, since the rule currently states the
+  prohibition without addressing the incentive that defeats it.
+  (source: 2026-07-28 lead-orchestrator runs 3-4, 4/4 reproduction)
+
 ## Completed work
 
 ### Orchestrator idempotency — Step 1.5 dispatch guard + structured summary format

@@ -1,4 +1,53 @@
-Reviewed SHA: 1b3f809b04d184d1b335def771a3e1a1dca022b1
+Reviewed SHA: d74a49525ae4c4052f5c6e3876c68411bc9b280d
+
+## Combined QC — PR #2155 `harness/check-universe-deps-residuals` (2026-07-28, orchestrator run 4)
+
+**overall_qc: APPROVED** — merged as `14e14b24`. Zero rework iterations.
+
+| Gate | Verdict | Quality | Review id | Posted at SHA |
+|---|---|---|---|---|
+| qc-structural | APPROVED | 5 | 4802689287 | `d74a49525ae4c4052f5c6e3876c68411bc9b280d` |
+| qc-behavioral | APPROVED | 5 | 4802708124 | `d74a49525ae4c4052f5c6e3876c68411bc9b280d` |
+| CI | green | — | — | re-verified on `40ba056419` immediately before merge |
+
+Scope: closes the three FLAG residuals qc-behavioral raised on #2148 —
+FLAG-1 (`universe_deps_exceptions.conf` unconstrained → `review_at` now required,
+hard-FAIL per-PR in the guard plus weekly expiry via `deep_scan/check_11_linter_expiry.sh`),
+FLAG-2 (candidate scan non-recursive → now `find`-based; `deep_scan/_lib.sh` and
+`deep_scan/main.sh` resolved via exceptions with evidence checked against the real
+`dune`), FLAG-3 (comment mis-credited assertion 5 instead of assertion 1).
+
+**Merge-gate note.** Both reviews were posted at `d74a4952`. Main moved during the
+run (#2156 landed), so the branch was `update-branch`d to `40ba056419` — a merge of
+main; `git diff main...40ba0564` remained the identical 5 files / +304 −56, so the
+QC verdicts carry — and CI was re-verified green on that new tip before merging.
+
+**Behavioral method worth keeping.** 12 mutations, all executed live rather than
+taken from the PR body. The decisive one was a **negative control**: the reviewer
+restored the pre-#2155 non-recursive scan verbatim from `main`, confirmed a
+subdirectory probe was invisible to it, then confirmed the new scan FAILs on the
+same probe. That proves the FLAG-2 gap was real *before* accepting that it is
+closed. It also re-verified the highest-risk change — the `_scan_exceptions_conf()`
+extraction inside the already-wired weekly `check_11_linter_expiry.sh` — by running
+old and new side by side and confirming the pre-existing `[EXPIRED]` finding for
+`segmentation.ml` still fires byte-identically.
+
+**One surviving mutation, non-blocking (FLAG).** `review_at: 2026-13-45` is accepted:
+the date check is shape-only (`[0-9]{4}-[0-9]{2}-[0-9]{2}`), not calendar-validating.
+This mirrors pre-existing laxity in the sibling `linter_exceptions.conf` and cannot
+produce a false green for the guarded class — a bogus date can only affect *when*
+something is re-reviewed, never whether a missing `(universe)` is detected.
+
+**Residual filed** (`H-CHECK-RUNTARGET-PATHQUAL`, `dev/status/harness.md`): the awk
+run-target regex `%\{dep:[A-Za-z0-9_.]+\}` excludes `/`, so a future path-qualified
+`%{dep:subdir/foo.sh}` run-target would not match that branch. Inert today — no rule
+uses that form.
+
+Audit record: `dev/audit/2026-07-28-harness-check-universe-deps-residuals-harness.json`.
+
+---
+
+_Prior entry (superseded head line was: `Reviewed SHA: 1b3f809b04d184d1b335def771a3e1a1dca022b1`)_
 
 ## Structural Checklist — harness POSIX shell portability linter (PR #493, 2026-04-22)
 
