@@ -695,6 +695,35 @@ convention above is the cheap mitigation.
   likely its successor is told to do nothing.** A run that leaves drift or an
   unreviewed PR forces a full pass; a run that leaves a tidy state does not.
 
+  **UPDATE 2026-07-29 (run 30458563291) — the cost is now measured, not
+  hypothetical.** Run 4 could only argue the defect from principle. Today it has
+  a price tag. **Four** orchestrator runs fired on 2026-07-29 before this one
+  (`30415536131`, `30424926891`, `30434301374`, `30446380142`). None pushed an
+  `ops/daily-2026-07-29*` branch, none produced a summary, and `git log` shows
+  **zero** commits from any of them on `main` — the only two commits main
+  received today were the maintainer's `#2159`/`#2160`. Every one took the
+  fast-exit on the same vacuous Condition 1, for the same reason: run 4 had
+  finished cleanly.
+
+  Their measured cost, recovered from the orphaned `ops/budget-*` branches (see
+  `A-NOOP-BUDGET-ORPHAN` below): **$11.17 + $9.07 + $14.63 + $8.66 = $43.53**,
+  for **zero** work product. They were not cheap no-ops either — runs 535 and 536
+  took 16 and 13 minutes of wall clock apiece, because the fast-exit check sits
+  *after* Steps 1/1b/1c/1.5, so a run pays for the full state read and then
+  discards it.
+
+  Meanwhile the state those four runs each read and discarded was: main green,
+  **zero** open orchestrator PRs, a full fresh UTC budget day, and a
+  six-item prioritized handoff whose top actionable item was unstarted. This run
+  overrode the exit on that basis and shipped two PRs (#2162, #2163) — one of
+  which caught a false-green regression in a merge-gating linter.
+
+  So the defect is no longer "a run might be wrongly suppressed." It is: **the
+  fast-exit suppressed an entire day of orchestrator work at a cost of $43.53 in
+  state-reads, and only an ad-hoc override recovered it.** That is the second
+  consecutive run to override rather than obey, which is precisely the "repeated
+  ad hoc" outcome run 4 asked to avoid. Option (a) remains one line.
+
   **Fix options** (any one closes it; (a) is the smallest):
   - **(a)** Make Condition 1 non-vacuous — require at least one open
     orchestrator-dispatched PR for the fast-exit to be eligible at all. Reword as
@@ -805,3 +834,55 @@ operational) has a clean reference instead of inheriting stale text.
 - [Setup guide](https://github.com/anthropics/claude-code-action/blob/main/docs/setup.md)
 - [Sub-agents](https://code.claude.com/docs/en/sub-agents)
 - [Scheduled tasks](https://code.claude.com/docs/en/scheduled-tasks)
+
+- [ ] **A-NOOP-BUDGET-ORPHAN — a run that takes the no-op fast-exit has no
+  summary PR to bundle its budget record into, so the record *always* falls back
+  to an unmerged branch and never reaches `main`.** Filed 2026-07-29 (run
+  30458563291), measured directly.
+
+  The workflow's "Bundle budget into daily summary and auto-merge" step amends
+  `dev/budget/<date>-<run_id>.json` onto the run's `ops/daily-*` branch. A no-op
+  run (Step 0.5) deliberately does **not** create that branch, so the step has
+  no target and takes its fallback path — every record written this way carries
+  `"fallback_branch": "1b"` and is pushed to a standalone `ops/budget-*` branch
+  that nothing ever merges.
+
+  **Measured.** `dev/budget/` on `main` had no record newer than run 3 of
+  2026-07-28 (`30393663268`). Five existed only on origin branches:
+
+  | run | measured | why orphaned |
+  |---|---|---|
+  | `2026-07-28-30405186411` (run 4) | $26.88 | **full pass with a summary PR — still fell back** |
+  | `2026-07-29-30415536131` | $11.17 | no-op, no branch to bundle into |
+  | `2026-07-29-30424926891` | $9.07 | no-op |
+  | `2026-07-29-30434301374` | $14.63 | no-op |
+  | `2026-07-29-30446380142` | $8.66 | no-op |
+
+  All five were recovered into `dev/budget/` by run 30458563291.
+  `budget_rollup_check.sh` still passes 8/8 with them present.
+
+  **Two distinct defects here, do not conflate them:**
+  1. **No-op runs (by design).** Expected given the current shape, but it means
+     no-op cost is structurally invisible — exactly the cost `A-FASTEXIT-VACUOUS`
+     needs measured to be arguable. Fix: on the no-op path, push the budget
+     record somewhere that lands (a tiny `ops/budget-*` PR that auto-merges, or
+     fold it into the next full-pass summary).
+  2. **Run 4 was a full pass and still fell back**, despite its summary PR
+     (#2157) merging cleanly as `cb248e2c` — which carried `dev/audit/`,
+     `dev/health/` and `dev/status/` files but **no** budget JSON. That is
+     `A-BUDGET-ORPHAN` proper and is *not* explained by the no-op path. Run 4
+     recorded the `A-WORKTREE-BLOCKS-BUNDLE` mitigation as having "demonstrably
+     worked"; it did for run 3 and did not for run 4, so the mitigation is not
+     the whole story.
+
+  **Consequence for every prior summary's §Budget.** Daily totals computed from
+  `dev/budget/` on `main` under-report. 2026-07-28's true total is **$194.65
+  (97% of the $200 backstop)**, not the $167.76 run 4 reported — i.e. yesterday
+  actually **breached** the 95% high-water mark, and no run could see it because
+  the record proving it was on an unmerged branch. Any future retune of
+  `target_utilization_*` should be done against recovered figures, not the
+  on-`main` series.
+
+  Blocked on the same `workflow`-scoped token as `A-GIT-SAFE-DIRECTORY`,
+  `A-WORKTREE-BLOCKS-BUNDLE`, `A-BUDGET-ORPHAN`, `A-SUMMARY-STALE-FALLBACK` and
+  `H-BLAS` (#1636) — six filed defects now share that one blocker.

@@ -1,0 +1,18 @@
+{
+  "date": "2026-07-29",
+  "feature": "cleanup",
+  "branch": "cleanup/rescale-duplication",
+  "recorded_at_ns": 1785336505412723655,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 1
+  },
+  "consecutive_rework_count": 0,
+  "notes": "Dispatched as a dedupe; shipped as a correctly-declined dedupe plus two findings. A2 blocks the switchover (analysis/ -> trading/trading/ edge outside backtest/**), independently confirmed by qc-structural. The backlog's byte-equivalent claim was disproved: Svg_series drops active_through via Types.Daily_price.make while Adjusted_basis preserves it via record update; dormant because every weekly_bars consumer discards it (7 call sites enumerated by qc-behavioral). Backlog file path was also stale (snapshot/gen/lib -> snapshot/lib). Merged de34c507. Zero rework iterations."
+}

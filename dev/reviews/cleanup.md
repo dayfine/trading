@@ -1,4 +1,4 @@
-Reviewed SHA: 7d818fd772e2f62fff73081d94cab2f3f898840d
+Reviewed SHA: d75d8b549a489f5be341950a2f22c4cc4f8e477a
 
 # QC review — cleanup track
 
@@ -340,3 +340,58 @@ CI was re-verified green on `46ff6510` immediately before the merge.
 the original was wrong."
 
 Reviewed SHA: 7d818fd772e2f62fff73081d94cab2f3f898840d
+
+
+## PR #2162 — `cleanup/rescale-duplication` (MERGED `de34c507`, orchestrator run 30458563291)
+
+Dispatched as a dedupe of the `rescale_duplication` backlog entry; shipped as a
+**correctly-declined dedupe plus two findings**. Diff is 3 files, +14 −3,
+comment/prose only — no executable code changed.
+
+**Finding 1 — A2 blocks the switchover.** Calling
+`Adjusted_basis.to_adjusted_basis` from `Svg_series` would add
+`weinstein.snapshot_pipeline` (an `analysis/` library) as a dependency of
+`trading/trading/weinstein/snapshot/lib/dune` — a new `analysis/` →
+`trading/trading/` edge outside `trading/trading/backtest/**`. `svg_series.mli`
+already documents the boundary as deliberate. qc-structural confirmed
+independently against both dune files.
+
+**Finding 2 — the backlog's "byte-equivalent" claim was wrong.** The rescale
+formula matches, but `Svg_series` builds via `Types.Daily_price.make` without
+`~active_through` (defaults to `None`) while `Adjusted_basis` uses
+`{ b with ... }` and preserves it. Dormant: qc-behavioral enumerated the single
+`_to_adjusted_basis` call site and all seven `weekly_bars` consumers
+(`html_report_renderer.ml:50`, `test_svg_chart.ml:531,575`,
+`test_svg_series.ml:36,53,79,100`) and confirmed none can observe it — so
+dormancy is stronger than the PR claims and does not depend on `weekly_bars`
+being private.
+
+**Finding 3 — the backlog file path was stale**: `snapshot/gen/lib/svg_series.ml`
+does not exist; the real file is `snapshot/lib/svg_series.ml`. Corrected.
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+Rework iterations: 0.
+
+| Gate | Verdict | Quality | Review id | Posted at SHA |
+|---|---|---|---|---|
+| qc-structural | APPROVED | 5 | 4809439338 | `d75d8b549a489f5be341950a2f22c4cc4f8e477a` |
+| qc-behavioral | APPROVED | 4 | 4809600081 | `d75d8b549a489f5be341950a2f22c4cc4f8e477a` |
+| CI | green | — | — | re-verified on the tip immediately before merge |
+
+## Quality Score
+
+4 — careful and well-evidenced; held back from 5 because the durable in-code
+comments omit the `active_through` divergence the PR itself discovered.
+
+**Open FLAG (non-blocking, carried).** Nothing pins the two implementations in
+sync — no test observes both, and `arch_layer_test.sh` guards only the reverse
+edge. qc-behavioral notes a cross-file pin *is* legal under A2 (the
+`trading/trading/` → consumed-by-`analysis/` direction is permitted, and
+`weinstein_snapshot_gen` already links both), so the follow-up is actionable
+rather than blocked. The PR parked it inside an `[x]`-closed backlog entry,
+where no scan of open `- [ ]` items would find it; the orchestrator re-filed it
+as an open item in `dev/status/cleanup.md` in the same run.
+`harness_gap: LINTER_CANDIDATE`.

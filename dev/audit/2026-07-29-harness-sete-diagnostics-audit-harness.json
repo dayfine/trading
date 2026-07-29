@@ -1,0 +1,18 @@
+{
+  "date": "2026-07-29",
+  "feature": "harness",
+  "branch": "harness/sete-diagnostics-audit",
+  "recorded_at_ns": 1785338668353182161,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 1
+  },
+  "consecutive_rework_count": 0,
+  "notes": "H-CHECK-SETE-DIAGNOSTICS + H-WRITE-AUDIT-SHEBANG-MISMATCH (usage-comment half). ONE REWORK ITERATION. Iteration 0 (eacbfb01): structural APPROVED q5, behavioral NEEDS_REWORK q2 -- the || continue fix converted an unreadable-but-present violating file from a loud exit-2 crash into 'OK: all lib/*.ml files within limits' exit 0, a FALSE GREEN in a merge-gating linter, falsifying the PR's own no-verdict-change claim; and the new guard pinned only 1 of 3 fixes. Iteration 1 (be62f248): both blockers fixed under the same mutations that found them -- unreadable-but-present now exits 1 with a named diagnostic, vanished files still tolerated (no flaky gate traded for the false green), and reverting each of the three fixes INDEPENDENTLY turns the guard red. Audit tally reconciled 23/20 -> 22 (19 safe + 3 fixed); perf_catalog_check.sh:73 itemized. write_audit.sh bash-only choice now pinned by an assertion verified load-bearing. Merged after update-branch to f37379e0 (PR content byte-identical, verdicts carried)."
+}
