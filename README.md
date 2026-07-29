@@ -22,12 +22,14 @@ each overwritten on regeneration — do not hand-edit between the markers:
 
 | Result | Total return | Max DD | Trades | Win rate | Period |
 |---|---|---|---|---|---|
-| Weinstein top-3000 (promoted config) | +8,689% | 30.3% | 1,170 | 38.4% | 2000-01-01 -> 2026-06-26 |
+| Weinstein top-3000 (promoted config, split-safe basis) | +8,367% | 37.1% | 1,122 | 37.7% | 2000-01-01 -> 2026-06-26 |
+| Weinstein top-3000 (superseded — split-blind resistance basis) | +8,689% | 30.3% | 1,170 | 38.4% | 2000-01-01 -> 2026-06-26 |
 | SPY total return (same window, comparator) | +706% | — | — | — | 2000-01-01 -> 2026-06-26 |
 | Pre-bundle record (superseded) | +7,914% | 32.3% | 1,187 | — | 2000-01-01 -> 2026-06-26 |
 
 Provenance (scenario / commit / date):
-- **Weinstein top-3000 (promoted config)** — `test_data/backtest_scenarios/staging-leverf-28y/top3000-2000-2026-rcb-f000.sexp` @ 6a2d9b426 (PR #2047 — promoted bundle: w30 + virgin-crossing + floors-zero) (2026-07-23)
+- **Weinstein top-3000 (promoted config, split-safe basis)** — `test_data/backtest_scenarios/staging-leverf-28y/top3000-2000-2026-rcb-f000.sexp` @ user R3 decision 2026-07-29 — same scenario on the split-safe clone (#2153 migrator); ledger 2026-07-28-split-basis-blast-radius (2026-07-29)
+- **Weinstein top-3000 (superseded — split-blind resistance basis)** — `test_data/backtest_scenarios/staging-leverf-28y/top3000-2000-2026-rcb-f000.sexp` @ 6a2d9b426 (PR #2047 — promoted bundle: w30 + virgin-crossing + floors-zero) (2026-07-23)
 - **SPY total return (same window, comparator)** — `n/a — dividend-adjusted SPY buy & hold` @ DEEP_RESULTS.md record-of-record standing comparator (2026-07-14)
 - **Pre-bundle record (superseded)** — `test_data/backtest_scenarios/staging-record-convention/top3000-2000-2026-record-convention.sexp` @ 0a2e4562d (PR #1960, Run D, dedup-v2 warehouse; DEEP_RESULTS record-of-record 2026-07-14) (2026-07-14)
 
@@ -37,14 +39,14 @@ _Basis: mark-to-market, including open-position marks on a few concentrated fat-
 <!-- toplines:start -->
 ## Top-line results
 
-Pinned testing period: **1998-12-22 -> 2026-06-12** (common bar coverage of SPY, BRK-B, and the nine original SPDR sector ETFs).
+Pinned testing period: **1998-12-22 -> 2026-07-10** (common bar coverage of SPY, BRK-B, and the nine original SPDR sector ETFs).
 
 | Strategy | Total return | CAGR (%/yr) | Notes |
 |---|---|---|---|
-| SPY buy-and-hold | +888.9% | +8.7% | buy & hold, dividend-adjusted close |
-| BRK-B buy-and-hold | +1132.4% | +9.6% | buy & hold, dividend-adjusted close |
-| SPY-only Weinstein | +408.0% | +6.1% | Spy_only_weinstein, 30-week investor MA, long/flat |
-| Sector-ETF Weinstein | +528.9% | +6.9% | Sector_rotation_weinstein k=3, 30-week investor MA, RS vs SPY |
+| SPY buy-and-hold | +909.1% | +8.8% | buy & hold, dividend-adjusted close |
+| BRK-B buy-and-hold | +1143.6% | +9.6% | buy & hold, dividend-adjusted close |
+| SPY-only Weinstein | +417.6% | +6.1% | Spy_only_weinstein, 30-week investor MA, long/flat |
+| Sector-ETF Weinstein | +520.6% | +6.9% | Sector_rotation_weinstein k=3, 30-week investor MA, RS vs SPY |
 
 Regenerate: `dune exec trading/backtest/readme_toplines/bin/readme_toplines.exe -- --readme README.md` (run inside the dev container).
 <!-- toplines:end -->

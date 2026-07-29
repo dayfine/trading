@@ -18,27 +18,32 @@ and *realized vs MTM*, not the raw absolute.
 > (RS-starved first 22 weeks). Absolute numbers are NOT comparable to runs made
 > after 2026-07-08. Relative comparisons within a block remain valid.
 
-## ⭐ RECORD OF RECORD — promoted bundle, top-3000 28y (2026-07-23)
+## ⭐ RECORD OF RECORD — promoted bundle, split-safe basis, top-3000 28y (re-pinned 2026-07-29)
 
-**The current long-only record basis** (promoted 2026-07-23, PR #2047): the
-resistance-v2 bundle flipped default-on (`w30` + virgin-crossing + floors-zero)
-on the top-3000 PIT-2000 warehouse, 2000-01-01 .. 2026-06-26. **Supersedes the
-Run-D record-of-record below.**
+**The current long-only record basis** (bundle promoted 2026-07-23, PR #2047;
+**re-pinned to the split-safe resistance basis 2026-07-29 per user R3
+decision**): the resistance-v2 bundle default-on (`w30` + virgin-crossing +
+floors-zero) on the split-safe clone (#2153 migrator) of the top-3000
+PIT-2000 warehouse, 2000-01-01 .. 2026-06-26.
 
 | Run | Total return (MTM) | MaxDD | Trades | Win rate | Scenario sexp | Basis |
 |---|---:|---:|---:|---:|---|---|
-| **Promoted bundle (RECORD)** | **+8,689%** | **30.3%** | 1,170 | 38.4% | `staging-leverf-28y/top3000-2000-2026-rcb-f000.sexp` (out-of-repo staging) | commit `6a2d9b426` (PR #2047) |
+| **Promoted bundle, split-safe (RECORD)** | **+8,366.8%** | **37.1%** | 1,122 | 37.7% | `staging-leverf-28y/top3000-2000-2026-rcb-f000.sexp` (out-of-repo staging, adjusted clone) | user R3 2026-07-29; ledger `2026-07-28-split-basis-blast-radius` |
+| Split-blind basis (superseded 07-29) | +8,689% | 30.3% | 1,170 | 38.4% | same scenario, raw-basis warehouse | commit `6a2d9b426` (PR #2047) |
 | Pre-bundle (Run D, superseded) | +7,914% | 32.3% | 1,187 | — | `staging-record-convention/top3000-2000-2026-record-convention.sexp` | commit `0a2e4562d` (PR #1960) |
 
-> ⚠ **Split-basis caveat (2026-07-28):** this row was measured on
-> **split-blind** resistance side-tables (#2133). On the split-safe clone of
-> the same warehouse the same scenario measures **+8,366.8% / MaxDD 37.1% /
-> 1,122 trades** (raw control reproduced this row exactly) — the return
-> flattering is mild (−322pp) but the **MaxDD was flattered by 6.8pp**.
-> Ledger `2026-07-28-split-basis-blast-radius`; memo
-> `dev/notes/split-basis-blast-radius-2026-07-28.md`. Re-pinning the record
-> to the honest numbers is a pending user decision; the fold-level promotion
-> evidence for the bundle is not yet re-certified on the honest basis.
+> **Split-basis grid (complete 2026-07-29):** the split-blind row was
+> measured on split-blind resistance side-tables (#2133). Grid: broad path
+> −322pp return / MaxDD flattered 6.8pp; broad folds honest **.765**/28.49
+> (never compare to .827 — ledger `2026-07-29-split-basis-fold-recert`);
+> sp500 path −187pp but MaxDD **improves** 1.7pp (DD-flattering is a
+> broad-universe marginal-cohort effect, not universal — ledger
+> `2026-07-29-split-basis-sp500-cell`). Memo
+> `dev/notes/split-basis-blast-radius-2026-07-28.md`. Note the bundle's
+> *relative* promotion margin (bundle vs pre-bundle/w15/floors alternatives)
+> has not been re-measured on the honest basis — the re-pin records the
+> honest level of the promoted config, not a re-certification of the
+> promotion decision.
 
 Same-window comparator: **SPY total return +706%** (dividend-adjusted). Standing
 caveats as in the Run-D block below: single path; terminal MTM concentrated on a
