@@ -414,11 +414,12 @@ let test_support_floor_callbacks_parity _ =
   let snap_cbs = Panel_callbacks.support_floor_callbacks_of_daily_view view in
   let bar_result =
     Weinstein_stops.Support_floor.find_recent_level_with_callbacks
-      ~callbacks:bar_cbs ~side:Trading_base.Types.Long ~min_pullback_pct:0.05
+      ~callbacks:bar_cbs ~side:Trading_base.Types.Long ~min_pullback_pct:0.05 ()
   in
   let snap_result =
     Weinstein_stops.Support_floor.find_recent_level_with_callbacks
       ~callbacks:snap_cbs ~side:Trading_base.Types.Long ~min_pullback_pct:0.05
+      ()
   in
   match (bar_result, snap_result) with
   | None, None -> ()
@@ -594,11 +595,12 @@ let test_support_floor_snapshot_views_parity _ =
   in
   let bar_result =
     Weinstein_stops.Support_floor.find_recent_level_with_callbacks
-      ~callbacks:bar_cbs ~side:Trading_base.Types.Long ~min_pullback_pct:0.05
+      ~callbacks:bar_cbs ~side:Trading_base.Types.Long ~min_pullback_pct:0.05 ()
   in
   let snap_result =
     Weinstein_stops.Support_floor.find_recent_level_with_callbacks
       ~callbacks:snap_cbs ~side:Trading_base.Types.Long ~min_pullback_pct:0.05
+      ()
   in
   match (bar_result, snap_result) with
   | None, None -> ()

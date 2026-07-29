@@ -68,9 +68,10 @@ let initial_stop_and_kind ?(min_stop_distance_pct = 0.0) ~stops_config
   in
   let stop_floor_kind : Audit_recorder.stop_floor_kind =
     match
-      Weinstein_stops.Support_floor.find_recent_level_with_callbacks ~callbacks
-        ~side:cand.side
-        ~min_pullback_pct:stops_config.Weinstein_stops.min_correction_pct
+      Weinstein_stops.Support_floor.find_recent_level_with_callbacks
+        ~anchor_mode:stops_config.Weinstein_stops.support_floor_anchor_mode
+        ~callbacks ~side:cand.side
+        ~min_pullback_pct:stops_config.Weinstein_stops.min_correction_pct ()
     with
     | Some _ -> Support_floor
     | None -> Buffer_fallback

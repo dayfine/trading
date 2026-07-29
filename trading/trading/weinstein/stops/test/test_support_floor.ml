@@ -577,6 +577,115 @@ let test_wrapper_support_floor_vs_proxy_differs _ =
   in
   assert_that (equal_stop_state proxy wrapped) (equal_to false)
 
+(* ==================================================================== *)
+(*            anchor_mode: Wick (default) vs Close                       *)
+(* ==================================================================== *)
+
+(* CLMB-shaped long fixture: bar 3 has a deep intraday wick (low 90) that
+   undercuts every surrounding close, while the closes hold a shallower
+   correction.
+     peak  (bar 2): high 110, close 109
+     wick  (bar 3): low  90,  close 100  <- capitulation wick
+   Wick mode  → correction low = intraday low 90  (depth (110-90)/110 = 18%).
+   Close mode → correction low = lowest close 100 (depth (109-100)/109 = 8.3%),
+                anchoring on the highest close 109; the wick is ignored. *)
+let clmb_long_bars =
+  [
+    make_bar ~date:"2024-01-01" ~high:102.0 ~low:100.0 ~close:101.0;
+    make_bar ~date:"2024-01-02" ~high:110.0 ~low:108.0 ~close:109.0;
+    make_bar ~date:"2024-01-03" ~high:101.0 ~low:90.0 ~close:100.0;
+    make_bar ~date:"2024-01-04" ~high:102.0 ~low:99.0 ~close:100.0;
+    make_bar ~date:"2024-01-05" ~high:109.0 ~low:105.0 ~close:108.0;
+  ]
+
+let clmb_long_callbacks =
+  Support_floor.callbacks_from_bars ~bars:clmb_long_bars
+    ~as_of:(Date.of_string "2024-01-05")
+    ~lookback_bars:90
+
+(* Mirror short fixture: bar 3 has an intraday spike (high 110) above every
+   surrounding close.
+     trough (bar 2): low 90, close 91
+     spike  (bar 3): high 110, close 100  <- counter-rally spike
+   Wick mode  → rally high = intraday high 110 (depth (110-90)/90 = 22%).
+   Close mode → rally high = highest close 100 (depth (100-91)/91 = 9.9%),
+                anchoring on the lowest close 91; the spike is ignored. *)
+let spike_short_bars =
+  [
+    make_bar ~date:"2024-01-01" ~high:100.0 ~low:99.0 ~close:99.5;
+    make_bar ~date:"2024-01-02" ~high:92.0 ~low:90.0 ~close:91.0;
+    make_bar ~date:"2024-01-03" ~high:110.0 ~low:97.0 ~close:100.0;
+    make_bar ~date:"2024-01-04" ~high:101.0 ~low:98.0 ~close:99.0;
+    make_bar ~date:"2024-01-05" ~high:95.0 ~low:92.0 ~close:93.0;
+  ]
+
+let spike_short_callbacks =
+  Support_floor.callbacks_from_bars ~bars:spike_short_bars
+    ~as_of:(Date.of_string "2024-01-05")
+    ~lookback_bars:90
+
+let test_anchor_default_is_wick_long _ =
+  (* Omitting [~anchor_mode] reads the intraday wick — bit-identical to the
+     historical behaviour (default = Wick). *)
+  assert_that
+    (Support_floor.find_recent_level_with_callbacks
+       ~callbacks:clmb_long_callbacks ~side:Long ~min_pullback_pct:0.08 ())
+    (is_some_and (float_equal 90.0))
+
+let test_anchor_wick_long_explicit _ =
+  assert_that
+    (Support_floor.find_recent_level_with_callbacks
+       ~anchor_mode:Support_floor.Wick ~callbacks:clmb_long_callbacks ~side:Long
+       ~min_pullback_pct:0.08 ())
+    (is_some_and (float_equal 90.0))
+
+let test_anchor_close_long_ignores_wick _ =
+  assert_that
+    (Support_floor.find_recent_level_with_callbacks
+       ~anchor_mode:Support_floor.Close ~callbacks:clmb_long_callbacks
+       ~side:Long ~min_pullback_pct:0.08 ())
+    (is_some_and (float_equal 100.0))
+
+let test_anchor_default_is_wick_short _ =
+  assert_that
+    (Support_floor.find_recent_level_with_callbacks
+       ~callbacks:spike_short_callbacks ~side:Short ~min_pullback_pct:0.08 ())
+    (is_some_and (float_equal 110.0))
+
+let test_anchor_close_short_ignores_spike _ =
+  assert_that
+    (Support_floor.find_recent_level_with_callbacks
+       ~anchor_mode:Support_floor.Close ~callbacks:spike_short_callbacks
+       ~side:Short ~min_pullback_pct:0.08 ())
+    (is_some_and (float_equal 100.0))
+
+(* ---- Config field: default, round-trip, omitted-defaults-to-Wick ---- *)
+
+let test_config_default_anchor_mode_is_wick _ =
+  assert_that default_config.support_floor_anchor_mode
+    (equal_to (Support_floor.Wick : Support_floor.anchor_mode))
+
+let test_config_close_sexp_roundtrips _ =
+  let c =
+    { default_config with support_floor_anchor_mode = Support_floor.Close }
+  in
+  assert_that (config_of_sexp (sexp_of_config c)) (equal_to (c : config))
+
+let test_config_sexp_omits_field_defaults_wick _ =
+  (* A serialized config that predates this field (no
+     [support_floor_anchor_mode] key) must parse back to the [Wick] default —
+     the backward-compat guarantee behind R1. *)
+  let stripped =
+    match sexp_of_config default_config with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List (Sexp.Atom "support_floor_anchor_mode" :: _) -> false
+            | _ -> true))
+    | other -> other
+  in
+  assert_that (config_of_sexp stripped) (equal_to (default_config : config))
+
 let suite =
   "support_floor"
   >::: [
@@ -624,6 +733,20 @@ let suite =
          >:: test_wrapper_short_uses_resistance_ceiling_when_available;
          "wrapper_support_floor_vs_proxy_differs"
          >:: test_wrapper_support_floor_vs_proxy_differs;
+         (* anchor_mode: Wick (default) vs Close *)
+         "anchor_default_is_wick_long" >:: test_anchor_default_is_wick_long;
+         "anchor_wick_long_explicit" >:: test_anchor_wick_long_explicit;
+         "anchor_close_long_ignores_wick"
+         >:: test_anchor_close_long_ignores_wick;
+         "anchor_default_is_wick_short" >:: test_anchor_default_is_wick_short;
+         "anchor_close_short_ignores_spike"
+         >:: test_anchor_close_short_ignores_spike;
+         (* config field: default / round-trip / back-compat *)
+         "config_default_anchor_mode_is_wick"
+         >:: test_config_default_anchor_mode_is_wick;
+         "config_close_sexp_roundtrips" >:: test_config_close_sexp_roundtrips;
+         "config_sexp_omits_field_defaults_wick"
+         >:: test_config_sexp_omits_field_defaults_wick;
        ]
 
 let () = run_test_tt_main suite

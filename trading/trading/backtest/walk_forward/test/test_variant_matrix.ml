@@ -675,6 +675,43 @@ let test_vol_scaled_stop_nested_axis_expands _ =
               ]);
        ])
 
+(* Proves R2 (experiment-flag-discipline) for the support-floor anchoring dial:
+   [support_floor_anchor_mode] is a real variant field on [Weinstein_stops.config]
+   (the [stops_config] field of [Weinstein_strategy.config]), so the nested key
+   path [stops_config.support_floor_anchor_mode] expands and passes
+   [Overlay_validator] validation (a bad key raises — see
+   [test_bad_nested_key_raises]) with no overlay-validator change. The no-op
+   default [Wick] and the experimental [Close] sit on the same axis. *)
+let test_support_floor_anchor_mode_nested_axis_expands _ =
+  let axis =
+    VM.Key
+      {
+        path = [ "stops_config"; "support_floor_anchor_mode" ];
+        values = Sexp.[ Atom "Wick"; Atom "Close" ];
+      }
+  in
+  let t = { VM.axes = [ axis ]; expansion = VM.Cartesian } in
+  assert_that (VM.expand t)
+    (elements_are
+       [
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string
+                     "((stops_config ((support_floor_anchor_mode Wick))))");
+              ]);
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string
+                     "((stops_config ((support_floor_anchor_mode Close))))");
+              ]);
+       ])
+
 (* ---------- Sampled determinism + fallback ---------- *)
 
 let test_sampled_determinism _ =
@@ -844,6 +881,8 @@ let suite =
          >:: test_cash_floor_exemption_nested_axis_expands;
          "vol-scaled stop nested axis expands + validates"
          >:: test_vol_scaled_stop_nested_axis_expands;
+         "support-floor anchor-mode nested axis expands + validates"
+         >:: test_support_floor_anchor_mode_nested_axis_expands;
          "sampled determinism (same seed -> same labels)"
          >:: test_sampled_determinism;
          "sampled different seed -> different subset"

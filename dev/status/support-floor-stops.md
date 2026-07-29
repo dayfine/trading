@@ -23,6 +23,47 @@ YES
 - Backtest regression pins updated on 2018-2023 cached data: 6YR round-trips 1W/6L → 4W/3L; COVID 0W/4L → 1W/3L; POS adds one sell — confirms the support-floor path fires on real entries (smoke check)
 - `dune build && dune runtest` green, `dune build @fmt` clean
 
+## 2026-07-29 addendum — anchor-mode dial (task #13, PR `feat/floor-anchor-close`)
+
+- Added `Support_floor.anchor_mode = Wick | Close` and threaded it as
+  `?anchor_mode` on `find_recent_level_with_callbacks` (default `Wick` =
+  bit-identical historical behaviour). `Close` measures the correction low /
+  rally high (and the anchoring peak / trough) on the bar **close** instead of
+  the intraday `low_price` / `high_price`, so a lone capitulation wick no longer
+  anchors the structural floor to the wick extreme. Long/short mirrored (short:
+  highest close vs highest high).
+- Wired as a real `Weinstein_stops.config` field `support_floor_anchor_mode`
+  (`[@sexp.default Wick]`) → embedded in `Weinstein_strategy.config.stops_config`
+  → resolves through `Overlay_validator` as the `Variant_matrix` axis
+  `((stops_config ((support_floor_anchor_mode Close))))`. R1 (default-off, exact
+  no-op) + R2 (searchable axis) satisfied; R3 promotion needs a ledger ACCEPT.
+- Motivation: CLMB 2026-04-30 wick $14.64 (~4% below neighbouring closes) forced
+  a 42.5% stop distance → tiny position (`dev/notes/weekly-picks-2026-07-26.md`,
+  priorities-2026-07-29 P1). Faithful-core: numeric-threshold-class initial-stop
+  dial; spine item 5 (stop below the base) intact under either reading.
+- Tests: default=Wick bit-identity, Close-mode long (wick) + short (spike)
+  fixtures, config sexp round-trip + omitted-field-defaults-to-Wick,
+  variant-matrix axis expansion. Bar-list `find_recent_level` intentionally left
+  Wick-only (all-labelled signature; the dial lives on the callbacks path that
+  the production stop + panel callers use) — avoids an unerasable-optional
+  warning and churning ~20 existing call sites.
+
+### Decision item — split-safe floors (A2 boundary; NOT executed here)
+
+The priorities doc also wants `support_floor` split-safe (anchor on raw,
+split-unadjusted lows) via `Adjusted_basis`. `Adjusted_basis` lives in
+`trading/analysis/weinstein/snapshot_pipeline/`, but `support_floor` is in
+`trading/trading/weinstein/stops/`. A direct import violates architecture rule
+A2 (analysis → `trading/trading/` only allowed under `backtest/**`). Proposed
+resolutions for human/review decision (per CLAUDE.md "propose as a decision
+item"):
+  1. Feed basis-corrected lows from the **caller** layer (the snapshot / entry
+     pipeline already crosses into `analysis/`), keeping `support_floor` a pure
+     price-list consumer — least architectural churn.
+  2. Move the split-basis helper to a **canonical shared lib** both subtrees may
+     depend on (e.g. `trading/base/` or a new shared module).
+Not executed in this PR; needs a scope/architecture call.
+
 ## Ownership
 `feat-weinstein` agent — see `.claude/agents/feat-weinstein.md`. Dispatched per the 2026-04-16 direction change in `dev/decisions.md` to unblock feat-backtest's support-floor stops experiment (see `dev/status/backtest-infra.md` §Blocked on).
 

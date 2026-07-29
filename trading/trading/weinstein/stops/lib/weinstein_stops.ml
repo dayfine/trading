@@ -78,8 +78,9 @@ let compute_initial_stop_with_floor_with_callbacks ~config ~side ~entry_price
     ~callbacks ~fallback_buffer =
   let reference_level =
     match
-      Support_floor.find_recent_level_with_callbacks ~callbacks ~side
-        ~min_pullback_pct:config.min_correction_pct
+      Support_floor.find_recent_level_with_callbacks
+        ~anchor_mode:config.support_floor_anchor_mode ~callbacks ~side
+        ~min_pullback_pct:config.min_correction_pct ()
     with
     | Some level -> level
     | None -> _fallback_reference ~side ~entry_price ~fallback_buffer

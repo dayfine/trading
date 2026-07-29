@@ -18,6 +18,30 @@
 
     All computation is pure — same input gives the same output. *)
 
+(** Which price field the correction-low / rally-high (and the anchoring peak /
+    trough) are read from.
+
+    Weinstein (§Stop-Loss Rules) says place the stop below "the significant
+    support floor (prior correction low)" but does not mandate the {e intraday}
+    extreme; whether the "correction low" is measured on closes or on intraday
+    lows is a numeric-threshold-class dial per
+    [.claude/rules/weinstein-faithful-core.md] (spine item 5 — "stop below the
+    base" — holds under either reading). [Close] avoids a lone intraday wick
+    anchoring the floor far below the surrounding trading range (e.g. CLMB's
+    2026-04-30 wick $14.64, ~4% below its neighbouring closes, which forced a
+    42.5% stop distance and a tiny position). *)
+type anchor_mode =
+  | Wick
+      (** Anchor and correction extreme are measured on the {b intraday}
+          [high_price] / [low_price] — a shakeout wick counts. This is the
+          historical behaviour. *)
+  | Close
+      (** Anchor and correction extreme are measured on the bar [close_price]
+          instead of the intraday high/low. A single-bar capitulation wick that
+          undercuts (long) or overshoots (short) every surrounding close does
+          {b not} pull the floor to the wick extreme. *)
+[@@deriving show, eq, sexp]
+
 val find_recent_level :
   bars:Types.Daily_price.t list ->
   as_of:Core.Date.t ->
@@ -28,6 +52,11 @@ val find_recent_level :
 (** [find_recent_level ~bars ~as_of ~side ~min_pullback_pct ~lookback_bars]
     returns the reference level of the most recent qualifying counter-trend move
     ending at or before [as_of].
+
+    Bar-list convenience wrapper — always [Wick] mode. The [anchor_mode] dial is
+    exposed only on {!find_recent_level_with_callbacks} (the path the production
+    stop {!Weinstein_stops.compute_initial_stop_with_floor} and panel-backed
+    callers use); this wrapper keeps its all-labelled signature unchanged.
 
     Long side:
     - Identify the {b peak}: the bar in the window with the highest
@@ -128,17 +157,22 @@ val callbacks_from_bars :
     accessor returns [None]. *)
 
 val find_recent_level_with_callbacks :
+  ?anchor_mode:anchor_mode ->
   callbacks:callbacks ->
   side:Trading_base.Types.position_side ->
   min_pullback_pct:float ->
+  unit ->
   float option
-(** [find_recent_level_with_callbacks ~callbacks ~side ~min_pullback_pct] is the
-    indicator-callback shape of {!find_recent_level}. [as_of] and
-    [lookback_bars] are baked into the [callbacks] bundle and no longer
-    parameters here.
+(** [find_recent_level_with_callbacks ?anchor_mode ~callbacks ~side
+     ~min_pullback_pct ()] is the indicator-callback shape of
+    {!find_recent_level}. The trailing [unit] makes the [?anchor_mode] optional
+    erasable (all other arguments are labelled). [as_of] and [lookback_bars] are
+    baked into the [callbacks] bundle and no longer parameters here.
 
     The algorithm scans [0..n_days-1] to identify the anchor (highest high for
-    [Long], lowest low for [Short]; tie-break: latest date wins, i.e. the
-    smallest day offset), then scans the post-anchor offsets
-    [0..anchor_offset-1] for the counter-move extreme. Returns [Some level] when
-    the counter-move depth meets [min_pullback_pct], else [None]. *)
+    [Long], lowest low for [Short] under the default [Wick] mode — the
+    [get_high] / [get_low] callbacks; the [get_close] callback under [Close];
+    tie-break: latest date wins, i.e. the smallest day offset), then scans the
+    post-anchor offsets [0..anchor_offset-1] for the counter-move extreme (read
+    from the same field). Returns [Some level] when the counter-move depth meets
+    [min_pullback_pct], else [None]. [anchor_mode] defaults to [Wick]. *)
