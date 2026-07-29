@@ -90,9 +90,45 @@ Ledger: `dev/experiments/_ledger/2026-07-28-split-basis-blast-radius.sexp`.
 - P1 (unchanged, next): #13 floor wick-vs-close anchoring; #2122 slice (a)
   validator wired into the generator.
 
+## Addendum (2026-07-29) — fold-level re-cert
+
+Ledger: `2026-07-29-split-basis-fold-recert`. Same 13×2y broad grid the
+promotion evidence used (`margin-m4-broad-13x2y-2000-2026`), promoted-bundle
+defaults, run against the split-safe clone from the same pinned worktree:
+
+| Basis | mean Sharpe | mean return % | mean MaxDD % | Calmar |
+|---|---:|---:|---:|---:|
+| Split-blind (was the basis of record) | .827 | 36.17 | 14.05 | 1.309 |
+| **Honest (adjusted)** | **.765 ± .462** | **28.49 ± 26.49** | **15.93** | **.897** |
+
+- Fold-level flattering: −.062 Sharpe / −7.7pp mean fold return / +1.9pp DD.
+- Internal parity: a no-op default variant is bit-identical to baseline on all
+  13 folds (worst gap 0.0000) — adjusted read path deterministic, axis
+  plumbing certified on the new hash.
+- ⚠ The honest .765 numerically resembles the *contaminated* 07-26 baseline
+  (.766, #2108) — coincidence; that one was environmental and raw-basis.
+  Never conflate them.
+- **From 2026-07-29 the honest fold baseline of record is .765/28.49/15.93 on
+  the adjusted clone.** New fold-level experiments must run on split-safe
+  warehouses and compare against it, not .827. Standing REJECTs citing .827
+  (margin M4, leverage-dawn, leverf-age) remain qualitatively safe — losing
+  margins dwarf the basis shift — but their baselines read as raw-basis.
+- Not settled: bundle-vs-**alternatives** honest margin (pre-bundle / w15 /
+  floors arms were never run adjusted). If the R3 record re-pin wants that
+  margin, it's a further comparison grid.
+- sp500 cell (universe-diversity leg of the grid): raw-vs-adjusted arms on
+  `sp500-2000-2026-catstop` queued the same night; results land in
+  `/tmp/sweeps/basis-sp500-{raw,adj}.log`.
+
+Spec (worktree-local, reproducible): `basis-recert-BROAD-2000-2026.sexp` —
+record-convention base, Rolling 13×730d 2000-01-01..2026-04-30, single no-op
+`overhead_supply` value at the promoted defaults, gate Sharpe 7/13.
+
 ## Artifacts
 
 - Runs: `/tmp/sweeps/basis-blast/{raw,adj}/` (`trades.csv`,
   `equity_curve.csv`, `actual.sexp`, `params.sexp`) +
-  `migration_report.sexp`; logs `/tmp/sweeps/basis-blast-{raw,adj}.log`.
+  `migration_report.sexp` + `walk_forward_report.md` + `aggregate.sexp`
+  (fold re-cert); logs `/tmp/sweeps/basis-blast-{raw,adj}.log`,
+  `/tmp/sweeps/basis-recert.log`.
 - Tool: PR #2153; migration re-runnable in ~4 min for any warehouse.
