@@ -100,31 +100,52 @@ let test_create_entering_long_emits_stoplimit_buy _ =
     _create_entering_transition ~position_id:"AAPL-1" ~symbol:"AAPL" ~side:Long
       ~quantity:100.0 ~entry_price:155.0
   in
-  let orders = from_transitions ~transitions:[ t ] ~get_position:_lookup in
+  let orders = from_transitions ~transitions:[ t ] ~get_position:_lookup () in
   assert_that orders
     (elements_are
        [
-         (fun o ->
-           assert_that o.ticker (equal_to "AAPL");
-           assert_that o.side (equal_to Trading_base.Types.Buy);
-           assert_that o.shares (equal_to 100));
+         all_of
+           [
+             field (fun o -> o.ticker) (equal_to "AAPL");
+             field (fun o -> o.side) (equal_to Trading_base.Types.Buy);
+             field (fun o -> o.shares) (equal_to 100);
+           ];
        ])
 
-let test_create_entering_long_order_type_is_stoplimit _ =
+(* Disarmed default (entry_extension_max_pct = 0.0): the limit collapses onto
+   the trigger — the degenerate StopLimit (E, E) the generator emitted before
+   #2158, so a default live run is byte-identical. *)
+let test_create_entering_long_disarmed_is_zero_width_band _ =
   let t =
     _create_entering_transition ~position_id:"AAPL-1" ~symbol:"AAPL" ~side:Long
       ~quantity:100.0 ~entry_price:155.0
   in
-  let orders = from_transitions ~transitions:[ t ] ~get_position:_lookup in
+  let orders = from_transitions ~transitions:[ t ] ~get_position:_lookup () in
   assert_that orders
     (elements_are
        [
-         (fun o ->
-           assert_that o.order_type
-             (matching ~msg:"Expected StopLimit"
-                (function
-                  | Trading_base.Types.StopLimit _ -> Some () | _ -> None)
-                (equal_to ())));
+         field
+           (fun o -> o.order_type)
+           (equal_to (Trading_base.Types.StopLimit (155.0, 155.0)));
+       ])
+
+(* Armed: the limit sits one extension above the trigger for a long — a
+   do-not-chase ceiling. 10% above 155.0 = 170.5. *)
+let test_create_entering_long_armed_caps_limit_above_trigger _ =
+  let t =
+    _create_entering_transition ~position_id:"AAPL-1" ~symbol:"AAPL" ~side:Long
+      ~quantity:100.0 ~entry_price:155.0
+  in
+  let orders =
+    from_transitions ~entry_extension_max_pct:10.0 ~transitions:[ t ]
+      ~get_position:_lookup ()
+  in
+  assert_that orders
+    (elements_are
+       [
+         field
+           (fun o -> o.order_type)
+           (equal_to (Trading_base.Types.StopLimit (155.0, 170.5)));
        ])
 
 let test_create_entering_short_emits_stoplimit_sell _ =
@@ -132,14 +153,34 @@ let test_create_entering_short_emits_stoplimit_sell _ =
     _create_entering_transition ~position_id:"TSLA-1" ~symbol:"TSLA" ~side:Short
       ~quantity:30.0 ~entry_price:200.0
   in
-  let orders = from_transitions ~transitions:[ t ] ~get_position:_lookup in
+  let orders = from_transitions ~transitions:[ t ] ~get_position:_lookup () in
   assert_that orders
     (elements_are
        [
-         (fun o ->
-           assert_that o.ticker (equal_to "TSLA");
-           assert_that o.side (equal_to Trading_base.Types.Sell);
-           assert_that o.shares (equal_to 30));
+         all_of
+           [
+             field (fun o -> o.ticker) (equal_to "TSLA");
+             field (fun o -> o.side) (equal_to Trading_base.Types.Sell);
+             field (fun o -> o.shares) (equal_to 30);
+           ];
+       ])
+
+(* Armed short: the cap mirrors below the trigger — 10% below 200.0 = 180.0. *)
+let test_create_entering_short_armed_caps_limit_below_trigger _ =
+  let t =
+    _create_entering_transition ~position_id:"TSLA-1" ~symbol:"TSLA" ~side:Short
+      ~quantity:30.0 ~entry_price:200.0
+  in
+  let orders =
+    from_transitions ~entry_extension_max_pct:10.0 ~transitions:[ t ]
+      ~get_position:_lookup ()
+  in
+  assert_that orders
+    (elements_are
+       [
+         field
+           (fun o -> o.order_type)
+           (equal_to (Trading_base.Types.StopLimit (200.0, 180.0)));
        ])
 
 (* --- TriggerExit → no broker order (GTC stop already at broker) --- *)
@@ -149,7 +190,7 @@ let test_trigger_exit_produces_no_order _ =
      broker as a GTC order. TriggerExit is internal accounting only — no
      additional order should be sent. *)
   let t = _trigger_exit_transition ~position_id:"AAPL-1" ~exit_price:138.0 in
-  let orders = from_transitions ~transitions:[ t ] ~get_position:_lookup in
+  let orders = from_transitions ~transitions:[ t ] ~get_position:_lookup () in
   assert_that orders (size_is 0)
 
 (* --- UpdateRiskParams → Stop order --- *)
@@ -158,7 +199,7 @@ let test_update_risk_with_stop_emits_stop_order _ =
   let t =
     _update_risk_transition ~position_id:"AAPL-1" ~stop_loss_price:142.0
   in
-  let orders = from_transitions ~transitions:[ t ] ~get_position:_lookup in
+  let orders = from_transitions ~transitions:[ t ] ~get_position:_lookup () in
   assert_that orders
     (elements_are
        [
@@ -185,7 +226,7 @@ let test_update_risk_no_stop_returns_empty _ =
           };
     }
   in
-  let orders = from_transitions ~transitions:[ t ] ~get_position:_lookup in
+  let orders = from_transitions ~transitions:[ t ] ~get_position:_lookup () in
   assert_that orders (size_is 0)
 
 (* --- Simulator-internal transitions → ignored --- *)
@@ -198,7 +239,7 @@ let test_entry_fill_is_ignored _ =
       kind = Position.EntryFill { filled_quantity = 50.0; fill_price = 155.0 };
     }
   in
-  let orders = from_transitions ~transitions:[ t ] ~get_position:_lookup in
+  let orders = from_transitions ~transitions:[ t ] ~get_position:_lookup () in
   assert_that orders (size_is 0)
 
 let test_exit_complete_is_ignored _ =
@@ -209,7 +250,7 @@ let test_exit_complete_is_ignored _ =
       kind = Position.ExitComplete;
     }
   in
-  let orders = from_transitions ~transitions:[ t ] ~get_position:_lookup in
+  let orders = from_transitions ~transitions:[ t ] ~get_position:_lookup () in
   assert_that orders (size_is 0)
 
 (* --- Multiple transitions in one call --- *)
@@ -222,13 +263,15 @@ let test_multiple_transitions_produce_one_order_each _ =
   let t2 =
     _update_risk_transition ~position_id:"AAPL-1" ~stop_loss_price:142.0
   in
-  let orders = from_transitions ~transitions:[ t1; t2 ] ~get_position:_lookup in
+  let orders =
+    from_transitions ~transitions:[ t1; t2 ] ~get_position:_lookup ()
+  in
   assert_that orders (size_is 2)
 
 (* --- Empty transitions → empty result --- *)
 
 let test_empty_transitions_returns_empty _ =
-  let orders = from_transitions ~transitions:[] ~get_position:_lookup in
+  let orders = from_transitions ~transitions:[] ~get_position:_lookup () in
   assert_that orders (size_is 0)
 
 let suite =
@@ -236,10 +279,14 @@ let suite =
   >::: [
          "create_entering_long_emits_stoplimit_buy"
          >:: test_create_entering_long_emits_stoplimit_buy;
-         "create_entering_long_order_type_is_stoplimit"
-         >:: test_create_entering_long_order_type_is_stoplimit;
+         "create_entering_long_disarmed_is_zero_width_band"
+         >:: test_create_entering_long_disarmed_is_zero_width_band;
+         "create_entering_long_armed_caps_limit_above_trigger"
+         >:: test_create_entering_long_armed_caps_limit_above_trigger;
          "create_entering_short_emits_stoplimit_sell"
          >:: test_create_entering_short_emits_stoplimit_sell;
+         "create_entering_short_armed_caps_limit_below_trigger"
+         >:: test_create_entering_short_armed_caps_limit_below_trigger;
          "trigger_exit_produces_no_order"
          >:: test_trigger_exit_produces_no_order;
          "update_risk_with_stop_emits_stop_order"

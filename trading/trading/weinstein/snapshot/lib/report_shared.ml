@@ -3,28 +3,64 @@ open Core
 let risk_pct ~entry ~stop =
   if Float.equal entry 0.0 then 0.0 else (entry -. stop) /. entry *. 100.0
 
-(* Resting stop ticket — the ordinary case: price has not reached the entry, so
-   the order sits at the breakout level and expires unfilled if it never gets
-   there. *)
-let _stop_order (c : Weekly_snapshot.candidate) =
+(* The do-not-chase cap price carried by a reconciled candidate, or [None] for
+   an unreconciled one and for a pre-#2158 snapshot (whose [cap] defaults to
+   [0.0]). Drives whether the ticket carries a limit leg. *)
+let _cap_of (c : Weekly_snapshot.candidate) =
+  match Entry_reconciliation.levels_of c.reconciliation with
+  | Some l when Float.( > ) l.cap 0.0 -> Some l.cap
+  | Some _ | None -> None
+
+(* Resting stop-limit ticket (issue #2158): price has not reached the entry, so
+   the order rests at the breakout level and fills anywhere up to the
+   do-not-chase [cap]. The displayed risk is the WORST case — [sized_risk_amount]
+   is sized on the cap, not on the entry (see [Trade_sizing]). *)
+let _stop_limit_order (c : Weekly_snapshot.candidate) ~cap =
   Printf.sprintf
-    "BUY STOP %d sh @ $%.2f (~$%.0f, %.1f%% of book, risk $%.0f); on fill \
-     place SELL STOP @ $%.2f, GTC; cancel if unfilled by Friday close"
-    c.sized_shares c.entry c.sized_position_value
+    "BUY STOPLIMIT %d sh, trigger $%.2f limit $%.2f (~$%.0f, %.1f%% of book, \
+     worst-case risk $%.0f); on fill place SELL STOP @ $%.2f, GTC; cancel if \
+     unfilled by Friday close"
+    c.sized_shares c.entry cap c.sized_position_value
     (c.sized_position_pct *. 100.0)
     c.sized_risk_amount c.stop
 
-(* Re-anchored market ticket (issue #2103): price is already through the entry,
-   so a resting stop there is an instantly-filling market order. The ticket says
-   so, quotes the fill it is sized on, and names the overshoot.
+(* Legacy resting-stop ticket for a candidate carrying no cap (disarmed default
+   / pre-#2158 snapshot): the exact string the report emitted before #2158, so
+   an unreconciled row renders unchanged. *)
+let _stop_order (c : Weekly_snapshot.candidate) =
+  match _cap_of c with
+  | Some cap -> _stop_limit_order c ~cap
+  | None ->
+      Printf.sprintf
+        "BUY STOP %d sh @ $%.2f (~$%.0f, %.1f%% of book, risk $%.0f); on fill \
+         place SELL STOP @ $%.2f, GTC; cancel if unfilled by Friday close"
+        c.sized_shares c.entry c.sized_position_value
+        (c.sized_position_pct *. 100.0)
+        c.sized_risk_amount c.stop
 
-   The quoted price comes from {!Weekly_snapshot.expected_fill_price} — the same
-   accessor [Trade_sizing] sizes on — and NOT from [l.close], which merely
-   happens to hold the same value. Sourcing it structurally is what makes the
-   single-source-of-truth claim in [weekly_snapshot.mli] true rather than
-   coincidentally true (review round 1). [l] remains the source of the
-   overshoot, which only the class carries. *)
-let _market_order (c : Weekly_snapshot.candidate)
+(* Re-anchored ticket (issues #2103, #2158): price is already through the entry,
+   so a resting stop there is already triggered. Rather than a MARKET order that
+   chases whatever the open prints, the ticket is a LIMIT at ~the Friday close
+   with the do-not-chase [cap] as the ceiling — it fills at or below the cap and
+   refuses to chase past it. The displayed risk is the worst case
+   ([sized_risk_amount], sized on the cap).
+
+   The quoted price comes from {!Weekly_snapshot.expected_fill_price} — the
+   ~close it would fill around — while [l] carries the overshoot and cap. A
+   pre-#2158 snapshot with no cap keeps the old MARKET wording. *)
+let _capped_limit_order (c : Weekly_snapshot.candidate)
+    (l : Entry_reconciliation.levels) ~cap =
+  Printf.sprintf
+    "BUY LIMIT %d sh @ ~$%.2f, limit $%.2f (~$%.0f, %.1f%% of book, worst-case \
+     risk $%.0f) — price is %.1f%% through the $%.2f entry level; sized on the \
+     cap, not the entry level; on fill place SELL STOP @ $%.2f, GTC"
+    c.sized_shares
+    (Weekly_snapshot.expected_fill_price c)
+    cap c.sized_position_value
+    (c.sized_position_pct *. 100.0)
+    c.sized_risk_amount l.overshoot_pct c.entry c.stop
+
+let _legacy_market_order (c : Weekly_snapshot.candidate)
     (l : Entry_reconciliation.levels) =
   Printf.sprintf
     "BUY MARKET %d sh @ ~$%.2f (~$%.0f, %.1f%% of book, risk $%.0f) — price is \
@@ -36,6 +72,12 @@ let _market_order (c : Weekly_snapshot.candidate)
     c.sized_position_value
     (c.sized_position_pct *. 100.0)
     c.sized_risk_amount l.overshoot_pct c.entry c.stop
+
+let _limit_order (c : Weekly_snapshot.candidate)
+    (l : Entry_reconciliation.levels) =
+  match _cap_of c with
+  | Some cap -> _capped_limit_order c l ~cap
+  | None -> _legacy_market_order c l
 
 (* Suppressed ticket (issue #2103): the name has run too far past its own
    breakout to buy. The row is kept so the reader can watch it, but there is no
@@ -52,7 +94,7 @@ let _do_not_chase (c : Weekly_snapshot.candidate)
    sizing-note fallbacks are applied. *)
 let _order (c : Weekly_snapshot.candidate) =
   match c.reconciliation with
-  | Entry_reconciliation.Through_entry l -> _market_order c l
+  | Entry_reconciliation.Through_entry l -> _limit_order c l
   | Not_reconciled | Valid_stop _ | Extended _ -> _stop_order c
 
 (* Executable order instruction for one candidate. Kept here rather than in a
@@ -82,9 +124,10 @@ let entry_reconciliation =
    stock turned Stage 2, which the <=4-week early-Stage-2 window lets a pick \
    outrun by weeks; this column reconciles it against the current close (issue \
    #2103). A row marked \"through\" is already past its trigger, so the order \
-   is a MARKET buy re-sized on that fill rather than a resting stop at the \
-   level. A row marked \"EXTENDED\" is past the configured chase cap: no order \
-   is issued and the row is kept for watch only."
+   is a LIMIT buy at ~the close capped at the do-not-chase ceiling rather than \
+   a resting stop at the level. A row marked \"EXTENDED\" is past the \
+   configured chase cap: no order is issued and the row is kept for watch \
+   only."
 
 let any_reconciled shown =
   List.exists shown ~f:(fun (c : Weekly_snapshot.candidate) ->

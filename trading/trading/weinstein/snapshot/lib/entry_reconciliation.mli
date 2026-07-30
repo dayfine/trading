@@ -67,10 +67,21 @@ type levels = {
           entry. Positive = price is already past the entry in the trade's
           direction; negative = the entry has not been reached (the ordinary
           resting-stop case). *)
+  cap : float; [@sexp.default 0.0]
+      (** The do-not-chase ceiling — the worst fill the order may accept, one
+          [extension_max_pct] past the entry in the trade's direction
+          ([entry x (1 + pct/100)] long, mirrored short). Carried in the frozen
+          snapshot so both the sizer ({!Weekly_snapshot.sizing_basis_price}) and
+          the report/chart draw the same ceiling the live order caps at (issue
+          #2158, "size on the cap" — the honest-conservative basis: worst
+          admissible fill, not expected fill). Additive field defaulting to
+          [0.0]: snapshots written before #2158 parse with no cap, and
+          {!Weekly_snapshot.sizing_basis_price} falls back to the expected fill
+          for them, so their sizing is read exactly as it was written. *)
 }
 [@@deriving sexp, eq, show]
-(** Price context carried by every reconciled class, so a renderer can show both
-    the close and the overshoot without re-deriving either. *)
+(** Price context carried by every reconciled class, so a renderer can show the
+    close, the overshoot and the do-not-chase cap without re-deriving them. *)
 
 (** Reconciliation class of one candidate. *)
 type t =
@@ -101,6 +112,19 @@ val overshoot_pct :
     "already past the entry".
 
     [0.0] for a non-positive [entry] rather than a division by zero. *)
+
+val cap_price :
+  side:[ `Long | `Short ] -> entry:float -> extension_max_pct:float -> float
+(** [cap_price ~side ~entry ~extension_max_pct] is the do-not-chase ceiling —
+    the worst fill an entry order should accept, one [extension_max_pct] past
+    [entry] in the trade's direction: [entry x (1 + pct/100)] for a long, its
+    mirror [entry x (1 - pct/100)] for a short.
+
+    Returns [entry] unchanged when [extension_max_pct <= 0.0] (disarmed — no
+    cap, so the worst admissible fill collapses onto the entry) or when
+    [entry <= 0.0] (undefined). This is the same ceiling the live
+    {!Weinstein_order_gen} caps its [StopLimit] at, and the value stored in
+    {!levels.cap} by {!classify}. *)
 
 val classify :
   side:[ `Long | `Short ] ->

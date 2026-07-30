@@ -164,6 +164,34 @@ let test_overshoot_pct_zero_entry_is_zero _ =
     (ER.overshoot_pct ~side:`Long ~entry:0.0 ~close:92.7)
     (float_equal 0.0)
 
+(* ---- [cap_price]: the do-not-chase ceiling (issue #2158) ---- *)
+
+(* Long cap sits one extension ABOVE the entry: 15% above 100 = 115. *)
+let test_cap_price_long_is_above_entry _ =
+  assert_that
+    (ER.cap_price ~side:`Long ~entry:_entry ~extension_max_pct:_cap)
+    (float_equal 115.0)
+
+(* Short cap mirrors BELOW the entry: 15% below 100 = 85. *)
+let test_cap_price_short_is_below_entry _ =
+  assert_that
+    (ER.cap_price ~side:`Short ~entry:_entry ~extension_max_pct:_cap)
+    (float_equal 85.0)
+
+(* Disarmed ([extension_max_pct <= 0]) collapses the cap onto the entry, so the
+   worst admissible fill is just the entry. *)
+let test_cap_price_disarmed_is_the_entry _ =
+  assert_that
+    (ER.cap_price ~side:`Long ~entry:_entry ~extension_max_pct:0.0)
+    (float_equal _entry)
+
+(* [classify] stores the cap on the levels of a reconciled candidate — a long
+   through-entry at $107.30 with the 15% cap carries cap $115.00. *)
+let test_classify_stores_the_cap_on_levels _ =
+  assert_that
+    (ER.levels_of (_classify 107.3))
+    (is_some_and (field (fun (l : ER.levels) -> l.cap) (float_equal 115.0)))
+
 let suite =
   "entry_reconciliation"
   >::: [
@@ -195,6 +223,13 @@ let suite =
          "overshoot_pct is side-signed" >:: test_overshoot_pct_is_side_signed;
          "overshoot_pct on a zero entry is zero"
          >:: test_overshoot_pct_zero_entry_is_zero;
+         "cap_price long is above entry" >:: test_cap_price_long_is_above_entry;
+         "cap_price short is below entry"
+         >:: test_cap_price_short_is_below_entry;
+         "cap_price disarmed is the entry"
+         >:: test_cap_price_disarmed_is_the_entry;
+         "classify stores the cap on levels"
+         >:: test_classify_stores_the_cap_on_levels;
        ]
 
 let () = run_test_tt_main suite

@@ -32,6 +32,7 @@ let _palette =
     "  --px: #52514e;";
     "  --entry: #2a78d6;";
     "  --stop: #e34948;";
+    "  --cap: #c77f1a;";
     "  --ma: #4a6fa5;";
     "  --vol: #d0cfc9;";
     "  --band: #eceae4;";
@@ -49,6 +50,7 @@ let _palette =
     "    --px: #c3c2b7;";
     "    --entry: #3987e5;";
     "    --stop: #e66767;";
+    "    --cap: #e0a54a;";
     "    --ma: #7ea3d8;";
     "    --vol: #45443f;";
     "    --band: #2b2b28;";
@@ -189,11 +191,13 @@ let _chart_style =
     "svg.spark .lvl-entry { stroke: var(--entry); stroke-dasharray: 5 3; }";
     "svg.spark .lvl-stop { stroke: var(--stop); stroke-dasharray: 2 2; }";
     "svg.spark .lvl-ref { stroke: var(--ink-soft); stroke-dasharray: 1 3; }";
+    "svg.spark .lvl-cap { stroke: var(--cap); stroke-dasharray: 4 2; }";
     "svg.spark .lvl-label { font-size: 10.5px;";
     "                       font-variant-numeric: tabular-nums; }";
     "svg.spark .lvl-label-entry { fill: var(--entry); }";
     "svg.spark .lvl-label-stop { fill: var(--stop); }";
     "svg.spark .lvl-label-ref { fill: var(--ink-soft); }";
+    "svg.spark .lvl-label-cap { fill: var(--cap); }";
   ]
 
 let css =

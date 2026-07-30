@@ -549,7 +549,7 @@ let test_through_entry_row_renders_market_order _ =
       (_reconciled_snap
          ~reconciliation:
            (Entry_reconciliation.Through_entry
-              { close = 107.3; overshoot_pct = 7.3 })
+              { close = 107.3; overshoot_pct = 7.3; cap = 0.0 })
          ~sized_shares:57 ~sized_position_value:6116.10
          ~sized_position_pct:0.061161 ~sized_risk_amount:986.10)
   in
@@ -567,6 +567,60 @@ let test_through_entry_row_renders_market_order _ =
          not_ ~msg:"a through-entry ticket must not be a resting stop"
            (_has_substring "BUY STOP");
          _has_substring "close vs entry:";
+       ])
+
+(* Issue #2158: an ARMED through-entry row (carrying a do-not-chase cap $115.00)
+   renders a LIMIT buy at ~the close capped at the ceiling — NOT a MARKET order
+   and NOT a resting stop. The sizes are the cap-based ones (40 sh / $4600 /
+   worst-case risk $1000), and the Risk % column is quoted against the cap:
+   (115.00 - 90.00) / 115.00 = 21.7%, agreeing with $1000 / $4600 = 21.7%. *)
+let test_armed_through_entry_row_renders_limit_at_close _ =
+  let md =
+    Report_renderer.render
+      (_reconciled_snap
+         ~reconciliation:
+           (Entry_reconciliation.Through_entry
+              { close = 107.3; overshoot_pct = 7.3; cap = 115.0 })
+         ~sized_shares:40 ~sized_position_value:4600.0 ~sized_position_pct:0.046
+         ~sized_risk_amount:1000.0)
+  in
+  assert_that md
+    (all_of
+       [
+         _has_substring
+           "| 1 | TEST | B | 0.50 | $100.00 | $107.30 (+7.3% through) | $90.00 \
+            | 21.7% |";
+         _has_substring
+           "BUY LIMIT 40 sh @ ~$107.30, limit $115.00 (~$4600, 4.6% of book, \
+            worst-case risk $1000) — price is 7.3% through the $100.00 entry \
+            level; sized on the cap, not the entry level; on fill place SELL \
+            STOP @ $90.00, GTC";
+         not_ ~msg:"an armed through-entry ticket must not be a MARKET order"
+           (_has_substring "BUY MARKET");
+       ])
+
+(* Issue #2158: an ARMED valid-stop row (price not yet at the entry, carrying a
+   $115.00 cap) renders a resting STOPLIMIT quoting BOTH the trigger ($100.00)
+   and the limit cap ($115.00), sized worst-case on the cap. *)
+let test_armed_valid_stop_row_renders_stoplimit _ =
+  let md =
+    Report_renderer.render
+      (_reconciled_snap
+         ~reconciliation:
+           (Entry_reconciliation.Valid_stop
+              { close = 99.0; overshoot_pct = -1.0; cap = 115.0 })
+         ~sized_shares:40 ~sized_position_value:4600.0 ~sized_position_pct:0.046
+         ~sized_risk_amount:1000.0)
+  in
+  assert_that md
+    (all_of
+       [
+         _has_substring
+           "BUY STOPLIMIT 40 sh, trigger $100.00 limit $115.00 (~$4600, 4.6% \
+            of book, worst-case risk $1000); on fill place SELL STOP @ $90.00, \
+            GTC; cancel if unfilled by Friday close";
+         not_ ~msg:"a stop-limit ticket must not be a plain resting stop"
+           (_has_substring "BUY STOP 40");
        ])
 
 (* Extended candidates leave the actionable table entirely: a mixed snapshot
@@ -587,7 +641,7 @@ let test_extended_candidate_moves_to_watch_section _ =
                 c with
                 reconciliation =
                   Entry_reconciliation.Extended
-                    { close = 134.5; overshoot_pct = 34.5 };
+                    { close = 134.5; overshoot_pct = 34.5; cap = 0.0 };
               }
             else c);
     }
@@ -632,7 +686,7 @@ let test_extended_row_is_kept_but_ticket_suppressed _ =
       (_reconciled_snap
          ~reconciliation:
            (Entry_reconciliation.Extended
-              { close = 134.5; overshoot_pct = 34.5 })
+              { close = 134.5; overshoot_pct = 34.5; cap = 0.0 })
          ~sized_shares:0 ~sized_position_value:0.0 ~sized_position_pct:0.0
          ~sized_risk_amount:0.0)
   in
@@ -659,7 +713,7 @@ let test_valid_stop_row_keeps_resting_ticket_and_needs_no_legend _ =
       (_reconciled_snap
          ~reconciliation:
            (Entry_reconciliation.Valid_stop
-              { close = 96.0; overshoot_pct = -4.0 })
+              { close = 96.0; overshoot_pct = -4.0; cap = 0.0 })
          ~sized_shares:100 ~sized_position_value:10_000.0
          ~sized_position_pct:0.10 ~sized_risk_amount:1000.0)
   in
@@ -699,6 +753,10 @@ let suite =
   >::: [
          "through_entry_row_renders_market_order"
          >:: test_through_entry_row_renders_market_order;
+         "armed_through_entry_row_renders_limit_at_close"
+         >:: test_armed_through_entry_row_renders_limit_at_close;
+         "armed_valid_stop_row_renders_stoplimit"
+         >:: test_armed_valid_stop_row_renders_stoplimit;
          "extended_candidate_moves_to_watch_section"
          >:: test_extended_candidate_moves_to_watch_section;
          "no_watch_section_without_extended"

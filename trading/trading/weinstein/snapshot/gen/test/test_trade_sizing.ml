@@ -104,83 +104,71 @@ let test_invalid_stop_direction _ =
        ])
 
 (* ------------------------------------------------------------------ *)
-(* Entry reconciliation (issue #2103): sizing on the expected FILL      *)
+(* Entry reconciliation (issues #2103, #2158): sizing on the CAP        *)
 (* ------------------------------------------------------------------ *)
 
-let _through_entry ~close =
-  Entry_reconciliation.Through_entry
-    { close; overshoot_pct = (close -. 100.0) /. 100.0 *. 100.0 }
+(* Reconciliation classes built through the REAL classifier with the armed
+   thresholds (band 1pt, chase cap 15pt) so the do-not-chase [cap] field is
+   the one production computes — entry $100 -> cap $115. The candidate's own
+   entry is $100, matching. *)
+let _classify ~close =
+  Entry_reconciliation.classify ~side:`Long ~entry:100.0 ~close
+    ~through_band_pct:1.0 ~extension_max_pct:15.0
 
-let _extended ~close =
-  Entry_reconciliation.Extended
-    { close; overshoot_pct = (close -. 100.0) /. 100.0 *. 100.0 }
-
-(* {b The pin for issue #2103.} A candidate whose $100.00 breakout entry the
-   price has already run 7.3% past is sized on the FILL ($107.30), never on the
-   stale level.
+(* {b The pin for issue #2158 ("size on the cap").} A through-entry candidate is
+   sized on the WORST admissible fill — the do-not-chase cap ($115.00) the live
+   [StopLimit] order caps at — not on the expected fill ($107.30) and not on the
+   stale $100.00 breakout level.
 
    Hand computation, default config (risk 1%, per-pos cap 30%, exposure 90%,
-   cash 100%), portfolio $100,000, stop $90.00:
+   cash 100%), portfolio $100,000, stop $90.00, cap $115.00:
 
-     risk/share  = |107.30 - 90.00|         = 17.30
-     risk shares = floor(1000 / 17.30)      = floor(57.803...) = 57
-     per-pos cap = floor(30000 / 107.30)    = 279     (looser)
-     exposure    = floor(90000 / 107.30)    = 838     (looser)
-     cash        = floor(100000 / 107.30)   = 932     (looser)
-     shares      = min(...)                 = 57
-     value       = 57 * 107.30              = 6116.10
-     pct         = 6116.10 / 100000         = 0.061161
-     risk        = 57 * 17.30               = 986.10
+     risk/share  = |115.00 - 90.00|         = 25.00
+     risk shares = floor(1000 / 25.00)      = 40
+     per-pos cap = floor(30000 / 115.00)    = 260     (looser)
+     shares      = min(...)                 = 40
+     value       = 40 * 115.00              = 4600.00
+     pct         = 4600.00 / 100000         = 0.046
+     risk        = 40 * 25.00               = 1000.00
 
-   Sizing on the STALE entry — the pre-fix behaviour — would give 100 shares,
-   $10,000 of value and $1,000 of stated risk, while the position would really
-   cost 100 * 107.30 = $10,730 and risk 100 * 17.30 = $1,730. Every one of the
-   four numbers below therefore differs between the two implementations, so
-   this test cannot pass against the bug. (On the real MBX row the same
-   arithmetic ran 651 sh @ $46.08 with the stock at $62: $784 of displayed risk
-   against ~$11,145 of real risk, 14x.) *)
-let test_through_entry_sized_on_the_fill_not_the_entry _ =
+   Sizing on the expected fill ($107.30) — the pre-#2158 behaviour — would give
+   57 shares, $6,116.10 of value and $986.10 of risk; sizing on the stale entry
+   ($100.00) would give 100 / $10,000 / $1,000. All four numbers below differ
+   from both, so this test pins the cap basis specifically. *)
+let test_through_entry_sized_on_the_cap _ =
   assert_that
-    (_size ~reconciliation:(_through_entry ~close:107.3) ())
+    (_size ~reconciliation:(_classify ~close:107.3) ())
     (all_of
        [
-         field _shares (equal_to 57);
-         field _value (float_equal 6116.10);
-         field _pct (float_equal 0.061161);
-         field _risk (float_equal 986.10);
+         field _shares (equal_to 40);
+         field _value (float_equal 4600.0);
+         field _pct (float_equal 0.046);
+         field _risk (float_equal 1000.0);
          field _note is_none;
        ])
 
-(* The re-sizing is not a fixed haircut: a bigger overshoot inside the cap costs
-   more per share and earns fewer of them.
+(* Size-on-cap is invariant to WHERE inside the band the close sits: two
+   through-entry candidates with different closes ($107.30 and $112.00) but the
+   same $115.00 cap size identically, because the worst admissible fill is the
+   cap in both cases. (Under the old expected-fill basis these would have sized
+   differently — 57 vs 45 shares.) *)
+let test_size_is_on_the_cap_not_the_close _ =
+  let at_107 = _size ~reconciliation:(_classify ~close:107.3) () in
+  let at_112 = _size ~reconciliation:(_classify ~close:112.0) () in
+  assert_that (_shares at_112) (equal_to (_shares at_107))
 
-     risk/share  = |112.00 - 90.00|      = 22.00
-     risk shares = floor(1000 / 22.00)   = 45
-     value       = 45 * 112.00           = 5040.00
-     risk        = 45 * 22.00            = 990.00 *)
-let test_larger_overshoot_sizes_smaller _ =
+(* A valid-stop candidate is ALSO sized on the cap: its resting [StopLimit (E,
+   cap)] can fill anywhere up to the cap, so the honest-conservative size is the
+   worst case ($115.00), identical to the through-entry cap sizing above — NOT
+   the $100 entry. This differs from the [Not_reconciled] baseline (100 sh),
+   which stays sized on the entry because it carries no cap (the R1 no-op). *)
+let test_valid_stop_sized_on_the_cap _ =
   assert_that
-    (_size ~reconciliation:(_through_entry ~close:112.0) ())
+    (_size ~reconciliation:(_classify ~close:96.0) ())
     (all_of
        [
-         field _shares (equal_to 45);
-         field _value (float_equal 5040.0);
-         field _risk (float_equal 990.0);
-       ])
-
-(* A valid-stop candidate is sized on the entry level exactly as before — the
-   resting order really does fill there. Identical to the [Not_reconciled]
-   baseline above (100 / 10000 / 1000), which is the R1 no-op guarantee. *)
-let test_valid_stop_sized_on_the_entry _ =
-  assert_that
-    (_size
-       ~reconciliation:
-         (Entry_reconciliation.Valid_stop { close = 96.0; overshoot_pct = -4.0 })
-       ())
-    (all_of
-       [
-         field _shares (equal_to 100);
-         field _value (float_equal 10_000.0);
+         field _shares (equal_to 40);
+         field _value (float_equal 4600.0);
          field _risk (float_equal 1000.0);
        ])
 
@@ -191,7 +179,7 @@ let test_valid_stop_sized_on_the_entry _ =
    sizing note's). *)
 let test_extended_is_left_unsized _ =
   assert_that
-    (_size ~reconciliation:(_extended ~close:134.5) ())
+    (_size ~reconciliation:(_classify ~close:134.5) ())
     (all_of
        [
          field _shares (equal_to 0);
@@ -209,7 +197,7 @@ let test_extended_clears_a_previous_size _ =
     (Trade_sizing.size_candidate ~risk_config:Portfolio_risk.default_config
        ~portfolio_value:100_000.0 ~sizing_cash:100_000.0 ~side:`Long
        ~placeholder:false
-       { sized with reconciliation = _extended ~close:134.5 })
+       { sized with reconciliation = _classify ~close:134.5 })
     (all_of [ field _shares (equal_to 0); field _value (float_equal 0.0) ])
 
 let suite =
@@ -219,12 +207,11 @@ let suite =
          "tighter_stop_more_shares" >:: test_tighter_stop_more_shares;
          "placeholder_note" >:: test_placeholder_note;
          "invalid_stop_direction" >:: test_invalid_stop_direction;
-         "through-entry is sized on the fill, not the entry"
-         >:: test_through_entry_sized_on_the_fill_not_the_entry;
-         "a larger overshoot sizes smaller"
-         >:: test_larger_overshoot_sizes_smaller;
-         "valid-stop is sized on the entry"
-         >:: test_valid_stop_sized_on_the_entry;
+         "through-entry is sized on the cap, not the close"
+         >:: test_through_entry_sized_on_the_cap;
+         "size is on the cap, not the close"
+         >:: test_size_is_on_the_cap_not_the_close;
+         "valid-stop is sized on the cap" >:: test_valid_stop_sized_on_the_cap;
          "extended is left unsized" >:: test_extended_is_left_unsized;
          "extended clears a previous size"
          >:: test_extended_clears_a_previous_size;
