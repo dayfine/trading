@@ -10,9 +10,9 @@
 
     {1 Mapping}
 
-    - [CreateEntering { side=Long; entry_price; target_quantity }] →
-      [StopLimit] buy [shares] triggering at [entry_price], with the limit capped
-      one [entry_extension_max_pct] above it (the do-not-chase ceiling — issue
+    - [CreateEntering { side=Long; entry_price; target_quantity }] → [StopLimit]
+      buy [shares] triggering at [entry_price], with the limit capped one
+      [entry_extension_max_pct] above it (the do-not-chase ceiling — issue
       #2158). The old degenerate [StopLimit (E, E)] never filled once price ran
       through the breakout; [StopLimit (E, E x (1 + pct/100))] fills anywhere
       between the trigger and the cap, and refuses to chase past it.
@@ -63,10 +63,11 @@ val from_transitions :
       one such fraction past the trigger ([E x (1 + pct/100)] long, mirrored
       short). Defaults to [0.0], which collapses the limit onto the trigger
       ([StopLimit (E, E)]) — the exact order the generator emitted before issue
-      #2158, so an unarmed live run is byte-identical (experiment-flag-discipline
-      R1). Pass the strategy's [entry_extension_max_pct] to arm the cap; it is
-      the {e same} knob {!Entry_reconciliation} classifies the weekly report's
-      tickets against, so live orders and the report share one ceiling.
+      #2158, so an unarmed live run is byte-identical
+      (experiment-flag-discipline R1). Pass the strategy's
+      [entry_extension_max_pct] to arm the cap; it is the {e same} knob
+      {!Entry_reconciliation} classifies the weekly report's tickets against, so
+      live orders and the report share one ceiling.
 
     @param transitions
       The [Position.transition list] returned by [Strategy.on_market_close].

@@ -1513,8 +1513,8 @@ let test_long_candidate_reconciled_and_sized_on_the_cap _ =
             field
               (fun (c : Weekly_snapshot.candidate) ->
                 c.sized_position_value
-                -. (Float.of_int c.sized_shares
-                   *. Weekly_snapshot.sizing_basis_price c))
+                -. Float.of_int c.sized_shares
+                   *. Weekly_snapshot.sizing_basis_price c)
               (float_equal 0.0);
             field
               (fun (c : Weekly_snapshot.candidate) ->

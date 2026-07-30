@@ -864,7 +864,8 @@ let _reconciled_snapshot =
         {
           _short_candidate with
           reconciliation =
-            Entry_reconciliation.Extended { close = 65.5; overshoot_pct = 34.5; cap = 0.0 };
+            Entry_reconciliation.Extended
+              { close = 65.5; overshoot_pct = 34.5; cap = 0.0 };
         };
       ];
   }
@@ -925,10 +926,7 @@ let test_armed_through_entry_draws_the_cap_chart_line _ =
   let html = Html_report_renderer.render ~bars_for:_bars_for snap in
   assert_that html
     (all_of
-       [
-         _has_substring "class=\"lvl lvl-cap\"";
-         _has_substring "cap $115.00";
-       ])
+       [ _has_substring "class=\"lvl lvl-cap\""; _has_substring "cap $115.00" ])
 
 (* The SHORT arm gets the mirrored treatment: an over-extended short carries the
    EXTENDED chip, its card and its ticket strip are marked, and its ticket is

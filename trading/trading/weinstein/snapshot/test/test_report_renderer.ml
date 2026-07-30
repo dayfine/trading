@@ -581,8 +581,8 @@ let test_armed_through_entry_row_renders_limit_at_close _ =
          ~reconciliation:
            (Entry_reconciliation.Through_entry
               { close = 107.3; overshoot_pct = 7.3; cap = 115.0 })
-         ~sized_shares:40 ~sized_position_value:4600.0
-         ~sized_position_pct:0.046 ~sized_risk_amount:1000.0)
+         ~sized_shares:40 ~sized_position_value:4600.0 ~sized_position_pct:0.046
+         ~sized_risk_amount:1000.0)
   in
   assert_that md
     (all_of
@@ -609,15 +609,15 @@ let test_armed_valid_stop_row_renders_stoplimit _ =
          ~reconciliation:
            (Entry_reconciliation.Valid_stop
               { close = 99.0; overshoot_pct = -1.0; cap = 115.0 })
-         ~sized_shares:40 ~sized_position_value:4600.0
-         ~sized_position_pct:0.046 ~sized_risk_amount:1000.0)
+         ~sized_shares:40 ~sized_position_value:4600.0 ~sized_position_pct:0.046
+         ~sized_risk_amount:1000.0)
   in
   assert_that md
     (all_of
        [
          _has_substring
-           "BUY STOPLIMIT 40 sh, trigger $100.00 limit $115.00 (~$4600, 4.6% of \
-            book, worst-case risk $1000); on fill place SELL STOP @ $90.00, \
+           "BUY STOPLIMIT 40 sh, trigger $100.00 limit $115.00 (~$4600, 4.6% \
+            of book, worst-case risk $1000); on fill place SELL STOP @ $90.00, \
             GTC; cancel if unfilled by Friday close";
          not_ ~msg:"a stop-limit ticket must not be a plain resting stop"
            (_has_substring "BUY STOP 40");

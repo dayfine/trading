@@ -88,7 +88,8 @@ let test_wrong_class_for_overshoot_is_an_error _ =
     [
       _candidate
         ~reconciliation:
-          (Entry_reconciliation.Extended { close = 107.3; overshoot_pct = 7.3; cap = 0.0 })
+          (Entry_reconciliation.Extended
+             { close = 107.3; overshoot_pct = 7.3; cap = 0.0 })
         ();
     ]
   in
@@ -147,7 +148,8 @@ let test_extended_with_a_sized_ticket_is_an_error _ =
     [
       _candidate
         ~reconciliation:
-          (Entry_reconciliation.Extended { close = 134.5; overshoot_pct = 34.5; cap = 0.0 })
+          (Entry_reconciliation.Extended
+             { close = 134.5; overshoot_pct = 34.5; cap = 0.0 })
         ~sized_shares:10 ~sized_risk_amount:445.0 ();
     ]
   in

@@ -211,8 +211,7 @@ let suite =
          >:: test_through_entry_sized_on_the_cap;
          "size is on the cap, not the close"
          >:: test_size_is_on_the_cap_not_the_close;
-         "valid-stop is sized on the cap"
-         >:: test_valid_stop_sized_on_the_cap;
+         "valid-stop is sized on the cap" >:: test_valid_stop_sized_on_the_cap;
          "extended is left unsized" >:: test_extended_is_left_unsized;
          "extended clears a previous size"
          >:: test_extended_clears_a_previous_size;

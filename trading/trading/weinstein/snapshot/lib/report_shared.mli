@@ -38,14 +38,14 @@ val instruction : Weekly_snapshot.candidate -> string
     - {!Entry_reconciliation.Not_reconciled} — a plain resting stop at the entry
       level (no cap carried), e.g.
       ["BUY STOP 55 sh @ $28.49 (~$1567, 1.6% of book, risk $126); on fill place
-       SELL STOP @ $26.21, GTC; cancel if unfilled by Friday close"]. This is the
-      exact pre-#2158 wording, so a disarmed / legacy row renders unchanged.
+       SELL STOP @ $26.21, GTC; cancel if unfilled by Friday close"]. This is
+      the exact pre-#2158 wording, so a disarmed / legacy row renders unchanged.
     - {!Entry_reconciliation.Valid_stop} — a resting {b stop-limit}: the order
       triggers at the entry and fills anywhere up to the do-not-chase cap, e.g.
       ["BUY STOPLIMIT 55 sh, trigger $28.49 limit $30.05 (~$1651, 1.6% of book,
        worst-case risk $198); on fill place SELL STOP @ $26.21, GTC; cancel if
        unfilled by Friday close"]. The risk is the {b worst case} (sized on the
-       cap — issue #2158, "size on the cap").
+      cap — issue #2158, "size on the cap").
     - {!Entry_reconciliation.Through_entry} — a {b LIMIT} buy at ~the Friday
       close with the cap as its ceiling, quoting the overshoot. Price is already
       through the trigger, so rather than a MARKET order that chases the open,

@@ -263,7 +263,9 @@ let test_multiple_transitions_produce_one_order_each _ =
   let t2 =
     _update_risk_transition ~position_id:"AAPL-1" ~stop_loss_price:142.0
   in
-  let orders = from_transitions ~transitions:[ t1; t2 ] ~get_position:_lookup () in
+  let orders =
+    from_transitions ~transitions:[ t1; t2 ] ~get_position:_lookup ()
+  in
   assert_that orders (size_is 2)
 
 (* --- Empty transitions → empty result --- *)

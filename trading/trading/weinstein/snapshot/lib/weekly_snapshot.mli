@@ -173,8 +173,9 @@ val expected_fill_price : candidate -> float
 
 val sizing_basis_price : candidate -> float
 (** The price {!Weinstein_snapshot_gen.Trade_sizing} sizes on and the
-    {!Snapshot_validator} risk identity is checked against — the {b worst
-    admissible fill}, not the expected one (issue #2158, "size on the cap").
+    {!Snapshot_validator} risk identity is checked against — the
+    {b worst admissible fill}, not the expected one (issue #2158, "size on the
+    cap").
 
     For a reconciled candidate carrying a do-not-chase cap
     ({!Entry_reconciliation.Valid_stop} / {!Entry_reconciliation.Through_entry}

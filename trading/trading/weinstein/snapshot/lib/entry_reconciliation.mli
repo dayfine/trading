@@ -120,10 +120,11 @@ val cap_price :
     [entry] in the trade's direction: [entry x (1 + pct/100)] for a long, its
     mirror [entry x (1 - pct/100)] for a short.
 
-    Returns [entry] unchanged when [extension_max_pct <= 0.0] (disarmed — no cap,
-    so the worst admissible fill collapses onto the entry) or when [entry <= 0.0]
-    (undefined). This is the same ceiling the live {!Weinstein_order_gen} caps
-    its [StopLimit] at, and the value stored in {!levels.cap} by {!classify}. *)
+    Returns [entry] unchanged when [extension_max_pct <= 0.0] (disarmed — no
+    cap, so the worst admissible fill collapses onto the entry) or when
+    [entry <= 0.0] (undefined). This is the same ceiling the live
+    {!Weinstein_order_gen} caps its [StopLimit] at, and the value stored in
+    {!levels.cap} by {!classify}. *)
 
 val classify :
   side:[ `Long | `Short ] ->
