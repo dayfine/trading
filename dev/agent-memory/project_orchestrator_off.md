@@ -4,7 +4,7 @@ description: Daily orchestrator cron reduced from 4 slots to 2 overnight slots (
 type: project
 originSessionId: 35c8f646-d23b-46d6-98b4-2e330e930c33
 ---
-GHA `Daily orchestrator` workflow runs **2× per day** (00:17 PT + 05:17 PT) as of 2026-04-26 (PR #581). Previously 4 slots, then briefly turned off 2026-04-25 for cost, then reinstated at reduced cadence 2026-04-26 to cover routine agent work overnight while keeping substantive work in local sessions.
+GHA `Daily orchestrator` workflow runs **2× per day** (00:17 PT + 05:17 PT) — re-cut 2026-07-29 (PR #2172, user quota directive). History: 4 slots → off 2026-04-25 → 2 slots 2026-04-26 (#581) → **silently drifted back to 8 slots/day** at some point (verified 8/day for 07-25..07-29, burning the weekly API quota mostly on summary-only runs) → cut to 2 again 2026-07-29. WATCH: if `dev/daily/<date>-runN.md` shows N>2, the cadence has drifted again — check `gh run list --workflow "Daily orchestrator"` and re-cut.
 
 **Why:** cost vs coverage tradeoff. The 4×/day cron was ~$5/run even when Step 0.5 NO-OP fast-exit applied — overhead not worth it given the queue is mostly empty between human-driven bursts. But fully-off lost coverage of routine night work the human would have to manually trigger. Two overnight slots = ~$10/day cap with hands-off cleanup running while the human sleeps; daytime work remains local.
 
