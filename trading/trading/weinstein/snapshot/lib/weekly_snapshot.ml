@@ -32,6 +32,14 @@ let expected_fill_price c =
   | Entry_reconciliation.Through_entry { close; _ } -> close
   | Not_reconciled | Valid_stop _ | Extended _ -> c.entry
 
+let sizing_basis_price c =
+  match c.reconciliation with
+  | (Entry_reconciliation.Valid_stop { cap; _ } | Through_entry { cap; _ })
+    when Float.( > ) cap 0.0 ->
+      cap
+  | Not_reconciled | Valid_stop _ | Through_entry _ | Extended _ ->
+      expected_fill_price c
+
 type held_position = {
   symbol : string;
   entered : Date.t;

@@ -37,11 +37,14 @@ let _unsized (c : Weekly_snapshot.candidate) =
     sizing_note = None;
   }
 
-(* Issue #2103: sizing is anchored to the price the order would actually fill
-   at, never to the (possibly weeks-stale) breakout level in [c.entry]. *)
+(* Issue #2103 / #2158: sizing is anchored to the WORST admissible fill — the
+   do-not-chase cap the live [StopLimit] order caps at — never to the
+   (possibly weeks-stale) breakout level in [c.entry]. Falls back to the
+   expected fill when the candidate carries no cap (disarmed default), so the
+   default path is unchanged. See [Weekly_snapshot.sizing_basis_price]. *)
 let _sized ~risk_config ~portfolio_value ~sizing_cash ~side ~placeholder
     (c : Weekly_snapshot.candidate) =
-  let fill = Weekly_snapshot.expected_fill_price c in
+  let fill = Weekly_snapshot.sizing_basis_price c in
   let sizing =
     Portfolio_risk.compute_position_size ~config:risk_config ~portfolio_value
       ~sizing_cash ~side ~entry_price:fill ~stop_price:c.stop ()

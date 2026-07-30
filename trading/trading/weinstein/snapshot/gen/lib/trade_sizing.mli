@@ -11,17 +11,22 @@
     the result onto the {!Weekly_snapshot.candidate}'s [sized_*] / [sizing_note]
     fields; the renderer formats the instruction cell from those fields.
 
-    {1 Sizing is always on the expected FILL price (issue #2103)}
+    {1 Sizing is on the WORST admissible fill — the cap (issues #2103, #2158)}
 
     The entry price fed to {!Portfolio_risk.compute_position_size} is
-    {!Weekly_snapshot.expected_fill_price}, {b never} [c.entry] directly.
+    {!Weekly_snapshot.sizing_basis_price}, {b never} [c.entry] directly.
     [c.entry] is the breakout level from the transition week; a candidate whose
     price has already run through it fills at the market, not at the level. The
     2026-07-24 MBX pick was sized 651 shares against a $46.08 entry with the
     stock at $62 — a 34% larger notional than intended and, against the $44.88
-    stop, {b 14x the displayed dollar risk}. Sizing on the reconciled fill
-    closes that gap; it also matches the backtest's [Entry_walk], which fills
-    and sizes at the price observed on signal evaluation.
+    stop, {b 14x the displayed dollar risk}.
+
+    Issue #2158 tightens this from the {e expected} fill to the do-not-chase
+    {b cap} — the worst fill the live [StopLimit] order can accept. Sizing on
+    the cap makes the displayed risk the worst case ([cap - stop]) rather than
+    optimistic ("size on the cap", user 2026-07-29). When the candidate carries
+    no cap (disarmed default), {!Weekly_snapshot.sizing_basis_price} falls back
+    to the expected fill, so the default path is unchanged.
 
     Run {!Entry_reconcile} before this pass so the class is available. *)
 
@@ -43,9 +48,9 @@ val size_candidate :
     - [portfolio_value] drives the risk-pct and %-cap math; [sizing_cash] bounds
       the spendable-cash cap (pass the portfolio's cash).
     - The stop is read from [c.stop]; the entry price is
-      {!Weekly_snapshot.expected_fill_price} [c] — [c.entry] for an unreconciled
-      or valid-stop candidate, and the {b current close} for one whose price is
-      already through its entry (issue #2103).
+      {!Weekly_snapshot.sizing_basis_price} [c] — the do-not-chase cap for a
+      reconciled candidate (issue #2158), and [c.entry] for an unreconciled one
+      (the disarmed default) or a pre-#2158 snapshot with no cap.
     - An {!Entry_reconciliation.Extended} candidate is returned
       {b explicitly unsized} ([sized_shares = 0], all [sized_*] zeroed,
       [sizing_note = None]): its ticket is suppressed with a do-not-chase

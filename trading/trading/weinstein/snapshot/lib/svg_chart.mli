@@ -53,6 +53,9 @@ type level_kind =
   | Entry  (** Breakout / fill price. Rendered with class [lvl-entry]. *)
   | Stop  (** Protective stop. Rendered with class [lvl-stop]. *)
   | Reference  (** Any other annotation. Rendered with class [lvl-ref]. *)
+  | Cap
+      (** Do-not-chase ceiling — the entry-order limit cap (issue #2158).
+          Rendered with class [lvl-cap]. *)
 
 type level = {
   label : string;

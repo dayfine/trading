@@ -153,7 +153,12 @@ let _risk_budget_finding (c : Weekly_snapshot.candidate) ~budget =
   _if_warn over ~symbol:c.symbol ~check:"risk_budget" detail
 
 let _sized_findings ?risk_budget (c : Weekly_snapshot.candidate) =
-  let fill = Weekly_snapshot.expected_fill_price c in
+  (* Issue #2158: sizing is on the worst admissible fill (the do-not-chase cap),
+     so the risk identity is checked against that basis, not the expected fill.
+     [sizing_basis_price] falls back to the expected fill when no cap is carried
+     (disarmed default / pre-#2158 snapshot), so historical artifacts still
+     validate against the basis they were actually sized on. *)
+  let fill = Weekly_snapshot.sizing_basis_price c in
   let expected_risk =
     Float.of_int c.sized_shares *. Float.abs (fill -. c.stop)
   in
