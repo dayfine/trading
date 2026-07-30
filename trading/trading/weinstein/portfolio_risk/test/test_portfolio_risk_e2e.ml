@@ -301,7 +301,7 @@ let _lifecycle_transitions =
 let test_order_generation_for_lifecycle _ =
   let orders =
     Weinstein_order_gen.from_transitions ~transitions:_lifecycle_transitions
-      ~get_position:_lookup_aapl
+      ~get_position:_lookup_aapl ()
   in
   (* Expected: one entry StopLimit + two Stop updates. EntryFill,
      EntryComplete, and TriggerExit all produce no broker order. *)

@@ -10,10 +10,15 @@
 
     {1 Mapping}
 
-    - [CreateEntering { side=Long; entry_price; target_quantity }] → [StopLimit]
-      buy [shares] at [entry_price] (breakout entry)
+    - [CreateEntering { side=Long; entry_price; target_quantity }] →
+      [StopLimit] buy [shares] triggering at [entry_price], with the limit capped
+      one [entry_extension_max_pct] above it (the do-not-chase ceiling — issue
+      #2158). The old degenerate [StopLimit (E, E)] never filled once price ran
+      through the breakout; [StopLimit (E, E x (1 + pct/100))] fills anywhere
+      between the trigger and the cap, and refuses to chase past it.
     - [CreateEntering { side=Short; entry_price; target_quantity }] →
-      [StopLimit] sell short [shares] at [entry_price]
+      [StopLimit] sell short [shares] triggering at [entry_price], limit capped
+      one [entry_extension_max_pct] {e below} it (the short mirror).
     - [UpdateRiskParams { new_risk_params = { stop_loss_price = Some p } }] →
       [Stop] order at [p] for the existing position quantity
     - [TriggerExit] → ignored. The [Stop] order placed via [UpdateRiskParams] is
@@ -42,13 +47,26 @@ type suggested_order = {
 (** A single suggested broker order for human review before placement. *)
 
 val from_transitions :
+  ?entry_extension_max_pct:float ->
   transitions:Trading_strategy.Position.transition list ->
   get_position:(string -> Trading_strategy.Position.t option) ->
+  unit ->
   suggested_order list
 (** Translate strategy output into broker order suggestions.
 
     Iterates over [transitions] and emits one [suggested_order] per
     strategy-triggered transition that maps to a broker action.
+
+    @param entry_extension_max_pct
+      Percentage-point cap on how far past the breakout an entry order may fill
+      — the limit leg of the [StopLimit] for a [CreateEntering] transition sits
+      one such fraction past the trigger ([E x (1 + pct/100)] long, mirrored
+      short). Defaults to [0.0], which collapses the limit onto the trigger
+      ([StopLimit (E, E)]) — the exact order the generator emitted before issue
+      #2158, so an unarmed live run is byte-identical (experiment-flag-discipline
+      R1). Pass the strategy's [entry_extension_max_pct] to arm the cap; it is
+      the {e same} knob {!Entry_reconciliation} classifies the weekly report's
+      tickets against, so live orders and the report share one ceiling.
 
     @param transitions
       The [Position.transition list] returned by [Strategy.on_market_close].
