@@ -12,7 +12,18 @@
 ; Row order = render order (headline first). When a record supersedes another,
 ; add the new row ABOVE and keep the superseded row with a "(superseded)" label.
 
-((label "Weinstein top-3000 (promoted config)")
+((label "Weinstein top-3000 (promoted config, split-safe basis)")
+ (total_return_pct 8366.8)
+ (max_drawdown_pct 37.1)
+ (trades 1122)
+ (win_rate_pct 37.7)
+ (period "2000-01-01 -> 2026-06-26")
+ (scenario_path
+  "test_data/backtest_scenarios/staging-leverf-28y/top3000-2000-2026-rcb-f000.sexp")
+ (basis_commit "user R3 decision 2026-07-29 — same scenario on the split-safe clone (#2153 migrator); ledger 2026-07-28-split-basis-blast-radius")
+ (date "2026-07-29"))
+
+((label "Weinstein top-3000 (superseded — split-blind resistance basis)")
  (total_return_pct 8689.0)
  (max_drawdown_pct 30.3)
  (trades 1170)
