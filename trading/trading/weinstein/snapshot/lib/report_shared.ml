@@ -48,31 +48,36 @@ let _stop_order (c : Weekly_snapshot.candidate) =
    The quoted price comes from {!Weekly_snapshot.expected_fill_price} — the
    ~close it would fill around — while [l] carries the overshoot and cap. A
    pre-#2158 snapshot with no cap keeps the old MARKET wording. *)
+let _capped_limit_order (c : Weekly_snapshot.candidate)
+    (l : Entry_reconciliation.levels) ~cap =
+  Printf.sprintf
+    "BUY LIMIT %d sh @ ~$%.2f, limit $%.2f (~$%.0f, %.1f%% of book, worst-case \
+     risk $%.0f) — price is %.1f%% through the $%.2f entry level; sized on the \
+     cap, not the entry level; on fill place SELL STOP @ $%.2f, GTC"
+    c.sized_shares
+    (Weekly_snapshot.expected_fill_price c)
+    cap c.sized_position_value
+    (c.sized_position_pct *. 100.0)
+    c.sized_risk_amount l.overshoot_pct c.entry c.stop
+
+let _legacy_market_order (c : Weekly_snapshot.candidate)
+    (l : Entry_reconciliation.levels) =
+  Printf.sprintf
+    "BUY MARKET %d sh @ ~$%.2f (~$%.0f, %.1f%% of book, risk $%.0f) — price is \
+     %.1f%% through the $%.2f entry level, so the order fills at the market; \
+     sized on the expected fill, not the entry level; on fill place SELL STOP \
+     @ $%.2f, GTC"
+    c.sized_shares
+    (Weekly_snapshot.expected_fill_price c)
+    c.sized_position_value
+    (c.sized_position_pct *. 100.0)
+    c.sized_risk_amount l.overshoot_pct c.entry c.stop
+
 let _limit_order (c : Weekly_snapshot.candidate)
     (l : Entry_reconciliation.levels) =
   match _cap_of c with
-  | Some cap ->
-      Printf.sprintf
-        "BUY LIMIT %d sh @ ~$%.2f, limit $%.2f (~$%.0f, %.1f%% of book, \
-         worst-case risk $%.0f) — price is %.1f%% through the $%.2f entry \
-         level; sized on the cap, not the entry level; on fill place SELL STOP \
-         @ $%.2f, GTC"
-        c.sized_shares
-        (Weekly_snapshot.expected_fill_price c)
-        cap c.sized_position_value
-        (c.sized_position_pct *. 100.0)
-        c.sized_risk_amount l.overshoot_pct c.entry c.stop
-  | None ->
-      Printf.sprintf
-        "BUY MARKET %d sh @ ~$%.2f (~$%.0f, %.1f%% of book, risk $%.0f) — price \
-         is %.1f%% through the $%.2f entry level, so the order fills at the \
-         market; sized on the expected fill, not the entry level; on fill place \
-         SELL STOP @ $%.2f, GTC"
-        c.sized_shares
-        (Weekly_snapshot.expected_fill_price c)
-        c.sized_position_value
-        (c.sized_position_pct *. 100.0)
-        c.sized_risk_amount l.overshoot_pct c.entry c.stop
+  | Some cap -> _capped_limit_order c l ~cap
+  | None -> _legacy_market_order c l
 
 (* Suppressed ticket (issue #2103): the name has run too far past its own
    breakout to buy. The row is kept so the reader can watch it, but there is no
@@ -121,7 +126,8 @@ let entry_reconciliation =
    #2103). A row marked \"through\" is already past its trigger, so the order \
    is a LIMIT buy at ~the close capped at the do-not-chase ceiling rather than \
    a resting stop at the level. A row marked \"EXTENDED\" is past the \
-   configured chase cap: no order is issued and the row is kept for watch only."
+   configured chase cap: no order is issued and the row is kept for watch \
+   only."
 
 let any_reconciled shown =
   List.exists shown ~f:(fun (c : Weekly_snapshot.candidate) ->
