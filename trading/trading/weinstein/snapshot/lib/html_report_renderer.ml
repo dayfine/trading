@@ -44,23 +44,39 @@ let _price_level ~label ~price ~kind =
    gutter. Weekly rather than daily because that is the cadence the stage
    framework is defined on, and because the same span in dailies is more marks
    than a card-scale chart can distinguish. *)
-let _chart ~(bars_for : bar_source) ~symbol ~entry ~entry_label ~stop =
+(* The do-not-chase cap line (issue #2158), appended after entry/stop only when
+   the candidate carries a cap. Omitted for held positions and unreconciled
+   candidates, so their charts are byte-identical to before this feature. *)
+let _cap_level = function
+  | None -> []
+  | Some cap -> [ _price_level ~label:"cap" ~price:cap ~kind:Svg_chart.Cap ]
+
+let _chart ?cap ~(bars_for : bar_source) ~symbol ~entry ~entry_label ~stop () =
   Svg_chart.render ~width:_chart_width ~height:_chart_height ~band:(entry, stop)
     ~ma_period:_ma_period_weeks ~annotate:true
     ~bars:(Svg_series.weekly_bars (bars_for ~symbol))
     ~levels:
-      [
-        _price_level ~label:entry_label ~price:entry ~kind:Svg_chart.Entry;
-        _price_level ~label:"stop" ~price:stop ~kind:Svg_chart.Stop;
-      ]
+      ([
+         _price_level ~label:entry_label ~price:entry ~kind:Svg_chart.Entry;
+         _price_level ~label:"stop" ~price:stop ~kind:Svg_chart.Stop;
+       ]
+      @ _cap_level cap)
     ()
 
 (* ---- Candidate sections ---- *)
 
+(* The do-not-chase cap the candidate's reconciliation carries, drawn as an
+   extra chart level. [None] for an unreconciled candidate (or one with cap
+   [0.0], a pre-#2158 snapshot), so its chart is unchanged. *)
+let _candidate_cap (c : Weekly_snapshot.candidate) =
+  match Entry_reconciliation.levels_of c.reconciliation with
+  | Some l when Float.( > ) l.cap 0.0 -> Some l.cap
+  | Some _ | None -> None
+
 let _candidate_card ~arm ~bars_for ~rank (c : Weekly_snapshot.candidate) =
   let chart =
-    _chart ~bars_for ~symbol:c.symbol ~entry:c.entry ~entry_label:"entry"
-      ~stop:c.stop
+    _chart ?cap:(_candidate_cap c) ~bars_for ~symbol:c.symbol ~entry:c.entry
+      ~entry_label:"entry" ~stop:c.stop ()
   in
   Candidate_card.render ~arm ~rank ~chart c
 
@@ -156,7 +172,7 @@ let _held_card ~bars_for (h : Weekly_snapshot.held_position) =
       nums = _held_nums h;
       chart =
         _chart ~bars_for ~symbol:h.symbol ~entry:h.entry_price
-          ~entry_label:"fill" ~stop:h.stop;
+          ~entry_label:"fill" ~stop:h.stop ();
       footer = Some (Report_card.footer (_e (_held_stop_line h)));
     }
 

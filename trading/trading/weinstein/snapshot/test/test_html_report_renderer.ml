@@ -852,7 +852,7 @@ let _reconciled_snapshot =
           _long_candidate with
           reconciliation =
             Entry_reconciliation.Through_entry
-              { close = 107.3; overshoot_pct = 7.3 };
+              { close = 107.3; overshoot_pct = 7.3; cap = 0.0 };
           sized_shares = 57;
           sized_position_value = 6116.10;
           sized_position_pct = 0.061161;
@@ -864,7 +864,7 @@ let _reconciled_snapshot =
         {
           _short_candidate with
           reconciliation =
-            Entry_reconciliation.Extended { close = 65.5; overshoot_pct = 34.5 };
+            Entry_reconciliation.Extended { close = 65.5; overshoot_pct = 34.5; cap = 0.0 };
         };
       ];
   }
@@ -895,6 +895,39 @@ let test_through_entry_chip_on_the_long_arm _ =
            "<div class=\"ticket\">BUY MARKET 57 sh @ ~$107.30 (~$6116, 6.1% of \
             book, risk $986)";
          _has_substring "close vs entry:";
+       ])
+
+(* Issue #2158: an ARMED through-entry candidate (carrying a $115.00 cap) draws
+   the do-not-chase cap as a third chart level — a [lvl-cap] line named
+   "cap $115.00" — alongside the entry and stop lines. Rendered WITH bars so a
+   chart exists; an unreconciled candidate (or one with no cap) draws no such
+   line. *)
+let test_armed_through_entry_draws_the_cap_chart_line _ =
+  let snap =
+    {
+      _full_snapshot with
+      long_candidates =
+        [
+          {
+            _long_candidate with
+            reconciliation =
+              Entry_reconciliation.Through_entry
+                { close = 107.3; overshoot_pct = 7.3; cap = 115.0 };
+            sized_shares = 40;
+            sized_position_value = 4600.0;
+            sized_position_pct = 0.046;
+            sized_risk_amount = 1000.0;
+          };
+        ];
+      short_candidates = [];
+    }
+  in
+  let html = Html_report_renderer.render ~bars_for:_bars_for snap in
+  assert_that html
+    (all_of
+       [
+         _has_substring "class=\"lvl lvl-cap\"";
+         _has_substring "cap $115.00";
        ])
 
 (* The SHORT arm gets the mirrored treatment: an over-extended short carries the
@@ -1041,6 +1074,8 @@ let suite =
          "no_bars_is_the_empty_source" >:: test_no_bars_is_the_empty_source;
          "through_entry_chip_on_the_long_arm"
          >:: test_through_entry_chip_on_the_long_arm;
+         "armed_through_entry_draws_the_cap_chart_line"
+         >:: test_armed_through_entry_draws_the_cap_chart_line;
          "extended_chip_and_suppression_on_the_short_arm"
          >:: test_extended_chip_and_suppression_on_the_short_arm;
          "extended_card_moves_to_watch_section"

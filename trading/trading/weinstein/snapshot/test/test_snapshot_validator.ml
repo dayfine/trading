@@ -71,7 +71,7 @@ let test_clean_snapshot_has_no_findings _ =
       _candidate ~symbol:"THRU"
         ~reconciliation:
           (Entry_reconciliation.Through_entry
-             { close = 107.3; overshoot_pct = 7.3 })
+             { close = 107.3; overshoot_pct = 7.3; cap = 0.0 })
         ~sized_shares:57 ~sized_risk_amount:986.1 ();
     ]
   in
@@ -88,7 +88,7 @@ let test_wrong_class_for_overshoot_is_an_error _ =
     [
       _candidate
         ~reconciliation:
-          (Entry_reconciliation.Extended { close = 107.3; overshoot_pct = 7.3 })
+          (Entry_reconciliation.Extended { close = 107.3; overshoot_pct = 7.3; cap = 0.0 })
         ();
     ]
   in
@@ -103,7 +103,7 @@ let test_stored_overshoot_must_match_close_vs_entry _ =
       _candidate
         ~reconciliation:
           (Entry_reconciliation.Through_entry
-             { close = 107.3; overshoot_pct = 2.0 })
+             { close = 107.3; overshoot_pct = 2.0; cap = 0.0 })
         ();
     ]
   in
@@ -123,7 +123,7 @@ let test_overshoot_exactly_at_the_band_is_valid_stop _ =
       _candidate ~entry:100.0
         ~reconciliation:
           (Entry_reconciliation.Valid_stop
-             { close = 101.0; overshoot_pct = 1.0 })
+             { close = 101.0; overshoot_pct = 1.0; cap = 0.0 })
         ();
     ]
   in
@@ -136,7 +136,7 @@ let test_overshoot_exactly_at_the_extension_cap_is_through_entry _ =
       _candidate ~entry:100.0
         ~reconciliation:
           (Entry_reconciliation.Through_entry
-             { close = 115.0; overshoot_pct = 15.0 })
+             { close = 115.0; overshoot_pct = 15.0; cap = 0.0 })
         ();
     ]
   in
@@ -147,7 +147,7 @@ let test_extended_with_a_sized_ticket_is_an_error _ =
     [
       _candidate
         ~reconciliation:
-          (Entry_reconciliation.Extended { close = 134.5; overshoot_pct = 34.5 })
+          (Entry_reconciliation.Extended { close = 134.5; overshoot_pct = 34.5; cap = 0.0 })
         ~sized_shares:10 ~sized_risk_amount:445.0 ();
     ]
   in
@@ -164,7 +164,7 @@ let test_risk_arithmetic_must_agree _ =
       _candidate
         ~reconciliation:
           (Entry_reconciliation.Through_entry
-             { close = 107.3; overshoot_pct = 7.3 })
+             { close = 107.3; overshoot_pct = 7.3; cap = 0.0 })
         ~sized_shares:57 ~sized_risk_amount:500.0 ();
     ]
   in
@@ -172,13 +172,62 @@ let test_risk_arithmetic_must_agree _ =
     (_checks (Snapshot_validator.validate (_snapshot ~longs ())))
     (equal_to [ "risk_consistency" ])
 
+(* Issue #2158: the risk identity is checked against the do-not-chase CAP (the
+   worst admissible fill), not the expected fill. A candidate carrying a $115.00
+   cap sized 40 sh with sized_risk_amount 40 x |115.00 - 90.00| = 1000.0 is
+   consistent — nothing fires. *)
+let test_risk_consistency_on_the_cap_passes _ =
+  let longs =
+    [
+      _candidate ~entry:100.0 ~stop:90.0
+        ~reconciliation:
+          (Entry_reconciliation.Through_entry
+             { close = 107.3; overshoot_pct = 7.3; cap = 115.0 })
+        ~sized_shares:40 ~sized_risk_amount:1000.0 ();
+    ]
+  in
+  assert_that (Snapshot_validator.validate (_snapshot ~longs ())) _no_findings
+
+(* The other direction: sizing the SAME candidate on the expected fill ($107.30)
+   — 40 x |107.30 - 90.00| = 692.0 — is now a [risk_consistency] ERROR, because
+   the identity moved off the expected fill onto the cap. Pins that the basis
+   genuinely changed (under the pre-#2158 code this row was consistent). *)
+let test_risk_consistency_on_the_expected_fill_now_fails _ =
+  let longs =
+    [
+      _candidate ~entry:100.0 ~stop:90.0
+        ~reconciliation:
+          (Entry_reconciliation.Through_entry
+             { close = 107.3; overshoot_pct = 7.3; cap = 115.0 })
+        ~sized_shares:40 ~sized_risk_amount:692.0 ();
+    ]
+  in
+  assert_that
+    (_checks (Snapshot_validator.validate (_snapshot ~longs ())))
+    (equal_to [ "risk_consistency" ])
+
+(* Backward-compat: a pre-#2158 snapshot carries no cap ([cap = 0.0]), so the
+   basis falls back to the expected fill and the row validates exactly as it did
+   before this feature — 57 sh x |107.30 - 90.00| = 986.10. *)
+let test_legacy_no_cap_validates_on_the_expected_fill _ =
+  let longs =
+    [
+      _candidate ~entry:100.0 ~stop:90.0
+        ~reconciliation:
+          (Entry_reconciliation.Through_entry
+             { close = 107.3; overshoot_pct = 7.3; cap = 0.0 })
+        ~sized_shares:57 ~sized_risk_amount:986.1 ();
+    ]
+  in
+  assert_that (Snapshot_validator.validate (_snapshot ~longs ())) _no_findings
+
 let test_risk_budget_excess_is_a_warning _ =
   let longs =
     [
       _candidate
         ~reconciliation:
           (Entry_reconciliation.Through_entry
-             { close = 107.3; overshoot_pct = 7.3 })
+             { close = 107.3; overshoot_pct = 7.3; cap = 0.0 })
         ~sized_shares:57 ~sized_risk_amount:986.1 ();
     ]
   in
@@ -345,6 +394,12 @@ let suite =
          "extended_with_a_sized_ticket_is_an_error"
          >:: test_extended_with_a_sized_ticket_is_an_error;
          "risk_arithmetic_must_agree" >:: test_risk_arithmetic_must_agree;
+         "risk_consistency_on_the_cap_passes"
+         >:: test_risk_consistency_on_the_cap_passes;
+         "risk_consistency_on_the_expected_fill_now_fails"
+         >:: test_risk_consistency_on_the_expected_fill_now_fails;
+         "legacy_no_cap_validates_on_the_expected_fill"
+         >:: test_legacy_no_cap_validates_on_the_expected_fill;
          "risk_budget_excess_is_a_warning"
          >:: test_risk_budget_excess_is_a_warning;
          "short_risk_is_the_absolute_fill_to_stop_distance"

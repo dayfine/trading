@@ -168,8 +168,27 @@ val expected_fill_price : candidate -> float
     {b The single source of truth for sizing and for display.} Issue #2103 was
     exactly the two disagreeing: the ticket showed a $46.08 breakout level while
     the stock traded at $62, so the displayed risk understated the real risk by
-    14x. Both {!Weinstein_snapshot_gen.Trade_sizing} and the report renderers
-    call this, so the arithmetic and the printed price cannot drift apart. *)
+    14x. The report renderers quote this as the {e expected} fill; sizing runs
+    off {!sizing_basis_price} instead (issue #2158, "size on the cap"). *)
+
+val sizing_basis_price : candidate -> float
+(** The price {!Weinstein_snapshot_gen.Trade_sizing} sizes on and the
+    {!Snapshot_validator} risk identity is checked against — the {b worst
+    admissible fill}, not the expected one (issue #2158, "size on the cap").
+
+    For a reconciled candidate carrying a do-not-chase cap
+    ({!Entry_reconciliation.Valid_stop} / {!Entry_reconciliation.Through_entry}
+    with [cap > 0.0]) this is that cap: the live {!Weinstein_order_gen} order
+    can fill anywhere up to the cap, so sizing on the cap makes the displayed
+    risk the {e worst} case ([cap - stop]) rather than an optimistic one — the
+    honest-conservative choice the user settled on 2026-07-29.
+
+    Falls back to {!expected_fill_price} for every other case: a
+    {!Entry_reconciliation.Not_reconciled} candidate (the disarmed default), an
+    {!Entry_reconciliation.Extended} one (unsized anyway), and any snapshot
+    written before #2158 (whose [cap] defaults to [0.0]) all size exactly as
+    they did before this feature — so the default path and historical snapshots
+    are unchanged. *)
 
 type held_position = {
   symbol : string;  (** Ticker of the held position. *)

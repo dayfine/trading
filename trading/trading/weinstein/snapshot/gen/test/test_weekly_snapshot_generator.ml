@@ -1483,14 +1483,18 @@ let _wide_cap = 1000.0
       pre-fix code it equalled [sized_shares * entry], and the guard matcher
       below asserts those two are genuinely different for this fixture, so the
       test cannot pass by coincidence. *)
-let test_long_candidate_reconciled_and_sized_on_the_fill _ =
+let test_long_candidate_reconciled_and_sized_on_the_cap _ =
   let bar_reader = _breakout_bar_reader () in
   let close = _reader_close bar_reader "AAPL" in
+  (* Realistic armed thresholds (band 1pt, chase cap 15pt) so the do-not-chase
+     cap is a modest premium over the breakout — not the [_wide_cap] used by the
+     short classification test, which would blow the risk/share up and zero the
+     size under the size-on-cap basis. *)
   let snap =
     Generator.generate
       (_armed_inputs ~bar_reader
          ~ticker_sectors:[ ("AAPL", "Information Technology") ]
-         ~through_band_pct:_wide_band ~extension_max_pct:_wide_cap)
+         ~through_band_pct:1.0 ~extension_max_pct:15.0)
   in
   assert_that
     (_find_candidate (snap : Weekly_snapshot.t).long_candidates "AAPL")
@@ -1498,22 +1502,23 @@ let test_long_candidate_reconciled_and_sized_on_the_fill _ =
        (all_of
           [
             field _class_label (is_some_and (equal_to "through-entry"));
-            field
-              (fun (c : Weekly_snapshot.candidate) ->
-                Weekly_snapshot.expected_fill_price c)
-              (float_equal close);
+            (* Issue #2158: sizing is anchored to the do-not-chase CAP (the worst
+               admissible fill), so [sized_position_value = shares * cap]. Under
+               the pre-#2158 code it equalled [shares * close]; the guard below
+               pins that cap and close genuinely differ here, so the two bases
+               are distinguishable and the test cannot pass by coincidence. *)
             field
               (fun (c : Weekly_snapshot.candidate) -> c.sized_shares)
               (gt (module Int_ord) 0);
             field
               (fun (c : Weekly_snapshot.candidate) ->
-                c.sized_position_value -. (Float.of_int c.sized_shares *. close))
+                c.sized_position_value
+                -. (Float.of_int c.sized_shares
+                   *. Weekly_snapshot.sizing_basis_price c))
               (float_equal 0.0);
-            (* Guard: entry and close differ, so "sized on the fill" and "sized
-               on the entry" are distinguishable outcomes here. *)
             field
               (fun (c : Weekly_snapshot.candidate) ->
-                Float.abs (c.entry -. close))
+                Float.abs (Weekly_snapshot.sizing_basis_price c -. close))
               (gt (module Float_ord) 0.01);
           ]))
 
@@ -1661,8 +1666,8 @@ let suite =
          >:: test_held_with_track_reports_the_threaded_stop;
          "held with triggered stop reports the exit"
          >:: test_held_with_triggered_stop_reports_the_exit;
-         "long candidate reconciled and sized on the fill"
-         >:: test_long_candidate_reconciled_and_sized_on_the_fill;
+         "long candidate reconciled and sized on the cap"
+         >:: test_long_candidate_reconciled_and_sized_on_the_cap;
          "default config leaves candidates unreconciled"
          >:: test_default_config_leaves_candidates_unreconciled;
          "short candidate reconciled at the generate seam"

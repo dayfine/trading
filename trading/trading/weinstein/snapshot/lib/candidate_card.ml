@@ -78,14 +78,15 @@ let _stop_value (c : Weekly_snapshot.candidate) =
   if c.stop_is_structural then Printf.sprintf "$%.2f" c.stop
   else Printf.sprintf "$%.2f*" c.stop
 
-(* Quoted against the EXPECTED FILL, never the entry level: a through-entry
-   candidate fills at its close, so risk-to-stop measured from the breakout
-   level understates the real risk (issue #2103, review round 1). Both renderers
-   read the same accessor. *)
+(* Quoted against the SIZING BASIS — the do-not-chase cap, i.e. the worst
+   admissible fill (issue #2158, "size on the cap") — never the stale entry
+   level. For a candidate carrying no cap (disarmed default / pre-#2158
+   snapshot) the basis falls back to the expected fill, so the figure is
+   unchanged there. Both renderers read the same accessor. *)
 let _risk_value (c : Weekly_snapshot.candidate) =
   Printf.sprintf "%.1f%%"
     (Report_shared.risk_pct
-       ~entry:(Weekly_snapshot.expected_fill_price c)
+       ~entry:(Weekly_snapshot.sizing_basis_price c)
        ~stop:c.stop)
 
 (* The current close, shown only when a reconciliation actually observed one.

@@ -1,9 +1,27 @@
 # Status: weekly-snapshot
 
-## Last updated: 2026-07-28
+## Last updated: 2026-07-29
 
 ## Status
 IN_PROGRESS
+
+**2026-07-29 (entry cap alignment — issue #2158 Phase 1, branch
+`feat/entry-cap-align`):** aligned the entry order type across live order-gen
+and the weekly report on a single do-not-chase cap = `E x (1 +/- extension_max_pct/100)`
+(the same knob `Entry_reconciliation` classifies against). Three layers:
+(1) `Weinstein_order_gen.from_transitions` gains `?entry_extension_max_pct`
+(default `0.0` = no-op → `StopLimit (E, E)` as before); armed it emits
+`StopLimit (E, cap)` so a through-breakout order fills up to the cap instead of
+silently no-filling. (2) Report: `Entry_reconciliation.levels` now carries the
+`cap` (computed in `classify`, exported `cap_price`); the instruction shows the
+stop-limit with BOTH prices and re-anchors a `Through_entry` ticket to a
+LIMIT-at-close (was Market). (3) `Svg_chart` gains a `Cap` level kind → the
+chart draws stop / entry / cap. **Sizing = on the cap** (user decision
+2026-07-29, honest-conservative): new `Weekly_snapshot.sizing_basis_price` = the
+cap (worst admissible fill) for reconciled candidates, else the expected fill;
+`Trade_sizing` and the `Snapshot_validator` risk identity both size/verify on
+that basis. Default (disarmed) path and pre-#2158 snapshots (no cap) fall back to
+the expected fill → unchanged. Phase 2 (simulator fill model) is OUT OF SCOPE.
 
 **2026-07-29 (validator wired into the generator, branch
 `feat/validator-wire-warn` — issue #2122 slice a):** `generate_weekly_snapshot`

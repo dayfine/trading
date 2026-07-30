@@ -1,6 +1,6 @@
 open Core
 
-type level_kind = Entry | Stop | Reference
+type level_kind = Entry | Stop | Reference | Cap
 type level = { label : string; price : float; kind : level_kind }
 
 let default_width = 260
@@ -167,6 +167,7 @@ let _level_class = function
   | Entry -> "lvl lvl-entry"
   | Stop -> "lvl lvl-stop"
   | Reference -> "lvl lvl-ref"
+  | Cap -> "lvl lvl-cap"
 
 let _level_line g l =
   let y = _c (_price_y g l.price) in
@@ -181,6 +182,7 @@ let _level_label_class = function
   | Entry -> "lvl-label lvl-label-entry"
   | Stop -> "lvl-label lvl-label-stop"
   | Reference -> "lvl-label lvl-label-ref"
+  | Cap -> "lvl-label lvl-label-cap"
 
 (* Right-margin text labels naming each level. {!Svg_labels} owns the
    collision-avoidance rule; this only projects each level's price to its target

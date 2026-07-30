@@ -1,6 +1,10 @@
 open Core
 
-type levels = { close : float; overshoot_pct : float }
+type levels = {
+  close : float;
+  overshoot_pct : float;
+  cap : float; [@sexp.default 0.0]
+}
 [@@deriving sexp, eq, show]
 
 type t =
@@ -20,6 +24,14 @@ let overshoot_pct ~side ~entry ~close =
     in
     signed /. entry *. _pct
 
+let cap_price ~side ~entry ~extension_max_pct =
+  if Float.( <= ) extension_max_pct 0.0 || Float.( <= ) entry 0.0 then entry
+  else
+    let frac = extension_max_pct /. _pct in
+    match side with
+    | `Long -> entry *. (1.0 +. frac)
+    | `Short -> entry *. (1.0 -. frac)
+
 (* Class for an armed reconciliation. Both boundaries fall to the LOWER class:
    an overshoot exactly at the de-minimis band is still a resting stop, and one
    exactly at the cap is still tradeable at the market. *)
@@ -37,7 +49,11 @@ let classify ~side ~entry ~close ~through_band_pct ~extension_max_pct =
     Not_reconciled
   else
     _class_of ~through_band_pct ~extension_max_pct
-      { close; overshoot_pct = overshoot_pct ~side ~entry ~close }
+      {
+        close;
+        overshoot_pct = overshoot_pct ~side ~entry ~close;
+        cap = cap_price ~side ~entry ~extension_max_pct;
+      }
 
 let label = function
   | Not_reconciled -> None
