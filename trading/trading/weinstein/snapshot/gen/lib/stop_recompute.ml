@@ -10,12 +10,16 @@ let for_candidate ~stops_config ~initial_stop_buffer ~bar_reader ~as_of
   in
   if List.is_empty daily then c
   else
+    (* Classify structural-vs-fallback through the SAME internal path the stop
+       level below is computed from ([floor_is_structural] and
+       [compute_initial_stop_with_floor] share [_floor_callbacks]), so the flag
+       always agrees with the level under both [support_floor_anchor_mode] and
+       [split_safe_floors]. Keying it off the Wick-only bar-list
+       [find_recent_level] (as this did before) silently disagreed under a
+       [Close]-anchored or split-safe level (#2167 QC finding). *)
     let is_structural =
-      Option.is_some
-        (Weinstein_stops.Support_floor.find_recent_level ~bars:daily ~as_of
-           ~side
-           ~min_pullback_pct:stops_config.Weinstein_stops.min_correction_pct
-           ~lookback_bars:stops_config.support_floor_lookback_bars)
+      Weinstein_stops.floor_is_structural ~config:stops_config ~side ~bars:daily
+        ~as_of
     in
     let state =
       Weinstein_stops.compute_initial_stop_with_floor ~config:stops_config ~side
