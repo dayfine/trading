@@ -666,7 +666,16 @@ convention above is the cheap mitigation.
 
 ### A-FASTEXIT-VACUOUS — Step 0.5's Condition 1 passes vacuously on an *empty* queue, so a maximally productive run guarantees a no-op successor
 
-- [ ] **A-FASTEXIT-VACUOUS — the saturated-queue fast-exit fires hardest when
+**FIXED 2026-08-02 (local session).** Step 0.5 now carries a "Precondition —
+the queue must be non-empty (A-FASTEXIT-VACUOUS fix)" block in
+`.claude/agents/lead-orchestrator.md`: zero open orchestrator PRs ⇒ skip the
+fast-exit entirely and proceed to Step 2 (the four conditions are never
+evaluated). This was never `workflow`-token-blocked — it is an agent-file
+edit; landed after the 07-31/08-01 stall (4 slots, only orphaned budget
+branches, #2166/#2169 passed over 4×) made the cost measured. Original
+finding kept below for the record.
+
+- [x] **A-FASTEXIT-VACUOUS — the saturated-queue fast-exit fires hardest when
   there is nothing in the queue at all.** Step 0.5 exists, in its own words, for
   when "the review queue is fully saturated (all PRs are under human review with
   no new commits, no status drift)" — a state in which dispatching is pointless.
