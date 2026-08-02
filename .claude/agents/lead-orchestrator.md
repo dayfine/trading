@@ -391,6 +391,16 @@ fi
 
 If `$SATURATED_CHECK_SKIP` is set, skip to Step 2.
 
+### Precondition — the queue must be non-empty (A-FASTEXIT-VACUOUS fix)
+
+"Saturated" requires something to be saturated WITH. If **zero** tracks have
+open orchestrator PRs, the queue is empty — the exact opposite of saturated
+(maximum dispatch capacity) — and Condition 1's loop would pass vacuously.
+Observed 2026-07-28 run 4 and again 07-31/08-01 (four consecutive no-op runs
+while #2166/#2169 sat stranded). If the count of open orchestrator-dispatched
+PRs across all tracks is 0, **skip the fast-exit entirely and proceed to
+Step 2** — do not evaluate the four conditions.
+
 ### Four conditions for no-op exit
 
 Evaluate all four. If ANY fails, proceed to Step 2 normally.
