@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-07-29 run1 (orchestrator run 30458563291 — main green throughout, verified on the starting HEAD `3da122db` and re-verified on each PR tip before merge. Merged: #2162 (adjusted-basis duplication documented; dedupe correctly declined on A2) and #2163 (`set -e` diagnostic-loss audit; 1 rework iteration after qc-behavioral caught a false-green regression in a merge-gating linter). Step 0.5's fast-exit passed all four conditions and was overridden for the second consecutive run — four earlier runs today took it, spending $43.53 for zero output; see A-FASTEXIT-VACUOUS. Five orphaned budget records recovered; new item A-NOOP-BUDGET-ORPHAN.)
+Last updated: 2026-08-02 run1 (orchestrator run 30738894584 — main green on `7c43e983`: build-and-test, perf-tier1-smoke, golden-sp500-5y, golden-custom-universe all SUCCESS. **Recovery run after a 3-day stall**: four orchestrator runs on 07-31/08-01 produced only orphaned `ops/budget-*` branches — no summaries, nothing merged since 2026-07-30, and PRs #2166/#2169 passed over four times (verified first-hand: 4 budget branches, 0 daily branches, 0 commits on main; independently corroborated by `dev/reviews/track-pacer-2026-08-02.md` §P7). This run did not fast-exit — the >24h first-run-of-day escape hatch fired — and re-dispatched both stranded PRs. Merged #2176 (track-pacer report, docs-only carve-out). A-FASTEXIT-VACUOUS is now the top escalation and is **not** `workflow`-token-blocked: it is a ~6-line edit to `.claude/agents/lead-orchestrator.md`, blocked only on this agent's write permission — 11th consecutive run.)
 
 ## Active + complete tracks
 
@@ -34,7 +34,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [decision-audit](decision-audit.md) | MERGED | feat-backtest | — | #1799/#1806/#1811 MERGED (report+counterfactual+weekly-picks adapter); selection FAITHFUL; live-picks pipeline ready (#1812); next: matured weekly counterfactual |
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
-| [support-floor-stops](support-floor-stops.md) | MERGED | — | — | — |
+| [support-floor-stops](support-floor-stops.md) | IN_PROGRESS | feat-weinstein | — | #2167 Wick/Close anchoring + #2168 MERGED 07-29; next: stop_recompute Wick-only stop_is_structural (blocks Close default-on) + A2 split-safe call |
 | [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | #2081 robust dollar-ADV (#2060) MERGED `9670e49a`; next: short-leg regime-P&L decomposition (LOCAL) |
 | [extension-stop](extension-stop.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | arming + insurance-ACCEPT MERGED (#1960, ext_stop 2.0/0.25, default-off); next: default-flip only on further insurance-ACCEPT (R3, human-gated) |
 | [decline-character](decline-character.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | All builds + A-D flip merged; arming-speed A-D-live WF-CV REJECTED (#1729 ledger 06-24); decline mechanisms stay default-off axes; exhausted (#1739) |
@@ -43,9 +43,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2163 MERGED `182485aa` — `set -e` diagnostic-loss audit, 22 candidates, 3 fixed + guard; 21 open; next: H-AUDIT-ATOMIC-WRITE (temp-file+mv) |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2169 | H-AUDIT-ATOMIC-WRITE in review: structural APPROVED, behavioral NEEDS_REWORK (N1 temp-dir invariant untested); 9 open; next: land #2169 rework |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 8 open; A-NOOP-BUDGET-ORPHAN new (5 records recovered); A-FASTEXIT-VACUOUS now has measured cost; six items share the `workflow`-token blocker |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2162 MERGED `de34c507` — dedupe declined on A2, duplication documented; 10 open; next: adjusted_basis_sync_pin (re-filed from a closed entry) |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | #2166 | adjusted_basis_sync_pin in flight (branch was a claim commit only for 4 days; re-dispatched 08-02); 9 open; next: land the cross-file rescale pin |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
@@ -57,7 +57,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
-| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | #2145 MERGED `790d23a0` (adjusted-basis sketch, #2133 defect 2; both QC gates APPROVED q4); next: #2133 follow-up warehouse rebuild + golden re-pin |
+| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | #2153/#2165/#2171 MERGED (sidetable rebuild, validator warn-first, entry-cap Ph1); next: #2122 slices (b) instr identity, (c) repro golden, (d) eligible-beyond-cap |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
 | [tax-lens](tax-lens.md) | MERGED | feat-backtest | — | Phase 1 #2066 + CP4 loader error-path contract #2073 MERGED; Phase 2 wash-sale / April outflows deferred, user-gated (#2006) |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | asset-type blocklist MERGED (#1939, default-off); next: arm ATB.curated for live universe build + General::Type enrichment feed |
