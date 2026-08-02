@@ -47,51 +47,23 @@ let check_stop_hit ?(on_close = false) ~state ~side ~bar () =
 
 (* ---- Initial stop computation ---- *)
 
-let compute_initial_stop ~config ~side ~reference_level =
-  (* Half the min-correction threshold: places the initial stop modestly inside
-     the reference level without using the full correction distance, which would
-     be too loose for an entry stop. *)
-  let delta = config.min_correction_pct /. 2.0 in
-  let raw_stop =
-    match side with
-    | Long -> reference_level *. (1.0 -. delta)
-    | Short -> reference_level *. (1.0 +. delta)
-  in
-  Initial
-    { stop_level = nudge_round_number ~config ~side raw_stop; reference_level }
+(* The initial-stop + support-floor family lives in {!Floor_stop} (extracted to
+   keep this coordinator under the file-length cap). Re-exported verbatim so the
+   public [Weinstein_stops.*] surface is unchanged; see [weinstein_stops.mli]
+   for the full contracts. *)
+module Floor_stop = Floor_stop
 
-(* Fallback reference when the bar history yields no qualifying counter-move.
-   Mirrors the pre-primitive caller behaviour: push the reference point into
-   the position's favour by the configured buffer. *)
-let _fallback_reference ~side ~entry_price ~fallback_buffer =
-  match side with
-  | Long -> entry_price *. fallback_buffer
-  | Short -> entry_price /. fallback_buffer
+let compute_initial_stop = Floor_stop.compute_initial_stop
 
-type callbacks = Support_floor.callbacks
+type callbacks = Floor_stop.callbacks
 
-let callbacks_from_bars ~config ~bars ~as_of =
-  Support_floor.callbacks_from_bars ~bars ~as_of
-    ~lookback_bars:config.support_floor_lookback_bars
+let callbacks_from_bars = Floor_stop.callbacks_from_bars
 
-let compute_initial_stop_with_floor_with_callbacks ~config ~side ~entry_price
-    ~callbacks ~fallback_buffer =
-  let reference_level =
-    match
-      Support_floor.find_recent_level_with_callbacks
-        ~anchor_mode:config.support_floor_anchor_mode ~callbacks ~side
-        ~min_pullback_pct:config.min_correction_pct ()
-    with
-    | Some level -> level
-    | None -> _fallback_reference ~side ~entry_price ~fallback_buffer
-  in
-  compute_initial_stop ~config ~side ~reference_level
+let compute_initial_stop_with_floor_with_callbacks =
+  Floor_stop.compute_initial_stop_with_floor_with_callbacks
 
-let compute_initial_stop_with_floor ~config ~side ~entry_price ~bars ~as_of
-    ~fallback_buffer =
-  let callbacks = callbacks_from_bars ~config ~bars ~as_of in
-  compute_initial_stop_with_floor_with_callbacks ~config ~side ~entry_price
-    ~callbacks ~fallback_buffer
+let compute_initial_stop_with_floor = Floor_stop.compute_initial_stop_with_floor
+let floor_is_structural = Floor_stop.floor_is_structural
 
 (* ---- Directional helpers ---- *)
 

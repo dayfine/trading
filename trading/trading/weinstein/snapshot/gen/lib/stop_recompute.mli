@@ -55,10 +55,12 @@ val for_candidate :
        (Weinstein_stops.compute_initial_stop_with_floor ~config:stops_config
        ~side ~entry_price:c.entry ~bars:daily ~as_of
        ~fallback_buffer:initial_stop_buffer)]. [stop_is_structural] is [true]
-      iff {!Weinstein_stops.Support_floor.find_recent_level} (same
-      [min_correction_pct] / [support_floor_lookback_bars] the compute call
-      reads internally) finds a qualifying counter-move; [false] otherwise (the
-      fallback-buffer branch fired).
+      iff {!Weinstein_stops.floor_is_structural} (same [config], [side], [bars]
+      the compute call reads internally) finds a qualifying counter-move;
+      [false] otherwise (the fallback-buffer branch fired). The two share
+      [Weinstein_stops]' internal [_floor_callbacks] so the flag and the
+      installed [stop] can never disagree under [support_floor_anchor_mode]
+      ([Close]) or [split_safe_floors] (#2167 QC finding).
 
     [c.entry] is read as the prospective fill price (the candidate's suggested
     breakout entry) — the same role [entry_price] plays for a real fill. Pure

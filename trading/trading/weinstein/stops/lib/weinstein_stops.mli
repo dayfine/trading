@@ -133,6 +133,28 @@ val compute_initial_stop_with_floor_with_callbacks :
     that index the same precomputed window the bar-list path used to walk
     inline. *)
 
+val floor_is_structural :
+  config:config ->
+  side:position_side ->
+  bars:Types.Daily_price.t list ->
+  as_of:Core.Date.t ->
+  bool
+(** [floor_is_structural ~config ~side ~bars ~as_of] is [true] iff the bar-list
+    support-floor path finds a qualifying counter-move in the lookback window —
+    i.e. iff {!compute_initial_stop_with_floor} (same [config], [side], [bars],
+    [as_of]) installs the {b structural} floor rather than falling back to the
+    fixed buffer.
+
+    Single source of truth for the [stop_is_structural] display flag: it builds
+    the callbacks through the {b same} internal path
+    {!compute_initial_stop_with_floor} uses — honouring both
+    [config.support_floor_anchor_mode] (Wick vs Close) and
+    [config.split_safe_floors] (raw vs adjusted-basis bars) — so the flag and
+    the installed level can never disagree. (Before this function existed the
+    flag was computed via the Wick-only bar-list
+    {!Support_floor.find_recent_level}, which silently diverged from a
+    [Close]-anchored or split-safe level.) Pure function. *)
+
 val check_stop_hit :
   ?on_close:bool ->
   state:stop_state ->
