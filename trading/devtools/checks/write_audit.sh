@@ -303,6 +303,41 @@ fi
 #
 # OUTPUT_FILE was computed earlier (before the consecutive_rework_count
 # scan) so that scan could skip its own about-to-be-written record.
+#
+# The write is staged through a temp file and then renamed into place
+# (H-AUDIT-ATOMIC-WRITE, dev/status/harness.md). `cat > "$OUTPUT_FILE"
+# <<ENDJSON` truncates the target the moment the redirect opens, BEFORE any
+# content is available -- an interruption mid-heredoc (SIGTERM on a
+# cancelled CI job, ENOSPC per sweep-hygiene.md) leaves a partial or empty
+# record at $OUTPUT_FILE, clobbering whatever valid record was there before.
+# Writing to a temp file first and `mv`-ing it into place makes the
+# replacement atomic: on any POSIX filesystem, `mv` within the same
+# directory is a single rename syscall, so $OUTPUT_FILE is either the old
+# content or the new content, never a partial write. This is what removes
+# H-PREV-VERDICT-PIPEFAIL's trigger at the source (a truncated record with
+# recorded_at_ns but no overall_qc can no longer be produced by this script).
+#
+# The temp file MUST be created in $AUDIT_DIR (same directory as
+# $OUTPUT_FILE, hence same filesystem) -- `mv` across filesystems silently
+# degrades to copy+unlink, which reintroduces the exact truncation window
+# this fix exists to remove. `mktemp "${OUTPUT_FILE}.XXXXXX"` satisfies
+# that and also gives a random per-invocation suffix, so concurrent
+# invocations for different records never collide on the same temp path.
+#
+# The temp suffix deliberately does NOT end in ".json" (mktemp appends
+# random chars after ".XXXXXX", replacing the literal template chars) --
+# both dev/audit consumers that glob this directory
+# (consecutive_rework_count above, and deep_scan/check_06_qc_calibration.sh)
+# match on `*-<feature>.json`, i.e. the filename must end in ".json". A
+# leftover temp file (e.g. if the process was SIGKILLed, which bypasses the
+# EXIT trap below) is therefore invisible to both globs -- it cannot be
+# mistaken for a real record, only left as inert disk litter for manual
+# cleanup.
+TMP_FILE="$(mktemp "${OUTPUT_FILE}.XXXXXX")"
+# Clean up the temp file if anything below fails or the process is
+# terminated by a caught signal before the `mv` completes. A no-op once the
+# `mv` has succeeded, since $TMP_FILE no longer exists at that path.
+trap 'rm -f "$TMP_FILE"' EXIT INT TERM
 
 # Escape strings for JSON (handle double quotes and backslashes)
 _json_str() {
@@ -316,7 +351,7 @@ else
   QS_JSON="$QUALITY_SCORE"
 fi
 
-cat > "$OUTPUT_FILE" <<ENDJSON
+cat > "$TMP_FILE" <<ENDJSON
 {
   "date": "$DATE",
   "feature": "$(_json_str "$FEATURE")",
@@ -336,5 +371,19 @@ cat > "$OUTPUT_FILE" <<ENDJSON
   "notes": "$(_json_str "$NOTES")"
 }
 ENDJSON
+
+# Test-only hook: simulate an interruption between finishing the temp-file
+# write and the atomic rename (e.g. SIGTERM landing right after the heredoc
+# closes, or the process being cancelled before it gets to `mv`). Used by
+# record_qc_audit_test.sh to prove the fix: with this set, $OUTPUT_FILE (if
+# it already existed) must be left byte-identical -- never truncated, never
+# partially overwritten. Mirrors the WRITE_AUDIT_RECORDED_AT_NS test-only
+# override above.
+if [ -n "${WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME:-}" ]; then
+  echo "FAIL: WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME set; simulating interruption before rename" >&2
+  exit 1
+fi
+
+mv -f "$TMP_FILE" "$OUTPUT_FILE"
 
 echo "OK: wrote $OUTPUT_FILE (consecutive_rework_count=$CONSECUTIVE)"
