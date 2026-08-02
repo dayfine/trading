@@ -118,6 +118,25 @@ val truncation :
     Requires [shown] to be non-empty whenever [hidden] is non-empty (a truncated
     table has rows); raises otherwise. *)
 
+val eligible_beyond_cap :
+  shown:Weekly_snapshot.candidate list -> beyond_cap:int -> string option
+(** [eligible_beyond_cap ~shown ~beyond_cap] is the visibility note for the
+    candidates the {e screener} dropped at its top-N cap — distinct from
+    {!truncation}, which reports rows the {e report}'s own display limit hid.
+
+    The screener admits the full eligible set, ranks it, and keeps only its top
+    [max_buy_candidates]; [beyond_cap] is how many otherwise-eligible names it
+    cut (see {!Weekly_snapshot.t.long_eligible_beyond_cap}). Since those names
+    never reach the snapshot, no {!truncation} note can mention them; this one
+    does, so a reader knows the shown list is a capped view of a larger eligible
+    set (issue #2122 slice d).
+
+    [None] when [beyond_cap <= 0] (nothing was cut — the [0] default of a
+    pre-#2122 snapshot renders no line) or when [shown] is empty (no row to
+    quote a cutoff score against). Otherwise a line naming the count and the
+    lowest shown score — the score of the last (lowest-ranked) shown row, the
+    bar the cut names fell just short of. *)
+
 val is_extended : Weekly_snapshot.candidate -> bool
 (** [is_extended c] is [true] iff [c]'s reconciliation class is
     {!Entry_reconciliation.Extended} — its close has outrun the entry level past

@@ -82,10 +82,11 @@ let _append_note table = function
    [table]. Split out of {!_candidate_table} to keep that function's nesting
    under the linter cap — each note is an independent, flat append rather than a
    nested match/if chain. *)
-let _append_table_notes ~shown ~hidden table =
+let _append_table_notes ~shown ~hidden ~beyond_cap table =
   let legend flag note = if flag then Some note else None in
   [
     Report_shared.truncation ~shown ~hidden;
+    Report_shared.eligible_beyond_cap ~shown ~beyond_cap;
     legend (Report_shared.any_fallback_stop shown) Report_shared.stop_fallback;
     legend (Report_shared.any_data_suspect shown) Report_shared.data_suspect;
     legend
@@ -117,7 +118,7 @@ let _candidate_columns =
 let _candidate_rows shown =
   List.mapi shown ~f:(fun i c -> _candidate_row ~rank:(i + 1) c)
 
-let _candidate_table candidates ~limit =
+let _candidate_table ?(beyond_cap = 0) candidates ~limit =
   match candidates with
   | [] -> _empty_marker
   | _ ->
@@ -125,7 +126,7 @@ let _candidate_table candidates ~limit =
       let hidden = List.drop candidates limit in
       String.concat ~sep:"\n"
         (_table_header _candidate_columns :: _candidate_rows shown)
-      |> _append_table_notes ~shown ~hidden
+      |> _append_table_notes ~shown ~hidden ~beyond_cap
 
 (* Recommended-stop cell: this week's recomputed Weinstein support-floor stop
    shown with its delta vs the current stop, so the reader sees whether to raise
@@ -201,12 +202,14 @@ let render ?(long_limit = default_long_display_limit)
   Buffer.add_string buf
     (_section
        ~title:(Printf.sprintf "Long candidates (top %d)" long_limit)
-       (_candidate_table long_actionable ~limit:long_limit));
+       (_candidate_table ~beyond_cap:t.long_eligible_beyond_cap long_actionable
+          ~limit:long_limit));
   Buffer.add_string buf "\n\n";
   Buffer.add_string buf
     (_section
        ~title:(Printf.sprintf "Short candidates (top %d)" short_limit)
-       (_candidate_table short_actionable ~limit:short_limit));
+       (_candidate_table ~beyond_cap:t.short_eligible_beyond_cap
+          short_actionable ~limit:short_limit));
   Buffer.add_string buf "\n\n";
   (* Extended candidates carry no ticket (do-not-chase), so they live in their
      own watch section instead of consuming actionable display slots. Omitted

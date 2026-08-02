@@ -43,6 +43,8 @@ let _snapshot ?(longs = []) ?(shorts = [])
     sectors_weak = [];
     long_candidates = longs;
     short_candidates = shorts;
+    long_eligible_beyond_cap = 0;
+    short_eligible_beyond_cap = 0;
     held_positions = [];
     warnings = [];
   }

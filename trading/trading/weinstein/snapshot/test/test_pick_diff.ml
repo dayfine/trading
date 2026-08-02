@@ -46,6 +46,8 @@ let _snapshot ?(system_version = "v1") ?(date = _common_date)
     sectors_weak = [];
     long_candidates;
     short_candidates = [];
+    long_eligible_beyond_cap = 0;
+    short_eligible_beyond_cap = 0;
     held_positions = [];
     warnings = [];
   }

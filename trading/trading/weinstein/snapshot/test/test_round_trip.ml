@@ -63,6 +63,10 @@ let _full_snapshot : Weekly_snapshot.t =
         };
       ];
     short_candidates = [];
+    (* Non-default eligible-beyond-cap counts, so the round-trip exercises the
+       issue #2122 slice-d fields too. *)
+    long_eligible_beyond_cap = 12;
+    short_eligible_beyond_cap = 3;
     held_positions =
       [
         {
@@ -92,6 +96,8 @@ let _empty_snapshot : Weekly_snapshot.t =
     sectors_weak = [];
     long_candidates = [];
     short_candidates = [];
+    long_eligible_beyond_cap = 0;
+    short_eligible_beyond_cap = 0;
     held_positions = [];
     warnings = [];
   }

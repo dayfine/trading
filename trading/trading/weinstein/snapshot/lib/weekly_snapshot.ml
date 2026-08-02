@@ -62,6 +62,8 @@ type t = {
   sectors_weak : string list;
   long_candidates : candidate list;
   short_candidates : candidate list;
+  long_eligible_beyond_cap : int; [@sexp.default 0]
+  short_eligible_beyond_cap : int; [@sexp.default 0]
   held_positions : held_position list;
   warnings : string list; [@sexp.default []]
 }

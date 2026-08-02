@@ -1657,9 +1657,25 @@ let test_held_with_triggered_stop_reports_the_exit _ =
     (field _held_row
        (elements_are [ field _status (contains_substring "STOP HIT") ]))
 
+(* Issue #2122 slice c.3: the practical stand-in for the full universe+warehouse
+   regeneration golden — which needs the (deliberately uncommitted) weekly-review
+   warehouse — is that [generate] is deterministic on a fixed in-repo bar
+   fixture: two runs off the same inputs produce byte-identical snapshots. The
+   07-27 v3 live regen demonstrated the full property; this pins the pure-core
+   half of it without committing a warehouse. *)
+let test_generate_is_deterministic _ =
+  let inputs =
+    _inputs ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  let first = Snapshot_writer.serialize (Generator.generate inputs) in
+  let second = Snapshot_writer.serialize (Generator.generate inputs) in
+  assert_that first (equal_to second)
+
 let suite =
   "weekly_snapshot_generator"
   >::: [
+         "generate is deterministic" >:: test_generate_is_deterministic;
          "held without track keeps the recomputed view"
          >:: test_held_without_track_keeps_the_recomputed_view;
          "held with track reports the threaded stop"

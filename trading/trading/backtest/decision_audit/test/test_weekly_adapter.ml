@@ -51,6 +51,8 @@ let _snapshot ?(date = _date "2024-03-01") ?(long_candidates = [])
     sectors_weak = [];
     long_candidates;
     short_candidates;
+    long_eligible_beyond_cap = 0;
+    short_eligible_beyond_cap = 0;
     held_positions = [];
     warnings = [];
   }

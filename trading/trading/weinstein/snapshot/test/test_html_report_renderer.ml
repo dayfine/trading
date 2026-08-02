@@ -147,6 +147,8 @@ let _empty_snapshot : Weekly_snapshot.t =
     sectors_weak = [];
     long_candidates = [];
     short_candidates = [];
+    long_eligible_beyond_cap = 0;
+    short_eligible_beyond_cap = 0;
     held_positions = [];
     warnings = [];
   }
@@ -1010,9 +1012,31 @@ let test_unreconciled_cards_are_plain _ =
            (_has_substring "cand-extended\">");
        ])
 
+(* Issue #2122 slice d: the screener-cap eligible-beyond-cap note, rendered as
+   its own [<p class="note">]. [_full_snapshot]'s single shown long (LONGA,
+   score 0.91) is the lowest shown row. *)
+let test_eligible_beyond_cap_note_rendered _ =
+  let snap = { _full_snapshot with long_eligible_beyond_cap = 7 } in
+  assert_that
+    (Html_report_renderer.render snap)
+    (_has_substring
+       "<p class=\"note\">7 additional eligible candidates beyond the \
+        displayed cap (lowest shown score 0.91).</p>")
+
+(* A [0] count (the pre-#2122 default) renders no such note. *)
+let test_no_eligible_beyond_cap_note_when_zero _ =
+  assert_that
+    (Html_report_renderer.render _full_snapshot)
+    (not_ ~msg:"no beyond-cap note when the count is zero"
+       (_has_substring "additional eligible candidate"))
+
 let suite =
   "html_report_renderer"
   >::: [
+         "eligible_beyond_cap_note_rendered"
+         >:: test_eligible_beyond_cap_note_rendered;
+         "no_eligible_beyond_cap_note_when_zero"
+         >:: test_no_eligible_beyond_cap_note_when_zero;
          "body_matches_golden" >:: test_body_matches_golden;
          "document_is_self_contained" >:: test_document_is_self_contained;
          "new_marks_are_styled" >:: test_new_marks_are_styled;

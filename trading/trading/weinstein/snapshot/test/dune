@@ -10,7 +10,9 @@
   test_html_report_renderer
   test_entry_reconciliation
   test_render_weekly_report_cli
-  test_snapshot_validator)
+  test_snapshot_validator
+  test_report_cross_artifact
+  test_committed_records)
  (libraries
   weinstein_trading.snapshot
   status
