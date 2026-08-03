@@ -14,6 +14,27 @@ default-off config field; interfaces firm up as NS2→NS4 ship.
 
 ## Completed
 
+- **[#1557 item 1 residual] Fold_health emission in the `backtest_runner`
+  binary** (branch `feat/1557-followups`). All three #1557 items had already
+  shipped (item 1 `Fold_health.check_divergence` wiring via #1558; item 2
+  `CancelExit` via #1575; item 3 cash-floor exemption via #1567/#1582 — see
+  entries below). The one genuine residual: item 1's `Fold_health_runner` was
+  wired into `scenario_runner.ml` only, so the #1553 stuck-`Exiting` divergence
+  guard fired in the scenario catalog but **not** in standalone
+  `backtest_runner.exe` runs (single / baseline / fuzz / smoke — all route
+  through `_run_and_write`). Lifted the emission into the library:
+  `Fold_health_runner.all_findings ~config result` (pure union of
+  `Fold_health.check` invariants + `divergence_findings`, check-first) and
+  `Fold_health_runner.emit ?config ~output_dir result` (stderr `WARN:
+  fold-health:` + `<output_dir>/fold_health.sexp`). `scenario_runner`'s inline
+  `_emit_fold_health` now delegates to `emit` (behaviour-identical dedup);
+  `backtest_runner._run_and_write` calls `emit` after `Result_writer.write`.
+  Purely diagnostic — reads `result` only, no metric/behaviour change, no golden
+  pins `fold_health.sexp` (verify: `dune runtest trading/backtest/test`; new
+  tests in `test_fold_health_runner.ml` cover `all_findings` union+order,
+  healthy-empty, and `emit` sexp round-trip). **Recommend closing #1557 — all
+  three items are now on `main`.**
+
 - **[NS1] #1557#3 — cash-floor closing-trade exemption** (branch
   `feat/cash-floor-closing-exempt`). Added default-off
   `Portfolio_risk.config.exempt_closing_trades_from_cash_floor : bool

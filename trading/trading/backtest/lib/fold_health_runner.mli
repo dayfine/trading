@@ -24,3 +24,27 @@ val divergence_findings :
     [config.max_stuck_held_positions]), else the empty list (#1553). The
     runner-path bridge the scenario runner unions with the {!Fold_health.check}
     findings; additive and purely diagnostic. *)
+
+val all_findings :
+  config:Fold_health.config -> Runner.result -> Fold_health.finding list
+(** [all_findings ~config result] is the complete fold-health finding list for a
+    completed [result]: the {!Fold_health.check} degenerate-fold invariants
+    (derived from [result.summary] plus the per-step equity curve built from
+    [result.steps]'s [portfolio_value]s) unioned with {!divergence_findings}
+    (the #1553 stuck-[Exiting] guard), in that order. An empty list means the
+    fold looks healthy on every axis. Purely diagnostic — reads [result] only,
+    computes no side effects, changes no metric. *)
+
+val emit :
+  ?config:Fold_health.config -> output_dir:string -> Runner.result -> unit
+(** [emit ?config ~output_dir result] surfaces {!all_findings} for a completed
+    run as the two canonical fold-health artefacts: each finding is printed to
+    stderr with a [WARN: fold-health:] prefix (via
+    {!Fold_health.finding_to_string}), and the full list is written to
+    [<output_dir>/fold_health.sexp] (an empty list on a healthy run, so the
+    artefact's presence is uniform across runs). [config] defaults to
+    {!Fold_health.default_config}. This is the single emission point shared by
+    every runner-path caller (the scenario runner and the [backtest_runner]
+    binary), so the divergence guard fires in real backtests and not only in the
+    scenario catalog (#1557). Purely a reporting post-step: it changes no metric
+    and never aborts the run. *)
