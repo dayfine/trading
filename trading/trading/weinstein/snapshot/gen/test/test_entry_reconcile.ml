@@ -67,6 +67,7 @@ let _candidate ~symbol : Weekly_snapshot.candidate =
     stop_is_structural = false;
     data_suspect = false;
     reconciliation = Entry_reconciliation.Not_reconciled;
+    score_components = [];
   }
 
 (* One reader carrying three symbols whose last closes land in three DIFFERENT

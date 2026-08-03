@@ -228,25 +228,14 @@ let _tally signals =
   List.fold_right signals ~init:(0, []) ~f:(fun (pts, label) (sum, labels) ->
       if pts = 0 then (sum, labels) else (sum + pts, label :: labels))
 
-(** Non-zero [(label, points)] pairs from a raw [(points, label)] list — the
-    per-signal decomposition {!_tally} folds away; labels equal the rationale
-    and points sum to the score. *)
+(* Non-zero [(label, points)] pairs — the decomposition {!_tally} folds away
+   (labels = rationale, points sum to the score). *)
 let _components signals =
   List.filter_map signals ~f:(fun (pts, label) ->
       if pts = 0 then None else Some (label, pts))
 
-(* ------------------------------------------------------------------ *)
-(* Scoring                                                              *)
-(* ------------------------------------------------------------------ *)
-
-(** Compute a long-side score for a stock analysis. [early_stage2_max_weeks]
-    (default 4) is the early-Stage2 scoring window; supplying it from
-    [Screener.config.early_stage2_max_weeks] keeps the scoring bonus window in
-    lockstep with the {!Stock_analysis.is_breakout_candidate} admission window.
-*)
-(* Raw signal lists shared by the score and its published decomposition so they
-   can never drift. [early_stage2_max_weeks] (default 4) is the early-Stage2
-   scoring window, kept in lockstep with the admission gate. *)
+(* Raw signal lists shared by the score and its decomposition so they can't
+   drift; [early_stage2_max_weeks] (default 4) is the early-Stage2 window. *)
 let _long_signals ~early_stage2_max_weeks ~w ~sector (a : Stock_analysis.t) =
   _stage_long_signal ~early_stage2_max_weeks ~w ~a
   @ _late_stage2_signal ~w ~a @ _volume_signal ~w ~a @ _rs_long_signal ~w ~a

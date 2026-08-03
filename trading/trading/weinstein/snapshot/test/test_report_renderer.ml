@@ -37,6 +37,7 @@ let _full_snapshot : Weekly_snapshot.t =
           stop_is_structural = true;
           data_suspect = false;
           reconciliation = Entry_reconciliation.Not_reconciled;
+          score_components = [];
         };
         {
           symbol = "MSFT";
@@ -56,6 +57,7 @@ let _full_snapshot : Weekly_snapshot.t =
           stop_is_structural = true;
           data_suspect = false;
           reconciliation = Entry_reconciliation.Not_reconciled;
+          score_components = [];
         };
       ];
     short_candidates = [];
@@ -212,6 +214,7 @@ let test_risk_pct_formatting _ =
             stop_is_structural = true;
             data_suspect = false;
             reconciliation = Entry_reconciliation.Not_reconciled;
+            score_components = [];
           };
         ];
     }
@@ -249,6 +252,7 @@ let test_resistance_grade_column_rendered _ =
             stop_is_structural = true;
             data_suspect = false;
             reconciliation = Entry_reconciliation.Not_reconciled;
+            score_components = [];
           };
         ];
     }
@@ -294,6 +298,7 @@ let _sized_cand ?(sized_shares = 0) ?(sized_position_value = 0.0)
     stop_is_structural;
     data_suspect;
     reconciliation;
+    score_components = [];
   }
 
 let test_instruction_cell_rendered _ =
@@ -377,6 +382,7 @@ let _long_snap ~n ~score_of =
       stop_is_structural = true;
       data_suspect = false;
       reconciliation = Entry_reconciliation.Not_reconciled;
+      score_components = [];
     }
   in
   { _empty_snapshot with long_candidates = List.init n ~f:(fun i -> make_c i) }

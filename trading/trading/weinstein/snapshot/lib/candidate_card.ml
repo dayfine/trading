@@ -40,7 +40,8 @@ let _resistance_chip = function
         else "resistance"
       in
       [
-        Chip.make ~modifier ~title:Report_shared.resistance_grade_explainer grade;
+        Chip.make ~modifier ~title:Report_shared.resistance_grade_explainer
+          grade;
       ]
 
 (* Issue #2084 Finding 2 in words rather than as a footnote glyph: whether the
@@ -107,7 +108,9 @@ let _weakness_chip (c : Weekly_snapshot.candidate) =
 
 let _chips (c : Weekly_snapshot.candidate) =
   Chip.make ~modifier:"score" (Printf.sprintf "%s %.2f" c.grade c.score)
-  :: _breakdown_chip c @ _sector_chip c @ _rationale_chips c.rationale
+  :: _breakdown_chip c
+  @ _sector_chip c
+  @ _rationale_chips c.rationale
   @ _resistance_chip c.resistance_grade
   @ [ _stop_chip c ]
   @ _suspect_chip c @ _reconciliation_chip c @ _weakness_chip c

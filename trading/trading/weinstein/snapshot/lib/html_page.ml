@@ -173,7 +173,8 @@ let _chip_style =
     ".chip-extended { background: var(--band); color: var(--flag);";
     "                 font-weight: 600; }";
     (* Score-composition + sector-name: recessive facts. *)
-    ".chip-breakdown { background: var(--surface-alt); border-color: transparent;";
+    ".chip-breakdown { background: var(--surface-alt); border-color: \
+     transparent;";
     "                  font-variant-numeric: tabular-nums; }";
     ".chip-sectorname { background: var(--surface-alt);";
     "                   border-color: transparent; }";

@@ -148,9 +148,10 @@ val score_breakdown : Weekly_snapshot.candidate -> string option
     ["70 = 30 + 20 + 20"], the total (sum of the per-signal points, which equals
     the candidate's score by construction) followed by the points that composed
     it, in scoring order. The matching labels are the candidate's rationale
-    clauses (same order) and the fuller labelled form is {!score_breakdown_detail}.
-    [None] when the candidate carries no components — a snapshot written before
-    the field existed, or one whose scoring produced no non-zero signal. *)
+    clauses (same order) and the fuller labelled form is
+    {!score_breakdown_detail}. [None] when the candidate carries no components —
+    a snapshot written before the field existed, or one whose scoring produced
+    no non-zero signal. *)
 
 val score_breakdown_detail : Weekly_snapshot.candidate -> string option
 (** Labelled decomposition of {!Weekly_snapshot.candidate.score_components} —
@@ -160,15 +161,16 @@ val score_breakdown_detail : Weekly_snapshot.candidate -> string option
 
 val weaknesses : Weekly_snapshot.candidate -> string list
 (** The weakest links in a candidate's setup, derived purely from data already
-    on the row (no new scoring): an ["adequate (not strong) volume"] confirmation,
-    a ["fallback stop (no structural floor)"], a ["wide risk N%"] to the stop, a
-    ["paying up +N% through entry"] / ["extended +N% past entry"] reconciliation,
-    and — for long candidates — a ["sector not strong"]. Empty when the setup has
-    none of these. Each phrase is factual and unwrapped (no markup). *)
+    on the row (no new scoring): an ["adequate (not strong) volume"]
+    confirmation, a ["fallback stop (no structural floor)"], a ["wide risk N%"]
+    to the stop, a ["paying up +N% through entry"] / ["extended +N% past entry"]
+    reconciliation, and — for long candidates — a ["sector not strong"]. Empty
+    when the setup has none of these. Each phrase is factual and unwrapped (no
+    markup). *)
 
 val weakness_line : Weekly_snapshot.candidate -> string option
-(** [weaknesses] joined with ["; "], or [None] when there are none — a
-    single per-candidate line both renderers show so they cannot drift. *)
+(** [weaknesses] joined with ["; "], or [None] when there are none — a single
+    per-candidate line both renderers show so they cannot drift. *)
 
 val is_extended : Weekly_snapshot.candidate -> bool
 (** [is_extended c] is [true] iff [c]'s reconciliation class is

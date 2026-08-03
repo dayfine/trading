@@ -172,10 +172,10 @@ val long_score_components :
   Stock_analysis.t ->
   (string * int) list
 (** [long_score_components ?early_stage2_max_weeks ~weights ~sector a] is the
-    per-signal [(label, points)] decomposition of the long-side score — the
-    same non-zero signals {!score_long} sums, in the same order, surfaced so a
-    report can show HOW the total composed (e.g. "70 = 30 breakout + 20 volume +
-    20 RS") without re-deriving the weights. The labels equal {!score_long}'s
+    per-signal [(label, points)] decomposition of the long-side score — the same
+    non-zero signals {!score_long} sums, in the same order, surfaced so a report
+    can show HOW the total composed (e.g. "70 = 30 breakout + 20 volume + 20
+    RS") without re-deriving the weights. The labels equal {!score_long}'s
     rationale list and the points sum to its score. Pure. *)
 
 val short_score_components :

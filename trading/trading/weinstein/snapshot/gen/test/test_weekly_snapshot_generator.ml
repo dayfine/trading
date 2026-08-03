@@ -1039,6 +1039,7 @@ let _mk_candidate ~symbol ~entry ~stop : Weekly_snapshot.candidate =
     stop_is_structural = false;
     data_suspect = false;
     reconciliation = Entry_reconciliation.Not_reconciled;
+    score_components = [];
   }
 
 let _stops_cfg () =
@@ -1672,9 +1673,80 @@ let test_generate_is_deterministic _ =
   let second = Snapshot_writer.serialize (Generator.generate inputs) in
   assert_that first (equal_to second)
 
+(* A bar reader over several breakout tickers (all reusing the AAPL breakout
+   series) plus the trending index, so more than one long candidate clears the
+   cascade. *)
+let _multi_breakout_bar_reader tickers =
+  Bar_reader.of_in_memory_bars
+    ((_index_symbol, _bars_for ~syn_config:_syn_config _index_symbol)
+    :: List.map tickers ~f:(fun t ->
+        (t, _bars_for ~syn_config:_syn_config "AAPL")))
+
+(* Deliverable 2 wiring: the generator populates [score_components] from the
+   screener's own scoring — a non-empty decomposition whose points sum to the
+   candidate's total score. *)
+let test_long_candidate_carries_score_components _ =
+  let snap =
+    _generate ~bar_reader:(_breakout_bar_reader ())
+      ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  let aapl =
+    match
+      List.find snap.long_candidates ~f:(fun (c : Weekly_snapshot.candidate) ->
+          String.equal c.symbol "AAPL")
+    with
+    | Some c -> c
+    | None -> assert_failure "expected an AAPL long candidate"
+  in
+  assert_that (List.length aapl.score_components) (gt (module Int_ord) 0);
+  (* The decomposition is faithful: its points sum to the candidate's score. *)
+  assert_that
+    (Float.of_int (List.sum (module Int) aapl.score_components ~f:snd))
+    (float_equal aapl.score)
+
+(* QC follow-up (#2182 slice d): [long_eligible_beyond_cap] is populated from the
+   screener diagnostics, [grade_admitted - top_n_admitted] floored at 0. With
+   three identical breakout candidates and the buy cap lowered to 1, two eligible
+   names are cut by the cap — so the count is > 0 (the existing generator tests
+   only ever hit the 0 case). *)
+let test_eligible_beyond_cap_positive_when_cap_bites _ =
+  let tickers = [ "AAA"; "BBB"; "CCC" ] in
+  let base =
+    _inputs_at ~as_of:_as_of
+      ~bar_reader:(_multi_breakout_bar_reader tickers)
+      ~ticker_sectors:
+        (List.map tickers ~f:(fun t -> (t, "Information Technology")))
+  in
+  let inputs =
+    {
+      base with
+      config =
+        {
+          base.config with
+          screening_config =
+            { base.config.screening_config with max_buy_candidates = 1 };
+        };
+    }
+  in
+  let snap = Generator.generate inputs in
+  assert_that snap
+    (all_of
+       [
+         field
+           (fun (s : Weekly_snapshot.t) -> List.length s.long_candidates)
+           (equal_to 1);
+         field
+           (fun (s : Weekly_snapshot.t) -> s.long_eligible_beyond_cap)
+           (gt (module Int_ord) 0);
+       ])
+
 let suite =
   "weekly_snapshot_generator"
   >::: [
+         "long candidate carries score components"
+         >:: test_long_candidate_carries_score_components;
+         "eligible beyond cap positive when cap bites"
+         >:: test_eligible_beyond_cap_positive_when_cap_bites;
          "generate is deterministic" >:: test_generate_is_deterministic;
          "held without track keeps the recomputed view"
          >:: test_held_without_track_keeps_the_recomputed_view;

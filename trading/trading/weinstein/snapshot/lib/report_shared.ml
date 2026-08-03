@@ -151,11 +151,10 @@ let data_suspect =
 
 let resistance_grade_explainer =
   "resistance grade: how much overhead supply (prior trapped buyers) sits \
-   between the entry and the swing target. Virgin_territory / Clean = little to \
-   none, the cleanest runway; Moderate / Heavy_resistance = old highs the \
-   advance must chew through first (weinstein-book-reference.md §4 \"Overhead \
-   Resistance\"). The parenthesised figure is the continuous supply score \
-   (0.00 = clean, 1.00 = heavy)."
+   between the entry and the swing target. Virgin_territory / Clean = little \
+   to none, the cleanest runway; Moderate / Heavy_resistance = old highs to \
+   chew through first. The parenthesised figure is the supply score (0 clean, \
+   1 heavy)."
 
 let any_fallback_stop shown =
   List.exists shown ~f:(fun (c : Weekly_snapshot.candidate) ->
@@ -215,14 +214,12 @@ let eligible_beyond_cap ~shown ~beyond_cap =
       let lowest_shown = (List.last_exn shown).Weekly_snapshot.score in
       Some (_beyond_cap_line ~beyond_cap ~lowest_shown)
 
-(* ---- Score breakdown: surface how the total composed ---- *)
-
+(* Score breakdown — points sum to the candidate's score by construction
+   (components come straight from the screener's own scoring). *)
 let score_breakdown (c : Weekly_snapshot.candidate) =
   match c.score_components with
   | [] -> None
   | components ->
-      (* Points sum to the candidate's score by construction (the components
-         come from the screener's own scoring). *)
       let total = List.sum (module Int) components ~f:snd in
       let points =
         List.map components ~f:(fun (_, p) -> Int.to_string p)
@@ -237,14 +234,11 @@ let score_breakdown_detail (c : Weekly_snapshot.candidate) =
       List.map components ~f:(fun (label, p) -> Printf.sprintf "%d %s" p label)
       |> String.concat ~sep:" · " |> Option.some
 
-(* ---- Per-candidate weakness line (derived from the row, no new scoring) ---- *)
-
-(* Risk to the stop beyond this fraction of the fill basis is "wide" — Weinstein
-   places the initial stop just below support (§5.1), a typical 8-10%. *)
+(* Per-candidate weakness line — from the row, no new scoring. Risk beyond this
+   fraction of the fill basis is "wide" (initial stop sits below support, §5.1). *)
 let _wide_risk_pct = 15.0
 
-(* Longs stop BELOW entry, shorts ABOVE — the sign identifies the side without a
-   side field; used only to scope the long-side sector-strength weakness. *)
+(* Longs stop below entry, shorts above — the sign gives the side. *)
 let _looks_long (c : Weekly_snapshot.candidate) = Float.( < ) c.stop c.entry
 
 let _rationale_has (c : Weekly_snapshot.candidate) needle =
