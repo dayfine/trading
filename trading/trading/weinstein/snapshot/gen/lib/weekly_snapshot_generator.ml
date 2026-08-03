@@ -225,16 +225,21 @@ let _reconcile_entry ~(inputs : inputs) ~side candidate =
    produces is what sizing anchors the fill price to. *)
 let _build_candidates ~(inputs : inputs) ~(result : Screener.result)
     ~portfolio_value ~sizing_cash =
+  let sc = inputs.config.screening_config in
+  let to_candidate =
+    Snapshot_display.candidate_of_scored ~weights:sc.weights
+      ~early_stage2_max_weeks:sc.early_stage2_max_weeks
+  in
   let longs =
     List.map result.buy_candidates ~f:(fun c ->
-        Snapshot_display.candidate_of_scored c
+        to_candidate c
         |> _overlay_structural_stop ~inputs ~side:Trading_base.Types.Long
         |> _reconcile_entry ~inputs ~side:`Long
         |> _size_long ~inputs ~portfolio_value ~sizing_cash)
   in
   let shorts =
     List.map result.short_candidates ~f:(fun c ->
-        Snapshot_display.candidate_of_scored c
+        to_candidate c
         |> _overlay_structural_stop ~inputs ~side:Trading_base.Types.Short
         |> _reconcile_entry ~inputs ~side:`Short)
   in

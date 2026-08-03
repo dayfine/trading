@@ -23,7 +23,17 @@ val regime_label : Weinstein_types.market_trend -> string
 
 val macro_context : Macro.result -> Weekly_snapshot.macro_context
 
-val candidate_of_scored : Screener.scored_candidate -> Weekly_snapshot.candidate
+val candidate_of_scored :
+  weights:Screener.scoring_weights ->
+  early_stage2_max_weeks:int ->
+  Screener.scored_candidate ->
+  Weekly_snapshot.candidate
 (** Field-by-field copy onto the decoupled snapshot schema (see
     weekly_snapshot.mli §Design). Sized-instruction fields are left at their
-    unsized defaults — the generator overwrites them for long candidates. *)
+    unsized defaults — the generator overwrites them for long candidates.
+
+    [weights] and [early_stage2_max_weeks] are the screener's scoring params
+    (from [Screener.config]); they are consumed only to recover
+    {!Weekly_snapshot.candidate.score_components} via
+    {!Screener.long_score_components} / {!Screener.short_score_components} — the
+    same scoring the cascade already ran, surfaced for the report. *)

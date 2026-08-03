@@ -152,6 +152,16 @@ type candidate = {
           {!Entry_reconciliation.Not_reconciled}: old snapshots — and any run
           with the mechanism disarmed — parse and behave exactly as before the
           fix. *)
+  score_components : (string * int) list; [@sexp.default []]
+      (** Per-signal [(label, points)] decomposition of {!score} — the screener
+          scoring signals that summed to this candidate's total, in scoring
+          order (e.g. [[("Stage1→Stage2 breakout", 30); ("Strong volume", 20)]]).
+          Comes straight from {!Screener.long_score_components} /
+          {!Screener.short_score_components}, so the labels equal the [rationale]
+          clauses and the points sum to {!score} — the report surfaces the
+          arithmetic ("70 = 30 + 20 + 20") without re-deriving any weight.
+          Additive field defaulting to [[]]: old snapshots without it parse as
+          empty, and an empty list renders no breakdown. *)
 }
 [@@deriving sexp, eq, show]
 (** A single ranked candidate. Same shape for long and short candidates — the

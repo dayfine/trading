@@ -165,6 +165,27 @@ val score_short :
 (** [score_short ~weights ~sector a] computes the short-side weighted score and
     rationale list for [a]. *)
 
+val long_score_components :
+  ?early_stage2_max_weeks:int ->
+  weights:scoring_weights ->
+  sector:sector_context ->
+  Stock_analysis.t ->
+  (string * int) list
+(** [long_score_components ?early_stage2_max_weeks ~weights ~sector a] is the
+    per-signal [(label, points)] decomposition of the long-side score — the
+    same non-zero signals {!score_long} sums, in the same order, surfaced so a
+    report can show HOW the total composed (e.g. "70 = 30 breakout + 20 volume +
+    20 RS") without re-deriving the weights. The labels equal {!score_long}'s
+    rationale list and the points sum to its score. Pure. *)
+
+val short_score_components :
+  weights:scoring_weights ->
+  sector:sector_context ->
+  Stock_analysis.t ->
+  (string * int) list
+(** Short-side mirror of {!long_score_components} — the [(label, points)]
+    decomposition of {!score_short}. Pure. *)
+
 val grade_of_score : thresholds:grade_thresholds -> int -> Weinstein_types.grade
 (** [grade_of_score ~thresholds score] converts a numeric score to a grade
     letter using the configured cutoffs. *)

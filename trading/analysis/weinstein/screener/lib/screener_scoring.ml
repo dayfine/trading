@@ -228,6 +228,13 @@ let _tally signals =
   List.fold_right signals ~init:(0, []) ~f:(fun (pts, label) (sum, labels) ->
       if pts = 0 then (sum, labels) else (sum + pts, label :: labels))
 
+(** Non-zero [(label, points)] pairs from a raw [(points, label)] list — the
+    per-signal decomposition {!_tally} folds away; labels equal the rationale
+    and points sum to the score. *)
+let _components signals =
+  List.filter_map signals ~f:(fun (pts, label) ->
+      if pts = 0 then None else Some (label, pts))
+
 (* ------------------------------------------------------------------ *)
 (* Scoring                                                              *)
 (* ------------------------------------------------------------------ *)
@@ -237,22 +244,34 @@ let _tally signals =
     [Screener.config.early_stage2_max_weeks] keeps the scoring bonus window in
     lockstep with the {!Stock_analysis.is_breakout_candidate} admission window.
 *)
+(* Raw signal lists shared by the score and its published decomposition so they
+   can never drift. [early_stage2_max_weeks] (default 4) is the early-Stage2
+   scoring window, kept in lockstep with the admission gate. *)
+let _long_signals ~early_stage2_max_weeks ~w ~sector (a : Stock_analysis.t) =
+  _stage_long_signal ~early_stage2_max_weeks ~w ~a
+  @ _late_stage2_signal ~w ~a @ _volume_signal ~w ~a @ _rs_long_signal ~w ~a
+  @ _resistance_signal ~w ~a
+  @ _sector_long_signal ~w ~sector
+
+let _short_signals ~w ~sector (a : Stock_analysis.t) =
+  _stage_short_signal ~w ~a @ _volume_short_signal ~w ~a
+  @ _rs_short_signal ~w ~a @ _support_signal ~w ~a
+  @ _sector_short_signal ~w ~sector
+
 let score_long ?(early_stage2_max_weeks = 4) ~weights ~sector
     (a : Stock_analysis.t) : int * string list =
-  let w = weights in
-  _tally
-    (_stage_long_signal ~early_stage2_max_weeks ~w ~a
-    @ _late_stage2_signal ~w ~a @ _volume_signal ~w ~a @ _rs_long_signal ~w ~a
-    @ _resistance_signal ~w ~a
-    @ _sector_long_signal ~w ~sector)
+  _tally (_long_signals ~early_stage2_max_weeks ~w:weights ~sector a)
 
-(** Compute a short-side score for a stock analysis. *)
 let score_short ~weights ~sector (a : Stock_analysis.t) : int * string list =
-  let w = weights in
-  _tally
-    (_stage_short_signal ~w ~a @ _volume_short_signal ~w ~a
-   @ _rs_short_signal ~w ~a @ _support_signal ~w ~a
-    @ _sector_short_signal ~w ~sector)
+  _tally (_short_signals ~w:weights ~sector a)
+
+let long_score_components ?(early_stage2_max_weeks = 4) ~weights ~sector
+    (a : Stock_analysis.t) : (string * int) list =
+  _components (_long_signals ~early_stage2_max_weeks ~w:weights ~sector a)
+
+let short_score_components ~weights ~sector (a : Stock_analysis.t) :
+    (string * int) list =
+  _components (_short_signals ~w:weights ~sector a)
 
 (** Convert score to grade using configurable thresholds. *)
 let grade_of_score ~thresholds score =

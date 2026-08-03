@@ -172,6 +172,14 @@ let _chip_style =
     ".chip-through-entry { background: var(--band); color: var(--ink); }";
     ".chip-extended { background: var(--band); color: var(--flag);";
     "                 font-weight: 600; }";
+    (* Score-composition + sector-name: recessive facts. *)
+    ".chip-breakdown { background: var(--surface-alt); border-color: transparent;";
+    "                  font-variant-numeric: tabular-nums; }";
+    ".chip-sectorname { background: var(--surface-alt);";
+    "                   border-color: transparent; }";
+    (* The weakest-links caveat escalates like the other flag chips. *)
+    ".chip-weak { background: var(--band); border-color: transparent;";
+    "             color: var(--flag); }";
   ]
 
 (* Mark specs: thin strokes, recessive volume, dashed level lines so identity
