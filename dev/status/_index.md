@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-03 run1 (orchestrator run 30797497236 — main green on `70f6cda9`, now `af19a3ae`). **Stall broken:** #2169 MERGED after 5 days idle — its base commit was already redundant (H-AUDIT-ATOMIC-WRITE had landed via #2163), which is why it was `dirty` and GitHub could not compute a merge ref, so CI never ran; rebased to the N1 pin alone, both QC gates APPROVED 5/5, merged. #2166 reworked (CP1) and QC-APPROVED, awaiting CI. Root cause of the multi-run stall identified: **parallel agents share ONE working tree in this container** (Step 4's 'branches are independent' claim is false) — they raced, clobbered each other's uncommitted work, and tree-wide `git add` swept foreign files into the index. Also recovered: orphaned branch `feat/picks-slices-bcd` (931 insertions, no PR ever opened) surfaced as #2182, and 4 orphaned budget records. A-FASTEXIT-VACUOUS RESOLVED (#2180).)
+Last updated: 2026-08-03 run1 (orchestrator run 30797497236 — main green on `70f6cda9`, now `af19a3ae`). **Stall broken:** #2169 MERGED after 5 days idle — its base commit was already redundant (H-AUDIT-ATOMIC-WRITE had landed via #2163), which is why it was `dirty` and GitHub could not compute a merge ref, so CI never ran; rebased to the N1 pin alone, both QC gates APPROVED 5/5, merged. #2166 also MERGED `22c801e2` after a CP1 rework — both stranded PRs cleared. Root cause of the multi-run stall identified: **parallel agents share ONE working tree in this container** (Step 4's 'branches are independent' claim is false) — they raced, clobbered each other's uncommitted work, and tree-wide `git add` swept foreign files into the index. Also recovered: orphaned branch `feat/picks-slices-bcd` (931 insertions, no PR ever opened) surfaced as #2182, and 4 orphaned budget records. A-FASTEXIT-VACUOUS RESOLVED (#2180).)
 
 ## Active + complete tracks
 
@@ -45,7 +45,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [sector-data](sector-data.md) | MERGED | — | — | — |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | H-AUDIT-ATOMIC-WRITE MERGED `af19a3ae` (#2169); F1/F2 filed; next: H-PREV-VERDICT-PIPEFAIL direction decision |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 8 open; A-NOOP-BUDGET-ORPHAN new (5 records recovered); A-FASTEXIT-VACUOUS now has measured cost; six items share the `workflow`-token blocker |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | #2166 | adjusted_basis_sync_pin QC APPROVED (5/5, 4/5) after rework 1; awaiting CI; next: expired linter exception (segmentation.ml) |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | adjusted_basis_sync_pin MERGED `22c801e2` (#2166) after rework 1; next: expired linter exception (segmentation.ml) |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
