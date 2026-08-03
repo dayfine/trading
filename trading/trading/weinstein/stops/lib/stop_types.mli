@@ -212,6 +212,40 @@ type config = {
           Default-off experiment axis per
           [.claude/rules/experiment-flag-discipline.md]; promoted only on a
           ledger ACCEPT. *)
+  split_safe_floors : bool; [@sexp.default false]
+      (** When [true], the bar-list support-floor path
+          ({!Weinstein_stops.compute_initial_stop_with_floor} and
+          {!Weinstein_stops.floor_is_structural}) rescales each raw-OHLC bar
+          onto its split/dividend-adjusted basis (per-bar factor
+          [adjusted_close /. close_price]) {b before} the correction low / rally
+          high is measured. Default [false] feeds the raw bars unchanged — an
+          exact no-op, so every existing golden replays bit-identically.
+
+          Why: {!Support_floor} anchors on [low_price] / [high_price] from the
+          daily bars. When a split falls inside the lookback window those raw
+          extremes are mis-scaled against the current entry price exactly like
+          the resistance-sketch grades were before #2133/#2145 — a forward split
+          leaves pre-split raw highs 4x the current price, so the primitive
+          anchors the "peak" on a phantom level and derives a garbage floor (the
+          live FBRX [split_in_window] warning, weekly-picks record 2026-07-31).
+          Pinning the measurement to the adjusted basis puts the floor in the
+          same continuous scale as the (current-basis) entry price.
+
+          Scope: this flag governs {b only} the bar-list path, whose bars carry
+          both raw OHLC and [adjusted_close] (so the factor is derivable
+          inline). The panel/callback path
+          ({!Weinstein_stops.compute_initial_stop_with_floor_with_callbacks}) is
+          unaffected — its [daily_view] exposes raw highs/lows and adjusted
+          closes but no raw close, so the per-bar factor cannot be recovered
+          there without extending the view type (out of scope).
+
+          Faithful-core: measuring the structural correction low on a
+          split-consistent price basis is {b data hygiene}, not a strategy
+          change — spine item 5 ("stop below the base") is unchanged; only the
+          scale on which "the base" is read is corrected (W1/W2,
+          [.claude/rules/weinstein-faithful-core.md]). Default-off experiment
+          axis per [.claude/rules/experiment-flag-discipline.md]; promoted only
+          on a ledger ACCEPT. *)
 }
 [@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable

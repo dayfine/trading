@@ -886,13 +886,36 @@ else
   CONTENT_AFTER="$(cat "${JSON19}" 2>/dev/null || echo "MISSING")"
   stray_tmp_count="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE19}.json.??????" | wc -l | tr -d ' ')"
 
+  # TMP_FILE=<path> is emitted by the abort hook itself (write_audit.sh's
+  # WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME branch) right before it exits, so it
+  # names the exact temp path that was staged for THIS invocation -- pin two
+  # invariants the write_audit.sh:320-335 comment block asserts but the
+  # pre-existing scenario 19 assertions did not actually exercise:
+  #   (a) same-directory/same-filesystem: the temp file's directory must be
+  #       $AUDIT_DIR (${TMP_REPO}/dev/audit), not $TMPDIR or anywhere else --
+  #       this is what makes the later `mv` a single rename syscall instead
+  #       of degrading to copy+unlink across filesystems.
+  #   (b) glob-invisible: the temp basename must NOT end in ".json", so a
+  #       leftover (e.g. from a SIGKILL that bypasses the EXIT trap) can
+  #       never be picked up by either dev/audit/ *.json glob consumer.
+  # A test that only checks "no stray temp file was left behind" (the
+  # pre-existing stray_tmp_count check) is satisfied whether the temp was
+  # ever created in dev/audit/ at all -- it cannot detect a `mktemp`
+  # relocated to $TMPDIR. This TMP_FILE_19 pin can.
+  TMP_FILE_19="$(echo "${out19_2}" | sed -n 's/.*TMP_FILE=//p' | tail -1)"
+  TMP_FILE_19_DIR="$(dirname "${TMP_FILE_19}")"
+  TMP_FILE_19_BASENAME="$(basename "${TMP_FILE_19}")"
+
   if (( rc19_2 != 0 )) \
      && [[ "${CONTENT_AFTER}" == "${CONTENT_A}" ]] \
      && [[ "${stray_tmp_count}" == "0" ]] \
-     && echo "${out19_2}" | grep -q "simulating interruption before rename"; then
-    pass "scenario 19 — interrupted write leaves pre-existing target byte-identical, temp file cleaned up (H-AUDIT-ATOMIC-WRITE)"
+     && echo "${out19_2}" | grep -q "simulating interruption before rename" \
+     && [[ -n "${TMP_FILE_19}" ]] \
+     && [[ "${TMP_FILE_19_DIR}" == "${TMP_REPO}/dev/audit" ]] \
+     && [[ "${TMP_FILE_19_BASENAME}" != *.json ]]; then
+    pass "scenario 19 — interrupted write leaves pre-existing target byte-identical, temp file cleaned up, staged in same dir with non-.json suffix (H-AUDIT-ATOMIC-WRITE)"
   else
-    fail "scenario 19 — expected rc2!=0, target unchanged (content A), no stray temp file; got rc2=${rc19_2}, stray_tmp_count=${stray_tmp_count}"
+    fail "scenario 19 — expected rc2!=0, target unchanged (content A), no stray temp file, temp staged in ${TMP_REPO}/dev/audit with non-.json suffix; got rc2=${rc19_2}, stray_tmp_count=${stray_tmp_count}, TMP_FILE_19=${TMP_FILE_19} (dir=${TMP_FILE_19_DIR}, basename=${TMP_FILE_19_BASENAME})"
     echo "${out19_2}" | sed 's/^/      /'
     echo "      content A: ${CONTENT_A}"
     echo "      content after: ${CONTENT_AFTER}"
@@ -922,6 +945,110 @@ else
   fail "scenario 20 — expected rc=0, record at ${JSON20} with score 5, no stray temp file; got rc=${rc20}, stray_tmp_count=${stray_tmp_count_20}"
   echo "${out20}" | sed 's/^/      /'
   [[ -f "${JSON20}" ]] && echo "      json: $(cat "${JSON20}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 21 — H-PREV-VERDICT-PIPEFAIL: a TRUNCATED prior record (has
+# recorded_at_ns so it sorts correctly by write order, but is missing
+# overall_qc entirely -- the exact shape a pre-H-AUDIT-ATOMIC-WRITE
+# SIGTERM/ENOSPC mid-heredoc-write would have produced) must NOT abort the
+# script on the NEEDS_REWORK escalation path, and must be SKIPPED rather
+# than treated as breaking the streak.
+#
+# Three prior-record ordering, oldest to newest by recorded_at_ns:
+#   1. branch "feat/old"       recorded_at_ns=1e18  NEEDS_REWORK (valid)
+#   2. branch "feat/truncated" recorded_at_ns=2e18  TRUNCATED (no overall_qc)
+#   current call:               recorded_at_ns=3e18  NEEDS_REWORK
+#
+# Pre-fix: the loop walks newest-to-oldest, hits "feat/truncated" first,
+# and the unguarded `grep -o '"overall_qc"...' | head -1 | sed ...`
+# pipeline exits 1 (no match) under `set -euo pipefail`, aborting the
+# whole script before it ever writes the current record -- rc=1, no file,
+# and (because the bad record is never removed) every future review for
+# this feature fails the exact same way, permanently.
+#
+# Post-fix: the truncated record is skipped (neither extends nor breaks
+# the streak), so the scan proceeds to "feat/old" (NEEDS_REWORK) and counts
+# it. Expected consecutive_rework_count for the current record is 2 (this
+# record + feat/old), NOT 1 (which is what treating the truncated record as
+# "streak broken" would have produced instead -- the "unsafe direction"
+# this item's own text names).
+# ---------------------------------------------------------------------------
+FEATURE21="truncated-record-skip"
+mkdir -p "${TMP_REPO}/dev/audit"
+
+out21_1=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=1000000000000000000 \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-30 --feature "${FEATURE21}" --branch "feat/old" \
+    --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK 2>&1) && rc21_1=0 || rc21_1=$?
+
+# Hand-seed a truncated record directly (write_audit.sh itself can no
+# longer produce this shape post-H-AUDIT-ATOMIC-WRITE -- it must still be
+# TOLERATED as a prior record possibly written before that fix, by another
+# tool, or left behind by an interruption predating this codebase version).
+cat > "${TMP_REPO}/dev/audit/2026-07-30-feat-truncated-${FEATURE21}.json" <<EOF
+{
+  "date": "2026-07-30",
+  "feature": "${FEATURE21}",
+  "branch": "feat/truncated",
+  "recorded_at_ns": 2000000000000000000
+EOF
+
+out21_3=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=3000000000000000000 \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-30 --feature "${FEATURE21}" --branch "feat/new" \
+    --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK 2>&1) && rc21_3=0 || rc21_3=$?
+JSON21="${TMP_REPO}/dev/audit/2026-07-30-feat-new-${FEATURE21}.json"
+
+if (( rc21_1 == 0 )) && (( rc21_3 == 0 )) && [[ -f "${JSON21}" ]] \
+   && grep -q '"consecutive_rework_count": *2' "${JSON21}" \
+   && echo "${out21_3}" | grep -q 'consecutive_rework_count=2' \
+   && ! echo "${out21_3}" | grep -q 'WARNING'; then
+  pass "scenario 21 — truncated prior record (no overall_qc) does not abort the script, is skipped not counted as a streak break, and emits NO warning (silent skip, H-PREV-VERDICT-PIPEFAIL)"
+else
+  fail "scenario 21 — expected rc=0/0, consecutive_rework_count=2 for feat/new record, and NO 'WARNING' in output (silent skip); got rc=${rc21_1}/${rc21_3}"
+  echo "${out21_1}" | sed 's/^/      /'
+  echo "${out21_3}" | sed 's/^/      /'
+  [[ -f "${JSON21}" ]] && echo "      json: $(cat "${JSON21}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 22 — H-PREV-VERDICT-PIPEFAIL, distinct failure class: a prior
+# "record" that is genuinely unreadable by grep (simulated with a directory
+# sitting at the glob-matched path, which GNU grep refuses with exit 2 --
+# "Is a directory" -- as opposed to exit 1 for "no match") must ALSO not
+# abort the script, but should be surfaced with a stderr WARNING naming the
+# file, distinguishing it from the silent-skip exit-1 case in scenario 21.
+# ---------------------------------------------------------------------------
+FEATURE22="unreadable-record-warns"
+mkdir -p "${TMP_REPO}/dev/audit"
+
+out22_1=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=1000000000000000000 \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-30 --feature "${FEATURE22}" --branch "feat/old" \
+    --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK 2>&1) && rc22_1=0 || rc22_1=$?
+
+# A directory at a path matching the "*-<feature>.json" glob makes grep
+# exit 2 ("Is a directory") rather than 1 ("no match").
+UNREADABLE_PATH_22="${TMP_REPO}/dev/audit/2026-07-30-feat-unreadable-${FEATURE22}.json"
+mkdir -p "${UNREADABLE_PATH_22}"
+
+out22_3=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=3000000000000000000 \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-30 --feature "${FEATURE22}" --branch "feat/new" \
+    --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK 2>&1) && rc22_3=0 || rc22_3=$?
+JSON22="${TMP_REPO}/dev/audit/2026-07-30-feat-new-${FEATURE22}.json"
+
+if (( rc22_1 == 0 )) && (( rc22_3 == 0 )) && [[ -f "${JSON22}" ]] \
+   && grep -q '"consecutive_rework_count": *2' "${JSON22}" \
+   && echo "${out22_3}" | grep -q 'WARNING: could not read prior audit record' \
+   && echo "${out22_3}" | grep -qF "${UNREADABLE_PATH_22}"; then
+  pass "scenario 22 — unreadable prior record (grep exit 2) does not abort the script, warns loudly naming the offending file, still skipped from the streak (H-PREV-VERDICT-PIPEFAIL)"
+else
+  fail "scenario 22 — expected rc=0/0, consecutive_rework_count=2, a WARNING naming ${UNREADABLE_PATH_22}; got rc=${rc22_1}/${rc22_3}"
+  echo "${out22_1}" | sed 's/^/      /'
+  echo "${out22_3}" | sed 's/^/      /'
+  [[ -f "${JSON22}" ]] && echo "      json: $(cat "${JSON22}")"
 fi
 
 # ---------------------------------------------------------------------------

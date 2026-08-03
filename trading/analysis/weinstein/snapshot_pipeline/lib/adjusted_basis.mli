@@ -6,8 +6,11 @@
     mis-scales any symbol with a split inside the lookback window — a forward
     split hides real supply, a reverse split fabricates phantom supply (issue
     #2133). This helper pins the measurement to the adjusted basis. Its
-    semantics match {!Weinstein_snapshot.Svg_series}'s chart-side rescale so the
-    report charts and the supply sketch agree on the same continuous scale. *)
+    open/high/low/close rescale matches {!Weinstein_snapshot.Svg_series}'s
+    chart-side rescale so the report charts and the supply sketch agree on the
+    same continuous scale — {b except} for [active_through]: this function
+    preserves it from the input bar, while [Svg_series]'s private duplicate
+    always drops it to [None] (pinned by [test_adjusted_basis.ml]). *)
 
 val to_adjusted_basis : Types.Daily_price.t -> Types.Daily_price.t
 (** [to_adjusted_basis b] scales [b]'s open/high/low by the split/dividend

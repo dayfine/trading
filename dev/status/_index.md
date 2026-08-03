@@ -4,7 +4,9 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-02 run1 (orchestrator run 30738894584 — main green on `7c43e983`: build-and-test, perf-tier1-smoke, golden-sp500-5y, golden-custom-universe all SUCCESS. **Recovery run after a 3-day stall**: four orchestrator runs on 07-31/08-01 produced only orphaned `ops/budget-*` branches — no summaries, nothing merged since 2026-07-30, and PRs #2166/#2169 passed over four times (verified first-hand: 4 budget branches, 0 daily branches, 0 commits on main; independently corroborated by `dev/reviews/track-pacer-2026-08-02.md` §P7). This run did not fast-exit — the >24h first-run-of-day escape hatch fired — and re-dispatched both stranded PRs. Merged #2176 (track-pacer report, docs-only carve-out). A-FASTEXIT-VACUOUS is now the top escalation and is **not** `workflow`-token-blocked: it is a ~6-line edit to `.claude/agents/lead-orchestrator.md`, blocked only on this agent's write permission — 11th consecutive run.)
+Last updated: 2026-08-03 run2 (orchestrator run 30817481526 — main green on `b4b7a3d0`, now `94343ea0`). **Run 2:** queue was EMPTY at start (Step 0.5 fast-exit correctly skipped on the non-empty-queue precondition from #2180), so max dispatch capacity. Writers dispatched **strictly sequentially** per run 1's root cause — no writer collision occurred. #2184 (H-PREV-VERDICT-PIPEFAIL) dispatched → QC NEEDS_REWORK (2/5, two documented claims unpinned, found by mutation testing) → rework iteration 1 → APPROVED 4/5 → **auto-merged `94343ea0`**, all 3 gates green. Also diagnosed #2182's CI failure (two mechanical linter violations, not a design problem) and opened #2185 against its branch to clear them. New findings: `jj`/`jst` are non-functional in GHA (so no agent can open its own PR — REST fallback is the only path); `write_audit.sh` writes audit records `0600` not `0644` (regression from #2169). Shared-tree churn again destroyed orchestrator-owned files mid-run; QC reviews survived only because they were posted to the PR via REST.
+
+Prior (run1, run 30797497236 — main green on `70f6cda9`, then `af19a3ae`). **Stall broken:** #2169 MERGED after 5 days idle — its base commit was already redundant (H-AUDIT-ATOMIC-WRITE had landed via #2163), which is why it was `dirty` and GitHub could not compute a merge ref, so CI never ran; rebased to the N1 pin alone, both QC gates APPROVED 5/5, merged. #2166 also MERGED `22c801e2` after a CP1 rework — both stranded PRs cleared. Root cause of the multi-run stall identified: **parallel agents share ONE working tree in this container** (Step 4's 'branches are independent' claim is false) — they raced, clobbered each other's uncommitted work, and tree-wide `git add` swept foreign files into the index. Also recovered: orphaned branch `feat/picks-slices-bcd` (931 insertions, no PR ever opened) surfaced as #2182, and 4 orphaned budget records. A-FASTEXIT-VACUOUS RESOLVED (#2180).)
 
 ## Active + complete tracks
 
@@ -43,9 +45,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2169 | H-AUDIT-ATOMIC-WRITE in review: structural APPROVED, behavioral NEEDS_REWORK (N1 temp-dir invariant untested); 9 open; next: land #2169 rework |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | H-PREV-VERDICT-PIPEFAIL MERGED `94343ea0` (#2184, skip-not-break + rework 1); next: H-AUDIT-MODE-0600 (new, #2169 regression) or H-QC-SCORE-ADJECTIVE-LEXICON |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 8 open; A-NOOP-BUDGET-ORPHAN new (5 records recovered); A-FASTEXIT-VACUOUS now has measured cost; six items share the `workflow`-token blocker |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | #2166 | adjusted_basis_sync_pin in flight (branch was a claim commit only for 4 days; re-dispatched 08-02); 9 open; next: land the cross-file rescale pin |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | adjusted_basis_sync_pin MERGED `22c801e2` (#2166) after rework 1; next: expired linter exception (segmentation.ml) |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
@@ -57,7 +59,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
-| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | #2153/#2165/#2171 MERGED (sidetable rebuild, validator warn-first, entry-cap Ph1); next: #2122 slices (b) instr identity, (c) repro golden, (d) eligible-beyond-cap |
+| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | #2182, #2185 | #2182 CI-red = 2 linter violations (fn_length 52/50, nesting 6/5); #2185 fixes them, CI green — merge it to green #2182, or close both |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
 | [tax-lens](tax-lens.md) | MERGED | feat-backtest | — | Phase 1 #2066 + CP4 loader error-path contract #2073 MERGED; Phase 2 wash-sale / April outflows deferred, user-gated (#2006) |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | asset-type blocklist MERGED (#1939, default-off); next: arm ATB.curated for live universe build + General::Type enrichment feed |

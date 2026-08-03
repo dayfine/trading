@@ -32,6 +32,12 @@ let make_bar ~date ~high ~low ~close =
     active_through = None;
   }
 
+(* Build a bar with a distinct [adjusted_close] — used by the split-safe
+   fixtures, where the per-bar factor [adjusted_close /. close] differs from
+   1.0 (a split / dividend inside the window). *)
+let make_bar_adj ~date ~high ~low ~close ~adjusted_close =
+  { (make_bar ~date ~high ~low ~close) with adjusted_close }
+
 (* ==================================================================== *)
 (*                           Long-side tests                            *)
 (* ==================================================================== *)
@@ -686,6 +692,192 @@ let test_config_sexp_omits_field_defaults_wick _ =
   in
   assert_that (config_of_sexp stripped) (equal_to (default_config : config))
 
+(* ==================================================================== *)
+(*            split_safe_floors: raw vs adjusted-basis bars              *)
+(* ==================================================================== *)
+
+let cfg_split = { cfg with split_safe_floors = true }
+
+(* Long 4:1 forward split between bar 4 and bar 5. Bars 1-4 are pre-split
+   (raw ~4x the current price, [adjusted_close] = raw / 4 → factor 0.25); bar 5
+   is post-split (factor 1.0). On the {b adjusted} basis the series is a clean
+   peak (110) + correction (low 98); on the {b raw} basis the pre-split high
+   (440) is a phantom peak and the post-split low (104) is picked up as the
+   "correction low" of a bogus 76% drawdown — a garbage floor at 104 that sits
+   right at the current ~104 entry. *)
+let split_long_bars =
+  [
+    make_bar_adj ~date:"2024-01-01" ~high:408.0 ~low:400.0 ~close:404.0
+      ~adjusted_close:101.0;
+    make_bar_adj ~date:"2024-01-02" ~high:440.0 ~low:432.0 ~close:436.0
+      ~adjusted_close:109.0;
+    make_bar_adj ~date:"2024-01-03" ~high:404.0 ~low:396.0 ~close:400.0
+      ~adjusted_close:100.0;
+    make_bar_adj ~date:"2024-01-04" ~high:412.0 ~low:392.0 ~close:408.0
+      ~adjusted_close:102.0;
+    make_bar_adj ~date:"2024-01-05" ~high:105.0 ~low:104.0 ~close:104.0
+      ~adjusted_close:104.0;
+  ]
+
+let split_long_entry = 104.0
+let split_as_of = Date.of_string "2024-01-05"
+
+let _initial_reference matcher =
+  matching ~msg:"Expected Initial state"
+    (function
+      | Initial { reference_level; _ } -> Some reference_level | _ -> None)
+    matcher
+
+let test_split_safe_long_uses_adjusted_floor _ =
+  (* split_safe on: floor lands where the adjusted chart says (98.0). *)
+  assert_that
+    (compute_initial_stop_with_floor ~config:cfg_split ~side:Long
+       ~entry_price:split_long_entry ~bars:split_long_bars ~as_of:split_as_of
+       ~fallback_buffer)
+    (_initial_reference (float_equal 98.0))
+
+let test_split_safe_long_off_uses_raw_floor _ =
+  (* Default-off (bit-identical to pre-flag behaviour): the raw pre-split high
+     anchors and the post-split low 104 becomes the phantom floor. *)
+  assert_that
+    (compute_initial_stop_with_floor ~config:cfg ~side:Long
+       ~entry_price:split_long_entry ~bars:split_long_bars ~as_of:split_as_of
+       ~fallback_buffer)
+    (_initial_reference (float_equal 104.0))
+
+(* Short mirror: same 4:1 split between bar 4 and bar 5. On the adjusted basis a
+   clean trough (low 90) + counter-rally (high 102); on the raw basis the
+   post-split low 92 is the lowest bar and it is the LAST bar, so there is no
+   counter-rally after the trough at all — the raw path finds no ceiling and
+   falls back to the buffer. *)
+let split_short_bars =
+  [
+    make_bar_adj ~date:"2024-01-01" ~high:400.0 ~low:396.0 ~close:398.0
+      ~adjusted_close:99.5;
+    make_bar_adj ~date:"2024-01-02" ~high:368.0 ~low:360.0 ~close:364.0
+      ~adjusted_close:91.0;
+    make_bar_adj ~date:"2024-01-03" ~high:400.0 ~low:392.0 ~close:396.0
+      ~adjusted_close:99.0;
+    make_bar_adj ~date:"2024-01-04" ~high:408.0 ~low:388.0 ~close:392.0
+      ~adjusted_close:98.0;
+    make_bar_adj ~date:"2024-01-05" ~high:95.0 ~low:92.0 ~close:93.0
+      ~adjusted_close:93.0;
+  ]
+
+let split_short_entry = 93.0
+
+let test_split_safe_short_uses_adjusted_ceiling _ =
+  assert_that
+    (compute_initial_stop_with_floor ~config:cfg_split ~side:Short
+       ~entry_price:split_short_entry ~bars:split_short_bars ~as_of:split_as_of
+       ~fallback_buffer)
+    (_initial_reference (float_equal 102.0))
+
+(* Corrupt-close guard: bar 3 (the correction-low bar) carries a [close_price]
+   of 0.0. Under [split_safe_floors] its factor would be [102 /. 0.0 = +inf]
+   without the one-sided guard, poisoning O/H/L to [inf]/[nan] and dropping the
+   real floor. The guard admits factor 1.0 for a non-positive raw close, so the
+   raw low 98 survives and a finite structural floor (98.0) still lands. *)
+let corrupt_close_bars =
+  [
+    make_bar_adj ~date:"2024-01-01" ~high:102.0 ~low:100.0 ~close:101.0
+      ~adjusted_close:101.0;
+    make_bar_adj ~date:"2024-01-02" ~high:110.0 ~low:108.0 ~close:109.0
+      ~adjusted_close:109.0;
+    make_bar_adj ~date:"2024-01-03" ~high:103.0 ~low:98.0 ~close:0.0
+      ~adjusted_close:102.0;
+    make_bar_adj ~date:"2024-01-04" ~high:105.0 ~low:100.0 ~close:104.0
+      ~adjusted_close:104.0;
+  ]
+
+let test_split_safe_corrupt_close_guarded _ =
+  assert_that
+    (compute_initial_stop_with_floor ~config:cfg_split ~side:Long
+       ~entry_price:104.0 ~bars:corrupt_close_bars ~as_of:split_as_of
+       ~fallback_buffer)
+    (_initial_reference (float_equal 98.0))
+
+(* ==================================================================== *)
+(*            floor_is_structural: flag agrees with the level            *)
+(* ==================================================================== *)
+
+(* Wick qualifies (deep intraday low 90) but the CLOSES hold a shallow (<8%)
+   correction, so [Close] mode finds no structural floor. This is exactly the
+   #2167 divergence: keying [stop_is_structural] off the Wick-only bar-list
+   [find_recent_level] reports [true] while a [Close]-anchored stop level uses
+   the fallback buffer. [floor_is_structural] threads [anchor_mode], so the flag
+   now agrees with the level. *)
+let wick_only_bars =
+  [
+    make_bar ~date:"2024-01-01" ~high:102.0 ~low:100.0 ~close:101.0;
+    make_bar ~date:"2024-01-02" ~high:110.0 ~low:108.0 ~close:109.0;
+    make_bar ~date:"2024-01-03" ~high:101.0 ~low:90.0 ~close:105.0;
+    make_bar ~date:"2024-01-04" ~high:108.0 ~low:104.0 ~close:106.0;
+    make_bar ~date:"2024-01-05" ~high:109.0 ~low:105.0 ~close:108.0;
+  ]
+
+let test_floor_is_structural_wick_true _ =
+  assert_that
+    (floor_is_structural ~config:cfg ~side:Long ~bars:wick_only_bars
+       ~as_of:split_as_of)
+    (equal_to true)
+
+let test_floor_is_structural_close_mode_false _ =
+  (* Fails on the old Wick-only classifier, which would return [true] here. *)
+  assert_that
+    (floor_is_structural
+       ~config:{ cfg with support_floor_anchor_mode = Support_floor.Close }
+       ~side:Long ~bars:wick_only_bars ~as_of:split_as_of)
+    (equal_to false)
+
+let test_floor_is_structural_close_level_uses_fallback _ =
+  (* The [Close]-mode level agrees with the [false] flag: it is the buffer
+     fallback, not a structural floor. *)
+  assert_that
+    (compute_initial_stop_with_floor
+       ~config:{ cfg with support_floor_anchor_mode = Support_floor.Close }
+       ~side:Long ~entry_price:108.0 ~bars:wick_only_bars ~as_of:split_as_of
+       ~fallback_buffer)
+    (_initial_reference (float_equal (108.0 *. fallback_buffer)))
+
+let test_floor_is_structural_split_safe_off_short_false _ =
+  (* Raw basis: no counter-rally after the (last-bar) trough → non-structural. *)
+  assert_that
+    (floor_is_structural ~config:cfg ~side:Short ~bars:split_short_bars
+       ~as_of:split_as_of)
+    (equal_to false)
+
+let test_floor_is_structural_split_safe_on_short_true _ =
+  (* Adjusted basis: a real trough + counter-rally → structural. Confirms
+     [split_safe_floors] threads through [floor_is_structural]. *)
+  assert_that
+    (floor_is_structural ~config:cfg_split ~side:Short ~bars:split_short_bars
+       ~as_of:split_as_of)
+    (equal_to true)
+
+(* ---- Config field: default, round-trip, omitted-defaults-to-false ---- *)
+
+let test_config_default_split_safe_is_false _ =
+  assert_that default_config.split_safe_floors (equal_to false)
+
+let test_config_split_safe_sexp_roundtrips _ =
+  let c = { default_config with split_safe_floors = true } in
+  assert_that (config_of_sexp (sexp_of_config c)) (equal_to (c : config))
+
+let test_config_sexp_omits_split_safe_defaults_false _ =
+  (* A serialized config predating this field (no [split_safe_floors] key) must
+     parse back to the [false] default — the R1 backward-compat guarantee. *)
+  let stripped =
+    match sexp_of_config default_config with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List (Sexp.Atom "split_safe_floors" :: _) -> false
+            | _ -> true))
+    | other -> other
+  in
+  assert_that (config_of_sexp stripped) (equal_to (default_config : config))
+
 let suite =
   "support_floor"
   >::: [
@@ -747,6 +939,32 @@ let suite =
          "config_close_sexp_roundtrips" >:: test_config_close_sexp_roundtrips;
          "config_sexp_omits_field_defaults_wick"
          >:: test_config_sexp_omits_field_defaults_wick;
+         (* split_safe_floors: raw vs adjusted-basis bars *)
+         "split_safe_long_uses_adjusted_floor"
+         >:: test_split_safe_long_uses_adjusted_floor;
+         "split_safe_long_off_uses_raw_floor"
+         >:: test_split_safe_long_off_uses_raw_floor;
+         "split_safe_short_uses_adjusted_ceiling"
+         >:: test_split_safe_short_uses_adjusted_ceiling;
+         "split_safe_corrupt_close_guarded"
+         >:: test_split_safe_corrupt_close_guarded;
+         (* floor_is_structural: flag agrees with level *)
+         "floor_is_structural_wick_true" >:: test_floor_is_structural_wick_true;
+         "floor_is_structural_close_mode_false"
+         >:: test_floor_is_structural_close_mode_false;
+         "floor_is_structural_close_level_uses_fallback"
+         >:: test_floor_is_structural_close_level_uses_fallback;
+         "floor_is_structural_split_safe_off_short_false"
+         >:: test_floor_is_structural_split_safe_off_short_false;
+         "floor_is_structural_split_safe_on_short_true"
+         >:: test_floor_is_structural_split_safe_on_short_true;
+         (* config field: split_safe default / round-trip / back-compat *)
+         "config_default_split_safe_is_false"
+         >:: test_config_default_split_safe_is_false;
+         "config_split_safe_sexp_roundtrips"
+         >:: test_config_split_safe_sexp_roundtrips;
+         "config_sexp_omits_split_safe_defaults_false"
+         >:: test_config_sexp_omits_split_safe_defaults_false;
        ]
 
 let () = run_test_tt_main suite

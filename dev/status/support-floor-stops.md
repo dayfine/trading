@@ -101,24 +101,62 @@ State machine itself (Initial → Trailing → Tightened) unchanged.
 - `dev/status/portfolio-stops.md` — prior base-strategy stops work (merged, interface stable)
 - `dev/status/short-side-strategy.md` — consumes the short-side primitive
 
+## 2026-08-02 addendum — split-safe floors + stop_recompute anchor-mode fix (PR `feat/split-safe-floors`)
+
+Closes BOTH open follow-up items below (the #2167 QC finding + the A2
+split-safe decision item).
+
+- **Split-safe floors** (`split_safe_floors : bool [@sexp.default false]` on
+  `Weinstein_stops.config`). When on, the bar-list floor path rescales each
+  raw-OHLC bar onto its split/dividend-adjusted basis (per-bar factor
+  `adjusted_close /. close_price`, one-sided corrupt-close guard → factor 1.0)
+  **before** the correction low / rally high is measured, so a split inside the
+  lookback window no longer mis-scales the floor against the current entry price
+  (the live FBRX `split_in_window` warning, weekly-picks record 2026-07-31).
+  Default-off = raw bars, exact bit-identity → zero golden changes (R1). Real
+  `stops_config` bool field → resolves through `Overlay_validator` as the axis
+  `((stops_config ((split_safe_floors true))))` (R2). Promotion needs a ledger
+  ACCEPT (R3).
+  - **User A2 decision (2026-08-02):** callers feed basis-corrected lows;
+    `Support_floor` stays a pure price-list consumer — NO cross-boundary
+    `Adjusted_basis` import, NO helper relocation. Implemented as a single
+    chokepoint inside `Weinstein_stops.compute_initial_stop_with_floor` (the
+    A2-forbidden `stops/` layer), which all bar-list callers (`stop_recompute`,
+    `stop_thread`, `spy_only_weinstein_strategy`, `sector_rotation_stops`)
+    funnel through. The per-bar rescale is inlined (few lines, mirrors
+    `Adjusted_basis.to_adjusted_basis` + its guard) because A2 forbids importing
+    analysis/ here; the factor is derivable from `Daily_price.adjusted_close`,
+    already on every bar.
+  - **Caller NOT converted:** the panel/callback path
+    (`compute_initial_stop_with_floor_with_callbacks`, the main multi-symbol
+    strategy hot path via `entry_audit_helpers`). Its `daily_view` exposes raw
+    highs/lows + adjusted closes but **no raw close**, so the per-bar factor
+    cannot be recovered without extending the view type — out of scope. The flag
+    is documented as governing only the bar-list path. The live weekly-picks
+    path (the FBRX motivator) IS the bar-list path, so it is covered.
+- **stop_recompute anchor-mode fix (#2167 QC follow-up).** New single-source
+  `Weinstein_stops.floor_is_structural` builds the callbacks through the SAME
+  internal `_floor_callbacks` that `compute_initial_stop_with_floor` uses
+  (honouring both `support_floor_anchor_mode` and `split_safe_floors`), so the
+  `stop_is_structural` display flag and the installed level can never disagree.
+  `stop_recompute.ml` now calls it instead of the Wick-only bar-list
+  `find_recent_level`. Pinned by a test that returns `false` under `Close` mode
+  where the old Wick-only classifier returned `true`.
+- Tests (`test_support_floor.ml`): split fixture (4:1 mid-window split) long
+  (raw 104 phantom vs adjusted 98) + short (raw non-structural vs adjusted 102)
+  mirrored; default-off raw bit-identity; corrupt-close guard; `floor_is_structural`
+  Close-mode-agrees-with-level + split-safe threading; config default-false /
+  sexp round-trip / omitted-defaults-false. `test_variant_matrix.ml`: axis
+  expansion for `stops_config.split_safe_floors`.
+
 ## Follow-ups
 
 - Round-number shading (§5.1): if computed stop lands near a round or half-point boundary, shade slightly below. New helper, probably `Support_floor.round_to_support` or inline in `Stops`.
-- **[from qc-behavioral on #2167, 2026-07-29 — must close BEFORE `Close` is ever
-  promoted default-on]** `snapshot/gen/lib/stop_recompute.ml:15` computes the
-  display-only `stop_is_structural` flag via the Wick-only bar-list
-  `find_recent_level`, while the same function's stop *level* is Close-aware
-  (callbacks path). Under `Close` mode flag and level can disagree, silently
-  falsifying the `stop_recompute.mli` "iff … same as the compute call reads
-  internally" contract. Benign at merge (default `Wick`; flag only renders the
-  `*` fallback marker in the weekly report, never a trade decision). Fix =
-  thread `support_floor_anchor_mode` into that classifier, mirroring the
-  entry-audit classifier fix in the same PR. Review comment:
-  https://github.com/dayfine/trading/pull/2167#issuecomment-5122542444
-- **[A2 decision item, recorded in the 07-29 addendum]** split-safe floors
-  (raw lows) need `Adjusted_basis`, which lives in analysis/ — direct import
-  into stops violates A2. Options: feed basis-corrected lows from the caller
-  layer, or move the helper to a canonical shared lib. Needs human/review call.
+- **Split-safe on the panel/callback path.** Extending `daily_view`
+  (`Data_panel_snapshot.Panel_views`) with a `raw_closes` array (as `weekly_view`
+  already has) would let the main multi-symbol strategy hot path derive the
+  per-bar factor and honour `split_safe_floors` too. Deferred — larger snapshot-infra
+  change; the live weekly-picks path is already covered via the bar-list chokepoint.
 
 ## QC
 

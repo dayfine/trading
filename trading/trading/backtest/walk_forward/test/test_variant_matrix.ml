@@ -712,6 +712,40 @@ let test_support_floor_anchor_mode_nested_axis_expands _ =
               ]);
        ])
 
+(* Proves R2 for the split-safe-floors data-hygiene dial: [split_safe_floors] is
+   a real bool field on [Weinstein_stops.config] (the [stops_config] field of
+   [Weinstein_strategy.config]), so the nested key path
+   [stops_config.split_safe_floors] expands and validates with no
+   overlay-validator change. The no-op default [false] and the experimental
+   [true] sit on the same axis. *)
+let test_split_safe_floors_nested_axis_expands _ =
+  let axis =
+    VM.Key
+      {
+        path = [ "stops_config"; "split_safe_floors" ];
+        values = Sexp.[ Atom "false"; Atom "true" ];
+      }
+  in
+  let t = { VM.axes = [ axis ]; expansion = VM.Cartesian } in
+  assert_that (VM.expand t)
+    (elements_are
+       [
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string "((stops_config ((split_safe_floors false))))");
+              ]);
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string "((stops_config ((split_safe_floors true))))");
+              ]);
+       ])
+
 (* ---------- Sampled determinism + fallback ---------- *)
 
 let test_sampled_determinism _ =
@@ -883,6 +917,8 @@ let suite =
          >:: test_vol_scaled_stop_nested_axis_expands;
          "support-floor anchor-mode nested axis expands + validates"
          >:: test_support_floor_anchor_mode_nested_axis_expands;
+         "split_safe_floors_nested_axis_expands"
+         >:: test_split_safe_floors_nested_axis_expands;
          "sampled determinism (same seed -> same labels)"
          >:: test_sampled_determinism;
          "sampled different seed -> different subset"
