@@ -72,12 +72,13 @@ let _empty_summary : Backtest.Summary.t =
     strategy positions still under stop evaluation. Only the two divergence
     inputs are meaningful; the remaining fields are empty since
     {!Backtest.Fold_health_runner.divergence_findings} reads none of them. *)
-let _make_result ~n_open ~n_stop_eligible : Backtest.Runner.result =
+let _make_result ?(summary = _empty_summary) ~n_open ~n_stop_eligible () :
+    Backtest.Runner.result =
   let positions =
     List.init n_open ~f:(fun i -> _make_position ~symbol:(sprintf "SYM%d" i))
   in
   {
-    summary = _empty_summary;
+    summary;
     round_trips = [];
     steps = [];
     final_portfolio = _make_portfolio ~positions;
@@ -98,7 +99,7 @@ let config = Backtest.Fold_health.default_config
    open count exceeds stop-eligible count → the divergence finding fires through
    the runner bridge. *)
 let test_divergence_fires_through_runner _ =
-  let result = _make_result ~n_open:2 ~n_stop_eligible:1 in
+  let result = _make_result ~n_open:2 ~n_stop_eligible:1 () in
   assert_that
     (Backtest.Fold_health_runner.open_position_count result.final_portfolio)
     (equal_to 2);
@@ -114,17 +115,58 @@ let test_divergence_fires_through_runner _ =
 (* Every open position is [Holding] (under stop evaluation) → no gap → silent.
    The tripwire stays quiet on healthy runs. *)
 let test_no_divergence_when_aligned _ =
-  let result = _make_result ~n_open:2 ~n_stop_eligible:2 in
+  let result = _make_result ~n_open:2 ~n_stop_eligible:2 () in
   assert_that
     (Backtest.Fold_health_runner.divergence_findings ~config result)
     (size_is 0)
 
 (* No open positions and none eligible → trivially aligned → silent. *)
 let test_no_divergence_when_flat _ =
-  let result = _make_result ~n_open:0 ~n_stop_eligible:0 in
+  let result = _make_result ~n_open:0 ~n_stop_eligible:0 () in
   assert_that
     (Backtest.Fold_health_runner.divergence_findings ~config result)
     (size_is 0)
+
+(* [all_findings] unions the {!Fold_health.check} invariants with the divergence
+   guard, check findings first. A 60-step zero-round-trip run (trips the
+   long-window guard) that also holds a stuck position yields both, in order. *)
+let test_all_findings_unions_check_and_divergence _ =
+  let summary = { _empty_summary with n_steps = 60; n_round_trips = 0 } in
+  let result = _make_result ~summary ~n_open:2 ~n_stop_eligible:1 () in
+  assert_that
+    (Backtest.Fold_health_runner.all_findings ~config result)
+    (elements_are
+       [
+         equal_to
+           (Backtest.Fold_health.Zero_round_trips_over_long_window
+              { n_steps = 60 });
+         equal_to
+           (Backtest.Fold_health.Stuck_held_positions
+              { n_open_positions = 2; n_stop_eligible = 1 });
+       ])
+
+(* A healthy run (short window, aligned counts) trips nothing on either axis. *)
+let test_all_findings_healthy_is_empty _ =
+  let result = _make_result ~n_open:2 ~n_stop_eligible:2 () in
+  assert_that
+    (Backtest.Fold_health_runner.all_findings ~config result)
+    (size_is 0)
+
+(* [emit] writes the finding union to [<output_dir>/fold_health.sexp]; the file
+   round-trips back to the same list. *)
+let test_emit_writes_findings_sexp _ =
+  let result = _make_result ~n_open:2 ~n_stop_eligible:1 () in
+  let output_dir = Filename_unix.temp_dir "fold_health_emit" "" in
+  Backtest.Fold_health_runner.emit ~output_dir result;
+  let loaded = Sexp.load_sexp (Filename.concat output_dir "fold_health.sexp") in
+  assert_that
+    ([%of_sexp: Backtest.Fold_health.finding list] loaded)
+    (elements_are
+       [
+         equal_to
+           (Backtest.Fold_health.Stuck_held_positions
+              { n_open_positions = 2; n_stop_eligible = 1 });
+       ])
 
 let suite =
   "fold_health_runner"
@@ -133,6 +175,10 @@ let suite =
          >:: test_divergence_fires_through_runner;
          "no divergence when aligned" >:: test_no_divergence_when_aligned;
          "no divergence when flat" >:: test_no_divergence_when_flat;
+         "all_findings unions check and divergence"
+         >:: test_all_findings_unions_check_and_divergence;
+         "all_findings healthy is empty" >:: test_all_findings_healthy_is_empty;
+         "emit writes findings sexp" >:: test_emit_writes_findings_sexp;
        ]
 
 let () = run_test_tt_main suite
