@@ -58,6 +58,8 @@ let _snapshot ~date ~candidates : Weekly_snapshot.t =
     sectors_weak = [];
     long_candidates = candidates;
     short_candidates = [];
+    long_eligible_beyond_cap = 0;
+    short_eligible_beyond_cap = 0;
     held_positions = [];
     warnings = [];
   }

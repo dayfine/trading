@@ -1,9 +1,25 @@
 # Status: weekly-snapshot
 
-## Last updated: 2026-07-29
+## Last updated: 2026-08-03
 
 ## Status
 IN_PROGRESS
+
+**2026-08-03 (#2122 slices b/c/d, branch `feat/picks-slices-bcd`):** closes
+issue #2122. (b) `test_report_cross_artifact.ml` pins per-candidate
+instruction-string identity between the Markdown and HTML renderers across
+all reconciliation classes (committed 790d23a06 record + synthetic post-#2158
+fixtures). (c) `test_committed_records.ml`: bit-stable
+serialize/parse/serialize round-trip on the v4 07-24 record, plus the F4+F5
+pin — the PRE-reconciliation `2bcf5b335` record parses through
+`Snapshot_reader` with `[@sexp.default]` fields defaulting and renders
+without raising (both records committed as test fixtures). (d)
+`Weekly_snapshot.eligible_beyond_cap` (`[@sexp.default 0]`) + a
+"N additional eligible candidates beyond the displayed cap" line in both
+renderers; old records render without the line (pinned). F4/F5 follow-up
+CLOSED. Feat-agent died on an API error after commit+push; dispatcher
+verified gates, fixed one nesting-linter hit (`_beyond_cap_line` extraction),
+added this entry, and opened the PR (feat-agent-dispatch §2 fallback).
 
 **2026-07-29 (entry cap alignment — issue #2158 Phase 1, branch
 `feat/entry-cap-align`):** aligned the entry order type across live order-gen

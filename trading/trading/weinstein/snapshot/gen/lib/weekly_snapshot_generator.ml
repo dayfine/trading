@@ -257,15 +257,9 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
     _eligible_tickers ~inputs live_tickers
   in
   let stocks = _analyze_universe ~inputs ~index_bars ~eligible_tickers in
-  let held_positions =
-    List.map inputs.live_portfolio.positions
-      ~f:
-        (Held_position_row.enrich inputs.bar_reader ~config:inputs.config
-           ~as_of:inputs.as_of)
-  in
-  let held_tickers =
-    List.map held_positions ~f:(fun (h : Weekly_snapshot.held_position) ->
-        h.symbol)
+  let held_positions, held_tickers =
+    Held_position_row.enrich_all inputs.bar_reader ~config:inputs.config
+      ~as_of:inputs.as_of inputs.live_portfolio.positions
   in
   let result =
     Screener.screen ~config:inputs.config.screening_config
@@ -278,6 +272,10 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
   let long_candidates, short_candidates, spike_warnings =
     _build_candidates ~inputs ~result ~portfolio_value ~sizing_cash
   in
+  (* Names that cleared every screener gate but were cut by the top-N cap
+     (issue #2122 slice d): [grade_admitted - top_n_admitted] per side, read
+     from the screener's own cascade diagnostics, floored at 0. *)
+  let diag = result.cascade_diagnostics in
   {
     schema_version = Weekly_snapshot.current_schema_version;
     system_version = inputs.system_version;
@@ -287,6 +285,10 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
     sectors_weak = _sectors_by_rating ~inputs ~index_bars Screener.Weak;
     long_candidates;
     short_candidates;
+    long_eligible_beyond_cap =
+      Int.max 0 (diag.long_grade_admitted - diag.long_top_n_admitted);
+    short_eligible_beyond_cap =
+      Int.max 0 (diag.short_grade_admitted - diag.short_top_n_admitted);
     held_positions;
     warnings = rename_warnings @ sparse_warnings @ spike_warnings;
   }

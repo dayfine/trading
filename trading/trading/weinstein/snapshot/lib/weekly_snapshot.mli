@@ -242,6 +242,21 @@ type t = {
       (** Ranked long candidates, score-descending. May be empty. *)
   short_candidates : candidate list;
       (** Ranked short candidates, score-descending. May be empty. *)
+  long_eligible_beyond_cap : int; [@sexp.default 0]
+      (** How many additional long names cleared every screener gate (macro,
+          breakout, sector, grade) but were dropped by the [max_buy_candidates]
+          top-N cap — i.e. [long_grade_admitted - long_top_n_admitted] from the
+          screener's {!Screener.cascade_diagnostics}, floored at [0]. Surfaced
+          by both report renderers as a "N additional eligible candidates beyond
+          the displayed cap" line so a reader knows the shown list is a capped
+          view, not the full eligible set (issue #2122 slice d — the screener
+          caps candidates at 20 and nothing used to say how many eligible names
+          were cut). Additive field: old snapshots without it parse as [0], and
+          a [0] count renders no line. *)
+  short_eligible_beyond_cap : int; [@sexp.default 0]
+      (** Short-side counterpart of {!long_eligible_beyond_cap}:
+          [short_grade_admitted - short_top_n_admitted] from the screener
+          diagnostics, floored at [0]. Additive field defaulting to [0]. *)
   held_positions : held_position list;
       (** Positions held into this Friday. May be empty. *)
   warnings : string list; [@sexp.default []]

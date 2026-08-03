@@ -55,6 +55,8 @@ let _snapshot : Weekly_snapshot.t =
         };
       ];
     short_candidates = [];
+    long_eligible_beyond_cap = 0;
+    short_eligible_beyond_cap = 0;
     held_positions = [];
     warnings = [];
   }

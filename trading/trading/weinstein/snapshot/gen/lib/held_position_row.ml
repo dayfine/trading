@@ -70,6 +70,13 @@ let enrich bar_reader ~(config : Weinstein_strategy.config) ~as_of
     recommended_stop;
   }
 
+let enrich_all bar_reader ~config ~as_of positions =
+  let held = List.map positions ~f:(enrich bar_reader ~config ~as_of) in
+  let tickers =
+    List.map held ~f:(fun (h : Weekly_snapshot.held_position) -> h.symbol)
+  in
+  (held, tickers)
+
 let long_market_value held =
   List.sum
     (module Float)

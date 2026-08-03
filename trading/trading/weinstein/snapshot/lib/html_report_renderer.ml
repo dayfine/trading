@@ -88,10 +88,11 @@ let _candidate_cards ~arm ~bars_for shown =
    legend, then the reconciliation legend — each an independent flat append,
    matching the Markdown renderer's order so the two reports read the same
    way. *)
-let _append_notes ~shown ~hidden body =
+let _append_notes ~shown ~hidden ~beyond_cap body =
   let legend flag note = if flag then Some note else None in
   [
     Report_shared.truncation ~shown ~hidden;
+    Report_shared.eligible_beyond_cap ~shown ~beyond_cap;
     legend (Report_shared.any_fallback_stop shown) Report_shared.stop_fallback;
     legend (Report_shared.any_data_suspect shown) Report_shared.data_suspect;
     legend
@@ -101,7 +102,7 @@ let _append_notes ~shown ~hidden body =
   |> List.filter_map ~f:Fn.id
   |> List.fold ~init:body ~f:(fun acc n -> acc ^ "\n" ^ _note n)
 
-let _candidate_list ~arm ~bars_for candidates ~limit =
+let _candidate_list ?(beyond_cap = 0) ~arm ~bars_for candidates ~limit =
   match candidates with
   | [] -> _empty_marker
   | _ ->
@@ -110,14 +111,15 @@ let _candidate_list ~arm ~bars_for candidates ~limit =
       Printf.sprintf "%s\n<div class=\"cands\">%s</div>"
         (Report_masthead.chart_legend ~ma_period:_ma_period_weeks)
         (_candidate_cards ~arm ~bars_for shown)
-      |> _append_notes ~shown ~hidden
+      |> _append_notes ~shown ~hidden ~beyond_cap
 
 (* One display-capped candidate section. The header echoes the effective limit
    so header and content stay in sync. *)
-let _candidate_section ~arm ~label ~bars_for candidates ~limit =
+let _candidate_section ?(beyond_cap = 0) ~arm ~label ~bars_for candidates ~limit
+    =
   _section
     ~title:(Printf.sprintf "%s (top %d)" label limit)
-    (_candidate_list ~arm ~bars_for candidates ~limit)
+    (_candidate_list ~beyond_cap ~arm ~bars_for candidates ~limit)
 
 (* ---- Held positions ---- *)
 
@@ -218,7 +220,9 @@ let _watch_body ~bars_for ~long_extended ~short_extended =
   Printf.sprintf "%s\n<div class=\"cands\">%s</div>"
     (Report_masthead.chart_legend ~ma_period:_ma_period_weeks)
     (_watch_cards ~bars_for ~long_extended ~short_extended)
-  |> _append_notes ~shown:(long_extended @ short_extended) ~hidden:[]
+  |> _append_notes
+       ~shown:(long_extended @ short_extended)
+       ~hidden:[] ~beyond_cap:0
 
 let _watch_section ~bars_for ~long_extended ~short_extended =
   match (long_extended, short_extended) with
@@ -240,11 +244,12 @@ let _body (t : Weekly_snapshot.t) ~title ~long_limit ~short_limit ~bars_for =
       Some (Report_masthead.counts_strip t);
       Some (_section ~title:"Strong sectors" (_sector_list t.sectors_strong));
       Some
-        (_candidate_section ~arm:"long" ~label:"Long candidates" ~bars_for
-           long_actionable ~limit:long_limit);
+        (_candidate_section ~beyond_cap:t.long_eligible_beyond_cap ~arm:"long"
+           ~label:"Long candidates" ~bars_for long_actionable ~limit:long_limit);
       Some
-        (_candidate_section ~arm:"short" ~label:"Short candidates" ~bars_for
-           short_actionable ~limit:short_limit);
+        (_candidate_section ~beyond_cap:t.short_eligible_beyond_cap ~arm:"short"
+           ~label:"Short candidates" ~bars_for short_actionable
+           ~limit:short_limit);
       _watch_section ~bars_for ~long_extended ~short_extended;
       Some
         (_section ~title:"Held positions"
