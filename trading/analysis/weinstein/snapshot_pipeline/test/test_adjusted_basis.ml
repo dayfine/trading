@@ -137,6 +137,44 @@ let test_dividend_only_adjustment_is_not_a_no_op _ =
            (float_equal 99.87);
        ])
 
+(* ------------------------------------------------------------------ *)
+(* Cross-file sync with Svg_series's private duplicate                 *)
+(* ------------------------------------------------------------------ *)
+
+(* {!Weinstein_snapshot.Svg_series} (trading/trading/weinstein/snapshot)
+   duplicates this exact rescale privately as [_to_adjusted_basis] — see its
+   .ml docstring: "kept as a private, intentional duplicate ... Keep both in
+   sync by hand if this formula changes." Nothing else observes both sides
+   (every other [to_adjusted_basis] reference is pipeline-side; every
+   [weekly_bars] test is snapshot-side), so a formula drift between the two
+   copies would go undetected — that is the gap this test closes.
+   [_to_adjusted_basis] itself is private, but [Svg_series.weekly_bars] on a
+   SINGLE bar reduces to it: [_fold_week] on a one-element list folds that
+   element's own open/high/low/close/adjusted_close back out unchanged, just
+   re-built through [Daily_price.make] with [active_through] defaulted to
+   [None] rather than carried through — the one field the two copies provably
+   do NOT agree on (see the .mli). *)
+module Svg_series = Weinstein_snapshot.Svg_series
+
+let test_svg_series_weekly_bars_matches_adjusted_basis_on_a_split _ =
+  let b =
+    { (_bar ~close:100.0 ~adjusted:25.0) with active_through = Some _as_of }
+  in
+  let via_pipeline = Adjusted_basis.to_adjusted_basis b in
+  let via_snapshot = List.hd_exn (Svg_series.weekly_bars [ b ]) in
+  assert_that via_snapshot
+    (_equal_bar { via_pipeline with active_through = None })
+
+(* Pins the one known, deliberate divergence named above so a future fix to
+   either side that changes this behavior is caught rather than silently
+   drifting further out of sync. *)
+let test_svg_series_weekly_bars_drops_active_through _ =
+  let b =
+    { (_bar ~close:100.0 ~adjusted:25.0) with active_through = Some _as_of }
+  in
+  assert_that (List.hd_exn (Svg_series.weekly_bars [ b ])).active_through
+    is_none
+
 let suite =
   "Adjusted_basis"
   >::: [
@@ -153,6 +191,10 @@ let suite =
          >:: test_equal_closes_is_bitwise_identity;
          "Dividend-only adjustment is not a no-op"
          >:: test_dividend_only_adjustment_is_not_a_no_op;
+         "Svg_series.weekly_bars matches Adjusted_basis on a split"
+         >:: test_svg_series_weekly_bars_matches_adjusted_basis_on_a_split;
+         "Svg_series.weekly_bars drops active_through"
+         >:: test_svg_series_weekly_bars_drops_active_through;
        ]
 
 let () = run_test_tt_main suite
