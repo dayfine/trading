@@ -193,17 +193,19 @@ let truncation ~shown ~hidden =
          ~n_tied:(_count_tied ~cutoff hidden)
          ~cutoff_score:cutoff)
 
+let _beyond_cap_line ~beyond_cap ~lowest_shown =
+  Printf.sprintf
+    "%d additional eligible candidate%s beyond the displayed cap (lowest shown \
+     score %.2f)."
+    beyond_cap (_plural beyond_cap) lowest_shown
+
 let eligible_beyond_cap ~shown ~beyond_cap =
   match shown with
   | [] -> None
   | _ when beyond_cap <= 0 -> None
   | _ ->
       let lowest_shown = (List.last_exn shown).Weekly_snapshot.score in
-      Some
-        (Printf.sprintf
-           "%d additional eligible candidate%s beyond the displayed cap \
-            (lowest shown score %.2f)."
-           beyond_cap (_plural beyond_cap) lowest_shown)
+      Some (_beyond_cap_line ~beyond_cap ~lowest_shown)
 
 let is_extended (c : Weekly_snapshot.candidate) =
   match c.reconciliation with
