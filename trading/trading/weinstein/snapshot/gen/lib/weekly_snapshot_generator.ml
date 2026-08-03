@@ -246,21 +246,6 @@ let _build_candidates ~(inputs : inputs) ~(result : Screener.result)
   let shorts, short_warnings = flag_spikes shorts in
   (longs, shorts, long_warnings @ short_warnings)
 
-(* Enriched held rows + their tickers, pulled out of [generate] so the
-   coordinator stays within the function-length limit. *)
-let _held_rows ~(inputs : inputs) =
-  let held_positions =
-    List.map inputs.live_portfolio.positions
-      ~f:
-        (Held_position_row.enrich inputs.bar_reader ~config:inputs.config
-           ~as_of:inputs.as_of)
-  in
-  let held_tickers =
-    List.map held_positions ~f:(fun (h : Weekly_snapshot.held_position) ->
-        h.symbol)
-  in
-  (held_positions, held_tickers)
-
 let generate (inputs : inputs) : Weekly_snapshot.t =
   let index_bars = _weekly_bars ~inputs inputs.config.indices.primary in
   let macro = _macro_result ~inputs ~index_bars in
@@ -272,7 +257,10 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
     _eligible_tickers ~inputs live_tickers
   in
   let stocks = _analyze_universe ~inputs ~index_bars ~eligible_tickers in
-  let held_positions, held_tickers = _held_rows ~inputs in
+  let held_positions, held_tickers =
+    Held_position_row.enrich_all inputs.bar_reader ~config:inputs.config
+      ~as_of:inputs.as_of inputs.live_portfolio.positions
+  in
   let result =
     Screener.screen ~config:inputs.config.screening_config
       ~macro_trend:macro.trend ~sector_map ~stocks ~held_tickers
