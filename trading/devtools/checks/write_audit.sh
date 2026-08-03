@@ -380,7 +380,7 @@ ENDJSON
 # partially overwritten. Mirrors the WRITE_AUDIT_RECORDED_AT_NS test-only
 # override above.
 if [ -n "${WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME:-}" ]; then
-  echo "FAIL: WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME set; simulating interruption before rename" >&2
+  echo "FAIL: WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME set; simulating interruption before rename; TMP_FILE=$TMP_FILE" >&2
   exit 1
 fi
 
