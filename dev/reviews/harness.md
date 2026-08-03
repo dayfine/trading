@@ -1,3 +1,244 @@
+Reviewed SHA: 027ae38a
+
+## Structural QC — PR #2169 `harness/audit-atomic-write` (rework iteration 1, 2026-08-03)
+
+**Context:** PR #2169 was previously APPROVED structurally at SHA `993a1437` (quality 4/5). qc-behavioral then returned NEEDS_REWORK on one item (CP4 FAIL): two load-bearing invariants asserted in `write_audit.sh:320–335` comment block were not tested by the original scenario 19. This rework iteration adds targeted test assertions to pin those invariants.
+
+**Build gates (all run by dispatch):**
+
+| # | Check | Status | Evidence |
+|---|-------|--------|----------|
+| H1 | dune build @fmt | PASS | Exit 0 (dispatch run) |
+| H2 | dune build | PASS | Exit 0 (dispatch run) |
+| H3 | dune runtest | PASS | Exit 0; 22 tests passed, 0 failed (dispatch run) |
+
+**Structural checklist (project authority rows H1–H3, P1–P6, A1–A3):**
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt | PASS | Exit 0 |
+| H2 | dune build | PASS | Exit 0 |
+| H3 | dune runtest | PASS | 22/22 scenarios pass |
+| P1 | Functions ≤ 50 lines | NA | Shell scripts only |
+| P2 | No magic numbers | NA | Shell scripts only |
+| P3 | Config completeness | NA | Harness infrastructure; test-only env hooks documented in code |
+| P4 | .mli coverage | NA | Shell scripts only |
+| P5 | Internal helpers prefixed with _ | NA | Shell helpers in established pattern |
+| P6 | Tests conform to test-patterns.md | NA | Shell test file, not OCaml |
+| A1 | Core module modifications | PASS | No core modules touched |
+| A2 | No analysis/ → trading/ imports | PASS | Shell scripts, no imports |
+| A3 | No unnecessary existing module modifications | PASS | Exactly 2 files in rework: `trading/devtools/checks/record_qc_audit_test.sh` and `trading/devtools/checks/write_audit.sh`; verified via `gh pr view` |
+
+### Rework changes — structural assessment
+
+**File 1: `write_audit.sh` line 383**
+- Added `;  TMP_FILE=$TMP_FILE` to the stderr message when `WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME` test-only abort hook fires
+- Test-only code path (guarded by `if [ -n "${WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME:-}" ]`); production behavior unchanged
+- ✅ No regression risk
+
+**File 2: `record_qc_audit_test.sh` lines 889–929**
+- Added detailed comment block (lines 889–901) documenting two load-bearing invariants:
+  1. **Same-directory/same-filesystem:** Temp file MUST be created in `${TMP_REPO}/dev/audit` (not `$TMPDIR`), so later `mv` is a single rename syscall rather than copy+unlink
+  2. **Glob-invisible suffix:** Temp filename must NOT end in `.json`, making leftover temps invisible to both `dev/audit/` consumers
+- Added parsing of `TMP_FILE` from abort hook stderr via sed (line 902)
+  - Robustness: sed pattern `'s/.*TMP_FILE=//'` is appropriately narrow; only the abort hook emits this; `tail -1` is defensive; variable safely quoted in all comparisons
+  - ✅ Parsing is sound
+- Added three new assertions to the pass condition (lines 913–915):
+  - `[[ -n "${TMP_FILE_19}" ]]` — ensures temp path was emitted
+  - `[[ "${TMP_FILE_19_DIR}" == "${TMP_REPO}/dev/audit" ]]` — asserts same-directory invariant
+  - `[[ "${TMP_FILE_19_BASENAME}" != *.json ]]` — asserts glob-invisible invariant
+- ✅ All assertions change-detecting (dispatch verified via two independent mutations)
+
+### Shell conformance
+- File is bash script (shebang line 1); `[[ ]]` bash-isms acceptable
+- No new patterns introduced; existing bash patterns (e.g., line 121) remain unchanged
+- `set -euo pipefail` interaction: new sed pipeline (line 902) already present elsewhere; no new hazard
+- ✅ No shell conformance regression
+
+### Change scope
+- Exactly 2 files in harness infrastructure
+- 29 insertions, 4 deletions (27 net LOC)
+- Zero scope creep; no `dev/status/` modifications (orchestrator handles reconciliation)
+
+### Test-only hook in production code
+The `TMP_FILE=` emission rides on the existing `WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME` test-only branch. Production code path unaffected. Diagnostic stderr line does not affect exit code or returned value. ✅ No production-side regression risk.
+
+### Verdict
+
+**APPROVED**
+
+All structural gates pass. The rework meaningfully strengthens test coverage by pinning two previously untested load-bearing invariants with clear, independent assertions. Change scope is tightly focused. No regressions detected.
+
+## Quality Score
+
+5 — Exemplary rework. The change identifies and pins two specific invariants critical for atomicity guarantees (same-filesystem and glob-invisible suffix). Added comment block clearly explains the WHY. Dispatch's independent mutation verification confirms both new assertions are change-detecting (not tautologies). Minimal scope, zero scope creep. All gates pass.
+
+---
+
+## Behavioral QC — PR #2169 `harness/audit-atomic-write` (rework iteration 1, 2026-08-03)
+
+**Scope:** pure harness / infra PR — no Weinstein domain logic touched. Per
+`.claude/rules/qc-behavioral-authority.md` §"When to skip this file entirely", the
+domain checklist (S1–S6, L1–L4, C1–C3, T1–T4) is **NA in its entirety**; A1 is NA
+(structural did not flag it, and there is no domain logic to leak). The review is the
+generic Contract Pinning Checklist CP1–CP4.
+
+**Re-review basis.** I returned NEEDS_REWORK at `993a1437` with exactly one item, **N1**
+(CP4 FAIL). The only question here is whether `027ae38a` closes it. The rework
+implements the "cheapest form" my N1 *Required fix* named, essentially verbatim: the
+abort hook emits `TMP_FILE=$TMP_FILE`, and scenario 19 asserts (a) `dirname == $AUDIT_DIR`
+and (b) `basename != *.json`.
+
+### Contract Pinning Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| CP1 | Each non-trivial claim in new `.mli` docstrings has an identified test | NA | No `.mli` in this PR (shell only). Script-header/comment-block contract claims are evaluated under CP4, the applicable row for docstring-named guards. Docstring *accuracy* re-verified below. |
+| CP2 | Each claim in the PR body / commit message has a corresponding committed test | PASS | Rework commit claims (a), (b), and mutation results A/B. All three verified: assertions present at `record_qc_audit_test.sh:913–915`; mutation A/B outcomes independently reproduced by the dispatcher (A: dir check fires, `stray_tmp_count` still 0; B: dir check passes, basename check fires). Iteration-0 CP2 claims re-checked and unchanged. |
+| CP3 | Pass-through / identity / invariant tests pin identity, not just size | PASS | Unchanged from iteration 0 and strengthened. Scenario 19 still asserts `[[ "${CONTENT_AFTER}" == "${CONTENT_A}" ]]` — full byte-identity of the whole record — and now additionally pins the *shape* of the staged path rather than only a count. The N1 defect was precisely a count-proxy (`stray_tmp_count == 0`) standing in for an identity assertion; that gap is now closed by a direct assertion on the path itself. |
+| CP4 | Each guard called out explicitly in code comments has a test exercising the guarded-against scenario | **PASS** (was FAIL) | Both halves of the `write_audit.sh:320–335` guard are now exercised. The mutations that reproduce each guarded-against scenario — relocating the temp off `$AUDIT_DIR`, and giving it a `.json` terminus — each turn the suite red (21/1, exit 1), and each is caught by a *different* one of the two new assertions, so they are independently change-detecting rather than one redundant pair. |
+
+**No CP\* FAIL → APPROVED** (mechanical).
+
+### Behavioral Checklist (domain)
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| A1 | Core module modification is strategy-agnostic | NA | Pure harness / infra PR. Structural did not flag A1. Rework touches only `trading/devtools/checks/`. |
+| S1–S6, L1–L4, C1–C3, T1–T4 | Weinstein domain rows | NA | Pure infra / harness PR; domain checklist not applicable. No stage classification, stop, screener, sizing, or macro/sector logic anywhere in the diff. |
+
+### N1 — disposition: **CLOSED**
+
+The mechanical question (does the new assertion actually detect the break?) was settled
+by independent mutation testing. Below are the four soundness questions that remained
+for judgment.
+
+**1. Does it close N1 *fully*, including folded-in finding 2 (temp invisibility to
+consumers)? → Yes, to the scope N1 actually claimed.**
+
+N1 folded finding 2 in on the stated grounds that "one assertion on the temp path's
+shape pins both", and the *Required fix* offered the seeded-leftover test as an
+"**equally acceptable alternative** for (b)" — either route, not both. The author took
+the path-shape route, which is the one N1 named first.
+
+Critically, the **drift vector finding 2 identified was the same single line as N1** —
+a "tidier" refactor to `mktemp "${AUDIT_DIR}/tmp.XXXXXX.json"`. That is exactly
+mutation B, and it now turns the suite red. The vector is closed.
+
+What the basename assertion does *not* pin is the **consumer-side** half: that
+`write_audit.sh:263`'s own scan and `check_06_qc_calibration.sh:101` require a literal
+`.json` terminus. If a *consumer's* glob later broadened to `*-<feature>.json*` or `*`,
+a leftover temp would become visible again and no test would notice. That vector lives
+in a different file, was never part of N1's scope, and I did not raise it as blocking.
+The factual claim itself I re-verified at this tip: both consumers still glob
+`*-"<feature>".json`, and there are still **exactly two** of them, as the comment
+claims. → **follow-up, not a blocker** (F1 below).
+
+**2. Parsing robustness — sound; and specifically it does *not* repeat
+H-PREV-VERDICT-PIPEFAIL.**
+
+`TMP_FILE_19="$(echo "${out19_2}" | sed -n 's/.*TMP_FILE=//p' | tail -1)"`, under the
+test script's `set -euo pipefail` (line 15):
+
+- **pipefail:** every stage exits 0 on the no-match path. `sed -n '…p'` returns **0**
+  when nothing matches — unlike `grep`, which returns 1. H-PREV-VERDICT-PIPEFAIL is the
+  `grep -o … | head -1` shape (`write_audit.sh:291`), where a no-match `grep` exits 1,
+  `pipefail` propagates it, and `set -e` aborts the assignment. **The new pipeline is a
+  different shape and does not reproduce that class.** The no-match case degrades to an
+  empty string, which the `-n "${TMP_FILE_19}"` guard then catches as a test failure —
+  the correct behaviour.
+- **Spaces in paths:** handled. The sed capture runs to end-of-line, and `TMP_FILE=` is
+  the last field on the emitted line; `dirname`/`basename` arguments and both
+  comparisons quote the variable. (In practice `TMP_REPO` is a `mktemp -d` path, so the
+  case is hypothetical.) Only an embedded newline would break it — unreachable from
+  `mktemp`.
+- **Other `TMP_FILE=` emitters:** none in the tree; `tail -1` is defensive against a
+  future second one, and the greedy `.*` takes the last occurrence per line.
+- **Residual (minor, degrades loudly):** because the capture runs to end-of-line, anyone
+  appending text after `TMP_FILE=$TMP_FILE` on that echo would corrupt the parsed value —
+  but the corrupted path then fails the `dirname` check and the test goes red with the
+  offending value printed. Loud, not silent. A one-line "keep `TMP_FILE=` last on this
+  line" comment at the hook would be a nice-to-have (F2).
+
+**3. Is the guard pinned in the right place? → Yes; every degradation path I could
+construct fails loudly, none silently.**
+
+The pin rides a test-only hook, so I traced what happens if that hook is deleted,
+renamed, or moved:
+
+| Mutation of the hook | Outcome |
+|---|---|
+| Hook deleted / renamed / env var renamed | Second invocation succeeds → `rc19_2 == 0` → `(( rc19_2 != 0 ))` fails. Also the `grep -q "simulating interruption before rename"` fails. **Two independent catches. Red.** |
+| Hook kept but `TMP_FILE=` dropped from the message | `TMP_FILE_19` empty → `-n` guard fails; `dirname ""` → `.` → dir check also fails. **Two independent catches. Red.** |
+| Hook moved above the `mktemp` call | `$TMP_FILE` unbound under `set -u` → abort before the message → grep for the abort text fails. **Red.** |
+
+No silent-degradation path found. The `-n` guard is doing real work here — it is what
+converts "hook stopped emitting" from a vacuous pass into a failure, and it is the
+reason this pin is robust rather than merely present.
+
+One property worth recording for the next reader: the assertion observes the path the
+*hook prints*, not the path `mv` consumes. They are the same `$TMP_FILE` variable three
+lines apart, so no divergence is constructible without editing between them — an
+acceptable pin, but it is an observation of the variable, not of the syscall.
+
+**4. Docstring accuracy (CP1/CP2) — accurate; one minor under-documentation.**
+
+- `write_audit.sh:320–335` re-verified at this tip and **still accurate, nothing over-
+  or under-claimed**. Both consumers confirmed to require a literal `.json` terminus
+  (`write_audit.sh:263` — `ls -1 "$AUDIT_DIR"/*-"$FEATURE".json`; and
+  `trading/devtools/checks/deep_scan/check_06_qc_calibration.sh:101` — `for audit_file
+  in "${REPO_ROOT}"/dev/audit/*-"${feature}".json`), and there are exactly two, as
+  claimed. The comment's relative reference `deep_scan/check_06_qc_calibration.sh` is
+  correct relative to write_audit.sh's own directory. The rework did not weaken any
+  claim; it converted two of them from *asserted* to *enforced*.
+- **Under-documented (minor):** the hook's own comment block at `write_audit.sh:375–381`
+  still describes the hook solely as "simulate an interruption … `$OUTPUT_FILE` must be
+  left byte-identical". It does not mention that the message now carries a `TMP_FILE=`
+  field that scenario 19 **parses and asserts on**. A future editor tidying that stderr
+  string has no in-place signal that a test depends on it. Per (3) this degrades loudly,
+  so it is a documentation nit, not a contract failure (F2).
+
+### Follow-ups (non-blocking — file to `dev/status/harness.md`, do **not** hold this merge)
+
+Neither of these is a CP\* failure; both are strengthenings of a residual I did not
+raise as blocking in N1.
+
+- **F1 — consumer-side glob invisibility is still unpinned.** The `basename != *.json`
+  assertion pins the *write* side (temp never gains a `.json` terminus). The *read* side —
+  that both `dev/audit/` consumers ignore a surviving temp — remains true by glob
+  semantics but untested, so a later broadening of either consumer's glob would go
+  unnoticed. The N1 *Required fix*'s alternative form is the fix: seed a leftover
+  `…-<feature>.json.aBcDeF` containing `"overall_qc": "NEEDS_REWORK"` and assert the
+  `consecutive_rework_count` scan ignores it. `harness_gap: LINTER_CANDIDATE`.
+- **F2 — hook docstring should name its parsed contract.** Add one line to
+  `write_audit.sh:375–381` noting that `record_qc_audit_test.sh` scenario 19 parses
+  `TMP_FILE=` from this message and that the field must remain last on the line.
+  `harness_gap: ONGOING_REVIEW`.
+
+Iteration-0 residuals recorded then and still open, unchanged by this rework and still
+non-blocking: the H-PREV-VERDICT-PIPEFAIL downstream failure remains reachable from
+inputs this script does not produce (already-committed records, hand edits, older
+script versions) — `harness_gap: ONGOING_REVIEW`; and the undocumented 0644→0600 temp-mode
+delta — `harness_gap: NONE`.
+
+## Quality Score
+
+5 — Exemplary rework. It implements the required fix precisely, and then goes past
+"make the test pass": the two assertions were shown to be *independently* change-detecting
+by two separate mutations rather than assumed, the added comment block explains why the
+pre-existing `stray_tmp_count` check was a false-green (the actual defect, not just its
+symptom), and every hook-degradation path I could construct fails loudly rather than
+silently. Scope is two files, +27/-4, with production behaviour untouched. The two
+follow-ups are strengthenings of a residual outside N1's scope, not defects.
+
+## Verdict
+
+APPROVED
+
+---
+
+## Prior review — Iteration 0 (SHA 993a1437)
+
 Reviewed SHA: 993a1437153d5ddb9f9874d14b84a2763871638e
 
 ## Structural QC — PR #2169 `harness/audit-atomic-write` (2026-07-30, solo-dispatch run)

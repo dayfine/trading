@@ -4,7 +4,7 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-02 run1 (orchestrator run 30738894584 — main green on `7c43e983`: build-and-test, perf-tier1-smoke, golden-sp500-5y, golden-custom-universe all SUCCESS. **Recovery run after a 3-day stall**: four orchestrator runs on 07-31/08-01 produced only orphaned `ops/budget-*` branches — no summaries, nothing merged since 2026-07-30, and PRs #2166/#2169 passed over four times (verified first-hand: 4 budget branches, 0 daily branches, 0 commits on main; independently corroborated by `dev/reviews/track-pacer-2026-08-02.md` §P7). This run did not fast-exit — the >24h first-run-of-day escape hatch fired — and re-dispatched both stranded PRs. Merged #2176 (track-pacer report, docs-only carve-out). A-FASTEXIT-VACUOUS is now the top escalation and is **not** `workflow`-token-blocked: it is a ~6-line edit to `.claude/agents/lead-orchestrator.md`, blocked only on this agent's write permission — 11th consecutive run.)
+Last updated: 2026-08-03 run1 (orchestrator run 30797497236 — main green on `70f6cda9`, now `af19a3ae`). **Stall broken:** #2169 MERGED after 5 days idle — its base commit was already redundant (H-AUDIT-ATOMIC-WRITE had landed via #2163), which is why it was `dirty` and GitHub could not compute a merge ref, so CI never ran; rebased to the N1 pin alone, both QC gates APPROVED 5/5, merged. #2166 reworked (CP1) and QC-APPROVED, awaiting CI. Root cause of the multi-run stall identified: **parallel agents share ONE working tree in this container** (Step 4's 'branches are independent' claim is false) — they raced, clobbered each other's uncommitted work, and tree-wide `git add` swept foreign files into the index. Also recovered: orphaned branch `feat/picks-slices-bcd` (931 insertions, no PR ever opened) surfaced as #2182, and 4 orphaned budget records. A-FASTEXIT-VACUOUS RESOLVED (#2180).)
 
 ## Active + complete tracks
 
@@ -43,9 +43,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2169 | H-AUDIT-ATOMIC-WRITE in review: structural APPROVED, behavioral NEEDS_REWORK (N1 temp-dir invariant untested); 9 open; next: land #2169 rework |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | H-AUDIT-ATOMIC-WRITE MERGED `af19a3ae` (#2169); F1/F2 filed; next: H-PREV-VERDICT-PIPEFAIL direction decision |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 8 open; A-NOOP-BUDGET-ORPHAN new (5 records recovered); A-FASTEXIT-VACUOUS now has measured cost; six items share the `workflow`-token blocker |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | #2166 | adjusted_basis_sync_pin in flight (branch was a claim commit only for 4 days; re-dispatched 08-02); 9 open; next: land the cross-file rescale pin |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | #2166 | adjusted_basis_sync_pin QC APPROVED (5/5, 4/5) after rework 1; awaiting CI; next: expired linter exception (segmentation.ml) |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
@@ -57,7 +57,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [experiments](experiments.md) | MERGED | — | — | — |
 | [tuning-methods](tuning-methods.md) | PENDING | feat-backtest | — | Step 0 done; steps 1-3 demoted (surface is the bind); component-decomposition objective next |
 | [tuning](tuning.md) | IN_PROGRESS | feat-backtest | — | M1 complete (5/5 deliverables); M2 qNEHVI next (awaiting maintainer enable-commit per #1327) |
-| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | — | #2153/#2165/#2171 MERGED (sidetable rebuild, validator warn-first, entry-cap Ph1); next: #2122 slices (b) instr identity, (c) repro golden, (d) eligible-beyond-cap |
+| [weekly-snapshot](weekly-snapshot.md) | IN_PROGRESS | feat-weinstein | #2182 | #2122 slices b/c/d exist on `feat/picks-slices-bcd` (maintainer-authored, no PR for a day); surfaced as draft #2182 — CI RED, needs triage |
 | [walk-forward-cv](walk-forward-cv.md) | MERGED | feat-backtest | — | — |
 | [tax-lens](tax-lens.md) | MERGED | feat-backtest | — | Phase 1 #2066 + CP4 loader error-path contract #2073 MERGED; Phase 2 wash-sale / April outflows deferred, user-gated (#2006) |
 | [data-foundations](data-foundations.md) | IN_PROGRESS | feat-data | — | asset-type blocklist MERGED (#1939, default-off); next: arm ATB.curated for live universe build + General::Type enrichment feed |
