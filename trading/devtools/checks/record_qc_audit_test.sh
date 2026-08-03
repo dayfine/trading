@@ -1002,10 +1002,11 @@ JSON21="${TMP_REPO}/dev/audit/2026-07-30-feat-new-${FEATURE21}.json"
 
 if (( rc21_1 == 0 )) && (( rc21_3 == 0 )) && [[ -f "${JSON21}" ]] \
    && grep -q '"consecutive_rework_count": *2' "${JSON21}" \
-   && echo "${out21_3}" | grep -q 'consecutive_rework_count=2'; then
-  pass "scenario 21 — truncated prior record (no overall_qc) does not abort the script and is skipped, not counted as a streak break (H-PREV-VERDICT-PIPEFAIL)"
+   && echo "${out21_3}" | grep -q 'consecutive_rework_count=2' \
+   && ! echo "${out21_3}" | grep -q 'WARNING'; then
+  pass "scenario 21 — truncated prior record (no overall_qc) does not abort the script, is skipped not counted as a streak break, and emits NO warning (silent skip, H-PREV-VERDICT-PIPEFAIL)"
 else
-  fail "scenario 21 — expected rc=0/0, consecutive_rework_count=2 for feat/new record; got rc=${rc21_1}/${rc21_3}"
+  fail "scenario 21 — expected rc=0/0, consecutive_rework_count=2 for feat/new record, and NO 'WARNING' in output (silent skip); got rc=${rc21_1}/${rc21_3}"
   echo "${out21_1}" | sed 's/^/      /'
   echo "${out21_3}" | sed 's/^/      /'
   [[ -f "${JSON21}" ]] && echo "      json: $(cat "${JSON21}")"
@@ -1029,7 +1030,8 @@ out22_1=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=1000000000000000000
 
 # A directory at a path matching the "*-<feature>.json" glob makes grep
 # exit 2 ("Is a directory") rather than 1 ("no match").
-mkdir -p "${TMP_REPO}/dev/audit/2026-07-30-feat-unreadable-${FEATURE22}.json"
+UNREADABLE_PATH_22="${TMP_REPO}/dev/audit/2026-07-30-feat-unreadable-${FEATURE22}.json"
+mkdir -p "${UNREADABLE_PATH_22}"
 
 out22_3=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=3000000000000000000 \
   bash "${WRITE_AUDIT}" \
@@ -1039,10 +1041,11 @@ JSON22="${TMP_REPO}/dev/audit/2026-07-30-feat-new-${FEATURE22}.json"
 
 if (( rc22_1 == 0 )) && (( rc22_3 == 0 )) && [[ -f "${JSON22}" ]] \
    && grep -q '"consecutive_rework_count": *2' "${JSON22}" \
-   && echo "${out22_3}" | grep -q 'WARNING: could not read prior audit record'; then
-  pass "scenario 22 — unreadable prior record (grep exit 2) does not abort the script, warns loudly, still skipped from the streak (H-PREV-VERDICT-PIPEFAIL)"
+   && echo "${out22_3}" | grep -q 'WARNING: could not read prior audit record' \
+   && echo "${out22_3}" | grep -qF "${UNREADABLE_PATH_22}"; then
+  pass "scenario 22 — unreadable prior record (grep exit 2) does not abort the script, warns loudly naming the offending file, still skipped from the streak (H-PREV-VERDICT-PIPEFAIL)"
 else
-  fail "scenario 22 — expected rc=0/0, consecutive_rework_count=2, a WARNING mentioning the unreadable record; got rc=${rc22_1}/${rc22_3}"
+  fail "scenario 22 — expected rc=0/0, consecutive_rework_count=2, a WARNING naming ${UNREADABLE_PATH_22}; got rc=${rc22_1}/${rc22_3}"
   echo "${out22_1}" | sed 's/^/      /'
   echo "${out22_3}" | sed 's/^/      /'
   [[ -f "${JSON22}" ]] && echo "      json: $(cat "${JSON22}")"
