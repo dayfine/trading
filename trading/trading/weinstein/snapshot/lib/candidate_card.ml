@@ -30,19 +30,18 @@ let _rationale_chips rationale =
   |> List.map ~f:(fun clause ->
       Chip.make ?modifier:(_clause_modifier clause) clause)
 
+let _resistance_modifier grade =
+  if String.is_prefix grade ~prefix:"Virgin_territory" then "virgin"
+  else "resistance"
+
 (* The resistance grade carries a hover explainer (deliverable 4) reusing the
    single-sourced [Report_shared] prose so the tooltip cannot drift. *)
 let _resistance_chip = function
   | None -> []
   | Some grade ->
-      let modifier =
-        if String.is_prefix grade ~prefix:"Virgin_territory" then "virgin"
-        else "resistance"
-      in
-      [
-        Chip.make ~modifier ~title:Report_shared.resistance_grade_explainer
-          grade;
-      ]
+      let modifier = _resistance_modifier grade in
+      let title = Report_shared.resistance_grade_explainer in
+      [ Chip.make ~modifier ~title grade ]
 
 (* Issue #2084 Finding 2 in words rather than as a footnote glyph: whether the
    stop is a real support floor or the fixed entry x buffer proxy. The fallback
