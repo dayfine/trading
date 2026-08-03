@@ -69,6 +69,15 @@
 # in a pipeline makes the whole pipeline's exit status non-zero, which
 # would otherwise kill the script before it ever writes the record;
 # regression-tested in record_qc_audit_test.sh scenario 9).
+#
+# The overall_qc extraction used further below (inside the
+# consecutive_rework_count loop) carries the identical fragility and is
+# guarded the same way, for the same reason plus one more: a prior record
+# can be truncated (has recorded_at_ns but no overall_qc -- see
+# H-PREV-VERDICT-PIPEFAIL, dev/status/harness.md) rather than merely
+# predating a field. Such a record is skipped (neither extends nor breaks
+# the streak) rather than aborting the script or silently breaking the
+# streak; regression-tested in record_qc_audit_test.sh scenarios 21-22.
 
 set -euo pipefail
 
@@ -287,8 +296,56 @@ if [ "$OVERALL" = "NEEDS_REWORK" ]; then
   for f in $ordered_files; do
     [ -n "$f" ] || continue
 
-    # Extract overall_qc from the JSON (simple grep — no jq dependency)
-    prev_verdict=$(grep -o '"overall_qc": *"[^"]*"' "$f" 2>/dev/null | head -1 | sed 's/.*: *"//;s/"//')
+    # Extract overall_qc from the JSON (simple grep — no jq dependency).
+    #
+    # H-PREV-VERDICT-PIPEFAIL: this extraction must not be allowed to abort
+    # the script the way an unguarded `grep | head | sed` pipeline can under
+    # `set -euo pipefail` (see the recorded_at_ns extraction above, which
+    # this mirrors). A prior record can be unparseable here for reasons
+    # distinct from "legacy record predates a field": it can be truncated
+    # mid-write (the pre-H-AUDIT-ATOMIC-WRITE `cat > ... <<ENDJSON` shape
+    # truncated its target the instant the redirect opened, so a SIGTERM or
+    # ENOSPC mid-write left a record with recorded_at_ns but no overall_qc
+    # -- grep exit 1, no match), or genuinely unreadable (grep exit 2, e.g.
+    # the file vanishing mid-scan or an unusual permissions state).
+    #
+    # Direction taken (deliberate, not a blind patch -- see
+    # dev/status/harness.md H-PREV-VERDICT-PIPEFAIL): an unparseable or
+    # unreadable prior record must never (a) crash the whole script, which
+    # would disable audit writes for this feature FOREVER since the exact
+    # same bad record is re-scanned on every future invocation, or (b)
+    # silently BREAK the streak, which under-counts consecutive_rework_count
+    # and suppresses the >=3 human-escalation trigger -- the "unsafe
+    # direction" this item warns against, since a missed escalation is a
+    # much worse failure than an occasional over-sensitive one. Instead,
+    # SKIP the record: treat it as absent from history (neither extending
+    # nor breaking the streak) and continue scanning older candidates.
+    #
+    # grep exit 1 (no match -- the shape a truncated record produces) is
+    # tolerated silently, matching how the legacy no-recorded_at_ns case
+    # above is already tolerated. grep exit >1 (e.g. 2 == unreadable
+    # target) is a distinct, rarer failure class -- surfaced as a stderr
+    # WARNING (visible in orchestrator run logs) without aborting, since
+    # aborting here would reintroduce the exact "one bad record disables
+    # this feature's audit writes forever" failure this item removes.
+    prev_grep_status=0
+    prev_verdict=$(grep -o '"overall_qc": *"[^"]*"' "$f" 2>/dev/null | head -1 | sed 's/.*: *"//;s/"//') || prev_grep_status=$?
+
+    case "$prev_grep_status" in
+      0)
+        # Matched fine, but tolerate a matched-yet-empty value the same way
+        # (defensive; grep -o with this pattern can't normally produce this).
+        [ -n "$prev_verdict" ] || continue
+        ;;
+      1)
+        # No overall_qc field found -- truncated/malformed record. Skip.
+        continue
+        ;;
+      *)
+        echo "WARNING: could not read prior audit record for consecutive_rework_count scan: $f (grep exit $prev_grep_status)" >&2
+        continue
+        ;;
+    esac
 
     if [ "$prev_verdict" = "NEEDS_REWORK" ]; then
       CONSECUTIVE=$((CONSECUTIVE + 1))
