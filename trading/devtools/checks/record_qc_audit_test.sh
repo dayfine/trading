@@ -886,13 +886,36 @@ else
   CONTENT_AFTER="$(cat "${JSON19}" 2>/dev/null || echo "MISSING")"
   stray_tmp_count="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE19}.json.??????" | wc -l | tr -d ' ')"
 
+  # TMP_FILE=<path> is emitted by the abort hook itself (write_audit.sh's
+  # WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME branch) right before it exits, so it
+  # names the exact temp path that was staged for THIS invocation -- pin two
+  # invariants the write_audit.sh:320-335 comment block asserts but the
+  # pre-existing scenario 19 assertions did not actually exercise:
+  #   (a) same-directory/same-filesystem: the temp file's directory must be
+  #       $AUDIT_DIR (${TMP_REPO}/dev/audit), not $TMPDIR or anywhere else --
+  #       this is what makes the later `mv` a single rename syscall instead
+  #       of degrading to copy+unlink across filesystems.
+  #   (b) glob-invisible: the temp basename must NOT end in ".json", so a
+  #       leftover (e.g. from a SIGKILL that bypasses the EXIT trap) can
+  #       never be picked up by either dev/audit/ *.json glob consumer.
+  # A test that only checks "no stray temp file was left behind" (the
+  # pre-existing stray_tmp_count check) is satisfied whether the temp was
+  # ever created in dev/audit/ at all -- it cannot detect a `mktemp`
+  # relocated to $TMPDIR. This TMP_FILE_19 pin can.
+  TMP_FILE_19="$(echo "${out19_2}" | sed -n 's/.*TMP_FILE=//p' | tail -1)"
+  TMP_FILE_19_DIR="$(dirname "${TMP_FILE_19}")"
+  TMP_FILE_19_BASENAME="$(basename "${TMP_FILE_19}")"
+
   if (( rc19_2 != 0 )) \
      && [[ "${CONTENT_AFTER}" == "${CONTENT_A}" ]] \
      && [[ "${stray_tmp_count}" == "0" ]] \
-     && echo "${out19_2}" | grep -q "simulating interruption before rename"; then
-    pass "scenario 19 — interrupted write leaves pre-existing target byte-identical, temp file cleaned up (H-AUDIT-ATOMIC-WRITE)"
+     && echo "${out19_2}" | grep -q "simulating interruption before rename" \
+     && [[ -n "${TMP_FILE_19}" ]] \
+     && [[ "${TMP_FILE_19_DIR}" == "${TMP_REPO}/dev/audit" ]] \
+     && [[ "${TMP_FILE_19_BASENAME}" != *.json ]]; then
+    pass "scenario 19 — interrupted write leaves pre-existing target byte-identical, temp file cleaned up, staged in same dir with non-.json suffix (H-AUDIT-ATOMIC-WRITE)"
   else
-    fail "scenario 19 — expected rc2!=0, target unchanged (content A), no stray temp file; got rc2=${rc19_2}, stray_tmp_count=${stray_tmp_count}"
+    fail "scenario 19 — expected rc2!=0, target unchanged (content A), no stray temp file, temp staged in ${TMP_REPO}/dev/audit with non-.json suffix; got rc2=${rc19_2}, stray_tmp_count=${stray_tmp_count}, TMP_FILE_19=${TMP_FILE_19} (dir=${TMP_FILE_19_DIR}, basename=${TMP_FILE_19_BASENAME})"
     echo "${out19_2}" | sed 's/^/      /'
     echo "      content A: ${CONTENT_A}"
     echo "      content after: ${CONTENT_AFTER}"
