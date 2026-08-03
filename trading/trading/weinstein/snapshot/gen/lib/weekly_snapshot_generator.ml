@@ -162,6 +162,13 @@ let _live_tickers ~(inputs : inputs) tickers =
     ~min_overlap_days:inputs.config.rename_detect_min_overlap_days
     ~match_fraction:inputs.config.rename_detect_match_fraction tickers
 
+(* Held positions enriched with structural context (stop state, P&L). *)
+let _held_positions ~(inputs : inputs) =
+  List.map inputs.live_portfolio.positions
+    ~f:
+      (Held_position_row.enrich inputs.bar_reader ~config:inputs.config
+         ~as_of:inputs.as_of)
+
 (* Rating of one sector ETF, or [None] when it has no bars. *)
 let _etf_rating ~(inputs : inputs) ~index_bars (etf, sector_name) =
   let bars = _weekly_bars ~inputs etf in
@@ -257,12 +264,7 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
     _eligible_tickers ~inputs live_tickers
   in
   let stocks = _analyze_universe ~inputs ~index_bars ~eligible_tickers in
-  let held_positions =
-    List.map inputs.live_portfolio.positions
-      ~f:
-        (Held_position_row.enrich inputs.bar_reader ~config:inputs.config
-           ~as_of:inputs.as_of)
-  in
+  let held_positions = _held_positions ~inputs in
   let held_tickers =
     List.map held_positions ~f:(fun (h : Weekly_snapshot.held_position) ->
         h.symbol)
@@ -278,9 +280,7 @@ let generate (inputs : inputs) : Weekly_snapshot.t =
   let long_candidates, short_candidates, spike_warnings =
     _build_candidates ~inputs ~result ~portfolio_value ~sizing_cash
   in
-  (* Names that cleared every screener gate but were cut by the top-N cap
-     (issue #2122 slice d): [grade_admitted - top_n_admitted] per side, read
-     from the screener's own cascade diagnostics, floored at 0. *)
+  (* Cleared every gate but cut by the top-N cap (issue #2122 slice d). *)
   let diag = result.cascade_diagnostics in
   {
     schema_version = Weekly_snapshot.current_schema_version;
