@@ -149,16 +149,16 @@ from `weinstein_strategy.ml`'s stops pass) only ever sees exits
 
       Plan: `dev/plans/trade-audit-external-exits-2026-07-25.md`.
 
-      Not done in this PR (explicitly out of scope, noted for a
-      follow-up if wanted): surfacing `external_exit` in
-      `trade_audit_report.ml`'s markdown/HTML rendering or
-      `trade_audit_ratings.ml`'s scoring — this PR is capture-only, per
-      the issue's ask. `_row_of_trade`'s `exit_trigger` column
-      currently stays blank for externally-generated exits in the
-      *report* (though `trades.csv`'s own `exit_trigger` column, via
-      `Stop_log`, has always been correct since #2074) — a small,
-      additive follow-up would read `external_exit` as a fallback when
-      `exit_` is `None`.
+      Report-side follow-up DONE 2026-08-04 (PR #2196, closes #2076):
+      `_row_of_trade`'s `exit_trigger` column now falls back to
+      `external_exit` when `exit_` is `None` (enriched always wins);
+      HTML report inherits via `per_trade_row.exit_trigger`. 5 pins in
+      `test_trade_audit_report.ml` (external-only → `margin_call`,
+      enriched-wins, neither → `—`, generic `stage3_force_exit` label,
+      markdown rendering). `trade_audit_ratings.ml` intentionally
+      unchanged: R7 needs `stage_at_exit` (unavailable by design →
+      `Not_applicable`), MFE/MAE cannot be fed by a reason-only
+      record.
 
 ## Report-side defect fixes (2026-07-13)
 
