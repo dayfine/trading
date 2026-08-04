@@ -227,6 +227,50 @@ let test_hysteresis_gate_n_matches_generated_fold_count _ =
   let generated = List.length (WS.generate spec.window_spec) in
   assert_that generated (all_of [ equal_to 31; equal_to spec.gate.n ])
 
+(* ---------- Exit-timing deep 55-fold fixture (#1672 window migration) ---------- *)
+
+let _exit_timing_deep_fixture = "exit-timing-surface-deep-1998-2026.sexp"
+
+let test_exit_timing_deep_spec_parses _ =
+  let spec = Spec.load (_fixture_path _exit_timing_deep_fixture) in
+  assert_that spec
+    (all_of
+       [
+         field
+           (fun (s : Spec.t) -> s.base_scenario)
+           (equal_to "goldens-sp500-historical/sp500-1998-2026.sexp");
+         field (fun (s : Spec.t) -> s.baseline_label) (equal_to "baseline");
+         (* baseline + 3x3 axes matrix *)
+         field (fun (s : Spec.t) -> List.length s.variants) (equal_to 10);
+       ])
+
+let test_exit_timing_deep_window_spans_1998_to_2026 _ =
+  let spec = Spec.load (_fixture_path _exit_timing_deep_fixture) in
+  assert_that spec.window_spec
+    (matching ~msg:"Expected Window_spec.Rolling variant"
+       (function WS.Rolling r -> Some r | _ -> None)
+       (all_of
+          [
+            field
+              (fun (r : WS.rolling_spec) -> r.start_date)
+              (equal_to (Date.of_string "1998-01-01"));
+            field
+              (fun (r : WS.rolling_spec) -> r.end_date)
+              (equal_to (Date.of_string "2026-04-30"));
+            field (fun (r : WS.rolling_spec) -> r.train_days) (equal_to 0);
+            field (fun (r : WS.rolling_spec) -> r.test_days) (equal_to 365);
+            field (fun (r : WS.rolling_spec) -> r.step_days) (equal_to 182);
+          ]))
+
+(** Pins the gate-count contract for the migrated window: the 1998-2026 Rolling
+    geometry yields exactly 55 OOS folds and [gate.n] must equal that count,
+    otherwise [Fold_gate.evaluate]'s fold-count guard makes the runner SKIP the
+    verdict (same failure mode as the 2026-05-29 hysteresis run). *)
+let test_exit_timing_deep_gate_n_matches_generated_fold_count _ =
+  let spec = Spec.load (_fixture_path _exit_timing_deep_fixture) in
+  let generated = List.length (WS.generate spec.window_spec) in
+  assert_that generated (all_of [ equal_to 55; equal_to spec.gate.n ])
+
 (* ---------- axes -> variants expansion on load (plan Gap A) ---------- *)
 
 (* Write [contents] to a fresh temp file and return its path. The spec [load]
@@ -360,6 +404,11 @@ let suite =
          >:: test_hysteresis_variants_are_h1m0_and_h2m02;
          "hysteresis gate.n matches generated fold count (31)"
          >:: test_hysteresis_gate_n_matches_generated_fold_count;
+         "exit-timing deep spec parses" >:: test_exit_timing_deep_spec_parses;
+         "exit-timing deep window spans 1998-01-01..2026-04-30"
+         >:: test_exit_timing_deep_window_spans_1998_to_2026;
+         "exit-timing deep gate.n matches generated fold count (55)"
+         >:: test_exit_timing_deep_gate_n_matches_generated_fold_count;
          "axes-only expands with auto-baseline"
          >:: test_axes_only_expands_with_baseline;
          "explicit variants + axes concatenate"
