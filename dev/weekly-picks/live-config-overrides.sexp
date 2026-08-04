@@ -70,3 +70,22 @@
 ;   longer a buy; reward/risk has shifted against you". Code defaults stay 0.0
 ;   (off) per experiment-flag R1. See [Weinstein_snapshot.Entry_reconciliation].
 ((entry_through_band_pct 1.0) (entry_extension_max_pct 15.0))
+;   (off) per experiment-flag R1. See [Weinstein_snapshot.Entry_reconciliation].
+((entry_through_band_pct 1.0) (entry_extension_max_pct 15.0))
+; live rename detection: issue #2083 fix 2 (armed 2026-08-04) — returns-basis
+;   succession detector (#2100, reuses the #1946 Twin_detector scorer at
+;   ret_epsilon 1e-3). When a universe ticker goes sparse at the right-hand
+;   edge while a younger ticker takes over with matching daily returns
+;   (SNSE->FTH class), the dead predecessor is dropped from candidates and the
+;   report warns naming the successor — prompting the human universe re-pin.
+;   Armed values: match_fraction 0.95 (Twin_detector top-3000 calibration:
+;   real twins .95-.99, controls <.06), min_overlap_days 5 (the SNSE-shaped
+;   zombie-tail fixture class). Arming dry-run 2026-08-04 over the full 3,158
+;   universe @ as-of 2026-07-31: ZERO detections (no false positives) and
+;   candidates bit-identical to the committed c028ee864 record. Report-layer
+;   data hygiene, NOT a strategy rule: consumed only by
+;   Weekly_snapshot_generator.generate; on_market_close never reads these
+;   fields, so arming cannot move a backtest number (same class as the
+;   sparse-tail gate + entry reconciliation armings above). Code defaults stay
+;   0/0.0 (off) per experiment-flag R1. See [Rename_detector] / [Rename_gate].
+((rename_detect_min_overlap_days 5) (rename_detect_match_fraction 0.95))

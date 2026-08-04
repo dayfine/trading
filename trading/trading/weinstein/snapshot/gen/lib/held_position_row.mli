@@ -46,6 +46,18 @@ val enrich :
     string both renderers print, so the machine's description reaches the report
     without a [current_schema_version] bump. *)
 
+val enrich_all :
+  Weinstein_strategy.Bar_reader.t ->
+  config:Weinstein_strategy.config ->
+  as_of:Date.t ->
+  Live_portfolio.position list ->
+  Weinstein_snapshot.Weekly_snapshot.held_position list * string list
+(** [enrich_all bar_reader ~config ~as_of positions] maps {!enrich} over the
+    held book and pairs the rows with their tickers — the two views the
+    generator threads to the screener (held tickers) and the report (rows).
+    Lives here rather than in the generator to keep that coordinator within the
+    file-length limit; pure convenience over {!enrich}. *)
+
 val long_market_value :
   Weinstein_snapshot.Weekly_snapshot.held_position list -> float
 (** [long_market_value held] is the sum of [shares * current_price] over [held]

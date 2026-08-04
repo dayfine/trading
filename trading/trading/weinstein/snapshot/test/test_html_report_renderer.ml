@@ -100,11 +100,18 @@ let _long_candidate : Weekly_snapshot.candidate =
     stop_is_structural = true;
     data_suspect = false;
     reconciliation = Entry_reconciliation.Not_reconciled;
+    score_components =
+      [
+        ("Stage1→Stage2 breakout", 30);
+        ("Strong volume", 20);
+        ("RS positive", 20);
+      ];
   }
 
 (* Deliberately the opposite of [_long_candidate] on every rendered flag: a
    fallback stop, spike-flagged, no resistance grade, unsized, different
-   rationale vocabulary, and a stop ABOVE the entry (short convention). *)
+   rationale vocabulary, and a stop ABOVE the entry (short convention). Keeps an
+   EMPTY [score_components] so the no-breakdown-chip degradation is pinned. *)
 let _short_candidate : Weekly_snapshot.candidate =
   {
     _long_candidate with
@@ -122,6 +129,7 @@ let _short_candidate : Weekly_snapshot.candidate =
     stop_is_structural = false;
     data_suspect = true;
     reconciliation = Entry_reconciliation.Not_reconciled;
+    score_components = [];
   }
 
 let _held : Weekly_snapshot.held_position =
@@ -147,6 +155,8 @@ let _empty_snapshot : Weekly_snapshot.t =
     sectors_weak = [];
     long_candidates = [];
     short_candidates = [];
+    long_eligible_beyond_cap = 0;
+    short_eligible_beyond_cap = 0;
     held_positions = [];
     warnings = [];
   }
@@ -387,16 +397,26 @@ let test_long_candidate_card _ =
            "<span class=\"rank\">1</span><a class=\"sym\" \
             href=\"https://www.tradingview.com/chart/?symbol=LONGA\" \
             target=\"_blank\" rel=\"noopener\">LONGA</a>";
-         (* Chips, in order and complete: score, the three rationale clauses
-            verbatim, the resistance grade, the stop kind. A dropped or
-            re-labelled chip fails here. *)
-         _has_substring
-           "<span class=\"chips\"><span class=\"chip chip-score\">A+ \
-            0.91</span><span class=\"chip chip-breakout\">Stage1 to Stage2 \
-            breakout</span><span class=\"chip chip-vol-strong\">Strong \
-            volume</span><span class=\"chip chip-rs\">RS positive</span><span \
-            class=\"chip chip-virgin\">Virgin_territory (0.95)</span><span \
-            class=\"chip chip-structural\">structural stop</span></span>";
+         (* Chips, in order and complete: score, the score-breakdown, the sector
+            name, the three rationale clauses verbatim, the resistance grade, the
+            stop kind, the weakness line. A dropped or re-ordered chip fails
+            here. The exhaustive full-span (titles and all) is pinned by the
+            body golden; this pins ORDER + the new columns' presence. *)
+         _in_order
+           [
+             "<span class=\"chip chip-score\">A+ 0.91</span>";
+             "<span class=\"chip chip-breakdown\" title=\"30 Stage1→Stage2 \
+              breakout · 20 Strong volume · 20 RS positive\">70 = 30 + 20 + \
+              20</span>";
+             "<span class=\"chip chip-sectorname\">XLK</span>";
+             "<span class=\"chip chip-breakout\">Stage1 to Stage2 \
+              breakout</span>";
+             "<span class=\"chip chip-vol-strong\">Strong volume</span>";
+             "<span class=\"chip chip-rs\">RS positive</span>";
+             ">Virgin_territory (0.95)</span>";
+             "<span class=\"chip chip-structural\">structural stop</span>";
+             "<span class=\"chip chip-weak\">weak: sector not strong</span>";
+           ];
          (* Figures, in order. Risk = (100 - 90) / 100. *)
          _has_substring
            "<span class=\"nums\"><span class=\"num\"><i>Entry</i><span \
@@ -436,14 +456,19 @@ let test_short_candidate_card_is_its_own_arm _ =
        [
          "<h2>Short candidates (top 5)</h2>";
          "?symbol=SHRTB";
-         (* The COMPLETE chips span: an unrecognised clause degrades to a plain
-            chip, and the absent resistance grade emits nothing at all — both
-            pinned by exhaustion rather than by a negative substring. *)
-         "<span class=\"chips\"><span class=\"chip chip-score\">B \
-          0.77</span><span class=\"chip\">Stage 4 breakdown</span><span \
-          class=\"chip chip-vol-ok\">Adequate volume</span><span class=\"chip \
-          chip-fallback\">fallback stop</span><span class=\"chip \
-          chip-suspect\">(!) data-suspect</span></span>";
+         (* The chips in order: an unrecognised clause ("Stage 4 breakdown")
+            degrades to a plain chip, the absent resistance grade emits nothing,
+            and the weakness line collects the adequate-volume + fallback-stop
+            caveats. Empty [score_components] → no breakdown chip. (The sector
+            chip "XLK" is not asserted here — it is not unique to the short arm
+            and is pinned by the body golden.) *)
+         "<span class=\"chip chip-score\">B 0.77</span>";
+         "<span class=\"chip\">Stage 4 breakdown</span>";
+         "<span class=\"chip chip-vol-ok\">Adequate volume</span>";
+         ">fallback stop</span>";
+         ">(!) data-suspect</span>";
+         "<span class=\"chip chip-weak\">weak: adequate (not strong) volume; \
+          fallback stop (no structural floor)</span>";
          "<span class=\"num-value num-value-stop\">$55.00*</span>";
          "<span class=\"num-value\">-10.0%</span>";
        ])
@@ -477,8 +502,13 @@ let test_structural_and_fallback_stops_are_chipped_and_explained _ =
   assert_that (render _short_candidate)
     (all_of
        [
+         (* The fallback chip carries the shared stop-fallback explainer as its
+            hover title (deliverable 4) — referenced, not re-spelled, so a drift
+            in the prose fails here. *)
          _has_substring
-           "<span class=\"chip chip-fallback\">fallback stop</span>";
+           ("<span class=\"chip chip-fallback\" title=\""
+           ^ Html_page.escape Report_shared.stop_fallback
+           ^ "\">fallback stop</span>");
          _has_substring "<p class=\"note\">* fallback stop:";
        ])
 
@@ -497,8 +527,11 @@ let test_data_suspect_is_chipped_and_explained _ =
   assert_that flagged
     (all_of
        [
+         (* The data-suspect chip hovers the shared explainer (deliverable 4). *)
          _has_substring
-           "<span class=\"chip chip-suspect\">(!) data-suspect</span>";
+           ("<span class=\"chip chip-suspect\" title=\""
+           ^ Html_page.escape Report_shared.data_suspect
+           ^ "\">(!) data-suspect</span>");
          _has_substring "<p class=\"note\">(!) data-suspect:";
        ])
 
@@ -516,7 +549,12 @@ let test_resistance_grade_chip_variants _ =
   in
   assert_that
     (render (Some "Clean (0.12)"))
-    (_has_substring "<span class=\"chip chip-resistance\">Clean (0.12)</span>");
+    (* The resistance chip hovers the shared resistance-grade explainer
+       (deliverable 4). *)
+    (_has_substring
+       ("<span class=\"chip chip-resistance\" title=\""
+       ^ Html_page.escape Report_shared.resistance_grade_explainer
+       ^ "\">Clean (0.12)</span>"));
   assert_that (render None)
     (not_ ~msg:"no resistance chip when the grade was not computed"
        (_has_substring "chip-resistance\">"))
@@ -883,9 +921,12 @@ let test_through_entry_chip_on_the_long_arm _ =
   assert_that html
     (all_of
        [
+         (* The reconciliation chip hovers the shared entry-reconciliation
+            explainer (deliverable 4). *)
          _has_substring
-           "<span class=\"chip chip-through-entry\">$107.30 (+7.3% \
-            through)</span>";
+           ("<span class=\"chip chip-through-entry\" title=\""
+           ^ Html_page.escape Report_shared.entry_reconciliation
+           ^ "\">$107.30 (+7.3% through)</span>");
          _has_substring "<span class=\"num-value\">16.1%</span>";
          not_ ~msg:"Risk must not be quoted against the already-breached entry"
            (_has_substring "<span class=\"num-value\">10.0%</span>");
@@ -941,8 +982,11 @@ let test_extended_chip_and_suppression_on_the_short_arm _ =
   assert_that html
     (all_of
        [
+         (* The extended reconciliation chip hovers the shared explainer too. *)
          _has_substring
-           "<span class=\"chip chip-extended\">$65.50 (+34.5% EXTENDED)</span>";
+           ("<span class=\"chip chip-extended\" title=\""
+           ^ Html_page.escape Report_shared.entry_reconciliation
+           ^ "\">$65.50 (+34.5% EXTENDED)</span>");
          _has_substring "<span class=\"num-value\">-10.0%</span>";
          _has_substring "<div class=\"cand cand-extended\">";
          _has_substring
@@ -1010,9 +1054,31 @@ let test_unreconciled_cards_are_plain _ =
            (_has_substring "cand-extended\">");
        ])
 
+(* Issue #2122 slice d: the screener-cap eligible-beyond-cap note, rendered as
+   its own [<p class="note">]. [_full_snapshot]'s single shown long (LONGA,
+   score 0.91) is the lowest shown row. *)
+let test_eligible_beyond_cap_note_rendered _ =
+  let snap = { _full_snapshot with long_eligible_beyond_cap = 7 } in
+  assert_that
+    (Html_report_renderer.render snap)
+    (_has_substring
+       "<p class=\"note\">7 additional eligible candidates beyond the \
+        displayed cap (lowest shown score 0.91).</p>")
+
+(* A [0] count (the pre-#2122 default) renders no such note. *)
+let test_no_eligible_beyond_cap_note_when_zero _ =
+  assert_that
+    (Html_report_renderer.render _full_snapshot)
+    (not_ ~msg:"no beyond-cap note when the count is zero"
+       (_has_substring "additional eligible candidate"))
+
 let suite =
   "html_report_renderer"
   >::: [
+         "eligible_beyond_cap_note_rendered"
+         >:: test_eligible_beyond_cap_note_rendered;
+         "no_eligible_beyond_cap_note_when_zero"
+         >:: test_no_eligible_beyond_cap_note_when_zero;
          "body_matches_golden" >:: test_body_matches_golden;
          "document_is_self_contained" >:: test_document_is_self_contained;
          "new_marks_are_styled" >:: test_new_marks_are_styled;

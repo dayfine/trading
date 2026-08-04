@@ -29,6 +29,7 @@ let _candidate ?(symbol = "TEST") ?(entry = 100.0) ?(stop = 90.0)
     stop_is_structural = true;
     data_suspect = false;
     reconciliation;
+    score_components = [];
   }
 
 let _snapshot ?(longs = []) ?(shorts = [])
@@ -43,6 +44,8 @@ let _snapshot ?(longs = []) ?(shorts = [])
     sectors_weak = [];
     long_candidates = longs;
     short_candidates = shorts;
+    long_eligible_beyond_cap = 0;
+    short_eligible_beyond_cap = 0;
     held_positions = [];
     warnings = [];
   }

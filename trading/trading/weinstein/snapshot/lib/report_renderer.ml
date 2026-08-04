@@ -57,20 +57,33 @@ let _resistance_cell : string option -> string = function
    in a column named "Risk %". For a candidate carrying no cap (disarmed default
    / pre-#2158 snapshot) the basis falls back to the expected fill, so this is
    identical to the previous behaviour there. *)
+(* A dash placeholder so a column is never blank: the sector name (absent when
+   the screener recorded none), the score breakdown (pre-field snapshots), the
+   weakness line (a setup with no weak links). *)
+let _cell = function "" -> "-" | s -> s
+let _opt_cell = function None -> "-" | Some s -> s
+
 let _candidate_row ~rank (c : Weekly_snapshot.candidate) =
   let risk =
     Report_shared.risk_pct
       ~entry:(Weekly_snapshot.sizing_basis_price c)
       ~stop:c.stop
   in
+  (* Sector / Score breakdown / Weakness are appended AFTER Instruction rather
+     than interleaved: the order is the widest cell, so the identity + price +
+     order columns stay leftmost and scannable, and the advisory columns trail. *)
   Printf.sprintf
-    "| %d | %s | %s | %.2f | $%.2f | %s | %s | %.1f%% | %s | %s | %s |" rank
-    (_symbol_cell c) c.grade c.score c.entry
+    "| %d | %s | %s | %.2f | $%.2f | %s | %s | %.1f%% | %s | %s | %s | %s | %s \
+     | %s |"
+    rank (_symbol_cell c) c.grade c.score c.entry
     (Report_shared.close_vs_entry c)
     (_stop_cell c) risk
     (_resistance_cell c.resistance_grade)
     c.rationale
     (Report_shared.instruction c)
+    (_cell c.sector)
+    (_opt_cell (Report_shared.score_breakdown c))
+    (_opt_cell (Report_shared.weakness_line c))
 
 let _append_note table = function
   | None -> table
@@ -82,10 +95,11 @@ let _append_note table = function
    [table]. Split out of {!_candidate_table} to keep that function's nesting
    under the linter cap — each note is an independent, flat append rather than a
    nested match/if chain. *)
-let _append_table_notes ~shown ~hidden table =
+let _append_table_notes ~shown ~hidden ~beyond_cap table =
   let legend flag note = if flag then Some note else None in
   [
     Report_shared.truncation ~shown ~hidden;
+    Report_shared.eligible_beyond_cap ~shown ~beyond_cap;
     legend (Report_shared.any_fallback_stop shown) Report_shared.stop_fallback;
     legend (Report_shared.any_data_suspect shown) Report_shared.data_suspect;
     legend
@@ -112,12 +126,15 @@ let _candidate_columns =
     "Resistance";
     "Rationale";
     "Instruction";
+    "Sector";
+    "Score breakdown";
+    "Weakness";
   ]
 
 let _candidate_rows shown =
   List.mapi shown ~f:(fun i c -> _candidate_row ~rank:(i + 1) c)
 
-let _candidate_table candidates ~limit =
+let _candidate_table ?(beyond_cap = 0) candidates ~limit =
   match candidates with
   | [] -> _empty_marker
   | _ ->
@@ -125,7 +142,7 @@ let _candidate_table candidates ~limit =
       let hidden = List.drop candidates limit in
       String.concat ~sep:"\n"
         (_table_header _candidate_columns :: _candidate_rows shown)
-      |> _append_table_notes ~shown ~hidden
+      |> _append_table_notes ~shown ~hidden ~beyond_cap
 
 (* Recommended-stop cell: this week's recomputed Weinstein support-floor stop
    shown with its delta vs the current stop, so the reader sees whether to raise
@@ -201,12 +218,14 @@ let render ?(long_limit = default_long_display_limit)
   Buffer.add_string buf
     (_section
        ~title:(Printf.sprintf "Long candidates (top %d)" long_limit)
-       (_candidate_table long_actionable ~limit:long_limit));
+       (_candidate_table ~beyond_cap:t.long_eligible_beyond_cap long_actionable
+          ~limit:long_limit));
   Buffer.add_string buf "\n\n";
   Buffer.add_string buf
     (_section
        ~title:(Printf.sprintf "Short candidates (top %d)" short_limit)
-       (_candidate_table short_actionable ~limit:short_limit));
+       (_candidate_table ~beyond_cap:t.short_eligible_beyond_cap
+          short_actionable ~limit:short_limit));
   Buffer.add_string buf "\n\n";
   (* Extended candidates carry no ticket (do-not-chase), so they live in their
      own watch section instead of consuming actionable display slots. Omitted

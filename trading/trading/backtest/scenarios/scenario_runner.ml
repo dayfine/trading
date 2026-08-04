@@ -269,29 +269,11 @@ let _actual_path ~output_root (s : Scenario.t) =
     steps — the same series {!Backtest.Result_writer} writes to
     [equity_curve.csv]. Purely diagnostic: no metric or return value changes. *)
 let _emit_fold_health ~scenario_dir ~(result : Backtest.Runner.result) =
-  let summary = result.summary in
-  let equity_curve =
-    List.map result.steps
-      ~f:(fun (st : Trading_simulation_types.Simulator_types.step_result) ->
-        st.portfolio_value)
-  in
-  let config = Backtest.Fold_health.default_config in
-  let findings =
-    Backtest.Fold_health.check ~config ~initial_cash:summary.initial_cash
-      ~final_portfolio_value:summary.final_portfolio_value
-      ~n_round_trips:summary.n_round_trips ~n_steps:summary.n_steps
-      ~equity_curve
-    (* Divergence guard (#1553): a position the portfolio holds but the strategy
-       no longer monitors under stop evaluation (stuck-[Exiting] zombie). Unioned
-       with the [check] invariants; in a healthy run this adds nothing. *)
-    @ Backtest.Fold_health_runner.divergence_findings ~config result
-  in
-  List.iter findings ~f:(fun f ->
-      eprintf "WARN: fold-health: %s\n%!"
-        (Backtest.Fold_health.finding_to_string f));
-  Sexp.save_hum
-    (Filename.concat scenario_dir "fold_health.sexp")
-    ([%sexp_of: Backtest.Fold_health.finding list] findings)
+  (* Delegates to the shared runner-path emission (#1557) so the scenario
+     catalog and the [backtest_runner] binary surface the same finding union
+     ([Fold_health.check] invariants ∪ the #1553 divergence guard) identically.
+     Behaviour-identical to the prior inline form. *)
+  Backtest.Fold_health_runner.emit ~output_dir:scenario_dir result
 
 let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
     ~emit_all_eligible ~bar_data_source ~scenario_path (s : Scenario.t) =

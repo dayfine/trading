@@ -46,6 +46,7 @@ let _candidate ?(score = 0.9) ?(grade = "A+") ?(sector = "XLK")
     stop_is_structural = false;
     data_suspect = false;
     reconciliation = Entry_reconciliation.Not_reconciled;
+    score_components = [];
   }
 
 let _snapshot ~date ~candidates : Weekly_snapshot.t =
@@ -58,6 +59,8 @@ let _snapshot ~date ~candidates : Weekly_snapshot.t =
     sectors_weak = [];
     long_candidates = candidates;
     short_candidates = [];
+    long_eligible_beyond_cap = 0;
+    short_eligible_beyond_cap = 0;
     held_positions = [];
     warnings = [];
   }

@@ -16,7 +16,7 @@ Each row: one line; deeper task detail in the linked status file.
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
 | [resistance-v2](resistance-v2.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | grid 3/3 ACCEPT w=30; BUNDLE PROMOTED default-on #2047 (R3 human-approved 07-23); next: WF-CV vs w30 (data-gated) + lever-b axis |
-| [margin-realism](margin-realism.md) | IN_PROGRESS | dayfine (maintainer LOCAL) + feat-backtest | — | M4 MERGED #2063; #2057 exit labels MERGED #2074; trade_audit half MERGED #2085; #2076 open (report-layer rendering out of scope) |
+| [margin-realism](margin-realism.md) | IN_PROGRESS | dayfine (maintainer LOCAL) + feat-backtest | — | M4 MERGED #2063; #2057 exit labels MERGED #2074; trade_audit half MERGED #2085; #2076 CLOSED (report fallback #2196) |
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
@@ -32,7 +32,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
 | [hybrid-tier](hybrid-tier.md) | MERGED | — | — | — |
-| [trade-audit](trade-audit.md) | IN_PROGRESS | feat-backtest | — | #2115 fixed the trades.csv duplicate/phantom rows; next: position_id join is date-proximity derived and suspect for forensics; #2076 report-layer rendering still open |
+| [trade-audit](trade-audit.md) | IN_PROGRESS | feat-backtest | — | #2115 fixed the trades.csv duplicate/phantom rows; #2076 CLOSED (report fallback #2196); next: position_id join is date-proximity derived and suspect for forensics |
 | [decision-audit](decision-audit.md) | MERGED | feat-backtest | — | #1799/#1806/#1811 MERGED (report+counterfactual+weekly-picks adapter); selection FAITHFUL; live-picks pipeline ready (#1812); next: matured weekly counterfactual |
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |

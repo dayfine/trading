@@ -30,46 +30,89 @@ let _rationale_chips rationale =
   |> List.map ~f:(fun clause ->
       Chip.make ?modifier:(_clause_modifier clause) clause)
 
+let _resistance_modifier grade =
+  if String.is_prefix grade ~prefix:"Virgin_territory" then "virgin"
+  else "resistance"
+
+(* The resistance grade carries a hover explainer (deliverable 4) reusing the
+   single-sourced [Report_shared] prose so the tooltip cannot drift. *)
 let _resistance_chip = function
   | None -> []
   | Some grade ->
-      let modifier =
-        if String.is_prefix grade ~prefix:"Virgin_territory" then "virgin"
-        else "resistance"
-      in
-      [ Chip.make ~modifier grade ]
+      let modifier = _resistance_modifier grade in
+      let title = Report_shared.resistance_grade_explainer in
+      [ Chip.make ~modifier ~title grade ]
 
 (* Issue #2084 Finding 2 in words rather than as a footnote glyph: whether the
-   stop is a real support floor or the fixed entry x buffer proxy. *)
+   stop is a real support floor or the fixed entry x buffer proxy. The fallback
+   chip hovers the shared fallback-stop explainer (deliverable 4). *)
 let _stop_chip (c : Weekly_snapshot.candidate) =
   if c.stop_is_structural then
     Chip.make ~modifier:"structural" "structural stop"
-  else Chip.make ~modifier:"fallback" "fallback stop"
+  else
+    Chip.make ~modifier:"fallback" ~title:Report_shared.stop_fallback
+      "fallback stop"
 
 (* Issue #2083 Finding 3: a spike-flagged candidate is annotated, not dropped —
-   its entry, stop and size are unchanged and only this chip is added. *)
+   its entry, stop and size are unchanged and only this chip is added. Hovers
+   the shared data-suspect explainer (deliverable 4). *)
 let _suspect_chip (c : Weekly_snapshot.candidate) =
-  if c.data_suspect then [ Chip.make ~modifier:"suspect" "(!) data-suspect" ]
+  if c.data_suspect then
+    [
+      Chip.make ~modifier:"suspect" ~title:Report_shared.data_suspect
+        "(!) data-suspect";
+    ]
   else []
 
 (* Issue #2103. The chip TEXT is [Report_shared.close_vs_entry] — the same
    string the Markdown column shows — so the two formats cannot drift; only the
-   variant is derived from the class. *)
+   variant is derived from the class. Hovers the shared reconciliation
+   explainer (deliverable 4). *)
 let _reconciliation_chip (c : Weekly_snapshot.candidate) =
   match Entry_reconciliation.label c.reconciliation with
   | None -> []
   | Some cls ->
       [
         Chip.make ~modifier:(String.lowercase cls)
+          ~title:Report_shared.entry_reconciliation
           (Report_shared.close_vs_entry c);
       ]
 
+(* The candidate's sector name, shown plainly (a neutral fact, not a strong /
+   weak judgement — the "Strong sector" scoring chip carries that). Omitted when
+   the screener recorded no sector. *)
+let _sector_chip (c : Weekly_snapshot.candidate) =
+  if String.is_empty c.sector then []
+  else [ Chip.make ~modifier:"sectorname" c.sector ]
+
+(* Score composition (e.g. "70 = 30 + 20 + 20"), hovering the labelled detail
+   ("30 Stage1→Stage2 breakout · …") so the arithmetic is on the face and the
+   labels a hover away. Empty when the snapshot predates the breakdown field. *)
+let _breakdown_chip (c : Weekly_snapshot.candidate) =
+  match Report_shared.score_breakdown c with
+  | None -> []
+  | Some compact ->
+      let title =
+        Option.value (Report_shared.score_breakdown_detail c) ~default:compact
+      in
+      [ Chip.make ~modifier:"breakdown" ~title compact ]
+
+(* The weakest links in the setup (fallback stop, adequate-not-strong volume,
+   wide risk, paying up, sector not strong), one chip carrying the whole line so
+   the reader sees the caveats without hunting the row. Empty when none apply. *)
+let _weakness_chip (c : Weekly_snapshot.candidate) =
+  match Report_shared.weakness_line c with
+  | None -> []
+  | Some line -> [ Chip.make ~modifier:"weak" ("weak: " ^ line) ]
+
 let _chips (c : Weekly_snapshot.candidate) =
   Chip.make ~modifier:"score" (Printf.sprintf "%s %.2f" c.grade c.score)
-  :: _rationale_chips c.rationale
+  :: _breakdown_chip c
+  @ _sector_chip c
+  @ _rationale_chips c.rationale
   @ _resistance_chip c.resistance_grade
   @ [ _stop_chip c ]
-  @ _suspect_chip c @ _reconciliation_chip c
+  @ _suspect_chip c @ _reconciliation_chip c @ _weakness_chip c
 
 (* The trailing "*" is kept from the Markdown report so the shared
    [Report_shared.stop_fallback] legend — whose prose opens "* fallback stop:" —

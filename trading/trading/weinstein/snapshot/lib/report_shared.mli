@@ -92,6 +92,12 @@ val data_suspect : string
     cell, including that the candidate was {e kept}, not dropped. Rendered below
     a candidate table iff {!any_data_suspect} holds for the shown rows. *)
 
+val resistance_grade_explainer : string
+(** Explains what a candidate's resistance grade (["Virgin_territory (0.00)"],
+    ["Heavy_resistance (0.82)"], …) means. Used as the HTML hover explainer on
+    the resistance chip; single-sourced here so any renderer that surfaces it
+    reads the same prose. *)
+
 val any_fallback_stop : Weekly_snapshot.candidate list -> bool
 (** [any_fallback_stop shown] is [true] when at least one of the {e displayed}
     candidates carries [stop_is_structural = false]. Gates {!stop_fallback}. *)
@@ -117,6 +123,54 @@ val truncation :
 
     Requires [shown] to be non-empty whenever [hidden] is non-empty (a truncated
     table has rows); raises otherwise. *)
+
+val eligible_beyond_cap :
+  shown:Weekly_snapshot.candidate list -> beyond_cap:int -> string option
+(** [eligible_beyond_cap ~shown ~beyond_cap] is the visibility note for the
+    candidates the {e screener} dropped at its top-N cap — distinct from
+    {!truncation}, which reports rows the {e report}'s own display limit hid.
+
+    The screener admits the full eligible set, ranks it, and keeps only its top
+    [max_buy_candidates]; [beyond_cap] is how many otherwise-eligible names it
+    cut (see {!Weekly_snapshot.t.long_eligible_beyond_cap}). Since those names
+    never reach the snapshot, no {!truncation} note can mention them; this one
+    does, so a reader knows the shown list is a capped view of a larger eligible
+    set (issue #2122 slice d).
+
+    [None] when [beyond_cap <= 0] (nothing was cut — the [0] default of a
+    pre-#2122 snapshot renders no line) or when [shown] is empty (no row to
+    quote a cutoff score against). Otherwise a line naming the count and the
+    lowest shown score — the score of the last (lowest-ranked) shown row, the
+    bar the cut names fell just short of. *)
+
+val score_breakdown : Weekly_snapshot.candidate -> string option
+(** Compact arithmetic of {!Weekly_snapshot.candidate.score_components} —
+    ["70 = 30 + 20 + 20"], the total (sum of the per-signal points, which equals
+    the candidate's score by construction) followed by the points that composed
+    it, in scoring order. The matching labels are the candidate's rationale
+    clauses (same order) and the fuller labelled form is
+    {!score_breakdown_detail}. [None] when the candidate carries no components —
+    a snapshot written before the field existed, or one whose scoring produced
+    no non-zero signal. *)
+
+val score_breakdown_detail : Weekly_snapshot.candidate -> string option
+(** Labelled decomposition of {!Weekly_snapshot.candidate.score_components} —
+    ["30 Stage1→Stage2 breakout · 20 Strong volume · 20 RS positive & rising"],
+    each signal's points beside its label. Used as the HTML hover explainer on
+    the compact {!score_breakdown} figure. [None] on empty components. *)
+
+val weaknesses : Weekly_snapshot.candidate -> string list
+(** The weakest links in a candidate's setup, derived purely from data already
+    on the row (no new scoring): an ["adequate (not strong) volume"]
+    confirmation, a ["fallback stop (no structural floor)"], a ["wide risk N%"]
+    to the stop, a ["paying up +N% through entry"] / ["extended +N% past entry"]
+    reconciliation, and — for long candidates — a ["sector not strong"]. Empty
+    when the setup has none of these. Each phrase is factual and unwrapped (no
+    markup). *)
+
+val weakness_line : Weekly_snapshot.candidate -> string option
+(** [weaknesses] joined with ["; "], or [None] when there are none — a single
+    per-candidate line both renderers show so they cannot drift. *)
 
 val is_extended : Weekly_snapshot.candidate -> bool
 (** [is_extended c] is [true] iff [c]'s reconciliation class is

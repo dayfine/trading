@@ -37,6 +37,7 @@ let _full_snapshot : Weekly_snapshot.t =
           stop_is_structural = true;
           data_suspect = false;
           reconciliation = Entry_reconciliation.Not_reconciled;
+          score_components = [];
         };
         {
           symbol = "MSFT";
@@ -56,9 +57,12 @@ let _full_snapshot : Weekly_snapshot.t =
           stop_is_structural = true;
           data_suspect = false;
           reconciliation = Entry_reconciliation.Not_reconciled;
+          score_components = [];
         };
       ];
     short_candidates = [];
+    long_eligible_beyond_cap = 0;
+    short_eligible_beyond_cap = 0;
     held_positions =
       [
         {
@@ -86,6 +90,8 @@ let _empty_snapshot : Weekly_snapshot.t =
     sectors_weak = [];
     long_candidates = [];
     short_candidates = [];
+    long_eligible_beyond_cap = 0;
+    short_eligible_beyond_cap = 0;
     held_positions = [];
     warnings = [];
   }
@@ -208,6 +214,7 @@ let test_risk_pct_formatting _ =
             stop_is_structural = true;
             data_suspect = false;
             reconciliation = Entry_reconciliation.Not_reconciled;
+            score_components = [];
           };
         ];
     }
@@ -245,6 +252,7 @@ let test_resistance_grade_column_rendered _ =
             stop_is_structural = true;
             data_suspect = false;
             reconciliation = Entry_reconciliation.Not_reconciled;
+            score_components = [];
           };
         ];
     }
@@ -290,6 +298,7 @@ let _sized_cand ?(sized_shares = 0) ?(sized_position_value = 0.0)
     stop_is_structural;
     data_suspect;
     reconciliation;
+    score_components = [];
   }
 
 let test_instruction_cell_rendered _ =
@@ -373,6 +382,7 @@ let _long_snap ~n ~score_of =
       stop_is_structural = true;
       data_suspect = false;
       reconciliation = Entry_reconciliation.Not_reconciled;
+      score_components = [];
     }
   in
   { _empty_snapshot with long_candidates = List.init n ~f:(fun i -> make_c i) }
@@ -748,9 +758,33 @@ let test_unreconciled_row_renders_dash_and_todays_ticket _ =
            (_has_substring "close vs entry:");
        ])
 
+(* Issue #2122 slice d: the screener caps candidates at [max_buy_candidates];
+   [long_eligible_beyond_cap] carries how many otherwise-eligible names it cut,
+   so the report can say the shown list is a capped view. The line names the
+   count and the lowest shown score (MSFT's 0.87 here — the last of the two
+   shown rows). *)
+let test_eligible_beyond_cap_line_rendered _ =
+  let snap = { _full_snapshot with long_eligible_beyond_cap = 7 } in
+  assert_that
+    (Report_renderer.render snap)
+    (_has_substring
+       "7 additional eligible candidates beyond the displayed cap (lowest \
+        shown score 0.87).")
+
+(* A [0] count (the default of every pre-#2122 record) renders no such line. *)
+let test_no_eligible_beyond_cap_line_when_zero _ =
+  assert_that
+    (Report_renderer.render _full_snapshot)
+    (not_ ~msg:"no beyond-cap line when the count is zero"
+       (_has_substring "additional eligible candidate"))
+
 let suite =
   "report_renderer"
   >::: [
+         "eligible_beyond_cap_line_rendered"
+         >:: test_eligible_beyond_cap_line_rendered;
+         "no_eligible_beyond_cap_line_when_zero"
+         >:: test_no_eligible_beyond_cap_line_when_zero;
          "through_entry_row_renders_market_order"
          >:: test_through_entry_row_renders_market_order;
          "armed_through_entry_row_renders_limit_at_close"

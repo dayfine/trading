@@ -844,10 +844,18 @@ operational) has a clean reference instead of inheriting stale text.
 - [Sub-agents](https://code.claude.com/docs/en/sub-agents)
 - [Scheduled tasks](https://code.claude.com/docs/en/scheduled-tasks)
 
-- [ ] **A-NOOP-BUDGET-ORPHAN — a run that takes the no-op fast-exit has no
+- [x] **A-NOOP-BUDGET-ORPHAN — a run that takes the no-op fast-exit has no
   summary PR to bundle its budget record into, so the record *always* falls back
   to an unmerged branch and never reaches `main`.** Filed 2026-07-29 (run
-  30458563291), measured directly.
+  30458563291), measured directly. **FIXED 2026-08-04 (PR #2195, closes
+  #1572):** the fallback path now opens an `ops/budget-*` PR (REST
+  `POST /pulls`) and auto-merges it via the shared `merge_pr_when_clean`
+  function (extracted from the daily-summary path; same
+  mergeable+clean poll, same squash merge). Failure at PR-create or
+  merge degrades to the old pushed-branch + `::warning` behavior. Run
+  4's A-BUDGET-ORPHAN full-pass fallback flows through the same fixed
+  path. Verify on the next genuinely-empty-queue no-op run: expect an
+  auto-merged `ops(budget): record ...` PR instead of an orphan branch.
 
   The workflow's "Bundle budget into daily summary and auto-merge" step amends
   `dev/budget/<date>-<run_id>.json` onto the run's `ops/daily-*` branch. A no-op

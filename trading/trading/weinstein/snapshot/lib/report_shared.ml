@@ -149,6 +149,13 @@ let data_suspect =
    quote before placing the order. See the Warnings section for the observed \
    move."
 
+let resistance_grade_explainer =
+  "resistance grade: how much overhead supply (prior trapped buyers) sits \
+   between the entry and the swing target. Virgin_territory / Clean = little \
+   to none, the cleanest runway; Moderate / Heavy_resistance = old highs to \
+   chew through first. The parenthesised figure is the supply score (0 clean, \
+   1 heavy)."
+
 let any_fallback_stop shown =
   List.exists shown ~f:(fun (c : Weekly_snapshot.candidate) ->
       not c.stop_is_structural)
@@ -192,6 +199,95 @@ let truncation ~shown ~hidden =
       (_note_body ~n_hidden:(List.length hidden)
          ~n_tied:(_count_tied ~cutoff hidden)
          ~cutoff_score:cutoff)
+
+let _beyond_cap_line ~beyond_cap ~lowest_shown =
+  Printf.sprintf
+    "%d additional eligible candidate%s beyond the displayed cap (lowest shown \
+     score %.2f)."
+    beyond_cap (_plural beyond_cap) lowest_shown
+
+let eligible_beyond_cap ~shown ~beyond_cap =
+  match shown with
+  | [] -> None
+  | _ when beyond_cap <= 0 -> None
+  | _ ->
+      let lowest_shown = (List.last_exn shown).Weekly_snapshot.score in
+      Some (_beyond_cap_line ~beyond_cap ~lowest_shown)
+
+(* Score breakdown — points sum to the candidate's score by construction
+   (components come straight from the screener's own scoring). *)
+let score_breakdown (c : Weekly_snapshot.candidate) =
+  match c.score_components with
+  | [] -> None
+  | components ->
+      let total = List.sum (module Int) components ~f:snd in
+      let points =
+        List.map components ~f:(fun (_, p) -> Int.to_string p)
+        |> String.concat ~sep:" + "
+      in
+      Some (Printf.sprintf "%d = %s" total points)
+
+let score_breakdown_detail (c : Weekly_snapshot.candidate) =
+  match c.score_components with
+  | [] -> None
+  | components ->
+      List.map components ~f:(fun (label, p) -> Printf.sprintf "%d %s" p label)
+      |> String.concat ~sep:" · " |> Option.some
+
+(* Per-candidate weakness line — from the row, no new scoring. Risk beyond this
+   fraction of the fill basis is "wide" (initial stop sits below support, §5.1). *)
+let _wide_risk_pct = 15.0
+
+(* Longs stop below entry, shorts above — the sign gives the side. *)
+let _looks_long (c : Weekly_snapshot.candidate) = Float.( < ) c.stop c.entry
+
+let _rationale_has (c : Weekly_snapshot.candidate) needle =
+  String.is_substring c.rationale ~substring:needle
+
+let _volume_weakness (c : Weekly_snapshot.candidate) =
+  if _rationale_has c "Adequate volume" || _rationale_has c "Adequate breakdown"
+  then Some "adequate (not strong) volume"
+  else None
+
+let _stop_weakness (c : Weekly_snapshot.candidate) =
+  if c.stop_is_structural then None
+  else Some "fallback stop (no structural floor)"
+
+let _risk_weakness (c : Weekly_snapshot.candidate) =
+  let risk =
+    Float.abs
+      (risk_pct ~entry:(Weekly_snapshot.sizing_basis_price c) ~stop:c.stop)
+  in
+  if Float.( >= ) risk _wide_risk_pct then
+    Some (Printf.sprintf "wide risk %.1f%%" risk)
+  else None
+
+let _chase_weakness (c : Weekly_snapshot.candidate) =
+  match c.reconciliation with
+  | Entry_reconciliation.Through_entry l ->
+      Some (Printf.sprintf "paying up %+.1f%% through entry" l.overshoot_pct)
+  | Extended l ->
+      Some (Printf.sprintf "extended %+.1f%% past entry" l.overshoot_pct)
+  | Not_reconciled | Valid_stop _ -> None
+
+let _sector_weakness (c : Weekly_snapshot.candidate) =
+  if _looks_long c && not (_rationale_has c "Strong sector") then
+    Some "sector not strong"
+  else None
+
+let weaknesses (c : Weekly_snapshot.candidate) =
+  List.filter_map
+    [
+      _volume_weakness c;
+      _stop_weakness c;
+      _risk_weakness c;
+      _chase_weakness c;
+      _sector_weakness c;
+    ]
+    ~f:Fn.id
+
+let weakness_line c =
+  match weaknesses c with [] -> None | ws -> Some (String.concat ~sep:"; " ws)
 
 let is_extended (c : Weekly_snapshot.candidate) =
   match c.reconciliation with

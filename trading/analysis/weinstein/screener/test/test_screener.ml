@@ -2396,6 +2396,22 @@ let test_failed_breakout_tolerance_sexp_round_trips _ =
       omitted.failed_breakout_tolerance_pct )
     (equal_to (0.05, 0.0))
 
+(* The published [(label, points)] decomposition is exactly the signals the
+   total score sums: the labels, in scoring order, equal the rationale, and the
+   points sum to the score. This is the contract the weekly report relies on to
+   show "70 = 30 + 20 + 20" without re-deriving any weight. *)
+let test_long_score_components_decompose_the_score _ =
+  let sector = make_sector "Tech" in
+  let a = _breakout_analysis () in
+  let score, rationale =
+    score_long ~weights:default_scoring_weights ~sector a
+  in
+  let components =
+    long_score_components ~weights:default_scoring_weights ~sector a
+  in
+  assert_that (List.map components ~f:fst) (equal_to rationale);
+  assert_that (List.sum (module Int) components ~f:snd) (equal_to score)
+
 let suite =
   "screener_tests"
   >::: [
@@ -2547,6 +2563,8 @@ let suite =
          >:: test_ranking_omitted_field_defaults_alphabetical;
          "test_score_long_window_controls_early_stage2_signal"
          >:: test_score_long_window_controls_early_stage2_signal;
+         "test_long_score_components_decompose_the_score"
+         >:: test_long_score_components_decompose_the_score;
          "test_insufficient_history_scores_zero_long"
          >:: test_insufficient_history_scores_zero_long;
          "test_w_overhead_supply_scoring_branch"

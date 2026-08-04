@@ -215,6 +215,11 @@ let _run_and_write ~start_date ~end_date ~overrides ~output_dir
   in
   eprintf "Writing output to %s/\n%!" output_dir;
   Backtest.Result_writer.write ~output_dir result;
+  (* Degenerate-fold + stuck-position guard (#1553/#1557): surface the finding
+     union to stderr and [<output_dir>/fold_health.sexp]. Fires the divergence
+     guard in real backtest-binary runs, not just the scenario catalog. Purely
+     diagnostic — changes no metric, never aborts. *)
+  Backtest.Fold_health_runner.emit ~output_dir result;
   eprintf "Output written to: %s/\n%!" output_dir;
   Option.iter (Option.both trace_path trace) ~f:(fun (path, trace) ->
       _write_trace ~path ~trace);
