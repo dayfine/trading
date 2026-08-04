@@ -41,6 +41,12 @@ type segmentation_params = {
       (** Maximum allowed width penalty before a segment is split. This controls
           how much deviation from the preferred channel width is tolerated
           before forcing a split. *)
+  trend_bonus_weight : float;
+      (** Weight applied to the trend-change bonus when scoring a candidate
+          split point. *)
+  penalty_weight : float;
+      (** Weight applied to each side's combined length/width penalty when
+          scoring a candidate split point. *)
 }
 [@@deriving show, eq]
 (** Parameters that control the behavior of the segmentation algorithm. These

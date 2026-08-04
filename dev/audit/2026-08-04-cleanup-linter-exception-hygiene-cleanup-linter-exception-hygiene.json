@@ -1,0 +1,18 @@
+{
+  "date": "2026-08-04",
+  "feature": "cleanup-linter-exception-hygiene",
+  "branch": "cleanup/linter-exception-hygiene",
+  "recorded_at_ns": 1785836313349475379,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
