@@ -69,6 +69,16 @@ let test_through_entry_is_a_weakness _ =
           ()))
     (elements_are [ equal_to "paying up +4.7% through entry" ])
 
+let test_extended_is_a_weakness _ =
+  assert_that
+    (Report_shared.weaknesses
+       (_cand
+          ~reconciliation:
+            (Entry_reconciliation.Extended
+               { close = 112.3; overshoot_pct = 12.3; cap = 0.0 })
+          ()))
+    (elements_are [ equal_to "extended +12.3% past entry" ])
+
 let test_sector_not_strong_is_a_long_weakness _ =
   (* A long setup (stop below entry) whose rationale lacks "Strong sector". *)
   assert_that
@@ -120,6 +130,7 @@ let suite =
          "fallback_stop_is_a_weakness" >:: test_fallback_stop_is_a_weakness;
          "wide_risk_is_a_weakness" >:: test_wide_risk_is_a_weakness;
          "through_entry_is_a_weakness" >:: test_through_entry_is_a_weakness;
+         "extended_is_a_weakness" >:: test_extended_is_a_weakness;
          "sector_not_strong_is_a_long_weakness"
          >:: test_sector_not_strong_is_a_long_weakness;
          "short_setup_does_not_flag_sector_strength"
