@@ -130,6 +130,7 @@ type config = {
   rename_detect_match_fraction : float; [@sexp.default 0.0]  (** See [.mli]. *)
   entry_through_band_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
   entry_extension_max_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
+  enable_sim_entry_stoplimit : bool; [@sexp.default false]  (** See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -228,6 +229,7 @@ let default_config ~universe ~index_symbol =
     rename_detect_match_fraction = 0.0;
     entry_through_band_pct = 0.0;
     entry_extension_max_pct = 0.0;
+    enable_sim_entry_stoplimit = false;
   }
 
 let name = "Weinstein"

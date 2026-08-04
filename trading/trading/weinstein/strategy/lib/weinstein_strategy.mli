@@ -780,8 +780,16 @@ type config = {
           breakout entry at which an order is still issued; beyond it the ticket
           is suppressed (do-not-chase) and the row kept for watch. Default [0.0]
           = reconciliation disabled, no-op: sizing uses [entry] as before.
-          Consumed only by [Weekly_snapshot_generator.generate]. See
+          Consumed by [Weekly_snapshot_generator.generate], and (with
+          [enable_sim_entry_stoplimit]) as the simulator entry-fill cap. See
           [Weinstein_strategy_config.entry_extension_max_pct]. *)
+  enable_sim_entry_stoplimit : bool; [@sexp.default false]
+      (** Simulator entry fill model (#2158 Phase 2): when [true] AND
+          [entry_extension_max_pct > 0], backtest entries fill as
+          [StopLimit (entry, cap)] with the do-not-chase cap instead of Market
+          orders. Default [false] = bit-identical baselines; fill-model basis
+          change when armed — own WF-CV surface, never bundled. See
+          [Weinstein_strategy_config.enable_sim_entry_stoplimit]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

@@ -27,6 +27,8 @@ type dependencies = {
   active_through_for : (string -> Core.Date.t option) option;  (** See .mli. *)
   on_transitions : (Trading_strategy.Position.transition list -> unit) option;
       (** See .mli. *)
+  entry_extension_max_pct : float option;
+      (** See .mli. #2158 Phase 2 fill model. *)
 }
 
 let create_deps ~symbols ~data_dir ~strategy ~commission
@@ -37,7 +39,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(initial_long_margin_req = 1.0) ?(long_margin_rate_annual_pct = 0.0)
     ?(maintenance_long_pct = 0.0)
     ?(exempt_closing_trades_from_cash_floor = false) ?on_trade_fill
-    ?active_through_for ?on_transitions () =
+    ?active_through_for ?on_transitions ?entry_extension_max_pct () =
   let engine_config = { Trading_engine.Types.commission; slippage_bps } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
@@ -68,6 +70,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     on_trade_fill;
     active_through_for;
     on_transitions;
+    entry_extension_max_pct;
   }
 
 (* See .mli. Win #4 point-in-time pruning. *)
@@ -420,7 +423,8 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
   let%bind positions = _apply_transitions ~positions ~transitions in
   let%bind orders, order_links =
     Order_generator.transitions_to_orders ~current_date:t.current_date
-      ~positions transitions
+      ~positions ?entry_extension_max_pct:t.deps.entry_extension_max_pct
+      transitions
   in
   (* Day orders: each generation pass replaces the in-flight link set. *)
   Hashtbl.clear t.order_links;

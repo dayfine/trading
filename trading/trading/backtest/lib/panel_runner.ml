@@ -43,6 +43,17 @@ let _stale_hold_policy (config : Weinstein_strategy.config) : Stale_hold.config
     stale_exit_after_days = config.stale_exit_after_days;
   }
 
+(* Simulator entry-fill cap (#2158 Phase 2): armed only when the flag is on
+   AND the cap knob is positive — either alone is inert, so the default config
+   keeps Market fills and every existing baseline bit-identical. Units are
+   percentage points, converted to a fraction inside [Order_generator]. *)
+let _entry_cap_for_sim (config : Weinstein_strategy.config) : float option =
+  if
+    config.enable_sim_entry_stoplimit
+    && Float.(config.entry_extension_max_pct > 0.0)
+  then Some config.entry_extension_max_pct
+  else None
+
 (* Two [stop_log] recording paths, both needed (#2057): [Strategy_wrapper]
    intercepts the strategy's own [on_market_close] result (fires only on
    strategy-call days, before margin dedup); [Simulator.on_transitions]
@@ -93,6 +104,7 @@ let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
         input.config.portfolio_config.exempt_closing_trades_from_cash_floor
       ?on_trade_fill ?active_through_for
       ~on_transitions:(_on_transitions ~stop_log ~trade_audit)
+      ?entry_extension_max_pct:(_entry_cap_for_sim input.config)
       ()
   in
   let config =

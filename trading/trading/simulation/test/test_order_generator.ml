@@ -357,6 +357,96 @@ let test_mixed_transitions_filters_non_order_generating _ =
                    : order_essentials));
           ]))
 
+(* ==================== Entry StopLimit cap tests (#2158 Phase 2) ============ *)
+
+(* [entry_extension_max_pct] is in percentage points: 15.0 => cap 15% past the
+   entry, mirrored below it for shorts. *)
+
+let test_entry_cap_long_emits_stoplimit _ =
+  let transitions =
+    [
+      make_create_entering_transition ~position_id:"AAPL-1" ~symbol:"AAPL"
+        ~quantity:100.0 ~price:100.0 ();
+    ]
+  in
+  let result =
+    Result.map
+      (transitions_to_orders ~current_date:today ~positions:empty_positions
+         ~entry_extension_max_pct:25.0 transitions)
+      ~f:fst
+  in
+  assert_that result
+    (is_ok_and_holds
+       (elements_are
+          [
+            field
+              (fun o -> order_essentials o)
+              (equal_to
+                 ({
+                    symbol = "AAPL";
+                    side = Buy;
+                    order_type = StopLimit (100.0, 125.0);
+                    quantity = 100.0;
+                    time_in_force = Day;
+                  }
+                   : order_essentials));
+          ]))
+
+let test_entry_cap_short_mirrors_cap_below_entry _ =
+  let transitions =
+    [
+      make_create_entering_transition ~side:Short ~position_id:"AAPL-1"
+        ~symbol:"AAPL" ~quantity:100.0 ~price:100.0 ();
+    ]
+  in
+  let result =
+    Result.map
+      (transitions_to_orders ~current_date:today ~positions:empty_positions
+         ~entry_extension_max_pct:25.0 transitions)
+      ~f:fst
+  in
+  assert_that result
+    (is_ok_and_holds
+       (elements_are
+          [
+            field
+              (fun o -> order_essentials o)
+              (equal_to
+                 ({
+                    symbol = "AAPL";
+                    side = Sell;
+                    order_type = StopLimit (100.0, 75.0);
+                    quantity = 100.0;
+                    time_in_force = Day;
+                  }
+                   : order_essentials));
+          ]))
+
+let test_entry_cap_leaves_exit_orders_market _ =
+  (* The cap governs ENTRY fills only — an armed run still exits at Market. *)
+  let position =
+    make_exiting_position ~position_id:"AAPL-1" ~symbol:"AAPL" ~quantity:100.0
+      ~price:150.0 ~exit_price:155.0 ()
+  in
+  let positions = String.Map.singleton "AAPL-1" position in
+  let transitions =
+    [ make_trigger_exit_transition ~position_id:"AAPL-1" ~exit_price:155.0 ]
+  in
+  let result =
+    Result.map
+      (transitions_to_orders ~current_date:today ~positions
+         ~entry_extension_max_pct:15.0 transitions)
+      ~f:fst
+  in
+  assert_that result
+    (is_ok_and_holds
+       (elements_are
+          [
+            field
+              (fun o -> o.Trading_orders.Types.order_type)
+              (equal_to Trading_base.Types.Market);
+          ]))
+
 (* ==================== Short Position Tests ==================== *)
 
 let test_short_create_entering_generates_sell_order _ =
@@ -437,6 +527,13 @@ let suite =
          >:: test_multiple_create_entering_generates_multiple_orders;
          "test_mixed_transitions_filters_non_order_generating"
          >:: test_mixed_transitions_filters_non_order_generating;
+         (* Entry StopLimit cap tests (#2158 Phase 2) *)
+         "entry cap: long emits StopLimit(entry, entry*1.25)"
+         >:: test_entry_cap_long_emits_stoplimit;
+         "entry cap: short mirrors cap below entry"
+         >:: test_entry_cap_short_mirrors_cap_below_entry;
+         "entry cap: exit orders stay Market"
+         >:: test_entry_cap_leaves_exit_orders_market;
          (* Short position tests *)
          "test_short_create_entering_generates_sell_order"
          >:: test_short_create_entering_generates_sell_order;
