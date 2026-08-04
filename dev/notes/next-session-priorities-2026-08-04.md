@@ -53,12 +53,49 @@ changes displayed stops for split-in-window names only).
 - `Extended`-branch unit case in test_report_shared.ml (qc-behavioral
   non-blocking nit on #2189).
 
-## Remaining open issues (8)
+## Remaining open issues (6) — the full backlog queue, with blockers (2026-08-04 late addendum)
 
-#2158 (Phase 2 simulator fill model — gated experiment, never bundle),
-#2083 (in flight), #2076 (margin exit-reason rendering), #2006 (tax lens),
-#1729 (broad golden complete data — data-gated), #1672 (window migration),
-#1572 (budget orphan — workflow-token-blocked), #1563 (short proceeds lock).
+Late-session updates: #2083 CLOSED (detector was already built in #2100; the
+real remainder — arming dry-run + live arming — done, #2191: 0 false
+positives over the full universe, candidates bit-identical). #1563 CLOSED
+(margin work covers it — Portfolio_margin strict-broker collateral lock,
+M4-verified; convention recorded: short-arm scenarios run margin-on). Also
+shipped: **07-31 v2 record** (`3e10a92c7/`, #2192) — picks bit-identical,
+artifact enriched with the #2189 columns + armed rename detection.
+
+All six remaining issues, blocker-triaged (session task list mirrored here
+since that list dies with the session):
+
+1. **#1672 window migration 1998-2026** — effectively UNBLOCKED; one pinned
+   spec (`exit-timing-surface-deep-2000-2026.sexp`) → 1998 start + rename +
+   as-of-1998 universe + fresh-run band re-pin (snapshot mode; use the
+   current split-safe warehouse basis). One local re-pin session. Cheapest
+   first bite.
+2. **#1572 budget orphans** — LOCALLY unblocked (the workflow-token label
+   only blocks GHA-side agents; #2172 proved local workflow pushes work).
+   Fix = orchestrator no-op path lands the budget record (tiny auto-merge PR
+   or fold into next summary). FIRST verify the orphan path still exists
+   post-#2180 (the non-empty-queue precondition may have shrunk it to
+   genuinely-empty-queue runs). Spec detail: A-NOOP-BUDGET-ORPHAN in
+   dev/status/orchestrator-automation.md.
+3. **#2006 after-tax lens Phase 1** — no hard blocker; pure post-run exe
+   (mtm_flat 0.35 must reproduce $18.8M/$21.8M on the Run D dir).
+   PRE-FLIGHT: confirm `dev/backtest/scenarios-2026-07-13-194522/…ALLARMED`
+   still on disk; else re-derive acceptance from a fresh record run.
+   Comparator = after-tax SPY-TR.
+4. **#2076 margin exit audit** — DESIGN first: Margin_runner fires outside
+   the strategy/audit path; options = thread an observer hook through
+   Simulator.dependencies (mirror #2074) vs unenriched margin-exit records.
+   Only matters for margin-armed runs.
+5. **#2158 Phase 2 simulator StopLimit fill** — user-set P1 (2026-08-04):
+   gated experiment, default-off, own WF-CV surface, NEVER bundle; fill-model
+   basis change shifts every golden. Needs explicit user go on compute.
+6. **#1729 complete-data broad goldens** — HEAVIEST. Memory-crash blocker
+   RESOLVED (snapshot-format-v2; issue comment updated 08-04). Remaining:
+   CI-provision the 3,017-sym warehouse (GHA cache/artifact) + wire
+   --snapshot-dir into perf-tier3/4 broad cells + re-pin all broad/custom
+   cells ON THE SPLIT-SAFE BASIS (post-#2145/#2153) or they move again.
+   Plan: dev/plans/broad-golden-complete-data-2026-06-24.md.
 
 ## Ops lessons this arc (recurring — internalize)
 
