@@ -1052,6 +1052,39 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 23 — H-AUDIT-MODE-0600: a record written via the atomic
+# temp-file+rename path (H-AUDIT-ATOMIC-WRITE) must end up mode 0644, matching
+# every record written before that fix. Without the `chmod 644 "$TMP_FILE"`
+# guard, `mktemp` creates the temp file 0600 (by design, ignoring umask) and
+# `mv` preserves that mode across the rename, so $OUTPUT_FILE would silently
+# regress to 0600 -- unreadable by any user other than the one that wrote it.
+#
+# Portable octal-mode read: GNU `stat -c '%a'` vs BSD/macOS `stat -f '%Lp'`.
+# ---------------------------------------------------------------------------
+_file_mode_octal() {
+  stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1" 2>/dev/null
+}
+
+FEATURE23="audit-mode-0644"
+
+# Force a restrictive umask for this call so a passing result can't be a
+# coincidence of the ambient umask already being permissive enough to
+# produce 644 by default -- the assertion must depend on the chmod, not on
+# the umask the test happens to run under.
+out23=$(REPO_ROOT="${TMP_REPO}" bash -c 'umask 077 && exec "$0" "$@"' "${WRITE_AUDIT}" \
+  --date 2026-08-04 --feature "${FEATURE23}" --branch "harness/audit-mode" \
+  --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1) && rc23=0 || rc23=$?
+JSON23="${TMP_REPO}/dev/audit/2026-08-04-harness-audit-mode-${FEATURE23}.json"
+mode23="$(_file_mode_octal "${JSON23}" 2>/dev/null || echo 'UNKNOWN')"
+
+if (( rc23 == 0 )) && [[ -f "${JSON23}" ]] && [[ "${mode23}" == "644" ]]; then
+  pass "scenario 23 — audit record written mode 0644 (not 0600) even under a restrictive ambient umask (H-AUDIT-MODE-0600)"
+else
+  fail "scenario 23 — expected rc=0, record at ${JSON23} mode 644; got rc=${rc23}, mode=${mode23}"
+  echo "${out23}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""

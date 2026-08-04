@@ -441,6 +441,18 @@ if [ -n "${WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME:-}" ]; then
   exit 1
 fi
 
+# `mktemp` deliberately creates $TMP_FILE mode 0600 regardless of umask (a
+# security property of mktemp itself, not a bug) and `mv` within the same
+# directory preserves the source file's mode across the rename -- so without
+# this chmod, every record written by this script since H-AUDIT-ATOMIC-WRITE
+# lands as 0600 where every record before it (written via the old
+# `cat > "$OUTPUT_FILE"` shape, subject to normal umask) was 0644
+# (H-AUDIT-MODE-0600, dev/status/harness.md). This is fixed by chmod'ing the
+# TMP_FILE before the rename rather than $OUTPUT_FILE after it: that way the
+# file has its final, correct mode from the instant it becomes visible at
+# $OUTPUT_FILE, with no window where a reader could observe the wrong mode.
+chmod 644 "$TMP_FILE"
+
 mv -f "$TMP_FILE" "$OUTPUT_FILE"
 
 echo "OK: wrote $OUTPUT_FILE (consecutive_rework_count=$CONSECUTIVE)"
