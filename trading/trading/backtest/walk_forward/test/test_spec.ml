@@ -271,6 +271,32 @@ let test_exit_timing_deep_gate_n_matches_generated_fold_count _ =
   let generated = List.length (WS.generate spec.window_spec) in
   assert_that generated (all_of [ equal_to 55; equal_to spec.gate.n ])
 
+(* ---------- Sim-entry-stoplimit 31-fold fixture (#2158 WF-CV) ---------- *)
+
+let _stoplimit_fixture = "sim_entry_stoplimit_31fold_2026_08_04.sexp"
+
+let test_stoplimit_spec_parses_with_four_variants _ =
+  let spec = Spec.load (_fixture_path _stoplimit_fixture) in
+  assert_that spec
+    (all_of
+       [
+         field
+           (fun (s : Spec.t) -> s.base_scenario)
+           (equal_to "goldens-sp500-historical/sp500-2010-2026.sexp");
+         field (fun (s : Spec.t) -> s.baseline_label) (equal_to "market");
+         field
+           (fun (s : Spec.t) ->
+             List.map s.variants
+               ~f:(fun (v : Walk_forward.Walk_forward_runner.variant) ->
+                 v.label))
+           (equal_to [ "market"; "cap10"; "cap15"; "cap20" ]);
+       ])
+
+let test_stoplimit_gate_n_matches_generated_fold_count _ =
+  let spec = Spec.load (_fixture_path _stoplimit_fixture) in
+  let generated = List.length (WS.generate spec.window_spec) in
+  assert_that generated (all_of [ equal_to 31; equal_to spec.gate.n ])
+
 (* ---------- axes -> variants expansion on load (plan Gap A) ---------- *)
 
 (* Write [contents] to a fresh temp file and return its path. The spec [load]
@@ -409,6 +435,10 @@ let suite =
          >:: test_exit_timing_deep_window_spans_1998_to_2026;
          "exit-timing deep gate.n matches generated fold count (55)"
          >:: test_exit_timing_deep_gate_n_matches_generated_fold_count;
+         "sim-entry-stoplimit spec parses with four variants"
+         >:: test_stoplimit_spec_parses_with_four_variants;
+         "sim-entry-stoplimit gate.n matches generated fold count (31)"
+         >:: test_stoplimit_gate_n_matches_generated_fold_count;
          "axes-only expands with auto-baseline"
          >:: test_axes_only_expands_with_baseline;
          "explicit variants + axes concatenate"
