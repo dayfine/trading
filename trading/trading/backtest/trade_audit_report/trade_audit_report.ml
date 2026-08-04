@@ -120,8 +120,18 @@ let _row_of_trade audit_idx (trade : Trading_simulation.Metrics.trade_metrics) :
   let side =
     Option.value_map entry ~default:Trading_base.Types.Long ~f:(fun e -> e.side)
   in
+  (* Enriched exit wins; otherwise fall back to the reason-only
+     [external_exit] captured for exits generated outside the strategy's
+     audit stream (margin_call, stage3_force_exit, ...) — see
+     Trade_audit.external_exit_decision (#2076). *)
   let exit_trigger =
-    match exit_ with Some e -> _exit_trigger_label e.exit_trigger | None -> ""
+    match exit_ with
+    | Some e -> _exit_trigger_label e.exit_trigger
+    | None ->
+        Option.bind audit ~f:(fun (r : TA.audit_record) -> r.external_exit)
+        |> Option.value_map ~default:""
+             ~f:(fun (x : TA.external_exit_decision) ->
+               _exit_trigger_label x.exit_trigger)
   in
   {
     symbol = trade.symbol;
