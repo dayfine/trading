@@ -8,6 +8,15 @@ as-of date; consumed by `trace_picks` / `diff_picks` / `render_weekly_report`.
 
 ## Superseded records
 
+- **2026-07-31: use `3e10a92c7/` (v2, enriched reporting).** Regenerated on
+  the #2189/#2191 main with the same inputs as `c028ee864/` (v1, the original
+  08-02 run). **Picks, tickets, sizing, and classes bit-identical** (symbol
+  set diffed clean); the artifact gains the 2026-08-02 user-requested columns
+  — Sector, Score breakdown (scorer's own `(label, points)` decomposition),
+  per-candidate Weakness line — plus HTML hover explainers, the
+  eligible-beyond-cap note, and armed rename detection (0 detections, as the
+  arming dry-run predicted). `validation.txt`: 0 errors / same single FBRX
+  `split_in_window` warning as v1.
 - **2026-07-24: use `790d23a06/` (v4, split-safe grading).** Regenerated
   after the #2145 split-safe resistance basis + the weekly-review warehouse
   rebuild (adjusted-basis side-tables, format hash `128e4c1e…`). **The only
