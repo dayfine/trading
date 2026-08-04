@@ -278,6 +278,93 @@ let test_row_has_none_audit_fields_when_unmatched _ =
            ];
        ])
 
+(* --- External (reason-only) exit fallback (#2076) ----------------------- *)
+
+let make_external_exit ?(symbol = "AAPL") ?(exit_date = _date "2024-04-20")
+    ?(position_id = "AAPL-wein-1") ?(label = "margin_call") () :
+    TA.external_exit_decision =
+  {
+    symbol;
+    exit_date;
+    position_id;
+    exit_trigger = Backtest.Stop_log.Strategy_signal { label; detail = None };
+  }
+
+let test_row_falls_back_to_external_exit_trigger _ =
+  let trade = make_trade ~symbol:"AAPL" ~entry_date:(_date "2024-01-15") () in
+  let entry = make_entry_decision () in
+  let record : TA.audit_record =
+    { entry; exit_ = None; external_exit = Some (make_external_exit ()) }
+  in
+  let report = TAR.render ~trade_audit:[ record ] ~trades:[ trade ] () in
+  assert_that report.rows
+    (elements_are
+       [
+         field
+           (fun (r : TAR.per_trade_row) -> r.exit_trigger)
+           (equal_to "margin_call");
+       ])
+
+let test_row_prefers_enriched_exit_over_external _ =
+  let trade = make_trade ~symbol:"AAPL" ~entry_date:(_date "2024-01-15") () in
+  let entry = make_entry_decision () in
+  let record : TA.audit_record =
+    {
+      entry;
+      exit_ = Some (make_exit_decision ());
+      external_exit = Some (make_external_exit ());
+    }
+  in
+  let report = TAR.render ~trade_audit:[ record ] ~trades:[ trade ] () in
+  assert_that report.rows
+    (elements_are
+       [
+         field
+           (fun (r : TAR.per_trade_row) -> r.exit_trigger)
+           (equal_to "stop_loss");
+       ])
+
+let test_row_empty_trigger_when_no_exit_and_no_external _ =
+  let trade = make_trade ~symbol:"AAPL" ~entry_date:(_date "2024-01-15") () in
+  let entry = make_entry_decision () in
+  let record : TA.audit_record =
+    { entry; exit_ = None; external_exit = None }
+  in
+  let report = TAR.render ~trade_audit:[ record ] ~trades:[ trade ] () in
+  assert_that report.rows
+    (elements_are
+       [ field (fun (r : TAR.per_trade_row) -> r.exit_trigger) (equal_to "") ])
+
+let test_row_external_exit_generic_label _ =
+  let trade = make_trade ~symbol:"AAPL" ~entry_date:(_date "2024-01-15") () in
+  let entry = make_entry_decision () in
+  let record : TA.audit_record =
+    {
+      entry;
+      exit_ = None;
+      external_exit = Some (make_external_exit ~label:"stage3_force_exit" ());
+    }
+  in
+  let report = TAR.render ~trade_audit:[ record ] ~trades:[ trade ] () in
+  assert_that report.rows
+    (elements_are
+       [
+         field
+           (fun (r : TAR.per_trade_row) -> r.exit_trigger)
+           (equal_to "stage3_force_exit");
+       ])
+
+let test_markdown_renders_external_exit_trigger _ =
+  let trade = make_trade ~symbol:"AAPL" ~entry_date:(_date "2024-01-15") () in
+  let entry = make_entry_decision () in
+  let record : TA.audit_record =
+    { entry; exit_ = None; external_exit = Some (make_external_exit ()) }
+  in
+  let report = TAR.render ~trade_audit:[ record ] ~trades:[ trade ] () in
+  assert_that
+    (String.is_substring (TAR.to_markdown report) ~substring:"margin_call")
+    (equal_to true)
+
 let test_rows_sorted_by_entry_date _ =
   let trades =
     [
@@ -845,6 +932,16 @@ let suite =
          >:: test_row_has_audit_fields_when_matched;
          "row has none audit fields when unmatched"
          >:: test_row_has_none_audit_fields_when_unmatched;
+         "row falls back to external exit trigger"
+         >:: test_row_falls_back_to_external_exit_trigger;
+         "row prefers enriched exit over external"
+         >:: test_row_prefers_enriched_exit_over_external;
+         "row empty trigger when no exit and no external"
+         >:: test_row_empty_trigger_when_no_exit_and_no_external;
+         "row external exit generic label (stage3_force_exit)"
+         >:: test_row_external_exit_generic_label;
+         "markdown renders external exit trigger"
+         >:: test_markdown_renders_external_exit_trigger;
          "rows sorted by entry_date" >:: test_rows_sorted_by_entry_date;
          "to_markdown pinned three-trade fixture"
          >:: test_to_markdown_pinned_three_trade_fixture;
