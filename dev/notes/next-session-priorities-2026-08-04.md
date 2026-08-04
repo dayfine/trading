@@ -97,6 +97,40 @@ since that list dies with the session):
    cells ON THE SPLIT-SAFE BASIS (post-#2145/#2153) or they move again.
    Plan: dev/plans/broad-golden-complete-data-2026-06-24.md.
 
+## Late-late addendum (2026-08-04 PM session) — queue is now ONE issue
+
+The 08-04 PM session closed 5 of the 6 queue items above; **only #1729
+remains** (plus the P0 Friday run + the P1 margin-grid user call):
+
+1. **#1672 window migration — DONE** (#2194; old base `sp500-2000-2026.sexp`
+   had never existed in-tree, retargeted to `sp500-1998-2026.sexp`, gate
+   n 51→55 m 26→28, fold count test-pinned).
+2. **#1572 budget orphans — DONE** (#2195; fallback path now opens +
+   auto-merges an `ops/budget-*` PR via shared `merge_pr_when_clean`;
+   4 dead orphan branches deleted; verify on the next empty-queue no-op run).
+3. **#2006 after-tax lens — WAS ALREADY SHIPPED 07-24** (#2066 + #2073,
+   `trading/trading/backtest/tax_lens/`): Phase 1 exe with acceptance
+   reproduced EXACTLY (Run D $26.84M / $18.81M / $21.80M; m4p-baseline
+   $31.18M corrected reference). This doc's item-3 brief was stale — the
+   named pre-flight (Run-D dir on disk) was a decoy; the deliverable itself
+   existed. Remaining scope: Phase 2 in-sim April outflows (user-gated) +
+   optional wash-sale. 4th stale-brief instance; rule: pre-flight the
+   deliverable's existence FIRST (`ls`/`gh pr list --search`), the blocker
+   second.
+4. **#2076 margin exit audit — DONE** (#2196 report-layer fallback; capture
+   half was already in #2085 — also a stale brief).
+5. **#2158 StopLimit fill — Phase 2 BUILT + MERGED** (#2202,
+   `enable_sim_entry_stoplimit` default-off, armed only with
+   `entry_extension_max_pct > 0`; QC 5/5 + 4/5). The WF-CV surface run is
+   the remaining gated step (user compute go); qc-behavioral pinned one
+   must-add test for the arming PR (flag=false + pct=15 stays Market).
+6. **#1729 complete-data broad goldens** — unchanged, still the heaviest:
+   CI-provision the 3,017-sym warehouse + wire `--snapshot-dir` into
+   perf-tier3/4 + re-pin broad/custom cells on the split-safe basis.
+
+Also this session: test_report_shared `Extended` pin (#2197, closes the
+#2189 QC nit — P1 item done), status reconcile (#2198), docs (#2193).
+
 ## Ops lessons this arc (recurring — internalize)
 
 - **Lint gauntlet**: 4 of 5 code PRs went CI-red on nesting/fn-length/
