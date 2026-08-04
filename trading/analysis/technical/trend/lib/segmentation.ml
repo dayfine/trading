@@ -19,6 +19,12 @@ type segmentation_params = {
       (** Additional tolerance for R-squared threshold *)
   max_width_penalty : float;
       (** Maximum allowed width penalty before splitting *)
+  trend_bonus_weight : float;
+      (** Weight applied to the trend-change bonus when scoring a candidate
+          split point. *)
+  penalty_weight : float;
+      (** Weight applied to each side's combined length/width penalty when
+          scoring a candidate split point. *)
 }
 [@@deriving show, eq]
 
@@ -46,6 +52,8 @@ let default_params =
     width_penalty_factor = 0.5;
     r_squared_tolerance = 0.1;
     max_width_penalty = 0.3;
+    trend_bonus_weight = 0.5;
+    penalty_weight = 0.2;
   }
 
 (* Internal module for calculating various penalties used in the segmentation
@@ -225,13 +233,11 @@ let evaluate_split_point ~start_idx ~end_idx ~split_idx ~data_array ~params =
       left_stats.slope right_stats.slope
   in
 
-  (* TODO(screener/segmentation-weights): move score weights into params for
-     tuning — trend_bonus_weight (0.5) and penalty_weight (0.2) are
-     hardcoded. *)
   let score =
     weighted_r2
-    +. (trend_change_bonus *. 0.5)
-    -. (left_penalty *. 0.2) -. (right_penalty *. 0.2)
+    +. (trend_change_bonus *. params.trend_bonus_weight)
+    -. (left_penalty *. params.penalty_weight)
+    -. (right_penalty *. params.penalty_weight)
   in
 
   (score, left_stats, right_stats)
