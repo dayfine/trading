@@ -327,4 +327,24 @@
  ((config_hash leverf-band-weights-on-bundle)
   (base_scenario "top3000 record convention on v5thin side-table warehouse + sp500 catstop (w15) on v4")
   (window_id leverf-broad-13x2y-2000-2026+sp500-26x1y)
-  (verdict Reject) (entry_slug leverf-age-band-surface)))
+  (verdict Reject) (entry_slug leverf-age-band-surface))
+ ((config_hash e79b8f802399c30e3e163a07d142aeea)
+  (base_scenario
+   "sp500-2010-2026 CSV panel, 31 rolling folds 365x182, pinned worktree @ba3ec93c")
+  (window_id rolling-sp500-2010-2026-31fold-365x182)
+  (verdict Reject) (entry_slug sim-entry-stoplimit-surface))
+ ((config_hash a6c26f57ed1f7a0e10f58cd8fadf642c)
+  (base_scenario
+   "sp500-2010-2026 CSV panel, 31 rolling folds 365x182, pinned worktree @ba3ec93c")
+  (window_id rolling-sp500-2010-2026-31fold-365x182)
+  (verdict Reject) (entry_slug sim-entry-stoplimit-surface))
+ ((config_hash 667e5c5ad0cf637acb82d2a9ba155696)
+  (base_scenario
+   "sp500-2010-2026 CSV panel, 31 rolling folds 365x182, pinned worktree @ba3ec93c")
+  (window_id rolling-sp500-2010-2026-31fold-365x182)
+  (verdict Reject) (entry_slug sim-entry-stoplimit-surface))
+ ((config_hash 0d5d1865ebee71290f56e4edc81e3707)
+  (base_scenario
+   "sp500-2010-2026 CSV panel, 31 rolling folds 365x182, pinned worktree @ba3ec93c")
+  (window_id rolling-sp500-2010-2026-31fold-365x182)
+  (verdict Reject) (entry_slug sim-entry-stoplimit-surface)))
