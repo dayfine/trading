@@ -1186,11 +1186,38 @@ type config = {
           candidate carries [Entry_reconciliation.Not_reconciled], sizing uses
           [entry] exactly as before, and the reports render unchanged. [15.0]
           (fifteen percentage points) is the armed value from the issue.
-          Consumed only by [Weekly_snapshot_generator.generate] — the
-          backtest/live strategy path ([on_market_close]) never reads this
-          field, so arming it cannot move a backtest number. R2: real config
-          field → resolves through [Backtest.Overlay_validator.apply_overrides],
-          armed via [dev/weekly-picks/live-config-overrides.sexp]. *)
+          Consumed by [Weekly_snapshot_generator.generate] (report/live-ticket
+          path), and — only when [enable_sim_entry_stoplimit] is also on — by
+          the backtest runner as the simulator's entry-fill cap; with that flag
+          at its default [false], arming this field alone cannot move a
+          backtest number. R2: real config field → resolves through
+          [Backtest.Overlay_validator.apply_overrides], armed via
+          [dev/weekly-picks/live-config-overrides.sexp]. *)
+  enable_sim_entry_stoplimit : bool; [@sexp.default false]
+      (** Simulator entry fill model (#2158 Phase 2) — when [true] AND
+          [entry_extension_max_pct > 0], the backtest runner threads the cap
+          into the simulator so entries fill as
+          [StopLimit (entry, entry * (1 +/- entry_extension_max_pct/100))]
+          (long/short mirrored) instead of Market orders: the order triggers at
+          the breakout entry and refuses fills beyond the do-not-chase cap, so a
+          gap past the cap is a no-fill and the candidate is re-evaluated at the
+          next strategy call. This aligns the simulator with the live
+          [Weinstein_order_gen] StopLimit(E, cap) tickets and the report's
+          [Entry_reconciliation] semantics (#2158's "one cap, three layers";
+          Phase 1 = #2171 covered live + report).
+
+          {b Default [false] = Market fills, bit-identical to every existing
+             baseline/golden} (R1). This is a fill-model basis change when
+          armed: route it through its own WF-CV surface and deliberate golden
+          re-pins before any default flip — NEVER bundle it with another
+          mechanism (user directive 2026-08-04, issue #2158). R2: real config
+          field → axis-expressible as
+          [((flag enable_sim_entry_stoplimit) (values (true false)))] via
+          [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides].
+          Weinstein authority: the book locates the buy at the breakout or a
+          pullback close to it — far above the breakout there is no buy point,
+          so an unfilled order (missing > chasing) is the faithful failure mode.
+      *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
