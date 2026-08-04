@@ -116,6 +116,18 @@ type dependencies = {
           transitions, generated after the strategy's own [on_market_close] call
           returns, were invisible to any transition observer wired only at the
           strategy-call boundary. See issue #2057. *)
+  entry_extension_max_pct : float option;
+      (** Entry fill model (#2158 Phase 2). [None] (the default) keeps the
+          historical Market-order entry fills — every existing baseline is
+          bit-identical. [Some pct] (percentage points) makes {!Order_generator}
+          emit [StopLimit (entry, entry * (1 +/- pct/100))] for entries
+          (long/short mirrored): the order triggers at the breakout entry and
+          refuses fills beyond the do-not-chase cap, so a gap past the cap is a
+          no-fill and the candidate is re-evaluated at the next strategy call.
+          The backtest runner arms this from the strategy config
+          ([enable_sim_entry_stoplimit] + [entry_extension_max_pct]); it is a
+          fill-model basis change, so any default flip routes through WF-CV +
+          deliberate golden re-pins per experiment-flag discipline. *)
 }
 
 val create_deps :
@@ -137,6 +149,7 @@ val create_deps :
   ?on_trade_fill:(Trading_base.Types.trade -> Trading_base.Types.trade) ->
   ?active_through_for:(string -> Core.Date.t option) ->
   ?on_transitions:(Trading_strategy.Position.transition list -> unit) ->
+  ?entry_extension_max_pct:float ->
   unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and
