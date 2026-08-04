@@ -24,6 +24,7 @@ type candidate = {
   data_suspect : bool; [@sexp.default false]
   reconciliation : Entry_reconciliation.t;
       [@sexp.default Entry_reconciliation.Not_reconciled]
+  score_components : (string * int) list; [@sexp.default []]
 }
 [@@deriving sexp, eq, show]
 

@@ -57,20 +57,33 @@ let _resistance_cell : string option -> string = function
    in a column named "Risk %". For a candidate carrying no cap (disarmed default
    / pre-#2158 snapshot) the basis falls back to the expected fill, so this is
    identical to the previous behaviour there. *)
+(* A dash placeholder so a column is never blank: the sector name (absent when
+   the screener recorded none), the score breakdown (pre-field snapshots), the
+   weakness line (a setup with no weak links). *)
+let _cell = function "" -> "-" | s -> s
+let _opt_cell = function None -> "-" | Some s -> s
+
 let _candidate_row ~rank (c : Weekly_snapshot.candidate) =
   let risk =
     Report_shared.risk_pct
       ~entry:(Weekly_snapshot.sizing_basis_price c)
       ~stop:c.stop
   in
+  (* Sector / Score breakdown / Weakness are appended AFTER Instruction rather
+     than interleaved: the order is the widest cell, so the identity + price +
+     order columns stay leftmost and scannable, and the advisory columns trail. *)
   Printf.sprintf
-    "| %d | %s | %s | %.2f | $%.2f | %s | %s | %.1f%% | %s | %s | %s |" rank
-    (_symbol_cell c) c.grade c.score c.entry
+    "| %d | %s | %s | %.2f | $%.2f | %s | %s | %.1f%% | %s | %s | %s | %s | %s \
+     | %s |"
+    rank (_symbol_cell c) c.grade c.score c.entry
     (Report_shared.close_vs_entry c)
     (_stop_cell c) risk
     (_resistance_cell c.resistance_grade)
     c.rationale
     (Report_shared.instruction c)
+    (_cell c.sector)
+    (_opt_cell (Report_shared.score_breakdown c))
+    (_opt_cell (Report_shared.weakness_line c))
 
 let _append_note table = function
   | None -> table
@@ -113,6 +126,9 @@ let _candidate_columns =
     "Resistance";
     "Rationale";
     "Instruction";
+    "Sector";
+    "Score breakdown";
+    "Weakness";
   ]
 
 let _candidate_rows shown =

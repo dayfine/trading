@@ -26,10 +26,19 @@ type t = {
           degrades to the plain appearance rather than disappearing. That is
           deliberate: screener vocabulary evolves, and a chip vanishing from the
           report would be a silent loss of information. *)
+  title : string option;
+      (** Optional native [title] hover explainer. [Some text] renders a
+          [title="…"] attribute (escaped) — a browser-standard tooltip that
+          needs no CSS or JS, so it survives the report's strict standalone CSP.
+          [None] renders no attribute. Used to attach the shared
+          {!Report_shared} explainer sentences to the terse marker chips
+          (fallback stop, data-suspect, reconciliation, resistance grade)
+          without spelling them out on the card face. *)
 }
 
-val make : ?modifier:string -> string -> t
-(** [make ?modifier text] is the chip stating [text]. *)
+val make : ?modifier:string -> ?title:string -> string -> t
+(** [make ?modifier ?title text] is the chip stating [text], optionally
+    CSS-variant-tagged and carrying a hover explainer. *)
 
 val render : t -> string
 (** [render chip] is the [<span class="chip …">…</span>] element, with [text]

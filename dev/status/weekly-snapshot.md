@@ -5,6 +5,30 @@
 ## Status
 IN_PROGRESS
 
+**2026-08-03 (report improvements — user request, branch `feat/report-improvements`, PR #2189):**
+four reader-facing report improvements, presentation + snapshot-field only
+(no screener/strategy decision-logic change — surfaces what the cascade already
+knows). (1) **Sector column** — rendered from the existing
+`Weekly_snapshot.candidate.sector` (no schema change): md column + HTML
+`sectorname` chip. (2) **Score breakdown** — new pure accessors
+`Screener.long_score_components` / `short_score_components` surface the
+per-signal `(label, points)` the scoring already sums (`score_long`/`score_short`
+kept bit-identical via a shared `_long_signals`/`_short_signals` helper);
+carried on `Weekly_snapshot.candidate.score_components : (string * int) list
+[@sexp.default []]`; rendered `"70 = 30 + 20 + 20"` (md col + HTML chip) with the
+labelled detail as the chip hover. (3) **Per-candidate weakness line** — pure
+`Report_shared.weakness_line` derived from the row (adequate-not-strong volume,
+fallback stop, wide risk %, paying-up/extended, long-only sector-not-strong);
+md col + HTML `weak` chip, one function so the two formats can't drift. (4)
+**HTML hover explainers** — native `title=` tooltips (CSP-safe) on the
+fallback-stop / data-suspect / reconciliation / resistance chips, reusing the
+single-sourced `Report_shared` explainer strings (added `resistance_grade_explainer`);
+`Chip.make` gains `?title`. Plus the QC follow-up test: generator-level
+`long_eligible_beyond_cap > 0` when the buy cap cuts eligible names. Back-compat:
+`score_components` additive-defaulted, committed fixtures + cross-artifact
+identity test stay green (instruction strings unchanged). HTML body golden
+regenerated. `report_shared.ml` / `screener_scoring.ml` trimmed to <=300 lines.
+
 **2026-08-03 (#2122 slices b/c/d, branch `feat/picks-slices-bcd`):** closes
 issue #2122. (b) `test_report_cross_artifact.ml` pins per-candidate
 instruction-string identity between the Markdown and HTML renderers across

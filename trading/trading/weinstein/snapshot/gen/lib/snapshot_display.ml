@@ -37,11 +37,27 @@ let regime_label : Weinstein_types.market_trend -> string = function
 let macro_context (macro : Macro.result) : Weekly_snapshot.macro_context =
   { regime = regime_label macro.trend; score = macro.confidence }
 
+(* Per-signal (label, points) decomposition of the candidate's total score,
+   read straight from the screener's own scoring (never re-derived here), so the
+   labels equal [c.rationale] and the points sum to [c.score]. Long and short
+   candidates route to their respective scoring path. *)
+let _score_components ~weights ~early_stage2_max_weeks
+    (c : Screener.scored_candidate) : (string * int) list =
+  match c.side with
+  | Trading_base.Types.Long ->
+      Screener.long_score_components ~early_stage2_max_weeks ~weights
+        ~sector:c.sector c.analysis
+  | Trading_base.Types.Short ->
+      Screener.short_score_components ~weights ~sector:c.sector c.analysis
+
 (* Map one screener candidate to the decoupled snapshot shape. The snapshot
    schema is independent of [scored_candidate] (see weekly_snapshot.mli
-   §Design), so this is a deliberate field-by-field copy. *)
-let candidate_of_scored (c : Screener.scored_candidate) :
-    Weekly_snapshot.candidate =
+   §Design), so this is a deliberate field-by-field copy. [weights] /
+   [early_stage2_max_weeks] are the screener scoring params, threaded only to
+   recover the score decomposition ([score_components]) — the same scoring the
+   cascade already ran, surfaced for display. *)
+let candidate_of_scored ~weights ~early_stage2_max_weeks
+    (c : Screener.scored_candidate) : Weekly_snapshot.candidate =
   {
     symbol = c.ticker;
     score = Float.of_int c.score;
@@ -77,4 +93,5 @@ let candidate_of_scored (c : Screener.scored_candidate) :
        pre-#2103 behaviour (sizing and ticket anchored to [entry]) rather than a
        fabricated claim about where this candidate would fill. *)
     reconciliation = Entry_reconciliation.Not_reconciled;
+    score_components = _score_components ~weights ~early_stage2_max_weeks c;
   }

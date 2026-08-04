@@ -57,6 +57,7 @@ let _candidate ~symbol ~score ~reconciliation ~sized_shares ~sizing_note :
     stop_is_structural = true;
     data_suspect = false;
     reconciliation;
+    score_components = [];
   }
 
 (* Every reconciliation class that produces a distinct ticket verb, plus the

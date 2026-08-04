@@ -36,6 +36,7 @@ let _candidate ?(entry = 100.0) ?(stop = 92.0) ?(rationale = "Stage2 breakout")
     stop_is_structural = false;
     data_suspect = false;
     reconciliation = Weinstein_snapshot.Entry_reconciliation.Not_reconciled;
+    score_components = [];
   }
 
 (** A minimal snapshot: only the fields the adapter reads carry test data; the
