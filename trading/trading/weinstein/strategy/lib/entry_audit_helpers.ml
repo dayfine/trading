@@ -51,9 +51,11 @@ let effective_entry_price ?(trigger_at_suggested = false) ~bar_reader
     | Some bar -> bar.Types.Daily_price.close_price
 
 (** Compute the support-floor-aware initial stop for [cand] entering at
-    [effective_entry], plus the [stop_floor_kind] tag for audit. Mirrors the
-    logic in [entry_audit_capture.classify_stop_floor_kind] for the floor-kind
-    tag — both key off [Support_floor.find_recent_level_with_callbacks].
+    [effective_entry], plus the [stop_floor_kind] tag for audit. The tag comes
+    from [Weinstein_stops.floor_is_structural_with_callbacks] — the same
+    internal scan the stop computation runs, so the tag cannot disagree with the
+    installed level under any [support_floor_anchor_mode] / [split_safe_floors]
+    combination (the #2167 class of bug).
 
     [?min_stop_distance_pct] is an optional floor on the placed stop's distance
     from [effective_entry]: when [Some pct], the resulting [stop_state] is
@@ -82,14 +84,11 @@ let initial_stop_and_kind ?(min_stop_distance_pct = 0.0) ~stops_config
       ~min_distance_pct:min_stop_distance_pct raw_stop
   in
   let stop_floor_kind : Audit_recorder.stop_floor_kind =
-    match
-      Weinstein_stops.Support_floor.find_recent_level_with_callbacks
-        ~anchor_mode:stops_config.Weinstein_stops.support_floor_anchor_mode
-        ~callbacks ~side:cand.side
-        ~min_pullback_pct:stops_config.Weinstein_stops.min_correction_pct ()
-    with
-    | Some _ -> Support_floor
-    | None -> Buffer_fallback
+    if
+      Weinstein_stops.floor_is_structural_with_callbacks ~config:stops_config
+        ~side:cand.side ~callbacks
+    then Support_floor
+    else Buffer_fallback
   in
   (initial_stop, stop_floor_kind)
 

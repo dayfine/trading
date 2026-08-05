@@ -15,7 +15,8 @@ type weekly_view = {
 type daily_view = {
   highs : float array;
   lows : float array;
-  closes : float array;
+  raw_closes : float array;
+  adjusted_closes : float array;
   dates : Date.t array;
   n_days : int;
 }

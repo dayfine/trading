@@ -54,10 +54,33 @@ type weekly_view = {
 
 type daily_view = {
   highs : float array;
-      (** Daily high prices, oldest at index 0, newest at index [n_days - 1]. *)
-  lows : float array;  (** Daily low prices, same indexing as [highs]. *)
-  closes : float array;  (** Daily adjusted closes, same indexing. *)
+      (** Raw (un-adjusted) daily high prices, oldest at index 0, newest at
+          index [n_days - 1]. *)
+  lows : float array;
+      (** Raw (un-adjusted) daily low prices, same indexing as [highs]. *)
+  raw_closes : float array;
+      (** Raw (un-adjusted) daily close prices, same indexing. Renamed from
+          [closes] on 2026-08-05: the field has always carried the raw
+          [Snapshot_schema.Close] value, but was documented as "adjusted", so
+          the name is now explicit. Consumers that scan raw highs / lows (the
+          support-floor primitive) want this one — it is on the same scale as
+          [highs] / [lows]. *)
+  adjusted_closes : float array;
+      (** Split- and dividend-adjusted daily close prices, same indexing. Used
+          together with [raw_closes] to compute per-bar split-adjustment factors
+          ([adjusted_closes.(i) /. raw_closes.(i)]), mirroring
+          {!weekly_view.raw_closes}. The factor stays constant over spans
+          without splits and changes at split boundaries (G14 — see
+          [dev/notes/g14-deep-dive-2026-05-01.md]); the support-floor stop path
+          uses it to measure the correction low on a split-consistent basis
+          under [Weinstein_stops.config.split_safe_floors]. [Float.nan] where
+          the snapshot has no [Adjusted_close] cell for the date. *)
   dates : Core.Date.t array;  (** Daily dates, same indexing. *)
   n_days : int;  (** Length of every array. *)
 }
-(** Float-array view of daily bars for one symbol within a lookback window. *)
+(** Float-array view of daily bars for one symbol within a lookback window.
+
+    Field-naming note: [weekly_view] names its adjusted series [closes] and its
+    raw series [raw_closes]; the daily view spells both out ([raw_closes] /
+    [adjusted_closes]) because its raw series is the one consumers historically
+    read. Both views expose the same two price bases. *)

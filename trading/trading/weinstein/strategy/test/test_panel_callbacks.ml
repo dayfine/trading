@@ -945,6 +945,277 @@ let test_sidetable_basis_threads_through_screening _ =
          field snd (elements_are [ equal_to Snapshot_schema.Close ]);
        ])
 
+(* ------------------------------------------------------------------ *)
+(* split_safe_floors on the panel / callback path                       *)
+(* ------------------------------------------------------------------ *)
+
+(* Same 4:1 mid-window split fixture as the bar-list tests in
+   [trading/weinstein/stops/test/test_support_floor.ml] — deliberately the same
+   numbers so the two paths are visibly testing the same thing. Bars 1-4 are
+   pre-split (raw ~4x the current price, [adjusted_close] = raw / 4 → factor
+   0.25); bar 5 is post-split (factor 1.0).
+
+   Long: on the {b adjusted} basis a clean peak 110 + correction low 98; on the
+   {b raw} basis the pre-split high 440 is a phantom peak and the post-split low
+   104 reads as the "correction low" of a bogus 76% drawdown — a garbage floor
+   sitting right at the ~104 entry. *)
+let _split_bar ~date ~high ~low ~close ~adjusted_close =
+  {
+    Types.Daily_price.date = Date.of_string date;
+    open_price = close;
+    high_price = high;
+    low_price = low;
+    close_price = close;
+    adjusted_close;
+    volume = 1_000_000;
+    active_through = None;
+  }
+
+let _split_long_bars =
+  [
+    _split_bar ~date:"2024-01-01" ~high:408.0 ~low:400.0 ~close:404.0
+      ~adjusted_close:101.0;
+    _split_bar ~date:"2024-01-02" ~high:440.0 ~low:432.0 ~close:436.0
+      ~adjusted_close:109.0;
+    _split_bar ~date:"2024-01-03" ~high:404.0 ~low:396.0 ~close:400.0
+      ~adjusted_close:100.0;
+    _split_bar ~date:"2024-01-04" ~high:412.0 ~low:392.0 ~close:408.0
+      ~adjusted_close:102.0;
+    _split_bar ~date:"2024-01-05" ~high:105.0 ~low:104.0 ~close:104.0
+      ~adjusted_close:104.0;
+  ]
+
+(* Short mirror: on the adjusted basis a clean trough (low 90) + counter-rally
+   (high 102); on the raw basis the lowest bar is the LAST one, so there is no
+   counter-rally after the trough and the scan finds no ceiling at all. *)
+let _split_short_bars =
+  [
+    _split_bar ~date:"2024-01-01" ~high:400.0 ~low:396.0 ~close:398.0
+      ~adjusted_close:99.5;
+    _split_bar ~date:"2024-01-02" ~high:368.0 ~low:360.0 ~close:364.0
+      ~adjusted_close:91.0;
+    _split_bar ~date:"2024-01-03" ~high:400.0 ~low:392.0 ~close:396.0
+      ~adjusted_close:99.0;
+    _split_bar ~date:"2024-01-04" ~high:408.0 ~low:388.0 ~close:392.0
+      ~adjusted_close:98.0;
+    _split_bar ~date:"2024-01-05" ~high:95.0 ~low:92.0 ~close:93.0
+      ~adjusted_close:93.0;
+  ]
+
+let _split_as_of = Date.of_string "2024-01-05"
+let _split_fallback_buffer = 1.02
+let _cfg_split_off = Weinstein_stops.default_config
+
+let _cfg_split_on =
+  {
+    Weinstein_stops.default_config with
+    Weinstein_stops.split_safe_floors = true;
+  }
+
+(* Bars → the exact callbacks bundle the strategy hot path uses: through the
+   real snapshot roundtrip (Pipeline.build_for_symbol → Snapshot_format.write →
+   daily_view_for) and then [support_floor_callbacks_of_daily_view], the same
+   two calls [Entry_audit_helpers.initial_stop_and_kind] makes. *)
+let _panel_callbacks_of_bars bars =
+  let cb = build_snapshot_callbacks [ ("SPLT", bars) ] in
+  let calendar =
+    Array.of_list (List.map bars ~f:(fun b -> b.Types.Daily_price.date))
+  in
+  let view =
+    Snapshot_bar_views.daily_view_for cb ~symbol:"SPLT" ~as_of:_split_as_of
+      ~lookback:90 ~calendar
+  in
+  Panel_callbacks.support_floor_callbacks_of_daily_view view
+
+let _panel_stop ~config ~side ~entry_price bars =
+  Weinstein_stops.compute_initial_stop_with_floor_with_callbacks ~config ~side
+    ~entry_price
+    ~callbacks:(_panel_callbacks_of_bars bars)
+    ~fallback_buffer:_split_fallback_buffer
+
+(* The pre-2026-08-05 panel path, transcribed: scan the bundle exactly as
+   supplied (no rescale — the flag did not reach this path at all), then place
+   the stop. R1 asserts the default-off path still equals this. *)
+let _pre_flag_panel_stop ~config ~side ~entry_price bars =
+  let callbacks = _panel_callbacks_of_bars bars in
+  let reference_level =
+    match
+      Weinstein_stops.Support_floor.find_recent_level_with_callbacks
+        ~anchor_mode:config.Weinstein_stops.support_floor_anchor_mode ~callbacks
+        ~side ~min_pullback_pct:config.Weinstein_stops.min_correction_pct ()
+    with
+    | Some level -> level
+    | None -> (
+        match side with
+        | Trading_base.Types.Long -> entry_price *. _split_fallback_buffer
+        | Trading_base.Types.Short -> entry_price /. _split_fallback_buffer)
+  in
+  Weinstein_stops.compute_initial_stop ~config ~side ~reference_level
+
+let _initial_reference matcher =
+  matching ~msg:"Expected Initial state"
+    (function
+      | Weinstein_stops.Initial { reference_level; _ } -> Some reference_level
+      | _ -> None)
+    matcher
+
+(* R1 — default-off is bit-identical over a split-straddling window. Compared
+   against a literal transcription of the pre-change code path (structural
+   [equal_to] over the whole [stop_state], so exact float equality on both
+   [stop_level] and [reference_level]), and pinned to the phantom 104.0 the raw
+   basis yields — the same value the bar-list default-off test asserts. *)
+let test_panel_split_safe_off_matches_pre_flag_path _ =
+  assert_that
+    (_panel_stop ~config:_cfg_split_off ~side:Trading_base.Types.Long
+       ~entry_price:104.0 _split_long_bars)
+    (all_of
+       [
+         equal_to
+           (_pre_flag_panel_stop ~config:_cfg_split_off
+              ~side:Trading_base.Types.Long ~entry_price:104.0 _split_long_bars
+             : Weinstein_stops.stop_state);
+         _initial_reference (float_equal 104.0);
+       ])
+
+(* R2 — flag-on now actually controls the panel path: the floor moves off the
+   raw phantom (104.0, right at the entry) onto the adjusted-basis correction
+   low (98.0), and agrees exactly with the bar-list path on the same bars. *)
+let test_panel_split_safe_on_uses_adjusted_floor _ =
+  assert_that
+    (_panel_stop ~config:_cfg_split_on ~side:Trading_base.Types.Long
+       ~entry_price:104.0 _split_long_bars)
+    (all_of
+       [
+         equal_to
+           (Weinstein_stops.compute_initial_stop_with_floor
+              ~config:_cfg_split_on ~side:Trading_base.Types.Long
+              ~entry_price:104.0 ~bars:_split_long_bars ~as_of:_split_as_of
+              ~fallback_buffer:_split_fallback_buffer
+             : Weinstein_stops.stop_state);
+         _initial_reference (float_equal 98.0);
+       ])
+
+(* Short mirror, through [floor_is_structural_with_callbacks] — the single
+   source [Entry_audit_helpers] now tags [stop_floor_kind] with. Raw basis: the
+   trough is the last bar, so no counter-rally → non-structural. Adjusted basis:
+   a real trough + counter-rally → structural. *)
+let test_panel_split_safe_short_structural_flag _ =
+  let callbacks = _panel_callbacks_of_bars _split_short_bars in
+  let is_structural config =
+    Weinstein_stops.floor_is_structural_with_callbacks ~config
+      ~side:Trading_base.Types.Short ~callbacks
+  in
+  assert_that
+    (is_structural _cfg_split_off, is_structural _cfg_split_on)
+    (all_of [ field fst (equal_to false); field snd (equal_to true) ])
+
+(* B1 panel sibling. The close-replacement half of the rescale is only
+   observable under [Close] anchor, and [(Close x split_safe_floors=true)] is an
+   expressible [Variant_matrix] cell. Same 100.0 the bar-list test pins: on the
+   adjusted basis the closes peak at 109 and bottom at 100 post-peak. Leave
+   [get_close] on [raw_closes] and this returns the phantom 104.0 — adjusted
+   highs/lows scanned against raw closes.
+
+   Pinning this only on the bar-list path would repeat the shape of the defect
+   this PR exists to fix, so it is asserted here too. *)
+let test_panel_split_safe_close_anchor_uses_adjusted_closes _ =
+  assert_that
+    (_panel_stop
+       ~config:
+         {
+           _cfg_split_on with
+           Weinstein_stops.support_floor_anchor_mode =
+             Weinstein_stops.Support_floor.Close;
+         }
+       ~side:Trading_base.Types.Long ~entry_price:104.0 _split_long_bars)
+    (_initial_reference (float_equal 100.0))
+
+(* B2 panel sibling — the "legacy warehouse" case, built as a [daily_view]
+   literal because that is exactly what the producer yields for a snapshot whose
+   schema predates [Adjusted_close]: the field read fails,
+   [Snapshot_bar_views._read_history_or_empty] maps it to [], and every
+   adjusted cell reads NaN. Constructing the view directly reaches the state
+   without needing a second on-disk schema.
+
+   The flag must be inert here, not merely safe: with the whole window
+   un-rescalable the scan runs raw, so flag-on is structurally identical to
+   flag-off. Inertness that equals baseline is diagnosable in a walk-forward
+   surface ("on == off in every row"); the alternative — collapsing every scan
+   to the buffer fallback — would read as a genuine negative result. *)
+let test_panel_split_safe_legacy_warehouse_all_nan_adjusted_is_inert _ =
+  let cb = build_snapshot_callbacks [ ("SPLT", _split_long_bars) ] in
+  let calendar =
+    Array.of_list
+      (List.map _split_long_bars ~f:(fun b -> b.Types.Daily_price.date))
+  in
+  let view =
+    Snapshot_bar_views.daily_view_for cb ~symbol:"SPLT" ~as_of:_split_as_of
+      ~lookback:90 ~calendar
+  in
+  let legacy_view =
+    {
+      view with
+      Snapshot_bar_views.adjusted_closes =
+        Array.map view.Snapshot_bar_views.adjusted_closes ~f:(fun _ ->
+            Float.nan);
+    }
+  in
+  let callbacks =
+    Panel_callbacks.support_floor_callbacks_of_daily_view legacy_view
+  in
+  let stop config =
+    Weinstein_stops.compute_initial_stop_with_floor_with_callbacks ~config
+      ~side:Trading_base.Types.Long ~entry_price:104.0 ~callbacks
+      ~fallback_buffer:_split_fallback_buffer
+  in
+  assert_that (stop _cfg_split_on)
+    (equal_to (stop _cfg_split_off : Weinstein_stops.stop_state))
+
+(* B3 panel sibling. [daily_view] is oldest-first and the callbacks flip the
+   index, so blanking [adjusted_closes.(0)] (2024-01-01) puts the unusable cell
+   at day_offset 4 — the far end of the window. Every other panel NaN fixture
+   blanks the whole column, which an offset-0-only window check would still
+   catch; this is the only panel fixture that pins the {b universal} quantifier
+   in [_window_is_adjustable].
+
+   It also closes the coverage asymmetry noted in the previous rework round,
+   where the per-bar-vs-whole-window mutation reddened only the bar-list suite.
+   Leaving the panel side without a non-zero-offset fixture would repeat the
+   exact shape of the defect this PR exists to fix: a contract covered on the
+   bar-list path and silently unexercised on the panel path. *)
+let test_panel_split_safe_nan_adjusted_at_far_offset_degrades_whole_window _ =
+  let cb = build_snapshot_callbacks [ ("SPLT", _split_long_bars) ] in
+  let calendar =
+    Array.of_list
+      (List.map _split_long_bars ~f:(fun b -> b.Types.Daily_price.date))
+  in
+  let view =
+    Snapshot_bar_views.daily_view_for cb ~symbol:"SPLT" ~as_of:_split_as_of
+      ~lookback:90 ~calendar
+  in
+  let blanked_view =
+    {
+      view with
+      Snapshot_bar_views.adjusted_closes =
+        Array.mapi view.Snapshot_bar_views.adjusted_closes ~f:(fun i v ->
+            if i = 0 then Float.nan else v);
+    }
+  in
+  let callbacks =
+    Panel_callbacks.support_floor_callbacks_of_daily_view blanked_view
+  in
+  let stop config =
+    Weinstein_stops.compute_initial_stop_with_floor_with_callbacks ~config
+      ~side:Trading_base.Types.Long ~entry_price:104.0 ~callbacks
+      ~fallback_buffer:_split_fallback_buffer
+  in
+  assert_that (stop _cfg_split_on)
+    (all_of
+       [
+         equal_to (stop _cfg_split_off : Weinstein_stops.stop_state);
+         _initial_reference (float_equal 104.0);
+       ])
+
 let suite =
   "Panel_callbacks parity"
   >::: [
@@ -970,6 +1241,18 @@ let suite =
          >:: test_weekly_sidetable_threading;
          "Side-table basis threads through the screening path"
          >:: test_sidetable_basis_threads_through_screening;
+         "split_safe_floors off — panel path matches the pre-flag path"
+         >:: test_panel_split_safe_off_matches_pre_flag_path;
+         "split_safe_floors on — panel path uses the adjusted-basis floor"
+         >:: test_panel_split_safe_on_uses_adjusted_floor;
+         "split_safe_floors on — panel structural flag (short mirror)"
+         >:: test_panel_split_safe_short_structural_flag;
+         "split_safe_floors on + Close anchor — panel uses adjusted closes"
+         >:: test_panel_split_safe_close_anchor_uses_adjusted_closes;
+         "legacy warehouse (all-NaN adjusted) — panel flag is inert"
+         >:: test_panel_split_safe_legacy_warehouse_all_nan_adjusted_is_inert;
+         "unusable adjusted cell at a far offset — panel degrades whole window"
+         >:: test_panel_split_safe_nan_adjusted_at_far_offset_degrades_whole_window;
        ]
 
 let () = run_test_tt_main suite

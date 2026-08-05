@@ -65,6 +65,9 @@ let compute_initial_stop_with_floor_with_callbacks =
 let compute_initial_stop_with_floor = Floor_stop.compute_initial_stop_with_floor
 let floor_is_structural = Floor_stop.floor_is_structural
 
+let floor_is_structural_with_callbacks =
+  Floor_stop.floor_is_structural_with_callbacks
+
 (* ---- Directional helpers ---- *)
 
 (* The bar's extreme price in the against-trend direction.

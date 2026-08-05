@@ -34,63 +34,122 @@ let callbacks_from_bars ~config ~bars ~as_of =
   Support_floor.callbacks_from_bars ~bars ~as_of
     ~lookback_bars:config.support_floor_lookback_bars
 
-(* Rescale one raw-OHLC bar onto its split/dividend-adjusted basis: scale O/H/L
-   by the per-bar factor [f = adjusted_close /. close_price] and set
-   [close_price := adjusted_close]. Inlined mirror of
-   [Adjusted_basis.to_adjusted_basis] (analysis/weinstein/snapshot_pipeline) —
-   this A2-forbidden layer cannot import analysis/, and the factor is derivable
-   from [Daily_price.adjusted_close], already carried on every bar. The guard is
-   one-sided: a non-positive / NaN raw close admits no factor ([f = 1.0], O/H/L
-   stay raw) so a corrupt raw close never blows up the rescale. Keep in sync
-   with [Adjusted_basis._factor] by hand if that formula ever changes. *)
-let _to_adjusted_basis_bar (b : Types.Daily_price.t) : Types.Daily_price.t =
-  let f =
-    if Float.is_nan b.close_price || Float.( <= ) b.close_price 0.0 then 1.0
-    else b.adjusted_close /. b.close_price
+(* A price is usable as an operand of the split/dividend factor only if it is a
+   real positive number. NaN-safe without a separate [Float.is_nan] test:
+   [Float.(nan > 0.0)] is [false] under IEEE, so NaN falls out here too (pinned
+   by the NaN-raw-close bar in [corrupt_close_bars]). *)
+let _usable_price p = Float.( > ) p 0.0
+
+(* Per-bar split/dividend factor [f = adjusted_close /. close_price] at
+   [day_offset], or [None] when either operand is unusable (NaN, zero, negative,
+   or the offset is outside the window). The guard is symmetric across both
+   operands — an unusable adjusted close is exactly as disqualifying as an
+   unusable raw close, because a factor computed from either is meaningless. *)
+let _adjusted_factor (cbs : callbacks) ~day_offset =
+  match (cbs.get_close ~day_offset, cbs.get_adjusted_close ~day_offset) with
+  | Some raw, Some adj when _usable_price raw && _usable_price adj ->
+      Some (adj /. raw)
+  | _, _ -> None
+
+(* Can EVERY offset in the window be rescaled? The rescale is all-or-nothing by
+   design — see [_to_adjusted_basis] for why per-bar degradation is not an
+   option. An empty window ([n_days = 0]) has nothing to scan, so it reports
+   [false] and takes the cheap path. *)
+let _window_is_adjustable (cbs : callbacks) =
+  let rec loop i =
+    i >= cbs.n_days
+    || (Option.is_some (_adjusted_factor cbs ~day_offset:i) && loop (i + 1))
+  in
+  cbs.n_days > 0 && loop 0
+
+(* The close on the adjusted basis is the published adjusted close itself, not
+   [raw *. factor] — same value up to rounding, but exactly what the data source
+   wrote. This is load-bearing under [Close] anchor mode, where the scan reads
+   the close: leaving it raw would measure adjusted highs / lows against raw
+   closes. *)
+let _adjusted_close_at (cbs : callbacks) ~day_offset =
+  match cbs.get_adjusted_close ~day_offset with
+  | Some _ as adj -> adj
+  | None -> cbs.get_close ~day_offset
+
+(* Rescale every offset. Caller must have checked [_window_is_adjustable], so
+   the [~default:1.0] below is unreachable; it only keeps the expression total. *)
+let _rescaled (cbs : callbacks) : callbacks =
+  let scaled get ~day_offset =
+    Option.map (get ~day_offset) ~f:(fun v ->
+        v *. Option.value (_adjusted_factor cbs ~day_offset) ~default:1.0)
   in
   {
-    b with
-    open_price = b.open_price *. f;
-    high_price = b.high_price *. f;
-    low_price = b.low_price *. f;
-    close_price = b.adjusted_close;
+    cbs with
+    get_high = scaled cbs.get_high;
+    get_low = scaled cbs.get_low;
+    get_close = _adjusted_close_at cbs;
   }
 
-(* Build the support-floor callbacks the bar-list stop path scans. Single source
-   for both [compute_initial_stop_with_floor] and [floor_is_structural] so the
-   installed stop level and its [stop_is_structural] classification always read
-   the same window. When [config.split_safe_floors] the bars are first rescaled
-   onto their adjusted basis (see [_to_adjusted_basis_bar]); default-off feeds
-   the raw bars unchanged (bit-identical). *)
-let _floor_callbacks ~config ~bars ~as_of =
-  let bars =
-    if config.split_safe_floors then List.map bars ~f:_to_adjusted_basis_bar
-    else bars
-  in
-  callbacks_from_bars ~config ~bars ~as_of
+(* Put a callbacks bundle on its split/dividend-adjusted basis: scale the high /
+   low by each bar's factor and replace the close with the adjusted close.
+   Inlined mirror of [Adjusted_basis.to_adjusted_basis]
+   (analysis/weinstein/snapshot_pipeline) — this A2-forbidden layer cannot
+   import analysis/, and the factor is derivable from the [get_adjusted_close]
+   accessor every bundle carries. Keep in sync with [Adjusted_basis._factor] by
+   hand if that formula ever changes.
+
+   Idempotent: after one pass [get_close] already returns the adjusted close, so
+   a second pass computes [f = adj /. adj = 1.0] and changes nothing.
+
+   Applying the rescale at the bundle level rather than the bar level is what
+   lets the panel/callback path share it — a [daily_view] has no
+   [Daily_price.t] to rewrite, only accessors. The bar-list path is unaffected
+   in value terms: scaling [high_price] / [low_price] and setting
+   [close_price := adjusted_close] on each bar produces exactly these
+   accessors.
+
+   {b All-or-nothing.} If any offset in the window cannot be rescaled, the whole
+   bundle is returned untouched and the scan runs on the raw basis, exactly as
+   it would with the flag off. Degrading only the offending {e bar} to raw was
+   measured and rejected: it leaves one raw bar inside an otherwise-adjusted
+   window, and on the 4:1 split fixture that lone raw high (412) out-tops every
+   adjusted high (110) and becomes the anchor, yielding the phantom 104.0
+   reference this flag exists to eliminate. Whole-window fallback keeps the
+   invariant that makes the mechanism sound: {b the scanned window is always on
+   exactly one price basis}, so the flag can only produce the correct adjusted
+   answer or the flag-off answer, never a third one. *)
+let _to_adjusted_basis (cbs : callbacks) : callbacks =
+  if _window_is_adjustable cbs then _rescaled cbs else cbs
+
+(* The bundle the support-floor scan actually reads. Single source for every
+   floor consumer — [compute_initial_stop_with_floor_with_callbacks] and
+   [floor_is_structural_with_callbacks] — so the installed stop level and its
+   [stop_is_structural] classification can never disagree. Under
+   [config.split_safe_floors] the bundle is first rescaled onto the adjusted
+   basis; default-off returns it untouched (bit-identical). *)
+let _scan_callbacks ~config ~callbacks =
+  if config.split_safe_floors then _to_adjusted_basis callbacks else callbacks
+
+let _find_level ~config ~side ~callbacks =
+  Support_floor.find_recent_level_with_callbacks
+    ~anchor_mode:config.support_floor_anchor_mode
+    ~callbacks:(_scan_callbacks ~config ~callbacks)
+    ~side ~min_pullback_pct:config.min_correction_pct ()
 
 let compute_initial_stop_with_floor_with_callbacks ~config ~side ~entry_price
     ~callbacks ~fallback_buffer =
   let reference_level =
-    match
-      Support_floor.find_recent_level_with_callbacks
-        ~anchor_mode:config.support_floor_anchor_mode ~callbacks ~side
-        ~min_pullback_pct:config.min_correction_pct ()
-    with
+    match _find_level ~config ~side ~callbacks with
     | Some level -> level
     | None -> _fallback_reference ~side ~entry_price ~fallback_buffer
   in
   compute_initial_stop ~config ~side ~reference_level
 
+let floor_is_structural_with_callbacks ~config ~side ~callbacks =
+  Option.is_some (_find_level ~config ~side ~callbacks)
+
 let compute_initial_stop_with_floor ~config ~side ~entry_price ~bars ~as_of
     ~fallback_buffer =
-  let callbacks = _floor_callbacks ~config ~bars ~as_of in
+  let callbacks = callbacks_from_bars ~config ~bars ~as_of in
   compute_initial_stop_with_floor_with_callbacks ~config ~side ~entry_price
     ~callbacks ~fallback_buffer
 
 let floor_is_structural ~config ~side ~bars ~as_of =
-  let callbacks = _floor_callbacks ~config ~bars ~as_of in
-  Option.is_some
-    (Support_floor.find_recent_level_with_callbacks
-       ~anchor_mode:config.support_floor_anchor_mode ~callbacks ~side
-       ~min_pullback_pct:config.min_correction_pct ())
+  let callbacks = callbacks_from_bars ~config ~bars ~as_of in
+  floor_is_structural_with_callbacks ~config ~side ~callbacks

@@ -120,10 +120,21 @@ type callbacks = {
       (** Daily [low_price] at [day_offset] days back. Same offset convention as
           [get_high]. *)
   get_close : day_offset:int -> float option;
-      (** Daily [close_price] at [day_offset] days back. Currently unused by
-          {!find_recent_level_with_callbacks} but kept in the bundle so panel-
-          backed callers can reuse the same callback shape across primitives
-          that may consume close. *)
+      (** Raw (un-adjusted) daily [close_price] at [day_offset] days back — the
+          same price basis as [get_high] / [get_low]. Read by
+          {!find_recent_level_with_callbacks} under [Close] anchor mode. *)
+  get_adjusted_close : day_offset:int -> float option;
+      (** Split- and dividend-adjusted daily close at [day_offset] days back.
+          Never read by {!find_recent_level_with_callbacks} — the primitive
+          stays a pure single-basis price consumer. It is carried in the bundle
+          so the stops layer can derive the per-bar split-adjustment factor
+          ([get_adjusted_close /. get_close]) and rescale a whole bundle onto
+          the adjusted basis before scanning, which is what
+          [Weinstein_stops.config.split_safe_floors] does. Returns [None]
+          exactly where [get_close] does (same window); the value may be
+          [Float.nan] when the backing source has no adjusted-close cell, in
+          which case that bar admits no factor and the stops layer scans the raw
+          basis for the whole window rather than rescaling part of it. *)
   get_date : day_offset:int -> Core.Date.t option;
       (** Calendar date of the bar at [day_offset] days back. Useful for
           telemetry / debugging; not consumed by the algorithm itself (the
@@ -151,7 +162,8 @@ val callbacks_from_bars :
     bundle by applying the same windowing the bar-list path used inline: drop
     bars dated strictly after [as_of], then keep only the trailing
     [lookback_bars] of the remainder. Day offset [0] is the newest bar in the
-    resulting window.
+    resulting window. [get_close] reads [Daily_price.close_price] (raw) and
+    [get_adjusted_close] reads [Daily_price.adjusted_close].
 
     When [lookback_bars <= 0], the resulting bundle has [n_days = 0] and every
     accessor returns [None]. *)

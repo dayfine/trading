@@ -84,22 +84,12 @@ let _empty_snapshot_callbacks : Snapshot_callbacks.t =
   }
 
 (* Empty views — used as the sentinel return when [as_of] falls outside the
-   snapshot's calendar or the snapshot has no rows. Match the empty literals
-   {!Snapshot_bar_views} uses internally so consumers can rely on [n = 0] /
-   [n_days = 0] as the "missing" signal. *)
-let _empty_weekly_view : Snapshot_bar_views.weekly_view =
-  {
-    closes = [||];
-    raw_closes = [||];
-    highs = [||];
-    lows = [||];
-    volumes = [||];
-    dates = [||];
-    n = 0;
-  }
-
-let _empty_daily_view : Snapshot_bar_views.daily_view =
-  { highs = [||]; lows = [||]; closes = [||]; dates = [||]; n_days = 0 }
+   snapshot's calendar or the snapshot has no rows. Taken straight from
+   {!Snapshot_bar_views} (rather than re-stated as a literal here) so the two
+   can never drift as the record gains fields, and consumers can rely on
+   [n = 0] / [n_days = 0] as the "missing" signal. *)
+let _empty_weekly_view = Snapshot_bar_views.empty_weekly_view
+let _empty_daily_view = Snapshot_bar_views.empty_daily_view
 
 (* {1 Empty backing — used by tests where no read is expected}
 
