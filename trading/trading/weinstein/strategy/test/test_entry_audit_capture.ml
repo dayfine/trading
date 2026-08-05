@@ -275,6 +275,149 @@ let test_empty_bar_reader_falls_back_to_suggested_entry _ =
           (float_equal 130.0)))
 
 (* ------------------------------------------------------------------ *)
+(* Book-faithful E-anchored entry trigger (user decision 2026-08-05)     *)
+(* ------------------------------------------------------------------ *)
+
+(** With [~trigger_at_suggested:true] (the flag the strategy sets when
+    [sim_entry_trigger_at_suggested && enable_sim_entry_stoplimit] are both on),
+    [make_entry_transition] anchors the entry at [cand.suggested_entry] (the
+    breakout level E = $130) even though [bar_reader]'s current close is $110.
+    Both the [CreateEntering.entry_price] — the StopLimit trigger the order
+    generator will rest at E — and [meta.effective_entry_price] — the sizing
+    anchor — equal E. This is the exact inverse of the G14 default, which pins
+    them to the current close. *)
+let test_trigger_at_suggested_anchors_entry_at_e _ =
+  let current_date = Date.of_string "2024-06-14" in
+  let bar_reader =
+    _bar_reader_with_current_close ~current_date ~current_close:110.0
+  in
+  let cand =
+    _long_candidate ~ticker:_ticker ~suggested_entry:130.0 ~suggested_stop:100.0
+      ~as_of_date:current_date
+  in
+  let stop_states = ref String.Map.empty in
+  let result =
+    Entry_audit_capture.make_entry_transition ~trigger_at_suggested:true
+      ~portfolio_risk_config:_portfolio_risk_config ~stops_config:_stops_config
+      ~initial_stop_buffer:0.92 ~stop_states ~bar_reader
+      ~portfolio_value:100_000.0 ~current_date cand
+  in
+  assert_that result
+    (matching ~msg:"Expected Entry_ok"
+       (function
+         | Entry_audit_capture.Entry_ok (trans, meta) -> Some (trans, meta)
+         | _ -> None)
+       (all_of
+          [
+            field
+              (fun ((trans : Position.transition), _) ->
+                match trans.kind with
+                | Position.CreateEntering e -> e.entry_price
+                | _ -> Float.nan)
+              (float_equal 130.0);
+            field
+              (fun (_, (m : Entry_audit_capture.entry_meta)) ->
+                m.effective_entry_price)
+              (float_equal 130.0);
+          ]))
+
+(** Sizing-at-E pin: with [~trigger_at_suggested:true] the audit event's
+    dollar-denominated sizing fields key off E ($130), not the current close
+    ($110). [initial_position_value = shares * E] and
+    [initial_risk_dollars = shares * |E - installed_stop|] — the whole sizing
+    computation is anchored at the breakout level, matching the live report's
+    tickets which size at E. *)
+let test_trigger_at_suggested_sizes_at_e _ =
+  let current_date = Date.of_string "2024-06-14" in
+  let bar_reader =
+    _bar_reader_with_current_close ~current_date ~current_close:110.0
+  in
+  let cand =
+    _long_candidate ~ticker:_ticker ~suggested_entry:130.0 ~suggested_stop:100.0
+      ~as_of_date:current_date
+  in
+  let stop_states = ref String.Map.empty in
+  let _, meta =
+    match
+      Entry_audit_capture.make_entry_transition ~trigger_at_suggested:true
+        ~portfolio_risk_config:_portfolio_risk_config
+        ~stops_config:_stops_config ~initial_stop_buffer:0.92 ~stop_states
+        ~bar_reader ~portfolio_value:100_000.0 ~current_date cand
+    with
+    | Entry_audit_capture.Entry_ok (trans, meta) -> (trans, meta)
+    | _ -> OUnit2.assert_failure "make_entry_transition did not return Entry_ok"
+  in
+  let macro : Macro.result =
+    {
+      index_stage = _stage_result;
+      indicators = [];
+      trend = Weinstein_types.Bullish;
+      confidence = 0.80;
+      regime_changed = false;
+      rationale = [ "fixture" ];
+    }
+  in
+  let event =
+    Entry_audit_capture.build_entry_event ~macro ~current_date ~candidate:cand
+      ~meta ~alternatives:[]
+  in
+  assert_that event
+    (all_of
+       [
+         (* Position value + risk both anchored at E = $130, not close $110.
+            (With the flag off, [effective_entry] = close $110 and these would
+            read [shares * 110] — so pinning [shares * 130] pins sizing at E.) *)
+         field
+           (fun e -> e.Audit_recorder.initial_position_value)
+           (float_equal (Float.of_int meta.shares *. 130.0));
+         field
+           (fun e -> e.Audit_recorder.initial_risk_dollars)
+           (float_equal
+              (Float.of_int meta.shares
+              *. Float.abs (130.0 -. meta.installed_stop)));
+       ])
+
+(** R1 / default-off pin at the seam: with [~trigger_at_suggested:false] (the
+    default, and what the strategy passes whenever either flag is off),
+    [make_entry_transition] keeps the G14 current-close entry ($110), leaving
+    the breakout level [cand.suggested_entry] ($130) as audit metadata only.
+    Bit-identical to the pre-flag path. *)
+let test_trigger_at_suggested_off_uses_current_close _ =
+  let current_date = Date.of_string "2024-06-14" in
+  let bar_reader =
+    _bar_reader_with_current_close ~current_date ~current_close:110.0
+  in
+  let cand =
+    _long_candidate ~ticker:_ticker ~suggested_entry:130.0 ~suggested_stop:100.0
+      ~as_of_date:current_date
+  in
+  let stop_states = ref String.Map.empty in
+  let result =
+    Entry_audit_capture.make_entry_transition ~trigger_at_suggested:false
+      ~portfolio_risk_config:_portfolio_risk_config ~stops_config:_stops_config
+      ~initial_stop_buffer:0.92 ~stop_states ~bar_reader
+      ~portfolio_value:100_000.0 ~current_date cand
+  in
+  assert_that result
+    (matching ~msg:"Expected Entry_ok"
+       (function
+         | Entry_audit_capture.Entry_ok (trans, meta) -> Some (trans, meta)
+         | _ -> None)
+       (all_of
+          [
+            field
+              (fun ((trans : Position.transition), _) ->
+                match trans.kind with
+                | Position.CreateEntering e -> e.entry_price
+                | _ -> Float.nan)
+              (float_equal 110.0);
+            field
+              (fun (_, (m : Entry_audit_capture.entry_meta)) ->
+                m.effective_entry_price)
+              (float_equal 110.0);
+          ]))
+
+(* ------------------------------------------------------------------ *)
 (* G15 step 2: short-notional cap tests                                  *)
 (* ------------------------------------------------------------------ *)
 
@@ -1125,6 +1268,12 @@ let () =
            >:: test_entry_event_audit_dollars_use_effective_entry;
            "G14: empty bar_reader falls back to suggested_entry"
            >:: test_empty_bar_reader_falls_back_to_suggested_entry;
+           "E-anchor: trigger_at_suggested anchors entry at E"
+           >:: test_trigger_at_suggested_anchors_entry_at_e;
+           "E-anchor: trigger_at_suggested sizes at E"
+           >:: test_trigger_at_suggested_sizes_at_e;
+           "E-anchor R1: trigger_at_suggested off uses current close"
+           >:: test_trigger_at_suggested_off_uses_current_close;
            "G15-step2: short notional cap skips at 31%"
            >:: test_short_notional_cap_skips_at_31pct;
            "G15-step2: short notional cap admits at 29%"

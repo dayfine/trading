@@ -1218,6 +1218,44 @@ type config = {
           pullback close to it — far above the breakout there is no buy point,
           so an unfilled order (missing > chasing) is the faithful failure mode.
       *)
+  sim_entry_trigger_at_suggested : bool; [@sexp.default false]
+      (** Book-faithful E-anchored entry trigger (user decision 2026-08-05, plan
+          [dev/plans/gtc-breakout-orders-2026-08-05.md] Step 0 option (b)). When
+          [true] AND [enable_sim_entry_stoplimit] is on, the strategy's
+          [CreateEntering.entry_price] is set to the candidate's
+          [suggested_entry] (the graded breakout level [E]) instead of the most
+          recent raw close (the G14 fix-B default). The emitted order is then a
+          genuine [StopLimit (E, E * (1 +/- entry_extension_max_pct/100))]
+          resting AT the breakout level — matching the book's "Buy ... at [E]
+          stop -- [E * band] limit" ticket (Ch.3 p.67-68,
+          [docs/design/weinstein-book-reference.md] §4.7) and the live report's
+          tickets, which size and trigger at [E]. Sizing follows automatically:
+          [make_entry_transition] anchors [compute_position_size ~entry_price]
+          at the same [effective_entry], so an armed backtest sizes at [E].
+
+          {b Default [false] = current-close trigger, bit-identical to every
+             existing baseline/golden} (R1). Because it gates on
+          [enable_sim_entry_stoplimit] as well, arming this field alone (with
+          the StopLimit flag at its default [false]) cannot move a backtest
+          number. This is a fill-model basis change when armed — its own WF-CV
+          surface, never bundled (same discipline as
+          [enable_sim_entry_stoplimit]). R2: real config field, axis-expressible
+          as [((flag sim_entry_trigger_at_suggested) (values (true false)))].
+
+          {b Split-safety} (why the G14 fix-B default exists): G14 fix-B pinned
+          the trigger to the current close because [suggested_entry] {i could}
+          land in a different price space than the fill on a symbol whose
+          screener lookback spanned a split boundary. That hazard is closed by
+          G14 fix-A: the screener's high/low lookback is truncated at the most
+          recent split ([Stock_analysis] [_no_split_between]), so the breakout
+          level -- and therefore [suggested_entry] -- is computed in {i current}
+          raw close-price space. In-sim the screener bars and the fill bars come
+          from the same snapshot/CSV source, so [E] and the close share one
+          price basis by construction; no per-symbol split guard is added.
+          (Deliberately no epsilon-disagreement fallback to close: [E] is by
+          design {i above} the close for a long breakout -- that is the whole
+          point of a resting stop -- so such a guard would misfire on every
+          normal breakout.) *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

@@ -25,15 +25,30 @@ open Trading_strategy
     [cand.ticker] (preserves the test/empty-bars edge). The
     [cand.suggested_entry] field itself remains the screener's audit metadata in
     [build_entry_event]; only the position-state and sizing/stop dollar
-    quantities switch to the realised entry. *)
-let effective_entry_price ~bar_reader ~current_date
-    (cand : Screener.scored_candidate) : float =
-  let bars =
-    Bar_reader.daily_bars_for bar_reader ~symbol:cand.ticker ~as_of:current_date
-  in
-  match List.last bars with
-  | None -> cand.suggested_entry
-  | Some bar -> bar.Types.Daily_price.close_price
+    quantities switch to the realised entry.
+
+    [?trigger_at_suggested] (default [false]) is the book-faithful E-anchored
+    override (user decision 2026-08-05, gated by
+    [config.sim_entry_trigger_at_suggested && config.enable_sim_entry_stoplimit]
+    at the caller). When [true], the entry is pinned to [cand.suggested_entry]
+    (the graded breakout level [E]) rather than the current close, so the
+    emitted [StopLimit] rests AT [E] and sizing anchors at [E]. Split-safe
+    in-sim because G14 fix-A truncates the screener lookback at the most recent
+    split, keeping [E] in current raw close-price space -- the same basis as the
+    fill bar (which comes from the same snapshot source). See
+    [Weinstein_strategy_config.sim_entry_trigger_at_suggested] for the full
+    split-safety argument and why no epsilon fallback is used. *)
+let effective_entry_price ?(trigger_at_suggested = false) ~bar_reader
+    ~current_date (cand : Screener.scored_candidate) : float =
+  if trigger_at_suggested then cand.suggested_entry
+  else
+    let bars =
+      Bar_reader.daily_bars_for bar_reader ~symbol:cand.ticker
+        ~as_of:current_date
+    in
+    match List.last bars with
+    | None -> cand.suggested_entry
+    | Some bar -> bar.Types.Daily_price.close_price
 
 (** Compute the support-floor-aware initial stop for [cand] entering at
     [effective_entry], plus the [stop_floor_kind] tag for audit. Mirrors the

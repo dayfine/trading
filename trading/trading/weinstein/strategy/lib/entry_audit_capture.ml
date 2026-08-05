@@ -94,11 +94,13 @@ let _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
     in
     Entry_ok (trans, meta))
 
-let make_entry_transition ?(min_stop_distance_pct = 0.0) ~portfolio_risk_config
-    ~stops_config ~initial_stop_buffer ~stop_states ~bar_reader ~portfolio_value
-    ~current_date (cand : Screener.scored_candidate) : entry_attempt_result =
+let make_entry_transition ?(min_stop_distance_pct = 0.0)
+    ?(trigger_at_suggested = false) ~portfolio_risk_config ~stops_config
+    ~initial_stop_buffer ~stop_states ~bar_reader ~portfolio_value ~current_date
+    (cand : Screener.scored_candidate) : entry_attempt_result =
   let effective_entry =
-    Entry_audit_helpers.effective_entry_price ~bar_reader ~current_date cand
+    Entry_audit_helpers.effective_entry_price ~trigger_at_suggested ~bar_reader
+      ~current_date cand
   in
   let initial_stop, stop_floor_kind =
     Entry_audit_helpers.initial_stop_and_kind ~min_stop_distance_pct

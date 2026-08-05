@@ -131,6 +131,8 @@ type config = {
   entry_through_band_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
   entry_extension_max_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
   enable_sim_entry_stoplimit : bool; [@sexp.default false]  (** See [.mli]. *)
+  sim_entry_trigger_at_suggested : bool; [@sexp.default false]
+      (** See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -230,6 +232,7 @@ let default_config ~universe ~index_symbol =
     entry_through_band_pct = 0.0;
     entry_extension_max_pct = 0.0;
     enable_sim_entry_stoplimit = false;
+    sim_entry_trigger_at_suggested = false;
   }
 
 let name = "Weinstein"
