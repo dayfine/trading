@@ -120,8 +120,8 @@ type callbacks = {
       (** Daily [low_price] at [day_offset] days back. Same offset convention as
           [get_high]. *)
   get_close : day_offset:int -> float option;
-      (** Raw (un-adjusted) daily [close_price] at [day_offset] days back —
-          the same price basis as [get_high] / [get_low]. Read by
+      (** Raw (un-adjusted) daily [close_price] at [day_offset] days back — the
+          same price basis as [get_high] / [get_low]. Read by
           {!find_recent_level_with_callbacks} under [Close] anchor mode. *)
   get_adjusted_close : day_offset:int -> float option;
       (** Split- and dividend-adjusted daily close at [day_offset] days back.

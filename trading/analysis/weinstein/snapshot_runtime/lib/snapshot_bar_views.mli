@@ -109,6 +109,16 @@ type daily_view = Data_panel_snapshot.Panel_views.daily_view = {
     {!Data_panel_snapshot.Panel_views.daily_view} (neutral-hub canonical home)
     via manifest type alias. *)
 
+val empty_weekly_view : weekly_view
+(** The [n = 0] weekly view every "no readable rows" path returns. Exposed so
+    consumers that need the same sentinel (e.g. a bar reader with no snapshot
+    backing) share this definition instead of hand-copying the literal — a copy
+    silently goes stale the next time the record gains a field. *)
+
+val empty_daily_view : daily_view
+(** The [n_days = 0] daily view every "no readable rows" path returns. Same
+    rationale as {!empty_weekly_view}. *)
+
 val weekly_view_for :
   Snapshot_callbacks.t ->
   symbol:string ->
@@ -151,11 +161,11 @@ val daily_view_for :
     runner everywhere ensures deterministic window definition across calls (#848
     forward fix).
 
-    Row emission is gated on the raw [Close] cell alone: a date with a
-    non-NaN raw close is emitted even when [High] / [Low] /
-    [Adjusted_close] are missing (those degrade to [Float.nan] in their
-    columns). A NaN [adjusted_closes] cell therefore propagates a NaN
-    split-adjustment factor rather than a silently-neutral [1.0].
+    Row emission is gated on the raw [Close] cell alone: a date with a non-NaN
+    raw close is emitted even when [High] / [Low] / [Adjusted_close] are missing
+    (those degrade to [Float.nan] in their columns). A NaN [adjusted_closes]
+    cell therefore propagates a NaN split-adjustment factor rather than a
+    silently-neutral [1.0].
 
     Returns the empty view ([n_days = 0], all arrays empty) when:
     - [lookback <= 0]

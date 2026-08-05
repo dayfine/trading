@@ -42,8 +42,7 @@ let callbacks_from_bars ~config ~bars ~as_of =
    bar-list behaviour where [Daily_price.adjusted_close] is taken as given. *)
 let _adjusted_factor (cbs : callbacks) ~day_offset =
   match (cbs.get_close ~day_offset, cbs.get_adjusted_close ~day_offset) with
-  | Some raw, Some adj
-    when not (Float.is_nan raw || Float.( <= ) raw 0.0) ->
+  | Some raw, Some adj when not (Float.is_nan raw || Float.( <= ) raw 0.0) ->
       adj /. raw
   | _, _ -> 1.0
 

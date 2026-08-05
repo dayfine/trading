@@ -54,8 +54,8 @@ let effective_entry_price ?(trigger_at_suggested = false) ~bar_reader
     [effective_entry], plus the [stop_floor_kind] tag for audit. The tag comes
     from [Weinstein_stops.floor_is_structural_with_callbacks] — the same
     internal scan the stop computation runs, so the tag cannot disagree with the
-    installed level under any [support_floor_anchor_mode] /
-    [split_safe_floors] combination (the #2167 class of bug).
+    installed level under any [support_floor_anchor_mode] / [split_safe_floors]
+    combination (the #2167 class of bug).
 
     [?min_stop_distance_pct] is an optional floor on the placed stop's distance
     from [effective_entry]: when [Some pct], the resulting [stop_state] is

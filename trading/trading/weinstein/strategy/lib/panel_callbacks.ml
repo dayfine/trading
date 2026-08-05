@@ -1,9 +1,10 @@
-(* @large-module: panel-shaped callback constructors for the eight strategy
-   callees (Stage / Rs / Volume / Resistance / Stock_analysis / Sector /
-   Macro / Support_floor) plus PR-D's cache-aware Stage path. Splitting
-   the per-callee constructors into sibling modules would force a cycle
-   (Sector / Macro / Stock_analysis re-call the Stage constructor) so they
-   live together, sharing the helpers above. *)
+(* @large-module: panel-shaped callback constructors for the strategy callees
+   (Stage / Rs / Volume / Resistance / Stock_analysis / Sector / Macro) plus
+   PR-D's cache-aware Stage path. Splitting these per-callee constructors into
+   sibling modules would force a cycle (Sector / Macro / Stock_analysis re-call
+   the Stage constructor) so they live together, sharing the helpers above.
+   Support_floor has no such back-edge and now lives in {!Panel_support_floor};
+   both of its constructors are re-exported below. *)
 
 (** Panel-shaped callback bundles for the Weinstein strategy callees.
 
@@ -381,36 +382,10 @@ let macro_callbacks_of_weekly_views_cached ?ma_cache ?index_symbol
 (* Support floor — daily view with day_offset:0 = NEWEST                *)
 (* ------------------------------------------------------------------ *)
 
-(** {!Support_floor.callbacks} use the convention day_offset:0 = newest bar in
-    the eligible window. Our {!Snapshot_bar_views.daily_view} is laid out the
-    other way (index 0 = oldest, n_days-1 = newest). The closure does the index
-    flip.
-
-    [get_close] reads [raw_closes] — the same (raw) price basis as [highs] /
-    [lows], so a [Close]-anchored scan stays on one scale. [get_adjusted_close]
-    reads [adjusted_closes]; the pair is what
-    {!Weinstein_stops.compute_initial_stop_with_floor_with_callbacks} divides to
-    recover each bar's split-adjustment factor under [split_safe_floors]. *)
-let support_floor_callbacks_of_daily_view (view : Snapshot_bar_views.daily_view)
-    : Weinstein_stops.callbacks =
-  let n = view.n_days in
-  let lookup f ~day_offset =
-    if day_offset < 0 || day_offset >= n then None
-    else
-      let idx = n - 1 - day_offset in
-      Some (f idx)
-  in
-  {
-    get_high = lookup (fun i -> view.highs.(i));
-    get_low = lookup (fun i -> view.lows.(i));
-    get_close = lookup (fun i -> view.raw_closes.(i));
-    get_adjusted_close = lookup (fun i -> view.adjusted_closes.(i));
-    get_date =
-      (fun ~day_offset ->
-        if day_offset < 0 || day_offset >= n then None
-        else Some view.dates.(n - 1 - day_offset));
-    n_days = n;
-  }
+(* Both support-floor constructors live in {!Panel_support_floor} (lifted out to
+   keep this coordinator under the file-length cap) and are re-exported here so
+   the [Panel_callbacks.*] surface is unchanged. *)
+let support_floor_callbacks_of_daily_view = Panel_support_floor.of_daily_view
 
 (* ------------------------------------------------------------------ *)
 (* Snapshot-views constructors (Phase F.3.c)                            *)
@@ -497,9 +472,5 @@ let macro_callbacks_of_snapshot_views ?ma_cache ~(config : Macro.config)
   macro_callbacks_of_weekly_views ?ma_cache ~index_symbol ~config ~index
     ~globals:global_views ~ad_bars ()
 
-let support_floor_callbacks_of_snapshot_views ~(cb : Snapshot_callbacks.t)
-    ~symbol ~as_of ~lookback ~calendar : Weinstein_stops.callbacks =
-  let view =
-    Snapshot_bar_views.daily_view_for cb ~symbol ~as_of ~lookback ~calendar
-  in
-  support_floor_callbacks_of_daily_view view
+let support_floor_callbacks_of_snapshot_views =
+  Panel_support_floor.of_snapshot_views

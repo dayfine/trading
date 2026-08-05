@@ -209,6 +209,37 @@ let test_daily_view_for_short_lookback _ =
   in
   _expect_n_days_eq ~msg:"short lookback" view.n_days 7
 
+(* The daily view carries BOTH price bases, each read from its own schema
+   field: [raw_closes] from [Close], [adjusted_closes] from [Adjusted_close].
+   The fixture's two formulas are deliberately distinct
+   ([105 + s + 0.15i] vs [102 + s + 0.13i]), so this fails loudly if either
+   column is filled from the other field — the failure mode that matters,
+   because equal columns make every split-adjustment factor
+   ([adjusted_closes /. raw_closes]) a silent [1.0] and would leave
+   [Weinstein_stops.config.split_safe_floors] a no-op on the panel path while
+   looking wired. *)
+let test_daily_view_raw_and_adjusted_closes_are_distinct_fields _ =
+  let cb = _setup_3sym_cb () in
+  let lookback = 7 in
+  let as_of_idx = 20 in
+  let as_of = _calendar_60.(as_of_idx) in
+  let view =
+    Snapshot_bar_views.daily_view_for cb ~symbol:"AAA" ~as_of ~lookback
+      ~calendar:_calendar_60
+  in
+  (* "AAA" is symbol_seed 0; the window covers day offsets 14..20. *)
+  let expected f =
+    List.init lookback ~f:(fun j -> f (as_of_idx - lookback + 1 + j))
+  in
+  assert_that
+    (Array.to_list view.raw_closes)
+    (elements_are
+       (expected (fun i -> float_equal (105.0 +. (Float.of_int i *. 0.15)))));
+  assert_that
+    (Array.to_list view.adjusted_closes)
+    (elements_are
+       (expected (fun i -> float_equal (102.0 +. (Float.of_int i *. 0.13)))))
+
 (* --- low_window smoke tests ---------------------------------------- *)
 
 let _bigarray_to_list (arr : (float, _, _) Bigarray.Array1.t) =
@@ -450,6 +481,8 @@ let suite =
          "daily_view_for full-window shape (all symbols)"
          >:: test_daily_view_for_full_window_shape;
          "daily_view_for short lookback" >:: test_daily_view_for_short_lookback;
+         "daily_view raw_closes / adjusted_closes are distinct fields"
+         >:: test_daily_view_raw_and_adjusted_closes_are_distinct_fields;
          "low_window full window shape" >:: test_low_window_shape;
          "unknown symbol yields empty views"
          >:: test_unknown_symbol_yields_empty_views;

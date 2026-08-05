@@ -32,26 +32,12 @@ type daily_view = Panel_views.daily_view = {
   n_days : int;
 }
 
-let _empty_weekly_view : weekly_view =
-  {
-    closes = [||];
-    raw_closes = [||];
-    highs = [||];
-    lows = [||];
-    volumes = [||];
-    dates = [||];
-    n = 0;
-  }
-
-let _empty_daily_view : daily_view =
-  {
-    highs = [||];
-    lows = [||];
-    raw_closes = [||];
-    adjusted_closes = [||];
-    dates = [||];
-    n_days = 0;
-  }
+(* The empty-view literals live in {!Snapshot_bar_views_helpers} and are
+   re-exported below, so consumers that need the same sentinel (e.g.
+   [Bar_reader]'s no-backing reader) share one definition instead of keeping a
+   hand-copied literal in sync field-by-field. *)
+let empty_weekly_view : weekly_view = H.empty_weekly_view
+let empty_daily_view : daily_view = H.empty_daily_view
 
 (* Calendar slack for date-keyed weekly windows: 7 weekdays + 1 holiday
    slack per week covers ISO-week buckets + a partial leading week. The
@@ -86,7 +72,7 @@ let _assemble_daily_bars ~open_ ~active_through ~adj ~close ~high ~low ~volume :
    [weekly_view] float-array shape. *)
 let _weekly_view_of_bars (weekly : Types.Daily_price.t list) : weekly_view =
   let n = List.length weekly in
-  if n = 0 then _empty_weekly_view
+  if n = 0 then empty_weekly_view
   else
     let arr_of f = Array.of_list (List.map weekly ~f) in
     {
@@ -145,10 +131,10 @@ let _build_weekly_view bars ~n =
 let _fetch_and_build_weekly_view cb ~symbol ~n ~as_of =
   let from = Date.add_days as_of (-_weekly_calendar_span ~n) in
   let bars = _daily_bars_in_range cb ~symbol ~from ~as_of in
-  if List.is_empty bars then _empty_weekly_view else _build_weekly_view bars ~n
+  if List.is_empty bars then empty_weekly_view else _build_weekly_view bars ~n
 
 let weekly_view_for (cb : Snapshot_callbacks.t) ~symbol ~n ~as_of =
-  if n <= 0 then _empty_weekly_view
+  if n <= 0 then empty_weekly_view
   else _fetch_and_build_weekly_view cb ~symbol ~n ~as_of
 
 (* Fixed-width lookback window for [daily_bars_for] / [weekly_bars_for]:
@@ -187,77 +173,6 @@ let _calendar_index_of (calendar : Date.t array) (as_of : Date.t) =
   Array.findi calendar ~f:(fun _ d -> Date.equal d as_of)
   |> Option.value_map ~default:(-1) ~f:fst
 
-(* The per-date field lookups the daily-view walker reads. Bundled into a
-   record so the walker stays inside the parameter-count guidance now that the
-   adjusted close is read alongside the raw OHLC fields. *)
-type _daily_tables = {
-  close_t : (Date.t, float) Hashtbl.t;
-  adj_t : (Date.t, float) Hashtbl.t;
-  high_t : (Date.t, float) Hashtbl.t;
-  low_t : (Date.t, float) Hashtbl.t;
-}
-
-(* Column buffers the walker fills in place; [count] rows are live. *)
-type _daily_buffers = {
-  b_highs : float array;
-  b_lows : float array;
-  b_raw_closes : float array;
-  b_adjusted_closes : float array;
-  b_dates : Date.t array;
-}
-
-let _alloc_daily_buffers ~len ~first_date =
-  let f () = Array.create ~len Float.nan in
-  {
-    b_highs = f ();
-    b_lows = f ();
-    b_raw_closes = f ();
-    b_adjusted_closes = f ();
-    b_dates = Array.create ~len first_date;
-  }
-
-(* Copy one calendar date's cells into slot [j]. Fields other than the raw
-   close degrade to NaN when the snapshot has no cell for the date — including
-   [Adjusted_close], so a missing adjustment cell yields a NaN factor rather
-   than a silently-wrong 1.0. *)
-let _emit_daily_row (b : _daily_buffers) (t : _daily_tables) ~date ~close_v ~j =
-  let find tbl = Hashtbl.find tbl date |> Option.value ~default:Float.nan in
-  b.b_raw_closes.(j) <- close_v;
-  b.b_adjusted_closes.(j) <- find t.adj_t;
-  b.b_highs.(j) <- find t.high_t;
-  b.b_lows.(j) <- find t.low_t;
-  b.b_dates.(j) <- date
-
-(* Walk calendar columns [from_idx..as_of_idx], emit one row per non-NaN raw
-   close. Missing snapshot rows leave NaN in the close lookup, same NaN-close
-   skip semantics. *)
-let _walk_daily_view_window ~calendar ~from_idx ~as_of_idx ~(tables : _daily_tables)
-    : daily_view =
-  let n_window = as_of_idx - from_idx + 1 in
-  let b = _alloc_daily_buffers ~len:n_window ~first_date:calendar.(from_idx) in
-  let count = ref 0 in
-  for i = from_idx to as_of_idx do
-    let date = calendar.(i) in
-    match Hashtbl.find tables.close_t date with
-    | None -> ()
-    | Some close_v when Float.is_nan close_v -> ()
-    | Some close_v ->
-        _emit_daily_row b tables ~date ~close_v ~j:!count;
-        Int.incr count
-  done;
-  let n = !count in
-  if n = 0 then _empty_daily_view
-  else
-    let take a = Array.sub a ~pos:0 ~len:n in
-    {
-      highs = take b.b_highs;
-      lows = take b.b_lows;
-      raw_closes = take b.b_raw_closes;
-      adjusted_closes = take b.b_adjusted_closes;
-      dates = take b.b_dates;
-      n_days = n;
-    }
-
 (* Read the raw close / adjusted close / high / low histories for
    [daily_view_for]; returns [None] when raw-close rows are absent. *)
 let _read_daily_tables cb ~symbol ~from_date ~until_date =
@@ -269,7 +184,7 @@ let _read_daily_tables cb ~symbol ~from_date ~until_date =
   else
     Some
       {
-        close_t = H.table_of close;
+        H.close_t = H.table_of close;
         adj_t = H.table_of (read Snapshot_schema.Adjusted_close);
         high_t = H.table_of (read Snapshot_schema.High);
         low_t = H.table_of (read Snapshot_schema.Low);
@@ -281,21 +196,21 @@ let _daily_view_from_idx cb ~symbol ~calendar ~as_of_idx ~lookback =
   let from_date = calendar.(from_idx) in
   let until_date = calendar.(as_of_idx) in
   match _read_daily_tables cb ~symbol ~from_date ~until_date with
-  | None -> _empty_daily_view
+  | None -> empty_daily_view
   | Some tables ->
-      _walk_daily_view_window ~calendar ~from_idx ~as_of_idx ~tables
+      H.walk_daily_view_window ~calendar ~from_idx ~as_of_idx ~tables
 
 (* Locate [as_of] in [calendar] and build a daily view; called when lookback > 0. *)
 let _find_and_build_daily_view cb ~symbol ~as_of ~lookback ~calendar =
   let as_of_idx = _calendar_index_of calendar as_of in
-  if as_of_idx < 0 then _empty_daily_view
+  if as_of_idx < 0 then empty_daily_view
   else _daily_view_from_idx cb ~symbol ~calendar ~as_of_idx ~lookback
 
 (* [~calendar] pins the window deterministically (pre-#848 path used
    ambiguous "lookback rows" semantics that diverged from the panel path). *)
 let daily_view_for (cb : Snapshot_callbacks.t) ~symbol ~as_of ~lookback
     ~calendar =
-  if lookback <= 0 then _empty_daily_view
+  if lookback <= 0 then empty_daily_view
   else _find_and_build_daily_view cb ~symbol ~as_of ~lookback ~calendar
 
 (* Fill a pre-allocated bigarray window with Low field values keyed by
