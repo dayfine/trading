@@ -1,5 +1,18 @@
 # Entry fill-model ladder — market vs stop vs stop-limit (2026-08-04/05)
 
+> **CORRECTION 2026-08-05 — read `dev/notes/bke-order-diagnosis-2026-08-05.md`
+> first.** Instrumented replay showed the stop arms' trigger is the CURRENT
+> CLOSE (G14 `effective_entry_price`), never the audit's `suggested_entry` E.
+> Consequently: the E-based trade classification below (classes 1/3/4, the
+> "base-buys below E" and "expired orders" stories, and the BKE specimen's
+> attribution) is MIS-SPECIFIED — those buckets measure report-vs-fill
+> distance, not the built mechanism; the deep-pair 2× gap is real but
+> dominated by 26y path divergence + close-trigger-vs-open-fill mechanics.
+> The ladder terminal numbers stand as measurements of the arms AS BUILT;
+> the attribution narrative does not. The fold-validated sp500 REJECT
+> (#2205) is unaffected. The GTC plan was rewritten around the true
+> prerequisite (entry trigger semantics).
+
 Follow-on to the 31-fold sp500 REJECT
 (`dev/notes/sim-entry-stoplimit-surface-2026-08-04.md`, ledger
 `2026-08-04-sim-entry-stoplimit-surface`). User asked for (1) broad universe,
@@ -69,20 +82,28 @@ resistance NEARBY" (BKE's top was far, not nearby → watchlist + armed order,
 not discard, and NOT a buy at 18). Both sim (Market fill, Day expiry) and the
 in-repo book reference (no order-mechanics section) missed this.
 
-## Conclusions
+## Conclusions (superseded 2026-08-05 — kept for the record; see the header)
 
-1. **Live ticket shape (StopLimit E, cap15, weekly re-issue) is the best
-   variant of its family** — the cap is vindicated (1.42× vs uncapped).
-2. **The record's Market-at-open fill is unfaithful**: it books pre-breakout
-   base buys the designed ticket cannot execute. Consistency decision
-   (record re-basing vs documented caveat) is the user's.
-3. **The one untested faithful lever: GTC persistence** (+ the book's tight
-   band as an axis). Spec: `dev/plans/gtc-breakout-orders-2026-08-05.md`.
-   Prior early_stage2_max_weeks REJECT does NOT carry over (that widened
-   MARKET-fill admission; GTC-stop only fills actual breakouts).
+> The four conclusions below were written before the diagnosis and are
+> retracted or reframed as follows: (1) the "family" comparison stands only
+> as an as-built measurement — all arms trigger at the current close, so
+> "StopLimit E" was a mislabel; (2) the record's fill is close-anchored BY
+> DESIGN (G14), and whether that is unfaithful is exactly the open Step-0
+> decision, not a settled verdict; (3) GTC persistence is NOT the lever —
+> engine orders already persist; the prerequisite is the entry-trigger
+> semantics decision (rewritten plan); (4) stands.
+
+1. ~~Live ticket shape is the best variant of its family~~ — as-built
+   measurement only; no arm triggers at E.
+2. ~~The record's Market-at-open fill is unfaithful~~ — reframed: the sim
+   anchors entries at the close by design while the report prints E; the
+   three-layer reconciliation is the open user decision.
+3. ~~The one untested faithful lever: GTC persistence~~ — void; see
+   `dev/notes/bke-order-diagnosis-2026-08-05.md` and the rewritten plan
+   (`dev/plans/gtc-breakout-orders-2026-08-05.md` Step 0/1).
 4. Open resistance-basis question (resistance-v2): local range top (~20.5)
    vs graded 520w top (28.66) as the resting level — false-virgins
-   protection vs earlier entries; BKE is the costing specimen.
+   protection vs earlier entries; BKE is the costing specimen. (Stands.)
 
 Follow-up not yet done: split class 4 into pre-breakout-base vs true
 post-breakout-pullback (needs per-symbol bar history vs E before signal).

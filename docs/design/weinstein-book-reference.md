@@ -238,21 +238,29 @@ your position... Use buy-stop orders on a good-'til-canceled (GTC) basis."*
 
 1. **GTC persistence.** The order rests for WEEKS until executed or cancelled —
    a slow breakout still fills (the "surprised two or three weeks later" case).
-   A Day-expiring order (the simulator's historical shape) or a weekly
-   re-issued ticket that lapses when the candidate ages out of the early-Stage-2
-   window is unfaithful: it structurally misses breakouts that arrive after
-   candidacy expires (measured specimen: BKE 2020 — Day-order arm missed the
-   Nov-10 breakout entirely and later chased the top for a loss).
+   NOTE (2026-08-05 diagnosis): the simulator's pending orders already persist
+   at the engine level (TIF is inert — pinned by
+   `test_gtc_entry_persistence.ml`), but this property is currently moot
+   because sim entry triggers sit at the CURRENT CLOSE and fill within a bar
+   (see below). GTC-persistence semantics only become meaningful for a live
+   weekly-re-issued ticket (which DOES lapse between reports) or for a sim
+   whose triggers rest at the breakout level E — see
+   `dev/notes/bke-order-diagnosis-2026-08-05.md`.
 2. **Tight limit band (~+2% in his example: 12⅛ stop / 12⅜ limit).** A gap
    through the band is NOT chased — but under GTC a refused gap is not a lost
    trade either; the resting order fills on a pullback into the band. The band
    is do-not-chase; GTC is don't-miss. The two work as a pair.
 
 **What the book does NOT sanction:** buying inside the trading range below the
-breakout level (a market order at the current price when the ticket's stop is
-above). The 2026-08-04/05 fill-model ladder measured the record simulator doing
-exactly that on 64% of trades — see
-`dev/notes/sim-entry-fill-ladder-2026-08-05.md`.
+breakout level (an order anchored at the current price when the designed
+ticket's stop is above, at the graded resistance). As of 2026-08-05 the
+simulator does this BY DESIGN on every entry — `effective_entry_price` (G14
+fix B) anchors `CreateEntering.entry_price` to the latest close, not the
+screener's `suggested_entry`, so even the #2202 StopLimit arm triggers at the
+current price while the weekly report prints "BUY STOP @ E". See
+`dev/notes/bke-order-diagnosis-2026-08-05.md` — the three layers (report=E,
+sim=current close, book=E+GTC) diverge, and reconciling them is an open
+design decision.
 
 **Entry level within the range:** the checklist anchors the buy-stop at the top
 of the CURRENT trading range ("write down the price that each would need to
