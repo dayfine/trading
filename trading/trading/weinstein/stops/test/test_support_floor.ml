@@ -885,6 +885,24 @@ let nan_adj_at_last_bar_bars =
         { b with adjusted_close = Float.nan }
       else b)
 
+(* B3: an unusable cell at a NON-ZERO day offset. [split_long_bars] is
+   oldest-first and the callbacks flip the index, so blanking 2024-01-01 puts
+   the bad cell at day_offset 4 — the far end of the window.
+
+   Every other NaN fixture here puts its bad cell at offset 0
+   ([nan_adj_at_last_bar_bars], [all_nan_adj_bars], [corrupt_close_bars]), so a
+   window check that only inspected the newest bar would still pass them; and
+   [nan_adj_at_low_bars] returns 104.0 under both whole-window and per-bar, so
+   its assertion cannot separate them either. This fixture is the only one that
+   pins the {b universal} quantifier in [_window_is_adjustable]: both per-bar
+   fallback and an offset-0-only check return 98.0 here, whole-window returns
+   the flag-off answer 104.0. *)
+let nan_adj_at_first_bar_bars =
+  List.map split_long_bars ~f:(fun (b : Types.Daily_price.t) ->
+      if Date.equal b.date (Date.of_string "2024-01-01") then
+        { b with adjusted_close = Float.nan }
+      else b)
+
 let _flag_off_long bars =
   compute_initial_stop_with_floor ~config:cfg ~side:Long
     ~entry_price:split_long_entry ~bars ~as_of:split_as_of ~fallback_buffer
@@ -905,6 +923,16 @@ let test_split_safe_nan_adjusted_falls_back_whole_window_not_per_bar _ =
     (all_of
        [
          equal_to (_flag_off_long nan_adj_at_last_bar_bars : stop_state);
+         _initial_reference (float_equal 104.0);
+       ])
+
+(* Pins that the window check is universal, not a check of the newest bar. *)
+let test_split_safe_nan_adjusted_at_far_offset_degrades_whole_window _ =
+  assert_that
+    (_flag_on_long nan_adj_at_first_bar_bars)
+    (all_of
+       [
+         equal_to (_flag_off_long nan_adj_at_first_bar_bars : stop_state);
          _initial_reference (float_equal 104.0);
        ])
 
@@ -1080,6 +1108,8 @@ let suite =
          >:: test_split_safe_nan_adjusted_close_degrades_to_raw_window;
          "split_safe_nan_adjusted_falls_back_whole_window_not_per_bar"
          >:: test_split_safe_nan_adjusted_falls_back_whole_window_not_per_bar;
+         "split_safe_nan_adjusted_at_far_offset_degrades_whole_window"
+         >:: test_split_safe_nan_adjusted_at_far_offset_degrades_whole_window;
          "split_safe_all_nan_adjusted_is_inert"
          >:: test_split_safe_all_nan_adjusted_is_inert;
          "split_safe_all_nan_adjusted_structural_flag_matches_flag_off"

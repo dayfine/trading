@@ -298,6 +298,52 @@ the panel path before this PR.
   linter (avg 3.06 > 3.0). Split into `_adjusted_close_at` / `_rescaled` /
   `_to_adjusted_basis` — no marker, no limit bump.
 
+### 2026-08-05 QC rework iteration 2 (PR #2213) — B3
+
+qc-structural APPROVED 5/5 at `fbc11600`; qc-behavioral reproduced all five
+mutation counts exactly with no overclaiming, and **retracted its own B2
+prescription** ("my fix for B2 would have re-created B1"). One coverage gap
+remained on correct code.
+
+- **B3 — the "any offset" quantifier is now pinned.** `_window_is_adjustable`
+  universally quantifies over the window, and both `weinstein_stops.mli` and
+  `stop_types.mli` state that as a contract, but nothing tested it: mutation
+  **MB5** (weaken the check to `day_offset:0` only) left the full repo
+  `dune runtest` at exit 0. Every existing NaN fixture put its unusable cell at
+  offset 0, and the one that didn't (`nan_adj_at_low_bars`, offset 1) returns
+  104.0 under both whole-window and per-bar, so its assertion could not separate
+  them.
+
+  New fixture `nan_adj_at_first_bar_bars` blanks the adjusted close on
+  2024-01-01 — `daily_view` is oldest-first and the callbacks flip the index, so
+  the bad cell sits at **day_offset 4**. All three arms measured independently
+  rather than taken from the review table; all three matched it:
+
+  | implementation | far-offset `reference_level` |
+  |---|---|
+  | flag off | 104.0 |
+  | **whole-window (shipped)** | **104.0** |
+  | per-bar (MN2) | 98.0 |
+  | offset-0-only (MB5) | 98.0 |
+
+  Pinned on **both** paths. The panel sibling also closes the `MN2 panel 0`
+  asymmetry flagged in the previous round — leaving the panel side without a
+  non-zero-offset fixture would have repeated the exact shape of the defect this
+  PR exists to fix.
+
+- **Mutation results** (baseline: both suites OK; every mutation compile-checked
+  before its result was read, per the stale-exe hazard hit earlier in this PR):
+
+  | mutation | stops/test_support_floor | strategy/test_panel_callbacks |
+  |---|---|---|
+  | MB5 — window check weakened to offset 0 | 1 (was 0) | 1 (was 0) |
+  | MN2 — per-bar instead of whole-window | 2 | **1 (was 0)** |
+
+- **F4 closed** — the `None`-everywhere sentinel case is resolved by the
+  all-or-nothing rework: a bundle whose `get_adjusted_close` is `None` at any
+  offset makes the window un-rescalable, so the flag is inert rather than
+  partially applied. No separate fix needed.
+
 ## Follow-ups
 
 - ~~Round-number shading (§5.1)~~ — **already implemented; this line was stale.**

@@ -1171,6 +1171,51 @@ let test_panel_split_safe_legacy_warehouse_all_nan_adjusted_is_inert _ =
   assert_that (stop _cfg_split_on)
     (equal_to (stop _cfg_split_off : Weinstein_stops.stop_state))
 
+(* B3 panel sibling. [daily_view] is oldest-first and the callbacks flip the
+   index, so blanking [adjusted_closes.(0)] (2024-01-01) puts the unusable cell
+   at day_offset 4 — the far end of the window. Every other panel NaN fixture
+   blanks the whole column, which an offset-0-only window check would still
+   catch; this is the only panel fixture that pins the {b universal} quantifier
+   in [_window_is_adjustable].
+
+   It also closes the coverage asymmetry noted in the previous rework round,
+   where the per-bar-vs-whole-window mutation reddened only the bar-list suite.
+   Leaving the panel side without a non-zero-offset fixture would repeat the
+   exact shape of the defect this PR exists to fix: a contract covered on the
+   bar-list path and silently unexercised on the panel path. *)
+let test_panel_split_safe_nan_adjusted_at_far_offset_degrades_whole_window _ =
+  let cb = build_snapshot_callbacks [ ("SPLT", _split_long_bars) ] in
+  let calendar =
+    Array.of_list
+      (List.map _split_long_bars ~f:(fun b -> b.Types.Daily_price.date))
+  in
+  let view =
+    Snapshot_bar_views.daily_view_for cb ~symbol:"SPLT" ~as_of:_split_as_of
+      ~lookback:90 ~calendar
+  in
+  let blanked_view =
+    {
+      view with
+      Snapshot_bar_views.adjusted_closes =
+        Array.mapi view.Snapshot_bar_views.adjusted_closes ~f:(fun i v ->
+            if i = 0 then Float.nan else v);
+    }
+  in
+  let callbacks =
+    Panel_callbacks.support_floor_callbacks_of_daily_view blanked_view
+  in
+  let stop config =
+    Weinstein_stops.compute_initial_stop_with_floor_with_callbacks ~config
+      ~side:Trading_base.Types.Long ~entry_price:104.0 ~callbacks
+      ~fallback_buffer:_split_fallback_buffer
+  in
+  assert_that (stop _cfg_split_on)
+    (all_of
+       [
+         equal_to (stop _cfg_split_off : Weinstein_stops.stop_state);
+         _initial_reference (float_equal 104.0);
+       ])
+
 let suite =
   "Panel_callbacks parity"
   >::: [
@@ -1206,6 +1251,8 @@ let suite =
          >:: test_panel_split_safe_close_anchor_uses_adjusted_closes;
          "legacy warehouse (all-NaN adjusted) — panel flag is inert"
          >:: test_panel_split_safe_legacy_warehouse_all_nan_adjusted_is_inert;
+         "unusable adjusted cell at a far offset — panel degrades whole window"
+         >:: test_panel_split_safe_nan_adjusted_at_far_offset_degrades_whole_window;
        ]
 
 let () = run_test_tt_main suite
