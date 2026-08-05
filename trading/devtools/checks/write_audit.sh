@@ -462,12 +462,24 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
 # (dev/status/harness.md): the chmod-before-mv placement above is supposed to
 # guarantee $OUTPUT_FILE already carries its final mode (644) the moment it
 # becomes visible, with no window in which a concurrent reader could observe
-# the pre-chmod 0600 mode. Used by record_qc_audit_test.sh to prove exactly
-# that: with this set, $OUTPUT_FILE must already be mode 644 right here, with
-# nothing else (in particular no chmod) having had a chance to run since the
-# rename completed. A refactor that moves the chmod to after the rename would
-# leave $OUTPUT_FILE at mktemp's 0600 at this exact point, turning this
-# assertion red.
+# the pre-chmod 0600 mode. Used by record_qc_audit_test.sh (scenario 24,
+# Part A) to prove that with this set, $OUTPUT_FILE is already mode 644 at
+# this exact point, in the ORDINARY (unmutated) script.
+#
+# This hook alone is NOT sufficient to pin the claim (rework 2026-08-05,
+# qc-behavioral B1): it is the literal next statement after `mv`, so any
+# statement a refactor inserts BETWEEN the `mv` line above and this `if`
+# -- e.g. a re-mode call re-targeted to $OUTPUT_FILE, placed directly below
+# the `mv` line -- runs before this hook ever fires, and is therefore
+# invisible to it by construction; no hook placed after the rename can
+# observe that. Closing that gap requires reading the source directly:
+# scenario 24 Part B asserts, statically, that this file's ONLY mode-fixing
+# call targets $TMP_FILE and appears at a line number strictly before the
+# `mv -f "$TMP_FILE" "$OUTPUT_FILE"` line above, and that no such call
+# targeting $OUTPUT_FILE exists anywhere in this file at all. That static
+# check is what actually makes "chmod-before-mv, no transient-wrong-mode
+# window" a pinned claim; this runtime hook only demonstrates the happy
+# path.
 if [ -n "${WRITE_AUDIT_TEST_ABORT_AFTER_RENAME:-}" ]; then
   echo "FAIL: WRITE_AUDIT_TEST_ABORT_AFTER_RENAME set; simulating interruption right after rename; OUTPUT_FILE=$OUTPUT_FILE" >&2
   exit 1
