@@ -68,6 +68,23 @@ let test_override_mirrors_into_support_via_shared_record _ =
   let built = Weinstein_strategy.stock_analysis_config_for ~config in
   assert_that built.resistance.min_history_bars (equal_to 520)
 
+(** The seam threads [entry_anchor_local_range_weeks] verbatim into the built
+    per-screen [Stock_analysis.config] (ticket-level local-range entry anchor).
+    Default [0] leaves it off — covered by
+    [test_default_builds_stock_analysis_default_config], which pins the built
+    config equal to {!Stock_analysis.default_config} (whose
+    [entry_anchor_local_range_weeks] is also [0]). A non-zero value flows
+    through unchanged. *)
+let test_threads_entry_anchor_local_range_weeks _ =
+  let config =
+    {
+      (_default_config ()) with
+      Weinstein_strategy.entry_anchor_local_range_weeks = 26;
+    }
+  in
+  let built = Weinstein_strategy.stock_analysis_config_for ~config in
+  assert_that built.entry_anchor_local_range_weeks (equal_to 26)
+
 let suite =
   "stock_analysis_config_wiring"
   >::: [
@@ -77,6 +94,8 @@ let suite =
          >:: test_override_sets_resistance_min_history_bars;
          "override mirrors into support via shared record"
          >:: test_override_mirrors_into_support_via_shared_record;
+         "threads entry_anchor_local_range_weeks into built config"
+         >:: test_threads_entry_anchor_local_range_weeks;
        ]
 
 let () = run_test_tt_main suite

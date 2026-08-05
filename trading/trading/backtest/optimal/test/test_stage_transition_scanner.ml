@@ -82,6 +82,7 @@ let make_analysis ?(ticker = "AAPL")
     support = None;
     breakout_price;
     breakdown_price = None;
+    local_range_top = None;
     prior_stage;
     continuation = None;
     supply = None;

@@ -1797,6 +1797,7 @@ let ranking_analysis ~ticker ~rs_norm ~weeks_advancing ~volume_ratio :
     support = None;
     breakout_price = Some 100.0;
     breakdown_price = None;
+    local_range_top = None;
     prior_stage = Some (Stage1 { weeks_in_base = 10 });
     continuation = None;
     supply = None;
@@ -2155,6 +2156,7 @@ let breakout_analysis ~ticker ~breakout_price ~current_close : Stock_analysis.t
     support = None;
     breakout_price;
     breakdown_price = None;
+    local_range_top = None;
     prior_stage = Some (Stage1 { weeks_in_base = 10 });
     continuation = None;
     supply = None;
@@ -2412,6 +2414,73 @@ let test_long_score_components_decompose_the_score _ =
   assert_that (List.map components ~f:fst) (equal_to rationale);
   assert_that (List.sum (module Int) components ~f:snd) (equal_to score)
 
+(* ------------------------------------------------------------------ *)
+(* entry_anchor_local_range_weeks: ticket-level entry anchor            *)
+(* ------------------------------------------------------------------ *)
+
+(** An admitting Stage-2 long whose graded breakout top is [breakout_price] and
+    whose (optional) local-range top is [local_range_top]. Built on
+    {!ranking_analysis} (fresh Stage-2, strong volume, positive RS) so [screen]
+    admits it as a buy candidate. *)
+let anchor_analysis ~ticker ~breakout_price ~local_range_top : Stock_analysis.t
+    =
+  {
+    (ranking_analysis ~ticker ~rs_norm:1.0 ~weeks_advancing:2 ~volume_ratio:2.5) with
+    breakout_price;
+    local_range_top;
+  }
+
+let _screen_buys analysis =
+  (screen ~config:cfg ~macro_trend:Bullish ~sector_map:(empty_sector_map ())
+     ~stocks:[ analysis ] ~held_tickers:[])
+    .buy_candidates
+
+(** Knob off ([local_range_top = None]): the entry ticket anchors at the graded
+    breakout top ([100.0]) → [suggested_entry = 100.0 *. 1.005 = 100.5] (default
+    [entry_buffer_pct]), bit-identical to pre-feature behaviour. *)
+let test_entry_anchor_graded_top_when_off _ =
+  let a =
+    anchor_analysis ~ticker:"AAA" ~breakout_price:(Some 100.0)
+      ~local_range_top:None
+  in
+  assert_that (_screen_buys a)
+    (elements_are
+       [
+         field
+           (fun (c : scored_candidate) -> c.suggested_entry)
+           (float_equal 100.5);
+       ])
+
+(** Knob armed ([local_range_top = Some 90.0], below the graded top): the entry
+    ticket re-anchors at the local range top ([90.0 *. 1.005 = 90.45]) and the
+    stop follows it ([90.45 *. 0.92]). The candidate is still admitted with the
+    SAME grade / score / side as with the knob off — admission and grading read
+    [breakout_price] (unchanged); only the entry / stop / risk ticket moves. *)
+let test_entry_anchor_local_top_when_armed _ =
+  let off =
+    anchor_analysis ~ticker:"AAA" ~breakout_price:(Some 100.0)
+      ~local_range_top:None
+  in
+  let on =
+    anchor_analysis ~ticker:"AAA" ~breakout_price:(Some 100.0)
+      ~local_range_top:(Some 90.0)
+  in
+  let c_off = List.hd_exn (_screen_buys off) in
+  assert_that (_screen_buys on)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (c : scored_candidate) -> c.suggested_entry)
+               (float_equal 90.45);
+             field (fun c -> c.suggested_stop) (float_equal (90.45 *. 0.92));
+             field (fun c -> c.grade) (equal_to c_off.grade);
+             field (fun c -> c.score) (equal_to c_off.score);
+             field (fun c -> c.side) (equal_to c_off.side);
+           ];
+       ])
+
 let suite =
   "screener_tests"
   >::: [
@@ -2605,6 +2674,10 @@ let suite =
          >:: test_failed_breakout_boolean_agrees_with_reason;
          "test_failed_breakout_tolerance_sexp_round_trips"
          >:: test_failed_breakout_tolerance_sexp_round_trips;
+         "entry anchor: graded top when knob off"
+         >:: test_entry_anchor_graded_top_when_off;
+         "entry anchor: local top when armed, admission/grading unchanged"
+         >:: test_entry_anchor_local_top_when_armed;
        ]
 
 let () = run_test_tt_main suite

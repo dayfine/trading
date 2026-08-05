@@ -152,6 +152,7 @@ let fresh_stage2 ?(virgin_readmission = false) ~weeks_advancing () :
     support = None;
     breakout_price = Some 100.0;
     breakdown_price = None;
+    local_range_top = None;
     prior_stage = None;
     continuation = None;
     supply = None;
@@ -505,6 +506,64 @@ let test_no_split_no_truncation _ =
   assert_that result.breakout_price (is_some_and (gt (module Float_ord) 100.0))
 
 (* ------------------------------------------------------------------ *)
+(* Local-range entry anchor (entry_anchor_local_range_weeks)            *)
+(* ------------------------------------------------------------------ *)
+
+(** Uniform [flat_price] highs except a single spike [spike_offset] weeks back
+    from the newest bar. Lets a test pin exactly which window bound captures the
+    spike. [adjusted_close = close] everywhere → no split truncation. *)
+let _local_range_bars ~n ~flat_price ~spike_offset ~spike_price =
+  List.init n ~f:(fun i ->
+      let off = n - 1 - i in
+      let price = if off = spike_offset then spike_price else flat_price in
+      make_bar i price 1000)
+
+let _analyze_local ~weeks bars =
+  analyze
+    ~config:{ cfg with entry_anchor_local_range_weeks = weeks }
+    ~ticker:"X" ~bars ~benchmark_bars:[] ~prior_stage:None ~as_of_date:as_of
+
+(** Off by default (knob [0]): [local_range_top] is [None], so the screener
+    keeps the graded breakout top as the sole entry basis (bit-identical). *)
+let test_local_range_top_off_is_none _ =
+  let bars = rising_bars ~n:60 50.0 150.0 in
+  let result =
+    analyze ~config:cfg ~ticker:"X" ~bars ~benchmark_bars:[] ~prior_stage:None
+      ~as_of_date:as_of
+  in
+  assert_that result.local_range_top is_none
+
+(** The window bound is exact on its lower edge: a spike 4 weeks back is OUTSIDE
+    a 3-week local range, so the anchor is the flat high [100 *. 1.02]. *)
+let test_local_range_top_excludes_older_spike _ =
+  let bars =
+    _local_range_bars ~n:20 ~flat_price:100.0 ~spike_offset:4 ~spike_price:200.0
+  in
+  assert_that (_analyze_local ~weeks:3 bars).local_range_top
+    (is_some_and (float_equal 102.0))
+
+(** The same spike 4 weeks back is INSIDE a 6-week local range, so the anchor
+    rises to the spike high [200 *. 1.02] — the max high over the window. *)
+let test_local_range_top_includes_spike_in_window _ =
+  let bars =
+    _local_range_bars ~n:20 ~flat_price:100.0 ~spike_offset:4 ~spike_price:200.0
+  in
+  assert_that (_analyze_local ~weeks:6 bars).local_range_top
+    (is_some_and (float_equal 204.0))
+
+(** Split truncation applies to the local-range window too: with a 4:1 split
+    inside the 30-week span, a 30-week local range must not leak the pre-split
+    $200 highs — the anchor stays in the current post-split price space
+    ([< 100]), mirroring [test_breakout_truncates_at_split_boundary]. *)
+let test_local_range_top_truncates_at_split_boundary _ =
+  let bars =
+    _split_synth ~n_total:30 ~n_pre:16 ~pre_high:200.0 ~pre_close:400.0
+      ~pre_adj:100.0 ~post_high:50.0 ~post_close:48.0 ~post_adj:48.0
+  in
+  assert_that (_analyze_local ~weeks:30 bars).local_range_top
+    (is_some_and (lt (module Float_ord) 100.0))
+
+(* ------------------------------------------------------------------ *)
 (* Continuation buys — Interpretation B of issue #889                   *)
 (*                                                                      *)
 (* The continuation arm of [is_breakout_candidate] only fires when      *)
@@ -787,6 +846,14 @@ let suite =
          "G14: breakdown truncates at split boundary"
          >:: test_breakdown_truncates_at_split_boundary;
          "G14: no split, no truncation" >:: test_no_split_no_truncation;
+         "local-range top off by default is None"
+         >:: test_local_range_top_off_is_none;
+         "local-range top excludes spike older than window"
+         >:: test_local_range_top_excludes_older_spike;
+         "local-range top includes spike within window"
+         >:: test_local_range_top_includes_spike_in_window;
+         "local-range top truncates at split boundary"
+         >:: test_local_range_top_truncates_at_split_boundary;
          "continuation default off keeps existing rejection"
          >:: test_continuation_default_off_keeps_existing_rejection;
          "continuation enabled admits mature stage2"

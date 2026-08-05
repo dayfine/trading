@@ -133,6 +133,7 @@ type config = {
   enable_sim_entry_stoplimit : bool; [@sexp.default false]  (** See [.mli]. *)
   sim_entry_trigger_at_suggested : bool; [@sexp.default false]
       (** See [.mli]. *)
+  entry_anchor_local_range_weeks : int; [@sexp.default 0]  (** See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -233,6 +234,7 @@ let default_config ~universe ~index_symbol =
     entry_extension_max_pct = 0.0;
     enable_sim_entry_stoplimit = false;
     sim_entry_trigger_at_suggested = false;
+    entry_anchor_local_range_weeks = 0;
   }
 
 let name = "Weinstein"
