@@ -129,6 +129,7 @@ val gen_position_id : string -> string
 
 val make_entry_transition :
   ?min_stop_distance_pct:float ->
+  ?trigger_at_suggested:bool ->
   portfolio_risk_config:Portfolio_risk.config ->
   stops_config:Weinstein_stops.config ->
   initial_stop_buffer:float ->
@@ -171,7 +172,17 @@ val make_entry_transition :
     [min_stop_distance_pct] away from [effective_entry]. Used by the strategy to
     re-wire {!Screener.candidate_params.initial_stop_pct} into the
     installed-stop path — preserves the G15 sizing invariant because sizing
-    still keys off the final installed [stop_level]. *)
+    still keys off the final installed [stop_level].
+
+    [?trigger_at_suggested] (default [false]) is the book-faithful E-anchored
+    entry override (user decision 2026-08-05): when [true], step (1) pins
+    [effective_entry] to [cand.suggested_entry] (the breakout level [E]) instead
+    of the current close, so the emitted [StopLimit] rests at [E] and sizing
+    (step 4) anchors at [E]. The caller sets this to
+    [config.sim_entry_trigger_at_suggested && config.enable_sim_entry_stoplimit];
+    default [false] is bit-identical to the current-close path (R1). See
+    {!Entry_audit_helpers.effective_entry_price} and
+    {!Weinstein_strategy_config.sim_entry_trigger_at_suggested}. *)
 
 val check_cash_and_deduct :
   leverage_enabled:bool ->

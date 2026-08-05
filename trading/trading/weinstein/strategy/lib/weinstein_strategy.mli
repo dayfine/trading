@@ -790,6 +790,17 @@ type config = {
           orders. Default [false] = bit-identical baselines; fill-model basis
           change when armed — own WF-CV surface, never bundled. See
           [Weinstein_strategy_config.enable_sim_entry_stoplimit]. *)
+  sim_entry_trigger_at_suggested : bool; [@sexp.default false]
+      (** Book-faithful E-anchored entry trigger (user decision 2026-08-05):
+          when [true] AND [enable_sim_entry_stoplimit] is on,
+          [CreateEntering.entry_price] = the candidate's [suggested_entry]
+          (breakout level [E]) instead of the current close, so the emitted
+          order rests as
+          [StopLimit (E, E * (1 +/- entry_extension_max_pct/100))] at the
+          breakout and sizes at [E]. Default [false] = current-close trigger,
+          bit-identical baselines (R1); gated on [enable_sim_entry_stoplimit] so
+          arming alone is a no-op. See
+          [Weinstein_strategy_config.sim_entry_trigger_at_suggested]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

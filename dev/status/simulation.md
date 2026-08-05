@@ -1,6 +1,45 @@
 # Status: simulation
 
-## Last updated: 2026-07-27
+## Last updated: 2026-08-05
+
+### 2026-08-05 — book-faithful E-anchored entry trigger (PR #2209)
+
+Plan: `dev/plans/gtc-breakout-orders-2026-08-05.md` (Step 1). Branch
+`feat/entry-trigger-at-e`. Diagnosis: `dev/notes/bke-order-diagnosis-2026-08-05.md`.
+
+**What.** New default-off strategy config flag `sim_entry_trigger_at_suggested :
+bool [@sexp.default false]`. When true AND `enable_sim_entry_stoplimit` is on, the
+strategy anchors `CreateEntering.entry_price` (and sizing) at the candidate's
+`suggested_entry` (breakout level E) instead of the current close (the G14 fix-B
+default). The emitted order is then a genuine `StopLimit (E, E×(1±band))` resting
+at the breakout — matching the book (Ch.3 p.67-68 / ref §4.7) and the live
+report's E-anchored tickets. User decision 2026-08-05 (Step 0 option (b)).
+
+**Status: DONE.** R1 (off = bit-identical) pinned; split-safe in-sim (G14 fix-A
+truncates the screener lookback at splits, so E and the close share one price
+basis). Narrowest seam: `Entry_audit_helpers.effective_entry_price` +
+`make_entry_transition` + `Entry_walk` AND-gate. StopLimit-rests-at-E-fills-on-cross
+already pinned by `test_gtc_entry_persistence.ml`.
+
+**Completed.** `sim_entry_trigger_at_suggested` flag (3 sync'd config sites);
+3 unit tests (E-anchor entry+sizing, R1 off pin); plan Step 0/1 updated.
+
+**Next steps (Steps 2-3, not in this PR).**
+- **PR2 — execution-faithfulness audit** (`feat/execution-faithfulness-audit`):
+  extend `Trade_audit` with per-trade execution fields (`designed_order_type`
+  Market/StopLimit+trigger+limit; `designed_trigger` = transition entry_price;
+  `fill_price`; `fill_vs_trigger_pct`; `fill_within_band`; `faithful`) as an
+  optional `[@sexp.option]` record on `audit_record` (external_exit_decision
+  pattern, #2085), surfaced as columns + a %-faithful summary in
+  `trade_audit_report`. Design (traced): `fill_price` reuses
+  `Metrics.trade_metrics.entry_price` (round-trip open-leg fill); `designed_trigger`
+  = `entry_decision.initial_position_value / shares` (= effective_entry);
+  `designed_order_type` = `Panel_runner._entry_cap_for_sim` config logic; join
+  audit↔trade by (symbol, entry_date) at the runner. Not started (was scoped this
+  session; deferred to keep PR1 clean + verified).
+- **Step 2** — managed GTC lifecycle (cancel-on-candidacy-loss, re-grade amend).
+- **Step 3** — honest fill-model ladder re-derivation + WF-CV surface on the
+  E-anchored basis.
 
 ### 2026-07-27 — LH phantom SHORT + duplicated `trades.csv` rows (issue #2059)
 

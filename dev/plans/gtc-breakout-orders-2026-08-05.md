@@ -11,9 +11,17 @@
 > manage. The faithful mechanics (rest at the breakout, GTC, tight band —
 > book Ch.3 p.67-68, reference §4.7) require a PREREQUISITE change first.
 
-## Step 0 (the actual open decision) — what is the entry trigger?
+## Step 0 — DECIDED (b) 2026-08-05 (user): book-faithful E-anchored orders
 
-Today's three-layer divergence:
+The sim (and therefore the record) moves to E-triggered resting stops: entry
+orders rest at the screener's breakout level `E` (`suggested_entry`), matching
+the book (Ch.3 p.67-68, reference §4.7) and the live report's tickets. Sizing
+also anchors at E (the sizing-at-E sub-decision below is resolved: E, consistent
+with live tickets). Implemented as Step 1's default-off flag
+`sim_entry_trigger_at_suggested` (PR `feat/entry-trigger-at-e`); the fill-model
+ladder is to be re-derived honestly on the E-anchored basis (Step 3).
+
+Today's three-layer divergence (pre-flag):
 
 | Layer | Entry anchored at |
 |---|---|
@@ -26,21 +34,29 @@ REPORT print close-anchored tickets for live/sim consistency; (b) move the
 sim to E-triggered resting stops → build the flag below, then re-derive the
 fill-model ladder honestly; (c) dual convention, documented.
 
-## Step 1 (if (b)) — `sim_entry_trigger_at_suggested : bool [@sexp.default false]`
+## Step 1 — `sim_entry_trigger_at_suggested : bool [@sexp.default false]` — DONE (PR `feat/entry-trigger-at-e`)
 
-Default-off flag routing `Order_generator`'s entry trigger to the candidate's
-`suggested_entry` instead of `effective_entry_price`'s close (the close stays
-the audit/sizing anchor unless decided otherwise — sizing-at-E vs sizing-at-
-close is itself a sub-decision; live sizes at E). With the flag on AND
-`enable_sim_entry_stoplimit` on, orders genuinely rest at E — engine-level
-persistence already carries them (pinned). R1: off = bit-identical. R2: flat
-config field, axis-expressible.
+Default-off flag that pins `effective_entry_price` (and hence
+`CreateEntering.entry_price` + sizing) to the candidate's `suggested_entry` (E)
+instead of the current close. With the flag on AND `enable_sim_entry_stoplimit`
+on, the emitted `StopLimit (E, E * (1 +/- entry_extension_max_pct/100))`
+genuinely rests at E — engine-level persistence already carries it (pinned in
+`test_gtc_entry_persistence.ml`, whose entry_price=160=E scenario is exactly
+"E above current close → resting StopLimit fills only on the later cross").
+Sizing anchors at E (sizing reads `effective_entry`). R1: off = bit-identical
+(pinned). R2: flat config field, axis-expressible.
 
-Watch-outs from the diagnosis: G14 fix B exists for split-basis safety —
-`suggested_entry` is a screener-buffer value; verify it is split-consistent
-with the fill-time bar basis before trusting E-anchored fills (this is WHY
-G14 moved to the close; the flag must not silently reintroduce that bug —
-may need the split-safe re-anchoring applied to E).
+Split-safety (resolved): G14 fix B pinned the trigger to the close because
+`suggested_entry` *could* land in a different price space on a symbol whose
+screener lookback spanned a split. That hazard is already closed by G14 fix A —
+the screener truncates its high/low lookback at the most recent split boundary
+(`Stock_analysis._no_split_between`), so `suggested_entry` is computed in
+*current* raw close-price space. In-sim the screener bars and fill bars share
+one snapshot source, so E and the close share one basis by construction. No
+per-symbol split guard is added, and deliberately no epsilon-fallback to close
+(E is by design *above* the close for a long breakout — a disagreement guard
+would misfire on every normal breakout). Full argument in the
+`sim_entry_trigger_at_suggested` .mli doc.
 
 ## Step 2 — management semantics (only meaningful after Step 1)
 
@@ -59,4 +75,6 @@ superseded (see the diagnosis note).
 
 ## Status
 
-Step 0 awaits the user. Nothing builds before that call.
+Step 0 DECIDED (b). Step 1 DONE (PR `feat/entry-trigger-at-e`, default-off).
+Steps 2 (managed GTC lifecycle) and 3 (honest ladder re-derivation + WF-CV
+surface) remain.

@@ -100,8 +100,15 @@ let entries_from_candidates ?sector_lookup ~config ~candidates ~stop_states
     ?(audit_recorder = Audit_recorder.noop) ?macro () =
   let held_set = String.Set.of_list (held_symbols portfolio) in
   let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
+  (* Book-faithful E-anchored entry trigger (user decision 2026-08-05): only
+     when BOTH the trigger-at-E flag and the StopLimit fill model are armed does
+     the entry rest at [suggested_entry] (E). Either flag off => current-close
+     trigger, bit-identical to the pre-flag path (R1). *)
+  let trigger_at_suggested =
+    config.sim_entry_trigger_at_suggested && config.enable_sim_entry_stoplimit
+  in
   let make_entry (cand : Screener.scored_candidate) =
-    Entry_audit_capture.make_entry_transition
+    Entry_audit_capture.make_entry_transition ~trigger_at_suggested
       ~min_stop_distance_pct:
         (Entry_stop_distance.min_stop_distance_for ~config ~bar_reader
            ~current_date cand)
