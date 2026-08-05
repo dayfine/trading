@@ -73,7 +73,7 @@ let _entry ?(entry_date = _date "2024-03-01") ?(symbol = "AAPL")
   }
 
 let _record entry : TA.audit_record =
-  { entry; exit_ = None; external_exit = None }
+  { entry; exit_ = None; external_exit = None; execution = None }
 
 (* Grouping -------------------------------------------------------------- *)
 

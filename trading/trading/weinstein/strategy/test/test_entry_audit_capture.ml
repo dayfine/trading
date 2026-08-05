@@ -417,6 +417,55 @@ let test_trigger_at_suggested_off_uses_current_close _ =
               (float_equal 110.0);
           ]))
 
+(** CP4 (#2209 review): [sim_entry_trigger_at_suggested] is inert ALONE. The
+    E-anchoring only fires when [enable_sim_entry_stoplimit] is ALSO on — the
+    AND-gate in {!Entry_walk.entries_from_candidates}. With the trigger flag on
+    but the StopLimit flag OFF, the emitted [CreateEntering.entry_price] stays
+    at the current close ($110), NOT at [suggested_entry] ($130). Exercised
+    through the real config→entry-walk path (not the direct
+    [~trigger_at_suggested] param) so the AND-gate itself is pinned. *)
+let test_trigger_flag_alone_is_inert _ =
+  let current_date = Date.of_string "2024-06-14" in
+  let bar_reader =
+    _bar_reader_with_current_close ~current_date ~current_close:110.0
+  in
+  let cand =
+    _long_candidate ~ticker:_ticker ~suggested_entry:130.0 ~suggested_stop:100.0
+      ~as_of_date:current_date
+  in
+  let config =
+    {
+      (Weinstein_strategy_config.default_config ~universe:[ _ticker ]
+         ~index_symbol:"SPY")
+      with
+      sim_entry_trigger_at_suggested = true;
+      enable_sim_entry_stoplimit = false;
+    }
+  in
+  let portfolio =
+    {
+      Trading_strategy.Portfolio_view.cash = 1_000_000.0;
+      positions = String.Map.empty;
+    }
+  in
+  let stop_states = ref String.Map.empty in
+  let transitions =
+    Entry_walk.entries_from_candidates ~config ~candidates:[ cand ] ~stop_states
+      ~bar_reader ~portfolio
+      ~get_price:(fun _ -> None)
+      ~current_date ()
+  in
+  assert_that transitions
+    (elements_are
+       [
+         field
+           (fun (t : Position.transition) ->
+             match t.kind with
+             | Position.CreateEntering e -> e.entry_price
+             | _ -> Float.nan)
+           (float_equal 110.0);
+       ])
+
 (* ------------------------------------------------------------------ *)
 (* G15 step 2: short-notional cap tests                                  *)
 (* ------------------------------------------------------------------ *)
@@ -1274,6 +1323,8 @@ let () =
            >:: test_trigger_at_suggested_sizes_at_e;
            "E-anchor R1: trigger_at_suggested off uses current close"
            >:: test_trigger_at_suggested_off_uses_current_close;
+           "E-anchor CP4: trigger flag alone is inert"
+           >:: test_trigger_flag_alone_is_inert;
            "G15-step2: short notional cap skips at 31%"
            >:: test_short_notional_cap_skips_at_31pct;
            "G15-step2: short notional cap admits at 29%"

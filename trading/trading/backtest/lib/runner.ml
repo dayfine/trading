@@ -442,7 +442,7 @@ let _assemble_result ~start_date ~end_date ~deps ~overrides ~sim_result
   let final_value = (List.last_exn steps).portfolio_value in
   let ( round_trips,
         stop_infos,
-        audit,
+        audit_raw,
         cascade_summaries,
         force_liquidations,
         stale_holds ) =
@@ -464,7 +464,9 @@ let _assemble_result ~start_date ~end_date ~deps ~overrides ~sim_result
     n_stop_eligible_positions = sim_result.n_stop_eligible_positions;
     overrides;
     stop_infos;
-    audit;
+    audit =
+      Execution_faithfulness.enrich_for_config ~audit:audit_raw ~round_trips
+        ~config:deps.config;
     cascade_summaries;
     force_liquidations;
     stale_holds;

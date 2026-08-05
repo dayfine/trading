@@ -95,10 +95,26 @@ type external_exit_decision = {
 }
 [@@deriving sexp]
 
+type designed_order_type =
+  | Market
+  | Stop_limit of { trigger : float; limit : float }
+[@@deriving sexp]
+
+type execution_faithfulness = {
+  designed_order_type : designed_order_type;
+  designed_trigger : float;
+  fill_price : float;
+  fill_vs_trigger_pct : float;
+  fill_within_band : bool;
+  faithful : bool;
+}
+[@@deriving sexp]
+
 type audit_record = {
   entry : entry_decision;
   exit_ : exit_decision option;
   external_exit : external_exit_decision option; [@sexp.option]
+  execution : execution_faithfulness option; [@sexp.option]
 }
 [@@deriving sexp]
 
@@ -207,6 +223,7 @@ let _bucket_to_record (bucket : _bucket) : audit_record =
     entry = bucket.bucket_entry;
     exit_ = bucket.bucket_exit;
     external_exit = bucket.bucket_external_exit;
+    execution = None;
   }
 
 let _compare_by_position_id (a : audit_record) (b : audit_record) =

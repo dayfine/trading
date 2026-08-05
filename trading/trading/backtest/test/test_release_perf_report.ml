@@ -521,7 +521,7 @@ let _make_audit_record ~symbol ~entry_date
       weeks_stage_left_2 = 1;
     }
   in
-  { entry; exit_ = Some exit_; external_exit = None }
+  { entry; exit_ = Some exit_; external_exit = None; execution = None }
 
 let _make_trade ~symbol ~entry_date ?(side = Trading_base.Types.Buy)
     ?(days_held = 100) ?(entry_price = 100.0) ?(exit_price = 110.0)

@@ -37,6 +37,7 @@ module Weekly_sidetable_reader = Weekly_sidetable_reader
 module Weekly_ma_cache = Weekly_ma_cache
 module Audit_recorder = Audit_recorder
 module Entry_audit_capture = Entry_audit_capture
+module Entry_walk = Entry_walk
 module Screening_notional = Screening_notional
 module Long_buying_power = Long_buying_power
 module Leverage_dawn = Leverage_dawn

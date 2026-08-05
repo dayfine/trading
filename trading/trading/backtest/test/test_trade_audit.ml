@@ -252,7 +252,12 @@ let test_external_exit_decision_sexp_round_trip _ =
 
 let test_audit_record_sexp_round_trip _ =
   let record : TA.audit_record =
-    { entry = make_entry (); exit_ = Some (make_exit ()); external_exit = None }
+    {
+      entry = make_entry ();
+      exit_ = Some (make_exit ());
+      external_exit = None;
+      execution = None;
+    }
   in
   let parsed = TA.audit_record_of_sexp (TA.sexp_of_audit_record record) in
   assert_that parsed (equal_to record)
@@ -264,6 +269,7 @@ let test_audit_records_sexp_round_trip_through_top_level_codec _ =
         entry = make_entry ();
         exit_ = Some (make_exit ());
         external_exit = None;
+        execution = None;
       };
       {
         entry =
@@ -271,6 +277,7 @@ let test_audit_records_sexp_round_trip_through_top_level_codec _ =
             ~entry_date:(_date "2024-02-01") ();
         exit_ = None;
         external_exit = None;
+        execution = None;
       };
     ]
   in
