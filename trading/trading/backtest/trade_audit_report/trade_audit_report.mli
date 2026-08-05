@@ -90,6 +90,19 @@ type per_trade_row = {
       (** Cascade grade at decision time. [None] when no audit match. *)
   cascade_score : int option;
       (** Cascade score at decision time. [None] when no audit match. *)
+  fill_vs_trigger_pct : float option;
+      (** Signed fraction [(fill_price -. designed_trigger) /. designed_trigger]
+          from the matched entry's
+          {!Backtest.Trade_audit.execution_faithfulness} record — how far the
+          realised fill sat from the designed breakout trigger. [None] when no
+          audit record matched or the entry had no realised fill (still open at
+          end-of-run). Rendered as a percentage (×100) in the markdown table. *)
+  faithful : bool option;
+      (** Whether the entry fill honoured the designed order (from the same
+          execution record). [Some true] for a [Market] fill by definition;
+          [Some false] flags a resting StopLimit that filled at a price the stop
+          should not have produced. [None] when no execution record was joined.
+      *)
 }
 [@@deriving sexp]
 (** One row in the per-trade table. Fields up through [exit_trigger] come from
@@ -97,7 +110,10 @@ type per_trade_row = {
     when a {!Backtest.Trade_audit.audit_record} matches the round-trip on
     [(symbol, entry_date)]. Audit fields are [None] when no [trade_audit.sexp]
     was found or when the audit collector did not capture this entry (e.g.
-    pre-PR-2 outputs). *)
+    pre-PR-2 outputs). [fill_vs_trigger_pct] / [faithful] additionally require
+    the audit record to carry an [execution] record (populated at the runner by
+    {!Backtest.Execution_faithfulness.enrich}); they are [None] for entries with
+    no matched fill. *)
 
 type analysis = {
   ratings : Trade_audit_ratings.rating list;

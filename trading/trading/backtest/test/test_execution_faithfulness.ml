@@ -261,14 +261,47 @@ let test_execution_record_round_trips _ =
   let round_tripped =
     TA.sexp_of_audit_records enriched |> TA.audit_records_of_sexp
   in
+  (* Whole-record pin: all six execution fields survive the sexp round-trip. *)
   assert_that
     (execution_of_first round_tripped)
     (is_some_and
        (all_of
           [
+            field
+              (fun e -> e.TA.designed_order_type)
+              (matching ~msg:"Expected Stop_limit"
+                 (function
+                   | TA.Stop_limit { trigger; limit } -> Some (trigger, limit)
+                   | TA.Market -> None)
+                 (all_of
+                    [
+                      field fst (float_equal 150.0);
+                      field snd (float_equal 172.5);
+                    ]));
             field (fun e -> e.TA.designed_trigger) (float_equal 150.0);
+            field (fun e -> e.TA.fill_price) (float_equal 150.0);
+            field (fun e -> e.TA.fill_vs_trigger_pct) (float_equal 0.0);
+            field (fun e -> e.TA.fill_within_band) (equal_to true);
             field (fun e -> e.TA.faithful) (equal_to true);
           ]))
+
+let test_degenerate_trigger_falls_back_to_suggested_entry _ =
+  (* When the dollar fields cannot recover [E] ([initial_position_value <= 0]),
+     the trigger falls back to the screener's [suggested_entry] — the recovery
+     formula is undefined (nan ratio), so the guard rejects it. *)
+  let entry =
+    {
+      (make_entry ~suggested_entry:200.0 ~installed_stop:180.0 ()) with
+      initial_position_value = 0.0;
+    }
+  in
+  assert_that
+    (execution_of_first
+       (EF.enrich
+          ~audit:[ make_record entry ]
+          ~round_trips:[ make_trade ~entry_price:200.0 () ]
+          ~entry_order_kind:Market))
+    (is_some_and (field (fun e -> e.TA.designed_trigger) (float_equal 200.0)))
 
 let suite =
   "execution_faithfulness"
@@ -290,6 +323,8 @@ let suite =
          "old sexp without execution parses as None"
          >:: test_old_sexp_without_execution_parses_as_none;
          "execution record round-trips" >:: test_execution_record_round_trips;
+         "degenerate trigger falls back to suggested_entry"
+         >:: test_degenerate_trigger_falls_back_to_suggested_entry;
        ]
 
 let () = run_test_tt_main suite
