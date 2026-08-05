@@ -1,17 +1,21 @@
 # Status: support-floor-stops
 
-## Last updated: 2026-04-17
+## Last updated: 2026-08-05
 
 ## Status
-MERGED
+READY_FOR_REVIEW
 
 ## Interface stable
 YES
 
 ## Open PR
-- None. Both PRs merged to main on 2026-04-17:
-  - PR A (primitive, long + short) — #382
-  - PR B (wrapper + strategy wiring, long side) — #390
+- `feat/split-safe-panel-path` — split-safe floors on the panel/callback path
+  (2026-08-05 addendum below). Branch pushed; PR opened by the orchestrator.
+- Previously merged on this track:
+  - PR A (primitive, long + short) — #382 (2026-04-17)
+  - PR B (wrapper + strategy wiring, long side) — #390 (2026-04-17)
+  - anchor-mode dial — `feat/floor-anchor-close` (2026-07-29)
+  - split-safe floors, bar-list path + `floor_is_structural` — #2181 (2026-08-02)
 
 ## Completed
 
@@ -149,14 +153,91 @@ split-safe decision item).
   sexp round-trip / omitted-defaults-false. `test_variant_matrix.ml`: axis
   expansion for `stops_config.split_safe_floors`.
 
+## 2026-08-05 addendum — split-safe floors on the panel/callback path (PR branch `feat/split-safe-panel-path`)
+
+Closes the last open follow-up. `split_safe_floors` now governs **both** floor
+paths; before this the flag was exposed as the searchable axis
+`((stops_config ((split_safe_floors true))))` but silently did nothing on the
+main multi-symbol strategy hot path, so a walk-forward surface over that axis was
+measuring a partial mechanism (an `experiment-flag-discipline.md` R2 defect).
+
+- **`Panel_views.daily_view` now carries both price bases.** Added
+  `adjusted_closes` (from the `Snapshot_schema.Adjusted_close` cell) and renamed
+  `closes` → `raw_closes`.
+  - **Correction to the prior note.** The 2026-08-02 addendum recorded the
+    blocker as "`daily_view` exposes raw highs/lows and adjusted closes but no
+    raw close." That was **inverted**: `daily_view.closes` was populated from
+    `Snapshot_schema.Close` (raw) all along, while the field's docstring claimed
+    "Daily adjusted closes". The missing half was the *adjusted* close. Renaming
+    the field rather than adding a same-named sibling keeps the change
+    compiler-checked — every construction site had to be updated, and no
+    existing `.closes` read could silently change meaning.
+  - Two pre-existing readers in `trade_audit_report_bin.ml` were on the raw
+    basis while their comments said "adjusted". Left on the raw basis (no
+    behaviour change) with the discrepancy documented in place; whether the R6
+    ratings *should* read adjusted closes is a separate question, deliberately
+    not answered here.
+- **One rescale implementation, at the callbacks-bundle level.** The rescale
+  moved out of `_to_adjusted_basis_bar` (bar-level) into `_to_adjusted_basis`
+  (bundle-level) inside `Floor_stop`, driven by a new
+  `Support_floor.callbacks.get_adjusted_close` accessor. `compute_initial_stop_
+  with_floor` now builds a raw bundle and calls straight through to
+  `..._with_callbacks`, so both paths share one code path — the corrupt-close
+  guard, the anchor mode and the flag cannot diverge between them by
+  construction. A `daily_view` has no `Daily_price.t` to rewrite, only
+  accessors, which is why the bundle level is the only level both paths share.
+  The A2 decision from 2026-08-02 stands: the rescale is still inlined in
+  `stops/`, with no `Adjusted_basis` import and no helper relocation.
+- **`floor_is_structural_with_callbacks`** — callback-shaped sibling of
+  `floor_is_structural`, running the same internal scan. `entry_audit_helpers`'
+  `stop_floor_kind` tag now routes through it instead of calling the primitive
+  directly, closing the #2167 class of bug on the panel path too (#2181 did the
+  same for `stop_recompute` on the bar-list path).
+- **R1 evidence (default-off bit-identical).** The panel test asserts structural
+  equality of the whole `stop_state` against an in-test transcription of the
+  pre-change code path (scan the bundle exactly as supplied, then place the
+  stop) over the split-straddling window, plus the literal 104.0 phantom
+  reference the raw basis yields. Mechanically, `_scan_callbacks` is the
+  identity when the flag is off. Full `dune runtest` is green with zero golden
+  changes.
+- **R2 evidence (flag-on controls the panel path).** Same window, flag on: the
+  long reference moves 104.0 → 98.0 (off the phantom that sat right at the
+  ~104 entry, onto the adjusted-basis correction low) and matches the bar-list
+  path exactly. Short mirror via `floor_is_structural_with_callbacks`:
+  `false` → `true`.
+- **Non-vacuity checked, not assumed.** Temporarily populating
+  `adjusted_closes` from the raw close (the "looks wired, factor is silently
+  1.0" failure mode) fails all three new adjusted-basis tests while the
+  default-off R1 test correctly stays green.
+- **Code health.** All three files the change touched were within 5 lines of
+  their length cap on main, so the additions tripped the linter. Fixed by
+  extraction, not by bumping limits or adding markers: daily-view walker →
+  `snapshot_bar_views_helpers`; `empty_weekly_view` / `empty_daily_view`
+  exported from `Snapshot_bar_views` and reused by `bar_reader` in place of a
+  hand-copied literal; support-floor constructors → new `Panel_support_floor`
+  (it has no back-edge to the Stage constructor, unlike the Sector / Macro /
+  Stock_analysis ones the `@large-module` note cites).
+
+Verify: `dev/lib/run-in-env.sh dune build && dev/lib/run-in-env.sh dune runtest`
+(exit 0 each), then
+`dune exec ./trading/weinstein/strategy/test/test_panel_callbacks.exe` — the
+three `split_safe_floors` cases — and
+`dune exec ./analysis/weinstein/snapshot_runtime/test/test_snapshot_bar_views.exe`
+— `daily_view raw_closes / adjusted_closes are distinct fields`.
+
 ## Follow-ups
 
-- Round-number shading (§5.1): if computed stop lands near a round or half-point boundary, shade slightly below. New helper, probably `Support_floor.round_to_support` or inline in `Stops`.
-- **Split-safe on the panel/callback path.** Extending `daily_view`
-  (`Data_panel_snapshot.Panel_views`) with a `raw_closes` array (as `weekly_view`
-  already has) would let the main multi-symbol strategy hot path derive the
-  per-bar factor and honour `split_safe_floors` too. Deferred — larger snapshot-infra
-  change; the live weekly-picks path is already covered via the bar-list chokepoint.
+- ~~Round-number shading (§5.1)~~ — **already implemented; this line was stale.**
+  `Stop_nudge.nudge_round_number` exists and `stop_types.ml` carries
+  `round_number_nudge = 0.125`, applied by `Floor_stop.compute_initial_stop` and
+  by the trailing / tightened candidates in `weinstein_stops.ml`. Nothing to build.
+- ~~Split-safe on the panel/callback path~~ — **done 2026-08-05**, see the
+  addendum above.
+- `split_safe_floors` still needs a ledger ACCEPT before its default can flip
+  (R3). Now that the axis actually controls both paths, a walk-forward surface
+  over `((stops_config ((split_safe_floors true))))` measures the whole
+  mechanism rather than the bar-list half — any earlier reading of that axis
+  under-states the effect and should be re-run.
 
 ## QC
 
