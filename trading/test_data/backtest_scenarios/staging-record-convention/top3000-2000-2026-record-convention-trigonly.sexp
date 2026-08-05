@@ -1,4 +1,4 @@
-;; #2158 DEEP PAIR — cap15 arm. Identical to
+;; #2158 DEEP PAIR — TRIGGER-ONLY arm. Identical to
 ;; top3000-2000-2026-record-convention.sexp (the record convention: honest
 ;; dials + armed extension_stop + reject_declining_ma) PLUS the sim
 ;; StopLimit entry fill cap at the live-armed 15pp value

@@ -23,8 +23,9 @@ evidence, not a WF verdict.
 | Stop uncapped (trigger @ E, fill any gap) | +2,852% (29.5×) | 0.71 | 40.7% | 30.5% | 1,108 |
 | StopLimit E×1.15 (live ticket) | +4,108% (42.1×) | 0.77 | 40.9% | 31.7% | 1,092 |
 
-Decomposition (multiplicative): **market / any-stop ≈ 2.0×** = the trigger
-wedge; **cap15 / uncapped-stop = 1.42×** = the do-not-chase cap's PROTECTIVE
+Decomposition (multiplicative): **market / cap15 = 2.0×** (market / uncapped
+stop = 2.9×) = the trigger wedge; **cap15 / uncapped-stop = 1.42×** = the
+do-not-chase cap's PROTECTIVE
 value within the stop family (refusing >15% gap-throughs is worth +42%
 terminal — broad small-caps gap hugely; sp500 didn't show this because large
 caps rarely gap >15%).
