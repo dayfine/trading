@@ -455,4 +455,22 @@ chmod 644 "$TMP_FILE"
 
 mv -f "$TMP_FILE" "$OUTPUT_FILE"
 
+# Test-only hook: simulate an interruption at the instant $OUTPUT_FILE first
+# becomes visible -- i.e. immediately after the rename, before anything else
+# in this script runs. Symmetric to WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME
+# above. This is the hook H-AUDIT-MODE-ORDER-UNPINNED asks for
+# (dev/status/harness.md): the chmod-before-mv placement above is supposed to
+# guarantee $OUTPUT_FILE already carries its final mode (644) the moment it
+# becomes visible, with no window in which a concurrent reader could observe
+# the pre-chmod 0600 mode. Used by record_qc_audit_test.sh to prove exactly
+# that: with this set, $OUTPUT_FILE must already be mode 644 right here, with
+# nothing else (in particular no chmod) having had a chance to run since the
+# rename completed. A refactor that moves the chmod to after the rename would
+# leave $OUTPUT_FILE at mktemp's 0600 at this exact point, turning this
+# assertion red.
+if [ -n "${WRITE_AUDIT_TEST_ABORT_AFTER_RENAME:-}" ]; then
+  echo "FAIL: WRITE_AUDIT_TEST_ABORT_AFTER_RENAME set; simulating interruption right after rename; OUTPUT_FILE=$OUTPUT_FILE" >&2
+  exit 1
+fi
+
 echo "OK: wrote $OUTPUT_FILE (consecutive_rework_count=$CONSECUTIVE)"

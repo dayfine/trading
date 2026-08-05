@@ -1085,6 +1085,44 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 24 — H-AUDIT-MODE-ORDER-UNPINNED: the chmod-before-mv placement
+# (H-AUDIT-MODE-0600) is supposed to guarantee $OUTPUT_FILE already has its
+# final mode (644) from the instant it first becomes visible via the rename
+# -- i.e. no window in which a concurrent reader could open() it at 0600.
+# That placement claim was unpinned: moving the chmod to after the `mv`
+# still left the whole suite green (mutation M2, qc-behavioral PR #2199
+# follow-up), because none of scenarios 1-23 observe file state at the
+# instant of first visibility -- scenario 23 only checks the mode AFTER the
+# script finishes normally, which the end state reaches either way.
+#
+# This scenario uses the WRITE_AUDIT_TEST_ABORT_AFTER_RENAME hook (symmetric
+# to WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME / scenario 19) to freeze execution
+# immediately after the rename and assert $OUTPUT_FILE is ALREADY mode 644
+# at that instant -- proving the chmod really did happen before the rename,
+# not merely by the time the script exits normally. Forces a restrictive
+# umask for the same reason as scenario 23: a pass must depend on the
+# chmod, not on a permissive ambient umask.
+# ---------------------------------------------------------------------------
+FEATURE24="audit-mode-order-pinned"
+
+out24=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_TEST_ABORT_AFTER_RENAME=1 \
+  bash -c 'umask 077 && exec "$0" "$@"' "${WRITE_AUDIT}" \
+    --date 2026-08-05 --feature "${FEATURE24}" --branch "harness/audit-mode-order" \
+    --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1) && rc24=0 || rc24=$?
+JSON24="${TMP_REPO}/dev/audit/2026-08-05-harness-audit-mode-order-${FEATURE24}.json"
+mode24="$(_file_mode_octal "${JSON24}" 2>/dev/null || echo 'UNKNOWN')"
+
+if (( rc24 != 0 )) \
+   && [[ -f "${JSON24}" ]] \
+   && [[ "${mode24}" == "644" ]] \
+   && echo "${out24}" | grep -q "simulating interruption right after rename"; then
+  pass "scenario 24 — \$OUTPUT_FILE already mode 0644 at the instant of first visibility, right after the rename (H-AUDIT-MODE-ORDER-UNPINNED)"
+else
+  fail "scenario 24 — expected rc!=0, record at ${JSON24} already mode 644 right after rename, 'simulating interruption right after rename' in output; got rc=${rc24}, mode=${mode24}"
+  echo "${out24}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
