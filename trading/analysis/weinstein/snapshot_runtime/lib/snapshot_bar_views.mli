@@ -27,7 +27,7 @@
     - [dates] = date of the last trading day in the week
 
     The daily view drops bars where the raw [Close] field is NaN, and exposes
-    raw OHLC plus dates.
+    raw highs / lows / closes plus the matching adjusted closes and dates.
 
     Unknown symbols, empty date ranges, or otherwise-unreadable snapshot rows
     yield the empty view. The strategy already handles empty bar histories. The
@@ -81,9 +81,21 @@ type weekly_view = Data_panel_snapshot.Panel_views.weekly_view = {
 
 type daily_view = Data_panel_snapshot.Panel_views.daily_view = {
   highs : float array;
-      (** Daily high prices, oldest at index 0, newest at index [n_days - 1]. *)
-  lows : float array;  (** Daily low prices, same indexing as [highs]. *)
-  closes : float array;  (** Daily adjusted closes, same indexing. *)
+      (** Raw daily high prices, oldest at index 0, newest at index
+          [n_days - 1]. *)
+  lows : float array;  (** Raw daily low prices, same indexing as [highs]. *)
+  raw_closes : float array;
+      (** Raw (un-adjusted) daily closes — the [Snapshot_schema.Close] cell,
+          same indexing. Named [closes] before 2026-08-05; the value is
+          unchanged, only the (previously misleading) name. *)
+  adjusted_closes : float array;
+      (** Split- and dividend-adjusted daily closes — the
+          [Snapshot_schema.Adjusted_close] cell, same indexing. Paired with
+          [raw_closes] to derive the per-bar split-adjustment factor
+          ([adjusted_closes.(i) /. raw_closes.(i)]), which
+          {!Weinstein_stops.compute_initial_stop_with_floor_with_callbacks}
+          consumes under [split_safe_floors]. [Float.nan] where the snapshot has
+          no adjusted-close cell for the date. *)
   dates : Core.Date.t array;  (** Daily dates, same indexing. *)
   n_days : int;  (** Length of every array. *)
 }
@@ -138,6 +150,12 @@ val daily_view_for :
     rows), and NaN-skips per close cell. Threading the same calendar used by the
     runner everywhere ensures deterministic window definition across calls (#848
     forward fix).
+
+    Row emission is gated on the raw [Close] cell alone: a date with a
+    non-NaN raw close is emitted even when [High] / [Low] /
+    [Adjusted_close] are missing (those degrade to [Float.nan] in their
+    columns). A NaN [adjusted_closes] cell therefore propagates a NaN
+    split-adjustment factor rather than a silently-neutral [1.0].
 
     Returns the empty view ([n_days = 0], all arrays empty) when:
     - [lookback <= 0]

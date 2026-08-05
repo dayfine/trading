@@ -194,7 +194,8 @@ let test_daily_view_for_full_window_shape _ =
           ~calendar:_calendar_60
       in
       _expect_n_days_eq ~msg:("full window " ^ symbol) view.n_days 30;
-      assert_that (Array.length view.closes) (equal_to view.n_days);
+      assert_that (Array.length view.raw_closes) (equal_to view.n_days);
+      assert_that (Array.length view.adjusted_closes) (equal_to view.n_days);
       assert_that (Array.length view.highs) (equal_to view.n_days);
       assert_that (Array.length view.lows) (equal_to view.n_days);
       assert_that (Array.length view.dates) (equal_to view.n_days))

@@ -384,7 +384,13 @@ let macro_callbacks_of_weekly_views_cached ?ma_cache ?index_symbol
 (** {!Support_floor.callbacks} use the convention day_offset:0 = newest bar in
     the eligible window. Our {!Snapshot_bar_views.daily_view} is laid out the
     other way (index 0 = oldest, n_days-1 = newest). The closure does the index
-    flip. *)
+    flip.
+
+    [get_close] reads [raw_closes] — the same (raw) price basis as [highs] /
+    [lows], so a [Close]-anchored scan stays on one scale. [get_adjusted_close]
+    reads [adjusted_closes]; the pair is what
+    {!Weinstein_stops.compute_initial_stop_with_floor_with_callbacks} divides to
+    recover each bar's split-adjustment factor under [split_safe_floors]. *)
 let support_floor_callbacks_of_daily_view (view : Snapshot_bar_views.daily_view)
     : Weinstein_stops.callbacks =
   let n = view.n_days in
@@ -397,7 +403,8 @@ let support_floor_callbacks_of_daily_view (view : Snapshot_bar_views.daily_view)
   {
     get_high = lookup (fun i -> view.highs.(i));
     get_low = lookup (fun i -> view.lows.(i));
-    get_close = lookup (fun i -> view.closes.(i));
+    get_close = lookup (fun i -> view.raw_closes.(i));
+    get_adjusted_close = lookup (fun i -> view.adjusted_closes.(i));
     get_date =
       (fun ~day_offset ->
         if day_offset < 0 || day_offset >= n then None

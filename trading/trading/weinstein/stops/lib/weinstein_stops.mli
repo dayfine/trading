@@ -131,7 +131,31 @@ val compute_initial_stop_with_floor_with_callbacks :
     [stop_state]. The wrapper {!compute_initial_stop_with_floor} guarantees
     byte-identical results for any bar-list inputs by constructing callbacks
     that index the same precomputed window the bar-list path used to walk
-    inline. *)
+    inline.
+
+    {b split_safe_floors.} When [config.split_safe_floors] is [true] the bundle
+    is rescaled onto its split/dividend-adjusted basis before the scan: each
+    offset's high / low is multiplied by that bar's factor
+    [get_adjusted_close /. get_close] and the close is replaced by the adjusted
+    close. Default [false] scans the bundle exactly as supplied — an exact
+    no-op. This is the {b same} rescale the bar-list path gets (that path builds
+    a bundle and calls straight through to here), so a split inside the lookback
+    window is handled identically whichever path the caller uses. A bundle whose
+    [get_adjusted_close] is [None] everywhere (or equal to [get_close]) yields
+    factor [1.0] and is unchanged even with the flag on. *)
+
+val floor_is_structural_with_callbacks :
+  config:config -> side:position_side -> callbacks:callbacks -> bool
+(** [floor_is_structural_with_callbacks ~config ~side ~callbacks] is [true] iff
+    {!compute_initial_stop_with_floor_with_callbacks} (same [config], [side] and
+    bundle) installs the {b structural} floor rather than falling back to the
+    fixed buffer.
+
+    The callback-shaped sibling of {!floor_is_structural}, and the correct
+    source for the [stop_is_structural] display flag on the panel/callback path:
+    it runs the same internal scan the stop computation does — honouring both
+    [config.support_floor_anchor_mode] and [config.split_safe_floors] — so the
+    flag and the installed level can never disagree. Pure function. *)
 
 val floor_is_structural :
   config:config ->

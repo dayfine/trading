@@ -99,7 +99,14 @@ let _empty_weekly_view : Snapshot_bar_views.weekly_view =
   }
 
 let _empty_daily_view : Snapshot_bar_views.daily_view =
-  { highs = [||]; lows = [||]; closes = [||]; dates = [||]; n_days = 0 }
+  {
+    highs = [||];
+    lows = [||];
+    raw_closes = [||];
+    adjusted_closes = [||];
+    dates = [||];
+    n_days = 0;
+  }
 
 (* {1 Empty backing — used by tests where no read is expected}
 

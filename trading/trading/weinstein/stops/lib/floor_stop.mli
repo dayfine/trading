@@ -36,8 +36,18 @@ val compute_initial_stop_with_floor_with_callbacks :
   callbacks:callbacks ->
   fallback_buffer:float ->
   stop_state
-(** Callback-shaped support-floor-aware initial stop. See
+(** Callback-shaped support-floor-aware initial stop. When
+    [config.split_safe_floors] the bundle is rescaled onto its
+    split/dividend-adjusted basis before the correction low / rally high is
+    measured (default-off scans the bundle unchanged, bit-identical). See
     {!Weinstein_stops.compute_initial_stop_with_floor_with_callbacks}. *)
+
+val floor_is_structural_with_callbacks :
+  config:config -> side:position_side -> callbacks:callbacks -> bool
+(** [true] iff {!compute_initial_stop_with_floor_with_callbacks} (same config,
+    side and bundle) installs a structural floor rather than the fixed-buffer
+    fallback — it runs the same internal scan, so the two never disagree. See
+    {!Weinstein_stops.floor_is_structural_with_callbacks}. *)
 
 val compute_initial_stop_with_floor :
   config:config ->
@@ -47,10 +57,11 @@ val compute_initial_stop_with_floor :
   as_of:Core.Date.t ->
   fallback_buffer:float ->
   stop_state
-(** Bar-list support-floor-aware initial stop. When [config.split_safe_floors]
-    the bars are rescaled onto their split/dividend-adjusted basis before the
-    correction low / rally high is measured (default-off = raw bars,
-    bit-identical). See {!Weinstein_stops.compute_initial_stop_with_floor}. *)
+(** Bar-list support-floor-aware initial stop. Builds the bundle via
+    {!callbacks_from_bars} and delegates to
+    {!compute_initial_stop_with_floor_with_callbacks}, so [split_safe_floors]
+    behaves identically on both paths. See
+    {!Weinstein_stops.compute_initial_stop_with_floor}. *)
 
 val floor_is_structural :
   config:config ->

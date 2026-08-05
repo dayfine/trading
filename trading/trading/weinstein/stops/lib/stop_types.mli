@@ -213,12 +213,11 @@ type config = {
           [.claude/rules/experiment-flag-discipline.md]; promoted only on a
           ledger ACCEPT. *)
   split_safe_floors : bool; [@sexp.default false]
-      (** When [true], the bar-list support-floor path
-          ({!Weinstein_stops.compute_initial_stop_with_floor} and
-          {!Weinstein_stops.floor_is_structural}) rescales each raw-OHLC bar
-          onto its split/dividend-adjusted basis (per-bar factor
-          [adjusted_close /. close_price]) {b before} the correction low / rally
-          high is measured. Default [false] feeds the raw bars unchanged — an
+      (** When [true], every support-floor path rescales the scanned window onto
+          its split/dividend-adjusted basis (per-bar factor
+          [adjusted_close /. close_price] applied to the high / low, close
+          replaced by the adjusted close) {b before} the correction low / rally
+          high is measured. Default [false] scans the raw window unchanged — an
           exact no-op, so every existing golden replays bit-identically.
 
           Why: {!Support_floor} anchors on [low_price] / [high_price] from the
@@ -231,13 +230,19 @@ type config = {
           Pinning the measurement to the adjusted basis puts the floor in the
           same continuous scale as the (current-basis) entry price.
 
-          Scope: this flag governs {b only} the bar-list path, whose bars carry
-          both raw OHLC and [adjusted_close] (so the factor is derivable
-          inline). The panel/callback path
-          ({!Weinstein_stops.compute_initial_stop_with_floor_with_callbacks}) is
-          unaffected — its [daily_view] exposes raw highs/lows and adjusted
-          closes but no raw close, so the per-bar factor cannot be recovered
-          there without extending the view type (out of scope).
+          Scope: {b both} floor paths, as of 2026-08-05. The rescale lives at
+          the callbacks-bundle level inside
+          {!Weinstein_stops.compute_initial_stop_with_floor_with_callbacks},
+          which the bar-list wrapper
+          ({!Weinstein_stops.compute_initial_stop_with_floor}) calls straight
+          through to, so there is one implementation and one behaviour. The
+          panel/callback path — the multi-symbol strategy hot path via
+          [Entry_audit_helpers] — supplies the factor from
+          [Panel_views.daily_view.adjusted_closes] / [.raw_closes]. (Before
+          2026-08-05 the [daily_view] carried only the raw close, so the factor
+          was unrecoverable there and the flag silently governed the bar-list
+          path alone; the view now carries both bases.) A bundle with no
+          adjusted-close data yields factor [1.0] and is unaffected either way.
 
           Faithful-core: measuring the structural correction low on a
           split-consistent price basis is {b data hygiene}, not a strategy
