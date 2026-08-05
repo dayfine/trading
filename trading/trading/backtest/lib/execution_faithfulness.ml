@@ -34,11 +34,14 @@ let _designed_trigger (entry : Trade_audit.entry_decision) =
   let v = entry.initial_position_value in
   (* [nan] when [v <= 0] so the guard below rejects it (any comparison with nan
      is false), falling back to [suggested_entry]. *)
-  let ratio = if Float.(v > 0.0) then entry.initial_risk_dollars /. v else Float.nan in
+  let ratio =
+    if Float.(v > 0.0) then entry.initial_risk_dollars /. v else Float.nan
+  in
   let denom =
     match entry.side with Long -> 1.0 -. ratio | Short -> 1.0 +. ratio
   in
-  if Float.(v > 0.0) && Float.(entry.installed_stop > 0.0) && Float.(denom > 0.0)
+  if
+    Float.(v > 0.0) && Float.(entry.installed_stop > 0.0) && Float.(denom > 0.0)
   then entry.installed_stop /. denom
   else entry.suggested_entry
 
@@ -105,12 +108,14 @@ let _fill_by_position_id ~audit ~round_trips =
   let pre = Trade_context.precompute ~audit ~stop_infos:[] in
   List.fold round_trips ~init:String.Map.empty ~f:(_add_fill ~pre)
 
-let _enriched_record ~fill_by_pid ~entry_order_kind (r : Trade_audit.audit_record)
-    =
+let _enriched_record ~fill_by_pid ~entry_order_kind
+    (r : Trade_audit.audit_record) =
   match Map.find fill_by_pid r.entry.position_id with
   | None -> r
   | Some fill_price ->
-      let execution = _execution_of ~entry_order_kind ~entry:r.entry ~fill_price in
+      let execution =
+        _execution_of ~entry_order_kind ~entry:r.entry ~fill_price
+      in
       { r with execution = Some execution }
 
 let enrich ~audit ~round_trips ~entry_order_kind =
