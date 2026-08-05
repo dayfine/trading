@@ -34,26 +34,65 @@ let callbacks_from_bars ~config ~bars ~as_of =
   Support_floor.callbacks_from_bars ~bars ~as_of
     ~lookback_bars:config.support_floor_lookback_bars
 
+(* A price is usable as an operand of the split/dividend factor only if it is a
+   real positive number. NaN-safe without a separate [Float.is_nan] test:
+   [Float.(nan > 0.0)] is [false] under IEEE, so NaN falls out here too (pinned
+   by the NaN-raw-close bar in [corrupt_close_bars]). *)
+let _usable_price p = Float.( > ) p 0.0
+
 (* Per-bar split/dividend factor [f = adjusted_close /. close_price] at
-   [day_offset]. The guard is one-sided: a non-positive / NaN raw close admits
-   no factor ([f = 1.0], the bar stays raw) so a corrupt raw close never blows
-   up the rescale. A missing adjusted close (offset out of window) is likewise
-   [1.0]; a present-but-NaN adjusted close propagates NaN, matching the
-   bar-list behaviour where [Daily_price.adjusted_close] is taken as given. *)
+   [day_offset], or [None] when either operand is unusable (NaN, zero, negative,
+   or the offset is outside the window). The guard is symmetric across both
+   operands — an unusable adjusted close is exactly as disqualifying as an
+   unusable raw close, because a factor computed from either is meaningless. *)
 let _adjusted_factor (cbs : callbacks) ~day_offset =
   match (cbs.get_close ~day_offset, cbs.get_adjusted_close ~day_offset) with
-  | Some raw, Some adj when not (Float.is_nan raw || Float.( <= ) raw 0.0) ->
-      adj /. raw
-  | _, _ -> 1.0
+  | Some raw, Some adj when _usable_price raw && _usable_price adj ->
+      Some (adj /. raw)
+  | _, _ -> None
 
-(* Rescale a whole callbacks bundle onto its split/dividend-adjusted basis:
-   scale the high / low by the per-bar factor and replace the close with the
-   adjusted close outright (not [raw *. f], so the result is exactly the value
-   the data source published). Inlined mirror of
-   [Adjusted_basis.to_adjusted_basis] (analysis/weinstein/snapshot_pipeline) —
-   this A2-forbidden layer cannot import analysis/, and the factor is derivable
-   from the [get_adjusted_close] accessor every bundle carries. Keep in sync
-   with [Adjusted_basis._factor] by hand if that formula ever changes.
+(* Can EVERY offset in the window be rescaled? The rescale is all-or-nothing by
+   design — see [_to_adjusted_basis] for why per-bar degradation is not an
+   option. An empty window ([n_days = 0]) has nothing to scan, so it reports
+   [false] and takes the cheap path. *)
+let _window_is_adjustable (cbs : callbacks) =
+  let rec loop i =
+    i >= cbs.n_days
+    || (Option.is_some (_adjusted_factor cbs ~day_offset:i) && loop (i + 1))
+  in
+  cbs.n_days > 0 && loop 0
+
+(* The close on the adjusted basis is the published adjusted close itself, not
+   [raw *. factor] — same value up to rounding, but exactly what the data source
+   wrote. This is load-bearing under [Close] anchor mode, where the scan reads
+   the close: leaving it raw would measure adjusted highs / lows against raw
+   closes. *)
+let _adjusted_close_at (cbs : callbacks) ~day_offset =
+  match cbs.get_adjusted_close ~day_offset with
+  | Some _ as adj -> adj
+  | None -> cbs.get_close ~day_offset
+
+(* Rescale every offset. Caller must have checked [_window_is_adjustable], so
+   the [~default:1.0] below is unreachable; it only keeps the expression total. *)
+let _rescaled (cbs : callbacks) : callbacks =
+  let scaled get ~day_offset =
+    Option.map (get ~day_offset) ~f:(fun v ->
+        v *. Option.value (_adjusted_factor cbs ~day_offset) ~default:1.0)
+  in
+  {
+    cbs with
+    get_high = scaled cbs.get_high;
+    get_low = scaled cbs.get_low;
+    get_close = _adjusted_close_at cbs;
+  }
+
+(* Put a callbacks bundle on its split/dividend-adjusted basis: scale the high /
+   low by each bar's factor and replace the close with the adjusted close.
+   Inlined mirror of [Adjusted_basis.to_adjusted_basis]
+   (analysis/weinstein/snapshot_pipeline) — this A2-forbidden layer cannot
+   import analysis/, and the factor is derivable from the [get_adjusted_close]
+   accessor every bundle carries. Keep in sync with [Adjusted_basis._factor] by
+   hand if that formula ever changes.
 
    Idempotent: after one pass [get_close] already returns the adjusted close, so
    a second pass computes [f = adj /. adj = 1.0] and changes nothing.
@@ -63,22 +102,20 @@ let _adjusted_factor (cbs : callbacks) ~day_offset =
    [Daily_price.t] to rewrite, only accessors. The bar-list path is unaffected
    in value terms: scaling [high_price] / [low_price] and setting
    [close_price := adjusted_close] on each bar produces exactly these
-   accessors. *)
+   accessors.
+
+   {b All-or-nothing.} If any offset in the window cannot be rescaled, the whole
+   bundle is returned untouched and the scan runs on the raw basis, exactly as
+   it would with the flag off. Degrading only the offending {e bar} to raw was
+   measured and rejected: it leaves one raw bar inside an otherwise-adjusted
+   window, and on the 4:1 split fixture that lone raw high (412) out-tops every
+   adjusted high (110) and becomes the anchor, yielding the phantom 104.0
+   reference this flag exists to eliminate. Whole-window fallback keeps the
+   invariant that makes the mechanism sound: {b the scanned window is always on
+   exactly one price basis}, so the flag can only produce the correct adjusted
+   answer or the flag-off answer, never a third one. *)
 let _to_adjusted_basis (cbs : callbacks) : callbacks =
-  let scaled get ~day_offset =
-    Option.map (get ~day_offset) ~f:(fun v ->
-        v *. _adjusted_factor cbs ~day_offset)
-  in
-  {
-    cbs with
-    get_high = scaled cbs.get_high;
-    get_low = scaled cbs.get_low;
-    get_close =
-      (fun ~day_offset ->
-        match cbs.get_adjusted_close ~day_offset with
-        | Some _ as adj -> adj
-        | None -> cbs.get_close ~day_offset);
-  }
+  if _window_is_adjustable cbs then _rescaled cbs else cbs
 
 (* The bundle the support-floor scan actually reads. Single source for every
    floor consumer — [compute_initial_stop_with_floor_with_callbacks] and

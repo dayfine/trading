@@ -774,10 +774,13 @@ let test_split_safe_short_uses_adjusted_ceiling _ =
     (_initial_reference (float_equal 102.0))
 
 (* Corrupt-close guard: bar 3 (the correction-low bar) carries a [close_price]
-   of 0.0. Under [split_safe_floors] its factor would be [102 /. 0.0 = +inf]
-   without the one-sided guard, poisoning O/H/L to [inf]/[nan] and dropping the
-   real floor. The guard admits factor 1.0 for a non-positive raw close, so the
-   raw low 98 survives and a finite structural floor (98.0) still lands. *)
+   of 0.0 and bar 4 a [close_price] of NaN. Either would make the factor
+   meaningless ([102 /. 0.0 = +inf]; [104 /. nan = nan]), poisoning the scanned
+   highs/lows and dropping the real floor. Both are rejected by
+   [_usable_price] — the zero by the [> 0.0] test and the NaN by the same test
+   (IEEE: [nan > 0.0] is [false]), which is why no separate [is_nan] branch is
+   needed. The window is then not adjustable at all, so the scan runs raw and
+   the finite structural floor (98.0) still lands. *)
 let corrupt_close_bars =
   [
     make_bar_adj ~date:"2024-01-01" ~high:102.0 ~low:100.0 ~close:101.0
@@ -786,7 +789,7 @@ let corrupt_close_bars =
       ~adjusted_close:109.0;
     make_bar_adj ~date:"2024-01-03" ~high:103.0 ~low:98.0 ~close:0.0
       ~adjusted_close:102.0;
-    make_bar_adj ~date:"2024-01-04" ~high:105.0 ~low:100.0 ~close:104.0
+    make_bar_adj ~date:"2024-01-04" ~high:105.0 ~low:100.0 ~close:Float.nan
       ~adjusted_close:104.0;
   ]
 
@@ -796,6 +799,129 @@ let test_split_safe_corrupt_close_guarded _ =
        ~entry_price:104.0 ~bars:corrupt_close_bars ~as_of:split_as_of
        ~fallback_buffer)
     (_initial_reference (float_equal 98.0))
+
+(* ---- B1: the close is replaced by the ADJUSTED close, not merely scaled ---- *)
+
+(* Under [Close] anchor the scan reads [get_close] for both the anchoring peak
+   and the correction extreme, so the close's basis is load-bearing — this is
+   the only configuration in which the close-replacement half of the rescale is
+   observable at all.
+
+   On the adjusted basis the closes are 101 / 109 / 100 / 102 / 104: peak 109,
+   post-peak low 100, depth (109-100)/109 = 8.3% >= 8% -> reference 100.0.
+   Leave [get_close] on the raw closes (404 / 436 / 400 / 408 / 104) and the
+   scan anchors on 436 and returns the phantom 104.0 instead — adjusted
+   highs/lows measured against raw closes, the exact mixed-basis pathology this
+   flag exists to remove. [(Close x split_safe_floors=true)] is an expressible
+   [Variant_matrix] cell (both are config fields), so this is a reachable
+   configuration, not a hypothetical. *)
+let test_split_safe_close_anchor_uses_adjusted_closes _ =
+  assert_that
+    (compute_initial_stop_with_floor
+       ~config:
+         { cfg_split with support_floor_anchor_mode = Support_floor.Close }
+       ~side:Long ~entry_price:split_long_entry ~bars:split_long_bars
+       ~as_of:split_as_of ~fallback_buffer)
+    (_initial_reference (float_equal 100.0))
+
+(* ---- B2: an unusable adjusted close degrades the WHOLE window to raw ---- *)
+
+(* The contract: [split_safe_floors] either measures on a fully-adjusted window
+   or does exactly what the flag-off path does. It never produces a third
+   answer. Both fixtures below therefore assert structural equality of the whole
+   [stop_state] against the same bars scanned with the flag off — a stronger and
+   more durable claim than any particular float. *)
+
+(* [split_long_bars] with the adjusted close blanked on the correction-low bar
+   (2024-01-04, whose adjusted low 98 IS the structural floor).
+
+   Degrading only this bar to raw was measured at reference 104.0 — the phantom
+   — because its un-rescaled high 412 out-tops every adjusted high and becomes
+   the anchor. Propagating the NaN instead was measured at 99.0: a silently
+   wrong floor still reported [stop_is_structural = true]. Whole-window fallback
+   is the only one of the three that yields a value the caller can reason
+   about. *)
+let nan_adj_at_low_bars =
+  List.map split_long_bars ~f:(fun (b : Types.Daily_price.t) ->
+      if Date.equal b.date (Date.of_string "2024-01-04") then
+        { b with adjusted_close = Float.nan }
+      else b)
+
+(* Every adjusted close blanked — the "legacy warehouse" shape. A snapshot whose
+   schema predates [Adjusted_close] makes the field read fail, and
+   [Snapshot_bar_views._read_history_or_empty] maps that to [], so every
+   adjusted cell reads NaN. Because the field read fails for the whole symbol
+   rather than per date, all-or-nothing is also the granularity at which the
+   real data source actually fails.
+
+   Under NaN-propagation this collapsed EVERY scan to the buffer fallback
+   (measured: reference 106.08 = entry x fallback_buffer), which in a
+   walk-forward surface over [((stops_config ((split_safe_floors true))))] would
+   read as a real, meaningful negative result. Inertness that is identical to
+   baseline is instead visible as "on == off in every row" — the same signature
+   that exposed this PR's original panel-path defect. *)
+let all_nan_adj_bars =
+  List.map split_long_bars ~f:(fun (b : Types.Daily_price.t) ->
+      { b with adjusted_close = Float.nan })
+
+(* The discriminating fixture for whole-window vs per-bar fallback: the adjusted
+   close is blanked on the {b post-split} bar (2024-01-05), whose true factor
+   happens to be 1.0.
+
+   Per-bar fallback substitutes 1.0 for that bar and rescales the other four, so
+   it reconstructs the fully-adjusted window by luck and returns 98.0.
+   Whole-window fallback returns the flag-off answer, 104.0. The two coincide on
+   [nan_adj_at_low_bars], which is why this second fixture exists.
+
+   Per-bar is a gamble on the unknowable: it is right exactly when the missing
+   factor was ~1.0 and lands on the phantom anchor when it was not (measured:
+   104.0 on [nan_adj_at_low_bars] via that bar's un-rescaled raw high 412
+   out-topping every adjusted high). A stop mechanism cannot tell those apart
+   from the data — the cell is missing precisely because the factor is unknown —
+   so it takes the conservative branch rather than the lucky one. *)
+let nan_adj_at_last_bar_bars =
+  List.map split_long_bars ~f:(fun (b : Types.Daily_price.t) ->
+      if Date.equal b.date (Date.of_string "2024-01-05") then
+        { b with adjusted_close = Float.nan }
+      else b)
+
+let _flag_off_long bars =
+  compute_initial_stop_with_floor ~config:cfg ~side:Long
+    ~entry_price:split_long_entry ~bars ~as_of:split_as_of ~fallback_buffer
+
+let _flag_on_long bars =
+  compute_initial_stop_with_floor ~config:cfg_split ~side:Long
+    ~entry_price:split_long_entry ~bars ~as_of:split_as_of ~fallback_buffer
+
+let test_split_safe_nan_adjusted_close_degrades_to_raw_window _ =
+  assert_that
+    (_flag_on_long nan_adj_at_low_bars)
+    (equal_to (_flag_off_long nan_adj_at_low_bars : stop_state))
+
+(* Pins whole-window (not per-bar) fallback: per-bar would return 98.0 here. *)
+let test_split_safe_nan_adjusted_falls_back_whole_window_not_per_bar _ =
+  assert_that
+    (_flag_on_long nan_adj_at_last_bar_bars)
+    (all_of
+       [
+         equal_to (_flag_off_long nan_adj_at_last_bar_bars : stop_state);
+         _initial_reference (float_equal 104.0);
+       ])
+
+let test_split_safe_all_nan_adjusted_is_inert _ =
+  assert_that
+    (_flag_on_long all_nan_adj_bars)
+    (equal_to (_flag_off_long all_nan_adj_bars : stop_state))
+
+(* The inert case must also not claim a structural floor it did not measure:
+   the classifier follows the same window fallback as the level. *)
+let test_split_safe_all_nan_adjusted_structural_flag_matches_flag_off _ =
+  assert_that
+    (floor_is_structural ~config:cfg_split ~side:Long ~bars:all_nan_adj_bars
+       ~as_of:split_as_of)
+    (equal_to
+       (floor_is_structural ~config:cfg ~side:Long ~bars:all_nan_adj_bars
+          ~as_of:split_as_of))
 
 (* ==================================================================== *)
 (*            floor_is_structural: flag agrees with the level            *)
@@ -948,6 +1074,16 @@ let suite =
          >:: test_split_safe_short_uses_adjusted_ceiling;
          "split_safe_corrupt_close_guarded"
          >:: test_split_safe_corrupt_close_guarded;
+         "split_safe_close_anchor_uses_adjusted_closes"
+         >:: test_split_safe_close_anchor_uses_adjusted_closes;
+         "split_safe_nan_adjusted_close_degrades_to_raw_window"
+         >:: test_split_safe_nan_adjusted_close_degrades_to_raw_window;
+         "split_safe_nan_adjusted_falls_back_whole_window_not_per_bar"
+         >:: test_split_safe_nan_adjusted_falls_back_whole_window_not_per_bar;
+         "split_safe_all_nan_adjusted_is_inert"
+         >:: test_split_safe_all_nan_adjusted_is_inert;
+         "split_safe_all_nan_adjusted_structural_flag_matches_flag_off"
+         >:: test_split_safe_all_nan_adjusted_structural_flag_matches_flag_off;
          (* floor_is_structural: flag agrees with level *)
          "floor_is_structural_wick_true" >:: test_floor_is_structural_wick_true;
          "floor_is_structural_close_mode_false"

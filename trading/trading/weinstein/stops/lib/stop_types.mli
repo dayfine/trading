@@ -241,8 +241,16 @@ type config = {
           [Panel_views.daily_view.adjusted_closes] / [.raw_closes]. (Before
           2026-08-05 the [daily_view] carried only the raw close, so the factor
           was unrecoverable there and the flag silently governed the bar-list
-          path alone; the view now carries both bases.) A bundle with no
-          adjusted-close data yields factor [1.0] and is unaffected either way.
+          path alone; the view now carries both bases.)
+
+          Degenerate data: a bar admits a factor only when both its raw and
+          adjusted closes are real positive numbers, and the rescale is
+          {b all-or-nothing} — if any bar in the window fails, the whole window
+          is scanned raw, i.e. exactly what the flag-off path does. The flag
+          therefore never yields a third answer, and the scanned window is
+          always on exactly one price basis. A warehouse with no adjusted-close
+          column at all is inert under the flag (on = off in every row) rather
+          than degraded to something that looks like a real result.
 
           Faithful-core: measuring the structural correction low on a
           split-consistent price basis is {b data hygiene}, not a strategy

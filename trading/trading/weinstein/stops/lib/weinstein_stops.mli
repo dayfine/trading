@@ -136,13 +136,23 @@ val compute_initial_stop_with_floor_with_callbacks :
     {b split_safe_floors.} When [config.split_safe_floors] is [true] the bundle
     is rescaled onto its split/dividend-adjusted basis before the scan: each
     offset's high / low is multiplied by that bar's factor
-    [get_adjusted_close /. get_close] and the close is replaced by the adjusted
-    close. Default [false] scans the bundle exactly as supplied — an exact
-    no-op. This is the {b same} rescale the bar-list path gets (that path builds
-    a bundle and calls straight through to here), so a split inside the lookback
-    window is handled identically whichever path the caller uses. A bundle whose
-    [get_adjusted_close] is [None] everywhere (or equal to [get_close]) yields
-    factor [1.0] and is unchanged even with the flag on. *)
+    [get_adjusted_close /. get_close], and the close is replaced by the adjusted
+    close (not [raw *. factor] — the published value itself). Replacing the
+    close matters under [Close] anchor mode, where the scan reads it: leaving it
+    raw would measure adjusted highs / lows against raw closes. Default [false]
+    scans the bundle exactly as supplied — an exact no-op. This is the {b same}
+    rescale the bar-list path gets (that path builds a bundle and calls straight
+    through to here), so a split inside the lookback window is handled
+    identically whichever path the caller uses.
+
+    {b The rescale is all-or-nothing.} A bar admits a factor only when both
+    [get_close] and [get_adjusted_close] are real positive numbers. If {e any}
+    offset in the window fails that test, the whole bundle is scanned unrescaled
+    — exactly as the flag-off path would. So this function returns either the
+    correct adjusted-basis answer or the flag-off answer, never a third one, and
+    the scanned window is always on exactly one price basis. A bundle with no
+    adjusted-close data (all [None], all NaN, or simply equal to [get_close]) is
+    therefore inert under the flag rather than degraded. *)
 
 val floor_is_structural_with_callbacks :
   config:config -> side:position_side -> callbacks:callbacks -> bool

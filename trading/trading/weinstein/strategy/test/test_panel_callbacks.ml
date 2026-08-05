@@ -1109,6 +1109,68 @@ let test_panel_split_safe_short_structural_flag _ =
     (is_structural _cfg_split_off, is_structural _cfg_split_on)
     (all_of [ field fst (equal_to false); field snd (equal_to true) ])
 
+(* B1 panel sibling. The close-replacement half of the rescale is only
+   observable under [Close] anchor, and [(Close x split_safe_floors=true)] is an
+   expressible [Variant_matrix] cell. Same 100.0 the bar-list test pins: on the
+   adjusted basis the closes peak at 109 and bottom at 100 post-peak. Leave
+   [get_close] on [raw_closes] and this returns the phantom 104.0 — adjusted
+   highs/lows scanned against raw closes.
+
+   Pinning this only on the bar-list path would repeat the shape of the defect
+   this PR exists to fix, so it is asserted here too. *)
+let test_panel_split_safe_close_anchor_uses_adjusted_closes _ =
+  assert_that
+    (_panel_stop
+       ~config:
+         {
+           _cfg_split_on with
+           Weinstein_stops.support_floor_anchor_mode =
+             Weinstein_stops.Support_floor.Close;
+         }
+       ~side:Trading_base.Types.Long ~entry_price:104.0 _split_long_bars)
+    (_initial_reference (float_equal 100.0))
+
+(* B2 panel sibling — the "legacy warehouse" case, built as a [daily_view]
+   literal because that is exactly what the producer yields for a snapshot whose
+   schema predates [Adjusted_close]: the field read fails,
+   [Snapshot_bar_views._read_history_or_empty] maps it to [], and every
+   adjusted cell reads NaN. Constructing the view directly reaches the state
+   without needing a second on-disk schema.
+
+   The flag must be inert here, not merely safe: with the whole window
+   un-rescalable the scan runs raw, so flag-on is structurally identical to
+   flag-off. Inertness that equals baseline is diagnosable in a walk-forward
+   surface ("on == off in every row"); the alternative — collapsing every scan
+   to the buffer fallback — would read as a genuine negative result. *)
+let test_panel_split_safe_legacy_warehouse_all_nan_adjusted_is_inert _ =
+  let cb = build_snapshot_callbacks [ ("SPLT", _split_long_bars) ] in
+  let calendar =
+    Array.of_list
+      (List.map _split_long_bars ~f:(fun b -> b.Types.Daily_price.date))
+  in
+  let view =
+    Snapshot_bar_views.daily_view_for cb ~symbol:"SPLT" ~as_of:_split_as_of
+      ~lookback:90 ~calendar
+  in
+  let legacy_view =
+    {
+      view with
+      Snapshot_bar_views.adjusted_closes =
+        Array.map view.Snapshot_bar_views.adjusted_closes ~f:(fun _ ->
+            Float.nan);
+    }
+  in
+  let callbacks =
+    Panel_callbacks.support_floor_callbacks_of_daily_view legacy_view
+  in
+  let stop config =
+    Weinstein_stops.compute_initial_stop_with_floor_with_callbacks ~config
+      ~side:Trading_base.Types.Long ~entry_price:104.0 ~callbacks
+      ~fallback_buffer:_split_fallback_buffer
+  in
+  assert_that (stop _cfg_split_on)
+    (equal_to (stop _cfg_split_off : Weinstein_stops.stop_state))
+
 let suite =
   "Panel_callbacks parity"
   >::: [
@@ -1140,6 +1202,10 @@ let suite =
          >:: test_panel_split_safe_on_uses_adjusted_floor;
          "split_safe_floors on — panel structural flag (short mirror)"
          >:: test_panel_split_safe_short_structural_flag;
+         "split_safe_floors on + Close anchor — panel uses adjusted closes"
+         >:: test_panel_split_safe_close_anchor_uses_adjusted_closes;
+         "legacy warehouse (all-NaN adjusted) — panel flag is inert"
+         >:: test_panel_split_safe_legacy_warehouse_all_nan_adjusted_is_inert;
        ]
 
 let () = run_test_tt_main suite

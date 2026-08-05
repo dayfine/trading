@@ -225,6 +225,79 @@ three `split_safe_floors` cases — and
 `dune exec ./analysis/weinstein/snapshot_runtime/test/test_snapshot_bar_views.exe`
 — `daily_view raw_closes / adjusted_closes are distinct fields`.
 
+### 2026-08-05 QC rework iteration 1 (PR #2213)
+
+qc-structural APPROVED 5/5. qc-behavioral NEEDS_REWORK on two unpinned
+contracts — both were documented in the `.mli`s but had no test; neither was a
+design defect. The reviewer independently rebuilt merge base `04e2c75b` in a
+second worktree and confirmed R1 bit-identical on all four default-off cases
+(including under `Close` anchor), and confirmed the flag was provably inert on
+the panel path before this PR.
+
+- **B1 — close-replacement pinned.** The rescale replaces the close with the
+  adjusted close rather than leaving it raw. That is only observable under
+  `Close` anchor mode, and `(Close × split_safe_floors=true)` is an expressible
+  `Variant_matrix` cell — without the replacement that cell scans adjusted
+  highs/lows against raw closes, i.e. the mixed-basis pathology this flag
+  exists to remove. Worth 4% on the installed reference (100.0 correct vs
+  104.0 phantom). Pinned on **both** paths; mutation M6 (drop the override) was
+  caught by 0 tests repo-wide before, now 1 + 1.
+
+- **B2 — unusable adjusted close now degrades the WHOLE window, not the bar.**
+  Chose the coordinator's option (b) — degrade toward the flag-off default —
+  but at **window** granularity, having measured that per-bar degradation as
+  literally specified is unsafe. Three semantics measured on the 4:1 split
+  fixture with the adjusted close blanked on the correction-low bar:
+
+  | semantics | reference | `stop_is_structural` |
+  |---|---|---|
+  | NaN-propagation (as merged) | 99.0 | true — silently wrong |
+  | per-bar fallback to 1.0 | **104.0 (phantom)** | true — the lone un-rescaled raw high 412 out-tops every adjusted high (110) and becomes the anchor |
+  | whole-window fallback (chosen) | 104.0 = flag-off | matches flag-off |
+
+  Per-bar degradation *creates* a mixed-basis window — the exact thing B1 is
+  about. Whole-window keeps the invariant that makes the mechanism sound: **the
+  scanned window is always on exactly one price basis**, so the flag returns
+  either the correct adjusted answer or the flag-off answer, never a third one.
+  Legacy-warehouse case (schema predating `Adjusted_close` ⇒ field read fails
+  ⇒ all-NaN column): the flag is now **inert** (on == off in every row, which
+  is diagnosable — it is the same signature that exposed this PR's original
+  defect) instead of collapsing every scan to the buffer fallback, which would
+  have read as a genuine negative result in a walk-forward surface. Note the
+  real data source fails per-symbol, not per-date, so all-or-nothing also
+  matches the granularity at which adjusted closes actually go missing.
+
+  The guard is now symmetric across both operands of the division, and
+  `_usable_price` is a single `> 0.0` test — NaN-safe without a separate
+  `is_nan` branch, since IEEE `nan > 0.0` is `false`. A NaN-raw-close bar added
+  to `corrupt_close_bars` pins that.
+
+- **Mutation results** (unmutated baseline: both suites OK):
+
+  | mutation | stops/test_support_floor | strategy/test_panel_callbacks |
+  |---|---|---|
+  | M6 — close override removed | 1 | 1 |
+  | MN1 — adjusted-close guard removed (NaN propagates) | 4 | 1 |
+  | MN2 — per-bar instead of whole-window | 1 | 0 |
+  | M11 — always rescale (breaks R1) | 2 | 2 |
+  | M12 — never rescale (breaks R2) | 4 | 3 |
+
+  MN2 is caught only on the bar-list suite. That is adequate rather than ideal:
+  there is one shared implementation now, so either suite exercises the same
+  code. It needed a second fixture — the first NaN fixture could not catch it,
+  because per-bar and whole-window happen to coincide at 104.0 there.
+  `nan_adj_at_last_bar_bars` blanks the *post-split* bar (true factor 1.0),
+  where per-bar reconstructs the adjusted window by luck (98.0) and
+  whole-window returns the flag-off answer (104.0).
+
+- **R1 unaffected.** Option (b) changes flag-**on** behaviour only; the
+  default-off path never consults `get_adjusted_close`. M11 confirms the no-op
+  is still pinned on both paths.
+
+- **Code health.** Flattening required: `_to_adjusted_basis` tripped the nesting
+  linter (avg 3.06 > 3.0). Split into `_adjusted_close_at` / `_rescaled` /
+  `_to_adjusted_basis` — no marker, no limit bump.
+
 ## Follow-ups
 
 - ~~Round-number shading (§5.1)~~ — **already implemented; this line was stale.**

@@ -132,7 +132,9 @@ type callbacks = {
           the adjusted basis before scanning, which is what
           [Weinstein_stops.config.split_safe_floors] does. Returns [None]
           exactly where [get_close] does (same window); the value may be
-          [Float.nan] when the backing source has no adjusted-close cell. *)
+          [Float.nan] when the backing source has no adjusted-close cell, in
+          which case that bar admits no factor and the stops layer scans the raw
+          basis for the whole window rather than rescaling part of it. *)
   get_date : day_offset:int -> Core.Date.t option;
       (** Calendar date of the bar at [day_offset] days back. Useful for
           telemetry / debugging; not consumed by the algorithm itself (the

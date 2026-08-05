@@ -164,8 +164,16 @@ val daily_view_for :
     Row emission is gated on the raw [Close] cell alone: a date with a non-NaN
     raw close is emitted even when [High] / [Low] / [Adjusted_close] are missing
     (those degrade to [Float.nan] in their columns). A NaN [adjusted_closes]
-    cell therefore propagates a NaN split-adjustment factor rather than a
-    silently-neutral [1.0].
+    cell admits no split-adjustment factor for that bar; the stops layer treats
+    that as making the whole window un-rescalable and scans the raw basis
+    instead (see [Weinstein_stops.config.split_safe_floors]), so a partial gap
+    can never yield a half-adjusted window.
+
+    Note the granularity: a schema that predates [Adjusted_close] fails the
+    field read for the {e whole symbol}, which
+    {!Snapshot_callbacks.read_field_history}'s error is mapped to [] and thence
+    to an all-NaN [adjusted_closes] column — not to a scattering of per-date
+    gaps.
 
     Returns the empty view ([n_days = 0], all arrays empty) when:
     - [lookback <= 0]

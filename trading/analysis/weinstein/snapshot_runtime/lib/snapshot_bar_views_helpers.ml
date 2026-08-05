@@ -53,8 +53,9 @@ let _alloc_daily_buffers ~len ~first_date =
 
 (* Copy one calendar date's cells into slot [j]. Every field other than the raw
    close degrades to NaN when the snapshot has no cell for the date — including
-   [Adjusted_close], so a missing adjustment cell yields a NaN split factor
-   rather than a silently-neutral 1.0. *)
+   [Adjusted_close]. A NaN adjusted cell admits no split-adjustment factor;
+   [Floor_stop] treats that as making the whole window un-rescalable rather than
+   silently substituting a neutral 1.0 for the one bar. *)
 let _emit_daily_row (b : _daily_buffers) (t : daily_tables) ~date ~close_v ~j =
   let find tbl = Hashtbl.find tbl date |> Option.value ~default:Float.nan in
   b.b_raw_closes.(j) <- close_v;
