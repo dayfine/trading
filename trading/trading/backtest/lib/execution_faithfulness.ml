@@ -1,8 +1,6 @@
 open Core
 
-type entry_order_kind =
-  | Market
-  | Stop_limit_band of float
+type entry_order_kind = Market | Stop_limit_band of float
 [@@deriving sexp, eq]
 
 (* Percentage points -> fraction for the do-not-chase band. *)
@@ -34,16 +32,15 @@ let entry_order_kind_of_config (config : Weinstein_strategy.config) =
    do not arise for an entry that actually filled). *)
 let _designed_trigger (entry : Trade_audit.entry_decision) =
   let v = entry.initial_position_value in
-  let r = entry.initial_risk_dollars in
-  if Float.(v <= 0.0) || Float.(entry.installed_stop <= 0.0) then
-    entry.suggested_entry
-  else
-    let ratio = r /. v in
-    let denom =
-      match entry.side with Long -> 1.0 -. ratio | Short -> 1.0 +. ratio
-    in
-    if Float.(denom <= 0.0) then entry.suggested_entry
-    else entry.installed_stop /. denom
+  (* [nan] when [v <= 0] so the guard below rejects it (any comparison with nan
+     is false), falling back to [suggested_entry]. *)
+  let ratio = if Float.(v > 0.0) then entry.initial_risk_dollars /. v else Float.nan in
+  let denom =
+    match entry.side with Long -> 1.0 -. ratio | Short -> 1.0 +. ratio
+  in
+  if Float.(v > 0.0) && Float.(entry.installed_stop > 0.0) && Float.(denom > 0.0)
+  then entry.installed_stop /. denom
+  else entry.suggested_entry
 
 let _limit_of ~(side : Trading_base.Types.position_side) ~trigger ~band =
   match side with
@@ -54,8 +51,8 @@ let _limit_of ~(side : Trading_base.Types.position_side) ~trigger ~band =
    and within the do-not-chase limit: for a long buy-stop [trigger <= fill <=
    limit]; mirrored for a short sell-stop [limit <= fill <= trigger]. Each bound
    carries [_rel_tolerance] for float noise. *)
-let _within_band ~(side : Trading_base.Types.position_side) ~trigger ~limit ~fill
-    =
+let _within_band ~(side : Trading_base.Types.position_side) ~trigger ~limit
+    ~fill =
   match side with
   | Long ->
       Float.(fill >= trigger *. (1.0 -. _rel_tolerance))
@@ -94,26 +91,32 @@ let _execution_of ~entry_order_kind ~(entry : Trade_audit.entry_decision)
         faithful = within;
       }
 
+(* Add one round-trip's entry fill to the [position_id -> fill] map, keyed by the
+   position [Trade_context] resolves for it (first match wins). *)
+let _add_fill ~pre acc (trade : Trading_simulation.Metrics.trade_metrics) =
+  match (Trade_context.of_precomputed pre ~trade).position_id with
+  | Some pid when not (Map.mem acc pid) ->
+      Map.set acc ~key:pid ~data:trade.entry_price
+  | _ -> acc
+
 (* position_id -> entry fill price. Reuses [Trade_context]'s (symbol,
-   entry_date) + 7-day window join to resolve each round-trip's position; the
-   first round-trip matched to a position supplies its entry fill. *)
+   entry_date) + 7-day window join to resolve each round-trip's position. *)
 let _fill_by_position_id ~audit ~round_trips =
   let pre = Trade_context.precompute ~audit ~stop_infos:[] in
-  List.fold round_trips ~init:String.Map.empty
-    ~f:(fun acc (trade : Trading_simulation.Metrics.trade_metrics) ->
-      match (Trade_context.of_precomputed pre ~trade).position_id with
-      | Some pid when not (Map.mem acc pid) ->
-          Map.set acc ~key:pid ~data:trade.entry_price
-      | _ -> acc)
+  List.fold round_trips ~init:String.Map.empty ~f:(_add_fill ~pre)
+
+let _enriched_record ~fill_by_pid ~entry_order_kind (r : Trade_audit.audit_record)
+    =
+  match Map.find fill_by_pid r.entry.position_id with
+  | None -> r
+  | Some fill_price ->
+      let execution = _execution_of ~entry_order_kind ~entry:r.entry ~fill_price in
+      { r with execution = Some execution }
 
 let enrich ~audit ~round_trips ~entry_order_kind =
   let fill_by_pid = _fill_by_position_id ~audit ~round_trips in
-  List.map audit ~f:(fun (r : Trade_audit.audit_record) ->
-      match Map.find fill_by_pid r.entry.position_id with
-      | None -> r
-      | Some fill_price ->
-          {
-            r with
-            execution =
-              Some (_execution_of ~entry_order_kind ~entry:r.entry ~fill_price);
-          })
+  List.map audit ~f:(_enriched_record ~fill_by_pid ~entry_order_kind)
+
+let enrich_for_config ~audit ~round_trips ~config =
+  enrich ~audit ~round_trips
+    ~entry_order_kind:(entry_order_kind_of_config config)

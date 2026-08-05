@@ -252,7 +252,12 @@ let test_external_exit_decision_sexp_round_trip _ =
 
 let test_audit_record_sexp_round_trip _ =
   let record : TA.audit_record =
-    { entry = make_entry (); exit_ = Some (make_exit ()); external_exit = None; execution = None }
+    {
+      entry = make_entry ();
+      exit_ = Some (make_exit ());
+      external_exit = None;
+      execution = None;
+    }
   in
   let parsed = TA.audit_record_of_sexp (TA.sexp_of_audit_record record) in
   assert_that parsed (equal_to record)

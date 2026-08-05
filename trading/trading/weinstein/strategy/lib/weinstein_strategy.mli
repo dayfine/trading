@@ -200,6 +200,12 @@ module Entry_audit_capture = Entry_audit_capture
     strategy file to keep it under the file-length cap. See
     {!Entry_audit_capture}. *)
 
+module Entry_walk = Entry_walk
+(** The screener-candidate → [CreateEntering] entry walk. Re-exposed so callers
+    running custom screening out-of-band (and tests pinning the config-gated
+    entry-trigger behaviour) can drive the same pipeline. See
+    {!Entry_walk.entries_from_candidates}. *)
+
 module Screening_notional = Screening_notional
 (** Per-Friday entry-walk notional / sector-exposure accumulator seeds. Exposed
     so tests can pin the accumulator-seeding primitives

@@ -831,8 +831,18 @@ let test_retraded_symbol_keys_triggers_by_position_id _ =
       stop_infos = [ stop2; stop1 ];
       audit =
         [
-          { entry = entry1; exit_ = None; external_exit = None; execution = None };
-          { entry = entry2; exit_ = None; external_exit = None; execution = None };
+          {
+            entry = entry1;
+            exit_ = None;
+            external_exit = None;
+            execution = None;
+          };
+          {
+            entry = entry2;
+            exit_ = None;
+            external_exit = None;
+            execution = None;
+          };
         ];
       cascade_summaries = [];
       force_liquidations = [];

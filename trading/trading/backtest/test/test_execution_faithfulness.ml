@@ -11,7 +11,8 @@
       audit's dollar fields.
     - Unmatched (still-open) entries keep [execution = None].
     - sexp back-compat: an old [audit_record] sexp with no [execution] field
-      parses ([execution = None]); a record carrying an [execution] round-trips. *)
+      parses ([execution = None]); a record carrying an [execution] round-trips.
+*)
 
 open OUnit2
 open Core
@@ -44,7 +45,8 @@ let make_trade ?(symbol = "AAPL") ?(side = Trading_base.Types.Buy)
    trigger recovery returns [suggested_entry] exactly. *)
 let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     ?(position_id = "AAPL-wein-1") ?(side = Trading_base.Types.Long)
-    ?(suggested_entry = 150.0) ?(installed_stop = 138.0) () : TA.entry_decision =
+    ?(suggested_entry = 150.0) ?(installed_stop = 138.0) () : TA.entry_decision
+    =
   {
     symbol;
     entry_date;
@@ -93,9 +95,7 @@ let config_with ~stoplimit ~extension_pct : Weinstein_strategy.config =
   }
 
 let execution_of_first records =
-  match records with
-  | [ (r : TA.audit_record) ] -> r.execution
-  | _ -> None
+  match records with [ (r : TA.audit_record) ] -> r.execution | _ -> None
 
 (* entry_order_kind_of_config ----------------------------------------- *)
 
@@ -123,7 +123,8 @@ let test_market_fill_is_faithful _ =
   let audit = [ make_record (make_entry ()) ] in
   let round_trips = [ make_trade ~entry_price:151.0 () ] in
   assert_that
-    (execution_of_first (EF.enrich ~audit ~round_trips ~entry_order_kind:Market))
+    (execution_of_first
+       (EF.enrich ~audit ~round_trips ~entry_order_kind:Market))
     (is_some_and
        (all_of
           [
@@ -205,8 +206,9 @@ let test_stoplimit_short_fill_at_trigger_is_faithful _ =
   in
   assert_that
     (execution_of_first
-       (EF.enrich ~audit:[ make_record entry ] ~round_trips
-          ~entry_order_kind:(Stop_limit_band 0.15)))
+       (EF.enrich
+          ~audit:[ make_record entry ]
+          ~round_trips ~entry_order_kind:(Stop_limit_band 0.15)))
     (is_some_and
        (all_of
           [
@@ -259,7 +261,8 @@ let test_execution_record_round_trips _ =
   let round_tripped =
     TA.sexp_of_audit_records enriched |> TA.audit_records_of_sexp
   in
-  assert_that (execution_of_first round_tripped)
+  assert_that
+    (execution_of_first round_tripped)
     (is_some_and
        (all_of
           [
@@ -271,7 +274,8 @@ let suite =
   "execution_faithfulness"
   >::: [
          "kind: Market when flag off" >:: test_kind_market_when_flag_off;
-         "kind: Market when extension 0" >:: test_kind_market_when_extension_zero;
+         "kind: Market when extension 0"
+         >:: test_kind_market_when_extension_zero;
          "kind: StopLimit when armed" >:: test_kind_stoplimit_when_armed;
          "Market fill is faithful" >:: test_market_fill_is_faithful;
          "StopLimit fill at trigger is faithful"

@@ -25,18 +25,23 @@ already pinned by `test_gtc_entry_persistence.ml`.
 3 unit tests (E-anchor entry+sizing, R1 off pin); plan Step 0/1 updated.
 
 **Next steps (Steps 2-3, not in this PR).**
-- **PR2 — execution-faithfulness audit** (`feat/execution-faithfulness-audit`):
-  extend `Trade_audit` with per-trade execution fields (`designed_order_type`
-  Market/StopLimit+trigger+limit; `designed_trigger` = transition entry_price;
-  `fill_price`; `fill_vs_trigger_pct`; `fill_within_band`; `faithful`) as an
-  optional `[@sexp.option]` record on `audit_record` (external_exit_decision
-  pattern, #2085), surfaced as columns + a %-faithful summary in
-  `trade_audit_report`. Design (traced): `fill_price` reuses
-  `Metrics.trade_metrics.entry_price` (round-trip open-leg fill); `designed_trigger`
-  = `entry_decision.initial_position_value / shares` (= effective_entry);
-  `designed_order_type` = `Panel_runner._entry_cap_for_sim` config logic; join
-  audit↔trade by (symbol, entry_date) at the runner. Not started (was scoped this
-  session; deferred to keep PR1 clean + verified).
+- **PR2 — execution-faithfulness audit CAPTURE** (`feat/execution-faithfulness-audit`):
+  **DONE.** Extended `Trade_audit.audit_record` with an optional
+  `execution : execution_faithfulness option [@sexp.option]` record
+  (`designed_order_type` Market/StopLimit+trigger+limit; `designed_trigger`;
+  `fill_price`; `fill_vs_trigger_pct`; `fill_within_band`; `faithful`) —
+  external_exit_decision pattern (#2085), old sexps parse. New
+  `Execution_faithfulness` module joins each entry to its realised fill (reuses
+  `Trade_context`'s position join) and is wired at the runner
+  (`_assemble_result`). `designed_trigger` recovered exactly as the effective
+  entry from the audit dollar fields (`entry_decision` carries no `shares`);
+  `designed_order_type` from `entry_order_kind_of_config`. Default runs ⇒ Market
+  ⇒ faithful=true. Includes the CP4 inertness test
+  (`sim_entry_trigger_at_suggested` alone is inert) + `Entry_walk` re-export.
+- **PR3 — execution-faithfulness REPORT columns** (follow-on, split for size):
+  surface the execution fields as `trade_audit_report` columns + a
+  %-faithful / mean-fill-vs-trigger summary line (mirror #2196's external-exit
+  fallback). Not started.
 - **Step 2** — managed GTC lifecycle (cancel-on-candidacy-loss, re-grade amend).
 - **Step 3** — honest fill-model ladder re-derivation + WF-CV surface on the
   E-anchored basis.

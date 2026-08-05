@@ -294,7 +294,12 @@ let test_row_falls_back_to_external_exit_trigger _ =
   let trade = make_trade ~symbol:"AAPL" ~entry_date:(_date "2024-01-15") () in
   let entry = make_entry_decision () in
   let record : TA.audit_record =
-    { entry; exit_ = None; external_exit = Some (make_external_exit ()); execution = None }
+    {
+      entry;
+      exit_ = None;
+      external_exit = Some (make_external_exit ());
+      execution = None;
+    }
   in
   let report = TAR.render ~trade_audit:[ record ] ~trades:[ trade ] () in
   assert_that report.rows
@@ -360,7 +365,12 @@ let test_markdown_renders_external_exit_trigger _ =
   let trade = make_trade ~symbol:"AAPL" ~entry_date:(_date "2024-01-15") () in
   let entry = make_entry_decision () in
   let record : TA.audit_record =
-    { entry; exit_ = None; external_exit = Some (make_external_exit ()); execution = None }
+    {
+      entry;
+      exit_ = None;
+      external_exit = Some (make_external_exit ());
+      execution = None;
+    }
   in
   let report = TAR.render ~trade_audit:[ record ] ~trades:[ trade ] () in
   assert_that

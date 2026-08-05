@@ -28,17 +28,17 @@
 type entry_order_kind =
   | Market  (** No resting order — Market fill ("making markets"). *)
   | Stop_limit_band of float
-      (** Resting StopLimit whose do-not-chase band is this fraction (e.g. [0.15]
-          for the 15-percentage-point cap). The per-entry trigger is the
+      (** Resting StopLimit whose do-not-chase band is this fraction (e.g.
+          [0.15] for the 15-percentage-point cap). The per-entry trigger is the
           effective entry; the limit is [trigger *. (1 +/- band)]. *)
 [@@deriving sexp, eq]
 
 val entry_order_kind_of_config : Weinstein_strategy.config -> entry_order_kind
 (** [Stop_limit_band (entry_extension_max_pct /. 100.)] when
-    [enable_sim_entry_stoplimit && entry_extension_max_pct > 0.0], else [Market].
-    Same arming condition as {!Backtest.Panel_runner}'s simulator entry cap, so
-    the recorded designed-order shape matches what the simulator actually
-    emitted. *)
+    [enable_sim_entry_stoplimit && entry_extension_max_pct > 0.0], else
+    [Market]. Same arming condition as {!Backtest.Panel_runner}'s simulator
+    entry cap, so the recorded designed-order shape matches what the simulator
+    actually emitted. *)
 
 val enrich :
   audit:Trade_audit.audit_record list ->
@@ -51,3 +51,11 @@ val enrich :
     [execution = None]. Pure; order-preserving. The join is by position id
     resolved through {!Trade_context} — the first round-trip matched to a given
     position supplies its entry fill. *)
+
+val enrich_for_config :
+  audit:Trade_audit.audit_record list ->
+  round_trips:Trading_simulation.Metrics.trade_metrics list ->
+  config:Weinstein_strategy.config ->
+  Trade_audit.audit_record list
+(** [enrich] with the [entry_order_kind] derived from [config] via
+    {!entry_order_kind_of_config} — the runner's one-call entry point. *)

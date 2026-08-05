@@ -451,14 +451,6 @@ let _assemble_result ~start_date ~end_date ~deps ~overrides ~sim_result
       ~all_steps:sim_result.Trading_simulation_types.Simulator_types.steps
       ~start_date ()
   in
-  (* Execution-faithfulness enrichment (#2158 follow-on): stamp each entry's
-     designed order shape vs its realised fill onto [audit_record.execution]. The
-     designed shape comes from the run's config; the fill from [round_trips]. *)
-  let audit =
-    Execution_faithfulness.enrich ~audit:audit_raw ~round_trips
-      ~entry_order_kind:
-        (Execution_faithfulness.entry_order_kind_of_config deps.config)
-  in
   let summary =
     _make_summary ~start_date ~end_date ~deps ~steps_in_range ~steps
       ~final_value ~round_trips ~sim_result ~stale_holds
@@ -472,7 +464,9 @@ let _assemble_result ~start_date ~end_date ~deps ~overrides ~sim_result
     n_stop_eligible_positions = sim_result.n_stop_eligible_positions;
     overrides;
     stop_infos;
-    audit;
+    audit =
+      Execution_faithfulness.enrich_for_config ~audit:audit_raw ~round_trips
+        ~config:deps.config;
     cascade_summaries;
     force_liquidations;
     stale_holds;

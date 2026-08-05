@@ -228,54 +228,60 @@ type external_exit_decision = {
     that context; recording an explicitly-partial record is preferred over a
     fabricated-context one. See issue #2076. *)
 
+(** The order shape the strategy *designed* for an entry — Market vs a resting
+    StopLimit. Makes the entry-fill convention VISIBLE per-trade: whether the
+    order was "following the stops" (a resting StopLimit at the breakout) or
+    "just making markets" (a Market fill). Derived from the run's config, not
+    from the fill. *)
 type designed_order_type =
   | Market
       (** No resting order — the simulator fills the entry at the next bar
           ("making markets"). The strategy's default entry-fill model. *)
   | Stop_limit of { trigger : float; limit : float }
       (** A resting stop-limit entry order: triggers at [trigger] (the breakout
-          level) and refuses fills beyond [limit] (the do-not-chase cap). Emitted
-          when [enable_sim_entry_stoplimit && entry_extension_max_pct > 0]. *)
+          level) and refuses fills beyond [limit] (the do-not-chase cap).
+          Emitted when
+          [enable_sim_entry_stoplimit && entry_extension_max_pct > 0]. *)
 [@@deriving sexp]
-(** The order shape the strategy *designed* for an entry — Market vs a resting
-    StopLimit. Makes the entry-fill convention VISIBLE per-trade: whether the
-    order was "following the stops" (a resting StopLimit at the breakout) or
-    "just making markets" (a Market fill). Derived from the run's config, not
-    from the fill. *)
 
 type execution_faithfulness = {
   designed_order_type : designed_order_type;
-      (** Market vs the resting StopLimit(trigger, limit) the strategy designed. *)
+      (** Market vs the resting StopLimit(trigger, limit) the strategy designed.
+      *)
   designed_trigger : float;
       (** The entry order's trigger — the [CreateEntering.entry_price] the
-          strategy installed (recovered as [initial_position_value /. shares], i.e.
-          the effective entry). For a [Stop_limit] this equals its [trigger]. *)
+          strategy installed (recovered as [initial_position_value /. shares],
+          i.e. the effective entry). For a [Stop_limit] this equals its
+          [trigger]. *)
   fill_price : float;
       (** The actual entry fill, from the matched round-trip's open-leg price
           ({!Trading_simulation.Metrics.trade_metrics.entry_price}). *)
   fill_vs_trigger_pct : float;
-      (** [(fill_price -. designed_trigger) /. designed_trigger] — signed. Positive
-          = filled above the trigger (a long that chased up into its cap); for a
-          short entry the sign convention is the same arithmetic. *)
+      (** [(fill_price -. designed_trigger) /. designed_trigger] — signed.
+          Positive = filled above the trigger (a long that chased up into its
+          cap); for a short entry the sign convention is the same arithmetic. *)
   fill_within_band : bool;
       (** Whether [fill_price] landed inside the designed order's price band
-          ([[trigger, limit]] for a long buy-stop, [[limit, trigger]] for a short
-          sell-stop). Trivially [true] for [Market] (no band constraint). *)
+          ([[trigger, limit]] for a long buy-stop, [[limit, trigger]] for a
+          short sell-stop). Trivially [true] for [Market] (no band constraint).
+      *)
   faithful : bool;
-      (** The verdict: did the fill honor the designed order? [true] for [Market]
-          by definition (there was no stop to honor — the point is making the
-          convention visible). For [Stop_limit], [true] iff the fill was at/beyond
-          the trigger in the breakout direction and within the do-not-chase cap
-          (i.e. [fill_within_band] modulo float tolerance). A [false] flags an
-          order that filled at a price the resting stop should not have produced —
-          e.g. below the breakout for a long — surfacing execution that "made
-          markets" instead of following the designed stop. *)
+      (** The verdict: did the fill honor the designed order? [true] for
+          [Market] by definition (there was no stop to honor — the point is
+          making the convention visible). For [Stop_limit], [true] iff the fill
+          was at/beyond the trigger in the breakout direction and within the
+          do-not-chase cap (i.e. [fill_within_band] modulo float tolerance). A
+          [false] flags an order that filled at a price the resting stop should
+          not have produced — e.g. below the breakout for a long — surfacing
+          execution that "made markets" instead of following the designed stop.
+      *)
 }
 [@@deriving sexp]
 (** Per-entry execution-quality record, captured at entry-fill time by joining
     the entry decision (designed order) to its realised fill. Populated by
-    {!Execution_faithfulness.enrich} at the runner; [None] on the collector's raw
-    records and for still-open / unmatched entries. See issue #2158 follow-on. *)
+    {!Execution_faithfulness.enrich} at the runner; [None] on the collector's
+    raw records and for still-open / unmatched entries. See issue #2158
+    follow-on. *)
 
 type audit_record = {
   entry : entry_decision;
@@ -292,7 +298,8 @@ type audit_record = {
           {!Execution_faithfulness.enrich} at the runner after the round-trip
           fills are known. [None] on the raw collector records and for entries
           with no matched fill (still open at end-of-run). [@sexp.option] keeps
-          [trade_audit.sexp] files written before this field existed parseable. *)
+          [trade_audit.sexp] files written before this field existed parseable.
+      *)
 }
 [@@deriving sexp]
 (** A paired entry + exit record. [exit_] is [None] for positions that were
