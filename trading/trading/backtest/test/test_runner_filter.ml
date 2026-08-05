@@ -596,6 +596,7 @@ let _audit_record ~entry_date ~position_id ~symbol :
     entry = _entry ~entry_date ~position_id ~symbol;
     exit_ = None;
     external_exit = None;
+    execution = None;
   }
 
 let test_filter_audit_records_drops_warmup _ =

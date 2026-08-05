@@ -136,7 +136,7 @@ let _write_audit path =
   Sexp.save_hum path
     (TA.sexp_of_audit_records
        [
-         { entry = _aapl_entry; exit_ = Some _aapl_exit; external_exit = None };
+         { entry = _aapl_entry; exit_ = Some _aapl_exit; external_exit = None; execution = None };
        ])
 
 let _stage_dir () =
