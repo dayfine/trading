@@ -563,6 +563,7 @@ let make_scored_candidate ~ticker ~side ~entry ~stop ~grade =
       volume = None;
       breakout_price = Some entry;
       breakdown_price = None;
+      local_range_top = None;
       resistance = None;
       support = None;
       prior_stage = Some (Stage3 { weeks_topping = 8 });

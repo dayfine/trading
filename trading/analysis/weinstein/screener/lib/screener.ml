@@ -127,8 +127,15 @@ let _build_candidate ~params ~sector ~(a : Stock_analysis.t) ~score ~reasons
     Option.value a.breakout_price
       ~default:(a.stage.ma_value *. (1.0 +. params.breakout_fallback_pct))
   in
+  (* Ticket-level entry anchor. When the local-range knob is armed the analysis
+     populates [a.local_range_top] (split-safe max high over the last N bars);
+     the entry ticket then anchors there instead of the graded breakout top.
+     [None] (default) falls back to [breakout] — bit-identical. Only the entry
+     (and its derived stop / risk) moves; [breakout] still drives [swing_target]
+     below and admission/grading are untouched (they read [breakout_price]). *)
+  let entry_anchor = Option.value a.local_range_top ~default:breakout in
   let entry =
-    suggested_entry ~entry_buffer_pct:params.entry_buffer_pct breakout
+    suggested_entry ~entry_buffer_pct:params.entry_buffer_pct entry_anchor
   in
   let stop_ =
     if is_short then entry *. (1.0 +. params.short_stop_pct)

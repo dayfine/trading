@@ -807,6 +807,15 @@ type config = {
           bit-identical baselines (R1); gated on [enable_sim_entry_stoplimit] so
           arming alone is a no-op. See
           [Weinstein_strategy_config.sim_entry_trigger_at_suggested]. *)
+  entry_anchor_local_range_weeks : int; [@sexp.default 0]
+      (** Book-faithful local-range entry anchor (2026-08-05 user decision):
+          when [> 0], the screener anchors each candidate's [suggested_entry] at
+          the split-safe max high over the last [entry_anchor_local_range_weeks]
+          bars (the current trading-range top) instead of the 520-week graded
+          top — a nearer, earlier-triggering buy-stop. Strictly ticket-level
+          (admission / grading / stage classification unchanged); default [0] =
+          off, bit-identical baselines (R1). See
+          [Weinstein_strategy_config.entry_anchor_local_range_weeks]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

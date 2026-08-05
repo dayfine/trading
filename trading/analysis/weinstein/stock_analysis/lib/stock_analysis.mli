@@ -54,6 +54,32 @@ type config = {
           to pre-feature behaviour. The [@sexp.default false] attribute is inert
           here (this config does not derive sexp) but marks the field as an
           additive, default-off option. *)
+  entry_anchor_local_range_weeks : int; [@sexp.default 0]
+      (** Ticket-level "local trading-range" entry anchor (Weinstein Ch. 3: the
+          buy-stop is placed just above the top of the {i current} trading range
+          — "write down the price it would need to break out"). When [> 0],
+          {!t.local_range_top} is populated with the split-safe maximum high
+          over the most recent [entry_anchor_local_range_weeks] bars (offsets
+          [0 .. weeks - 1]) and the screener anchors {!Screener.suggested_entry}
+          there instead of the 520-week graded breakout top. Because the local
+          top is typically {i below} the graded top, an armed resting/StopLimit
+          order triggers earlier — composes with
+          [Weinstein_strategy_config.sim_entry_trigger_at_suggested] +
+          [enable_sim_entry_stoplimit] (the E-anchored fill family).
+
+          {b Strictly ticket-level}: this knob moves only {!t.local_range_top}
+          and, through it, the screener's entry / stop / risk ticket fields.
+          {!t.breakout_price} — which feeds admission, resistance grading, and
+          the false-virgins protection ([[project_false_virgins_load_bearing]])
+          — is UNCHANGED, so no candidate's admission or grade moves. Stage
+          classification is untouched.
+
+          {b Default [0] = off}, {!t.local_range_top} is [None] and the screener
+          uses the graded breakout top exactly as before (bit-identical, R1).
+          Split truncation is identical to the breakout scan (same
+          [Stock_analysis_scans.scan_max_high] walk). The [@sexp.default 0]
+          attribute is inert here (this config does not derive sexp) but marks
+          the field as an additive, default-off option. *)
 }
 (** Configuration bundling all sub-module configs. *)
 
@@ -82,6 +108,16 @@ type t = {
           Mirror of [breakout_price] for the short-side cascade. Computed as the
           minimum [low_price] over the prior-base window
           [(base_end_offset_weeks .. base_lookback_weeks)]. *)
+  local_range_top : float option;
+      (** Ticket-level local-range entry anchor: the split-safe maximum high
+          over the most recent [config.entry_anchor_local_range_weeks] bars
+          (offsets [0 .. weeks - 1], the "current trading range"). [None] when
+          [config.entry_anchor_local_range_weeks = 0] (default — feature off) OR
+          when no defined high exists in the window. Read {i only} by the
+          screener to anchor {!Screener.suggested_entry} (and, through it, the
+          derived stop / risk ticket fields); it never feeds admission, grading,
+          or stage classification, so [breakout_price] remains the sole basis
+          for those. Off by default = bit-identical to prior behaviour. *)
   prior_stage : Weinstein_types.stage option;
       (** Stage from the previous week, passed forward for transition tracking.
       *)

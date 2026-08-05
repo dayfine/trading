@@ -32,6 +32,11 @@ type config = {
           .mli. *)
   virgin_crossing_readmission : bool; [@sexp.default false]
       (** resistance-v2 lever (a); [false] = off (bit-identical). See .mli. *)
+  entry_anchor_local_range_weeks : int; [@sexp.default 0]
+      (** Ticket-level local-range entry anchor (default [0] = off). When [> 0],
+          {!local_range_top} is the split-safe max high over the last
+          [entry_anchor_local_range_weeks] bars; [0] leaves it [None]
+          (bit-identical). See .mli. *)
 }
 
 let default_config =
@@ -46,6 +51,7 @@ let default_config =
     continuation = None;
     overhead_supply = None;
     virgin_crossing_readmission = false;
+    entry_anchor_local_range_weeks = 0;
   }
 
 type t = {
@@ -57,6 +63,13 @@ type t = {
   support : Support.result option;
   breakout_price : float option;
   breakdown_price : float option;
+  local_range_top : float option;
+      (** Ticket-level local-range entry anchor: the split-safe maximum high
+          over the last [config.entry_anchor_local_range_weeks] bars, or [None]
+          when that knob is [0] (the default) or no defined high exists in the
+          window. Read {i only} by the screener to anchor
+          {!Screener.suggested_entry}; never feeds admission, grading, or stage
+          classification. See .mli. *)
   prior_stage : stage option;
   continuation : Continuation.result option;
   supply : Resistance_supply.result option;
@@ -281,8 +294,23 @@ let _breakout_and_breakdown_prices ~(config : config) ~(callbacks : callbacks) :
   in
   (breakout, breakdown)
 
+(** Ticket-level local-range entry anchor: the split-safe maximum high over the
+    most recent [config.entry_anchor_local_range_weeks] bars (offsets
+    [0 .. weeks - 1], i.e. including the current bar — the "current trading
+    range" the book anchors the buy-stop above). Returns [None] when the knob is
+    [0] (feature off, bit-identical) so no unused work runs. Reuses the same
+    {!Stock_analysis_scans.scan_max_high} walk as the breakout scan (identical
+    split-boundary truncation), differing only in the window bounds. *)
+let _local_range_top ~(config : config) ~(callbacks : callbacks) : float option
+    =
+  if config.entry_anchor_local_range_weeks <= 0 then None
+  else
+    Stock_analysis_scans.scan_max_high ~get_high:callbacks.get_high
+      ~get_split_factor:callbacks.get_split_factor ~base_end_offset:0
+      ~base_lookback:config.entry_anchor_local_range_weeks
+
 (* @large-function: record-assembly coordinator — threads the 8 sub-analysis
-   results into the single 15-field [t]; splitting scatters the one-shot
+   results into the single 16-field [t]; splitting scatters the one-shot
    assembly with no readability gain. *)
 let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
     ~prior_stage ~as_of_date : t =
@@ -300,6 +328,7 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
   let breakout_price, breakdown_price =
     _breakout_and_breakdown_prices ~config ~callbacks
   in
+  let local_range_top = _local_range_top ~config ~callbacks in
   let peak_offset_opt =
     _find_peak_volume_offset_callback ~get_volume:callbacks.get_volume
       ~lookback:config.breakout_event_lookback
@@ -330,6 +359,7 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
     support = support_result;
     breakout_price;
     breakdown_price;
+    local_range_top;
     prior_stage;
     continuation;
     supply;

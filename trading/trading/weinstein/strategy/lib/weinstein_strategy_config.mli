@@ -1256,6 +1256,41 @@ type config = {
           design {i above} the close for a long breakout -- that is the whole
           point of a resting stop -- so such a guard would misfire on every
           normal breakout.) *)
+  entry_anchor_local_range_weeks : int; [@sexp.default 0]
+      (** Book-faithful local-range entry anchor (2026-08-05 user decision,
+          option (b); note [dev/notes/honest-ladder-2026-08-05.md], PR #2216).
+          When [> 0], the screener anchors each candidate's [suggested_entry] at
+          the top of the {i current} trading range — the split-safe maximum high
+          over the most recent [entry_anchor_local_range_weeks] bars
+          ([Stock_analysis.t.local_range_top]) — instead of the 520-week graded
+          resistance top. This is the book's "write down the price it would need
+          to break out" ticket (Ch. 3; [docs/design/weinstein-book-reference.md]
+          §4.1): a nearer, earlier-triggering buy-stop. Example candidate value:
+          [26] (a half-year range).
+
+          {b Strictly ticket-level.} Threaded verbatim into
+          [Stock_analysis.config.entry_anchor_local_range_weeks] on both the
+          simulator screening path ([_stock_analysis_config_for]) and the
+          weekly-report path ([Weekly_snapshot_generator]). It moves only the
+          entry ticket (and its derived stop / risk); it does NOT shorten the
+          resistance-grading lookback, so admission, [resistance_quality]
+          grading, the false-virgins protection
+          ([[project_false_virgins_load_bearing]]), cascade scoring, and stage
+          classification are all UNCHANGED.
+
+          {b Composes with the E-anchored fill family.} The local top is
+          typically {i below} the graded top, so an armed
+          [sim_entry_trigger_at_suggested] + [enable_sim_entry_stoplimit] order
+          rests / triggers earlier (nearer the breakout) than with the graded E.
+
+          {b Default [0] = off, bit-identical to every existing baseline/golden}
+          (R1): [Stock_analysis.t.local_range_top = None] and the screener uses
+          the graded breakout top exactly as before. R2: real config field,
+          axis-expressible as
+          [((flag entry_anchor_local_range_weeks) (values (13 26 52)))] via
+          [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides]. Per
+          the experiment discipline it stays default-off until a ledger ACCEPT
+          (WF-CV per the honest-ladder plan). *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
