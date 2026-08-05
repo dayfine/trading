@@ -219,6 +219,48 @@ A second category of buy signal that occurs within an established Stage 2 uptren
 
 **Implementation note:** Continuation buys are a distinct buy_reason enum value from initial breakouts — they share the same volume + RS checks but the MA-slope check is stricter (MA must be *clearly* trending higher, not merely flat-to-rising). Source: Ch. 3, ~lines 2214–2238.
 
+### 4.7 Order Mechanics — GTC Buy-Stop-Limit (Ch. 3 ~lines 2450–2490, Ch. 4 checklist ~line 4178)
+
+Weinstein's prescribed order for entering a breakout is fully specified — and
+neither half of it matched our implementation until 2026-08-05:
+
+> "Enter buy-stop orders for all three stocks on a good-'til-canceled (GTC)
+> basis. This means that you have a standing order with the specialist until
+> you either cancel the orders or they are actually executed... You may be
+> surprised two or three weeks later when you find out that you bought 2,000
+> shares of Widget Technology. Here's how your buy order should now read:
+> **Buy 1,000 XYZ at 12⅛ stop – 12⅜ limit – GTC.**"
+
+Ch. 4 buying checklist repeats it: *"Put in your buy-stop orders for half of
+your position... Use buy-stop orders on a good-'til-canceled (GTC) basis."*
+
+**The two load-bearing properties:**
+
+1. **GTC persistence.** The order rests for WEEKS until executed or cancelled —
+   a slow breakout still fills (the "surprised two or three weeks later" case).
+   A Day-expiring order (the simulator's historical shape) or a weekly
+   re-issued ticket that lapses when the candidate ages out of the early-Stage-2
+   window is unfaithful: it structurally misses breakouts that arrive after
+   candidacy expires (measured specimen: BKE 2020 — Day-order arm missed the
+   Nov-10 breakout entirely and later chased the top for a loss).
+2. **Tight limit band (~+2% in his example: 12⅛ stop / 12⅜ limit).** A gap
+   through the band is NOT chased — but under GTC a refused gap is not a lost
+   trade either; the resting order fills on a pullback into the band. The band
+   is do-not-chase; GTC is don't-miss. The two work as a pair.
+
+**What the book does NOT sanction:** buying inside the trading range below the
+breakout level (a market order at the current price when the ticket's stop is
+above). The 2026-08-04/05 fill-model ladder measured the record simulator doing
+exactly that on 64% of trades — see
+`dev/notes/sim-entry-fill-ladder-2026-08-05.md`.
+
+**Entry level within the range:** the checklist anchors the buy-stop at the top
+of the CURRENT trading range ("write down the price that each would need to
+break out"), with deep overhead resistance a discard criterion only when
+NEARBY. Our resistance mapper's 520-week graded top is a deliberately
+conservative alternative anchoring (false-virgins protection) — an open design
+axis, not book-settled.
+
 ## 5. Stop-Loss and Selling Rules (Ch. 6)
 
 ### 5.1 Initial Stop Placement
