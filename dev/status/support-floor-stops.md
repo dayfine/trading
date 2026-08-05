@@ -352,6 +352,47 @@ remained on correct code.
   by the trailing / tightened candidates in `weinstein_stops.ml`. Nothing to build.
 - ~~Split-safe on the panel/callback path~~ — **done 2026-08-05**, see the
   addendum above.
+- **F5 (qc-behavioral, PR #2213) — no telemetry when the whole-window fallback
+  fires.** Ranked by the reviewer as the most consequential of this PR's
+  follow-ups. The all-or-nothing design is right, but silent at the single-decision
+  level: a caller cannot distinguish "flag on, window adjusted, answer 104.0" from
+  "flag on, window unadjustable, answer 104.0". Diagnosability exists only in
+  aggregate (`on == off` across many rows). Because whole-window is by design
+  sensitive to a *single* unusable cell anywhere in `support_floor_lookback_bars`,
+  a run could be substantially inert with nobody knowing what fraction was
+  affected. A counter or an `Audit_recorder` tag ("split-safe fallback fired")
+  turns a silent condition into a measurable one and lets a walk-forward run
+  report *how much* of the surface was inert. **Do this before the mechanism is
+  ever promoted** — an ACCEPT computed over a partly-inert surface would be
+  uninterpretable, precisely the failure class
+  `.claude/rules/mechanism-validation-rigor.md` exists to prevent.
+- **F3 (qc-behavioral, PR #2213) — `trade_audit_report_bin.ml` reads the raw
+  basis where the domain wants adjusted.** Exposed (not introduced) by #2213's
+  `closes` → `raw_closes` rename, which is why both readers were deliberately
+  left on raw with no behaviour change. The domain judgement, from qc-behavioral:
+  reading `raw_closes` in `_closes_lookup_of_reader` (R6 ratings) and
+  `_bar_close_of_reader` (HTML benchmark / utilization marks) **is** a real
+  correctness defect — a split inside the R6 lookback injects a ~4x discontinuity
+  into the pre-entry close series, and a raw mark taken across a split produces a
+  fake jump in the benchmark curve. This is the G14 pathology relocated to the
+  reporting layer. Needs its own PR **including** a re-pin of affected report
+  goldens.
+- **F1 (qc-behavioral, PR #2213) — panel R2 fixture is one-sided on the high
+  leg.** At `c7b1bcf6`, mutation M5 (`get_high` left unscaled) left
+  `test_panel_callbacks.exe` fully green; only the bar-list
+  `split_safe_short_uses_adjusted_ceiling` caught it. Lower priority after the
+  rework: the panel path has since acquired discriminating coverage at three
+  separate points (Close anchor, all-NaN, far-offset). Suggested fix — assert the
+  panel short case's `reference_level` (102.0) rather than only the structural
+  boolean.
+- **F2 (qc-behavioral, PR #2213) — R1 comparand is an in-test transcription.**
+  `test_panel_split_safe_off_matches_pre_flag_path` compares against
+  `_pre_flag_panel_stop`, a re-statement of the old code path rather than an
+  independent value, so a drifted transcription would pass while the invariant
+  broke. No live risk — qc-behavioral verified R1 against merge base `04e2c75b`
+  directly at both `c7b1bcf6` and `fbc11600`, all four default-off cases
+  bit-identical — but pinning to literal floats (`104.0` / `99.84`) would make it
+  self-sufficient. Lowest priority of the four.
 - `split_safe_floors` still needs a ledger ACCEPT before its default can flip
   (R3). Now that the axis actually controls both paths, a walk-forward surface
   over `((stops_config ((split_safe_floors true))))` measures the whole
