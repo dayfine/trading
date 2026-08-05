@@ -9,6 +9,7 @@ type callbacks = {
   get_high : day_offset:int -> float option;
   get_low : day_offset:int -> float option;
   get_close : day_offset:int -> float option;
+  get_adjusted_close : day_offset:int -> float option;
   get_date : day_offset:int -> Core.Date.t option;
   n_days : int;
 }
@@ -35,6 +36,7 @@ let callbacks_from_bars ~bars ~as_of ~lookback_bars =
       get_high = (fun ~day_offset:_ -> None);
       get_low = (fun ~day_offset:_ -> None);
       get_close = (fun ~day_offset:_ -> None);
+      get_adjusted_close = (fun ~day_offset:_ -> None);
       get_date = (fun ~day_offset:_ -> None);
       n_days = 0;
     }
@@ -53,6 +55,8 @@ let callbacks_from_bars ~bars ~as_of ~lookback_bars =
       get_high = lookup (fun (b : Types.Daily_price.t) -> b.high_price);
       get_low = lookup (fun (b : Types.Daily_price.t) -> b.low_price);
       get_close = lookup (fun (b : Types.Daily_price.t) -> b.close_price);
+      get_adjusted_close =
+        lookup (fun (b : Types.Daily_price.t) -> b.adjusted_close);
       get_date =
         (fun ~day_offset ->
           if day_offset < 0 || day_offset >= n_days then None

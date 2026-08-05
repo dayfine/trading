@@ -122,8 +122,15 @@ let _bar_reader_of_snapshot ~snapshot_dir =
   Bar_reader.of_snapshot_views (Snapshot_callbacks.of_daily_panels panels)
 
 (* Resolve each entry's pre-entry daily closes from the snapshot warehouse via
-   the float-array daily view (adjusted closes), zipped with their dates. R6
-   filters to its own lookback window and ignores the entry-day bar. *)
+   the float-array daily view, zipped with their dates. R6 filters to its own
+   lookback window and ignores the entry-day bar.
+
+   Reads [raw_closes]. The comment here used to say "adjusted closes", but the
+   field it read ([daily_view.closes], renamed [raw_closes] on 2026-08-05) has
+   always carried the raw [Snapshot_schema.Close] cell — the name was the
+   inaccurate part, not the value. Kept on the raw basis so this report's output
+   is unchanged; whether the ratings *should* read [adjusted_closes] is a
+   separate question, deliberately not answered here. *)
 let _closes_lookup_of_reader reader :
     Trade_audit_report.Trade_audit_ratings.closes_lookup =
  fun ~symbol ~as_of ->
@@ -132,7 +139,8 @@ let _closes_lookup_of_reader reader :
       ~lookback:_daily_lookback_days
   in
   Array.to_list
-    (Array.zip_exn view.Snapshot_bar_views.dates view.Snapshot_bar_views.closes)
+    (Array.zip_exn view.Snapshot_bar_views.dates
+       view.Snapshot_bar_views.raw_closes)
 
 (* Weekly [(date, close)] bars for the per-trade HTML chart series: up to [n]
    weekly bars ending at/before [as_of], straight off the snapshot weekly view.
@@ -141,15 +149,17 @@ let _weekly_series_of_reader reader ~symbol ~n ~as_of =
   let view = Bar_reader.weekly_view_for reader ~symbol ~n ~as_of in
   Array.zip_exn view.Snapshot_bar_views.dates view.Snapshot_bar_views.closes
 
-(* Last adjusted close at/before [as_of] for [symbol], or [None] when the
-   warehouse has no bar within the lookback window. Feeds the HTML benchmark and
-   utilization series. *)
+(* Last raw close at/before [as_of] for [symbol], or [None] when the warehouse
+   has no bar within the lookback window. Feeds the HTML benchmark and
+   utilization series. (Same rename note as [_closes_lookup_of_reader]: the
+   field was called [closes] and documented "adjusted", but has always been the
+   raw close cell.) *)
 let _bar_close_of_reader reader ~symbol ~as_of =
   let view =
     Bar_reader.daily_view_for reader ~symbol ~as_of
       ~lookback:_mark_lookback_days
   in
-  let closes = view.Snapshot_bar_views.closes in
+  let closes = view.Snapshot_bar_views.raw_closes in
   if Array.is_empty closes then None else Some closes.(Array.length closes - 1)
 
 let _write ~path s =

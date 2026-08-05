@@ -1085,6 +1085,99 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 24 — H-AUDIT-MODE-ORDER-UNPINNED: the chmod-before-mv placement
+# (H-AUDIT-MODE-0600) is supposed to guarantee $OUTPUT_FILE already has its
+# final mode (644) from the instant it first becomes visible via the rename
+# -- i.e. no window in which a concurrent reader could open() it at 0600.
+# That placement claim was unpinned: moving the chmod to after the `mv`
+# still left the whole suite green (mutation M2, qc-behavioral PR #2199
+# follow-up), because none of scenarios 1-23 observe file state at the
+# instant of first visibility -- scenario 23 only checks the mode AFTER the
+# script finishes normally, which the end state reaches either way.
+#
+# Part A (behavioral): uses the WRITE_AUDIT_TEST_ABORT_AFTER_RENAME hook
+# (symmetric to WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME / scenario 19) to
+# freeze execution immediately after the rename and assert $OUTPUT_FILE is
+# ALREADY mode 644 at that instant. Forces a restrictive umask for the same
+# reason as scenario 23: a pass must depend on the chmod, not on a
+# permissive ambient umask.
+#
+# Part A alone is NOT sufficient (rework 2026-08-05, qc-behavioral B1): the
+# hook is the literal next statement after `mv`, so anything a refactor
+# inserts BETWEEN `mv` and the hook -- e.g. `chmod 644 "$OUTPUT_FILE"`
+# placed directly below the `mv` line (mutation M2b) -- already ran by the
+# time the hook checks, and Part A alone cannot see it: the information is
+# gone by the time any post-rename hook runs, regardless of where after the
+# rename that hook sits. No behavioral hook placed after the rename can ever
+# close this gap.
+#
+# Part B (source-order, static): reads ${WRITE_AUDIT} directly and asserts
+# the property no runtime hook can observe -- that the ONLY chmod call in
+# the script targets $TMP_FILE, and it appears strictly before the `mv`
+# line. Two checks:
+#   B1. `chmod 644 "$TMP_FILE"` appears at a line number strictly less than
+#       `mv -f "$TMP_FILE" "$OUTPUT_FILE"`'s line number.
+#   B2. write_audit.sh contains NO `chmod ... "$OUTPUT_FILE"` anywhere, at
+#       any line, in any position relative to the rename.
+# B1 alone already catches M1 (chmod deleted -- no match, order check fails
+# open) and, combined with B2, unconditionally catches BOTH M2 (chmod
+# relocated below the hook block, retargeted to $OUTPUT_FILE) and M2b
+# (chmod relocated to directly after `mv`, retargeted to $OUTPUT_FILE) --
+# B2 is a source-level invariant independent of exactly where after the
+# rename the mutated chmod is placed, closing the gap Part A structurally
+# cannot.
+# ---------------------------------------------------------------------------
+FEATURE24="audit-mode-order-pinned"
+
+out24=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_TEST_ABORT_AFTER_RENAME=1 \
+  bash -c 'umask 077 && exec "$0" "$@"' "${WRITE_AUDIT}" \
+    --date 2026-08-05 --feature "${FEATURE24}" --branch "harness/audit-mode-order" \
+    --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1) && rc24=0 || rc24=$?
+JSON24="${TMP_REPO}/dev/audit/2026-08-05-harness-audit-mode-order-${FEATURE24}.json"
+mode24="$(_file_mode_octal "${JSON24}" 2>/dev/null || echo 'UNKNOWN')"
+
+# Part B: static source-order check against the actual script under test
+# (the copy at $WRITE_AUDIT, identical to trading/devtools/checks/write_audit.sh).
+# Whole-line comments are blanked out first (line numbers preserved via sed,
+# not removed) so a docstring merely DESCRIBING the pattern (e.g. this very
+# file's own comment explaining what a bad chmod placement would look like)
+# can never be mistaken for the executable statement itself.
+CODE_ONLY_24="$(sed -E 's/^[[:space:]]*#.*$//' "${WRITE_AUDIT}")"
+# `|| true` on each is load-bearing under `set -euo pipefail` (mirrors the
+# established pattern in write_audit.sh's own recorded_at_ns/overall_qc
+# extractions): when a mutation genuinely removes/relocates the pattern
+# (e.g. mutation M1 below, which deletes the chmod line entirely), `grep`
+# legitimately finds no match and exits 1 -- under pipefail that would
+# otherwise propagate through `head`/`cut` and abort this whole test
+# script before it can report a clean FAIL for scenario 24. Without this
+# guard, M1 was observed to kill the test run silently, short-circuiting
+# scenarios 24+ entirely rather than reporting a failure -- the empty
+# CHMOD_TMP_LINE_24 that results after `|| true` is exactly what the
+# `[[ -n ... ]]` guard below is designed to catch instead.
+CHMOD_TMP_LINE_24="$(printf '%s\n' "${CODE_ONLY_24}" | grep -n 'chmod 644 "\$TMP_FILE"' | head -1 | cut -d: -f1 || true)"
+MV_LINE_24="$(printf '%s\n' "${CODE_ONLY_24}" | grep -n 'mv -f "\$TMP_FILE" "\$OUTPUT_FILE"' | head -1 | cut -d: -f1 || true)"
+OUTPUT_CHMOD_COUNT_24="$(printf '%s\n' "${CODE_ONLY_24}" | grep -c 'chmod [0-9]* "\$OUTPUT_FILE"' || true)"
+[ -z "${OUTPUT_CHMOD_COUNT_24}" ] && OUTPUT_CHMOD_COUNT_24=0
+
+source_order_ok=0
+if [[ -n "${CHMOD_TMP_LINE_24}" ]] && [[ -n "${MV_LINE_24}" ]] \
+   && (( CHMOD_TMP_LINE_24 < MV_LINE_24 )) \
+   && (( OUTPUT_CHMOD_COUNT_24 == 0 )); then
+  source_order_ok=1
+fi
+
+if (( rc24 != 0 )) \
+   && [[ -f "${JSON24}" ]] \
+   && [[ "${mode24}" == "644" ]] \
+   && echo "${out24}" | grep -q "simulating interruption right after rename" \
+   && (( source_order_ok == 1 )); then
+  pass "scenario 24 — \$OUTPUT_FILE already mode 0644 at the instant of first visibility right after the rename, AND source-order check confirms chmod 644 \"\$TMP_FILE\" precedes mv with no chmod ever targeting \$OUTPUT_FILE (H-AUDIT-MODE-ORDER-UNPINNED)"
+else
+  fail "scenario 24 — expected rc!=0, record at ${JSON24} already mode 644 right after rename, 'simulating interruption right after rename' in output, chmod-TMP_FILE line < mv line with zero chmod-OUTPUT_FILE occurrences; got rc=${rc24}, mode=${mode24}, chmod_tmp_line=${CHMOD_TMP_LINE_24}, mv_line=${MV_LINE_24}, output_chmod_count=${OUTPUT_CHMOD_COUNT_24}"
+  echo "${out24}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""

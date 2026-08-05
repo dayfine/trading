@@ -50,6 +50,8 @@ type per_trade_row = {
   entry_macro_trend : Weinstein_types.market_trend option;
   cascade_grade : Weinstein_types.grade option;
   cascade_score : int option;
+  fill_vs_trigger_pct : float option;
+  faithful : bool option;
 }
 [@@deriving sexp]
 
@@ -117,6 +119,9 @@ let _row_of_trade audit_idx (trade : Trading_simulation.Metrics.trade_metrics) :
   in
   let entry = Option.map audit ~f:(fun (r : TA.audit_record) -> r.entry) in
   let exit_ = Option.bind audit ~f:(fun (r : TA.audit_record) -> r.exit_) in
+  let execution =
+    Option.bind audit ~f:(fun (r : TA.audit_record) -> r.execution)
+  in
   let side =
     Option.value_map entry ~default:Trading_base.Types.Long ~f:(fun e -> e.side)
   in
@@ -149,6 +154,12 @@ let _row_of_trade audit_idx (trade : Trading_simulation.Metrics.trade_metrics) :
     entry_macro_trend = Option.map entry ~f:(fun e -> e.macro_trend);
     cascade_grade = Option.map entry ~f:(fun e -> e.cascade_grade);
     cascade_score = Option.map entry ~f:(fun e -> e.cascade_score);
+    fill_vs_trigger_pct =
+      Option.map execution ~f:(fun (e : TA.execution_faithfulness) ->
+          e.fill_vs_trigger_pct);
+    faithful =
+      Option.map execution ~f:(fun (e : TA.execution_faithfulness) ->
+          e.faithful);
   }
 
 let _compare_rows (a : per_trade_row) (b : per_trade_row) =
@@ -287,6 +298,19 @@ let _fmt_float_2 v = sprintf "%.2f" v
 let _fmt_pct v = sprintf "%+.2f%%" v
 let _fmt_pct_unsigned v = sprintf "%.1f%%" v
 
+(* [execution_faithfulness.fill_vs_trigger_pct] is a signed *fraction*
+   ([(fill -. trigger) /. trigger]); scale to a percentage for display. *)
+let _fmt_fill_vs_trigger = function
+  | Some fraction -> _fmt_pct (fraction *. 100.0)
+  | None -> "" (* blank cell when the entry had no execution record *)
+
+(* Byte glyphs: ✓ = U+2713, ✗ = U+2717, em-dash = U+2014 (the None placeholder
+   used elsewhere in the table). *)
+let _fmt_faithful = function
+  | Some true -> "\xe2\x9c\x93"
+  | Some false -> "\xe2\x9c\x97"
+  | None -> "\xe2\x80\x94"
+
 let _format_header (h : scenario_header) : string list =
   let title =
     sprintf "# Trade audit \xe2\x80\x94 %s" (_opt_string h.scenario_name)
@@ -305,7 +329,40 @@ let _format_header (h : scenario_header) : string list =
     "";
   ]
 
-let _format_aggregate (bw : best_worst) : string list =
+(* One-line execution-faithfulness rollup across every row that carried an
+   [execution] record. Returns [[]] when no row had one, so the aggregate block
+   is byte-identical to a pre-execution report; the [fill_vs_trigger] mean is a
+   fraction (scaled to a percentage for display, matching the per-row column). *)
+let _execution_summary_line (rows : per_trade_row list) : string list =
+  let execs =
+    List.filter_map rows ~f:(fun (r : per_trade_row) ->
+        match (r.faithful, r.fill_vs_trigger_pct) with
+        | Some faithful, Some fraction -> Some (faithful, fraction)
+        | _ -> None)
+  in
+  match execs with
+  | [] -> []
+  | _ ->
+      let n = List.length execs in
+      let faithful_count =
+        List.count execs ~f:(fun (faithful, _) -> faithful)
+      in
+      let faithful_pct =
+        Float.of_int faithful_count /. Float.of_int n *. 100.0
+      in
+      let mean_fraction =
+        List.fold execs ~init:0.0 ~f:(fun acc (_, fraction) -> acc +. fraction)
+        /. Float.of_int n
+      in
+      [
+        sprintf "- Execution: %d records, %s faithful, mean fill_vs_trigger %s"
+          n
+          (_fmt_pct_unsigned faithful_pct)
+          (_fmt_pct (mean_fraction *. 100.0));
+      ]
+
+let _format_aggregate (bw : best_worst) (rows : per_trade_row list) :
+    string list =
   let fmt_triple = function
     | None -> "—"
     | Some (sym, d, pct) ->
@@ -316,8 +373,9 @@ let _format_aggregate (bw : best_worst) : string list =
     "";
     sprintf "- Best trade: %s" (fmt_triple bw.best);
     sprintf "- Worst trade: %s" (fmt_triple bw.worst);
-    "";
   ]
+  @ _execution_summary_line rows
+  @ [ "" ]
 
 let _row_cells (r : per_trade_row) =
   [
@@ -336,6 +394,8 @@ let _row_cells (r : per_trade_row) =
     _opt_label _macro_label r.entry_macro_trend;
     _opt_label Weinstein_types.grade_to_string r.cascade_grade;
     _opt_int r.cascade_score;
+    _fmt_fill_vs_trigger r.fill_vs_trigger_pct;
+    _fmt_faithful r.faithful;
   ]
 
 let _format_row r =
@@ -345,8 +405,9 @@ let _format_row r =
 let _format_table_header () =
   [
     "| symbol | entry_date | side | entry_px | exit_date | exit_px | days | \
-     pnl_$ | pnl_% | exit_trigger | stage | rs | macro | grade | score |";
-    "|---|---|---|---:|---|---:|---:|---:|---:|---|---|---|---|---|---:|";
+     pnl_$ | pnl_% | exit_trigger | stage | rs | macro | grade | score | \
+     fill_vs_trig | faithful |";
+    "|---|---|---|---:|---|---:|---:|---:|---:|---|---|---|---|---|---:|---:|---|";
   ]
 
 let _format_table (rows : per_trade_row list) : string list =
@@ -366,7 +427,7 @@ let _format_analysis (a : analysis) : string list =
 let to_markdown (t : t) : string =
   let core_lines =
     _format_header t.header
-    @ _format_aggregate t.best_worst
+    @ _format_aggregate t.best_worst t.rows
     @ _format_table t.rows
   in
   let analysis_lines =

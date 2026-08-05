@@ -3,6 +3,37 @@
 
 open Core
 
+val empty_weekly_view : Data_panel_snapshot.Panel_views.weekly_view
+(** The [n = 0] weekly view returned whenever no rows are readable. Shared so
+    every producer and every consumer-side sentinel is the same literal. *)
+
+val empty_daily_view : Data_panel_snapshot.Panel_views.daily_view
+(** The [n_days = 0] daily view returned whenever no rows are readable. *)
+
+type daily_tables = {
+  close_t : (Date.t, float) Hashtbl.t;  (** Raw [Close] cell by date. *)
+  adj_t : (Date.t, float) Hashtbl.t;  (** [Adjusted_close] cell by date. *)
+  high_t : (Date.t, float) Hashtbl.t;  (** Raw [High] cell by date. *)
+  low_t : (Date.t, float) Hashtbl.t;  (** Raw [Low] cell by date. *)
+}
+(** The per-date field lookups {!walk_daily_view_window} reads, bundled so the
+    walker keeps a small parameter list. *)
+
+val walk_daily_view_window :
+  calendar:Date.t array ->
+  from_idx:int ->
+  as_of_idx:int ->
+  tables:daily_tables ->
+  Data_panel_snapshot.Panel_views.daily_view
+(** [walk_daily_view_window ~calendar ~from_idx ~as_of_idx ~tables] walks
+    calendar columns [from_idx..as_of_idx] and emits one view row per column
+    whose raw [Close] cell is present and non-NaN, in calendar order.
+
+    Row emission is gated on the raw close alone: a column with a good close
+    still emits when [High] / [Low] / [Adjusted_close] are missing, with
+    [Float.nan] in those columns. Returns {!empty_daily_view} when no column
+    qualifies. *)
+
 val table_of : (Date.t * float) list -> (Date.t, float) Hashtbl.t
 (** Build a date-keyed hashtable from a [(date, value)] row list. *)
 

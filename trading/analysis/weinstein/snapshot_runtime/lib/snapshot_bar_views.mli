@@ -27,7 +27,7 @@
     - [dates] = date of the last trading day in the week
 
     The daily view drops bars where the raw [Close] field is NaN, and exposes
-    raw OHLC plus dates.
+    raw highs / lows / closes plus the matching adjusted closes and dates.
 
     Unknown symbols, empty date ranges, or otherwise-unreadable snapshot rows
     yield the empty view. The strategy already handles empty bar histories. The
@@ -81,9 +81,21 @@ type weekly_view = Data_panel_snapshot.Panel_views.weekly_view = {
 
 type daily_view = Data_panel_snapshot.Panel_views.daily_view = {
   highs : float array;
-      (** Daily high prices, oldest at index 0, newest at index [n_days - 1]. *)
-  lows : float array;  (** Daily low prices, same indexing as [highs]. *)
-  closes : float array;  (** Daily adjusted closes, same indexing. *)
+      (** Raw daily high prices, oldest at index 0, newest at index
+          [n_days - 1]. *)
+  lows : float array;  (** Raw daily low prices, same indexing as [highs]. *)
+  raw_closes : float array;
+      (** Raw (un-adjusted) daily closes — the [Snapshot_schema.Close] cell,
+          same indexing. Named [closes] before 2026-08-05; the value is
+          unchanged, only the (previously misleading) name. *)
+  adjusted_closes : float array;
+      (** Split- and dividend-adjusted daily closes — the
+          [Snapshot_schema.Adjusted_close] cell, same indexing. Paired with
+          [raw_closes] to derive the per-bar split-adjustment factor
+          ([adjusted_closes.(i) /. raw_closes.(i)]), which
+          {!Weinstein_stops.compute_initial_stop_with_floor_with_callbacks}
+          consumes under [split_safe_floors]. [Float.nan] where the snapshot has
+          no adjusted-close cell for the date. *)
   dates : Core.Date.t array;  (** Daily dates, same indexing. *)
   n_days : int;  (** Length of every array. *)
 }
@@ -96,6 +108,16 @@ type daily_view = Data_panel_snapshot.Panel_views.daily_view = {
     {b Phase F.3.e-1 (revised 2026-05-06)}: re-exported from
     {!Data_panel_snapshot.Panel_views.daily_view} (neutral-hub canonical home)
     via manifest type alias. *)
+
+val empty_weekly_view : weekly_view
+(** The [n = 0] weekly view every "no readable rows" path returns. Exposed so
+    consumers that need the same sentinel (e.g. a bar reader with no snapshot
+    backing) share this definition instead of hand-copying the literal — a copy
+    silently goes stale the next time the record gains a field. *)
+
+val empty_daily_view : daily_view
+(** The [n_days = 0] daily view every "no readable rows" path returns. Same
+    rationale as {!empty_weekly_view}. *)
 
 val weekly_view_for :
   Snapshot_callbacks.t ->
@@ -138,6 +160,20 @@ val daily_view_for :
     rows), and NaN-skips per close cell. Threading the same calendar used by the
     runner everywhere ensures deterministic window definition across calls (#848
     forward fix).
+
+    Row emission is gated on the raw [Close] cell alone: a date with a non-NaN
+    raw close is emitted even when [High] / [Low] / [Adjusted_close] are missing
+    (those degrade to [Float.nan] in their columns). A NaN [adjusted_closes]
+    cell admits no split-adjustment factor for that bar; the stops layer treats
+    that as making the whole window un-rescalable and scans the raw basis
+    instead (see [Weinstein_stops.config.split_safe_floors]), so a partial gap
+    can never yield a half-adjusted window.
+
+    Note the granularity: a schema that predates [Adjusted_close] fails the
+    field read for the {e whole symbol}, which
+    {!Snapshot_callbacks.read_field_history}'s error is mapped to [] and thence
+    to an all-NaN [adjusted_closes] column — not to a scattering of per-date
+    gaps.
 
     Returns the empty view ([n_days = 0], all arrays empty) when:
     - [lookback <= 0]

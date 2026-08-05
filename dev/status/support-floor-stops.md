@@ -1,17 +1,21 @@
 # Status: support-floor-stops
 
-## Last updated: 2026-04-17
+## Last updated: 2026-08-05
 
 ## Status
-MERGED
+READY_FOR_REVIEW
 
 ## Interface stable
 YES
 
 ## Open PR
-- None. Both PRs merged to main on 2026-04-17:
-  - PR A (primitive, long + short) — #382
-  - PR B (wrapper + strategy wiring, long side) — #390
+- `feat/split-safe-panel-path` — split-safe floors on the panel/callback path
+  (2026-08-05 addendum below). Branch pushed; PR opened by the orchestrator.
+- Previously merged on this track:
+  - PR A (primitive, long + short) — #382 (2026-04-17)
+  - PR B (wrapper + strategy wiring, long side) — #390 (2026-04-17)
+  - anchor-mode dial — `feat/floor-anchor-close` (2026-07-29)
+  - split-safe floors, bar-list path + `floor_is_structural` — #2181 (2026-08-02)
 
 ## Completed
 
@@ -149,14 +153,251 @@ split-safe decision item).
   sexp round-trip / omitted-defaults-false. `test_variant_matrix.ml`: axis
   expansion for `stops_config.split_safe_floors`.
 
+## 2026-08-05 addendum — split-safe floors on the panel/callback path (PR branch `feat/split-safe-panel-path`)
+
+Closes the last open follow-up. `split_safe_floors` now governs **both** floor
+paths; before this the flag was exposed as the searchable axis
+`((stops_config ((split_safe_floors true))))` but silently did nothing on the
+main multi-symbol strategy hot path, so a walk-forward surface over that axis was
+measuring a partial mechanism (an `experiment-flag-discipline.md` R2 defect).
+
+- **`Panel_views.daily_view` now carries both price bases.** Added
+  `adjusted_closes` (from the `Snapshot_schema.Adjusted_close` cell) and renamed
+  `closes` → `raw_closes`.
+  - **Correction to the prior note.** The 2026-08-02 addendum recorded the
+    blocker as "`daily_view` exposes raw highs/lows and adjusted closes but no
+    raw close." That was **inverted**: `daily_view.closes` was populated from
+    `Snapshot_schema.Close` (raw) all along, while the field's docstring claimed
+    "Daily adjusted closes". The missing half was the *adjusted* close. Renaming
+    the field rather than adding a same-named sibling keeps the change
+    compiler-checked — every construction site had to be updated, and no
+    existing `.closes` read could silently change meaning.
+  - Two pre-existing readers in `trade_audit_report_bin.ml` were on the raw
+    basis while their comments said "adjusted". Left on the raw basis (no
+    behaviour change) with the discrepancy documented in place; whether the R6
+    ratings *should* read adjusted closes is a separate question, deliberately
+    not answered here.
+- **One rescale implementation, at the callbacks-bundle level.** The rescale
+  moved out of `_to_adjusted_basis_bar` (bar-level) into `_to_adjusted_basis`
+  (bundle-level) inside `Floor_stop`, driven by a new
+  `Support_floor.callbacks.get_adjusted_close` accessor. `compute_initial_stop_
+  with_floor` now builds a raw bundle and calls straight through to
+  `..._with_callbacks`, so both paths share one code path — the corrupt-close
+  guard, the anchor mode and the flag cannot diverge between them by
+  construction. A `daily_view` has no `Daily_price.t` to rewrite, only
+  accessors, which is why the bundle level is the only level both paths share.
+  The A2 decision from 2026-08-02 stands: the rescale is still inlined in
+  `stops/`, with no `Adjusted_basis` import and no helper relocation.
+- **`floor_is_structural_with_callbacks`** — callback-shaped sibling of
+  `floor_is_structural`, running the same internal scan. `entry_audit_helpers`'
+  `stop_floor_kind` tag now routes through it instead of calling the primitive
+  directly, closing the #2167 class of bug on the panel path too (#2181 did the
+  same for `stop_recompute` on the bar-list path).
+- **R1 evidence (default-off bit-identical).** The panel test asserts structural
+  equality of the whole `stop_state` against an in-test transcription of the
+  pre-change code path (scan the bundle exactly as supplied, then place the
+  stop) over the split-straddling window, plus the literal 104.0 phantom
+  reference the raw basis yields. Mechanically, `_scan_callbacks` is the
+  identity when the flag is off. Full `dune runtest` is green with zero golden
+  changes.
+- **R2 evidence (flag-on controls the panel path).** Same window, flag on: the
+  long reference moves 104.0 → 98.0 (off the phantom that sat right at the
+  ~104 entry, onto the adjusted-basis correction low) and matches the bar-list
+  path exactly. Short mirror via `floor_is_structural_with_callbacks`:
+  `false` → `true`.
+- **Non-vacuity checked, not assumed.** Temporarily populating
+  `adjusted_closes` from the raw close (the "looks wired, factor is silently
+  1.0" failure mode) fails all three new adjusted-basis tests while the
+  default-off R1 test correctly stays green.
+- **Code health.** All three files the change touched were within 5 lines of
+  their length cap on main, so the additions tripped the linter. Fixed by
+  extraction, not by bumping limits or adding markers: daily-view walker →
+  `snapshot_bar_views_helpers`; `empty_weekly_view` / `empty_daily_view`
+  exported from `Snapshot_bar_views` and reused by `bar_reader` in place of a
+  hand-copied literal; support-floor constructors → new `Panel_support_floor`
+  (it has no back-edge to the Stage constructor, unlike the Sector / Macro /
+  Stock_analysis ones the `@large-module` note cites).
+
+Verify: `dev/lib/run-in-env.sh dune build && dev/lib/run-in-env.sh dune runtest`
+(exit 0 each), then
+`dune exec ./trading/weinstein/strategy/test/test_panel_callbacks.exe` — the
+three `split_safe_floors` cases — and
+`dune exec ./analysis/weinstein/snapshot_runtime/test/test_snapshot_bar_views.exe`
+— `daily_view raw_closes / adjusted_closes are distinct fields`.
+
+### 2026-08-05 QC rework iteration 1 (PR #2213)
+
+qc-structural APPROVED 5/5. qc-behavioral NEEDS_REWORK on two unpinned
+contracts — both were documented in the `.mli`s but had no test; neither was a
+design defect. The reviewer independently rebuilt merge base `04e2c75b` in a
+second worktree and confirmed R1 bit-identical on all four default-off cases
+(including under `Close` anchor), and confirmed the flag was provably inert on
+the panel path before this PR.
+
+- **B1 — close-replacement pinned.** The rescale replaces the close with the
+  adjusted close rather than leaving it raw. That is only observable under
+  `Close` anchor mode, and `(Close × split_safe_floors=true)` is an expressible
+  `Variant_matrix` cell — without the replacement that cell scans adjusted
+  highs/lows against raw closes, i.e. the mixed-basis pathology this flag
+  exists to remove. Worth 4% on the installed reference (100.0 correct vs
+  104.0 phantom). Pinned on **both** paths; mutation M6 (drop the override) was
+  caught by 0 tests repo-wide before, now 1 + 1.
+
+- **B2 — unusable adjusted close now degrades the WHOLE window, not the bar.**
+  Chose the coordinator's option (b) — degrade toward the flag-off default —
+  but at **window** granularity, having measured that per-bar degradation as
+  literally specified is unsafe. Three semantics measured on the 4:1 split
+  fixture with the adjusted close blanked on the correction-low bar:
+
+  | semantics | reference | `stop_is_structural` |
+  |---|---|---|
+  | NaN-propagation (as merged) | 99.0 | true — silently wrong |
+  | per-bar fallback to 1.0 | **104.0 (phantom)** | true — the lone un-rescaled raw high 412 out-tops every adjusted high (110) and becomes the anchor |
+  | whole-window fallback (chosen) | 104.0 = flag-off | matches flag-off |
+
+  Per-bar degradation *creates* a mixed-basis window — the exact thing B1 is
+  about. Whole-window keeps the invariant that makes the mechanism sound: **the
+  scanned window is always on exactly one price basis**, so the flag returns
+  either the correct adjusted answer or the flag-off answer, never a third one.
+  Legacy-warehouse case (schema predating `Adjusted_close` ⇒ field read fails
+  ⇒ all-NaN column): the flag is now **inert** (on == off in every row, which
+  is diagnosable — it is the same signature that exposed this PR's original
+  defect) instead of collapsing every scan to the buffer fallback, which would
+  have read as a genuine negative result in a walk-forward surface. Note the
+  real data source fails per-symbol, not per-date, so all-or-nothing also
+  matches the granularity at which adjusted closes actually go missing.
+
+  The guard is now symmetric across both operands of the division, and
+  `_usable_price` is a single `> 0.0` test — NaN-safe without a separate
+  `is_nan` branch, since IEEE `nan > 0.0` is `false`. A NaN-raw-close bar added
+  to `corrupt_close_bars` pins that.
+
+- **Mutation results** (unmutated baseline: both suites OK):
+
+  | mutation | stops/test_support_floor | strategy/test_panel_callbacks |
+  |---|---|---|
+  | M6 — close override removed | 1 | 1 |
+  | MN1 — adjusted-close guard removed (NaN propagates) | 4 | 1 |
+  | MN2 — per-bar instead of whole-window | 1 | 0 |
+  | M11 — always rescale (breaks R1) | 2 | 2 |
+  | M12 — never rescale (breaks R2) | 4 | 3 |
+
+  MN2 is caught only on the bar-list suite. That is adequate rather than ideal:
+  there is one shared implementation now, so either suite exercises the same
+  code. It needed a second fixture — the first NaN fixture could not catch it,
+  because per-bar and whole-window happen to coincide at 104.0 there.
+  `nan_adj_at_last_bar_bars` blanks the *post-split* bar (true factor 1.0),
+  where per-bar reconstructs the adjusted window by luck (98.0) and
+  whole-window returns the flag-off answer (104.0).
+
+- **R1 unaffected.** Option (b) changes flag-**on** behaviour only; the
+  default-off path never consults `get_adjusted_close`. M11 confirms the no-op
+  is still pinned on both paths.
+
+- **Code health.** Flattening required: `_to_adjusted_basis` tripped the nesting
+  linter (avg 3.06 > 3.0). Split into `_adjusted_close_at` / `_rescaled` /
+  `_to_adjusted_basis` — no marker, no limit bump.
+
+### 2026-08-05 QC rework iteration 2 (PR #2213) — B3
+
+qc-structural APPROVED 5/5 at `fbc11600`; qc-behavioral reproduced all five
+mutation counts exactly with no overclaiming, and **retracted its own B2
+prescription** ("my fix for B2 would have re-created B1"). One coverage gap
+remained on correct code.
+
+- **B3 — the "any offset" quantifier is now pinned.** `_window_is_adjustable`
+  universally quantifies over the window, and both `weinstein_stops.mli` and
+  `stop_types.mli` state that as a contract, but nothing tested it: mutation
+  **MB5** (weaken the check to `day_offset:0` only) left the full repo
+  `dune runtest` at exit 0. Every existing NaN fixture put its unusable cell at
+  offset 0, and the one that didn't (`nan_adj_at_low_bars`, offset 1) returns
+  104.0 under both whole-window and per-bar, so its assertion could not separate
+  them.
+
+  New fixture `nan_adj_at_first_bar_bars` blanks the adjusted close on
+  2024-01-01 — `daily_view` is oldest-first and the callbacks flip the index, so
+  the bad cell sits at **day_offset 4**. All three arms measured independently
+  rather than taken from the review table; all three matched it:
+
+  | implementation | far-offset `reference_level` |
+  |---|---|
+  | flag off | 104.0 |
+  | **whole-window (shipped)** | **104.0** |
+  | per-bar (MN2) | 98.0 |
+  | offset-0-only (MB5) | 98.0 |
+
+  Pinned on **both** paths. The panel sibling also closes the `MN2 panel 0`
+  asymmetry flagged in the previous round — leaving the panel side without a
+  non-zero-offset fixture would have repeated the exact shape of the defect this
+  PR exists to fix.
+
+- **Mutation results** (baseline: both suites OK; every mutation compile-checked
+  before its result was read, per the stale-exe hazard hit earlier in this PR):
+
+  | mutation | stops/test_support_floor | strategy/test_panel_callbacks |
+  |---|---|---|
+  | MB5 — window check weakened to offset 0 | 1 (was 0) | 1 (was 0) |
+  | MN2 — per-bar instead of whole-window | 2 | **1 (was 0)** |
+
+- **F4 closed** — the `None`-everywhere sentinel case is resolved by the
+  all-or-nothing rework: a bundle whose `get_adjusted_close` is `None` at any
+  offset makes the window un-rescalable, so the flag is inert rather than
+  partially applied. No separate fix needed.
+
 ## Follow-ups
 
-- Round-number shading (§5.1): if computed stop lands near a round or half-point boundary, shade slightly below. New helper, probably `Support_floor.round_to_support` or inline in `Stops`.
-- **Split-safe on the panel/callback path.** Extending `daily_view`
-  (`Data_panel_snapshot.Panel_views`) with a `raw_closes` array (as `weekly_view`
-  already has) would let the main multi-symbol strategy hot path derive the
-  per-bar factor and honour `split_safe_floors` too. Deferred — larger snapshot-infra
-  change; the live weekly-picks path is already covered via the bar-list chokepoint.
+- ~~Round-number shading (§5.1)~~ — **already implemented; this line was stale.**
+  `Stop_nudge.nudge_round_number` exists and `stop_types.ml` carries
+  `round_number_nudge = 0.125`, applied by `Floor_stop.compute_initial_stop` and
+  by the trailing / tightened candidates in `weinstein_stops.ml`. Nothing to build.
+- ~~Split-safe on the panel/callback path~~ — **done 2026-08-05**, see the
+  addendum above.
+- **F5 (qc-behavioral, PR #2213) — no telemetry when the whole-window fallback
+  fires.** Ranked by the reviewer as the most consequential of this PR's
+  follow-ups. The all-or-nothing design is right, but silent at the single-decision
+  level: a caller cannot distinguish "flag on, window adjusted, answer 104.0" from
+  "flag on, window unadjustable, answer 104.0". Diagnosability exists only in
+  aggregate (`on == off` across many rows). Because whole-window is by design
+  sensitive to a *single* unusable cell anywhere in `support_floor_lookback_bars`,
+  a run could be substantially inert with nobody knowing what fraction was
+  affected. A counter or an `Audit_recorder` tag ("split-safe fallback fired")
+  turns a silent condition into a measurable one and lets a walk-forward run
+  report *how much* of the surface was inert. **Do this before the mechanism is
+  ever promoted** — an ACCEPT computed over a partly-inert surface would be
+  uninterpretable, precisely the failure class
+  `.claude/rules/mechanism-validation-rigor.md` exists to prevent.
+- **F3 (qc-behavioral, PR #2213) — `trade_audit_report_bin.ml` reads the raw
+  basis where the domain wants adjusted.** Exposed (not introduced) by #2213's
+  `closes` → `raw_closes` rename, which is why both readers were deliberately
+  left on raw with no behaviour change. The domain judgement, from qc-behavioral:
+  reading `raw_closes` in `_closes_lookup_of_reader` (R6 ratings) and
+  `_bar_close_of_reader` (HTML benchmark / utilization marks) **is** a real
+  correctness defect — a split inside the R6 lookback injects a ~4x discontinuity
+  into the pre-entry close series, and a raw mark taken across a split produces a
+  fake jump in the benchmark curve. This is the G14 pathology relocated to the
+  reporting layer. Needs its own PR **including** a re-pin of affected report
+  goldens.
+- **F1 (qc-behavioral, PR #2213) — panel R2 fixture is one-sided on the high
+  leg.** At `c7b1bcf6`, mutation M5 (`get_high` left unscaled) left
+  `test_panel_callbacks.exe` fully green; only the bar-list
+  `split_safe_short_uses_adjusted_ceiling` caught it. Lower priority after the
+  rework: the panel path has since acquired discriminating coverage at three
+  separate points (Close anchor, all-NaN, far-offset). Suggested fix — assert the
+  panel short case's `reference_level` (102.0) rather than only the structural
+  boolean.
+- **F2 (qc-behavioral, PR #2213) — R1 comparand is an in-test transcription.**
+  `test_panel_split_safe_off_matches_pre_flag_path` compares against
+  `_pre_flag_panel_stop`, a re-statement of the old code path rather than an
+  independent value, so a drifted transcription would pass while the invariant
+  broke. No live risk — qc-behavioral verified R1 against merge base `04e2c75b`
+  directly at both `c7b1bcf6` and `fbc11600`, all four default-off cases
+  bit-identical — but pinning to literal floats (`104.0` / `99.84`) would make it
+  self-sufficient. Lowest priority of the four.
+- `split_safe_floors` still needs a ledger ACCEPT before its default can flip
+  (R3). Now that the axis actually controls both paths, a walk-forward surface
+  over `((stops_config ((split_safe_floors true))))` measures the whole
+  mechanism rather than the bar-list half — any earlier reading of that axis
+  under-states the effect and should be re-run.
 
 ## QC
 

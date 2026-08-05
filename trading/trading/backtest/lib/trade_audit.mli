@@ -250,9 +250,14 @@ type execution_faithfulness = {
       *)
   designed_trigger : float;
       (** The entry order's trigger — the [CreateEntering.entry_price] the
-          strategy installed (recovered as [initial_position_value /. shares],
-          i.e. the effective entry). For a [Stop_limit] this equals its
-          [trigger]. *)
+          strategy installed, i.e. the effective entry [E]. [entry_decision]
+          carries no raw share count, so [E] is recovered from the two dollar
+          fields: [initial_position_value = shares * E] and
+          [initial_risk_dollars = shares * |E - installed_stop|] give
+          [E = installed_stop /. (1 -/+ initial_risk_dollars /.
+           initial_position_value)] for a long / short (falling back to
+          [suggested_entry] in the degenerate cases). For a [Stop_limit] this
+          equals its [trigger]. *)
   fill_price : float;
       (** The actual entry fill, from the matched round-trip's open-leg price
           ({!Trading_simulation.Metrics.trade_metrics.entry_price}). *)

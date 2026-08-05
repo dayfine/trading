@@ -196,7 +196,11 @@ val support_floor_callbacks_of_daily_view :
     [lookback]); offset [0] is the most recent bar, [n_days - 1] is the oldest,
     mirroring the convention of {!Support_floor.callbacks_from_bars}.
 
-    Returns [None]-yielding callbacks (with [n_days = 0]) for empty views. *)
+    Returns [None]-yielding callbacks (with [n_days = 0]) for empty views.
+
+    Re-export of {!Panel_support_floor.of_daily_view}; see that interface for
+    the per-accessor contract (in particular which price basis [get_close] and
+    [get_adjusted_close] read). *)
 
 (** {1 Snapshot-views constructors (Phase F.3.c)}
 
@@ -336,4 +340,6 @@ val support_floor_callbacks_of_snapshot_views :
     The [~calendar] parameter is the trading-day calendar that the panel-backed
     reader uses internally; passing it makes the resulting daily view bit-equal
     to {!Snapshot_runtime.Snapshot_bar_views.daily_view_for}'s window (#848
-    forward fix). *)
+    forward fix).
+
+    Re-export of {!Panel_support_floor.of_snapshot_views}. *)

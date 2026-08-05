@@ -97,8 +97,21 @@ let make_exit_decision ?(symbol = "AAPL") ?(exit_date = _date "2024-04-20")
     weeks_stage_left_2 = 1;
   }
 
-let make_record entry exit_ : TA.audit_record =
-  { entry; exit_ = Some exit_; external_exit = None; execution = None }
+let make_execution ?(designed_order_type = TA.Market)
+    ?(designed_trigger = 100.0) ?(fill_price = 100.0)
+    ?(fill_vs_trigger_pct = 0.0) ?(fill_within_band = true) ?(faithful = true)
+    () : TA.execution_faithfulness =
+  {
+    designed_order_type;
+    designed_trigger;
+    fill_price;
+    fill_vs_trigger_pct;
+    fill_within_band;
+    faithful;
+  }
+
+let make_record ?(execution = None) entry exit_ : TA.audit_record =
+  { entry; exit_ = Some exit_; external_exit = None; execution }
 
 (* --- Header computation ------------------------------------------------- *)
 
@@ -276,6 +289,134 @@ let test_row_has_none_audit_fields_when_unmatched _ =
              field (fun (r : TAR.per_trade_row) -> r.entry_stage) is_none;
              field (fun (r : TAR.per_trade_row) -> r.exit_trigger) (equal_to "");
            ];
+       ])
+
+(* --- Execution-faithfulness columns + summary (#2210 follow-on) --------- *)
+
+let test_row_has_execution_fields_when_present _ =
+  let trade = make_trade ~symbol:"AAPL" ~entry_date:(_date "2024-01-15") () in
+  let record =
+    make_record
+      ~execution:
+        (Some
+           (make_execution ~fill_vs_trigger_pct:0.03 ~faithful:true
+              ~designed_order_type:
+                (TA.Stop_limit { trigger = 150.0; limit = 172.5 })
+              ()))
+      (make_entry_decision ()) (make_exit_decision ())
+  in
+  let report = TAR.render ~trade_audit:[ record ] ~trades:[ trade ] () in
+  assert_that report.rows
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (r : TAR.per_trade_row) -> r.fill_vs_trigger_pct)
+               (is_some_and (float_equal 0.03));
+             field
+               (fun (r : TAR.per_trade_row) -> r.faithful)
+               (is_some_and (equal_to true));
+           ];
+       ])
+
+let test_row_execution_fields_none_when_absent _ =
+  (* Matched audit record but [execution = None] (pre-#2158 capture) — both
+     execution columns stay [None] and render as blank / em-dash. *)
+  let trade = make_trade ~symbol:"AAPL" ~entry_date:(_date "2024-01-15") () in
+  let record = make_record (make_entry_decision ()) (make_exit_decision ()) in
+  let report = TAR.render ~trade_audit:[ record ] ~trades:[ trade ] () in
+  assert_that report.rows
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (r : TAR.per_trade_row) -> r.fill_vs_trigger_pct)
+               is_none;
+             field (fun (r : TAR.per_trade_row) -> r.faithful) is_none;
+           ];
+       ])
+
+let test_markdown_renders_execution_columns _ =
+  let trade = make_trade ~symbol:"AAPL" ~entry_date:(_date "2024-01-15") () in
+  let record =
+    make_record
+      ~execution:
+        (Some (make_execution ~fill_vs_trigger_pct:0.03 ~faithful:true ()))
+      (make_entry_decision ()) (make_exit_decision ())
+  in
+  let report = TAR.render ~trade_audit:[ record ] ~trades:[ trade ] () in
+  let md = TAR.to_markdown report in
+  let contains s = String.is_substring md ~substring:s in
+  assert_that md
+    (all_of
+       [
+         (* new table columns present in the header *)
+         field (fun _ -> contains "fill_vs_trig | faithful |") (equal_to true);
+         (* fraction 0.03 renders as +3.00% and faithful renders as U+2713 *)
+         field (fun _ -> contains "+3.00%") (equal_to true);
+         field (fun _ -> contains "\xe2\x9c\x93") (equal_to true);
+         (* single-record summary line *)
+         field
+           (fun _ ->
+             contains
+               "- Execution: 1 records, 100.0% faithful, mean fill_vs_trigger \
+                +3.00%")
+           (equal_to true);
+       ])
+
+let test_execution_summary_math _ =
+  (* 3 matched records, 2 faithful + 1 not; fractions {0.05, 0.09, 0.01} with a
+     mean of 0.05 (= +5.00%). Pins the aggregate summary line arithmetic. *)
+  let mk sym date frac faithful =
+    ( make_trade ~symbol:sym ~entry_date:(_date date) (),
+      make_record
+        ~execution:
+          (Some (make_execution ~fill_vs_trigger_pct:frac ~faithful ()))
+        (make_entry_decision ~symbol:sym ~entry_date:(_date date)
+           ~position_id:(sym ^ "-1") ())
+        (make_exit_decision ~symbol:sym ~position_id:(sym ^ "-1") ()) )
+  in
+  let t1, r1 = mk "AAPL" "2024-01-15" 0.05 true in
+  let t2, r2 = mk "MSFT" "2024-02-15" 0.09 false in
+  let t3, r3 = mk "NVDA" "2024-03-15" 0.01 true in
+  let report =
+    TAR.render ~trade_audit:[ r1; r2; r3 ] ~trades:[ t1; t2; t3 ] ()
+  in
+  assert_that
+    (String.is_substring (TAR.to_markdown report)
+       ~substring:
+         "- Execution: 3 records, 66.7% faithful, mean fill_vs_trigger +5.00%")
+    (equal_to true)
+
+let test_aggregate_byte_path_unchanged_without_execution _ =
+  (* No record carries an execution — the aggregate block is byte-identical to a
+     pre-execution report (no "Execution:" line spliced in). *)
+  let trade = make_trade ~symbol:"AAPL" ~entry_date:(_date "2024-01-15") () in
+  let record = make_record (make_entry_decision ()) (make_exit_decision ()) in
+  let report = TAR.render ~trade_audit:[ record ] ~trades:[ trade ] () in
+  let md = TAR.to_markdown report in
+  assert_that md
+    (all_of
+       [
+         field
+           (fun _ -> String.is_substring md ~substring:"- Execution:")
+           (equal_to false);
+         field
+           (fun _ ->
+             String.is_substring md
+               ~substring:
+                 (String.concat ~sep:"\n"
+                    [
+                      "## Aggregate summary";
+                      "";
+                      "- Best trade: AAPL 2024-01-15 \xe2\x86\x92 -8.00%";
+                      "- Worst trade: AAPL 2024-01-15 \xe2\x86\x92 -8.00%";
+                      "";
+                      "## Per-trade table";
+                    ]))
+           (equal_to true);
        ])
 
 (* --- External (reason-only) exit fallback (#2076) ----------------------- *)
@@ -467,7 +608,8 @@ let test_to_markdown_pinned_three_trade_fixture _ =
         "## Per-trade table";
         "";
         "| symbol | entry_date | side | entry_px | exit_date | exit_px | days \
-         | pnl_$ | pnl_% | exit_trigger | stage | rs | macro | grade | score |";
+         | pnl_$ | pnl_% | exit_trigger | stage | rs | macro | grade | score | \
+         fill_vs_trig | faithful |";
       ]
   in
   let contains s = String.is_substring md ~substring:s in
@@ -944,6 +1086,15 @@ let suite =
          >:: test_row_has_audit_fields_when_matched;
          "row has none audit fields when unmatched"
          >:: test_row_has_none_audit_fields_when_unmatched;
+         "row has execution fields when present"
+         >:: test_row_has_execution_fields_when_present;
+         "row execution fields none when absent"
+         >:: test_row_execution_fields_none_when_absent;
+         "markdown renders execution columns"
+         >:: test_markdown_renders_execution_columns;
+         "execution summary math" >:: test_execution_summary_math;
+         "aggregate byte-path unchanged without execution"
+         >:: test_aggregate_byte_path_unchanged_without_execution;
          "row falls back to external exit trigger"
          >:: test_row_falls_back_to_external_exit_trigger;
          "row prefers enriched exit over external"
