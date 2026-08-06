@@ -3,13 +3,17 @@
 ## Last updated: 2026-08-06
 
 ## Status
-READY_FOR_REVIEW
+IN_PROGRESS
 
 ## Interface stable
 YES
 
 ## Open PR
-- `feat/split-safe-fallback-telemetry` — F5 whole-window fallback telemetry
+None — the queue is empty on this track.
+
+## Recently merged
+- `feat/split-safe-fallback-telemetry` — **MERGED #2220 `480a59b7`** (2026-08-06),
+  F5 whole-window fallback telemetry
   (2026-08-06 addendum below). Branch pushed; PR opened by the orchestrator.
 - Previously merged on this track:
   - split-safe floors on the panel/callback path — #2213 (2026-08-05)
