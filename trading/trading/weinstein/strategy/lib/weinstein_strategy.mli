@@ -816,6 +816,21 @@ type config = {
           (admission / grading / stage classification unchanged); default [0] =
           off, bit-identical baselines (R1). See
           [Weinstein_strategy_config.entry_anchor_local_range_weeks]. *)
+  stop_anchor_at_entry_base : bool; [@sexp.default false]
+      (** Book-faithful initial-stop re-anchoring for E-anchored entries (user
+          go 2026-08-06). When [true] AND the entry is E-anchored (effective
+          [trigger_at_suggested], i.e.
+          [sim_entry_trigger_at_suggested && enable_sim_entry_stoplimit] on), a
+          support-floor initial stop farther from [E] than
+          [stops_config.max_stop_distance_pct] is re-anchored to the
+          buffer-below-breakout stop ([E *. initial_stop_buffer] fallback)
+          instead of the deep crash floor, so risk pairs faithfully with the E
+          entry (book §5.1) and the ticket clears the 15% [Stop_too_wide] gate.
+          Structural floors already within 15% are kept; INITIAL stop only
+          (trailing untouched); admission / grading / [breakout_price]
+          unchanged. Default [false] = off, bit-identical baselines (R1); also
+          gated on the E-family, so arming alone is a no-op. See
+          [Weinstein_strategy_config.stop_anchor_at_entry_base]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

@@ -1,6 +1,49 @@
 # Status: simulation
 
-## Last updated: 2026-08-05
+## Last updated: 2026-08-06
+
+### 2026-08-06 — book-faithful stop re-anchoring for E-anchored entries (branch `feat/stop-anchor-entry-base`)
+
+Note: `dev/notes/honest-ladder-2026-08-05.md` (AXTI evidence). Book authority:
+`docs/design/weinstein-book-reference.md` §5.1. User go 2026-08-06 (pair the
+E-anchored entry with a book-faithful stop).
+
+**What.** New default-off strategy config flag `stop_anchor_at_entry_base :
+bool [@sexp.default false]`. The faithfulness fix that PAIRS with the E-anchored
+entry family (#2209 + #2217): those tickets rest the entry at the breakout level
+E, but the initial stop still came from the deep support-floor machinery
+anchored to crash lows. For a crash-recovery name the mismatched pair
+(E-entry × crash-floor-stop) inflated risk% so the entry walk's 15%
+`max_stop_distance_pct` gate (G15 step 3) rejected the ticket as `Stop_too_wide`
+— AXTI (score 100, ranked #1) was skipped 24× in the localtop26 arm and never
+entered; systemically 11,178 / 13,765 `Stop_too_wide` skips over 26y
+(localtop26 / localtop52). When armed AND the entry is E-anchored (effective
+`trigger_at_suggested`), a support-floor stop farther from E than
+`max_stop_distance_pct` is re-anchored to the buffer-below-breakout stop (the
+`initial_stop_buffer` fallback the stops layer already computes — book §5.1
+"just under the breakout base / below the MA"). Structural floors already within
+15% (normal shapes) are unchanged; the `Stop_too_wide` gate itself is untouched
+(it now sees honestly-paired risk).
+
+**Status: DONE (this PR).** R1 (off = bit-identical) + E-family gating
+(inert unless `trigger_at_suggested`). INITIAL stop only — trailing machinery,
+admission, grading, `breakout_price`, false-virgins protection all UNCHANGED.
+Narrowest seam: `Entry_audit_helpers.initial_stop_and_kind`
+(`_maybe_reanchor_to_entry_base`, reuses the production fallback via an empty
+callbacks bundle — no new floor math) + `make_entry_transition`
+(`?stop_anchor_at_entry_base`, ANDs with `trigger_at_suggested`) + `Entry_walk`
+call site.
+
+**Completed.** `stop_anchor_at_entry_base` flag (3 sync'd config sites);
+5 unit tests (R1 off pin, armed re-anchor of an AXTI-shaped deep floor to the
+entry base, normal-shape bit-identity, E-family gate, and the load-bearing
+`entries_from_candidates` integration pin funding a previously-`Stop_too_wide`
+candidate); composes-with note in the .mli with the E-anchored family.
+
+**Next steps (not in this PR).** WF-CV surface on the armed E-family bundle
+(`sim_entry_trigger_at_suggested` + `enable_sim_entry_stoplimit` +
+`entry_anchor_local_range_weeks` + `stop_anchor_at_entry_base`) per the
+honest-ladder plan; ledger ACCEPT gates any default flip.
 
 ### 2026-08-05 — book-faithful E-anchored entry trigger (PR #2209)
 

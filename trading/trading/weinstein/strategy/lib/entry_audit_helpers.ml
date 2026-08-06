@@ -50,6 +50,45 @@ let effective_entry_price ?(trigger_at_suggested = false) ~bar_reader
     | None -> cand.suggested_entry
     | Some bar -> bar.Types.Daily_price.close_price
 
+(** Book §5.1 initial-stop re-anchoring for E-anchored entries
+    ([config.stop_anchor_at_entry_base], user go 2026-08-06). A support-floor
+    stop is derived from prior correction lows; for a crash-recovery name that
+    low sits far below the E-anchored entry, inflating risk% so the ticket trips
+    the 15% [max_stop_distance_pct] gate ([Stop_too_wide]). The book places the
+    breakout buy's initial stop just under the breakout base, not under the
+    multi-year crash floor. When [reanchor] is set (the E-family armed) and the
+    support-floor [raw_stop] lands farther than [max_stop_distance_pct] from
+    [effective_entry], re-anchor it to the buffer-below-breakout stop — the same
+    [initial_stop_buffer] fallback the stops layer places when no structural
+    floor qualifies. Reusing the production fallback via an empty callbacks
+    bundle avoids duplicating [Floor_stop._fallback_reference].
+
+    A structural floor already within the 15% limit (normal-shape candidates) is
+    returned verbatim, so off-path and in-limit behaviour are bit-identical. The
+    audit [stop_floor_kind] becomes [Buffer_fallback] on re-anchor, honestly
+    reflecting the installed level. *)
+let _maybe_reanchor_to_entry_base ~reanchor ~stops_config ~side ~effective_entry
+    ~initial_stop_buffer ~current_date ~raw_stop
+    ~(structural_kind : Audit_recorder.stop_floor_kind) =
+  let level = Weinstein_stops.get_stop_level raw_stop in
+  let dist = Float.abs (level -. effective_entry) /. effective_entry in
+  let should_reanchor =
+    reanchor
+    && Float.( > ) dist stops_config.Weinstein_stops.max_stop_distance_pct
+  in
+  if not should_reanchor then (raw_stop, structural_kind)
+  else
+    let empty_callbacks =
+      Weinstein_stops.callbacks_from_bars ~config:stops_config ~bars:[]
+        ~as_of:current_date
+    in
+    let buffer_stop =
+      Weinstein_stops.compute_initial_stop_with_floor_with_callbacks
+        ~config:stops_config ~side ~entry_price:effective_entry
+        ~callbacks:empty_callbacks ~fallback_buffer:initial_stop_buffer
+    in
+    (buffer_stop, Audit_recorder.Buffer_fallback)
+
 (** Compute the support-floor-aware initial stop for [cand] entering at
     [effective_entry], plus the [stop_floor_kind] tag for audit. The tag comes
     from [Weinstein_stops.floor_is_structural_with_callbacks] — the same
@@ -62,9 +101,16 @@ let effective_entry_price ?(trigger_at_suggested = false) ~bar_reader
     widened (if necessary) so the [Initial] [stop_level] is at least [pct] away
     from entry. Used to re-wire {!Screener.candidate_params.initial_stop_pct}
     into the actual installed stop — see
-    {!Weinstein_stops.widen_initial_to_min_distance}. *)
-let initial_stop_and_kind ?(min_stop_distance_pct = 0.0) ~stops_config
-    ~initial_stop_buffer ~bar_reader ~current_date ~effective_entry
+    {!Weinstein_stops.widen_initial_to_min_distance}.
+
+    [?reanchor_to_entry_base] (default [false]) applies the book §5.1
+    initial-stop re-anchoring (see {!_maybe_reanchor_to_entry_base}) before the
+    min-distance widening. The strategy sets it only when
+    [config.stop_anchor_at_entry_base] AND the entry is E-anchored; default
+    [false] keeps the support-floor stop verbatim (bit-identical, R1). *)
+let initial_stop_and_kind ?(min_stop_distance_pct = 0.0)
+    ?(reanchor_to_entry_base = false) ~stops_config ~initial_stop_buffer
+    ~bar_reader ~current_date ~effective_entry
     (cand : Screener.scored_candidate) =
   let daily_view =
     Bar_reader.daily_view_for bar_reader ~symbol:cand.ticker ~as_of:current_date
@@ -78,17 +124,22 @@ let initial_stop_and_kind ?(min_stop_distance_pct = 0.0) ~stops_config
       ~config:stops_config ~side:cand.side ~entry_price:effective_entry
       ~callbacks ~fallback_buffer:initial_stop_buffer
   in
-  let initial_stop =
-    Weinstein_stops.Stop_widen.widen_initial_to_min_distance
-      ~config:stops_config ~side:cand.side ~entry_price:effective_entry
-      ~min_distance_pct:min_stop_distance_pct raw_stop
-  in
-  let stop_floor_kind : Audit_recorder.stop_floor_kind =
+  let structural_kind : Audit_recorder.stop_floor_kind =
     if
       Weinstein_stops.floor_is_structural_with_callbacks ~config:stops_config
         ~side:cand.side ~callbacks
     then Support_floor
     else Buffer_fallback
+  in
+  let raw_stop, stop_floor_kind =
+    _maybe_reanchor_to_entry_base ~reanchor:reanchor_to_entry_base ~stops_config
+      ~side:cand.side ~effective_entry ~initial_stop_buffer ~current_date
+      ~raw_stop ~structural_kind
+  in
+  let initial_stop =
+    Weinstein_stops.Stop_widen.widen_initial_to_min_distance
+      ~config:stops_config ~side:cand.side ~entry_price:effective_entry
+      ~min_distance_pct:min_stop_distance_pct raw_stop
   in
   (initial_stop, stop_floor_kind)
 

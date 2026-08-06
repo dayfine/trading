@@ -121,6 +121,74 @@ let _portfolio_risk_config : Portfolio_risk.config =
 let _stops_config : Weinstein_stops.config = Weinstein_stops.default_config
 
 (* ------------------------------------------------------------------ *)
+(* Multi-bar support-floor fixtures (stop-anchor re-anchoring tests)    *)
+(* ------------------------------------------------------------------ *)
+
+let _bar ~date ~high ~low ~close : Types.Daily_price.t =
+  {
+    date;
+    open_price = close;
+    high_price = high;
+    low_price = low;
+    close_price = close;
+    adjusted_close = close;
+    volume = 1_000_000;
+    active_through = None;
+  }
+
+(** Build a one-symbol reader from [(high, low, close)] triples (oldest first),
+    placed on consecutive Fridays ending at [end_date] so every bar lands on a
+    weekday within the support-floor lookback window. *)
+let _reader_of_hlc ~end_date hlc : Bar_reader.t =
+  let n = List.length hlc in
+  let bars =
+    List.mapi hlc ~f:(fun i (high, low, close) ->
+        let date = Date.add_days end_date (-7 * (n - 1 - i)) in
+        _bar ~date ~high ~low ~close)
+  in
+  Bar_reader.of_in_memory_bars [ (_ticker, bars) ]
+
+(** AXTI-shaped series: a high peak ($200) followed by a deep crash low ($40),
+    then a partial recovery. The support-floor scan anchors the correction low
+    at $40 — far below an E-anchored entry near $100 — producing a >15% stop
+    distance that trips [Stop_too_wide]. *)
+let _deep_floor_reader ~end_date : Bar_reader.t =
+  _reader_of_hlc ~end_date
+    [
+      (150.0, 145.0, 148.0);
+      (200.0, 190.0, 198.0);
+      (* peak high 200 *)
+      (180.0, 120.0, 130.0);
+      (140.0, 70.0, 80.0);
+      (90.0, 40.0, 45.0);
+      (* deep correction low 40 *)
+      (60.0, 45.0, 55.0);
+      (70.0, 55.0, 65.0);
+      (80.0, 65.0, 75.0);
+      (88.0, 78.0, 85.0);
+      (92.0, 85.0, 90.0);
+      (95.0, 88.0, 93.0);
+      (97.0, 90.0, 95.0);
+    ]
+
+(** Normal-shape series: a shallow pullback (peak $108, correction low $95). The
+    structural floor sits ~9% below an E-anchored $100 entry — already within
+    the 15% book limit, so the re-anchor must leave it untouched. *)
+let _shallow_floor_reader ~end_date : Bar_reader.t =
+  _reader_of_hlc ~end_date
+    [
+      (104.0, 100.0, 103.0);
+      (108.0, 103.0, 106.0);
+      (* peak high 108 *)
+      (106.0, 98.0, 100.0);
+      (102.0, 95.0, 97.0);
+      (* correction low 95 *)
+      (100.0, 96.0, 99.0);
+      (103.0, 98.0, 101.0);
+      (105.0, 99.0, 103.0);
+    ]
+
+(* ------------------------------------------------------------------ *)
 (* Tests                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -465,6 +533,160 @@ let test_trigger_flag_alone_is_inert _ =
              | Position.CreateEntering e -> e.entry_price
              | _ -> Float.nan)
            (float_equal 110.0);
+       ])
+
+(* ------------------------------------------------------------------ *)
+(* Book §5.1 stop re-anchoring for E-anchored entries (user go 2026-08-06) *)
+(* ------------------------------------------------------------------ *)
+
+let _current_date = Date.of_string "2024-06-14"
+
+let _deep_floor_candidate () : Screener.scored_candidate =
+  _long_candidate ~ticker:_ticker ~suggested_entry:100.0 ~suggested_stop:95.0
+    ~as_of_date:_current_date
+
+(** R1 default-off pin: with [stop_anchor_at_entry_base] OFF but the entry
+    E-anchored, the deep support-floor stop ($40 correction low, >61% below the
+    $100 entry) is installed verbatim and the ticket trips the [Stop_too_wide]
+    gate — bit-identical to the pre-knob path. This is the AXTI skip mechanism
+    the knob exists to fix. *)
+let test_stop_anchor_off_deep_floor_still_too_wide _ =
+  let bar_reader = _deep_floor_reader ~end_date:_current_date in
+  let stop_states = ref String.Map.empty in
+  let result =
+    Entry_audit_capture.make_entry_transition ~trigger_at_suggested:true
+      ~stop_anchor_at_entry_base:false
+      ~portfolio_risk_config:_portfolio_risk_config ~stops_config:_stops_config
+      ~initial_stop_buffer:1.02 ~stop_states ~bar_reader
+      ~portfolio_value:100_000.0 ~current_date:_current_date
+      (_deep_floor_candidate ())
+  in
+  assert_that result
+    (matching ~msg:"Expected Stop_too_wide"
+       (function Entry_audit_capture.Stop_too_wide -> Some () | _ -> None)
+       (equal_to ()))
+
+(** Armed pin: with [stop_anchor_at_entry_base] AND [trigger_at_suggested] both
+    on, the deep-floor ticket is RE-ANCHORED to the buffer-below-breakout stop
+    (~$98, ~2% below the $100 E entry) instead of the $40 crash floor. It now
+    clears the 15% gate and funds ([Entry_ok]); [installed_stop] sits just under
+    E and [stop_floor_kind] is [Buffer_fallback] (honestly reflecting the
+    re-anchored level). Book §5.1: the breakout buy's stop sits just under the
+    breakout base, not under the multi-year crash floor. *)
+let test_stop_anchor_armed_reanchors_deep_floor _ =
+  let bar_reader = _deep_floor_reader ~end_date:_current_date in
+  let stop_states = ref String.Map.empty in
+  let result =
+    Entry_audit_capture.make_entry_transition ~trigger_at_suggested:true
+      ~stop_anchor_at_entry_base:true
+      ~portfolio_risk_config:_portfolio_risk_config ~stops_config:_stops_config
+      ~initial_stop_buffer:1.02 ~stop_states ~bar_reader
+      ~portfolio_value:100_000.0 ~current_date:_current_date
+      (_deep_floor_candidate ())
+  in
+  assert_that result
+    (matching ~msg:"Expected Entry_ok"
+       (function
+         | Entry_audit_capture.Entry_ok (_, meta) -> Some meta | _ -> None)
+       (all_of
+          [
+            field
+              (fun (m : Entry_audit_capture.entry_meta) -> m.installed_stop)
+              (is_between (module Float_ord) ~low:94.0 ~high:99.0);
+            field
+              (fun (m : Entry_audit_capture.entry_meta) -> m.stop_floor_kind)
+              (equal_to
+                 (Audit_recorder.Buffer_fallback
+                   : Audit_recorder.stop_floor_kind));
+          ]))
+
+(** Normal-shape candidate is UNCHANGED by the armed knob: the structural floor
+    ($95, ~9% below the $100 E entry) is already within the 15% book limit, so
+    the re-anchor is a no-op. Pin bit-identity by asserting the armed and
+    knob-off [installed_stop] are equal. *)
+let test_stop_anchor_armed_normal_shape_unchanged _ =
+  let bar_reader = _shallow_floor_reader ~end_date:_current_date in
+  let cand = _deep_floor_candidate () in
+  let installed knob =
+    let stop_states = ref String.Map.empty in
+    match
+      Entry_audit_capture.make_entry_transition ~trigger_at_suggested:true
+        ~stop_anchor_at_entry_base:knob
+        ~portfolio_risk_config:_portfolio_risk_config
+        ~stops_config:_stops_config ~initial_stop_buffer:1.02 ~stop_states
+        ~bar_reader ~portfolio_value:100_000.0 ~current_date:_current_date cand
+    with
+    | Entry_audit_capture.Entry_ok (_, m) -> m.installed_stop
+    | _ -> OUnit2.assert_failure "expected Entry_ok for normal-shape candidate"
+  in
+  assert_that (installed true) (float_equal (installed false))
+
+(** E-family gate: [stop_anchor_at_entry_base] is inert without E-anchoring.
+    With the stop knob on but [trigger_at_suggested] OFF, the entry uses the
+    current close ($95) and the deep floor is NOT re-anchored — the ticket still
+    trips [Stop_too_wide]. The re-anchor only pairs with an entry that rests at
+    the breakout level. *)
+let test_stop_anchor_requires_e_family _ =
+  let bar_reader = _deep_floor_reader ~end_date:_current_date in
+  let stop_states = ref String.Map.empty in
+  let result =
+    Entry_audit_capture.make_entry_transition ~trigger_at_suggested:false
+      ~stop_anchor_at_entry_base:true
+      ~portfolio_risk_config:_portfolio_risk_config ~stops_config:_stops_config
+      ~initial_stop_buffer:1.02 ~stop_states ~bar_reader
+      ~portfolio_value:100_000.0 ~current_date:_current_date
+      (_deep_floor_candidate ())
+  in
+  assert_that result
+    (matching ~msg:"Expected Stop_too_wide"
+       (function Entry_audit_capture.Stop_too_wide -> Some () | _ -> None)
+       (equal_to ()))
+
+(** Load-bearing integration pin through [Entry_walk.entries_from_candidates]: a
+    config with the full E-anchored family armed ([enable_sim_entry_stoplimit] +
+    [sim_entry_trigger_at_suggested] + [stop_anchor_at_entry_base]) FUNDS the
+    deep-floor candidate that the control config (stop knob off) rejects as
+    [Stop_too_wide]. Exercises the real config -> walk -> make_entry path, not
+    the direct param. *)
+let _entries_for ~stop_anchor bar_reader cand =
+  let config =
+    {
+      (Weinstein_strategy_config.default_config ~universe:[ _ticker ]
+         ~index_symbol:"SPY")
+      with
+      enable_sim_entry_stoplimit = true;
+      sim_entry_trigger_at_suggested = true;
+      stop_anchor_at_entry_base = stop_anchor;
+    }
+  in
+  let portfolio =
+    {
+      Trading_strategy.Portfolio_view.cash = 1_000_000.0;
+      positions = String.Map.empty;
+    }
+  in
+  let stop_states = ref String.Map.empty in
+  Entry_walk.entries_from_candidates ~config ~candidates:[ cand ] ~stop_states
+    ~bar_reader ~portfolio
+    ~get_price:(fun _ -> None)
+    ~current_date:_current_date ()
+
+let test_entries_from_candidates_funds_reanchored _ =
+  let bar_reader = _deep_floor_reader ~end_date:_current_date in
+  let cand = _deep_floor_candidate () in
+  (* Control: stop knob off -> Stop_too_wide -> no transition. *)
+  assert_that (_entries_for ~stop_anchor:false bar_reader cand) (size_is 0);
+  (* Armed: re-anchored stop clears the gate -> one CreateEntering at E ($100). *)
+  assert_that
+    (_entries_for ~stop_anchor:true bar_reader cand)
+    (elements_are
+       [
+         field
+           (fun (t : Position.transition) ->
+             match t.kind with
+             | Position.CreateEntering e -> e.entry_price
+             | _ -> Float.nan)
+           (float_equal 100.0);
        ])
 
 (* ------------------------------------------------------------------ *)
@@ -1326,6 +1548,16 @@ let () =
            >:: test_trigger_at_suggested_off_uses_current_close;
            "E-anchor CP4: trigger flag alone is inert"
            >:: test_trigger_flag_alone_is_inert;
+           "stop-anchor R1: off leaves deep floor Stop_too_wide"
+           >:: test_stop_anchor_off_deep_floor_still_too_wide;
+           "stop-anchor: armed re-anchors deep floor to entry base"
+           >:: test_stop_anchor_armed_reanchors_deep_floor;
+           "stop-anchor: armed leaves normal shape unchanged"
+           >:: test_stop_anchor_armed_normal_shape_unchanged;
+           "stop-anchor: requires E-family (inert without trigger)"
+           >:: test_stop_anchor_requires_e_family;
+           "stop-anchor: entries_from_candidates funds re-anchored"
+           >:: test_entries_from_candidates_funds_reanchored;
            "G15-step2: short notional cap skips at 31%"
            >:: test_short_notional_cap_skips_at_31pct;
            "G15-step2: short notional cap admits at 29%"

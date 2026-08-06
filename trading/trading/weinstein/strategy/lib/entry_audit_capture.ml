@@ -95,17 +95,24 @@ let _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
     Entry_ok (trans, meta))
 
 let make_entry_transition ?(min_stop_distance_pct = 0.0)
-    ?(trigger_at_suggested = false) ~portfolio_risk_config ~stops_config
-    ~initial_stop_buffer ~stop_states ~bar_reader ~portfolio_value ~current_date
+    ?(trigger_at_suggested = false) ?(stop_anchor_at_entry_base = false)
+    ~portfolio_risk_config ~stops_config ~initial_stop_buffer ~stop_states
+    ~bar_reader ~portfolio_value ~current_date
     (cand : Screener.scored_candidate) : entry_attempt_result =
   let effective_entry =
     Entry_audit_helpers.effective_entry_price ~trigger_at_suggested ~bar_reader
       ~current_date cand
   in
+  (* The book §5.1 stop re-anchor only fires for the E-family entry: it pairs a
+     stop just under the breakout base with an entry AT the breakout, so it is
+     meaningful only when [trigger_at_suggested] anchors the entry at E. *)
+  let reanchor_to_entry_base =
+    stop_anchor_at_entry_base && trigger_at_suggested
+  in
   let initial_stop, stop_floor_kind =
     Entry_audit_helpers.initial_stop_and_kind ~min_stop_distance_pct
-      ~stops_config ~initial_stop_buffer ~bar_reader ~current_date
-      ~effective_entry cand
+      ~reanchor_to_entry_base ~stops_config ~initial_stop_buffer ~bar_reader
+      ~current_date ~effective_entry cand
   in
   let installed_stop_level = Weinstein_stops.get_stop_level initial_stop in
   let stop_distance_pct =

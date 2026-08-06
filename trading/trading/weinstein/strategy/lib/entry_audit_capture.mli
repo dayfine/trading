@@ -130,6 +130,7 @@ val gen_position_id : string -> string
 val make_entry_transition :
   ?min_stop_distance_pct:float ->
   ?trigger_at_suggested:bool ->
+  ?stop_anchor_at_entry_base:bool ->
   portfolio_risk_config:Portfolio_risk.config ->
   stops_config:Weinstein_stops.config ->
   initial_stop_buffer:float ->
@@ -182,7 +183,22 @@ val make_entry_transition :
     [config.sim_entry_trigger_at_suggested && config.enable_sim_entry_stoplimit];
     default [false] is bit-identical to the current-close path (R1). See
     {!Entry_audit_helpers.effective_entry_price} and
-    {!Weinstein_strategy_config.sim_entry_trigger_at_suggested}. *)
+    {!Weinstein_strategy_config.sim_entry_trigger_at_suggested}.
+
+    [?stop_anchor_at_entry_base] (default [false]) is the book §5.1 initial-stop
+    re-anchoring that PAIRS with the E-anchored entry (user go 2026-08-06). It
+    fires only when this flag AND [trigger_at_suggested] are both [true] (the
+    E-family armed): a support-floor initial stop farther than
+    [stops_config.max_stop_distance_pct] from [E] — the crash-floor mismatch
+    that trips step (3)'s [Stop_too_wide] gate for crash-recovery names — is
+    re-anchored in step (2) to the buffer-below-breakout stop
+    ([initial_stop_buffer] fallback), so the ticket's risk pairs faithfully with
+    its E entry and clears the gate. Structural floors already within the 15%
+    limit are unchanged. INITIAL stop only; the gate itself and the trailing
+    machinery are untouched. The caller sets it to
+    [config.stop_anchor_at_entry_base]; default [false] is bit-identical (R1).
+    See {!Entry_audit_helpers.initial_stop_and_kind} and
+    {!Weinstein_strategy_config.stop_anchor_at_entry_base}. *)
 
 val check_cash_and_deduct :
   leverage_enabled:bool ->
