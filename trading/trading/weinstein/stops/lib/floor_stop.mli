@@ -49,6 +49,30 @@ val floor_is_structural_with_callbacks :
     fallback — it runs the same internal scan, so the two never disagree. See
     {!Weinstein_stops.floor_is_structural_with_callbacks}. *)
 
+(** Which price basis the support-floor scan actually ran on. See
+    {!Weinstein_stops.split_safe_basis}. *)
+type split_safe_basis =
+  | Flag_off  (** [config.split_safe_floors] off — no basis decision taken. *)
+  | Adjusted
+      (** Flag on and every offset rescalable — scan ran adjusted-basis. *)
+  | Raw_fallback
+      (** Flag on but some offset unusable — whole-window fallback fired. *)
+[@@deriving show, eq, sexp]
+
+val split_safe_basis_of_callbacks :
+  config:config -> callbacks:callbacks -> split_safe_basis
+(** Basis the scan {e would} run on for this bundle. Shares its single branch
+    with the scan itself. See {!Weinstein_stops.split_safe_basis_of_callbacks}.
+*)
+
+val split_safe_basis_of_bars :
+  config:config ->
+  bars:Types.Daily_price.t list ->
+  as_of:Core.Date.t ->
+  split_safe_basis
+(** Bar-list sibling of {!split_safe_basis_of_callbacks}. See
+    {!Weinstein_stops.split_safe_basis_of_bars}. *)
+
 val compute_initial_stop_with_floor :
   config:config ->
   side:position_side ->

@@ -951,6 +951,70 @@ let test_split_safe_all_nan_adjusted_structural_flag_matches_flag_off _ =
        (floor_is_structural ~config:cfg ~side:Long ~bars:all_nan_adj_bars
           ~as_of:split_as_of))
 
+(* ---- F5: telemetry for the whole-window fallback ---- *)
+
+(* The fallback is silent in the {b answer}: it returns exactly the flag-off
+   level. So "flag on, window adjusted, level 104.0" and "flag on, window
+   unadjustable, level 104.0" are indistinguishable from the level alone, and a
+   walk-forward arm could be substantially inert with no per-decision signal.
+   [split_safe_basis_of_bars] restores the distinction; these tests pin that it
+   reports the branch that actually ran, and that it never conflates a
+   configured raw scan ([Flag_off]) with a degraded one ([Raw_fallback]). *)
+let _stop_and_basis ~config bars =
+  ( compute_initial_stop_with_floor ~config ~side:Long
+      ~entry_price:split_long_entry ~bars ~as_of:split_as_of ~fallback_buffer,
+    split_safe_basis_of_bars ~config ~bars ~as_of:split_as_of )
+
+(* The F5 case itself: identical installed stop, distinguishable telemetry. *)
+let test_split_safe_basis_fallback_distinguishable_from_flag_off _ =
+  assert_that
+    (_stop_and_basis ~config:cfg_split all_nan_adj_bars)
+    (all_of
+       [
+         field fst
+           (equal_to
+              (fst (_stop_and_basis ~config:cfg all_nan_adj_bars) : stop_state));
+         field snd (equal_to (Raw_fallback : split_safe_basis));
+       ])
+
+(* State (a) is not state (c): with the flag off the raw scan is the configured
+   behaviour, not a degradation, even on bars that would be unadjustable. *)
+let test_split_safe_basis_flag_off_never_reports_fallback _ =
+  assert_that
+    (split_safe_basis_of_bars ~config:cfg ~bars:all_nan_adj_bars
+       ~as_of:split_as_of)
+    (equal_to (Flag_off : split_safe_basis))
+
+(* State (b): the mechanism actually ran. Same fixture whose flag-on reference
+   moves 104.0 -> 98.0. *)
+let test_split_safe_basis_adjusted_when_window_rescalable _ =
+  assert_that
+    (split_safe_basis_of_bars ~config:cfg_split ~bars:split_long_bars
+       ~as_of:split_as_of)
+    (equal_to (Adjusted : split_safe_basis))
+
+(* The telemetry inherits the {b universal} quantifier: an unusable cell at
+   day_offset 4 (see [nan_adj_at_first_bar_bars]) must still report the
+   fallback, not [Adjusted]. Pairs with
+   [test_split_safe_nan_adjusted_at_far_offset_degrades_whole_window], which
+   pins the same quantifier on the level. *)
+let test_split_safe_basis_far_offset_reports_fallback _ =
+  assert_that
+    (split_safe_basis_of_bars ~config:cfg_split ~bars:nan_adj_at_first_bar_bars
+       ~as_of:split_as_of)
+    (equal_to (Raw_fallback : split_safe_basis))
+
+(* An unusable {b raw} close degrades the window exactly as an unusable adjusted
+   close does, so the tag reports the fallback even though the raw scan still
+   finds the finite structural floor 98.0 (see
+   [test_split_safe_corrupt_close_guarded]) — a structural answer is not
+   evidence the mechanism ran. *)
+let test_split_safe_basis_corrupt_close_reports_fallback _ =
+  assert_that
+    (split_safe_basis_of_bars ~config:cfg_split ~bars:corrupt_close_bars
+       ~as_of:split_as_of)
+    (equal_to (Raw_fallback : split_safe_basis))
+
 (* ==================================================================== *)
 (*            floor_is_structural: flag agrees with the level            *)
 (* ==================================================================== *)
@@ -1114,6 +1178,17 @@ let suite =
          >:: test_split_safe_all_nan_adjusted_is_inert;
          "split_safe_all_nan_adjusted_structural_flag_matches_flag_off"
          >:: test_split_safe_all_nan_adjusted_structural_flag_matches_flag_off;
+         (* F5: whole-window fallback telemetry *)
+         "split_safe_basis_fallback_distinguishable_from_flag_off"
+         >:: test_split_safe_basis_fallback_distinguishable_from_flag_off;
+         "split_safe_basis_flag_off_never_reports_fallback"
+         >:: test_split_safe_basis_flag_off_never_reports_fallback;
+         "split_safe_basis_adjusted_when_window_rescalable"
+         >:: test_split_safe_basis_adjusted_when_window_rescalable;
+         "split_safe_basis_far_offset_reports_fallback"
+         >:: test_split_safe_basis_far_offset_reports_fallback;
+         "split_safe_basis_corrupt_close_reports_fallback"
+         >:: test_split_safe_basis_corrupt_close_reports_fallback;
          (* floor_is_structural: flag agrees with level *)
          "floor_is_structural_wick_true" >:: test_floor_is_structural_wick_true;
          "floor_is_structural_close_mode_false"

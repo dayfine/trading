@@ -189,6 +189,69 @@ val floor_is_structural :
     {!Support_floor.find_recent_level}, which silently diverged from a
     [Close]-anchored or split-safe level.) Pure function. *)
 
+(** Which price basis a support-floor scan actually ran on — the telemetry for
+    [config.split_safe_floors]'s whole-window fallback.
+
+    The fallback is by design {b silent} in the answer it produces: when the
+    window cannot be rescaled the scan returns exactly the flag-off level, which
+    is indistinguishable from a flag-on window that legitimately measured to the
+    same number. This type restores the distinction. Three constructors, not two
+    — collapsing [Flag_off] into [Raw_fallback] would reproduce the very
+    ambiguity the type exists to remove.
+
+    {b Why it matters.} Whole-window fallback trips on a {e single} unusable
+    cell anywhere in [config.support_floor_lookback_bars], so a walk-forward arm
+    over [((stops_config ((split_safe_floors true))))] can be substantially
+    inert with no signal other than "on == off" in aggregate. An ACCEPT computed
+    over a partly-inert surface is uninterpretable
+    ([.claude/rules/mechanism-validation-rigor.md]); this tag lets a run report
+    {e what fraction} of its decisions were inert before the mechanism is
+    promoted. *)
+type split_safe_basis =
+  | Flag_off
+      (** [config.split_safe_floors] is [false]: no basis decision was taken and
+          the raw bundle was scanned. Distinct from {!Raw_fallback} — the raw
+          scan here is the configured behaviour, not a degradation. *)
+  | Adjusted
+      (** Flag on and every offset in the window was rescalable: the scan ran on
+          the split/dividend-adjusted basis. This is the only state in which the
+          mechanism did anything. *)
+  | Raw_fallback
+      (** Flag on but at least one offset was unusable (missing / NaN /
+          non-positive raw or adjusted close), so the whole window degraded to
+          raw. The level returned equals the flag-off level; only this tag says
+          so. *)
+[@@deriving show, eq, sexp]
+
+val split_safe_basis_of_callbacks :
+  config:config -> callbacks:callbacks -> split_safe_basis
+(** [split_safe_basis_of_callbacks ~config ~callbacks] reports the basis
+    {!compute_initial_stop_with_floor_with_callbacks} and
+    {!floor_is_structural_with_callbacks} scan this bundle on, for this config.
+
+    Not a re-derivation: the branch that picks the basis and the branch that
+    builds the scanned bundle are the {b same} branch internally, so the
+    reported basis cannot drift from the basis actually used. (A separately
+    evaluated predicate is exactly how the [stop_is_structural] flag once came
+    to disagree with the installed level — #2167.)
+
+    Pure function; does not change any stop level. *)
+
+val split_safe_basis_of_bars :
+  config:config ->
+  bars:Types.Daily_price.t list ->
+  as_of:Core.Date.t ->
+  split_safe_basis
+(** Bar-list sibling of {!split_safe_basis_of_callbacks}, built through the same
+    {!callbacks_from_bars} path {!compute_initial_stop_with_floor} uses.
+
+    {b Denominator caveat for aggregate reporting.} The strategy records this
+    tag per {e entered} position (via [Audit_recorder.entry_event] into
+    [trade_audit.sexp]), so an inert-fraction computed from a run measures
+    "fraction of entries whose floor scan was inert", not "fraction of all
+    scans". Screened-and-skipped candidates carry no stop fields in the audit.
+    Name the denominator correctly when reading the number. *)
+
 val check_stop_hit :
   ?on_close:bool ->
   state:stop_state ->
