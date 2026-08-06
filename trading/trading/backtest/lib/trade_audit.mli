@@ -130,13 +130,22 @@ type stop_floor_kind = Support_floor | Buffer_fallback [@@deriving sexp]
 
 (** Which price basis the entry's support-floor scan ran on. Mirrors
     {!Weinstein_strategy.Audit_recorder.split_safe_basis} /
-    {!Weinstein_stops.split_safe_basis}; re-declared here (like
-    {!stop_floor_kind}) so [backtest] needs no dependency on the stops library.
+    {!Weinstein_stops.split_safe_basis}, re-declared here for the same reason
+    {!stop_floor_kind} is: [Trade_audit] owns the on-disk schema for
+    [trade_audit.sexp], so its constructors should be free to evolve (or gain
+    sexp attributes) without that being a change to a strategy-layer type. The
+    upstream type {e is} reachable — [backtest/lib/dune] declares
+    [weinstein_trading.strategy], which aliases it with its constructors
+    re-exported — so this is a deliberate schema boundary, not an unavoidable
+    one. {!Trade_audit_recorder} holds the total mapping between them.
 
     [Raw_fallback] is the F5 case: [split_safe_floors] was on but the lookback
     window held an unusable cell, so the whole window degraded to raw and the
-    scan produced the flag-off level. Nothing else in the row says so. *)
-type split_safe_basis = Flag_off | Adjusted | Raw_fallback [@@deriving sexp]
+    scan produced the flag-off level. Nothing else in the row says so.
+    [Empty_window] is the non-event (no bars to scan) held out of the
+    inert-fraction numerator. *)
+type split_safe_basis = Flag_off | Adjusted | Raw_fallback | Empty_window
+[@@deriving sexp]
 
 type entry_decision = {
   symbol : string;

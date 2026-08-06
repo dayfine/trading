@@ -75,6 +75,7 @@ type split_safe_basis = Weinstein_stops.split_safe_basis =
   | Flag_off
   | Adjusted
   | Raw_fallback
+  | Empty_window
       (** Which price basis the entry's support-floor scan ran on. Aliased from
           the stops layer rather than re-declared (unlike {!stop_floor_kind},
           which predates the strategy library's dependency on

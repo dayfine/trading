@@ -22,6 +22,7 @@ type split_safe_basis = Weinstein_stops.split_safe_basis =
   | Flag_off
   | Adjusted
   | Raw_fallback
+  | Empty_window
 
 type entry_event = {
   position_id : string;

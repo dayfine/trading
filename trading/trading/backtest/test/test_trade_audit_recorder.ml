@@ -129,7 +129,7 @@ let _recorded_entry ~split_safe_basis ~stop_floor_kind =
     default — is what makes hardcoding any single value at this hop fail. *)
 let test_split_safe_basis_projects_all_three_states _ =
   let projected =
-    [ AR.Flag_off; AR.Adjusted; AR.Raw_fallback ]
+    [ AR.Flag_off; AR.Adjusted; AR.Raw_fallback; AR.Empty_window ]
     |> List.map ~f:(fun split_safe_basis ->
         (_recorded_entry ~split_safe_basis ~stop_floor_kind:AR.Buffer_fallback)
           .TA.split_safe_basis)
@@ -140,6 +140,7 @@ let test_split_safe_basis_projects_all_three_states _ =
          equal_to (TA.Flag_off : TA.split_safe_basis);
          equal_to (TA.Adjusted : TA.split_safe_basis);
          equal_to (TA.Raw_fallback : TA.split_safe_basis);
+         equal_to (TA.Empty_window : TA.split_safe_basis);
        ])
 
 (** The sibling tag on the same hop, pinned for the same reason: both

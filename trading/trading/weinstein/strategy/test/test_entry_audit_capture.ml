@@ -861,7 +861,7 @@ let test_build_entry_event_propagates_split_safe_basis _ =
       ~as_of_date:current_date
   in
   let bases =
-    [ Audit_recorder.Flag_off; Adjusted; Raw_fallback ]
+    [ Audit_recorder.Flag_off; Adjusted; Raw_fallback; Empty_window ]
     |> List.map ~f:(fun split_safe_basis ->
         let _, meta =
           _stub_trans_and_meta ~split_safe_basis ~side:Trading_base.Types.Long
@@ -878,6 +878,8 @@ let test_build_entry_event_propagates_split_safe_basis _ =
          equal_to (Audit_recorder.Adjusted : Audit_recorder.split_safe_basis);
          equal_to
            (Audit_recorder.Raw_fallback : Audit_recorder.split_safe_basis);
+         equal_to
+           (Audit_recorder.Empty_window : Audit_recorder.split_safe_basis);
        ])
 
 (** Portfolio at $100K with 25% existing short notional ($25K). A fresh short

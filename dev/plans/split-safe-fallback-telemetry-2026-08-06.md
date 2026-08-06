@@ -91,6 +91,16 @@ display flag disagreeing with the installed level), which this track has already
 been burned by twice. `_to_adjusted_basis` disappears; its docstring moves to
 `_scan_basis`.
 
+> **Correction (rework iteration 1, 2026-08-06).** This property is
+> **structural / compile-time, not test-pinnable** — see acceptance criterion 3
+> below. A faithful re-derivation of the predicate is behaviour-identical by
+> construction and therefore green under any test; only a *divergent*
+> re-derivation reddens, and that is the MT1 mutation, which pins "the tag
+> tracks the branch" rather than "there is only one branch". The single-source
+> form makes drift *unrepresentable* rather than *absent*; that is a code-shape
+> claim verified by review, and it should not be advertised with a mutation
+> count.
+
 Public surface (mirrors the existing `floor_is_structural` /
 `floor_is_structural_with_callbacks` pair):
 
@@ -234,6 +244,12 @@ edge at all:
 - [ ] No behaviour change to stop levels. `split_safe_floors = false` remains
       bit-identical; every existing test passes unchanged.
 - [ ] The basis reported is single-sourced with the basis scanned (one branch).
+      **This is a structural/compile-time property, not a behavioural one, and
+      is verified by reading the code — not by a test.** Any behaviour-preserving
+      re-derivation is green by construction; only a divergent one reddens, and
+      that divergence is what MT1 pins. Do not claim a mutation count for this
+      criterion (rework iteration 1 correction; the original wording implied a
+      test existed).
 - [ ] A test pins that on an unadjustable window with the flag **on**, the stop
       level equals the flag-off level *and* the basis is `Raw_fallback` — i.e.
       the same answer with distinguishable telemetry. This is the F5 case.
@@ -244,6 +260,16 @@ edge at all:
 - [ ] **Mutation evidence:** report `Adjusted` unconditionally in the fallback
       branch (behaviour unchanged, telemetry lying) → new tests go RED; revert →
       green and `git diff --stat` empty.
+- [ ] **Every hop between the scan and the written artifact is pinned**
+      (rework iteration 1, B1). Hardcoding a constant at `build_entry_event` or
+      at `Trade_audit_recorder._entry_decision_of_event` must redden a test.
+      Before rework, both could be hardcoded with the full repo at exit 0 —
+      `Trade_audit_recorder` had no test anywhere and every `build_entry_event`
+      fixture drove the `Flag_off` default, so neither hop could distinguish
+      "propagated" from "constant".
+- [ ] **An empty lookback window is not counted as inertness**
+      (rework iteration 1, B3). `n_days = 0` is a non-event, held out of both
+      terms of `Raw_fallback / (Raw_fallback + Adjusted)`.
 - [ ] `dune build @fmt`, `dune build`, full-repo `dune runtest` all exit 0.
 
 ## 6. Out of scope

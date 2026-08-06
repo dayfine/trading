@@ -1015,6 +1015,29 @@ let test_split_safe_basis_corrupt_close_reports_fallback _ =
        ~as_of:split_as_of)
     (equal_to (Raw_fallback : split_safe_basis))
 
+(* B3. An empty lookback window is a {b non-event}, not a degradation: there
+   was nothing to rescale and nothing to scan. Folding it into [Raw_fallback]
+   (which is what [_window_is_adjustable]'s [n_days > 0] guard would produce
+   without an explicit branch) would inflate the inert-fraction numerator with
+   symbols the mechanism was never given a chance to act on — a correctness bug
+   in the very number this telemetry exists to produce. *)
+let test_split_safe_basis_empty_window_is_not_fallback _ =
+  assert_that
+    (split_safe_basis_of_bars ~config:cfg_split ~bars:[] ~as_of:split_as_of)
+    (equal_to (Empty_window : split_safe_basis))
+
+(* The empty window still takes the flag-off branch first: no basis decision is
+   taken when the mechanism is off, whatever the window looks like. *)
+let test_split_safe_basis_empty_window_flag_off _ =
+  assert_that
+    (split_safe_basis_of_bars ~config:cfg ~bars:[] ~as_of:split_as_of)
+    (equal_to (Flag_off : split_safe_basis))
+
+(* The empty-window branch is telemetry-only: the stop it produces is
+   bit-identical to the flag-off stop, as it was before the branch existed. *)
+let test_split_safe_empty_window_stop_matches_flag_off _ =
+  assert_that (_flag_on_long []) (equal_to (_flag_off_long [] : stop_state))
+
 (* ==================================================================== *)
 (*            floor_is_structural: flag agrees with the level            *)
 (* ==================================================================== *)
@@ -1189,6 +1212,12 @@ let suite =
          >:: test_split_safe_basis_far_offset_reports_fallback;
          "split_safe_basis_corrupt_close_reports_fallback"
          >:: test_split_safe_basis_corrupt_close_reports_fallback;
+         "split_safe_basis_empty_window_is_not_fallback"
+         >:: test_split_safe_basis_empty_window_is_not_fallback;
+         "split_safe_basis_empty_window_flag_off"
+         >:: test_split_safe_basis_empty_window_flag_off;
+         "split_safe_empty_window_stop_matches_flag_off"
+         >:: test_split_safe_empty_window_stop_matches_flag_off;
          (* floor_is_structural: flag agrees with level *)
          "floor_is_structural_wick_true" >:: test_floor_is_structural_wick_true;
          "floor_is_structural_close_mode_false"

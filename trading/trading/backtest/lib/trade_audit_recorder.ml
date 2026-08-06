@@ -8,14 +8,18 @@ let _stop_floor_kind_of_event = function
   | AR.Support_floor -> Trade_audit.Support_floor
   | AR.Buffer_fallback -> Trade_audit.Buffer_fallback
 
-(* F5 telemetry passthrough. [AR.split_safe_basis] is an alias of the stops
-   layer's type; [Trade_audit] re-declares its own so [backtest] needs no
-   dependency on [weinstein_trading.stops]. Exhaustive by construction — a new
-   basis constructor upstream fails this match. *)
+(* F5 telemetry passthrough between the strategy-layer tag and [Trade_audit]'s
+   own on-disk schema copy (see [trade_audit.mli] for why the copy exists).
+   Exhaustive by construction — a new basis constructor upstream fails this
+   match, which is the point of writing it out rather than casting. Pinned
+   per-constructor by [test_trade_audit_recorder.ml]: this is the last hop
+   before [trade_audit.sexp], so a value dropped here is invisible everywhere
+   else. *)
 let _split_safe_basis_of_event = function
   | AR.Flag_off -> Trade_audit.Flag_off
   | AR.Adjusted -> Trade_audit.Adjusted
   | AR.Raw_fallback -> Trade_audit.Raw_fallback
+  | AR.Empty_window -> Trade_audit.Empty_window
 
 let _skip_reason_of_event = function
   | AR.Insufficient_cash -> Trade_audit.Insufficient_cash

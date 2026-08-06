@@ -35,7 +35,9 @@ type alternative_candidate = {
 [@@deriving sexp]
 
 type stop_floor_kind = Support_floor | Buffer_fallback [@@deriving sexp]
-type split_safe_basis = Flag_off | Adjusted | Raw_fallback [@@deriving sexp]
+
+type split_safe_basis = Flag_off | Adjusted | Raw_fallback | Empty_window
+[@@deriving sexp]
 
 type entry_decision = {
   symbol : string;

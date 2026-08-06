@@ -198,7 +198,9 @@ let test_stop_floor_kind_sexp_round_trip _ =
   assert_that parsed (elements_are (List.map all ~f:equal_to))
 
 let test_split_safe_basis_sexp_round_trip _ =
-  let all : TA.split_safe_basis list = [ Flag_off; Adjusted; Raw_fallback ] in
+  let all : TA.split_safe_basis list =
+    [ Flag_off; Adjusted; Raw_fallback; Empty_window ]
+  in
   let parsed =
     List.map all ~f:(fun b ->
         TA.split_safe_basis_of_sexp (TA.sexp_of_split_safe_basis b))

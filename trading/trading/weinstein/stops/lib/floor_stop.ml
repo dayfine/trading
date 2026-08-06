@@ -86,7 +86,7 @@ let _rescaled (cbs : callbacks) : callbacks =
     get_close = _adjusted_close_at cbs;
   }
 
-type split_safe_basis = Flag_off | Adjusted | Raw_fallback
+type split_safe_basis = Flag_off | Adjusted | Raw_fallback | Empty_window
 [@@deriving show, eq, sexp]
 
 (* Put a callbacks bundle on its split/dividend-adjusted basis: scale the high /
@@ -125,9 +125,18 @@ type split_safe_basis = Flag_off | Adjusted | Raw_fallback
    describing which branch produced it. Deriving the basis from a second,
    separate evaluation of [_window_is_adjustable] would let the reported basis
    drift from the basis actually scanned — the #2167 class of bug this track has
-   already been bitten by twice. One branch, two outputs. *)
+   already been bitten by twice. One branch, two outputs.
+
+   The [n_days = 0] branch is what keeps the telemetry a usable {e metric}
+   rather than just a tag. [_window_is_adjustable] answers [false] for an empty
+   window, so without this branch a symbol with no bars in the lookback would
+   report [Raw_fallback] — "the fallback fired" for a window that had nothing to
+   scan — inflating the inert-fraction numerator with non-events. It is
+   behaviour-preserving: the empty branch returns the bundle untouched, exactly
+   as the [Raw_fallback] branch did. *)
 let _scan_basis ~config ~(callbacks : callbacks) =
   if not config.split_safe_floors then (callbacks, Flag_off)
+  else if callbacks.n_days = 0 then (callbacks, Empty_window)
   else if _window_is_adjustable callbacks then (_rescaled callbacks, Adjusted)
   else (callbacks, Raw_fallback)
 

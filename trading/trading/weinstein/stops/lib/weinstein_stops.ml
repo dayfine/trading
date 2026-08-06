@@ -72,6 +72,7 @@ type split_safe_basis = Floor_stop.split_safe_basis =
   | Flag_off
   | Adjusted
   | Raw_fallback
+  | Empty_window
 [@@deriving show, eq, sexp]
 
 let split_safe_basis_of_callbacks = Floor_stop.split_safe_basis_of_callbacks

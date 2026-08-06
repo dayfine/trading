@@ -57,6 +57,7 @@ type split_safe_basis =
       (** Flag on and every offset rescalable — scan ran adjusted-basis. *)
   | Raw_fallback
       (** Flag on but some offset unusable — whole-window fallback fired. *)
+  | Empty_window  (** Flag on but the window has no bars — nothing to scan. *)
 [@@deriving show, eq, sexp]
 
 val split_safe_basis_of_callbacks :
