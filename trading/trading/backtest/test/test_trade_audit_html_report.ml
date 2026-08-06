@@ -109,6 +109,7 @@ let _aapl_entry : TA.entry_decision =
     suggested_stop = 260.0;
     installed_stop = 260.0;
     stop_floor_kind = TA.Buffer_fallback;
+    split_safe_basis = TA.Flag_off;
     risk_pct = 0.08;
     initial_position_value = 28_000.0;
     initial_risk_dollars = 2_000.0;

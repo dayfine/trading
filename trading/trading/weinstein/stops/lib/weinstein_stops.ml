@@ -68,6 +68,16 @@ let floor_is_structural = Floor_stop.floor_is_structural
 let floor_is_structural_with_callbacks =
   Floor_stop.floor_is_structural_with_callbacks
 
+type split_safe_basis = Floor_stop.split_safe_basis =
+  | Flag_off
+  | Adjusted
+  | Raw_fallback
+  | Empty_window
+[@@deriving show, eq, sexp]
+
+let split_safe_basis_of_callbacks = Floor_stop.split_safe_basis_of_callbacks
+let split_safe_basis_of_bars = Floor_stop.split_safe_basis_of_bars
+
 (* ---- Directional helpers ---- *)
 
 (* The bar's extreme price in the against-trend direction.

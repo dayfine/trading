@@ -90,9 +90,10 @@ let _maybe_reanchor_to_entry_base ~reanchor ~stops_config ~side ~effective_entry
     (buffer_stop, Audit_recorder.Buffer_fallback)
 
 (** Compute the support-floor-aware initial stop for [cand] entering at
-    [effective_entry], plus the [stop_floor_kind] tag for audit. The tag comes
-    from [Weinstein_stops.floor_is_structural_with_callbacks] — the same
-    internal scan the stop computation runs, so the tag cannot disagree with the
+    [effective_entry], plus the [stop_floor_kind] and [split_safe_basis] tags
+    for audit. The [stop_floor_kind] tag comes from
+    [Weinstein_stops.floor_is_structural_with_callbacks] — the same internal
+    scan the stop computation runs, so the tag cannot disagree with the
     installed level under any [support_floor_anchor_mode] / [split_safe_floors]
     combination (the #2167 class of bug).
 
@@ -107,7 +108,16 @@ let _maybe_reanchor_to_entry_base ~reanchor ~stops_config ~side ~effective_entry
     initial-stop re-anchoring (see {!_maybe_reanchor_to_entry_base}) before the
     min-distance widening. The strategy sets it only when
     [config.stop_anchor_at_entry_base] AND the entry is E-anchored; default
-    [false] keeps the support-floor stop verbatim (bit-identical, R1). *)
+    [false] keeps the support-floor stop verbatim (bit-identical, R1).
+
+    The third component of the result is the F5 telemetry tag: which price basis
+    the floor scan actually ran on ([Flag_off] / [Adjusted] / [Raw_fallback]).
+    It is read from the stops layer's single-source
+    {!Weinstein_stops.split_safe_basis_of_callbacks} on the very bundle that was
+    scanned, so it cannot claim the mechanism ran when the whole-window fallback
+    silently returned the flag-off level. Unaffected by the re-anchor below —
+    the re-anchor replaces the level but does not re-run the scan, and the tag
+    describes the scan. *)
 let initial_stop_and_kind ?(min_stop_distance_pct = 0.0)
     ?(reanchor_to_entry_base = false) ~stops_config ~initial_stop_buffer
     ~bar_reader ~current_date ~effective_entry
@@ -131,6 +141,10 @@ let initial_stop_and_kind ?(min_stop_distance_pct = 0.0)
     then Support_floor
     else Buffer_fallback
   in
+  let split_safe_basis =
+    Weinstein_stops.split_safe_basis_of_callbacks ~config:stops_config
+      ~callbacks
+  in
   let raw_stop, stop_floor_kind =
     _maybe_reanchor_to_entry_base ~reanchor:reanchor_to_entry_base ~stops_config
       ~side:cand.side ~effective_entry ~initial_stop_buffer ~current_date
@@ -141,7 +155,7 @@ let initial_stop_and_kind ?(min_stop_distance_pct = 0.0)
       ~config:stops_config ~side:cand.side ~entry_price:effective_entry
       ~min_distance_pct:min_stop_distance_pct raw_stop
   in
-  (initial_stop, stop_floor_kind)
+  (initial_stop, stop_floor_kind, split_safe_basis)
 
 (** Build the [CreateEntering] transition given the pre-computed sizing and
     effective entry. Returns only the transition; the caller constructs

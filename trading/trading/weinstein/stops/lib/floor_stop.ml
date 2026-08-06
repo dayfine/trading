@@ -52,9 +52,9 @@ let _adjusted_factor (cbs : callbacks) ~day_offset =
   | _, _ -> None
 
 (* Can EVERY offset in the window be rescaled? The rescale is all-or-nothing by
-   design — see [_to_adjusted_basis] for why per-bar degradation is not an
-   option. An empty window ([n_days = 0]) has nothing to scan, so it reports
-   [false] and takes the cheap path. *)
+   design — see [_scan_basis] for why per-bar degradation is not an option. An
+   empty window ([n_days = 0]) has nothing to scan, so it reports [false] and
+   takes the cheap path. *)
 let _window_is_adjustable (cbs : callbacks) =
   let rec loop i =
     i >= cbs.n_days
@@ -86,6 +86,9 @@ let _rescaled (cbs : callbacks) : callbacks =
     get_close = _adjusted_close_at cbs;
   }
 
+type split_safe_basis = Flag_off | Adjusted | Raw_fallback | Empty_window
+[@@deriving show, eq, sexp]
+
 (* Put a callbacks bundle on its split/dividend-adjusted basis: scale the high /
    low by each bar's factor and replace the close with the adjusted close.
    Inlined mirror of [Adjusted_basis.to_adjusted_basis]
@@ -113,9 +116,29 @@ let _rescaled (cbs : callbacks) : callbacks =
    reference this flag exists to eliminate. Whole-window fallback keeps the
    invariant that makes the mechanism sound: {b the scanned window is always on
    exactly one price basis}, so the flag can only produce the correct adjusted
-   answer or the flag-off answer, never a third one. *)
-let _to_adjusted_basis (cbs : callbacks) : callbacks =
-  if _window_is_adjustable cbs then _rescaled cbs else cbs
+   answer or the flag-off answer, never a third one.
+
+   {b Telemetry (F5).} Whole-window fallback is silent at the single-decision
+   level — it returns the flag-off answer, which is indistinguishable from a
+   flag-on window that legitimately measured to the same number. So this one
+   function returns BOTH the bundle the scan reads and the [split_safe_basis]
+   describing which branch produced it. Deriving the basis from a second,
+   separate evaluation of [_window_is_adjustable] would let the reported basis
+   drift from the basis actually scanned — the #2167 class of bug this track has
+   already been bitten by twice. One branch, two outputs.
+
+   The [n_days = 0] branch is what keeps the telemetry a usable {e metric}
+   rather than just a tag. [_window_is_adjustable] answers [false] for an empty
+   window, so without this branch a symbol with no bars in the lookback would
+   report [Raw_fallback] — "the fallback fired" for a window that had nothing to
+   scan — inflating the inert-fraction numerator with non-events. It is
+   behaviour-preserving: the empty branch returns the bundle untouched, exactly
+   as the [Raw_fallback] branch did. *)
+let _scan_basis ~config ~(callbacks : callbacks) =
+  if not config.split_safe_floors then (callbacks, Flag_off)
+  else if callbacks.n_days = 0 then (callbacks, Empty_window)
+  else if _window_is_adjustable callbacks then (_rescaled callbacks, Adjusted)
+  else (callbacks, Raw_fallback)
 
 (* The bundle the support-floor scan actually reads. Single source for every
    floor consumer — [compute_initial_stop_with_floor_with_callbacks] and
@@ -123,8 +146,10 @@ let _to_adjusted_basis (cbs : callbacks) : callbacks =
    [stop_is_structural] classification can never disagree. Under
    [config.split_safe_floors] the bundle is first rescaled onto the adjusted
    basis; default-off returns it untouched (bit-identical). *)
-let _scan_callbacks ~config ~callbacks =
-  if config.split_safe_floors then _to_adjusted_basis callbacks else callbacks
+let _scan_callbacks ~config ~callbacks = fst (_scan_basis ~config ~callbacks)
+
+let split_safe_basis_of_callbacks ~config ~callbacks =
+  snd (_scan_basis ~config ~callbacks)
 
 let _find_level ~config ~side ~callbacks =
   Support_floor.find_recent_level_with_callbacks
@@ -153,3 +178,7 @@ let compute_initial_stop_with_floor ~config ~side ~entry_price ~bars ~as_of
 let floor_is_structural ~config ~side ~bars ~as_of =
   let callbacks = callbacks_from_bars ~config ~bars ~as_of in
   floor_is_structural_with_callbacks ~config ~side ~callbacks
+
+let split_safe_basis_of_bars ~config ~bars ~as_of =
+  let callbacks = callbacks_from_bars ~config ~bars ~as_of in
+  split_safe_basis_of_callbacks ~config ~callbacks
