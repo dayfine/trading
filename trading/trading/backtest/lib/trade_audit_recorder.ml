@@ -8,6 +8,15 @@ let _stop_floor_kind_of_event = function
   | AR.Support_floor -> Trade_audit.Support_floor
   | AR.Buffer_fallback -> Trade_audit.Buffer_fallback
 
+(* F5 telemetry passthrough. [AR.split_safe_basis] is an alias of the stops
+   layer's type; [Trade_audit] re-declares its own so [backtest] needs no
+   dependency on [weinstein_trading.stops]. Exhaustive by construction — a new
+   basis constructor upstream fails this match. *)
+let _split_safe_basis_of_event = function
+  | AR.Flag_off -> Trade_audit.Flag_off
+  | AR.Adjusted -> Trade_audit.Adjusted
+  | AR.Raw_fallback -> Trade_audit.Raw_fallback
+
 let _skip_reason_of_event = function
   | AR.Insufficient_cash -> Trade_audit.Insufficient_cash
   | AR.Already_held -> Trade_audit.Already_held
@@ -89,6 +98,7 @@ let _entry_decision_of_event (e : AR.entry_event) : Trade_audit.entry_decision =
     suggested_stop = cand.suggested_stop;
     installed_stop = e.installed_stop;
     stop_floor_kind = _stop_floor_kind_of_event e.stop_floor_kind;
+    split_safe_basis = _split_safe_basis_of_event e.split_safe_basis;
     risk_pct = cand.risk_pct;
     initial_position_value = e.initial_position_value;
     initial_risk_dollars = e.initial_risk_dollars;

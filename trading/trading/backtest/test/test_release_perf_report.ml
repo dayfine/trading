@@ -497,6 +497,7 @@ let _make_audit_record ~symbol ~entry_date
       suggested_stop = 90.0;
       installed_stop = 90.0;
       stop_floor_kind;
+      split_safe_basis = Backtest.Trade_audit.Flag_off;
       risk_pct = 0.10;
       initial_position_value = 60_000.0;
       initial_risk_dollars;

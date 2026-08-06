@@ -11,7 +11,17 @@ type entry_meta = {
   shares : int;
   installed_stop : float;
   stop_floor_kind : Audit_recorder.stop_floor_kind;
+  split_safe_basis : Audit_recorder.split_safe_basis;
   effective_entry_price : float;
+}
+
+(* The two audit-only classifications of a freshly-computed initial stop,
+   carried as one value so the stop-construction helpers keep a readable
+   argument list as tags are added. Private — [entry_meta] is the exported
+   shape. *)
+type stop_tags = {
+  floor_kind : Audit_recorder.stop_floor_kind;
+  basis : Audit_recorder.split_safe_basis;
 }
 
 (** Outcome of an attempt to construct an entry transition for one candidate.
@@ -57,7 +67,7 @@ let _sizing_side_of_cand_side (side : Trading_base.Types.position_side) =
 (** Size the candidate and, on success, register the stop and build the
     transition + meta. Returns [Sized_zero] when share count rounds to 0. *)
 let _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
-    ~current_date ~effective_entry ~initial_stop ~stop_floor_kind ~id
+    ~current_date ~effective_entry ~initial_stop ~(stop_tags : stop_tags) ~id
     ~stop_distance_pct ~max_stop_distance_pct (cand : Screener.scored_candidate)
     : entry_attempt_result =
   let installed_stop_level = Weinstein_stops.get_stop_level initial_stop in
@@ -88,7 +98,8 @@ let _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
         position_id = id;
         shares = sizing.shares;
         installed_stop = installed_stop_level;
-        stop_floor_kind;
+        stop_floor_kind = stop_tags.floor_kind;
+        split_safe_basis = stop_tags.basis;
         effective_entry_price = effective_entry;
       }
     in
@@ -109,7 +120,7 @@ let make_entry_transition ?(min_stop_distance_pct = 0.0)
   let reanchor_to_entry_base =
     stop_anchor_at_entry_base && trigger_at_suggested
   in
-  let initial_stop, stop_floor_kind =
+  let initial_stop, stop_floor_kind, split_safe_basis =
     Entry_audit_helpers.initial_stop_and_kind ~min_stop_distance_pct
       ~reanchor_to_entry_base ~stops_config ~initial_stop_buffer ~bar_reader
       ~current_date ~effective_entry cand
@@ -137,8 +148,9 @@ let make_entry_transition ?(min_stop_distance_pct = 0.0)
        fixed-risk-sizing contract). *)
     let id = gen_position_id cand.ticker in
     _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
-      ~current_date ~effective_entry ~initial_stop ~stop_floor_kind ~id
-      ~stop_distance_pct ~max_stop_distance_pct cand
+      ~current_date ~effective_entry ~initial_stop
+      ~stop_tags:{ floor_kind = stop_floor_kind; basis = split_safe_basis }
+      ~id ~stop_distance_pct ~max_stop_distance_pct cand
 
 (* Decide + apply the cash draw for a [CreateEntering] of [side] costing [cost].
    [borrow_ok] is [true] when long-margin leverage is engaged ([leverage_enabled],
@@ -396,6 +408,7 @@ let build_entry_event ~(macro : Macro.result) ~current_date
     current_date;
     installed_stop = meta.installed_stop;
     stop_floor_kind = meta.stop_floor_kind;
+    split_safe_basis = meta.split_safe_basis;
     shares = meta.shares;
     initial_position_value;
     initial_risk_dollars;

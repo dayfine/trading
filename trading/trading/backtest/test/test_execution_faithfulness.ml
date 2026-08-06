@@ -74,6 +74,7 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     suggested_stop = installed_stop;
     installed_stop;
     stop_floor_kind = TA.Buffer_fallback;
+    split_safe_basis = TA.Flag_off;
     risk_pct = 0.08;
     initial_position_value = 100.0 *. suggested_entry;
     initial_risk_dollars = 100.0 *. Float.abs (suggested_entry -. installed_stop);

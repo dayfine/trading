@@ -723,6 +723,7 @@ let _stub_trans_and_meta ~side ~shares ~effective_entry_price :
       shares;
       installed_stop = effective_entry_price *. 0.95;
       stop_floor_kind = Audit_recorder.Buffer_fallback;
+      split_safe_basis = Audit_recorder.Flag_off;
       effective_entry_price;
     }
   in

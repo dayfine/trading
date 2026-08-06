@@ -13,6 +13,12 @@ type entry_meta = {
   shares : int;
   installed_stop : float;
   stop_floor_kind : Audit_recorder.stop_floor_kind;
+  split_safe_basis : Audit_recorder.split_safe_basis;
+      (** F5 telemetry: which price basis the support-floor scan for this entry
+          ran on. [Raw_fallback] means [stops_config.split_safe_floors] was on
+          but the lookback window could not be rescaled, so the scan returned
+          the flag-off answer — invisible in [installed_stop] alone. Carried
+          straight into {!Audit_recorder.entry_event}. *)
   effective_entry_price : float;
       (** The price the strategy installs into [Position.t] state — most recent
           close from [bar_reader] at order placement, or

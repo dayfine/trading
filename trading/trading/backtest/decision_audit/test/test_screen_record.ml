@@ -66,6 +66,7 @@ let _entry ?(entry_date = _date "2024-03-01") ?(symbol = "AAPL")
     suggested_stop = 92.0;
     installed_stop = 92.0;
     stop_floor_kind = TA.Buffer_fallback;
+    split_safe_basis = TA.Flag_off;
     risk_pct = 0.08;
     initial_position_value = 10_000.0;
     initial_risk_dollars = 800.0;

@@ -132,6 +132,7 @@ let _seed_entry ~trade_audit ~symbol ~position_id ~entry_date =
       suggested_stop = 0.0;
       installed_stop = 0.0;
       stop_floor_kind = TA.Buffer_fallback;
+      split_safe_basis = TA.Flag_off;
       risk_pct = 0.0;
       initial_position_value = 0.0;
       initial_risk_dollars = 0.0;

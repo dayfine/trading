@@ -50,9 +50,9 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
       ]) ?(cascade_rationale = [ "Stage2 breakout"; "RS positive rising" ])
     ?(suggested_entry = 150.50) ?(suggested_stop = 138.46)
     ?(installed_stop = 138.46) ?(stop_floor_kind = TA.Buffer_fallback)
-    ?(risk_pct = 0.08) ?(initial_position_value = 75_000.0)
-    ?(initial_risk_dollars = 6_000.0) ?(alternatives_considered = []) () :
-    TA.entry_decision =
+    ?(split_safe_basis = TA.Flag_off) ?(risk_pct = 0.08)
+    ?(initial_position_value = 75_000.0) ?(initial_risk_dollars = 6_000.0)
+    ?(alternatives_considered = []) () : TA.entry_decision =
   {
     symbol;
     entry_date;
@@ -80,6 +80,7 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     suggested_stop;
     installed_stop;
     stop_floor_kind;
+    split_safe_basis;
     risk_pct;
     initial_position_value;
     initial_risk_dollars;
