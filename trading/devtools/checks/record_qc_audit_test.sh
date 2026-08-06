@@ -1119,8 +1119,12 @@ fi
 #       `mv -f "$TMP_FILE" "$OUTPUT_FILE"`'s line number.
 #   B2. write_audit.sh contains NO `chmod ... "$OUTPUT_FILE"` anywhere, at
 #       any line, in any position relative to the rename.
-# B1 alone already catches M1 (chmod deleted -- no match, order check fails
-# open) and, combined with B2, unconditionally catches BOTH M2 (chmod
+# B1 alone already catches M1 (chmod deleted -- grep finds no match, the
+# `[[ -n "${CHMOD_TMP_LINE_24}" ]]` guard below rejects, and the order check
+# therefore fails CLOSED: source_order_ok stays 0 and the scenario goes red.
+# The `|| true` on the extraction keeps the missing match from aborting the
+# run, it does NOT let the check pass) and, combined with B2, B1
+# unconditionally catches BOTH M2 (chmod
 # relocated below the hook block, retargeted to $OUTPUT_FILE) and M2b
 # (chmod relocated to directly after `mv`, retargeted to $OUTPUT_FILE) --
 # B2 is a source-level invariant independent of exactly where after the
@@ -1175,6 +1179,136 @@ if (( rc24 != 0 )) \
 else
   fail "scenario 24 — expected rc!=0, record at ${JSON24} already mode 644 right after rename, 'simulating interruption right after rename' in output, chmod-TMP_FILE line < mv line with zero chmod-OUTPUT_FILE occurrences; got rc=${rc24}, mode=${mode24}, chmod_tmp_line=${CHMOD_TMP_LINE_24}, mv_line=${MV_LINE_24}, output_chmod_count=${OUTPUT_CHMOD_COUNT_24}"
   echo "${out24}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
+# Scenarios 25 & 26 — H-AUDIT-HOOK-GATE-TRUTHY: both write_audit.sh
+# test-only abort hooks must require the literal value `1` to fire. They
+# previously gated on `[ -n "${VAR:-}" ]`, so the two most natural ways to
+# spell "off" -- `VAR=0` and `VAR=false` -- are non-empty and therefore
+# FIRED the hook, the exact opposite of the caller's intent (verified live
+# in both directions, qc-behavioral PR #2211 finding F1). Nothing in
+# scenarios 1-24 pinned this: they only ever set the hooks to `1` or leave
+# them unset, and BOTH the `-n` form and the `= "1"` form agree on those
+# two inputs.
+#
+# Each scenario asserts BOTH directions, because a one-sided test here is
+# actively dangerous. Asserting only "VAR=0 does not fire" would be fully
+# satisfied by a hook that can never fire at all (e.g. gated on a
+# misspelled variable name) -- which would silently disable the atomicity
+# and mode-order pins scenarios 19 and 24 are built on, a strictly worse
+# outcome than the bug being fixed. So:
+#   (a) DISABLE direction (the regression direction): `VAR=0` and
+#       `VAR=false` must both leave the hook inert -- script runs to
+#       completion, rc=0, "OK:" line emitted, record on disk. Under the old
+#       `-n` gate this goes red: the hook fires and the script exits 1.
+#   (b) FIRE direction (the anti-over-correction guard): `VAR=1` must still
+#       abort exactly as before -- rc!=0 with the hook's own "simulating
+#       interruption ..." message.
+#
+# The scenarios differ in what "inert" is observable as, because the two
+# hooks sit on opposite sides of the publish:
+#   25 (BEFORE_RENAME) — inert means the record gets written at all; a
+#      spurious fire aborts before the `mv`, so nothing is published.
+#   26 (AFTER_RENAME)  — inert means rc=0; a spurious fire aborts AFTER the
+#      `mv`, so the record IS on disk either way and only the exit code and
+#      the missing "OK:" line distinguish them. This is the higher-blast-
+#      radius hook: a caller under `set -e` treats the audit as failed while
+#      the record actually exists.
+# ---------------------------------------------------------------------------
+FEATURE25="hook-gate-before-rename"
+JSON25="${TMP_REPO}/dev/audit/2026-08-06-harness-hook-gate-${FEATURE25}.json"
+
+_run_write_audit_25() {  # $1 = value for the BEFORE_RENAME hook, $2 = notes
+  REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME="$1" \
+    bash "${WRITE_AUDIT}" \
+      --date 2026-08-06 --feature "${FEATURE25}" --branch "harness/hook-gate" \
+      --structural APPROVED --behavioral APPROVED --overall APPROVED \
+      --notes "$2" 2>&1
+}
+
+# (a) disable direction — `0` then `false`, each must run to completion.
+out25_zero=$(_run_write_audit_25 0 "gate off via 0") && rc25_zero=0 || rc25_zero=$?
+json25_after_zero=$([[ -f "${JSON25}" ]] && echo yes || echo no)
+rm -f "${JSON25}"
+out25_false=$(_run_write_audit_25 false "gate off via false") && rc25_false=0 || rc25_false=$?
+json25_after_false=$([[ -f "${JSON25}" ]] && echo yes || echo no)
+
+if (( rc25_zero == 0 )) && [[ "${json25_after_zero}" == "yes" ]] \
+   && echo "${out25_zero}" | grep -q "^OK: wrote" \
+   && (( rc25_false == 0 )) && [[ "${json25_after_false}" == "yes" ]] \
+   && echo "${out25_false}" | grep -q "^OK: wrote"; then
+  pass "scenario 25a — WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME=0 and =false both leave the hook disabled: write completes, record published (H-AUDIT-HOOK-GATE-TRUTHY)"
+else
+  fail "scenario 25a — expected rc=0 + record + 'OK: wrote' for both =0 and =false; got rc(0)=${rc25_zero} record=${json25_after_zero}, rc(false)=${rc25_false} record=${json25_after_false}"
+  echo "${out25_zero}" | sed 's/^/      [0]     /'
+  echo "${out25_false}" | sed 's/^/      [false] /'
+fi
+
+# (b) fire direction — `1` must still abort before publishing, leaving the
+# record written by (a) byte-identical.
+#
+# `|| echo MISSING` is load-bearing under `set -euo pipefail`, same reason
+# as the `|| true` guards in scenario 24: when the gate regresses to `-n`,
+# (a)'s writes above all abort before the rename, so ${JSON25} does not
+# exist and a bare `cat` exits 1 -- which kills this whole test script
+# before it can report 25a's failure and every scenario after it. Observed
+# live while mutation-testing this very fix: the `-n` mutation produced one
+# FAIL line and no summary, having aborted here. Degrading to the sentinel
+# lets 25b report a clean FAIL and the run continue to scenario 26.
+CONTENT_25_BEFORE="$(cat "${JSON25}" 2>/dev/null || echo MISSING)"
+out25_one=$(_run_write_audit_25 1 "gate on via 1 - must never land") && rc25_one=0 || rc25_one=$?
+CONTENT_25_AFTER="$(cat "${JSON25}" 2>/dev/null || echo MISSING)"
+
+# The `!= MISSING` guard keeps the byte-identical comparison from passing
+# vacuously: with no prior record on disk, MISSING == MISSING would satisfy
+# "unchanged" without ever exercising the property.
+if (( rc25_one != 0 )) \
+   && echo "${out25_one}" | grep -q "simulating interruption before rename" \
+   && [[ "${CONTENT_25_BEFORE}" != "MISSING" ]] \
+   && [[ "${CONTENT_25_AFTER}" == "${CONTENT_25_BEFORE}" ]]; then
+  pass "scenario 25b — WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME=1 still fires: aborts before publishing, prior record untouched (hook not fixed into permanently dead)"
+else
+  fail "scenario 25b — expected rc!=0 + 'simulating interruption before rename' + a real prior record left unchanged; got rc=${rc25_one}, prior_record_present=$([[ "${CONTENT_25_BEFORE}" != "MISSING" ]] && echo yes || echo no), content_changed=$([[ "${CONTENT_25_AFTER}" == "${CONTENT_25_BEFORE}" ]] && echo no || echo yes)"
+  echo "${out25_one}" | sed 's/^/      /'
+fi
+
+FEATURE26="hook-gate-after-rename"
+JSON26="${TMP_REPO}/dev/audit/2026-08-06-harness-hook-gate-${FEATURE26}.json"
+
+_run_write_audit_26() {  # $1 = value for the AFTER_RENAME hook
+  REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_TEST_ABORT_AFTER_RENAME="$1" \
+    bash "${WRITE_AUDIT}" \
+      --date 2026-08-06 --feature "${FEATURE26}" --branch "harness/hook-gate" \
+      --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1
+}
+
+# (a) disable direction. The record lands whether or not the hook fires
+# (this hook aborts after the `mv`), so rc and the "OK:" line -- NOT the
+# file's existence -- are what separate inert from fired here.
+out26_zero=$(_run_write_audit_26 0) && rc26_zero=0 || rc26_zero=$?
+out26_false=$(_run_write_audit_26 false) && rc26_false=0 || rc26_false=$?
+
+if (( rc26_zero == 0 )) && echo "${out26_zero}" | grep -q "^OK: wrote" \
+   && (( rc26_false == 0 )) && echo "${out26_false}" | grep -q "^OK: wrote" \
+   && [[ -f "${JSON26}" ]]; then
+  pass "scenario 26a — WRITE_AUDIT_TEST_ABORT_AFTER_RENAME=0 and =false both leave the hook disabled: rc=0 with the 'OK:' line, no spurious failure reported for an already-published record (H-AUDIT-HOOK-GATE-TRUTHY)"
+else
+  fail "scenario 26a — expected rc=0 + 'OK: wrote' for both =0 and =false; got rc(0)=${rc26_zero}, rc(false)=${rc26_false}, record_present=$([[ -f "${JSON26}" ]] && echo yes || echo no)"
+  echo "${out26_zero}" | sed 's/^/      [0]     /'
+  echo "${out26_false}" | sed 's/^/      [false] /'
+fi
+
+# (b) fire direction — `1` must still abort right after the rename.
+out26_one=$(_run_write_audit_26 1) && rc26_one=0 || rc26_one=$?
+
+if (( rc26_one != 0 )) \
+   && echo "${out26_one}" | grep -q "simulating interruption right after rename" \
+   && ! echo "${out26_one}" | grep -q "^OK: wrote"; then
+  pass "scenario 26b — WRITE_AUDIT_TEST_ABORT_AFTER_RENAME=1 still fires: aborts right after the rename with no 'OK:' line (hook not fixed into permanently dead; scenario 24 depends on this)"
+else
+  fail "scenario 26b — expected rc!=0 + 'simulating interruption right after rename' + no 'OK: wrote'; got rc=${rc26_one}"
+  echo "${out26_one}" | sed 's/^/      /'
 fi
 
 # ---------------------------------------------------------------------------
