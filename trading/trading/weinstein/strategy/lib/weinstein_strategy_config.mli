@@ -1291,6 +1291,58 @@ type config = {
           [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides]. Per
           the experiment discipline it stays default-off until a ledger ACCEPT
           (WF-CV per the honest-ladder plan). *)
+  stop_anchor_at_entry_base : bool; [@sexp.default false]
+      (** Book-faithful initial-stop re-anchoring for E-anchored entries (user
+          go 2026-08-06; note [dev/notes/honest-ladder-2026-08-05.md]). The
+          faithfulness fix that PAIRS with the E-anchored entry family
+          ([sim_entry_trigger_at_suggested] + [enable_sim_entry_stoplimit],
+          #2209): those tickets rest the entry at the breakout level [E], but
+          the initial stop still comes from the deep support-floor machinery
+          anchored to crash lows. For a crash-recovery name the mismatched pair
+          (E-entry × crash-floor-stop) inflates risk% so the entry walk's 15%
+          [max_stop_distance_pct] gate ([G15] step 3) rejects the ticket as
+          [Stop_too_wide] — AXTI, ranked #1, was skipped 24x this way and never
+          entered (honest-ladder note). This is unfaithful to the book, which
+          places the breakout buy's initial stop just under the breakout base /
+          below the MA, NOT under the entire multi-year crash floor
+          ([docs/design/weinstein-book-reference.md] §5.1).
+
+          When [true] AND the entry is E-anchored (i.e. the effective
+          [trigger_at_suggested] the strategy derives from
+          [sim_entry_trigger_at_suggested && enable_sim_entry_stoplimit] is on),
+          a support-floor-derived initial stop that sits farther from [E] than
+          [stops_config.max_stop_distance_pct] is RE-ANCHORED to the
+          buffer-below-breakout stop (the [initial_stop_buffer] fallback the
+          stops layer already computes — [E *. initial_stop_buffer] then the
+          standard round-nudged half-correction inset). A structural floor that
+          is already within the 15% book limit is kept UNCHANGED, so
+          normal-shape candidates are unaffected. The [Stop_too_wide] gate
+          itself is NOT modified — it simply sees honestly-paired risk.
+
+          {b Strictly the INITIAL stop, ticket-level.} It moves only the
+          installed initial stop and its derived risk / sizing for the entry
+          ticket. Admission, [resistance_quality] grading, [breakout_price],
+          cascade scoring, stage classification, and the false-virgins
+          protection ([[project_false_virgins_load_bearing]]) are all UNCHANGED.
+          The trailing-stop machinery ([Weinstein_stops.update] / stop-recompute
+          on held positions) is UNTOUCHED — this is the entry-time stop only.
+
+          {b Composes with the E-anchored fill family} as the intended armed set
+          with [sim_entry_trigger_at_suggested] + [enable_sim_entry_stoplimit]
+          (and typically [entry_anchor_local_range_weeks] for the nearer local
+          top): entry rests at [E], stop sits just under the breakout base, risk
+          is book-faithful.
+
+          {b Default [false] = off, bit-identical to every existing
+             baseline/golden} (R1): the support-floor stop is installed
+          verbatim, exactly as before. Because it additionally gates on the
+          E-family being armed (both StopLimit flags default [false]), arming
+          this field alone cannot move a backtest number. R2: real config field,
+          axis-expressible as
+          [((flag stop_anchor_at_entry_base) (values (true false)))] via
+          [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides]. Per
+          the experiment discipline it stays default-off until a ledger ACCEPT
+          (WF-CV per the honest-ladder plan). *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

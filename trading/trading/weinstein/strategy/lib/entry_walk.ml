@@ -82,6 +82,28 @@ let _sleeve_decisions ~held_set ~make_entry ~portfolio_value ~state ~long_cash
   |> List.sort ~compare:(fun (i, _, _) (j, _, _) -> Int.compare i j)
   |> List.map ~f:(fun (_, c, d) -> (c, d))
 
+(** Build the per-candidate entry constructor for a walk. Computes the
+    E-anchored trigger (both StopLimit flags armed — user decision 2026-08-05)
+    and threads the ticket-level stop-anchor knob
+    ([config.stop_anchor_at_entry_base], user go 2026-08-06); both default-off,
+    so the closure is bit-identical to the pre-flag path when the flags are off
+    (R1). Factored out of {!entries_from_candidates} so that function stays
+    under the function-length limit. *)
+let _make_entry_fn ~config ~bar_reader ~current_date ~stop_states
+    ~portfolio_value (cand : Screener.scored_candidate) =
+  let trigger_at_suggested =
+    config.sim_entry_trigger_at_suggested && config.enable_sim_entry_stoplimit
+  in
+  Entry_audit_capture.make_entry_transition ~trigger_at_suggested
+    ~stop_anchor_at_entry_base:config.stop_anchor_at_entry_base
+    ~min_stop_distance_pct:
+      (Entry_stop_distance.min_stop_distance_for ~config ~bar_reader
+         ~current_date cand)
+    ~portfolio_risk_config:(Scale_in_runner.entry_sizing_config config)
+    ~stops_config:config.stops_config
+    ~initial_stop_buffer:config.initial_stop_buffer ~stop_states ~bar_reader
+    ~portfolio_value ~current_date cand
+
 (** Generate CreateEntering transitions for screener candidates. Tracks
     remaining cash to avoid generating orders that exceed funds.
 
@@ -100,22 +122,9 @@ let entries_from_candidates ?sector_lookup ~config ~candidates ~stop_states
     ?(audit_recorder = Audit_recorder.noop) ?macro () =
   let held_set = String.Set.of_list (held_symbols portfolio) in
   let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
-  (* Book-faithful E-anchored entry trigger (user decision 2026-08-05): only
-     when BOTH the trigger-at-E flag and the StopLimit fill model are armed does
-     the entry rest at [suggested_entry] (E). Either flag off => current-close
-     trigger, bit-identical to the pre-flag path (R1). *)
-  let trigger_at_suggested =
-    config.sim_entry_trigger_at_suggested && config.enable_sim_entry_stoplimit
-  in
-  let make_entry (cand : Screener.scored_candidate) =
-    Entry_audit_capture.make_entry_transition ~trigger_at_suggested
-      ~min_stop_distance_pct:
-        (Entry_stop_distance.min_stop_distance_for ~config ~bar_reader
-           ~current_date cand)
-      ~portfolio_risk_config:(Scale_in_runner.entry_sizing_config config)
-      ~stops_config:config.stops_config
-      ~initial_stop_buffer:config.initial_stop_buffer ~stop_states ~bar_reader
-      ~portfolio_value ~current_date cand
+  let make_entry =
+    _make_entry_fn ~config ~bar_reader ~current_date ~stop_states
+      ~portfolio_value
   in
   let spendable, state =
     Screening_notional.reserve_reduced_walk_state ~config ~portfolio
