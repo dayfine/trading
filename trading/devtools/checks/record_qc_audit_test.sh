@@ -1198,13 +1198,43 @@ fi
 # misspelled variable name) -- which would silently disable the atomicity
 # and mode-order pins scenarios 19 and 24 are built on, a strictly worse
 # outcome than the bug being fixed. So:
-#   (a) DISABLE direction (the regression direction): `VAR=0` and
-#       `VAR=false` must both leave the hook inert -- script runs to
-#       completion, rc=0, "OK:" line emitted, record on disk. Under the old
-#       `-n` gate this goes red: the hook fires and the script exits 1.
+#   (a) DISABLE direction (the regression direction): EVERY value in
+#       ${HOOK_DISABLE_VALUES[@]} must leave the hook inert -- script runs
+#       to completion, rc=0, "OK:" line emitted, record on disk. Under the
+#       old `-n` gate this goes red: the hook fires and the script exits 1.
 #   (b) FIRE direction (the anti-over-correction guard): `VAR=1` must still
 #       abort exactly as before -- rc!=0 with the hook's own "simulating
 #       interruption ..." message.
+#
+# (a) enumerates a SET, not the two values named in the finding, because
+# the contract those hooks now document is "only the literal string `1`
+# enables; every other value disables" -- a claim over all values, which a
+# two-value pin cannot support (qc-behavioral PR #2221 finding F1). Two
+# widening mutations were live-verified to pass a `{0,false}`-only pin
+# 30/30 green:
+#   MW1 -- gates widened to accept `1|true|yes`. Caught here by `true`/`yes`.
+#   MW5 -- gates changed to "fire on anything non-empty except 0/false",
+#          which reinstates the ORIGINAL bug under a different spelling
+#          (`VAR=no` fires, publishing the record and returning rc=1).
+#          Caught here by `no`/`yes`/`true`.
+# The list is deliberately EXACTLY the documented spellings and no more.
+# Two extra values (`TRUE`, `01`) were trialled to pin the word "literal"
+# against a case-folding gate and an arithmetic `(( VAR == 1 ))` gate, then
+# dropped: measuring both mutations showed neither value is the sole
+# detector of either. Case-insensitive widening is already caught by
+# `true`/`yes`, and the arithmetic gate by `false`/`no`/`true`/`yes` (each
+# is an unset name in arithmetic context, which trips `set -u`). A test
+# value that detects nothing the list already detects is cost without
+# coverage.
+#
+# On empty-vs-unset: `""` here pins the EMPTY state only. Env-assigning
+# `VAR=""` sets the variable to the empty string; it does not unset it.
+# The UNSET state is pinned by every other scenario in this file -- none of
+# scenarios 1-24 sets either hook, and all of them require normal
+# completion (scenario 20 most directly). Between the two, the docstring's
+# "empty, unset" pair is fully covered. `""` is kept in the list anyway
+# because it is a documented value and because it is the element a careless
+# refactor drops (see the iteration-count guard below).
 #
 # The scenarios differ in what "inert" is observable as, because the two
 # hooks sit on opposite sides of the publish:
@@ -1216,6 +1246,16 @@ fi
 #      radius hook: a caller under `set -e` treats the audit as failed while
 #      the record actually exists.
 # ---------------------------------------------------------------------------
+# Shared by 25a and 26a so the two hooks are pinned against the IDENTICAL
+# value set -- the whole point of the fix is that they stay symmetric, and
+# two hand-maintained copies of this list would be free to drift apart.
+# Must be a real array, quoted "${HOOK_DISABLE_VALUES[@]}": an unquoted
+# expansion (or a plain space-separated string) word-splits and silently
+# DROPS the empty element, which is exactly how the empty case would stop
+# being tested without anyone noticing. The iteration counters below exist
+# to make that specific refactor go red rather than quietly shrink the pin.
+HOOK_DISABLE_VALUES=(0 false no yes true "")
+
 FEATURE25="hook-gate-before-rename"
 JSON25="${TMP_REPO}/dev/audit/2026-08-06-harness-hook-gate-${FEATURE25}.json"
 
@@ -1227,22 +1267,27 @@ _run_write_audit_25() {  # $1 = value for the BEFORE_RENAME hook, $2 = notes
       --notes "$2" 2>&1
 }
 
-# (a) disable direction — `0` then `false`, each must run to completion.
-out25_zero=$(_run_write_audit_25 0 "gate off via 0") && rc25_zero=0 || rc25_zero=$?
-json25_after_zero=$([[ -f "${JSON25}" ]] && echo yes || echo no)
-rm -f "${JSON25}"
-out25_false=$(_run_write_audit_25 false "gate off via false") && rc25_false=0 || rc25_false=$?
-json25_after_false=$([[ -f "${JSON25}" ]] && echo yes || echo no)
+# (a) disable direction — every documented "off" spelling must run to
+# completion. Each iteration clears the target first, so "record published"
+# is proven per-value rather than inherited from an earlier iteration.
+offenders25=""
+seen25=0
+for hookval25 in "${HOOK_DISABLE_VALUES[@]}"; do
+  seen25=$(( seen25 + 1 ))
+  rm -f "${JSON25}"
+  out25=$(_run_write_audit_25 "${hookval25}" "gate off via [${hookval25}]") \
+    && rc25=0 || rc25=$?
+  present25=$([[ -f "${JSON25}" ]] && echo yes || echo no)
+  if (( rc25 != 0 )) || [[ "${present25}" != "yes" ]] \
+     || ! echo "${out25}" | grep -q "^OK: wrote"; then
+    offenders25="${offenders25} [${hookval25}](rc=${rc25},record=${present25})"
+  fi
+done
 
-if (( rc25_zero == 0 )) && [[ "${json25_after_zero}" == "yes" ]] \
-   && echo "${out25_zero}" | grep -q "^OK: wrote" \
-   && (( rc25_false == 0 )) && [[ "${json25_after_false}" == "yes" ]] \
-   && echo "${out25_false}" | grep -q "^OK: wrote"; then
-  pass "scenario 25a — WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME=0 and =false both leave the hook disabled: write completes, record published (H-AUDIT-HOOK-GATE-TRUTHY)"
+if [[ -z "${offenders25}" ]] && (( seen25 == ${#HOOK_DISABLE_VALUES[@]} )); then
+  pass "scenario 25a — all ${seen25} documented 'off' spellings (0 false no yes true '') leave WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME disabled: write completes, record published (H-AUDIT-HOOK-GATE-TRUTHY)"
 else
-  fail "scenario 25a — expected rc=0 + record + 'OK: wrote' for both =0 and =false; got rc(0)=${rc25_zero} record=${json25_after_zero}, rc(false)=${rc25_false} record=${json25_after_false}"
-  echo "${out25_zero}" | sed 's/^/      [0]     /'
-  echo "${out25_false}" | sed 's/^/      [false] /'
+  fail "scenario 25a — expected rc=0 + record + 'OK: wrote' for all ${#HOOK_DISABLE_VALUES[@]} documented 'off' spellings; exercised ${seen25}; offending values:${offenders25:-none}"
 fi
 
 # (b) fire direction — `1` must still abort before publishing, leaving the
@@ -1283,20 +1328,25 @@ _run_write_audit_26() {  # $1 = value for the AFTER_RENAME hook
       --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1
 }
 
-# (a) disable direction. The record lands whether or not the hook fires
-# (this hook aborts after the `mv`), so rc and the "OK:" line -- NOT the
-# file's existence -- are what separate inert from fired here.
-out26_zero=$(_run_write_audit_26 0) && rc26_zero=0 || rc26_zero=$?
-out26_false=$(_run_write_audit_26 false) && rc26_false=0 || rc26_false=$?
+# (a) disable direction, same value set as 25a. The record lands whether or
+# not the hook fires (this hook aborts after the `mv`), so rc and the "OK:"
+# line -- NOT the file's existence -- are what separate inert from fired
+# here.
+offenders26=""
+seen26=0
+for hookval26 in "${HOOK_DISABLE_VALUES[@]}"; do
+  seen26=$(( seen26 + 1 ))
+  out26=$(_run_write_audit_26 "${hookval26}") && rc26=0 || rc26=$?
+  if (( rc26 != 0 )) || ! echo "${out26}" | grep -q "^OK: wrote"; then
+    offenders26="${offenders26} [${hookval26}](rc=${rc26})"
+  fi
+done
 
-if (( rc26_zero == 0 )) && echo "${out26_zero}" | grep -q "^OK: wrote" \
-   && (( rc26_false == 0 )) && echo "${out26_false}" | grep -q "^OK: wrote" \
+if [[ -z "${offenders26}" ]] && (( seen26 == ${#HOOK_DISABLE_VALUES[@]} )) \
    && [[ -f "${JSON26}" ]]; then
-  pass "scenario 26a — WRITE_AUDIT_TEST_ABORT_AFTER_RENAME=0 and =false both leave the hook disabled: rc=0 with the 'OK:' line, no spurious failure reported for an already-published record (H-AUDIT-HOOK-GATE-TRUTHY)"
+  pass "scenario 26a — all ${seen26} documented 'off' spellings (0 false no yes true '') leave WRITE_AUDIT_TEST_ABORT_AFTER_RENAME disabled: rc=0 with the 'OK:' line, no spurious failure reported for an already-published record (H-AUDIT-HOOK-GATE-TRUTHY)"
 else
-  fail "scenario 26a — expected rc=0 + 'OK: wrote' for both =0 and =false; got rc(0)=${rc26_zero}, rc(false)=${rc26_false}, record_present=$([[ -f "${JSON26}" ]] && echo yes || echo no)"
-  echo "${out26_zero}" | sed 's/^/      [0]     /'
-  echo "${out26_false}" | sed 's/^/      [false] /'
+  fail "scenario 26a — expected rc=0 + 'OK: wrote' for all ${#HOOK_DISABLE_VALUES[@]} documented 'off' spellings; exercised ${seen26}, record_present=$([[ -f "${JSON26}" ]] && echo yes || echo no); offending values:${offenders26:-none}"
 fi
 
 # (b) fire direction — `1` must still abort right after the rename.
