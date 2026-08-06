@@ -18,6 +18,12 @@ type alternative_input = {
 
 type stop_floor_kind = Support_floor | Buffer_fallback
 
+type split_safe_basis = Weinstein_stops.split_safe_basis =
+  | Flag_off
+  | Adjusted
+  | Raw_fallback
+  | Empty_window
+
 type entry_event = {
   position_id : string;
   candidate : Screener.scored_candidate;
@@ -25,6 +31,7 @@ type entry_event = {
   current_date : Date.t;
   installed_stop : float;
   stop_floor_kind : stop_floor_kind;
+  split_safe_basis : split_safe_basis;
   shares : int;
   initial_position_value : float;
   initial_risk_dollars : float;

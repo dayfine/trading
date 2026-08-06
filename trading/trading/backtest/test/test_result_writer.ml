@@ -584,6 +584,7 @@ let _m5_2e_entry ~symbol ~entry_date ~position_id :
     suggested_stop = 92.0;
     installed_stop = 92.0;
     stop_floor_kind = Backtest.Trade_audit.Buffer_fallback;
+    split_safe_basis = Backtest.Trade_audit.Flag_off;
     risk_pct = 0.08;
     initial_position_value = 10_000.0;
     initial_risk_dollars = 800.0;

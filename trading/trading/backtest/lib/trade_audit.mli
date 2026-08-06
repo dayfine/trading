@@ -128,6 +128,25 @@ type alternative_candidate = {
     [Weinstein_stops.compute_initial_stop_with_floor]. *)
 type stop_floor_kind = Support_floor | Buffer_fallback [@@deriving sexp]
 
+(** Which price basis the entry's support-floor scan ran on. Mirrors
+    {!Weinstein_strategy.Audit_recorder.split_safe_basis} /
+    {!Weinstein_stops.split_safe_basis}, re-declared here for the same reason
+    {!stop_floor_kind} is: [Trade_audit] owns the on-disk schema for
+    [trade_audit.sexp], so its constructors should be free to evolve (or gain
+    sexp attributes) without that being a change to a strategy-layer type. The
+    upstream type {e is} reachable — [backtest/lib/dune] declares
+    [weinstein_trading.strategy], which aliases it with its constructors
+    re-exported — so this is a deliberate schema boundary, not an unavoidable
+    one. {!Trade_audit_recorder} holds the total mapping between them.
+
+    [Raw_fallback] is the F5 case: [split_safe_floors] was on but the lookback
+    window held an unusable cell, so the whole window degraded to raw and the
+    scan produced the flag-off level. Nothing else in the row says so.
+    [Empty_window] is the non-event (no bars to scan) held out of the
+    inert-fraction numerator. *)
+type split_safe_basis = Flag_off | Adjusted | Raw_fallback | Empty_window
+[@@deriving sexp]
+
 type entry_decision = {
   symbol : string;
   entry_date : Date.t;
@@ -171,6 +190,20 @@ type entry_decision = {
       (** After [Weinstein_stops.compute_initial_stop_with_floor] applies the
           initial-stop buffer. *)
   stop_floor_kind : stop_floor_kind;
+  split_safe_basis : split_safe_basis; [@sexp.default Flag_off]
+      (** F5 telemetry for [stops_config.split_safe_floors]. Aggregating this
+          column over a run's [trade_audit.sexp] gives the {e inert fraction} of
+          a [split_safe_floors] walk-forward arm —
+          [Raw_fallback / (Raw_fallback + Adjusted)] — which must be known
+          before the mechanism can be promoted, since an ACCEPT measured over a
+          partly-inert surface is uninterpretable.
+
+          Denominator caveat: only {e entered} candidates produce an
+          [entry_decision], so the fraction is over entries, not over all floor
+          scans.
+
+          [[@sexp.default Flag_off]] keeps [trade_audit.sexp] files written
+          before this field existed readable. *)
   risk_pct : float;
   initial_position_value : float;
   initial_risk_dollars : float;  (** [(entry - stop) * qty]. *)

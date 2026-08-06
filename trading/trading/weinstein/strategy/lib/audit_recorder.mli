@@ -71,6 +71,20 @@ type alternative_input = {
     fixed-buffer proxy. Mirrors {!Backtest.Trade_audit.stop_floor_kind}. *)
 type stop_floor_kind = Support_floor | Buffer_fallback
 
+type split_safe_basis = Weinstein_stops.split_safe_basis =
+  | Flag_off
+  | Adjusted
+  | Raw_fallback
+  | Empty_window
+      (** Which price basis the entry's support-floor scan ran on. Aliased from
+          the stops layer rather than re-declared (unlike {!stop_floor_kind},
+          which predates the strategy library's dependency on
+          [weinstein_trading.stops]) so the audit tag and the scan cannot drift
+          apart; the constructors are re-exported so downstream recorders can
+          match on them without depending on the stops library. See
+          {!Weinstein_stops.split_safe_basis} for why three states are needed.
+      *)
+
 type entry_event = {
   position_id : string;
       (** Position id assigned at entry — matches the [Position.transition] this
@@ -89,6 +103,14 @@ type entry_event = {
           stop level after the buffer is applied. *)
   stop_floor_kind : stop_floor_kind;
       (** Whether [installed_stop] sat on a real support floor or fell back. *)
+  split_safe_basis : split_safe_basis;
+      (** F5 telemetry: which price basis the floor scan for this entry ran on.
+          [Raw_fallback] means [config.split_safe_floors] was on but the window
+          could not be rescaled, so the scan silently produced the flag-off
+          answer — a condition that is invisible in [installed_stop] alone.
+          Aggregated over a run's entries this gives the {e inert fraction} of a
+          [split_safe_floors] walk-forward arm, which must be known before the
+          mechanism is promoted. *)
   shares : int;
       (** From [Portfolio_risk.compute_position_size] — round-share count
           actually ordered. *)

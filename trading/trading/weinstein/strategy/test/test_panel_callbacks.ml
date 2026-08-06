@@ -1142,24 +1142,28 @@ let test_panel_split_safe_close_anchor_uses_adjusted_closes _ =
    flag-off. Inertness that equals baseline is diagnosable in a walk-forward
    surface ("on == off in every row"); the alternative — collapsing every scan
    to the buffer fallback — would read as a genuine negative result. *)
-let test_panel_split_safe_legacy_warehouse_all_nan_adjusted_is_inert _ =
+let _split_long_daily_view () =
   let cb = build_snapshot_callbacks [ ("SPLT", _split_long_bars) ] in
   let calendar =
     Array.of_list
       (List.map _split_long_bars ~f:(fun b -> b.Types.Daily_price.date))
   in
-  let view =
-    Snapshot_bar_views.daily_view_for cb ~symbol:"SPLT" ~as_of:_split_as_of
-      ~lookback:90 ~calendar
-  in
-  let legacy_view =
-    {
-      view with
-      Snapshot_bar_views.adjusted_closes =
-        Array.map view.Snapshot_bar_views.adjusted_closes ~f:(fun _ ->
-            Float.nan);
-    }
-  in
+  Snapshot_bar_views.daily_view_for cb ~symbol:"SPLT" ~as_of:_split_as_of
+    ~lookback:90 ~calendar
+
+(* [_split_long_daily_view] with [adjusted_closes] blanked at every index where
+   [blank i] holds — how the missing-adjusted-cell fixtures below are built. *)
+let _split_long_view_blanked ~blank =
+  let view = _split_long_daily_view () in
+  {
+    view with
+    Snapshot_bar_views.adjusted_closes =
+      Array.mapi view.Snapshot_bar_views.adjusted_closes ~f:(fun i v ->
+          if blank i then Float.nan else v);
+  }
+
+let test_panel_split_safe_legacy_warehouse_all_nan_adjusted_is_inert _ =
+  let legacy_view = _split_long_view_blanked ~blank:(fun _ -> true) in
   let callbacks =
     Panel_callbacks.support_floor_callbacks_of_daily_view legacy_view
   in
@@ -1184,23 +1188,7 @@ let test_panel_split_safe_legacy_warehouse_all_nan_adjusted_is_inert _ =
    exact shape of the defect this PR exists to fix: a contract covered on the
    bar-list path and silently unexercised on the panel path. *)
 let test_panel_split_safe_nan_adjusted_at_far_offset_degrades_whole_window _ =
-  let cb = build_snapshot_callbacks [ ("SPLT", _split_long_bars) ] in
-  let calendar =
-    Array.of_list
-      (List.map _split_long_bars ~f:(fun b -> b.Types.Daily_price.date))
-  in
-  let view =
-    Snapshot_bar_views.daily_view_for cb ~symbol:"SPLT" ~as_of:_split_as_of
-      ~lookback:90 ~calendar
-  in
-  let blanked_view =
-    {
-      view with
-      Snapshot_bar_views.adjusted_closes =
-        Array.mapi view.Snapshot_bar_views.adjusted_closes ~f:(fun i v ->
-            if i = 0 then Float.nan else v);
-    }
-  in
+  let blanked_view = _split_long_view_blanked ~blank:(fun i -> i = 0) in
   let callbacks =
     Panel_callbacks.support_floor_callbacks_of_daily_view blanked_view
   in
@@ -1215,6 +1203,49 @@ let test_panel_split_safe_nan_adjusted_at_far_offset_degrades_whole_window _ =
          equal_to (stop _cfg_split_off : Weinstein_stops.stop_state);
          _initial_reference (float_equal 104.0);
        ])
+
+(* ---- F5: whole-window fallback telemetry on the panel path ---- *)
+
+let _panel_basis ~config view =
+  Weinstein_stops.split_safe_basis_of_callbacks ~config
+    ~callbacks:(Panel_callbacks.support_floor_callbacks_of_daily_view view)
+
+(* The two tests above pin that flag-on and flag-off produce the {b same} stop
+   state when the window is unrescalable — which is exactly why the level cannot
+   tell a caller whether the mechanism ran. This pins that the basis tag can:
+   on the identical view, flag-off reports [Flag_off] and flag-on reports
+   [Raw_fallback]. Conflating those two would leave a walk-forward arm unable to
+   say what fraction of it was inert. *)
+let test_panel_split_safe_basis_separates_fallback_from_flag_off _ =
+  let view = _split_long_view_blanked ~blank:(fun _ -> true) in
+  assert_that
+    ( _panel_basis ~config:_cfg_split_off view,
+      _panel_basis ~config:_cfg_split_on view )
+    (all_of
+       [
+         field fst
+           (equal_to
+              (Weinstein_stops.Flag_off : Weinstein_stops.split_safe_basis));
+         field snd
+           (equal_to
+              (Weinstein_stops.Raw_fallback : Weinstein_stops.split_safe_basis));
+       ])
+
+(* The positive state: the same window the R2 test measures at 98.0 reports
+   [Adjusted], so the tag is not stuck at [Raw_fallback]. *)
+let test_panel_split_safe_basis_adjusted_when_window_rescalable _ =
+  assert_that
+    (_panel_basis ~config:_cfg_split_on (_split_long_daily_view ()))
+    (equal_to (Weinstein_stops.Adjusted : Weinstein_stops.split_safe_basis))
+
+(* The telemetry inherits the universal quantifier: one unusable cell at
+   day_offset 4 still reports the fallback. Panel sibling of the bar-list B3
+   fixture. *)
+let test_panel_split_safe_basis_far_offset_reports_fallback _ =
+  assert_that
+    (_panel_basis ~config:_cfg_split_on
+       (_split_long_view_blanked ~blank:(fun i -> i = 0)))
+    (equal_to (Weinstein_stops.Raw_fallback : Weinstein_stops.split_safe_basis))
 
 let suite =
   "Panel_callbacks parity"
@@ -1253,6 +1284,12 @@ let suite =
          >:: test_panel_split_safe_legacy_warehouse_all_nan_adjusted_is_inert;
          "unusable adjusted cell at a far offset — panel degrades whole window"
          >:: test_panel_split_safe_nan_adjusted_at_far_offset_degrades_whole_window;
+         "split_safe basis separates the fallback from flag-off (panel)"
+         >:: test_panel_split_safe_basis_separates_fallback_from_flag_off;
+         "split_safe basis is Adjusted when the panel window is rescalable"
+         >:: test_panel_split_safe_basis_adjusted_when_window_rescalable;
+         "split_safe basis reports the fallback for a far-offset bad cell"
+         >:: test_panel_split_safe_basis_far_offset_reports_fallback;
        ]
 
 let () = run_test_tt_main suite

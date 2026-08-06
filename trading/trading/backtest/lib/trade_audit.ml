@@ -36,6 +36,9 @@ type alternative_candidate = {
 
 type stop_floor_kind = Support_floor | Buffer_fallback [@@deriving sexp]
 
+type split_safe_basis = Flag_off | Adjusted | Raw_fallback | Empty_window
+[@@deriving sexp]
+
 type entry_decision = {
   symbol : string;
   entry_date : Date.t;
@@ -63,6 +66,7 @@ type entry_decision = {
   suggested_stop : float;
   installed_stop : float;
   stop_floor_kind : stop_floor_kind;
+  split_safe_basis : split_safe_basis; [@sexp.default Flag_off]
   risk_pct : float;
   initial_position_value : float;
   initial_risk_dollars : float;
