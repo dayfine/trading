@@ -52,9 +52,9 @@ let _adjusted_factor (cbs : callbacks) ~day_offset =
   | _, _ -> None
 
 (* Can EVERY offset in the window be rescaled? The rescale is all-or-nothing by
-   design — see [_to_adjusted_basis] for why per-bar degradation is not an
-   option. An empty window ([n_days = 0]) has nothing to scan, so it reports
-   [false] and takes the cheap path. *)
+   design — see [_scan_basis] for why per-bar degradation is not an option. An
+   empty window ([n_days = 0]) has nothing to scan, so it reports [false] and
+   takes the cheap path. *)
 let _window_is_adjustable (cbs : callbacks) =
   let rec loop i =
     i >= cbs.n_days

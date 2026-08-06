@@ -1,6 +1,6 @@
 # Status: support-floor-stops
 
-## Last updated: 2026-08-05
+## Last updated: 2026-08-06
 
 ## Status
 READY_FOR_REVIEW
@@ -9,9 +9,10 @@ READY_FOR_REVIEW
 YES
 
 ## Open PR
-- `feat/split-safe-panel-path` — split-safe floors on the panel/callback path
-  (2026-08-05 addendum below). Branch pushed; PR opened by the orchestrator.
+- `feat/split-safe-fallback-telemetry` — F5 whole-window fallback telemetry
+  (2026-08-06 addendum below). Branch pushed; PR opened by the orchestrator.
 - Previously merged on this track:
+  - split-safe floors on the panel/callback path — #2213 (2026-08-05)
   - PR A (primitive, long + short) — #382 (2026-04-17)
   - PR B (wrapper + strategy wiring, long side) — #390 (2026-04-17)
   - anchor-mode dial — `feat/floor-anchor-close` (2026-07-29)
@@ -344,6 +345,78 @@ remained on correct code.
   offset makes the window un-rescalable, so the flag is inert rather than
   partially applied. No separate fix needed.
 
+## 2026-08-06 addendum — F5 whole-window fallback telemetry (PR branch `feat/split-safe-fallback-telemetry`)
+
+Closes **F5**. Plan: `dev/plans/split-safe-fallback-telemetry-2026-08-06.md`
+(committed first on the branch, per plan-first).
+
+The whole-window fallback returns exactly the flag-off level, so the level alone
+cannot say whether the mechanism ran. A walk-forward arm over
+`((stops_config ((split_safe_floors true))))` could therefore be substantially
+inert with no per-decision signal, and an ACCEPT measured over a partly-inert
+surface would be uninterpretable. This makes the condition measurable.
+
+- **`Weinstein_stops.split_safe_basis = Flag_off | Adjusted | Raw_fallback`**
+  (pure; `show`/`eq`/`sexp`), with `split_safe_basis_of_callbacks` and
+  `split_safe_basis_of_bars`. Three states, not two — conflating "flag off" with
+  "flag on but degraded" reproduces the exact ambiguity F5 is about.
+- **Single-sourced, not re-derived.** `_to_adjusted_basis` was folded into a new
+  private `_scan_basis` that returns **both** the bundle the scan reads and the
+  basis it is on; `_scan_callbacks` is its `fst` and the public query its `snd`.
+  A second, independent evaluation of `_window_is_adjustable` would let the
+  reported basis drift from the basis actually scanned — the #2167 class of bug
+  this track has already been bitten by twice (mutation MT2 below pins this).
+- **Reaches a run artifact.** The tag threads
+  `Entry_audit_helpers.initial_stop_and_kind` → `Entry_audit_capture.entry_meta`
+  → `Audit_recorder.entry_event` → `Trade_audit.entry_decision` →
+  `<scenario>/trade_audit.sexp`, so the inert fraction of a surface cell is a
+  one-liner over artifacts that already exist:
+  `Raw_fallback / (Raw_fallback + Adjusted)` counted over the run's
+  `trade_audit.sexp`. A non-zero `Flag_off` count in a flag-on arm is itself a
+  wiring alarm. **Denominator caveat, documented in the `.mli`s:** only *entered*
+  candidates produce an `entry_decision`, so the fraction is over entries, not
+  over all floor scans (`alternative_candidate` carries no stop fields).
+- **R1 unaffected.** No stop level changes; `split_safe_floors = false` stays
+  bit-identical. Full `dune runtest` green with zero golden changes.
+- **Backward compatibility.** `Trade_audit.entry_decision.split_safe_basis`
+  carries `[@sexp.default Flag_off]` so `trade_audit.sexp` files written before
+  the field exist still parse — they are read back by `Optimal_run_artefacts`,
+  `Validator_report` and `Trade_audit_report`. Pinned by a test that strips the
+  field from a serialized row and asserts the parse defaults to `Flag_off`.
+- **Design alternatives rejected** (full reasoning in the plan): a module-level
+  mutable counter (cheapest, but destroys the purity the reproducible-backtest
+  invariant rests on and makes the stops suite order-sensitive); an
+  `~on_fallback` callback (pushes impurity to every call site and cannot express
+  the `Adjusted` denominator, so it can produce a count but never a fraction); a
+  richer return type on `compute_initial_stop_with_floor_with_callbacks` (forces
+  every one of its many callers to change for telemetry most do not want);
+  stopping at `Audit_recorder` (the recorder would drop the field — telemetry
+  nobody reads, which reads as coverage without being it).
+
+- **Mutation results** (baseline: all four suites OK; each mutation
+  compile-checked before its result was read):
+
+  | mutation | stops/test_support_floor | strategy/test_panel_callbacks | strategy/test_entry_audit_capture |
+  |---|---|---|---|
+  | MT1 — fallback branch reports `Adjusted` (behaviour unchanged, tag lies) | **3** | **2** | **1** |
+  | MT2 — basis re-derived independently of `_window_is_adjustable` (the drift the single-source design prevents) | **3** | **2** | **1** |
+  | MT3 — helper hardcodes `Flag_off` (telemetry computed but not wired) | 0 | 0 | **2** |
+
+  MT1 failing assertions, verbatim:
+  `support_floor:47:split_safe_basis_fallback_distinguishable_from_flag_off`,
+  `support_floor:50:split_safe_basis_far_offset_reports_fallback`,
+  `support_floor:51:split_safe_basis_corrupt_close_reports_fallback`, each
+  "Values should be equal / not equal". MT3:
+  `entry_audit_capture:12:F5: entry_meta basis is Adjusted when the window rescales`
+  and `...:13:F5: entry_meta basis is Raw_fallback when the window degrades`.
+  MT1/MT2 leaving `test_entry_audit_capture` at only 1 failure is expected — its
+  `Flag_off` case does not touch the mutated branch. All three mutations were
+  reverted and the library confirmed byte-identical (`git diff` empty on
+  `floor_stop.ml` / `entry_audit_helpers.ml`).
+
+- **Suite counts:** `test_support_floor` 55 → 60, `test_panel_callbacks` 21 → 24,
+  `test_entry_audit_capture` 40 → 43, `test_trade_audit` 26 → 28.
+
 ## Follow-ups
 
 - ~~Round-number shading (§5.1)~~ — **already implemented; this line was stale.**
@@ -352,7 +425,10 @@ remained on correct code.
   by the trailing / tightened candidates in `weinstein_stops.ml`. Nothing to build.
 - ~~Split-safe on the panel/callback path~~ — **done 2026-08-05**, see the
   addendum above.
-- **F5 (qc-behavioral, PR #2213) — no telemetry when the whole-window fallback
+- ~~**F5 (qc-behavioral, PR #2213) — no telemetry when the whole-window fallback
+  fires.**~~ — **done 2026-08-06** via `split_safe_basis`; see the addendum
+  above. Original text retained for context:
+- ~~**F5 (qc-behavioral, PR #2213) — no telemetry when the whole-window fallback
   fires.** Ranked by the reviewer as the most consequential of this PR's
   follow-ups. The all-or-nothing design is right, but silent at the single-decision
   level: a caller cannot distinguish "flag on, window adjusted, answer 104.0" from
@@ -365,7 +441,7 @@ remained on correct code.
   report *how much* of the surface was inert. **Do this before the mechanism is
   ever promoted** — an ACCEPT computed over a partly-inert surface would be
   uninterpretable, precisely the failure class
-  `.claude/rules/mechanism-validation-rigor.md` exists to prevent.
+  `.claude/rules/mechanism-validation-rigor.md` exists to prevent.~~
 - **F3 (qc-behavioral, PR #2213) — `trade_audit_report_bin.ml` reads the raw
   basis where the domain wants adjusted.** Exposed (not introduced) by #2213's
   `closes` → `raw_closes` rename, which is why both readers were deliberately
@@ -397,7 +473,31 @@ remained on correct code.
   (R3). Now that the axis actually controls both paths, a walk-forward surface
   over `((stops_config ((split_safe_floors true))))` measures the whole
   mechanism rather than the bar-list half — any earlier reading of that axis
-  under-states the effect and should be re-run.
+  under-states the effect and should be re-run. **When that surface is run,
+  report the inert fraction from `trade_audit.sexp`'s `split_safe_basis` column
+  alongside the metrics** — a cell whose entries are mostly `Raw_fallback` is
+  measuring baseline, not the mechanism.
+- **F6 (new, from the F5 work) — no report surface for the inert fraction.**
+  The per-decision tag is in `trade_audit.sexp`, but `Trade_audit_report` / the
+  HTML report do not render it, so today the number comes from a shell count.
+  Cheap follow-up: one summary row (`Adjusted / Raw_fallback / Flag_off` counts)
+  in the trade-audit report. Not blocking — the shell count is sufficient to
+  qualify a surface — but a rendered row is what makes it hard to forget.
+- **F7 (new, from the F5 work) — telemetry covers entries only.** Screened but
+  skipped candidates run a floor scan too and produce no `entry_decision`, so
+  the inert fraction has an entries-denominator. Widening it would mean adding
+  stop fields to `Trade_audit.alternative_candidate`. Low priority: the entries
+  are the decisions the mechanism actually changes.
+- **F8 (new, observed while wiring F5) —
+  `Entry_audit_capture.classify_stop_floor_kind` bypasses the scan chokepoint.**
+  It calls `Support_floor.find_recent_level_with_callbacks` directly instead of
+  `Weinstein_stops.floor_is_structural_with_callbacks`, so it honours
+  `support_floor_anchor_mode` but **not** `split_safe_floors` — the #2167 shape
+  that #2181/#2213 closed everywhere else. The production path
+  (`Entry_audit_helpers.initial_stop_and_kind`) does not use it, so there is no
+  live defect today, but it is an exported `.mli` val and a trap for the next
+  caller. Should either be re-pointed at `floor_is_structural_with_callbacks` or
+  deleted.
 
 ## QC
 
