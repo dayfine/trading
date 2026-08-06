@@ -1,5 +1,6 @@
 open Core
 open OUnit2
+open Matchers
 open Trend.Segmentation
 open Trend.Trend_type
 
@@ -232,6 +233,35 @@ let test_complex_segmentation _ =
     ~printer:(fun l -> List.map ~f:show_segment l |> String.concat ~sep:"; ")
     ~cmp:(List.equal segment_equal) segments expected
 
+(* [default_params]'s score weights (trend_bonus_weight, penalty_weight) are
+   consumed only by [find_best_split]'s argmax over candidate split points.
+   An argmax is sensitive only to mutations that dislodge the winning split;
+   a mutation that reinforces the incumbent split (e.g. scaling a weight up
+   or down without changing which split wins) is invisible to any test built
+   around asserted split-point output. A direct equality assertion on the
+   whole record has no such blind spot. This pins the record's *values*
+   exactly as they stand today — it says nothing about whether those values
+   are the empirically-best or Weinstein-faithful choices. *)
+let test_default_params_pinned _ =
+  assert_that default_params
+    (equal_to
+       ({
+          min_segment_length = 3;
+          preferred_segment_length = 10;
+          length_flexibility = 1.;
+          min_r_squared = 0.9;
+          min_slope = 0.01;
+          max_segments = 10;
+          preferred_channel_width = 0.5;
+          max_channel_width = 2.0;
+          width_penalty_factor = 0.5;
+          r_squared_tolerance = 0.1;
+          max_width_penalty = 0.3;
+          trend_bonus_weight = 0.5;
+          penalty_weight = 0.2;
+        }
+         : segmentation_params))
+
 let suite =
   "segmentation_suite"
   >::: [
@@ -239,6 +269,7 @@ let suite =
          "test_data_too_short" >:: test_data_too_short;
          "test_short_data" >:: test_short_data;
          "test_complex_segmentation" >:: test_complex_segmentation;
+         "test_default_params_pinned" >:: test_default_params_pinned;
        ]
 
 let () = run_test_tt_main suite
