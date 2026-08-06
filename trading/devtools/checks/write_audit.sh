@@ -436,7 +436,23 @@ ENDJSON
 # it already existed) must be left byte-identical -- never truncated, never
 # partially overwritten. Mirrors the WRITE_AUDIT_RECORDED_AT_NS test-only
 # override above.
-if [ -n "${WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME:-}" ]; then
+#
+# ACCEPTED SPELLING: the ONLY value that enables this hook is the literal
+# string `1`. Every other value -- `0`, `false`, `no`, `yes`, `true`, the
+# empty string, unset -- leaves the hook disabled. Set it as `VAR=1`.
+#
+# The gate is deliberately `= "1"` and NOT `-n "${VAR:-}"`
+# (H-AUDIT-HOOK-GATE-TRUTHY, dev/status/harness.md): under `-n`, the two
+# most natural ways to spell "off" -- `VAR=0` and `VAR=false` -- are both
+# non-empty and therefore FIRE the hook, the exact opposite of the caller's
+# intent. Whitelisting a single literal makes every misspelling fail safe
+# (hook stays off) rather than fail surprising (hook fires), which matters
+# most for the AFTER_RENAME hook below, whose accidental firing returns
+# rc=1 with the record already published on disk. A caller who guesses
+# `VAR=true` gets a hook that does not fire -- loudly visible, because the
+# scenario asserting the abort then fails -- instead of silent misbehaviour.
+# Kept identical at both hook sites so the two stay symmetric.
+if [ "${WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME:-0}" = "1" ]; then
   echo "FAIL: WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME set; simulating interruption before rename; TMP_FILE=$TMP_FILE" >&2
   exit 1
 fi
@@ -480,7 +496,15 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
 # check is what actually makes "chmod-before-mv, no transient-wrong-mode
 # window" a pinned claim; this runtime hook only demonstrates the happy
 # path.
-if [ -n "${WRITE_AUDIT_TEST_ABORT_AFTER_RENAME:-}" ]; then
+#
+# ACCEPTED SPELLING: as with the BEFORE_RENAME hook above, the ONLY value
+# that enables this hook is the literal string `1`; `0`, `false`, the empty
+# string and unset all leave it disabled. Set it as `VAR=1`. See the gate
+# rationale on that hook (H-AUDIT-HOOK-GATE-TRUTHY) -- it applies with extra
+# force here, because this hook aborts AFTER the record is published, so an
+# accidental fire returns rc=1 to a caller under `set -e` while the record
+# is in fact already on disk.
+if [ "${WRITE_AUDIT_TEST_ABORT_AFTER_RENAME:-0}" = "1" ]; then
   echo "FAIL: WRITE_AUDIT_TEST_ABORT_AFTER_RENAME set; simulating interruption right after rename; OUTPUT_FILE=$OUTPUT_FILE" >&2
   exit 1
 fi
