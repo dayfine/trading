@@ -197,6 +197,34 @@ let test_stop_floor_kind_sexp_round_trip _ =
   in
   assert_that parsed (elements_are (List.map all ~f:equal_to))
 
+let test_split_safe_basis_sexp_round_trip _ =
+  let all : TA.split_safe_basis list = [ Flag_off; Adjusted; Raw_fallback ] in
+  let parsed =
+    List.map all ~f:(fun b ->
+        TA.split_safe_basis_of_sexp (TA.sexp_of_split_safe_basis b))
+  in
+  assert_that parsed (elements_are (List.map all ~f:equal_to))
+
+(* [split_safe_basis] is [\[@sexp.default Flag_off\]] so that [trade_audit.sexp]
+   files written before the field existed stay readable — they are read back by
+   [Optimal_run_artefacts], [Validator_report] and [Trade_audit_report]. Drop the
+   field from a serialized row and the parse must still succeed, defaulting to
+   [Flag_off] (which is the truth for any run predating the field). *)
+let test_entry_decision_sexp_tolerates_missing_split_safe_basis _ =
+  let entry = make_entry ~split_safe_basis:TA.Raw_fallback () in
+  let stripped =
+    match TA.sexp_of_entry_decision entry with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List (Sexp.Atom "split_safe_basis" :: _) -> false
+            | _ -> true))
+    | other -> other
+  in
+  assert_that
+    (TA.entry_decision_of_sexp stripped)
+    (equal_to (make_entry ~split_safe_basis:TA.Flag_off () : TA.entry_decision))
+
 let test_alternative_candidate_sexp_round_trip _ =
   (* Exercise the enriched decision-time fields (stage / weeks_advancing /
      rs_value / volume_ratio / sector_name / score_components) through the
@@ -598,6 +626,10 @@ let suite =
          "skip_reason sexp round-trip" >:: test_skip_reason_sexp_round_trip;
          "stop_floor_kind sexp round-trip"
          >:: test_stop_floor_kind_sexp_round_trip;
+         "split_safe_basis sexp round-trip"
+         >:: test_split_safe_basis_sexp_round_trip;
+         "entry_decision sexp tolerates a missing split_safe_basis"
+         >:: test_entry_decision_sexp_tolerates_missing_split_safe_basis;
          "alternative_candidate sexp round-trip"
          >:: test_alternative_candidate_sexp_round_trip;
          "entry_decision sexp round-trip"

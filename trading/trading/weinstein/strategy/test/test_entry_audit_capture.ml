@@ -139,14 +139,14 @@ let _bar ~date ~high ~low ~close : Types.Daily_price.t =
 (** Build a one-symbol reader from [(high, low, close)] triples (oldest first),
     placed on consecutive Fridays ending at [end_date] so every bar lands on a
     weekday within the support-floor lookback window. *)
-let _reader_of_hlc ~end_date hlc : Bar_reader.t =
+let _bars_of_hlc ~end_date hlc =
   let n = List.length hlc in
-  let bars =
-    List.mapi hlc ~f:(fun i (high, low, close) ->
-        let date = Date.add_days end_date (-7 * (n - 1 - i)) in
-        _bar ~date ~high ~low ~close)
-  in
-  Bar_reader.of_in_memory_bars [ (_ticker, bars) ]
+  List.mapi hlc ~f:(fun i (high, low, close) ->
+      let date = Date.add_days end_date (-7 * (n - 1 - i)) in
+      _bar ~date ~high ~low ~close)
+
+let _reader_of_hlc ~end_date hlc : Bar_reader.t =
+  Bar_reader.of_in_memory_bars [ (_ticker, _bars_of_hlc ~end_date hlc) ]
 
 (** AXTI-shaped series: a high peak ($200) followed by a deep crash low ($40),
     then a partial recovery. The support-floor scan anchors the correction low
@@ -174,19 +174,33 @@ let _deep_floor_reader ~end_date : Bar_reader.t =
 (** Normal-shape series: a shallow pullback (peak $108, correction low $95). The
     structural floor sits ~9% below an E-anchored $100 entry — already within
     the 15% book limit, so the re-anchor must leave it untouched. *)
+let _shallow_floor_hlc =
+  [
+    (104.0, 100.0, 103.0);
+    (108.0, 103.0, 106.0);
+    (* peak high 108 *)
+    (106.0, 98.0, 100.0);
+    (102.0, 95.0, 97.0);
+    (* correction low 95 *)
+    (100.0, 96.0, 99.0);
+    (103.0, 98.0, 101.0);
+    (105.0, 99.0, 103.0);
+  ]
+
 let _shallow_floor_reader ~end_date : Bar_reader.t =
-  _reader_of_hlc ~end_date
-    [
-      (104.0, 100.0, 103.0);
-      (108.0, 103.0, 106.0);
-      (* peak high 108 *)
-      (106.0, 98.0, 100.0);
-      (102.0, 95.0, 97.0);
-      (* correction low 95 *)
-      (100.0, 96.0, 99.0);
-      (103.0, 98.0, 101.0);
-      (105.0, 99.0, 103.0);
-    ]
+  _reader_of_hlc ~end_date _shallow_floor_hlc
+
+(** [_shallow_floor_reader] with every [adjusted_close] blanked — the "legacy
+    warehouse" shape (a snapshot whose schema predates [Adjusted_close]). No
+    offset in the lookback window admits a split factor, so [split_safe_floors]
+    cannot rescale and degrades the whole window to raw. *)
+let _shallow_floor_reader_no_adjusted ~end_date : Bar_reader.t =
+  let bars =
+    List.map (_bars_of_hlc ~end_date _shallow_floor_hlc)
+      ~f:(fun (b : Types.Daily_price.t) ->
+        { b with Types.Daily_price.adjusted_close = Float.nan })
+  in
+  Bar_reader.of_in_memory_bars [ (_ticker, bars) ]
 
 (* ------------------------------------------------------------------ *)
 (* Tests                                                                *)
@@ -641,6 +655,73 @@ let test_stop_anchor_requires_e_family _ =
     (matching ~msg:"Expected Stop_too_wide"
        (function Entry_audit_capture.Stop_too_wide -> Some () | _ -> None)
        (equal_to ()))
+
+(* ------------------------------------------------------------------ *)
+(* F5: entry_meta carries the split-safe basis                          *)
+(* ------------------------------------------------------------------ *)
+
+let _stops_config_split_safe =
+  { _stops_config with Weinstein_stops.split_safe_floors = true }
+
+(** [entry_meta] for a normal-shape candidate under [stops_config]. Fails the
+    test if the candidate does not fund — every caller below expects [Entry_ok].
+*)
+let _shallow_entry_meta ~stops_config ~bar_reader =
+  let stop_states = ref String.Map.empty in
+  match
+    Entry_audit_capture.make_entry_transition ~trigger_at_suggested:true
+      ~portfolio_risk_config:_portfolio_risk_config ~stops_config
+      ~initial_stop_buffer:1.02 ~stop_states ~bar_reader
+      ~portfolio_value:100_000.0 ~current_date:_current_date
+      (_deep_floor_candidate ())
+  with
+  | Entry_audit_capture.Entry_ok (_, m) -> m
+  | _ -> OUnit2.assert_failure "expected Entry_ok for normal-shape candidate"
+
+(** Default config: no basis decision is taken at all. Distinct from
+    [Raw_fallback] — the raw scan here is the configured behaviour, not a
+    degradation. *)
+let test_entry_meta_split_safe_basis_flag_off _ =
+  assert_that
+    (_shallow_entry_meta ~stops_config:_stops_config
+       ~bar_reader:(_shallow_floor_reader ~end_date:_current_date))
+      .Entry_audit_capture.split_safe_basis
+    (equal_to (Audit_recorder.Flag_off : Audit_recorder.split_safe_basis))
+
+(** Flag on with usable adjusted closes: the mechanism actually ran, so the
+    audit row says [Adjusted]. Without this positive case the tag could be stuck
+    at [Raw_fallback] and the negative cases would still pass. *)
+let test_entry_meta_split_safe_basis_adjusted _ =
+  assert_that
+    (_shallow_entry_meta ~stops_config:_stops_config_split_safe
+       ~bar_reader:(_shallow_floor_reader ~end_date:_current_date))
+      .Entry_audit_capture.split_safe_basis
+    (equal_to (Audit_recorder.Adjusted : Audit_recorder.split_safe_basis))
+
+(** The F5 case end-to-end. Flag on, but no offset in the window admits a split
+    factor, so the whole window degrades to raw: [installed_stop] is exactly the
+    flag-off stop — the mechanism did nothing — and only [split_safe_basis]
+    records that. Asserting both on the same value is the point: identical
+    number, distinguishable tag. *)
+let test_entry_meta_split_safe_basis_raw_fallback _ =
+  let flag_off_stop =
+    (_shallow_entry_meta ~stops_config:_stops_config
+       ~bar_reader:(_shallow_floor_reader_no_adjusted ~end_date:_current_date))
+      .Entry_audit_capture.installed_stop
+  in
+  assert_that
+    (_shallow_entry_meta ~stops_config:_stops_config_split_safe
+       ~bar_reader:(_shallow_floor_reader_no_adjusted ~end_date:_current_date))
+    (all_of
+       [
+         field
+           (fun (m : Entry_audit_capture.entry_meta) -> m.installed_stop)
+           (float_equal flag_off_stop);
+         field
+           (fun (m : Entry_audit_capture.entry_meta) -> m.split_safe_basis)
+           (equal_to
+              (Audit_recorder.Raw_fallback : Audit_recorder.split_safe_basis));
+       ])
 
 (** Load-bearing integration pin through [Entry_walk.entries_from_candidates]: a
     config with the full E-anchored family armed ([enable_sim_entry_stoplimit] +
@@ -1557,6 +1638,12 @@ let () =
            >:: test_stop_anchor_armed_normal_shape_unchanged;
            "stop-anchor: requires E-family (inert without trigger)"
            >:: test_stop_anchor_requires_e_family;
+           "F5: entry_meta basis is Flag_off by default"
+           >:: test_entry_meta_split_safe_basis_flag_off;
+           "F5: entry_meta basis is Adjusted when the window rescales"
+           >:: test_entry_meta_split_safe_basis_adjusted;
+           "F5: entry_meta basis is Raw_fallback when the window degrades"
+           >:: test_entry_meta_split_safe_basis_raw_fallback;
            "stop-anchor: entries_from_candidates funds re-anchored"
            >:: test_entries_from_candidates_funds_reanchored;
            "G15-step2: short notional cap skips at 31%"
