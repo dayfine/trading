@@ -1,0 +1,6 @@
+(executable
+ (name faithfulness_report_cli)
+ (modules faithfulness_report_cli)
+ (libraries core core_unix.command_unix faithfulness_report)
+ (preprocess
+  (pps ppx_jane)))
