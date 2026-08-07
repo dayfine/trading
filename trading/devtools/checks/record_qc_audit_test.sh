@@ -1256,6 +1256,30 @@ fi
 # to make that specific refactor go red rather than quietly shrink the pin.
 HOOK_DISABLE_VALUES=(0 false no yes true "")
 
+# Independent of HOOK_DISABLE_VALUES by design. The coverage checks below used
+# to compare the number of values iterated against `${#HOOK_DISABLE_VALUES[@]}`
+# -- i.e. the array against ITSELF. That comparison cannot detect the array
+# being silently shrunk: `HOOK_DISABLE_VALUES=(0)` still satisfies
+# `seen == ${#HOOK_DISABLE_VALUES[@]}` (1 == 1) and ships green while covering
+# five fewer of the documented "off" spellings (H-AUDIT-TEST-DISABLE-COUNT-
+# TAUTOLOGICAL). This constant is the second, independent source of truth the
+# array length is checked against. Update it only when deliberately changing
+# the documented "off" spelling contract -- never as a side effect of editing
+# the array above.
+HOOK_DISABLE_EXPECTED_COUNT=6
+
+# Renders HOOK_DISABLE_VALUES for the pass/fail messages below. Deriving the
+# printed spelling list from the array (rather than a hardcoded literal)
+# means a shrunk or padded array can never print a message that contradicts
+# what was actually exercised -- the message and the count share one source.
+_disable_values_repr() {
+  local repr="" v
+  for v in "${HOOK_DISABLE_VALUES[@]}"; do
+    repr="${repr:+${repr} }'${v}'"
+  done
+  echo "${repr}"
+}
+
 FEATURE25="hook-gate-before-rename"
 JSON25="${TMP_REPO}/dev/audit/2026-08-06-harness-hook-gate-${FEATURE25}.json"
 
@@ -1284,10 +1308,10 @@ for hookval25 in "${HOOK_DISABLE_VALUES[@]}"; do
   fi
 done
 
-if [[ -z "${offenders25}" ]] && (( seen25 == ${#HOOK_DISABLE_VALUES[@]} )); then
-  pass "scenario 25a — all ${seen25} documented 'off' spellings (0 false no yes true '') leave WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME disabled: write completes, record published (H-AUDIT-HOOK-GATE-TRUTHY)"
+if [[ -z "${offenders25}" ]] && (( seen25 == HOOK_DISABLE_EXPECTED_COUNT )); then
+  pass "scenario 25a — all ${seen25} documented 'off' spellings ($(_disable_values_repr)) leave WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME disabled: write completes, record published (H-AUDIT-HOOK-GATE-TRUTHY)"
 else
-  fail "scenario 25a — expected rc=0 + record + 'OK: wrote' for all ${#HOOK_DISABLE_VALUES[@]} documented 'off' spellings; exercised ${seen25}; offending values:${offenders25:-none}"
+  fail "scenario 25a — expected rc=0 + record + 'OK: wrote' for all ${HOOK_DISABLE_EXPECTED_COUNT} documented 'off' spellings ($(_disable_values_repr)); exercised ${seen25}; offending values:${offenders25:-none}"
 fi
 
 # (b) fire direction — `1` must still abort before publishing, leaving the
@@ -1342,11 +1366,11 @@ for hookval26 in "${HOOK_DISABLE_VALUES[@]}"; do
   fi
 done
 
-if [[ -z "${offenders26}" ]] && (( seen26 == ${#HOOK_DISABLE_VALUES[@]} )) \
+if [[ -z "${offenders26}" ]] && (( seen26 == HOOK_DISABLE_EXPECTED_COUNT )) \
    && [[ -f "${JSON26}" ]]; then
-  pass "scenario 26a — all ${seen26} documented 'off' spellings (0 false no yes true '') leave WRITE_AUDIT_TEST_ABORT_AFTER_RENAME disabled: rc=0 with the 'OK:' line, no spurious failure reported for an already-published record (H-AUDIT-HOOK-GATE-TRUTHY)"
+  pass "scenario 26a — all ${seen26} documented 'off' spellings ($(_disable_values_repr)) leave WRITE_AUDIT_TEST_ABORT_AFTER_RENAME disabled: rc=0 with the 'OK:' line, no spurious failure reported for an already-published record (H-AUDIT-HOOK-GATE-TRUTHY)"
 else
-  fail "scenario 26a — expected rc=0 + 'OK: wrote' for all ${#HOOK_DISABLE_VALUES[@]} documented 'off' spellings; exercised ${seen26}, record_present=$([[ -f "${JSON26}" ]] && echo yes || echo no); offending values:${offenders26:-none}"
+  fail "scenario 26a — expected rc=0 + 'OK: wrote' for all ${HOOK_DISABLE_EXPECTED_COUNT} documented 'off' spellings ($(_disable_values_repr)); exercised ${seen26}, record_present=$([[ -f "${JSON26}" ]] && echo yes || echo no); offending values:${offenders26:-none}"
 fi
 
 # (b) fire direction — `1` must still abort right after the rename.
@@ -1360,6 +1384,53 @@ else
   fail "scenario 26b — expected rc!=0 + 'simulating interruption right after rename' + no 'OK: wrote'; got rc=${rc26_one}"
   echo "${out26_one}" | sed 's/^/      /'
 fi
+
+# ---------------------------------------------------------------------------
+# Scenario 27 (H-WRITE-AUDIT-REPO-ROOT-NOT-REDIRECTABLE): an explicitly-set
+# REPO_ROOT must win over write_audit.sh's own walk-up, even when the
+# walk-up would ALSO succeed -- just to a DIFFERENT root. This is the exact
+# shape of the bug: a script invoked in-place from inside a real checkout
+# (where a `.git`/`.claude` marker is always found a few directories up)
+# silently ignored any REPO_ROOT override and published into the walked-up
+# root's dev/audit/ instead of the caller's intended redirect target. Two
+# people probing the hook gate by hand hit this independently on
+# 2026-08-06 and leaked a stray record into the live dev/audit/.
+#
+# WALKUP_ROOT has its own `.claude` sentinel a few directories above the
+# copied script (so the walk-up "succeeds" on its own terms) AND its own
+# dev/audit/. TARGET_ROOT is a completely separate directory passed via
+# REPO_ROOT. Before the fix, the record lands in WALKUP_ROOT/dev/audit/;
+# after the fix it must land in TARGET_ROOT/dev/audit/ instead.
+# ---------------------------------------------------------------------------
+WALKUP_ROOT="$(mktemp -d -t write_audit_walkup.XXXXXX)"
+TARGET_ROOT="$(mktemp -d -t write_audit_target.XXXXXX)"
+mkdir -p "${WALKUP_ROOT}/.claude" "${WALKUP_ROOT}/trading/devtools/checks" \
+         "${WALKUP_ROOT}/dev/audit" "${TARGET_ROOT}/dev/audit"
+cp "${SCRIPT_DIR}/write_audit.sh" "${WALKUP_ROOT}/trading/devtools/checks/"
+chmod +x "${WALKUP_ROOT}/trading/devtools/checks/write_audit.sh"
+
+out27=$(REPO_ROOT="${TARGET_ROOT}" \
+  bash "${WALKUP_ROOT}/trading/devtools/checks/write_audit.sh" \
+    --date 2026-08-06 --feature "repo-root-override" --branch "harness/repo-root" \
+    --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1) && rc27=0 || rc27=$?
+
+# `find` (not `ls .../*.json`) deliberately: under `set -euo pipefail`, `ls`
+# on a glob that matches nothing exits non-zero, and pipefail propagates
+# that into this assignment's exit status, aborting the whole test script
+# right here with no summary line -- exactly the zero-match case
+# walkup_count27 is expected to hit on a passing run. `find` returns 0 with
+# empty output when nothing matches, so it can't trip -e this way.
+target_count27="$(find "${TARGET_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+walkup_count27="$(find "${WALKUP_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+
+if (( rc27 == 0 )) && echo "${out27}" | grep -q "^OK: wrote" \
+   && [[ "${target_count27}" == "1" ]] && [[ "${walkup_count27}" == "0" ]]; then
+  pass "scenario 27 — REPO_ROOT override wins over a SUCCESSFUL walk-up to a different root: record lands under \$REPO_ROOT/dev/audit only, never the walked-up root (H-WRITE-AUDIT-REPO-ROOT-NOT-REDIRECTABLE)"
+else
+  fail "scenario 27 — expected rc=0 + 'OK: wrote' + exactly 1 record under TARGET_ROOT and 0 under WALKUP_ROOT; got rc=${rc27}, target_count=${target_count27}, walkup_count=${walkup_count27}"
+  echo "${out27}" | sed 's/^/      /'
+fi
+rm -rf "${WALKUP_ROOT}" "${TARGET_ROOT}"
 
 # ---------------------------------------------------------------------------
 # Summary
