@@ -9,11 +9,12 @@ IN_PROGRESS
 YES
 
 ## Open PR
-- `feat/split-safe-empty-window-panel` — B5 + B6, the two remaining documented
-  gaps in the F5 telemetry that gate the `split_safe_floors` promotion surface.
-  See the 2026-08-07 addendum below.
+- `feat/split-safe-inert-report-row` — F6, the trade-audit report row for the
+  split-safe basis tally + inert fraction. See the 2026-08-07 F6 addendum below.
 
 ## Recently merged
+- `feat/split-safe-empty-window-panel` — **MERGED #2232 `b54f8880`** (2026-08-07),
+  B5 + B6, the last two telemetry gaps (2026-08-07 addendum below).
 - `feat/split-safe-fallback-telemetry` — **MERGED #2220 `480a59b7`** (2026-08-06),
   F5 whole-window fallback telemetry
   (2026-08-06 addendum below). Branch pushed; PR opened by the orchestrator.
@@ -617,6 +618,81 @@ ACCEPT).
 - **Suite counts:** `test_panel_callbacks` 24 → 25, `test_split_safe_metric`
   0 → 8 (new module test).
 
+## 2026-08-07 addendum — F6, the split-safe report row (PR branch `feat/split-safe-inert-report-row`)
+
+**What shipped.** `Trade_audit_report` now carries the split-safe basis tally on
+its document model and renders it as a section of the markdown report. It is a
+pure consumer: `Backtest.Split_safe_metric` is untouched.
+
+- `trade_audit_report.mli` / `.ml` — new field `split_safe_tally :
+  Backtest.Split_safe_metric.tally` on `t`, populated by `render` from the
+  `split_safe_basis` of every `Trade_audit.entry_decision` in the `trade_audit`
+  argument.
+- `to_markdown` emits a `## Split-safe floor basis` section between the
+  per-trade table and the analysis layer (both existing pinned markdown blocks
+  end at `## Per-trade table` / the table header, so neither moved).
+
+**Two decisions worth recording.**
+
+1. **The tally is over the audit population, not over `rows`.** The basis tag
+   lives on the entry decision. An entry still open at end-of-run, or one whose
+   round-trip failed the `(symbol, entry_date)` join, exercised
+   `split_safe_floors` exactly as much as a closed one; tallying over `rows`
+   would drop it and understate the denominator. Pinned by
+   `split-safe tally counts audit population not rows`.
+2. **The inert fraction is not stored, only the tally.** It is a total function
+   of the tally (`Split_safe_metric.inertness_of_tally`); a second stored copy
+   could disagree with the counts printed beside it. `to_markdown` derives it at
+   format time, which is also why the report and a `Split_safe_metric` caller
+   cannot report different numbers. (`inertness` derives only `show, eq`, not
+   `sexp`, so storing it on the `sexp`-deriving `t` would also have forced a
+   change to a module this PR is a consumer of.)
+
+**The `Not_exercised` rendering — the point of the item.** The section always
+prints the four counts, then one of two lines:
+
+- exercised: `- Inert fraction (raw_fallback / (raw_fallback + adjusted)): 25.0%`
+- not exercised: `- Inert fraction: NOT EXERCISED — the denominator is zero, so
+  there is no measurement here; this is not zero inertness. <cause>`
+
+The not-exercised line contains **no percent sign at all** — a test asserts the
+section is `%`-free in that state, so it cannot be skimmed as a wired-but-zero
+column. `<cause>` names which of the three sub-cases on
+`Split_safe_metric.inertness` applies, and the flag-off cause takes priority
+when both it and empty windows are present (it is the louder signal — the flag
+never reached the scan):
+
+| tally state | rendered cause |
+|---|---|
+| `flag_off > 0` | `N decision(s) carry flag_off, so none reached the basis choice. In a run configured split_safe_floors=true that is a wiring alarm, not a data point.` |
+| `empty_window > 0`, `flag_off = 0` | `the flag reached the scan, but all N lookback window(s) were empty — the mechanism ran with nothing to act on, so this run has no exposure to it.` |
+| all zero | `no entry decisions were captured, so this run says nothing either way.` |
+
+**The section is emitted unconditionally**, including for pre-PR-2 reports with
+no audit records at all. An omitted section is indistinguishable from an inert
+arm, which is the same confusion the variant exists to prevent — so "nothing to
+report" is itself reported, as the all-zero cause.
+
+**Tests.** 31 → 36 in `test_trade_audit_report.ml`. Every claim was
+mutation-checked in both directions (mutation applied → the new test reddens;
+mutation applied with the new tests reverted to `origin/main` → 31 tests, exit
+0, i.e. the path was genuinely blind, not merely under-asserted):
+
+| claim | mutation | with new tests | tests reverted |
+|---|---|---|---|
+| counts line reports the right column per state | swap `adjusted` / `raw_fallback` in the `sprintf` args | 1 failure | 31 tests, exit 0 |
+| the fraction renders as a percentage | drop `*. 100.0` (25.0% → 0.3%) | 1 failure | 31 tests, exit 0 |
+| the flag-off cause is reported, and wins over empty-window | make the `flag_off` branch unreachable | 1 failure | 31 tests, exit 0 |
+| the empty-window cause is distinct from the empty-population one | make the `empty_window` branch unreachable | 1 failure | 31 tests, exit 0 |
+| `Not_exercised` never renders as a percentage | render it as `0.0%` on the fraction line | 3 failures | 31 tests, exit 0 |
+| the section is never silently omitted | `_format_split_safe` returns `[]` | 4 failures | 31 tests, exit 0 |
+| the tally is join-independent | drop audit records that joined a round-trip | 1 failure (only the tally test) | 31 tests, exit 0 |
+| the tally is over entries, not round-trips | keep only audit records that joined a round-trip | 4 failures | 31 tests, exit 0 |
+
+**Deliberately not done.** The HTML report — a separate surface, filed as F10.
+No change to `Split_safe_metric`, `trade_audit_report_bin.ml`'s raw-vs-adjusted
+reads (F3), or any core module.
+
 ## Follow-ups
 
 - ~~**B5 (qc-behavioral, PR #2220 rework) — `Empty_window` pinned on only one of
@@ -699,18 +775,26 @@ ACCEPT).
   both narrowings *understate* how much of a run the flag touched, so neither
   can make an inert arm look active — but both must be named when the number is
   read.
-- **F6 (new, from the F5 work) — no report surface for the inert fraction.**
+- ~~**F6 (new, from the F5 work) — no report surface for the inert fraction.**
   The per-decision tag is in `trade_audit.sexp`, but `Trade_audit_report` / the
   HTML report do not render it, so today the number comes from a shell count.
   Cheap follow-up: one summary row (`Adjusted / Raw_fallback / Flag_off` counts)
-  in the trade-audit report. Not blocking — the shell count is sufficient to
-  qualify a surface — but a rendered row is what makes it hard to forget.
-  **Updated 2026-08-07 (B6):** the arithmetic is no longer the follow-up's
-  problem — `Backtest.Split_safe_metric.tally_of_bases` +
-  `inertness_of_tally` exist and are tested. F6 is now purely the rendering,
-  and it must render `Not_exercised` as something a reader cannot confuse with
-  a wired-but-zero column (the tally is carried on the constructor for exactly
-  that).
+  in the trade-audit report.~~ — **done 2026-08-07** for the **markdown**
+  report; see the 2026-08-07 F6 addendum below. The HTML renderer is a separate
+  surface and is **not** covered (residual, recorded as F10).
+  **R4 correction (the original text said "the shell count is sufficient to
+  qualify a surface"): it is not.** A shell count over `trade_audit.sexp` is
+  exactly the ad-hoc path that produces the bare `0/0` blank
+  `Split_safe_metric.inertness` exists to forbid — it cannot tell a
+  never-exercised arm from an unwired column. Read the rendered section, or
+  call `Split_safe_metric.inertness_of_tally`; do not hand-count.
+- **F10 (new, residual from F6) — the HTML report still has no split-safe
+  surface.** F6 shipped the section on the **markdown** `Trade_audit_report`
+  only; the HTML renderer is a separate surface with its own layout and was
+  kept out to keep the F6 diff reviewable. Low priority — anyone reading the
+  inert fraction today reads the markdown report — but until it lands, an HTML
+  reader sees no split-safe row at all, which is the same "absence reads as
+  zero" ambiguity F6 exists to close, just on a different surface.
 - **F7 (new, from the F5 work) — telemetry covers entries only.** Screened but
   skipped candidates run a floor scan too and produce no `entry_decision`, so
   the inert fraction has an entries-denominator. Widening it would mean adding
@@ -734,7 +818,7 @@ ACCEPT).
 - **R3 -- one skimmer-facing line in Follow-ups.** The strikethrough reads "~~B6...~~ -- **done 2026-08-07** via `Backtest.Split_safe_metric.inertness`". The "renderer still pending" qualifier lives in the addendum and in F6, not on that line. Everything is accurate and traceable, but a skimmer reading only the struck line could infer more closure than exists. Suggest appending "(reduction only; rendering remains F6)".
 - **R4 -- F6's "shell count is sufficient" is now stale advice.** F6 still says "the shell count over `trade_audit.sexp` is sufficient to qualify a surface", which is precisely the ad-hoc path that produces the `0/0` blank B6 exists to prevent. It predates this PR and is not one of the three `.mli` sites, so it does not affect the Q4 consistency finding -- but a reader following it would reintroduce the defect the new type forbids.
 
-**Standing sequencing note.** With B5 and B6 closed, the `split_safe_floors` axis can report its own inert fraction on both paths, and an all-`Empty_window` arm is now distinguishable from an unwired column. What remains before a promotion decision per `.claude/rules/promotion-confirmation.md` is **F6** (render the fraction) and, separately, a walk-forward surface that actually reports it. F9 (`Stop_recompute` / `Stop_thread` scans untagged) and F7 (skipped candidates) both **understate** how much of a run the flag touched, so neither can make an inert arm look active -- but both must be named when the number is read.
+**Standing sequencing note.** With B5, B6 and now F6 closed, the `split_safe_floors` axis can report its own inert fraction on both paths, an all-`Empty_window` arm is distinguishable from an unwired column, and the number is rendered rather than hand-counted. What remains before a promotion decision per `.claude/rules/promotion-confirmation.md` is a walk-forward surface that actually reports it. F9 (`Stop_recompute` / `Stop_thread` scans untagged) and F7 (skipped candidates) both **understate** how much of a run the flag touched, so neither can make an inert arm look active -- but both must be named when the number is read.
 
 ## QC
 
