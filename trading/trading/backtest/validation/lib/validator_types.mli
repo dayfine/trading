@@ -46,6 +46,14 @@ type entry_context = {
   macro_trend : Weinstein_types.market_trend;
   ma_direction : Weinstein_types.ma_direction;
   resistance_quality : Weinstein_types.overhead_quality option;
+  installed_stop : float; [@sexp.default 0.0]
+      (** V12: the initial protective stop the strategy actually installed
+          ([Trade_audit.entry_decision.installed_stop]). [0.0] on legacy audit
+          sexps predating capture — V12 skips those. *)
+  suggested_entry : float; [@sexp.default 0.0]
+      (** The screener's graded breakout level [E]
+          ([Trade_audit.entry_decision.suggested_entry]); carried for V12's
+          specimen detail and the faithfulness harness. *)
 }
 [@@deriving sexp]
 (** Decision-time features a check reads from a {!Trade_audit.entry_decision},
@@ -81,6 +89,11 @@ type check_config = {
           than this many days before run end flags. *)
   stop_distance_min_pct : float;  (** V11: lower bound on stop distance. *)
   stop_distance_max_pct : float;  (** V11: upper bound on stop distance. *)
+  gate_max_stop_distance_pct : float;
+      (** V12: the strategy's own [stops_config.max_stop_distance_pct]
+          [Stop_too_wide] gate (default 0.15). A filled entry whose installed
+          stop sits farther than this from its fill price is an invariant break
+          — the gate that should have rejected it did not fire. *)
   disabled_checks : string list;  (** Check ids to omit from the report. *)
   severity_overrides : (string * string) list;
       (** [(check_id, "INVARIANT" | "EXPECTATION")] overrides of the default

@@ -45,6 +45,42 @@ let _v11_step (c : check_config) (row : trade_row) =
 
 let check_v11 inputs = fold_steps inputs.trades ~f:(_v11_step inputs.config)
 
+(* ---- V12: stop-distance gate consistency ------------------------------- *)
+
+(* The strategy rejects any entry whose installed stop sits farther than
+   [stops_config.max_stop_distance_pct] from the fill as [Stop_too_wide]
+   ([entry_audit_capture.ml]). So a filled trade wider than the gate is an
+   invariant break: either the gate did not fire, or the captured
+   [installed_stop] disagrees with the gated stop. The distance is measured
+   exactly as the gate measures it — against the FILL price
+   ([trade_row.entry_price] = the strategy's [effective_entry]), not the
+   screener's [suggested_entry]. *)
+let _v12_dist ~(row : trade_row) ~(ctx : entry_context) =
+  Float.abs (ctx.installed_stop -. row.entry_price) /. row.entry_price
+
+let _v12_detail (c : check_config) ~dist ~(ctx : entry_context)
+    ~(row : trade_row) =
+  sprintf "installed_stop=%.4f vs fill=%.4f -> dist=%.4f > gate=%.4f"
+    ctx.installed_stop row.entry_price dist c.gate_max_stop_distance_pct
+
+(* Un-evaluable rows: legacy audits with no captured [installed_stop] ([0.0]
+   default) or a non-positive fill. *)
+let _v12_unevaluable ~(row : trade_row) ~(ctx : entry_context) =
+  Float.( <= ) ctx.installed_stop 0.0 || Float.( <= ) row.entry_price 0.0
+
+let _v12_pred (c : check_config) (row : trade_row) (ctx : entry_context) =
+  (* The unevaluable guard is checked first, so the divide-by-zero [dist] of a
+     non-positive fill (inf/nan) never reaches a verdict. *)
+  match _v12_dist ~row ~ctx with
+  | _ when _v12_unevaluable ~row ~ctx -> Skip
+  | dist when Float.( > ) dist c.gate_max_stop_distance_pct ->
+      Fail (spec row (_v12_detail c ~dist ~ctx ~row))
+  | _ -> Pass
+
+let check_v12 inputs =
+  fold_steps inputs.trades
+    ~f:(audit_step inputs.audit ~pred:(_v12_pred inputs.config))
+
 (* ---- V5: exit_trigger vs stop_trigger_kind consistency ----------------- *)
 
 let _stop_triggers =

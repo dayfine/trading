@@ -18,6 +18,7 @@ let _registry : (string * severity * (inputs -> Validator_step.finding)) list =
     ("V9", Expectation, B.check_v9);
     ("V10", Expectation, B.check_v10);
     ("V11", Expectation, R.check_v11);
+    ("V12", Invariant, R.check_v12);
   ]
 
 let all_check_ids = List.map _registry ~f:(fun (id, _, _) -> id)
