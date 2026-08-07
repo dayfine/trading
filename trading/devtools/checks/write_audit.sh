@@ -152,6 +152,22 @@ fi
 # --- Locate repo root ---
 
 _repo_root() {
+  # An explicitly-set REPO_ROOT takes precedence over the walk-up, matching
+  # the shared repo_root() helper (trading/devtools/checks/_check_lib.sh)
+  # that most other check scripts source. Before this fix the walk-up ran
+  # FIRST and only fell back to $REPO_ROOT when it found nothing -- so an
+  # ad-hoc in-place invocation (run from inside a real checkout, where
+  # .git/.claude are always found a few directories up) silently ignored any
+  # REPO_ROOT override and wrote into the live dev/audit/ directory instead
+  # of the caller's intended redirect target
+  # (H-WRITE-AUDIT-REPO-ROOT-NOT-REDIRECTABLE). Every test caller of this
+  # script sets REPO_ROOT to a fixture dir that ALSO contains its own
+  # .claude sentinel, so the walk-up and the override already agreed there;
+  # this reorder only changes behaviour for the ad-hoc-invocation case.
+  if [ -n "${REPO_ROOT:-}" ] && [ -d "$REPO_ROOT" ]; then
+    echo "$REPO_ROOT"
+    return 0
+  fi
   dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
   while [ -n "$dir" ] && [ "$dir" != "/" ]; do
     if [ -d "$dir/.git" ] || [ -d "$dir/.claude" ]; then
@@ -160,11 +176,6 @@ _repo_root() {
     fi
     dir="$(dirname "$dir")"
   done
-  # Fallback: try REPO_ROOT env var
-  if [ -n "${REPO_ROOT:-}" ] && [ -d "$REPO_ROOT" ]; then
-    echo "$REPO_ROOT"
-    return 0
-  fi
   echo "FAIL: could not locate repo root" >&2
   exit 1
 }
