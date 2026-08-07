@@ -27,9 +27,16 @@ let trade ?(side = "LONG") ?(exit_trigger = "") ?(stop_trigger_kind = "")
 
 let ctx ?(stage = Weinstein_types.Stage2 { weeks_advancing = 3; late = false })
     ?(macro_trend = Weinstein_types.Bullish)
-    ?(ma_direction = Weinstein_types.Rising) ?(resistance_quality = None) () :
-    Vt.entry_context =
-  { stage; macro_trend; ma_direction; resistance_quality }
+    ?(ma_direction = Weinstein_types.Rising) ?(resistance_quality = None)
+    ?(installed_stop = 90.0) ?(suggested_entry = 100.0) () : Vt.entry_context =
+  {
+    stage;
+    macro_trend;
+    ma_direction;
+    resistance_quality;
+    installed_stop;
+    suggested_entry;
+  }
 
 let audit_of assoc (row : Vt.trade_row) =
   List.Assoc.find assoc row.symbol ~equal:String.equal
@@ -323,6 +330,64 @@ let test_v11 _ =
   in
   assert_that (result ~id:"V11" inputs) (violations_and_pass 1 false)
 
+(* ---- V12: stop-distance gate consistency ------------------------------- *)
+
+(* A fill at 100 with an installed stop at 50 is 50% away — wider than the 15%
+   gate, so the [Stop_too_wide] gate should have rejected it. A stop at 90 (10%)
+   is within the gate and passes. The distance is measured against the FILL
+   (entry_price), exactly as the gate measures it. *)
+let test_v12 _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"WIDE" ~entry_date:"2020-01-03" ~entry_price:100.0 ();
+          trade ~symbol:"OK" ~entry_date:"2020-02-07" ~entry_price:100.0 ();
+        ];
+      audit =
+        audit_of
+          [
+            ("WIDE", ctx ~installed_stop:50.0 ());
+            ("OK", ctx ~installed_stop:90.0 ());
+          ];
+    }
+  in
+  assert_that (result ~id:"V12" inputs) (violations_and_pass 1 false)
+
+(* Rows with no audit join or a legacy [installed_stop = 0.0] are un-evaluable
+   and must be skipped (not flagged), so V12 stays PASS on inputs it cannot
+   judge rather than false-firing. *)
+let test_v12_skips_unevaluable _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"NOAUDIT" ~entry_date:"2020-01-03" ~entry_price:100.0 ();
+          trade ~symbol:"LEGACY" ~entry_date:"2020-02-07" ~entry_price:100.0 ();
+        ];
+      audit = audit_of [ ("LEGACY", ctx ~installed_stop:0.0 ()) ];
+    }
+  in
+  assert_that (result ~id:"V12" inputs) (violations_and_pass 0 true)
+
+(* The gate threshold is configurable: a run whose strategy loosened the gate to
+   60% must not flag a 50% stop. *)
+let test_v12_respects_config_gate _ =
+  let inputs =
+    {
+      (Vt.empty_inputs
+         ~config:{ Vt.default_config with gate_max_stop_distance_pct = 0.60 }
+         ())
+      with
+      trades =
+        [ trade ~symbol:"WIDE" ~entry_date:"2020-01-03" ~entry_price:100.0 () ];
+      audit = audit_of [ ("WIDE", ctx ~installed_stop:50.0 ()) ];
+    }
+  in
+  assert_that (result ~id:"V12" inputs) (violations_and_pass 0 true)
+
 (* ---- audit join: position_id vs symbol|date ---------------------------- *)
 
 let join_row ?(context = ctx ()) ~position_id ~symbol ~entry_date () :
@@ -422,6 +487,9 @@ let suite =
          "v10_spike" >:: test_v10;
          "v10_calm" >:: test_v10_calm;
          "v11_stop_bounds" >:: test_v11;
+         "v12_gate_consistency" >:: test_v12;
+         "v12_skips_unevaluable" >:: test_v12_skips_unevaluable;
+         "v12_respects_config_gate" >:: test_v12_respects_config_gate;
          "join_by_position_id_survives_date_skew"
          >:: test_join_by_position_id_survives_date_skew;
          "join_legacy_falls_back_to_symbol_date"

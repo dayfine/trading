@@ -90,6 +90,8 @@ let _entry_context_of (e : Backtest.Trade_audit.entry_decision) =
     macro_trend = e.macro_trend;
     ma_direction = e.ma_direction;
     resistance_quality = e.resistance_quality;
+    installed_stop = e.installed_stop;
+    suggested_entry = e.suggested_entry;
   }
 
 type audit_join_row = {
