@@ -8,6 +8,7 @@ let _default_virgin_lookback_bars = 520
 let _default_adv_lookback_bars = 20
 let _default_stop_distance_min_pct = 0.0
 let _default_stop_distance_max_pct = 0.30
+let _default_gate_max_stop_distance_pct = 0.15
 let far_future = Date.of_string "2100-01-01"
 
 type severity = Invariant | Expectation [@@deriving sexp, equal]
@@ -39,6 +40,8 @@ type entry_context = {
   macro_trend : Weinstein_types.market_trend;
   ma_direction : Weinstein_types.ma_direction;
   resistance_quality : Weinstein_types.overhead_quality option;
+  installed_stop : float; [@sexp.default 0.0]
+  suggested_entry : float; [@sexp.default 0.0]
 }
 [@@deriving sexp]
 
@@ -59,6 +62,8 @@ type check_config = {
   stale_exit_after_days : int option; [@sexp.default None]
   stop_distance_min_pct : float; [@sexp.default _default_stop_distance_min_pct]
   stop_distance_max_pct : float; [@sexp.default _default_stop_distance_max_pct]
+  gate_max_stop_distance_pct : float;
+      [@sexp.default _default_gate_max_stop_distance_pct]
   disabled_checks : string list; [@sexp.default []]
   severity_overrides : (string * string) list; [@sexp.default []]
 }
@@ -103,6 +108,7 @@ let default_config =
     stale_exit_after_days = None;
     stop_distance_min_pct = _default_stop_distance_min_pct;
     stop_distance_max_pct = _default_stop_distance_max_pct;
+    gate_max_stop_distance_pct = _default_gate_max_stop_distance_pct;
     disabled_checks = [];
     severity_overrides = [];
   }
