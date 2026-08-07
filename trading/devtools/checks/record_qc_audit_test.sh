@@ -1430,6 +1430,33 @@ else
   fail "scenario 27 — expected rc=0 + 'OK: wrote' + exactly 1 record under TARGET_ROOT and 0 under WALKUP_ROOT; got rc=${rc27}, target_count=${target_count27}, walkup_count=${walkup_count27}"
   echo "${out27}" | sed 's/^/      /'
 fi
+# ---------------------------------------------------------------------------
+# Scenario 27b (H-WRITE-AUDIT-REPO-ROOT-NOT-REDIRECTABLE, B1 rework): the
+# OTHER half of _repo_root()'s two-branch contract. 27a only pins that an
+# explicit REPO_ROOT wins over a successful walk-up; every caller anywhere
+# else in this file also sets REPO_ROOT explicitly, so nothing in this
+# suite previously reached the walk-up branch at all -- despite it being
+# the ONLY path production uses: `lead-orchestrator.md` invokes
+# write_audit.sh with REPO_ROOT unset. Reuses the WALKUP_ROOT fixture from
+# 27a (its dev/audit/ is empty at this point -- 27a asserted
+# walkup_count27 == 0). `env -u REPO_ROOT` forces the var unset regardless
+# of ambient shell state, rather than relying on this script never having
+# exported it.
+# ---------------------------------------------------------------------------
+out27b=$(env -u REPO_ROOT \
+  bash "${WALKUP_ROOT}/trading/devtools/checks/write_audit.sh" \
+    --date 2026-08-06 --feature "repo-root-walkup" --branch "harness/repo-root" \
+    --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1) && rc27b=0 || rc27b=$?
+
+walkup_count27b="$(find "${WALKUP_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+
+if (( rc27b == 0 )) && echo "${out27b}" | grep -q "^OK: wrote" && [[ "${walkup_count27b}" == "1" ]]; then
+  pass "scenario 27b — REPO_ROOT unset: the walk-up still locates the root and publishes the record (H-WRITE-AUDIT-REPO-ROOT-NOT-REDIRECTABLE, pins the fallback branch production actually uses)"
+else
+  fail "scenario 27b — expected rc=0 + 'OK: wrote' + exactly 1 record under WALKUP_ROOT; got rc=${rc27b}, walkup_count=${walkup_count27b}"
+  echo "${out27b}" | sed 's/^/      /'
+fi
+
 rm -rf "${WALKUP_ROOT}" "${TARGET_ROOT}"
 
 # ---------------------------------------------------------------------------
