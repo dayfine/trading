@@ -1,0 +1,5 @@
+(library
+ (name faithfulness_report)
+ (libraries core)
+ (preprocess
+  (pps ppx_jane)))

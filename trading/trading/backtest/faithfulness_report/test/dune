@@ -1,0 +1,5 @@
+(test
+ (name test_faithfulness_report)
+ (libraries core ounit2 matchers faithfulness_report)
+ (preprocess
+  (pps ppx_jane)))
