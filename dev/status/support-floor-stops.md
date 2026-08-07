@@ -727,6 +727,15 @@ ACCEPT).
   caller. Should either be re-pointed at `floor_is_structural_with_callbacks` or
   deleted.
 
+### Follow-ups filed 2026-08-07 (qc-behavioral residuals on PR #2232, all non-blocking)
+
+- **R1 -- `tally_of_bases` order-independence documented but unpinned.** The `split_safe_metric.mli` docstring says "Order-independent and total"; totality is pinned by `tally counts every basis state`, order-independence is not (no test permutes the input). True by inspection -- a fold over independent counters -- and a test would be **green by construction** in exactly the way the author correctly withheld the panel stop-level test for. Filed only so the claim/test map is complete, not as work to do.
+- **R2 -- `empty_tally`'s field values pinned only transitively.** `empty population is Not_exercised` uses `M.empty_tally` on both sides of the equality, so it does not independently pin "all four counts zero". The literal zeros *are* pinned elsewhere (`all Empty_window is Not_exercised` asserts `flag_off = 0; adjusted = 0; raw_fallback = 0` literally), so there is no real hole -- a naming nit at most.
+- **R3 -- one skimmer-facing line in Follow-ups.** The strikethrough reads "~~B6...~~ -- **done 2026-08-07** via `Backtest.Split_safe_metric.inertness`". The "renderer still pending" qualifier lives in the addendum and in F6, not on that line. Everything is accurate and traceable, but a skimmer reading only the struck line could infer more closure than exists. Suggest appending "(reduction only; rendering remains F6)".
+- **R4 -- F6's "shell count is sufficient" is now stale advice.** F6 still says "the shell count over `trade_audit.sexp` is sufficient to qualify a surface", which is precisely the ad-hoc path that produces the `0/0` blank B6 exists to prevent. It predates this PR and is not one of the three `.mli` sites, so it does not affect the Q4 consistency finding -- but a reader following it would reintroduce the defect the new type forbids.
+
+**Standing sequencing note.** With B5 and B6 closed, the `split_safe_floors` axis can report its own inert fraction on both paths, and an all-`Empty_window` arm is now distinguishable from an unwired column. What remains before a promotion decision per `.claude/rules/promotion-confirmation.md` is **F6** (render the fraction) and, separately, a walk-forward surface that actually reports it. F9 (`Stop_recompute` / `Stop_thread` scans untagged) and F7 (skipped candidates) both **understate** how much of a run the flag touched, so neither can make an inert arm look active -- but both must be named when the number is read.
+
 ## QC
 
 overall_qc: PENDING

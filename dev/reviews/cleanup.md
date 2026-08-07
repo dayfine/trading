@@ -1,4 +1,4 @@
-Reviewed SHA: d75d8b549a489f5be341950a2f22c4cc4f8e477a
+Reviewed SHA: bfc02ac50a963c73c915488ceb098e56d5b16ec9 (PR #2228, closed as superseded -- zero net diff; see the #2228 section at the bottom)
 
 # QC review — cleanup track
 
@@ -814,3 +814,154 @@ the status entry miscounts the FLAGs it closed.
 APPROVED
 
 behavioral_qc: APPROVED (2026-08-03, rework iteration 1, SHA `83a3a3ff`)
+
+---
+
+## PR #2228 — `cleanup/segmentation-default-params-pin` (2026-08-07)
+
+**Recovery review.** This commit was authored 2026-08-06 13:14Z by the code-health agent and pushed, but no PR was opened (orchestrator fallback opened it today, rebased onto current main). The code has never been reviewed by anyone.
+
+Reviewed SHA: bfc02ac50a963c73c915488ceb098e56d5b16ec9
+
+structural_qc: APPROVED
+behavioral_qc: NA
+overall_qc: APPROVED
+
+Rework iterations: 0.
+
+### Context
+
+Closes the `test_pin` backlog finding filed by qc-behavioral on PR #2200 (2026-08-04, finding F2). The score-weight fields `trend_bonus_weight` and `penalty_weight` (hoisted into `segmentation_params` in #2200) were only pinned indirectly via `find_best_split`'s argmax over split-point candidates. An argmax is blind to mutations that reinforce (rather than dislodge) the incumbent split — so reinforcing-direction mutations (`penalty_weight -> 0.02`, `trend_bonus_weight -> 5.0`) shipped green on `segmentation_test.test_complex_segmentation`, exposing the one-sided pinning.
+
+The fix: a direct equality assertion on all 13 fields of `default_params` using the Matchers library. Immune to argmax insensitivity. Mutation-verified per the commit message: both reinforcing mutations turn the new test red; reverted, back to green.
+
+### Structural Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt (format check) | PASS | Exit code 0 |
+| H2 | dune build | PASS | Exit code 0 |
+| H3 | dune runtest | PASS | All tests passed, exit code 0 |
+| P1 | Functions ≤ 50 lines (linter) | PASS | New test function `test_default_params_pinned` is ~18 lines; well within limit |
+| P2 | No magic numbers (linter) | PASS | Test contains only configuration record values; no hardcoded constants |
+| P3 | Config completeness | NA | Test file, no new config fields introduced |
+| P4 | Public-symbol export hygiene (linter) | PASS | Test file; mli_coverage passed as part of H3 |
+| P5 | Internal helpers prefixed per convention | PASS | No new internal helpers added |
+| P6 | Tests conform to `.claude/rules/test-patterns.md` | PASS | Single `assert_that` per value; uses `equal_to` with type annotation (`: segmentation_params`); no nested `assert_that` in callbacks. Complies strictly with core rule and matcher composition patterns. |
+| A1 | Core module modifications | PASS | No modifications to core modules (Portfolio/Orders/Position/Strategy/Engine). Test file only. |
+| A2 | Dependency-direction rules respected | PASS | Added `matchers` library (from `base/matchers/`, not `analysis/`). No new `analysis/` imports into `trading/trading/` outside backtest exception surface. |
+| A3 | No unnecessary existing module modifications | PASS | Only touched: `trading/analysis/technical/trend/test/segmentation_test.ml` (added test), `trading/analysis/technical/trend/test/dune` (added library). Both changes necessary and focused. |
+
+### Behavioral Checklist
+
+**All rows NA.** Per `.claude/rules/qc-behavioral-authority.md` §"When to skip this file entirely": test-only PR touching no domain logic. No stage classification, stop rule, screener cascade, or strategy behavior is affected. Rows A1, S1–S6, L1–L4, C1–C3, T1–T4 all NA. qc-structural did not raise A1; no core module in diff.
+
+### Quality Score
+
+5 — All gates pass, clean patterns, focused fix with correct test structure. Exemplary test-pattern compliance and mutation-verified correctness.
+
+### Verdict
+
+APPROVED
+
+### Implementation notes
+
+**Docstring.** Explains the argmax sensitivity problem concisely (lines 236–244): the score is consumed only by `find_best_split`'s argmax, which is blind to mutations that reinforce the incumbent. Clarifies that the pin "pins the record's *values* exactly as they stand today — it says nothing about whether those values are the empirically-best or Weinstein-faithful choices." Accurate and guards against misreading the pin as an endorsement rather than a constraint.
+
+**Test structure.** Uses type annotation at the record level (line 263) rather than a function parameter, which is the project's preferred pattern per `.claude/rules/test-patterns.md`. The 13-field record is inlined as the expected value, making every field visible in one place. All tests pass; `dune runtest` exit 0.
+
+**File list from recovery.** The commit touches exactly 2 files: `trading/analysis/technical/trend/test/segmentation_test.ml` (+31) and `trading/analysis/technical/trend/test/dune` (+1). The `dev/status/cleanup.md` backlog entry remained at `[~]` (in-progress) rather than advancing to `[x]` (completed with PR reference) because the agent's session ended before completing the second step. This is a meta-task deferral, not a structural problem — the code changes themselves are complete and correct.
+
+---
+
+### Behavioral (qc-behavioral, 2026-08-07, SHA `bfc02ac50a963c73c915488ceb098e56d5b16ec9`)
+
+behavioral_qc: NEEDS_REWORK
+overall_qc: NEEDS_REWORK
+
+**Headline: this PR has a zero-byte net diff against `main`.** Its content already
+landed on 2026-08-06 via PR #2224, an ops budget-record PR. The *content* is
+correct and I mutation-verified every claim it makes; the *PR* delivers nothing
+and leaves the finding it claims to close marked in-progress.
+
+#### Contract Pinning Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| CP1 | Each non-trivial claim in new `.mli` docstrings has an identified test that pins it | NA | No new `.mli`. The PR adds a test + one dune library stanza only. |
+| CP2 | Each claim in PR body / commit message has a corresponding delivery in the diff | **FAIL** | See B1. The commit message and PR body claim this PR adds `test_default_params_pinned` and closes backlog finding F2. `git diff origin/main HEAD` is **empty** (tree `91cc0158` on both sides) — the advertised test exists on `main` but is **not delivered by this PR**. Same failure shape as the #478 worked example: PR body advertises a deliverable the diff does not contain. |
+| CP3 | Pass-through / identity / invariant tests pin identity, not just size | PASS | The pin is a whole-record `equal_to` on all 13 fields with a `: segmentation_params` type annotation — the strongest available form, exactly what CP3 asks for. No `size_is` shortcut. |
+| CP4 | Each guard called out in code docstrings has a test exercising the guarded-against scenario | PASS | The docstring's guarded scenario is the argmax blind spot (a *reinforcing* weight mutation). Verified empirically, not by reading: mutations M1/M2 below are GREEN pre-PR and RED post-PR. |
+
+#### Behavioral Checklist (domain)
+
+**All rows NA.** Per `.claude/rules/qc-behavioral-authority.md` §"When to skip this
+file entirely": pure test-pin PR touching no domain logic. Rows A1, S1–S6, L1–L4,
+C1–C3, T1–T4 all NA. `segmentation_params` holds **estimator constants, not
+Weinstein dials** — `stage.ml:294` calls `segment_by_trends` without `~params`, so
+no book rule, stage boundary, stop level, or screener gate is reachable from this
+change. No domain finding is manufactured here.
+
+#### Mutation evidence (measured, not reasoned)
+
+Each mutation applied to `default_params` in `segmentation.ml`, run against both
+the **pre-PR** fixture (`b4f86f87`, no pin) and the **post-PR** fixture, then
+reverted. Exit codes read directly from `dune`, not from grepping `FAIL:`.
+
+| # | Mutation | pre-PR trend | post-PR trend | stage suite |
+|---|---|---|---|---|
+| M0 | *(control, unmutated)* | — | GREEN (5 tests OK) | GREEN |
+| M1 | `penalty_weight` 0.2 → 0.02 | **GREEN** | **RED** | GREEN |
+| M2 | `trend_bonus_weight` 0.5 → 5.0 | **GREEN** | **RED** | GREEN |
+| M3 | `min_r_squared` 0.9 → 0.85 | **GREEN** | **RED** | GREEN |
+| M4 | `max_segments` 10 → 12 | **GREEN** | **RED** | GREEN |
+
+- **Claim 1 (blind spot is real) — CONFIRMED.** M1/M2 ship green pre-PR on both
+  the trend and stage suites, exactly as the finding stated. The finding was not
+  stale; `test_complex_segmentation` genuinely did not catch them.
+- **Claim 2 (fix closes it) — CONFIRMED.** Every RED is `segmentation_suite:4:test_default_params_pinned`,
+  failing 1 of 5 cases — the pin itself is the detector, not collateral damage.
+- **Beyond the finding.** M3/M4 were *not* anticipated by F2. They are also green
+  pre-PR and red post-PR, so the pin closes a wider hole than the two score
+  weights: `min_r_squared` and `max_segments` were equally unpinned. The "pins all
+  13 fields exactly" claim is **real, not aspirational** — OCaml record-literal
+  exhaustivity makes it compiler-enforced.
+- **Claim 3 (scope disclaimer) — PRESENT** and accurate at lines 236–244.
+- **Claim 4 (experiment artifacts) — VERIFIED.** Both cited directories exist and
+  `grep -rl "stage_method[[:space:]]*Segmentation" --include=*.sexp` returns
+  **exactly 8** scenario sexps (7 under `rolling-5y-segmentation-ab-2026-05-11/`,
+  1 under `segmentation-ab-2026-05-10/`). The stated motivation checks out.
+
+Final state at review SHA: trend suite exit 0 (5 tests), stage suite exit 0. Tree
+restored; `git status` clean apart from this review file.
+
+## Quality Score
+
+2 — The pinned test itself is exemplary and mutation-verified 4/4, but the PR as submitted delivers a zero-byte diff and leaves the finding it claims to close marked in-progress.
+
+## Verdict
+
+NEEDS_REWORK
+
+#### NEEDS_REWORK Items
+
+##### B1: PR delivers no net change — content already merged via an unrelated ops PR
+- Finding: `git diff origin/main HEAD` is empty; `HEAD^{tree}` and `origin/main^{tree}` are both `91cc0158`. The branch commit `c8943fef` is **not** an ancestor of main, yet main's copies of `segmentation_test.ml` and `test/dune` are **byte-identical** to `c8943fef`'s. The content reached main through `5abfaf58` = **PR #2224, "ops(budget): record 2026-08-06-31103636022 ($9.7172)"**, whose body reads "Automated budget-record landing… **Additive observational data only**" but whose diff is `A dev/budget/…json`, `M dev/status/cleanup.md`, `M trading/analysis/technical/trend/test/dune`, `M trading/analysis/technical/trend/test/segmentation_test.ml`. A test-code change rode into main inside an ops PR that declared itself data-only, bypassing both QC gates. Merging #2228 as-is is a harmless no-op, but it silently ratifies that path and closes the loop with no record of it.
+- Location: `bfc02ac5` (merge commit) vs `origin/main` `73826b7a`; contaminating commit `5abfaf58` (PR #2224).
+- Authority: `.claude/rules/pr-merge-gates.md` — every code-touching PR requires CI + qc-structural + qc-behavioral; #2224 was landed under the docs/ops carve-out it did not qualify for. `.claude/rules/worktree-isolation.md` §"The rule" — "verify your working copy contains only the files your task requires… do not hand off a contaminated PR for review." This is that hazard class, realized.
+- Required fix: (a) repoint this PR so its remaining diff is non-empty and meaningful — the only useful content left is the B2 status-marker advance — or close #2228 as superseded and land B2 as a one-line status PR; (b) either way, record the #2224 contamination on the cleanup backlog so the sweep-in path is visible, since the test code on main has still never passed a code review gate. **This review is that gate: the content is hereby verified correct** (see mutation evidence), so no revert is warranted.
+- harness_gap: LINTER_CANDIDATE — a CI check asserting that a PR whose body claims "data only"/docs-only touches no `*.ml`/`dune` file would have caught #2224 deterministically. A second cheap check — "PR diff against base is empty" — would flag no-op PRs like this one at open time.
+
+##### B2: backlog finding F2 left at `[~]` after the work is complete and merged
+- Finding: `dev/status/cleanup.md:35` still marks F2 `[~]` (in-progress). It is the **only** `[~]` in the file, against **50** `[x]` entries — every other completed item advanced to `[x]` with a branch/PR reference. Because the code is already on main, leaving it at `[~]` means the backlog will assert this work is in flight indefinitely, and a future code-health dispatch can reasonably pick F2 up again and re-do finished work.
+- Location: `dev/status/cleanup.md` line 35.
+- Authority: The `code-health` agent contract `[ ]` → `[~]` → `[x]`, as evidenced by the 50 existing `[x]` entries each carrying a PR/branch reference (e.g. lines 18–19).
+- Required fix: advance line 35 to `[x]` with the PR reference and a one-line result summary, matching the format of the surrounding completed entries.
+- harness_gap: LINTER_CANDIDATE — `status_file_integrity_linter` could flag any `[~]` item whose named source file is unchanged on main for more than N days, or assert `[~]` count is 0 on main.
+
+##### B3: whole-record pin is an undocumented speed bump on a refactor the backlog already plans
+- Finding: The pin is the right instrument (CP3) and its *own* docstring is good, but the intent — "this red is deliberate; re-pin the values consciously" — is documented **only in the test file**. Someone adding a 14th field edits `segmentation.ml`/`.mli` and gets a failure in a different directory with no pointer back. This is not hypothetical: backlog item `record_size` (line 41) explicitly anticipates that a third hoist should trigger "grouping (e.g. a nested `score_weights` sub-record)" — a refactor that will break this pin by construction. Separately, open item `docstring_caveat` (line 37) already queues `.mli` docstring work on these exact two fields and is the natural place for a forward reference, but does not currently mention the pin.
+- Location: `trading/analysis/technical/trend/test/segmentation_test.ml:236–265`; interacts with `dev/status/cleanup.md:37` and `:41`.
+- Authority: `.claude/rules/code-health-discipline.md` — deliberate friction is legitimate, but must be discoverable rather than a surprise red; CLAUDE.md "Make comments for symbols in `.mli`".
+- Required fix: one sentence on `default_params` in `segmentation.mli` noting its values are pinned by `segmentation_test.test_default_params_pinned` and that changing them requires updating that test deliberately. Folding this into the already-open line-37 item is acceptable — no new test needed.
+- harness_gap: ONGOING_REVIEW — whether a change-detector's friction is worth its maintenance cost is a judgment call, not a mechanical check.
