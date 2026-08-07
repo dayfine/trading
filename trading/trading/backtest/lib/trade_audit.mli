@@ -198,6 +198,14 @@ type entry_decision = {
           before the mechanism can be promoted, since an ACCEPT measured over a
           partly-inert surface is uninterpretable.
 
+          Reduce the column with {!Split_safe_metric.tally_of_bases} +
+          {!Split_safe_metric.inertness_of_tally} rather than by hand: the
+          denominator can be zero (an arm whose decisions are all
+          [Empty_window], all [Flag_off], or absent entirely), and that
+          undefined [0/0] read as a blank is indistinguishable from an unwired
+          column. The reduction names the undefined case instead of rendering
+          it.
+
           Denominator caveat: only {e entered} candidates produce an
           [entry_decision], so the fraction is over entries, not over all floor
           scans.

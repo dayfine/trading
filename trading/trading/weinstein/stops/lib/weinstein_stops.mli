@@ -206,6 +206,18 @@ val floor_is_structural :
     mechanism. [Flag_off] appearing at all in a flag-on arm is a wiring alarm,
     not a data point.
 
+    That denominator can be {b zero} — an arm in which every decision was
+    [Empty_window] (or [Flag_off], or which recorded no decisions at all) makes
+    the fraction undefined, and a [0/0] rendered as a blank cell is
+    indistinguishable from "this column was never wired up". Those two states
+    demand opposite responses: disqualify the arm for lack of exposure, versus
+    go and fix the harness. Do not compute this ratio ad hoc. Populations of
+    these tags are counted in exactly one place —
+    [Backtest.Split_safe_metric.inertness_of_tally], over the audit-layer
+    re-declaration [Trade_audit.split_safe_basis] — which returns a variant
+    whose undefined case is named and carries the tally that says which cause it
+    was.
+
     {b Why it matters.} Whole-window fallback trips on a {e single} unusable
     cell anywhere in [config.support_floor_lookback_bars], so a walk-forward arm
     over [((stops_config ((split_safe_floors true))))] can be substantially
