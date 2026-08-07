@@ -42,7 +42,8 @@ let make_entry_decision ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     ?(macro_trend = Weinstein_types.Bullish)
     ?(stage = Weinstein_types.Stage2 { weeks_advancing = 4; late = false })
     ?(rs_trend = Some Weinstein_types.Positive_rising) ?(cascade_score = 75)
-    ?(cascade_grade = Weinstein_types.A) () : TA.entry_decision =
+    ?(cascade_grade = Weinstein_types.A) ?(split_safe_basis = TA.Flag_off) () :
+    TA.entry_decision =
   {
     symbol;
     entry_date;
@@ -70,7 +71,7 @@ let make_entry_decision ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     suggested_stop = 138.46;
     installed_stop = 138.46;
     stop_floor_kind = TA.Buffer_fallback;
-    split_safe_basis = TA.Flag_off;
+    split_safe_basis;
     risk_pct = 0.08;
     initial_position_value = 75_000.0;
     initial_risk_dollars = 6_000.0;
@@ -643,6 +644,197 @@ let test_to_markdown_zero_trades _ =
            (equal_to true);
        ])
 
+(* --- Split-safe floor basis (F6) --------------------------------------- *)
+
+(* One audit record per supplied basis tag, each on a distinct symbol so the
+   report's symbol-keyed audit index keeps them apart. *)
+let _split_safe_records bases =
+  List.mapi bases ~f:(fun i basis ->
+      let symbol = sprintf "SYM%d" i in
+      make_record
+        (make_entry_decision ~symbol ~entry_date:(_date "2024-01-15")
+           ~position_id:(symbol ^ "-1") ~split_safe_basis:basis ())
+        (make_exit_decision ~symbol ~position_id:(symbol ^ "-1") ()))
+
+(* Just the [## Split-safe floor basis] section, so that "this section renders
+   no percentage" is a real assertion rather than one defeated by the "0.0%"
+   win-rate that the header prints for a zero-trade fixture. Returns [""] when
+   the section is absent, which fails every [contains] check below. *)
+let _split_safe_section bases =
+  let md =
+    TAR.to_markdown
+      (TAR.render ~trade_audit:(_split_safe_records bases) ~trades:[] ())
+  in
+  match
+    String.split_lines md
+    |> List.drop_while ~f:(fun l ->
+        not (String.equal l "## Split-safe floor basis"))
+  with
+  | [] -> ""
+  | heading :: rest ->
+      let body =
+        List.take_while rest ~f:(fun l ->
+            not (String.is_prefix l ~prefix:"## "))
+      in
+      String.concat ~sep:"\n" (heading :: body)
+
+let test_split_safe_renders_counts_and_inert_fraction _ =
+  (* adjusted 3, raw_fallback 1, flag_off 1, empty_window 1. The fraction is
+     raw_fallback / (raw_fallback + adjusted) = 1/4 = 25.0% — flag_off and
+     empty_window sit in neither term. *)
+  let section =
+    _split_safe_section
+      [
+        TA.Adjusted;
+        TA.Adjusted;
+        TA.Adjusted;
+        TA.Raw_fallback;
+        TA.Flag_off;
+        TA.Empty_window;
+      ]
+  in
+  assert_that section
+    (all_of
+       [
+         field
+           (fun s ->
+             String.is_substring s ~substring:"## Split-safe floor basis")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:
+                 "- Basis of 6 entry decision(s): adjusted 3, raw_fallback 1, \
+                  flag_off 1, empty_window 1")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:
+                 "- Inert fraction (raw_fallback / (raw_fallback + adjusted)): \
+                  25.0%")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"NOT EXERCISED")
+           (equal_to false);
+       ])
+
+let test_split_safe_not_exercised_flag_off_reads_as_wiring_alarm _ =
+  (* Nothing reached the basis choice because the flag never reached the scan.
+     Must not render as a percentage — "0.0%" here would be read as "the
+     mechanism ran and never degraded", the opposite of the truth.
+
+     An [Empty_window] is mixed in to pin the reporting priority: with both
+     causes present the flag-off one is the louder signal and is the one
+     named, per {!Backtest.Split_safe_metric.inertness}. *)
+  let section =
+    _split_safe_section [ TA.Flag_off; TA.Flag_off; TA.Empty_window ]
+  in
+  assert_that section
+    (all_of
+       [
+         field
+           (fun s -> String.is_substring s ~substring:"NOT EXERCISED")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:
+                 "2 decision(s) carry flag_off, so none reached the basis \
+                  choice")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"wiring alarm")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s ~substring:"lookback window(s) were empty")
+           (equal_to false);
+         (* No percentage anywhere in the section: a reader cannot mistake it
+            for a wired-but-zero column. *)
+         field (fun s -> String.is_substring s ~substring:"%") (equal_to false);
+       ])
+
+let test_split_safe_not_exercised_empty_window_reads_as_no_exposure _ =
+  (* Same [Not_exercised] constructor as the flag-off case, different cause:
+     the flag DID reach the scan. The two must not collapse into one string. *)
+  let section =
+    _split_safe_section [ TA.Empty_window; TA.Empty_window; TA.Empty_window ]
+  in
+  assert_that section
+    (all_of
+       [
+         field
+           (fun s -> String.is_substring s ~substring:"NOT EXERCISED")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:
+                 "the flag reached the scan, but all 3 lookback window(s) were \
+                  empty")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"no exposure")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"wiring alarm")
+           (equal_to false);
+         field (fun s -> String.is_substring s ~substring:"%") (equal_to false);
+       ])
+
+let test_split_safe_not_exercised_empty_population _ =
+  (* No audit records at all: the section is still emitted (an omitted section
+     is indistinguishable from an inert arm) and names the third cause. *)
+  let section = _split_safe_section [] in
+  assert_that section
+    (all_of
+       [
+         field
+           (fun s ->
+             String.is_substring s
+               ~substring:
+                 "- Basis of 0 entry decision(s): adjusted 0, raw_fallback 0, \
+                  flag_off 0, empty_window 0")
+           (equal_to true);
+         field
+           (fun s ->
+             String.is_substring s ~substring:"no entry decisions were captured")
+           (equal_to true);
+         field
+           (fun s -> String.is_substring s ~substring:"wiring alarm")
+           (equal_to false);
+         field
+           (fun s ->
+             String.is_substring s ~substring:"lookback window(s) were empty")
+           (equal_to false);
+       ])
+
+let test_split_safe_tally_counts_audit_population_not_rows _ =
+  (* Three audit records, only one of which joins a round-trip. The basis tag
+     lives on the entry decision, so all three are counted — a tally taken
+     over [rows] would report 1. *)
+  let records =
+    _split_safe_records [ TA.Adjusted; TA.Adjusted; TA.Raw_fallback ]
+  in
+  let trade = make_trade ~symbol:"SYM0" ~entry_date:(_date "2024-01-15") () in
+  let report = TAR.render ~trade_audit:records ~trades:[ trade ] () in
+  assert_that report
+    (all_of
+       [
+         field (fun (t : TAR.t) -> t.rows) (size_is 1);
+         field
+           (fun (t : TAR.t) -> t.split_safe_tally)
+           (equal_to
+              ({
+                 flag_off = 0;
+                 adjusted = 2;
+                 raw_fallback = 1;
+                 empty_window = 0;
+               }
+                : Backtest.Split_safe_metric.tally));
+       ])
+
 (* --- Loader (on-disk fixtures) ---------------------------------------- *)
 
 let _write_text path text =
@@ -1110,6 +1302,16 @@ let suite =
          "to_markdown pinned three-trade fixture"
          >:: test_to_markdown_pinned_three_trade_fixture;
          "to_markdown zero trades" >:: test_to_markdown_zero_trades;
+         "split-safe renders counts and inert fraction"
+         >:: test_split_safe_renders_counts_and_inert_fraction;
+         "split-safe not exercised: flag_off reads as wiring alarm"
+         >:: test_split_safe_not_exercised_flag_off_reads_as_wiring_alarm;
+         "split-safe not exercised: empty_window reads as no exposure"
+         >:: test_split_safe_not_exercised_empty_window_reads_as_no_exposure;
+         "split-safe not exercised: empty population"
+         >:: test_split_safe_not_exercised_empty_population;
+         "split-safe tally counts audit population not rows"
+         >:: test_split_safe_tally_counts_audit_population_not_rows;
          "load reads full directory" >:: test_load_reads_full_directory;
          "load without audit file" >:: test_load_without_audit_file;
          "load missing trades.csv raises"

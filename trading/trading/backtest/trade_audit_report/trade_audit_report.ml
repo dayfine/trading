@@ -3,6 +3,7 @@
 open Core
 module TA = Backtest.Trade_audit
 module Stop_log = Backtest.Stop_log
+module Split_safe = Backtest.Split_safe_metric
 
 module Trade_audit_ratings = Trade_audit_ratings
 (** Re-export the per-trade-rating + analysis library so external callers can
@@ -68,6 +69,7 @@ type t = {
   best_worst : best_worst;
   rows : per_trade_row list;
   analysis : analysis option;
+  split_safe_tally : Split_safe.tally;
 }
 [@@deriving sexp]
 
@@ -244,6 +246,15 @@ let _compute_analysis ~config ~closes_lookup ~trade_audit ~trades :
     in
     Some { ratings; behavioral; weinstein; decision_quality }
 
+(* The basis tag lives on the entry decision, so the population is the audit
+   records themselves — not the joined round-trips. An entry still open at
+   end-of-run exercised [split_safe_floors] exactly as much as a closed one;
+   counting over [rows] would drop it and understate the denominator. *)
+let _compute_split_safe_tally (trade_audit : TA.audit_record list) =
+  List.map trade_audit ~f:(fun (r : TA.audit_record) ->
+      r.entry.split_safe_basis)
+  |> Split_safe.tally_of_bases
+
 let render ?scenario_name ?period_start ?period_end ?universe_size
     ?(ratings_config = Trade_audit_ratings.default_config)
     ?(closes_lookup = fun ~symbol:_ ~as_of:_ -> []) ~trade_audit ~trades () : t
@@ -261,7 +272,8 @@ let render ?scenario_name ?period_start ?period_end ?universe_size
   let analysis =
     _compute_analysis ~config:ratings_config ~closes_lookup ~trade_audit ~trades
   in
-  { header; best_worst; rows; analysis }
+  let split_safe_tally = _compute_split_safe_tally trade_audit in
+  { header; best_worst; rows; analysis; split_safe_tally }
 
 (* Markdown formatting ---------------------------------------------------- *)
 
@@ -418,6 +430,54 @@ let _format_table (rows : per_trade_row list) : string list =
   in
   head @ body @ [ "" ]
 
+(* Which of the three causes put the population in [Not_exercised]. The order
+   mirrors {!Backtest.Split_safe_metric.inertness}: a [flag_off] count is the
+   loudest signal (the flag never reached the scan at all) and so is reported
+   first even when empty windows are also present. *)
+let _not_exercised_cause (tally : Split_safe.tally) =
+  if tally.flag_off > 0 then
+    sprintf
+      "%d decision(s) carry flag_off, so none reached the basis choice. In a \
+       run configured split_safe_floors=true that is a wiring alarm, not a \
+       data point."
+      tally.flag_off
+  else if tally.empty_window > 0 then
+    sprintf
+      "the flag reached the scan, but all %d lookback window(s) were empty — \
+       the mechanism ran with nothing to act on, so this run has no exposure \
+       to it."
+      tally.empty_window
+  else "no entry decisions were captured, so this run says nothing either way."
+
+(* Always emitted. An omitted section is indistinguishable from an arm that was
+   inert, which is precisely the confusion [Split_safe_metric.inertness]
+   exists to prevent — so the undefined case gets prose, never a percentage and
+   never a blank. *)
+let _format_split_safe (tally : Split_safe.tally) : string list =
+  let total =
+    tally.flag_off + tally.adjusted + tally.raw_fallback + tally.empty_window
+  in
+  let counts =
+    sprintf
+      "- Basis of %d entry decision(s): adjusted %d, raw_fallback %d, flag_off \
+       %d, empty_window %d"
+      total tally.adjusted tally.raw_fallback tally.flag_off tally.empty_window
+  in
+  let inertness =
+    match Split_safe.inertness_of_tally tally with
+    | Split_safe.Inert_fraction f ->
+        sprintf
+          "- Inert fraction (raw_fallback / (raw_fallback + adjusted)): %s"
+          (_fmt_pct_unsigned (f *. 100.0))
+    | Split_safe.Not_exercised t ->
+        sprintf
+          "- Inert fraction: NOT EXERCISED \xe2\x80\x94 the denominator is \
+           zero, so there is no measurement here; this is not zero inertness. \
+           %s"
+          (_not_exercised_cause t)
+  in
+  [ "## Split-safe floor basis"; ""; counts; inertness; "" ]
+
 let _format_analysis (a : analysis) : string list =
   Trade_audit_ratings.format_per_trade_extras ~ratings:a.ratings
   @ Trade_audit_ratings.format_behavioral_section a.behavioral
@@ -429,6 +489,7 @@ let to_markdown (t : t) : string =
     _format_header t.header
     @ _format_aggregate t.best_worst t.rows
     @ _format_table t.rows
+    @ _format_split_safe t.split_safe_tally
   in
   let analysis_lines =
     match t.analysis with Some a -> _format_analysis a | None -> []

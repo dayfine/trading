@@ -29,8 +29,9 @@ module Trade_score = Trade_score
 
 (** {1 Document model}
 
-    The rendered document has three sections — a scenario header, an aggregate
-    summary (best / worst, hit-rate), and a per-trade table. All three are
+    The rendered document has four core sections — a scenario header, an
+    aggregate summary (best / worst, hit-rate), a per-trade table, and the
+    split-safe floor-basis summary — plus the optional analysis layer. All are
     computed from the inputs at {!render} time and surfaced on {!t} so callers
     can introspect the report before formatting. *)
 
@@ -143,6 +144,21 @@ type t = {
       (** [Some _] when at least one trade in the run has a matching audit
           record. [None] for pre-PR-2 outputs where no audit was captured — the
           markdown renderer skips the analysis sections in that case. *)
+  split_safe_tally : Backtest.Split_safe_metric.tally;
+      (** How this run's [stops_config.split_safe_floors] basis tags distribute,
+          counted over every {!Backtest.Trade_audit.entry_decision} in the
+          [trade_audit] argument — {b not} over the round-trips in [rows]. The
+          tag is recorded per entry decision, so entries still open at
+          end-of-run (and entries whose round-trip did not join) exercised the
+          mechanism just as much as closed ones; tallying over [rows] would
+          silently drop them.
+
+          The inert fraction itself is deliberately {b not} stored here. It is a
+          total function of this tally
+          ({!Backtest.Split_safe_metric.inertness_of_tally}), and a second
+          stored copy could disagree with the counts printed beside it. Callers
+          wanting the fraction call [inertness_of_tally] on this field, which is
+          exactly what {!to_markdown} does. *)
 }
 [@@deriving sexp]
 (** A complete trade-audit report ready to format. *)
@@ -183,7 +199,16 @@ val render :
 val to_markdown : t -> string
 (** Render [t] to a markdown string. Output is deterministic for a given [t] —
     no timestamps, no environment-dependent fields. The trailing newline is
-    included. *)
+    included.
+
+    The [## Split-safe floor basis] section is emitted unconditionally — a
+    report that silently omits it is indistinguishable from one whose arm was
+    inert, which is the confusion {!Backtest.Split_safe_metric.inertness} exists
+    to prevent. It prints the four counts, then either the inert fraction or,
+    when no decision reached the basis choice, an explicit not-exercised line
+    that names which of the three causes applies (flag never reached the scan /
+    every lookback window empty / no entry decisions at all). The not-exercised
+    line never renders as a percentage, so it cannot be read as "0% inert". *)
 
 (** {1 Loading from a scenario output directory} *)
 
