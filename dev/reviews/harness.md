@@ -1,4 +1,4 @@
-Reviewed SHA: 7416161efe747b6ea9fabc05a701bc8da6868cb5
+Reviewed SHA: a89e61da97ab690eb2c407a669865f37799f3681
 
 ## Structural QC — harness/audit-hook-gate-truthy (PR #2221), rework iteration 1 — DELTA
 
@@ -878,3 +878,298 @@ APPROVED
 ---
 _Posted by the lead-orchestrator on behalf of `qc-behavioral` (GHA run 30817481526). `gh` is absent in this runtime._
 
+
+---
+
+## PR #2231 — harness/audit-test-count-and-repo-root
+
+Reviewed SHA: 1c67a533e1798a286992a0bf28c9811a3f496388
+
+### Mutation-Tested Findings
+
+All three mutation checks from the structural review protocol were conducted and reproduced the author's claims exactly:
+
+**Mutation 1 (H-AUDIT-TEST-DISABLE-COUNT-TAUTOLOGICAL):** Shrinking `HOOK_DISABLE_VALUES` to `(0)`:
+- Pre-fix behavior: 30/30 green (tautological check), exit 0 — the array-against-itself check cannot detect the shrinkage
+- Post-fix behavior: 29 passed, 2 failed (scenarios 25a, 26a fail), exit 1 — the independent `HOOK_DISABLE_EXPECTED_COUNT=6` constant detects the mismatch
+- **Verdict:** Fix confirmed. The constant is a true second source of truth.
+
+**Mutation 2 (HOOK_DISABLE_EXPECTED_COUNT independence):** Padding the array to 7 values:
+- Constant remains `6` (hardcoded literal)
+- Rendered message shows all 7 array values via `_disable_values_repr()` helper
+- Tests fail with `exercised 7` vs `expected 6`
+- **Verdict:** Constant is genuinely independent; drift is detected on edit.
+
+**Mutation 3 (H-WRITE-AUDIT-REPO-ROOT-NOT-REDIRECTABLE):** Reverting `write_audit.sh`'s precedence order (walk-up first, REPO_ROOT fallback):
+- Scenario 27 fails with `target_count=0, walkup_count=1` — record lands in WALKUP_ROOT instead of TARGET_ROOT
+- Restoring the fix returns scenario 27 to PASS
+- **Verdict:** Regression scenario 27 is a valid discriminator of the bug.
+
+### Structural Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt | PASS | Exit code 0 |
+| H2 | dune build | PASS | Exit code 0 |
+| H3 | dune runtest | PASS | Exit code 0; 31 tests, 31 passed, 0 failed |
+| P1 | Functions ≤ 50 lines (linter) | PASS | `record_qc_audit_test.sh`: `_disable_values_repr()` is 5 lines; `write_audit.sh` pre-change/post-change are both well under 50. Linter passed as part of H3. |
+| P2 | No magic numbers (linter) | PASS | Linter passed as part of H3 |
+| P3 | Config completeness | NA | No config records; shell test/harness scripts only |
+| P4 | Public-symbol export hygiene | NA | Shell scripts only (no `.mli` / `.ml` files) |
+| P5 | Internal helpers prefixed per convention | PASS | `_disable_values_repr()` correctly uses underscore prefix (internal helper). No violations in diff. |
+| P6 | Tests conform to project test-patterns | PASS | Shell test framework, not OCaml/OUnit. Scenarios 25a, 26a, 27 all follow assertion/pass/fail convention: explicit test name, clear expected vs actual on failure, no nested assertions. |
+| A1 | Core module modifications | NA | No core trading modules (`portfolio/`, `orders/`, `position/`, `strategy/`, `engine/`) touched |
+| A2 | analysis/→trading/ imports | NA | No dune files modified |
+| A3 | No unnecessary module modifications | PASS | Only 3 files: `dev/status/harness.md` (docs), `record_qc_audit_test.sh` (test harness), `write_audit.sh` (test harness helper). All changes are targeted to the two findings + docs. `dev/status/_index.md` not touched (correct). |
+
+### Quality Score
+
+5 — Both fixes are minimal, well-motivated, mutation-tested against the specific bugs they address, and introduce new regression scenarios (27) to pin the hazard permanently. The additional `set -euo pipefail` safety fix (ls→find) removes a latent defect class from the codebase. Exemplary test-harness work.
+
+### Verdict
+
+APPROVED
+
+---
+
+
+---
+
+## Behavioral QC — harness/audit-test-count-and-repo-root (PR #2231)
+
+Reviewed SHA: 1c67a533e1798a286992a0bf28c9811a3f496388
+
+Pure test-harness / infrastructure PR. Touches `trading/devtools/checks/record_qc_audit_test.sh`,
+`trading/devtools/checks/write_audit.sh`, `dev/status/harness.md`. No Weinstein domain logic.
+
+Baseline: `bash trading/devtools/checks/record_qc_audit_test.sh` → **31 passed, 0 failed, exit 0** (1.6s).
+
+### Contract Pinning Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| CP1 | Each non-trivial claim in new .mli docstrings has an identified test that pins it | NA | Shell-only PR; no OCaml modules, no `.mli` added. |
+| CP2 | Each claim in PR body / status-file "Test coverage" has a corresponding test in the committed test file | PASS | Every advertised artefact exists and behaves as advertised, verified by re-running the author's own mutations. `HOOK_DISABLE_EXPECTED_COUNT=6` (L1269) + `_disable_values_repr()` (L1263-1270) present; scenarios 25a/26a compare against the constant (L1311, L1369); scenario 27 present (L1388-1434). Claimed counts confirmed: "31 assertions across 27 scenarios" → measured 31/31. Mutation claims reproduced exactly — see Probes A/B below. |
+| CP3 | Pass-through / identity / invariant tests pin identity, not just size | PASS | Scenario 27's contract is a *routing* identity ("which root did the record land in"), and the paired `target_count27==1` / `walkup_count27==0` assertion does establish it. Nit (non-blocking): it pins neither the record's filename nor its JSON contents — those are pinned by scenarios 1/8/9/20 through the same code path, so the residual is small. |
+| CP4 | Each guard called out explicitly in code docstrings has a test that exercises the guarded-against scenario | **FAIL** | The new `_repo_root()` docstring (`write_audit.sh` L153-168) states a two-branch contract — `$REPO_ROOT` wins, *"and only falls back to the `.git`/`.claude` walk-up if unset"*. Only the first branch is pinned. Deleting the entire walk-up block leaves the suite **31/31 green** (Probe C). See B1. |
+
+### Behavioral Checklist (Weinstein domain)
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| A1, S1–S6, L1–L4, C1–C3, T1–T4 | — | NA | Pure infra / harness PR; domain checklist not applicable per `.claude/rules/qc-behavioral-authority.md` §"When to skip this file entirely". qc-structural did not raise A1 (no core-module changes). |
+
+### Probes run (all measured, not reasoned)
+
+| Probe | Mutation / action | Measured result |
+|---|---|---|
+| **A** | Pad `HOOK_DISABLE_VALUES` to 7 (`… "" off`), constant left at 6 | **29 passed, 2 failed**, exit 1. Message: `expected … for all 6 documented 'off' spellings ('0' 'false' 'no' 'yes' 'true' '' 'off'); exercised 7; offending values:none` |
+| **B** | Shrink array to `(0)` (the original tautology mutation) | **29 passed, 2 failed**, exit 1. Message: `… for all 6 documented 'off' spellings ('0'); exercised 1; offending values:none` |
+| **B2** | Shrink array to `(0)` **and** lower constant to `1` | **31 passed, 0 failed**, exit 0 — coverage silently back to one spelling |
+| **C** | Delete the `.git`/`.claude` walk-up from `write_audit.sh:_repo_root()` | **31 passed, 0 failed, exit 0** — suite completely blind |
+| **E1** | `REPO_ROOT=$T bash write_audit.sh` from a fake checkout with its own `.claude` | Record → `$T` (1), checkout (0). **Fix works.** |
+| **E2** | Same override via `bash record_qc_audit.sh` (the wrapper) | Record → **checkout** (1), `$T` (0). **Override defeated.** |
+| **F** | Probe E2 re-run against pre-fix `write_audit.sh` | Identical (checkout 1, `$T` 0) → E2 is **pre-existing, not a regression** |
+| **G1/G2** | Proposed 27b: `env -u REPO_ROOT`, fixed code / walk-up-deleted code | G1 rc=0, record under walk-up root. G2 rc=1, `FAIL: could not locate repo root`. Pin is feasible and discriminating. |
+
+### Assessment of the two claimed fixes
+
+**H-AUDIT-TEST-DISABLE-COUNT-TAUTOLOGICAL — genuinely fixed.** The tautology has moved
+from *agreement-by-construction* (one edit, undetectable) to *agreement-by-two-coordinated-edits*
+(Probe B2), which is the standard and correct escape from a self-referential assertion; the
+inline comment at L1259-1268 names that residual and warns against it explicitly. Critically,
+the failure message steers a maintainer **correctly** in the dangerous direction: Probe B prints
+`for all 6 … ('0'); exercised 1`, where the array-derived repr makes the five lost spellings
+visually obvious right next to the expected count — it reads as "you dropped five", not as
+"lower the constant". `_disable_values_repr()` is doing real work here, not decoration.
+
+**H-WRITE-AUDIT-REPO-ROOT-NOT-REDIRECTABLE — fix is correct, coverage is half.** The
+precedence flip does what it claims (Probe E1) and matches `_check_lib.sh:66-68`. Scenario 27
+is a well-built discriminating test for the override direction. The gap is the other direction
+(B1).
+
+### Quality Score
+
+2 — Below standard. The two fixes are individually correct and unusually well-evidenced (real mutation runs, an avoided `pipefail`/`ls`-glob trap, honest in-file scoping notes), but a PR whose entire subject is *reordering two branches* ships with only one branch pinned, and the unpinned one is the production path — the same "coverage claim that isn't" defect class this PR exists to close.
+
+### Verdict
+
+NEEDS_REWORK
+
+### NEEDS_REWORK Items
+
+#### B1 (CP4): the walk-up fallback direction of `_repo_root()` is entirely unpinned
+- **Finding:** `write_audit.sh:_repo_root()` now has two branches — explicit `$REPO_ROOT`, then the `.git`/`.claude` walk-up. Scenario 27 pins only the first. Deleting the walk-up block outright (Probe C) leaves the suite at **31/31 green, exit 0**: every existing caller in `record_qc_audit_test.sh` sets `REPO_ROOT` explicitly, and the new scenario 27 does too, so no test in the suite ever reaches the walk-up. The walk-up is nonetheless the **only** path used in production: the orchestrator's documented direct invocation (`.claude/agents/lead-orchestrator.md` L1414, the `record_qc_audit.sh`-failure fallback) runs `bash trading/devtools/checks/write_audit.sh --date … ` with `REPO_ROOT` unset. A future refactor that breaks or drops the walk-up ships green and silently strands the orchestrator's audit writes.
+- **Location:** `trading/devtools/checks/write_audit.sh` L153-181 (`_repo_root`); `trading/devtools/checks/record_qc_audit_test.sh` L1388-1434 (scenario 27).
+- **Authority:** the PR's own new docstring, `write_audit.sh` L153-156: *"An explicitly-set REPO_ROOT takes precedence over the walk-up … only falls back to `$REPO_ROOT` when it found nothing"*; and `dev/status/harness.md` L464: *"`_repo_root()` now checks `$REPO_ROOT` first **and only falls back to the `.git`/`.claude` walk-up if unset**"* plus the explicit non-regression claim *"this reorder only changes behaviour for the ad-hoc-invocation case only"*. Both halves are asserted; one half is tested. CP4: "FAIL if the docstring names an edge case but no test covers it."
+- **Required fix:** add scenario 27b reusing scenario 27's existing `WALKUP_ROOT` fixture — invoke the copied `write_audit.sh` under `env -u REPO_ROOT` and assert rc=0, `OK: wrote`, and exactly 1 record under `WALKUP_ROOT/dev/audit`. Verified feasible and discriminating: Probe G1 (fixed code) rc=0 with the record present; Probe G2 (walk-up deleted) rc=1 with `FAIL: could not locate repo root`. Roughly 8 lines; bump the header count to 32 assertions / 28 scenarios.
+- **harness_gap:** LINTER_CANDIDATE — "every branch of a repo-root resolver is exercised by at least one scenario" is mechanically checkable; the `repo_root()`/`_repo_root()` precedence family is already named as a linter candidate in the same status entry.
+
+### Non-blocking follow-ups (file separately; do not gate this PR)
+
+#### B2: the stated rationale for leaving `record_qc_audit.sh` unfixed is measurably wrong
+`dev/status/harness.md` L464 scopes the sibling out because *"the two scripts' `REPO_ROOT` usage is
+independently overridable."* Probe E2 disproves this: `REPO_ROOT=$T bash record_qc_audit.sh probe …`
+writes into the **walked-up live repo**, not `$T`. Mechanism — `record_qc_audit.sh` L102 does
+`REPO_ROOT="$(_repo_root)"`, overwriting the inherited value; because `REPO_ROOT` arrived via the
+caller's `VAR=x cmd` prefix it is already *exported*, so the overwritten walk-up value stays exported
+and becomes exactly what `write_audit.sh`'s **newly-first** `$REPO_ROOT` branch consumes. The sibling's
+bug therefore propagates *through* this PR's new precedence rather than being independent of it.
+Probe F confirms the wrapper behaves identically pre-fix, so this is **pre-existing and not a
+regression** and the scope call itself is defensible — but the residual is understated and the reason
+given should be corrected. Fix: apply the same three-line reorder to `record_qc_audit.sh` L85-100, or
+amend the status note to say the wrapper path remains un-redirectable.
+
+#### B3: the pad-direction message still self-contradicts
+Probe A prints `for all 6 documented 'off' spellings ('0' 'false' 'no' 'yes' 'true' '' 'off')` — states 6,
+lists 7. This is the same self-contradiction class the PR fixed in the shrink direction. Mitigated because
+`exercised 7` appears on the same line, so a maintainer is not actually misled. Cheapest fix: print
+`${#HOOK_DISABLE_VALUES[@]}` alongside the repr, or word it as `expected ${HOOK_DISABLE_EXPECTED_COUNT},
+array holds ${#HOOK_DISABLE_VALUES[@]}: <repr>`.
+
+#### B4: `6` has no mechanical tie to the documentation it encodes — and that documentation is self-inconsistent
+`HOOK_DISABLE_EXPECTED_COUNT=6` traces to `write_audit.sh` L451-453 (BEFORE_RENAME: *"`0`, `false`, `no`,
+`yes`, `true`, the empty string, unset"* = 6 settable spellings). Nothing connects the constant to that
+block; they are two hand-maintained lists in different files that can drift. Separately — and pre-existing
+— the AFTER_RENAME block (L511-513) enumerates only *three* (*"`0`, `false`, the empty string and unset"*),
+so `write_audit.sh`'s two ACCEPTED SPELLING docstrings already disagree about their own contract, and `6`
+matches only one of them. The test applying all six values to both hooks is a strict superset and therefore
+sound, but the docs should be reconciled. Full mechanical derivation is probably not worth it (the source
+is prose); reconciling the two blocks and cross-referencing the constant is.
+
+### Premise checked and dropped
+
+The dispatch asked whether an ambient `REPO_ROOT` (CI, dune sandbox, a wrapper) could make a
+previously-correct in-repo invocation silently write elsewhere. **The premise is false.** No `REPO_ROOT`
+appears in any of the 15 files under `.github/workflows/`, and there is no `export REPO_ROOT` anywhere
+outside `_build/`. The only path by which `REPO_ROOT` reaches `write_audit.sh` from a non-test caller is
+the `record_qc_audit.sh` re-export described in B2, and Probe F shows that path is behaviourally
+unchanged by this PR. No blast-radius finding.
+
+---
+_Posted by the lead-orchestrator on behalf of `qc-behavioral`. `gh` is absent in this runtime._
+
+---
+
+## Delta Review — PR #2231, Rework Iteration 1
+
+**Reviewed SHA:** a89e61da97ab690eb2c407a669865f37799f3681 (2 commits on top of approved 1c67a533)
+
+### The B1 Critical Finding
+
+qc-behavioral correctly identified that **scenario 27 only pins the REPO_ROOT-precedence direction**; it never exercises the walk-up branch. Every caller in the test file sets `REPO_ROOT` explicitly, so the walk-up code was entirely unpinned — despite being the **only path production uses** (`lead-orchestrator.md` invokes with `REPO_ROOT` unset).
+
+#### B1 Mutation Test
+
+Deleted the entire walk-up block (`dir=...` through `done`) from `_repo_root()`:
+- Result: **31 passed, 1 failed**, exit 1
+- Sole failure: **scenario 27b** (`expected rc=0 + 'OK: wrote' + exactly 1 record under WALKUP_ROOT; got rc=1, walkup_count=0`)
+- Scenario 27 still passes (never reaches walk-up code)
+- **Verdict:** 27b correctly discriminates the walk-up branch. ✅
+
+#### Scenario 27b Implementation Soundness
+
+- **Fixture independence:** Scenario 27 asserts `walkup_count27 == 0` (record went to TARGET_ROOT), so WALKUP_ROOT/dev/audit is empty at start of 27b. Scenario 27b reuses that fixture and asserts `walkup_count27b == 1`. No vacuous pass possible. ✅
+- **Unset mechanism:** `env -u REPO_ROOT bash ...` correctly unsets the variable before invocation. ✅
+- **Shell safety:** Uses `find` (not `ls`), which is safe under `set -euo pipefail`. No unguarded glob/pipe traps. ✅
+
+### The B2 Corrected Rationale
+
+Original claim: `record_qc_audit.sh`'s sibling `_repo_root()` was "out of scope because the two scripts' REPO_ROOT usage is independently overridable."
+
+**Measured finding:** This rationale was **false**. Because bash's export attribute persists across a plain (non-`export`) reassignment of an already-exported variable, when `record_qc_audit.sh` does `REPO_ROOT="$(_repo_root)"`, it silently overwrites any caller override with its own walked-up value, which then propagates through to `write_audit.sh` as a child process. Author verified this with a two-script export-persistence repro (`REPO_ROOT="from-caller" bash mid.sh` where `mid.sh` reassigns `REPO_ROOT="from-mid"` and invokes child: child sees `from-mid`, not `from-caller`).
+
+**Scope unchanged, but rationale corrected:** Leaving `record_qc_audit.sh`'s sibling `_repo_root()` unfixed because the finding named `write_audit.sh` specifically and fixing the sibling would require mutation-tested regression coverage (same rigor as above), which is new scope for a rework PR. **Filed as follow-up:** `H-RECORD-QC-AUDIT-REPO-ROOT-SIBLING` (explicitly scheduled, not a dangling "worth a follow-up" note). ✅
+
+### Non-Blocking Findings B3 and B4
+
+**B3 — Wording inconsistency (pad direction):** Adding a 7th value to `HOOK_DISABLE_VALUES` prints `for all 6 ... (7-element list)` — internally contradictory like the pre-fix shrink direction. Functionally harmless (tests still fail), but wording is messy. Fix: word as "expected N, exercised M" without conflating the count with the list. **Filed:** `H-AUDIT-TEST-DISABLE-COUNT-PAD-DIRECTION-WORDING`.
+
+**B4 — Docstring drift:** `write_audit.sh`'s BEFORE_RENAME block lists 6 accepted spellings; AFTER_RENAME block lists only 3. `HOOK_DISABLE_EXPECTED_COUNT=6` matches the superset (tests are sound), but the constant has no mechanical tie to the docs. Fix: reconcile the docstrings or explain the superset in a comment. **Filed:** `H-AUDIT-HOOK-DISABLE-COUNT-DOCSTRING-DRIFT`.
+
+### Structural Checklist (Delta)
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt | PASS | Exit code 0 |
+| H2 | dune build | PASS | Exit code 0 |
+| H3 | dune runtest | PASS | Exit code 0; 32 passed, 0 failed (27b integrated) |
+| B1 | Scenario 27b pins walk-up branch | PASS | Mutation-tested: deleting walk-up kills 27b alone (31 pass, 1 fail). Fixture independent. ✅ |
+| B2 | Status file B2 rationale corrected | PASS | Export-persistence mechanism measured and documented. `record_qc_audit.sh` sibling filed as follow-up. ✅ |
+| B3/B4 | Backlog items B3/B4 filed | PASS | Non-blocking wording + docstring issues captured. ✅ |
+| P1–P5, A1–A3 | (unchanged from first pass) | PASS | Delta touches only test scenarios + status docs; no new code violations. |
+
+### Quality Score
+
+5 — The B1 mutation methodology is rigorous (two-direction testing: precedence reversal verified first, now deletion of one branch verified). Status file corrections are measured against live behavior, not overclaimed. Backlog items are properly filed rather than lost to prose notes. Work demonstrates scientific discipline on a subtle harness hazard.
+
+### Verdict
+
+APPROVED
+
+---
+
+---
+
+## Behavioral QC — harness/audit-test-count-and-repo-root (PR #2231), rework iteration 1 — DELTA
+
+Reviewed SHA: a89e61da97ab690eb2c407a669865f37799f3681
+
+Delta pass over `1c67a533..a89e61da` (39 insertions, 2 files). Prior-pass PASS rows on CP1/CP2/CP3 stand unchanged; only CP4 was in question. Baseline at the new tip: `bash trading/devtools/checks/record_qc_audit_test.sh` -> **32 passed, 0 failed, exit 0**.
+
+### Contract Pinning Checklist (delta)
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| CP1 | .mli docstring claims pinned | NA | Unchanged — shell-only PR, no OCaml modules. |
+| CP2 | PR-body / status-file claims have corresponding tests | PASS | Delta claims re-verified independently and reproduce exactly. Scenario 27b at L1436-1462. Claimed "32 assertions" -> measured 32. B1 mutation claim reproduced verbatim (Probe H). B2's export-persistence repro reproduced (Probe B2-2). |
+| CP3 | Identity pinned, not just size | PASS | Unchanged. 27b asserts rc=0 **and** `OK: wrote` **and** exactly 1 record — the rc/`OK:` guards prevent a stale-fixture false pass. |
+| CP4 | Guards named in docstrings have tests exercising the guarded-against scenario | **PASS** (was FAIL) | Both branches of `_repo_root()`'s two-branch contract are now pinned. 27 pins override-beats-walk-up; 27b pins walk-up-when-unset — the branch production actually uses (`lead-orchestrator.md` L1414). Verified at contract level: 27b catches 3 of 4 independently-constructed subtler walk-up regressions. |
+
+### Behavioral Checklist (Weinstein domain)
+
+All rows (A1, S1-S6, L1-L4, C1-C3, T1-T4) **NA** — pure infra / harness PR; domain checklist not applicable per `.claude/rules/qc-behavioral-authority.md` §"When to skip this file entirely".
+
+### Probes run (delta pass, all measured)
+
+| Probe | Action | Measured result |
+|---|---|---|
+| Baseline | suite at `a89e61da` | **32 passed, 0 failed, exit 0** |
+| H | Delete entire walk-up block (the original B1 mutation, previously 31/31 green) | **31 passed, 1 failed, exit 1**; sole failure 27b (`rc=1, walkup_count=0`, `FAIL: could not locate repo root`); 27 still passes |
+| K1 | Sentinel narrowed to `.git` only | 31/1 — 27b FAIL, caught |
+| K2 | Sentinel narrowed to `.claude` only | 32/0 — not caught (R3; not a real regression here) |
+| K3 | Walk-up returns `dirname` of the sentinel | 31/1 — 27b FAIL, caught |
+| K4 | Walk-up starts from `$PWD` not `dirname $0` | 31/1 — 27b FAIL, caught (R2) |
+| I1 | Full suite with ambient `REPO_ROOT="$PWD"` | 32/0, live `dev/audit` 104->104 (no leak) |
+| I2 | Same with `env -u REPO_ROOT` removed from 27b | 31/1 **and leaked** into live `dev/audit` (104->105) |
+| J1 | Scenario 27's write neutralized, fixture kept | 27 FAIL, **27b PASS** — no dependence on 27 running |
+| J2 | Revert the precedence fix (walk-up first) | 30/2 — both red; over-reports, never false-green |
+| J4 | Remove the `WALKUP_ROOT` fixture | `WALKUP_ROOT: unbound variable`, exit 1 — fails loud under `set -u` |
+| L1/L2/L3 | `set -euo pipefail` audit of all 3 substitution sites in 27b | All safe |
+| B2-1/2/3 | `record_qc_audit.sh` diff; export-persistence toy repro; E1/E2 re-run | Walk-up-first confirmed L85-100 + plain reassign L102; E1 = 1/0, E2 = 0/1 |
+
+### Assessment
+
+**B1 — closed at the contract level, not just the mutation.** 27b catches a narrowed sentinel (K1), a wrong-ancestor return (K3), and a wrong starting directory (K4) in addition to full deletion (H). Only K2 slips, and K2 is not a real regression: this repo's root carries both `.git` and `.claude`, so narrowing to `.claude` alone changes nothing in production. A fixture limitation, not a contract gap.
+
+**`env -u REPO_ROOT` is load-bearing — the best detail in the delta.** Probe I2 measured it: with the guard removed and the suite run under an ambient `REPO_ROOT`, 27b not only fails, it writes a record into the **live `dev/audit/`** — reproducing the exact litter bug this item was filed for, inside the test meant to pin it. Necessary, not cosmetic, and it is the same export-persistence mechanism the B2 correction documents.
+
+**Ordering coupling — sound and fail-loud in every direction constructed.** 27b depends on the *fixture*, not 27's side effects (J1). Fixture removal is an unbound-variable abort, not a silent pass (J4). A precedence revert reddens both with a readable `walkup_count=2` (J2). No false-green path exists today.
+
+**No fourth instance of the unguarded-substitution class.** All three substitution/pipeline sites in the new block are safe under `set -euo pipefail`. The `find` (not `ls`-glob) choice carried over correctly from scenario 27.
+
+**B2 — accurate, not merely different.** Every claim in the replacement text was verified independently, *including the negative direction*: with the caller not setting `REPO_ROOT`, the child sees `<unset>` rather than the mid-script's plain var — so the qualifier "of an already-**exported** variable" is precise rather than sloppy. The efficacy claim is correctly narrowed ("does not close the leak **when reached through** `record_qc_audit.sh`"); direct invocation still works (E1 = 1/0). A dangling prose note became a real backlog item with a fix shape. This is a retraction that lands.
+
+## Quality Score
+
+4 — Precise, minimal, correctly targeted: it pins the contract rather than the one mutation that exposed it, the `env -u` guard is demonstrably load-bearing, the new code introduces no `pipefail` trap in a file that has produced three, and the B2 rationale was corrected with measured evidence rather than quietly softened. Three minor robustness residuals keep it below exemplary.
+
+## Verdict
+
+APPROVED
+
+## Non-blocking residuals (filed; do not gate this PR)
+
+- **R1** — 27b's `walkup_count27b == 1` is a cumulative count on a fixture shared with 27. Robust today (J2 confirms no false-green) but sensitive to any future scenario writing into `WALKUP_ROOT`. Fix shape: snapshot the count before 27b and assert a delta of exactly 1, or give 27b its own fixture.
+- **R2** — under a `$PWD`-resolving walk-up regression (K4), 27b goes red *and* leaves a stray record in the live `dev/audit/`. Inherent to exercising the unset-`REPO_ROOT` path with an in-tree script; the test does go red so a human looks. Fix shape: `cd` to a scratch dir for the 27b invocation.
+- **R3** — K2 unpinned: narrowing the sentinel to `.claude` only is not caught, since `WALKUP_ROOT` carries only `.claude`. Low value; closing it needs a `.git`-sentinel fixture variant.
