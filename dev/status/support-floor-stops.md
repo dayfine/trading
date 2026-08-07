@@ -1,6 +1,6 @@
 # Status: support-floor-stops
 
-## Last updated: 2026-08-06
+## Last updated: 2026-08-07
 
 ## Status
 IN_PROGRESS
@@ -9,7 +9,9 @@ IN_PROGRESS
 YES
 
 ## Open PR
-None — the queue is empty on this track.
+- `feat/split-safe-empty-window-panel` — B5 + B6, the two remaining documented
+  gaps in the F5 telemetry that gate the `split_safe_floors` promotion surface.
+  See the 2026-08-07 addendum below.
 
 ## Recently merged
 - `feat/split-safe-fallback-telemetry` — **MERGED #2220 `480a59b7`** (2026-08-06),
@@ -513,8 +515,122 @@ qc-structural APPROVED 5/5 at `7e3b2586` (independently reproduced MT1 at
   `test_entry_audit_capture` 40 → 45, `test_trade_audit` 26 → 28,
   `test_trade_audit_recorder` 0 → 3 (new module test).
 
+## 2026-08-07 addendum — B5 + B6, the last two telemetry gaps (PR branch `feat/split-safe-empty-window-panel`)
+
+Closes **B5** and **B6**. Both were raised by qc-behavioral during #2220's rework
+round and recorded in `dev/daily/2026-08-06.md` §Follow-up Queue, but the
+corresponding edit to this file was **lost to shared-tree churn** — they never
+appeared in §Follow-ups below. They are filed there now (struck through, since
+this PR closes them) so the audit trail is not a dangling reference to a daily
+summary.
+
+Telemetry + test work only. No behaviour change, no stop level moves,
+`split_safe_floors` stays default-off; no default is flipped
+(`.claude/rules/experiment-flag-discipline.md` R3 — there is still no ledger
+ACCEPT).
+
+- **B5 — `Empty_window` pinned on the bar-list path only.** When the fourth
+  basis state landed (#2220 rework, B3) it was pinned in
+  `stops/test/test_support_floor.ml` but not in
+  `strategy/test/test_panel_callbacks.ml`, which carried siblings for the other
+  three (`Flag_off`, `Raw_fallback`, `Adjusted`). "Covered on one path, silently
+  unexercised on the other" is this track's documented recurring defect class —
+  it was #2213's B3 and the shape #2220's B1 landed in.
+
+  Fixed by one panel test asserting both configs on one view: flag-off reports
+  `Flag_off`, flag-on reports `Empty_window`. The empty view is reached the way
+  production reaches it — `Snapshot_bar_views.daily_view_for` asked for a symbol
+  the snapshot has no rows for, on a calendar that *does* contain the `as_of`,
+  so the emptiness comes from `_read_daily_tables` finding no raw-close rows (the
+  newly-listed / snapshot-missing-symbol route) rather than from an unresolvable
+  `as_of` or a non-positive lookback.
+
+  Deliberately **not** added: a panel sibling of the bar-list
+  `split_safe_empty_window_stop_matches_flag_off`. With `n_days = 0` every
+  accessor returns `None`, so `_rescaled` and the untouched bundle are
+  observationally identical and no plausible mutation of the empty branch can
+  redden such a test. It would have been coverage-shaped but green by
+  construction — the exact defect #2220's B2 was about.
+
+- **B6 — an all-`Empty_window` arm reports an undefined `0/0`.** The metric
+  documented on `Weinstein_stops.split_safe_basis` is
+  `Raw_fallback / (Raw_fallback + Adjusted)` with `Empty_window` excluded from
+  both terms (correct — folding non-events in inflates apparent inertness). But
+  that denominator can be zero, and a blank cell then reads as "this column was
+  never wired up". Those two states demand opposite responses: disqualify the arm
+  for lack of exposure, versus stop and fix the harness.
+
+  Fixed by making the undefined case a **named value rather than a rendered
+  blank**, in a new pure module `trading/trading/backtest/lib/split_safe_metric.{ml,mli}`:
+
+  ```
+  type inertness = Inert_fraction of float | Not_exercised of tally
+  ```
+
+  `Not_exercised` carries the tally so the *cause* survives to the site that
+  would otherwise print nothing: `flag_off > 0` is a wiring alarm; `empty_window
+  > 0` with `flag_off = 0` is a coverage problem; all-zero is an empty
+  population. A consumer must pattern-match, so `0/0` cannot silently reach a
+  report as `0.0`, `nan`, or a blank.
+
+  **Home: the audit layer, not the stops library.** The three re-declarations of
+  the variant (`Weinstein_stops`, `Audit_recorder`, `Trade_audit`) are distinct
+  OCaml types, and only the audit layer ever sees a *population* — the stops
+  entrypoint returns one tag per decision. A reduction in the stops library would
+  need a conversion at every call site and could not be used by the report that
+  will consume it.
+
+  **Deliberately not done:** no renderer. F6 below is exactly the report-row
+  follow-up, and inventing a renderer here would have pre-empted it. The
+  `.mli` prose that previously defined the metric in two places
+  (`weinstein_stops.mli`, `trade_audit.mli`) now points at the one reduction
+  instead of inviting each reader to re-derive the arithmetic.
+
+- **Mutation results** (baseline: `dune runtest` exit 0 with the new tests; each
+  mutation applied to the library, compile-checked, result read, then reverted
+  and confirmed byte-identical against a pre-mutation copy):
+
+  | mutation | strategy/test_panel_callbacks | backtest/test_split_safe_metric |
+  |---|---|---|
+  | MT5 — `Empty_window` branch removed from `_scan_basis` (empty windows fall through to `Raw_fallback`) | **1** | n/a |
+  | MB1 — undefined case returns `Inert_fraction 0.0` instead of `Not_exercised` | n/a | **3** |
+  | MB2 — `empty_window` folded into the denominator | n/a | **3** |
+  | MB3 — `Not_exercised` carries `empty_tally` instead of the real tally (cause dropped) | n/a | **2** |
+  | MB4 — `Empty_window` counted into `raw_fallback` (non-events inflate the numerator) | n/a | **4** |
+
+  MT5 is the B5 measurement and was run **twice** to establish the before/after
+  the finding claims. With the new panel test present it reddens
+  `Panel_callbacks parity:24:split_safe basis is Empty_window, not a fallback,
+  for an empty panel window` (25 cases, 1 failure, exit 1). With the same
+  mutation applied and `test_panel_callbacks.ml` reverted to `25d07cfc`, the
+  whole `trading/weinstein/strategy/test/` suite is **exit 0** (24 cases, 0
+  failures) — i.e. the panel path really was blind to the branch, which is the
+  finding.
+
+  MB1 failing assertions, verbatim: `Split_safe_metric:1:all Empty_window is
+  Not_exercised, not a number`, `Split_safe_metric:2:all Flag_off stays
+  distinguishable from all Empty_window`, `Split_safe_metric:3:empty population
+  is Not_exercised`. MB1 leaves `Split_safe_metric:7:all Adjusted is zero inert`
+  green, which is the point: `0.0` is a legitimate reachable reading, so it can
+  never be a safe rendering for the undefined case.
+
+- **Suite counts:** `test_panel_callbacks` 24 → 25, `test_split_safe_metric`
+  0 → 8 (new module test).
+
 ## Follow-ups
 
+- ~~**B5 (qc-behavioral, PR #2220 rework) — `Empty_window` pinned on only one of
+  two paths.** Filed late: raised in #2220's rework and recorded in
+  `dev/daily/2026-08-06.md` §Follow-up Queue, but the status-file edit was lost
+  to shared-tree churn, so it never reached this section. Original text: "the
+  panel path has telemetry siblings for the other three states but not the
+  fourth. Not blocking, but 'covered on one path, unexercised on the other' is
+  this track's documented recurring defect class (it was #2213's B3)."~~ —
+  **done 2026-08-07**, see the addendum above.
+- ~~**B6 (qc-behavioral, PR #2220 rework) — an all-`Empty_window` arm reports an
+  undefined `0/0` that reads as "column unwired".** Filed late for the same
+  reason as B5.~~ — **done 2026-08-07** via
+  `Backtest.Split_safe_metric.inertness`; see the addendum above.
 - ~~Round-number shading (§5.1)~~ — **already implemented; this line was stale.**
   `Stop_nudge.nudge_round_number` exists and `stop_types.ml` carries
   `round_number_nudge = 0.125`, applied by `Floor_stop.compute_initial_stop` and
@@ -572,7 +688,10 @@ qc-structural APPROVED 5/5 at `7e3b2586` (independently reproduced MT1 at
   under-states the effect and should be re-run. **When that surface is run,
   report the inert fraction from `trade_audit.sexp`'s `split_safe_basis` column
   alongside the metrics** — a cell whose entries are mostly `Raw_fallback` is
-  measuring baseline, not the mechanism.
+  measuring baseline, not the mechanism. Compute it with
+  `Backtest.Split_safe_metric.inertness_of_tally` rather than by hand: a cell
+  that comes back `Not_exercised` has **no** reading and must be disqualified,
+  not recorded as 0% inert.
 - **F9 (new, rework iteration 1) — `Stop_recompute` / `Stop_thread` scan under
   the flag untagged.** `split_safe_basis_of_bars` exists for them but no caller
   is wired, so the inert fraction is entry-time-only. Disclosed on
@@ -586,6 +705,12 @@ qc-structural APPROVED 5/5 at `7e3b2586` (independently reproduced MT1 at
   Cheap follow-up: one summary row (`Adjusted / Raw_fallback / Flag_off` counts)
   in the trade-audit report. Not blocking — the shell count is sufficient to
   qualify a surface — but a rendered row is what makes it hard to forget.
+  **Updated 2026-08-07 (B6):** the arithmetic is no longer the follow-up's
+  problem — `Backtest.Split_safe_metric.tally_of_bases` +
+  `inertness_of_tally` exist and are tested. F6 is now purely the rendering,
+  and it must render `Not_exercised` as something a reader cannot confuse with
+  a wired-but-zero column (the tally is carried on the constructor for exactly
+  that).
 - **F7 (new, from the F5 work) — telemetry covers entries only.** Screened but
   skipped candidates run a floor scan too and produce no `entry_decision`, so
   the inert fraction has an entries-denominator. Widening it would mean adding

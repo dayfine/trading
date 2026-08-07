@@ -1247,6 +1247,52 @@ let test_panel_split_safe_basis_far_offset_reports_fallback _ =
        (_split_long_view_blanked ~blank:(fun i -> i = 0)))
     (equal_to (Weinstein_stops.Raw_fallback : Weinstein_stops.split_safe_basis))
 
+(* B5. The fourth basis state, on the panel path. When [Empty_window] was
+   introduced (#2220 rework, B3) it was pinned only on the bar-list path, while
+   the panel path acquired siblings for the other three. "Covered on one path
+   and silently unexercised on the other" is this track's documented recurring
+   defect class — it was #2213's B3 and the shape #2220's B1 landed in.
+
+   The empty view is reached the way production reaches it rather than by
+   writing the [empty_daily_view] sentinel literal: [daily_view_for] is asked
+   for a symbol the snapshot holds no rows for, on a calendar that {b does}
+   contain [_split_as_of]. So the emptiness comes from [_read_daily_tables]
+   finding no raw-close rows — the newly-listed / snapshot-missing-symbol route,
+   one of the three live routes to [empty_daily_view] — and not from an
+   unresolvable [as_of] or a [lookback <= 0]. That view carries [n_days = 0]
+   into the callbacks, which is [_scan_basis]'s empty branch.
+
+   Both configs are asserted on the one view because the pair is the claim.
+   Flag-off must still short-circuit to [Flag_off]: no basis decision is taken
+   when the mechanism is off, whatever the window looks like. Flag-on must
+   report [Empty_window] and not [Raw_fallback]: folding the non-event into the
+   fallback would inflate the inert-fraction numerator with symbols the
+   mechanism was never given a chance to act on — a correctness bug in the very
+   number this telemetry exists to produce. *)
+let _absent_symbol_daily_view () =
+  let cb = build_snapshot_callbacks [ ("SPLT", _split_long_bars) ] in
+  let calendar =
+    Array.of_list
+      (List.map _split_long_bars ~f:(fun b -> b.Types.Daily_price.date))
+  in
+  Snapshot_bar_views.daily_view_for cb ~symbol:"ABSENT" ~as_of:_split_as_of
+    ~lookback:90 ~calendar
+
+let test_panel_split_safe_basis_empty_window_is_not_fallback _ =
+  let view = _absent_symbol_daily_view () in
+  assert_that
+    ( _panel_basis ~config:_cfg_split_off view,
+      _panel_basis ~config:_cfg_split_on view )
+    (all_of
+       [
+         field fst
+           (equal_to
+              (Weinstein_stops.Flag_off : Weinstein_stops.split_safe_basis));
+         field snd
+           (equal_to
+              (Weinstein_stops.Empty_window : Weinstein_stops.split_safe_basis));
+       ])
+
 let suite =
   "Panel_callbacks parity"
   >::: [
@@ -1290,6 +1336,8 @@ let suite =
          >:: test_panel_split_safe_basis_adjusted_when_window_rescalable;
          "split_safe basis reports the fallback for a far-offset bad cell"
          >:: test_panel_split_safe_basis_far_offset_reports_fallback;
+         "split_safe basis is Empty_window, not a fallback, for an empty panel \
+          window" >:: test_panel_split_safe_basis_empty_window_is_not_fallback;
        ]
 
 let () = run_test_tt_main suite
