@@ -10,8 +10,16 @@
       tuner cares about distinguishing them.
     - [entry_volume_ratio] — breakout-bar volume / 4-week avg volume at entry,
       sourced from {!Volume.result.volume_ratio}.
-    - [stop_initial_distance_pct] — [|entry - installed_stop| / entry], the
-      fractional distance from entry to the initial stop. 0.08 = 8%.
+    - [stop_initial_distance_pct] —
+      [|suggested_entry - installed_stop| / suggested_entry], the fractional
+      distance from the {b screener's} entry [E] to the initial stop. 0.08 = 8%.
+      {b E-basis, not fill-basis}: in arms whose fill diverges from [E] this
+      overstates stop depth vs cost (the 2026-08-07 confound; findings §4
+      RESOLVED) — for gate-basis analysis use [stop_fill_distance_pct].
+    - [stop_fill_distance_pct] — [|installed_stop - fill| / fill], the same
+      quantity the strategy's [Stop_too_wide] gate bounds and the V12 validator
+      checks; [fill] is the round trip's realized entry price. [None] when the
+      audit is missing or fill/stop is non-positive.
     - [stop_trigger_kind] — string label from
       {!Stop_log.classify_stop_trigger_kind}: [gap_down] / [intraday] /
       [end_of_period] / [non_stop_exit].
@@ -46,6 +54,7 @@ type t = {
   days_to_first_stop_trigger : int option;
   screener_score_at_entry : int option;
   position_id : string option;
+  stop_fill_distance_pct : float option;
 }
 [@@deriving sexp]
 (** One per-trade context row, keyed by [(symbol, entry_date)] for join with
@@ -61,17 +70,18 @@ val stop_trigger_kind_label : Stop_log.stop_trigger_kind -> string
     label: [gap_down] / [intraday] / [end_of_period] / [non_stop_exit]. *)
 
 val csv_header_fields : string list
-(** The 7 trailing column names for [trades.csv]: the 6 M5.2e columns
+(** The 8 trailing column names for [trades.csv]: the 6 M5.2e columns
     ([entry_stage], [entry_volume_ratio], [stop_initial_distance_pct],
     [stop_trigger_kind], [days_to_first_stop_trigger],
-    [screener_score_at_entry]) followed by [position_id]. Producers concatenate
-    these onto the legacy 13-column header so consumers can locate columns by
-    name. [position_id] is intentionally last so the fixed base-column indices
-    used by positional readers (e.g. the post-run validator's [exit_trigger]=12,
-    [stop_trigger_kind]=16) stay valid. *)
+    [screener_score_at_entry]), then [position_id], then
+    [stop_fill_distance_pct]. Producers concatenate these onto the legacy
+    13-column header so consumers can locate columns by name. New columns are
+    {b appended} so every fixed base-column index used by positional readers
+    stays valid (post-run validator's [exit_trigger]=12, [stop_trigger_kind]=16,
+    [position_id]=19; faithfulness harness's [stop_initial_distance_pct]=15). *)
 
 val csv_row_fields : t -> string list
-(** Render a {!t} as the 7 trailing CSV cells in the same order as
+(** Render a {!t} as the 8 trailing CSV cells in the same order as
     {!csv_header_fields}. Floats render at %.4f, ints as decimal, string labels
     verbatim. [None] renders as the empty cell — consumers must tolerate empty
     cells (the canonical M5.2e missing-data sentinel). *)
