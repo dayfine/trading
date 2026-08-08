@@ -1,6 +1,39 @@
 # Status: simulation
 
-## Last updated: 2026-08-06
+## Last updated: 2026-08-07
+
+### 2026-08-07 — next-bar-open Market-entry fill (Fix #1, branch `feat/sim-entry-next-open`, PR #2238)
+
+Plan: `dev/plans/fill-model-faithfulness-2026-08-07.md` Workstream C. Findings:
+`dev/notes/fill-model-fix-findings-2026-08-07.md` §5.
+
+**What.** New default-off strategy config flag `sim_entry_fill_next_open : bool
+[@sexp.default false]`. When true, a **Market ENTRY** order routing to an
+`Entering` position is held back on any step where its symbol has no fresh bar,
+so it fills at the **next fresh trading bar's open** instead of the signal bar
+the engine retains on non-trading (weekend/holiday) steps. Scope: Market entries
+only — exits, stops, StopLimit entries, and the decision-time `entry_price`
+(sizing / stops) are untouched.
+
+**Seam (deviates from the plan's `fill_router.ml:69` expectation).** The engine
+already fills Market entries at a bar's open, but `Market_state.update` keeps the
+last bar per symbol on empty-bar steps, so a Friday-close decision fills against
+that stale bar's own open (an optimistic, same-day price). Implemented as an
+optional generic `?can_fill` predicate on `Engine.process_orders` (`None` =
+bit-identical) + a new `Next_open_fill_gate` module that builds the entry-only
+gate from `positions` + `today_bars`; `panel_runner` threads the flag from the
+strategy config like `entry_extension_max_pct`. Extracted the gate to keep
+`simulator.ml` under the 500-line limit (517 → 484, no bump).
+
+**Status: DONE (PR #2238).** R1 (off = bit-identical, verified by the OFF test +
+cached-clean simulation/engine suites) + R2 (axis-expressible
+`((flag sim_entry_fill_next_open) (values (true false)))`). Tests
+(`test_sim_entry_next_open.ml`, 4): OFF stale-open fill, ON next-fresh-open fill,
+fill-basis-only (sizing unchanged), exits-unaffected-when-on.
+
+**Next.** Fix #2 (no-chase entry E, Workstream D) is the remaining scoped
+follow-up; then the honest ladder re-run (Step 3) under WF-CV + confirmation grid
+before any default flip.
 
 ### 2026-08-06 — book-faithful stop re-anchoring for E-anchored entries (branch `feat/stop-anchor-entry-base`)
 
