@@ -21,6 +21,7 @@ val run_macro_only :
     universe screen is gated off. *)
 
 val run_screen_after_macro :
+  pending_entry_e:Entry_freeze.t ->
   fold_start_date:Date.t option ->
   config:Weinstein_strategy_config.config ->
   stop_states:Weinstein_stops.stop_state String.Map.t ref ->
@@ -51,6 +52,7 @@ val run_screen_after_macro :
     See [dev/plans/v7-sweep-speedup-2026-05-26.md] §Win #4. *)
 
 val entry_transitions_if_active :
+  pending_entry_e:Entry_freeze.t ->
   fold_start_date:Date.t option ->
   halted:bool ->
   is_screening_day:bool ->

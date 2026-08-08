@@ -1390,6 +1390,59 @@ type config = {
           Weinstein-faithful (spine untouched: the Stage-2 breakout entry
           decision is identical; only the {i fill assumption} — a realism dial —
           changes). *)
+  freeze_entry_at_first_breakout : bool; [@sexp.default false]
+      (** No-chase entry-[E] freeze (Fix #2, plan
+          [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream D;
+          findings [dev/notes/fill-model-fix-findings-2026-08-07.md] §4 Q3).
+
+          {b The faithfulness gap it closes.} The screener recomputes each
+          candidate's [suggested_entry] — the breakout level [E] =
+          [breakout_price *. (1 + entry_buffer_pct)] — every Friday from the
+          current analysis ([Screener.screen]). For a stock making new highs,
+          [E] floats {i up} week over week, so the strategy's resting entry
+          ticket ratchets upward with the trend: from the screener's view each
+          Friday is a "fresh breakout," but from a Weinstein-purist view it is
+          {b buying an extended stock} — the exact thing the book warns against
+          ([docs/design/weinstein-book-reference.md] §4.1 "write down the price
+          it would need to break out and buy {i that} breakout"; §3 do not chase
+          a stock that has already run). Observed: BDLN 2000 chased from [E] =
+          50 in January to a March fill at 79.81 (~60% higher, straight into a
+          whipsaw); the record vs book fill-basis gap is dragged up by this
+          E-chase (findings §4 "Reframe of the reframe").
+
+          {b Behaviour when [true].} The first Friday a symbol qualifies
+          (appears as an actionable entry candidate with a suggested [E]), that
+          [E] is {b pinned}. On subsequent Fridays the strategy reuses the
+          pinned [E] — overriding the freshly recomputed higher level — for as
+          long as the setup stays live. The pin is {b released} when the symbol
+          stops qualifying and is no longer held (candidate drops out / setup
+          expires / the position round-trips to [Closed]), so a genuinely new
+          base/breakout later earns a fresh [E]. A symbol resting an unfilled
+          entry order stays held, so its pin persists (dormant — held symbols
+          are excluded from the candidate walk) until the position closes.
+
+          {b Faithfulness (W2): this INCREASES faithfulness.} It restores the
+          book's "buy {i the} breakout, not every successive higher high" rule.
+          The spine is untouched — Stage-2 admission, volume confirmation,
+          grading, stage classification, and the stop machinery are all
+          UNCHANGED; only the entry ticket's price level is frozen (a faithful
+          adaptation of the entry-mode dial per
+          [.claude/rules/weinstein-faithful-core.md]).
+
+          {b Strictly ticket-level and the entry [E] only.} Freezing overrides
+          the candidate's [suggested_entry]; the installed initial stop is
+          re-derived from the effective entry as before. The paired
+          suggested-stop / [risk_pct] audit metadata carried into the entry
+          event reflect the current week's screener output.
+
+          {b Default [false] = off, bit-identical to every existing
+             baseline/golden} (R1): {!Entry_freeze.apply} returns the candidate
+          list untouched and never allocates a pin. R2: real config field,
+          axis-expressible as
+          [((flag freeze_entry_at_first_breakout) (values (true false)))] via
+          [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides]. Per
+          the experiment discipline it stays default-off until a ledger ACCEPT
+          (WF-CV per the fill-model plan). *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

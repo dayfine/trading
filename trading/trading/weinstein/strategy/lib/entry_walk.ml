@@ -117,10 +117,19 @@ let _make_entry_fn ~config ~bar_reader ~current_date ~stop_states
     original screener order) is bit-equivalent to the pre-audit shape: same
     candidates, same transitions, same side-effects on [stop_states] and
     [remaining_cash]. *)
-let entries_from_candidates ?sector_lookup ~config ~candidates ~stop_states
+let entries_from_candidates ?sector_lookup
+    ?(pending_entry_e = Entry_freeze.create ()) ~config ~candidates ~stop_states
     ~bar_reader ~(portfolio : Portfolio_view.t) ~get_price ~current_date
     ?(audit_recorder = Audit_recorder.noop) ?macro () =
   let held_set = String.Set.of_list (held_symbols portfolio) in
+  (* Fix #2 (default-off): freeze each candidate's [suggested_entry] to its
+     first-qualifying breakout so a trending symbol's ticket does not chase the
+     extension upward week over week. No-op + no allocation when the flag is off
+     (R1). *)
+  let candidates =
+    Entry_freeze.apply ~enabled:config.freeze_entry_at_first_breakout
+      ~pending:pending_entry_e ~held_set ~candidates
+  in
   let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
   let make_entry =
     _make_entry_fn ~config ~bar_reader ~current_date ~stop_states

@@ -99,10 +99,10 @@ let _prune_args_of ~bar_reader ~fold_start_date =
     screener is invoked; macro-specific gating — longs blocked under Bearish,
     shorts blocked under Bullish — happens inside the screener. Under Bearish
     this yields short-side entries (per the bear-market shorting chapter). *)
-let run_screen_after_macro ~fold_start_date ~config ~stop_states
-    ~last_stop_out_dates ~bar_reader ~prior_stages ~sector_prior_stages
-    ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
-    ~audit_recorder ~macro_result =
+let run_screen_after_macro ~pending_entry_e ~fold_start_date ~config
+    ~stop_states ~last_stop_out_dates ~bar_reader ~prior_stages
+    ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio ~current_date
+    ~index_view ~audit_recorder ~macro_result =
   let ma_cache = Bar_reader.ma_cache bar_reader in
   (* Phase F.3.d-2 caller migration: the sector ETF analysis reads through
      {!Snapshot_runtime.Snapshot_callbacks} directly via the
@@ -120,24 +120,25 @@ let run_screen_after_macro ~fold_start_date ~config ~stop_states
     _prune_args_of ~bar_reader ~fold_start_date
   in
   Weinstein_strategy_screening.screen_universe ?active_through_for
-    ?fold_start_date ?membership_at ~config ~index_view ~macro_result
-    ~sector_map ~stop_states ~last_stop_out_dates ~portfolio ~get_price
-    ~bar_reader ~prior_stages ~current_date ~audit_recorder ()
+    ?fold_start_date ?membership_at ~pending_entry_e ~config ~index_view
+    ~macro_result ~sector_map ~stop_states ~last_stop_out_dates ~portfolio
+    ~get_price ~bar_reader ~prior_stages ~current_date ~audit_recorder ()
 
 (** Run the universe screen when the strategy is active (not halted, on a
     Friday, with a valid macro result). Returns the list of entry transitions,
     or [[]] when any guard is false. Extracted from [_on_market_close] to keep
     the entry-transition branch at a shallower nesting level. *)
-let entry_transitions_if_active ~fold_start_date ~halted ~is_screening_day
-    ~macro_result_opt ~config ~stop_states ~last_stop_out_dates ~bar_reader
-    ~prior_stages ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio
-    ~current_date ~index_view ~audit_recorder =
+let entry_transitions_if_active ~pending_entry_e ~fold_start_date ~halted
+    ~is_screening_day ~macro_result_opt ~config ~stop_states
+    ~last_stop_out_dates ~bar_reader ~prior_stages ~sector_prior_stages
+    ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
+    ~audit_recorder =
   match (halted, is_screening_day, macro_result_opt) with
   | false, true, Some macro_result ->
-      run_screen_after_macro ~fold_start_date ~config ~stop_states
-        ~last_stop_out_dates ~bar_reader ~prior_stages ~sector_prior_stages
-        ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
-        ~audit_recorder ~macro_result
+      run_screen_after_macro ~pending_entry_e ~fold_start_date ~config
+        ~stop_states ~last_stop_out_dates ~bar_reader ~prior_stages
+        ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio ~current_date
+        ~index_view ~audit_recorder ~macro_result
   | _ -> []
 
 module Internal_for_test = struct
