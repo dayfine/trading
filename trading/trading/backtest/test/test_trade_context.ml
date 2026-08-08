@@ -124,6 +124,7 @@ let test_csv_header_fields_pinned _ =
          equal_to "days_to_first_stop_trigger";
          equal_to "screener_score_at_entry";
          equal_to "position_id";
+         equal_to "stop_fill_distance_pct";
        ])
 
 (* of_audit_and_stop_log: full join ----------------------------------- *)
@@ -163,6 +164,32 @@ let test_of_audit_and_stop_log_populates_all_fields _ =
          field
            (fun (c : TC.t) -> c.position_id)
            (is_some_and (equal_to "AAPL-wein-1"));
+         field
+           (fun (c : TC.t) -> c.stop_fill_distance_pct)
+           (is_some_and (float_equal ~epsilon:1e-6 0.08));
+       ])
+
+(* Fill-basis vs E-basis: when the realized fill (120) diverges from the
+   screener's suggested E (150), the two stop-distance columns disagree —
+   E-basis |150-138|/150 = 0.08 but fill-basis |138-120|/120 = 0.15. This is
+   the WDC confound in miniature (findings 2026-08-07 §4 RESOLVED): only the
+   fill-basis column reflects stop depth vs cost. *)
+let test_fill_basis_diverges_from_e_basis _ =
+  let trade = make_trade ~entry_price:120.0 () in
+  let ctx =
+    TC.of_audit_and_stop_log
+      ~audit:[ make_record (make_entry ()) ]
+      ~stop_infos:[] ~trade
+  in
+  assert_that ctx
+    (all_of
+       [
+         field
+           (fun (c : TC.t) -> c.stop_initial_distance_pct)
+           (is_some_and (float_equal ~epsilon:1e-6 0.08));
+         field
+           (fun (c : TC.t) -> c.stop_fill_distance_pct)
+           (is_some_and (float_equal ~epsilon:1e-6 0.15));
        ])
 
 (* Late Stage2 propagates to entry_stage label. *)
@@ -251,6 +278,7 @@ let test_missing_audit_yields_none_for_audit_fields _ =
          field (fun (c : TC.t) -> c.entry_stage) is_none;
          field (fun (c : TC.t) -> c.entry_volume_ratio) is_none;
          field (fun (c : TC.t) -> c.stop_initial_distance_pct) is_none;
+         field (fun (c : TC.t) -> c.stop_fill_distance_pct) is_none;
          field (fun (c : TC.t) -> c.screener_score_at_entry) is_none;
          field (fun (c : TC.t) -> c.position_id) is_none;
          field
@@ -343,6 +371,7 @@ let test_csv_row_fields_formats_correctly _ =
       days_to_first_stop_trigger = Some 96;
       screener_score_at_entry = Some 75;
       position_id = Some "AAPL-wein-1";
+      stop_fill_distance_pct = Some 0.065;
     }
   in
   assert_that (TC.csv_row_fields ctx)
@@ -355,6 +384,7 @@ let test_csv_row_fields_formats_correctly _ =
          equal_to "96";
          equal_to "75";
          equal_to "AAPL-wein-1";
+         equal_to "0.0650";
        ])
 
 let test_csv_row_fields_renders_none_as_empty _ =
@@ -369,11 +399,13 @@ let test_csv_row_fields_renders_none_as_empty _ =
       days_to_first_stop_trigger = None;
       screener_score_at_entry = None;
       position_id = None;
+      stop_fill_distance_pct = None;
     }
   in
   assert_that (TC.csv_row_fields ctx)
     (elements_are
        [
+         equal_to "";
          equal_to "";
          equal_to "";
          equal_to "";
@@ -391,6 +423,8 @@ let suite =
          "stop_trigger_kind_label all variants"
          >:: test_stop_trigger_kind_label_distinguishes_all;
          "csv_header_fields pinned" >:: test_csv_header_fields_pinned;
+         "fill basis diverges from E basis"
+         >:: test_fill_basis_diverges_from_e_basis;
          "of_audit_and_stop_log full join"
          >:: test_of_audit_and_stop_log_populates_all_fields;
          "late stage2 label" >:: test_late_stage2_label;

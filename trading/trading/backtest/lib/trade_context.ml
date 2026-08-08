@@ -12,6 +12,7 @@ type t = {
   days_to_first_stop_trigger : int option;
   screener_score_at_entry : int option;
   position_id : string option;
+  stop_fill_distance_pct : float option;
 }
 [@@deriving sexp]
 
@@ -39,6 +40,7 @@ let csv_header_fields =
     "days_to_first_stop_trigger";
     "screener_score_at_entry";
     "position_id";
+    "stop_fill_distance_pct";
   ]
 
 let _fmt_float4_opt = function Some f -> Printf.sprintf "%.4f" f | None -> ""
@@ -54,6 +56,7 @@ let csv_row_fields (t : t) =
     _fmt_int_opt t.days_to_first_stop_trigger;
     _fmt_int_opt t.screener_score_at_entry;
     _fmt_string_opt t.position_id;
+    _fmt_float4_opt t.stop_fill_distance_pct;
   ]
 
 type precomputed = {
@@ -168,12 +171,25 @@ let _stop_info_for ~position_id ~symbol (pre : precomputed) :
   | Some pid -> Map.find pre.stop_by_position_id pid
   | None -> Map.find pre.stop_first_by_symbol symbol
 
+(* E-basis distance: measured against the screener's [suggested_entry], NOT the
+   fill. In arms whose fill diverges from E (market-at-close vs a chased E) this
+   overstates stop depth vs cost — see the 2026-08-07 confound resolution
+   (fill-model findings §4 RESOLVED). Kept for backwards-compat; gate-basis
+   analysis should read [stop_fill_distance_pct]. *)
 let _stop_initial_distance_pct (entry : Trade_audit.entry_decision) =
   if Float.( <= ) entry.suggested_entry 0.0 then None
   else
     Some
       (Float.abs (entry.suggested_entry -. entry.installed_stop)
       /. entry.suggested_entry)
+
+(* Fill-basis distance: |installed_stop - fill| / fill, the exact quantity the
+   strategy's [Stop_too_wide] gate bounds (measured vs [effective_entry] at
+   decision time) and the basis the V12 validator checks. [fill] is the round
+   trip's realized entry price. *)
+let _stop_fill_distance_pct ~fill (entry : Trade_audit.entry_decision) =
+  if Float.( <= ) fill 0.0 || Float.( <= ) entry.installed_stop 0.0 then None
+  else Some (Float.abs (entry.installed_stop -. fill) /. fill)
 
 let _days_to_first_stop_trigger ~(entry_date : Date.t) ~(exit_date : Date.t)
     ~(trigger : Stop_log.exit_trigger option) =
@@ -211,6 +227,9 @@ let of_precomputed (pre : precomputed)
   let stop_initial_distance_pct =
     Option.bind entry ~f:_stop_initial_distance_pct
   in
+  let stop_fill_distance_pct =
+    Option.bind entry ~f:(_stop_fill_distance_pct ~fill:trade.entry_price)
+  in
   let screener_score_at_entry =
     Option.map entry ~f:(fun e -> e.cascade_score)
   in
@@ -238,6 +257,7 @@ let of_precomputed (pre : precomputed)
     days_to_first_stop_trigger;
     screener_score_at_entry;
     position_id;
+    stop_fill_distance_pct;
   }
 
 (** Convenience wrapper: builds [precomputed] inline. Per-trade callers in a
