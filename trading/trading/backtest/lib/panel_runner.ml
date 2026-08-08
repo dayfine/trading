@@ -105,7 +105,7 @@ let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
       ?on_trade_fill ?active_through_for
       ~on_transitions:(_on_transitions ~stop_log ~trade_audit)
       ?entry_extension_max_pct:(_entry_cap_for_sim input.config)
-      ()
+      ~sim_entry_fill_next_open:input.config.sim_entry_fill_next_open ()
   in
   let config =
     Simulator.

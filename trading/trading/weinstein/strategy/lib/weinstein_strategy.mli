@@ -831,6 +831,18 @@ type config = {
           unchanged. Default [false] = off, bit-identical baselines (R1); also
           gated on the E-family, so arming alone is a no-op. See
           [Weinstein_strategy_config.stop_anchor_at_entry_base]. *)
+  sim_entry_fill_next_open : bool; [@sexp.default false]
+      (** Next-bar-open fill realism for Market entries (Fix #1, plan
+          [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream C). When
+          [true], a Market entry order routing to an [Entering] position is not
+          filled against a stale (weekend/holiday) bar; it waits for the next
+          fresh trading bar and fills at that bar's open — the earliest
+          tradeable price after the signal-close decision. Scope: Market ENTRY
+          orders only (exits / stops / [StopLimit] entries untouched);
+          decision-time [entry_price] for sizing/stops is unchanged. Default
+          [false] = current stale-bar fill, bit-identical baselines (R1);
+          fill-model basis change when armed — own WF-CV surface, never bundled.
+          See [Weinstein_strategy_config.sim_entry_fill_next_open]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
