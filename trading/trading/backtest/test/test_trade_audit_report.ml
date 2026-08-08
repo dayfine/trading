@@ -798,6 +798,9 @@ let test_split_safe_not_exercised_empty_population _ =
                   flag_off 0, empty_window 0")
            (equal_to true);
          field
+           (fun s -> String.is_substring s ~substring:"NOT EXERCISED")
+           (equal_to true);
+         field
            (fun s ->
              String.is_substring s ~substring:"no entry decisions were captured")
            (equal_to true);
@@ -808,6 +811,12 @@ let test_split_safe_not_exercised_empty_population _ =
            (fun s ->
              String.is_substring s ~substring:"lookback window(s) were empty")
            (equal_to false);
+         (* No percentage anywhere in the section — the same pin the other two
+            [Not_exercised] causes carry. Without it the all-zero tally (what
+            every zero-entry run produces) could render "- Inert fraction: 0.0%"
+            with the suite green, which is exactly the "wired-but-zero" reading
+            this section exists to make impossible. *)
+         field (fun s -> String.is_substring s ~substring:"%") (equal_to false);
        ])
 
 let test_split_safe_tally_counts_audit_population_not_rows _ =

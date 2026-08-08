@@ -1,6 +1,6 @@
 # Status: support-floor-stops
 
-## Last updated: 2026-08-07
+## Last updated: 2026-08-08
 
 ## Status
 IN_PROGRESS
@@ -9,10 +9,19 @@ IN_PROGRESS
 YES
 
 ## Open PR
-- `feat/split-safe-inert-report-row` — F6, the trade-audit report row for the
-  split-safe basis tally + inert fraction. See the 2026-08-07 F6 addendum below.
+- `fix/split-safe-empty-population-pin` — the 2026-08-08 fix-forward on F6's
+  qc-behavioral finding: the empty-population `Not_exercised` state was the one
+  of three that pinned neither `"NOT EXERCISED"` nor `%`-absence. Test-only.
+  See the "Correction 2026-08-08" block under the F6 addendum below.
 
 ## Recently merged
+- `feat/split-safe-inert-report-row` — F6, the trade-audit report row for the
+  split-safe basis tally + inert fraction (2026-08-07 addendum below). **PR
+  #2234 was closed, not merged**: its entire content reached `main` via an
+  unrelated auto-merged `ops(budget)` PR (#2235) built from a shared working
+  tree, verified by identical file hashes on all four files. The code is live
+  on `main`; the qc-behavioral rework it never received is the fix-forward
+  above.
 - `feat/split-safe-empty-window-panel` — **MERGED #2232 `b54f8880`** (2026-08-07),
   B5 + B6, the last two telemetry gaps (2026-08-07 addendum below).
 - `feat/split-safe-fallback-telemetry` — **MERGED #2220 `480a59b7`** (2026-08-06),
@@ -684,7 +693,7 @@ mutation applied with the new tests reverted to `origin/main` → 31 tests, exit
 | the fraction renders as a percentage | drop `*. 100.0` (25.0% → 0.3%) | 1 failure | 31 tests, exit 0 |
 | the flag-off cause is reported, and wins over empty-window | make the `flag_off` branch unreachable | 1 failure | 31 tests, exit 0 |
 | the empty-window cause is distinct from the empty-population one | make the `empty_window` branch unreachable | 1 failure | 31 tests, exit 0 |
-| `Not_exercised` never renders as a percentage | render it as `0.0%` on the fraction line | 3 failures | 31 tests, exit 0 |
+| `Not_exercised` never renders as a percentage — **flag-off and empty-window states only** (see correction below) | replace the whole shared `Not_exercised` `sprintf` with a `0.0%` line | 3 failures | 31 tests, exit 0 |
 | the section is never silently omitted | `_format_split_safe` returns `[]` | 4 failures | 31 tests, exit 0 |
 | the tally is join-independent | drop audit records that joined a round-trip | 1 failure (only the tally test) | 31 tests, exit 0 |
 | the tally is over entries, not round-trips | keep only audit records that joined a round-trip | 4 failures | 31 tests, exit 0 |
@@ -692,6 +701,41 @@ mutation applied with the new tests reverted to `origin/main` → 31 tests, exit
 **Deliberately not done.** The HTML report — a separate surface, filed as F10.
 No change to `Split_safe_metric`, `trade_audit_report_bin.ml`'s raw-vs-adjusted
 reads (F3), or any core module.
+
+#### Correction 2026-08-08 — the "never a percentage" row over-claimed, and the gap is now closed
+
+qc-behavioral (on PR #2234, since closed — its content reached `main` via an
+unrelated shared-tree auto-merge, so the defect was live on `main` rather than
+on a branch) measured that the 3-failure row above **generalised from a
+mutation of the shared `sprintf` branch to all three `Not_exercised` states**,
+which does not follow. That mutation replaced the entire message, so it also
+dropped the cause prose (`no entry decisions were captured`) that
+`test_split_safe_not_exercised_empty_population` *does* assert — which is where
+its third failure came from. The empty-population state asserted neither
+`"NOT EXERCISED"` present nor the section `%`-free, so **"never a percentage"
+was pinned on two of three states, not three.**
+
+The all-zero tally is what every pre-PR-2 report and every zero-entry run
+produces, so this was the state most likely to render as a bare `0.0%` — the
+exact "wired-but-zero" reading the section exists to make impossible.
+
+Closed 2026-08-08 by adding the two assertions its siblings already carry
+(`"NOT EXERCISED"` present, `"%"` absent) to
+`test_split_safe_not_exercised_empty_population`. Test-only change — no
+implementation change was needed, confirming the renderer was already correct
+and only the pin was missing. Re-measured in both directions with mutation
+**M-G** (special-case the all-zero branch to
+`sprintf "- Inert fraction: 0.0%% — %s" (_not_exercised_cause t)`, which keeps
+the cause prose and so escapes every pre-existing assertion):
+
+| state of `test_trade_audit_report.ml` | implementation | result |
+|---|---|---|
+| with the two new assertions | M-G applied | **1 failure** (`split-safe not exercised: empty population`), exit 1 |
+| at `origin/main` (pre-fix) | M-G applied | 36 tests, **exit 0** — genuinely blind, not merely under-asserted |
+| with the two new assertions | unmutated | 36 tests, exit 0 |
+
+Suite count is unchanged at 36 — the assertions were added to the existing
+test rather than as a new case.
 
 ## Follow-ups
 
@@ -811,12 +855,61 @@ reads (F3), or any core module.
   caller. Should either be re-pointed at `floor_is_structural_with_callbacks` or
   deleted.
 
+- [ ] **F11 (new, from the 2026-08-08 F6 rework; measurement corrected
+  2026-08-08 after qc-behavioral NEEDS_REWORK) — anchor the not-exercised
+  assertion to its label.** All three `Not_exercised` tests assert
+  `String.is_substring s ~substring:"NOT EXERCISED"`, which is satisfied by any
+  line containing those two words anywhere — the assertion is not anchored to
+  the `- Inert fraction:` label that precedes them.
+  **Measured, not inferred.** Mutation **M-A** (interpose a percentage between
+  the label and the words, i.e. render
+  `- Inert fraction: 0.0% — NOT EXERCISED — the denominator is zero …`) was
+  applied to `_format_split_safe`'s `Not_exercised` branch in
+  `trade_audit_report.ml` and the suite re-run. Baseline is `Ran: 36 tests … OK`,
+  exit 0. Results:
+  - guarded to the flag-off and empty-window states (the reviewer's form):
+    **`Failures: 2`, exit 1** — `Trade_audit_report:25:split-safe not exercised:
+    flag_off reads as wiring alarm` and `:26:… empty_window reads as no
+    exposure`. This **reproduces qc-behavioral's measurement exactly.**
+  - ungated (all three `Not_exercised` states): **`Failures: 3`, exit 1** —
+    adds `Trade_audit_report:27:split-safe not exercised: empty population`.
+  So **M-A is caught, not missed.** The assertion that fires is the
+  `%`-absence one (`~substring:"%"` → `equal_to false`), which the F6 rework put
+  on **all three** states; the `"NOT EXERCISED"` substring assertion itself still
+  passes under M-A, since the mutated line does still contain those two words.
+  That is precisely the gap F11 names: the *label anchor* is unpinned, but the
+  `%`-absence pin covers the concrete rendering that gap would admit.
+  **Therefore F11 is defence-in-depth on the label anchor — forbidding anything
+  numeric interposed between the label and the words — and not a live hole.**
+  It **would be** closed at zero cost by tightening the three substrings to
+  `"- Inert fraction: NOT EXERCISED"`. That tightening is **not** in this PR
+  (the three assertions on the branch still read `~substring:"NOT EXERCISED"`);
+  it is left as a clean, separately-reviewable follow-up, so F11 stays **open**.
+  **Non-blocking.**
+- **F12 (new, from the 2026-08-08 F6 rework) — extend the existing `core_lines`
+  byte pin to cover the split-safe section.** Mutation **M-E** (swap the order
+  of the two bullets — counts line and inertness line) escapes every current
+  assertion, since all of them are substring containment over the section as a
+  whole; so would duplicate emission of either bullet, or a change to the blank
+  lines around the heading. Presentation-only, which is why the original author's
+  withholding was judged correct — but `to_markdown`'s `core_lines` already
+  byte-pins the header / aggregate / per-trade-table block, so extending that pin
+  over the fourth block is consistent with what the file already does rather than
+  new machinery. **Non-blocking.**
+
 ### Follow-ups filed 2026-08-07 (qc-behavioral residuals on PR #2232, all non-blocking)
 
 - **R1 -- `tally_of_bases` order-independence documented but unpinned.** The `split_safe_metric.mli` docstring says "Order-independent and total"; totality is pinned by `tally counts every basis state`, order-independence is not (no test permutes the input). True by inspection -- a fold over independent counters -- and a test would be **green by construction** in exactly the way the author correctly withheld the panel stop-level test for. Filed only so the claim/test map is complete, not as work to do.
 - **R2 -- `empty_tally`'s field values pinned only transitively.** `empty population is Not_exercised` uses `M.empty_tally` on both sides of the equality, so it does not independently pin "all four counts zero". The literal zeros *are* pinned elsewhere (`all Empty_window is Not_exercised` asserts `flag_off = 0; adjusted = 0; raw_fallback = 0` literally), so there is no real hole -- a naming nit at most.
-- **R3 -- one skimmer-facing line in Follow-ups.** The strikethrough reads "~~B6...~~ -- **done 2026-08-07** via `Backtest.Split_safe_metric.inertness`". The "renderer still pending" qualifier lives in the addendum and in F6, not on that line. Everything is accurate and traceable, but a skimmer reading only the struck line could infer more closure than exists. Suggest appending "(reduction only; rendering remains F6)".
-- **R4 -- F6's "shell count is sufficient" is now stale advice.** F6 still says "the shell count over `trade_audit.sexp` is sufficient to qualify a surface", which is precisely the ad-hoc path that produces the `0/0` blank B6 exists to prevent. It predates this PR and is not one of the three `.mli` sites, so it does not affect the Q4 consistency finding -- but a reader following it would reintroduce the defect the new type forbids.
+- ~~**R3 -- one skimmer-facing line in Follow-ups.**~~ — **moot 2026-08-08.** F6
+  has shipped on the markdown surface, so the struck B6 line no longer implies
+  closure that does not exist; the only remaining residual is the HTML surface,
+  which is separately named as F10. Original text: The strikethrough reads "~~B6...~~ -- **done 2026-08-07** via `Backtest.Split_safe_metric.inertness`". The "renderer still pending" qualifier lives in the addendum and in F6, not on that line. Everything is accurate and traceable, but a skimmer reading only the struck line could infer more closure than exists. Suggest appending "(reduction only; rendering remains F6)".
+- ~~**R4 -- F6's "shell count is sufficient" is now stale advice.**~~ —
+  **resolved 2026-08-07**, in the F6 entry itself: the "R4 correction" paragraph
+  on F6 above now states that a shell count is *not* sufficient and directs the
+  reader to the rendered section or `Split_safe_metric.inertness_of_tally`.
+  Original text: F6 still says "the shell count over `trade_audit.sexp` is sufficient to qualify a surface", which is precisely the ad-hoc path that produces the `0/0` blank B6 exists to prevent. It predates this PR and is not one of the three `.mli` sites, so it does not affect the Q4 consistency finding -- but a reader following it would reintroduce the defect the new type forbids.
 
 **Standing sequencing note.** With B5, B6 and now F6 closed, the `split_safe_floors` axis can report its own inert fraction on both paths, an all-`Empty_window` arm is distinguishable from an unwired column, and the number is rendered rather than hand-counted. What remains before a promotion decision per `.claude/rules/promotion-confirmation.md` is a walk-forward surface that actually reports it. F9 (`Stop_recompute` / `Stop_thread` scans untagged) and F7 (skipped candidates) both **understate** how much of a run the flag touched, so neither can make an inert arm look active -- but both must be named when the number is read.
 
