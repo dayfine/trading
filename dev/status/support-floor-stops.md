@@ -855,19 +855,37 @@ test rather than as a new case.
   caller. Should either be re-pointed at `floor_is_structural_with_callbacks` or
   deleted.
 
-- **F11 (new, from the 2026-08-08 F6 rework) — anchor the not-exercised
+- [ ] **F11 (new, from the 2026-08-08 F6 rework; measurement corrected
+  2026-08-08 after qc-behavioral NEEDS_REWORK) — anchor the not-exercised
   assertion to its label.** All three `Not_exercised` tests assert
   `String.is_substring s ~substring:"NOT EXERCISED"`, which is satisfied by any
-  line containing those two words anywhere. The reviewer's mutation **M-A**
-  (emit the percentage *and* the words on the same line, e.g.
-  `- Inert fraction: 0.0% — NOT EXERCISED …`) passes all 36 on the flag-off and
-  empty-window states, because the `%`-absence assertion is the only thing
-  standing between the reader and a number. Closed at zero cost by tightening
-  the three substrings to `"- Inert fraction: NOT EXERCISED"`, which forbids
-  interposing anything numeric between the label and the words.
-  **Non-blocking** — the `%`-absence assertion (now on all three states) already
-  catches the concrete rendering, so this is defence in depth on the label
-  itself, not a live hole.
+  line containing those two words anywhere — the assertion is not anchored to
+  the `- Inert fraction:` label that precedes them.
+  **Measured, not inferred.** Mutation **M-A** (interpose a percentage between
+  the label and the words, i.e. render
+  `- Inert fraction: 0.0% — NOT EXERCISED — the denominator is zero …`) was
+  applied to `_format_split_safe`'s `Not_exercised` branch in
+  `trade_audit_report.ml` and the suite re-run. Baseline is `Ran: 36 tests … OK`,
+  exit 0. Results:
+  - guarded to the flag-off and empty-window states (the reviewer's form):
+    **`Failures: 2`, exit 1** — `Trade_audit_report:25:split-safe not exercised:
+    flag_off reads as wiring alarm` and `:26:… empty_window reads as no
+    exposure`. This **reproduces qc-behavioral's measurement exactly.**
+  - ungated (all three `Not_exercised` states): **`Failures: 3`, exit 1** —
+    adds `Trade_audit_report:27:split-safe not exercised: empty population`.
+  So **M-A is caught, not missed.** The assertion that fires is the
+  `%`-absence one (`~substring:"%"` → `equal_to false`), which the F6 rework put
+  on **all three** states; the `"NOT EXERCISED"` substring assertion itself still
+  passes under M-A, since the mutated line does still contain those two words.
+  That is precisely the gap F11 names: the *label anchor* is unpinned, but the
+  `%`-absence pin covers the concrete rendering that gap would admit.
+  **Therefore F11 is defence-in-depth on the label anchor — forbidding anything
+  numeric interposed between the label and the words — and not a live hole.**
+  It **would be** closed at zero cost by tightening the three substrings to
+  `"- Inert fraction: NOT EXERCISED"`. That tightening is **not** in this PR
+  (the three assertions on the branch still read `~substring:"NOT EXERCISED"`);
+  it is left as a clean, separately-reviewable follow-up, so F11 stays **open**.
+  **Non-blocking.**
 - **F12 (new, from the 2026-08-08 F6 rework) — extend the existing `core_lines`
   byte pin to cover the split-safe section.** Mutation **M-E** (swap the order
   of the two bullets — counts line and inertness line) escapes every current
