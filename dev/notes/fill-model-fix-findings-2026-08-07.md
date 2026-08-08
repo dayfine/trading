@@ -204,14 +204,51 @@ outcome per candidate; V12 then reads it). Cheap once run; deferred tonight
 (disk ~30GB — no unattended multi-hour run per sweep-hygiene). **V12 is the
 standing guard** either way.
 
-**Why load-bearing — it reframes the A/B.** The deep support-floor stop is a
-*separate axis* from the fill model, and the record-vs-book comparison bundles
-them: record = deep-floor stops + Friday-close fill; book = tight
-(stop_anchor) stops + E-anchored chase. The +8,367% vs +287% gap is therefore
-**not attributable to fill timing alone** — the stop treatment differs too. An
-honest re-run must **hold the stop gate fixed across both arms** to isolate the
-fill-model effect. This is the same lesson as §4 Q2 (deep stops = the edge),
-now shown to be entangled in the A/B rather than controlled.
+### RESOLVED (2026-08-07 regen) — neither (a) nor (b): a metric artifact
+
+The regen ran (pinned worktree `28b187d7a`, v5thin_adj warehouse, control
+scenario): **+8,366.8%, 1122 trades, `trades.csv` bit-identical to the
+committed `deep-pair/control-trades.csv`.** So **(a) is dead** — the committed
+config + warehouse reproduce the record exactly; the re-run recipe is sound.
+
+V12 on the regen audit: **29/1122 violations (2.6%), all 15–20%** — not the
+~62%/94% profile. And the audit shows the gate firing in-arm (e.g. CRA
+`reason_skipped Stop_too_wide`). So **(b) is dead too** — the support-floor
+path does NOT bypass the gate.
+
+**The true cause is the measurement.** `trades.csv.stop_initial_distance_pct`
+is computed vs the screener's **suggested_entry**, not the fill
+(`trade_context.ml:171-176`). Rosetta-stone specimen WDC 2000-01-28:
+
+| field | value |
+|---|---|
+| suggested_entry (chased breakout E) | 14.57 |
+| suggested_stop (screener, ~8% under E) | 13.40 |
+| **installed_stop (Support_floor)** | **4.44** |
+| **fill (market @ Friday close)** | **4.75** |
+| gate basis: \|4.44−4.75\|/4.75 | **6.5% — compliant** |
+| csv col-16 basis: \|14.57−4.44\|/14.57 | **69.5% — the "deep stop"** |
+
+The "62% > 15%, max 94%" characterization measured stop depth **vs the stale /
+chased E**, which in the record arm diverges hugely from the market fill. Vs
+cost basis, record stops are ~97.4% gate-compliant. The 29 real violations are
+**decision-close vs fill-price drift** (TEO: gate passed vs Fri close ≈12.5 →
+fill recorded next step @12.92 → 17.5%) — the same fill-timing seam Fix #1
+closes. Follow-up: add a fill-basis stop-distance column (or fix col-16's
+docstring) — V11's 250 "violations" are the same E-basis artifact.
+
+**Reframe of the reframe (what this does to the A/B).** The stop-gate axis
+**dissolves as a confound**: both arms run the same gate against their own
+fills. What actually differs is the **fill basis** — record buys the Stage-2
+signal at the current weekly close (WDC 4.75, ~3× cheaper than E → ~3× shares,
+stop set near cost); book rests at the chased E (14.57) and pays up or never
+fills. The record's "deep structural stops" (§4 Q2) are deep **relative to E
+only** — the edge is not stop width, it is the cheap fill + more shares +
+stop-near-basis geometry. This sharpens the faithfulness question for the A/B:
+the record enters **without price having reached the suggested breakout E** —
+whether that is "buy the breakout" (spine) or "buy the signal early" is now the
+core of the user's A/B decision, and Fix #2 (no-chase E) directly narrows the
+gap between the two arms.
 
 ## 5. Fix #1 execution seam (for implementation)
 
