@@ -9,12 +9,16 @@ IN_PROGRESS
 YES
 
 ## Open PR
-- `fix/split-safe-empty-population-pin` — the 2026-08-08 fix-forward on F6's
-  qc-behavioral finding: the empty-population `Not_exercised` state was the one
-  of three that pinned neither `"NOT EXERCISED"` nor `%`-absence. Test-only.
-  See the "Correction 2026-08-08" block under the F6 addendum below.
+- None.
 
 ## Recently merged
+- `fix/split-safe-empty-population-pin` — **MERGED #2239 `ec6f5ce6`**
+  (2026-08-08), the fix-forward on F6's qc-behavioral finding: the
+  empty-population `Not_exercised` state was the one of three that pinned
+  neither `"NOT EXERCISED"` nor `%`-absence. Test-only (+9 in
+  `test_trade_audit_report.ml`). One QC rework, on the **status prose**, not the
+  code — see the 2026-08-08 residuals section under Follow-ups. Structural 5/5,
+  behavioral 2/5 → 4/5.
 - `feat/split-safe-inert-report-row` — F6, the trade-audit report row for the
   split-safe basis tally + inert fraction (2026-08-07 addendum below). **PR
   #2234 was closed, not merged**: its entire content reached `main` via an
@@ -913,11 +917,56 @@ test rather than as a new case.
 
 **Standing sequencing note.** With B5, B6 and now F6 closed, the `split_safe_floors` axis can report its own inert fraction on both paths, an all-`Empty_window` arm is distinguishable from an unwired column, and the number is rendered rather than hand-counted. What remains before a promotion decision per `.claude/rules/promotion-confirmation.md` is a walk-forward surface that actually reports it. F9 (`Stop_recompute` / `Stop_thread` scans untagged) and F7 (skipped candidates) both **understate** how much of a run the flag touched, so neither can make an inert arm look active -- but both must be named when the number is read.
 
+### Follow-ups filed 2026-08-08 (qc-behavioral residuals on PR #2239, all non-blocking)
+
+Filed by the orchestrator from the pass-1 behavioral review of #2239. The author
+correctly left all four alone; they are not rework scope. Numbering is local to
+#2239 — distinct from the #2232 R1–R4 above.
+
+- **R1 (#2239) — the three `%`-absence pins depend on an unpinned section boundary.**
+  All three `Not_exercised` tests read the section via `_split_safe_section`,
+  which slices from `"## Split-safe floor basis"` up to the next line prefixed
+  `"## "`. The **adjacent** block is `## Per-trade ratings`, whose table header
+  contains `mfe_%` and `mae_%` (`trade_audit_ratings.ml:837`). It prefix-matches
+  today so nothing leaks, and the reviewer verified that. But if any future block
+  emitted between them begins with a **non-`##` line carrying a `%`**, all three
+  `%` pins break at once, with a failure message pointing at the split-safe
+  section rather than the real cause. Cheap hardening: assert the extracted
+  section's last line, or slice on an explicit end sentinel. Failure direction is
+  loud, so this is robustness, not correctness.
+- **R2 (#2239) — `NOT EXERCISED` plus a *trailing* bare number slips both pins.**
+  Measured (reviewer mutation M4): rendering
+  `- Inert fraction: NOT EXERCISED — <cause> (computed: 0.00)` passes 36/36.
+  Neither pin fires — the `%` pin because there is no `%`, the label pin because
+  the words are present. Low realism (no plausible refactor produces it), but it
+  is the true outer boundary of what this test pins. Strictly **narrower** than
+  F11, which concerns a number *preceding* the label; R2 is one *following* it.
+- **R3 (#2239) — cross-negative asymmetry across the three `Not_exercised` tests.**
+  Measured (reviewer mutation M6): appending
+  `"no entry decisions were captured…"` to the **flag-off** message passes 36/36,
+  producing a report that names two causes at once. The empty-population test
+  excludes both sibling literals; `…_flag_off_reads_as_wiring_alarm` and
+  `…_empty_window_reads_as_no_exposure` do **not** exclude the empty-population
+  literal. Pre-existing from #2232 — after #2239 the empty-population test is the
+  only one of the three with complete cross-negatives. Fix is symmetric and
+  zero-cost: add
+  `field (fun s -> String.is_substring s ~substring:"no entry decisions were captured") (equal_to false)`
+  to the other two tests. **Pairs naturally with F11 and F12 as one small
+  test-hardening PR** — that bundle is the recommended next pick on this track's
+  telemetry arc.
+- **R4 (#2239) — `NOT EXERCISED` is the load-bearing pin; `%`-absence is the proxy.**
+  Measured (reviewer mutation M3, against main's test file): a numeric regression
+  rendering `0.00` with **no percent sign** is invisible to the `%` pin and is
+  caught *only* by the co-added `NOT EXERCISED` assertion. Recorded so a future
+  reader does not delete the positive pin as "redundant with the `%` check" — the
+  redundancy runs the other way. Worth one clarifying sentence in the test's
+  inline comment, which currently motivates only the `%` half.
+
 ## QC
 
-overall_qc: PENDING
-structural_qc: PENDING
-behavioral_qc: PENDING
+overall_qc: APPROVED (PR #2239, 2026-08-08 — structural 5/5, behavioral 4/5 after one rework)
+structural_qc: APPROVED
+behavioral_qc: APPROVED
 
 Reviewers when work lands:
 - qc-structural — module boundaries, pure-function discipline, test coverage for degenerate inputs (empty bars, single bar, all-flat prices); symmetry of long/short branches in the primitive.

@@ -1,0 +1,18 @@
+{
+  "date": "2026-08-08",
+  "feature": "support-floor-stops",
+  "branch": "fix/split-safe-empty-population-pin",
+  "recorded_at_ns": 1786195420228081769,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "PR #2239. Structural APPROVED 5/5 at 41bb42c4 (mutation run in both directions: PR+mutation exit 1 / pre-fix main+same mutation exit 0 = genuinely blind). Behavioral NEEDS_REWORK 2/5 at 41bb42c4 (B-1: status-file F11 claimed mutation M-A 'passes all 36' when measured 2 failures, and declared itself 'Closed' on a tightening absent from the diff). Rework iteration 1 of 2, docs-only, Option A. Behavioral delta APPROVED 4/5 at 241f7882; confirmed the new mechanism claim by falsification (flipping only the three %-absence expectations to equal_to true under M-A yields 36 pass, proving the %-pin fires and NOT EXERCISED still passes). Branch was rebased by the orchestrator pre-QC: its two-dot diff had shown -561 lines deleting entry_freeze.* (the #2241 feature) purely from being behind main."
+}

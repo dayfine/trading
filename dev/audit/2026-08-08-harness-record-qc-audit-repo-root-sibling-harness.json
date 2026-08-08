@@ -1,0 +1,18 @@
+{
+  "date": "2026-08-08",
+  "feature": "harness",
+  "branch": "harness/record-qc-audit-repo-root-sibling",
+  "recorded_at_ns": 1786196765213857825,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "PR #2243, H-RECORD-QC-AUDIT-REPO-ROOT-SIBLING. Zero reworks. Structural 5/5 and behavioral 5/5, both re-derived the revert demo independently (fix 34/0 exit 0; reverted 33/1 exit 1 failing scenario 28 only; restored 34/0). Behavioral additionally verified the export-persistence rationale with its own two-script repro (declare -x confirms the export ATTRIBUTE survives plain reassignment) and mutation-tested BOTH halves of scenario 28's end-to-end claim independently, each failing with a distinct signature. dev/audit/ 106 before and after every run. Residuals R1 (set-but-invalid REPO_ROOT falls through to walk-up silently, shared by all three implementations), R2 (scenario-count prose reconciles with no mechanical count), R3 (universe_deps_exceptions.conf evidence stale) filed to harness.md by the orchestrator."
+}
