@@ -172,6 +172,27 @@ runs, or (b) support-floor bypasses the gate. **Distinguished only by the
    arms** (so it isolates the fill-model effect) under WF-CV + the confirmation
    grid, then the A/B decision. Promotion gated regardless.
 
+## Status update (2026-08-07 PM) — step 1 DONE, confound RESOLVED
+
+Regen executed (pinned worktree `28b187d7a`, v5thin_adj warehouse):
+**bit-identical reproduction** (+8,366.8%, 1122 trades) → (a) dead. V12:
+29/1122 modest (15–20%) violations, gate firing in-arm → (b) dead. True cause
+= **metric artifact**: `trades.csv.stop_initial_distance_pct` is E-basis
+(`trade_context.ml:171`), not fill-basis; record stops are ~97.4%
+gate-compliant vs cost. Full evidence: findings doc §4 "RESOLVED". Artifacts:
+`dev/…/.sweep-output/confound-regen-artifacts/` (local),
+`confound-regen-v12.{md,sexp}`.
+
+**Consequences for the sequence:** step 2 is void (nothing to fix — recipe
+sound, gate sound). Step 4's "hold the stop gate fixed" is automatic (same
+gate both arms); the A/B isolates to **fill basis** (market-at-close vs
+resting-at-chased-E). Remaining:
+- Fix #1 (next-open fill) — also cleans up the 29 drift cases V12 caught.
+- Fix #2 (no-chase E) — now MORE central: it directly narrows the arms' gap.
+- Follow-up (small): fill-basis stop-distance column in trades.csv (or fix
+  col-16 docstring); V11 thresholds re-read on fill basis.
+- Then the honest ladder re-run + A/B under WF-CV + grid, unchanged.
+
 ## Out of scope / do NOT
 
 - Do **not** touch the deep structural stops (findings §4 Q2) — the edge.
