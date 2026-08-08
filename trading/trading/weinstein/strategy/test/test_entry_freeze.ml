@@ -10,7 +10,7 @@ open Weinstein_strategy
 (** Minimal [Screener.scored_candidate] — [Entry_freeze.apply] only reads
     [ticker] and [suggested_entry], but the record must be fully populated.
     Long-side stub; the freeze logic is side-agnostic. *)
-let make_candidate ~ticker ~entry =
+let make_candidate ?(side = Trading_base.Types.Long) ~ticker ~entry () =
   let open Weinstein_types in
   let stub_stage : Stage.result =
     {
@@ -52,7 +52,7 @@ let make_candidate ~ticker ~entry =
     Screener.ticker;
     analysis = stub_analysis;
     sector = stub_sector;
-    side = Trading_base.Types.Long;
+    side;
     grade = Weinstein_types.A;
     score = 70;
     suggested_entry = entry;
@@ -89,8 +89,8 @@ let test_off_path_leaves_rising_e_unchanged _ =
   let apply candidates =
     Entry_freeze.apply ~enabled:false ~pending ~held_set ~candidates
   in
-  let wk1 = apply [ make_candidate ~ticker:"BDLN" ~entry:50.0 ] in
-  let wk2 = apply [ make_candidate ~ticker:"BDLN" ~entry:55.0 ] in
+  let wk1 = apply [ make_candidate ~ticker:"BDLN" ~entry:50.0 () ] in
+  let wk2 = apply [ make_candidate ~ticker:"BDLN" ~entry:55.0 () ] in
   assert_that
     (List.map (wk1 @ wk2) ~f:entry_of)
     (elements_are [ float_equal 50.0; float_equal 55.0 ])
@@ -103,8 +103,8 @@ let test_on_path_freezes_to_first_e _ =
   let apply candidates =
     Entry_freeze.apply ~enabled:true ~pending ~held_set ~candidates
   in
-  let _wk1 = apply [ make_candidate ~ticker:"BDLN" ~entry:50.0 ] in
-  let wk2 = apply [ make_candidate ~ticker:"BDLN" ~entry:79.81 ] in
+  let _wk1 = apply [ make_candidate ~ticker:"BDLN" ~entry:50.0 () ] in
+  let wk2 = apply [ make_candidate ~ticker:"BDLN" ~entry:79.81 () ] in
   assert_that (List.map wk2 ~f:entry_of) (elements_are [ float_equal 50.0 ])
 
 (** Release-on-expiry: a symbol that drops out of the candidate list while not
@@ -115,12 +115,12 @@ let test_release_on_dropout_repins_fresh _ =
   let apply ?(held_set = String.Set.empty) candidates =
     Entry_freeze.apply ~enabled:true ~pending ~held_set ~candidates
   in
-  let _wk1 = apply [ make_candidate ~ticker:"AAA" ~entry:50.0 ] in
+  let _wk1 = apply [ make_candidate ~ticker:"AAA" ~entry:50.0 () ] in
   let _wk2 =
     apply []
     (* AAA drops out, not held -> pin released *)
   in
-  let wk3 = apply [ make_candidate ~ticker:"AAA" ~entry:60.0 ] in
+  let wk3 = apply [ make_candidate ~ticker:"AAA" ~entry:60.0 () ] in
   assert_that (List.map wk3 ~f:entry_of) (elements_are [ float_equal 60.0 ])
 
 (** Release-on-round-trip: while a symbol is held (order resting / position
@@ -132,13 +132,43 @@ let test_pin_persists_while_held_then_repins _ =
   let apply ?(held_set = String.Set.empty) candidates =
     Entry_freeze.apply ~enabled:true ~pending ~held_set ~candidates
   in
-  let _wk1 = apply [ make_candidate ~ticker:"BBB" ~entry:50.0 ] in
+  let _wk1 = apply [ make_candidate ~ticker:"BBB" ~entry:50.0 () ] in
   (* Held: no candidate, but the position is open -> pin retained. *)
   let _wk2 = apply ~held_set:(String.Set.of_list [ "BBB" ]) [] in
   (* Closed: no longer held, still not qualifying -> pin released. *)
   let _wk3 = apply [] in
-  let wk4 = apply [ make_candidate ~ticker:"BBB" ~entry:70.0 ] in
+  let wk4 = apply [ make_candidate ~ticker:"BBB" ~entry:70.0 () ] in
   assert_that (List.map wk4 ~f:entry_of) (elements_are [ float_equal 70.0 ])
+
+(** Discriminating held-persistence: wk1 pins E=50; wk2 the symbol is HELD and
+    not a candidate — the [held_set] guard must RETAIN the pin; wk3 it
+    re-qualifies (no longer held) at a chased E=70 — the emitted E must be the
+    retained 50.0. Fails if the [not (Set.mem held_set sym)] clause in
+    [_release_stale] is removed (wk2 would release, wk3 would re-pin at 70). *)
+let test_held_guard_retains_pin_across_dormancy _ =
+  let pending = Entry_freeze.create () in
+  let apply ?(held_set = String.Set.empty) candidates =
+    Entry_freeze.apply ~enabled:true ~pending ~held_set ~candidates
+  in
+  let _wk1 = apply [ make_candidate ~ticker:"DDD" ~entry:50.0 () ] in
+  (* Held, not qualifying: only the held guard keeps the pin alive. *)
+  let _wk2 = apply ~held_set:(String.Set.of_list [ "DDD" ]) [] in
+  let wk3 = apply [ make_candidate ~ticker:"DDD" ~entry:70.0 () ] in
+  assert_that (List.map wk3 ~f:entry_of) (elements_are [ float_equal 50.0 ])
+
+(** Short-side symmetry: a short candidate's breakdown level is pinned the same
+    way — a later LOWER recomputed level reuses the first pin (no chasing the
+    breakdown down). *)
+let test_short_side_pins_symmetrically _ =
+  let pending = Entry_freeze.create () in
+  let held_set = String.Set.empty in
+  let apply candidates =
+    Entry_freeze.apply ~enabled:true ~pending ~held_set ~candidates
+  in
+  let short = make_candidate ~side:Trading_base.Types.Short in
+  let _wk1 = apply [ short ~ticker:"SSS" ~entry:50.0 () ] in
+  let wk2 = apply [ short ~ticker:"SSS" ~entry:40.0 () ] in
+  assert_that (List.map wk2 ~f:entry_of) (elements_are [ float_equal 50.0 ])
 
 (** Distinct symbols pin independently: freezing one does not affect another. *)
 let test_independent_pins_per_symbol _ =
@@ -147,12 +177,12 @@ let test_independent_pins_per_symbol _ =
   let apply candidates =
     Entry_freeze.apply ~enabled:true ~pending ~held_set ~candidates
   in
-  let _wk1 = apply [ make_candidate ~ticker:"AAA" ~entry:50.0 ] in
+  let _wk1 = apply [ make_candidate ~ticker:"AAA" ~entry:50.0 () ] in
   let wk2 =
     apply
       [
-        make_candidate ~ticker:"AAA" ~entry:60.0;
-        make_candidate ~ticker:"CCC" ~entry:30.0;
+        make_candidate ~ticker:"AAA" ~entry:60.0 ();
+        make_candidate ~ticker:"CCC" ~entry:30.0 ();
       ]
   in
   assert_that (List.map wk2 ~f:entry_of)
@@ -192,7 +222,7 @@ let two_week_wk2_entry ~freeze =
     let stop_states = ref String.Map.empty in
     let get_price = fun _ -> Some (make_bar "2000-01-21" entry) in
     entries_from_candidates ~pending_entry_e ~config:cfg
-      ~candidates:[ make_candidate ~ticker:"BDLN" ~entry ]
+      ~candidates:[ make_candidate ~ticker:"BDLN" ~entry () ]
       ~stop_states ~bar_reader ~portfolio ~get_price
       ~current_date:(Date.of_string "2000-01-21")
       ()
@@ -226,6 +256,9 @@ let suite =
          >:: test_release_on_dropout_repins_fresh;
          "pin persists while held then re-pins"
          >:: test_pin_persists_while_held_then_repins;
+         "held guard retains pin across dormancy"
+         >:: test_held_guard_retains_pin_across_dormancy;
+         "short side pins symmetrically" >:: test_short_side_pins_symmetrically;
          "independent pins per symbol" >:: test_independent_pins_per_symbol;
          "frozen E flows to entry price" >:: test_frozen_e_flows_to_entry_price;
          "off path emits chased E" >:: test_off_path_emits_chased_e;

@@ -6,8 +6,8 @@
     [E]) every Friday, so for a symbol making new highs [E] floats upward week
     over week and the strategy's resting entry ticket chases the extension —
     "buying an extended stock," the exact thing Weinstein's breakout rule warns
-    against ([docs/design/weinstein-book-reference.md] §4.1 "buy {i the}
-    breakout"; §3 do not chase a stock that has already run). This module pins
+    against ([docs/design/weinstein-book-reference.md] §4.7 — "write down the
+    price ... break out", do not chase beyond the buy band). This module pins
     [E] to the first-qualifying breakout while the setup stays live, so the
     ticket rests at the price the stock first needed to break out — not every
     successive higher high.
