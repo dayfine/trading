@@ -57,13 +57,24 @@ val update_market :
     Engine.update_market engine bars
     ]} *)
 
-val process_orders : t -> order_manager -> execution_report list status_or
+val process_orders :
+  ?can_fill:(Trading_orders.Types.order -> bool) ->
+  t ->
+  order_manager ->
+  execution_report list status_or
 (** Process pending orders from the order manager.
 
     For each pending order: 1. Check if execution is possible (market data
     available, price conditions met) 2. If executable, generate trade and update
     order status to Filled in manager 3. If not executable, leave as Pending
     (limit/stop not triggered)
+
+    [?can_fill] is an optional per-order gate applied {i before} matching: an
+    order for which it returns [false] is not offered to the fill logic this
+    call, stays active in the manager, and is re-considered on the next call (it
+    is not cancelled). [None] (the default) offers every active order, so the
+    result is bit-identical to omitting the argument. Used by the simulator to
+    defer next-open entry fills past stale-bar steps.
 
     Returns list of execution reports for orders that were processed.
 

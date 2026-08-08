@@ -135,6 +135,7 @@ type config = {
       (** See [.mli]. *)
   entry_anchor_local_range_weeks : int; [@sexp.default 0]  (** See [.mli]. *)
   stop_anchor_at_entry_base : bool; [@sexp.default false]  (** See [.mli]. *)
+  sim_entry_fill_next_open : bool; [@sexp.default false]  (** See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -237,6 +238,7 @@ let default_config ~universe ~index_symbol =
     sim_entry_trigger_at_suggested = false;
     entry_anchor_local_range_weeks = 0;
     stop_anchor_at_entry_base = false;
+    sim_entry_fill_next_open = false;
   }
 
 let name = "Weinstein"

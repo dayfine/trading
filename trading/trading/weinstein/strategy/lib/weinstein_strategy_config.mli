@@ -1343,6 +1343,53 @@ type config = {
           [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides]. Per
           the experiment discipline it stays default-off until a ledger ACCEPT
           (WF-CV per the honest-ladder plan). *)
+  sim_entry_fill_next_open : bool; [@sexp.default false]
+      (** Next-bar-open fill realism for Market entries (Fix #1, plan
+          [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream C;
+          findings [dev/notes/fill-model-fix-findings-2026-08-07.md] §5).
+          Threaded from this config into the simulator dependencies by the
+          backtest runner (same route as [entry_extension_max_pct]).
+
+          {b The realism gap it closes.} The record entry is a Market order (the
+          default fill model, [enable_sim_entry_stoplimit = false]). The
+          strategy decides on a weekly signal bar's close and the order rests in
+          the manager until the engine matches it against a bar. Because the
+          engine retains the last bar per symbol on non-trading
+          (weekend/holiday) steps, a Market entry created from a Friday-close
+          decision is filled on the following non-trading step against the
+          {i stale} signal bar — i.e. at that same bar's open, a price observed
+          {i before} the close the decision was made on. That is an optimistic,
+          effectively look-back fill ("you cannot buy the close you just
+          observed" — nor the open from earlier that day).
+
+          When [true], a Market order that would route to an [Entering] position
+          is NOT filled on a step where its symbol has no fresh bar; it stays
+          pending until the next {i fresh} trading bar and fills at that bar's
+          open — the earliest genuinely tradeable price after the decision.
+          {b Scope: Market ENTRY orders only.} Exits, stops, [StopLimit] entries
+          (the [enable_sim_entry_stoplimit] family), and every other order path
+          are untouched. The strategy's decision-time
+          [CreateEntering.entry_price] (used for position sizing and
+          stop-distance math at the signal close) is UNCHANGED — only the
+          executed engine fill price/date move to the next open. The position's
+          realized cost basis (portfolio cash + round-trip pairing) already
+          comes from the engine fill, so it moves with the fill; the
+          [Position.entry_price] the state machine carries remains the decision
+          close by construction (the engine fill price has always been discarded
+          there).
+
+          {b Default [false] = current stale-bar fill, bit-identical to every
+             existing baseline/golden} (R1): no [Entering]-fill is ever
+          deferred, so the engine processes orders exactly as before. This is a
+          fill-model basis change when armed — route it through its own WF-CV
+          surface and deliberate golden re-pins before any default flip; NEVER
+          bundle it with another mechanism (same discipline as
+          [enable_sim_entry_stoplimit]). R2: real config field, axis-expressible
+          as [((flag sim_entry_fill_next_open) (values (true false)))] via
+          [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides].
+          Weinstein-faithful (spine untouched: the Stage-2 breakout entry
+          decision is identical; only the {i fill assumption} — a realism dial —
+          changes). *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

@@ -256,7 +256,14 @@ let _process_order engine order_mgr order =
   | StopLimit (stop_price, limit_price) ->
       _process_stop_limit_order engine order_mgr order stop_price limit_price
 
-let process_orders engine order_mgr =
+let process_orders ?can_fill engine order_mgr =
   let pending = list_orders order_mgr ~filter:ActiveOnly in
+  (* [can_fill] lets a caller hold specific orders back from matching this
+     tick without cancelling them: an order for which it returns [false] is
+     skipped, stays active in the manager, and is re-offered next call. [None]
+     (the default) fills every active order exactly as before — bit-identical. *)
+  let pending =
+    match can_fill with None -> pending | Some f -> List.filter pending ~f
+  in
   let reports = List.filter_map pending ~f:(_process_order engine order_mgr) in
   Result.Ok reports

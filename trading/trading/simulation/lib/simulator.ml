@@ -29,6 +29,8 @@ type dependencies = {
       (** See .mli. *)
   entry_extension_max_pct : float option;
       (** See .mli. #2158 Phase 2 fill model. *)
+  sim_entry_fill_next_open : bool;
+      (** See .mli. Fix #1 next-bar-open Market-entry fill (default-off). *)
 }
 
 let create_deps ~symbols ~data_dir ~strategy ~commission
@@ -39,7 +41,8 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(initial_long_margin_req = 1.0) ?(long_margin_rate_annual_pct = 0.0)
     ?(maintenance_long_pct = 0.0)
     ?(exempt_closing_trades_from_cash_floor = false) ?on_trade_fill
-    ?active_through_for ?on_transitions ?entry_extension_max_pct () =
+    ?active_through_for ?on_transitions ?entry_extension_max_pct
+    ?(sim_entry_fill_next_open = false) () =
   let engine_config = { Trading_engine.Types.commission; slippage_bps } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
@@ -71,6 +74,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     active_through_for;
     on_transitions;
     entry_extension_max_pct;
+    sim_entry_fill_next_open;
   }
 
 (* See .mli. Win #4 point-in-time pruning. *)
@@ -358,11 +362,19 @@ let _build_step_result t ~portfolio ~portfolio_value ~trades ~orders ~today_bars
   }
 
 (* Execute pending orders, apply fills, and route rejected fills through
-   {!Cancel_handler}. Returns post-fill (portfolio, positions, accepted). *)
-let _process_fills_and_cancels t ~portfolio ~positions =
+   {!Cancel_handler}. Returns post-fill (portfolio, positions, accepted). The
+   Fix #1 next-open gate (default-off) defers Market entry fills past stale-bar
+   steps; see {!Next_open_fill_gate}. *)
+let _process_fills_and_cancels t ~portfolio ~positions ~today_bars =
   let open Result.Let_syntax in
+  let can_fill =
+    if t.deps.sim_entry_fill_next_open then
+      Some (Next_open_fill_gate.make ~positions ~today_bars)
+    else None
+  in
   let%bind execution_reports =
-    Trading_engine.Engine.process_orders t.deps.engine t.deps.order_manager
+    Trading_engine.Engine.process_orders ?can_fill t.deps.engine
+      t.deps.order_manager
   in
   let all_trades = _extract_trades ~date:t.current_date execution_reports in
   let portfolio, trades, rejected_trades =
@@ -406,7 +418,7 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
     ~stale_exit_trades =
   let open Result.Let_syntax in
   let%bind portfolio, positions, fill_trades =
-    _process_fills_and_cancels t ~portfolio ~positions
+    _process_fills_and_cancels t ~portfolio ~positions ~today_bars
   in
   (* Surface the already-realised stale force-exits in this step's trades. *)
   let trades = stale_exit_trades @ fill_trades in

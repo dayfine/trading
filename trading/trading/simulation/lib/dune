@@ -13,6 +13,7 @@
  (modules
   simulator
   fill_router
+  next_open_fill_gate
   simulator_metrics
   fill_date_stamp
   split_handler

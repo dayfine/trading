@@ -128,6 +128,22 @@ type dependencies = {
           ([enable_sim_entry_stoplimit] + [entry_extension_max_pct]); it is a
           fill-model basis change, so any default flip routes through WF-CV +
           deliberate golden re-pins per experiment-flag discipline. *)
+  sim_entry_fill_next_open : bool;
+      (** Next-bar-open Market-entry fill realism (Fix #1;
+          [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream C).
+          [false] (the default) is bit-identical to every existing baseline: a
+          Market entry order fills whenever the engine next matches it,
+          including against the stale signal bar retained on non-trading steps
+          (so a Friday-close decision fills at that bar's own open). [true]
+          holds a Market order routing to an [Entering] position back on any
+          step where its symbol has no fresh bar, so it fills at the next fresh
+          trading bar's open — the earliest tradeable price after the decision.
+          Scope: Market ENTRY orders only; exits, stops, and StopLimit entries
+          are untouched, and the decision-time [entry_price] used for sizing /
+          stop math is unchanged. Armed by the backtest runner from the strategy
+          config ([Weinstein_strategy_config.sim_entry_fill_next_open]); a
+          fill-model basis change, so any default flip routes through WF-CV +
+          deliberate golden re-pins per experiment-flag discipline. *)
 }
 
 val create_deps :
@@ -150,6 +166,7 @@ val create_deps :
   ?active_through_for:(string -> Core.Date.t option) ->
   ?on_transitions:(Trading_strategy.Position.transition list -> unit) ->
   ?entry_extension_max_pct:float ->
+  ?sim_entry_fill_next_open:bool ->
   unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and
