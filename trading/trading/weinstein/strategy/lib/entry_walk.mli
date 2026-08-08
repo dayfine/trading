@@ -21,6 +21,7 @@ val held_symbols : Trading_strategy.Portfolio_view.t -> string list
 
 val entries_from_candidates :
   ?sector_lookup:(string -> string option) ->
+  ?pending_entry_e:Entry_freeze.t ->
   config:Weinstein_strategy_config.config ->
   candidates:Screener.scored_candidate list ->
   stop_states:Weinstein_stops.stop_state Core.String.Map.t ref ->
@@ -80,4 +81,11 @@ val entries_from_candidates :
       accumulator is empty — held positions don't contribute to any sector
       bucket. Default-off path
       ([config.portfolio_config.max_sector_exposure_pct = None]) is bit-equal to
-      pre-P1 behaviour regardless of whether [sector_lookup] is passed. *)
+      pre-P1 behaviour regardless of whether [sector_lookup] is passed.
+    @param pending_entry_e
+      Fix #2 no-chase pin table ({!Entry_freeze.t}). Threaded from the
+      {!Weinstein_strategy.make} closure so the first-qualifying entry [E]
+      persists across Fridays. Only consulted when
+      [config.freeze_entry_at_first_breakout = true]; when the flag is off the
+      table is never touched, so an omitted argument (default fresh table) is
+      bit-identical to the pre-freeze path (R1). *)

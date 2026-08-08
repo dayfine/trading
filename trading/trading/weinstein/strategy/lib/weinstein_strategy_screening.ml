@@ -317,9 +317,9 @@ let _run_screener ?membership_at ~config ~(macro_result : Macro.result)
    (P1b, default-off): on a "dawn" week lower the effective long initial-margin
    requirement for THIS entry walk only — a no-op (returns [config] unchanged,
    no fetch) when [config.dawn_leverage_enabled = false]. See {!Leverage_dawn}. *)
-let _entries_of_screen_result ~config ~sector_map ~stop_states ~portfolio
-    ~get_price ~bar_reader ~current_date ~audit_recorder ~macro_result
-    screen_result =
+let _entries_of_screen_result ?pending_entry_e ~config ~sector_map ~stop_states
+    ~portfolio ~get_price ~bar_reader ~current_date ~audit_recorder
+    ~macro_result screen_result =
   let combined_candidates =
     Entry_assembly.assemble ~config ~bar_reader ~current_date screen_result
   in
@@ -328,14 +328,15 @@ let _entries_of_screen_result ~config ~sector_map ~stop_states ~portfolio
   in
   Entry_walk.entries_from_candidates
     ~sector_lookup:(_sector_lookup_of ~sector_map)
-    ~config:entry_config ~candidates:combined_candidates ~stop_states
-    ~bar_reader ~portfolio ~get_price ~current_date ~audit_recorder
+    ?pending_entry_e ~config:entry_config ~candidates:combined_candidates
+    ~stop_states ~bar_reader ~portfolio ~get_price ~current_date ~audit_recorder
     ~macro:macro_result ()
 
-let screen_universe ?active_through_for ?fold_start_date ?membership_at ~config
-    ~index_view ~(macro_result : Macro.result) ~sector_map ~stop_states
-    ~last_stop_out_dates ~(portfolio : Portfolio_view.t) ~get_price ~bar_reader
-    ~prior_stages ~current_date ~audit_recorder () =
+let screen_universe ?active_through_for ?fold_start_date ?membership_at
+    ?pending_entry_e ~config ~index_view ~(macro_result : Macro.result)
+    ~sector_map ~stop_states ~last_stop_out_dates
+    ~(portfolio : Portfolio_view.t) ~get_price ~bar_reader ~prior_stages
+    ~current_date ~audit_recorder () =
   let classified =
     _classify_all ?active_through_for ?fold_start_date ~config ~bar_reader
       ~prior_stages ~current_date ()
@@ -358,9 +359,9 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at ~config
       ~stocks ~portfolio ~last_stop_out_dates ~current_date ()
   in
   let entries =
-    _entries_of_screen_result ~config ~sector_map ~stop_states ~portfolio
-      ~get_price ~bar_reader ~current_date ~audit_recorder ~macro_result
-      screen_result
+    _entries_of_screen_result ?pending_entry_e ~config ~sector_map ~stop_states
+      ~portfolio ~get_price ~bar_reader ~current_date ~audit_recorder
+      ~macro_result screen_result
   in
   (* Per-Friday cascade-rejection capture. Fires after the entry walk so the
      [entered] count reflects actual transitions emitted, not just the
