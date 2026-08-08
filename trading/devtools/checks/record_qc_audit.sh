@@ -83,6 +83,24 @@ GH_BIN="${RECORD_QC_AUDIT_GH_BIN:-gh}"
 # --- Locate repo root ---
 
 _repo_root() {
+  # An explicitly-set REPO_ROOT takes precedence over the walk-up, matching
+  # the shared repo_root() helper (trading/devtools/checks/_check_lib.sh)
+  # that most other check scripts source, and matching write_audit.sh's own
+  # _repo_root() (fixed for H-WRITE-AUDIT-REPO-ROOT-NOT-REDIRECTABLE). Before
+  # this fix the walk-up ran FIRST and only fell back to $REPO_ROOT when it
+  # found nothing -- so an ad-hoc in-place invocation (run from inside a real
+  # checkout, where .git/.claude are always found a few directories up)
+  # silently ignored any REPO_ROOT override. That was worse here than in
+  # write_audit.sh: this script reassigns REPO_ROOT="$(_repo_root)" below
+  # with a PLAIN (non-export) assignment, and bash's export attribute
+  # survives plain reassignment of an already-exported variable -- so the
+  # walked-up value stayed exported and silently overrode the caller's real
+  # REPO_ROOT for write_audit.sh, which this script invokes as a child
+  # process. See H-RECORD-QC-AUDIT-REPO-ROOT-SIBLING (dev/status/harness.md).
+  if [ -n "${REPO_ROOT:-}" ] && [ -d "$REPO_ROOT" ]; then
+    echo "$REPO_ROOT"
+    return 0
+  fi
   dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
   while [ -n "$dir" ] && [ "$dir" != "/" ]; do
     if [ -d "$dir/.git" ] || [ -d "$dir/.claude" ]; then
@@ -91,10 +109,6 @@ _repo_root() {
     fi
     dir="$(dirname "$dir")"
   done
-  if [ -n "${REPO_ROOT:-}" ] && [ -d "$REPO_ROOT" ]; then
-    echo "$REPO_ROOT"
-    return 0
-  fi
   echo "FAIL: could not locate repo root" >&2
   exit 1
 }

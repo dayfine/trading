@@ -1460,6 +1460,149 @@ fi
 rm -rf "${WALKUP_ROOT}" "${TARGET_ROOT}"
 
 # ---------------------------------------------------------------------------
+# Scenario 28 (H-RECORD-QC-AUDIT-REPO-ROOT-SIBLING): record_qc_audit.sh has
+# its OWN separate _repo_root(), and until this fix it had the sibling bug
+# of scenario 27 -- walk-up first, REPO_ROOT fallback second. It is WORSE
+# than a plain duplicate: record_qc_audit.sh reassigns its REPO_ROOT
+# variable from the call's output with a PLAIN (non-export) assignment,
+# and bash's export attribute survives plain reassignment of an
+# already-exported variable. So a caller's REPO_ROOT override -- even after
+# write_audit.sh's own #2231 fix made ITS _repo_root() prefer REPO_ROOT --
+# never reaches write_audit.sh as the caller intended: record_qc_audit.sh's
+# unfixed walk-up silently overwrites the exported REPO_ROOT with its own
+# walked-up value before ever invoking write_audit.sh as a child process.
+#
+# This scenario pins the STRONGER, end-to-end claim (not just
+# record_qc_audit.sh's own _repo_root() return value in isolation): invoke
+# record_qc_audit.sh directly with an explicit REPO_ROOT override pointing
+# at TARGET2_ROOT, from a script physically located under WALKUP2_ROOT (whose
+# own .claude sentinel makes the walk-up ALSO succeed, just to the wrong
+# root). The audit record produced by the write_audit.sh CHILD PROCESS must
+# land under TARGET2_ROOT/dev/audit -- never WALKUP2_ROOT/dev/audit. Distinct
+# quality scores in each root's dev/reviews/<feature>.md fixture (4 vs 5)
+# let the assertion pin not just *that* a record landed in the right place,
+# but that it is the RIGHT record (i.e. REVIEW_FILE resolution followed the
+# same override, not just WRITE_AUDIT's target path).
+#
+# WALKUP2_ROOT and TARGET2_ROOT each carry a full copy of BOTH
+# record_qc_audit.sh and write_audit.sh (not just one) because the buggy
+# pre-fix path resolves REVIEW_FILE, WRITE_AUDIT, and the audit output dir
+# all from whichever root _repo_root() picks -- a partial fixture would
+# mask the bug behind a "file not found" error rather than a wrong-location
+# write.
+# ---------------------------------------------------------------------------
+FEATURE28="repo-root-sibling-override"
+WALKUP2_ROOT="$(mktemp -d -t record_qc_audit_walkup2.XXXXXX)"
+TARGET2_ROOT="$(mktemp -d -t record_qc_audit_target2.XXXXXX)"
+mkdir -p "${WALKUP2_ROOT}/.claude" "${WALKUP2_ROOT}/trading/devtools/checks" \
+         "${WALKUP2_ROOT}/dev/audit" "${WALKUP2_ROOT}/dev/reviews" \
+         "${TARGET2_ROOT}/trading/devtools/checks" \
+         "${TARGET2_ROOT}/dev/audit" "${TARGET2_ROOT}/dev/reviews"
+
+cp "${SCRIPT}" "${WALKUP2_ROOT}/trading/devtools/checks/"
+cp "${SCRIPT_DIR}/write_audit.sh" "${WALKUP2_ROOT}/trading/devtools/checks/"
+cp "${SCRIPT}" "${TARGET2_ROOT}/trading/devtools/checks/"
+cp "${SCRIPT_DIR}/write_audit.sh" "${TARGET2_ROOT}/trading/devtools/checks/"
+chmod +x "${WALKUP2_ROOT}/trading/devtools/checks/"*.sh "${TARGET2_ROOT}/trading/devtools/checks/"*.sh
+
+cat > "${WALKUP2_ROOT}/dev/reviews/${FEATURE28}.md" <<'EOF'
+Reviewed SHA: walkup2sha
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+4 — WRONG root; must not be the record that gets published
+EOF
+
+cat > "${TARGET2_ROOT}/dev/reviews/${FEATURE28}.md" <<'EOF'
+Reviewed SHA: target2sha
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+5 — RIGHT root; this is the record that must be published
+EOF
+
+out28=$(REPO_ROOT="${TARGET2_ROOT}" \
+  bash "${WALKUP2_ROOT}/trading/devtools/checks/record_qc_audit.sh" \
+    "${FEATURE28}" "harness/repo-root-sibling" "2026-08-08" 2>&1) && rc28=0 || rc28=$?
+
+target_count28="$(find "${TARGET2_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+walkup_count28="$(find "${WALKUP2_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+JSON28="${TARGET2_ROOT}/dev/audit/2026-08-08-harness-repo-root-sibling-${FEATURE28}.json"
+
+if (( rc28 == 0 )) && [[ "${target_count28}" == "1" ]] && [[ "${walkup_count28}" == "0" ]] \
+   && [[ -f "${JSON28}" ]] && grep -q '"quality_score": *5' "${JSON28}"; then
+  pass "scenario 28 — REPO_ROOT override wins end-to-end through the write_audit.sh child process: record (quality_score 5, from TARGET2_ROOT's review file) lands under \$REPO_ROOT/dev/audit only, never the walked-up root (H-RECORD-QC-AUDIT-REPO-ROOT-SIBLING)"
+else
+  fail "scenario 28 — expected rc=0 + exactly 1 record under TARGET2_ROOT (quality_score 5) and 0 under WALKUP2_ROOT; got rc=${rc28}, target_count=${target_count28}, walkup_count=${walkup_count28}"
+  echo "${out28}" | sed 's/^/      /'
+  [[ -f "${JSON28}" ]] && echo "      json: $(cat "${JSON28}")"
+fi
+
+rm -rf "${WALKUP2_ROOT}" "${TARGET2_ROOT}"
+
+# ---------------------------------------------------------------------------
+# Scenario 28b (H-RECORD-QC-AUDIT-REPO-ROOT-SIBLING): the OTHER half of
+# record_qc_audit.sh's _repo_root() contract -- with REPO_ROOT unset, the
+# walk-up must still locate the root and publish correctly, exactly as
+# production uses it (lead-orchestrator.md invokes record_qc_audit.sh
+# without ever setting REPO_ROOT). Uses its OWN fresh fixture
+# (WALKUP3_ROOT) rather than reusing scenario 28's WALKUP2_ROOT, and asserts
+# an absolute post-run count rather than a delta -- deliberately avoiding
+# the cumulative-count pattern in scenario 27b (H-AUDIT-27B-CUMULATIVE-COUNT
+# is a known, separately-tracked residual in that scenario; this one is not
+# built to inherit it).
+#
+# `env -u REPO_ROOT` forces the var unset regardless of ambient shell
+# state, matching scenario 27b's guard -- without it, an ambient REPO_ROOT
+# in the invoking shell would (a) make this scenario pass for the wrong
+# reason and (b), per the H-WRITE-AUDIT-REPO-ROOT-NOT-REDIRECTABLE rework
+# history, risks writing a stray record into the live dev/audit/ if the
+# guard is missing and the ambient value is unset.
+# ---------------------------------------------------------------------------
+FEATURE28B="repo-root-sibling-walkup"
+WALKUP3_ROOT="$(mktemp -d -t record_qc_audit_walkup3.XXXXXX)"
+mkdir -p "${WALKUP3_ROOT}/.claude" "${WALKUP3_ROOT}/trading/devtools/checks" \
+         "${WALKUP3_ROOT}/dev/audit" "${WALKUP3_ROOT}/dev/reviews"
+cp "${SCRIPT}" "${WALKUP3_ROOT}/trading/devtools/checks/"
+cp "${SCRIPT_DIR}/write_audit.sh" "${WALKUP3_ROOT}/trading/devtools/checks/"
+chmod +x "${WALKUP3_ROOT}/trading/devtools/checks/"*.sh
+
+cat > "${WALKUP3_ROOT}/dev/reviews/${FEATURE28B}.md" <<'EOF'
+Reviewed SHA: walkup3sha
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+3 — walk-up fallback path
+EOF
+
+out28b=$(env -u REPO_ROOT \
+  bash "${WALKUP3_ROOT}/trading/devtools/checks/record_qc_audit.sh" \
+    "${FEATURE28B}" "harness/repo-root-sibling" "2026-08-08" 2>&1) && rc28b=0 || rc28b=$?
+
+walkup_count28b="$(find "${WALKUP3_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+JSON28B="${WALKUP3_ROOT}/dev/audit/2026-08-08-harness-repo-root-sibling-${FEATURE28B}.json"
+
+if (( rc28b == 0 )) && [[ "${walkup_count28b}" == "1" ]] \
+   && [[ -f "${JSON28B}" ]] && grep -q '"quality_score": *3' "${JSON28B}"; then
+  pass "scenario 28b — REPO_ROOT unset: the walk-up still locates the root and publishes the record end-to-end through write_audit.sh (H-RECORD-QC-AUDIT-REPO-ROOT-SIBLING, own fixture, absolute count not cumulative)"
+else
+  fail "scenario 28b — expected rc=0 + exactly 1 record under WALKUP3_ROOT (quality_score 3); got rc=${rc28b}, walkup_count=${walkup_count28b}"
+  echo "${out28b}" | sed 's/^/      /'
+  [[ -f "${JSON28B}" ]] && echo "      json: $(cat "${JSON28B}")"
+fi
+
+rm -rf "${WALKUP3_ROOT}"
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
