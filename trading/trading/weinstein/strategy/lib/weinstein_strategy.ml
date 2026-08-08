@@ -38,6 +38,7 @@ module Weekly_ma_cache = Weekly_ma_cache
 module Audit_recorder = Audit_recorder
 module Entry_audit_capture = Entry_audit_capture
 module Entry_walk = Entry_walk
+module Entry_freeze = Entry_freeze
 module Screening_notional = Screening_notional
 module Long_buying_power = Long_buying_power
 module Leverage_dawn = Leverage_dawn
@@ -195,10 +196,10 @@ let _run_macro ~config ~ad_series ~prior_macro ~prior_macro_result ~peak_tracker
     _maybe_reset_halt ~peak_tracker ~prior_macro:prev ~current_macro:r.trend;
     Some r
 
-let _run_entries ~fold_start_date ~config ~stop_states ~last_stop_out_dates
-    ~peak_tracker ~bar_reader ~prior_stages ~sector_prior_stages ~ticker_sectors
-    ~get_price ~portfolio ~current_date ~index_view ~audit_recorder
-    ~is_screening_day ~macro_result_opt =
+let _run_entries ~pending_entry_e ~fold_start_date ~config ~stop_states
+    ~last_stop_out_dates ~peak_tracker ~bar_reader ~prior_stages
+    ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio ~current_date
+    ~index_view ~audit_recorder ~is_screening_day ~macro_result_opt =
   let halted =
     match
       Portfolio_risk.Force_liquidation.Peak_tracker.halt_state peak_tracker
@@ -206,11 +207,11 @@ let _run_entries ~fold_start_date ~config ~stop_states ~last_stop_out_dates
     | Halted -> true
     | Active -> false
   in
-  Weinstein_strategy_macro.entry_transitions_if_active ~fold_start_date ~halted
-    ~is_screening_day ~macro_result_opt ~config ~stop_states
-    ~last_stop_out_dates ~bar_reader ~prior_stages ~sector_prior_stages
-    ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
-    ~audit_recorder
+  Weinstein_strategy_macro.entry_transitions_if_active ~pending_entry_e
+    ~fold_start_date ~halted ~is_screening_day ~macro_result_opt ~config
+    ~stop_states ~last_stop_out_dates ~bar_reader ~prior_stages
+    ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio ~current_date
+    ~index_view ~audit_recorder
 
 (** Compute the macro result (mutating the macro refs via {!_run_macro}) and run
     the macro-bearish trim pass, returning both. Extracted from
@@ -271,8 +272,8 @@ let _run_scale_in ~config ~positions ~portfolio ~get_price ~bar_reader
     [(late_tighten, harvest_rotate, entries)] with the adds prepended to the
     entries. Extracted from {!_process_market_day} so that coordinator stays
     within the function-length limit. *)
-let _run_dials_and_entries ~fold_start_date ~config ~stop_states
-    ~last_stop_out_dates ~peak_tracker ~bar_reader ~prior_stages
+let _run_dials_and_entries ~pending_entry_e ~fold_start_date ~config
+    ~stop_states ~last_stop_out_dates ~peak_tracker ~bar_reader ~prior_stages
     ~prior_stage_ma_values ~scale_in_added ~sector_prior_stages ~ticker_sectors
     ~get_price ~(portfolio : Portfolio_view.t) ~current_date ~index_view
     ~audit_recorder ~prior_macro_result ~is_screening_day ~macro_result_opt
@@ -290,17 +291,18 @@ let _run_dials_and_entries ~fold_start_date ~config ~stop_states
     { portfolio with Portfolio_view.cash = portfolio.cash -. scale_in_cash }
   in
   let entry_transitions =
-    _run_entries ~fold_start_date ~config ~stop_states ~last_stop_out_dates
-      ~peak_tracker ~bar_reader ~prior_stages ~sector_prior_stages
-      ~ticker_sectors ~get_price ~portfolio:entry_portfolio ~current_date
-      ~index_view ~audit_recorder ~is_screening_day ~macro_result_opt
+    _run_entries ~pending_entry_e ~fold_start_date ~config ~stop_states
+      ~last_stop_out_dates ~peak_tracker ~bar_reader ~prior_stages
+      ~sector_prior_stages ~ticker_sectors ~get_price ~portfolio:entry_portfolio
+      ~current_date ~index_view ~audit_recorder ~is_screening_day
+      ~macro_result_opt
   in
   ( late_tighten_transitions,
     harvest_rotate_transitions,
     scale_in_transitions @ entry_transitions )
 
-let _process_market_day ~fold_start_date ~config ~ad_series ~stop_states
-    ~last_stop_out_dates ~prior_macro ~prior_macro_result
+let _process_market_day ~pending_entry_e ~fold_start_date ~config ~ad_series
+    ~stop_states ~last_stop_out_dates ~prior_macro ~prior_macro_result
     ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
     ~prior_stage_ma_values ~scale_in_added ~sector_prior_stages ~ticker_sectors
     ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price
@@ -337,8 +339,8 @@ let _process_market_day ~fold_start_date ~config ~ad_series ~stop_states
       ~force_exit_transitions
   in
   let late_tighten_transitions, harvest_rotate_transitions, entry_transitions =
-    _run_dials_and_entries ~fold_start_date ~config ~stop_states
-      ~last_stop_out_dates ~peak_tracker ~bar_reader ~prior_stages
+    _run_dials_and_entries ~pending_entry_e ~fold_start_date ~config
+      ~stop_states ~last_stop_out_dates ~peak_tracker ~bar_reader ~prior_stages
       ~prior_stage_ma_values ~scale_in_added ~sector_prior_stages
       ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
       ~audit_recorder ~prior_macro_result ~is_screening_day ~macro_result_opt
@@ -350,8 +352,8 @@ let _process_market_day ~fold_start_date ~config ~ad_series ~stop_states
     ~adjust_transitions:(adjust_transitions @ late_tighten_transitions)
     ~entry_transitions ~stop_exited_ids ~stage3_exited_ids ~laggard_exited_ids
 
-let _on_market_close ~fold_start_date ~config ~ad_series ~stop_states
-    ~last_stop_out_dates ~prior_macro ~prior_macro_result
+let _on_market_close ~pending_entry_e ~fold_start_date ~config ~ad_series
+    ~stop_states ~last_stop_out_dates ~prior_macro ~prior_macro_result
     ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
     ~prior_stage_ma_values ~scale_in_added ~sector_prior_stages ~ticker_sectors
     ~stage3_streaks ~laggard_streaks ~audit_recorder ~get_price ~get_indicator:_
@@ -360,12 +362,21 @@ let _on_market_close ~fold_start_date ~config ~ad_series ~stop_states
   | None -> Ok { Strategy_interface.transitions = [] }
   | Some primary_bar ->
       let current_date = primary_bar.Types.Daily_price.date in
-      _process_market_day ~fold_start_date ~config ~ad_series ~stop_states
-        ~last_stop_out_dates ~prior_macro ~prior_macro_result
+      _process_market_day ~pending_entry_e ~fold_start_date ~config ~ad_series
+        ~stop_states ~last_stop_out_dates ~prior_macro ~prior_macro_result
         ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
         ~prior_stage_ma_values ~scale_in_added ~sector_prior_stages
         ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder
         ~get_price ~portfolio ~current_date
+
+(** Per-run closure bookkeeping tables threaded through [on_market_close]:
+    [scale_in_added] (symbol -> adds emitted) and [pending_entry_e] (the Fix #2
+    no-chase pin table, consulted only when
+    [config.freeze_entry_at_first_breakout] is on — default-off => untouched).
+    Neither is persisted (backtests are single-process; the live weekly
+    generator is a one-shot). *)
+let _make_closure_tables () : int Hashtbl.M(String).t * Entry_freeze.t =
+  (Hashtbl.create (module String), Entry_freeze.create ())
 
 let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
     ?(ticker_sectors = Hashtbl.create (module String)) ?bar_reader
@@ -399,18 +410,13 @@ let make ?(initial_stop_states = String.Map.empty) ?(ad_bars = [])
       ~momentum_period:config.macro_config.indicator_thresholds.momentum_period
       weekly_ad_bars
   in
-  (* Scale-in add bookkeeping (symbol -> adds emitted). Closure state like
-     [laggard_streaks]; not persisted (backtests are single-process; the live
-     weekly generator is a one-shot). *)
-  let scale_in_added : int Hashtbl.M(String).t =
-    Hashtbl.create (module String)
-  in
+  let scale_in_added, pending_entry_e = _make_closure_tables () in
   let module M = struct
     let name = name
 
     let on_market_close =
-      _on_market_close ~fold_start_date ~config ~ad_series ~stop_states
-        ~last_stop_out_dates ~prior_macro ~prior_macro_result
+      _on_market_close ~pending_entry_e ~fold_start_date ~config ~ad_series
+        ~stop_states ~last_stop_out_dates ~prior_macro ~prior_macro_result
         ~prior_decline_character ~peak_tracker ~bar_reader ~prior_stages
         ~prior_stage_ma_values ~scale_in_added ~sector_prior_stages
         ~ticker_sectors ~stage3_streaks ~laggard_streaks ~audit_recorder
@@ -427,10 +433,9 @@ module Internal_for_test = struct
         ~momentum_period:
           config.macro_config.indicator_thresholds.momentum_period ad_bars
     in
-    let scale_in_added : int Hashtbl.M(String).t =
-      Hashtbl.create (module String)
-    in
-    _on_market_close ~fold_start_date ~config ~ad_series ~scale_in_added
+    let scale_in_added, pending_entry_e = _make_closure_tables () in
+    _on_market_close ~pending_entry_e ~fold_start_date ~config ~ad_series
+      ~scale_in_added
 
   let maybe_reset_halt = _maybe_reset_halt
   let positions_minus_exited = _positions_minus_exited

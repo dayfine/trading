@@ -206,6 +206,11 @@ module Entry_walk = Entry_walk
     entry-trigger behaviour) can drive the same pipeline. See
     {!Entry_walk.entries_from_candidates}. *)
 
+module Entry_freeze = Entry_freeze
+(** Fix #2 no-chase entry-[E] freeze (default-off, gated by
+    [config.freeze_entry_at_first_breakout]). Re-exposed so the entry walk and
+    tests can construct / drive the per-run pin table. See {!Entry_freeze}. *)
+
 module Screening_notional = Screening_notional
 (** Per-Friday entry-walk notional / sector-exposure accumulator seeds. Exposed
     so tests can pin the accumulator-seeding primitives
@@ -843,6 +848,21 @@ type config = {
           [false] = current stale-bar fill, bit-identical baselines (R1);
           fill-model basis change when armed — own WF-CV surface, never bundled.
           See [Weinstein_strategy_config.sim_entry_fill_next_open]. *)
+  freeze_entry_at_first_breakout : bool; [@sexp.default false]
+      (** No-chase entry-[E] freeze (Fix #2, plan
+          [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream D). The
+          screener recomputes each candidate's [suggested_entry] (breakout level
+          [E]) every Friday, so for a stock making new highs [E] floats up week
+          over week and the resting entry ticket chases the extension — "buying
+          an extended stock," which Weinstein's breakout rule warns against
+          ([docs/design/weinstein-book-reference.md] §4.1 / §3). When [true],
+          the first-qualifying [E] is pinned while the setup stays live
+          (released when the symbol stops qualifying and is not held, or the
+          position closes), so the ticket rests at the price the stock first
+          needed to break out. INCREASES faithfulness (W2); strictly
+          ticket-level (spine / admission / grading / stops unchanged). Default
+          [false] = off, bit-identical baselines (R1). See
+          [Weinstein_strategy_config.freeze_entry_at_first_breakout]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
@@ -969,6 +989,7 @@ val stock_analysis_config_for : config:config -> Stock_analysis.config
 
 val entries_from_candidates :
   ?sector_lookup:(string -> string option) ->
+  ?pending_entry_e:Entry_freeze.t ->
   config:config ->
   candidates:Screener.scored_candidate list ->
   stop_states:Weinstein_stops.stop_state String.Map.t ref ->
