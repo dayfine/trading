@@ -11,15 +11,16 @@ YES
 ## Open PR
 - `feat/trade-audit-adjusted-basis` — **F3**, the adjusted-basis fix in
   `trade_audit_report_bin.ml` (2026-08-09 addendum below). Adds the
-  `trade_audit_basis` library (one module, two pure functions) and moves both
-  snapshot readers in the report exe onto the split-adjusted close column, with
-  an all-or-nothing raw fallback for windows whose adjusted column is
+  `trade_audit_basis` library (one module, one pure function) and moves the
+  **R6 ratings reader** in the report exe onto the split-adjusted close column,
+  with an all-or-nothing raw fallback for windows whose adjusted column is
   incomplete. **Behaviour-changing** by design: on the real AAPL 4:1 of
   2020-08-31, R6 flips from a spurious `Fail` (76.11% raw drawdown) to `Pass`
-  (9.91% adjusted). No goldens re-pinned — nothing in the repo pins this exe's
-  output. Tests 39 → 43 in `test_trade_audit_ratings.ml`, plus 10 new in
-  `test_trade_audit_basis.ml`. Pushed to origin; PR to be opened by the
-  orchestrator (no `gh` available in this environment).
+  (9.91% adjusted). The HTML mark reader (`_bar_close_of_reader`) **stays raw**
+  — see the QC-rework note in the addendum and follow-up G4. No goldens
+  re-pinned — nothing in the repo pins this exe's output. Tests 39 → 45 in
+  `test_trade_audit_ratings.ml`, plus 6 new in `test_trade_audit_basis.ml`.
+  Pushed to origin; PR #2251.
 - `feat/split-safe-test-hardening` — F11 + F12 + R3 test-hardening bundle
   (this session). Test-only change to `test_trade_audit_report.ml`: anchors
   the three `Not_exercised` positive assertions to their `- Inert fraction:`
@@ -761,29 +762,28 @@ test rather than as a new case.
 
 ## 2026-08-09 addendum — F3, adjusted basis in the report exe (PR branch `feat/trade-audit-adjusted-basis`)
 
-Closes F3. Both snapshot readers in
+Closes F3. The **R6 ratings reader** in
 `trading/trading/backtest/bin/trade_audit_report_bin.ml` moved off the raw
 close column onto the split-adjusted one. **This changes report output** —
-that is the point.
+that is the point. The HTML mark reader stays raw; see "QC rework 1" below for
+why the first cut of this PR moved it too and why that was wrong.
 
 ### What changed
 
 New library `trading/trading/backtest/trade_audit_basis/` (one module,
-`Trade_audit_basis`, two functions, no deps beyond `core`). It exists because
+`Trade_audit_basis`, one function, no deps beyond `core`). It exists because
 the exe is an `(executable)` with no test surface; the *policy* had to live
 somewhere a test could reach it.
 
 - `window_closes ~adjusted ~raw` — returns `adjusted` when every cell in the
   window is finite, else `raw` **wholesale**.
-- `last_close ~adjusted ~raw` — newest close of the selected window; `None` on
-  an empty window or a non-finite mark.
 
 Call sites:
 
 | site | consumer | was | now |
 |---|---|---|---|
 | `_closes_lookup_of_reader` | R6 recent-plunge ratings | `view.raw_closes` | `Trade_audit_basis.window_closes` |
-| `_bar_close_of_reader` | HTML benchmark + utilization marks | last of `view.raw_closes` | `Trade_audit_basis.last_close` |
+| `_bar_close_of_reader` | HTML benchmark + utilization marks | last of `view.raw_closes` | **unchanged — still raw** (see QC rework 1) |
 
 ### The NaN policy, and why this one
 
@@ -806,15 +806,14 @@ order of weight:
 3. Because the fallback target is NaN-free, the policy **cannot introduce a NaN
    where the pre-existing raw code had none** — it does not add an instance of
    the open `adjusted_basis_guard_asymmetry` finding in `dev/status/cleanup.md`.
-   `last_close` additionally guards the selected mark and returns `None` rather
-   than `Some nan`, so a poisoned benchmark point is unreachable even if the
-   daily-view invariant were ever violated.
 
-Residual, stated plainly: `_bar_close_of_reader` decides per *mark*, so if a
-symbol's adjusted column is holed in the middle of a run, marks whose 15-day
-window straddles the hole come off raw while neighbouring marks come off
-adjusted. Bounded and rare, but real. Surfacing which basis a series was drawn
-on (as F5/F6 did for the stops layer) is the follow-up filed below.
+Residual, stated plainly: the finiteness scan runs over the whole array the
+call site requested (`_daily_lookback_days` = 60 calendar days, ~41 bars), not
+over the ~22-bar sub-window R6 actually scans (30 calendar days), so a NaN
+outside R6's own window still demotes R6 to
+raw. Conservative in the safe direction, but it widens the silent-fallback
+surface ~3×. Filed as G5. Surfacing which basis a series was drawn on (as
+F5/F6 did for the stops layer) is filed as G2.
 
 ### The divergence, measured on real data
 
@@ -834,20 +833,86 @@ across the split day (121.1715 → 125.2807 adjusted). The adjusted number lands
 just under the threshold. Same 22 bars, same trough date; only the basis
 differs.
 
-The same split also explains the HTML benchmark defect: a benchmark curve is
-`initial_cash * c_t / c_0`, so a raw pair straddling 2020-08-31 renders a −74%
-cliff the symbol never took.
+**A second, higher-margin entry off the same bars (added in QC rework 1).** The
+09-04 case is the sharper illustration but sits 0.09pp from the threshold, so a
+test resting only on it is coupled to `recent_plunge_min_drop_pct` staying
+exactly `0.10`. Entering **2020-09-02** truncates the window at 09-01, before
+the post-split slide:
+
+| basis | peak | trough | drawdown | trough → entry | R6 verdict |
+|---|---|---|---|---|---|
+| raw | 506.09 (08-26) | 129.04 (08-31) | **74.50%** | 2d | **Fail** |
+| adjusted | 110.3852 (08-06) | 106.1886 (08-11) | **3.80%** | 22d | **Pass** |
+
+Same Fail → Pass divergence with **6.2pp** of headroom instead of 0.09pp. Both
+entries are now pinned; the fixture array already contained every bar needed.
+
+**`adjusted_close` carries dividends as well as splits.** Worth stating because
+the argument above is framed entirely on the split. Dividends move the adjusted
+column too, so "adjusted" is not a pure split rescale. Measured inside this
+fixture window: one ex-div, 2020-08-07, stepping `adj/raw` from 0.242280 to
+0.242717 = **+0.18%**. It contributes **exactly zero** to the headline case
+because both the 09-04 window's peak (09-01) and trough (09-03) fall after it,
+so the ratio is constant across the pair. Worst realistic case for a 30-day
+window is ~0.5pp against a 10pp threshold — immaterial here, but it is the
+reason the utilization series cannot take the adjusted column (see below): over
+*years*, the dividend drift is not immaterial at all.
 
 ### Corroborating asymmetry (verified)
 
 `_weekly_series_of_reader` reads `weekly_view.closes`, documented in
 `snapshot_bar_views.mli:50` as *"Adjusted close per weekly bar"* — confirmed by
-reading the `.mli`. So before this change, **inside a single HTML report**, a
-trade's weekly chart line was on the adjusted basis while the benchmark line
-drawn beside it was on the raw basis. `html_report.mli:52` independently
-documents `?bar_close` as resolving *"a symbol's adjusted close"*, so the exe
-was also violating its consumer's stated contract. F3 was not a basis
-*preference*; it was two series in one artefact disagreeing across a split.
+reading the `.mli`. So **inside a single HTML report**, a trade's weekly chart
+line is on the adjusted basis while the benchmark line drawn beside it is on
+the raw basis. `html_report.mli:52` independently documents `?bar_close` as
+resolving *"a symbol's adjusted close"*, so the exe also does not honour its
+consumer's stated contract. This is **still true after this PR** — see QC
+rework 1 and follow-up G4.
+
+### QC rework 1 (2026-08-09) — `_bar_close_of_reader` reverted to raw
+
+The first cut of this PR moved `_bar_close_of_reader` to the adjusted basis as
+well, justified by the claim that both of `?bar_close`'s consumers "divide a
+mark by an earlier mark". **That claim is true of `Html_report._benchmark` and
+false of `Html_report._utilization`**, which qc-behavioral caught. Correct
+arithmetic:
+
+`_utilization` (`html_report.ml:110-122`) computes
+`sum over held positions of (i_qty *. c) /. nav * 100` — it **multiplies** the
+mark by a share count. Both other terms are raw: `i_qty` comes from
+`trades.csv`'s `quantity` (`html_sources.ml:90` ← `round_trip_pairing.ml:72-74`,
+a raw share count split-restated to the exit date) or from the live broker count
+in `open_positions.csv` (`reconciler_writer.ml:27`); `nav` comes from
+`equity_curve.csv`, which marks positions at `bar.close_price`
+(`portfolio_valuation.ml:57-61`), the raw `Snapshot_schema.Close` cell.
+
+With `adj(d) = raw(d) / S(d→T) * D(d→T)` and `i_qty = qty(d) * S(d→exit)`:
+
+| basis of the mark | `deployed` evaluates to |
+|---|---|
+| raw (pre-PR, and restored) | `true_deployed * S(d→exit)` — **exact** for any hold not straddling a split, i.e. the overwhelming majority |
+| adjusted (first cut) | `true_deployed * D(d→T) / S(exit→T)` — wrong for **every** trade in a symbol that split *or paid a dividend* after the trade closed |
+
+Dividends alone make this large, measured from `trading/test_data`:
+KO 2016-03-01 `adj/raw` = 0.7253 (**−27.5%**, no split at all); JNJ = 0.7596
+(**−24.0%**); AAPL 2015-01-02 = 0.2215 (**−77.9%**). On a 2010-2026 S&P run the
+utilization chart would be understated 4×–20× for AAPL/GOOG/AMZN/NVDA/TSLA,
+where before it was correct.
+
+So the PR narrows to the `_closes_lookup_of_reader` (R6) change, which is
+unambiguously correct. `_bar_close_of_reader` is back on raw with a comment
+stating the above. `Trade_audit_basis.last_close` — the newest-close-of-the-
+selected-window helper the first cut added — was **removed** along with its four
+tests, rather than kept as a public function with no caller: its docstring
+justified its NaN guard by reference to "a benchmark or utilization mark", a
+wiring that no longer exists, so keeping it would mean keeping a documented
+contract about a consumer that isn't there, and `code-health-discipline.md`
+treats unreferenced public API as a cleanup finding. It is four lines over
+`window_closes` and G4 can reintroduce it in whatever shape the split needs
+(plausibly two accessors, not one).
+
+The genuine underlying defect — `?bar_close` is one callback feeding two series
+with opposite basis needs — is filed as **G4**.
 
 ### Goldens re-pinned: none, and why that is correct
 
@@ -864,20 +929,23 @@ than manufacturing a golden to satisfy the clause.
 dir — checked precisely because a golden elsewhere might have pinned the exe;
 none did). `dune fmt` clean.
 
-New tests: 10 in `test_trade_audit_basis.ml` (policy), 4 added to
-`test_trade_audit_ratings.ml` (domain consequence on the real AAPL window,
-43 tests total there, up from 39).
+New tests: 6 in `test_trade_audit_basis.ml` (policy), 6 added to
+`test_trade_audit_ratings.ml` (domain consequence on the real AAPL window, at
+two entry dates — 45 tests total there, up from 39).
 
 Mutation results — per the standing `all_of`/`elements_are` lesson from #2249,
-the *specific* failing assertion is named, not just the count:
+the *specific* failing assertion is named, not just the count. **Re-run after
+the QC-rework 1 edits**, so these reflect the shipped test set, not the first
+cut's:
 
 | mutation | RED assertions |
 |---|---|
-| **M1** — per-bar splice instead of wholesale fallback | 5 in `test_trade_audit_basis` (`nan at head` — first divergence at element 1, expected 44.0 got 11.0, since element 0 legitimately matched the spliced raw value; `nan in middle`, `nan at tail`, `infinity falls back` — all at element 0, expected 40.0 got 10.0; `last close falls back with its window`) **and** `Trade_audit_ratings:20:R6 falls back to raw when adjusted incomplete` (the splice moves the trough to an old date, so R6 flips Fail→Pass) |
-| **M2** — `window_closes` always returns `raw` (pre-fix behaviour) | `Trade_audit_ratings:19:R6 uses adjusted basis via window_closes`, plus `window prefers adjusted when all finite` and `last close reads newest adjusted` |
-| **M3** — drop the `Float.is_finite` guard on the selected mark | exactly `last close none rather than some nan` |
+| **M1** — per-bar splice instead of wholesale fallback | 4 in `test_trade_audit_basis` (`nan at head`, `nan in middle`, `nan at tail`, `infinity falls back to raw`) **and** `Trade_audit_ratings:20:R6 falls back to raw when adjusted incomplete` (the splice moves the trough to an old date, so R6 flips Fail→Pass) |
+| **M2** — `window_closes` always returns `raw` (pre-fix behaviour) | `Trade_audit_ratings:19:R6 uses adjusted basis via window_closes` and `Trade_audit_ratings:22:R6 high margin adjusted basis sees no plunge`, plus `trade_audit_basis:0:window prefers adjusted when all finite` |
 
-All three reverted; both suites back to green (10/10 and 43/43).
+Both reverted; both suites back to green (6/6 and 45/45). The first cut's **M3**
+(drop the `Float.is_finite` guard on the selected mark) no longer exists — it
+mutated `last_close`, which QC rework 1 removed.
 
 ### Honest gap
 
@@ -934,8 +1002,13 @@ fixture), which is a larger piece of work than F3. Filed below.
   into the pre-entry close series, and a raw mark taken across a split produces a
   fake jump in the benchmark curve. This is the G14 pathology relocated to the
   reporting layer. Needs its own PR **including** a re-pin of affected report
-  goldens.~~ — **done 2026-08-09** via `Trade_audit_basis`; see the addendum
-  below. The "re-pin of affected report goldens" clause turned out to be
+  goldens.~~ — **the R6 half done 2026-08-09** via `Trade_audit_basis`; see the
+  addendum below. The **benchmark half is deliberately NOT done**: the same
+  `?bar_close` callback also feeds the capital-utilization series, which needs
+  the raw basis (it multiplies the mark by a raw share count against a raw NAV),
+  so moving the callback to adjusted is a net regression. That half is filed as
+  **G4** and needs an `Html_report.load` signature change.
+  The "re-pin of affected report goldens" clause turned out to be
   **moot**: no golden, test, CI workflow or script pins this exe's output
   (verified by grep across `.github/`, `dev/scripts/`,
   `trading/trading/backtest/scripts/` and every `dune` rule) — the exe is
@@ -1157,8 +1230,8 @@ correctly left all four alone; they are not rework scope. Numbering is local to
 
 - **G1 — the exe's own wiring is unpinned.** `Trade_audit_basis` and R6's
   response to each basis are both tested, but nothing goes red if
-  `_closes_lookup_of_reader` or `_bar_close_of_reader` in
-  `trade_audit_report_bin.ml` is edited back to `view.raw_closes`.
+  `_closes_lookup_of_reader` in `trade_audit_report_bin.ml` is edited back to
+  `view.raw_closes`.
   `trading/trading/backtest/bin/` is an `(executable)` stanza with no test
   surface, so pinning the wiring needs an e2e harness: a scenario dir
   (`trades.csv` + `trade_audit.sexp`) plus a snapshot warehouse fixture with a
@@ -1174,18 +1247,73 @@ correctly left all four alone; they are not rework scope. Numbering is local to
   This is the exact condition F5/F6 made visible for the stops layer
   (`split_safe_basis` tally + inert fraction in the report). The report has no
   equivalent surface for its *own* bar reads, so a reader cannot tell whether
-  an R6 verdict or a benchmark segment came off adjusted or raw. Suggest
-  reusing the F6 pattern: count fallbacks in the exe and render one line.
+  an R6 verdict came off adjusted or raw. **Severity raised in QC rework 1**
+  (qc-behavioral disagreed with the original "cosmetic" framing, correctly):
+  per `snapshot_bar_views.mli:171-176` the dominant missingness mode is
+  **whole-symbol**, not scattered per-date gaps — a snapshot schema predating
+  `Adjusted_close` fails the field read for the entire symbol and yields an
+  all-NaN column. So the fallback does not degrade one window at the margin; it
+  reverts a whole symbol to raw, and the report can then render the **exact
+  pre-fix 76% artefact** with nothing in the output distinguishing it from a
+  real plunge. Minimum acceptable bar: a stderr line naming the symbol and the
+  basis actually used. Better: the F6 pattern — count fallbacks in the exe and
+  render one line in the report.
 
-- **G3 — `_bar_close_of_reader` decides per mark, not per curve.** Consequence
-  of G2's condition: a symbol whose adjusted column is holed mid-run yields
-  marks on mixed bases *across dates* within one benchmark curve (each 15-day
-  mark window decides independently). Bounded — it needs a partial adjusted-data
-  gap, and `_benchmark` already drops the whole series if any mark is `None` —
-  but it is the one place the "never mix bases" invariant is enforced only
-  per-window rather than per-series. Fixing it properly means deciding the basis
-  once per `(symbol, run)` rather than once per mark, which is a signature
-  change to `Html_report.load`'s `?bar_close` contract.
+- ~~**G3 — `_bar_close_of_reader` decides per mark, not per curve.**~~ **Moot
+  as of QC rework 1** — `_bar_close_of_reader` no longer uses
+  `Trade_audit_basis` at all (it is back on raw, unconditionally), so there is
+  no per-mark basis decision left to make. The underlying "one callback, two
+  series with opposite basis needs" problem it was gesturing at is filed
+  properly as **G4** below.
+
+### Follow-ups filed 2026-08-09 (QC rework 1, all non-blocking)
+
+- **G4 — `Html_report.load`'s `?bar_close` is one callback feeding two series
+  with opposite basis needs.** `_benchmark` divides a mark by an earlier mark
+  and genuinely wants the **adjusted** column — and `html_report.mli:52` already
+  promises exactly that ("resolves a symbol's adjusted close"), a promise the
+  exe does not currently keep. `_utilization` (`html_report.ml:110-122`)
+  computes `(i_qty *. c) /. nav` and genuinely wants **raw**, because `i_qty`
+  (`trades.csv` `quantity` / `open_positions.csv`) and `nav`
+  (`equity_curve.csv`, marked at `bar.close_price`) are both raw. One callback
+  cannot serve both; this PR resolved the conflict by keeping raw, which is
+  correct for utilization and wrong for benchmark, because raw is the
+  numerically better of the two *available* options (see the QC-rework-1 section
+  above for the arithmetic).
+  **Magnitude, already measured — do not re-derive:** the error term for an
+  adjusted mark in `_utilization` is `D(d→T) / S(exit→T)`, and dividends alone
+  dominate it. From `trading/test_data`: KO 2016-03-01 `adj/raw` = **0.7253**
+  (−27.5%, no split); JNJ 2016-03-01 = **0.7596** (−24.0%); AAPL 2015-01-02 =
+  **0.2215** (−77.9%). A 2010-2026 S&P run holding AAPL/GOOG/AMZN/NVDA/TSLA
+  would understate the utilization chart 4×–20× for those names.
+  **Shape of the fix:** an `Html_report.load` signature change — either two
+  callbacks (`?benchmark_close` / `?position_mark`) or one callback taking a
+  basis argument — plus an `.mli` contract amendment naming which series gets
+  which basis (the current line 52 wording is the ambiguity that let the first
+  cut of this PR through). Deliberately out of scope here: it is a consumer-API
+  change, not a reader change. The exe side then wants a
+  "newest close on the preferred basis" helper over
+  `Trade_audit_basis.window_closes` — that is the `last_close` this PR removed,
+  four lines, reintroduce it in whatever shape the split needs.
+
+- **G5 — the finiteness scan is wider than R6's window.**
+  `_closes_lookup_of_reader` requests `_daily_lookback_days` = 60 calendar days
+  (~41 bars) and hands the whole array to `Trade_audit_basis.window_closes`, but
+  R6 then filters to `recent_plunge_lookback_days` = 30 calendar days (~22 bars)
+  before measuring anything. So a NaN 55 bars back — outside what R6 ever scans —
+  demotes R6 to the raw basis anyway, widening the silent-fallback surface ~3×.
+  Conservative in the safe direction (it never mixes), but it fires the G2
+  condition far more often than necessary. Fixing it means narrowing the array
+  before the basis decision, which changes the `closes_lookup` call-site
+  contract (the lookup currently returns "the reader's window", not "R6's
+  window") — hence deferred rather than bundled.
+
+- **G6 — `trade_audit_basis.mli`'s aliasing claim is unpinned.** The docstring
+  says *"The returned array is one of the inputs, not a copy — callers must not
+  mutate it."* No test asserts it; a `phys_equal` check on both branches
+  (adjusted-selected and raw-selected) would pin it in two lines. Low value on
+  its own, but it is a stated contract with no test, which is exactly the class
+  qc-behavioral flags.
 
 ## QC
 

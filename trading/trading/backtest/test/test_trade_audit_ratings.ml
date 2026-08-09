@@ -363,11 +363,22 @@ let _aapl_adjusted =
 
 let _aapl_entry = make_entry ~entry_date:(_date "2020-09-04") ()
 
-let _r6_of_closes closes =
+(* A second, higher-margin entry off the same bars. The 09-04 window's adjusted
+   drawdown is 9.91% against a 10% threshold — a sharp illustration, but only
+   0.09pp of headroom, so that case alone would couple this test to
+   [default_config.recent_plunge_min_drop_pct] staying exactly 0.10. Entering on
+   09-02 truncates the window at 09-01, before the post-split slide: adjusted
+   drawdown 3.80% (110.3852 on 08-06 -> 106.1886 on 08-11), 6.2pp of headroom,
+   while raw still reads 74.50% (506.09 on 08-26 -> 129.04 on 08-31, troughing
+   2 days before the entry, inside R6's 5-day proximity). Same Fail -> Pass
+   divergence, far from the threshold. *)
+let _aapl_entry_high_margin = make_entry ~entry_date:(_date "2020-09-02") ()
+
+let _r6_of_closes ?(entry = _aapl_entry) closes =
   let evals =
     TR.evaluate_rules
       ~pre_entry_closes:(Array.to_list (Array.zip_exn _aapl_dates closes))
-      ~config:cfg (make_record _aapl_entry)
+      ~config:cfg (make_record entry)
   in
   outcome_of_rule_id evals TR.R6_no_recent_plunge
 
@@ -405,6 +416,20 @@ let test_r6_falls_back_to_raw_when_adjusted_incomplete _ =
     (_r6_of_closes
        (Trade_audit_basis.window_closes ~adjusted:holed ~raw:_aapl_raw))
     (equal_to TR.Fail)
+
+(* The same divergence with 6.2pp of headroom instead of 0.09pp, so the pin does
+   not rest on the exact value of [recent_plunge_min_drop_pct]. See
+   [_aapl_entry_high_margin]. *)
+let test_r6_high_margin_raw_basis_fabricates_a_plunge _ =
+  assert_that
+    (_r6_of_closes ~entry:_aapl_entry_high_margin _aapl_raw)
+    (equal_to TR.Fail)
+
+let test_r6_high_margin_adjusted_basis_sees_no_plunge _ =
+  assert_that
+    (_r6_of_closes ~entry:_aapl_entry_high_margin
+       (Trade_audit_basis.window_closes ~adjusted:_aapl_adjusted ~raw:_aapl_raw))
+    (equal_to TR.Pass)
 
 (* -- R7 stop discipline on Stage3 -> Stage4 transition ------------------- *)
 
@@ -913,6 +938,10 @@ let suite =
          >:: test_r6_uses_adjusted_basis_via_window_closes;
          "R6 falls back to raw when adjusted incomplete"
          >:: test_r6_falls_back_to_raw_when_adjusted_incomplete;
+         "R6 high margin raw basis fabricates a plunge"
+         >:: test_r6_high_margin_raw_basis_fabricates_a_plunge;
+         "R6 high margin adjusted basis sees no plunge"
+         >:: test_r6_high_margin_adjusted_basis_sees_no_plunge;
          "R7 pass long exit stage 4 via stop"
          >:: test_r7_pass_long_exit_in_stage_4_via_stop;
          "R7 fail held through stage 4 via time"
