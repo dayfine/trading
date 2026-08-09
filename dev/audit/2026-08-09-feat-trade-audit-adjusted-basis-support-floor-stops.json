@@ -1,0 +1,18 @@
+{
+  "date": "2026-08-09",
+  "feature": "support-floor-stops",
+  "branch": "feat/trade-audit-adjusted-basis",
+  "recorded_at_ns": 1786287984680099307,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "F3 adjusted price basis. Rework iteration 1 of 2: qc-behavioral D1/CP2 found _bar_close_of_reader's move to adjusted regressed Html_report._utilization (raw i_qty x adjusted mark against raw NAV; measured KO -27.5%, JNJ -24.0%, AAPL -77.9%). Author took recommended option 1 (narrow the PR): reverted that reader to raw, deleted the orphaned Trade_audit_basis.last_close, corrected the false arithmetic in both comment and status file, added a high-margin R6 case at 2020-09-02 (6.2pp headroom vs 0.09pp), filed G4/G5/G6 and raised G2 severity. R6 half landed. Merged 3f0b0d44."
+}
