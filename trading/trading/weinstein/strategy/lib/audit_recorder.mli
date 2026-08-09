@@ -97,6 +97,14 @@ type entry_event = {
   macro : Macro.result;
       (** Macro snapshot computed by [_run_screen] this Friday. *)
   current_date : Date.t;
+  close_at_decision : float option;
+      (** Most recent close from [bar_reader] at the moment the entry was
+          constructed — the price the strategy actually saw, independent of
+          which entry basis ([suggested_entry] vs close) the config anchors the
+          ticket at. [None] when [bar_reader] had no bars for the symbol.
+          E-provenance telemetry (entry-ticket right-basis plan, 2026-08-08):
+          lets the audit compare [candidate.suggested_entry] against the
+          decision-time close without re-reading raw bars. *)
   installed_stop : float;
       (** Output of
           [Weinstein_stops.compute_initial_stop_with_floor_with_callbacks]'s

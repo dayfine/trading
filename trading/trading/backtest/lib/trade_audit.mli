@@ -185,6 +185,28 @@ type entry_decision = {
   side : Trading_base.Types.position_side;
   (* Sizing + stop. *)
   suggested_entry : float;
+  close_at_decision : float option; [@sexp.option]
+      (** Most recent daily close at the moment the entry was constructed — the
+          price the strategy actually saw, regardless of which basis
+          ([suggested_entry] vs close) the config anchored the ticket at.
+          E-provenance (entry-ticket right-basis plan 2026-08-08): with this
+          column [trade-dissection] can read close-vs-E divergence straight off
+          [trade_audit.sexp] instead of re-reading raw snapshot bars. [None]
+          when the bar reader had no bars, and absent in files written before
+          the field existed ([@sexp.option] keeps them parseable). *)
+  ma_value : float option; [@sexp.option]
+      (** The stage classifier's MA level at decision time
+          ([Stock_analysis.t.stage.ma_value]). Complements the existing
+          [ma_direction] / [ma_slope_pct] with the level itself, so close-vs-MA
+          distance at entry is computable without raw bars. [@sexp.option] for
+          pre-field file compatibility; always [Some] on newly-written rows. *)
+  local_range_top : float option; [@sexp.option]
+      (** Ticket-level local-range entry anchor
+          ([Stock_analysis.t.local_range_top]): split-safe max high over the
+          most recent [entry_anchor_local_range_weeks] bars. [None] when the
+          knob is at its default 0 (feature off) or no defined high existed in
+          the window — so the column also records whether the local-anchor
+          mechanism was armed for this entry. *)
   suggested_stop : float;  (** From the screener. *)
   installed_stop : float;
       (** After [Weinstein_stops.compute_initial_stop_with_floor] applies the

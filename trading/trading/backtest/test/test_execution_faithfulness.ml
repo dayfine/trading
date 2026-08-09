@@ -71,6 +71,9 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     cascade_rationale = [];
     side;
     suggested_entry;
+    close_at_decision = None;
+    ma_value = None;
+    local_range_top = None;
     suggested_stop = installed_stop;
     installed_stop;
     stop_floor_kind = TA.Buffer_fallback;

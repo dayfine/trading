@@ -494,6 +494,9 @@ let _make_audit_record ~symbol ~entry_date
       cascade_rationale = [];
       side;
       suggested_entry = 100.0;
+      close_at_decision = None;
+      ma_value = None;
+      local_range_top = None;
       suggested_stop = 90.0;
       installed_stop = 90.0;
       stop_floor_kind;
