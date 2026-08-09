@@ -63,6 +63,9 @@ type entry_decision = {
   cascade_rationale : string list;
   side : Trading_base.Types.position_side;
   suggested_entry : float;
+  close_at_decision : float option; [@sexp.option]
+  ma_value : float option; [@sexp.option]
+  local_range_top : float option; [@sexp.option]
   suggested_stop : float;
   installed_stop : float;
   stop_floor_kind : stop_floor_kind;

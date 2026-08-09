@@ -27,6 +27,12 @@ type entry_meta = {
           [initial_risk_dollars] in {!build_entry_event}) key off this rather
           than [candidate.suggested_entry] so the audit reflects the realised
           entry rather than the screener's pre-fill intent. *)
+  close_at_decision : float option;
+      (** Most recent close from [bar_reader] at entry construction — recorded
+          even when the entry basis is E-anchored ([trigger_at_suggested]), so
+          the audit can always compare [candidate.suggested_entry] against the
+          decision-time close. [None] when no bars were available. Carried into
+          {!Audit_recorder.entry_event.close_at_decision}. *)
 }
 (** Audit-relevant intermediates computed during entry-transition construction.
     Returned alongside the transition so the audit recorder can capture them

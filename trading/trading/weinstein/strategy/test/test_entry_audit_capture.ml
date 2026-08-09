@@ -357,6 +357,73 @@ let test_empty_bar_reader_falls_back_to_suggested_entry _ =
             m.effective_entry_price)
           (float_equal 130.0)))
 
+(** E-provenance (entry-ticket right-basis plan 2026-08-08):
+    [meta.close_at_decision] must record the decision-time close ($110)
+    {b regardless of entry basis} — both on the default current-close path and
+    on the E-anchored [~trigger_at_suggested:true] path, where
+    [effective_entry_price] is E ($130) but the close the strategy saw is still
+    $110. That independence is the field's whole point: it lets the audit
+    compare E against the close without raw bars. *)
+let test_meta_close_at_decision_recorded_on_both_entry_bases _ =
+  let current_date = Date.of_string "2024-06-14" in
+  let bar_reader =
+    _bar_reader_with_current_close ~current_date ~current_close:110.0
+  in
+  let cand =
+    _long_candidate ~ticker:_ticker ~suggested_entry:130.0 ~suggested_stop:100.0
+      ~as_of_date:current_date
+  in
+  let meta_of ~trigger_at_suggested =
+    let stop_states = ref String.Map.empty in
+    match
+      Entry_audit_capture.make_entry_transition ~trigger_at_suggested
+        ~portfolio_risk_config:_portfolio_risk_config
+        ~stops_config:_stops_config ~initial_stop_buffer:0.92 ~stop_states
+        ~bar_reader ~portfolio_value:100_000.0 ~current_date cand
+    with
+    | Entry_audit_capture.Entry_ok (_, meta) -> meta
+    | _ -> OUnit2.assert_failure "make_entry_transition did not return Entry_ok"
+  in
+  assert_that
+    [ meta_of ~trigger_at_suggested:false; meta_of ~trigger_at_suggested:true ]
+    (elements_are
+       [
+         field
+           (fun (m : Entry_audit_capture.entry_meta) -> m.close_at_decision)
+           (is_some_and (float_equal 110.0));
+         field
+           (fun (m : Entry_audit_capture.entry_meta) -> m.close_at_decision)
+           (is_some_and (float_equal 110.0));
+       ])
+
+(** With no bars for the ticker, [meta.close_at_decision] is [None] (honest
+    absence, mirroring the [effective_entry_price] fallback-to-E edge), and
+    [build_entry_event] carries the meta's value into the event verbatim. *)
+let test_event_close_at_decision_passthrough_and_empty_reader _ =
+  let current_date = Date.of_string "2024-06-14" in
+  let cand =
+    _long_candidate ~ticker:_ticker ~suggested_entry:130.0 ~suggested_stop:100.0
+      ~as_of_date:current_date
+  in
+  let stop_states = ref String.Map.empty in
+  let meta =
+    match
+      Entry_audit_capture.make_entry_transition
+        ~portfolio_risk_config:_portfolio_risk_config
+        ~stops_config:_stops_config ~initial_stop_buffer:0.92 ~stop_states
+        ~bar_reader:(Bar_reader.empty ()) ~portfolio_value:100_000.0
+        ~current_date cand
+    with
+    | Entry_audit_capture.Entry_ok (_, meta) -> meta
+    | _ -> OUnit2.assert_failure "make_entry_transition did not return Entry_ok"
+  in
+  let event =
+    Entry_audit_capture.build_entry_event ~macro:_macro_fixture ~current_date
+      ~candidate:cand ~meta ~alternatives:[]
+  in
+  assert_that event
+    (field (fun e -> e.Audit_recorder.close_at_decision) is_none)
+
 (* ------------------------------------------------------------------ *)
 (* Book-faithful E-anchored entry trigger (user decision 2026-08-05)     *)
 (* ------------------------------------------------------------------ *)
@@ -842,6 +909,7 @@ let _stub_trans_and_meta ?(split_safe_basis = Audit_recorder.Flag_off) ~side
       stop_floor_kind = Audit_recorder.Buffer_fallback;
       split_safe_basis;
       effective_entry_price;
+      close_at_decision = None;
     }
   in
   (trans, meta)
@@ -1694,6 +1762,10 @@ let () =
            >:: test_entry_event_audit_dollars_use_effective_entry;
            "G14: empty bar_reader falls back to suggested_entry"
            >:: test_empty_bar_reader_falls_back_to_suggested_entry;
+           "E-provenance: close_at_decision recorded on both entry bases"
+           >:: test_meta_close_at_decision_recorded_on_both_entry_bases;
+           "E-provenance: event passthrough + empty reader gives None"
+           >:: test_event_close_at_decision_passthrough_and_empty_reader;
            "E-anchor: trigger_at_suggested anchors entry at E"
            >:: test_trigger_at_suggested_anchors_entry_at_e;
            "E-anchor: trigger_at_suggested sizes at E"

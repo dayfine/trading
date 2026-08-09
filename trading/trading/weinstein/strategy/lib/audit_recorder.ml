@@ -29,6 +29,7 @@ type entry_event = {
   candidate : Screener.scored_candidate;
   macro : Macro.result;
   current_date : Date.t;
+  close_at_decision : float option;
   installed_stop : float;
   stop_floor_kind : stop_floor_kind;
   split_safe_basis : split_safe_basis;

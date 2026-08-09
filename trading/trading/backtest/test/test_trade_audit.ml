@@ -48,7 +48,8 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
         ("clean_resistance", 15);
         ("sector_strong", 10);
       ]) ?(cascade_rationale = [ "Stage2 breakout"; "RS positive rising" ])
-    ?(suggested_entry = 150.50) ?(suggested_stop = 138.46)
+    ?(suggested_entry = 150.50) ?(close_at_decision = None) ?(ma_value = None)
+    ?(local_range_top = None) ?(suggested_stop = 138.46)
     ?(installed_stop = 138.46) ?(stop_floor_kind = TA.Buffer_fallback)
     ?(split_safe_basis = TA.Flag_off) ?(risk_pct = 0.08)
     ?(initial_position_value = 75_000.0) ?(initial_risk_dollars = 6_000.0)
@@ -77,6 +78,9 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     cascade_rationale;
     side;
     suggested_entry;
+    close_at_decision;
+    ma_value;
+    local_range_top;
     suggested_stop;
     installed_stop;
     stop_floor_kind;
@@ -226,6 +230,43 @@ let test_entry_decision_sexp_tolerates_missing_split_safe_basis _ =
   assert_that
     (TA.entry_decision_of_sexp stripped)
     (equal_to (make_entry ~split_safe_basis:TA.Flag_off () : TA.entry_decision))
+
+(* The E-provenance fields ([close_at_decision] / [ma_value] /
+   [local_range_top], entry-ticket right-basis plan 2026-08-08) are
+   [\[@sexp.option\]]: a [trade_audit.sexp] written before they existed carries
+   no such fields and must parse with all three [None]. Serialize a row that
+   HAS the fields, strip them, and the parse must still succeed with [None]s —
+   the same tolerance contract [split_safe_basis] pins above. *)
+let test_entry_decision_sexp_tolerates_missing_e_provenance_fields _ =
+  let entry =
+    make_entry ~close_at_decision:(Some 148.2) ~ma_value:(Some 140.0)
+      ~local_range_top:(Some 151.0) ()
+  in
+  let stripped =
+    match TA.sexp_of_entry_decision entry with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List (Sexp.Atom name :: _) ->
+                not
+                  (List.mem
+                     [ "close_at_decision"; "ma_value"; "local_range_top" ]
+                     name ~equal:String.equal)
+            | _ -> true))
+    | other -> other
+  in
+  assert_that
+    (TA.entry_decision_of_sexp stripped)
+    (equal_to (make_entry () : TA.entry_decision))
+
+(** Populated E-provenance fields survive the codec round trip. *)
+let test_entry_decision_sexp_round_trips_e_provenance_fields _ =
+  let entry =
+    make_entry ~close_at_decision:(Some 148.2) ~ma_value:(Some 140.0)
+      ~local_range_top:(Some 151.0) ()
+  in
+  let parsed = TA.entry_decision_of_sexp (TA.sexp_of_entry_decision entry) in
+  assert_that parsed (equal_to entry)
 
 let test_alternative_candidate_sexp_round_trip _ =
   (* Exercise the enriched decision-time fields (stage / weeks_advancing /
@@ -632,6 +673,10 @@ let suite =
          >:: test_split_safe_basis_sexp_round_trip;
          "entry_decision sexp tolerates a missing split_safe_basis"
          >:: test_entry_decision_sexp_tolerates_missing_split_safe_basis;
+         "entry_decision sexp tolerates missing E-provenance fields"
+         >:: test_entry_decision_sexp_tolerates_missing_e_provenance_fields;
+         "entry_decision sexp round-trips E-provenance fields"
+         >:: test_entry_decision_sexp_round_trips_e_provenance_fields;
          "alternative_candidate sexp round-trip"
          >:: test_alternative_candidate_sexp_round_trip;
          "entry_decision sexp round-trip"

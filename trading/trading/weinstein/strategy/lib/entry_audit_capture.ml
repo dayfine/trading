@@ -13,6 +13,7 @@ type entry_meta = {
   stop_floor_kind : Audit_recorder.stop_floor_kind;
   split_safe_basis : Audit_recorder.split_safe_basis;
   effective_entry_price : float;
+  close_at_decision : float option;
 }
 
 (* The two audit-only classifications of a freshly-computed initial stop,
@@ -67,9 +68,9 @@ let _sizing_side_of_cand_side (side : Trading_base.Types.position_side) =
 (** Size the candidate and, on success, register the stop and build the
     transition + meta. Returns [Sized_zero] when share count rounds to 0. *)
 let _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
-    ~current_date ~effective_entry ~initial_stop ~(stop_tags : stop_tags) ~id
-    ~stop_distance_pct ~max_stop_distance_pct (cand : Screener.scored_candidate)
-    : entry_attempt_result =
+    ~current_date ~effective_entry ~close_at_decision ~initial_stop
+    ~(stop_tags : stop_tags) ~id ~stop_distance_pct ~max_stop_distance_pct
+    (cand : Screener.scored_candidate) : entry_attempt_result =
   let installed_stop_level = Weinstein_stops.get_stop_level initial_stop in
   let sizing =
     Portfolio_risk.compute_position_size ~config:portfolio_risk_config
@@ -101,6 +102,7 @@ let _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
         stop_floor_kind = stop_tags.floor_kind;
         split_safe_basis = stop_tags.basis;
         effective_entry_price = effective_entry;
+        close_at_decision;
       }
     in
     Entry_ok (trans, meta))
@@ -110,9 +112,12 @@ let make_entry_transition ?(min_stop_distance_pct = 0.0)
     ~portfolio_risk_config ~stops_config ~initial_stop_buffer ~stop_states
     ~bar_reader ~portfolio_value ~current_date
     (cand : Screener.scored_candidate) : entry_attempt_result =
+  let close_at_decision =
+    Entry_audit_helpers.latest_close ~bar_reader ~current_date cand
+  in
   let effective_entry =
-    Entry_audit_helpers.effective_entry_price ~trigger_at_suggested ~bar_reader
-      ~current_date cand
+    Entry_audit_helpers.effective_entry_of_close ~trigger_at_suggested
+      ~close:close_at_decision cand
   in
   (* The book §5.1 stop re-anchor only fires for the E-family entry: it pairs a
      stop just under the breakout base with an entry AT the breakout, so it is
@@ -148,7 +153,7 @@ let make_entry_transition ?(min_stop_distance_pct = 0.0)
        fixed-risk-sizing contract). *)
     let id = gen_position_id cand.ticker in
     _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
-      ~current_date ~effective_entry ~initial_stop
+      ~current_date ~effective_entry ~close_at_decision ~initial_stop
       ~stop_tags:{ floor_kind = stop_floor_kind; basis = split_safe_basis }
       ~id ~stop_distance_pct ~max_stop_distance_pct cand
 
@@ -406,6 +411,7 @@ let build_entry_event ~(macro : Macro.result) ~current_date
     candidate;
     macro;
     current_date;
+    close_at_decision = meta.close_at_decision;
     installed_stop = meta.installed_stop;
     stop_floor_kind = meta.stop_floor_kind;
     split_safe_basis = meta.split_safe_basis;

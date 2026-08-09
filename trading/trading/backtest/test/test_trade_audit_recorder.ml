@@ -93,6 +93,7 @@ let _entry_event ~split_safe_basis ~stop_floor_kind : AR.entry_event =
     candidate = _candidate;
     macro = _macro;
     current_date = _current_date;
+    close_at_decision = Some 99.0;
     installed_stop = 92.0;
     stop_floor_kind;
     split_safe_basis;
@@ -183,6 +184,61 @@ let test_entry_projection_carries_identifying_fields _ =
            (float_equal 800.0);
        ])
 
+(** E-provenance fields (entry-ticket right-basis plan 2026-08-08):
+    [close_at_decision] must pass through from the event verbatim, [ma_value]
+    must be read off the candidate's stage analysis (the fixture's
+    [_stage_result.ma_value = 100.0]), and [local_range_top] mirrors the
+    candidate's analysis field — [None] here because the fixture leaves the
+    local-anchor knob off. Non-default values, same reason as the enum pins: a
+    hardcoded [None]/constant at this hop must fail. *)
+let test_entry_projection_carries_e_provenance_fields _ =
+  assert_that
+    (_recorded_entry ~split_safe_basis:AR.Flag_off
+       ~stop_floor_kind:AR.Buffer_fallback)
+    (all_of
+       [
+         field
+           (fun (e : TA.entry_decision) -> e.close_at_decision)
+           (is_some_and (float_equal 99.0));
+         field
+           (fun (e : TA.entry_decision) -> e.ma_value)
+           (is_some_and (float_equal 100.0));
+         field (fun (e : TA.entry_decision) -> e.local_range_top) is_none;
+       ])
+
+(** When the candidate's analysis carries an armed [local_range_top], the
+    projection must surface it — pins the [Some] side of the mirror the test
+    above pins the [None] side of. *)
+let test_entry_projection_carries_armed_local_range_top _ =
+  let candidate =
+    {
+      _candidate with
+      analysis = { _stock_analysis with local_range_top = Some 105.0 };
+    }
+  in
+  let trade_audit = TA.create () in
+  let recorder =
+    Backtest.Trade_audit_recorder.of_collector ~trade_audit
+      ~force_liquidation_log:(Backtest.Force_liquidation_log.create ())
+  in
+  recorder.record_entry
+    {
+      (_entry_event ~split_safe_basis:AR.Flag_off
+         ~stop_floor_kind:AR.Buffer_fallback)
+      with
+      candidate;
+    };
+  match TA.get_audit_records trade_audit with
+  | [ r ] ->
+      assert_that r.TA.entry
+        (field
+           (fun (e : TA.entry_decision) -> e.local_range_top)
+           (is_some_and (float_equal 105.0)))
+  | records ->
+      OUnit2.assert_failure
+        (Printf.sprintf "expected exactly 1 audit record, got %d"
+           (List.length records))
+
 let suite =
   "Trade_audit_recorder"
   >::: [
@@ -192,6 +248,10 @@ let suite =
          >:: test_stop_floor_kind_projects_both_states;
          "entry projection carries identifying fields"
          >:: test_entry_projection_carries_identifying_fields;
+         "entry projection carries E-provenance fields"
+         >:: test_entry_projection_carries_e_provenance_fields;
+         "entry projection carries armed local_range_top"
+         >:: test_entry_projection_carries_armed_local_range_top;
        ]
 
 let () = run_test_tt_main suite

@@ -12,6 +12,25 @@ open Trading_strategy
 (* Per-candidate entry construction helpers                            *)
 (* ------------------------------------------------------------------ *)
 
+(** Most recent daily close for [cand] as of [current_date], [None] when
+    [bar_reader] has no bars for the symbol. Shared by
+    {!effective_entry_price}'s current-close path and the audit's
+    [close_at_decision] E-provenance field, so the two cannot drift. *)
+let latest_close ~bar_reader ~current_date (cand : Screener.scored_candidate) :
+    float option =
+  let bars =
+    Bar_reader.daily_bars_for bar_reader ~symbol:cand.ticker ~as_of:current_date
+  in
+  Option.map (List.last bars) ~f:(fun bar -> bar.Types.Daily_price.close_price)
+
+(** Resolve the entry price from an already-read [close] (see {!latest_close}),
+    so a caller that also records [close_at_decision] performs one bar read, not
+    two. *)
+let effective_entry_of_close ?(trigger_at_suggested = false) ~close
+    (cand : Screener.scored_candidate) : float =
+  if trigger_at_suggested then cand.suggested_entry
+  else Option.value close ~default:cand.suggested_entry
+
 (** G14 fix B: pin the entry price the strategy installs into [Position.t] state
     to the most recent raw close from [bar_reader]. The screener's
     [cand.suggested_entry] is a buffered breakout level (typically dollars above
@@ -40,15 +59,9 @@ open Trading_strategy
     split-safety argument and why no epsilon fallback is used. *)
 let effective_entry_price ?(trigger_at_suggested = false) ~bar_reader
     ~current_date (cand : Screener.scored_candidate) : float =
-  if trigger_at_suggested then cand.suggested_entry
-  else
-    let bars =
-      Bar_reader.daily_bars_for bar_reader ~symbol:cand.ticker
-        ~as_of:current_date
-    in
-    match List.last bars with
-    | None -> cand.suggested_entry
-    | Some bar -> bar.Types.Daily_price.close_price
+  effective_entry_of_close ~trigger_at_suggested
+    ~close:(latest_close ~bar_reader ~current_date cand)
+    cand
 
 (** Book §5.1 initial-stop re-anchoring for E-anchored entries
     ([config.stop_anchor_at_entry_base], user go 2026-08-06). A support-floor
