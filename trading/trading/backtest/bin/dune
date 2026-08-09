@@ -22,6 +22,7 @@
  (libraries
   core
   status
+  trade_audit_basis
   trade_audit_report
   trade_audit_html
   weinstein_trading.strategy
