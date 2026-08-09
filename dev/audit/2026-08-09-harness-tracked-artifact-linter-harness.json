@@ -1,0 +1,18 @@
+{
+  "date": "2026-08-09",
+  "feature": "harness",
+  "branch": "harness/tracked-artifact-linter",
+  "recorded_at_ns": 1786289891279454320,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "tracked_artifact_linter — class fix for #2248. QC APPROVED 4/5 + 4/5 at f3dd310a; CI build-and-test then failed on 'fatal: detected dubious ownership' because actions/checkout writes safe.directory into a temporary HOME the dune sandbox does not inherit. Rework 1 of 2 (2e427fc7) pinned git -c safe.directory=$REPO_ROOT -c core.excludesFile=/dev/null and added a git-error-vs-violation branch, plus doc residuals R2/R3/R5 and the R1 filing. Orchestrator re-ran both controls on the reworked script under a stripped HOME (negative exit 0, positive exit 1 naming the file) rather than re-running QC; reasoning posted as a PR comment. Merged 0d8b7c9f."
+}

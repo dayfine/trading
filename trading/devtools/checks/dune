@@ -431,6 +431,22 @@
  (action
   (run sh %{dep:no_python_check.sh})))
 
+; Tracked-artifact check (H-TRACKED-ARTIFACT-CLASS): fails if any file is
+; BOTH tracked in git AND matched by a .gitignore pattern, unless explicitly
+; allow-listed via a `tracked_artifact <prefix> ...` entry in
+; linter_exceptions.conf. Generalizes the #2248 fix (trading/compile_commands.json
+; tracked 3x: #1299, #2085, #2129) from one path to the whole class. See
+; tracked_artifact_linter.sh header for the full design-trade-off writeup.
+; Reads live git state via repo_root() + `git ls-files -i -c --exclude-standard`
+; (real working tree, not the dune sandbox mirror), so (universe) is required
+; -- same reasoning as no_python_check.sh directly above.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh %{dep:linter_exceptions.conf} (universe))
+ (action
+  (run sh %{dep:tracked_artifact_linter.sh})))
+
 ; promote_config.sh gate-helper smoke test: pins the runtime semantics of
 ; regresses_by_more_than (Sharpe + MaxDD), trades_out_of_ratio, and
 ; extract_metric. Reads dev/scripts/lib/extract_metrics.sh via repo_root().

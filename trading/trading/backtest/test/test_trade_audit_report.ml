@@ -696,6 +696,25 @@ let test_split_safe_renders_counts_and_inert_fraction _ =
         TA.Empty_window;
       ]
   in
+  (* F12: byte-exact pin on the whole section, mirroring [_format_split_safe]'s
+     own line list (heading, blank, counts, inertness, trailing blank). The
+     substring checks below only assert containment, so they miss a mutation
+     that reorders the two bullets, duplicates one, or changes the blank
+     lines around the heading — none of those change which substrings are
+     present, only their order/count/spacing. This exact-equality check
+     catches all of them, the same way [core_lines] above pins the
+     header/aggregate/table block. *)
+  let expected_section =
+    String.concat ~sep:"\n"
+      [
+        "## Split-safe floor basis";
+        "";
+        "- Basis of 6 entry decision(s): adjusted 3, raw_fallback 1, flag_off \
+         1, empty_window 1";
+        "- Inert fraction (raw_fallback / (raw_fallback + adjusted)): 25.0%";
+        "";
+      ]
+  in
   assert_that section
     (all_of
        [
@@ -720,6 +739,7 @@ let test_split_safe_renders_counts_and_inert_fraction _ =
          field
            (fun s -> String.is_substring s ~substring:"NOT EXERCISED")
            (equal_to false);
+         field (fun s -> s) (equal_to expected_section);
        ])
 
 let test_split_safe_not_exercised_flag_off_reads_as_wiring_alarm _ =
@@ -736,8 +756,14 @@ let test_split_safe_not_exercised_flag_off_reads_as_wiring_alarm _ =
   assert_that section
     (all_of
        [
+         (* Anchored to the "- Inert fraction:" label (F11), not just the bare
+            words "NOT EXERCISED" — a mutation that interposes a percentage
+            between the label and the words (e.g. "- Inert fraction: 0.0% —
+            NOT EXERCISED") must fail here even though the bare words are
+            still present somewhere in the section. *)
          field
-           (fun s -> String.is_substring s ~substring:"NOT EXERCISED")
+           (fun s ->
+             String.is_substring s ~substring:"- Inert fraction: NOT EXERCISED")
            (equal_to true);
          field
            (fun s ->
@@ -753,6 +779,14 @@ let test_split_safe_not_exercised_flag_off_reads_as_wiring_alarm _ =
            (fun s ->
              String.is_substring s ~substring:"lookback window(s) were empty")
            (equal_to false);
+         (* R3: symmetrise the cross-negative — this test only excluded the
+            empty_window sibling literal; also exclude the empty_population
+            one so all three [Not_exercised] tests carry complete
+            cross-negatives against each other. *)
+         field
+           (fun s ->
+             String.is_substring s ~substring:"no entry decisions were captured")
+           (equal_to false);
          (* No percentage anywhere in the section: a reader cannot mistake it
             for a wired-but-zero column. *)
          field (fun s -> String.is_substring s ~substring:"%") (equal_to false);
@@ -767,8 +801,12 @@ let test_split_safe_not_exercised_empty_window_reads_as_no_exposure _ =
   assert_that section
     (all_of
        [
+         (* Anchored to the "- Inert fraction:" label (F11) — see the
+            flag_off test above for why the bare-words substring is too
+            weak. *)
          field
-           (fun s -> String.is_substring s ~substring:"NOT EXERCISED")
+           (fun s ->
+             String.is_substring s ~substring:"- Inert fraction: NOT EXERCISED")
            (equal_to true);
          field
            (fun s ->
@@ -782,6 +820,12 @@ let test_split_safe_not_exercised_empty_window_reads_as_no_exposure _ =
            (equal_to true);
          field
            (fun s -> String.is_substring s ~substring:"wiring alarm")
+           (equal_to false);
+         (* R3: symmetrise the cross-negative — exclude the empty_population
+            sibling literal too. *)
+         field
+           (fun s ->
+             String.is_substring s ~substring:"no entry decisions were captured")
            (equal_to false);
          field (fun s -> String.is_substring s ~substring:"%") (equal_to false);
        ])
@@ -800,8 +844,12 @@ let test_split_safe_not_exercised_empty_population _ =
                  "- Basis of 0 entry decision(s): adjusted 0, raw_fallback 0, \
                   flag_off 0, empty_window 0")
            (equal_to true);
+         (* Anchored to the "- Inert fraction:" label (F11) — see the
+            flag_off test above for why the bare-words substring is too
+            weak. *)
          field
-           (fun s -> String.is_substring s ~substring:"NOT EXERCISED")
+           (fun s ->
+             String.is_substring s ~substring:"- Inert fraction: NOT EXERCISED")
            (equal_to true);
          field
            (fun s ->
