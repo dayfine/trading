@@ -71,7 +71,14 @@
 # needs property (a) above (a post-build `git status --porcelain` gate,
 # run outside `dune runtest` e.g. as a separate CI step); we judged the
 # dune-sandbox awkwardness not worth it given there are zero known
-# instances of an unignored artifact type today.
+# instances of an unignored artifact type today. It also does NOT catch a
+# force-added artifact under an existing broad ALLOW-list prefix: the
+# `trading/test_data` exception (`review_at: never`) covers all 1285 files
+# in that subtree for the golden-bars use case, but the same prefix match
+# silently exempts ANY future artifact kind added under that subtree too,
+# not just golden bars -- e.g. a force-added `compile_commands.json`
+# dropped into `trading/test_data/` would pass with exit 0 (demonstrated
+# during qc-behavioral review of this check).
 #
 # Considered and rejected: also using `git ls-files -i -o` (-o = "other",
 # i.e. untracked-but-ignored) to warn about ignored-but-not-yet-tracked
@@ -118,7 +125,44 @@ if [ -f "$EXCEPTIONS_CONF" ]; then
   done < "$EXCEPTIONS_CONF"
 fi
 
-TRACKED_IGNORED=$(cd "$REPO_ROOT" && git ls-files -i -c --exclude-standard)
+# `-c safe.directory="$REPO_ROOT"` -- required so this works inside dune's
+# sandboxed CI environment. `actions/checkout` adds a safe.directory
+# exception, but it writes that into a TEMPORARY HOME
+# (/__w/_temp/<uuid>/.gitconfig) that the dune-sandboxed subprocess running
+# this script does not inherit; without the -c override every git
+# invocation here fails with "fatal: detected dubious ownership" (see
+# repo_root()'s comment above for the same class of issue with
+# `git rev-parse`). Passed per-invocation via -c (not written to any
+# .gitconfig) so it doesn't mutate shared state other checks/processes
+# might rely on. $REPO_ROOT is the directory we `cd` into immediately
+# before running git, so it is exactly the directory git's ownership check
+# is evaluated against -- no need for a blanket `safe.directory=*`.
+#
+# `-c core.excludesFile=/dev/null` -- QC residual R4: --exclude-standard
+# also honours `.git/info/exclude` and any configured `core.excludesFile`,
+# both of which are developer-local, not repo-controlled. A local exclude
+# entry (e.g. accidentally excluding `dev/status/harness.md`) would make
+# this check report a legitimately-tracked source file as a false-positive
+# violation. Pinning excludesFile to /dev/null means the result depends
+# only on the repo-controlled `.gitignore` files that --exclude-standard
+# also reads, which is the invariant this check needs.
+#
+# Capture git's exit status explicitly (VAR=$(cmd) && CODE=0 || CODE=$?,
+# not the sete_diagnostics_check.sh anti-pattern of a bare `VAR=$(cmd);
+# CODE=$?`, which trips `set -e` on the assignment itself before CODE=$? is
+# ever reached -- see H-CHECK-SETE-DIAGNOSTICS and jj_workspace_smoke.sh
+# for the same idiom). This is what actually fixes the CI failure this
+# rework addresses: previously a git error (e.g. the dubious-ownership
+# fatal) produced empty stdout, which read as "zero tracked+ignored files"
+# -- a false OK -- right up until `set -e` killed the script on the failed
+# assignment with no FAIL: line at all. Now a git failure is reported
+# explicitly and distinctly from "0 violations found".
+TRACKED_IGNORED=$(cd "$REPO_ROOT" && git -c safe.directory="$REPO_ROOT" -c core.excludesFile=/dev/null ls-files -i -c --exclude-standard 2>&1) && GIT_CODE=0 || GIT_CODE=$?
+
+if [ "$GIT_CODE" -ne 0 ]; then
+  echo "FAIL: tracked_artifact_linter -- could not read the git index: ${TRACKED_IGNORED}"
+  exit 1
+fi
 
 VIOLATIONS=""
 if [ -n "$TRACKED_IGNORED" ]; then
