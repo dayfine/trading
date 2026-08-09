@@ -7,6 +7,7 @@
   test_trade_audit_recorder
   test_split_safe_metric
   test_trade_audit_capture
+  test_trade_audit_basis
   test_trade_audit_report
   test_trade_audit_ratings
   test_trade_audit_html_report
@@ -46,6 +47,7 @@
   core_unix.time_ns_unix
   fpath
   backtest
+  trade_audit_basis
   trade_audit_report
   trade_audit_html
   trading.backtest.runner_args
