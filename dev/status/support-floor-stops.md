@@ -975,6 +975,39 @@ correctly left all four alone; they are not rework scope. Numbering is local to
   redundancy runs the other way. Worth one clarifying sentence in the test's
   inline comment, which currently motivates only the `%` half.
 
+### Follow-ups filed 2026-08-09 (qc residuals on PR #2249, all non-blocking)
+
+- **R5 (#2249) — the F12 byte pin is transcribed, not derived.** `expected_section`
+  in `test_split_safe_renders_counts_and_inert_fraction` is a hand-written
+  `String.concat` list that duplicates `_format_split_safe`'s own `sprintf`
+  format strings verbatim (`"- Basis of %d entry decision(s): adjusted %d, …"`
+  and `"- Inert fraction (raw_fallback / (raw_fallback + adjusted)): %s"`),
+  rather than being produced by calling the renderer with a constructed tally.
+  Verified by qc-behavioral reading both side by side. This is the **same style
+  as the pre-existing `core_lines` pin** earlier in the same file, so it is a
+  precedented local convention rather than a new practice — but it carries the
+  generic drift risk of any transcribed golden: a cosmetic change to
+  `_format_split_safe` requires updating this literal in lockstep or the test
+  reds for the wrong reason. Manageable and intentional (byte-exactness is the
+  point of the pin); recorded so the coupling is visible. **Non-blocking.**
+
+- **R6 (#2249) — `all_of` reports only the FIRST raising check, which makes
+  assertion ORDER semantically load-bearing.** Established by qc-behavioral while
+  verifying F11: `all_of` in `trading/base/matchers/lib/matchers.ml` is a
+  `List.iter`, and `equal_to` raises via OUnit `assert_equal`, so once one check
+  raises the remaining checks in the same list are **never evaluated**. This is
+  precisely why mutation M-A produced `Failures: 3` on *both* the pre-change and
+  post-change suites while a *different assertion* fired in each: pre-change the
+  bare `"NOT EXERCISED"` check passed and the trailing `%`-absence check raised;
+  post-change the label-anchored check is listed first and raises immediately, so
+  the `%` check is never reached. Consequence: **a mutation-testing result on
+  these tests cannot be read from the failure count alone** — the count is
+  identical in both directions — and reordering checks within an `all_of` changes
+  which failure a future reader sees. Worth one sentence in the test file's
+  comment, and worth remembering for every future mutation claim on this track,
+  where prose claims about mutation results are the known defect surface (#2239).
+  **Non-blocking.**
+
 ## QC
 
 overall_qc: APPROVED (PR #2239, 2026-08-08 — structural 5/5, behavioral 4/5 after one rework)
