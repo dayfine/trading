@@ -1,6 +1,6 @@
 # Status: support-floor-stops
 
-## Last updated: 2026-08-08
+## Last updated: 2026-08-09
 
 ## Status
 IN_PROGRESS
@@ -9,7 +9,14 @@ IN_PROGRESS
 YES
 
 ## Open PR
-- None.
+- `feat/split-safe-test-hardening` — F11 + F12 + R3 test-hardening bundle
+  (this session). Test-only change to `test_trade_audit_report.ml`: anchors
+  the three `Not_exercised` positive assertions to their `- Inert fraction:`
+  label (F11), adds a byte-exact pin over the split-safe section (F12), and
+  symmetrises the cross-negative literals across the three `Not_exercised`
+  tests (R3). Pushed to origin; branch pushed by the agent, PR to be opened
+  by the orchestrator (no `gh` available in this environment). Test count
+  36 → 36 (assertions added inside existing tests, no new test functions).
 
 ## Recently merged
 - `fix/split-safe-empty-population-pin` — **MERGED #2239 `ec6f5ce6`**
@@ -859,47 +866,49 @@ test rather than as a new case.
   caller. Should either be re-pointed at `floor_is_structural_with_callbacks` or
   deleted.
 
-- [ ] **F11 (new, from the 2026-08-08 F6 rework; measurement corrected
-  2026-08-08 after qc-behavioral NEEDS_REWORK) — anchor the not-exercised
-  assertion to its label.** All three `Not_exercised` tests assert
-  `String.is_substring s ~substring:"NOT EXERCISED"`, which is satisfied by any
-  line containing those two words anywhere — the assertion is not anchored to
-  the `- Inert fraction:` label that precedes them.
-  **Measured, not inferred.** Mutation **M-A** (interpose a percentage between
-  the label and the words, i.e. render
-  `- Inert fraction: 0.0% — NOT EXERCISED — the denominator is zero …`) was
-  applied to `_format_split_safe`'s `Not_exercised` branch in
-  `trade_audit_report.ml` and the suite re-run. Baseline is `Ran: 36 tests … OK`,
-  exit 0. Results:
-  - guarded to the flag-off and empty-window states (the reviewer's form):
-    **`Failures: 2`, exit 1** — `Trade_audit_report:25:split-safe not exercised:
-    flag_off reads as wiring alarm` and `:26:… empty_window reads as no
-    exposure`. This **reproduces qc-behavioral's measurement exactly.**
-  - ungated (all three `Not_exercised` states): **`Failures: 3`, exit 1** —
-    adds `Trade_audit_report:27:split-safe not exercised: empty population`.
-  So **M-A is caught, not missed.** The assertion that fires is the
-  `%`-absence one (`~substring:"%"` → `equal_to false`), which the F6 rework put
-  on **all three** states; the `"NOT EXERCISED"` substring assertion itself still
-  passes under M-A, since the mutated line does still contain those two words.
-  That is precisely the gap F11 names: the *label anchor* is unpinned, but the
-  `%`-absence pin covers the concrete rendering that gap would admit.
-  **Therefore F11 is defence-in-depth on the label anchor — forbidding anything
-  numeric interposed between the label and the words — and not a live hole.**
-  It **would be** closed at zero cost by tightening the three substrings to
-  `"- Inert fraction: NOT EXERCISED"`. That tightening is **not** in this PR
-  (the three assertions on the branch still read `~substring:"NOT EXERCISED"`);
-  it is left as a clean, separately-reviewable follow-up, so F11 stays **open**.
-  **Non-blocking.**
-- **F12 (new, from the 2026-08-08 F6 rework) — extend the existing `core_lines`
-  byte pin to cover the split-safe section.** Mutation **M-E** (swap the order
-  of the two bullets — counts line and inertness line) escapes every current
-  assertion, since all of them are substring containment over the section as a
-  whole; so would duplicate emission of either bullet, or a change to the blank
-  lines around the heading. Presentation-only, which is why the original author's
-  withholding was judged correct — but `to_markdown`'s `core_lines` already
-  byte-pins the header / aggregate / per-trade-table block, so extending that pin
-  over the fourth block is consistent with what the file already does rather than
-  new machinery. **Non-blocking.**
+- [x] **F11 — CLOSED 2026-08-09 (branch `feat/split-safe-test-hardening`,
+  F11+F12+R3 bundle) — anchor the not-exercised assertion to its label.**
+  Applies to the three *positive* `Not_exercised` assertions only (the
+  `flag_off`, `empty_window`, and `empty_population` tests) — **not** the
+  fourth, cross-negative site in `test_split_safe_renders_counts_and_inert_fraction`
+  (`~substring:"NOT EXERCISED"` → `equal_to false`), which stays untouched
+  since tightening a negative assertion only weakens it. All three positive
+  sites now read `~substring:"- Inert fraction: NOT EXERCISED"` (confirmed
+  against the actual rendered prefix in `_format_split_safe`'s `Not_exercised`
+  branch before editing).
+  **Re-measured this session** (not transcribed from the prior entry).
+  Mutation **M-A** (interpose a percentage between the label and the words:
+  `- Inert fraction: 0.0% — NOT EXERCISED — …`) applied to `_format_split_safe`
+  in `trade_audit_report.ml`:
+  - **New test file** (post-F11): `Ran: 36 tests`, `Failures: 3`, exit 1 — all
+    three `Not_exercised` tests fail (`Trade_audit_report:25/26/27`).
+  - **Pre-change test file** (`origin/main`'s version, same mutation): `Ran: 36
+    tests`, `Failures: 3`, exit 1 — **also fails**, same three tests. The
+    honest result: the old suite was **not** blind to M-A — the pre-existing
+    `%`-absence assertion (`~substring:"%"` → `equal_to false`) already caught
+    it on all three states, exactly as the 2026-08-08 measurement above found.
+    F11's label anchor is therefore **defence-in-depth**, not a closed gap —
+    it makes the *label* assertion itself catch M-A (previously it passed
+    under M-A even though the `%` assertion failed), rather than relying on a
+    second, differently-motivated assertion to carry the whole burden.
+  Mutation reverted; both files diffed clean against origin/main afterward
+  except the intended test-file edit.
+- [x] **F12 — CLOSED 2026-08-09 (same bundle) — extend a byte-exact pin over
+  the split-safe section.** Added an `equal_to expected_section` check to
+  `test_split_safe_renders_counts_and_inert_fraction`, mirroring
+  `_format_split_safe`'s own 5-element line list (heading, blank, counts,
+  inertness, trailing blank) — the same style `to_markdown`'s pre-existing
+  `core_lines` pin uses for the header/aggregate/table block.
+  **Measured this session.** Mutation **M-E** (swap the order of the counts
+  and inertness bullets in `_format_split_safe`'s output list):
+  - **New test file**: `Ran: 36 tests`, `Failures: 1`, exit 1 —
+    `Trade_audit_report:24:split-safe renders counts and inert fraction` (the
+    byte-exact pin fires).
+  - **Pre-change test file** (`origin/main`, same mutation): `Ran: 36 tests …
+    OK`, exit 0 — **the old suite is genuinely blind to M-E.** Every existing
+    assertion on that section is substring containment, so bullet order never
+    mattered to it.
+  Mutation reverted; production file diffs clean against origin/main.
 
 ### Follow-ups filed 2026-08-07 (qc-behavioral residuals on PR #2232, all non-blocking)
 
@@ -941,19 +950,23 @@ correctly left all four alone; they are not rework scope. Numbering is local to
   the words are present. Low realism (no plausible refactor produces it), but it
   is the true outer boundary of what this test pins. Strictly **narrower** than
   F11, which concerns a number *preceding* the label; R2 is one *following* it.
-- **R3 (#2239) — cross-negative asymmetry across the three `Not_exercised` tests.**
-  Measured (reviewer mutation M6): appending
-  `"no entry decisions were captured…"` to the **flag-off** message passes 36/36,
-  producing a report that names two causes at once. The empty-population test
-  excludes both sibling literals; `…_flag_off_reads_as_wiring_alarm` and
-  `…_empty_window_reads_as_no_exposure` do **not** exclude the empty-population
-  literal. Pre-existing from #2232 — after #2239 the empty-population test is the
-  only one of the three with complete cross-negatives. Fix is symmetric and
-  zero-cost: add
+- [x] **R3 (#2239) — CLOSED 2026-08-09 (branch `feat/split-safe-test-hardening`,
+  F11+F12+R3 bundle) — cross-negative asymmetry across the three
+  `Not_exercised` tests.** Added
   `field (fun s -> String.is_substring s ~substring:"no entry decisions were captured") (equal_to false)`
-  to the other two tests. **Pairs naturally with F11 and F12 as one small
-  test-hardening PR** — that bundle is the recommended next pick on this track's
-  telemetry arc.
+  to `…_flag_off_reads_as_wiring_alarm` and `…_empty_window_reads_as_no_exposure`;
+  all three `Not_exercised` tests now carry complete cross-negatives against
+  each other's literal.
+  **Re-measured this session** (mutation applied directly, not the reviewer's
+  original M6 run reused): appending `"no entry decisions were captured."` to
+  the flag-off branch of `_not_exercised_cause` in `trade_audit_report.ml`:
+  - **New test file** (post-R3): `Ran: 36 tests`, `Failures: 1`, exit 1 —
+    `Trade_audit_report:25:split-safe not exercised: flag_off reads as wiring
+    alarm` fires on the new cross-negative field.
+  - **Pre-change test file** (`origin/main`): `Ran: 36 tests … OK`, exit 0 —
+    confirms the old suite was genuinely blind, matching the reviewer's M6
+    finding.
+  Mutation reverted; production file diffs clean against origin/main.
 - **R4 (#2239) — `NOT EXERCISED` is the load-bearing pin; `%`-absence is the proxy.**
   Measured (reviewer mutation M3, against main's test file): a numeric regression
   rendering `0.00` with **no percent sign** is invisible to the `%` pin and is
