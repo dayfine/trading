@@ -125,12 +125,12 @@ let _bar_reader_of_snapshot ~snapshot_dir =
    the float-array daily view, zipped with their dates. R6 filters to its own
    lookback window and ignores the entry-day bar.
 
-   Reads [raw_closes]. The comment here used to say "adjusted closes", but the
-   field it read ([daily_view.closes], renamed [raw_closes] on 2026-08-05) has
-   always carried the raw [Snapshot_schema.Close] cell — the name was the
-   inaccurate part, not the value. Kept on the raw basis so this report's output
-   is unchanged; whether the ratings *should* read [adjusted_closes] is a
-   separate question, deliberately not answered here. *)
+   Reads the split-adjusted basis via {!Trade_audit_basis.window_closes}. R6
+   measures a peak-to-trough drawdown across the window, so a split inside it
+   reads on the raw basis as a plunge the price never took (AAPL's 4:1 on
+   2020-08-31 turns a 9.9% adjusted drawdown into a 76.1% raw one, flipping the
+   verdict from Pass to Fail). Windows with an incomplete adjusted column fall
+   back to raw wholesale — never mixed; see the module docstring. *)
 let _closes_lookup_of_reader reader :
     Trade_audit_report.Trade_audit_ratings.closes_lookup =
  fun ~symbol ~as_of ->
@@ -140,7 +140,9 @@ let _closes_lookup_of_reader reader :
   in
   Array.to_list
     (Array.zip_exn view.Snapshot_bar_views.dates
-       view.Snapshot_bar_views.raw_closes)
+       (Trade_audit_basis.window_closes
+          ~adjusted:view.Snapshot_bar_views.adjusted_closes
+          ~raw:view.Snapshot_bar_views.raw_closes))
 
 (* Weekly [(date, close)] bars for the per-trade HTML chart series: up to [n]
    weekly bars ending at/before [as_of], straight off the snapshot weekly view.
@@ -149,18 +151,25 @@ let _weekly_series_of_reader reader ~symbol ~n ~as_of =
   let view = Bar_reader.weekly_view_for reader ~symbol ~n ~as_of in
   Array.zip_exn view.Snapshot_bar_views.dates view.Snapshot_bar_views.closes
 
-(* Last raw close at/before [as_of] for [symbol], or [None] when the warehouse
-   has no bar within the lookback window. Feeds the HTML benchmark and
-   utilization series. (Same rename note as [_closes_lookup_of_reader]: the
-   field was called [closes] and documented "adjusted", but has always been the
-   raw close cell.) *)
+(* Last split-adjusted close at/before [as_of] for [symbol], or [None] when the
+   warehouse has no usable bar within the lookback window. Feeds the HTML
+   benchmark and utilization series, which is the basis
+   [Html_report.load]'s [?bar_close] contract asks for: both series divide a
+   mark by an earlier mark, so a raw pair straddling a split renders a step the
+   symbol never took. It also removes an inconsistency inside one artefact —
+   [_weekly_series_of_reader] above reads [weekly_view.closes], already the
+   adjusted column, so before this change a trade's chart line and the
+   benchmark line beside it disagreed across a split.
+
+   Same all-or-nothing fallback as [_closes_lookup_of_reader], and [None]
+   rather than [Some nan] on a non-finite mark — see {!Trade_audit_basis}. *)
 let _bar_close_of_reader reader ~symbol ~as_of =
   let view =
     Bar_reader.daily_view_for reader ~symbol ~as_of
       ~lookback:_mark_lookback_days
   in
-  let closes = view.Snapshot_bar_views.raw_closes in
-  if Array.is_empty closes then None else Some closes.(Array.length closes - 1)
+  Trade_audit_basis.last_close ~adjusted:view.Snapshot_bar_views.adjusted_closes
+    ~raw:view.Snapshot_bar_views.raw_closes
 
 let _write ~path s =
   Out_channel.with_file path ~f:(fun oc -> Out_channel.output_string oc s)
