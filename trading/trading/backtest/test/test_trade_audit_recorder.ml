@@ -31,7 +31,10 @@ let _current_date = _date "2024-06-14"
 let _stage_result : Stage.result =
   {
     stage = Weinstein_types.Stage2 { weeks_advancing = 8; late = false };
-    ma_value = 100.0;
+    (* Distinct from every other price in the fixture ([suggested_entry] =
+       100.0, [close_at_decision] = 99.0, [installed_stop] = 92.0) so a
+       mis-wire of [entry_decision.ma_value] to any of them fails the pin. *)
+    ma_value = 97.5;
     ma_direction = Weinstein_types.Rising;
     ma_slope_pct = 0.01;
     transition = None;
@@ -187,10 +190,11 @@ let test_entry_projection_carries_identifying_fields _ =
 (** E-provenance fields (entry-ticket right-basis plan 2026-08-08):
     [close_at_decision] must pass through from the event verbatim, [ma_value]
     must be read off the candidate's stage analysis (the fixture's
-    [_stage_result.ma_value = 100.0]), and [local_range_top] mirrors the
-    candidate's analysis field — [None] here because the fixture leaves the
-    local-anchor knob off. Non-default values, same reason as the enum pins: a
-    hardcoded [None]/constant at this hop must fail. *)
+    [_stage_result.ma_value = 97.5], distinct from every other fixture price so
+    a mis-wire cannot pass), and [local_range_top] mirrors the candidate's
+    analysis field — [None] here because the fixture leaves the local-anchor
+    knob off. Non-default values, same reason as the enum pins: a hardcoded
+    [None]/constant at this hop must fail. *)
 let test_entry_projection_carries_e_provenance_fields _ =
   assert_that
     (_recorded_entry ~split_safe_basis:AR.Flag_off
@@ -202,7 +206,7 @@ let test_entry_projection_carries_e_provenance_fields _ =
            (is_some_and (float_equal 99.0));
          field
            (fun (e : TA.entry_decision) -> e.ma_value)
-           (is_some_and (float_equal 100.0));
+           (is_some_and (float_equal 97.5));
          field (fun (e : TA.entry_decision) -> e.local_range_top) is_none;
        ])
 

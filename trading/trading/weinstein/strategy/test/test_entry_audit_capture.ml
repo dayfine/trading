@@ -363,7 +363,9 @@ let test_empty_bar_reader_falls_back_to_suggested_entry _ =
     on the E-anchored [~trigger_at_suggested:true] path, where
     [effective_entry_price] is E ($130) but the close the strategy saw is still
     $110. That independence is the field's whole point: it lets the audit
-    compare E against the close without raw bars. *)
+    compare E against the close without raw bars. Asserted on the
+    [build_entry_event] OUTPUT (not the meta), so the meta -> event hop is
+    pinned on a [Some] value in the same pass. *)
 let test_meta_close_at_decision_recorded_on_both_entry_bases _ =
   let current_date = Date.of_string "2024-06-14" in
   let bar_reader =
@@ -384,15 +386,29 @@ let test_meta_close_at_decision_recorded_on_both_entry_bases _ =
     | Entry_audit_capture.Entry_ok (_, meta) -> meta
     | _ -> OUnit2.assert_failure "make_entry_transition did not return Entry_ok"
   in
+  (* Feed each real meta (close = [Some 110.0]) through [build_entry_event] and
+     assert the EVENT field, not just the meta: this pins the meta -> event hop
+     on a [Some] value. The only other coverage of that hop is [None]-valued
+     (empty-reader test below), which cannot distinguish the copy from a
+     hardcoded [None] — the same constant-vs-propagated trap the B1
+     split_safe_basis pin exists for (qc-behavioral 2026-08-09 CP3). *)
+  let event_of ~trigger_at_suggested =
+    Entry_audit_capture.build_entry_event ~macro:_macro_fixture ~current_date
+      ~candidate:cand
+      ~meta:(meta_of ~trigger_at_suggested)
+      ~alternatives:[]
+  in
   assert_that
-    [ meta_of ~trigger_at_suggested:false; meta_of ~trigger_at_suggested:true ]
+    [
+      event_of ~trigger_at_suggested:false; event_of ~trigger_at_suggested:true;
+    ]
     (elements_are
        [
          field
-           (fun (m : Entry_audit_capture.entry_meta) -> m.close_at_decision)
+           (fun (e : Audit_recorder.entry_event) -> e.close_at_decision)
            (is_some_and (float_equal 110.0));
          field
-           (fun (m : Entry_audit_capture.entry_meta) -> m.close_at_decision)
+           (fun (e : Audit_recorder.entry_event) -> e.close_at_decision)
            (is_some_and (float_equal 110.0));
        ])
 
