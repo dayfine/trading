@@ -8,10 +8,7 @@
       spliced window would reintroduce the cross-split discontinuity the module
       exists to remove)
     - non-finite means non-finite: infinities fall back too, not just NaN
-    - empty in, empty out
-    - [last_close] reads the newest close of the selected window, falls back
-      alongside it, and returns [None] rather than [Some nan] on an empty window
-      or a non-finite mark *)
+    - empty in, empty out *)
 
 open OUnit2
 open Core
@@ -59,35 +56,6 @@ let test_infinity_falls_back_to_raw _ =
        ~raw:[| 40.0; 44.0; 48.0 |])
     (elements_are [ float_equal 40.0; float_equal 44.0; float_equal 48.0 ])
 
-(* -- last_close ---------------------------------------------------------- *)
-
-let test_last_close_reads_newest_adjusted _ =
-  assert_that
-    (TB.last_close ~adjusted:[| 10.0; 11.0; 12.0 |] ~raw:[| 40.0; 44.0; 48.0 |])
-    (is_some_and (float_equal 12.0))
-
-let test_last_close_falls_back_with_its_window _ =
-  (* The NaN is not the newest cell, yet the mark still comes off raw: the mark
-     must sit on the same basis as the window it was selected from, or a
-     benchmark curve built from successive marks mixes bases across dates. *)
-  assert_that
-    (TB.last_close
-       ~adjusted:[| Float.nan; 11.0; 12.0 |]
-       ~raw:[| 40.0; 44.0; 48.0 |])
-    (is_some_and (float_equal 48.0))
-
-let test_last_close_none_on_empty_window _ =
-  assert_that (TB.last_close ~adjusted:[||] ~raw:[||]) is_none
-
-(* Belt-and-braces: a well-formed daily view never has a NaN raw close (the
-   view drops those bars), so this state is unreachable in production — but if
-   it ever arises the mark is dropped rather than handed on as [Some nan],
-   which would silently poison the benchmark and utilization series. *)
-let test_last_close_none_rather_than_some_nan _ =
-  assert_that
-    (TB.last_close ~adjusted:[| 10.0; Float.nan |] ~raw:[| 40.0; Float.nan |])
-    is_none
-
 let suite =
   "trade_audit_basis"
   >::: [
@@ -101,14 +69,6 @@ let suite =
          "nan at tail falls back to whole raw window"
          >:: test_nan_at_tail_falls_back_to_whole_raw_window;
          "infinity falls back to raw" >:: test_infinity_falls_back_to_raw;
-         "last close reads newest adjusted"
-         >:: test_last_close_reads_newest_adjusted;
-         "last close falls back with its window"
-         >:: test_last_close_falls_back_with_its_window;
-         "last close none on empty window"
-         >:: test_last_close_none_on_empty_window;
-         "last close none rather than some nan"
-         >:: test_last_close_none_rather_than_some_nan;
        ]
 
 let () = run_test_tt_main suite

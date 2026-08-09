@@ -151,25 +151,40 @@ let _weekly_series_of_reader reader ~symbol ~n ~as_of =
   let view = Bar_reader.weekly_view_for reader ~symbol ~n ~as_of in
   Array.zip_exn view.Snapshot_bar_views.dates view.Snapshot_bar_views.closes
 
-(* Last split-adjusted close at/before [as_of] for [symbol], or [None] when the
-   warehouse has no usable bar within the lookback window. Feeds the HTML
-   benchmark and utilization series, which is the basis
-   [Html_report.load]'s [?bar_close] contract asks for: both series divide a
-   mark by an earlier mark, so a raw pair straddling a split renders a step the
-   symbol never took. It also removes an inconsistency inside one artefact —
-   [_weekly_series_of_reader] above reads [weekly_view.closes], already the
-   adjusted column, so before this change a trade's chart line and the
-   benchmark line beside it disagreed across a split.
+(* Last RAW close at/before [as_of] for [symbol], or [None] when the warehouse
+   has no bar within the lookback window. Feeds [Html_report.load ?bar_close],
+   which drives two series with *different* basis needs — so unlike
+   [_closes_lookup_of_reader] above, this one deliberately stays raw.
 
-   Same all-or-nothing fallback as [_closes_lookup_of_reader], and [None]
-   rather than [Some nan] on a non-finite mark — see {!Trade_audit_basis}. *)
+   [Html_report._benchmark] divides a mark by an earlier mark and would indeed
+   prefer adjusted. [Html_report._utilization] does not: it computes
+   [sum over held positions of (i_qty *. c) /. nav], i.e. it *multiplies* the
+   mark by a share count and divides by NAV, and both of those other terms are
+   raw — [i_qty] comes from [trades.csv]'s [quantity] (a raw share count,
+   split-restated to the exit date) or from the live broker count in
+   [open_positions.csv], and [nav] comes from [equity_curve.csv], which marks
+   positions at [bar.close_price], the raw [Snapshot_schema.Close] cell.
+
+   With [adj d = raw d /. split d..T *. div d..T] and
+   [i_qty = qty d *. split d..exit], a raw mark makes [deployed] exact for any
+   hold that does not straddle a split, whereas an adjusted mark scales it by
+   [div d..T /. split exit..T] — wrong for every trade in a symbol that split or
+   paid a dividend after the trade closed, and dividends alone are large (KO
+   2016-03-01 adj/raw = 0.7253, JNJ = 0.7596, AAPL 2015-01-02 = 0.2215). Raw is
+   the numerically better of the two available options while one callback feeds
+   both series.
+
+   Unresolved tension: [html_report.mli:52] documents [?bar_close] as resolving
+   "a symbol's adjusted close", which this does not honour. Splitting the
+   callback per series (benchmark → adjusted, utilization → raw) needs an
+   [Html_report.load] signature change; filed as follow-up G4. *)
 let _bar_close_of_reader reader ~symbol ~as_of =
   let view =
     Bar_reader.daily_view_for reader ~symbol ~as_of
       ~lookback:_mark_lookback_days
   in
-  Trade_audit_basis.last_close ~adjusted:view.Snapshot_bar_views.adjusted_closes
-    ~raw:view.Snapshot_bar_views.raw_closes
+  let closes = view.Snapshot_bar_views.raw_closes in
+  if Array.is_empty closes then None else Some closes.(Array.length closes - 1)
 
 let _write ~path s =
   Out_channel.with_file path ~f:(fun oc -> Out_channel.output_string oc s)
