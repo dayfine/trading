@@ -1803,6 +1803,7 @@ let ranking_analysis ~ticker ~rs_norm ~weeks_advancing ~volume_ratio :
     supply = None;
     virgin_readmission = false;
     range_top_freshness = None;
+    require_breakout_volume = true;
     current_close = None;
     as_of_date = as_of;
   }
@@ -2163,6 +2164,7 @@ let breakout_analysis ~ticker ~breakout_price ~current_close : Stock_analysis.t
     supply = None;
     virgin_readmission = false;
     range_top_freshness = None;
+    require_breakout_volume = true;
     current_close;
     as_of_date = as_of;
   }

@@ -146,6 +146,7 @@ type config = {
       [@sexp.default Stop_width_mode.Drop_over_max]
       (** See [.mli]. *)
   stop_width_size_down_max_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
+  volume_confirm_at_fill : bool; [@sexp.default false]  (** See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -254,6 +255,14 @@ let default_config ~universe ~index_symbol =
     entry_order_ttl_weeks = 0;
     stop_width_mode = Stop_width_mode.Drop_over_max;
     stop_width_size_down_max_pct = 0.0;
+    volume_confirm_at_fill = false;
   }
+
+(* F5 arming predicate — the single source of truth for both halves of the
+   mechanism (placement waiver + at-fill eject), so the two can never drift out
+   of step. See [.mli]. *)
+let volume_confirm_at_fill_armed (c : config) : bool =
+  c.volume_confirm_at_fill && c.sim_entry_trigger_at_suggested
+  && c.enable_sim_entry_stoplimit
 
 let name = "Weinstein"

@@ -209,9 +209,80 @@ let test_nan_event_volume_returns_none _ =
   in
   assert_that result is_none
 
+(* ------------------------------------------------------------------ *)
+(* confirms_breakout — the two §4.2 branches (F5)                       *)
+(* ------------------------------------------------------------------ *)
+
+(** Chronological bars (oldest first) from a volume list; the LAST entry is the
+    event bar, so [event_offset = 0]. *)
+let _confirms volumes =
+  confirms_breakout ~config:cfg
+    ~callbacks:(callbacks_from_bars ~bars:(List.map volumes ~f:make_bar))
+    ~event_offset:0
+
+(** Branch (a): the event bar alone is 3x the prior 4 weeks. *)
+let test_confirms_via_spike_branch _ =
+  assert_that
+    (_confirms [ 1000; 1000; 1000; 1000; 3000 ])
+    (is_some_and (equal_to true))
+
+(** Branch (b): the event bar is only 1.36x its prior 4 weeks (branch (a)
+    fails), but the 4-week build-up (1500/1400/1300/1200, mean 1350) is 2.7x the
+    prior 4-week baseline (mean 500) and the event bar rises over the week
+    before it. Book: "volume build-up over 3-4 weeks that is >= 2x average of
+    prior several weeks, with at least some increase on breakout week". *)
+let test_confirms_via_buildup_branch _ =
+  assert_that
+    (_confirms [ 500; 500; 500; 500; 1200; 1300; 1400; 1500 ])
+    (is_some_and (equal_to true))
+
+(** A build-up whose ratio qualifies but whose event bar FALLS is not a
+    confirmation — the book requires some increase on the breakout week. *)
+let test_buildup_without_increase_on_event_bar_does_not_confirm _ =
+  assert_that
+    (_confirms [ 500; 500; 500; 500; 1500; 1500; 1500; 1400 ])
+    (is_some_and (equal_to false))
+
+(** Neither branch: a flat tape with a below-average event bar. *)
+let test_neither_branch_confirms _ =
+  assert_that
+    (_confirms [ 1000; 1000; 1000; 1000; 1000; 1000; 1000; 900 ])
+    (is_some_and (equal_to false))
+
+(** Enough history for branch (a) but not for branch (b) (which needs two
+    [lookback_bars]-sized windows): the spike verdict still stands alone. *)
+let test_spike_verdict_stands_without_buildup_history _ =
+  assert_that
+    (_confirms [ 1000; 1000; 1000; 1000; 900 ])
+    (is_some_and (equal_to false))
+
+(** Too little history for EITHER branch is [None] — "no verdict", which callers
+    must not read as an unconfirmed breakout. *)
+let test_insufficient_history_is_none _ =
+  assert_that (_confirms [ 1000; 900 ]) is_none
+
+(** A negative offset has no bar to judge. *)
+let test_negative_offset_is_none _ =
+  assert_that
+    (confirms_breakout ~config:cfg
+       ~callbacks:(callbacks_from_bars ~bars:[ make_bar 1000 ])
+       ~event_offset:(-1))
+    is_none
+
 let suite =
   "volume_tests"
   >::: [
+         "test_confirms_via_spike_branch" >:: test_confirms_via_spike_branch;
+         "test_confirms_via_buildup_branch" >:: test_confirms_via_buildup_branch;
+         "test_buildup_without_increase_on_event_bar_does_not_confirm"
+         >:: test_buildup_without_increase_on_event_bar_does_not_confirm;
+         "test_neither_branch_confirms" >:: test_neither_branch_confirms;
+         "test_spike_verdict_stands_without_buildup_history"
+         >:: test_spike_verdict_stands_without_buildup_history;
+         "test_confirms_insufficient_history_is_none"
+         >:: test_insufficient_history_is_none;
+         "test_confirms_negative_offset_is_none"
+         >:: test_negative_offset_is_none;
          "test_strong_breakout" >:: test_strong_breakout;
          "test_adequate_breakout" >:: test_adequate_breakout;
          "test_weak_breakout" >:: test_weak_breakout;

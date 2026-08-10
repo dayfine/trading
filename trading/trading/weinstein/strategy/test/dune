@@ -26,6 +26,7 @@
   test_liquidity_gate
   test_liquidity_exit_runner
   test_extension_stop_runner
+  test_volume_eject_runner
   test_spy_only_weinstein_strategy
   test_breaker_spy_strategy
   test_stage3_force_exit_runner
@@ -76,6 +77,7 @@
   weinstein.rs
   weinstein.sector
   weinstein.stock_analysis
+  weinstein.volume
   weinstein.resistance
   weinstein_trading.portfolio_risk
   weinstein_trading.stops

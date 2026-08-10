@@ -85,9 +85,72 @@ let test_threads_entry_anchor_local_range_weeks _ =
   let built = Weinstein_strategy.stock_analysis_config_for ~config in
   assert_that built.entry_anchor_local_range_weeks (equal_to 26)
 
+(* ------------------------------------------------------------------ *)
+(* F5 — volume_confirm_at_fill => require_breakout_volume = false       *)
+(* ------------------------------------------------------------------ *)
+
+(** The armed F5 config, through the REAL config→strategy seam, waives the
+    screen-time volume gate. This is the placement half of the mechanism (book
+    §4.7: a GTC ticket is written before the breakout, so its volume is
+    unknowable at placement); its counterpart, {!Volume_eject_runner}, reads the
+    same arming predicate and confirms the volume at the fill. *)
+let test_armed_f5_waives_screen_time_volume_gate _ =
+  let config =
+    {
+      (_default_config ()) with
+      Weinstein_strategy.volume_confirm_at_fill = true;
+      sim_entry_trigger_at_suggested = true;
+      enable_sim_entry_stoplimit = true;
+    }
+  in
+  let built = Weinstein_strategy.stock_analysis_config_for ~config in
+  assert_that built.require_breakout_volume (equal_to false)
+
+(** R1: at the default config the gate stays armed, so admission is
+    bit-identical to pre-F5. (Also covered structurally by
+    {!test_default_builds_stock_analysis_default_config}, which pins the whole
+    built record.) *)
+let test_default_keeps_screen_time_volume_gate _ =
+  let built =
+    Weinstein_strategy.stock_analysis_config_for ~config:(_default_config ())
+  in
+  assert_that built.require_breakout_volume (equal_to true)
+
+(** The flag alone does not arm F5 — the mechanism is defined only for the
+    resting E-anchored ticket family. Each StopLimit half on its own leaves the
+    screen-time gate in place. *)
+let test_flag_without_stoplimit_family_keeps_gate _ =
+  let with_overrides overrides =
+    let config = overrides (_default_config ()) in
+    (Weinstein_strategy.stock_analysis_config_for ~config)
+      .require_breakout_volume
+  in
+  assert_that
+    ( with_overrides (fun c ->
+          { c with Weinstein_strategy.volume_confirm_at_fill = true }),
+      with_overrides (fun c ->
+          {
+            c with
+            Weinstein_strategy.volume_confirm_at_fill = true;
+            enable_sim_entry_stoplimit = true;
+          }),
+      with_overrides (fun c ->
+          {
+            c with
+            Weinstein_strategy.volume_confirm_at_fill = true;
+            sim_entry_trigger_at_suggested = true;
+          }) )
+    (equal_to (true, true, true))
+
 let suite =
   "stock_analysis_config_wiring"
   >::: [
+         "armed F5 waives the screen-time volume gate"
+         >:: test_armed_f5_waives_screen_time_volume_gate;
+         "default keeps the screen-time volume gate"
+         >:: test_default_keeps_screen_time_volume_gate;
+         "flag without the StopLimit family keeps the gate"
+         >:: test_flag_without_stoplimit_family_keeps_gate;
          "default builds Stock_analysis.default_config"
          >:: test_default_builds_stock_analysis_default_config;
          "override sets resistance.min_history_bars"

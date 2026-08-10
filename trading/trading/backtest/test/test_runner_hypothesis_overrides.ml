@@ -746,6 +746,52 @@ let test_strategy_config_parses_with_entry_freshness_basis_absent _ =
        (equal_to Entry_freshness.Ma_cross))
 
 (* -------------------------------------------------------------------- *)
+(* volume_confirm_at_fill — R1/R2 wiring for F5 (default-off flag)        *)
+(* -------------------------------------------------------------------- *)
+
+(** [volume_confirm_at_fill] defaults to [false] — volume stays a screen-time
+    admission gate and no at-fill eject path is reachable, so every existing
+    golden/baseline replays unchanged
+    ([.claude/rules/experiment-flag-discipline.md] R1). *)
+let test_default_volume_confirm_at_fill_is_false _ =
+  let cfg = _default_config () in
+  assert_that cfg.volume_confirm_at_fill (equal_to false)
+
+(** Axis reachability (experiment-flag-discipline R2): the
+    [((volume_confirm_at_fill true))] override resolves through the {b real}
+    [Overlay_validator.apply_overrides] (the sweep / WF-CV path) with no
+    unknown-key error and lands the armed value — this is what makes
+    [((flag volume_confirm_at_fill) (values (true false)))] a valid
+    [Variant_matrix] axis on landing. *)
+let test_volume_confirm_at_fill_axis_resolves_via_overlay_validator _ =
+  let merged =
+    Backtest.Overlay_validator.apply_overrides (_default_config ())
+      [ Sexp.of_string "((volume_confirm_at_fill true))" ]
+  in
+  assert_that merged.volume_confirm_at_fill (equal_to true)
+
+(** A config sexp with the field entirely ABSENT parses and lands the [false]
+    no-op — the [[@sexp.default]] backward-compat half of R1: every pre-F5 spec
+    on disk keeps parsing, bit-identically. Same pattern as
+    {!test_strategy_config_parses_with_entry_freshness_basis_absent}. *)
+let test_strategy_config_parses_with_volume_confirm_at_fill_absent _ =
+  let base = Weinstein_strategy.sexp_of_config (_default_config ()) in
+  let stripped =
+    match base with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List [ Sexp.Atom "volume_confirm_at_fill"; _ ] -> false
+            | _ -> true))
+    | other -> other
+  in
+  assert_that
+    (Weinstein_strategy.config_of_sexp stripped)
+    (field
+       (fun (c : Weinstein_strategy.config) -> c.volume_confirm_at_fill)
+       (equal_to false))
+
+(* -------------------------------------------------------------------- *)
 (* screening_config.failed_breakout_tolerance_pct — failed-breakout gate  *)
 (* -------------------------------------------------------------------- *)
 
@@ -926,6 +972,12 @@ let suite =
          >:: test_entry_freshness_basis_axis_resolves_via_overlay_validator;
          "strategy config parses with entry_freshness_basis absent"
          >:: test_strategy_config_parses_with_entry_freshness_basis_absent;
+         "default volume_confirm_at_fill is false"
+         >:: test_default_volume_confirm_at_fill_is_false;
+         "volume_confirm_at_fill axis resolves via Overlay_validator"
+         >:: test_volume_confirm_at_fill_axis_resolves_via_overlay_validator;
+         "strategy config parses with volume_confirm_at_fill absent"
+         >:: test_strategy_config_parses_with_volume_confirm_at_fill_absent;
        ]
 
 let () = run_test_tt_main suite

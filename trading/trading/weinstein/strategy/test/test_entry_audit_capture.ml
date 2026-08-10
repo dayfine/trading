@@ -66,6 +66,7 @@ let _stock_analysis ~ticker ~as_of_date : Stock_analysis.t =
     supply = None;
     virgin_readmission = false;
     range_top_freshness = None;
+    require_breakout_volume = true;
     current_close = None;
     as_of_date;
   }
