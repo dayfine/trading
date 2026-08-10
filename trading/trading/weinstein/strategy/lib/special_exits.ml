@@ -165,8 +165,59 @@ let _build_force_exit_channel ~config ~positions ~get_price ~cash ~peak_tracker
   ( Transition_assembly.filter_out_exited_ids stop_exited_ids raw_force_exit_ts,
     stop_exited_ids )
 
-(* The two trailing special exits (liquidity, then extension) share the same
-   emit/merge shape; threading them here keeps [run] under the length cap. *)
+(* F5 at-fill volume-confirmation eject: emitted last and merged into the
+   force-exit channel — same close-fill convention + audit path as the other
+   trailing special exits. Skips every position already exiting this tick via
+   any prior channel ([skip_ids] is the pre-liquidity union; [force_exit_ts]
+   carries the liquidity + extension exits prepended, so their union is the full
+   skip set). The [Volume.config] is read off the SAME [Stock_analysis.config]
+   the screener builds, so the at-fill thresholds and the screen-time
+   confirmation grade cannot drift. The arming check is repeated here (the
+   runner guards on it too) so the default path never even builds that config —
+   an exact no-op at [volume_confirm_at_fill = false]. *)
+let _volume_eject_transitions ~config ~positions ~bar_reader ~get_price
+    ~is_friday ~skip_ids ~current_date =
+  let stock_analysis_config =
+    Weinstein_strategy_screening._stock_analysis_config_for ~config
+  in
+  Volume_eject_runner.update ~config
+    ~volume_config:stock_analysis_config.Stock_analysis.volume
+    ~is_screening_day:is_friday ~positions ~bar_reader ~get_price
+    ~skip_position_ids:skip_ids ~current_date
+
+let _run_volume_eject_exit ~config ~record_force_exit ~positions
+    ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~skip_ids
+    ~current_date =
+  let volume_eject_ts =
+    if not (Weinstein_strategy_config.volume_confirm_at_fill_armed config) then
+      []
+    else
+      _volume_eject_transitions ~config ~positions ~bar_reader ~get_price
+        ~is_friday ~skip_ids ~current_date
+  in
+  List.iter volume_eject_ts
+    ~f:
+      (record_force_exit ~last_stop_out_dates ~positions ~current_date
+         ~cooldown_weeks:0 ~label:Volume_eject_runner.eject_label);
+  volume_eject_ts
+
+let _run_volume_eject_special_exit ~config ~record_force_exit ~positions
+    ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit ~skip_ids
+    ~force_exit_ts ~current_date =
+  let volume_skip_ids =
+    Set.union skip_ids (Transition_assembly.trigger_exit_ids_of force_exit_ts)
+  in
+  let volume_eject_ts =
+    _run_volume_eject_exit ~config ~record_force_exit ~positions
+      ~last_stop_out_dates ~bar_reader ~get_price ~is_friday
+      ~skip_ids:volume_skip_ids ~current_date
+  in
+  emit_audit volume_eject_ts;
+  volume_eject_ts @ force_exit_ts
+
+(* The three trailing special exits (liquidity, extension, then the F5 volume
+   eject) share the same emit/merge shape; threading them here keeps [run] under
+   the length cap. *)
 let _run_trailing_special_exits ~config ~record_force_exit ~positions
     ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit ~skip_ids
     ~force_exit_ts ~current_date =
@@ -175,7 +226,12 @@ let _run_trailing_special_exits ~config ~record_force_exit ~positions
       ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit
       ~skip_ids ~force_exit_ts ~current_date
   in
-  _run_extension_special_exit ~config ~record_force_exit ~positions
+  let force_exit_ts =
+    _run_extension_special_exit ~config ~record_force_exit ~positions
+      ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit
+      ~skip_ids ~force_exit_ts ~current_date
+  in
+  _run_volume_eject_special_exit ~config ~record_force_exit ~positions
     ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit ~skip_ids
     ~force_exit_ts ~current_date
 

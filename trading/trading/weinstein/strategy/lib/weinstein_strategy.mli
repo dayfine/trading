@@ -167,6 +167,14 @@ module Extension_stop_runner = Extension_stop_runner
     [config.extension_stop_config] is enabled; LONG-only, weekly-close,
     tighten-only. See {!Extension_stop_runner}. *)
 
+module Volume_eject_runner = Volume_eject_runner
+(** F5 at-fill volume-confirmation eject runner. Invoked among the special exits
+    on Friday ticks when
+    [Weinstein_strategy_config.volume_confirm_at_fill_armed config] holds; emits
+    a [volume_eject] [TriggerExit] for any freshly-filled long whose fill-week
+    volume fails both §4.2 branches. Returns [[]] at the default config. See
+    {!Volume_eject_runner}. *)
+
 module Macro_inputs = Macro_inputs
 (** Sector map + global index assembly from accumulated bar history. Exposes the
     canonical {!Macro_inputs.spdr_sector_etfs} and
@@ -920,6 +928,23 @@ type config = {
           admits the same population [Drop_over_max] does. Unread under
           [Drop_over_max]; default is an exact no-op (R1). See
           [Weinstein_strategy_config.stop_width_size_down_max_pct]. *)
+  volume_confirm_at_fill : bool; [@sexp.default false]
+      (** F5 volume-judged-at-the-fill (plan
+          [dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F5;
+          [docs/design/weinstein-book-reference.md] §4.2 + §4.7). A §4.7 GTC
+          buy-stop is written before the breakout, so breakout-week volume
+          cannot be known at placement; §4.2's confirmation belongs to the week
+          the ticket {b fills}. When armed (this flag AND the StopLimit family —
+          see {!Weinstein_strategy_config.volume_confirm_at_fill_armed}), the
+          screen-week volume signal is no longer required to place a ticket, and
+          {!Volume_eject_runner} confirms the fill week's volume against both
+          §4.2 branches on the first screening tick at which that week is
+          complete — unconfirmed ⇒ eject (audit tag [Volume_eject]), confirmed ⇒
+          hold. The eject is inseparable from the flag: holding a
+          volume-unconfirmed breakout is a W1 spine item-3 violation. Default
+          [false] = today's screen-time volume requirement, bit-identical
+          baselines (R1). See
+          [Weinstein_strategy_config.volume_confirm_at_fill]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

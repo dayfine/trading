@@ -26,6 +26,7 @@ module Liquidity_metric = Liquidity_metric
 module Entry_liquidity_gate = Entry_liquidity_gate
 module Liquidity_exit_runner = Liquidity_exit_runner
 module Extension_stop_runner = Extension_stop_runner
+module Volume_eject_runner = Volume_eject_runner
 module Stage3_force_exit = Stage3_force_exit
 module Laggard_rotation = Laggard_rotation
 module Ad_bars = Ad_bars

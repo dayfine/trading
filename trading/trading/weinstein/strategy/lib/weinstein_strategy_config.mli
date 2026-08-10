@@ -1611,6 +1611,58 @@ type config = {
           separated so a wide-admission cell is not confounded with a re-anchor
           change. Unread under [Drop_over_max]. Default [0.0] is an exact no-op
           (R1); axis-expressible (R2). *)
+  volume_confirm_at_fill : bool; [@sexp.default false]
+      (** F5 — judge the breakout's volume {b at the fill}, not at placement
+          (plan [dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F5;
+          [docs/design/weinstein-book-reference.md] §4.2 + §4.7).
+
+          {b The faithfulness gap it closes.} Book §4.7's GTC buy-stop is
+          written {i before} the breakout, so breakout-week volume is unknowable
+          at placement — yet today's cascade demands Strong/Adequate volume at
+          the Friday screen. §1 further notes that base volume "dries up", so a
+          screen-week volume requirement selects {i against} textbook bases.
+          §4.2's confirmation is defined on the breakout week, which under a
+          resting ticket is the {b fill} week.
+
+          {b Armed behaviour} (two inseparable halves, both gated on
+          {!volume_confirm_at_fill_armed} — this flag AND the StopLimit family
+          [sim_entry_trigger_at_suggested] + [enable_sim_entry_stoplimit]):
+
+          - {b Placement}: the screen-week volume signal is no longer required
+            to place the ticket ([Stock_analysis.config.require_breakout_volume]
+            goes [false]). Every other gate — stage, base, RS, resistance,
+            macro, sector — still applies, so the placed-ticket population
+            widens but stays bounded.
+          - {b At fill}: {!Volume_eject_runner} confirms the fill week's volume
+            against {b both} §4.2 branches ([Volume.confirms_breakout]) on the
+            first screening tick at which that week is complete (no partial-week
+            lookahead). Unconfirmed ⇒ the position is ejected, audit tag
+            [Volume_eject]; confirmed ⇒ held.
+
+          {b The eject is INSEPARABLE from the flag.} There is deliberately no
+          eject-off cell: holding a volume-unconfirmed breakout would be a W1
+          spine item-3 violation ("entry on a breakout above resistance WITH
+          volume confirmation"), and §4.2's low-volume-breakout SELL rule is
+          explicit that a buy-stop filled without volume confirmation is sold,
+          not held. Arming the placement waiver alone is not expressible.
+
+          {b Default [false] = today's screen-time volume requirement,
+             bit-identical} (R1): [require_breakout_volume] stays [true] and the
+          eject runner short-circuits to [[]], so no golden moves. R2: real
+          config field, axis-expressible as
+          [((flag volume_confirm_at_fill) (values (true false)))] via
+          [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides]. R3:
+          no default flip without a ledger ACCEPT.
+
+          {b Faithfulness: BOOK-SUPPORTED.} Spine item 3 is preserved and
+          relocated to the correct event — the check is not weakened, it is
+          moved from a week the book never evaluates to the week the book
+          defines it on.
+
+          {b Future work (NOT built)}: plan §3-F5 amendment (iv) notes a later
+          trader/investor variant of the unconfirmed branch
+          ([eject | hold_with_stop_at_breakout]); v4 implements the eject only.
+      *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
@@ -1623,6 +1675,22 @@ val default_dawn_max_flip_age_weeks : int
 
 val default_config : universe:string list -> index_symbol:string -> config
 (** Build a default config with Weinstein book values. *)
+
+val volume_confirm_at_fill_armed : config -> bool
+(** [volume_confirm_at_fill_armed c] is [true] iff F5 is active:
+    [c.volume_confirm_at_fill] AND the StopLimit family
+    ([c.sim_entry_trigger_at_suggested] && [c.enable_sim_entry_stoplimit]).
+
+    F5 only makes sense for a resting E-anchored ticket — that is the entry
+    model whose fill week {i is} the breakout week. Under the default
+    close-triggered entry the fill week and the screen week coincide, so
+    relocating the check would be a pure loss of information.
+
+    Single source of truth for both halves of the mechanism: the screener's
+    placement waiver ([Stock_analysis.config.require_breakout_volume]) and the
+    {!Volume_eject_runner} at-fill confirmation read this same predicate, so a
+    ticket can never be placed without volume {i and} then held without the
+    at-fill check. *)
 
 val name : string
 (** Strategy name, always ["Weinstein"]. *)
