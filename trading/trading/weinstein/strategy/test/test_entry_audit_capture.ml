@@ -1433,6 +1433,71 @@ let test_stop_width_gate_size_down_bands _ =
          equal_to (Stop_width_mode.Drop : Stop_width_mode.outcome);
        ])
 
+(** Run the 36%-stop fixture through the REAL walk with F3 armed on the [config]
+    — not via the direct [~stop_width] parameter. [initial_stop_buffer] is the
+    config field {!_entry_under_stop_width} passes by hand, so the two paths see
+    the same structural stop; the only difference is that here
+    [Entry_walk._make_entry_fn] is what builds the policy. *)
+let _entries_under_stop_width_config ~(mode : Stop_width_mode.t)
+    ~size_down_max_pct =
+  let config =
+    {
+      (Weinstein_strategy_config.default_config ~universe:[ _ticker ]
+         ~index_symbol:"SPY")
+      with
+      initial_stop_buffer = _buffer_36pct_stop;
+      stop_width_mode = mode;
+      stop_width_size_down_max_pct = size_down_max_pct;
+    }
+  in
+  let portfolio =
+    {
+      Trading_strategy.Portfolio_view.cash = 100_000.0;
+      positions = String.Map.empty;
+    }
+  in
+  let stop_states = ref String.Map.empty in
+  Entry_walk.entries_from_candidates ~config
+    ~candidates:
+      [
+        _long_candidate ~ticker:_ticker ~suggested_entry:100.0
+          ~suggested_stop:95.0 ~as_of_date:_current_date;
+      ]
+    ~stop_states
+    ~bar_reader:
+      (_bar_reader_with_current_close ~current_date:_current_date
+         ~current_close:100.0)
+    ~portfolio
+    ~get_price:(fun _ -> None)
+    ~current_date:_current_date ()
+
+(** Load-bearing config-level pin for F3: arming [Size_down] on the CONFIG (with
+    a 50% sanity ceiling) admits the 36%-stop candidate that the control config
+    drops, sized down to the risk-parity share count ($100k * 1% = $1,000 risk /
+    ~$36 per share = 27 shares). Without this, dropping the [~stop_width:]
+    argument at [entry_walk.ml] would make an armed [Size_down] config silently
+    no-op — every other F3 test bypasses the walk and would still pass. Mirrors
+    {!test_entries_from_candidates_funds_reanchored}, the same pin for
+    [stop_anchor_at_entry_base]. *)
+let test_entries_from_candidates_config_arms_size_down _ =
+  (* Control: the default mode drops the wide stop -> no transition. *)
+  assert_that
+    (_entries_under_stop_width_config ~mode:Stop_width_mode.Drop_over_max
+       ~size_down_max_pct:0.50)
+    (size_is 0);
+  assert_that
+    (_entries_under_stop_width_config ~mode:Stop_width_mode.Size_down
+       ~size_down_max_pct:0.50)
+    (elements_are
+       [
+         field
+           (fun (t : Position.transition) ->
+             match t.kind with
+             | Position.CreateEntering e -> e.target_quantity
+             | _ -> Float.nan)
+           (is_between (module Float_ord) ~low:26.0 ~high:28.0);
+       ])
+
 let test_config_default_stop_width_mode_is_drop_over_max _ =
   let config =
     Weinstein_strategy.default_config ~universe:[] ~index_symbol:""
@@ -2069,6 +2134,8 @@ let () =
            "F3: gate Drop_over_max boundary"
            >:: test_stop_width_gate_drop_over_max_boundary;
            "F3: gate Size_down bands" >:: test_stop_width_gate_size_down_bands;
+           "F3: config arms Size_down through the entry walk"
+           >:: test_entries_from_candidates_config_arms_size_down;
            "F3: config default is Drop_over_max"
            >:: test_config_default_stop_width_mode_is_drop_over_max;
            "F3: config sexp omitted defaults to no-op"
