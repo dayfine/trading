@@ -724,6 +724,27 @@ let test_entry_freshness_basis_axis_resolves_via_overlay_validator _ =
   assert_that merged.entry_freshness_basis
     (equal_to Entry_freshness.Range_top_breakout)
 
+(** A config sexp with the field entirely ABSENT parses and lands the [Ma_cross]
+    no-op — the [[@sexp.default]] backward-compat half of R1: every pre-F1 spec
+    on disk keeps parsing, bit-identically. Same pattern as
+    {!test_strategy_config_parses_with_overhead_supply_absent}. *)
+let test_strategy_config_parses_with_entry_freshness_basis_absent _ =
+  let base = Weinstein_strategy.sexp_of_config (_default_config ()) in
+  let stripped =
+    match base with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List [ Sexp.Atom "entry_freshness_basis"; _ ] -> false
+            | _ -> true))
+    | other -> other
+  in
+  assert_that
+    (Weinstein_strategy.config_of_sexp stripped)
+    (field
+       (fun (c : Weinstein_strategy.config) -> c.entry_freshness_basis)
+       (equal_to Entry_freshness.Ma_cross))
+
 (* -------------------------------------------------------------------- *)
 (* screening_config.failed_breakout_tolerance_pct — failed-breakout gate  *)
 (* -------------------------------------------------------------------- *)
@@ -857,6 +878,8 @@ let suite =
          >:: test_default_entry_freshness_basis_is_ma_cross;
          "entry_freshness_basis axis resolves via Overlay_validator"
          >:: test_entry_freshness_basis_axis_resolves_via_overlay_validator;
+         "strategy config parses with entry_freshness_basis absent"
+         >:: test_strategy_config_parses_with_entry_freshness_basis_absent;
        ]
 
 let () = run_test_tt_main suite

@@ -70,9 +70,14 @@ val range_top_freshness :
     - {b the trigger sits above the MA}: [local_range_top > ma_value] — §4.1
       requirements 1 and 3. A breakout below a declining MA "is a trap, not a
       buy" (Ch. 3, Western Union: broke out of its range below a declining MA,
-      then fell 45 → 8½). Because the ticket rests at [local_range_top], testing
-      {i that} level (not the current close) against the MA is what actually
-      pins the eventual fill above the MA.
+      then fell 45 → 8½). The ticket rests at [local_range_top], so the anchor
+      is the price the fill happens at — anchor-above-MA is exactly "the fill is
+      above the MA". The close is not tested against the MA: since the anchor is
+      a max-high over a window {i including} the current bar, [close <= anchor]
+      always, and a close-based test would only be {i stricter} — it would
+      wrongly reject the coiled-under-the-top setup whose close dips below the
+      MA while the trigger level stays above it (that rejected close never
+      fills; the breakout through the anchor does).
 
     [Some false] when either [local_range_top] or [current_close] is [None]: the
     anchor is the ticket level, so with no anchor there is no breakout to be

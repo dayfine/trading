@@ -93,13 +93,28 @@ let test_flat_ma_accepted _ =
   assert_that (freshness ~ma_direction:Flat ()) (is_some_and (equal_to true))
 
 (** §4.1 requirement 1: the breakout must be above the MA. The test is applied
-    to the ANCHOR, not the close, because the anchor is where the resting ticket
-    fills — testing the close would let a ticket fill below the MA. Here the MA
-    sits above the anchor, so the eventual fill would be a sub-MA breakout. *)
+    to the ANCHOR, because the anchor is where the resting ticket fills. Here
+    the MA sits above the anchor (and therefore above the close too, since
+    [close <= anchor] by construction), so the eventual fill would be a sub-MA
+    breakout. *)
 let test_trigger_below_ma_rejects _ =
   assert_that
     (freshness ~ma_value:(anchor *. 1.05) ())
     (is_some_and (equal_to false))
+
+(** The discriminator between anchor-based and close-based MA tests: MA between
+    the close and the anchor ([close 96 < ma 98 < anchor 100], close still
+    inside the 5% band). A close-based test would reject; the anchor-based test
+    admits, because the fill (at the anchor) is above the MA — the
+    coiled-under-the-top shape whose close momentarily dips below the MA. This
+    is the only reachable divergence: [close <= anchor] always ([scan_max_high]
+    includes the current bar), so close-based would only ever be stricter. *)
+let test_ma_between_close_and_anchor_admits _ =
+  assert_that
+    (freshness ~ma_value:(anchor *. 0.98)
+       ~current_close:(Some (anchor *. 0.96))
+       ())
+    (is_some_and (equal_to true))
 
 (* --- Missing inputs ------------------------------------------------ *)
 
@@ -132,6 +147,8 @@ let suite =
          "declining MA rejects" >:: test_declining_ma_rejects;
          "flat MA accepted" >:: test_flat_ma_accepted;
          "trigger below MA rejects" >:: test_trigger_below_ma_rejects;
+         "MA between close and anchor admits (anchor-based test)"
+         >:: test_ma_between_close_and_anchor_admits;
          "missing anchor admits nothing" >:: test_missing_anchor_admits_nothing;
          "missing close admits nothing" >:: test_missing_close_admits_nothing;
        ]
