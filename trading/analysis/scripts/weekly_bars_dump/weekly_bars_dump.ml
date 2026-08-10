@@ -36,13 +36,23 @@ let _write_out ~out text =
   | None -> print_string text
   | Some path -> Out_channel.write_all path ~data:text
 
-(* Never written to [out] / stdout -- the judge's channel. Emitted only to
-   [--mapping-out] (an operator-only artifact) or, absent that flag, stderr. *)
+(* Mapping file is required under [-blind] (never defaulted to stderr) so a
+   routine `... > case.txt 2>&1` redirect cannot leak the de-blinding key
+   into the judge's file alongside the table. *)
 let _emit_mapping ~mapping_out ~pseudonym ~symbol =
   let line = Printf.sprintf "%s %s\n" pseudonym symbol in
-  match mapping_out with
-  | Some path -> Out_channel.write_all path ~data:line
-  | None -> eprintf "# mapping: %s\n%!" line
+  Out_channel.write_all mapping_out ~data:line
+
+(* Operator-facing metadata: which store served this symbol's bars. Always to
+   stderr, never to [out] / stdout -- the judge's channel -- so a cohort run
+   can confirm homogeneity across cases without touching what the judge sees. *)
+let _emit_source (source : Bar_source.source) =
+  let label =
+    match source with
+    | Bar_source.Warehouse -> "warehouse-snap"
+    | Bar_source.Csv -> "csv-store"
+  in
+  eprintf "# source: %s\n%!" label
 
 let _plain_week_label (b : Types.Daily_price.t) = Date.to_string b.date
 
@@ -59,17 +69,30 @@ let _render_and_emit ~symbol ~blind ~with_ma ~out ~mapping_out bars =
     else None
   in
   _write_out ~out (Table_format.render ~symbol_label ~bars ~week_labels ~ma_30w);
-  if blind then _emit_mapping ~mapping_out ~pseudonym:symbol_label ~symbol
+  if blind then
+    let mapping_out =
+      Option.value_exn mapping_out
+        ~message:"_run enforces -mapping-out under -blind"
+    in
+    _emit_mapping ~mapping_out ~pseudonym:symbol_label ~symbol
 
 let _run ~symbol ~through_week ~weeks_back ~blind ~with_ma ~out ~mapping_out
     ~warehouse_dir ~csv_data_dir () =
+  if blind && Option.is_none mapping_out then (
+    eprintf
+      "weekly_bars_dump: -blind requires -mapping-out FILE -- never redirect \
+       stderr for a blinded run, or the de-blinding key can land in the \
+       judge's file (see .claude/skills/blind-judge/SKILL.md)\n\
+       %!";
+    exit 1);
   let through = _parse_through through_week in
   let result =
     let open Result.Let_syntax in
-    let%bind weekly =
+    let%bind weekly, source =
       Bar_source.load_weekly ~symbol ~warehouse_dir ~csv_data_dir
     in
     let%bind bars = Bar_window.select ~weekly ~through ~weeks_back in
+    _emit_source source;
     return (_render_and_emit ~symbol ~blind ~with_ma ~out ~mapping_out bars)
   in
   match result with
@@ -86,8 +109,10 @@ let command =
        truncates at --through-week (never emitting a bar after it -- the \
        lookahead guard), and prints an aligned OHLCV table. --blind replaces \
        the symbol with a stable pseudonym and dates with sequential week \
-       labels; the mapping goes to --mapping-out (or stderr), never to the \
-       table itself.")
+       labels; the mapping goes to the required --mapping-out file, never to \
+       the table itself. Which store served the bars (warehouse-snap or \
+       csv-store) is reported on stderr as '# source: ...', so a cohort run \
+       can be checked for homogeneity.")
     (let%map_open.Command symbol =
        flag "-symbol" (required string) ~doc:"SYM ticker to dump"
      and through_week =
@@ -108,8 +133,8 @@ let command =
      and mapping_out =
        flag "-mapping-out" (optional string)
          ~doc:
-           "FILE write the blind mapping here (default stderr; ignored unless \
-            --blind)"
+           "FILE write the blind mapping here (required with --blind; ignored \
+            otherwise)"
      and warehouse_dir =
        flag "-warehouse-dir" (optional string)
          ~doc:"DIR snapshot warehouse holding SYMBOL.snap"

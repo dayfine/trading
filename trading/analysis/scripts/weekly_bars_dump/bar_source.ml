@@ -37,6 +37,8 @@ let _load_from_csv ~symbol ~dir : Types.Daily_price.t list option =
       | Error _ -> None
       | Ok bars -> Some bars)
 
+type source = Warehouse | Csv
+
 (* [None] on an absent source, an unreadable one, or one that decoded to an
    empty bar list -- all three should fall through to the next source. *)
 let _nonempty = function
@@ -44,23 +46,26 @@ let _nonempty = function
   | _ -> None
 
 let load_daily ~symbol ~warehouse_dir ~csv_data_dir :
-    Types.Daily_price.t list Status.status_or =
+    (Types.Daily_price.t list * source) Status.status_or =
   let from_warehouse =
     Option.bind warehouse_dir ~f:(fun dir -> _load_from_warehouse ~symbol ~dir)
     |> _nonempty
+    |> Option.map ~f:(fun bars -> (bars, Warehouse))
   in
   let from_csv () =
     Option.bind csv_data_dir ~f:(fun dir -> _load_from_csv ~symbol ~dir)
     |> _nonempty
+    |> Option.map ~f:(fun bars -> (bars, Csv))
   in
   match Option.first_some from_warehouse (from_csv ()) with
-  | Some bars -> Ok bars
+  | Some result -> Ok result
   | None ->
       Status.error_not_found
         (Printf.sprintf "no daily bars for %s in warehouse or CSV store" symbol)
 
 let load_weekly ~symbol ~warehouse_dir ~csv_data_dir :
-    Types.Daily_price.t list Status.status_or =
+    (Types.Daily_price.t list * source) Status.status_or =
   let open Result.Let_syntax in
-  let%map daily = load_daily ~symbol ~warehouse_dir ~csv_data_dir in
-  Time_period.Conversion.daily_to_weekly ~include_partial_week:true daily
+  let%map daily, source = load_daily ~symbol ~warehouse_dir ~csv_data_dir in
+  ( Time_period.Conversion.daily_to_weekly ~include_partial_week:true daily,
+    source )

@@ -58,7 +58,13 @@ let test_load_daily_from_csv_when_no_warehouse _ =
     Bar_source.load_daily ~symbol:_symbol ~warehouse_dir:None
       ~csv_data_dir:(Some csv_dir)
   in
-  assert_that result (is_ok_and_holds (size_is (List.length bars)))
+  assert_that result
+    (is_ok_and_holds
+       (all_of
+          [
+            field fst (elements_are (List.map bars ~f:equal_to));
+            field snd (equal_to Bar_source.Csv);
+          ]))
 
 let test_load_daily_prefers_warehouse_over_csv _ =
   let csv_dir = _tmp_dir "weekly_bars_dump_csv2_" in
@@ -66,7 +72,7 @@ let test_load_daily_prefers_warehouse_over_csv _ =
   let bars = _daily_bars () in
   (* CSV holds only half the history; the warehouse holds all of it, so a
      loader that mistakenly fell back to CSV would betray itself via the
-     row count. *)
+     row count -- and, now, via the values themselves. *)
   _write_csv ~csv_dir (List.take bars (List.length bars / 2));
   let snap_rows =
     _ok_or_fail ~what:"build_for_symbol"
@@ -81,7 +87,57 @@ let test_load_daily_prefers_warehouse_over_csv _ =
     Bar_source.load_daily ~symbol:_symbol ~warehouse_dir:(Some warehouse_dir)
       ~csv_data_dir:(Some csv_dir)
   in
-  assert_that result (is_ok_and_holds (size_is (List.length bars)))
+  assert_that result
+    (is_ok_and_holds
+       (all_of
+          [
+            field fst (elements_are (List.map bars ~f:equal_to));
+            field snd (equal_to Bar_source.Warehouse);
+          ]))
+
+let test_load_daily_falls_back_to_csv_when_snap_absent _ =
+  (* [warehouse_dir] is configured but holds no [.snap] for this symbol --
+     the documented "the .snap file is absent" fallback trigger
+     ([bar_source.mli]'s [load_daily]), previously untested. *)
+  let csv_dir = _tmp_dir "weekly_bars_dump_csv4_" in
+  let warehouse_dir = _tmp_dir "weekly_bars_dump_snap_absent_" in
+  let bars = _daily_bars () in
+  _write_csv ~csv_dir bars;
+  let result =
+    Bar_source.load_daily ~symbol:_symbol ~warehouse_dir:(Some warehouse_dir)
+      ~csv_data_dir:(Some csv_dir)
+  in
+  assert_that result
+    (is_ok_and_holds
+       (all_of
+          [
+            field fst (elements_are (List.map bars ~f:equal_to));
+            field snd (equal_to Bar_source.Csv);
+          ]))
+
+let test_load_daily_falls_back_to_csv_when_snap_unreadable _ =
+  (* The [.snap] file exists but is not a valid v2 columnar file -- the
+     documented "or reading it errors" fallback trigger, previously
+     untested. [Snapshot_columnar.with_reader] returns [Error] on a bad
+     magic rather than raising, which is what makes the fallback possible. *)
+  let csv_dir = _tmp_dir "weekly_bars_dump_csv5_" in
+  let warehouse_dir = _tmp_dir "weekly_bars_dump_snap_corrupt_" in
+  let bars = _daily_bars () in
+  _write_csv ~csv_dir bars;
+  Out_channel.write_all
+    (Filename.concat warehouse_dir (_symbol ^ ".snap"))
+    ~data:"not a v2 snapshot file";
+  let result =
+    Bar_source.load_daily ~symbol:_symbol ~warehouse_dir:(Some warehouse_dir)
+      ~csv_data_dir:(Some csv_dir)
+  in
+  assert_that result
+    (is_ok_and_holds
+       (all_of
+          [
+            field fst (elements_are (List.map bars ~f:equal_to));
+            field snd (equal_to Bar_source.Csv);
+          ]))
 
 let test_load_daily_not_found _ =
   let dir = _tmp_dir "weekly_bars_dump_empty_" in
@@ -103,7 +159,7 @@ let test_weekly_aggregation_matches_sidetable_builder _ =
   let bars = _daily_bars () in
   let csv_dir = _tmp_dir "weekly_bars_dump_csv3_" in
   _write_csv ~csv_dir bars;
-  let weekly =
+  let weekly, _source =
     _ok_or_fail ~what:"load_weekly"
       (Bar_source.load_weekly ~symbol:_symbol ~warehouse_dir:None
          ~csv_data_dir:(Some csv_dir))
@@ -127,6 +183,10 @@ let suite =
          >:: test_load_daily_from_csv_when_no_warehouse;
          "load_daily_prefers_warehouse_over_csv"
          >:: test_load_daily_prefers_warehouse_over_csv;
+         "load_daily_falls_back_to_csv_when_snap_absent"
+         >:: test_load_daily_falls_back_to_csv_when_snap_absent;
+         "load_daily_falls_back_to_csv_when_snap_unreadable"
+         >:: test_load_daily_falls_back_to_csv_when_snap_unreadable;
          "load_daily_not_found" >:: test_load_daily_not_found;
          "weekly_aggregation_matches_sidetable_builder"
          >:: test_weekly_aggregation_matches_sidetable_builder;

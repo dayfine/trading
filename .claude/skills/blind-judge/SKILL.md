@@ -56,15 +56,45 @@ dune exec analysis/scripts/weekly_bars_dump/weekly_bars_dump.exe -- \
   placed/evaluated. `weekly_bars_dump` NEVER emits a bar dated after this
   week (the lookahead guard is `Bar_window.select`'s entire reason to exist,
   pinned by its own test suite) — a judge that sees future bars is answering
-  "what happened next," not "would you enter here."
-- `-blind`: symbol → stable pseudonym (`SYM-XXXX`), dates → sequential
+  "what happened next," not "would you enter here." One caveat: the weekly
+  fold uses `include_partial_week:true` (`bar_source.mli`), so if the
+  decision week is still in progress (its 5 trading days haven't all
+  happened yet as of the data pull) the last row's volume is truncated and
+  renders identically to a genuine low-volume week — a judge applying the
+  mandatory §4.2 volume-confirmation rule could misread that as a volume
+  collapse. Prefer a `-through-week` that names a *complete* historical
+  week, not a currently-in-progress one.
+- `-blind`: symbol → stable pseudonym (`SYM-XXXXXX`), dates → sequential
   `w1..wN` week labels. Prices are **NOT rescaled** — §5.1's round-number
   stop rule and §4.3's overhead-resistance grading both depend on real price
-  levels, so blinding only strips the *identity*, never the *geometry*.
-- The mapping (`case1.txt` never contains it; `mapping.txt` does, or stderr
-  if `-mapping-out` is omitted) is the operator's answer key. **Never paste
-  the mapping file, or a filename/prompt that reveals it, into the judge's
-  context.**
+  levels, so blinding only strips the *identity*, never the *geometry*. This
+  requires the warehouse's `.snap` `Close` column to actually be the raw
+  (unadjusted) close — confirmed for `snap_top3000_dedup_v5thin_adj` and any
+  of its siblings: the `_adj` suffix denotes a clone whose `.weekly`
+  side-tables (used by the resistance sketches) were rebuilt on the
+  split/dividend-adjusted basis (`dev/notes/split-basis-blast-radius-2026-07-28.md`)
+  -- a *different* artifact from the `.snap` files, which are hard-linked,
+  unchanged, and still hold the original raw `Close` / adjusted
+  `Adjusted_close` pair as two separate columns (`Pipeline.build_for_symbol`'s
+  contract: "Open / High / Low / Close / Adjusted_close: copied verbatim").
+  `weekly_bars_dump` reads only `.snap` via `Bar_source`, never `.weekly`
+  side-tables, so it is unaffected by which basis a given warehouse's
+  side-tables were rebuilt on. If a future warehouse ever stores an adjusted
+  series directly in `Close`, the round-number / resistance-grading rationale
+  above breaks silently -- re-verify this note before pointing the tool at an
+  unfamiliar warehouse.
+- `-mapping-out` is **required** with `-blind` (the CLI exits 1 without it) --
+  a routine `... > case1.txt 2>&1` redirect would otherwise write the
+  de-blinding key into the judge's own file, since the mapping used to
+  default to stderr. `case1.txt` (the `-out` file) never contains the
+  mapping; `mapping.txt` (the `-mapping-out` file) is the operator's answer
+  key. **Never paste the mapping file, or a filename/prompt that reveals it,
+  into the judge's context.**
+- Stderr also carries a `# source: warehouse-snap` or `# source: csv-store`
+  line reporting which store served the bars -- operator-only, never routed
+  to `-out`. If a cohort mixes sources across cases (e.g. one symbol's
+  `.snap` happened to be missing), that is a comparability problem worth
+  checking for before treating the cohort's counts as homogeneous.
 
 ## Step 2 — The judge prompt contract
 
@@ -103,9 +133,11 @@ BUY CRITERIA (SS4.1, SS4.2, SS4.3, SS4.5):
      B Moderate (some resistance overhead, not dense).
      C Heavy (a dense prior trading zone just above the breakout -- the
        stock will use up buying power getting through it).
-  6. Triple confirmation (A+ big-winner pattern) if ALL of: volume >= 2x
-     (preferably 3x+) and stays heavy afterward; AND the stock already
-     advanced significantly (~40%+) during its base before breaking out.
+  6. Partial big-winner confirmation (2 of the book's 3 legs -- the
+     relative-strength leg is not available in this series, see "Known
+     judge-vs-book gaps" below) if BOTH of: volume >= 2x (preferably 3x+)
+     and stays heavy afterward; AND the stock already advanced significantly
+     (~40%+) during its base before breaking out.
 
 ORDER MECHANICS (SS4.7): the entry is a buy-stop placed at the top of the
 current trading range, good-til-canceled, with a tight limit band (~2%)
@@ -124,6 +156,49 @@ decide: would Weinstein's rules have you place a buy-stop-limit ticket at
 the top of the current range as of the decision week? Output ONLY the
 JSON object specified below, no other prose.
 ```
+
+## Known judge-vs-book gaps
+
+The rule card above deliberately omits three things the book requires, and
+one item is presented in a weakened form. **This is forced, not sloppy**: a
+single symbol's blinded price series carries no market or peer context, so
+the judge genuinely cannot apply a rule that compares the candidate against
+other stocks or the tape. But the omissions are undisclosed to the judge and
+are **all one-directional toward "place"**:
+
+- **§4.4 Relative Strength is absent entirely**, including the book's
+  hardest exclusion rule -- "Negative RS in negative territory → NEVER buy,
+  no matter how good other factors" (spine item 7,
+  `.claude/rules/weinstein-faithful-core.md`). A judge with no RS signal
+  cannot decline on this basis; our code can and does.
+- **The macro gate and sector gating are absent** (spine item 6; the book's
+  §4 cascade preamble is "only after macro and sector pass do we evaluate
+  individual stocks"). A judge with no market/sector context cannot decline
+  on this basis either.
+- **§4.5's third leg (RS confirmation) is dropped** -- the rule card's item
+  6 above is relabeled "partial big-winner confirmation (2 of 3 legs)" so
+  the judge is not told it is applying the book's full triple-confirmation
+  test when it is applying two-thirds of it.
+
+Every one of these omissions removes a reason the book would say "decline."
+None removes a reason to buy. So the judge is **structurally more permissive
+than the book**, in the exact same direction as the harness's headline
+measured quantity: `we-declined-judge-places` (candidate over-exclusion,
+the ladder-v3 question). A raw `we-declined-judge-places` count is therefore
+**not** clean evidence of our gate being wrong -- part of any such divergence
+is the judge's forced blindness to RS/macro/sector, not a flaw in our code.
+
+**Mitigation — an RS/macro-driven decline control class.** The mandatory
+cohort (below) already includes non-gate-decline controls, but none of them
+probe this specific bias: `Insufficient_cash`, Stage 1/3/4, and missing
+volume confirmation are all decisions the judge *can* make from the series
+alone. Add at least one case where our code declined specifically for an RS
+or macro reason (a case the judge, lacking that context, is expected to get
+"wrong" by placing). If such a case cannot be constructed under blinding
+(e.g. no RS-driven decline exists in the available trade_audit history),
+say so explicitly in the writeup and treat every `we-declined-judge-places`
+finding as upper-bound-only until one is available -- do not read the raw
+rate as calibrated.
 
 ## Output contract
 
@@ -199,6 +274,14 @@ A cohort of only disputed cases cannot distinguish "our gate is wrong" from
   a Stage 1/3/4 week, missing volume confirmation) — these should read as
   clear judge declines too; if they don't, the judge itself is unreliable and
   the whole run's findings are suspect.
+- **At least one week where our code declined for an RS or macro reason**
+  (see "Known judge-vs-book gaps" above). Without this class, RS/macro-driven
+  divergence lands entirely on the disputed side of the ledger with nothing
+  to calibrate it — the judge's forced blindness to RS and macro context
+  otherwise reads as evidence for over-exclusion when it may just be the
+  gap. If no such case exists in the available `trade_audit.sexp` history,
+  say so explicitly in the deliverable and downgrade every
+  `we-declined-judge-places` finding to upper-bound-only.
 
 Aim for a cohort where disputed cases are a minority (e.g. 5 disputed + 10+
 controls) so the agreement-rate denominator isn't dominated by the very
@@ -219,6 +302,15 @@ Forbidden conclusions:
   `max_stop_distance_pct`, or any other mechanism/flag.
 - Treating a single judge run (no self-consistency check) as evidence at
   all.
+- **Treating a raw `we-declined-judge-places` count as calibrated evidence
+  of over-exclusion**, ignoring "Known judge-vs-book gaps" above. The judge
+  is structurally more permissive than the book (no RS, no macro/sector
+  gate, a weakened §4.5) — every disputed-case rate must be read as a
+  differential against the control baseline rate, never as an absolute
+  number, and even the differential is only trustworthy to the extent the
+  RS/macro-driven control class exists. A run that skips that control class
+  may report a differential but must caveat it as **not fully controlling
+  for the judge's permissiveness bias**.
 
 ## The deliverable
 

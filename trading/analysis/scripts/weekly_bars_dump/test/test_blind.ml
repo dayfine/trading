@@ -16,7 +16,7 @@ let test_pseudonym_format _ =
     (Blind.pseudonym_of_symbol "AAPL")
     (all_of
        [
-         field String.length (equal_to 8);
+         field String.length (equal_to 10);
          field (fun p -> String.prefix p 4) (equal_to "SYM-");
        ])
 
