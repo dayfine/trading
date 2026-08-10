@@ -50,6 +50,16 @@ let _write_csv ~csv_dir bars =
   in
   _ok_or_fail ~what:"csv save" (Csv.Csv_storage.save storage bars)
 
+(* [load_daily] returns [(bars, source)]; every case below asserts BOTH halves.
+   Split into named matchers so each test stays one flat [assert_that] -- the
+   inline [is_ok_and_holds (all_of [ field ... ])] tree nests six deep and
+   trips the nesting linter. *)
+let _bars_are bars = field fst (elements_are (List.map bars ~f:equal_to))
+let _source_is source = field snd (equal_to source)
+
+let _loaded ~bars ~source =
+  is_ok_and_holds (all_of [ _bars_are bars; _source_is source ])
+
 let test_load_daily_from_csv_when_no_warehouse _ =
   let csv_dir = _tmp_dir "weekly_bars_dump_csv_" in
   let bars = _daily_bars () in
@@ -58,13 +68,7 @@ let test_load_daily_from_csv_when_no_warehouse _ =
     Bar_source.load_daily ~symbol:_symbol ~warehouse_dir:None
       ~csv_data_dir:(Some csv_dir)
   in
-  assert_that result
-    (is_ok_and_holds
-       (all_of
-          [
-            field fst (elements_are (List.map bars ~f:equal_to));
-            field snd (equal_to Bar_source.Csv);
-          ]))
+  assert_that result (_loaded ~bars ~source:Bar_source.Csv)
 
 let test_load_daily_prefers_warehouse_over_csv _ =
   let csv_dir = _tmp_dir "weekly_bars_dump_csv2_" in
@@ -87,13 +91,7 @@ let test_load_daily_prefers_warehouse_over_csv _ =
     Bar_source.load_daily ~symbol:_symbol ~warehouse_dir:(Some warehouse_dir)
       ~csv_data_dir:(Some csv_dir)
   in
-  assert_that result
-    (is_ok_and_holds
-       (all_of
-          [
-            field fst (elements_are (List.map bars ~f:equal_to));
-            field snd (equal_to Bar_source.Warehouse);
-          ]))
+  assert_that result (_loaded ~bars ~source:Bar_source.Warehouse)
 
 let test_load_daily_falls_back_to_csv_when_snap_absent _ =
   (* [warehouse_dir] is configured but holds no [.snap] for this symbol --
@@ -107,13 +105,7 @@ let test_load_daily_falls_back_to_csv_when_snap_absent _ =
     Bar_source.load_daily ~symbol:_symbol ~warehouse_dir:(Some warehouse_dir)
       ~csv_data_dir:(Some csv_dir)
   in
-  assert_that result
-    (is_ok_and_holds
-       (all_of
-          [
-            field fst (elements_are (List.map bars ~f:equal_to));
-            field snd (equal_to Bar_source.Csv);
-          ]))
+  assert_that result (_loaded ~bars ~source:Bar_source.Csv)
 
 let test_load_daily_falls_back_to_csv_when_snap_unreadable _ =
   (* The [.snap] file exists but is not a valid v2 columnar file -- the
@@ -131,13 +123,7 @@ let test_load_daily_falls_back_to_csv_when_snap_unreadable _ =
     Bar_source.load_daily ~symbol:_symbol ~warehouse_dir:(Some warehouse_dir)
       ~csv_data_dir:(Some csv_dir)
   in
-  assert_that result
-    (is_ok_and_holds
-       (all_of
-          [
-            field fst (elements_are (List.map bars ~f:equal_to));
-            field snd (equal_to Bar_source.Csv);
-          ]))
+  assert_that result (_loaded ~bars ~source:Bar_source.Csv)
 
 let test_load_daily_not_found _ =
   let dir = _tmp_dir "weekly_bars_dump_empty_" in
