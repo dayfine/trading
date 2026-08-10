@@ -146,6 +146,9 @@ let _classification_at ~volume_config ~weekly ~event_offset =
     ~callbacks:(Volume.callbacks_from_bars ~bars:weekly)
     ~event_offset
 
+let _row_of_window ~volume_config ~position_id (weekly, event_offset) =
+  (position_id, _classification_at ~volume_config ~weekly ~event_offset)
+
 (** [(position_id, classification)] for one position, or [None] when it is not
     an evaluable freshly-filled LONG holding. *)
 let _confirmation_for_position ~config ~volume_config ~bar_reader ~current_date
@@ -153,9 +156,8 @@ let _confirmation_for_position ~config ~volume_config ~bar_reader ~current_date
   match (pos.Position.side, Position.get_state pos) with
   | Position.Long, Position.Holding { entry_date; _ } ->
       _fill_week_window ~config ~bar_reader ~entry_date ~current_date pos
-      |> Option.map ~f:(fun (weekly, event_offset) ->
-          ( pos.Position.id,
-            _classification_at ~volume_config ~weekly ~event_offset ))
+      |> Option.map
+           ~f:(_row_of_window ~volume_config ~position_id:pos.Position.id)
   | _ -> None
 
 let _fold_confirmation ~config ~volume_config ~bar_reader ~current_date acc pos
