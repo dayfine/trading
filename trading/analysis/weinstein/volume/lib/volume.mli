@@ -96,6 +96,54 @@ val analyze_breakout_with_callbacks :
 
     Pure function: same callback outputs always produce the same result. *)
 
+(** Which of Weinstein's §4.2 branches confirmed a breakout bar — the {b named}
+    form of {!confirms_breakout}'s boolean.
+
+    Exists because the at-fill audit (plan
+    [dev/plans/entry-ticket-async-v2-2026-08-10.md] §4 PR-5) must be able to
+    separate the two sanctioned confirmations from each other and from a
+    measured non-confirmation. "Confirmed" alone cannot answer "did the
+    build-up branch carry the arm", and a bare [false] cannot be told apart
+    from the {i no-verdict} case ([classify_breakout] returning [None]), which
+    is the population the F5 runner {b holds} rather than ejects.
+
+    Each constructor carries the quantity that decided it, so the audit row
+    records the measurement and not only the label. *)
+type breakout_confirmation =
+  | Spike of float
+      (** Branch (a): the event bar's volume / prior-[lookback_bars] average,
+          which reached [config.strong_threshold]. *)
+  | Buildup of float
+      (** Branch (b): the build-up window's average / the preceding equally
+          sized window's average, which reached [config.strong_threshold] with
+          some increase on the event bar. *)
+  | Unconfirmed of {
+      spike_ratio : float option;
+      buildup_multiple : float option;
+    }
+      (** At least one branch was evaluable and none confirmed. Both measured
+          quantities are carried (each [None] only when that branch had too
+          little history), so the audit can rank near-misses rather than only
+          count them. *)
+[@@deriving show, eq]
+
+val classify_breakout :
+  config:config ->
+  callbacks:callbacks ->
+  event_offset:int ->
+  breakout_confirmation option
+(** [classify_breakout ~config ~callbacks ~event_offset] is {!confirms_breakout}
+    with the deciding branch and its measurement retained.
+
+    [None] means exactly what {!confirms_breakout}'s [None] means: {i neither}
+    branch had enough history, so there is {b no verdict} — never a failed
+    breakout. A [Spike]/[Buildup] maps to [Some true] and an [Unconfirmed] to
+    [Some false], and {!confirms_breakout} is literally defined as that
+    projection, so the two can never disagree.
+
+    When both branches clear, the result is [Spike] (the book's headline case);
+    the verdict is branch-agnostic, so the precedence only labels. Pure. *)
+
 val confirms_breakout :
   config:config -> callbacks:callbacks -> event_offset:int -> bool option
 (** [confirms_breakout ~config ~callbacks ~event_offset] is Weinstein's §4.2

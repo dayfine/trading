@@ -21,6 +21,50 @@ let _split_safe_basis_of_event = function
   | AR.Raw_fallback -> Trade_audit.Raw_fallback
   | AR.Empty_window -> Trade_audit.Empty_window
 
+(* PR-5 schema hops. Same discipline as [_split_safe_basis_of_event]: written
+   out per-constructor rather than cast, so a new upstream constructor fails the
+   build here — the last point before [trade_audit.sexp] where a dropped value
+   would become invisible. *)
+let _fill_volume_of_confirmation :
+    Volume.breakout_confirmation option -> Trade_audit.fill_volume_verdict =
+  function
+  | None -> Trade_audit.No_verdict
+  | Some (Volume.Spike ratio) -> Trade_audit.Confirmed_spike ratio
+  | Some (Volume.Buildup multiple) -> Trade_audit.Confirmed_buildup multiple
+  | Some (Volume.Unconfirmed { spike_ratio; buildup_multiple }) ->
+      Trade_audit.Unconfirmed { spike_ratio; buildup_multiple }
+
+let _freshness_basis_of_event :
+    Weinstein_strategy.Entry_freshness.basis -> Trade_audit.entry_freshness_basis
+    = function
+  | Ma_cross -> Trade_audit.Ma_cross
+  | Range_top_breakout -> Trade_audit.Range_top_breakout
+
+let _triple_confirmation_of_event
+    (t : Weinstein_strategy.Entry_ticket_tags.triple_confirmation) :
+    Trade_audit.triple_confirmation =
+  {
+    breakout_volume_multiple = t.breakout_volume_multiple;
+    rs_zero_cross = t.rs_zero_cross;
+    in_base_advance_pct = t.in_base_advance_pct;
+  }
+
+(** The placement-time half of the lifecycle record. The fill/cancel half
+    ([fill_volume], [ticket_age_weeks_at_fill_or_cancel]) is unknowable at
+    placement and is merged in later — by {!Trade_audit.record_fill_volume} /
+    {!Trade_audit.record_transitions} at drain time and by
+    {!Execution_faithfulness.enrich} at the runner. *)
+let _ticket_lifecycle_of_event (e : AR.entry_event) :
+    Trade_audit.ticket_lifecycle =
+  {
+    placement_date = e.current_date;
+    ticket_age_weeks_at_fill_or_cancel = None;
+    fill_volume = None;
+    freshness_basis = _freshness_basis_of_event e.freshness_basis;
+    sized_down_wide_stop = e.sized_down_wide_stop;
+    triple_confirmation = _triple_confirmation_of_event e.triple_confirmation;
+  }
+
 let _skip_reason_of_event = function
   | AR.Insufficient_cash -> Trade_audit.Insufficient_cash
   | AR.Already_held -> Trade_audit.Already_held
@@ -109,6 +153,7 @@ let _entry_decision_of_event (e : AR.entry_event) : Trade_audit.entry_decision =
     risk_pct = cand.risk_pct;
     initial_position_value = e.initial_position_value;
     initial_risk_dollars = e.initial_risk_dollars;
+    ticket_lifecycle = Some (_ticket_lifecycle_of_event e);
     alternatives_considered = List.map e.alternatives ~f:_alternative_of_event;
   }
 
@@ -179,4 +224,8 @@ let of_collector ~(trade_audit : Trade_audit.t)
           (_cascade_summary_of_event event));
     record_force_liquidation =
       Force_liquidation_log.record force_liquidation_log;
+    record_fill_volume =
+      (fun (event : AR.fill_volume_event) ->
+        Trade_audit.record_fill_volume trade_audit ~position_id:event.position_id
+          (_fill_volume_of_confirmation event.confirmation));
   }

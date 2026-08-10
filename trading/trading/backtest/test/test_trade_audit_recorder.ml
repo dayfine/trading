@@ -92,10 +92,21 @@ let _macro : Macro.result =
     rationale = [ "fixture" ];
   }
 
-let _entry_event ~split_safe_basis ~stop_floor_kind : AR.entry_event =
+let _no_triple_confirmation :
+    Weinstein_strategy.Entry_ticket_tags.triple_confirmation =
+  {
+    breakout_volume_multiple = None;
+    rs_zero_cross = false;
+    in_base_advance_pct = None;
+  }
+
+let _entry_event ?(candidate = _candidate) ?(sized_down_wide_stop = false)
+    ?(freshness_basis = Weinstein_strategy.Entry_freshness.Ma_cross)
+    ?(triple_confirmation = _no_triple_confirmation) ~split_safe_basis
+    ~stop_floor_kind () : AR.entry_event =
   {
     position_id = "ZZZZ-wein-1";
-    candidate = _candidate;
+    candidate;
     macro = _macro;
     current_date = _current_date;
     close_at_decision = Some 99.0;
@@ -105,6 +116,9 @@ let _entry_event ~split_safe_basis ~stop_floor_kind : AR.entry_event =
     shares = 100;
     initial_position_value = 10_000.0;
     initial_risk_dollars = 800.0;
+    sized_down_wide_stop;
+    freshness_basis;
+    triple_confirmation;
     alternatives = [];
   }
 
@@ -112,19 +126,22 @@ let _entry_event ~split_safe_basis ~stop_floor_kind : AR.entry_event =
     single [entry_decision] the collector holds. Goes through [of_collector] /
     [record_entry] rather than calling the private projection directly, so the
     wiring inside the bundle is exercised too. *)
-let _recorded_entry ~split_safe_basis ~stop_floor_kind =
+let _recorded_entry_of (event : AR.entry_event) =
   let trade_audit = TA.create () in
   let recorder =
     Backtest.Trade_audit_recorder.of_collector ~trade_audit
       ~force_liquidation_log:(Backtest.Force_liquidation_log.create ())
   in
-  recorder.record_entry (_entry_event ~split_safe_basis ~stop_floor_kind);
+  recorder.record_entry event;
   match TA.get_audit_records trade_audit with
   | [ r ] -> r.TA.entry
   | records ->
       OUnit2.assert_failure
         (Printf.sprintf "expected exactly 1 audit record, got %d"
            (List.length records))
+
+let _recorded_entry ~split_safe_basis ~stop_floor_kind =
+  _recorded_entry_of (_entry_event ~split_safe_basis ~stop_floor_kind ())
 
 (* ------------------------------------------------------------------ *)
 (* Tests                                                                *)
@@ -222,32 +239,132 @@ let test_entry_projection_carries_armed_local_range_top _ =
       analysis = { _stock_analysis with local_range_top = Some 105.0 };
     }
   in
-  let trade_audit = TA.create () in
-  let recorder =
-    Backtest.Trade_audit_recorder.of_collector ~trade_audit
-      ~force_liquidation_log:(Backtest.Force_liquidation_log.create ())
-  in
-  recorder.record_entry
-    {
+  assert_that
+    (_recorded_entry_of
+       (_entry_event ~candidate ~split_safe_basis:AR.Flag_off
+          ~stop_floor_kind:AR.Buffer_fallback ()))
+    (field
+       (fun (e : TA.entry_decision) -> e.local_range_top)
+       (is_some_and (float_equal 105.0)))
+
+(* PR-5 ticket-lifecycle projection -------------------------------------- *)
+
+(** The placement-time half of the lifecycle: the placement date is the tick the
+    event was captured on, the F3 tag and the F1 basis pass through, and the F6
+    §4.5 measurements are copied field-for-field. The fill/cancel half is [None]
+    on a freshly-recorded row — it is merged in later, not fabricated here. *)
+let test_entry_projection_carries_placement_time_lifecycle _ =
+  assert_that
+    (_recorded_entry_of
+       (_entry_event ~sized_down_wide_stop:true
+          ~freshness_basis:Weinstein_strategy.Entry_freshness.Range_top_breakout
+          ~triple_confirmation:
+            {
+              breakout_volume_multiple = Some 3.1;
+              rs_zero_cross = true;
+              in_base_advance_pct = Some 0.62;
+            }
+          ~split_safe_basis:AR.Flag_off ~stop_floor_kind:AR.Buffer_fallback ()))
+    (field
+       (fun (e : TA.entry_decision) -> e.ticket_lifecycle)
+       (is_some_and
+          (all_of
+             [
+               field
+                 (fun (l : TA.ticket_lifecycle) -> l.placement_date)
+                 (equal_to _current_date);
+               field
+                 (fun (l : TA.ticket_lifecycle) -> l.sized_down_wide_stop)
+                 (equal_to true);
+               field
+                 (fun (l : TA.ticket_lifecycle) -> l.freshness_basis)
+                 (equal_to (TA.Range_top_breakout : TA.entry_freshness_basis));
+               field
+                 (fun (l : TA.ticket_lifecycle) -> l.triple_confirmation)
+                 (equal_to
+                    ({
+                       breakout_volume_multiple = Some 3.1;
+                       rs_zero_cross = true;
+                       in_base_advance_pct = Some 0.62;
+                     }
+                      : TA.triple_confirmation));
+               field (fun (l : TA.ticket_lifecycle) -> l.fill_volume) is_none;
+               field
+                 (fun (l : TA.ticket_lifecycle) ->
+                   l.ticket_age_weeks_at_fill_or_cancel)
+                 is_none;
+             ])))
+
+(** The default no-op shape: an unarmed run records [Ma_cross] and an untagged
+    stop. Driving both basis constructors is what makes hardcoding either at
+    this hop fail. *)
+let test_entry_projection_defaults_to_ma_cross_and_untagged _ =
+  assert_that
+    (_recorded_entry_of
+       (_entry_event ~split_safe_basis:AR.Flag_off
+          ~stop_floor_kind:AR.Buffer_fallback ()))
+    (field
+       (fun (e : TA.entry_decision) -> e.ticket_lifecycle)
+       (is_some_and
+          (all_of
+             [
+               field
+                 (fun (l : TA.ticket_lifecycle) -> l.freshness_basis)
+                 (equal_to (TA.Ma_cross : TA.entry_freshness_basis));
+               field
+                 (fun (l : TA.ticket_lifecycle) -> l.sized_down_wide_stop)
+                 (equal_to false);
+             ])))
+
+(** Sink-hop pin for the F5 verdict: every {!Volume.breakout_confirmation}
+    constructor — plus the [None] no-verdict case — must reach its [TA]
+    counterpart. A value dropped here is invisible in [trade_audit.sexp]. *)
+let test_fill_volume_projects_every_verdict_class _ =
+  let recorded confirmation =
+    let trade_audit = TA.create () in
+    let recorder =
+      Backtest.Trade_audit_recorder.of_collector ~trade_audit
+        ~force_liquidation_log:(Backtest.Force_liquidation_log.create ())
+    in
+    recorder.record_entry
       (_entry_event ~split_safe_basis:AR.Flag_off
-         ~stop_floor_kind:AR.Buffer_fallback)
-      with
-      candidate;
-    };
-  match TA.get_audit_records trade_audit with
-  | [ r ] ->
-      assert_that r.TA.entry
-        (field
-           (fun (e : TA.entry_decision) -> e.local_range_top)
-           (is_some_and (float_equal 105.0)))
-  | records ->
-      OUnit2.assert_failure
-        (Printf.sprintf "expected exactly 1 audit record, got %d"
-           (List.length records))
+         ~stop_floor_kind:AR.Buffer_fallback ());
+    recorder.record_fill_volume
+      { AR.position_id = "ZZZZ-wein-1"; confirmation };
+    match TA.get_audit_records trade_audit with
+    | [ r ] -> Option.bind r.TA.entry.ticket_lifecycle ~f:(fun l -> l.fill_volume)
+    | records ->
+        OUnit2.assert_failure
+          (Printf.sprintf "expected exactly 1 audit record, got %d"
+             (List.length records))
+  in
+  assert_that
+    (List.map ~f:recorded
+       [
+         Some (Volume.Spike 3.4);
+         Some (Volume.Buildup 2.2);
+         Some (Volume.Unconfirmed { spike_ratio = Some 1.1; buildup_multiple = None });
+         None;
+       ])
+    (elements_are
+       [
+         is_some_and (equal_to (TA.Confirmed_spike 3.4));
+         is_some_and (equal_to (TA.Confirmed_buildup 2.2));
+         is_some_and
+           (equal_to
+              (TA.Unconfirmed { spike_ratio = Some 1.1; buildup_multiple = None }));
+         is_some_and (equal_to (TA.No_verdict : TA.fill_volume_verdict));
+       ])
 
 let suite =
   "Trade_audit_recorder"
   >::: [
+         "entry projection carries the placement-time lifecycle"
+         >:: test_entry_projection_carries_placement_time_lifecycle;
+         "entry projection defaults to Ma_cross and untagged"
+         >:: test_entry_projection_defaults_to_ma_cross_and_untagged;
+         "fill_volume projects every verdict class"
+         >:: test_fill_volume_projects_every_verdict_class;
          "split_safe_basis projects all three states"
          >:: test_split_safe_basis_projects_all_three_states;
          "stop_floor_kind projects both states"

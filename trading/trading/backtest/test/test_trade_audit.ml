@@ -53,7 +53,8 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     ?(installed_stop = 138.46) ?(stop_floor_kind = TA.Buffer_fallback)
     ?(split_safe_basis = TA.Flag_off) ?(risk_pct = 0.08)
     ?(initial_position_value = 75_000.0) ?(initial_risk_dollars = 6_000.0)
-    ?(alternatives_considered = []) () : TA.entry_decision =
+    ?(ticket_lifecycle = None) ?(alternatives_considered = []) () :
+    TA.entry_decision =
   {
     symbol;
     entry_date;
@@ -88,6 +89,7 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     risk_pct;
     initial_position_value;
     initial_risk_dollars;
+    ticket_lifecycle;
     alternatives_considered;
   }
 
@@ -259,6 +261,95 @@ let test_entry_decision_sexp_tolerates_missing_e_provenance_fields _ =
     (TA.entry_decision_of_sexp stripped)
     (equal_to (make_entry () : TA.entry_decision))
 
+(* PR-5 ticket-lifecycle fields ---------------------------------------- *)
+
+let _triple : TA.triple_confirmation =
+  {
+    breakout_volume_multiple = Some 3.1;
+    rs_zero_cross = true;
+    in_base_advance_pct = Some 0.62;
+  }
+
+let _lifecycle ?(placement_date = _date "2024-03-01")
+    ?(ticket_age_weeks_at_fill_or_cancel = Some 3) ?(fill_volume = None)
+    ?(freshness_basis = TA.Range_top_breakout)
+    ?(sized_down_wide_stop = true) ?(triple_confirmation = _triple) () :
+    TA.ticket_lifecycle =
+  {
+    placement_date;
+    ticket_age_weeks_at_fill_or_cancel;
+    fill_volume;
+    freshness_basis;
+    sized_down_wide_stop;
+    triple_confirmation;
+  }
+
+(** Every [fill_volume_verdict] constructor — including the [No_verdict] cell
+    the eject rate alone cannot see — survives the codec, as do the other
+    lifecycle fields around it. *)
+let test_entry_decision_sexp_round_trips_ticket_lifecycle _ =
+  let verdicts =
+    [
+      Some (TA.Confirmed_spike 3.4);
+      Some (TA.Confirmed_buildup 2.2);
+      Some
+        (TA.Unconfirmed { spike_ratio = Some 1.1; buildup_multiple = None });
+      Some TA.No_verdict;
+      None;
+    ]
+  in
+  let entries =
+    List.map verdicts ~f:(fun fill_volume ->
+        make_entry ~ticket_lifecycle:(Some (_lifecycle ~fill_volume ())) ())
+  in
+  assert_that
+    (List.map entries ~f:(fun e ->
+         TA.entry_decision_of_sexp (TA.sexp_of_entry_decision e)))
+    (elements_are
+       (List.map entries ~f:(fun e -> equal_to (e : TA.entry_decision))))
+
+(** [ticket_lifecycle] is [\[@sexp.option\]]: a [trade_audit.sexp] written before
+    PR-5 carries no such field and must parse with [None]. *)
+let test_entry_decision_sexp_tolerates_missing_ticket_lifecycle _ =
+  let entry = make_entry ~ticket_lifecycle:(Some (_lifecycle ())) () in
+  let stripped =
+    match TA.sexp_of_entry_decision entry with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List (Sexp.Atom "ticket_lifecycle" :: _) -> false
+            | _ -> true))
+    | other -> other
+  in
+  assert_that
+    (TA.entry_decision_of_sexp stripped)
+    (equal_to (make_entry () : TA.entry_decision))
+
+(** The two fill/cancel-side fields inside the record are themselves
+    [\[@sexp.option\]] — a still-resting ticket writes neither, and a row
+    missing both parses back to the unresolved shape rather than to a zero age
+    or a fabricated verdict. *)
+let test_ticket_lifecycle_sexp_omits_unresolved_fill_fields _ =
+  let unresolved =
+    _lifecycle ~ticket_age_weeks_at_fill_or_cancel:None ~fill_volume:None ()
+  in
+  let sexp = TA.sexp_of_ticket_lifecycle unresolved in
+  let field_names =
+    match sexp with
+    | Sexp.List fields ->
+        List.filter_map fields ~f:(function
+          | Sexp.List (Sexp.Atom name :: _) -> Some name
+          | _ -> None)
+    | _ -> []
+  in
+  assert_that
+    ( List.count field_names ~f:(fun n ->
+          List.mem
+            [ "ticket_age_weeks_at_fill_or_cancel"; "fill_volume" ]
+            n ~equal:String.equal),
+      TA.ticket_lifecycle_of_sexp sexp )
+    (equal_to (0, unresolved))
+
 (** Populated E-provenance fields survive the codec round trip. *)
 let test_entry_decision_sexp_round_trips_e_provenance_fields _ =
   let entry =
@@ -356,6 +447,77 @@ let test_audit_records_sexp_round_trip_through_top_level_codec _ =
   let sexp = TA.sexp_of_audit_records records in
   let parsed = TA.audit_records_of_sexp sexp in
   assert_that parsed (elements_are (List.map records ~f:equal_to))
+
+(* PR-5 collector-side lifecycle merges ---------------------------------- *)
+
+let _lifecycle_of (r : TA.audit_record) = r.entry.ticket_lifecycle
+
+(** The F5 verdict arrives after the entry (at the fill week's closing tick) and
+    is merged into that entry's lifecycle at drain time. *)
+let test_record_fill_volume_merges_into_the_entry_row _ =
+  let t = TA.create () in
+  TA.record_entry t
+    (make_entry
+       ~ticket_lifecycle:
+         (Some (_lifecycle ~ticket_age_weeks_at_fill_or_cancel:None ()))
+       ());
+  TA.record_fill_volume t ~position_id:"AAPL-wein-1" TA.No_verdict;
+  assert_that (TA.get_audit_records t)
+    (elements_are
+       [
+         field _lifecycle_of
+           (is_some_and
+              (field
+                 (fun (l : TA.ticket_lifecycle) -> l.fill_volume)
+                 (is_some_and (equal_to (TA.No_verdict : TA.fill_volume_verdict)))));
+       ])
+
+(** No entry on record ⇒ the verdict is dropped, mirroring [record_exit]'s
+    no-entry contract. *)
+let test_record_fill_volume_without_entry_is_dropped _ =
+  let t = TA.create () in
+  TA.record_fill_volume t ~position_id:"GHOST-wein-9" TA.No_verdict;
+  assert_that (TA.get_audit_records t) is_empty
+
+(** F2's cancel path: a ticket cancelled three weeks after placement records a
+    resting age of 3. This is the only place a never-filled ticket's age is
+    observable — it produces no round-trip for the fill-side enrichment. *)
+let test_cancel_entry_records_the_resting_age_in_weeks _ =
+  let t = TA.create () in
+  TA.record_entry t
+    (make_entry
+       ~ticket_lifecycle:
+         (Some
+            (_lifecycle ~placement_date:(_date "2024-03-01")
+               ~ticket_age_weeks_at_fill_or_cancel:None ()))
+       ());
+  TA.record_transitions t
+    [
+      {
+        Position.position_id = "AAPL-wein-1";
+        date = _date "2024-03-22";
+        kind = Position.CancelEntry { reason = "ttl_expired" };
+      };
+    ];
+  assert_that (TA.get_audit_records t)
+    (elements_are
+       [
+         field _lifecycle_of
+           (is_some_and
+              (field
+                 (fun (l : TA.ticket_lifecycle) ->
+                   l.ticket_age_weeks_at_fill_or_cancel)
+                 (is_some_and (equal_to 3))));
+       ])
+
+(** A row written before PR-5 carries no [ticket_lifecycle]; the collector must
+    leave it alone rather than fabricate one from a late verdict. *)
+let test_lifecycle_merges_are_inert_on_a_pre_pr5_row _ =
+  let t = TA.create () in
+  TA.record_entry t (make_entry ());
+  TA.record_fill_volume t ~position_id:"AAPL-wein-1" TA.No_verdict;
+  assert_that (TA.get_audit_records t)
+    (elements_are [ field _lifecycle_of is_none ])
 
 (* Collector behaviour --------------------------------------------------- *)
 
@@ -677,6 +839,20 @@ let suite =
          >:: test_entry_decision_sexp_tolerates_missing_e_provenance_fields;
          "entry_decision sexp round-trips E-provenance fields"
          >:: test_entry_decision_sexp_round_trips_e_provenance_fields;
+         "entry_decision sexp round-trips every ticket_lifecycle verdict"
+         >:: test_entry_decision_sexp_round_trips_ticket_lifecycle;
+         "entry_decision sexp tolerates a missing ticket_lifecycle"
+         >:: test_entry_decision_sexp_tolerates_missing_ticket_lifecycle;
+         "ticket_lifecycle sexp omits the unresolved fill/cancel fields"
+         >:: test_ticket_lifecycle_sexp_omits_unresolved_fill_fields;
+         "record_fill_volume merges into the entry row"
+         >:: test_record_fill_volume_merges_into_the_entry_row;
+         "record_fill_volume without an entry is dropped"
+         >:: test_record_fill_volume_without_entry_is_dropped;
+         "CancelEntry records the resting age in weeks"
+         >:: test_cancel_entry_records_the_resting_age_in_weeks;
+         "lifecycle merges are inert on a pre-PR-5 row"
+         >:: test_lifecycle_merges_are_inert_on_a_pre_pr5_row;
          "alternative_candidate sexp round-trip"
          >:: test_alternative_candidate_sexp_round_trip;
          "entry_decision sexp round-trip"

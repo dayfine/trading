@@ -348,9 +348,199 @@ let test_insufficient_history_holds _ =
   in
   assert_that (List.length result) (equal_to 0)
 
+(* ------------------------------------------------------------------ *)
+(* fill_week_confirmations — the PR-5 audit surface                      *)
+(* ------------------------------------------------------------------ *)
+
+(** Render one [(position_id, classification)] row so a single [assert_that] can
+    pin the constructor without exact-float record equality. *)
+let _summary (position_id, confirmation) =
+  let label =
+    match confirmation with
+    | None -> "no_verdict"
+    | Some (Volume.Spike _) -> "spike"
+    | Some (Volume.Buildup _) -> "buildup"
+    | Some (Volume.Unconfirmed _) -> "unconfirmed"
+  in
+  position_id ^ ":" ^ label
+
+let _confirmations ?(config = _armed_config) ?(is_screening_day = true)
+    ?(current_date = _screening_friday) ~positions ~weekly_volumes () =
+  let bars = _bars_of_weekly_volumes weekly_volumes in
+  Volume_eject_runner.fill_week_confirmations ~config
+    ~volume_config:Volume.default_config ~is_screening_day ~positions
+    ~bar_reader:(Bar_reader.of_in_memory_bars [ (_ticker, bars) ])
+    ~current_date
+  |> List.map ~f:_summary
+
+(** The four cells a ladder-v4 F5 arm must report separately. Only the third
+    ejects; the first, second and FOURTH are all held — and the eject count
+    alone cannot separate the fourth (held without a verdict, the qc-behavioral
+    #2267 residual) from the confirmed holds. *)
+let test_confirmations_distinguish_all_four_verdict_classes _ =
+  let summarise weekly_volumes =
+    _confirmations ~positions:(_held_positions ()) ~weekly_volumes ()
+  in
+  assert_that
+    (List.concat_map
+       ~f:summarise
+       [
+         _spike_volumes;
+         _buildup_volumes;
+         _unconfirmed_volumes;
+         [ 1000; 1000; 900 ];
+       ])
+    (elements_are
+       [
+         equal_to (_ticker ^ ":spike");
+         equal_to (_ticker ^ ":buildup");
+         equal_to (_ticker ^ ":unconfirmed");
+         equal_to (_ticker ^ ":no_verdict");
+       ])
+
+(** The audit surface reads the same fill-week window the eject path reads: a
+    position [update] does not evaluate produces no audit row either, so the two
+    can never disagree about which week was judged. *)
+let test_confirmations_share_the_eject_paths_eligibility _ =
+  let stale = _held_positions ~fill_date:(Date.of_string "2024-03-05") () in
+  let short = _held_positions ~side:Trading_base.Types.Short () in
+  let entering =
+    String.Map.singleton _ticker
+      (make_entering_pos _ticker 100.0 _screening_friday)
+  in
+  let rows positions =
+    _confirmations ~positions ~weekly_volumes:_unconfirmed_volumes ()
+  in
+  assert_that
+    (List.map [ stale; short; entering ] ~f:(fun p -> List.length (rows p)))
+    (elements_are [ equal_to 0; equal_to 0; equal_to 0 ])
+
+(** R1: under the default config — and under the flag armed without the
+    StopLimit family — no at-fill check runs, so the audit surface emits
+    nothing and reads no bars. A mid-week tick is likewise silent (the fill
+    week has not closed). *)
+let test_confirmations_are_empty_when_unarmed_or_midweek _ =
+  let unarmed = _default_config () in
+  let flag_only =
+    {
+      (_default_config ()) with
+      Weinstein_strategy_config.volume_confirm_at_fill = true;
+    }
+  in
+  let counts =
+    [
+      _confirmations ~config:unarmed ~positions:(_held_positions ())
+        ~weekly_volumes:_unconfirmed_volumes ();
+      _confirmations ~config:flag_only ~positions:(_held_positions ())
+        ~weekly_volumes:_unconfirmed_volumes ();
+      _confirmations ~is_screening_day:false ~current_date:_midweek
+        ~positions:(_held_positions ())
+        ~weekly_volumes:_unconfirmed_volumes ();
+    ]
+  in
+  assert_that
+    (List.map counts ~f:List.length)
+    (elements_are [ equal_to 0; equal_to 0; equal_to 0 ])
+
+(* ------------------------------------------------------------------ *)
+(* Special_exits.run integration — the audit glue actually fires         *)
+(* ------------------------------------------------------------------ *)
+
+(* A weekly_view whose last bar is the screening Friday, so
+   [is_screening_day_view] is true inside [Special_exits.run]. *)
+let _friday_weekly_view : Snapshot_runtime.Snapshot_bar_views.weekly_view =
+  {
+    closes = [| 100.0 |];
+    raw_closes = [| 100.0 |];
+    highs = [| 100.0 |];
+    lows = [| 100.0 |];
+    volumes = [| 1000.0 |];
+    dates = [| _screening_friday |];
+    n = 1;
+  }
+
+(** Drive the whole special-exit pipeline with a capturing recorder and read
+    back the [fill_volume_event]s it emitted. This pins the glue between
+    {!Volume_eject_runner.fill_week_confirmations} and
+    {!Audit_recorder.record_fill_volume} — the runner-level tests above only
+    pin the classification itself. *)
+let _fill_volume_events_from_run ~config ~weekly_volumes =
+  let captured = ref [] in
+  let recorder : Audit_recorder.t =
+    {
+      Audit_recorder.noop with
+      record_fill_volume = (fun e -> captured := e :: !captured);
+    }
+  in
+  let bars = _bars_of_weekly_volumes weekly_volumes in
+  let bar_reader = Bar_reader.of_in_memory_bars [ (_ticker, bars) ] in
+  let last_bar = List.last_exn bars in
+  let positions = _held_positions () in
+  let no_op_record_force_exit ~last_stop_out_dates:_ ~positions:_
+      ~current_date:_ ~cooldown_weeks:_ ~label:_ _ =
+    ()
+  in
+  let _ =
+    Special_exits.run ~config ~record_force_exit:no_op_record_force_exit
+      ~positions
+      ~last_stop_out_dates:(Hashtbl.create (module String))
+      ~portfolio:{ cash = 1_000_000.0; positions }
+      ~get_price:(fun s ->
+        if String.equal s _ticker then Some last_bar else None)
+      ~peak_tracker:Portfolio_risk.Force_liquidation.Peak_tracker.(create ())
+      ~audit_recorder:recorder ~prior_macro_result:(ref None)
+      ~prior_stages:(Hashtbl.create (module String))
+      ~prior_stage_ma_values:(Hashtbl.create (module String))
+      ~stage3_streaks:(Hashtbl.create (module String))
+      ~laggard_streaks:(Hashtbl.create (module String))
+      ~bar_reader ~index_view:_friday_weekly_view ~exit_transitions:[]
+      ~current_date:_screening_friday
+  in
+  List.rev !captured
+
+(** End-to-end through the real config path: with F5 armed on a config built by
+    [default_config], a held ticket whose fill week confirmed via branch (a)
+    produces one audit event carrying that classification. *)
+let test_armed_config_emits_a_fill_volume_audit_event _ =
+  assert_that
+    (_fill_volume_events_from_run ~config:_armed_config
+       ~weekly_volumes:_spike_volumes)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (e : Audit_recorder.fill_volume_event) -> e.position_id)
+               (equal_to _ticker);
+             field
+               (fun (e : Audit_recorder.fill_volume_event) -> e.confirmation)
+               (matching ~msg:"Expected Some (Spike _)"
+                  (function Some (Volume.Spike r) -> Some r | _ -> None)
+                  (float_equal 3.0));
+           ];
+       ])
+
+(** R1: the default config emits no audit event at all on the same bars — the
+    capture is inert exactly where the mechanism is. *)
+let test_default_config_emits_no_fill_volume_audit_event _ =
+  assert_that
+    (_fill_volume_events_from_run ~config:(_default_config ())
+       ~weekly_volumes:_spike_volumes)
+    is_empty
+
 let suite =
   "volume_eject_runner"
   >::: [
+         "armed config emits a fill_volume audit event"
+         >:: test_armed_config_emits_a_fill_volume_audit_event;
+         "default config emits no fill_volume audit event"
+         >:: test_default_config_emits_no_fill_volume_audit_event;
+         "fill_week_confirmations distinguish all four verdict classes"
+         >:: test_confirmations_distinguish_all_four_verdict_classes;
+         "fill_week_confirmations share the eject path's eligibility"
+         >:: test_confirmations_share_the_eject_paths_eligibility;
+         "fill_week_confirmations are empty when unarmed or mid-week"
+         >:: test_confirmations_are_empty_when_unarmed_or_midweek;
          "fill-week 2x volume confirms and holds"
          >:: test_fill_week_spike_confirms_and_holds;
          "3-4-week build-up branch confirms and holds"

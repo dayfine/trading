@@ -269,9 +269,100 @@ let test_negative_offset_is_none _ =
        ~event_offset:(-1))
     is_none
 
+(* ------------------------------------------------------------------ *)
+(* classify_breakout — the same verdict, with the branch + measurement  *)
+(* ------------------------------------------------------------------ *)
+
+let _classify volumes =
+  classify_breakout ~config:cfg
+    ~callbacks:(callbacks_from_bars ~bars:(List.map volumes ~f:make_bar))
+    ~event_offset:0
+
+(** Render a classification as a stable string so one [assert_that] can pin the
+    constructor AND its measurement across several fixtures without exact-float
+    record equality. *)
+let _measure = function None -> "none" | Some v -> Printf.sprintf "%.3f" v
+
+let _summary = function
+  | None -> "no_verdict"
+  | Some (Spike ratio) -> Printf.sprintf "spike:%.3f" ratio
+  | Some (Buildup multiple) -> Printf.sprintf "buildup:%.3f" multiple
+  | Some (Unconfirmed { spike_ratio; buildup_multiple }) ->
+      Printf.sprintf "unconfirmed:%s/%s" (_measure spike_ratio)
+        (_measure buildup_multiple)
+
+(** All four cases the audit must tell apart, on the same fixtures the boolean
+    tests use. Confirmations name their branch AND carry the deciding multiple
+    (the spike bar is 3x its prior 4 weeks; the build-up window, mean 1350, is
+    2.7x its baseline of 500). The two non-confirmations are different kinds:
+    [Unconfirmed] is "measured and failed", [None] is "no verdict, nothing was
+    measurable" — the cell the F5 runner holds on. *)
+let test_classify_names_each_branch_and_the_no_verdict_case _ =
+  assert_that
+    (List.map ~f:(fun v -> _summary (_classify v))
+       [
+         [ 1000; 1000; 1000; 1000; 3000 ];
+         [ 500; 500; 500; 500; 1200; 1300; 1400; 1500 ];
+         [ 1000; 1000; 1000; 1000; 1000; 1000; 1000; 900 ];
+         [ 1000; 900 ];
+       ])
+    (elements_are
+       [
+         equal_to "spike:3.000";
+         equal_to "buildup:2.700";
+         equal_to "unconfirmed:0.900/0.975";
+         equal_to "no_verdict";
+       ])
+
+(** A build-up that clears the 2x multiple but FALLS on the event bar is
+    [Unconfirmed] — and its 2.95x near-miss multiple is still recorded, so the
+    audit can rank it against a flat tape rather than only counting it. *)
+let test_classify_records_the_near_miss_buildup_multiple _ =
+  assert_that
+    (_summary (_classify [ 500; 500; 500; 500; 1500; 1500; 1500; 1400 ]))
+    (equal_to "unconfirmed:1.120/2.950")
+
+(** Only branch (a) had history: the branch that could not be evaluated records
+    [None] rather than a fabricated zero. *)
+let test_classify_carries_none_for_the_unevaluable_branch _ =
+  assert_that
+    (_summary (_classify [ 1000; 1000; 1000; 1000; 900 ]))
+    (equal_to "unconfirmed:0.900/none")
+
+(** [confirms_breakout] is defined as the projection of [classify_breakout], so
+    the two can never disagree. Pinned across every shape above, including the
+    negative offset. *)
+let test_confirms_breakout_agrees_with_classify _ =
+  let shapes =
+    [
+      [ 1000; 1000; 1000; 1000; 3000 ];
+      [ 500; 500; 500; 500; 1200; 1300; 1400; 1500 ];
+      [ 500; 500; 500; 500; 1500; 1500; 1500; 1400 ];
+      [ 1000; 1000; 1000; 1000; 1000; 1000; 1000; 900 ];
+      [ 1000; 1000; 1000; 1000; 900 ];
+      [ 1000; 900 ];
+    ]
+  in
+  let projected =
+    List.map shapes ~f:(fun volumes ->
+        Option.map (_classify volumes) ~f:(function
+          | Spike _ | Buildup _ -> true
+          | Unconfirmed _ -> false))
+  in
+  assert_that projected
+    (elements_are (List.map shapes ~f:(fun v -> equal_to (_confirms v))))
+
 let suite =
   "volume_tests"
   >::: [
+         "test_classify_names_each_branch_and_the_no_verdict_case"
+         >:: test_classify_names_each_branch_and_the_no_verdict_case;
+         "test_classify_records_the_near_miss_buildup_multiple"
+         >:: test_classify_records_the_near_miss_buildup_multiple;
+         "test_classify_carries_none_for_the_unevaluable_branch"
+         >:: test_classify_carries_none_for_the_unevaluable_branch;
+         "test_confirms_breakout_agrees_with_classify"
+         >:: test_confirms_breakout_agrees_with_classify;
          "test_confirms_via_spike_branch" >:: test_confirms_via_spike_branch;
          "test_confirms_via_buildup_branch" >:: test_confirms_via_buildup_branch;
          "test_buildup_without_increase_on_event_bar_does_not_confirm"

@@ -96,6 +96,37 @@ val update :
     [trades.csv]; [detail] carries the fill-week offset for forensics. Same
     close-fill convention as the sibling special-exit runners. *)
 
+val fill_week_confirmations :
+  config:Weinstein_strategy_config.config ->
+  volume_config:Volume.config ->
+  is_screening_day:bool ->
+  positions:Position.t Map.M(String).t ->
+  bar_reader:Bar_reader.t ->
+  current_date:Date.t ->
+  (string * Volume.breakout_confirmation option) list
+(** The {b audit} counterpart of {!update}: [(position_id, classification)] for
+    every position {!update} evaluates this tick — not only the ones it ejects.
+
+    Same eligibility and same judged bar as {!update} (both route through one
+    private fill-week-window helper), so a row here and an eject there can never
+    disagree about which week was read. The classification is
+    {!Volume.classify_breakout} rather than its boolean projection, so the audit
+    can separate:
+
+    - [Some (Spike r)] — confirmed via §4.2 branch (a), at multiple [r];
+    - [Some (Buildup m)] — confirmed via branch (b), at multiple [m];
+    - [Some (Unconfirmed _)] — evaluated, neither branch confirmed ⇒ ejected;
+    - [None] — {b no verdict}: neither branch had enough history, so the runner
+      {b held} the position. This is the held-without-verdict cell, which the
+      eject count alone cannot distinguish from a confirmed hold. Measuring its
+      size is a precondition for reading a ladder-v4 F5 arm's eject rate
+      (qc-behavioral #2267 recommendation).
+
+    Returns [[]] — with no bar reads — when
+    [Weinstein_strategy_config.volume_confirm_at_fill_armed config] is [false]
+    (the default) or [is_screening_day] is [false]. Order follows [positions]
+    key order. Pure: no transitions, no state, no effect on the run. *)
+
 val eject_label : string
 (** ["volume_eject"] — the [StrategySignal] label carried by every transition
     this runner emits (the [Volume_eject] audit tag). Exposed so tests and audit

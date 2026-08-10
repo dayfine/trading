@@ -44,12 +44,12 @@ type entry_meta = {
           field partitions a [Size_down] run's entries into "would have been
           entered anyway" and "admitted by the mechanism".
 
-          Scope note: PR-2 carries the tag on the strategy-internal meta and in
-          the [PANEL_GOLDEN_DEBUG] candidate trace. Projecting it into the
-          persisted [Backtest.Trade_audit.entry_decision] row belongs to the
-          plan's PR-5 audit-fields step
-          ([dev/plans/entry-ticket-async-v2-2026-08-10.md] §4), which owns the
-          sexp-shape golden change. *)
+          PR-5 ([dev/plans/entry-ticket-async-v2-2026-08-10.md] §4) discharges
+          PR-2's deferral: {!build_entry_event} now also carries the tag onto
+          {!Audit_recorder.entry_event.sized_down_wide_stop}, from where it is
+          persisted in the [Backtest.Trade_audit.entry_decision] row. The
+          strategy-internal meta and the [PANEL_GOLDEN_DEBUG] candidate trace
+          are unchanged. *)
 }
 (** Audit-relevant intermediates computed during entry-transition construction.
     Returned alongside the transition so the audit recorder can capture them
@@ -126,7 +126,13 @@ val build_entry_event :
     [meta.effective_entry_price], and [meta.installed_stop]. The audit row's
     [candidate] field still carries the screener-original
     [candidate.suggested_entry], so consumers can compare the screener's
-    pre-fill intent against the strategy's realised entry. *)
+    pre-fill intent against the strategy's realised entry.
+
+    Also stamps the PR-5 placement-time ticket tags: [sized_down_wide_stop]
+    from [meta], and the F1 freshness basis + F6 §4.5 triple-confirmation
+    measurements projected off [candidate.analysis] by {!Entry_ticket_tags}.
+    All three are pure reads of values already in scope — no extra bar walk,
+    no behaviour change. *)
 
 val emit_entries :
   audit_recorder:Audit_recorder.t ->

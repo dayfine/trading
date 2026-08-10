@@ -39,6 +39,35 @@ type stop_floor_kind = Support_floor | Buffer_fallback [@@deriving sexp]
 type split_safe_basis = Flag_off | Adjusted | Raw_fallback | Empty_window
 [@@deriving sexp]
 
+type fill_volume_verdict =
+  | Confirmed_spike of float
+  | Confirmed_buildup of float
+  | Unconfirmed of {
+      spike_ratio : float option;
+      buildup_multiple : float option;
+    }
+  | No_verdict
+[@@deriving sexp]
+
+type triple_confirmation = {
+  breakout_volume_multiple : float option;
+  rs_zero_cross : bool;
+  in_base_advance_pct : float option;
+}
+[@@deriving sexp]
+
+type entry_freshness_basis = Ma_cross | Range_top_breakout [@@deriving sexp]
+
+type ticket_lifecycle = {
+  placement_date : Date.t;
+  ticket_age_weeks_at_fill_or_cancel : int option; [@sexp.option]
+  fill_volume : fill_volume_verdict option; [@sexp.option]
+  freshness_basis : entry_freshness_basis;
+  sized_down_wide_stop : bool;
+  triple_confirmation : triple_confirmation;
+}
+[@@deriving sexp]
+
 type entry_decision = {
   symbol : string;
   entry_date : Date.t;
@@ -73,6 +102,7 @@ type entry_decision = {
   risk_pct : float;
   initial_position_value : float;
   initial_risk_dollars : float;
+  ticket_lifecycle : ticket_lifecycle option; [@sexp.option]
   alternatives_considered : alternative_candidate list;
 }
 [@@deriving sexp]
@@ -157,6 +187,8 @@ type _bucket = {
   bucket_entry : entry_decision;
   mutable bucket_exit : exit_decision option;
   mutable bucket_external_exit : external_exit_decision option;
+  mutable bucket_fill_volume : fill_volume_verdict option;
+  mutable bucket_cancel_age_weeks : int option;
 }
 (** Internal mutable bucket. [exit_] is added to a record when the matching
     entry has already been recorded; otherwise the exit is dropped.
@@ -182,7 +214,18 @@ let create () =
 let record_entry t (entry : entry_decision) =
   Hashtbl.set t.records ~key:entry.position_id
     ~data:
-      { bucket_entry = entry; bucket_exit = None; bucket_external_exit = None }
+      {
+        bucket_entry = entry;
+        bucket_exit = None;
+        bucket_external_exit = None;
+        bucket_fill_volume = None;
+        bucket_cancel_age_weeks = None;
+      }
+
+let record_fill_volume t ~position_id (verdict : fill_volume_verdict) =
+  match Hashtbl.find t.records position_id with
+  | None -> ()
+  | Some bucket -> bucket.bucket_fill_volume <- Some verdict
 
 let record_exit t (exit_ : exit_decision) =
   match Hashtbl.find t.records exit_.position_id with
@@ -212,6 +255,21 @@ let _fill_in_external_exit (bucket : _bucket)
     bucket.bucket_external_exit <-
       Some (_external_exit_of_transition bucket trans ~exit_reason)
 
+let _days_per_week = 7
+
+(* Whole weeks the ticket rested before [trans] cancelled it. The placement
+   anchor is the entry row's own [ticket_lifecycle.placement_date] (falling back
+   to [entry_date], which the recorder sets to the same tick), so the age cannot
+   drift if [entry_date]'s meaning ever changes. Clamped at 0: a cancel dated
+   before its own placement is not a negative age. *)
+let _cancel_age_weeks (bucket : _bucket) ~cancel_date =
+  let placed =
+    match bucket.bucket_entry.ticket_lifecycle with
+    | Some lifecycle -> lifecycle.placement_date
+    | None -> bucket.bucket_entry.entry_date
+  in
+  Int.max 0 (Date.diff cancel_date placed / _days_per_week)
+
 let _process_transition_for_external_exit t
     (trans : Trading_strategy.Position.transition) =
   match trans.kind with
@@ -219,15 +277,40 @@ let _process_transition_for_external_exit t
       match Hashtbl.find t.records trans.position_id with
       | None -> ()
       | Some bucket -> _fill_in_external_exit bucket trans ~exit_reason)
+  | Trading_strategy.Position.CancelEntry _ -> (
+      match Hashtbl.find t.records trans.position_id with
+      | None -> ()
+      | Some bucket ->
+          bucket.bucket_cancel_age_weeks <-
+            Some (_cancel_age_weeks bucket ~cancel_date:trans.date))
   | _ -> ()
 
 let record_transitions t
     (transitions : Trading_strategy.Position.transition list) =
   List.iter transitions ~f:(_process_transition_for_external_exit t)
 
+(* Fold the two collector-side lifecycle observations (the F5 fill-week verdict,
+   the cancel age) into the entry row's [ticket_lifecycle]. Both are absent on a
+   row whose ticket simply filled under an unarmed F5 config — that is the
+   no-observation case, not a zero. *)
+let _entry_with_lifecycle (bucket : _bucket) : entry_decision =
+  match bucket.bucket_entry.ticket_lifecycle with
+  | None -> bucket.bucket_entry
+  | Some lifecycle ->
+      {
+        bucket.bucket_entry with
+        ticket_lifecycle =
+          Some
+            {
+              lifecycle with
+              fill_volume = bucket.bucket_fill_volume;
+              ticket_age_weeks_at_fill_or_cancel = bucket.bucket_cancel_age_weeks;
+            };
+      }
+
 let _bucket_to_record (bucket : _bucket) : audit_record =
   {
-    entry = bucket.bucket_entry;
+    entry = _entry_with_lifecycle bucket;
     exit_ = bucket.bucket_exit;
     external_exit = bucket.bucket_external_exit;
     execution = None;

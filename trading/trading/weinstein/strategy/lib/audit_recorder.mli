@@ -127,10 +127,49 @@ type entry_event = {
   initial_risk_dollars : float;
       (** [|suggested_entry - installed_stop| * shares] — dollar risk to stop.
       *)
+  sized_down_wide_stop : bool;
+      (** F3 audit tag: [config.stop_width_mode = Size_down] admitted this
+          candidate even though its structural stop sits further than
+          [stops_config.max_stop_distance_pct] from entry, so the entry exists
+          only because the §5.1 drop was waived and its share count is the
+          risk-parity-shrunk one. Always [false] under the default
+          [Drop_over_max] (such candidates are dropped, never entered).
+          Carried straight from
+          {!Entry_audit_capture.entry_meta.sized_down_wide_stop} — #2258
+          deliberately deferred persisting it to the PR-5 audit-fields step. *)
+  freshness_basis : Entry_freshness.basis;
+      (** F1: which admission clock was in force when the candidate was
+          analysed, recovered from the analysis by
+          {!Entry_ticket_tags.freshness_basis_of_analysis}. *)
+  triple_confirmation : Entry_ticket_tags.triple_confirmation;
+      (** F6: the three book §4.5 "big winner" signals measured at placement.
+          Capture only — nothing gates on it. *)
   alternatives : alternative_input list;
       (** Rivals from the same screen call that were not entered. *)
 }
 (** Event captured at entry-decision time. *)
+
+type fill_volume_event = {
+  position_id : string;
+      (** The filled position whose fill week was judged — joins to
+          {!entry_event.position_id}. *)
+  confirmation : Volume.breakout_confirmation option;
+      (** The §4.2 verdict for the fill week. [None] is the {b no-verdict} case
+          ([Volume.classify_breakout] found neither branch evaluable), which the
+          F5 runner deliberately {b holds} on: recording it is what makes the
+          held-without-verdict population countable alongside the eject rate,
+          rather than silently pooled with the confirmed holds. *)
+}
+(** Event captured when the F5 at-fill volume check judges a freshly-filled
+    ticket's fill week.
+
+    Emitted for {b every} evaluated position, not only the ejected ones — the
+    eject transition already surfaces in [trades.csv] via its [volume_eject]
+    exit trigger, so on its own it cannot separate "confirmed and held" from
+    "no verdict and held". Only emitted when
+    [Weinstein_strategy_config.volume_confirm_at_fill_armed] is [true]; under
+    the default config no event is ever produced and the audit row's verdict
+    stays absent. *)
 
 type exit_event = {
   position_id : string;
@@ -196,6 +235,9 @@ type t = {
   record_exit : exit_event -> unit;
   record_cascade_summary : cascade_event -> unit;
   record_force_liquidation : force_liquidation_event -> unit;
+  record_fill_volume : fill_volume_event -> unit;
+      (** Invoked once per position the F5 at-fill check evaluates. Never
+          invoked under the default (unarmed) config. *)
 }
 (** Recorder bundle. All callbacks are invoked unconditionally by the strategy
     at entry / exit / per-Friday sites; the implementation decides whether to

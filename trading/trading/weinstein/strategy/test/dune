@@ -7,6 +7,7 @@
   test_bar_reader
   test_entry_audit_capture
   test_entry_freeze
+  test_entry_ticket_tags
   test_entry_ticket_ttl
   test_exit_audit_capture
   test_force_liquidation_runner

@@ -215,6 +215,26 @@ let _run_volume_eject_special_exit ~config ~record_force_exit ~positions
   emit_audit volume_eject_ts;
   volume_eject_ts @ force_exit_ts
 
+(* PR-5 audit capture: record the F5 fill-week §4.2 classification for EVERY
+   position the eject runner evaluates, not just the ejected ones. The eject
+   transition already labels itself in [trades.csv], so on its own it cannot
+   separate "confirmed and held" from "no verdict and held" — and the latter is
+   the cell a ladder-v4 F5 arm must report alongside its eject rate. Reads the
+   same fill-week window the eject path reads; emits nothing (and reads no bars)
+   under the default unarmed config. *)
+let _emit_fill_volume_audit ~config ~(audit_recorder : Audit_recorder.t)
+    ~positions ~bar_reader ~is_friday ~current_date =
+  if Weinstein_strategy_config.volume_confirm_at_fill_armed config then
+    let stock_analysis_config =
+      Weinstein_strategy_screening._stock_analysis_config_for ~config
+    in
+    Volume_eject_runner.fill_week_confirmations ~config
+      ~volume_config:stock_analysis_config.Stock_analysis.volume
+      ~is_screening_day:is_friday ~positions ~bar_reader ~current_date
+    |> List.iter ~f:(fun (position_id, confirmation) ->
+           audit_recorder.record_fill_volume
+             { Audit_recorder.position_id; confirmation })
+
 (* The three trailing special exits (liquidity, extension, then the F5 volume
    eject) share the same emit/merge shape; threading them here keeps [run] under
    the length cap. *)
@@ -251,6 +271,8 @@ let run ~config ~record_force_exit ~positions ~last_stop_out_dates
   let is_friday =
     Weinstein_strategy_screening.is_screening_day_view index_view
   in
+  _emit_fill_volume_audit ~config ~audit_recorder ~positions ~bar_reader
+    ~is_friday ~current_date;
   let stage3_ts =
     _run_stage3_force_exit ~config ~record_force_exit ~positions
       ~last_stop_out_dates ~prior_stage_ma_values ~stage3_streaks ~get_price

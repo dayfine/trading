@@ -163,12 +163,14 @@ let _positive_mean (vs : float list) : float option =
     let m = _mean_of vs in
     Option.some_if (Float.is_finite m && Float.(m > 0.0)) m
 
-(** Branch (a) — "breakout-week volume >= 2x average volume of prior 4 weeks".
-    Reuses {!analyze_breakout_with_callbacks}'s ratio so the spike branch and
-    the screen-time confirmation grade can never drift. *)
-let _spike_confirms ~config ~callbacks ~event_offset : bool option =
+(** Branch (a)'s measured quantity — the event bar's volume over the average of
+    the prior [lookback_bars] bars. Reuses
+    {!analyze_breakout_with_callbacks}'s ratio so the spike branch and the
+    screen-time confirmation grade can never drift. [None] = branch (a) could
+    not be evaluated. *)
+let _spike_ratio ~config ~callbacks ~event_offset : float option =
   Option.map (analyze_breakout_with_callbacks ~config ~callbacks ~event_offset)
-    ~f:(fun r -> Float.(r.volume_ratio >= config.strong_threshold))
+    ~f:(fun r -> r.volume_ratio)
 
 (** "with at least some increase on breakout week" — the event bar's volume
     exceeds the bar immediately before it. [false] when either read is
@@ -187,7 +189,7 @@ let _increase_on_event_bar ~get_volume ~event_offset : bool =
     4 = the book's "3-4 weeks"); the baseline is the equally-sized window before
     that (the book's "prior several weeks"). Both windows are sized off the same
     configurable [lookback_bars], so the branch carries no hidden constant. *)
-let _buildup_confirms ~config ~callbacks ~event_offset : bool option =
+let _buildup_multiple ~config ~callbacks ~event_offset : float option =
   let get_volume = callbacks.get_volume in
   let window = config.lookback_bars in
   let buildup =
@@ -199,23 +201,45 @@ let _buildup_confirms ~config ~callbacks ~event_offset : bool option =
     ( Option.bind buildup ~f:_positive_mean,
       Option.bind baseline ~f:_positive_mean )
   with
-  | Some buildup_avg, Some baseline_avg ->
-      Some
-        (Float.(buildup_avg >= config.strong_threshold *. baseline_avg)
-        && _increase_on_event_bar ~get_volume ~event_offset)
+  | Some buildup_avg, Some baseline_avg -> Some (buildup_avg /. baseline_avg)
   | _ -> None
+
+type breakout_confirmation =
+  | Spike of float
+  | Buildup of float
+  | Unconfirmed of {
+      spike_ratio : float option;
+      buildup_multiple : float option;
+    }
+[@@deriving show, eq]
+
+(* Branch precedence: (a) is checked first so a bar clearing BOTH branches is
+   reported as the spike — the book's headline case, and the one
+   [analyze_breakout]'s [confirmation] grade already names. The verdict itself
+   is branch-agnostic ([confirms_breakout] below), so precedence is a labelling
+   choice, never a behaviour one. *)
+let classify_breakout ~(config : config) ~(callbacks : callbacks) ~event_offset :
+    breakout_confirmation option =
+  if event_offset < 0 then None
+  else
+    let spike_ratio = _spike_ratio ~config ~callbacks ~event_offset in
+    let buildup_multiple = _buildup_multiple ~config ~callbacks ~event_offset in
+    let clears r = Float.(r >= config.strong_threshold) in
+    match (spike_ratio, buildup_multiple) with
+    | Some r, _ when clears r -> Some (Spike r)
+    | _, Some m
+      when clears m
+           && _increase_on_event_bar ~get_volume:callbacks.get_volume
+                ~event_offset ->
+        Some (Buildup m)
+    | None, None -> None
+    | _ -> Some (Unconfirmed { spike_ratio; buildup_multiple })
 
 let confirms_breakout ~(config : config) ~(callbacks : callbacks) ~event_offset
     : bool option =
-  if event_offset < 0 then None
-  else
-    match
-      ( _spike_confirms ~config ~callbacks ~event_offset,
-        _buildup_confirms ~config ~callbacks ~event_offset )
-    with
-    | Some true, _ | _, Some true -> Some true
-    | None, None -> None
-    | _ -> Some false
+  Option.map (classify_breakout ~config ~callbacks ~event_offset) ~f:(function
+    | Spike _ | Buildup _ -> true
+    | Unconfirmed _ -> false)
 
 (* ------------------------------------------------------------------ *)
 (* Bar-list wrapper — preserves the existing API                        *)
