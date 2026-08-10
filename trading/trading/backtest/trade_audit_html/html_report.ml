@@ -6,6 +6,11 @@ include Html_data
 
 let render = Html_render.render
 
+(* Which close column a mark must be drawn from. The two series this module
+   derives from marks need opposite bases, so the requirement travels with each
+   request rather than being baked into the supplier. See the [.mli]. *)
+type price_basis = Adjusted | Raw
+
 (* Derived: open positions -------------------------------------------------- *)
 
 let _open_position ~final_prices (sym, side_str, entry_date, entry_price, qty) :
@@ -47,15 +52,19 @@ let _downsample ~every rows =
       let sampled = List.filteri rows ~f:(fun i _ -> i % every = 0) in
       if (n - 1) % every = 0 then sampled else sampled @ [ List.last_exn rows ]
 
-let _benchmark ~bar_close ~symbol ~initial_cash ~dates =
+(* Buy-and-hold benchmark, indexed to [initial_cash] at the first curve date.
+   Every value divides a mark by an *earlier mark of the same symbol*, so the
+   marks must be split/dividend-adjusted: on the raw column a split inside the
+   run reads as a price move the benchmark never made. Hence [Adjusted]. *)
+let _benchmark ~adjusted_close ~symbol ~initial_cash ~dates =
   match dates with
   | [] -> None
   | first :: _ -> (
-      match bar_close ~symbol ~as_of:first with
+      match adjusted_close ~symbol ~as_of:first with
       | Some base when Float.(base > 0.0) ->
           let vals =
             List.map dates ~f:(fun d ->
-                Option.map (bar_close ~symbol ~as_of:d) ~f:(fun c ->
+                Option.map (adjusted_close ~symbol ~as_of:d) ~f:(fun c ->
                     (d, initial_cash *. c /. base)))
           in
           if List.for_all vals ~f:Option.is_some then
@@ -107,14 +116,20 @@ let _covers iv d =
   Date.( >= ) d iv.i_lo
   && match iv.i_hi with None -> true | Some hi -> Date.( <= ) d hi
 
-let _utilization ~bar_close ~intervals ~curve =
+(* Percentage of NAV deployed at each curve point. Each term *multiplies* a
+   mark by a share count and divides by NAV, and both of those are raw: [i_qty]
+   comes from [trades.csv] / [open_positions.csv] (as-traded share counts) and
+   [nav] from [equity_curve.csv], which marks positions at the raw close. An
+   adjusted mark would rescale the whole term by the symbol's split/dividend
+   factor from the mark date to the snapshot's last date. Hence [Raw]. *)
+let _utilization ~position_mark ~intervals ~curve =
   List.map curve ~f:(fun (d, nav) ->
       if Float.(nav <= 0.0) then 0.0
       else
         let deployed =
           List.fold intervals ~init:0.0 ~f:(fun acc iv ->
               if _covers iv d then
-                match bar_close ~symbol:iv.i_sym ~as_of:d with
+                match position_mark ~symbol:iv.i_sym ~as_of:d with
                 | Some c -> acc +. (iv.i_qty *. c)
                 | None -> acc
               else acc)
@@ -305,13 +320,18 @@ let load ?bar_close ?weekly_series ?(benchmark_symbol = "SPY")
     | Some v -> v
     | None -> ( match List.last curve with Some (_, v) -> v | None -> 0.0)
   in
+  (* The one supplier, asked for each series' own basis. Partially applying
+     [~basis] here is what keeps the choice with this module — the only place
+     that knows which arithmetic each series performs. *)
   let benchmark =
     Option.bind bar_close ~f:(fun bar_close ->
-        _benchmark ~bar_close ~symbol:benchmark_symbol ~initial_cash ~dates)
+        _benchmark
+          ~adjusted_close:(bar_close ~basis:Adjusted)
+          ~symbol:benchmark_symbol ~initial_cash ~dates)
   in
   let utilization =
     Option.map bar_close ~f:(fun bar_close ->
-        _utilization ~bar_close
+        _utilization ~position_mark:(bar_close ~basis:Raw)
           ~intervals:(_intervals report extras opens)
           ~curve)
   in
