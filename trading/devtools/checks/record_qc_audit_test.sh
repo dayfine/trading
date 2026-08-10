@@ -837,6 +837,56 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 18b — H-AUDIT-HARNESS-GAP-DROPPED-ON-APPROVED regression: a
+# --harness-gap value passed alongside --overall APPROVED must survive into
+# the JSON record, not be silently discarded with a WARNING. A harness gap
+# is a statement about the harness ("here is a check the automation should
+# have but doesn't"), not the verdict -- a real gap can be filed and the PR
+# still end APPROVED after rework (demonstrated live on #2251), and the
+# pre-fix behavior threw that finding away precisely in that case.
+# ---------------------------------------------------------------------------
+FEATURE18B="harness-gap-on-approved"
+
+out18b=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
+  --date 2026-07-27 --feature "${FEATURE18B}" --branch "harness/z" \
+  --structural APPROVED --behavioral APPROVED --overall APPROVED \
+  --harness-gap "LINTER_CANDIDATE: golden scenario would have caught this" 2>&1) && rc18b=0 || rc18b=$?
+
+JSON18B="${TMP_REPO}/dev/audit/2026-07-27-harness-z-${FEATURE18B}.json"
+
+if (( rc18b == 0 )) && [[ -f "${JSON18B}" ]] \
+   && grep -q '"harness_gap": *"LINTER_CANDIDATE: golden scenario would have caught this"' "${JSON18B}" \
+   && ! echo "${out18b}" | grep -q "harness-gap is only meaningful"; then
+  pass "scenario 18b — --harness-gap survives an APPROVED verdict, no longer discarded (H-AUDIT-HARNESS-GAP-DROPPED-ON-APPROVED fix)"
+else
+  fail "scenario 18b — expected the harness_gap text to survive in the record with no WARNING; got rc=${rc18b}"
+  echo "${out18b}" | sed 's/^/      /'
+  [[ -f "${JSON18B}" ]] && echo "      json: $(cat "${JSON18B}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 18c — control: --harness-gap on NEEDS_REWORK still works exactly
+# as before (this fix only changes the APPROVED path).
+# ---------------------------------------------------------------------------
+FEATURE18C="harness-gap-on-needs-rework"
+
+out18c=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
+  --date 2026-07-27 --feature "${FEATURE18C}" --branch "harness/z2" \
+  --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK \
+  --harness-gap "MISSING_TEST_PATTERN: no golden for this stop transition" 2>&1) && rc18c=0 || rc18c=$?
+
+JSON18C="${TMP_REPO}/dev/audit/2026-07-27-harness-z2-${FEATURE18C}.json"
+
+if (( rc18c == 0 )) && [[ -f "${JSON18C}" ]] \
+   && grep -q '"harness_gap": *"MISSING_TEST_PATTERN: no golden for this stop transition"' "${JSON18C}"; then
+  pass "scenario 18c — --harness-gap on NEEDS_REWORK unaffected by the fix (control)"
+else
+  fail "scenario 18c — expected the harness_gap text to survive on a NEEDS_REWORK record; got rc=${rc18c}"
+  echo "${out18c}" | sed 's/^/      /'
+  [[ -f "${JSON18C}" ]] && echo "      json: $(cat "${JSON18C}")"
+fi
+
+# ---------------------------------------------------------------------------
 # Scenario 19 — H-AUDIT-ATOMIC-WRITE: an interruption between finishing the
 # temp-file write and the atomic rename must leave a pre-existing target
 # record BYTE-IDENTICAL, never truncated or partially overwritten. Before

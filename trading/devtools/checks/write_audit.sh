@@ -19,7 +19,7 @@
 #     --structural APPROVED \
 #     --behavioral APPROVED \
 #     --overall    APPROVED \
-#     [--harness-gap "description of what the harness missed"] \
+#     [--harness-gap "description of what the harness missed"] \  # recorded on ANY verdict, not just NEEDS_REWORK
 #     [--quality-score 4] \
 #     [--pass-count 8] \
 #     [--fail-count 0] \
@@ -143,11 +143,24 @@ for verdict_name in structural behavioral overall; do
   esac
 done
 
-# harness_gap is only meaningful on NEEDS_REWORK
-if [ "$OVERALL" = "APPROVED" ] && [ -n "$HARNESS_GAP" ]; then
-  echo "WARNING: --harness-gap is only meaningful when --overall is NEEDS_REWORK; ignoring." >&2
-  HARNESS_GAP=""
-fi
+# harness_gap is recorded regardless of --overall
+# (H-AUDIT-HARNESS-GAP-DROPPED-ON-APPROVED, dev/status/harness.md). A harness
+# gap is a statement about the HARNESS ("here is a check the automation
+# should have but doesn't"), not a statement about the verdict the review
+# happened to land on -- a real gap can be filed and then the PR still ends
+# APPROVED after rework, which is the process working as intended, not a
+# reason to discard the finding. Previously this script dropped the value
+# whenever --overall was APPROVED, which biased the corpus toward gaps
+# review never recovered from (the opposite of what a "what should we
+# automate" read wants to see) -- demonstrated live on #2251, where
+# qc-behavioral filed a real LINTER_CANDIDATE gap and the PR still ended
+# APPROVED. If a future consumer wants only the NEEDS_REWORK-scoped subset,
+# it should filter by (overall_qc, harness_gap) together at READ time
+# (e.g. deep_scan/check_06_qc_calibration.sh), not have the value discarded
+# here at WRITE time. As of this fix no consumer reads this field at all --
+# record_qc_audit.sh never populates --harness-gap either -- so there is no
+# existing verdict-scoped assumption elsewhere that needs updating in
+# tandem with this change.
 
 # --- Locate repo root ---
 
