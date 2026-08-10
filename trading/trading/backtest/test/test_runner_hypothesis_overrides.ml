@@ -700,6 +700,32 @@ let test_resistance_min_history_bars_axis_resolves_via_overlay_validator _ =
   assert_that merged.resistance_min_history_bars (equal_to 520)
 
 (* -------------------------------------------------------------------- *)
+(* entry_freshness_basis — R1/R2 wiring for F1 (default-off variant)      *)
+(* -------------------------------------------------------------------- *)
+
+(** [entry_freshness_basis] defaults to [Ma_cross] — the Stage-2 admission clock
+    still counts from the MA cross, so every existing golden/baseline replays
+    unchanged ([.claude/rules/experiment-flag-discipline.md] R1). *)
+let test_default_entry_freshness_basis_is_ma_cross _ =
+  let cfg = _default_config () in
+  assert_that cfg.entry_freshness_basis
+    (equal_to Entry_freshness.Ma_cross)
+
+(** Axis reachability (experiment-flag-discipline R2): the
+    [((entry_freshness_basis Range_top_breakout))] override resolves through the
+    {b real} [Overlay_validator.apply_overrides] (the sweep / WF-CV path) with no
+    unknown-key error and lands the armed variant — this is what makes
+    [((flag entry_freshness_basis) (values (Ma_cross Range_top_breakout)))] a
+    valid [Variant_matrix] axis on landing. *)
+let test_entry_freshness_basis_axis_resolves_via_overlay_validator _ =
+  let merged =
+    Backtest.Overlay_validator.apply_overrides (_default_config ())
+      [ Sexp.of_string "((entry_freshness_basis Range_top_breakout))" ]
+  in
+  assert_that merged.entry_freshness_basis
+    (equal_to Entry_freshness.Range_top_breakout)
+
+(* -------------------------------------------------------------------- *)
 (* screening_config.failed_breakout_tolerance_pct — failed-breakout gate  *)
 (* -------------------------------------------------------------------- *)
 
@@ -828,6 +854,10 @@ let suite =
          >:: test_override_screening_failed_breakout_tolerance;
          "failed_breakout_tolerance_pct axis resolves via Overlay_validator"
          >:: test_failed_breakout_tolerance_axis_resolves_via_overlay_validator;
+         "default entry_freshness_basis is Ma_cross"
+         >:: test_default_entry_freshness_basis_is_ma_cross;
+         "entry_freshness_basis axis resolves via Overlay_validator"
+         >:: test_entry_freshness_basis_axis_resolves_via_overlay_validator;
        ]
 
 let () = run_test_tt_main suite

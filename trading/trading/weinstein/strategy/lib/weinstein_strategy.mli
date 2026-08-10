@@ -821,6 +821,15 @@ type config = {
           (admission / grading / stage classification unchanged); default [0] =
           off, bit-identical baselines (R1). See
           [Weinstein_strategy_config.entry_anchor_local_range_weeks]. *)
+  entry_freshness_basis : Entry_freshness.basis;
+      [@sexp.default Entry_freshness.Ma_cross]
+      (** F1 — which event starts the Stage-2 admission clock. [Ma_cross]
+          (default) counts [weeks_advancing] from the MA cross, exactly as
+          today (R1, bit-identical baselines). [Range_top_breakout] measures
+          freshness from the breakout above the ticket anchor instead — the
+          book's own Stage-2 start event (§1) with §4.1's MA conditions kept
+          explicit — replacing, not widening, the [early_stage2_max_weeks]
+          window. See [Weinstein_strategy_config.entry_freshness_basis]. *)
   stop_anchor_at_entry_base : bool; [@sexp.default false]
       (** Book-faithful initial-stop re-anchoring for E-anchored entries (user
           go 2026-08-06). When [true] AND the entry is E-anchored (effective

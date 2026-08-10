@@ -134,6 +134,9 @@ type config = {
   sim_entry_trigger_at_suggested : bool; [@sexp.default false]
       (** See [.mli]. *)
   entry_anchor_local_range_weeks : int; [@sexp.default 0]  (** See [.mli]. *)
+  entry_freshness_basis : Entry_freshness.basis;
+      [@sexp.default Entry_freshness.Ma_cross]
+      (** See [.mli]. *)
   stop_anchor_at_entry_base : bool; [@sexp.default false]  (** See [.mli]. *)
   sim_entry_fill_next_open : bool; [@sexp.default false]  (** See [.mli]. *)
   freeze_entry_at_first_breakout : bool; [@sexp.default false]
@@ -239,6 +242,7 @@ let default_config ~universe ~index_symbol =
     enable_sim_entry_stoplimit = false;
     sim_entry_trigger_at_suggested = false;
     entry_anchor_local_range_weeks = 0;
+    entry_freshness_basis = Entry_freshness.Ma_cross;
     stop_anchor_at_entry_base = false;
     sim_entry_fill_next_open = false;
     freeze_entry_at_first_breakout = false;

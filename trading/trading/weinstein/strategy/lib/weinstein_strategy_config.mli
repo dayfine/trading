@@ -1291,6 +1291,60 @@ type config = {
           [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides]. Per
           the experiment discipline it stays default-off until a ledger ACCEPT
           (WF-CV per the honest-ladder plan). *)
+  entry_freshness_basis : Entry_freshness.basis;
+      [@sexp.default Entry_freshness.Ma_cross]
+      (** F1 — which event starts the Stage-2 admission clock (plan
+          [dev/plans/entry-ticket-async-v2-2026-08-10.md] §2 M1 / §3 F1).
+
+          {b The mis-mapping.} [docs/design/weinstein-book-reference.md] §1 says
+          Stage 2 {i begins} when the stock breaks out above the top of the
+          resistance zone AND above the 30-week MA; Stage 1 explicitly has price
+          tossed above and below the MA for months while it bases. Our stage
+          classifier starts [weeks_advancing] at the {b MA cross}, so a name that
+          crossed its MA ten weeks ago but is still coiled under its range top
+          has aged out of the [early_stage2_max_weeks <= 4] admission window
+          before the book's Stage-2 week one has happened. Ladder v3
+          ([dev/notes/ladder-v3-faithful-stoplimit-2026-08-09.md]) traced the
+          structural exclusion of the crash-recovery cohort to exactly this.
+
+          {b [Ma_cross] (default, no-op).} Today's clock, verbatim. R1: every
+          existing baseline / golden is bit-identical — [Stock_analysis.t
+          .range_top_freshness] is [None] and [is_breakout_candidate] runs its
+          pre-F1 arms unchanged.
+
+          {b [Range_top_breakout] (armed).} Freshness is measured from the
+          breakout above the ticket anchor
+          ([entry_anchor_local_range_weeks] → [Stock_analysis.t.local_range_top]
+          — deliberately the {i same} level the resting order uses, so the
+          freshness test and the ticket cannot drift apart). A non-late Stage-2
+          candidate is admitted iff the close is at or within
+          [Entry_freshness.proximity_pct] (5%) below that anchor {b and} the MA
+          is not declining {b and} the anchor clears the MA — §4.1 requirements
+          1–3 kept explicit, because "a breakout below a declining MA is a trap,
+          not a buy" (Ch. 3, Western Union). The MA-cross age is not consulted:
+          the basis {b replaces} that window rather than widening it, so this is
+          not a stealth re-run of the rejected continuation (#1366) or
+          early-admission axes — the [<= 4] value itself is untouched.
+
+          {b Interaction with [reject_declining_ma_long_entry] (#1775).} That
+          flag is a later strategy-level veto on long entries taken while the MA
+          declines. F1 enforces the same §4.1 condition earlier and against the
+          {i anchor} (the level a resting ticket actually fills at), so the two
+          compose without conflict: an armed basis never admits a candidate the
+          #1775 gate would then have to reject on MA direction, and leaving
+          #1775 off does not weaken F1's own check.
+
+          {b Faithfulness (W1/W2).} Spine intact — Stage-2-only, volume
+          confirmation, and the macro/sector gates are untouched; this moves the
+          admission clock onto the book's own Stage-2 start event, and the
+          crossing requirement is enforced {i better} because the ticket cannot
+          fill without the cross.
+
+          R2: real config field, axis-expressible as
+          [((flag entry_freshness_basis) (values (Ma_cross Range_top_breakout)))]
+          via [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides].
+          R3: no default is flipped by this PR — it stays [Ma_cross] until a
+          ledger ACCEPT plus the promotion-confirmation grid. *)
   stop_anchor_at_entry_base : bool; [@sexp.default false]
       (** Book-faithful initial-stop re-anchoring for E-anchored entries (user
           go 2026-08-06; note [dev/notes/honest-ladder-2026-08-05.md]). The
