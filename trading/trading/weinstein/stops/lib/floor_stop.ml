@@ -154,6 +154,7 @@ let split_safe_basis_of_callbacks ~config ~callbacks =
 let _find_level ~config ~side ~callbacks =
   Support_floor.find_recent_level_with_callbacks
     ~anchor_mode:config.support_floor_anchor_mode
+    ~anchor_scope:config.support_floor_anchor_scope
     ~callbacks:(_scan_callbacks ~config ~callbacks)
     ~side ~min_pullback_pct:config.min_correction_pct ()
 

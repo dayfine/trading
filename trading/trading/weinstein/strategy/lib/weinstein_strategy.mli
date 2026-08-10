@@ -195,6 +195,12 @@ module Audit_recorder = Audit_recorder
     strategy emits raw events; backtest layers wrap a {!Backtest.Trade_audit.t}
     collector. See {!Audit_recorder}. *)
 
+module Stop_width_mode = Stop_width_mode
+(** F3 wide-stop admission policy ([Drop_over_max] vs [Size_down]). Re-exposed
+    so callers driving {!Entry_audit_capture.make_entry_transition} out-of-band
+    (and tests pinning the config-gated behaviour) can build the policy. See
+    {!Stop_width_mode} for the honest-citation framing. *)
+
 module Entry_audit_capture = Entry_audit_capture
 (** Per-candidate entry construction + audit emission. Factored out of the main
     strategy file to keep it under the file-length cap. See
@@ -863,6 +869,26 @@ type config = {
           ticket-level (spine / admission / grading / stops unchanged). Default
           [false] = off, bit-identical baselines (R1). See
           [Weinstein_strategy_config.freeze_entry_at_first_breakout]. *)
+  stop_width_mode : Stop_width_mode.t;
+      [@sexp.default Stop_width_mode.Drop_over_max]
+      (** F3 wide-stop admission policy (plan
+          [dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F3).
+          [Drop_over_max] (default) is today's G15 step-3 drop of any candidate
+          whose structural initial stop sits further than
+          [stops_config.max_stop_distance_pct] from entry; [Size_down] admits it
+          (up to {!stop_width_size_down_max_pct}) and lets fixed-risk sizing
+          shrink the share count instead. Explicitly a tolerated-participation
+          READING of §5.1, not a documented book mechanism — the faithful
+          alternative is [stops_config.support_floor_anchor_scope = Nearest].
+          Default [Drop_over_max] = bit-identical baselines (R1). See
+          [Weinstein_strategy_config.stop_width_mode] and {!Stop_width_mode}. *)
+  stop_width_size_down_max_pct : float; [@sexp.default 0.0]
+      (** Sanity ceiling for [stop_width_mode = Size_down]; distances above it
+          are still dropped. [0.0] (default) falls back to
+          [stops_config.max_stop_distance_pct], so an unconfigured [Size_down]
+          admits the same population [Drop_over_max] does. Unread under
+          [Drop_over_max]; default is an exact no-op (R1). See
+          [Weinstein_strategy_config.stop_width_size_down_max_pct]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
