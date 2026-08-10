@@ -9,6 +9,9 @@
     - the analysis panels populated from the reused report aggregates;
     - graceful benchmark / utilization omission when no bar source is supplied,
       and their presence when one is;
+    - the per-series price basis: with a split-straddling mark supplier whose
+      adjusted and raw columns disagree, the benchmark must read [Adjusted] and
+      the capital-utilization series [Raw] (the G4 contract);
     - JS-string escaping of an adversarial symbol. *)
 
 open OUnit2
@@ -255,13 +258,13 @@ let test_no_snapshot_omits_benchmark_and_util _ =
        ])
 
 let test_bar_close_populates_benchmark_and_util _ =
-  (* Constant close 100 over the 2-point downsampled curve
+  (* Constant close 100 on either basis, over the 2-point downsampled curve
      [(2020-04-24, 1.0M); (2021-03-01, 1.2M)]:
        - benchmark indexes flat to initial cash (100/100) → 1.0M at both dates,
          so each curve row is [date, strat, 1000000];
        - utilization is 0% at 2020-04-24 (no position open yet) and, at
          2021-03-01, (WMT 200sh + MSFT 200sh) * 100 / 1.2M * 100 = 3.3333%. *)
-  let bar_close ~symbol:_ ~as_of:_ = Some 100.0 in
+  let bar_close ~basis:_ ~symbol:_ ~as_of:_ = Some 100.0 in
   let html = _render_fixture ~bar_close () in
   assert_that html
     (all_of
@@ -274,6 +277,77 @@ let test_bar_close_populates_benchmark_and_util _ =
            (equal_to true);
          field (fun s -> _has s "\"util\":[0.0000,3.3333]") (equal_to true);
        ])
+
+(* -- basis split (G4) ---------------------------------------------------- *)
+
+(* A split-straddling mark supplier, i.e. one whose two columns actually
+   disagree — the fixture the single-basis callback could not have.
+
+   [SPY] (the benchmark) 2:1s inside the run: its adjusted history before the
+   split is halved against raw, so the two bases give different *ratios*
+   (adjusted 200/50 = 4x vs raw 200/100 = 2x) and the benchmark line differs by
+   which column it read. The position symbols 4:1 *after* the run, so their
+   adjusted marks are a quarter of raw at every date the report asks about, and
+   the utilization chart differs by 4x. *)
+let _split_date = _date "2020-06-01"
+
+let _straddling_close ~basis ~symbol ~as_of =
+  if String.equal symbol "SPY" then
+    let pre_split = Date.( < ) as_of _split_date in
+    match basis with
+    | HR.Raw -> Some (if pre_split then 100.0 else 200.0)
+    | HR.Adjusted -> Some (if pre_split then 50.0 else 200.0)
+  else match basis with HR.Raw -> Some 400.0 | HR.Adjusted -> Some 100.0
+
+(* The D1 regression pin (qc-behavioral, PR #2251). Over the 2-point curve
+   [(2020-04-24, 1.0M); (2021-03-01, 1.2M)] with the supplier above:
+
+     benchmark on ADJUSTED (correct): base 50 → 1.0M*50/50 = 1.0M, then
+       1.0M*200/50 = 4.0M.                       On raw it would be 2.0M.
+     utilization on RAW (correct):    0% at 2020-04-24 (nothing open), then
+       (WMT 200sh + MSFT 200sh)*400/1.2M*100 = 13.3333%.
+                                                 On adjusted it would be 3.3333%.
+
+   Both cross-negatives are asserted absent, so wiring either series to the
+   other's column fails this test on two counts. *)
+let test_split_straddling_marks_route_each_series_to_its_own_basis _ =
+  let html = _render_fixture ~bar_close:_straddling_close () in
+  let correct_curve =
+    "\"curve\":[[\"2020-04-24\",1000000.0000,1000000.0000],[\"2021-03-01\",1200000.0000,4000000.0000]]"
+  in
+  let raw_basis_curve =
+    "\"curve\":[[\"2020-04-24\",1000000.0000,1000000.0000],[\"2021-03-01\",1200000.0000,2000000.0000]]"
+  in
+  assert_that html
+    (all_of
+       [
+         field (fun s -> _has s "\"has_benchmark\":true") (equal_to true);
+         field (fun s -> _has s correct_curve) (equal_to true);
+         field (fun s -> _has s raw_basis_curve) (equal_to false);
+         field (fun s -> _has s "\"util\":[0.0000,13.3333]") (equal_to true);
+         field (fun s -> _has s "\"util\":[0.0000,3.3333]") (equal_to false);
+       ])
+
+(* The same contract read off the requests rather than the numbers: whatever the
+   marks are, the benchmark symbol must only ever be asked for [Adjusted] and
+   the held positions only ever for [Raw]. AAPL never appears because its
+   holding window (2020-04-25 .. 2020-08-01) covers neither downsampled curve
+   date. *)
+let test_each_series_requests_only_its_own_basis _ =
+  let seen = ref [] in
+  let bar_close ~basis ~symbol ~as_of =
+    seen := (symbol, basis) :: !seen;
+    _straddling_close ~basis ~symbol ~as_of
+  in
+  let _ = _render_fixture ~bar_close () in
+  let label (symbol, basis) =
+    sprintf "%s:%s" symbol
+      (match basis with HR.Adjusted -> "Adjusted" | HR.Raw -> "Raw")
+  in
+  assert_that
+    (List.dedup_and_sort ~compare:String.compare (List.map !seen ~f:label))
+    (elements_are
+       [ equal_to "MSFT:Raw"; equal_to "SPY:Adjusted"; equal_to "WMT:Raw" ])
 
 let _row ~symbol : HR.trade_row =
   {
@@ -388,6 +462,10 @@ let suite =
          >:: test_no_snapshot_omits_benchmark_and_util;
          "bar_close populates benchmark and util"
          >:: test_bar_close_populates_benchmark_and_util;
+         "split straddling marks route each series to its own basis"
+         >:: test_split_straddling_marks_route_each_series_to_its_own_basis;
+         "each series requests only its own basis"
+         >:: test_each_series_requests_only_its_own_basis;
          "symbol escaping" >:: test_symbol_escaping;
          "script-close escaping" >:: test_script_close_escaping;
        ]
