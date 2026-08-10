@@ -160,15 +160,15 @@ let test_is_triple_confirmed_requires_all_three _ =
          ~breakout_price:12.0 ~breakdown_price:10.0 ())
   in
   assert_that
-    (List.map [ confirmed; no_cross; shallow_base ]
+    (List.map
+       [ confirmed; no_cross; shallow_base ]
        ~f:(Entry_ticket_tags.is_triple_confirmed ~strong_volume_threshold:2.0))
     (elements_are [ equal_to true; equal_to false; equal_to false ])
 
 (** The book's ≥40% accumulation signature (§4.5, National Semiconductor /
     Blocker Energy) is the constant the cohort predicate reads. *)
 let test_book_min_in_base_advance_pct_is_forty_percent _ =
-  assert_that Entry_ticket_tags.book_min_in_base_advance_pct
-    (float_equal 0.40)
+  assert_that Entry_ticket_tags.book_min_in_base_advance_pct (float_equal 0.40)
 
 (* ------------------------------------------------------------------ *)
 (* F1 — freshness basis recovery                                        *)

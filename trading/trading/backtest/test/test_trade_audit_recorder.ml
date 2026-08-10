@@ -19,6 +19,7 @@ open OUnit2
 open Core
 open Matchers
 module TA = Backtest.Trade_audit
+module TL = Backtest.Ticket_lifecycle
 module AR = Weinstein_strategy.Audit_recorder
 
 (* ------------------------------------------------------------------ *)
@@ -271,27 +272,24 @@ let test_entry_projection_carries_placement_time_lifecycle _ =
           (all_of
              [
                field
-                 (fun (l : TA.ticket_lifecycle) -> l.placement_date)
+                 (fun (l : TL.t) -> l.placement_date)
                  (equal_to _current_date);
+               field (fun (l : TL.t) -> l.sized_down_wide_stop) (equal_to true);
                field
-                 (fun (l : TA.ticket_lifecycle) -> l.sized_down_wide_stop)
-                 (equal_to true);
+                 (fun (l : TL.t) -> l.freshness_basis)
+                 (equal_to (TL.Range_top_breakout : TL.entry_freshness_basis));
                field
-                 (fun (l : TA.ticket_lifecycle) -> l.freshness_basis)
-                 (equal_to (TA.Range_top_breakout : TA.entry_freshness_basis));
-               field
-                 (fun (l : TA.ticket_lifecycle) -> l.triple_confirmation)
+                 (fun (l : TL.t) -> l.triple_confirmation)
                  (equal_to
                     ({
                        breakout_volume_multiple = Some 3.1;
                        rs_zero_cross = true;
                        in_base_advance_pct = Some 0.62;
                      }
-                      : TA.triple_confirmation));
-               field (fun (l : TA.ticket_lifecycle) -> l.fill_volume) is_none;
+                      : TL.triple_confirmation));
+               field (fun (l : TL.t) -> l.fill_volume) is_none;
                field
-                 (fun (l : TA.ticket_lifecycle) ->
-                   l.ticket_age_weeks_at_fill_or_cancel)
+                 (fun (l : TL.t) -> l.ticket_age_weeks_at_fill_or_cancel)
                  is_none;
              ])))
 
@@ -309,11 +307,9 @@ let test_entry_projection_defaults_to_ma_cross_and_untagged _ =
           (all_of
              [
                field
-                 (fun (l : TA.ticket_lifecycle) -> l.freshness_basis)
-                 (equal_to (TA.Ma_cross : TA.entry_freshness_basis));
-               field
-                 (fun (l : TA.ticket_lifecycle) -> l.sized_down_wide_stop)
-                 (equal_to false);
+                 (fun (l : TL.t) -> l.freshness_basis)
+                 (equal_to (TL.Ma_cross : TL.entry_freshness_basis));
+               field (fun (l : TL.t) -> l.sized_down_wide_stop) (equal_to false);
              ])))
 
 (** Sink-hop pin for the F5 verdict: every {!Volume.breakout_confirmation}
@@ -329,10 +325,10 @@ let test_fill_volume_projects_every_verdict_class _ =
     recorder.record_entry
       (_entry_event ~split_safe_basis:AR.Flag_off
          ~stop_floor_kind:AR.Buffer_fallback ());
-    recorder.record_fill_volume
-      { AR.position_id = "ZZZZ-wein-1"; confirmation };
+    recorder.record_fill_volume { AR.position_id = "ZZZZ-wein-1"; confirmation };
     match TA.get_audit_records trade_audit with
-    | [ r ] -> Option.bind r.TA.entry.ticket_lifecycle ~f:(fun l -> l.fill_volume)
+    | [ r ] ->
+        Option.bind r.TA.entry.ticket_lifecycle ~f:(fun l -> l.fill_volume)
     | records ->
         OUnit2.assert_failure
           (Printf.sprintf "expected exactly 1 audit record, got %d"
@@ -343,17 +339,20 @@ let test_fill_volume_projects_every_verdict_class _ =
        [
          Some (Volume.Spike 3.4);
          Some (Volume.Buildup 2.2);
-         Some (Volume.Unconfirmed { spike_ratio = Some 1.1; buildup_multiple = None });
+         Some
+           (Volume.Unconfirmed
+              { spike_ratio = Some 1.1; buildup_multiple = None });
          None;
        ])
     (elements_are
        [
-         is_some_and (equal_to (TA.Confirmed_spike 3.4));
-         is_some_and (equal_to (TA.Confirmed_buildup 2.2));
+         is_some_and (equal_to (TL.Confirmed_spike 3.4));
+         is_some_and (equal_to (TL.Confirmed_buildup 2.2));
          is_some_and
            (equal_to
-              (TA.Unconfirmed { spike_ratio = Some 1.1; buildup_multiple = None }));
-         is_some_and (equal_to (TA.No_verdict : TA.fill_volume_verdict));
+              (TL.Unconfirmed
+                 { spike_ratio = Some 1.1; buildup_multiple = None }));
+         is_some_and (equal_to (TL.No_verdict : TL.fill_volume_verdict));
        ])
 
 let suite =

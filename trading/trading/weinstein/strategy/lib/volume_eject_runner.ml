@@ -138,22 +138,34 @@ let update ~(config : Weinstein_strategy_config.config) ~volume_config
 (* Audit surface — the same verdict, named rather than thresholded      *)
 (* ------------------------------------------------------------------ *)
 
-(** The §4.2 classification for one position's fill week, or [None] when the
-    position is not an evaluable freshly-filled LONG holding. The inner option
-    is the {b no-verdict} case ([Volume.classify_breakout] found neither branch
-    evaluable) and is deliberately preserved as data. *)
+(** The §4.2 classification of [weekly]'s bar at [event_offset]. [None] is the
+    {b no-verdict} case ([Volume.classify_breakout] found neither branch
+    evaluable) and is deliberately preserved as data rather than collapsed. *)
+let _classification_at ~volume_config ~weekly ~event_offset =
+  Volume.classify_breakout ~config:volume_config
+    ~callbacks:(Volume.callbacks_from_bars ~bars:weekly)
+    ~event_offset
+
+(** [(position_id, classification)] for one position, or [None] when it is not
+    an evaluable freshly-filled LONG holding. *)
 let _confirmation_for_position ~config ~volume_config ~bar_reader ~current_date
     (pos : Position.t) =
   match (pos.Position.side, Position.get_state pos) with
   | Position.Long, Position.Holding { entry_date; _ } ->
-      Option.map
-        (_fill_week_window ~config ~bar_reader ~entry_date ~current_date pos)
-        ~f:(fun (weekly, event_offset) ->
+      _fill_week_window ~config ~bar_reader ~entry_date ~current_date pos
+      |> Option.map ~f:(fun (weekly, event_offset) ->
           ( pos.Position.id,
-            Volume.classify_breakout ~config:volume_config
-              ~callbacks:(Volume.callbacks_from_bars ~bars:weekly)
-              ~event_offset ))
+            _classification_at ~volume_config ~weekly ~event_offset ))
   | _ -> None
+
+let _fold_confirmation ~config ~volume_config ~bar_reader ~current_date acc pos
+    =
+  match
+    _confirmation_for_position ~config ~volume_config ~bar_reader ~current_date
+      pos
+  with
+  | Some row -> row :: acc
+  | None -> acc
 
 let fill_week_confirmations ~(config : Weinstein_strategy_config.config)
     ~volume_config ~is_screening_day ~positions ~bar_reader ~current_date =
@@ -161,9 +173,13 @@ let fill_week_confirmations ~(config : Weinstein_strategy_config.config)
   else if not is_screening_day then []
   else
     Map.fold_right positions ~init:[] ~f:(fun ~key:_ ~data:pos acc ->
-        match
-          _confirmation_for_position ~config ~volume_config ~bar_reader
-            ~current_date pos
-        with
-        | Some entry -> entry :: acc
-        | None -> acc)
+        _fold_confirmation ~config ~volume_config ~bar_reader ~current_date acc
+          pos)
+
+let emit_fill_week_audit ~config ~(audit_recorder : Audit_recorder.t)
+    ~volume_config ~is_screening_day ~positions ~bar_reader ~current_date =
+  fill_week_confirmations ~config ~volume_config ~is_screening_day ~positions
+    ~bar_reader ~current_date
+  |> List.iter ~f:(fun (position_id, confirmation) ->
+      audit_recorder.record_fill_volume
+        { Audit_recorder.position_id; confirmation })

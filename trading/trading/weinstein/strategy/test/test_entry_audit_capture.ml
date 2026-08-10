@@ -984,9 +984,8 @@ let test_build_entry_event_propagates_sized_down_wide_stop _ =
   in
   let tag_of sized_down_wide_stop =
     let _, meta =
-      _stub_trans_and_meta ~sized_down_wide_stop
-        ~side:Trading_base.Types.Long ~shares:100 ~effective_entry_price:100.0
-        ()
+      _stub_trans_and_meta ~sized_down_wide_stop ~side:Trading_base.Types.Long
+        ~shares:100 ~effective_entry_price:100.0 ()
     in
     (Entry_audit_capture.build_entry_event ~macro:_macro_fixture ~current_date
        ~candidate:cand ~meta ~alternatives:[])
@@ -1002,8 +1001,9 @@ let test_build_entry_event_propagates_sized_down_wide_stop _ =
     at this hop fails. *)
 let test_build_entry_event_carries_freshness_basis_and_triple_confirmation _ =
   let current_date = Date.of_string "2024-06-14" in
-  let base = _long_candidate ~ticker:"STUB" ~suggested_entry:100.0
-      ~suggested_stop:95.0 ~as_of_date:current_date
+  let base =
+    _long_candidate ~ticker:"STUB" ~suggested_entry:100.0 ~suggested_stop:95.0
+      ~as_of_date:current_date
   in
   let cand =
     {

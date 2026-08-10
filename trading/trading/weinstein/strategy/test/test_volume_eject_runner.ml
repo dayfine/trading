@@ -382,8 +382,7 @@ let test_confirmations_distinguish_all_four_verdict_classes _ =
     _confirmations ~positions:(_held_positions ()) ~weekly_volumes ()
   in
   assert_that
-    (List.concat_map
-       ~f:summarise
+    (List.concat_map ~f:summarise
        [
          _spike_volumes;
          _buildup_volumes;
@@ -416,9 +415,9 @@ let test_confirmations_share_the_eject_paths_eligibility _ =
     (elements_are [ equal_to 0; equal_to 0; equal_to 0 ])
 
 (** R1: under the default config — and under the flag armed without the
-    StopLimit family — no at-fill check runs, so the audit surface emits
-    nothing and reads no bars. A mid-week tick is likewise silent (the fill
-    week has not closed). *)
+    StopLimit family — no at-fill check runs, so the audit surface emits nothing
+    and reads no bars. A mid-week tick is likewise silent (the fill week has not
+    closed). *)
 let test_confirmations_are_empty_when_unarmed_or_midweek _ =
   let unarmed = _default_config () in
   let flag_only =
@@ -434,8 +433,7 @@ let test_confirmations_are_empty_when_unarmed_or_midweek _ =
       _confirmations ~config:flag_only ~positions:(_held_positions ())
         ~weekly_volumes:_unconfirmed_volumes ();
       _confirmations ~is_screening_day:false ~current_date:_midweek
-        ~positions:(_held_positions ())
-        ~weekly_volumes:_unconfirmed_volumes ();
+        ~positions:(_held_positions ()) ~weekly_volumes:_unconfirmed_volumes ();
     ]
   in
   assert_that
@@ -462,8 +460,8 @@ let _friday_weekly_view : Snapshot_runtime.Snapshot_bar_views.weekly_view =
 (** Drive the whole special-exit pipeline with a capturing recorder and read
     back the [fill_volume_event]s it emitted. This pins the glue between
     {!Volume_eject_runner.fill_week_confirmations} and
-    {!Audit_recorder.record_fill_volume} — the runner-level tests above only
-    pin the classification itself. *)
+    {!Audit_recorder.record_fill_volume} — the runner-level tests above only pin
+    the classification itself. *)
 let _fill_volume_events_from_run ~config ~weekly_volumes =
   let captured = ref [] in
   let recorder : Audit_recorder.t =

@@ -127,6 +127,25 @@ val fill_week_confirmations :
     (the default) or [is_screening_day] is [false]. Order follows [positions]
     key order. Pure: no transitions, no state, no effect on the run. *)
 
+val emit_fill_week_audit :
+  config:Weinstein_strategy_config.config ->
+  audit_recorder:Audit_recorder.t ->
+  volume_config:Volume.config ->
+  is_screening_day:bool ->
+  positions:Position.t Map.M(String).t ->
+  bar_reader:Bar_reader.t ->
+  current_date:Date.t ->
+  unit
+(** Route every {!fill_week_confirmations} row through
+    [audit_recorder.record_fill_volume], so the per-entry [Backtest.Trade_audit]
+    row records the fill-week verdict. Lives next to the runner that owns the
+    verdict rather than in the exit pipeline that calls it.
+
+    Inherits {!fill_week_confirmations}'s guards verbatim: a no-op emitting
+    nothing, and reading no bars, unless F5 is armed on a screening tick.
+    Observational only — emits no transitions and cannot influence any simulated
+    number. *)
+
 val eject_label : string
 (** ["volume_eject"] — the [StrategySignal] label carried by every transition
     this runner emits (the [Volume_eject] audit tag). Exposed so tests and audit

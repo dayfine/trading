@@ -26,23 +26,24 @@ let _split_safe_basis_of_event = function
    build here — the last point before [trade_audit.sexp] where a dropped value
    would become invisible. *)
 let _fill_volume_of_confirmation :
-    Volume.breakout_confirmation option -> Trade_audit.fill_volume_verdict =
-  function
-  | None -> Trade_audit.No_verdict
-  | Some (Volume.Spike ratio) -> Trade_audit.Confirmed_spike ratio
-  | Some (Volume.Buildup multiple) -> Trade_audit.Confirmed_buildup multiple
+    Volume.breakout_confirmation option -> Ticket_lifecycle.fill_volume_verdict
+    = function
+  | None -> Ticket_lifecycle.No_verdict
+  | Some (Volume.Spike ratio) -> Ticket_lifecycle.Confirmed_spike ratio
+  | Some (Volume.Buildup multiple) ->
+      Ticket_lifecycle.Confirmed_buildup multiple
   | Some (Volume.Unconfirmed { spike_ratio; buildup_multiple }) ->
-      Trade_audit.Unconfirmed { spike_ratio; buildup_multiple }
+      Ticket_lifecycle.Unconfirmed { spike_ratio; buildup_multiple }
 
 let _freshness_basis_of_event :
-    Weinstein_strategy.Entry_freshness.basis -> Trade_audit.entry_freshness_basis
-    = function
-  | Ma_cross -> Trade_audit.Ma_cross
-  | Range_top_breakout -> Trade_audit.Range_top_breakout
+    Weinstein_strategy.Entry_freshness.basis ->
+    Ticket_lifecycle.entry_freshness_basis = function
+  | Ma_cross -> Ticket_lifecycle.Ma_cross
+  | Range_top_breakout -> Ticket_lifecycle.Range_top_breakout
 
 let _triple_confirmation_of_event
     (t : Weinstein_strategy.Entry_ticket_tags.triple_confirmation) :
-    Trade_audit.triple_confirmation =
+    Ticket_lifecycle.triple_confirmation =
   {
     breakout_volume_multiple = t.breakout_volume_multiple;
     rs_zero_cross = t.rs_zero_cross;
@@ -54,8 +55,7 @@ let _triple_confirmation_of_event
     placement and is merged in later — by {!Trade_audit.record_fill_volume} /
     {!Trade_audit.record_transitions} at drain time and by
     {!Execution_faithfulness.enrich} at the runner. *)
-let _ticket_lifecycle_of_event (e : AR.entry_event) :
-    Trade_audit.ticket_lifecycle =
+let _ticket_lifecycle_of_event (e : AR.entry_event) : Ticket_lifecycle.t =
   {
     placement_date = e.current_date;
     ticket_age_weeks_at_fill_or_cancel = None;
@@ -226,6 +226,7 @@ let of_collector ~(trade_audit : Trade_audit.t)
       Force_liquidation_log.record force_liquidation_log;
     record_fill_volume =
       (fun (event : AR.fill_volume_event) ->
-        Trade_audit.record_fill_volume trade_audit ~position_id:event.position_id
+        Trade_audit.record_fill_volume trade_audit
+          ~position_id:event.position_id
           (_fill_volume_of_confirmation event.confirmation));
   }

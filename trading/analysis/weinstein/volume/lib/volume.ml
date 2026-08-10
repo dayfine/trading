@@ -164,10 +164,9 @@ let _positive_mean (vs : float list) : float option =
     Option.some_if (Float.is_finite m && Float.(m > 0.0)) m
 
 (** Branch (a)'s measured quantity — the event bar's volume over the average of
-    the prior [lookback_bars] bars. Reuses
-    {!analyze_breakout_with_callbacks}'s ratio so the spike branch and the
-    screen-time confirmation grade can never drift. [None] = branch (a) could
-    not be evaluated. *)
+    the prior [lookback_bars] bars. Reuses {!analyze_breakout_with_callbacks}'s
+    ratio so the spike branch and the screen-time confirmation grade can never
+    drift. [None] = branch (a) could not be evaluated. *)
 let _spike_ratio ~config ~callbacks ~event_offset : float option =
   Option.map (analyze_breakout_with_callbacks ~config ~callbacks ~event_offset)
     ~f:(fun r -> r.volume_ratio)
@@ -213,27 +212,34 @@ type breakout_confirmation =
     }
 [@@deriving show, eq]
 
+(** Branch (b)'s full verdict for an already-measured [multiple]: it clears the
+    threshold {i and} the event bar itself shows some increase. *)
+let _buildup_confirms ~config ~callbacks ~event_offset ~multiple =
+  Float.(multiple >= config.strong_threshold)
+  && _increase_on_event_bar ~get_volume:callbacks.get_volume ~event_offset
+
 (* Branch precedence: (a) is checked first so a bar clearing BOTH branches is
    reported as the spike — the book's headline case, and the one
    [analyze_breakout]'s [confirmation] grade already names. The verdict itself
    is branch-agnostic ([confirms_breakout] below), so precedence is a labelling
    choice, never a behaviour one. *)
-let classify_breakout ~(config : config) ~(callbacks : callbacks) ~event_offset :
-    breakout_confirmation option =
+let _classify_of ~config ~callbacks ~event_offset ~spike_ratio ~buildup_multiple
+    =
+  match (spike_ratio, buildup_multiple) with
+  | Some r, _ when Float.(r >= config.strong_threshold) -> Some (Spike r)
+  | _, Some m
+    when _buildup_confirms ~config ~callbacks ~event_offset ~multiple:m ->
+      Some (Buildup m)
+  | None, None -> None
+  | _ -> Some (Unconfirmed { spike_ratio; buildup_multiple })
+
+let classify_breakout ~(config : config) ~(callbacks : callbacks) ~event_offset
+    : breakout_confirmation option =
   if event_offset < 0 then None
   else
-    let spike_ratio = _spike_ratio ~config ~callbacks ~event_offset in
-    let buildup_multiple = _buildup_multiple ~config ~callbacks ~event_offset in
-    let clears r = Float.(r >= config.strong_threshold) in
-    match (spike_ratio, buildup_multiple) with
-    | Some r, _ when clears r -> Some (Spike r)
-    | _, Some m
-      when clears m
-           && _increase_on_event_bar ~get_volume:callbacks.get_volume
-                ~event_offset ->
-        Some (Buildup m)
-    | None, None -> None
-    | _ -> Some (Unconfirmed { spike_ratio; buildup_multiple })
+    _classify_of ~config ~callbacks ~event_offset
+      ~spike_ratio:(_spike_ratio ~config ~callbacks ~event_offset)
+      ~buildup_multiple:(_buildup_multiple ~config ~callbacks ~event_offset)
 
 let confirms_breakout ~(config : config) ~(callbacks : callbacks) ~event_offset
     : bool option =

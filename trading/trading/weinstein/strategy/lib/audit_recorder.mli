@@ -133,10 +133,10 @@ type entry_event = {
           [stops_config.max_stop_distance_pct] from entry, so the entry exists
           only because the §5.1 drop was waived and its share count is the
           risk-parity-shrunk one. Always [false] under the default
-          [Drop_over_max] (such candidates are dropped, never entered).
-          Carried straight from
-          {!Entry_audit_capture.entry_meta.sized_down_wide_stop} — #2258
-          deliberately deferred persisting it to the PR-5 audit-fields step. *)
+          [Drop_over_max] (such candidates are dropped, never entered). Carried
+          straight from {!Entry_audit_capture.entry_meta.sized_down_wide_stop} —
+          #2258 deliberately deferred persisting it to the PR-5 audit-fields
+          step. *)
   freshness_basis : Entry_freshness.basis;
       (** F1: which admission clock was in force when the candidate was
           analysed, recovered from the analysis by
@@ -165,8 +165,8 @@ type fill_volume_event = {
 
     Emitted for {b every} evaluated position, not only the ejected ones — the
     eject transition already surfaces in [trades.csv] via its [volume_eject]
-    exit trigger, so on its own it cannot separate "confirmed and held" from
-    "no verdict and held". Only emitted when
+    exit trigger, so on its own it cannot separate "confirmed and held" from "no
+    verdict and held". Only emitted when
     [Weinstein_strategy_config.volume_confirm_at_fill_armed] is [true]; under
     the default config no event is ever produced and the audit row's verdict
     stays absent. *)

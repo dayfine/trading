@@ -19,6 +19,7 @@ open Core
 open Matchers
 module EF = Backtest.Execution_faithfulness
 module TA = Backtest.Trade_audit
+module TL = Backtest.Ticket_lifecycle
 
 let _date d = Date.of_string d
 
@@ -310,12 +311,12 @@ let test_degenerate_trigger_falls_back_to_suggested_entry _ =
 
 (* PR-5 ticket age at fill --------------------------------------------- *)
 
-let _lifecycle ~placement_date : TA.ticket_lifecycle =
+let _lifecycle ~placement_date : TL.t =
   {
     placement_date;
     ticket_age_weeks_at_fill_or_cancel = None;
     fill_volume = None;
-    freshness_basis = TA.Ma_cross;
+    freshness_basis = TL.Ma_cross;
     sized_down_wide_stop = false;
     triple_confirmation =
       {
@@ -376,8 +377,7 @@ let test_enrich_leaves_a_pre_pr5_row_without_a_lifecycle _ =
                is_none;
              field
                (fun (r : TA.audit_record) -> r.execution)
-               (is_some_and
-                  (field (fun e -> e.TA.faithful) (equal_to true)));
+               (is_some_and (field (fun e -> e.TA.faithful) (equal_to true)));
            ];
        ])
 

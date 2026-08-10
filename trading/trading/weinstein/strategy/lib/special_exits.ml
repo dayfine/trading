@@ -201,9 +201,21 @@ let _run_volume_eject_exit ~config ~record_force_exit ~positions
          ~cooldown_weeks:0 ~label:Volume_eject_runner.eject_label);
   volume_eject_ts
 
+(* PR-5 capture: the F5 fill-week §4.2 classification for EVERY evaluated
+   position, not just the ejected ones. Arming is re-checked here so the default
+   never builds the config. See {!Volume_eject_runner.emit_fill_week_audit}. *)
+let _emit_fill_volume_audit ~config ~audit_recorder ~positions ~bar_reader
+    ~is_friday ~current_date =
+  if Weinstein_strategy_config.volume_confirm_at_fill_armed config then
+    Volume_eject_runner.emit_fill_week_audit ~config ~audit_recorder
+      ~volume_config:
+        (Weinstein_strategy_screening._stock_analysis_config_for ~config)
+          .Stock_analysis.volume
+      ~is_screening_day:is_friday ~positions ~bar_reader ~current_date
+
 let _run_volume_eject_special_exit ~config ~record_force_exit ~positions
-    ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit ~skip_ids
-    ~force_exit_ts ~current_date =
+    ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit
+    ~audit_recorder ~skip_ids ~force_exit_ts ~current_date =
   let volume_skip_ids =
     Set.union skip_ids (Transition_assembly.trigger_exit_ids_of force_exit_ts)
   in
@@ -213,34 +225,16 @@ let _run_volume_eject_special_exit ~config ~record_force_exit ~positions
       ~skip_ids:volume_skip_ids ~current_date
   in
   emit_audit volume_eject_ts;
+  _emit_fill_volume_audit ~config ~audit_recorder ~positions ~bar_reader
+    ~is_friday ~current_date;
   volume_eject_ts @ force_exit_ts
-
-(* PR-5 audit capture: record the F5 fill-week §4.2 classification for EVERY
-   position the eject runner evaluates, not just the ejected ones. The eject
-   transition already labels itself in [trades.csv], so on its own it cannot
-   separate "confirmed and held" from "no verdict and held" — and the latter is
-   the cell a ladder-v4 F5 arm must report alongside its eject rate. Reads the
-   same fill-week window the eject path reads; emits nothing (and reads no bars)
-   under the default unarmed config. *)
-let _emit_fill_volume_audit ~config ~(audit_recorder : Audit_recorder.t)
-    ~positions ~bar_reader ~is_friday ~current_date =
-  if Weinstein_strategy_config.volume_confirm_at_fill_armed config then
-    let stock_analysis_config =
-      Weinstein_strategy_screening._stock_analysis_config_for ~config
-    in
-    Volume_eject_runner.fill_week_confirmations ~config
-      ~volume_config:stock_analysis_config.Stock_analysis.volume
-      ~is_screening_day:is_friday ~positions ~bar_reader ~current_date
-    |> List.iter ~f:(fun (position_id, confirmation) ->
-           audit_recorder.record_fill_volume
-             { Audit_recorder.position_id; confirmation })
 
 (* The three trailing special exits (liquidity, extension, then the F5 volume
    eject) share the same emit/merge shape; threading them here keeps [run] under
    the length cap. *)
 let _run_trailing_special_exits ~config ~record_force_exit ~positions
-    ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit ~skip_ids
-    ~force_exit_ts ~current_date =
+    ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit
+    ~audit_recorder ~skip_ids ~force_exit_ts ~current_date =
   let force_exit_ts =
     _run_liquidity_special_exit ~config ~record_force_exit ~positions
       ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit
@@ -252,8 +246,8 @@ let _run_trailing_special_exits ~config ~record_force_exit ~positions
       ~skip_ids ~force_exit_ts ~current_date
   in
   _run_volume_eject_special_exit ~config ~record_force_exit ~positions
-    ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit ~skip_ids
-    ~force_exit_ts ~current_date
+    ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit
+    ~audit_recorder ~skip_ids ~force_exit_ts ~current_date
 
 let run ~config ~record_force_exit ~positions ~last_stop_out_dates
     ~(portfolio : Portfolio_view.t) ~get_price ~peak_tracker ~audit_recorder
@@ -271,8 +265,6 @@ let run ~config ~record_force_exit ~positions ~last_stop_out_dates
   let is_friday =
     Weinstein_strategy_screening.is_screening_day_view index_view
   in
-  _emit_fill_volume_audit ~config ~audit_recorder ~positions ~bar_reader
-    ~is_friday ~current_date;
   let stage3_ts =
     _run_stage3_force_exit ~config ~record_force_exit ~positions
       ~last_stop_out_dates ~prior_stage_ma_values ~stage3_streaks ~get_price
@@ -298,7 +290,7 @@ let run ~config ~record_force_exit ~positions ~last_stop_out_dates
   let force_exit_ts =
     _run_trailing_special_exits ~config ~record_force_exit ~positions
       ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit
-      ~skip_ids ~force_exit_ts ~current_date
+      ~audit_recorder ~skip_ids ~force_exit_ts ~current_date
   in
   ( force_exit_ts,
     stage3_ts,

@@ -299,7 +299,8 @@ let _summary = function
     measurable" — the cell the F5 runner holds on. *)
 let test_classify_names_each_branch_and_the_no_verdict_case _ =
   assert_that
-    (List.map ~f:(fun v -> _summary (_classify v))
+    (List.map
+       ~f:(fun v -> _summary (_classify v))
        [
          [ 1000; 1000; 1000; 1000; 3000 ];
          [ 500; 500; 500; 500; 1200; 1300; 1400; 1500 ];

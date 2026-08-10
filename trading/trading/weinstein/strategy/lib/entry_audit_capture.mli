@@ -128,11 +128,11 @@ val build_entry_event :
     [candidate.suggested_entry], so consumers can compare the screener's
     pre-fill intent against the strategy's realised entry.
 
-    Also stamps the PR-5 placement-time ticket tags: [sized_down_wide_stop]
-    from [meta], and the F1 freshness basis + F6 §4.5 triple-confirmation
-    measurements projected off [candidate.analysis] by {!Entry_ticket_tags}.
-    All three are pure reads of values already in scope — no extra bar walk,
-    no behaviour change. *)
+    Also stamps the PR-5 placement-time ticket tags: [sized_down_wide_stop] from
+    [meta], and the F1 freshness basis + F6 §4.5 triple-confirmation
+    measurements projected off [candidate.analysis] by {!Entry_ticket_tags}. All
+    three are pure reads of values already in scope — no extra bar walk, no
+    behaviour change. *)
 
 val emit_entries :
   audit_recorder:Audit_recorder.t ->

@@ -102,10 +102,10 @@ val analyze_breakout_with_callbacks :
     Exists because the at-fill audit (plan
     [dev/plans/entry-ticket-async-v2-2026-08-10.md] §4 PR-5) must be able to
     separate the two sanctioned confirmations from each other and from a
-    measured non-confirmation. "Confirmed" alone cannot answer "did the
-    build-up branch carry the arm", and a bare [false] cannot be told apart
-    from the {i no-verdict} case ([classify_breakout] returning [None]), which
-    is the population the F5 runner {b holds} rather than ejects.
+    measured non-confirmation. "Confirmed" alone cannot answer "did the build-up
+    branch carry the arm", and a bare [false] cannot be told apart from the
+    {i no-verdict} case ([classify_breakout] returning [None]), which is the
+    population the F5 runner {b holds} rather than ejects.
 
     Each constructor carries the quantity that decided it, so the audit row
     records the measurement and not only the label. *)

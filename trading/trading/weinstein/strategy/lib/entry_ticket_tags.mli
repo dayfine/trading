@@ -25,17 +25,17 @@ type triple_confirmation = {
   rs_zero_cross : bool;
       (** §4.5 (2) "RS breakout" — the RS line moved from near the zero line
           into positive territory on the breakout, i.e. the classified trend is
-          [Weinstein_types.Bullish_crossover] (the book's own "A+ bonus"
-          state). [false] when the analysis carried no RS result — absence of
-          evidence, recorded as "not observed". *)
+          [Weinstein_types.Bullish_crossover] (the book's own "A+ bonus" state).
+          [false] when the analysis carried no RS result — absence of evidence,
+          recorded as "not observed". *)
   in_base_advance_pct : float option;
-      (** §4.5 (3) "pre-breakout advance" — how far the stock advanced {i
-          inside} its base before breaking out, as
-          [(breakout_price - breakdown_price) / breakdown_price]: the base's
-          top over the base's floor, both already computed on the same
-          prior-base window. [None] when either level is undefined or the floor
-          is non-positive. Book reference level:
-          {!book_min_in_base_advance_pct}. *)
+      (** §4.5 (3) "pre-breakout advance" — how far the stock advanced
+          {i inside} its base before breaking out, as
+          [(breakout_price - breakdown_price) / breakdown_price]: the base's top
+          over the base's floor, both already computed on the same prior-base
+          window. [None] when either level is undefined or the floor is
+          non-positive. Book reference level: {!book_min_in_base_advance_pct}.
+      *)
 }
 [@@deriving show, eq]
 (** The three §4.5 "big winner" signals, captured as measurements rather than a
@@ -48,8 +48,7 @@ val book_min_in_base_advance_pct : float
     constant, not a threshold this module applies on its own behalf: only
     {!is_triple_confirmed} reads it, and nothing in the strategy calls that. *)
 
-val triple_confirmation_of_analysis :
-  Stock_analysis.t -> triple_confirmation
+val triple_confirmation_of_analysis : Stock_analysis.t -> triple_confirmation
 (** Project the three §4.5 signals out of a candidate's analysis. Total — every
     unavailable input becomes [None] / [false] rather than an exception, so a
     thin-history candidate still produces a row. *)
@@ -63,9 +62,8 @@ val is_triple_confirmed :
     reaches {!book_min_in_base_advance_pct}. A missing measurement is not a
     confirmation, so [None] fails.
 
-    Provided for cohort analysis of a completed run
-    ([trade_audit.sexp] consumers, tests). {b No strategy code calls this} —
-    F6 gates nothing. *)
+    Provided for cohort analysis of a completed run ([trade_audit.sexp]
+    consumers, tests). {b No strategy code calls this} — F6 gates nothing. *)
 
 val freshness_basis_of_analysis : Stock_analysis.t -> Entry_freshness.basis
 (** Which F1 admission clock was in force when this candidate was analysed.
@@ -74,5 +72,5 @@ val freshness_basis_of_analysis : Stock_analysis.t -> Entry_freshness.basis
     is [None] {i exactly} under the default [Ma_cross] basis and [Some _]
     (including [Some false]) under [Range_top_breakout] — see
     {!Entry_freshness.range_top_freshness}. {!Stock_analysis.analyze} populates
-    it unconditionally from [config.entry_freshness_basis], so this recovers
-    the configured basis rather than guessing at it. *)
+    it unconditionally from [config.entry_freshness_basis], so this recovers the
+    configured basis rather than guessing at it. *)

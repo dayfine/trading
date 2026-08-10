@@ -2,6 +2,55 @@
 
 ## Last updated: 2026-08-10
 
+### 2026-08-10 — ticket-lifecycle audit fields (branch `feat/ticket-lifecycle-audit-fields`, PR-5)
+
+Plan: `dev/plans/entry-ticket-async-v2-2026-08-10.md` §4 PR-5 row + §3-F6 + §5.
+Book: `docs/design/weinstein-book-reference.md` §4.5 (triple confirmation), §4.2
+(the two breakout-volume branches).
+
+**The gap.** Under the asynchronous ticket model an entry is no longer one
+instant — the ticket is *placed* on one Friday and *fills* (or is cancelled)
+later — but `Trade_audit.entry_decision` recorded only the placement instant's
+analysis. None of ladder-v4's §5 questions were answerable from
+`trade_audit.sexp`: how long tickets rested, which F1 clock admitted them,
+whether the fill's volume actually confirmed, and whether the §4.5
+triple-confirmed cohort is where the outsized winners live.
+
+**What.** One new `[@sexp.option]` field, `entry_decision.ticket_lifecycle`,
+carrying: `placement_date`; `ticket_age_weeks_at_fill_or_cancel`; `fill_volume`
+(a 4-way `fill_volume_verdict` — `Confirmed_spike` / `Confirmed_buildup` /
+`Unconfirmed` / **`No_verdict`**); `freshness_basis`; `sized_down_wide_stop`;
+and the F6 `triple_confirmation` measurements (breakout-volume multiple, RS
+zero-cross, in-base advance %). Supporting: `Volume.classify_breakout` (the
+named form of `confirms_breakout`, defined as its projection),
+`Volume_eject_runner.fill_week_confirmations` + `emit_fill_week_audit` (the
+audit twin of `update`, sharing one fill-week-window helper), and two new leaf
+modules — `Entry_ticket_tags` (strategy-side placement projections) and
+`Ticket_lifecycle` (backtest-side sub-schema + its two resolution merges, the
+way `Stop_log` owns `exit_trigger`).
+
+**Status: READY_FOR_REVIEW.** Capture-only — no config field, no gate, no
+behaviour change; goldens move only in sexp shape. Discharges two deferrals:
+#2258's `Sized_down_wide_stop` (was `entry_meta` + trace only) and
+qc-behavioral #2267's held-without-verdict recommendation (`Some No_verdict` is
+now countable alongside the eject rate).
+
+**Scope notes / follow-ups.**
+- **Fill-side age has a 7-day ceiling.** It is stamped by
+  `Execution_faithfulness.enrich`, which joins through `Trade_context`'s 7-day
+  window — so a ticket resting longer than a week is not matched and the age
+  stays `None` (that row also already gets `execution = None` today, a
+  pre-existing property of that join, not introduced here). The **cancel-side**
+  age (from `CancelEntry`, via `Trade_audit.record_transitions`) is unbounded
+  and is the one F2's TTL analysis should read. Widening the entry↔fill join for
+  long-resting async tickets is a real follow-up — it currently blinds #2158's
+  execution-faithfulness column on exactly the v4 arms.
+- `EntryFill` transitions are not visible to `on_transitions` (fills are applied
+  inside `_process_fills_and_cancels`), which is why the fill date has to come
+  from the round-trip join rather than from a transition observer.
+- F6 gates nothing, per plan §3-F6. `Entry_ticket_tags.is_triple_confirmed`
+  exists for cohort analysis of a completed run and has no strategy caller.
+
 ### 2026-08-10 — F2 `entry_order_ttl_weeks` + re-screen cancel (branch `feat/entry-order-ttl`, PR-3)
 
 Plan: `dev/plans/entry-ticket-async-v2-2026-08-10.md` §2-M2 / §3-F2 / §4 PR-3
@@ -52,9 +101,9 @@ names no number; the 13-weeks-with-no-revalidation cell is the least book-like.
 - Order matching uses the `(symbol, entry-side)` heuristic `Fill_router` already
   relies on — the per-step `order_links` table is cleared on every generation
   pass, so an order placed on an earlier step has no position-id link.
-- Ticket age / cancel reason are not yet projected into the persisted
-  `Trade_audit.entry_decision` row — that is the plan's **PR-5** audit-fields
-  step (which owns the golden-shape change).
+- Ticket age is now projected into the persisted `Trade_audit.entry_decision`
+  row by PR-5 (`ticket_lifecycle.ticket_age_weeks_at_fill_or_cancel`, set from
+  the `CancelEntry` transition). The cancel *reason* is still not carried.
 
 ### 2026-08-10 — F3 `stop_width_mode` + nearest-floor anchor arm (branch `feat/stop-width-mode`, PR-2)
 
