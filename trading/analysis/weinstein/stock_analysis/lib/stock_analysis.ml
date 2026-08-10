@@ -41,6 +41,10 @@ type config = {
       [@sexp.default Entry_freshness.Ma_cross]
       (** F1 — which event starts the Stage-2 admission clock. [Ma_cross]
           (default) is today's MA-cross window, bit-identical. See .mli. *)
+  require_breakout_volume : bool; [@sexp.default true]
+      (** F5 — whether {!is_breakout_candidate} requires screen-time volume
+          confirmation. [true] (default) is today's gate, bit-identical. See
+          .mli. *)
 }
 
 let default_config =
@@ -57,6 +61,7 @@ let default_config =
     virgin_crossing_readmission = false;
     entry_anchor_local_range_weeks = 0;
     entry_freshness_basis = Entry_freshness.Ma_cross;
+    require_breakout_volume = true;
   }
 
 type t = {
@@ -89,6 +94,10 @@ type t = {
       (** F1 — the armed admission clock's verdict. [None] under the default
           [Ma_cross] basis ("no opinion" — admission keeps its pre-F1 MA-cross
           window verbatim); [Some live] under [Range_top_breakout]. See .mli. *)
+  require_breakout_volume : bool;
+      (** F5 — [config.require_breakout_volume] carried onto the analysis so
+          {!is_breakout_candidate} (which sees only [t]) can honour it. [true]
+          (default) keeps the screen-time volume gate. See .mli. *)
   current_close : float option;
       (** Most recent (offset-0) weekly close; see .mli. *)
   as_of_date : Date.t;
@@ -380,6 +389,7 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
     supply;
     virgin_readmission;
     range_top_freshness;
+    require_breakout_volume = config.require_breakout_volume;
     current_close;
     as_of_date;
   }
@@ -451,8 +461,15 @@ let is_breakout_candidate ?(early_stage2_max_weeks = 4) (a : t) : bool =
     _freshness_arm ~early_stage2_max_weeks a
     || _continuation_arm a || _virgin_readmission_arm a
   in
-  (* Volume confirmation: at least Adequate *)
+  (* Volume confirmation: at least Adequate. F5 armed
+     ([require_breakout_volume = false]) relocates this spine item-3 check to
+     the fill week — the GTC ticket is written BEFORE the breakout, so
+     breakout-week volume cannot be known at placement (book §4.7). Volume is
+     not dropped: {!Weinstein_strategy.Volume_eject_runner} confirms it at the
+     fill and ejects when it fails. *)
   let volume_ok =
+    (not a.require_breakout_volume)
+    ||
     match a.volume with
     | Some { confirmation = Strong _; _ }
     | Some { confirmation = Adequate _; _ } ->

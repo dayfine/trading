@@ -96,6 +96,24 @@ type config = {
           of the resistance zone AND above the 30-week MA"), with §4.1's MA
           conditions kept explicit. See {!Entry_freshness} for the admit rule
           and {!is_breakout_candidate} for how the arm composes. *)
+  require_breakout_volume : bool; [@sexp.default true]
+      (** F5 (plan §3-F5) — whether {!is_breakout_candidate} requires
+          {b screen-time} volume confirmation.
+
+          [true] {b (default, no-op)} keeps today's gate verbatim: a candidate
+          is admitted only when its most recent breakout event carries Strong or
+          Adequate volume. Bit-identical to pre-feature.
+
+          [false] waives the check {i at placement only}. Book §4.7: the GTC
+          buy-stop is written before the breakout, so breakout-week volume
+          cannot be known when the order is placed; §1 further notes that base
+          volume "dries up", so demanding screen-week volume selects against
+          textbook bases. Spine item 3 (breakout must carry volume) is not
+          dropped — it is relocated to the fill week, where
+          {!Weinstein_strategy.Volume_eject_runner} confirms it and ejects the
+          position when it fails. Arming this without that eject would be a W1
+          spine violation; the strategy config exposes the pair as the single
+          flag [Weinstein_strategy_config.volume_confirm_at_fill]. *)
 }
 (** Configuration bundling all sub-module configs. *)
 
@@ -174,6 +192,12 @@ type t = {
           [Range_top_breakout]: [live] is [true] iff the close sits at or within
           {!Entry_freshness.proximity_pct} below the ticket anchor AND the MA is
           not declining AND the anchor clears the MA. *)
+  require_breakout_volume : bool;
+      (** F5 — [config.require_breakout_volume] carried onto the analysis so
+          {!is_breakout_candidate}, which sees only [t], can honour it without
+          the screener re-threading a flag. [true] (default) keeps the
+          screen-time volume gate; [false] waives it at placement and defers
+          §4.2 confirmation to the fill week. *)
   current_close : float option;
       (** The most recent weekly close (offset 0), read from
           [callbacks.stage.get_close]. [None] when the callback bundle has no
@@ -358,7 +382,9 @@ val is_breakout_candidate : ?early_stage2_max_weeks:int -> t -> bool
     reject on MA direction.
 
     Volume confirmation (Strong / Adequate) and the RS-not-negative-declining
-    gate apply to all arms equally.
+    gate apply to all arms equally — {i except} that F5's
+    [t.require_breakout_volume = false] waives the volume half at screen time
+    (see that field; the RS gate and every stage arm are untouched).
 
     Uses the sub-analysis results directly — no additional I/O. *)
 
