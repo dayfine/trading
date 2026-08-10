@@ -96,6 +96,36 @@ val analyze_breakout_with_callbacks :
 
     Pure function: same callback outputs always produce the same result. *)
 
+val confirms_breakout :
+  config:config -> callbacks:callbacks -> event_offset:int -> bool option
+(** [confirms_breakout ~config ~callbacks ~event_offset] is Weinstein's §4.2
+    breakout-volume verdict at [event_offset] (0 = newest bar), implementing
+    {b both} branches the book sanctions:
+
+    - {b (a) spike}: the event bar's volume is >= [config.strong_threshold] (2x)
+      the average of the prior [config.lookback_bars] bars.
+    - {b (b) build-up}: the mean of the build-up window — the event bar plus the
+      [lookback_bars - 1] bars before it (default 4 = the book's "3-4 weeks") —
+      is >= [strong_threshold] x the mean of the equally-sized window before it
+      (the book's "prior several weeks"), {i and} the event bar itself shows
+      some increase over the bar before it.
+
+    Either branch confirming yields [Some true]. Implementing (a) alone would
+    eject book-valid breakouts whose volume arrived as a multi-week build-up
+    rather than a single spike.
+
+    Returns:
+    - [Some true] — confirmed by at least one branch.
+    - [Some false] — at least one branch could be evaluated and none confirmed.
+    - [None] — {i neither} branch had enough history to judge. Callers must not
+      read [None] as a failed breakout: it carries no verdict. (The F5
+      volume-at-fill eject holds the position on [None] rather than ejecting on
+      missing data.)
+
+    Pure function. Consumed by the screen-time gate's sibling, the
+    {!Weinstein_strategy.Volume_eject_runner} at-fill confirmation
+    (`volume_confirm_at_fill`). *)
+
 val is_pullback_confirmed :
   config:config -> breakout_volume:int -> pullback_volume:int -> bool
 (** [is_pullback_confirmed ~config ~breakout_volume ~pullback_volume] checks
