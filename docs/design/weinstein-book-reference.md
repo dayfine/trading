@@ -156,6 +156,22 @@ Only after macro and sector pass do we evaluate individual stocks.
 
 **Real examples:** Puerto Rican Cement — 10× volume on breakout → +300%. Texas Industries (same group) — volume contracted on breakout → crashed to 22. Allied Signal — volume didn't reach 2× → stalled at resistance. Goodyear — nearly triple volume → pulled back on low volume → another buy signal → doubled.
 
+**The low-volume-breakout SELL rule (buy-stop fills without confirmation):**
+When a buy-stop order fills on a breakout whose volume does NOT confirm, the
+book's instruction is to exit, not hold: do not buy a stock with poor volume
+characteristics on the breakout — and if it was bought automatically via a
+resting buy-stop order, sell it quickly. Exact secondary-source wording: "If
+volume is not significant on breakout, sell the stock on the first rally, or
+sell when it breaks below the breakout level."
+*Provenance (2026-08-10):* verified against two independent secondary sources
+([detailed chapter review](https://whatheheckaboom.wordpress.com/2012/01/01/book-review-of-stan-weinsteins-secrets-for-profiting-in-bull-and-bear-markets/),
+"Buy Orders / Going Long" section, i.e. the Ch. 3 buy-stop discussion;
+corroborated by [TraderLion's summary](https://traderlion.com/trading-books/secrets-for-profiting-in-bull-and-bear-markets/)).
+Page-level primary cite pending physical book — mark SECONDARY-VERIFIED until
+then. This is the passage that licenses F5 `volume_confirm_at_fill`'s eject
+branch (async-v2 plan §3-F5): a held volume-unconfirmed breakout is a spine
+item-3 violation; the eject is inseparable from the flag.
+
 ### 4.3 Overhead Resistance (Ch. 4)
 
 **Grading system:**
@@ -250,6 +266,13 @@ your position... Use buy-stop orders on a good-'til-canceled (GTC) basis."*
    through the band is NOT chased — but under GTC a refused gap is not a lost
    trade either; the resting order fills on a pullback into the band. The band
    is do-not-chase; GTC is don't-miss. The two work as a pair.
+
+**Volume is judged AT the fill, not at placement.** The GTC ticket is written
+before the breakout, so breakout-week volume cannot be known when the order is
+placed; §4.2's confirmation applies to the week the ticket fills. When the
+fill's volume does NOT confirm, the book says sell quickly (see §4.2, "the
+low-volume-breakout SELL rule" — SECONDARY-VERIFIED provenance there). This is
+the §4.7 half of F5 `volume_confirm_at_fill` (async-v2 plan §3-F5).
 
 **What the book does NOT sanction:** buying inside the trading range below the
 breakout level (an order anchored at the current price when the designed
