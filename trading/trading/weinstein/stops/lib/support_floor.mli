@@ -42,6 +42,37 @@ type anchor_mode =
           {b not} pull the floor to the wick extreme. *)
 [@@deriving show, eq, sexp]
 
+(** WHICH prior counter-move the scan anchors on, orthogonal to {!anchor_mode}
+    (which decides which price {e field} both the anchor and the counter-move
+    are read from).
+
+    Weinstein §5.1 says place the initial stop below "the significant support
+    floor (prior correction low) BEFORE the breakout" — singular and {b recent},
+    not "the deepest low anywhere in the lookback". For a normally-shaped base
+    the two readings coincide (the window extremum {e is} the recent base). They
+    diverge for a crash-recovery name, where the window extremum is a pre-crash
+    peak and its counter-move is the crash floor tens of percent below the entry
+    — a structurally wide stop that the entry gate then drops
+    ([Audit_recorder.Stop_too_wide]).
+
+    {!Nearest} is the book's own remedy for that width: shrink the stop
+    {e distance} by anchoring on the nearest qualifying correction, rather than
+    shrinking the {e share count} (which the book never prescribes — see
+    [Weinstein_strategy_config.stop_width_mode] for the contrasting
+    tolerated-participation reading). *)
+type anchor_scope =
+  | Window_extreme
+      (** Anchor on the window extremum (highest high for a long, lowest low for
+          a short), then take the counter-move extreme newer than it. The
+          historical behaviour and the default. *)
+  | Nearest
+      (** Anchor on the {b nearest} bar (walking back from [as_of]) whose
+          subsequent counter-move already meets [min_pullback_pct], and return
+          that counter-move's extreme. Yields the most recent qualifying
+          correction low (long) / counter-rally high (short), which is at or
+          nearer to current price than the {!Window_extreme} answer. *)
+[@@deriving show, eq, sexp]
+
 val find_recent_level :
   bars:Types.Daily_price.t list ->
   as_of:Core.Date.t ->
@@ -170,21 +201,35 @@ val callbacks_from_bars :
 
 val find_recent_level_with_callbacks :
   ?anchor_mode:anchor_mode ->
+  ?anchor_scope:anchor_scope ->
   callbacks:callbacks ->
   side:Trading_base.Types.position_side ->
   min_pullback_pct:float ->
   unit ->
   float option
-(** [find_recent_level_with_callbacks ?anchor_mode ~callbacks ~side
-     ~min_pullback_pct ()] is the indicator-callback shape of
-    {!find_recent_level}. The trailing [unit] makes the [?anchor_mode] optional
-    erasable (all other arguments are labelled). [as_of] and [lookback_bars] are
-    baked into the [callbacks] bundle and no longer parameters here.
+(** [find_recent_level_with_callbacks ?anchor_mode ?anchor_scope ~callbacks
+     ~side ~min_pullback_pct ()] is the indicator-callback shape of
+    {!find_recent_level}. The trailing [unit] makes the optionals erasable (all
+    other arguments are labelled). [as_of] and [lookback_bars] are baked into
+    the [callbacks] bundle and no longer parameters here.
 
-    The algorithm scans [0..n_days-1] to identify the anchor (highest high for
-    [Long], lowest low for [Short] under the default [Wick] mode — the
-    [get_high] / [get_low] callbacks; the [get_close] callback under [Close];
-    tie-break: latest date wins, i.e. the smallest day offset), then scans the
-    post-anchor offsets [0..anchor_offset-1] for the counter-move extreme (read
-    from the same field). Returns [Some level] when the counter-move depth meets
-    [min_pullback_pct], else [None]. [anchor_mode] defaults to [Wick]. *)
+    Under the default [anchor_scope = Window_extreme] the algorithm scans
+    [0..n_days-1] to identify the anchor (highest high for [Long], lowest low
+    for [Short] under the default [Wick] mode — the [get_high] / [get_low]
+    callbacks; the [get_close] callback under [Close]; tie-break: latest date
+    wins, i.e. the smallest day offset), then scans the post-anchor offsets
+    [0..anchor_offset-1] for the counter-move extreme (read from the same
+    field). Returns [Some level] when the counter-move depth meets
+    [min_pullback_pct], else [None].
+
+    Under [anchor_scope = Nearest] the scan instead walks candidate anchors
+    outward from day offset [0] and returns the counter-move extreme of the
+    {b first} offset whose counter-move over [0..offset-1] already meets
+    [min_pullback_pct] — the nearest qualifying correction rather than the
+    deepest one. Offset [0] can never qualify (its post-anchor range is empty).
+    Both scopes use the same depth formula and the same [anchor_mode] price
+    field, so they agree whenever the window extremum {e is} the nearest
+    qualifying anchor.
+
+    [anchor_mode] defaults to [Wick]; [anchor_scope] defaults to
+    [Window_extreme]. Both defaults reproduce the pre-flag behaviour exactly. *)

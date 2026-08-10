@@ -49,6 +49,8 @@ type config = {
   catastrophic_stop_pct : float; [@sexp.default 0.0]
   support_floor_anchor_mode : Support_floor.anchor_mode;
       [@sexp.default Support_floor.Wick]
+  support_floor_anchor_scope : Support_floor.anchor_scope;
+      [@sexp.default Support_floor.Window_extreme]
   split_safe_floors : bool; [@sexp.default false]
 }
 [@@deriving show, eq, sexp]
@@ -68,5 +70,6 @@ let default_config =
     vol_scaled_stop_atr_period = default_vol_scaled_stop_atr_period;
     catastrophic_stop_pct = 0.0;
     support_floor_anchor_mode = Support_floor.Wick;
+    support_floor_anchor_scope = Support_floor.Window_extreme;
     split_safe_floors = false;
   }

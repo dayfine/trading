@@ -692,7 +692,6 @@ let test_config_sexp_omits_field_defaults_wick _ =
   in
   assert_that (config_of_sexp stripped) (equal_to (default_config : config))
 
-(* ==================================================================== *)
 (*            split_safe_floors: raw vs adjusted-basis bars              *)
 (* ==================================================================== *)
 
@@ -1039,6 +1038,197 @@ let test_split_safe_empty_window_stop_matches_flag_off _ =
   assert_that (_flag_on_long []) (equal_to (_flag_off_long [] : stop_state))
 
 (* ==================================================================== *)
+(*      anchor_scope: Window_extreme (default) vs Nearest (F3 arm)       *)
+(* ==================================================================== *)
+
+(* AXTI-shaped long fixture: a pre-crash peak (high 200) whose correction low is
+   the crash floor (low 40), followed by a recovery that puts in a RECENT local
+   peak (high 90) and a shallower qualifying pullback (low 78).
+
+   Window_extreme → anchors on the window's highest high 200, counter-move low
+                    40 (depth 80%) — a floor 52% below the last close (87).
+   Nearest        → walks anchors outward from today: offset 1 (high 85) sees a
+                    3.5% pullback (rejected), offset 2 (high 90) sees the 78 low
+                    at depth (90-78)/90 = 13.3% >= 8% → 78, only 10% below the
+                    last close. This is the width shrink the book prescribes
+                    (§5.1, nearest prior correction low). *)
+let crash_recovery_long_bars =
+  [
+    make_bar ~date:"2024-01-01" ~high:200.0 ~low:190.0 ~close:198.0;
+    make_bar ~date:"2024-01-02" ~high:180.0 ~low:120.0 ~close:130.0;
+    make_bar ~date:"2024-01-03" ~high:100.0 ~low:40.0 ~close:45.0;
+    make_bar ~date:"2024-01-04" ~high:60.0 ~low:45.0 ~close:55.0;
+    make_bar ~date:"2024-01-05" ~high:75.0 ~low:58.0 ~close:72.0;
+    make_bar ~date:"2024-01-06" ~high:90.0 ~low:80.0 ~close:88.0;
+    make_bar ~date:"2024-01-07" ~high:85.0 ~low:78.0 ~close:80.0;
+    make_bar ~date:"2024-01-08" ~high:88.0 ~low:82.0 ~close:87.0;
+  ]
+
+let crash_recovery_as_of = Date.of_string "2024-01-08"
+
+let crash_recovery_long_callbacks =
+  Support_floor.callbacks_from_bars ~bars:crash_recovery_long_bars
+    ~as_of:crash_recovery_as_of ~lookback_bars:90
+
+(* Mirror short fixture: a pre-squeeze trough (low 40) whose counter-rally high
+   is 160, then a recent local trough (low 85) with a shallower qualifying rally
+   (high 98, depth (98-85)/85 = 15.3%). *)
+let crash_recovery_short_bars =
+  [
+    make_bar ~date:"2024-01-01" ~high:45.0 ~low:40.0 ~close:42.0;
+    make_bar ~date:"2024-01-02" ~high:80.0 ~low:60.0 ~close:75.0;
+    make_bar ~date:"2024-01-03" ~high:160.0 ~low:100.0 ~close:155.0;
+    make_bar ~date:"2024-01-04" ~high:140.0 ~low:120.0 ~close:130.0;
+    make_bar ~date:"2024-01-05" ~high:115.0 ~low:100.0 ~close:105.0;
+    make_bar ~date:"2024-01-06" ~high:95.0 ~low:85.0 ~close:88.0;
+    make_bar ~date:"2024-01-07" ~high:98.0 ~low:90.0 ~close:95.0;
+    make_bar ~date:"2024-01-08" ~high:96.0 ~low:92.0 ~close:94.0;
+  ]
+
+let crash_recovery_short_callbacks =
+  Support_floor.callbacks_from_bars ~bars:crash_recovery_short_bars
+    ~as_of:crash_recovery_as_of ~lookback_bars:90
+
+let test_anchor_scope_default_is_window_extreme _ =
+  (* Omitting [~anchor_scope] must reproduce the deepest-floor answer
+     bit-identically — the R1 no-op guarantee. *)
+  assert_that
+    (Support_floor.find_recent_level_with_callbacks
+       ~callbacks:crash_recovery_long_callbacks ~side:Long
+       ~min_pullback_pct:0.08 ())
+    (is_some_and (float_equal 40.0))
+
+let test_anchor_scope_window_extreme_explicit_long _ =
+  assert_that
+    (Support_floor.find_recent_level_with_callbacks
+       ~anchor_scope:Support_floor.Window_extreme
+       ~callbacks:crash_recovery_long_callbacks ~side:Long
+       ~min_pullback_pct:0.08 ())
+    (is_some_and (float_equal 40.0))
+
+let test_anchor_scope_nearest_picks_shallower_low _ =
+  assert_that
+    (Support_floor.find_recent_level_with_callbacks
+       ~anchor_scope:Support_floor.Nearest
+       ~callbacks:crash_recovery_long_callbacks ~side:Long
+       ~min_pullback_pct:0.08 ())
+    (is_some_and (float_equal 78.0))
+
+let test_anchor_scope_nearest_short_picks_lower_ceiling _ =
+  assert_that
+    (Support_floor.find_recent_level_with_callbacks
+       ~anchor_scope:Support_floor.Nearest
+       ~callbacks:crash_recovery_short_callbacks ~side:Short
+       ~min_pullback_pct:0.08 ())
+    (is_some_and (float_equal 98.0))
+
+let test_anchor_scope_window_extreme_short_picks_deepest_ceiling _ =
+  assert_that
+    (Support_floor.find_recent_level_with_callbacks
+       ~callbacks:crash_recovery_short_callbacks ~side:Short
+       ~min_pullback_pct:0.08 ())
+    (is_some_and (float_equal 160.0))
+
+let test_anchor_scope_nearest_respects_depth_threshold _ =
+  (* Raise the threshold above the nearest correction's 13.3% depth: that anchor
+     no longer qualifies, so the scan keeps walking outward and lands on the
+     first anchor that does — the 100-high crash bar, whose post-anchor low is
+     45 (the 40 low sits ON that bar, not after it, so it is not a counter-move
+     for this anchor). The scope changes WHICH qualifying move is chosen; it
+     never relaxes the depth threshold. *)
+  assert_that
+    (Support_floor.find_recent_level_with_callbacks
+       ~anchor_scope:Support_floor.Nearest
+       ~callbacks:crash_recovery_long_callbacks ~side:Long
+       ~min_pullback_pct:0.20 ())
+    (is_some_and (float_equal 45.0))
+
+let test_anchor_scope_nearest_none_when_no_qualifying_move _ =
+  (* Monotonic advance: every candidate anchor's post-anchor range holds only
+     higher lows, so no counter-move reaches 8% under either scope. *)
+  let monotonic =
+    [
+      make_bar ~date:"2024-01-01" ~high:100.0 ~low:99.0 ~close:99.5;
+      make_bar ~date:"2024-01-02" ~high:101.0 ~low:100.0 ~close:100.5;
+      make_bar ~date:"2024-01-03" ~high:102.0 ~low:101.0 ~close:101.5;
+    ]
+  in
+  let callbacks =
+    Support_floor.callbacks_from_bars ~bars:monotonic
+      ~as_of:(Date.of_string "2024-01-03")
+      ~lookback_bars:90
+  in
+  assert_that
+    (Support_floor.find_recent_level_with_callbacks
+       ~anchor_scope:Support_floor.Nearest ~callbacks ~side:Long
+       ~min_pullback_pct:0.08 ())
+    is_none
+
+let test_anchor_scope_nearest_empty_window_is_none _ =
+  let callbacks =
+    Support_floor.callbacks_from_bars ~bars:[] ~as_of:crash_recovery_as_of
+      ~lookback_bars:90
+  in
+  assert_that
+    (Support_floor.find_recent_level_with_callbacks
+       ~anchor_scope:Support_floor.Nearest ~callbacks ~side:Long
+       ~min_pullback_pct:0.08 ())
+    is_none
+
+(* ---- Config seam: default, round-trip, and the installed stop ---- *)
+
+let test_config_default_anchor_scope_is_window_extreme _ =
+  assert_that default_config.support_floor_anchor_scope
+    (equal_to (Support_floor.Window_extreme : Support_floor.anchor_scope))
+
+let test_config_nearest_sexp_roundtrips _ =
+  let c =
+    { default_config with support_floor_anchor_scope = Support_floor.Nearest }
+  in
+  assert_that (config_of_sexp (sexp_of_config c)) (equal_to (c : config))
+
+let test_config_sexp_omits_scope_defaults_window_extreme _ =
+  (* A config serialized before this field existed must parse back to the
+     [Window_extreme] default — the backward-compat half of R1. *)
+  let stripped =
+    match sexp_of_config default_config with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List (Sexp.Atom "support_floor_anchor_scope" :: _) -> false
+            | _ -> true))
+    | other -> other
+  in
+  assert_that (config_of_sexp stripped) (equal_to (default_config : config))
+
+let test_nearest_scope_installs_tighter_stop _ =
+  (* End-to-end through the config seam: the reference level the initial stop is
+     built from moves from the crash floor (40) to the nearest correction low
+     (78), which is what shrinks the entry-to-stop distance the book's way. *)
+  assert_that
+    (compute_initial_stop_with_floor
+       ~config:{ cfg with support_floor_anchor_scope = Support_floor.Nearest }
+       ~side:Long ~entry_price:87.0 ~bars:crash_recovery_long_bars
+       ~as_of:crash_recovery_as_of ~fallback_buffer)
+    (_initial_reference (float_equal 78.0))
+
+let test_window_extreme_scope_installs_crash_floor_stop _ =
+  assert_that
+    (compute_initial_stop_with_floor ~config:cfg ~side:Long ~entry_price:87.0
+       ~bars:crash_recovery_long_bars ~as_of:crash_recovery_as_of
+       ~fallback_buffer)
+    (_initial_reference (float_equal 40.0))
+
+let test_floor_is_structural_agrees_under_nearest _ =
+  (* The structural flag reads the same scope the level does, so it cannot
+     disagree with the installed stop (the #2167 class of bug). *)
+  assert_that
+    (floor_is_structural
+       ~config:{ cfg with support_floor_anchor_scope = Support_floor.Nearest }
+       ~side:Long ~bars:crash_recovery_long_bars ~as_of:crash_recovery_as_of)
+    (equal_to true)
+
+(* ==================================================================== *)
 (*            floor_is_structural: flag agrees with the level            *)
 (* ==================================================================== *)
 
@@ -1218,6 +1408,35 @@ let suite =
          >:: test_split_safe_basis_empty_window_flag_off;
          "split_safe_empty_window_stop_matches_flag_off"
          >:: test_split_safe_empty_window_stop_matches_flag_off;
+         (* anchor_scope: Window_extreme (default) vs Nearest (F3 arm) *)
+         "anchor_scope_default_is_window_extreme"
+         >:: test_anchor_scope_default_is_window_extreme;
+         "anchor_scope_window_extreme_explicit_long"
+         >:: test_anchor_scope_window_extreme_explicit_long;
+         "anchor_scope_nearest_picks_shallower_low"
+         >:: test_anchor_scope_nearest_picks_shallower_low;
+         "anchor_scope_nearest_short_picks_lower_ceiling"
+         >:: test_anchor_scope_nearest_short_picks_lower_ceiling;
+         "anchor_scope_window_extreme_short_picks_deepest_ceiling"
+         >:: test_anchor_scope_window_extreme_short_picks_deepest_ceiling;
+         "anchor_scope_nearest_respects_depth_threshold"
+         >:: test_anchor_scope_nearest_respects_depth_threshold;
+         "anchor_scope_nearest_none_when_no_qualifying_move"
+         >:: test_anchor_scope_nearest_none_when_no_qualifying_move;
+         "anchor_scope_nearest_empty_window_is_none"
+         >:: test_anchor_scope_nearest_empty_window_is_none;
+         "config_default_anchor_scope_is_window_extreme"
+         >:: test_config_default_anchor_scope_is_window_extreme;
+         "config_nearest_sexp_roundtrips"
+         >:: test_config_nearest_sexp_roundtrips;
+         "config_sexp_omits_scope_defaults_window_extreme"
+         >:: test_config_sexp_omits_scope_defaults_window_extreme;
+         "nearest_scope_installs_tighter_stop"
+         >:: test_nearest_scope_installs_tighter_stop;
+         "window_extreme_scope_installs_crash_floor_stop"
+         >:: test_window_extreme_scope_installs_crash_floor_stop;
+         "floor_is_structural_agrees_under_nearest"
+         >:: test_floor_is_structural_agrees_under_nearest;
          (* floor_is_structural: flag agrees with level *)
          "floor_is_structural_wick_true" >:: test_floor_is_structural_wick_true;
          "floor_is_structural_close_mode_false"

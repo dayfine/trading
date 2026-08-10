@@ -1,6 +1,50 @@
 # Status: simulation
 
-## Last updated: 2026-08-07
+## Last updated: 2026-08-10
+
+### 2026-08-10 — F3 `stop_width_mode` + nearest-floor anchor arm (branch `feat/stop-width-mode`, PR-2)
+
+Plan: `dev/plans/entry-ticket-async-v2-2026-08-10.md` §3-F3 / §4 PR-2 row.
+Evidence: `dev/notes/ladder-v3-faithful-stoplimit-2026-08-09.md` (crash-recovery
+names tripped `Stop_too_wide` 22–28× on the exact record-run entry weeks).
+
+**What.** Two rival, default-off treatments of a structurally wide initial stop:
+
+1. `stop_width_mode : Drop_over_max | Size_down [@sexp.default Drop_over_max]`
+   + `stop_width_size_down_max_pct : float [@sexp.default 0.0]` on
+   `Weinstein_strategy_config`. `Size_down` admits a candidate whose stop sits
+   past `stops_config.max_stop_distance_pct` and lets fixed-risk sizing shrink
+   the share count ~`1/stop_distance`; the drop threshold moves to the swept
+   sanity ceiling (`0.0` falls back to `max_stop_distance_pct`, so an
+   unconfigured `Size_down` admits exactly the `Drop_over_max` population).
+   Admitted-by-mechanism entries carry
+   `Entry_audit_capture.entry_meta.sized_down_wide_stop = true` and trace as
+   `Sized_down_wide_stop`. **Honest citation: NOT a documented book mechanism** —
+   §5.1's "prefer other candidates" is comparative, but the book's remedies are
+   nearest-low anchoring, the §5.3 trader stop, or passing; never risk-parity
+   size-down. Labelled a tolerated-participation reading in `stop_width_mode.mli`.
+2. `stops_config.support_floor_anchor_scope : Window_extreme | Nearest
+   [@sexp.default Window_extreme]` — the competing **faithful** arm. `Nearest`
+   anchors the initial stop on the nearest qualifying prior correction low
+   instead of the window extremum's (crash-floor) counter-move, shrinking the
+   stop *distance* the book's way rather than the share count. Orthogonal to the
+   existing `support_floor_anchor_mode` (Wick/Close) price-field dial.
+
+New module: `trading/trading/weinstein/strategy/lib/stop_width_mode.{ml,mli}`
+(pure gate: `Admit | Admit_sized_down | Drop`).
+
+**Status: READY_FOR_REVIEW.** R1 — both defaults are exact no-ops (pinned by
+default-drops-36%-stop, omitted-sexp-field, and `Window_extreme` bit-identity
+tests). R2 — both are real config fields resolved by
+`Overlay_validator.apply_overrides`, so `stop_width_mode` and
+`stops_config.support_floor_anchor_scope` expand as `Variant_matrix` axes. R3 —
+no default flipped; promotion needs a ledger ACCEPT + the confirmation grid.
+
+**Scope note / follow-up.** The `Sized_down_wide_stop` tag lives on the
+strategy-internal `entry_meta` and the `PANEL_GOLDEN_DEBUG` candidate trace.
+Projecting it into the persisted `Backtest.Trade_audit.entry_decision` sexp row
+is the plan's **PR-5** audit-fields step (which owns the golden-shape change).
+
 
 ### 2026-08-07 — next-bar-open Market-entry fill (Fix #1, branch `feat/sim-entry-next-open`, PR #2238)
 

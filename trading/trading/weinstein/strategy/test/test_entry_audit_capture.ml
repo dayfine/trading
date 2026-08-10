@@ -926,6 +926,7 @@ let _stub_trans_and_meta ?(split_safe_basis = Audit_recorder.Flag_off) ~side
       split_safe_basis;
       effective_entry_price;
       close_at_decision = None;
+      sized_down_wide_stop = false;
     }
   in
   (trans, meta)
@@ -1255,6 +1256,293 @@ let test_sizing_uses_installed_stop _ =
      catches a regression where sizing re-keyed off cand.suggested_stop. *)
   assert_that meta.installed_stop
     (is_between (module Float_ord) ~low:85.0 ~high:94.0)
+
+(* ------------------------------------------------------------------ *)
+(* F3 2026-08-10: stop_width_mode (Drop_over_max vs Size_down)          *)
+(* ------------------------------------------------------------------ *)
+
+(* [initial_stop_buffer] that puts the fallback floor 36% below a $100 entry:
+   reference = 100 * 0.6667 = 66.67, stop = reference * (1 - 0.08/2) = 64.0.
+   Chosen to reproduce the ladder-v3 AXTI shape (a ~36% structural stop that the
+   default 15% gate drops). *)
+let _buffer_36pct_stop = 0.6667
+
+(* Run [make_entry_transition] on a long $100 entry whose structural stop lands
+   [buffer] below it, under the given wide-stop [policy]. *)
+let _entry_under_stop_width ~policy ?(buffer = _buffer_36pct_stop)
+    ?(portfolio_value = 100_000.0) () =
+  let current_date = Date.of_string "2024-06-14" in
+  let bar_reader =
+    _bar_reader_with_current_close ~current_date ~current_close:100.0
+  in
+  let cand =
+    _long_candidate ~ticker:_ticker ~suggested_entry:100.0 ~suggested_stop:95.0
+      ~as_of_date:current_date
+  in
+  let stop_states = ref String.Map.empty in
+  Entry_audit_capture.make_entry_transition ~stop_width:policy
+    ~portfolio_risk_config:_portfolio_risk_config ~stops_config:_stops_config
+    ~initial_stop_buffer:buffer ~stop_states ~bar_reader ~portfolio_value
+    ~current_date cand
+
+let _is_stop_too_wide =
+  matching ~msg:"Expected Stop_too_wide"
+    (function Entry_audit_capture.Stop_too_wide -> Some () | _ -> None)
+    (equal_to ())
+
+let _entry_ok_meta matcher =
+  matching ~msg:"Expected Entry_ok"
+    (function Entry_audit_capture.Entry_ok (_, meta) -> Some meta | _ -> None)
+    matcher
+
+let _size_down ~max_pct : Stop_width_mode.policy =
+  { mode = Stop_width_mode.Size_down; size_down_max_pct = max_pct }
+
+(** R1 baseline: with no [~stop_width] argument at all, a 36% structural stop is
+    dropped exactly as it is today. This is the behaviour PR-2 must not perturb.
+*)
+let test_stop_width_default_drops_36pct_stop _ =
+  let current_date = Date.of_string "2024-06-14" in
+  let bar_reader =
+    _bar_reader_with_current_close ~current_date ~current_close:100.0
+  in
+  let cand =
+    _long_candidate ~ticker:_ticker ~suggested_entry:100.0 ~suggested_stop:95.0
+      ~as_of_date:current_date
+  in
+  let stop_states = ref String.Map.empty in
+  let result =
+    Entry_audit_capture.make_entry_transition
+      ~portfolio_risk_config:_portfolio_risk_config ~stops_config:_stops_config
+      ~initial_stop_buffer:_buffer_36pct_stop ~stop_states ~bar_reader
+      ~portfolio_value:100_000.0 ~current_date cand
+  in
+  assert_that result _is_stop_too_wide;
+  (* No side-effects on the dropped path. *)
+  assert_that (Map.length !stop_states) (equal_to 0)
+
+(** Passing the explicit no-op policy is identical to omitting it. *)
+let test_stop_width_drop_over_max_explicit_drops_36pct_stop _ =
+  assert_that
+    (_entry_under_stop_width
+       ~policy:
+         { mode = Stop_width_mode.Drop_over_max; size_down_max_pct = 0.50 }
+       ())
+    _is_stop_too_wide
+
+(** Armed [Size_down] with a 50% sanity ceiling ADMITS the same 36% candidate,
+    tags it [sized_down_wide_stop], and sizes it at ~risk_budget /
+    stop_distance: $100k * 1% = $1,000 risk / ~$36 per share = 27 shares. The
+    per-position (30%) and side-exposure (90%) caps sit far above that, so the
+    fixed-risk term is what binds — the risk-parity size-down the mechanism
+    claims. *)
+let test_stop_width_size_down_admits_36pct_stop _ =
+  assert_that
+    (_entry_under_stop_width ~policy:(_size_down ~max_pct:0.50) ())
+    (_entry_ok_meta
+       (all_of
+          [
+            field
+              (fun (m : Entry_audit_capture.entry_meta) ->
+                m.sized_down_wide_stop)
+              (equal_to true);
+            field
+              (fun (m : Entry_audit_capture.entry_meta) -> m.shares)
+              (is_between (module Int_ord) ~low:26 ~high:28);
+            (* Risk-to-stop never exceeds the 1%-of-portfolio budget. *)
+            field
+              (fun (m : Entry_audit_capture.entry_meta) ->
+                Float.of_int m.shares
+                *. Float.abs (m.effective_entry_price -. m.installed_stop))
+              (le (module Float_ord) 1_000.0);
+          ]))
+
+(** The ceiling is a real gate: the same 36% candidate is still dropped when the
+    swept sanity ceiling sits below it. *)
+let test_stop_width_size_down_still_drops_above_ceiling _ =
+  assert_that
+    (_entry_under_stop_width ~policy:(_size_down ~max_pct:0.30) ())
+    _is_stop_too_wide
+
+(** An armed-but-unconfigured [Size_down] ([size_down_max_pct = 0.0]) falls back
+    to [max_stop_distance_pct], so it admits exactly the [Drop_over_max]
+    population — the mechanism can never admit unbounded structural risk by
+    omission. *)
+let test_stop_width_size_down_unset_ceiling_matches_drop_over_max _ =
+  assert_that
+    (_entry_under_stop_width ~policy:(_size_down ~max_pct:0.0) ())
+    _is_stop_too_wide
+
+(** A candidate already inside the 15% book limit is untouched by [Size_down]:
+    admitted (as under [Drop_over_max]) and NOT tagged. The tag therefore
+    partitions a [Size_down] run's entries into "would have been entered anyway"
+    and "admitted by the mechanism". *)
+let test_stop_width_size_down_narrow_stop_not_tagged _ =
+  assert_that
+    (_entry_under_stop_width ~policy:(_size_down ~max_pct:0.50) ~buffer:0.92 ())
+    (_entry_ok_meta
+       (field
+          (fun (m : Entry_audit_capture.entry_meta) -> m.sized_down_wide_stop)
+          (equal_to false)))
+
+(** Plan §6 risk — size-down x min-notional: on a small book the risk-parity
+    share count for a 36% stop rounds to zero. The existing [Sized_zero] gate
+    catches it, so [Size_down] can never emit a zero-share entry; it degrades to
+    a skip, not a phantom position. $2,000 * 1% = $20 risk vs ~$36 per share. *)
+let test_stop_width_size_down_rounds_to_zero_is_sized_zero _ =
+  assert_that
+    (_entry_under_stop_width ~policy:(_size_down ~max_pct:0.50)
+       ~portfolio_value:2_000.0 ())
+    (matching ~msg:"Expected Sized_zero"
+       (function Entry_audit_capture.Sized_zero -> Some () | _ -> None)
+       (equal_to ()))
+
+(* ---- The pure gate + the config seam ---- *)
+
+let test_stop_width_gate_drop_over_max_boundary _ =
+  (* Strict [>]: a distance exactly at the limit admits, matching the pre-F3
+     inline test. *)
+  let outcomes =
+    [ 0.15; 0.1500001 ]
+    |> List.map ~f:(fun stop_distance_pct ->
+        Stop_width_mode.gate ~policy:Stop_width_mode.default_policy
+          ~max_stop_distance_pct:0.15 ~stop_distance_pct)
+  in
+  assert_that outcomes
+    (elements_are
+       [
+         equal_to (Stop_width_mode.Admit : Stop_width_mode.outcome);
+         equal_to (Stop_width_mode.Drop : Stop_width_mode.outcome);
+       ])
+
+let test_stop_width_gate_size_down_bands _ =
+  (* Under [Size_down] with a 0.50 ceiling the distance axis has three bands:
+     within the book limit, over it but within the ceiling, and over the
+     ceiling. [Admit_sized_down] is never produced by [Drop_over_max]. *)
+  let outcomes =
+    [ 0.10; 0.36; 0.60 ]
+    |> List.map ~f:(fun stop_distance_pct ->
+        Stop_width_mode.gate ~policy:(_size_down ~max_pct:0.50)
+          ~max_stop_distance_pct:0.15 ~stop_distance_pct)
+  in
+  assert_that outcomes
+    (elements_are
+       [
+         equal_to (Stop_width_mode.Admit : Stop_width_mode.outcome);
+         equal_to (Stop_width_mode.Admit_sized_down : Stop_width_mode.outcome);
+         equal_to (Stop_width_mode.Drop : Stop_width_mode.outcome);
+       ])
+
+(** Run the 36%-stop fixture through the REAL walk with F3 armed on the [config]
+    — not via the direct [~stop_width] parameter. [initial_stop_buffer] is the
+    config field {!_entry_under_stop_width} passes by hand, so the two paths see
+    the same structural stop; the only difference is that here
+    [Entry_walk._make_entry_fn] is what builds the policy. *)
+let _entries_under_stop_width_config ~(mode : Stop_width_mode.t)
+    ~size_down_max_pct =
+  let config =
+    {
+      (Weinstein_strategy_config.default_config ~universe:[ _ticker ]
+         ~index_symbol:"SPY")
+      with
+      initial_stop_buffer = _buffer_36pct_stop;
+      stop_width_mode = mode;
+      stop_width_size_down_max_pct = size_down_max_pct;
+    }
+  in
+  let portfolio =
+    {
+      Trading_strategy.Portfolio_view.cash = 100_000.0;
+      positions = String.Map.empty;
+    }
+  in
+  let stop_states = ref String.Map.empty in
+  Entry_walk.entries_from_candidates ~config
+    ~candidates:
+      [
+        _long_candidate ~ticker:_ticker ~suggested_entry:100.0
+          ~suggested_stop:95.0 ~as_of_date:_current_date;
+      ]
+    ~stop_states
+    ~bar_reader:
+      (_bar_reader_with_current_close ~current_date:_current_date
+         ~current_close:100.0)
+    ~portfolio
+    ~get_price:(fun _ -> None)
+    ~current_date:_current_date ()
+
+(** Load-bearing config-level pin for F3: arming [Size_down] on the CONFIG (with
+    a 50% sanity ceiling) admits the 36%-stop candidate that the control config
+    drops, sized down to the risk-parity share count ($100k * 1% = $1,000 risk /
+    ~$36 per share = 27 shares). Without this, dropping the [~stop_width:]
+    argument at [entry_walk.ml] would make an armed [Size_down] config silently
+    no-op — every other F3 test bypasses the walk and would still pass. Mirrors
+    {!test_entries_from_candidates_funds_reanchored}, the same pin for
+    [stop_anchor_at_entry_base]. *)
+let test_entries_from_candidates_config_arms_size_down _ =
+  (* Control: the default mode drops the wide stop -> no transition. *)
+  assert_that
+    (_entries_under_stop_width_config ~mode:Stop_width_mode.Drop_over_max
+       ~size_down_max_pct:0.50)
+    (size_is 0);
+  assert_that
+    (_entries_under_stop_width_config ~mode:Stop_width_mode.Size_down
+       ~size_down_max_pct:0.50)
+    (elements_are
+       [
+         field
+           (fun (t : Position.transition) ->
+             match t.kind with
+             | Position.CreateEntering e -> e.target_quantity
+             | _ -> Float.nan)
+           (is_between (module Float_ord) ~low:26.0 ~high:28.0);
+       ])
+
+let test_config_default_stop_width_mode_is_drop_over_max _ =
+  let config =
+    Weinstein_strategy.default_config ~universe:[] ~index_symbol:""
+  in
+  assert_that config
+    (all_of
+       [
+         field
+           (fun (c : Weinstein_strategy.config) -> c.stop_width_mode)
+           (equal_to (Stop_width_mode.Drop_over_max : Stop_width_mode.t));
+         field
+           (fun (c : Weinstein_strategy.config) ->
+             c.stop_width_size_down_max_pct)
+           (float_equal 0.0);
+       ])
+
+let test_config_stop_width_sexp_omitted_defaults_to_no_op _ =
+  (* A config serialized before F3 existed (no [stop_width_mode] /
+     [stop_width_size_down_max_pct] keys) must parse back to the no-op — the
+     backward-compat half of R1, and what makes the field a safe
+     [Variant_matrix] axis (R2). *)
+  let base = Weinstein_strategy.default_config ~universe:[] ~index_symbol:"" in
+  let stripped =
+    match Weinstein_strategy.sexp_of_config base with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List (Sexp.Atom "stop_width_mode" :: _)
+            | Sexp.List (Sexp.Atom "stop_width_size_down_max_pct" :: _) ->
+                false
+            | _ -> true))
+    | other -> other
+  in
+  assert_that
+    (Weinstein_strategy.config_of_sexp stripped)
+    (all_of
+       [
+         field
+           (fun (c : Weinstein_strategy.config) -> c.stop_width_mode)
+           (equal_to (Stop_width_mode.Drop_over_max : Stop_width_mode.t));
+         field
+           (fun (c : Weinstein_strategy.config) ->
+             c.stop_width_size_down_max_pct)
+           (float_equal 0.0);
+       ])
 
 (* ------------------------------------------------------------------ *)
 (* P1 2026-05-15: per-sector exposure cap gate                          *)
@@ -1829,6 +2117,29 @@ let () =
            >:: test_vol_scaled_floor_under_cap_admits;
            "G15-step3: sizing uses installed_stop"
            >:: test_sizing_uses_installed_stop;
+           "F3: default drops 36% stop"
+           >:: test_stop_width_default_drops_36pct_stop;
+           "F3: explicit Drop_over_max drops 36% stop"
+           >:: test_stop_width_drop_over_max_explicit_drops_36pct_stop;
+           "F3: Size_down admits 36% stop at risk-parity size"
+           >:: test_stop_width_size_down_admits_36pct_stop;
+           "F3: Size_down still drops above ceiling"
+           >:: test_stop_width_size_down_still_drops_above_ceiling;
+           "F3: Size_down unset ceiling matches Drop_over_max"
+           >:: test_stop_width_size_down_unset_ceiling_matches_drop_over_max;
+           "F3: Size_down leaves narrow stop untagged"
+           >:: test_stop_width_size_down_narrow_stop_not_tagged;
+           "F3: Size_down rounding to zero is Sized_zero"
+           >:: test_stop_width_size_down_rounds_to_zero_is_sized_zero;
+           "F3: gate Drop_over_max boundary"
+           >:: test_stop_width_gate_drop_over_max_boundary;
+           "F3: gate Size_down bands" >:: test_stop_width_gate_size_down_bands;
+           "F3: config arms Size_down through the entry walk"
+           >:: test_entries_from_candidates_config_arms_size_down;
+           "F3: config default is Drop_over_max"
+           >:: test_config_default_stop_width_mode_is_drop_over_max;
+           "F3: config sexp omitted defaults to no-op"
+           >:: test_config_stop_width_sexp_omitted_defaults_to_no_op;
            "P1: sector exposure cap off passes through"
            >:: test_sector_exposure_cap_off_passes_through;
            "P1: sector exposure cap rejects at 33%"

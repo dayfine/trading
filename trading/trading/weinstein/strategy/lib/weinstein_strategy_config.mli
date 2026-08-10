@@ -1443,6 +1443,52 @@ type config = {
           [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides]. Per
           the experiment discipline it stays default-off until a ledger ACCEPT
           (WF-CV per the fill-model plan). *)
+  stop_width_mode : Stop_width_mode.t;
+      [@sexp.default Stop_width_mode.Drop_over_max]
+      (** F3 ([dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F3): what the
+          entry walk does with a candidate whose structural initial stop sits
+          further than [stops_config.max_stop_distance_pct] from entry.
+
+          [Drop_over_max] (default) is today's G15 step-3 drop — the candidate
+          is skipped with [Audit_recorder.Stop_too_wide]. [Size_down] admits it
+          instead, up to {!stop_width_size_down_max_pct}, and lets fixed-risk
+          sizing shrink the share count ~[1 / stop_distance] so dollar
+          risk-to-stop is unchanged; such entries carry
+          [Entry_audit_capture.entry_meta.sized_down_wide_stop = true] and trace
+          as [Sized_down_wide_stop].
+
+          {b Honest citation.} This is NOT a documented book mechanism. §5.1's
+          "prefer other candidates" is comparative rather than an absolute ban,
+          but the book's remedies for a wide stop are (i) anchor at the nearest
+          prior correction low
+          ([stops_config.support_floor_anchor_scope = Nearest], the competing
+          {e faithful} arm), (ii) the §5.3 trader preset's 4–6% stop, (iii) pass
+          — never risk-parity size-down. F3 is a tolerated-participation
+          {e reading}, labelled as such; see {!Stop_width_mode} for the full
+          framing and the ladder-v3 evidence it responds to.
+
+          {b Default [Drop_over_max] = bit-identical to every existing
+             baseline/golden} (R1). R2: real config field, axis-expressible as
+          [((flag stop_width_mode) (values (Drop_over_max Size_down)))] via
+          [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides]. Stays
+          default-off until a ledger ACCEPT plus the promotion-confirmation grid
+          (R3). *)
+  stop_width_size_down_max_pct : float; [@sexp.default 0.0]
+      (** Sanity ceiling for {!stop_width_mode} [= Size_down]: stop distances
+          above this fraction of entry are still dropped, so the mechanism can
+          never admit unbounded structural risk. [0.0] (the default) falls back
+          to [stops_config.max_stop_distance_pct], which makes an
+          armed-but-unconfigured [Size_down] admit exactly the population
+          [Drop_over_max] admits.
+
+          It exists as its own knob rather than reusing [max_stop_distance_pct]
+          so the ladder-v4 sweep can widen the {e admission} boundary without
+          also moving the §5.1 15% line that other mechanisms read (the
+          [stop_anchor_at_entry_base] re-anchor threshold, and the
+          [Sized_down_wide_stop] tag boundary itself) — the two roles are
+          separated so a wide-admission cell is not confounded with a re-anchor
+          change. Unread under [Drop_over_max]. Default [0.0] is an exact no-op
+          (R1); axis-expressible (R2). *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

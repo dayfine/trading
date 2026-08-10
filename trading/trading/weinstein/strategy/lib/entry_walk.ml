@@ -96,6 +96,11 @@ let _make_entry_fn ~config ~bar_reader ~current_date ~stop_states
   in
   Entry_audit_capture.make_entry_transition ~trigger_at_suggested
     ~stop_anchor_at_entry_base:config.stop_anchor_at_entry_base
+    ~stop_width:
+      {
+        Stop_width_mode.mode = config.stop_width_mode;
+        size_down_max_pct = config.stop_width_size_down_max_pct;
+      }
     ~min_stop_distance_pct:
       (Entry_stop_distance.min_stop_distance_for ~config ~bar_reader
          ~current_date cand)
