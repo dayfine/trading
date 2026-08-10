@@ -1,6 +1,6 @@
 # Status: support-floor-stops
 
-## Last updated: 2026-08-09
+## Last updated: 2026-08-10
 
 ## Status
 IN_PROGRESS
@@ -9,6 +9,18 @@ IN_PROGRESS
 YES
 
 ## Open PR
+- `feat/html-report-basis-split` — **G4**, the per-series price-basis split in
+  `Html_report.load` (2026-08-10 addendum below). `?bar_close` now takes
+  `basis:price_basis` (`Adjusted | Raw`); the benchmark asks for `Adjusted`,
+  the capital-utilization series for `Raw`, and the `.mli` names which series
+  takes which basis and why — the line-52 ambiguity that let #2251's first cut
+  through is gone. Reintroduces `Trade_audit_basis.last_close` (removed in
+  #2251's rework) now that it has a caller again. **No behaviour change for a
+  caller that supplies no `?bar_close`**; behaviour-changing for the exe, which
+  is the point. No goldens re-pinned — nothing pins this exe's output. Tests
+  8 → 10 in `test_trade_audit_html_report.ml` and 6 → 11 in
+  `test_trade_audit_basis.ml`. Branch pushed to origin; PR to be opened by the
+  orchestrator (no `gh` in this environment).
 - `feat/trade-audit-adjusted-basis` — **F3**, the adjusted-basis fix in
   `trade_audit_report_bin.ml` (2026-08-09 addendum below). Adds the
   `trade_audit_basis` library (one module, one pure function) and moves the
@@ -1268,8 +1280,11 @@ correctly left all four alone; they are not rework scope. Numbering is local to
 
 ### Follow-ups filed 2026-08-09 (QC rework 1, all non-blocking)
 
-- **G4 — `Html_report.load`'s `?bar_close` is one callback feeding two series
-  with opposite basis needs.** `_benchmark` divides a mark by an earlier mark
+- ~~**G4 — `Html_report.load`'s `?bar_close` is one callback feeding two series
+  with opposite basis needs.**~~ — **done 2026-08-10** on branch
+  `feat/html-report-basis-split`; see the `## 2026-08-10 addendum — G4`
+  section below. Original text follows.
+  `_benchmark` divides a mark by an earlier mark
   and genuinely wants the **adjusted** column — and `html_report.mli:52` already
   promises exactly that ("resolves a symbol's adjusted close"), a promise the
   exe does not currently keep. `_utilization` (`html_report.ml:110-122`)
@@ -1314,6 +1329,149 @@ correctly left all four alone; they are not rework scope. Numbering is local to
   (adjusted-selected and raw-selected) would pin it in two lines. Low value on
   its own, but it is a stated contract with no test, which is exactly the class
   qc-behavioral flags.
+
+### Follow-ups filed 2026-08-10 (G4, all non-blocking)
+
+- **G7 — the exe-side supplier is still unpinned, and G4 widened the blast
+  radius.** F3 already recorded this as its "honest gap": nothing fails if
+  someone edits `trade_audit_report_bin`'s readers back to the wrong column,
+  because the exe has no test surface. **Measured, not assumed** (mutation M6 in
+  the addendum below): making `_bar_close_of_reader` ignore its `~basis`
+  argument and serve raw for both series leaves the **entire** suite green,
+  `dune runtest trading/backtest/test/` exit 0, zero failures. G4 makes that
+  gap matter more than it did — before, the supplier had one behaviour and it
+  was inspectable at a glance; now it has two branches, and the branch the
+  benchmark depends on is exercised by nothing. Closing it needs the same e2e
+  harness F3 identified (scenario dir + snapshot warehouse fixture with a real
+  split), which remains larger than any single follow-up here.
+
+- **G8 — the benchmark can still mix bases *across* calls.** Each
+  `Adjusted` request resolves its own ~15-day window independently through
+  `Trade_audit_basis.window_closes`, so a symbol whose adjusted column is
+  populated for recent dates but NaN for older ones yields adjusted marks at
+  one end of the curve and raw marks at the other — and `_benchmark` divides
+  one by the other, which is exactly the cross-basis mix `window_closes` exists
+  to prevent *within* a window. The all-or-nothing policy is per-window; the
+  benchmark's estimand is per-series. Not a regression (before G4 every mark
+  was raw, hence consistent), and it cannot fire on the common cases: a fully
+  populated adjusted column never falls back, and a schema predating the field
+  is all-NaN so *every* window falls back and the series stays consistently
+  raw. Only a partially-populated column triggers it. The clean fix is to
+  resolve the benchmark's whole series under one basis decision — i.e. a
+  series-shaped source rather than a per-date callback — which is a second
+  `Html_report.load` signature change and deliberately not bundled here.
+  Cheaper interim: have the supplier decide once per symbol.
+
+## 2026-08-10 addendum — G4, per-series price basis for the HTML mark callback (PR branch `feat/html-report-basis-split`)
+
+Closes G4. `Html_report.load`'s `?bar_close` now carries the basis as an
+argument:
+
+```ocaml
+?bar_close:(basis:price_basis -> symbol:string -> as_of:Date.t -> float option)
+```
+
+with `type price_basis = Adjusted | Raw` declared in `html_report.mli`.
+`_benchmark` is served `bar_close ~basis:Adjusted`, `_utilization`
+`bar_close ~basis:Raw`; their internal parameters were renamed to
+`~adjusted_close` / `~position_mark` so the requirement is legible at the use
+site too. No behaviour change for a caller that supplies no `?bar_close`.
+
+### Why the basis argument and not two callbacks
+
+G4 offered both shapes. Two callbacks (`?benchmark_close` / `?position_mark`)
+would have **identical types** — `symbol:string -> as_of:Date.t -> float
+option` — so a caller could pass the same closure to both and neither the
+compiler nor a reviewer would see anything. That is precisely the G4 defect
+relocated one level up, not fixed: the original bug was a competent author and
+a competent reviewer both failing to notice an invisible basis mismatch.
+
+The basis argument moves the decision to where the knowledge actually lives.
+Which column a series needs follows from the *arithmetic that series performs*,
+and that arithmetic is in `Html_report`, not at the call site. So
+`Html_report` states the requirement per request and the supplier's only job is
+to honour it — which means matching on an exhaustive two-constructor variant,
+so neither branch can be dropped silently. A supplier can still defeat it by
+writing `~basis:_`, but that discard is a visible token in the supplier's own
+source, where passing one closure twice would have been no token at all.
+Secondary: one optional argument instead of two, so there is no "supplied the
+benchmark source but not the mark source" state to define.
+
+The `.mli` was rewritten accordingly — the old line-52 wording ("resolves a
+symbol's adjusted close") was the ambiguity that let #2251's first cut through,
+so replacing it was part of the deliverable. It now names each series, the
+basis it takes, the arithmetic that forces it, and the measured magnitude of
+getting it wrong (KO 0.7253 / JNJ 0.7596 / AAPL 0.2215, carried over from the
+QC-rework-1 section above, not re-derived).
+
+### `Trade_audit_basis.last_close` is back, with a caller
+
+QC rework 1 removed `last_close` because the wiring that justified it no longer
+existed. G4 restores the wiring, so the helper returns:
+
+```ocaml
+val last_close : float array -> float option
+```
+
+Newest cell; `None` when the window is empty or that cell is non-finite.
+Deliberately **not** a backwards scan for the newest finite cell — the last
+cell is the newest bar at or before the requested date, and substituting an
+older bar's close would answer a different question than the one asked. `None`
+is a shape both consumers already handle (the benchmark drops the whole series
+when any curve date fails to resolve; utilization skips that position for that
+date).
+
+### Which reader takes which path, and why the two differ
+
+| basis | source | rationale |
+|---|---|---|
+| `Adjusted` (benchmark) | `window_closes ~adjusted ~raw` then `last_close` | cross-time division, so a split inside the run must not read as a price move. Keeps the wholesale raw fallback so a warehouse whose schema predates the adjusted field still renders a benchmark — there *every* window falls back, so the series stays consistently raw rather than vanishing. |
+| `Raw` (utilization) | `raw_closes` then `last_close` | mark × share count ÷ NAV, and both other terms are as-traded. Raw is **the answer** here, not a fallback, so this branch never consults `window_closes`. |
+
+The residual of the first row — a *partially* populated adjusted column can
+give adjusted marks at one end of the curve and raw at the other — is filed as
+G8 above.
+
+### Tests
+
+- `test_trade_audit_html_report.ml`: **8 → 10**. A split-straddling mark
+  supplier whose two columns genuinely disagree: SPY 2:1s inside the run
+  (adjusted ratio 4× vs raw 2×), the held symbols 4:1 after it (utilization
+  differs 4×). One test pins the numbers (benchmark 4.0M, **never** the raw
+  2.0M; utilization 13.3333%, **never** the adjusted 3.3333% — both
+  cross-negatives asserted absent, so a mis-wire fails on two counts); one
+  pins the *requests* rather than the values, asserting the exact set
+  `{SPY:Adjusted, MSFT:Raw, WMT:Raw}`. This is the `LINTER_CANDIDATE`
+  qc-behavioral filed on #2251.
+- `test_trade_audit_basis.ml`: **6 → 11**, all five new ones on `last_close`.
+
+### Mutation results
+
+Each mutation applied, measured, reverted; the file confirmed byte-identical
+afterwards (`git diff` empty / restored from backup).
+
+| mutation | RED assertions |
+|---|---|
+| **M1** — `_utilization` wired to `Adjusted` (the D1 regression itself) | `Trade_audit_html.Html_report:6:split straddling marks route each series to its own basis` and `Trade_audit_html.Html_report:7:each series requests only its own basis` (2 failures / 10 cases) |
+| **M2** — `_benchmark` wired to `Raw` (pre-G4 behaviour) | the same two |
+| **M4** — `last_close` finiteness guard dropped (`Some closes.(n-1)` unconditionally) | `trade_audit_basis:8:last_close non finite newest cell is none` and `trade_audit_basis:9:last_close infinite newest cell is none` (2 / 11) |
+| **M5** — `last_close` scans back for the newest *finite* cell | the same two |
+| **M6** — exe supplier ignores `~basis`, serves raw for both | **NOT CAUGHT — 0 failures, suite exit 0.** Honest negative; filed as G7. |
+
+M1/M2 both landing on the same two assertions is expected and is the point:
+the pair of tests brackets the contract from both sides, so either series
+reading the other's column is caught regardless of direction.
+
+### Goldens re-pinned: none
+
+Same reason as F3 — `trade_audit_report_bin` is an operator-invoked CLI that no
+dune rule, test, or script pins. Reported as an honest negative rather than
+manufacturing a golden.
+
+### Verification
+
+`dune build @fmt` exit 0, `dune build` exit 0, **full** `dune runtest` exit 0
+(not just the backtest test dir). Exit codes read directly, not grepped.
 
 ## QC
 
