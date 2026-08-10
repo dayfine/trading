@@ -25,6 +25,8 @@ let _freeze_one ~pending (cand : Screener.scored_candidate) =
       Hashtbl.set pending ~key:cand.ticker ~data:cand.suggested_entry;
       cand
 
+let release pending ~symbol = Hashtbl.remove pending symbol
+
 let apply ~enabled ~pending ~held_set ~candidates =
   if not enabled then candidates
   else

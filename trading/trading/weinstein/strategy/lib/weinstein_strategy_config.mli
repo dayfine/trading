@@ -1498,6 +1498,73 @@ type config = {
           [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides]. Per
           the experiment discipline it stays default-off until a ledger ACCEPT
           (WF-CV per the fill-model plan). *)
+  entry_order_ttl_weeks : int; [@sexp.default 0]
+      (** F2 ([dev/plans/entry-ticket-async-v2-2026-08-10.md] §2-M2 / §3-F2):
+          how long an {b unfilled} entry ticket may keep resting, and — the
+          load-bearing half — whether it is re-validated at all.
+
+          {b The faithfulness gap it closes.} Under the StopLimit entry family
+          the strategy writes a resting breakout order and waits; an unfilled
+          order persists across every later step until a bar trades through [E]
+          (pinned by [trading/simulation/test/test_gtc_entry_persistence.ml]).
+          That is Good-Till-{i Cancelled} with no cancel authority anywhere in
+          the system, so only half of the book's contract is implemented: §4.7
+          has the order standing "until you either cancel the orders or they are
+          actually executed", and §7's weekend homework is precisely the loop at
+          which the cancel decision is taken. Today a ticket written against a
+          base that has since broken down still fills weeks later.
+
+          {b Behaviour when [> 0].} On each weekly review every unfilled
+          [Entering] position is re-examined ({!Entry_ticket_ttl}):
+
+          - {b Primary — re-screen cancel.} Its symbol is cancelled when it
+            fails the next weekly re-screen: it no longer classifies into the
+            stage its side requires (base broken down / MA rolled over), its
+            sector rating flipped against it, or the macro gate flipped. The
+            predicate reuses the cascade's own Phase-1 stage filter, sector
+            pre-filter and {!Screener.longs_admitted_by_macro} /
+            {!Screener.shorts_admitted_by_macro} gates, so re-screen and screen
+            cannot drift.
+          - {b Backstop — clock TTL.} A ticket that has rested more than
+            [entry_order_ttl_weeks] whole weeks without filling is cancelled
+            regardless. A ticket placed on review week 0 survives review week
+            [entry_order_ttl_weeks] and is cancelled at week
+            [entry_order_ttl_weeks + 1].
+
+          Cancelling emits [Position.CancelEntry] (the [Entering] position
+          closes) {b and} releases the symbol's {!Entry_freeze} pin, so the
+          symbol may re-qualify later at a fresh [E] rather than at the level
+          its expired ticket was written against. The simulator cancels the
+          matching resting order
+          ({!Trading_simulation.Cancel_handler.cancel_resting_entry_orders});
+          without that a "cancelled" ticket would still fill. A partially-filled
+          entry is never cancelled — those shares are booked.
+
+          {b Faithfulness (W2): BOOK-NEUTRAL dial.} The book grants the cancel
+          authority (§4.7) and locates the decision in the weekly review (§7)
+          but names no number, so the {i primary} re-screen cancel is
+          book-supported while the {i number} is a free dial. The
+          13-weeks-with-no-revalidation cell is the least book-like one. The
+          spine is untouched: Stage-2-only admission, volume confirmation,
+          grading and the stop machinery are unchanged — this governs only the
+          lifetime of an order that has not yet become a position.
+
+          {b Only meaningful under the StopLimit entry family}
+          ([enable_sim_entry_stoplimit] + [sim_entry_trigger_at_suggested]).
+          With Market entries a ticket fills on its own tick, so no position
+          ever rests long enough for either path to fire; the knob is left
+          ungated so it stays an independent axis.
+
+          {b Default [0] = off, bit-identical to every existing baseline/golden}
+          (R1): {!Entry_ticket_ttl.cancellations} returns [[]] without
+          consulting the re-screen predicate, and no strategy emits
+          [CancelEntry], so the simulator's order-cancel path is never reached —
+          weekly re-issue and GTC-forever persistence are exactly as before.
+          This {b extends}, and does not weaken, the contract pinned by
+          [test_gtc_entry_persistence.ml]. R2: real config field,
+          axis-expressible as [((flag entry_order_ttl_weeks) (values (0 4 8)))]
+          via [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides].
+          Stays default-off until a ledger ACCEPT (R3). *)
   stop_width_mode : Stop_width_mode.t;
       [@sexp.default Stop_width_mode.Drop_over_max]
       (** F3 ([dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F3): what the

@@ -2,6 +2,60 @@
 
 ## Last updated: 2026-08-10
 
+### 2026-08-10 — F2 `entry_order_ttl_weeks` + re-screen cancel (branch `feat/entry-order-ttl`, PR-3)
+
+Plan: `dev/plans/entry-ticket-async-v2-2026-08-10.md` §2-M2 / §3-F2 / §4 PR-3
+row (+ §6 "TTL × freeze" pin-lifecycle risk). Book: §4.7 "until you either
+cancel the orders or they are actually executed" + the §7 weekend-homework loop.
+
+**The gap.** `test_gtc_entry_persistence.ml` pins that an unfilled StopLimit
+entry order rests forever until a bar trades through `E`. That is GTC with **no
+cancel authority anywhere in the system** — only half of §4.7 exists, so a
+ticket written against a base that has since broken down still fills weeks
+later.
+
+**What.** New `Weinstein_strategy_config.entry_order_ttl_weeks : int
+[@sexp.default 0]`. When `> 0`, each weekly review re-examines every unfilled
+`Entering` position (`Entry_ticket_ttl`, new module):
+
+1. **Primary — re-screen cancel.** Cancel when the symbol fails the next weekly
+   re-screen. The predicate reuses the cascade's own gates (Phase-1 stage filter
+   specialised to the ticket's side, the sector pre-filter, and the newly
+   exported `Screener.longs_admitted_by_macro` /
+   `Screener.shorts_admitted_by_macro`), so re-screen and screen cannot drift.
+   A resting ticket's symbol is *held*, hence excluded from the candidate list —
+   which is why the question has to be re-asked directly.
+2. **Backstop — clock TTL.** Cancel after more than `entry_order_ttl_weeks`
+   whole weeks unfilled (placed week 0 → survives week N → cancelled week N+1).
+
+Cancelling emits `Position.CancelEntry`, **releases the symbol's `Entry_freeze`
+pin** (new `Entry_freeze.release`; `apply`'s stale-release rule cannot cover this
+— the symbol is still held on the cancelling tick and may still be qualifying
+after a clock cancel), and the simulator retires the resting order via
+`Cancel_handler.cancel_resting_entry_orders`. Partially-filled entries are never
+cancelled (booked shares).
+
+**Status: READY_FOR_REVIEW.** R1 — `0` returns `[]` without even consulting the
+re-screen predicate and no strategy emits `CancelEntry`, so the simulator's new
+cancel path is unreachable at the default; this **extends**, never weakens, the
+`test_gtc_entry_persistence` contract (that file gains a third test for the new
+half; its two original tests are untouched). R2 — real config field resolved by
+`Overlay_validator.apply_overrides`, so `((entry_order_ttl_weeks (0 4 8)))`
+expands as a `Variant_matrix` axis (round-trip + omitted-field parse tests). R3
+— no default flipped. **Faithfulness: BOOK-NEUTRAL dial** — §4.7 + §7 grant the
+cancel authority and locate the decision in the weekly review, but the book
+names no number; the 13-weeks-with-no-revalidation cell is the least book-like.
+
+**Scope notes / follow-ups.**
+- The cancel pass runs inside the Friday screen, so it is skipped on a
+  force-liquidation-halted week (entries are gated off wholesale there).
+- Order matching uses the `(symbol, entry-side)` heuristic `Fill_router` already
+  relies on — the per-step `order_links` table is cleared on every generation
+  pass, so an order placed on an earlier step has no position-id link.
+- Ticket age / cancel reason are not yet projected into the persisted
+  `Trade_audit.entry_decision` row — that is the plan's **PR-5** audit-fields
+  step (which owns the golden-shape change).
+
 ### 2026-08-10 — F3 `stop_width_mode` + nearest-floor anchor arm (branch `feat/stop-width-mode`, PR-2)
 
 Plan: `dev/plans/entry-ticket-async-v2-2026-08-10.md` §3-F3 / §4 PR-2 row.

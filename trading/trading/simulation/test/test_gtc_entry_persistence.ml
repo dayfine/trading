@@ -16,7 +16,17 @@
     previously unpinned and had been mis-described as "Day orders expire". These
     tests lock it in so any future change (e.g. adding a genuine Day-expiry
     default, or a cancel-on-candidacy-loss lifecycle) is a deliberate, visible
-    diff rather than a silent one. *)
+    diff rather than a silent one.
+
+    {b F2 extension (2026-08-10, plan
+       [dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F2).} The "Cancelled"
+    half of GTC now exists: a strategy may emit [CancelEntry] for a resting
+    ticket, and the simulator retires the matching order via
+    {!Trading_simulation.Cancel_handler.cancel_resting_entry_orders}. The two
+    original tests are unchanged and remain the {b default} contract — no
+    strategy emits [CancelEntry] unless [entry_order_ttl_weeks > 0], so
+    persistence is exactly as before. The third test pins the new half: cancel
+    the ticket and the later cross does {e not} fill. *)
 
 open OUnit2
 open Core
@@ -126,6 +136,42 @@ module Reemit_if_not_held_strategy :
         }
 end
 
+(** Emits [CreateEntering] on the first call, then [CancelEntry] for the same
+    position on the third — i.e. retires the resting ticket on Jan-4, one bar
+    before the Jan-5 cross that would otherwise fill it. Stands in for the F2
+    weekly re-screen / TTL decision without pulling the Weinstein strategy in.
+*)
+module Cancel_before_cross_strategy : sig
+  include Trading_strategy.Strategy_interface.STRATEGY
+
+  val reset : unit -> unit
+end = struct
+  let name = "CancelBeforeCross"
+  let calls = ref 0
+  let reset () = calls := 0
+
+  let _transitions_for n : Trading_strategy.Position.transition list =
+    match n with
+    | 1 -> [ make_create_entering ~position_id:"AAPL-CANCEL" ]
+    | 3 ->
+        [
+          {
+            position_id = "AAPL-CANCEL";
+            date = date_of_string "2024-01-04";
+            kind = CancelEntry { reason = "entry_ticket_ttl_expired" };
+          };
+        ]
+    | _ -> []
+
+  let on_market_close ~get_price:_ ~get_indicator:_ ~portfolio:_ =
+    incr calls;
+    Ok
+      {
+        Trading_strategy.Strategy_interface.transitions =
+          _transitions_for !calls;
+      }
+end
+
 let config =
   {
     start_date = date_of_string "2024-01-02";
@@ -207,6 +253,23 @@ let test_entering_position_suppresses_reemission_yet_order_persists _ =
   assert_single_later_cross_fill result;
   assert_fill_is_on_cross_day result
 
+(* F2: the "Cancelled" half of GTC. The identical bar series that fills on Jan-5
+   under the two tests above produces NO trade once the strategy cancels the
+   ticket on Jan-4 — proving the cancel reaches the order manager and is not
+   merely a strategy-side position close (a closed position with a live order
+   would still have filled, and Fill_router's symbol/state/side fallback would
+   still have routed it). *)
+let test_cancelled_ticket_does_not_fill_on_the_later_cross _ =
+  Cancel_before_cross_strategy.reset ();
+  let result =
+    run_exn ~name:"gtc_entry_persistence_cancel"
+      ~strategy:(module Cancel_before_cross_strategy)
+  in
+  assert_that
+    (List.map result.steps ~f:(fun s -> List.length s.orders_submitted))
+    (equal_to [ 1; 0; 0; 0; 0; 0; 0 ]);
+  assert_that (all_trades result) is_empty
+
 let suite =
   "GTC entry persistence"
   >::: [
@@ -215,6 +278,8 @@ let suite =
          "Entering position suppresses re-emission yet the resting order \
           persists"
          >:: test_entering_position_suppresses_reemission_yet_order_persists;
+         "a strategy-cancelled ticket does not fill on the later cross"
+         >:: test_cancelled_ticket_does_not_fill_on_the_later_cross;
        ]
 
 let () = run_test_tt_main suite

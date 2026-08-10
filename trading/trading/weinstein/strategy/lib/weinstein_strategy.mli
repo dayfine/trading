@@ -217,6 +217,12 @@ module Entry_freeze = Entry_freeze
     [config.freeze_entry_at_first_breakout]). Re-exposed so the entry walk and
     tests can construct / drive the per-run pin table. See {!Entry_freeze}. *)
 
+module Entry_ticket_ttl = Entry_ticket_ttl
+(** F2 resting-entry-ticket lifecycle: re-screen cancel (primary) + clock TTL
+    (backstop), gated by [config.entry_order_ttl_weeks] (default [0] = off).
+    Re-exposed so tests can pin the cancel decision independently of a full
+    screening tick. See {!Entry_ticket_ttl}. *)
+
 module Screening_notional = Screening_notional
 (** Per-Friday entry-walk notional / sector-exposure accumulator seeds. Exposed
     so tests can pin the accumulator-seeding primitives
@@ -878,6 +884,22 @@ type config = {
           ticket-level (spine / admission / grading / stops unchanged). Default
           [false] = off, bit-identical baselines (R1). See
           [Weinstein_strategy_config.freeze_entry_at_first_breakout]. *)
+  entry_order_ttl_weeks : int; [@sexp.default 0]
+      (** F2 resting-entry-ticket lifetime (plan
+          [dev/plans/entry-ticket-async-v2-2026-08-10.md] §2-M2 / §3-F2). Today
+          an unfilled StopLimit entry order rests forever (pinned by
+          [trading/simulation/test/test_gtc_entry_persistence.ml]) — GTC with no
+          cancel authority, so only half of the book's §4.7 contract ("until you
+          either cancel the orders or they are actually executed") exists. When
+          [> 0], each weekly review cancels an unfilled entry ticket whose
+          symbol {b fails the re-screen} (stage / sector / macro — the primary
+          path) or has rested more than [entry_order_ttl_weeks] weeks (the clock
+          backstop); the [Entering] position closes, its {!Entry_freeze} pin is
+          released, and the simulator retires the resting order. BOOK-NEUTRAL
+          dial: §4.7 + §7 grant the authority, the book names no number. Default
+          [0] = off, bit-identical baselines (R1). See
+          [Weinstein_strategy_config.entry_order_ttl_weeks] and
+          {!Entry_ticket_ttl}. *)
   stop_width_mode : Stop_width_mode.t;
       [@sexp.default Stop_width_mode.Drop_over_max]
       (** F3 wide-stop admission policy (plan
