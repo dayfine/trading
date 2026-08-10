@@ -35,6 +35,64 @@ experiment-platform program (`dev/plans/experiment-platform-2026-05-29.md`).
    (Deflated Sharpe), not a single-window win. Until then it stays
    default-off and lives as an axis.
 
+## Rule 4 — retirement (the graveyard)
+
+4. **Terminal REJECT marked do-not-revive → REMOVE.** A mechanism whose
+   ledger verdict is a terminal REJECT explicitly marked do-not-revive
+   (in the ledger entry, its writeup, or its `project_*` memory) is
+   **deleted outright** — config field, code paths, tests, and
+   docstrings — once it has sat unused for **3 sessions** after the
+   verdict. "Unused" means: not referenced by any live scenario spec,
+   preset, golden config, or in-flight experiment plan. The ledger
+   entry (plus its memory / writeup) remains the durable record of
+   what was tried and why it failed — deletion loses nothing.
+
+Why 3 sessions: long enough that the post-verdict session (which may
+still run a follow-up screen against the flag) and its immediate
+successors have passed; short enough that dead docstrings don't
+accumulate. Rejected mechanisms otherwise pile up forever as
+default-off flags + docstrings + dead code paths + tests, diluting the
+context every reader (human or agent) must wade through —
+`weinstein_strategy_config.mli` reached ~1,450 lines by 2026-08-09,
+much of it dead-mechanism docstrings. Rules 1–3 make landing safe;
+Rule 4 makes leaving safe.
+
+**Deletion is safe by construction.** A never-promoted flag defaults
+to the no-op (R1), so the default config path is bit-identical with
+the flag removed. Goldens unchanged + the full `dune build && dune
+runtest` gates are the proof — a removal PR that moves any golden is
+not a retirement, it's a behaviour change: stop and re-scope.
+
+**Two REJECT shapes — only one retires:**
+
+- **REJECT-do-not-revive.** The mechanism failed across every tested
+  context and the record says do not revive (e.g. early-admission
+  after the 27y deep-grid reversal). → **Remove.**
+- **REJECT-as-default-but-legitimate-axis.** The mechanism lost as a
+  *default* but remains a coherent regime-dependent or preset-scoped
+  dial (e.g. a breadth-preset knob, or a screen blocked on data
+  rather than rejected). → **Keep, default-off**, per Rules 1–2.
+
+A REJECT with neither classification is **not** retirement-eligible —
+record the classification first (ledger amendment or memory), don't
+guess it at removal time.
+
+**Removal PR mechanics:**
+
+- Full three gates (CI + qc-structural + qc-behavioral) — removal PRs
+  touch code, never docs-only.
+- One mechanism per commit (flag + code + tests together), so each
+  deletion is independently reviewable and revertable.
+- PR body cites the terminal ledger REJECT entry (path under
+  `dev/experiments/_ledger/`) and where do-not-revive is recorded.
+- Goldens green / bit-identical = proof of the no-op claim.
+- The retirement worklist is the flag inventory
+  (`dev/notes/mechanism-flag-inventory-*.md`, newest wins).
+
+Out of scope for Rule 4: retiring one *value* of a promoted knob, and
+removing plumbing shared with a live mechanism — both are refactors,
+not retirements, and need their own review.
+
 ## Why
 
 The 2026-05-29 hysteresis episode and the 2026-05-13 continuation
@@ -62,6 +120,22 @@ For a PR that adds a strategy mechanism:
   (default-off → default-on, or changes a no-op default value) must
   cite the ledger ACCEPT entry that justifies it. FAIL otherwise.
 
+For a PR that removes a strategy mechanism (Rule 4):
+
+- **R4 — retirement eligibility.** The PR body cites (a) a terminal
+  ledger REJECT entry under `dev/experiments/_ledger/`, (b) where the
+  do-not-revive classification is recorded, and (c) evidence of no
+  live references (grep of scenario specs / presets / plans for the
+  flag name comes back empty outside the removal diff). FAIL if any
+  of the three is missing, or if the record classifies the mechanism
+  as a keep-as-axis REJECT.
+- **R5 — pure deletion, no semantic drift.** The diff only removes:
+  the config field with its `[@sexp.default <no-op>]`, the code paths
+  gated on the non-default value, their tests, and their docstrings.
+  Goldens are bit-identical and CI is green. FAIL if any golden
+  changes, if the default path's behaviour is touched, or if the
+  commit bundles more than one mechanism.
+
 These are mechanical: grep the `config` record diff for the new field +
 its `[@sexp.default ...]`; check the PR body for a ledger citation when
-a default changes.
+a default changes (R3) or a mechanism is deleted (R4).
