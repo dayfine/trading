@@ -54,3 +54,18 @@ val apply :
     (dormant, since held symbols are excluded from [candidates]) until the
     position closes and it drops out. Applies symmetrically to long and short
     candidates — a short breakdown level should not be chased lower either. *)
+
+val release : t -> symbol:string -> unit
+(** [release pending ~symbol] drops [symbol]'s pin so its next qualification
+    earns a {b fresh} [E] instead of reusing the stale frozen level. No-op when
+    the symbol has no pin.
+
+    {!apply}'s own release rule cannot cover the F2 ticket-cancel case
+    ([dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F2): a symbol whose
+    resting ticket is cancelled is still in [held_set] on the cancelling tick
+    (its [Entering] position closes only once the transition is applied), and on
+    a clock-TTL cancel it may still be qualifying the following week — under
+    either condition the stale-release rule {b keeps} the pin.
+    {!Entry_ticket_ttl.run} therefore releases explicitly, which is what makes
+    "cancel releases the pin; the symbol may re-qualify later with a fresh [E]"
+    actually true. *)

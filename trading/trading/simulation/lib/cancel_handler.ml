@@ -36,6 +36,57 @@ let transitions_for_rejected_trades ~date ~positions ~rejected_trades =
       let symbol = trade.Trading_base.Types.symbol in
       _cancel_transition_for_symbol ~date ~positions ~symbol)
 
+(* Routing key for "an order that would open THIS position": symbol plus the
+   order side that opens it (long entries rest as Buy, short entries as Sell —
+   the mirror of [Order_generator]'s entry-side mapping). Same (symbol, side)
+   heuristic {!Fill_router} already uses to route fills back to positions, since
+   the per-step [order_links] table is cleared on every generation pass and so
+   cannot identify an order placed on an earlier step. *)
+let _order_route_key ~symbol ~(side : Trading_base.Types.side) =
+  symbol ^ "|" ^ Trading_base.Types.show_side side
+
+let _entry_route_key ~symbol ~(side : Trading_base.Types.position_side) =
+  _order_route_key ~symbol ~side:(match side with Long -> Buy | Short -> Sell)
+
+(* The position a [CancelEntry] names, if it is still present. Other transition
+   kinds resolve to [None]. *)
+let _position_of_cancel_entry ~positions (t : Position.transition) =
+  match t.kind with
+  | Position.CancelEntry _ -> Map.find positions t.position_id
+  | _ -> None
+
+(* Route key of a position that is still a resting [Entering] — i.e. one whose
+   order must go. Anything else (already filled, already closed) resolves to
+   [None] and its orders are left alone. *)
+let _route_key_of_resting_entry (pos : Position.t) =
+  if _is_entering_for_symbol ~symbol:pos.symbol pos then
+    Some (_entry_route_key ~symbol:pos.symbol ~side:pos.side)
+  else None
+
+let _cancelled_entry_keys ~positions (transitions : Position.transition list) =
+  List.filter_map transitions ~f:(fun t ->
+      _position_of_cancel_entry ~positions t
+      |> Option.bind ~f:_route_key_of_resting_entry)
+  |> String.Set.of_list
+
+let cancel_resting_entry_orders ~order_manager ~positions ~transitions =
+  let wanted = _cancelled_entry_keys ~positions transitions in
+  if Set.is_empty wanted then []
+  else
+    let is_wanted (o : Trading_orders.Types.order) =
+      Float.equal o.filled_quantity 0.0
+      && Set.mem wanted (_order_route_key ~symbol:o.symbol ~side:o.side)
+    in
+    let ids =
+      Trading_orders.Manager.list_orders ~filter:ActiveOnly order_manager
+      |> List.filter ~f:is_wanted
+      |> List.map ~f:(fun (o : Trading_orders.Types.order) -> o.id)
+    in
+    let (_ : Status.status list) =
+      Trading_orders.Manager.cancel_orders order_manager ids
+    in
+    ids
+
 let apply_to_positions positions trans =
   let open Result.Let_syntax in
   match Map.find positions trans.Position.position_id with

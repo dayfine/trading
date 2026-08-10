@@ -40,6 +40,7 @@ module Stop_width_mode = Stop_width_mode
 module Entry_audit_capture = Entry_audit_capture
 module Entry_walk = Entry_walk
 module Entry_freeze = Entry_freeze
+module Entry_ticket_ttl = Entry_ticket_ttl
 module Screening_notional = Screening_notional
 module Long_buying_power = Long_buying_power
 module Leverage_dawn = Leverage_dawn

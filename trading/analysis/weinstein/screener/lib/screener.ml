@@ -284,6 +284,13 @@ let _shorts_admitted_by_macro ~neutral_blocks_shorts macro_trend =
   | Neutral -> not neutral_blocks_shorts
   | Bearish -> true
 
+(* Public aliases: the F2 re-screen cancel must ask the same macro question the
+   cascade asks, for a symbol the cascade never sees (a resting ticket's symbol
+   is held, hence excluded from the candidate list). Sharing the function is
+   what keeps re-screen and screen from drifting. *)
+let longs_admitted_by_macro = _longs_admitted_by_macro
+let shorts_admitted_by_macro = _shorts_admitted_by_macro
+
 (** Filter, score, grade, sort, and cap long candidates. *)
 let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price
