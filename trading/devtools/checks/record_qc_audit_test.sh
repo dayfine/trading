@@ -348,11 +348,13 @@ else
   [[ -f "${JSON7B}" ]] && echo "      json B: $(cat "${JSON7B}")"
 fi
 
-# Re-invoke for the FIRST branch again (idempotency check): must overwrite
-# its own record, not create a third file, and JSON7B (the sibling branch's
-# record) must survive untouched.
+# Re-invoke for the FIRST branch again with the SAME reviewed sha (genuine
+# idempotency check -- a retried invocation for the exact same commit, e.g.
+# a transient `gh` failure retried by the orchestrator): must overwrite its
+# own record in place, not create a third file, and JSON7B (the sibling
+# branch's record) must survive untouched.
 cat > "${TMP_REPO}/dev/reviews/${FEATURE7}.md" <<'EOF'
-Reviewed SHA: run1sha-rerun
+Reviewed SHA: run1sha
 
 structural_qc: APPROVED
 behavioral_qc: NEEDS_REWORK
@@ -370,7 +372,7 @@ if (( rc3 == 0 )) && [[ -f "${JSON7A}" ]] && [[ -f "${JSON7B}" ]] \
    && [[ "${audit_count}" == "2" ]] \
    && grep -q '"quality_score": *2' "${JSON7A}" \
    && grep -q '"quality_score": *5' "${JSON7B}"; then
-  pass "scenario 7b — re-invoking same branch overwrites its own record (idempotent, no duplicate)"
+  pass "scenario 7b — re-invoking same branch AND same reviewed sha overwrites its own record (idempotent, no duplicate)"
 else
   fail "scenario 7b — expected exactly 2 audit files for ${FEATURE7} on 2026-07-27, JSON7A rewritten to q=2, JSON7B untouched at q=5; got rc=${rc3}, audit_count=${audit_count}"
   echo "${out3}" | sed 's/^/      /'
@@ -379,18 +381,160 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 7d — H-AUDIT-REWORK-COUNT-BLIND regression: re-invoking the SAME
+# branch with a DIFFERENT reviewed sha (a genuine rework at a new commit
+# tip, not a retry of the same review) must NOT clobber the record it
+# followed. Both must survive: the just-preserved NEEDS_REWORK record from
+# scenario 7b's call (JSON7A, q=2, sha run1sha) and a new APPROVED record
+# for the rework (sha run1sha-v2). Before the fix, this collided on the
+# exact same $OUTPUT_FILE as scenario 7b and the APPROVED call would have
+# silently destroyed the NEEDS_REWORK record -- the actual production bug
+# (demonstrated live: a NEEDS_REWORK -> fix -> APPROVED cycle on one PR
+# branch, within one orchestrator run, loses the NEEDS_REWORK record and
+# undercounts consecutive_rework_count for every future rework streak on
+# that feature).
+# ---------------------------------------------------------------------------
+cat > "${TMP_REPO}/dev/reviews/${FEATURE7}.md" <<'EOF'
+Reviewed SHA: run1sha-v2
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+5 — fixed after rework
+EOF
+out4=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE7}" "feat/picks-phase-c" "2026-07-27" 2>&1) && rc4=0 || rc4=$?
+
+audit_count_7d="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "2026-07-27-*-${FEATURE7}.json" | wc -l | tr -d ' ')"
+
+if (( rc4 == 0 )) && [[ -f "${JSON7A}" ]] && [[ -f "${JSON7B}" ]] \
+   && [[ "${audit_count_7d}" == "3" ]] \
+   && grep -q '"quality_score": *5' "${JSON7A}" \
+   && grep -q '"sha": *"run1sha-v2"' "${JSON7A}" \
+   && grep -q '"quality_score": *5' "${JSON7B}"; then
+  # The preserved (superseded) NEEDS_REWORK record must exist somewhere
+  # under the ${FEATURE7} glob, distinct from JSON7A/JSON7B, and still show
+  # the rework's own verdict/sha/score -- not silently vanished.
+  preserved_found=false
+  for f in "${TMP_REPO}/dev/audit/2026-07-27-"*"-${FEATURE7}.json"; do
+    [[ "${f}" == "${JSON7A}" ]] && continue
+    [[ "${f}" == "${JSON7B}" ]] && continue
+    if grep -q '"sha": *"run1sha"' "${f}" && grep -q '"quality_score": *2' "${f}" \
+       && grep -q '"overall_qc": *"NEEDS_REWORK"' "${f}"; then
+      preserved_found=true
+    fi
+  done
+  if $preserved_found; then
+    pass "scenario 7d — same branch, DIFFERENT reviewed sha (rework) preserves the prior NEEDS_REWORK record instead of clobbering it (H-AUDIT-REWORK-COUNT-BLIND fix)"
+  else
+    fail "scenario 7d — expected the pre-rework NEEDS_REWORK record (sha run1sha, q=2) to survive under a distinct filename; not found"
+    ls -la "${TMP_REPO}/dev/audit/" | sed 's/^/      /'
+  fi
+else
+  fail "scenario 7d — expected 3 audit files for ${FEATURE7} on 2026-07-27 (JSON7A now q=5/run1sha-v2, JSON7B untouched q=5, plus a preserved record); got rc=${rc4}, audit_count=${audit_count_7d}"
+  echo "${out4}" | sed 's/^/      /'
+  [[ -f "${JSON7A}" ]] && echo "      json A: $(cat "${JSON7A}")"
+  [[ -f "${JSON7B}" ]] && echo "      json B: $(cat "${JSON7B}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 7e — the streak survives the preservation: with the collision now
+# preserving rather than clobbering, three CONSECUTIVE NEEDS_REWORK calls on
+# one branch (three distinct reviewed shas) must produce
+# consecutive_rework_count=3 on the third -- the exact escalation trigger
+# (>=3) that H-AUDIT-REWORK-COUNT-BLIND documents as unreachable pre-fix
+# (a same-day streak on one branch could never exceed 1, since every call
+# but the first destroyed its predecessor before the scan ever saw it).
+# ---------------------------------------------------------------------------
+FEATURE7E="streak-survives-preservation"
+WRITE_AUDIT="${TMP_REPO}/trading/devtools/checks/write_audit.sh"
+
+out7e_1=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=5000000000000000000 \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-28 --feature "${FEATURE7E}" --branch "feat/streaky" --sha "shaAAA" \
+    --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK 2>&1) && rc7e_1=0 || rc7e_1=$?
+
+out7e_2=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=6000000000000000000 \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-28 --feature "${FEATURE7E}" --branch "feat/streaky" --sha "shaBBB" \
+    --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK 2>&1) && rc7e_2=0 || rc7e_2=$?
+
+out7e_3=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=7000000000000000000 \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-28 --feature "${FEATURE7E}" --branch "feat/streaky" --sha "shaCCC" \
+    --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK 2>&1) && rc7e_3=0 || rc7e_3=$?
+
+JSON7E="${TMP_REPO}/dev/audit/2026-07-28-feat-streaky-${FEATURE7E}.json"
+
+if (( rc7e_1 == 0 )) && (( rc7e_2 == 0 )) && (( rc7e_3 == 0 )) \
+   && [[ -f "${JSON7E}" ]] \
+   && grep -q '"consecutive_rework_count": *3' "${JSON7E}" \
+   && echo "${out7e_3}" | grep -q 'consecutive_rework_count=3'; then
+  pass "scenario 7e — 3 consecutive same-day NEEDS_REWORK calls on one branch reach consecutive_rework_count=3 (was capped at 1 pre-fix, H-AUDIT-REWORK-COUNT-BLIND)"
+else
+  fail "scenario 7e — expected consecutive_rework_count=3 on the third call; got rc=${rc7e_1}/${rc7e_2}/${rc7e_3}"
+  echo "${out7e_1}" | sed 's/^/      /'
+  echo "${out7e_2}" | sed 's/^/      /'
+  echo "${out7e_3}" | sed 's/^/      /'
+  [[ -f "${JSON7E}" ]] && echo "      json: $(cat "${JSON7E}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 7f — write_audit.sh direct callers that never pass --sha are
+# completely unaffected (100% backward compatible): two direct calls for
+# the identical date+branch+feature, neither with --sha, still overwrite
+# exactly as before this fix (both sides' sha are unknown/empty, so the
+# preserve-on-collision guard never fires -- see the "identity key"
+# rationale in write_audit.sh).
+# ---------------------------------------------------------------------------
+FEATURE7F="no-sha-caller-unaffected"
+
+out7f_1=$(REPO_ROOT="${TMP_REPO}" \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-29 --feature "${FEATURE7F}" --branch "feat/no-sha" \
+    --structural APPROVED --behavioral APPROVED --overall APPROVED --quality-score 3 2>&1) && rc7f_1=0 || rc7f_1=$?
+
+out7f_2=$(REPO_ROOT="${TMP_REPO}" \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-29 --feature "${FEATURE7F}" --branch "feat/no-sha" \
+    --structural APPROVED --behavioral APPROVED --overall APPROVED --quality-score 4 2>&1) && rc7f_2=0 || rc7f_2=$?
+
+JSON7F="${TMP_REPO}/dev/audit/2026-07-29-feat-no-sha-${FEATURE7F}.json"
+audit_count_7f="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "2026-07-29-*-${FEATURE7F}.json" | wc -l | tr -d ' ')"
+
+if (( rc7f_1 == 0 )) && (( rc7f_2 == 0 )) && [[ -f "${JSON7F}" ]] \
+   && [[ "${audit_count_7f}" == "1" ]] \
+   && grep -q '"quality_score": *4' "${JSON7F}"; then
+  pass "scenario 7f — direct callers omitting --sha still overwrite in place, no preserved-aside file (backward compatible)"
+else
+  fail "scenario 7f — expected exactly 1 file with q=4 (second call wins, no --sha means no preserve); got rc=${rc7f_1}/${rc7f_2}, audit_count=${audit_count_7f}"
+  echo "${out7f_1}" | sed 's/^/      /'
+  echo "${out7f_2}" | sed 's/^/      /'
+  [[ -f "${JSON7F}" ]] && echo "      json: $(cat "${JSON7F}")"
+fi
+
+# ---------------------------------------------------------------------------
 # Scenario 7c — empty --branch fallback: `record_qc_audit.sh <feature> "" <date>`
 # satisfies the 3-positional-arg arity check (an unset $BRANCH in the
 # orchestrator's documented fallback invocation silently takes this path).
 # write_audit.sh's `[ -n "$BRANCH" ]` guard treats "" the same as "omitted",
-# falling back to the pre-fix dev/audit/<date>-<feature>.json shape, which
-# DOES still clobber same-day sibling reviews of the same feature.
+# falling back to the pre-fix dev/audit/<date>-<feature>.json shape.
 #
-# This is a KNOWN, documented gap -- NOT fixed by this change (out of scope
-# for the H-AUDIT-COLLISION fix, which requires a real branch value to
-# disambiguate). This test pins the current (still-clobbering) behavior so
-# a future change to this fallback path doesn't silently regress it further
-# without updating this test.
+# The BRANCH-disambiguation gap (H-AUDIT-COLLISION) is still NOT fixed here
+# -- two DIFFERENT branches that both happen to report an empty branch
+# string are still indistinguishable by filename, out of scope for that
+# fix. But as of H-AUDIT-REWORK-COUNT-BLIND, the sha-based preserve-on-
+# collision guard is orthogonal to branch and fires here too: this fixture
+# uses two DIFFERENT reviewed shas (as it always has), so the second call no
+# longer clobbers the first -- it preserves it under a distinct filename.
+# Updated from "KNOWN gap, pinned not fixed" (the pre-fix expectation of
+# exactly 1 clobbered file) to pin the improved (2-file, nothing lost)
+# outcome. The narrower remaining gap -- the preserved filename carries no
+# branch identity -- is content the "notes"/"branch" fields inside each
+# record still capture, so no data is actually lost, only the filename's
+# ability to name which review is which at a glance.
 # ---------------------------------------------------------------------------
 FEATURE7C="empty-branch-fallback"
 cat > "${TMP_REPO}/dev/reviews/${FEATURE7C}.md" <<'EOF'
@@ -424,11 +568,23 @@ out7c_2=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/reco
 audit_count_7c="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "2026-07-27-*${FEATURE7C}.json" | wc -l | tr -d ' ')"
 
 if (( rc7c_1 == 0 )) && (( rc7c_2 == 0 )) && [[ -f "${JSON7C}" ]] \
-   && [[ "${audit_count_7c}" == "1" ]] \
+   && [[ "${audit_count_7c}" == "2" ]] \
    && grep -q '"quality_score": *5' "${JSON7C}"; then
-  pass "scenario 7c — empty --branch reaches the no-branch fallback and still clobbers (KNOWN gap, pinned not fixed)"
+  # Confirm the FIRST record (q=4) survived under a distinct (preserved)
+  # filename rather than vanishing.
+  preserved_7c_found=false
+  for f in "${TMP_REPO}/dev/audit/2026-07-27-"*"${FEATURE7C}.json"; do
+    [[ "${f}" == "${JSON7C}" ]] && continue
+    grep -q '"quality_score": *4' "${f}" && preserved_7c_found=true
+  done
+  if $preserved_7c_found; then
+    pass "scenario 7c — empty --branch fallback: sha-based identity now preserves rather than clobbers a same-day collision (gap narrowed by H-AUDIT-REWORK-COUNT-BLIND)"
+  else
+    fail "scenario 7c — expected the first record (q=4) to survive under a distinct filename; not found"
+    ls -la "${TMP_REPO}/dev/audit/" | sed 's/^/      /'
+  fi
 else
-  fail "scenario 7c — expected exactly 1 file (second run wins, q=5); got rc=${rc7c_1}/${rc7c_2}, audit_count=${audit_count_7c}"
+  fail "scenario 7c — expected exactly 2 files (q=4 preserved, q=5 canonical); got rc=${rc7c_1}/${rc7c_2}, audit_count=${audit_count_7c}"
   echo "${out7c_1}" | sed 's/^/      /'
   echo "${out7c_2}" | sed 's/^/      /'
   [[ -f "${JSON7C}" ]] && echo "      json: $(cat "${JSON7C}")"
