@@ -1,0 +1,17 @@
+(tests
+ (names test_bar_window test_blind test_table_format test_bar_source)
+ (libraries
+  core
+  core_unix
+  core_unix.filename_unix
+  fpath
+  matchers
+  ounit2
+  status
+  types
+  csv
+  trading.data_panel.snapshot
+  weinstein.snapshot_pipeline
+  weekly_bars_dump_lib)
+ (preprocess
+  (pps ppx_jane)))
