@@ -268,8 +268,8 @@ let test_breakout_week_admitted_under_both_bases _ =
         (axti_shape ~basis:Entry_freshness.Ma_cross ~weeks_advancing:1
            ~close:axti_anchor ()),
       is_breakout_candidate
-        (axti_shape ~basis:Entry_freshness.Range_top_breakout
-           ~weeks_advancing:1 ~close:axti_anchor ()) )
+        (axti_shape ~basis:Entry_freshness.Range_top_breakout ~weeks_advancing:1
+           ~close:axti_anchor ()) )
     (equal_to (true, true))
 
 (* Replaces, never widens: a fresh (weeks_advancing = 2) name whose close is 25%
@@ -281,8 +281,8 @@ let test_armed_basis_replaces_rather_than_widens _ =
         (axti_shape ~basis:Entry_freshness.Ma_cross ~weeks_advancing:2
            ~close:(axti_anchor *. 0.75) ()),
       is_breakout_candidate
-        (axti_shape ~basis:Entry_freshness.Range_top_breakout
-           ~weeks_advancing:2 ~close:(axti_anchor *. 0.75) ()) )
+        (axti_shape ~basis:Entry_freshness.Range_top_breakout ~weeks_advancing:2
+           ~close:(axti_anchor *. 0.75) ()) )
     (equal_to (true, false))
 
 (* No ticket anchor ([entry_anchor_local_range_weeks = 0]) means the armed basis
@@ -336,8 +336,7 @@ let test_analyze_threads_entry_freshness_basis _ =
        ~as_of_date:as_of)
       .range_top_freshness
   in
-  assert_that (freshness cfg, freshness armed)
-    (equal_to (None, Some true))
+  assert_that (freshness cfg, freshness armed) (equal_to (None, Some true))
 
 (* ------------------------------------------------------------------ *)
 (* Breakdown candidate                                                  *)

@@ -342,8 +342,8 @@ val is_breakout_candidate : ?early_stage2_max_weeks:int -> t -> bool
     above the MA (weinstein-book-reference.md §1 Stage-2 start event, §4.1
     requirements 1–3). Because the two clocks are alternatives rather than a
     disjunction, arming the basis can {i reject} names the MA-cross window would
-    have admitted; that is intended (M3 — the resting ticket, not the screen-time
-    window, is the discipline).
+    have admitted; that is intended (M3 — the resting ticket, not the
+    screen-time window, is the discipline).
 
     The armed basis composes with, and does not double-count, the continuation
     and virgin-crossing arms: both are evaluated exactly as before. AXTI-class

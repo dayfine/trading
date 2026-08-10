@@ -708,13 +708,12 @@ let test_resistance_min_history_bars_axis_resolves_via_overlay_validator _ =
     unchanged ([.claude/rules/experiment-flag-discipline.md] R1). *)
 let test_default_entry_freshness_basis_is_ma_cross _ =
   let cfg = _default_config () in
-  assert_that cfg.entry_freshness_basis
-    (equal_to Entry_freshness.Ma_cross)
+  assert_that cfg.entry_freshness_basis (equal_to Entry_freshness.Ma_cross)
 
 (** Axis reachability (experiment-flag-discipline R2): the
     [((entry_freshness_basis Range_top_breakout))] override resolves through the
-    {b real} [Overlay_validator.apply_overrides] (the sweep / WF-CV path) with no
-    unknown-key error and lands the armed variant — this is what makes
+    {b real} [Overlay_validator.apply_overrides] (the sweep / WF-CV path) with
+    no unknown-key error and lands the armed variant — this is what makes
     [((flag entry_freshness_basis) (values (Ma_cross Range_top_breakout)))] a
     valid [Variant_matrix] axis on landing. *)
 let test_entry_freshness_basis_axis_resolves_via_overlay_validator _ =
