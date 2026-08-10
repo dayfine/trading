@@ -80,6 +80,22 @@ type config = {
           [Stock_analysis_scans.scan_max_high] walk). The [@sexp.default 0]
           attribute is inert here (this config does not derive sexp) but marks
           the field as an additive, default-off option. *)
+  entry_freshness_basis : Entry_freshness.basis;
+      [@sexp.default Entry_freshness.Ma_cross]
+      (** F1 (plan [dev/plans/entry-ticket-async-v2-2026-08-10.md] §2 M1 / §3
+          F1) — which event starts the Stage-2 admission clock read by
+          {!is_breakout_candidate}.
+
+          [Ma_cross] {b (default, no-op)} keeps today's behaviour verbatim: the
+          window is [Stage.result.weeks_advancing] counted from the MA cross,
+          and {!t.range_top_freshness} is [None]. Bit-identical to pre-feature.
+
+          [Range_top_breakout] measures freshness from the breakout above the
+          ticket anchor {!t.local_range_top} instead — Weinstein §1's own
+          Stage-2 start event ("begins when the stock breaks out above the top
+          of the resistance zone AND above the 30-week MA"), with §4.1's MA
+          conditions kept explicit. See {!Entry_freshness} for the admit rule
+          and {!is_breakout_candidate} for how the arm composes. *)
 }
 (** Configuration bundling all sub-module configs. *)
 
@@ -146,6 +162,18 @@ type t = {
           re-admission arm to bypass the [early_stage2_max_weeks] staleness
           rejection for a genuine new-high breakout. [false] whenever the flag
           is off — bit-identical to pre-feature behaviour. *)
+  range_top_freshness : bool option;
+      (** F1 — the armed admission clock's verdict, computed by
+          {!Entry_freshness.range_top_freshness} from
+          [config.entry_freshness_basis], the stage MA direction / value,
+          {!local_range_top}, and {!current_close}.
+
+          [None] under the default [Ma_cross] basis — "this basis has no
+          opinion", which {!is_breakout_candidate} reads as "run the pre-F1
+          MA-cross admission arm verbatim". [Some live] under
+          [Range_top_breakout]: [live] is [true] iff the close sits at or within
+          {!Entry_freshness.proximity_pct} below the ticket anchor AND the MA is
+          not declining AND the anchor clears the MA. *)
   current_close : float option;
       (** The most recent weekly close (offset 0), read from
           [callbacks.stage.get_close]. [None] when the callback bundle has no
@@ -303,6 +331,31 @@ val is_breakout_candidate : ?early_stage2_max_weeks:int -> t -> bool
     valid Stage-2 entry regardless of how long ago the Stage-2 transition
     happened. [false] (default) when the flag is off, so admission is
     bit-identical to pre-feature.
+
+    F1 freshness basis ([config.entry_freshness_basis], plan §2 M1 / §3 F1): the
+    basis {b replaces} the initial-breakout arm, it never widens it. Under the
+    default [Ma_cross], [t.range_top_freshness] is [None] and the
+    [early_stage2_max_weeks] window above runs verbatim — bit-identical. Under
+    [Range_top_breakout] that window is not consulted at all; a non-late Stage-2
+    stock qualifies iff [t.range_top_freshness = Some true], i.e. its breakout
+    setup is live at the ticket anchor with a non-declining MA and the anchor
+    above the MA (weinstein-book-reference.md §1 Stage-2 start event, §4.1
+    requirements 1–3). Because the two clocks are alternatives rather than a
+    disjunction, arming the basis can {i reject} names the MA-cross window would
+    have admitted; that is intended (M3 — the resting ticket, not the
+    screen-time window, is the discipline).
+
+    The armed basis composes with, and does not double-count, the continuation
+    and virgin-crossing arms: both are evaluated exactly as before. AXTI-class
+    names (heavy overhead, non-virgin breakout) are not eligible for the virgin
+    arm, so F1 is the only path that admits them (plan §6).
+
+    Interaction with [Weinstein_strategy_config.reject_declining_ma_long_entry]
+    (#1775): that gate is a separate, later strategy-level veto on declining-MA
+    long entries. F1's admit rule enforces the same §4.1 condition earlier and
+    against the {i anchor} (where a resting ticket fills), so the two are
+    complementary — F1 never admits something the #1775 gate would have to
+    reject on MA direction.
 
     Volume confirmation (Strong / Adequate) and the RS-not-negative-declining
     gate apply to all arms equally.

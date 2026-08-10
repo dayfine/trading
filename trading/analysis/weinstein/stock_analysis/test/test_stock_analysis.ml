@@ -119,15 +119,17 @@ let test_breakout_candidate_false_when_no_volume_confirmation _ =
 (** A fresh Stage2 analysis (no observed Stage1→Stage2 predecessor) with the
     given [weeks_advancing], Strong volume, and rising RS — so admission turns
     solely on the early-Stage2 window arm of [is_breakout_candidate]. *)
-let fresh_stage2 ?(virgin_readmission = false) ~weeks_advancing () :
+let fresh_stage2 ?(virgin_readmission = false) ?(range_top_freshness = None)
+    ?(late = false) ?(ma_direction = Rising) ?(ma_value = 100.0)
+    ?(local_range_top = None) ?(current_close = None) ~weeks_advancing () :
     Stock_analysis.t =
   {
     ticker = "X";
     stage =
       {
-        stage = Stage2 { weeks_advancing; late = false };
-        ma_value = 100.0;
-        ma_direction = Rising;
+        stage = Stage2 { weeks_advancing; late };
+        ma_value;
+        ma_direction;
         ma_slope_pct = 0.05;
         transition = None;
         above_ma_count = 5;
@@ -152,12 +154,13 @@ let fresh_stage2 ?(virgin_readmission = false) ~weeks_advancing () :
     support = None;
     breakout_price = Some 100.0;
     breakdown_price = None;
-    local_range_top = None;
+    local_range_top;
     prior_stage = None;
     continuation = None;
     supply = None;
     virgin_readmission;
-    current_close = None;
+    range_top_freshness;
+    current_close;
     as_of_date = as_of;
   }
 
@@ -204,6 +207,136 @@ let test_fresh_candidate_unaffected_by_readmission_flag _ =
       is_breakout_candidate
         (fresh_stage2 ~weeks_advancing:4 ~virgin_readmission:false ()) )
     (equal_to (true, true))
+
+(* ------------------------------------------------------------------ *)
+(* F1 — entry_freshness_basis (admission clock)                          *)
+(* ------------------------------------------------------------------ *)
+
+let axti_anchor = 100.0
+let axti_ma = 90.0
+
+(** An AXTI-shaped Stage-2 candidate: [weeks_advancing] weeks above a rising MA
+    at [ma_value], still coiled at [close] under the ticket anchor
+    [local_range_top]. The freshness flag is derived through the REAL
+    {!Entry_freshness.range_top_freshness} rather than hand-set, so these tests
+    pin the composition of the module with the admission arm, not a stub. *)
+let axti_shape ?(basis = Entry_freshness.Range_top_breakout)
+    ?(ma_direction = Rising) ?(ma_value = axti_ma)
+    ?(local_range_top = Some axti_anchor) ?(virgin_readmission = false)
+    ?(late = false) ~weeks_advancing ~close () =
+  let current_close = Some close in
+  fresh_stage2 ~weeks_advancing ~virgin_readmission ~late ~ma_direction
+    ~ma_value ~local_range_top ~current_close
+    ~range_top_freshness:
+      (Entry_freshness.range_top_freshness ~basis ~ma_direction ~ma_value
+         ~local_range_top ~current_close)
+    ()
+
+(* The motivating shape (plan §2 M1): 10 weeks above a rising MA but still 2%
+   under the range top. [Ma_cross] has aged it out of the <=4-week window;
+   [Range_top_breakout] admits it because the book's Stage-2 has not started
+   yet — its breakout setup is live. *)
+let test_axti_shape_admitted_only_under_range_top_basis _ =
+  assert_that
+    ( is_breakout_candidate
+        (axti_shape ~basis:Entry_freshness.Ma_cross ~weeks_advancing:10
+           ~close:(axti_anchor *. 0.98) ()),
+      is_breakout_candidate
+        (axti_shape ~basis:Entry_freshness.Range_top_breakout
+           ~weeks_advancing:10 ~close:(axti_anchor *. 0.98) ()) )
+    (equal_to (false, true))
+
+(* §4.1 requirement 2: the same shape under a DECLINING MA is rejected by both
+   bases — arming F1 never buys a breakout below a falling MA (Ch. 3, Western
+   Union). *)
+let test_declining_ma_shape_rejected_under_both_bases _ =
+  assert_that
+    ( is_breakout_candidate
+        (axti_shape ~basis:Entry_freshness.Ma_cross ~ma_direction:Declining
+           ~weeks_advancing:10 ~close:(axti_anchor *. 0.98) ()),
+      is_breakout_candidate
+        (axti_shape ~basis:Entry_freshness.Range_top_breakout
+           ~ma_direction:Declining ~weeks_advancing:10
+           ~close:(axti_anchor *. 0.98) ()) )
+    (equal_to (false, false))
+
+(* The actual breakout week is admitted by both clocks: the MA-cross window is
+   still open (weeks_advancing = 1) and the setup is live at the anchor. *)
+let test_breakout_week_admitted_under_both_bases _ =
+  assert_that
+    ( is_breakout_candidate
+        (axti_shape ~basis:Entry_freshness.Ma_cross ~weeks_advancing:1
+           ~close:axti_anchor ()),
+      is_breakout_candidate
+        (axti_shape ~basis:Entry_freshness.Range_top_breakout ~weeks_advancing:1
+           ~close:axti_anchor ()) )
+    (equal_to (true, true))
+
+(* Replaces, never widens: a fresh (weeks_advancing = 2) name whose close is 25%
+   below the anchor is admitted by the MA-cross window but REJECTED by the armed
+   basis — the two clocks are alternatives, not a disjunction. *)
+let test_armed_basis_replaces_rather_than_widens _ =
+  assert_that
+    ( is_breakout_candidate
+        (axti_shape ~basis:Entry_freshness.Ma_cross ~weeks_advancing:2
+           ~close:(axti_anchor *. 0.75) ()),
+      is_breakout_candidate
+        (axti_shape ~basis:Entry_freshness.Range_top_breakout ~weeks_advancing:2
+           ~close:(axti_anchor *. 0.75) ()) )
+    (equal_to (true, false))
+
+(* No ticket anchor ([entry_anchor_local_range_weeks = 0]) means the armed basis
+   has no breakout level to be fresh from, so it admits nothing — even for a
+   weeks_advancing = 2 name the MA-cross window would take. *)
+let test_armed_basis_without_anchor_admits_nothing _ =
+  assert_that
+    (is_breakout_candidate
+       (axti_shape ~local_range_top:None ~weeks_advancing:2 ~close:axti_anchor
+          ()))
+    (equal_to false)
+
+(* [late] Stage 2 stays excluded under the armed basis: F1 moves the clock, it
+   does not relax the stage gate. *)
+let test_armed_basis_still_excludes_late_stage2 _ =
+  assert_that
+    (is_breakout_candidate
+       (axti_shape ~late:true ~weeks_advancing:1 ~close:axti_anchor ()))
+    (equal_to false)
+
+(* Virgin independence (plan §6): a stale virgin survivor far below its anchor
+   is admitted by the virgin-crossing arm under BOTH bases — F1 composes with
+   that arm rather than double-counting or suppressing it. *)
+let test_virgin_arm_independent_of_freshness_basis _ =
+  assert_that
+    ( is_breakout_candidate
+        (axti_shape ~basis:Entry_freshness.Ma_cross ~virgin_readmission:true
+           ~weeks_advancing:8 ~close:(axti_anchor *. 0.5) ()),
+      is_breakout_candidate
+        (axti_shape ~basis:Entry_freshness.Range_top_breakout
+           ~virgin_readmission:true ~weeks_advancing:8
+           ~close:(axti_anchor *. 0.5) ()) )
+    (equal_to (true, true))
+
+(* End-to-end threading through [analyze]: the default config leaves
+   [range_top_freshness = None] (R1 no-op), and arming the basis alongside a
+   local-range anchor produces a real verdict on a rising series whose close
+   sits at the top of its own range. *)
+let test_analyze_threads_entry_freshness_basis _ =
+  let bars = rising_bars ~n:60 50.0 150.0 in
+  let bench = rising_bars ~n:60 80.0 110.0 in
+  let armed =
+    {
+      cfg with
+      entry_anchor_local_range_weeks = 26;
+      entry_freshness_basis = Entry_freshness.Range_top_breakout;
+    }
+  in
+  let freshness config =
+    (analyze ~config ~ticker:"X" ~bars ~benchmark_bars:bench ~prior_stage:None
+       ~as_of_date:as_of)
+      .range_top_freshness
+  in
+  assert_that (freshness cfg, freshness armed) (equal_to (None, Some true))
 
 (* ------------------------------------------------------------------ *)
 (* Breakdown candidate                                                  *)
@@ -824,6 +957,22 @@ let suite =
          >:: test_stale_virgin_readmitted_only_when_armed;
          "fresh candidate unaffected by readmission flag"
          >:: test_fresh_candidate_unaffected_by_readmission_flag;
+         "AXTI shape admitted only under Range_top_breakout"
+         >:: test_axti_shape_admitted_only_under_range_top_basis;
+         "declining-MA shape rejected under both bases"
+         >:: test_declining_ma_shape_rejected_under_both_bases;
+         "breakout week admitted under both bases"
+         >:: test_breakout_week_admitted_under_both_bases;
+         "armed basis replaces rather than widens"
+         >:: test_armed_basis_replaces_rather_than_widens;
+         "armed basis without anchor admits nothing"
+         >:: test_armed_basis_without_anchor_admits_nothing;
+         "armed basis still excludes late Stage2"
+         >:: test_armed_basis_still_excludes_late_stage2;
+         "virgin arm independent of freshness basis"
+         >:: test_virgin_arm_independent_of_freshness_basis;
+         "analyze threads entry_freshness_basis"
+         >:: test_analyze_threads_entry_freshness_basis;
          "test_breakdown_candidate_true_with_stage3_prior"
          >:: test_breakdown_candidate_true_with_stage3_prior;
          "test_breakdown_candidate_false_for_stage2"

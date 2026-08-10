@@ -700,6 +700,52 @@ let test_resistance_min_history_bars_axis_resolves_via_overlay_validator _ =
   assert_that merged.resistance_min_history_bars (equal_to 520)
 
 (* -------------------------------------------------------------------- *)
+(* entry_freshness_basis — R1/R2 wiring for F1 (default-off variant)      *)
+(* -------------------------------------------------------------------- *)
+
+(** [entry_freshness_basis] defaults to [Ma_cross] — the Stage-2 admission clock
+    still counts from the MA cross, so every existing golden/baseline replays
+    unchanged ([.claude/rules/experiment-flag-discipline.md] R1). *)
+let test_default_entry_freshness_basis_is_ma_cross _ =
+  let cfg = _default_config () in
+  assert_that cfg.entry_freshness_basis (equal_to Entry_freshness.Ma_cross)
+
+(** Axis reachability (experiment-flag-discipline R2): the
+    [((entry_freshness_basis Range_top_breakout))] override resolves through the
+    {b real} [Overlay_validator.apply_overrides] (the sweep / WF-CV path) with
+    no unknown-key error and lands the armed variant — this is what makes
+    [((flag entry_freshness_basis) (values (Ma_cross Range_top_breakout)))] a
+    valid [Variant_matrix] axis on landing. *)
+let test_entry_freshness_basis_axis_resolves_via_overlay_validator _ =
+  let merged =
+    Backtest.Overlay_validator.apply_overrides (_default_config ())
+      [ Sexp.of_string "((entry_freshness_basis Range_top_breakout))" ]
+  in
+  assert_that merged.entry_freshness_basis
+    (equal_to Entry_freshness.Range_top_breakout)
+
+(** A config sexp with the field entirely ABSENT parses and lands the [Ma_cross]
+    no-op — the [[@sexp.default]] backward-compat half of R1: every pre-F1 spec
+    on disk keeps parsing, bit-identically. Same pattern as
+    {!test_strategy_config_parses_with_overhead_supply_absent}. *)
+let test_strategy_config_parses_with_entry_freshness_basis_absent _ =
+  let base = Weinstein_strategy.sexp_of_config (_default_config ()) in
+  let stripped =
+    match base with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List [ Sexp.Atom "entry_freshness_basis"; _ ] -> false
+            | _ -> true))
+    | other -> other
+  in
+  assert_that
+    (Weinstein_strategy.config_of_sexp stripped)
+    (field
+       (fun (c : Weinstein_strategy.config) -> c.entry_freshness_basis)
+       (equal_to Entry_freshness.Ma_cross))
+
+(* -------------------------------------------------------------------- *)
 (* screening_config.failed_breakout_tolerance_pct — failed-breakout gate  *)
 (* -------------------------------------------------------------------- *)
 
@@ -828,6 +874,12 @@ let suite =
          >:: test_override_screening_failed_breakout_tolerance;
          "failed_breakout_tolerance_pct axis resolves via Overlay_validator"
          >:: test_failed_breakout_tolerance_axis_resolves_via_overlay_validator;
+         "default entry_freshness_basis is Ma_cross"
+         >:: test_default_entry_freshness_basis_is_ma_cross;
+         "entry_freshness_basis axis resolves via Overlay_validator"
+         >:: test_entry_freshness_basis_axis_resolves_via_overlay_validator;
+         "strategy config parses with entry_freshness_basis absent"
+         >:: test_strategy_config_parses_with_entry_freshness_basis_absent;
        ]
 
 let () = run_test_tt_main suite

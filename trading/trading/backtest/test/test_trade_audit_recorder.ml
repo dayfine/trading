@@ -56,6 +56,7 @@ let _stock_analysis : Stock_analysis.t =
     continuation = None;
     supply = None;
     virgin_readmission = false;
+    range_top_freshness = None;
     current_close = None;
     as_of_date = _current_date;
   }

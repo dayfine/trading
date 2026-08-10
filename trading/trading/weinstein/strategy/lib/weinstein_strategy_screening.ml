@@ -78,7 +78,8 @@ let _classify_stage_for_screening ~config ~bar_reader ~prior_stages
     [virgin_crossing_readmission] knobs (both default off, bit-identical), and
     (d) threading the ticket-level [entry_anchor_local_range_weeks] knob
     (default 0 = off, bit-identical; moves only the screener's entry ticket,
-    never admission/grading).
+    never admission/grading), and (e) threading the F1 [entry_freshness_basis]
+    knob (default [Ma_cross] = off, bit-identical).
 
     The [min_history_bars] override sets [config.resistance.min_history_bars];
     because {!Stock_analysis} reuses the same [Resistance.config] record for the
@@ -99,6 +100,7 @@ let _stock_analysis_config_for ~(config : Weinstein_strategy_config.config) :
       overhead_supply = config.overhead_supply;
       virgin_crossing_readmission = config.virgin_crossing_readmission;
       entry_anchor_local_range_weeks = config.entry_anchor_local_range_weeks;
+      entry_freshness_basis = config.entry_freshness_basis;
     }
   in
   if config.resistance_min_history_bars = 0 then base

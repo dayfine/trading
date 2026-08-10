@@ -37,6 +37,7 @@ let make_candidate ?(side = Trading_base.Types.Long) ~ticker ~entry () =
       continuation = None;
       supply = None;
       virgin_readmission = false;
+      range_top_freshness = None;
       current_close = None;
       as_of_date = Date.of_string "2000-01-21";
     }
