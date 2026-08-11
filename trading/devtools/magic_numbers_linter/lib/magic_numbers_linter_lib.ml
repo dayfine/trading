@@ -15,126 +15,16 @@
    that both (a) contains a magic number and (b) contains a literal
    backslash-escape-like substring. *)
 
-(* --- Small string utilities (mirrors devtools/list_active_exceptions.ml's
-   style: no external string/regex library, plain char-level scanning). --- *)
-
-let contains_substring s sub =
-  let n = String.length s and m = String.length sub in
-  if m > n then false
-  else
-    let found = ref false in
-    let i = ref 0 in
-    while (not !found) && !i + m <= n do
-      if String.sub s !i m = sub then found := true;
-      incr i
-    done;
-    !found
-
-let count_occurrences s sub =
-  let n = String.length s and m = String.length sub in
-  if m = 0 || m > n then 0
-  else begin
-    let count = ref 0 in
-    let i = ref 0 in
-    while !i + m <= n do
-      if String.sub s !i m = sub then begin
-        incr count;
-        i := !i + m
-      end
-      else incr i
-    done;
-    !count
-  end
-
-let ends_with s suffix =
-  let n = String.length s and m = String.length suffix in
-  m <= n && String.sub s (n - m) m = suffix
-
-let split_fields s =
-  let n = String.length s in
-  let fields = ref [] in
-  let buf = Buffer.create 16 in
-  let flush () =
-    if Buffer.length buf > 0 then begin
-      fields := Buffer.contents buf :: !fields;
-      Buffer.clear buf
-    end
-  in
-  for i = 0 to n - 1 do
-    match s.[i] with ' ' | '\t' -> flush () | c -> Buffer.add_char buf c
-  done;
-  flush ();
-  List.rev !fields
-
-(* --- linter_exceptions.conf: magic_numbers path-substring exclusions --- *)
-
-let read_magic_number_exclusions conf_path =
-  if not (Sys.file_exists conf_path) then []
-  else begin
-    let ic = open_in conf_path in
-    let excludes = ref [] in
-    (try
-       while true do
-         let raw = input_line ic in
-         if String.length raw > 0 && raw.[0] <> '#' then
-           match split_fields raw with
-           | linter :: path_substr :: _ when linter = "magic_numbers" ->
-               excludes := path_substr :: !excludes
-           | _ -> ()
-       done
-     with End_of_file -> ());
-    close_in ic;
-    List.rev !excludes
-  end
-
-let is_excluded excludes path =
-  List.exists (fun sub -> contains_substring path sub) excludes
-
-(* --- File discovery: mirrors
-   find "$TRADING_DIR" \( -name '_build' -o -name '.formatted' \) -prune -o \
-        -path "*/lib/*.ml" -not -name "*.pp.ml" -print
-   -- prune _build/.formatted dirs at any depth; select files whose path
-   contains "/lib/" and ends in ".ml" but not ".pp.ml". --- *)
-
-let is_pruned_dir name = name = "_build" || name = ".formatted"
-
-let matches_lib_ml_pattern path =
-  ends_with path ".ml"
-  && (not (ends_with path ".pp.ml"))
-  && contains_substring path "/lib/"
-
-let collect_lib_ml_files root =
-  let result = ref [] in
-  let rec walk dir =
-    match Sys.readdir dir with
-    | exception _ -> ()
-    | entries ->
-        Array.sort String.compare entries;
-        Array.iter
-          (fun entry ->
-            if is_pruned_dir entry then ()
-            else begin
-              let path = Filename.concat dir entry in
-              if matches_lib_ml_pattern path then result := path :: !result;
-              match Sys.is_directory path with
-              | true -> walk path
-              | false -> ()
-              | exception _ -> ()
-            end)
-          entries
-  in
-  walk root;
-  List.rev !result
+(* Generic char-level string helpers (contains_substring, count_occurrences,
+   ends_with, split_fields, find_substring, is_digit, is_word_or_dot,
+   digit_run_end, lookahead_ok) live in String_utils; which files get
+   scanned and which are excluded lives in File_discovery. Both extracted
+   purely to keep this file under the file-length linter's limit -- see
+   string_utils.mli / file_discovery.mli. *)
+open String_utils
 
 (* --- Per-line skip predicates (each mirrors one `case ... continue` guard
    in the shell script, in the same order). --- *)
-
-let is_digit c = c >= '0' && c <= '9'
-
-let is_word_or_dot c =
-  (c >= 'a' && c <= 'z')
-  || (c >= 'A' && c <= 'Z')
-  || is_digit c || c = '_' || c = '.'
 
 let has_eq_digit_default line =
   let n = String.length line in
@@ -153,17 +43,6 @@ let has_eq_digit_default line =
     else scan (i + 1)
   in
   scan 0
-
-let find_substring s sub ~from =
-  let n = String.length s and m = String.length sub in
-  if m = 0 then None
-  else
-    let rec scan i =
-      if i + m > n then None
-      else if String.sub s i m = sub then Some i
-      else scan (i + 1)
-    in
-    scan from
 
 let has_let_binding line =
   match find_substring line "let " ~from:0 with
@@ -204,16 +83,6 @@ let should_skip_line line =
    grep -oP '(?<![a-zA-Z0-9_.])([0-9]+\.[0-9]+|[0-9]{2,})(?![a-zA-Z0-9_.])'
    including PCRE backtracking semantics on the digit-run lengths, scanning
    left to right for non-overlapping matches. --- *)
-
-let digit_run_end s start =
-  let n = String.length s in
-  let j = ref start in
-  while !j < n && is_digit s.[!j] do
-    incr j
-  done;
-  !j
-
-let lookahead_ok s pos = pos >= String.length s || not (is_word_or_dot s.[pos])
 
 let try_match_at s i =
   let n = String.length s in
@@ -370,9 +239,9 @@ let scan_file path =
         []
 
 let lint ~trading_root ~exceptions_conf =
-  let excludes = read_magic_number_exclusions exceptions_conf in
+  let excludes = File_discovery.read_magic_number_exclusions exceptions_conf in
   let files =
-    collect_lib_ml_files trading_root
-    |> List.filter (fun f -> not (is_excluded excludes f))
+    File_discovery.collect_lib_ml_files trading_root
+    |> List.filter (fun f -> not (File_discovery.is_excluded excludes f))
   in
   List.concat_map (fun f -> if Sys.file_exists f then scan_file f else []) files

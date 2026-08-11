@@ -13,7 +13,11 @@
 
     See [magic_numbers_linter.ml] (in the parent directory) for the thin CLI
     entry point, and [test/test_magic_numbers_linter_lib.ml] for the pinned
-    regression suite covering every rule enumerated below.
+    regression suite covering every rule enumerated below. Generic char-level
+    string helpers live in [String_utils] and file-discovery (which files get
+    scanned, which are excluded) lives in [File_discovery] -- both split out of
+    this module purely to stay under the file-length linter's limit; the
+    detection rules and their order are unchanged.
 
     {1 The exempt surface, in full}
 
@@ -121,28 +125,11 @@ val scan_file : string -> string list
     FINDING-1). If [path] no longer exists (vanished between discovery and scan
     -- a TOCTOU race), returns []. *)
 
-val read_magic_number_exclusions : string -> string list
-(** [read_magic_number_exclusions conf_path] reads
-    [magic_numbers <path-substring> ...] rows from a
-    [linter_exceptions.conf]-formatted file at [conf_path] and returns the path
-    substrings. Returns [] if [conf_path] does not exist. *)
-
-val is_excluded : string list -> string -> bool
-(** [is_excluded excludes path] is [true] if [path] contains any of the
-    [excludes] substrings. *)
-
-val collect_lib_ml_files : string -> string list
-(** [collect_lib_ml_files root] walks [root] and returns every path whose name
-    ends in [.ml] (but not [.pp.ml]) and contains [/lib/] -- mirrors the shell
-    [find] pruning [_build]/[.formatted] at any depth and selecting paths
-    matching [*/lib/*.ml] but not [*.pp.ml]. Note this has no file-type filter:
-    a matching DIRECTORY is both returned and still walked into (only
-    [_build]/[.formatted] are pruned from descent). *)
-
 val lint : trading_root:string -> exceptions_conf:string -> string list
 (** [lint ~trading_root ~exceptions_conf] is the full detection pipeline:
-    discover files via {!collect_lib_ml_files}, drop excluded paths per
-    {!read_magic_number_exclusions} and {!is_excluded}, then scan every
+    discover files via [File_discovery.collect_lib_ml_files], drop excluded
+    paths per [File_discovery.read_magic_number_exclusions] and
+    [File_discovery.is_excluded] (see file_discovery.mli), then scan every
     remaining file via {!scan_file}. Returns the flat, ordered violation list;
     the CLI entry point decides how to format/print it and what exit code to
     use. *)
