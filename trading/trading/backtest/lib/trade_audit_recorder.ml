@@ -35,6 +35,21 @@ let _fill_volume_of_confirmation :
   | Some (Volume.Unconfirmed { spike_ratio; buildup_multiple }) ->
       Ticket_lifecycle.Unconfirmed { spike_ratio; buildup_multiple }
 
+let _fill_volume_outcome_of_event :
+    AR.fill_volume_outcome -> Ticket_lifecycle.fill_volume_outcome = function
+  | Ejected -> Ticket_lifecycle.Ejected
+  | Skipped_other_exit -> Ticket_lifecycle.Skipped_other_exit
+  | Held -> Ticket_lifecycle.Held
+
+(* The verdict and the outcome travel together: the eject population is narrower
+   than the audit population, so a verdict alone cannot say what happened. *)
+let _fill_volume_check_of_event (e : AR.fill_volume_event) :
+    Ticket_lifecycle.fill_volume_check =
+  {
+    verdict = _fill_volume_of_confirmation e.confirmation;
+    outcome = _fill_volume_outcome_of_event e.outcome;
+  }
+
 let _freshness_basis_of_event :
     Weinstein_strategy.Entry_freshness.basis ->
     Ticket_lifecycle.entry_freshness_basis = function
@@ -50,15 +65,16 @@ let _triple_confirmation_of_event
     in_base_advance_pct = t.in_base_advance_pct;
   }
 
-(** The placement-time half of the lifecycle record. The fill/cancel half
-    ([fill_volume], [ticket_age_weeks_at_fill_or_cancel]) is unknowable at
-    placement and is merged in later — by {!Trade_audit.record_fill_volume} /
-    {!Trade_audit.record_transitions} at drain time and by
-    {!Execution_faithfulness.enrich} at the runner. *)
+(** The placement-time half of the lifecycle record. The resolution half
+    ([fill_volume], [ticket_age_weeks_at_cancel], [ticket_age_weeks_at_fill]) is
+    unknowable at placement and is merged in later — by
+    {!Trade_audit.record_fill_volume} / {!Trade_audit.record_transitions} at
+    drain time and by {!Execution_faithfulness.enrich} at the runner. *)
 let _ticket_lifecycle_of_event (e : AR.entry_event) : Ticket_lifecycle.t =
   {
     placement_date = e.current_date;
-    ticket_age_weeks_at_fill_or_cancel = None;
+    ticket_age_weeks_at_cancel = None;
+    ticket_age_weeks_at_fill = None;
     fill_volume = None;
     freshness_basis = _freshness_basis_of_event e.freshness_basis;
     sized_down_wide_stop = e.sized_down_wide_stop;
@@ -228,5 +244,5 @@ let of_collector ~(trade_audit : Trade_audit.t)
       (fun (event : AR.fill_volume_event) ->
         Trade_audit.record_fill_volume trade_audit
           ~position_id:event.position_id
-          (_fill_volume_of_confirmation event.confirmation));
+          (_fill_volume_check_of_event event));
   }

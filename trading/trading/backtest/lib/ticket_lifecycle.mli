@@ -41,9 +41,12 @@ type fill_volume_verdict =
       buildup_multiple : float option;
     }
       (** Both branches were evaluated against real history and neither
-          confirmed ⇒ the position was {b ejected} ([volume_eject]). Each
-          measured quantity is carried so near-misses are rankable; a [None]
-          means that one branch alone lacked history. *)
+          confirmed ⇒ the F5 rule {i would} eject. Whether it actually did is
+          {!fill_volume_outcome}'s job, not this constructor's: the audit
+          population is deliberately wider than the eject population (see
+          {!fill_volume_check}). Each measured quantity is carried so
+          near-misses are rankable; a [None] means that one branch alone lacked
+          history. *)
   | No_verdict
       (** {b Held without a verdict}: neither branch had enough history, so
           {!Volume.classify_breakout} returned [None] and the runner held —
@@ -52,6 +55,41 @@ type fill_volume_verdict =
           the held population cannot be split into "confirmed" and "never
           judged", and an arm's eject rate carries an unmeasured residual. *)
 [@@deriving sexp]
+
+(** What the F5 eject path {b actually did} with the position on the tick the
+    verdict above was recorded. Read off the tick's real
+    [volume_eject] transitions and skip set — never inferred from the verdict,
+    because the two populations differ. *)
+type fill_volume_outcome =
+  | Ejected  (** A [volume_eject] [TriggerExit] was emitted for this position. *)
+  | Skipped_other_exit
+      (** {!Weinstein_strategy.Volume_eject_runner.update} never considered this
+          position: another exit channel (stop, Stage-3, laggard, force-liq,
+          liquidity, extension) had already claimed it this tick. The audit
+          surface still evaluated it, because the fill's volume verdict is a
+          property of the {i fill}, independent of what else befell the position
+          that day — and this cohort (weak-volume breakout that stops out in
+          week 0/1) is exactly what the plan's §5 prediction 4 measures. *)
+  | Held
+      (** Considered and not ejected — either confirmed, or [No_verdict]'s
+          fail-soft hold. *)
+[@@deriving sexp]
+
+type fill_volume_check = {
+  verdict : fill_volume_verdict;  (** What §4.2 said about the fill week. *)
+  outcome : fill_volume_outcome;  (** What the run did about it. *)
+}
+[@@deriving sexp]
+(** The F5 at-fill record: a verdict {b paired with} an outcome.
+
+    They are one record rather than two optional fields so that a verdict
+    without its outcome is unrepresentable. That matters because
+    [Unconfirmed] does {b not} imply [Ejected]: an [Unconfirmed] row carrying
+    [Skipped_other_exit] is a fill whose volume failed §4.2 but whose position
+    was already leaving via another channel. Counting [Unconfirmed] rows as
+    ejects would overstate the eject rate by exactly that cohort; with both
+    halves recorded, a ladder-v4 reader can compute "unconfirmed fills" and
+    "actual ejects" separately and measure their overlap. *)
 
 type triple_confirmation = {
   breakout_volume_multiple : float option;
@@ -96,39 +134,46 @@ type t = {
           row's join key and its name reads like a {i fill} date (indeed
           {!Trade_context} matches it to fills with a 7-day window). Naming the
           placement instant explicitly gives
-          {!ticket_age_weeks_at_fill_or_cancel} a documented anchor that a later
-          change to [entry_date]'s meaning cannot silently invalidate. *)
-  ticket_age_weeks_at_fill_or_cancel : int option; [@sexp.option]
-      (** Whole weeks the ticket rested before it resolved — the quantity F2's
-          TTL analysis needs ([entry_order_ttl_weeks] is also in weeks, so the
-          units line up without conversion). The two resolutions are mutually
-          exclusive and both are recorded:
+          the two age fields below a documented anchor that a later change to
+          [entry_date]'s meaning cannot silently invalidate. *)
+  ticket_age_weeks_at_cancel : int option; [@sexp.option]
+      (** Whole weeks the ticket rested before it was {b cancelled} — set by
+          {!Trade_audit.record_transitions} from the [CancelEntry] transition's
+          date minus {!placement_date}. {b Unbounded}, and the column F2's TTL
+          analysis should read: a TTL cancel is by construction the multi-week
+          case ([entry_order_ttl_weeks] is also in weeks, so the units line up
+          without conversion).
 
-          - {b cancelled} — set by {!Trade_audit.record_transitions} from the
-            [CancelEntry] transition's date minus {!placement_date}. Unbounded,
-            and the resolution F2's TTL analysis actually reads: a TTL cancel is
-            by construction the multi-week case.
-          - {b filled} — set by {!Execution_faithfulness.enrich} from the
-            matched round-trip's entry-fill date minus {!placement_date}.
+          [None] when the ticket did not resolve by cancellation — it filled,
+          or it was still resting at end-of-run. *)
+  ticket_age_weeks_at_fill : int option; [@sexp.option]
+      (** Whole weeks the ticket rested before it {b filled} — set by
+          {!Execution_faithfulness.enrich} from the matched round-trip's
+          entry-fill date minus {!placement_date}.
 
-          {b Ceiling on the FILLED side}: that enrichment joins through
+          {b Structurally capped at one week.} That enrichment joins through
           {!Trade_context}, whose fallback window is 7 days, so a fill more than
-          a week after placement is not matched and the age stays [None] (as
+          a week after placement is not matched at all and this stays [None] (as
           does [Trade_audit.audit_record.execution] — a pre-existing property of
-          that join, not introduced here). Read a fill-side age as "0 or 1
-          week", never as the resting-time distribution; use the cancel side, or
-          [trades.csv]'s own entry date, for long rests.
+          that join, not introduced here). The only values this column can ever
+          take are [0] and [1]: read it as "filled same week / next week", never
+          as the resting-time distribution.
 
-          [None] means no resolution was observed
-          {i in the artifacts this row was built from}: still resting at
-          end-of-run, filled outside the join window, or the enrichment pass did
-          not run (raw collector output, e.g. in unit tests). *)
-  fill_volume : fill_volume_verdict option; [@sexp.option]
-      (** The F5 at-fill §4.2 verdict, or [None] when no at-fill check ran for
-          this entry at all — the default config
-          ([volume_confirm_at_fill = false]), a short, or a ticket that never
-          filled. Distinct from [Some No_verdict], which means the check {i did}
-          run and could not judge. *)
+          Kept separate from {!ticket_age_weeks_at_cancel} precisely so that
+          cap cannot leak: a reader who never opens this file cannot average
+          one column and get the other's statistic wearing a fill-inclusive
+          label. The two resolutions are mutually exclusive, so at most one of
+          the pair is ever [Some].
+
+          [None] also when the enrichment pass did not run at all (raw collector
+          output, e.g. in unit tests). *)
+  fill_volume : fill_volume_check option; [@sexp.option]
+      (** The F5 at-fill §4.2 verdict {b paired with what the run did about it},
+          or [None] when no at-fill check ran for this entry at all — the
+          default config ([volume_confirm_at_fill = false]), a short, or a
+          ticket that never filled. Distinct from
+          [Some { verdict = No_verdict; _ }], which means the check {i did} run
+          and could not judge. *)
   freshness_basis : entry_freshness_basis;
       (** F1: which clock admitted the candidate. *)
   sized_down_wide_stop : bool;
@@ -142,7 +187,7 @@ type t = {
 [@@deriving sexp]
 (** The lifecycle record carried by {!Trade_audit.entry_decision}. Written with
     the placement-time fields populated and the two resolution fields [None];
-    the resolutions are merged in later by {!resolve} / {!with_age}. *)
+    the resolutions are merged in later by {!resolve} / {!with_fill_age}. *)
 
 val age_weeks : placed:Date.t -> resolved:Date.t -> int
 (** Whole weeks between placement and resolution. Clamped at [0]: a resolution
@@ -155,18 +200,20 @@ val age_weeks_from : t option -> resolved:Date.t -> int option
 
 val resolve :
   t option ->
-  fill_volume:fill_volume_verdict option ->
-  age_weeks:int option ->
+  fill_volume:fill_volume_check option ->
+  cancel_age_weeks:int option ->
   t option
-(** Fold the collector-side observations (the F5 fill-week verdict and the
-    cancel age) into a placement-time record. [None] in ⇒ [None] out: a
+(** Fold the collector-side observations (the F5 fill-week check and the cancel
+    age) into a placement-time record. [None] in ⇒ [None] out: a
     [trade_audit.sexp] row written before PR-5 has no lifecycle to merge into
     and is never given one. Both arguments are [None] on a row whose ticket
     simply filled under an unarmed F5 config — the no-observation case, not a
-    zero. *)
+    zero. Never touches {!ticket_age_weeks_at_fill}, which only the enrichment
+    pass can know. *)
 
-val with_age : t option -> resolved:Date.t -> t option
-(** Stamp only {!ticket_age_weeks_at_fill_or_cancel}, from [resolved] against
-    the record's own {!placement_date}. Used by the fill-side enrichment, which
-    learns the fill date after the collector has already been drained. [None] in
-    ⇒ [None] out, same contract as {!resolve}. *)
+val with_fill_age : t option -> resolved:Date.t -> t option
+(** Stamp only {!ticket_age_weeks_at_fill}, from [resolved] against the record's
+    own {!placement_date}. Used by the fill-side enrichment, which learns the
+    fill date after the collector has already been drained; an already-merged
+    {!ticket_age_weeks_at_cancel} is left intact. [None] in ⇒ [None] out, same
+    contract as {!resolve}. *)

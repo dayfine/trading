@@ -165,69 +165,66 @@ let _build_force_exit_channel ~config ~positions ~get_price ~cash ~peak_tracker
   ( Transition_assembly.filter_out_exited_ids stop_exited_ids raw_force_exit_ts,
     stop_exited_ids )
 
-(* F5 at-fill volume-confirmation eject: emitted last and merged into the
-   force-exit channel — same close-fill convention + audit path as the other
-   trailing special exits. Skips every position already exiting this tick via
-   any prior channel ([skip_ids] is the pre-liquidity union; [force_exit_ts]
-   carries the liquidity + extension exits prepended, so their union is the full
-   skip set). The [Volume.config] is read off the SAME [Stock_analysis.config]
-   the screener builds, so the at-fill thresholds and the screen-time
-   confirmation grade cannot drift. The arming check is repeated here (the
-   runner guards on it too) so the default path never even builds that config —
-   an exact no-op at [volume_confirm_at_fill = false]. *)
-let _volume_eject_transitions ~config ~positions ~bar_reader ~get_price
-    ~is_friday ~skip_ids ~current_date =
-  let stock_analysis_config =
-    Weinstein_strategy_screening._stock_analysis_config_for ~config
-  in
-  Volume_eject_runner.update ~config
-    ~volume_config:stock_analysis_config.Stock_analysis.volume
-    ~is_screening_day:is_friday ~positions ~bar_reader ~get_price
-    ~skip_position_ids:skip_ids ~current_date
+(* The ONE F5 arming gate, feeding both the eject and its audit twin. The
+   [Volume.config] is read off the SAME [Stock_analysis.config] the screener
+   builds, so the at-fill thresholds and the screen-time confirmation grade
+   cannot drift. [None] at the default config, so that path never even builds
+   the [Stock_analysis.config] — an exact no-op at
+   [volume_confirm_at_fill = false]. (The runner guards on arming too; this gate
+   is what keeps the default path from doing the work at all.) *)
+let _volume_config_if_armed ~config =
+  if Weinstein_strategy_config.volume_confirm_at_fill_armed config then
+    Some
+      (Weinstein_strategy_screening._stock_analysis_config_for ~config)
+        .Stock_analysis.volume
+  else None
 
-let _run_volume_eject_exit ~config ~record_force_exit ~positions
-    ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~skip_ids
-    ~current_date =
+(* The armed F5 branch: run the eject, stamp its cooldowns, emit its exit audit,
+   then emit the PR-5 fill-week capture for EVERY evaluated position — passing
+   the tick's real skip set and the ids just ejected, so each audit row records
+   what actually happened rather than what the verdict implies. Extracted so
+   neither this nor its caller nests past the linter's depth limit. *)
+let _armed_volume_eject ~config ~record_force_exit ~positions
+    ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit
+    ~audit_recorder ~skip_ids ~volume_config ~current_date =
   let volume_eject_ts =
-    if not (Weinstein_strategy_config.volume_confirm_at_fill_armed config) then
-      []
-    else
-      _volume_eject_transitions ~config ~positions ~bar_reader ~get_price
-        ~is_friday ~skip_ids ~current_date
+    Volume_eject_runner.update ~config ~volume_config
+      ~is_screening_day:is_friday ~positions ~bar_reader ~get_price
+      ~skip_position_ids:skip_ids ~current_date
   in
   List.iter volume_eject_ts
     ~f:
       (record_force_exit ~last_stop_out_dates ~positions ~current_date
          ~cooldown_weeks:0 ~label:Volume_eject_runner.eject_label);
+  emit_audit volume_eject_ts;
+  Volume_eject_runner.emit_fill_week_audit ~config ~audit_recorder
+    ~volume_config ~is_screening_day:is_friday ~positions ~bar_reader
+    ~skip_position_ids:skip_ids
+    ~ejected_position_ids:
+      (Transition_assembly.trigger_exit_ids_of volume_eject_ts)
+    ~current_date;
   volume_eject_ts
 
-(* PR-5 capture: the F5 fill-week §4.2 classification for EVERY evaluated
-   position, not just the ejected ones. Arming is re-checked here so the default
-   never builds the config. See {!Volume_eject_runner.emit_fill_week_audit}. *)
-let _emit_fill_volume_audit ~config ~audit_recorder ~positions ~bar_reader
-    ~is_friday ~current_date =
-  if Weinstein_strategy_config.volume_confirm_at_fill_armed config then
-    Volume_eject_runner.emit_fill_week_audit ~config ~audit_recorder
-      ~volume_config:
-        (Weinstein_strategy_screening._stock_analysis_config_for ~config)
-          .Stock_analysis.volume
-      ~is_screening_day:is_friday ~positions ~bar_reader ~current_date
-
+(* F5 at-fill volume-confirmation eject: emitted last and merged into the
+   force-exit channel — same close-fill convention + audit path as the other
+   trailing special exits. Skips every position already exiting this tick via
+   any prior channel ([skip_ids] is the pre-liquidity union; [force_exit_ts]
+   carries the liquidity + extension exits prepended, so their union is the full
+   skip set). *)
 let _run_volume_eject_special_exit ~config ~record_force_exit ~positions
     ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit
     ~audit_recorder ~skip_ids ~force_exit_ts ~current_date =
-  let volume_skip_ids =
-    Set.union skip_ids (Transition_assembly.trigger_exit_ids_of force_exit_ts)
-  in
-  let volume_eject_ts =
-    _run_volume_eject_exit ~config ~record_force_exit ~positions
-      ~last_stop_out_dates ~bar_reader ~get_price ~is_friday
-      ~skip_ids:volume_skip_ids ~current_date
-  in
-  emit_audit volume_eject_ts;
-  _emit_fill_volume_audit ~config ~audit_recorder ~positions ~bar_reader
-    ~is_friday ~current_date;
-  volume_eject_ts @ force_exit_ts
+  match _volume_config_if_armed ~config with
+  | None -> force_exit_ts
+  | Some volume_config ->
+      let volume_skip_ids =
+        Set.union skip_ids
+          (Transition_assembly.trigger_exit_ids_of force_exit_ts)
+      in
+      _armed_volume_eject ~config ~record_force_exit ~positions
+        ~last_stop_out_dates ~bar_reader ~get_price ~is_friday ~emit_audit
+        ~audit_recorder ~skip_ids:volume_skip_ids ~volume_config ~current_date
+      @ force_exit_ts
 
 (* The three trailing special exits (liquidity, extension, then the F5 volume
    eject) share the same emit/merge shape; threading them here keeps [run] under

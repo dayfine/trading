@@ -113,14 +113,15 @@ let _fill_by_position_id ~audit ~round_trips =
   List.fold round_trips ~init:String.Map.empty ~f:(_add_fill ~pre)
 
 (* PR-5: stamp the ticket's resting age at fill, anchored on the entry row's own
-   [placement_date]. A row with no [ticket_lifecycle] (written before PR-5) is
-   left untouched, and a cancel-side age is never overwritten here — a cancelled
-   ticket has no round-trip to join. *)
+   [placement_date]. Writes ONLY [ticket_age_weeks_at_fill]: a row with no
+   [ticket_lifecycle] (written before PR-5) is left untouched, and any
+   already-merged [ticket_age_weeks_at_cancel] is preserved — a cancelled ticket
+   has no round-trip to join. *)
 let _with_ticket_age (entry : Trade_audit.entry_decision) ~fill_date =
   {
     entry with
     ticket_lifecycle =
-      Ticket_lifecycle.with_age entry.ticket_lifecycle ~resolved:fill_date;
+      Ticket_lifecycle.with_fill_age entry.ticket_lifecycle ~resolved:fill_date;
   }
 
 let _enriched_record ~fill_by_pid ~entry_order_kind

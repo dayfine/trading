@@ -158,7 +158,7 @@ type _bucket = {
   bucket_entry : entry_decision;
   mutable bucket_exit : exit_decision option;
   mutable bucket_external_exit : external_exit_decision option;
-  mutable bucket_fill_volume : Ticket_lifecycle.fill_volume_verdict option;
+  mutable bucket_fill_volume : Ticket_lifecycle.fill_volume_check option;
   mutable bucket_cancel_age_weeks : int option;
 }
 (** Internal mutable bucket. Every [record_*] merge lands here and is folded
@@ -198,8 +198,8 @@ let record_entry t (entry : entry_decision) =
 let _with_bucket t ~position_id ~f =
   Option.iter (Hashtbl.find t.records position_id) ~f
 
-let record_fill_volume t ~position_id verdict =
-  _with_bucket t ~position_id ~f:(fun b -> b.bucket_fill_volume <- Some verdict)
+let record_fill_volume t ~position_id check =
+  _with_bucket t ~position_id ~f:(fun b -> b.bucket_fill_volume <- Some check)
 
 let record_exit t (exit_ : exit_decision) =
   _with_bucket t ~position_id:exit_.position_id ~f:(fun b ->
@@ -254,7 +254,7 @@ let _entry_with_lifecycle (bucket : _bucket) : entry_decision =
     ticket_lifecycle =
       Ticket_lifecycle.resolve bucket.bucket_entry.ticket_lifecycle
         ~fill_volume:bucket.bucket_fill_volume
-        ~age_weeks:bucket.bucket_cancel_age_weeks;
+        ~cancel_age_weeks:bucket.bucket_cancel_age_weeks;
   }
 
 let _bucket_to_record (bucket : _bucket) : audit_record =

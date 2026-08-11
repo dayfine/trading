@@ -149,6 +149,18 @@ type entry_event = {
 }
 (** Event captured at entry-decision time. *)
 
+(** What the F5 eject path did with the position on the tick its fill week was
+    judged. Derived from the tick's {i actual} eject transitions and skip set —
+    never inferred from the verdict, because an [Unconfirmed] fill on a position
+    already exiting via another channel is not an eject. *)
+type fill_volume_outcome =
+  | Ejected  (** A [volume_eject] [TriggerExit] was emitted for it. *)
+  | Skipped_other_exit
+      (** {!Volume_eject_runner.update} never considered it: another exit
+          channel had already claimed it this tick. The audit surface evaluated
+          it anyway — the fill's volume verdict is a property of the fill. *)
+  | Held  (** Considered and not ejected (confirmed, or a fail-soft hold). *)
+
 type fill_volume_event = {
   position_id : string;
       (** The filled position whose fill week was judged — joins to
@@ -159,14 +171,19 @@ type fill_volume_event = {
           F5 runner deliberately {b holds} on: recording it is what makes the
           held-without-verdict population countable alongside the eject rate,
           rather than silently pooled with the confirmed holds. *)
+  outcome : fill_volume_outcome;
+      (** What actually happened to the position, so a consumer never has to
+          guess the eject population from the verdict. *)
 }
 (** Event captured when the F5 at-fill volume check judges a freshly-filled
     ticket's fill week.
 
-    Emitted for {b every} evaluated position, not only the ejected ones — the
-    eject transition already surfaces in [trades.csv] via its [volume_eject]
-    exit trigger, so on its own it cannot separate "confirmed and held" from "no
-    verdict and held". Only emitted when
+    Emitted for {b every} evaluable fill-week LONG holding, not only the ejected
+    ones and not only the ones {!Volume_eject_runner.update} was allowed to act
+    on — the eject transition already surfaces in [trades.csv] via its
+    [volume_eject] exit trigger, so on its own it cannot separate "confirmed and
+    held" from "no verdict and held", nor from "unconfirmed but already exiting
+    elsewhere". {!outcome} carries that last distinction. Only emitted when
     [Weinstein_strategy_config.volume_confirm_at_fill_armed] is [true]; under
     the default config no event is ever produced and the audit row's verdict
     stays absent. *)

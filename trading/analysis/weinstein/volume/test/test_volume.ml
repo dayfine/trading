@@ -330,9 +330,13 @@ let test_classify_carries_none_for_the_unevaluable_branch _ =
     (_summary (_classify [ 1000; 1000; 1000; 1000; 900 ]))
     (equal_to "unconfirmed:0.900/none")
 
-(** [confirms_breakout] is defined as the projection of [classify_breakout], so
-    the two can never disagree. Pinned across every shape above, including the
-    negative offset. *)
+(** [confirms_breakout] is defined as the projection of [classify_breakout] —
+    which means asserting one {i against the other} cannot fail by
+    construction. Both surfaces are therefore asserted against the same six
+    {b independently written} expected verdicts (spike / build-up / build-up
+    that falls on the event bar / flat tape / spike-only history / no history),
+    so a change to either surface, or to the projection between them, is
+    caught. *)
 let test_confirms_breakout_agrees_with_classify _ =
   let shapes =
     [
@@ -344,14 +348,17 @@ let test_confirms_breakout_agrees_with_classify _ =
       [ 1000; 900 ];
     ]
   in
-  let projected =
-    List.map shapes ~f:(fun volumes ->
-        Option.map (_classify volumes) ~f:(function
-          | Spike _ | Buildup _ -> true
-          | Unconfirmed _ -> false))
+  let expected =
+    [ Some true; Some true; Some false; Some false; Some false; None ]
   in
-  assert_that projected
-    (elements_are (List.map shapes ~f:(fun v -> equal_to (_confirms v))))
+  let projected volumes =
+    Option.map (_classify volumes) ~f:(function
+      | Spike _ | Buildup _ -> true
+      | Unconfirmed _ -> false)
+  in
+  assert_that
+    (List.map shapes ~f:_confirms, List.map shapes ~f:projected)
+    (equal_to (expected, expected))
 
 let suite =
   "volume_tests"

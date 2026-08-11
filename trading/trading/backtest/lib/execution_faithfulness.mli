@@ -53,13 +53,14 @@ val enrich :
     position supplies its entry fill.
 
     Also stamps the fill-side half of the PR-5 ticket-lifecycle record: a
-    matched record's [entry.ticket_lifecycle.ticket_age_weeks_at_fill_or_cancel]
-    is set to whole weeks between its [placement_date] and the matched
-    round-trip's entry-fill date. This join is the only place both instants are
-    in hand, so the age rides along rather than duplicating the join in a second
-    pass. A row with no [ticket_lifecycle] (a [trade_audit.sexp] written before
-    PR-5) is left untouched, and the cancel-side age is unaffected — a cancelled
-    ticket produces no round-trip to match.
+    matched record's [entry.ticket_lifecycle.ticket_age_weeks_at_fill] is set to
+    whole weeks between its [placement_date] and the matched round-trip's
+    entry-fill date. This join is the only place both instants are in hand, so
+    the age rides along rather than duplicating the join in a second pass. Only
+    that one column is written: a row with no [ticket_lifecycle] (a
+    [trade_audit.sexp] written before PR-5) is left untouched, and an
+    already-merged [ticket_age_weeks_at_cancel] is preserved — a cancelled
+    ticket produces no round-trip to match, so the two never collide.
 
     {b The age inherits this join's 7-day window.} A ticket that rests longer
     than a week before filling is not matched at all — it already gets

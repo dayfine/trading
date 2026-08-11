@@ -12,6 +12,15 @@ type fill_volume_verdict =
   | No_verdict
 [@@deriving sexp]
 
+type fill_volume_outcome = Ejected | Skipped_other_exit | Held
+[@@deriving sexp]
+
+type fill_volume_check = {
+  verdict : fill_volume_verdict;
+  outcome : fill_volume_outcome;
+}
+[@@deriving sexp]
+
 type triple_confirmation = {
   breakout_volume_multiple : float option;
   rs_zero_cross : bool;
@@ -23,8 +32,9 @@ type entry_freshness_basis = Ma_cross | Range_top_breakout [@@deriving sexp]
 
 type t = {
   placement_date : Date.t;
-  ticket_age_weeks_at_fill_or_cancel : int option; [@sexp.option]
-  fill_volume : fill_volume_verdict option; [@sexp.option]
+  ticket_age_weeks_at_cancel : int option; [@sexp.option]
+  ticket_age_weeks_at_fill : int option; [@sexp.option]
+  fill_volume : fill_volume_check option; [@sexp.option]
   freshness_basis : entry_freshness_basis;
   sized_down_wide_stop : bool;
   triple_confirmation : triple_confirmation;
@@ -40,11 +50,18 @@ let age_weeks_from lifecycle ~resolved =
   Option.map lifecycle ~f:(fun l ->
       age_weeks ~placed:l.placement_date ~resolved)
 
-let resolve lifecycle ~fill_volume ~age_weeks =
+let resolve lifecycle ~fill_volume ~cancel_age_weeks =
   Option.map lifecycle ~f:(fun l ->
-      { l with fill_volume; ticket_age_weeks_at_fill_or_cancel = age_weeks })
+      { l with fill_volume; ticket_age_weeks_at_cancel = cancel_age_weeks })
 
-let with_age lifecycle ~resolved =
-  resolve lifecycle
-    ~fill_volume:(Option.bind lifecycle ~f:(fun l -> l.fill_volume))
-    ~age_weeks:(age_weeks_from lifecycle ~resolved)
+(* Extracted so [with_fill_age] stays a one-liner: inlining this record update
+   inside the [Option.map] closure trips the nesting linter. *)
+let _stamp_fill_age ~resolved l =
+  {
+    l with
+    ticket_age_weeks_at_fill =
+      Some (age_weeks ~placed:l.placement_date ~resolved);
+  }
+
+let with_fill_age lifecycle ~resolved =
+  Option.map lifecycle ~f:(_stamp_fill_age ~resolved)

@@ -272,33 +272,45 @@ let _triple : TL.triple_confirmation =
   }
 
 let _lifecycle ?(placement_date = _date "2024-03-01")
-    ?(ticket_age_weeks_at_fill_or_cancel = Some 3) ?(fill_volume = None)
-    ?(freshness_basis = TL.Range_top_breakout) ?(sized_down_wide_stop = true)
-    ?(triple_confirmation = _triple) () : TL.t =
+    ?(ticket_age_weeks_at_cancel = Some 3) ?(ticket_age_weeks_at_fill = None)
+    ?(fill_volume = None) ?(freshness_basis = TL.Range_top_breakout)
+    ?(sized_down_wide_stop = true) ?(triple_confirmation = _triple) () : TL.t =
   {
     placement_date;
-    ticket_age_weeks_at_fill_or_cancel;
+    ticket_age_weeks_at_cancel;
+    ticket_age_weeks_at_fill;
     fill_volume;
     freshness_basis;
     sized_down_wide_stop;
     triple_confirmation;
   }
 
+let _check verdict outcome : TL.fill_volume_check = { verdict; outcome }
+
 (** Every [fill_volume_verdict] constructor — including the [No_verdict] cell
-    the eject rate alone cannot see — survives the codec, as do the other
-    lifecycle fields around it. *)
+    the eject rate alone cannot see — survives the codec paired with an
+    outcome, as do the other lifecycle fields around it. The third row is the
+    divergence case: [Unconfirmed] that was NOT ejected because another exit
+    channel had already claimed the position. *)
 let test_entry_decision_sexp_round_trips_ticket_lifecycle _ =
-  let verdicts =
+  let checks =
     [
-      Some (TL.Confirmed_spike 3.4);
-      Some (TL.Confirmed_buildup 2.2);
-      Some (TL.Unconfirmed { spike_ratio = Some 1.1; buildup_multiple = None });
-      Some TL.No_verdict;
+      Some (_check (TL.Confirmed_spike 3.4) TL.Held);
+      Some (_check (TL.Confirmed_buildup 2.2) TL.Held);
+      Some
+        (_check
+           (TL.Unconfirmed { spike_ratio = Some 1.1; buildup_multiple = None })
+           TL.Skipped_other_exit);
+      Some
+        (_check
+           (TL.Unconfirmed { spike_ratio = None; buildup_multiple = Some 1.2 })
+           TL.Ejected);
+      Some (_check TL.No_verdict TL.Held);
       None;
     ]
   in
   let entries =
-    List.map verdicts ~f:(fun fill_volume ->
+    List.map checks ~f:(fun fill_volume ->
         make_entry ~ticket_lifecycle:(Some (_lifecycle ~fill_volume ())) ())
   in
   assert_that
@@ -324,13 +336,14 @@ let test_entry_decision_sexp_tolerates_missing_ticket_lifecycle _ =
     (TA.entry_decision_of_sexp stripped)
     (equal_to (make_entry () : TA.entry_decision))
 
-(** The two fill/cancel-side fields inside the record are themselves
-    [[@sexp.option]] — a still-resting ticket writes neither, and a row missing
-    both parses back to the unresolved shape rather than to a zero age or a
-    fabricated verdict. *)
+(** The three resolution-side fields inside the record are themselves
+    [[@sexp.option]] — a still-resting ticket writes none of them, and a row
+    missing all three parses back to the unresolved shape rather than to a zero
+    age or a fabricated verdict. *)
 let test_ticket_lifecycle_sexp_omits_unresolved_fill_fields _ =
   let unresolved =
-    _lifecycle ~ticket_age_weeks_at_fill_or_cancel:None ~fill_volume:None ()
+    _lifecycle ~ticket_age_weeks_at_cancel:None ~ticket_age_weeks_at_fill:None
+      ~fill_volume:None ()
   in
   let sexp = TL.sexp_of_t unresolved in
   let field_names =
@@ -344,10 +357,23 @@ let test_ticket_lifecycle_sexp_omits_unresolved_fill_fields _ =
   assert_that
     ( List.count field_names ~f:(fun n ->
           List.mem
-            [ "ticket_age_weeks_at_fill_or_cancel"; "fill_volume" ]
+            [
+              "ticket_age_weeks_at_cancel";
+              "ticket_age_weeks_at_fill";
+              "fill_volume";
+            ]
             n ~equal:String.equal),
       TL.t_of_sexp sexp )
     (equal_to (0, unresolved))
+
+(** [age_weeks] clamps at [0]: a resolution dated before its own placement is a
+    data anomaly, never a negative resting age. *)
+let test_age_weeks_clamps_at_zero _ =
+  assert_that
+    ( TL.age_weeks ~placed:(_date "2024-03-22") ~resolved:(_date "2024-03-01"),
+      TL.age_weeks ~placed:(_date "2024-03-01") ~resolved:(_date "2024-03-22")
+    )
+    (equal_to (0, 3))
 
 (** Populated E-provenance fields survive the codec round trip. *)
 let test_entry_decision_sexp_round_trips_e_provenance_fields _ =
@@ -451,16 +477,17 @@ let test_audit_records_sexp_round_trip_through_top_level_codec _ =
 
 let _lifecycle_of (r : TA.audit_record) = r.entry.ticket_lifecycle
 
-(** The F5 verdict arrives after the entry (at the fill week's closing tick) and
-    is merged into that entry's lifecycle at drain time. *)
+(** The F5 check arrives after the entry (at the fill week's closing tick) and
+    is merged into that entry's lifecycle at drain time — verdict and outcome
+    together. *)
 let test_record_fill_volume_merges_into_the_entry_row _ =
   let t = TA.create () in
   TA.record_entry t
     (make_entry
-       ~ticket_lifecycle:
-         (Some (_lifecycle ~ticket_age_weeks_at_fill_or_cancel:None ()))
+       ~ticket_lifecycle:(Some (_lifecycle ~ticket_age_weeks_at_cancel:None ()))
        ());
-  TA.record_fill_volume t ~position_id:"AAPL-wein-1" TL.No_verdict;
+  TA.record_fill_volume t ~position_id:"AAPL-wein-1"
+    (_check TL.No_verdict TL.Held);
   assert_that (TA.get_audit_records t)
     (elements_are
        [
@@ -469,19 +496,23 @@ let test_record_fill_volume_merges_into_the_entry_row _ =
               (field
                  (fun (l : TL.t) -> l.fill_volume)
                  (is_some_and
-                    (equal_to (TL.No_verdict : TL.fill_volume_verdict)))));
+                    (equal_to
+                       (_check TL.No_verdict TL.Held : TL.fill_volume_check)))));
        ])
 
-(** No entry on record ⇒ the verdict is dropped, mirroring [record_exit]'s
+(** No entry on record ⇒ the check is dropped, mirroring [record_exit]'s
     no-entry contract. *)
 let test_record_fill_volume_without_entry_is_dropped _ =
   let t = TA.create () in
-  TA.record_fill_volume t ~position_id:"GHOST-wein-9" TL.No_verdict;
+  TA.record_fill_volume t ~position_id:"GHOST-wein-9"
+    (_check TL.No_verdict TL.Held);
   assert_that (TA.get_audit_records t) is_empty
 
 (** F2's cancel path: a ticket cancelled three weeks after placement records a
-    resting age of 3. This is the only place a never-filled ticket's age is
-    observable — it produces no round-trip for the fill-side enrichment. *)
+    resting age of 3 in the CANCEL column, and leaves the fill column [None] —
+    the two resolutions are mutually exclusive. This is the only place a
+    never-filled ticket's age is observable; it produces no round-trip for the
+    fill-side enrichment. *)
 let test_cancel_entry_records_the_resting_age_in_weeks _ =
   let t = TA.create () in
   TA.record_entry t
@@ -489,7 +520,7 @@ let test_cancel_entry_records_the_resting_age_in_weeks _ =
        ~ticket_lifecycle:
          (Some
             (_lifecycle ~placement_date:(_date "2024-03-01")
-               ~ticket_age_weeks_at_fill_or_cancel:None ()))
+               ~ticket_age_weeks_at_cancel:None ()))
        ());
   TA.record_transitions t
     [
@@ -504,9 +535,13 @@ let test_cancel_entry_records_the_resting_age_in_weeks _ =
        [
          field _lifecycle_of
            (is_some_and
-              (field
-                 (fun (l : TL.t) -> l.ticket_age_weeks_at_fill_or_cancel)
-                 (is_some_and (equal_to 3))));
+              (all_of
+                 [
+                   field
+                     (fun (l : TL.t) -> l.ticket_age_weeks_at_cancel)
+                     (is_some_and (equal_to 3));
+                   field (fun (l : TL.t) -> l.ticket_age_weeks_at_fill) is_none;
+                 ]));
        ])
 
 (** A row written before PR-5 carries no [ticket_lifecycle]; the collector must
@@ -514,7 +549,8 @@ let test_cancel_entry_records_the_resting_age_in_weeks _ =
 let test_lifecycle_merges_are_inert_on_a_pre_pr5_row _ =
   let t = TA.create () in
   TA.record_entry t (make_entry ());
-  TA.record_fill_volume t ~position_id:"AAPL-wein-1" TL.No_verdict;
+  TA.record_fill_volume t ~position_id:"AAPL-wein-1"
+    (_check TL.No_verdict TL.Held);
   assert_that (TA.get_audit_records t)
     (elements_are [ field _lifecycle_of is_none ])
 
@@ -844,6 +880,7 @@ let suite =
          >:: test_entry_decision_sexp_tolerates_missing_ticket_lifecycle;
          "ticket_lifecycle sexp omits the unresolved fill/cancel fields"
          >:: test_ticket_lifecycle_sexp_omits_unresolved_fill_fields;
+         "age_weeks clamps at zero" >:: test_age_weeks_clamps_at_zero;
          "record_fill_volume merges into the entry row"
          >:: test_record_fill_volume_merges_into_the_entry_row;
          "record_fill_volume without an entry is dropped"

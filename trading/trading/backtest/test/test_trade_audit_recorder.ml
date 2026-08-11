@@ -252,8 +252,9 @@ let test_entry_projection_carries_armed_local_range_top _ =
 
 (** The placement-time half of the lifecycle: the placement date is the tick the
     event was captured on, the F3 tag and the F1 basis pass through, and the F6
-    §4.5 measurements are copied field-for-field. The fill/cancel half is [None]
-    on a freshly-recorded row — it is merged in later, not fabricated here. *)
+    §4.5 measurements are copied field-for-field. All three resolution fields
+    are [None] on a freshly-recorded row — they are merged in later, not
+    fabricated here. *)
 let test_entry_projection_carries_placement_time_lifecycle _ =
   assert_that
     (_recorded_entry_of
@@ -288,9 +289,8 @@ let test_entry_projection_carries_placement_time_lifecycle _ =
                      }
                       : TL.triple_confirmation));
                field (fun (l : TL.t) -> l.fill_volume) is_none;
-               field
-                 (fun (l : TL.t) -> l.ticket_age_weeks_at_fill_or_cancel)
-                 is_none;
+               field (fun (l : TL.t) -> l.ticket_age_weeks_at_cancel) is_none;
+               field (fun (l : TL.t) -> l.ticket_age_weeks_at_fill) is_none;
              ])))
 
 (** The default no-op shape: an unarmed run records [Ma_cross] and an untagged
@@ -312,11 +312,14 @@ let test_entry_projection_defaults_to_ma_cross_and_untagged _ =
                field (fun (l : TL.t) -> l.sized_down_wide_stop) (equal_to false);
              ])))
 
-(** Sink-hop pin for the F5 verdict: every {!Volume.breakout_confirmation}
-    constructor — plus the [None] no-verdict case — must reach its [TA]
-    counterpart. A value dropped here is invisible in [trade_audit.sexp]. *)
+(** Sink-hop pin for the F5 record: every {!Volume.breakout_confirmation}
+    constructor — plus the [None] no-verdict case — and every
+    {!AR.fill_volume_outcome} must reach its [TA] counterpart. A value dropped
+    here is invisible in [trade_audit.sexp]. Each row pairs a distinct verdict
+    with a distinct outcome, so a hop that mixed the two up (or hardcoded
+    either) fails. *)
 let test_fill_volume_projects_every_verdict_class _ =
-  let recorded confirmation =
+  let recorded (confirmation, outcome) =
     let trade_audit = TA.create () in
     let recorder =
       Backtest.Trade_audit_recorder.of_collector ~trade_audit
@@ -325,7 +328,8 @@ let test_fill_volume_projects_every_verdict_class _ =
     recorder.record_entry
       (_entry_event ~split_safe_basis:AR.Flag_off
          ~stop_floor_kind:AR.Buffer_fallback ());
-    recorder.record_fill_volume { AR.position_id = "ZZZZ-wein-1"; confirmation };
+    recorder.record_fill_volume
+      { AR.position_id = "ZZZZ-wein-1"; confirmation; outcome };
     match TA.get_audit_records trade_audit with
     | [ r ] ->
         Option.bind r.TA.entry.ticket_lifecycle ~f:(fun l -> l.fill_volume)
@@ -334,25 +338,39 @@ let test_fill_volume_projects_every_verdict_class _ =
           (Printf.sprintf "expected exactly 1 audit record, got %d"
              (List.length records))
   in
+  let check verdict outcome : TL.fill_volume_check = { verdict; outcome } in
   assert_that
     (List.map ~f:recorded
        [
-         Some (Volume.Spike 3.4);
-         Some (Volume.Buildup 2.2);
-         Some
-           (Volume.Unconfirmed
-              { spike_ratio = Some 1.1; buildup_multiple = None });
-         None;
+         (Some (Volume.Spike 3.4), AR.Held);
+         (Some (Volume.Buildup 2.2), AR.Held);
+         ( Some
+             (Volume.Unconfirmed
+                { spike_ratio = Some 1.1; buildup_multiple = None }),
+           AR.Ejected );
+         ( Some
+             (Volume.Unconfirmed
+                { spike_ratio = None; buildup_multiple = Some 1.2 }),
+           AR.Skipped_other_exit );
+         (None, AR.Held);
        ])
     (elements_are
        [
-         is_some_and (equal_to (TL.Confirmed_spike 3.4));
-         is_some_and (equal_to (TL.Confirmed_buildup 2.2));
+         is_some_and (equal_to (check (TL.Confirmed_spike 3.4) TL.Held));
+         is_some_and (equal_to (check (TL.Confirmed_buildup 2.2) TL.Held));
          is_some_and
            (equal_to
-              (TL.Unconfirmed
-                 { spike_ratio = Some 1.1; buildup_multiple = None }));
-         is_some_and (equal_to (TL.No_verdict : TL.fill_volume_verdict));
+              (check
+                 (TL.Unconfirmed
+                    { spike_ratio = Some 1.1; buildup_multiple = None })
+                 TL.Ejected));
+         is_some_and
+           (equal_to
+              (check
+                 (TL.Unconfirmed
+                    { spike_ratio = None; buildup_multiple = Some 1.2 })
+                 TL.Skipped_other_exit));
+         is_some_and (equal_to (check TL.No_verdict TL.Held));
        ])
 
 let suite =

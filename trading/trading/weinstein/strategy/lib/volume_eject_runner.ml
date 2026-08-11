@@ -178,10 +178,30 @@ let fill_week_confirmations ~(config : Weinstein_strategy_config.config)
         _fold_confirmation ~config ~volume_config ~bar_reader ~current_date acc
           pos)
 
+(** What the eject path actually did with [position_id] this tick, read off the
+    two id sets the caller observed — never inferred from the verdict. An
+    [Unconfirmed] fill on a position already leaving via another channel is
+    [Skipped_other_exit], not [Ejected]. *)
+let _outcome_for ~ejected_position_ids ~skip_position_ids position_id :
+    Audit_recorder.fill_volume_outcome =
+  if Set.mem ejected_position_ids position_id then Ejected
+  else if Set.mem skip_position_ids position_id then Skipped_other_exit
+  else Held
+
+(* Extracted: an inline record literal inside the [List.iter] closure nests
+   past the linter's depth limit. *)
+let _event_of ~ejected_position_ids ~skip_position_ids
+    (position_id, confirmation) =
+  {
+    Audit_recorder.position_id;
+    confirmation;
+    outcome = _outcome_for ~ejected_position_ids ~skip_position_ids position_id;
+  }
+
 let emit_fill_week_audit ~config ~(audit_recorder : Audit_recorder.t)
-    ~volume_config ~is_screening_day ~positions ~bar_reader ~current_date =
+    ~volume_config ~is_screening_day ~positions ~bar_reader ~skip_position_ids
+    ~ejected_position_ids ~current_date =
   fill_week_confirmations ~config ~volume_config ~is_screening_day ~positions
     ~bar_reader ~current_date
-  |> List.iter ~f:(fun (position_id, confirmation) ->
-      audit_recorder.record_fill_volume
-        { Audit_recorder.position_id; confirmation })
+  |> List.map ~f:(_event_of ~ejected_position_ids ~skip_position_ids)
+  |> List.iter ~f:audit_recorder.record_fill_volume

@@ -478,20 +478,23 @@ val record_transitions : t -> Trading_strategy.Position.transition list -> unit
     [exit_decision] / [external_exit_decision] to record.
 
     [CancelEntry] transitions (the F2 TTL / re-screen ticket cancel) set the
-    bucket's [ticket_lifecycle.ticket_age_weeks_at_fill_or_cancel] from the
-    transition date minus the entry's [placement_date] — the only place a
-    never-filled ticket's resting age is observable, since it produces no
-    round-trip for the fill-side enrichment to join. Dropped when no entry was
-    recorded for the id, same as the exit path. *)
+    bucket's [ticket_lifecycle.ticket_age_weeks_at_cancel] from the transition
+    date minus the entry's [placement_date] — the only place a never-filled
+    ticket's resting age is observable, since it produces no round-trip for the
+    fill-side enrichment to join. The fill-side column
+    ([ticket_age_weeks_at_fill]) is left [None]: the two resolutions are
+    mutually exclusive. Dropped when no entry was recorded for the id, same as
+    the exit path. *)
 
 val record_fill_volume :
-  t -> position_id:string -> Ticket_lifecycle.fill_volume_verdict -> unit
-(** Record the F5 at-fill §4.2 verdict for an already-entered position. Merged
-    into that entry's [ticket_lifecycle.fill_volume] at drain time. Dropped when
-    no entry was recorded for [position_id] (mirrors {!record_exit}'s no-entry
-    contract); recording twice keeps the later verdict — the classification is a
-    pure function of a fixed historical bar, so a repeat inside the runner's
-    two-week evaluation window is the same value. *)
+  t -> position_id:string -> Ticket_lifecycle.fill_volume_check -> unit
+(** Record the F5 at-fill §4.2 verdict, paired with what the run did about it,
+    for an already-entered position. Merged into that entry's
+    [ticket_lifecycle.fill_volume] at drain time. Dropped when no entry was
+    recorded for [position_id] (mirrors {!record_exit}'s no-entry contract);
+    recording twice keeps the later check — the classification is a pure
+    function of a fixed historical bar, so a repeat inside the runner's two-week
+    evaluation window is the same value. *)
 
 val record_cascade_summary : t -> cascade_summary -> unit
 (** Append a per-Friday cascade summary. Append-only — recording two summaries

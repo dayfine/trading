@@ -159,11 +159,21 @@ let test_is_triple_confirmed_requires_all_three _ =
          ~rs:(_rs_result ~trend:Weinstein_types.Bullish_crossover)
          ~breakout_price:12.0 ~breakdown_price:10.0 ())
   in
+  (* All three signals but only a 1.5x breakout multiple — under the 2.0
+     threshold, so the volume leg is driven on its negative side too. *)
+  let weak_volume =
+    Entry_ticket_tags.triple_confirmation_of_analysis
+      (_analysis
+         ~volume:(_volume_result ~ratio:1.5)
+         ~rs:(_rs_result ~trend:Weinstein_types.Bullish_crossover)
+         ~breakout_price:15.0 ~breakdown_price:10.0 ())
+  in
   assert_that
     (List.map
-       [ confirmed; no_cross; shallow_base ]
+       [ confirmed; no_cross; shallow_base; weak_volume ]
        ~f:(Entry_ticket_tags.is_triple_confirmed ~strong_volume_threshold:2.0))
-    (elements_are [ equal_to true; equal_to false; equal_to false ])
+    (elements_are
+       [ equal_to true; equal_to false; equal_to false; equal_to false ])
 
 (** The book's ≥40% accumulation signature (§4.5, National Semiconductor /
     Blocker Energy) is the constant the cohort predicate reads. *)
