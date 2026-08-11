@@ -96,6 +96,85 @@ val update :
     [trades.csv]; [detail] carries the fill-week offset for forensics. Same
     close-fill convention as the sibling special-exit runners. *)
 
+val fill_week_confirmations :
+  config:Weinstein_strategy_config.config ->
+  volume_config:Volume.config ->
+  is_screening_day:bool ->
+  positions:Position.t Map.M(String).t ->
+  bar_reader:Bar_reader.t ->
+  current_date:Date.t ->
+  (string * Volume.breakout_confirmation option) list
+(** The {b audit} counterpart of {!update}: [(position_id, classification)] for
+    every evaluable fill-week LONG holding this tick — not only the ones
+    {!update} ejects, and {b not only the ones it was allowed to act on}.
+
+    {b The population is deliberately WIDER than {!update}'s, by exactly
+       [skip_position_ids].} {!update} skips a position that another exit
+    channel (stop, Stage-3, laggard, force-liq, liquidity, extension) has
+    already claimed this tick; this function does not, because the fill's volume
+    verdict is a property of the {i fill}, independent of whatever else befell
+    the position that day — and that skipped cohort (weak-volume breakout that
+    stops out in week 0/1) is precisely what the plan's §5 prediction 4
+    measures. A count of [Unconfirmed] rows here is therefore {b not} an eject
+    count; {!emit_fill_week_audit} pairs each row with the outcome that
+    disambiguates it.
+
+    The shared private fill-week-window helper guarantees the two surfaces judge
+    the same {b bar} and apply the same shape test (LONG, [Holding], inside the
+    evaluation window); it does {i not} equalise their {b eligibility}. The
+    classification is {!Volume.classify_breakout} rather than its boolean
+    projection, so the audit can separate:
+
+    - [Some (Spike r)] — confirmed via §4.2 branch (a), at multiple [r];
+    - [Some (Buildup m)] — confirmed via branch (b), at multiple [m];
+    - [Some (Unconfirmed _)] — evaluated, neither branch confirmed ⇒ the F5 rule
+      {i would} eject (and did, unless the position was in [skip_position_ids]);
+    - [None] — {b no verdict}: neither branch had enough history, so the runner
+      {b held} the position. This is the held-without-verdict cell, which the
+      eject count alone cannot distinguish from a confirmed hold. Measuring its
+      size is a precondition for reading a ladder-v4 F5 arm's eject rate
+      (qc-behavioral #2267 recommendation).
+
+    Returns [[]] — with no bar reads — when
+    [Weinstein_strategy_config.volume_confirm_at_fill_armed config] is [false]
+    (the default) or [is_screening_day] is [false]. Order follows [positions]
+    key order. Pure: no transitions, no state, no effect on the run. *)
+
+val emit_fill_week_audit :
+  config:Weinstein_strategy_config.config ->
+  audit_recorder:Audit_recorder.t ->
+  volume_config:Volume.config ->
+  is_screening_day:bool ->
+  positions:Position.t Map.M(String).t ->
+  bar_reader:Bar_reader.t ->
+  skip_position_ids:Set.M(String).t ->
+  ejected_position_ids:Set.M(String).t ->
+  current_date:Date.t ->
+  unit
+(** Route every {!fill_week_confirmations} row through
+    [audit_recorder.record_fill_volume], so the per-entry [Backtest.Trade_audit]
+    row records the fill-week verdict {b and} what the run did about it. Lives
+    next to the runner that owns the verdict rather than in the exit pipeline
+    that calls it.
+
+    Each row's [Audit_recorder.fill_volume_outcome] is read off the two id sets
+    the caller observed on this very tick — [ejected_position_ids] (the
+    [volume_eject] transitions {!update} just returned) and [skip_position_ids]
+    (the same set passed to {!update}) — never inferred from the verdict:
+
+    - in [ejected_position_ids] ⇒ [Ejected];
+    - otherwise in [skip_position_ids] ⇒ [Skipped_other_exit] — evaluated by
+      this surface but never considered by {!update};
+    - otherwise ⇒ [Held].
+
+    Pass the {i same} [skip_position_ids] given to {!update} on this tick;
+    passing a different set mislabels the divergent cohort.
+
+    Inherits {!fill_week_confirmations}'s guards verbatim: a no-op emitting
+    nothing, and reading no bars, unless F5 is armed on a screening tick.
+    Observational only — emits no transitions and cannot influence any simulated
+    number. *)
+
 val eject_label : string
 (** ["volume_eject"] — the [StrategySignal] label carried by every transition
     this runner emits (the [Volume_eject] audit tag). Exposed so tests and audit

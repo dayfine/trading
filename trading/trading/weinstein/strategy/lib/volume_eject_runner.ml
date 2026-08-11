@@ -74,22 +74,32 @@ let _eject_of_verdict ~volume_config ~weekly ~fill_week_offset ~get_price
   | Some false ->
       _eject_transition ~get_price ~current_date ~fill_week_offset pos
 
-(** Decide the eject for one freshly-filled holding. Reads the completed weekly
-    bar containing [entry_date]; the caller has already established that this is
-    a screening tick, so that bar is never partial. Fill weeks older than
-    {!_max_fill_week_offset} are outside the evaluation window. *)
-let _eject_for_holding ~(config : Weinstein_strategy_config.config)
-    ~volume_config ~bar_reader ~get_price ~entry_date ~current_date
-    (pos : Position.t) =
+(** The completed weekly bars for [pos] plus the offset of the bar containing
+    its fill, when that fill week is still inside the evaluation window. [None]
+    otherwise — the single place the window rule is applied, shared by the eject
+    path and the audit-verdict path so they can never judge different bars. *)
+let _fill_week_window ~(config : Weinstein_strategy_config.config) ~bar_reader
+    ~entry_date ~current_date (pos : Position.t) =
   let weekly =
     Bar_reader.weekly_bars_for bar_reader ~symbol:pos.symbol
       ~n:config.lookback_bars ~as_of:current_date
   in
   match _fill_week_offset ~weekly ~entry_date with
   | Some fill_week_offset when fill_week_offset <= _max_fill_week_offset ->
+      Some (weekly, fill_week_offset)
+  | _ -> None
+
+(** Decide the eject for one freshly-filled holding. Reads the completed weekly
+    bar containing [entry_date]; the caller has already established that this is
+    a screening tick, so that bar is never partial. Fill weeks older than
+    {!_max_fill_week_offset} are outside the evaluation window. *)
+let _eject_for_holding ~config ~volume_config ~bar_reader ~get_price ~entry_date
+    ~current_date (pos : Position.t) =
+  match _fill_week_window ~config ~bar_reader ~entry_date ~current_date pos with
+  | Some (weekly, fill_week_offset) ->
       _eject_of_verdict ~volume_config ~weekly ~fill_week_offset ~get_price
         ~current_date pos
-  | _ -> None
+  | None -> None
 
 (** Process one position. LONG holdings only — F5 is a property of the long-side
     E-anchored breakout ticket — and never one already exiting via another
@@ -123,3 +133,75 @@ let update ~(config : Weinstein_strategy_config.config) ~volume_config
     Map.fold positions ~init:[] ~f:(fun ~key:_ ~data:pos acc ->
         _fold_position ~config ~volume_config ~bar_reader ~get_price
           ~skip_position_ids ~current_date acc pos)
+
+(* ------------------------------------------------------------------ *)
+(* Audit surface — the same verdict, named rather than thresholded      *)
+(* ------------------------------------------------------------------ *)
+
+(** The §4.2 classification of [weekly]'s bar at [event_offset]. [None] is the
+    {b no-verdict} case ([Volume.classify_breakout] found neither branch
+    evaluable) and is deliberately preserved as data rather than collapsed. *)
+let _classification_at ~volume_config ~weekly ~event_offset =
+  Volume.classify_breakout ~config:volume_config
+    ~callbacks:(Volume.callbacks_from_bars ~bars:weekly)
+    ~event_offset
+
+let _row_of_window ~volume_config ~position_id (weekly, event_offset) =
+  (position_id, _classification_at ~volume_config ~weekly ~event_offset)
+
+(** [(position_id, classification)] for one position, or [None] when it is not
+    an evaluable freshly-filled LONG holding. *)
+let _confirmation_for_position ~config ~volume_config ~bar_reader ~current_date
+    (pos : Position.t) =
+  match (pos.Position.side, Position.get_state pos) with
+  | Position.Long, Position.Holding { entry_date; _ } ->
+      _fill_week_window ~config ~bar_reader ~entry_date ~current_date pos
+      |> Option.map
+           ~f:(_row_of_window ~volume_config ~position_id:pos.Position.id)
+  | _ -> None
+
+let _fold_confirmation ~config ~volume_config ~bar_reader ~current_date acc pos
+    =
+  match
+    _confirmation_for_position ~config ~volume_config ~bar_reader ~current_date
+      pos
+  with
+  | Some row -> row :: acc
+  | None -> acc
+
+let fill_week_confirmations ~(config : Weinstein_strategy_config.config)
+    ~volume_config ~is_screening_day ~positions ~bar_reader ~current_date =
+  if not (Weinstein_strategy_config.volume_confirm_at_fill_armed config) then []
+  else if not is_screening_day then []
+  else
+    Map.fold_right positions ~init:[] ~f:(fun ~key:_ ~data:pos acc ->
+        _fold_confirmation ~config ~volume_config ~bar_reader ~current_date acc
+          pos)
+
+(** What the eject path actually did with [position_id] this tick, read off the
+    two id sets the caller observed — never inferred from the verdict. An
+    [Unconfirmed] fill on a position already leaving via another channel is
+    [Skipped_other_exit], not [Ejected]. *)
+let _outcome_for ~ejected_position_ids ~skip_position_ids position_id :
+    Audit_recorder.fill_volume_outcome =
+  if Set.mem ejected_position_ids position_id then Ejected
+  else if Set.mem skip_position_ids position_id then Skipped_other_exit
+  else Held
+
+(* Extracted: an inline record literal inside the [List.iter] closure nests
+   past the linter's depth limit. *)
+let _event_of ~ejected_position_ids ~skip_position_ids
+    (position_id, confirmation) =
+  {
+    Audit_recorder.position_id;
+    confirmation;
+    outcome = _outcome_for ~ejected_position_ids ~skip_position_ids position_id;
+  }
+
+let emit_fill_week_audit ~config ~(audit_recorder : Audit_recorder.t)
+    ~volume_config ~is_screening_day ~positions ~bar_reader ~skip_position_ids
+    ~ejected_position_ids ~current_date =
+  fill_week_confirmations ~config ~volume_config ~is_screening_day ~positions
+    ~bar_reader ~current_date
+  |> List.map ~f:(_event_of ~ejected_position_ids ~skip_position_ids)
+  |> List.iter ~f:audit_recorder.record_fill_volume

@@ -214,6 +214,19 @@ module Entry_audit_capture = Entry_audit_capture
     strategy file to keep it under the file-length cap. See
     {!Entry_audit_capture}. *)
 
+module Entry_ticket_tags = Entry_ticket_tags
+(** Placement-time ticket audit tags — the F1 freshness basis and the F6 book
+    §4.5 triple-confirmation measurements, projected off the candidate's
+    analysis. Capture only; nothing gates on them. Re-exposed so the backtest
+    recorder and tests can read the same projections the capture site uses. See
+    {!Entry_ticket_tags}. *)
+
+module Entry_freshness = Entry_freshness
+(** F1 admission-clock basis ([Ma_cross] vs [Range_top_breakout]). Re-exposed
+    alongside {!Entry_ticket_tags} so downstream consumers of the audit surface
+    (the backtest recorder, tests) can name the basis without depending on
+    [weinstein.stock_analysis] directly. See {!Entry_freshness}. *)
+
 module Entry_walk = Entry_walk
 (** The screener-candidate → [CreateEntering] entry walk. Re-exposed so callers
     running custom screening out-of-band (and tests pinning the config-gated

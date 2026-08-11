@@ -14,7 +14,10 @@
     - No partial-week lookahead: a mid-week (non-screening) tick evaluates
       nothing; the same position ejects on the week's closing tick.
     - Fail-soft: too little history for either branch holds the position.
-    - Short side, stale fills, and skip-list collisions are no-ops. *)
+    - Short side, stale fills, and skip-list collisions are no-ops.
+    - The audit population is WIDER than the eject population: a skipped
+      position still yields a row, tagged [Skipped_other_exit], and the same
+      [Unconfirmed] verdict carries all three outcomes. *)
 
 open OUnit2
 open Core
@@ -348,9 +351,299 @@ let test_insufficient_history_holds _ =
   in
   assert_that (List.length result) (equal_to 0)
 
+(* ------------------------------------------------------------------ *)
+(* fill_week_confirmations — the PR-5 audit surface                      *)
+(* ------------------------------------------------------------------ *)
+
+(** Render one [(position_id, classification)] row so a single [assert_that] can
+    pin the constructor without exact-float record equality. *)
+let _summary (position_id, confirmation) =
+  let label =
+    match confirmation with
+    | None -> "no_verdict"
+    | Some (Volume.Spike _) -> "spike"
+    | Some (Volume.Buildup _) -> "buildup"
+    | Some (Volume.Unconfirmed _) -> "unconfirmed"
+  in
+  position_id ^ ":" ^ label
+
+let _confirmations ?(config = _armed_config) ?(is_screening_day = true)
+    ?(current_date = _screening_friday) ~positions ~weekly_volumes () =
+  let bars = _bars_of_weekly_volumes weekly_volumes in
+  Volume_eject_runner.fill_week_confirmations ~config
+    ~volume_config:Volume.default_config ~is_screening_day ~positions
+    ~bar_reader:(Bar_reader.of_in_memory_bars [ (_ticker, bars) ])
+    ~current_date
+  |> List.map ~f:_summary
+
+let _outcome_label : Audit_recorder.fill_volume_outcome -> string = function
+  | Ejected -> "ejected"
+  | Skipped_other_exit -> "skipped_other_exit"
+  | Held -> "held"
+
+(** ["<position_id>:<verdict>:<outcome>"] — renders both halves of an emitted
+    event so one [assert_that] pins the pairing. *)
+let _event_summary (e : Audit_recorder.fill_volume_event) =
+  _summary (e.position_id, e.confirmation) ^ ":" ^ _outcome_label e.outcome
+
+(** Drive {!Volume_eject_runner.emit_fill_week_audit} with a capturing recorder
+    and explicit id sets, so the outcome tagging can be exercised independently
+    of the exit pipeline that normally supplies those sets. *)
+let _audit_events ?(config = _armed_config)
+    ?(skip_position_ids = String.Set.empty)
+    ?(ejected_position_ids = String.Set.empty) ~positions ~weekly_volumes () =
+  let captured = ref [] in
+  let recorder : Audit_recorder.t =
+    {
+      Audit_recorder.noop with
+      record_fill_volume = (fun e -> captured := e :: !captured);
+    }
+  in
+  let bars = _bars_of_weekly_volumes weekly_volumes in
+  Volume_eject_runner.emit_fill_week_audit ~config ~audit_recorder:recorder
+    ~volume_config:Volume.default_config ~is_screening_day:true ~positions
+    ~bar_reader:(Bar_reader.of_in_memory_bars [ (_ticker, bars) ])
+    ~skip_position_ids ~ejected_position_ids ~current_date:_screening_friday;
+  List.rev !captured |> List.map ~f:_event_summary
+
+(** The four cells a ladder-v4 F5 arm must report separately. Only the third
+    ejects; the first, second and FOURTH are all held — and the eject count
+    alone cannot separate the fourth (held without a verdict, the qc-behavioral
+    #2267 residual) from the confirmed holds. *)
+let test_confirmations_distinguish_all_four_verdict_classes _ =
+  let summarise weekly_volumes =
+    _confirmations ~positions:(_held_positions ()) ~weekly_volumes ()
+  in
+  assert_that
+    (List.concat_map ~f:summarise
+       [
+         _spike_volumes;
+         _buildup_volumes;
+         _unconfirmed_volumes;
+         [ 1000; 1000; 900 ];
+       ])
+    (elements_are
+       [
+         equal_to (_ticker ^ ":spike");
+         equal_to (_ticker ^ ":buildup");
+         equal_to (_ticker ^ ":unconfirmed");
+         equal_to (_ticker ^ ":no_verdict");
+       ])
+
+(** The audit surface reads the same fill-week WINDOW and applies the same SHAPE
+    test as the eject path (LONG, [Holding], inside the evaluation window), so
+    the two can never disagree about which week was judged. It does {i not}
+    share the eject path's {b eligibility} — see
+    {!test_skipped_position_is_audited_but_not_ejected}. *)
+let test_confirmations_share_the_eject_paths_window_and_shape _ =
+  let stale = _held_positions ~fill_date:(Date.of_string "2024-03-05") () in
+  let short = _held_positions ~side:Trading_base.Types.Short () in
+  let entering =
+    String.Map.singleton _ticker
+      (make_entering_pos _ticker 100.0 _screening_friday)
+  in
+  let rows positions =
+    _confirmations ~positions ~weekly_volumes:_unconfirmed_volumes ()
+  in
+  assert_that
+    (List.map [ stale; short; entering ] ~f:(fun p -> List.length (rows p)))
+    (elements_are [ equal_to 0; equal_to 0; equal_to 0 ])
+
+(** R1: under the default config — and under the flag armed without the
+    StopLimit family — no at-fill check runs, so the audit surface emits nothing
+    and reads no bars. A mid-week tick is likewise silent (the fill week has not
+    closed). *)
+let test_confirmations_are_empty_when_unarmed_or_midweek _ =
+  let unarmed = _default_config () in
+  let flag_only =
+    {
+      (_default_config ()) with
+      Weinstein_strategy_config.volume_confirm_at_fill = true;
+    }
+  in
+  let counts =
+    [
+      _confirmations ~config:unarmed ~positions:(_held_positions ())
+        ~weekly_volumes:_unconfirmed_volumes ();
+      _confirmations ~config:flag_only ~positions:(_held_positions ())
+        ~weekly_volumes:_unconfirmed_volumes ();
+      _confirmations ~is_screening_day:false ~current_date:_midweek
+        ~positions:(_held_positions ()) ~weekly_volumes:_unconfirmed_volumes ();
+    ]
+  in
+  assert_that
+    (List.map counts ~f:List.length)
+    (elements_are [ equal_to 0; equal_to 0; equal_to 0 ])
+
+(* ------------------------------------------------------------------ *)
+(* The audit population DIVERGES from the eject population              *)
+(* ------------------------------------------------------------------ *)
+
+(** The blocking divergence, pinned. A position already exiting this tick via
+    another channel is in [skip_position_ids]: {!Volume_eject_runner.update}
+    emits no eject for it, yet the audit surface still records its fill-week
+    verdict — because that verdict is a property of the {i fill}, and this
+    cohort (weak-volume breakout that stops out in week 0/1) is exactly what the
+    plan's §5 prediction 4 measures. The row is tagged [Skipped_other_exit] so
+    it can never be miscounted as an eject. *)
+let test_skipped_position_is_audited_but_not_ejected _ =
+  let skip = String.Set.singleton _ticker in
+  let ejects =
+    run ~skip_position_ids:skip ~positions:(_held_positions ())
+      ~weekly_volumes:_unconfirmed_volumes ()
+  in
+  let audited =
+    _audit_events ~skip_position_ids:skip ~positions:(_held_positions ())
+      ~weekly_volumes:_unconfirmed_volumes ()
+  in
+  assert_that
+    (List.length ejects, audited)
+    (equal_to (0, [ _ticker ^ ":unconfirmed:skipped_other_exit" ]))
+
+(** [outcome] is read off what the run DID, never off the verdict: one and the
+    same [Unconfirmed] verdict carries all three outcomes, decided only by the
+    id sets the tick observed. *)
+let test_outcome_distinguishes_ejected_skipped_and_held _ =
+  let events ?skip_position_ids ?ejected_position_ids () =
+    _audit_events ?skip_position_ids ?ejected_position_ids
+      ~positions:(_held_positions ()) ~weekly_volumes:_unconfirmed_volumes ()
+  in
+  assert_that
+    (List.concat
+       [
+         events ~ejected_position_ids:(String.Set.singleton _ticker) ();
+         events ~skip_position_ids:(String.Set.singleton _ticker) ();
+         events ();
+       ])
+    (elements_are
+       [
+         equal_to (_ticker ^ ":unconfirmed:ejected");
+         equal_to (_ticker ^ ":unconfirmed:skipped_other_exit");
+         equal_to (_ticker ^ ":unconfirmed:held");
+       ])
+
+(* ------------------------------------------------------------------ *)
+(* Special_exits.run integration — the audit glue actually fires         *)
+(* ------------------------------------------------------------------ *)
+
+(* A weekly_view whose last bar is the screening Friday, so
+   [is_screening_day_view] is true inside [Special_exits.run]. *)
+let _friday_weekly_view : Snapshot_runtime.Snapshot_bar_views.weekly_view =
+  {
+    closes = [| 100.0 |];
+    raw_closes = [| 100.0 |];
+    highs = [| 100.0 |];
+    lows = [| 100.0 |];
+    volumes = [| 1000.0 |];
+    dates = [| _screening_friday |];
+    n = 1;
+  }
+
+(** Drive the whole special-exit pipeline with a capturing recorder and read
+    back the [fill_volume_event]s it emitted. This pins the glue between
+    {!Volume_eject_runner.fill_week_confirmations} and
+    {!Audit_recorder.record_fill_volume} — the runner-level tests above only pin
+    the classification itself. *)
+let _fill_volume_events_from_run ~config ~weekly_volumes =
+  let captured = ref [] in
+  let recorder : Audit_recorder.t =
+    {
+      Audit_recorder.noop with
+      record_fill_volume = (fun e -> captured := e :: !captured);
+    }
+  in
+  let bars = _bars_of_weekly_volumes weekly_volumes in
+  let bar_reader = Bar_reader.of_in_memory_bars [ (_ticker, bars) ] in
+  let last_bar = List.last_exn bars in
+  let positions = _held_positions () in
+  let no_op_record_force_exit ~last_stop_out_dates:_ ~positions:_
+      ~current_date:_ ~cooldown_weeks:_ ~label:_ _ =
+    ()
+  in
+  let _ =
+    Special_exits.run ~config ~record_force_exit:no_op_record_force_exit
+      ~positions
+      ~last_stop_out_dates:(Hashtbl.create (module String))
+      ~portfolio:{ cash = 1_000_000.0; positions }
+      ~get_price:(fun s ->
+        if String.equal s _ticker then Some last_bar else None)
+      ~peak_tracker:Portfolio_risk.Force_liquidation.Peak_tracker.(create ())
+      ~audit_recorder:recorder ~prior_macro_result:(ref None)
+      ~prior_stages:(Hashtbl.create (module String))
+      ~prior_stage_ma_values:(Hashtbl.create (module String))
+      ~stage3_streaks:(Hashtbl.create (module String))
+      ~laggard_streaks:(Hashtbl.create (module String))
+      ~bar_reader ~index_view:_friday_weekly_view ~exit_transitions:[]
+      ~current_date:_screening_friday
+  in
+  List.rev !captured
+
+(** End-to-end through the real config path: with F5 armed on a config built by
+    [default_config], a held ticket whose fill week confirmed via branch (a)
+    produces one audit event carrying that classification — and, since nothing
+    ejected it, the [Held] outcome. *)
+let test_armed_config_emits_a_fill_volume_audit_event _ =
+  assert_that
+    (_fill_volume_events_from_run ~config:_armed_config
+       ~weekly_volumes:_spike_volumes)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (e : Audit_recorder.fill_volume_event) -> e.position_id)
+               (equal_to _ticker);
+             field
+               (fun (e : Audit_recorder.fill_volume_event) -> e.confirmation)
+               (matching ~msg:"Expected Some (Spike _)"
+                  (function Some (Volume.Spike r) -> Some r | _ -> None)
+                  (float_equal 3.0));
+             field
+               (fun (e : Audit_recorder.fill_volume_event) ->
+                 _outcome_label e.outcome)
+               (equal_to "held");
+           ];
+       ])
+
+(** The other half of the end-to-end pairing: an unconfirmed fill week ejects,
+    and the very same pipeline pass records the row as [Unconfirmed] +
+    [Ejected]. Pins that [Special_exits] hands the eject ids it just produced to
+    the audit emitter, so the two halves of the record agree without anyone
+    re-deriving one from the other. *)
+let test_unconfirmed_fill_week_audit_event_is_tagged_ejected _ =
+  assert_that
+    (_fill_volume_events_from_run ~config:_armed_config
+       ~weekly_volumes:_unconfirmed_volumes
+    |> List.map ~f:_event_summary)
+    (elements_are [ equal_to (_ticker ^ ":unconfirmed:ejected") ])
+
+(** R1: the default config emits no audit event at all on the same bars — the
+    capture is inert exactly where the mechanism is. *)
+let test_default_config_emits_no_fill_volume_audit_event _ =
+  assert_that
+    (_fill_volume_events_from_run ~config:(_default_config ())
+       ~weekly_volumes:_spike_volumes)
+    is_empty
+
 let suite =
   "volume_eject_runner"
   >::: [
+         "armed config emits a fill_volume audit event"
+         >:: test_armed_config_emits_a_fill_volume_audit_event;
+         "unconfirmed fill week audit event is tagged ejected"
+         >:: test_unconfirmed_fill_week_audit_event_is_tagged_ejected;
+         "default config emits no fill_volume audit event"
+         >:: test_default_config_emits_no_fill_volume_audit_event;
+         "fill_week_confirmations distinguish all four verdict classes"
+         >:: test_confirmations_distinguish_all_four_verdict_classes;
+         "fill_week_confirmations share the eject path's window and shape"
+         >:: test_confirmations_share_the_eject_paths_window_and_shape;
+         "skipped position is audited but not ejected"
+         >:: test_skipped_position_is_audited_but_not_ejected;
+         "outcome distinguishes ejected, skipped and held"
+         >:: test_outcome_distinguishes_ejected_skipped_and_held;
+         "fill_week_confirmations are empty when unarmed or mid-week"
+         >:: test_confirmations_are_empty_when_unarmed_or_midweek;
          "fill-week 2x volume confirms and holds"
          >:: test_fill_week_spike_confirms_and_holds;
          "3-4-week build-up branch confirms and holds"
