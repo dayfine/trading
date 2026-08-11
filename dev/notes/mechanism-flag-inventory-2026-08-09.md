@@ -96,23 +96,39 @@ Call legend: **RETIRE** (terminal REJECT, remove flag+code+tests) /
 | `short_sleeve_fraction` | `Weinstein_strategy_config` | `0.0` | screens only, no WF-CV ledger entry — `project_p0_levers_no_build_2026_06_20` (short sleeve fails), `project_p1a_deep_short_screens` (hedge-shaped) | DEFER | No terminal ledger REJECT exists; either run the surface or record a do-not-revive classification before retiring. |
 | `stop_anchor_at_entry_base` | `Weinstein_strategy_config` | `false` | ladder-v3 history references it; retirement note in the async-v2 plan | DEFER | Seeded DEFER — joins the graveyard only after ladder v4. |
 
-## UNKNOWN — no verdict found (needs human/ledger check)
+## RESOLVED 2026-08-10 (was UNKNOWN — classified by consumer-grep + user decision)
 
-| field | config module | default | ledger verdict (pointer) | call | notes |
+All four were listed UNKNOWN because no ledger verdict exists for any of them.
+That turned out to be the wrong lens: **none is a retirement question** (Rule 4
+needs a terminal REJECT, and there is none), they are mechanisms that were
+built, wired, defaulted to no-op, and then **never evaluated** — zero scenario-
+spec references between three of them. That is an `experiment-flag-discipline`
+**R2 gap** ("an axis the day it lands"), not an R4 one.
+
+Consumer counts that drove the calls (non-test `.ml` refs | tests | scenario specs):
+
+| field | refs | tests | specs | call | reasoning |
 |---|---|---|---|---|---|
-| `stage3_reentry_cooldown_weeks` | `Weinstein_strategy_config` | `0` | none found | UNKNOWN | Possibly exit-timing family (would retire with the hysteresis knob) or live stage3 machinery — needs the mapping checked. |
-| `cascade_post_stop_cooldown_weeks` | `Screener.config` | `0` | none found | UNKNOWN | |
-| `failed_breakout_tolerance_pct` | `Screener.config` | `0.0` | none found | UNKNOWN | |
-| `max_long_exposure_pct_entry` | `Weinstein_strategy_config` | `0.0` | none found directly; envelope family — `project_envelope_knobs_dead` says grep knob consumers before touching | UNKNOWN | May be a dead envelope knob (retire with cash_reserve) or live exposure plumbing. |
+| `max_long_exposure_pct_entry` | 10 | 6 | **7** | **KEEP — in active use** | Referenced by 7 live scenario specs, so not a graveyard candidate at all. `project_envelope_knobs_dead`'s "grep consumers first" warning was right and the answer came back yes. No longer open. |
+| `stage3_reentry_cooldown_weeks` | 3 | **0** | 0 | **RETIRE** (with the stage3 family) | One consumer (`special_exits.ml:64`, `~cooldown_weeks`), **no `.mli` docstring at all** (the field at line 99 is undocumented; the neighbouring docstring belongs to `stage3_exit_margin_pct` below it), no tests, no specs. Its sibling `stage3_exit_margin_pct` is already on the RETIRE list as part of the rejected stage3-hysteresis family (`project_stage3_hysteresis_rejected_wfcv`). Reads as a leftover of that rejection. Retire alongside it. |
+| `cascade_post_stop_cooldown_weeks` | 5 | 4 | 0 | **KEEP-AXIS — sweep once, expect it to lose** | Benches a symbol for N weeks after a stop-out; motivated by a real documented pathology (cascade re-firing within days of stop-out, `dev/notes/sp500-trade-quality-findings-2026-04-30.md`). Strong prior AGAINST from `project_edge_is_the_fat_tail`: it is a re-entry suppressor, and the AXTI-class monsters are exactly names that whipsaw before they run. Cheap as one axis; a **recorded** loss is worth more than a silent flag. |
+| `failed_breakout_tolerance_pct` | 21 | 24 | 0 | **RESOLVE AGAINST F2 FIRST** | Drops a long candidate whose close fell back below `breakout_price *. (1. -. k)` and demotes it to the watchlist. This **overlaps F2 `entry_order_ttl_weeks`' primary re-screen cancel** (#2263, merged 2026-08-10): under the async ticket model, price falling back below the breakout while the ticket rests *is* the failed breakout. Either this is now largely redundant, or it is the sharper-specified version of F2's cancel condition. Sweeping both without resolving the overlap would test two spellings of one mechanism and read the interaction as signal. Decide the overlap before either is swept. |
+
+**Common shape worth noting:** all three non-KEEP entries are re-entry /
+whipsaw suppressors. They are close to one question, not three, and
+`project_edge_is_the_fat_tail` already carries a strong prior on that family.
 
 ## Tallies
 
 - RETIRE (seeded, ready for step-3 removal PRs): **12 rows** (~14 fields)
 - RETIRE (confirm-first): **5 rows** (~10 fields)
 - KEEP-PROMOTED: **9 rows**
-- KEEP-AXIS: **19 rows**
+- KEEP-AXIS: **20 rows** (19 + `cascade_post_stop_cooldown_weeks`, resolved 08-10)
 - DEFER: **2 rows** (`short_sleeve_fraction`, `stop_anchor_at_entry_base`)
-- UNKNOWN: **4 rows**
+- UNKNOWN: **0 rows** — all four resolved 2026-08-10, see the RESOLVED section
+  above. Net effect: +1 RETIRE (`stage3_reentry_cooldown_weeks`, folded into the
+  stage3 family), +1 KEEP-AXIS, +1 KEEP (`max_long_exposure_pct_entry`, in
+  active use), +1 pending-overlap-decision (`failed_breakout_tolerance_pct`).
 
 ## Step-3 sequencing suggestion
 
