@@ -1,2 +1,3 @@
 (executable
- (name magic_numbers_linter))
+ (name magic_numbers_linter)
+ (libraries magic_numbers_linter_lib))

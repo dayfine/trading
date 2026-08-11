@@ -61,8 +61,9 @@
 ; extraction -- ~460k-575k process spawns across ~57k lines, ~35 minutes
 ; under Docker-on-macOS. This does the identical per-line scan in one
 ; process, no forking: ~35min -> ~1s. See
-; devtools/magic_numbers_linter/magic_numbers_linter.ml's header comment for
-; the full equivalence rationale and known cosmetic divergences.
+; devtools/magic_numbers_linter/lib/magic_numbers_linter_lib.mli for the
+; full exempt-surface rule enumeration and known cosmetic divergences, and
+; devtools/magic_numbers_linter/test/ for the pinned regression suite.
 
 (rule
  (alias runtest)

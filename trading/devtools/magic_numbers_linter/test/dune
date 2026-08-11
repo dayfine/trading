@@ -1,0 +1,10 @@
+; Regression suite for magic_numbers_linter_lib: pins detection equivalence
+; with the removed shell linter (linter_magic_numbers.sh) via inline OUnit2
+; unit tests -- no fixture files, no temp dirs, no subprocess. See
+; ../lib/magic_numbers_linter_lib.mli for the full rule-surface
+; documentation these tests pin, and test_magic_numbers_linter_lib.ml's
+; header for the PR #2272 CP2 rework context.
+
+(tests
+ (names test_magic_numbers_linter_lib)
+ (libraries magic_numbers_linter_lib ounit2 matchers))
