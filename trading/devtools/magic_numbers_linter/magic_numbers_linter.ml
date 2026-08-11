@@ -1,10 +1,10 @@
 (** Magic-number linter CLI entry point: bare numeric literals in [lib/*.ml]
     files must be routed through a config record or a named constant.
 
-    All detection logic lives in {!Magic_numbers_linter_lib} (see that
-    module's [.mli] for the full exempt-surface rule enumeration and the
-    pinned regression suite under [test/]); this file is just argv parsing
-    and output formatting.
+    All detection logic lives in {!Magic_numbers_linter_lib} (see that module's
+    [.mli] for the full exempt-surface rule enumeration and the pinned
+    regression suite under [test/]); this file is just argv parsing and output
+    formatting.
 
     Usage: magic_numbers_linter <trading-root> <exceptions-conf-path>
 

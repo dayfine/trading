@@ -328,10 +328,10 @@ let scan_file_lines ~path lines =
         let stripped = lazy (strip_quoted_segments line) in
         extract_candidates line
         |> List.filter_map (fun num ->
-               if is_exempt_literal num then None
-               else if contains_substring (Lazy.force stripped) num then
-                 Some (Printf.sprintf "%s: %s in: %s" path num line)
-               else None))
+            if is_exempt_literal num then None
+            else if contains_substring (Lazy.force stripped) num then
+              Some (Printf.sprintf "%s: %s in: %s" path num line)
+            else None))
     lines
 
 (* --- Unreadable-file handling: mirrors the shell script's TOCTOU-aware

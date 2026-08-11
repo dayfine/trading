@@ -33,7 +33,8 @@ let test_exempt_literal_2_0 _ =
 let test_exempt_literal_100_0 _ =
   assert_that (is_exempt_literal "100.0") (equal_to true)
 
-let test_non_exempt_literal _ = assert_that (is_exempt_literal "42") (equal_to false)
+let test_non_exempt_literal _ =
+  assert_that (is_exempt_literal "42") (equal_to false)
 
 (* End-to-end: an exempt literal never produces a violation even on an
    otherwise fully-scanned line. *)
@@ -62,8 +63,7 @@ let test_skip_rule_eg _ =
 
 let test_skip_rule_eg_end_to_end_no_violation _ =
   assert_that
-    (scan_file_lines ~path:"f.ml"
-       [ "helper_use e.g. 42 as an example value" ])
+    (scan_file_lines ~path:"f.ml" [ "helper_use e.g. 42 as an example value" ])
     (equal_to [])
 
 let test_skip_rule_comment_marker _ =
@@ -196,8 +196,7 @@ let test_number_inside_quotes_not_flagged _ =
 let test_number_outside_quotes_flagged _ =
   assert_that
     (scan_file_lines ~path:"f.ml" [ "compute_value 42 label \"some text\"" ])
-    (equal_to
-       [ "f.ml: 42 in: compute_value 42 label \"some text\"" ])
+    (equal_to [ "f.ml: 42 in: compute_value 42 label \"some text\"" ])
 
 (* ------------------------------------------------------------------ *)
 (* Comment-depth tracking, including a nested (* (* *) *) marker.       *)
@@ -269,11 +268,9 @@ let () =
            "skip rule: e.g. end-to-end no violation"
            >:: test_skip_rule_eg_end_to_end_no_violation;
            "skip rule: comment marker" >:: test_skip_rule_comment_marker;
-           "skip rule: trailing backslash"
-           >:: test_skip_rule_trailing_backslash;
+           "skip rule: trailing backslash" >:: test_skip_rule_trailing_backslash;
            "skip rule: odd quote count" >:: test_skip_rule_odd_quote_count;
-           "skip rule: = <digit> default"
-           >:: test_skip_rule_eq_digit_default;
+           "skip rule: = <digit> default" >:: test_skip_rule_eq_digit_default;
            "skip rule: = -<digit> negative default"
            >:: test_skip_rule_eq_digit_default_negative;
            "skip rule: let binding" >:: test_skip_rule_let_binding;
@@ -285,8 +282,7 @@ let () =
            "plain line is not skipped" >:: test_not_skipped_plain_line;
            "has_let_binding: true case" >:: test_has_let_binding_true;
            "has_let_binding: false case" >:: test_has_let_binding_false;
-           "has_eq_digit_default: true case"
-           >:: test_has_eq_digit_default_true;
+           "has_eq_digit_default: true case" >:: test_has_eq_digit_default_true;
            "has_eq_digit_default: negative case"
            >:: test_has_eq_digit_default_negative;
            "has_eq_digit_default: false case"
