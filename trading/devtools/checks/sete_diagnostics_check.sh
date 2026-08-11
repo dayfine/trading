@@ -115,7 +115,9 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Parts 3-4: the two linter fixes (linter_file_length.sh, linter_magic_numbers.sh).
+# Parts 3-4: the two linter fixes (linter_file_length.sh,
+# magic_numbers_linter.exe -- formerly linter_magic_numbers.sh, rewritten as
+# an OCaml exe for speed; see devtools/magic_numbers_linter/).
 #
 # 2026-07-29 qc-behavioral rework (FINDING-1, FINDING-2): the first version of
 # this PR fixed both linters with a blanket `|| continue`, which cannot tell
@@ -190,7 +192,7 @@ else
 fi
 rm -rf "$FIX3_NEW"
 
-# --- Part 4: linter_magic_numbers.sh ---
+# --- Part 4: magic_numbers_linter.exe (formerly linter_magic_numbers.sh) ---
 
 FIX4_OLD="$(mktemp -d)"
 OLD_MN_SCRIPT="$(mktemp)"
@@ -224,12 +226,13 @@ fi
 rm -rf "$FIX4_OLD" "$OLD_MN_SCRIPT"
 
 FIX4_NEW="$(mktemp -d)"
-_make_unreadable_fixture "$FIX4_NEW" "linter_magic_numbers.sh"
-NEW_MN_OUT=$(sh "${FIX4_NEW}/devtools/checks/linter_magic_numbers.sh" 2>&1) && NEW_MN_CODE=0 || NEW_MN_CODE=$?
+mkdir -p "${FIX4_NEW}/somemod/lib/unreadable_dir.ml"
+: "${MAGIC_NUMBERS_LINTER_EXE:?MAGIC_NUMBERS_LINTER_EXE not set -- checks/dune must setenv it for this rule}"
+NEW_MN_OUT=$("$MAGIC_NUMBERS_LINTER_EXE" "$FIX4_NEW" "${FIX4_NEW}/nonexistent_exceptions.conf" 2>&1) && NEW_MN_CODE=0 || NEW_MN_CODE=$?
 if [ "$NEW_MN_CODE" -ne 0 ] && printf '%s' "$NEW_MN_OUT" | grep -qF "unreadable_dir.ml"; then
-  ok "${LABEL} — fix (magic_numbers): linter_magic_numbers.sh FAILs and names unreadable_dir.ml instead of a false green (exit=${NEW_MN_CODE})"
+  ok "${LABEL} — fix (magic_numbers): magic_numbers_linter.exe FAILs and names unreadable_dir.ml instead of a false green (exit=${NEW_MN_CODE})"
 else
-  bad "${LABEL} — expected linter_magic_numbers.sh to FAIL naming unreadable_dir.ml; got exit=${NEW_MN_CODE} output='${NEW_MN_OUT}'"
+  bad "${LABEL} — expected magic_numbers_linter.exe to FAIL naming unreadable_dir.ml; got exit=${NEW_MN_CODE} output='${NEW_MN_OUT}'"
 fi
 rm -rf "$FIX4_NEW"
 
