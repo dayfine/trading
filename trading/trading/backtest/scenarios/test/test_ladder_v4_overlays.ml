@@ -80,15 +80,27 @@ let test_every_v4_spec_round_trips _ =
      24-cell ladder is present rather than a subset. *)
   assert_that (List.length (_all_applied_configs ())) (equal_to 24)
 
+(* The validator's verdict on one overlay list, as a string: either the
+   [Failure] message it raised, or a marker saying it accepted the overlay.
+   Rendering both outcomes as a string keeps the assertion a single
+   [contains_substring] and makes a silent acceptance name itself. *)
+let _overlay_verdict overrides =
+  match
+    Or_error.try_with (fun () ->
+        Overlay_validator.apply_overrides (_base_config ()) overrides)
+  with
+  | Ok _ -> "ACCEPTED (no failure raised)"
+  | Error err -> Error.to_string_hum err
+
 let test_typo_in_axis_flag_is_rejected _ =
+  (* A misspelled axis flag must fail validation naming the offending path,
+     rather than resolving to nothing and silently rerunning the baseline. *)
   let typo =
     [ Sexp.of_string "((entry_freshness_bassis Range_top_breakout))" ]
   in
-  let result =
-    Or_error.try_with (fun () ->
-        Overlay_validator.apply_overrides (_base_config ()) typo)
-  in
-  assert_that result is_error
+  assert_that
+    (_overlay_verdict typo)
+    (contains_substring "entry_freshness_bassis")
 
 (* --- Axis coverage: the designed 24-cell shape ---------------------------- *)
 
