@@ -54,15 +54,26 @@
   (run sh %{dep:linter_mli_coverage.sh} %{dep:linter_exceptions.conf})))
 
 ; Magic numbers: numeric literals must be routed through config records
-; Scans all lib/*.ml files across the workspace.
+; Scans all lib/*.ml files across the workspace via Sys.readdir at runtime.
+; OCaml exe (devtools/magic_numbers_linter/), not a shell script: the former
+; shell version (linter_magic_numbers.sh, removed) forked ~8-10 subprocesses
+; PER SOURCE LINE for comment-depth tracking, quote counting, and candidate
+; extraction -- ~460k-575k process spawns across ~57k lines, ~35 minutes
+; under Docker-on-macOS. This does the identical per-line scan in one
+; process, no forking: ~35min -> ~1s. See
+; devtools/magic_numbers_linter/magic_numbers_linter.ml's header comment for
+; the full equivalence rationale and known cosmetic divergences.
 
 (rule
  (alias runtest)
  (deps
-  _check_lib.sh
-  (glob_files_rec %{workspace_root}/*.ml))
+  (glob_files_rec %{workspace_root}/*.ml)
+  %{dep:linter_exceptions.conf})
  (action
-  (run sh %{dep:linter_magic_numbers.sh} %{dep:linter_exceptions.conf})))
+  (run
+   %{exe:../magic_numbers_linter/magic_numbers_linter.exe}
+   %{workspace_root}
+   %{dep:linter_exceptions.conf})))
 
 ; Function length: no top-level function body may exceed 50 lines (AST-based)
 ; Scans all .ml files across the workspace via Sys.readdir at runtime.
@@ -156,12 +167,19 @@
 ; `&& CODE=0 || CODE=$?` shape survives the same failure with a diagnostic.
 ; Invokes jj_workspace_smoke.sh with a fake `jj` on PATH; declares it as an
 ; explicit dep so the cache invalidates when that script's logic changes.
+; Also exercises the unreadable-file diagnostic in magic_numbers_linter.exe
+; (Part 4) -- MAGIC_NUMBERS_LINTER_EXE points the script at the built exe
+; (%{exe:...} is itself a dependency, so this also invalidates the cache
+; when the linter's logic changes).
 
 (rule
  (alias runtest)
  (deps _check_lib.sh jj_workspace_smoke.sh (universe))
  (action
-  (run sh %{dep:sete_diagnostics_check.sh})))
+  (setenv
+   MAGIC_NUMBERS_LINTER_EXE
+   %{exe:../magic_numbers_linter/magic_numbers_linter.exe}
+   (run sh %{dep:sete_diagnostics_check.sh}))))
 
 ; Status file integrity: each dev/status/*.md must declare Status, Last updated,
 ; and (for feature files) Interface stable. Invoked by health-scanner fast scan.
