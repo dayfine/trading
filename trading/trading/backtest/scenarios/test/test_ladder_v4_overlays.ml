@@ -98,8 +98,7 @@ let test_typo_in_axis_flag_is_rejected _ =
   let typo =
     [ Sexp.of_string "((entry_freshness_bassis Range_top_breakout))" ]
   in
-  assert_that
-    (_overlay_verdict typo)
+  assert_that (_overlay_verdict typo)
     (contains_substring "entry_freshness_bassis")
 
 (* --- Axis coverage: the designed 24-cell shape ---------------------------- *)
