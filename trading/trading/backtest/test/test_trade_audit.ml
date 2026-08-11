@@ -288,10 +288,10 @@ let _lifecycle ?(placement_date = _date "2024-03-01")
 let _check verdict outcome : TL.fill_volume_check = { verdict; outcome }
 
 (** Every [fill_volume_verdict] constructor — including the [No_verdict] cell
-    the eject rate alone cannot see — survives the codec paired with an
-    outcome, as do the other lifecycle fields around it. The third row is the
-    divergence case: [Unconfirmed] that was NOT ejected because another exit
-    channel had already claimed the position. *)
+    the eject rate alone cannot see — survives the codec paired with an outcome,
+    as do the other lifecycle fields around it. The third row is the divergence
+    case: [Unconfirmed] that was NOT ejected because another exit channel had
+    already claimed the position. *)
 let test_entry_decision_sexp_round_trips_ticket_lifecycle _ =
   let checks =
     [

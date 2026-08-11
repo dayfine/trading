@@ -606,10 +606,10 @@ let test_armed_config_emits_a_fill_volume_audit_event _ =
        ])
 
 (** The other half of the end-to-end pairing: an unconfirmed fill week ejects,
-    and the very same pipeline pass records the row as
-    [Unconfirmed] + [Ejected]. Pins that [Special_exits] hands the eject ids it
-    just produced to the audit emitter, so the two halves of the record agree
-    without anyone re-deriving one from the other. *)
+    and the very same pipeline pass records the row as [Unconfirmed] +
+    [Ejected]. Pins that [Special_exits] hands the eject ids it just produced to
+    the audit emitter, so the two halves of the record agree without anyone
+    re-deriving one from the other. *)
 let test_unconfirmed_fill_week_audit_event_is_tagged_ejected _ =
   assert_that
     (_fill_volume_events_from_run ~config:_armed_config

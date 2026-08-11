@@ -109,28 +109,26 @@ val fill_week_confirmations :
     {!update} ejects, and {b not only the ones it was allowed to act on}.
 
     {b The population is deliberately WIDER than {!update}'s, by exactly
-    [skip_position_ids].} {!update} skips a position that another exit channel
-    (stop, Stage-3, laggard, force-liq, liquidity, extension) has already
-    claimed this tick; this function does not, because the fill's volume verdict
-    is a property of the {i fill}, independent of whatever else befell the
-    position that day — and that skipped cohort (weak-volume breakout that stops
-    out in week 0/1) is precisely what the plan's §5 prediction 4 measures. A
-    count of [Unconfirmed] rows here is therefore {b not} an eject count;
-    {!emit_fill_week_audit} pairs each row with the outcome that disambiguates
-    it.
+       [skip_position_ids].} {!update} skips a position that another exit
+    channel (stop, Stage-3, laggard, force-liq, liquidity, extension) has
+    already claimed this tick; this function does not, because the fill's volume
+    verdict is a property of the {i fill}, independent of whatever else befell
+    the position that day — and that skipped cohort (weak-volume breakout that
+    stops out in week 0/1) is precisely what the plan's §5 prediction 4
+    measures. A count of [Unconfirmed] rows here is therefore {b not} an eject
+    count; {!emit_fill_week_audit} pairs each row with the outcome that
+    disambiguates it.
 
     The shared private fill-week-window helper guarantees the two surfaces judge
     the same {b bar} and apply the same shape test (LONG, [Holding], inside the
     evaluation window); it does {i not} equalise their {b eligibility}. The
-    classification is
-    {!Volume.classify_breakout} rather than its boolean projection, so the audit
-    can separate:
+    classification is {!Volume.classify_breakout} rather than its boolean
+    projection, so the audit can separate:
 
     - [Some (Spike r)] — confirmed via §4.2 branch (a), at multiple [r];
     - [Some (Buildup m)] — confirmed via branch (b), at multiple [m];
     - [Some (Unconfirmed _)] — evaluated, neither branch confirmed ⇒ the F5 rule
-      {i would} eject (and did, unless the position was in
-      [skip_position_ids]);
+      {i would} eject (and did, unless the position was in [skip_position_ids]);
     - [None] — {b no verdict}: neither branch had enough history, so the runner
       {b held} the position. This is the held-without-verdict cell, which the
       eject count alone cannot distinguish from a confirmed hold. Measuring its

@@ -379,7 +379,8 @@ let test_enrich_writes_only_the_fill_age_column _ =
     (is_some_and
        (all_of
           [
-            field (fun (l : TL.t) -> l.ticket_age_weeks_at_fill)
+            field
+              (fun (l : TL.t) -> l.ticket_age_weeks_at_fill)
               (is_some_and (equal_to 0));
             field
               (fun (l : TL.t) -> l.ticket_age_weeks_at_cancel)

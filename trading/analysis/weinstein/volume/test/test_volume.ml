@@ -331,12 +331,12 @@ let test_classify_carries_none_for_the_unevaluable_branch _ =
     (equal_to "unconfirmed:0.900/none")
 
 (** [confirms_breakout] is defined as the projection of [classify_breakout] —
-    which means asserting one {i against the other} cannot fail by
-    construction. Both surfaces are therefore asserted against the same six
+    which means asserting one {i against the other} cannot fail by construction.
+    Both surfaces are therefore asserted against the same six
     {b independently written} expected verdicts (spike / build-up / build-up
     that falls on the event bar / flat tape / spike-only history / no history),
-    so a change to either surface, or to the projection between them, is
-    caught. *)
+    so a change to either surface, or to the projection between them, is caught.
+*)
 let test_confirms_breakout_agrees_with_classify _ =
   let shapes =
     [
