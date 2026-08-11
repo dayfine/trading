@@ -7,7 +7,8 @@
   test_scenario_runner_isolation
   test_scenario_runner_actual_sexp
   test_scenario_progress
-  test_bar_source_resolver)
+  test_bar_source_resolver
+  test_ladder_v4_overlays)
  (modules
   test_scenario
   test_universe_file
@@ -16,7 +17,8 @@
   test_scenario_runner_isolation
   test_scenario_runner_actual_sexp
   test_scenario_progress
-  test_bar_source_resolver)
+  test_bar_source_resolver
+  test_ladder_v4_overlays)
  (libraries
   ounit2
   core
@@ -29,6 +31,8 @@
   backtest_cost_model
   weinstein.data_source
   weinstein.snapshot_pipeline
+  weinstein_trading.strategy
+  weinstein_trading.stops
   trading.data_panel.snapshot
   trading.simulation
   universe
