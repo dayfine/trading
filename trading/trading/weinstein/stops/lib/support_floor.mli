@@ -8,7 +8,9 @@
       Long:  Place BELOW the significant support floor (prior correction low)
              BEFORE the breakout. (§5.1)
       Short: Place ABOVE the significant resistance ceiling (prior
-             counter-rally high) BEFORE the breakdown. (§6.3)
+             counter-rally high) BEFORE the breakdown. (§6.3; timing per §6
+             mirror-image preamble — §6.3 itself only says "Initial
+             buy-stop: above prior rally peak", not the pre-breakdown timing)
     v}
 
     Callers pipe the output into {!Weinstein_stops.compute_initial_stop}'s
