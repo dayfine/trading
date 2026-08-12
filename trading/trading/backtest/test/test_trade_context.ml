@@ -70,6 +70,9 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     cascade_rationale = [];
     side;
     suggested_entry;
+    close_at_decision = None;
+    ma_value = None;
+    local_range_top = None;
     suggested_stop = installed_stop;
     installed_stop;
     stop_floor_kind = TA.Buffer_fallback;
@@ -77,6 +80,7 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     risk_pct = 0.08;
     initial_position_value = 15000.0;
     initial_risk_dollars = 1200.0;
+    ticket_lifecycle = None;
     alternatives_considered = [];
   }
 

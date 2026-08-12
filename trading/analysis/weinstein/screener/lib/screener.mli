@@ -422,6 +422,26 @@ type result = {
 }
 (** Screener output. *)
 
+val longs_admitted_by_macro :
+  neutral_blocks_longs:bool -> Weinstein_types.market_trend -> bool
+(** Whether the macro tape admits new {b long} entries — the cascade's
+    unconditional macro gate, exposed so consumers that must re-ask the same
+    question outside a full [screen] call cannot drift from it. [Bearish] always
+    blocks; [Neutral] blocks only when [neutral_blocks_longs] is set; [Bullish]
+    always admits. Pure.
+
+    First out-of-cascade consumer: the F2 re-screen cancel
+    ({!Weinstein_trading.Entry_ticket_ttl}), which must decide whether a resting
+    ticket's symbol would still be admitted this week. A resting ticket's symbol
+    is held, so it is excluded from [screen]'s candidate list and its
+    admissibility is not otherwise observable. *)
+
+val shorts_admitted_by_macro :
+  neutral_blocks_shorts:bool -> Weinstein_types.market_trend -> bool
+(** Short-side mirror of {!longs_admitted_by_macro}: [Bullish] always blocks;
+    [Neutral] blocks only when [neutral_blocks_shorts] is set; [Bearish] always
+    admits (the book's short-only-in-a-confirmed-bear rule). Pure. *)
+
 val compare_for_ranking :
   candidate_ranking -> scored_candidate -> scored_candidate -> int
 (** [compare_for_ranking ranking a b] is the total order the cascade uses to

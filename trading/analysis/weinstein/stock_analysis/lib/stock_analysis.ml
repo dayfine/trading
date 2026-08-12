@@ -37,6 +37,14 @@ type config = {
           {!local_range_top} is the split-safe max high over the last
           [entry_anchor_local_range_weeks] bars; [0] leaves it [None]
           (bit-identical). See .mli. *)
+  entry_freshness_basis : Entry_freshness.basis;
+      [@sexp.default Entry_freshness.Ma_cross]
+      (** F1 — which event starts the Stage-2 admission clock. [Ma_cross]
+          (default) is today's MA-cross window, bit-identical. See .mli. *)
+  require_breakout_volume : bool; [@sexp.default true]
+      (** F5 — whether {!is_breakout_candidate} requires screen-time volume
+          confirmation. [true] (default) is today's gate, bit-identical. See
+          .mli. *)
 }
 
 let default_config =
@@ -52,6 +60,8 @@ let default_config =
     overhead_supply = None;
     virgin_crossing_readmission = false;
     entry_anchor_local_range_weeks = 0;
+    entry_freshness_basis = Entry_freshness.Ma_cross;
+    require_breakout_volume = true;
   }
 
 type t = {
@@ -80,6 +90,14 @@ type t = {
           [Some r] carries [r.score] in [0, 1] (0 = virgin, 1 = heavy recent
           supply) consumed by the screener's long-side scoring weight. *)
   virgin_readmission : bool;  (** resistance-v2 lever (a); see .mli. *)
+  range_top_freshness : bool option;
+      (** F1 — the armed admission clock's verdict. [None] under the default
+          [Ma_cross] basis ("no opinion" — admission keeps its pre-F1 MA-cross
+          window verbatim); [Some live] under [Range_top_breakout]. See .mli. *)
+  require_breakout_volume : bool;
+      (** F5 — [config.require_breakout_volume] carried onto the analysis so
+          {!is_breakout_candidate} (which sees only [t]) can honour it. [true]
+          (default) keeps the screen-time volume gate. See .mli. *)
   current_close : float option;
       (** Most recent (offset-0) weekly close; see .mli. *)
   as_of_date : Date.t;
@@ -329,6 +347,12 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
     _breakout_and_breakdown_prices ~config ~callbacks
   in
   let local_range_top = _local_range_top ~config ~callbacks in
+  let current_close = callbacks.stage.get_close ~week_offset:0 in
+  let range_top_freshness =
+    Entry_freshness.range_top_freshness ~basis:config.entry_freshness_basis
+      ~ma_direction:stage_result.ma_direction ~ma_value:stage_result.ma_value
+      ~local_range_top ~current_close
+  in
   let peak_offset_opt =
     _find_peak_volume_offset_callback ~get_volume:callbacks.get_volume
       ~lookback:config.breakout_event_lookback
@@ -364,7 +388,9 @@ let analyze_with_callbacks ~(config : config) ~ticker ~(callbacks : callbacks)
     continuation;
     supply;
     virgin_readmission;
-    current_close = callbacks.stage.get_close ~week_offset:0;
+    range_top_freshness;
+    require_breakout_volume = config.require_breakout_volume;
+    current_close;
     as_of_date;
   }
 
@@ -394,6 +420,26 @@ let _initial_breakout_arm ~early_stage2_max_weeks (a : t) : bool =
       weeks_advancing <= early_stage2_max_weeks
   | _ -> false
 
+(** F1 range-top arm: the armed clock's admission test. Admits a non-late
+    Stage-2 name whose breakout setup is live at the ticket anchor
+    ({!Entry_freshness.range_top_freshness}); the MA-cross age is not consulted.
+    The Stage-2 restriction is spine item 2 (buy only in Stage 2) and [late] is
+    still excluded — F1 moves the clock, it does not widen the stage gate. *)
+let _range_top_arm (a : t) : bool =
+  match (a.stage.stage, a.range_top_freshness) with
+  | Stage2 { late = false; _ }, Some setup_live -> setup_live
+  | _ -> false
+
+(** F1 replaces, never widens: under the default [Ma_cross] basis
+    [range_top_freshness] is [None] and the pre-F1 initial-breakout arm runs
+    verbatim (bit-identical); under [Range_top_breakout] the range-top arm is
+    used {i instead of} the MA-cross window, not in disjunction with it. The
+    continuation and virgin-readmission arms are untouched either way. *)
+let _freshness_arm ~early_stage2_max_weeks (a : t) : bool =
+  match a.range_top_freshness with
+  | None -> _initial_breakout_arm ~early_stage2_max_weeks a
+  | Some _ -> _range_top_arm a
+
 (** Continuation-buy arm (Interpretation B of issue #889). Active only when
     [a.continuation = Some r] (the detector ran AND found a hit). Restricted to
     symbols currently in Stage 2 — the book's continuation pattern only fires
@@ -412,11 +458,18 @@ let _virgin_readmission_arm (a : t) : bool =
 
 let is_breakout_candidate ?(early_stage2_max_weeks = 4) (a : t) : bool =
   let stage_ok =
-    _initial_breakout_arm ~early_stage2_max_weeks a
+    _freshness_arm ~early_stage2_max_weeks a
     || _continuation_arm a || _virgin_readmission_arm a
   in
-  (* Volume confirmation: at least Adequate *)
+  (* Volume confirmation: at least Adequate. F5 armed
+     ([require_breakout_volume = false]) relocates this spine item-3 check to
+     the fill week — the GTC ticket is written BEFORE the breakout, so
+     breakout-week volume cannot be known at placement (book §4.7). Volume is
+     not dropped: {!Weinstein_strategy.Volume_eject_runner} confirms it at the
+     fill and ejects when it fails. *)
   let volume_ok =
+    (not a.require_breakout_volume)
+    ||
     match a.volume with
     | Some { confirmation = Strong _; _ }
     | Some { confirmation = Adequate _; _ } ->

@@ -13,15 +13,17 @@ type entry_meta = {
   stop_floor_kind : Audit_recorder.stop_floor_kind;
   split_safe_basis : Audit_recorder.split_safe_basis;
   effective_entry_price : float;
+  close_at_decision : float option;
+  sized_down_wide_stop : bool;
 }
 
-(* The two audit-only classifications of a freshly-computed initial stop,
-   carried as one value so the stop-construction helpers keep a readable
-   argument list as tags are added. Private — [entry_meta] is the exported
-   shape. *)
+(* The audit-only classifications of a freshly-computed initial stop, carried as
+   one value so the stop-construction helpers keep a readable argument list as
+   tags are added. Private — [entry_meta] is the exported shape. *)
 type stop_tags = {
   floor_kind : Audit_recorder.stop_floor_kind;
   basis : Audit_recorder.split_safe_basis;
+  sized_down : bool;
 }
 
 (** Outcome of an attempt to construct an entry transition for one candidate.
@@ -45,6 +47,7 @@ let classify_stop_floor_kind ~stops_config ~callbacks ~side :
   match
     Weinstein_stops.Support_floor.find_recent_level_with_callbacks
       ~anchor_mode:stops_config.Weinstein_stops.support_floor_anchor_mode
+      ~anchor_scope:stops_config.Weinstein_stops.support_floor_anchor_scope
       ~callbacks ~side
       ~min_pullback_pct:stops_config.Weinstein_stops.min_correction_pct ()
   with
@@ -67,9 +70,9 @@ let _sizing_side_of_cand_side (side : Trading_base.Types.position_side) =
 (** Size the candidate and, on success, register the stop and build the
     transition + meta. Returns [Sized_zero] when share count rounds to 0. *)
 let _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
-    ~current_date ~effective_entry ~initial_stop ~(stop_tags : stop_tags) ~id
-    ~stop_distance_pct ~max_stop_distance_pct (cand : Screener.scored_candidate)
-    : entry_attempt_result =
+    ~current_date ~effective_entry ~close_at_decision ~initial_stop
+    ~(stop_tags : stop_tags) ~id ~stop_distance_pct ~max_stop_distance_pct
+    (cand : Screener.scored_candidate) : entry_attempt_result =
   let installed_stop_level = Weinstein_stops.get_stop_level initial_stop in
   let sizing =
     Portfolio_risk.compute_position_size ~config:portfolio_risk_config
@@ -84,10 +87,14 @@ let _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
       ~max_stop_distance_pct ~outcome:"Sized_zero";
     Sized_zero)
   else (
+    (* F3: the trace outcome names the wide-stop admission when [Size_down]
+       waived the §5.1 drop, so a run's [Sized_down_wide_stop] population is
+       greppable from the candidate trace as well as from [entry_meta]. *)
     Entry_audit_helpers.emit_candidate_trace ~ticker:cand.ticker
       ~score:cand.score ~rationale:cand.rationale ~effective_entry
       ~installed_stop:installed_stop_level ~stop_distance_pct
-      ~max_stop_distance_pct ~outcome:"Pass";
+      ~max_stop_distance_pct
+      ~outcome:(if stop_tags.sized_down then "Sized_down_wide_stop" else "Pass");
     stop_states := Map.set !stop_states ~key:cand.ticker ~data:initial_stop;
     let trans =
       Entry_audit_helpers.build_entry_transition ~id ~current_date
@@ -101,18 +108,54 @@ let _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
         stop_floor_kind = stop_tags.floor_kind;
         split_safe_basis = stop_tags.basis;
         effective_entry_price = effective_entry;
+        close_at_decision;
+        sized_down_wide_stop = stop_tags.sized_down;
       }
     in
     Entry_ok (trans, meta))
 
+(* G15 step 3, F3-parameterised. [Drop_over_max] (the default) drops any stop
+   further than [max_stop_distance_pct] from entry, exactly as before (R1);
+   [Size_down] admits it up to the sanity ceiling and tags it [sized_down], so
+   fixed-risk sizing shrinks the share count ~[1 / stop_distance] instead.
+   Sizing keys off the INSTALLED stop, not [cand.suggested_stop], so total
+   risk-to-stop stays [risk_per_trade_pct * portfolio_value] either way.
+   Extracted so {!make_entry_transition} stays inside the fn-length cap. *)
+let _gate_and_build ~stop_width ~portfolio_risk_config ~portfolio_value
+    ~stop_states ~current_date ~effective_entry ~close_at_decision ~initial_stop
+    ~floor_kind ~basis ~stop_distance_pct ~max_stop_distance_pct
+    (cand : Screener.scored_candidate) : entry_attempt_result =
+  let build ~sized_down =
+    _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
+      ~current_date ~effective_entry ~close_at_decision ~initial_stop
+      ~stop_tags:{ floor_kind; basis; sized_down }
+      ~id:(gen_position_id cand.ticker)
+      ~stop_distance_pct ~max_stop_distance_pct cand
+  in
+  match
+    Stop_width_mode.gate ~policy:stop_width ~max_stop_distance_pct
+      ~stop_distance_pct
+  with
+  | Stop_width_mode.Admit -> build ~sized_down:false
+  | Stop_width_mode.Admit_sized_down -> build ~sized_down:true
+  | Stop_width_mode.Drop ->
+      Entry_audit_helpers.emit_candidate_trace ~ticker:cand.ticker
+        ~score:cand.score ~rationale:cand.rationale ~effective_entry
+        ~installed_stop:(Weinstein_stops.get_stop_level initial_stop)
+        ~stop_distance_pct ~max_stop_distance_pct ~outcome:"Stop_too_wide";
+      Stop_too_wide
+
 let make_entry_transition ?(min_stop_distance_pct = 0.0)
     ?(trigger_at_suggested = false) ?(stop_anchor_at_entry_base = false)
-    ~portfolio_risk_config ~stops_config ~initial_stop_buffer ~stop_states
-    ~bar_reader ~portfolio_value ~current_date
-    (cand : Screener.scored_candidate) : entry_attempt_result =
+    ?(stop_width = Stop_width_mode.default_policy) ~portfolio_risk_config
+    ~stops_config ~initial_stop_buffer ~stop_states ~bar_reader ~portfolio_value
+    ~current_date (cand : Screener.scored_candidate) : entry_attempt_result =
+  let close_at_decision =
+    Entry_audit_helpers.latest_close ~bar_reader ~current_date cand
+  in
   let effective_entry =
-    Entry_audit_helpers.effective_entry_price ~trigger_at_suggested ~bar_reader
-      ~current_date cand
+    Entry_audit_helpers.effective_entry_of_close ~trigger_at_suggested
+      ~close:close_at_decision cand
   in
   (* The book §5.1 stop re-anchor only fires for the E-family entry: it pairs a
      stop just under the breakout base with an entry AT the breakout, so it is
@@ -125,32 +168,15 @@ let make_entry_transition ?(min_stop_distance_pct = 0.0)
       ~reanchor_to_entry_base ~stops_config ~initial_stop_buffer ~bar_reader
       ~current_date ~effective_entry cand
   in
-  let installed_stop_level = Weinstein_stops.get_stop_level initial_stop in
   let stop_distance_pct =
     Entry_audit_helpers.stop_distance_pct ~effective_entry
-      ~installed_stop:installed_stop_level
+      ~installed_stop:(Weinstein_stops.get_stop_level initial_stop)
   in
-  let max_stop_distance_pct =
-    stops_config.Weinstein_stops.max_stop_distance_pct
-  in
-  if Float.( > ) stop_distance_pct max_stop_distance_pct then (
-    Entry_audit_helpers.emit_candidate_trace ~ticker:cand.ticker
-      ~score:cand.score ~rationale:cand.rationale ~effective_entry
-      ~installed_stop:installed_stop_level ~stop_distance_pct
-      ~max_stop_distance_pct ~outcome:"Stop_too_wide";
-    Stop_too_wide)
-  else
-    (* G15 step 3: size off the INSTALLED stop, not [cand.suggested_stop]. The
-       support-floor-derived [installed_stop] may sit further from entry than
-       the screener's pre-fill suggestion, in which case risk-per-share is
-       larger and share count must shrink accordingly so total
-       risk-to-stop = config.risk_per_trade_pct * portfolio_value (the
-       fixed-risk-sizing contract). *)
-    let id = gen_position_id cand.ticker in
-    _size_and_build_entry ~portfolio_risk_config ~portfolio_value ~stop_states
-      ~current_date ~effective_entry ~initial_stop
-      ~stop_tags:{ floor_kind = stop_floor_kind; basis = split_safe_basis }
-      ~id ~stop_distance_pct ~max_stop_distance_pct cand
+  _gate_and_build ~stop_width ~portfolio_risk_config ~portfolio_value
+    ~stop_states ~current_date ~effective_entry ~close_at_decision ~initial_stop
+    ~floor_kind:stop_floor_kind ~basis:split_safe_basis ~stop_distance_pct
+    ~max_stop_distance_pct:stops_config.Weinstein_stops.max_stop_distance_pct
+    cand
 
 (* Decide + apply the cash draw for a [CreateEntering] of [side] costing [cost].
    [borrow_ok] is [true] when long-margin leverage is engaged ([leverage_enabled],
@@ -406,12 +432,18 @@ let build_entry_event ~(macro : Macro.result) ~current_date
     candidate;
     macro;
     current_date;
+    close_at_decision = meta.close_at_decision;
     installed_stop = meta.installed_stop;
     stop_floor_kind = meta.stop_floor_kind;
     split_safe_basis = meta.split_safe_basis;
     shares = meta.shares;
     initial_position_value;
     initial_risk_dollars;
+    sized_down_wide_stop = meta.sized_down_wide_stop;
+    freshness_basis =
+      Entry_ticket_tags.freshness_basis_of_analysis candidate.analysis;
+    triple_confirmation =
+      Entry_ticket_tags.triple_confirmation_of_analysis candidate.analysis;
     alternatives;
   }
 

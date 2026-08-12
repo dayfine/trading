@@ -53,6 +53,9 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     cascade_rationale = [];
     side;
     suggested_entry = 100.0;
+    close_at_decision = None;
+    ma_value = None;
+    local_range_top = None;
     suggested_stop = 90.0;
     installed_stop = 90.0;
     stop_floor_kind = TA.Buffer_fallback;
@@ -60,6 +63,7 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     risk_pct = 0.08;
     initial_position_value = 10_000.0;
     initial_risk_dollars;
+    ticket_lifecycle = None;
     alternatives_considered = [];
   }
 
@@ -317,6 +321,119 @@ let test_r6_na_for_short _ =
   assert_that
     (outcome_of_rule_id evals TR.R6_no_recent_plunge)
     (equal_to TR.Not_applicable)
+
+(* -- R6 price basis: a split inside the window ---------------------------- *)
+
+(* Real AAPL bars from [trading/test_data/A/L/AAPL/data.csv], the 30 calendar
+   days before a hypothetical 2020-09-04 entry — i.e. exactly the window R6
+   scans. AAPL split 4:1 on 2020-08-31, so the raw close steps 499.23 -> 129.04
+   overnight while the adjusted close *rises* 121.17 -> 125.28.
+
+   Columns: (date, raw close, adjusted close). *)
+let _aapl_split_window =
+  [
+    (_date "2020-08-05", 440.25, 106.6638);
+    (_date "2020-08-06", 455.61, 110.3852);
+    (_date "2020-08-07", 444.45, 107.8755);
+    (_date "2020-08-10", 450.91, 109.4434);
+    (_date "2020-08-11", 437.5, 106.1886);
+    (_date "2020-08-12", 452.04, 109.7177);
+    (_date "2020-08-13", 460.04, 111.6595);
+    (_date "2020-08-14", 459.63, 111.5599);
+    (_date "2020-08-17", 458.43, 111.2687);
+    (_date "2020-08-18", 462.25, 112.1959);
+    (_date "2020-08-19", 462.83, 112.3366);
+    (_date "2020-08-20", 473.1, 114.8293);
+    (_date "2020-08-21", 497.48, 120.7468);
+    (_date "2020-08-24", 503.43, 122.1909);
+    (_date "2020-08-25", 499.3, 121.1885);
+    (_date "2020-08-26", 506.09, 122.8366);
+    (_date "2020-08-27", 500.04, 121.3681);
+    (_date "2020-08-28", 499.23, 121.1715);
+    (_date "2020-08-31", 129.04, 125.2807);
+    (_date "2020-09-01", 134.18, 130.271);
+    (_date "2020-09-02", 131.4, 127.572);
+    (_date "2020-09-03", 120.88, 117.3584);
+  ]
+
+let _aapl_dates =
+  Array.of_list (List.map _aapl_split_window ~f:(fun (d, _, _) -> d))
+
+let _aapl_raw =
+  Array.of_list (List.map _aapl_split_window ~f:(fun (_, r, _) -> r))
+
+let _aapl_adjusted =
+  Array.of_list (List.map _aapl_split_window ~f:(fun (_, _, a) -> a))
+
+let _aapl_entry = make_entry ~entry_date:(_date "2020-09-04") ()
+
+(* A second, higher-margin entry off the same bars. The 09-04 window's adjusted
+   drawdown is 9.91% against a 10% threshold — a sharp illustration, but only
+   0.09pp of headroom, so that case alone would couple this test to
+   [default_config.recent_plunge_min_drop_pct] staying exactly 0.10. Entering on
+   09-02 truncates the window at 09-01, before the post-split slide: adjusted
+   drawdown 3.80% (110.3852 on 08-06 -> 106.1886 on 08-11), 6.2pp of headroom,
+   while raw still reads 74.50% (506.09 on 08-26 -> 129.04 on 08-31, troughing
+   2 days before the entry, inside R6's 5-day proximity). Same Fail -> Pass
+   divergence, far from the threshold. *)
+let _aapl_entry_high_margin = make_entry ~entry_date:(_date "2020-09-02") ()
+
+let _r6_of_closes ?(entry = _aapl_entry) closes =
+  let evals =
+    TR.evaluate_rules
+      ~pre_entry_closes:(Array.to_list (Array.zip_exn _aapl_dates closes))
+      ~config:cfg (make_record entry)
+  in
+  outcome_of_rule_id evals TR.R6_no_recent_plunge
+
+(* The defect, stated as a test. On the raw basis the deepest peak-to-trough
+   move in the window is 506.09 -> 120.88 = 76.1%, with the trough one day
+   before the entry — far past R6's 10%/5-day plunge test, so R6 condemns an
+   entry that followed no plunge at all. *)
+let test_r6_raw_basis_fabricates_a_plunge_across_a_split _ =
+  assert_that (_r6_of_closes _aapl_raw) (equal_to TR.Fail)
+
+(* On the adjusted basis the same 22 bars drawdown 130.271 -> 117.3584 = 9.91%,
+   just inside the 10% threshold, and R6 passes. Same trough date; only the
+   basis differs. *)
+let test_r6_adjusted_basis_sees_no_plunge _ =
+  assert_that (_r6_of_closes _aapl_adjusted) (equal_to TR.Pass)
+
+(* End-to-end: the selection the report binary actually performs. Given the
+   view's two close columns, [Trade_audit_basis.window_closes] hands R6 the
+   adjusted series, so the verdict is the correct Pass rather than the raw
+   basis's spurious Fail. *)
+let test_r6_uses_adjusted_basis_via_window_closes _ =
+  assert_that
+    (_r6_of_closes
+       (Trade_audit_basis.window_closes ~adjusted:_aapl_adjusted ~raw:_aapl_raw))
+    (equal_to TR.Pass)
+
+(* And when the snapshot has no adjusted cell for one of those bars, the whole
+   window degrades to raw — reproducing the pre-fix verdict rather than
+   splicing the two bases together. Documented behaviour, not an accident:
+   a spliced window would carry the same split step the fix removes. *)
+let test_r6_falls_back_to_raw_when_adjusted_incomplete _ =
+  let holed = Array.copy _aapl_adjusted in
+  holed.(0) <- Float.nan;
+  assert_that
+    (_r6_of_closes
+       (Trade_audit_basis.window_closes ~adjusted:holed ~raw:_aapl_raw))
+    (equal_to TR.Fail)
+
+(* The same divergence with 6.2pp of headroom instead of 0.09pp, so the pin does
+   not rest on the exact value of [recent_plunge_min_drop_pct]. See
+   [_aapl_entry_high_margin]. *)
+let test_r6_high_margin_raw_basis_fabricates_a_plunge _ =
+  assert_that
+    (_r6_of_closes ~entry:_aapl_entry_high_margin _aapl_raw)
+    (equal_to TR.Fail)
+
+let test_r6_high_margin_adjusted_basis_sees_no_plunge _ =
+  assert_that
+    (_r6_of_closes ~entry:_aapl_entry_high_margin
+       (Trade_audit_basis.window_closes ~adjusted:_aapl_adjusted ~raw:_aapl_raw))
+    (equal_to TR.Pass)
 
 (* -- R7 stop discipline on Stage3 -> Stage4 transition ------------------- *)
 
@@ -817,6 +934,18 @@ let suite =
          "R6 pass when plunge is stale" >:: test_r6_pass_when_plunge_is_stale;
          "R6 NA no bar source" >:: test_r6_na_no_bar_source;
          "R6 NA for short" >:: test_r6_na_for_short;
+         "R6 raw basis fabricates a plunge across a split"
+         >:: test_r6_raw_basis_fabricates_a_plunge_across_a_split;
+         "R6 adjusted basis sees no plunge"
+         >:: test_r6_adjusted_basis_sees_no_plunge;
+         "R6 uses adjusted basis via window_closes"
+         >:: test_r6_uses_adjusted_basis_via_window_closes;
+         "R6 falls back to raw when adjusted incomplete"
+         >:: test_r6_falls_back_to_raw_when_adjusted_incomplete;
+         "R6 high margin raw basis fabricates a plunge"
+         >:: test_r6_high_margin_raw_basis_fabricates_a_plunge;
+         "R6 high margin adjusted basis sees no plunge"
+         >:: test_r6_high_margin_adjusted_basis_sees_no_plunge;
          "R7 pass long exit stage 4 via stop"
          >:: test_r7_pass_long_exit_in_stage_4_via_stop;
          "R7 fail held through stage 4 via time"

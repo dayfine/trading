@@ -78,7 +78,14 @@ let _classify_stage_for_screening ~config ~bar_reader ~prior_stages
     [virgin_crossing_readmission] knobs (both default off, bit-identical), and
     (d) threading the ticket-level [entry_anchor_local_range_weeks] knob
     (default 0 = off, bit-identical; moves only the screener's entry ticket,
-    never admission/grading).
+    never admission/grading), and (e) threading the F1 [entry_freshness_basis]
+    knob (default [Ma_cross] = off, bit-identical), and (f) waiving the
+    screen-time volume gate ([require_breakout_volume = false]) when F5 is armed
+    ([Weinstein_strategy_config.volume_confirm_at_fill_armed] — default off, so
+    the gate stays [true] and admission is bit-identical). The waiver's
+    counterpart, {!Volume_eject_runner}, reads the {i same} predicate, so volume
+    is never dropped: it moves from the screen week to the fill week (book §4.7
+    / §4.2).
 
     The [min_history_bars] override sets [config.resistance.min_history_bars];
     because {!Stock_analysis} reuses the same [Resistance.config] record for the
@@ -99,6 +106,9 @@ let _stock_analysis_config_for ~(config : Weinstein_strategy_config.config) :
       overhead_supply = config.overhead_supply;
       virgin_crossing_readmission = config.virgin_crossing_readmission;
       entry_anchor_local_range_weeks = config.entry_anchor_local_range_weeks;
+      entry_freshness_basis = config.entry_freshness_basis;
+      require_breakout_volume =
+        not (Weinstein_strategy_config.volume_confirm_at_fill_armed config);
     }
   in
   if config.resistance_min_history_bars = 0 then base
@@ -227,6 +237,78 @@ let survivors_for_screening ?active_through_for ?fold_start_date ?sector_map
   in
   _commit_prior_stages ~prior_stages classified;
   final_survivors
+
+(** F2 re-screen predicate (plan §3-F2): would [symbol] still be admitted as a
+    candidate on [side] this week?
+
+    A symbol resting an unfilled entry ticket is {b held}, so the cascade
+    excludes it from [candidates] and its admissibility is not observable from
+    the screen result. We therefore re-ask the question directly, reusing the
+    very gates the cascade applies to everyone else — Phase-1 stage
+    ({!_survives_phase1} specialised to the ticket's side), the sector
+    pre-filter ({!_survives_sector_filter}), and the macro gate
+    ({!Screener.longs_admitted_by_macro} / {!Screener.shorts_admitted_by_macro})
+    — so the two cannot drift. Between them these cover the plan's three named
+    failures: base broken down / MA rolled declining (the symbol leaves [Stage2]
+    for a long, [Stage4] for a short), sector flip, and macro flip.
+
+    A symbol with no classification this week (empty weekly view, or pruned out
+    of the universe) fails: it is no longer screenable, so its ticket is stale.
+
+    This is deliberately the {e stage-level} cascade surface, not the full
+    scoring pass: it is the same over-broad-on-purpose filter [_survives_phase1]
+    documents, so a ticket is cancelled only on an unambiguous structural loss,
+    never on a marginal score move. *)
+let _stage_admits_side ~(side : Trading_base.Types.position_side)
+    (stage_result : Stage.result) =
+  match (side, stage_result.stage) with
+  | Trading_base.Types.Long, Weinstein_types.Stage2 _ -> true
+  | Trading_base.Types.Short, Weinstein_types.Stage4 _ -> true
+  | _ -> false
+
+let _macro_admits_side ~config ~(macro_result : Macro.result)
+    ~(side : Trading_base.Types.position_side) =
+  match side with
+  | Trading_base.Types.Long ->
+      Screener.longs_admitted_by_macro
+        ~neutral_blocks_longs:config.neutral_blocks_longs macro_result.trend
+  | Trading_base.Types.Short ->
+      Screener.shorts_admitted_by_macro
+        ~neutral_blocks_shorts:config.neutral_blocks_shorts macro_result.trend
+
+let _still_qualifies ~config ~macro_result ~sector_map ~stage_by_ticker ~symbol
+    ~side =
+  match Hashtbl.find stage_by_ticker symbol with
+  | None -> false
+  | Some (stage_result : Stage.result) ->
+      _stage_admits_side ~side stage_result
+      && _macro_admits_side ~config ~macro_result ~side
+      && _survives_sector_filter ~sector_map (symbol, (), stage_result)
+
+(** F2: cancel the resting entry tickets that this week's re-screen (or the
+    clock backstop) retires, releasing each cancelled symbol's frozen [E].
+
+    Runs {b before} the entry walk so the pin release lands ahead of
+    {!Entry_freeze.apply}. The cancelled symbol is not re-placed on this same
+    tick — its [Entering] position is still held until the transition is
+    applied, so the cascade still excludes it — which is the intent: cancel now,
+    re-qualify (at a fresh [E]) on a later week. No-op at the default
+    [entry_order_ttl_weeks = 0]. *)
+let _ticket_cancellations ?pending_entry_e ~config ~macro_result ~sector_map
+    ~(portfolio : Portfolio_view.t) ~classified ~current_date () =
+  if config.entry_order_ttl_weeks <= 0 then []
+  else
+    let stage_by_ticker = Hashtbl.create (module String) in
+    List.iter classified ~f:(fun (ticker, _view, _prior, sr) ->
+        Hashtbl.set stage_by_ticker ~key:ticker ~data:sr);
+    let pending_entry_e =
+      match pending_entry_e with Some t -> t | None -> Entry_freeze.create ()
+    in
+    Entry_ticket_ttl.run ~ttl_weeks:config.entry_order_ttl_weeks
+      ~pending_entry_e ~positions:portfolio.positions
+      ~still_qualifies:
+        (_still_qualifies ~config ~macro_result ~sector_map ~stage_by_ticker)
+      ~current_date
 
 (* Per-element predicates over the four-tuple shape so [screen_universe]'s
    cascade stays a flat pipeline (one filter per gate, no destructuring
@@ -358,6 +440,12 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at
     _run_screener ?membership_at ~config ~macro_result ~index_view ~sector_map
       ~stocks ~portfolio ~last_stop_out_dates ~current_date ()
   in
+  (* F2: retire stale resting tickets before the walk, so the pin release lands
+     ahead of [Entry_freeze.apply]. [[]] at the default TTL of 0. *)
+  let ticket_cancellations =
+    _ticket_cancellations ?pending_entry_e ~config ~macro_result ~sector_map
+      ~portfolio ~classified ~current_date ()
+  in
   let entries =
     _entries_of_screen_result ?pending_entry_e ~config ~sector_map ~stop_states
       ~portfolio ~get_price ~bar_reader ~current_date ~audit_recorder
@@ -373,7 +461,7 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at
       diagnostics = screen_result.Screener.cascade_diagnostics;
       entered = List.length entries;
     };
-  entries
+  ticket_cancellations @ entries
 
 (** Stops are adjusted daily; screening runs only on Fridays (weekly review).
 

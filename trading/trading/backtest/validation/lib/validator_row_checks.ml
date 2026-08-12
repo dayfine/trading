@@ -54,7 +54,16 @@ let check_v11 inputs = fold_steps inputs.trades ~f:(_v11_step inputs.config)
    [installed_stop] disagrees with the gated stop. The distance is measured
    exactly as the gate measures it — against the FILL price
    ([trade_row.entry_price] = the strategy's [effective_entry]), not the
-   screener's [suggested_entry]. *)
+   screener's [suggested_entry].
+
+   F3 exception (2026-08-10): under [config.stop_width_mode = Size_down] the
+   strategy ADMITS a wider-than-gate structural stop and shrinks the share count
+   instead, so every sized-down entry is a filled trade wider than
+   [gate_max_stop_distance_pct] BY DESIGN — not an invariant break. A ladder-v4
+   cell running [Size_down] must raise [gate_max_stop_distance_pct] to that
+   cell's [stop_width_size_down_max_pct] or V12 reports a wall of false
+   failures. Under the default [Drop_over_max] the invariant holds exactly as
+   stated above. *)
 let _v12_dist ~(row : trade_row) ~(ctx : entry_context) =
   Float.abs (ctx.installed_stop -. row.entry_price) /. row.entry_price
 

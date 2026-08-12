@@ -212,6 +212,37 @@ type config = {
           Default-off experiment axis per
           [.claude/rules/experiment-flag-discipline.md]; promoted only on a
           ledger ACCEPT. *)
+  support_floor_anchor_scope : Support_floor.anchor_scope;
+      [@sexp.default Support_floor.Window_extreme]
+      (** WHICH prior counter-move the support-floor primitive anchors on
+          (default [Window_extreme] = the historical "deepest move in the
+          window" reading). Orthogonal to [support_floor_anchor_mode], which
+          picks the price {e field}; both are threaded into
+          {!Weinstein_stops.compute_initial_stop_with_floor} via
+          {!Support_floor.find_recent_level_with_callbacks}.
+
+          Under [Nearest] the scan returns the {b nearest} qualifying prior
+          correction low (long) / counter-rally high (short) instead of the
+          window extremum's counter-move. For a normally-shaped base the two
+          agree. They diverge for a crash-recovery name, where the window
+          extremum is a pre-crash peak whose counter-move is the crash floor — a
+          stop tens of percent below entry that the entry gate then drops as
+          [Stop_too_wide], structurally excluding that whole population (the
+          ladder-v3 AXTI finding,
+          [dev/notes/ladder-v3-faithful-stoplimit-2026-08-09.md]).
+
+          Faithful-core: an {b initial-stop-placement dial}, and the book's own
+          remedy for a wide stop — §5.1 places the stop below "the significant
+          support floor (prior correction low) BEFORE the breakout", singular
+          and recent, and never prescribes shrinking the share count instead
+          (contrast [Weinstein_strategy_config.stop_width_mode], which is
+          explicitly labelled a non-book reading). Spine item 5 (stop below the
+          base) holds under either scope; see
+          [.claude/rules/weinstein-faithful-core.md]. Default [Window_extreme]
+          is an exact no-op so every existing golden replays unchanged.
+          Default-off experiment axis per
+          [.claude/rules/experiment-flag-discipline.md]; promoted only on a
+          ledger ACCEPT. *)
   split_safe_floors : bool; [@sexp.default false]
       (** When [true], every support-floor path rescales the scanned window onto
           its split/dividend-adjusted basis (per-bar factor

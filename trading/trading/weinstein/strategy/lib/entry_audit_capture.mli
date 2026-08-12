@@ -27,6 +27,29 @@ type entry_meta = {
           [initial_risk_dollars] in {!build_entry_event}) key off this rather
           than [candidate.suggested_entry] so the audit reflects the realised
           entry rather than the screener's pre-fill intent. *)
+  close_at_decision : float option;
+      (** Most recent close from [bar_reader] at entry construction — recorded
+          even when the entry basis is E-anchored ([trigger_at_suggested]), so
+          the audit can always compare [candidate.suggested_entry] against the
+          decision-time close. [None] when no bars were available. Carried into
+          {!Audit_recorder.entry_event.close_at_decision}. *)
+  sized_down_wide_stop : bool;
+      (** F3 audit tag ([Sized_down_wide_stop]). [true] when
+          [config.stop_width_mode = Size_down] admitted this candidate even
+          though its structural stop sits further than
+          [stops_config.max_stop_distance_pct] from entry — i.e. the entry
+          exists only because the §5.1 drop was waived, and its share count is
+          the risk-parity-shrunk one. Always [false] under the default
+          [Drop_over_max] (such candidates are dropped, never entered), so this
+          field partitions a [Size_down] run's entries into "would have been
+          entered anyway" and "admitted by the mechanism".
+
+          PR-5 ([dev/plans/entry-ticket-async-v2-2026-08-10.md] §4) discharges
+          PR-2's deferral: {!build_entry_event} now also carries the tag onto
+          {!Audit_recorder.entry_event.sized_down_wide_stop}, from where it is
+          persisted in the [Backtest.Trade_audit.entry_decision] row. The
+          strategy-internal meta and the [PANEL_GOLDEN_DEBUG] candidate trace
+          are unchanged. *)
 }
 (** Audit-relevant intermediates computed during entry-transition construction.
     Returned alongside the transition so the audit recorder can capture them
@@ -103,7 +126,13 @@ val build_entry_event :
     [meta.effective_entry_price], and [meta.installed_stop]. The audit row's
     [candidate] field still carries the screener-original
     [candidate.suggested_entry], so consumers can compare the screener's
-    pre-fill intent against the strategy's realised entry. *)
+    pre-fill intent against the strategy's realised entry.
+
+    Also stamps the PR-5 placement-time ticket tags: [sized_down_wide_stop] from
+    [meta], and the F1 freshness basis + F6 §4.5 triple-confirmation
+    measurements projected off [candidate.analysis] by {!Entry_ticket_tags}. All
+    three are pure reads of values already in scope — no extra bar walk, no
+    behaviour change. *)
 
 val emit_entries :
   audit_recorder:Audit_recorder.t ->
@@ -137,6 +166,7 @@ val make_entry_transition :
   ?min_stop_distance_pct:float ->
   ?trigger_at_suggested:bool ->
   ?stop_anchor_at_entry_base:bool ->
+  ?stop_width:Stop_width_mode.policy ->
   portfolio_risk_config:Portfolio_risk.config ->
   stops_config:Weinstein_stops.config ->
   initial_stop_buffer:float ->
@@ -204,7 +234,20 @@ val make_entry_transition :
     machinery are untouched. The caller sets it to
     [config.stop_anchor_at_entry_base]; default [false] is bit-identical (R1).
     See {!Entry_audit_helpers.initial_stop_and_kind} and
-    {!Weinstein_strategy_config.stop_anchor_at_entry_base}. *)
+    {!Weinstein_strategy_config.stop_anchor_at_entry_base}.
+
+    [?stop_width] (default {!Stop_width_mode.default_policy}) parameterises step
+    (3). Under the default [Drop_over_max] the step is bit-identical to the
+    pre-F3 code: distance over [stops_config.max_stop_distance_pct] ⇒
+    [Stop_too_wide] (R1). Under [Size_down] such a candidate is admitted instead
+    (up to [stop_width.size_down_max_pct], the sanity ceiling above which it is
+    still dropped) and its [entry_meta.sized_down_wide_stop] is [true]. Sizing
+    itself is untouched — step (4) already keys off the installed stop, so the
+    wider stop mechanically yields ~[1 / stop_distance] fewer shares, which is
+    exactly the risk-parity size-down. The caller builds the policy from
+    [config.stop_width_mode] / [config.stop_width_size_down_max_pct]; see
+    {!Stop_width_mode} for the honest-citation framing (a tolerated-
+    participation reading of §5.1, not a documented book mechanism). *)
 
 val check_cash_and_deduct :
   leverage_enabled:bool ->

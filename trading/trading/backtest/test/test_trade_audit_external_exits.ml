@@ -129,6 +129,9 @@ let _seed_entry ~trade_audit ~symbol ~position_id ~entry_date =
       cascade_rationale = [];
       side = Trading_base.Types.Long;
       suggested_entry = 0.0;
+      close_at_decision = None;
+      ma_value = None;
+      local_range_top = None;
       suggested_stop = 0.0;
       installed_stop = 0.0;
       stop_floor_kind = TA.Buffer_fallback;
@@ -136,6 +139,7 @@ let _seed_entry ~trade_audit ~symbol ~position_id ~entry_date =
       risk_pct = 0.0;
       initial_position_value = 0.0;
       initial_risk_dollars = 0.0;
+      ticket_lifecycle = None;
       alternatives_considered = [];
     }
 

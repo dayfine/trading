@@ -209,9 +209,179 @@ let test_nan_event_volume_returns_none _ =
   in
   assert_that result is_none
 
+(* ------------------------------------------------------------------ *)
+(* confirms_breakout — the two §4.2 branches (F5)                       *)
+(* ------------------------------------------------------------------ *)
+
+(** Chronological bars (oldest first) from a volume list; the LAST entry is the
+    event bar, so [event_offset = 0]. *)
+let _confirms volumes =
+  confirms_breakout ~config:cfg
+    ~callbacks:(callbacks_from_bars ~bars:(List.map volumes ~f:make_bar))
+    ~event_offset:0
+
+(** Branch (a): the event bar alone is 3x the prior 4 weeks. *)
+let test_confirms_via_spike_branch _ =
+  assert_that
+    (_confirms [ 1000; 1000; 1000; 1000; 3000 ])
+    (is_some_and (equal_to true))
+
+(** Branch (b): the event bar is only 1.36x its prior 4 weeks (branch (a)
+    fails), but the 4-week build-up (1500/1400/1300/1200, mean 1350) is 2.7x the
+    prior 4-week baseline (mean 500) and the event bar rises over the week
+    before it. Book: "volume build-up over 3-4 weeks that is >= 2x average of
+    prior several weeks, with at least some increase on breakout week". *)
+let test_confirms_via_buildup_branch _ =
+  assert_that
+    (_confirms [ 500; 500; 500; 500; 1200; 1300; 1400; 1500 ])
+    (is_some_and (equal_to true))
+
+(** A build-up whose ratio qualifies but whose event bar FALLS is not a
+    confirmation — the book requires some increase on the breakout week. *)
+let test_buildup_without_increase_on_event_bar_does_not_confirm _ =
+  assert_that
+    (_confirms [ 500; 500; 500; 500; 1500; 1500; 1500; 1400 ])
+    (is_some_and (equal_to false))
+
+(** Neither branch: a flat tape with a below-average event bar. *)
+let test_neither_branch_confirms _ =
+  assert_that
+    (_confirms [ 1000; 1000; 1000; 1000; 1000; 1000; 1000; 900 ])
+    (is_some_and (equal_to false))
+
+(** Enough history for branch (a) but not for branch (b) (which needs two
+    [lookback_bars]-sized windows): the spike verdict still stands alone. *)
+let test_spike_verdict_stands_without_buildup_history _ =
+  assert_that
+    (_confirms [ 1000; 1000; 1000; 1000; 900 ])
+    (is_some_and (equal_to false))
+
+(** Too little history for EITHER branch is [None] — "no verdict", which callers
+    must not read as an unconfirmed breakout. *)
+let test_insufficient_history_is_none _ =
+  assert_that (_confirms [ 1000; 900 ]) is_none
+
+(** A negative offset has no bar to judge. *)
+let test_negative_offset_is_none _ =
+  assert_that
+    (confirms_breakout ~config:cfg
+       ~callbacks:(callbacks_from_bars ~bars:[ make_bar 1000 ])
+       ~event_offset:(-1))
+    is_none
+
+(* ------------------------------------------------------------------ *)
+(* classify_breakout — the same verdict, with the branch + measurement  *)
+(* ------------------------------------------------------------------ *)
+
+let _classify volumes =
+  classify_breakout ~config:cfg
+    ~callbacks:(callbacks_from_bars ~bars:(List.map volumes ~f:make_bar))
+    ~event_offset:0
+
+(** Render a classification as a stable string so one [assert_that] can pin the
+    constructor AND its measurement across several fixtures without exact-float
+    record equality. *)
+let _measure = function None -> "none" | Some v -> Printf.sprintf "%.3f" v
+
+let _summary = function
+  | None -> "no_verdict"
+  | Some (Spike ratio) -> Printf.sprintf "spike:%.3f" ratio
+  | Some (Buildup multiple) -> Printf.sprintf "buildup:%.3f" multiple
+  | Some (Unconfirmed { spike_ratio; buildup_multiple }) ->
+      Printf.sprintf "unconfirmed:%s/%s" (_measure spike_ratio)
+        (_measure buildup_multiple)
+
+(** All four cases the audit must tell apart, on the same fixtures the boolean
+    tests use. Confirmations name their branch AND carry the deciding multiple
+    (the spike bar is 3x its prior 4 weeks; the build-up window, mean 1350, is
+    2.7x its baseline of 500). The two non-confirmations are different kinds:
+    [Unconfirmed] is "measured and failed", [None] is "no verdict, nothing was
+    measurable" — the cell the F5 runner holds on. *)
+let test_classify_names_each_branch_and_the_no_verdict_case _ =
+  assert_that
+    (List.map
+       ~f:(fun v -> _summary (_classify v))
+       [
+         [ 1000; 1000; 1000; 1000; 3000 ];
+         [ 500; 500; 500; 500; 1200; 1300; 1400; 1500 ];
+         [ 1000; 1000; 1000; 1000; 1000; 1000; 1000; 900 ];
+         [ 1000; 900 ];
+       ])
+    (elements_are
+       [
+         equal_to "spike:3.000";
+         equal_to "buildup:2.700";
+         equal_to "unconfirmed:0.900/0.975";
+         equal_to "no_verdict";
+       ])
+
+(** A build-up that clears the 2x multiple but FALLS on the event bar is
+    [Unconfirmed] — and its 2.95x near-miss multiple is still recorded, so the
+    audit can rank it against a flat tape rather than only counting it. *)
+let test_classify_records_the_near_miss_buildup_multiple _ =
+  assert_that
+    (_summary (_classify [ 500; 500; 500; 500; 1500; 1500; 1500; 1400 ]))
+    (equal_to "unconfirmed:1.120/2.950")
+
+(** Only branch (a) had history: the branch that could not be evaluated records
+    [None] rather than a fabricated zero. *)
+let test_classify_carries_none_for_the_unevaluable_branch _ =
+  assert_that
+    (_summary (_classify [ 1000; 1000; 1000; 1000; 900 ]))
+    (equal_to "unconfirmed:0.900/none")
+
+(** [confirms_breakout] is defined as the projection of [classify_breakout] —
+    which means asserting one {i against the other} cannot fail by construction.
+    Both surfaces are therefore asserted against the same six
+    {b independently written} expected verdicts (spike / build-up / build-up
+    that falls on the event bar / flat tape / spike-only history / no history),
+    so a change to either surface, or to the projection between them, is caught.
+*)
+let test_confirms_breakout_agrees_with_classify _ =
+  let shapes =
+    [
+      [ 1000; 1000; 1000; 1000; 3000 ];
+      [ 500; 500; 500; 500; 1200; 1300; 1400; 1500 ];
+      [ 500; 500; 500; 500; 1500; 1500; 1500; 1400 ];
+      [ 1000; 1000; 1000; 1000; 1000; 1000; 1000; 900 ];
+      [ 1000; 1000; 1000; 1000; 900 ];
+      [ 1000; 900 ];
+    ]
+  in
+  let expected =
+    [ Some true; Some true; Some false; Some false; Some false; None ]
+  in
+  let projected volumes =
+    Option.map (_classify volumes) ~f:(function
+      | Spike _ | Buildup _ -> true
+      | Unconfirmed _ -> false)
+  in
+  assert_that
+    (List.map shapes ~f:_confirms, List.map shapes ~f:projected)
+    (equal_to (expected, expected))
+
 let suite =
   "volume_tests"
   >::: [
+         "test_classify_names_each_branch_and_the_no_verdict_case"
+         >:: test_classify_names_each_branch_and_the_no_verdict_case;
+         "test_classify_records_the_near_miss_buildup_multiple"
+         >:: test_classify_records_the_near_miss_buildup_multiple;
+         "test_classify_carries_none_for_the_unevaluable_branch"
+         >:: test_classify_carries_none_for_the_unevaluable_branch;
+         "test_confirms_breakout_agrees_with_classify"
+         >:: test_confirms_breakout_agrees_with_classify;
+         "test_confirms_via_spike_branch" >:: test_confirms_via_spike_branch;
+         "test_confirms_via_buildup_branch" >:: test_confirms_via_buildup_branch;
+         "test_buildup_without_increase_on_event_bar_does_not_confirm"
+         >:: test_buildup_without_increase_on_event_bar_does_not_confirm;
+         "test_neither_branch_confirms" >:: test_neither_branch_confirms;
+         "test_spike_verdict_stands_without_buildup_history"
+         >:: test_spike_verdict_stands_without_buildup_history;
+         "test_confirms_insufficient_history_is_none"
+         >:: test_insufficient_history_is_none;
+         "test_confirms_negative_offset_is_none"
+         >:: test_negative_offset_is_none;
          "test_strong_breakout" >:: test_strong_breakout;
          "test_adequate_breakout" >:: test_adequate_breakout;
          "test_weak_breakout" >:: test_weak_breakout;

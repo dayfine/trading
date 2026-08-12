@@ -39,6 +39,41 @@ val transitions_for_rejected_trades :
     [Entering] match are silently skipped (defensive — should not happen given
     the strategy invariant). *)
 
+val cancel_resting_entry_orders :
+  order_manager:Trading_orders.Manager.order_manager ->
+  positions:Position.t String.Map.t ->
+  transitions:Position.transition list ->
+  Trading_orders.Types.order_id list
+(** [cancel_resting_entry_orders ~order_manager ~positions ~transitions] cancels
+    the still-active, wholly-unfilled entry orders belonging to the
+    [CancelEntry] transitions in [transitions], returning the cancelled order
+    ids.
+
+    {b Why this exists.} [CancelEntry] closes the strategy-side [Entering]
+    position, but the order it created lives in the order manager and — per the
+    GTC persistence contract pinned by [test_gtc_entry_persistence.ml] — would
+    otherwise stay [Pending] and still fill on a later bar. A "cancelled" ticket
+    that fills anyway is worse than no cancel at all, so the strategy's F2
+    decision ({!Weinstein_trading.Entry_ticket_ttl}) is only real once the order
+    is retired too.
+
+    [positions] must be the map {e before} the transitions are applied — that is
+    where the cancelled position is still [Entering] and still carries its
+    symbol and side. Orders are matched on (symbol, entry order side: [Buy] for
+    a long, [Sell] for a short) and must be active with [filled_quantity = 0.0].
+    That is the same (symbol, side) heuristic {!Fill_router} already relies on:
+    the per-step [order_links] table is cleared on every generation pass, so an
+    order placed on an earlier step cannot be identified by position id. A
+    partially-filled order is left alone — its shares are booked, and
+    {!Weinstein_trading.Entry_ticket_ttl} will not have emitted a [CancelEntry]
+    for it.
+
+    Returns [[]] — touching neither the manager nor its order list — when
+    [transitions] contains no [CancelEntry] whose position is a resting
+    [Entering]. Today only F2 emits such a transition from a strategy; the
+    rejected-fill [CancelEntry]s built by {!transitions_for_rejected_trades}
+    describe orders that already filled, so they match nothing here. *)
+
 val apply_to_positions :
   Position.t String.Map.t ->
   Position.transition ->

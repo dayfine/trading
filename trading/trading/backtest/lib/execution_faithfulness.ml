@@ -94,29 +94,49 @@ let _execution_of ~entry_order_kind ~(entry : Trade_audit.entry_decision)
         faithful = within;
       }
 
-(* Add one round-trip's entry fill to the [position_id -> fill] map, keyed by the
-   position [Trade_context] resolves for it (first match wins). *)
+(* Add one round-trip's entry leg to the [position_id -> (fill price, fill date)]
+   map, keyed by the position [Trade_context] resolves for it (first match
+   wins). The fill date is carried alongside the price for the PR-5 ticket-age
+   stamp below; it costs nothing extra — this join is the only place the
+   placement tick and the fill tick are both in hand. *)
 let _add_fill ~pre acc (trade : Trading_simulation.Metrics.trade_metrics) =
   match (Trade_context.of_precomputed pre ~trade).position_id with
   | Some pid when not (Map.mem acc pid) ->
-      Map.set acc ~key:pid ~data:trade.entry_price
+      Map.set acc ~key:pid ~data:(trade.entry_price, trade.entry_date)
   | _ -> acc
 
-(* position_id -> entry fill price. Reuses [Trade_context]'s (symbol,
-   entry_date) + 7-day window join to resolve each round-trip's position. *)
+(* position_id -> (entry fill price, entry fill date). Reuses [Trade_context]'s
+   (symbol, entry_date) + 7-day window join to resolve each round-trip's
+   position. *)
 let _fill_by_position_id ~audit ~round_trips =
   let pre = Trade_context.precompute ~audit ~stop_infos:[] in
   List.fold round_trips ~init:String.Map.empty ~f:(_add_fill ~pre)
+
+(* PR-5: stamp the ticket's resting age at fill, anchored on the entry row's own
+   [placement_date]. Writes ONLY [ticket_age_weeks_at_fill]: a row with no
+   [ticket_lifecycle] (written before PR-5) is left untouched, and any
+   already-merged [ticket_age_weeks_at_cancel] is preserved — a cancelled ticket
+   has no round-trip to join. *)
+let _with_ticket_age (entry : Trade_audit.entry_decision) ~fill_date =
+  {
+    entry with
+    ticket_lifecycle =
+      Ticket_lifecycle.with_fill_age entry.ticket_lifecycle ~resolved:fill_date;
+  }
 
 let _enriched_record ~fill_by_pid ~entry_order_kind
     (r : Trade_audit.audit_record) =
   match Map.find fill_by_pid r.entry.position_id with
   | None -> r
-  | Some fill_price ->
+  | Some (fill_price, fill_date) ->
       let execution =
         _execution_of ~entry_order_kind ~entry:r.entry ~fill_price
       in
-      { r with execution = Some execution }
+      {
+        r with
+        entry = _with_ticket_age r.entry ~fill_date;
+        execution = Some execution;
+      }
 
 let enrich ~audit ~round_trips ~entry_order_kind =
   let fill_by_pid = _fill_by_position_id ~audit ~round_trips in

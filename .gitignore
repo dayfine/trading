@@ -139,3 +139,11 @@ dev/experiments/bayesian-production-sweep-*/output-11knob*-parallel*/
 
 # Live-generator prior-stage bug investigation scratch (2026-07-01) — regenerable
 trading/dev/experiments/weekly-cf/
+
+# dune build-output artifact (regenerated on every `dune build`, embeds
+# host-specific absolute opam paths like /home/opam/.opam/5.3/lib/...).
+# Not consumed by any dune rule, CI job, or linter — grepped the repo
+# for "compile_commands" before untracking (2026-08-09 cleanup). Was
+# accidentally committed at least 3 times (#1299, #2085, #2129) because
+# every build dirties it. See dev/status/cleanup.md tracked_build_artifact.
+trading/compile_commands.json

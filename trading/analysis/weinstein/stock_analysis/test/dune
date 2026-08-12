@@ -15,6 +15,11 @@
   matchers))
 
 (test
+ (name test_entry_freshness)
+ (modules test_entry_freshness)
+ (libraries stock_analysis weinstein_types core ounit2 matchers))
+
+(test
  (name test_stock_analysis_e2e)
  (modules test_stock_analysis_e2e)
  (libraries

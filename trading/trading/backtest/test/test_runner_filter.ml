@@ -581,6 +581,9 @@ let _entry ~entry_date ~position_id ~symbol :
     cascade_rationale = [];
     side = Long;
     suggested_entry = 100.0;
+    close_at_decision = None;
+    ma_value = None;
+    local_range_top = None;
     suggested_stop = 95.0;
     installed_stop = 95.0;
     stop_floor_kind = Buffer_fallback;
@@ -588,6 +591,7 @@ let _entry ~entry_date ~position_id ~symbol :
     risk_pct = 0.05;
     initial_position_value = 10_000.0;
     initial_risk_dollars = 500.0;
+    ticket_lifecycle = None;
     alternatives_considered = [];
   }
 

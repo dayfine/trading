@@ -21,6 +21,66 @@ let _split_safe_basis_of_event = function
   | AR.Raw_fallback -> Trade_audit.Raw_fallback
   | AR.Empty_window -> Trade_audit.Empty_window
 
+(* PR-5 schema hops. Same discipline as [_split_safe_basis_of_event]: written
+   out per-constructor rather than cast, so a new upstream constructor fails the
+   build here — the last point before [trade_audit.sexp] where a dropped value
+   would become invisible. *)
+let _fill_volume_of_confirmation :
+    Volume.breakout_confirmation option -> Ticket_lifecycle.fill_volume_verdict
+    = function
+  | None -> Ticket_lifecycle.No_verdict
+  | Some (Volume.Spike ratio) -> Ticket_lifecycle.Confirmed_spike ratio
+  | Some (Volume.Buildup multiple) ->
+      Ticket_lifecycle.Confirmed_buildup multiple
+  | Some (Volume.Unconfirmed { spike_ratio; buildup_multiple }) ->
+      Ticket_lifecycle.Unconfirmed { spike_ratio; buildup_multiple }
+
+let _fill_volume_outcome_of_event :
+    AR.fill_volume_outcome -> Ticket_lifecycle.fill_volume_outcome = function
+  | Ejected -> Ticket_lifecycle.Ejected
+  | Skipped_other_exit -> Ticket_lifecycle.Skipped_other_exit
+  | Held -> Ticket_lifecycle.Held
+
+(* The verdict and the outcome travel together: the eject population is narrower
+   than the audit population, so a verdict alone cannot say what happened. *)
+let _fill_volume_check_of_event (e : AR.fill_volume_event) :
+    Ticket_lifecycle.fill_volume_check =
+  {
+    verdict = _fill_volume_of_confirmation e.confirmation;
+    outcome = _fill_volume_outcome_of_event e.outcome;
+  }
+
+let _freshness_basis_of_event :
+    Weinstein_strategy.Entry_freshness.basis ->
+    Ticket_lifecycle.entry_freshness_basis = function
+  | Ma_cross -> Ticket_lifecycle.Ma_cross
+  | Range_top_breakout -> Ticket_lifecycle.Range_top_breakout
+
+let _triple_confirmation_of_event
+    (t : Weinstein_strategy.Entry_ticket_tags.triple_confirmation) :
+    Ticket_lifecycle.triple_confirmation =
+  {
+    breakout_volume_multiple = t.breakout_volume_multiple;
+    rs_zero_cross = t.rs_zero_cross;
+    in_base_advance_pct = t.in_base_advance_pct;
+  }
+
+(** The placement-time half of the lifecycle record. The resolution half
+    ([fill_volume], [ticket_age_weeks_at_cancel], [ticket_age_weeks_at_fill]) is
+    unknowable at placement and is merged in later — by
+    {!Trade_audit.record_fill_volume} / {!Trade_audit.record_transitions} at
+    drain time and by {!Execution_faithfulness.enrich} at the runner. *)
+let _ticket_lifecycle_of_event (e : AR.entry_event) : Ticket_lifecycle.t =
+  {
+    placement_date = e.current_date;
+    ticket_age_weeks_at_cancel = None;
+    ticket_age_weeks_at_fill = None;
+    fill_volume = None;
+    freshness_basis = _freshness_basis_of_event e.freshness_basis;
+    sized_down_wide_stop = e.sized_down_wide_stop;
+    triple_confirmation = _triple_confirmation_of_event e.triple_confirmation;
+  }
+
 let _skip_reason_of_event = function
   | AR.Insufficient_cash -> Trade_audit.Insufficient_cash
   | AR.Already_held -> Trade_audit.Already_held
@@ -99,6 +159,9 @@ let _entry_decision_of_event (e : AR.entry_event) : Trade_audit.entry_decision =
     cascade_rationale = cand.rationale;
     side = cand.side;
     suggested_entry = cand.suggested_entry;
+    close_at_decision = e.close_at_decision;
+    ma_value = Some analysis.stage.ma_value;
+    local_range_top = analysis.local_range_top;
     suggested_stop = cand.suggested_stop;
     installed_stop = e.installed_stop;
     stop_floor_kind = _stop_floor_kind_of_event e.stop_floor_kind;
@@ -106,6 +169,7 @@ let _entry_decision_of_event (e : AR.entry_event) : Trade_audit.entry_decision =
     risk_pct = cand.risk_pct;
     initial_position_value = e.initial_position_value;
     initial_risk_dollars = e.initial_risk_dollars;
+    ticket_lifecycle = Some (_ticket_lifecycle_of_event e);
     alternatives_considered = List.map e.alternatives ~f:_alternative_of_event;
   }
 
@@ -176,4 +240,9 @@ let of_collector ~(trade_audit : Trade_audit.t)
           (_cascade_summary_of_event event));
     record_force_liquidation =
       Force_liquidation_log.record force_liquidation_log;
+    record_fill_volume =
+      (fun (event : AR.fill_volume_event) ->
+        Trade_audit.record_fill_volume trade_audit
+          ~position_id:event.position_id
+          (_fill_volume_check_of_event event));
   }

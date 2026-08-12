@@ -2,6 +2,7 @@ open Core
 open Trading_base.Types
 
 type anchor_mode = Wick | Close [@@deriving show, eq, sexp]
+type anchor_scope = Window_extreme | Nearest [@@deriving show, eq, sexp]
 
 (* ---- Callback bundle ---- *)
 
@@ -182,15 +183,75 @@ let _qualifying_level_for_anchor ~mode ~side ~callbacks ~min_pullback_pct
         Some counter
       else None
 
-let find_recent_level_with_callbacks ?(anchor_mode = Wick) ~callbacks ~side
-    ~min_pullback_pct () =
+(* [Window_extreme] scope: anchor on the window extremum, then look for the
+   qualifying counter-move newer than it. The historical (and default)
+   behaviour. *)
+let _window_extreme_level ~mode ~side ~callbacks ~min_pullback_pct =
+  match _anchor_offset ~mode ~side ~callbacks with
+  | None -> None
+  | Some (anchor_off, anchor) ->
+      _qualifying_level_for_anchor ~mode ~side ~callbacks ~min_pullback_pct
+        ~anchor_off ~anchor
+
+(* Fold the value at [off] into the running counter-move extreme (the extreme
+   over the offsets already visited). [better] is the side-specific comparison
+   from {!_counter_better}. *)
+let _extend_counter ~read_counter ~better ~off counter =
+  match read_counter ~day_offset:off with
+  | None -> counter
+  | Some v -> (
+      match counter with Some c when not (better v c) -> counter | _ -> Some v)
+
+(* Depth test for the candidate anchor at [off] against the running [counter]
+   (the counter-move extreme over offsets [0, off-1]). [None] when there is no
+   post-anchor counter-move yet, no anchor value at [off], or the move is
+   shallower than [min_pullback_pct]. *)
+let _qualifies_at ~read_anchor ~side ~min_pullback_pct ~off counter =
+  match (counter, read_anchor ~day_offset:off) with
+  | Some c, Some anchor
+    when Float.( >= ) (_depth_pct ~side ~anchor ~counter:c) min_pullback_pct ->
+      Some c
+  | _, _ -> None
+
+(* [Nearest] scope: walk candidate anchor offsets outward from the most recent
+   bar (offset 0 = today) and return the counter-move level of the FIRST anchor
+   whose counter-move meets [min_pullback_pct] — i.e. the nearest qualifying
+   prior correction low (long) / counter-rally high (short), not the deepest one
+   in the window.
+
+   [counter] is carried as the running extreme over [0, off-1] so the scan stays
+   O(n) rather than re-scanning the post-anchor range for every candidate
+   anchor. Offset 0 always fails (its post-anchor range is empty, so [counter]
+   is [None]); the first bar is folded in before offset 1 is tested. *)
+let rec _nearest_scan ~read_anchor ~read_counter ~better ~side ~min_pullback_pct
+    ~off ~n counter =
+  if off >= n then None
+  else
+    let continue_from counter =
+      _nearest_scan ~read_anchor ~read_counter ~better ~side ~min_pullback_pct
+        ~off:(off + 1) ~n counter
+    in
+    match _qualifies_at ~read_anchor ~side ~min_pullback_pct ~off counter with
+    | Some _ as level -> level
+    | None -> continue_from (_extend_counter ~read_counter ~better ~off counter)
+
+let _nearest_level ~mode ~side ~callbacks ~min_pullback_pct =
+  _nearest_scan
+    ~read_anchor:(_anchor_reader ~mode ~side ~callbacks)
+    ~read_counter:(_counter_reader ~mode ~side ~callbacks)
+    ~better:(_counter_better side) ~side ~min_pullback_pct ~off:0
+    ~n:callbacks.n_days None
+
+let find_recent_level_with_callbacks ?(anchor_mode = Wick)
+    ?(anchor_scope = Window_extreme) ~callbacks ~side ~min_pullback_pct () =
   if callbacks.n_days <= 0 then None
   else
-    match _anchor_offset ~mode:anchor_mode ~side ~callbacks with
-    | None -> None
-    | Some (anchor_off, anchor) ->
-        _qualifying_level_for_anchor ~mode:anchor_mode ~side ~callbacks
-          ~min_pullback_pct ~anchor_off ~anchor
+    match anchor_scope with
+    | Window_extreme ->
+        _window_extreme_level ~mode:anchor_mode ~side ~callbacks
+          ~min_pullback_pct
+    | Nearest ->
+        _nearest_level ~mode:anchor_mode ~side ~callbacks ~min_pullback_pct
 
 (* Bar-list convenience wrapper. Wick-only: the [anchor_mode] dial is exposed on
    the callback path ({!find_recent_level_with_callbacks}), which is the path the

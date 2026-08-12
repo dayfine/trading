@@ -106,6 +106,9 @@ let _aapl_entry : TA.entry_decision =
     cascade_rationale = [ "Stage2 breakout" ];
     side = Trading_base.Types.Long;
     suggested_entry = 280.0;
+    close_at_decision = None;
+    ma_value = None;
+    local_range_top = None;
     suggested_stop = 260.0;
     installed_stop = 260.0;
     stop_floor_kind = TA.Buffer_fallback;
@@ -113,6 +116,7 @@ let _aapl_entry : TA.entry_decision =
     risk_pct = 0.08;
     initial_position_value = 28_000.0;
     initial_risk_dollars = 2_000.0;
+    ticket_lifecycle = None;
     alternatives_considered = [];
   }
 
