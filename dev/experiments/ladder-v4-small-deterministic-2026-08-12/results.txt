@@ -1,0 +1,26 @@
+cell                                     ret  trades   sharpe    maxDD     hold
+---------------------------------------------------------------------------
+sm-v4-00-core-w4                      112.28     240    1.105    16.98     45.4
+sm-v4-01-anchor-w8                     90.28     230    0.970    13.49     45.7
+sm-v4-02-fresh-rangetop                45.33     233    0.603    21.43     34.4
+sm-v4-03-ttl4                          98.62     210    1.113    12.50     48.3
+sm-v4-04-ttl8                          43.07     243    0.610    19.01     41.4
+sm-v4-05-maxstop25                     65.98     267    0.785    21.46     64.4
+sm-v4-06-maxstop35-diag                53.55     303    0.692    17.15     61.8
+sm-v4-07-maxstop50-diag                59.36     305    0.711    19.70     71.0
+sm-v4-08-sizedown50-diag               59.36     305    0.711    19.70     71.0
+sm-v4-09-nearfloor                     38.64     207    0.531    16.23     68.6
+sm-v4-10-volconf                       -9.96     750   -0.177    26.06      5.8
+sm-v4-11-anchor-w8-rangetop            76.41     226    0.834    17.00     34.2
+sm-v4-12-rt-ttl4                       40.56     217    0.556    23.38     35.0
+sm-v4-13-rt-nearfloor                  31.31     155    0.471    21.70     62.8
+sm-v4-14-rt-volconf                     3.20     648    0.116    14.95      4.8
+sm-v4-15-rt-ttl4-nearfloor             24.68     138    0.403    26.35     61.8
+sm-v4-16-rt-ttl4-nearfloor-volconf     -9.55     250   -0.462    13.51      7.3
+sm-v4-17-rt-ttl8-nearfloor-volconf     -8.75     262   -0.407    12.48      7.3
+sm-v4-18-rt-ttl4-nearfloor-volconf-w8    -10.78     201   -0.575    15.59      7.4
+sm-v4-19-rt-ttl4-maxstop25             62.64     233    0.743    17.29     49.3
+sm-v4-20-rt-ttl4-maxstop35-diag        90.00     221    0.933    16.71     56.5
+sm-v4-21-rt-ttl4-sizedown50-diag       94.43     234    0.956    16.93     58.1
+sm-v4-22-rt-volconf-sizedown50-diag     -4.55     772   -0.066    20.43      6.0
+sm-v4-23-rt-ttl4-nearfloor-maxstop25     44.14     237    0.579    29.24     80.4
