@@ -167,6 +167,14 @@ module Extension_stop_runner = Extension_stop_runner
     [config.extension_stop_config] is enabled; LONG-only, weekly-close,
     tighten-only. See {!Extension_stop_runner}. *)
 
+module Volume_eject_runner = Volume_eject_runner
+(** F5 at-fill volume-confirmation eject runner. Invoked among the special exits
+    on Friday ticks when
+    [Weinstein_strategy_config.volume_confirm_at_fill_armed config] holds; emits
+    a [volume_eject] [TriggerExit] for any freshly-filled long whose fill-week
+    volume fails both §4.2 branches. Returns [[]] at the default config. See
+    {!Volume_eject_runner}. *)
+
 module Macro_inputs = Macro_inputs
 (** Sector map + global index assembly from accumulated bar history. Exposes the
     canonical {!Macro_inputs.spdr_sector_etfs} and
@@ -206,6 +214,19 @@ module Entry_audit_capture = Entry_audit_capture
     strategy file to keep it under the file-length cap. See
     {!Entry_audit_capture}. *)
 
+module Entry_ticket_tags = Entry_ticket_tags
+(** Placement-time ticket audit tags — the F1 freshness basis and the F6 book
+    §4.5 triple-confirmation measurements, projected off the candidate's
+    analysis. Capture only; nothing gates on them. Re-exposed so the backtest
+    recorder and tests can read the same projections the capture site uses. See
+    {!Entry_ticket_tags}. *)
+
+module Entry_freshness = Entry_freshness
+(** F1 admission-clock basis ([Ma_cross] vs [Range_top_breakout]). Re-exposed
+    alongside {!Entry_ticket_tags} so downstream consumers of the audit surface
+    (the backtest recorder, tests) can name the basis without depending on
+    [weinstein.stock_analysis] directly. See {!Entry_freshness}. *)
+
 module Entry_walk = Entry_walk
 (** The screener-candidate → [CreateEntering] entry walk. Re-exposed so callers
     running custom screening out-of-band (and tests pinning the config-gated
@@ -216,6 +237,12 @@ module Entry_freeze = Entry_freeze
 (** Fix #2 no-chase entry-[E] freeze (default-off, gated by
     [config.freeze_entry_at_first_breakout]). Re-exposed so the entry walk and
     tests can construct / drive the per-run pin table. See {!Entry_freeze}. *)
+
+module Entry_ticket_ttl = Entry_ticket_ttl
+(** F2 resting-entry-ticket lifecycle: re-screen cancel (primary) + clock TTL
+    (backstop), gated by [config.entry_order_ttl_weeks] (default [0] = off).
+    Re-exposed so tests can pin the cancel decision independently of a full
+    screening tick. See {!Entry_ticket_ttl}. *)
 
 module Screening_notional = Screening_notional
 (** Per-Friday entry-walk notional / sector-exposure accumulator seeds. Exposed
@@ -827,6 +854,15 @@ type config = {
           (admission / grading / stage classification unchanged); default [0] =
           off, bit-identical baselines (R1). See
           [Weinstein_strategy_config.entry_anchor_local_range_weeks]. *)
+  entry_freshness_basis : Entry_freshness.basis;
+      [@sexp.default Entry_freshness.Ma_cross]
+      (** F1 — which event starts the Stage-2 admission clock. [Ma_cross]
+          (default) counts [weeks_advancing] from the MA cross, exactly as today
+          (R1, bit-identical baselines). [Range_top_breakout] measures freshness
+          from the breakout above the ticket anchor instead — the book's own
+          Stage-2 start event (§1) with §4.1's MA conditions kept explicit —
+          replacing, not widening, the [early_stage2_max_weeks] window. See
+          [Weinstein_strategy_config.entry_freshness_basis]. *)
   stop_anchor_at_entry_base : bool; [@sexp.default false]
       (** Book-faithful initial-stop re-anchoring for E-anchored entries (user
           go 2026-08-06). When [true] AND the entry is E-anchored (effective
@@ -869,6 +905,22 @@ type config = {
           ticket-level (spine / admission / grading / stops unchanged). Default
           [false] = off, bit-identical baselines (R1). See
           [Weinstein_strategy_config.freeze_entry_at_first_breakout]. *)
+  entry_order_ttl_weeks : int; [@sexp.default 0]
+      (** F2 resting-entry-ticket lifetime (plan
+          [dev/plans/entry-ticket-async-v2-2026-08-10.md] §2-M2 / §3-F2). Today
+          an unfilled StopLimit entry order rests forever (pinned by
+          [trading/simulation/test/test_gtc_entry_persistence.ml]) — GTC with no
+          cancel authority, so only half of the book's §4.7 contract ("until you
+          either cancel the orders or they are actually executed") exists. When
+          [> 0], each weekly review cancels an unfilled entry ticket whose
+          symbol {b fails the re-screen} (stage / sector / macro — the primary
+          path) or has rested more than [entry_order_ttl_weeks] weeks (the clock
+          backstop); the [Entering] position closes, its {!Entry_freeze} pin is
+          released, and the simulator retires the resting order. BOOK-NEUTRAL
+          dial: §4.7 + §7 grant the authority, the book names no number. Default
+          [0] = off, bit-identical baselines (R1). See
+          [Weinstein_strategy_config.entry_order_ttl_weeks] and
+          {!Entry_ticket_ttl}. *)
   stop_width_mode : Stop_width_mode.t;
       [@sexp.default Stop_width_mode.Drop_over_max]
       (** F3 wide-stop admission policy (plan
@@ -889,6 +941,23 @@ type config = {
           admits the same population [Drop_over_max] does. Unread under
           [Drop_over_max]; default is an exact no-op (R1). See
           [Weinstein_strategy_config.stop_width_size_down_max_pct]. *)
+  volume_confirm_at_fill : bool; [@sexp.default false]
+      (** F5 volume-judged-at-the-fill (plan
+          [dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F5;
+          [docs/design/weinstein-book-reference.md] §4.2 + §4.7). A §4.7 GTC
+          buy-stop is written before the breakout, so breakout-week volume
+          cannot be known at placement; §4.2's confirmation belongs to the week
+          the ticket {b fills}. When armed (this flag AND the StopLimit family —
+          see {!Weinstein_strategy_config.volume_confirm_at_fill_armed}), the
+          screen-week volume signal is no longer required to place a ticket, and
+          {!Volume_eject_runner} confirms the fill week's volume against both
+          §4.2 branches on the first screening tick at which that week is
+          complete — unconfirmed ⇒ eject (audit tag [Volume_eject]), confirmed ⇒
+          hold. The eject is inseparable from the flag: holding a
+          volume-unconfirmed breakout is a W1 spine item-3 violation. Default
+          [false] = today's screen-time volume requirement, bit-identical
+          baselines (R1). See
+          [Weinstein_strategy_config.volume_confirm_at_fill]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

@@ -63,6 +63,7 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     risk_pct = 0.08;
     initial_position_value = 10_000.0;
     initial_risk_dollars;
+    ticket_lifecycle = None;
     alternatives_considered = [];
   }
 

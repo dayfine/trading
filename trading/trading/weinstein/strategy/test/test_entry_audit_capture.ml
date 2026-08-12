@@ -65,6 +65,8 @@ let _stock_analysis ~ticker ~as_of_date : Stock_analysis.t =
     continuation = None;
     supply = None;
     virgin_readmission = false;
+    range_top_freshness = None;
+    require_breakout_volume = true;
     current_close = None;
     as_of_date;
   }
@@ -899,8 +901,8 @@ let test_entries_from_candidates_funds_reanchored _ =
     sizing path — it keys solely off [meta.shares * meta.effective_entry_price]
     — and constructing a fixture that produces the exact share count we want via
     [compute_position_size] would couple the test to risk-config defaults. *)
-let _stub_trans_and_meta ?(split_safe_basis = Audit_recorder.Flag_off) ~side
-    ~shares ~effective_entry_price () :
+let _stub_trans_and_meta ?(split_safe_basis = Audit_recorder.Flag_off)
+    ?(sized_down_wide_stop = false) ~side ~shares ~effective_entry_price () :
     Position.transition * Entry_audit_capture.entry_meta =
   let trans : Position.transition =
     {
@@ -926,7 +928,7 @@ let _stub_trans_and_meta ?(split_safe_basis = Audit_recorder.Flag_off) ~side
       split_safe_basis;
       effective_entry_price;
       close_at_decision = None;
-      sized_down_wide_stop = false;
+      sized_down_wide_stop;
     }
   in
   (trans, meta)
@@ -965,6 +967,95 @@ let test_build_entry_event_propagates_split_safe_basis _ =
            (Audit_recorder.Raw_fallback : Audit_recorder.split_safe_basis);
          equal_to
            (Audit_recorder.Empty_window : Audit_recorder.split_safe_basis);
+       ])
+
+(* ------------------------------------------------------------------ *)
+(* PR-5: placement-time ticket tags reach the entry_event               *)
+(* ------------------------------------------------------------------ *)
+
+(** F3's [Sized_down_wide_stop] tag must survive the meta -> event hop. #2258
+    deliberately stopped at [entry_meta]; without this hop the tag never reaches
+    [trade_audit.sexp]. Driven off BOTH values so a hardcoded [false] fails. *)
+let test_build_entry_event_propagates_sized_down_wide_stop _ =
+  let current_date = Date.of_string "2024-06-14" in
+  let cand =
+    _long_candidate ~ticker:"STUB" ~suggested_entry:100.0 ~suggested_stop:95.0
+      ~as_of_date:current_date
+  in
+  let tag_of sized_down_wide_stop =
+    let _, meta =
+      _stub_trans_and_meta ~sized_down_wide_stop ~side:Trading_base.Types.Long
+        ~shares:100 ~effective_entry_price:100.0 ()
+    in
+    (Entry_audit_capture.build_entry_event ~macro:_macro_fixture ~current_date
+       ~candidate:cand ~meta ~alternatives:[])
+      .Audit_recorder.sized_down_wide_stop
+  in
+  assert_that
+    (List.map [ true; false ] ~f:tag_of)
+    (elements_are [ equal_to true; equal_to false ])
+
+(** The F1 basis and the F6 §4.5 measurements are read off the candidate's
+    analysis at event-build time. Driven off an ARMED analysis (range-top clock,
+    3x breakout volume, RS zero-cross, a base 50% deep) so a hardcoded default
+    at this hop fails. *)
+let test_build_entry_event_carries_freshness_basis_and_triple_confirmation _ =
+  let current_date = Date.of_string "2024-06-14" in
+  let base =
+    _long_candidate ~ticker:"STUB" ~suggested_entry:100.0 ~suggested_stop:95.0
+      ~as_of_date:current_date
+  in
+  let cand =
+    {
+      base with
+      analysis =
+        {
+          base.analysis with
+          range_top_freshness = Some true;
+          breakout_price = Some 15.0;
+          breakdown_price = Some 10.0;
+          rs =
+            Some
+              {
+                Rs.current_rs = 1.0;
+                current_normalized = 0.1;
+                trend = Weinstein_types.Bullish_crossover;
+                history = [];
+              };
+          volume =
+            Some
+              {
+                Volume.confirmation = Weinstein_types.Strong 3.0;
+                event_volume = 3_000_000;
+                avg_volume = 1_000_000.0;
+                volume_ratio = 3.0;
+              };
+        };
+    }
+  in
+  let _, meta =
+    _stub_trans_and_meta ~side:Trading_base.Types.Long ~shares:100
+      ~effective_entry_price:100.0 ()
+  in
+  let event =
+    Entry_audit_capture.build_entry_event ~macro:_macro_fixture ~current_date
+      ~candidate:cand ~meta ~alternatives:[]
+  in
+  assert_that event
+    (all_of
+       [
+         field
+           (fun (e : Audit_recorder.entry_event) -> e.freshness_basis)
+           (equal_to Entry_freshness.Range_top_breakout);
+         field
+           (fun (e : Audit_recorder.entry_event) -> e.triple_confirmation)
+           (equal_to
+              ({
+                 breakout_volume_multiple = Some 3.0;
+                 rs_zero_cross = true;
+                 in_base_advance_pct = Some 0.5;
+               }
+                : Entry_ticket_tags.triple_confirmation));
        ])
 
 (** Portfolio at $100K with 25% existing short notional ($25K). A fresh short
@@ -2096,6 +2187,10 @@ let () =
            >:: test_entry_meta_split_safe_basis_survives_reanchor;
            "B1 hop 1: build_entry_event propagates the basis"
            >:: test_build_entry_event_propagates_split_safe_basis;
+           "PR-5: build_entry_event propagates sized_down_wide_stop"
+           >:: test_build_entry_event_propagates_sized_down_wide_stop;
+           "PR-5: build_entry_event carries the F1 basis + F6 tag"
+           >:: test_build_entry_event_carries_freshness_basis_and_triple_confirmation;
            "stop-anchor: entries_from_candidates funds re-anchored"
            >:: test_entries_from_candidates_funds_reanchored;
            "G15-step2: short notional cap skips at 31%"

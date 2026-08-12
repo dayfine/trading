@@ -1,0 +1,27 @@
+(library
+ (name weekly_bars_dump_lib)
+ (public_name scripts.weekly_bars_dump_lib)
+ (modules bar_window blind table_format bar_source)
+ (libraries
+  core
+  core_unix
+  status
+  types
+  fpath
+  csv
+  indicators.time_period
+  trading.data_panel.snapshot)
+ (preprocess
+  (pps ppx_jane)))
+
+(executable
+ (name weekly_bars_dump)
+ (modules weekly_bars_dump)
+ (libraries
+  core
+  core_unix
+  core_unix.command_unix
+  status
+  weekly_bars_dump_lib)
+ (preprocess
+  (pps ppx_jane)))

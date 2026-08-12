@@ -1291,6 +1291,61 @@ type config = {
           [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides]. Per
           the experiment discipline it stays default-off until a ledger ACCEPT
           (WF-CV per the honest-ladder plan). *)
+  entry_freshness_basis : Entry_freshness.basis;
+      [@sexp.default Entry_freshness.Ma_cross]
+      (** F1 — which event starts the Stage-2 admission clock (plan
+          [dev/plans/entry-ticket-async-v2-2026-08-10.md] §2 M1 / §3 F1).
+
+          {b The mis-mapping.} [docs/design/weinstein-book-reference.md] §1 says
+          Stage 2 {i begins} when the stock breaks out above the top of the
+          resistance zone AND above the 30-week MA; Stage 1 explicitly has price
+          tossed above and below the MA for months while it bases. Our stage
+          classifier starts [weeks_advancing] at the {b MA cross}, so a name
+          that crossed its MA ten weeks ago but is still coiled under its range
+          top has aged out of the [early_stage2_max_weeks <= 4] admission window
+          before the book's Stage-2 week one has happened. Ladder v3
+          ([dev/notes/ladder-v3-faithful-stoplimit-2026-08-09.md]) traced the
+          structural exclusion of the crash-recovery cohort to exactly this.
+
+          {b [Ma_cross] (default, no-op).} Today's clock, verbatim. R1: every
+          existing baseline / golden is bit-identical —
+          [Stock_analysis.t .range_top_freshness] is [None] and
+          [is_breakout_candidate] runs its pre-F1 arms unchanged.
+
+          {b [Range_top_breakout] (armed).} Freshness is measured from the
+          breakout above the ticket anchor ([entry_anchor_local_range_weeks] →
+          [Stock_analysis.t.local_range_top] — deliberately the {i same} level
+          the resting order uses, so the freshness test and the ticket cannot
+          drift apart). A non-late Stage-2 candidate is admitted iff the close
+          is at or within [Entry_freshness.proximity_pct] (5%) below that anchor
+          {b and} the MA is not declining {b and} the anchor clears the MA —
+          §4.1 requirements 1–3 kept explicit, because "a breakout below a
+          declining MA is a trap, not a buy" (Ch. 3, Western Union). The
+          MA-cross age is not consulted: the basis {b replaces} that window
+          rather than widening it, so this is not a stealth re-run of the
+          rejected continuation (#1366) or early-admission axes — the [<= 4]
+          value itself is untouched.
+
+          {b Interaction with [reject_declining_ma_long_entry] (#1775).} That
+          flag is a later strategy-level veto on long entries taken while the MA
+          declines. F1 enforces the same §4.1 condition earlier and against the
+          {i anchor} (the level a resting ticket actually fills at), so the two
+          compose without conflict: an armed basis never admits a candidate the
+          #1775 gate would then have to reject on MA direction, and leaving
+          #1775 off does not weaken F1's own check.
+
+          {b Faithfulness (W1/W2).} Spine intact — Stage-2-only, volume
+          confirmation, and the macro/sector gates are untouched; this moves the
+          admission clock onto the book's own Stage-2 start event, and the
+          crossing requirement is enforced {i better} because the ticket cannot
+          fill without the cross.
+
+          R2: real config field, axis-expressible as
+          [((flag entry_freshness_basis) (values (Ma_cross
+           Range_top_breakout)))] via [Variant_matrix] /
+          [Backtest.Overlay_validator.apply_overrides]. R3: no default is
+          flipped by this PR — it stays [Ma_cross] until a ledger ACCEPT plus
+          the promotion-confirmation grid. *)
   stop_anchor_at_entry_base : bool; [@sexp.default false]
       (** Book-faithful initial-stop re-anchoring for E-anchored entries (user
           go 2026-08-06; note [dev/notes/honest-ladder-2026-08-05.md]). The
@@ -1443,6 +1498,73 @@ type config = {
           [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides]. Per
           the experiment discipline it stays default-off until a ledger ACCEPT
           (WF-CV per the fill-model plan). *)
+  entry_order_ttl_weeks : int; [@sexp.default 0]
+      (** F2 ([dev/plans/entry-ticket-async-v2-2026-08-10.md] §2-M2 / §3-F2):
+          how long an {b unfilled} entry ticket may keep resting, and — the
+          load-bearing half — whether it is re-validated at all.
+
+          {b The faithfulness gap it closes.} Under the StopLimit entry family
+          the strategy writes a resting breakout order and waits; an unfilled
+          order persists across every later step until a bar trades through [E]
+          (pinned by [trading/simulation/test/test_gtc_entry_persistence.ml]).
+          That is Good-Till-{i Cancelled} with no cancel authority anywhere in
+          the system, so only half of the book's contract is implemented: §4.7
+          has the order standing "until you either cancel the orders or they are
+          actually executed", and §7's weekend homework is precisely the loop at
+          which the cancel decision is taken. Today a ticket written against a
+          base that has since broken down still fills weeks later.
+
+          {b Behaviour when [> 0].} On each weekly review every unfilled
+          [Entering] position is re-examined ({!Entry_ticket_ttl}):
+
+          - {b Primary — re-screen cancel.} Its symbol is cancelled when it
+            fails the next weekly re-screen: it no longer classifies into the
+            stage its side requires (base broken down / MA rolled over), its
+            sector rating flipped against it, or the macro gate flipped. The
+            predicate reuses the cascade's own Phase-1 stage filter, sector
+            pre-filter and {!Screener.longs_admitted_by_macro} /
+            {!Screener.shorts_admitted_by_macro} gates, so re-screen and screen
+            cannot drift.
+          - {b Backstop — clock TTL.} A ticket that has rested more than
+            [entry_order_ttl_weeks] whole weeks without filling is cancelled
+            regardless. A ticket placed on review week 0 survives review week
+            [entry_order_ttl_weeks] and is cancelled at week
+            [entry_order_ttl_weeks + 1].
+
+          Cancelling emits [Position.CancelEntry] (the [Entering] position
+          closes) {b and} releases the symbol's {!Entry_freeze} pin, so the
+          symbol may re-qualify later at a fresh [E] rather than at the level
+          its expired ticket was written against. The simulator cancels the
+          matching resting order
+          ({!Trading_simulation.Cancel_handler.cancel_resting_entry_orders});
+          without that a "cancelled" ticket would still fill. A partially-filled
+          entry is never cancelled — those shares are booked.
+
+          {b Faithfulness (W2): BOOK-NEUTRAL dial.} The book grants the cancel
+          authority (§4.7) and locates the decision in the weekly review (§7)
+          but names no number, so the {i primary} re-screen cancel is
+          book-supported while the {i number} is a free dial. The
+          13-weeks-with-no-revalidation cell is the least book-like one. The
+          spine is untouched: Stage-2-only admission, volume confirmation,
+          grading and the stop machinery are unchanged — this governs only the
+          lifetime of an order that has not yet become a position.
+
+          {b Only meaningful under the StopLimit entry family}
+          ([enable_sim_entry_stoplimit] + [sim_entry_trigger_at_suggested]).
+          With Market entries a ticket fills on its own tick, so no position
+          ever rests long enough for either path to fire; the knob is left
+          ungated so it stays an independent axis.
+
+          {b Default [0] = off, bit-identical to every existing baseline/golden}
+          (R1): {!Entry_ticket_ttl.cancellations} returns [[]] without
+          consulting the re-screen predicate, and no strategy emits
+          [CancelEntry], so the simulator's order-cancel path is never reached —
+          weekly re-issue and GTC-forever persistence are exactly as before.
+          This {b extends}, and does not weaken, the contract pinned by
+          [test_gtc_entry_persistence.ml]. R2: real config field,
+          axis-expressible as [((flag entry_order_ttl_weeks) (values (0 4 8)))]
+          via [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides].
+          Stays default-off until a ledger ACCEPT (R3). *)
   stop_width_mode : Stop_width_mode.t;
       [@sexp.default Stop_width_mode.Drop_over_max]
       (** F3 ([dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F3): what the
@@ -1489,6 +1611,58 @@ type config = {
           separated so a wide-admission cell is not confounded with a re-anchor
           change. Unread under [Drop_over_max]. Default [0.0] is an exact no-op
           (R1); axis-expressible (R2). *)
+  volume_confirm_at_fill : bool; [@sexp.default false]
+      (** F5 — judge the breakout's volume {b at the fill}, not at placement
+          (plan [dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F5;
+          [docs/design/weinstein-book-reference.md] §4.2 + §4.7).
+
+          {b The faithfulness gap it closes.} Book §4.7's GTC buy-stop is
+          written {i before} the breakout, so breakout-week volume is unknowable
+          at placement — yet today's cascade demands Strong/Adequate volume at
+          the Friday screen. §1 further notes that base volume "dries up", so a
+          screen-week volume requirement selects {i against} textbook bases.
+          §4.2's confirmation is defined on the breakout week, which under a
+          resting ticket is the {b fill} week.
+
+          {b Armed behaviour} (two inseparable halves, both gated on
+          {!volume_confirm_at_fill_armed} — this flag AND the StopLimit family
+          [sim_entry_trigger_at_suggested] + [enable_sim_entry_stoplimit]):
+
+          - {b Placement}: the screen-week volume signal is no longer required
+            to place the ticket ([Stock_analysis.config.require_breakout_volume]
+            goes [false]). Every other gate — stage, base, RS, resistance,
+            macro, sector — still applies, so the placed-ticket population
+            widens but stays bounded.
+          - {b At fill}: {!Volume_eject_runner} confirms the fill week's volume
+            against {b both} §4.2 branches ([Volume.confirms_breakout]) on the
+            first screening tick at which that week is complete (no partial-week
+            lookahead). Unconfirmed ⇒ the position is ejected, audit tag
+            [Volume_eject]; confirmed ⇒ held.
+
+          {b The eject is INSEPARABLE from the flag.} There is deliberately no
+          eject-off cell: holding a volume-unconfirmed breakout would be a W1
+          spine item-3 violation ("entry on a breakout above resistance WITH
+          volume confirmation"), and §4.2's low-volume-breakout SELL rule is
+          explicit that a buy-stop filled without volume confirmation is sold,
+          not held. Arming the placement waiver alone is not expressible.
+
+          {b Default [false] = today's screen-time volume requirement,
+             bit-identical} (R1): [require_breakout_volume] stays [true] and the
+          eject runner short-circuits to [[]], so no golden moves. R2: real
+          config field, axis-expressible as
+          [((flag volume_confirm_at_fill) (values (true false)))] via
+          [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides]. R3:
+          no default flip without a ledger ACCEPT.
+
+          {b Faithfulness: BOOK-SUPPORTED.} Spine item 3 is preserved and
+          relocated to the correct event — the check is not weakened, it is
+          moved from a week the book never evaluates to the week the book
+          defines it on.
+
+          {b Future work (NOT built)}: plan §3-F5 amendment (iv) notes a later
+          trader/investor variant of the unconfirmed branch
+          ([eject | hold_with_stop_at_breakout]); v4 implements the eject only.
+      *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
@@ -1501,6 +1675,22 @@ val default_dawn_max_flip_age_weeks : int
 
 val default_config : universe:string list -> index_symbol:string -> config
 (** Build a default config with Weinstein book values. *)
+
+val volume_confirm_at_fill_armed : config -> bool
+(** [volume_confirm_at_fill_armed c] is [true] iff F5 is active:
+    [c.volume_confirm_at_fill] AND the StopLimit family
+    ([c.sim_entry_trigger_at_suggested] && [c.enable_sim_entry_stoplimit]).
+
+    F5 only makes sense for a resting E-anchored ticket — that is the entry
+    model whose fill week {i is} the breakout week. Under the default
+    close-triggered entry the fill week and the screen week coincide, so
+    relocating the check would be a pure loss of information.
+
+    Single source of truth for both halves of the mechanism: the screener's
+    placement waiver ([Stock_analysis.config.require_breakout_volume]) and the
+    {!Volume_eject_runner} at-fill confirmation read this same predicate, so a
+    ticket can never be placed without volume {i and} then held without the
+    at-fill check. *)
 
 val name : string
 (** Strategy name, always ["Weinstein"]. *)

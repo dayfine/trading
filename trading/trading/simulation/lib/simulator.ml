@@ -411,6 +411,18 @@ let _process_fills_and_cancels t ~portfolio ~positions ~today_bars =
 let _notify_transitions ~on_transitions transitions =
   Option.iter on_transitions ~f:(fun observe -> observe transitions)
 
+(* F2 ticket lifecycle: retire the resting orders of any strategy-cancelled
+   entry ticket. Must run BEFORE the transitions are applied — [positions] still
+   carries each cancelled ticket's symbol + side at that point. A no-op when no
+   [CancelEntry] names a resting [Entering], which is every run at the default
+   config ([entry_order_ttl_weeks = 0] emits none). *)
+let _retire_cancelled_entry_orders t ~positions ~transitions =
+  let (_ : Trading_orders.Types.order_id list) =
+    Cancel_handler.cancel_resting_entry_orders
+      ~order_manager:t.deps.order_manager ~positions ~transitions
+  in
+  ()
+
 (** Process one day: execute pending orders, call strategy, generate new orders,
     and assemble the [step_result]. Returns the next simulator state paired with
     this day's [step_result]. *)
@@ -432,6 +444,7 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
       ~today_bars ~date:t.current_date ~strategy_transitions
   in
   _notify_transitions ~on_transitions:t.deps.on_transitions transitions;
+  _retire_cancelled_entry_orders t ~positions ~transitions;
   let%bind positions = _apply_transitions ~positions ~transitions in
   let%bind orders, order_links =
     Order_generator.transitions_to_orders ~current_date:t.current_date

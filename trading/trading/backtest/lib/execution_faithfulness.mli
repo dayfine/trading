@@ -50,7 +50,23 @@ val enrich :
     end-of-run, or otherwise unjoined) are returned unchanged with
     [execution = None]. Pure; order-preserving. The join is by position id
     resolved through {!Trade_context} — the first round-trip matched to a given
-    position supplies its entry fill. *)
+    position supplies its entry fill.
+
+    Also stamps the fill-side half of the PR-5 ticket-lifecycle record: a
+    matched record's [entry.ticket_lifecycle.ticket_age_weeks_at_fill] is set to
+    whole weeks between its [placement_date] and the matched round-trip's
+    entry-fill date. This join is the only place both instants are in hand, so
+    the age rides along rather than duplicating the join in a second pass. Only
+    that one column is written: a row with no [ticket_lifecycle] (a
+    [trade_audit.sexp] written before PR-5) is left untouched, and an
+    already-merged [ticket_age_weeks_at_cancel] is preserved — a cancelled
+    ticket produces no round-trip to match, so the two never collide.
+
+    {b The age inherits this join's 7-day window.} A ticket that rests longer
+    than a week before filling is not matched at all — it already gets
+    [execution = None] today — so its age stays [None] rather than being
+    recorded. The stamped ages are therefore 0 or 1 week, not a resting-time
+    distribution; see [Trade_audit.ticket_lifecycle]'s field doc. *)
 
 val enrich_for_config :
   audit:Trade_audit.audit_record list ->

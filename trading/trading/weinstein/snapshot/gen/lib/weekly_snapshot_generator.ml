@@ -126,12 +126,11 @@ let _analyze_ticker ~(inputs : inputs)
          ~callbacks ~prior_stage ~as_of_date:inputs.as_of)
 
 (* Per-stock analysis for the screened universe. Threads the strategy config's
-   [overhead_supply] (resistance-v2) into the per-stock analysis config so the
-   continuous supply score runs on the live path when armed; [None] (default)
-   keeps the analysis bit-identical to the binary-grade behaviour.
-   [eligible_tickers] is pre-filtered by the sparse-tail gate (see
-   [_eligible_tickers]) — this function no longer walks
-   [inputs.ticker_sectors] directly. *)
+   ticket-level knobs ([overhead_supply], [entry_anchor_local_range_weeks],
+   [entry_freshness_basis]) into the per-stock analysis config; each defaults to
+   the no-op, so the live path stays bit-identical when unarmed.
+   [eligible_tickers] is pre-filtered by the sparse-tail gate
+   ([_eligible_tickers]); this fn no longer walks [inputs.ticker_sectors]. *)
 let _analyze_universe ~(inputs : inputs) ~index_bars ~eligible_tickers :
     Stock_analysis.t list =
   let analysis_config =
@@ -140,6 +139,7 @@ let _analyze_universe ~(inputs : inputs) ~index_bars ~eligible_tickers :
       overhead_supply = inputs.config.overhead_supply;
       entry_anchor_local_range_weeks =
         inputs.config.entry_anchor_local_range_weeks;
+      entry_freshness_basis = inputs.config.entry_freshness_basis;
     }
   in
   List.filter_map eligible_tickers ~f:(fun ticker ->

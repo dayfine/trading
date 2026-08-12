@@ -2,6 +2,144 @@
 
 ## Last updated: 2026-08-10
 
+### 2026-08-10 — ticket-lifecycle audit fields (branch `feat/ticket-lifecycle-audit-fields`, PR-5)
+
+Plan: `dev/plans/entry-ticket-async-v2-2026-08-10.md` §4 PR-5 row + §3-F6 + §5.
+Book: `docs/design/weinstein-book-reference.md` §4.5 (triple confirmation), §4.2
+(the two breakout-volume branches).
+
+**The gap.** Under the asynchronous ticket model an entry is no longer one
+instant — the ticket is *placed* on one Friday and *fills* (or is cancelled)
+later — but `Trade_audit.entry_decision` recorded only the placement instant's
+analysis. None of ladder-v4's §5 questions were answerable from
+`trade_audit.sexp`: how long tickets rested, which F1 clock admitted them,
+whether the fill's volume actually confirmed, and whether the §4.5
+triple-confirmed cohort is where the outsized winners live.
+
+**What.** One new `[@sexp.option]` field, `entry_decision.ticket_lifecycle`,
+carrying: `placement_date`; `ticket_age_weeks_at_cancel` and
+`ticket_age_weeks_at_fill` (two separate columns — see below); `fill_volume` (a
+`fill_volume_check` = a 4-way `fill_volume_verdict` — `Confirmed_spike` /
+`Confirmed_buildup` / `Unconfirmed` / **`No_verdict`** — paired with a 3-way
+`fill_volume_outcome`: `Ejected` / `Skipped_other_exit` / `Held`);
+`freshness_basis`; `sized_down_wide_stop`; and the F6 `triple_confirmation`
+measurements (breakout-volume multiple, RS zero-cross, in-base advance %).
+Supporting: `Volume.classify_breakout` (the named form of `confirms_breakout`,
+defined as its projection), `Volume_eject_runner.fill_week_confirmations` +
+`emit_fill_week_audit` (the audit twin of `update`, sharing one
+fill-week-window helper), and two new leaf modules — `Entry_ticket_tags`
+(strategy-side placement projections) and `Ticket_lifecycle` (backtest-side
+sub-schema + its two resolution merges, the way `Stop_log` owns
+`exit_trigger`).
+
+**Status: READY_FOR_REVIEW.** Capture-only — no config field, no gate, no
+behaviour change; goldens move only in sexp shape. Discharges two deferrals:
+#2258's `Sized_down_wide_stop` (was `entry_meta` + trace only) and
+qc-behavioral #2267's held-without-verdict recommendation
+(`Some { verdict = No_verdict; _ }` is now countable alongside the eject rate).
+
+**The audit population diverges from the eject population — deliberately, and
+now recorded.** `Volume_eject_runner.update` (the decision surface) skips every
+position in `skip_position_ids` — another exit channel (stop, Stage-3, laggard,
+force-liq, liquidity, extension) already claimed it this tick.
+`fill_week_confirmations` (the audit surface) does not: the fill's volume
+verdict is a property of the *fill*, and the cohort it retains (weak-volume
+breakout that stops out in week 0/1) is exactly what plan §5 prediction 4
+measures. The wider population is therefore kept, and each row additionally
+carries `fill_volume_outcome`, read off the tick's **actual** eject transitions
+and skip set rather than inferred from the verdict. So an `Unconfirmed` count is
+**not** an eject count; v4 can compute "unconfirmed fills" and "actual ejects"
+separately and measure their overlap. Pinned by a test that shows a
+`skip_position_ids` position yielding an audit row tagged `Skipped_other_exit`
+while `update` returns `[]`.
+
+**What actually gates the no-behaviour-change claim.** The **required** PR
+checks do *not* assert backtest metrics: `perf-tier1-smoke` is a 120 s
+timeout/crash gate, `dune runtest` carries no full-run metric assertion, and the
+scenario metric goldens run in the scheduled `golden-runs-*` workflows, not on
+this PR. Nothing in the required checks would catch a moved number. What *is*
+gated here: (a) default-config inertness driven through the real
+`Special_exits.run` pipeline with a capturing recorder (zero events), plus
+unarmed / flag-without-family / mid-week coverage at the runner level; and (b)
+constructor-for-constructor equivalence of the `confirms_breakout` refactor,
+asserted against independently written expected verdicts rather than against
+`classify_breakout`'s own output.
+
+**Scope notes / follow-ups.**
+- **Fill-side age has a 7-day ceiling.** It is stamped by
+  `Execution_faithfulness.enrich`, which joins through `Trade_context`'s 7-day
+  window — so a ticket resting longer than a week is not matched and the age
+  stays `None` (that row also already gets `execution = None` today, a
+  pre-existing property of that join, not introduced here). The **cancel-side**
+  age (from `CancelEntry`, via `Trade_audit.record_transitions`) is unbounded
+  and is the one F2's TTL analysis should read. The two live in **separate
+  columns** (`ticket_age_weeks_at_fill` / `ticket_age_weeks_at_cancel`) so the
+  fill side's structural cap cannot leak into a fill-inclusive-sounding
+  statistic. Widening the entry↔fill join for long-resting async tickets is a
+  real follow-up — it currently blinds #2158's execution-faithfulness column on
+  exactly the v4 arms.
+- `EntryFill` transitions are not visible to `on_transitions` (fills are applied
+  inside `_process_fills_and_cancels`), which is why the fill date has to come
+  from the round-trip join rather than from a transition observer.
+- F6 gates nothing, per plan §3-F6. `Entry_ticket_tags.is_triple_confirmed`
+  exists for cohort analysis of a completed run and has no strategy caller.
+
+### 2026-08-10 — F2 `entry_order_ttl_weeks` + re-screen cancel (branch `feat/entry-order-ttl`, PR-3)
+
+Plan: `dev/plans/entry-ticket-async-v2-2026-08-10.md` §2-M2 / §3-F2 / §4 PR-3
+row (+ §6 "TTL × freeze" pin-lifecycle risk). Book: §4.7 "until you either
+cancel the orders or they are actually executed" + the §7 weekend-homework loop.
+
+**The gap.** `test_gtc_entry_persistence.ml` pins that an unfilled StopLimit
+entry order rests forever until a bar trades through `E`. That is GTC with **no
+cancel authority anywhere in the system** — only half of §4.7 exists, so a
+ticket written against a base that has since broken down still fills weeks
+later.
+
+**What.** New `Weinstein_strategy_config.entry_order_ttl_weeks : int
+[@sexp.default 0]`. When `> 0`, each weekly review re-examines every unfilled
+`Entering` position (`Entry_ticket_ttl`, new module):
+
+1. **Primary — re-screen cancel.** Cancel when the symbol fails the next weekly
+   re-screen. The predicate reuses the cascade's own gates (Phase-1 stage filter
+   specialised to the ticket's side, the sector pre-filter, and the newly
+   exported `Screener.longs_admitted_by_macro` /
+   `Screener.shorts_admitted_by_macro`), so re-screen and screen cannot drift.
+   A resting ticket's symbol is *held*, hence excluded from the candidate list —
+   which is why the question has to be re-asked directly.
+2. **Backstop — clock TTL.** Cancel after more than `entry_order_ttl_weeks`
+   whole weeks unfilled (placed week 0 → survives week N → cancelled week N+1).
+
+Cancelling emits `Position.CancelEntry`, **releases the symbol's `Entry_freeze`
+pin** (new `Entry_freeze.release`; `apply`'s stale-release rule cannot cover this
+— the symbol is still held on the cancelling tick and may still be qualifying
+after a clock cancel), and the simulator retires the resting order via
+`Cancel_handler.cancel_resting_entry_orders`. Partially-filled entries are never
+cancelled (booked shares).
+
+**Status: READY_FOR_REVIEW.** R1 — `0` returns `[]` without even consulting the
+re-screen predicate and no strategy emits `CancelEntry`, so the simulator's new
+cancel path is unreachable at the default; this **extends**, never weakens, the
+`test_gtc_entry_persistence` contract (that file gains a third test for the new
+half; its two original tests are untouched). R2 — real config field resolved by
+`Overlay_validator.apply_overrides`, so `((entry_order_ttl_weeks (0 4 8)))`
+expands as a `Variant_matrix` axis (round-trip + omitted-field parse tests). R3
+— no default flipped. **Faithfulness: BOOK-NEUTRAL dial** — §4.7 + §7 grant the
+cancel authority and locate the decision in the weekly review, but the book
+names no number; the 13-weeks-with-no-revalidation cell is the least book-like.
+
+**Scope notes / follow-ups.**
+- The cancel pass runs inside the Friday screen, so it is skipped on a
+  force-liquidation-halted week (entries are gated off wholesale there).
+- Order matching uses the `(symbol, entry-side)` heuristic `Fill_router` already
+  relies on — the per-step `order_links` table is cleared on every generation
+  pass, so an order placed on an earlier step has no position-id link.
+- Ticket age is now projected into the persisted `Trade_audit.entry_decision`
+  row by PR-5 (`ticket_lifecycle.ticket_age_weeks_at_cancel`, set from the
+  `CancelEntry` transition — its own column, unbounded, distinct from the
+  7-day-capped `ticket_age_weeks_at_fill`). The cancel *reason* is still not
+  carried.
+
 ### 2026-08-10 — F3 `stop_width_mode` + nearest-floor anchor arm (branch `feat/stop-width-mode`, PR-2)
 
 Plan: `dev/plans/entry-ticket-async-v2-2026-08-10.md` §3-F3 / §4 PR-2 row.

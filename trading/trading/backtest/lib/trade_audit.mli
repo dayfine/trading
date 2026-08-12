@@ -237,6 +237,12 @@ type entry_decision = {
   risk_pct : float;
   initial_position_value : float;
   initial_risk_dollars : float;  (** [(entry - stop) * qty]. *)
+  ticket_lifecycle : Ticket_lifecycle.t option; [@sexp.option]
+      (** PR-5 ticket-lifecycle audit fields ({!Ticket_lifecycle}). Always
+          [Some] on rows written by this build ({!Trade_audit_recorder}
+          populates it for every entry); [None] only in [trade_audit.sexp] files
+          written before the field existed, which [[@sexp.option]] keeps
+          parseable. *)
   alternatives_considered : alternative_candidate list;
       (** Top-N candidates from the same screen call that were not entered.
           Empty when the screener returned no other candidates that round. *)
@@ -469,7 +475,26 @@ val record_transitions : t -> Trading_strategy.Position.transition list -> unit
 
     [TriggerPartialExit] transitions are ignored — a partial trim (e.g.
     [harvest_rotate]) does not close the position, so it has no round-trip
-    [exit_decision] / [external_exit_decision] to record. *)
+    [exit_decision] / [external_exit_decision] to record.
+
+    [CancelEntry] transitions (the F2 TTL / re-screen ticket cancel) set the
+    bucket's [ticket_lifecycle.ticket_age_weeks_at_cancel] from the transition
+    date minus the entry's [placement_date] — the only place a never-filled
+    ticket's resting age is observable, since it produces no round-trip for the
+    fill-side enrichment to join. The fill-side column
+    ([ticket_age_weeks_at_fill]) is left [None]: the two resolutions are
+    mutually exclusive. Dropped when no entry was recorded for the id, same as
+    the exit path. *)
+
+val record_fill_volume :
+  t -> position_id:string -> Ticket_lifecycle.fill_volume_check -> unit
+(** Record the F5 at-fill §4.2 verdict, paired with what the run did about it,
+    for an already-entered position. Merged into that entry's
+    [ticket_lifecycle.fill_volume] at drain time. Dropped when no entry was
+    recorded for [position_id] (mirrors {!record_exit}'s no-entry contract);
+    recording twice keeps the later check — the classification is a pure
+    function of a fixed historical bar, so a repeat inside the runner's two-week
+    evaluation window is the same value. *)
 
 val record_cascade_summary : t -> cascade_summary -> unit
 (** Append a per-Friday cascade summary. Append-only — recording two summaries
