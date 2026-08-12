@@ -96,7 +96,37 @@ comparable to v3's +318%** (see P0 below):
 Two of four pre-registered predictions are falsified (3: freshness > TTL — it is
 backwards ~20x; 4: volconf costs little — it costs -391pp).
 
-## P0 — the armed-baseline regression (task #17)
+## P0 — the armed-baseline regression (task #17) — **RESOLVED 2026-08-11 late**
+
+> **The premise below is void.** There is no code regression to find: the
+> armed-StopLimit backtest was **nondeterministic**. Four runs of one binary
+> over one scenario and one dataset returned 49.2846 / 50.0589 / 49.3444 /
+> 49.3723 on the short probe — a 0.774pp spread that swallows every one of the
+> per-commit deltas the bisect produced (0.06–1.12pp, n=1 each).
+>
+> Cause: `Price_path.default_config` had `seed = None` → a self-initialising
+> RNG per generated intraday path. No golden caught it because market orders
+> fill at the bar's open/close and never walk the path; only resting stop/limit
+> orders do — exactly the family no golden arms. The "structural hole" this
+> section diagnosed is real, and this was the defect it hid.
+>
+> Fixed in **PR #2279** (`Market_state` derives the seed from the bar). Unarmed
+> golden bit-identical pre/post; armed probe now reproducible.
+> Full record: `dev/notes/backtest-nondeterminism-2026-08-11.md`.
+> Wrapper for task #13 shipped alongside in **PR #2280**.
+>
+> **Read the rest of this file with that in mind** — in particular the Stage-A
+> table above was produced on the pre-fix build, so its *modest* cell-to-cell
+> deltas have an unmeasured noise term under them. The large ones (cell 09
+> nearfloor 670.0, cell 10 volconf −47.6) are far beyond any plausible noise
+> floor and stand. Cells 01–05 do not, until the null is measured at
+> 26y/top-3000 scale (new task) or they are re-run on the fixed build.
+>
+> The v3-vs-v4 cell-00 gap is **not** attributable to a code regression on
+> current evidence. Whether *any* gap survives is now answerable only by
+> re-running both cells on the fixed build.
+
+### Original framing (superseded, kept for the record)
 
 **Ladder-v4 cell 00 does not reproduce ladder-v3 faithful-w4**, though the spec
 is semantically identical (all 7 added overrides equal declared defaults;
