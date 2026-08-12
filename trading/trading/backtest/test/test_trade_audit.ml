@@ -157,16 +157,15 @@ let _strategy_signal_trigger_exit ?(position_id = "AAPL-wein-1")
   }
 
 (** A [TriggerPartialExit] transition carrying a [StrategySignal] exit reason —
-    what a partial trim (e.g. a macro-bearish exposure trim) looks like on the
-    [Position.transition] list [record_transitions] observes. Structurally
-    adjacent to {!_strategy_signal_trigger_exit} (same [exit_reason] shape)
-    except for [kind], so it genuinely discriminates [record_transitions]'s
-    "only [TriggerExit], not [TriggerPartialExit]" behavior — unlike
+    what a partial trim looks like on the [Position.transition] list
+    [record_transitions] observes. Structurally adjacent to
+    {!_strategy_signal_trigger_exit} (same [exit_reason] shape) except for
+    [kind], so it genuinely discriminates [record_transitions]'s "only
+    [TriggerExit], not [TriggerPartialExit]" behavior — unlike
     [UpdateRiskParams], which has no [exit_reason] field at all. *)
 let _strategy_signal_trigger_partial_exit ?(position_id = "AAPL-wein-1")
-    ?(date = _date "2024-04-20") ?(label = "macro_bearish_trim")
-    ?(detail = None) ?(exit_price = 137.20) ?(target_quantity = 50.0) () :
-    Position.transition =
+    ?(date = _date "2024-04-20") ?(label = "partial_trim") ?(detail = None)
+    ?(exit_price = 137.20) ?(target_quantity = 50.0) () : Position.transition =
   {
     position_id;
     date;
@@ -713,7 +712,7 @@ let test_record_transitions_ignores_partial_exit _ =
   TA.record_entry t (make_entry ());
   TA.record_transitions t
     [
-      _strategy_signal_trigger_partial_exit ~label:"macro_bearish_trim"
+      _strategy_signal_trigger_partial_exit ~label:"partial_trim"
         ~target_quantity:50.0 ();
     ];
   (* A partial trim does not close the position, so [record_transitions]
