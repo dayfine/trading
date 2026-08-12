@@ -4,8 +4,8 @@
     Extracted from [weinstein_strategy.ml] to keep that coordinator under the
     file-length cap: these are the pure list/set utilities that combine the
     several exit / adjust / entry transition streams a market day produces into
-    the single ordered output, dropping adjust/harvest transitions for positions
-    already fully exited this tick. *)
+    the single ordered output, dropping adjust transitions for positions already
+    fully exited this tick. *)
 
 open Core
 open Trading_strategy
@@ -25,7 +25,6 @@ val assemble_output :
   laggard_rotation_transitions:Position.transition list ->
   force_exit_transitions:Position.transition list ->
   macro_trim_transitions:Position.transition list ->
-  harvest_rotate_transitions:Position.transition list ->
   adjust_transitions:Position.transition list ->
   entry_transitions:Position.transition list ->
   stop_exited_ids:String.Set.t ->
@@ -33,7 +32,7 @@ val assemble_output :
   laggard_exited_ids:String.Set.t ->
   Strategy_interface.output Status.status_or
 (** Combine the per-tick transition streams into the single ordered
-    {!Strategy_interface.output}. Adjust and harvest-rotate transitions are
-    dropped for any position already fully exited this tick (a stop / Stage-3 /
-    laggard / force-liq / macro-bearish exit), since a closing position has
-    nothing left to adjust or trim. Always returns [Ok]. *)
+    {!Strategy_interface.output}. Adjust transitions are dropped for any
+    position already fully exited this tick (a stop / Stage-3 / laggard /
+    force-liq / macro-bearish exit), since a closing position has nothing left
+    to adjust. Always returns [Ok]. *)

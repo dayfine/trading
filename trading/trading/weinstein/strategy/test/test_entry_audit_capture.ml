@@ -1915,8 +1915,7 @@ let test_long_exposure_cap_classify_skips_and_refunds _ =
   assert_that !remaining_cash (float_equal 100_000.0)
 
 (** Build a [Holding] {!Position.t} for [ticker] at [entry] with [qty] shares on
-    [side]. Mirrors the helper in [test_harvest_rotate_runner.ml]; used to seed
-    the long-notional accumulator. *)
+    [side]. Used to seed the long-notional accumulator. *)
 let _make_holding ?(side = Trading_base.Types.Long) ~ticker ~qty ~entry () :
     Position.t =
   let date = Date.of_string "2024-06-14" in

@@ -95,8 +95,6 @@ type config = {
   stale_exit_after_days : int option;
       [@sexp.default Some default_stale_exit_days]
       (** See [.mli]. *)
-  enable_harvest_rotate : bool; [@sexp.default false]  (** See [.mli]. *)
-  harvest_fraction : float; [@sexp.default 0.5]  (** See [.mli]. *)
   short_sleeve_fraction : float; [@sexp.default 0.0]  (** See [.mli]. *)
   extension_stop_config : Weinstein_stops.Extension_stop.config;
       [@sexp.default Weinstein_stops.Extension_stop.default_config]
@@ -219,8 +217,6 @@ let default_config ~universe ~index_symbol =
     enable_macro_bearish_exposure_trim = false;
     macro_bearish_max_long_exposure_pct = macro_bearish_no_op_cap;
     stale_exit_after_days = Some default_stale_exit_days;
-    enable_harvest_rotate = false;
-    harvest_fraction = 0.5;
     short_sleeve_fraction = 0.0;
     extension_stop_config = Weinstein_stops.Extension_stop.default_config;
     liquidity_config = Liquidity_config.default_config;
