@@ -33,6 +33,17 @@
 > harvest_rotate retirement, #2284 early_admission retirement, #2286
 > cash_reserve retirement, #2288 ladder-v4 read, #2289 residual nondeterminism.
 >
+> **Third result (05:50): a single 26y run cannot rank cells, and now there is a
+> tool for it.** #2279 made runs repeatable, not representative — the return is
+> concentrated in a few trades and the cash queue is saturated, so one run is one
+> draw from a lottery over which monsters get funded. **#2293** adds
+> `TRADING_PATH_SEED_SALT` (a run-level dial, bit-identical when unset) so one
+> config can be run K times for a **distribution**. First measurement: five salts
+> on sp500/5y give mean 112.50, range 2.53pp (**~2.2% relative**), trades
+> identical at 240 — against **~47% relative** for the 26y cells-07/08 pair. Same
+> mechanism, >20x amplification with horizon and breadth, and 26y/top-3000 is
+> where the ladder does its comparisons. **Compare distributions, not points.**
+>
 > The v4 sweep was **not disturbed** — 14/24 at 03:10, chain armed to auto-run
 > cell-00 + cell-09 on the fixed build the moment its exit sentinel appears
 > (`/tmp/chain_26y.log`, worktree `.claude/worktrees/v4-fixed`). Given the 278pp
