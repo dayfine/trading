@@ -44,6 +44,24 @@
 > mechanism, >20x amplification with horizon and breadth, and 26y/top-3000 is
 > where the ladder does its comparisons. **Compare distributions, not points.**
 >
+> **Fourth result (08:35): nearfloor is a RISK dial, not a return dial.** Cell 09
+> re-run against cell 00 in two independent contexts with path salts. The
+> mechanism reproduces everywhere — fewer trades, higher win rate, lower
+> drawdown (26y: 967<1136, 40.4>34.0, 27.0<44.3; 302/6y: 235<291, 37.9>31.4,
+> 15.2<19.1). The **return** advantage appears in exactly one place: the 26y
+> single draw. At 302/6y over three salts core beats nearfloor ~20pp every draw
+> (45.6 vs 25.0) against a ≤6.6pp spread; at sp500/5y, 112.3 vs 38.6. So the
+> question is **not** "does nearfloor earn more" (two contexts say no) but "is
+> the risk reduction worth the return it costs" — a Calmar/Sharpe question
+> (26y: Sharpe .582 vs .457, DD 27.0 vs 44.3). Details: #2288 §3c, memory
+> `project_nearfloor_is_risk_not_return`.
+>
+> **Also (07:13):** Spearman ρ between the 26y single-run ranking and the 500/5y
+> deterministic ranking is **0.239** over 16 cells. Only the two volconf cells
+> hold rank. The control is in the same table — cells 07/08 are the *same*
+> config and rank **1st and 7th** at 26y, so a large part of the disagreement is
+> demonstrably noise rather than scale. #2288 §3b.
+>
 > The v4 sweep was **not disturbed** — 14/24 at 03:10, chain armed to auto-run
 > cell-00 + cell-09 on the fixed build the moment its exit sentinel appears
 > (`/tmp/chain_26y.log`, worktree `.claude/worktrees/v4-fixed`). Given the 278pp
