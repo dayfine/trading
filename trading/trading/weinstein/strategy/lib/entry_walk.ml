@@ -140,8 +140,9 @@ let entries_from_candidates ?sector_lookup
     _make_entry_fn ~config ~bar_reader ~current_date ~stop_states
       ~portfolio_value
   in
-  let spendable, state =
-    Screening_notional.reserve_reduced_walk_state ~config ~portfolio
+  let spendable = portfolio.Portfolio_view.cash in
+  let state =
+    Screening_notional.make_entry_walk_state ~cash:spendable ~config ~portfolio
       ~portfolio_value ~sector_lookup
   in
   let decisions =

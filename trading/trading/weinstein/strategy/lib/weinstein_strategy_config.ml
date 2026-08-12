@@ -108,7 +108,6 @@ type config = {
   scale_in_config : Scale_in_detector.config;
       [@sexp.default Scale_in_detector.default_config]
       (** See [.mli]. *)
-  cash_reserve_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
   max_long_exposure_pct_entry : float; [@sexp.default 0.0]  (** See [.mli]. *)
   initial_long_margin_req : float; [@sexp.default 1.0]  (** See [.mli]. *)
   long_margin_rate_annual_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
@@ -226,7 +225,6 @@ let default_config ~universe ~index_symbol =
     liquidity_config = Liquidity_config.default_config;
     enable_scale_in = false;
     scale_in_config = Scale_in_detector.default_config;
-    cash_reserve_pct = 0.0;
     max_long_exposure_pct_entry = 0.0;
     initial_long_margin_req = 1.0;
     long_margin_rate_annual_pct = 0.0;

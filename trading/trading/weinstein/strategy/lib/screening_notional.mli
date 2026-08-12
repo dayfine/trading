@@ -89,19 +89,3 @@ val make_entry_walk_state :
     positions' notional (empty when [sector_lookup] is [None]). The short/sector
     caps come from [config.portfolio_config]; the long cap comes from
     [config.max_long_exposure_pct_entry] ([Float.infinity] when [<= 0.0]). *)
-
-val reserve_reduced_walk_state :
-  config:Weinstein_strategy_config.config ->
-  portfolio:Portfolio_view.t ->
-  portfolio_value:float ->
-  sector_lookup:(string -> string option) option ->
-  float * entry_walk_state
-(** Cash-reserve knob: hold back [config.cash_reserve_pct] of portfolio value
-    from the per-Friday entry-funding budget and seed the walk state with the
-    remainder — [spendable = max 0 (cash - cash_reserve_pct * portfolio_value)],
-    returned alongside the state. Default [0.0] => [spendable = cash],
-    bit-identical to baseline. The reserve is subtracted exactly once here (off
-    the top-level budget); the short-sleeve split derives from [spendable] so it
-    is never charged twice. Scoped to NEW entries only — exits/covers/stops do
-    not flow through the entry walk. See
-    [Weinstein_strategy_config.cash_reserve_pct]. *)
