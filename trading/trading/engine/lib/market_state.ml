@@ -49,9 +49,25 @@ let _scratch_for t ~symbol =
     Hashtbl.set t.scratches ~key:symbol ~data:grown;
     grown
 
+(* [Price_path.default_config] carries [seed = None], which makes path
+   generation draw from [Random.State.make_self_init ()] — a fresh path per
+   call, so the same backtest binary produced different fill prices on every
+   run. Derive the seed from the bar instead, which makes the path a function of
+   the bar (the contract [.mli] already claims) while keeping the noise
+   independent across bars and symbols. An explicitly configured [seed] still
+   wins: that is the escape hatch for tests that want one fixed draw. *)
+let _config_for t bar =
+  match t.path_config.Price_path.seed with
+  | Some _ -> t.path_config
+  | None ->
+      {
+        t.path_config with
+        Price_path.seed = Some (Price_path.seed_for_bar bar);
+      }
+
 let _generate t ~symbol bar =
   let scratch = _scratch_for t ~symbol in
-  Price_path.generate_path_into ~scratch ~config:t.path_config bar
+  Price_path.generate_path_into ~scratch ~config:(_config_for t bar) bar
 
 let path_for t ~symbol =
   match Hashtbl.find t.generated symbol with
