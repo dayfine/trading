@@ -1,5 +1,39 @@
 # Next-session priorities — 2026-08-12
 
+> **AMENDED 03:15 after the overnight run.** Two things below are now wrong and
+> the corrections are the most important content in this file:
+>
+> 1. **The armed-golden "blocker" I described was my own misconfiguration.** CI
+>    sets `TRADING_DATA_DIR=<workspace>/trading/test_data`; I had been running
+>    against the local `data/` warehouse. Under CI's path the `six-year-2018-2023`
+>    golden reads 79.134696483942491 / 321 — dead on its pinned band. Local
+>    reproduces CI exactly. The 27 local `runtest` failures are the same
+>    misconfiguration, not a repo property.
+> 2. **PR #2279 is a partial fix.** A second nondeterminism source remains —
+>    decision-level (trade count moves 240↔241), reproducing under CI's data path
+>    and not the local warehouse. `dev/notes/residual-nondeterminism-2026-08-12.md`,
+>    PR #2289. The armed golden is written, validated, and **parked** until it's
+>    closed.
+>
+> **New headline result: the 26y noise floor is ~278pp**, measured from the
+> sweep's own cells 07/08 — which are one configuration spelled two ways.
+> `dev/notes/ladder-v4-read-2026-08-12.md`, PR #2288. Only volconf's reject
+> survives it; **nearfloor's 670.0 is not a result**, and a deterministic 24-cell
+> re-run at 500/5y reverses it.
+>
+> P0 item 1 below ("measure the null at v4 scale") is therefore **done**, for
+> free, without the ~5h of dedicated re-runs it budgeted.
+>
+> Open PRs at handoff, all CI-green, none merged (code PRs need the two QC
+> gates): #2279 fix (partial, see correction), #2280 harness wrapper, #2283
+> harvest_rotate retirement, #2284 early_admission retirement, #2286
+> cash_reserve retirement, #2288 ladder-v4 read, #2289 residual nondeterminism.
+>
+> The v4 sweep was **not disturbed** — 14/24 at 03:10, chain armed to auto-run
+> cell-00 + cell-09 on the fixed build the moment its exit sentinel appears
+> (`/tmp/chain_26y.log`, worktree `.claude/worktrees/v4-fixed`). Given the 278pp
+> null, treat those two runs as a determinism check rather than as the ranking.
+
 **Supersedes** `next-session-priorities-2026-08-11.md` for priorities. That
 file's *ladder-v4 pickup instructions and Stage-A results table are still
 live* — read them there, but read them through the correction below.

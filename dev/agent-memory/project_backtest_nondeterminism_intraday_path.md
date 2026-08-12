@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: d7d8f2bb-6b58-4fde-8e01-c50e796e5faa
-  modified: 2026-08-12T06:14:54.331Z
+  modified: 2026-08-12T10:06:40.606Z
 ---
 
 Until PR #2279 (2026-08-11), **armed-StopLimit backtests returned a different
@@ -20,7 +20,18 @@ armed-StopLimit entry family, which no golden arms. Goldens were verifiably
 bit-identical run to run, so the whole gate surface was blind by construction.
 This is the mechanism behind "zero of the 10 golden specs arm that family".
 
-**Fix:** `Market_state` derives the seed from the bar (`Price_path.seed_for_bar`
+**⚠ THE FIX IS PARTIAL.** #2279 removes this source but **a second remains**
+(2026-08-12): same binary/spec/env back to back gave 112.755/241 trades vs
+112.670/240. The moving *trade count* makes it decision-level (admission or
+ordering), not price noise. It reproduces under
+`TRADING_DATA_DIR=<repo>/trading/test_data` and not under the local `data/`
+warehouse. Likely class named by the G6 comment at `order_generator.ml:18`:
+unstable order ids → different `Manager.list_orders` hashtable iteration →
+different fill order. Untraced. See
+`dev/notes/residual-nondeterminism-2026-08-12.md`; the armed-StopLimit golden is
+parked until it's fixed (`dev/experiments/armed-stoplimit-golden-parked-2026-08-12/`).
+
+**Fix (source 1):** `Market_state` derives the seed from the bar (`Price_path.seed_for_bar`
 = ticker + four prices) when none is configured — path is a function of the bar,
 noise still independent across bars/symbols. Explicit `seed = Some s` still
 wins. Unarmed golden bit-identical pre/post (100.63260509255689), armed probe
