@@ -30,6 +30,31 @@ Call legend: **RETIRE** (terminal REJECT, remove flag+code+tests) /
 **DEFER** (decision blocked on an in-flight program) /
 **UNKNOWN** (no verdict found — needs human/ledger check).
 
+## Correction log
+
+**2026-08-12 — `trigger_on_weekly_close` reclassified RETIRE -> KEEP.** Caught
+while attempting the removal: the flag is armed by live production code
+(`Stop_thread`, the weekly picks report), which the ledger REJECT did not
+cover because that verdict was about the *simulator lever*, not the field.
+
+The general lesson for the rest of this worklist: a ledger REJECT retires a
+**mechanism**, not necessarily a **field**. Before removing any row, grep for
+code that *assigns* the flag — not just scenario specs that override it:
+
+```sh
+git grep -n '<flag> *=' -- 'trading/**/*.ml' | grep -v /test/ | grep -v 'sexp.default'
+```
+
+Anything beyond the `default_config` assignment is a live consumer. Goldens
+will not catch this class: they exercise the backtest path only, so a flag armed
+by the snapshot generator or any other non-backtest surface stays bit-identical
+in every golden while being load-bearing in production.
+
+Audited on 2026-08-12 against the three already-removed rows
+(`enable_harvest_rotate` / `harvest_fraction`, `early_admission_ma_period`,
+`cash_reserve_pct`): each had only its `default_config` assignment, so those
+removals are clean.
+
 ## RETIRE — graveyard (seeded by the 08-09 priorities doc)
 
 | field | config module | default | ledger verdict (pointer) | call | notes |
@@ -42,7 +67,7 @@ Call legend: **RETIRE** (terminal REJECT, remove flag+code+tests) /
 | `enable_scale_in` + `scale_in_config` | `Weinstein_strategy_config` | `false` / `Scale_in_detector.default_config` | REJECT — `2026-07-03-scale-in-v1-surface` + `2026-07-05-continuation-add-v2-surface`; `project_capital_mgmt_scale_in_design` (v1+v2 CLOSED) | RETIRE | "Breadth IS the edge" — sizing mechanics closed. |
 | `enable_macro_bearish_exposure_trim` | `Weinstein_strategy_config` | `false` | REJECT-leaning — `project_macro_bearish_trim_lever` (regime-dependent); seeded graveyard 08-09 | RETIRE | Memory had earlier kept it as a default-off axis; the 08-09 priorities doc reclassifies it graveyard. Cite that supersession in the removal PR. |
 | `macro_bearish_max_long_exposure_pct` | `Weinstein_strategy_config` | `0.70` | same as `enable_macro_bearish_exposure_trim` | RETIRE | Companion knob; same commit. |
-| `trigger_on_weekly_close` | `Weinstein_stops.config` (`stop_types.mli`) | `false` | REJECT — `2026-05-31-exit-timing-deep-2000-2026` (9 Rejects); `project_weekly_close_stop_lever` (stop cost = structural premium) | RETIRE | The weekly-close stop lever. |
+| `trigger_on_weekly_close` | `Weinstein_stops.config` (`stop_types.mli`) | `false` | REJECT as a backtest lever — `2026-05-31-exit-timing-deep-2000-2026` (9 Rejects); `project_weekly_close_stop_lever` | **KEEP — NOT RETIRABLE** | **Corrected 2026-08-12.** The flag has a LIVE production consumer the ledger verdict does not cover: `Stop_thread._weekly_close_config` (`trading/trading/weinstein/snapshot/gen/lib/stop_thread.ml:34`) sets it to `true` on purpose, because that path replays **weekly** bars where the default intra-bar trigger would fire on an intra-week wick — and the book's rule is a weekly CLOSE. Reached from the weekly picks report via `held_position_row.ml`. The REJECT was about *arming it in the simulator*, not about deleting the field. Removing it would silently break the weekly report, and **no golden would catch it** — the goldens do not exercise the snapshot generator. |
 | `vol_scaled_stop_atr_mult` | `Weinstein_stops.config` | `0.0` | NO-BUILD/REJECT — `project_p0_levers_no_build_2026_06_20` (vol-stop fails); seeded graveyard 08-09 | RETIRE | Vol-scaled stop. |
 | `vol_scaled_stop_atr_period` | `Weinstein_stops.config` | `14` | same as `vol_scaled_stop_atr_mult` | RETIRE | Companion knob; same commit (also delete `vol_scaled_stop.ml/.mli`). |
 | `cash_reserve_pct` | `Weinstein_strategy_config` | `0.0` | REJECT — `2026-07-06-cash-reserve-surface`; `project_cash_reserve_rejected` (envelope closed) | RETIRE | Protection lever superseded by barbell. |
