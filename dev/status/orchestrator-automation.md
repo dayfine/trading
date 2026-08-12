@@ -557,6 +557,68 @@ convention above is the cheap mitigation.
   but it is the one defect both silent runs demonstrably hit, and it is
   independently worth fixing.
 
+  **RECURRED 2026-08-10 → 2026-08-12, at ~6x the measured cost, across FIVE
+  consecutive runs.** Measured by run `31596975517` from the workflow logs:
+
+  | run | slot | conclusion | `Using daily summary:` | cost |
+  |---|---|---|---|---|
+  | 31367887011 | 08-10 07:56 | success | `dev/daily/2026-08-09-run2.md` | — |
+  | 31388568372 | 08-10 12:33 | **failure** | agent step died before the locator | $54.20 |
+  | 31470174724 | 08-11 07:44 | success | `dev/daily/2026-08-07.md` | $12.28 |
+  | 31491648198 | 08-11 12:31 | success | `dev/daily/2026-08-06.md` | $9.37 |
+  | 31575697571 | 08-12 07:50 | **failure** | agent step died before the locator | $54.73 |
+
+  **Zero daily summaries reached `main` for 08-10, 08-11 or 08-12** (confirmed:
+  `ls dev/daily/2026-08-1*.md` → none; `git ls-remote --heads origin 'ops/daily-*'`
+  → empty). ~**$130.58** of measured spend produced no human-readable record.
+
+  Three refinements to the diagnosis above, all newly measured:
+
+  1. **It is the *fallback* at `orchestrator.yml:334`, not the primary lookup at
+     `:332`.** The primary is already date-scoped
+     (`dev/daily/${DATE}.md dev/daily/${DATE}-run*.md`) and correctly returns
+     empty. The bug is that the next line then globs **all** summaries
+     (`ls -t dev/daily/*.md | grep -v -- '-summary\.md$' | head -n 1`) and
+     substitutes whatever it finds. Fixing the fallback alone closes this.
+  2. **`ls -t` is not merely "typically a different run's file" — it is
+     *arbitrary*.** On a fresh `actions/checkout` every file carries the checkout
+     mtime, so the ordering is checkout order, not date order. That is why the
+     three runs selected three *different* and progressively **older** files. Live
+     proof from this run's own checkout — the two files differ by **1 ms**, in the
+     wrong direction:
+
+     ```
+     2026-08-12 12:37:05.363595298 +0000 dev/daily/2026-08-09.md       <- ls -t ranks first
+     2026-08-12 12:37:05.362595291 +0000 dev/daily/2026-08-09-run2.md  <- actual latest
+     ```
+
+     This also affects the **orchestrator's own Step 1b**, which uses the same
+     `ls -t … | head -1` idiom to find the prior summary for drift detection. This
+     run hit it: `ls -t` offered `2026-08-09.md` when `2026-08-09-run2.md` was the
+     real predecessor.
+  3. **A plain lexicographic `sort -r` is ALSO wrong** and must not be the fix:
+     `-` (0x2D) sorts before `.` (0x2E), so `2026-08-09-run2.md` sorts *before*
+     `2026-08-09.md`. Correct ordering needs a `(date, run_number)` key with the
+     un-suffixed file treated as run 1.
+
+  **Consequences observed this time**, beyond the lost records: PRs **#2265** and
+  **#2266** were dispatched and fully QC'd by run `31388568372` on 08-10 and then
+  **sat as stranded drafts for two days** — #2266 with a structural APPROVE and no
+  behavioral review ever run, #2265 with a behavioral NEEDS_REWORK nobody acted
+  on. #2285 (08-12) likewise sat structurally-approved and unmerged. Neither
+  Step 0.5 nor any later run picked them up, because a run that writes no summary
+  also leaves no `## Pending work` table for its successor to read. **The summary
+  is not just a report — it is the inter-run handoff**, so losing it strands the
+  work as well as the record. Run `31596975517` cleared all three.
+
+  Recommended fix ordering, cheapest first: **(a)** make the fallback a hard
+  `::error::` (a run that wrote no summary should fail loudly, not inherit one) —
+  this is a 3-line change and closes the whole class; **(b)** have the
+  orchestrator emit its summary path to `$GITHUB_OUTPUT` so the workflow never has
+  to guess; **(c)** fix the `(date, run_number)` ordering in both the workflow and
+  the agent's Step 1b. Blocked on `.github/workflows/**` write access for (a)/(b)
+  and `.claude/**` for (c).
+
 ### A-GIT-SAFE-DIRECTORY — `git` is dead on arrival in the orchestrator container
 
 - [ ] **A-GIT-SAFE-DIRECTORY — every orchestrator run begins with `git`
