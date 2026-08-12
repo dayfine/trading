@@ -82,6 +82,37 @@ let test_repeated_calls_within_tick_memoized _ =
     (Option.map first ~f:prices)
     (is_some_and (equal_to (Option.value_exn (Option.map second ~f:prices))))
 
+(* The salt selects a different path realisation without touching any decision
+   rule. [0] must be bit-identical to the unsalted build, or every existing
+   pinned number moves. *)
+let test_salt_zero_matches_unsalted _ =
+  assert_that
+    (Price_path.seed_for_bar ~salt:0 a_bar)
+    (equal_to (Price_path.seed_for_bar a_bar))
+
+let test_nonzero_salt_changes_the_seed _ =
+  assert_that
+    (Price_path.seed_for_bar ~salt:1 a_bar = Price_path.seed_for_bar a_bar)
+    (equal_to false)
+
+(* Distinct salts must not collapse onto one realisation, or a K-salt sweep
+   would silently measure the same draw K times. *)
+let test_distinct_salts_stay_distinct _ =
+  let seeds =
+    List.map [ 1; 2; 3; 4; 5 ] ~f:(fun salt ->
+        Price_path.seed_for_bar ~salt a_bar)
+  in
+  assert_that
+    (List.length (List.dedup_and_sort seeds ~compare:Int.compare))
+    (equal_to 5)
+
+(* A salted seed is still a function of the bar: same salt + same bar => same
+   seed, so a salted run is as reproducible as an unsalted one. *)
+let test_salted_seed_is_reproducible _ =
+  assert_that
+    (Price_path.seed_for_bar ~salt:7 a_bar)
+    (equal_to (Price_path.seed_for_bar ~salt:7 a_bar))
+
 let test_unknown_symbol_is_none _ =
   let t = Market_state.create () in
   Market_state.update t ~path_config:Price_path.default_config [ a_bar ];
@@ -99,6 +130,12 @@ let suite =
          "repeated calls within a tick are memoized"
          >:: test_repeated_calls_within_tick_memoized;
          "unknown symbol has no path" >:: test_unknown_symbol_is_none;
+         "salt 0 is bit-identical to unsalted"
+         >:: test_salt_zero_matches_unsalted;
+         "a non-zero salt changes the seed"
+         >:: test_nonzero_salt_changes_the_seed;
+         "distinct salts stay distinct" >:: test_distinct_salts_stay_distinct;
+         "a salted seed is reproducible" >:: test_salted_seed_is_reproducible;
        ]
 
 let () = run_test_tt_main suite

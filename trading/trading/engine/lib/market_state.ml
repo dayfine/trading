@@ -56,13 +56,30 @@ let _scratch_for t ~symbol =
    the bar (the contract [.mli] already claims) while keeping the noise
    independent across bars and symbols. An explicitly configured [seed] still
    wins: that is the escape hatch for tests that want one fixed draw. *)
+(* Which intraday-path realisation this process draws. A run-level dial, not a
+   strategy parameter — it changes no decision rule, only which of the equally
+   valid paths through each bar the simulator walks — so it is read from the
+   environment like [SNAPSHOT_CACHE_MB] rather than threaded through
+   [Weinstein_strategy.config]. Unset, empty, or unparseable reads as [0], which
+   is bit-identical to the pre-salt build.
+
+   Its purpose is to make a backtest comparison POSSIBLE, not merely repeatable:
+   one config run across K salts yields a distribution, and a distribution is
+   what ranking two configs actually requires. See [bar_shape.mli]. *)
+let _path_seed_salt =
+  lazy
+    (match Sys.getenv "TRADING_PATH_SEED_SALT" with
+    | None -> 0
+    | Some s -> ( try Int.of_string (String.strip s) with _ -> 0))
+
 let _config_for t bar =
   match t.path_config.Price_path.seed with
   | Some _ -> t.path_config
   | None ->
       {
         t.path_config with
-        Price_path.seed = Some (Price_path.seed_for_bar bar);
+        Price_path.seed =
+          Some (Price_path.seed_for_bar ~salt:(Lazy.force _path_seed_salt) bar);
       }
 
 let _generate t ~symbol bar =

@@ -26,8 +26,21 @@ val decide_high_first : Random.State.t -> price_bar -> bool
     {!infer_volatility_scale}, clamped to [[0.2, 0.8]] so the order is never
     fully determined. A doji (close = open) is an unbiased flip. *)
 
-val seed_for_bar : price_bar -> int
+val seed_for_bar : ?salt:int -> price_bar -> int
 (** A deterministic seed derived from the bar's ticker and its four prices.
+
+    [salt] selects which intraday-path {e realisation} the run draws, without
+    touching any strategy parameter. [0] (the default) returns the unsalted hash
+    verbatim, so the default path is bit-identical to the pre-salt build; a
+    non-zero salt gives an independent but equally reproducible set of paths.
+
+    This exists because determinism alone does not make a backtest
+    {e representative}. The strategy's return is concentrated in a handful of
+    trades, and a saturated cash queue means a cent of fill difference changes
+    which of them get funded — so a single run is one draw from a lottery, and
+    two configurations cannot be ranked by comparing one draw each. Running one
+    config across K salts yields a distribution, which is what a comparison
+    actually needs. See `dev/notes/ladder-v4-read-2026-08-12.md` §1b.
 
     Callers that must be reproducible across processes — every backtest —
     generate paths under [{ config with seed = Some (seed_for_bar bar) }] rather
