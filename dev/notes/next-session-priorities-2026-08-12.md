@@ -9,11 +9,15 @@
 >    golden reads 79.134696483942491 / 321 — dead on its pinned band. Local
 >    reproduces CI exactly. The 27 local `runtest` failures are the same
 >    misconfiguration, not a repo property.
-> 2. **PR #2279 is a partial fix.** A second nondeterminism source remains —
->    decision-level (trade count moves 240↔241), reproducing under CI's data path
->    and not the local warehouse. `dev/notes/residual-nondeterminism-2026-08-12.md`,
->    PR #2289. The armed golden is written, validated, and **parked** until it's
->    closed.
+> 2. ~~PR #2279 is a partial fix.~~ **RETRACTED — that was my error.** I claimed
+>    a second nondeterminism source survived; the runs behind it were built from
+>    `cleanup/*` branches cut off main *before* #2279 merged, so they exercised a
+>    **pre-fix binary**. Re-run on post-merge main: `112.28323995525771` / 240
+>    trades twice, byte-identical `trades.csv`, agreeing with a third measurement
+>    on the fix branch itself. #2279 is complete; #2289 is closed as wrong. **The
+>    armed golden is unblocked and lands in #2291** with those values pinned.
+>    Lesson, applied to me: a determinism check must hold the binary fixed —
+>    `git log main` for the merge before treating a moving number as a defect.
 >
 > **New headline result: the 26y noise floor is ~278pp**, measured from the
 > sweep's own cells 07/08 — which are one configuration spelled two ways.
@@ -25,7 +29,7 @@
 > free, without the ~5h of dedicated re-runs it budgeted.
 >
 > Open PRs at handoff, all CI-green, none merged (code PRs need the two QC
-> gates): #2279 fix (partial, see correction), #2280 harness wrapper, #2283
+> gates): #2279 fix (MERGED), #2280 harness wrapper, #2283
 > harvest_rotate retirement, #2284 early_admission retirement, #2286
 > cash_reserve retirement, #2288 ladder-v4 read, #2289 residual nondeterminism.
 >

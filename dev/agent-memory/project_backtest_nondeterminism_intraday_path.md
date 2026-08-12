@@ -20,18 +20,7 @@ armed-StopLimit entry family, which no golden arms. Goldens were verifiably
 bit-identical run to run, so the whole gate surface was blind by construction.
 This is the mechanism behind "zero of the 10 golden specs arm that family".
 
-**⚠ THE FIX IS PARTIAL.** #2279 removes this source but **a second remains**
-(2026-08-12): same binary/spec/env back to back gave 112.755/241 trades vs
-112.670/240. The moving *trade count* makes it decision-level (admission or
-ordering), not price noise. It reproduces under
-`TRADING_DATA_DIR=<repo>/trading/test_data` and not under the local `data/`
-warehouse. Likely class named by the G6 comment at `order_generator.ml:18`:
-unstable order ids → different `Manager.list_orders` hashtable iteration →
-different fill order. Untraced. See
-`dev/notes/residual-nondeterminism-2026-08-12.md`; the armed-StopLimit golden is
-parked until it's fixed (`dev/experiments/armed-stoplimit-golden-parked-2026-08-12/`).
-
-**Fix (source 1):** `Market_state` derives the seed from the bar (`Price_path.seed_for_bar`
+**Fix:** `Market_state` derives the seed from the bar (`Price_path.seed_for_bar`
 = ticker + four prices) when none is configured — path is a function of the bar,
 noise still independent across bars/symbols. Explicit `seed = Some s` still
 wins. Unarmed golden bit-identical pre/post (100.63260509255689), armed probe
@@ -46,6 +35,15 @@ the fixed build. The ladder-v3-vs-v4 cell-00 gap is **not** attributable to a
 code regression on current evidence — the five-commit bisect that chased it
 returned per-commit deltas (0.06–1.12pp, n=1 each) sitting inside a 0.774pp
 null.
+
+**Verified complete** (2026-08-12): three independent post-fix measurements
+agree exactly — 302/6y and 500/5y under the local warehouse, and 500/5y under
+CI's committed data (`112.28323995525771` / 240 trades twice, byte-identical
+`trades.csv`). An earlier "residual source" claim was my own error: those runs
+were built from branches cut off main *before* the fix merged, so they exercised
+a pre-fix binary. A determinism check must hold the binary fixed — check
+`git log main` for the merge before treating a moving number as a new defect.
+The armed-StopLimit golden that closes the gate hole is PR #2291.
 
 Writeup: `dev/notes/backtest-nondeterminism-2026-08-11.md`. Probe spec:
 `trading/test_data/backtest_scenarios/experiments/armed-stoplimit-repro-2026-08-11/`
