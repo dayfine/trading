@@ -15,6 +15,17 @@
 
 type t
 
+val parse_salt : string option -> int
+(** Parse the [TRADING_PATH_SEED_SALT] value into a path-realisation salt.
+
+    Exposed only so the degenerate inputs are testable without mutating the
+    process environment. [None] (unset), an empty/blank string, and any
+    unparseable value all yield [0], which reproduces the unsalted build
+    bit-for-bit. The empty case is the one that matters in practice: the
+    documented sweep loop sets the variable per iteration, so a typo'd variable
+    name reads empty every time and would otherwise collapse a K-salt sweep onto
+    a single draw without any visible failure. *)
+
 val create : unit -> t
 (** Empty market state: no bars observed, empty scratch pool and memo. *)
 
