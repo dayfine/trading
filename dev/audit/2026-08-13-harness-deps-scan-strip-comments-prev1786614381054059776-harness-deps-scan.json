@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-13",
+  "feature": "harness-deps-scan",
+  "branch": "harness/deps-scan-strip-comments",
+  "sha": "bea63e83",
+  "recorded_at_ns": 1786614381054059776,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "LINTER_CANDIDATE: assertion 9 fixture noise inert; partial-line-strip mutation passes 10/10",
+  "quality_score": 2,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": ""
+}
