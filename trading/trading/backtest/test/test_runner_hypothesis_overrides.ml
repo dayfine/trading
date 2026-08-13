@@ -576,40 +576,6 @@ let test_unknown_key_error_reports_overlay_index _ =
           ]))
 
 (* -------------------------------------------------------------------- *)
-(* cash_reserve_pct — working replacement for dead Portfolio_risk.min_cash_pct *)
-(* -------------------------------------------------------------------- *)
-
-(** [cash_reserve_pct] defaults to [0.0] when omitted from the sexp (backward
-    compat — every existing golden/baseline decodes unchanged). The working,
-    live-path replacement for the dead [Portfolio_risk.min_cash_pct]
-    (dev/notes/envelope-knobs-dead-2026-07-05.md). *)
-let test_default_cash_reserve_pct_is_zero _ =
-  let cfg = _default_config () in
-  assert_that cfg.cash_reserve_pct (float_equal 0.0)
-
-(** Deep-merge path for [cash_reserve_pct]: a
-    [--override '((cash_reserve_pct 0.30))'] round-trips through the sexp merge
-    and lands the explicit value. *)
-let test_override_cash_reserve_pct _ =
-  let merged =
-    _apply_one_override (_default_config ())
-      (Sexp.of_string "((cash_reserve_pct 0.30))")
-  in
-  assert_that merged.cash_reserve_pct (float_equal 0.30)
-
-(** Axis reachability (experiment-flag-discipline R2): the [cash_reserve_pct]
-    override sexp resolves through the {b real}
-    [Overlay_validator.apply_overrides] (the sweep / WF-CV path) with no
-    unknown-key error, and lands the value — this is what makes
-    [((cash_reserve_pct 0.30))] a valid [Variant_matrix] axis. *)
-let test_cash_reserve_pct_axis_resolves_via_overlay_validator _ =
-  let merged =
-    Backtest.Overlay_validator.apply_overrides (_default_config ())
-      [ Sexp.of_string "((cash_reserve_pct 0.30))" ]
-  in
-  assert_that merged.cash_reserve_pct (float_equal 0.30)
-
-(* -------------------------------------------------------------------- *)
 (* extension_stop_config — tail-insurance trail (default-off nested axis) *)
 (* -------------------------------------------------------------------- *)
 
@@ -942,12 +908,6 @@ let suite =
          >:: test_override_virgin_crossing_readmission;
          "error message reports overlay index for multi-overlay runs"
          >:: test_unknown_key_error_reports_overlay_index;
-         "default cash_reserve_pct is zero"
-         >:: test_default_cash_reserve_pct_is_zero;
-         "override cash_reserve_pct through sexp"
-         >:: test_override_cash_reserve_pct;
-         "cash_reserve_pct axis resolves via Overlay_validator"
-         >:: test_cash_reserve_pct_axis_resolves_via_overlay_validator;
          "default extension_stop_config is no-op"
          >:: test_default_extension_stop_config_is_no_op;
          "override extension_stop_config through sexp"
