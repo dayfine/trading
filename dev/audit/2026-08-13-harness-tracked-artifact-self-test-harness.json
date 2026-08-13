@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-13",
+  "feature": "harness",
+  "branch": "harness/tracked-artifact-self-test",
+  "sha": "afe3f36a",
+  "recorded_at_ns": 1786612072090926427,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "tracked_artifact_linter allow-list positive direction is untested: deleting allow-list parsing entirely leaves the 4-fixture suite green",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
