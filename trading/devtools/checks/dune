@@ -491,7 +491,7 @@
 ; linter_exceptions.conf. Generalizes the #2248 fix (trading/compile_commands.json
 ; tracked 3x: #1299, #2085, #2129) from one path to the whole class. See
 ; tracked_artifact_linter.sh header for the full design-trade-off writeup.
-; Reads live git state via repo_root() + `git ls-files -i -c --exclude-standard`
+; Reads live git state via repo_root() + `git ls-files -i -c --exclude-per-directory=.gitignore`
 ; (real working tree, not the dune sandbox mirror), so (universe) is required
 ; -- same reasoning as no_python_check.sh directly above.
 

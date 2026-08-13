@@ -4,7 +4,7 @@
 # qc-behavioral review).
 #
 # tracked_artifact_linter.sh's core logic is non-trivial (allow-list prefix
-# construction from linter_exceptions.conf, `-i -c --exclude-standard`
+# construction from linter_exceptions.conf, `-i -c --exclude-per-directory=.gitignore`
 # semantics, the anchored-`^prefix` allow-list match, and the git-error
 # short-circuit added by PR #2252) and had no fixture coverage. This test
 # builds real throwaway git repos under `mktemp -d` (real `git init`, real
@@ -33,6 +33,16 @@
 #      the exact CI failure class (`fatal: detected dubious ownership`)
 #      PR #2252's rework fixed; this fixture pins it against regressing
 #      back to the pre-fix `set -e`-kills-silently shape.
+#   5. Developer-local excludes, added when the linter moved from
+#      `--exclude-standard` to `--exclude-per-directory=.gitignore`: one
+#      repo with a tracked file matched only by `.git/info/exclude`, a
+#      tracked file matched only by `core.excludesFile`, and a tracked
+#      file matched by the repo's own `.gitignore` -> expect exit 1 naming
+#      ONLY the last one. Carrying all three shapes in one repo means the
+#      fixture cannot be satisfied by a linter that simply stopped
+#      ignoring things. Mutation that reddens it: reinstating
+#      `--exclude-standard` (either developer-local path then appears in
+#      the violation list).
 #
 # Each of fixtures 1-3 runs against a PRIVATE copy of the linter (plus
 # _check_lib.sh) in its own mktemp'd "checks dir", paired with a
@@ -158,7 +168,7 @@ fi
 # =============================================================================
 # Fixture 3: unignored-artifact-type limitation -> exit 0 (documented blind
 # spot: a force-added file matching NO .gitignore pattern is invisible to
-# `git ls-files -i -c --exclude-standard`, so the linter cannot see it)
+# `git ls-files -i -c --exclude-per-directory=.gitignore`, so the linter cannot see it)
 # =============================================================================
 
 REPO3="${BASE_DIR}/repo3"
@@ -204,6 +214,58 @@ if [ "$CODE4" -ne 0 ] \
   ok "fixture 4 — git invocation failure (non-repo REPO_ROOT) -> distinct FAIL message, exit 1, no false-OK"
 else
   bad "fixture 4 — expected non-zero exit with the 'could not read the git index' message and no OK: line; got exit=$CODE4 output=<<$OUT4>>"
+fi
+
+# =============================================================================
+# Fixture 5: developer-local excludes must NOT produce violations, while
+# repo-controlled .gitignore patterns still must. One repo carrying all
+# three shapes at once, so the fixture cannot be satisfied by a linter that
+# simply stopped ignoring things:
+#
+#   local_via_info_exclude.txt  tracked, matched ONLY by .git/info/exclude
+#   local_via_excludes_file.txt tracked, matched ONLY by core.excludesFile
+#   real.novelartifact          tracked, matched by the repo's .gitignore
+#
+# Expect exit 1 naming ONLY real.novelartifact. `.git/info/exclude` and
+# `core.excludesFile` are per-developer state that never reaches CI, so a
+# check gated on them reports a legitimately-tracked source file as a
+# violation on one machine and not another. See the linter's
+# `--exclude-per-directory` comment for the real instance: Claude Code
+# writes `**/.claude/scheduled_tasks.lock` and
+# `**/.claude/settings.local.json` into `.git/info/exclude`, both of which
+# are tracked on main, and `--exclude-standard` turned that into a
+# local-only `dune runtest` failure invisible to CI.
+# =============================================================================
+
+REPO5="${BASE_DIR}/repo5"
+init_git_repo "$REPO5"
+echo '*.novelartifact' > "${REPO5}/.gitignore"
+echo 'data' > "${REPO5}/real.novelartifact"
+echo 'data' > "${REPO5}/local_via_info_exclude.txt"
+echo 'data' > "${REPO5}/local_via_excludes_file.txt"
+echo 'local_via_info_exclude.txt' >> "${REPO5}/.git/info/exclude"
+echo 'local_via_excludes_file.txt' > "${BASE_DIR}/global_excludes"
+git -C "$REPO5" config core.excludesFile "${BASE_DIR}/global_excludes"
+git -C "$REPO5" add .gitignore
+git -C "$REPO5" add -f real.novelartifact local_via_info_exclude.txt \
+  local_via_excludes_file.txt
+git -C "$REPO5" commit -q -m init
+
+CHECKS5="${BASE_DIR}/checks5"
+make_fixture_checks_dir "$CHECKS5" ""
+
+set +e
+OUT5=$(REPO_ROOT="$REPO5" sh "${CHECKS5}/tracked_artifact_linter.sh" 2>&1)
+CODE5=$?
+set -e
+
+if [ "$CODE5" -ne 0 ] \
+  && echo "$OUT5" | grep -q "real.novelartifact" \
+  && ! echo "$OUT5" | grep -q "local_via_info_exclude" \
+  && ! echo "$OUT5" | grep -q "local_via_excludes_file"; then
+  ok "fixture 5 — repo .gitignore still caught (real.novelartifact) while developer-local .git/info/exclude and core.excludesFile entries are ignored"
+else
+  bad "fixture 5 — expected non-zero exit naming ONLY real.novelartifact (not the two developer-local paths); got exit=$CODE5 output=<<$OUT5>>"
 fi
 
 cleanup
