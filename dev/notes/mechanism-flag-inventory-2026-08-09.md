@@ -55,6 +55,41 @@ Audited on 2026-08-12 against the three already-removed rows
 `cash_reserve_pct`): each had only its `default_config` assignment, so those
 removals are clean.
 
+**2026-08-13 — `enable_continuation_buys` + `continuation_config` reclassified
+RETIRE -> KEEP-AXIS.** Caught during the Rule-4 eligibility screen for the
+removal. Full evidence:
+`dev/plans/continuation-retirement-2026-08-13.md`. Four findings:
+
+1. **The row was never seeded.** The 08-09 priorities doc §P1 graveyard list
+   names *"scale-in v2 continuation-add"* — the **scale-in** mechanism, retired
+   by #2299. This inventory turned that one seed item into two RETIRE rows. By
+   this file's own scope note, an unseeded RETIRE row is a "confirm first" row.
+2. **One cited verdict belongs to a different mechanism.**
+   `2026-07-05-continuation-add-v2-surface` armed `enable_scale_in` +
+   `Scale_in_detector.Consolidation_breakout` (#1855) — code #2299 deleted. It
+   never armed `enable_continuation_buys`. #2299 already spent that verdict.
+3. **No do-not-revive anywhere; an uncancelled revival path instead.**
+   `project_continuation_combined_rejected` says *"if the mechanism is to come
+   back, it needs a different design (eg gated by macro regime …)"*, and
+   `dev/experiments/continuation-combined-2026-05-14/report.md` makes
+   retirement the **fallback if the regime-gated test fails** — that test was
+   never run. This is the deciding asymmetry vs #2299, whose one named revival
+   path *was* recorded as cancelled (`project_envelope_knobs_dead`, #1861).
+4. **It is a Weinstein-documented dial with an open plan.** Entry mode
+   (base vs continuation) is a dial per `.claude/rules/weinstein-faithful-core.md`,
+   which states the #1366 rejection tested a one-at-a-time graft rather than
+   the mechanism; `dev/plans/weinstein-trader-investor-presets-2026-05-31.md`
+   names this flag as the Trader preset's entry-mode config home.
+
+The single on-point REJECT (`2026-05-14-continuation-combined-axis`) is two
+single-run windows on one universe — no folds, no DSR, no deep macro-regime
+cell — and its own comment concedes the config hash is approximate.
+
+**General lesson (extends the 08-12 one):** a ledger REJECT retires the
+mechanism *it actually armed*. Before removing a row, confirm each cited entry
+armed **this** field — and check whether the entry has already been spent on a
+different row.
+
 ## RETIRE — graveyard (seeded by the 08-09 priorities doc)
 
 | field | config module | default | ledger verdict (pointer) | call | notes |
@@ -63,7 +98,6 @@ removals are clean.
 | `stage3_exit_margin_pct` | `Weinstein_strategy_config` | `0.0` | REJECT — `2026-05-29-stage3-hysteresis-wf-cv`, `2026-05-31-exit-timing-hysteresis-revalidated` (9 Rejects); `project_stage3_hysteresis_rejected_wfcv` | RETIRE | The stage3 hysteresis knob (#1362). |
 | `enable_harvest_rotate` | `Weinstein_strategy_config` | `false` | REJECT — `2026-06-11-harvest-rotate-top3000`; `project_harvest_rotate_rejected` (coin-flip per decision) | RETIRE | Winner-trimming taxes the fat tail (`project_edge_is_the_fat_tail`). |
 | `harvest_fraction` | `Weinstein_strategy_config` | `0.5` | same as `enable_harvest_rotate` | RETIRE | Remove in the same commit as its enable flag. |
-| `enable_continuation_buys` + `continuation_config` | `Weinstein_strategy_config` | `false` / `Continuation.default_config` | REJECT — `2026-05-14-continuation-combined-axis` (single-window overfit); `2026-07-05-continuation-add-v2-surface`; `project_continuation_combined_rejected` | RETIRE | Both the standalone mechanism and the scale-in-v2 continuation-add revival rejected. |
 | `enable_scale_in` + `scale_in_config` | `Weinstein_strategy_config` | `false` / `Scale_in_detector.default_config` | REJECT — `2026-07-03-scale-in-v1-surface` + `2026-07-05-continuation-add-v2-surface`; `project_capital_mgmt_scale_in_design` (v1+v2 CLOSED) | RETIRE | "Breadth IS the edge" — sizing mechanics closed. |
 | `enable_macro_bearish_exposure_trim` | `Weinstein_strategy_config` | `false` | REJECT-leaning — `project_macro_bearish_trim_lever` (regime-dependent); seeded graveyard 08-09 | RETIRE | Memory had earlier kept it as a default-off axis; the 08-09 priorities doc reclassifies it graveyard. Cite that supersession in the removal PR. |
 | `macro_bearish_max_long_exposure_pct` | `Weinstein_strategy_config` | `0.70` | same as `enable_macro_bearish_exposure_trim` | RETIRE | Companion knob; same commit. |
@@ -101,6 +135,7 @@ removals are clean.
 | field | config module | default | ledger verdict (pointer) | call | notes |
 |---|---|---|---|---|---|
 | `early_stage2_max_weeks` | `Screener.config` | `4` | value ≤4 pinned — `2026-07-06-early-stage2-window-surface` (alternatives Reject); `project_early_stage2_window_validated` | KEEP-AXIS | Seeded keep. Basis (not value) revisited by async-v2 F1. |
+| `enable_continuation_buys` + `continuation_config` | `Weinstein_strategy_config` | `false` / `Continuation.default_config` | REJECT as default — `2026-05-14-continuation-combined-axis` (two single-run windows, pre-WF-CV); `project_continuation_combined_rejected` names an **uncancelled** regime-gated revival | **KEEP-AXIS — reclassified 2026-08-13**, see Correction log | Was a RETIRE row; the seed was a transcription of the *scale-in* v2 continuation-add item (retired by #2299), and `2026-07-05-continuation-add-v2-surface` armed `enable_scale_in`, not this flag. Weinstein-documented entry-mode dial ("The Trader's Way", Ch. 3) and the Trader preset's config home in `weinstein-trader-investor-presets-2026-05-31.md`. Retirement-eligible once EITHER the trader-preset program is *recorded* as closed, OR the regime-gated surface runs and REJECTs. Evidence: `dev/plans/continuation-retirement-2026-08-13.md`. |
 | `reject_declining_ma_long_entry` | `Weinstein_strategy_config` | `false` | REJECT as default — `2026-06-28-declining-ma-gate-grid`; but `project_declining_ma_gate_breadth_preset` (broad-only ARM-FOR-BROAD preset knob) | KEEP-AXIS | Seeded keep — the model case of REJECT-as-default-but-legitimate-axis. |
 | `enable_slow_grind_short_gate` | `Weinstein_strategy_config` (+ screener mirror) | `false` | REJECT — `2026-06-22-slow-grind-adlive-wfcv`; but `project_decline_character_builds`: deep re-screens blocked on pre-2009 data, not rejected | KEEP-AXIS | Decline-character trio, seeded keep. |
 | `fast_v_arm_on_rate_alone` | `Weinstein_strategy_config` | `false` | Mixed — `2026-06-22-arming-speed-wfcv` Accept, `2026-06-24-arming-speed-adlive-wfcv` Reject; `project_decline_character_builds` | KEEP-AXIS | Decline-character trio. |
@@ -145,10 +180,13 @@ whipsaw suppressors. They are close to one question, not three, and
 
 ## Tallies
 
-- RETIRE (seeded, ready for step-3 removal PRs): **12 rows** (~14 fields)
+- RETIRE (seeded, ready for step-3 removal PRs): **11 rows** (~12 fields)
+  — was 12/~14; `enable_continuation_buys`+`continuation_config` moved to
+  KEEP-AXIS on 2026-08-13 (see Correction log).
 - RETIRE (confirm-first): **5 rows** (~10 fields)
 - KEEP-PROMOTED: **9 rows**
-- KEEP-AXIS: **20 rows** (19 + `cascade_post_stop_cooldown_weeks`, resolved 08-10)
+- KEEP-AXIS: **21 rows** (20 + `enable_continuation_buys`+`continuation_config`,
+  reclassified 08-13)
 - DEFER: **2 rows** (`short_sleeve_fraction`, `stop_anchor_at_entry_base`)
 - UNKNOWN: **0 rows** — all four resolved 2026-08-10, see the RESOLVED section
   above. Net effect: +1 RETIRE (`stage3_reentry_cooldown_weeks`, folded into the
@@ -163,8 +201,11 @@ whipsaw suppressors. They are close to one question, not three, and
    `early_admission_ma_period`.
 2. Then the stop levers (`trigger_on_weekly_close`, vol-scaled pair +
    module, then `catastrophic_stop_pct` if confirmed).
-3. Then the entry-side pairs (`continuation`, `scale_in`) and
-   `macro_bearish` pair.
+3. Then the entry-side pair `scale_in` (done, #2299) and the
+   `macro_bearish` pair. **`continuation` is no longer in this sequence** —
+   reclassified KEEP-AXIS 2026-08-13 (see Correction log); it re-enters only
+   if the trader-preset program is recorded as closed or a regime-gated
+   surface REJECTs.
 4. Long-leverage family (`dawn_*` + long-margin fields) last, as one
    coordinated family removal — only after human confirmation.
 5. Serialize all of these AFTER the in-flight async-v2 PR-1/PR-2
