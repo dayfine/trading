@@ -66,11 +66,18 @@ let _scratch_for t ~symbol =
    Its purpose is to make a backtest comparison POSSIBLE, not merely repeatable:
    one config run across K salts yields a distribution, and a distribution is
    what ranking two configs actually requires. See [bar_shape.mli]. *)
-let _path_seed_salt =
-  lazy
-    (match Sys.getenv "TRADING_PATH_SEED_SALT" with
-    | None -> 0
-    | Some s -> ( try Int.of_string (String.strip s) with _ -> 0))
+(* Pure so the unset / empty / unparseable cases are testable without touching
+   the process environment. An EMPTY value is the dangerous one: the documented
+   sweep loop is `for s in 0 1 2 3 4; do TRADING_PATH_SEED_SALT=$s ...`, and a
+   typo'd variable there reads empty on every iteration, which would silently
+   collapse a K-salt sweep onto the salt-0 draw — exactly what salting exists to
+   prevent. All three degrade to [0]. *)
+let parse_salt (raw : string option) : int =
+  match raw with
+  | None -> 0
+  | Some s -> ( try Int.of_string (String.strip s) with _ -> 0)
+
+let _path_seed_salt = lazy (parse_salt (Sys.getenv "TRADING_PATH_SEED_SALT"))
 
 let _config_for t bar =
   match t.path_config.Price_path.seed with

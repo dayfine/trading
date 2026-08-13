@@ -118,6 +118,50 @@ let test_unknown_symbol_is_none _ =
   Market_state.update t ~path_config:Price_path.default_config [ a_bar ];
   assert_that (Market_state.path_for t ~symbol:"NVDA") is_none
 
+(* The salted branch (`Hashtbl.hash (salt, base)`) had no bar- or
+   symbol-dependence coverage: test_different_bars_differ routes through
+   Market_state, which reads the env salt — unset in the test process — so it
+   only ever exercised the salt=0 branch. Pin the salted branch directly. *)
+let test_salted_seed_still_depends_on_the_bar _ =
+  let other =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:130.0 ~low_price:80.0
+      ~close_price:120.0
+  in
+  assert_that
+    (Price_path.seed_for_bar ~salt:7 a_bar
+    = Price_path.seed_for_bar ~salt:7 other)
+    (equal_to false)
+
+let test_salted_seed_still_depends_on_the_symbol _ =
+  let twin = { a_bar with symbol = "MSFT" } in
+  assert_that
+    (Price_path.seed_for_bar ~salt:7 a_bar
+    = Price_path.seed_for_bar ~salt:7 twin)
+    (equal_to false)
+
+(* Env degradation. Empty is the live hazard: a typo'd variable in the
+   documented sweep loop reads empty every iteration and would collapse the
+   sweep onto one draw. *)
+let test_unset_salt_is_zero _ =
+  assert_that (Market_state.parse_salt None) (equal_to 0)
+
+let test_empty_salt_is_zero _ =
+  assert_that
+    (List.map [ ""; " "; "\t" ] ~f:(fun s -> Market_state.parse_salt (Some s)))
+    (equal_to [ 0; 0; 0 ])
+
+let test_unparseable_salt_is_zero _ =
+  assert_that
+    (List.map [ "abc"; "1.5"; "3x"; "--" ] ~f:(fun s ->
+         Market_state.parse_salt (Some s)))
+    (equal_to [ 0; 0; 0; 0 ])
+
+let test_valid_salt_parses _ =
+  assert_that
+    (List.map [ "0"; "7"; " 42 "; "-3" ] ~f:(fun s ->
+         Market_state.parse_salt (Some s)))
+    (equal_to [ 0; 7; 42; -3 ])
+
 let suite =
   "market_state"
   >::: [
@@ -136,6 +180,14 @@ let suite =
          >:: test_nonzero_salt_changes_the_seed;
          "distinct salts stay distinct" >:: test_distinct_salts_stay_distinct;
          "a salted seed is reproducible" >:: test_salted_seed_is_reproducible;
+         "a salted seed still depends on the bar"
+         >:: test_salted_seed_still_depends_on_the_bar;
+         "a salted seed still depends on the symbol"
+         >:: test_salted_seed_still_depends_on_the_symbol;
+         "unset salt parses to 0" >:: test_unset_salt_is_zero;
+         "empty/blank salt parses to 0" >:: test_empty_salt_is_zero;
+         "unparseable salt parses to 0" >:: test_unparseable_salt_is_zero;
+         "valid salt parses" >:: test_valid_salt_parses;
        ]
 
 let () = run_test_tt_main suite
