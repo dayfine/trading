@@ -729,9 +729,19 @@ let _run_sleeve_entries cfg =
 let test_short_sleeve_default_crowds_out_shorts _ =
   let cfg = default_config ~universe:[ "X" ] ~index_symbol:"GSPCX" in
   let transitions = _run_sleeve_entries cfg in
-  assert_that
-    (_count_entering_side transitions Trading_base.Types.Short)
-    (equal_to 0)
+  assert_that transitions
+    (all_of
+       [
+         field
+           (fun ts -> _count_entering_side ts Trading_base.Types.Short)
+           (equal_to 0);
+         (* Pins that the shorts are crowded out by FUNDED longs, not by a
+            wrongly-zeroed [spendable]: all three $9k longs fit the $30k
+            budget. *)
+         field
+           (fun ts -> _count_entering_side ts Trading_base.Types.Long)
+           (equal_to 3);
+       ])
 
 (** [short_sleeve_fraction = 0.3] reserves $9k (0.30 * $30k PV) for a short-only
     walk, so the $6k short now enters where it was crowded out at 0.0; the longs

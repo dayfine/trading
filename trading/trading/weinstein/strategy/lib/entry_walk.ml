@@ -152,9 +152,8 @@ let entries_from_candidates ?sector_lookup
       _classify_candidates ~held_set ~make_entry ~portfolio_value ~state
         candidates
     else
-      (* Reserved short sleeve: partition the (reserve-reduced) cash budget
-         between a long and a short walk that share [state]'s notional/sector
-         accumulators. *)
+      (* Reserved short sleeve: partition the cash budget between a long and a
+         short walk that share [state]'s notional/sector accumulators. *)
       let short_budget = portfolio_value *. config.short_sleeve_fraction in
       let long_cash = Float.max 0.0 (spendable -. short_budget) in
       _sleeve_decisions ~held_set ~make_entry ~portfolio_value ~state ~long_cash
