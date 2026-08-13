@@ -1,0 +1,17 @@
+# baseline (universes/small.sexp, 302 symbols)
+total_return_pct 65.908134763030574 total_trades 288 win_rate 33.333333333333329 max_drawdown_pct 19.054595721125295 
+universe.txt lines: 302
+wall_seconds: 188.040
+
+# fixture (universes/small-candidates-2018-2023.sexp, 291 symbols)
+total_return_pct 65.908134763030574 total_trades 288 win_rate 33.333333333333329 max_drawdown_pct 19.054595721125295 
+universe.txt lines: 291
+wall_seconds: 185.352
+
+# byte-comparison
+actual.sexp IDENTICAL
+trades.csv IDENTICAL
+equity_curve.csv IDENTICAL
+trade_audit.sexp IDENTICAL
+macro_trend.sexp IDENTICAL
+open_positions.csv IDENTICAL

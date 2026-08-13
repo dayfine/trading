@@ -1,0 +1,5 @@
+(test
+ (name test_candidate_universe)
+ (libraries core ounit2 matchers candidate_universe scenario_lib)
+ (preprocess
+  (pps ppx_sexp_conv)))
