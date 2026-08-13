@@ -219,9 +219,52 @@ Cell 00 vs cell 09 re-run in a **second independent context** — the 302-symbol
 | 00 core-w4 | 47.3 | 41.5 | 48.1 | **45.6** | 6.6 |
 | 09 nearfloor | 25.2 | 24.9 | 24.9 | **25.0** | 0.3 |
 
-Core wins every draw by ~20pp against a draw-spread of at most 6.6pp. Decisive
-at this scale — and note nearfloor is remarkably *stable* across draws (0.3pp),
-which is itself informative.
+Core wins every draw. Decisive at this scale — and note nearfloor is remarkably
+*stable* across draws (0.3pp), which is itself informative.
+
+> **Corrected 2026-08-13 (PR #2288 review).** This cell originally shipped with
+> no spec, results file, or run script — the claim framed with the most
+> statistical rigour and the least traceability. It has since been re-run and
+> committed: `dev/experiments/nearfloor-302-6y-2026-08-13/`.
+>
+> | arm | s0 | s1 | s2 | mean | spread |
+> |---|---|---|---|---|---|
+> | 00 core | 65.91 | 47.33 | 48.27 | 53.84 | **18.58** |
+> | 09 nearfloor | 24.98 | 25.42 | 25.32 | 25.24 | **0.44** |
+>
+> **Nearfloor reproduces essentially exactly** (24.98/25.42/25.32 vs the original
+> 25.2/24.9/24.9) — the stability claim is the strongest number in the cell.
+> **The core draw-spread does not**: the re-run's core range is **18.58pp**,
+> ~2.8x the 6.6pp reported here. The original sentence "against a draw-spread of
+> at most 6.6pp" is struck above; a range from n=3 of a fat-tailed quantity is
+> itself a high-variance estimate, and this one measured the *stable* arm's
+> spread and assumed it described both.
+>
+> The two runs are **not poolable** (an earlier draft quoted a pooled 24.4pp —
+> withdrawn). Both are salts 0/1/2 of the same spec, so post-#2279 they should be
+> bit-identical, and they are not: the old 47.3 aligns to the new **s1** and 48.1
+> is not 48.27. Different generative processes, not six draws of one
+> distribution — which is itself the strongest argument for retiring the old
+> numbers rather than reconciling them.
+>
+> The **win-rate column below was unsourced** when this table was written; it now
+> reproduces for this row (37.87 vs 31.25–33.33). The 26y row's `40.4 > 34.0`
+> still has no committed source — treat it as unverified.
+>
+> The **conclusion is unaffected and in fact stronger**: all six draws separate,
+> with the worst core draw (47.33) beating the best nearfloor draw (25.42) by
+> 21.9pp.
+>
+> What the re-run adds is the *structure* of core's dispersion, which is the
+> risk-dial mechanism made directly visible. Across core's three draws the trade
+> count moves by **one** (288/289/288) and maxDD by **0.009pp**, while return
+> moves **18.58pp** — nearly the whole draw-to-draw difference sits in a single
+> trade's outcome, which is §1b's "a cent re-runs the lottery" seen directly at a
+> scale small enough to inspect. Nearfloor's trade count is exactly invariant
+> (235/235/235) and it holds ~62 days against core's ~41. Stated that way rather
+> than as a ~40x spread *ratio*: that ratio's numerator is an n=3 range from a
+> fat-tailed quantity, which is precisely what the correction above says not to
+> lean on.
 
 ### The mechanism signature is consistent everywhere; only the return flips
 
@@ -229,7 +272,7 @@ which is itself informative.
 |---|---|---|---|---|
 | 26y / top-3000 | 967 < 1136 | 40.4 > 34.0 | 27.0 < 44.3 | **670 > 344** |
 | 500 / 5y | 207 < 240 | — | — | **38.6 < 112.3** |
-| 302 / 6y | 235 < 291 | 37.9 > 31.4 | 15.2 < 19.1 | **25.0 < 45.6** |
+| 302 / 6y | 235 < 288 | 37.87 > 31.25 | 15.09 < 19.05 | **25.24 < 53.84** |
 
 In all three contexts `Nearest` does the same thing: **fewer trades, higher win
 rate, lower drawdown.** That is exactly what a better-anchored stop should do —
