@@ -26,9 +26,16 @@
 ;; dev/notes/ladder-v4-read-2026-08-12.md.
 ;;
 ;; This scenario closes the hole. It is the ladder v2-core entry stack — a
-;; resting StopLimit at the top of the current 4-week trading range, E frozen at
-;; the first qualifying breakout (#2241), honest next-open Market-leg fills
-;; (#2238), support-floor stop — on the canonical sp500 5-year universe.
+;; resting StopLimit at the top of the current 4-week trading range, E frozen
+;; at the first qualifying breakout (#2241), support-floor stop — on the
+;; canonical sp500 5-year universe. [sim_entry_fill_next_open] (#2238,
+;; "honest next-open Market-leg fills") is also set below to match the
+;; intended production config, but it is a NO-OP in this specific scenario:
+;; every entry here resolves to StopLimit via [enable_sim_entry_stoplimit],
+;; and that flag only changes fill semantics for Market-entry orders (see
+;; [_entry_cap_for_sim] in panel_runner.ml). It does not contribute to the
+;; behaviour this golden measures — see the inline comment at its config
+;; site below.
 ;;
 ;; WHAT IT PROTECTS
 ;;
@@ -57,11 +64,44 @@
 ;; 239, then 112.755 / 241, then 112.670 / 240) — that spread is exactly what
 ;; this golden now guards against.
 ;;
-;; Bands are ±10%, tighter than the ±15% house default: this run is
-;; deterministic, so the only legitimate movement is an intentional behaviour
-;; change, which should re-pin rather than slip through a wide band. If a
-;; postsubmit run lands outside these bands, do NOT widen them — that is the
-;; signal this golden exists to raise.
+;; BAND ARITHMETIC (tightened 2026-08-13 — the original ±10% pins were wide
+;; enough that a recurrence of the pre-#2279 wander would sail through
+;; undetected; ±10% around 112.28 spans [101.05, 123.51], well outside even
+;; 114.5):
+;;
+;;   total_return_pct: center 112.28323995525771, band ±1.5 percentage points
+;;   -> [110.78323995525771, 113.78323995525771]. Matches this directory's
+;;   tightest existing convention for a claimed-deterministic run
+;;   ([sp500-2019-2023-bah-brk-b.sexp]'s ±1.5pp scheme).
+;;
+;;   total_trades: pinned to exactly 240 via a half-trade buffer
+;;   -> [239.5, 240.5], the same integer-pin idiom the BAH goldens use for
+;;   their 0-round-trip pin ([(min 0) (max 0.5)]).
+;;
+;; Coverage against the three pre-#2279 draws: (114.5, 239) fails BOTH fields
+;; (114.5 > 113.78 and 239 < 239.5); (112.755, 241) fails the trades field
+;; (241 > 240.5) even though its return sits inside the return band; (112.670,
+;; 240) is the one draw that slips through both fields — its return sits only
+;; 0.39pp below the deterministic center and its trade count matches exactly,
+;; so it is honestly the smallest and least distinguishable of the three
+;; wanders. Two of the three documented pre-fix draws now fail the pins
+;; outright; catching the third would require asserting near-exact
+;; floating-point equality, which is out of scope for a range-pinned golden.
+;;
+;; The remaining metrics (win_rate, sharpe_ratio, max_drawdown_pct,
+;; avg_holding_days, open_positions_value) keep their original ±10% bands —
+;; no pre-#2279 wander data was captured for them, so tightening them here
+;; would be inventing precision this golden cannot back up.
+;;
+;; wall_seconds is pinned [100, 1500], mirroring [sp500-2019-2023.sexp]'s
+;; convention. This golden is the entry-path-heaviest scenario in the suite
+;; — every entry walks the intraday path — so it is the golden most exposed
+;; to a performance regression there; measured ~4 min locally (see the
+;; perf-tier rationale above), comfortably inside this band. Sized to catch
+;; only a catastrophic (~2x+) slowdown, not routine CI-vs-local variance.
+;;
+;; If a postsubmit run lands outside these bands, do NOT widen them — that is
+;; the signal this golden exists to raise.
 ((name "sp500-2019-2023-armed-stoplimit")
  (description "Armed StopLimit entry stack (ladder v2-core) on the sp500 5-year universe — the entry regime no other golden covers.")
  (period ((start_date 2019-01-02) (end_date 2023-12-29)))
@@ -74,6 +114,11 @@
    ((entry_anchor_local_range_weeks 4))
    ((entry_extension_max_pct 2.0))
    ((freeze_entry_at_first_breakout true))
+   ;; NO-OP in this config: every entry above already resolves to StopLimit
+   ;; (enable_sim_entry_stoplimit), and this flag only changes fill
+   ;; semantics for Market-entry orders (see _entry_cap_for_sim in
+   ;; panel_runner.ml). Set here to match the intended production config,
+   ;; not because it does anything to this scenario's numbers.
    ((sim_entry_fill_next_open true))
    ;; --- sizing / exit half: the Cell-E standard config, as the other goldens ---
    ((extension_stop_config ((trigger_ratio 2.0) (trail_pct 0.25))))
@@ -90,11 +135,21 @@
    ((liquidity_config ((min_entry_dollar_adv 1000000.0))))
    ((liquidity_config ((min_hold_dollar_adv 500000.0))))
    ((stale_exit_after_days (5)))))
+ ;; Cost-model overlay (PR #1260 wiring). See goldens-small/bull-crash-2015-2020.sexp
+ ;; for the full rationale. [retail_default] with per_trade=0 is byte-equal
+ ;; to [None] under current wiring; spread / per_share activate once
+ ;; [Cost_model.to_engine_costs] is wired into [Panel_runner].
+ (cost_model
+  ((per_trade_commission 0.0)
+   (per_share_commission 0.0)
+   (bid_ask_spread_bps 5.0)
+   (market_impact_bps_per_pct_adv 0.0)))
  (expected
-  ((total_return_pct     ((min 101.05)      (max 123.51)))
-   (total_trades         ((min 216)         (max 264)))
+  ((total_return_pct     ((min 110.78323995525771) (max 113.78323995525771)))
+   (total_trades         ((min 239.5)       (max 240.5)))
    (win_rate             ((min  34.12)      (max  41.71)))
    (sharpe_ratio         ((min   0.994)     (max   1.215)))
    (max_drawdown_pct     ((min  15.29)      (max  18.68)))
    (avg_holding_days     ((min  40.83)      (max  49.90)))
-   (open_positions_value ((min 1878875.0)   (max 2296403.0))))))
+   (open_positions_value ((min 1878875.0)   (max 2296403.0)))
+   (wall_seconds         ((min 100.0)       (max 1500.0))))))
