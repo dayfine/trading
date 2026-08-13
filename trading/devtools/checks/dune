@@ -30,16 +30,36 @@
  (action
   (run sh %{dep:arch_layer_test.sh} %{dep:linter_exceptions.conf})))
 
-; File length: 300-line soft limit, 500-line declared-large limit (11% cap)
-; Scans all lib/*.ml files across the workspace.
+; File length: 300-line soft limit, 500-line declared-large limit (11% cap).
+; Scans lib/*.ml files (raw line count) AND lib/*.mli files (signature line
+; count -- comment blocks + blank lines stripped; see linter_file_length.sh
+; header for the raw-vs-signature rationale, H-MLI-FILE-LENGTH-BLIND-SPOT).
+; Both globs are required deps: without the *.mli glob, a new .mli-only
+; violation would not invalidate this rule's cache key (H-CHECK-CACHE-BLIND
+; -- see PR #943 / dune-linter-deps entry in dev/status/harness.md).
 
 (rule
  (alias runtest)
  (deps
   _check_lib.sh
-  (glob_files_rec %{workspace_root}/*.ml))
+  (glob_files_rec %{workspace_root}/*.ml)
+  (glob_files_rec %{workspace_root}/*.mli))
  (action
   (run sh %{dep:linter_file_length.sh})))
+
+; Fixture-driven self-test for linter_file_length.sh's .mli signature-line
+; counting (H-MLI-FILE-LENGTH-BLIND-SPOT). Builds its own private fixture
+; "trading dirs" under mktemp -d with crafted .mli files, so it never reads
+; the real workspace tree -- no (glob_files_rec ...) dep needed beyond the
+; linter script itself. See linter_file_length_test.sh's header for the
+; four fixtures (raw>300/sig<=300 PASS, sig>300 FAIL, nested-comment
+; depth-counter PASS, @large-module marker parity).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh linter_file_length.sh)
+ (action
+  (run sh %{dep:linter_file_length_test.sh})))
 
 ; .mli coverage: every lib/*.ml must have a matching .mli
 ; Scans lib/*.ml and lib/*.mli files across the workspace.
