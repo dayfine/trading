@@ -16,7 +16,7 @@ what to *run* when, so the session neither idles nor thrashes.
 
 | class | container cost | can run concurrently? |
 |---|---|---|
-| **Backtest / sweep** — `scenario_runner`, `panel_runner`, tuner | ~3.3 GB resident for a 26y top-3000 run; 1 core per `--parallel` unit; hours | **One at a time.** Two 26y workers do not fit. |
+| **Backtest / sweep** — `scenario_runner`, `panel_runner`, tuner | **~2.2-2.4 GB** by `docker stats` for a 26y top-3000 run; 1 core per `--parallel` unit; hours | **One at a time.** Two 26y workers do not fit. |
 | **Agent (QC / feat / harness)** — dune build + runtest in its own worktree | ~1-2 GB while linking, bursty, all cores; 5-8 GB disk per worktree | **Cap 3.** Each is a full OCaml link. |
 | **Dispatcher-side work** — `gh`, `jj`, `git`, reading logs, writing docs/memory | ~0 | **Unlimited.** Always safe. |
 
@@ -26,7 +26,7 @@ mutually exclusive; dispatcher-side work is free and should fill every gap.**
 ## Scheduling rules
 
 1. **Never dispatch agents while a multi-hour backtest is running.** Not "few
-   agents" — none. A 26y run holds ~3.3 GB for hours; three linking agents
+   agents" — none. A 26y run holds ~2.2-2.4 GB for hours; three linking agents
    spike past what remains. If a backtest is live and PR work is queued, either
    (a) let the backtest finish, or (b) decide the backtest is lower value, stop
    it *cleanly*, and record what was lost. Do not run both and hope.
@@ -50,6 +50,22 @@ mutually exclusive; dispatcher-side work is free and should fill every gap.**
 6. **Long runs go in a pinned worktree, detached, with a file log**
    (`sweep-hygiene.md`), so a dispatcher-side mistake cannot kill them and a
    session boundary cannot orphan them.
+
+### ⚠ Measure with `docker stats`, not per-process RSS
+
+Measured on the 2026-08-13 cell-09 run: `docker stats` sat at **2.2-2.4 GB** for
+the whole leg, while a per-process peak-RSS sampler logged **10,460 MB** — which
+is impossible as anonymous memory against a 7.75 GB container.
+
+The gap is the **columnar mmap'd snapshot warehouse**
+(`project_snapshot_format_v2`): mapped file pages count toward RSS but are
+evictable, so RSS overstates the true footprint several-fold for anything that
+opens the warehouse. Two operational consequences:
+
+- An **RSS-based capacity guard would refuse to launch** on a container with
+  plenty of room. Guard on `docker stats MemUsage`.
+- An **RSS-based post-mortem would misattribute an OOM** — a 10 GB peak-RSS line
+  in a log is not evidence the process was near the limit.
 
 ## Diagnosing an OOM kill (it does not announce itself)
 
