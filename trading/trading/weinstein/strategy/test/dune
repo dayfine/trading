@@ -35,8 +35,6 @@
   test_macro_bearish_trim_runner
   test_laggard_rotation_runner
   test_stops_runner
-  test_scale_in_detector
-  test_scale_in_runner
   test_long_buying_power
   test_leverage_dawn
   test_stops_split_runner

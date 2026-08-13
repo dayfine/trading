@@ -125,18 +125,6 @@ module Liquidity_config = Liquidity_config
     callers building a {!Weinstein_strategy.config} can reference
     {!Liquidity_config.default_config} without a separate library import. *)
 
-module Scale_in_detector = Scale_in_detector
-(** Scale-in add-trigger detection + knobs ({!Scale_in_detector.config}).
-    Re-exposed so callers building a {!Weinstein_strategy.config} can reference
-    {!Scale_in_detector.default_config} and the [trigger] variants without a
-    separate library import. *)
-
-module Scale_in_runner = Scale_in_runner
-(** Scale-in add runner (default-off). Runs on Friday ticks before the
-    fresh-entry walk when [config.enable_scale_in = true]; emits sibling
-    [CreateEntering] adds into revealed strength and reduces the entry walk's
-    cash budget by their cost. See {!Scale_in_runner}. *)
-
 module Liquidity_metric = Liquidity_metric
 (** Pure trailing dollar-ADV metric. See {!Liquidity_metric}. *)
 
@@ -642,15 +630,6 @@ type config = {
           entry liquidity gate). Default [Liquidity_config.default_config] is a
           no-op (both thresholds [0.0]) — bit-identical to baseline. See
           [Weinstein_strategy_config]. *)
-  enable_scale_in : bool; [@sexp.default false]
-      (** Master switch for the explore/exploit scale-in mechanism (½-unit
-          initial entries + one pullback add into revealed strength). Default
-          [false] is a no-op — bit-identical to baseline. See
-          [Weinstein_strategy_config]. *)
-  scale_in_config : Scale_in_detector.config;
-      [@sexp.default Scale_in_detector.default_config]
-      (** Scale-in knobs; only consulted when [enable_scale_in = true]. See
-          [Weinstein_strategy_config] and {!Scale_in_detector}. *)
   max_long_exposure_pct_entry : float; [@sexp.default 0.0]
       (** Cap on aggregate NEW long-entry (entry-price-denominated) notional as
           a fraction of current portfolio value, applied at the Friday entry
