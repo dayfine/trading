@@ -224,9 +224,25 @@ fi
 #
 #   local_via_info_exclude.txt  tracked, matched ONLY by .git/info/exclude
 #   local_via_excludes_file.txt tracked, matched ONLY by core.excludesFile
-#   real.novelartifact          tracked, matched by the repo's .gitignore
+#   real.novelartifact          tracked, matched by the repo's ROOT .gitignore
+#   sub/nested.subartifact      tracked, matched ONLY by sub/.gitignore
 #
-# Expect exit 1 naming ONLY real.novelartifact. `.git/info/exclude` and
+# The NESTED file is what distinguishes `--exclude-per-directory=.gitignore`
+# from a root-only primitive. `git ls-files -i -c --exclude-from=.gitignore`
+# reads the root file and does no per-directory traversal at all, yet on this
+# repo it returns a byte-identical 1334 hits -- because BOTH nested
+# `.gitignore` files that exist here (`trading/analysis/data/sources/eodhd/`
+# → `secrets`, `dev/experiments/cell-e-15y-2026-05-07/` → `trade_audit.sexp`)
+# match ZERO tracked files. So the 1336 → 1334 measurement quoted for this
+# change says nothing whatsoever about nested traversal, and `--exclude-from`
+# reads as a tightening in the same direction -- a plausible future edit that
+# would silently narrow this merge-gating check to the root file with no
+# check in this repo able to tell. `sub/nested.subartifact` is the assertion
+# that closes that: it can only be reported if per-directory patterns are
+# read at depth.
+#
+# Expect exit 1 naming real.novelartifact AND sub/nested.subartifact and
+# NEITHER developer-local path. `.git/info/exclude` and
 # `core.excludesFile` are per-developer state that never reaches CI, so a
 # check gated on them reports a legitimately-tracked source file as a
 # violation on one machine and not another. See the linter's
@@ -246,9 +262,14 @@ echo 'data' > "${REPO5}/local_via_excludes_file.txt"
 echo 'local_via_info_exclude.txt' >> "${REPO5}/.git/info/exclude"
 echo 'local_via_excludes_file.txt' > "${BASE_DIR}/global_excludes"
 git -C "$REPO5" config core.excludesFile "${BASE_DIR}/global_excludes"
-git -C "$REPO5" add .gitignore
+# The nested pattern is deliberately one the ROOT .gitignore cannot match, so
+# reporting it requires reading sub/.gitignore specifically.
+mkdir -p "${REPO5}/sub"
+echo '*.subartifact' > "${REPO5}/sub/.gitignore"
+echo 'data' > "${REPO5}/sub/nested.subartifact"
+git -C "$REPO5" add .gitignore sub/.gitignore
 git -C "$REPO5" add -f real.novelartifact local_via_info_exclude.txt \
-  local_via_excludes_file.txt
+  local_via_excludes_file.txt sub/nested.subartifact
 git -C "$REPO5" commit -q -m init
 
 CHECKS5="${BASE_DIR}/checks5"
@@ -261,11 +282,12 @@ set -e
 
 if [ "$CODE5" -ne 0 ] \
   && echo "$OUT5" | grep -q "real.novelartifact" \
+  && echo "$OUT5" | grep -q "sub/nested.subartifact" \
   && ! echo "$OUT5" | grep -q "local_via_info_exclude" \
   && ! echo "$OUT5" | grep -q "local_via_excludes_file"; then
-  ok "fixture 5 — repo .gitignore still caught (real.novelartifact) while developer-local .git/info/exclude and core.excludesFile entries are ignored"
+  ok "fixture 5 — root AND nested .gitignore both caught (real.novelartifact, sub/nested.subartifact) while developer-local .git/info/exclude and core.excludesFile entries are ignored"
 else
-  bad "fixture 5 — expected non-zero exit naming ONLY real.novelartifact (not the two developer-local paths); got exit=$CODE5 output=<<$OUT5>>"
+  bad "fixture 5 — expected non-zero exit naming real.novelartifact and sub/nested.subartifact but NEITHER developer-local path; got exit=$CODE5 output=<<$OUT5>>"
 fi
 
 cleanup

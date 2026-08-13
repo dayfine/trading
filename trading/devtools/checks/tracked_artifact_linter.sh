@@ -164,11 +164,27 @@ fi
 # is exactly the "repo-controlled patterns only" invariant this check
 # needs, expressed positively rather than by subtracting one leak at a
 # time. Measured on main 2026-08-13: --exclude-standard returns 1336 hits,
-# --exclude-per-directory=.gitignore returns 1334 -- the same set minus
-# precisely the two info/exclude paths above, confirming that nested
-# `.gitignore` files (e.g. trading/analysis/data/sources/eodhd/.gitignore)
-# are still honoured. `core.excludesFile` is no longer overridden because
-# it is no longer read.
+# --exclude-per-directory=.gitignore returns 1334, and a `comm` of the two
+# sorted outputs differs by exactly the two info/exclude paths above and
+# nothing else. `core.excludesFile` is no longer overridden because it is no
+# longer read.
+#
+# That measurement establishes the SET IDENTITY and nothing more. It does
+# NOT establish that nested `.gitignore` files are still honoured, though an
+# earlier draft of this comment claimed it did: `git ls-files -i -c
+# --exclude-from=.gitignore`, which reads the root file and performs no
+# per-directory traversal whatsoever, returns the identical 1334 on this
+# tree -- because both nested `.gitignore` files that exist here
+# (`trading/analysis/data/sources/eodhd/` → `secrets`,
+# `dev/experiments/cell-e-15y-2026-05-07/` → `trade_audit.sexp`) match ZERO
+# tracked files and so cannot move either count. Nested traversal is
+# guaranteed by git's own definition (--exclude-standard IS
+# --exclude-per-directory=.gitignore plus the two local sources) and is
+# pinned behaviourally by fixture 5's `sub/nested.subartifact`, NOT by the
+# numbers above. Keep it that way: this check's whole subject is silent
+# wrong answers, and `--exclude-from` reads as a tightening in the same
+# direction, so an unpinned invariant here is a plausible future edit that
+# narrows the check to the root file with nothing to catch it.
 #
 # Capture git's exit status explicitly (VAR=$(cmd) && CODE=0 || CODE=$?,
 # not the sete_diagnostics_check.sh anti-pattern of a bare `VAR=$(cmd);
