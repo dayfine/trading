@@ -151,40 +151,46 @@ let _weekly_series_of_reader reader ~symbol ~n ~as_of =
   let view = Bar_reader.weekly_view_for reader ~symbol ~n ~as_of in
   Array.zip_exn view.Snapshot_bar_views.dates view.Snapshot_bar_views.closes
 
-(* Last RAW close at/before [as_of] for [symbol], or [None] when the warehouse
-   has no bar within the lookback window. Feeds [Html_report.load ?bar_close],
-   which drives two series with *different* basis needs — so unlike
-   [_closes_lookup_of_reader] above, this one deliberately stays raw.
+(* Last close at/before [as_of] for [symbol] *on the requested basis*, or [None]
+   when the warehouse has no usable bar within the lookback window. Feeds
+   [Html_report.load ?bar_close], which drives two series with opposite basis
+   needs and so asks for the basis it wants per call rather than assuming one
+   (see [Trade_audit_html.Html_report.price_basis]).
 
-   [Html_report._benchmark] divides a mark by an earlier mark and would indeed
-   prefer adjusted. [Html_report._utilization] does not: it computes
-   [sum over held positions of (i_qty *. c) /. nav], i.e. it *multiplies* the
-   mark by a share count and divides by NAV, and both of those other terms are
-   raw — [i_qty] comes from [trades.csv]'s [quantity] (a raw share count,
-   split-restated to the exit date) or from the live broker count in
-   [open_positions.csv], and [nav] comes from [equity_curve.csv], which marks
-   positions at [bar.close_price], the raw [Snapshot_schema.Close] cell.
+   [Adjusted] — the benchmark, which divides a mark by an earlier mark, so a
+   split inside the run must not read as a price move. The window goes through
+   [Trade_audit_basis.window_closes], which falls back to raw wholesale when the
+   adjusted column is incomplete; that keeps the benchmark rendering at all on a
+   warehouse whose schema predates the adjusted field, where every window falls
+   back and the series therefore stays consistently raw.
 
-   With [adj d = raw d /. split d..T *. div d..T] and
-   [i_qty = qty d *. split d..exit], a raw mark makes [deployed] exact for any
-   hold that does not straddle a split, whereas an adjusted mark scales it by
-   [div d..T /. split exit..T] — wrong for every trade in a symbol that split or
-   paid a dividend after the trade closed, and dividends alone are large (KO
-   2016-03-01 adj/raw = 0.7253, JNJ = 0.7596, AAPL 2015-01-02 = 0.2215). Raw is
-   the numerically better of the two available options while one callback feeds
-   both series.
-
-   Unresolved tension: [html_report.mli:52] documents [?bar_close] as resolving
-   "a symbol's adjusted close", which this does not honour. Splitting the
-   callback per series (benchmark → adjusted, utilization → raw) needs an
-   [Html_report.load] signature change; filed as follow-up G4. *)
-let _bar_close_of_reader reader ~symbol ~as_of =
+   [Raw] — the capital-utilization series, which *multiplies* the mark by a
+   share count and divides by NAV. Both of those are raw: [i_qty] comes from
+   [trades.csv]'s [quantity] (an as-traded count, split-restated to the exit
+   date) or from the live broker count in [open_positions.csv], and [nav] from
+   [equity_curve.csv], which marks positions at [bar.close_price], the raw
+   [Snapshot_schema.Close] cell. With [adj d = raw d /. split d..T *. div d..T]
+   and [i_qty = qty d *. split d..exit], a raw mark makes [deployed] exact for
+   any hold that does not straddle a split, whereas an adjusted mark scales it
+   by [div d..T /. split exit..T] — wrong for every trade in a symbol that split
+   or paid a dividend after the trade closed, and dividends alone are large (KO
+   2016-03-01 adj/raw = 0.7253, JNJ = 0.7596, AAPL 2015-01-02 = 0.2215). So this
+   branch never consults [window_closes]: raw is not a fallback here, it is the
+   answer. *)
+let _bar_close_of_reader reader ~basis ~symbol ~as_of =
   let view =
     Bar_reader.daily_view_for reader ~symbol ~as_of
       ~lookback:_mark_lookback_days
   in
-  let closes = view.Snapshot_bar_views.raw_closes in
-  if Array.is_empty closes then None else Some closes.(Array.length closes - 1)
+  let closes =
+    match basis with
+    | Html_report.Adjusted ->
+        Trade_audit_basis.window_closes
+          ~adjusted:view.Snapshot_bar_views.adjusted_closes
+          ~raw:view.Snapshot_bar_views.raw_closes
+    | Html_report.Raw -> view.Snapshot_bar_views.raw_closes
+  in
+  Trade_audit_basis.last_close closes
 
 let _write ~path s =
   Out_channel.with_file path ~f:(fun oc -> Out_channel.output_string oc s)

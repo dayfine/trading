@@ -125,7 +125,7 @@ val generate_path : ?config:path_config -> price_bar -> intraday_path
     Allocates a fresh internal scratch buffer per call. For per-symbol hot-loop
     callers, prefer [generate_path_into] with a reused buffer. *)
 
-val seed_for_bar : price_bar -> int
+val seed_for_bar : ?salt:int -> price_bar -> int
 (** Alias for {!Trading_engine.Bar_shape.seed_for_bar} — the deterministic
     per-bar seed a reproducible caller passes as [config.seed], since the
     [seed = None] default draws a fresh path every run. See that module for the

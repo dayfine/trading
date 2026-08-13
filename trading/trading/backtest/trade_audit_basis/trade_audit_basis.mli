@@ -11,10 +11,15 @@
     The qualifier matters. A consumer that {e multiplies} a mark by a share
     count rather than dividing it by an earlier mark wants the {b raw} column
     instead, because the share count and the NAV it is measured against are
-    themselves raw — that is why [trade_audit_report_bin._bar_close_of_reader]
-    (which feeds the HTML capital-utilization series) does {e not} use this
-    module. See follow-up G4 in [dev/status/support-floor-stops.md]. This module
-    is the selector for the cross-time-comparison case only.
+    themselves raw. So {!window_closes} is the selector for the
+    cross-time-comparison case only; a raw-basis consumer takes the view's
+    [raw_closes] directly and never asks this module to choose.
+
+    Which consumer needs which basis is decided by
+    {!Trade_audit_html.Html_report.price_basis}, whose supplier in
+    [trade_audit_report_bin] routes an [Adjusted] request through
+    {!window_closes} and a [Raw] request straight at [raw_closes], reading the
+    single mark off either with {!last_close}.
 
     The complication the two columns do not share is missingness. The daily view
     drops bars whose raw [Close] is NaN, so [raw_closes] is NaN-free by
@@ -53,3 +58,21 @@ val window_closes : adjusted:float array -> raw:float array -> float array
 
     The returned array is one of the inputs, not a copy — callers must not
     mutate it. *)
+
+val last_close : float array -> float option
+(** [last_close closes] is the newest close of a window — its last cell — or
+    [None] when the window is empty or that cell is not finite.
+
+    This is the single-mark accessor the HTML report's [?bar_close] supplier
+    needs, applied to whichever column the caller's basis choice selected. It is
+    deliberately {e not} a backwards search for the newest finite cell: the last
+    cell is the newest bar at or before the requested date, and silently
+    substituting an older bar's close would answer a different question than the
+    one asked. [None] is the honest answer, and both consumers handle it —
+    {!Trade_audit_html.Html_report}'s benchmark drops the whole series when any
+    curve date fails to resolve, and its utilization series skips that position
+    for that date.
+
+    The finiteness guard is what stops a missing adjusted cell from reaching a
+    consumer as a [Float.nan] mark, which would poison a benchmark base (a
+    division) or a utilization sum irrecoverably. *)
