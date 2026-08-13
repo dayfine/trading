@@ -90,20 +90,49 @@ mechanism *it actually armed*. Before removing a row, confirm each cited entry
 armed **this** field — and check whether the entry has already been spent on a
 different row.
 
+**2026-08-13 (second pass) — the seeded RETIRE list is NOT a worklist. Every
+remaining row fails Rule 4.** After the continuation correction, the same
+eligibility screen was run against the rest of the seeded list rather than
+row-by-row at removal time. All of them fail, for two recurring reasons:
+
+| row | verdict of the screen |
+|---|---|
+| `stage3_exit_margin_pct` + `stage3_reentry_cooldown_weeks` | **NOT ELIGIBLE.** The ledger entries do name this field (unlike continuation), but `project_stage3_hysteresis_rejected_wfcv` says the opposite of do-not-revive: *"PR-A code plumbing (#1362) **stays on main** with knob defaults that preserve panel behavior … Do NOT flip the production default."* That is REJECT-as-default with an explicit instruction to keep the plumbing. Note also that both entries arm `hysteresis_weeks` too, which belongs to the KEEP-AXIS `stage3_force_exit_config` row. |
+| `enable_macro_bearish_exposure_trim` + `macro_bearish_max_long_exposure_pct` | **NOT ELIGIBLE. No ledger entry exists at all** — `grep -rl macro_bearish dev/experiments/_ledger/` is empty, so Rule 4's required "terminal ledger REJECT" cannot be cited. `project_macro_bearish_trim_lever` says *"Stays default-off as a Variant_matrix axis"* and describes the cost as regime-dependent: the textbook keep-as-axis shape. |
+| `vol_scaled_stop_atr_mult` + `vol_scaled_stop_atr_period` | **NOT ELIGIBLE. No ledger entry exists at all.** `project_p0_levers_no_build_2026_06_20` says *"Both NO-BUILD, kept default-off as axes."* It was also a **screen**, not a WF-CV surface — per `.claude/rules/mechanism-validation-rigor.md` a screen rejects *prioritization*, not the mechanism, and may not be cited as a terminal REJECT. |
+
+**What went wrong when the list was seeded.** The 08-09 graveyard seeding
+collapsed Rule 4's two REJECT shapes into one. Nearly every entry it drew on is
+a *REJECT-for-promotion / kept-as-axis* record — which Rule 4 explicitly says
+does **not** retire — and in two cases there is no ledger entry to cite at all.
+The distinction was in the rule the whole time; it simply was not applied when
+the list was written.
+
+**Standing instruction:** treat every remaining row in the table below as
+**presumed ineligible** until it passes its own screen. Do not open a removal PR
+off this list. The three rows that did ship (`harvest_rotate`,
+`early_admission_ma_period`, `cash_reserve_pct`) plus `scale_in` were each
+screened individually — `cash_reserve_pct` and `scale_in` both turned out to
+carry the same keep-as-axis contradiction and needed the classification recorded
+explicitly before removal, which is the pattern, not the exception.
+
+The retirement program is therefore **not** "work the list"; it is "screen a row,
+and expect the answer to be no."
+
 ## RETIRE — graveyard (seeded by the 08-09 priorities doc)
 
 | field | config module | default | ledger verdict (pointer) | call | notes |
 |---|---|---|---|---|---|
 | `early_admission_ma_period` | `Stage.config` | `None` | REJECT — `2026-05-31-early-admission-deep-27y` (27y grid reversed all post-2009 cells); `project_early_admission_mechanism` "do not revive" | RETIRE | The canonical do-not-revive case. Supersedes the earlier surface-v2 Accept. |
-| `stage3_exit_margin_pct` | `Weinstein_strategy_config` | `0.0` | REJECT — `2026-05-29-stage3-hysteresis-wf-cv`, `2026-05-31-exit-timing-hysteresis-revalidated` (9 Rejects); `project_stage3_hysteresis_rejected_wfcv` | RETIRE | The stage3 hysteresis knob (#1362). |
+| `stage3_exit_margin_pct` | `Weinstein_strategy_config` | `0.0` | REJECT — `2026-05-29-stage3-hysteresis-wf-cv`, `2026-05-31-exit-timing-hysteresis-revalidated` (9 Rejects); `project_stage3_hysteresis_rejected_wfcv` | **KEEP-AXIS — reclassified 2026-08-13** | Entries DO name this field, but `project_stage3_hysteresis_rejected_wfcv` says the plumbing "stays on main … Do NOT flip the production default" — REJECT-as-default, no do-not-revive. Both entries also arm `hysteresis_weeks` (a KEEP-AXIS row). See Correction log. |
 | `enable_harvest_rotate` | `Weinstein_strategy_config` | `false` | REJECT — `2026-06-11-harvest-rotate-top3000`; `project_harvest_rotate_rejected` (coin-flip per decision) | RETIRE | Winner-trimming taxes the fat tail (`project_edge_is_the_fat_tail`). |
 | `harvest_fraction` | `Weinstein_strategy_config` | `0.5` | same as `enable_harvest_rotate` | RETIRE | Remove in the same commit as its enable flag. |
 | `enable_scale_in` + `scale_in_config` | `Weinstein_strategy_config` | `false` / `Scale_in_detector.default_config` | REJECT — `2026-07-03-scale-in-v1-surface` + `2026-07-05-continuation-add-v2-surface`; `project_capital_mgmt_scale_in_design` (v1+v2 CLOSED) | RETIRE | "Breadth IS the edge" — sizing mechanics closed. |
-| `enable_macro_bearish_exposure_trim` | `Weinstein_strategy_config` | `false` | REJECT-leaning — `project_macro_bearish_trim_lever` (regime-dependent); seeded graveyard 08-09 | RETIRE | Memory had earlier kept it as a default-off axis; the 08-09 priorities doc reclassifies it graveyard. Cite that supersession in the removal PR. |
-| `macro_bearish_max_long_exposure_pct` | `Weinstein_strategy_config` | `0.70` | same as `enable_macro_bearish_exposure_trim` | RETIRE | Companion knob; same commit. |
+| `enable_macro_bearish_exposure_trim` | `Weinstein_strategy_config` | `false` | REJECT-leaning — `project_macro_bearish_trim_lever` (regime-dependent); seeded graveyard 08-09 | **KEEP-AXIS — reclassified 2026-08-13** | NO ledger entry exists (`grep -rl macro_bearish dev/experiments/_ledger/` empty), so Rule 4 has nothing to cite. Memory: "Stays default-off as a Variant_matrix axis"; cost is regime-dependent. See Correction log. |
+| `macro_bearish_max_long_exposure_pct` | `Weinstein_strategy_config` | `0.70` | same as `enable_macro_bearish_exposure_trim` | **KEEP-AXIS — reclassified 2026-08-13** | Companion knob; same reasoning. |
 | `trigger_on_weekly_close` | `Weinstein_stops.config` (`stop_types.mli`) | `false` | REJECT as a backtest lever — `2026-05-31-exit-timing-deep-2000-2026` (9 Rejects); `project_weekly_close_stop_lever` | **KEEP — NOT RETIRABLE** | **Corrected 2026-08-12.** The flag has a LIVE production consumer the ledger verdict does not cover: `Stop_thread._weekly_close_config` (`trading/trading/weinstein/snapshot/gen/lib/stop_thread.ml:34`) sets it to `true` on purpose, because that path replays **weekly** bars where the default intra-bar trigger would fire on an intra-week wick — and the book's rule is a weekly CLOSE. Reached from the weekly picks report via `held_position_row.ml`. The REJECT was about *arming it in the simulator*, not about deleting the field. Removing it would silently break the weekly report, and **no golden would catch it** — the goldens do not exercise the snapshot generator. |
-| `vol_scaled_stop_atr_mult` | `Weinstein_stops.config` | `0.0` | NO-BUILD/REJECT — `project_p0_levers_no_build_2026_06_20` (vol-stop fails); seeded graveyard 08-09 | RETIRE | Vol-scaled stop. |
-| `vol_scaled_stop_atr_period` | `Weinstein_stops.config` | `14` | same as `vol_scaled_stop_atr_mult` | RETIRE | Companion knob; same commit (also delete `vol_scaled_stop.ml/.mli`). |
+| `vol_scaled_stop_atr_mult` | `Weinstein_stops.config` | `0.0` | NO-BUILD/REJECT — `project_p0_levers_no_build_2026_06_20` (vol-stop fails); seeded graveyard 08-09 | **KEEP-AXIS — reclassified 2026-08-13** | NO ledger entry exists. `project_p0_levers_no_build_2026_06_20`: "Both NO-BUILD, kept default-off as axes." A SCREEN, not a WF-CV surface — per mechanism-validation-rigor.md a screen rejects prioritization, not the mechanism. See Correction log. |
+| `vol_scaled_stop_atr_period` | `Weinstein_stops.config` | `14` | same as `vol_scaled_stop_atr_mult` | **KEEP-AXIS — reclassified 2026-08-13** | Companion knob; same reasoning. `vol_scaled_stop.ml/.mli` stays. |
 | `cash_reserve_pct` | `Weinstein_strategy_config` | `0.0` | REJECT — `2026-07-06-cash-reserve-surface`; `project_cash_reserve_rejected` (envelope closed) | RETIRE | Protection lever superseded by barbell. |
 
 ## RETIRE — candidates NOT in the 08-09 seed list (confirm before removal)
@@ -170,7 +199,7 @@ Consumer counts that drove the calls (non-test `.ml` refs | tests | scenario spe
 | field | refs | tests | specs | call | reasoning |
 |---|---|---|---|---|---|
 | `max_long_exposure_pct_entry` | 10 | 6 | **7** | **KEEP — in active use** | Referenced by 7 live scenario specs, so not a graveyard candidate at all. `project_envelope_knobs_dead`'s "grep consumers first" warning was right and the answer came back yes. No longer open. |
-| `stage3_reentry_cooldown_weeks` | 3 | **0** | 0 | **RETIRE** (with the stage3 family) | One consumer (`special_exits.ml:64`, `~cooldown_weeks`), **no `.mli` docstring at all** (the field at line 99 is undocumented; the neighbouring docstring belongs to `stage3_exit_margin_pct` below it), no tests, no specs. Its sibling `stage3_exit_margin_pct` is already on the RETIRE list as part of the rejected stage3-hysteresis family (`project_stage3_hysteresis_rejected_wfcv`). Reads as a leftover of that rejection. Retire alongside it. |
+| `stage3_reentry_cooldown_weeks` | 3 | **0** | 0 | **KEEP-AXIS — reclassified 2026-08-13** (with the stage3 family) | One consumer (`special_exits.ml:64`, `~cooldown_weeks`), **no `.mli` docstring at all** (the field at line 99 is undocumented; the neighbouring docstring belongs to `stage3_exit_margin_pct` below it), no tests, no specs. Its sibling `stage3_exit_margin_pct` is already on the RETIRE list as part of the rejected stage3-hysteresis family (`project_stage3_hysteresis_rejected_wfcv`). Reads as a leftover of that rejection. Retire alongside it. |
 | `cascade_post_stop_cooldown_weeks` | 5 | 4 | 0 | **KEEP-AXIS — sweep once, expect it to lose** | Benches a symbol for N weeks after a stop-out; motivated by a real documented pathology (cascade re-firing within days of stop-out, `dev/notes/sp500-trade-quality-findings-2026-04-30.md`). Strong prior AGAINST from `project_edge_is_the_fat_tail`: it is a re-entry suppressor, and the AXTI-class monsters are exactly names that whipsaw before they run. Cheap as one axis; a **recorded** loss is worth more than a silent flag. |
 | `failed_breakout_tolerance_pct` | 21 | 24 | 0 | **RESOLVE AGAINST F2 FIRST** | Drops a long candidate whose close fell back below `breakout_price *. (1. -. k)` and demotes it to the watchlist. This **overlaps F2 `entry_order_ttl_weeks`' primary re-screen cancel** (#2263, merged 2026-08-10): under the async ticket model, price falling back below the breakout while the ticket rests *is* the failed breakout. Either this is now largely redundant, or it is the sharper-specified version of F2's cancel condition. Sweeping both without resolving the overlap would test two spellings of one mechanism and read the interaction as signal. Decide the overlap before either is swept. |
 
