@@ -202,9 +202,21 @@ fi
 TOTAL_MLI=0
 LARGE_COUNT_MLI=0
 
+# The `*.pp.mli` exclusion mirrors the `*.pp.ml` one in the .ml loop above and
+# is load-bearing, not cosmetic: dune's PPX output lands at
+# `_build/.sandbox/<hash>/default/**/foo.pp.mli`, and because the check runs
+# FROM INSIDE that sandbox with a relative TRADING_DIR (`./../..`), the
+# `-name '_build' -prune` above never matches on the way down. Preprocessed
+# interfaces are macro-expanded and routinely exceed 300 signature lines, so
+# without this the check FAILS on generated files that have no source form
+# (measured: `trade_audit.pp.mli` 396, `barbell_floor_sweep.pp.mli` 316,
+# `validator_types.pp.mli` 306 -- none of which is a real violation).
+# Running the script directly against the source tree cannot surface this:
+# there are zero `*.pp.mli` outside `_build`. Only `dune runtest` reproduces it.
 for mli_file in $(find "$TRADING_DIR" \
     \( -name '_build' -o -name '.formatted' \) -prune -o \
     -path "*/lib/*.mli" \
+    -not -name "*.pp.mli" \
     -print 2>/dev/null || true); do
   TOTAL_MLI=$((TOTAL_MLI + 1))
   # Same TOCTOU vanished-vs-unreadable discrimination as the .ml loop above
