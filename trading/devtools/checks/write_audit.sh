@@ -285,6 +285,24 @@ if [ -f "$OUTPUT_FILE" ]; then
     else
       PRESERVED_FILE="$AUDIT_DIR/${DATE}-prev${OLD_TS}-${FEATURE}.json"
     fi
+    # Test-only hook: force the preservation copy below to genuinely FAIL
+    # (as opposed to a synthetic `exit 1`, unlike the two rename-abort hooks
+    # further down this file) by redirecting $PRESERVED_FILE under a
+    # directory that does not exist. `cp -p` then errors for real (ENOENT
+    # from cp itself) rather than us simulating the failure -- and unlike a
+    # permission-based injection (e.g. chmod 555 on $AUDIT_DIR), a missing
+    # parent directory fails for root too, so the hook can't silently
+    # become a no-op when the test suite runs as root inside the container.
+    # Used by record_qc_audit_test.sh to prove the safety claim on the
+    # `cp -p` line below: when this copy fails under `set -euo pipefail`,
+    # the script aborts BEFORE $OUTPUT_FILE's original content is touched.
+    #
+    # ACCEPTED SPELLING: same convention as WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME
+    # / WRITE_AUDIT_TEST_ABORT_AFTER_RENAME below -- only the literal string
+    # `1` enables this hook; `0`, `false`, empty, unset all leave it off.
+    if [ "${WRITE_AUDIT_TEST_FORCE_PRESERVE_COPY_FAIL:-0}" = "1" ]; then
+      PRESERVED_FILE="/nonexistent-dir-for-write-audit-test/${OUTPUT_BASENAME}"
+    fi
     # `cp -p` (not `mv`): if this fails under `set -euo pipefail` the
     # script aborts before $OUTPUT_FILE's original content is touched --
     # a loud failure with the old record intact beats a silent one with

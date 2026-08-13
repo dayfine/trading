@@ -1154,6 +1154,70 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 20b — H-AUDIT-REWORK-COUNT-BLIND, the `cp -p` preservation copy's
+# OWN failure-safety claim (added on QC rework, PR #2266): the comment
+# directly above the `cp -p "$OUTPUT_FILE" "$PRESERVED_FILE"` call in
+# write_audit.sh says that if this copy fails under `set -euo pipefail`,
+# the script aborts before $OUTPUT_FILE's original content is touched. Every
+# sibling guard in this file (the mv-interruption case in scenario 19 above,
+# chmod-ordering in scenario 24, etc.) has a scenario that actually forces
+# the guarded-against failure; this one had none until now.
+#
+# This scenario forces `cp -p` to fail FOR REAL (not a synthetic `exit 1`
+# like the mv-abort hooks) via WRITE_AUDIT_TEST_FORCE_PRESERVE_COPY_FAIL=1,
+# which redirects the preserved-copy destination under a nonexistent
+# directory -- `cp` then fails with its own ENOENT, which (unlike a
+# permission-based injection such as chmod 555 on $AUDIT_DIR) still fails
+# even when the test suite runs as root inside the container, where
+# permission checks are bypassed.
+#   1. Writes a real record (rc=0, content A, sha shaOLD).
+#   2. Re-invokes write_audit.sh for the SAME branch/feature/date with a
+#      DIFFERENT --sha (shaNEW, triggering the preserve-on-collision path)
+#      AND the forced-failure hook set.
+#   3. Asserts the second call failed (rc!=0), the target file on disk is
+#      still byte-identical to content A, and no second record (preserved
+#      or otherwise) was created for this feature -- proving the failed
+#      copy aborted the script before the later write ever ran.
+# ---------------------------------------------------------------------------
+FEATURE20B="preserve-copy-forced-failure"
+
+out20b_1=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=8000000000000000000 \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-29 --feature "${FEATURE20B}" --branch "harness/preserve-fail" --sha "shaOLD" \
+    --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK \
+    --quality-score 2 --notes "content A" 2>&1) && rc20b_1=0 || rc20b_1=$?
+JSON20B="${TMP_REPO}/dev/audit/2026-07-29-harness-preserve-fail-${FEATURE20B}.json"
+
+if [[ ! -f "${JSON20B}" ]]; then
+  fail "scenario 20b — setup: first write did not produce ${JSON20B} (rc=${rc20b_1})"
+  echo "${out20b_1}" | sed 's/^/      /'
+else
+  CONTENT_A_20B="$(cat "${JSON20B}")"
+
+  out20b_2=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_TEST_FORCE_PRESERVE_COPY_FAIL=1 \
+    WRITE_AUDIT_RECORDED_AT_NS=9000000000000000000 \
+    bash "${WRITE_AUDIT}" \
+      --date 2026-07-29 --feature "${FEATURE20B}" --branch "harness/preserve-fail" --sha "shaNEW" \
+      --structural APPROVED --behavioral APPROVED --overall APPROVED \
+      --quality-score 5 --notes "content B - must never land" 2>&1) && rc20b_2=0 || rc20b_2=$?
+
+  CONTENT_AFTER_20B="$(cat "${JSON20B}" 2>/dev/null || echo "MISSING")"
+  audit_count_20b="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE20B}.json" | wc -l | tr -d ' ')"
+
+  if (( rc20b_2 != 0 )) \
+     && [[ "${CONTENT_AFTER_20B}" == "${CONTENT_A_20B}" ]] \
+     && [[ "${audit_count_20b}" == "1" ]] \
+     && echo "${out20b_2}" | grep -q "nonexistent-dir-for-write-audit-test"; then
+    pass "scenario 20b — forced cp -p preservation-copy failure leaves the pre-existing target byte-identical and creates no second record (H-AUDIT-REWORK-COUNT-BLIND, cp -p failure-safety)"
+  else
+    fail "scenario 20b — expected rc2!=0, target unchanged (content A), exactly 1 record for ${FEATURE20B}, cp error naming the injected path; got rc2=${rc20b_2}, audit_count=${audit_count_20b}"
+    echo "${out20b_2}" | sed 's/^/      /'
+    echo "      content A: ${CONTENT_A_20B}"
+    echo "      content after: ${CONTENT_AFTER_20B}"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
 # Scenario 21 — H-PREV-VERDICT-PIPEFAIL: a TRUNCATED prior record (has
 # recorded_at_ns so it sorts correctly by write order, but is missing
 # overall_qc entirely -- the exact shape a pre-H-AUDIT-ATOMIC-WRITE
