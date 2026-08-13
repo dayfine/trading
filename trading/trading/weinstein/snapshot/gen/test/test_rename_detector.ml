@@ -151,6 +151,15 @@ let _stronger_successor = _rebased ~symbol:"ZETACO" _successor_indices
 let _trunc_changeover_idx = 128
 let _trunc_as_of_idx = 149
 let _trunc_as_of = _date _trunc_as_of_idx
+
+(* Load-bearing for [prefilter_rel_tol = Float.infinity] in
+   [Rename_detector._returns_score]: these dates' anchor-key (return) gaps
+   between TRUNCOLD and TRUNCNEW measure ~0.041-0.050, above the stock
+   [Twin_detector] prefilter tolerance of 2e-2 — so this is the fixture that
+   actually depends on the infinite tolerance (verified: dialing it back to
+   2e-2 turns [test_bars_after_as_of_are_ignored] red). The main OLDCO/NEWCO
+   pair's smallest gap is ~0.0057, comfortably under 2e-2, so it would keep
+   passing even without the override and pins nothing here. *)
 let _trunc_zombie_indices = [ 128; 132; 136; 140; 144; 148 ]
 
 let _trunc_old_indices =
