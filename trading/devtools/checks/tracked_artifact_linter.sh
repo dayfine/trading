@@ -28,10 +28,10 @@
 #       the exact class-vs-instance gap the finding exists to close.
 #
 # This check is STATIC (like (b)) but sidesteps the hand-maintained-list gap
-# by using `git ls-files -i -c --exclude-standard` as the primitive instead
-# of a second pattern list: it reports every file that is BOTH tracked AND
-# ignored, using .gitignore itself as the single source of truth for "what
-# counts as an artifact." Any pattern anyone has ever added to .gitignore
+# by using `git ls-files -i -c --exclude-per-directory=.gitignore` as the
+# primitive instead of a second pattern list: it reports every file that is
+# BOTH tracked AND ignored, using .gitignore itself as the single source of
+# truth for "what counts as an artifact." Any pattern added to .gitignore
 # (*.cmi, *.install, compile_commands.json, a brand-new entry added next
 # month, ...) is automatically covered with zero duplication here -- this
 # closes the *class*, including future artifact kinds, as long as they get
@@ -39,8 +39,9 @@
 #
 # CAUTION verified against real data before picking this shape: a naive
 # "fail on any output" gate does NOT work. On main today,
-# `git ls-files -i -c --exclude-standard` returns ~1334 hits, and 1285 of
-# them are `trading/test_data/**/data.csv` / `data.metadata.sexp` --
+# `git ls-files -i -c --exclude-per-directory=.gitignore` returns ~1334
+# hits, and 1285 of them are `trading/test_data/**/data.csv` /
+# `data.metadata.sexp` --
 # deliberately committed golden bars. Their .gitignore pattern was added
 # later to protect *new* fetches only; .gitignore's own comment says so
 # explicitly ("Already-tracked golden bars are UNAFFECTED"). The remaining
@@ -87,8 +88,9 @@
 # every _build/ output, ...) -- it is precisely what .gitignore is working
 # as designed to hide, not a violation.
 #
-# `git ls-files -i -c --exclude-standard` needs the REAL working tree (a
-# dune sandbox mirror under _build/default/ has no .git directory), so this
+# `git ls-files -i -c --exclude-per-directory=.gitignore` needs the REAL
+# working tree (a dune sandbox mirror under _build/default/ has no .git
+# directory), so this
 # script resolves repo_root() and runs git there rather than from its own
 # sandboxed cwd. The owning dune rule declares (universe) because git's
 # tracked/ignored state can change independent of any dune-tracked source
@@ -138,14 +140,51 @@ fi
 # before running git, so it is exactly the directory git's ownership check
 # is evaluated against -- no need for a blanket `safe.directory=*`.
 #
-# `-c core.excludesFile=/dev/null` -- QC residual R4: --exclude-standard
-# also honours `.git/info/exclude` and any configured `core.excludesFile`,
-# both of which are developer-local, not repo-controlled. A local exclude
-# entry (e.g. accidentally excluding `dev/status/harness.md`) would make
-# this check report a legitimately-tracked source file as a false-positive
-# violation. Pinning excludesFile to /dev/null means the result depends
-# only on the repo-controlled `.gitignore` files that --exclude-standard
-# also reads, which is the invariant this check needs.
+# `--exclude-per-directory=.gitignore` instead of `--exclude-standard` --
+# QC residual R4, completed. --exclude-standard reads THREE sources: the
+# repo-controlled `.gitignore` files, plus `.git/info/exclude` and any
+# configured `core.excludesFile`, both of which are developer-local. Only
+# repo-controlled patterns can legitimately define "what counts as an
+# artifact" for a merge-gating check; a developer-local exclude makes the
+# check report a legitimately-tracked source file as a violation on one
+# machine and not on CI.
+#
+# The original R4 fix pinned `core.excludesFile=/dev/null`, which closed
+# the second source but left `.git/info/exclude` -- which has no config
+# knob to neutralise -- still live. That gap was not hypothetical: Claude
+# Code writes `**/.claude/scheduled_tasks.lock` and
+# `**/.claude/settings.local.json` into `.git/info/exclude`, and both of
+# those paths are TRACKED on main, so `dune runtest` failed on every
+# developer machine with those entries while CI (a fresh checkout, empty
+# info/exclude) stayed green -- a local-only red that hides real failures
+# behind noise.
+#
+# --exclude-per-directory reads ONLY the named per-directory file, at every
+# level of the traversal, and consults neither developer-local source. It
+# is exactly the "repo-controlled patterns only" invariant this check
+# needs, expressed positively rather than by subtracting one leak at a
+# time. Measured on main 2026-08-13: --exclude-standard returns 1336 hits,
+# --exclude-per-directory=.gitignore returns 1334, and a `comm` of the two
+# sorted outputs differs by exactly the two info/exclude paths above and
+# nothing else. `core.excludesFile` is no longer overridden because it is no
+# longer read.
+#
+# That measurement establishes the SET IDENTITY and nothing more. It does
+# NOT establish that nested `.gitignore` files are still honoured, though an
+# earlier draft of this comment claimed it did: `git ls-files -i -c
+# --exclude-from=.gitignore`, which reads the root file and performs no
+# per-directory traversal whatsoever, returns the identical 1334 on this
+# tree -- because both nested `.gitignore` files that exist here
+# (`trading/analysis/data/sources/eodhd/` → `secrets`,
+# `dev/experiments/cell-e-15y-2026-05-07/` → `trade_audit.sexp`) match ZERO
+# tracked files and so cannot move either count. Nested traversal is
+# guaranteed by git's own definition (--exclude-standard IS
+# --exclude-per-directory=.gitignore plus the two local sources) and is
+# pinned behaviourally by fixture 5's `sub/nested.subartifact`, NOT by the
+# numbers above. Keep it that way: this check's whole subject is silent
+# wrong answers, and `--exclude-from` reads as a tightening in the same
+# direction, so an unpinned invariant here is a plausible future edit that
+# narrows the check to the root file with nothing to catch it.
 #
 # Capture git's exit status explicitly (VAR=$(cmd) && CODE=0 || CODE=$?,
 # not the sete_diagnostics_check.sh anti-pattern of a bare `VAR=$(cmd);
@@ -157,7 +196,7 @@ fi
 # -- a false OK -- right up until `set -e` killed the script on the failed
 # assignment with no FAIL: line at all. Now a git failure is reported
 # explicitly and distinctly from "0 violations found".
-TRACKED_IGNORED=$(cd "$REPO_ROOT" && git -c safe.directory="$REPO_ROOT" -c core.excludesFile=/dev/null ls-files -i -c --exclude-standard 2>&1) && GIT_CODE=0 || GIT_CODE=$?
+TRACKED_IGNORED=$(cd "$REPO_ROOT" && git -c safe.directory="$REPO_ROOT" ls-files -i -c --exclude-per-directory=.gitignore 2>&1) && GIT_CODE=0 || GIT_CODE=$?
 
 if [ "$GIT_CODE" -ne 0 ]; then
   echo "FAIL: tracked_artifact_linter -- could not read the git index: ${TRACKED_IGNORED}"
