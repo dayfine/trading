@@ -102,10 +102,6 @@ type config = {
   liquidity_config : Liquidity_config.t;
       [@sexp.default Liquidity_config.default_config]
       (** See [.mli]. *)
-  enable_scale_in : bool; [@sexp.default false]  (** See [.mli]. *)
-  scale_in_config : Scale_in_detector.config;
-      [@sexp.default Scale_in_detector.default_config]
-      (** See [.mli]. *)
   max_long_exposure_pct_entry : float; [@sexp.default 0.0]  (** See [.mli]. *)
   initial_long_margin_req : float; [@sexp.default 1.0]  (** See [.mli]. *)
   long_margin_rate_annual_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
@@ -219,8 +215,6 @@ let default_config ~universe ~index_symbol =
     short_sleeve_fraction = 0.0;
     extension_stop_config = Weinstein_stops.Extension_stop.default_config;
     liquidity_config = Liquidity_config.default_config;
-    enable_scale_in = false;
-    scale_in_config = Scale_in_detector.default_config;
     max_long_exposure_pct_entry = 0.0;
     initial_long_margin_req = 1.0;
     long_margin_rate_annual_pct = 0.0;
