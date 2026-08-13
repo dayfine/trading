@@ -13,8 +13,6 @@ module Stops_split_runner = Stops_split_runner
 module Force_liquidation_runner = Force_liquidation_runner
 module Stage3_force_exit_runner = Stage3_force_exit_runner
 module Late_stage2_stop_runner = Late_stage2_stop_runner
-module Harvest_rotate_runner = Harvest_rotate_runner
-module Harvest_rotate_wiring = Harvest_rotate_wiring
 module Macro_bearish_trim_runner = Macro_bearish_trim_runner
 module Macro_bearish_trim_wiring = Macro_bearish_trim_wiring
 module Laggard_rotation_runner = Laggard_rotation_runner
@@ -170,19 +168,6 @@ let _run_late_stage2_tighten ~config ~positions ~get_price ~prior_stages
       ~buffer_pct:config.late_stage2_stop_buffer_pct ~is_screening_day:is_friday
       ~positions ~get_price ~prior_stages ~current_date
 
-(** The two weekly held-position dials (both Friday-gated, default-off):
-    late-Stage-2 stop-tighten ([UpdateRiskParams]) and harvest-rotate
-    ([TriggerPartialExit]). Returns [(late_tighten_ts, harvest_rotate_ts)].
-    Extracted so {!_process_market_day} stays within the function-length limit.
-*)
-let _run_held_position_dials ~config ~positions ~get_price ~prior_stages
-    ~index_view ~audit_recorder ~prior_macro_result ~bar_reader ~current_date =
-  ( _run_late_stage2_tighten ~config ~positions ~get_price ~prior_stages
-      ~index_view ~current_date,
-    Harvest_rotate_wiring.run ~config ~positions ~get_price ~prior_stages
-      ~index_view ~audit_recorder ~prior_macro_result ~bar_reader ~current_date
-  )
-
 (** Compute the macro result for [current_date] (Friday only) and run the
     halt-reset side effect. Returns [None] on non-screening days. Mutates
     [prior_macro] / [prior_macro_result] via {!run_macro_only}. Hoisted out of
@@ -272,20 +257,18 @@ let _run_scale_in ~config ~positions ~portfolio ~get_price ~bar_reader
     ~prior_stages ~prior_stage_ma_values ~stop_states ~scale_in_added
     ~macro_result_opt ~is_screening_day ~halted ~current_date
 
-(** Run the held-position dials (late-Stage-2 tighten + harvest-rotate), the
-    scale-in add pass, and the entry walk. Returns
-    [(late_tighten, harvest_rotate, entries)] with the adds prepended to the
+(** Run the late-Stage-2 stop-tighten dial, the scale-in add pass, and the entry
+    walk. Returns [(late_tighten, entries)] with the adds prepended to the
     entries. Extracted from {!_process_market_day} so that coordinator stays
     within the function-length limit. *)
 let _run_dials_and_entries ~pending_entry_e ~fold_start_date ~config
     ~stop_states ~last_stop_out_dates ~peak_tracker ~bar_reader ~prior_stages
     ~prior_stage_ma_values ~scale_in_added ~sector_prior_stages ~ticker_sectors
     ~get_price ~(portfolio : Portfolio_view.t) ~current_date ~index_view
-    ~audit_recorder ~prior_macro_result ~is_screening_day ~macro_result_opt
-    ~positions =
-  let late_tighten_transitions, harvest_rotate_transitions =
-    _run_held_position_dials ~config ~positions ~get_price ~prior_stages
-      ~index_view ~audit_recorder ~prior_macro_result ~bar_reader ~current_date
+    ~audit_recorder ~is_screening_day ~macro_result_opt ~positions =
+  let late_tighten_transitions =
+    _run_late_stage2_tighten ~config ~positions ~get_price ~prior_stages
+      ~index_view ~current_date
   in
   let scale_in_transitions, scale_in_cash =
     _run_scale_in ~config ~positions ~portfolio ~get_price ~bar_reader
@@ -302,9 +285,7 @@ let _run_dials_and_entries ~pending_entry_e ~fold_start_date ~config
       ~current_date ~index_view ~audit_recorder ~is_screening_day
       ~macro_result_opt
   in
-  ( late_tighten_transitions,
-    harvest_rotate_transitions,
-    scale_in_transitions @ entry_transitions )
+  (late_tighten_transitions, scale_in_transitions @ entry_transitions)
 
 let _process_market_day ~pending_entry_e ~fold_start_date ~config ~ad_series
     ~stop_states ~last_stop_out_dates ~prior_macro ~prior_macro_result
@@ -343,17 +324,16 @@ let _process_market_day ~pending_entry_e ~fold_start_date ~config ~ad_series
       ~stop_exited_ids ~stage3_exited_ids ~laggard_exited_ids
       ~force_exit_transitions
   in
-  let late_tighten_transitions, harvest_rotate_transitions, entry_transitions =
+  let late_tighten_transitions, entry_transitions =
     _run_dials_and_entries ~pending_entry_e ~fold_start_date ~config
       ~stop_states ~last_stop_out_dates ~peak_tracker ~bar_reader ~prior_stages
       ~prior_stage_ma_values ~scale_in_added ~sector_prior_stages
       ~ticker_sectors ~get_price ~portfolio ~current_date ~index_view
-      ~audit_recorder ~prior_macro_result ~is_screening_day ~macro_result_opt
-      ~positions
+      ~audit_recorder ~is_screening_day ~macro_result_opt ~positions
   in
   Transition_assembly.assemble_output ~exit_transitions
     ~stage3_force_exit_transitions ~laggard_rotation_transitions
-    ~force_exit_transitions ~macro_trim_transitions ~harvest_rotate_transitions
+    ~force_exit_transitions ~macro_trim_transitions
     ~adjust_transitions:(adjust_transitions @ late_tighten_transitions)
     ~entry_transitions ~stop_exited_ids ~stage3_exited_ids ~laggard_exited_ids
 

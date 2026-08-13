@@ -473,9 +473,11 @@ val record_transitions : t -> Trading_strategy.Position.transition list -> unit
       ([symbol] from the recorded [entry], [exit_trigger] via
       {!Stop_log.exit_trigger_of_reason}).
 
-    [TriggerPartialExit] transitions are ignored — a partial trim (e.g.
-    [harvest_rotate]) does not close the position, so it has no round-trip
-    [exit_decision] / [external_exit_decision] to record.
+    [TriggerPartialExit] transitions are ignored — a partial trim does not close
+    the position, so it has no round-trip [exit_decision] /
+    [external_exit_decision] to record. No live strategy currently emits one
+    (harvest-rotate, the last emitter, was retired); the case is kept because
+    the simulator and order generator still handle the transition.
 
     [CancelEntry] transitions (the F2 TTL / re-screen ticket cancel) set the
     bucket's [ticket_lifecycle.ticket_age_weeks_at_cancel] from the transition
