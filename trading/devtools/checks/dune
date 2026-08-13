@@ -375,6 +375,21 @@
  (action
   (run sh %{dep:run_in_env_root_check.sh})))
 
+; Smoke test for dev/scripts/docker_dune.sh: pins the PR #2280 qc-behavioral
+; rework fixes (B2 sentinel/last-match, B3 docker-exec-mid-poll diagnostic,
+; B4 brace-grouped redirect so a bad --dir lands in the log). Fakes `docker`
+; (plus `dune` / `opam`) on PATH -- does not require a running container.
+; docker_dune.sh lives under dev/scripts/, outside the dune workspace root,
+; and is read via repo_root() in _check_lib.sh at RUN TIME, so (universe) is
+; required for the same reason as run_in_env_root_check.sh above
+; (H-CHECK-CACHE-BLIND).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:docker_dune_smoke.sh})))
+
 ; Rule promotion check (T3-F): verify every Lifecycle: enforced rule in
 ; docs/design/dependency-rules.md has a corresponding check script that
 ; exists on disk and is referenced by this dune file.

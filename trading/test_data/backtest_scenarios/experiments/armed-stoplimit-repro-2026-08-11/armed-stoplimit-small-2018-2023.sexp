@@ -49,6 +49,17 @@
    ((stage3_force_exit_config ((hysteresis_weeks 1))))
    ((enable_laggard_rotation true))
    ((laggard_rotation_config ((hysteresis_weeks 2))))))
+ ;; Cost-model overlay, copied verbatim from goldens-small/six-year-2018-2023
+ ;; (see that file for the full rationale) so this probe's "only the entry
+ ;; stack differs" guarantee (see WHAT THIS IS above) still holds once
+ ;; Cost_model.to_engine_costs is wired into Panel_runner — without this
+ ;; block the probe silently ran with a different cost model than its
+ ;; sizing/exit-half source, undermining the controlled-comparison claim.
+ (cost_model
+  ((per_trade_commission 0.0)
+   (per_share_commission 0.0)
+   (bid_ask_spread_bps 5.0)
+   (market_impact_bps_per_pct_adv 0.0)))
  (expected
   ;; Sentinel bands only — this spec exists to be DIFFED across commits, not to
   ;; pin a value. Wide enough that the probe never fails for being a probe.
