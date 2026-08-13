@@ -27,12 +27,17 @@
 #      comment (documentation prose quoting call syntax) never becomes a
 #      candidate at all -- H-CHECK-UNIVERSE-DEPS-SCANS-COMMENTS: the
 #      false positive that briefly flagged record_qc_audit_test.sh.
-#   9. A script with a real call site that ALSO has a trailing "#"
-#      comment on the same line, plus "${var#prefix}"/"${#arr[@]}"
-#      parameter-expansion noise elsewhere in the file, is still
-#      detected as a candidate -> FAIL without (universe) -- guards
-#      against an over-eager fix that strips past end-of-line instead of
-#      whole-comment-lines only.
+#   9. A script whose real call-site line is preceded by a load-bearing
+#      "${var#prefix}" parameter expansion (so the line's FIRST "#" is
+#      not the trailing comment) and ALSO carries a trailing "#" comment
+#      of its own, plus "${#arr[@]}" noise elsewhere in the file, is
+#      still detected as a candidate -> FAIL without (universe) -- guards
+#      against two over-eager comment-stripping shapes: (a) dropping any
+#      line that merely CONTAINS a "#" (would wrongly treat this line as
+#      a whole-line comment), and (b) stripping from the first "#" to
+#      end-of-line unconditionally (would truncate this line before
+#      "repo_root)" ever appears, since "${var#prefix}"'s "#" comes
+#      first) -- only whole-comment-line stripping should pass.
 #  10. Same fixture as #9 with (universe) added -> PASS, confirming the
 #      true-positive path (not just the FAIL path) survives the fix.
 #
@@ -120,9 +125,16 @@ EOF
 # "#" comment (documentation prose quoting call syntax) -- it is
 # deliberately NEVER given a dune rule below, because after the fix it
 # must never become a candidate at all. risky_comment_repo_root.sh has a
-# real call site that ALSO carries a trailing "#" comment on the same
-# line, plus "${var#prefix}"/"${#arr[@]}" parameter-expansion noise
-# elsewhere -- it must always still be detected as a candidate.
+# real call site whose OWN line starts with a load-bearing
+# "${var#prefix}" expansion (so the line's first "#" is that expansion's,
+# not a comment) and ALSO carries a trailing "#" comment, plus standalone
+# "${var#prefix}"/"${#arr[@]}" noise elsewhere in the file -- it must
+# always still be detected as a candidate. The expansion on the call-site
+# line itself is what makes assertion 9 discriminating: an implementation
+# that strips from the first "#" to end-of-line (instead of whole-comment
+# lines only) truncates this line before "repo_root)" is ever reached,
+# so a naive fixture with the expansion only on standalone lines would
+# not catch that regression -- see assertion 9's inline comment below.
 cat > "${FIXTURE_CHECKS}/comment_only_repo_root.sh" <<'EOF'
 #!/bin/sh
 # quoted call syntax example, NOT a real call site:
@@ -134,7 +146,7 @@ cat > "${FIXTURE_CHECKS}/risky_comment_repo_root.sh" <<'EOF'
 # a full-line comment above must be stripped and must not itself count
 SHORT="${SOME_VAR#prefix}"
 COUNT="${#SOME_ARRAY[@]}"
-REAL="$(repo_root)/dev/status/qux.md" # trailing comment on the real call-site line
+REAL="${SOME_VAR#pre}$(repo_root)/dev/status/qux.md" # trailing comment on the real call-site line
 echo "OK: $REAL count=$COUNT short=$SHORT"
 EOF
 
@@ -354,10 +366,15 @@ else
   bad "assertion 8 — expected comment_only_repo_root.sh to never appear in output with exit 0; got exit=$CODE8 output=<<$OUT8>>"
 fi
 
-# --- Assertion 9: real call site survives comment-stripping despite a
-# trailing "#" comment on its own line plus "${var#prefix}"/"${#arr[@]}"
-# noise elsewhere in the file -> still detected as a candidate, and FAILs
-# when its owning rule lacks (universe).
+# --- Assertion 9: real call site survives comment-stripping despite (a)
+# a load-bearing "${var#prefix}" expansion earlier on its OWN line, (b) a
+# trailing "#" comment on that same line, and (c) "${#arr[@]}" noise
+# elsewhere in the file -> still detected as a candidate, and FAILs when
+# its owning rule lacks (universe). The expansion on the call-site line
+# is what makes this assertion actually discriminate a strip-to-end-of-
+# line regression: it puts a "#" character BEFORE "repo_root)" on the
+# same line, so an implementation that truncates at the first "#" instead
+# of only stripping whole-comment lines would cut the match away.
 write_dune "universe" "universe" "universe" "no-universe"
 
 set +e
