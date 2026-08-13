@@ -439,6 +439,11 @@ let build_entry_event ~(macro : Macro.result) ~current_date
     shares = meta.shares;
     initial_position_value;
     initial_risk_dollars;
+    sized_down_wide_stop = meta.sized_down_wide_stop;
+    freshness_basis =
+      Entry_ticket_tags.freshness_basis_of_analysis candidate.analysis;
+    triple_confirmation =
+      Entry_ticket_tags.triple_confirmation_of_analysis candidate.analysis;
     alternatives;
   }
 

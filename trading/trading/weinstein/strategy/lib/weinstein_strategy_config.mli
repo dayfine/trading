@@ -391,43 +391,6 @@ type config = {
           a searchable [Variant_matrix] flag axis
           ([((flag stale_exit_after_days) (values (() (5))))]). Ledger:
           [2026-07-10-realism-defaults-flip]. *)
-  enable_harvest_rotate : bool; [@sexp.default false]
-      (** Master switch for the harvest-rotate dial ({!Harvest_rotate_runner},
-          plan [dev/plans/harvest-rotate-rigorous-test-2026-06-10.md]). When
-          [true], on a screening (Friday) day the runner trims a fraction
-          [harvest_fraction] of every held long whose current stage is
-          [Stage2 { late = true }] (the earliest Stage-3 topping precursor),
-          emitting a [TriggerPartialExit]; the freed capital recycles through
-          the existing entry pipeline into a fresh Stage-2 leader. Default
-          [false] preserves all existing baselines — the runner short-circuits
-          to [[]] before any work, so the disabled path is byte-identical to the
-          pre-feature strategy.
-
-          This is the {b exit-aggressiveness} dial ("sell half as the Stage-3
-          top forms") combined with {b rotate-into-leadership}, both Weinstein's
-          "The Trader's Way" — a faithful adaptation of
-          [docs/design/weinstein-book-reference.md] §Stage 3 detail (Ch. 2):
-          "Investors: sell half, protect remaining half." The strategy {b spine}
-          is untouched — stage classification, the Stage-2-only buy rule,
-          breakout+volume entry, the macro/sector gate, and relative strength
-          are all unaffected; only the size of an existing held long is reduced
-          when it begins to top. Searchable as a [Variant_matrix] flag axis
-          ([((flag enable_harvest_rotate) (values (true false)))]). Default-off
-          until an experiment-ledger ACCEPT (per
-          [.claude/rules/experiment-flag-discipline.md] +
-          [.claude/rules/promotion-confirmation.md]). See
-          {!Harvest_rotate_runner}. *)
-  harvest_fraction : float; [@sexp.default 0.5]
-      (** Fraction of a held long position trimmed by {!Harvest_rotate_runner}
-          when it enters [Stage2 { late = true }]: the trimmed quantity is
-          [held_quantity *. Float.min 1.0 harvest_fraction]. [0.5] = sell half
-          (the book's "sell half as the Stage-3 top forms"); [1.0] = full rotate
-          out of the topping name. Only consulted when
-          [enable_harvest_rotate = true]; because the runner is gated entirely
-          by the flag, the disabled path is byte-identical to baseline
-          regardless of this value. A value [<= 0.0] is itself a no-op (nothing
-          to trim). Searchable as a [Variant_matrix] axis. See
-          {!Harvest_rotate_runner}. *)
   short_sleeve_fraction : float; [@sexp.default 0.0]
       (** Fraction of portfolio value reserved as a dedicated short-only cash
           budget in the per-Friday entry walk
@@ -554,78 +517,6 @@ type config = {
           a [Variant_matrix] axis, e.g.
           [((key (liquidity_config min_hold_dollar_adv)) (values (0.0 1e6)))].
           Default-off until an experiment-ledger ACCEPT. *)
-  enable_scale_in : bool; [@sexp.default false]
-      (** Master switch for the explore/exploit scale-in mechanism
-          ([dev/plans/capital-management-scale-in-2026-07-02.md]): initial
-          entries at [scale_in_config.initial_entry_fraction] of the full risk
-          unit (broader survey of fresh Stage-2 breakouts) plus at most
-          [scale_in_config.max_adds] follow-up adds into {e revealed} strength
-          (the first pullback that holds the breakout — Weinstein's ½ + ½, "The
-          Trader's Way"). A
-          {b reallocation inside the existing exposure envelope}: per-symbol
-          notional stays capped at [portfolio_config.max_position_pct_long] and
-          no gross-exposure knob changes.
-
-          Default [false] is a {b no-op} — the entry walk, sizing, and
-          transitions are bit-identical to baseline (experiment-flag-discipline
-          R1); the mechanism is searchable as a flag axis the day it lands (R2).
-      *)
-  scale_in_config : Scale_in_detector.config;
-      [@sexp.default Scale_in_detector.default_config]
-      (** Scale-in knobs — initial-entry fraction, add trigger ([Pullback] v1
-          default / [Early_new_high] / [Either]), pullback proximity, the
-          extension gate (max distance above the 30-week MA), and the not-late
-          gate. Only consulted when [enable_scale_in = true]; each field is
-          addressable as a [Variant_matrix] dot-path axis, e.g.
-          [((key (scale_in_config add_trigger)) (values (Pullback Either)))].
-          See {!Scale_in_detector}. *)
-  cash_reserve_pct : float; [@sexp.default 0.0]
-      (** Fraction of {e current portfolio value} held back from NEW entry
-          funding on each Friday entry walk
-          ({!Weinstein_strategy.entries_from_candidates}). The per-Friday
-          spendable cash is
-          [max 0 (portfolio.cash - cash_reserve_pct * portfolio_value)]; the
-          reserve is taken off the top-level entry budget exactly once (in the
-          reserved-short-sleeve path the same reduced budget is split between
-          the long and short walks, so it is never charged twice).
-
-          {b The working replacement for the dead
-             [Portfolio_risk.min_cash_pct].} Per
-          [dev/notes/envelope-knobs-dead-2026-07-05.md] (merged #1861),
-          [Portfolio_risk.min_cash_pct] is unwired — it has no production
-          consumer (its only reader, the dead [Portfolio_risk.check_limits], was
-          deleted 2026-07-09), so backtests run at ~89-99% deployment with no
-          cash-reserve mechanism at all. This field is the honest, live-path
-          reserve: it is consumed at the one seam that actually gates entry
-          funding (the entry-walk [remaining_cash]).
-
-          {b Scope — entries only.} The reserve narrows only NEW entry funding.
-          Exits, covers, stop orders, and force-liquidations do not flow through
-          the entry walk and are structurally unaffected, so a reserve can never
-          block an exit (the #1553 exit-fill-reject lesson). A held position
-          always exits on its stop/stage/liquidity signal regardless of the
-          reserve.
-
-          {b Semantics.}
-          - [0.0] (default): {b bit-identical to baseline} —
-            [spendable = portfolio.cash], so every existing golden/baseline
-            replays unchanged (experiment-flag-discipline R1).
-          - [> 0.0]: a candidate whose cost fits within [portfolio.cash] but not
-            within the reduced [spendable] budget is rejected exactly as an
-            [Insufficient_cash] skip; candidates that fit within [spendable] are
-            admitted normally.
-
-          {b Faithfulness} (W1/W2, [.claude/rules/weinstein-faithful-core.md]).
-          A portfolio-risk / capital-preservation dial that {e tightens}
-          deployment — it holds cash back in exactly the spirit of the book's
-          "when in doubt, stay out" caution, without touching any spine item
-          (stage classification, the Stage-2-only buy rule, breakout+volume
-          entry, stops, the macro/sector gate are all unchanged). Searchable as
-          a single-component [Variant_matrix] axis
-          ([((cash_reserve_pct) (values (0.0 0.1 0.2 0.3)))]). Default-off until
-          an experiment-ledger ACCEPT (per
-          [.claude/rules/experiment-flag-discipline.md] +
-          [.claude/rules/promotion-confirmation.md]). *)
   max_long_exposure_pct_entry : float; [@sexp.default 0.0]
       (** Cap on aggregate NEW long-entry notional as a fraction of
           {e current portfolio value}, applied at the Friday entry walk
@@ -1611,6 +1502,58 @@ type config = {
           separated so a wide-admission cell is not confounded with a re-anchor
           change. Unread under [Drop_over_max]. Default [0.0] is an exact no-op
           (R1); axis-expressible (R2). *)
+  volume_confirm_at_fill : bool; [@sexp.default false]
+      (** F5 — judge the breakout's volume {b at the fill}, not at placement
+          (plan [dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F5;
+          [docs/design/weinstein-book-reference.md] §4.2 + §4.7).
+
+          {b The faithfulness gap it closes.} Book §4.7's GTC buy-stop is
+          written {i before} the breakout, so breakout-week volume is unknowable
+          at placement — yet today's cascade demands Strong/Adequate volume at
+          the Friday screen. §1 further notes that base volume "dries up", so a
+          screen-week volume requirement selects {i against} textbook bases.
+          §4.2's confirmation is defined on the breakout week, which under a
+          resting ticket is the {b fill} week.
+
+          {b Armed behaviour} (two inseparable halves, both gated on
+          {!volume_confirm_at_fill_armed} — this flag AND the StopLimit family
+          [sim_entry_trigger_at_suggested] + [enable_sim_entry_stoplimit]):
+
+          - {b Placement}: the screen-week volume signal is no longer required
+            to place the ticket ([Stock_analysis.config.require_breakout_volume]
+            goes [false]). Every other gate — stage, base, RS, resistance,
+            macro, sector — still applies, so the placed-ticket population
+            widens but stays bounded.
+          - {b At fill}: {!Volume_eject_runner} confirms the fill week's volume
+            against {b both} §4.2 branches ([Volume.confirms_breakout]) on the
+            first screening tick at which that week is complete (no partial-week
+            lookahead). Unconfirmed ⇒ the position is ejected, audit tag
+            [Volume_eject]; confirmed ⇒ held.
+
+          {b The eject is INSEPARABLE from the flag.} There is deliberately no
+          eject-off cell: holding a volume-unconfirmed breakout would be a W1
+          spine item-3 violation ("entry on a breakout above resistance WITH
+          volume confirmation"), and §4.2's low-volume-breakout SELL rule is
+          explicit that a buy-stop filled without volume confirmation is sold,
+          not held. Arming the placement waiver alone is not expressible.
+
+          {b Default [false] = today's screen-time volume requirement,
+             bit-identical} (R1): [require_breakout_volume] stays [true] and the
+          eject runner short-circuits to [[]], so no golden moves. R2: real
+          config field, axis-expressible as
+          [((flag volume_confirm_at_fill) (values (true false)))] via
+          [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides]. R3:
+          no default flip without a ledger ACCEPT.
+
+          {b Faithfulness: BOOK-SUPPORTED.} Spine item 3 is preserved and
+          relocated to the correct event — the check is not weakened, it is
+          moved from a week the book never evaluates to the week the book
+          defines it on.
+
+          {b Future work (NOT built)}: plan §3-F5 amendment (iv) notes a later
+          trader/investor variant of the unconfirmed branch
+          ([eject | hold_with_stop_at_breakout]); v4 implements the eject only.
+      *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
@@ -1623,6 +1566,22 @@ val default_dawn_max_flip_age_weeks : int
 
 val default_config : universe:string list -> index_symbol:string -> config
 (** Build a default config with Weinstein book values. *)
+
+val volume_confirm_at_fill_armed : config -> bool
+(** [volume_confirm_at_fill_armed c] is [true] iff F5 is active:
+    [c.volume_confirm_at_fill] AND the StopLimit family
+    ([c.sim_entry_trigger_at_suggested] && [c.enable_sim_entry_stoplimit]).
+
+    F5 only makes sense for a resting E-anchored ticket — that is the entry
+    model whose fill week {i is} the breakout week. Under the default
+    close-triggered entry the fill week and the screen week coincide, so
+    relocating the check would be a pure loss of information.
+
+    Single source of truth for both halves of the mechanism: the screener's
+    placement waiver ([Stock_analysis.config.require_breakout_volume]) and the
+    {!Volume_eject_runner} at-fill confirmation read this same predicate, so a
+    ticket can never be placed without volume {i and} then held without the
+    at-fill check. *)
 
 val name : string
 (** Strategy name, always ["Weinstein"]. *)

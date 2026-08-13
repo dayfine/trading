@@ -108,14 +108,3 @@ let make_entry_walk_state ~cash ~(config : Weinstein_strategy_config.config)
        finite ([equity / req]), so the buying-power ceiling always binds. *)
     leverage_enabled = Float.( < ) config.initial_long_margin_req 1.0;
   }
-
-let reserve_reduced_walk_state ~(config : Weinstein_strategy_config.config)
-    ~(portfolio : Portfolio_view.t) ~portfolio_value ~sector_lookup =
-  let spendable =
-    Float.max 0.0
-      (portfolio.Portfolio_view.cash
-      -. (config.cash_reserve_pct *. portfolio_value))
-  in
-  ( spendable,
-    make_entry_walk_state ~cash:spendable ~config ~portfolio ~portfolio_value
-      ~sector_lookup )

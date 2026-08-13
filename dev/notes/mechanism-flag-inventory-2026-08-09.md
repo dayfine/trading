@@ -30,6 +30,31 @@ Call legend: **RETIRE** (terminal REJECT, remove flag+code+tests) /
 **DEFER** (decision blocked on an in-flight program) /
 **UNKNOWN** (no verdict found — needs human/ledger check).
 
+## Correction log
+
+**2026-08-12 — `trigger_on_weekly_close` reclassified RETIRE -> KEEP.** Caught
+while attempting the removal: the flag is armed by live production code
+(`Stop_thread`, the weekly picks report), which the ledger REJECT did not
+cover because that verdict was about the *simulator lever*, not the field.
+
+The general lesson for the rest of this worklist: a ledger REJECT retires a
+**mechanism**, not necessarily a **field**. Before removing any row, grep for
+code that *assigns* the flag — not just scenario specs that override it:
+
+```sh
+git grep -n '<flag> *=' -- 'trading/**/*.ml' | grep -v /test/ | grep -v 'sexp.default'
+```
+
+Anything beyond the `default_config` assignment is a live consumer. Goldens
+will not catch this class: they exercise the backtest path only, so a flag armed
+by the snapshot generator or any other non-backtest surface stays bit-identical
+in every golden while being load-bearing in production.
+
+Audited on 2026-08-12 against the three already-removed rows
+(`enable_harvest_rotate` / `harvest_fraction`, `early_admission_ma_period`,
+`cash_reserve_pct`): each had only its `default_config` assignment, so those
+removals are clean.
+
 ## RETIRE — graveyard (seeded by the 08-09 priorities doc)
 
 | field | config module | default | ledger verdict (pointer) | call | notes |
@@ -42,7 +67,7 @@ Call legend: **RETIRE** (terminal REJECT, remove flag+code+tests) /
 | `enable_scale_in` + `scale_in_config` | `Weinstein_strategy_config` | `false` / `Scale_in_detector.default_config` | REJECT — `2026-07-03-scale-in-v1-surface` + `2026-07-05-continuation-add-v2-surface`; `project_capital_mgmt_scale_in_design` (v1+v2 CLOSED) | RETIRE | "Breadth IS the edge" — sizing mechanics closed. |
 | `enable_macro_bearish_exposure_trim` | `Weinstein_strategy_config` | `false` | REJECT-leaning — `project_macro_bearish_trim_lever` (regime-dependent); seeded graveyard 08-09 | RETIRE | Memory had earlier kept it as a default-off axis; the 08-09 priorities doc reclassifies it graveyard. Cite that supersession in the removal PR. |
 | `macro_bearish_max_long_exposure_pct` | `Weinstein_strategy_config` | `0.70` | same as `enable_macro_bearish_exposure_trim` | RETIRE | Companion knob; same commit. |
-| `trigger_on_weekly_close` | `Weinstein_stops.config` (`stop_types.mli`) | `false` | REJECT — `2026-05-31-exit-timing-deep-2000-2026` (9 Rejects); `project_weekly_close_stop_lever` (stop cost = structural premium) | RETIRE | The weekly-close stop lever. |
+| `trigger_on_weekly_close` | `Weinstein_stops.config` (`stop_types.mli`) | `false` | REJECT as a backtest lever — `2026-05-31-exit-timing-deep-2000-2026` (9 Rejects); `project_weekly_close_stop_lever` | **KEEP — NOT RETIRABLE** | **Corrected 2026-08-12.** The flag has a LIVE production consumer the ledger verdict does not cover: `Stop_thread._weekly_close_config` (`trading/trading/weinstein/snapshot/gen/lib/stop_thread.ml:34`) sets it to `true` on purpose, because that path replays **weekly** bars where the default intra-bar trigger would fire on an intra-week wick — and the book's rule is a weekly CLOSE. Reached from the weekly picks report via `held_position_row.ml`. The REJECT was about *arming it in the simulator*, not about deleting the field. Removing it would silently break the weekly report, and **no golden would catch it** — the goldens do not exercise the snapshot generator. |
 | `vol_scaled_stop_atr_mult` | `Weinstein_stops.config` | `0.0` | NO-BUILD/REJECT — `project_p0_levers_no_build_2026_06_20` (vol-stop fails); seeded graveyard 08-09 | RETIRE | Vol-scaled stop. |
 | `vol_scaled_stop_atr_period` | `Weinstein_stops.config` | `14` | same as `vol_scaled_stop_atr_mult` | RETIRE | Companion knob; same commit (also delete `vol_scaled_stop.ml/.mli`). |
 | `cash_reserve_pct` | `Weinstein_strategy_config` | `0.0` | REJECT — `2026-07-06-cash-reserve-surface`; `project_cash_reserve_rejected` (envelope closed) | RETIRE | Protection lever superseded by barbell. |
@@ -96,23 +121,39 @@ Call legend: **RETIRE** (terminal REJECT, remove flag+code+tests) /
 | `short_sleeve_fraction` | `Weinstein_strategy_config` | `0.0` | screens only, no WF-CV ledger entry — `project_p0_levers_no_build_2026_06_20` (short sleeve fails), `project_p1a_deep_short_screens` (hedge-shaped) | DEFER | No terminal ledger REJECT exists; either run the surface or record a do-not-revive classification before retiring. |
 | `stop_anchor_at_entry_base` | `Weinstein_strategy_config` | `false` | ladder-v3 history references it; retirement note in the async-v2 plan | DEFER | Seeded DEFER — joins the graveyard only after ladder v4. |
 
-## UNKNOWN — no verdict found (needs human/ledger check)
+## RESOLVED 2026-08-10 (was UNKNOWN — classified by consumer-grep + user decision)
 
-| field | config module | default | ledger verdict (pointer) | call | notes |
+All four were listed UNKNOWN because no ledger verdict exists for any of them.
+That turned out to be the wrong lens: **none is a retirement question** (Rule 4
+needs a terminal REJECT, and there is none), they are mechanisms that were
+built, wired, defaulted to no-op, and then **never evaluated** — zero scenario-
+spec references between three of them. That is an `experiment-flag-discipline`
+**R2 gap** ("an axis the day it lands"), not an R4 one.
+
+Consumer counts that drove the calls (non-test `.ml` refs | tests | scenario specs):
+
+| field | refs | tests | specs | call | reasoning |
 |---|---|---|---|---|---|
-| `stage3_reentry_cooldown_weeks` | `Weinstein_strategy_config` | `0` | none found | UNKNOWN | Possibly exit-timing family (would retire with the hysteresis knob) or live stage3 machinery — needs the mapping checked. |
-| `cascade_post_stop_cooldown_weeks` | `Screener.config` | `0` | none found | UNKNOWN | |
-| `failed_breakout_tolerance_pct` | `Screener.config` | `0.0` | none found | UNKNOWN | |
-| `max_long_exposure_pct_entry` | `Weinstein_strategy_config` | `0.0` | none found directly; envelope family — `project_envelope_knobs_dead` says grep knob consumers before touching | UNKNOWN | May be a dead envelope knob (retire with cash_reserve) or live exposure plumbing. |
+| `max_long_exposure_pct_entry` | 10 | 6 | **7** | **KEEP — in active use** | Referenced by 7 live scenario specs, so not a graveyard candidate at all. `project_envelope_knobs_dead`'s "grep consumers first" warning was right and the answer came back yes. No longer open. |
+| `stage3_reentry_cooldown_weeks` | 3 | **0** | 0 | **RETIRE** (with the stage3 family) | One consumer (`special_exits.ml:64`, `~cooldown_weeks`), **no `.mli` docstring at all** (the field at line 99 is undocumented; the neighbouring docstring belongs to `stage3_exit_margin_pct` below it), no tests, no specs. Its sibling `stage3_exit_margin_pct` is already on the RETIRE list as part of the rejected stage3-hysteresis family (`project_stage3_hysteresis_rejected_wfcv`). Reads as a leftover of that rejection. Retire alongside it. |
+| `cascade_post_stop_cooldown_weeks` | 5 | 4 | 0 | **KEEP-AXIS — sweep once, expect it to lose** | Benches a symbol for N weeks after a stop-out; motivated by a real documented pathology (cascade re-firing within days of stop-out, `dev/notes/sp500-trade-quality-findings-2026-04-30.md`). Strong prior AGAINST from `project_edge_is_the_fat_tail`: it is a re-entry suppressor, and the AXTI-class monsters are exactly names that whipsaw before they run. Cheap as one axis; a **recorded** loss is worth more than a silent flag. |
+| `failed_breakout_tolerance_pct` | 21 | 24 | 0 | **RESOLVE AGAINST F2 FIRST** | Drops a long candidate whose close fell back below `breakout_price *. (1. -. k)` and demotes it to the watchlist. This **overlaps F2 `entry_order_ttl_weeks`' primary re-screen cancel** (#2263, merged 2026-08-10): under the async ticket model, price falling back below the breakout while the ticket rests *is* the failed breakout. Either this is now largely redundant, or it is the sharper-specified version of F2's cancel condition. Sweeping both without resolving the overlap would test two spellings of one mechanism and read the interaction as signal. Decide the overlap before either is swept. |
+
+**Common shape worth noting:** all three non-KEEP entries are re-entry /
+whipsaw suppressors. They are close to one question, not three, and
+`project_edge_is_the_fat_tail` already carries a strong prior on that family.
 
 ## Tallies
 
 - RETIRE (seeded, ready for step-3 removal PRs): **12 rows** (~14 fields)
 - RETIRE (confirm-first): **5 rows** (~10 fields)
 - KEEP-PROMOTED: **9 rows**
-- KEEP-AXIS: **19 rows**
+- KEEP-AXIS: **20 rows** (19 + `cascade_post_stop_cooldown_weeks`, resolved 08-10)
 - DEFER: **2 rows** (`short_sleeve_fraction`, `stop_anchor_at_entry_base`)
-- UNKNOWN: **4 rows**
+- UNKNOWN: **0 rows** — all four resolved 2026-08-10, see the RESOLVED section
+  above. Net effect: +1 RETIRE (`stage3_reentry_cooldown_weeks`, folded into the
+  stage3 family), +1 KEEP-AXIS, +1 KEEP (`max_long_exposure_pct_entry`, in
+  active use), +1 pending-overlap-decision (`failed_breakout_tolerance_pct`).
 
 ## Step-3 sequencing suggestion
 

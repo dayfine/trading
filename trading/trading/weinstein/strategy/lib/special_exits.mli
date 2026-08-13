@@ -8,7 +8,7 @@
     path is bit-identical to baseline.
 
     Extracted from {!Weinstein_strategy} so the top-level strategy module stays
-    within its file-length budget (mirrors {!Harvest_rotate_wiring}). *)
+    within its file-length budget. *)
 
 open Core
 open Trading_strategy

@@ -5,7 +5,28 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 78c98b7f-b5bb-42f0-abac-d99c79b0a11d
+  modified: 2026-08-13T05:59:55.466Z
 ---
+
+**RETIREMENT CLASSIFICATION — DO-NOT-REVIVE (recorded 2026-08-12, for PR #2299).**
+Rule 4 (`experiment-flag-discipline.md`) requires the classification be *recorded*,
+not inferred at removal time, and both scale-in ledger entries are ambiguous on
+their face: each says "mechanism KEEPS default-off axis status" (the keep-as-axis
+shape) while the v2 entry simultaneously says "SCALE-IN PROGRAM CLOSED (both halves
+now tested)" and "stop proposing intra-envelope capital-reallocation variants — the
+class is exhausted." Classifying it **do-not-revive** on three grounds:
+1. v2 (2026-07-05) is the *later, terminal* entry and closes both halves — v1's
+   ½-sizing (fat-tail tax) and v2's full-size book-faithful adds (flat redistribution).
+2. The single revival path v2 names — "revisit adds only PAIRED with an envelope
+   change (min_cash/max_exposure pair-sweep)" — is itself closed:
+   [[project_envelope_knobs_dead]] records both envelope knobs as dead code and the
+   pair-sweep as cancelled. There is no live path to revive.
+3. `dev/notes/mechanism-flag-inventory-2026-08-09.md` triages the row RETIRE, and
+   that file is actively curated — it was corrected 2026-08-12 to pull
+   `trigger_on_weekly_close` *out* of RETIRE, so this row survived a real review.
+Deletion is a no-op by construction: `Scale_in_runner.entry_sizing_config` returned
+the identical `config.portfolio_config` record at the default, so replacing the call
+with that value cannot move a golden.
 
 **CONTINUATION-ADD v2 REJECTED — SCALE-IN PROGRAM CLOSED (2026-07-05, ledger
 `2026-07-05-continuation-add-v2-surface`):** broad-only 13×2y WF-CV, gate FAIL

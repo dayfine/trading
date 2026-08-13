@@ -7,6 +7,7 @@
   test_bar_reader
   test_entry_audit_capture
   test_entry_freeze
+  test_entry_ticket_tags
   test_entry_ticket_ttl
   test_exit_audit_capture
   test_force_liquidation_runner
@@ -26,16 +27,14 @@
   test_liquidity_gate
   test_liquidity_exit_runner
   test_extension_stop_runner
+  test_volume_eject_runner
   test_spy_only_weinstein_strategy
   test_breaker_spy_strategy
   test_stage3_force_exit_runner
   test_late_stage2_stop_runner
-  test_harvest_rotate_runner
   test_macro_bearish_trim_runner
   test_laggard_rotation_runner
   test_stops_runner
-  test_scale_in_detector
-  test_scale_in_runner
   test_long_buying_power
   test_leverage_dawn
   test_stops_split_runner
@@ -76,6 +75,7 @@
   weinstein.rs
   weinstein.sector
   weinstein.stock_analysis
+  weinstein.volume
   weinstein.resistance
   weinstein_trading.portfolio_risk
   weinstein_trading.stops

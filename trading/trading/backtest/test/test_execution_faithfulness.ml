@@ -19,6 +19,7 @@ open Core
 open Matchers
 module EF = Backtest.Execution_faithfulness
 module TA = Backtest.Trade_audit
+module TL = Backtest.Ticket_lifecycle
 
 let _date d = Date.of_string d
 
@@ -45,8 +46,8 @@ let make_trade ?(symbol = "AAPL") ?(side = Trading_base.Types.Buy)
    trigger recovery returns [suggested_entry] exactly. *)
 let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     ?(position_id = "AAPL-wein-1") ?(side = Trading_base.Types.Long)
-    ?(suggested_entry = 150.0) ?(installed_stop = 138.0) () : TA.entry_decision
-    =
+    ?(suggested_entry = 150.0) ?(installed_stop = 138.0)
+    ?(ticket_lifecycle = None) () : TA.entry_decision =
   {
     symbol;
     entry_date;
@@ -81,6 +82,7 @@ let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
     risk_pct = 0.08;
     initial_position_value = 100.0 *. suggested_entry;
     initial_risk_dollars = 100.0 *. Float.abs (suggested_entry -. installed_stop);
+    ticket_lifecycle;
     alternatives_considered = [];
   }
 
@@ -307,9 +309,114 @@ let test_degenerate_trigger_falls_back_to_suggested_entry _ =
           ~entry_order_kind:Market))
     (is_some_and (field (fun e -> e.TA.designed_trigger) (float_equal 200.0)))
 
+(* PR-5 ticket age at fill --------------------------------------------- *)
+
+let _lifecycle ?(ticket_age_weeks_at_cancel = None) ~placement_date () : TL.t =
+  {
+    placement_date;
+    ticket_age_weeks_at_cancel;
+    ticket_age_weeks_at_fill = None;
+    fill_volume = None;
+    freshness_basis = TL.Ma_cross;
+    sized_down_wide_stop = false;
+    triple_confirmation =
+      {
+        breakout_volume_multiple = None;
+        rs_zero_cross = false;
+        in_base_advance_pct = None;
+      };
+  }
+
+let _lifecycle_of_first records =
+  match records with
+  | [ (r : TA.audit_record) ] -> r.entry.ticket_lifecycle
+  | _ -> None
+
+let _age_of_first records =
+  Option.bind (_lifecycle_of_first records) ~f:(fun (l : TL.t) ->
+      l.ticket_age_weeks_at_fill)
+
+let _enrich_one ?ticket_age_weeks_at_cancel ~placement ~fill () =
+  let audit =
+    [
+      make_record
+        (make_entry ~entry_date:(_date placement)
+           ~ticket_lifecycle:
+             (Some
+                (_lifecycle ?ticket_age_weeks_at_cancel
+                   ~placement_date:(_date placement) ()))
+           ());
+    ]
+  in
+  EF.enrich ~audit
+    ~round_trips:[ make_trade ~entry_date:(_date fill) () ]
+    ~entry_order_kind:Market
+
+(** A ticket placed on the Friday and filled the following Monday resolves at
+    age 0; one filled a week later resolves at 1. Both sit inside
+    {!Trade_context}'s 7-day join window — the ceiling the field doc names — so
+    these are the two ages this enrichment can actually observe. *)
+let test_enrich_stamps_ticket_age_at_fill _ =
+  let enriched ~placement ~fill =
+    _age_of_first (_enrich_one ~placement ~fill ())
+  in
+  assert_that
+    [
+      enriched ~placement:"2024-01-12" ~fill:"2024-01-15";
+      enriched ~placement:"2024-01-08" ~fill:"2024-01-15";
+    ]
+    (elements_are [ is_some_and (equal_to 0); is_some_and (equal_to 1) ])
+
+(** The fill stamp writes ONLY its own column. Given a row that already carries
+    a cancel-side age, enrichment leaves that value intact — the split is what
+    makes the fill side's structural 7-day ceiling unable to leak into the
+    unbounded cancel-side statistic. *)
+let test_enrich_writes_only_the_fill_age_column _ =
+  assert_that
+    (_lifecycle_of_first
+       (_enrich_one ~ticket_age_weeks_at_cancel:(Some 9) ~placement:"2024-01-12"
+          ~fill:"2024-01-15" ()))
+    (is_some_and
+       (all_of
+          [
+            field
+              (fun (l : TL.t) -> l.ticket_age_weeks_at_fill)
+              (is_some_and (equal_to 0));
+            field
+              (fun (l : TL.t) -> l.ticket_age_weeks_at_cancel)
+              (is_some_and (equal_to 9));
+          ]))
+
+(** A [trade_audit.sexp] written before PR-5 has no [ticket_lifecycle]; the
+    enrichment must not fabricate one, only the [execution] record it owns. *)
+let test_enrich_leaves_a_pre_pr5_row_without_a_lifecycle _ =
+  let audit = [ make_record (make_entry ()) ] in
+  let enriched =
+    EF.enrich ~audit ~round_trips:[ make_trade () ] ~entry_order_kind:Market
+  in
+  assert_that enriched
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (r : TA.audit_record) -> r.entry.ticket_lifecycle)
+               is_none;
+             field
+               (fun (r : TA.audit_record) -> r.execution)
+               (is_some_and (field (fun e -> e.TA.faithful) (equal_to true)));
+           ];
+       ])
+
 let suite =
   "execution_faithfulness"
   >::: [
+         "enrich stamps the ticket age at fill"
+         >:: test_enrich_stamps_ticket_age_at_fill;
+         "enrich writes only the fill age column"
+         >:: test_enrich_writes_only_the_fill_age_column;
+         "enrich leaves a pre-PR-5 row without a lifecycle"
+         >:: test_enrich_leaves_a_pre_pr5_row_without_a_lifecycle;
          "kind: Market when flag off" >:: test_kind_market_when_flag_off;
          "kind: Market when extension 0"
          >:: test_kind_market_when_extension_zero;

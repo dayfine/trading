@@ -19,7 +19,8 @@
 #     --structural APPROVED \
 #     --behavioral APPROVED \
 #     --overall    APPROVED \
-#     [--harness-gap "description of what the harness missed"] \
+#     [--sha       <reviewed-commit-sha>] \  # identity key; see H-AUDIT-REWORK-COUNT-BLIND below
+#     [--harness-gap "description of what the harness missed"] \  # recorded on ANY verdict, not just NEEDS_REWORK
 #     [--quality-score 4] \
 #     [--pass-count 8] \
 #     [--fail-count 0] \
@@ -78,6 +79,42 @@
 # predating a field. Such a record is skipped (neither extends nor breaks
 # the streak) rather than aborting the script or silently breaking the
 # streak; regression-tested in record_qc_audit_test.sh scenarios 21-22.
+#
+# Same-branch rework collisions (H-AUDIT-REWORK-COUNT-BLIND,
+# dev/status/harness.md): the branch segment above (H-AUDIT-COLLISION)
+# disambiguates two DIFFERENT branches reviewed on the same day, but does
+# NOT disambiguate two DIFFERENT reviews of the SAME branch on the same
+# day -- which is exactly what a rework cycle is (NEEDS_REWORK at tip A,
+# fix pushed, APPROVED at tip B, both still on the same branch, same date).
+# Both calls compute the identical $OUTPUT_FILE, so without the guard
+# below the second (APPROVED) call silently clobbers the first
+# (NEEDS_REWORK) record before the consecutive_rework_count scan ever
+# gets a chance to see it -- making a >=3-in-a-row escalation trigger
+# unreachable within a single day for a single branch, no matter how many
+# times it actually got reworked.
+#
+# The optional --sha (the reviewed commit) is the identity key: two calls
+# for the same $OUTPUT_FILE with the SAME non-empty sha are the SAME
+# review (e.g. a retried `record_qc_audit.sh` invocation after a
+# transient `gh` failure) and should overwrite, preserving the existing
+# idempotency contract; two calls with DIFFERENT non-empty shas are
+# DIFFERENT reviews (a genuine rework at a new tip) and must both survive.
+# When either side's sha is unknown (empty --sha, or an existing record
+# written before this fix / without --sha) the two calls are
+# indistinguishable, so this degrades to the pre-fix overwrite behavior --
+# a deliberate, documented gap rather than a guess; the SHA-in-content
+# comparison below only starts protecting a branch once every call for it
+# supplies --sha, which record_qc_audit.sh (H-AUDIT-REWORK-COUNT-BLIND
+# fix) now does unconditionally, not just on NEEDS_REWORK, matching the
+# same "record identity, not verdict" principle as the harness_gap fix
+# just above.
+#
+# Deliberately does NOT change $OUTPUT_FILE's naming scheme (still
+# <date>-<branch-safe>-<feature>.json) -- only what happens when that
+# name is about to be reused for a genuinely different review. This keeps
+# the blast radius to the collision path only: every existing caller that
+# never collides (unique branch/date per call, the overwhelming majority)
+# writes the exact same filename as before this fix.
 
 set -euo pipefail
 
@@ -86,6 +123,7 @@ set -euo pipefail
 DATE=""
 FEATURE=""
 BRANCH=""
+SHA=""
 STRUCTURAL="SKIPPED"
 BEHAVIORAL="SKIPPED"
 OVERALL=""
@@ -101,6 +139,7 @@ while [ $# -gt 0 ]; do
     --date)        DATE="$2";          shift 2 ;;
     --feature)     FEATURE="$2";       shift 2 ;;
     --branch)      BRANCH="$2";        shift 2 ;;
+    --sha)         SHA="$2";           shift 2 ;;
     --structural)  STRUCTURAL="$2";    shift 2 ;;
     --behavioral)  BEHAVIORAL="$2";    shift 2 ;;
     --overall)     OVERALL="$2";       shift 2 ;;
@@ -143,11 +182,24 @@ for verdict_name in structural behavioral overall; do
   esac
 done
 
-# harness_gap is only meaningful on NEEDS_REWORK
-if [ "$OVERALL" = "APPROVED" ] && [ -n "$HARNESS_GAP" ]; then
-  echo "WARNING: --harness-gap is only meaningful when --overall is NEEDS_REWORK; ignoring." >&2
-  HARNESS_GAP=""
-fi
+# harness_gap is recorded regardless of --overall
+# (H-AUDIT-HARNESS-GAP-DROPPED-ON-APPROVED, dev/status/harness.md). A harness
+# gap is a statement about the HARNESS ("here is a check the automation
+# should have but doesn't"), not a statement about the verdict the review
+# happened to land on -- a real gap can be filed and then the PR still ends
+# APPROVED after rework, which is the process working as intended, not a
+# reason to discard the finding. Previously this script dropped the value
+# whenever --overall was APPROVED, which biased the corpus toward gaps
+# review never recovered from (the opposite of what a "what should we
+# automate" read wants to see) -- demonstrated live on #2251, where
+# qc-behavioral filed a real LINTER_CANDIDATE gap and the PR still ended
+# APPROVED. If a future consumer wants only the NEEDS_REWORK-scoped subset,
+# it should filter by (overall_qc, harness_gap) together at READ time
+# (e.g. deep_scan/check_06_qc_calibration.sh), not have the value discarded
+# here at WRITE time. As of this fix no consumer reads this field at all --
+# record_qc_audit.sh never populates --harness-gap either -- so there is no
+# existing verdict-scoped assumption elsewhere that needs updating in
+# tandem with this change.
 
 # --- Locate repo root ---
 
@@ -194,9 +246,71 @@ if [ -n "$BRANCH" ]; then
   BRANCH_SAFE="$(printf '%s' "$BRANCH" | tr '/' '-')"
   OUTPUT_FILE="$AUDIT_DIR/${DATE}-${BRANCH_SAFE}-${FEATURE}.json"
 else
+  BRANCH_SAFE=""
   OUTPUT_FILE="$AUDIT_DIR/${DATE}-${FEATURE}.json"
 fi
 OUTPUT_BASENAME="$(basename "$OUTPUT_FILE")"
+
+# --- Preserve a same-name record from a DIFFERENT review before reusing
+#     its filename (H-AUDIT-REWORK-COUNT-BLIND, dev/status/harness.md) ---
+#
+# See the docstring block near the top of this file for the full
+# rationale. Short version: $OUTPUT_FILE's name is keyed on
+# date+branch+feature only, so a rework cycle (NEEDS_REWORK at tip A,
+# APPROVED at tip B, same branch, same day) computes the SAME
+# $OUTPUT_FILE for both calls. Without this guard the second call's
+# `mv -f "$TMP_FILE" "$OUTPUT_FILE"` below silently destroys the first
+# call's record -- the rework happened, but nothing in dev/audit/ ever
+# reflects it, and the consecutive_rework_count scan a few sections down
+# never sees the destroyed record because it is already gone by the time
+# that scan runs.
+#
+# This block runs BEFORE the consecutive_rework_count scan (not just
+# before the write) specifically so that scan's glob picks up the
+# preserved copy under its new name -- no changes needed to that scan's
+# logic at all, it already walks every "*-<feature>.json" file and skips
+# only the literal $OUTPUT_BASENAME.
+if [ -f "$OUTPUT_FILE" ]; then
+  OLD_SHA=$(grep -o '"sha": *"[^"]*"' "$OUTPUT_FILE" 2>/dev/null | head -1 | sed 's/.*: *"//;s/"//') || true
+  # Only preserve when BOTH sides positively identify a review and they
+  # DIFFER -- see the "identity key" paragraph above. Either side empty
+  # (unknown identity) falls through to the normal overwrite path below,
+  # exactly like every direct write_audit.sh caller that never passes
+  # --sha today (100% backward compatible with existing callers/tests).
+  if [ -n "$OLD_SHA" ] && [ -n "$SHA" ] && [ "$OLD_SHA" != "$SHA" ]; then
+    OLD_TS=$(grep -o '"recorded_at_ns": *[0-9]*' "$OUTPUT_FILE" 2>/dev/null | head -1 | sed 's/.*: *//') || true
+    [ -z "$OLD_TS" ] && OLD_TS="0"
+    if [ -n "$BRANCH_SAFE" ]; then
+      PRESERVED_FILE="$AUDIT_DIR/${DATE}-${BRANCH_SAFE}-prev${OLD_TS}-${FEATURE}.json"
+    else
+      PRESERVED_FILE="$AUDIT_DIR/${DATE}-prev${OLD_TS}-${FEATURE}.json"
+    fi
+    # Test-only hook: force the preservation copy below to genuinely FAIL
+    # (as opposed to a synthetic `exit 1`, unlike the two rename-abort hooks
+    # further down this file) by redirecting $PRESERVED_FILE under a
+    # directory that does not exist. `cp -p` then errors for real (ENOENT
+    # from cp itself) rather than us simulating the failure -- and unlike a
+    # permission-based injection (e.g. chmod 555 on $AUDIT_DIR), a missing
+    # parent directory fails for root too, so the hook can't silently
+    # become a no-op when the test suite runs as root inside the container.
+    # Used by record_qc_audit_test.sh to prove the safety claim on the
+    # `cp -p` line below: when this copy fails under `set -euo pipefail`,
+    # the script aborts BEFORE $OUTPUT_FILE's original content is touched.
+    #
+    # ACCEPTED SPELLING: same convention as WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME
+    # / WRITE_AUDIT_TEST_ABORT_AFTER_RENAME below -- only the literal string
+    # `1` enables this hook; `0`, `false`, empty, unset all leave it off.
+    if [ "${WRITE_AUDIT_TEST_FORCE_PRESERVE_COPY_FAIL:-0}" = "1" ]; then
+      PRESERVED_FILE="/nonexistent-dir-for-write-audit-test/${OUTPUT_BASENAME}"
+    fi
+    # `cp -p` (not `mv`): if this fails under `set -euo pipefail` the
+    # script aborts before $OUTPUT_FILE's original content is touched --
+    # a loud failure with the old record intact beats a silent one with
+    # the old record gone. The later atomic write below replaces
+    # $OUTPUT_FILE's content regardless of whether this copy ran.
+    cp -p "$OUTPUT_FILE" "$PRESERVED_FILE"
+  fi
+fi
 
 # --- Validate quality score is an integer in 1..5 ---
 #
@@ -424,6 +538,7 @@ cat > "$TMP_FILE" <<ENDJSON
   "date": "$DATE",
   "feature": "$(_json_str "$FEATURE")",
   "branch": "$(_json_str "$BRANCH")",
+  "sha": "$(_json_str "$SHA")",
   "recorded_at_ns": $RECORDED_AT_NS,
   "structural_qc": "$STRUCTURAL",
   "behavioral_qc": "$BEHAVIORAL",

@@ -95,8 +95,6 @@ type config = {
   stale_exit_after_days : int option;
       [@sexp.default Some default_stale_exit_days]
       (** See [.mli]. *)
-  enable_harvest_rotate : bool; [@sexp.default false]  (** See [.mli]. *)
-  harvest_fraction : float; [@sexp.default 0.5]  (** See [.mli]. *)
   short_sleeve_fraction : float; [@sexp.default 0.0]  (** See [.mli]. *)
   extension_stop_config : Weinstein_stops.Extension_stop.config;
       [@sexp.default Weinstein_stops.Extension_stop.default_config]
@@ -104,11 +102,6 @@ type config = {
   liquidity_config : Liquidity_config.t;
       [@sexp.default Liquidity_config.default_config]
       (** See [.mli]. *)
-  enable_scale_in : bool; [@sexp.default false]  (** See [.mli]. *)
-  scale_in_config : Scale_in_detector.config;
-      [@sexp.default Scale_in_detector.default_config]
-      (** See [.mli]. *)
-  cash_reserve_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
   max_long_exposure_pct_entry : float; [@sexp.default 0.0]  (** See [.mli]. *)
   initial_long_margin_req : float; [@sexp.default 1.0]  (** See [.mli]. *)
   long_margin_rate_annual_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
@@ -146,6 +139,7 @@ type config = {
       [@sexp.default Stop_width_mode.Drop_over_max]
       (** See [.mli]. *)
   stop_width_size_down_max_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
+  volume_confirm_at_fill : bool; [@sexp.default false]  (** See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -218,14 +212,9 @@ let default_config ~universe ~index_symbol =
     enable_macro_bearish_exposure_trim = false;
     macro_bearish_max_long_exposure_pct = macro_bearish_no_op_cap;
     stale_exit_after_days = Some default_stale_exit_days;
-    enable_harvest_rotate = false;
-    harvest_fraction = 0.5;
     short_sleeve_fraction = 0.0;
     extension_stop_config = Weinstein_stops.Extension_stop.default_config;
     liquidity_config = Liquidity_config.default_config;
-    enable_scale_in = false;
-    scale_in_config = Scale_in_detector.default_config;
-    cash_reserve_pct = 0.0;
     max_long_exposure_pct_entry = 0.0;
     initial_long_margin_req = 1.0;
     long_margin_rate_annual_pct = 0.0;
@@ -254,6 +243,14 @@ let default_config ~universe ~index_symbol =
     entry_order_ttl_weeks = 0;
     stop_width_mode = Stop_width_mode.Drop_over_max;
     stop_width_size_down_max_pct = 0.0;
+    volume_confirm_at_fill = false;
   }
+
+(* F5 arming predicate — the single source of truth for both halves of the
+   mechanism (placement waiver + at-fill eject), so the two can never drift out
+   of step. See [.mli]. *)
+let volume_confirm_at_fill_armed (c : config) : bool =
+  c.volume_confirm_at_fill && c.sim_entry_trigger_at_suggested
+  && c.enable_sim_entry_stoplimit
 
 let name = "Weinstein"

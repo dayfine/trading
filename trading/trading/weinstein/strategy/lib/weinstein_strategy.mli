@@ -94,14 +94,6 @@ module Late_stage2_stop_runner = Late_stage2_stop_runner
     transitions (never exits). Default-off preserves all baselines. See
     {!Late_stage2_stop_runner}. *)
 
-module Harvest_rotate_runner = Harvest_rotate_runner
-(** Harvest-rotate dial (default-off). Invoked on Friday ticks when
-    [config.enable_harvest_rotate = true]: trims [config.harvest_fraction] of
-    every held [Stage2 { late = true }] long via a [TriggerPartialExit] (the
-    book's "sell half as the Stage-3 top forms"), freeing capital to recycle
-    through the existing entry pipeline into a fresh Stage-2 leader. Default-off
-    preserves all baselines. See {!Harvest_rotate_runner}. *)
-
 module Macro_bearish_trim_runner = Macro_bearish_trim_runner
 (** Macro-bearish held-exposure trim runner (default-off). Invoked AFTER the
     special-exit passes on Friday ticks when
@@ -133,18 +125,6 @@ module Liquidity_config = Liquidity_config
     callers building a {!Weinstein_strategy.config} can reference
     {!Liquidity_config.default_config} without a separate library import. *)
 
-module Scale_in_detector = Scale_in_detector
-(** Scale-in add-trigger detection + knobs ({!Scale_in_detector.config}).
-    Re-exposed so callers building a {!Weinstein_strategy.config} can reference
-    {!Scale_in_detector.default_config} and the [trigger] variants without a
-    separate library import. *)
-
-module Scale_in_runner = Scale_in_runner
-(** Scale-in add runner (default-off). Runs on Friday ticks before the
-    fresh-entry walk when [config.enable_scale_in = true]; emits sibling
-    [CreateEntering] adds into revealed strength and reduces the entry walk's
-    cash budget by their cost. See {!Scale_in_runner}. *)
-
 module Liquidity_metric = Liquidity_metric
 (** Pure trailing dollar-ADV metric. See {!Liquidity_metric}. *)
 
@@ -166,6 +146,14 @@ module Extension_stop_runner = Extension_stop_runner
     tail-insurance stop. Invoked among the special exits on Friday ticks when
     [config.extension_stop_config] is enabled; LONG-only, weekly-close,
     tighten-only. See {!Extension_stop_runner}. *)
+
+module Volume_eject_runner = Volume_eject_runner
+(** F5 at-fill volume-confirmation eject runner. Invoked among the special exits
+    on Friday ticks when
+    [Weinstein_strategy_config.volume_confirm_at_fill_armed config] holds; emits
+    a [volume_eject] [TriggerExit] for any freshly-filled long whose fill-week
+    volume fails both §4.2 branches. Returns [[]] at the default config. See
+    {!Volume_eject_runner}. *)
 
 module Macro_inputs = Macro_inputs
 (** Sector map + global index assembly from accumulated bar history. Exposes the
@@ -205,6 +193,19 @@ module Entry_audit_capture = Entry_audit_capture
 (** Per-candidate entry construction + audit emission. Factored out of the main
     strategy file to keep it under the file-length cap. See
     {!Entry_audit_capture}. *)
+
+module Entry_ticket_tags = Entry_ticket_tags
+(** Placement-time ticket audit tags — the F1 freshness basis and the F6 book
+    §4.5 triple-confirmation measurements, projected off the candidate's
+    analysis. Capture only; nothing gates on them. Re-exposed so the backtest
+    recorder and tests can read the same projections the capture site uses. See
+    {!Entry_ticket_tags}. *)
+
+module Entry_freshness = Entry_freshness
+(** F1 admission-clock basis ([Ma_cross] vs [Range_top_breakout]). Re-exposed
+    alongside {!Entry_ticket_tags} so downstream consumers of the audit surface
+    (the backtest recorder, tests) can name the basis without depending on
+    [weinstein.stock_analysis] directly. See {!Entry_freshness}. *)
 
 module Entry_walk = Entry_walk
 (** The screener-candidate → [CreateEntering] entry walk. Re-exposed so callers
@@ -609,17 +610,6 @@ type config = {
           no-op (detector-only, byte-identical to pre-#1484). Threaded into the
           simulator's [Trading_simulation.Stale_hold.config]. Searchable as a
           [Variant_matrix] flag axis. See [Weinstein_strategy_config]. *)
-  enable_harvest_rotate : bool; [@sexp.default false]
-      (** Master switch for the harvest-rotate dial: trim [harvest_fraction] of
-          every held [Stage2 { late = true }] long via a [TriggerPartialExit] on
-          Friday ticks, recycling the freed capital through the existing entry
-          pipeline. Default [false] is a no-op (byte-identical to baseline).
-          Searchable as a [Variant_matrix] flag axis. See
-          [Weinstein_strategy_config] / {!Harvest_rotate_runner}. *)
-  harvest_fraction : float; [@sexp.default 0.5]
-      (** Fraction of a held [Stage2 { late }] long trimmed by the
-          harvest-rotate runner; [0.5] = sell half. Only consulted when
-          [enable_harvest_rotate = true]. See [Weinstein_strategy_config]. *)
   short_sleeve_fraction : float; [@sexp.default 0.0]
       (** Fraction of portfolio value reserved as a dedicated short-only cash
           budget in the per-Friday entry walk; default [0.0] is a no-op
@@ -639,21 +629,6 @@ type config = {
       (** Liquidity-realism overlay parameters (held-position degradation exit +
           entry liquidity gate). Default [Liquidity_config.default_config] is a
           no-op (both thresholds [0.0]) — bit-identical to baseline. See
-          [Weinstein_strategy_config]. *)
-  enable_scale_in : bool; [@sexp.default false]
-      (** Master switch for the explore/exploit scale-in mechanism (½-unit
-          initial entries + one pullback add into revealed strength). Default
-          [false] is a no-op — bit-identical to baseline. See
-          [Weinstein_strategy_config]. *)
-  scale_in_config : Scale_in_detector.config;
-      [@sexp.default Scale_in_detector.default_config]
-      (** Scale-in knobs; only consulted when [enable_scale_in = true]. See
-          [Weinstein_strategy_config] and {!Scale_in_detector}. *)
-  cash_reserve_pct : float; [@sexp.default 0.0]
-      (** Fraction of current portfolio value held back from NEW entry funding
-          each Friday; default [0.0] is a no-op (bit-identical to baseline). The
-          working replacement for the dead [Portfolio_risk.min_cash_pct]. Scoped
-          to entries only — exits are never blocked. See
           [Weinstein_strategy_config]. *)
   max_long_exposure_pct_entry : float; [@sexp.default 0.0]
       (** Cap on aggregate NEW long-entry (entry-price-denominated) notional as
@@ -920,6 +895,23 @@ type config = {
           admits the same population [Drop_over_max] does. Unread under
           [Drop_over_max]; default is an exact no-op (R1). See
           [Weinstein_strategy_config.stop_width_size_down_max_pct]. *)
+  volume_confirm_at_fill : bool; [@sexp.default false]
+      (** F5 volume-judged-at-the-fill (plan
+          [dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F5;
+          [docs/design/weinstein-book-reference.md] §4.2 + §4.7). A §4.7 GTC
+          buy-stop is written before the breakout, so breakout-week volume
+          cannot be known at placement; §4.2's confirmation belongs to the week
+          the ticket {b fills}. When armed (this flag AND the StopLimit family —
+          see {!Weinstein_strategy_config.volume_confirm_at_fill_armed}), the
+          screen-week volume signal is no longer required to place a ticket, and
+          {!Volume_eject_runner} confirms the fill week's volume against both
+          §4.2 branches on the first screening tick at which that week is
+          complete — unconfirmed ⇒ eject (audit tag [Volume_eject]), confirmed ⇒
+          hold. The eject is inseparable from the flag: holding a
+          volume-unconfirmed breakout is a W1 spine item-3 violation. Default
+          [false] = today's screen-time volume requirement, bit-identical
+          baselines (R1). See
+          [Weinstein_strategy_config.volume_confirm_at_fill]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

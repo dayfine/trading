@@ -119,6 +119,7 @@ let _capturing_recorder () =
       record_exit = (fun _ -> ());
       record_cascade_summary = (fun _ -> ());
       record_force_liquidation = (fun e -> captured := e :: !captured);
+      record_fill_volume = (fun _ -> ());
     }
   in
   (recorder, captured)

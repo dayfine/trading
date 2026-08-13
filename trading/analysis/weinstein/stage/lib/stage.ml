@@ -23,7 +23,6 @@ type config = {
   confirm_weeks : int;
   late_stage2_decel : float;
   stage_method : stage_method;
-  early_admission_ma_period : int option; [@sexp.default None]
   enable_stage2_ma_hold : bool; [@sexp.default false]
 }
 [@@deriving sexp]
@@ -37,7 +36,6 @@ let default_config =
     confirm_weeks = 6;
     late_stage2_decel = 0.5;
     stage_method = MaSlope;
-    early_admission_ma_period = None;
     enable_stage2_ma_hold = false;
   }
 
@@ -359,20 +357,17 @@ let _stage1_default_result : result =
     [classify_with_callbacks] so the latter stays a flat sequence of
     let-bindings. *)
 let _build_result ~current_ma ~ma_dir ~ma_slope_pct ~prior_stage ~above_ma_count
-    ~below_ma_count ~is_late ~early_admit ~enable_stage2_ma_hold ~current_close
+    ~below_ma_count ~is_late ~enable_stage2_ma_hold ~current_close
     ~confirm_weeks : result =
   let standard_stage =
     _classify_new_stage ~ma_dir ~prior_stage ~above_ma_count ~below_ma_count
       ~is_late ~confirm_weeks
   in
-  let admitted_stage =
-    Early_admission.apply ~early_admit ~prior_stage ~standard_stage
-  in
   (* Stage-2 MA-hold refinement (default-off): a pullback that holds the MA
      (close >= MA) stays Stage 2 rather than being demoted to Stage 3. *)
   let new_stage =
     Stage2_ma_hold.apply ~enabled:enable_stage2_ma_hold ~prior_stage
-      ~standard_stage:admitted_stage ~current_close ~current_ma
+      ~standard_stage ~current_close ~current_ma
   in
   let transition = _detect_transition ~prior_stage ~new_stage in
   {
@@ -405,17 +400,10 @@ let _classify_signals ~config ~get_ma ~get_close ~prior_stage ~current_ma :
     Stage2_late.is_late_stage2 ~get_ma ~decel_threshold:config.late_stage2_decel
       ~slope_lookback:config.slope_lookback
   in
-  let early_admit =
-    Early_admission.compute ~get_close
-      ~early_admission_ma_period:config.early_admission_ma_period
-      ~slope_threshold:config.slope_threshold
-      ~slope_lookback:config.slope_lookback
-  in
   let current_close = get_close ~week_offset:0 in
   _build_result ~current_ma ~ma_dir ~ma_slope_pct ~prior_stage ~above_ma_count
-    ~below_ma_count ~is_late ~early_admit
-    ~enable_stage2_ma_hold:config.enable_stage2_ma_hold ~current_close
-    ~confirm_weeks:config.confirm_weeks
+    ~below_ma_count ~is_late ~enable_stage2_ma_hold:config.enable_stage2_ma_hold
+    ~current_close ~confirm_weeks:config.confirm_weeks
 
 let classify_with_callbacks ~config ~get_ma ~get_close ~prior_stage : result =
   match get_ma ~week_offset:0 with

@@ -139,6 +139,7 @@ let _seed_entry ~trade_audit ~symbol ~position_id ~entry_date =
       risk_pct = 0.0;
       initial_position_value = 0.0;
       initial_risk_dollars = 0.0;
+      ticket_lifecycle = None;
       alternatives_considered = [];
     }
 

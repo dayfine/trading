@@ -39,10 +39,21 @@
 #     bold-wrapped digit ("**5 -- ..."). The LAST such section in the file is
 #     used (behavioral takes precedence over structural). Defaults to null.
 #
-# The call is idempotent: re-running overwrites any prior record for the same
-# date+branch+feature (a different branch on the same date+feature produces a
-# DISTINCT record -- see H-AUDIT-COLLISION, dev/status/harness.md -- unless
-# <branch> is empty, which still falls back to the collision-prone
+#   Reviewed SHA:
+#     Last occurrence of "Reviewed SHA: <sha>" (the first line of every QC
+#     review pass, per qc-structural.md / qc-behavioral.md), truncated to 12
+#     chars. Passed to write_audit.sh as --sha so it can tell a genuine
+#     rework (new sha, same branch) apart from a retried invocation of the
+#     same review (same sha) -- see H-AUDIT-REWORK-COUNT-BLIND,
+#     dev/status/harness.md. Empty if no such line is found anywhere.
+#
+# The call is idempotent for a given (date, branch, feature, reviewed sha):
+# re-running with all four unchanged overwrites the prior record. A
+# different branch on the same date+feature always produces a DISTINCT
+# record (H-AUDIT-COLLISION); a different reviewed sha on the SAME branch
+# (a rework at a new tip) also produces a DISTINCT record, preserving the
+# one it followed rather than clobbering it (H-AUDIT-REWORK-COUNT-BLIND) --
+# unless <branch> is empty, which still falls back to the collision-prone
 # date+feature-only shape; see write_audit.sh). Errors from write_audit.sh
 # propagate to the caller.
 
@@ -372,11 +383,44 @@ if [ -n "$QUALITY_SCORE" ] && ! echo "$QUALITY_SCORE" | grep -qE '^[1-5]$'; then
   exit 1
 fi
 
+# --- Extract reviewed SHA (H-AUDIT-REWORK-COUNT-BLIND, dev/status/harness.md) ---
+#
+# Both QC agents' PR review comment bodies (qc-structural.md /
+# qc-behavioral.md "Reviewed SHA" contract) and file-mode
+# dev/reviews/<feature>.md begin EACH review pass with a
+# "Reviewed SHA: <sha>" line. A rework cycle appends a NEW occurrence for
+# its own pass, so -- mirroring the "last occurrence wins" convention
+# already used for overall_qc/quality-score above -- the LAST occurrence
+# is this call's reviewed commit. Truncated to 12 chars: enough to
+# disambiguate distinct commits without an unwieldy 40-char filename
+# segment.
+#
+# This is what lets write_audit.sh distinguish "same review, re-run" (a
+# retried invocation for the same commit -- overwrite, stays idempotent)
+# from "different review, same branch" (an actual rework at a new tip --
+# must not clobber the record it followed). See write_audit.sh's own
+# H-AUDIT-REWORK-COUNT-BLIND docstring for the write-side half. Passed
+# unconditionally (both APPROVED and NEEDS_REWORK calls), same reasoning
+# as the H-AUDIT-HARNESS-GAP-DROPPED-ON-APPROVED fix just above this one
+# in the ledger: identity metadata should never be gated on the verdict.
+SHA=""
+if [ -n "${BODIES:-}" ]; then
+  SHA="$(echo "$BODIES" | grep -oE '^Reviewed SHA: .*' | tail -1 | sed 's/^Reviewed SHA: *//' | cut -c1-12 || true)"
+fi
+if [ -z "$SHA" ] && [ -f "$REVIEW_FILE" ]; then
+  SHA="$(grep -oE '^Reviewed SHA: .*' "$REVIEW_FILE" 2>/dev/null | tail -1 | sed 's/^Reviewed SHA: *//' | cut -c1-12 || true)"
+fi
+
 # --- Call write_audit.sh ---
 
 SCORE_ARG=""
 if [ -n "$QUALITY_SCORE" ]; then
   SCORE_ARG="--quality-score $QUALITY_SCORE"
+fi
+
+SHA_ARG=""
+if [ -n "$SHA" ]; then
+  SHA_ARG="--sha $SHA"
 fi
 
 # shellcheck disable=SC2086
@@ -387,4 +431,5 @@ bash "$WRITE_AUDIT" \
   --structural "$STRUCTURAL" \
   --behavioral "$BEHAVIORAL" \
   --overall "$OVERALL" \
-  $SCORE_ARG
+  $SCORE_ARG \
+  $SHA_ARG

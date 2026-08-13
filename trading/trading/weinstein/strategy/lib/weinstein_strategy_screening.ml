@@ -79,7 +79,13 @@ let _classify_stage_for_screening ~config ~bar_reader ~prior_stages
     (d) threading the ticket-level [entry_anchor_local_range_weeks] knob
     (default 0 = off, bit-identical; moves only the screener's entry ticket,
     never admission/grading), and (e) threading the F1 [entry_freshness_basis]
-    knob (default [Ma_cross] = off, bit-identical).
+    knob (default [Ma_cross] = off, bit-identical), and (f) waiving the
+    screen-time volume gate ([require_breakout_volume = false]) when F5 is armed
+    ([Weinstein_strategy_config.volume_confirm_at_fill_armed] — default off, so
+    the gate stays [true] and admission is bit-identical). The waiver's
+    counterpart, {!Volume_eject_runner}, reads the {i same} predicate, so volume
+    is never dropped: it moves from the screen week to the fill week (book §4.7
+    / §4.2).
 
     The [min_history_bars] override sets [config.resistance.min_history_bars];
     because {!Stock_analysis} reuses the same [Resistance.config] record for the
@@ -101,6 +107,8 @@ let _stock_analysis_config_for ~(config : Weinstein_strategy_config.config) :
       virgin_crossing_readmission = config.virgin_crossing_readmission;
       entry_anchor_local_range_weeks = config.entry_anchor_local_range_weeks;
       entry_freshness_basis = config.entry_freshness_basis;
+      require_breakout_volume =
+        not (Weinstein_strategy_config.volume_confirm_at_fill_armed config);
     }
   in
   if config.resistance_min_history_bars = 0 then base

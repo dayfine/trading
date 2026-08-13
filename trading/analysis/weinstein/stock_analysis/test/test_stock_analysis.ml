@@ -121,8 +121,9 @@ let test_breakout_candidate_false_when_no_volume_confirmation _ =
     solely on the early-Stage2 window arm of [is_breakout_candidate]. *)
 let fresh_stage2 ?(virgin_readmission = false) ?(range_top_freshness = None)
     ?(late = false) ?(ma_direction = Rising) ?(ma_value = 100.0)
-    ?(local_range_top = None) ?(current_close = None) ~weeks_advancing () :
-    Stock_analysis.t =
+    ?(local_range_top = None) ?(current_close = None)
+    ?(require_breakout_volume = true) ?(volume_confirmation = Strong 3.0)
+    ~weeks_advancing () : Stock_analysis.t =
   {
     ticker = "X";
     stage =
@@ -145,7 +146,7 @@ let fresh_stage2 ?(virgin_readmission = false) ?(range_top_freshness = None)
     volume =
       Some
         {
-          confirmation = Strong 3.0;
+          confirmation = volume_confirmation;
           event_volume = 3000;
           avg_volume = 1000.0;
           volume_ratio = 3.0;
@@ -160,6 +161,7 @@ let fresh_stage2 ?(virgin_readmission = false) ?(range_top_freshness = None)
     supply = None;
     virgin_readmission;
     range_top_freshness;
+    require_breakout_volume;
     current_close;
     as_of_date = as_of;
   }
@@ -337,6 +339,60 @@ let test_analyze_threads_entry_freshness_basis _ =
       .range_top_freshness
   in
   assert_that (freshness cfg, freshness armed) (equal_to (None, Some true))
+
+(* ------------------------------------------------------------------ *)
+(* F5 — require_breakout_volume (placement-time volume gate)            *)
+(* ------------------------------------------------------------------ *)
+
+(** The textbook dried-up base (book §1: base volume "dries up"): a fresh
+    Stage-2 name whose most recent breakout event carries only Weak volume. The
+    default gate ([require_breakout_volume = true]) rejects it; F5's placement
+    waiver admits it, because under a resting §4.7 GTC ticket the breakout week
+    has not happened yet and its volume is judged at the fill instead. *)
+let test_dried_up_base_admitted_only_when_volume_gate_waived _ =
+  let dried_up ~require_breakout_volume =
+    fresh_stage2 ~weeks_advancing:2 ~require_breakout_volume
+      ~volume_confirmation:(Weak 0.4) ()
+  in
+  assert_that
+    ( is_breakout_candidate (dried_up ~require_breakout_volume:true),
+      is_breakout_candidate (dried_up ~require_breakout_volume:false) )
+    (equal_to (false, true))
+
+(** The waiver drops the volume half ONLY. A Stage-2 name that fails a
+    non-volume gate — here negative-declining RS — is still rejected with the
+    waiver armed, so F5 cannot be mistaken for a general admission widener. *)
+let test_volume_waiver_does_not_widen_other_gates _ =
+  let weak_rs =
+    {
+      (fresh_stage2 ~weeks_advancing:2 ~require_breakout_volume:false
+         ~volume_confirmation:(Weak 0.4) ())
+      with
+      Stock_analysis.rs =
+        Some
+          {
+            current_rs = 0.5;
+            current_normalized = 0.5;
+            trend = Negative_declining;
+            history = [];
+          };
+    }
+  in
+  assert_that (is_breakout_candidate weak_rs) (equal_to false)
+
+(* End-to-end threading through [analyze]: the flag lands on the analysis so
+   [is_breakout_candidate], which sees only [t], can honour it. *)
+let test_analyze_threads_require_breakout_volume _ =
+  let bars = rising_bars ~n:60 50.0 150.0 in
+  let bench = rising_bars ~n:60 80.0 110.0 in
+  let gate config =
+    (analyze ~config ~ticker:"X" ~bars ~benchmark_bars:bench ~prior_stage:None
+       ~as_of_date:as_of)
+      .require_breakout_volume
+  in
+  assert_that
+    (gate cfg, gate { cfg with require_breakout_volume = false })
+    (equal_to (true, false))
 
 (* ------------------------------------------------------------------ *)
 (* Breakdown candidate                                                  *)
@@ -1026,6 +1082,12 @@ let suite =
          >:: test_current_close_is_last_bar_close;
          "current_close is None without bars"
          >:: test_current_close_none_without_bars;
+         "dried-up base admitted only when the volume gate is waived"
+         >:: test_dried_up_base_admitted_only_when_volume_gate_waived;
+         "volume waiver does not widen other gates"
+         >:: test_volume_waiver_does_not_widen_other_gates;
+         "analyze threads require_breakout_volume"
+         >:: test_analyze_threads_require_breakout_volume;
        ]
 
 let () = run_test_tt_main suite

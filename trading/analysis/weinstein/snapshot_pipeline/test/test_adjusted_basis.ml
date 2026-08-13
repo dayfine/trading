@@ -1,6 +1,6 @@
 (** Contract tests for {!Snapshot_pipeline.Adjusted_basis}.
 
-    Two contracts are pinned here, neither of which the rest of the sketch suite
+    Three contracts are pinned here, none of which the rest of the sketch suite
     can reach (every other fixture in these suites sets
     [adjusted_close = close_price] and carries no corrupt bar):
 
@@ -8,6 +8,12 @@
       no factor ([f = 1.0]), so O/H/L stay raw and only [close_price] takes
       [adjusted_close]. Without the guard these inputs produce NaN / infinite /
       negative bars.
+    - {b the guard is one-sided, by design} — a corrupt [adjusted_close] is NOT
+      guarded (see the .mli): it poisons the whole bar. This is the mirror image
+      of the corrupt-bar guard above and exercises the opposite input, so a
+      future change that accidentally symmetrizes or removes the asymmetry is
+      caught here rather than discovered downstream as a silently-dropped
+      histogram week.
     - {b the real no-op precondition} — the rescale is bit-identity exactly when
       [adjusted_close = close_price], NOT merely when the data is split-free. A
       dividend-only adjustment (no split) already moves every O/H/L bit, which
@@ -73,6 +79,60 @@ let test_negative_raw_close_admits_no_factor _ =
   assert_that
     (Adjusted_basis.to_adjusted_basis (_bar ~close:(-2.0) ~adjusted:25.0))
     (_equal_bar _unscaled_with_adjusted_close)
+
+(* ------------------------------------------------------------------ *)
+(* Corrupt adjusted_close -> unguarded, poisons the whole bar          *)
+(* (the documented asymmetry: see the .mli "The guard is one-sided")   *)
+(* ------------------------------------------------------------------ *)
+
+(* [f = nan /. 25.0 = nan]; every scaled field and [close_price] (which takes
+   [adjusted_close] directly) come out NaN. *)
+let test_nan_adjusted_close_poisons_whole_bar _ =
+  let out =
+    Adjusted_basis.to_adjusted_basis (_bar ~close:25.0 ~adjusted:Float.nan)
+  in
+  assert_that out
+    (all_of
+       [
+         field
+           (fun (r : Types.Daily_price.t) -> Float.is_nan r.open_price)
+           (equal_to true);
+         field
+           (fun (r : Types.Daily_price.t) -> Float.is_nan r.high_price)
+           (equal_to true);
+         field
+           (fun (r : Types.Daily_price.t) -> Float.is_nan r.low_price)
+           (equal_to true);
+         field
+           (fun (r : Types.Daily_price.t) -> Float.is_nan r.close_price)
+           (equal_to true);
+       ])
+
+(* [f = 0.0 /. 25.0 = 0.0]; O/H/L are zeroed and [close_price] takes the
+   (also zero) [adjusted_close]. *)
+let test_zero_adjusted_close_zeroes_bar _ =
+  assert_that
+    (Adjusted_basis.to_adjusted_basis (_bar ~close:25.0 ~adjusted:0.0))
+    (_equal_bar
+       {
+         (_bar ~close:0.0 ~adjusted:0.0) with
+         open_price = 0.0;
+         high_price = 0.0;
+         low_price = 0.0;
+       })
+
+(* [f = -25.0 /. 25.0 = -1.0]; O/H/L flip sign and [close_price] takes the
+   negative [adjusted_close]. *)
+let test_negative_adjusted_close_yields_negative_prices _ =
+  assert_that
+    (Adjusted_basis.to_adjusted_basis (_bar ~close:25.0 ~adjusted:(-25.0)))
+    (_equal_bar
+       {
+         (_bar ~close:(-25.0) ~adjusted:(-25.0)) with
+         open_price = -96.0;
+         high_price = -104.0;
+         low_price = -92.0;
+       })
 
 (* ------------------------------------------------------------------ *)
 (* Rescale + idempotence                                               *)
@@ -205,6 +265,12 @@ let suite =
          >:: test_zero_raw_close_admits_no_factor;
          "Negative raw close admits no factor"
          >:: test_negative_raw_close_admits_no_factor;
+         "NaN adjusted_close poisons whole bar"
+         >:: test_nan_adjusted_close_poisons_whole_bar;
+         "Zero adjusted_close zeroes bar"
+         >:: test_zero_adjusted_close_zeroes_bar;
+         "Negative adjusted_close yields negative prices"
+         >:: test_negative_adjusted_close_yields_negative_prices;
          "Split rescales O/H/L" >:: test_split_rescales_ohl;
          "Idempotent on an already-adjusted bar"
          >:: test_idempotent_on_already_adjusted_bar;

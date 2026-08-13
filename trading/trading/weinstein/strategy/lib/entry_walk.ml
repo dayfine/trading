@@ -104,7 +104,7 @@ let _make_entry_fn ~config ~bar_reader ~current_date ~stop_states
     ~min_stop_distance_pct:
       (Entry_stop_distance.min_stop_distance_for ~config ~bar_reader
          ~current_date cand)
-    ~portfolio_risk_config:(Scale_in_runner.entry_sizing_config config)
+    ~portfolio_risk_config:config.portfolio_config
     ~stops_config:config.stops_config
     ~initial_stop_buffer:config.initial_stop_buffer ~stop_states ~bar_reader
     ~portfolio_value ~current_date cand
@@ -140,8 +140,9 @@ let entries_from_candidates ?sector_lookup
     _make_entry_fn ~config ~bar_reader ~current_date ~stop_states
       ~portfolio_value
   in
-  let spendable, state =
-    Screening_notional.reserve_reduced_walk_state ~config ~portfolio
+  let spendable = portfolio.Portfolio_view.cash in
+  let state =
+    Screening_notional.make_entry_walk_state ~cash:spendable ~config ~portfolio
       ~portfolio_value ~sector_lookup
   in
   let decisions =
@@ -151,9 +152,8 @@ let entries_from_candidates ?sector_lookup
       _classify_candidates ~held_set ~make_entry ~portfolio_value ~state
         candidates
     else
-      (* Reserved short sleeve: partition the (reserve-reduced) cash budget
-         between a long and a short walk that share [state]'s notional/sector
-         accumulators. *)
+      (* Reserved short sleeve: partition the cash budget between a long and a
+         short walk that share [state]'s notional/sector accumulators. *)
       let short_budget = portfolio_value *. config.short_sleeve_fraction in
       let long_cash = Float.max 0.0 (spendable -. short_budget) in
       _sleeve_decisions ~held_set ~make_entry ~portfolio_value ~state ~long_cash

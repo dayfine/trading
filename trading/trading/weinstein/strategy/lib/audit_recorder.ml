@@ -36,7 +36,18 @@ type entry_event = {
   shares : int;
   initial_position_value : float;
   initial_risk_dollars : float;
+  sized_down_wide_stop : bool;
+  freshness_basis : Entry_freshness.basis;
+  triple_confirmation : Entry_ticket_tags.triple_confirmation;
   alternatives : alternative_input list;
+}
+
+type fill_volume_outcome = Ejected | Skipped_other_exit | Held
+
+type fill_volume_event = {
+  position_id : string;
+  confirmation : Volume.breakout_confirmation option;
+  outcome : fill_volume_outcome;
 }
 
 type exit_event = {
@@ -67,6 +78,7 @@ type t = {
   record_exit : exit_event -> unit;
   record_cascade_summary : cascade_event -> unit;
   record_force_liquidation : force_liquidation_event -> unit;
+  record_fill_volume : fill_volume_event -> unit;
 }
 
 let noop : t =
@@ -75,4 +87,5 @@ let noop : t =
     record_exit = (fun _ -> ());
     record_cascade_summary = (fun _ -> ());
     record_force_liquidation = (fun _ -> ());
+    record_fill_volume = (fun _ -> ());
   }

@@ -119,6 +119,7 @@ let _aapl_entry : TA.entry_decision =
     risk_pct = 0.08;
     initial_position_value = 28_000.0;
     initial_risk_dollars = 2_000.0;
+    ticket_lifecycle = None;
     alternatives_considered = [];
   }
 
