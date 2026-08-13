@@ -1,11 +1,11 @@
 ---
 name: project-nearfloor-is-risk-not-return
-description: "Nearest-floor stop anchoring is a reproducible risk-reduction dial that costs return — its 26y \"670%\" return edge rests on a single draw and reverses in two independent contexts"
+description: "Nearest-floor stop anchoring: the RISK signature (fewer trades, higher win rate, lower maxDD, longer holds) separates with ZERO overlap at BOTH 302/6y and 26y — magnitudes differ by scale (maxDD −3.97pp / holds +49% at 302/6y; −9.8pp / +57% at 26y). RETURN is scale-dependent and unresolved: core wins 9/9 at 302/6y, nearfloor leads +139pp (8/9, p≈0.10 one-sided) at 26y. Promotion candidate, not promoted; the variance-collapse claim was retracted as 302/6y-specific"
 metadata: 
   node_type: memory
   type: project
   originSessionId: d7d8f2bb-6b58-4fde-8e01-c50e796e5faa
-  modified: 2026-08-12T15:26:45.607Z
+  modified: 2026-08-13T20:12:41.062Z
 ---
 
 `stops_config.support_floor_anchor_scope = Nearest` (F3, PR #2258) anchors the
@@ -15,28 +15,39 @@ program (669.98 vs cell 00's 343.90 at 26y/top-3000). **That return claim does
 not hold up.**
 
 **The mechanism is real and reproduces everywhere** — fewer trades, higher win
-rate, lower drawdown, in all three contexts tested:
+rate, lower drawdown, in every context tested:
 
 | context | trades | win rate | maxDD | return |
 |---|---|---|---|---|
-| 26y / top-3000 | 967 < 1136 | 40.4 > 34.0 | 27.0 < 44.3 | **670 > 344** |
+| 26y / top-3000 — SINGLE DRAW, superseded ↓ | 967 < 1136 | 40.4 > 34.0 | 27.0 < 44.3 | **670 > 344** |
+| 26y / top-3000 — **3 salts, sourced** | 976 < 1151 | **40.1 > 33.2** | **29.0 < 38.8** | 454.0 > 315.0 (overlapping) |
 | sp500 / 5y | 207 < 240 | — | — | **38.6 < 112.3** |
 | small-302 / 6y (3 salts) | 235 < 288 | 37.87 > 31.25 | 15.09 < 19.05 | **25.24 < 53.84** |
 
-⚠ **Sourcing of the win-rate column.** The 302/6y row is sourced
-(`dev/experiments/nearfloor-302-6y-2026-08-13/results.txt`). The **26y row's
-`40.4 > 34.0` is NOT** — it has no committed artifact anywhere in the repo, and
-a repo-wide grep for it comes back empty outside these two tables. Treat it as
-unverified until a 26y run emits it. The trades / maxDD / return columns for
-that row are sourced; the win rate alone is not. (So "reproduces everywhere"
-above rests on two sourced rows plus one unverified cell, not three sourced
-rows.)
+⚠ **The 26y single-draw row above is superseded** by the 3-salt row beneath it
+(`dev/experiments/nearfloor-26y-salts-2026-08-13/results.txt`) and is kept only
+so the older figures are recognisable when they turn up in prior writeups. Use
+the sourced row.
 
-**The return advantage appears in exactly one context** — the 26y *single draw*,
-which is the measurement most exposed to the monster lottery and whose noise
+That also **closes the win-rate gap**: the previously-unsourced `40.4 > 34.0`
+now has a measured counterpart, **40.1 > 33.2** — close, but different in both
+columns, which is exactly why it needed sourcing rather than trusting. Every
+cell in the 3-salt row traces to `results.txt`.
+
+**The return advantage was originally seen in exactly one context** — the 26y
+*single draw*, the measurement most exposed to the monster lottery, whose noise
 floor is ~278pp ([[project-ladder-v4-null-278pp]]). At 302/6y across three path
-salts, core beats nearfloor on every draw; nearfloor itself is strikingly stable
-(25.2 / 24.9 / 24.9).
+salts, core beats nearfloor on **every** draw (9/9 pairwise, complete
+separation); nearfloor itself is strikingly stable (25.2 / 24.9 / 24.9).
+
+⚠ **Superseded in part (2026-08-13).** The 26y arm has since been re-run with 3
+salts and the advantage did **not** vanish: nearfloor leads by +139pp on the mean
+and 8/9 pairwise. It is *not established* (ranges overlap 337–398; the 8/9 gives
+p≈0.10 one-sided, ≈0.20 two-sided, and the direction was chosen after seeing the
+data against a prior pointing the other way) — but "appears in exactly one
+context, therefore an artifact" is no longer the right reading. The honest
+statement is that **return is scale-dependent and unresolved at 26y**, while the
+risk signature separates cleanly at both scales.
 
 **Re-run + corrected 2026-08-13** (`dev/experiments/nearfloor-302-6y-2026-08-13/`,
 committed after PR #2288's review found this cell had no artifact at all).
@@ -54,16 +65,28 @@ post-#2279 they should be bit-identical and are not (old 47.3 aligns to new
 endpoint came from the run being retired as untraceable. That non-reproducibility
 *even by salt* is the real argument for retiring the old numbers.
 
-**The mechanism:** core's dispersion is structurally concentrated — across its
-three draws the trade count moves by **one** (288/289/288) and maxDD by
-**0.009pp**, while return moves 18.58pp. Nearly the whole draw-to-draw
+**The mechanism at 302/6y:** core's dispersion is structurally concentrated —
+across its three draws the trade count moves by **one** (288/289/288) and maxDD
+by **0.009pp**, while return moves 18.58pp. Nearly the whole draw-to-draw
 difference sits in **a single trade's outcome** — §1b's "a cent re-runs the
 lottery", seen directly. Nearfloor's trade count is exactly invariant
-(235/235/235). So nearfloor does not merely earn less; it **collapses
-path-variance**, clipping the path-dependence that makes the baseline a lottery
-over which monsters get funded. (State it that way, not as a ~40x variance
-ratio — that ratio's numerator is an n=3 range, which the rule below forbids
-leaning on.)
+(235/235/235).
+
+⚠ **RETRACTED 2026-08-13 (26y salts): "nearfloor collapses path-variance" is
+SCALE-SPECIFIC, not a property of the mechanism.** I generalized it from the
+302/6y context the same night I measured it — the exact error this whole writeup
+warns about. At 26y/top-3000, 3 salts each:
+
+| | core | nearfloor |
+|---|---|---|
+| return spread | **132.5** | **204.3** ← MORE dispersed, not less |
+
+At 302/6y nearfloor was ~42x tighter; at 26y it is ~1.5x *wider*. Likely reason:
+at 302/6y the opportunity set is thin, both arms trade nearly the same names, and
+the stop dominates the outcome; at 26y/top-3000 the monster lottery is live and
+*which* monsters get funded is a breadth-and-capital phenomenon a stop rule does
+not damp ([[project_edge_is_the_fat_tail]]). Do not carry the variance-collapse
+claim outside 302/6y.
 
 **Method carry-forward:** never quote a range from n=3 as a noise floor. The
 original error was measuring the *stable* arm's spread accurately and assuming it
@@ -71,11 +94,40 @@ characterised both arms; three draws of a fat-tailed quantity look tight by luck
 Prefer a duplicate-cell null ([[project-ladder-v4-null-278pp]]) over a small-n
 range, and always report n.
 
+## 26y × top-3000, 3 path salts each (2026-08-13) — the powered-ish read
+
+| metric | core (n=3) | nearfloor (n=3) | separated? |
+|---|---|---|---|
+| return | 265.4 / 281.7 / 398.0 → **315.0** | 337.3 / 483.1 / 541.6 → **454.0** | **no** (overlap 337-398); 8/9 pairwise to nearfloor, p≈0.10 |
+| trades | 1135 / 1147 / 1172 | 970 / 973 / 985 | **YES**, zero overlap |
+| win rate | 32.95 / 33.13 / 33.45 | 39.39 / 40.08 / 40.72 | **YES**, zero overlap |
+| maxDD | 36.25 / 39.03 / 41.01 → 38.8 | 27.77 / 29.45 / 29.86 → **29.0** | **YES**, zero overlap |
+| holding days | 46.3 / 47.1 / 48.2 | 72.6 / 74.3 / 74.7 | **YES**, zero overlap |
+| Sharpe | 0.420 / 0.432 / 0.500 → 0.451 | 0.448 / 0.527 / 0.542 → 0.506 | no |
+
+**The mechanism signature reproduces at 26y with zero overlap on four metrics** —
+fewer trades, higher win rate, ~10pp lower drawdown, ~57% longer holds. That is
+not a lottery artifact.
+
+**The return direction FLIPS between scales.** 302/6y: core beat nearfloor **9/9 pairwise** (6 draws, every pairing), cleanly separated — the stronger of the two results. 26y: nearfloor leads on mean by +139pp and wins 8/9 pairwise,
+though ranges overlap. So "nearfloor costs return" is itself **scale-dependent** —
+true at 302/6y, UNRESOLVED at 26y (overlapping ranges, not a refutation). Return/maxDD roughly doubles at 26y
+(8.1 → 15.6).
+
+**Status: a genuine promotion CANDIDATE, not a promotion.** Three path draws is
+not walk-forward CV; `promotion-confirmation.md` requires the ≥3-cell grid with
+macro-regime diversity, and the DSR/best-of-N correction has not been applied.
+The drawdown result (38.8 → 29.0, zero overlap) is the strongest single number.
+
 **How to apply:** do not carry "nearfloor = the result" forward. The right
-question is not "does it make more money" — two independent contexts say no — but
-"is the risk reduction worth the return it costs". That is a Calmar/Sharpe
-question; at 26y it showed Sharpe 0.582 vs 0.457 and maxDD 27.0 vs 44.3, which
-is worth evaluating properly on distributions in the target regime. Also note
+question is not "does it make more money" but "is the risk reduction worth the
+return it costs" — and note that at 26y the answer to the first question is no
+longer clearly no (nearfloor leads +139pp there; it is 302/6y and 500/5y that
+say core wins). That is a Calmar/Sharpe question, and the 3-salt distributions
+above supersede the single-draw figures this paragraph used to quote
+(Sharpe 0.582 vs 0.457, maxDD 27.0 vs 44.3): use **Sharpe 0.506 vs 0.451** and
+**maxDD 29.0 vs 38.8**, which are means over three draws with the maxDD
+separation clean and the Sharpe separation not. Also note
 the mechanism verified in the audit: `stop_floor_kind` moves 867/558 →
 108/1158 Buffer_fallback/Support_floor, i.e. `Window_extreme` was falling back
 to an arbitrary buffer for most candidates.
