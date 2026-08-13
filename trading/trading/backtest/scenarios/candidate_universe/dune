@@ -1,0 +1,19 @@
+(library
+ (name candidate_universe)
+ (modules candidate_universe)
+ (libraries core scenario_lib)
+ (preprocess
+  (pps ppx_sexp_conv)))
+
+(executable
+ (name pick)
+ (modules pick)
+ (libraries
+  core
+  core_unix
+  fpath
+  candidate_universe
+  scenario_lib
+  weinstein.data_source)
+ (preprocess
+  (pps ppx_sexp_conv)))
