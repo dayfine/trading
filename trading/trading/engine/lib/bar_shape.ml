@@ -87,6 +87,15 @@ let decide_high_first (random_state : Random.State.t) (bar : price_bar) : bool =
   if Float.(body = 0.0) then Random.State.bool random_state
   else _decide_high_first_directional random_state bar body
 
-let seed_for_bar (bar : price_bar) : int =
-  Hashtbl.hash
-    (bar.symbol, bar.open_price, bar.high_price, bar.low_price, bar.close_price)
+let seed_for_bar ?(salt = 0) (bar : price_bar) : int =
+  let base =
+    Hashtbl.hash
+      ( bar.symbol,
+        bar.open_price,
+        bar.high_price,
+        bar.low_price,
+        bar.close_price )
+  in
+  (* [salt = 0] returns the unsalted hash verbatim rather than hashing [(0,
+     base)], so the default path stays bit-identical to the pre-salt build. *)
+  if salt = 0 then base else Hashtbl.hash (salt, base)
