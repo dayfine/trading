@@ -72,8 +72,48 @@ EXCEPTIONS_FILE="${CHECKS_DIR}/universe_deps_exceptions.conf"
 # awk dep-matching and exceptions-list lookup below both already accept
 # '/' in script names (see the depsonly character class and the plain
 # string-equality allow-list check).
-CANDIDATES=$(cd "$CHECKS_DIR" && find . -name '*.sh' -type f -exec grep -lE 'repo_root\)' {} + 2>/dev/null \
-  | sed 's#^\./##' | grep -v '^_check_lib\.sh$' || true)
+#
+# H-CHECK-UNIVERSE-DEPS-SCANS-COMMENTS: strip whole-line "#" shell
+# comments from each candidate file BEFORE grepping for a call site, so a
+# comment that merely quotes call syntax as documentation prose (e.g.
+# `# REPO_ROOT="$(_repo_root)"` inside an explanatory comment) is not
+# mistaken for a real call site. This mirrors the strip_comments() awk
+# helper further down in this script, which strips dune's ";"-led
+# whole-line comments before parsing a rule block — same principle (a
+# line whose first non-whitespace character is the comment leader is
+# prose, not code) applied to shell's "#" leader instead of dune's ";".
+# It is a separate implementation rather than a call into that helper:
+# strip_comments() is an awk function embedded in the single awk program
+# below that parses DUNE_FILE's text in paragraph (RS="") mode; this scan
+# runs earlier, in `sh`, over individual candidate *.sh files one at a
+# time via `find`/`grep`, well before that awk program is ever invoked —
+# there is no shared process or string to call the same function on.
+#
+# Only a WHOLE-LINE comment (first non-blank character on the line is
+# "#") is stripped — never any "#" occurring later on a line. This
+# deliberately preserves detection of:
+#   - a real call site on a line that also carries a trailing "# ..."
+#     comment (e.g. `REAL="$(repo_root)" # note`)
+#   - "${var#prefix}" / "${#arr[@]}" shell parameter-expansion syntax
+#     appearing elsewhere in the file, which never starts a comment-only
+#     line
+# See check_universe_deps_test.sh assertions 8-10 for the pinned
+# false-positive (comment-only mention, must NOT be flagged) and
+# false-negative (real call site plus trailing-comment / "#"-expansion
+# noise, must still be flagged) regression fixtures.
+_strip_hash_comments() {
+  awk '$0 !~ /^[ \t]*#/'
+}
+
+CANDIDATES=$(
+  cd "$CHECKS_DIR" && find . -name '*.sh' -type f -print | {
+    while IFS= read -r f; do
+      if _strip_hash_comments <"$f" 2>/dev/null | grep -qE 'repo_root\)'; then
+        printf '%s\n' "$f"
+      fi
+    done
+  } | sed 's#^\./##' | grep -v '^_check_lib\.sh$' || true
+)
 
 if [ -z "$CANDIDATES" ]; then
   echo "OK: check_universe_deps — no repo_root()-calling scripts found (unexpected; audit by hand)."

@@ -23,6 +23,23 @@
 #      "# review_at: <value>" annotation -> FAIL, naming the entry --
 #      #2148 FLAG-1: an unconstrained exceptions list must not silently
 #      disable the guard forever.
+#   8. A script whose ONLY "repo_root)" occurrence is inside a "#"
+#      comment (documentation prose quoting call syntax) never becomes a
+#      candidate at all -- H-CHECK-UNIVERSE-DEPS-SCANS-COMMENTS: the
+#      false positive that briefly flagged record_qc_audit_test.sh.
+#   9. A script whose real call-site line is preceded by a load-bearing
+#      "${var#prefix}" parameter expansion (so the line's FIRST "#" is
+#      not the trailing comment) and ALSO carries a trailing "#" comment
+#      of its own, plus "${#arr[@]}" noise elsewhere in the file, is
+#      still detected as a candidate -> FAIL without (universe) -- guards
+#      against two over-eager comment-stripping shapes: (a) dropping any
+#      line that merely CONTAINS a "#" (would wrongly treat this line as
+#      a whole-line comment), and (b) stripping from the first "#" to
+#      end-of-line unconditionally (would truncate this line before
+#      "repo_root)" ever appears, since "${var#prefix}"'s "#" comes
+#      first) -- only whole-comment-line stripping should pass.
+#  10. Same fixture as #9 with (universe) added -> PASS, confirming the
+#      true-positive path (not just the FAIL path) survives the fix.
 #
 # How to re-verify by hand:
 #   sh trading/devtools/checks/check_universe_deps_test.sh
@@ -103,6 +120,36 @@ cat > "${FIXTURE_CHECKS}/subdir_wrapper_test.sh" <<'EOF'
 echo "subdir_wrapper invokes subdir/nested_check.sh"
 EOF
 
+# --- Assertions 8-10 fixtures (H-CHECK-UNIVERSE-DEPS-SCANS-COMMENTS):
+# comment_only_repo_root.sh's ONLY "repo_root)" occurrence is inside a
+# "#" comment (documentation prose quoting call syntax) -- it is
+# deliberately NEVER given a dune rule below, because after the fix it
+# must never become a candidate at all. risky_comment_repo_root.sh has a
+# real call site whose OWN line starts with a load-bearing
+# "${var#prefix}" expansion (so the line's first "#" is that expansion's,
+# not a comment) and ALSO carries a trailing "#" comment, plus standalone
+# "${var#prefix}"/"${#arr[@]}" noise elsewhere in the file -- it must
+# always still be detected as a candidate. The expansion on the call-site
+# line itself is what makes assertion 9 discriminating: an implementation
+# that strips from the first "#" to end-of-line (instead of whole-comment
+# lines only) truncates this line before "repo_root)" is ever reached,
+# so a naive fixture with the expansion only on standalone lines would
+# not catch that regression -- see assertion 9's inline comment below.
+cat > "${FIXTURE_CHECKS}/comment_only_repo_root.sh" <<'EOF'
+#!/bin/sh
+# quoted call syntax example, NOT a real call site:
+#   REPO_ROOT="$(_repo_root)"
+echo "prose only -- no real repo_root() call in this script"
+EOF
+cat > "${FIXTURE_CHECKS}/risky_comment_repo_root.sh" <<'EOF'
+#!/bin/sh
+# a full-line comment above must be stripped and must not itself count
+SHORT="${SOME_VAR#prefix}"
+COUNT="${#SOME_ARRAY[@]}"
+REAL="${SOME_VAR#pre}$(repo_root)/dev/status/qux.md" # trailing comment on the real call-site line
+echo "OK: $REAL count=$COUNT short=$SHORT"
+EOF
+
 write_dune() {
   # $1 = "universe" | "no-universe" for sample_check.sh's rule
   # $2 = "universe" | "no-universe" for wrapper_test.sh's rule (governs
@@ -111,12 +158,19 @@ write_dune() {
   #      (governs subdir/nested_check.sh, listed only as a dep) --
   #      defaults to "universe" (clean) when omitted, so existing callers
   #      (assertions 1-5) don't need to pass it.
+  # $4 = "universe" | "no-universe" for risky_comment_repo_root.sh's rule
+  #      (assertions 8-10, H-CHECK-UNIVERSE-DEPS-SCANS-COMMENTS) --
+  #      defaults to "universe" (clean) when omitted. Note:
+  #      comment_only_repo_root.sh is deliberately NEVER given a rule
+  #      here -- after the fix it must never become a candidate at all.
   sample_deps="_check_lib.sh"
   [ "$1" = "universe" ] && sample_deps="_check_lib.sh (universe)"
   wrapper_deps="helper_with_repo_root.sh"
   [ "$2" = "universe" ] && wrapper_deps="helper_with_repo_root.sh (universe)"
   subdir_deps="subdir/nested_check.sh"
   [ "${3:-universe}" = "universe" ] && subdir_deps="subdir/nested_check.sh (universe)"
+  risky_deps="_check_lib.sh"
+  [ "${4:-universe}" = "universe" ] && risky_deps="_check_lib.sh (universe)"
 
   cat > "${FIXTURE_CHECKS}/dune" <<EOF
 (rule
@@ -142,6 +196,12 @@ write_dune() {
  (deps ${subdir_deps})
  (action
   (run sh %{dep:subdir_wrapper_test.sh})))
+
+(rule
+ (alias runtest)
+ (deps ${risky_deps})
+ (action
+  (run sh %{dep:risky_comment_repo_root.sh})))
 EOF
 }
 
@@ -271,6 +331,77 @@ else
 fi
 
 rm -f "${FIXTURE_CHECKS}/universe_deps_exceptions.conf"
+
+# ============================================================
+# Assertions 8-10 (H-CHECK-UNIVERSE-DEPS-SCANS-COMMENTS): the candidate
+# scan strips whole-line "#" comments before matching "repo_root)", so a
+# comment merely quoting call syntax as documentation prose is NOT
+# mistaken for a real call site (false positive, the bug that motivated
+# this fix -- record_qc_audit_test.sh briefly got flagged this way while
+# authoring a comment quoting `REPO_ROOT="$(_repo_root)"`) -- while a
+# real call site sharing a line with a trailing "#" comment, or a file
+# that also contains "${var#prefix}" / "${#arr[@]}" parameter-expansion
+# syntax elsewhere, is STILL detected (guards against an over-eager fix
+# that strips to end-of-line unconditionally instead of whole-comment
+# lines only).
+# ============================================================
+# All prior rules ((universe)-clean) plus risky_comment_repo_root.sh's
+# rule -- see write_dune's $4.
+
+# --- Assertion 8: comment-only mention never becomes a candidate -> the
+# script must never appear anywhere in the guard's output, and the run
+# must stay green (comment_only_repo_root.sh has no dune rule at all, so
+# if it were wrongly treated as a candidate it would fail as "not
+# referenced by any runtest rule").
+write_dune "universe" "universe" "universe" "universe"
+
+set +e
+OUT8=$(REPO_ROOT="$FAKE_ROOT" sh "$CHECK" 2>&1)
+CODE8=$?
+set -e
+
+if [ "$CODE8" -eq 0 ] && ! echo "$OUT8" | grep -q "comment_only_repo_root.sh"; then
+  ok "assertion 8 — comment-only repo_root() mention is stripped and never becomes a candidate"
+else
+  bad "assertion 8 — expected comment_only_repo_root.sh to never appear in output with exit 0; got exit=$CODE8 output=<<$OUT8>>"
+fi
+
+# --- Assertion 9: real call site survives comment-stripping despite (a)
+# a load-bearing "${var#prefix}" expansion earlier on its OWN line, (b) a
+# trailing "#" comment on that same line, and (c) "${#arr[@]}" noise
+# elsewhere in the file -> still detected as a candidate, and FAILs when
+# its owning rule lacks (universe). The expansion on the call-site line
+# is what makes this assertion actually discriminate a strip-to-end-of-
+# line regression: it puts a "#" character BEFORE "repo_root)" on the
+# same line, so an implementation that truncates at the first "#" instead
+# of only stripping whole-comment lines would cut the match away.
+write_dune "universe" "universe" "universe" "no-universe"
+
+set +e
+OUT9=$(REPO_ROOT="$FAKE_ROOT" sh "$CHECK" 2>&1)
+CODE9=$?
+set -e
+
+if [ "$CODE9" -ne 0 ] && echo "$OUT9" | grep -q "risky_comment_repo_root.sh"; then
+  ok "assertion 9 — real call site with trailing comment + \${var#...}/\${#arr} noise still detected -> FAIL without (universe)"
+else
+  bad "assertion 9 — expected non-zero exit naming risky_comment_repo_root.sh; got exit=$CODE9 output=<<$OUT9>>"
+fi
+
+# --- Assertion 10: same fixture with (universe) declared -> PASS, proving
+# the true-positive path (not just the FAIL path) survives the fix.
+write_dune "universe" "universe" "universe" "universe"
+
+set +e
+OUT10=$(REPO_ROOT="$FAKE_ROOT" sh "$CHECK" 2>&1)
+CODE10=$?
+set -e
+
+if [ "$CODE10" -eq 0 ] && echo "$OUT10" | grep -q "OK: risky_comment_repo_root.sh"; then
+  ok "assertion 10 — risky_comment_repo_root.sh's rule declares (universe) -> PASS"
+else
+  bad "assertion 10 — expected exit 0 with an OK line for risky_comment_repo_root.sh; got exit=$CODE10 output=<<$OUT10>>"
+fi
 
 echo ""
 echo "check_universe_deps_test: ${PASS} passed, ${FAIL} failed"
