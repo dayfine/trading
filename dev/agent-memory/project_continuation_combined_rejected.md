@@ -37,3 +37,31 @@ unsuitable to Cell E's portfolio constraints.
 worktree was deleted before the artifacts were committed; the cell-
 level scenario sexp files were lost but the summary.sexp results
 survived. A PR was NOT opened.
+
+**NOT RETIREMENT-ELIGIBLE — reclassified KEEP-AXIS 2026-08-13 (PR #2307).**
+The 08-09 flag inventory listed `enable_continuation_buys` + `continuation_config`
+as RETIRE and the 08-14 handoff called it "the next big retirement row". Both
+were wrong, and the Rule-4 eligibility screen caught it before any deletion:
+
+1. **The RETIRE seed was a transcription error.** It conflated the *scale-in v2
+   continuation-add* item with this standalone flag. The cited ledger entry
+   `2026-07-05-continuation-add-v2-surface` armed **`enable_scale_in`**, not
+   `enable_continuation_buys` — that verdict was already spent retiring scale-in
+   in #2299. Citing it here double-counts it.
+2. **No do-not-revive is recorded anywhere.** The opposite is: this memory names
+   an *uncancelled* regime-gated revival path, and the 05-14 rejection was two
+   single-run windows, pre-WF-CV.
+3. **It is a Weinstein-documented dial**, not an invented mechanism — the
+   continuation / pullback re-breakout entry mode ("The Trader's Way", Ch. 3),
+   and the config home for the Trader preset
+   (`dev/plans/weinstein-trader-investor-presets-2026-05-31.md`).
+
+Re-enters the graveyard only when EITHER the trader-preset program is *recorded*
+closed, OR a regime-gated surface runs and REJECTs. Evidence:
+`dev/plans/continuation-retirement-2026-08-13.md`.
+
+**The transferable lesson:** a retirement worklist row is a *claim about which
+verdict covers which flag*, and that mapping can be wrong. Always re-read the
+cited ledger entry and confirm it armed **this** field before removing anything —
+the 08-12 `trigger_on_weekly_close` correction was the same class of error
+(a verdict about a simulator lever, misread as covering the field).
