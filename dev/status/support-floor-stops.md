@@ -1345,6 +1345,20 @@ correctly left all four alone; they are not rework scope. Numbering is local to
   harness F3 identified (scenario dir + snapshot warehouse fixture with a real
   split), which remains larger than any single follow-up here.
 
+  **Widened per QC rework (#2265):** the gap is not only the exe-side
+  supplier — the only `Html_report.load` call site under test at all is
+  `_load_fixture` in `test_trade_audit_html_report.ml`. That leaves this PR's
+  own headline user-visible fix — that a real report now draws the benchmark
+  on the adjusted column instead of raw — unverified end-to-end. The unit
+  tests pin `Html_report`'s per-series *requests* (which basis it asks for)
+  and `Trade_audit_basis`'s primitives (`window_closes`, `last_close`)
+  independently; the join between them — a real `bar_close` reading an actual
+  snapshot warehouse and actually returning split-adjusted numbers into a
+  rendered report — is precisely the seam #2251's original defect lived in.
+  Correct by inspection on this SHA (qc-behavioral independently re-derived
+  the three premises from source), so this is a coverage gap, not a known
+  defect — but it is a real gap, not a formality.
+
 - **G8 — the benchmark can still mix bases *across* calls.** Each
   `Adjusted` request resolves its own ~15-day window independently through
   `Trade_audit_basis.window_closes`, so a symbol whose adjusted column is
@@ -1352,11 +1366,20 @@ correctly left all four alone; they are not rework scope. Numbering is local to
   one end of the curve and raw marks at the other — and `_benchmark` divides
   one by the other, which is exactly the cross-basis mix `window_closes` exists
   to prevent *within* a window. The all-or-nothing policy is per-window; the
-  benchmark's estimand is per-series. Not a regression (before G4 every mark
-  was raw, hence consistent), and it cannot fire on the common cases: a fully
-  populated adjusted column never falls back, and a schema predating the field
-  is all-NaN so *every* window falls back and the series stays consistently
-  raw. Only a partially-populated column triggers it. The clean fix is to
+  benchmark's estimand is per-series. **Corrected per QC rework (#2265):**
+  "not a regression" is a shade generous — it is not a regression in
+  *accuracy* on the common cases, but it is a new failure mode that is
+  strictly rarer, and louder, than the silent split artefact it replaces.
+  Pre-G4 the benchmark could not be internally inconsistent (it only ever had
+  one basis, always raw); post-G4 a partially-populated adjusted column can
+  make it silently switch basis mid-series. It cannot fire on the common
+  cases: a fully populated adjusted column never falls back, and a schema
+  predating the field is all-NaN so *every* window falls back and the series
+  stays consistently raw. Only a partially-populated column triggers it, and
+  the worst sub-case is the *base* (the first curve date) falling back while
+  later points do not — the ratio's denominator switches basis, which
+  mis-scales the *entire* series uniformly (by the symbol's split/dividend
+  factor) rather than producing a visible one-off kink. The clean fix is to
   resolve the benchmark's whole series under one basis decision — i.e. a
   series-shaped source rather than a per-date callback — which is a second
   `Html_report.load` signature change and deliberately not bundled here.

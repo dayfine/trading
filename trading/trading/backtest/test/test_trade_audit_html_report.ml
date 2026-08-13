@@ -278,6 +278,72 @@ let test_bar_close_populates_benchmark_and_util _ =
          field (fun s -> _has s "\"util\":[0.0000,3.3333]") (equal_to true);
        ])
 
+(* -- None-propagation contract (B1, QC rework #2265) --------------------- *)
+
+(* Every supplier above is total (always [Some]); this section exercises the
+   documented consumer response to a [None] mark, per [trade_audit_basis.mli]
+   and [html_report.mli]: the benchmark drops its whole series when any curve
+   date fails to resolve, while utilization skips only the position/date that
+   failed. *)
+
+(* SPY (the benchmark symbol) fails to resolve at the second curve date only;
+   MSFT/WMT (the held positions) resolve at every date. Per the documented
+   contract this must drop the *whole* benchmark series (not just the failed
+   point) while leaving utilization — a different symbol, a different basis —
+   unaffected: same values as [test_bar_close_populates_benchmark_and_util]. *)
+let _benchmark_gap_close ~basis:_ ~symbol ~as_of =
+  if String.equal symbol "SPY" && Date.equal as_of (_date "2021-03-01") then
+    None
+  else Some 100.0
+
+let test_none_mark_drops_whole_benchmark_but_leaves_util_intact _ =
+  let html = _render_fixture ~bar_close:_benchmark_gap_close () in
+  assert_that html
+    (all_of
+       [
+         field (fun s -> _has s "\"has_benchmark\":false") (equal_to true);
+         field (fun s -> _has s "\"util\":[0.0000,3.3333]") (equal_to true);
+       ])
+
+(* MSFT (a held open position) never resolves a mark; WMT and SPY always do.
+   Per the documented contract, utilization must skip only the MSFT
+   contribution at each date it would otherwise cover, not the whole series —
+   so at 2021-03-01 only WMT's (200sh * 100) / 1.2M term is counted. The
+   benchmark, reading SPY alone, is unaffected. *)
+let _one_position_gap_close ~basis:_ ~symbol ~as_of:_ =
+  if String.equal symbol "MSFT" then None else Some 100.0
+
+let test_none_mark_for_one_position_excludes_only_that_position _ =
+  let html = _render_fixture ~bar_close:_one_position_gap_close () in
+  assert_that html
+    (all_of
+       [
+         field (fun s -> _has s "\"has_benchmark\":true") (equal_to true);
+         field (fun s -> _has s "\"util\":[0.0000,1.6667]") (equal_to true);
+         (* the MSFT-inclusive figure from the total-supplier test must be
+            absent, confirming MSFT's term was actually dropped, not just
+            coincidentally unchanged *)
+         field (fun s -> _has s "\"util\":[0.0000,3.3333]") (equal_to false);
+       ])
+
+(* The base guard: a non-positive first-date mark must also drop the whole
+   benchmark series (the [Some base when Float.(base > 0.0)] guard in
+   [_benchmark]), distinct from the [None]-mark path above.
+
+   This supplier is deliberately TOTAL apart from the zero at the base date --
+   it must NOT fall back to [_benchmark_gap_close], whose [None] at the second
+   curve date would trip the [List.for_all ... is_some] check and drop the
+   series for the wrong reason, leaving the base guard unexercised. *)
+let _non_positive_base_close ~basis:_ ~symbol ~as_of =
+  if String.equal symbol "SPY" && Date.equal as_of (_date "2020-04-24") then
+    Some 0.0
+  else Some 100.0
+
+let test_non_positive_base_drops_benchmark _ =
+  let html = _render_fixture ~bar_close:_non_positive_base_close () in
+  assert_that html
+    (field (fun s -> _has s "\"has_benchmark\":false") (equal_to true))
+
 (* -- basis split (G4) ---------------------------------------------------- *)
 
 (* A split-straddling mark supplier, i.e. one whose two columns actually
@@ -462,6 +528,12 @@ let suite =
          >:: test_no_snapshot_omits_benchmark_and_util;
          "bar_close populates benchmark and util"
          >:: test_bar_close_populates_benchmark_and_util;
+         "none mark drops whole benchmark but leaves util intact"
+         >:: test_none_mark_drops_whole_benchmark_but_leaves_util_intact;
+         "none mark for one position excludes only that position"
+         >:: test_none_mark_for_one_position_excludes_only_that_position;
+         "non-positive base drops benchmark"
+         >:: test_non_positive_base_drops_benchmark;
          "split straddling marks route each series to its own basis"
          >:: test_split_straddling_marks_route_each_series_to_its_own_basis;
          "each series requests only its own basis"
