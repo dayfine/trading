@@ -481,6 +481,24 @@
  (action
   (run sh %{dep:tracked_artifact_linter.sh})))
 
+; Fixture-driven self-test for tracked_artifact_linter.sh
+; (H-TRACKED-ARTIFACT-SELF-TEST): builds real throwaway git repos under
+; `mktemp -d` and exercises the four cases qc-behavioral verified by hand
+; during PR #2252's rework -- novel-.gitignore-pattern positive control,
+; contains-but-not-prefixed negative control (pins the anchored `^prefix`
+; allow-list semantics), the unignored-artifact-type blind spot, and the
+; git-error path. Copies the linter (+ _check_lib.sh) into its own fixture
+; dirs with controlled linter_exceptions.conf content, so it never depends
+; on this repo's real linter_exceptions.conf or real tracked git state --
+; no (universe) needed. See tracked_artifact_linter_test.sh's header for
+; the full fixture design.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh tracked_artifact_linter.sh)
+ (action
+  (run sh %{dep:tracked_artifact_linter_test.sh})))
+
 ; promote_config.sh gate-helper smoke test: pins the runtime semantics of
 ; regresses_by_more_than (Sharpe + MaxDD), trades_out_of_ratio, and
 ; extract_metric. Reads dev/scripts/lib/extract_metrics.sh via repo_root().
