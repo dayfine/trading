@@ -96,7 +96,8 @@ val csv_header_fields : string list
     [stop_trigger_kind], [days_to_first_stop_trigger],
     [screener_score_at_entry]), then [position_id], then
     [stop_fill_distance_pct]. Producers concatenate these onto the legacy
-    13-column header so consumers can locate columns by name. New columns are
+    13-column header so consumers can locate columns by name — see
+    {!Trades_csv_schema} for the reader side of that lookup. New columns are
     {b appended} so every fixed base-column index used by positional readers
     stays valid (post-run validator's [exit_trigger]=12, [stop_trigger_kind]=16,
     [position_id]=19; faithfulness harness's [stop_initial_distance_pct]=15). *)
@@ -106,41 +107,6 @@ val csv_row_fields : t -> string list
     {!csv_header_fields}. Floats render at %.4f, ints as decimal, string labels
     verbatim. [None] renders as the empty cell — consumers must tolerate empty
     cells (the canonical M5.2e missing-data sentinel). *)
-
-val position_id_column_name : string
-(** The [trades.csv] column name carrying the strategy position ID. Shared by
-    the writer-side {!csv_header_fields} and the reader-side
-    {!csv_schema_of_header_line} so the two cannot drift. *)
-
-type csv_schema
-(** Column positions recovered by {b name} from a [trades.csv] header line.
-
-    [position_id] is a {b trailing} column, and readers deliberately tolerate
-    further trailing columns being appended by later schema revisions — so a
-    fixed cell index is not safe to hardcode in a reader. Resolving the index
-    from the header keeps that reader honest against any column list: it either
-    finds the named column or reports its absence. Silently reading a
-    neighbouring cell would be worse than reading nothing. *)
-
-val csv_schema_of_header_line : string -> csv_schema
-(** Parse a [trades.csv] header line into a {!csv_schema}. A header with no
-    [position_id] column (every pre-#2317 layout, including the legacy 12-column
-    one) yields a schema behaving like {!legacy_csv_schema}. *)
-
-val legacy_csv_schema : csv_schema
-(** The schema of a layout that carries no [position_id] column at all.
-    {!position_id_of_cells} always returns [None] against it. Parsers for the
-    legacy row layout use this explicitly, rather than relying on an index
-    lookup happening to miss. *)
-
-val position_id_of_cells : csv_schema -> string list -> string option
-(** Read the [position_id] cell out of one already-split [trades.csv] data row.
-
-    Returns [None] — never a wrong cell, never [Some ""] — when any of: the
-    schema has no [position_id] column; the row is shorter than that column's
-    index (a row written before the column existed); or the cell is empty (the
-    canonical missing-data sentinel {!csv_row_fields} writes for [None]).
-    Surrounding whitespace is stripped. *)
 
 type precomputed
 (** Index bundle amortising the audit + stop-log scans across many trades.

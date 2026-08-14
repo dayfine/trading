@@ -97,10 +97,11 @@ traded symbols inherited the first trade's trigger and stops).
 - [x] **Thread `position_id` through both CSV-readback loaders.** Branch
       `feat/report-path-position-id`.
 
-      New reader-side surface on `Backtest.Trade_context` (writer-side
-      `csv_header_fields` / `csv_row_fields` already lived there, so the reader
-      side belongs with them): `position_id_column_name`, abstract
-      `csv_schema`, `csv_schema_of_header_line`, `legacy_csv_schema`,
+      New module `trading/trading/backtest/lib/trades_csv_schema.{ml,mli}` —
+      the reader-side counterpart to `Trade_context`'s writer-side
+      `csv_header_fields` / `csv_row_fields`. Surface:
+      `position_id_column_name` (shared with `csv_header_fields` so the two
+      cannot drift), abstract `t`, `of_header_line`, `legacy`,
       `position_id_of_cells`. The column index is resolved **by header name**,
       never hardcoded — `position_id` is a trailing column and both loaders
       deliberately tolerate further trailing columns being appended, so a fixed
@@ -108,6 +109,13 @@ traded symbols inherited the first trade's trigger and stops).
       `position_id_of_cells` returns `None` (never `Some ""`, never a wrong
       cell) when the header lacks the column, the row is shorter than the
       column index, or the cell is empty.
+
+      (It lives in its own module rather than inside `Trade_context` because
+      `trade_context.ml` was already at the 300-line file-length limit; per
+      `.claude/rules/code-health-discipline.md` the answer is extraction, not
+      a limit bump. `trade_context.ml` is back to exactly 300 lines, its only
+      change being `"position_id"` → `Trades_csv_schema.position_id_column_name`
+      in `csv_header_fields`.)
 
       - `trading/trading/backtest/trade_audit_report/trade_audit_report.ml` —
         `_trade_metrics_of_strings` takes `~position_id`;
@@ -125,13 +133,14 @@ traded symbols inherited the first trade's trigger and stops).
       Both `KNOWN GAP (PR #2317)` comments are gone; the surviving comments
       describe the fallback's role rather than claiming an open gap.
 
-      Tests (15 new):
-      - `test_trade_context.ml` (+6) — direct pins on the schema helper:
-        populated cell → `Some`, empty cell → `None`, header without the column
-        → `None`, row shorter than the index → `None`, `legacy_csv_schema`
-        always `None`, and a header with an *inserted* column ahead of
+      Tests (16 new):
+      - new `test_trades_csv_schema.ml` (7) — direct pins on the schema module:
+        populated cell → `Some`, empty cell → `None` (never `Some ""`), header
+        without the column → `None`, row shorter than the index → `None`,
+        `legacy` always `None`, a header with an *inserted* column ahead of
         `position_id` still reading the right cell (a fixed-index reader fails
-        this one).
+        this one), and `position_id_column_name` present in
+        `Trade_context.csv_header_fields`.
       - `test_trade_audit_report.ml` (+5) — the discriminating misattribution
         fixture: a resting AAPL ticket decided 2020-04-24 (`AAPL-1`, grade A)
         that fills 2020-11-09, with a *second* AAPL decision 2020-11-06
@@ -145,9 +154,14 @@ traded symbols inherited the first trade's trigger and stops).
       Verify:
       `dune runtest trading/backtest/test trading/backtest/optimal/test`
 
-      Mutation check performed: reverting `_find_audit` to date-only turns
-      `load: position_id join beats nearer date match` and
-      `render: position_id join beats nearer date match` red (A → D).
+      Mutation checks performed (both restored afterwards):
+      - reverting `_find_audit` to the date-only path → exactly 2 failures,
+        `load: position_id join beats nearer date match` and
+        `render: position_id join beats nearer date match` (they read grade D
+        instead of A);
+      - forcing the parsed cell to `None` in both loaders → exactly 2
+        failures, `load: position_id join beats nearer date match` and
+        `Optimal_run_artefacts: load reads populated position_id`.
 
 ## Externally-generated exits (2026-07-25, issue #2076)
 

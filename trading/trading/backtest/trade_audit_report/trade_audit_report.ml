@@ -3,7 +3,7 @@
 open Core
 module TA = Backtest.Trade_audit
 module Stop_log = Backtest.Stop_log
-module Trade_context = Backtest.Trade_context
+module Csv_schema = Backtest.Trades_csv_schema
 module Split_safe = Backtest.Split_safe_metric
 
 module Trade_audit_ratings = Trade_audit_ratings
@@ -573,8 +573,8 @@ let _trade_metrics_of_strings ~symbol ~side ~entry_date ~exit_date ~days_held
 
     The one trailing column this loader does consume is [position_id], which the
     caller resolves by name against the file's header (see
-    {!Backtest.Trade_context.position_id_of_cells}) rather than by a hardcoded
-    index — appending further columns must not shift what gets read. *)
+    {!Backtest.Trades_csv_schema}) rather than by a hardcoded index — appending
+    further columns must not shift what gets read. *)
 let _match_post_g2_csv_row ~position_id cells :
     Trading_simulation.Metrics.trade_metrics option =
   match cells with
@@ -589,11 +589,17 @@ let _match_post_g2_csv_row ~position_id cells :
            ~pnl_percent ~position_id)
   | _ -> None
 
+(* The legacy layout predates the [position_id] column entirely, so there is no
+   cell to read. Resolved through {!Csv_schema.legacy} rather than written as a
+   bare [None] so the absence stays a statement about the layout, checkable
+   against the schema, instead of an incidental omission. *)
+let _legacy_position_id cells =
+  Csv_schema.position_id_of_cells Csv_schema.legacy cells
+
 (** Match a legacy (pre-G2) row layout — leading 12 columns with no [side];
     trailing columns ignored for the same forward-compat reason as the post-G2
-    matcher. Defaults [side] to [Buy]. The layout predates the [position_id]
-    column entirely, so [position_id] is [None] by construction — the join in
-    {!_find_audit} falls back to date proximity for these rows. *)
+    matcher. Defaults [side] to [Buy]. [position_id] is [None] by construction,
+    so {!_find_audit} falls back to date proximity for these rows. *)
 let _match_legacy_csv_row cells :
     Trading_simulation.Metrics.trade_metrics option =
   match cells with
@@ -604,9 +610,7 @@ let _match_legacy_csv_row cells :
         (_trade_metrics_of_strings ~symbol ~side:"LONG" ~entry_date ~exit_date
            ~days_held ~entry_price ~exit_price ~quantity ~pnl_dollars
            ~pnl_percent
-           ~position_id:
-             (Trade_context.position_id_of_cells Trade_context.legacy_csv_schema
-                cells))
+           ~position_id:(_legacy_position_id cells))
   | _ -> None
 
 (** Read trades.csv. Tolerates both the post-G2 (13-column, with [side]) and
@@ -619,7 +623,7 @@ let _parse_trades_csv_line ~schema path line :
   if String.is_empty (String.strip line) then None
   else
     let cells = String.split line ~on:',' in
-    let position_id = Trade_context.position_id_of_cells schema cells in
+    let position_id = Csv_schema.position_id_of_cells schema cells in
     match _match_post_g2_csv_row ~position_id cells with
     | Some _ as t -> t
     | None -> (
@@ -634,7 +638,7 @@ let _read_trades_csv path : Trading_simulation.Metrics.trade_metrics list =
   match lines with
   | [] -> failwithf "trades.csv at %s is empty" path ()
   | header :: rest ->
-      let schema = Trade_context.csv_schema_of_header_line header in
+      let schema = Csv_schema.of_header_line header in
       List.filter_map rest ~f:(_parse_trades_csv_line ~schema path)
 
 type _summary_meta = {

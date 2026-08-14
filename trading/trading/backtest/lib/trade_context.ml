@@ -31,11 +31,6 @@ let stop_trigger_kind_label (k : Stop_log.stop_trigger_kind) =
   | End_of_period -> "end_of_period"
   | Non_stop_exit -> "non_stop_exit"
 
-(* Single source of truth for the [position_id] column name: it appears both in
-   the writer-side header list and in the reader-side schema lookup, and the two
-   must never drift. *)
-let position_id_column_name = "position_id"
-
 let csv_header_fields =
   [
     "entry_stage";
@@ -44,38 +39,9 @@ let csv_header_fields =
     "stop_trigger_kind";
     "days_to_first_stop_trigger";
     "screener_score_at_entry";
-    position_id_column_name;
+    Trades_csv_schema.position_id_column_name;
     "stop_fill_distance_pct";
   ]
-
-(* Reader-side column map. Only [position_id] is resolved today; the record
-   shape leaves room for further name-addressed columns without changing the
-   two call sites' plumbing. *)
-type csv_schema = { position_id_column : int option }
-
-let csv_schema_of_header_line header =
-  let names = String.split header ~on:',' |> List.map ~f:String.strip in
-  let position_id_column =
-    List.findi names ~f:(fun _ name ->
-        String.equal name position_id_column_name)
-    |> Option.map ~f:fst
-  in
-  { position_id_column }
-
-let legacy_csv_schema = { position_id_column = None }
-
-let position_id_of_cells schema cells =
-  match schema.position_id_column with
-  | None -> None
-  | Some index -> (
-      (* A row shorter than the header (e.g. a run written before the trailing
-         context columns existed) has no cell at [index]; that is a missing
-         value, not an error. *)
-      match List.nth cells index with
-      | None -> None
-      | Some cell ->
-          let value = String.strip cell in
-          if String.is_empty value then None else Some value)
 
 let _fmt_float4_opt = function Some f -> Printf.sprintf "%.4f" f | None -> ""
 let _fmt_int_opt = function Some i -> Int.to_string i | None -> ""

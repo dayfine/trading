@@ -1,4 +1,5 @@
 open Core
+module Csv_schema = Backtest.Trades_csv_schema
 
 (* --------------------------------------------------------------- *)
 (* On-disk sexp shapes                                              *)
@@ -84,9 +85,8 @@ let _trade_metrics_of_strings ~symbol ~side ~entry_date ~exit_date ~days_held
 
     Trailing columns beyond the round-trip P&L block are ignored, except
     [position_id], which the caller resolves by name against the file's header
-    (see {!Backtest.Trade_context.position_id_of_cells}) rather than by a
-    hardcoded index — appending further columns must not shift what gets read.
-*)
+    (see {!Backtest.Trades_csv_schema}) rather than by a hardcoded index —
+    appending further columns must not shift what gets read. *)
 let _match_post_g2_row ~position_id cells :
     Trading_simulation.Metrics.trade_metrics option =
   match cells with
@@ -104,10 +104,16 @@ let _match_post_g2_row ~position_id cells :
            ~pnl_percent ~position_id)
   | _ -> None
 
+(* The legacy layout predates the [position_id] column entirely, so there is no
+   cell to read. Resolved through {!Csv_schema.legacy} rather than written as a
+   bare [None] so the absence stays a statement about the layout, checkable
+   against the schema, instead of an incidental omission. *)
+let _legacy_position_id cells =
+  Csv_schema.position_id_of_cells Csv_schema.legacy cells
+
 (** Match a legacy (pre-G2) row layout: [symbol,entry_date,…]. Defaults [side]
-    to [Buy] preserving the historical long-only semantics. The layout predates
-    the [position_id] column entirely, so [position_id] is [None] by
-    construction and downstream joins fall back to date proximity. *)
+    to [Buy] preserving the historical long-only semantics. [position_id] is
+    [None] by construction, so downstream joins fall back to date proximity. *)
 let _match_legacy_row cells : Trading_simulation.Metrics.trade_metrics option =
   match cells with
   | symbol :: entry_date :: exit_date :: days_held :: entry_price :: exit_price
@@ -116,9 +122,7 @@ let _match_legacy_row cells : Trading_simulation.Metrics.trade_metrics option =
         (_trade_metrics_of_strings ~symbol ~side:"LONG" ~entry_date ~exit_date
            ~days_held ~entry_price ~exit_price ~quantity ~pnl_dollars
            ~pnl_percent
-           ~position_id:
-             (Backtest.Trade_context.position_id_of_cells
-                Backtest.Trade_context.legacy_csv_schema cells))
+           ~position_id:(_legacy_position_id cells))
   | _ -> None
 
 (** Parse one trades.csv line. Tolerates the post-G2 [(symbol,side,…)] layout
@@ -129,9 +133,7 @@ let _parse_trade_row ~schema line :
     Trading_simulation.Metrics.trade_metrics option =
   let cells = String.split line ~on:',' in
   try
-    let position_id =
-      Backtest.Trade_context.position_id_of_cells schema cells
-    in
+    let position_id = Csv_schema.position_id_of_cells schema cells in
     match _match_post_g2_row ~position_id cells with
     | Some _ as t -> t
     | None -> _match_legacy_row cells
@@ -148,7 +150,7 @@ let _load_trades ~output_dir : Trading_simulation.Metrics.trade_metrics list =
     match lines with
     | [] -> []
     | header :: rows ->
-        let schema = Backtest.Trade_context.csv_schema_of_header_line header in
+        let schema = Csv_schema.of_header_line header in
         List.filter_map rows ~f:(_parse_trade_row ~schema)
 
 (** Convert one [alternative_candidate] to a [(symbol, reason)] pair. Renders
