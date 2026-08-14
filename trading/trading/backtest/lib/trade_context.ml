@@ -39,7 +39,7 @@ let csv_header_fields =
     "stop_trigger_kind";
     "days_to_first_stop_trigger";
     "screener_score_at_entry";
-    "position_id";
+    Trades_csv_schema.position_id_column_name;
     "stop_fill_distance_pct";
   ]
 

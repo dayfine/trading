@@ -96,10 +96,15 @@ val csv_header_fields : string list
     [stop_trigger_kind], [days_to_first_stop_trigger],
     [screener_score_at_entry]), then [position_id], then
     [stop_fill_distance_pct]. Producers concatenate these onto the legacy
-    13-column header so consumers can locate columns by name. New columns are
+    13-column header so consumers can locate columns by name — see
+    {!Trades_csv_schema} for the reader side of that lookup. New columns are
     {b appended} so every fixed base-column index used by positional readers
     stays valid (post-run validator's [exit_trigger]=12, [stop_trigger_kind]=16,
-    [position_id]=19; faithfulness harness's [stop_initial_distance_pct]=15). *)
+    [position_id]=19; faithfulness harness's [stop_initial_distance_pct]=15).
+    That is a discipline this writer keeps, not a guarantee of the format:
+    [position_id] itself landed by insertion {i inside} the trailing block,
+    ahead of [stop_fill_distance_pct]. Readers that must tolerate any producer
+    of the format resolve by name via {!Trades_csv_schema} instead. *)
 
 val csv_row_fields : t -> string list
 (** Render a {!t} as the 8 trailing CSV cells in the same order as

@@ -22,8 +22,8 @@ let _date d = Date.of_string d
 let make_trade ?(symbol = "AAPL") ?(side = Trading_base.Types.Buy)
     ?(entry_date = _date "2024-01-15") ?(exit_date = _date "2024-04-20")
     ?(days_held = 96) ?(entry_price = 150.50) ?(exit_price = 138.46)
-    ?(quantity = 500.0) ?(pnl_dollars = -6_020.0) ?(pnl_percent = -8.0) () :
-    Trading_simulation.Metrics.trade_metrics =
+    ?(quantity = 500.0) ?(pnl_dollars = -6_020.0) ?(pnl_percent = -8.0)
+    ?position_id () : Trading_simulation.Metrics.trade_metrics =
   {
     symbol;
     side;
@@ -35,7 +35,7 @@ let make_trade ?(symbol = "AAPL") ?(side = Trading_base.Types.Buy)
     quantity;
     pnl_dollars;
     pnl_percent;
-    position_id = None;
+    position_id;
   }
 
 let make_entry_decision ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
@@ -1324,9 +1324,144 @@ let test_load_reads_blob_format_audit _ =
              (fun (r : TAR.per_trade_row) -> r.cascade_grade)
              (is_some_and (equal_to Weinstein_types.A)))))
 
+(* --- Report-path position_id join (follow-up to PR #2317) --------------
+
+   The in-process join ({!Backtest.Trade_context}) prefers an exact
+   [position_id] match and keeps date proximity only as a fallback. This report
+   re-reads [trades.csv] from disk, so it needs the same preference — otherwise
+   a re-traded symbol's row silently inherits a different position's audit
+   record.
+
+   The fixture below is the exact misattribution shape: a resting entry ticket
+   decided 2020-04-24 (position AAPL-1) that only fills 2020-11-09, by which
+   time a *second* decision for AAPL (position AAPL-2, 2020-11-06) sits three
+   days from the fill. Date proximity picks AAPL-2 — wrong. Only the
+   position_id join recovers AAPL-1. *)
+
+let _stale_fill_audit_records =
+  [
+    (* The decision that actually placed the filled ticket — grade A. *)
+    make_record
+      (make_entry_decision ~symbol:"AAPL" ~entry_date:(_date "2020-04-24")
+         ~position_id:"AAPL-1" ~cascade_grade:Weinstein_types.A
+         ~cascade_score:80 ())
+      (make_exit_decision ~symbol:"AAPL" ~exit_date:(_date "2021-02-01")
+         ~position_id:"AAPL-1" ());
+    (* A distinct, later re-entry of the same symbol — grade D. Nearest by date
+       to the 2020-11-09 fill, so it is what the fallback returns. *)
+    make_record
+      (make_entry_decision ~symbol:"AAPL" ~entry_date:(_date "2020-11-06")
+         ~position_id:"AAPL-2" ~cascade_grade:Weinstein_types.D
+         ~cascade_score:40 ())
+      (make_exit_decision ~symbol:"AAPL" ~exit_date:(_date "2021-03-01")
+         ~position_id:"AAPL-2" ());
+  ]
+
+let _write_stale_fill_audit_sexp path =
+  Sexp.save_hum path
+    (TA.sexp_of_audit_blob
+       ({ audit_records = _stale_fill_audit_records; cascade_summaries = [] }
+         : TA.audit_blob))
+
+(* One post-G2 row for the 2020-11-09 AAPL fill, with the trailing per-trade
+   context block present and [position_id] parameterised (cell 19 — see
+   {!_canonical_post_g2_header}). *)
+let _stale_fill_row ~position_id =
+  "AAPL,LONG,2020-11-09,2021-02-01,84,280.00,404.00,100,12400.00,44.20,260.00,400.00,signal_reversal,Stage2,2.4000,0.0800,intraday,84,80,"
+  ^ position_id ^ ",0.0650"
+
+let _stage_stale_fill_scenario ~prefix ~row =
+  let scenario_dir = _stage_post_g2_scenario ~prefix ~rows:[ row ] in
+  _write_stale_fill_audit_sexp (Filename.concat scenario_dir "trade_audit.sexp");
+  scenario_dir
+
+(** Cascade grade of the single row in a staged scenario — the observable that
+    tells the two candidate audit records apart (A = correct AAPL-1, D =
+    misattributed AAPL-2, [None] = joined nothing). *)
+let _only_row_grade scenario_dir =
+  let report = TAR.load ~scenario_dir () in
+  List.hd report.rows
+  |> Option.bind ~f:(fun (r : TAR.per_trade_row) -> r.cascade_grade)
+
+let test_load_position_id_beats_nearer_date_match _ =
+  (* THE discriminating case: revert the position_id preference in
+     [_find_audit] (or drop the column in the parser) and this reads [D]. *)
+  let scenario_dir =
+    _stage_stale_fill_scenario ~prefix:"pid_join"
+      ~row:(_stale_fill_row ~position_id:"AAPL-1")
+  in
+  assert_that
+    (_only_row_grade scenario_dir)
+    (is_some_and (equal_to Weinstein_types.A))
+
+let test_load_empty_position_id_cell_falls_back_to_date _ =
+  (* Same fixture, empty cell: no id to join on, so the date path runs and
+     returns the nearer AAPL-2 record. Pins that the fallback stays wired. *)
+  let scenario_dir =
+    _stage_stale_fill_scenario ~prefix:"pid_join_empty"
+      ~row:(_stale_fill_row ~position_id:"")
+  in
+  assert_that
+    (_only_row_grade scenario_dir)
+    (is_some_and (equal_to Weinstein_types.D))
+
+let test_load_unknown_position_id_falls_back_to_date _ =
+  (* An id no audit record claims must not strand the row unjoined. *)
+  let scenario_dir =
+    _stage_stale_fill_scenario ~prefix:"pid_join_unknown"
+      ~row:(_stale_fill_row ~position_id:"AAPL-does-not-exist")
+  in
+  assert_that
+    (_only_row_grade scenario_dir)
+    (is_some_and (equal_to Weinstein_types.D))
+
+let test_load_legacy_row_has_no_position_id_and_falls_back _ =
+  (* The legacy 12-column layout has no position_id column at all, so the join
+     is the date path by construction. *)
+  let dir = Core_unix.mkdtemp "/tmp/trade_audit_report_pid_legacy_" in
+  let scenario_dir = Filename.concat dir "scenario" in
+  Core_unix.mkdir_p scenario_dir;
+  _write_text
+    (Filename.concat scenario_dir "trades.csv")
+    "symbol,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger\n\
+     AAPL,2020-11-09,2021-02-01,84,280.00,404.00,100,12400.00,44.20,260.00,400.00,signal_reversal\n";
+  _write_summary_sexp (Filename.concat scenario_dir "summary.sexp");
+  _write_stale_fill_audit_sexp (Filename.concat scenario_dir "trade_audit.sexp");
+  assert_that
+    (_only_row_grade scenario_dir)
+    (is_some_and (equal_to Weinstein_types.D))
+
+let test_render_position_id_beats_nearer_date_match _ =
+  (* The same preference at the in-memory [render] entry point, independent of
+     CSV parsing — pins the join itself rather than the loader. *)
+  let trade =
+    make_trade ~symbol:"AAPL" ~entry_date:(_date "2020-11-09")
+      ~position_id:"AAPL-1" ()
+  in
+  let report =
+    TAR.render ~trade_audit:_stale_fill_audit_records ~trades:[ trade ] ()
+  in
+  assert_that report.rows
+    (elements_are
+       [
+         field
+           (fun (r : TAR.per_trade_row) -> r.cascade_grade)
+           (is_some_and (equal_to Weinstein_types.A));
+       ])
+
 let suite =
   "Trade_audit_report"
   >::: [
+         "load: position_id join beats nearer date match"
+         >:: test_load_position_id_beats_nearer_date_match;
+         "load: empty position_id cell falls back to date"
+         >:: test_load_empty_position_id_cell_falls_back_to_date;
+         "load: unknown position_id falls back to date"
+         >:: test_load_unknown_position_id_falls_back_to_date;
+         "load: legacy row has no position_id and falls back"
+         >:: test_load_legacy_row_has_no_position_id_and_falls_back;
+         "render: position_id join beats nearer date match"
+         >:: test_render_position_id_beats_nearer_date_match;
          "row matches audit with off-by-one date"
          >:: test_row_matches_audit_with_off_by_one_date;
          "analysis non-empty with off-by-one date"
