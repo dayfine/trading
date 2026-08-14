@@ -3,6 +3,7 @@
 open Core
 module TA = Backtest.Trade_audit
 module Stop_log = Backtest.Stop_log
+module Csv_schema = Backtest.Trades_csv_schema
 module Split_safe = Backtest.Split_safe_metric
 
 module Trade_audit_ratings = Trade_audit_ratings
@@ -82,29 +83,43 @@ type t = {
     without cross-matching a distinct re-entry of the same symbol. *)
 let _audit_join_tolerance_days = 7
 
-(* Group audit records by symbol so the join can match the round-trip's fill
-   date to the nearest decision date within [_audit_join_tolerance_days]. *)
+type _audit_index = {
+  by_position_id : (string, TA.audit_record, String.comparator_witness) Map.t;
+      (** [entry.position_id] → record. The exact join: immune to any
+          decision→fill date gap. Position ids are unique per strategy position,
+          so at most one record lands per key. *)
+  by_symbol : (string, TA.audit_record list, String.comparator_witness) Map.t;
+      (** symbol → records, for the date-proximity fallback below. *)
+}
+
 let _audit_index audit =
   List.fold audit
-    ~init:(Map.empty (module String))
+    ~init:
+      {
+        by_position_id = Map.empty (module String);
+        by_symbol = Map.empty (module String);
+      }
     ~f:(fun acc (record : TA.audit_record) ->
-      Map.add_multi acc ~key:record.entry.symbol ~data:record)
+      {
+        by_position_id =
+          Map.set acc.by_position_id ~key:record.entry.position_id ~data:record;
+        by_symbol =
+          Map.add_multi acc.by_symbol ~key:record.entry.symbol ~data:record;
+      })
 
 (* Find the audit record for [symbol] whose decision date is closest to the
    round-trip [entry_date], within tolerance. Returns [None] when the symbol has
    no audit record or the nearest one is too far away.
 
-   KNOWN GAP (PR #2317). This symmetric nearest-date scan is precisely the
-   silent misattribution the in-process path retired: on async (resting-order)
-   configs a ticket can fill arbitrarily long after the decision that placed
-   it, so a row either misses its record entirely or attaches a distinct
-   re-entry of the same symbol. This offline report keeps that behaviour only
-   because [_trade_metrics_of_strings] above drops the [position_id] column
-   [trades.csv] now carries. The fix is to consume that column and prefer an
-   exact id join, keeping this scan as the fallback — the preference order
-   {!Trade_context} already implements. *)
-let _find_audit audit_idx ~symbol ~entry_date =
-  match Map.find audit_idx symbol with
+   Fallback only — see {!_find_audit}. This symmetric nearest-date scan is the
+   silent misattribution PR #2317 retired for the in-process path: on async
+   (resting-order) configs a ticket can fill arbitrarily long after the decision
+   that placed it, so a row either misses its record entirely or attaches a
+   distinct re-entry of the same symbol. It is retained (exactly as
+   {!Trade_context} retains its own date path) for rows that carry no position
+   id — legacy trades.csv layouts, and post-G2 rows whose cell is empty. *)
+let _find_audit_by_date audit_idx ~symbol ~entry_date =
+  match Map.find audit_idx.by_symbol symbol with
   | None -> None
   | Some records ->
       List.filter_map records ~f:(fun (r : TA.audit_record) ->
@@ -112,6 +127,15 @@ let _find_audit audit_idx ~symbol ~entry_date =
           if gap <= _audit_join_tolerance_days then Some (gap, r) else None)
       |> List.min_elt ~compare:(fun (g1, _) (g2, _) -> Int.compare g1 g2)
       |> Option.map ~f:snd
+
+(* Prefer the exact [position_id] join; fall back to date proximity when the
+   round-trip carries no position id, or one no audit record claims. Mirrors
+   [Trade_context._lookup_audit_for_trade]'s preference order so the offline
+   report and the in-process pipeline agree on which record belongs to a row. *)
+let _find_audit audit_idx ~position_id ~symbol ~entry_date =
+  match Option.bind position_id ~f:(Map.find audit_idx.by_position_id) with
+  | Some _ as record -> record
+  | None -> _find_audit_by_date audit_idx ~symbol ~entry_date
 
 let _exit_trigger_label (trigger : Stop_log.exit_trigger) =
   match trigger with
@@ -127,7 +151,8 @@ let _exit_trigger_label (trigger : Stop_log.exit_trigger) =
 let _row_of_trade audit_idx (trade : Trading_simulation.Metrics.trade_metrics) :
     per_trade_row =
   let audit =
-    _find_audit audit_idx ~symbol:trade.symbol ~entry_date:trade.entry_date
+    _find_audit audit_idx ~position_id:trade.position_id ~symbol:trade.symbol
+      ~entry_date:trade.entry_date
   in
   let entry = Option.map audit ~f:(fun (r : TA.audit_record) -> r.entry) in
   let exit_ = Option.bind audit ~f:(fun (r : TA.audit_record) -> r.exit_) in
@@ -519,9 +544,11 @@ let _parse_side = function
 
 (** Build a [trade_metrics] from already-parsed string cells. Shared by the
     post-G2 (with [side]) and legacy (no [side]) parser branches in
-    {!_read_trades_csv} so the field list lives in one place. *)
+    {!_read_trades_csv} so the field list lives in one place. [position_id] is
+    resolved by the caller from the header-derived schema — [None] for the
+    legacy layout, which has no such column. *)
 let _trade_metrics_of_strings ~symbol ~side ~entry_date ~exit_date ~days_held
-    ~entry_price ~exit_price ~quantity ~pnl_dollars ~pnl_percent :
+    ~entry_price ~exit_price ~quantity ~pnl_dollars ~pnl_percent ~position_id :
     Trading_simulation.Metrics.trade_metrics =
   {
     symbol;
@@ -534,17 +561,7 @@ let _trade_metrics_of_strings ~symbol ~side ~entry_date ~exit_date ~days_held
     quantity = Float.of_string quantity;
     pnl_dollars = Float.of_string pnl_dollars;
     pnl_percent = Float.of_string pnl_percent;
-    (* This loader consumes only the round-trip P&L columns; the trailing
-       [position_id] column is one of the ignored ones.
-
-       KNOWN GAP (PR #2317). That column is now POPULATED in [trades.csv], so
-       dropping it here forces [_find_audit] below back onto the date-proximity
-       join that the in-process pipeline retired — see the note there. Closing
-       it is not a one-liner: both row layouts this builder serves (post-G2 and
-       legacy) would need a new cell position, and the legacy layout has no such
-       column at all, so the field must become an option threaded from two
-       parser branches. Deliberately left for a follow-up. *)
-    position_id = None;
+    position_id;
   }
 
 (** Match a post-G2 row layout (≥13 columns; [side] = [LONG]/[SHORT]). The head
@@ -552,9 +569,13 @@ let _trade_metrics_of_strings ~symbol ~side ~entry_date ~exit_date ~days_held
     columns (added by M5.2e: entry_stage, entry_volume_ratio,
     stop_initial_distance_pct, stop_trigger_kind, days_to_first_stop_trigger,
     screener_score_at_entry; and by future schema additions) are tolerated and
-    ignored — this loader only consumes the round-trip P&L columns required by
-    [Trade_audit_report]. *)
-let _match_post_g2_csv_row cells :
+    otherwise ignored.
+
+    The one trailing column this loader does consume is [position_id], which the
+    caller resolves by name against the file's header (see
+    {!Backtest.Trades_csv_schema}) rather than by a hardcoded index — appending
+    further columns must not shift what gets read. *)
+let _match_post_g2_csv_row ~position_id cells :
     Trading_simulation.Metrics.trade_metrics option =
   match cells with
   | symbol
@@ -565,12 +586,20 @@ let _match_post_g2_csv_row cells :
       Some
         (_trade_metrics_of_strings ~symbol ~side ~entry_date ~exit_date
            ~days_held ~entry_price ~exit_price ~quantity ~pnl_dollars
-           ~pnl_percent)
+           ~pnl_percent ~position_id)
   | _ -> None
+
+(* The legacy layout predates the [position_id] column entirely, so there is no
+   cell to read. Resolved through {!Csv_schema.legacy} rather than written as a
+   bare [None] so the absence stays a statement about the layout, checkable
+   against the schema, instead of an incidental omission. *)
+let _legacy_position_id cells =
+  Csv_schema.position_id_of_cells Csv_schema.legacy cells
 
 (** Match a legacy (pre-G2) row layout — leading 12 columns with no [side];
     trailing columns ignored for the same forward-compat reason as the post-G2
-    matcher. Defaults [side] to [Buy]. *)
+    matcher. Defaults [side] to [Buy]. [position_id] is [None] by construction,
+    so {!_find_audit} falls back to date proximity for these rows. *)
 let _match_legacy_csv_row cells :
     Trading_simulation.Metrics.trade_metrics option =
   match cells with
@@ -580,7 +609,8 @@ let _match_legacy_csv_row cells :
       Some
         (_trade_metrics_of_strings ~symbol ~side:"LONG" ~entry_date ~exit_date
            ~days_held ~entry_price ~exit_price ~quantity ~pnl_dollars
-           ~pnl_percent)
+           ~pnl_percent
+           ~position_id:(_legacy_position_id cells))
   | _ -> None
 
 (** Read trades.csv. Tolerates both the post-G2 (13-column, with [side]) and
@@ -588,12 +618,13 @@ let _match_legacy_csv_row cells :
     second cell is a [LONG]/[SHORT] tag (post-G2) or a date (legacy). Legacy
     rows default to [side = Buy] preserving the historical long-only semantics.
 *)
-let _parse_trades_csv_line path line :
+let _parse_trades_csv_line ~schema path line :
     Trading_simulation.Metrics.trade_metrics option =
   if String.is_empty (String.strip line) then None
   else
     let cells = String.split line ~on:',' in
-    match _match_post_g2_csv_row cells with
+    let position_id = Csv_schema.position_id_of_cells schema cells in
+    match _match_post_g2_csv_row ~position_id cells with
     | Some _ as t -> t
     | None -> (
         match _match_legacy_csv_row cells with
@@ -606,7 +637,9 @@ let _read_trades_csv path : Trading_simulation.Metrics.trade_metrics list =
   In_channel.close ic;
   match lines with
   | [] -> failwithf "trades.csv at %s is empty" path ()
-  | _header :: rest -> List.filter_map rest ~f:(_parse_trades_csv_line path)
+  | header :: rest ->
+      let schema = Csv_schema.of_header_line header in
+      List.filter_map rest ~f:(_parse_trades_csv_line ~schema path)
 
 type _summary_meta = {
   start_date : Date.t;
