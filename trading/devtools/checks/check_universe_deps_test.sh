@@ -53,8 +53,33 @@
 #      other rule and its real cache-blindness is reported as OK.
 #  13. A path-qualified script whose ONLY dune mention is inside a ";"
 #      whole-line comment is NOT resolved -> FAIL "not referenced by any
-#      runtest rule". Pins that admitting '/', '.' and '-' into the class
-#      did not make the run-target branch match something it shouldn't.
+#      runtest rule". This pins RECORD CLASSIFICATION -- the "/^\(rule/"
+#      paragraph guard plus strip_comments() -- and NOT the character
+#      class. Measured: assertion 13 is invariant under every mutation of
+#      the run-target class (narrow "[A-Za-z0-9_.]", this file's
+#      "[A-Za-z0-9_./-]", and an unbounded "[^}]" all leave it green),
+#      because its fixture record starts with ";" and is discarded by the
+#      paragraph guard before the run-target regex is ever consulted. It
+#      DOES go red when the record classifier is broken (a botched
+#      glued-rule fix that strips the ";" leader but keeps the line
+#      content makes #13 the sole failure), which is the invariant it
+#      actually guards -- H-CHECK-DUNE-COMMENT-GLUED-RULE. The
+#      class-containment guard is assertion 14, not this one.
+#  14. The over-match direction of the widened class: a "%{dep:...}" blob
+#      that is NOT a plain script name ("$LEGACY_DIR/old check.sh" --
+#      contains "$" and a space) sitting in LIVE rule text (an "(echo
+#      ...)" argument, so strip_comments() cannot remove it) EARLIER in
+#      the same record than the real run-target must be SKIPPED by the
+#      class, so the real run-target is still the one matched. awk
+#      match() returns the FIRST match in the record, so a class wide
+#      enough to swallow the blob hijacks attribution and the real script
+#      falls through to the dep-list branch -- reported against the wrong
+#      rule. Measured three states: narrow "[A-Za-z0-9_.]" -> FAIL (no
+#      '/', the pre-fix bug), "[A-Za-z0-9_./-]" -> PASS, unbounded
+#      "[^}]" -> FAIL (hijacked). Unlike a ";"-comment fixture, this one
+#      does not depend on strip_comments()'s whole-line-only behaviour,
+#      so it keeps discriminating once H-CHECK-DUNE-COMMENT-GLUED-RULE
+#      is fixed.
 #
 # How to re-verify by hand:
 #   sh trading/devtools/checks/check_universe_deps_test.sh
@@ -520,11 +545,24 @@ else
   bad "assertion 12 — expected non-zero exit with a FAIL for subdir/runtarget_check.sh naming owner (run-target); got exit=$CODE12 output=<<$OUT12>>"
 fi
 
-# --- Assertion 13 (negative direction): widening the class to admit '/',
-# '.' and '-' must not make the run-target branch resolve text that is not
-# a live rule. A path-qualified script mentioned ONLY inside a ";"
-# whole-line dune comment must still be reported as unreferenced, not
-# silently resolved to the commented-out rule.
+# --- Assertion 13 (RECORD CLASSIFICATION, not the character class): a
+# path-qualified script mentioned ONLY inside a ";" whole-line dune
+# comment must still be reported as unreferenced, not silently resolved
+# to the commented-out rule.
+#
+# What this does NOT pin: the run-target character class. The commented
+# fixture below is appended after a blank line, so in awk paragraph mode
+# it is its own record STARTING WITH ";" -- it fails the /^\(rule/ guard
+# and is discarded before the run-target regex is ever consulted.
+# Measured: this assertion is green under the narrow pre-fix class
+# "[A-Za-z0-9_.]", under this file's "[A-Za-z0-9_./-]", AND under an
+# unbounded "[^}]" -- no class mutation can move it. The class-containment
+# guard is assertion 14 below.
+#
+# What it DOES pin: record classification. Mutating the classifier so a
+# ";"-led line is treated as rule content (a plausible botch of the
+# H-CHECK-DUNE-COMMENT-GLUED-RULE fix) makes this the sole failing
+# assertion.
 write_dune "universe" "universe" "universe" "universe" "universe" "universe"
 cat > "${FIXTURE_CHECKS}/subdir/commented_out_check.sh" <<'EOF'
 #!/bin/sh
@@ -547,12 +585,83 @@ set -e
 
 if [ "$CODE13" -ne 0 ] &&
   echo "$OUT13" | grep -q "^FAIL: subdir/commented_out_check.sh calls repo_root() but is not referenced by any runtest rule"; then
-  ok "assertion 13 — commented-out path-qualified run-target is not resolved by the widened class"
+  ok "assertion 13 — a \";\"-commented rule record is not classified as a rule, so its run-target is not resolved"
 else
   bad "assertion 13 — expected non-zero exit reporting subdir/commented_out_check.sh as unreferenced; got exit=$CODE13 output=<<$OUT13>>"
 fi
 
 rm -f "${FIXTURE_CHECKS}/subdir/commented_out_check.sh"
+
+# --- Assertion 14 (OVER-MATCH containment — the guard assertion 13 was
+# mistakenly credited with): the class must admit only plain script-name
+# characters, so a "%{dep:...}" blob that is not a script name is skipped
+# and the REAL run-target later in the same record is the one matched.
+#
+# The ghost lives in LIVE rule text — an "(echo ...)" argument inside the
+# action — not in a ";" comment, so strip_comments() cannot remove it and
+# the character class is genuinely consulted. That is what makes this
+# discriminating where assertion 13 is not, and it keeps discriminating
+# after H-CHECK-DUNE-COMMENT-GLUED-RULE (whose fix changes comment
+# handling only).
+#
+# The blob carries "$" and a space — the two characters most likely to be
+# swept in by a careless future widening (e.g. relaxing to "[^}]+" to
+# "just make dune variables work"). awk match() returns the FIRST match in
+# the record, so the ghost is placed BEFORE the real run-target: a class
+# that swallows it hijacks attribution, subdir/overmatch_check.sh falls
+# through to the dep-list branch, and it is credited to
+# overmatch_wrapper_test.sh's rule — which deliberately LACKS (universe),
+# turning the hijack into a visible FAIL.
+#
+# Measured (all three states, same fixture):
+#   [A-Za-z0-9_.]    (pre-fix, narrow)  -> FAIL (no '/', the #11/#12 bug)
+#   [A-Za-z0-9_./-]  (this file)        -> PASS
+#   [^}]             (unbounded)        -> FAIL (ghost hijacks)
+write_dune "universe" "universe" "universe" "universe" "universe" "universe"
+cat > "${FIXTURE_CHECKS}/subdir/overmatch_check.sh" <<'EOF'
+#!/bin/sh
+. "$(dirname "$0")/../_check_lib.sh"
+echo "OK: overmatch_check read $(repo_root)/dev/status/corge.md"
+EOF
+cat > "${FIXTURE_CHECKS}/overmatch_wrapper_test.sh" <<'EOF'
+#!/bin/sh
+echo "overmatch_wrapper deps subdir/overmatch_check.sh"
+EOF
+cat >> "${FIXTURE_CHECKS}/dune" <<'EOF'
+
+; The dep-listing rule comes FIRST (same ordering rationale as the
+; assertions 11-12 pair above): it is where a hijacked run-target match
+; makes the script land. It lacks (universe) so the hijack is loud.
+
+(rule
+ (alias runtest)
+ (deps subdir/overmatch_check.sh)
+ (action
+  (run sh %{dep:overmatch_wrapper_test.sh})))
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (progn
+   (echo "hand-run form: (run sh %{dep:$LEGACY_DIR/old check.sh})\n")
+   (run sh %{dep:subdir/overmatch_check.sh}))))
+EOF
+
+set +e
+OUT14=$(REPO_ROOT="$FAKE_ROOT" sh "$CHECK" 2>&1)
+CODE14=$?
+set -e
+
+if [ "$CODE14" -eq 0 ] &&
+  echo "$OUT14" | grep -q "^OK: subdir/overmatch_check.sh -- owning rule (run-target)"; then
+  ok "assertion 14 — a non-script-name %{dep:...} blob in live rule text is skipped; the real run-target still wins"
+else
+  bad "assertion 14 — expected exit 0 with 'OK: subdir/overmatch_check.sh -- owning rule (run-target)'; got exit=$CODE14 output=<<$OUT14>>"
+fi
+
+rm -f "${FIXTURE_CHECKS}/subdir/overmatch_check.sh" \
+  "${FIXTURE_CHECKS}/overmatch_wrapper_test.sh"
 
 echo ""
 echo "check_universe_deps_test: ${PASS} passed, ${FAIL} failed"
