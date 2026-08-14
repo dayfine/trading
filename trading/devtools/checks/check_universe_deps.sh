@@ -208,14 +208,37 @@ BEGIN {
   block = strip_comments($0)
   hasuniv = (block ~ /\(universe\)/) ? 1 : 0
 
+  # H-CHECK-RUNTARGET-PATHQUAL: the run-target name class must admit "/"
+  # (and "-"), because the candidate scan above is recursive and yields
+  # path-qualified names like "deep_scan/_lib.sh". A rule written as
+  # (run sh %{dep:deep_scan/foo_check.sh}) would otherwise not match
+  # here, and the script would fall through to the dep-list branch below
+  # -- which resolves to whichever OTHER rule happens to list it as a
+  # plain dep, inheriting the (universe) status of THAT rule instead of
+  # its own. The misattribution is silent in both directions: a false
+  # FAIL when the owning run-target rule is clean, and (worse) a false OK
+  # when the owning run-target rule is the cache-blind one. See
+  # check_universe_deps_test.sh assertions 11-13.
+  #
+  # NOTE: no apostrophes anywhere in this awk program -- it is a single-
+  # quoted shell string, so one would terminate it early.
   runtarget = ""
-  if (match(block, /\(run[ \t\n]+(sh|bash)[ \t\n]+%\{dep:[A-Za-z0-9_.]+\}/)) {
+  if (match(block, /\(run[ \t\n]+(sh|bash)[ \t\n]+%\{dep:[A-Za-z0-9_.\/-]+\}/)) {
     seg = substr(block, RSTART, RLENGTH)
     sub(/.*%\{dep:/, "", seg)
     sub(/\}.*/, "", seg)
     runtarget = seg
   }
 
+  # This class is deliberately NOT widened alongside the run-target one
+  # above. Its job is to drop %{dep:...} wrappers so they are not counted
+  # as plain deps; widening it to "/" would ALSO drop a path-qualified
+  # %{dep:...} written in a DEPS position (not a run position), which the
+  # run-target branch by construction never matches -- that script would
+  # then resolve to no rule at all and be reported as unreferenced. The
+  # narrower class leaves such a dep visible to the fallback below; and
+  # because the run-target branch is consulted first, the resulting leak
+  # of a path-qualified run-target into this dep list is inert.
   depsonly = block
   gsub(/%\{dep:[A-Za-z0-9_.]+\}/, "", depsonly)
   gsub(/[^A-Za-z0-9_.\/-]/, " ", depsonly)
