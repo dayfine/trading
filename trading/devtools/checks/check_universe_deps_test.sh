@@ -80,6 +80,24 @@
 #      does not depend on strip_comments()'s whole-line-only behaviour,
 #      so it keeps discriminating once H-CHECK-DUNE-COMMENT-GLUED-RULE
 #      is fixed.
+#  15. H-CHECK-DUNE-COMMENT-GLUED-RULE shape 1: a rule preceded by a ";"
+#      comment GLUED directly onto it (no blank line separating them) must
+#      still be classified as a rule, so its run-target
+#      (subdir/glued_check.sh) resolves via that rule -> PASS. Pre-fix,
+#      awk paragraph mode treats the comment+rule text as one record
+#      starting with ";", which never matches /^\(rule/, so the rule (and
+#      its run-target) is invisible to the guard and the script is
+#      reported as unreferenced -- a genuine FAIL(pre-fix) ->
+#      PASS(post-fix) transition.
+#  16. H-CHECK-DUNE-COMMENT-GLUED-RULE shape 2: a decoy
+#      "(run sh %{dep:decoy_check.sh})" snippet inside a TRAILING same-line
+#      comment (glued onto "(alias runtest)", not its own whole line, so
+#      the pre-fix whole-line-only strip_comments() cannot remove it) must
+#      not hijack run-target resolution away from the real run-target
+#      (trailing_comment_check.sh) -> PASS. Pre-fix, the decoy appears
+#      earlier in the record than the real run-target, so awk match()'s
+#      first-match semantics resolve "runtarget" to the decoy name and the
+#      real script is reported as unreferenced.
 #
 # How to re-verify by hand:
 #   sh trading/devtools/checks/check_universe_deps_test.sh
@@ -211,6 +229,42 @@ cat > "${FIXTURE_CHECKS}/runtarget_wrapper_test.sh" <<'EOF'
 echo "runtarget_wrapper deps subdir/runtarget_check.sh"
 EOF
 
+# --- Assertion 15 fixture (H-CHECK-DUNE-COMMENT-GLUED-RULE shape 1): a
+# script that is the run-target of a rule preceded by a ";" comment GLUED
+# directly onto it -- no blank line separates the comment from "(rule".
+# It is never mentioned anywhere else in the dune file, so before the fix
+# (which strips leading comments before the "/^\(rule/" classification
+# test) the whole comment+rule text is one paragraph-mode record starting
+# with ";", is never classified as a rule, and glued_check.sh is reported
+# as unreferenced. After the fix it resolves cleanly via its own
+# (universe)-declaring rule.
+mkdir -p "${FIXTURE_CHECKS}/subdir"
+cat > "${FIXTURE_CHECKS}/subdir/glued_check.sh" <<'EOF'
+#!/bin/sh
+. "$(dirname "$0")/../_check_lib.sh"
+echo "OK: glued_check read $(repo_root)/dev/status/glued.md"
+EOF
+
+# --- Assertion 16 fixture (H-CHECK-DUNE-COMMENT-GLUED-RULE shape 2): a
+# script whose OWN rule carries a decoy "(run sh %{dep:decoy_check.sh})"
+# snippet inside a TRAILING same-line comment (glued onto the "(alias
+# runtest)" line, not a whole-line comment) EARLIER in the record than the
+# real run-target. decoy_check.sh does not need to exist on disk -- it is
+# never scanned as a candidate; it only needs to be syntactically
+# %{dep:...}-shaped so the run-target regex can match it. Before the fix,
+# strip_comments() only strips WHOLE-LINE comments, so this trailing
+# comment survives into the block the run-target regex scans; awk
+# match()'s first-match semantics then hijack "runtarget" to the decoy
+# name, and trailing_comment_check.sh -- which is not listed anywhere else
+# -- is reported as unreferenced. After the fix (strip_comments() also
+# strips trailing same-line comments) only the real "(run sh
+# %{dep:trailing_comment_check.sh})" survives, and resolution is correct.
+cat > "${FIXTURE_CHECKS}/trailing_comment_check.sh" <<'EOF'
+#!/bin/sh
+. "$(dirname "$0")/_check_lib.sh"
+echo "OK: trailing_comment_check read $(repo_root)/dev/status/trailing.md"
+EOF
+
 write_dune() {
   # $1 = "universe" | "no-universe" for sample_check.sh's rule
   # $2 = "universe" | "no-universe" for wrapper_test.sh's rule (governs
@@ -230,6 +284,14 @@ write_dune() {
   # $6 = "universe" | "no-universe" for runtarget_wrapper_test.sh's rule,
   #      which lists subdir/runtarget_check.sh as a plain DEP (assertions
   #      11-12) -- defaults to "universe" (clean) when omitted.
+  # $7 = "universe" | "no-universe" for the glued-leading-comment rule
+  #      whose run-target is subdir/glued_check.sh (assertion 15,
+  #      H-CHECK-DUNE-COMMENT-GLUED-RULE shape 1) -- defaults to
+  #      "universe" (clean) when omitted.
+  # $8 = "universe" | "no-universe" for the trailing-same-line-comment
+  #      rule whose run-target is trailing_comment_check.sh (assertion 16,
+  #      H-CHECK-DUNE-COMMENT-GLUED-RULE shape 2) -- defaults to
+  #      "universe" (clean) when omitted.
   sample_deps="_check_lib.sh"
   [ "$1" = "universe" ] && sample_deps="_check_lib.sh (universe)"
   wrapper_deps="helper_with_repo_root.sh"
@@ -242,6 +304,10 @@ write_dune() {
   [ "${5:-universe}" = "universe" ] && runtarget_deps="_check_lib.sh (universe)"
   rtwrapper_deps="subdir/runtarget_check.sh"
   [ "${6:-universe}" = "universe" ] && rtwrapper_deps="subdir/runtarget_check.sh (universe)"
+  glued_deps="_check_lib.sh"
+  [ "${7:-universe}" = "universe" ] && glued_deps="_check_lib.sh (universe)"
+  trailing_deps="_check_lib.sh"
+  [ "${8:-universe}" = "universe" ] && trailing_deps="_check_lib.sh (universe)"
 
   cat > "${FIXTURE_CHECKS}/dune" <<EOF
 (rule
@@ -283,10 +349,12 @@ write_dune() {
 ;
 ; The blank line between this comment and the rule below is load-bearing:
 ; the guard parses DUNE_FILE in awk paragraph mode and only treats a
-; record starting with "(rule" as a rule, so a comment glued directly onto
-; a rule with no blank line makes that whole rule invisible to it. (That
-; is a separate latent gap, filed as H-CHECK-DUNE-COMMENT-GLUED-RULE; the
-; real dune file always separates them, as this fixture now does.)
+; record starting with "(rule" as a rule -- a comment glued directly onto
+; a rule with no blank line would otherwise make that whole rule invisible
+; to it (H-CHECK-DUNE-COMMENT-GLUED-RULE shape 1, fixed and pinned by
+; assertion 15 below via a DEDICATED fixture with a genuinely glued
+; comment; this particular comment keeps its blank-line separation so it
+; does not also perturb assertions 11-14's resolution).
 
 (rule
  (alias runtest)
@@ -299,6 +367,42 @@ write_dune() {
  (deps ${runtarget_deps})
  (action
   (run sh %{dep:subdir/runtarget_check.sh})))
+
+; H-CHECK-DUNE-COMMENT-GLUED-RULE shape 1 fixture (assertion 15): this
+; explanatory comment is GLUED directly onto the rule below -- there is
+; deliberately NO blank line between this comment paragraph and "(rule".
+; Before the fix, awk paragraph mode makes the whole comment+rule text one
+; record starting with ";", which never matches /^\(rule/, so this rule
+; (and subdir/glued_check.sh, its run-target) is invisible to the guard.
+(rule
+ (alias runtest)
+ (deps ${glued_deps})
+ (action
+  (run sh %{dep:subdir/glued_check.sh})))
+
+; H-CHECK-DUNE-COMMENT-GLUED-RULE shape 2 fixture (assertion 16): the
+; "(alias runtest)" line below carries a TRAILING same-line comment with a
+; decoy run-target snippet, "(run sh %{dep:decoy_check.sh})", that appears
+; EARLIER in this rule's paragraph-mode record than the real run-target.
+; decoy_check.sh is never created on disk -- it is not a candidate, it
+; only needs to be %{dep:...}-shaped so the run-target regex can match it.
+; Before the fix, strip_comments() only strips WHOLE-LINE comments, so
+; this trailing comment survives into the block the regex scans, and awk
+; match()'s first-match semantics hijack "runtarget" to the decoy name --
+; trailing_comment_check.sh (the real run-target, listed nowhere else)
+; then falls through to the dep-list branch, where it is not listed
+; either, and is reported as unreferenced.
+;
+; (Blank line below is deliberate, unlike assertion 15's fixture: this
+; rule's own explanatory comment is NOT glued to it, so assertion 16
+; isolates the TRAILING-comment mechanism only, independent of the
+; leading-comment fix that assertion 15 pins.)
+
+(rule
+ (alias runtest) ; legacy invocation, kept for reference: (run sh %{dep:decoy_check.sh})
+ (deps ${trailing_deps})
+ (action
+  (run sh %{dep:trailing_comment_check.sh})))
 EOF
 }
 
@@ -662,6 +766,52 @@ fi
 
 rm -f "${FIXTURE_CHECKS}/subdir/overmatch_check.sh" \
   "${FIXTURE_CHECKS}/overmatch_wrapper_test.sh"
+
+# ============================================================
+# Assertion 15 (H-CHECK-DUNE-COMMENT-GLUED-RULE shape 1): a rule preceded
+# by a ";" comment glued directly above it (no blank line) must still be
+# classified as a rule, so its run-target (subdir/glued_check.sh) resolves
+# via that rule -> PASS (the rule declares (universe)). Pre-fix, the whole
+# comment+rule text is one paragraph-mode record starting with ";", never
+# matches /^\(rule/, and subdir/glued_check.sh is reported as unreferenced
+# instead -- a FAIL, not the OK asserted here. This is a genuine
+# FAIL(pre-fix) -> PASS(post-fix) transition, not just a differently
+# worded FAIL.
+# ============================================================
+write_dune "universe" "universe" "universe" "universe" "universe" "universe"
+
+set +e
+OUT15=$(REPO_ROOT="$FAKE_ROOT" sh "$CHECK" 2>&1)
+CODE15=$?
+set -e
+
+if [ "$CODE15" -eq 0 ] &&
+  echo "$OUT15" | grep -q "^OK: subdir/glued_check.sh -- owning rule (run-target)"; then
+  ok "assertion 15 — a rule with a glued leading comment (no blank line above it) is still classified as a rule"
+else
+  bad "assertion 15 — expected exit 0 with 'OK: subdir/glued_check.sh -- owning rule (run-target)'; got exit=$CODE15 output=<<$OUT15>>"
+fi
+
+# ============================================================
+# Assertion 16 (H-CHECK-DUNE-COMMENT-GLUED-RULE shape 2): a decoy
+# "(run sh %{dep:decoy_check.sh})" snippet sitting inside a TRAILING
+# same-line comment (glued onto "(alias runtest)", not its own whole
+# line) must NOT hijack run-target resolution away from the rule's real
+# run-target (trailing_comment_check.sh) -> PASS. Pre-fix, strip_comments()
+# only strips WHOLE-LINE comments, so this trailing comment survives into
+# the block the run-target regex scans; since the decoy appears earlier in
+# the record than the real run-target, awk match()'s first-match semantics
+# hijack "runtarget" to the decoy name and trailing_comment_check.sh falls
+# through to the dep-list branch -- where it is not listed at all, so it
+# is reported as unreferenced. Same OUT15 run covers this assertion too
+# (both fixtures are present in the same write_dune call above).
+# ============================================================
+if [ "$CODE15" -eq 0 ] &&
+  echo "$OUT15" | grep -q "^OK: trailing_comment_check.sh -- owning rule (run-target)"; then
+  ok "assertion 16 — a decoy run-target snippet inside a trailing same-line comment does not hijack resolution"
+else
+  bad "assertion 16 — expected exit 0 with 'OK: trailing_comment_check.sh -- owning rule (run-target)'; got exit=$CODE15 output=<<$OUT15>>"
+fi
 
 echo ""
 echo "check_universe_deps_test: ${PASS} passed, ${FAIL} failed"
