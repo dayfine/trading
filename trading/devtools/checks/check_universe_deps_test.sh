@@ -40,6 +40,21 @@
 #      first) -- only whole-comment-line stripping should pass.
 #  10. Same fixture as #9 with (universe) added -> PASS, confirming the
 #      true-positive path (not just the FAIL path) survives the fix.
+#  11. A PATH-QUALIFIED run-target -- (run sh %{dep:subdir/foo.sh}) --
+#      whose own rule declares (universe) resolves via the RUN-TARGET
+#      branch -> PASS, even when an earlier rule lists the same script as
+#      a plain dep WITHOUT (universe) (H-CHECK-RUNTARGET-PATHQUAL: the
+#      run-target regex's character class must admit '/').
+#  12. The mirror image of #11 -- the path-qualified run-target's own rule
+#      LACKS (universe) while the earlier dep-listing rule HAS it -> FAIL,
+#      attributed to the run-target. This is the false GREEN that the
+#      H-CHECK-RUNTARGET-PATHQUAL fix closes: with a '/'-excluding class
+#      the run-target is invisible, so the script is misattributed to the
+#      other rule and its real cache-blindness is reported as OK.
+#  13. A path-qualified script whose ONLY dune mention is inside a ";"
+#      whole-line comment is NOT resolved -> FAIL "not referenced by any
+#      runtest rule". Pins that admitting '/', '.' and '-' into the class
+#      did not make the run-target branch match something it shouldn't.
 #
 # How to re-verify by hand:
 #   sh trading/devtools/checks/check_universe_deps_test.sh
@@ -150,6 +165,27 @@ REAL="${SOME_VAR#pre}$(repo_root)/dev/status/qux.md" # trailing comment on the r
 echo "OK: $REAL count=$COUNT short=$SHORT"
 EOF
 
+# --- Assertions 11-12 fixtures (H-CHECK-RUNTARGET-PATHQUAL): a
+# SUBDIRECTORY script that calls repo_root() and is the RUN-TARGET of its
+# own rule, written path-qualified as %{dep:subdir/runtarget_check.sh}.
+# It is ALSO listed as a plain dep of an earlier rule (the shape the real
+# dune file uses for check_universe_deps.sh: its own rule runs it, and
+# check_universe_deps_test.sh's rule deps it). The two rules carry
+# INDEPENDENT (universe) flags, so the guard's answer differs depending on
+# which rule it attributes the script to -- that is what makes assertions
+# 11 and 12 discriminating.
+mkdir -p "${FIXTURE_CHECKS}/subdir"
+cat > "${FIXTURE_CHECKS}/subdir/runtarget_check.sh" <<'EOF'
+#!/bin/sh
+. "$(dirname "$0")/../_check_lib.sh"
+REAL="$(repo_root)/dev/status/baz.md"
+echo "OK: runtarget_check read $REAL"
+EOF
+cat > "${FIXTURE_CHECKS}/runtarget_wrapper_test.sh" <<'EOF'
+#!/bin/sh
+echo "runtarget_wrapper deps subdir/runtarget_check.sh"
+EOF
+
 write_dune() {
   # $1 = "universe" | "no-universe" for sample_check.sh's rule
   # $2 = "universe" | "no-universe" for wrapper_test.sh's rule (governs
@@ -163,6 +199,12 @@ write_dune() {
   #      defaults to "universe" (clean) when omitted. Note:
   #      comment_only_repo_root.sh is deliberately NEVER given a rule
   #      here -- after the fix it must never become a candidate at all.
+  # $5 = "universe" | "no-universe" for the rule whose RUN-TARGET is the
+  #      path-qualified %{dep:subdir/runtarget_check.sh} (assertions
+  #      11-12) -- defaults to "universe" (clean) when omitted.
+  # $6 = "universe" | "no-universe" for runtarget_wrapper_test.sh's rule,
+  #      which lists subdir/runtarget_check.sh as a plain DEP (assertions
+  #      11-12) -- defaults to "universe" (clean) when omitted.
   sample_deps="_check_lib.sh"
   [ "$1" = "universe" ] && sample_deps="_check_lib.sh (universe)"
   wrapper_deps="helper_with_repo_root.sh"
@@ -171,6 +213,10 @@ write_dune() {
   [ "${3:-universe}" = "universe" ] && subdir_deps="subdir/nested_check.sh (universe)"
   risky_deps="_check_lib.sh"
   [ "${4:-universe}" = "universe" ] && risky_deps="_check_lib.sh (universe)"
+  runtarget_deps="_check_lib.sh"
+  [ "${5:-universe}" = "universe" ] && runtarget_deps="_check_lib.sh (universe)"
+  rtwrapper_deps="subdir/runtarget_check.sh"
+  [ "${6:-universe}" = "universe" ] && rtwrapper_deps="subdir/runtarget_check.sh (universe)"
 
   cat > "${FIXTURE_CHECKS}/dune" <<EOF
 (rule
@@ -202,6 +248,32 @@ write_dune() {
  (deps ${risky_deps})
  (action
   (run sh %{dep:risky_comment_repo_root.sh})))
+
+; The dep-listing rule is emitted BEFORE the path-qualified run-target
+; rule below deliberately: the guard scans rules in file order and takes
+; the FIRST dep-list match, so with the run-target branch blind to '/'
+; (the H-CHECK-RUNTARGET-PATHQUAL bug) resolution lands here instead of on
+; the script's own rule. Reordering these two rules would make assertions
+; 11-12 stop discriminating.
+;
+; The blank line between this comment and the rule below is load-bearing:
+; the guard parses DUNE_FILE in awk paragraph mode and only treats a
+; record starting with "(rule" as a rule, so a comment glued directly onto
+; a rule with no blank line makes that whole rule invisible to it. (That
+; is a separate latent gap, filed as H-CHECK-DUNE-COMMENT-GLUED-RULE; the
+; real dune file always separates them, as this fixture now does.)
+
+(rule
+ (alias runtest)
+ (deps ${rtwrapper_deps})
+ (action
+  (run sh %{dep:runtarget_wrapper_test.sh})))
+
+(rule
+ (alias runtest)
+ (deps ${runtarget_deps})
+ (action
+  (run sh %{dep:subdir/runtarget_check.sh})))
 EOF
 }
 
@@ -402,6 +474,85 @@ if [ "$CODE10" -eq 0 ] && echo "$OUT10" | grep -q "OK: risky_comment_repo_root.s
 else
   bad "assertion 10 — expected exit 0 with an OK line for risky_comment_repo_root.sh; got exit=$CODE10 output=<<$OUT10>>"
 fi
+
+# ============================================================
+# Assertions 11-13 (H-CHECK-RUNTARGET-PATHQUAL): the run-target regex's
+# character class must admit '/', so a path-qualified run-target
+# `(run sh %{dep:subdir/runtarget_check.sh})` resolves to ITS OWN rule
+# rather than silently falling through to whichever other rule happens to
+# list the script as a plain dep.
+# ============================================================
+
+# --- Assertion 11: the run-target's own rule declares (universe); the
+# earlier dep-listing rule does NOT. Correct attribution (run-target) ->
+# PASS. With a '/'-excluding class this is a false FAIL against the
+# dep-listing rule.
+write_dune "universe" "universe" "universe" "universe" "universe" "no-universe"
+
+set +e
+OUT11=$(REPO_ROOT="$FAKE_ROOT" sh "$CHECK" 2>&1)
+CODE11=$?
+set -e
+
+if [ "$CODE11" -eq 0 ] &&
+  echo "$OUT11" | grep -q "^OK: subdir/runtarget_check.sh -- owning rule (run-target)"; then
+  ok "assertion 11 — path-qualified run-target resolves to its own (universe) rule -> PASS"
+else
+  bad "assertion 11 — expected exit 0 with 'OK: subdir/runtarget_check.sh -- owning rule (run-target)'; got exit=$CODE11 output=<<$OUT11>>"
+fi
+
+# --- Assertion 12: mirror image -- the run-target's own rule LACKS
+# (universe) while the earlier dep-listing rule HAS it. Correct
+# attribution -> FAIL naming the run-target owner. With a '/'-excluding
+# class this is a false GREEN: the script is credited with the OTHER
+# rule's (universe) and its real cache-blindness goes unreported.
+write_dune "universe" "universe" "universe" "universe" "no-universe" "universe"
+
+set +e
+OUT12=$(REPO_ROOT="$FAKE_ROOT" sh "$CHECK" 2>&1)
+CODE12=$?
+set -e
+
+if [ "$CODE12" -ne 0 ] &&
+  echo "$OUT12" | grep -q "^FAIL: subdir/runtarget_check.sh calls repo_root() .*owning rule (run-target)"; then
+  ok "assertion 12 — path-qualified run-target without (universe) -> FAIL, attributed to the run-target"
+else
+  bad "assertion 12 — expected non-zero exit with a FAIL for subdir/runtarget_check.sh naming owner (run-target); got exit=$CODE12 output=<<$OUT12>>"
+fi
+
+# --- Assertion 13 (negative direction): widening the class to admit '/',
+# '.' and '-' must not make the run-target branch resolve text that is not
+# a live rule. A path-qualified script mentioned ONLY inside a ";"
+# whole-line dune comment must still be reported as unreferenced, not
+# silently resolved to the commented-out rule.
+write_dune "universe" "universe" "universe" "universe" "universe" "universe"
+cat > "${FIXTURE_CHECKS}/subdir/commented_out_check.sh" <<'EOF'
+#!/bin/sh
+. "$(dirname "$0")/../_check_lib.sh"
+echo "OK: commented_out_check read $(repo_root)/dev/status/quux.md"
+EOF
+cat >> "${FIXTURE_CHECKS}/dune" <<'EOF'
+
+; (rule
+;  (alias runtest)
+;  (deps _check_lib.sh (universe))
+;  (action
+;   (run sh %{dep:subdir/commented_out_check.sh})))
+EOF
+
+set +e
+OUT13=$(REPO_ROOT="$FAKE_ROOT" sh "$CHECK" 2>&1)
+CODE13=$?
+set -e
+
+if [ "$CODE13" -ne 0 ] &&
+  echo "$OUT13" | grep -q "^FAIL: subdir/commented_out_check.sh calls repo_root() but is not referenced by any runtest rule"; then
+  ok "assertion 13 — commented-out path-qualified run-target is not resolved by the widened class"
+else
+  bad "assertion 13 — expected non-zero exit reporting subdir/commented_out_check.sh as unreferenced; got exit=$CODE13 output=<<$OUT13>>"
+fi
+
+rm -f "${FIXTURE_CHECKS}/subdir/commented_out_check.sh"
 
 echo ""
 echo "check_universe_deps_test: ${PASS} passed, ${FAIL} failed"
