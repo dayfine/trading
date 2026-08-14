@@ -1050,13 +1050,18 @@ let test_extract_round_trips_stamps_position_id_from_entry_order _ =
         ();
     ]
   in
+  (* The exit legs are deliberately CROSS-mapped — [s1-order] to position 2 and
+     [s2-order] to position 1 — so the fixture discriminates. With each exit leg
+     pointing at its own position (the natural mapping) an implementation that
+     read [exit.order_id] would pass byte-identically; with the cross-mapping it
+     reports the pair in the wrong order and the assertion below fails. *)
   let order_links =
     String.Map.of_alist_exn
       [
         ("b1-order", "AAPL-wein-1");
-        ("s1-order", "AAPL-wein-1");
+        ("s1-order", "AAPL-wein-2");
         ("b2-order", "AAPL-wein-2");
-        ("s2-order", "AAPL-wein-2");
+        ("s2-order", "AAPL-wein-1");
       ]
   in
   assert_that

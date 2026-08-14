@@ -40,12 +40,26 @@ type trade_metrics = {
           direction so a positive reading always means profit, regardless of
           long or short. *)
   position_id : string option;
-      (** The strategy position this round-trip's {b entry} leg opened, resolved
-          from the entry fill's [order_id] through the [order_links] passed to
-          {!extract_round_trips}. This is the {b exact} join key back to
-          {!Trade_audit} / {!Stop_log} records — both are keyed by position id —
-          and it is stable no matter how many calendar days separate the
-          screener's decision tick from the resting order's fill tick.
+      (** The strategy position whose transition {b generated} this round-trip's
+          entry order, resolved from the entry fill's [order_id] through the
+          [order_links] passed to {!extract_round_trips}. It is the join key
+          back to {!Trade_audit} / {!Stop_log} records — both are keyed by
+          position id — and, unlike a date-proximity join, it is stable no
+          matter how many calendar days separate the screener's decision tick
+          from the resting order's fill tick.
+
+          {b Ordering position vs receiving position.} These are normally the
+          same position, but not necessarily. This stamp is unconditional,
+          whereas {!Trading_simulation.Fill_router.update_positions_from_trades}
+          honours a link only while the linked position is still in a fillable
+          state and otherwise falls through to its (symbol, state, side)
+          heuristic — so a fill can be {e booked} on a same-symbol sibling while
+          this field names the position that {e placed} the order. Under the
+          one-position-per-symbol invariant the two always agree; with scale-in
+          siblings they need not. The ordering position is the better
+          attribution for the audit join (the audit record is written by the
+          position that made the decision), so the field is not weakened to
+          track the routing outcome.
 
           [None] when the caller supplied no links (the default, e.g. unit tests
           building step streams by hand) or when the entry order was not one the

@@ -92,7 +92,17 @@ let _audit_index audit =
 
 (* Find the audit record for [symbol] whose decision date is closest to the
    round-trip [entry_date], within tolerance. Returns [None] when the symbol has
-   no audit record or the nearest one is too far away. *)
+   no audit record or the nearest one is too far away.
+
+   KNOWN GAP (PR #2317). This symmetric nearest-date scan is precisely the
+   silent misattribution the in-process path retired: on async (resting-order)
+   configs a ticket can fill arbitrarily long after the decision that placed
+   it, so a row either misses its record entirely or attaches a distinct
+   re-entry of the same symbol. This offline report keeps that behaviour only
+   because [_trade_metrics_of_strings] above drops the [position_id] column
+   [trades.csv] now carries. The fix is to consume that column and prefer an
+   exact id join, keeping this scan as the fallback — the preference order
+   {!Trade_context} already implements. *)
 let _find_audit audit_idx ~symbol ~entry_date =
   match Map.find audit_idx symbol with
   | None -> None
@@ -525,7 +535,15 @@ let _trade_metrics_of_strings ~symbol ~side ~entry_date ~exit_date ~days_held
     pnl_dollars = Float.of_string pnl_dollars;
     pnl_percent = Float.of_string pnl_percent;
     (* This loader consumes only the round-trip P&L columns; the trailing
-       [position_id] column is one of the ignored ones. *)
+       [position_id] column is one of the ignored ones.
+
+       KNOWN GAP (PR #2317). That column is now POPULATED in [trades.csv], so
+       dropping it here forces [_find_audit] below back onto the date-proximity
+       join that the in-process pipeline retired — see the note there. Closing
+       it is not a one-liner: both row layouts this builder serves (post-G2 and
+       legacy) would need a new cell position, and the legacy layout has no such
+       column at all, so the field must become an option threaded from two
+       parser branches. Deliberately left for a follow-up. *)
     position_id = None;
   }
 
