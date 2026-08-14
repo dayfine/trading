@@ -46,9 +46,17 @@ Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
   date-proximity path is retained verbatim as the fallback for round-trips
   with no id, so nothing that worked before regresses.
   Also retires the "ticket-age-at-FILL is structurally capped at ~1 week"
-  caveat in `Ticket_lifecycle` / the ladder-v4 spec headers — that cap was
+  caveat in `Ticket_lifecycle` and `Execution_faithfulness` — that cap was
   circular, an artifact of this very 7-day window rather than a property of
-  the tickets. Lives at
+  the tickets. **The 51 ladder-v4 / nearfloor spec headers still carry the
+  caveat and are deliberately left alone**: they are the committed record of
+  what a given experiment knew when it ran, so editing them would rewrite
+  provenance rather than correct it. Read any ticket-age figure produced
+  before #2317 as truncated at the join window, whatever its header says.
+  (`grep -rn "structurally capped"` lists them, under
+  `trading/test_data/backtest_scenarios/experiments/ladder-v4-async-ticket-2026-08-10/`,
+  `dev/experiments/ladder-v4-small-deterministic-2026-08-12/specs/`, and
+  `dev/experiments/nearfloor-302-6y-2026-08-13/specs/`.) Lives at
   `trading/trading/simulation/lib/{fill_router,round_trip_pairing,simulator}.ml`
   + `trading/trading/backtest/lib/trade_context.ml`.
   **Reporting-only — no strategy-behaviour change.** `goldens-small` 3/3 PASS
