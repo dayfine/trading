@@ -108,9 +108,31 @@ _repo_root() {
   # walked-up value stayed exported and silently overrode the caller's real
   # REPO_ROOT for write_audit.sh, which this script invokes as a child
   # process. See H-RECORD-QC-AUDIT-REPO-ROOT-SIBLING (dev/status/harness.md).
-  if [ -n "${REPO_ROOT:-}" ] && [ -d "$REPO_ROOT" ]; then
-    echo "$REPO_ROOT"
-    return 0
+  #
+  # H-REPO-ROOT-SET-BUT-INVALID-SILENT-FALLTHROUGH: a REPO_ROOT that is SET
+  # but fails the `[ -d ]` guard (nonexistent path, or a path that exists
+  # but is a regular file, not a directory) is a hard error, not a silent
+  # fallthrough to the walk-up -- same rationale as write_audit.sh's own
+  # _repo_root(): a set-but-invalid override is far more likely a typo than
+  # a request to fall back, and this script's plain (non-export)
+  # `REPO_ROOT="$(_repo_root)"` reassignment below means a silent
+  # fallthrough here ALSO clobbers the exported REPO_ROOT the
+  # write_audit.sh child process sees -- the exact H-RECORD-QC-AUDIT-
+  # REPO-ROOT-SIBLING shape, just triggered by malformed input instead of
+  # a successful competing walk-up.
+  #
+  # REPO_ROOT='' (empty string) is treated the SAME as unset, matching
+  # _check_lib.sh:repo_root() and write_audit.sh:_repo_root()'s identical
+  # decision: `${REPO_ROOT:-}` is empty for both unset and empty-string
+  # REPO_ROOT, so '' already falls into the walk-up branch below by shell
+  # construction -- every existing caller relies on exactly that fallback.
+  if [ -n "${REPO_ROOT:-}" ]; then
+    if [ -d "$REPO_ROOT" ]; then
+      echo "$REPO_ROOT"
+      return 0
+    fi
+    echo "FAIL: REPO_ROOT is set to '$REPO_ROOT' but is not a directory" >&2
+    exit 1
   fi
   dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
   while [ -n "$dir" ] && [ "$dir" != "/" ]; do
