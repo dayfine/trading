@@ -10,7 +10,12 @@
     - row shorter than the column index → [None]
     - a column inserted ahead of [position_id] → still the right cell (a reader
       pinned to today's fixed index fails this one)
-    - [legacy] → always [None] *)
+    - [legacy] → always [None]
+    - whitespace around a header {b name} is stripped (a producer emitting
+      comma-space-separated columns must still resolve — otherwise the column
+      resolves nowhere and every row in the file silently falls back)
+    - whitespace around a {b cell value} is stripped, and a whitespace-only cell
+      is a missing value, not [Some "   "] *)
 
 open OUnit2
 open Core
@@ -117,9 +122,45 @@ let test_legacy_schema_never_yields_an_id _ =
 
 let test_column_name_matches_the_writer_side _ =
   assert_that
-    (List.mem TC.csv_header_fields Schema.position_id_column_name
-       ~equal:String.equal)
-    (equal_to true)
+    (List.count TC.csv_header_fields ~f:(fun name ->
+         String.equal name Schema.position_id_column_name))
+    (equal_to 1)
+
+let test_header_name_whitespace_is_stripped _ =
+  (* A producer emitting comma-space-separated columns pads every header name.
+     Without the header strip the by-name lookup matches nothing, so *every* row in
+     that file reads [None] and the whole file silently reverts to the caller's
+     date-proximity fallback — the mass-misattribution mode this reader exists
+     to close. The row's own cells are unpadded, so only the header-side strip
+     can carry this one. *)
+  let padded_header =
+    String.split ~on:',' _canonical_header
+    |> List.map ~f:(fun name -> " " ^ name ^ " ")
+    |> String.concat ~sep:","
+  in
+  assert_that
+    (Schema.position_id_of_cells
+       (Schema.of_header_line padded_header)
+       (_canonical_row ~position_id:"AAPL-wein-7"))
+    (is_some_and (equal_to "AAPL-wein-7"))
+
+let test_cell_whitespace_is_stripped _ =
+  (* The header here is unpadded, so only the cell-side strip can carry this
+     one: an id surfaced with its padding intact would join nothing. *)
+  assert_that
+    (Schema.position_id_of_cells
+       (Schema.of_header_line _canonical_header)
+       (_canonical_row ~position_id:" AAPL-wein-7 "))
+    (is_some_and (equal_to "AAPL-wein-7"))
+
+let test_whitespace_only_cell_reads_none _ =
+  (* Stripping happens before the emptiness check, so a padded-but-empty cell is
+     the missing-data sentinel, not [Some "   "]. *)
+  assert_that
+    (Schema.position_id_of_cells
+       (Schema.of_header_line _canonical_header)
+       (_canonical_row ~position_id:"   "))
+    is_none
 
 let suite =
   "Trades_csv_schema"
@@ -136,6 +177,11 @@ let suite =
          >:: test_legacy_schema_never_yields_an_id;
          "column name matches the writer side"
          >:: test_column_name_matches_the_writer_side;
+         "header name whitespace is stripped"
+         >:: test_header_name_whitespace_is_stripped;
+         "cell whitespace is stripped" >:: test_cell_whitespace_is_stripped;
+         "whitespace only cell reads none"
+         >:: test_whitespace_only_cell_reads_none;
        ]
 
 let () = run_test_tt_main suite

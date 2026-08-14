@@ -80,8 +80,26 @@ NO
 
 ## Open work
 
-(none currently in flight — see §2026-08-14 below for the most recent
-PR)
+- [ ] **Give `Trade_audit_ratings` the `position_id` join too.** After the
+      2026-08-14 report-path fix (§ below) one `trade_audit.md` carries **two
+      joins of different fidelity**: the per-trade table is exact (id join),
+      while the analysis sections — per-trade ratings, behavioural metrics,
+      decision-quality matrix — keep the date-join population. `rate_all`,
+      `_exit_winners` and `_quartile_assignments_by_score` in
+      `trading/trading/backtest/trade_audit_report/trade_audit_ratings.ml` have
+      zero `position_id` references.
+
+      It cannot be a partial fix. `rate_all` joins audit→trade, but the other
+      two join *back* from a `rating`, which carries no position id. Giving
+      `rate_all` the id join alone newly admits long-gap trades into the ratings
+      population, which `_exit_winners` then fails to find by date and silently
+      scores at `realized_pct = 0.0` — a missing rating turned into a wrong one.
+      Doing it correctly means adding `position_id` to the public `rating` type
+      and rewiring all three joins.
+
+      Until it lands, any analysis-section number in a `trade_audit.md` for a
+      re-traded symbol is still date-joined and may be misattributed, even
+      though the per-trade table above it is exact.
 
 ## Report-path `position_id` join (2026-08-14, follow-up to PR #2317)
 
@@ -91,8 +109,18 @@ fallback. The **report path** re-reads `trades.csv` from disk and did not get
 the same fix — two CSV-readback loaders hardcoded `position_id = None`, which
 forced their downstream joins back onto the symmetric 7-day nearest-date scan
 #2317 retired. On a re-traded symbol that scan attaches a *different*
-position's audit record (the `stop_first_by_symbol` misattribution: repeat-
-traded symbols inherited the first trade's trigger and stops).
+position's audit record.
+
+Note the report path's fallback is **not** #2317's `stop_first_by_symbol`
+mechanism — that is an in-process `Trade_context` map with no report-path
+counterpart, and it hands a repeat-traded symbol the *first* trade's trigger
+and stops without bound. The report path's fallback is `_find_audit_by_date`:
+the nearest audit record for the symbol within ±7 days. Same misattribution
+class, different selector, and a materially narrower blast radius — so the
+report path's damage profile should not be expected to match #2317's numbers.
+(The report's window is also **symmetric** — `Int.abs (Date.diff …)` — where
+`Trade_context`'s is one-sided, so the report path can attach a decision dated
+*after* the fill. Pre-existing, out of scope here, recorded so it is not lost.)
 
 - [x] **Thread `position_id` through both CSV-readback loaders.** Branch
       `feat/report-path-position-id`.
@@ -103,12 +131,18 @@ traded symbols inherited the first trade's trigger and stops).
       `position_id_column_name` (shared with `csv_header_fields` so the two
       cannot drift), abstract `t`, `of_header_line`, `legacy`,
       `position_id_of_cells`. The column index is resolved **by header name**,
-      never hardcoded — `position_id` is a trailing column and both loaders
-      deliberately tolerate further trailing columns being appended, so a fixed
-      index would silently read a neighbour after the next schema addition.
+      never hardcoded. `Trade_context.csv_header_fields` keeps an append-only
+      discipline, which is what lets the positional readers named there pin
+      base-column indices — but that is a property of *this* writer, not of the
+      format, and it does not make index 19 stable: `position_id` sits *inside*
+      the trailing context block (`stop_fill_distance_pct` follows it at 20) and
+      got there by insertion ahead of that column. Appending strictly after the
+      block is harmless; an insertion **at or ahead of** `position_id` shifts it,
+      and a fixed index would then silently read a neighbour.
       `position_id_of_cells` returns `None` (never `Some ""`, never a wrong
       cell) when the header lacks the column, the row is shorter than the
-      column index, or the cell is empty.
+      column index, or the cell is empty; surrounding whitespace on both header
+      names and cell values is stripped.
 
       (It lives in its own module rather than inside `Trade_context` because
       `trade_context.ml` was already at the 300-line file-length limit; per
@@ -133,14 +167,16 @@ traded symbols inherited the first trade's trigger and stops).
       Both `KNOWN GAP (PR #2317)` comments are gone; the surviving comments
       describe the fallback's role rather than claiming an open gap.
 
-      Tests (16 new):
-      - new `test_trades_csv_schema.ml` (7) — direct pins on the schema module:
+      Tests (19 new):
+      - new `test_trades_csv_schema.ml` (10) — direct pins on the schema module:
         populated cell → `Some`, empty cell → `None` (never `Some ""`), header
         without the column → `None`, row shorter than the index → `None`,
         `legacy` always `None`, a header with an *inserted* column ahead of
         `position_id` still reading the right cell (a fixed-index reader fails
-        this one), and `position_id_column_name` present in
-        `Trade_context.csv_header_fields`.
+        this one), `position_id_column_name` present exactly once in
+        `Trade_context.csv_header_fields`, and three whitespace pins —
+        padded header names still resolve, a padded cell value reads stripped,
+        a whitespace-only cell reads `None`.
       - `test_trade_audit_report.ml` (+5) — the discriminating misattribution
         fixture: a resting AAPL ticket decided 2020-04-24 (`AAPL-1`, grade A)
         that fills 2020-11-09, with a *second* AAPL decision 2020-11-06
@@ -162,6 +198,28 @@ traded symbols inherited the first trade's trigger and stops).
       - forcing the parsed cell to `None` in both loaders → exactly 2
         failures, `load: position_id join beats nearer date match` and
         `Optimal_run_artefacts: load reads populated position_id`.
+
+      The two mutations overlap on `load: position_id join beats nearer date
+      match`, but each mechanism has an **exclusive** pin — `render: …` fails
+      only under the first, `load reads populated position_id` only under the
+      second — so neither rests on one over-broad assertion.
+
+      Whitespace mutations (QC rework, both restored):
+      - dropping `String.strip` on header names in `of_header_line` → exactly 1
+        failure, `header name whitespace is stripped`;
+      - dropping `String.strip` on the cell in `_cell_at` → exactly 2 failures,
+        `cell whitespace is stripped` and `whitespace only cell reads none`.
+
+      **Residual (what this does *not* close).** The misattribution is closed
+      for id-bearing rows **whose id appears in the audit set**. Three
+      populations still take the ±7-day date scan and can still inherit another
+      position's record: legacy layouts, rows whose cell is empty, and rows
+      carrying a well-formed id that no audit record claims (`_find_audit` is
+      `Option.bind`, so an unknown id falls through rather than reporting
+      nothing — exact parity with `Trade_context._lookup_audit_for_trade`, and
+      pinned by `test_load_unknown_position_id_falls_back_to_date`, which
+      asserts the *misattributed* grade D as expected behaviour). The analysis
+      sections are a fourth, tracked under `## Open work` above.
 
 ## Externally-generated exits (2026-07-25, issue #2076)
 
