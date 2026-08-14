@@ -14,8 +14,16 @@ type trade_metrics = {
   quantity : float;
   pnl_dollars : float;
   pnl_percent : float;
+  position_id : string option;
 }
 [@@deriving show, eq]
+
+(** Resolve the strategy position that opened this round-trip, via the
+    [order_id -> position_id] links the order generator recorded when it turned
+    the entry transition into an order. [None] when the caller supplied no links
+    (the default) or when the entry leg's order predates link recording. *)
+let _position_id_of ~order_links (entry : Trading_base.Types.trade) =
+  Map.find order_links entry.order_id
 
 (** Compute (pnl_dollars, pnl_percent) for a closed round-trip, dispatching on
     the entry side. Long: profit when exit > entry. Short: profit when exit
@@ -54,8 +62,8 @@ let _cumulative_split_factor ~entry_date ~exit_date
         acc *. s.factor
       else acc)
 
-let _make_trade_metric ~quantity:entry_basis_quantity symbol entry_date entry
-    exit_date exit splits =
+let _make_trade_metric ~quantity:entry_basis_quantity ~order_links symbol
+    entry_date entry exit_date exit splits =
   let open Trading_base.Types in
   let days_held = Date.diff exit_date entry_date in
   (* Restate the entry leg onto the exit's (post-split) basis so pnl is computed
@@ -87,6 +95,7 @@ let _make_trade_metric ~quantity:entry_basis_quantity symbol entry_date entry
     quantity;
     pnl_dollars;
     pnl_percent;
+    position_id = _position_id_of ~order_links entry;
   }
 
 (* Whether [entry]'s quantity, restated onto the exit date's post-split basis
@@ -135,8 +144,8 @@ let _rewrite_entry_at open_entries ~idx ~remaining =
    emitting one metric per entry leg touched. Returns the surviving open
    entries, the metrics prepended to [acc] (newest first), and the exit quantity
    left unconsumed once every open entry is exhausted. *)
-let rec _consume_exit ~symbol ~splits ~exit_date ~exit_trade ~exit_qty
-    open_entries acc =
+let rec _consume_exit ~symbol ~splits ~order_links ~exit_date ~exit_trade
+    ~exit_qty open_entries acc =
   match open_entries with
   | [] -> ([], acc, exit_qty)
   | _ when Float.( <= ) exit_qty _residual_qty_epsilon ->
@@ -150,13 +159,13 @@ let rec _consume_exit ~symbol ~splits ~exit_date ~exit_trade ~exit_qty
       (* Restate the exit's ask onto the entry's basis before comparing. *)
       let take = Float.min e.remaining (exit_qty /. factor) in
       let metric =
-        _make_trade_metric ~quantity:take symbol e.entry_date e.trade exit_date
-          exit_trade splits
+        _make_trade_metric ~quantity:take ~order_links symbol e.entry_date
+          e.trade exit_date exit_trade splits
       in
       let open_entries =
         _rewrite_entry_at open_entries ~idx ~remaining:(e.remaining -. take)
       in
-      _consume_exit ~symbol ~splits ~exit_date ~exit_trade
+      _consume_exit ~symbol ~splits ~order_links ~exit_date ~exit_trade
         ~exit_qty:(exit_qty -. (take *. factor))
         open_entries (metric :: acc)
 
@@ -167,15 +176,17 @@ let _opposes (a : Trading_base.Types.trade) (b : Trading_base.Types.trade) =
    the open entries as its quantity covers; a same-side trade (or the excess of
    an over-close, which really does flip the position's direction) joins the
    open entries. *)
-let _pair_step ~symbol ~splits (open_entries, metrics) (date, trade) =
+let _pair_step ~symbol ~splits ~order_links (open_entries, metrics) (date, trade)
+    =
   let append_entry ~remaining entries =
     entries @ [ _open_entry_of ~date ~trade ~remaining ]
   in
   match open_entries with
   | e :: _ when _opposes e.trade trade ->
       let remaining_open, metrics, unconsumed =
-        _consume_exit ~symbol ~splits ~exit_date:date ~exit_trade:trade
-          ~exit_qty:trade.Trading_base.Types.quantity open_entries metrics
+        _consume_exit ~symbol ~splits ~order_links ~exit_date:date
+          ~exit_trade:trade ~exit_qty:trade.Trading_base.Types.quantity
+          open_entries metrics
       in
       if Float.( > ) unconsumed _residual_qty_epsilon then
         (append_entry ~remaining:unconsumed remaining_open, metrics)
@@ -204,11 +215,11 @@ let _pair_step ~symbol ~splits (open_entries, metrics) (date, trade) =
     with the residual dropped (the pre-#2059 behaviour), the {e next} closing
     Sell found no open entry and was re-read as a short open — see the [.mli].
 *)
-let _pair_trades_for_symbol symbol
+let _pair_trades_for_symbol ~order_links symbol
     (trades : (Date.t * Trading_base.Types.trade) list)
     (splits : Trading_portfolio.Split_event.t list) : trade_metrics list =
   let _, metrics =
-    List.fold trades ~init:([], []) ~f:(_pair_step ~symbol ~splits)
+    List.fold trades ~init:([], []) ~f:(_pair_step ~symbol ~splits ~order_links)
   in
   List.rev metrics
 
@@ -223,8 +234,8 @@ let _splits_by_symbol (steps : Simulator_types.step_result list) :
        ~f:(fun acc (s : Trading_portfolio.Split_event.t) ->
          Map.add_multi acc ~key:s.symbol ~data:s)
 
-let extract_round_trips (steps : Simulator_types.step_result list) :
-    trade_metrics list =
+let extract_round_trips ?(order_links = String.Map.empty)
+    (steps : Simulator_types.step_result list) : trade_metrics list =
   let all_trades =
     List.concat_map steps ~f:(fun step ->
         List.map step.trades ~f:(fun trade -> (step.date, trade)))
@@ -245,4 +256,4 @@ let extract_round_trips (steps : Simulator_types.step_result list) :
       let splits =
         Map.find splits_by_symbol symbol |> Option.value ~default:[]
       in
-      _pair_trades_for_symbol symbol sorted splits @ acc)
+      _pair_trades_for_symbol ~order_links symbol sorted splits @ acc)

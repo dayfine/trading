@@ -16,6 +16,7 @@ type trade_metrics = Round_trip_pairing.trade_metrics = {
   quantity : float;
   pnl_dollars : float;
   pnl_percent : float;
+  position_id : string option;
 }
 [@@deriving show, eq]
 

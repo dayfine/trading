@@ -251,6 +251,7 @@ let test_summary_metrics_overlay_aligns_with_range_round_trips _ =
       quantity = 100.0;
       pnl_dollars = pnl;
       pnl_percent = pnl /. 100.0;
+      position_id = None;
     }
   in
   let runner_round_trips =

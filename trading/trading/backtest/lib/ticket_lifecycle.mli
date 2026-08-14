@@ -133,10 +133,11 @@ type t = {
           Equal to [Trade_audit.entry_decision.entry_date] on every row this
           build writes, and recorded separately on purpose: [entry_date] is the
           row's join key and its name reads like a {i fill} date (indeed
-          {!Trade_context} matches it to fills with a 7-day window). Naming the
-          placement instant explicitly gives the two age fields below a
-          documented anchor that a later change to [entry_date]'s meaning cannot
-          silently invalidate. *)
+          {!Trade_context} still falls back to matching it against fill dates
+          when a round-trip carries no position id). Naming the placement
+          instant explicitly gives the two age fields below a documented anchor
+          that a later change to [entry_date]'s meaning cannot silently
+          invalidate. *)
   ticket_age_weeks_at_cancel : int option; [@sexp.option]
       (** Whole weeks the ticket rested before it was {b cancelled} — set by
           {!Trade_audit.record_transitions} from the [CancelEntry] transition's
@@ -152,19 +153,18 @@ type t = {
           {!Execution_faithfulness.enrich} from the matched round-trip's
           entry-fill date minus {!placement_date}.
 
-          {b Structurally capped at one week.} That enrichment joins through
-          {!Trade_context}, whose fallback window is 7 days, so a fill more than
-          a week after placement is not matched at all and this stays [None] (as
-          does [Trade_audit.audit_record.execution] — a pre-existing property of
-          that join, not introduced here). The only values this column can ever
-          take are [0] and [1]: read it as "filled same week / next week", never
-          as the resting-time distribution.
+          {b Unbounded} since the {!Trade_context} join became position-id
+          keyed. Before that it was structurally capped at one week — the join
+          could only reach back 7 days from the fill, so a longer-resting ticket
+          was not matched at all and this column could only read [0] or [1]. Any
+          analysis of this field over a run produced before that fix is reading
+          the join window, not the resting-time distribution.
 
-          Kept separate from {!ticket_age_weeks_at_cancel} precisely so that cap
-          cannot leak: a reader who never opens this file cannot average one
-          column and get the other's statistic wearing a fill-inclusive label.
-          The two resolutions are mutually exclusive, so at most one of the pair
-          is ever [Some].
+          Kept separate from {!ticket_age_weeks_at_cancel} so the two resolution
+          modes stay distinguishable: a reader cannot average one column and get
+          the other's statistic wearing a fill-inclusive label. The two
+          resolutions are mutually exclusive, so at most one of the pair is ever
+          [Some].
 
           [None] also when the enrichment pass did not run at all (raw collector
           output, e.g. in unit tests). *)

@@ -1022,6 +1022,74 @@ let test_extract_round_trips_over_close_opens_leftover_on_closing_side _ =
            ~entry_price:12.0 ~exit_price:9.0 ~quantity:30.0 ~pnl:90.0;
        ])
 
+(** Two round-trips on one symbol, entered by two different positions. Pins that
+    [position_id] is resolved from the {b entry} leg's order (never the exit
+    leg's, and never by date), so a re-traded symbol resolves each leg to its
+    own position. *)
+let test_extract_round_trips_stamps_position_id_from_entry_order _ =
+  let leg ~id ~side ~price =
+    _make_trade ~id ~symbol:"AAPL" ~side ~quantity:10.0 ~price
+  in
+  let steps =
+    [
+      _step_with_trades
+        ~date:(date_of_string "2024-01-02")
+        ~trades:[ leg ~id:"b1" ~side:Buy ~price:100.0 ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2024-01-12")
+        ~trades:[ leg ~id:"s1" ~side:Sell ~price:110.0 ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2024-03-01")
+        ~trades:[ leg ~id:"b2" ~side:Buy ~price:120.0 ]
+        ();
+      _step_with_trades
+        ~date:(date_of_string "2024-03-20")
+        ~trades:[ leg ~id:"s2" ~side:Sell ~price:130.0 ]
+        ();
+    ]
+  in
+  let order_links =
+    String.Map.of_alist_exn
+      [
+        ("b1-order", "AAPL-wein-1");
+        ("s1-order", "AAPL-wein-1");
+        ("b2-order", "AAPL-wein-2");
+        ("s2-order", "AAPL-wein-2");
+      ]
+  in
+  assert_that
+    (extract_round_trips ~order_links steps)
+    (elements_are
+       [
+         field
+           (fun (t : trade_metrics) -> t.position_id)
+           (is_some_and (equal_to "AAPL-wein-1"));
+         field
+           (fun (t : trade_metrics) -> t.position_id)
+           (is_some_and (equal_to "AAPL-wein-2"));
+       ])
+
+(** With no links supplied (the default), [position_id] is [None] and pairing is
+    otherwise untouched. *)
+let test_extract_round_trips_without_links_has_no_position_id _ =
+  let buy =
+    _make_trade ~id:"b1" ~symbol:"AAPL" ~side:Buy ~quantity:10.0 ~price:100.0
+  in
+  let sell =
+    _make_trade ~id:"s1" ~symbol:"AAPL" ~side:Sell ~quantity:10.0 ~price:110.0
+  in
+  let steps =
+    [
+      _step_with_trades ~date:(date_of_string "2024-01-02") ~trades:[ buy ] ();
+      _step_with_trades ~date:(date_of_string "2024-01-12") ~trades:[ sell ] ();
+    ]
+  in
+  assert_that
+    (extract_round_trips steps)
+    (elements_are [ field (fun (t : trade_metrics) -> t.position_id) is_none ])
+
 (* ==================== Metric Computer Tests ==================== *)
 
 (* Helper to create a mock step_result *)
@@ -1410,6 +1478,7 @@ let _make_round_trip ?(symbol = "SYM") ?(side = Trading_base.Types.Buy)
     quantity;
     pnl_dollars;
     pnl_percent;
+    position_id = None;
   }
 
 (** The flagship invariant: WinCount + LossCount equal the round-trip count, and
@@ -2120,6 +2189,10 @@ let suite =
          >:: test_extract_round_trips_partial_exit_splits_into_two_legs;
          "extract_round_trips over-close opens leftover on closing side"
          >:: test_extract_round_trips_over_close_opens_leftover_on_closing_side;
+         "extract_round_trips stamps position_id from the entry order"
+         >:: test_extract_round_trips_stamps_position_id_from_entry_order;
+         "extract_round_trips without links has no position_id"
+         >:: test_extract_round_trips_without_links_has_no_position_id;
          (* Sharpe ratio tests *)
          "sharpe ratio zero with no data"
          >:: test_sharpe_ratio_zero_with_no_data;

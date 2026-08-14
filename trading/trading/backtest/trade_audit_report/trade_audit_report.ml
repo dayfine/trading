@@ -524,6 +524,9 @@ let _trade_metrics_of_strings ~symbol ~side ~entry_date ~exit_date ~days_held
     quantity = Float.of_string quantity;
     pnl_dollars = Float.of_string pnl_dollars;
     pnl_percent = Float.of_string pnl_percent;
+    (* This loader consumes only the round-trip P&L columns; the trailing
+       [position_id] column is one of the ignored ones. *)
+    position_id = None;
   }
 
 (** Match a post-G2 row layout (≥13 columns; [side] = [LONG]/[SHORT]). The head

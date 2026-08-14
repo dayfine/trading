@@ -26,7 +26,7 @@ let _date d = Date.of_string d
 (* Builders ----------------------------------------------------------- *)
 
 let make_trade ?(symbol = "AAPL") ?(side = Trading_base.Types.Buy)
-    ?(entry_date = _date "2024-01-15") ?(entry_price = 150.0) () :
+    ?(entry_date = _date "2024-01-15") ?(entry_price = 150.0) ?position_id () :
     Trading_simulation.Metrics.trade_metrics =
   {
     symbol;
@@ -39,6 +39,7 @@ let make_trade ?(symbol = "AAPL") ?(side = Trading_base.Types.Buy)
     quantity = 100.0;
     pnl_dollars = -1200.0;
     pnl_percent = -8.0;
+    position_id;
   }
 
 (* [initial_position_value = 100 * suggested_entry],
@@ -336,7 +337,7 @@ let _age_of_first records =
   Option.bind (_lifecycle_of_first records) ~f:(fun (l : TL.t) ->
       l.ticket_age_weeks_at_fill)
 
-let _enrich_one ?ticket_age_weeks_at_cancel ~placement ~fill () =
+let _enrich_one ?ticket_age_weeks_at_cancel ?position_id ~placement ~fill () =
   let audit =
     [
       make_record
@@ -349,13 +350,13 @@ let _enrich_one ?ticket_age_weeks_at_cancel ~placement ~fill () =
     ]
   in
   EF.enrich ~audit
-    ~round_trips:[ make_trade ~entry_date:(_date fill) () ]
+    ~round_trips:[ make_trade ~entry_date:(_date fill) ?position_id () ]
     ~entry_order_kind:Market
 
 (** A ticket placed on the Friday and filled the following Monday resolves at
     age 0; one filled a week later resolves at 1. Both sit inside
-    {!Trade_context}'s 7-day join window — the ceiling the field doc names — so
-    these are the two ages this enrichment can actually observe. *)
+    {!Trade_context}'s date-proximity fallback window, so they resolve even for
+    a round-trip carrying no position id. *)
 let test_enrich_stamps_ticket_age_at_fill _ =
   let enriched ~placement ~fill =
     _age_of_first (_enrich_one ~placement ~fill ())
@@ -367,10 +368,19 @@ let test_enrich_stamps_ticket_age_at_fill _ =
     ]
     (elements_are [ is_some_and (equal_to 0); is_some_and (equal_to 1) ])
 
+(** A ticket that rested 12 weeks before filling. The date-proximity fallback
+    cannot reach that far — which is why this column used to read only 0 or 1 —
+    but the position-id join does, so the real resting age is stamped. *)
+let test_enrich_stamps_multi_week_age_via_position_id _ =
+  assert_that
+    (_age_of_first
+       (_enrich_one ~position_id:"AAPL-wein-1" ~placement:"2024-01-12"
+          ~fill:"2024-04-05" ()))
+    (is_some_and (equal_to 12))
+
 (** The fill stamp writes ONLY its own column. Given a row that already carries
-    a cancel-side age, enrichment leaves that value intact — the split is what
-    makes the fill side's structural 7-day ceiling unable to leak into the
-    unbounded cancel-side statistic. *)
+    a cancel-side age, enrichment leaves that value intact — the split keeps the
+    two resolution modes' statistics from being averaged together. *)
 let test_enrich_writes_only_the_fill_age_column _ =
   assert_that
     (_lifecycle_of_first
@@ -413,6 +423,8 @@ let suite =
   >::: [
          "enrich stamps the ticket age at fill"
          >:: test_enrich_stamps_ticket_age_at_fill;
+         "enrich stamps a multi-week age via position_id"
+         >:: test_enrich_stamps_multi_week_age_via_position_id;
          "enrich writes only the fill age column"
          >:: test_enrich_writes_only_the_fill_age_column;
          "enrich leaves a pre-PR-5 row without a lifecycle"

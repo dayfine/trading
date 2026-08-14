@@ -35,6 +35,7 @@ let make_trade ?(symbol = "AAPL") ?(side = Trading_base.Types.Buy)
     quantity;
     pnl_dollars;
     pnl_percent;
+    position_id = None;
   }
 
 let make_entry_decision ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
@@ -1185,6 +1186,7 @@ let test_writer_reader_post_g2_round_trip _ =
       quantity = 10.0;
       pnl_dollars = 150.00;
       pnl_percent = 10.00;
+      position_id = None;
     }
   in
   let short_trip : Trading_simulation.Metrics.trade_metrics =
@@ -1199,6 +1201,7 @@ let test_writer_reader_post_g2_round_trip _ =
       quantity = 5.0;
       pnl_dollars = 100.00;
       pnl_percent = 10.00;
+      position_id = None;
     }
   in
   let result =

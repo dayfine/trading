@@ -267,9 +267,9 @@ let test_same_state_siblings_route_by_order_link _ =
           ~entry_price:24.0 ~exit_price:25.0;
       ]
   in
-  let order_links = String.Table.create () in
-  Hashtbl.set order_links ~key:"ord-big" ~data:"WTW-orig";
-  Hashtbl.set order_links ~key:"ord-small" ~data:"WTW-add";
+  let order_links = Fill_router.create_links () in
+  Fill_router.record order_links
+    [ ("ord-big", "WTW-orig"); ("ord-small", "WTW-add") ];
   let trade ~order_id ~quantity =
     { (_trade ~symbol:"WTW" ~side:Sell ~quantity ~price:25.0) with order_id }
   in
@@ -300,8 +300,8 @@ let test_stale_link_to_unfillable_position_falls_back _ =
           ~entry_price:100.0 ~exit_price:95.0;
       ]
   in
-  let order_links = String.Table.create () in
-  Hashtbl.set order_links ~key:"ord-1" ~data:"AAPL-stale";
+  let order_links = Fill_router.create_links () in
+  Fill_router.record order_links [ ("ord-1", "AAPL-stale") ];
   let updated =
     Fill_router.update_positions_from_trades ~order_links ~date:_date ~positions
       ~trades:

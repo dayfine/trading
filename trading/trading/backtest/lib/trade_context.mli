@@ -28,17 +28,38 @@
     - [screener_score_at_entry] — cascade score the screener assigned at
       decision time. Links to the [optimal-strategy] oracle for M5.5 ML training
       (per-Friday counterfactual labels).
-    - [position_id] — the strategy position ID resolved for this round-trip
-      (from the matched {!Trade_audit.audit_record}). Surfaced as the trailing
-      [trades.csv] column so downstream consumers (post-run validator, trade
-      audit tooling) can join a trade row back to its {!Trade_audit} /
-      {!Stop_log} record by position rather than by the ambiguous
-      [(symbol, entry_date)] tuple — the latter misaligns on re-traded symbols.
-      [None] when no audit record matched.
+    - [position_id] — the strategy position ID resolved for this round-trip.
+      Taken from the round-trip's own
+      {!Trading_simulation.Metrics.trade_metrics.position_id} when the simulator
+      recorded an order→position link for its entry fill, else from the matched
+      {!Trade_audit.audit_record}. Surfaced as the trailing [trades.csv] column
+      so downstream consumers (post-run validator, trade audit tooling) can join
+      a trade row back to its {!Trade_audit} / {!Stop_log} record by position
+      rather than by the ambiguous [(symbol, entry_date)] tuple — the latter
+      misaligns on re-traded symbols. [None] when neither source has one.
+
+    {2 How a trade is joined to its audit record}
+
+    In preference order:
+
+    + {b By position id} — the round-trip's [position_id], looked up against
+      [entry.position_id]. Exact and date-independent.
+    + {b By exact (symbol, entry_date)}.
+    + {b By date proximity} — the most recent audit record for the symbol whose
+      [entry.entry_date] is ≤ the fill date and no more than one week before it.
+
+    Steps 2–3 are the historical join and are retained only as the fallback for
+    round-trips that carry no position id. They are unreliable on their own: a
+    resting entry ticket can fill arbitrarily long after the decision that
+    placed it (measured on a 288-trade run: 51% of rows had {e no} audit record
+    within a week of the fill, with a mean gap to the nearest prior record of
+    ~97 days and a maximum of 1322), and widening the window does not fix it —
+    at that spacing "most recent record within the window" stops identifying a
+    unique decision, so a re-screened symbol would silently attach the wrong
+    one. An empty column is visible; a wrong one is not.
 
     Pure projection — no computation beyond simple subtraction / ratio / label
-    rendering. The audit + stop-log inputs are joined on [(symbol, entry_date)]
-    / [position_id]; trades without a matching audit record return [None] for
+    rendering. Trades with no matching audit record return [None] for
     audit-derived fields, mirroring the convention used by
     {!Trade_audit_report.per_trade_row}. *)
 
@@ -114,8 +135,9 @@ val stop_info_for_trade :
   trade:Trading_simulation.Metrics.trade_metrics ->
   Stop_log.stop_info option
 (** Resolve the {!Stop_log.stop_info} that belongs to [trade], keyed by the
-    position ID recovered from the matched audit record (falling back to the
-    first {!Stop_log.stop_info} for the symbol when no audit record matches).
+    position ID the round-trip carries (falling back to the one recovered from
+    the date-matched audit record, and then to the first {!Stop_log.stop_info}
+    for the symbol when no position ID resolves at all).
 
     This is the {b canonical} trade → stop-info join and the single source of
     truth for every stop-derived [trades.csv] column: {!of_precomputed} uses it

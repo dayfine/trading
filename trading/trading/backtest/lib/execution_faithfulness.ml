@@ -106,8 +106,8 @@ let _add_fill ~pre acc (trade : Trading_simulation.Metrics.trade_metrics) =
   | _ -> acc
 
 (* position_id -> (entry fill price, entry fill date). Reuses [Trade_context]'s
-   (symbol, entry_date) + 7-day window join to resolve each round-trip's
-   position. *)
+   join to resolve each round-trip's position: the id the round-trip carries,
+   else the legacy (symbol, entry_date) date-proximity fallback. *)
 let _fill_by_position_id ~audit ~round_trips =
   let pre = Trade_context.precompute ~audit ~stop_infos:[] in
   List.fold round_trips ~init:String.Map.empty ~f:(_add_fill ~pre)

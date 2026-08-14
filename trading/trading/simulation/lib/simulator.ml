@@ -101,10 +101,10 @@ and t = {
   last_known_prices : float String.Table.t;
       (** Per-symbol last-resolved close, used as the third fallback for
           [_resolve_price]. Reference-shared across per-step copies of [t]. *)
-  order_links : string String.Table.t;
-      (** order_id -> position_id for the orders currently in flight (recorded
-          at generation, consumed by {!Fill_router} for exact fill routing).
-          Cleared and repopulated on each generation pass; reference-shared
+  order_links : Fill_router.links;
+      (** Order→position links recorded at order generation: the in-flight set
+          {!Fill_router} routes fills on, plus the run-scoped archive
+          snapshotted onto [run_result.order_position_links]. Reference-shared
           across per-step copies of [t]. *)
   valuation_failure_count : int ref;
       (** Counter for fallback-to-avg-cost valuations; [0] in healthy runs. *)
@@ -139,7 +139,7 @@ let _build_initial_state ~config ~deps =
     positions = String.Map.empty;
     step_history = [];
     last_known_prices = String.Table.create ();
-    order_links = String.Table.create ();
+    order_links = Fill_router.create_links ();
     valuation_failure_count = ref 0;
   }
 
@@ -309,6 +309,7 @@ let _build_run_result t =
     steps;
     final_portfolio = t.portfolio;
     n_stop_eligible_positions = _count_stop_eligible t.positions;
+    order_position_links = Fill_router.archived t.order_links;
     metrics;
   }
 
@@ -451,10 +452,7 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
       ~positions ?entry_extension_max_pct:t.deps.entry_extension_max_pct
       transitions
   in
-  (* Day orders: each generation pass replaces the in-flight link set. *)
-  Hashtbl.clear t.order_links;
-  List.iter order_links ~f:(fun (order_id, position_id) ->
-      Hashtbl.set t.order_links ~key:order_id ~data:position_id);
+  Fill_router.record t.order_links order_links;
   let portfolio_value =
     Portfolio_valuation.compute ~adapter:t.deps.market_data_adapter
       ~date:t.current_date ~portfolio ~today_bars
