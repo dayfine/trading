@@ -267,9 +267,9 @@ let test_same_state_siblings_route_by_order_link _ =
           ~entry_price:24.0 ~exit_price:25.0;
       ]
   in
-  let order_links = String.Table.create () in
-  Hashtbl.set order_links ~key:"ord-big" ~data:"WTW-orig";
-  Hashtbl.set order_links ~key:"ord-small" ~data:"WTW-add";
+  let order_links = Fill_router.create_links () in
+  Fill_router.record order_links
+    [ ("ord-big", "WTW-orig"); ("ord-small", "WTW-add") ];
   let trade ~order_id ~quantity =
     { (_trade ~symbol:"WTW" ~side:Sell ~quantity ~price:25.0) with order_id }
   in
@@ -300,8 +300,8 @@ let test_stale_link_to_unfillable_position_falls_back _ =
           ~entry_price:100.0 ~exit_price:95.0;
       ]
   in
-  let order_links = String.Table.create () in
-  Hashtbl.set order_links ~key:"ord-1" ~data:"AAPL-stale";
+  let order_links = Fill_router.create_links () in
+  Fill_router.record order_links [ ("ord-1", "AAPL-stale") ];
   let updated =
     Fill_router.update_positions_from_trades ~order_links ~date:_date ~positions
       ~trades:
@@ -329,6 +329,59 @@ let test_stale_link_to_unfillable_position_falls_back _ =
                  (float_equal 5.0)));
        ])
 
+let test_archive_outlives_in_flight_recycling _ =
+  (* The two lifetimes of [links]: [record] replaces the in-flight set wholesale
+     but only APPENDS to the archive. Both halves are asserted here:
+
+     (i) a pass-1 order is still resolvable in [archived] after pass 2 recycled
+     the in-flight set — this is what lets a months-resting ticket recover the
+     position that ordered it;
+
+     (ii) that same pass-1 order no longer routes exactly — it falls through to
+     the (symbol, state, side) heuristic, which picks the id-ordered first
+     match "AAPL-a" rather than the linked "AAPL-b". That pins the routing side
+     of the contract: the table the router consults holds exactly the current
+     pass, as the pre-extraction inline table did.
+
+     No golden can catch a regression in (i). On market-entry configs the
+     decision→fill gap is a single day, so every row still joins by date and
+     [Trade_context] refills the [position_id] column from the matched audit
+     record. A [record] that also cleared the archive would leave every golden
+     bit-identical while silently re-breaking the async (resting-order) configs
+     the archive exists for. *)
+  let positions =
+    _positions_of
+      [
+        _exiting ~id:"AAPL-a" ~symbol:"AAPL" ~side:Long ~quantity:10.0
+          ~entry_price:100.0 ~exit_price:95.0;
+        _exiting ~id:"AAPL-b" ~symbol:"AAPL" ~side:Long ~quantity:10.0
+          ~entry_price:100.0 ~exit_price:95.0;
+      ]
+  in
+  let links = Fill_router.create_links () in
+  Fill_router.record links [ ("ord-pass1", "AAPL-b") ];
+  Fill_router.record links [ ("ord-pass2", "AAPL-a") ];
+  assert_that
+    (Map.to_alist (Fill_router.archived links))
+    (elements_are
+       [ equal_to ("ord-pass1", "AAPL-b"); equal_to ("ord-pass2", "AAPL-a") ]);
+  let updated =
+    Fill_router.update_positions_from_trades ~order_links:links ~date:_date
+      ~positions
+      ~trades:
+        [
+          {
+            (_trade ~symbol:"AAPL" ~side:Sell ~quantity:10.0 ~price:95.0) with
+            order_id = "ord-pass1";
+          };
+        ]
+      ()
+    |> _ok_exn ~msg:"recycled-link fallback"
+  in
+  (* Heuristic, not exact: the id-ordered first Exiting match closed and was
+     dropped. Exact routing on the recycled link would have closed "AAPL-b". *)
+  assert_that (Map.keys updated) (elements_are [ equal_to "AAPL-b" ])
+
 let suite =
   "fill_routing"
   >::: [
@@ -347,6 +400,8 @@ let suite =
          >:: test_same_state_siblings_route_by_order_link;
          "stale_link_to_unfillable_position_falls_back"
          >:: test_stale_link_to_unfillable_position_falls_back;
+         "archive_outlives_in_flight_recycling"
+         >:: test_archive_outlives_in_flight_recycling;
        ]
 
 let () = run_test_tt_main suite

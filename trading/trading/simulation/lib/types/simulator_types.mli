@@ -94,6 +94,21 @@ type run_result = {
           that rode an adverse move unbounded. In a healthy run every open
           portfolio position is [Holding], so this equals the open-position
           count. *)
+  order_position_links : string String.Map.t;
+      (** [order_id -> position_id] for {b every} order the run's
+          {!Order_generator} produced, accumulated across the whole run.
+
+          The simulator also keeps a same-shaped table for {e in-flight} orders
+          ({!Fill_router}'s exact-routing input), but that one is cleared on
+          every generation pass because entry orders are day orders. This map is
+          the run-scoped archive: it is what lets a post-run consumer take a
+          fill's [order_id] off a [step_result.trades] entry and recover the
+          strategy position that ordered it — the join
+          {!Round_trip_pairing.extract_round_trips} needs to stamp [position_id]
+          onto each round-trip, and hence the join [trades.csv] needs to attach
+          the right {!Trade_audit} record to each row.
+
+          Empty for a run in which no order was ever generated. *)
   metrics : Metric_types.metric_set;  (** Computed metrics from the simulation *)
 }
 (** Complete result of running a simulation with metrics *)

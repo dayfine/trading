@@ -112,6 +112,7 @@ let make_trade ?(symbol = "AAPL") ?(side = Trading_base.Types.Buy)
     quantity;
     pnl_dollars;
     pnl_percent;
+    position_id = None;
   }
 
 let cfg = TR.default_config

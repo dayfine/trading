@@ -30,8 +30,8 @@ let _date = Date.of_string
 
 let _make_trade ?(symbol = "AAPL") ?(side = Trading_base.Types.Buy)
     ?(entry_date = _date "2024-01-02") ?(exit_date = _date "2024-04-29")
-    ?(entry_price = 100.0) ?(exit_price = 40.0) ?(quantity = 100.0) () :
-    Trading_simulation.Metrics.trade_metrics =
+    ?(entry_price = 100.0) ?(exit_price = 40.0) ?(quantity = 100.0) ?position_id
+    () : Trading_simulation.Metrics.trade_metrics =
   let days_held = Date.diff exit_date entry_date in
   {
     symbol;
@@ -44,6 +44,7 @@ let _make_trade ?(symbol = "AAPL") ?(side = Trading_base.Types.Buy)
     quantity;
     pnl_dollars = (exit_price -. entry_price) *. quantity;
     pnl_percent = (exit_price -. entry_price) /. entry_price *. 100.0;
+    position_id;
   }
 
 (** Build a force-liquidation event matching a trade by [(symbol, exit_date)].

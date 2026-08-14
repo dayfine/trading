@@ -6,6 +6,7 @@
    the dependency-loading orchestration only. *)
 open Core
 open Trading_simulation
+module Sim_types = Trading_simulation_types.Simulator_types
 
 (* Configuration constants *)
 
@@ -37,7 +38,7 @@ let warmup_days_for : Strategy_choice.t -> int = function
 type result = {
   summary : Summary.t;
   round_trips : Metrics.trade_metrics list;
-  steps : Trading_simulation_types.Simulator_types.step_result list;
+  steps : Sim_types.step_result list;
   final_portfolio : Trading_portfolio.Portfolio.t;
   n_stop_eligible_positions : int;
   overrides : Sexp.t list;
@@ -82,9 +83,7 @@ type result = {
     Applying this filter before [Metrics.extract_round_trips] silently drops
     every trade whose entry *and* exit landed on steps where
     [had_market_bars = false]. *)
-let is_trading_day (step : Trading_simulation_types.Simulator_types.step_result)
-    =
-  step.had_market_bars
+let is_trading_day (step : Sim_types.step_result) = step.had_market_bars
 
 (* Config overrides via sexp deep-merge — see {!Overlay_validator} for the
    deep-merge + unknown-key validation. Extracted to a sibling module to keep
@@ -356,16 +355,14 @@ let _final_prices_for_held_symbols
     [steps_in_range] includes every calendar day (needed for round-trip
     extraction) and [steps] keeps only real trading days (needed for
     mark-to-market consumers such as the equity curve). *)
-let _filter_steps ~sim_result ~start_date =
+let _filter_steps ~(sim_result : Sim_types.run_result) ~start_date =
   (* Steps in the requested date range, all days included. Round-trip
      extraction derives trades from position-state transitions recorded on
      these steps, so it must see *every* step where a trade fill happened —
      including days the [is_trading_day] mark-to-market heuristic would
      otherwise discard. *)
   let steps_in_range =
-    List.filter sim_result.Trading_simulation_types.Simulator_types.steps
-      ~f:(fun (s : Trading_simulation_types.Simulator_types.step_result) ->
-        Date.( >= ) s.date start_date)
+    List.filter sim_result.steps ~f:(fun s -> Date.( >= ) s.date start_date)
   in
   (* Steps on real trading days only — used for [OpenPositionsValue] /
      [UnrealizedPnl] consumers and anything else that needs a meaningful
@@ -377,8 +374,8 @@ let _filter_steps ~sim_result ~start_date =
 
 (* Round-trips over FULL warmup-inclusive [all_steps]; keep in-window entries
    only. Full rationale (the warmup-orphan SHORT bug) in the .mli. *)
-let round_trips_in_window all_steps ~start_date =
-  Metrics.extract_round_trips all_steps
+let round_trips_in_window ?order_links all_steps ~start_date =
+  Metrics.extract_round_trips ?order_links all_steps
   |> List.filter ~f:(fun (t : Metrics.trade_metrics) ->
       Date.( >= ) t.entry_date start_date)
 
@@ -386,8 +383,8 @@ let round_trips_in_window all_steps ~start_date =
     records, cascade summaries, force liquidations) from the simulation logs.
     [all_steps] is the warmup-inclusive step series ([sim_result.steps]). *)
 let _collect_teardown_artefacts ~stop_log ~trade_audit ~force_liquidation_log
-    ~all_steps ~start_date =
-  ( round_trips_in_window all_steps ~start_date,
+    ~all_steps ~order_links ~start_date =
+  ( round_trips_in_window ~order_links all_steps ~start_date,
     filter_stop_infos_in_window (Stop_log.get_stop_infos stop_log) ~start_date,
     filter_audit_records_in_window
       (Trade_audit.get_audit_records trade_audit)
@@ -409,11 +406,12 @@ let _filter_stale_holds ~stale_hold_log ~start_date =
     stop infos, audit records, cascade summaries, force liquidations, and stale
     holds. Wrapped in a [Trace.Teardown] span. *)
 let _extract_filtered_logs ?trace ?gc_trace ~stop_log ~trade_audit
-    ~force_liquidation_log ~stale_hold_log ~all_steps ~start_date () =
+    ~force_liquidation_log ~stale_hold_log ~all_steps ~order_links ~start_date
+    () =
   let round_trips, stop_infos, audit, cascade_summaries, force_liquidations =
     Trace.record ?trace Trace.Phase.Teardown (fun () ->
         _collect_teardown_artefacts ~stop_log ~trade_audit
-          ~force_liquidation_log ~all_steps ~start_date)
+          ~force_liquidation_log ~all_steps ~order_links ~start_date)
   in
   Gc_trace.record ?trace:gc_trace ~phase:"teardown_done" ();
   let stale_holds = _filter_stale_holds ~stale_hold_log ~start_date in
@@ -435,9 +433,10 @@ let _log_backtest_window ~start_date ~end_date ~warmup_start ~all_symbols =
 (* Post-simulation assembly: filter steps to the requested window, extract the
    teardown artefacts, and build the [result] record. Split out of
    [run_backtest] to keep that function under the length limit. *)
-let _assemble_result ~start_date ~end_date ~deps ~overrides ~sim_result
-    ~stop_log ~trade_audit ~force_liquidation_log ~stale_hold_log
-    ~final_close_prices ?trace ?gc_trace () =
+let _assemble_result ~start_date ~end_date ~deps ~overrides
+    ~(sim_result : Sim_types.run_result) ~stop_log ~trade_audit
+    ~force_liquidation_log ~stale_hold_log ~final_close_prices ?trace ?gc_trace
+    () =
   let steps_in_range, steps = _filter_steps ~sim_result ~start_date in
   let final_value = (List.last_exn steps).portfolio_value in
   let ( round_trips,
@@ -447,9 +446,8 @@ let _assemble_result ~start_date ~end_date ~deps ~overrides ~sim_result
         force_liquidations,
         stale_holds ) =
     _extract_filtered_logs ?trace ?gc_trace ~stop_log ~trade_audit
-      ~force_liquidation_log ~stale_hold_log
-      ~all_steps:sim_result.Trading_simulation_types.Simulator_types.steps
-      ~start_date ()
+      ~force_liquidation_log ~stale_hold_log ~all_steps:sim_result.steps
+      ~order_links:sim_result.order_position_links ~start_date ()
   in
   let summary =
     _make_summary ~start_date ~end_date ~deps ~steps_in_range ~steps

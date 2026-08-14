@@ -34,6 +34,8 @@ type run_result = {
   final_portfolio : Trading_portfolio.Portfolio.t;
   n_stop_eligible_positions : int;
       (** Count of strategy positions in the [Holding] state at end of run *)
+  order_position_links : string String.Map.t;
+      (** order_id -> position_id for every order generated during the run *)
   metrics : Metric_types.metric_set;
 }
 

@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-07-27
+## Last updated: 2026-08-13
 
 ## Status
 IN_PROGRESS
@@ -18,6 +18,49 @@ landed 2026-04-25. Continuous perf monitoring + benchmark-suite work
 moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
+
+## 2026-08-13 — trade-audit join keyed by position_id (closes the 51%-loss join)
+
+- [x] **`Trade_context` joins on `position_id`, not date proximity** —
+  `_lookup_audit_for_trade` matched an audit record to a round-trip by
+  `(symbol, entry_date)` with a 7-day-before fallback. Measured on a real
+  288-trade async-ticket run, **147 rows (51%) lost the join**: all four
+  audit-derived `trades.csv` columns (`entry_stage`,
+  `stop_initial_distance_pct`, `position_id`, `stop_fill_distance_pct`) were
+  empty on exactly the same rows — one join failing, not four emission bugs.
+  For all 147 the symbol had audit records, all of them preceded the fill, and
+  none was within 7 days (mean gap to the nearest prior record **96.7 days**,
+  max **1322**). Widening the window is the wrong fix: at that spacing "most
+  recent record within the window" stops identifying a unique decision, so a
+  re-screened symbol would silently attach the *wrong* record. An empty column
+  is visible; a wrong one is not.
+  The key existed on both sides but was dropped in the middle — audit records
+  carry `entry.position_id` and the simulator carries an `(order_id,
+  position_id)` link per generated order, but `Round_trip_pairing.trade_metrics`
+  had no position id. Fix threads it end to end: `Fill_router.links` now owns
+  both link lifetimes (the in-flight set it routes on, plus a run-scoped
+  archive), the archive is snapshotted onto
+  `Simulator_types.run_result.order_position_links`, `extract_round_trips`
+  takes `?order_links` and stamps `position_id` on each round-trip from its
+  **entry** leg's `order_id`, and `Trade_context` prefers that id. The
+  date-proximity path is retained verbatim as the fallback for round-trips
+  with no id, so nothing that worked before regresses.
+  Also retires the "ticket-age-at-FILL is structurally capped at ~1 week"
+  caveat in `Ticket_lifecycle` / the ladder-v4 spec headers — that cap was
+  circular, an artifact of this very 7-day window rather than a property of
+  the tickets. Lives at
+  `trading/trading/simulation/lib/{fill_router,round_trip_pairing,simulator}.ml`
+  + `trading/trading/backtest/lib/trade_context.ml`.
+  **Reporting-only — no strategy-behaviour change.** `goldens-small` 3/3 PASS
+  and `six-year-2018-2023` reproduces its pinned values exactly (79.1% / 321
+  trades / 38.0% win / 19.0% DD). On that run every fill lands **1 calendar day**
+  after its decision (max gap 0 beyond that), so the date join already matched
+  321/321 — before and after are both 100% there, which is why the goldens are
+  bit-identical. The 51%-loss population is the async resting-ticket configs.
+  **Verify:** `dune runtest trading/backtest/test/` +
+  `dune runtest trading/simulation/test/`, then
+  `dune exec trading/backtest/scenarios/scenario_runner.exe -- --dir trading/test_data/backtest_scenarios/goldens-small --parallel 3`.
+  PR: `feat/audit-position-id-join`.
 
 ## 2026-07-27 — LAPACKE GP-Cholesky failure root-caused and fixed
 

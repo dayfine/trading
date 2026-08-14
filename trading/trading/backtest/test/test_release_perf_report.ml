@@ -543,6 +543,7 @@ let _make_trade ~symbol ~entry_date ?(side = Trading_base.Types.Buy)
     quantity;
     pnl_dollars;
     pnl_percent;
+    position_id = None;
   }
 
 let _make_trade_quality ~entries : Trade_audit_report.t =

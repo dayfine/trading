@@ -8,6 +8,8 @@
     - Missing audit: audit-derived fields are [None], symbol still propagates
     - Missing stop_log: stop_trigger_kind / days_to_first_stop_trigger are
       [None]
+    - Join preference: position_id first (matching however long after the
+      decision the ticket filled), date proximity only as the fallback
     - days_to_first_stop_trigger is [None] when exit was not a stop trigger
     - csv_header_fields shape pin
     - csv_row_fields formatting (None → empty cell, %.4f for floats) *)
@@ -26,8 +28,8 @@ let _date d = Date.of_string d
 let make_trade ?(symbol = "AAPL") ?(side = Trading_base.Types.Buy)
     ?(entry_date = _date "2024-01-15") ?(exit_date = _date "2024-04-20")
     ?(days_held = 96) ?(entry_price = 150.0) ?(exit_price = 138.0)
-    ?(quantity = 100.0) ?(pnl_dollars = -1200.0) ?(pnl_percent = -8.0) () :
-    Trading_simulation.Metrics.trade_metrics =
+    ?(quantity = 100.0) ?(pnl_dollars = -1200.0) ?(pnl_percent = -8.0)
+    ?position_id () : Trading_simulation.Metrics.trade_metrics =
   {
     symbol;
     side;
@@ -39,6 +41,7 @@ let make_trade ?(symbol = "AAPL") ?(side = Trading_base.Types.Buy)
     quantity;
     pnl_dollars;
     pnl_percent;
+    position_id;
   }
 
 let make_entry ?(symbol = "AAPL") ?(entry_date = _date "2024-01-15")
@@ -361,6 +364,105 @@ let test_stop_info_for_trade_keys_by_position_id _ =
           (fun (i : SL.stop_info) -> i.position_id)
           (equal_to "AAPL-wein-2")))
 
+(* position_id join: decision→fill gap far beyond the date window ------ *)
+
+(* A resting entry ticket placed on the 2024-01-15 decision tick but not filled
+   until 2024-09-30 — 259 days later, two orders of magnitude outside the 7-day
+   date-proximity window. The position_id join must still attach the audit
+   record. This is the case that was silently empty for 51% of rows on a real
+   run before the round-trip carried its position id. *)
+let _stale_fill_trade ?position_id () =
+  make_trade ~entry_date:(_date "2024-09-30") ~exit_date:(_date "2024-11-15")
+    ?position_id ()
+
+let test_position_id_join_survives_stale_fill _ =
+  let audit = [ make_record (make_entry ~position_id:"AAPL-wein-7" ()) ] in
+  let ctx =
+    TC.of_audit_and_stop_log ~audit ~stop_infos:[]
+      ~trade:(_stale_fill_trade ~position_id:"AAPL-wein-7" ())
+  in
+  assert_that ctx
+    (all_of
+       [
+         field
+           (fun (c : TC.t) -> c.entry_stage)
+           (is_some_and (equal_to "Stage2"));
+         field
+           (fun (c : TC.t) -> c.screener_score_at_entry)
+           (is_some_and (equal_to 75));
+         (* |150 - 138| / 150 on both the E basis and the fill basis, since the
+            round-trip's entry_price defaults to the suggested entry. *)
+         field
+           (fun (c : TC.t) -> c.stop_initial_distance_pct)
+           (is_some_and (float_equal 0.08));
+         field
+           (fun (c : TC.t) -> c.stop_fill_distance_pct)
+           (is_some_and (float_equal 0.08));
+         field
+           (fun (c : TC.t) -> c.position_id)
+           (is_some_and (equal_to "AAPL-wein-7"));
+       ])
+
+(* Same stale fill with NO position id on the round-trip: the date fallback is
+   all that remains, and it correctly declines to guess across a 259-day gap.
+   Pins that the fix threads a key through rather than widening the window —
+   an empty column here is the intended outcome, not a wrong one. *)
+let test_stale_fill_without_position_id_stays_unjoined _ =
+  let audit = [ make_record (make_entry ~position_id:"AAPL-wein-7" ()) ] in
+  let ctx =
+    TC.of_audit_and_stop_log ~audit ~stop_infos:[] ~trade:(_stale_fill_trade ())
+  in
+  assert_that ctx
+    (all_of
+       [
+         field (fun (c : TC.t) -> c.entry_stage) is_none;
+         field (fun (c : TC.t) -> c.position_id) is_none;
+       ])
+
+(* No position id, fill 3 days after the decision: the legacy date-proximity
+   path still joins, so nothing that worked before regresses. *)
+let test_date_fallback_still_joins_within_window _ =
+  let audit =
+    [
+      make_record
+        (make_entry ~entry_date:(_date "2024-01-12") ~position_id:"AAPL-wein-3"
+           ());
+    ]
+  in
+  let ctx =
+    TC.of_audit_and_stop_log ~audit ~stop_infos:[]
+      ~trade:(make_trade ~entry_date:(_date "2024-01-15") ())
+  in
+  assert_that ctx
+    (all_of
+       [
+         field
+           (fun (c : TC.t) -> c.entry_stage)
+           (is_some_and (equal_to "Stage2"));
+         field
+           (fun (c : TC.t) -> c.position_id)
+           (is_some_and (equal_to "AAPL-wein-3"));
+       ])
+
+(* A position id no audit record claims falls back to the date path rather than
+   returning nothing — the pre-fix behaviour for such a row, preserved. *)
+let test_unknown_position_id_falls_back_to_date _ =
+  let audit =
+    [
+      make_record
+        (make_entry ~entry_date:(_date "2024-01-12") ~position_id:"AAPL-wein-3"
+           ());
+    ]
+  in
+  let ctx =
+    TC.of_audit_and_stop_log ~audit ~stop_infos:[]
+      ~trade:
+        (make_trade ~entry_date:(_date "2024-01-15")
+           ~position_id:"AAPL-wein-999" ())
+  in
+  assert_that ctx
+    (field (fun (c : TC.t) -> c.entry_stage) (is_some_and (equal_to "Stage2")))
+
 (* csv_row_fields formatting ----------------------------------------- *)
 
 let test_csv_row_fields_formats_correctly _ =
@@ -441,6 +543,14 @@ let suite =
          >:: test_missing_stop_log_yields_none_for_stop_fields;
          "stop_info_for_trade keys by position_id"
          >:: test_stop_info_for_trade_keys_by_position_id;
+         "position_id join survives stale fill"
+         >:: test_position_id_join_survives_stale_fill;
+         "stale fill without position_id stays unjoined"
+         >:: test_stale_fill_without_position_id_stays_unjoined;
+         "date fallback still joins within window"
+         >:: test_date_fallback_still_joins_within_window;
+         "unknown position_id falls back to date"
+         >:: test_unknown_position_id_falls_back_to_date;
          "csv_row_fields formats correctly"
          >:: test_csv_row_fields_formats_correctly;
          "csv_row_fields renders None as empty"

@@ -122,11 +122,18 @@ type result = {
 }
 
 val round_trips_in_window :
+  ?order_links:string String.Map.t ->
   Trading_simulation_types.Simulator_types.step_result list ->
   start_date:Date.t ->
   Trading_simulation.Metrics.trade_metrics list
 (** Extract round-trips from the full (warmup-inclusive) step series, then keep
     only those whose entry landed in-window ([entry_date >= start_date]).
+
+    [order_links] is the run's
+    [Simulator_types.run_result.order_position_links]; it only stamps
+    [position_id] on each round-trip (see
+    {!Trading_simulation.Metrics.extract_round_trips}) and never changes which
+    round-trips are produced or kept.
 
     Pairing must see the warmup steps: a position opened in the warmup window
     has its opening fill on a step before [start_date]. Extracting over the

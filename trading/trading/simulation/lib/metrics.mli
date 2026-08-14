@@ -41,6 +41,10 @@ type trade_metrics = Round_trip_pairing.trade_metrics = {
       (** Profit/loss as percentage of (split-adjusted) entry price. Mirrored
           direction so a positive reading always means profit, regardless of
           long or short. *)
+  position_id : string option;
+      (** Strategy position the entry leg opened — the exact join key back to
+          {!Trade_audit} / {!Stop_log}. See
+          {!Round_trip_pairing.trade_metrics.position_id}. *)
 }
 [@@deriving show, eq]
 (** Metrics for a completed round-trip trade.
@@ -67,12 +71,16 @@ type summary_stats = {
 (** {1 Trade Metrics Functions} *)
 
 val extract_round_trips :
+  ?order_links:string String.Map.t ->
   Trading_simulation_types.Simulator_types.step_result list ->
   trade_metrics list
 (** Re-export of {!Round_trip_pairing.extract_round_trips}, which carries the
     full pairing contract (long/short direction, sibling-position quantity
     matching, partial-exit residual tracking, split restatement).
 
+    @param order_links
+      [order_id -> position_id] links used to stamp [position_id]; pairing is
+      unaffected by them.
     @param steps List of step results from simulator run
     @return List of trade metrics for completed round-trips *)
 

@@ -21,9 +21,10 @@
     - {b fill price} — the matched round-trip's open-leg
       {!Trading_simulation.Metrics.trade_metrics.entry_price}.
 
-    The entry↔fill join reuses {!Trade_context} (its [(symbol, entry_date)]
-    exact match with a 7-day decision→fill window fallback), so a resting order
-    that fills a bar or two after the Friday decision is still matched. *)
+    The entry↔fill join reuses {!Trade_context}, which keys on the round-trip's
+    [position_id] and falls back to [(symbol, entry_date)] date proximity only
+    for round-trips that carry none — so a resting order is matched however long
+    it rested before filling. *)
 
 type entry_order_kind =
   | Market  (** No resting order — Market fill ("making markets"). *)
@@ -62,11 +63,10 @@ val enrich :
     already-merged [ticket_age_weeks_at_cancel] is preserved — a cancelled
     ticket produces no round-trip to match, so the two never collide.
 
-    {b The age inherits this join's 7-day window.} A ticket that rests longer
-    than a week before filling is not matched at all — it already gets
-    [execution = None] today — so its age stays [None] rather than being
-    recorded. The stamped ages are therefore 0 or 1 week, not a resting-time
-    distribution; see [Trade_audit.ticket_lifecycle]'s field doc. *)
+    {b The age inherits whatever this join can reach.} With the position-id join
+    that is the full resting time, however many weeks it ran. On the old
+    date-proximity-only join it was 0 or 1 week by construction — see
+    [Ticket_lifecycle.t.ticket_age_weeks_at_fill]'s field doc. *)
 
 val enrich_for_config :
   audit:Trade_audit.audit_record list ->

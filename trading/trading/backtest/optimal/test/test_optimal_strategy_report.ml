@@ -56,6 +56,7 @@ let _make_actual_trade ~symbol ~entry_date ~exit_date ~pnl_dollars ~pnl_percent
     quantity = 10.0;
     pnl_dollars;
     pnl_percent;
+    position_id = None;
   }
 
 let _make_optimal_rt ~symbol ~entry_week ~exit_week ~pnl_dollars ~r_multiple

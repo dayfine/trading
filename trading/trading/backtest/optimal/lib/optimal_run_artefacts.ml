@@ -73,6 +73,17 @@ let _trade_metrics_of_strings ~symbol ~side ~entry_date ~exit_date ~days_held
     quantity = Float.of_string quantity;
     pnl_dollars = Float.of_string pnl_dollars;
     pnl_percent = Float.of_string pnl_percent;
+    (* This loader consumes only the round-trip P&L columns; the trailing
+       [position_id] column is one of the ignored ones.
+
+       KNOWN GAP (PR #2317). That column is now POPULATED in [trades.csv]; any
+       consumer that re-reads a run through this loader therefore sees [None]
+       and must fall back to a weaker join. Same shape as the gap noted in
+       {!Trade_audit_report._trade_metrics_of_strings}; closing it means
+       threading the cell through both the post-G2 and legacy row layouts, the
+       latter of which predates the column. Deliberately left for a
+       follow-up. *)
+    position_id = None;
   }
 
 (** Match a post-G2 row layout ([symbol,side,…] with [side] = [LONG]/[SHORT]).

@@ -5,6 +5,22 @@ open Core
 (* Expected trade side for filling a position's entry / exit order. A long
    enters with a Buy and exits with a Sell; a short enters with a Sell
    (sell-to-open) and exits with a Buy (buy-to-cover). *)
+type links = {
+  in_flight : string String.Table.t;
+  archive : string String.Table.t;
+}
+
+let create_links () =
+  { in_flight = String.Table.create (); archive = String.Table.create () }
+
+let record t pairs =
+  Hashtbl.clear t.in_flight;
+  List.iter pairs ~f:(fun (order_id, position_id) ->
+      Hashtbl.set t.in_flight ~key:order_id ~data:position_id;
+      Hashtbl.set t.archive ~key:order_id ~data:position_id)
+
+let archived t = Hashtbl.to_alist t.archive |> String.Map.of_alist_exn
+
 let _entry_trade_side :
     Trading_base.Types.position_side -> Trading_base.Types.side = function
   | Long -> Buy
@@ -94,7 +110,7 @@ let set_or_drop_if_closed positions ~key ~data =
 let _find_linked_target positions ~order_links ~order_id =
   let open Option.Let_syntax in
   let%bind links = order_links in
-  let%bind position_id = Hashtbl.find links order_id in
+  let%bind position_id = Hashtbl.find links.in_flight order_id in
   let%bind pos = Map.find positions position_id in
   match Trading_strategy.Position.get_state pos with
   | Trading_strategy.Position.Entering _ -> Some (position_id, pos, true)
