@@ -43,10 +43,21 @@ type segmentation_params = {
           before forcing a split. *)
   trend_bonus_weight : float;
       (** Weight applied to the trend-change bonus when scoring a candidate
-          split point. *)
+          split point. The score it feeds is consumed only by an argmax over
+          candidate split points, so this weight changes {i which} split point
+          is chosen and scales no reported [segment] statistic. It is a
+          regression-estimator constant, not a Weinstein dial (see
+          [.claude/rules/weinstein-faithful-core.md]), and is unreachable from
+          any spec today — [Stage] calls [segment_by_trends] without [~params] —
+          so tuning it needs justification as an estimator parameter, not as a
+          faithful adaptation. *)
   penalty_weight : float;
       (** Weight applied to each side's combined length/width penalty when
-          scoring a candidate split point. *)
+          scoring a candidate split point. Same two caveats as
+          [trend_bonus_weight]: it only moves the argmax over candidate split
+          points and scales no reported [segment] statistic, and it is a
+          regression-estimator constant rather than a Weinstein dial reachable
+          from a spec. *)
 }
 [@@deriving show, eq]
 (** Parameters that control the behavior of the segmentation algorithm. These
