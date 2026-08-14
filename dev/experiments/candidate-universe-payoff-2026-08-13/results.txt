@@ -1,0 +1,18 @@
+# Byte-compare: baseline (3000 symbols) vs capture-derived fixture (277)
+
+/tmp/p02-payoff/run_base.log:exit=0 wall=1020s
+/tmp/p02-payoff/run_fix.log:exit=0 wall=808s
+
+actual.sexp IDENTICAL
+trades.csv IDENTICAL
+equity_curve.csv IDENTICAL
+trade_audit.sexp IDENTICAL
+macro_trend.sexp IDENTICAL
+open_positions.csv IDENTICAL
+
+universe: 3000 -> 277 symbols
+
+# capture
+all_eligible: 17589 scored candidates (pre filter+dedup)
+all_eligible: min_grade=F → 4123 trades
+all_eligible: wrote /tmp/p02-payoff/capture/grade-F/trades.csv, /tmp/p02-payoff/capture/grade-F/summary.md, /tmp/p02-payoff/capture/grade-F/summary.sexp, /tmp/p02-payoff/capture/grade-F/config.sexp
