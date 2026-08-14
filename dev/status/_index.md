@@ -59,7 +59,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | H-CHECK-RUNTARGET-PATHQUAL MERGED #2322 (false green, not a confusing FAIL); next: allow-list positive fixture, then audit-script rewrite (8 defects) |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2327 | H-REPO-ROOT-SET-BUT-INVALID MERGED #2328 `8c465194` (9 cells pinned, 9 mutations); #2327 glued-comment fix in rework 1/2 — behavioral found it introduces a latent false-OK |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 8 open; A-NOOP-BUDGET-ORPHAN new (5 records recovered); A-FASTEXIT-VACUOUS now has measured cost; six items share the `workflow`-token blocker |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | segmentation weight caveats MERGED #2324 `4f602d0d`; 5 open; top item `linter_coverage` is a HUMAN POLICY DECISION (header half already shipped), not agent work |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
