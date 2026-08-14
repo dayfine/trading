@@ -61,7 +61,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [sector-data](sector-data.md) | MERGED | — | — | — |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | H-CHECK-RUNTARGET-PATHQUAL MERGED #2322 (false green, not a confusing FAIL); next: allow-list positive fixture, then audit-script rewrite (8 defects) |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 8 open; A-NOOP-BUDGET-ORPHAN new (5 records recovered); A-FASTEXIT-VACUOUS now has measured cost; six items share the `workflow`-token blocker |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | #2324 | segmentation weight caveats #2324 open (structural APPROVED); 5 open, next: linter_coverage (test files exempt from file-length limits) |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | segmentation weight caveats MERGED #2324 `4f602d0d`; 5 open; top item `linter_coverage` is a HUMAN POLICY DECISION (header half already shipped), not agent work |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
