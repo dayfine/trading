@@ -64,9 +64,35 @@ repo_root() {
   # reaches the real repo root either way.
   #
   # Optional env var override REPO_ROOT lets callers pin it explicitly.
-  if [ -n "${REPO_ROOT:-}" ] && [ -d "$REPO_ROOT" ]; then
-    echo "$REPO_ROOT"
-    return 0
+  #
+  # H-REPO-ROOT-SET-BUT-INVALID-SILENT-FALLTHROUGH: a REPO_ROOT that is SET
+  # but fails the `[ -d ]` guard (nonexistent path, or a path that exists
+  # but is a regular file, not a directory) is a hard error here -- it is
+  # far more likely a typo/misconfiguration than a deliberate request to
+  # fall back to the walk-up. Silently falling through used to write the
+  # audit record into a root the caller never chose, with rc=0 and no
+  # diagnostic -- exactly the failure shape this whole helper exists to
+  # prevent, just reachable via malformed input instead of valid input.
+  #
+  # REPO_ROOT='' (empty string) is treated the SAME as unset, not as
+  # "set but invalid": `${REPO_ROOT:-}` is empty for both an unset and an
+  # empty-string REPO_ROOT (the `:-` operator triggers on null-or-unset),
+  # so the two cases already collapse into the walk-up branch below by
+  # shell construction. This is a deliberate choice, not an oversight: an
+  # empty override is indistinguishable from "no override supplied", and
+  # every existing caller relies on the no-REPO_ROOT case falling through
+  # to the walk-up (that's the only path production uses -- REPO_ROOT is
+  # test-only plumbing). Treating '' as a hard error would NOT protect
+  # against a genuine typo (an empty value can't carry a wrong path) and
+  # WOULD risk breaking a caller that does `REPO_ROOT= some_command` to
+  # mean "no override".
+  if [ -n "${REPO_ROOT:-}" ]; then
+    if [ -d "$REPO_ROOT" ]; then
+      echo "$REPO_ROOT"
+      return 0
+    fi
+    echo "FAIL: REPO_ROOT is set to '$REPO_ROOT' but is not a directory" >&2
+    exit 1
   fi
   dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
   while [ -n "$dir" ] && [ "$dir" != "/" ]; do

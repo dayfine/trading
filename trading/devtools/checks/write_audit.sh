@@ -216,9 +216,29 @@ _repo_root() {
   # script sets REPO_ROOT to a fixture dir that ALSO contains its own
   # .claude sentinel, so the walk-up and the override already agreed there;
   # this reorder only changes behaviour for the ad-hoc-invocation case.
-  if [ -n "${REPO_ROOT:-}" ] && [ -d "$REPO_ROOT" ]; then
-    echo "$REPO_ROOT"
-    return 0
+  #
+  # H-REPO-ROOT-SET-BUT-INVALID-SILENT-FALLTHROUGH: a REPO_ROOT that is SET
+  # but fails the `[ -d ]` guard (nonexistent path, or a path that exists
+  # but is a regular file, not a directory) is a hard error, not a silent
+  # fallthrough to the walk-up -- a set-but-invalid override is far more
+  # likely a typo than a request to fall back, and falling back silently
+  # used to publish the audit record into a root the caller never chose,
+  # with rc=0 and no diagnostic.
+  #
+  # REPO_ROOT='' (empty string) is treated the SAME as unset, matching
+  # _check_lib.sh:repo_root()'s identical decision (see that function's
+  # comment for the full rationale): `${REPO_ROOT:-}` is empty for both
+  # unset and empty-string REPO_ROOT, so '' already falls into the walk-up
+  # branch below by shell construction -- every existing caller (including
+  # every test in record_qc_audit_test.sh that doesn't override REPO_ROOT)
+  # relies on exactly that fallback, so '' must keep walking up, not error.
+  if [ -n "${REPO_ROOT:-}" ]; then
+    if [ -d "$REPO_ROOT" ]; then
+      echo "$REPO_ROOT"
+      return 0
+    fi
+    echo "FAIL: REPO_ROOT is set to '$REPO_ROOT' but is not a directory" >&2
+    exit 1
   fi
   dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
   while [ -n "$dir" ] && [ "$dir" != "/" ]; do

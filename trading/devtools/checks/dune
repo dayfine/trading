@@ -548,8 +548,14 @@
 ; NEEDS_REWORK, non-numeric --pr-number rejection, COMMENTED body-parse,
 ; and empty-PR-reviews fallback to file mode.
 ; The test creates its own temp dir fixtures (no real dev/reviews/ or
-; dev/audit/ dirs are touched). record_qc_audit.sh and write_audit.sh are
-; declared as deps so the cache key invalidates when either changes.
+; dev/audit/ dirs are touched). record_qc_audit.sh, write_audit.sh, and
+; _check_lib.sh are declared as deps so the cache key invalidates when any
+; of them changes. _check_lib.sh was added for the H-REPO-ROOT-SET-BUT-
+; INVALID-SILENT-FALLTHROUGH scenarios (29a-29c): those copy _check_lib.sh
+; into a temp fixture and probe its repo_root() directly, so without this
+; dep dune's sandbox never copies the file in and the `cp` fails
+; (`No such file or directory`) even though the same file is readable
+; outside the sandbox.
 ; Uses `bash` (not `sh`) because the test script uses set -euo pipefail
 ; and bash-specific constructs (intentional — see #!/usr/bin/env bash shebang).
 ;
@@ -557,14 +563,15 @@
 ; each define a private _repo_root() (same walk-up-for-.git/.claude logic
 ; as _check_lib.sh's repo_root()) and use it to locate dev/reviews/ and
 ; dev/audit/ -- real outside-workspace paths. But record_qc_audit_test.sh
-; ALWAYS invokes both scripts with REPO_ROOT explicitly overridden to a
+; ALWAYS invokes both scripts (and, since 29a-29c, _check_lib.sh's
+; repo_root() directly) with REPO_ROOT explicitly overridden to a
 ; freshly-created temp fixture repo (see the REPO_ROOT="${TMP_REPO}" ...
 ; invocations throughout the test), so no real dev/reviews/ or dev/audit/
 ; content is ever read by this rule. See universe_deps_exceptions.conf.
 
 (rule
  (alias runtest)
- (deps record_qc_audit.sh write_audit.sh)
+ (deps record_qc_audit.sh write_audit.sh _check_lib.sh)
  (action
   (run bash %{dep:record_qc_audit_test.sh})))
 

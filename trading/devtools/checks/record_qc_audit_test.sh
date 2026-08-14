@@ -1873,6 +1873,250 @@ fi
 rm -rf "${WALKUP3_ROOT}"
 
 # ---------------------------------------------------------------------------
+# Scenario 29 (H-REPO-ROOT-SET-BUT-INVALID-SILENT-FALLTHROUGH): the shared
+# _check_lib.sh:repo_root() helper -- sourced by most OTHER check scripts,
+# not just the audit pair -- must treat a REPO_ROOT that is SET but fails
+# the `[ -d ]` guard as a hard error, not a silent fallthrough to the
+# walk-up. Before this fix, `REPO_ROOT=/definitely/not/a/dir` (or any
+# non-directory) fell through exactly like an unset REPO_ROOT: the walk-up
+# ran, found a DIFFERENT root than the caller asked for, and returned it
+# with rc=0 and no diagnostic -- the exact "audit record lands in a root
+# the caller didn't choose" failure this whole H-* family exists to
+# prevent, just reachable via malformed input instead of valid input.
+#
+# WALKUP4_ROOT carries its own `.claude` sentinel, so the walk-up branch
+# would ALSO succeed here if reached -- proving a hard-error scenario
+# actually stopped the walk-up, not merely that no root happened to be
+# findable. _repo_root_probe.sh is a minimal wrapper that sources the
+# fixture's own copy of _check_lib.sh and calls repo_root() directly:
+# repo_root() itself only echoes a path or exits 1, it never writes a
+# file, so a direct probe (rather than a full check script) is the
+# smallest correct fixture for pinning ITS contract in isolation --
+# scenarios 30/31 below separately pin the two write-side siblings
+# end-to-end.
+# ---------------------------------------------------------------------------
+WALKUP4_ROOT="$(mktemp -d -t check_lib_walkup4.XXXXXX)"
+mkdir -p "${WALKUP4_ROOT}/.claude" "${WALKUP4_ROOT}/trading/devtools/checks"
+cp "${SCRIPT_DIR}/_check_lib.sh" "${WALKUP4_ROOT}/trading/devtools/checks/"
+cat > "${WALKUP4_ROOT}/trading/devtools/checks/_repo_root_probe.sh" <<'EOF'
+#!/usr/bin/env bash
+# Minimal wrapper: source _check_lib.sh and call repo_root() directly, so
+# its return value / exit code can be pinned without a full check script.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "${SCRIPT_DIR}/_check_lib.sh"
+repo_root
+EOF
+chmod +x "${WALKUP4_ROOT}/trading/devtools/checks/"*.sh
+PROBE29="${WALKUP4_ROOT}/trading/devtools/checks/_repo_root_probe.sh"
+
+# The three malformed REPO_ROOT shapes filed against this defect: a path
+# that doesn't exist at all, and a path that exists but is a regular file
+# (not a directory). `mktemp -u` reserves a name without creating it, so
+# BOGUS_MISSING29 is guaranteed absent; `mktemp` (no `-u`) creates
+# BOGUS_FILE29 as a real, ordinary file.
+BOGUS_MISSING29="$(mktemp -u -t repo_root_bogus_missing.XXXXXX)"
+BOGUS_FILE29="$(mktemp -t repo_root_bogus_file.XXXXXX)"
+
+# (a) nonexistent path -- must hard-error, not walk up to WALKUP4_ROOT.
+out29a=$(REPO_ROOT="${BOGUS_MISSING29}" bash "${PROBE29}" 2>&1) && rc29a=0 || rc29a=$?
+if (( rc29a != 0 )) \
+   && [[ "${out29a}" == "FAIL: REPO_ROOT is set to '${BOGUS_MISSING29}' but is not a directory" ]]; then
+  pass "scenario 29a — _check_lib.sh:repo_root(): REPO_ROOT set to a nonexistent path is a hard error (rc!=0), never silently falls through to the walk-up (H-REPO-ROOT-SET-BUT-INVALID-SILENT-FALLTHROUGH)"
+else
+  fail "scenario 29a — expected rc!=0 + exact FAIL message naming '${BOGUS_MISSING29}' and nothing else on stdout (i.e. no walked-up root leaked); got rc=${rc29a}"
+  echo "${out29a}" | sed 's/^/      /'
+fi
+
+# (b) a REGULAR FILE, not a directory -- the `[ -d ]` guard must reject
+# this too, not just a bare nonexistent path.
+out29b=$(REPO_ROOT="${BOGUS_FILE29}" bash "${PROBE29}" 2>&1) && rc29b=0 || rc29b=$?
+if (( rc29b != 0 )) \
+   && [[ "${out29b}" == "FAIL: REPO_ROOT is set to '${BOGUS_FILE29}' but is not a directory" ]]; then
+  pass "scenario 29b — _check_lib.sh:repo_root(): REPO_ROOT set to a regular file (not a directory) is a hard error (rc!=0), never silently falls through to the walk-up"
+else
+  fail "scenario 29b — expected rc!=0 + exact FAIL message naming '${BOGUS_FILE29}'; got rc=${rc29b}"
+  echo "${out29b}" | sed 's/^/      /'
+fi
+
+# (c) REPO_ROOT='' (empty string) -- the DELIBERATE other half of this
+# fix's contract: an empty override is treated the SAME as unset, so it
+# must keep walking up successfully (rc=0, returns WALKUP4_ROOT), exactly
+# like the unset case every existing caller depends on. This is not "not
+# yet fixed" -- it is the chosen, documented behaviour (see the code
+# comment in _check_lib.sh:repo_root()), and this scenario is what pins
+# that choice so a future change can't silently flip it either direction.
+out29c=$(REPO_ROOT="" bash "${PROBE29}" 2>&1) && rc29c=0 || rc29c=$?
+if (( rc29c == 0 )) && [[ "${out29c}" == "${WALKUP4_ROOT}" ]]; then
+  pass "scenario 29c — _check_lib.sh:repo_root(): REPO_ROOT='' (empty string) is treated as unset, not as set-but-invalid: the walk-up still succeeds (rc=0), matching every existing caller's expectation"
+else
+  fail "scenario 29c — expected rc=0 + stdout exactly '${WALKUP4_ROOT}' (empty REPO_ROOT walks up like unset); got rc=${rc29c}"
+  echo "${out29c}" | sed 's/^/      /'
+fi
+
+rm -f "${BOGUS_FILE29}"
+rm -rf "${WALKUP4_ROOT}"
+
+# ---------------------------------------------------------------------------
+# Scenario 30 (H-REPO-ROOT-SET-BUT-INVALID-SILENT-FALLTHROUGH): the SAME
+# contract, end-to-end through write_audit.sh:_repo_root(). This is the
+# script that actually WRITES the audit record, so here the assertion is
+# the stronger, observable one the defect filing asked for: a malformed
+# REPO_ROOT must produce rc!=0 AND zero records written anywhere -- not
+# just a hard-error return value in isolation (scenario 29), but proof
+# nothing landed in the walked-up root either.
+#
+# WALKUP5_ROOT mirrors the scenario-27 fixture shape: its own `.claude`
+# sentinel plus its own dev/audit/, so a regression back to the silent
+# fallthrough would publish a record there with rc=0 -- exactly what
+# scenario 27 pinned for the *valid*-REPO_ROOT-wins-over-walk-up case;
+# this scenario pins the malformed-REPO_ROOT-must-not-reach-the-walk-up-
+# at-all case.
+# ---------------------------------------------------------------------------
+WALKUP5_ROOT="$(mktemp -d -t write_audit_walkup5.XXXXXX)"
+mkdir -p "${WALKUP5_ROOT}/.claude" "${WALKUP5_ROOT}/trading/devtools/checks" \
+         "${WALKUP5_ROOT}/dev/audit"
+cp "${SCRIPT_DIR}/write_audit.sh" "${WALKUP5_ROOT}/trading/devtools/checks/"
+chmod +x "${WALKUP5_ROOT}/trading/devtools/checks/write_audit.sh"
+
+BOGUS_MISSING30="$(mktemp -u -t write_audit_bogus_missing.XXXXXX)"
+BOGUS_FILE30="$(mktemp -t write_audit_bogus_file.XXXXXX)"
+
+_run_write_audit_30() {  # $1 = REPO_ROOT value, $2 = feature suffix (for a distinct record name per sub-scenario)
+  REPO_ROOT="$1" bash "${WALKUP5_ROOT}/trading/devtools/checks/write_audit.sh" \
+    --date 2026-08-08 --feature "repo-root-malformed-$2" --branch "harness/repo-root-malformed" \
+    --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1
+}
+
+# (a) nonexistent path
+out30a=$(_run_write_audit_30 "${BOGUS_MISSING30}" "missing") && rc30a=0 || rc30a=$?
+walkup_count30a="$(find "${WALKUP5_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+if (( rc30a != 0 )) \
+   && [[ "${out30a}" == "FAIL: REPO_ROOT is set to '${BOGUS_MISSING30}' but is not a directory" ]] \
+   && [[ "${walkup_count30a}" == "0" ]]; then
+  pass "scenario 30a — write_audit.sh: REPO_ROOT set to a nonexistent path is a hard error, zero records written under the walked-up root either (H-REPO-ROOT-SET-BUT-INVALID-SILENT-FALLTHROUGH)"
+else
+  fail "scenario 30a — expected rc!=0 + exact FAIL message + 0 records under WALKUP5_ROOT; got rc=${rc30a}, walkup_count=${walkup_count30a}"
+  echo "${out30a}" | sed 's/^/      /'
+fi
+
+# (b) regular file, not a directory
+out30b=$(_run_write_audit_30 "${BOGUS_FILE30}" "file") && rc30b=0 || rc30b=$?
+walkup_count30b="$(find "${WALKUP5_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+if (( rc30b != 0 )) \
+   && [[ "${out30b}" == "FAIL: REPO_ROOT is set to '${BOGUS_FILE30}' but is not a directory" ]] \
+   && [[ "${walkup_count30b}" == "0" ]]; then
+  pass "scenario 30b — write_audit.sh: REPO_ROOT set to a regular file (not a directory) is a hard error, zero records written under the walked-up root either"
+else
+  fail "scenario 30b — expected rc!=0 + exact FAIL message + 0 records under WALKUP5_ROOT (cumulative with 30a); got rc=${rc30b}, walkup_count=${walkup_count30b}"
+  echo "${out30b}" | sed 's/^/      /'
+fi
+
+# (c) REPO_ROOT='' -- must behave exactly like unset (scenario 27b): the
+# walk-up succeeds and the record is published under WALKUP5_ROOT.
+out30c=$(_run_write_audit_30 "" "empty") && rc30c=0 || rc30c=$?
+walkup_count30c="$(find "${WALKUP5_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+if (( rc30c == 0 )) && echo "${out30c}" | grep -q "^OK: wrote" && [[ "${walkup_count30c}" == "1" ]]; then
+  pass "scenario 30c — write_audit.sh: REPO_ROOT='' (empty string) is treated as unset: the walk-up still succeeds and publishes the record (deliberate, not a regression of 30a/30b)"
+else
+  fail "scenario 30c — expected rc=0 + 'OK: wrote' + exactly 1 record under WALKUP5_ROOT (30a/30b wrote none); got rc=${rc30c}, walkup_count=${walkup_count30c}"
+  echo "${out30c}" | sed 's/^/      /'
+fi
+
+rm -f "${BOGUS_FILE30}"
+rm -rf "${WALKUP5_ROOT}"
+
+# ---------------------------------------------------------------------------
+# Scenario 31 (H-REPO-ROOT-SET-BUT-INVALID-SILENT-FALLTHROUGH): the third
+# implementation, record_qc_audit.sh:_repo_root(), pinned end-to-end
+# through its write_audit.sh CHILD PROCESS -- mirroring scenario 28's
+# two-script fixture shape. Before this fix, a malformed REPO_ROOT here
+# was WORSE than in write_audit.sh alone: record_qc_audit.sh reassigns
+# its own REPO_ROOT from the walked-up value with a plain (non-export)
+# assignment that still carries bash's inherited export attribute, so the
+# wrong root would have propagated silently into the write_audit.sh child
+# too (the exact H-RECORD-QC-AUDIT-REPO-ROOT-SIBLING shape). This
+# scenario proves the malformed REPO_ROOT is rejected before ever
+# reaching that child, so nothing is written under the walked-up root
+# through either process.
+# ---------------------------------------------------------------------------
+WALKUP6_ROOT="$(mktemp -d -t record_qc_audit_walkup6.XXXXXX)"
+mkdir -p "${WALKUP6_ROOT}/.claude" "${WALKUP6_ROOT}/trading/devtools/checks" \
+         "${WALKUP6_ROOT}/dev/audit" "${WALKUP6_ROOT}/dev/reviews"
+cp "${SCRIPT}" "${WALKUP6_ROOT}/trading/devtools/checks/"
+cp "${SCRIPT_DIR}/write_audit.sh" "${WALKUP6_ROOT}/trading/devtools/checks/"
+chmod +x "${WALKUP6_ROOT}/trading/devtools/checks/"*.sh
+
+# A dev/reviews/<feature>.md fixture for EACH sub-scenario's feature name
+# (not just 31c's), so that if the hard-error guard regresses, 31a/31b
+# reach all the way through to a successful wrong-root PUBLISH under
+# WALKUP6_ROOT -- demonstrating the full H-RECORD-QC-AUDIT-REPO-ROOT-
+# SIBLING blast radius this fix closes -- rather than merely tripping a
+# LATER, incidental "review file not found" error that would still leave
+# rc!=0 for the wrong reason and mask a real regression in the guard
+# itself.
+for _suffix31 in missing file empty; do
+  cat > "${WALKUP6_ROOT}/dev/reviews/repo-root-sibling-malformed-${_suffix31}.md" <<EOF
+Reviewed SHA: walkup6sha-${_suffix31}
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+3 — walk-up fallback fixture for sub-scenario ${_suffix31}
+EOF
+done
+
+BOGUS_MISSING31="$(mktemp -u -t record_qc_audit_bogus_missing.XXXXXX)"
+BOGUS_FILE31="$(mktemp -t record_qc_audit_bogus_file.XXXXXX)"
+
+_run_record_qc_audit_31() {  # $1 = REPO_ROOT value, $2 = feature suffix
+  REPO_ROOT="$1" bash "${WALKUP6_ROOT}/trading/devtools/checks/record_qc_audit.sh" \
+    "repo-root-sibling-malformed-$2" "harness/repo-root-sibling-malformed" "2026-08-08" 2>&1
+}
+
+# (a) nonexistent path
+out31a=$(_run_record_qc_audit_31 "${BOGUS_MISSING31}" "missing") && rc31a=0 || rc31a=$?
+walkup_count31a="$(find "${WALKUP6_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+if (( rc31a != 0 )) \
+   && echo "${out31a}" | grep -qF "FAIL: REPO_ROOT is set to '${BOGUS_MISSING31}' but is not a directory" \
+   && [[ "${walkup_count31a}" == "0" ]]; then
+  pass "scenario 31a — record_qc_audit.sh: REPO_ROOT set to a nonexistent path is a hard error, zero records written under the walked-up root end-to-end through the write_audit.sh child (H-REPO-ROOT-SET-BUT-INVALID-SILENT-FALLTHROUGH)"
+else
+  fail "scenario 31a — expected rc!=0 + FAIL message naming '${BOGUS_MISSING31}' + 0 records under WALKUP6_ROOT; got rc=${rc31a}, walkup_count=${walkup_count31a}"
+  echo "${out31a}" | sed 's/^/      /'
+fi
+
+# (b) regular file, not a directory
+out31b=$(_run_record_qc_audit_31 "${BOGUS_FILE31}" "file") && rc31b=0 || rc31b=$?
+walkup_count31b="$(find "${WALKUP6_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+if (( rc31b != 0 )) \
+   && echo "${out31b}" | grep -qF "FAIL: REPO_ROOT is set to '${BOGUS_FILE31}' but is not a directory" \
+   && [[ "${walkup_count31b}" == "0" ]]; then
+  pass "scenario 31b — record_qc_audit.sh: REPO_ROOT set to a regular file (not a directory) is a hard error, zero records written under the walked-up root end-to-end (cumulative with 31a)"
+else
+  fail "scenario 31b — expected rc!=0 + FAIL message naming '${BOGUS_FILE31}' + 0 records under WALKUP6_ROOT; got rc=${rc31b}, walkup_count=${walkup_count31b}"
+  echo "${out31b}" | sed 's/^/      /'
+fi
+
+# (c) REPO_ROOT='' -- must behave exactly like unset (scenario 28b): the
+# walk-up succeeds end-to-end and the record is published under
+# WALKUP6_ROOT via the write_audit.sh child process. Its dev/reviews/
+# fixture was already created in the per-sub-scenario loop above.
+out31c=$(_run_record_qc_audit_31 "" "empty") && rc31c=0 || rc31c=$?
+walkup_count31c="$(find "${WALKUP6_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+if (( rc31c == 0 )) && [[ "${walkup_count31c}" == "1" ]]; then
+  pass "scenario 31c — record_qc_audit.sh: REPO_ROOT='' (empty string) is treated as unset: the walk-up still succeeds end-to-end and publishes the record (deliberate, not a regression of 31a/31b)"
+else
+  fail "scenario 31c — expected rc=0 + exactly 1 record under WALKUP6_ROOT (31a/31b wrote none); got rc=${rc31c}, walkup_count=${walkup_count31c}"
+  echo "${out31c}" | sed 's/^/      /'
+fi
+
+rm -f "${BOGUS_FILE31}"
+rm -rf "${WALKUP6_ROOT}"
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
