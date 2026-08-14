@@ -1,9 +1,9 @@
 # Status: trade-audit
 
-## Last updated: 2026-07-27
+## Last updated: 2026-08-14
 
 ## Status
-MERGED
+READY_FOR_REVIEW
 
 ### 2026-07-27 — `trades.csv` phantom SHORT / duplicate rows (issue #2059)
 
@@ -80,8 +80,74 @@ NO
 
 ## Open work
 
-(none currently in flight — see §2026-07-25 below for the most recent
+(none currently in flight — see §2026-08-14 below for the most recent
 PR)
+
+## Report-path `position_id` join (2026-08-14, follow-up to PR #2317)
+
+PR #2317 fixed the **in-process** join: `Trade_context._lookup_audit_for_trade`
+prefers an exact `position_id` match and keeps date proximity only as the
+fallback. The **report path** re-reads `trades.csv` from disk and did not get
+the same fix — two CSV-readback loaders hardcoded `position_id = None`, which
+forced their downstream joins back onto the symmetric 7-day nearest-date scan
+#2317 retired. On a re-traded symbol that scan attaches a *different*
+position's audit record (the `stop_first_by_symbol` misattribution: repeat-
+traded symbols inherited the first trade's trigger and stops).
+
+- [x] **Thread `position_id` through both CSV-readback loaders.** Branch
+      `feat/report-path-position-id`.
+
+      New reader-side surface on `Backtest.Trade_context` (writer-side
+      `csv_header_fields` / `csv_row_fields` already lived there, so the reader
+      side belongs with them): `position_id_column_name`, abstract
+      `csv_schema`, `csv_schema_of_header_line`, `legacy_csv_schema`,
+      `position_id_of_cells`. The column index is resolved **by header name**,
+      never hardcoded — `position_id` is a trailing column and both loaders
+      deliberately tolerate further trailing columns being appended, so a fixed
+      index would silently read a neighbour after the next schema addition.
+      `position_id_of_cells` returns `None` (never `Some ""`, never a wrong
+      cell) when the header lacks the column, the row is shorter than the
+      column index, or the cell is empty.
+
+      - `trading/trading/backtest/trade_audit_report/trade_audit_report.ml` —
+        `_trade_metrics_of_strings` takes `~position_id`;
+        `_match_post_g2_csv_row` receives the header-resolved value;
+        `_match_legacy_csv_row` resolves against `legacy_csv_schema`
+        (explicitly `None` — the layout predates the column).
+        `_audit_index` became a record carrying both a `by_position_id` map and
+        the existing `by_symbol` map; `_find_audit` now prefers the id join and
+        falls back to `_find_audit_by_date` (the 7-day scan is **kept**, exactly
+        as `Trade_context` keeps its own date path).
+      - `trading/trading/backtest/optimal/lib/optimal_run_artefacts.ml` — same
+        threading through `_trade_metrics_of_strings` / `_match_post_g2_row` /
+        `_match_legacy_row` / `_parse_trade_row` / `_load_trades`.
+
+      Both `KNOWN GAP (PR #2317)` comments are gone; the surviving comments
+      describe the fallback's role rather than claiming an open gap.
+
+      Tests (15 new):
+      - `test_trade_context.ml` (+6) — direct pins on the schema helper:
+        populated cell → `Some`, empty cell → `None`, header without the column
+        → `None`, row shorter than the index → `None`, `legacy_csv_schema`
+        always `None`, and a header with an *inserted* column ahead of
+        `position_id` still reading the right cell (a fixed-index reader fails
+        this one).
+      - `test_trade_audit_report.ml` (+5) — the discriminating misattribution
+        fixture: a resting AAPL ticket decided 2020-04-24 (`AAPL-1`, grade A)
+        that fills 2020-11-09, with a *second* AAPL decision 2020-11-06
+        (`AAPL-2`, grade D) three days from the fill. Date proximity returns D;
+        only the id join returns A. Pinned end-to-end through `TAR.load`
+        (populated / empty / unknown id / legacy row) and through `TAR.render`.
+      - `test_optimal_run_artefacts.ml` (+4) — `RA.load` surfaces
+        `trade_metrics.position_id` directly: populated, empty cell, row
+        predating the column, legacy layout.
+
+      Verify:
+      `dune runtest trading/backtest/test trading/backtest/optimal/test`
+
+      Mutation check performed: reverting `_find_audit` to date-only turns
+      `load: position_id join beats nearer date match` and
+      `render: position_id join beats nearer date match` red (A → D).
 
 ## Externally-generated exits (2026-07-25, issue #2076)
 
