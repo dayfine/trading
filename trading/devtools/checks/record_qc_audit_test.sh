@@ -2117,6 +2117,244 @@ rm -f "${BOGUS_FILE31}"
 rm -rf "${WALKUP6_ROOT}"
 
 # ---------------------------------------------------------------------------
+# Scenario 32 — H-AUDIT-GH-FALLBACK-RESIDUAL: gh present, nonzero exit +
+# stderr output (simulates unauthenticated / rate-limited gh). Before this
+# fix, `2>/dev/null || true` discarded both signals and the resulting empty
+# $BODIES fell straight through to the file-mode fallback -- exactly the
+# danger scenario 14's missing-binary guard exists to prevent, just reached
+# via a different trigger (gh present but failing, not absent). Must refuse
+# loudly the same way scenario 14 does: exit 1, no record written, message
+# names the PR + the refused fallback path.
+# ---------------------------------------------------------------------------
+FEATURE32="gh-nonzero-exit-with-stderr-refuses-fallback"
+S32_DIR="${TMP_REPO}/s32"
+mkdir -p "${S32_DIR}"
+cat > "${S32_DIR}/gh" <<'EOF'
+#!/bin/sh
+case "$1 $2" in
+  "pr view")
+    echo "gh: rate limit exceeded, please try again later" >&2
+    exit 1
+    ;;
+esac
+EOF
+chmod +x "${S32_DIR}/gh"
+
+# Companion file-mode review file, deliberately holding the WRONG (APPROVED)
+# verdict -- proves the fallback is refused rather than silently consumed,
+# same pattern as scenario 14.
+cat > "${TMP_REPO}/dev/reviews/${FEATURE32}.md" <<'EOF'
+Reviewed SHA: unrelatedsha32
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+5 — this file belongs to a different run and must NOT be used
+EOF
+
+audit_count_before_32="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE32}.json" | wc -l | tr -d ' ')"
+
+out32=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S32_DIR}/gh" \
+  bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+  "${FEATURE32}" "feat/dummy" "2026-05-25" --pr-number 3001 2>&1) && rc32=0 || rc32=$?
+
+audit_count_after_32="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE32}.json" | wc -l | tr -d ' ')"
+
+if (( rc32 == 1 )) && [[ "${audit_count_before_32}" == "0" ]] && [[ "${audit_count_after_32}" == "0" ]] \
+   && echo "${out32}" | grep -q "failed (exit 1)" \
+   && echo "${out32}" | grep -q "rate limit exceeded" \
+   && echo "${out32}" | grep -q "dev/reviews/${FEATURE32}.md"; then
+  pass "scenario 32 — gh nonzero exit + stderr (rate-limited) refuses file-mode fallback, no record written (H-AUDIT-GH-FALLBACK-RESIDUAL)"
+else
+  fail "scenario 32 — expected rc=1, no file written, message naming exit code + stderr + review path; got rc=${rc32}, before=${audit_count_before_32}, after=${audit_count_after_32}"
+  echo "${out32}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 33 — H-AUDIT-GH-FALLBACK-RESIDUAL: gh present, nonzero exit but
+# SILENT (no stderr at all). Confirms the refusal triggers on exit code
+# alone -- not only when stderr happens to be non-empty.
+# ---------------------------------------------------------------------------
+FEATURE33="gh-nonzero-exit-silent-refuses-fallback"
+S33_DIR="${TMP_REPO}/s33"
+mkdir -p "${S33_DIR}"
+cat > "${S33_DIR}/gh" <<'EOF'
+#!/bin/sh
+case "$1 $2" in
+  "pr view") exit 1;;
+esac
+EOF
+chmod +x "${S33_DIR}/gh"
+
+cat > "${TMP_REPO}/dev/reviews/${FEATURE33}.md" <<'EOF'
+Reviewed SHA: unrelatedsha33
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+5 — this file belongs to a different run and must NOT be used
+EOF
+
+audit_count_before_33="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE33}.json" | wc -l | tr -d ' ')"
+
+out33=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S33_DIR}/gh" \
+  bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+  "${FEATURE33}" "feat/dummy" "2026-05-25" --pr-number 3002 2>&1) && rc33=0 || rc33=$?
+
+audit_count_after_33="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE33}.json" | wc -l | tr -d ' ')"
+
+if (( rc33 == 1 )) && [[ "${audit_count_before_33}" == "0" ]] && [[ "${audit_count_after_33}" == "0" ]] \
+   && echo "${out33}" | grep -q "failed (exit 1)" \
+   && echo "${out33}" | grep -q "dev/reviews/${FEATURE33}.md"; then
+  pass "scenario 33 — gh nonzero exit, silent (no stderr) refuses file-mode fallback, no record written (H-AUDIT-GH-FALLBACK-RESIDUAL)"
+else
+  fail "scenario 33 — expected rc=1, no file written, message naming exit code + review path; got rc=${rc33}, before=${audit_count_before_33}, after=${audit_count_after_33}"
+  echo "${out33}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 34 — H-AUDIT-GH-FALLBACK-RESIDUAL: gh exits 0 but emits a stderr
+# warning alongside empty stdout. An exit-0 result is NOT sufficient to
+# trust an empty $BODIES as "genuinely zero reviews" -- a warning on stderr
+# (deprecation notice, partial-failure notice, etc.) must also refuse.
+# ---------------------------------------------------------------------------
+FEATURE34="gh-exit0-stderr-warning-refuses-fallback"
+S34_DIR="${TMP_REPO}/s34"
+mkdir -p "${S34_DIR}"
+cat > "${S34_DIR}/gh" <<'EOF'
+#!/bin/sh
+case "$1 $2" in
+  "pr view")
+    echo "gh: warning: using deprecated API version" >&2
+    exit 0
+    ;;
+esac
+EOF
+chmod +x "${S34_DIR}/gh"
+
+cat > "${TMP_REPO}/dev/reviews/${FEATURE34}.md" <<'EOF'
+Reviewed SHA: unrelatedsha34
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+5 — this file belongs to a different run and must NOT be used
+EOF
+
+audit_count_before_34="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE34}.json" | wc -l | tr -d ' ')"
+
+out34=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S34_DIR}/gh" \
+  bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+  "${FEATURE34}" "feat/dummy" "2026-05-25" --pr-number 3003 2>&1) && rc34=0 || rc34=$?
+
+audit_count_after_34="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE34}.json" | wc -l | tr -d ' ')"
+
+if (( rc34 == 1 )) && [[ "${audit_count_before_34}" == "0" ]] && [[ "${audit_count_after_34}" == "0" ]] \
+   && echo "${out34}" | grep -q "failed (exit 0)" \
+   && echo "${out34}" | grep -q "deprecated API version" \
+   && echo "${out34}" | grep -q "dev/reviews/${FEATURE34}.md"; then
+  pass "scenario 34 — gh exit 0 + stderr warning (empty stdout) refuses file-mode fallback, no record written (H-AUDIT-GH-FALLBACK-RESIDUAL)"
+else
+  fail "scenario 34 — expected rc=1, no file written, message naming exit code + stderr + review path; got rc=${rc34}, before=${audit_count_before_34}, after=${audit_count_after_34}"
+  echo "${out34}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 35 — H-AUDIT-GH-FALLBACK-RESIDUAL regression pin: gh exits 0 with
+# EMPTY stdout and NO stderr -- the one shape that legitimately means "PR
+# has no reviews yet". Must still fall through to file mode unchanged
+# (same fixture shape as scenario 6, kept independent here so a future
+# tightening of the exit-code/stderr check has its own dedicated pin
+# distinct from scenario 6's CP1 dual-source regression).
+# ---------------------------------------------------------------------------
+FEATURE35="gh-exit0-empty-no-stderr-still-falls-back"
+S35_DIR="${TMP_REPO}/s35"
+mkdir -p "${S35_DIR}"
+cat > "${S35_DIR}/gh" <<'EOF'
+#!/bin/sh
+case "$1 $2" in
+  "pr view") exit 0;;
+esac
+EOF
+chmod +x "${S35_DIR}/gh"
+
+cat > "${TMP_REPO}/dev/reviews/${FEATURE35}.md" <<'EOF'
+Reviewed SHA: genuinelyempty35
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+3 — genuine file-mode fallback, this PR really has zero reviews
+EOF
+
+out35=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S35_DIR}/gh" \
+  bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+  "${FEATURE35}" "feat/dummy" "2026-05-25" --pr-number 3004 2>&1) && rc35=0 || rc35=$?
+JSON35="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE35}.json"
+if (( rc35 == 0 )) && [[ -f "${JSON35}" ]] \
+   && grep -q '"structural_qc": *"APPROVED"' "${JSON35}" \
+   && grep -q '"quality_score": *3' "${JSON35}"; then
+  pass "scenario 35 — gh exit 0, empty stdout, no stderr: genuine zero-review PR still falls back to file mode unchanged (H-AUDIT-GH-FALLBACK-RESIDUAL regression pin)"
+else
+  fail "scenario 35 — expected file-fallback rc=0 + APPROVED + score 3; got rc=${rc35}, output:"
+  echo "${out35}" | sed 's/^/      /'
+  [[ -f "${JSON35}" ]] && echo "      json: $(cat "${JSON35}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 36 — H-AUDIT-GH-FALLBACK-RESIDUAL regression pin: gh exits 0 with
+# non-empty stdout (the ordinary happy path, already exercised by scenario
+# 2) -- confirms the new exit-code/stderr capture does not disturb the
+# unchanged case where gh genuinely returns review data.
+# ---------------------------------------------------------------------------
+FEATURE36="gh-exit0-nonempty-stdout-happy-path-unchanged"
+S36_DIR="${TMP_REPO}/s36"
+mkdir -p "${S36_DIR}"
+cat > "${S36_DIR}/reviews.txt" <<'EOF'
+STATE:APPROVED
+## Structural QC
+
+## Verdict
+
+APPROVED
+ENDBODY
+STATE:APPROVED
+## Behavioral QC
+
+## Verdict
+
+APPROVED
+
+## Quality Score
+4 — clean
+ENDBODY
+EOF
+make_gh_mock "${S36_DIR}" "${S36_DIR}/reviews.txt"
+
+out36=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S36_DIR}/gh" \
+  bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+  "${FEATURE36}" "feat/dummy" "2026-05-25" --pr-number 3005 2>&1) && rc36=0 || rc36=$?
+JSON36="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE36}.json"
+if (( rc36 == 0 )) && [[ -f "${JSON36}" ]] \
+   && grep -q '"structural_qc": *"APPROVED"' "${JSON36}" \
+   && grep -q '"behavioral_qc": *"APPROVED"' "${JSON36}" \
+   && grep -q '"quality_score": *4' "${JSON36}"; then
+  pass "scenario 36 — gh exit 0, non-empty stdout: happy path unchanged, record written from PR reviews (H-AUDIT-GH-FALLBACK-RESIDUAL)"
+else
+  fail "scenario 36 — expected rc=0 + APPROVED+APPROVED+score 4; got rc=${rc36}, output:"
+  echo "${out36}" | sed 's/^/      /'
+  [[ -f "${JSON36}" ]] && echo "      json: $(cat "${JSON36}")"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
