@@ -221,8 +221,35 @@ if [ -n "$PR_NUMBER" ]; then
   fi
 
   # One gh call: render reviews into a STATE/body/ENDBODY frame, one per review.
+  #
+  # H-AUDIT-GH-FALLBACK-RESIDUAL: capture gh's exit code AND stderr instead of
+  # discarding both. The missing-binary guard above only covers `gh` being
+  # absent from PATH -- every OTHER gh failure mode (present but
+  # unauthenticated, rate-limited, network error) used to hit the discarded
+  # `2>/dev/null || true` and come out as the exact same empty-$BODIES shape
+  # as "PR legitimately has no reviews yet" (scenario 6), so those failures
+  # silently fell through to the file-mode fallback below -- the same danger
+  # the missing-binary guard exists to prevent, just via a different trigger.
+  # Only "exit 0, empty stdout, no stderr" is treated as a genuine
+  # zero-review PR; any nonzero exit, OR any stderr output even alongside
+  # exit 0 (a warning-emitting gh is not a trustworthy empty result), refuses
+  # loudly instead -- mirroring the missing-binary message shape below.
+  GH_STDERR_FILE="$(mktemp)"
   BODIES="$("$GH_BIN" pr view "$PR_NUMBER" --json reviews \
-    --jq '.reviews[] | "STATE:\(.state)\n\(.body)\nENDBODY"' 2>/dev/null || true)"
+    --jq '.reviews[] | "STATE:\(.state)\n\(.body)\nENDBODY"' \
+    2>"$GH_STDERR_FILE")" && GH_RC=0 || GH_RC=$?
+  GH_STDERR="$(cat "$GH_STDERR_FILE" 2>/dev/null || true)"
+  rm -f "$GH_STDERR_FILE"
+
+  if [ "$GH_RC" -ne 0 ] || [ -n "$GH_STDERR" ]; then
+    echo "FAIL: --pr-number $PR_NUMBER was given but '$GH_BIN pr view' failed (exit $GH_RC)." >&2
+    if [ -n "$GH_STDERR" ]; then
+      echo "  stderr: $GH_STDERR" >&2
+    fi
+    echo "  Refusing to silently fall back to dev/reviews/${FEATURE}.md -- it may belong to a different PR/run." >&2
+    echo "  Check gh auth status / network / rate limits, or omit --pr-number to explicitly use file mode." >&2
+    exit 1
+  fi
 
   if [ -n "$BODIES" ]; then
     # Single-pass awk extracts per-section (state, body_verdict) tuples.
