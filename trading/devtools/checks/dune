@@ -355,6 +355,39 @@
  (action
   (run sh %{dep:deep_scan_followup_count_check.sh})))
 
+; Deep scan rework-streak escalation change-detector test
+; (H-REWORK-STREAK-ESCALATION-UNTESTED): actually invokes
+; check_06_qc_calibration.sh against a synthetic dev/audit/ fixture (via
+; the REPO_ROOT env-var override) with a known-correct answer, same
+; pattern as deep_scan_followup_count_check.sh above. Pins the >= 3
+; threshold boundary (2 does not fire, 3 and 4 do), the per-feature
+; maximum-not-per-record reporting, and the legacy-record (field absent)
+; no-crash path for the rework-streak scan that consumes
+; write_audit.sh's consecutive_rework_count field. Deps list
+; check_06_qc_calibration.sh + deep_scan/_lib.sh explicitly (not just
+; _check_lib.sh) so dune's cache invalidates when their logic changes.
+;
+; Declares (universe): this script's own repo_root() call site
+; (REPO_ROOT_REAL) makes it a repo_root()-calling candidate under
+; check_universe_deps.sh. Takes the (universe) branch rather than an
+; exceptions-list entry: the check under test (check_06's rework-streak
+; scan) reads dev/audit/*.json, a real outside-workspace directory whose
+; contents change independently of any dune dep list, so a "provably
+; already covered or dead" exemption claim would not hold up the way it
+; does for deep_scan_followup_count_check.sh's simpler status-file
+; fixture. See the open H-UNIVERSE-DEPS-EXEMPTION-EVIDENCE-STALE item for
+; why a shaky exemption claim is worth avoiding rather than asserting.
+
+(rule
+ (alias runtest)
+ (deps
+  _check_lib.sh
+  deep_scan/_lib.sh
+  deep_scan/check_06_qc_calibration.sh
+  (universe))
+ (action
+  (run sh %{dep:deep_scan_rework_streak_check.sh})))
+
 ; Same-day summary consolidation smoke test: generates a 3-run fixture in /tmp/,
 ; runs dev/lib/consolidate_day.sh, and verifies deduped output sections.
 ; Does NOT touch real dev/daily/ files.

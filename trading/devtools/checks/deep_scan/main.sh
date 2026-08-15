@@ -91,6 +91,7 @@ SIZE_VIOLATION_COUNT=0
 FOLLOWUP_COUNT=0
 QC_CAL_COUNT=0
 DUNE_AVAILABLE=false
+REWORK_STREAK_COUNT=0
 ARCH_GRAPH_VIOLATION_COUNT=0
 RECENT_COMMITS_COUNT=0
 EXPIRY_COUNT=0
@@ -131,6 +132,7 @@ for findings_file in "${FINDINGS_DIR}"/*.findings; do
           FOLLOWUP_COUNT)           FOLLOWUP_COUNT="$val" ;;
           QC_CAL_COUNT)             QC_CAL_COUNT="$val" ;;
           DUNE_AVAILABLE)           DUNE_AVAILABLE="$val" ;;
+          REWORK_STREAK_COUNT)      REWORK_STREAK_COUNT="$val" ;;
           ARCH_GRAPH_VIOLATION_COUNT) ARCH_GRAPH_VIOLATION_COUNT="$val" ;;
           RECENT_COMMITS_COUNT)     RECENT_COMMITS_COUNT="$val" ;;
           EXPIRY_COUNT)             EXPIRY_COUNT="$val" ;;
@@ -188,6 +190,7 @@ cat >> "$OUTPUT_FILE" <<METRICS_EOF
 - Files >300 lines: ${SIZE_VIOLATION_COUNT}
 - Open items (\`- [ ]\` in dev/status/*.md, unscoped by heading): ${FOLLOWUP_COUNT} (maintenance threshold: 10)
 - QC calibration findings: ${QC_CAL_COUNT} (dune available: ${DUNE_AVAILABLE})
+- Rework streak escalations (consecutive_rework_count >= 3, per write_audit.sh:37): ${REWORK_STREAK_COUNT}
 - Architecture graph violations (monitored): ${ARCH_GRAPH_VIOLATION_COUNT}
 - Status file template violations (forbidden ## Recent Commits): ${RECENT_COMMITS_COUNT}
 - Linter exception expiry: ${EXPIRY_COUNT} expired/unknown, ${EXPIRY_MISSING_COUNT} missing review_at
