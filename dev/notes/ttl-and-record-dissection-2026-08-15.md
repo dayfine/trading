@@ -97,6 +97,89 @@ fresh E. It does re-qualify. It still never fills:
 The pin-release machinery works as designed and still cannot compensate, because
 the clock resets faster than the setup resolves.
 
+### The rest distribution — and where the P&L actually is
+
+1,070d is **not** the maximum; it was only the longest among the four 2025
+symbols. Across all 942 joined trades in cell 13:
+
+| | days |
+|---|---|
+| median | **12** |
+| p75 | 48 |
+| p90 | 160 |
+| p95 | 427 |
+| p99 | **1,648** (4.5 yr) |
+| max | **7,941** (21.7 yr) |
+
+The extreme verified end-to-end: `FUL-wein-64` decided **2000-02-04**, filled
+**2021-11-01**, realized −1,138. A resting order that survived 21.7 years is the
+literal-GTC defect in its purest form.
+
+Most tickets fill promptly (median 12d); 31.6% pass 4 weeks, 15.5% pass 13 weeks,
+5.8% pass a year. So TTL only ever touches the tail — but *which part* of the
+tail decides everything:
+
+| rest bucket | n | share | realized pnl | pnl/trade |
+|---|---:|---:|---:|---:|
+| ≤7d | 396 | 42.0% | 2,225,496 | 5,620 |
+| 8-28d | 248 | 26.3% | 423,842 | 1,709 |
+| **29-91d** | 152 | 16.1% | **1,273,096** | **8,376** |
+| 92-182d | 59 | 6.3% | 404,455 | 6,855 |
+| 183-365d | 32 | 3.4% | −10,173 | −318 |
+| 1-3yr | 35 | 3.7% | 379,985 | 10,857 |
+| **>3yr** | 20 | 2.1% | **−154,006** | **−7,700** |
+
+**ttl4's 28-day cut lands exactly on the lower edge of the most profitable
+bucket.** The 29-91d band is 16% of trades and 28% of all realized P&L at the
+best per-trade rate of any bulk bucket — and ttl4 cancels all of it. That is the
+mechanical reason ttl4 loses money, and it means the tested axis
+({0, 4, 8} weeks) never reached the useful range.
+
+Meanwhile the >3yr bucket is actively destructive (−7,700/trade), so the answer
+is not "no TTL" either. A cut around **26 weeks** retains ~95% of realized P&L
+with 91% of trades while removing the 183d+ tail including the >3yr losses.
+
+⚠ Static decomposition: it assumes cancelling a bucket leaves the others
+unchanged, whereas freed capital would redeploy. Indicative of where to set the
+knob, not a prediction of the resulting return.
+
+### Per-symbol: the fast fills lost, the slow fill won
+
+Every ticket for the three 2025 drivers, in cell 13 (TTL absent):
+
+| symbol | rest | realized |
+|---|---|---|
+| AMG | 181d | +229,597 |
+| CHRW | 11d / 3d / **1,070d** | −9,363 / −44,224 / **+166,717** |
+| JNJ | 5d / **728d** | −21,903 / **+209,844** |
+
+For CHRW and JNJ the promptly-filled tickets lost money and the long-resting one
+carried the name.
+
+### Three-arm YoY (realized pnl)
+
+| year | 13 (ttl0) | 15 (ttl4) | record |
+|---|---:|---:|---:|
+| 2003 | 551,148 | 570,301 | 1,472,537 |
+| 2008 | −118,454 | −56,234 | −289,878 |
+| 2014 | 627,899 | 459,285 | 1,343,850 |
+| 2015 | 1,382 | 69,801 | **−845,480** |
+| 2016 | 1,384,858 | 981,503 | 515,016 |
+| 2017 | 108,535 | 170,954 | 1,874,003 |
+| 2018 | −600,152 | −477,696 | −645,877 |
+| 2020 | 1,054,523 | 1,227,051 | 5,365,533 |
+| 2022 | −98,199 | **−602,727** | 317,601 |
+| 2023 | 1,133,577 | 1,333,523 | 3,442,470 |
+| **2025** | −172,214 | **−827,925** | **+57,080,155** |
+| 2026 | −401,293 | −304,441 | −4,732,975 |
+| **total** | **4,486,567** | **3,233,396** | **66,820,669** |
+
+Record's 2025 is AXTI in a single line. But note it also leads in the other big
+years (2020 5.37M vs 1.05M, 2017 1.87M vs 0.11M, 2023 3.44M vs 1.13M) — that is
+**position sizing / concentration**, not entry timing, and it is the ex-AXTI 2.4×.
+Cells 13 and 15 track each other closely in every year **except 2022 and 2025**,
+where the entire TTL gap lives.
+
 ### The uncomfortable implication
 
 **The least book-faithful entries are the most profitable ones.** A ticket that
@@ -169,3 +252,98 @@ moonshot the process is designed to decline."
 That last point is the actionable one: **splitting the re-screen cancel from the
 clock is a config change worth making**, because it is the only shape that buys
 faithfulness without taxing the tail.
+
+## Three follow-up questions, answered with data
+
+### Q1 — is an arbitrary upper bound (e.g. 183d) justified?
+
+**A bound is justified, but at ~3 years, not 26 weeks — and for absurdity, not
+return.** The >3yr bucket is not one outlier: 20 trades, **7 winners (+87,354)
+vs 13 losers (−241,360)**, largest win only +21,987. It is a systematically
+poor, **upside-free** population — no fat tail at all, which is exactly what
+distinguishes it.
+
+Correcting an earlier over-read in this note: 183-365d is **essentially
+break-even** (11 winners +318,283 vs 21 losers −328,456), not "bad", and the
+**1-3yr bucket is the best per-trade of any** (+10,857). A 26-week bound cuts
+that band. So the defensible bound is long — around 3 years — and its
+justification is removing 21-year resting orders, not improving return.
+
+### Q2 — wouldn't a later screen achieve the same as the later fill?
+
+**No, empirically.** Neither arm made a **2025 entry decision** for CHRW, JNJ or
+AMG:
+
+| symbol | 13 (ttl0) decisions | 15 (ttl4) decisions |
+|---|---|---|
+| CHRW | 2012-10-26, 2019-10-25, 2022-09-09 | 2012-10-26, 2021-11-05, 2022-09-09, 2023-02-24, 2023-05-19, 2024-12-20 |
+| JNJ | 2019-11-29, 2023-08-18 | 2022-12-23, 2024-08-09 |
+| AMG | 2024-12-27 | 2024-12-27 |
+
+The screener never re-selected these names at their 2025 breakout. Cell 13's
+2025 fills came entirely from 2022/2023/2024 tickets.
+
+And ttl4 was not short of opportunities — it placed **35% more tickets**
+(1,663 vs 1,235; 107 vs 71 in 2025), because each cancellation frees a slot. It
+spent those slots on *different* names, and the reallocation was worse: symbols
+only-15 returned +51,745 against only-13's +913,534.
+
+So a resting ticket is not merely an entry mechanism — it is a **commitment that
+holds a capital slot for one name at one price across time**. Cancelling
+reallocates that slot to whatever ranks best this week. Here, commitment beat
+reallocation: **35% more tickets, 28% less money.**
+
+### Q3 — what is the record arm doing right in 2020?
+
+Not catching the knife. Record's **March 2020** entries lost **−103,962** in
+aggregate, most stopped out within days — it caught falling knives and was cut.
+
+Its 2020 comes from four post-crash *recovery* entries:
+
+| | entry | fill | pnl | stop_dist |
+|---|---|---|---|---|
+| BFX | 2020-04-20 | $5.00 | +1,265,910 | 0.221 |
+| LOGI | 2020-05-04 | $48.52 | +1,114,624 | 0.068 |
+| COHU | 2020-09-28 | $17.05 | +1,102,958 | **0.440** |
+| BANB | 2020-04-06 | $196.20 | +830,586 | 0.050 |
+
+Cell 13 **never screened BFX, COHU or BANB at all** — zero decisions in 26 years.
+So this is not an entry-price or timing effect; the names never became
+candidates.
+
+The dominant cause is the same one that excludes AXTI, generalized:
+
+> **60.3% of record's trades (676/1121) have `stop_initial_distance_pct` > 15% —
+> the faithful arms' `max_stop_distance_pct` gate — and those trades carry
+> 60,402,579 of its 66,820,670 realized P&L: 90.4%.**
+
+Record's gate-passing trades earn **6,418,091**, against cell 13's 4,486,567 —
+the same order of magnitude. **Record's entire edge is the population the gate
+excludes.**
+
+That is not "doing something right" in a book sense: a stop 22-57% below entry
+is not a Weinstein stop, which sits just below the base. It is a different risk
+rule that occasionally returns 56×.
+
+⚠ Two of the four 2020 monsters (BANB 0.050, LOGI 0.068) **would** pass the 15%
+gate and cell 13 still never screened them. So there is a second, smaller
+selection effect beyond the stop gate — worth its own dissection.
+
+## The two concrete next moves
+
+1. **Re-test the TTL axis at values that matter.** {0, 4, 8} weeks was the wrong
+   range — 4 weeks cuts the best bucket's lower edge and 8 weeks barely clears
+   it. The evidence points at **{13, 26, 52} weeks**, where 26 keeps ~95% of
+   realized P&L and drops the destructive >3yr tail. This is cheap: the knob
+   already exists and is a `Variant_matrix` axis.
+2. **Split the knob.** `entry_order_ttl_weeks` currently arms the re-screen
+   cancel *and* the clock together (`weinstein_strategy_screening.ml:299`
+   returns `[]` at 0 without consulting the re-screen predicate). Separating
+   them allows the shape the book actually supports — cancel when the setup
+   breaks down (§4.7, §7), no arbitrary timer — which on this evidence is the
+   only variant that removes 21-year resting orders without also cancelling the
+   29-91d band that pays for the strategy.
+
+Note these compose: a long clock (26wk) as a backstop against the >3yr absurdity,
+plus re-screen cancel as the real mechanism, is a coherent and book-faithful
+design that no cell in v4 tested.
