@@ -156,17 +156,19 @@ function strip_trailing_comment_line(line,    i, n, c, prev, inquote, out) {
   # rather than a comment leader (check_universe_deps_test.sh assertion 19
   # pins the dangerous direction: without this guard, the escaped quote
   # closes the string early and a live run-target is truncated away as if
-  # it were a trailing comment). The rule is conservative BY CONSTRUCTION,
-  # not a faithful reimplementation of how dune itself escapes strings: it
-  # can only ever SUPPRESS a toggle, never ADD one, so its only failure mode
-  # is failing to strip a comment (retaining live text) -- it can never
-  # destroy live rule text. Known divergence from how dune itself handles
-  # escaping: a backslash that is itself the last character of an
+  # it were a trailing comment). This is a single-line parity scan, not a
+  # faithful reimplementation of how dune itself escapes strings. Known
+  # limitation: a backslash that is itself the second character of an
   # escaped-backslash pair immediately before a closing quote (e.g.
-  # "endswithbackslash\\") is misread as escaping that closing quote, which
-  # can leave quote state open for the remainder of the line -- still safe
-  # (a comment is retained unstripped, never live text deleted), just
-  # imprecise.
+  # "endswithbackslash\\") is misread as escaping that closing quote
+  # rather than terminating the backslash pair. That desyncs quote parity
+  # for the rest of the line, so a later real quote on the same line
+  # re-closes the string while dune is still inside it, and a live ";"
+  # after that point can then be read as a comment leader and truncated.
+  # This sequence does not occur in this repo today (no dune file under
+  # this checks directory contains a backslash immediately before a
+  # closing quote), so it is not a live defect, but it is a real gap in
+  # this scan, not a bound on it.
   inquote = 0
   out = ""
   n = length(line)
