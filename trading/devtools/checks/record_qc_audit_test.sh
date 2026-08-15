@@ -1536,6 +1536,13 @@ HOOK_DISABLE_VALUES=(0 false no yes true "")
 # array length is checked against. Update it only when deliberately changing
 # the documented "off" spelling contract -- never as a side effect of editing
 # the array above.
+#
+# Matches BOTH hooks' documented "off" spelling set (H-AUDIT-HOOK-DISABLE-
+# COUNT-DOCSTRING-DRIFT): write_audit.sh's BEFORE_RENAME and AFTER_RENAME
+# ACCEPTED SPELLING blocks are kept textually identical -- `0`, `false`,
+# `no`, `yes`, `true`, empty, unset all disable -- because both hooks gate
+# on the exact same `= "1"` comparison. This is not a superset applied to a
+# narrower hook; it is one spelling contract shared by both gates.
 HOOK_DISABLE_EXPECTED_COUNT=6
 
 # Renders HOOK_DISABLE_VALUES for the pass/fail messages below. Deriving the
@@ -1910,11 +1917,13 @@ EOF
 chmod +x "${WALKUP4_ROOT}/trading/devtools/checks/"*.sh
 PROBE29="${WALKUP4_ROOT}/trading/devtools/checks/_repo_root_probe.sh"
 
-# The three malformed REPO_ROOT shapes filed against this defect: a path
-# that doesn't exist at all, and a path that exists but is a regular file
-# (not a directory). `mktemp -u` reserves a name without creating it, so
-# BOGUS_MISSING29 is guaranteed absent; `mktemp` (no `-u`) creates
-# BOGUS_FILE29 as a real, ordinary file.
+# The two malformed REPO_ROOT shapes filed against this defect, plus the
+# deliberate `''` no-op: a path that doesn't exist at all, and a path that
+# exists but is a regular file (not a directory), are the malformed cases;
+# REPO_ROOT='' (pinned separately below as scenario 29c) is NOT malformed --
+# it is the documented no-op that behaves as unset. `mktemp -u` reserves a
+# name without creating it, so BOGUS_MISSING29 is guaranteed absent;
+# `mktemp` (no `-u`) creates BOGUS_FILE29 as a real, ordinary file.
 BOGUS_MISSING29="$(mktemp -u -t repo_root_bogus_missing.XXXXXX)"
 BOGUS_FILE29="$(mktemp -t repo_root_bogus_file.XXXXXX)"
 
