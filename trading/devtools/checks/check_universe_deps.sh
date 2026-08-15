@@ -149,8 +149,24 @@ function strip_trailing_comment_line(line,    i, n, c, prev, inquote, out) {
   # legal and the "MSG" value really does contain a ";" -- so a ";" seen
   # while inquote is true is live content, not a comment leader, and must
   # be preserved (measured against a real `dune build @sub/runtest` run;
-  # see the PR discussion for the exact repro). A `\"` escape does not
-  # toggle quote state, matching how dune escapes quotes in strings.
+  # see the PR discussion for the exact repro). A `"` immediately preceded
+  # by a "\" on the same line does not toggle quote state, so a `\"`-escaped
+  # quote inside a live string (e.g. "say \" hi; there") does not close it
+  # early -- this is what keeps the ";" that follows read as live content
+  # rather than a comment leader (check_universe_deps_test.sh assertion 19
+  # pins the dangerous direction: without this guard, the escaped quote
+  # closes the string early and a live run-target is truncated away as if
+  # it were a trailing comment). The rule is conservative BY CONSTRUCTION,
+  # not a faithful reimplementation of how dune itself escapes strings: it
+  # can only ever SUPPRESS a toggle, never ADD one, so its only failure mode
+  # is failing to strip a comment (retaining live text) -- it can never
+  # destroy live rule text. Known divergence from how dune itself handles
+  # escaping: a backslash that is itself the last character of an
+  # escaped-backslash pair immediately before a closing quote (e.g.
+  # "endswithbackslash\\") is misread as escaping that closing quote, which
+  # can leave quote state open for the remainder of the line -- still safe
+  # (a comment is retained unstripped, never live text deleted), just
+  # imprecise.
   inquote = 0
   out = ""
   n = length(line)

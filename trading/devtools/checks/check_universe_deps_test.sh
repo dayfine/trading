@@ -115,6 +115,20 @@
 #      was credited a silent false OK -- exactly the failure mode this
 #      guard exists to prevent. This pins the quote-aware fix against
 #      reintroducing it.
+#  19. Rework iter 2 (CP4, the "\"" escape-guard direction -- the
+#      dangerous one): same shape as #18 (run-target rule genuinely LACKS
+#      (universe), later dep-listing rule HAS it), but the quoted string
+#      on the run-target's own line carries an ESCAPED quote
+#      (`"say \" hi; there"`) before the live ";". If the escape guard in
+#      strip_trailing_comment_line() is deleted (inquote toggles
+#      unconditionally on every literal '"'), the escaped quote closes the
+#      string early, the ";" that follows is then read as an unquoted
+#      comment leader, and the "(run sh %{dep:...})" text after it on the
+#      same line is truncated away -- the script falls through to the
+#      dep-list branch and is credited a silent false OK, exactly the
+#      failure mode #18 pins for the unescaped case. This pins the escape
+#      guard itself (not just the base quote-awareness #17/#18 already
+#      cover) -> FAIL, attributed to (run-target).
 #
 # How to re-verify by hand:
 #   sh trading/devtools/checks/check_universe_deps_test.sh
@@ -927,6 +941,69 @@ else
 fi
 
 rm -f "${FIXTURE_CHECKS}/quote_semi2_check.sh" "${FIXTURE_CHECKS}/quote_wrapper2_test.sh"
+
+# ============================================================
+# Assertion 19 (rework iter 2 on H-CHECK-DUNE-COMMENT-GLUED-RULE, CP4 --
+# the "\"" escape-guard direction, the DANGEROUS one): same false-OK shape
+# as assertion 18 (rule A is the script's own run-target rule and
+# genuinely LACKS (universe); rule B, later in file order, lists the same
+# script as a plain dep and HAS (universe) -- correct resolution is via
+# the run-target branch -> FAIL), but this time the quoted string on rule
+# A's run-target line carries an ESCAPED quote before the live ";":
+# `(setenv MSG "say \" hi; there" (run sh %{dep:...}))`. Per dune's own
+# string escaping, `\"` is a literal quote character, not a close -- the
+# string stays open through "; there" and the run-target text after it on
+# the same line is preserved, so this must resolve exactly like #18 -> a
+# genuine FAIL. If the escape guard in strip_trailing_comment_line() is
+# removed (inquote toggles unconditionally on every literal '"', ignoring
+# whether it was preceded by a backslash), the escaped quote is
+# misread as a close: inquote flips to false, the very next ";" (still on
+# the same line, still meant as string content) is then read as an
+# unquoted comment leader, and everything after it -- including the
+# "(run sh %{dep:...})" run-target -- is truncated away. The script then
+# falls through to the dep-list branch (rule B) and is credited a silent
+# false OK: precisely the failure mode assertion 18 pins for the
+# unescaped case, one character (`\"` vs a bare `"`) away. This assertion
+# pins the escape guard itself.
+# ============================================================
+write_dune "universe" "universe" "universe" "universe" "universe" "universe" "universe" "universe"
+cat > "${FIXTURE_CHECKS}/quote_semi3_check.sh" <<'EOF'
+#!/bin/sh
+. "$(dirname "$0")/_check_lib.sh"
+echo "OK: quote_semi3_check read $(repo_root)/dev/status/quote3.md"
+EOF
+cat > "${FIXTURE_CHECKS}/quote_wrapper3_test.sh" <<'EOF'
+#!/bin/sh
+echo "quote_wrapper3 deps quote_semi3_check.sh"
+EOF
+cat >> "${FIXTURE_CHECKS}/dune" <<'EOF'
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (setenv MSG "say \" hi; there" (run sh %{dep:quote_semi3_check.sh}))))
+
+(rule
+ (alias runtest)
+ (deps quote_semi3_check.sh (universe))
+ (action
+  (run sh %{dep:quote_wrapper3_test.sh})))
+EOF
+
+set +e
+OUT19=$(REPO_ROOT="$FAKE_ROOT" sh "$CHECK" 2>&1)
+CODE19=$?
+set -e
+
+if [ "$CODE19" -ne 0 ] &&
+  echo "$OUT19" | grep -q "^FAIL: quote_semi3_check.sh calls repo_root() .*owning rule (run-target)"; then
+  ok "assertion 19 — an escaped quote (\\\") before a quoted \";\" does not hide a genuine missing-(universe) run-target rule (the dangerous false-OK direction)"
+else
+  bad "assertion 19 — expected non-zero exit with a FAIL for quote_semi3_check.sh naming owner (run-target); got exit=$CODE19 output=<<$OUT19>>"
+fi
+
+rm -f "${FIXTURE_CHECKS}/quote_semi3_check.sh" "${FIXTURE_CHECKS}/quote_wrapper3_test.sh"
 
 echo ""
 echo "check_universe_deps_test: ${PASS} passed, ${FAIL} failed"
