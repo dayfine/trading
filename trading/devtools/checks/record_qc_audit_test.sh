@@ -2265,7 +2265,7 @@ out34=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S34_DIR}/gh" \
 audit_count_after_34="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE34}.json" | wc -l | tr -d ' ')"
 
 if (( rc34 == 1 )) && [[ "${audit_count_before_34}" == "0" ]] && [[ "${audit_count_after_34}" == "0" ]] \
-   && echo "${out34}" | grep -q "failed (exit 0)" \
+   && echo "${out34}" | grep -q "returned no reviews and wrote to stderr (exit 0)" \
    && echo "${out34}" | grep -q "deprecated API version" \
    && echo "${out34}" | grep -q "dev/reviews/${FEATURE34}.md"; then
   pass "scenario 34 — gh exit 0 + stderr warning (empty stdout) refuses file-mode fallback, no record written (H-AUDIT-GH-FALLBACK-RESIDUAL)"
@@ -2361,6 +2361,84 @@ else
   fail "scenario 36 — expected rc=0 + APPROVED+APPROVED+score 4; got rc=${rc36}, output:"
   echo "${out36}" | sed 's/^/      /'
   [[ -f "${JSON36}" ]] && echo "      json: $(cat "${JSON36}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 37 — H-AUDIT-GH-STDERR-GATE-TOO-BROAD: gh exits 0 with a REAL
+# (non-empty) review payload on stdout AND a stderr warning (e.g. an
+# update-notifier line). Before this fix, the refusal condition was
+# `[ "$GH_RC" -ne 0 ] || [ -n "$GH_STDERR" ]` -- $BODIES appeared nowhere in
+# it, so this cell refused loudly (exit 1, no record, self-contradictory
+# "failed (exit 0)" message) even though gh had already handed back a
+# perfectly good, parseable review payload. Must now behave like scenario 36
+# (record written from the real PR reviews) and NOT fall back to the
+# companion dev/reviews/ file below, which deliberately holds a different
+# (wrong) verdict+score so a silent fallback would be caught by content, not
+# merely by exit code.
+# ---------------------------------------------------------------------------
+FEATURE37="gh-exit0-nonempty-stdout-with-stderr-not-refused"
+S37_DIR="${TMP_REPO}/s37"
+mkdir -p "${S37_DIR}"
+cat > "${S37_DIR}/reviews.txt" <<'EOF'
+STATE:APPROVED
+Reviewed SHA: real37
+
+## Structural QC — gh-exit0-nonempty-stdout-with-stderr-not-refused
+
+## Verdict
+APPROVED
+ENDBODY
+STATE:CHANGES_REQUESTED
+Reviewed SHA: real37
+
+## Behavioral QC — gh-exit0-nonempty-stdout-with-stderr-not-refused
+
+## Quality Score
+2 — real payload, must be used instead of the wrong fallback file
+
+## Verdict
+NEEDS_REWORK
+ENDBODY
+EOF
+cat > "${S37_DIR}/gh" <<EOF
+#!/bin/sh
+case "\$1 \$2" in
+  "pr view")
+    echo "gh: A new release of gh is available" >&2
+    cat "${S37_DIR}/reviews.txt"
+    ;;
+esac
+EOF
+chmod +x "${S37_DIR}/gh"
+
+# Companion file-mode review file, deliberately holding the WRONG (all
+# APPROVED, score 5) verdict -- proves a fix that accidentally fell back to
+# file mode instead of using the real PR payload would be caught here.
+cat > "${TMP_REPO}/dev/reviews/${FEATURE37}.md" <<'EOF'
+Reviewed SHA: unrelatedsha37
+
+structural_qc: APPROVED
+behavioral_qc: APPROVED
+overall_qc: APPROVED
+
+## Quality Score
+5 — this file belongs to a different run and must NOT be used
+EOF
+
+out37=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S37_DIR}/gh" \
+  bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+  "${FEATURE37}" "feat/dummy" "2026-05-25" --pr-number 3006 2>&1) && rc37=0 || rc37=$?
+JSON37="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE37}.json"
+if (( rc37 == 0 )) && [[ -f "${JSON37}" ]] \
+   && grep -q '"structural_qc": *"APPROVED"' "${JSON37}" \
+   && grep -q '"behavioral_qc": *"NEEDS_REWORK"' "${JSON37}" \
+   && grep -q '"overall_qc": *"NEEDS_REWORK"' "${JSON37}" \
+   && grep -q '"quality_score": *2' "${JSON37}"; then
+  pass "scenario 37 — gh exit 0, non-empty stdout + stderr warning: real PR payload recorded, not refused, not the wrong file-mode fallback (H-AUDIT-GH-STDERR-GATE-TOO-BROAD)"
+else
+  fail "scenario 37 — expected rc=0 + APPROVED/NEEDS_REWORK/NEEDS_REWORK/score 2 from the real payload (not the wrong file fixture, not a refusal); got rc=${rc37}, output:"
+  echo "${out37}" | sed 's/^/      /'
+  [[ -f "${JSON37}" ]] && echo "      json: $(cat "${JSON37}")"
 fi
 
 # ---------------------------------------------------------------------------

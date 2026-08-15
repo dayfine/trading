@@ -231,9 +231,16 @@ if [ -n "$PR_NUMBER" ]; then
   # silently fell through to the file-mode fallback below -- the same danger
   # the missing-binary guard exists to prevent, just via a different trigger.
   # Only "exit 0, empty stdout, no stderr" is treated as a genuine
-  # zero-review PR; any nonzero exit, OR any stderr output even alongside
-  # exit 0 (a warning-emitting gh is not a trustworthy empty result), refuses
-  # loudly instead -- mirroring the missing-binary message shape below.
+  # zero-review PR; any nonzero exit refuses loudly regardless of stdout, and
+  # an exit-0 call with stderr output but EMPTY stdout also refuses (a
+  # warning-emitting gh alongside no reviews is not a trustworthy empty
+  # result) -- mirroring the missing-binary message shape below. An exit-0
+  # call that returned a real (non-empty) review payload on stdout is used
+  # as-is even if gh also wrote something to stderr (e.g. an update-notifier
+  # line) -- H-AUDIT-GH-STDERR-GATE-TOO-BROAD: the original version of this
+  # check refused whenever stderr was non-empty regardless of $BODIES,
+  # discarding a perfectly good review payload and exiting 1 with the
+  # self-contradictory message "failed (exit 0)".
   GH_STDERR_FILE="$(mktemp)"
   BODIES="$("$GH_BIN" pr view "$PR_NUMBER" --json reviews \
     --jq '.reviews[] | "STATE:\(.state)\n\(.body)\nENDBODY"' \
@@ -241,8 +248,12 @@ if [ -n "$PR_NUMBER" ]; then
   GH_STDERR="$(cat "$GH_STDERR_FILE" 2>/dev/null || true)"
   rm -f "$GH_STDERR_FILE"
 
-  if [ "$GH_RC" -ne 0 ] || [ -n "$GH_STDERR" ]; then
-    echo "FAIL: --pr-number $PR_NUMBER was given but '$GH_BIN pr view' failed (exit $GH_RC)." >&2
+  if [ "$GH_RC" -ne 0 ] || { [ -n "$GH_STDERR" ] && [ -z "$BODIES" ]; }; then
+    if [ "$GH_RC" -ne 0 ]; then
+      echo "FAIL: --pr-number $PR_NUMBER was given but '$GH_BIN pr view' failed (exit $GH_RC)." >&2
+    else
+      echo "FAIL: --pr-number $PR_NUMBER was given but '$GH_BIN pr view' returned no reviews and wrote to stderr (exit 0)." >&2
+    fi
     if [ -n "$GH_STDERR" ]; then
       echo "  stderr: $GH_STDERR" >&2
     fi
@@ -321,8 +332,22 @@ if [ -n "$PR_NUMBER" ]; then
   fi
 fi
 
-# Fall back to file mode if --pr-number wasn't given OR the PR query returned nothing.
+# Fall back to file mode if --pr-number wasn't given OR the PR query returned
+# nothing. FILE_MODE records which branch we took: every REVIEW_FILE-reading
+# fallback below (the overall_qc anywhere-scan immediately following, plus
+# the ## Verdict block parsers further down) must consult dev/reviews/ ONLY
+# in this branch. A successful PR-mode run already fully resolves
+# STRUCTURAL/BEHAVIORAL from real PR review bodies; touching REVIEW_FILE at
+# all in that case risks silently overriding a correct PR-mode verdict with a
+# stale/unrelated file's content -- the same danger class the missing-binary
+# and gh-failure guards above exist to prevent, just reached through the
+# OVERALL field specifically. Found via H-AUDIT-GH-STDERR-GATE-TOO-BROAD
+# scenario 37: a companion dev/reviews file carrying a deliberately wrong
+# overall_qc leaked into an otherwise-correctly-resolved PR-mode record
+# because the scan below used to run unconditionally.
+FILE_MODE=0
 if [ -z "$STRUCTURAL" ] && [ -z "$BEHAVIORAL" ]; then
+  FILE_MODE=1
   _extract_verdict() {
     # $1 = field name (e.g. "overall_qc", "structural_qc", "behavioral_qc")
     # Returns the verdict (APPROVED|NEEDS_REWORK) or empty string.
@@ -335,8 +360,10 @@ if [ -z "$STRUCTURAL" ] && [ -z "$BEHAVIORAL" ]; then
   OVERALL="$(_extract_verdict "overall_qc")"
 fi
 
-# Fallback: scan for overall_qc anywhere in the file
-if [ -z "$OVERALL" ]; then
+# Fallback: scan for overall_qc anywhere in the file (file mode only -- see
+# FILE_MODE comment above; PR-mode must derive OVERALL from
+# STRUCTURAL/BEHAVIORAL alone, further down, never from REVIEW_FILE).
+if [ "$FILE_MODE" -eq 1 ] && [ -z "$OVERALL" ]; then
   OVERALL=$(grep -oE "overall_qc: (APPROVED|NEEDS_REWORK)" "$REVIEW_FILE" 2>/dev/null \
     | tail -1 | sed 's/.*: //' || true)
 fi
