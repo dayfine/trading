@@ -4,9 +4,9 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-14 run2 (orchestrator run 31800659453; main
-`4bda0ae0` -> `8c465194`). Shipped #2328; #2327 held in draft at rework
-1/2. Full narrative: `dev/daily/2026-08-14-run2.md`.
+Last updated: 2026-08-15 (orchestrator run 31872019203; main
+`4b7c410e` -> `1ee62725`). Shipped #2327 + #2334; #2335 open.
+Full narrative: `dev/daily/2026-08-15.md`.
 
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
@@ -54,7 +54,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2327 | H-REPO-ROOT-SET-BUT-INVALID MERGED #2328 `8c465194` (9 cells pinned, 9 mutations); #2327 glued-comment fix in rework 1/2 — behavioral found it introduces a latent false-OK |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2335 | #2327 `1ee62725` + #2334 `3eaa8676` MERGED; next: H-AUDIT-GH-STDERR-GATE-TOO-BROAD (one-line, verified fix) |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 8 open; A-NOOP-BUDGET-ORPHAN new (5 records recovered); A-FASTEXIT-VACUOUS now has measured cost; six items share the `workflow`-token blocker |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | segmentation weight caveats MERGED #2324 `4f602d0d`; 5 open; top item `linter_coverage` is a HUMAN POLICY DECISION (header half already shipped), not agent work |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
