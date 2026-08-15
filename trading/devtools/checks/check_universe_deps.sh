@@ -17,7 +17,16 @@
 # Method: parse trading/devtools/checks/dune into per-rule blocks (each
 # rule is blank-line-delimited and starts with "(rule" at column 0 — true
 # for every current rule in this file; see the parser's own self-check in
-# check_universe_deps_test.sh). Candidate scripts are found RECURSIVELY
+# check_universe_deps_test.sh). H-CHECK-DUNE-COMMENT-GLUED-RULE: a record
+# may carry a ";"-led explanatory comment glued directly above the rule
+# with no intervening blank line (dune permits this); such a record's raw
+# text starts with ";", not "(rule", so leading whole-line comments are
+# stripped from each record BEFORE the "(rule" classification test, not
+# after — see strip_leading_comments() below. strip_comments() (applied
+# once a record is classified as a rule) also strips TRAILING same-line
+# comments, not just whole-line ones, so a stray %{dep:...}-shaped snippet
+# inside a trailing comment cannot hijack the run-target regex below.
+# Candidate scripts are found RECURSIVELY
 # under trading/devtools/checks/ (any *.sh whose body contains the
 # substring "repo_root"), not just at the top level — see the CANDIDATES
 # scan below. For every candidate, find the rule that runs it (its
@@ -133,8 +142,89 @@ trap 'rm -f "$TMP_CAND" "$RESULT_FILE"' EXIT
 # H-CHECK-SETE-DIAGNOSTICS item tracks.
 set +e
 awk -v exceptions="$EXCEPTIONS_FILE" -v candfile="$TMP_CAND" '
-function strip_comments(b) {
+function strip_trailing_comment_line(line,    i, n, c, prev, inquote, out) {
+  # Quote-aware scan of a SINGLE physical line: truncate at the first ";"
+  # that is not inside a double-quoted dune string. Dune permits a literal
+  # ";" as string content -- e.g. (setenv MSG "step one; step two" ...) is
+  # legal and the "MSG" value really does contain a ";" -- so a ";" seen
+  # while inquote is true is live content, not a comment leader, and must
+  # be preserved (measured against a real `dune build @sub/runtest` run;
+  # see the PR discussion for the exact repro). A `"` immediately preceded
+  # by a "\" on the same line does not toggle quote state, so a `\"`-escaped
+  # quote inside a live string (e.g. "say \" hi; there") does not close it
+  # early -- this is what keeps the ";" that follows read as live content
+  # rather than a comment leader (check_universe_deps_test.sh assertion 19
+  # pins the dangerous direction: without this guard, the escaped quote
+  # closes the string early and a live run-target is truncated away as if
+  # it were a trailing comment). This is a single-line parity scan, not a
+  # faithful reimplementation of how dune itself escapes strings. Known
+  # limitation: a backslash that is itself the second character of an
+  # escaped-backslash pair immediately before a closing quote (e.g.
+  # "endswithbackslash\\") is misread as escaping that closing quote
+  # rather than terminating the backslash pair. That desyncs quote parity
+  # for the rest of the line, so a later real quote on the same line
+  # re-closes the string while dune is still inside it, and a live ";"
+  # after that point can then be read as a comment leader and truncated.
+  # This sequence does not occur in this repo today (no dune file under
+  # this checks directory contains a backslash immediately before a
+  # closing quote), so it is not a live defect, but it is a real gap in
+  # this scan, not a bound on it.
+  inquote = 0
+  out = ""
+  n = length(line)
+  for (i = 1; i <= n; i++) {
+    c = substr(line, i, 1)
+    if (c == "\"") {
+      prev = (i > 1) ? substr(line, i - 1, 1) : ""
+      if (prev != "\\") inquote = !inquote
+      out = out c
+      continue
+    }
+    if (c == ";" && !inquote) break
+    out = out c
+  }
+  return out
+}
+function strip_comments(b,    lines, n, i, out) {
+  # Whole-line comments: a ";" that is the first non-whitespace character
+  # after the start of the block or a newline.
   gsub(/(^|\n)[ \t]*;[^\n]*/, "\n", b)
+  # H-CHECK-DUNE-COMMENT-GLUED-RULE shape 2: TRAILING same-line comments,
+  # i.e. a ";" preceded by real content earlier on the same line. Applied
+  # AFTER the whole-line pass above, so only ";" characters that survived
+  # (never a line-start one) reach this pass. Quote-aware, per physical
+  # line, via strip_trailing_comment_line() above: a survivor ";" is only
+  # treated as a comment leader when it falls OUTSIDE a double-quoted
+  # string on its own line -- an unconditional "delete to end-of-line"
+  # here would also delete a live quoted ";" and anything after it on that
+  # line (measured false-FAIL / false-OK regression; see the PR
+  # discussion), which is why this is quote-aware rather than a single
+  # gsub.
+  n = split(b, lines, "\n")
+  out = ""
+  for (i = 1; i <= n; i++) {
+    out = out strip_trailing_comment_line(lines[i])
+    if (i < n) out = out "\n"
+  }
+  return out
+}
+function strip_leading_comments(b) {
+  # H-CHECK-DUNE-COMMENT-GLUED-RULE shape 1: strip contiguous whole-line
+  # ";" comments from the very FRONT of a paragraph-mode record, so a rule
+  # with an explanatory comment glued directly above it (no blank line
+  # separating them) is still classified as a rule by the /^\(rule/ test
+  # below. A record that is ENTIRELY comment lines (a genuinely
+  # commented-out / dead rule) reduces to its FINAL comment line, not the
+  # empty string: awk paragraph mode ($0 under RS="") strips the trailing
+  # newline off the record, so the last ";"-led line has no trailing "\n"
+  # left for the "\n"-anchored sub() below to consume, and the loop stops
+  # one line early. That reduced text still starts with ";" (never "(rule"),
+  # so classification is unaffected and still fails the test below --
+  # see check_universe_deps_test.sh assertion 13 -- but the mechanism is
+  # "stops at the last line", not "reduces to empty".
+  while (b ~ /^[ \t]*;[^\n]*\n/) {
+    sub(/^[ \t]*;[^\n]*\n/, "", b)
+  }
   return b
 }
 BEGIN {
@@ -204,8 +294,14 @@ BEGIN {
 
   RS = ""
 }
-/^\(rule/ {
-  block = strip_comments($0)
+{
+  # H-CHECK-DUNE-COMMENT-GLUED-RULE: strip leading comments BEFORE the
+  # "(rule" classification test below, not after -- see the
+  # strip_leading_comments doc comment above.
+  rec = strip_leading_comments($0)
+}
+rec ~ /^\(rule/ {
+  block = strip_comments(rec)
   hasuniv = (block ~ /\(universe\)/) ? 1 : 0
 
   # H-CHECK-RUNTARGET-PATHQUAL: the run-target name class must admit "/"
@@ -218,7 +314,7 @@ BEGIN {
   # its own. The misattribution is silent in both directions: a false
   # FAIL when the owning run-target rule is clean, and (worse) a false OK
   # when the owning run-target rule is the cache-blind one. See
-  # check_universe_deps_test.sh assertions 11-13.
+  # check_universe_deps_test.sh assertions 11-14.
   #
   # NOTE: no apostrophes anywhere in this awk program -- it is a single-
   # quoted shell string, so one would terminate it early.

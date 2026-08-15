@@ -80,6 +80,55 @@
 #      does not depend on strip_comments()'s whole-line-only behaviour,
 #      so it keeps discriminating once H-CHECK-DUNE-COMMENT-GLUED-RULE
 #      is fixed.
+#  15. H-CHECK-DUNE-COMMENT-GLUED-RULE shape 1: a rule preceded by a ";"
+#      comment GLUED directly onto it (no blank line separating them) must
+#      still be classified as a rule, so its run-target
+#      (subdir/glued_check.sh) resolves via that rule -> PASS. Pre-fix,
+#      awk paragraph mode treats the comment+rule text as one record
+#      starting with ";", which never matches /^\(rule/, so the rule (and
+#      its run-target) is invisible to the guard and the script is
+#      reported as unreferenced -- a genuine FAIL(pre-fix) ->
+#      PASS(post-fix) transition.
+#  16. H-CHECK-DUNE-COMMENT-GLUED-RULE shape 2: a decoy
+#      "(run sh %{dep:decoy_check.sh})" snippet inside a TRAILING same-line
+#      comment (glued onto "(alias runtest)", not its own whole line, so
+#      the pre-fix whole-line-only strip_comments() cannot remove it) must
+#      not hijack run-target resolution away from the real run-target
+#      (trailing_comment_check.sh) -> PASS. Pre-fix, the decoy appears
+#      earlier in the record than the real run-target, so awk match()'s
+#      first-match semantics resolve "runtarget" to the decoy name and the
+#      real script is reported as unreferenced.
+#  17. Rework iter 1 (B1, false FAIL direction): a ";" inside a
+#      DOUBLE-QUOTED dune string on the SAME line as the real run-target
+#      (dune permits a literal ";" as string content -- measured via a
+#      real `dune build @sub/runtest`) must not be treated as a trailing
+#      comment leader -> PASS, run-target still resolves. The first
+#      shape-2 fix (unconditional gsub(/;[^\n]*/, "", b)) deleted from
+#      that quoted ";" to end-of-line, destroying the run-target text on
+#      the same line -- a false FAIL this assertion pins against.
+#  18. Rework iter 1 (B1, false OK direction -- the dangerous one): same
+#      quoted-";" shape as #17, but the run-target's OWN rule genuinely
+#      LACKS (universe) while a later rule lists the script as a plain
+#      dep and HAS (universe) -> FAIL, attributed to (run-target). The
+#      first shape-2 fix's unconditional strip destroyed the run-target
+#      reference, so the script fell through to the dep-list branch and
+#      was credited a silent false OK -- exactly the failure mode this
+#      guard exists to prevent. This pins the quote-aware fix against
+#      reintroducing it.
+#  19. Rework iter 2 (CP4, the "\"" escape-guard direction -- the
+#      dangerous one): same shape as #18 (run-target rule genuinely LACKS
+#      (universe), later dep-listing rule HAS it), but the quoted string
+#      on the run-target's own line carries an ESCAPED quote
+#      (`"say \" hi; there"`) before the live ";". If the escape guard in
+#      strip_trailing_comment_line() is deleted (inquote toggles
+#      unconditionally on every literal '"'), the escaped quote closes the
+#      string early, the ";" that follows is then read as an unquoted
+#      comment leader, and the "(run sh %{dep:...})" text after it on the
+#      same line is truncated away -- the script falls through to the
+#      dep-list branch and is credited a silent false OK, exactly the
+#      failure mode #18 pins for the unescaped case. This pins the escape
+#      guard itself (not just the base quote-awareness #17/#18 already
+#      cover) -> FAIL, attributed to (run-target).
 #
 # How to re-verify by hand:
 #   sh trading/devtools/checks/check_universe_deps_test.sh
@@ -211,6 +260,42 @@ cat > "${FIXTURE_CHECKS}/runtarget_wrapper_test.sh" <<'EOF'
 echo "runtarget_wrapper deps subdir/runtarget_check.sh"
 EOF
 
+# --- Assertion 15 fixture (H-CHECK-DUNE-COMMENT-GLUED-RULE shape 1): a
+# script that is the run-target of a rule preceded by a ";" comment GLUED
+# directly onto it -- no blank line separates the comment from "(rule".
+# It is never mentioned anywhere else in the dune file, so before the fix
+# (which strips leading comments before the "/^\(rule/" classification
+# test) the whole comment+rule text is one paragraph-mode record starting
+# with ";", is never classified as a rule, and glued_check.sh is reported
+# as unreferenced. After the fix it resolves cleanly via its own
+# (universe)-declaring rule.
+mkdir -p "${FIXTURE_CHECKS}/subdir"
+cat > "${FIXTURE_CHECKS}/subdir/glued_check.sh" <<'EOF'
+#!/bin/sh
+. "$(dirname "$0")/../_check_lib.sh"
+echo "OK: glued_check read $(repo_root)/dev/status/glued.md"
+EOF
+
+# --- Assertion 16 fixture (H-CHECK-DUNE-COMMENT-GLUED-RULE shape 2): a
+# script whose OWN rule carries a decoy "(run sh %{dep:decoy_check.sh})"
+# snippet inside a TRAILING same-line comment (glued onto the "(alias
+# runtest)" line, not a whole-line comment) EARLIER in the record than the
+# real run-target. decoy_check.sh does not need to exist on disk -- it is
+# never scanned as a candidate; it only needs to be syntactically
+# %{dep:...}-shaped so the run-target regex can match it. Before the fix,
+# strip_comments() only strips WHOLE-LINE comments, so this trailing
+# comment survives into the block the run-target regex scans; awk
+# match()'s first-match semantics then hijack "runtarget" to the decoy
+# name, and trailing_comment_check.sh -- which is not listed anywhere else
+# -- is reported as unreferenced. After the fix (strip_comments() also
+# strips trailing same-line comments) only the real "(run sh
+# %{dep:trailing_comment_check.sh})" survives, and resolution is correct.
+cat > "${FIXTURE_CHECKS}/trailing_comment_check.sh" <<'EOF'
+#!/bin/sh
+. "$(dirname "$0")/_check_lib.sh"
+echo "OK: trailing_comment_check read $(repo_root)/dev/status/trailing.md"
+EOF
+
 write_dune() {
   # $1 = "universe" | "no-universe" for sample_check.sh's rule
   # $2 = "universe" | "no-universe" for wrapper_test.sh's rule (governs
@@ -230,6 +315,14 @@ write_dune() {
   # $6 = "universe" | "no-universe" for runtarget_wrapper_test.sh's rule,
   #      which lists subdir/runtarget_check.sh as a plain DEP (assertions
   #      11-12) -- defaults to "universe" (clean) when omitted.
+  # $7 = "universe" | "no-universe" for the glued-leading-comment rule
+  #      whose run-target is subdir/glued_check.sh (assertion 15,
+  #      H-CHECK-DUNE-COMMENT-GLUED-RULE shape 1) -- defaults to
+  #      "universe" (clean) when omitted.
+  # $8 = "universe" | "no-universe" for the trailing-same-line-comment
+  #      rule whose run-target is trailing_comment_check.sh (assertion 16,
+  #      H-CHECK-DUNE-COMMENT-GLUED-RULE shape 2) -- defaults to
+  #      "universe" (clean) when omitted.
   sample_deps="_check_lib.sh"
   [ "$1" = "universe" ] && sample_deps="_check_lib.sh (universe)"
   wrapper_deps="helper_with_repo_root.sh"
@@ -242,6 +335,10 @@ write_dune() {
   [ "${5:-universe}" = "universe" ] && runtarget_deps="_check_lib.sh (universe)"
   rtwrapper_deps="subdir/runtarget_check.sh"
   [ "${6:-universe}" = "universe" ] && rtwrapper_deps="subdir/runtarget_check.sh (universe)"
+  glued_deps="_check_lib.sh"
+  [ "${7:-universe}" = "universe" ] && glued_deps="_check_lib.sh (universe)"
+  trailing_deps="_check_lib.sh"
+  [ "${8:-universe}" = "universe" ] && trailing_deps="_check_lib.sh (universe)"
 
   cat > "${FIXTURE_CHECKS}/dune" <<EOF
 (rule
@@ -283,10 +380,12 @@ write_dune() {
 ;
 ; The blank line between this comment and the rule below is load-bearing:
 ; the guard parses DUNE_FILE in awk paragraph mode and only treats a
-; record starting with "(rule" as a rule, so a comment glued directly onto
-; a rule with no blank line makes that whole rule invisible to it. (That
-; is a separate latent gap, filed as H-CHECK-DUNE-COMMENT-GLUED-RULE; the
-; real dune file always separates them, as this fixture now does.)
+; record starting with "(rule" as a rule -- a comment glued directly onto
+; a rule with no blank line would otherwise make that whole rule invisible
+; to it (H-CHECK-DUNE-COMMENT-GLUED-RULE shape 1, fixed and pinned by
+; assertion 15 below via a DEDICATED fixture with a genuinely glued
+; comment; this particular comment keeps its blank-line separation so it
+; does not also perturb assertions 11-14's resolution).
 
 (rule
  (alias runtest)
@@ -299,6 +398,42 @@ write_dune() {
  (deps ${runtarget_deps})
  (action
   (run sh %{dep:subdir/runtarget_check.sh})))
+
+; H-CHECK-DUNE-COMMENT-GLUED-RULE shape 1 fixture (assertion 15): this
+; explanatory comment is GLUED directly onto the rule below -- there is
+; deliberately NO blank line between this comment paragraph and "(rule".
+; Before the fix, awk paragraph mode makes the whole comment+rule text one
+; record starting with ";", which never matches /^\(rule/, so this rule
+; (and subdir/glued_check.sh, its run-target) is invisible to the guard.
+(rule
+ (alias runtest)
+ (deps ${glued_deps})
+ (action
+  (run sh %{dep:subdir/glued_check.sh})))
+
+; H-CHECK-DUNE-COMMENT-GLUED-RULE shape 2 fixture (assertion 16): the
+; "(alias runtest)" line below carries a TRAILING same-line comment with a
+; decoy run-target snippet, "(run sh %{dep:decoy_check.sh})", that appears
+; EARLIER in this rule's paragraph-mode record than the real run-target.
+; decoy_check.sh is never created on disk -- it is not a candidate, it
+; only needs to be %{dep:...}-shaped so the run-target regex can match it.
+; Before the fix, strip_comments() only strips WHOLE-LINE comments, so
+; this trailing comment survives into the block the regex scans, and awk
+; match()'s first-match semantics hijack "runtarget" to the decoy name --
+; trailing_comment_check.sh (the real run-target, listed nowhere else)
+; then falls through to the dep-list branch, where it is not listed
+; either, and is reported as unreferenced.
+;
+; (Blank line below is deliberate, unlike assertion 15's fixture: this
+; rule's own explanatory comment is NOT glued to it, so assertion 16
+; isolates the TRAILING-comment mechanism only, independent of the
+; leading-comment fix that assertion 15 pins.)
+
+(rule
+ (alias runtest) ; legacy invocation, kept for reference: (run sh %{dep:decoy_check.sh})
+ (deps ${trailing_deps})
+ (action
+  (run sh %{dep:trailing_comment_check.sh})))
 EOF
 }
 
@@ -662,6 +797,213 @@ fi
 
 rm -f "${FIXTURE_CHECKS}/subdir/overmatch_check.sh" \
   "${FIXTURE_CHECKS}/overmatch_wrapper_test.sh"
+
+# ============================================================
+# Assertion 15 (H-CHECK-DUNE-COMMENT-GLUED-RULE shape 1): a rule preceded
+# by a ";" comment glued directly above it (no blank line) must still be
+# classified as a rule, so its run-target (subdir/glued_check.sh) resolves
+# via that rule -> PASS (the rule declares (universe)). Pre-fix, the whole
+# comment+rule text is one paragraph-mode record starting with ";", never
+# matches /^\(rule/, and subdir/glued_check.sh is reported as unreferenced
+# instead -- a FAIL, not the OK asserted here. This is a genuine
+# FAIL(pre-fix) -> PASS(post-fix) transition, not just a differently
+# worded FAIL.
+# ============================================================
+write_dune "universe" "universe" "universe" "universe" "universe" "universe"
+
+set +e
+OUT15=$(REPO_ROOT="$FAKE_ROOT" sh "$CHECK" 2>&1)
+CODE15=$?
+set -e
+
+if [ "$CODE15" -eq 0 ] &&
+  echo "$OUT15" | grep -q "^OK: subdir/glued_check.sh -- owning rule (run-target)"; then
+  ok "assertion 15 — a rule with a glued leading comment (no blank line above it) is still classified as a rule"
+else
+  bad "assertion 15 — expected exit 0 with 'OK: subdir/glued_check.sh -- owning rule (run-target)'; got exit=$CODE15 output=<<$OUT15>>"
+fi
+
+# ============================================================
+# Assertion 16 (H-CHECK-DUNE-COMMENT-GLUED-RULE shape 2): a decoy
+# "(run sh %{dep:decoy_check.sh})" snippet sitting inside a TRAILING
+# same-line comment (glued onto "(alias runtest)", not its own whole
+# line) must NOT hijack run-target resolution away from the rule's real
+# run-target (trailing_comment_check.sh) -> PASS. Pre-fix, strip_comments()
+# only strips WHOLE-LINE comments, so this trailing comment survives into
+# the block the run-target regex scans; since the decoy appears earlier in
+# the record than the real run-target, awk match()'s first-match semantics
+# hijack "runtarget" to the decoy name and trailing_comment_check.sh falls
+# through to the dep-list branch -- where it is not listed at all, so it
+# is reported as unreferenced. Same OUT15 run covers this assertion too
+# (both fixtures are present in the same write_dune call above).
+# ============================================================
+if [ "$CODE15" -eq 0 ] &&
+  echo "$OUT15" | grep -q "^OK: trailing_comment_check.sh -- owning rule (run-target)"; then
+  ok "assertion 16 — a decoy run-target snippet inside a trailing same-line comment does not hijack resolution"
+else
+  bad "assertion 16 — expected exit 0 with 'OK: trailing_comment_check.sh -- owning rule (run-target)'; got exit=$CODE15 output=<<$OUT15>>"
+fi
+
+# ============================================================
+# Assertion 17 (rework iter 1 on H-CHECK-DUNE-COMMENT-GLUED-RULE, B1): a
+# ";" inside a DOUBLE-QUOTED dune string, on the SAME line as the real
+# run-target, must NOT be treated as a trailing-comment leader. Dune
+# permits a literal ";" as string content -- measured against a real
+# `dune build @sub/runtest` run: `(setenv MSG "step one; step two" (run sh
+# %{dep:echo.sh}))` is legal dune and the %{dep:...} after the quoted ";"
+# on the same line is honoured. The FIRST shape-2 fix (an unconditional
+# gsub(/;[^\n]*/, "", b) second pass) did not know this: it deleted from
+# that quoted ";" all the way to end-of-line, destroying the
+# "(run sh %{dep:...})" text that followed it on the same line -- a false
+# FAIL ("not referenced by any runtest rule") for a script whose rule is
+# entirely correct. This pins the quote-aware replacement
+# (strip_trailing_comment_line()): the run-target survives and resolves.
+# ============================================================
+write_dune "universe" "universe" "universe" "universe" "universe" "universe" "universe" "universe"
+cat > "${FIXTURE_CHECKS}/quote_semi_check.sh" <<'EOF'
+#!/bin/sh
+. "$(dirname "$0")/_check_lib.sh"
+echo "OK: quote_semi_check read $(repo_root)/dev/status/quote.md"
+EOF
+cat >> "${FIXTURE_CHECKS}/dune" <<'EOF'
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (setenv MSG "step one; step two" (run sh %{dep:quote_semi_check.sh}))))
+EOF
+
+set +e
+OUT17=$(REPO_ROOT="$FAKE_ROOT" sh "$CHECK" 2>&1)
+CODE17=$?
+set -e
+
+if [ "$CODE17" -eq 0 ] &&
+  echo "$OUT17" | grep -q "^OK: quote_semi_check.sh -- owning rule (run-target)"; then
+  ok "assertion 17 — a \";\" inside a quoted dune string on the run-target's own line is not treated as a trailing comment"
+else
+  bad "assertion 17 — expected exit 0 with 'OK: quote_semi_check.sh -- owning rule (run-target)'; got exit=$CODE17 output=<<$OUT17>>"
+fi
+
+rm -f "${FIXTURE_CHECKS}/quote_semi_check.sh"
+
+# ============================================================
+# Assertion 18 (rework iter 1 on H-CHECK-DUNE-COMMENT-GLUED-RULE, B1 --
+# the DANGEROUS direction): rule A (the script's own run-target rule)
+# genuinely LACKS (universe) and carries a quoted ";" on its run-target
+# line; rule B (later in file order, listing the same script as a plain
+# dep) HAS (universe). Correct resolution is via the run-target branch
+# (rule A is consulted first) -> FAIL, a genuine H-CHECK-CACHE-BLIND
+# violation. The first shape-2 fix's unconditional strip destroyed rule
+# A's run-target reference on that line, so the script fell through to
+# the dep-list branch (rule B) and was credited a FALSE OK -- precisely
+# the failure mode this guard exists to prevent (see the "(worse) a false
+# OK when the owning run-target rule is the cache-blind one" note in
+# check_universe_deps.sh). This pins the quote-aware fix against silently
+# reintroducing that false OK.
+# ============================================================
+write_dune "universe" "universe" "universe" "universe" "universe" "universe" "universe" "universe"
+cat > "${FIXTURE_CHECKS}/quote_semi2_check.sh" <<'EOF'
+#!/bin/sh
+. "$(dirname "$0")/_check_lib.sh"
+echo "OK: quote_semi2_check read $(repo_root)/dev/status/quote2.md"
+EOF
+cat > "${FIXTURE_CHECKS}/quote_wrapper2_test.sh" <<'EOF'
+#!/bin/sh
+echo "quote_wrapper2 deps quote_semi2_check.sh"
+EOF
+cat >> "${FIXTURE_CHECKS}/dune" <<'EOF'
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (setenv MSG "step one; step two" (run sh %{dep:quote_semi2_check.sh}))))
+
+(rule
+ (alias runtest)
+ (deps quote_semi2_check.sh (universe))
+ (action
+  (run sh %{dep:quote_wrapper2_test.sh})))
+EOF
+
+set +e
+OUT18=$(REPO_ROOT="$FAKE_ROOT" sh "$CHECK" 2>&1)
+CODE18=$?
+set -e
+
+if [ "$CODE18" -ne 0 ] &&
+  echo "$OUT18" | grep -q "^FAIL: quote_semi2_check.sh calls repo_root() .*owning rule (run-target)"; then
+  ok "assertion 18 — a quoted \";\" does not hide a genuine missing-(universe) run-target rule (the dangerous false-OK direction)"
+else
+  bad "assertion 18 — expected non-zero exit with a FAIL for quote_semi2_check.sh naming owner (run-target); got exit=$CODE18 output=<<$OUT18>>"
+fi
+
+rm -f "${FIXTURE_CHECKS}/quote_semi2_check.sh" "${FIXTURE_CHECKS}/quote_wrapper2_test.sh"
+
+# ============================================================
+# Assertion 19 (rework iter 2 on H-CHECK-DUNE-COMMENT-GLUED-RULE, CP4 --
+# the "\"" escape-guard direction, the DANGEROUS one): same false-OK shape
+# as assertion 18 (rule A is the script's own run-target rule and
+# genuinely LACKS (universe); rule B, later in file order, lists the same
+# script as a plain dep and HAS (universe) -- correct resolution is via
+# the run-target branch -> FAIL), but this time the quoted string on rule
+# A's run-target line carries an ESCAPED quote before the live ";":
+# `(setenv MSG "say \" hi; there" (run sh %{dep:...}))`. Per dune's own
+# string escaping, `\"` is a literal quote character, not a close -- the
+# string stays open through "; there" and the run-target text after it on
+# the same line is preserved, so this must resolve exactly like #18 -> a
+# genuine FAIL. If the escape guard in strip_trailing_comment_line() is
+# removed (inquote toggles unconditionally on every literal '"', ignoring
+# whether it was preceded by a backslash), the escaped quote is
+# misread as a close: inquote flips to false, the very next ";" (still on
+# the same line, still meant as string content) is then read as an
+# unquoted comment leader, and everything after it -- including the
+# "(run sh %{dep:...})" run-target -- is truncated away. The script then
+# falls through to the dep-list branch (rule B) and is credited a silent
+# false OK: precisely the failure mode assertion 18 pins for the
+# unescaped case, one character (`\"` vs a bare `"`) away. This assertion
+# pins the escape guard itself.
+# ============================================================
+write_dune "universe" "universe" "universe" "universe" "universe" "universe" "universe" "universe"
+cat > "${FIXTURE_CHECKS}/quote_semi3_check.sh" <<'EOF'
+#!/bin/sh
+. "$(dirname "$0")/_check_lib.sh"
+echo "OK: quote_semi3_check read $(repo_root)/dev/status/quote3.md"
+EOF
+cat > "${FIXTURE_CHECKS}/quote_wrapper3_test.sh" <<'EOF'
+#!/bin/sh
+echo "quote_wrapper3 deps quote_semi3_check.sh"
+EOF
+cat >> "${FIXTURE_CHECKS}/dune" <<'EOF'
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh)
+ (action
+  (setenv MSG "say \" hi; there" (run sh %{dep:quote_semi3_check.sh}))))
+
+(rule
+ (alias runtest)
+ (deps quote_semi3_check.sh (universe))
+ (action
+  (run sh %{dep:quote_wrapper3_test.sh})))
+EOF
+
+set +e
+OUT19=$(REPO_ROOT="$FAKE_ROOT" sh "$CHECK" 2>&1)
+CODE19=$?
+set -e
+
+if [ "$CODE19" -ne 0 ] &&
+  echo "$OUT19" | grep -q "^FAIL: quote_semi3_check.sh calls repo_root() .*owning rule (run-target)"; then
+  ok "assertion 19 — an escaped quote (\\\") before a quoted \";\" does not hide a genuine missing-(universe) run-target rule (the dangerous false-OK direction)"
+else
+  bad "assertion 19 — expected non-zero exit with a FAIL for quote_semi3_check.sh naming owner (run-target); got exit=$CODE19 output=<<$OUT19>>"
+fi
+
+rm -f "${FIXTURE_CHECKS}/quote_semi3_check.sh" "${FIXTURE_CHECKS}/quote_wrapper3_test.sh"
 
 echo ""
 echo "check_universe_deps_test: ${PASS} passed, ${FAIL} failed"
