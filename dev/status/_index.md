@@ -4,9 +4,9 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-15 (orchestrator run 31884644256, run 2; main
-`5b2cf063` -> `700e298d`). Shipped #2335 + #2337; #2338/#2339 open.
-Full narrative: `dev/daily/2026-08-15-run2.md`.
+Last updated: 2026-08-16 (orchestrator run 31933953820; main
+`a2ad930c` -> `9f901d86`). Merged #2336/#2347/#2350/#2349/#2348;
+#2338/#2339/#2352 open. Full narrative: `dev/daily/2026-08-16.md`.
 
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
@@ -41,7 +41,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
 | [hybrid-tier](hybrid-tier.md) | MERGED | — | — | — |
-| [trade-audit](trade-audit.md) | IN_PROGRESS | feat-backtest | — | report-path position_id join MERGED #2323 (closes #2317's follow-up); next: Trade_audit_ratings still date-joined, so one report carries two join fidelities |
+| [trade-audit](trade-audit.md) | IN_PROGRESS | feat-backtest | — | ticket-cancel observability MERGED #2348 (3 gates); next: Trade_audit_ratings still date-joined, so one report carries two join fidelities |
 | [decision-audit](decision-audit.md) | MERGED | feat-backtest | — | #1799/#1806/#1811 MERGED (report+counterfactual+weekly-picks adapter); selection FAITHFUL; live-picks pipeline ready (#1812); next: matured weekly counterfactual |
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
@@ -54,14 +54,14 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2338, #2339 | #2335 `17173e6d` MERGED; #2338 gh-stderr gate (rework 1/2), #2339 rework-streak consumer (behavioral QC) |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2338, #2339 | #2338 rework 2/2 `ecafe950` (at cap), #2339 rework 1/2 `b3c65c07`; re-verify both gates at those tips |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 8 open; A-NOOP-BUDGET-ORPHAN new (5 records recovered); A-FASTEXIT-VACUOUS now has measured cost; six items share the `workflow`-token blocker |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | segmentation weight caveats MERGED #2324 `4f602d0d`; 5 open; top item `linter_coverage` is a HUMAN POLICY DECISION (header half already shipped), not agent work |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
 | [screener](screener.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | local-range entry anchor MERGED #2217 (default-off axis `entry_anchor_local_range_weeks`); next: re-run honest ladder with local-top-E arms, then WF-CV |
-| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | stop re-anchor to entry base MERGED #2219 (default-off, E-family gated); next: WF-CV the E-anchored family per the honest-ladder plan |
+| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | #2352 | TTL knob split MERGED #2349 (3 gates); #2352 Demote_over_max structural APPROVED, behavioral pending |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
 | [experiment-platform](experiment-platform.md) | IN_PROGRESS | feat-backtest | — | force-exit-off grid REJECTED for promotion (#1503); single-dial surface exhausted; next: continuation-buy recheck on top-3000 (data-gated) |
