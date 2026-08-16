@@ -362,6 +362,14 @@ let _build_step_result t ~portfolio ~portfolio_value ~trades ~orders ~today_bars
     had_market_bars = not (List.is_empty today_bars);
   }
 
+(* Notify the optional [on_transitions] observer. Called twice per step, and
+   deliberately not once: the portfolio-rejection cancels are applied in
+   [_process_fills_and_cancels], before the strategy is even called, so folding
+   them into the later notification would report them out of order. The second
+   call carries the strategy + margin transitions (#2057). *)
+let _notify_transitions ~on_transitions transitions =
+  Option.iter on_transitions ~f:(fun observe -> observe transitions)
+
 (* Execute pending orders, apply fills, and route rejected fills through
    {!Cancel_handler}. Returns post-fill (portfolio, positions, accepted). The
    Fix #1 next-open gate (default-off) defers Market entry fills past stale-bar
@@ -391,6 +399,11 @@ let _process_fills_and_cancels t ~portfolio ~positions ~today_bars =
     Cancel_handler.transitions_for_rejected_trades ~date:t.current_date
       ~positions ~rejected_trades
   in
+  (* The ONLY resolution a portfolio-rejected entry ticket gets; unannounced,
+     they left a quarter of all placed tickets resolving to nothing in
+     [trade_audit.sexp] (dev/notes/ticket-death-on-cash-2026-08-16.md G1).
+     Observational: [Stop_log] ignores [CancelEntry], no metric reads it. *)
+  _notify_transitions ~on_transitions:t.deps.on_transitions cancel_transitions;
   let%bind positions =
     _apply_transitions ~positions ~transitions:cancel_transitions
   in
@@ -402,15 +415,6 @@ let _process_fills_and_cancels t ~portfolio ~positions ~today_bars =
       ~rejected_trades
   in
   Ok (portfolio, positions, trades)
-
-(* Notify the optional [on_transitions] observer with this step's final
-   transition list (the strategy's surviving transitions plus any margin-
-   driven ones from [Margin_runner.tick], post same-tick dedup). Margin runs
-   unconditionally every step regardless of strategy cadence, so this is the
-   only point in the pipeline where every transition that will actually be
-   applied is visible in one place. See issue #2057. *)
-let _notify_transitions ~on_transitions transitions =
-  Option.iter on_transitions ~f:(fun observe -> observe transitions)
 
 (* F2 ticket lifecycle: retire the resting orders of any strategy-cancelled
    entry ticket. Must run BEFORE the transitions are applied — [positions] still
@@ -444,6 +448,7 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
       ~maintenance_long_pct:t.deps.maintenance_long_pct ~portfolio ~positions
       ~today_bars ~date:t.current_date ~strategy_transitions
   in
+  (* Strategy-side half only; the fill-rejection cancels were announced above. *)
   _notify_transitions ~on_transitions:t.deps.on_transitions transitions;
   _retire_cancelled_entry_orders t ~positions ~transitions;
   let%bind positions = _apply_transitions ~positions ~transitions in

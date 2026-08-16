@@ -148,6 +148,22 @@ type t = {
 
           [None] when the ticket did not resolve by cancellation — it filled, or
           it was still resting at end-of-run. *)
+  cancel_reason : string option; [@sexp.option]
+      (** The [CancelEntry] transition's own reason token, persisted verbatim.
+          Always [Some] exactly when {!ticket_age_weeks_at_cancel} is, and read
+          together with it: the age says {i how long} the ticket rested, this
+          says {i what killed it}. Three tokens exist —
+          {!Trading_simulation.Cancel_handler.portfolio_rejection_reason}
+          ([entry_fill_rejected_by_portfolio]) and
+          {!Weinstein_strategy.Entry_ticket_ttl}'s [entry_ticket_ttl_expired] /
+          [entry_ticket_requalification_failed].
+
+          The distinction is load-bearing, not cosmetic. The two TTL tokens are
+          {b decisions} the strategy took; the rejection token is an
+          {b accident of capital timing} — a ticket that triggered, filled at
+          the engine, and was then refused because the book could not fund it
+          (dev/notes/ticket-death-on-cash-2026-08-16.md). Averaging a cancel-age
+          column across both populations mixes a policy with a failure. *)
   ticket_age_weeks_at_fill : int option; [@sexp.option]
       (** Whole weeks the ticket rested before it {b filled} — set by
           {!Execution_faithfulness.enrich} from the matched round-trip's
@@ -203,9 +219,10 @@ val resolve :
   t option ->
   fill_volume:fill_volume_check option ->
   cancel_age_weeks:int option ->
+  cancel_reason:string option ->
   t option
 (** Fold the collector-side observations (the F5 fill-week check and the cancel
-    age) into a placement-time record. [None] in ⇒ [None] out: a
+    age + reason) into a placement-time record. [None] in ⇒ [None] out: a
     [trade_audit.sexp] row written before PR-5 has no lifecycle to merge into
     and is never given one. Both arguments are [None] on a row whose ticket
     simply filled under an unarmed F5 config — the no-observation case, not a
