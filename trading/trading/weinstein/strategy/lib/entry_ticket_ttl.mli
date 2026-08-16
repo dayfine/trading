@@ -25,32 +25,42 @@
       {!Screener.shorts_admitted_by_macro} gates the cascade itself uses, so
       re-screen and screen cannot drift.
     - {b Backstop — clock TTL.} The ticket has rested strictly longer than
-      [ttl_weeks] weekly reviews without filling. The book grants cancel
-      authority but names no number, so this is a {b BOOK-NEUTRAL dial} (the
-      13-weeks-no-revalidation cell is the least book-like one).
+      [max_rest_weeks] weekly reviews without filling. The book grants cancel
+      authority but names no number, so this is a {b BOOK-NEUTRAL dial}.
+
+    {b The two are independently armed} ([rescreen] / [max_rest_weeks]) as of
+    2026-08-16, defect C of [dev/plans/entry-anchor-and-ttl-2026-08-15.md]. They
+    used to share one [ttl_weeks] knob that returned [[]] at [0] without even
+    consulting the re-screen predicate, so the book-supported half was
+    unreachable without the invented one. That conflation is also why the
+    ladder-v4 finding — ttl4 and ttl8 indistinguishable against a 132.5pp null,
+    i.e. the re-screen doing the work and the number being free — could not be
+    stated as a config fact before now.
 
     Cancellation emits a [Position.CancelEntry] transition. The strategy is the
     only decider; the simulator's matching order-cancel path lives in
     {!Trading_simulation.Cancel_handler.cancel_resting_entry_orders} (without it
     a "cancelled" ticket would still fill).
 
-    {b Default-off (R1).} [ttl_weeks = 0] returns [[]] unconditionally and never
-    touches the pin table — no clock cancel, no re-screen cancel, weekly
-    re-issue and GTC-forever persistence exactly as before. This {b extends} the
-    persistence contract; it does not weaken it. *)
+    {b Default-off (R1).} [rescreen = false] with [max_rest_weeks = 0] returns
+    [[]] unconditionally and never touches the pin table — no clock cancel, no
+    re-screen cancel, weekly re-issue and GTC-forever persistence exactly as
+    before, i.e. the old [ttl_weeks = 0]. This {b extends} the persistence
+    contract; it does not weaken it. *)
 
 open Core
 module Position = Trading_strategy.Position
 
 val cancellations :
-  ttl_weeks:int ->
+  rescreen:bool ->
+  max_rest_weeks:int ->
   positions:Position.t String.Map.t ->
   still_qualifies:(symbol:string -> side:Position.position_side -> bool) ->
   current_date:Date.t ->
   Position.transition list
-(** [cancellations ~ttl_weeks ~positions ~still_qualifies ~current_date] returns
-    one [CancelEntry] transition per resting ticket that should be cancelled, in
-    [positions] key order.
+(** [cancellations ~rescreen ~max_rest_weeks ~positions ~still_qualifies
+     ~current_date] returns one [CancelEntry] transition per resting ticket that
+    should be cancelled, in [positions] key order.
 
     A position is considered only when it is [Entering] with
     [filled_quantity = 0.0]. Partially-filled entries are deliberately skipped:
@@ -62,17 +72,23 @@ val cancellations :
     order-lifecycle rule, not an exit rule.
 
     A qualifying ticket is cancelled when either:
-    - [still_qualifies ~symbol ~side] is [false] (primary), or
-    - it has rested more than [ttl_weeks] whole weeks (backstop). Age is
-      [Date.diff current_date created_date / 7] against the [Entering] state's
-      [created_date], so a ticket placed on review week 0 survives review week
-      [ttl_weeks] and is cancelled at review week [ttl_weeks + 1].
+    - [rescreen] is [true] and [still_qualifies ~symbol ~side] is [false]
+      (primary), or
+    - [max_rest_weeks > 0] and it has rested more than that many whole weeks
+      (backstop). Age is [Date.diff current_date created_date / 7] against the
+      [Entering] state's [created_date], so a ticket placed on review week 0
+      survives review week [max_rest_weeks] and is cancelled at review week
+      [max_rest_weeks + 1]. [max_rest_weeks <= 0] means {b unbounded}, not "off"
+      — the re-screen still runs when [rescreen] is set.
 
-    Returns [[]] when [ttl_weeks <= 0] — [still_qualifies] is not even consulted
+    The re-screen is evaluated first, so its reason wins when both would fire.
+
+    Returns [[]] when neither is armed — [still_qualifies] is not even consulted
     (R1). *)
 
 val run :
-  ttl_weeks:int ->
+  rescreen:bool ->
+  max_rest_weeks:int ->
   pending_entry_e:Entry_freeze.t ->
   positions:Position.t String.Map.t ->
   still_qualifies:(symbol:string -> side:Position.position_side -> bool) ->

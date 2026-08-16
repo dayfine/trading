@@ -107,7 +107,7 @@ it does not, plan §5's stop rule applies — **re-dissect, do not knob-search.*
 | axis | config field | PR |
 |---|---|---|
 | freshness basis | `entry_freshness_basis` | #2261 |
-| ticket TTL | `entry_order_ttl_weeks` | #2263 |
+| ticket TTL | `enable_entry_ticket_rescreen` + `entry_order_max_rest_weeks` | #2263 |
 | stop width | `stop_width_mode`, `stop_width_size_down_max_pct`, `stops_config.support_floor_anchor_scope` | #2258 |
 | volume confirm | `volume_confirm_at_fill` | #2267 |
 | audit fields | (measurement only) | #2270 |

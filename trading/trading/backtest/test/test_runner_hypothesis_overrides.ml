@@ -797,55 +797,81 @@ let test_failed_breakout_tolerance_axis_resolves_via_overlay_validator _ =
   assert_that merged.screening_config.failed_breakout_tolerance_pct
     (float_equal 0.03)
 
-(** F2 (plan [dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F2) R1: the
-    resting-entry-ticket lifetime defaults to [0] — no clock cancel, no
-    re-screen cancel, GTC-forever persistence exactly as before. *)
-let test_default_entry_order_ttl_weeks_is_zero _ =
-  assert_that (_default_config ()).entry_order_ttl_weeks (equal_to 0)
+(** F2 (plan [dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F2) R1: both
+    halves of the resting-entry-ticket lifecycle default to off — no clock
+    cancel, no re-screen cancel, GTC-forever persistence exactly as before.
+    Asserted as a pair because the pair, not either field alone, is what
+    reproduces the retired [entry_order_ttl_weeks = 0]. *)
+let test_default_entry_ticket_lifecycle_is_off _ =
+  assert_that
+    ( (_default_config ()).enable_entry_ticket_rescreen,
+      (_default_config ()).entry_order_max_rest_weeks )
+    (equal_to (false, 0))
 
-(** F2 R2 (axis reachability): [((entry_order_ttl_weeks (0 4 8)))] must be a
-    valid [Variant_matrix] axis, which requires each value to resolve through
-    the {b real} [Overlay_validator.apply_overrides] with no unknown-key error.
-*)
-let test_entry_order_ttl_weeks_axis_resolves_via_overlay_validator _ =
-  let armed_to n =
-    (Backtest.Overlay_validator.apply_overrides (_default_config ())
-       [ Sexp.of_string (Printf.sprintf "((entry_order_ttl_weeks %d))" n) ])
-      .entry_order_ttl_weeks
+(** F2 R2 (axis reachability): both fields must be valid [Variant_matrix] axes,
+    which requires each value to resolve through the {b real}
+    [Overlay_validator.apply_overrides] with no unknown-key error. The clock's
+    values are the defect-D re-test range {13, 26, 52} — the range the original
+    {0, 4, 8} axis never reached (28 days cuts the lower edge of the 29-91d
+    bucket, 16% of trades and 28% of realized P&L). *)
+let test_entry_ticket_lifecycle_axes_resolve_via_overlay_validator _ =
+  let apply s =
+    Backtest.Overlay_validator.apply_overrides (_default_config ())
+      [ Sexp.of_string s ]
+  in
+  let rescreen_to b =
+    (apply (Printf.sprintf "((enable_entry_ticket_rescreen %b))" b))
+      .enable_entry_ticket_rescreen
+  in
+  let clock_to n =
+    (apply (Printf.sprintf "((entry_order_max_rest_weeks %d))" n))
+      .entry_order_max_rest_weeks
   in
   assert_that
-    [ armed_to 0; armed_to 4; armed_to 8 ]
-    (elements_are [ equal_to 0; equal_to 4; equal_to 8 ])
+    ( [ rescreen_to true; rescreen_to false ],
+      [ clock_to 0; clock_to 13; clock_to 26; clock_to 52 ] )
+    (equal_to ([ true; false ], [ 0; 13; 26; 52 ]))
 
-(** Back-compat: a strategy config sexp written before F2 (no
-    [entry_order_ttl_weeks] field at all) still parses, defaulting to the [0]
-    no-op via [@sexp.default 0]. Proven by stripping the field from the
-    serialized default config and parsing the result. *)
-let test_strategy_config_parses_with_entry_order_ttl_weeks_absent _ =
+(** Back-compat: a strategy config sexp written before these fields existed
+    still parses, defaulting to the off pair via their [@sexp.default]s. Proven
+    by stripping both fields from the serialized default config and parsing the
+    result. *)
+let test_strategy_config_parses_with_lifecycle_fields_absent _ =
+  let dropped =
+    [ "enable_entry_ticket_rescreen"; "entry_order_max_rest_weeks" ]
+  in
   let stripped =
     match Weinstein_strategy.sexp_of_config (_default_config ()) with
     | Sexp.List fields ->
         Sexp.List
           (List.filter fields ~f:(function
-            | Sexp.List [ Sexp.Atom "entry_order_ttl_weeks"; _ ] -> false
+            | Sexp.List [ Sexp.Atom name; _ ] ->
+                not (List.mem dropped name ~equal:String.equal)
             | _ -> true))
     | other -> other
   in
   assert_that
     (Weinstein_strategy.config_of_sexp stripped)
-    (field
-       (fun (c : Weinstein_strategy.config) -> c.entry_order_ttl_weeks)
-       (equal_to 0))
+    (all_of
+       [
+         field
+           (fun (c : Weinstein_strategy.config) ->
+             c.enable_entry_ticket_rescreen)
+           (equal_to false);
+         field
+           (fun (c : Weinstein_strategy.config) -> c.entry_order_max_rest_weeks)
+           (equal_to 0);
+       ])
 
 let suite =
   "Runner_hypothesis_overrides"
   >::: [
-         "F2: entry_order_ttl_weeks defaults to 0"
-         >:: test_default_entry_order_ttl_weeks_is_zero;
-         "F2: entry_order_ttl_weeks resolves as a Variant_matrix axis"
-         >:: test_entry_order_ttl_weeks_axis_resolves_via_overlay_validator;
-         "F2: config parses with entry_order_ttl_weeks absent"
-         >:: test_strategy_config_parses_with_entry_order_ttl_weeks_absent;
+         "F2: the ticket-lifecycle pair defaults to off"
+         >:: test_default_entry_ticket_lifecycle_is_off;
+         "F2: both lifecycle fields resolve as Variant_matrix axes"
+         >:: test_entry_ticket_lifecycle_axes_resolve_via_overlay_validator;
+         "F2: config parses with both lifecycle fields absent"
+         >:: test_strategy_config_parses_with_lifecycle_fields_absent;
          "default config preserves current behaviour"
          >:: test_default_preserves_current_behaviour;
          "override: bar_history_max_lookback_days round-trips through sexp"
