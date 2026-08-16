@@ -2504,6 +2504,61 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 39 — H-AUDIT-SHA-FILE-LEAK: PR mode, structural-only review whose
+# body carries NO "Reviewed SHA:" line (so $BODIES yields no match), with a
+# companion dev/reviews/<feature>.md left over from an UNRELATED run
+# carrying a conflicting "Reviewed SHA:" line. Before this fix, the
+# "Reviewed SHA" extractor (record_qc_audit.sh:~506-507, pre-fix unguarded)
+# ran unconditionally whenever BODIES yielded no "Reviewed SHA:" line --
+# including in PR mode -- and would read the unrelated file's
+# "Reviewed SHA: FOREIGNSHA99" into the SHA field, mis-keying
+# write_audit.sh's consecutive_rework_count identity check. The correct
+# result leaves sha at its "" default and ignores the companion file
+# entirely, because this is a genuine PR-mode run (FILE_MODE must stay 0).
+# ---------------------------------------------------------------------------
+FEATURE39="structural-only-pr-mode-no-sha-file-leak"
+S39_DIR="${TMP_REPO}/s39"
+mkdir -p "${S39_DIR}"
+cat > "${S39_DIR}/reviews.txt" <<'EOF'
+STATE:APPROVED
+
+## Structural QC — structural-only-pr-mode-no-sha-file-leak
+
+## Verdict
+APPROVED
+ENDBODY
+EOF
+make_gh_mock "${S39_DIR}" "${S39_DIR}/reviews.txt"
+
+# Companion file-mode review file, left over from an unrelated run, holding
+# a deliberately foreign SHA. Must NOT be consulted: this PR-mode call's
+# BODIES has no "Reviewed SHA:" line, and per the fix, sha must fall through
+# to its "" default rather than reading this file.
+cat > "${TMP_REPO}/dev/reviews/${FEATURE39}.md" <<'EOF'
+Reviewed SHA: FOREIGNSHA99
+
+## Verdict
+APPROVED
+
+## Quality Score
+5 — this file belongs to a different run and must NOT be used
+EOF
+
+out39=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S39_DIR}/gh" \
+  bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+  "${FEATURE39}" "feat/dummy" "2026-05-25" --pr-number 3008 2>&1) && rc39=0 || rc39=$?
+JSON39="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE39}.json"
+if (( rc39 == 0 )) && [[ -f "${JSON39}" ]] \
+   && grep -q '"structural_qc": *"APPROVED"' "${JSON39}" \
+   && grep -q '"sha": *""' "${JSON39}"; then
+  pass "scenario 39 — PR mode, structural-only review with no Reviewed SHA line: sha stays empty, not leaked from an unrelated dev/reviews/ file (H-AUDIT-SHA-FILE-LEAK)"
+else
+  fail "scenario 39 — expected rc=0 + structural_qc APPROVED + sha \"\" (not leaked from the wrong file fixture); got rc=${rc39}, output:"
+  echo "${out39}" | sed 's/^/      /'
+  [[ -f "${JSON39}" ]] && echo "      json: $(cat "${JSON39}")"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""

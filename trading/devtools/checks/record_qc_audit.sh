@@ -333,27 +333,29 @@ if [ -n "$PR_NUMBER" ]; then
 fi
 
 # Fall back to file mode if --pr-number wasn't given OR the PR query returned
-# nothing. FILE_MODE records which branch we took. Exactly four sites below
+# nothing. FILE_MODE records which branch we took. Exactly five sites below
 # key off FILE_MODE to consult dev/reviews/ ONLY when FILE_MODE=1: (1) the
 # overall_qc anywhere-scan immediately following, (2) the STRUCTURAL
-# ## Verdict block parser, (3) the BEHAVIORAL ## Verdict block parser, and
-# (4) the file-mode quality-score extractor further down. A successful
-# PR-mode run already fully resolves those four fields from real PR review
-# bodies; touching REVIEW_FILE at all in that case risks silently overriding
-# a correct PR-mode verdict with a stale/unrelated file's content -- the same
-# danger class the missing-binary and gh-failure guards above exist to
-# prevent, just reached through the OVERALL field specifically. Found via
+# ## Verdict block parser, (3) the BEHAVIORAL ## Verdict block parser, (4) the
+# file-mode quality-score extractor further down, and (5) the "Reviewed SHA"
+# extractor further down (:506-507). A successful PR-mode run already fully
+# resolves those five fields from real PR review bodies; touching REVIEW_FILE
+# at all in that case risks silently overriding a correct PR-mode verdict
+# with a stale/unrelated file's content -- the same danger class the
+# missing-binary and gh-failure guards above exist to prevent, just reached
+# through the OVERALL field specifically. Found via
 # H-AUDIT-GH-STDERR-GATE-TOO-BROAD scenario 37: a companion dev/reviews file
 # carrying a deliberately wrong overall_qc leaked into an
 # otherwise-correctly-resolved PR-mode record because the scan below used to
 # run unconditionally.
 #
-# NOT covered by this FILE_MODE gate: the "Reviewed SHA" extractor below
-# (~:497-498) reads REVIEW_FILE unconditionally whenever BODIES yields no
-# "Reviewed SHA:" line, including in PR mode -- a companion dev/reviews file
-# can leak a foreign SHA into an otherwise-correct PR-mode record. This is a
-# known, pre-existing, ungated residual, not fixed by this comment or by the
-# guards above it. See H-AUDIT-SHA-FILE-LEAK (dev/status/harness.md).
+# The "Reviewed SHA" extractor (:506-507) was itself the last ungated site
+# until H-AUDIT-SHA-FILE-LEAK (dev/status/harness.md): it used to read
+# REVIEW_FILE unconditionally whenever BODIES yielded no "Reviewed SHA:"
+# line, including in PR mode, letting a companion dev/reviews file leak a
+# foreign SHA into an otherwise-correct PR-mode record. It is now gated like
+# the other four; this comment documents the closed list above rather than a
+# residual gap.
 FILE_MODE=0
 if [ -z "$STRUCTURAL" ] && [ -z "$BEHAVIORAL" ]; then
   FILE_MODE=1
@@ -503,7 +505,7 @@ SHA=""
 if [ -n "${BODIES:-}" ]; then
   SHA="$(echo "$BODIES" | grep -oE '^Reviewed SHA: .*' | tail -1 | sed 's/^Reviewed SHA: *//' | cut -c1-12 || true)"
 fi
-if [ -z "$SHA" ] && [ -f "$REVIEW_FILE" ]; then
+if [ "$FILE_MODE" -eq 1 ] && [ -z "$SHA" ] && [ -f "$REVIEW_FILE" ]; then
   SHA="$(grep -oE '^Reviewed SHA: .*' "$REVIEW_FILE" 2>/dev/null | tail -1 | sed 's/^Reviewed SHA: *//' | cut -c1-12 || true)"
 fi
 
