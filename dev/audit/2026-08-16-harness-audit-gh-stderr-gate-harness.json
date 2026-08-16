@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-16",
+  "feature": "harness",
+  "branch": "harness/audit-gh-stderr-gate",
+  "sha": "ecafe950a2adacac828b6f1e7591c6bf0eaaaded",
+  "recorded_at_ns": 1786869314507792095,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
