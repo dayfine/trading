@@ -141,3 +141,33 @@ Three to pin, each a small universe over a short window (seconds to run):
   the wrong thing" held for AXTI but not BFX, which is a *correct* rejection at
   2.2× its 30-week MA. The 30-week MA was the check that separated them, and it
   should have been the first thing pulled.
+
+---
+
+## Rebuilding the task list
+
+The harness task list is **scoped to a session UUID**
+(`~/.claude/tasks/<uuid>/N.json`), so a new session starts empty. This doc is
+the durable copy — recreate the list from the table below.
+
+The 2026-08-15 session's tasks are still readable at
+`~/.claude/tasks/f38d1024-5259-467e-95cf-9aa2c8fe4ddb/` if the full
+descriptions are wanted.
+
+| # | task | state | blocked by |
+|---|---|---|---|
+| 15 | nearfloor confirmation grid (7 runs, narrowed) | **in flight** | — |
+| 22 | why did zero AXTI tickets fill? | pending | — |
+| 14 | **[F, queue 1]** emit utilization + E-provenance into artifacts | pending | — |
+| 16 | **[C+E, queue 2]** split the TTL knob; bound the clock ~3yr | pending | — |
+| 17 | **[A, queue 3]** fix the stale entry anchor E | pending | **22** |
+| 18 | **[D, queue 4]** re-test TTL at {13, 26, 52} weeks | pending | **16** |
+| 19 | **[B, queue 5]** make the 15% stop rule a demotion | pending | — |
+| 20 | turn the dissections into pinned scenario tests | pending | — |
+| 8 | recompute async `exit_trigger` groupings post-fix | pending | — |
+| 10 | attack the 808s per-run floor | pending | — |
+| 13 | candidate supply vs capital capacity | pending | — |
+
+**Suggested opening move:** check the grid (15), then start **F (14)** — it is
+pure emission, blocks nothing, and A is measured through it. Do **not** start A
+(17) before resolving 22.
