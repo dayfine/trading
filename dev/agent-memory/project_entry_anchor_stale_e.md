@@ -5,7 +5,27 @@ metadata:
   node_type: memory
   type: project
   originSessionId: f38d1024-5259-467e-95cf-9aa2c8fe4ddb
-  modified: 2026-08-16T01:54:41.473Z
+  modified: 2026-08-16T07:52:28.041Z
+---
+
+## ⚠ SCOPE CORRECTED 2026-08-16 — read [[project-stop-gate-not-entry-anchor]] first
+
+This file is **only about configs with `entry_anchor_local_range_weeks = 0`**
+(its default), where `Screener._build_candidate` falls back to the resistance
+`breakout_price` — which can be years old.
+
+With the knob **armed** (every ladder-v4 arm sets 4), the anchor is the max high
+over the last **4 weekly bars** and cannot be stale: `suggested_entry` is
+bit-identical between a 26-year and a 2.5-year run. AXTI's E is **2.71, not
+4.05**, in every armed arm, and it is rejected **21×** by the *stop-width* gate,
+not by E. The "AXTI E = 4.05 = 2.25× its MA" reading below is therefore an
+**unarmed-arm** measurement, not a general property, and the conclusion drawn
+from it — that fixing E would admit AXTI — is wrong for the armed arms.
+
+What survives: the *mechanism* (E anchors on a possibly-old high when the local
+range knob is off) and the BFX/AXTI 30-week-MA discriminator. What does not: the
+prioritisation, and "the window could not see far enough back".
+
 ---
 
 `E = round2(entry_anchor × (1 + entry_buffer_pct))`, `entry_buffer_pct = 0.005`
