@@ -185,20 +185,33 @@ done
 # last occurrence").
 #
 # Tie-break when two records for one feature share the same
-# recorded_at_ns (only possible for legacy records predating the field,
-# which all default to 0 — see below): prefer the HIGHER count. This
-# favors escalating over silently dropping a real streak when write
-# order can't be determined, consistent with write_audit.sh's own stated
-# preference (see its H-PREV-VERDICT-PIPEFAIL discussion: "a missed
-# escalation is a much worse failure than an occasional
-# over-sensitive one").
+# recorded_at_ns: prefer the HIGHER count. Ties are NOT limited to
+# legacy records predating the field — write_audit.sh itself falls back
+# to whole-second resolution (scaled to ns) on any platform without GNU
+# `date +%s%N`, so two MODERN records written in the same second can tie
+# too, and WRITE_AUDIT_RECORDED_AT_NS can set the value directly. This
+# tie-break favors escalating over silently dropping a real streak when
+# write order can't be determined, consistent with write_audit.sh's own
+# stated preference (see its H-PREV-VERDICT-PIPEFAIL discussion: "a
+# missed escalation is a much worse failure than an occasional
+# over-sensitive one"). Within an all-legacy tie set (every record for a
+# feature lacks recorded_at_ns and so defaults to 0 — see below), this
+# rule degenerates to max-across-history: the same semantics this scan
+# otherwise avoids by keying on the latest record, restricted to frozen
+# history that can no longer change. That degeneration has no live
+# impact today (no new zero-timestamp records can be created, and the
+# live scan currently reports REWORK_STREAK_COUNT=0) but is stated here
+# plainly rather than implying legacy ties are inert.
 #
 # Records written before the "consecutive_rework_count" field existed
 # (legacy-shaped records; see write_audit.sh's own discussion of
 # pre-field records) are skipped — neither counted nor treated as a
 # malformed/crashing input. Records that have consecutive_rework_count
 # but predate "recorded_at_ns" default to recorded_at_ns=0 (oldest),
-# matching write_audit.sh's own convention for the same field.
+# matching write_audit.sh's own convention for the same field — this
+# default (line below) is pinned by the featureG fixture in
+# deep_scan_rework_streak_check.sh (81 of 121 live dev/audit/ records,
+# 67%, take this shape: count present, recorded_at_ns absent).
 
 REWORK_STREAK_THRESHOLD=3  # write_audit.sh:37 — "consecutive_rework_count >= 3"
 REWORK_STREAK_COUNT=0

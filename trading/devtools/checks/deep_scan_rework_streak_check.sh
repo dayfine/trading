@@ -37,6 +37,21 @@
 #             recorded_at_ns), not the highest count ever recorded, or a
 #             resolved streak could never stop escalating (see
 #             write_audit.sh's "If APPROVED, the streak resets to 0").
+#   featureG  legacy record: consecutive_rework_count PRESENT (4,
+#             NEEDS_REWORK) but recorded_at_ns ABSENT, then a LATER
+#             modern APPROVED reset (count=0, recorded_at_ns=9e9) -> must
+#             NOT fire. Pins check_06_qc_calibration.sh's
+#             "recorded_at_ns absent -> defaults to 0 (oldest)" branch,
+#             which is 67% of live dev/audit/ records (count present, no
+#             recorded_at_ns) and was previously unexercised by any
+#             fixture (2026-08-16 QC finding, rework iteration 2).
+#   featureH  fire-direction mirror of featureF: an earlier APPROVED
+#             reset (count=0, recorded_at_ns=1e9), then a LATER
+#             NEEDS_REWORK streak (count=3, recorded_at_ns=9e9) -> MUST
+#             fire, at 3. Without this, an implementation that suppresses
+#             any feature ever APPROVED (rather than keying on the
+#             latest record) would pass the whole suite while missing a
+#             real escalation.
 #
 # dev/reviews/ is left empty in the fixture: the pre-existing verdict/
 # test-health cross-reference loop in check_06 has nothing to iterate
@@ -74,20 +89,31 @@ mkdir -p "${FAKE_ROOT}/.claude" "${FAKE_ROOT}/dev/audit" "${FAKE_ROOT}/dev/revie
 
 # $1=output path  $2=feature name  $3=count line (e.g. '"consecutive_rework_count": 3,')
 # or empty string to omit the field entirely (legacy-shaped record).
-# $4=recorded_at_ns (default 1000000000)  $5=overall_qc (default NEEDS_REWORK)
+# $4=recorded_at_ns (default 1000000000; pass an EXPLICIT empty string ""
+# to omit the "recorded_at_ns" field entirely -- the count-present /
+# timestamp-absent legacy shape, see featureG below). Uses "${4-...}"
+# (no colon) so an explicit "" is distinguished from "unset": with a
+# colon, "${4:-1000000000}" would substitute the default for an explicit
+# empty string too, making omission unreachable from a caller.
+# $5=overall_qc (default NEEDS_REWORK)
 _audit_record() {
   path="$1"
   feature="$2"
   count_line="$3"
-  recorded_at_ns="${4:-1000000000}"
+  recorded_at_ns="${4-1000000000}"
   overall_qc="${5:-NEEDS_REWORK}"
+  if [ -n "$recorded_at_ns" ]; then
+    recorded_at_ns_line="\"recorded_at_ns\": ${recorded_at_ns},"
+  else
+    recorded_at_ns_line=""
+  fi
   cat > "$path" <<EOF
 {
   "date": "2026-08-01",
   "feature": "${feature}",
   "branch": "feat/${feature}",
   "sha": "sha-${feature}",
-  "recorded_at_ns": ${recorded_at_ns},
+  ${recorded_at_ns_line}
   "structural_qc": "APPROVED",
   "behavioral_qc": "${overall_qc}",
   "overall_qc": "${overall_qc}",
@@ -117,6 +143,28 @@ _audit_record "${FAKE_ROOT}/dev/audit/2026-08-01-feat-eee-featureE-r2.json" "fea
 # stale 4.
 _audit_record "${FAKE_ROOT}/dev/audit/2026-08-01-feat-fff-featureF-r1.json" "featureF" '"consecutive_rework_count": 4,' "1000000000" "NEEDS_REWORK"
 _audit_record "${FAKE_ROOT}/dev/audit/2026-08-02-feat-fff-featureF-r2.json" "featureF" '"consecutive_rework_count": 0,' "9000000000" "APPROVED"
+
+# featureG: legacy record -- consecutive_rework_count PRESENT (4,
+# NEEDS_REWORK) but recorded_at_ns ABSENT -- followed by a LATER modern
+# APPROVED reset (count=0, recorded_at_ns=9e9). Must NOT fire. This is
+# the dominant live dev/audit/ shape (81 of 121 records, 67%, as of the
+# 2026-08-16 QC finding): count present, no recorded_at_ns. The absent
+# timestamp must default to 0 (oldest) so the later modern reset still
+# wins the latest-record comparison -- pins
+# check_06_qc_calibration.sh:219's `[ -z "$streak_recorded_at" ] &&
+# streak_recorded_at=0` default, which no fixture previously executed.
+_audit_record "${FAKE_ROOT}/dev/audit/2026-08-01-feat-ggg-featureG-r1.json" "featureG" '"consecutive_rework_count": 4,' "" "NEEDS_REWORK"
+_audit_record "${FAKE_ROOT}/dev/audit/2026-08-02-feat-ggg-featureG-r2.json" "featureG" '"consecutive_rework_count": 0,' "9000000000" "APPROVED"
+
+# featureH: fire-direction mirror of featureF -- an earlier APPROVED
+# reset (count=0, recorded_at_ns=1e9) followed by a LATER NEEDS_REWORK
+# streak (count=3, recorded_at_ns=9e9). Must fire, at 3. Without this,
+# an implementation that suppresses any feature that was EVER APPROVED
+# (rather than keying on the latest record) would pass the entire
+# committed fixture while producing a missed escalation -- the failure
+# write_audit.sh explicitly calls the worse one.
+_audit_record "${FAKE_ROOT}/dev/audit/2026-08-01-feat-hhh-featureH-r1.json" "featureH" '"consecutive_rework_count": 0,' "1000000000" "APPROVED"
+_audit_record "${FAKE_ROOT}/dev/audit/2026-08-02-feat-hhh-featureH-r2.json" "featureH" '"consecutive_rework_count": 3,' "9000000000" "NEEDS_REWORK"
 
 REPO_ROOT="$FAKE_ROOT" sh "$CHECK_06" "$DETAIL_FILE" "$FINDINGS_FILE"
 
@@ -165,9 +213,28 @@ if grep -q 'Rework streak:.*`featureF`' "$FINDINGS_FILE"; then
   fail "featureF (resolved: count=4 then a later APPROVED count=0) must NOT fire — scan must key on latest record, not max-ever count"
 fi
 
-# Metric line: 3 features over threshold (A, C, E) — B, D, F excluded.
-if ! grep -q '^M: REWORK_STREAK_COUNT=3' "$FINDINGS_FILE"; then
-  fail "expected 'M: REWORK_STREAK_COUNT=3' in findings (featureA + featureC + featureE); got:"
+# featureG: legacy record (count=4, NO recorded_at_ns -> defaults to 0,
+# oldest) followed by a later modern APPROVED reset (count=0, ns=9e9)
+# must NOT fire. Pins the absent-recorded_at_ns default branch
+# (check_06_qc_calibration.sh:219), which is 67% of live dev/audit/
+# records (2026-08-16 QC finding) and was previously unexercised by any
+# fixture here.
+if grep -q 'Rework streak:.*`featureG`' "$FINDINGS_FILE"; then
+  fail "featureG (legacy count=4 with no recorded_at_ns, later APPROVED reset) must NOT fire — an absent timestamp must default to oldest (0), not win the latest-record comparison"
+fi
+
+# featureH: an earlier APPROVED reset (count=0) followed by a LATER
+# NEEDS_REWORK streak (count=3) must fire, at 3 — the fire-direction
+# mirror of featureF. Without this, an implementation that suppresses
+# any feature that was ever APPROVED (instead of keying on the latest
+# record) would pass the whole suite while missing a real escalation.
+if ! grep -q 'Rework streak:.*`featureH`.*consecutive_rework_count=3' "$FINDINGS_FILE"; then
+  fail "expected a rework-streak warning for featureH (count=3, latest record after an earlier APPROVED reset)"
+fi
+
+# Metric line: 4 features over threshold (A, C, E, H) — B, D, F, G excluded.
+if ! grep -q '^M: REWORK_STREAK_COUNT=4' "$FINDINGS_FILE"; then
+  fail "expected 'M: REWORK_STREAK_COUNT=4' in findings (featureA + featureC + featureE + featureH); got:"
   grep '^M: REWORK_STREAK_COUNT' "$FINDINGS_FILE" >&2 || echo "      <missing>" >&2
 fi
 
