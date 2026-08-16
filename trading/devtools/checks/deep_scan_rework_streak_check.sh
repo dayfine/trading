@@ -25,9 +25,18 @@
 #   featureB  consecutive_rework_count=2  -> must NOT fire (catches > vs >=)
 #   featureC  consecutive_rework_count=4  -> must fire (catches == vs >=)
 #   featureD  legacy record, field absent -> must NOT fire, must NOT crash
-#   featureE  two records, counts 2 and 3 -> exactly ONE warning, at the
-#             max (3) -- pins "report highest per feature, not one
-#             finding per record"
+#   featureE  two records, counts 2 and 3, SAME recorded_at_ns -> exactly
+#             ONE warning, at the higher of the two (3) -- pins "report
+#             one finding per feature, not per record" plus the
+#             tie-break rule (same recorded_at_ns -> prefer higher count)
+#   featureF  two records with DISTINCT recorded_at_ns: an earlier
+#             NEEDS_REWORK at count=4, then a LATER APPROVED reset at
+#             count=0 -> must NOT fire. Pins the resolved-streak case a
+#             max-across-all-history reading would get wrong: the scan
+#             must key on the LATEST record (write order, via
+#             recorded_at_ns), not the highest count ever recorded, or a
+#             resolved streak could never stop escalating (see
+#             write_audit.sh's "If APPROVED, the streak resets to 0").
 #
 # dev/reviews/ is left empty in the fixture: the pre-existing verdict/
 # test-health cross-reference loop in check_06 has nothing to iterate
@@ -65,20 +74,23 @@ mkdir -p "${FAKE_ROOT}/.claude" "${FAKE_ROOT}/dev/audit" "${FAKE_ROOT}/dev/revie
 
 # $1=output path  $2=feature name  $3=count line (e.g. '"consecutive_rework_count": 3,')
 # or empty string to omit the field entirely (legacy-shaped record).
+# $4=recorded_at_ns (default 1000000000)  $5=overall_qc (default NEEDS_REWORK)
 _audit_record() {
   path="$1"
   feature="$2"
   count_line="$3"
+  recorded_at_ns="${4:-1000000000}"
+  overall_qc="${5:-NEEDS_REWORK}"
   cat > "$path" <<EOF
 {
   "date": "2026-08-01",
   "feature": "${feature}",
   "branch": "feat/${feature}",
   "sha": "sha-${feature}",
-  "recorded_at_ns": 1000000000,
+  "recorded_at_ns": ${recorded_at_ns},
   "structural_qc": "APPROVED",
-  "behavioral_qc": "NEEDS_REWORK",
-  "overall_qc": "NEEDS_REWORK",
+  "behavioral_qc": "${overall_qc}",
+  "overall_qc": "${overall_qc}",
   "harness_gap": "",
   "quality_score": null,
   "findings_count": {
@@ -98,6 +110,13 @@ _audit_record "${FAKE_ROOT}/dev/audit/2026-08-01-feat-ccc-featureC.json" "featur
 _audit_record "${FAKE_ROOT}/dev/audit/2026-08-01-feat-ddd-featureD.json" "featureD" ''
 _audit_record "${FAKE_ROOT}/dev/audit/2026-08-01-feat-eee-featureE-r1.json" "featureE" '"consecutive_rework_count": 2,'
 _audit_record "${FAKE_ROOT}/dev/audit/2026-08-01-feat-eee-featureE-r2.json" "featureE" '"consecutive_rework_count": 3,'
+# featureF: resolved streak -- an earlier NEEDS_REWORK record at
+# count=4 (recorded_at_ns=1e9) followed by a LATER APPROVED reset at
+# count=0 (recorded_at_ns=9e9). The latest record is the one that
+# matters; a max-across-all-history reading would wrongly fire on the
+# stale 4.
+_audit_record "${FAKE_ROOT}/dev/audit/2026-08-01-feat-fff-featureF-r1.json" "featureF" '"consecutive_rework_count": 4,' "1000000000" "NEEDS_REWORK"
+_audit_record "${FAKE_ROOT}/dev/audit/2026-08-02-feat-fff-featureF-r2.json" "featureF" '"consecutive_rework_count": 0,' "9000000000" "APPROVED"
 
 REPO_ROOT="$FAKE_ROOT" sh "$CHECK_06" "$DETAIL_FILE" "$FINDINGS_FILE"
 
@@ -124,18 +143,29 @@ if grep -q 'Rework streak:.*`featureD`' "$FINDINGS_FILE"; then
   fail "featureD (legacy record, field absent) must NOT fire"
 fi
 
-# featureE: two records (counts 2 and 3) must produce exactly ONE
-# warning, reporting the MAX (3) — not one warning per record and not
-# the lower of the two.
+# featureE: two records (counts 2 and 3) sharing the SAME recorded_at_ns
+# must produce exactly ONE warning, reporting the higher of the two (3)
+# per the tie-break rule — not one warning per record and not the lower
+# of the two.
 featureE_hits="$(grep -c 'Rework streak:.*`featureE`' "$FINDINGS_FILE" || true)"
 if [ "$featureE_hits" != "1" ]; then
-  fail "expected exactly 1 rework-streak warning for featureE (max across its 2 records), got ${featureE_hits}"
+  fail "expected exactly 1 rework-streak warning for featureE (tie-break across its 2 same-timestamp records), got ${featureE_hits}"
 fi
 if ! grep -q 'Rework streak:.*`featureE`.*consecutive_rework_count=3' "$FINDINGS_FILE"; then
-  fail "featureE's single warning must report the MAX count (3), not the lower record's count (2)"
+  fail "featureE's single warning must report the higher tied count (3), not the lower record's count (2)"
 fi
 
-# Metric line: 3 features over threshold (A, C, E) — B and D excluded.
+# featureF: an earlier NEEDS_REWORK record (count=4) followed by a LATER
+# APPROVED reset (count=0) must NOT fire — the scan must key on the
+# LATEST record (by recorded_at_ns), not the highest count ever seen.
+# This is the resolved-streak case: keying on max instead of latest
+# would make the escalation permanently unclearable (write_audit.sh: "If
+# APPROVED, the streak resets to 0").
+if grep -q 'Rework streak:.*`featureF`' "$FINDINGS_FILE"; then
+  fail "featureF (resolved: count=4 then a later APPROVED count=0) must NOT fire — scan must key on latest record, not max-ever count"
+fi
+
+# Metric line: 3 features over threshold (A, C, E) — B, D, F excluded.
 if ! grep -q '^M: REWORK_STREAK_COUNT=3' "$FINDINGS_FILE"; then
   fail "expected 'M: REWORK_STREAK_COUNT=3' in findings (featureA + featureC + featureE); got:"
   grep '^M: REWORK_STREAK_COUNT' "$FINDINGS_FILE" >&2 || echo "      <missing>" >&2

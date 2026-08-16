@@ -166,14 +166,39 @@ done
 # missing consumer.
 #
 # Scans every dev/audit/*.json record, extracts (feature,
-# consecutive_rework_count), and reports the HIGHEST count seen per
-# feature — not one finding per record, or a long streak would spam the
-# report with N nearly-identical warnings.
+# recorded_at_ns, consecutive_rework_count), and reports the count from
+# the LATEST record per feature — NOT the highest count ever seen.
+#
+# This must key on recency, not magnitude, because write_audit.sh
+# defines the field as a live streak that RESETS: "If the current
+# verdict is NEEDS_REWORK, the count includes this record. If APPROVED,
+# the streak resets to 0." (write_audit.sh, "Compute
+# consecutive_rework_count"). A feature that hit consecutive_rework_count=4
+# and was subsequently APPROVED has its most recent record at 0 — that
+# is a RESOLVED streak. Keying on the max instead of the latest would
+# make the escalation permanently unclearable: dev/audit/*.json records
+# are committed and never pruned, so a resolved feature's old high-water
+# mark would warn forever, on every future run, with no action able to
+# silence it (H-REWORK-STREAK-ESCALATION-UNTESTED rework, 2026-08-16 QC
+# finding). This mirrors the pre-existing verdict-extraction logic
+# earlier in this same file, which already keys on recency ("Take the
+# last occurrence").
+#
+# Tie-break when two records for one feature share the same
+# recorded_at_ns (only possible for legacy records predating the field,
+# which all default to 0 — see below): prefer the HIGHER count. This
+# favors escalating over silently dropping a real streak when write
+# order can't be determined, consistent with write_audit.sh's own stated
+# preference (see its H-PREV-VERDICT-PIPEFAIL discussion: "a missed
+# escalation is a much worse failure than an occasional
+# over-sensitive one").
 #
 # Records written before the "consecutive_rework_count" field existed
 # (legacy-shaped records; see write_audit.sh's own discussion of
 # pre-field records) are skipped — neither counted nor treated as a
-# malformed/crashing input.
+# malformed/crashing input. Records that have consecutive_rework_count
+# but predate "recorded_at_ns" default to recorded_at_ns=0 (oldest),
+# matching write_audit.sh's own convention for the same field.
 
 REWORK_STREAK_THRESHOLD=3  # write_audit.sh:37 — "consecutive_rework_count >= 3"
 REWORK_STREAK_COUNT=0
@@ -185,27 +210,32 @@ for audit_file in "${REPO_ROOT}"/dev/audit/*.json; do
   [ -f "$audit_file" ] || continue
   streak_feature=""
   streak_count=""
+  streak_recorded_at=""
   streak_feature="$(grep -o '"feature": *"[^"]*"' "$audit_file" 2>/dev/null | head -1 | sed 's/.*: *"//;s/"$//')" || true
   streak_count="$(grep -o '"consecutive_rework_count": *[0-9]*' "$audit_file" 2>/dev/null | head -1 | sed 's/.*: *//')" || true
   [ -z "$streak_feature" ] && continue
   [ -z "$streak_count" ] && continue
-  printf '%s:%s\n' "$streak_feature" "$streak_count" >> "$_streak_raw"
+  streak_recorded_at="$(grep -o '"recorded_at_ns": *[0-9]*' "$audit_file" 2>/dev/null | head -1 | sed 's/.*: *//')" || true
+  [ -z "$streak_recorded_at" ] && streak_recorded_at=0
+  printf '%s:%s:%s\n' "$streak_feature" "$streak_recorded_at" "$streak_count" >> "$_streak_raw"
 done
 
 if [ -s "$_streak_raw" ]; then
-  # Sort numerically by count, descending, then keep only the FIRST line
-  # seen per feature — after the sort, that first line is the max for
-  # that feature. Assumes feature names never contain ":" (true of every
+  # Sort by recorded_at_ns descending (write order — latest first), then
+  # by count descending as the tie-break above, then keep only the FIRST
+  # line seen per feature — after the sort, that first line is the
+  # latest record for that feature (ties broken toward the higher
+  # count). Assumes feature names never contain ":" (true of every
   # feature slug this repo has ever used — screener, data-layer,
   # portfolio-stops, simulation, harness-<item>, etc.).
-  while IFS=: read -r sf sc; do
+  while IFS=: read -r sf sn sc; do
     [ -z "$sf" ] && continue
     if [ "$sc" -ge "$REWORK_STREAK_THRESHOLD" ] 2>/dev/null; then
       REWORK_STREAK_COUNT=$((REWORK_STREAK_COUNT + 1))
       add_warning "Rework streak: \`${sf}\` has consecutive_rework_count=${sc} (>= ${REWORK_STREAK_THRESHOLD}) — escalation policy (write_audit.sh:37) recommends human review"
     fi
   done << STREAKEOF
-$(sort -t: -k2 -rn "$_streak_raw" | awk -F: '!seen[$1]++')
+$(sort -t: -k2,2rn -k3,3rn "$_streak_raw" | awk -F: '!seen[$1]++')
 STREAKEOF
 fi
 
