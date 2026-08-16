@@ -2,22 +2,30 @@
     ban — {!Weinstein_strategy.Entry_stop_width_order} plus its wiring into the
     entry walk.
 
-    Two layers are pinned:
-    - the ordering pass itself: a wide-stop candidate is moved behind a
-      narrow-stop one, and is left exactly where it was under the other two
-      modes;
-    - the walk: with only enough cash for one entry, the narrow-stop candidate
-      is the one funded — which is the whole point of a demotion, and what a
-      pure-ordering unit test cannot show.
+    Three layers are pinned:
+    - the ordering pass itself — that wide-stop candidates move behind
+      narrow-stop ones, that the partition is {b stable} within each group, and
+      that the other two modes leave the list untouched;
+    - the walk under ample capital, where the only observable is the {e order}
+      entries are emitted (and therefore charged) in;
+    - the walk under a binding budget, where that order becomes a
+      {b different admitted set} — the whole behavioural difference between
+      [Size_down] and [Demote_over_max], since sizing never reads the mode.
 
-    The fixture makes the two candidates differ on stop width the way the real
-    screener does, not by stubbing the width: [NARROW]'s daily history contains
-    a 9.1% correction inside the support-floor lookback, so a structural floor
-    is found ~5% under entry; [WIDE] has a single flat bar, no correction to
-    find, so the stop falls back to [initial_stop_buffer] and lands at 67% — far
-    outside the 15% limit. The first assertion below checks that separation
-    directly, so a fixture that stops separating them cannot masquerade as a
-    passing demotion. *)
+    {b Two of each width}, not one, because a single candidate per group makes
+    stability unobservable: [List.rev narrow @ List.rev wide] would pass a
+    membership-only assertion, and candidate order determines capital
+    allocation.
+
+    The fixture separates the groups the way the real screener would, not by
+    stubbing the width: the [NARROW] history contains a 9.1% correction inside
+    the support-floor lookback, so a structural floor is found ~5% under entry;
+    the [WIDE] symbols have a single flat bar, no correction to find, so the
+    stop falls back to [initial_stop_buffer] at 67% — far outside the 15% limit.
+    The first assertion checks that separation directly, so a fixture that stops
+    separating cannot masquerade as a passing demotion; the first version of it
+    put the peak on the last bar, which left the counter-move scan range empty
+    and made every candidate wide. *)
 
 open OUnit2
 open Core
@@ -26,8 +34,16 @@ open Weinstein_strategy
 module Position = Trading_strategy.Position
 
 let _current_date = Date.of_string "2024-06-14"
-let _narrow = "NARROW"
-let _wide = "WIDE"
+
+(* Two of each, so the partition's STABILITY is observable. With one candidate
+   per group, [List.rev narrow @ List.rev wide] — or any non-stable sort —
+   passes every assertion in this file unchanged, and candidate order determines
+   capital allocation, so a silent re-rank of the majority population would be a
+   reproducibility defect rather than a style nit. *)
+let _narrow_a = "NARROWA"
+let _narrow_b = "NARROWB"
+let _wide_a = "WIDEA"
+let _wide_b = "WIDEB"
 
 (* The stop the fallback installs for a symbol with no correction to anchor on.
    Chosen well outside [max_stop_distance_pct = 0.15] so [WIDE] is unambiguously
@@ -76,10 +92,23 @@ let _narrow_bars =
   List.mapi closes ~f:(fun i close ->
       _bar ~date:(Date.add_days _current_date (-10 + i)) ~close)
 
+(* A single flat bar: no correction for the support-floor scan to anchor on, so
+   the stop falls through to [initial_stop_buffer] and the candidate is wide. *)
+let _flat_bars = [ _bar ~date:_current_date ~close:100.0 ]
+
+(* [NOBARS] carries no history at all. It is here because the mli claims this is
+   NOT a special case — [latest_close] returns [None], the entry falls back to
+   the candidate's own [suggested_entry], the floor scan finds nothing, and the
+   buffer fallback classifies it wide, exactly as the gate would. *)
+let _nobars = "NOBARS"
+
 let _bar_reader =
   Bar_reader.of_in_memory_bars
     [
-      (_narrow, _narrow_bars); (_wide, [ _bar ~date:_current_date ~close:100.0 ]);
+      (_narrow_a, _narrow_bars);
+      (_narrow_b, _narrow_bars);
+      (_wide_a, _flat_bars);
+      (_wide_b, _flat_bars);
     ]
 
 let _stage_result : Stage.result =
@@ -135,48 +164,98 @@ let _candidate ~ticker : Screener.scored_candidate =
     rationale = [ "test breakout" ];
   }
 
-(* [WIDE] deliberately ranks FIRST, so leaving the order alone is observably
-   different from demoting. *)
-let _candidates = [ _candidate ~ticker:_wide; _candidate ~ticker:_narrow ]
+(* Interleaved, and a wide one FIRST, so that leaving the order alone is
+   observably different from demoting AND a non-stable partition is observably
+   different from a stable one. *)
+let _candidates =
+  List.map
+    ~f:(fun ticker -> _candidate ~ticker)
+    [ _wide_a; _narrow_a; _wide_b; _narrow_b ]
 
-let _config ~mode ~ceiling =
+let _config ?(sector_cap = None) ~mode ~ceiling () =
+  let base =
+    Weinstein_strategy_config.default_config
+      ~universe:[ _wide_a; _wide_b; _narrow_a; _narrow_b ]
+      ~index_symbol:"SPY"
+  in
   {
-    (Weinstein_strategy_config.default_config ~universe:[ _wide; _narrow ]
-       ~index_symbol:"SPY")
-    with
+    base with
     initial_stop_buffer = _wide_buffer;
     stop_width_mode = mode;
     stop_width_size_down_max_pct = ceiling;
+    portfolio_config =
+      { base.portfolio_config with max_sector_exposure_pct = sector_cap };
   }
 
 let _order_under ~mode ~ceiling =
-  Entry_stop_width_order.prefer_narrow_stops ~config:(_config ~mode ~ceiling)
+  Entry_stop_width_order.prefer_narrow_stops
+    ~config:(_config ~mode ~ceiling ())
     ~bar_reader:_bar_reader ~current_date:_current_date _candidates
   |> List.map ~f:(fun (c : Screener.scored_candidate) -> c.ticker)
 
-(** The fixture is only meaningful if the two candidates really do land on
-    opposite sides of the 15% limit. Asserted first, and separately, so a
-    failure here reads as "the fixture stopped separating them" rather than as
-    "the demotion broke". *)
-let test_fixture_separates_the_two_candidates _ =
+(** The fixture is only meaningful if the candidates really do land on opposite
+    sides of the 15% limit, and the assertion is on the FULL permutation rather
+    than on group membership — which is what pins the partition's {b stability}.
+    Input is [WIDE_A; NARROW_A; WIDE_B; NARROW_B]; a stable partition yields
+    [NARROW_A; NARROW_B; WIDE_A; WIDE_B]. Any non-stable sort, or
+    [List.rev narrow @ List.rev wide], produces a different permutation and
+    fails here.
+
+    Asserted first, and separately, so a failure reads as "the fixture stopped
+    separating them" rather than as "the demotion broke". *)
+let test_partition_is_stable_and_separates _ =
   assert_that
     (_order_under ~mode:Stop_width_mode.Demote_over_max ~ceiling:0.90)
-    (elements_are [ equal_to _narrow; equal_to _wide ])
+    (elements_are
+       [
+         equal_to _narrow_a;
+         equal_to _narrow_b;
+         equal_to _wide_a;
+         equal_to _wide_b;
+       ])
 
 (** Identity under the two modes that do not demote — including [Size_down],
-    which admits the same wide candidate but keeps its rank. This is the R1
+    which admits the same wide candidates but keeps their rank. This is the R1
     half: the default path is not reordered, and does not even pay for the
     per-candidate stop recomputation. *)
 let test_other_modes_leave_the_order_untouched _ =
+  let unchanged =
+    elements_are
+      [
+        equal_to _wide_a;
+        equal_to _narrow_a;
+        equal_to _wide_b;
+        equal_to _narrow_b;
+      ]
+  in
   assert_that
     [
       _order_under ~mode:Stop_width_mode.Drop_over_max ~ceiling:0.90;
       _order_under ~mode:Stop_width_mode.Size_down ~ceiling:0.90;
     ]
+    (elements_are [ unchanged; unchanged ])
+
+(** A symbol with NO bars is not a special case — the mli says so, and this is
+    the pin. [latest_close] returns [None], the effective entry falls back to
+    [suggested_entry], the support-floor scan finds nothing, and the
+    [initial_stop_buffer] fallback makes it wide — which is exactly where the
+    gate would put it. It therefore sorts into the wide group, {i behind} the
+    narrow candidates, rather than keeping its rank as an earlier version of the
+    docstring claimed. *)
+let test_a_symbol_with_no_bars_sorts_wide _ =
+  let candidates = _candidate ~ticker:_nobars :: _candidates in
+  assert_that
+    (Entry_stop_width_order.prefer_narrow_stops
+       ~config:(_config ~mode:Stop_width_mode.Demote_over_max ~ceiling:0.90 ())
+       ~bar_reader:_bar_reader ~current_date:_current_date candidates
+    |> List.map ~f:(fun (c : Screener.scored_candidate) -> c.ticker))
     (elements_are
        [
-         elements_are [ equal_to _wide; equal_to _narrow ];
-         elements_are [ equal_to _wide; equal_to _narrow ];
+         equal_to _narrow_a;
+         equal_to _narrow_b;
+         equal_to _nobars;
+         equal_to _wide_a;
+         equal_to _wide_b;
        ])
 
 (** An unset ceiling makes the mode a no-op: with
@@ -194,9 +273,9 @@ let test_unset_ceiling_still_drops_the_wide_candidate _ =
        ~max_stop_distance_pct:0.15 ~stop_distance_pct:0.36)
     (equal_to (Stop_width_mode.Drop : Stop_width_mode.outcome))
 
-(** The three distance bands under [Demote_over_max] with a 0.90 ceiling.
-    Crucially the middle band is [Admit], not [Admit_sized_down]: demotion
-    changes order, never size — that is what separates it from [Size_down]. *)
+(** The three distance bands under [Demote_over_max] with a 0.90 ceiling. The
+    middle band is [Admit], never [Admit_sized_down] — demotion changes the walk
+    order, and sizing does not read the mode at all. *)
 let test_gate_demote_bands _ =
   assert_that
     ([ 0.10; 0.36; 0.95 ]
@@ -212,66 +291,121 @@ let test_gate_demote_bands _ =
          equal_to (Stop_width_mode.Drop : Stop_width_mode.outcome);
        ])
 
-let _entered_tickers ~mode ~cash =
+let _entered_tickers ?sector_cap ~mode ~cash () =
   let portfolio =
     { Trading_strategy.Portfolio_view.cash; positions = String.Map.empty }
   in
   let stop_states = ref String.Map.empty in
   Entry_walk.entries_from_candidates
-    ~config:(_config ~mode ~ceiling:0.90)
+    ~config:(_config ?sector_cap ~mode ~ceiling:0.90 ())
     ~candidates:_candidates ~stop_states ~bar_reader:_bar_reader ~portfolio
     ~get_price:(fun _ -> None)
     ~current_date:_current_date ()
   |> List.filter_map ~f:(fun (t : Position.transition) ->
       match t.kind with Position.CreateEntering e -> Some e.symbol | _ -> None)
 
-(** The load-bearing wiring pin, and the reason a unit test of the ordering pass
-    alone is not enough. Same candidates, same cash, same bars — only the
-    reading of §5.1 differs, and the walk emits them in a different order:
+(** CAPITAL-RICH: everyone is funded, and the only observable is the ORDER the
+    walk emits them in — which is also the order they claimed capital in.
 
-    - [Drop_over_max] enters [NARROW] only; [WIDE] is excluded outright.
-    - [Size_down] enters both, [WIDE] first — it kept its rank.
-    - [Demote_over_max] enters both, [NARROW] first — the wide stop cost it
-      priority, not existence.
+    - [Drop_over_max] enters the narrow pair only; the wide pair is excluded.
+    - [Size_down] enters all four in screener rank.
+    - [Demote_over_max] enters all four, narrow pair first.
 
-    Emission order is the observable because the walk charges each entry against
-    a shared budget {i in this order}: whoever is emitted first is whoever had
-    first claim on the week's capital. Deleting the [Entry_stop_width_order]
-    call from [entry_walk.ml] makes an armed [Demote_over_max] behave exactly
-    like [Size_down], and every other test in this file still passes.
+    Deleting the [Entry_stop_width_order] call from [entry_walk.ml] makes an
+    armed [Demote_over_max] behave exactly like [Size_down], and every other
+    test in this file still passes.
 
-    Cash is deliberately ample so the assertion is about {i priority}, not about
-    which of two specific position sizes happens to fit — the two candidates
-    cost very different fractions of the book (risk-based sizing shrinks [WIDE]
-    ~13x for its 67% stop), so a starvation-based test would pin an arithmetic
-    coincidence rather than the ordering rule. *)
-let test_walk_emits_the_narrow_stop_first _ =
+    Cash is ample here on purpose: this case is about {i priority}, and the case
+    where priority becomes a different admitted set is
+    {!test_capital_tight_modes_admit_different_sets}. *)
+let test_walk_emits_the_narrow_stops_first _ =
   let cash = 1_000_000.0 in
   assert_that
     [
-      _entered_tickers ~mode:Stop_width_mode.Drop_over_max ~cash;
-      _entered_tickers ~mode:Stop_width_mode.Size_down ~cash;
-      _entered_tickers ~mode:Stop_width_mode.Demote_over_max ~cash;
+      _entered_tickers ~mode:Stop_width_mode.Drop_over_max ~cash ();
+      _entered_tickers ~mode:Stop_width_mode.Size_down ~cash ();
+      _entered_tickers ~mode:Stop_width_mode.Demote_over_max ~cash ();
     ]
     (elements_are
        [
-         elements_are [ equal_to _narrow ];
-         elements_are [ equal_to _wide; equal_to _narrow ];
-         elements_are [ equal_to _narrow; equal_to _wide ];
+         elements_are [ equal_to _narrow_a; equal_to _narrow_b ];
+         elements_are
+           [
+             equal_to _wide_a;
+             equal_to _narrow_a;
+             equal_to _wide_b;
+             equal_to _narrow_b;
+           ];
+         elements_are
+           [
+             equal_to _narrow_a;
+             equal_to _narrow_b;
+             equal_to _wide_a;
+             equal_to _wide_b;
+           ];
+       ])
+
+(** CAPITAL-TIGHT: the direction that matters, and the only one where the two
+    non-default modes admit a {b different set} rather than the same set in a
+    different order. Since sizing never reads the mode, this is the entire
+    behavioural difference between [Size_down] and [Demote_over_max].
+
+    {b The binding resource is a sector cap, not cash, and that is forced.} Cash
+    cannot bind here: every position's cost is a fixed fraction of portfolio
+    value ([risk$ / stop_distance], with [risk$] itself a fraction of the book),
+    so scaling the book scales every cost and the same set always fits. Lowering
+    cash rounds share counts to zero before it starves anyone. All four
+    candidates share one sector, so the sector cap is a budget the walk consumes
+    in walk order — which is exactly the resource a demotion is about.
+
+    {b The wide-stop positions are the CHEAP ones}, which is what makes this
+    test sharp rather than arbitrary. Fixed-risk sizing shrinks the share count
+    in proportion to stop distance, so a 67%-stop candidate costs roughly a
+    quarter of a 5%-stop candidate. Under [Size_down] the two wide candidates
+    reach the budget first and consume enough of it that {i neither} narrow
+    candidate can be funded; under [Demote_over_max] the first narrow candidate
+    takes the budget instead. Same candidates, same capital, same bars, disjoint
+    outcomes:
+
+    - [Size_down] → [WIDE_A; WIDE_B] — the wide pair kept its rank and crowded
+      the narrow pair out entirely.
+    - [Demote_over_max] → [NARROW_A] — one narrow-stop position instead of two
+      wide-stop ones.
+
+    That inversion is also the practical argument for the mechanism: under
+    [Size_down] a §5.1-violating stop does not merely get admitted, it is
+    {i cheaper} than a compliant one and therefore outcompetes it for a shared
+    budget. *)
+let test_capital_tight_modes_admit_different_sets _ =
+  let entered mode =
+    _entered_tickers ~sector_cap:(Some 0.14) ~mode ~cash:1_000_000.0 ()
+  in
+  assert_that
+    [
+      entered Stop_width_mode.Size_down; entered Stop_width_mode.Demote_over_max;
+    ]
+    (elements_are
+       [
+         elements_are [ equal_to _wide_a; equal_to _wide_b ];
+         elements_are [ equal_to _narrow_a ];
        ])
 
 let suite =
   "entry_stop_width_order"
   >::: [
-         "the fixture separates narrow from wide"
-         >:: test_fixture_separates_the_two_candidates;
+         "the partition is stable and separates narrow from wide"
+         >:: test_partition_is_stable_and_separates;
          "non-demoting modes leave the order untouched"
          >:: test_other_modes_leave_the_order_untouched;
+         "a symbol with no bars sorts wide, like the gate would put it"
+         >:: test_a_symbol_with_no_bars_sorts_wide;
          "an unset ceiling still drops the wide candidate"
          >:: test_unset_ceiling_still_drops_the_wide_candidate;
          "gate bands under Demote_over_max" >:: test_gate_demote_bands;
-         "the walk emits the narrow stop first"
-         >:: test_walk_emits_the_narrow_stop_first;
+         "capital-rich: the walk emits the narrow stops first"
+         >:: test_walk_emits_the_narrow_stops_first;
+         "capital-tight: the two modes admit different sets"
+         >:: test_capital_tight_modes_admit_different_sets;
        ]
 
 let () = run_test_tt_main suite

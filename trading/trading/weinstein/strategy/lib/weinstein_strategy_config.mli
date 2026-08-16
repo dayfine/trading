@@ -1467,28 +1467,39 @@ type config = {
           - [Drop_over_max] (default) is today's G15 step-3 drop — the candidate
             is skipped with [Audit_recorder.Stop_too_wide]. §5.1 read as a ban.
           - [Size_down] admits it, up to {!stop_width_size_down_max_pct}, and
-            lets fixed-risk sizing shrink the share count ~[1 / stop_distance]
-            so dollar risk-to-stop is unchanged; such entries carry
-            [Entry_audit_capture.entry_meta.sized_down_wide_stop = true] and
-            trace as [Sized_down_wide_stop]. Keeps rank, gives up size.
-          - [Demote_over_max] (added 2026-08-16, defect B) admits it at
-            {e normal} size but walks it {e after} every candidate whose stop is
-            within the limit, so wide stops are funded only with what is left
-            ({!Entry_stop_width_order}). Keeps size, gives up rank. Also bounded
-            by {!stop_width_size_down_max_pct} — leaving that at [0.0] makes
-            this mode a no-op, so a spec must set the ceiling for it to bite.
+            {e tags} the entry
+            [Entry_audit_capture.entry_meta.sized_down_wide_stop = true] (trace
+            outcome [Sized_down_wide_stop]). Note that fixed-risk sizing already
+            shrinks the share count ~[1 / stop_distance] under {b every} mode —
+            sizing never reads the mode — so what [Size_down] adds over the
+            default is the admission and the tag, not the shrink.
+          - [Demote_over_max] (added 2026-08-16, defect B) admits the identical
+            candidate at the identical size, but walks it {e after} every
+            candidate whose stop is within the limit, so wide stops are funded
+            only with what is left ({!Entry_stop_width_order}). The delta
+            against [Size_down] is {b order only}, which means the two diverge
+            exactly when capital binds. Also bounded by
+            {!stop_width_size_down_max_pct} — leaving that at [0.0] makes this
+            mode a no-op, so a spec must set the ceiling for it to bite.
 
           {b Honest citation.} §5.1 says "prefer other candidates", which is
-          comparative rather than an absolute ban. Of the three,
-          [Demote_over_max] is the closest to that wording — and it is the shape
-          the codebase already uses for [overhead_supply], a rank demotion that
-          never excludes. [Size_down] is NOT a documented book mechanism: the
-          book's remedies for a wide stop are (i) anchor at the nearest prior
-          correction low ([stops_config.support_floor_anchor_scope = Nearest],
-          the competing {e faithful} arm), (ii) the §5.3 trader preset's 4–6%
-          stop, (iii) pass — never risk-parity size-down. It remains a
-          tolerated-participation {e reading}, labelled as such; see
-          {!Stop_width_mode} for the full framing and the ladder-v3 evidence.
+          comparative rather than an absolute ban — and the book reserves ban
+          vocabulary for the cases it means as bans ("NEVER buy, no matter how
+          good other factors", §4.4 on negative RS) while {e grading} the rest
+          (§4.3 A+/A/B/C on overhead resistance). Of the three,
+          [Demote_over_max] is the closest to §5.1's wording. It is {b not},
+          contrary to an earlier draft of this docstring, the shape the codebase
+          already uses for [overhead_supply]: the supply score is a term of
+          [Screener.score_long], so a heavy-supply candidate can fall under
+          [passes_score_floor] and be excluded outright. That precedent claim is
+          withdrawn; the argument rests on the book. [Size_down] is NOT a
+          documented book mechanism: the book's remedies for a wide stop are (i)
+          anchor at the nearest prior correction low
+          ([stops_config.support_floor_anchor_scope = Nearest], the competing
+          {e faithful} arm), (ii) the §5.3 trader preset's 4–6% stop, (iii) pass
+          — never risk-parity size-down. It remains a tolerated-participation
+          {e reading}, labelled as such; see {!Stop_width_mode} for the full
+          framing and the ladder-v3 evidence.
 
           {b What [Demote_over_max] is responding to.} On the 26-year top-3000
           core arm AXTI was rejected {b 21 times} with [Stop_too_wide] at a
@@ -1503,12 +1514,14 @@ type config = {
           [Backtest.Overlay_validator.apply_overrides]. Stays default-off until
           a ledger ACCEPT plus the promotion-confirmation grid (R3). *)
   stop_width_size_down_max_pct : float; [@sexp.default 0.0]
-      (** Sanity ceiling for {!stop_width_mode} [= Size_down]: stop distances
-          above this fraction of entry are still dropped, so the mechanism can
-          never admit unbounded structural risk. [0.0] (the default) falls back
-          to [stops_config.max_stop_distance_pct], which makes an
-          armed-but-unconfigured [Size_down] admit exactly the population
-          [Drop_over_max] admits.
+      (** Sanity ceiling for {!stop_width_mode} — {b both} [Size_down] and
+          [Demote_over_max]: stop distances above this fraction of entry are
+          still dropped, so neither mechanism can admit unbounded structural
+          risk. [0.0] (the default) falls back to
+          [stops_config.max_stop_distance_pct], which makes an
+          armed-but-unconfigured mode admit exactly the population
+          [Drop_over_max] admits. The field name predates [Demote_over_max]
+          (2026-08-16); it was not renamed because 26 committed specs set it.
 
           It exists as its own knob rather than reusing [max_stop_distance_pct]
           so the ladder-v4 sweep can widen the {e admission} boundary without

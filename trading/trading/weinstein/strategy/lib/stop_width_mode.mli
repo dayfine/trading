@@ -47,26 +47,49 @@ type t =
           to [size_down_max_pct] (the swept sanity ceiling). *)
   | Demote_over_max
       (** The literal reading of §5.1: "prefer other candidates" is a
-          {b ranking} instruction, not a ban. The candidate is admitted at
-          {e normal} size, but every candidate whose stop is within
-          [max_stop_distance_pct] gets first claim on the week's capital — the
-          wide-stop ones are walked afterwards, with whatever is left. A wide
-          stop costs priority, never existence, and on a week with enough
+          {b ranking} instruction, not a ban. Every candidate whose stop is
+          within [max_stop_distance_pct] gets first claim on the week's capital;
+          the wide-stop ones are walked afterwards, with whatever is left. A
+          wide stop costs priority, never existence, and on a week with enough
           capital for everyone it costs nothing at all.
 
-          The codebase already has this shape: [overhead_supply] is a rank
-          demotion and never an exclusion. This is the same treatment for the
-          §5.1 width rule.
+          {b The book's own vocabulary separates the two cases.} §4.4 uses
+          "NEVER buy, no matter how good other factors" for negative relative
+          strength — an actual ban. §4.3 {e grades} overhead resistance
+          A+/A/B/C, with heavy resistance yielding "mediocre performance" rather
+          than exclusion. §5.1 says "prefer other candidates", which is the
+          grading vocabulary, not the ban vocabulary.
 
-          {b Distinct from {!Size_down}} in what it gives up. [Size_down] keeps
-          rank and shrinks the position so dollar risk stays constant;
-          [Demote_over_max] keeps the size and gives up rank. The first is a
-          risk-parity reading the book never states; the second is the book's
-          own comparative wording. They disagree in both directions — on a
-          capital-rich week [Demote_over_max] admits at full size where
-          [Size_down] admits a fraction; on a capital-tight week
-          [Demote_over_max] admits nothing where [Size_down] still admits a
-          sliver.
+          (An earlier draft of this docstring cited [overhead_supply] as an
+          in-codebase precedent for "demote, never exclude". That is
+          {b not accurate} and is withdrawn: the supply score is a term of
+          [Screener.score_long], and a candidate whose score falls below
+          [passes_score_floor ~min_grade] is dropped outright — so heavy supply
+          {i can} exclude, via the score. The argument above rests on the book,
+          which is where it should have rested.)
+
+          {b The delta against {!Size_down} is ORDER ONLY.} Both modes admit the
+          same population (same ceiling) at the {e same} share count: sizing is
+          {!Portfolio_risk.compute_position_size} against the installed stop and
+          never reads the mode, so a wide stop already shrinks the position
+          ~[1 / stop_distance] under {i every} mode, [Drop_over_max] included.
+          [Size_down]'s only effects beyond the default are to admit past the
+          book limit and to {e tag} the entry [Sized_down_wide_stop];
+          [Demote_over_max] admits the identical candidate at the identical size
+          and moves it to the back of the walk. It is [Size_down] plus a
+          reordering, minus the tag.
+
+          The two therefore differ {b only when capital binds}. The walk charges
+          each entry against a shared budget in order, so on a capital-tight
+          week [Size_down] funds the wide-stop candidate that outranked its
+          rivals and [Demote_over_max] funds the rivals instead; on a
+          capital-rich week they produce the same entries in a different order.
+
+          {b Why that is still the more faithful reading.} §5.1 expresses a
+          {e preference between candidates}. [Size_down] admits the wide-stop
+          candidate in its original rank, which expresses no preference at all;
+          [Demote_over_max] is the only one of the three that acts on the
+          comparison the sentence actually makes.
 
           [size_down_max_pct] is the shared sanity ceiling (see {!policy}): a
           stop beyond it is still dropped, so demotion cannot admit unbounded

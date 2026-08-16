@@ -139,10 +139,17 @@ let _prepare_candidates ~config ~pending_entry_e ~held_set ~bar_reader
     The walk produces a tagged decision list (see
     {!Entry_audit_capture.candidate_decision}). After the walk, kept candidates
     are emitted to [audit_recorder.record_entry] with the rivals they outranked
-    — this is the PR-2 entry-capture site. The output transition list (in
-    original screener order) is bit-equivalent to the pre-audit shape: same
-    candidates, same transitions, same side-effects on [stop_states] and
-    [remaining_cash]. *)
+    — this is the PR-2 entry-capture site. The output transition list is
+    bit-equivalent to the pre-audit shape: same candidates, same transitions,
+    same side-effects on [stop_states] and [remaining_cash].
+
+    {b Order.} The list comes back in the order the walk charged the shared
+    budget, which is screener order under every mode except
+    {!Stop_width_mode.Demote_over_max}; that mode permutes the input in
+    {!_prepare_candidates} so wide-stop candidates are charged last. The
+    permutation moves the [long_notional_acc] and [sector_exposure_acc]
+    mutations with it, not only [remaining_cash] — every accumulator the walk
+    threads is order-dependent, which is the whole point of demoting. *)
 let entries_from_candidates ?sector_lookup
     ?(pending_entry_e = Entry_freeze.create ()) ~config ~candidates ~stop_states
     ~bar_reader ~(portfolio : Portfolio_view.t) ~get_price ~current_date

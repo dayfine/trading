@@ -7,10 +7,11 @@
 
     Weinstein §5.1 says that when a structurally-placed stop would require more
     than ~15% risk you should {b "prefer other candidates"}. That is a
-    comparative instruction about {e order}, and the codebase already implements
-    exactly that shape elsewhere: [overhead_supply] demotes a candidate's rank
-    and never excludes it. {!Stop_width_mode.Drop_over_max}, the default, reads
-    the same sentence as a ban.
+    comparative instruction about {e order} — the book reserves ban vocabulary
+    ("NEVER buy, no matter how good other factors", §4.4 on negative RS) for the
+    cases it means as bans, and grades the rest (§4.3 A+/A/B/C on overhead
+    resistance). {!Stop_width_mode.Drop_over_max}, the default, reads §5.1 as a
+    ban anyway.
 
     A demotion cannot be expressed inside {!Stop_width_mode.gate}, which sees
     one candidate at a time and has no view of the others. It has to happen
@@ -52,6 +53,21 @@ val prefer_narrow_stops :
     The width test is {!Stop_width_mode.over_book_limit} against the same
     structural stop {!Entry_audit_capture.make_entry_transition} will install,
     computed through the same helpers — so a candidate this pass calls "wide" is
-    exactly one the gate would call wide. A candidate whose stop cannot be
-    computed (no resident bars) is treated as narrow, i.e. it keeps its rank: an
-    unmeasurable stop is not evidence of a wide one. *)
+    exactly one the gate would call wide.
+    {b Agreeing with the gate is the contract}, and it settles the edge cases:
+    there is no separate policy here for thin data, because whatever stop the
+    gate would install is the stop this pass measures.
+
+    In particular, a symbol with {b no resident bars} is not a special case.
+    {!Entry_audit_helpers.latest_close} returns [None], the effective entry
+    falls back to the candidate's own [suggested_entry], and the support-floor
+    scan finds nothing — so the stop is the [initial_stop_buffer] fallback and
+    the candidate is classified by {i that} width. Under a wide buffer it sorts
+    with the wide group, which is exactly where the gate would put it. (The
+    fixture in [test_entry_stop_width_order.ml] relies on this: its [WIDE]
+    candidate is a data-poor symbol.)
+
+    The one genuinely unmeasurable case is a non-positive effective entry, where
+    a distance ratio is undefined. Such a candidate keeps its rank rather than
+    being demoted on a division that has no answer; sizing rejects it
+    downstream. *)

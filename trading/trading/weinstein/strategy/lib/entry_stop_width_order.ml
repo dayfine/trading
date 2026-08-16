@@ -40,10 +40,13 @@ let _stop_distance_pct_for ~config ~bar_reader ~current_date
       (_distance_at ~config ~bar_reader ~current_date ~trigger_at_suggested
          ~effective_entry cand)
 
-(* [true] when this candidate's stop is wider than the §5.1 limit. An
-   unmeasurable stop counts as narrow: the absence of a measurement is not
-   evidence of a wide stop, and demoting on it would silently penalise
-   thinly-covered symbols for a data gap. *)
+(* [true] when this candidate's stop is wider than the §5.1 limit — measured
+   through the same helpers the gate uses, so the two cannot disagree. A symbol
+   with no bars is NOT special-cased: it falls through to the
+   [initial_stop_buffer] stop and is classified by that width, exactly as the
+   gate would classify it. The only [None] case is a non-positive effective
+   entry, where the ratio is undefined; it keeps its rank rather than being
+   demoted on a division with no answer. *)
 let _is_wide ~config ~bar_reader ~current_date cand =
   match _stop_distance_pct_for ~config ~bar_reader ~current_date cand with
   | None -> false
