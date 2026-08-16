@@ -644,12 +644,16 @@ mv -f "$TMP_FILE" "$OUTPUT_FILE"
 # path.
 #
 # ACCEPTED SPELLING: as with the BEFORE_RENAME hook above, the ONLY value
-# that enables this hook is the literal string `1`; `0`, `false`, the empty
-# string and unset all leave it disabled. Set it as `VAR=1`. See the gate
-# rationale on that hook (H-AUDIT-HOOK-GATE-TRUTHY) -- it applies with extra
-# force here, because this hook aborts AFTER the record is published, so an
-# accidental fire returns rc=1 to a caller under `set -e` while the record
-# is in fact already on disk.
+# that enables this hook is the literal string `1`; every other value --
+# `0`, `false`, `no`, `yes`, `true`, the empty string, unset -- leaves it
+# disabled. Set it as `VAR=1`. Kept identical to the BEFORE_RENAME gate
+# above (same `= "1"` comparison, same accepted/rejected spelling set) --
+# record_qc_audit_test.sh's scenarios 25a/26a exercise both hooks against
+# the identical HOOK_DISABLE_VALUES set for exactly this reason. See the
+# gate rationale on that hook (H-AUDIT-HOOK-GATE-TRUTHY) -- it applies with
+# extra force here, because this hook aborts AFTER the record is published,
+# so an accidental fire returns rc=1 to a caller under `set -e` while the
+# record is in fact already on disk.
 if [ "${WRITE_AUDIT_TEST_ABORT_AFTER_RENAME:-0}" = "1" ]; then
   echo "FAIL: WRITE_AUDIT_TEST_ABORT_AFTER_RENAME set; simulating interruption right after rename; OUTPUT_FILE=$OUTPUT_FILE" >&2
   exit 1
