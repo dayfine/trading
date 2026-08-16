@@ -121,13 +121,22 @@ let test_freshness_axis_coverage _ =
            Freshness.Range_top_breakout))
     (equal_to 14)
 
+(* Post-split (defect C, 2026-08-16) the old single [entry_order_ttl_weeks]
+   is two fields, and the ladder specs were migrated behaviour-preservingly:
+   [0] -> (false, 0), [N > 0] -> (true, N). The counts are unchanged, which is
+   what makes the migration checkable. *)
 let test_ttl_axis_coverage _ =
   let cfgs = _all_applied_configs () in
-  let n ttl =
+  let n ~rescreen ~weeks =
     List.count cfgs ~f:(fun (c : Weinstein_strategy.config) ->
-        c.entry_order_ttl_weeks = ttl)
+        Bool.equal c.enable_entry_ticket_rescreen rescreen
+        && c.entry_order_max_rest_weeks = weeks)
   in
-  assert_that (n 0, n 4, n 8) (equal_to (13, 9, 2))
+  assert_that
+    ( n ~rescreen:false ~weeks:0,
+      n ~rescreen:true ~weeks:4,
+      n ~rescreen:true ~weeks:8 )
+    (equal_to (13, 9, 2))
 
 let test_stop_width_mode_axis_coverage _ =
   let cfgs = _all_applied_configs () in
@@ -175,14 +184,14 @@ let test_cell_00_is_the_all_no_op_reference _ =
   assert_that
     ( c.entry_anchor_local_range_weeks,
       Freshness.show_basis c.entry_freshness_basis,
-      c.entry_order_ttl_weeks,
+      (c.enable_entry_ticket_rescreen, c.entry_order_max_rest_weeks),
       Width.show c.stop_width_mode,
       Floor.show_anchor_scope c.stops_config.support_floor_anchor_scope,
       c.volume_confirm_at_fill )
     (equal_to
        ( 4,
          Freshness.show_basis Freshness.Ma_cross,
-         0,
+         (false, 0),
          Width.show Width.Drop_over_max,
          Floor.show_anchor_scope Floor.Window_extreme,
          false ))

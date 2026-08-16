@@ -9,12 +9,15 @@
       cancel (plan §6 "TTL × freeze"), including the complementary no-ratchet
       guarantee for a ticket that is still resting.
     - The end-to-end arming: a real [Weinstein_strategy.config] driven through
-      the real [on_market_close] screening path emits the cancel when
-      [entry_order_ttl_weeks > 0] and emits nothing at the default [0].
+      the real [on_market_close] screening path emits the cancel when either
+      [enable_entry_ticket_rescreen] or [entry_order_max_rest_weeks > 0] is set,
+      and emits nothing at the defaults ([false] / [0]) — {b including} the two
+      single-mechanism arms that the old combined [entry_order_ttl_weeks] knob
+      could not express (defect C, 2026-08-16).
 
-    The [0] path deliberately {b extends} — never weakens — the GTC persistence
-    contract pinned by [trading/simulation/test/test_gtc_entry_persistence.ml].
-*)
+    The both-off path deliberately {b extends} — never weakens — the GTC
+    persistence contract pinned by
+    [trading/simulation/test/test_gtc_entry_persistence.ml]. *)
 
 open OUnit2
 open Core
@@ -122,7 +125,7 @@ let _never_qualifies ~symbol:_ ~side:_ = false
     rather than a weakening. *)
 let test_ttl_zero_never_cancels _ =
   assert_that
-    (Entry_ticket_ttl.cancellations ~ttl_weeks:0
+    (Entry_ticket_ttl.cancellations ~rescreen:false ~max_rest_weeks:0
        ~positions:
          (_positions
             [
@@ -139,7 +142,7 @@ let test_ttl_zero_never_cancels _ =
     macro flip — is cancelled on requalification, not on the clock. *)
 let test_requalification_failure_cancels_before_ttl _ =
   assert_that
-    (Entry_ticket_ttl.cancellations ~ttl_weeks:4
+    (Entry_ticket_ttl.cancellations ~rescreen:true ~max_rest_weeks:4
        ~positions:
          (_positions
             [
@@ -156,7 +159,7 @@ let test_requalification_failure_cancels_before_ttl _ =
     either direction fails. *)
 let test_clock_backstop_fires_one_week_after_ttl _ =
   let cancels_at ~weeks =
-    Entry_ticket_ttl.cancellations ~ttl_weeks:4
+    Entry_ticket_ttl.cancellations ~rescreen:true ~max_rest_weeks:4
       ~positions:
         (_positions
            [
@@ -179,7 +182,7 @@ let test_clock_backstop_fires_one_week_after_ttl _ =
 *)
 let test_filled_and_partially_filled_tickets_are_never_cancelled _ =
   assert_that
-    (Entry_ticket_ttl.cancellations ~ttl_weeks:4
+    (Entry_ticket_ttl.cancellations ~rescreen:true ~max_rest_weeks:4
        ~positions:
          (_positions
             [
@@ -204,7 +207,7 @@ let test_requalification_is_per_side _ =
     | Trading_base.Types.Short -> true
   in
   assert_that
-    (Entry_ticket_ttl.cancellations ~ttl_weeks:4
+    (Entry_ticket_ttl.cancellations ~rescreen:true ~max_rest_weeks:4
        ~positions:
          (_positions
             [
@@ -262,7 +265,8 @@ let test_cancel_releases_pin_so_symbol_repins_fresh _ =
   let held = String.Set.of_list [ "AAA" ] in
   let _wk1 = _pin_apply pending [ _candidate ~ticker:"AAA" ~entry:50.0 ] in
   let cancelled =
-    Entry_ticket_ttl.run ~ttl_weeks:4 ~pending_entry_e:pending
+    Entry_ticket_ttl.run ~rescreen:true ~max_rest_weeks:4
+      ~pending_entry_e:pending
       ~positions:
         (_positions
            [
@@ -293,7 +297,8 @@ let test_resting_ticket_does_not_ratchet_e _ =
   (* Ticket rests: under the armed TTL it is young enough and still qualifies,
      so nothing is cancelled and nothing is released. *)
   let resting =
-    Entry_ticket_ttl.run ~ttl_weeks:4 ~pending_entry_e:pending
+    Entry_ticket_ttl.run ~rescreen:true ~max_rest_weeks:4
+      ~pending_entry_e:pending
       ~positions:
         (_positions
            [
@@ -378,12 +383,13 @@ let _drive ~config ~bar_reader ~current_date ~positions =
   | Ok output -> _cancels output.Trading_strategy.Strategy_interface.transitions
   | Error _ -> []
 
-let _ttl_config ~ttl =
+let _ttl_config ~rescreen ~max_rest_weeks =
   {
     (Weinstein_strategy.default_config ~universe:[ "ZZZ" ]
        ~index_symbol:_index_symbol)
     with
-    entry_order_ttl_weeks = ttl;
+    enable_entry_ticket_rescreen = rescreen;
+    entry_order_max_rest_weeks = max_rest_weeks;
   }
 
 let _resting_ticket ~weeks_old =
@@ -397,41 +403,60 @@ let _resting_ticket ~weeks_old =
 (** END-TO-END, PRIMARY path: a resting ticket on a symbol in a sustained
     decline (below a falling 30-week MA — Stage 4, never a long candidate) fails
     the weekly re-screen and is cancelled — but ONLY when the config arms the
-    mechanism. Both arms run the identical tick; the sole difference is
-    [entry_order_ttl_weeks], which pins the config→screening arming rather than
-    the direct-parameter surface. *)
+    mechanism. All three arms run the identical tick; the differences are the
+    config flags, which pins the config→screening arming rather than the
+    direct-parameter surface.
+
+    The third arm is the point of defect C: [enable_entry_ticket_rescreen]
+    alone, with the clock left unbounded, gets the book-supported cancel. Under
+    the old single [entry_order_ttl_weeks] knob that combination was unreachable
+    — [0] returned [[]] without even consulting the re-screen predicate, so
+    taking the faithful half meant also accepting an invented number. *)
 let test_config_arms_rescreen_cancel_end_to_end _ =
   let bar_reader =
     _reader ~end_date:_friday ~symbol:"ZZZ" ~symbol_step:(-0.5)
   in
-  let drive ~ttl =
-    _drive ~config:(_ttl_config ~ttl) ~bar_reader ~current_date:_friday
+  let drive ~rescreen ~max_rest_weeks =
+    _drive
+      ~config:(_ttl_config ~rescreen ~max_rest_weeks)
+      ~bar_reader ~current_date:_friday
       ~positions:(_resting_ticket ~weeks_old:1)
   in
-  assert_that
-    [ drive ~ttl:0; drive ~ttl:4 ]
-    (elements_are
-       [ is_empty; elements_are [ equal_to ("ZZZ-1", "requalification") ] ])
-
-(** END-TO-END, BACKSTOP path: an aged ticket is retired on the clock even while
-    its symbol keeps qualifying (rising series, Stage 2). The default-[0] arm
-    again emits nothing, and the [ttl = 8] arm shows the younger-than-TTL ticket
-    surviving — so the cancel is attributable to age, not to the tick simply
-    always cancelling. *)
-let test_config_arms_clock_backstop_end_to_end _ =
-  let bar_reader = _reader ~end_date:_friday ~symbol:"ZZZ" ~symbol_step:1.0 in
-  let drive ~ttl ~weeks_old =
-    _drive ~config:(_ttl_config ~ttl) ~bar_reader ~current_date:_friday
-      ~positions:(_resting_ticket ~weeks_old)
-  in
+  let cancelled = elements_are [ equal_to ("ZZZ-1", "requalification") ] in
   assert_that
     [
-      drive ~ttl:0 ~weeks_old:9;
-      drive ~ttl:8 ~weeks_old:9;
-      drive ~ttl:8 ~weeks_old:3;
+      drive ~rescreen:false ~max_rest_weeks:0;
+      drive ~rescreen:true ~max_rest_weeks:4;
+      drive ~rescreen:true ~max_rest_weeks:0;
     ]
-    (elements_are
-       [ is_empty; elements_are [ equal_to ("ZZZ-1", "ttl") ]; is_empty ])
+    (elements_are [ is_empty; cancelled; cancelled ])
+
+(** END-TO-END, BACKSTOP path: an aged ticket is retired on the clock even while
+    its symbol keeps qualifying (rising series, Stage 2). The unbounded arm
+    emits nothing however old the ticket is, and the [8] arm shows the
+    younger-than-TTL ticket surviving — so the cancel is attributable to age,
+    not to the tick simply always cancelling.
+
+    The fourth arm is the other half of defect C: the clock alone, with the
+    re-screen off, still fires. The two mechanisms are now genuinely independent
+    in both directions. *)
+let test_config_arms_clock_backstop_end_to_end _ =
+  let bar_reader = _reader ~end_date:_friday ~symbol:"ZZZ" ~symbol_step:1.0 in
+  let drive ~rescreen ~max_rest_weeks ~weeks_old =
+    _drive
+      ~config:(_ttl_config ~rescreen ~max_rest_weeks)
+      ~bar_reader ~current_date:_friday
+      ~positions:(_resting_ticket ~weeks_old)
+  in
+  let expired = elements_are [ equal_to ("ZZZ-1", "ttl") ] in
+  assert_that
+    [
+      drive ~rescreen:false ~max_rest_weeks:0 ~weeks_old:9;
+      drive ~rescreen:true ~max_rest_weeks:8 ~weeks_old:9;
+      drive ~rescreen:true ~max_rest_weeks:8 ~weeks_old:3;
+      drive ~rescreen:false ~max_rest_weeks:8 ~weeks_old:9;
+    ]
+    (elements_are [ is_empty; expired; is_empty; expired ])
 
 let suite =
   "entry_ticket_ttl"

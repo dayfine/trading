@@ -292,11 +292,18 @@ let _still_qualifies ~config ~macro_result ~sector_map ~stage_by_ticker ~symbol
     {!Entry_freeze.apply}. The cancelled symbol is not re-placed on this same
     tick — its [Entering] position is still held until the transition is
     applied, so the cascade still excludes it — which is the intent: cancel now,
-    re-qualify (at a fresh [E]) on a later week. No-op at the default
-    [entry_order_ttl_weeks = 0]. *)
+    re-qualify (at a fresh [E]) on a later week. No-op at the defaults
+    ([enable_entry_ticket_rescreen = false], [entry_order_max_rest_weeks = 0]).
+
+    The two halves are independently armed (defect C, 2026-08-16): the
+    book-supported re-screen no longer requires opting into the invented clock.
+    Neither armed ⇒ the predicate below is never even built. *)
 let _ticket_cancellations ?pending_entry_e ~config ~macro_result ~sector_map
     ~(portfolio : Portfolio_view.t) ~classified ~current_date () =
-  if config.entry_order_ttl_weeks <= 0 then []
+  if
+    (not config.enable_entry_ticket_rescreen)
+    && config.entry_order_max_rest_weeks <= 0
+  then []
   else
     let stage_by_ticker = Hashtbl.create (module String) in
     List.iter classified ~f:(fun (ticker, _view, _prior, sr) ->
@@ -304,8 +311,9 @@ let _ticket_cancellations ?pending_entry_e ~config ~macro_result ~sector_map
     let pending_entry_e =
       match pending_entry_e with Some t -> t | None -> Entry_freeze.create ()
     in
-    Entry_ticket_ttl.run ~ttl_weeks:config.entry_order_ttl_weeks
-      ~pending_entry_e ~positions:portfolio.positions
+    Entry_ticket_ttl.run ~rescreen:config.enable_entry_ticket_rescreen
+      ~max_rest_weeks:config.entry_order_max_rest_weeks ~pending_entry_e
+      ~positions:portfolio.positions
       ~still_qualifies:
         (_still_qualifies ~config ~macro_result ~sector_map ~stage_by_ticker)
       ~current_date
