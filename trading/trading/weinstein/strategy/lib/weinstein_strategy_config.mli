@@ -1462,30 +1462,46 @@ type config = {
           entry walk does with a candidate whose structural initial stop sits
           further than [stops_config.max_stop_distance_pct] from entry.
 
-          [Drop_over_max] (default) is today's G15 step-3 drop — the candidate
-          is skipped with [Audit_recorder.Stop_too_wide]. [Size_down] admits it
-          instead, up to {!stop_width_size_down_max_pct}, and lets fixed-risk
-          sizing shrink the share count ~[1 / stop_distance] so dollar
-          risk-to-stop is unchanged; such entries carry
-          [Entry_audit_capture.entry_meta.sized_down_wide_stop = true] and trace
-          as [Sized_down_wide_stop].
+          Three readings of one book sentence:
 
-          {b Honest citation.} This is NOT a documented book mechanism. §5.1's
-          "prefer other candidates" is comparative rather than an absolute ban,
-          but the book's remedies for a wide stop are (i) anchor at the nearest
-          prior correction low
-          ([stops_config.support_floor_anchor_scope = Nearest], the competing
-          {e faithful} arm), (ii) the §5.3 trader preset's 4–6% stop, (iii) pass
-          — never risk-parity size-down. F3 is a tolerated-participation
-          {e reading}, labelled as such; see {!Stop_width_mode} for the full
-          framing and the ladder-v3 evidence it responds to.
+          - [Drop_over_max] (default) is today's G15 step-3 drop — the candidate
+            is skipped with [Audit_recorder.Stop_too_wide]. §5.1 read as a ban.
+          - [Size_down] admits it, up to {!stop_width_size_down_max_pct}, and
+            lets fixed-risk sizing shrink the share count ~[1 / stop_distance]
+            so dollar risk-to-stop is unchanged; such entries carry
+            [Entry_audit_capture.entry_meta.sized_down_wide_stop = true] and
+            trace as [Sized_down_wide_stop]. Keeps rank, gives up size.
+          - [Demote_over_max] (added 2026-08-16, defect B) admits it at
+            {e normal} size but walks it {e after} every candidate whose stop is
+            within the limit, so wide stops are funded only with what is left
+            ({!Entry_stop_width_order}). Keeps size, gives up rank. Also bounded
+            by {!stop_width_size_down_max_pct} — leaving that at [0.0] makes
+            this mode a no-op, so a spec must set the ceiling for it to bite.
+
+          {b Honest citation.} §5.1 says "prefer other candidates", which is
+          comparative rather than an absolute ban. Of the three,
+          [Demote_over_max] is the closest to that wording — and it is the shape
+          the codebase already uses for [overhead_supply], a rank demotion that
+          never excludes. [Size_down] is NOT a documented book mechanism: the
+          book's remedies for a wide stop are (i) anchor at the nearest prior
+          correction low ([stops_config.support_floor_anchor_scope = Nearest],
+          the competing {e faithful} arm), (ii) the §5.3 trader preset's 4–6%
+          stop, (iii) pass — never risk-parity size-down. It remains a
+          tolerated-participation {e reading}, labelled as such; see
+          {!Stop_width_mode} for the full framing and the ladder-v3 evidence.
+
+          {b What [Demote_over_max] is responding to.} On the 26-year top-3000
+          core arm AXTI was rejected {b 21 times} with [Stop_too_wide] at a
+          correct, fresh entry anchor — and became the single largest winner in
+          the record run. The width gate, not the entry anchor, is what excludes
+          that cohort ([dev/notes/entry-anchor-defect-a-refuted-2026-08-16.md]).
 
           {b Default [Drop_over_max] = bit-identical to every existing
              baseline/golden} (R1). R2: real config field, axis-expressible as
-          [((flag stop_width_mode) (values (Drop_over_max Size_down)))] via
-          [Variant_matrix] / [Backtest.Overlay_validator.apply_overrides]. Stays
-          default-off until a ledger ACCEPT plus the promotion-confirmation grid
-          (R3). *)
+          [((flag stop_width_mode) (values (Drop_over_max Size_down
+           Demote_over_max)))] via [Variant_matrix] /
+          [Backtest.Overlay_validator.apply_overrides]. Stays default-off until
+          a ledger ACCEPT plus the promotion-confirmation grid (R3). *)
   stop_width_size_down_max_pct : float; [@sexp.default 0.0]
       (** Sanity ceiling for {!stop_width_mode} [= Size_down]: stop distances
           above this fraction of entry are still dropped, so the mechanism can

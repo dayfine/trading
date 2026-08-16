@@ -109,6 +109,27 @@ let _make_entry_fn ~config ~bar_reader ~current_date ~stop_states
     ~initial_stop_buffer:config.initial_stop_buffer ~stop_states ~bar_reader
     ~portfolio_value ~current_date cand
 
+(** The two pre-walk transforms of the candidate list, both default-off
+    identities (R1):
+
+    - Fix #2 [freeze_entry_at_first_breakout] pins each candidate's
+      [suggested_entry] to its first qualifying breakout, so a trending symbol's
+      ticket does not chase the extension upward week over week.
+    - Defect B [Demote_over_max] moves the wide-stop candidates behind the
+      narrow-stop ones, so §5.1's "prefer other candidates" costs priority
+      rather than existence — they are funded with whatever the narrow-stop
+      candidates leave.
+
+    Order matters: the freeze rewrites [suggested_entry], and the demotion's
+    stop-width measurement keys off the entry, so the freeze must run first or
+    the two would disagree about which entry a candidate is being judged at. *)
+let _prepare_candidates ~config ~pending_entry_e ~held_set ~bar_reader
+    ~current_date candidates =
+  Entry_freeze.apply ~enabled:config.freeze_entry_at_first_breakout
+    ~pending:pending_entry_e ~held_set ~candidates
+  |> Entry_stop_width_order.prefer_narrow_stops ~config ~bar_reader
+       ~current_date
+
 (** Generate CreateEntering transitions for screener candidates. Tracks
     remaining cash to avoid generating orders that exceed funds.
 
@@ -127,13 +148,9 @@ let entries_from_candidates ?sector_lookup
     ~bar_reader ~(portfolio : Portfolio_view.t) ~get_price ~current_date
     ?(audit_recorder = Audit_recorder.noop) ?macro () =
   let held_set = String.Set.of_list (held_symbols portfolio) in
-  (* Fix #2 (default-off): freeze each candidate's [suggested_entry] to its
-     first-qualifying breakout so a trending symbol's ticket does not chase the
-     extension upward week over week. No-op + no allocation when the flag is off
-     (R1). *)
   let candidates =
-    Entry_freeze.apply ~enabled:config.freeze_entry_at_first_breakout
-      ~pending:pending_entry_e ~held_set ~candidates
+    _prepare_candidates ~config ~pending_entry_e ~held_set ~bar_reader
+      ~current_date candidates
   in
   let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
   let make_entry =
