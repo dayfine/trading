@@ -3,34 +3,60 @@
 Does fixing the **stop** side admit AXTI, or is the **entry anchor** the binding
 constraint? Gates defect A in `dev/plans/entry-anchor-and-ttl-2026-08-15.md`.
 
-## Result
+> ## ⛔ Both of this file's original conclusions were wrong. Corrected 2026-08-16.
+>
+> The answer the diagnostic actually gives is **the stop is the binding
+> constraint, not the entry anchor** — i.e. defect A is refuted for every arm
+> here. Full derivation:
+> `dev/notes/entry-anchor-defect-a-refuted-2026-08-16.md`; the zero-fill thread
+> is resolved in `dev/notes/ticket-death-on-cash-2026-08-16.md`. The original
+> text is kept below, struck through, so the error is legible.
 
-Real top-3000 universe, real 15% gate, window 2024-01-01..2026-06-26, salt 0:
+## Result — corrected
 
-| arm | AXTI tickets placed | AXTI fills |
-|---|---|---|
-| `d2-core` — `Window_extreme` | 1 | **0** |
-| `d2-nearfloor` — `Nearest` | 4 | **0** |
-| `d2-nf-anchor` — `Nearest` + `stop_anchor_at_entry_base` | 5 | **0** |
+Real top-3000 universe, real 15% gate, window 2024-01-01..2026-06-26, salt 0.
+All three arms carry `entry_anchor_local_range_weeks 4` and
+`freeze_entry_at_first_breakout true`; they differ **only on the stop side**:
 
-**Stop-side fixes raise admissions 1 → 4 → 5 and produce zero fills.**
+| arm | stop config | AXTI tickets placed | AXTI fills |
+|---|---|---|---|
+| `d2-core` | `Window_extreme` | **0** (`Stop_too_wide`) | 0 |
+| `d2-nearfloor` | `Nearest` | **0** (`Stop_too_wide` ×4) | 0 |
+| `d2-nf-anchor` | `Nearest` + `stop_anchor_at_entry_base` | **1** | 0 |
 
-On the exact 2025-06-27 decision the anchor arm gives **E = 2.71, risk 2.1% —
-admitted**, against **E = 4.05, risk 57.3% — rejected** in the full-history run.
-The only difference is how far back the anchor window could see: a 2024 start
-cannot reach the pre-crash high. That is the sharpest evidence that E, not the
-stop, is the binding constraint.
+E is **2.71 in all three arms**. `stop_anchor_at_entry_base` is the flag that
+admits AXTI, and it is the only difference between the arm that placed a ticket
+and the arm that did not. `d2-nearfloor` alone does **not** admit it — the two
+stop flags are different mechanisms.
 
 BFX is absent from the top-3000 universe, so it cannot be screened here at all —
 only the record arm, on a different universe, ever saw it.
 
-## ⚠ Open thread
+## The two errors
 
-A ticket resting at E = 2.71 from 2025-06-27, with AXTI first trading above 4.05
-on 2025-09-16, **should have filled** — and did not, in any arm. Check
-`entry_extension_max_pct 2.0` rejecting a fill that gaps past E, budget
-starvation in the entry walk, or ticket supersession. **Resolve before acting on
-A**; it may be a second, independent defect.
+1. ~~"Stop-side fixes raise admissions 1 → 4 → 5."~~ Those counts are
+   `grep -c AXTI trade_audit.sexp`, which also counts rows where AXTI appears
+   inside some *other* ticket's `alternatives_considered`. Real ticket counts
+   (`grep -c '(symbol AXTI) (entry_date'`) are **0 / 0 / 1**.
+2. ~~"E = 2.71 here vs E = 4.05 in the full-history run; the only difference is
+   how far back the anchor window could see."~~ At
+   `entry_anchor_local_range_weeks = 4` the anchor is the max high over **4
+   weekly bars**, which cannot reach a pre-crash high and is identical in a 26y
+   and a 2.5y run — verified bit-identical on `suggested_entry`,
+   `local_range_top`, `ma_value` and `installed_stop` across four shared
+   tickets. The 4.05 figure comes from an arm where the knob is **0** (its
+   default), where E falls back to the resistance `breakout_price`. The
+   comparison was armed-vs-unarmed **config**, mislabelled as
+   long-window-vs-short-window.
+
+## ~~⚠ Open thread~~ — RESOLVED 2026-08-16
+
+~~A ticket resting at E = 2.71 from 2025-06-27 ... should have filled — and did
+not, in any arm.~~ It **did** trigger, on ~2025-08-22, and the engine filled it
+at 2.7475 — inside the 2.7642 do-not-chase cap, so `entry_extension_max_pct` was
+not the cause. The **portfolio** then rejected the fill for cash (needed
+\$124,039, had \$16,531) and the ticket was destroyed with no artifact trace.
+See `dev/notes/ticket-death-on-cash-2026-08-16.md`.
 
 ## The first attempt failed by design — recorded so it is not repeated
 

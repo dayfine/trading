@@ -1,5 +1,20 @@
 # Plan — entry anchor, TTL, and the artifacts that measure them
 
+> **⛔ Status 2026-08-16 — the queue below has been re-ordered by evidence.**
+>
+> | | then | now |
+> |---|---|---|
+> | **F** | order 1 | **re-scoped and shipped** as G1 (PR #2348). The audit already carried `ma_value` / `close_at_decision` / `local_range_top`; the real gap was ticket *resolution* — `ticket_age_weeks_at_cancel` was written zero times, leaving 26% of placements unaccounted (`dev/notes/ticket-death-on-cash-2026-08-16.md`). |
+> | **C + E** | order 2 | **shipped** (PR #2349). Two independent fields; the clock's default stays `0` until D. |
+> | **A** | order 3, impact **high** | **REFUTED for every v4 arm.** The armed 4-week anchor is history-independent (verified bit-identical across a 26y and a 2.5y run); AXTI's E is 2.71 everywhere and it is rejected 21× by the **stop**. A's remaining scope is a promotion question for `entry_anchor_local_range_weeks` (default `0`), not a fix. `dev/notes/entry-anchor-defect-a-refuted-2026-08-16.md` |
+> | **D** | order 4 | unchanged; now unblocked by the C+E split. |
+> | **B** | order 5 | **moves to the front of the strategy work.** The 15% hard rejection is what excludes AXTI 21 times at a correct, fresh E. |
+> | **G2/G3** | — | **new.** A triggered ticket the book cannot fund is destroyed, not retried; ~25% of would-be entries. |
+>
+> The per-defect sections below are the original text and are left unedited
+> except where a section is explicitly marked.
+
+
 Supersedes the ladder-v4 "which cell wins" framing. The seeded re-run
 (`dev/experiments/ladder-v4-seeded-2026-08-14/results.md`) settled the cell
 question: **only nearfloor clears the 132.5pp null, and it does so three ways.**
