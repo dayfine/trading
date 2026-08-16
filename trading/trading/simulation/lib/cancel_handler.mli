@@ -28,6 +28,14 @@
 open Core
 module Position = Trading_strategy.Position
 
+val portfolio_rejection_reason : string
+(** The reason token stamped on every [CancelEntry] this module builds:
+    ["entry_fill_rejected_by_portfolio"]. Exposed so a reader (and the tests)
+    can group ticket deaths by cause without matching prose. It sits in the same
+    namespace as {!Weinstein_strategy.Entry_ticket_ttl}'s
+    [entry_ticket_ttl_expired] / [entry_ticket_requalification_failed], which
+    are the only other ways a resting entry ticket dies. *)
+
 val transitions_for_rejected_trades :
   date:Date.t ->
   positions:Position.t String.Map.t ->

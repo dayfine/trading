@@ -160,19 +160,16 @@ type _bucket = {
   mutable bucket_external_exit : external_exit_decision option;
   mutable bucket_fill_volume : Ticket_lifecycle.fill_volume_check option;
   mutable bucket_cancel_age_weeks : int option;
+  mutable bucket_cancel_reason : string option;
 }
-(** Internal mutable bucket. Every [record_*] merge lands here and is folded
-    into the emitted [audit_record] at drain time; [external_exit] is filled in
-    only when [bucket_exit] is still [None] (enriched always wins — see
-    {!record_transitions}). *)
+(** Internal mutable bucket: every [record_*] merge lands here and is folded
+    into the emitted [audit_record] at drain time. *)
 
 type t = {
   records : (string, _bucket) Hashtbl.t;
   cascade_summaries : cascade_summary Queue.t;
-      (** Per-Friday cascade summaries, recorded in insertion order. Sorted by
-          [date] ascending on retrieval — the strategy emits one per Friday
-          screen call, but ordering across multiple backtests / threads is not
-          relied on. *)
+      (** Per-Friday cascade summaries in insertion order, sorted by [date] on
+          retrieval — cross-backtest/thread ordering is not relied on. *)
 }
 
 let create () =
@@ -188,6 +185,7 @@ let _fresh_bucket (entry : entry_decision) =
     bucket_external_exit = None;
     bucket_fill_volume = None;
     bucket_cancel_age_weeks = None;
+    bucket_cancel_reason = None;
   }
 
 let record_entry t (entry : entry_decision) =
@@ -228,25 +226,25 @@ let _fill_in_external_exit (bucket : _bucket)
     bucket.bucket_external_exit <-
       Some (_external_exit_of_transition bucket trans ~exit_reason)
 
-(* PR-5: the resting age of a cancelled ticket, anchored on [placement_date]. *)
-let _record_cancel_age ~cancel_date (bucket : _bucket) =
+(* PR-5: a cancelled ticket's resting age, anchored on [placement_date], paired
+   with the transition's reason token — see [Ticket_lifecycle.cancel_reason]. *)
+let _record_cancel ~cancel_date ~reason (bucket : _bucket) =
   bucket.bucket_cancel_age_weeks <-
     Ticket_lifecycle.age_weeks_from bucket.bucket_entry.ticket_lifecycle
-      ~resolved:cancel_date
+      ~resolved:cancel_date;
+  bucket.bucket_cancel_reason <- Some reason
 
-let _process_transition_for_external_exit t
-    (trans : Trading_strategy.Position.transition) =
+let _process_transition t (trans : Trading_strategy.Position.transition) =
   let apply f = _with_bucket t ~position_id:trans.position_id ~f in
   match trans.kind with
   | Trading_strategy.Position.TriggerExit { exit_reason; _ } ->
       apply (fun bucket -> _fill_in_external_exit bucket trans ~exit_reason)
-  | Trading_strategy.Position.CancelEntry _ ->
-      apply (_record_cancel_age ~cancel_date:trans.date)
+  | Trading_strategy.Position.CancelEntry { reason } ->
+      apply (_record_cancel ~cancel_date:trans.date ~reason)
   | _ -> ()
 
-let record_transitions t
-    (transitions : Trading_strategy.Position.transition list) =
-  List.iter transitions ~f:(_process_transition_for_external_exit t)
+let record_transitions t transitions =
+  List.iter transitions ~f:(_process_transition t)
 
 let _entry_with_lifecycle (bucket : _bucket) : entry_decision =
   {
@@ -254,7 +252,8 @@ let _entry_with_lifecycle (bucket : _bucket) : entry_decision =
     ticket_lifecycle =
       Ticket_lifecycle.resolve bucket.bucket_entry.ticket_lifecycle
         ~fill_volume:bucket.bucket_fill_volume
-        ~cancel_age_weeks:bucket.bucket_cancel_age_weeks;
+        ~cancel_age_weeks:bucket.bucket_cancel_age_weeks
+        ~cancel_reason:bucket.bucket_cancel_reason;
   }
 
 let _bucket_to_record (bucket : _bucket) : audit_record =

@@ -38,7 +38,8 @@
   test_fold_health
   test_fold_health_runner
   test_margin_exit_observability
-  test_trade_audit_external_exits)
+  test_trade_audit_external_exits
+  test_ticket_cancel_observability)
  (libraries
   ounit2
   core

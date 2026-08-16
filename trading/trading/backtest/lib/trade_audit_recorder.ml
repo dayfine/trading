@@ -74,6 +74,7 @@ let _ticket_lifecycle_of_event (e : AR.entry_event) : Ticket_lifecycle.t =
   {
     placement_date = e.current_date;
     ticket_age_weeks_at_cancel = None;
+    cancel_reason = None;
     ticket_age_weeks_at_fill = None;
     fill_volume = None;
     freshness_basis = _freshness_basis_of_event e.freshness_basis;

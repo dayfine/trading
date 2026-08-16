@@ -272,12 +272,15 @@ let _triple : TL.triple_confirmation =
   }
 
 let _lifecycle ?(placement_date = _date "2024-03-01")
-    ?(ticket_age_weeks_at_cancel = Some 3) ?(ticket_age_weeks_at_fill = None)
-    ?(fill_volume = None) ?(freshness_basis = TL.Range_top_breakout)
-    ?(sized_down_wide_stop = true) ?(triple_confirmation = _triple) () : TL.t =
+    ?(ticket_age_weeks_at_cancel = Some 3)
+    ?(cancel_reason = Some "entry_ticket_ttl_expired")
+    ?(ticket_age_weeks_at_fill = None) ?(fill_volume = None)
+    ?(freshness_basis = TL.Range_top_breakout) ?(sized_down_wide_stop = true)
+    ?(triple_confirmation = _triple) () : TL.t =
   {
     placement_date;
     ticket_age_weeks_at_cancel;
+    cancel_reason;
     ticket_age_weeks_at_fill;
     fill_volume;
     freshness_basis;
@@ -342,8 +345,8 @@ let test_entry_decision_sexp_tolerates_missing_ticket_lifecycle _ =
     age or a fabricated verdict. *)
 let test_ticket_lifecycle_sexp_omits_unresolved_fill_fields _ =
   let unresolved =
-    _lifecycle ~ticket_age_weeks_at_cancel:None ~ticket_age_weeks_at_fill:None
-      ~fill_volume:None ()
+    _lifecycle ~ticket_age_weeks_at_cancel:None ~cancel_reason:None
+      ~ticket_age_weeks_at_fill:None ~fill_volume:None ()
   in
   let sexp = TL.sexp_of_t unresolved in
   let field_names =
@@ -359,6 +362,7 @@ let test_ticket_lifecycle_sexp_omits_unresolved_fill_fields _ =
           List.mem
             [
               "ticket_age_weeks_at_cancel";
+              "cancel_reason";
               "ticket_age_weeks_at_fill";
               "fill_volume";
             ]
@@ -509,8 +513,9 @@ let test_record_fill_volume_without_entry_is_dropped _ =
   assert_that (TA.get_audit_records t) is_empty
 
 (** F2's cancel path: a ticket cancelled three weeks after placement records a
-    resting age of 3 in the CANCEL column, and leaves the fill column [None] —
-    the two resolutions are mutually exclusive. This is the only place a
+    resting age of 3 in the CANCEL column
+    {b and the transition's own reason token}, and leaves the fill column [None]
+    — the two resolutions are mutually exclusive. This is the only place a
     never-filled ticket's age is observable; it produces no round-trip for the
     fill-side enrichment. *)
 let test_cancel_entry_records_the_resting_age_in_weeks _ =
@@ -520,14 +525,14 @@ let test_cancel_entry_records_the_resting_age_in_weeks _ =
        ~ticket_lifecycle:
          (Some
             (_lifecycle ~placement_date:(_date "2024-03-01")
-               ~ticket_age_weeks_at_cancel:None ()))
+               ~ticket_age_weeks_at_cancel:None ~cancel_reason:None ()))
        ());
   TA.record_transitions t
     [
       {
         Position.position_id = "AAPL-wein-1";
         date = _date "2024-03-22";
-        kind = Position.CancelEntry { reason = "ttl_expired" };
+        kind = Position.CancelEntry { reason = "entry_ticket_ttl_expired" };
       };
     ];
   assert_that (TA.get_audit_records t)
@@ -540,9 +545,48 @@ let test_cancel_entry_records_the_resting_age_in_weeks _ =
                    field
                      (fun (l : TL.t) -> l.ticket_age_weeks_at_cancel)
                      (is_some_and (equal_to 3));
+                   field
+                     (fun (l : TL.t) -> l.cancel_reason)
+                     (is_some_and (equal_to "entry_ticket_ttl_expired"));
                    field (fun (l : TL.t) -> l.ticket_age_weeks_at_fill) is_none;
                  ]));
        ])
+
+(** The cause is carried through verbatim, so the two ways a resting ticket dies
+    stay separable in [trade_audit.sexp]. A strategy-side TTL cancel is a
+    {i decision}; a [Cancel_handler.portfolio_rejection_reason] cancel is an
+    {i accident of capital timing} — a ticket that triggered, filled at the
+    engine, and was then refused because the book could not fund it. Grouping a
+    cancel-age column without this field averages a policy with a failure. *)
+let test_cancel_reason_distinguishes_rejection_from_ttl _ =
+  let record_cancel ~position_id ~reason =
+    let t = TA.create () in
+    TA.record_entry t
+      (make_entry ~position_id
+         ~ticket_lifecycle:
+           (Some
+              (_lifecycle ~placement_date:(_date "2024-03-01")
+                 ~ticket_age_weeks_at_cancel:None ~cancel_reason:None ()))
+         ());
+    TA.record_transitions t
+      [
+        {
+          Position.position_id;
+          date = _date "2024-03-22";
+          kind = Position.CancelEntry { reason };
+        };
+      ];
+    List.filter_map (TA.get_audit_records t) ~f:(fun (r : TA.audit_record) ->
+        Option.bind r.entry.ticket_lifecycle ~f:(fun (l : TL.t) ->
+            l.cancel_reason))
+  in
+  assert_that
+    ( record_cancel ~position_id:"AAPL-wein-1"
+        ~reason:Trading_simulation.Cancel_handler.portfolio_rejection_reason,
+      record_cancel ~position_id:"AAPL-wein-1"
+        ~reason:"entry_ticket_ttl_expired" )
+    (equal_to
+       ([ "entry_fill_rejected_by_portfolio" ], [ "entry_ticket_ttl_expired" ]))
 
 (** A row written before PR-5 carries no [ticket_lifecycle]; the collector must
     leave it alone rather than fabricate one from a late verdict. *)
@@ -887,6 +931,8 @@ let suite =
          >:: test_record_fill_volume_without_entry_is_dropped;
          "CancelEntry records the resting age in weeks"
          >:: test_cancel_entry_records_the_resting_age_in_weeks;
+         "cancel_reason distinguishes a portfolio rejection from a TTL cancel"
+         >:: test_cancel_reason_distinguishes_rejection_from_ttl;
          "lifecycle merges are inert on a pre-PR-5 row"
          >:: test_lifecycle_merges_are_inert_on_a_pre_pr5_row;
          "alternative_candidate sexp round-trip"
