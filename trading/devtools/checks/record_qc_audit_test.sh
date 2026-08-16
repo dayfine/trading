@@ -2442,6 +2442,68 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 38 — CP4 rework: PR mode, structural-only review (behavioral not
+# yet run -- a normal, caller-documented state per
+# .claude/agents/lead-orchestrator.md's Stage 4 note "after Stage 1 if
+# behavioral was not run"), with a companion dev/reviews/<feature>.md left
+# over from an UNRELATED run carrying a conflicting ## Verdict + ## Quality
+# Score. Before this fix, the ## Verdict / quality-score fallbacks
+# (record_qc_audit.sh:~382-452, pre-fix unguarded) ran unconditionally
+# whenever STRUCTURAL/BEHAVIORAL/QUALITY_SCORE were still empty -- including
+# in PR mode with only one review resolved -- and would read the
+# unrelated file's NEEDS_REWORK verdict + score 1 into the still-unresolved
+# BEHAVIORAL/QUALITY_SCORE fields, flipping overall_qc from APPROVED to
+# NEEDS_REWORK. The correct result leaves the unresolved fields at their
+# SKIPPED/null defaults and ignores the companion file entirely, because
+# this is a genuine PR-mode run (FILE_MODE must stay 0).
+# ---------------------------------------------------------------------------
+FEATURE38="structural-only-pr-mode-no-file-leak"
+S38_DIR="${TMP_REPO}/s38"
+mkdir -p "${S38_DIR}"
+cat > "${S38_DIR}/reviews.txt" <<'EOF'
+STATE:APPROVED
+Reviewed SHA: real38
+
+## Structural QC — structural-only-pr-mode-no-file-leak
+
+## Verdict
+APPROVED
+ENDBODY
+EOF
+make_gh_mock "${S38_DIR}" "${S38_DIR}/reviews.txt"
+
+# Companion file-mode review file, left over from an unrelated run, holding
+# a deliberately WRONG verdict + score. Must NOT be consulted: this PR-mode
+# call already resolved structural_qc for real, and per the fix,
+# behavioral_qc / quality_score must fall through to their SKIPPED/null
+# defaults rather than reading this file.
+cat > "${TMP_REPO}/dev/reviews/${FEATURE38}.md" <<'EOF'
+Reviewed SHA: unrelatedsha38
+
+## Verdict
+NEEDS_REWORK
+
+## Quality Score
+1 — this file belongs to a different run and must NOT be used
+EOF
+
+out38=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S38_DIR}/gh" \
+  bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+  "${FEATURE38}" "feat/dummy" "2026-05-25" --pr-number 3007 2>&1) && rc38=0 || rc38=$?
+JSON38="${TMP_REPO}/dev/audit/2026-05-25-feat-dummy-${FEATURE38}.json"
+if (( rc38 == 0 )) && [[ -f "${JSON38}" ]] \
+   && grep -q '"structural_qc": *"APPROVED"' "${JSON38}" \
+   && grep -q '"behavioral_qc": *"SKIPPED"' "${JSON38}" \
+   && grep -q '"overall_qc": *"APPROVED"' "${JSON38}" \
+   && grep -q '"quality_score": *null' "${JSON38}"; then
+  pass "scenario 38 — PR mode, structural-only review: unresolved behavioral_qc/quality_score fall to SKIPPED/null, not leaked from an unrelated dev/reviews/ file (CP4 rework)"
+else
+  fail "scenario 38 — expected rc=0 + APPROVED/SKIPPED/APPROVED/null (not leaked from the wrong file fixture); got rc=${rc38}, output:"
+  echo "${out38}" | sed 's/^/      /'
+  [[ -f "${JSON38}" ]] && echo "      json: $(cat "${JSON38}")"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""

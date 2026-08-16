@@ -368,27 +368,34 @@ if [ "$FILE_MODE" -eq 1 ] && [ -z "$OVERALL" ]; then
     | tail -1 | sed 's/.*: //' || true)
 fi
 
-# Fallback: parse ## Verdict blocks from the review body.
+# Fallback: parse ## Verdict blocks from the review body (file mode only --
+# see FILE_MODE comment above; PR-mode already fully resolved STRUCTURAL /
+# BEHAVIORAL from the real PR review bodies above, and must never fall back
+# to REVIEW_FILE for either -- a PR carrying only one of the two reviews
+# (e.g. behavioral not yet run) is a normal, caller-documented state, not an
+# edge case, so leaving these unguarded would read a possibly-unrelated
+# dev/reviews/<feature>.md and populate the still-unresolved verdict from
+# it instead of the correct SKIPPED default below).
 # The structural section uses the first ## Verdict; behavioral uses the last.
 # Both bare (APPROVED) and bold (**APPROVED**) formats are supported.
 
-if [ -z "$STRUCTURAL" ]; then
+if [ "$FILE_MODE" -eq 1 ] && [ -z "$STRUCTURAL" ]; then
   STRUCTURAL=$(awk '
     /^## Verdict/{found=1; next}
     found && /^(APPROVED|NEEDS_REWORK|\*\*(APPROVED|NEEDS_REWORK)\*\*)/ {
       v=$0; gsub(/^\*\*|\*\*$/, "", v); print v; exit
     }
-  ' "$REVIEW_FILE" || true)
+  ' "$REVIEW_FILE" 2>/dev/null || true)
 fi
 
-if [ -z "$BEHAVIORAL" ]; then
+if [ "$FILE_MODE" -eq 1 ] && [ -z "$BEHAVIORAL" ]; then
   BEHAVIORAL=$(awk '
     /^## Verdict/{found=1; next}
     found && /^(APPROVED|NEEDS_REWORK|\*\*(APPROVED|NEEDS_REWORK)\*\*)/ {
       v=$0; gsub(/^\*\*|\*\*$/, "", v); last=v; found=0
     }
     END { if (last != "") print last }
-  ' "$REVIEW_FILE" || true)
+  ' "$REVIEW_FILE" 2>/dev/null || true)
 fi
 
 # Defaults if still empty
@@ -424,11 +431,15 @@ fi
 # silently discarded by a narrow acceptance regex -- the range check below
 # then fails loudly on it. See H-QC-SCALE (dev/status/harness.md).
 
-# Only run the file-mode quality-score extractor if PR-mode didn't already
-# populate QUALITY_SCORE. Otherwise the awk would run against a missing
-# review file (PR-mode skips the file existence check) and zero out the
-# PR-derived value.
-if [ -z "$QUALITY_SCORE" ]; then
+# Only run the file-mode quality-score extractor in file mode. Otherwise
+# (a) in PR mode the awk would run against a possibly-nonexistent review
+# file (PR-mode skips the file-existence check) or, worse, a REAL file left
+# over from an unrelated run for the same feature name, silently
+# overwriting a correct PR-derived QUALITY_SCORE (or the correct "not yet
+# resolved" empty state) with that unrelated file's score -- the same
+# FILE_MODE danger class documented above, just reached through the
+# quality-score field instead of a verdict field.
+if [ "$FILE_MODE" -eq 1 ] && [ -z "$QUALITY_SCORE" ]; then
   QUALITY_SCORE=$(awk '
     /^## Quality Score|^### Quality Score/ { in_qs=1; next }
     in_qs && /^[[:space:]]*$/ { next }
