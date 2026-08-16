@@ -224,10 +224,12 @@ val resolve :
 (** Fold the collector-side observations (the F5 fill-week check and the cancel
     age + reason) into a placement-time record. [None] in ⇒ [None] out: a
     [trade_audit.sexp] row written before PR-5 has no lifecycle to merge into
-    and is never given one. Both arguments are [None] on a row whose ticket
-    simply filled under an unarmed F5 config — the no-observation case, not a
-    zero. Never touches {!ticket_age_weeks_at_fill}, which only the enrichment
-    pass can know. *)
+    and is never given one. All three labelled arguments are [None] on a row
+    whose ticket simply filled under an unarmed F5 config — the no-observation
+    case, not a zero. [cancel_age_weeks] and [cancel_reason] always travel
+    together: a row carries both or neither, because a cancel is exactly one
+    observation with two fields. Never touches {!ticket_age_weeks_at_fill},
+    which only the enrichment pass can know. *)
 
 val with_fill_age : t option -> resolved:Date.t -> t option
 (** Stamp only {!ticket_age_weeks_at_fill}, from [resolved] against the record's

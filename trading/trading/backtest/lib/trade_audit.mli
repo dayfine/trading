@@ -479,14 +479,27 @@ val record_transitions : t -> Trading_strategy.Position.transition list -> unit
     (harvest-rotate, the last emitter, was retired); the case is kept because
     the simulator and order generator still handle the transition.
 
-    [CancelEntry] transitions (the F2 TTL / re-screen ticket cancel) set the
-    bucket's [ticket_lifecycle.ticket_age_weeks_at_cancel] from the transition
-    date minus the entry's [placement_date] — the only place a never-filled
-    ticket's resting age is observable, since it produces no round-trip for the
-    fill-side enrichment to join. The fill-side column
+    [CancelEntry] transitions set the bucket's
+    [ticket_lifecycle.ticket_age_weeks_at_cancel] from the transition date minus
+    the entry's [placement_date], {b and} its [cancel_reason] from the
+    transition's own reason token. That is the only place a never-filled
+    ticket's resolution is observable at all, since it produces no round-trip
+    for the fill-side enrichment to join. The fill-side column
     ([ticket_age_weeks_at_fill]) is left [None]: the two resolutions are
     mutually exclusive. Dropped when no entry was recorded for the id, same as
-    the exit path. *)
+    the exit path.
+
+    {b Three kinds of cancel arrive here, not one.} Two are strategy
+    {e decisions} — {!Weinstein_strategy.Entry_ticket_ttl}'s
+    [entry_ticket_ttl_expired] and [entry_ticket_requalification_failed]. The
+    third, {!Trading_simulation.Cancel_handler.portfolio_rejection_reason}, is
+    an {e accident of capital timing}: a ticket that triggered, filled at the
+    engine, and was then refused because the book could not fund it. That third
+    population is not a corner case — it was ~26% of placements on the run that
+    motivated recording the reason
+    ([dev/notes/ticket-death-on-cash-2026-08-16.md]) — so a cancel-age column
+    averaged without splitting on [cancel_reason] mixes a policy with a failure.
+*)
 
 val record_fill_volume :
   t -> position_id:string -> Ticket_lifecycle.fill_volume_check -> unit
