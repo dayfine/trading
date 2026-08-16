@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-16",
+  "feature": "simulation",
+  "branch": "refactor/ttl-knob-split",
+  "sha": "04b92026cdee1b12310e6249c9d43cc82afeb503",
+  "recorded_at_ns": 1786868456440413469,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
