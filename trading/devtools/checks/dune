@@ -596,10 +596,14 @@
 ; each define a private _repo_root() (same walk-up-for-.git/.claude logic
 ; as _check_lib.sh's repo_root()) and use it to locate dev/reviews/ and
 ; dev/audit/ -- real outside-workspace paths. But record_qc_audit_test.sh
-; ALWAYS invokes both scripts (and, since 29a-29c, _check_lib.sh's
-; repo_root() directly) with REPO_ROOT explicitly overridden to a
+; invokes both scripts (and, since 29a-29c, _check_lib.sh's repo_root()
+; directly) either with REPO_ROOT explicitly overridden to a
 ; freshly-created temp fixture repo (see the REPO_ROOT="${TMP_REPO}" ...
-; invocations throughout the test), so no real dev/reviews/ or dev/audit/
+; invocations throughout the test), or -- for the unset-REPO_ROOT walk-up
+; path production actually uses -- via `env -u REPO_ROOT` from a copy of
+; the script located inside a temp fixture that carries its own `.claude`
+; sentinel (scenarios 27b and 28b), so the walk-up still terminates
+; inside the fixture. Either way, no real dev/reviews/ or dev/audit/
 ; content is ever read by this rule. See universe_deps_exceptions.conf.
 
 (rule
