@@ -1,6 +1,6 @@
 # Status: trade-audit
 
-## Last updated: 2026-08-14
+## Last updated: 2026-08-17
 
 ## Status
 READY_FOR_REVIEW
@@ -113,23 +113,49 @@ NO
       guarantee. Fix shape: make the pair one `option` of a record (or a private
       constructor), so the type carries the invariant instead of a docstring.
 
-- [ ] **Pin the cancel-reason closed list with an exhaustiveness test (R2, from
-      qc-behavioral on PR #2357).** `trade_audit.mli` documents a closed list of
-      "three kinds of cancel" (the two `Entry_ticket_ttl` tokens plus
-      `Cancel_handler.portfolio_rejection_reason`). The list is correct at this
-      SHA — verified by enumerating the production `CancelEntry {` construction
-      sites (`entry_ticket_ttl.ml:17` with exactly two `Some` arms in
-      `_cancel_reason_for:38-50`; `cancel_handler.ml:28`) — but no test fails if
-      a fourth producer is added, so the docstring silently goes stale. Fix
-      shape: a test that asserts the set of reason tokens reachable through
-      `record_transitions` equals the documented three.
+- [x] **Pin the cancel-reason closed list with an exhaustiveness test (R2, from
+      qc-behavioral on PR #2357).** Done — `trading/trading/backtest/test/
+      test_cancel_reason_closed_list.ml`. The reachable side of the equality is
+      derived, not written down: the test drives both production producers
+      (`Entry_ticket_ttl.cancellations` over a 144-input grid,
+      `Cancel_handler.transitions_for_rejected_trades` over 9), pushes every
+      emitted `CancelEntry` through `Trade_audit.record_transitions`, and reads
+      back the persisted `cancel_reason`. Only the documented three are
+      literals. A second test pins the decision-vs-accident partition, so a
+      token migrating between the two modules is also caught. Verify:
+      `dune exec trading/backtest/test/test_cancel_reason_closed_list.exe`.
+      Load-bearing check: adding a fourth arm to `_cancel_reason_for` reddens
+      both tests, as does renaming `_ttl_reason`'s value.
 
-- [ ] **Fix the broken odoc ref at `cancel_handler.mli:76` (R4, pre-existing,
-      spotted by qc-behavioral on PR #2357).** The ref reads
-      `{!Weinstein_trading.Entry_ticket_ttl}`, but `Weinstein_trading` is a dune
-      *public-name prefix*, not a module — the reference does not resolve. The
-      correct form is `{!Weinstein_strategy.Entry_ticket_ttl}`, as used in
-      `trade_audit.mli`. Pre-dates PR #2357 and was left out of its scope.
+- [x] **Fix the broken odoc ref at `cancel_handler.mli:76` (R4, pre-existing,
+      spotted by qc-behavioral on PR #2357).** Done — and it was three refs,
+      not one: two in `Cancel_handler.cancel_resting_entry_orders`'s docstring
+      and one in `Screener.longs_admitted_by_macro`'s. All now read
+      `{!Weinstein_strategy.Entry_ticket_ttl}`. Verify:
+      `grep -rn '{!Weinstein_trading\.' --include=*.ml --include=*.mli .`
+      returns nothing.
+
+- [ ] **Census the `CancelEntry` construction sites in a linter (R5, residual
+      gap left open by R2).** R2's test derives its reachable set by driving the
+      two producer modules that exist today, so it catches a renamed token, a
+      deleted arm, an audit path that stops persisting a reason, and (very
+      likely) a new arm inside either driven module. It does **not** catch a
+      **fourth producer added in a third module** — nothing would reach it, and
+      the test would stay green while the closed-list docstrings went stale.
+      Closing that needs a source-level census: assert the set of production
+      `CancelEntry { ... }` construction sites equals the known set, failing on
+      any new one. That is a linter's job (`trading/devtools/checks/`), not a
+      unit test's — a unit test cannot see source files it does not link. Note
+      the census must exclude `trade_audit.ml`'s `CancelEntry { reason }`, which
+      is a match arm rather than a construction site, and the eight test-file
+      occurrences. Baseline for the census, from
+      `grep -rn 'CancelEntry {' --include=*.ml .` (11 hits at this SHA): 2
+      production construction sites (`entry_ticket_ttl.ml`
+      `_cancel_transition`, `cancel_handler.ml` `_cancel_entry_transition`), 1
+      production match arm (`trade_audit.ml` `_process_transition`), and 8 in
+      test files — 2 each in `test_position.ml`, `test_cancel_handler.ml`,
+      `test_trade_audit.ml`; 1 each in `test_entry_ticket_ttl.ml`,
+      `test_gtc_entry_persistence.ml`.
 
 ## Report-path `position_id` join (2026-08-14, follow-up to PR #2317)
 
