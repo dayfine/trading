@@ -420,8 +420,12 @@ type config = {
             shorts. The {!Portfolio_risk} short-notional cap
             ([max_short_notional_fraction]) and the shared per-sector exposure
             accumulator still apply across both walks; the kept transitions are
-            re-emitted in original screener order so audit ordering is
-            preserved.
+            re-emitted in the order the candidates {e entered} the walk, so
+            audit ordering matches the single-walk path. That is screener order
+            (score-desc) under the defaults, and post-demotion order once
+            [stop_width_mode = Demote_over_max] has already permuted the list —
+            the sleeve restores whichever order it was handed, it does not
+            recover the screener's.
 
           {b Faithfulness} (W1/W2, [.claude/rules/weinstein-faithful-core.md]).
           This is a {b portfolio-allocation / structural-diversification} dial —
