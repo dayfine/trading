@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-17",
+  "feature": "harness",
+  "branch": "harness/universe-deps-evidence",
+  "sha": "c31cc5137ea03463ac2f51fafee9f3ccc10cf74c",
+  "recorded_at_ns": 1786975559496470182,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
