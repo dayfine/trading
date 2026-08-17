@@ -431,10 +431,10 @@ val longs_admitted_by_macro :
     always admits. Pure.
 
     First out-of-cascade consumer: the F2 re-screen cancel
-    ({!Weinstein_trading.Entry_ticket_ttl}), which must decide whether a resting
-    ticket's symbol would still be admitted this week. A resting ticket's symbol
-    is held, so it is excluded from [screen]'s candidate list and its
-    admissibility is not otherwise observable. *)
+    ({!Weinstein_strategy.Entry_ticket_ttl}), which must decide whether a
+    resting ticket's symbol would still be admitted this week. A resting
+    ticket's symbol is held, so it is excluded from [screen]'s candidate list
+    and its admissibility is not otherwise observable. *)
 
 val shorts_admitted_by_macro :
   neutral_blocks_shorts:bool -> Weinstein_types.market_trend -> bool
