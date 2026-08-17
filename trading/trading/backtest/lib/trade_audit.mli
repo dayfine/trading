@@ -453,11 +453,15 @@ val record_exit : t -> exit_decision -> unit
     surface). *)
 
 val record_transitions : t -> Trading_strategy.Position.transition list -> unit
-(** Observe a batch of transitions — the same final, post-margin-dedup list
-    {!Stop_log.record_transitions} observes, from
-    {!Trading_simulation.Simulator.dependencies.on_transitions} — and fill in a
-    reason-only {!external_exit_decision} for any [TriggerExit] whose position
-    has an [entry] on record but no [exit_] yet.
+(** Observe one batch of transitions from
+    {!Trading_simulation.Simulator.dependencies.on_transitions} — the same
+    batches {!Stop_log.record_transitions} observes, since {!Panel_runner}
+    composes both onto that single hook. {b Two batches arrive per step, not
+    one}: the [CancelEntry]-only batch for portfolio-rejected entry fills,
+    announced before the strategy runs ([simulator.ml:406]), and the final
+    post-margin-dedup list ([simulator.ml:452]). Fills in a reason-only
+    {!external_exit_decision} for any [TriggerExit] whose position has an
+    [entry] on record but no [exit_] yet.
 
     For each [TriggerExit { exit_reason; _ }] transition, looks up the bucket by
     [position_id]:
@@ -466,9 +470,13 @@ val record_transitions : t -> Trading_strategy.Position.transition list -> unit
     - Bucket has [exit_ = Some _] (an enriched exit was already recorded via
       {!record_exit}, e.g. a [Stops_runner]-triggered exit captured by
       {!Weinstein_strategy.Exit_audit_capture}) — a deliberate no-op. Enriched
-      always wins; safe by construction because the strategy's own
-      [on_market_close] call (and its enriched-path recording) completes before
-      [on_transitions] fires for the same step.
+      always wins. This stays safe even though one batch now arrives {e before}
+      the strategy's [on_market_close] call: that early batch is
+      [CancelEntry]-only (its sole producer,
+      {!Trading_simulation.Cancel_handler.transitions_for_rejected_trades},
+      builds no other kind), so it never reaches this [TriggerExit] path. Every
+      [TriggerExit] seen here therefore comes from the post-strategy batch, by
+      which point that step's enriched-path recording has completed.
     - Bucket has [exit_ = None] — sets [external_exit] from the transition
       ([symbol] from the recorded [entry], [exit_trigger] via
       {!Stop_log.exit_trigger_of_reason}).
