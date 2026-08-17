@@ -94,12 +94,12 @@ type t = {
 
           From {!of_audit_records} that is the entry walk's emission order:
           screener order (score-desc) under every
-          [Weinstein_strategy_config.stop_width_mode] except
-          [Demote_over_max], which stably partitions the candidate list
-          narrow-stop-first {e before} the walk, so on that arm [funded] reads
-          in post-demotion order. From {!Weekly_adapter} it is always score-desc
-          — that path ranks the screener's candidate list directly and runs no
-          entry walk. *)
+          [Weinstein_strategy_config.stop_width_mode] except [Demote_over_max],
+          which stably partitions the candidate list narrow-stop-first
+          {e before} the walk, so on that arm [funded] reads in post-demotion
+          order. From {!Weekly_adapter} it is always score-desc — that path
+          ranks the screener's candidate list directly and runs no entry walk.
+      *)
   near_misses : near_miss list;
       (** Union of [alternatives_considered] across this screen's entries,
           deduplicated by symbol (first occurrence wins), sorted score-desc. *)
