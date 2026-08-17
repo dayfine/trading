@@ -96,15 +96,32 @@ type dependencies = {
           participates in every step's bar-fetch loop. Authority:
           [dev/plans/v7-sweep-speedup-2026-05-26.md] §Win #4. *)
   on_transitions : (Trading_strategy.Position.transition list -> unit) option;
-      (** Optional per-step observer, invoked once per step with the final list
-          of [Position.transition]s that step will apply — the strategy's own
-          transitions plus any margin-driven transitions appended by
-          {!Margin_runner.tick} (after same-tick collision dedup). Invoked
-          unconditionally every step, including steps where
+      (** Optional per-step observer of [Position.transition] batches. Fires
+          {b twice per step, not once}: there are exactly two call sites, both
+          reached from [_process_step_day], in this order.
+
+          - [simulator.ml:406], inside [_process_fills_and_cancels] — the
+            [CancelEntry] transitions for entry fills the portfolio refused to
+            fund. Announced {e before} the strategy is called, because that is
+            where the rejection is applied; folding them into the later batch
+            would report them out of order. Its sole producer,
+            {!Cancel_handler.transitions_for_rejected_trades}, builds no
+            transition kind but [CancelEntry], so this batch is
+            [CancelEntry]-only.
+          - [simulator.ml:452], after {!Margin_runner.tick} — the strategy's own
+            transitions plus any margin-driven transitions appended by
+            {!Margin_runner.tick} (after same-tick collision dedup): the final
+            list that step will apply.
+
+          Both fire unconditionally on every step, including steps where
           [_should_call_strategy] is false but the margin runner still fires
-          (margin checks are not gated by the strategy cadence). [None] (the
-          default) is a no-op — purely observational, never influences
-          [portfolio], [positions], fills, or any simulated number.
+          (margin checks are not gated by the strategy cadence), and including
+          steps whose batch is empty — the observer is called with [[]] rather
+          than skipped. (An [Error] anywhere in a step aborts the whole run
+          rather than skipping a batch.) An observer must therefore treat each
+          call as {e one batch of} the step, never as "the step's transitions".
+          [None] (the default) is a no-op — purely observational, never
+          influences [portfolio], [positions], fills, or any simulated number.
 
           Strategy-agnostic hook (mirrors [on_trade_fill]) so the simulator does
           not depend on the higher-layer [Backtest.Stop_log] / [Trade_audit]

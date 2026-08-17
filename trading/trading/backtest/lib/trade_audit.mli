@@ -453,11 +453,16 @@ val record_exit : t -> exit_decision -> unit
     surface). *)
 
 val record_transitions : t -> Trading_strategy.Position.transition list -> unit
-(** Observe a batch of transitions — the same final, post-margin-dedup list
-    {!Stop_log.record_transitions} observes, from
-    {!Trading_simulation.Simulator.dependencies.on_transitions} — and fill in a
-    reason-only {!external_exit_decision} for any [TriggerExit] whose position
-    has an [entry] on record but no [exit_] yet.
+(** Observe one batch of transitions from
+    {!Trading_simulation.Simulator.dependencies.on_transitions} — the same
+    batches {!Stop_log.record_transitions} observes, since {!Panel_runner}
+    composes both onto that single hook.
+    {b Two batches arrive per step, not one}: the [CancelEntry]-only batch for
+    portfolio-rejected entry fills, announced before the strategy runs
+    ([simulator.ml:406]), and the final post-margin-dedup list
+    ([simulator.ml:452]). Fills in a reason-only {!external_exit_decision} for
+    any [TriggerExit] whose position has an [entry] on record but no [exit_]
+    yet.
 
     For each [TriggerExit { exit_reason; _ }] transition, looks up the bucket by
     [position_id]:
@@ -466,9 +471,13 @@ val record_transitions : t -> Trading_strategy.Position.transition list -> unit
     - Bucket has [exit_ = Some _] (an enriched exit was already recorded via
       {!record_exit}, e.g. a [Stops_runner]-triggered exit captured by
       {!Weinstein_strategy.Exit_audit_capture}) — a deliberate no-op. Enriched
-      always wins; safe by construction because the strategy's own
-      [on_market_close] call (and its enriched-path recording) completes before
-      [on_transitions] fires for the same step.
+      always wins. This stays safe even though one batch now arrives {e before}
+      the strategy's [on_market_close] call: that early batch is
+      [CancelEntry]-only (its sole producer,
+      {!Trading_simulation.Cancel_handler.transitions_for_rejected_trades},
+      builds no other kind), so it never reaches this [TriggerExit] path. Every
+      [TriggerExit] seen here therefore comes from the post-strategy batch, by
+      which point that step's enriched-path recording has completed.
     - Bucket has [exit_ = None] — sets [external_exit] from the transition
       ([symbol] from the recorded [entry], [exit_trigger] via
       {!Stop_log.exit_trigger_of_reason}).
@@ -479,14 +488,27 @@ val record_transitions : t -> Trading_strategy.Position.transition list -> unit
     (harvest-rotate, the last emitter, was retired); the case is kept because
     the simulator and order generator still handle the transition.
 
-    [CancelEntry] transitions (the F2 TTL / re-screen ticket cancel) set the
-    bucket's [ticket_lifecycle.ticket_age_weeks_at_cancel] from the transition
-    date minus the entry's [placement_date] — the only place a never-filled
-    ticket's resting age is observable, since it produces no round-trip for the
-    fill-side enrichment to join. The fill-side column
+    [CancelEntry] transitions set the bucket's
+    [ticket_lifecycle.ticket_age_weeks_at_cancel] from the transition date minus
+    the entry's [placement_date], {b and} its [cancel_reason] from the
+    transition's own reason token. That is the only place a never-filled
+    ticket's resolution is observable at all, since it produces no round-trip
+    for the fill-side enrichment to join. The fill-side column
     ([ticket_age_weeks_at_fill]) is left [None]: the two resolutions are
     mutually exclusive. Dropped when no entry was recorded for the id, same as
-    the exit path. *)
+    the exit path.
+
+    {b Three kinds of cancel arrive here, not one.} Two are strategy
+    {e decisions} — {!Weinstein_strategy.Entry_ticket_ttl}'s
+    [entry_ticket_ttl_expired] and [entry_ticket_requalification_failed]. The
+    third, {!Trading_simulation.Cancel_handler.portfolio_rejection_reason}, is
+    an {e accident of capital timing}: a ticket that triggered, filled at the
+    engine, and was then refused because the book could not fund it. That third
+    population is not a corner case — it was ~26% of placements on the run that
+    motivated recording the reason
+    ([dev/notes/ticket-death-on-cash-2026-08-16.md]) — so a cancel-age column
+    averaged without splitting on [cancel_reason] mixes a policy with a failure.
+*)
 
 val record_fill_volume :
   t -> position_id:string -> Ticket_lifecycle.fill_volume_check -> unit

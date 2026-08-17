@@ -56,10 +56,12 @@ let _entry_cap_for_sim (config : Weinstein_strategy.config) : float option =
 
 (* Two [stop_log] recording paths, both needed (#2057): [Strategy_wrapper]
    intercepts the strategy's own [on_market_close] result (fires only on
-   strategy-call days, before margin dedup); [Simulator.on_transitions]
-   observes the FINAL per-step transition list — the strategy's transitions
-   plus any margin-driven ones from [Margin_runner.tick], after same-tick
-   collision dedup — on EVERY step, since margin runs unconditionally
+   strategy-call days, before margin dedup); [Simulator.on_transitions] fires
+   TWICE per step (#2348) — first the [CancelEntry]-only portfolio-rejection
+   batch, before the strategy is called ([simulator.ml:406]), then the final
+   list of the strategy's transitions plus any margin-driven ones from
+   [Margin_runner.tick], after same-tick collision dedup ([simulator.ml:452])
+   — and both fire on EVERY step, since margin runs unconditionally
    regardless of strategy cadence. Without the latter, margin-driven exit
    reasons ([margin_call] / [buyin_stress] / [maintenance_reduce]) never reach
    [stop_log] at all. [Stop_log.record_transitions] is idempotent w.r.t.

@@ -101,6 +101,36 @@ NO
       re-traded symbol is still date-joined and may be misattributed, even
       though the per-trade table above it is exact.
 
+- [ ] **Enforce the "always together" invariant on the cancel pair (R1, from
+      qc-behavioral on PR #2357).** `ticket_lifecycle.mli:153` asserts
+      `cancel_reason` is "Always `Some` exactly when `ticket_age_weeks_at_cancel`
+      is", and `:229` repeats it ("always travel together"), but they are two
+      independent `int option` / `string option` fields — nothing in the type
+      forbids one being `Some` with the other `None`. The invariant holds today
+      only because `Trade_audit._record_cancel`
+      (`trading/trading/backtest/lib/trade_audit.ml:231-235`) is the single
+      writer and sets both. A second writer would silently break a documented
+      guarantee. Fix shape: make the pair one `option` of a record (or a private
+      constructor), so the type carries the invariant instead of a docstring.
+
+- [ ] **Pin the cancel-reason closed list with an exhaustiveness test (R2, from
+      qc-behavioral on PR #2357).** `trade_audit.mli` documents a closed list of
+      "three kinds of cancel" (the two `Entry_ticket_ttl` tokens plus
+      `Cancel_handler.portfolio_rejection_reason`). The list is correct at this
+      SHA — verified by enumerating the production `CancelEntry {` construction
+      sites (`entry_ticket_ttl.ml:17` with exactly two `Some` arms in
+      `_cancel_reason_for:38-50`; `cancel_handler.ml:28`) — but no test fails if
+      a fourth producer is added, so the docstring silently goes stale. Fix
+      shape: a test that asserts the set of reason tokens reachable through
+      `record_transitions` equals the documented three.
+
+- [ ] **Fix the broken odoc ref at `cancel_handler.mli:76` (R4, pre-existing,
+      spotted by qc-behavioral on PR #2357).** The ref reads
+      `{!Weinstein_trading.Entry_ticket_ttl}`, but `Weinstein_trading` is a dune
+      *public-name prefix*, not a module — the reference does not resolve. The
+      correct form is `{!Weinstein_strategy.Entry_ticket_ttl}`, as used in
+      `trade_audit.mli`. Pre-dates PR #2357 and was left out of its scope.
+
 ## Report-path `position_id` join (2026-08-14, follow-up to PR #2317)
 
 PR #2317 fixed the **in-process** join: `Trade_context._lookup_audit_for_trade`
