@@ -5,7 +5,48 @@ metadata:
   node_type: memory
   type: project
   originSessionId: d7d8f2bb-6b58-4fde-8e01-c50e796e5faa
-  modified: 2026-08-13T20:12:41.062Z
+  modified: 2026-08-16T06:00:03.147Z
+---
+
+## ⛔ GRID VERDICT 2026-08-16 — NOT PROMOTED, and the knob is universe/regime conditional
+
+The `promotion-confirmation.md` grid ran three cells and **kills the promotion**
+(`dev/experiments/nearfloor-confirmation-grid-2026-08-16/results.md`). Paired at
+the same path salt, against **each cell's own** core-salt null:
+
+| cell | universe × period | core null | nearfloor vs core | maxDD | read |
+|---|---|---|---|---|---|
+| A | top-3000 × 2000-2026 | 132.5pp (n=3) | +139 mean, ranges OVERLAP | −9.8pp, zero overlap | return unresolved, risk better |
+| B | sp500 × 2000-2026 | **180.1pp** (n=3) | −86.7pp — inside the null | +0.6pp — inside | **no effect** |
+| C | top-3000 × 2010-2026 | 34.2pp (n=2) | **−69.2pp = 2.0× the null** | −5.2pp = 4.8× the null | **real return loss** |
+
+**0 of 3 cells clear their own null on return**, and C dominates it on return and
+Calmar both (Calmar at salt 0: A 16.18 vs 7.22; B 18.06 vs 21.62; C 5.43 vs 6.63).
+
+**THE TRANSFERABLE WHY — it is a crash-depth dial, not a stop dial.** Both grid
+axes flip it independently and in the same direction. Narrow the universe
+(A→B) and the effect vanishes *and the trade count stops moving* (−5.7% vs
+−15.4%): the two anchors only disagree when the window holds a deep prior low,
+which is routine for a crash-scarred microcap and rare for an S&P name. Remove
+the bear regimes (A→C) and the trade/DD effects survive but the return goes
+negative: the tighter stop still fires more, and without crashes to be saved
+from it fires on winners. `Window_extreme` anchors at the window's deepest low,
+so the stop is loose and losers run; `Nearest` tightens it. **That tightening
+pays only where deep prior lows are common AND crashes actually arrive.**
+Everywhere else it is a plain fat-tail tax — the 12th confirmation of
+[[project-edge-is-the-fat-tail]], same shape as
+[[project-weekly-close-stop-lever]].
+
+**Classification for `experiment-flag-discipline.md` Rule 4:
+REJECT-as-default-but-legitimate-axis. NOT do-not-revive. Do not retire the
+flag.** It is a breadth-conditional preset knob, the shape of
+[[project-declining-ma-gate-breadth-preset]] (ARM-FOR-BROAD).
+
+**Also corrected by the grid:** the "−10pp maxDD, zero overlap" risk signature
+below is a **broad-universe** number, not a property of the mechanism — cell B
+shows +0.6pp. And the `483 / 508 / 568` trio that motivated the grid is three
+*different mixes* at salt 0, not three salts of one arm.
+
 ---
 
 `stops_config.support_floor_anchor_scope = Nearest` (F3, PR #2258) anchors the

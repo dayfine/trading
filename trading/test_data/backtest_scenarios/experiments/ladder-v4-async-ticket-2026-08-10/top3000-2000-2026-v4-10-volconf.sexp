@@ -71,7 +71,8 @@
    ;;     rather than silently running the baseline — the #1051 hazard) ---
    ((entry_anchor_local_range_weeks 4))
    ((entry_freshness_basis Ma_cross))
-   ((entry_order_ttl_weeks 0))
+   ((enable_entry_ticket_rescreen false))
+   ((entry_order_max_rest_weeks 0))
    ((stop_width_mode Drop_over_max))
    ((stop_width_size_down_max_pct 0.0))
    ((volume_confirm_at_fill true))

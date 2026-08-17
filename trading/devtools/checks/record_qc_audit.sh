@@ -231,9 +231,16 @@ if [ -n "$PR_NUMBER" ]; then
   # silently fell through to the file-mode fallback below -- the same danger
   # the missing-binary guard exists to prevent, just via a different trigger.
   # Only "exit 0, empty stdout, no stderr" is treated as a genuine
-  # zero-review PR; any nonzero exit, OR any stderr output even alongside
-  # exit 0 (a warning-emitting gh is not a trustworthy empty result), refuses
-  # loudly instead -- mirroring the missing-binary message shape below.
+  # zero-review PR; any nonzero exit refuses loudly regardless of stdout, and
+  # an exit-0 call with stderr output but EMPTY stdout also refuses (a
+  # warning-emitting gh alongside no reviews is not a trustworthy empty
+  # result) -- mirroring the missing-binary message shape below. An exit-0
+  # call that returned a real (non-empty) review payload on stdout is used
+  # as-is even if gh also wrote something to stderr (e.g. an update-notifier
+  # line) -- H-AUDIT-GH-STDERR-GATE-TOO-BROAD: the original version of this
+  # check refused whenever stderr was non-empty regardless of $BODIES,
+  # discarding a perfectly good review payload and exiting 1 with the
+  # self-contradictory message "failed (exit 0)".
   GH_STDERR_FILE="$(mktemp)"
   BODIES="$("$GH_BIN" pr view "$PR_NUMBER" --json reviews \
     --jq '.reviews[] | "STATE:\(.state)\n\(.body)\nENDBODY"' \
@@ -241,8 +248,12 @@ if [ -n "$PR_NUMBER" ]; then
   GH_STDERR="$(cat "$GH_STDERR_FILE" 2>/dev/null || true)"
   rm -f "$GH_STDERR_FILE"
 
-  if [ "$GH_RC" -ne 0 ] || [ -n "$GH_STDERR" ]; then
-    echo "FAIL: --pr-number $PR_NUMBER was given but '$GH_BIN pr view' failed (exit $GH_RC)." >&2
+  if [ "$GH_RC" -ne 0 ] || { [ -n "$GH_STDERR" ] && [ -z "$BODIES" ]; }; then
+    if [ "$GH_RC" -ne 0 ]; then
+      echo "FAIL: --pr-number $PR_NUMBER was given but '$GH_BIN pr view' failed (exit $GH_RC)." >&2
+    else
+      echo "FAIL: --pr-number $PR_NUMBER was given but '$GH_BIN pr view' returned no reviews and wrote to stderr (exit 0)." >&2
+    fi
     if [ -n "$GH_STDERR" ]; then
       echo "  stderr: $GH_STDERR" >&2
     fi
@@ -321,8 +332,31 @@ if [ -n "$PR_NUMBER" ]; then
   fi
 fi
 
-# Fall back to file mode if --pr-number wasn't given OR the PR query returned nothing.
+# Fall back to file mode if --pr-number wasn't given OR the PR query returned
+# nothing. FILE_MODE records which branch we took. Exactly four sites below
+# key off FILE_MODE to consult dev/reviews/ ONLY when FILE_MODE=1: (1) the
+# overall_qc anywhere-scan immediately following, (2) the STRUCTURAL
+# ## Verdict block parser, (3) the BEHAVIORAL ## Verdict block parser, and
+# (4) the file-mode quality-score extractor further down. A successful
+# PR-mode run already fully resolves those four fields from real PR review
+# bodies; touching REVIEW_FILE at all in that case risks silently overriding
+# a correct PR-mode verdict with a stale/unrelated file's content -- the same
+# danger class the missing-binary and gh-failure guards above exist to
+# prevent, just reached through the OVERALL field specifically. Found via
+# H-AUDIT-GH-STDERR-GATE-TOO-BROAD scenario 37: a companion dev/reviews file
+# carrying a deliberately wrong overall_qc leaked into an
+# otherwise-correctly-resolved PR-mode record because the scan below used to
+# run unconditionally.
+#
+# NOT covered by this FILE_MODE gate: the "Reviewed SHA" extractor below
+# (~:497-498) reads REVIEW_FILE unconditionally whenever BODIES yields no
+# "Reviewed SHA:" line, including in PR mode -- a companion dev/reviews file
+# can leak a foreign SHA into an otherwise-correct PR-mode record. This is a
+# known, pre-existing, ungated residual, not fixed by this comment or by the
+# guards above it. See H-AUDIT-SHA-FILE-LEAK (dev/status/harness.md).
+FILE_MODE=0
 if [ -z "$STRUCTURAL" ] && [ -z "$BEHAVIORAL" ]; then
+  FILE_MODE=1
   _extract_verdict() {
     # $1 = field name (e.g. "overall_qc", "structural_qc", "behavioral_qc")
     # Returns the verdict (APPROVED|NEEDS_REWORK) or empty string.
@@ -335,33 +369,42 @@ if [ -z "$STRUCTURAL" ] && [ -z "$BEHAVIORAL" ]; then
   OVERALL="$(_extract_verdict "overall_qc")"
 fi
 
-# Fallback: scan for overall_qc anywhere in the file
-if [ -z "$OVERALL" ]; then
+# Fallback: scan for overall_qc anywhere in the file (file mode only -- see
+# FILE_MODE comment above; PR-mode must derive OVERALL from
+# STRUCTURAL/BEHAVIORAL alone, further down, never from REVIEW_FILE).
+if [ "$FILE_MODE" -eq 1 ] && [ -z "$OVERALL" ]; then
   OVERALL=$(grep -oE "overall_qc: (APPROVED|NEEDS_REWORK)" "$REVIEW_FILE" 2>/dev/null \
     | tail -1 | sed 's/.*: //' || true)
 fi
 
-# Fallback: parse ## Verdict blocks from the review body.
+# Fallback: parse ## Verdict blocks from the review body (file mode only --
+# see FILE_MODE comment above; PR-mode already fully resolved STRUCTURAL /
+# BEHAVIORAL from the real PR review bodies above, and must never fall back
+# to REVIEW_FILE for either -- a PR carrying only one of the two reviews
+# (e.g. behavioral not yet run) is a normal, caller-documented state, not an
+# edge case, so leaving these unguarded would read a possibly-unrelated
+# dev/reviews/<feature>.md and populate the still-unresolved verdict from
+# it instead of the correct SKIPPED default below).
 # The structural section uses the first ## Verdict; behavioral uses the last.
 # Both bare (APPROVED) and bold (**APPROVED**) formats are supported.
 
-if [ -z "$STRUCTURAL" ]; then
+if [ "$FILE_MODE" -eq 1 ] && [ -z "$STRUCTURAL" ]; then
   STRUCTURAL=$(awk '
     /^## Verdict/{found=1; next}
     found && /^(APPROVED|NEEDS_REWORK|\*\*(APPROVED|NEEDS_REWORK)\*\*)/ {
       v=$0; gsub(/^\*\*|\*\*$/, "", v); print v; exit
     }
-  ' "$REVIEW_FILE" || true)
+  ' "$REVIEW_FILE" 2>/dev/null || true)
 fi
 
-if [ -z "$BEHAVIORAL" ]; then
+if [ "$FILE_MODE" -eq 1 ] && [ -z "$BEHAVIORAL" ]; then
   BEHAVIORAL=$(awk '
     /^## Verdict/{found=1; next}
     found && /^(APPROVED|NEEDS_REWORK|\*\*(APPROVED|NEEDS_REWORK)\*\*)/ {
       v=$0; gsub(/^\*\*|\*\*$/, "", v); last=v; found=0
     }
     END { if (last != "") print last }
-  ' "$REVIEW_FILE" || true)
+  ' "$REVIEW_FILE" 2>/dev/null || true)
 fi
 
 # Defaults if still empty
@@ -397,11 +440,15 @@ fi
 # silently discarded by a narrow acceptance regex -- the range check below
 # then fails loudly on it. See H-QC-SCALE (dev/status/harness.md).
 
-# Only run the file-mode quality-score extractor if PR-mode didn't already
-# populate QUALITY_SCORE. Otherwise the awk would run against a missing
-# review file (PR-mode skips the file existence check) and zero out the
-# PR-derived value.
-if [ -z "$QUALITY_SCORE" ]; then
+# Only run the file-mode quality-score extractor in file mode. Otherwise
+# (a) in PR mode the awk would run against a possibly-nonexistent review
+# file (PR-mode skips the file-existence check) or, worse, a REAL file left
+# over from an unrelated run for the same feature name, silently
+# overwriting a correct PR-derived QUALITY_SCORE (or the correct "not yet
+# resolved" empty state) with that unrelated file's score -- the same
+# FILE_MODE danger class documented above, just reached through the
+# quality-score field instead of a verdict field.
+if [ "$FILE_MODE" -eq 1 ] && [ -z "$QUALITY_SCORE" ]; then
   QUALITY_SCORE=$(awk '
     /^## Quality Score|^### Quality Score/ { in_qs=1; next }
     in_qs && /^[[:space:]]*$/ { next }

@@ -316,6 +316,7 @@ let _lifecycle ?(ticket_age_weeks_at_cancel = None) ~placement_date () : TL.t =
   {
     placement_date;
     ticket_age_weeks_at_cancel;
+    cancel_reason = None;
     ticket_age_weeks_at_fill = None;
     fill_volume = None;
     freshness_basis = TL.Ma_cross;

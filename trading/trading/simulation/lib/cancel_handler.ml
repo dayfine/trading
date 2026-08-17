@@ -9,16 +9,23 @@ let _is_entering_for_symbol ~symbol (pos : Position.t) =
   | Entering _ -> String.equal pos.symbol symbol
   | _ -> false
 
+(** The reason token stamped on a portfolio-rejection [CancelEntry]. A stable
+    identifier rather than a sentence, matching the two
+    {!Weinstein_strategy.Entry_ticket_ttl} tokens ([entry_ticket_ttl_expired] /
+    [entry_ticket_requalification_failed]), so that a [trade_audit.sexp] reader
+    can group ticket deaths by cause instead of parsing prose. The symbol is not
+    interpolated: the audit row it lands on already names it, and a per-symbol
+    string would defeat grouping. *)
+let portfolio_rejection_reason = "entry_fill_rejected_by_portfolio"
+
 (** Build a [CancelEntry] transition for [position_id] on [date]. The reason
     string is purely diagnostic — neither the position state machine nor the
-    engine inspects it. *)
-let _cancel_entry_transition ~date ~position_id ~symbol : Position.transition =
+    engine inspects it; {!Backtest.Trade_audit} persists it verbatim. *)
+let _cancel_entry_transition ~date ~position_id : Position.transition =
   {
     position_id;
     date;
-    kind =
-      CancelEntry
-        { reason = Printf.sprintf "fill rejected by portfolio for %s" symbol };
+    kind = CancelEntry { reason = portfolio_rejection_reason };
   }
 
 (** Find the [Entering] position for [symbol] in [positions] and emit a
@@ -28,7 +35,7 @@ let _cancel_transition_for_symbol ~date ~positions ~symbol =
   Map.to_alist positions
   |> List.find_map ~f:(fun (id, pos) ->
       if _is_entering_for_symbol ~symbol pos then
-        Some (_cancel_entry_transition ~date ~position_id:id ~symbol)
+        Some (_cancel_entry_transition ~date ~position_id:id)
       else None)
 
 let transitions_for_rejected_trades ~date ~positions ~rejected_trades =
@@ -157,11 +164,20 @@ let _try_apply_trade ~initial_long_margin_req portfolio trade =
 
 (* Loud, per-trade WARN on a portfolio-rejected fill. Silent drops here are how
    issue #1553's stuck-[Exiting] zombie escaped notice — every rejected fill now
-   names symbol / side / qty / reason on stderr. *)
+   names symbol / side / qty / reason on stderr.
+
+   The trailing sentence used to read "Stranded position will be reverted for
+   retry", which is true only on the EXIT side ([revert_rejected_exits]). An
+   entry is CANCELLED, not retried, and its resting order is already marked
+   [Filled] by the engine before the portfolio ever sees the trade — so one
+   cash-tight instant destroys a ticket that may have rested for months. That
+   wording sent the 2026-08-15 session looking for a retry that does not exist;
+   see dev/notes/ticket-death-on-cash-2026-08-16.md §G2. *)
 let _warn_rejected_trade (trade : Trading_base.Types.trade) err =
   eprintf
     "WARN: portfolio rejected fill for %s (side=%s qty=%.4f price=%.4f): %s. \
-     Stranded position will be reverted for retry (see Cancel_handler).\n\
+     An entry is cancelled outright; an exit is reverted to Holding for retry \
+     (see Cancel_handler).\n\
      %!"
     trade.symbol
     (Trading_base.Types.show_side trade.side)

@@ -33,6 +33,7 @@ type entry_freshness_basis = Ma_cross | Range_top_breakout [@@deriving sexp]
 type t = {
   placement_date : Date.t;
   ticket_age_weeks_at_cancel : int option; [@sexp.option]
+  cancel_reason : string option; [@sexp.option]
   ticket_age_weeks_at_fill : int option; [@sexp.option]
   fill_volume : fill_volume_check option; [@sexp.option]
   freshness_basis : entry_freshness_basis;
@@ -50,9 +51,19 @@ let age_weeks_from lifecycle ~resolved =
   Option.map lifecycle ~f:(fun l ->
       age_weeks ~placed:l.placement_date ~resolved)
 
-let resolve lifecycle ~fill_volume ~cancel_age_weeks =
-  Option.map lifecycle ~f:(fun l ->
-      { l with fill_volume; ticket_age_weeks_at_cancel = cancel_age_weeks })
+(* Extracted for the same reason [_stamp_fill_age] is: a record update this wide
+   inside the [Option.map] closure trips the nesting linter. *)
+let _merge_resolutions ~fill_volume ~cancel_age_weeks ~cancel_reason l =
+  {
+    l with
+    fill_volume;
+    ticket_age_weeks_at_cancel = cancel_age_weeks;
+    cancel_reason;
+  }
+
+let resolve lifecycle ~fill_volume ~cancel_age_weeks ~cancel_reason =
+  Option.map lifecycle
+    ~f:(_merge_resolutions ~fill_volume ~cancel_age_weeks ~cancel_reason)
 
 (* Extracted so [with_fill_age] stays a one-liner: inlining this record update
    inside the [Option.map] closure trips the nesting linter. *)

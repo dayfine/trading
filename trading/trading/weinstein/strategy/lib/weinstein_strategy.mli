@@ -220,7 +220,8 @@ module Entry_freeze = Entry_freeze
 
 module Entry_ticket_ttl = Entry_ticket_ttl
 (** F2 resting-entry-ticket lifecycle: re-screen cancel (primary) + clock TTL
-    (backstop), gated by [config.entry_order_ttl_weeks] (default [0] = off).
+    (backstop), armed independently by [config.enable_entry_ticket_rescreen] and
+    [config.entry_order_max_rest_weeks] (defaults [false] / [0] = off).
     Re-exposed so tests can pin the cancel decision independently of a full
     screening tick. See {!Entry_ticket_ttl}. *)
 
@@ -859,21 +860,26 @@ type config = {
           ticket-level (spine / admission / grading / stops unchanged). Default
           [false] = off, bit-identical baselines (R1). See
           [Weinstein_strategy_config.freeze_entry_at_first_breakout]. *)
-  entry_order_ttl_weeks : int; [@sexp.default 0]
-      (** F2 resting-entry-ticket lifetime (plan
-          [dev/plans/entry-ticket-async-v2-2026-08-10.md] §2-M2 / §3-F2). Today
-          an unfilled StopLimit entry order rests forever (pinned by
-          [trading/simulation/test/test_gtc_entry_persistence.ml]) — GTC with no
-          cancel authority, so only half of the book's §4.7 contract ("until you
-          either cancel the orders or they are actually executed") exists. When
-          [> 0], each weekly review cancels an unfilled entry ticket whose
-          symbol {b fails the re-screen} (stage / sector / macro — the primary
-          path) or has rested more than [entry_order_ttl_weeks] weeks (the clock
-          backstop); the [Entering] position closes, its {!Entry_freeze} pin is
-          released, and the simulator retires the resting order. BOOK-NEUTRAL
-          dial: §4.7 + §7 grant the authority, the book names no number. Default
-          [0] = off, bit-identical baselines (R1). See
-          [Weinstein_strategy_config.entry_order_ttl_weeks] and
+  enable_entry_ticket_rescreen : bool; [@sexp.default false]
+      (** F2 {b primary}: re-validate every unfilled entry ticket on each weekly
+          review and cancel the ones whose setup no longer exists (stage /
+          sector / macro). Today an unfilled StopLimit entry order rests forever
+          (pinned by [trading/simulation/test/test_gtc_entry_persistence.ml]) —
+          GTC with no cancel authority, so only half of the book's §4.7 contract
+          ("until you either cancel the orders or they are actually executed")
+          exists. BOOK-SUPPORTED (§4.7 + §7); carries no invented number.
+          Default [false] = off, bit-identical baselines (R1). See
+          [Weinstein_strategy_config.enable_entry_ticket_rescreen]. *)
+  entry_order_max_rest_weeks : int; [@sexp.default 0]
+      (** F2 {b backstop}: cancel an unfilled ticket that has rested more than
+          this many whole weeks regardless of whether it still qualifies. [0]
+          (default) = unbounded — which is genuinely wrong at the extreme
+          ([FUL-wein-64] rested {b 21.7 years}), so ~156 is the candidate value,
+          earned through the defect-D re-test rather than asserted here.
+          BOOK-NEUTRAL dial: the book grants the authority and names no number.
+          Split from the re-screen above on 2026-08-16 (defect C) — one knob
+          used to arm both. See
+          [Weinstein_strategy_config.entry_order_max_rest_weeks] and
           {!Entry_ticket_ttl}. *)
   stop_width_mode : Stop_width_mode.t;
       [@sexp.default Stop_width_mode.Drop_over_max]

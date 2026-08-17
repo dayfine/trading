@@ -134,7 +134,8 @@ type config = {
   sim_entry_fill_next_open : bool; [@sexp.default false]  (** See [.mli]. *)
   freeze_entry_at_first_breakout : bool; [@sexp.default false]
       (** See [.mli]. *)
-  entry_order_ttl_weeks : int; [@sexp.default 0]  (** See [.mli]. *)
+  enable_entry_ticket_rescreen : bool; [@sexp.default false]  (** See [.mli]. *)
+  entry_order_max_rest_weeks : int; [@sexp.default 0]  (** See [.mli]. *)
   stop_width_mode : Stop_width_mode.t;
       [@sexp.default Stop_width_mode.Drop_over_max]
       (** See [.mli]. *)
@@ -240,7 +241,8 @@ let default_config ~universe ~index_symbol =
     stop_anchor_at_entry_base = false;
     sim_entry_fill_next_open = false;
     freeze_entry_at_first_breakout = false;
-    entry_order_ttl_weeks = 0;
+    enable_entry_ticket_rescreen = false;
+    entry_order_max_rest_weeks = 0;
     stop_width_mode = Stop_width_mode.Drop_over_max;
     stop_width_size_down_max_pct = 0.0;
     volume_confirm_at_fill = false;
