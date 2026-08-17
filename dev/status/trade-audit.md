@@ -131,17 +131,6 @@ NO
       correct form is `{!Weinstein_strategy.Entry_ticket_ttl}`, as used in
       `trade_audit.mli`. Pre-dates PR #2357 and was left out of its scope.
 
-- [ ] **`Panel_runner._on_transitions` comment carries the same stale "final
-      list" claim (found while completing the #2348 sweep in PR #2357).**
-      `trading/trading/backtest/lib/panel_runner.ml:59-64` still describes
-      `Simulator.on_transitions` as observing "the FINAL per-step transition
-      list ... on EVERY step". Since `1ebc3731` (#2348) the hook fires *twice*
-      per step — the early `CancelEntry`-only batch at `simulator.ml:406`, then
-      the final post-dedup list at `:452`. The comment's `#2057` reasoning about
-      margin exits is still correct; only the "the FINAL list" framing is now
-      incomplete. Left out of PR #2357 because that PR is `.mli`-only by
-      construction; this is a `.ml` inline comment.
-
 ## Report-path `position_id` join (2026-08-14, follow-up to PR #2317)
 
 PR #2317 fixed the **in-process** join: `Trade_context._lookup_audit_for_trade`

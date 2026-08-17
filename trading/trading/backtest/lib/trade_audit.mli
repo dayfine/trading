@@ -456,12 +456,13 @@ val record_transitions : t -> Trading_strategy.Position.transition list -> unit
 (** Observe one batch of transitions from
     {!Trading_simulation.Simulator.dependencies.on_transitions} — the same
     batches {!Stop_log.record_transitions} observes, since {!Panel_runner}
-    composes both onto that single hook. {b Two batches arrive per step, not
-    one}: the [CancelEntry]-only batch for portfolio-rejected entry fills,
-    announced before the strategy runs ([simulator.ml:406]), and the final
-    post-margin-dedup list ([simulator.ml:452]). Fills in a reason-only
-    {!external_exit_decision} for any [TriggerExit] whose position has an
-    [entry] on record but no [exit_] yet.
+    composes both onto that single hook.
+    {b Two batches arrive per step, not one}: the [CancelEntry]-only batch for
+    portfolio-rejected entry fills, announced before the strategy runs
+    ([simulator.ml:406]), and the final post-margin-dedup list
+    ([simulator.ml:452]). Fills in a reason-only {!external_exit_decision} for
+    any [TriggerExit] whose position has an [entry] on record but no [exit_]
+    yet.
 
     For each [TriggerExit { exit_reason; _ }] transition, looks up the bucket by
     [position_id]:
