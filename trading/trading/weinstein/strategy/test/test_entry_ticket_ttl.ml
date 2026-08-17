@@ -154,6 +154,29 @@ let test_requalification_failure_cancels_before_ttl _ =
     |> _cancels)
     (elements_are [ equal_to ("P1", "requalification") ])
 
+(** PRECEDENCE, with the two causes actually in contention. The test above
+    cannot show it: a 1-week-old ticket against a 4-week clock leaves the clock
+    unable to fire, so "re-screen first" is never exercised. Here the ticket is
+    9 weeks old (past the clock) {b and} failing the re-screen, so both branches
+    would cancel it and only the recorded reason distinguishes them.
+
+    The reason is not cosmetic — [Ticket_lifecycle.cancel_reason] persists it,
+    and a TTL analysis that reads the clock's token on a ticket the re-screen
+    retired would attribute a book-supported decision to an invented number. *)
+let test_rescreen_reason_wins_when_both_would_fire _ =
+  assert_that
+    (Entry_ticket_ttl.cancellations ~rescreen:true ~max_rest_weeks:4
+       ~positions:
+         (_positions
+            [
+              _entering ~id:"P1" ~symbol:"AAA"
+                ~created:(Date.add_days _friday (-7 * 9))
+                ();
+            ])
+       ~still_qualifies:_never_qualifies ~current_date:_friday
+    |> _cancels)
+    (elements_are [ equal_to ("P1", "requalification") ])
+
 (** BACKSTOP path: a still-qualifying ticket survives review week [N] and is
     cancelled at week [N + 1]. Both halves asserted together so an off-by-one in
     either direction fails. *)
@@ -464,6 +487,8 @@ let suite =
          "ttl 0 never cancels" >:: test_ttl_zero_never_cancels;
          "re-screen failure cancels before the clock"
          >:: test_requalification_failure_cancels_before_ttl;
+         "the re-screen's reason wins when both causes would fire"
+         >:: test_rescreen_reason_wins_when_both_would_fire;
          "clock backstop fires at week N+1"
          >:: test_clock_backstop_fires_one_week_after_ttl;
          "filled / partially-filled tickets are never cancelled"
