@@ -62,8 +62,8 @@ val cancel_resting_entry_orders :
     GTC persistence contract pinned by [test_gtc_entry_persistence.ml] — would
     otherwise stay [Pending] and still fill on a later bar. A "cancelled" ticket
     that fills anyway is worse than no cancel at all, so the strategy's F2
-    decision ({!Weinstein_trading.Entry_ticket_ttl}) is only real once the order
-    is retired too.
+    decision ({!Weinstein_strategy.Entry_ticket_ttl}) is only real once the
+    order is retired too.
 
     [positions] must be the map {e before} the transitions are applied — that is
     where the cancelled position is still [Entering] and still carries its
@@ -73,7 +73,7 @@ val cancel_resting_entry_orders :
     the per-step [order_links] table is cleared on every generation pass, so an
     order placed on an earlier step cannot be identified by position id. A
     partially-filled order is left alone — its shares are booked, and
-    {!Weinstein_trading.Entry_ticket_ttl} will not have emitted a [CancelEntry]
+    {!Weinstein_strategy.Entry_ticket_ttl} will not have emitted a [CancelEntry]
     for it.
 
     Returns [[]] — touching neither the manager nor its order list — when
