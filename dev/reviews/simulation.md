@@ -343,3 +343,188 @@ re-deriving by date proximity.
 ## Verdict
 
 APPROVED
+
+---
+
+## Behavioral QC — PR #2364 `docs/walk-order-docstrings` (2026-08-17 run 2)
+
+Reviewed SHA: f79d3a3a7b7cc9707b9b061d8329d99188819459
+Reviewer: qc-behavioral
+Track: simulation. Closes **R-a** (filed by qc-behavioral on PR #2352).
+
+**CI at this tip:** `build-and-test` **completed/success**, `perf-tier1-smoke`
+**completed/success**. qc-structural approved while `build-and-test` was still
+`in_progress`; that gap is now closed — CI settled green under this review, not
+inherited.
+
+### What is under review
+
+Nothing executes here. The artifact is a **claim**, three times over, so CP1–CP4
+reduces to one question per docstring: *is it exactly true of the code as it
+stands — no broader, no narrower?* Every premise below was re-derived from source
+rather than taken from the PR body.
+
+### The premise the whole PR rests on: the demotion is the only reordering
+
+| link | evidence | verdict |
+|---|---|---|
+| `Entry_stop_width_order.prefer_narrow_stops` stably partitions narrow-first | `List.partition_tf` (order-preserving within each group) then `List.append narrow wide`; guarded by `Stop_width_mode.demotes` | confirmed |
+| called from `Entry_walk._prepare_candidates`, which feeds the walk | `_prepare_candidates` = `Entry_freeze.apply … |> prefer_narrow_stops`; `entries_from_candidates` rebinds `candidates` to its output before the walk | confirmed |
+| `Entry_freeze.apply` does not permute | body is `List.map candidates ~f:(_freeze_one ~pending)` (and returns `candidates` unchanged when disabled) | confirmed |
+| `_sleeve_decisions` does not permute either | `List.mapi` then re-sort by that index — restores the *handed* order | confirmed |
+| `Stop_width_mode` has exactly 3 constructors; `demotes` true only for `Demote_over_max` | `Drop_over_max | Size_down | Demote_over_max` | confirmed |
+
+So **the demotion is the only reordering**, and the `funded` docstring's "every
+mode except `Demote_over_max`" is *exhaustively* correct rather than merely
+true-so-far.
+
+### Contract Pinning Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| CP1 | Each non-trivial claim in new `.mli` docstrings has an identified pin | PASS (by trace) | No new `.mli` *files*; three rewritten docstrings on existing types. Nothing executable is asserted, so the pin is a source trace, performed per claim below. Ordering behaviour itself is pinned by `test_entry_stop_width_order.ml` (shipped with #2352). |
+| CP2 | Each PR-body claim has corresponding evidence in the committed diff | PASS | Every load-bearing body claim re-derived independently: 10 `skip_reason` constructors; 1 production caller of `entries_from_candidates`; `.ml` zero-diff; `_index.md` untouched. All hold. |
+| CP3 | Pass-through / identity claims pin identity, not size | PASS | The identity claim here is `prefer_narrow_stops` returning the input **physically unchanged** off-mode; `demotes` short-circuits before `partition_tf`, so it is a true identity, not a same-length rebuild. |
+| CP4 | Each guard named in a docstring has a test exercising it | NA | No new guard claims; the three rewrites *narrow* existing claims rather than adding guarded behaviour. |
+
+### Claim-by-claim verification
+
+**1. `funded` (`screen_record.mli`) — names two producers with different behaviour.**
+Both limbs confirmed, and the "there are two" universal was itself enumerated:
+
+- `of_audit_records` → `_record_of_screen`: `Hashtbl.add_multi` accumulation then
+  `List.rev`, i.e. insertion order = `emit_entries` emission order = the order
+  the walk charged the budget. Post-demotion on that arm. ✔
+- `Weekly_adapter._record_of_snapshot`: `List.split_n snap.long_candidates
+  displayed_k |> List.map` — preserves `long_candidates` order, documented
+  score-desc at `weekly_snapshot.mli`; **no entry walk on that path**. ✔
+- **Exactly two producers.** The only other site returning `Screen_record.t list`
+  is `decision_audit_bin._screens_of_mode`, a CLI dispatcher between those two
+  (mutually exclusive `--audit` / `--weekly-picks-dir`). `counterfactual.ml` and
+  `report.ml` are consumers. The docstring's own "because there are two" holds.
+
+**2. `inversion` (same file) — the causal clause was already an incomplete enumeration.**
+Confirmed, and worse than "stale-from-#2352": the old "sizing / sector-cap"
+pairing was wrong *before* `Demote_over_max` existed.
+
+- `alternatives_of_decisions` = `List.filter_map … (_alternative_of_decision)`,
+  which returns `Some` for **every** `Skipped reason` — no filter, no top-N cut. ✔
+- **`Trade_audit.skip_reason` constructor count: 10** — `Insufficient_cash`,
+  `Already_held`, `Below_min_grade`, `Sized_to_zero`, `Sector_concentration`,
+  `Top_n_cutoff`, `Short_notional_cap`, `Stop_too_wide`, `Sector_exposure_cap`,
+  `Long_exposure_cap`. Matches the PR's count. Pointing at the *type* instead of
+  re-listing ten names that would drift is the right call.
+- The new text's examples map onto real constructors, and `Stop_too_wide` is
+  genuinely reachable under the `Drop_over_max` default (that mode is precisely
+  the one that reads §5.1 as a ban) — so the example set is not over-broad.
+- **Third case verified.** `summary_of` computes `inversion` as `exists near_miss.
+  score > min funded score`. Under `Weekly_adapter`, `funded` is the top-`displayed_k`
+  longs while `near_misses` is long overflow **plus every short**
+  (`List.map snap.short_candidates`, no cut). A short outscoring the lowest
+  displayed long therefore fires `inversion` benignly, exactly as documented. ✔
+
+**3. `short_sleeve_fraction` (`weinstein_strategy_config.mli`).**
+`_sleeve_decisions` does `List.mapi candidates` where `candidates` is already
+`_prepare_candidates`' output (rebound at the top of `entries_from_candidates`).
+The re-sort therefore restores the **post-demotion** order, not the screener's.
+The old "re-emitted in original screener order" was false under an armed
+demotion; the new "restores whichever order it was handed … does not recover the
+screener's" is exactly right. ✔
+
+### "No fourth site" — the universal, re-derived and stress-tested
+
+This is the defect class that has rejected eight PRs in eight days, so it got the
+enumeration rather than the assertion.
+
+- **`entries_from_candidates` production callers: 1** — `weinstein_strategy_screening.ml:419`.
+  `weinstein_strategy.ml:55` is an alias re-export (`let entries_from_candidates =
+  Entry_walk.entries_from_candidates`); `entry_walk.ml:153` is the definition;
+  every other hit is a test or a `{!…}` doc reference. Third independent
+  derivation, agrees with author and structural.
+- **Corroborated structurally, not just by count:** the entire
+  `trading/trading/weinstein/snapshot/gen/lib/` subtree references
+  `Weinstein_strategy` only for `Bar_reader`, `config` and
+  `Weekly_sidetable_reader` — never `Entry_walk`. The demotion genuinely cannot
+  reach the snapshot path.
+- **Two "correct as written" claims spot-checked** (the ask was to find a site the
+  sweep never considered, not to re-audit the count):
+  - `weekly_snapshot.mli:253/255` — "Ranked long/short candidates,
+    score-descending" on `Weekly_snapshot.t`, populated from the screener with no
+    walk in between. Correct, rightly untouched.
+  - `pick_diff.mli:17` — rank as "1-based positional index in `long_candidates`
+    (already score-descending per the screener contract)", reading the same
+    snapshot record. Correct, rightly untouched.
+- **I swept wider than the PR's list and found three further score-desc sites the
+  body does not name:** `weekly_adapter.mli:48` ("already score-descending"),
+  `trade_audit_ratings.mli:374` ("cascade-score-descending quartiles"),
+  `report_renderer.mli:80` ("candidates arrive score-descending with an
+  alphabetical tie-break"). **All three are non-stale**: the latter two describe
+  sorts the *report* performs on its own inputs (quartile bucketing, display
+  ordering), not walk-emission order; the first describes the snapshot path and
+  in fact *corroborates* the new `funded` docstring's second limb. The
+  conclusion "no fourth stale site" therefore survives a wider sweep than the one
+  the author ran — noted as a scoping nit on the body's prose, not a finding.
+- **Converse check — does the new prose over-claim?** No. Each rewrite is
+  narrower than what it replaced, and each names the mode under which it holds.
+  The one phrase worth flagging is "inversions fire systematically on that arm":
+  strictly, a demoted high-scorer becomes a near-miss only once cash runs out, so
+  this reads as a characterisation of the class ("systematic-by-design rather
+  than anomalous") rather than a per-screen guarantee. In context — immediately
+  after "is the mechanism working as designed" — it is not misleading. Nit only.
+- **No `:NNN` line-number citations** in any added prose (grep of added `.mli`
+  lines for `\w+\.mli?:[0-9]+` is empty). Symbolic `{!…}` references throughout.
+  The status file's *old* text used `L73` / `L62-65` / `L423`; the replacement
+  prose is symbolic.
+
+### Experiment-flag / faithfulness rows
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| W1 | Spine intact | PASS | Docstrings only. No stage rule, entry gate, volume confirmation, stop or macro gate touched. |
+| W2 | Adaptation is a config-expressed dial | NA | No mechanism added or changed. |
+| R1 | Default-off preserved | PASS | `weinstein_strategy_config.ml` is a **zero-byte diff**; `stop_width_mode` remains `[@sexp.default Stop_width_mode.Drop_over_max]` and the default record still sets `Drop_over_max`. No `[@sexp.default]` line added or removed anywhere in the diff. |
+| R3 | No default flipped without a ledger ACCEPT | PASS | Nothing flipped; no ACCEPT claimed. `Demote_over_max` stays default-off. Correctly framed: these claims only become load-bearing *if* it earns one. |
+| A1 | Core-module change strategy-agnostic | NA | qc-structural raised no A1 FLAG; no `.ml` under a core module changed. |
+| S1–S6, L1–L4, C1–C3, T1–T4 | Domain logic rows | NA | Docstring-only PR with zero executable change; no stage, stop, screener-cascade or macro logic touched. Domain-adjacent by file location, not by behaviour. |
+
+### Status file and follow-ups
+
+- `dev/status/simulation.md` completion note matches what shipped: the three
+  files, the mechanism, the caller count, and the zero-diff invariant all agree
+  with the diff I read. Item correctly checked `[x]`.
+- **R-c remains open** and untouched — still listed as an unchecked follow-up
+  ("the demoted-wide cohort is not greppable from the trace"). Correctly out of
+  scope.
+- **New follow-up confirmed real and correctly filed, not silently fixed.**
+  `trade_audit.mli:247` documents `alternatives_considered` as "**Top-N**
+  candidates from the same screen call that were not entered", but
+  `alternatives_of_decisions` applies no top-N cut whatsoever — it emits every
+  `Skipped` decision. Genuine inaccuracy. `trade_audit.mli` was a sibling agent's
+  file this run, so filing it rather than editing it was the right call under
+  worktree-isolation discipline.
+- Incidental observation, not a finding: `_alternative_of_decision`'s `Kept` arm
+  is `if String.equal … then None else None` — both branches `None`, so the
+  `exclude_position_id` comparison is dead. Pre-existing, outside this diff, and
+  behaviourally inert. Worth a future cleanup ticket; not this PR's business.
+
+## Quality Score
+
+5 — Exemplary. The author traced the mechanism end to end *before* rewriting, and
+every premise I re-derived independently held: the caller count, the 10-constructor
+enumeration, the two-producer set, the stable partition, the zero-byte `.ml` diff.
+The rewrites are strictly narrower than what they replaced, point at a *type*
+where a name-list would drift, and correctly discovered that one clause was
+already wrong before `Demote_over_max` existed. Out-of-scope inaccuracies were
+filed rather than absorbed. Only nits: the body's "five snapshot-side claims"
+under-enumerates the sites carrying score-desc language (three more exist, all
+non-stale, so the conclusion stands), and "inversions fire systematically" is a
+class characterisation rather than a per-screen guarantee.
+
+## Verdict
+
+APPROVED
+
+(Derived mechanically: CP1–CP3 PASS, CP4 NA; W1/R1/R3 PASS; all domain rows NA.
+No FAILs.)
+
+behavioral_qc: APPROVED
