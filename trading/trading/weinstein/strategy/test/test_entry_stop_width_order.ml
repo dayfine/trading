@@ -102,6 +102,14 @@ let _flat_bars = [ _bar ~date:_current_date ~close:100.0 ]
    buffer fallback classifies it wide, exactly as the gate would. *)
 let _nobars = "NOBARS"
 
+(* [ZEROENTRY] is the OTHER unmeasurable shape, and the one the mli's second
+   carve-out is about: no resident bars AND a [suggested_entry] the screener left
+   at zero, so the effective entry resolves to 0.0 and [|stop - E| / E] has no
+   answer. It is deliberately distinct from [NOBARS], which is measurable — its
+   entry falls back to a POSITIVE [suggested_entry], so it gets classified (and
+   demoted) like any other candidate. *)
+let _zero_entry = "ZEROENTRY"
+
 let _bar_reader =
   Bar_reader.of_in_memory_bars
     [
@@ -258,6 +266,41 @@ let test_a_symbol_with_no_bars_sorts_wide _ =
          equal_to _wide_b;
        ])
 
+(** The one genuinely unmeasurable case the mli carves out (
+    [entry_stop_width_order.mli] §"non-positive effective entry"): a candidate
+    with no resident bars whose own [suggested_entry] is [0.0], so the effective
+    entry is [0.0] and a distance ratio against it is undefined. The pass
+    declines to classify it and it {b keeps its rank} rather than being demoted
+    on a division with no answer.
+
+    It is placed {i first} in the input, ahead of both narrow candidates, so
+    "keeps its rank" is observably different from "sorted into the wide group":
+    flipping [_is_wide]'s [None] branch from [false] to [true] — the one
+    plausible mutation, since the guard's shape is forced by the option type —
+    moves [ZEROENTRY] to the back and fails this assertion.
+
+    Contrast {!test_a_symbol_with_no_bars_sorts_wide}, the adjacent clause:
+    missing bars alone is {i not} unmeasurable, because the entry falls back to
+    a positive [suggested_entry], and that candidate does sort wide. *)
+let test_non_positive_effective_entry_keeps_its_rank _ =
+  let zero_entry_candidate : Screener.scored_candidate =
+    { (_candidate ~ticker:_zero_entry) with suggested_entry = 0.0 }
+  in
+  assert_that
+    (Entry_stop_width_order.prefer_narrow_stops
+       ~config:(_config ~mode:Stop_width_mode.Demote_over_max ~ceiling:0.90 ())
+       ~bar_reader:_bar_reader ~current_date:_current_date
+       (zero_entry_candidate :: _candidates)
+    |> List.map ~f:(fun (c : Screener.scored_candidate) -> c.ticker))
+    (elements_are
+       [
+         equal_to _zero_entry;
+         equal_to _narrow_a;
+         equal_to _narrow_b;
+         equal_to _wide_a;
+         equal_to _wide_b;
+       ])
+
 (** An unset ceiling makes the mode a no-op: with
     [stop_width_size_down_max_pct = 0.0] the ceiling falls back to
     [max_stop_distance_pct], so the wide candidate is dropped by the gate anyway
@@ -359,13 +402,16 @@ let test_walk_emits_the_narrow_stops_first _ =
     in walk order — which is exactly the resource a demotion is about.
 
     {b The wide-stop positions are the CHEAP ones}, which is what makes this
-    test sharp rather than arbitrary. Fixed-risk sizing shrinks the share count
-    in proportion to stop distance, so a 67%-stop candidate costs roughly a
-    quarter of a 5%-stop candidate. Under [Size_down] the two wide candidates
-    reach the budget first and consume enough of it that {i neither} narrow
-    candidate can be funded; under [Demote_over_max] the first narrow candidate
-    takes the budget instead. Same candidates, same capital, same bars, disjoint
-    outcomes:
+    test sharp rather than arbitrary. Under fixed-risk sizing the share count is
+    [risk$ / (entry - stop)], so a position's {e cost} is
+    [shares * entry = risk$ / stop_distance_pct] — inversely proportional to the
+    stop distance, with no other term. The wide candidates sit at the 66.7%
+    buffer and the narrow ones ~5% under entry, so a wide position costs about a
+    {b thirteenth} of a narrow one ([0.05 / 0.667]), not a quarter as an earlier
+    draft of this comment said. Under [Size_down] the two wide candidates reach
+    the budget first and consume enough of it that {i neither} narrow candidate
+    can be funded; under [Demote_over_max] the first narrow candidate takes the
+    budget instead. Same candidates, same capital, same bars, disjoint outcomes:
 
     - [Size_down] → [WIDE_A; WIDE_B] — the wide pair kept its rank and crowded
       the narrow pair out entirely.
@@ -399,6 +445,8 @@ let suite =
          >:: test_other_modes_leave_the_order_untouched;
          "a symbol with no bars sorts wide, like the gate would put it"
          >:: test_a_symbol_with_no_bars_sorts_wide;
+         "a non-positive effective entry keeps its rank"
+         >:: test_non_positive_effective_entry_keeps_its_rank;
          "an unset ceiling still drops the wide candidate"
          >:: test_unset_ceiling_still_drops_the_wide_candidate;
          "gate bands under Demote_over_max" >:: test_gate_demote_bands;
