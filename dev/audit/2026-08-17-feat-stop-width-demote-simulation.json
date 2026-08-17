@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-17",
+  "feature": "simulation",
+  "branch": "feat/stop-width-demote",
+  "sha": "ea90fc87ebdd937dc82d57e4f580eacefb38d0ee",
+  "recorded_at_ns": 1786956951337655675,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "PR #2352; rework 1/2 then 3 gates green; merged 87b83871"
+}

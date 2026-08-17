@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-17",
+  "feature": "trade-audit",
+  "branch": "docs/audit-docstring-fixes",
+  "sha": "b8d69b511df0bc5a4364d4e9e7393278b9ad918c",
+  "recorded_at_ns": 1786956951377171532,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "PR #2357; rework 1/2 (+fmt fix) then 3 gates green; merged 5250d4a7"
+}

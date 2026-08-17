@@ -4,9 +4,10 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-16 (orchestrator run 31933953820; main
-`a2ad930c` -> `9f901d86`). Merged #2336/#2347/#2350/#2349/#2348;
-#2338/#2339/#2352 open. Full narrative: `dev/daily/2026-08-16.md`.
+Last updated: 2026-08-17 (orchestrator run 32006595069; main
+`e1d62260` -> `5250d4a7`). **Queue fully cleared: all five open PRs
+merged** (#2355/#2339/#2359/#2352/#2357); three took one rework each.
+Zero open PRs at run end. Full narrative: `dev/daily/2026-08-17.md`.
 
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
@@ -41,7 +42,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
 | [hybrid-tier](hybrid-tier.md) | MERGED | — | — | — |
-| [trade-audit](trade-audit.md) | IN_PROGRESS | feat-backtest | — | ticket-cancel observability MERGED #2348 (3 gates); next: Trade_audit_ratings still date-joined, so one report carries two join fidelities |
+| [trade-audit](trade-audit.md) | IN_PROGRESS | feat-backtest | — | #2357 `5250d4a7` MERGED — #2348 stale-docstring sweep complete; next: Trade_audit_ratings still date-joined (two join fidelities) |
 | [decision-audit](decision-audit.md) | MERGED | feat-backtest | — | #1799/#1806/#1811 MERGED (report+counterfactual+weekly-picks adapter); selection FAITHFUL; live-picks pipeline ready (#1812); next: matured weekly counterfactual |
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
@@ -54,14 +55,14 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2339 | #2338 `b602123c` MERGED (3 gates); #2339 behavioral NEEDS_REWORK at `b3c65c07` — surviving mutant, 1 rework left |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2339 `ab7604f2` + #2359 `9a48f008` both MERGED (3 gates); next: H-AUDIT-REWORK-COUNT-COMPOSITION-UNPINNED (filed this run) |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 8 open; A-NOOP-BUDGET-ORPHAN new (5 records recovered); A-FASTEXIT-VACUOUS now has measured cost; six items share the `workflow`-token blocker |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | segmentation weight caveats MERGED #2324 `4f602d0d`; 5 open; top item `linter_coverage` is a HUMAN POLICY DECISION (header half already shipped), not agent work |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
 | [screener](screener.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | local-range entry anchor MERGED #2217 (default-off axis `entry_anchor_local_range_weeks`); next: re-run honest ladder with local-top-E arms, then WF-CV |
-| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | #2352 | TTL knob split MERGED #2349 (3 gates); #2352 Demote_over_max structural APPROVED, behavioral pending |
+| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | #2355 `41f982ca` + #2352 Demote_over_max `87b83871` MERGED (default-off); next: R-a/R-c follow-ups, then WF-CV before any R3 flip |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
 | [experiment-platform](experiment-platform.md) | IN_PROGRESS | feat-backtest | — | force-exit-off grid REJECTED for promotion (#1503); single-dial surface exhausted; next: continuation-buy recheck on top-3000 (data-gated) |

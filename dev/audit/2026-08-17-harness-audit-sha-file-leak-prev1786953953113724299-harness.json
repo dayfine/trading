@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-17",
+  "feature": "harness",
+  "branch": "harness/audit-sha-file-leak",
+  "sha": "d02112a1459b4ce5a8eb87829e65fc9cb4dfe290",
+  "recorded_at_ns": 1786953953113724299,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": 2,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": "PR #2359; H1 line citations undelivered; rework 1/2 dispatched"
+}
