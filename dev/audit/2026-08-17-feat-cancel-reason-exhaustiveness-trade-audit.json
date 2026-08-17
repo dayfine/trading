@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-17",
+  "feature": "trade-audit",
+  "branch": "feat/cancel-reason-exhaustiveness",
+  "sha": "8988ae73087eb2fe056a0eef426dd94a3c37b108",
+  "recorded_at_ns": 1786974200432906753,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

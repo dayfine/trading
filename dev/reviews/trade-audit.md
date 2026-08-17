@@ -279,3 +279,187 @@ residual note rather than a blocking issue.
 ## Verdict
 
 APPROVED
+
+---
+
+Reviewed SHA: 8988ae73087eb2fe056a0eef426dd94a3c37b108
+
+## Behavioral QC — trade-audit PR #2365 (R2 + R4)
+
+### CI status — independently re-checked, NOT inherited from structural
+
+Structural approved while `build-and-test` was `in_progress` and substituted a
+scoped local run. I re-polled the check-runs API twice during this review:
+
+- `perf-tier1-smoke`: `completed/success`
+- `build-and-test`: **`in_progress/-` — still pending at the time of this review**
+
+My behavioral verdict is on contract correctness and is independent of that
+gate, but **the merge gate is not satisfied until `build-and-test` reports
+`completed/success`** (`.claude/rules/pr-merge-gates.md`). Do not merge on the
+strength of two APPROVED reviews alone.
+
+What I did verify by execution, in my own detached worktree at the PR tip:
+
+```
+dune exec trading/backtest/test/test_cancel_reason_closed_list.exe
+Ran: 2 tests in: 0.10 seconds.  OK   EXIT=0
+```
+
+### Contract Pinning Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| CP1 | Each non-trivial claim in new `.mli` docstrings has an identified test that pins it | NA | **No new `.mli` is added.** The two `.mli` files in the diff (`cancel_handler.mli`, `screener.mli`) are docstring-only odoc-ref corrections that introduce no new claim. The load-bearing new contract text is the *module docstring of the new test file*; its claims are evaluated under CP2/CP4 below rather than skipped. |
+| CP2 | Each claim in the PR body's "Test plan"/"Test coverage" has a corresponding committed test | PASS | Every falsifiable PR-body claim independently reproduced — see the table below. Nothing advertised is absent from the tree. |
+| CP3 | Pass-through/identity/invariant tests pin identity, not just size | PASS | Both tests assert whole-value identity via `equal_to` on the complete `Set.to_list` (and on a tuple of two complete lists), never `size_is`. `grep 'size_is' test_cancel_reason_closed_list.ml` → no hits. A size-only assertion here would have passed under my MUT-D below; the identity assertion does not. |
+| CP4 | Each guard called out explicitly in code docstrings has a test exercising the guarded-against scenario | PASS | The module docstring names four guards and disclaims a fifth. I executed all four (MUT-A–D below); each reddens the suite. The disclaimed fifth ("a fourth producer in a third module is NOT caught") is accurate — I confirmed a unit test structurally cannot close it — and is filed as R5 with baseline counts rather than papered over. |
+
+### CP2 — PR-body claims, each re-derived rather than restated
+
+| PR-body claim | Verified how | Result |
+|---|---|---|
+| `grep -rn 'CancelEntry {' --include=*.ml .` → **11 hits**, split 2 production construction / 1 production match arm / 8 test-file | Re-ran the grep myself and re-classified every hit by hand | **Exact match.** See enumeration below. |
+| Grid is 144 `Entry_ticket_ttl` inputs | Read `_ttl_inputs`; 3 position states × 2 `rescreen` × 4 `max_rest_weeks` × 2 `qualifies` × 3 dates | 144 ✓ |
+| Grid is 9 `Cancel_handler` inputs | Read `_rejection_transitions`; 3 position maps × 3 trade lists | 9 ✓ |
+| Mutation 1 (fourth producer arm) → 2/2 FAILED | Re-ran it (MUT-A) | 2/2 FAILED, exit 1 ✓ |
+| Mutation 2 (rename `_ttl_reason`) → 2/2 FAILED | Re-ran it (MUT-B) | 2/2 FAILED, exit 1 ✓ |
+| "Non-vacuous in **both** directions — an empty reachable set fails as loudly" | MUT-C (mine, below) | 2/2 FAILED ✓ |
+| "A second test pins the decision-vs-accident partition, so a token migrating between the two modules is caught too" | MUT-D (mine, below) | test 1 **PASSES**, test 2 **FAILS** ✓ — the second test is non-redundant and does exactly what it claims |
+| `grep -rn '{!Weinstein_trading\.'` returns **zero** | Re-ran over `*.ml` + `*.mli` | **0 hits** ✓ |
+| No `weinstein_trading.ml/.mli` exists in the tree | `find` | none ✓ |
+| `Weinstein_trading_state` is a different, real library, left alone | `trading/trading/weinstein/trading_state/lib/dune` declares `(name weinstein_trading_state)` | ✓ real; the escaped-dot regex `Weinstein_trading\.` cannot over-match it |
+| `dune build` / `dune runtest` / `dune build @fmt` all exit 0 | **Not independently verified** — whole-tree build deliberately not started (container-capacity rule). This is `build-and-test`'s job, and it is still `in_progress`. | **pending on CI** |
+
+### My own `CancelEntry {` enumeration (11 hits, re-derived)
+
+The author force-pushed once specifically to correct this count (first commit
+message said "9 in test files"; correct is 8). I re-counted from scratch:
+
+**Production construction sites — 2**
+- `trading/trading/weinstein/strategy/lib/entry_ticket_ttl.ml:17` (`_cancel_transition`) → 2 reachable tokens, both **module-private** (`entry_ticket_ttl.mli` exports only `cancellations` and `run` — I checked; no reason token is exported)
+- `trading/trading/simulation/lib/cancel_handler.ml:28` (`_cancel_entry_transition`) → 1 reachable token, the exported `portfolio_rejection_reason`
+
+**Production match arm — consumer, not a producer — 1**
+- `trading/trading/backtest/lib/trade_audit.ml:242` (`_process_transition`)
+
+**Test files — 8**
+- `test_position.ml:300,323` (2), `test_cancel_handler.ml:169,184` (2), `test_trade_audit.ml:535,576` (2), `test_entry_ticket_ttl.ml:105` (1, itself a match arm), `test_gtc_entry_persistence.ml:161` (1)
+
+2 + 1 + 8 = 11. **The closed list is exactly three at this SHA**, and the two
+exclusion classes a naive grep gets wrong (the `trade_audit.ml` match arm; the
+test-file hits) are both correctly identified in the PR body, the commit
+message, and the R5 baseline.
+
+### Is the reachable side genuinely derived, or does it collapse to literals?
+
+**Genuinely derived.** The documented side is 2 literals + 1 symbolic reference
+(`Cancel_handler.portfolio_rejection_reason`); the two `Entry_ticket_ttl` tokens
+*must* be literals there because they are private to that module — which is
+precisely why the reachable side has to run the producer to obtain them. The
+reachable side is never written down: it is `_reachable_from`, which runs the
+real `Entry_ticket_ttl.cancellations` / `Cancel_handler.transitions_for_rejected_trades`,
+pushes each emitted `CancelEntry` through the real `Trade_audit.record_transitions`,
+and reads back `ticket_lifecycle.cancel_reason` off the persisted audit record.
+
+The decisive evidence is MUT-C: in a literals-vs-literals test, breaking the
+audit's *persistence* would change nothing. Here it reddens both tests.
+
+### Mutation probes — the author's two, reproduced, plus two they did not run
+
+| # | Mutation | Whose | Result |
+|---|---|---|---|
+| MUT-A | Fourth arm in `_cancel_reason_for` returning `entry_ticket_partial_abandoned`, reachable by the grid | author's #1 | **2 of 2 FAILED**, exit 1 ✓ reproduced |
+| MUT-B | `_ttl_reason` value → `entry_ticket_clock_expired` | author's #2 | **2 of 2 FAILED**, exit 1 ✓ reproduced |
+| **MUT-C** | **`Trade_audit._record_cancel` silently drops the reason** (`bucket_cancel_reason <- None`) — the producers still emit all three tokens, the audit just stops persisting them | **mine** | **2 of 2 FAILED**, exit 1 — reachable set collapses to empty and the equality fails as loudly as a fourth token. **Non-vacuity confirmed in the direction that is usually broken.** |
+| **MUT-D** | **Union-preserving cross-module token leak** — `Entry_ticket_ttl` additionally emits `entry_fill_rejected_by_portfolio`, so the *union* stays exactly the documented three while the decision-vs-accident partition breaks | **mine** | **test 1 PASSES, test 2 FAILS** (`Failures: 1`), exit 1 — the partition test is **not redundant** with the set-equality test and catches precisely the case its docstring claims. |
+
+Reverted after each; final state green (`Ran: 2 tests … OK`, exit 0,
+`git status --porcelain` clean).
+
+MUT-D is the one worth dwelling on. It is deliberately constructed so that
+set-union equality cannot see it — exactly the shape that let PR #2362's
+scenario pass under the very mutation it existed to catch. Here the second test
+fires and the first correctly stays green, which is the right behaviour for both
+and demonstrates the two tests are testing different things rather than one
+being decoration.
+
+### R4 — is the substituted verification method sound?
+
+The author reports that `dune build @…/doc` emits no warning *even with the bad
+ref deliberately restored* (exit 0), so odoc is not a discriminating gate, and
+substitutes structural evidence. Judging that:
+
+- **Sound for what it claims.** (a) No `weinstein_trading.ml/.mli` exists → the
+  old `{!Weinstein_trading.X}` form could never resolve, full stop. (b) The
+  target path is compiler-proven by the new test's
+  `module Entry_ticket_ttl = Weinstein_strategy.Entry_ticket_ttl`, which
+  compiles. I confirmed the underlying diagnosis directly:
+  `weinstein_strategy`'s dune carries `(public_name weinstein_trading.strategy)`
+  — `Weinstein_trading` is indeed a public-name *prefix*, not a module. Given a
+  silent odoc, this is genuinely stronger evidence than a build warning.
+- **Non-blocking residual (observation, not a finding).** Neither
+  `trading.simulation` (which contains `cancel_handler.mli`) nor
+  `weinstein.screener` declares `weinstein_strategy` as a dependency — screener
+  is a *dependency of* the strategy, so its ref points up the dependency graph.
+  Those two refs may therefore still not resolve under odoc, for a different
+  reason than before. **This is not a FAIL:** the PR never claims odoc
+  resolution — it explicitly states odoc is not a gate — and naming a real
+  module in place of a nonexistent one is a strict improvement either way. Worth
+  a follow-up line on the track (cross-library odoc refs may want `{!module:…}`
+  or plain `[Entry_ticket_ttl]` prose), not a rework cycle.
+
+### Status-file verification (`dev/status/trade-audit.md`)
+
+- **R2 → `[x]`** (line 116), accurate: names the real test path, the derived-not-literal
+  design, both grid sizes, the reproduce command, and the load-bearing mutations.
+- **R4 → `[x]`** (line 130), accurate, and correctly records that it was three
+  refs rather than the one originally filed.
+- **R1 still `[ ]`** (line 104) — confirmed open and untouched, as intended.
+- **R5 filed** (line 138) with the full baseline census: 2/1/8 split, both
+  exclusion classes named, and the correct rationale for why it belongs in
+  `trading/devtools/checks/` rather than a unit test.
+- **`dev/status/_index.md` untouched** — confirmed; matches
+  `.claude/rules/feat-agent-dispatch.md` §4.
+
+**Line-number citations:** none in any new docstring — the new test's module
+docstring cites `dev/notes/ticket-death-on-cash-2026-08-16.md` and
+`dev/status/trade-audit.md` symbolically, and the R2 item's old
+`entry_ticket_ttl.ml:17` / `_cancel_reason_for:38-50` citations were *removed*.
+One nit: the completed R4 item's heading still reads "at `cancel_handler.mli:76`"
+— carried-over text from the original filing describing where the defect was, in
+a status file rather than a docstring. Harmless; no action required.
+
+### Behavioral Checklist (domain)
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| A1 | Core module modification is strategy-agnostic | NA | qc-structural did not FLAG A1; no core module touched. |
+| S1–S6, L1–L4, C1–C3, T1–T4 | Weinstein stage / stop / cascade / domain-test rows | NA | **Audit-observability plumbing and an odoc-ref docstring fix — no Weinstein decision logic is added or altered.** The new test drives existing producers to enumerate diagnostic reason tokens; it changes no stage rule, entry/exit criterion, stop, or cascade behaviour. Per `.claude/rules/qc-behavioral-authority.md` §"When to skip this file entirely", CP1–CP4 is the review. |
+
+### Rules spot-check
+
+- `.claude/rules/experiment-flag-discipline.md` — NA, no strategy mechanism or config field added.
+- `.claude/rules/weinstein-faithful-core.md` W1 — spine untouched; the diff adds a test and corrects three doc refs.
+- `.claude/rules/no-python.md` — no `*.py` in the diff.
+
+## Quality Score
+
+5 — Exemplary. This is the reference implementation of the discipline the last
+eight rejections were about: the universal ("exactly three tokens") is closed by
+*deriving* the reachable side rather than restating it, every enumerated count
+re-derives exactly, the coverage limit is stated in the docstring and filed as
+R5 with a baseline instead of being papered over, and the author force-pushed to
+correct their own miscount rather than leave it in a durable commit message. My
+two independent mutations both landed where the docstring says they should —
+including a union-preserving cross-module leak that isolates the second test and
+proves it is not decoration. The only residual (cross-library odoc refs may still
+not resolve) sits outside anything the PR claims and is non-blocking.
+
+## Verdict
+
+APPROVED
+
+Behavioral gate satisfied at `8988ae73`. **Merge remains blocked until
+`build-and-test` reports `completed/success` at this SHA** — it was still
+`in_progress` throughout this review.

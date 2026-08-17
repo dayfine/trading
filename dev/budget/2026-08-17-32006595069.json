@@ -1,0 +1,28 @@
+{
+  "run_id": "2026-08-17-32006595069",
+  "timestamp": "2026-08-17T09:17:24Z",
+  "commit_sha": "5250d4a73bea6e6b2b71cc48bdaf7d72e639d4e5",
+  "measurement_source": "RECOVERED from GHA job log 95317242603 (run 32006595069, step 9 'Bundle budget into daily summary and auto-merge'). The capture step computed the value and committed it, but its push was rejected non-fast-forward, so the original JSON was destroyed with the runner. Only the total survives, transcribed from the bundling commit subject 'ops(budget): bundle 2026-08-17-32006595069 ($52.9371) into daily summary'.",
+  "fallback_branch": "recovered-by-orchestrator-run-32030003678",
+  "notes": "Reconstructed by orchestrator run 32030003678 (2026-08-17 run 2). PRECISION CAVEAT: total_cost_usd is transcribed at 4 decimal places from a log line; the original execution_file value carried full float precision (compare 2026-08-16-31947128499, which records 8.864786799999997). Treat 52.9371 as exact-to-4dp, not as the raw measurement. All token fields are null for the same reason they are null in every other record -- claude-code-action does not surface per-subagent or token-level breakdown; see dev/status/cost-tracking.md. Root cause of the loss is filed as an escalation in dev/daily/2026-08-17-run2.md: step 9 fetches the daily branch into FETCH_HEAD but then checks out a stale same-named local branch, commits onto that outdated base, and is correctly rejected on push.",
+  "subagents": [
+    {
+      "name": "orchestrator-total",
+      "model": "sonnet",
+      "input_tokens": null,
+      "output_tokens": null,
+      "cache_read_input_tokens": null,
+      "cache_creation_input_tokens": null,
+      "estimated_cost_usd": null,
+      "note": "Per-subagent breakdown not available from claude-code-action. total_cost_usd in totals covers all spawned subagents (19 dispatches this run)."
+    }
+  ],
+  "totals": {
+    "input_tokens": null,
+    "output_tokens": null,
+    "cache_read_input_tokens": null,
+    "cache_creation_input_tokens": null,
+    "total_cost_usd": 52.9371,
+    "measurement": "recovered from GHA job log; exact to 4 decimal places, see measurement_source"
+  }
+}
