@@ -596,11 +596,22 @@
 ; each define a private _repo_root() (same walk-up-for-.git/.claude logic
 ; as _check_lib.sh's repo_root()) and use it to locate dev/reviews/ and
 ; dev/audit/ -- real outside-workspace paths. But record_qc_audit_test.sh
-; ALWAYS invokes both scripts (and, since 29a-29c, _check_lib.sh's
-; repo_root() directly) with REPO_ROOT explicitly overridden to a
-; freshly-created temp fixture repo (see the REPO_ROOT="${TMP_REPO}" ...
-; invocations throughout the test), so no real dev/reviews/ or dev/audit/
-; content is ever read by this rule. See universe_deps_exceptions.conf.
+; invokes both scripts (and, since 29a-29c, _check_lib.sh's repo_root()
+; directly) via one of three shapes: (a) REPO_ROOT explicitly overridden
+; to a freshly-created temp fixture repo (see the REPO_ROOT="${TMP_REPO}"
+; ... invocations throughout the test); (b) REPO_ROOT overridden to a
+; deliberately malformed value -- nonexistent path or regular file
+; (scenarios 29a/b, 30a/b, 31a/b) -- which the `[ -d ]` guard in
+; _repo_root() rejects with a hard error before any path is computed; or
+; (c) the walk-up branch, reached either via `env -u REPO_ROOT` or via
+; REPO_ROOT='' which _repo_root() treats as unset (scenarios 29c, 30c,
+; 31c), from a copy of the script located inside a temp fixture that
+; carries its own `.claude` sentinel, e.g. scenarios 27b/28b -- the
+; walk-up seeds from the script's own directory (`dirname "$0"`), not the
+; caller's CWD, so it terminates inside the fixture regardless of where
+; the test runs from. In all three shapes, no real dev/reviews/ or
+; dev/audit/ content is ever read by this rule. See
+; universe_deps_exceptions.conf.
 
 (rule
  (alias runtest)
