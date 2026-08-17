@@ -218,6 +218,13 @@ module Entry_freeze = Entry_freeze
     [config.freeze_entry_at_first_breakout]). Re-exposed so the entry walk and
     tests can construct / drive the per-run pin table. See {!Entry_freeze}. *)
 
+module Entry_stop_width_order = Entry_stop_width_order
+(** Defect B: the {!Stop_width_mode.Demote_over_max} ordering pass, which puts
+    narrow-stop candidates ahead of wide-stop ones so §5.1's "prefer other
+    candidates" costs priority rather than existence. Identity under the other
+    two modes. Re-exposed so tests can pin the ordering independently of a full
+    entry walk. See {!Entry_stop_width_order}. *)
+
 module Entry_ticket_ttl = Entry_ticket_ttl
 (** F2 resting-entry-ticket lifecycle: re-screen cancel (primary) + clock TTL
     (backstop), armed independently by [config.enable_entry_ticket_rescreen] and

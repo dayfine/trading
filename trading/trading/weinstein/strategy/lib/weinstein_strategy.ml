@@ -39,6 +39,7 @@ module Entry_ticket_tags = Entry_ticket_tags
 module Entry_freshness = Entry_freshness
 module Entry_walk = Entry_walk
 module Entry_freeze = Entry_freeze
+module Entry_stop_width_order = Entry_stop_width_order
 module Entry_ticket_ttl = Entry_ticket_ttl
 module Screening_notional = Screening_notional
 module Long_buying_power = Long_buying_power

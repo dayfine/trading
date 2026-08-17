@@ -109,6 +109,27 @@ let _make_entry_fn ~config ~bar_reader ~current_date ~stop_states
     ~initial_stop_buffer:config.initial_stop_buffer ~stop_states ~bar_reader
     ~portfolio_value ~current_date cand
 
+(** The two pre-walk transforms of the candidate list, both default-off
+    identities (R1):
+
+    - Fix #2 [freeze_entry_at_first_breakout] pins each candidate's
+      [suggested_entry] to its first qualifying breakout, so a trending symbol's
+      ticket does not chase the extension upward week over week.
+    - Defect B [Demote_over_max] moves the wide-stop candidates behind the
+      narrow-stop ones, so §5.1's "prefer other candidates" costs priority
+      rather than existence — they are funded with whatever the narrow-stop
+      candidates leave.
+
+    Order matters: the freeze rewrites [suggested_entry], and the demotion's
+    stop-width measurement keys off the entry, so the freeze must run first or
+    the two would disagree about which entry a candidate is being judged at. *)
+let _prepare_candidates ~config ~pending_entry_e ~held_set ~bar_reader
+    ~current_date candidates =
+  Entry_freeze.apply ~enabled:config.freeze_entry_at_first_breakout
+    ~pending:pending_entry_e ~held_set ~candidates
+  |> Entry_stop_width_order.prefer_narrow_stops ~config ~bar_reader
+       ~current_date
+
 (** Generate CreateEntering transitions for screener candidates. Tracks
     remaining cash to avoid generating orders that exceed funds.
 
@@ -118,22 +139,25 @@ let _make_entry_fn ~config ~bar_reader ~current_date ~stop_states
     The walk produces a tagged decision list (see
     {!Entry_audit_capture.candidate_decision}). After the walk, kept candidates
     are emitted to [audit_recorder.record_entry] with the rivals they outranked
-    — this is the PR-2 entry-capture site. The output transition list (in
-    original screener order) is bit-equivalent to the pre-audit shape: same
-    candidates, same transitions, same side-effects on [stop_states] and
-    [remaining_cash]. *)
+    — this is the PR-2 entry-capture site. The output transition list is
+    bit-equivalent to the pre-audit shape: same candidates, same transitions,
+    same side-effects on [stop_states] and [remaining_cash].
+
+    {b Order.} The list comes back in the order the walk charged the shared
+    budget, which is screener order under every mode except
+    {!Stop_width_mode.Demote_over_max}; that mode permutes the input in
+    {!_prepare_candidates} so wide-stop candidates are charged last. The
+    permutation moves the [long_notional_acc] and [sector_exposure_acc]
+    mutations with it, not only [remaining_cash] — every accumulator the walk
+    threads is order-dependent, which is the whole point of demoting. *)
 let entries_from_candidates ?sector_lookup
     ?(pending_entry_e = Entry_freeze.create ()) ~config ~candidates ~stop_states
     ~bar_reader ~(portfolio : Portfolio_view.t) ~get_price ~current_date
     ?(audit_recorder = Audit_recorder.noop) ?macro () =
   let held_set = String.Set.of_list (held_symbols portfolio) in
-  (* Fix #2 (default-off): freeze each candidate's [suggested_entry] to its
-     first-qualifying breakout so a trending symbol's ticket does not chase the
-     extension upward week over week. No-op + no allocation when the flag is off
-     (R1). *)
   let candidates =
-    Entry_freeze.apply ~enabled:config.freeze_entry_at_first_breakout
-      ~pending:pending_entry_e ~held_set ~candidates
+    _prepare_candidates ~config ~pending_entry_e ~held_set ~bar_reader
+      ~current_date candidates
   in
   let portfolio_value = Portfolio_view.portfolio_value portfolio ~get_price in
   let make_entry =

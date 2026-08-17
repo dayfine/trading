@@ -45,16 +45,75 @@ type t =
           being the {e admission} threshold and becomes the boundary above which
           the entry is tagged [Sized_down_wide_stop]; the drop threshold moves
           to [size_down_max_pct] (the swept sanity ceiling). *)
+  | Demote_over_max
+      (** The literal reading of §5.1: "prefer other candidates" is a
+          {b ranking} instruction, not a ban. Every candidate whose stop is
+          within [max_stop_distance_pct] gets first claim on the week's capital;
+          the wide-stop ones are walked afterwards, with whatever is left. A
+          wide stop costs priority, never existence, and on a week with enough
+          capital for everyone it costs nothing at all.
+
+          {b The book's own vocabulary separates the two cases.} §4.4 uses
+          "NEVER buy, no matter how good other factors" for negative relative
+          strength — an actual ban. §4.3 {e grades} overhead resistance
+          A+/A/B/C, with heavy resistance yielding "mediocre performance" rather
+          than exclusion. §5.1 says "prefer other candidates", which is the
+          grading vocabulary, not the ban vocabulary.
+
+          (An earlier draft of this docstring cited [overhead_supply] as an
+          in-codebase precedent for "demote, never exclude". That is
+          {b not accurate} and is withdrawn: the supply score is a term of
+          [Screener.score_long], and a candidate whose score falls below
+          [passes_score_floor ~min_grade] is dropped outright — so heavy supply
+          {i can} exclude, via the score. The argument above rests on the book,
+          which is where it should have rested.)
+
+          {b The delta against {!Size_down} is ORDER ONLY.} Both modes admit the
+          same population (same ceiling) at the {e same} share count: sizing is
+          {!Portfolio_risk.compute_position_size} against the installed stop and
+          never reads the mode, so a wide stop already shrinks the position
+          ~[1 / stop_distance] under {i every} mode, [Drop_over_max] included.
+          [Size_down]'s only effects beyond the default are to admit past the
+          book limit and to {e tag} the entry [Sized_down_wide_stop];
+          [Demote_over_max] admits the identical candidate at the identical size
+          and moves it to the back of the walk. It is [Size_down] plus a
+          reordering, minus the tag.
+
+          The two therefore differ {b only when capital binds}. The walk charges
+          each entry against a shared budget in order, so on a capital-tight
+          week [Size_down] funds the wide-stop candidate that outranked its
+          rivals and [Demote_over_max] funds the rivals instead; on a
+          capital-rich week they produce the same entries in a different order.
+
+          {b Why that is still the more faithful reading.} §5.1 expresses a
+          {e preference between candidates}. [Size_down] admits the wide-stop
+          candidate in its original rank, which expresses no preference at all;
+          [Demote_over_max] is the only one of the three that acts on the
+          comparison the sentence actually makes.
+
+          [size_down_max_pct] is the shared sanity ceiling (see {!policy}): a
+          stop beyond it is still dropped, so demotion cannot admit unbounded
+          structural risk. Leaving it at [0.0] makes this mode admit exactly the
+          population [Drop_over_max] admits — an armed-but-unconfigured demotion
+          is a no-op, so a spec must set the ceiling for it to bite.
+
+          {b Why it exists.} On the 26-year top-3000 core arm AXTI was rejected
+          {b 21 times} with [Stop_too_wide] at a correct, fresh entry anchor,
+          and went on to be the single largest winner in the record run
+          ([dev/notes/entry-anchor-defect-a-refuted-2026-08-16.md]). The width
+          gate — not the entry anchor — is what excludes that cohort. *)
 [@@deriving show, eq, sexp]
 
 type policy = {
   mode : t;
   size_down_max_pct : float;
-      (** Sanity ceiling for {!Size_down}: stop distances above this fraction
-          are still dropped, so the mechanism cannot admit unbounded structural
-          risk. [0.0] (unset) falls back to [max_stop_distance_pct], which makes
-          an armed-but-unconfigured {!Size_down} admit exactly the population
-          {!Drop_over_max} admits. Unread under {!Drop_over_max}. *)
+      (** Sanity ceiling for {!Size_down} {b and} {!Demote_over_max}: stop
+          distances above this fraction are still dropped, so neither mechanism
+          can admit unbounded structural risk. [0.0] (unset) falls back to
+          [max_stop_distance_pct], which makes an armed-but-unconfigured mode
+          admit exactly the population {!Drop_over_max} admits. Unread under
+          {!Drop_over_max}. The name predates {!Demote_over_max}; it is the
+          ceiling for both non-default modes. *)
 }
 (** The mode plus its ceiling, bundled so the entry-construction path takes one
     argument rather than two. Built by the strategy from
@@ -66,8 +125,11 @@ val default_policy : policy
 (** What the gate decided for one candidate. *)
 type outcome =
   | Admit
-      (** Stop distance is within [max_stop_distance_pct]; unchanged under both
-          modes. *)
+      (** Admitted at normal size. Under every mode when the distance is within
+          [max_stop_distance_pct]; also the {!Demote_over_max} verdict for a
+          wide-but-under-ceiling stop, since demotion changes {e order}, not
+          sizing — the reordering happens before the walk (see
+          {!Entry_stop_width_order}), not here. *)
   | Admit_sized_down
       (** {!Size_down} only: distance is over [max_stop_distance_pct] but within
           the sanity ceiling. The candidate proceeds to sizing and its
@@ -91,4 +153,22 @@ val gate :
     ([policy.size_down_max_pct] when [> 0.0], else [max_stop_distance_pct]);
     [Admit_sized_down] when it is within the ceiling but over
     [max_stop_distance_pct]; [Admit] otherwise. {!Admit_sized_down} is never
-    produced under [Drop_over_max]. *)
+    produced under [Drop_over_max].
+
+    Under [Demote_over_max]: [Drop] iff [stop_distance_pct] exceeds the same
+    ceiling, else [Admit] — the mode never returns {!Admit_sized_down}, because
+    what it changes is the candidate's {e position in the walk}, not its size.
+*)
+
+val over_book_limit :
+  max_stop_distance_pct:float -> stop_distance_pct:float -> bool
+(** The §5.1 width test on its own, without a mode: [true] when the stop sits
+    further than [max_stop_distance_pct] from entry. Exposed so
+    {!Entry_stop_width_order} can partition candidates by the same predicate
+    {!gate} applies, rather than re-deriving the strict [>] and risking a
+    boundary disagreement between the ordering and the gate. *)
+
+val demotes : policy:policy -> bool
+(** [true] only for {!Demote_over_max}. Lets the entry walk skip the ordering
+    pass — and its per-candidate stop recomputation — entirely under the other
+    two modes, so the default path allocates nothing new (R1). *)

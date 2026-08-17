@@ -620,6 +620,37 @@ favour of a discrete event on the position ledger. Four PRs landed:
 
 ## Follow-up
 
+- **Walk-order docstrings go stale when `Demote_over_max` is armed** (residual
+  R-a from PR #2352 qc-behavioral iteration 1). Three untouched,
+  default-off-safe docstrings assert that the entry walk funds candidates in
+  screener score order, which stops being true once
+  `config.stop_width_mode = Demote_over_max` reorders the candidate list before
+  the walk:
+  - `trading/trading/backtest/decision_audit/lib/screen_record.mli` L73 —
+    `funded` is documented as "in screener order (score-desc)"; under an armed
+    demotion it is in *demoted* order.
+  - Same file L62–65 — `inversion` is documented as "usually `false` … flags a
+    sizing / sector-cap quirk worth eyeballing". Under an armed demotion an
+    inversion fires **systematically by design** (that is the mechanism), so the
+    flag stops being an anomaly signal for that arm.
+  - `trading/trading/weinstein/strategy/lib/weinstein_strategy_config.mli` L423
+    — "re-emitted in original screener order so audit ordering is preserved"
+    (the `short_sleeve_fraction` docstring); "original screener order" is the
+    post-demotion order when both mechanisms are armed.
+
+  Scope: docstring corrections only, no behaviour change. At the
+  `Drop_over_max` default all three claims remain exactly true, so this is only
+  load-bearing if `Demote_over_max` earns a ledger ACCEPT.
+- **The demoted-wide cohort is not greppable from the trace** (residual R-c from
+  PR #2352). Under `Demote_over_max` a wide-stop candidate that gets admitted
+  behind the narrow ones records `"Pass"` with `sized_down_wide_stop = false` —
+  indistinguishable in the audit from a candidate that was never wide. Under
+  `Size_down` the same candidate is tagged `Sized_down_wide_stop`. Consequence:
+  a `Demote_over_max` arm cannot be attributed post-hoc ("which entries did the
+  demotion actually admit, and where in the walk did they land?") without
+  re-running. Fix shape: either a `demoted_wide_stop` boolean on `entry_meta`
+  alongside `sized_down_wide_stop`, or a rank-delta field on the screen record.
+  Needed before any ladder cell that runs this mode is read for attribution.
 - **Local sp500 baseline rerun (deferred from PR-4 of split-day redesign)** —
   capture post-PR-3 metrics on `goldens-sp500/sp500-2019-2023` against
   the full 491-symbol universe. Cannot run in GHA (22-symbol fixture
