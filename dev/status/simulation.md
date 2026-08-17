@@ -1,6 +1,6 @@
 # Status: simulation
 
-## Last updated: 2026-08-10
+## Last updated: 2026-08-17
 
 ### 2026-08-10 — ticket-lifecycle audit fields (branch `feat/ticket-lifecycle-audit-fields`, PR-5)
 
@@ -620,27 +620,43 @@ favour of a discrete event on the position ledger. Four PRs landed:
 
 ## Follow-up
 
-- **Walk-order docstrings go stale when `Demote_over_max` is armed** (residual
-  R-a from PR #2352 qc-behavioral iteration 1). Three untouched,
-  default-off-safe docstrings assert that the entry walk funds candidates in
-  screener score order, which stops being true once
-  `config.stop_width_mode = Demote_over_max` reorders the candidate list before
-  the walk:
-  - `trading/trading/backtest/decision_audit/lib/screen_record.mli` L73 —
-    `funded` is documented as "in screener order (score-desc)"; under an armed
-    demotion it is in *demoted* order.
-  - Same file L62–65 — `inversion` is documented as "usually `false` … flags a
-    sizing / sector-cap quirk worth eyeballing". Under an armed demotion an
-    inversion fires **systematically by design** (that is the mechanism), so the
-    flag stops being an anomaly signal for that arm.
-  - `trading/trading/weinstein/strategy/lib/weinstein_strategy_config.mli` L423
-    — "re-emitted in original screener order so audit ordering is preserved"
-    (the `short_sleeve_fraction` docstring); "original screener order" is the
-    post-demotion order when both mechanisms are armed.
+- [x] **Walk-order docstrings go stale when `Demote_over_max` is armed**
+  (residual R-a from PR #2352 qc-behavioral iteration 1) — DONE, branch
+  `docs/walk-order-docstrings`. Three docstrings asserted that the entry walk
+  funds candidates in screener score order, which stops being true once
+  `config.stop_width_mode = Demote_over_max` permutes the candidate list in
+  `Entry_walk._prepare_candidates` before the walk. All three were traced to
+  the code path and confirmed stale before rewriting; each now states the
+  configuration under which its ordering claim holds rather than hedging:
+  - `screen_record.mli` `funded` — was "in screener order (score-desc)"; now
+    names both producers (`of_audit_records` = walk emission order, screener
+    order except under `Demote_over_max` where it is post-demotion order;
+    `Weekly_adapter` = always score-desc, no entry walk).
+  - Same file, `inversion` — was "usually `false` … flags a sizing / sector-cap
+    quirk". Now: anomaly signal only under the `Drop_over_max` default; fires
+    systematically by design under an armed `Demote_over_max`; and the cause
+    enumeration points at `Trade_audit.skip_reason` (10 constructors) instead
+    of naming only sizing / sector caps.
+  - `weinstein_strategy_config.mli` `short_sleeve_fraction` — was "re-emitted
+    in original screener order"; `Entry_walk._sleeve_decisions` re-sorts by the
+    index into the list *handed to* the walk, i.e. post-demotion order when
+    that mode is armed. Reworded to "the order the candidates entered the walk".
 
-  Scope: docstring corrections only, no behaviour change. At the
-  `Drop_over_max` default all three claims remain exactly true, so this is only
-  load-bearing if `Demote_over_max` earns a ledger ACCEPT.
+  Completeness: swept the tree for other score/screener-ordering claims. The
+  snapshot-side ones (`weekly_snapshot.mli`, `report_shared.mli`,
+  `pick_diff.mli`, `weekly_snapshot_generator.mli`, `screener.mli`) are correct
+  as written — `entries_from_candidates` has exactly one production caller
+  (`weinstein_strategy_screening.ml`), so the demotion never reaches the
+  snapshot path. `entry_walk.ml`'s own "Order." paragraph was already corrected
+  by #2352. No fourth stale site. Docstrings only; no default changed, and
+  `weinstein_strategy_config.ml` has a zero-byte diff.
+
+  Found but not fixed (out of R-a scope, sibling agent owns the file this run):
+  `Trade_audit.alternatives_considered` is documented as "Top-N candidates from
+  the same screen call that were not entered", but
+  `Entry_audit_capture.alternatives_of_decisions` emits **every** `Skipped`
+  decision in the walk regardless of any top-N cut. Worth a follow-up on
+  `trade_audit.mli`.
 - **The demoted-wide cohort is not greppable from the trace** (residual R-c from
   PR #2352). Under `Demote_over_max` a wide-stop candidate that gets admitted
   behind the narrow ones records `"Pass"` with `sized_down_wide_stop = false` —

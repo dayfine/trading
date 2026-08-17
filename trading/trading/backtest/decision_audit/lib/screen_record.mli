@@ -61,8 +61,28 @@ type summary = {
   inversion : bool;
       (** [true] when some near-miss scored strictly higher than the lowest
           funded entry — i.e. a higher-scored name was skipped for a
-          lower-scored one. Usually [false] (funding walks score-desc); an
-          inversion flags a sizing / sector-cap quirk worth eyeballing. *)
+          lower-scored one.
+
+          It reads as an {e anomaly} signal only where funding walks score-desc,
+          which is the case under the default
+          [Weinstein_strategy_config.stop_width_mode = Drop_over_max]: there an
+          inversion is usually [false], and when it fires it means one of the
+          per-candidate gates took a better-scored name out of the walk. That
+          gate can be any [Backtest.Trade_audit.skip_reason] — cash, a sector or
+          notional cap, a quality floor, an over-wide stop, an already-held
+          symbol — so read [near_miss.reason_skipped] rather than assuming
+          sizing or a sector cap.
+
+          Under an armed [stop_width_mode = Demote_over_max] it is {b not} an
+          anomaly signal: that mode deliberately moves wide-stop candidates
+          behind narrow-stop ones, so funding a lower-scored name ahead of a
+          higher-scored one is the mechanism working as designed, and inversions
+          fire systematically on that arm.
+
+          On records built by {!Weekly_adapter} it also fires benignly whenever
+          a short candidate outscores the lowest displayed long, since that path
+          funds only the top-[displayed_k] longs and files every short as a
+          near-miss. *)
 }
 [@@deriving sexp]
 (** Per-screen roll-up counts + the inversion flag. *)
@@ -70,7 +90,16 @@ type summary = {
 type t = {
   screen_date : Date.t;  (** The Friday the screen ran (the entry date). *)
   funded : funded_entry list;
-      (** Entries taken this screen, in screener order (score-desc). *)
+      (** Entries taken this screen, in the order they were funded.
+
+          From {!of_audit_records} that is the entry walk's emission order:
+          screener order (score-desc) under every
+          [Weinstein_strategy_config.stop_width_mode] except
+          [Demote_over_max], which stably partitions the candidate list
+          narrow-stop-first {e before} the walk, so on that arm [funded] reads
+          in post-demotion order. From {!Weekly_adapter} it is always score-desc
+          — that path ranks the screener's candidate list directly and runs no
+          entry walk. *)
   near_misses : near_miss list;
       (** Union of [alternatives_considered] across this screen's entries,
           deduplicated by symbol (first occurrence wins), sorted score-desc. *)
