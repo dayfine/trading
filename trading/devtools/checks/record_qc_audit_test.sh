@@ -2559,6 +2559,166 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 40 — H-AUDIT-REWORK-COUNT-COMPOSITION-UNPINNED: carries the
+# H-AUDIT-SHA-FILE-LEAK guard (scenario 39) forward through write_audit.sh's
+# consecutive_rework_count composition, instead of stopping at the "sha"
+# field. Scenario 39 proves a single PR-mode call with no "Reviewed SHA:"
+# line in $BODIES does not leak a companion dev/reviews/ file's foreign sha.
+# It never checks what that empty sha then does to the streak. This scenario
+# runs THREE consecutive PR-mode NEEDS_REWORK calls (same feature, branch,
+# date), each with no "Reviewed SHA:" line and the same companion
+# dev/reviews/<feature>.md present, and asserts the resulting
+# consecutive_rework_count end to end.
+#
+# The honest expectation is NOT that the streak reaches 3. An empty --sha on
+# both sides of write_audit.sh's identity check (the docstring's "identity
+# key" paragraph, ~write_audit.sh's "The optional --sha ... is the identity
+# key" comment) falls into the documented degrade-to-overwrite path SAME-DATE:
+# OUTPUT_FILE is "${DATE}-${BRANCH_SAFE}-${FEATURE}.json", so all three calls
+# in this scenario (same DATE40) compute the SAME $OUTPUT_FILE, no
+# preserved-aside copy is ever made (mirrors scenario 7f, which pins this for
+# a direct write_audit.sh caller), and the consecutive_rework_count scan
+# explicitly excludes the file it is about to overwrite ("Skip the file we
+# are about to write" in write_audit.sh) -- so each call's immediate
+# predecessor is invisible to the scan by construction. The correct, pinned
+# result is that the streak stays at 1 on every one of the three calls, even
+# though all three really are consecutive NEEDS_REWORK reviews of the same
+# branch. This is H-AUDIT-REWORK-COUNT-BLIND's pre-existing empty-SHA gap
+# (H-AUDIT-REWORK-COUNT-BLIND's own docstring, "a deliberate, documented
+# gap rather than a guess"), now pinned at the consumer field
+# (consecutive_rework_count) instead of only at the producer field (sha).
+#
+# Scope: this cap is a property of same (date, branch, feature) -- because
+# OUTPUT_FILE embeds DATE, a different DATE produces a different
+# $OUTPUT_FILE and the same three calls spread across successive days DO
+# accumulate (1 -> 2 -> 3 -> 4), which is exactly what lets #2339's `>= 3`
+# escalation fire on the third consecutive day. This scenario pins only the
+# same-day cell; the cross-day accumulation is pinned separately below
+# (scenario 41).
+# ---------------------------------------------------------------------------
+FEATURE40="rework-count-composition-no-sha"
+BRANCH40="feat/composition-no-sha"
+DATE40="2026-08-17"
+
+# Companion file-mode review file, left over from an unrelated run, holding
+# a deliberately foreign sha + a NEEDS_REWORK verdict of its own. Present
+# throughout all three calls below. Must never be consulted for sha (PR mode,
+# per H-AUDIT-SHA-FILE-LEAK) or for verdicts (PR mode always resolves
+# structural_qc for real, per the FILE_MODE guard).
+cat > "${TMP_REPO}/dev/reviews/${FEATURE40}.md" <<'EOF'
+Reviewed SHA: FOREIGNSHA40
+
+## Verdict
+APPROVED
+
+## Quality Score
+5 — this file belongs to a different run and must NOT be used
+EOF
+
+_scenario40_call() {
+  # $1 = subdirectory name, $2 = PR number
+  local dir="${TMP_REPO}/$1" pr="$2"
+  mkdir -p "${dir}"
+  cat > "${dir}/reviews.txt" <<EOF
+STATE:CHANGES_REQUESTED
+
+## Structural QC — ${FEATURE40}
+
+## Verdict
+NEEDS_REWORK
+EOF
+  echo "ENDBODY" >> "${dir}/reviews.txt"
+  make_gh_mock "${dir}" "${dir}/reviews.txt"
+  REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${dir}/gh" \
+    bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+    "${FEATURE40}" "${BRANCH40}" "${DATE40}" --pr-number "${pr}" 2>&1
+}
+
+out40_1=$(_scenario40_call "s40a" 3009) && rc40_1=0 || rc40_1=$?
+out40_2=$(_scenario40_call "s40b" 3010) && rc40_2=0 || rc40_2=$?
+out40_3=$(_scenario40_call "s40c" 3011) && rc40_3=0 || rc40_3=$?
+
+JSON40="${TMP_REPO}/dev/audit/${DATE40}-feat-composition-no-sha-${FEATURE40}.json"
+audit_count_40="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "${DATE40}-*-${FEATURE40}.json" | wc -l | tr -d ' ')"
+
+if (( rc40_1 == 0 )) && (( rc40_2 == 0 )) && (( rc40_3 == 0 )) \
+   && [[ -f "${JSON40}" ]] \
+   && [[ "${audit_count_40}" == "1" ]] \
+   && grep -q '"sha": *""' "${JSON40}" \
+   && grep -q '"overall_qc": *"NEEDS_REWORK"' "${JSON40}" \
+   && grep -q '"consecutive_rework_count": *1,' "${JSON40}" \
+   && echo "${out40_3}" | grep -q 'consecutive_rework_count=1'; then
+  pass "scenario 40 — 3 consecutive PR-mode NEEDS_REWORK calls with no Reviewed SHA line: sha stays empty AND consecutive_rework_count stays 1 (not 3) end to end, no preserved-aside file (H-AUDIT-REWORK-COUNT-COMPOSITION-UNPINNED, empty-sha degrade-to-overwrite path)"
+else
+  fail "scenario 40 — expected rc=0/0/0 + exactly 1 audit file + sha \"\" + overall NEEDS_REWORK + consecutive_rework_count=1; got rc=${rc40_1}/${rc40_2}/${rc40_3}, audit_count=${audit_count_40}"
+  echo "${out40_1}" | sed 's/^/      /'
+  echo "${out40_2}" | sed 's/^/      /'
+  echo "${out40_3}" | sed 's/^/      /'
+  [[ -f "${JSON40}" ]] && echo "      json: $(cat "${JSON40}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 41 — H-AUDIT-REWORK-COUNT-COMPOSITION-UNPINNED (cross-date half):
+# mechanically pins the other half of scenario 40's scope note. Scenario 40
+# pins that the empty-sha degrade-to-overwrite cap holds WITHIN a single
+# date. This scenario pins that the cap does NOT hold ACROSS dates for the
+# same branch+feature -- because OUTPUT_FILE embeds DATE
+# ("${DATE}-${BRANCH_SAFE}-${FEATURE}.json"), two calls on two different
+# dates produce two distinct files, both visible to the
+# consecutive_rework_count scan (which globs "*-${FEATURE}.json" across all
+# dates, not just the current one -- see write_audit.sh's "Look at prior
+# audit records for this feature" scan). Two consecutive PR-mode
+# NEEDS_REWORK calls on successive dates, same branch, no Reviewed SHA line,
+# must therefore accumulate 1 -> 2, not stay pinned at 1. This is the
+# reachable half of #2339's `>= 3` escalation through the empty-sha path
+# (H-REWORK-STREAK-ESCALATION-UNTESTED): it fires on the third consecutive
+# DAY, not the third consecutive call within a day.
+# ---------------------------------------------------------------------------
+FEATURE41="rework-count-composition-cross-date"
+BRANCH41="feat/composition-cross-date"
+DATE41A="2026-08-17"
+DATE41B="2026-08-18"
+
+_scenario41_call() {
+  # $1 = subdirectory name, $2 = PR number, $3 = date
+  local dir="${TMP_REPO}/$1" pr="$2" date="$3"
+  mkdir -p "${dir}"
+  cat > "${dir}/reviews.txt" <<EOF
+STATE:CHANGES_REQUESTED
+
+## Structural QC — ${FEATURE41}
+
+## Verdict
+NEEDS_REWORK
+EOF
+  echo "ENDBODY" >> "${dir}/reviews.txt"
+  make_gh_mock "${dir}" "${dir}/reviews.txt"
+  REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${dir}/gh" \
+    bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+    "${FEATURE41}" "${BRANCH41}" "${date}" --pr-number "${pr}" 2>&1
+}
+
+out41_1=$(_scenario41_call "s41a" 3012 "${DATE41A}") && rc41_1=0 || rc41_1=$?
+out41_2=$(_scenario41_call "s41b" 3013 "${DATE41B}") && rc41_2=0 || rc41_2=$?
+
+JSON41A="${TMP_REPO}/dev/audit/${DATE41A}-feat-composition-cross-date-${FEATURE41}.json"
+JSON41B="${TMP_REPO}/dev/audit/${DATE41B}-feat-composition-cross-date-${FEATURE41}.json"
+
+if (( rc41_1 == 0 )) && (( rc41_2 == 0 )) \
+   && [[ -f "${JSON41A}" ]] && [[ -f "${JSON41B}" ]] \
+   && grep -q '"consecutive_rework_count": *1,' "${JSON41A}" \
+   && grep -q '"consecutive_rework_count": *2,' "${JSON41B}" \
+   && echo "${out41_2}" | grep -q 'consecutive_rework_count=2'; then
+  pass "scenario 41 — 2 consecutive PR-mode NEEDS_REWORK calls on successive dates, same branch, no Reviewed SHA line: consecutive_rework_count ACCUMULATES 1 -> 2 across dates (H-AUDIT-REWORK-COUNT-COMPOSITION-UNPINNED, cross-date half)"
+else
+  fail "scenario 41 — expected rc=0/0 + day A consecutive_rework_count=1 + day B consecutive_rework_count=2; got rc=${rc41_1}/${rc41_2}"
+  echo "${out41_1}" | sed 's/^/      /'
+  echo "${out41_2}" | sed 's/^/      /'
+  [[ -f "${JSON41A}" ]] && echo "      json A: $(cat "${JSON41A}")"
+  [[ -f "${JSON41B}" ]] && echo "      json B: $(cat "${JSON41B}")"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
