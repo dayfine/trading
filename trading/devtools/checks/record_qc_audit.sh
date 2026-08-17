@@ -338,9 +338,12 @@ fi
 # overall_qc anywhere-scan immediately following, (2) the STRUCTURAL
 # ## Verdict block parser, (3) the BEHAVIORAL ## Verdict block parser, (4) the
 # file-mode quality-score extractor further down, and (5) the "Reviewed SHA"
-# extractor further down (:506-507). A successful PR-mode run already fully
-# resolves those five fields from real PR review bodies; touching REVIEW_FILE
-# at all in that case risks silently overriding a correct PR-mode verdict
+# extractor's FILE_MODE-gated REVIEW_FILE fallback, in the "Extract reviewed
+# SHA" block further down (search for that heading -- not a line number,
+# which drifts every time this comment block itself is edited). A successful
+# PR-mode run already fully resolves those five fields from real PR review
+# bodies; touching REVIEW_FILE at all in that case risks silently
+# overriding a correct PR-mode verdict
 # with a stale/unrelated file's content -- the same danger class the
 # missing-binary and gh-failure guards above exist to prevent, just reached
 # through the OVERALL field specifically. Found via
@@ -349,8 +352,10 @@ fi
 # otherwise-correctly-resolved PR-mode record because the scan below used to
 # run unconditionally.
 #
-# The "Reviewed SHA" extractor (:506-507) was itself the last ungated site
-# until H-AUDIT-SHA-FILE-LEAK (dev/status/harness.md): it used to read
+# The "Reviewed SHA" extractor's REVIEW_FILE fallback (the "Extract
+# reviewed SHA" block further down -- see the FILE_MODE guard immediately
+# preceding its REVIEW_FILE read) was itself the last ungated site until
+# H-AUDIT-SHA-FILE-LEAK (dev/status/harness.md): it used to read
 # REVIEW_FILE unconditionally whenever BODIES yielded no "Reviewed SHA:"
 # line, including in PR mode, letting a companion dev/reviews file leak a
 # foreign SHA into an otherwise-correct PR-mode record. It is now gated like
