@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-17",
+  "feature": "simulation",
+  "branch": "fix/ttl-split-review-notes",
+  "sha": "8793a4be18f29ca4399341f4d13aed840f1c7974",
+  "recorded_at_ns": 1786953952983334249,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "PR #2355; 40-spec migration semantics verified; merged 41f982ca"
+}

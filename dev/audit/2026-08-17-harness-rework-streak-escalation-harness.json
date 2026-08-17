@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-17",
+  "feature": "harness",
+  "branch": "harness/rework-streak-escalation",
+  "sha": "72de5c629d67b36b1533d47f6014721baa864cfe",
+  "recorded_at_ns": 1786953952950442092,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "PR #2339; 7 mutants applied, 7 killed; merged ab7604f2"
+}

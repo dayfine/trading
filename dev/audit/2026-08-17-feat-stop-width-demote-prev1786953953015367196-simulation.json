@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-17",
+  "feature": "simulation",
+  "branch": "feat/stop-width-demote",
+  "sha": "d56a571b2f4e0fed654b66257a3dd21028c6c4a0",
+  "recorded_at_ns": 1786953953015367196,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": 2,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": "PR #2352; BR1 PR-body stale, BR2 untested guard; rework 1/2 dispatched"
+}
