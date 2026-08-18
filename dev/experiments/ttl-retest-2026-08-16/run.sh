@@ -1,16 +1,37 @@
 #!/bin/sh
 # TTL re-test chain — defect D of dev/plans/entry-anchor-and-ttl-2026-08-15.md.
 #
-# FOUR runs, not the six specs in the directory. The clock arms are deferred,
-# for a quantified reason: joining cell 00's own filled tickets
-# (position_id -> ticket_age_weeks_at_fill -> pnl_dollars) puts every clock
-# value's GROSS effect at 8-30pp against a 132.5pp null, i.e. 4-13x below the
-# noise floor. A single-salt clock arm cannot come back with an interpretable
-# number in either direction. See the README for the per-bucket table.
+# FOUR runs, not the six specs in the directory. The clock arms are DEFERRED
+# pending a within-run cohort metric -- NOT retired, and NOT because they were
+# measured and found dead. Two separate things:
 #
-# What runs instead:
+#   - On the TOP LINE, a single-salt clock arm is not resolvable on this base.
+#     The between-run null here is 132.5pp (cell 00's own three salts,
+#     265.44 / 281.71 / 397.95) and a clock removes a small minority of fills
+#     (147 of 1,147 even at the widest tested cut), so the top-line effect sits
+#     far below the noise floor. That conclusion survives; sibling PR #2371
+#     states it independently. What does NOT survive is the specific 8-30pp
+#     gross-effect table this header used to quote -- it came from a rest-time
+#     table this directory has since WITHDRAWN, and it is deliberately not
+#     restated here. Do not reintroduce those figures.
+#
+#   - On the WITHIN-RUN metric -- per-bucket realized P&L on the arm's own
+#     trades -- the clock IS resolvable, because that is within-run accounting
+#     rather than a difference between two runs, so the 132.5pp between-run
+#     null does not bound it. On the position_id-keyed measurement of arm 00
+#     every candidate bound cuts a NET-LOSING cohort, 26 weeks the largest
+#     (89 fills, -349,132). So the clock arms are worth running, and 03-ttl26
+#     is the one to run FIRST -- on that metric, on a later budget, not on
+#     this chain's top line. See the README for both tables.
+#
+# This chain runs 4 arms because it was already launched and the re-screen is
+# the question three salts can genuinely answer -- not because the clock axis
+# was refuted.
+#
+# What runs:
 #   00-null          rescreen=false clock=0   salt 0     determinism tripwire
-#   01-rescreen-only rescreen=true  clock=0   salts 0,1,2  the one resolvable question
+#   01-rescreen-only rescreen=true  clock=0   salts 0,1,2  the question THIS budget
+#                                                          can answer on the top line
 #
 # The re-screen cancels on stage/sector/macro flips rather than elapsed time, so
 # its population is NOT bounded by the rest-time table and its effect is genuinely
