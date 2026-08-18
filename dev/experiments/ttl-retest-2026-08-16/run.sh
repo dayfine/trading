@@ -30,6 +30,16 @@
 #    paths out from under a running chain -- it killed two chains on 08-15);
 #  - skips any arm that already has a RESULT line, so a restart is cheap;
 #  - refuses to start an arm without memory + disk headroom.
+#  - WORK is under /tmp/sweeps/ (container-side, bind-mounted to host) per
+#    sweep-hygiene.md: every $WORK read/write happens inside `docker exec`,
+#    so an un-mounted /tmp path would land on the Docker writable layer --
+#    the exact failure class (Docker.raw runaway growth, host ENOSPC) that
+#    rule was written after. LOG_HOST deliberately stays plain /tmp: it is
+#    written and read only on the HOST side (outside docker exec), so it was
+#    never on the writable layer, and it doubles as the resume predicate
+#    (`grep RESULT "$LOG_HOST"`) and the documented log read path -- moving
+#    it would silently blank a running chain's resume state. Do not "fix"
+#    LOG_HOST for consistency with WORK; they are different-side variables.
 C=trading-1-dev
 REPO=/Users/difan/Projects/trading-1
 WT=/workspaces/trading-1/.claude/worktrees/sweep-ttl-retest
@@ -37,7 +47,7 @@ ROOT=$WT/trading
 HOST_WT="$REPO/.claude/worktrees/sweep-ttl-retest"
 SPECS_HOST=/tmp/ttl-retest-specs
 FIX=$ROOT/test_data/backtest_scenarios
-WORK=/tmp/ttl-retest
+WORK=/tmp/sweeps/ttl-retest
 LOG_HOST=/tmp/ttl-retest-chain.log
 SNAP=/tmp/snap_top3000_dedup_v5thin_adj
 
@@ -61,6 +71,11 @@ require_disk() {
   [ "${free_gb:-0}" -ge 20 ] || { log "ABORT ($1): ${free_gb}GB disk free, need 20"; exit 1; }
 }
 
+# Migration note: WORK moved from /tmp/ttl-retest to /tmp/sweeps/ttl-retest
+# (rework of #2368). Any arm already completed under the old path has its
+# RESULT line in $LOG_HOST (so it is still correctly skipped below) but its
+# per-arm log/output ($WORK/$tag.log, $d) is at the OLD path, not under this
+# WORK -- no code moves those artifacts, this is just stating the fact.
 touch "$LOG_HOST"
 docker exec $C mkdir -p $WORK
 
