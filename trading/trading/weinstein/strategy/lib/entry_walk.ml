@@ -130,6 +130,33 @@ let _prepare_candidates ~config ~pending_entry_e ~held_set ~bar_reader
   |> Entry_stop_width_order.prefer_narrow_stops ~config ~bar_reader
        ~current_date
 
+(* G3: cost the book has already committed to tickets that are still resting.
+
+   Only the UNFILLED remainder counts — a partial fill already drew its own cash
+   out of [portfolio.cash], so charging [target_quantity] would double-count it.
+   Longs only: an entering short credits cash on fill, so reserving against one
+   would shrink the budget for a claim that pays in. *)
+let _resting_long_ticket_cost (portfolio : Portfolio_view.t) =
+  Map.fold portfolio.positions ~init:0.0 ~f:(fun ~key:_ ~data:pos acc ->
+      match (pos.Position.state, pos.Position.side) with
+      | ( Position.Entering { target_quantity; entry_price; filled_quantity; _ },
+          Trading_base.Types.Long ) ->
+          acc +. ((target_quantity -. filled_quantity) *. entry_price)
+      | _ -> acc)
+
+(* Cash the walk may commit this tick.
+
+   The default is [portfolio.cash] verbatim. Under G3 the resting tickets'
+   unfilled cost is held back, because the per-tick [remaining_cash] discipline
+   in {!Entry_audit_capture.check_cash_and_deduct} is re-seeded every tick and
+   so cannot see that last week's tickets have already claimed this week's cash.
+   Floored at 0: over-commitment from before the flag was armed must not produce
+   a negative budget. *)
+let _spendable_cash ~config (portfolio : Portfolio_view.t) =
+  if config.reserve_cash_for_resting_tickets then
+    Float.max 0.0 (portfolio.cash -. _resting_long_ticket_cost portfolio)
+  else portfolio.cash
+
 (** Generate CreateEntering transitions for screener candidates. Tracks
     remaining cash to avoid generating orders that exceed funds.
 
@@ -164,7 +191,7 @@ let entries_from_candidates ?sector_lookup
     _make_entry_fn ~config ~bar_reader ~current_date ~stop_states
       ~portfolio_value
   in
-  let spendable = portfolio.Portfolio_view.cash in
+  let spendable = _spendable_cash ~config portfolio in
   let state =
     Screening_notional.make_entry_walk_state ~cash:spendable ~config ~portfolio
       ~portfolio_value ~sector_lookup

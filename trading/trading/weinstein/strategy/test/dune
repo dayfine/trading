@@ -15,6 +15,7 @@
   test_force_liquidation_strategy
   test_macro_inputs
   test_panel_callbacks
+  test_reserve_resting_ticket_cash
   test_resistance_sketch_reader
   test_weekly_sidetable_reader
   test_pi_filter_wiring

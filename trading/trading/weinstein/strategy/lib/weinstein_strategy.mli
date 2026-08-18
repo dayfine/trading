@@ -888,6 +888,12 @@ type config = {
           used to arm both. See
           [Weinstein_strategy_config.entry_order_max_rest_weeks] and
           {!Entry_ticket_ttl}. *)
+  reserve_cash_for_resting_tickets : bool; [@sexp.default false]
+      (** G3: hold back the unfilled cost of still-resting entry tickets from
+          the cash the entry walk may commit this tick. [false] (default) leaves
+          [spendable] at [portfolio.cash], bit-identical to prior behaviour. See
+          [Weinstein_strategy_config.reserve_cash_for_resting_tickets] for the
+          leak it closes and the measured cohort that motivates it. *)
   stop_width_mode : Stop_width_mode.t;
       [@sexp.default Stop_width_mode.Drop_over_max]
       (** F3 wide-stop admission policy (plan
