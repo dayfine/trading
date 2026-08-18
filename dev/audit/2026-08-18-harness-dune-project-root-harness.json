@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-18",
+  "feature": "harness",
+  "branch": "harness/dune-project-root",
+  "sha": "ee60f0b2ecf8cf4f1a9b239d67a1b797538bcbc2",
+  "recorded_at_ns": 1787041878491942974,
+  "structural_qc": "SKIPPED",
+  "behavioral_qc": "SKIPPED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": null,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "PR #2373 -> a5d5c48f. Docs-only (dev/status/harness.md only) => both QC gates skipped per .claude/rules/pr-merge-gates.md; CI-only gate, verified green on the exact tip before merge. Records a NEGATIVE result: H-RUNENV-DUNE-PROJECT-WARNING stays open because adding trading/dune-project silently unsandboxes 45 runtest rule invocations (reproduced 3x), which would remove the hermeticity backstop H-CHECK-CACHE-BLIND et al were built for. Agent bailed out correctly rather than forcing a green."
+}

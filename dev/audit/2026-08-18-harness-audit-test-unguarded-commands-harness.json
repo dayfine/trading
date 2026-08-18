@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-18",
+  "feature": "harness",
+  "branch": "harness/audit-test-unguarded-commands",
+  "sha": "cbaa633a0966aeed75d23305abb19f1ab279b6f8",
+  "recorded_at_ns": 1787041878458661068,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "PR #2372 -> 973d9282. Closes F2/F3 from #2221 (unguarded commands under set -euo pipefail in record_qc_audit_test.sh). Backlog count was stale: 20 recorded, 42 actual; author re-derived and used its own number, structural confirmed independently. Behavioral filed R1 non-blocking: the guard is UNPINNED (replacing the helper body with a bare pipeline leaves the suite 59/0), and a pin in the obvious call-site shape would not pin it -- only a direct non-command-substitution invocation does. R2/R3 doc-precision nits."
+}

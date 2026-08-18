@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-18",
+  "feature": "experiments",
+  "branch": "docs/cohort-measurements-0818",
+  "sha": "941a3502f42cc18668bebdb9522a85d1542530a5",
+  "recorded_at_ns": 1787042191460125228,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "PR #2371 -> 6c3485c4. Cycle: structural APPROVED(4) -> behavioral NEEDS_REWORK(2) on B1/B2/B3+CP2 -> rework 1/2 -> structural APPROVED(5) -> behavioral APPROVED(4). rework_iterations=1 of 2 (second unused). Highest-consequence finding B1: README asserted cell 00 runs 'after both fixes'; 1ebc3731 (#2348) is NOT an ancestor of 59b26c3b (#2349), it lands 14 min later -- so cell 00 cannot decompose the placed-ticket population, and the 08-18 priorities doc sends the next session there first. B2: 'mis-join artifact' diagnosis withdrawn to 'not reproducible' per mechanism-validation-rigor. B3: 2 hardcoded trades.csv column indices now header-resolved per trades_csv_schema.mli. Residual R1: README:310 'these figures bound the effect' contradicts #2368's corrected text; non-blocking, two-word fix, filed."
+}
