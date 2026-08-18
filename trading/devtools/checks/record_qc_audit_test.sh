@@ -1440,7 +1440,17 @@ mode24="$(_file_mode_octal "${JSON24}" 2>/dev/null || echo 'UNKNOWN')"
 # not removed) so a docstring merely DESCRIBING the pattern (e.g. this very
 # file's own comment explaining what a bad chmod placement would look like)
 # can never be mistaken for the executable statement itself.
-CODE_ONLY_24="$(sed -E 's/^[[:space:]]*#.*$//' "${WRITE_AUDIT}")"
+# `|| true` here (H-AUDIT-TEST-SUT-READ-UNGUARDED) is defence-in-depth: the
+# suite copies write_audit.sh into $TMP_REPO during setup and fails fast if
+# that copy is absent, so $WRITE_AUDIT is expected to always be readable by
+# this point -- but if it were ever missing or unreadable, `sed` would exit
+# non-zero and, under `set -euo pipefail`, abort the whole run right here
+# instead of reporting scenario 24 as a clean FAIL. The `[[ -n ... ]]` guard
+# on CODE_ONLY_24 below (mirroring the existing CHMOD_TMP_LINE_24 guard)
+# makes that failure mode explicit at the read site itself, rather than
+# relying solely on the downstream empty-match cascade through
+# CHMOD_TMP_LINE_24/MV_LINE_24 to fail closed.
+CODE_ONLY_24="$(sed -E 's/^[[:space:]]*#.*$//' "${WRITE_AUDIT}" 2>/dev/null)" || true
 # `|| true` on each is load-bearing under `set -euo pipefail` (mirrors the
 # established pattern in write_audit.sh's own recorded_at_ns/overall_qc
 # extractions): when a mutation genuinely removes/relocates the pattern
@@ -1458,7 +1468,8 @@ OUTPUT_CHMOD_COUNT_24="$(printf '%s\n' "${CODE_ONLY_24}" | grep -c 'chmod [0-9]*
 [ -z "${OUTPUT_CHMOD_COUNT_24}" ] && OUTPUT_CHMOD_COUNT_24=0
 
 source_order_ok=0
-if [[ -n "${CHMOD_TMP_LINE_24}" ]] && [[ -n "${MV_LINE_24}" ]] \
+if [[ -n "${CODE_ONLY_24}" ]] \
+   && [[ -n "${CHMOD_TMP_LINE_24}" ]] && [[ -n "${MV_LINE_24}" ]] \
    && (( CHMOD_TMP_LINE_24 < MV_LINE_24 )) \
    && (( OUTPUT_CHMOD_COUNT_24 == 0 )); then
   source_order_ok=1
