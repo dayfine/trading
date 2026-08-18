@@ -33,13 +33,40 @@ was worth checking against the base the re-test actually runs. Cell 00's own
 136 trades at 11,740 each — and a 4-week clock cuts it entirely. The `{13, 26,
 52}` axis is right.
 
-**Refuted:** defect **E**'s premise. On cell 13 the >3yr population was 20
-trades, 13 losers, −154,006 and "upside-free"; on cell 00 it is **25 trades,
-+304,101, the second-highest per-trade bucket in the run**. The loss-maker here
-is the **1-3yr** bucket (−220,314), not the >3yr one. So "unbounded is genuinely
-wrong at the extreme" is a cell-13 fact, not a general one, and a 156-week bound
-would cut a *profitable* population on this base. That is exactly why
-`entry_order_max_rest_weeks` shipped defaulting to `0` rather than to 156.
+**~~Refuted:~~ WITHDRAWN 2026-08-18 — the per-bucket P&L above is a mis-join.**
+
+The table was built over a **pre-#2317 artifact**, whose
+`ticket_age_weeks_at_fill` can only read 0 or 1 (the 7-day date-proximity
+reach-back), so its ages must have come from a symbol/date match instead — which
+mis-pairs whenever one symbol carries more than one ticket.
+
+Re-measured on `ttl-retest-00-null`, the same config on the same base but a
+**post-#2317 tree**, joined on `position_id` (1,147 of 1,147 round trips
+joined, max fill age 865 weeks):
+
+| bucket | n here | P&L here | n above | P&L above |
+|---|---:|---:|---:|---:|
+| ≤1wk | 698 | +1,710,291 | 696 | +679,738 |
+| 2–4wk | 166 | −149,906 | 167 | −201,330 |
+| 5–13wk | 136 | +1,021,434 | 136 | +1,596,587 |
+| 14–26wk | 58 | +82,266 | 58 | +3,254 |
+| 27–52wk | 29 | −148,226 | 29 | +11,622 |
+| 1–3yr | 35 | +16,612 | 35 | −220,314 |
+| **>3yr** | 25 | **−217,518** | 25 | **+304,101** |
+
+The **counts match bucket for bucket** while the P&L is redistributed — the
+signature of a join that finds the right tickets and attaches the wrong money to
+them. Only the keyed column can be trusted.
+
+So defect **E**'s premise is **not** refuted: the >3yr population is
+money-losing here too (−217,518 on 25 trades, −8,701 each, 28% winners), with
+the worst a ticket that rested **380 weeks** to lose 39,827 and the longest
+resting **865 weeks — 16.6 years**. The 1–3yr bucket, named above as the real
+loss-maker, is in fact mildly positive (+16,612).
+
+`entry_order_max_rest_weeks` still shipping at `0` remains correct — a default
+must be the pre-existing no-op regardless (`experiment-flag-discipline.md` R1) —
+but the *reason* recorded here for preferring 0 over 156 does not hold.
 
 ## Why four of the six arms were dropped
 
@@ -59,6 +86,33 @@ interpretable number in either direction — and neither could four of them. (Gr
 attribution is also not the counterfactual: cancelling a ticket frees capital for
 something else, so these are upper bounds on the magnitude, which only makes the
 point stronger.)
+
+### ⚠ This section's arithmetic inherits the mis-join — corrected 2026-08-18
+
+The four gross-effect figures come from the withdrawn table, so they are wrong
+too. Recomputed on the keyed join (arm 00, `position_id`, max fill age 865wk):
+
+| clock | fills cut | realized P&L of the cut cohort | direction if removed |
+|---|---:|---:|---|
+| 13w | 147 | −266,866 | **+11.5%** of realized |
+| **26w** | 89 | **−349,132** | **+15.1%** of realized |
+| 52w | 60 | −200,906 | **+8.7%** of realized |
+| 156w | 25 | −217,518 | **+9.4%** of realized |
+
+Every bound removes a **net-losing** cohort, and the largest is 26 weeks, not
+156. More importantly the *framing* above is wrong: this is **within-run
+accounting of the arm's own trades**, not a difference between two runs, so the
+132.5pp between-run null does not bound it. The null argument that retired four
+arms does not apply to the metric that can actually resolve them — which is the
+metric this README itself named as the one that would ("what would resolve them
+is a **different metric** — per-bucket realized P&L on the arm's own trades").
+
+**What stands:** narrowing *this* chain to 4 arms is still right, because the
+chain was already launched and the re-screen question is genuinely the one it can
+answer with three salts. **What does not:** "the clock axis cannot return an
+interpretable number." It can, on this metric, and it should get a run.
+Still gross, not net — cancelling a resting ticket frees capital the walk
+redeploys, and that replacement's P&L is unmeasured.
 
 The **re-screen** is different. It cancels on stage / sector / macro flips rather
 than on elapsed time, so its population is not bounded by the rest-time table and
@@ -97,14 +151,23 @@ is a standing item) or a metric with a tighter noise floor than total return —
 per-bucket realized P&L on the arm's own trades would resolve a 10pp effect that
 the top line cannot.
 
+**That metric now exists and has been run** (2026-08-18):
+`dev/experiments/ticket-funding-cohort-2026-08-18/rest_time_pnl.sh`, which joins
+on `position_id` and refuses any pre-#2317 artifact. On arm 00 it says every
+clock bound removes a net-losing cohort, 26 weeks largest. The clock arms are
+therefore **worth running**, and `03-ttl26` is the one to run first — the
+opposite priority to what the (mis-joined) table above implied.
+
 Also missing by construction, and worth adding whenever they do run: the
 composite **`(rescreen = true, clock = 156)`**. `weinstein_strategy_config.mli`
 names ~156 weeks as the candidate value that "earns the default only through the
 defect-D re-test", and the candidate is the composite — so as originally
 specified this re-test could not have earned 156 its default even in principle.
-Given the table above, the more interesting composite may be
-`(true, 52)`, which cuts the −220,314 1-3yr bucket while keeping the +304,101
-tail.
+Given the **corrected** table, the ranking flips: `(true, 26)` is the
+composite to run — 26 weeks cuts the largest net-losing cohort (89 fills,
+−349,132) — and `(true, 156)` is now defensible on its own evidence rather than
+being the bound that "cuts a profitable population". The `(true, 52)` suggestion
+was reasoning off the mis-joined 1-3yr / >3yr figures and should be ignored.
 
 ## Running
 
