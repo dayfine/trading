@@ -4,13 +4,15 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-17 run 2 (orchestrator run 32030003678; main
-`5250d4a7` -> `fe641831`). Opened with an empty track queue and refilled
-it: merged #2361 (run 1's stranded summary), #2362/#2363/#2364/#2365 (3 gates
-each, 2 with a rework). Queue cleared again. Both harness PRs were rejected on
-behavioral for committing the defect class they were written to close.
-Full narrative: `dev/daily/2026-08-17-run2.md` (run 1:
-`dev/daily/2026-08-17.md`).
+Last updated: 2026-08-18 (orchestrator run 32111680652; main `7ce138b9` ->
+`a994b7bc`). Opened with two unreviewed local-session PRs and zero track PRs;
+merged four (#2371, #2368, #2372, #2373) with four rework iterations across
+two of them. #2368 and #2371 independently asserted the same unsupported
+causal claim about one measurement -- a defect invisible inside each PR and
+obvious across them; both withdrew it. #2371 also had cell 00 on the wrong
+side of #2348 by 14 minutes, which would have misdirected the next session's
+first action. Queue empty at exit.
+Full narrative: `dev/daily/2026-08-18.md`.
 
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
@@ -45,7 +47,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [cost-model](cost-model.md) | MERGED | — | — | — |
 | [data-panels](data-panels.md) | MERGED | — | — | — |
 | [hybrid-tier](hybrid-tier.md) | MERGED | — | — | — |
-| [trade-audit](trade-audit.md) | IN_PROGRESS | feat-backtest | — | R2+R4 MERGED #2365 `69bbd006` (cancel-reason closed list now pinned by reachable set); next: R1 type-level invariant, R5 census linter |
+| [trade-audit](trade-audit.md) | IN_PROGRESS | feat-backtest | — | #2371 `6c3485c4` + #2368 `a994b7bc` MERGED (cohort measured; mis-join claim withdrawn); next: retire `project_rest_time_pnl_is_cell_specific` (obligation now due) |
 | [decision-audit](decision-audit.md) | MERGED | feat-backtest | — | #1799/#1806/#1811 MERGED (report+counterfactual+weekly-picks adapter); selection FAITHFUL; live-picks pipeline ready (#1812); next: matured weekly counterfactual |
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
@@ -58,7 +60,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2362 `78a008fa` + #2363 `fe641831` MERGED (3 gates, 1 rework each); next: 4 items all edit `record_qc_audit_test.sh` — batch or serialise |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2372 `973d9282` (F2+F3 batched, 42 sites not 20) + #2373 `a5d5c48f` (dune-project bail-out) MERGED; next: R1 — the new `_glob_count` guard is unpinned |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 8 open; A-NOOP-BUDGET-ORPHAN new (5 records recovered); A-FASTEXIT-VACUOUS now has measured cost; six items share the `workflow`-token blocker |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | segmentation weight caveats MERGED #2324 `4f602d0d`; 5 open; top item `linter_coverage` is a HUMAN POLICY DECISION (header half already shipped), not agent work |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |

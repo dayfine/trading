@@ -80,6 +80,58 @@ NO
 
 ## Open work
 
+- [ ] **`ticket-funding-cohort-2026-08-18/README.md:310` says the gross figures
+      "bound" the effect — they do not.** Two-word fix, filed rather than
+      reworked because it is pre-existing, errs toward *under*-claiming, and
+      both affected documents give identical practical guidance. Found
+      2026-08-18 by qc-behavioral on PR #2371 (residual R1) as a **cross-PR
+      divergence**: #2368 (merged the same run) reworked in the opposite
+      direction and now strikes that exact claim — *"'upper bounds on the
+      magnitude' is false … the net effect can be larger in magnitude than the
+      gross … gross is not a bound at all"*. The reasoning is on #2368's side:
+      #2371 states the identical premise one clause earlier ("that
+      replacement's P&L is unmeasured") and then draws the opposite conclusion,
+      so it contradicts its own adjacent sentence. Fix shape: replace "bound"
+      with "indicate the scale of" (or equivalent) at `:310`, and check the
+      surrounding paragraph for the same word. Worth doing before anyone cites
+      that line as a bound in a sizing argument.
+      `harness_gap: NONE`. (source: 2026-08-18 qc-behavioral R1 on PR #2371)
+
+- [ ] **`ticket-funding-cohort-2026-08-18/README.md` disagrees with itself on
+      the keyed total: `:207` says **+2,314,952**, `:249` says **+2,314,953**.**
+      The buckets sum to **2,314,953**, and #2368 (`a994b7bc`) states 2,314,953
+      in all three places it arises, so `:207` is the typo. One digit, but it is
+      a denominator — every "% of realized" figure in that note divides by it,
+      and the two values are quoted in adjacent sections of the same file. Fix
+      `:207`. Found 2026-08-18 by qc-behavioral on **#2368** while adjudicating
+      cross-PR consistency, i.e. by a reviewer looking at the *other* PR — which
+      is the point about cross-PR review being worth more than either individual
+      pass. `harness_gap: NONE`. (source: 2026-08-18 qc-behavioral on PR #2368)
+
+- [ ] **Retire `dev/agent-memory/project_rest_time_pnl_is_cell_specific.md`.**
+      This is a **recorded in-tree obligation, not a suggestion**:
+      `dev/experiments/ttl-retest-2026-08-16/README.md:100` states that whichever
+      of #2368/#2371 lands second retires it. #2371 merged as `6c3485c4` and
+      #2368 as `a994b7bc`, so **#2368 was second and the obligation is now
+      live and unmet**. The memory's substantive content is superseded: it
+      records the earlier cell-00 rest-time figure as `position_id`-keyed, which
+      both PRs now cite only inside their withdrawal of the mis-join diagnosis.
+      Leaving it in the exported snapshot means the next session loads a memory
+      asserting a framing two merged PRs have retracted. Retire per
+      `.claude/rules/session-rampup.md` §"refresh the committed memory snapshot"
+      (add to the `STALE` list in `dev/scripts/export-memory.sh`, then re-run
+      it). Deliberately **not** done inside #2368: it was at rework iteration
+      2 of 2, and widening scope at the cap is how a PR fails to land at all.
+      `harness_gap: NONE`. (source: 2026-08-18 qc-behavioral residual 3 on PR #2368)
+
+- [ ] **`exit-trigger-recompute-2026-08-18.md:118–120` contradicts itself two
+      sentences apart** — says "no row here should be read as a share of the run
+      total", then reads one (32% of +2,314,952). Both figures are correct and
+      both denominators are named, so nothing is wrong numerically; the caution
+      was really about the *tabulated columns* and is worded as though it
+      covered the whole note. Reword the caution to name what it actually
+      scopes. `harness_gap: NONE`. (source: 2026-08-18 qc-behavioral R2 on PR #2371)
+
 - [ ] **Give `Trade_audit_ratings` the `position_id` join too.** After the
       2026-08-14 report-path fix (§ below) one `trade_audit.md` carries **two
       joins of different fidelity**: the per-trade table is exact (id join),
