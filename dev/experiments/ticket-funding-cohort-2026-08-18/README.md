@@ -148,7 +148,7 @@ first that could is a scenario run from a tree containing #2348 — i.e. at or
 after `1ebc3731`, which means a run on current `main`. That is the pending work
 item; do not re-analyse cell 00 for it.
 
-## Side effect — the rest-time table the TTL axis rests on is not reproducible
+## Side effect — the cell-13 rest-time table the TTL axis was chosen from is not reproducible
 
 `rest_time_pnl.sh` (added here) computes realized P&L by ticket rest time the
 only way that is sound: `position_id` → `ticket_age_weeks_at_fill` from the
@@ -163,20 +163,26 @@ re-test was chosen from a rest-time table over **cell 13's "942 joined trades"**
 round trips. A 942-row join over that artifact cannot have been keyed on
 `position_id`; it was keyed on dates, which is the join class #2317 replaced.
 
-That does not make the table wrong, but it does mean **no run currently on disk
-can reproduce it**, and the one internal cross-check available already
-disagrees: the `>3yr` bucket is −154,006 on cell 13 and +304,101 on cell 00
-(the 08-18 priorities note). A 20–25 trade bucket flipping sign between two arms
-of the same ladder is what an unverified join and a thin tail look like from the
-outside — indistinguishable without the keyed join.
+That does not make the cell-13 table wrong, but it does mean **no run currently
+on disk can reproduce the cell-13 table**, and the one internal cross-check
+available already disagrees: the `>3yr` bucket is −154,006 on cell 13 and
++304,101 on cell 00 (the 08-18 priorities note). A 20–25 trade bucket flipping
+sign between two arms of the same ladder is what an unverified join and a thin
+tail look like from the outside — indistinguishable without the keyed join.
+
+**This paragraph is about cell 13 only.** The `position_id`-coverage disproof
+above (404 of 953) is a statement about *cell 13's* `trades.csv`; it is not
+evidence about any other cell's, and nothing below extends it to one.
 
 Arm 00 of the chain is the first artifact `rest_time_pnl.sh` will accept. The
-axis re-derived from it is below — and it **reverses** the premise the earlier
-table supplied.
+axis re-derived from it is below — and it **disagrees** with the recorded cell-00
+table the earlier premise came from.
 
 ## The re-derived rest-time table (arm 00, keyed join, max fill age 865 weeks)
 
-1,147 of 1,147 round trips joined on `position_id`; total realized +2,314,952.
+1,147 of 1,147 round trips joined on `position_id`; total realized +2,314,952
+(the bucket rows below sum to +2,314,953 — a \$1 artifact of per-bucket
+rounding, not a missing trade).
 
 | bucket | n | share | P&L \$ | per trade | win% |
 |---|---:|---:|---:|---:|---:|
@@ -188,21 +194,69 @@ table supplied.
 | 1–3yr | 35 | 3.1% | +16,612 | +475 | 37% |
 | **>3yr** | 25 | 2.2% | **−217,518** | **−8,701** | 28% |
 
-**F1 — the 5–13 week profit band confirms.** 11.9% of fills carry 44% of
-realized P&L at +7,511/trade, the best per-trade bucket outside the two-trade
-`extension_stop` tail. `ttl4`'s 28-day cut still lands on its lower edge, so the
-`{13, 26, 52}` axis remains the right one.
+**F1 — the 5–13 week profit band confirms as to sign and rank, not magnitude.**
+11.9% of fills carry 44% of realized P&L at +7,511/trade, the best per-trade
+bucket outside the two-trade `extension_stop` tail. `ttl4`'s 28-day cut still
+lands on its lower edge, so the `{13, 26, 52}` axis remains the right one. What
+"confirms" means here is narrow: the recorded table (F2 below) puts the same
+bucket at +1,596,587 / +11,740 per trade, so the **magnitude moved −575,153**
+even as the rank held. Only the ordering is being confirmed.
 
-**F2 — the `>3yr` bucket is net-NEGATIVE here, reversing the recorded premise.**
-`dev/notes/next-session-priorities-2026-08-18.md` records this bucket as
-**+304,101 on 25 trades (+12,164/trade, "second-highest per-trade in the run")**
-and concludes that defect E's absurdity bound "would cut a *profitable*
-population on this base". Re-measured with the keyed join on a post-#2317 run:
-**the same 25 trades are −217,518 (−8,701/trade)**. Same n, opposite sign — the
-earlier figure is a mis-join artifact, which is what `rest_time_pnl.sh`'s
-refusal was designed to catch. Read individually the cohort is what defect E
-described: the worst is BLDP resting **380 weeks** for −39,827, the longest rest
-is **865 weeks (16.6 years)**, and only a handful are positive.
+**F2 — this table and the recorded cell-00 table disagree in every bucket, and
+the cause is not established.** `dev/notes/next-session-priorities-2026-08-18.md`
+and `dev/agent-memory/project_rest_time_pnl_is_cell_specific.md` record a cell-00
+rest-time table whose `>3yr` bucket is **+304,101 on 25 trades (+12,164/trade,
+"second-highest per-trade in the run")**, and conclude that defect E's absurdity
+bound "would cut a *profitable* population on this base". The keyed-join
+measurement above puts that bucket at **−217,518 (−8,701/trade) on 25 trades**.
+
+The divergence is not confined to that bucket. Against the recorded table, at
+near-identical per-bucket n:
+
+| bucket | recorded (n) | this run (n) | recorded P&L | this run P&L | Δ |
+|---|---:|---:|---:|---:|---:|
+| ≤1wk | 696 | 698 | +679,738 | +1,710,291 | **+1,030,553** |
+| 2–4wk | 167 | 166 | −201,330 | −149,906 | +51,424 |
+| 5–13wk | 136 | 136 | +1,596,587 | +1,021,434 | **−575,153** |
+| 14–26wk | 58 | 58 | +3,254 | +82,266 | +79,012 |
+| 27–52wk | 29 | 29 | +11,622 | −148,226 | −159,848 |
+| 1–3yr | 35 | 35 | −220,314 | +16,612 | +236,926 |
+| >3yr | 25 | 25 | +304,101 | −217,518 | **−521,619** |
+| **total** | **1,146** | **1,147** | **+2,173,658** | **+2,314,953** | **+141,295** |
+
+**What this establishes, and what it does not.** Every bucket moved and the run
+total moved; the two row counts differ (1,146 vs 1,147, and two tickets sit on
+opposite sides of the 1-week boundary), so these are **not the same set of
+trades** and "the same 25 trades" is not a claim this measurement supports for
+the `>3yr` row either. The honest statement is: **the recorded cell-00 table is
+not reproducible from any artifact now on disk, and a `position_id`-keyed
+measurement on the post-#2317 arm 00 disagrees with it across the whole table.**
+
+The *cause* is unestablished, and three candidates remain open, none of which
+this PR can distinguish without the artifacts:
+
+1. **Two different runs both labelled "cell 00."** The recorded table states
+   1,145 filled tickets (its own rows sum to 1,146); this one joins 1,147.
+2. **A reader difference on the `trades.csv` side.** Until the fix in this PR,
+   `rest_time_pnl.sh` addressed `position_id` by fixed index — a different
+   `trades.csv` vintage would have been read one column off. That hazard is now
+   removed going forward but cannot be retro-applied to the recorded figure.
+3. **A genuine data difference** between the two trees.
+
+Explicitly **not** established: that the earlier figure is a mis-join artifact.
+Its own record (`project_rest_time_pnl_is_cell_specific`) states it was joined
+`position_id` → `ticket_age_weeks_at_fill` → `pnl_dollars` — the *same* key this
+script uses — so the recorded provenance contradicts that diagnosis rather than
+supporting it. The `404 of 953` coverage disproof above is about **cell 13** and
+is not evidence about either cell-00 measurement. Per
+`.claude/rules/mechanism-validation-rigor.md` §"Verdict calibration", a
+disagreement between two measurements licenses *"not reproducible"*; it does not
+license a causal account of why.
+
+Read individually, this run's `>3yr` cohort is what defect E described: the
+worst is BLDP resting **380 weeks** for −39,827, the longest rest is **865 weeks
+(16.6 years)**, and only a handful are positive. That description is of *this*
+run's 25 trades and is not offered as a correction of the recorded 25.
 
 **F3 — every candidate clock cuts a net-losing cohort.** Gross effect of
 cancelling tickets that rested longer than each bound:
@@ -227,5 +281,6 @@ P&L.
 which the walk redeploys into some other candidate, and that replacement's P&L is
 unmeasured. These figures bound the effect, they do not predict it. It is also
 one salt on one base. The honest conclusion is *"the clock axis is worth running
-and #2368's deferral rested on a number that was wrong"* — not *"a 26-week clock
+and #2368's deferral rested on a number this run does not reproduce"* — not
+*"#2368's number was wrong"*, which F2 does not establish, and not *"a 26-week clock
 is worth +15%"*.
