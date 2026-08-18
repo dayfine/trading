@@ -74,13 +74,50 @@ structurally-anchored entries.** Essentially every candidate the 15% gate can
 reach carries a `Support_floor` stop, i.e. the stop placed the way the book
 places it. 167 of the 558 structural entries sit within one point of the gate, so
 the gate's edge is crowded: a small ceiling move re-admits or drops a large block
-at once, and everything it drops (`Stop_too_wide` — AXTI 21×) comes from the
-book-faithful population, never from the buffer population.
+at once.
+
+On the **dropped** side the evidence is weaker, and is stated as such. The 1,425
+tickets measured above are the gate's **survivors**; the `Stop_too_wide` cohort
+is a different, unmeasured set, and the only case traced end-to-end is AXTI
+(21× `Stop_too_wide`, `dev/notes/axti-entry-construction-from-raw-bars-2026-08-18.md`),
+whose stop is structural. So the supported claim is that what the gate drops
+should be **predominantly** book-faithful — by the arithmetic that a fast mover
+off a deep base has a structural stop far below its breakout — not that it is
+*never* from the buffer population. A `Buffer_fallback` stop can exceed the
+ceiling in principle, and one already sits within a point of it. The dropped
+cohort is derivable from the same artifact by the same expression; until it is
+enumerated, "never" is not earned.
 
 That is the same structural exclusion `project_faithful_ticket_structural_exclusion`
 recorded from the ladder-v3 side, arrived at here from the artifact rather than
 from one symbol — and it is the mechanism behind `max_stop_distance_pct` reading
 as a concentration dial in `project_record_gap_is_concentration`.
+
+## Calibration — what these numbers may not be used for
+
+- **The ceiling check is one-sided.** Under `Drop_over_max` @ 0.15, "entries over
+  the 15% ceiling: 0" is **true by construction** for the surviving population:
+  the gate already removed anything above the ceiling, so the derivation cannot
+  fail that check by running systematically *low*. It is a necessary condition,
+  not a two-sided validation. What actually discriminates is the **boundary
+  crowding** — max 14.99%, p99 14.92%, 168 entries in the 14–15% band. A
+  derivation that were merely approximate would not pile up against the ceiling
+  and stop a hundredth of a point short of it. Read §"Verified against a real
+  artifact" as *"consistent with reproducing the gate, on the strength of the
+  boundary behaviour"*, not as a proof of exactness.
+- **One arm, one universe, one window.** Everything here is ladder-v4 cell 00
+  (26y, top-3000, `Drop_over_max` @ 0.15). The bimodality and the 867/558 split
+  are properties of that arm's stop construction; neither the split ratio nor
+  the 2.3% / 13.2% means are claimed to transfer to another cell. The
+  *derivability* argument — the mechanical point this note exists to make — does
+  transfer, because it rests on which fields the audit persists, not on their
+  values.
+- **Survivors only.** Every distribution above is over admitted tickets. No
+  claim about the dropped `Stop_too_wide` cohort is measured here; see the hedge
+  in §2.
+- **No P&L claim is made or possible.** Nothing here says the demoted or dropped
+  cohorts would have been profitable. The note's conclusion is about *schema*
+  (no new field is needed), not about whether the ceiling should move.
 
 ## What to do instead of the schema change
 

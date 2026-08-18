@@ -12,17 +12,20 @@ up" statement is a counterfactual and is labelled as one.
 
 | source | what it gives | n |
 |---|---|---|
-| `scenario_runner` stderr (`WARN: portfolio rejected fill …`) | per-rejection **required vs available cash** → the shortfall distribution, and the burst structure | 3,530 over 20 ladder-v4 arms (`.sweep-output/ladder-v4.log`, 2026-08-11) |
-| `trade_audit.sexp` (post-#2348) | per-ticket **cancel_reason + rest-time + cascade grade + date** | the TTL re-test cell 00 run (see below) |
+| `scenario_runner` stderr (`WARN: portfolio rejected fill …`) | per-rejection **required vs available cash** → the shortfall distribution, and the burst structure | 3,530 over the 20 ladder-v4 arm-blocks in `.sweep-output/ladder-v4.log` (2026-08-11) — see limit 5 on how this differs from the 19-arm `trades.csv` set |
+| `trade_audit.sexp` of the TTL re-test cell 00 (tree `59b26c3bf` — post-#2317, **pre**-#2348) | per-ticket **rest-time**, joined to `pnl_dollars` on `position_id` | 1,147 joined round trips (§"The re-derived rest-time table") |
+| `trade_audit.sexp` **post-#2348** — the source that would give per-ticket `cancel_reason` + cascade grade + date | **nothing yet — no such artifact exists on disk** | 0; needs a run on current `main` (§"Artifact side") |
 
 Scripts: `cohort_from_log.sh` (stderr side), `cohort_from_audit.sh` (artifact
-side). Both are pure text extraction — no container, no build, so they are safe
-to run while a sweep holds the container.
+side, and the one that will decompose the cancel cohort once a post-#2348 run
+exists), `rest_time_pnl.sh` (the rest-time join). All three are pure text
+extraction — no container, no build, so they are safe to run while a sweep holds
+the container.
 
 ## Finding 1 — the cohort is NOT a near-miss population
 
 The plan's motivating case is `PRGS`, destroyed **\$397 (0.3%)** short. That case
-is real and it is the **1st percentile**, not the shape:
+is real and it sits **below the 1st percentile** (p1 = 0.8%), not on the shape:
 
 ```
 shortfall as % of the ticket's required cost   (n = 3,530)
@@ -35,10 +38,12 @@ shortfall as % of the ticket's required cost   (n = 3,530)
 **The median rejected ticket is short slightly more than half of what it needed.**
 Only **5.1%** of the cohort is within 5% of being fundable.
 
-The shape is **config-invariant** — across the 16 ladder-v4 arms with n ≥ 90
-(different stop widths, TTLs, anchors, nearfloor / volconf settings), mean
-shortfall is **44.5–58.4%** and the ≤5% near-miss share is **2.0–7.7%**. It is a
-property of the sizing-vs-cash regime, not of any one knob.
+The shape holds on **every arm with enough n to read it** — across the 16
+ladder-v4 arms with n ≥ 90 (different stop widths, TTLs, anchors, nearfloor /
+volconf settings), mean shortfall is **44.5–58.4%** and the ≤5% near-miss share
+is **2.0–7.7%**. Over those 16 arms it reads as a property of the
+sizing-vs-cash regime rather than of any one knob; the arms below n = 90 were
+not tested, and limit 2 bounds how far this generalises.
 
 Supporting scale (same pool): the ticket's designed cost has p50 ≈ **\$245k**,
 while available cash at the moment of rejection has p50 ≈ **\$101k**. Only **87
@@ -56,7 +61,7 @@ bursts of > 1 rejection        :   771, covering 2,207 rejections (63%)
 largest bursts                 : 18, 14, 12, 11, 11 tickets on one balance
 ```
 
-Two thirds of the cohort died in **groups on a single tick**: several tickets
+63% of the cohort died in **groups on a single tick**: several tickets
 triggered the same week, the first ones consumed the cash, and the rest were
 refused in arrival order. This is the mechanism behind
 `project_ticket_dies_on_cash_shortfall`'s "selection at trigger = arrival order,
@@ -101,16 +106,26 @@ the build budget.
    destroyed tickets would have been profitable. AXTI's 5.8× is one path, and
    `project_edge_is_the_fat_tail` cuts both ways: a fatter entry population
    contains more monsters *and* more of everything else.
-2. **The 3,530 pool is 20 arms of one universe/window** (top-3000, 2000-2026),
-   not 20 independent samples — arms share the base and most of the calendar.
-   The per-arm table shows the shape is stable across *configs*; it does not
-   establish stability across *periods* or *universes*.
-3. **The stderr side cannot see rank or date.** The artifact side (below) is what
-   carries grade, rest-time and calendar; before #2348 those columns did not
-   exist, which is why this measurement could not have been made two weeks ago.
+2. **The 3,530 pool is 20 arm-blocks of one universe/window** (top-3000,
+   2000-2026), not 20 independent samples — arms share the base and most of the
+   calendar. The per-arm table shows the shape is stable across *configs*; it
+   does not establish stability across *periods* or *universes*.
+3. **The stderr side cannot see rank or date.** Only the audit side carries
+   grade, rest-time and calendar. Rest-time became readable with #2317, which is
+   why the join below could not have been made two weeks ago; grade and
+   `cancel_reason` need #2348 and are **still not available** on any artifact
+   here (§"Artifact side").
 4. **No top-line claim is made or possible.** The 08-14 seeded null on this base
    is **132.5pp** (three salts: 265.44 / 281.71 / 397.95). Any of these axes will
    have to clear that, and this note deliberately produces no return number.
+5. **The 20-arm stderr pool and the 19-arm `trades.csv` recompute were never
+   reconciled.** `dev/notes/exit-trigger-recompute-2026-08-18.md` enumerates 19
+   arms (`v4-00` … `v4-18`) — every ladder-v4 directory carrying a `trades.csv`
+   — while this cohort counts 20 arm-blocks in the shared `ladder-v4.log`. With
+   the artifacts off disk it is not determined whether one arm produced no
+   `trades.csv` or whether the log carries a re-run block. No arm was dropped
+   from either side for disagreeing with a result. Every figure here quantifies
+   over the log's 20; every figure there over the CSVs' 19.
 
 ## Artifact side (cancel_reason join)
 

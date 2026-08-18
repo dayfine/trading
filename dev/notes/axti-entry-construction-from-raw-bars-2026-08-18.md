@@ -80,7 +80,28 @@ Using the 17 weekly bars above as a committed fixture:
    under `Demote_over_max` with the same ceiling — one assertion per mode, so
    the three policies are pinned against one real, reproducible candidate.
 
-Nothing here is a claim that admitting AXTI would have been *right*; the
-counterfactual is untested. What is pinned is that the exclusion is structural
-and arithmetic, so a debate about it is a debate about the ceiling, not about
-the anchor or the classifier.
+## Calibration — what these numbers may not be used for
+
+- **No counterfactual is claimed.** Nothing here says admitting AXTI would have
+  been *right*. The 5.8× is the realized path of a name we did not hold; what a
+  ticket with a 33–58% stop would have returned *under this strategy's sizing,
+  stops and rotation* is untested, and a stop that wide is a different risk
+  object from the ones the book-faithful population carries. Per
+  `project_edge_is_the_fat_tail`, admitting a wider population admits more of
+  everything, not more monsters.
+- **n = 1, and it is a selected 1.** AXTI was chosen *because* it was a
+  conspicuous miss. A single hand-traced case cannot establish the shape of the
+  `Stop_too_wide` cohort; it establishes that at least one member of that cohort
+  is excluded by arithmetic rather than by an anchor defect. The population-level
+  version of that claim is unmeasured — see the hedge in
+  `dev/notes/demoted-wide-cohort-derivable-2026-08-18.md` §2.
+- **"The general statement" is arithmetic, not evidence.** That a stock running
+  ~50% off its base in three weeks has a book-faithful stop more than 15% below
+  its breakout follows from the definitions of the two quantities. It says what
+  the gate *must* exclude; it says nothing about how often that case arises, or
+  what those exclusions cost.
+- **What is pinned is narrow, and that is the point.** The reproduction covers
+  two quantities — `local_range_top = 2.70` and `E = 2.71` — from public daily
+  bars. That makes the exclusion structural and arithmetic, so a debate about it
+  is a debate about the **ceiling**, not about the anchor or the classifier. It
+  is not a recommendation to move the ceiling.

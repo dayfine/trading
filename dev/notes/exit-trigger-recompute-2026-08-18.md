@@ -31,7 +31,18 @@ pre-08-14 artifact is measuring the join window.
 | `liquidity_exit` | 5 | +60,025 | +12,005 | 80% |
 | `stop_loss` | 722 | **−4,437,915** | −6,147 | 20% |
 
-## Across all 19 arms — the two structural facts
+## Across all 19 arms with a `trades.csv` — the two structural facts
+
+The 19 arms enumerated below are every ladder-v4 arm directory carrying a
+`trades.csv` (`v4-00` … `v4-18`). The stderr-side cohort in
+`dev/experiments/ticket-funding-cohort-2026-08-18/README.md` counts **20** arm
+blocks in the shared `ladder-v4.log`. **The two populations were never
+reconciled**, and with the artifacts off disk they cannot be: it is not
+determined whether one arm produced no `trades.csv`, or whether the log carries
+a 20th block that is a re-run of an arm already listed. What *is* determined is
+that no arm was excluded here for its result — the 19 are every directory that
+had the file. Every "19 arms" figure below is over `trades.csv`; every "20 arms"
+figure there is over the log; neither is a subset claim about the other.
 
 ```
 arm                                trades   total P&L | laggard n /      P&L | stop n /       P&L | lag share
@@ -96,6 +107,17 @@ which returned the determinism tripwire exactly (281.707836…):
 | `stage3_force_exit` | 4 | +176,186 | +44,046 | 75% |
 | `liquidity_exit` | 6 | +38,321 | +6,387 | 67% |
 | `stop_loss` | 752 | −5,511,128 | −7,329 | 17% |
+
+**This table is not a partition.** Its rows sum to **1,141 trades / +2,216,298**
+against the run's **1,147 round trips / +2,314,952** — **6 trades and \$98,654
+are unaccounted for**, and the recompute does not explain them. They are rows
+whose `exit_trigger` cell did not fall into one of the five named groups (empty,
+or a value not listed); which, is not determined here, and the artifacts are no
+longer on disk to check. The shares and per-trade figures above are therefore
+over the 1,141 grouped trades, not over the run. The residual is 0.5% of trades
+and 4.3% of realized P&L — small enough not to move F1 (a sign test on the two
+largest groups) but large enough that no row here should be read as a share of
+the run total.
 
 F1 holds on a different code tree and a different build: laggard positive, stops
 negative. The two `extension_stop` exits carrying +749,388 between them is the
