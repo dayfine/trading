@@ -83,3 +83,22 @@ where volconf's rejection was the one result that survived the null.
   (share and count) and agrees with a null-controlled prior result.
 - Realized trade P&L ≠ `total_return_pct`; open positions at end-of-run are
   excluded, so these totals are not comparable to the scenario's headline.
+
+## Arm 00 of the TTL re-test (post-#2317 tree) — same structure, independently
+
+Recomputed on `ttl-retest-00-null` (26y top-3000, salt 0, tree `59b26c3bf`),
+which returned the determinism tripwire exactly (281.707836…):
+
+| exit_trigger | n | P&L \$ | per trade | win% |
+|---|---:|---:|---:|---:|
+| `laggard_rotation` | 377 | +6,763,531 | +17,940 | 64% |
+| `extension_stop` | 2 | +749,388 | +374,694 | 100% |
+| `stage3_force_exit` | 4 | +176,186 | +44,046 | 75% |
+| `liquidity_exit` | 6 | +38,321 | +6,387 | 67% |
+| `stop_loss` | 752 | −5,511,128 | −7,329 | 17% |
+
+F1 holds on a different code tree and a different build: laggard positive, stops
+negative. The two `extension_stop` exits carrying +749,388 between them is the
+fat tail showing up in the exit mix — **two trades worth 32% of the run's entire
+realized total** (+2,314,952), and 11% of the laggard channel on its own. That is
+`project_edge_is_the_fat_tail` in one line of a table.

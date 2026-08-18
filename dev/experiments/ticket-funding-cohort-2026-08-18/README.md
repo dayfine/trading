@@ -114,8 +114,16 @@ the build budget.
 
 ## Artifact side (cancel_reason join)
 
-Pending the TTL re-test cell 00 run (in flight at time of writing; the artifact
-lands with the chain's first RESULT line).
+**Still pending, and not obtainable from this chain.** The TTL re-test runs from
+a worktree pinned at `59b26c3bf` (#2349, the TTL split), which **predates #2348**
+— `git merge-base --is-ancestor 1ebc37317 59b26c3bf` is false. So no arm of the
+chain emits `cancel_reason`: arm 00 records **1,466 placed tickets and zero
+cancels of any kind**, while its own log carries **262** `WARN: portfolio
+rejected fill` lines. The decomposition needs a run from a tree containing
+#2348; the next scenario run on current main is the first opportunity.
+
+What the chain's tree *does* contain is #2317, which is why the rest-time join
+below is valid.
 
 The ladder-v4 artifacts cannot stand in for it, for two independent reasons:
 
@@ -153,4 +161,61 @@ of the same ladder is what an unverified join and a thin tail look like from the
 outside — indistinguishable without the keyed join.
 
 Arm 00 of the chain is the first artifact `rest_time_pnl.sh` will accept. The
-axis should be re-derived from it before any clock arm is run.
+axis re-derived from it is below — and it **reverses** the premise the earlier
+table supplied.
+
+## The re-derived rest-time table (arm 00, keyed join, max fill age 865 weeks)
+
+1,147 of 1,147 round trips joined on `position_id`; total realized +2,314,952.
+
+| bucket | n | share | P&L \$ | per trade | win% |
+|---|---:|---:|---:|---:|---:|
+| ≤1wk | 698 | 60.9% | +1,710,291 | +2,450 | 32% |
+| 2–4wk | 166 | 14.5% | −149,906 | −903 | 33% |
+| **5–13wk** | 136 | 11.9% | **+1,021,434** | **+7,511** | 39% |
+| 14–26wk | 58 | 5.1% | +82,266 | +1,418 | 40% |
+| 27–52wk | 29 | 2.5% | −148,226 | −5,111 | 24% |
+| 1–3yr | 35 | 3.1% | +16,612 | +475 | 37% |
+| **>3yr** | 25 | 2.2% | **−217,518** | **−8,701** | 28% |
+
+**F1 — the 5–13 week profit band confirms.** 11.9% of fills carry 44% of
+realized P&L at +7,511/trade, the best per-trade bucket outside the two-trade
+`extension_stop` tail. `ttl4`'s 28-day cut still lands on its lower edge, so the
+`{13, 26, 52}` axis remains the right one.
+
+**F2 — the `>3yr` bucket is net-NEGATIVE here, reversing the recorded premise.**
+`dev/notes/next-session-priorities-2026-08-18.md` records this bucket as
+**+304,101 on 25 trades (+12,164/trade, "second-highest per-trade in the run")**
+and concludes that defect E's absurdity bound "would cut a *profitable*
+population on this base". Re-measured with the keyed join on a post-#2317 run:
+**the same 25 trades are −217,518 (−8,701/trade)**. Same n, opposite sign — the
+earlier figure is a mis-join artifact, which is what `rest_time_pnl.sh`'s
+refusal was designed to catch. Read individually the cohort is what defect E
+described: the worst is BLDP resting **380 weeks** for −39,827, the longest rest
+is **865 weeks (16.6 years)**, and only a handful are positive.
+
+**F3 — every candidate clock cuts a net-losing cohort.** Gross effect of
+cancelling tickets that rested longer than each bound:
+
+| clock | fills cut | realized P&L of the cut cohort | as % of total realized |
+|---|---:|---:|---:|
+| 13w | 147 | −266,866 | +11.5% if removed |
+| **26w** | 89 | **−349,132** | **+15.1% if removed** |
+| 52w | 60 | −200,906 | +8.7% if removed |
+| 156w | 25 | −217,518 | +9.4% if removed |
+
+**This changes the narrowing decision in #2368.** That PR deferred the clock arms
+because their *top-line* effect (8–30pp) sits 4–13× below the 132.5pp null — which
+is true and remains true. But the metric it named as the one that could resolve
+them ("per-bucket realized P&L on the arm's own trades") is exactly the table
+above, and it is **within-run accounting, not a between-run difference**, so the
+null does not apply to it. On this base the clock is not a coin flip: every bound
+tested removes money-losing fills, with 26 weeks the largest at 15% of realized
+P&L.
+
+**Calibration.** Gross ≠ net: cancelling a resting ticket frees its capital,
+which the walk redeploys into some other candidate, and that replacement's P&L is
+unmeasured. These figures bound the effect, they do not predict it. It is also
+one salt on one base. The honest conclusion is *"the clock axis is worth running
+and #2368's deferral rested on a number that was wrong"* — not *"a 26-week clock
+is worth +15%"*.
