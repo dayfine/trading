@@ -156,6 +156,15 @@ audit, `position_id` → `pnl_dollars` from `trades.csv`. It **refuses to report
 when the artifact's maximum fill age is ≤ 1 week, because that is the pre-#2317
 signature rather than a distribution.
 
+Both `trades.csv` columns it reads are resolved **by name from the file's own
+header**, and it refuses if either is absent rather than falling back to an
+index — the contract
+`trading/trading/backtest/lib/trades_csv_schema.mli` states ("silently reading
+the wrong cell is worse than reading nothing"). `position_id` sits *inside* the
+trailing per-trade context block, so a writer that inserts at or ahead of it
+shifts the index and a positional read returns a neighbouring cell that still
+looks like data.
+
 Run against ladder-v4 cell 00 it refuses, as it should: 572 fill ages, max 1
 week. That matters beyond hygiene, because the `{13, 26, 52}` axis of the TTL
 re-test was chosen from a rest-time table over **cell 13's "942 joined trades"**
@@ -238,9 +247,13 @@ this PR can distinguish without the artifacts:
 1. **Two different runs both labelled "cell 00."** The recorded table states
    1,145 filled tickets (its own rows sum to 1,146); this one joins 1,147.
 2. **A reader difference on the `trades.csv` side.** Until the fix in this PR,
-   `rest_time_pnl.sh` addressed `position_id` by fixed index — a different
-   `trades.csv` vintage would have been read one column off. That hazard is now
-   removed going forward but cannot be retro-applied to the recorded figure.
+   `rest_time_pnl.sh` addressed `position_id` by fixed index. On the current
+   21-column layout that index is in fact correct (verified against
+   `Result_writer._trades_csv_header` + `Trade_context.csv_header_fields`), so
+   the table above is not affected — but nothing pins which reader produced the
+   *recorded* figure, and a fixed-index read of a different vintage returns a
+   neighbouring cell silently. The hazard is removed going forward; it cannot be
+   retro-applied to a figure whose reader is unrecorded.
 3. **A genuine data difference** between the two trees.
 
 Explicitly **not** established: that the earlier figure is a mis-join artifact.

@@ -15,6 +15,10 @@
 # read 0 or 1 (the 7-day reach-back), and every bucket above 1 week is empty.
 # The script refuses to report if that signature is present.
 #
+# Both trades.csv columns it reads (position_id, pnl_dollars) are resolved by
+# NAME from the file's own header and the script refuses if either is absent —
+# no fixed indices, no fallback. See the comment above the resolution below.
+#
 # Usage: sh rest_time_pnl.sh <trade_audit.sexp> <trades.csv>
 
 SEXP=${1:?usage: rest_time_pnl.sh <trade_audit.sexp> <trades.csv>}
@@ -45,8 +49,36 @@ if [ "$MAXAGE" -le 1 ]; then
   exit 1
 fi
 
-# position_id is the last-but-one column in trades.csv (column 20 of 21).
-awk -F, 'NR > 1 && $20 != "" { print $20 "\t" $9 }' "$CSV" | sort -u > /tmp/_pnl.tsv
+# trades.csv columns are resolved by NAME from the file's own header, never by
+# fixed index. position_id sits INSIDE the trailing per-trade context block
+# (stop_fill_distance_pct already follows it), so any writer that inserts at or
+# ahead of it shifts the index and a positional read silently returns a
+# neighbouring cell. This mirrors Trades_csv_schema.of_header_line
+# (trading/trading/backtest/lib/trades_csv_schema.mli), whose contract is
+# "silently reading the wrong cell is worse than reading nothing" — hence the
+# hard refusal below rather than a fallback index.
+COLS=$(head -n 1 "$CSV" | awk -F, '
+  { for (i = 1; i <= NF; i++) {
+      name = $i
+      gsub(/^[ \t]+/, "", name); gsub(/[ \t\r]+$/, "", name)
+      if (name == "position_id") pid = i
+      if (name == "pnl_dollars") pnl = i
+    }
+    printf "%d %d\n", pid + 0, pnl + 0 }')
+PID_COL=${COLS% *}
+PNL_COL=${COLS#* }
+if [ "$PID_COL" -eq 0 ] || [ "$PNL_COL" -eq 0 ]; then
+  echo "REFUSING to report: cannot resolve trades.csv columns by header name"
+  echo "  (position_id -> ${PID_COL}, pnl_dollars -> ${PNL_COL}; 0 = absent)."
+  echo "  A layout without position_id cannot be joined on it, and this script"
+  echo "  does not fall back to a fixed column index. See"
+  echo "  trading/trading/backtest/lib/trades_csv_schema.mli."
+  exit 1
+fi
+echo "trades.csv columns from header: position_id=$PID_COL pnl_dollars=$PNL_COL"
+
+awk -F, -v pid="$PID_COL" -v pnl="$PNL_COL" \
+  'NR > 1 && $pid != "" { print $pid "\t" $pnl }' "$CSV" | sort -u > /tmp/_pnl.tsv
 echo "round trips with a position_id: $(wc -l < /tmp/_pnl.tsv | tr -d ' ')"
 
 join -t "$(printf '\t')" /tmp/_ages.tsv /tmp/_pnl.tsv > /tmp/_rest_pnl.tsv
