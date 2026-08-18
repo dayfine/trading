@@ -1,0 +1,26 @@
+((date 2026-08-18) (slug entry-ticket-rescreen)
+ (hypothesis
+  "Does the book-supported weekly re-screen cancel (enable_entry_ticket_rescreen, PR #2349's split of the old entry_order_ttl_weeks knob) improve outcomes on its own, with the invented clock held at its no-op 0? The re-screen cancels a resting entry ticket when its stage / sector / macro qualification flips; it was never separately testable before #2349, because the composite knob returned [] at 0 without consulting the re-screen at all.")
+ (base_scenario
+  "ladder-v4 cell 00 base (top-3000 PIT-2000, 2000-01-01..2026-06-26), split-safe warehouse /tmp/snap_top3000_dedup_v5thin_adj, --no-emit-all-eligible --parallel 1, pinned worktree @59b26c3bf")
+ (window_id top3000-2000-2026-single-window-3salt) (baseline_label null)
+ (variants
+  (((label null) (config_hash rescreen-false-clock-0)
+    (aggregate
+     (((total_return_pct 281.707836178685) (total_trades 1147)
+       (max_drawdown_pct 39.034688012227853) (rejected_fills 262)))))
+   ((label rescreen-s0) (config_hash rescreen-true-clock-0)
+    (aggregate
+     (((total_return_pct 176.35786116047007) (total_trades 1115)
+       (max_drawdown_pct 42.234603661515521) (rejected_fills 123)))))
+   ((label rescreen-s1) (config_hash rescreen-true-clock-0)
+    (aggregate
+     (((total_return_pct 174.82938549036868) (total_trades 1114)
+       (max_drawdown_pct 42.851866643388789) (rejected_fills 125)))))
+   ((label rescreen-s2) (config_hash rescreen-true-clock-0)
+    (aggregate
+     (((total_return_pct 182.28130127123399) (total_trades 1113)
+       (max_drawdown_pct 42.881515346248889) (rejected_fills 124)))))))
+ (verdict Reject)
+ (notes
+  "REJECT for arming (no default flip); enable_entry_ticket_rescreen KEEPS default-off axis status per experiment-flag-discipline R1/R2. SEPARATION IS COMPLETE, which is why one window suffices to reject: the three re-screen draws are 176.36 / 174.83 / 182.28 against the null's own three measured draws 265.44 / 281.71 / 397.95 (ladder-v4-seeded-2026-08-14, same base/window/universe/warehouse). The BEST re-screen draw sits 83pp below the null's WORST; the distributions do not overlap. MaxDD is also worse (42.2-42.9 vs 39.0), so this is not a return-for-risk trade. The null tripwire arm reproduced 281.707836178685 exactly, so the borrowed null is valid. THE TRANSFERABLE WHY (dissected trade-by-trade via position_id-keyed rest-time join, dev/experiments/ticket-funding-cohort-2026-08-18/rest_time_pnl.sh): (1) THE RE-SCREEN IS A DE-FACTO ~22-WEEK CAP. Max fill age collapses from 865 weeks (null) to 22 weeks; the 27-52wk, 1-3yr and >3yr buckets go to exactly ZERO fills. (2) IT DESTROYS THE PROFIT BAND. The 5-13wk band -- the best per-trade bucket in the null at +1,021,434 on 136 trades (+7,511 each) -- becomes -131,738 on 58 trades (-2,271 each): 57% fewer fills AND a sign flip. Total realized falls 2,314,952 -> 1,271,267 (-45%). (3) CONDITION-BASED CANCELLATION IS THE OPPOSITE OF TIME-BASED CANCELLATION. A clock cuts tickets that rested long WITHOUT their setup changing (stale, never resumed) -- on the same null arm every clock bound {13,26,52,156} cuts a NET-LOSING cohort. The re-screen cuts tickets whose stage/sector/macro FLIPPED while resting -- but a stock that pulls back out of Stage 2 and then re-breaks out IS the base-building pattern (weinstein-book-reference Stage 1->2), so cancelling on the wobble discards precisely the pullback-then-resume winners. The two rules select OPPOSITE populations and must never again be conflated behind one knob (which is exactly what the pre-#2349 composite did). (4) VARIANCE COLLAPSE AS EVIDENCE: the re-screen's own spread is 7.45pp against the null's 132.5pp. The null's huge dispersion IS the long-rest lottery -- which tickets happen to survive and get funded; capping rest at 22 weeks removes the lottery and its positive expected value together. 12th edge_is_the_fat_tail confirmation, and the cleanest one yet: the mechanism removes variance and return in the same stroke, which is what taxing a fat tail looks like. (5) MECHANISM DID WORK AS SPECIFIED -- rejected_fills halves 262 -> 123/125/124, confirming it really does cancel tickets before they trigger into a cash-short book; it is not a no-op that failed, it is a working mechanism whose selection rule is wrong. FORWARD GUIDANCE: stop proposing CONDITION-based cancellation of resting tickets in any form (re-qualify, re-score, re-grade at trigger) -- the population it removes is the tail. TIME-based bounds remain open and are the arm to run next (03-ttl26 first; on the null arm a 26w bound cuts 89 fills worth -349,132, the largest net-losing cohort of the four bounds tested). Artifacts: /tmp/ttl-retest-chain.log, dev/experiments/ttl-retest-2026-08-16/ (specs + run.sh), dev/experiments/ticket-funding-cohort-2026-08-18/ (the keyed rest-time tool). CAVEAT: single window, single universe; the reject rests on complete distributional separation plus a mechanism dissection, not on a confirmation grid -- a grid would be required to PROMOTE, not to reject."))

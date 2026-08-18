@@ -347,4 +347,9 @@
   (base_scenario
    "sp500-2010-2026 CSV panel, 31 rolling folds 365x182, pinned worktree @ba3ec93c")
   (window_id rolling-sp500-2010-2026-31fold-365x182)
-  (verdict Reject) (entry_slug sim-entry-stoplimit-surface)))
+  (verdict Reject) (entry_slug sim-entry-stoplimit-surface))
+ ((config_hash rescreen-true-clock-0)
+  (base_scenario
+   "ladder-v4 cell 00 base (top-3000 PIT-2000, 2000-2026), split-safe v5thin warehouse, pinned worktree @59b26c3bf")
+  (window_id top3000-2000-2026-single-window-3salt)
+  (verdict Reject) (entry_slug entry-ticket-rescreen)))
