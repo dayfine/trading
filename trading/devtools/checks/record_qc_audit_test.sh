@@ -40,6 +40,30 @@ FAIL_COUNT=0
 pass() { echo "  PASS: $*"; PASS_COUNT=$(( PASS_COUNT + 1 )); }
 fail() { echo "  FAIL: $*" >&2; FAIL_COUNT=$(( FAIL_COUNT + 1 )); }
 
+# _glob_count <dir> <name-pattern> [extra-find-predicate]
+#
+# Counts entries under <dir> (maxdepth 1) matching glob <name-pattern>,
+# without ever aborting this suite under `set -euo pipefail`
+# (H-AUDIT-TEST-FIND-PIPELINE-UNGUARDED). `find` exits 0 with empty stdout
+# when nothing matches -- unlike `ls <dir>/<pattern>`, which exits non-zero
+# on a no-match glob and, combined with `pipefail`, would abort the whole
+# script mid-run right at the call site. The remaining risk this guards is
+# narrower: if <dir> itself is missing (e.g. a hand-written `rm -rf` of the
+# temp audit dir mid-suite), `find` reports the error to stderr and returns
+# non-zero -- but its stdout is still empty, so `wc -l` still reports "0"
+# and the caller gets the correct count; the `|| true` below exists only to
+# stop that non-zero `find` exit status from propagating through `set -e`
+# before the count can be captured and returned. Optional 3rd arg: an extra
+# `find` predicate appended verbatim (e.g. "-type f") for call sites that
+# also filter by entry type.
+_glob_count() {
+  local dir="$1" pattern="$2" extra="${3:-}"
+  local n
+  # shellcheck disable=SC2086  # $extra is a predicate word; must word-split
+  n="$(find "${dir}" -maxdepth 1 -name "${pattern}" ${extra} 2>/dev/null | wc -l | tr -d ' ')" || true
+  echo "${n}"
+}
+
 # Mock-gh factory. Emits a tiny shell script that responds to
 # `gh pr view N --json reviews [--jq '.reviews[]...']` with canned JSON
 # or canned `STATE:/body/ENDBODY` framed output.
@@ -366,7 +390,7 @@ EOF
 out3=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE7}" "feat/picks-phase-c" "2026-07-27" 2>&1) && rc3=0 || rc3=$?
 
-audit_count="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "2026-07-27-*-${FEATURE7}.json" | wc -l | tr -d ' ')"
+audit_count="$(_glob_count "${TMP_REPO}/dev/audit" "2026-07-27-*-${FEATURE7}.json")"
 
 if (( rc3 == 0 )) && [[ -f "${JSON7A}" ]] && [[ -f "${JSON7B}" ]] \
    && [[ "${audit_count}" == "2" ]] \
@@ -407,7 +431,7 @@ EOF
 out4=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE7}" "feat/picks-phase-c" "2026-07-27" 2>&1) && rc4=0 || rc4=$?
 
-audit_count_7d="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "2026-07-27-*-${FEATURE7}.json" | wc -l | tr -d ' ')"
+audit_count_7d="$(_glob_count "${TMP_REPO}/dev/audit" "2026-07-27-*-${FEATURE7}.json")"
 
 if (( rc4 == 0 )) && [[ -f "${JSON7A}" ]] && [[ -f "${JSON7B}" ]] \
    && [[ "${audit_count_7d}" == "3" ]] \
@@ -502,7 +526,7 @@ out7f_2=$(REPO_ROOT="${TMP_REPO}" \
     --structural APPROVED --behavioral APPROVED --overall APPROVED --quality-score 4 2>&1) && rc7f_2=0 || rc7f_2=$?
 
 JSON7F="${TMP_REPO}/dev/audit/2026-07-29-feat-no-sha-${FEATURE7F}.json"
-audit_count_7f="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "2026-07-29-*-${FEATURE7F}.json" | wc -l | tr -d ' ')"
+audit_count_7f="$(_glob_count "${TMP_REPO}/dev/audit" "2026-07-29-*-${FEATURE7F}.json")"
 
 if (( rc7f_1 == 0 )) && (( rc7f_2 == 0 )) && [[ -f "${JSON7F}" ]] \
    && [[ "${audit_count_7f}" == "1" ]] \
@@ -565,7 +589,7 @@ EOF
 out7c_2=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE7C}" "" "2026-07-27" 2>&1) && rc7c_2=0 || rc7c_2=$?
 
-audit_count_7c="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "2026-07-27-*${FEATURE7C}.json" | wc -l | tr -d ' ')"
+audit_count_7c="$(_glob_count "${TMP_REPO}/dev/audit" "2026-07-27-*${FEATURE7C}.json")"
 
 if (( rc7c_1 == 0 )) && (( rc7c_2 == 0 )) && [[ -f "${JSON7C}" ]] \
    && [[ "${audit_count_7c}" == "2" ]] \
@@ -699,13 +723,13 @@ fi
 # substituting some other value.
 # ---------------------------------------------------------------------------
 FEATURE10="bad-override-rejected"
-audit_count_before_10="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE10}.json" | wc -l | tr -d ' ')"
+audit_count_before_10="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE10}.json")"
 
 out10=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=oops \
   bash "${WRITE_AUDIT}" \
     --date 2026-07-27 --feature "${FEATURE10}" --branch "harness/x" \
     --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1) && rc10=0 || rc10=$?
-audit_count_after_10="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE10}.json" | wc -l | tr -d ' ')"
+audit_count_after_10="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE10}.json")"
 
 if (( rc10 == 1 )) && [[ "${audit_count_before_10}" == "0" ]] && [[ "${audit_count_after_10}" == "0" ]] \
    && echo "${out10}" | grep -q 'must be a nonnegative integer'; then
@@ -776,12 +800,12 @@ overall_qc: APPROVED
 7 — inverted or bogus score
 EOF
 
-audit_count_before_12="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE12}.json" | wc -l | tr -d ' ')"
+audit_count_before_12="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE12}.json")"
 
 out12=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE12}" "feat/dummy" "2026-05-25" 2>&1) && rc12=0 || rc12=$?
 
-audit_count_after_12="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE12}.json" | wc -l | tr -d ' ')"
+audit_count_after_12="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE12}.json")"
 
 if (( rc12 == 1 )) && [[ "${audit_count_before_12}" == "0" ]] && [[ "${audit_count_after_12}" == "0" ]] \
    && echo "${out12}" | grep -q "quality score '7' is not an integer in 1..5"; then
@@ -799,14 +823,14 @@ fi
 # quality_score reaches the committed JSON body.
 # ---------------------------------------------------------------------------
 FEATURE13="out-of-range-score-direct"
-audit_count_before_13="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE13}.json" | wc -l | tr -d ' ')"
+audit_count_before_13="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE13}.json")"
 
 out13=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
   --date 2026-07-27 --feature "${FEATURE13}" --branch "harness/y" \
   --structural APPROVED --behavioral APPROVED --overall APPROVED \
   --quality-score 0 2>&1) && rc13=0 || rc13=$?
 
-audit_count_after_13="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE13}.json" | wc -l | tr -d ' ')"
+audit_count_after_13="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE13}.json")"
 
 if (( rc13 == 1 )) && [[ "${audit_count_before_13}" == "0" ]] && [[ "${audit_count_after_13}" == "0" ]] \
    && echo "${out13}" | grep -q "must be an integer 1..5" \
@@ -844,13 +868,13 @@ overall_qc: APPROVED
 5 — this file belongs to a different run and must NOT be used
 EOF
 
-audit_count_before_14="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE14}.json" | wc -l | tr -d ' ')"
+audit_count_before_14="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE14}.json")"
 
 out14=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="/nonexistent/gh-binary-that-does-not-exist" \
   bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
   "${FEATURE14}" "feat/dummy" "2026-05-25" --pr-number 2129 2>&1) && rc14=0 || rc14=$?
 
-audit_count_after_14="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE14}.json" | wc -l | tr -d ' ')"
+audit_count_after_14="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE14}.json")"
 
 if (( rc14 == 1 )) && [[ "${audit_count_before_14}" == "0" ]] && [[ "${audit_count_after_14}" == "0" ]] \
    && echo "${out14}" | grep -q "not available on PATH" \
@@ -883,12 +907,12 @@ overall_qc: APPROVED
 0 — bogus zero score
 EOF
 
-audit_count_before_15="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE15}.json" | wc -l | tr -d ' ')"
+audit_count_before_15="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE15}.json")"
 
 out15=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE15}" "feat/dummy" "2026-05-25" 2>&1) && rc15=0 || rc15=$?
 
-audit_count_after_15="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE15}.json" | wc -l | tr -d ' ')"
+audit_count_after_15="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE15}.json")"
 
 if (( rc15 == 1 )) && [[ "${audit_count_before_15}" == "0" ]] && [[ "${audit_count_after_15}" == "0" ]] \
    && echo "${out15}" | grep -q "quality score '0' is not an integer in 1..5"; then
@@ -922,12 +946,12 @@ overall_qc: APPROVED
 10 — double-digit bogus score
 EOF
 
-audit_count_before_16="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE16}.json" | wc -l | tr -d ' ')"
+audit_count_before_16="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE16}.json")"
 
 out16=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE16}" "feat/dummy" "2026-05-25" 2>&1) && rc16=0 || rc16=$?
 
-audit_count_after_16="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE16}.json" | wc -l | tr -d ' ')"
+audit_count_after_16="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE16}.json")"
 
 if (( rc16 == 1 )) && [[ "${audit_count_before_16}" == "0" ]] && [[ "${audit_count_after_16}" == "0" ]] \
    && echo "${out16}" | grep -q "quality score '10' is not an integer in 1..5"; then
@@ -947,14 +971,14 @@ fi
 # already-invalid value to filter first.
 # ---------------------------------------------------------------------------
 FEATURE17="six-score-direct"
-audit_count_before_17="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE17}.json" | wc -l | tr -d ' ')"
+audit_count_before_17="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE17}.json")"
 
 out17=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
   --date 2026-07-27 --feature "${FEATURE17}" --branch "harness/y" \
   --structural APPROVED --behavioral APPROVED --overall APPROVED \
   --quality-score 6 2>&1) && rc17=0 || rc17=$?
 
-audit_count_after_17="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE17}.json" | wc -l | tr -d ' ')"
+audit_count_after_17="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE17}.json")"
 
 if (( rc17 == 1 )) && [[ "${audit_count_before_17}" == "0" ]] && [[ "${audit_count_after_17}" == "0" ]] \
    && echo "${out17}" | grep -q "must be an integer 1..5" \
@@ -974,14 +998,14 @@ fi
 # non-integer value baked into the committed audit JSON.
 # ---------------------------------------------------------------------------
 FEATURE18="decimal-score-direct"
-audit_count_before_18="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE18}.json" | wc -l | tr -d ' ')"
+audit_count_before_18="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE18}.json")"
 
 out18=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
   --date 2026-07-27 --feature "${FEATURE18}" --branch "harness/y" \
   --structural APPROVED --behavioral APPROVED --overall APPROVED \
   --quality-score 3.5 2>&1) && rc18=0 || rc18=$?
 
-audit_count_after_18="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE18}.json" | wc -l | tr -d ' ')"
+audit_count_after_18="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE18}.json")"
 
 if (( rc18 == 1 )) && [[ "${audit_count_before_18}" == "0" ]] && [[ "${audit_count_after_18}" == "0" ]] \
    && echo "${out18}" | grep -q "must be an integer 1..5" \
@@ -1090,7 +1114,7 @@ else
       --quality-score 1 --notes "content B - must never land" 2>&1) && rc19_2=0 || rc19_2=$?
 
   CONTENT_AFTER="$(cat "${JSON19}" 2>/dev/null || echo "MISSING")"
-  stray_tmp_count="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE19}.json.??????" | wc -l | tr -d ' ')"
+  stray_tmp_count="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE19}.json.??????")"
 
   # TMP_FILE=<path> is emitted by the abort hook itself (write_audit.sh's
   # WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME branch) right before it exits, so it
@@ -1141,7 +1165,7 @@ out20=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
   --structural APPROVED --behavioral APPROVED --overall APPROVED \
   --quality-score 5 2>&1) && rc20=0 || rc20=$?
 JSON20="${TMP_REPO}/dev/audit/2026-07-29-harness-atomic-${FEATURE20}.json"
-stray_tmp_count_20="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE20}.json.??????" | wc -l | tr -d ' ')"
+stray_tmp_count_20="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE20}.json.??????")"
 
 if (( rc20 == 0 )) && [[ -f "${JSON20}" ]] \
    && grep -q '"quality_score": *5' "${JSON20}" \
@@ -1202,7 +1226,7 @@ else
       --quality-score 5 --notes "content B - must never land" 2>&1) && rc20b_2=0 || rc20b_2=$?
 
   CONTENT_AFTER_20B="$(cat "${JSON20B}" 2>/dev/null || echo "MISSING")"
-  audit_count_20b="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE20B}.json" | wc -l | tr -d ' ')"
+  audit_count_20b="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE20B}.json")"
 
   if (( rc20b_2 != 0 )) \
      && [[ "${CONTENT_AFTER_20B}" == "${CONTENT_A_20B}" ]] \
@@ -1416,7 +1440,17 @@ mode24="$(_file_mode_octal "${JSON24}" 2>/dev/null || echo 'UNKNOWN')"
 # not removed) so a docstring merely DESCRIBING the pattern (e.g. this very
 # file's own comment explaining what a bad chmod placement would look like)
 # can never be mistaken for the executable statement itself.
-CODE_ONLY_24="$(sed -E 's/^[[:space:]]*#.*$//' "${WRITE_AUDIT}")"
+# `|| true` here (H-AUDIT-TEST-SUT-READ-UNGUARDED) is defence-in-depth: the
+# suite copies write_audit.sh into $TMP_REPO during setup and fails fast if
+# that copy is absent, so $WRITE_AUDIT is expected to always be readable by
+# this point -- but if it were ever missing or unreadable, `sed` would exit
+# non-zero and, under `set -euo pipefail`, abort the whole run right here
+# instead of reporting scenario 24 as a clean FAIL. The `[[ -n ... ]]` guard
+# on CODE_ONLY_24 below (mirroring the existing CHMOD_TMP_LINE_24 guard)
+# makes that failure mode explicit at the read site itself, rather than
+# relying solely on the downstream empty-match cascade through
+# CHMOD_TMP_LINE_24/MV_LINE_24 to fail closed.
+CODE_ONLY_24="$(sed -E 's/^[[:space:]]*#.*$//' "${WRITE_AUDIT}" 2>/dev/null)" || true
 # `|| true` on each is load-bearing under `set -euo pipefail` (mirrors the
 # established pattern in write_audit.sh's own recorded_at_ns/overall_qc
 # extractions): when a mutation genuinely removes/relocates the pattern
@@ -1434,7 +1468,8 @@ OUTPUT_CHMOD_COUNT_24="$(printf '%s\n' "${CODE_ONLY_24}" | grep -c 'chmod [0-9]*
 [ -z "${OUTPUT_CHMOD_COUNT_24}" ] && OUTPUT_CHMOD_COUNT_24=0
 
 source_order_ok=0
-if [[ -n "${CHMOD_TMP_LINE_24}" ]] && [[ -n "${MV_LINE_24}" ]] \
+if [[ -n "${CODE_ONLY_24}" ]] \
+   && [[ -n "${CHMOD_TMP_LINE_24}" ]] && [[ -n "${MV_LINE_24}" ]] \
    && (( CHMOD_TMP_LINE_24 < MV_LINE_24 )) \
    && (( OUTPUT_CHMOD_COUNT_24 == 0 )); then
   source_order_ok=1
@@ -1691,14 +1726,16 @@ out27=$(REPO_ROOT="${TARGET_ROOT}" \
     --date 2026-08-06 --feature "repo-root-override" --branch "harness/repo-root" \
     --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1) && rc27=0 || rc27=$?
 
-# `find` (not `ls .../*.json`) deliberately: under `set -euo pipefail`, `ls`
-# on a glob that matches nothing exits non-zero, and pipefail propagates
+# `_glob_count` (not `ls .../*.json`) deliberately: under `set -euo pipefail`,
+# `ls` on a glob that matches nothing exits non-zero, and pipefail propagates
 # that into this assignment's exit status, aborting the whole test script
 # right here with no summary line -- exactly the zero-match case
-# walkup_count27 is expected to hit on a passing run. `find` returns 0 with
-# empty output when nothing matches, so it can't trip -e this way.
-target_count27="$(find "${TARGET_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
-walkup_count27="$(find "${WALKUP_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+# walkup_count27 is expected to hit on a passing run. `_glob_count` (see its
+# definition near the top of this file) returns "0" with no abort in that
+# case, and even if the directory itself were missing, so it can't trip -e
+# this way (H-AUDIT-TEST-FIND-PIPELINE-UNGUARDED).
+target_count27="$(_glob_count "${TARGET_ROOT}/dev/audit" '*.json' '-type f')"
+walkup_count27="$(_glob_count "${WALKUP_ROOT}/dev/audit" '*.json' '-type f')"
 
 if (( rc27 == 0 )) && echo "${out27}" | grep -q "^OK: wrote" \
    && [[ "${target_count27}" == "1" ]] && [[ "${walkup_count27}" == "0" ]]; then
@@ -1725,7 +1762,7 @@ out27b=$(env -u REPO_ROOT \
     --date 2026-08-06 --feature "repo-root-walkup" --branch "harness/repo-root" \
     --structural APPROVED --behavioral APPROVED --overall APPROVED 2>&1) && rc27b=0 || rc27b=$?
 
-walkup_count27b="$(find "${WALKUP_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+walkup_count27b="$(_glob_count "${WALKUP_ROOT}/dev/audit" '*.json' '-type f')"
 
 if (( rc27b == 0 )) && echo "${out27b}" | grep -q "^OK: wrote" && [[ "${walkup_count27b}" == "1" ]]; then
   pass "scenario 27b — REPO_ROOT unset: the walk-up still locates the root and publishes the record (H-WRITE-AUDIT-REPO-ROOT-NOT-REDIRECTABLE, pins the fallback branch production actually uses)"
@@ -1808,8 +1845,8 @@ out28=$(REPO_ROOT="${TARGET2_ROOT}" \
   bash "${WALKUP2_ROOT}/trading/devtools/checks/record_qc_audit.sh" \
     "${FEATURE28}" "harness/repo-root-sibling" "2026-08-08" 2>&1) && rc28=0 || rc28=$?
 
-target_count28="$(find "${TARGET2_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
-walkup_count28="$(find "${WALKUP2_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+target_count28="$(_glob_count "${TARGET2_ROOT}/dev/audit" '*.json' '-type f')"
+walkup_count28="$(_glob_count "${WALKUP2_ROOT}/dev/audit" '*.json' '-type f')"
 JSON28="${TARGET2_ROOT}/dev/audit/2026-08-08-harness-repo-root-sibling-${FEATURE28}.json"
 
 if (( rc28 == 0 )) && [[ "${target_count28}" == "1" ]] && [[ "${walkup_count28}" == "0" ]] \
@@ -1865,7 +1902,7 @@ out28b=$(env -u REPO_ROOT \
   bash "${WALKUP3_ROOT}/trading/devtools/checks/record_qc_audit.sh" \
     "${FEATURE28B}" "harness/repo-root-sibling" "2026-08-08" 2>&1) && rc28b=0 || rc28b=$?
 
-walkup_count28b="$(find "${WALKUP3_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+walkup_count28b="$(_glob_count "${WALKUP3_ROOT}/dev/audit" '*.json' '-type f')"
 JSON28B="${WALKUP3_ROOT}/dev/audit/2026-08-08-harness-repo-root-sibling-${FEATURE28B}.json"
 
 if (( rc28b == 0 )) && [[ "${walkup_count28b}" == "1" ]] \
@@ -1999,7 +2036,7 @@ _run_write_audit_30() {  # $1 = REPO_ROOT value, $2 = feature suffix (for a dist
 
 # (a) nonexistent path
 out30a=$(_run_write_audit_30 "${BOGUS_MISSING30}" "missing") && rc30a=0 || rc30a=$?
-walkup_count30a="$(find "${WALKUP5_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+walkup_count30a="$(_glob_count "${WALKUP5_ROOT}/dev/audit" '*.json' '-type f')"
 if (( rc30a != 0 )) \
    && [[ "${out30a}" == "FAIL: REPO_ROOT is set to '${BOGUS_MISSING30}' but is not a directory" ]] \
    && [[ "${walkup_count30a}" == "0" ]]; then
@@ -2011,7 +2048,7 @@ fi
 
 # (b) regular file, not a directory
 out30b=$(_run_write_audit_30 "${BOGUS_FILE30}" "file") && rc30b=0 || rc30b=$?
-walkup_count30b="$(find "${WALKUP5_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+walkup_count30b="$(_glob_count "${WALKUP5_ROOT}/dev/audit" '*.json' '-type f')"
 if (( rc30b != 0 )) \
    && [[ "${out30b}" == "FAIL: REPO_ROOT is set to '${BOGUS_FILE30}' but is not a directory" ]] \
    && [[ "${walkup_count30b}" == "0" ]]; then
@@ -2024,7 +2061,7 @@ fi
 # (c) REPO_ROOT='' -- must behave exactly like unset (scenario 27b): the
 # walk-up succeeds and the record is published under WALKUP5_ROOT.
 out30c=$(_run_write_audit_30 "" "empty") && rc30c=0 || rc30c=$?
-walkup_count30c="$(find "${WALKUP5_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+walkup_count30c="$(_glob_count "${WALKUP5_ROOT}/dev/audit" '*.json' '-type f')"
 if (( rc30c == 0 )) && echo "${out30c}" | grep -q "^OK: wrote" && [[ "${walkup_count30c}" == "1" ]]; then
   pass "scenario 30c — write_audit.sh: REPO_ROOT='' (empty string) is treated as unset: the walk-up still succeeds and publishes the record (deliberate, not a regression of 30a/30b)"
 else
@@ -2087,7 +2124,7 @@ _run_record_qc_audit_31() {  # $1 = REPO_ROOT value, $2 = feature suffix
 
 # (a) nonexistent path
 out31a=$(_run_record_qc_audit_31 "${BOGUS_MISSING31}" "missing") && rc31a=0 || rc31a=$?
-walkup_count31a="$(find "${WALKUP6_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+walkup_count31a="$(_glob_count "${WALKUP6_ROOT}/dev/audit" '*.json' '-type f')"
 if (( rc31a != 0 )) \
    && echo "${out31a}" | grep -qF "FAIL: REPO_ROOT is set to '${BOGUS_MISSING31}' but is not a directory" \
    && [[ "${walkup_count31a}" == "0" ]]; then
@@ -2099,7 +2136,7 @@ fi
 
 # (b) regular file, not a directory
 out31b=$(_run_record_qc_audit_31 "${BOGUS_FILE31}" "file") && rc31b=0 || rc31b=$?
-walkup_count31b="$(find "${WALKUP6_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+walkup_count31b="$(_glob_count "${WALKUP6_ROOT}/dev/audit" '*.json' '-type f')"
 if (( rc31b != 0 )) \
    && echo "${out31b}" | grep -qF "FAIL: REPO_ROOT is set to '${BOGUS_FILE31}' but is not a directory" \
    && [[ "${walkup_count31b}" == "0" ]]; then
@@ -2114,7 +2151,7 @@ fi
 # WALKUP6_ROOT via the write_audit.sh child process. Its dev/reviews/
 # fixture was already created in the per-sub-scenario loop above.
 out31c=$(_run_record_qc_audit_31 "" "empty") && rc31c=0 || rc31c=$?
-walkup_count31c="$(find "${WALKUP6_ROOT}/dev/audit" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
+walkup_count31c="$(_glob_count "${WALKUP6_ROOT}/dev/audit" '*.json' '-type f')"
 if (( rc31c == 0 )) && [[ "${walkup_count31c}" == "1" ]]; then
   pass "scenario 31c — record_qc_audit.sh: REPO_ROOT='' (empty string) is treated as unset: the walk-up still succeeds end-to-end and publishes the record (deliberate, not a regression of 31a/31b)"
 else
@@ -2163,13 +2200,13 @@ overall_qc: APPROVED
 5 — this file belongs to a different run and must NOT be used
 EOF
 
-audit_count_before_32="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE32}.json" | wc -l | tr -d ' ')"
+audit_count_before_32="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE32}.json")"
 
 out32=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S32_DIR}/gh" \
   bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
   "${FEATURE32}" "feat/dummy" "2026-05-25" --pr-number 3001 2>&1) && rc32=0 || rc32=$?
 
-audit_count_after_32="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE32}.json" | wc -l | tr -d ' ')"
+audit_count_after_32="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE32}.json")"
 
 if (( rc32 == 1 )) && [[ "${audit_count_before_32}" == "0" ]] && [[ "${audit_count_after_32}" == "0" ]] \
    && echo "${out32}" | grep -q "failed (exit 1)" \
@@ -2208,13 +2245,13 @@ overall_qc: APPROVED
 5 — this file belongs to a different run and must NOT be used
 EOF
 
-audit_count_before_33="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE33}.json" | wc -l | tr -d ' ')"
+audit_count_before_33="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE33}.json")"
 
 out33=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S33_DIR}/gh" \
   bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
   "${FEATURE33}" "feat/dummy" "2026-05-25" --pr-number 3002 2>&1) && rc33=0 || rc33=$?
 
-audit_count_after_33="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE33}.json" | wc -l | tr -d ' ')"
+audit_count_after_33="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE33}.json")"
 
 if (( rc33 == 1 )) && [[ "${audit_count_before_33}" == "0" ]] && [[ "${audit_count_after_33}" == "0" ]] \
    && echo "${out33}" | grep -q "failed (exit 1)" \
@@ -2256,13 +2293,13 @@ overall_qc: APPROVED
 5 — this file belongs to a different run and must NOT be used
 EOF
 
-audit_count_before_34="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE34}.json" | wc -l | tr -d ' ')"
+audit_count_before_34="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE34}.json")"
 
 out34=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S34_DIR}/gh" \
   bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
   "${FEATURE34}" "feat/dummy" "2026-05-25" --pr-number 3003 2>&1) && rc34=0 || rc34=$?
 
-audit_count_after_34="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "*-${FEATURE34}.json" | wc -l | tr -d ' ')"
+audit_count_after_34="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE34}.json")"
 
 if (( rc34 == 1 )) && [[ "${audit_count_before_34}" == "0" ]] && [[ "${audit_count_after_34}" == "0" ]] \
    && echo "${out34}" | grep -q "returned no reviews and wrote to stderr (exit 0)" \
@@ -2639,7 +2676,7 @@ out40_2=$(_scenario40_call "s40b" 3010) && rc40_2=0 || rc40_2=$?
 out40_3=$(_scenario40_call "s40c" 3011) && rc40_3=0 || rc40_3=$?
 
 JSON40="${TMP_REPO}/dev/audit/${DATE40}-feat-composition-no-sha-${FEATURE40}.json"
-audit_count_40="$(find "${TMP_REPO}/dev/audit" -maxdepth 1 -name "${DATE40}-*-${FEATURE40}.json" | wc -l | tr -d ' ')"
+audit_count_40="$(_glob_count "${TMP_REPO}/dev/audit" "${DATE40}-*-${FEATURE40}.json")"
 
 if (( rc40_1 == 0 )) && (( rc40_2 == 0 )) && (( rc40_3 == 0 )) \
    && [[ -f "${JSON40}" ]] \
