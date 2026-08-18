@@ -135,8 +135,18 @@ The ladder-v4 artifacts cannot stand in for it, for two independent reasons:
    failing to match, not tickets that never resolved
    (`dev/notes/exit-trigger-recompute-2026-08-18.md` §"The defect").
 
-Cell 00 of the TTL re-test runs at `59b26c3bf`, after both fixes, and is the
-first artifact in which the placed-ticket population can be decomposed at all.
+Cell 00 of the TTL re-test runs at `59b26c3bf`, which contains #2317 but **not**
+#2348 — re-verified here: `git merge-base --is-ancestor 1ebc37317 59b26c3bf`
+exits 1 (false), and `1ebc3731` (#2348, Aug 16 01:13) landed **14 minutes after**
+`59b26c3b` (#2349, Aug 16 00:59). So cell 00 is the first artifact that can
+measure **rest time** — the join §"The re-derived rest-time table" rests on — and
+it is **not** an artifact in which the placed-ticket population can be
+decomposed: like ladder-v4 it emits zero `cancel_reason` of any kind.
+
+**No artifact now on disk can decompose the placed-ticket population.** The
+first that could is a scenario run from a tree containing #2348 — i.e. at or
+after `1ebc3731`, which means a run on current `main`. That is the pending work
+item; do not re-analyse cell 00 for it.
 
 ## Side effect — the rest-time table the TTL axis rests on is not reproducible
 
