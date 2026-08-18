@@ -130,19 +130,28 @@ let _prepare_candidates ~config ~pending_entry_e ~held_set ~bar_reader
   |> Entry_stop_width_order.prefer_narrow_stops ~config ~bar_reader
        ~current_date
 
-(* G3: cost the book has already committed to tickets that are still resting.
+(* G3: what one position still owes on a resting entry ticket, 0 for anything
+   that is not one.
 
    Only the UNFILLED remainder counts — a partial fill already drew its own cash
    out of [portfolio.cash], so charging [target_quantity] would double-count it.
    Longs only: an entering short credits cash on fill, so reserving against one
-   would shrink the budget for a claim that pays in. *)
+   would shrink the budget for a claim that pays in.
+
+   Split out of the fold below rather than inlined: the per-position rule is the
+   part with the two easy-to-get-wrong cases, and keeping it a named function
+   keeps both it and the fold under the nesting limit. *)
+let _resting_ticket_cost_of (pos : Position.t) =
+  match (pos.state, pos.side) with
+  | ( Position.Entering { target_quantity; entry_price; filled_quantity; _ },
+      Trading_base.Types.Long ) ->
+      (target_quantity -. filled_quantity) *. entry_price
+  | _ -> 0.0
+
+(* Total the book has committed to tickets that have not yet drawn their cash. *)
 let _resting_long_ticket_cost (portfolio : Portfolio_view.t) =
   Map.fold portfolio.positions ~init:0.0 ~f:(fun ~key:_ ~data:pos acc ->
-      match (pos.Position.state, pos.Position.side) with
-      | ( Position.Entering { target_quantity; entry_price; filled_quantity; _ },
-          Trading_base.Types.Long ) ->
-          acc +. ((target_quantity -. filled_quantity) *. entry_price)
-      | _ -> acc)
+      acc +. _resting_ticket_cost_of pos)
 
 (* Cash the walk may commit this tick.
 
