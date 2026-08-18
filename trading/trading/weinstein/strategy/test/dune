@@ -1,5 +1,6 @@
 (tests
  (names
+  test_axti_entry_construction
   test_ad_series_cache
   test_ad_bars_unicorn
   test_ad_bars_compose
