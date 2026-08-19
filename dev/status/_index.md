@@ -4,15 +4,16 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-18 (orchestrator run 32111680652; main `7ce138b9` ->
-`a994b7bc`). Opened with two unreviewed local-session PRs and zero track PRs;
-merged four (#2371, #2368, #2372, #2373) with four rework iterations across
-two of them. #2368 and #2371 independently asserted the same unsupported
-causal claim about one measurement -- a defect invisible inside each PR and
-obvious across them; both withdrew it. #2371 also had cell 00 on the wrong
-side of #2348 by 14 minutes, which would have misdirected the next session's
-first action. Queue empty at exit.
-Full narrative: `dev/daily/2026-08-18.md`.
+Last updated: 2026-08-19 (orchestrator run 32228074121; main `184f563f` ->
+`5c278bb7`). Merged two: #2390 (harness `_glob_count` pin) and #2384 (clock-26
+default promotion, 2 rework commits + full re-QC). A harness agent finished its
+work then stalled before committing, leaving it uncommitted with no branch on
+origin -- recovered dispatcher-side. #2384 shipped a public signature that
+contradicted its own implementation: `weinstein_strategy.mli` re-declares the
+whole `config` record and still said `[@sexp.default 0]`; sexp attributes do not
+participate in signature matching, so it compiled green and no gate could catch
+it. Two new unreviewed PRs (#2391, #2392) arrived after the dispatch window.
+Full narrative: `dev/daily/2026-08-19.md`.
 
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
@@ -60,14 +61,14 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2372 `973d9282` (F2+F3 batched, 42 sites not 20) + #2373 `a5d5c48f` (dune-project bail-out) MERGED; next: R1 — the new `_glob_count` guard is unpinned |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2390 `5a8af145` MERGED — `_glob_count` guard pinned (R1+R2/R3), mutation-verified; next: F1 unguarded `declare -f` read + F2 vacuity precondition |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 8 open; A-NOOP-BUDGET-ORPHAN new (5 records recovered); A-FASTEXIT-VACUOUS now has measured cost; six items share the `workflow`-token blocker |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | segmentation weight caveats MERGED #2324 `4f602d0d`; 5 open; top item `linter_coverage` is a HUMAN POLICY DECISION (header half already shipped), not agent work |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
 | [screener](screener.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | local-range entry anchor MERGED #2217 (default-off axis `entry_anchor_local_range_weeks`); next: re-run honest ladder with local-top-E arms, then WF-CV |
-| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | R-a walk-order docstrings MERGED #2364 `1f19c6c3` (3 gates); next: R-c demoted-wide trace field, then WF-CV before any R3 flip |
+| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | clock-26 default PROMOTED #2384 `5c278bb7` (user-directed, ledger `Inconclusive`); next: confirmation grid — ≥3 cells, ≥1 pre-2009 macro regime |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
 | [experiment-platform](experiment-platform.md) | IN_PROGRESS | feat-backtest | — | force-exit-off grid REJECTED for promotion (#1503); single-dial surface exhausted; next: continuation-buy recheck on top-3000 (data-gated) |
