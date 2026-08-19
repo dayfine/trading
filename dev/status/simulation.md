@@ -2,7 +2,34 @@
 
 ## Last updated: 2026-08-19
 
-### 2026-08-18 — F2 clock default promoted 0 → 26 (PR #2384) — **CONFIRMATION GRID OWED**
+### 2026-08-18 — F2 clock default promoted 0 → 26 (PR #2384) — **REVERTED 2026-08-19 by #2397**
+
+> **⚠ READ THIS BEFORE THE SECTION BELOW. The flip described here is no longer
+> on main.** #2397 returned `entry_order_max_rest_weeks` to `0` after the
+> post-merge golden run on
+> `goldens-sp500/sp500-2019-2023-armed-stoplimit.sexp` regressed **−40.91pp** —
+> which is exactly the postsubmit watch R-5 below anticipated. Verified on main
+> 2026-08-19: `[@sexp.default 0]` in both `weinstein_strategy_config.mli` and
+> the re-declared record in `weinstein_strategy.mli`.
+>
+> **A spec that omits the field runs at `0` again.** The "also note for any new
+> spec" paragraph at the end of this section is superseded; no pinning is
+> required for the old behaviour.
+>
+> **The mechanism is not dead, and the grid below is still the right grid.**
+> The larger sample favours the cut: on 1,147 fills over 26 years, tickets
+> resting >26wk are 7.8% of fills and **−15.1%** of realized P&L
+> (`project_stale_order_fills_are_not_an_edge`). The −40.91pp cell removed
+> **SMCI +240%**, one trade worth more than the whole cut cohort — a tail
+> lottery on a net-losing class. Re-flip framed in **#2405**.
+>
+> **But age may be the wrong variable entirely.** #2407 proposes cancelling on
+> whether the *base* that defined `E` still holds, which would supersede the
+> clock rather than tune it; its companion measurement is in flight
+> (`dev/experiments/base-broken-2026-08-19/`).
+>
+> Everything below is kept verbatim as the record of what was promoted and what
+> it owed.
 
 `Weinstein_strategy_config.entry_order_max_rest_weeks` was promoted `0 → 26`
 **by user decision**, outside the normal gate. The full evidence and the
