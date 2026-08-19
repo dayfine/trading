@@ -1,20 +1,22 @@
 ---
 name: project-rest-time-pnl-is-cell-specific
-description: "The ticket rest-time P&L table does not transfer between ladder cells — the 5-13wk profit band does, but the >3yr bucket flips sign, which refutes defect E's premise for bounding the TTL clock."
+description: "SUPERSEDED — this table's per-bucket P&L is not reproducible from any artifact on disk; the >3yr bucket is negative on the keyed measurement, so defect E's premise was never refuted. Kept as a record of the withdrawn figures."
 metadata: 
   node_type: memory
   type: project
-  originSessionId: f3803253-a181-4a9d-88bc-d6fadb39647f
-  modified: 2026-08-18T04:47:10.050Z
+  originSessionId: 7b9bffd9-4afb-483a-9e22-50b6142eb14c
+  modified: 2026-08-18T19:58:06.694Z
 ---
 
-Ticket **rest time** (`ticket_age_weeks_at_fill`) is downstream of the entry
-anchor basis, so a P&L-by-rest-time table measured on one ladder cell **does not
-transfer** to another. Established 2026-08-17 by re-deriving the table on the
-base a re-test actually runs.
+⚠ **SUPERSEDED 2026-08-18.** The table below is retained as the durable record
+of what was claimed; **do not cite its numbers.** Current facts live in
+[[project-prefix-artifacts-cannot-measure-rest]] and the TTL results writeup
+(`dev/experiments/ttl-retest-2026-08-16/results.md`).
 
-Cell 00 (`Ma_cross` + `Window_extreme`, 1,145 filled tickets), joined
-`position_id` → `ticket_age_weeks_at_fill` → `pnl_dollars`:
+## What was recorded (2026-08-17) — WITHDRAWN
+
+Cell 00, stated as 1,145 filled tickets joined `position_id` →
+`ticket_age_weeks_at_fill` → `pnl_dollars`:
 
 | bucket | n | realized pnl | pnl/trade |
 |---|---:|---:|---:|
@@ -26,31 +28,42 @@ Cell 00 (`Ma_cross` + `Window_extreme`, 1,145 filled tickets), joined
 | wk 53-156 | 35 | **−220,314** | −6,295 |
 | **wk >156** | 25 | **+304,101** | **+12,164** |
 
-**Transfers:** the **5-13 week band is the profit band** — here 1.60M on 136
-trades, and on cell 13 the same band was 16.1% of trades and 28% of P&L. A
-4-week clock cuts it entirely on both. `{13, 26, 52}` is the right axis.
+## What replaced it
 
-**Does NOT transfer:** the **>3yr bucket flips sign**. Cell 13: 20 trades, 13
-losers, −154,006, "upside-free". Cell 00: 25 trades, **+304,101**, the
-second-highest per-trade bucket in the run. And the loss-maker on cell 00 is the
-**1-3yr** bucket, not the >3yr one.
+A `position_id`-keyed measurement on `ttl-retest-00-null` (same nominal cell,
+post-#2317 tree, 1,147 of 1,147 round trips joined, max fill age 865 weeks)
+disagrees across **every** bucket. Most consequentially the `>3yr` bucket is
+**−217,518** (−8,701/trade, 28% winners), not +304,101.
 
-**Consequence — defect E's premise is cell-specific.** "Unbounded is genuinely
-wrong at the extreme, the >3yr population is systematically poor and
-upside-free" was the whole justification for bounding
-`entry_order_max_rest_weeks` at ~156 weeks. On cell 00 **a 156-week bound cuts a
-profitable population.** Shipping the field defaulting to `0` (#2349) was right
-for a better reason than R1 discipline. See [[project-ttl-is-a-tail-lever]].
+- **What survives:** the **5-13 week band is the profit band** (+1,021,434 on
+  136 trades, +7,511 each), so the `{13, 26, 52}` axis is still the right one.
+  Only the ordering transferred; the magnitudes did not.
+- **What does not:** "defect E's premise is cell-specific" and "a 156-week bound
+  cuts a profitable population". On the keyed measurement the long-rest
+  population loses money, so **defect E was never refuted**. The worst ticket
+  rested 380 weeks to lose 39,827; the longest rested 865 weeks (16.6 years).
+- **Also withdrawn:** the gross-attribution figures (13w −98,663, 26w −101,917,
+  52w −83,787, 156w −304,101) and the conclusion drawn from them. Keyed, every
+  bound cuts a **net-losing** cohort — 26w largest at −349,132 over 89 fills.
 
-**And the clock cannot be tested by top-line return at this scale.** Gross
-attribution of what each clock removes: 13w −98,663 (~9.9pp), 26w −101,917
-(~10.2pp), 52w −83,787 (~8.4pp), 156w −304,101 (~30.4pp) — against a **132.5pp
-null**. Every value is 4-13× below the noise floor, and gross attribution is an
-upper bound on the magnitude. The metric that would resolve it is **per-bucket
-realized P&L on the arm's own trades**, not `total_return_pct`.
+**Not a mis-join.** An earlier correction of mine claimed that; it was refuted
+in QC on #2368 and the refutation is right. A re-pairing permutes P&L across
+buckets but preserves the total, and these totals move (+2,173,658 →
++2,314,953) while the n differ (1,146 vs 1,147). That is a **different trade
+set** — a reproducibility problem, not a pairing bug.
 
-**How to apply.** Before spending a multi-hour run on an axis, convert the
-motivating table into a predicted effect size and compare it to the null
-([[feedback-run-the-null-control-first]]). If it loses, either change the metric
-or don't run. Re-derive any borrowed distribution on the base you are actually
-running — the join is minutes of work and it changed a conclusion here.
+## What still applies
+
+The two process lessons are unaffected, and one is strengthened:
+
+- **Re-derive any borrowed distribution on the base you are actually running.**
+  This episode is now its own best example: the borrowed table survived into two
+  PRs and a memory before anyone re-measured it.
+- **Convert a motivating table into a predicted effect size and compare it to
+  the null before spending a run** ([[feedback-run-the-null-control-first]]) —
+  but note the null must *bound the metric you are reading*. The 132.5pp figure
+  is a **between-run** null and does not bound a **within-run** per-bucket
+  cohort accounting. Applying it to the wrong metric is what retired four arms
+  on a bad argument.
+
+See [[project-ttl-is-a-tail-lever]].
