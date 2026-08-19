@@ -115,8 +115,7 @@ val rs_blocks_long : min_rs_normalized:float -> Rs.result option -> bool
     [_rs_long_signal]), which is a soft preference and does not implement the
     book's prohibition (#2381).
 
-    Returns [true] when [current_normalized < min_rs_normalized] and the trend
-    is not the exempt one (see the conjunction paragraph below).
+    Returns [true] when [current_normalized < min_rs_normalized].
     [current_normalized] is the Mansfield zero-line position — [rs_value] over
     its own long-term average ([Relative_strength._build_history]) — so
     {b 1.0 is the zero line}: above is positive territory, below is negative.
@@ -127,26 +126,34 @@ val rs_blocks_long : min_rs_normalized:float -> Rs.result option -> bool
     The comparison is strict, so a candidate sitting exactly on the zero line is
     admitted, and the [0.0] default is an exact no-op rather than a near one.
 
-    {b The rule is a conjunction}, so one trend is exempt regardless of level:
-    [Bullish_crossover] is never blocked. §4.4 rule 3 makes a stock "crossing
-    from negative to positive territory" an {b A+ bonus signal}, and
-    mid-crossing it is still below [1.0] — a level-only gate would block
-    precisely the cohort the book singles out.
+    {b Level-only is the faithful reading, not a simplification.} §4.4 rule 3
+    makes a stock "crossing from negative to positive territory" an
+    {b A+ bonus signal}, which looks like it might conflict — but it cannot.
+    [Rs._classify_trend] emits [Bullish_crossover] only on the
+    [(cur > 1.0, prev > 1.0) = (true, false)] arm, and [_result_of_history]
+    reports that same float as [current_normalized]. So [Bullish_crossover]
+    {b implies} [current_normalized > 1.0] as a module invariant: a crossing has
+    already {i landed} above the line by the time it is classified as one. A
+    level gate therefore never reaches rule 3's cohort, and the two rules
+    partition cleanly.
 
-    The exemption is exactly one trend, which keeps this the mirror of
-    {!rs_blocks_short}: that gate counts [Bullish_crossover] as {i strong} (so
-    it blocks shorts) and this one counts it as {i not weak} (so it admits
-    longs). [Negative_improving] mirrors too — {i not strong} there, therefore
-    still {i weak} here, and still {b blocked}. Improving-but-still-negative is
-    not rule 3's case; rule 3 names the crossing.
+    That invariant is pinned in the [Rs] suite
+    ([test_bullish_crossover_implies_positive_territory]) rather than argued
+    here, so a future change to the classifier that broke the partition would
+    fail a test instead of silently making this gate wrong.
 
-    [Positive_flat] is deliberately {b not} exempt. "Positive and flat"
-    contradicts a sub-[1.0] level, so its appearance there is a symptom of the
-    stuck trend classifier (#2380) rather than signal; exempting it would make
-    the gate inert. Consequently the trend arm of the conjunction is inert
-    {i today} — every candidate classifies as [Positive_flat] — and the gate
-    behaves level-only. It becomes faithful the moment #2380 lands, with no
-    further change here.
+    An earlier revision of this function carried a trend exemption for
+    [Bullish_crossover], on the theory that rules 2 and 3 overlap mid-crossing.
+    They do not. The exemption was unreachable in production and its test
+    hand-built an [Rs.result] the module cannot construct. {b Withdrawn} — see
+    the review discussion on #2391.
+
+    The trends that {i can} co-occur with [current_normalized < 1.0] are
+    [Negative_declining], [Negative_improving], [Bearish_crossover], and
+    [Positive_flat] via the degenerate [n < 2] fallback (#2380). All are blocked
+    by the level test, which is correct: [Negative_improving]'s own type
+    docstring reads "RS still negative but improving — watch,
+    {b not yet a buy}".
 
     Absent RS data does {b not} block, mirroring {!rs_blocks_short}: the rule
     prohibits buying on {i established} negative RS, and a missing series does

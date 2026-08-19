@@ -2474,20 +2474,15 @@ let test_rs_gate_diagnostics_track_live_rejection _ =
          field (fun d -> d.long_grade_admitted) (equal_to 0);
        ])
 
-(* §4.4 rule 3: "RS crossing from negative to positive territory while all other
-   criteria met → A+ bonus signal". Mid-crossing the level is still below 1.0,
-   so a level-only rule 2 would block exactly this cohort. The conjunction is
-   what reconciles the two rules. *)
-let test_rs_gate_crossing_is_exempt_below_the_line _ =
-  let result =
-    _screen_long ~min_rs_normalized:1.0
-      ~stock:(_long_stock_with_rs ~trend:Bullish_crossover (Some 0.90))
-  in
-  assert_that result.buy_candidates (size_is 1)
-
-(* The other arm of the conjunction: same sub-zero-line level, but declining
-   rather than improving, is exactly what rule 2 forbids. Without this the
-   exemption above could be satisfied by a gate that never blocks at all. *)
+(* The trends that can actually co-occur with a sub-1.0 level are
+   Negative_declining, Negative_improving, Bearish_crossover, and (degenerately,
+   per #2380) Positive_flat. Bullish_crossover CANNOT: Rs._classify_trend emits
+   it only when cur > 1.0, and that same float is current_normalized — pinned by
+   test_bullish_crossover_implies_positive_territory in the Rs suite. An earlier
+   revision of this file tested a hand-built {0.90, Bullish_crossover} fixture
+   that the module cannot construct; it was removed with the exemption it
+   guarded. *)
+(* The canonical rule 2 case: below the zero line and declining. *)
 let test_rs_gate_declining_below_the_line_is_blocked _ =
   let result =
     _screen_long ~min_rs_normalized:1.0
@@ -2495,10 +2490,10 @@ let test_rs_gate_declining_below_the_line_is_blocked _ =
   in
   assert_that result.buy_candidates is_empty
 
-(* The exemption is exactly ONE trend, which is what keeps this the mirror of
-   [rs_blocks_short]: that gate counts Negative_improving as not-strong (so
-   shorting stays allowed), so this one must count it as still-weak. Without
-   this test, widening the exemption to "any improving trend" would pass. *)
+(* Improving but still below the line is STILL blocked — Negative_improving's
+   own type docstring reads "RS still negative but improving — watch, not yet a
+   buy". This is the test that would fail if anyone re-introduced a trend
+   exemption wide enough to admit it. *)
 let test_rs_gate_improving_but_still_negative_is_blocked _ =
   let result =
     _screen_long ~min_rs_normalized:1.0
@@ -2826,8 +2821,6 @@ let suite =
          >:: test_rs_gate_absent_rs_does_not_block;
          "RS gate: the diagnostics grade count tracks the live rejection"
          >:: test_rs_gate_diagnostics_track_live_rejection;
-         "RS gate: a crossing RS below the line is exempt (§4.4 rule 3)"
-         >:: test_rs_gate_crossing_is_exempt_below_the_line;
          "RS gate: a declining RS below the line is still blocked"
          >:: test_rs_gate_declining_below_the_line_is_blocked;
          "RS gate: improving but still negative is still blocked"

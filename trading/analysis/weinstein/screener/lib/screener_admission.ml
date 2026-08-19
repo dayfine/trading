@@ -72,23 +72,21 @@ let rs_blocks_short = function
       true
   | _ -> false
 
-let rs_blocks_long ~min_rs_normalized = function
-  (* §4.4 rule 2 is a CONJUNCTION — negative RS *trend* AND negative territory.
-     Rule 3 makes a stock "crossing from negative to positive territory" an A+
-     bonus signal, and mid-crossing it is still below 1.0, so a level-only gate
-     would block exactly the cohort the book singles out. Exempting that one
-     trend mirrors [rs_blocks_short] exactly: that gate treats
-     [Bullish_crossover] as STRONG (so it blocks shorts), and this one treats it
-     as not-weak (so it admits longs). [Negative_improving] gets the mirrored
-     treatment too — not-strong there, so still weak here, hence still BLOCKED.
-     Improving-but-still-negative is not the book's A+ case; rule 3 names the
-     crossing.
+(* Book §4.4 rule 2, and level-only is the FAITHFUL reading rather than a
+   simplification of it. Rule 3 ("RS crossing from negative to positive
+   territory -> A+ bonus signal") cannot conflict, because [_classify_trend]
+   emits [Bullish_crossover] only on the [(cur > 1.0, prev > 1.0) = (true,
+   false)] arm and [_result_of_history] reports that same float as
+   [current_normalized]. So [Bullish_crossover] implies
+   [current_normalized > 1.0] as a module invariant — a crossing has already
+   LANDED above the line — and a level gate never reaches rule 3's cohort.
+   Pinned by [test_bullish_crossover_implies_positive_territory] in the Rs
+   suite, so the invariant is guarded mechanically rather than argued here.
 
-     [Positive_flat] is deliberately NOT exempt: "positive and flat" contradicts
-     a sub-1.0 level, so its appearance there is a symptom of #2380 (the trend
-     classifier is stuck at that value) rather than signal. Exempting it would
-     make the gate inert today. *)
-  | Some { Rs.trend = Bullish_crossover; _ } -> false
+   An earlier revision exempted [Bullish_crossover] on the theory that the two
+   rules overlap mid-crossing. They do not; the exemption was unreachable and
+   its test hand-built a state [Rs] cannot produce. Withdrawn. *)
+let rs_blocks_long ~min_rs_normalized = function
   | Some { Rs.current_normalized; _ } ->
       Float.( < ) current_normalized min_rs_normalized
   | None -> false

@@ -129,6 +129,63 @@ let test_bullish_crossover _ =
 (* flat_threshold config                                                *)
 (* ------------------------------------------------------------------ *)
 
+(** The invariant [Screener_admission.rs_blocks_long] relies on:
+    [Bullish_crossover] implies [current_normalized > 1.0].
+
+    [_classify_trend] emits it only on the
+    [(cur > 1.0, prev > 1.0) = (true, false)] arm, and [_result_of_history]
+    reports that same float as [current_normalized] — so a crossing has already
+    LANDED above the zero line by the time it is classified as one.
+
+    That is why the long-side RS gate can be level-only without conflicting with
+    book §4.4 rule 3 ("RS crossing from negative to positive territory -> A+
+    bonus signal"): a level test never reaches rule 3's cohort. #2391 briefly
+    carried a trend exemption built on the opposite assumption.
+
+    {b Swept across the trend space, not one fixture.} A single
+    genuine-crossover fixture cannot detect a classifier that starts emitting
+    [Bullish_crossover] BELOW the line, because that fixture never reaches the
+    offending branch — the check has to include cases that sit under 1.0. Each
+    pair below is labelled so a failure names the shape that broke it. *)
+let test_bullish_crossover_implies_positive_territory _ =
+  let n = 80 in
+  let rising_from_below =
+    List.init n ~f:(fun i ->
+        if i < 60 then 50.0 else 100.0 +. (Float.of_int (i - 60) *. 5.0))
+    |> weekly_bars
+  in
+  (* Below the zero line throughout and improving — the shape that a broken
+     classifier would most plausibly mislabel as a crossover. *)
+  let below_and_improving =
+    List.init n ~f:(fun i -> 40.0 +. (Float.of_int i *. 0.3)) |> weekly_bars
+  in
+  (* Below the line and deteriorating. *)
+  let below_and_declining =
+    List.init n ~f:(fun i -> 100.0 +. (Float.of_int i *. 0.2)) |> weekly_bars
+  in
+  let flat_bench = const_bars ~n 100.0 in
+  let rising_bench =
+    List.init n ~f:(fun i -> 100.0 +. (Float.of_int i *. 2.0)) |> weekly_bars
+  in
+  let cases =
+    [
+      ("rising from below", rising_from_below, flat_bench);
+      ("below and improving", below_and_improving, flat_bench);
+      ("below and declining", below_and_declining, rising_bench);
+    ]
+  in
+  List.iter cases ~f:(fun (label, stock_bars, benchmark_bars) ->
+      match analyze ~config:cfg ~stock_bars ~benchmark_bars with
+      | Some ({ trend = Bullish_crossover; current_normalized; _ } : result)
+        when Float.(current_normalized <= 1.0) ->
+          assert_failure
+            (Printf.sprintf
+               "%s: Bullish_crossover at current_normalized = %.4f, which \
+                breaks the invariant Screener_admission.rs_blocks_long depends \
+                on (see its .mli)"
+               label current_normalized)
+      | _ -> ())
+
 let test_flat_threshold_configurable _ =
   (* With a very tight threshold (1.0), even a tiny RS drop is NOT flat. *)
   let strict_cfg = { cfg with flat_threshold = 1.0 } in
@@ -351,6 +408,8 @@ let suite =
          "stock_falling_benchmark_rising"
          >:: test_stock_falling_benchmark_rising;
          "bullish_crossover" >:: test_bullish_crossover;
+         "bullish_crossover_implies_positive_territory"
+         >:: test_bullish_crossover_implies_positive_territory;
          "flat_threshold_configurable" >:: test_flat_threshold_configurable;
          "pure_same_inputs_same_output" >:: test_pure_same_inputs_same_output;
          "parity_positive_rs" >:: test_parity_positive_rs;
