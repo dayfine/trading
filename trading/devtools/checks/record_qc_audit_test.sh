@@ -51,11 +51,20 @@ fail() { echo "  FAIL: $*" >&2; FAIL_COUNT=$(( FAIL_COUNT + 1 )); }
 # narrower: if <dir> itself is missing (e.g. a hand-written `rm -rf` of the
 # temp audit dir mid-suite), `find` reports the error to stderr and returns
 # non-zero -- but its stdout is still empty, so `wc -l` still reports "0"
-# and the caller gets the correct count; the `|| true` below exists only to
-# stop that non-zero `find` exit status from propagating through `set -e`
-# before the count can be captured and returned. Optional 3rd arg: an extra
-# `find` predicate appended verbatim (e.g. "-type f") for call sites that
-# also filter by entry type.
+# and the caller gets the correct count.
+#
+# NOTE on what actually prevents the abort at call sites: every real call
+# site is shaped `x="$(_glob_count ...)"`. That outer command substitution
+# runs this function's body in a subshell where `errexit` is inactive
+# (`shopt inherit_errexit` is off in this suite), so at those sites a
+# non-zero `find`/pipeline status inside the body is NOT what aborts the
+# caller -- the function-call wrapping itself already absorbs it, `|| true`
+# or not. `|| true` below is load-bearing only for a DIRECT, non-command-
+# substitution invocation of `_glob_count` (errexit active in the caller's
+# frame) -- see scenario 42, the pin for H-AUDIT-GLOB-COUNT-GUARD-UNPINNED,
+# for the call shape where removing it actually turns this suite red.
+# Optional 3rd arg: an extra `find` predicate appended verbatim (e.g.
+# "-type f") for call sites that also filter by entry type.
 _glob_count() {
   local dir="$1" pattern="$2" extra="${3:-}"
   local n
@@ -2753,6 +2762,41 @@ else
   echo "${out41_2}" | sed 's/^/      /'
   [[ -f "${JSON41A}" ]] && echo "      json A: $(cat "${JSON41A}")"
   [[ -f "${JSON41B}" ]] && echo "      json B: $(cat "${JSON41B}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 42 — _glob_count guard pin, DIRECT invocation
+# (H-AUDIT-GLOB-COUNT-GUARD-UNPINNED)
+#
+# Every real call site in this suite is shaped `x="$(_glob_count ...)"`.
+# That command substitution runs the helper's body in a subshell where
+# `errexit` is inactive (`shopt inherit_errexit` is off), so a pin written
+# in that call shape passes whether or not `_glob_count` still guards its
+# internal pipeline (2>/dev/null + `|| true`) -- mutation M-A (stripping
+# the guard) is invisible to scenarios 1-41 and leaves this suite green.
+#
+# The one call shape that DOES exercise the guard is a DIRECT, top-level
+# invocation (no `$( )` wrapper) against a missing directory: `errexit` is
+# active in the caller's frame there, so an unguarded internal pipeline
+# failure (pipefail-propagated from `find` on a missing dir) aborts the
+# call instead of returning "0". We extract the function's CURRENT body
+# via `declare -f` (rather than duplicating its source here) so this pin
+# tracks whatever `_glob_count` actually does, not a copy that can drift.
+# ---------------------------------------------------------------------------
+GLOB_COUNT_DEF="$(declare -f _glob_count)"
+SCENARIO42_MISSING_DIR="${TMP_REPO}/dev/audit/nonexistent-dir-42"
+SCENARIO42_SCRIPT="${TMP_REPO}/scenario42_direct_call.sh"
+cat > "${SCENARIO42_SCRIPT}" <<EOF
+set -euo pipefail
+${GLOB_COUNT_DEF}
+_glob_count "${SCENARIO42_MISSING_DIR}" "*.json"
+EOF
+out42="$(bash "${SCENARIO42_SCRIPT}" 2>&1)" && rc42=0 || rc42=$?
+
+if [[ "${rc42}" -eq 0 ]] && [[ "${out42}" == "0" ]]; then
+  pass "scenario 42 — _glob_count called DIRECTLY (not via command substitution) against a nonexistent directory prints a clean 0 and does not abort (H-AUDIT-GLOB-COUNT-GUARD-UNPINNED)"
+else
+  fail "scenario 42 — expected direct _glob_count call against a missing dir to print '0' and exit 0; got rc=${rc42} output=${out42}"
 fi
 
 # ---------------------------------------------------------------------------
