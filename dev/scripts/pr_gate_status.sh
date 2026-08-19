@@ -81,10 +81,16 @@ printf '%-6s %-8s %-14s %-14s %s\n' PR CI STRUCT BEHAV NEXT-ACTION
 printf '%s\n' "----------------------------------------------------------------------------"
 
 for n in $PRS; do
-  meta=$(gh pr view "$n" --repo "$REPO" --json headRefOid,files,reviews)
+  meta=$(gh pr view "$n" --repo "$REPO" --json headRefOid,files,reviews,labels)
   tip=$(printf '%s' "$meta" | jq -r '.headRefOid')
   files=$(printf '%s' "$meta" | jq -r '.files[].path')
   reviews=$(printf '%s' "$meta" | jq -c '.reviews')
+  # A do-not-merge label is a HARD hold: it outranks every gate below, including
+  # three greens. Draft status does NOT do this -- `gh pr merge --admin` merges
+  # drafts without complaint and the orchestrator reads gate state, not draft
+  # state, which is how #2384 merged 30 min after being drafted under an
+  # explicit hold (#2396).
+  held=$(printf '%s' "$meta" | jq -r '[.labels[].name] | index("do-not-merge") // empty')
 
   # CI: pending anywhere beats fail beats pass -- never merge on non-pass.
   checks=$(gh pr checks "$n" --repo "$REPO" 2>/dev/null | awk '{print $2}' | sort -u | tr '\n' ' ')
@@ -104,6 +110,14 @@ for n in $PRS; do
 
   # One next action, in dependency order: CI first, then structural (behavioral
   # does not run until structural is APPROVED), then behavioral, then merge.
+  case "$ci:$struct:$behav" in
+    *)               if [ -n "$held" ]; then
+                       printf '%-6s %-8s %-14s %-14s %s\n' \
+                         "$n" "$ci" "$struct" "$behav" "HOLD -- do-not-merge label"
+                       continue
+                     fi ;;
+  esac
+
   case "$ci:$struct:$behav" in
     FAIL:*)          action="fix CI -- do not merge" ;;
     pending:*)       action="wait for CI" ;;
