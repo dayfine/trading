@@ -23,8 +23,44 @@ what to *run* when, so the session neither idles nor thrashes.
 The rule that follows from the table: **a long backtest and an agent wave are
 mutually exclusive; dispatcher-side work is free and should fill every gap.**
 
+## QC outranks backtests (user directive, 2026-08-18)
+
+**An open PR waiting on QC is scheduled BEFORE any backtest.** When the two
+compete for the container, QC wins — including killing or deferring a run
+already in flight if that is what frees the machine.
+
+Why this ordering, even though a backtest looks like the more productive use:
+
+- A queued QC gate blocks a **merge**, which blocks every branch that would
+  build on it. A deferred backtest blocks only itself.
+- QC is **bounded** (minutes); a backtest is **unbounded** (hours). The
+  backtest waiting on QC costs far less total latency than QC waiting on the
+  backtest.
+- Backtests are **relaunch-resumable** — the spec is committed and the run is
+  reproducible. A PR sitting unreviewed is pure dead time, and it accumulates:
+  `pr-gate-loop.md` opens with a session that found **eight** unreviewed PRs.
+
+**Pre-flight, before launching anything long:**
+
+```sh
+sh dev/scripts/pr_gate_status.sh
+```
+
+If any PR reads `dispatch qc-structural` or `dispatch qc-behavioral`, run that
+wave first. Do not start a multi-hour run "while QC is pending" on the grounds
+that the container looks free — it is not free, it is committed.
+
+Observed 2026-08-18: four CI-green PRs sat idle behind a tiebreak backtest that
+was itself testing a baseline about to be retired. The backtest was killed, the
+QC wave ran, all four merged, and nothing was lost — which is the general shape
+of this trade. The wave also produced four corrections to the durable record
+that CI could not have caught, including a README that would have sent the next
+session on a 1.5-hour confounded run.
+
 ## Scheduling rules
 
+0. **QC first.** See above — an open PR awaiting QC preempts any backtest, in
+   flight or planned.
 1. **Never dispatch agents while a multi-hour backtest is running.** Not "few
    agents" — none. A 26y run holds ~2.2-2.4 GB for hours; three linking agents
    spike past what remains. If a backtest is live and PR work is queued, either
