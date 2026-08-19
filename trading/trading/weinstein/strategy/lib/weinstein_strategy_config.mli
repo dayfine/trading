@@ -1492,6 +1492,63 @@ type config = {
           - [((entry_order_ttl_weeks N))] for [N > 0] →
             [((enable_entry_ticket_rescreen true))
              ((entry_order_max_rest_weeks N))] *)
+  reserve_cash_for_resting_tickets : bool; [@sexp.default false]
+      (** G3 of [dev/plans/ticket-funding-2026-08-16.md]: subtract the cost the
+          book has already committed to {b resting} entry tickets from the cash
+          the entry walk is allowed to spend this tick.
+
+          {b The leak it closes.} {!Entry_audit_capture.check_cash_and_deduct}
+          already enforces cash discipline {i within} one tick — the walk
+          threads a [remaining_cash] ref and each admitted [CreateEntering]
+          deducts its designed cost, so one Friday's tickets cannot collectively
+          exceed that Friday's cash. But the ref is re-seeded from
+          [portfolio.cash] every tick, and a ticket placed in week [N] and still
+          resting in week [N+1] has taken {b no} cash — it is a resting order,
+          not a position. So the next walk sees that money as available and
+          commits it again. Repeat weekly and the book carries more claims than
+          cash.
+
+          {b What that costs today.} When several over-committed tickets trigger
+          in the same week, the first ones consume the balance and the rest are
+          {b destroyed} — not retried, not resized
+          ([[project-ticket-dies-on-cash-shortfall]]). Measured over 3,530
+          rejections: median shortfall is {b 52%} of the ticket's cost, only
+          5.1% are within 5% of fundable, and {b 63%} arrive in bursts against a
+          single cash balance. That burst structure is the signature of
+          aggregate over-commitment rather than per-ticket bad luck, and it is
+          why this axis is the one that removes the failure instead of
+          arbitrating it (G2a retry and G2b size-to-available both arbitrate).
+
+          {b Reserved amount} is the {b unfilled remainder},
+          [(target_quantity - filled_quantity) * entry_price], summed over
+          [Entering] {b long} positions. Partial fills already drew their own
+          cash, so reserving the full [target_quantity] would double-count them;
+          an entering {i short} credits cash on fill, so reserving against it
+          would shrink the budget for a claim that pays in.
+
+          {b No double-count on the filling tick.}
+          {!Trading_simulation.Simulator} applies fills in
+          [_process_fills_and_cancels] {i before} [_call_strategy], so a ticket
+          that fills this tick has already left [Entering] and its cash has
+          already left [portfolio.cash] by the time [spendable] is computed.
+
+          {b Not [cash_reserve_pct]} (retired in #2286,
+          [[project-cash-reserve-rejected]]). That was a blanket idle-cash floor
+          — a protection lever, which the barbell dominates. This reserve is
+          earmarked against {b specific written claims} and is released the
+          moment a ticket fills or cancels; with no resting tickets it is
+          exactly [0.0].
+
+          {b The cost, stated up front.} Reserved cash is idle cash. Deployment
+          already sits near the exposure cap, so this plausibly pushes
+          utilisation {i below} it — fewer claims, each funded. Report
+          deployment alongside return, not after it.
+
+          [false] (default) = [spendable] is [portfolio.cash], bit-identical to
+          the prior behaviour (R1).
+
+          R2: axis-expressible as
+          [((flag reserve_cash_for_resting_tickets) (values (true false)))]. *)
   stop_width_mode : Stop_width_mode.t;
       [@sexp.default Stop_width_mode.Drop_over_max]
       (** F3 ([dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F3): what the
