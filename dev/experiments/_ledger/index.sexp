@@ -352,4 +352,9 @@
   (base_scenario
    "ladder-v4 cell 00 base (top-3000 PIT-2000, 2000-2026), split-safe v5thin warehouse, pinned worktree @59b26c3bf")
   (window_id top3000-2000-2026-single-window-3salt)
-  (verdict Reject) (entry_slug entry-ticket-rescreen)))
+  (verdict Reject) (entry_slug entry-ticket-rescreen))
+ ((config_hash rescreen-false-clock-26)
+  (base_scenario
+   "ladder-v4 cell 00 base (top-3000 PIT-2000, 2000-2026), split-safe v5thin warehouse, pinned worktree @59b26c3bf")
+  (window_id top3000-2000-2026-single-window-3salt)
+  (verdict Inconclusive) (entry_slug entry-ticket-clock26-promotion)))

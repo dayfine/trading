@@ -822,6 +822,73 @@ let test_default_entry_ticket_lifecycle_is_rescreen_off_clock_26 _ =
       (_default_config ()).entry_order_max_rest_weeks )
     (equal_to (false, 26))
 
+(* -------------------------------------------------------------------- *)
+(* F2: the two [config] declarations must agree on the clock's default   *)
+(* -------------------------------------------------------------------- *)
+
+(* The [config] record is declared twice: authoritatively in
+   [weinstein_strategy_config.ml] (which is what ppx_sexp_conv compiles into
+   [config_of_sexp]) and again, by hand, in [weinstein_strategy.mli] — the
+   signature consumers actually open, since [weinstein_strategy.ml] does
+   [include Weinstein_strategy_config]. Per-field [[@sexp.default]] attributes
+   do NOT participate in signature matching, so the two can disagree and still
+   compile green: the 0 -> 26 promotion (PR #2384) left [weinstein_strategy.mli]
+   declaring [[@sexp.default 0]] and no build, linter or test noticed.
+
+   Read the .mli as text and compare its declared default against the runtime
+   one. Textual because the .mli attribute is inert — there is no value to
+   observe at runtime, only a source-level claim that can drift. *)
+let _weinstein_strategy_mli_rel =
+  "trading/trading/weinstein/strategy/lib/weinstein_strategy.mli"
+
+let rec _walk_up_to_file dir rel tries_left =
+  if tries_left = 0 then None
+  else
+    let candidate = Filename.concat dir rel in
+    if try Stdlib.Sys.file_exists candidate with _ -> false then Some candidate
+    else
+      let parent = Filename.dirname dir in
+      if String.equal parent dir then None
+      else _walk_up_to_file parent rel (tries_left - 1)
+
+(* The [[@sexp.default N]] attached to [field] in the given .mli text. Matches
+   the one-line declaration shape ocamlformat produces for these fields:
+   [  <field> : int; [@sexp.default N]] *)
+let _declared_sexp_default ~path ~field =
+  let marker = "[@sexp.default " in
+  In_channel.read_lines path
+  |> List.find_map ~f:(fun line ->
+      let trimmed = String.strip line in
+      if String.is_prefix trimmed ~prefix:(field ^ " :") then
+        match String.substr_index trimmed ~pattern:marker with
+        | None -> None
+        | Some i ->
+            String.subo trimmed ~pos:(i + String.length marker)
+            |> String.take_while ~f:Char.is_digit
+            |> Int.of_string_opt
+      else None)
+
+(** F2 drift guard: [Weinstein_strategy.config]'s hand-written re-declaration of
+    [entry_order_max_rest_weeks] must carry the same [[@sexp.default]] as the
+    value [Weinstein_strategy_config] actually ships. Nothing in the build
+    checks this (sexp attributes are not part of signature matching), so a
+    future default change that updates only one of the two declarations fails
+    here instead of compiling silently. *)
+let test_strategy_mli_redeclares_clock_default_consistently _ =
+  let path =
+    match
+      _walk_up_to_file (Stdlib.Sys.getcwd ()) _weinstein_strategy_mli_rel 10
+    with
+    | Some p -> p
+    | None ->
+        assert_failure
+          (sprintf "%s not found from cwd=%s" _weinstein_strategy_mli_rel
+             (Stdlib.Sys.getcwd ()))
+  in
+  assert_that
+    (_declared_sexp_default ~path ~field:"entry_order_max_rest_weeks")
+    (is_some_and (equal_to (_default_config ()).entry_order_max_rest_weeks))
+
 (** F2 R2 (axis reachability): both fields must be valid [Variant_matrix] axes,
     which requires each value to resolve through the {b real}
     [Overlay_validator.apply_overrides] with no unknown-key error. The clock's
@@ -888,6 +955,8 @@ let suite =
   >::: [
          "F2: re-screen defaults off, clock defaults to 26"
          >:: test_default_entry_ticket_lifecycle_is_rescreen_off_clock_26;
+         "F2: weinstein_strategy.mli re-declares the clock default consistently"
+         >:: test_strategy_mli_redeclares_clock_default_consistently;
          "F2: both lifecycle fields resolve as Variant_matrix axes"
          >:: test_entry_ticket_lifecycle_axes_resolve_via_overlay_validator;
          "F2: config parses with both lifecycle fields absent"
