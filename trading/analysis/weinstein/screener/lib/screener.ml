@@ -52,6 +52,7 @@ type config = {
   min_price : float; [@sexp.default 0.0]
   failed_breakout_tolerance_pct : float; [@sexp.default 0.0]
   early_stage2_max_weeks : int; [@sexp.default 4]
+  min_rs_normalized : float; [@sexp.default 0.0]
 }
 [@@deriving sexp]
 
@@ -74,6 +75,7 @@ let default_config =
     min_price = 0.0;
     failed_breakout_tolerance_pct = 0.0;
     early_stage2_max_weeks = 4;
+    min_rs_normalized = 0.0;
   }
 
 type scored_candidate = {
@@ -184,7 +186,8 @@ let _score_and_build ~weights ~thresholds ~params ~min_grade ~min_score_override
     score floor. *)
 let _long_candidate ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price
-    ~failed_breakout_tolerance_pct ~early_stage2_max_weeks (a, sector) =
+    ~failed_breakout_tolerance_pct ~early_stage2_max_weeks ~min_rs_normalized
+    (a, sector) =
   if not (passes_price_floor ~min_price ~price:a.Stock_analysis.breakout_price)
   then None
   else if equal_sector_rating sector.rating Weak then None
@@ -196,6 +199,7 @@ let _long_candidate ~weights ~thresholds ~params ~min_grade ~min_score_override
          ~breakout_price:a.Stock_analysis.breakout_price
          ~current_close:a.Stock_analysis.current_close)
   then None
+  else if rs_blocks_long ~min_rs_normalized a.Stock_analysis.rs then None
   else if not (passes_volume_band ~excl:volume_ratio_exclude_range a) then None
   else
     _score_and_build ~weights ~thresholds ~params ~min_grade ~min_score_override
@@ -294,15 +298,16 @@ let shorts_admitted_by_macro = _shorts_admitted_by_macro
 (** Filter, score, grade, sort, and cap long candidates. *)
 let _evaluate_longs ~weights ~thresholds ~params ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price
-    ~failed_breakout_tolerance_pct ~early_stage2_max_weeks ~max_buy_candidates
-    ~neutral_blocks_longs ~ranking ~candidates ~macro_trend :
-    scored_candidate list =
+    ~failed_breakout_tolerance_pct ~early_stage2_max_weeks ~min_rs_normalized
+    ~max_buy_candidates ~neutral_blocks_longs ~ranking ~candidates ~macro_trend
+    : scored_candidate list =
   if not (_longs_admitted_by_macro ~neutral_blocks_longs macro_trend) then []
   else
     let candidate_fn =
       _long_candidate ~weights ~thresholds ~params ~min_grade
         ~min_score_override ~max_score_override ~volume_ratio_exclude_range
         ~min_price ~failed_breakout_tolerance_pct ~early_stage2_max_weeks
+        ~min_rs_normalized
     in
     _filter_and_cap ~ranking ~candidate_fn ~max_n:max_buy_candidates candidates
 
@@ -354,33 +359,6 @@ let _resolve_sector ~sector_map ticker =
         stage = Stage1 { weeks_in_base = 0 };
       }
 
-(** Compute the cascade-diagnostics record for one screen call. Decoupled from
-    [screen] so the latter stays within the 50-line linter cap. *)
-let _diagnostics_for_screen ~weights ~grade_thresholds ~min_grade
-    ~min_score_override ~max_score_override ~volume_ratio_exclude_range
-    ~min_price ~failed_breakout_tolerance_pct ~early_stage2_max_weeks
-    ~total_stocks ~candidates_after_held ~macro_trend ~candidates
-    ~buy_candidates ~short_candidates =
-  let long_phases =
-    count_long_phases ~weights ~thresholds:grade_thresholds ~min_grade
-      ~min_score_override ~max_score_override ~volume_ratio_exclude_range
-      ~min_price ~failed_breakout_tolerance_pct ~early_stage2_max_weeks
-      ~candidates
-  in
-  let long_failed_breakout_dropped =
-    count_long_failed_breakouts ~tolerance_pct:failed_breakout_tolerance_pct
-      ~early_stage2_max_weeks ~candidates
-  in
-  let short_phases =
-    count_short_phases ~weights ~thresholds:grade_thresholds ~min_grade
-      ~min_score_override ~max_score_override ~volume_ratio_exclude_range
-      ~min_price ~candidates
-  in
-  Screener_cascade_diagnostics.build ~total_stocks ~candidates_after_held
-    ~macro_trend ~long_phases ~long_failed_breakout_dropped ~short_phases
-    ~long_top_n:(List.length buy_candidates)
-    ~short_top_n:(List.length short_candidates)
-
 (** Build the per-symbol cooldown set: tickers whose last stop-out is within
     [cooldown_weeks] of [as_of] are blocked from the cascade. Returns an empty
     set when the gate is disabled ([cooldown_weeks <= 0] or empty
@@ -419,6 +397,7 @@ let _evaluate_candidates ~config ~decline_is_slow_grind ~candidates ~macro_trend
       ~min_price:config.min_price
       ~failed_breakout_tolerance_pct:config.failed_breakout_tolerance_pct
       ~early_stage2_max_weeks:config.early_stage2_max_weeks
+      ~min_rs_normalized:config.min_rs_normalized
       ~max_buy_candidates:config.max_buy_candidates
       ~neutral_blocks_longs:config.neutral_blocks_longs
       ~ranking:config.candidate_ranking ~candidates ~macro_trend
@@ -467,14 +446,15 @@ let _screen ~config ~decline_is_slow_grind ~macro_trend ~sector_map ~stocks
         ~buys_active;
     macro_trend;
     cascade_diagnostics =
-      _diagnostics_for_screen ~weights:config.weights
+      diagnostics_for_screen ~weights:config.weights
         ~grade_thresholds:config.grade_thresholds ~min_grade:config.min_grade
         ~min_score_override:config.min_score_override
         ~max_score_override:config.max_score_override
         ~volume_ratio_exclude_range:config.volume_ratio_exclude_range
         ~min_price:config.min_price
         ~failed_breakout_tolerance_pct:config.failed_breakout_tolerance_pct
-        ~early_stage2_max_weeks:config.early_stage2_max_weeks ~total_stocks
+        ~early_stage2_max_weeks:config.early_stage2_max_weeks
+        ~min_rs_normalized:config.min_rs_normalized ~total_stocks
         ~candidates_after_held ~macro_trend ~candidates ~buy_candidates
         ~short_candidates;
   }
