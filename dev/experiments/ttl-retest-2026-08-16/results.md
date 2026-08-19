@@ -79,12 +79,44 @@ rule** is wrong.
 
 ## Forward guidance
 
-- **Stop proposing condition-based cancellation of resting tickets** in any
-  form — re-qualify, re-score, re-grade at trigger. The population it removes
-  is the tail.
-- **Time-based bounds stay open**, and are the next arm: `03-ttl26` first. On
-  the null arm a 26-week bound cuts 89 fills worth **−349,132**, the largest
-  net-losing cohort of the four bounds tested.
+- **Stop proposing *unbounded* condition-based cancellation of resting
+  tickets** — re-qualify, re-score, re-grade at trigger, with no time bound.
+  The population an unbounded re-screen removes is the tail.
+
+  ⚠ **Scoped after review (QC finding V3).** An earlier draft said "in any
+  form", and a measurement already on disk contradicts that. In
+  `dev/experiments/ladder-v4-seeded-2026-08-14/results.md`, **`03-ttl4`
+  returned 282.20** against core s0's **281.71** at the *same salt, base,
+  window, universe and warehouse* — and the pre-#2349 composite knob at 4
+  armed the re-screen **and** a 4-week clock together. This chain measures
+  the re-screen with the clock at 0 and gets **176.36**. Paired, adding a
+  4-week clock on top of the re-screen is worth **+105.8pp** — roughly 14×
+  the re-screen arm's own 7.45pp spread, so it cannot be dismissed as noise.
+  (The 132.5pp yardstick describes the *null* arm, not one whose dispersion
+  this mechanism collapsed.)
+
+  **What that does and does not establish.** It establishes that a bounded
+  re-screen is not the same object as an unbounded one, so the blanket claim
+  was wrong. It does **not** establish that a clock *rescues* the re-screen,
+  because `03-ttl4` is a **composite** and no `rescreen = false, clock = 4`
+  arm exists. Two readings survive it:
+
+  - *rescue* — the clock makes the re-screen useful, implying
+    `rescreen + clock > clock alone`;
+  - *neutralisation* — at a 4-week bound almost no ticket survives long
+    enough for the re-screen to act, so `rescreen + clock ≈ clock alone` and
+    the re-screen is inert dead weight the clock happens to hide.
+
+  The available evidence leans **neutralisation**: clock-26 *alone* returned
+  **513.42** at salt 0, well above the composite's 282.20. Different clock
+  values, so not decisive — but it is the wrong direction for a rescue story.
+  **The disambiguating run is a `rescreen = false, clock = 4` arm**, and it
+  should be run before any composite is proposed.
+- **Time-based bounds stay open** and are the next arm — but use a
+  **clock-only** spec, not the committed `03-ttl26`, which arms the re-screen
+  as well and is therefore confounded by exactly the composite problem above.
+  On the null arm a 26-week bound cuts 89 fills worth **−349,132**, the
+  largest net-losing cohort of the four bounds tested.
 - `enable_entry_ticket_rescreen` stays **default-off** as an axis
   (`experiment-flag-discipline.md` R1/R2). It is a REJECT-as-default, **not**
   a do-not-revive REJECT — it is a coherent book-supported rule that loses on
