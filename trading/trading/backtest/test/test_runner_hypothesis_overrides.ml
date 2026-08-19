@@ -955,7 +955,7 @@ let test_strategy_config_parses_with_lifecycle_fields_absent _ =
 let suite =
   "Runner_hypothesis_overrides"
   >::: [
-         "F2: re-screen defaults off, clock defaults to 26"
+         "F2: re-screen and clock both default to off"
          >:: test_default_entry_ticket_lifecycle_is_off;
          "F2: weinstein_strategy.mli re-declares the clock default consistently"
          >:: test_strategy_mli_redeclares_clock_default_consistently;

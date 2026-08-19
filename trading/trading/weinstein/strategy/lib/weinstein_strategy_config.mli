@@ -1446,9 +1446,10 @@ type config = {
 
           {b Why it exists at all.} Unbounded is genuinely wrong at the extreme
           (defect E): [FUL-wein-64] was decided 2000-02-04 and filled 2021-11-01
-          — a resting order that survived {b 21.7 years}. Max fill age on the
-          26-year null is {b 865 weeks}. The clock's job is removing that
-          absurdity.
+          — a resting order that survived {b 21.7 years}. (The {b 865-week} max
+          fill age quoted below is a different run's longest rester, ~16.6
+          years; the two are not in conflict — they are two measurements of the
+          same pathology.) The clock's job is removing that absurdity.
 
           {b What the promotion rested on.} Three salts of a clock-only arm on
           top3000 × 2000-2026 returned 513.42 / 434.06 / 377.73 against the
@@ -1477,9 +1478,31 @@ type config = {
           0.05), and the effect is ~10x the larger arm's spread. The armed arm
           returns 227 trades in all three draws while the control varies
           238-240, so the clock removes a {i stable} cohort rather than winning
-          or losing on path luck. CI's own postsubmit confirms it: the golden
-          passed on the commit before the promotion merged and FAILED on the
-          merge commit (masked, because that step is [continue-on-error]).
+          or losing on path luck.
+
+          {b CI reproduces the salt-0 pair independently, to the cent.} Reading
+          the scenario [summary.sexp] from the two postsubmit runs' artefacts:
+
+          {v
+                             parent (clock=0)   merge commit (clock=26)
+          totalreturnpct     108.23             69.81
+          numtrades          238                227
+          totalpnl           751,808.07         424,936.24
+          largestwindollar   258,902.38         170,802.85
+          v}
+
+          The control's [largestwindollar] is SMCI to the cent, and it is absent
+          from the armed arm — the decomposition below, confirmed in a different
+          environment on different hardware.
+
+          ⚠ An earlier version of this docstring claimed the golden "passed on
+          the commit before the promotion and FAILED on the merge commit". That
+          is {b false} and is withdrawn: the scenario has failed on {i every}
+          run back to [e00bb5a90] (2026-08-18), a full day before the promotion
+          merged — it is a standing pre-existing red against a 110.78 floor, and
+          the claim compared a {i job} conclusion against a {i step} result. The
+          artefact comparison above is the honest form, and is stronger: a
+          status flip proves nothing, whereas two reproduced metric sets do.
 
           {b The mechanism — a tail-touching lever.} Dissecting the two arms'
           trades (joined on [symbol|entry_date]; [position_id] does {i not} join
@@ -1500,11 +1523,24 @@ type config = {
           change which tickets get funded. {b Every base needs its own null};
           never import one base's floor to judge another's gap.
 
-          {b If a bound is wanted}, the evidence argues for a value like
-          {b 156 weeks} that clips only the genuinely absurd tail.
-          {b 26 cuts where the monsters are.} Any future promotion needs a
-          ledger ACCEPT plus the [promotion-confirmation.md] grid, neither of
-          which the 26 flip had.
+          {b If a bound is wanted}, the evidence points at {b 156 weeks}, and
+          the working belongs here rather than the bare number. On cell 13's
+          rest-time buckets a 26-week bound cuts {b 87 trades worth +215,806},
+          including the best per-trade bucket (1-3yr at +10,857/trade); a
+          156-week bound cuts only the >3yr population, {b −154,006} and
+          upside-free. [project_ttl_is_a_tail_lever] reaches the same place
+          independently. {b 26 cuts where the monsters are.}
+
+          ⚠ {b One base disagrees}, and it is the one this flip was promoted on:
+          the ledger's four-bound table for the 26-year null {i inverts} the
+          ranking, with the 26-week bound removing the largest net-losing cohort
+          there (89 fills, −349,132). So two of three bases say 26 cuts profit
+          and 156 is never contradicted — but
+          {b 156 is a reasoned candidate, not a measured winner}. No surface has
+          been run on it. Treat it as the value to test first, not as a result.
+
+          Any future promotion needs a ledger ACCEPT plus the
+          [promotion-confirmation.md] grid, neither of which the 26 flip had.
 
           {b Faithfulness (W2): BOOK-NEUTRAL dial.} The book grants the cancel
           authority (§4.7 / §7) but names no number, so every value here is a
