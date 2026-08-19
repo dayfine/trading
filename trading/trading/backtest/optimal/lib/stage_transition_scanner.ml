@@ -55,6 +55,7 @@ let _permissive_screener_config (config : config) : Screener.config =
     min_price = 0.0;
     failed_breakout_tolerance_pct = 0.0;
     early_stage2_max_weeks = 4;
+    min_rs_normalized = 0.0;
   }
 
 (** Whether [trend] would have admitted longs at the macro gate. *)

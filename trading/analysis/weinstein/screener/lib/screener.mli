@@ -315,6 +315,51 @@ type config = {
           parsing a missing field back to [4] (older config sexps round-trip).
           Not wired into any non-default config until it earns an ACCEPT in the
           experiment ledger ([.claude/rules/experiment-flag-discipline.md]). *)
+  min_rs_normalized : float; [@sexp.default 0.0]
+      (** W1 long-side relative-strength admission floor — book §4.4 rule 2,
+          {i "negative RS in negative territory → NEVER buy, no matter how good
+             the other factors"} (issue #2381).
+
+          A long candidate is rejected outright when its
+          [Rs.result.current_normalized] is strictly below this value. That
+          field is the Mansfield zero-line position — RS divided by its own
+          long-term average — so {b 1.0 is the zero line}: above is positive
+          territory, below is negative. [1.0] is therefore the book-faithful
+          setting.
+
+          {b Default [0.0] = off (R1)}, and exactly off rather than nearly so:
+          on real data [current_normalized] is a ratio of two positive price
+          series (and {!Relative_strength} substitutes [1.0] when the moving
+          average is zero), so it is always positive, and the comparison is
+          strict. Every golden is bit-identical at the default. A hand-built
+          test fixture {i can} carry a negative [current_normalized] — some
+          short-side tests do — and such a value would be blocked even at [0.0];
+          that is out of the production domain, not a leak in the no-op claim.
+
+          {b The gap it closes.} RS previously entered the long path {i only} as
+          score points ({!Screener_scoring} [_rs_long_signal]) — a soft
+          preference, not the book's prohibition. The short side has had its
+          hard RS gate ({!Screener_admission.rs_blocks_short}, book rule 4)
+          since the beginning; this is its long-side mirror.
+          [.claude/rules/weinstein-faithful-core.md] lists relative strength for
+          selection as {b spine item 7}, so the absence was a spine gap rather
+          than a missing dial.
+
+          {b Not a breadth cost.} Measured on ladder-v4 cell 00: ~45% of
+          admitted candidates sit below 1.0, but the system rejects 15.2
+          candidates per ticket actually placed (~16.4/week considered vs ~1.08
+          placed). Gating 45% still leaves ~8× more candidates than there is
+          cash to fund, so this changes {i which} candidates get funded, not how
+          many. {b Do not expect a return improvement}: on the same data
+          [pnl% ~ rs_value] has R² = 0.00000 and the sign is mildly against the
+          gate. That sample is range-restricted to admitted-and-filled tickets —
+          the wrong sample for judging an admission rule — so it cannot settle
+          the question either way. This lands as a faithfulness fix, and needs a
+          ledger ACCEPT plus the confirmation grid before any default moves.
+
+          Reachable as [((screening_config ((min_rs_normalized 1.0))))], so it
+          routes through [Overlay_validator.apply_overrides] and is a
+          [Variant_matrix] axis (R2). *)
 }
 [@@deriving sexp]
 (** Main screener configuration. *)

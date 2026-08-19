@@ -2388,6 +2388,110 @@ let test_failed_breakout_boolean_agrees_with_reason _ =
 (* The knob round-trips through the config sexp, and an omitted field
    deserialises to the 0.0 no-op — older config sexps that predate this knob
    keep their behaviour. *)
+(* ------------------------------------------------------------------ *)
+(* W1 — book §4.4 rule 2: long-side RS admission floor (#2381)          *)
+(* ------------------------------------------------------------------ *)
+
+(** A long candidate that is admitted on every gate except RS, with
+    [current_normalized] injected. [rising_bars_with_spike ~spike_idx:31] is the
+    same admitted shape {!test_candidate_has_suggested_entry} uses, so any
+    rejection below is attributable to the RS gate alone. [benchmark_bars] is
+    empty in {!make_analysis}, so the analyzer leaves [rs = None] and the
+    injected value is the only RS in play. *)
+let _long_stock_with_rs normalized =
+  let bars = rising_bars_with_spike ~n:35 50.0 100.0 ~spike_idx:31 in
+  let base =
+    make_analysis "RSGATE" (Some (Stage1 { weeks_in_base = 10 })) bars
+  in
+  match normalized with
+  | None -> { base with rs = None }
+  | Some current_normalized ->
+      let rs : Rs.result =
+        {
+          current_rs = 1.0;
+          current_normalized;
+          trend = Positive_rising;
+          history = [];
+        }
+      in
+      { base with rs = Some rs }
+
+let _screen_long ~min_rs_normalized ~stock =
+  screen
+    ~config:{ cfg with min_rs_normalized }
+    ~macro_trend:Bullish ~sector_map:(empty_sector_map ()) ~stocks:[ stock ]
+    ~held_tickers:[]
+
+(* 0.90 is inside the measured admitted population — ladder-v4 cell 00 puts p10
+   at 0.910 — so this is the real cohort the gate would remove, not a synthetic
+   extreme. *)
+let test_rs_gate_default_admits_negative_territory _ =
+  let result =
+    _screen_long ~min_rs_normalized:default_config.min_rs_normalized
+      ~stock:(_long_stock_with_rs (Some 0.90))
+  in
+  assert_that result.buy_candidates (size_is 1)
+
+let test_rs_gate_armed_rejects_negative_territory _ =
+  let result =
+    _screen_long ~min_rs_normalized:1.0 ~stock:(_long_stock_with_rs (Some 0.90))
+  in
+  assert_that result.buy_candidates is_empty
+
+let test_rs_gate_armed_admits_positive_territory _ =
+  let result =
+    _screen_long ~min_rs_normalized:1.0 ~stock:(_long_stock_with_rs (Some 1.05))
+  in
+  assert_that result.buy_candidates (size_is 1)
+
+(* The comparison is strict, so the zero line itself is positive territory. This
+   is what makes [min_rs_normalized = 0.0] an exact no-op rather than one that
+   depends on no candidate ever landing on 0.0. *)
+let test_rs_gate_zero_line_is_admitted _ =
+  let result =
+    _screen_long ~min_rs_normalized:1.0 ~stock:(_long_stock_with_rs (Some 1.0))
+  in
+  assert_that result.buy_candidates (size_is 1)
+
+(* Mirrors [rs_blocks_short], which treats absent RS as not-strong. The book
+   prohibits buying on established negative RS; a missing series does not
+   establish it. *)
+let test_rs_gate_absent_rs_does_not_block _ =
+  let result =
+    _screen_long ~min_rs_normalized:1.0 ~stock:(_long_stock_with_rs None)
+  in
+  assert_that result.buy_candidates (size_is 1)
+
+(* The cascade diagnostics run a second, independently-written admission path
+   ([Screener_admission.count_long_phases]). If the gate were wired into only
+   one of them the counts would silently disagree with the live cascade. The
+   long triple carries no RS phase of its own, so an RS rejection must show up
+   as sector-admitted-but-not-grade-admitted. *)
+let test_rs_gate_diagnostics_track_live_rejection _ =
+  let result =
+    _screen_long ~min_rs_normalized:1.0 ~stock:(_long_stock_with_rs (Some 0.90))
+  in
+  assert_that result.cascade_diagnostics
+    (all_of
+       [
+         field (fun d -> d.long_sector_admitted) (equal_to 1);
+         field (fun d -> d.long_grade_admitted) (equal_to 0);
+       ])
+
+let test_rs_gate_sexp_round_trips _ =
+  let armed = { default_config with min_rs_normalized = 1.0 } in
+  let omitted =
+    config_of_sexp
+      (Sexp.of_string
+         (String.substr_replace_first
+            (Sexp.to_string (sexp_of_config default_config))
+            ~pattern:"(min_rs_normalized 0)" ~with_:""))
+  in
+  assert_that
+    ( (config_of_sexp (sexp_of_config armed)).min_rs_normalized,
+      omitted.min_rs_normalized )
+    (equal_to (1.0, 0.0))
+
 let test_failed_breakout_tolerance_sexp_round_trips _ =
   let armed = { default_config with failed_breakout_tolerance_pct = 0.05 } in
   let omitted =
@@ -2682,6 +2786,20 @@ let suite =
          >:: test_entry_anchor_graded_top_when_off;
          "entry anchor: local top when armed, admission/grading unchanged"
          >:: test_entry_anchor_local_top_when_armed;
+         "RS gate: negative territory admitted at the 0.0 default"
+         >:: test_rs_gate_default_admits_negative_territory;
+         "RS gate: negative territory rejected when armed at 1.0"
+         >:: test_rs_gate_armed_rejects_negative_territory;
+         "RS gate: positive territory admitted when armed at 1.0"
+         >:: test_rs_gate_armed_admits_positive_territory;
+         "RS gate: exactly on the zero line is admitted (strict <)"
+         >:: test_rs_gate_zero_line_is_admitted;
+         "RS gate: absent RS does not block"
+         >:: test_rs_gate_absent_rs_does_not_block;
+         "RS gate: the diagnostics grade count tracks the live rejection"
+         >:: test_rs_gate_diagnostics_track_live_rejection;
+         "RS gate: min_rs_normalized sexp round-trips"
+         >:: test_rs_gate_sexp_round_trips;
        ]
 
 let () = run_test_tt_main suite

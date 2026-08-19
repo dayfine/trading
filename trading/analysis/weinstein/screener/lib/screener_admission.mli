@@ -107,6 +107,29 @@ val rs_blocks_short : Rs.result option -> bool
     [Negative_improving] stays eligible; absent RS data is treated as not-strong
     (doesn't block shorts). *)
 
+val rs_blocks_long : min_rs_normalized:float -> Rs.result option -> bool
+(** Long-side mirror of {!rs_blocks_short}: book §4.4 rule 2,
+    {i "negative RS in negative territory → NEVER buy, no matter how good the
+       other factors"}. A hard admission gate, not a scoring input — RS
+    previously entered the long path only as score points ({!Screener_scoring}
+    [_rs_long_signal]), which is a soft preference and does not implement the
+    book's prohibition (#2381).
+
+    Returns [true] when [current_normalized < min_rs_normalized].
+    [current_normalized] is the Mansfield zero-line position — [rs_value] over
+    its own long-term average ([Relative_strength._build_history]) — so
+    {b 1.0 is the zero line}: above is positive territory, below is negative.
+    [min_rs_normalized = 1.0] is therefore the book-faithful setting, and [0.0]
+    (the default) blocks nothing, since the ratio of two positive price series
+    is always positive.
+
+    The comparison is strict, so a candidate sitting exactly on the zero line is
+    admitted, and the [0.0] default is an exact no-op rather than a near one.
+
+    Absent RS data does {b not} block, mirroring {!rs_blocks_short}: the rule
+    prohibits buying on {i established} negative RS, and a missing series does
+    not establish it. *)
+
 val count_long_phases :
   weights:scoring_weights ->
   thresholds:grade_thresholds ->
@@ -117,6 +140,7 @@ val count_long_phases :
   min_price:float ->
   failed_breakout_tolerance_pct:float ->
   early_stage2_max_weeks:int ->
+  min_rs_normalized:float ->
   candidates:(Stock_analysis.t * sector_context) list ->
   int * int * int
 (** Long-side cascade-phase counts [(breakout, sector, grade)] for the
@@ -126,7 +150,16 @@ val count_long_phases :
     re-validation both fold into the breakout phase. [early_stage2_max_weeks] is
     the early-Stage2 admission window (see
     [Screener.config.early_stage2_max_weeks]) threaded into both the breakout
-    gate and the score so the diagnostic count tracks the live cascade. *)
+    gate and the score so the diagnostic count tracks the live cascade.
+
+    {b [min_rs_normalized] folds into the grade phase}, unlike the short side,
+    where {!count_short_phases} reports its RS gate as a phase of its own. The
+    long triple is deliberately left at three components so the
+    cascade-diagnostics record — and every report built on it — is untouched,
+    which is what makes the [0.0] default a provable no-op. The cost is
+    attribution: with the gate armed, RS drops are indistinguishable from score
+    drops in [grade]. Splitting it out is a follow-up, and is only worth doing
+    once some config actually arms the gate. *)
 
 val count_short_phases :
   weights:scoring_weights ->
@@ -141,3 +174,34 @@ val count_short_phases :
 (** Short-side cascade-phase counts [(breakdown, sector, rs, grade)] mirroring
     {!count_long_phases}, with the RS hard gate inserted between sector and
     grade. The [min_price] liquidity floor folds into the breakdown phase. *)
+
+val diagnostics_for_screen :
+  weights:scoring_weights ->
+  grade_thresholds:grade_thresholds ->
+  min_grade:Weinstein_types.grade ->
+  min_score_override:int option ->
+  max_score_override:int option ->
+  volume_ratio_exclude_range:volume_ratio_band option ->
+  min_price:float ->
+  failed_breakout_tolerance_pct:float ->
+  early_stage2_max_weeks:int ->
+  min_rs_normalized:float ->
+  total_stocks:int ->
+  candidates_after_held:int ->
+  macro_trend:Weinstein_types.market_trend ->
+  candidates:(Stock_analysis.t * sector_context) list ->
+  buy_candidates:'a list ->
+  short_candidates:'b list ->
+  Screener_cascade_diagnostics.t
+(** The cascade-diagnostics record for one {!Screener.screen} call: runs
+    {!count_long_phases}, {!count_long_failed_breakouts} and
+    {!count_short_phases} and hands the results to
+    {!Screener_cascade_diagnostics.build}.
+
+    Lives here rather than in [Screener] because this module owns the three
+    counters it composes; [Screener] only needed the result. It moved out of
+    [screener.ml] when that file hit the 500-line declared-large cap
+    (`code-health-discipline.md`: extract, do not raise the limit).
+
+    [buy_candidates] / [short_candidates] are only measured for their length,
+    hence the free type variables. *)

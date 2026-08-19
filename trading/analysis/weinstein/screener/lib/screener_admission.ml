@@ -72,6 +72,16 @@ let rs_blocks_short = function
       true
   | _ -> false
 
+(* Book §4.4 rule 2. Reads [current_normalized] (the Mansfield zero-line
+   position, i.e. RS over its own long-term average) rather than [trend],
+   deliberately: [trend] is degenerate whenever [lookback_bars = rs_ma_period]
+   leaves a 1-element history (#2380), whereas the level is well-defined on the
+   same data. Absent RS does not block — see the .mli. *)
+let rs_blocks_long ~min_rs_normalized = function
+  | Some { Rs.current_normalized; _ } ->
+      Float.( < ) current_normalized min_rs_normalized
+  | None -> false
+
 let count_long_failed_breakouts ~tolerance_pct ~early_stage2_max_weeks
     ~candidates =
   List.count candidates ~f:(fun ((a : Stock_analysis.t), _sector) ->
@@ -80,7 +90,8 @@ let count_long_failed_breakouts ~tolerance_pct ~early_stage2_max_weeks
 
 let _long_admission ~weights ~thresholds ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price
-    ~failed_breakout_tolerance_pct ~early_stage2_max_weeks (a, sector) =
+    ~failed_breakout_tolerance_pct ~early_stage2_max_weeks ~min_rs_normalized
+    (a, sector) =
   (* Volume-band exclusion, the min-price liquidity floor, and the
      failed-breakout re-validation all fold into the breakout phase: the
      admitted chain stays a three-phase monotone triple while every gate still
@@ -99,8 +110,17 @@ let _long_admission ~weights ~thresholds ~min_grade ~min_score_override
   let passes_sector =
     passes_breakout && not (equal_sector_rating sector.rating Weak)
   in
+  (* Book §4.4 rule 2. The short side reports its RS gate as a phase of its own
+     ([_short_admission] returns a 4-tuple); the long triple is kept as-is so
+     the cascade-diagnostics record and every report built on it are untouched,
+     which is what lets the [min_rs_normalized = 0.0] default stay a provable
+     no-op. The cost is attribution: with the gate armed, its drops land in
+     [grade_ok]. See the .mli. *)
+  let passes_rs =
+    passes_sector && not (rs_blocks_long ~min_rs_normalized a.Stock_analysis.rs)
+  in
   let passes_grade =
-    if not passes_sector then false
+    if not passes_rs then false
     else
       let score, _ = score_long ~early_stage2_max_weeks ~weights ~sector a in
       passes_score_floor ~thresholds ~min_grade ~min_score_override
@@ -112,15 +132,20 @@ let _bump n b = if b then n + 1 else n
 
 let count_long_phases ~weights ~thresholds ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price
-    ~failed_breakout_tolerance_pct ~early_stage2_max_weeks ~candidates =
-  List.fold candidates ~init:(0, 0, 0)
-    ~f:(fun (breakout, sector_ok, grade_ok) pair ->
-      let pb, ps, pg =
-        _long_admission ~weights ~thresholds ~min_grade ~min_score_override
-          ~max_score_override ~volume_ratio_exclude_range ~min_price
-          ~failed_breakout_tolerance_pct ~early_stage2_max_weeks pair
-      in
-      (_bump breakout pb, _bump sector_ok ps, _bump grade_ok pg))
+    ~failed_breakout_tolerance_pct ~early_stage2_max_weeks ~min_rs_normalized
+    ~candidates =
+  (* Partially applied so the fold body stays a two-liner — the gate list is
+     long enough that inlining it inside the closure trips the nesting linter. *)
+  let admit =
+    _long_admission ~weights ~thresholds ~min_grade ~min_score_override
+      ~max_score_override ~volume_ratio_exclude_range ~min_price
+      ~failed_breakout_tolerance_pct ~early_stage2_max_weeks ~min_rs_normalized
+  in
+  let step (breakout, sector_ok, grade_ok) pair =
+    let pb, ps, pg = admit pair in
+    (_bump breakout pb, _bump sector_ok ps, _bump grade_ok pg)
+  in
+  List.fold candidates ~init:(0, 0, 0) ~f:step
 
 let _short_admission ~weights ~thresholds ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price (a, sector) =
@@ -153,3 +178,30 @@ let count_short_phases ~weights ~thresholds ~min_grade ~min_score_override
           ~max_score_override ~volume_ratio_exclude_range ~min_price pair
       in
       (_bump breakdown pb, _bump sector_ok ps, _bump rs_ok pr, _bump grade_ok pg))
+
+(** Compute the cascade-diagnostics record for one screen call. Decoupled from
+    [screen] so the latter stays within the 50-line linter cap. *)
+let diagnostics_for_screen ~weights ~grade_thresholds ~min_grade
+    ~min_score_override ~max_score_override ~volume_ratio_exclude_range
+    ~min_price ~failed_breakout_tolerance_pct ~early_stage2_max_weeks
+    ~min_rs_normalized ~total_stocks ~candidates_after_held ~macro_trend
+    ~candidates ~buy_candidates ~short_candidates =
+  let long_phases =
+    count_long_phases ~weights ~thresholds:grade_thresholds ~min_grade
+      ~min_score_override ~max_score_override ~volume_ratio_exclude_range
+      ~min_price ~failed_breakout_tolerance_pct ~early_stage2_max_weeks
+      ~min_rs_normalized ~candidates
+  in
+  let long_failed_breakout_dropped =
+    count_long_failed_breakouts ~tolerance_pct:failed_breakout_tolerance_pct
+      ~early_stage2_max_weeks ~candidates
+  in
+  let short_phases =
+    count_short_phases ~weights ~thresholds:grade_thresholds ~min_grade
+      ~min_score_override ~max_score_override ~volume_ratio_exclude_range
+      ~min_price ~candidates
+  in
+  Screener_cascade_diagnostics.build ~total_stocks ~candidates_after_held
+    ~macro_trend ~long_phases ~long_failed_breakout_dropped ~short_phases
+    ~long_top_n:(List.length buy_candidates)
+    ~short_top_n:(List.length short_candidates)
