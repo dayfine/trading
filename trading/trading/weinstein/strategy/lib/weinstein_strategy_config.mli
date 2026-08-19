@@ -1431,153 +1431,99 @@ type config = {
           [trading/simulation/test/test_gtc_entry_persistence.ml]. R2:
           axis-expressible as
           [((flag enable_entry_ticket_rescreen) (values (true false)))]. *)
-  entry_order_max_rest_weeks : int; [@sexp.default 26]
+  entry_order_max_rest_weeks : int; [@sexp.default 0]
       (** F2 {b backstop}, the invented half: the clock. An unfilled ticket that
           has rested more than this many whole weeks is cancelled regardless of
-          whether it still qualifies. [0] = {b unbounded}.
-
-          {b Default promoted 0 -> 26 on 2026-08-18 by user decision.} The
-          evidence and the two process deviations are recorded below, because
-          this promotion did {i not} follow the normal gate.
+          whether it still qualifies. [0] = {b unbounded} = the default.
 
           A ticket placed on review week 0 survives review week
           [entry_order_max_rest_weeks] and is cancelled at week
           [entry_order_max_rest_weeks + 1].
 
+          {b ⚠ Promoted to 26 on 2026-08-18, REVERTED on 2026-08-19.} The
+          promotion was user-directed on a single cell and is recorded here
+          because the reversal is the more useful fact.
+
           {b Why it exists at all.} Unbounded is genuinely wrong at the extreme
-          (defect E): [FUL-wein-64] was decided 2000-02-04 and filled
-          2021-11-01 — a resting order that survived {b 21.7 years}. The >3yr
-          population is 20 trades, 13 of them losers, net −154,006 and
-          upside-free, which is what distinguishes it from every other rest
-          bucket. The clock's job is removing that absurdity, not shaping
-          returns.
+          (defect E): [FUL-wein-64] was decided 2000-02-04 and filled 2021-11-01
+          — a resting order that survived {b 21.7 years}. Max fill age on the
+          26-year null is {b 865 weeks}. The clock's job is removing that
+          absurdity.
 
-          {b Promotion evidence.} Three salts of a {b clock-only} arm
-          (re-screen off; single-knob diff from the null) returned
-          {b 513.42 / 434.06 / 377.73} against the null's own three draws
-          {b 265.44 / 281.71 / 397.95} — mean gap {b +126.7pp}, winning
-          {b 8 of 9} pairwise comparisons. Secondary signals move together:
-          maxDD better in all three (32.46 / 34.38 / 34.19 vs 39.03),
-          [rejected_fills] lower (206 / 208 / 207 vs 262), realized totals
-          3.82M / 3.25M / 2.82M vs 2.31M. Mechanism verified — max fill age
-          26 / 26 / 27 weeks against the null's 865. (27 is expected, not a
-          bug: a ticket placed on review week N survives week N+26 and is
-          cancelled at N+27.)
+          {b What the promotion rested on.} Three salts of a clock-only arm on
+          top3000 × 2000-2026 returned 513.42 / 434.06 / 377.73 against the
+          null's 265.44 / 281.71 / 397.95 — mean gap {b +126.7pp}. But that
+          base's own seed spread is {b 132.5pp}
+          ([dev/experiments/ladder-v4-seeded-2026-08-14/results.md]), so the gap
+          sits {i inside} its own noise floor; the distributions touch and the
+          exact rank test gives p = 0.100.
 
-          {b ⚠ The gap is below this base's own noise floor.} The
-          pre-registered yardstick for this exact base / window / universe is
-          the null's own seed spread:
-          [dev/experiments/ladder-v4-seeded-2026-08-14/results.md] measures it
-          at {b 132.5pp} and states "no variant gap below it is interpretable".
-          The clock's mean gap is {b +126.7pp} — {i below} that floor. (The
-          yardstick is the null's max−min {i spread} and the candidate figure is
-          a difference of {i means}; that comparison is the pre-registered rule
-          of thumb this base adopted, not a formal test. The formal test is the
-          p = 0.100 below, and it agrees.) The same
-          file's bar for the only axis that ever cleared it was "all three draws
-          above the null's maximum (397.95)"; the clock's worst draw is
-          {b 377.73}, so it does not clear that either. And [nearfloor] {i did}
-          clear it and was still not promoted
-          ([memory/project_nearfloor_is_risk_not_return]). Stating the raw
-          numbers without this rule invites the reading "promising but
-          under-powered", when the yardstick's own verdict is "inside the seed
-          noise". Same failure shape as [feedback_run_the_null_control_first].
+          {b What reversed it.} The one golden that arms
+          [enable_sim_entry_stoplimit] — and therefore the only one where a
+          clock can bite, since Market entries fill immediately and never rest —
+          measured at three salts per arm:
 
-          {b The argument that does {i not} depend on that gap.} A 26-week bound
-          is a {i within}-run cohort claim, and the cohort accounting is
-          unambiguous: on the null arm the bound cuts {b 89 fills worth
-          −349,132} — the largest net-losing cohort of the four bounds tested
-          (13 / 26 / 52 / 156 cut 147 / 89 / 60 / 25 fills worth −266,866 /
-          −349,132 / −200,906 / −217,518; all four are net-losing). That is the
-          honest case for this default: it removes a measurably loss-making
-          population, not that it wins a between-run comparison the noise floor
-          cannot resolve.
+          {v
+          salt   clock=0            clock=26         delta
+          0      108.23% (238 tr)   69.81% (227)     -38.42pp
+          1      111.40% (240)      69.09% (227)     -42.31pp
+          2      112.30% (240)      70.30% (227)     -42.00pp
+          mean   110.64%            69.73%           -40.91pp
+          spread   4.07pp            1.21pp
+          v}
 
-          {b And its limit.} Static bucket subtraction {i also} does not settle
-          the question, because it ignores capital recycling — the cash freed by
-          cancelling those 89 fills is redeployed, and the bucket table cannot
-          say into what. So the cohort argument establishes that the cut
-          population is loss-making, {i not} that cutting it is net-positive.
-          The genuinely unarguable reason for a bound is the one under "Why it
-          exists at all": a 21.7-year resting order is wrong on its face,
-          whatever it earns.
+          {b Complete separation} — the armed arm's best draw sits 37.93pp below
+          the control's worst, giving the 3-vs-3 exact rank test its floor (p =
+          0.05), and the effect is ~10x the larger arm's spread. The armed arm
+          returns 227 trades in all three draws while the control varies
+          238-240, so the clock removes a {i stable} cohort rather than winning
+          or losing on path luck. CI's own postsubmit confirms it: the golden
+          passed on the commit before the promotion merged and FAILED on the
+          merge commit (masked, because that step is [continue-on-error]).
 
-          {b ⚠ Two deviations from the normal gate, both user-directed.} The
-          distributions {b touch} — the clock arm's worst draw (377.73) sits
-          below the null's best (397.95) — and the exact rank test gives
-          {b p = 0.100} one-sided, where 0.050 is the floor at 3-vs-3. So this
-          was promoted (a) {b without} the [promotion-confirmation.md]
-          confirmation grid, and (b) {b without} a ledger ACCEPT
-          ([experiment-flag-discipline.md] R3). The grid is queued as
-          {i validation of a shipped default} rather than as a gate before one;
-          if it fails, the right response is to reconsider this flip, not to
-          discount the grid.
+          {b The mechanism — a tail-touching lever.} Dissecting the two arms'
+          trades (joined on [symbol|entry_date]; [position_id] does {i not} join
+          across arms, only 99 of 238 overlap once the ticket counter shifts):
+          59 trades removed worth {b +248,545}, 48 substituted worth
+          {b -84,172}, 179 shared and unchanged. The removed cohort is mostly
+          junk — median {b -2,840}, 40 losers to 19 winners — and its entire
+          positive total is one trade: {b SMCI +258,902 (+240.0%, 292 days)},
+          larger than the cohort's net. The clock cuts the resting-ticket
+          population blind, and that population is where the fat-tail winners
+          live. 12th+ confirmation of [project_edge_is_the_fat_tail]; it joins
+          harvest-rotate, trim, re-time and cap.
 
-          {b ⚠ The evidence is not reproducible from the repo.} The three draws
-          live only in chain logs under [/tmp]; no committed artifact carries
-          them. They are reproducible by re-running
-          [dev/experiments/ttl-retest-2026-08-16/specs/ttl-retest-06-clock26-only.sexp]
-          at salts 0/1/2, which determinism makes reliable (the null tripwire
-          reproduces to 15 digits), but that is a weaker record than an
-          artifact. The grid should commit its per-arm outputs.
+          {b The calibration lesson.} 132.5pp is a property of {i that} base,
+          not a universal floor — this base measures {b 4.07pp}, ~40x quieter. A
+          longer, broader run is not automatically the more reliable one: more
+          symbols and more decision points give path realisation more places to
+          change which tickets get funded. {b Every base needs its own null};
+          never import one base's floor to judge another's gap.
 
-          {b Prior reasoning, retained.} ~156 weeks (3 years) was the earlier
-          candidate value, on the argument that unbounded is wrong only at the
-          extreme (defect E). That re-test also has to reach values the
-          original {0, 4, 8} axis never did: on cell 13's 942 joined trades the
-          29-91-day bucket is 16.1% of trades and 28% of realized P&L at
-          8,376/trade, and {b ttl4's 28-day cut lands on its lower edge}. Re-test
-          at {13, 26, 52}.
+          {b If a bound is wanted}, the evidence argues for a value like
+          {b 156 weeks} that clips only the genuinely absurd tail.
+          {b 26 cuts where the monsters are.} Any future promotion needs a
+          ledger ACCEPT plus the [promotion-confirmation.md] grid, neither of
+          which the 26 flip had.
 
           {b Faithfulness (W2): BOOK-NEUTRAL dial.} The book grants the cancel
           authority (§4.7 / §7) but names no number, so every value here is a
-          free parameter — which is precisely why it is the {i backstop} and not
-          the primary rule.
+          free parameter — which is why it is the {i backstop} and not the
+          primary rule.
 
-          {b Do {i not} prefer the re-screen instead.} An earlier draft of this
-          docstring said "prefer arming {!enable_entry_ticket_rescreen} alone".
-          That is now wrong: the re-screen was {b REJECTED} on 2026-08-18
+          {b Do {i not} prefer the re-screen instead.} It was {b REJECTED} on
+          2026-08-18
           ([dev/experiments/_ledger/2026-08-18-entry-ticket-rescreen.sexp]),
           draws 176.36 / 174.83 / 182.28 with its best sitting 83pp below the
-          null's worst — complete separation, and worse maxDD. The two rules
-          select {b opposite} populations: a clock cuts tickets that rested long
-          {i without} their setup changing, while the re-screen cuts tickets
-          whose stage/sector/macro wobbled — which is the base-building
-          pullback-then-resume pattern. Book-supported does not mean
-          profitable, and the two halves must not be conflated again (that is
-          what the pre-[#2349] composite knob did).
+          null's worst. The two rules select {b opposite} populations: a clock
+          cuts tickets that rested long {i without} their setup changing, while
+          the re-screen cuts tickets whose stage/sector/macro wobbled — which is
+          the base-building pullback-then-resume pattern.
 
           R2: axis-expressible as
-          [((flag entry_order_max_rest_weeks) (values (0 13 26 52)))].
+          [((flag entry_order_max_rest_weeks) (values (0 13 26 52 156)))].
 
-          {2 Shared mechanics (both F2 fields)}
-
-          They feed one path ({!Entry_ticket_ttl}). Cancelling emits
-          [Position.CancelEntry] (the [Entering] position closes) {b and}
-          releases the symbol's {!Entry_freeze} pin, so the symbol may
-          re-qualify later at a fresh [E] rather than at the level its expired
-          ticket was written against. The simulator retires the matching resting
-          order
-          ({!Trading_simulation.Cancel_handler.cancel_resting_entry_orders});
-          without that a "cancelled" ticket would still fill. A partially-filled
-          entry is never cancelled — those shares are booked.
-
-          {b Only meaningful under the StopLimit entry family}
-          ([enable_sim_entry_stoplimit] + [sim_entry_trigger_at_suggested]).
-          With Market entries a ticket fills on its own tick, so no position
-          ever rests long enough for either path to fire; the knobs are left
-          ungated so they stay independent axes.
-
-          {b Retired: [entry_order_ttl_weeks].} These two fields replace it. A
-          spec that still sets it now fails validation loudly rather than
-          silently running a baseline (the #1051 hazard). Mechanical migration,
-          exactly behaviour-preserving:
-          - [((entry_order_ttl_weeks 0))] →
-            [((enable_entry_ticket_rescreen false))
-             ((entry_order_max_rest_weeks 0))]
-          - [((entry_order_ttl_weeks N))] for [N > 0] →
-            [((enable_entry_ticket_rescreen true))
-             ((entry_order_max_rest_weeks N))] *)
+          Full record: [dev/experiments/clock26-golden-ab-2026-08-19/]. *)
   reserve_cash_for_resting_tickets : bool; [@sexp.default false]
       (** G3 of [dev/plans/ticket-funding-2026-08-16.md]: subtract the cost the
           book has already committed to {b resting} entry tickets from the cash

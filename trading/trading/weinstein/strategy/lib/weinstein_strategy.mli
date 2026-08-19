@@ -228,9 +228,9 @@ module Entry_stop_width_order = Entry_stop_width_order
 module Entry_ticket_ttl = Entry_ticket_ttl
 (** F2 resting-entry-ticket lifecycle: re-screen cancel (primary) + clock TTL
     (backstop), armed independently by [config.enable_entry_ticket_rescreen] and
-    [config.entry_order_max_rest_weeks] (defaults [false] = off / {b [26]} =
-    armed, promoted 2026-08-18). Re-exposed so tests can pin the cancel decision
-    independently of a full screening tick. See {!Entry_ticket_ttl}. *)
+    [config.entry_order_max_rest_weeks] (defaults [false] / [0] = off).
+    Re-exposed so tests can pin the cancel decision independently of a full
+    screening tick. See {!Entry_ticket_ttl}. *)
 
 module Screening_notional = Screening_notional
 (** Per-Friday entry-walk notional / sector-exposure accumulator seeds. Exposed
@@ -877,7 +877,7 @@ type config = {
           exists. BOOK-SUPPORTED (§4.7 + §7); carries no invented number.
           Default [false] = off, bit-identical baselines (R1). See
           [Weinstein_strategy_config.enable_entry_ticket_rescreen]. *)
-  entry_order_max_rest_weeks : int; [@sexp.default 26]
+  entry_order_max_rest_weeks : int; [@sexp.default 0]
       (** F2 {b backstop}: cancel an unfilled ticket that has rested more than
           this many whole weeks regardless of whether it still qualifies. [0] =
           unbounded, which is genuinely wrong at the extreme ([FUL-wein-64]

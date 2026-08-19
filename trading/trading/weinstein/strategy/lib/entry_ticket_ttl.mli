@@ -48,10 +48,11 @@
     exactly as before, i.e. the old [ttl_weeks = 0]. This {b extends} the
     persistence contract; it does not weaken it.
 
-    Note this is no longer what the {i config defaults} produce: since
-    2026-08-18 [Weinstein_strategy_config.entry_order_max_rest_weeks] ships at
-    {b 26}, so the default path arms the clock. This function's contract is
-    unchanged — only which arguments the shipped config passes it. *)
+    This is also what the shipped config defaults produce. It briefly was not:
+    the clock defaulted to 26 for one day (2026-08-18, reverted 2026-08-19 after
+    it measured -40.91pp on the one golden that arms the StopLimit family). This
+    function's contract never changed through either move — only which arguments
+    the shipped config passed it. *)
 
 open Core
 module Position = Trading_strategy.Position
