@@ -28,6 +28,12 @@ enable_entry_ticket_rescreen : bool [@sexp.default false]
 entry_order_max_rest_weeks   : int  [@sexp.default 0]   (* 0 = unbounded *)
 ```
 
+> The `0` above is the shape **as of the #2349 split**, which is what this
+> migration entry documents. The default was later promoted to **26** (PR
+> #2384, 2026-08-18); a spec written today that omits the field gets `26`, not
+> `0`. Specs that pin it explicitly — including every one migrated below — are
+> unaffected.
+
 **Mapping applied** (the same one PR #2349 applied to the 24 committed ladder-v4
 specs under `trading/test_data/`):
 

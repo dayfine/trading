@@ -57,12 +57,12 @@
    ((label "market") (overrides ()))
    ((label "cap10")
     (overrides
-     (((enable_sim_entry_stoplimit true)) ((entry_extension_max_pct 10.0)))))
+     (((enable_sim_entry_stoplimit true)) ((entry_order_max_rest_weeks 0)) ((entry_extension_max_pct 10.0)))))
    ((label "cap15")
     (overrides
-     (((enable_sim_entry_stoplimit true)) ((entry_extension_max_pct 15.0)))))
+     (((enable_sim_entry_stoplimit true)) ((entry_order_max_rest_weeks 0)) ((entry_extension_max_pct 15.0)))))
    ((label "cap20")
     (overrides
-     (((enable_sim_entry_stoplimit true)) ((entry_extension_max_pct 20.0)))))))
+     (((enable_sim_entry_stoplimit true)) ((entry_order_max_rest_weeks 0)) ((entry_extension_max_pct 20.0)))))))
  (baseline_label "market")
  (gate ((metric Sharpe) (m 16) (n 31) (worst_delta 0.20))))

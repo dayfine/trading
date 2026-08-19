@@ -14,8 +14,11 @@
  (period ((start_date 2000-01-01) (end_date 2026-06-26)))
  (universe_path "../goldens-custom-universe/composition/top-3000-2000.sexp")
  (universe_size 3000)
+ ;; entry_order_max_rest_weeks pinned at its pre-promotion value 0
+ ;; (unbounded) so this recorded arm stays reproducible after the default
+ ;; moved 0 -> 26 on 2026-08-18 (PR #2384). Do not drop this pin.
  (config_overrides
-  (((enable_sim_entry_stoplimit true))
+  (((enable_sim_entry_stoplimit true)) ((entry_order_max_rest_weeks 0))
    ((entry_extension_max_pct 15.0))
    ((extension_stop_config ((trigger_ratio 2.0) (trail_pct 0.25))))
    ((reject_declining_ma_long_entry true))

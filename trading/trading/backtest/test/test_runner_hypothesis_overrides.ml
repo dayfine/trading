@@ -797,16 +797,97 @@ let test_failed_breakout_tolerance_axis_resolves_via_overlay_validator _ =
   assert_that merged.screening_config.failed_breakout_tolerance_pct
     (float_equal 0.03)
 
-(** F2 (plan [dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F2) R1: both
-    halves of the resting-entry-ticket lifecycle default to off — no clock
-    cancel, no re-screen cancel, GTC-forever persistence exactly as before.
-    Asserted as a pair because the pair, not either field alone, is what
-    reproduces the retired [entry_order_ttl_weeks = 0]. *)
-let test_default_entry_ticket_lifecycle_is_off _ =
+(** F2 (plan [dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F2): the
+    resting-entry-ticket lifecycle pair. Asserted as a pair because the pair,
+    not either field alone, is what the retired [entry_order_ttl_weeks] used to
+    control.
+
+    {b The two halves no longer default the same way.} The re-screen stays
+    [false] — it was REJECTED at −137pp (PR #2376, ledger
+    [2026-08-18-entry-ticket-rescreen]; condition-based cancellation removes the
+    pullback-then-resume winners). The clock was
+    {b promoted 0 → 26 on 2026-08-18 by user decision} (PR #2384), so
+    GTC-forever persistence is no longer the default: an unfilled ticket resting
+    more than 26 whole weeks is now cancelled.
+
+    This test previously asserted [(false, 0)] under the title "the
+    ticket-lifecycle pair defaults to off". It failed on the promotion, which is
+    exactly what it is for — the R1 no-op claim it pinned is no longer the claim
+    being made. See [Weinstein_strategy_config.entry_order_max_rest_weeks] for
+    the promotion evidence and its two recorded gate deviations (no confirmation
+    grid, no ledger ACCEPT; p = 0.100 with touching distributions). *)
+let test_default_entry_ticket_lifecycle_is_rescreen_off_clock_26 _ =
   assert_that
     ( (_default_config ()).enable_entry_ticket_rescreen,
       (_default_config ()).entry_order_max_rest_weeks )
-    (equal_to (false, 0))
+    (equal_to (false, 26))
+
+(* -------------------------------------------------------------------- *)
+(* F2: the two [config] declarations must agree on the clock's default   *)
+(* -------------------------------------------------------------------- *)
+
+(* The [config] record is declared twice: authoritatively in
+   [weinstein_strategy_config.ml] (which is what ppx_sexp_conv compiles into
+   [config_of_sexp]) and again, by hand, in [weinstein_strategy.mli] — the
+   signature consumers actually open, since [weinstein_strategy.ml] does
+   [include Weinstein_strategy_config]. Per-field [[@sexp.default]] attributes
+   do NOT participate in signature matching, so the two can disagree and still
+   compile green: the 0 -> 26 promotion (PR #2384) left [weinstein_strategy.mli]
+   declaring [[@sexp.default 0]] and no build, linter or test noticed.
+
+   Read the .mli as text and compare its declared default against the runtime
+   one. Textual because the .mli attribute is inert — there is no value to
+   observe at runtime, only a source-level claim that can drift. *)
+let _weinstein_strategy_mli_rel =
+  "trading/trading/weinstein/strategy/lib/weinstein_strategy.mli"
+
+let rec _walk_up_to_file dir rel tries_left =
+  if tries_left = 0 then None
+  else
+    let candidate = Filename.concat dir rel in
+    if try Stdlib.Sys.file_exists candidate with _ -> false then Some candidate
+    else
+      let parent = Filename.dirname dir in
+      if String.equal parent dir then None
+      else _walk_up_to_file parent rel (tries_left - 1)
+
+(* The [[@sexp.default N]] attached to [field] in the given .mli text. Matches
+   the one-line declaration shape ocamlformat produces for these fields:
+   [  <field> : int; [@sexp.default N]] *)
+let _declared_sexp_default ~path ~field =
+  let marker = "[@sexp.default " in
+  In_channel.read_lines path
+  |> List.find_map ~f:(fun line ->
+      let trimmed = String.strip line in
+      if String.is_prefix trimmed ~prefix:(field ^ " :") then
+        match String.substr_index trimmed ~pattern:marker with
+        | None -> None
+        | Some i ->
+            String.subo trimmed ~pos:(i + String.length marker)
+            |> String.take_while ~f:Char.is_digit
+            |> Int.of_string_opt
+      else None)
+
+(** F2 drift guard: [Weinstein_strategy.config]'s hand-written re-declaration of
+    [entry_order_max_rest_weeks] must carry the same [[@sexp.default]] as the
+    value [Weinstein_strategy_config] actually ships. Nothing in the build
+    checks this (sexp attributes are not part of signature matching), so a
+    future default change that updates only one of the two declarations fails
+    here instead of compiling silently. *)
+let test_strategy_mli_redeclares_clock_default_consistently _ =
+  let path =
+    match
+      _walk_up_to_file (Stdlib.Sys.getcwd ()) _weinstein_strategy_mli_rel 10
+    with
+    | Some p -> p
+    | None ->
+        assert_failure
+          (sprintf "%s not found from cwd=%s" _weinstein_strategy_mli_rel
+             (Stdlib.Sys.getcwd ()))
+  in
+  assert_that
+    (_declared_sexp_default ~path ~field:"entry_order_max_rest_weeks")
+    (is_some_and (equal_to (_default_config ()).entry_order_max_rest_weeks))
 
 (** F2 R2 (axis reachability): both fields must be valid [Variant_matrix] axes,
     which requires each value to resolve through the {b real}
@@ -833,9 +914,15 @@ let test_entry_ticket_lifecycle_axes_resolve_via_overlay_validator _ =
     (equal_to ([ true; false ], [ 0; 13; 26; 52 ]))
 
 (** Back-compat: a strategy config sexp written before these fields existed
-    still parses, defaulting to the off pair via their [@sexp.default]s. Proven
-    by stripping both fields from the serialized default config and parsing the
-    result. *)
+    still parses, taking each field's [@sexp.default]. Proven by stripping both
+    fields from the serialized default config and parsing the result.
+
+    {b Note what "back-compat" means after the 2026-08-18 clock promotion.} An
+    old sexp that omits [entry_order_max_rest_weeks] now resolves to {b 26}, not
+    0 — so it parses, but it does {i not} reproduce the behaviour it had when it
+    was written. That is the intended semantics of a default change (an unpinned
+    field inherits the new default), and it is why archived specs that need the
+    old behaviour must pin [0] explicitly rather than rely on omission. *)
 let test_strategy_config_parses_with_lifecycle_fields_absent _ =
   let dropped =
     [ "enable_entry_ticket_rescreen"; "entry_order_max_rest_weeks" ]
@@ -860,14 +947,16 @@ let test_strategy_config_parses_with_lifecycle_fields_absent _ =
            (equal_to false);
          field
            (fun (c : Weinstein_strategy.config) -> c.entry_order_max_rest_weeks)
-           (equal_to 0);
+           (equal_to 26);
        ])
 
 let suite =
   "Runner_hypothesis_overrides"
   >::: [
-         "F2: the ticket-lifecycle pair defaults to off"
-         >:: test_default_entry_ticket_lifecycle_is_off;
+         "F2: re-screen defaults off, clock defaults to 26"
+         >:: test_default_entry_ticket_lifecycle_is_rescreen_off_clock_26;
+         "F2: weinstein_strategy.mli re-declares the clock default consistently"
+         >:: test_strategy_mli_redeclares_clock_default_consistently;
          "F2: both lifecycle fields resolve as Variant_matrix axes"
          >:: test_entry_ticket_lifecycle_axes_resolve_via_overlay_validator;
          "F2: config parses with both lifecycle fields absent"

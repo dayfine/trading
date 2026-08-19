@@ -1,6 +1,48 @@
 # Status: simulation
 
-## Last updated: 2026-08-17
+## Last updated: 2026-08-19
+
+### 2026-08-18 — F2 clock default promoted 0 → 26 (PR #2384) — **CONFIRMATION GRID OWED**
+
+`Weinstein_strategy_config.entry_order_max_rest_weeks` was promoted `0 → 26`
+**by user decision**, outside the normal gate. The full evidence and the
+declared deviations live on that field's `.mli` docstring and in
+`dev/experiments/_ledger/2026-08-18-entry-ticket-clock26-promotion.sexp`
+(verdict **`Inconclusive`**, not `Accept` — the ledger's verdict type has no
+"promoted-by-override" label; same shape as the #2047 bundle precedent).
+
+**Why this section exists.** The PR's own argument for shipping ahead of the
+grid is that *the grid still happens*. A session handoff note
+(`dev/notes/next-session-priorities-2026-08-19.md`) is not a tracked
+obligation, so the owed work is recorded here.
+
+**Owed — the confirmation grid** (`.claude/rules/promotion-confirmation.md`).
+Re-run the candidate surface `{0, 13, 26, 52}` across ≥3 independent
+(period × universe) cells. Queued as **validation of a shipped default**, not as
+a gate before one: if it fails, the response is to reconsider the flip, not to
+discount the grid.
+
+- **R-1 — at least one cell must span a genuinely different macro regime**
+  (ideally deep enough to cover 2000-02 + 2008). Four agreeing post-2009 cells
+  were exactly what the early-admission grid had before a 27y cell reversed it.
+- **R-2 — commit the per-arm outputs.** The three clock draws
+  (513.42 / 434.06 / 377.73) and the three null draws
+  (265.44 / 281.71 / 397.95) currently live only in `/tmp` chain logs; nothing
+  in the repo carries them. They are reproducible from
+  `dev/experiments/ttl-retest-2026-08-16/specs/ttl-retest-06-clock26-only.sexp`
+  at salts 0/1/2 (added on main by #2377), but reproducible ≠ recorded.
+- **R-5 — postsubmit watch on
+  `trading/test_data/backtest_scenarios/goldens-sp500/sp500-2019-2023-armed-stoplimit.sexp`.**
+  It arms StopLimit and is deliberately left *unpinned* (a golden should track
+  intended defaults), so the new default can move it — and
+  `golden-runs-sp500-5y.yml` runs post-merge only, so the PR never saw it. The
+  13 non-golden StopLimit specs were pinned at `0` in #2384 to keep their
+  recorded results reproducible.
+
+**Also note for any new spec:** after this flip, an arm that omits
+`entry_order_max_rest_weeks` runs at **26**, not `0`. Both 2026-08-18 ledger
+entries measured `0` under the label `null`; that label no longer denotes the
+shipped default. Pin the field explicitly.
 
 ### 2026-08-10 — ticket-lifecycle audit fields (branch `feat/ticket-lifecycle-audit-fields`, PR-5)
 
