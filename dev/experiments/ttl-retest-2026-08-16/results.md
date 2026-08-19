@@ -103,15 +103,34 @@ rule** is wrong.
 
   - *rescue* — the clock makes the re-screen useful, implying
     `rescreen + clock > clock alone`;
-  - *neutralisation* — at a 4-week bound almost no ticket survives long
-    enough for the re-screen to act, so `rescreen + clock ≈ clock alone` and
-    the re-screen is inert dead weight the clock happens to hide.
+  - *neutralisation* — a 4-week bound removes most of the population the
+    re-screen would otherwise act on, so `rescreen + clock ≈ clock alone` and
+    the re-screen contributes little either way.
 
-  The available evidence leans **neutralisation**: clock-26 *alone* returned
-  **513.42** at salt 0, well above the composite's 282.20. Different clock
-  values, so not decisive — but it is the wrong direction for a rescue story.
-  **The disambiguating run is a `rescreen = false, clock = 4` arm**, and it
-  should be run before any composite is proposed.
+  **The honest strength is UNDETERMINED**, and if anything this document's own
+  table leans the other way. A 4-week bound cuts the 5-13wk, 14-26wk, 27-52wk,
+  1-3yr and >3yr buckets — **+1,021,434 + 82,266 − 148,226 + 16,612 − 217,518
+  = +754,568 net, a *winning* cohort** (claim 3's "every bound cuts a
+  net-losing cohort" covers `{13, 26, 52, 156}`, not 4). So clock-4 *alone*
+  should land **below** baseline, while the composite came in at ≈ baseline —
+  which points toward `rescreen + clock4 > clock4 alone`, i.e. **rescue**.
+
+  That does not establish rescue either: static bucket subtraction ignores
+  that cancelling a ticket frees capital the walk redeploys, so the true
+  counterfactual is not the arithmetic difference. **The disambiguating run is
+  a `rescreen = false, clock = 4` arm**, and it should be run before any
+  composite is proposed.
+
+  ⚠ **Two corrections to an earlier draft of this passage** (QC re-review at
+  58562044). It claimed the evidence "leans neutralisation" on the strength of
+  clock-26-alone returning 513.42 against the composite's 282.20 — different
+  clock values, and the bucket arithmetic above points the opposite way, so
+  that lean was unsupported. It also justified neutralisation by "at a 4-week
+  bound almost no ticket survives", which is **false**: 864 of 1,147 fills
+  (75%) rest ≤4 weeks, so a quarter do survive. The defensible version of the
+  mechanism is narrower — a 4-week clock already removes the 5-13wk band the
+  re-screen destroys, so the two mechanisms overlap on the population that
+  matters.
 - **Time-based bounds stay open** and are the next arm — but use a
   **clock-only** spec, not the committed `03-ttl26`, which arms the re-screen
   as well and is therefore confounded by exactly the composite problem above.
