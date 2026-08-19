@@ -252,13 +252,32 @@ the top line cannot.
 `dev/experiments/ticket-funding-cohort-2026-08-18/rest_time_pnl.sh`, which joins
 on `position_id` and refuses any pre-#2317 artifact. On arm 00 it says every
 clock bound removes a net-losing cohort, 26 weeks largest. The clock arms are
-therefore **worth running**, and `03-ttl26` is the one to run first — the
-opposite priority to what the withdrawn table above implied.
+therefore **worth running**.
 
-**Read the arm on that metric, not on its top line.** The recommendation above is
-"run `03-ttl26` and rerun `rest_time_pnl.sh` against its artifact", not "run it
-and read `total_return_pct`" — the top line is a between-run comparison and is
-bounded by the 132.5pp null exactly as the withdrawn section said.
+> ⚠ **Corrected 2026-08-18: run `06-clock26-only`, NOT `03-ttl26`.** An earlier
+> version of this paragraph named `03-ttl26` as the arm to run first. That is
+> wrong and would have cost a ~1.5h run: **`03-ttl26` arms
+> `enable_entry_ticket_rescreen true` as well as the clock**, and the re-screen
+> was independently REJECTED at −137pp (`results.md`, ledger
+> `2026-08-18-entry-ticket-rescreen`). A composite of a rejected mechanism and
+> an untested one cannot isolate the clock. `specs/06-clock26-only.sexp` is the
+> single-knob replacement — a one-line diff from `00-null.sexp`
+> (`entry_order_max_rest_weeks` 0 → 26) with the re-screen left `false`.
+>
+> The same confound applies to `02-ttl13` and `04-ttl52`: every committed
+> `ttlN` spec arms both halves. Any clock arm needs a clock-only spec.
+
+**Read the arm on that metric, not on its top line.** The recommendation is
+"run `06-clock26-only` and rerun `rest_time_pnl.sh` against its artifact", not
+"run it and read `total_return_pct`" — the top line is a between-run comparison
+and is bounded by the 132.5pp null exactly as the withdrawn section said.
+
+**Result (2026-08-18):** `06-clock26-only` ran at three salts and returned
+**513.42 / 434.06 / 377.73** against the null's **265.44 / 281.71 / 397.95** —
+mean gap +126.7pp, 8 of 9 pairwise, but the distributions **touch** and the
+exact rank test gives **p = 0.100**. Promising, not established. The default was
+subsequently flipped to 26 by user decision without the confirmation grid; see
+`weinstein_strategy_config.mli` for that record and its stated caveats.
 
 Also missing by construction, and worth adding whenever they do run: the
 composite **`(rescreen = true, clock = 156)`**. `weinstein_strategy_config.mli`

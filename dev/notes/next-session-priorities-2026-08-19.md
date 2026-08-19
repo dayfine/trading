@@ -23,8 +23,8 @@
 
 - **[X1] clock-26-ALONE arm** — launched 2026-08-18 12:55, pinned worktree
   `@59b26c3bf`, ETA ~14:25. Log `/tmp/clock26-chain.log`, spec
-  `/tmp/ttl-retest-specs/ttl-retest-06-clock26-only.sexp` (**not yet committed**
-  — commit it if the result is worth keeping).
+  `dev/experiments/ttl-retest-2026-08-16/specs/ttl-retest-06-clock26-only.sexp`
+  (committed in this PR).
   ⚠ **Read the within-run per-bucket P&L, not the top line.** Run
   `dev/experiments/ticket-funding-cohort-2026-08-18/rest_time_pnl.sh` on the
   arm's own `trade_audit.sexp` + `trades.csv`. The 132.5pp null is a
