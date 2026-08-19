@@ -7,7 +7,89 @@ down) … whether in that case the prior support should be ignored, and we just
 install a plain 15% stop instead — and maybe this stop should be dynamically
 adjusted on-fill to be exactly / closer to -15% of the actual fill."*
 
-Two ideas, separable, and the second is already a **measured defect**.
+Two ideas, separable. The second turned out not to be a defect at all
+(withdrawn below), and the first turned out **not to need building** — see the
+banner immediately after this line.
+
+---
+
+> ## ⚠ Idea A is already implemented — 2026-08-19
+>
+> **No new `Stop_width_mode` case is needed.** The mechanism this plan proposes
+> exists, default-off, and has since 2026-08-06.
+>
+> `entry_audit_helpers.ml:83`, `_maybe_reanchor_to_entry_base`:
+>
+> ```ocaml
+> let should_reanchor =
+>   reanchor
+>   && Float.( > ) dist stops_config.Weinstein_stops.max_stop_distance_pct
+> in
+> if not should_reanchor then (raw_stop, structural_kind)
+> else ... compute_initial_stop_with_floor_with_callbacks
+>          ~callbacks:empty_callbacks ~fallback_buffer:initial_stop_buffer
+> ```
+>
+> Read literally: **when the support-floor stop lands farther than
+> `max_stop_distance_pct` from entry, discard the structural floor and install a
+> plain `entry × initial_stop_buffer` percentage stop.** Passing
+> `~callbacks:empty_callbacks` is precisely what makes it ignore prior support —
+> the stops layer sees no bars and takes its buffer fallback. Candidates whose
+> floor is already inside the limit are returned verbatim, so armed/off differ
+> only on the over-wide cohort.
+>
+> That is the user's proposal, including the "ignore the prior support" part.
+> It is gated by `config.stop_anchor_at_entry_base` (`[@sexp.default false]`),
+> and the function header already records *"user go 2026-08-06"* — it was
+> greenlit once before, landed default-off per R1, and was never surfaced.
+> `Cap_at_max` with `initial_stop_buffer = 1 − max_stop_distance_pct = 0.85`
+> would be **bit-identical** to arming this flag.
+>
+> The remaining work is therefore a **surface, with zero new code** — both knobs
+> are already `Weinstein_strategy.config` fields, so both are
+> `Variant_matrix`-expressible today:
+>
+> ```
+> ((flag stop_anchor_at_entry_base) (values (false true)))
+> ((flag initial_stop_buffer)       (values (0.85 0.92 0.94 0.96)))
+> ```
+>
+> ### What the book actually licenses here
+>
+> Both halves matter and they pull in different directions:
+>
+> - **§5.1** — *"Pre-calculate stop before buying. If stop requires >15% risk
+>   from entry → prefer other candidates."* That is exactly today's
+>   `Drop_over_max` default (verified: `weinstein_strategy_config.ml:249`, with
+>   `max_stop_distance_pct = 0.15` at `stop_types.ml:67`), and it is why the
+>   faithful arm passes on AXTI. **Dropping the candidate is the book-faithful
+>   response to a far base; re-anchoring is a departure from it.**
+> - **§5.3, Trader Method** — *"Use 4-6% initial stop if no nearby prior peak."*
+>   The book **does** sanction a flat percentage stop divorced from structure —
+>   but inside the trader preset, conditioned on *no nearby prior peak*, and at
+>   **4-6%**.
+>
+> So the *shape* of the idea is book-supported; the *value* proposed is not.
+> **15% is §5.1's rejection threshold, not a stop level the book ever recommends
+> placing.** Conflating "the 15% admission gate" with "install a 15% stop" is
+> the error to avoid — two different quantities that happen to share a number.
+> Hence the grid above spans `0.94 / 0.96` (the book's 4-6%), `0.92` (8%, the
+> value the existing tests exercise) and `0.85` (15%, included to *test* the
+> user's number, not because the book endorses it).
+>
+> One thing the book does not settle: its trigger is "no nearby prior peak" (no
+> usable structure at all), while the flag's trigger is "structure exists but is
+> far away". AXTI at E = 2.71 with its base near 1.4 has structure 48% away.
+> Whether that counts as "no nearby prior peak" is a judgement call, and it is
+> the one question worth putting to `blind-judge` before promoting anything.
+>
+> **What to read in the surface.** The tradeoff is predictable in advance: a
+> tighter flat stop admits the fast movers the 15% gate currently drops
+> (`project_max_stop_filters_structural_stops`) but stops them out on ordinary
+> volatility. Since this strategy's return is a fat-tail phenomenon
+> (`project_edge_is_the_fat_tail`, 11+ confirmations), a stop tight enough to
+> whipsaw a monster out early is the failure mode to watch — read **max single-
+> trade P&L**, not just the top line.
 
 ---
 
@@ -180,12 +262,21 @@ the structural meaning. They diverge exactly when the fill gaps.
 
 ## Sequencing
 
-**A only.** The original sequencing put B first on the strength of a +7.02pp
-measurement that turned out to be a mis-join; with the correct figure (+0.28pp)
-there is nothing to fix, and B does not change the population A acts on either.
+**Neither is a build.** The original sequencing put B first on the strength of a
++7.02pp measurement that turned out to be a mis-join; with the correct figure
+(+0.28pp) there is nothing to fix. A then turned out to be already implemented
+(banner at the top), so it is not a build either.
 
-A remains a real proposal and still needs the book question settled before any
-build — default-off flag and axis before it is ever a default.
+What is left is one **surface** over two existing knobs —
+`stop_anchor_at_entry_base × initial_stop_buffer` — and one **judgement**: does
+"structure exists but sits 48% away" satisfy the book's "no nearby prior peak"
+condition, or does §5.1's *prefer other candidates* govern? Settle the
+judgement before reading the surface as a promotion case, not after; otherwise
+the numbers decide a question the book already has an opinion about.
+
+Promotion, if it ever comes, still routes through the normal gate: ledger
+ACCEPT, then the confirmation grid (`promotion-confirmation.md`) with one cell
+spanning a pre-2009 macro regime.
 
 **Method note worth keeping.** The withdrawn measurement failed the way two
 other artifacts failed this week: joined on a non-unique key. In this codebase
