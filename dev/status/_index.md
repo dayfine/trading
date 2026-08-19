@@ -15,6 +15,16 @@ participate in signature matching, so it compiled green and no gate could catch
 it. Two new unreviewed PRs (#2391, #2392) arrived after the dispatch window.
 Full narrative: `dev/daily/2026-08-19.md`.
 
+**Superseded the same day, by the local session (2026-08-19 PM):** #2384's
+clock-26 promotion was **reverted** by #2397 after the sp500 golden regressed
+−40.91pp, and the cron had merged it 30 minutes after it was drafted under an
+explicit hold — draft status is not a hold, which is why #2402 added a
+`do-not-merge` label the gate script enforces. The mechanism itself is not
+dead: the larger sample favours it (`project_stale_order_fills_are_not_an_edge`),
+the re-flip is framed in #2405, and #2407 proposes a better discriminator than
+age. Also merged: #2411 (entry-cap axis + handoff). Open: #2413, the axis's
+3-year-fold horizon control, which reverses its reading (#2404).
+
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
 Ten prior run summaries were inlined above it until 2026-08-14, growing
@@ -68,7 +78,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
 | [screener](screener.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | local-range entry anchor MERGED #2217 (default-off axis `entry_anchor_local_range_weeks`); next: re-run honest ladder with local-top-E arms, then WF-CV |
-| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | clock-26 default PROMOTED #2384 `5c278bb7` (user-directed, ledger `Inconclusive`); next: confirmation grid — ≥3 cells, ≥1 pre-2009 macro regime |
+| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | clock-26 REVERTED to 0 by #2397 (golden −40.91pp); re-flip framed in #2405, superseded discriminator in #2407; next: base-held measurement |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
 | [experiment-platform](experiment-platform.md) | IN_PROGRESS | feat-backtest | — | force-exit-off grid REJECTED for promotion (#1503); single-dial surface exhausted; next: continuation-buy recheck on top-3000 (data-gated) |
