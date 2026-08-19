@@ -21,8 +21,8 @@
     - The entry: [E = 2.71] via {!Screener_scoring.suggested_entry} — the range
       top plus the screener's 0.5% buffer, cent-rounded.
     - The gate: at every stop the {i book} would place — anywhere in the
-      April-May base — the distance from [E] is 34-58%, so [Drop_over_max]
-      refuses the candidate, [Size_down] admits it shrunken and
+      1.13-1.47 base band — the distance from [E] is 33.6-58.3%, so
+      [Drop_over_max] refuses the candidate, [Size_down] admits it shrunken and
       [Demote_over_max] admits it demoted.
     - The general claim: the required 15% stop level sits
       {b above the decision week's own low}, so no structural stop can satisfy
@@ -77,8 +77,12 @@ let _weekly_highs =
     2.2301;
   ]
 
-(* The base the book would anchor a stop under: the April-May consolidation.
-   Lows run 1.13 (2025-04-11 and 04-17) to 1.47 (2025-06-06). *)
+(* The base the book would anchor a stop under. Its floor is the April-May
+   consolidation — 1.13 on 2025-04-11 and 04-17. The upper bound 1.47 is the
+   week ending 2025-06-06, i.e. the last correction low BEFORE the breakout
+   rather than part of April-May itself; it is included because §5.1 anchors on
+   "the prior correction low", and 06-06 is that low. So the pair brackets every
+   level the book could reasonably choose, not one contiguous consolidation. *)
 let _base_low = 1.13
 let _base_high_low = 1.47
 
@@ -118,10 +122,13 @@ let _gate ~mode ~ceiling ~stop_distance_pct =
     decision week spans 2025-06-06..06-27, whose highs are 1.83 / 2.70 / 2.18 /
     2.2301. Its max is the 2.70 breakout bar.
 
-    Asserted alongside the 1-bar window so the test distinguishes "the scan
-    found the window's max" from "the scan returned the latest bar" — a last-bar
-    bug returns 2.2301 here and would pass a max-only assertion on a fixture
-    whose newest bar happened to be the high. *)
+    Asserted alongside the 1-bar window, which pins the {i window boundary}
+    rather than the max-vs-last-bar distinction: with [weeks = 1] the scan must
+    see only the decision week and return its 2.2301 high. An off-by-one that
+    widened the window to two bars would return 2.70 and fail here, while still
+    passing the 4-bar assertion below — so the pair brackets the window from
+    both sides. (A last-bar bug is already caught by the 4-bar case, whose max
+    2.70 is not its newest bar.) *)
 let test_local_range_top_is_the_breakout_bar _ =
   assert_that
     [ _range_top ~weeks:1; _range_top ~weeks:4 ]
@@ -200,7 +207,7 @@ let test_three_modes_disagree_on_this_candidate _ =
        ])
 
 (** Even the two non-default modes refuse it once the sanity ceiling is below
-    the real distance — 58.4% is outside a 50% ceiling. So "arm [Size_down] and
+    the real distance — 58.3% is outside a 50% ceiling. So "arm [Size_down] and
     AXTI gets in" is only true for a ceiling chosen wide enough to admit it, and
     the ceiling is the actual dial under discussion. *)
 let test_a_tight_ceiling_refuses_it_under_every_mode _ =
