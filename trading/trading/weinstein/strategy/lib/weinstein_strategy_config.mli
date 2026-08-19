@@ -1468,12 +1468,12 @@ type config = {
           salt   clock=0            clock=26         delta
           0      108.23% (238 tr)   69.81% (227)     -38.42pp
           1      111.40% (240)      69.09% (227)     -42.31pp
-          2      112.30% (240)      70.30% (227)     -42.00pp
+          2      112.30% (240)      70.29% (227)     -42.01pp
           mean   110.64%            69.73%           -40.91pp
-          spread   4.07pp            1.21pp
+          spread   4.07pp            1.20pp
           v}
 
-          {b Complete separation} — the armed arm's best draw sits 37.93pp below
+          {b Complete separation} — the armed arm's best draw sits 37.94pp below
           the control's worst, giving the 3-vs-3 exact rank test its floor (p =
           0.05), and the effect is ~10x the larger arm's spread. The armed arm
           returns 227 trades in all three draws while the control varies
@@ -1538,6 +1538,15 @@ type config = {
           and 156 is never contradicted — but
           {b 156 is a reasoned candidate, not a measured winner}. No surface has
           been run on it. Treat it as the value to test first, not as a result.
+
+          ⚠ {b And all of that is static bucket subtraction}, which is not the
+          counterfactual. It assumes the trades a bound removes simply vanish;
+          they do not — the cash they would have consumed funds different later
+          tickets. This PR's own decomposition is the proof: cutting at 26 weeks
+          removed 59 trades but {i added} 48 others, a near-total reshuffle that
+          no bucket arithmetic predicts. So the 87-trades/+215,806 figure bounds
+          what is cut, not what is lost. Another reason 156 is a value to test
+          rather than a value to adopt.
 
           Any future promotion needs a ledger ACCEPT plus the
           [promotion-confirmation.md] grid, neither of which the 26 flip had.

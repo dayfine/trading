@@ -808,8 +808,8 @@ let test_failed_breakout_tolerance_axis_resolves_via_overlay_validator _ =
     [0] after a one-day round trip: promoted to 26 on 2026-08-18 (PR #2384,
     user-directed) and {b reverted on 2026-08-19} when the one golden that arms
     the StopLimit entry family measured {b −40.91pp} against it at three salts
-    per arm, with complete separation and CI's own postsubmit failing on the
-    merge commit.
+    per arm, with complete separation, reproduced to the cent by CI's own run
+    artefacts.
 
     So GTC-forever persistence is the default again, and this assertion is back
     to pinning the R1 no-op claim. It moved 0 → 26 → 0 across two days; both
