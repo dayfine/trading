@@ -5,6 +5,34 @@ harness: project
 
 # PR merge gates
 
+## Rule 0 — the `do-not-merge` label is a HARD hold
+
+**A PR carrying the `do-not-merge` label is not mergeable, no matter what the
+gates say.** It outranks CI, qc-structural, qc-behavioral, and `--admin`. Remove
+it only on an explicit human decision, and never as a step in your own merge.
+
+`sh dev/scripts/pr_gate_status.sh` enforces this: a held PR prints
+`HOLD -- do-not-merge label` instead of `MERGE`, even at `pass / ok / ok`.
+
+**Converting a PR to draft does NOT hold it.** `gh pr merge --admin` merges
+drafts without complaint, and the orchestrator reads *gate state*, not draft
+state. On 2026-08-19 PR #2384 was drafted with an explicit hold comment
+explaining that new measurements contradicted its evidence, and the cron merged
+it **~30 minutes later** — behaving correctly on the only signals it could see.
+The result was a −40.91pp regression on `main` (#2397, issue #2396).
+
+The general form, worth internalising beyond this label: **anything that must
+not happen while nobody is watching has to be expressed in the vocabulary
+automation reads.** Draft status, review comments and TODO notes are
+human-vocabulary. Labels, failing checks and branch protection are
+automation-vocabulary.
+
+Corollary: if you find evidence against a PR you cannot merge-block yourself,
+**prepare the revert before you walk away.** That is what turned the #2384
+episode from a lost decision into a 30-minute recovery.
+
+---
+
 A PR is mergeable only when **all three** are green:
 
 1. **GitHub CI** — `build-and-test` + `perf-tier1-smoke` (and any other
