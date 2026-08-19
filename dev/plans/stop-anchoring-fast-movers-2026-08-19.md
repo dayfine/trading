@@ -99,7 +99,7 @@ measure**, not the return.
 
 ---
 
-## Idea B — re-anchor the stop to the actual fill (a measured defect)
+## Idea B — re-anchor the stop to the actual fill (WITHDRAWN — not a defect)
 
 Independent of A, and **not a proposal so much as a bug report**.
 
@@ -108,18 +108,48 @@ The position is then filled at whatever the market gives — which under the
 StopLimit family can be up to `entry_extension_max_pct` above E. The stop is
 not re-anchored, so realised risk drifts from designed risk.
 
-### Measured, arm 00, 924 fills joined designed-vs-realised
+### ⚠ WITHDRAWN 2026-08-19 — the measurement was a mis-join
 
-| | |
-|---|---|
-| mean (realised − designed) stop distance | **+7.02pp wider** |
-| fills whose realised distance is >20% wider than designed | **268 (29%)** |
-| fills whose realised stop distance exceeds 20% | **152 (16%)** |
+**The claimed defect is not real.** The original figures came from a join keyed
+on **symbol**, with `sort -u -k1,1` on the fill side — which keeps one fill per
+symbol while the audit holds 1,466 tickets across only 802 symbols. Rows were
+therefore paired arbitrarily. Re-run keyed on **`position_id`** (unique per
+ticket):
 
-The last row is the sharp one. **`max_stop_distance_pct` is enforced at design
-time and then violated at fill time.** The gate refuses candidates whose
-*designed* stop exceeds 15%, and then admits candidates that end up past 20%
-because the fill landed above E. The cap is not doing what its name says.
+| | claimed (symbol join) | correct (`position_id` join) |
+|---|---|---|
+| n | 924 | 1,133 |
+| mean (realised − designed) | **+7.02pp** | **+0.28pp** |
+| median | — | +0.09pp |
+| p90 | — | +0.85pp |
+| >20% wider than designed | 29% | 11% |
+| realised distance beyond 20% | **16%** | **0%** |
+
+**Zero fills end up with a realised stop distance beyond 20%**, so the headline
+claim — that `max_stop_distance_pct` is enforced at design time and violated at
+fill time — is **false**. The realised stop distance essentially equals the
+designed one (median drift +0.09pp).
+
+Split by construction, the drift is negligible for both kinds:
+`Buffer_fallback` +0.30pp (n=685), `Support_floor` +0.26pp (n=448).
+
+**Why the drift is small, in hindsight:** it is bounded by how far a fill can
+land above E, and under the StopLimit family most fills land at or very near
+the trigger. The mechanism for a large drift exists but almost never fires.
+
+### What survives
+
+Not the defect claim. What survives is a **design observation**, and it is worth
+recording only because it is now measured rather than assumed:
+
+- For a **percentage** stop (`Buffer_fallback`), the level's only meaning is
+  "X% of risk", so anchoring it to E rather than the fill is arguably wrong in
+  principle — but empirically worth +0.30pp, i.e. nothing.
+- For a **structural** stop (`Support_floor`), the level is a real support
+  price. It *should not* follow the fill; moving it would destroy its meaning.
+  So "re-anchor" was never the right verb for this half.
+
+**No build is justified.** This is a no-build on measurement, not on priors.
 
 ### Why this is worth fixing regardless of Idea A
 
@@ -150,10 +180,15 @@ the structural meaning. They diverge exactly when the fill gaps.
 
 ## Sequencing
 
-**B before A.** B is a defect with a measurement already in hand and no
-faithfulness argument to win; A is a genuine strategy change that needs the
-book question settled and carries a real fat-tail risk. Fixing B also changes
-the population A would act on — after re-anchoring, fewer positions sit beyond
-the cap, so A's cohort shrinks and its measurement gets cleaner.
+**A only.** The original sequencing put B first on the strength of a +7.02pp
+measurement that turned out to be a mis-join; with the correct figure (+0.28pp)
+there is nothing to fix, and B does not change the population A acts on either.
 
-Both are default-off flags and axes before either is a default.
+A remains a real proposal and still needs the book question settled before any
+build — default-off flag and axis before it is ever a default.
+
+**Method note worth keeping.** The withdrawn measurement failed the way two
+other artifacts failed this week: joined on a non-unique key. In this codebase
+**`position_id` is the only safe join key** between `trade_audit.sexp` and
+`trades.csv`; `symbol` repeats (802 symbols across 1,466 tickets) and
+`sort -u -k1,1` on it silently drops rows rather than erroring.
