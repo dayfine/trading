@@ -1447,9 +1447,9 @@ type config = {
           {b Why it exists at all.} Unbounded is genuinely wrong at the extreme
           (defect E): [FUL-wein-64] was decided 2000-02-04 and filled 2021-11-01
           — a resting order that survived {b 21.7 years}. (The {b 865-week} max
-          fill age quoted below is a different run's longest rester, ~16.6
-          years; the two are not in conflict — they are two measurements of the
-          same pathology.) The clock's job is removing that absurdity.
+          fill age on the 26-year null is a different run's longest rester,
+          ~16.6 years; the two are not in conflict — they are two measurements
+          of the same pathology.) The clock's job is removing that absurdity.
 
           {b What the promotion rested on.} Three salts of a clock-only arm on
           top3000 × 2000-2026 returned 513.42 / 434.06 / 377.73 against the
@@ -1517,11 +1517,12 @@ type config = {
           harvest-rotate, trim, re-time and cap.
 
           {b The calibration lesson.} 132.5pp is a property of {i that} base,
-          not a universal floor — this base measures {b 4.07pp}, ~40x quieter. A
-          longer, broader run is not automatically the more reliable one: more
-          symbols and more decision points give path realisation more places to
-          change which tickets get funded. {b Every base needs its own null};
-          never import one base's floor to judge another's gap.
+          not a universal floor — this base measures {b 4.07pp}, ~33x quieter
+          (132.5 / 4.07 = 32.6). A longer, broader run is not automatically the
+          more reliable one: more symbols and more decision points give path
+          realisation more places to change which tickets get funded.
+          {b Every base needs its own null}; never import one base's floor to
+          judge another's gap.
 
           {b If a bound is wanted}, the evidence points at {b 156 weeks}, and
           the working belongs here rather than the bare number. On cell 13's
