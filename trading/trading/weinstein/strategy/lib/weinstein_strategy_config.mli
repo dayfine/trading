@@ -1431,10 +1431,14 @@ type config = {
           [trading/simulation/test/test_gtc_entry_persistence.ml]. R2:
           axis-expressible as
           [((flag enable_entry_ticket_rescreen) (values (true false)))]. *)
-  entry_order_max_rest_weeks : int; [@sexp.default 0]
+  entry_order_max_rest_weeks : int; [@sexp.default 26]
       (** F2 {b backstop}, the invented half: the clock. An unfilled ticket that
           has rested more than this many whole weeks is cancelled regardless of
-          whether it still qualifies. [0] (default) = {b unbounded}.
+          whether it still qualifies. [0] = {b unbounded}.
+
+          {b Default promoted 0 -> 26 on 2026-08-18 by user decision.} The
+          evidence and the two process deviations are recorded below, because
+          this promotion did {i not} follow the normal gate.
 
           A ticket placed on review week 0 survives review week
           [entry_order_max_rest_weeks] and is cancelled at week
@@ -1448,10 +1452,40 @@ type config = {
           bucket. The clock's job is removing that absurdity, not shaping
           returns.
 
-          {b Why the default is still [0].} A bound is a behaviour change and
-          R1 requires the merge default to be the prior no-op; ~156 weeks (3
-          years) is the candidate value, and it earns the default only through
-          the defect-D re-test. That re-test also has to reach values the
+          {b Promotion evidence.} Three salts of a {b clock-only} arm
+          (re-screen off; single-knob diff from the null) returned
+          {b 513.42 / 434.06 / 377.73} against the null's own three draws
+          {b 265.44 / 281.71 / 397.95} — mean gap {b +126.7pp}, winning
+          {b 8 of 9} pairwise comparisons. Secondary signals move together:
+          maxDD better in all three (32.46 / 34.38 / 34.19 vs 39.03),
+          [rejected_fills] lower (206 / 208 / 207 vs 262), realized totals
+          3.82M / 3.25M / 2.82M vs 2.31M. Mechanism verified — max fill age
+          26 / 26 / 27 weeks against the null's 865. (27 is expected, not a
+          bug: a ticket placed on review week N survives week N+26 and is
+          cancelled at N+27.)
+
+          {b ⚠ Two deviations from the normal gate, both user-directed.} The
+          distributions {b touch} — the clock arm's worst draw (377.73) sits
+          below the null's best (397.95) — and the exact rank test gives
+          {b p = 0.100} one-sided, where 0.050 is the floor at 3-vs-3. So this
+          was promoted (a) {b without} the [promotion-confirmation.md]
+          confirmation grid, and (b) {b without} a ledger ACCEPT
+          ([experiment-flag-discipline.md] R3). The grid is queued as
+          {i validation of a shipped default} rather than as a gate before one;
+          if it fails, the right response is to reconsider this flip, not to
+          discount the grid.
+
+          {b ⚠ The evidence is not reproducible from the repo.} The three draws
+          live only in chain logs under [/tmp]; no committed artifact carries
+          them. They are reproducible by re-running
+          [dev/experiments/ttl-retest-2026-08-16/specs/ttl-retest-06-clock26-only.sexp]
+          at salts 0/1/2, which determinism makes reliable (the null tripwire
+          reproduces to 15 digits), but that is a weaker record than an
+          artifact. The grid should commit its per-arm outputs.
+
+          {b Prior reasoning, retained.} ~156 weeks (3 years) was the earlier
+          candidate value, on the argument that unbounded is wrong only at the
+          extreme (defect E). That re-test also has to reach values the
           original {0, 4, 8} axis never did: on cell 13's 942 joined trades the
           29-91-day bucket is 16.1% of trades and 28% of realized P&L at
           8,376/trade, and {b ttl4's 28-day cut lands on its lower edge}. Re-test
