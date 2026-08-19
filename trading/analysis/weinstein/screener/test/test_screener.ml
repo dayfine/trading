@@ -2398,7 +2398,8 @@ let test_failed_breakout_boolean_agrees_with_reason _ =
     rejection below is attributable to the RS gate alone. [benchmark_bars] is
     empty in {!make_analysis}, so the analyzer leaves [rs = None] and the
     injected value is the only RS in play. *)
-let _long_stock_with_rs normalized =
+let _long_stock_with_rs ?(trend = (Positive_rising : Weinstein_types.rs_trend))
+    normalized =
   let bars = rising_bars_with_spike ~n:35 50.0 100.0 ~spike_idx:31 in
   let base =
     make_analysis "RSGATE" (Some (Stage1 { weeks_in_base = 10 })) bars
@@ -2407,12 +2408,7 @@ let _long_stock_with_rs normalized =
   | None -> { base with rs = None }
   | Some current_normalized ->
       let rs : Rs.result =
-        {
-          current_rs = 1.0;
-          current_normalized;
-          trend = Positive_rising;
-          history = [];
-        }
+        { current_rs = 1.0; current_normalized; trend; history = [] }
       in
       { base with rs = Some rs }
 
@@ -2477,6 +2473,38 @@ let test_rs_gate_diagnostics_track_live_rejection _ =
          field (fun d -> d.long_sector_admitted) (equal_to 1);
          field (fun d -> d.long_grade_admitted) (equal_to 0);
        ])
+
+(* §4.4 rule 3: "RS crossing from negative to positive territory while all other
+   criteria met → A+ bonus signal". Mid-crossing the level is still below 1.0,
+   so a level-only rule 2 would block exactly this cohort. The conjunction is
+   what reconciles the two rules. *)
+let test_rs_gate_crossing_is_exempt_below_the_line _ =
+  let result =
+    _screen_long ~min_rs_normalized:1.0
+      ~stock:(_long_stock_with_rs ~trend:Bullish_crossover (Some 0.90))
+  in
+  assert_that result.buy_candidates (size_is 1)
+
+(* The other arm of the conjunction: same sub-zero-line level, but declining
+   rather than improving, is exactly what rule 2 forbids. Without this the
+   exemption above could be satisfied by a gate that never blocks at all. *)
+let test_rs_gate_declining_below_the_line_is_blocked _ =
+  let result =
+    _screen_long ~min_rs_normalized:1.0
+      ~stock:(_long_stock_with_rs ~trend:Negative_declining (Some 0.90))
+  in
+  assert_that result.buy_candidates is_empty
+
+(* The exemption is exactly ONE trend, which is what keeps this the mirror of
+   [rs_blocks_short]: that gate counts Negative_improving as not-strong (so
+   shorting stays allowed), so this one must count it as still-weak. Without
+   this test, widening the exemption to "any improving trend" would pass. *)
+let test_rs_gate_improving_but_still_negative_is_blocked _ =
+  let result =
+    _screen_long ~min_rs_normalized:1.0
+      ~stock:(_long_stock_with_rs ~trend:Negative_improving (Some 0.90))
+  in
+  assert_that result.buy_candidates is_empty
 
 let test_rs_gate_sexp_round_trips _ =
   let armed = { default_config with min_rs_normalized = 1.0 } in
@@ -2798,6 +2826,12 @@ let suite =
          >:: test_rs_gate_absent_rs_does_not_block;
          "RS gate: the diagnostics grade count tracks the live rejection"
          >:: test_rs_gate_diagnostics_track_live_rejection;
+         "RS gate: a crossing RS below the line is exempt (§4.4 rule 3)"
+         >:: test_rs_gate_crossing_is_exempt_below_the_line;
+         "RS gate: a declining RS below the line is still blocked"
+         >:: test_rs_gate_declining_below_the_line_is_blocked;
+         "RS gate: improving but still negative is still blocked"
+         >:: test_rs_gate_improving_but_still_negative_is_blocked;
          "RS gate: min_rs_normalized sexp round-trips"
          >:: test_rs_gate_sexp_round_trips;
        ]

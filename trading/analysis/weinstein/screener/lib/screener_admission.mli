@@ -115,7 +115,8 @@ val rs_blocks_long : min_rs_normalized:float -> Rs.result option -> bool
     [_rs_long_signal]), which is a soft preference and does not implement the
     book's prohibition (#2381).
 
-    Returns [true] when [current_normalized < min_rs_normalized].
+    Returns [true] when [current_normalized < min_rs_normalized] and the trend
+    is not the exempt one (see the conjunction paragraph below).
     [current_normalized] is the Mansfield zero-line position — [rs_value] over
     its own long-term average ([Relative_strength._build_history]) — so
     {b 1.0 is the zero line}: above is positive territory, below is negative.
@@ -125,6 +126,27 @@ val rs_blocks_long : min_rs_normalized:float -> Rs.result option -> bool
 
     The comparison is strict, so a candidate sitting exactly on the zero line is
     admitted, and the [0.0] default is an exact no-op rather than a near one.
+
+    {b The rule is a conjunction}, so one trend is exempt regardless of level:
+    [Bullish_crossover] is never blocked. §4.4 rule 3 makes a stock "crossing
+    from negative to positive territory" an {b A+ bonus signal}, and
+    mid-crossing it is still below [1.0] — a level-only gate would block
+    precisely the cohort the book singles out.
+
+    The exemption is exactly one trend, which keeps this the mirror of
+    {!rs_blocks_short}: that gate counts [Bullish_crossover] as {i strong} (so
+    it blocks shorts) and this one counts it as {i not weak} (so it admits
+    longs). [Negative_improving] mirrors too — {i not strong} there, therefore
+    still {i weak} here, and still {b blocked}. Improving-but-still-negative is
+    not rule 3's case; rule 3 names the crossing.
+
+    [Positive_flat] is deliberately {b not} exempt. "Positive and flat"
+    contradicts a sub-[1.0] level, so its appearance there is a symptom of the
+    stuck trend classifier (#2380) rather than signal; exempting it would make
+    the gate inert. Consequently the trend arm of the conjunction is inert
+    {i today} — every candidate classifies as [Positive_flat] — and the gate
+    behaves level-only. It becomes faithful the moment #2380 lands, with no
+    further change here.
 
     Absent RS data does {b not} block, mirroring {!rs_blocks_short}: the rule
     prohibits buying on {i established} negative RS, and a missing series does

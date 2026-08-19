@@ -72,12 +72,23 @@ let rs_blocks_short = function
       true
   | _ -> false
 
-(* Book §4.4 rule 2. Reads [current_normalized] (the Mansfield zero-line
-   position, i.e. RS over its own long-term average) rather than [trend],
-   deliberately: [trend] is degenerate whenever [lookback_bars = rs_ma_period]
-   leaves a 1-element history (#2380), whereas the level is well-defined on the
-   same data. Absent RS does not block — see the .mli. *)
 let rs_blocks_long ~min_rs_normalized = function
+  (* §4.4 rule 2 is a CONJUNCTION — negative RS *trend* AND negative territory.
+     Rule 3 makes a stock "crossing from negative to positive territory" an A+
+     bonus signal, and mid-crossing it is still below 1.0, so a level-only gate
+     would block exactly the cohort the book singles out. Exempting that one
+     trend mirrors [rs_blocks_short] exactly: that gate treats
+     [Bullish_crossover] as STRONG (so it blocks shorts), and this one treats it
+     as not-weak (so it admits longs). [Negative_improving] gets the mirrored
+     treatment too — not-strong there, so still weak here, hence still BLOCKED.
+     Improving-but-still-negative is not the book's A+ case; rule 3 names the
+     crossing.
+
+     [Positive_flat] is deliberately NOT exempt: "positive and flat" contradicts
+     a sub-1.0 level, so its appearance there is a symptom of #2380 (the trend
+     classifier is stuck at that value) rather than signal. Exempting it would
+     make the gate inert today. *)
+  | Some { Rs.trend = Bullish_crossover; _ } -> false
   | Some { Rs.current_normalized; _ } ->
       Float.( < ) current_normalized min_rs_normalized
   | None -> false
