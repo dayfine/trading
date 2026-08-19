@@ -132,9 +132,17 @@ the real loss-maker, is on this measurement mildly positive (+16,612). This is a
 description of *this* run's 25 long-rest trades; it is not offered as a
 correction of the recorded 25, which are not the same set.
 
-`entry_order_max_rest_weeks` still shipping at `0` remains correct — a default
-must be the pre-existing no-op regardless (`experiment-flag-discipline.md` R1) —
-but the *reason* recorded here for preferring 0 over 156 does not hold.
+`entry_order_max_rest_weeks` shipping at `0` was correct **at the time this was
+written** — a default must be the pre-existing no-op (`experiment-flag-discipline.md`
+R1) — but the *reason* recorded here for preferring 0 over 156 does not hold.
+
+> **⚠ Superseded 2026-08-18.** The default was subsequently promoted `0 → 26`
+> by user decision (PR #2384), i.e. outside R1/R3. The evidence, the two
+> process deviations, and the fact that the measured between-run gap sits
+> *below* this base's own 132.5pp seed-noise floor are all recorded on
+> `Weinstein_strategy_config.entry_order_max_rest_weeks`. The load-bearing
+> argument is the within-run cohort measured in this very file: a 26-week bound
+> cuts 89 fills worth −349,132.
 
 ## Why four of the six arms were dropped
 

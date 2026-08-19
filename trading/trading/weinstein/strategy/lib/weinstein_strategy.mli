@@ -228,9 +228,9 @@ module Entry_stop_width_order = Entry_stop_width_order
 module Entry_ticket_ttl = Entry_ticket_ttl
 (** F2 resting-entry-ticket lifecycle: re-screen cancel (primary) + clock TTL
     (backstop), armed independently by [config.enable_entry_ticket_rescreen] and
-    [config.entry_order_max_rest_weeks] (defaults [false] / [0] = off).
-    Re-exposed so tests can pin the cancel decision independently of a full
-    screening tick. See {!Entry_ticket_ttl}. *)
+    [config.entry_order_max_rest_weeks] (defaults [false] = off / {b [26]} =
+    armed, promoted 2026-08-18). Re-exposed so tests can pin the cancel decision
+    independently of a full screening tick. See {!Entry_ticket_ttl}. *)
 
 module Screening_notional = Screening_notional
 (** Per-Friday entry-walk notional / sector-exposure accumulator seeds. Exposed
@@ -877,16 +877,20 @@ type config = {
           exists. BOOK-SUPPORTED (§4.7 + §7); carries no invented number.
           Default [false] = off, bit-identical baselines (R1). See
           [Weinstein_strategy_config.enable_entry_ticket_rescreen]. *)
-  entry_order_max_rest_weeks : int; [@sexp.default 0]
+  entry_order_max_rest_weeks : int; [@sexp.default 26]
       (** F2 {b backstop}: cancel an unfilled ticket that has rested more than
-          this many whole weeks regardless of whether it still qualifies. [0]
-          (default) = unbounded — which is genuinely wrong at the extreme
-          ([FUL-wein-64] rested {b 21.7 years}), so ~156 is the candidate value,
-          earned through the defect-D re-test rather than asserted here.
-          BOOK-NEUTRAL dial: the book grants the authority and names no number.
-          Split from the re-screen above on 2026-08-16 (defect C) — one knob
-          used to arm both. See
-          [Weinstein_strategy_config.entry_order_max_rest_weeks] and
+          this many whole weeks regardless of whether it still qualifies. [0] =
+          unbounded, which is genuinely wrong at the extreme ([FUL-wein-64]
+          rested {b 21.7 years}).
+          {b Default promoted 0 -> 26 on 2026-08-18 by user decision}, outside
+          the normal gate: the measured gap sits below this base's own
+          seed-noise floor, and the load-bearing argument is the within-run
+          cohort (a 26w bound cuts 89 fills worth −349,132). Both the evidence
+          and the two process deviations are recorded in full on
+          [Weinstein_strategy_config.entry_order_max_rest_weeks] — read that
+          before treating this default as settled. BOOK-NEUTRAL dial: the book
+          grants the authority and names no number. Split from the re-screen
+          above on 2026-08-16 (defect C) — one knob used to arm both. See also
           {!Entry_ticket_ttl}. *)
   reserve_cash_for_resting_tickets : bool; [@sexp.default false]
       (** G3: hold back the unfilled cost of still-resting entry tickets from

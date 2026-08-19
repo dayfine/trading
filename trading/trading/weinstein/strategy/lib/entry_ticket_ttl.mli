@@ -42,11 +42,16 @@
     {!Trading_simulation.Cancel_handler.cancel_resting_entry_orders} (without it
     a "cancelled" ticket would still fill).
 
-    {b Default-off (R1).} [rescreen = false] with [max_rest_weeks = 0] returns
-    [[]] unconditionally and never touches the pin table — no clock cancel, no
-    re-screen cancel, weekly re-issue and GTC-forever persistence exactly as
-    before, i.e. the old [ttl_weeks = 0]. This {b extends} the persistence
-    contract; it does not weaken it. *)
+    {b The no-op configuration.} [rescreen = false] with [max_rest_weeks = 0]
+    returns [[]] unconditionally and never touches the pin table — no clock
+    cancel, no re-screen cancel, weekly re-issue and GTC-forever persistence
+    exactly as before, i.e. the old [ttl_weeks = 0]. This {b extends} the
+    persistence contract; it does not weaken it.
+
+    Note this is no longer what the {i config defaults} produce: since
+    2026-08-18 [Weinstein_strategy_config.entry_order_max_rest_weeks] ships at
+    {b 26}, so the default path arms the clock. This function's contract is
+    unchanged — only which arguments the shipped config passes it. *)
 
 open Core
 module Position = Trading_strategy.Position

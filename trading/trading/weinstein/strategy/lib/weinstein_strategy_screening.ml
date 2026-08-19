@@ -292,8 +292,12 @@ let _still_qualifies ~config ~macro_result ~sector_map ~stage_by_ticker ~symbol
     {!Entry_freeze.apply}. The cancelled symbol is not re-placed on this same
     tick — its [Entering] position is still held until the transition is
     applied, so the cascade still excludes it — which is the intent: cancel now,
-    re-qualify (at a fresh [E]) on a later week. No-op at the defaults
-    ([enable_entry_ticket_rescreen = false], [entry_order_max_rest_weeks = 0]).
+    re-qualify (at a fresh [E]) on a later week.
+    {b No longer a no-op at the defaults}: since the 2026-08-18 promotion the
+    clock half is armed by default ([enable_entry_ticket_rescreen = false],
+    [entry_order_max_rest_weeks = 26]), so the guard below falls through and the
+    clock runs on every tick. Only [entry_order_max_rest_weeks = 0] restores the
+    old skip-everything path.
 
     The two halves are independently armed (defect C, 2026-08-16): the
     book-supported re-screen no longer requires opting into the invented clock.

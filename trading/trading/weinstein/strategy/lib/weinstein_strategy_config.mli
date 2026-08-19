@@ -1464,6 +1464,44 @@ type config = {
           bug: a ticket placed on review week N survives week N+26 and is
           cancelled at N+27.)
 
+          {b ⚠ The gap is below this base's own noise floor.} The
+          pre-registered yardstick for this exact base / window / universe is
+          the null's own seed spread:
+          [dev/experiments/ladder-v4-seeded-2026-08-14/results.md] measures it
+          at {b 132.5pp} and states "no variant gap below it is interpretable".
+          The clock's mean gap is {b +126.7pp} — {i below} that floor. (The
+          yardstick is the null's max−min {i spread} and the candidate figure is
+          a difference of {i means}; that comparison is the pre-registered rule
+          of thumb this base adopted, not a formal test. The formal test is the
+          p = 0.100 below, and it agrees.) The same
+          file's bar for the only axis that ever cleared it was "all three draws
+          above the null's maximum (397.95)"; the clock's worst draw is
+          {b 377.73}, so it does not clear that either. And [nearfloor] {i did}
+          clear it and was still not promoted
+          ([memory/project_nearfloor_is_risk_not_return]). Stating the raw
+          numbers without this rule invites the reading "promising but
+          under-powered", when the yardstick's own verdict is "inside the seed
+          noise". Same failure shape as [feedback_run_the_null_control_first].
+
+          {b The argument that does {i not} depend on that gap.} A 26-week bound
+          is a {i within}-run cohort claim, and the cohort accounting is
+          unambiguous: on the null arm the bound cuts {b 89 fills worth
+          −349,132} — the largest net-losing cohort of the four bounds tested
+          (13 / 26 / 52 / 156 cut 147 / 89 / 60 / 25 fills worth −266,866 /
+          −349,132 / −200,906 / −217,518; all four are net-losing). That is the
+          honest case for this default: it removes a measurably loss-making
+          population, not that it wins a between-run comparison the noise floor
+          cannot resolve.
+
+          {b And its limit.} Static bucket subtraction {i also} does not settle
+          the question, because it ignores capital recycling — the cash freed by
+          cancelling those 89 fills is redeployed, and the bucket table cannot
+          say into what. So the cohort argument establishes that the cut
+          population is loss-making, {i not} that cutting it is net-positive.
+          The genuinely unarguable reason for a bound is the one under "Why it
+          exists at all": a 21.7-year resting order is wrong on its face,
+          whatever it earns.
+
           {b ⚠ Two deviations from the normal gate, both user-directed.} The
           distributions {b touch} — the clock arm's worst draw (377.73) sits
           below the null's best (397.95) — and the exact rank test gives
@@ -1493,7 +1531,21 @@ type config = {
 
           {b Faithfulness (W2): BOOK-NEUTRAL dial.} The book grants the cancel
           authority (§4.7 / §7) but names no number, so every value here is a
-          free parameter. Prefer arming {!enable_entry_ticket_rescreen} alone.
+          free parameter — which is precisely why it is the {i backstop} and not
+          the primary rule.
+
+          {b Do {i not} prefer the re-screen instead.} An earlier draft of this
+          docstring said "prefer arming {!enable_entry_ticket_rescreen} alone".
+          That is now wrong: the re-screen was {b REJECTED} on 2026-08-18
+          ([dev/experiments/_ledger/2026-08-18-entry-ticket-rescreen.sexp]),
+          draws 176.36 / 174.83 / 182.28 with its best sitting 83pp below the
+          null's worst — complete separation, and worse maxDD. The two rules
+          select {b opposite} populations: a clock cuts tickets that rested long
+          {i without} their setup changing, while the re-screen cuts tickets
+          whose stage/sector/macro wobbled — which is the base-building
+          pullback-then-resume pattern. Book-supported does not mean
+          profitable, and the two halves must not be conflated again (that is
+          what the pre-[#2349] composite knob did).
 
           R2: axis-expressible as
           [((flag entry_order_max_rest_weeks) (values (0 13 26 52)))].

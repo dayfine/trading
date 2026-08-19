@@ -33,9 +33,12 @@
  (description "Armed StopLimit entry stack (v2-core) on the 302-symbol small universe, 2018-2023. Short bisect probe for the ladder-v4 cell-00 regression.")
  (period ((start_date 2018-01-02) (end_date 2023-12-29)))
  (universe_size 302)
+ ;; entry_order_max_rest_weeks pinned at its pre-promotion value 0
+ ;; (unbounded) so this recorded arm stays reproducible after the default
+ ;; moved 0 -> 26 on 2026-08-18 (PR #2384). Do not drop this pin.
  (config_overrides
   (;; --- armed StopLimit entry stack (the regime no golden covers) ---
-   ((enable_sim_entry_stoplimit true))
+   ((enable_sim_entry_stoplimit true)) ((entry_order_max_rest_weeks 0))
    ((sim_entry_trigger_at_suggested true))
    ((entry_anchor_local_range_weeks 4))
    ((entry_extension_max_pct 2.0))
