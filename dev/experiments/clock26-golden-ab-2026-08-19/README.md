@@ -16,7 +16,10 @@ a worktree pinned at that PR's tip `4d079a54`.
 | `clock=26` | **69.81%** | 227 | 35.2% | 14.5% | 1,473,782 |
 | **delta** | **−38.42pp** | **−11** | −0.1pp | −1.5pp | −405,093 |
 
-Raw runner lines: `raw-results.txt`.
+Raw runner lines: `raw-results.txt` (salt 0) and `null-control-raw.txt` (salts
+1-2, both arms — added 2026-08-19 after qc-behavioral pointed out that four of
+the six draws lived only in prose, which is the same defect this file levels at
+the promotion side).
 
 ### Why this is a clean measurement
 
@@ -141,13 +144,50 @@ Running it would have spent ~4 container-hours re-measuring noise, which is the
 error `feedback_run_the_null_control_first` exists to prevent. Anyone reviving
 it should add salts first.
 
+## CI reproduces the salt-0 pair independently — to the cent
+
+Reading the scenario `summary.sexp` from the two postsubmit runs' artefacts
+(`9359806063` on the parent, `9361240272` on the merge commit):
+
+| metric | parent (`clock=0`) | merge commit (`clock=26`) |
+|---|---:|---:|
+| `totalreturnpct` | 108.23 | 69.81 |
+| `numtrades` | 238 | 227 |
+| `totalpnl` | 751,808.07 | 424,936.24 |
+| `largestwindollar` | **258,902.38** | 170,802.85 |
+
+The control's `largestwindollar` is **SMCI to the cent**, and it is absent from
+the armed arm — the decomposition above, confirmed on different hardware in a
+different environment.
+
+> **⚠ Correction, 2026-08-19.** An earlier version of this section claimed the
+> golden "was `success` on the parent commit and **FAIL** on the merge commit".
+> **That is false and is withdrawn.** The workflow *job* was `success` on both
+> (the step is `continue-on-error`), and the *scenario* has FAILED on every run
+> back to `e00bb5a90` on 08-18 — a full day before the promotion merged. It is a
+> **standing pre-existing red** against a 110.78 floor, not a status flip. The
+> claim compared a job conclusion against a step result.
+>
+> The artefact comparison above is the honest form and is strictly stronger: a
+> status flip would prove nothing about *which* change caused it, whereas two
+> reproduced metric sets pin the paired effect directly. Caught by qc-behavioral
+> on PR #2397.
+
+**Note this revert does not return the golden to green.** 108.23 still sits
+below the 110.78 floor. That gap is a separate, older problem; the clock is
+responsible for the 38-42pp on top of it, not for the whole shortfall.
+
 ## Process finding worth keeping
 
 **The golden that catches this runs post-merge only.**
 `.github/workflows/golden-runs-sp500-5y.yml` fires on push to `main`, not on
-pull requests, and its step is `continue-on-error: true` during soak. So CI green
-on the PR said nothing about it, and a merge would have moved the golden −38pp
-while reporting success.
+pull requests, and its step is `continue-on-error: true` during soak. So CI on
+the PR said nothing about it either way.
+
+**And a standing red is worse than a flipping one**: because the scenario was
+already failing, there was no transition for anyone to notice. A regression
+landed inside an existing failure and was invisible by construction. A check
+that is allowed to stay red indefinitely stops being a check.
 
 Generalisation: **when a PR changes a config default, identify which goldens arm
 the affected knob and run them by hand.** "Only 1 of 27 goldens is affected" is a
