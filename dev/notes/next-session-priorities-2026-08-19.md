@@ -21,14 +21,19 @@
 
 ## In flight
 
-- **[X1] clock-26-ALONE arm** — launched 2026-08-18 12:55, pinned worktree
-  `@59b26c3bf`, ETA ~14:25. Log `/tmp/clock26-chain.log`, spec
+- **[X1] clock-26-ALONE arm — COMPLETE.** Three salts returned
+  **513.42 / 434.06 / 377.73** against the null's **265.44 / 281.71 / 397.95**:
+  mean gap +126.7pp, 8 of 9 pairwise, but the distributions **touch** and the
+  exact rank test gives **p = 0.100**. Promising, not established. Spec
   `dev/experiments/ttl-retest-2026-08-16/specs/ttl-retest-06-clock26-only.sexp`
   (committed in this PR).
-  ⚠ **Read the within-run per-bucket P&L, not the top line.** Run
+  ⚠ **Read the within-run per-bucket P&L, not the top line.**
   `dev/experiments/ticket-funding-cohort-2026-08-18/rest_time_pnl.sh` on the
   arm's own `trade_audit.sexp` + `trades.csv`. The 132.5pp null is a
   *between-run* figure and does not bound a *within-run* cohort accounting.
+  **Next:** the confirmation grid, ≥3 cells with one spanning a pre-2009 macro
+  regime. A user-directed default flip to 26 is in progress separately and is
+  explicitly NOT gated on that grid.
 - **PR #2376** — TTL re-screen REJECT + ledger. Needs the three gates.
 
 ## Open work, graded

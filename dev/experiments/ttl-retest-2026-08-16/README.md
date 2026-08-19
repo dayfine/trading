@@ -275,9 +275,20 @@ and is bounded by the 132.5pp null exactly as the withdrawn section said.
 **Result (2026-08-18):** `06-clock26-only` ran at three salts and returned
 **513.42 / 434.06 / 377.73** against the null's **265.44 / 281.71 / 397.95** —
 mean gap +126.7pp, 8 of 9 pairwise, but the distributions **touch** and the
-exact rank test gives **p = 0.100**. Promising, not established. The default was
-subsequently flipped to 26 by user decision without the confirmation grid; see
-`weinstein_strategy_config.mli` for that record and its stated caveats.
+exact rank test gives **p = 0.100**. Promising, not established.
+
+**The shipped default is still `0`.** A user-directed flip to 26 is in progress
+but not merged as of this commit — it re-pins every golden, since no golden spec
+pins this field. Until that lands, `weinstein_strategy_config.mli` still reads
+"Why the default is still `[0]`", and *that* is the accurate description of the
+code. (An earlier version of this paragraph said the flip had already happened
+and pointed at the `.mli` for the record — the pointer's destination stated the
+negation. Corrected after QC re-review at `ecfdd8bf`.)
+
+Artifacts for the three draws are the chain logs and per-arm output roots under
+`/tmp`, not committed — the returns above are reproducible by re-running
+`specs/ttl-retest-06-clock26-only.sexp` at salts 0/1/2, which is the durable
+form.
 
 Also missing by construction, and worth adding whenever they do run: the
 composite **`(rescreen = true, clock = 156)`**. `weinstein_strategy_config.mli`
