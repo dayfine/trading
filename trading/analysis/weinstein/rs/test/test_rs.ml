@@ -145,8 +145,15 @@ let test_bullish_crossover _ =
     {b Swept across the trend space, not one fixture.} A single
     genuine-crossover fixture cannot detect a classifier that starts emitting
     [Bullish_crossover] BELOW the line, because that fixture never reaches the
-    offending branch — the check has to include cases that sit under 1.0. Each
-    pair below is labelled so a failure names the shape that broke it. *)
+    offending branch — the check has to include cases that sit under 1.0. The
+    sweep covers BOTH producers of a sub-1.0 trend value: the [(false, false)]
+    comparison arm and the [n < 2] fallback, the latter reachable only when the
+    history is a single element ([n = rs_ma_period]). Each pair below is
+    labelled so a failure names the shape that broke it.
+
+    {b Non-vacuous only alongside {!test_bullish_crossover}}: a classifier that
+    stopped emitting [Bullish_crossover] at all would pass this test through its
+    catch-all. Do not delete that one. *)
 let test_bullish_crossover_implies_positive_territory _ =
   let n = 80 in
   let rising_from_below =
@@ -167,11 +174,31 @@ let test_bullish_crossover_implies_positive_territory _ =
   let rising_bench =
     List.init n ~f:(fun i -> 100.0 +. (Float.of_int i *. 2.0)) |> weekly_bars
   in
+  (* n = rs_ma_period leaves a ONE-element history, the only shape that reaches
+     the [n < 2 -> Positive_flat] fallback (rs.ml:48) — the other producer of a
+     sub-1.0 trend value, and the branch that fires in production today per
+     #2380. Without it the sweep misses half the ways the invariant can break. *)
+  let degenerate_n = 52 in
+  let degenerate_stock =
+    List.init degenerate_n ~f:(fun i -> 100.0 -. (Float.of_int i *. 0.5))
+    |> weekly_bars
+  in
+  let degenerate_bench =
+    List.init degenerate_n ~f:(fun i -> 100.0 +. (Float.of_int i *. 2.0))
+    |> weekly_bars
+  in
   let cases =
     [
-      ("rising from below", rising_from_below, flat_bench);
-      ("below and improving", below_and_improving, flat_bench);
-      ("below and declining", below_and_declining, rising_bench);
+      (* Labels state the MEASURED normalized level, not the intent behind the
+         price shape — an earlier version named two of these "below" when they
+         in fact finish above the zero line, which would have made a failure
+         report the wrong shape. *)
+      ("crossed, now well above (2.23)", rising_from_below, flat_bench);
+      ("just above the line (1.14)", below_and_improving, flat_bench);
+      ("below the line, improving (0.82)", below_and_declining, rising_bench);
+      ( "below the line, one-element history (0.60)",
+        degenerate_stock,
+        degenerate_bench );
     ]
   in
   List.iter cases ~f:(fun (label, stock_bars, benchmark_bars) ->
