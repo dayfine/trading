@@ -43,7 +43,12 @@ triggering is by **arrival order, not rank** (AXTI was score 100 / A_plus and
 lost its ticket to whatever triggered first that week). It is also
 **tail-preserving** in the sense of [[project-edge-is-the-fat-tail]]: the
 destroyed population is breakouts that actually broke out — AXTI went 2.03 →
-11.76 (5.8×) in four months after its ticket died.
+11.76 (5.8×) in four months after its ticket died. ⚠ **That 5.8× is a
+truncated window.** Re-measured 2026-08-18 against bars through 2026-08-17:
+AXTI ran from the 2.71 entry level to **143.16 (2026-05-26)** — roughly
+**53×**, with no split (adjusted == raw throughout, volume *rising* into the
+move). The cost of losing this one ticket is an order of magnitude larger
+than recorded here.
 
 **How to apply.** Land G1 (pure emission, no golden movement) before measuring
 anything; then the "what did we give up" question is answerable from the
