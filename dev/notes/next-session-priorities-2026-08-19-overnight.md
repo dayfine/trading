@@ -33,13 +33,37 @@ the fixtures. **Struck.**
 This is a second cell, and it is **badly dominated** — which
 `promotion-confirmation.md` says is disqualifying on its own.
 
-**The why, which transfers.** The clock is an **exposure-reduction dial**, not a
-quality filter. It removes fills, and with them return *and* risk together
-(238→227 trades, DD 16.0→14.5). It pays when the removed exposure would have
-fired into a crash and costs when it would have compounded:
+**The why, which transfers — and it is one trade.** Dissecting the two arms'
+`trades.csv` (joined on `symbol|entry_date`; `position_id` does **not** join
+across arms — only 99 of 238 overlap, since the ticket counter shifts on the
+first cancel):
 
-- sp500 2019-2023 — uninterrupted bull → **−38pp**
-- top3000 2000-2026 — dot-com + GFC + COVID → **+127pp**
+| cohort | n | net P&L |
+|---|---:|---:|
+| removed by the clock | **59** | **+248,545** |
+| bought with the freed cash | 48 | **−84,172** |
+| shared | 179 | +5,846 (noise) |
+
+The removed cohort is **mostly junk** — median **−2,840**, 40 losers vs 19
+winners. Its positive total is a tail: **SMCI alone (+258,902, +240%, 292 days)
+exceeds the whole cohort's net**, and the top 5 are 178% of it. MU and AZO
+vanish entirely when armed; AXON and MPWR keep their small early losers and lose
+the later winner; SMCI re-enters *earlier* and is stopped out at −17.4%.
+
+**So the clock is a tail-touching lever** — it cuts the resting-ticket
+population blind, and that population is where the monsters live. That explains
+the +126.7pp promotion cell with no extra hypothesis, and is why that figure
+sits **below its own base's 132.5pp seed-noise floor**. A coin flip on the tail
+is not promotable whatever its sign. 12th+ confirmation of
+`project_edge_is_the_fat_tail`.
+
+If a bound is wanted purely for correctness (21.7-year zombie orders), that
+argues for ~**156 weeks**, which touches only the absurd tail — not 26, which
+cuts into the live distribution.
+
+*(Two earlier mechanisms — "regime-dependent", then "window length" — are
+retracted in `dev/experiments/clock26-golden-ab-2026-08-19/`. Both were reasoned
+from window characteristics before I opened `trades.csv` once.)*
 
 **Your options**, my preference first:
 
@@ -56,11 +80,14 @@ Full writeup: `dev/experiments/clock26-golden-ab-2026-08-19/`.
 
 ## Running / queued
 
-- **Regime grid** — a *pre-registered directional test*, not a survey. Predicts
-  clock **helps** on `bull-crash-2015-2020` (2018 selloff + COVID) and **hurts**
-  on `covid-recovery-2020-2024` (recovery bull). Both arms arm the same
-  StopLimit stack; only the clock differs. If both land as predicted, the
-  exposure story is confirmed; if either flips, it is refuted. ~3h.
+- **Regime grid — CANCELLED, not run.** `grid.sh` is committed and correct, but
+  once the effect is understood as a tail lottery, **four single runs cannot
+  resolve it**: this base's own seed spread is 132.5pp, larger than the
+  promotion cell's entire gap. More *cells* is the wrong axis; more *salts per
+  cell* is the right one — and the conclusion is already settled by mechanism.
+  Running it would have spent ~4 container-hours re-measuring noise, which is
+  what `feedback_run_the_null_control_first` exists to prevent. Revive only with
+  salts.
 - **#2384** — draft, rework commit (F1/F2/F3) complete and good regardless.
 - **W1 / #2381** — long-side RS gate, see below.
 

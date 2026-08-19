@@ -14,7 +14,7 @@ a worktree pinned at that PR's tip `4d079a54`.
 |---|---:|---:|---:|---:|---:|
 | `clock=0` (control) | **108.23%** | 238 | 35.3% | 16.0% | 1,878,875 |
 | `clock=26` | **69.81%** | 227 | 35.2% | 14.5% | 1,473,782 |
-| **delta** | **−38.42pp** | **−11** | −0.1pp | −1.5pp | −404,918 |
+| **delta** | **−38.42pp** | **−11** | −0.1pp | −1.5pp | −405,093 |
 
 Raw runner lines: `raw-results.txt`.
 
@@ -53,57 +53,93 @@ different (period × universe) cell — sp500 × 2019-2023 — at **−38.42pp**
 majority of cells **and is never badly dominated in any**. It is badly dominated
 here. **Do not promote.** Keep the clock default-off as an axis (R1 / R2).
 
-### The transferable why — window length, not regime
+### The transferable why — a tail-touching lever
 
-> **⚠ A first version of this section blamed market regime and is retracted.**
-> It called sp500 2019-2023 "a near-uninterrupted bull run" where removing
-> exposure merely forgoes gains. The window is **2019-01-02 → 2023-12-29** and
-> contains **the COVID crash (−34% SPX) and the 2022 bear (−25%)** — one of the
-> more crash-dense five-year windows available. The regime story was refuted by
-> the very cell it was built on. **Check the window dates before attributing a
-> result to regime.**
+> **⚠ Two earlier mechanisms are retracted.** Both were derived from window
+> characteristics **before opening `trades.csv` once**:
+>
+> 1. ~~"Regime-dependent — pays in crash-spanning windows"~~ — refuted by the
+>    window dates. 2019-01-02 → 2023-12-29 **contains the COVID crash and the
+>    2022 bear**; it is one of the more crash-dense 5y windows available.
+> 2. ~~"Window length — the multi-year pathology can't exist in 5 years"~~ —
+>    explains an absence of *gain*, not a **−38pp loss**. (qc-structural passed
+>    this one; the dissection below disproves it anyway, which is worth noting —
+>    a reviewer without the trade files could not have caught it.)
+>
+> The dissection that found the real answer took four commands.
+> `.claude/rules/mechanism-validation-rigor.md` and
+> `feedback_always_dissect_before_reporting` both say to do it first.
 
-The account that survives is mechanical rather than narrative.
+Joined on `symbol|entry_date`. **`position_id` does not join across arms** —
+only **99 of 238** overlap, because the global ticket counter shifts as soon as
+the clock cancels anything. It remains the correct *within*-run key.
 
-The clock exists to remove **multi-year resting orders** — defect E,
-`FUL-wein-64` resting **21.7 years**, max fill age **865 weeks** on the 26-year
-null. **That pathology is structurally impossible in a five-year window**: no
-ticket can rest longer than the window itself.
+| cohort | n | net P&L |
+|---|---:|---:|
+| in control, **not** in armed (what the clock removed) | **59** | **+248,545** |
+| in armed, **not** in control (what the freed cash bought) | 48 | **−84,172** |
+| shared | 179 | +5,846 (noise) |
 
-So on sp500 2019-2023 a 26-week bound removes *none* of the tickets the
-mechanism was designed for. It can only cut tickets that would have filled
-inside the window — **all cost, no available benefit**. That is exactly the
-shape of the measurement: −38.42pp on −11 trades, with drawdown falling too
-(16.0% → 14.5%) because what was removed was exposure, not error.
+So this is **not** "11 trades removed" — it is **59 out, 48 in**. Cancelling a
+ticket frees cash that funds entirely different later tickets. Net realized:
+control **751,808** vs armed **424,937**.
 
-On top3000 2000-2026 the same bound cuts 89 fills spanning 27 → 865 weeks, and
-the multi-year tail is real money.
+**The removed cohort is mostly junk.** Median **−2,840**; **40 losers vs 19
+winners**. Its positive total is entirely a tail:
 
-### The two measured cells are CONFOUNDED — this is the grid's job
+| symbol | entry | held | P&L | % |
+|---|---|---:|---:|---:|
+| **SMCI** | 2022-10-31 | 292d | **+258,902** | **+240.0%** |
+| MU | 2020-11-05 | 177d | +62,096 | +63.8% |
+| AXON | 2022-10-24 | 117d | +52,080 | +43.7% |
+| MPWR | 2021-07-21 | 150d | +41,135 | +19.9% |
+| AZO | 2021-03-11 | 107d | +28,608 | +15.0% |
 
-They differ in **both** window length (26y vs 5y) **and** universe breadth
-(3000 vs 500). Neither factor can be attributed from these two points alone.
-The discriminating 2×2 completes the square:
+Top 5 = **+442,821 = 178%** of the cohort's net. **SMCI alone exceeds the entire
+cohort's net.**
 
-| cell | window | universe | prediction if WINDOW LENGTH drives |
-|---|---|---|---|
-| sp500-2019-2023 ✓ measured | 5y | 500 | hurts — **−38.4pp** ✓ |
-| top3000-2000-2026 ✓ measured | 26y | 3000 | helps — **+126.7pp** ✓ |
-| `sp500-2010-2026` | **16y** | **510** | **helps**, despite the narrow universe |
-| `six-year-2018-2023` | **6y** | **1000** | **hurts**, despite the broad universe |
+Tracing those five across arms:
 
-If universe breadth is the driver instead, the two open predictions invert.
-**One hypothesis dies either way**, which is what makes this a test rather than
-the survey a generic "confirmation grid" would have been.
+- **MU, AZO** — simply **absent** when armed. Ticket cancelled, never re-issued.
+- **AXON, MPWR** — keep their small early losers, **lose the later winner**.
+- **SMCI** — re-enters *earlier* (2022-08-18), is stopped out at **−17.4%**
+  after 33 days, and never catches the real breakout.
 
-### What follows for the default
+**The clock cuts the resting-ticket population blind, and that population is
+where the fat-tail winners live.** The −38.42pp is, to a first approximation,
+one trade.
 
-The window-length account is *less* forgiving than the regime one it replaces.
-Regime-dependence would have left room for "fine in the windows we care about";
-window-length says the clock is a **long-horizon correctness fix that charges a
-real cost at every horizon**, and its benefit only materialises when the window
-is long enough to contain the pathology. A single global default of 26 charges
-every short-window user the cost with no access to the benefit.
+### Why this settles the promotion question
+
+The clock's effect in **both** directions is dominated by whether it happens to
+cancel a monster. That explains the promotion cell (+126.7pp on top3000 ×
+2000-2026) with no additional hypothesis — and is precisely why that figure sits
+**below its own base's 132.5pp seed-noise floor**.
+
+**A coin flip on the tail is not a promotable mechanism**, whatever its sign on
+one window. This is the 12th+ confirmation of `project_edge_is_the_fat_tail`;
+the clock joins harvest-rotate, trim, re-time and cap.
+
+**If a bound is wanted for correctness** — defect E, `FUL-wein-64` resting 21.7
+years, 865-week max fill age — that argues for a value like **156 weeks** that
+touches only the genuinely absurd tail, not **26**, which cuts deep into the
+live distribution where the monsters are.
+
+### Why the 2×2 grid in `grid.sh` was NOT run
+
+The script is committed for the record and is still correct as written, but it
+was **deliberately not run**.
+
+It was designed to separate *window length* from *universe breadth* across four
+single runs. Once the effect is understood as a tail lottery, **single runs
+cannot resolve it** — this base's own seed spread is 132.5pp, larger than the
+promotion cell's entire measured gap. More *cells* is the wrong axis; more
+*salts per cell* is the right one, and the conclusion (do not promote) is
+already established by mechanism.
+
+Running it would have spent ~4 container-hours re-measuring noise, which is the
+error `feedback_run_the_null_control_first` exists to prevent. Anyone reviving
+it should add salts first.
 
 ## Process finding worth keeping
 
