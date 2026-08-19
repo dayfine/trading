@@ -1,0 +1,2 @@
+sp500-2019-2023-armed-stoplimit    69.8%     227    35.2%    14.5%   FAIL (total_return_pct low (69.81 < 110.78); total_trades low (227.00 < 239.50); sharpe_ratio low (0.84 < 0.99); max_drawdown_pct low (14.46 < 15.29); open_positions_value low (1473782.24 < 1878875.00))
+sp500-2019-2023-armed-stoplimit   108.2%     238    35.3%    16.0%   FAIL (total_return_pct low (108.23 < 110.78); total_trades low (238.00 < 239.50))
