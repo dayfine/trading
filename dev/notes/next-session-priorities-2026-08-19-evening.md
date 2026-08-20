@@ -79,11 +79,57 @@ problem.
 | **#2412** filed | `fold_actual` carries no trade count / max single-trade P&L, so fewer-positions-vs-better-picks is unanswerable from any WF surface |
 | **#2410** closed | cancel decomposition moot at defaults, already answered by the rest-time table |
 
+## Amendment — what the QC round-trip changed (written after everything merged)
+
+Everything above was written before the five PRs went through their gates. Nine
+review passes over eight rework commits changed **six numbers** and produced one
+new issue. No verdict moved; every correction made a claim narrower or a record
+more honest.
+
+| finding | who | effect |
+|---|---|---|
+| `position_id` is **not unique** — `trades.csv` had 1,147 round trips over 1,146 ids | qc-behavioral | E4's total was overstated **+3,750.90**; true total 2,314,952 |
+| the flags run on a **RAW, unadjusted** price basis | qc-behavioral | rescue cohort **12 fills / −922**, not 10 / +17,678 — verdict *strengthened* |
+| `broken_4w` flips at **two** trades, not three | qc-behavioral | robustness table gained a minus-top-2 column |
+| *"live's 15.0 was the worst value tested"* is **false** — 5.0 was, on every mean | qc-behavioral | corrected in two specs; the 1y aggregate is now archived so it is falsifiable |
+| the gate script could read a gate **green that never ran** | mine, then reviewed | #2419 + #2420; 19 mutation-verified cases, now enforced in CI |
+| the `^` anchor **moved** the false-green hole to column 0 rather than closing it | qc-behavioral | the inline `Verdict:` fallback was deleted outright |
+
+**New issue #2421** — `pr_gate_status` reads the **first** `## Verdict` section, so
+a flush-left quotation of another gate's verdict is read as the review's own.
+Pre-existing (reproduces at merge-base), latent (88/88 real reviews carry a
+heading, 0 disagreements over 80 bodies), and it wants its own review because
+neither first-match nor last-match is right in general.
+
+### The pattern worth carrying
+
+**Five times tonight the same failure: correct the primary text, miss the copy.**
+The census fix left "82" in the README; the README fix left it in the PR body;
+the PR body fix left it in the memory export; the memory fix left the retracted
+safety claim in the source comments; and a new spec file re-asserted a claim a
+sibling commit was retracting. The surfaces are enumerable — README, PR body,
+memory export, spec header, source comment — which is why qc-behavioral filed it
+as a linter candidate. **A PR body is the squash-merge message; it is a durable
+surface, not commentary.**
+
+Second pattern, twice: **a fixture that passes for a reason other than the one it
+names.** Both times I wrote the test from the fix I had just made rather than
+from the failure mode. Mutation testing caught both — a test that cannot fail is
+worth exactly nothing, and the cheap way to know is to break the code on purpose.
+
+### Run artifacts kept
+
+`.claude/worktrees/sweep-base-broken/trading/dev/backtest/scenarios-2026-08-19-224506/`
+holds the 26-year run's `trade_audit.sexp` + `trades.csv` (11 MB; the 452 MB
+`_build` was removed). Two reviews used it to verify provenance independently.
+Delete once nothing references it.
+
 ## The queue
 
 | | task | state |
 |---|---|---|
 | **#2412** | add `total_trades` + max single-trade P&L to `fold_actual` | small harness PR; unblocks the question E1 could not answer |
+| **#2421** | `pr_gate_status` reads the *first* `## Verdict` section | latent false-green in the merge loop's own state reader; fix + its own review |
 | **E2** #2403 | goldens track live config + declare deviations | structural half (shared base + `deviates_from_live` + linter) stands alone; the re-pin half is now a **user decision on which side moves** |
 | **E3** | flip `enable_sim_entry_stoplimit` default-on | user-directed; still needs E2 |
 | **#2405** | clock-26 re-flip | needs the confirmation grid, ≥1 macro-diverse cell — not a new discriminator |
