@@ -126,7 +126,7 @@ splits them three ways:
 
 | flag | specs | where | call |
 |---|---:|---|---|
-| `enable_late_stage2_stop_tighten` | 7 | all in `dev/experiments/late-dial-grid-2026-06-06/` (the experiment that rejected it) + ledger | **eligible** |
+| `enable_late_stage2_stop_tighten` | 7 | all in `dev/experiments/late-dial-grid-2026-06-06/` (the experiment that rejected it) + ledger | ~~eligible~~ → **KEEP-AXIS**, see the correction below |
 | `enable_stage2_ma_hold` | 3 | — | **likely eligible**, same screen not yet run |
 | `dawn_leverage_*` | 1 | — | do-not-revive in substance, but **coupled** to the margin family below |
 | `initial_long_margin_req` family | 5 | + optional params of `simulator.ml:41` and `cancel_handler.ml:198` | **NOT a retirement** — core simulator plumbing; Rule 4 scopes this out as a refactor |
@@ -139,9 +139,38 @@ different correction from the previous two: not a misread verdict, but a row
 that should never have been listed. It joins `trigger_on_weekly_close` and the
 continuation family as the fourth reclassification.
 
+**2026-08-20 (same day, second pass) — `enable_late_stage2_stop_tighten` is
+KEEP-AXIS. The correct count of eligible rows is ZERO.**
+
+The entry above called it "eligible", on the strength of the main table's note
+*"Memory reads as do-not-revive."* **That note is wrong, and it was never
+checked against the memory.** `project_stage_late_flag_discarded`, §"Dial
+confirmation grid — REJECTED 2026-06-06" — which is about exactly this flag
+(#1446, buffer ∈ {0.03,0.05,0.08}) — concludes:
+
+> *"Dial stays default-off / available as an axis; no further investment. […] A
+> `late`-driven PARTIAL-TRIM variant (vs stop-tighten) could still differ."*
+
+That is **REJECT-as-default-but-legitimate-axis** — the shape Rule 4 explicitly
+says does **not** retire — and it even names a surviving variant. Reclassify
+**RETIRE (confirm) → KEEP-AXIS**. Fifth reclassification.
+
+**How it was caught, which is the useful part.** `dev/scripts/prune_candidates.sh`
+(#2449) reads its classification from this file, so it faithfully reported this
+flag as the one `ELIGIBLE` row. Making the claim *operational* is what exposed
+it — prose asserting "memory reads as do-not-revive" sat unchallenged from 08-09
+to 08-20; a script acting on that prose was checked within minutes. Any tool
+consuming this file inherits its errors, which is an argument for the tool, not
+against it.
+
 Consequence for anyone reading the tallies: **the graveyard's apparent size
-overstates what is removable.** Of 5 "confirm" rows, 2 are genuinely
-retirement-eligible, 2 are refactors or coupled families, and 1 is live. That
+overstates what is removable — and the true figure is zero.** Of the 5 "confirm"
+rows: **0 retirement-eligible**, 2 refactors or coupled families, 1 live, and 2
+(`enable_late_stage2_stop_tighten`, `enable_stage2_ma_hold`) carrying
+keep-as-axis records rather than do-not-revive ones. This is the file's own
+standing instruction vindicated a third time — *"screen a row, and expect the
+answer to be no."* The instruction was read on 08-20 and a list of two
+"eligible" rows was produced anyway; both have now failed their screen. That
 gap is the most likely reason the list has sat unworked since 08-09 — it reads
 as five deletions and is two.
 
