@@ -1,0 +1,3 @@
+(executable
+ (name sexp_default_drift_linter)
+ (libraries compiler-libs.common))
