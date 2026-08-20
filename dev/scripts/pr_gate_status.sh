@@ -25,11 +25,12 @@ set -eu
 
 REPO=dayfine/trading
 
-if [ "$#" -gt 0 ]; then
-  PRS="$*"
-else
-  PRS=$(gh pr list --repo "$REPO" --state open --limit 50 --json number --jq '.[].number')
-fi
+# NOTE: the `gh pr list` that discovers open PRs lives at the BOTTOM of this
+# file, after the PR_GATE_STATUS_LIB guard -- not here. It used to sit at the
+# top, which meant sourcing the file for the unit tests ran it before reaching
+# the guard: the "offline" suite made a network call, and in CI (no `gh` on
+# PATH) died with `gh: not found`, exit 127. Keep every side effect below the
+# guard; only definitions belong above it.
 
 # A PR is docs-only (both QC gates skipped, per pr-merge-gates.md) when every
 # path is *.md or under the doc dirs. Anything else -- including experiment
@@ -123,8 +124,15 @@ _gate() {
 }
 
 # Sourcing with PR_GATE_STATUS_LIB=1 stops here, exposing _gate / _is_docs_only
-# for pr_gate_status_test.sh without hitting the network.
+# for pr_gate_status_test.sh without hitting the network. EVERYTHING BELOW THIS
+# LINE IS A SIDE EFFECT and must stay below it.
 [ "${PR_GATE_STATUS_LIB:-}" = 1 ] && return 0
+
+if [ "$#" -gt 0 ]; then
+  PRS="$*"
+else
+  PRS=$(gh pr list --repo "$REPO" --state open --limit 50 --json number --jq '.[].number')
+fi
 
 printf '%-6s %-8s %-14s %-14s %s\n' PR CI STRUCT BEHAV NEXT-ACTION
 printf '%s\n' "----------------------------------------------------------------------------"

@@ -235,8 +235,25 @@ NEEDS_REWORK"
 check "indented Verdict heading does not supply the verdict" \
   rework "$(_gate "$(reviews "$INDENTED_VERDICT")" behavioral "$TIP")"
 
+# 15. THE SUITE IS OFFLINE. Sourcing the script must not invoke `gh` -- the
+#     library guard has to sit above every side effect, not merely above the
+#     main loop. It did not, so `gh pr list` ran at source time: harmless on a
+#     laptop with `gh` on PATH, exit 127 in CI. Re-source with a PATH that has
+#     no `gh` and confirm the functions still load.
+#     Pinned with a `gh` STUB that leaves a marker file: shadowing `gh` on PATH
+#     proves a call did not happen, rather than merely that it would fail.
+offline_probe() {
+  _dir=$(mktemp -d)
+  printf '#!/bin/sh\ntouch "%s/called"\n' "$_dir" > "$_dir/gh"
+  chmod +x "$_dir/gh"
+  PATH="$_dir:$PATH" PR_GATE_STATUS_LIB=1 sh -c '. "$1"' _ "$HERE/pr_gate_status.sh" >/dev/null 2>&1
+  if [ -e "$_dir/called" ]; then printf 'gh-was-called'; else printf 'offline'; fi
+  rm -rf "$_dir"
+}
+check "sourcing makes no gh call" offline "$(offline_probe)"
+
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"
   exit 1
 fi
-printf 'OK: pr_gate_status -- %d tests clean.\n' 15
+printf 'OK: pr_gate_status -- %d tests clean.\n' 16
