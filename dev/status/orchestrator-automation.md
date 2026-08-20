@@ -872,35 +872,74 @@ Found by qc-behavioral while reviewing #2420; reproduces at merge-base
 #2419/#2420 fence work. On the autonomous merge path this is `pass:ok:ok →
 MERGE` on a PR that was told to rework.
 
-**Fix:** take the **last** unfenced "## Verdict" match instead of the first
+**Original fix (superseded within this PR, see below):** the first commit took
+the **last** unfenced "## Verdict" match instead of the first
 (`[$clean | match(...; "g")] | last`), mirroring the `| last` pattern already
-used for review selection. Because `$clean` is already fence-stripped before
-this match runs, "last match in `$clean`" already *is* "last top-level Verdict
-not inside a fence" — no separate fence-awareness needed in the new code.
+used for review selection.
 
-**Known, deliberately unfixed gap:** a review that states its own verdict
-first and appends an addendum quoting a *different* verdict below it will have
-the addendum win instead — last-match and first-match are symmetric failure
-modes and neither is correct in general. Fixing this needs quotation markers
-(e.g. blockquote `>`) that no review body in this repo uses today. Pinned as a
-documented (non-asserting) case in the test suite rather than silently
-reintroduced later; empirical exposure is nil either way (88/88 recent QC
-reviews carry exactly one "## Verdict" section).
+**qc-behavioral rework (iteration 1, same PR):** last-match is exactly as
+unsound as first-match — it only wins when the leaked quotation happens to sit
+on the *right* side of the real verdict. `strip_fences` is a parity toggle
+over fence-marker lines, not a fence recognizer: in a nested fence (an outer
+4-backtick block containing an inner 3-backtick block) the inner-open flips
+the toggle back, so content between the inner-open and inner-close is treated
+as unfenced and leaks into `$clean`; HTML comments are not fences at all and
+are never stripped. A leaked heading positioned *below* the real verdict —
+inert under first-match — became decisive and produced a false `ok` on a
+rework review under last-match. The reviewer found four such false greens,
+two of them regressions introduced by the last-match fix: a verdict quoted in
+an HTML comment after the real one, a verdict leaked from a nested fence's
+inner block after the real one, a deeper (`######`-level) Verdict heading
+after the real one, and a verdict inside a `<details>` appendix after the
+real one.
+
+**Corrected fix:** collect every unfenced "## Verdict" match in the body. If
+they all agree (the overwhelming common case — a single "## Verdict" section),
+use that verdict. If more than one *distinct* verdict value appears, return
+`unclear` rather than picking a position — fail-safe against a leaked
+quotation on *either* side of the real verdict, and against the leak *source*
+(fence nesting, HTML comments) rather than just one position. `unclear` is not
+treated as a green by the gate's `NEXT-ACTION` table (it falls through every
+`*:ok:*` / `*:rework:*` case to `inspect manually`). This also resolves the
+previously-known addendum gap (own verdict first, disagreeing quotation
+appended after) the same way: two disagreeing matches → `unclear`, no longer a
+guess. Differential-tested against 84 real QC review bodies pulled from the 40
+most-recently-updated PRs (`Reviewed SHA` stripped so verdicts surface):
+**zero** carry disagreeing matches, so the corrected fix is empirically inert
+on the corpus that exists today, same as the original.
+
+**Corrected residual description (CP2-a):** the PR originally described the
+nested-fence residual as "a heading between a nested fence's outer-open and
+inner-open" — that position does **not** leak (it is still inside the outer
+fence at that point, correctly stripped either way). The actual leak zone is
+**between the inner-open and the inner-close**. Both positions are now pinned
+in the test suite (cases 24 and 25) so the wrong description cannot resurface.
+
+**Known, still-unfixed gap (narrower than before):** an *unpaired* fence
+(opens, never closes) can erase the review's own "## Verdict" section
+entirely, leaving an earlier *quoted* heading as the sole surviving match —
+one match, nothing to disagree with, so it wins outright. This is a
+pre-existing false green (probe p8 / test case 26), not introduced by this
+PR and not fixed here; the reviewer explicitly scoped it out as a follow-up,
+not a blocker.
 
 Also in this PR: fixed CRLF line endings producing `unclear` (the gap class
 between the "## Verdict" heading and its token now includes `\r`, a one-char,
 fence-logic-independent addition); restored the script's exec bit
 (100644 → 100755, dropped by an earlier rework commit); corrected several
-stale in-code comments left over from the #2420 fallback deletion (both in
-`pr_gate_status.sh`'s `_gate` function and in `pr_gate_status_test.sh`'s case
-17); confirmed the two declared-and-not-fixed residuals (a heading inside an
-HTML comment, and a heading between a nested fence's outer-open and
-inner-open) still reproduce exactly as described, so they are not
-rediscovered as new.
+stale in-code comments left over from the #2420 fallback deletion, plus two
+more found by qc-behavioral in this rework: `_gate`'s comment claiming a
+verdict "quoted inside a fence still cannot win here" (false — nested fences
+and HTML comments leak) and `pr_gate_status_test.sh` case 17's comment
+claiming over-stripping generally "reads unclear, fail-safe" (false in the
+p8 shape — see case 26).
 
-Verify: `sh dev/scripts/pr_gate_status_test.sh` — 21/21 cases pass (19
-pre-existing + the #2421 reproduction case + the CRLF case), plus one
-documented non-asserting note for the symmetric addendum gap.
+Verify: `sh dev/scripts/pr_gate_status_test.sh` — 26/26 cases pass (19
+pre-existing + the #2421 reproduction case, now asserting `unclear` + the
+CRLF case + the former addendum note, now a real assertion + four new cases
+from this rework: HTML-comment-after, nested-inner-fence-after, the
+outer-open/inner-open non-leak correction, and the pre-existing p8 false
+green pinned as known-not-fixed).
 `sh trading/devtools/checks/posix_sh_check.sh` stays green (no non-POSIX
 constructs introduced).
 

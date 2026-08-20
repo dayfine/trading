@@ -88,7 +88,20 @@ _gate() {
     # over-stripping could reach a QUOTED foreign verdict and return a false
     # GREEN; an earlier version of this comment claimed the opposite and was
     # wrong. With "## Verdict" as the sole verdict source, an over-stripped body
-    # loses its own heading and reads "unclear" -> "inspect manually".
+    # that removes its OWN heading entirely usually reads "unclear" (cases
+    # 17/18) -- but only when no OTHER unfenced Verdict heading survives the
+    # strip. If a quoted heading sits BEFORE the point an unpaired fence starts
+    # eating the rest of the body, that quoted heading is left as the sole
+    # survivor and wins outright: a false "ok", not "unclear" (see probe p8 in
+    # the test suite -- a known, pre-existing gap, not introduced by this fix).
+    #
+    # NOT a fence stack: `.inside` is a single boolean toggled by ANY fence-like
+    # line, so nesting (a 4-backtick block containing a 3-backtick block) is not
+    # tracked as depth. The inner-open flips `.inside` back to false, so content
+    # between the inner-open and the inner-close is treated as NOT inside a
+    # fence and leaks into $clean -- not, as an earlier PR body description
+    # claimed, content between the outer-open and inner-open (that span is
+    # still correctly stripped; see the disagreement-based mitigation below).
     def strip_fences:
       split("\n")
       | reduce .[] as $l ({out: [], inside: false};
@@ -118,29 +131,49 @@ _gate() {
         # of another review (four spaces, so not a fence at all) supplied this
         # gate its verdict.
         #
-        # THE LAST match wins, not the first (#2421). `capture()` has no /g and
-        # returns the FIRST match; a review that quotes another gate sign-off
-        # flush left -- no fence, no indent required at all -- puts that
-        # quoted "## Verdict" heading ABOVE the reviews own, and a first-match
-        # reader attributes the quoted verdict to this gate. Fixed the same way
-        # review selection above already handles the analogous problem
-        # (multiple reviews, `| last` wins): take the LAST "## Verdict" section
-        # in the body. This is deliberately "last UNFENCED Verdict", not "last
-        # Verdict" -- $clean is already fence-stripped above, so a verdict
-        # quoted inside a fence still cannot win here; only an unfenced,
-        # un-indented quotation can, and taking the last of those matches how a
-        # review is actually written (the real verdict closes the body; a
-        # quotation used as context sits above it).
+        # DISAGREEING matches read "unclear", not "whichever position wins"
+        # (#2425 rework of #2421). #2421 shipped "take the LAST unfenced
+        # Verdict match" to fix a flush-left quotation sitting ABOVE the real
+        # verdict (case 20 below) -- but "first" and "last" are symmetric
+        # failure modes, not a fix: `capture()` (no /g, FIRST match) lets a
+        # quotation ABOVE the real verdict win; `match(...; "g") | last` lets a
+        # quotation BELOW the real verdict win instead. And $clean is NOT a
+        # reliable proxy for "no quoted verdict remains" -- strip_fences does
+        # not track fence nesting (see its doc comment above) and does not
+        # touch HTML comments or `<details>` blocks at all, so a quoted
+        # heading below the real one routinely survives into $clean.
         #
-        # Known accepted gap, not fixed here: a review that states its own
-        # verdict first and then appends an addendum quoting a DIFFERENT
-        # verdict below it will have the addendum quotation win instead.
-        # Neither first-match nor last-match is correct in general -- doing
-        # better needs quotation markers (e.g. blockquote), which no review in
-        # this repos QC agents uses today. Empirically nil exposure (88 of 88
-        # recent reviews carry exactly one "## Verdict" section; see #2421) and
-        # pinned as a known-not-handled case in the test suite rather than
-        # silently reintroduced later.
+        # The fix: collect EVERY unfenced "## Verdict" match, not just one.
+        #   - Zero matches -> no verdict in the body -> "unclear".
+        #   - Exactly one DISTINCT verdict value across all matches -> use it.
+        #     This covers the overwhelmingly common case (a single "## Verdict"
+        #     section) and the case where a quoted heading happens to carry the
+        #     SAME token as the real one (harmless either way).
+        #   - More than one DISTINCT verdict value -> the body contains an
+        #     unresolved quotation with a conflicting token -- return "unclear"
+        #     rather than guessing which one is "the real" verdict, so the PR
+        #     routes to "inspect manually" (never a green) instead of picking a
+        #     side. This is fail-safe against a leaked quotation on EITHER
+        #     side of the real verdict, and against the leak SOURCE (fence
+        #     nesting, HTML comments) rather than just one position.
+        #   Differential-tested against 84 real QC review bodies pulled from
+        #   the 40 most-recently-updated PRs (`Reviewed SHA` stripped so the
+        #   verdict surfaces): zero bodies carry disagreeing matches, so this
+        #   is empirically inert on the corpus that exists today.
+        #
+        # This also resolves the addendum case that #2421 left as an accepted,
+        # documented gap (a review states its own verdict, then a trailing
+        # addendum quotes a DIFFERENT verdict): that was last-match picking the
+        # addendum quoted verdict outright -- a false green. Now: two
+        # disagreeing matches -> "unclear". Still not the true verdict of the
+        # review, but no longer a false green; see case 21 below.
+        #
+        # STILL NOT COVERED: an unpaired fence (opens, never closes) can erase
+        # the reviews OWN "## Verdict" section entirely, leaving an earlier
+        # QUOTED heading as the ONLY surviving match -- one match, nothing to
+        # disagree with, so it wins outright. Known, pre-existing false green
+        # (not introduced by this fix); pinned as probe p8 in the test suite
+        # rather than silently rediscovered later.
         #
         # `\\r` alongside `\\n` in the gap class: a CRLF review body (GitHub
         # normalises to LF on ingest, but a pasted-in body can still carry CR)
@@ -152,9 +185,10 @@ _gate() {
         # heading and its token).
         | ( [ $clean
               | match("(?ism)^#+ +Verdict[ *`\\r\\n]+(?<v>APPROVED|NEEDS_REWORK)"; "g")
-            ] | if length == 0 then ""
-                else (last.captures[] | select(.name == "v") | .string) end
-          ) as $raw
+              | .captures[] | select(.name == "v") | .string
+            ] | unique
+          ) as $verdicts
+        | ( if ($verdicts | length) == 1 then $verdicts[0] else "" end ) as $raw
         | (if $raw == "NEEDS_REWORK" then "rework"
            elif $raw == "APPROVED" then "ok"
            else "unclear" end) as $verdict
