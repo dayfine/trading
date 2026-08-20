@@ -20,8 +20,9 @@ Three metrics clear their own null at all three salts (Rule 4):
 | **win rate** | 33.18% → **34.91%** | **1.96×** null |
 | **max drawdown** | 38.76 → **30.81** (−21%) | 1.02× null |
 
-Two metrics **fail** Rule 4 and must not be quoted as moved — see
-"Rule 4 applied to the metrics that fail it" below.
+Trade count and holding time are reported **descriptively, with no verdict** —
+they are not performance metrics and Rule 4 does not apply to them. See
+"Turnover and holding time, reported without a verdict" below.
 
 ### Correction history, kept rather than edited away
 
@@ -30,9 +31,10 @@ Two metrics **fail** Rule 4 and must not be quoted as moved — see
   (1.02× → 1.43×), a path-integrated measure being less noisy than a single
   extremum.
 - **v2** (this file's previous headline) said *"trades FEWER, HOLDS LONGER, WINS
-  MORE OFTEN and draws down LESS."* **Two of those four verbs fail this
-  document's own pre-registered Rule 4**, and were asserted from a difference of
-  means, which Rule 3 forbids. Corrected below.
+  MORE OFTEN and draws down LESS."* **Two of those four verbs — "trades FEWER, holds
+  LONGER" — were asserted from a difference of means, which Rule 3 forbids, and
+  describe quantities that have no better/worse direction to score.** They are
+  now reported plainly with no verdict. Corrected below.
 - **v2** also claimed the finding *"reconciles the horizon contradiction."* It
   does not — measured since, and it is the reverse.
 - **v3** (the previous rework) said `nearfloor` beat rt *"on every leg"* and that
@@ -166,34 +168,39 @@ What survives, and it is the half the conclusion needs: **rt is not less
 exposed**, so the drawdown/ulcer improvement cannot be explained by holding
 less. What does not survive is the stronger "more exposed" reading.
 
-## Rule 4 applied to the metrics that fail it
+## Turnover and holding time, reported without a verdict
 
 ⚠ **Correction.** This section previously read *"rt does turn over less: 1105 vs
 1151 trades at equal-or-higher concurrency ⇒ ~5.5% longer holds (47.2 → 49.8
-days)"* — a **difference of means**, which pre-registered Rule 3 forbids, and
-never scored against Rule 4. Scored properly, **both fail**:
+days)"* — a **difference of means**, which pre-registered Rule 3 forbids.
 
-| metric | null (core, 3 salts) | s0 | s1 | s2 | Rule 4 |
-|---|---:|---|---|---|---|
-| total trades (tested direction: FEWER) | **37** | −53 (1.43×) ✓ | **−6 (0.16×)** ✗ | −80 (2.16×) ✓ | **FAILS** |
-| avg holding days (tested direction: LONGER) | **1.8768** | +2.853 (1.52×) ✓ | **+1.504 (0.80×)** ✗ | +3.456 (1.84×) ✓ | **FAILS** |
+**Reported descriptively, with no verdict** (see the note below on why):
 
-⚠ **These two rows test a CLAIM, not a quality.** Trade count and holding time
-are descriptive; neither "fewer" nor "longer" is a priori better. The direction
-scored is simply the one this document had asserted ("trades FEWER, HOLDS
-LONGER"), so the row answers *"is the asserted direction real?"* — no, both fail
-at s1 — and must **not** be read as rt being better or worse on turnover. Raised
-by the user 2026-08-20; the original table gave a signed ratio with no stated
-direction.
+| metric | core (s0/s1/s2) | rt (s0/s1/s2) | per-salt difference | core spread across salts |
+|---|---|---|---|---:|
+| total trades | 1147 / 1135 / 1172 | 1094 / 1129 / 1092 | −53 / −6 / −80 | 37 |
+| avg holding days | 48.18 / 47.10 / 46.31 | 51.04 / 48.60 / 49.76 | +2.85 / +1.50 / +3.46 | 1.877 |
 
-The nulls themselves are unremarkable once put in relative terms: holding days
-1.877 d on a mean of 47.2 = **4.0%**, trades 37 on 1151 = **3.2%** — consistent
-with each other, not anomalous.
+rt trades less and holds longer in all three salts, but at s1 the differences
+(−6 trades, +1.50 d) are **smaller than core's own salt-to-salt spread** (37
+trades, 1.877 d), so the size of the effect is not resolved by three salts. The
+direction is consistent; the magnitude is not established.
 
-Neither may be stated as an effect. The selection was one-directional and that
-is the real defect: every metric that *passes* Rule 4 was tabulated with its
-×null ratio, while both metrics that *fail* it were asserted in prose without
-one — and the "selectivity" framing leaned on exactly those two.
+⚠ **No pass/fail is asserted on these two, deliberately** (user, 2026-08-20).
+Trade count and holding time are **descriptive, not performance metrics** —
+neither "fewer" nor "longer" is a priori better, so there is no direction to
+score against and Rule 4 does not apply. An earlier version ran them through
+Rule 4 anyway and stamped both **FAILS**, using the direction this document had
+itself asserted. That was a category error: it manufactured a verdict for a
+quantity nobody had defined a goal for.
+
+The spreads themselves are unremarkable in relative terms: holding days 1.877 d
+on a mean of 47.2 = **4.0%**, trades 37 on 1151 = **3.2%** — consistent with
+each other, not anomalous.
+
+What the original defect actually was: the "selectivity" framing leaned on these
+two quantities while every metric that *did* have a scored ratio was tabulated
+with one. Reporting them plainly, without a verdict, is the fix.
 
 ### Rule 5, which this document never evaluated
 
