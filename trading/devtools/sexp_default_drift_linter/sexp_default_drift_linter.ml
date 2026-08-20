@@ -23,6 +23,22 @@
    .ml/.mli pair. A group with more than one declaring file is therefore a
    *bona fide* duplicate of one logical record, not a coincidence.
 
+   No group-size floor is applied (a prior revision filtered out groups
+   below 6 fields; removed 2026-08-20 rework of PR #2430). Measured on the
+   shipped tree: of 909 record declarations, a 6-field floor silently
+   dropped 614 (67.5%) before grouping and cut multi-file duplicate-group
+   coverage from 402 groups (no floor) to 134 (floor 6) -- yet running with
+   no floor at all produces the SAME zero live findings as the floor did,
+   because the (type_name, field-list) grouping key plus the opted-in
+   filter below are already what makes a match non-coincidental: a false
+   positive would require two UNRELATED types to share an exact type name,
+   an exact ordered field-name list, [@sexp.default] on the same field in
+   both, AND different literal values -- and even then it is a one-line
+   [linter_exceptions.conf] entry, not a correctness bug. A field-count
+   floor bought no precision and cost most of the check's coverage; see
+   dev/status/harness.md's H-SEXP-DEFAULT-DRIFT-LINTER entry for the fuller
+   writeup.
+
    For each field in such a group, compares the [@sexp.default ...]
    attribute payload (its source text) across all declaring files, after:
      - collapsing whitespace runs (so multi-line vs single-line attributes
@@ -42,8 +58,6 @@
    sections; see linter_exceptions.conf header). *)
 
 open Parsetree
-
-let min_group_fields = 6
 
 (* --- Utility -------------------------------------------------------------- *)
 
@@ -315,11 +329,9 @@ let group_records records =
   let tbl = Hashtbl.create 64 in
   List.iter
     (fun r ->
-      if List.length r.fields >= min_group_fields then begin
-        let key = group_key r in
-        let existing = Option.value (Hashtbl.find_opt tbl key) ~default:[] in
-        Hashtbl.replace tbl key (r :: existing)
-      end)
+      let key = group_key r in
+      let existing = Option.value (Hashtbl.find_opt tbl key) ~default:[] in
+      Hashtbl.replace tbl key (r :: existing))
     records;
   Hashtbl.fold
     (fun _ decls acc ->
@@ -350,7 +362,22 @@ type violation = {
    before this filter, none a real bug). Only declarations that DO carry at
    least one real attribute on this type are compared against each other --
    that is the shape of the two confirmed bugs (#2384, #2388): the type is
-   documented with defaults in more than one place, and one copy is stale. *)
+   documented with defaults in more than one place, and one copy is stale.
+
+   This filter is also what still excludes a genuinely partially-documented
+   type from ever being compared -- e.g. [Liquidity_config.t]: a two-file,
+   five-field record whose [.ml] carries 2 [@sexp.default] attributes and
+   whose [.mli] carries 0. With only one opted-in declaration, [opted_in]
+   never reaches 2 and the type is silently never checked. Measured across
+   all 402 multi-file duplicate groups on the shipped tree with no
+   group-size floor (2026-08-20 rework of PR #2430): 376 groups are 0
+   opted-in (nothing to compare -- an intentional documentation style, see
+   above), 19 are fully opted-in (>=2, actually compared), 1 has 3
+   opted-in declarations, and **6 groups sit exactly at this blind spot**
+   (opted_in = 1, silently unchecked -- [Liquidity_config.t] is one of the
+   6). A type moving from 1 to 2 opted-in declarations (e.g. a future
+   [.mli] documenting its own defaults) starts being checked with no code
+   change required. *)
 let has_any_default (r : record_decl) =
   List.exists (fun f -> f.default_text <> None) r.fields
 
