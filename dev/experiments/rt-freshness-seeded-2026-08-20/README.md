@@ -1,11 +1,18 @@
 # F1 freshness axis, seeded — `Range_top_breakout` vs `Ma_cross` on the 26y base
 
-**RESULT: `Range_top_breakout` trades FEWER, HOLDS LONGER, WINS MORE OFTEN and
-draws down LESS — without reducing exposure.** Return and Sharpe flip sign
-between salts and stay inside their nulls, so it is not a return lever.
-Completed 05:39.
+**RESULT: on the 26-year base, `Range_top_breakout` improves ulcer index, win
+rate and max drawdown past their own nulls at all three salts, and moves return
+and Sharpe not at all. It does NOT survive its first independent cell, and the
+same signature is produced more strongly by a mechanism that already failed
+confirmation 0-of-3.** Completed 05:39.
 
-Three metrics clear their own null at all three salts:
+⚠ **Read the two sections "It reverses at 5 years" and "`nearfloor` produces
+this same signature, and it failed 0-of-3" before quoting anything below.** They
+are what the record is actually for. The 26y measurement is sound and
+reproduces; what it licenses is much narrower than the first two versions of
+this file claimed.
+
+Three metrics clear their own null at all three salts (Rule 4):
 
 | metric | core → rt (mean) | weakest leg |
 |---|---|---|
@@ -13,19 +20,42 @@ Three metrics clear their own null at all three salts:
 | **win rate** | 33.18% → **34.91%** | **1.96×** null |
 | **max drawdown** | 38.76 → **30.81** (−21%) | 1.02× null |
 
-⚠ **An earlier version of this file said "moves drawdown and nothing else."
-That was false and is corrected here rather than edited away** — the PR's own
-`actual.sexp` files carry ulcer index and win rate, and both move by the same
-Rule-4 test. Found by qc-behavioral, which also noted the consequence: **ulcer
-index repairs the fragile s1 leg** (1.02× on MaxDD → 1.43× on ulcer), because a
-path-integrated drawdown measure is less noisy than a single extremum. The
-finding is stronger than first stated, and its shape is *selectivity*, not
-"lower risk" alone.
+Two metrics **fail** Rule 4 and must not be quoted as moved — see
+"Rule 4 applied to the metrics that fail it" below.
 
-All three tripwires reproduced the recorded null draws digit-for-digit
-(281.707836178685 / 397.94778549196963 / 265.44150500657236), and the measured
-null spread reproduces the historical one exactly — **132.51pp** on return
-(recorded 132.5) and **37** on trades (recorded 37). The instrument is validated.
+### Correction history, kept rather than edited away
+
+- **v1** said *"moves drawdown and nothing else."* False: ulcer index and win
+  rate move by the same Rule-4 test. **Ulcer repairs MaxDD's fragile s1 leg**
+  (1.02× → 1.43×), a path-integrated measure being less noisy than a single
+  extremum.
+- **v2** (this file's previous headline) said *"trades FEWER, HOLDS LONGER, WINS
+  MORE OFTEN and draws down LESS."* **Two of those four verbs fail this
+  document's own pre-registered Rule 4**, and were asserted from a difference of
+  means, which Rule 3 forbids. Corrected below.
+- **v2** also claimed the finding *"reconciles the horizon contradiction."* It
+  does not — measured since, and it is the reverse.
+
+All three corrections came from qc-behavioral. The pattern is worth naming
+because it recurred three times: **each rework fixed the instances found and not
+the rule that generated them** — Rule 4 kept being applied only where it passed.
+
+## Instrument validation — stronger than first claimed
+
+This file originally claimed only the three *return* draws reproduced. In fact
+**six metrics × three salts** reproduce digit-for-digit against an independent
+committed artefact, `dev/experiments/nearfloor-26y-salts-2026-08-13/results.txt`:
+
+```
+08-13 file:  00-core-w4 s1 => return 397.94778549196963 | trades 1135
+             | win_rate 32.951541850220259 | maxDD 36.249041280521169
+             | sharpe 0.49983223694668849 | holding_days 47.098678414096916
+this run:    identical, all six, all three salts
+```
+
+That is a far better determinism tripwire than "the return draws matched", and
+it was available for free — the understatement cost the record its strongest
+evidence.
 
 ## Results
 
@@ -77,8 +107,13 @@ removed that excess, and our null is measured on the fixed binary, from the same
 three salts the comparison is paired against.
 
 Anyone re-reading this should still treat MaxDD's s1 leg (1.02×) as the weak
-point, and prefer the ulcer-index legs, which do not depend on which null you
-accept.
+point, and prefer the ulcer-index legs, which carry more headroom against
+their own null (1.43x vs 1.02x) and so survive a moderately wider one.
+
+⚠ This sentence previously claimed the ulcer legs "do not depend on which null
+you accept." False — they are ratios against ulcer's own 3-draw range (1.851)
+exactly as MaxDD's are against 4.76. Headroom is not independence, and the
+overclaim sat in the very section written to concede a null objection.
 
 ## It is NOT the position-count artifact
 
@@ -113,18 +148,112 @@ What survives, and it is the half the conclusion needs: **rt is not less
 exposed**, so the drawdown/ulcer improvement cannot be explained by holding
 less. What does not survive is the stronger "more exposed" reading.
 
-rt does turn over less: 1105 vs 1151 trades at equal-or-higher concurrency ⇒
-~5.5% longer holds (47.2 → 49.8 days).
+## Rule 4 applied to the metrics that fail it
 
-Note this inverts the 5-year testbed, where rt held *shorter* (45.4 → 34.4 days)
-and drawdown got *worse* — a second concrete 5y-vs-26y divergence on this axis.
+⚠ **Correction.** This section previously read *"rt does turn over less: 1105 vs
+1151 trades at equal-or-higher concurrency ⇒ ~5.5% longer holds (47.2 → 49.8
+days)"* — a **difference of means**, which pre-registered Rule 3 forbids, and
+never scored against Rule 4. Scored properly, **both fail**:
+
+| metric | null (core, 3 salts) | s0 | s1 | s2 | Rule 4 |
+|---|---:|---|---|---|---|
+| total trades | **37** | −53 (1.43×) ✓ | **−6 (0.16×)** ✗ | −80 (2.16×) ✓ | **FAILS** |
+| avg holding days | **1.8768** | +2.853 (1.52×) ✓ | **+1.504 (0.80×)** ✗ | +3.456 (1.84×) ✓ | **FAILS** |
+
+Neither may be stated as an effect. The selection was one-directional and that
+is the real defect: every metric that *passes* Rule 4 was tabulated with its
+×null ratio, while both metrics that *fail* it were asserted in prose without
+one — and the "selectivity" framing leaned on exactly those two.
+
+### Rule 5, which this document never evaluated
+
+Pre-registered Rule 5: *trade count is a **control, not an outcome**; if 26y
+shows a large count change, the mechanism differs between horizons and the
+comparison needs re-framing **before any verdict**.*
+
+Evaluated now: the count change is **ambiguous** — 2 of 3 salts outside the
+null, 1 inside. That is neither "no change" nor a clean "large change", so
+Rule 5's trigger is not cleanly met; but it is close enough that the honest
+reading is *the trigger cannot be ruled out*, which is itself a reason the 26y
+verdict should not have been stated as broadly as it was. The re-framing Rule 5
+demands is supplied by the two sections that follow, from a different direction
+than anticipated.
+
+Note the 5-year testbed inverts the holding-time direction outright: rt held
+*shorter* there (45.4 → 34.4 days).
+
+## What the 26y cell establishes on its own
+
+**`Range_top_breakout` improves ulcer, win rate and MaxDD on the 26-year
+top-3000 base past their own nulls, moves return and Sharpe not at all, and is
+not an exposure artifact.** That is the whole of it. ⚠ A previous version called
+this "a drawdown lever", unqualified — the two sections that follow are why that
+phrasing does not survive.
+
+## It reverses at 5 years — measured, not assumed
+
+The open question this file left ("salt the 5y testbed and measure its floor")
+was **answered the same morning**:
+`../rt-freshness-5y-null-2026-08-20/` (PR #2436), same six-cell design.
+
+**The 5y drawdown null is 0.3616pp.** The contradiction it poses is +4.60pp —
+**12.7× its own null**. The horizons genuinely disagree, and the "5 years of 187
+names cannot resolve a ~3pp effect" dismissal is refuted by measurement: that
+cell resolves a **0.36pp** effect.
+
+And rt does not merely lose on drawdown there. It loses on **every** metric, at
+13–73× the 5y null, with all three salts agreeing in sign:
+
+| metric | core | rt | gap | ÷ 5y null |
+|---|---:|---:|---:|---:|
+| return | 112.68 | **45.49** | −67.20pp | 68× |
+| Sharpe | 1.1075 | **0.6044** | −0.5031 | 73× |
+| ulcer | 6.937 | **10.531** | +3.594 | 35× |
+| win rate | 38.06% | **28.55%** | −9.50pp | 23× |
+| MaxDD | 16.758 | **21.360** | +4.601 | 13× |
+
+**Ulcer flips hardest** — rt's strongest leg here (−26.5%, 1.43× null) is
+**+51.8% worse** there at 35× null. A metric cannot be a mechanism's signature
+in one cell and its opposite in another. What it can be is regime-conditional.
+
+Neither cell is wrong. Both reproduce. The two differ in **period AND universe**,
+so nothing yet says which axis carries the reversal.
+
+## `nearfloor` produces this same signature, and it failed 0-of-3
+
+The strongest objection to this record is not about its arithmetic. From the
+committed `dev/experiments/nearfloor-26y-salts-2026-08-13/results.txt`, on this
+same base and these same three salts, scored by this document's own Rule 4:
+
+| metric (26y) | rt (this PR) | `09-nearfloor` |
+|---|---|---|
+| trades | **fails** s1 (0.16×) | −177/−162/−187 → **4.4–5.1×** ✓ |
+| holding days | **fails** s1 (0.80×) | +26.5/+27.2/+26.3 → **14×** ✓ |
+| win rate | +0.97 → 1.96× ✓ | +7.6/+7.1/+5.9 → **11.9–15.3×** ✓ |
+| MaxDD | +4.83 → 1.02× ✓ | +9.2/+8.5/+11.6 → **1.8–2.4×** ✓ |
+| return | in-null, sign flips | in-null at s2 → **not moved** |
+
+**`nearfloor` produces the identical "selectivity" signature — fewer trades,
+much longer holds, higher win rate, lower drawdown, return unmoved — with an
+order of magnitude more headroom on every leg.** And `nearfloor` **failed its
+confirmation grid 0 of 3** (`project_nearfloor_is_risk_not_return`).
+
+This record cited that rejection only under "Not bundled", as a reason to keep
+the axes separate. It is much more than that: it is a **prior on the signature
+itself.** The pattern this file calls a finding is one a rejected mechanism
+produces more strongly, which means the signature is weak evidence for a
+mechanism being good — plausibly just what trading less looks like on this base.
+
+Taken with the 5y reversal, the honest reading is: **"fewer, longer, higher-win,
+lower-drawdown, return-unmoved" is a generic consequence of reduced turnover on
+the 26y top-3000 base, not a mechanism-specific virtue.** Any future mechanism
+producing it should be treated as unproven until a second cell agrees.
 
 ## What this does and does not license
 
-**Does:** `Range_top_breakout` is a drawdown lever on the 26-year top-3000 base,
-not a return lever, and not an exposure trick.
-
-**Does not — (a) reconcile the horizons.** The 5y testbed moved drawdown **+4.45pp the other
+**Does not — (a) reconcile the horizons.** ⚠ Superseded by the measurement
+above; the text below is retained for the audit trail. The 5y testbed moved
+drawdown **+4.45pp the other
 way** (16.98 → 21.43). ⚠ An earlier version claimed reconciliation, on the
 grounds that "5 years of 187 names cannot resolve a ~3pp drawdown effect."
 **That threshold was asserted, never derived** — the 5y testbed is
@@ -201,9 +330,18 @@ unmeasurable on 26y and clearly worse on 5y.
 
 ## Why six cells and not two
 
-The 2026-08-14 seeded run recorded **return and trades per salt and nothing
-else**, and its artifacts are gone. So there is **no null spread for MaxDD or
-Sharpe** — and drawdown is precisely the disputed metric.
+⚠ **Corrected premise.** This section previously said the 2026-08-14 seeded run
+recorded "return and trades per salt and nothing else" so there was "no null
+spread for MaxDD or Sharpe". **That is wrong, and a committed artefact in this
+repo refutes it:** `dev/experiments/nearfloor-26y-salts-2026-08-13/results.txt`
+already carries `00-core-w4` at all three salts with `win_rate`, `maxDD`,
+`sharpe` and `holding_days`. The MaxDD null (4.7596), the Sharpe null, the
+win-rate null (0.4956) and the holding-days null (1.8768) were all derivable
+before this run.
+
+**Only ulcer index was genuinely unrecorded** — and the rt arm had never been run
+seeded at all. The six-cell design remains justified on those two grounds; the
+reason originally given for it was not one.
 
 Running **both arms at the same three salts** yields the null spread *and* the
 treatment effect for every metric, in one self-contained design that depends on
