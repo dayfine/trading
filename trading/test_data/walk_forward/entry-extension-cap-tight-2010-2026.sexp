@@ -28,7 +28,10 @@
 ;; !! RESULT 2026-08-19: the prediction that once stood here -- fewer trades and
 ;; LOWER return -- was WRONG IN DIRECTION. The axis found TIGHTER IS BETTER on
 ;; every metric: 1.0 beat baseline(=2.0) on return, Sharpe, MaxDD and Calmar,
-;; winning Calmar 13/16 and MaxDD 15/16, while 5/10/15 all trailed 2.0.
+;; winning Calmar 13/16 and MaxDD 15/16, while 5/10/15 all trailed 2.0 on
+;; return, Sharpe and Calmar (NOT on mean MaxDD, where 10.0's 9.6206 and 15.0's
+;; 9.6305 both beat 2.0's 9.7438 -- an early instance of the drawdown inversion
+;; the 3-year control makes unmissable).
 ;;
 ;; (This block used to end "Live's 15.0 was the WORST value tested." That is
 ;; FALSE and is corrected here rather than deleted. On this 1-year surface 5.0

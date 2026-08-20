@@ -3,9 +3,9 @@
 ;;
 ;; WHY THIS EXISTS. The 1-year-fold surface (sibling spec, #2404) found tighter
 ;; is better on every metric: 1.0 beat baseline(=2.0) on return, Sharpe, MaxDD
-;; and Calmar, winning Calmar 13/16 and MaxDD 15/16, and live's 15.0 was the
-;; worst value tested. That measurement is real but its DESIGN is biased toward
-;; the answer it produced:
+;; and Calmar, winning Calmar 13/16 and MaxDD 15/16, while 5.0 was the worst
+;; value tested on every mean. That measurement is real but its DESIGN is biased
+;; toward the answer it produced:
 ;;
 ;;   A tighter cap's failure mode is a NO-FILL, which forgoes the stock's
 ;;   ENTIRE subsequent run. A 1-year fold TRUNCATES that run at the fold

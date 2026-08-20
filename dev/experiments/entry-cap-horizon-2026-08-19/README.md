@@ -59,7 +59,11 @@ beaten by anything.
    the forgone run lands inside the measurement window: fold-004 (2022-2024) has
    1.0 at 42.92 against baseline's 53.84, a **−10.9pp** gap on a single fold.
 
-4. **5.0 is the worst value on both horizons.** The response is not monotone in
+4. **5.0 is the worst value on both horizons** — on return, Sharpe and Calmar,
+   which is where the ranking claim lives. Two exceptions, stated so the claim
+   is not read wider than it holds: on 3-year mean **MaxDD** 5.0 (14.02) is
+   third of five rather than worst, and on the 1-year **Calmar win-count** it
+   takes 4/16 against 10.0's and 15.0's 3/16. The response is not monotone in
    the cap, which is itself a caution against reading any single-point result
    as a trend.
 
