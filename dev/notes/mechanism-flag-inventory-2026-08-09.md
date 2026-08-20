@@ -119,6 +119,32 @@ explicitly before removal, which is the pattern, not the exception.
 The retirement program is therefore **not** "work the list"; it is "screen a row,
 and expect the answer to be no."
 
+**2026-08-20 — the five "confirm" rows re-screened; only two survive as
+eligible.** All five are still present in source. Running Rule 4's own
+live-reference test (`git grep -l <flag> -- '*.sexp'`, then locating the hits)
+splits them three ways:
+
+| flag | specs | where | call |
+|---|---:|---|---|
+| `enable_late_stage2_stop_tighten` | 7 | all in `dev/experiments/late-dial-grid-2026-06-06/` (the experiment that rejected it) + ledger | **eligible** |
+| `enable_stage2_ma_hold` | 3 | — | **likely eligible**, same screen not yet run |
+| `dawn_leverage_*` | 1 | — | do-not-revive in substance, but **coupled** to the margin family below |
+| `initial_long_margin_req` family | 5 | + optional params of `simulator.ml:41` and `cancel_handler.ml:198` | **NOT a retirement** — core simulator plumbing; Rule 4 scopes this out as a refactor |
+| **`catastrophic_stop_pct`** | **135** | incl. `staging-record-convention` (9, the live record baseline) and every current-arc experiment (ladder-v4, ttl-retest) | **NOT ELIGIBLE — reclassify RETIRE → KEEP** |
+
+`catastrophic_stop_pct` fails all four of Rule 4's live-reference clauses (live
+scenario spec, preset, golden config, in-flight experiment plan). **No human
+classification is needed — the rule already answers it**, which makes this a
+different correction from the previous two: not a misread verdict, but a row
+that should never have been listed. It joins `trigger_on_weekly_close` and the
+continuation family as the fourth reclassification.
+
+Consequence for anyone reading the tallies: **the graveyard's apparent size
+overstates what is removable.** Of 5 "confirm" rows, 2 are genuinely
+retirement-eligible, 2 are refactors or coupled families, and 1 is live. That
+gap is the most likely reason the list has sat unworked since 08-09 — it reads
+as five deletions and is two.
+
 ## RETIRE — graveyard (seeded by the 08-09 priorities doc)
 
 | field | config module | default | ledger verdict (pointer) | call | notes |
