@@ -101,8 +101,85 @@ check "verdict at a superseded sha is stale" \
 # 7. No reviews at all.
 check "no reviews" none "$(_gate '[]' behavioral "$TIP")"
 
+# --- Cases 8-11 exist because qc-behavioral mutation-tested cases 1-7 and found
+# --- two guards the function documents but nothing pinned. Each of these fails
+# --- against the corresponding mutation.
+
+# 8. GUARD: verdict comes from the "## Verdict" SECTION, not the first
+#    APPROVED/NEEDS_REWORK token. Reviews quote each other constantly, so a
+#    first-token reader returns `ok` for a review that says rework -- which is
+#    `pass:ok:ok MERGE` on a PR that was told to rework.
+QUOTES_APPROVED_BUT_REWORKS="Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — quoting the other gate
+
+qc-structural already returned APPROVED at this tip, and the earlier behavioral
+pass was also APPROVED before the rework.
+
+## Verdict
+
+NEEDS_REWORK"
+
+check "verdict section wins over quoted APPROVED tokens" \
+  rework "$(_gate "$(reviews "$QUOTES_APPROVED_BUT_REWORKS")" behavioral "$TIP")"
+
+# 9. GUARD: the LAST matching review wins. A rework cycle leaves the superseded
+#    verdict earlier in the array; reading the first re-greens a reworked PR.
+TWO_AT_SAME_TIP=$(jq -nc --arg a "Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — first pass
+
+## Verdict
+
+APPROVED" --arg b "Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — second pass, after new evidence
+
+## Verdict
+
+NEEDS_REWORK" '[{body: $a}, {body: $b}]')
+
+check "newest review wins at the same tip" \
+  rework "$(_gate "$TWO_AT_SAME_TIP" behavioral "$TIP")"
+
+# 10. GUARD: a heading QUOTED INSIDE A FENCE is evidence, not a verdict. Found
+#     by a reviewer who pasted another PR's heading list into a review and
+#     thereby satisfied that other gate.
+STRUCT_QUOTING_A_BEHAVIORAL_HEADING="Reviewed SHA: 7dc57cc06
+
+## Structural QC — quoting evidence
+
+The other PR's review opens with:
+
+\`\`\`
+## Behavioral QC — some other PR
+## Verdict
+NEEDS_REWORK
+\`\`\`
+
+## Verdict
+
+APPROVED"
+
+check "fenced heading does not satisfy the quoted gate" \
+  none "$(_gate "$(reviews "$STRUCT_QUOTING_A_BEHAVIORAL_HEADING")" behavioral "$TIP")"
+check "...and the quoting review still counts as its own gate" \
+  ok "$(_gate "$(reviews "$STRUCT_QUOTING_A_BEHAVIORAL_HEADING")" structural "$TIP")"
+
+# 11. A body with NO verdict section must return "unclear" -- not crash the run.
+#     jq's `|` binds looser than `//`, so the fallback chain used to re-apply
+#     `.body` to a string, exit 5, and kill the caller mid-table under `set -eu`.
+NO_VERDICT_SECTION="Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — an unfinished review
+
+Ran out of budget before reaching a verdict."
+
+check "missing verdict section is unclear, not a crash" \
+  unclear "$(_gate "$(reviews "$NO_VERDICT_SECTION")" behavioral "$TIP")"
+
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"
   exit 1
 fi
-printf 'OK: pr_gate_status -- %d tests clean.\n' 7
+printf 'OK: pr_gate_status -- %d tests clean.\n' 12
