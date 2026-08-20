@@ -120,6 +120,16 @@ mkdir -p "$FIXTURE/dev/notes"
 echo "next-session-priorities-2026-01-01.md was a great read" >"$FIXTURE/dev/notes/some-other-note.md"
 _git_commit "2026-01-07" "a note mentioning the uncited doc (must not count)" dev/notes/some-other-note.md
 
+# F2 rework requirement: checker 1 must STILL propose a priorities doc whose
+# ONLY citation is from ANOTHER priorities doc (not just an arbitrary note --
+# this is the specific circularity the checker1-vs-checker2 citation-source
+# asymmetry exists to prevent collapsing on). 01-02 is cited only by 01-03,
+# and 01-03 is itself uncited by any real source -- both must be candidates.
+echo "doc cited only by another priorities doc" >"$FIXTURE/dev/notes/next-session-priorities-2026-01-02.md"
+_git_commit "2026-01-02" "add doc cited only by another priorities doc" dev/notes/next-session-priorities-2026-01-02.md
+echo "See dev/notes/next-session-priorities-2026-01-02.md for backstory." >"$FIXTURE/dev/notes/next-session-priorities-2026-01-03.md"
+_git_commit "2026-01-03" "priorities doc citing 01-02 (a dev/notes-only citation)" dev/notes/next-session-priorities-2026-01-03.md
+
 # --- Checker 2 fixture: dirs spanning quarantine + citation ------------------
 # fuzz-startdate-crash: production's mandatory pinned anchor -- old, uncited.
 mkdir -p "$FIXTURE/dev/experiments/fuzz-startdate-crash"
@@ -148,6 +158,19 @@ mkdir -p "$FIXTURE/dev/experiments/recent-and-uncited-2026-08-05"
 echo "a" >"$FIXTURE/dev/experiments/recent-and-uncited-2026-08-05/a.txt"
 _git_commit "2026-08-05" "add recent-and-uncited dir" dev/experiments/recent-and-uncited-2026-08-05/a.txt
 
+# F2 rework requirement: checker 2 must NOT propose a dir whose ONLY citation
+# is in dev/notes/ (unlike checker 1, dev/notes/ IS a citation source for
+# checker 2 -- a note genuinely referencing an experiment dir means deleting
+# it breaks that reference; see the CITATION SOURCES header comment for the
+# measured 5x overstatement this fixes). Old enough to clear quarantine, and
+# NOT cited by ledger/plans/status/.claude/CLAUDE.md -- only by a dev/notes
+# writeup.
+mkdir -p "$FIXTURE/dev/experiments/notes-only-cited-2026-05-04"
+echo "a" >"$FIXTURE/dev/experiments/notes-only-cited-2026-05-04/a.txt"
+_git_commit "2026-05-04" "add dir cited only via dev/notes" dev/experiments/notes-only-cited-2026-05-04/a.txt
+echo "see dev/experiments/notes-only-cited-2026-05-04 in this writeup" >"$FIXTURE/dev/notes/some-writeup-2026-05-05.md"
+_git_commit "2026-05-05" "cite the dir from a dev/notes writeup (checker2-only citation source)" dev/notes/some-writeup-2026-05-05.md
+
 # --- Checker 3 fixture: strategy config + ledger + specs --------------------
 cat >"$FIXTURE/trading/trading/weinstein/strategy/lib/weinstein_strategy_config.mli" <<'EOF'
 type config = {
@@ -156,6 +179,11 @@ type config = {
           [[:space:]] matching indented/tabbed declarations that a
           non-portable `\s` pattern (BSD grep does not expand `\s` inside a
           POSIX/extended regex) would silently miss. *)
+  enable_test_unclassified_flag : bool; [@sexp.default false]
+      (** A flag with a ledger REJECT but NO recorded do-not-revive
+          classification anywhere (no inventory row, no ledger/memory
+          marker) -- must report NEEDS-CLASSIFICATION, never default to
+          ELIGIBLE (F1, rework iteration 1, 2026-08-20). *)
 	  stops_config : Stop_types_fixture.config;
       (** Nested fast-crash stop, referenced below as
           [stops_config.catastrophic_stop_pct]; default is a no-op. *)
@@ -185,7 +213,20 @@ cat >"$FIXTURE/dev/experiments/_ledger/2026-01-03-catstop.sexp" <<'EOF'
  (verdict Reject)
  (notes "REJECT(promotion): fixture entry for catastrophic_stop_pct."))
 EOF
-_git_commit "2026-01-02" "add ledger rejects" dev/experiments/_ledger/2026-01-02-test-dead-flag.sexp dev/experiments/_ledger/2026-01-03-catstop.sexp
+# This flag's ledger entry deliberately contains "do-not-revive" INSIDE A
+# NEGATION -- "NO do-not-revive classification recorded" -- mirroring the
+# real dev/agent-memory/project_continuation_combined_rejected.md counter-
+# example found during rework (that memory's sentence "No do-not-revive is
+# recorded anywhere" would be misread as a confirmation by a bare substring
+# search). This pins _flag_classification's negation guard directly, not
+# just via the inventory path.
+cat >"$FIXTURE/dev/experiments/_ledger/2026-01-08-test-unclassified-flag.sexp" <<'EOF'
+((date 2026-01-08) (slug test-unclassified-flag)
+ (hypothesis "enable_test_unclassified_flag helps")
+ (verdict Reject)
+ (notes "Reject(promotion): NO do-not-revive classification recorded for this fixture entry."))
+EOF
+_git_commit "2026-01-02" "add ledger rejects" dev/experiments/_ledger/2026-01-02-test-dead-flag.sexp dev/experiments/_ledger/2026-01-03-catstop.sexp dev/experiments/_ledger/2026-01-08-test-unclassified-flag.sexp
 
 # enable_test_dead_flag: referenced ONLY inside its own dead experiment dir --
 # must report ELIGIBLE.
@@ -197,6 +238,13 @@ _git_commit "2026-01-04" "dead flag's own experiment record" dev/experiments/dea
 # -- must report NOT ELIGIBLE.
 echo "((stops_config ((catastrophic_stop_pct 0.10))))" >"$FIXTURE/trading/test_data/live-scenario.sexp"
 _git_commit "2026-01-05" "live spec referencing catastrophic_stop_pct" trading/test_data/live-scenario.sexp
+
+# enable_test_unclassified_flag: live-ref CLEAN (referenced only inside its
+# own dev/experiments dir), but no do-not-revive classification anywhere --
+# must report NEEDS-CLASSIFICATION, not ELIGIBLE.
+mkdir -p "$FIXTURE/dev/experiments/unclassified-flag-grid-2026-01-08"
+echo "((enable_test_unclassified_flag true))" >"$FIXTURE/dev/experiments/unclassified-flag-grid-2026-01-08/cell.sexp"
+_git_commit "2026-01-08" "unclassified flag's own experiment record" dev/experiments/unclassified-flag-grid-2026-01-08/cell.sexp
 
 # An odoc-style bracket cross-reference must NOT count as a live .ml
 # assignment -- pins the docstring-vs-code false positive an earlier draft
@@ -217,7 +265,11 @@ echo "== Fixture A: happy path =="
 check "exits 0 on a fully-consistent fixture" 0 "" \
   env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="$TODAY" sh "$SCRIPT"
 
-check "checker1: reports exactly 1 candidate" 0 "Candidates: 1 files, 10 total lines" \
+# 3 candidates: 01-01 (uncited, 10 lines), 01-02 (cited only by 01-03, a
+# priorities doc -- dev/notes is not a checker-1 citation source), and 01-03
+# itself (uncited by any real source). 12 total lines. 01-05 (cited via
+# dev/plans) is the only exclusion, hence "excluded: 1".
+check "checker1: reports exactly 3 candidates, 12 total lines" 0 "Candidates: 3 files, 12 total lines (cited-elsewhere and excluded: 1)." \
   env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="$TODAY" sh "$SCRIPT"
 
 check "checker1: lists the uncited doc" 0 "next-session-priorities-2026-01-01.md" \
@@ -229,13 +281,21 @@ check_not "checker1: does NOT list the cited doc as a candidate row" 0 "| dev/no
 check_not "checker1: a note-only mention does not exclude a candidate (dev/notes is not a citation source)" 0 "Candidates: 0 files" \
   env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="$TODAY" sh "$SCRIPT"
 
-# 3 candidate dirs: old-and-uncited, fuzz-startdate-crash, AND
-# dead-flag-grid-2026-01-04 (checker3's own fixture dir for the ELIGIBLE
-# flag case, which is itself old + uncited by the shared citation sources --
-# it is only "cited" in the .sexp sense checker3 reads, which checker2 does
-# not consult). Both checkers correctly seeing it independently is the
-# right behaviour, not a fixture bug.
-check "checker2: reports exactly 3 candidate dirs" 0 "Candidates: 3 dirs" \
+# F2 rework requirement, pinned explicitly: a priorities doc cited ONLY by
+# another priorities doc is STILL a candidate -- dev/notes/ never counts as
+# a checker-1 citation source, even when the citer is itself the same
+# category of document.
+check "checker1: a doc cited only by another priorities doc is still a candidate" 0 "| dev/notes/next-session-priorities-2026-01-02.md |" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="$TODAY" sh "$SCRIPT"
+
+# 4 candidate dirs: old-and-uncited, fuzz-startdate-crash, dead-flag-grid
+# (checker3's own ELIGIBLE-flag fixture dir), and unclassified-flag-grid
+# (checker3's own NEEDS-CLASSIFICATION-flag fixture dir) -- all old and
+# uncited by the checker-2 citation sources. They are only "cited" in the
+# .sexp sense checker3 reads, which checker2 does not consult; both
+# checkers correctly seeing their own dirs independently is right, not a
+# fixture bug.
+check "checker2: reports exactly 4 candidate dirs" 0 "Candidates: 4 dirs" \
   env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="$TODAY" sh "$SCRIPT"
 
 check "checker2: 30-day quarantine EXCLUDES the recent-and-uncited dir" 0 "" \
@@ -247,6 +307,12 @@ check "checker2: 30-day quarantine INCLUDES an old dir past the boundary" 0 "old
   env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="$TODAY" sh "$SCRIPT"
 
 check_not "checker2: citation excludes an old-but-cited dir even though it is old enough" 0 "old-but-cited-2026-05-02" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="$TODAY" sh "$SCRIPT"
+
+# F2 rework requirement, pinned explicitly: unlike checker 1, checker 2 DOES
+# treat dev/notes/ as a citation source, so a dir cited only from a
+# dev/notes/ writeup must be EXCLUDED, not proposed.
+check_not "checker2: a dir cited only via dev/notes is NOT proposed" 0 "notes-only-cited-2026-05-04" \
   env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="$TODAY" sh "$SCRIPT"
 
 check "checker3: [[:space:]] matches a tab-indented flag declaration" 0 "enable_test_dead_flag" \
@@ -261,6 +327,21 @@ check "checker3: flag referenced by a live spec is NOT ELIGIBLE" 0 "| catastroph
   env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="$TODAY" sh "$SCRIPT"
 
 check "checker3: an odoc bracket cross-reference is not counted as a live .ml assignment" 0 "" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="$TODAY" sh "$SCRIPT"
+
+# F1 rework requirement, pinned explicitly: a flag with a ledger REJECT, a
+# clean live-reference check, but NO recorded do-not-revive classification
+# anywhere must report NEEDS-CLASSIFICATION -- never a default ELIGIBLE.
+# Its ledger notes contain "NO do-not-revive classification recorded",
+# which also pins the negation guard: a bare substring search for
+# "do-not-revive" would have misread this exact sentence as confirmation.
+check "checker3: a flag with no recorded classification is NEEDS-CLASSIFICATION, not ELIGIBLE" 0 "| enable_test_unclassified_flag | NEEDS-CLASSIFICATION | 2 | 0 | 0 |" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="$TODAY" sh "$SCRIPT"
+
+check_not "checker3: the unclassified flag never prints as ELIGIBLE" 0 "| enable_test_unclassified_flag | ELIGIBLE |" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="$TODAY" sh "$SCRIPT"
+
+check "checker3: overall tally reflects 1 eligible, 1 not eligible, 1 needs classification" 0 "Flags with a ledger REJECT: 3 (eligible: 1, not eligible: 1, needs classification: 1)." \
   env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="$TODAY" sh "$SCRIPT"
 
 rm -rf "$FIXTURE"
@@ -322,6 +403,101 @@ EOF
 _git_commit "2026-01-01" "a strategy config with no catastrophic_stop_pct anywhere" trading/trading/weinstein/strategy/lib/weinstein_strategy_config.mli
 
 check "checker3 sanity probe fires when catastrophic_stop_pct cannot be discovered" 1 "FAIL(checker3): sanity probe failed" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="2026-08-20" sh "$SCRIPT"
+
+rm -rf "$FIXTURE"
+
+# ==============================================================================
+# FIXTURE E: F1 rework regression pin -- the inventory-file classification
+# path (checker3's PRIMARY source), mirroring the exact shape of the real
+# bug report: enable_continuation_buys' inventory row reads "**KEEP-AXIS --
+# reclassified 2026-08-13**, see Correction log" AND its own prose contains
+# the word "RETIRE" ("Was a RETIRE row; the seed was..."). A naive "does
+# 'ELIGIBLE' appear near this flag" check, or a check that finds the FIRST
+# recognizable keyword instead of checking KEEP-type classifications first
+# and unconditionally, would misread this exact row.
+# ==============================================================================
+_init_fixture_repo
+echo "newest doc" >"$FIXTURE/dev/notes/next-session-priorities-2026-08-19.md"
+_git_commit "2026-08-19" "newest doc" dev/notes/next-session-priorities-2026-08-19.md
+echo "See dev/notes/next-session-priorities-2026-05-15.md for context." >"$FIXTURE/dev/plans/sector-concentration-cap-2026-05-15.md"
+_git_commit "2026-05-15" "anchor file (satisfies checker1)" dev/plans/sector-concentration-cap-2026-05-15.md
+mkdir -p "$FIXTURE/dev/experiments/fuzz-startdate-crash"
+echo "a" >"$FIXTURE/dev/experiments/fuzz-startdate-crash/a.txt"
+_git_commit "2026-01-01" "fuzz-startdate-crash (satisfies checker2)" dev/experiments/fuzz-startdate-crash/a.txt
+
+cat >"$FIXTURE/trading/trading/weinstein/strategy/lib/weinstein_strategy_config.mli" <<'EOF'
+type config = {
+  stops_config : Stop_types_fixture.config;
+      (** Nested fast-crash stop; the searchable mechanism flag is
+          [stops_config.catastrophic_stop_pct]; satisfies checker3's own
+          live-flag sanity probe. *)
+  enable_test_keepaxis_flag : bool; [@sexp.default false]
+      (** inventory says KEEP-AXIS; must never print ELIGIBLE *)
+  enable_test_bare_retire_flag : bool; [@sexp.default false]
+      (** inventory says bare RETIRE (no "(confirm)"); must print ELIGIBLE *)
+}
+EOF
+_git_commit "2026-01-01" "fixture strategy config with two inventoried flags" trading/trading/weinstein/strategy/lib/weinstein_strategy_config.mli
+
+mkdir -p "$FIXTURE/trading/trading/weinstein/stops/lib"
+cat >"$FIXTURE/trading/trading/weinstein/stops/lib/stop_types_fixture.mli" <<'EOF'
+type config = {
+  catastrophic_stop_pct : float; [@sexp.default 0.0]
+      (** Fast-crash absolute stop pct; 0.0 is a no-op. *)
+}
+EOF
+_git_commit "2026-01-01" "fixture nested stop config" trading/trading/weinstein/stops/lib/stop_types_fixture.mli
+
+cat >"$FIXTURE/dev/experiments/_ledger/2026-01-02-catstop.sexp" <<'EOF'
+((date 2026-01-02) (slug catstop) (verdict Reject)
+ (notes "fixture entry for catastrophic_stop_pct"))
+EOF
+cat >"$FIXTURE/dev/experiments/_ledger/2026-01-03-keepaxis.sexp" <<'EOF'
+((date 2026-01-03) (slug keepaxis) (verdict Reject)
+ (notes "fixture entry for enable_test_keepaxis_flag"))
+EOF
+cat >"$FIXTURE/dev/experiments/_ledger/2026-01-04-bare-retire.sexp" <<'EOF'
+((date 2026-01-04) (slug bare-retire) (verdict Reject)
+ (notes "fixture entry for enable_test_bare_retire_flag"))
+EOF
+_git_commit "2026-01-02" "ledger rejects" \
+  dev/experiments/_ledger/2026-01-02-catstop.sexp \
+  dev/experiments/_ledger/2026-01-03-keepaxis.sexp \
+  dev/experiments/_ledger/2026-01-04-bare-retire.sexp
+
+# catastrophic_stop_pct: live spec outside dev/experiments/ -- keeps it
+# NOT ELIGIBLE via live-ref, satisfying checker3's sanity probe.
+echo "((stops_config ((catastrophic_stop_pct 0.10))))" >"$FIXTURE/trading/test_data/live-scenario.sexp"
+_git_commit "2026-01-05" "live spec referencing catastrophic_stop_pct" trading/test_data/live-scenario.sexp
+
+# Both inventoried flags: live-ref CLEAN (referenced only in their own
+# experiment dirs), so their final verdict comes entirely from the
+# inventory classification path under test.
+mkdir -p "$FIXTURE/dev/experiments/keepaxis-grid-2026-01-06"
+echo "((enable_test_keepaxis_flag true))" >"$FIXTURE/dev/experiments/keepaxis-grid-2026-01-06/cell.sexp"
+_git_commit "2026-01-06" "keepaxis flag's own experiment record" dev/experiments/keepaxis-grid-2026-01-06/cell.sexp
+mkdir -p "$FIXTURE/dev/experiments/bare-retire-grid-2026-01-07"
+echo "((enable_test_bare_retire_flag true))" >"$FIXTURE/dev/experiments/bare-retire-grid-2026-01-07/cell.sexp"
+_git_commit "2026-01-07" "bare-retire flag's own experiment record" dev/experiments/bare-retire-grid-2026-01-07/cell.sexp
+
+# The inventory file itself -- mirrors dev/notes/mechanism-flag-inventory-
+# 2026-08-09.md's real enable_continuation_buys row verbatim in shape.
+cat >"$FIXTURE/dev/notes/mechanism-flag-inventory-2026-08-09.md" <<'EOF'
+# Mechanism-flag inventory (fixture)
+
+| `enable_test_keepaxis_flag` | `Weinstein_strategy_config` | `false` | REJECT as default | **KEEP-AXIS -- reclassified 2026-08-13**, see Correction log | Was a RETIRE row; retirement-eligible once the axis program closes. |
+| `enable_test_bare_retire_flag` | `Weinstein_strategy_config` | `false` | REJECT | RETIRE | The canonical do-not-revive case. |
+EOF
+_git_commit "2026-01-08" "add fixture inventory doc" dev/notes/mechanism-flag-inventory-2026-08-09.md
+
+check "checker3: inventory KEEP-AXIS row is NOT ELIGIBLE despite 'RETIRE' appearing in its own prose" 0 "| enable_test_keepaxis_flag | NOT ELIGIBLE (classified KEEP-AXIS) |" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="2026-08-20" sh "$SCRIPT"
+
+check_not "checker3: the KEEP-AXIS flag never prints as bare ELIGIBLE" 0 "| enable_test_keepaxis_flag | ELIGIBLE |" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="2026-08-20" sh "$SCRIPT"
+
+check "checker3: inventory bare-RETIRE (no confirm) row is ELIGIBLE" 0 "| enable_test_bare_retire_flag | ELIGIBLE |" \
   env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="2026-08-20" sh "$SCRIPT"
 
 rm -rf "$FIXTURE"

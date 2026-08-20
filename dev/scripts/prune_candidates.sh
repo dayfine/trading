@@ -61,14 +61,32 @@
 # which universe a scenario measures, it MUST read the scenario's own
 # `universe_path` field, never match on a directory or file name.
 #
-# CITATION SOURCES (checkers 1 and 2 share this definition)
+# CITATION SOURCES (checkers 1 and 2 DELIBERATELY DIFFER -- do not "fix" this
+# back to a shared list; the asymmetry is load-bearing, not an oversight)
 #
-# A file is "cited" if its basename (checker 1) or a directory's basename
-# (checker 2) appears, as a literal substring, in any file under:
-#   dev/experiments/_ledger/, dev/plans/, dev/status/, .claude/, CLAUDE.md
-# Deliberately NOT dev/notes/: notes are exactly the kind of prose write-up
-# whose own liveness is unverified (checker 1's target category is notes),
-# so a mention in a note does not establish that the mentioned thing is live.
+# Both checkers ask "is this basename cited anywhere", but the answer to
+# "does dev/notes/ count as a citation source" is opposite for the two:
+#
+# - Checker 1 (superseded priorities docs): dev/notes/ is EXCLUDED. Its
+#   target category IS dev/notes/ prose write-ups, whose own liveness is
+#   unverified -- one priorities doc mentioning another's filename doesn't
+#   make the mentioned one live, it just means two dead docs cite each
+#   other. Measured: including dev/notes/ here collapses the candidate
+#   count from 84 to 5 (rework iteration 1, 2026-08-20) -- almost every
+#   "citation" was exactly this circularity, not a real reference.
+# - Checker 2 (orphaned experiment dirs): dev/notes/ is INCLUDED. An
+#   experiment dir mentioned in a note (e.g. a trade-forensics writeup, a
+#   next-session-priorities doc) IS a genuine reference -- deleting the dir
+#   breaks that citation, unlike checker 1's self-referential case. Measured:
+#   excluding dev/notes/ here overstated candidates 5x (44 dirs / 292 files
+#   vs. 7 dirs / 58 files with it included; independent hand-verification
+#   landed at 53 files / 18 dirs, corroborating the dev/notes-included
+#   figure once the age-quarantine boundary is also accounted for).
+#
+# Both checkers still share: dev/experiments/_ledger/, dev/plans/,
+# dev/status/, .claude/, CLAUDE.md.
+CITE_DIRS_CHECKER1="dev/experiments/_ledger dev/plans dev/status .claude"
+CITE_DIRS_CHECKER2="dev/experiments/_ledger dev/plans dev/status .claude dev/notes"
 #
 # SCOPING NOTE: every helper below declares its loop/temp variables with
 # `local` (a dash/bash extension, not strict POSIX, but syntax-checked by
@@ -94,7 +112,6 @@ fi
 ROOT="${PRUNE_CANDIDATES_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 TODAY="${PRUNE_CANDIDATES_TODAY:-$(date -u +%Y-%m-%d)}"
 
-CITE_DIRS="dev/experiments/_ledger dev/plans dev/status .claude"
 CITE_FILES="CLAUDE.md"
 
 # Portable YYYY-MM-DD -> epoch seconds. BSD date (macOS, dev machines) and
@@ -120,8 +137,14 @@ _age_days() {
 }
 
 _is_cited() {
-  # $1 = literal substring (a basename) to search for across the shared
-  # citation sources. Returns 0 (cited) if found, 1 (not cited) otherwise.
+  # $1 = literal substring (a basename) to search for.
+  # $2 = space-separated list of citation-source dirs to check (caller
+  #      MUST pass its own list explicitly -- checker 1 and checker 2 use
+  #      different lists; see the CITATION SOURCES header comment above for
+  #      why. There is deliberately no default here: a silently-reused
+  #      default is exactly how a future edit could re-collapse the two
+  #      checkers back onto one shared (and wrong-for-one-of-them) list.)
+  # Returns 0 (cited) if found, 1 (not cited) otherwise.
   #
   # Deliberately `grep -rl`, NOT `find | xargs grep -l`: when a citation-
   # source directory is empty (or has zero matching files), BSD xargs (the
@@ -133,9 +156,10 @@ _is_cited() {
   # would have made every priorities doc / experiment dir look cited, the
   # false-CLEAN direction. `grep -r` has no such empty-input special case on
   # either BSD or GNU grep: zero matches is always exit 1.
-  local needle d dir f fp
+  local needle dirs d dir f fp
   needle="$1"
-  for d in $CITE_DIRS; do
+  dirs="$2"
+  for d in $dirs; do
     dir="$ROOT/$d"
     [ -d "$dir" ] || continue
     if grep -rl -F -- "$needle" "$dir" >/dev/null 2>&1; then
@@ -150,6 +174,103 @@ _is_cited() {
     fi
   done
   return 1
+}
+
+_flag_classification() {
+  # $1 = flag name (already known to have a ledger REJECT and to pass the
+  # live-reference test -- callers should not bother invoking this
+  # otherwise; a live-referenced flag is NOT ELIGIBLE regardless of
+  # classification, per Rule 4's own precedence).
+  #
+  # Prints one of: ELIGIBLE | KEEP-AXIS | KEEP-PROMOTED | DEFER |
+  # NEEDS-CLASSIFICATION -- per experiment-flag-discipline.md Rule 4:
+  # "A REJECT with neither classification is not retirement-eligible --
+  # record the classification first, don't guess it at removal time."
+  # ELIGIBLE requires an explicit, recorded do-not-revive classification;
+  # its absence is NEEDS-CLASSIFICATION, never a default ELIGIBLE.
+  #
+  # PRIMARY SOURCE: the newest dev/notes/mechanism-flag-inventory-*.md
+  # ("newest wins" per experiment-flag-discipline.md's own pointer to this
+  # file as "the retirement worklist"). Rule-4 rework iteration 1
+  # (2026-08-20) found the concrete failure this guards against: a naive
+  # "does 'ELIGIBLE' print" check with no classification test at all
+  # reported `enable_continuation_buys` as ELIGIBLE, when the inventory's
+  # own row for it reads "**KEEP-AXIS -- reclassified 2026-08-13**" --
+  # the flag has an uncancelled regime-gated revival path and is the
+  # Trader preset's config home (dev/plans/continuation-retirement-
+  # 2026-08-13.md). KEEP-type classifications are checked FIRST and
+  # unconditionally, precisely so a flag like this can never fall through
+  # to an eligible-sounding match elsewhere in its own inventory entry
+  # (its row's prose also contains "RETIRE" -- "Was a RETIRE row" -- which
+  # a less careful check could mistake for a live classification).
+  #
+  # FALLBACK (inventory silent on this flag): the flag's own ledger REJECT
+  # file(s), and any dev/agent-memory/project_*.md file(s) they cite, for an
+  # explicit "do-not-revive" marker. This fallback carries a NEGATION GUARD
+  # found necessary during rework: dev/agent-memory/project_continuation_
+  # combined_rejected.md contains the literal substring "do-not-revive"
+  # inside the sentence "No do-not-revive is recorded anywhere, opposite is:
+  # this memory names..." -- a bare substring search over that file would
+  # have reported the flag ELIGIBLE from the exact document explaining why
+  # it is not. The guard excludes any line where a negation word appears
+  # immediately before the phrase.
+  local flag inv_file matches ledger_dir ledger_hits lf mem_names mem mp
+  flag="$1"
+
+  inv_file=$(ls -1t "$ROOT"/dev/notes/mechanism-flag-inventory-*.md 2>/dev/null | head -1)
+  if [ -n "$inv_file" ]; then
+    matches=$(grep -F -- "$flag" "$inv_file" 2>/dev/null)
+  else
+    matches=""
+  fi
+
+  if [ -n "$matches" ]; then
+    if printf '%s\n' "$matches" | grep -qE 'KEEP-PROMOTED'; then
+      echo "KEEP-PROMOTED"
+      return
+    fi
+    if printf '%s\n' "$matches" | grep -qE 'KEEP-AXIS|(->|→)[[:space:]]*KEEP\b'; then
+      echo "KEEP-AXIS"
+      return
+    fi
+    if printf '%s\n' "$matches" | grep -qE '\bDEFER\b'; then
+      echo "DEFER"
+      return
+    fi
+    if printf '%s\n' "$matches" \
+      | grep -viE '(not|likely|un)[[:space:]]*eligible' \
+      | grep -qiE '\beligible\b'; then
+      echo "ELIGIBLE"
+      return
+    fi
+    if printf '%s\n' "$matches" | grep -qE '\bRETIRE\b' \
+      && ! printf '%s\n' "$matches" | grep -qE 'RETIRE[[:space:]]*\(confirm\)'; then
+      echo "ELIGIBLE"
+      return
+    fi
+  fi
+
+  ledger_dir="$ROOT/dev/experiments/_ledger"
+  ledger_hits=$(find "$ledger_dir" -name '*.sexp' 2>/dev/null | xargs grep -l -F -- "$flag" 2>/dev/null)
+  for lf in $ledger_hits; do
+    if grep -iE 'do.not.revive' "$lf" 2>/dev/null \
+      | grep -viE '(no|not|isn.t|opposite of)[[:space:]]+do.not.revive' | grep -q .; then
+      echo "ELIGIBLE"
+      return
+    fi
+    mem_names=$(grep -oE 'project_[a-z0-9_]+' "$lf" 2>/dev/null | sort -u)
+    for mem in $mem_names; do
+      mp="$ROOT/dev/agent-memory/${mem}.md"
+      [ -f "$mp" ] || continue
+      if grep -iE 'do.not.revive' "$mp" 2>/dev/null \
+        | grep -viE '(no|not|isn.t|opposite of)[[:space:]]+do.not.revive' | grep -q .; then
+        echo "ELIGIBLE"
+        return
+      fi
+    done
+  done
+
+  echo "NEEDS-CLASSIFICATION"
 }
 
 # ----------------------------------------------------------------------------
@@ -193,7 +314,7 @@ checker1() {
   for f in $all_docs; do
     [ "$f" = "$newest" ] && continue
     older_count=$((older_count + 1))
-    if _is_cited "$f"; then
+    if _is_cited "$f" "$CITE_DIRS_CHECKER1"; then
       cited_others=$((cited_others + 1))
       continue
     fi
@@ -276,7 +397,7 @@ checker2() {
     fi
     age=$(_age_days "$cdate")
     [ "$age" -lt 30 ] && continue
-    _is_cited "$base" && continue
+    _is_cited "$base" "$CITE_DIRS_CHECKER2" && continue
     fcount=$(find "$ROOT/$d" -type f | wc -l | tr -d ' ')
     candidates="$candidates$d|$fcount|$age|$cdate
 "
@@ -334,8 +455,8 @@ checker3() {
   local strategy_mli direct_flags dotted_leaves leaf default_line
   local nested_flags all_flags flag ledger_hits has_reject lf
   local spec_hits live_specs total_specs sf rel
-  local ml_hits live_ml
-  local report eligible_count not_eligible_count probed_catstop verdict
+  local ml_hits live_ml classification
+  local report eligible_count not_eligible_count needs_class_count probed_catstop verdict
   local catstop_line catstop_live
 
   strategy_mli="$ROOT/trading/trading/weinstein/strategy/lib/weinstein_strategy_config.mli"
@@ -373,6 +494,7 @@ checker3() {
   report=""
   eligible_count=0
   not_eligible_count=0
+  needs_class_count=0
   probed_catstop=0
   for flag in $all_flags; do
     # Must have a ledger REJECT to be in Rule-4 scope at all.
@@ -417,9 +539,28 @@ checker3() {
         | grep -c . || true)
     fi
 
+    # Live-reference is a hard gate, checked BEFORE classification: a flag
+    # with any live spec or .ml reference is NOT ELIGIBLE no matter what a
+    # do-not-revive record says (Rule 4's "Unused" precondition). Only when
+    # live-reference is clean does the do-not-revive CLASSIFICATION even
+    # get consulted -- see _flag_classification's header for why a REJECT
+    # with no recorded classification must never default to ELIGIBLE.
     if [ "$live_specs" -eq 0 ] && [ "$live_ml" -eq 0 ]; then
-      eligible_count=$((eligible_count + 1))
-      verdict="ELIGIBLE"
+      classification=$(_flag_classification "$flag")
+      case "$classification" in
+      ELIGIBLE)
+        eligible_count=$((eligible_count + 1))
+        verdict="ELIGIBLE"
+        ;;
+      KEEP-AXIS | KEEP-PROMOTED | DEFER)
+        not_eligible_count=$((not_eligible_count + 1))
+        verdict="NOT ELIGIBLE (classified $classification)"
+        ;;
+      *)
+        needs_class_count=$((needs_class_count + 1))
+        verdict="NEEDS-CLASSIFICATION"
+        ;;
+      esac
     else
       not_eligible_count=$((not_eligible_count + 1))
       verdict="NOT ELIGIBLE"
@@ -448,7 +589,7 @@ checker3() {
 
   echo "## Checker 3 -- Rule-4 flag eligibility"
   echo
-  echo "Flags with a ledger REJECT: $((eligible_count + not_eligible_count)) (eligible: $eligible_count, not eligible: $not_eligible_count)."
+  echo "Flags with a ledger REJECT: $((eligible_count + not_eligible_count + needs_class_count)) (eligible: $eligible_count, not eligible: $not_eligible_count, needs classification: $needs_class_count)."
   echo
   if [ -n "$report" ]; then
     echo "| flag | eligibility | total specs | live specs | live .ml assignments |"
