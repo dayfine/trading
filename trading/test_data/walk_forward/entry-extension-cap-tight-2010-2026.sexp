@@ -4,7 +4,12 @@
 ;;   - live (dev/weekly-picks/live-config-overrides.sexp) uses 15.0, eyeballed
 ;;     off ONE day's picks ("3 of that day's 20 were past it: CRNX +43.7%,
 ;;     MBX +34.5%, SAFT +26.0%").
-;;   - all 82 committed backtest specs use 2.0, which propagated by spec-copying.
+;;   - 81 of the 89 committed sexp occurrences use 2.0, which propagated by
+;;     spec-copying. (Corrected 2026-08-19: this line said "all 82 specs" and
+;;     both halves were wrong. The other 8: live at 15.0 x2, the
+;;     staging-record-convention cap15 / estop15 / trigonly specs at
+;;     15.0/15.0/1000.0, and the 2026-08-04 ledger surface's own axis values
+;;     10.0/15.0/20.0.)
 ;; The 2026-08-04 ledger surface tested {10, 15, 20} and found them near
 ;; identical and all worse than uncapped Market fills. 2.0 was never in it, so
 ;; "cap-insensitivity" is established between 10 and 20 and says NOTHING about
@@ -23,8 +28,19 @@
 ;; !! RESULT 2026-08-19: the prediction that once stood here -- fewer trades and
 ;; LOWER return -- was WRONG IN DIRECTION. The axis found TIGHTER IS BETTER on
 ;; every metric: 1.0 beat baseline(=2.0) on return, Sharpe, MaxDD and Calmar,
-;; winning Calmar 13/16 and MaxDD 15/16, while 5/10/15 all trailed 2.0. Live's
-;; 15.0 was the WORST value tested.
+;; winning Calmar 13/16 and MaxDD 15/16, while 5/10/15 all trailed 2.0 on
+;; return, Sharpe and Calmar (NOT on mean MaxDD, where 10.0's 9.6206 and 15.0's
+;; 9.6305 both beat 2.0's 9.7438 -- an early instance of the drawdown inversion
+;; the 3-year control makes unmissable).
+;;
+;; (This block used to end "Live's 15.0 was the WORST value tested." That is
+;; FALSE and is corrected here rather than deleted. On this 1-year surface 5.0
+;; is worse than 15.0 on every mean -- return 6.4359 vs 6.6796, Sharpe 0.5142 vs
+;; 0.5505, MaxDD 9.7751 vs 9.6305, Calmar 1.0365 vs 1.2542 -- and 15.0 is worst
+;; only on the Calmar WIN-COUNT, where it ties 10.0 at 3/16. The claim was
+;; uncheckable when written because #2411 merged this spec without its outputs;
+;; dev/experiments/entry-cap-horizon-2026-08-19/aggregate_1y.sexp now carries
+;; them, which is how it was caught. 5.0 is the worst value on BOTH horizons.)
 ;;
 ;; !! BUT THIS DESIGN IS BIASED TOWARD THAT ANSWER. test_days=365 gives ONE-YEAR
 ;; folds. A tighter cap's failure mode is a NO-FILL, which forgoes the stock's
@@ -37,6 +53,19 @@
 ;; DO NOT promote a value off this spec as written. Re-run at test_days 1095+,
 ;; record per-arm trade COUNT and max single-trade P&L, then the confirmation
 ;; grid. See #2404.
+;;
+;; !! HORIZON CONTROL RAN 2026-08-19 (entry-extension-cap-3y-folds-2010-2026.sexp,
+;; 5 disjoint 3-year folds, same base, wall 1543s): THE TIGHT-CAP RESULT DOES NOT
+;; SURVIVE. At 3-year folds 1.0 falls BELOW baseline on return (43.76 vs 45.49),
+;; Sharpe (0.961 vs 0.998) and Calmar (1.002 vs 1.033); every variant FAILS the
+;; 3-of-5 Calmar gate; and the MaxDD advantage inverts -- the lowest mean
+;; drawdown now belongs to the LOOSE caps 10.0/15.0 (12.60 vs baseline 14.42).
+;; The bias this header predicted is the whole effect. Full writeup:
+;; dev/experiments/entry-cap-horizon-2026-08-19/README.md.
+;;
+;; The trade-count question (fewer positions vs better picks) is STILL open and
+;; is a harness gap, not a measurement to re-run: fold_actual carries no trade
+;; count. Filed as #2412.
 ;;
 ;; This surface is run for FIDELITY, not to find a return winner. The user
 ;; directive (2026-08-19) is that the backtest should model what live does; the
