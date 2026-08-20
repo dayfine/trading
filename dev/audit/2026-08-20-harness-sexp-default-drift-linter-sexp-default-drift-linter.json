@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-20",
+  "feature": "sexp-default-drift-linter",
+  "branch": "harness/sexp-default-drift-linter",
+  "sha": "394069bead",
+  "recorded_at_ns": 1787234056402814786,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "LINTER_CANDIDATE: a self-test asserting a scanned/compared coverage floor would mechanically catch silent narrowing like min_group_fields=6 (drops 67.5% of records). Also ONGOING_REVIEW: the linter prints OK/exit 0 on an empty dir and silently skips unparseable files.",
+  "quality_score": 2,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": "New AST-based linter closing the sexp.default cross-declaration drift class (#2384/#2388). Structural APPROVED (5) passed min_group_fields=6 as a benign named constant; behavioral measured it as a 67% coverage cut that buys zero precision on the current tree. Rework dispatched."
+}
