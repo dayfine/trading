@@ -16,9 +16,16 @@ rather than to fill-price perturbation:
 
 At 5y the trade SET is identical across path seeds — the same (symbol,
 entry_date) pairs every time. ⚠ An earlier version said "bit-identical", which
-is wrong and which this document elsewhere contradicts: **454 of 480 control
-rows differ** between salts (`pnl_dollars` 94.6%, `entry_price` 74.2%,
-`quantity` 65.0%). The seed moves fill prices *within* a fixed trade set, which
+is wrong and which this document elsewhere contradicts. Per salt pair, joined on
+`(symbol, entry_date)` over n=240: **227 of 240 rows (94.6%) differ** for
+s0-vs-s1 and **228 (95.0%)** for s0-vs-s2; per field on s0-vs-s1,
+`pnl_dollars` 94.6% / `entry_price` 74.2% / `quantity` 65.0%. Pooled across both
+pairs that is 455 of 480.
+
+⚠ An earlier version said "454 of 480", which was **227 doubled** — one pair
+counted twice and mislabelled as the pooled figure, the same double-count this
+PR corrects in the divergence metric. It escaped notice because 454/480 =
+94.58% is accidentally within rounding of the true 94.6% per-pair rate. The seed moves fill prices *within* a fixed trade set, which
 is exactly why the control still has a 0.99pp return null. At 26y the seed
 re-rolls a large fraction of *which trades happen* — a different channel
 entirely. ⚠ The table above quotes #2436 as it read at the time; both records
@@ -186,7 +193,17 @@ Both readings require *some* binding admission constraint, so the sufficiency
 result below survives either way. But which one operates decides whether the
 forward guidance generalises, and this run does not separate them. Separating
 them needs a cell that raises admission pressure **without** changing size
-dispersion — e.g. holding sizing fixed and cutting starting capital.
+dispersion.
+
+⚠ **Not by cutting starting capital**, which an earlier version proposed: there
+is no capital field in `trading/trading/backtest/scenarios/scenario.mli` —
+`initial_cash` is a module constant (`trading/trading/backtest/lib/runner.ml:14`,
+`let initial_cash = 1_000_000.0`) and is unreachable from `config_overrides`.
+The spec-expressible equivalents are lowering `max_long_exposure_pct` or raising
+`min_cash_pct`, both of which raise admission pressure at fixed per-position
+sizing — and both are already set in this PR's own spec
+(`specs/contention-tight.sexp:60-61`), so the next session should vary them
+rather than start by patching the runner.
 
 ## Cell metrics
 
