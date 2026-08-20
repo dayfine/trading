@@ -106,27 +106,65 @@ noisier on breadth; **MaxDD gets 2.3× more stable.**
 | ulcer | −0.985 | −1.381 | −2.265 | **0.88×** / 1.2× / 2.0× | direction holds 3/3; s0 inside its null |
 | return | −6.219 | −16.576 | **+7.826** | — | sign flips |
 | Sharpe | −0.078 | −0.221 | **+0.089** | — | sign flips |
-| win rate | +3.318 | **−3.068** | +2.196 | — | sign flips |
+| **win rate** | +3.318 | **−3.068** | +2.196 | s1 = **2.24×** null | **sign flips — see below, this one is a CONTRADICTION** |
 | trades | −5 | **+4** | −12 | — | sign flips |
 | holding days | −0.317 | −4.965 | **+1.204** | — | sign flips |
+| sortino | −0.1061 | −0.2990 | **+0.1308** | — | sign flips |
+| calmar | −0.0351 | −0.1001 | **+0.0497** | — | sign flips |
 
-Per pre-registration item 2, every metric is reported, including the failures.
+Every performance metric present in the committed `actual.sexp` files is listed,
+per pre-registration item 2. Sortino and calmar were omitted from the first
+version of this table under a heading claiming completeness; both sign-flip, so
+nothing favourable was hidden, but the omitted class was exactly the one the
+pre-registration singled out.
+
+**⚠ The nulls are max−min of three draws**, which is a downward-biased estimate
+of the true spread — a wider null makes every ratio smaller. #2436 carried this
+caveat and licensed dropping it on a 12.31× margin. It is restored here because
+this cell's weakest passing leg is **1.4×** and the mechanism headline (0.44×)
+is a ratio of two such estimates quoted to 4 s.f. The retraction does not depend
+on it; "MaxDD passes outright" does.
 
 ## Verdict — branch 2 fires: the reversal was the UNIVERSE, not the period
 
-`Range_top_breakout` does **not** reverse on broad-5y. MaxDD passes Rule 4
-outright; ulcer holds its direction at all three salts. #2436 reported the 5y
-cell reversing **all five** metrics — at the same period on a broad universe,
-the two that survived at 26y do not reverse.
+`Range_top_breakout` does **not** reverse on broad-5y in the way #2436
+described — that cell reported all five metrics reversing, and here they do not.
+
+**But "the metrics that survived at 26y hold" is false, and the precise count
+matters.** Three metrics cleared Rule 4 at 26y (ulcer 1.43×, win rate 1.96×,
+MaxDD 1.02×), not two. Of those three, on broad-5y:
+
+| 26y Rule-4 survivor | broad-5y |
+|---|---|
+| MaxDD | **holds** — passes Rule 4 here too, 14.9× / 1.4× / 19.3× |
+| ulcer | **direction holds** 3/3, but s0 sits inside its null (0.88×) |
+| **win rate** | **CONTRADICTED** — sign flips, and s1's −3.068pp is **2.24×** its own null |
+
+So this cell does not simply fail to reverse; it **splits** the 26y result.
 
 Consequences, as pre-registered:
 
 - **#2436's headline claim is wrong as stated** and is retracted; see the
   correction appended to `dev/experiments/rt-freshness-5y-null-2026-08-20/README.md`.
-- **#2433's 26y result stands un-contradicted**, now at 2 cells agreeing on
-  MaxDD rather than 1 cell contradicted.
+- **#2433's drawdown finding is not contradicted** — MaxDD now agrees across
+  both windows. **Its win-rate leg IS contradicted** and should no longer be
+  quoted as a Rule-4 survivor without this cell's counter-evidence. An earlier
+  version of this section said "#2433's 26y result stands un-contradicted",
+  which was false.
 - `Range_top_breakout` is still **not promotable** — nothing here changes that,
   and see the scope caveat immediately below.
+
+### The design supports a stronger claim than the first version made
+
+Comment-stripped spec diffs (verified by qc-behavioral, #2448):
+
+- `broad5y-00-core` vs the **sp500-5y** core — differ only in name/description/
+  `universe_path`/`universe_size`. **Period byte-identical ⇒ universe-only leg.**
+- `broad5y-00-core` vs the **26y** core — differ only in name/description/
+  `period`/`universe_path`. **⇒ period-only leg.**
+
+This is a **two-leg decomposition**, not a single comparison, and both legs point
+the same way. The first version of this writeup under-claimed it.
 
 ## ⚠ Amendment to the pre-registration's scope claim
 
@@ -159,9 +197,17 @@ might be a low-power artefact of the horizon. It is not a horizon artefact — i
 is a property of **breadth**, and it moves in opposite directions for the two
 metric families.
 
-It also states the cost of the universe error concretely: on sp500-5y a −6pp
-gap sits at 6× a 0.99pp null and reads as decisive; against the true broad null
-of 14.65pp the same gap is invisible.
+It also states the cost of the universe error concretely. On sp500-5y the
+measured return gap was **−67.20pp against a 0.9862pp null — 68×**, which reads
+as overwhelming. The same *arm* on broad-5y produces gaps of −6.219 / −16.576 /
+**+7.826** pp against a 14.650pp null: two inside the null and a sign flip.
+
+An earlier version of this paragraph wrote "on sp500-5y a −6pp gap sits at 6× a
+0.99pp null." That mislabelled scope — −6.219pp is *this* cell's s0 figure, not
+the sp500 cell's, whose gap was an order of magnitude larger. It also called
+14.65pp "the true null", which is wrong: **0.9862pp was the correct null for
+sp500-500.** The error was never the null; it was measuring on a surface whose
+result does not generalise.
 
 ## Run notes — two harness defects hit during this run
 

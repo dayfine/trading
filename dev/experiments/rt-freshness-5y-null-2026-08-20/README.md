@@ -13,9 +13,16 @@
 >
 > **What settled it:** `../rt-freshness-broad5y-2026-08-20/` re-ran the same
 > six-cell design at the **same period** on **top-3000 PIT-2019**, isolating the
-> universe axis. `Range_top_breakout` does **not** reverse there — MaxDD passes
-> Rule 4 at all three salts (14.9× / 1.4× / 19.3× its null) and ulcer holds its
-> direction 3-of-3. **The reversal was a universe effect, not a period effect.**
+> universe axis. `Range_top_breakout` does **not** reverse there in the way this
+> cell reported — MaxDD passes Rule 4 at all three salts (14.9× / 1.4× / 19.3×
+> its null) and ulcer holds its direction 3-of-3. **The reversal was a universe
+> effect, not a period effect.**
+>
+> Stated precisely, because the count matters: **three** metrics cleared Rule 4
+> at 26y (ulcer, win rate, MaxDD). On broad-5y MaxDD holds, ulcer holds its
+> direction, and **win rate is contradicted** — it flips sign, with s1 at 2.24×
+> its own null. So the broad cell **splits** the 26y result rather than simply
+> confirming it.
 >
 > **The measured cause.** The nulls do not transfer between universes, and they
 > do not even move in the same *direction* per metric:
@@ -33,10 +40,14 @@
 > of 14.65pp the same gap is invisible.
 >
 > **What still stands.** The null-measurement *method* is sound and the numbers
-> in this file are correct as measurements of the sp500-500 testbed. What does
-> not stand is any inference from them about `Range_top_breakout`, or about the
-> 26y result. #2433's 26y finding is **not** contradicted; it now has a second
-> cell agreeing with it on MaxDD.
+> in this file are correct as measurements of the sp500-500 testbed — **0.9862pp
+> was the right return null for sp500-500.** The error was never the null; it was
+> measuring on a surface whose result does not generalise. What does not stand is
+> any inference from these numbers about `Range_top_breakout`.
+>
+> #2433's **drawdown** finding is not contradicted — MaxDD now agrees across both
+> windows. Its **win-rate** leg is contradicted by the broad cell and should not
+> be quoted as a Rule-4 survivor without that counter-evidence.
 >
 > **Rule that came out of it:** `.claude/rules/universe-discipline.md` (#2444) —
 > sp500 is a sanity-check / rule-validation fixture, never a measurement
