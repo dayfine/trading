@@ -29,9 +29,13 @@ decision (`.claude/rules/pr-merge-gates.md` Rule 0).
 | **#2434** | merged (by cron) | daily orchestrator record |
 | **#2435** | merged | re-lands corrections to #2434 that the cron's merge stranded |
 | **#2433** | **HELD** | 26y rt-freshness A/B, reworked 3× |
-| **#2436** | open, CI green | the 5y null measurement |
-| **#2437** | open | `prior_cell_check` tooling |
-| **#2438** | open | contention test — the mechanism, confirmed |
+| **#2436** | merged | the 5y null measurement |
+| **#2439** | merged | this priorities doc |
+| **#2437** | merged | `prior_cell_check` tooling — 11 mutation-verified cases, wired into `dune runtest` |
+| **#2441** | merged | scope-labelling follow-up to #2436 |
+| **#2438** | merged | contention test |
+| **#2442** | open (docs, CI only) | four residuals from #2438's final review, one a semantic inversion |
+| **#2440** | open issue | `record_qc_audit_test` scenario 22 — confirmed intermittent, not a latent red main |
 
 ## The strategy findings, in order of how much they should change future work
 
@@ -126,9 +130,34 @@ throughout; the interpretive layer did not.
 
 ## Suggested order next session
 
-1. **Decide #2433** (P0 above) — one judgement call, then merge or rework.
-2. **Merge #2438** (contention) — it confirms, not falsifies, so #2436 needs no correction on that point.
-3. **Merge #2436 / #2437** through the normal gates.
-4. **The ledger audit** from finding 1 — the highest-value unexplored item, and
+1. **Decide #2433** (P0 above) — one judgement call, then merge or rework. It is
+   the only thing blocked on a human.
+2. **Merge #2442** if CI is green (docs-only, gates skipped).
+3. **The ledger audit** from finding 1 — the highest-value unexplored item, and
    it re-reads existing records rather than spending container time.
+4. **Run the contention discriminating cell**, now that #2438 identifies the
+   knob: `max_long_exposure_pct_entry`, calibrated **below** the arm's realized
+   committed-long fraction (the six existing specs set 1.0, which does not
+   bind). It separates admission-funding contention from the concentration
+   explanation that #2438 leaves live.
 5. Only then new mechanism work.
+
+## What this session cost, and the process lessons that came out of it
+
+Nine PRs merged; **every substantive correction came from a reviewer, not from
+me**, and each made the result narrower and more accurate. Four durable notes
+were written, all reachable from `MEMORY.md`:
+
+- **Corrections have a base rate.** Four consecutive PR-body edits introduced
+  three new errors. Past ~2 passes on a passage, record the residual instead —
+  and when you must touch it, **delete rather than rewrite**.
+- **Coverage counts per shape, not per element.** The false-OK in
+  `prior_cell_check` lived in the element with the *most* tests. Deletion-
+  mutation cannot detect a too-narrow predicate; only widening can.
+- **Check memory before claiming what code does.** Four wrong knob claims in a
+  row while `project_envelope_knobs_dead` answered all of them. A **negative**
+  existence claim needs a stated search surface.
+- **Rework the PR body too** — squash-merge makes it `main`'s commit message.
+
+The measurements held up under independent re-derivation throughout. What
+repeatedly failed was the step from measurement to sentence.
