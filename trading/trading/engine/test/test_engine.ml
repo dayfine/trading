@@ -940,6 +940,40 @@ let test_blocked_count_accumulates_across_bars _ =
     (stop_limit_blocked_count engine)
     (all_of [ equal_to 2; ge (module Int_ord) after_first_bar ])
 
+let test_blocked_count_survives_a_later_fill _ =
+  (* The clause that makes the tally an UPPER BOUND on distinct refused tickets
+     rather than a count of them: a ticket blocked on one bar and filled on a
+     later bar still contributes its one block. Every other tally test is
+     block-only or fill-only, so a [Fills] branch that reset the counter would
+     pass all of them while reporting only the blocks since the last fill —
+     neither an upper bound nor a count, and systematically under-reporting the
+     cap's cost for exactly the tickets that later recover. *)
+  let path_config = { default_config with seed = Some 42 } in
+  let engine, order_mgr, order =
+    setup_order_test
+      ~order_type:(StopLimit (110.0, 117.0))
+      ~side:Buy ~time_in_force:GTC
+      ~quote:
+        (make_bar "AAPL" ~open_price:120.0 ~high_price:130.0 ~low_price:118.0
+           ~close_price:125.0)
+      ()
+  in
+  (* Bar 1: the stop triggers at 120.0 but the whole bar stays above the 117.0
+     limit, so the ticket is refused and — being GTC — stays active. *)
+  assert_order_not_executed engine order_mgr;
+  assert_that (stop_limit_blocked_count engine) (equal_to 1);
+  (* Bar 2: opens at 112.0 — past the 110.0 stop and inside the 117.0 limit — so
+     the same still-active ticket fills. Pinning the fill matters as much as
+     pinning the count: a variant where the order silently failed to fill would
+     assert nothing about what a fill does to the tally. *)
+  update_market ~path_config engine
+    [
+      make_bar "AAPL" ~open_price:112.0 ~high_price:116.0 ~low_price:111.0
+        ~close_price:115.0;
+    ];
+  assert_order_executed engine order_mgr order ~price:112.0;
+  assert_that (stop_limit_blocked_count engine) (equal_to 1)
+
 let test_sell_stop_limit_gap_down_fills_at_open _ =
   (* Gap down with stop-limit: stop triggers, limit allows open price *)
   let bar =
@@ -1294,6 +1328,8 @@ let suite =
          >:: test_blocked_count_is_fresh_per_engine;
          "test_blocked_count_accumulates_across_bars"
          >:: test_blocked_count_accumulates_across_bars;
+         "test_blocked_count_survives_a_later_fill"
+         >:: test_blocked_count_survives_a_later_fill;
          "test_sell_stop_limit_gap_down_fills_at_open"
          >:: test_sell_stop_limit_gap_down_fills_at_open;
          "test_sell_stop_limit_gap_down_limit_not_reached"
