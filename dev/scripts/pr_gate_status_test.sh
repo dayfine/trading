@@ -178,8 +178,65 @@ Ran out of budget before reaching a verdict."
 check "missing verdict section is unclear, not a crash" \
   unclear "$(_gate "$(reviews "$NO_VERDICT_SECTION")" behavioral "$TIP")"
 
+# --- Cases 12-14: the three leaks qc-behavioral found still open after the
+# --- first rework. Each is the SAME false-green as case 10, in a notation the
+# --- fence stripper or the verdict regex did not cover.
+
+# 12. A `~~~` fence is still a fence.
+TILDE_FENCED="Reviewed SHA: 7dc57cc06
+
+## Structural QC — quoting with tildes
+
+~~~
+## Behavioral QC — some other PR
+## Verdict
+APPROVED
+~~~
+
+## Verdict
+
+APPROVED"
+
+check "tilde-fenced heading does not satisfy the quoted gate" \
+  none "$(_gate "$(reviews "$TILDE_FENCED")" behavioral "$TIP")"
+
+# 13. An indented fence is still a fence.
+INDENTED_FENCE="Reviewed SHA: 7dc57cc06
+
+## Structural QC — quoting inside a list item
+
+    \`\`\`
+    ## Behavioral QC — some other PR
+    \`\`\`
+
+## Verdict
+
+APPROVED"
+
+check "indented-fence heading does not satisfy the quoted gate" \
+  none "$(_gate "$(reviews "$INDENTED_FENCE")" behavioral "$TIP")"
+
+# 14. An INDENTED verdict heading is a quotation, not this review's verdict.
+#     No fence at all here -- four spaces is how a quoted block often arrives.
+INDENTED_VERDICT="Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — quoting the prior verdict inline
+
+The prior review ended:
+
+    ## Verdict
+
+    APPROVED
+
+## Verdict
+
+NEEDS_REWORK"
+
+check "indented Verdict heading does not supply the verdict" \
+  rework "$(_gate "$(reviews "$INDENTED_VERDICT")" behavioral "$TIP")"
+
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"
   exit 1
 fi
-printf 'OK: pr_gate_status -- %d tests clean.\n' 12
+printf 'OK: pr_gate_status -- %d tests clean.\n' 15

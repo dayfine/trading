@@ -75,10 +75,16 @@ _gate() {
     # Drop fenced blocks before any heading match. Line-wise rather than a
     # multiline regex so an unterminated fence degrades to "ignore the rest"
     # instead of matching across the whole body.
+    # Both fence spellings, and any indent. Matching only ``` at <=3 spaces let
+    # a ~~~ fence or a 4-space-indented one leak a quoted heading straight back
+    # through -- the same false-green this function exists to stop, one notation
+    # over. An indented fence is not a fence in strict CommonMark, but a review
+    # body is prose, and being over-eager here can only produce a false RED
+    # (an ignored verdict reads "unclear"), never a false green.
     def strip_fences:
       split("\n")
       | reduce .[] as $l ({out: [], inside: false};
-          if ($l | test("^ {0,3}```")) then .inside = (.inside | not)
+          if ($l | test("^ *(```|~~~)")) then .inside = (.inside | not)
           elif .inside then .
           else .out += [$l] end)
       | .out | join("\n");
@@ -100,7 +106,10 @@ _gate() {
         # produced, jq would exit 5, and -- because the caller assigns bare
         # under `set -eu` -- the whole run would die mid-table. That also made
         # the inline "Verdict:" fallback and the "unclear" branch unreachable.
-        | ( ($clean | capture("(?is)#+ +Verdict[ *`\\n]+(?<v>APPROVED|NEEDS_REWORK)").v)
+        # `^` anchor on the Verdict heading: without it, an INDENTED quotation
+        # of another review (four spaces, so not a fence at all) supplied this
+        # gate its verdict.
+        | ( ($clean | capture("(?ism)^#+ +Verdict[ *`\\n]+(?<v>APPROVED|NEEDS_REWORK)").v)
             // ($clean | capture("(?i)Verdict:[ *`]*(?<v>APPROVED|NEEDS_REWORK)").v)
             // "" ) as $raw
         | (if $raw == "NEEDS_REWORK" then "rework"
