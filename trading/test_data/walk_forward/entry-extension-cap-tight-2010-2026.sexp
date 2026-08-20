@@ -28,8 +28,16 @@
 ;; !! RESULT 2026-08-19: the prediction that once stood here -- fewer trades and
 ;; LOWER return -- was WRONG IN DIRECTION. The axis found TIGHTER IS BETTER on
 ;; every metric: 1.0 beat baseline(=2.0) on return, Sharpe, MaxDD and Calmar,
-;; winning Calmar 13/16 and MaxDD 15/16, while 5/10/15 all trailed 2.0. Live's
-;; 15.0 was the WORST value tested.
+;; winning Calmar 13/16 and MaxDD 15/16, while 5/10/15 all trailed 2.0.
+;;
+;; (This block used to end "Live's 15.0 was the WORST value tested." That is
+;; FALSE and is corrected here rather than deleted. On this 1-year surface 5.0
+;; is worse than 15.0 on every mean -- return 6.4359 vs 6.6796, Sharpe 0.5142 vs
+;; 0.5505, MaxDD 9.7751 vs 9.6305, Calmar 1.0365 vs 1.2542 -- and 15.0 is worst
+;; only on the Calmar WIN-COUNT, where it ties 10.0 at 3/16. The claim was
+;; uncheckable when written because #2411 merged this spec without its outputs;
+;; dev/experiments/entry-cap-horizon-2026-08-19/aggregate_1y.sexp now carries
+;; them, which is how it was caught. 5.0 is the worst value on BOTH horizons.)
 ;;
 ;; !! BUT THIS DESIGN IS BIASED TOWARD THAT ANSWER. test_days=365 gives ONE-YEAR
 ;; folds. A tighter cap's failure mode is a NO-FILL, which forgoes the stock's
