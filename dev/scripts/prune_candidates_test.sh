@@ -174,11 +174,21 @@ _git_commit "2026-05-05" "cite the dir from a dev/notes writeup (checker2-only c
 # --- Checker 3 fixture: strategy config + ledger + specs --------------------
 cat >"$FIXTURE/trading/trading/weinstein/strategy/lib/weinstein_strategy_config.mli" <<'EOF'
 type config = {
-  enable_test_dead_flag : bool; [@sexp.default false]
-      (** A direct default-off flag, tab-indented below to also pin
-          [[:space:]] matching indented/tabbed declarations that a
-          non-portable `\s` pattern (BSD grep does not expand `\s` inside a
-          POSIX/extended regex) would silently miss. *)
+	enable_test_dead_flag : bool; [@sexp.default false]
+      (** A direct default-off flag, deliberately TAB-indented. This is the
+          line checker 3's anchored grep scans, so the tab pins that the
+          leading-whitespace class is tab-tolerant: mutating
+          [^[[:space:]]*] to [^ *] turns 26/0 into 23/3.
+
+          Keep the tab. An earlier version of this fixture was
+          space-indented while its comment claimed otherwise, so the
+          tab-hostile mutant still shipped 26/0 — the assertion existed in
+          four places and was pinned in none.
+
+          Note (not testable here): [[:space:]] is also the portable choice
+          because BSD grep does not expand [\s] in a POSIX/extended regex.
+          CI cannot pin that — GNU grep in the container does expand it — so
+          tab tolerance is the property this fixture actually proves. *)
   enable_test_unclassified_flag : bool; [@sexp.default false]
       (** A flag with a ledger REJECT but NO recorded do-not-revive
           classification anywhere (no inventory row, no ledger/memory
@@ -315,7 +325,7 @@ check_not "checker2: citation excludes an old-but-cited dir even though it is ol
 check_not "checker2: a dir cited only via dev/notes is NOT proposed" 0 "notes-only-cited-2026-05-04" \
   env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="$TODAY" sh "$SCRIPT"
 
-check "checker3: [[:space:]] matches a tab-indented flag declaration" 0 "enable_test_dead_flag" \
+check "checker3: anchored flag grep tolerates a TAB-indented declaration" 0 "enable_test_dead_flag" \
   env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY="$TODAY" sh "$SCRIPT"
 
 # total specs = 2: the grid cell AND the ledger entry itself (its notes

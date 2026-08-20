@@ -37,9 +37,19 @@
 # bill of health ("every flag already unreferenced, safe to remove"). A
 # checker whose match primitive is broken must not be allowed to report an
 # empty-therefore-safe result; it must say so and stop. This is why every
-# regex below uses the POSIX bracket class [[:space:]], never \s, and why
-# every checker's very first move re-derives a fact this file's own
-# comments assert is true today and refuses to proceed if it isn't.
+# checker's very first move re-derives a fact this file's own comments
+# assert is true today, and refuses to proceed if it isn't.
+#
+# Every regex below uses the POSIX bracket class [[:space:]], never \s,
+# because BSD grep does not expand \s inside a POSIX/extended regex and a
+# \s pattern there matches nothing -- which for a checker means reporting
+# "found none", i.e. a false clean bill of health.
+#
+# What the suite can actually pin is TAB TOLERANCE, not the absence of \s:
+# GNU grep in the CI container does expand \s, so the portability rule
+# itself is unreachable from a test. The checker-3 fixture is therefore
+# tab-indented on the line the anchored grep scans; mutating
+# ^[[:space:]]* to ^ * turns 26/0 into 23/3. Do not "simplify" that tab.
 #
 # QUARANTINE (checker 2 only)
 #
