@@ -714,3 +714,15 @@
  (deps _check_lib.sh check_universe_deps.sh (universe))
  (action
   (run sh %{dep:check_universe_deps_test.sh})))
+
+; prior_cell_check test (2026-08-20): dev/scripts/prior_cell_check.sh guards
+; against claiming a metric unmeasured when a committed results file already
+; carries it -- the qc-behavioral B3 finding on PR #2433. Same shim + (universe)
+; pattern as docker_dune_smoke.sh: the script lives outside the dune workspace
+; root and is resolved via repo_root() at run time.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:prior_cell_check_test_runner.sh})))
