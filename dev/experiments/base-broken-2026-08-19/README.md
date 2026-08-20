@@ -37,7 +37,9 @@ flag + walk-forward surface #2407 proposes.
 
 Established this session and recorded in
 `project_stale_order_fills_are_not_an_edge`: fills from tickets resting >26
-weeks are 7.8% of fills and **−15.1% of total P&L** (−3,923/trade vs +2,518).
+weeks are 7.8% of fills and **−15.1% of total P&L** (−3,923/trade vs +2,518 —
+those are per *trade* over 1,147 round trips, from the prior session; the tables
+below are per *position id* over 1,146, which puts the same figure at +2,520).
 Net-losing — but tail-heavy, which is why a single 5-year cell showed −40.91pp
 for cutting them (the removed cohort held SMCI +240%, alone exceeding the
 cohort's net).
@@ -130,20 +132,25 @@ below rests on counts and totals (89, 79, 10, 52) rather than on any mean.
 
 ### Only the deepest flag is robust to the tail
 
-| flag | total | minus top-1 | minus top-3 |
-|---|---:|---:|---:|
-| `broken_stop` | +1,048,334 | +387,087 | **−65,575** |
-| `broken_4w` | +320,073 | +116,235 | **−160,671** |
-| `broken_8w` | −222,667 | **−371,317** | **−587,105** |
+| flag | total | minus top-1 | minus top-2 | minus top-3 |
+|---|---:|---:|---:|---:|
+| `broken_stop` | +1,048,334 | +387,087 | +138,264 | **−65,575** |
+| `broken_4w` | +320,073 | +116,235 | **−32,415** | **−160,671** |
+| `broken_8w` | −222,667 | **−371,317** | **−499,573** | **−587,105** |
 
-Both shallow flags survive losing their single best trade and **flip at the top
-three** — `broken_stop` at +387,087 minus-top-1 is still positive, and only
-−65,575 once three are gone; `broken_4w` likewise. So their positive sign rests
-on a handful of trades, not on one (an earlier draft of this file said "one
-trade", which overstated it — MSTR's +661,246 is 63% of `broken_stop`'s total
-but not the whole of its sign). `broken_8w` gets *more* negative as winners are
-removed, so its negative sign is the one result here that a tail argument cannot
-touch.
+Both shallow flags survive losing their single best trade, then flip —
+`broken_4w` at **two**, `broken_stop` at **three**. So their positive sign rests
+on a handful of trades, and on fewer for the shallower cut.
+
+Two prior versions of this paragraph were wrong in opposite directions and both
+are recorded rather than overwritten: the first said the sign was "one trade"
+(understating robustness — MSTR's +661,246 is 63% of `broken_stop`'s total but
+not the whole of its sign); the correction then said both flip "at three",
+which *overstated* `broken_4w`'s robustness. The minus-top-2 column is added so
+the claim is readable off the table instead of resting on prose.
+
+`broken_8w` gets *more* negative at every step, so its negative sign is the one
+result here that a tail argument cannot touch.
 
 ### But it is age wearing a structural mask
 
