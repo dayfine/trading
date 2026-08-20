@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 7959dddf-3101-4cab-8f02-c90b77a7d8fd
-  modified: 2026-08-20T01:14:19.992Z
+  modified: 2026-08-20T01:59:52.507Z
 ---
 
 **"Cancel when the base breaks" is the clock with extra steps.** Measured on the
@@ -33,16 +33,32 @@ the 89 fills resting >26wk had already broken their 8-week base low.**
 | below the 8-week base low | 131 | **−1,700** |
 
 Monotone. A shallow dip below a resting ticket's own stop **beats the average**
-(held: +1,572) — the re-screen REJECT's lesson again: a pullback that resumes
+(held: +1,570) — the re-screen REJECT's lesson again: a pullback that resumes
 *is* base-building. Only a break of the 8-week low marks a failed base. Any
 future entry-quality work should use the **8-week base low** as its structural
 test, never the ticket's own stop.
 
 Robustness: minus the top 3 trades, `broken_stop` goes +1,048,334 → **−65,575**
 and `broken_4w` +320,073 → **−160,671**; `broken_8w` goes −222,667 →
-**−587,105**. Both shallow flags *survive* minus-top-1 (+387,087 / +116,235) and
-flip at three — their sign rests on a handful of trades, not on one. Only the
-deepest flag's sign is untouchable by a tail argument.
+**−587,105**. Both shallow flags *survive* minus-top-1 (+387,087 / +116,235),
+then flip — `broken_4w` at **two** (−32,415), `broken_stop` at **three**. Their
+sign rests on a handful of trades. Only the deepest flag's sign is untouchable
+by a tail argument.
+
+## ⚠ The flags are computed on a RAW (unadjusted) price basis
+
+`dump_snap` emits unadjusted OHLC, so `measure.sh` compares raw rest-window
+closes against raw pre-placement lows — not like-for-like across a multi-year
+rest window, because a split in between moves the two ends differently. Found by
+qc-behavioral on #2417, which re-ran the >26wk band on adjusted prices: **87 of
+89 identical**, 2 flip BROKEN→held (both losers), none the other way. The rescue
+cohort becomes **12 fills at −922** rather than 10 at +17,678.
+
+**The verdict is unchanged and slightly stronger** — the population a structural
+rule would rescue from the clock goes from negligible-and-positive to
+negligible-and-negative. Any *future* use of this pipeline should adjust first;
+this is the `project_split_safe_resistance_basis` hazard in an analysis script
+rather than in the strategy.
 
 ## Transferable
 

@@ -208,6 +208,30 @@ incumbent**, and the verdict below does not depend on the repair.
   breach ≈ real failure. Any future entry-quality work should use the 8-week
   base low, not the ticket's own stop, as its structural test.
 
+## ⚠ The flags are computed on a RAW (unadjusted) price basis
+
+`dump_snap` emits unadjusted OHLC, and `measure.sh` compares raw rest-window
+closes against raw pre-placement lows. Across a multi-year rest window that is
+**not like-for-like**: a split in between moves the two ends of the comparison
+differently, so a ticket can read BROKEN purely because the price series
+re-based. This is `project_split_safe_resistance_basis`'s hazard showing up in
+an analysis script rather than in the strategy.
+
+Measured rather than assumed. qc-behavioral on #2417 re-ran the classification
+for the whole 89-fill >26wk band on adjusted prices:
+
+- **87 of 89 identical**;
+- **2 flip BROKEN → held** (`ARE-wein-2493`, `ARLP-wein-1800`, both losers);
+- **0 flip the other way**.
+
+So the rescue cohort — the population #2407 exists to save — becomes **12 fills
+at −922** rather than 10 at +17,678. **The verdict is unchanged and slightly
+stronger**: it goes from negligible-and-positive to negligible-and-negative.
+
+The tables above are left on the raw basis, matching the committed `joined.tsv`,
+so the artifact and the writeup agree. Any *future* use of this pipeline should
+adjust first — that is the fix, not a re-statement of these numbers.
+
 ## What this does not test
 
 - The **second** criterion in #2407 — that the resistance `E` was derived from

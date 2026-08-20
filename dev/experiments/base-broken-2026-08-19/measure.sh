@@ -28,7 +28,17 @@
 # NOT age. Age is what the clock cuts and what #2407 argues is the wrong
 # variable; rest days are carried per row so the two can be cross-tabbed.
 #
-# JOIN KEY IS position_id, ALWAYS (feedback_position_id_is_the_only_join_key).
+# JOIN KEY IS position_id, ALWAYS (feedback_position_id_is_the_only_join_key) --
+# but NOT a unique one; see step 3.
+#
+# ⚠ RAW PRICE BASIS. dump_snap emits UNADJUSTED OHLC and the reduction below
+# uses columns 3/4/5 (high/low/close), not column 6 (adj_close). Comparing a
+# rest-window close to a pre-placement low across a multi-year window is
+# therefore not like-for-like: a split in between re-bases one end. Measured on
+# the >26wk band, adjusting flips 2 of 89 (both BROKEN->held, both losers), so
+# it does not move this experiment's verdict -- but ANY REUSE OF THIS SCRIPT
+# SHOULD SWITCH TO AN ADJUSTED BASIS FIRST. Scaling OHLC by adj_close/close per
+# bar is the minimal fix.
 #
 # Usage: measure.sh <scenario-out-dir> <snapshot-dir> <work-dir>
 set -e
