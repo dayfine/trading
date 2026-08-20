@@ -20,7 +20,11 @@ is wrong and which this document elsewhere contradicts: **454 of 480 control
 rows differ** between salts (`pnl_dollars` 94.6%, `entry_price` 74.2%,
 `quantity` 65.0%). The seed moves fill prices *within* a fixed trade set, which
 is exactly why the control still has a 0.99pp return null. At 26y the seed
-re-rolls 40–62% of *which trades happen* — a different channel entirely.
+re-rolls a large fraction of *which trades happen* — a different channel
+entirely. ⚠ The table above quotes #2436 as it read at the time; both records
+have since been corrected for a double-counting error in the same statistic
+(see the RESULT section). On the corrected convention the 26y core figures are
+**361 (31.5%)** and **217 (18.9%)** absent-from-other, not 61.9%/40.0%.
 
 The proposed mechanism: **a binding capital constraint.** Per
 `project_ticket_dies_on_cash_shortfall`, an unfundable triggered ticket is
@@ -83,7 +87,7 @@ obligation now, before seeing the number.
 
 ---
 
-# RESULT — one knob takes divergence from 0% to 13-36%
+# RESULT — one knob takes divergence from 0% to 7.4-18.9%
 
 Completed 09:09, three cells, ~3.5 min each.
 
@@ -91,17 +95,31 @@ Completed 09:09, three cells, ~3.5 min each.
 
 Trade sets joined on `(symbol, entry_date)` against each arm's own salt-0 run:
 
-| arm | `max_position_pct_long` | s0 vs s1 | s0 vs s2 | of N |
-|---|---|---:|---:|---:|
-| **control** (committed, not re-run) | 0.14 | **0 (0.0%)** | **0 (0.0%)** | 240 |
-| **tightened** | **0.33** | **23 (13.1%)** | **63 (36.0%)** | 175 |
+⚠ **Definition, corrected.** The statistic is **trades present in s0 and absent
+from the other salt, as a fraction of s0**. An earlier version reported the
+**symmetric difference** over |s0|, which counts a substituted trade twice in the
+numerator and once in the denominator — roughly doubling every figure. Both
+conventions are shown; the earlier (inflated) one is parenthesised.
 
-**Prediction (1) fires.** Divergence goes from *exactly zero* to 13–36% on a
-one-knob change, with **period and universe held fixed**. That is the
+| arm | `max_position_pct_long` | s0 vs s1 | s0 vs s2 | of N | (sym-diff ÷ s0, as previously reported) |
+|---|---|---:|---:|---:|---:|
+| **control** (committed, not re-run) | 0.14 | **0 (0.0%)** | **0 (0.0%)** | 240 | 0.0% / 0.0% |
+| **tightened** | **0.33** | **13 (7.4%)** | **33 (18.9%)** | 175 | 13.1% / 36.0% |
+
+Union basis (sym-diff ÷ |s0 ∪ sx|): 12.4% / 30.7%.
+
+**Prediction (1) fires.** Divergence goes from *exactly zero* to **7.4–18.9%**
+on a one-knob change, with **period and universe held fixed**. That is the
 confounding the 26y-vs-5y comparison could not escape, removed.
 
-The magnitude lands in the same range as the 26y cell (40–62%), which is the
-comparison the mechanism was proposed to explain.
+The control is **0 under every convention**, so the qualitative result — a
+discrete channel that was closed and is now open — does not depend on the choice
+at all. Only the magnitude does, and it is about half what was first reported.
+
+The magnitude is comparable to the 26y cell on the SAME corrected convention
+(19-32% absent-from-other; #2436 carried the identical double-counting error and
+is corrected in step), which is the comparison the mechanism was proposed to
+explain.
 
 ## Prediction (2) did NOT fire — and my reading of why was wrong
 
@@ -189,7 +207,7 @@ noise **31×**, at fixed period and universe.
 ## What this establishes, and what it does not
 
 **Does:** **one config knob**, at fixed period and universe, takes cross-salt
-trade-set divergence from exactly 0% to 13–36%. The 26y-vs-5y comparison could
+trade-set divergence from exactly 0% to 7.4-18.9%. The 26y-vs-5y comparison could
 not separate that from period and universe; this can, and does.
 
 **Does not:** identify *which* consequence of that knob is responsible.
@@ -207,7 +225,7 @@ confirming direction remains a relaxed-26y run.
 falls 112.7 → 38.3. This is an instrument experiment, not a strategy one, and
 the tightened arm is not a candidate.
 
-⚠ **Three draws**, same downward-biased max−min caveat as #2436. The 0 → 13–36%
+⚠ **Three draws**, same downward-biased max−min caveat as #2436. The 0 -> 7.4-18.9%
 step is far too large for that to matter; the 10.76pp return null quoted above
 is a soft number.
 
