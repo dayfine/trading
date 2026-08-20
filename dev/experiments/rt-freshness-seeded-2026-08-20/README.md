@@ -1,9 +1,26 @@
 # F1 freshness axis, seeded — `Range_top_breakout` vs `Ma_cross` on the 26y base
 
-**RESULT: `Range_top_breakout` moves DRAWDOWN and nothing else — and it is not
-an exposure artifact.** Mean MaxDD **38.76 → 30.81** (−7.95pp, −21% relative),
-better at all three salts by more than drawdown's own null. Return and Sharpe
-flip sign between salts and stay inside their nulls. Completed 05:39.
+**RESULT: `Range_top_breakout` trades FEWER, HOLDS LONGER, WINS MORE OFTEN and
+draws down LESS — without reducing exposure.** Return and Sharpe flip sign
+between salts and stay inside their nulls, so it is not a return lever.
+Completed 05:39.
+
+Three metrics clear their own null at all three salts:
+
+| metric | core → rt (mean) | weakest leg |
+|---|---|---|
+| **ulcer index** | 14.98 → **11.02** (−26.5%) | **1.43×** null |
+| **win rate** | 33.18% → **34.91%** | **1.96×** null |
+| **max drawdown** | 38.76 → **30.81** (−21%) | 1.02× null |
+
+⚠ **An earlier version of this file said "moves drawdown and nothing else."
+That was false and is corrected here rather than edited away** — the PR's own
+`actual.sexp` files carry ulcer index and win rate, and both move by the same
+Rule-4 test. Found by qc-behavioral, which also noted the consequence: **ulcer
+index repairs the fragile s1 leg** (1.02× on MaxDD → 1.43× on ulcer), because a
+path-integrated drawdown measure is less noisy than a single extremum. The
+finding is stronger than first stated, and its shape is *selectivity*, not
+"lower risk" alone.
 
 All three tripwires reproduced the recorded null draws digit-for-digit
 (281.707836178685 / 397.94778549196963 / 265.44150500657236), and the measured
@@ -32,6 +49,37 @@ Sharpe **0.0797**, trades **37**.
 passes, but that leg is inside any reasonable measurement wobble. The finding
 rests on s0 and s2 being comfortable and s1 not contradicting.
 
+## The other two moved metrics
+
+| metric | null | s0 | s1 | s2 |
+|---|---:|---|---|---|
+| ulcer index (lower better) | 1.851 | +4.12 (2.23×) | +2.65 (**1.43×**) | +5.12 (2.76×) |
+| win rate (higher better) | 0.496pp | +2.52 (5.08×) | +0.97 (1.96×) | +1.72 (3.47×) |
+
+Both clear at all three salts in the same direction, same Rule-4 test as MaxDD.
+Ulcer is the more informative drawdown statistic here: it integrates depth over
+time rather than taking one extremum, which is why its weakest leg is
+comfortable where MaxDD's is marginal.
+
+## Is drawdown's null really 4.76pp? — the 7.8pp objection
+
+`dev/notes/ladder-v4-read-2026-08-12.md` §"Sharpe and drawdown are contaminated
+in the same proportion" records a **behaviourally identical** config pair on
+this same base differing by **0.222 Sharpe and 7.8pp of drawdown**. That 7.8pp
+exceeds two of our three gaps (4.83, 7.67), so it has to be addressed rather
+than left out — omitting it would favour our own conclusion.
+
+**It is the nondeterministic binary's contamination, not this one's.** The same
+document puts that chain's *return* floor at **278pp**; measured on the seeded
+binary here, return's null is **132.51pp** — 2.1× tighter. Drawdown moves the
+same way, 7.8pp → 4.76pp (1.6×). The path-seed fix (#2279) is exactly what
+removed that excess, and our null is measured on the fixed binary, from the same
+three salts the comparison is paired against.
+
+Anyone re-reading this should still treat MaxDD's s1 leg (1.02×) as the weak
+point, and prefer the ulcer-index legs, which do not depend on which null you
+accept.
+
 ## It is NOT the position-count artifact
 
 `project_entry_cap_horizon_reversal` warns that a risk-metric-led win is an
@@ -44,10 +92,29 @@ exposure signal until proven otherwise. Tested directly, from `trades.csv`
 | 1 | 5.53 → **5.67** | $1.29M → **$1.36M** |
 | 2 | 5.61 → **5.62** | $1.16M → **$1.68M** |
 
-**rt holds more concurrent positions and deploys more capital at every salt,
-while taking less drawdown at every salt.** The improvement cannot be "it holds
-less" — it is the reverse. rt also turns over less (1105 vs 1151 trades at
-higher concurrency ⇒ ~6% longer holds).
+**Exposure does not fall. The artifact explanation is refuted — but it is NOT
+reversed, and an earlier version of this file wrongly said it was.**
+
+⚠ **Correction.** This section previously read *"rt holds more concurrent
+positions and deploys more capital … the improvement cannot be 'it holds less'
+— it is the reverse."* The second half overclaims, in two ways qc-behavioral
+caught:
+
+- **Concurrency gaps are inside concurrency's own null.** +0.059 / +0.146 /
+  +0.007 against a null of **0.187**. Concurrency does not move; it merely fails
+  to fall.
+- **Raw dollar deployment rises largely because equity rises.** rt earned more,
+  so it had more to deploy — the dollar gaps track the equity gaps almost
+  exactly (×1.248 vs ×1.231, ×1.053 vs ×1.056, ×1.452 vs ×1.393). Normalised by
+  each arm's own equity, the fractional gaps **flip sign** across salts and are
+  mostly in-null.
+
+What survives, and it is the half the conclusion needs: **rt is not less
+exposed**, so the drawdown/ulcer improvement cannot be explained by holding
+less. What does not survive is the stronger "more exposed" reading.
+
+rt does turn over less: 1105 vs 1151 trades at equal-or-higher concurrency ⇒
+~5.5% longer holds (47.2 → 49.8 days).
 
 Note this inverts the 5-year testbed, where rt held *shorter* (45.4 → 34.4 days)
 and drawdown got *worse* — a second concrete 5y-vs-26y divergence on this axis.
@@ -55,11 +122,27 @@ and drawdown got *worse* — a second concrete 5y-vs-26y divergence on this axis
 ## What this does and does not license
 
 **Does:** `Range_top_breakout` is a drawdown lever on the 26-year top-3000 base,
-not a return lever, and not an exposure trick. That reconciles the horizon
-contradiction: the unseeded 26y hinted exactly this (44.28 → 32.51) and the 5y
-testbed could not resolve a ~3pp drawdown effect on 187 names.
+not a return lever, and not an exposure trick.
 
-**Does not:** promotion. One universe, one window. Per
+**Does not — (a) reconcile the horizons.** The 5y testbed moved drawdown **+4.45pp the other
+way** (16.98 → 21.43). ⚠ An earlier version claimed reconciliation, on the
+grounds that "5 years of 187 names cannot resolve a ~3pp drawdown effect."
+**That threshold was asserted, never derived** — the 5y testbed is
+single-realization deterministic, so *its* drawdown null has never been
+measured, and dismissing its result requires a 5y null above ~4.5pp that no run
+in this repo establishes. The two horizons still disagree, and the cheapest way
+to settle it is to salt the 5y testbed three ways (minutes of compute) and
+measure that floor directly. Until then, treat the 26y result as scoped to 26y.
+
+The one piece of independent 26y support is directional only: the unseeded
+ladder-v4 chain put core-w4 at **44.2845** and `02-fresh-rangetop` at
+**32.5078** MaxDD. Those live in the **untracked**
+`.sweep-output/ladder-v4-artifacts-2026-08-12/*/actual.sexp`, not in the repo,
+and they come from the **nondeterministic** binary whose drawdown contamination
+that same chain measures at 7.8pp — so an 11.78pp gap is barely above its own
+noise. It agrees in sign with this run; it is not evidence on its own.
+
+**Does not — (b) license promotion.** One universe, one window. Per
 `promotion-confirmation.md` this earns a confirmation grid — ≥3 cells across
 period × universe, including a macro-diverse one — not a default flip. The mean
 return gain (+115.7pp) is inside the null and must not be quoted as a return
@@ -111,8 +194,10 @@ ago but is still coiled under its range top has aged out of
 | small-deterministic, 2026-08-12 | sp500 500 (**187 traded**), 2019-2023 | 112.28 → **45.33**, Sharpe 1.105 → 0.603, MaxDD 16.98 → **21.43** | Zero noise floor (reproduced digit-for-digit on 2026-08-20), but **one 5-year bull-heavy window, 187 names**. Its own README warns that `nearfloor` and `anchor-w8` *reverse sign* between this testbed and 26y. |
 
 **The two horizons disagree on the metric that matters.** Drawdown gets *worse*
-on 5y (16.98 → 21.43) and much *better* on the unseeded 26y (44.28 → 32.51),
-with returns unmeasurable on 26y and clearly worse on 5y.
+on 5y (16.98 → 21.43) and much *better* on the unseeded 26y (44.2845 → 32.5078,
+`.sweep-output/ladder-v4-artifacts-2026-08-12/top3000-2000-2026-v4-{00-core-w4,02-fresh-rangetop}/actual.sexp`
+— **untracked**, and from the nondeterministic binary), with returns
+unmeasurable on 26y and clearly worse on 5y.
 
 ## Why six cells and not two
 
