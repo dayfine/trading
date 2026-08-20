@@ -70,6 +70,9 @@ _is_docs_only() {
 #     verdicts, and the checklist rows contain the words too.
 #   - Take the LAST matching review, not the first: a rework cycle leaves the
 #     superseded verdict earlier in the list.
+#   - Within a single review body, take the LAST unfenced "## Verdict" section,
+#     not the first: a review that quotes another gate's sign-off flush left
+#     (no fence needed) puts that quotation's heading above its own (#2421).
 _gate() {
   _reviews=$1; _kind=$2; _tip=$3
   printf '%s' "$_reviews" | jq -r --arg kind "$_kind" --arg tip "$_tip" '
@@ -85,7 +88,20 @@ _gate() {
     # over-stripping could reach a QUOTED foreign verdict and return a false
     # GREEN; an earlier version of this comment claimed the opposite and was
     # wrong. With "## Verdict" as the sole verdict source, an over-stripped body
-    # loses its own heading and reads "unclear" -> "inspect manually".
+    # that removes its OWN heading entirely usually reads "unclear" (cases
+    # 17/18) -- but only when no OTHER unfenced Verdict heading survives the
+    # strip. If a quoted heading sits BEFORE the point an unpaired fence starts
+    # eating the rest of the body, that quoted heading is left as the sole
+    # survivor and wins outright: a false "ok", not "unclear" (see probe p8 in
+    # the test suite -- a known, pre-existing gap, not introduced by this fix).
+    #
+    # NOT a fence stack: `.inside` is a single boolean toggled by ANY fence-like
+    # line, so nesting (a 4-backtick block containing a 3-backtick block) is not
+    # tracked as depth. The inner-open flips `.inside` back to false, so content
+    # between the inner-open and the inner-close is treated as NOT inside a
+    # fence and leaks into $clean -- not, as an earlier PR body description
+    # claimed, content between the outer-open and inner-open (that span is
+    # still correctly stripped; see the disagreement-based mitigation below).
     def strip_fences:
       split("\n")
       | reduce .[] as $l ({out: [], inside: false};
@@ -110,25 +126,69 @@ _gate() {
         # chain, the second `.body` would be applied to the STRING the first
         # produced, jq would exit 5, and -- because the caller assigns bare
         # under `set -eu` -- the whole run would die mid-table. That also made
-        # the inline "Verdict:" fallback and the "unclear" branch unreachable.
+        # the "unclear" branch unreachable.
         # `^` anchor on the Verdict heading: without it, an INDENTED quotation
         # of another review (four spaces, so not a fence at all) supplied this
         # gate its verdict.
-        | ( ($clean | capture("(?ism)^#+ +Verdict[ *`\\n]+(?<v>APPROVED|NEEDS_REWORK)").v)
-            # `^` here too, for the same reason as the heading form above. Left
-            # unanchored, this fallback made OVER-stripping produce a false
-            # THE INLINE "Verdict: X" FALLBACK IS DELETED, not fixed. It was the
-            # only path by which over-stripping could go GREEN: when the
-            # stripper eats a reviews own "## Verdict" (a lone ~~~ is enough),
-            # the fallback matched a QUOTED FOREIGN verdict instead. Anchoring
-            # it to ^ did not close that -- it moved the hole from "anywhere in
-            # the line" to "column 0", which is exactly where a pasted block
-            # quotation sits, and left a REGRESSION against the pre-fence code
-            # (rework -> ok on a flush-left quotation plus an unpaired fence).
-            # Nothing in the suite depends on the branch: the inline form
-            # appears in one fixture, negatively. A review with no "## Verdict"
-            # heading now reads "unclear" -> "inspect manually", fail-safe.
-            // "" ) as $raw
+        #
+        # DISAGREEING matches read "unclear", not "whichever position wins"
+        # (#2425 rework of #2421). #2421 shipped "take the LAST unfenced
+        # Verdict match" to fix a flush-left quotation sitting ABOVE the real
+        # verdict (case 20 below) -- but "first" and "last" are symmetric
+        # failure modes, not a fix: `capture()` (no /g, FIRST match) lets a
+        # quotation ABOVE the real verdict win; `match(...; "g") | last` lets a
+        # quotation BELOW the real verdict win instead. And $clean is NOT a
+        # reliable proxy for "no quoted verdict remains" -- strip_fences does
+        # not track fence nesting (see its doc comment above) and does not
+        # touch HTML comments or `<details>` blocks at all, so a quoted
+        # heading below the real one routinely survives into $clean.
+        #
+        # The fix: collect EVERY unfenced "## Verdict" match, not just one.
+        #   - Zero matches -> no verdict in the body -> "unclear".
+        #   - Exactly one DISTINCT verdict value across all matches -> use it.
+        #     This covers the overwhelmingly common case (a single "## Verdict"
+        #     section) and the case where a quoted heading happens to carry the
+        #     SAME token as the real one (harmless either way).
+        #   - More than one DISTINCT verdict value -> the body contains an
+        #     unresolved quotation with a conflicting token -- return "unclear"
+        #     rather than guessing which one is "the real" verdict, so the PR
+        #     routes to "inspect manually" (never a green) instead of picking a
+        #     side. This is fail-safe against a leaked quotation on EITHER
+        #     side of the real verdict, and against the leak SOURCE (fence
+        #     nesting, HTML comments) rather than just one position.
+        #   Differential-tested against 84 real QC review bodies pulled from
+        #   the 40 most-recently-updated PRs (`Reviewed SHA` stripped so the
+        #   verdict surfaces): zero bodies carry disagreeing matches, so this
+        #   is empirically inert on the corpus that exists today.
+        #
+        # This also resolves the addendum case that #2421 left as an accepted,
+        # documented gap (a review states its own verdict, then a trailing
+        # addendum quotes a DIFFERENT verdict): that was last-match picking the
+        # addendum quoted verdict outright -- a false green. Now: two
+        # disagreeing matches -> "unclear". Still not the true verdict of the
+        # review, but no longer a false green; see case 21 below.
+        #
+        # STILL NOT COVERED: an unpaired fence (opens, never closes) can erase
+        # the reviews OWN "## Verdict" section entirely, leaving an earlier
+        # QUOTED heading as the ONLY surviving match -- one match, nothing to
+        # disagree with, so it wins outright. Known, pre-existing false green
+        # (not introduced by this fix); pinned as probe p8 in the test suite
+        # rather than silently rediscovered later.
+        #
+        # `\\r` alongside `\\n` in the gap class: a CRLF review body (GitHub
+        # normalises to LF on ingest, but a pasted-in body can still carry CR)
+        # leaves "## Verdict\r" as the heading line, and the untouched \r
+        # between it and the verdict token used to break the match entirely,
+        # reading "unclear" -- fail-safe but wrong. Covered directly here since
+        # it is a one-character class addition with no interaction with the
+        # fence stripper (which matches fence markers, not the gap between a
+        # heading and its token).
+        | ( [ $clean
+              | match("(?ism)^#+ +Verdict[ *`\\r\\n]+(?<v>APPROVED|NEEDS_REWORK)"; "g")
+              | .captures[] | select(.name == "v") | .string
+            ] | unique
+          ) as $verdicts
+        | ( if ($verdicts | length) == 1 then $verdicts[0] else "" end ) as $raw
         | (if $raw == "NEEDS_REWORK" then "rework"
            elif $raw == "APPROVED" then "ok"
            else "unclear" end) as $verdict

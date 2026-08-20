@@ -257,13 +257,22 @@ offline_probe() {
 }
 check "sourcing makes no gh call" offline "$(offline_probe)"
 
-# 17. OVER-STRIPPING MUST NOT GO GREEN. A lone `~~~` opens a fence that never
-#     closes, so the stripper eats the rest of the body including this review's
-#     own "## Verdict". With the inline `Verdict:` fallback left unanchored,
-#     that fallback then matched a QUOTED foreign verdict and returned `ok` —
-#     the exact false green the fence work exists to prevent, reached by being
-#     too eager rather than too lax. The safety claim ("over-stripping can only
-#     produce a false RED") was therefore false until the fallback was anchored.
+# 17. OVER-STRIPPING MUST NOT GO GREEN, in THIS shape. A lone `~~~` opens a
+#     fence that never closes, so the stripper eats the rest of the body
+#     including this review's own "## Verdict". An earlier version of this
+#     matcher had an inline `Verdict:` fallback that, in this exact shape,
+#     matched a QUOTED foreign verdict and returned `ok` -- the exact false
+#     green the fence work exists to prevent, reached by being too eager
+#     rather than too lax. That fallback is now deleted outright (not merely
+#     anchored -- anchoring it to `^` only moved the hole to column 0, see
+#     case 18 below), so with "## Verdict" as the sole verdict source, THIS
+#     fixture's quotation (inline "Verdict:" prose, no heading) never matches
+#     at all, the real heading is erased by the unclosed fence, and the result
+#     is "unclear". That is NOT a general fail-safety property of
+#     over-stripping, only of this shape: when the quotation before the
+#     unpaired fence IS itself a "## Verdict" heading, it survives as the sole
+#     match and wins outright -- see case 26 (probe p8), a known, pre-existing
+#     false green in that shape, not fixed by this suite.
 OVERSTRIP_WITH_QUOTED_VERDICT="Reviewed SHA: 7dc57cc06
 
 ## Behavioral QC — over-stripped by a stray separator
@@ -321,8 +330,187 @@ NEEDS_REWORK"
 check "same body without the stray fence reads its own verdict" \
   rework "$(_gate "$(reviews "$FLUSH_LEFT_QUOTE_NO_FENCE")" behavioral "$TIP")"
 
+# 20. #2421 / #2425. A review that quotes ANOTHER gate's "## Verdict" heading
+#     flush left -- no fence, no indent needed at all -- puts a second,
+#     disagreeing "## Verdict" heading into the body. #2421 originally fixed
+#     this case by taking the LAST match, which returned "rework" here -- but
+#     that policy is exactly as unsound as the first-match bug it replaced:
+#     "last" only wins when the leaked heading happens to sit ABOVE the real
+#     one. Cases 23/24 below are the mirror shape (leak AFTER the real
+#     verdict) and show last-match producing a false "ok" there. #2425
+#     replaced "pick a position" with "disagreeing matches -> unclear": still
+#     never a false green, and it no longer matters which side the quotation
+#     leaked to.
+QUOTES_A_VERDICT_HEADING_FLUSH_LEFT="Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — my review
+
+The structural pass ended:
+
+## Verdict
+
+APPROVED
+
+## Verdict
+
+NEEDS_REWORK"
+
+check "quoted flush-left Verdict heading disagreeing with the real one reads unclear (#2421/#2425)" \
+  unclear "$(_gate "$(reviews "$QUOTES_A_VERDICT_HEADING_FLUSH_LEFT")" behavioral "$TIP")"
+
+# 21. Symmetric case to #20: a review states its OWN verdict first, then
+#     appends an addendum quoting a DIFFERENT verdict below it. Under #2421's
+#     last-match policy this was a known, accepted gap -- the addendum's
+#     quotation won outright, reading "ok" for a review that actually said
+#     NEEDS_REWORK. #2425's disagreeing-matches-are-unclear rule resolves it:
+#     two distinct verdict tokens in the body -> "unclear", not a guess. Still
+#     not the review's true verdict, but no longer a false green, so this is
+#     now a real assertion rather than a printed note (the note form let a
+#     mutation flip the printed word from ok to rework with the suite still
+#     exiting 0 -- exactly the coverage-in-appearance defect #2390/#2424 exist
+#     to close).
+ADDENDUM_QUOTES_A_DIFFERENT_VERDICT_AFTER="Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — my review
+
+## Verdict
+
+NEEDS_REWORK
+
+Addendum: for context, the prior structural pass ended:
+
+## Verdict
+
+APPROVED"
+
+check "addendum quoting a different verdict after the real one reads unclear, not the addendum's token (#2425)" \
+  unclear "$(_gate "$(reviews "$ADDENDUM_QUOTES_A_DIFFERENT_VERDICT_AFTER")" behavioral "$TIP")"
+
+# 23. #2425 regression probe (review finding A1/p1): a verdict quoted inside an
+#     HTML comment -- not a fence, so strip_fences never touches it -- placed
+#     AFTER the real "## Verdict" section. Under #2421's last-match policy this
+#     read "ok" on a review that said NEEDS_REWORK: a false green, and a
+#     regression against pre-#2421 main (which read this correctly via
+#     first-match, since the leak sat below the real verdict). Confirmed red
+#     against the unfixed tip (ef758806) before this fix: reads "ok" there.
+HTML_COMMENT_VERDICT_AFTER="Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — my review
+
+## Verdict
+
+NEEDS_REWORK
+
+<!--
+## Verdict
+
+APPROVED
+-->"
+
+check "verdict quoted inside an HTML comment after the real one does not win (#2425)" \
+  unclear "$(_gate "$(reviews "$HTML_COMMENT_VERDICT_AFTER")" behavioral "$TIP")"
+
+# 24. #2425 regression probe (review finding A1/p3b/n3/n4): strip_fences is a
+#     parity toggle, not a fence stack (see its doc comment). In a nested fence
+#     -- an outer 4-backtick block containing an inner 3-backtick block -- the
+#     inner-open flips `.inside` back to false, so content between the
+#     inner-open and inner-close is treated as unfenced and leaks into $clean.
+#     Placed AFTER the real "## Verdict" section, this was another false "ok"
+#     under last-match. Confirmed red against the unfixed tip before this fix.
+NESTED_FENCE_INNER_LEAK_AFTER="Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — my review
+
+## Verdict
+
+NEEDS_REWORK
+
+Quoting for context:
+
+\`\`\`\`
+some intro
+\`\`\`
+## Verdict
+
+APPROVED
+\`\`\`
+some outro
+\`\`\`\`"
+
+check "verdict leaked from a nested fence's inner block, after the real one, does not win (#2425)" \
+  unclear "$(_gate "$(reviews "$NESTED_FENCE_INNER_LEAK_AFTER")" behavioral "$TIP")"
+
+# 25. Companion to case 24, correcting the PR body / status-doc claim that the
+#     nested-fence residual sits "between the outer-open and inner-open"
+#     (review finding CP2-a). It does not: a heading placed there is still
+#     inside the outer fence at that point (`.inside` has been flipped true by
+#     the outer-open and not yet flipped back by the inner-open), so it is
+#     correctly stripped either way. Pinned so the wrong description does not
+#     resurface as a "residual" that needs fixing.
+NESTED_FENCE_BETWEEN_OUTER_AND_INNER_OPEN="Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — my review
+
+## Verdict
+
+NEEDS_REWORK
+
+Quoting for context:
+
+\`\`\`\`
+## Verdict
+
+APPROVED
+\`\`\`
+some inner fence content
+\`\`\`
+\`\`\`\`"
+
+check "heading between a nested fence's outer-open and inner-open does not leak (CP2-a correction)" \
+  rework "$(_gate "$(reviews "$NESTED_FENCE_BETWEEN_OUTER_AND_INNER_OPEN")" behavioral "$TIP")"
+
+# 26. #2425 review probe p8, KNOWN PRE-EXISTING false green -- NOT introduced or
+#     fixed by this PR, pinned so it is not silently rediscovered as new. An
+#     unpaired fence (opens, never closes) puts strip_fences into "inside" for
+#     the rest of the body, which erases the review's OWN "## Verdict" section.
+#     What survives is only the QUOTED heading that sits BEFORE the unpaired
+#     fence -- a single match, so the disagreeing-matches guard (case 20/21/
+#     23/24) has nothing to disagree with, and that quoted "APPROVED" wins
+#     outright. Distinct from case 17 (quotation is inline "Verdict:" text, not
+#     a heading, so it never matches at all -> "unclear") and case 18 (same,
+#     flush left) -- here the quotation IS a real "## Verdict" heading, which
+#     is what lets it win. See the CP4-ii-scoped comment on case 17 below.
+OVERSTRIP_HEADING_BEFORE_UNPAIRED_FENCE="Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — my review
+
+The prior pass ended:
+
+## Verdict
+
+APPROVED
+
+~~~
+
+## Verdict
+
+NEEDS_REWORK"
+
+check "quoted Verdict heading before an unpaired fence still wins -- known pre-existing gap, not fixed here (#2425)" \
+  ok "$(_gate "$(reviews "$OVERSTRIP_HEADING_BEFORE_UNPAIRED_FENCE")" behavioral "$TIP")"
+
+# 27. CRLF line endings. A pasted-in review body can carry \r\n rather than
+#     plain \n; the gap between the "## Verdict" heading and its token used to
+#     be matched by a class with no \r in it, so the trailing \r broke the
+#     match entirely and the gate read "unclear" instead of the real verdict.
+#     Built with printf (not a shell here-doc) so the \r bytes are real, not a
+#     literal backslash-r.
+CRLF_BODY=$(printf 'Reviewed SHA: 7dc57cc06\r\n\r\n## Behavioral QC crlf review\r\n\r\n## Verdict\r\n\r\nNEEDS_REWORK\r\n')
+check "CRLF body still reads its own verdict" \
+  rework "$(_gate "$(reviews "$CRLF_BODY")" behavioral "$TIP")"
+
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"
   exit 1
 fi
-printf 'OK: pr_gate_status -- %d tests clean.\n' 19
+printf 'OK: pr_gate_status -- %d tests clean.\n' 26
