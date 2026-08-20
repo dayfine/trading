@@ -85,6 +85,12 @@ reads `total_return_pct 112.28323995525771`, `max_drawdown_pct
 
 Null = max − min across core's three salts, exactly as pre-registered.
 
+⚠ **Three draws.** max−min over three samples is a **downward-biased** estimator
+of spread, so every null below is more likely too small than too large, and the
+×null ratios that follow are correspondingly optimistic. The verdict tolerates
+this — MaxDD's margin is 12.7× and survives a several-fold wider null — but do
+not read the 4-significant-figure nulls as precise quantities.
+
 | metric | **5y null** | 26y null (for scale) | ratio |
 |---|---:|---:|---:|
 | return | **0.9862pp** | 132.51pp | 134× |
@@ -143,27 +149,95 @@ universe** (2000-2026 top-3000 vs 2019-2023 sp500-500, 187 traded). Nothing here
 says which axis carries it. A third cell varying one axis at a time is what
 would.
 
-## The transferable finding: a noise floor is a function of tail exposure
+## Why the nulls differ by scale — measured, not a story
 
-The nulls themselves are the more durable result. Relative noise on return is
-**132.51 / 315.0 ≈ 42%** at 26y and **0.99 / 112.7 ≈ 0.9%** at 5y — a **48×**
-difference in relative terms, on only ~5× the trades.
+⚠ **An earlier version of this section asserted the gap "is not a sample-size
+effect; it is the fat tail", and explained it as monster fills re-rolling. The
+first clause is right and now demonstrated. The second was a causal story fitted
+to two data points — and it understates the real mechanism by an order of
+magnitude.** Replaced below with what the committed `trades.csv` files actually
+show. Found by qc-behavioral; the superseded text is retained above in git
+history rather than being the version anyone reads.
 
-That is not a sample-size effect; it is the fat tail
-(`project_edge_is_the_fat_tail`). At 26y on 3000 names a handful of monster
-trades dominate the return, and whether each one fills is path-dependent — so
-the seed re-rolls the outcome. At 5y on 500 bull-market names there are no
-monsters to win or lose, so every salt lands in the same place.
+### The seed does not perturb fills at 26y. It re-rolls half the trade set.
 
-Two consequences worth carrying:
+Joining each arm's `trades.csv` on `(symbol, entry_date)` against its own salt-0
+run:
 
-1. **Never import a null across scales.** The 26y floor is 13–134× the 5y floor
-   depending on metric. A 5y-sized floor applied at 26y would certify noise; a
-   26y-sized floor applied at 5y buries real effects — which is precisely the
-   error the 26y writeup made when it assumed 5y "cannot resolve ~3pp".
-2. **A tight null is not a better instrument.** It means the cell has little
-   tail exposure, which is exactly what makes its answer regime-specific. The 5y
-   testbed measures precisely, and what it measures precisely is one bull market.
+| scale / arm | s0 vs s1 | s0 vs s2 | of N rows |
+|---|---:|---:|---:|
+| **5y core** | **0 (0.0%)** | **0 (0.0%)** | 240 |
+| 5y rangetop | 3 (1.3%) | 5 (2.1%) | 233 |
+| **26y core** | **710 (61.9%)** | **459 (40.0%)** | 1147 |
+| 26y rangetop | 689 (63.0%) | 554 (50.6%) | 1094 |
+
+**At 5y the core trade set is bit-identical across all three salts.** Every
+metric difference there comes from fill *prices* moving within a fixed set of
+trades — which is why the 5y nulls are tiny, and why win rate moves by exactly
+one trade (37.9167 / 37.9167 / 38.3333).
+
+**At 26y, 40–62% of trades are different trades.** That is a discrete channel,
+not a perturbation, and it is what the large 26y nulls are made of.
+
+### Why the channel opens at 26y and not 5y
+
+`force_liquidations_count`, same runs: **26y = 4 / 3 / 4; 5y = 0 / 0 / 0.**
+
+The 26y cell runs a binding capital constraint and the 5y cell does not. Per
+`project_ticket_dies_on_cash_shortfall`, an unfundable triggered ticket is
+destroyed outright and selection at trigger is effectively arrival order — so a
+tiny path-induced P&L difference changes what is affordable, which changes which
+tickets fund, which cascades. At 5y on 187 traded names the constraint rarely
+binds, so everything that triggers gets funded regardless of path.
+
+This also explains the one metric that stays flat: **win rate is
+scale-invariant (1.2×) even though half the 26y trade set churns**, because a
+re-rolled set is drawn from the same population with the same base rate. The
+seed changes *which* names are held, not *what fraction* of them work.
+
+⚠ **Attribution hedge, stated with the same force as the primary one.** These
+two cells differ in period **and** universe, so this account is a mechanism
+*consistent with* the data, not an isolated cause. What is directly measured and
+not inferred: the trade-set divergence percentages, and the force-liquidation
+counts.
+
+### The 48× headline is the most extreme framing available
+
+Relative return noise is 42% at 26y (132.51/315.0) vs 0.9% at 5y (0.99/112.7).
+That 48× is real but horizon-inflated: **annualised, the return-null ratio is
+≈33×, and the horizon-free Sharpe null ratio is 12×.** Quote 12× if you want the
+conservative number.
+
+⚠ **The nulls are 3-draw ranges.** A max−min over three samples is a
+*downward-biased* estimator of spread, so every null here is more likely too
+small than too large, and the ×null ratios are correspondingly optimistic. This
+does not threaten the verdict — the MaxDD margin is 12.7× and would survive a
+several-fold wider null — but the 4-significant-figure nulls should not be read
+as precise quantities.
+
+### What survives regardless of mechanism
+
+1. **Never import a null across scales.** 1.2× (win rate) to 134× (return) apart
+   *by metric*, and the ordering is not guessable in advance. A 5y-sized floor at
+   26y certifies noise; a 26y-sized floor at 5y buries real effects — which is
+   exactly the error the 26y writeup made assuming 5y "cannot resolve ~3pp".
+2. **A tight null is not a better instrument.** The 5y cell measures precisely,
+   and what it measures precisely is one bull market with a non-binding capital
+   constraint.
+3. **⭐ Return is a near-useless A/B metric on the 26y base** — ~10× worse SNR
+   than any risk metric. So the program's recurring "**X is a risk lever, not a
+   return lever**" conclusion is partly an instrument artefact: "return did not
+   move" is what a low-powered test looks like. Honest phrasing is "risk moved;
+   return is not measurable here at this effect size." Worth auditing ledger
+   entries that turn on a return-in-null reading. Recorded, not acted on here.
+
+### Falsifiable, and cheap
+
+If the capital-contention account is right, a 26y run with the constraint
+relaxed (larger starting capital, or a higher `max_long_exposure_pct`) should
+show a **much smaller** trade-set divergence across salts. One pair of runs
+tests it.
+
 
 ## Artefacts
 
