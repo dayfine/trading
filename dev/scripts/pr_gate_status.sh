@@ -54,19 +54,55 @@ _is_docs_only() {
 #   - Match the gate on a HEADING ("## Behavioral QC"), not on the word appearing
 #     anywhere. Behavioral bodies routinely say "qc-structural already returned
 #     APPROVED", so a loose match assigns the behavioral review to both gates.
+#   - Anchor the gate word to the START of the heading text. Matching it anywhere
+#     in a heading is not enough: on PR #2417 the *structural* review carried a
+#     "### Notes for Behavioral QC" section, so its APPROVED was read as the
+#     behavioral verdict too and the PR printed `pass / ok / ok  MERGE` while
+#     qc-behavioral had never run. Real verdict reviews open with
+#     "## <Kind> QC — ..." or "## qc-<kind>", which is what the anchor allows.
+#   - Ignore headings inside FENCED CODE BLOCKS. A review that quotes another
+#     review's headings as evidence would otherwise satisfy that other gate.
+#     Found the hard way: qc-behavioral's review of this very PR pasted #2417's
+#     heading list, and immediately satisfied the STRUCTURAL gate with it.
 #   - Read the verdict from the "## Verdict" SECTION, not from the first
 #     APPROVED/NEEDS_REWORK token in the body -- reviews quote each other's
 #     verdicts, and the checklist rows contain the words too.
+#   - Take the LAST matching review, not the first: a rework cycle leaves the
+#     superseded verdict earlier in the list.
 _gate() {
   _reviews=$1; _kind=$2; _tip=$3
   printf '%s' "$_reviews" | jq -r --arg kind "$_kind" --arg tip "$_tip" '
-    [ .[] | select(.body | test("(?im)^#{1,4} +.*\\b" + $kind + "\\b")) ] | last
+    # Drop fenced blocks before any heading match. Line-wise rather than a
+    # multiline regex so an unterminated fence degrades to "ignore the rest"
+    # instead of matching across the whole body.
+    def strip_fences:
+      split("\n")
+      | reduce .[] as $l ({out: [], inside: false};
+          if ($l | test("^ {0,3}```")) then .inside = (.inside | not)
+          elif .inside then .
+          else .out += [$l] end)
+      | .out | join("\n");
+    [ .[] | select(.body | strip_fences
+                         | test("(?im)^#{1,4} +(qc[- ])?" + $kind + "\\b")) ] | last
     | if . == null then "none"
       else
-        (.body | capture("(?i)Reviewed SHA:?[ `*]*(?<s>[0-9a-f]{8,40})").s // "") as $sha
-        | (.body | capture("(?is)#+ +Verdict[ *`\\n]+(?<v>APPROVED|NEEDS_REWORK)").v
-             // (.body | capture("(?i)Verdict:[ *`]*(?<v>APPROVED|NEEDS_REWORK)").v)
-             // "") as $raw
+        # Every read below is on the FENCE-STRIPPED body, not just the heading
+        # match. A review that quotes another review verbatim carries its
+        # "## Verdict / NEEDS_REWORK" and its "Reviewed SHA" too, and reading
+        # those out of a code block attributes a foreign verdict to this gate.
+        # The first version stripped fences for the heading only, and case 10b
+        # in the test suite caught it immediately.
+        # (No apostrophes in this jq program: it is single-quoted in sh.)
+        (.body | strip_fences) as $clean
+        | ($clean | capture("(?i)Reviewed SHA:?[ `*]*(?<s>[0-9a-f]{8,40})").s // "") as $sha
+        # Each alternative re-enters from $clean. Written as a single piped
+        # chain, the second `.body` would be applied to the STRING the first
+        # produced, jq would exit 5, and -- because the caller assigns bare
+        # under `set -eu` -- the whole run would die mid-table. That also made
+        # the inline "Verdict:" fallback and the "unclear" branch unreachable.
+        | ( ($clean | capture("(?is)#+ +Verdict[ *`\\n]+(?<v>APPROVED|NEEDS_REWORK)").v)
+            // ($clean | capture("(?i)Verdict:[ *`]*(?<v>APPROVED|NEEDS_REWORK)").v)
+            // "" ) as $raw
         | (if $raw == "NEEDS_REWORK" then "rework"
            elif $raw == "APPROVED" then "ok"
            else "unclear" end) as $verdict
@@ -76,6 +112,10 @@ _gate() {
           end
       end'
 }
+
+# Sourcing with PR_GATE_STATUS_LIB=1 stops here, exposing _gate / _is_docs_only
+# for pr_gate_status_test.sh without hitting the network.
+[ "${PR_GATE_STATUS_LIB:-}" = 1 ] && return 0
 
 printf '%-6s %-8s %-14s %-14s %s\n' PR CI STRUCT BEHAV NEXT-ACTION
 printf '%s\n' "----------------------------------------------------------------------------"
