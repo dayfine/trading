@@ -14,8 +14,13 @@ rather than to fill-price perturbation:
 | **5y core** | **0 (0.0%)** | **0 (0.0%)** | 240 |
 | 26y core | 710 (61.9%) | 459 (40.0%) | 1147 |
 
-At 5y the trade set is **bit-identical** across path seeds. At 26y the seed
-re-rolls 40–62% of *which trades happen*.
+At 5y the trade SET is identical across path seeds — the same (symbol,
+entry_date) pairs every time. ⚠ An earlier version said "bit-identical", which
+is wrong and which this document elsewhere contradicts: **454 of 480 control
+rows differ** between salts (`pnl_dollars` 94.6%, `entry_price` 74.2%,
+`quantity` 65.0%). The seed moves fill prices *within* a fixed trade set, which
+is exactly why the control still has a 0.99pp return null. At 26y the seed
+re-rolls 40–62% of *which trades happen* — a different channel entirely.
 
 The proposed mechanism: **a binding capital constraint.** Per
 `project_ticket_dies_on_cash_shortfall`, an unfundable triggered ticket is
@@ -78,7 +83,7 @@ obligation now, before seeing the number.
 
 ---
 
-# RESULT — confirmed. Contention opens the channel; 0% → 13–36%.
+# RESULT — one knob takes divergence from 0% to 13-36%
 
 Completed 09:09, three cells, ~3.5 min each.
 
@@ -98,26 +103,72 @@ confounding the 26y-vs-5y comparison could not escape, removed.
 The magnitude lands in the same range as the 26y cell (40–62%), which is the
 comparison the mechanism was proposed to explain.
 
-## Prediction (2) did NOT fire, and that sharpens the mechanism
+## Prediction (2) did NOT fire — and my reading of why was wrong
 
 `force_liquidations_count` is **0 / 0 / 0** in all three tightened cells — same
 as the control. It was pre-registered as the coarse signal whose absence would
 not refute (1), and that is how it should be read; but the *reason* it stayed
 at zero is informative.
 
-At `max_position_pct_long = 0.33` against `max_long_exposure_pct = 0.70`, only
-about **two positions fit at once**. So the constraint that binds here is a
-**slot** constraint, not cash exhaustion. Forced liquidation is what happens
-when cash runs out; **arrival-order slot competition is what happens when many
-triggered tickets contend for few openings**, and it is the latter that opens
-the discrete channel.
+⚠ **An earlier version of this section reclassified the constraint from cash to
+"slots", reasoning that at `max_position_pct_long = 0.33` against
+`max_long_exposure_pct = 0.70` "only about two positions fit at once". That
+reasoning is wrong, and this PR's own trade data refutes it by 3–6×.** Position
+size is a *cap*, not a target — sizing is driven by stop distance, so most
+positions sit far below the cap and the cap arithmetic does not predict the
+count. Measured from `results/`:
 
-So the mechanism is more precisely stated than in #2436:
+| | control (0.14) | tight (0.33) |
+|---|---:|---:|
+| mean concurrent positions | 5.96 | **5.99** |
+| peak concurrent | 10 | **12** |
 
-> **Any binding admission constraint** — cash *or* slots — makes ticket
-> selection depend on arrival order, and arrival order is path-dependent.
-> Force-liquidation count is a symptom of one particular constraint binding,
-> not a proxy for contention in general.
+**Concurrency is flat.** There is no slot scarcity. Found by qc-behavioral.
+
+### What the knob actually changed
+
+| | control | tight |
+|---|---:|---:|
+| median position notional | $138,758 | **$87,224** |
+| p90 | $226,998 | **$329,381** |
+| max | $284,794 | **$421,067** |
+| mean holding days | 45.4 | **62.5** |
+
+Not "fewer, larger positions" — **wider size dispersion at flat concurrency**,
+with longer holds. The median position got *smaller* while the tail got bigger.
+
+### So what does bind?
+
+`force_liquidations_count` is 0/0/0, so nothing is being force-sold; and slots
+are plentiful. What remains is **admission funding**: per
+`project_ticket_dies_on_cash_shortfall`, a triggered ticket that cannot be
+funded at that moment is destroyed outright, and selection at trigger is
+effectively arrival order. A fatter size tail consumes cash unevenly, so
+*which* tickets are fundable at a given moment becomes path-dependent — without
+any position ever being liquidated.
+
+That is **#2436's original cash account, not a replacement for it** — refined
+only in *when* it binds: at the moment a ticket needs funding, not at the moment
+a position must be sold. The correction cuts back toward the reading this
+section previously claimed to supersede.
+
+> **A binding admission-funding constraint makes ticket selection depend on
+> arrival order, and arrival order is path-dependent.** `force_liquidations_count`
+> is a symptom of cash exhaustion *at the selling end* and is not a proxy for
+> funding contention at the admission end — it stayed 0 throughout.
+
+### The alternative this run does NOT rule out
+
+Because what moved was size dispersion and holding time rather than admission
+pressure per se, a competing explanation is live and untested: **concentration
+alone makes each admission decision more consequential**, so a path difference
+propagates further regardless of whether funding ever binds.
+
+Both readings require *some* binding admission constraint, so the sufficiency
+result below survives either way. But which one operates decides whether the
+forward guidance generalises, and this run does not separate them. Separating
+them needs a cell that raises admission pressure **without** changing size
+dispersion — e.g. holding sizing fixed and cutting starting capital.
 
 ## Cell metrics
 
@@ -137,9 +188,15 @@ noise **31×**, at fixed period and universe.
 
 ## What this establishes, and what it does not
 
-**Does:** a binding admission constraint is **sufficient** to open the
-discrete trade-set channel, at fixed period and universe. The #2436 account is
-supported by an unconfounded test rather than by an n=2 story.
+**Does:** **one config knob**, at fixed period and universe, takes cross-salt
+trade-set divergence from exactly 0% to 13–36%. The 26y-vs-5y comparison could
+not separate that from period and universe; this can, and does.
+
+**Does not:** identify *which* consequence of that knob is responsible.
+Admission-funding contention and concentration-raises-the-stakes are both live
+(see above) and this run does not separate them. Both are forms of "a binding
+admission constraint", so the sufficiency statement holds at that level of
+abstraction and no lower.
 
 **Does not:** prove it is what opens the channel *at 26y*. That cell differs in
 period, universe, breadth and constraint simultaneously. This shows the
@@ -156,9 +213,17 @@ is a soft number.
 
 ## Forward guidance
 
-1. **A backtest's noise floor is a property of how binding its admission
-   constraints are**, not of its length or its tail exposure. Two cells with the
-   same universe and window can differ 31× in relative return noise.
+1. **A backtest's noise floor depends on its portfolio-construction regime, not
+   only on its length or breadth.** Two cells with the **same universe and
+   window** differ **31×** in relative return noise on one knob.
+
+   ⚠ An earlier version wrote this as "a property of how binding its admission
+   constraints are, **not of its length or its tail exposure**" — an exclusivity
+   claim, and one that contradicts this document's own hedge twelve lines above
+   ("does not show it is the only one operating there"). Nothing here rules
+   *out* length or tail exposure; it rules them *in*sufficient as the whole
+   story. Fourth recurrence of that shape today, and this is the paragraph a
+   future session copies forward, which is exactly why it matters.
 2. **Report the constraint regime alongside any null.** A null measured at
    `max_position_pct_long = 0.14` does not transfer to a run at 0.33, let alone
    across universes.
