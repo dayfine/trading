@@ -178,8 +178,151 @@ Ran out of budget before reaching a verdict."
 check "missing verdict section is unclear, not a crash" \
   unclear "$(_gate "$(reviews "$NO_VERDICT_SECTION")" behavioral "$TIP")"
 
+# --- Cases 12-14: the three leaks qc-behavioral found still open after the
+# --- first rework. Each is the SAME false-green as case 10, in a notation the
+# --- fence stripper or the verdict regex did not cover.
+
+# 12. A `~~~` fence is still a fence.
+TILDE_FENCED="Reviewed SHA: 7dc57cc06
+
+## Structural QC — quoting with tildes
+
+~~~
+## Behavioral QC — some other PR
+## Verdict
+APPROVED
+~~~
+
+## Verdict
+
+APPROVED"
+
+check "tilde-fenced heading does not satisfy the quoted gate" \
+  none "$(_gate "$(reviews "$TILDE_FENCED")" behavioral "$TIP")"
+
+# 13. An indented fence is still a fence.
+#     ⚠ The quoted heading is FLUSH LEFT while the fence markers are indented.
+#     The first version of this fixture indented the heading too, which made it
+#     pass on pre-fix code (the heading regex needs `^#`, so an indented heading
+#     never matched in the first place) — a vacuous test that looked green for
+#     the wrong reason. Found by qc-behavioral on #2420.
+INDENTED_FENCE="Reviewed SHA: 7dc57cc06
+
+## Structural QC — quoting inside a list item
+
+    \`\`\`
+## Behavioral QC — some other PR
+    \`\`\`
+
+## Verdict
+
+APPROVED"
+
+check "indented-fence heading does not satisfy the quoted gate" \
+  none "$(_gate "$(reviews "$INDENTED_FENCE")" behavioral "$TIP")"
+
+# 14. An INDENTED verdict heading is a quotation, not this review's verdict.
+#     No fence at all here -- four spaces is how a quoted block often arrives.
+INDENTED_VERDICT="Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — quoting the prior verdict inline
+
+The prior review ended:
+
+    ## Verdict
+
+    APPROVED
+
+## Verdict
+
+NEEDS_REWORK"
+
+check "indented Verdict heading does not supply the verdict" \
+  rework "$(_gate "$(reviews "$INDENTED_VERDICT")" behavioral "$TIP")"
+
+# 15. THE SUITE IS OFFLINE. Sourcing the script must not invoke `gh` -- the
+#     library guard has to sit above every side effect, not merely above the
+#     main loop. It did not, so `gh pr list` ran at source time: harmless on a
+#     laptop with `gh` on PATH, exit 127 in CI. Re-source with a PATH that has
+#     no `gh` and confirm the functions still load.
+#     Pinned with a `gh` STUB that leaves a marker file: shadowing `gh` on PATH
+#     proves a call did not happen, rather than merely that it would fail.
+offline_probe() {
+  _dir=$(mktemp -d)
+  printf '#!/bin/sh\ntouch "%s/called"\n' "$_dir" > "$_dir/gh"
+  chmod +x "$_dir/gh"
+  PATH="$_dir:$PATH" PR_GATE_STATUS_LIB=1 sh -c '. "$1"' _ "$HERE/pr_gate_status.sh" >/dev/null 2>&1
+  if [ -e "$_dir/called" ]; then printf 'gh-was-called'; else printf 'offline'; fi
+  rm -rf "$_dir"
+}
+check "sourcing makes no gh call" offline "$(offline_probe)"
+
+# 17. OVER-STRIPPING MUST NOT GO GREEN. A lone `~~~` opens a fence that never
+#     closes, so the stripper eats the rest of the body including this review's
+#     own "## Verdict". With the inline `Verdict:` fallback left unanchored,
+#     that fallback then matched a QUOTED foreign verdict and returned `ok` —
+#     the exact false green the fence work exists to prevent, reached by being
+#     too eager rather than too lax. The safety claim ("over-stripping can only
+#     produce a false RED") was therefore false until the fallback was anchored.
+OVERSTRIP_WITH_QUOTED_VERDICT="Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — over-stripped by a stray separator
+
+The prior pass ended with Verdict: APPROVED, which I disagree with.
+
+~~~
+
+## Verdict
+
+NEEDS_REWORK"
+
+check "over-stripping never yields ok" \
+  unclear "$(_gate "$(reviews "$OVERSTRIP_WITH_QUOTED_VERDICT")" behavioral "$TIP")"
+
+# 18. The shape case 17 MISSED. Case 17 embeds its quoted verdict mid-sentence,
+#     so anchoring the inline fallback to `^` appeared to fix it — while a
+#     quotation pasted FLUSH LEFT, which is how quotations normally arrive,
+#     still matched at column 0. That was a regression against the pre-fence
+#     code (rework -> ok), not a leftover residual: the anchor moved the hole
+#     rather than closing it. The inline fallback is now deleted outright, and
+#     this fixture is the one that forced it. Found by qc-behavioral on #2420.
+OVERSTRIP_FLUSH_LEFT_QUOTE="Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — quoting the other gate at column zero
+
+The structural pass signed off with:
+
+Verdict: APPROVED
+
+~~~
+
+## Verdict
+
+NEEDS_REWORK"
+
+check "flush-left quoted verdict + unpaired fence never yields ok" \
+  unclear "$(_gate "$(reviews "$OVERSTRIP_FLUSH_LEFT_QUOTE")" behavioral "$TIP")"
+
+# 19. ...and with the stray separator removed, the same body reads its OWN
+#     verdict correctly. Isolates the mechanism: it is the over-strip that
+#     hides the real heading, not the quotation itself.
+FLUSH_LEFT_QUOTE_NO_FENCE="Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — quoting the other gate at column zero
+
+The structural pass signed off with:
+
+Verdict: APPROVED
+
+## Verdict
+
+NEEDS_REWORK"
+
+check "same body without the stray fence reads its own verdict" \
+  rework "$(_gate "$(reviews "$FLUSH_LEFT_QUOTE_NO_FENCE")" behavioral "$TIP")"
+
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"
   exit 1
 fi
-printf 'OK: pr_gate_status -- %d tests clean.\n' 12
+printf 'OK: pr_gate_status -- %d tests clean.\n' 19

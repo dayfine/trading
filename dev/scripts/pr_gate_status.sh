@@ -25,11 +25,12 @@ set -eu
 
 REPO=dayfine/trading
 
-if [ "$#" -gt 0 ]; then
-  PRS="$*"
-else
-  PRS=$(gh pr list --repo "$REPO" --state open --limit 50 --json number --jq '.[].number')
-fi
+# NOTE: the `gh pr list` that discovers open PRs lives at the BOTTOM of this
+# file, after the PR_GATE_STATUS_LIB guard -- not here. It used to sit at the
+# top, which meant sourcing the file for the unit tests ran it before reaching
+# the guard: the "offline" suite made a network call, and in CI (no `gh` on
+# PATH) died with `gh: not found`, exit 127. Keep every side effect below the
+# guard; only definitions belong above it.
 
 # A PR is docs-only (both QC gates skipped, per pr-merge-gates.md) when every
 # path is *.md or under the doc dirs. Anything else -- including experiment
@@ -75,10 +76,20 @@ _gate() {
     # Drop fenced blocks before any heading match. Line-wise rather than a
     # multiline regex so an unterminated fence degrades to "ignore the rest"
     # instead of matching across the whole body.
+    # Both fence spellings, and any indent. Matching only ``` at <=3 spaces let
+    # a ~~~ fence or a 4-space-indented one leak a quoted heading straight back
+    # through -- the same false-green this function exists to stop, one notation
+    # over. An indented fence is not a fence in strict CommonMark, but a review
+    # body is prose, so over-eager is the right default HERE -- but only because
+    # the inline verdict fallback below was deleted. While that fallback existed,
+    # over-stripping could reach a QUOTED foreign verdict and return a false
+    # GREEN; an earlier version of this comment claimed the opposite and was
+    # wrong. With "## Verdict" as the sole verdict source, an over-stripped body
+    # loses its own heading and reads "unclear" -> "inspect manually".
     def strip_fences:
       split("\n")
       | reduce .[] as $l ({out: [], inside: false};
-          if ($l | test("^ {0,3}```")) then .inside = (.inside | not)
+          if ($l | test("^ *(```|~~~)")) then .inside = (.inside | not)
           elif .inside then .
           else .out += [$l] end)
       | .out | join("\n");
@@ -100,8 +111,23 @@ _gate() {
         # produced, jq would exit 5, and -- because the caller assigns bare
         # under `set -eu` -- the whole run would die mid-table. That also made
         # the inline "Verdict:" fallback and the "unclear" branch unreachable.
-        | ( ($clean | capture("(?is)#+ +Verdict[ *`\\n]+(?<v>APPROVED|NEEDS_REWORK)").v)
-            // ($clean | capture("(?i)Verdict:[ *`]*(?<v>APPROVED|NEEDS_REWORK)").v)
+        # `^` anchor on the Verdict heading: without it, an INDENTED quotation
+        # of another review (four spaces, so not a fence at all) supplied this
+        # gate its verdict.
+        | ( ($clean | capture("(?ism)^#+ +Verdict[ *`\\n]+(?<v>APPROVED|NEEDS_REWORK)").v)
+            # `^` here too, for the same reason as the heading form above. Left
+            # unanchored, this fallback made OVER-stripping produce a false
+            # THE INLINE "Verdict: X" FALLBACK IS DELETED, not fixed. It was the
+            # only path by which over-stripping could go GREEN: when the
+            # stripper eats a reviews own "## Verdict" (a lone ~~~ is enough),
+            # the fallback matched a QUOTED FOREIGN verdict instead. Anchoring
+            # it to ^ did not close that -- it moved the hole from "anywhere in
+            # the line" to "column 0", which is exactly where a pasted block
+            # quotation sits, and left a REGRESSION against the pre-fence code
+            # (rework -> ok on a flush-left quotation plus an unpaired fence).
+            # Nothing in the suite depends on the branch: the inline form
+            # appears in one fixture, negatively. A review with no "## Verdict"
+            # heading now reads "unclear" -> "inspect manually", fail-safe.
             // "" ) as $raw
         | (if $raw == "NEEDS_REWORK" then "rework"
            elif $raw == "APPROVED" then "ok"
@@ -114,8 +140,15 @@ _gate() {
 }
 
 # Sourcing with PR_GATE_STATUS_LIB=1 stops here, exposing _gate / _is_docs_only
-# for pr_gate_status_test.sh without hitting the network.
+# for pr_gate_status_test.sh without hitting the network. EVERYTHING BELOW THIS
+# LINE IS A SIDE EFFECT and must stay below it.
 [ "${PR_GATE_STATUS_LIB:-}" = 1 ] && return 0
+
+if [ "$#" -gt 0 ]; then
+  PRS="$*"
+else
+  PRS=$(gh pr list --repo "$REPO" --state open --limit 50 --json number --jq '.[].number')
+fi
 
 printf '%-6s %-8s %-14s %-14s %s\n' PR CI STRUCT BEHAV NEXT-ACTION
 printf '%s\n' "----------------------------------------------------------------------------"

@@ -111,3 +111,15 @@ jobs:
           eval $(opam env)
           # @fmt fails if formatting would change anything; no --auto-promote.
           dune build @fmt
+
+      # dev/scripts/ sits OUTSIDE the dune root (trading/), so `dune runtest`
+      # cannot depend on it and these guards would otherwise be enforced by
+      # nothing -- qc-behavioral's finding on #2419: a suite on no alias and in
+      # no workflow is documentation, not a test. pr_gate_status.sh is what the
+      # merge loop reads instead of remembering gate state, so a regression in
+      # it can mark a gate green that never ran.
+      #
+      # Offline: fixtures are review bodies, no `gh` call, no network.
+      - name: pr_gate_status guards
+        working-directory: .
+        run: sh dev/scripts/pr_gate_status_test.sh
