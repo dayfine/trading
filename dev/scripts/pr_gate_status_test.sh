@@ -259,11 +259,14 @@ check "sourcing makes no gh call" offline "$(offline_probe)"
 
 # 17. OVER-STRIPPING MUST NOT GO GREEN. A lone `~~~` opens a fence that never
 #     closes, so the stripper eats the rest of the body including this review's
-#     own "## Verdict". With the inline `Verdict:` fallback left unanchored,
-#     that fallback then matched a QUOTED foreign verdict and returned `ok` —
-#     the exact false green the fence work exists to prevent, reached by being
-#     too eager rather than too lax. The safety claim ("over-stripping can only
-#     produce a false RED") was therefore false until the fallback was anchored.
+#     own "## Verdict". An earlier version of this matcher had an inline
+#     `Verdict:` fallback that, in this exact shape, matched a QUOTED foreign
+#     verdict and returned `ok` -- the exact false green the fence work exists
+#     to prevent, reached by being too eager rather than too lax. That fallback
+#     is now deleted outright (not merely anchored -- anchoring it to `^` only
+#     moved the hole to column 0, see case 18 below), so with "## Verdict" as
+#     the sole verdict source, an over-stripped body loses its own heading
+#     entirely and reads "unclear", fail-safe.
 OVERSTRIP_WITH_QUOTED_VERDICT="Reviewed SHA: 7dc57cc06
 
 ## Behavioral QC — over-stripped by a stray separator
@@ -321,8 +324,68 @@ NEEDS_REWORK"
 check "same body without the stray fence reads its own verdict" \
   rework "$(_gate "$(reviews "$FLUSH_LEFT_QUOTE_NO_FENCE")" behavioral "$TIP")"
 
+# 20. #2421. A review that quotes ANOTHER gate's "## Verdict" heading flush left
+#     -- no fence, no indent needed at all -- has that quotation read as its own
+#     verdict, because `capture()` (no /g) returns the FIRST match in the body
+#     and the quoted heading sits above the review's real one. Distinct from
+#     case 14 (indented quote) and cases 17-19 (fence-adjacent): this one needs
+#     no fence and no indentation, just a second "## Verdict" heading earlier in
+#     the body. The review's own verdict is the LAST "## Verdict" section.
+QUOTES_A_VERDICT_HEADING_FLUSH_LEFT="Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — my review
+
+The structural pass ended:
+
+## Verdict
+
+APPROVED
+
+## Verdict
+
+NEEDS_REWORK"
+
+check "quoted flush-left Verdict heading above the real one does not win (#2421)" \
+  rework "$(_gate "$(reviews "$QUOTES_A_VERDICT_HEADING_FLUSH_LEFT")" behavioral "$TIP")"
+
+# 21. Symmetric case to #20, deliberately NOT required to pass: a review states
+#     its OWN verdict first, then appends an addendum quoting a DIFFERENT
+#     verdict below it. Taking the last unfenced "## Verdict" section (the #2421
+#     fix) reads the addendum's quotation, not the review's real verdict, here.
+#     This is a known, accepted gap -- see the comment above _gate's verdict
+#     extraction and the PR body for #2421. Not asserted against; recorded so a
+#     future reader does not "rediscover" it as new. (No `check` call: this is
+#     documentation of current behavior, not a requirement.)
+ADDENDUM_QUOTES_A_DIFFERENT_VERDICT_AFTER="Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — my review
+
+## Verdict
+
+NEEDS_REWORK
+
+Addendum: for context, the prior structural pass ended:
+
+## Verdict
+
+APPROVED"
+
+printf 'note %s: known gap, addendum-quoted verdict read as %s (see #2421)\n' \
+  "symmetric addendum case is NOT handled by last-match" \
+  "$(_gate "$(reviews "$ADDENDUM_QUOTES_A_DIFFERENT_VERDICT_AFTER")" behavioral "$TIP")"
+
+# 22. CRLF line endings. A pasted-in review body can carry \r\n rather than
+#     plain \n; the gap between the "## Verdict" heading and its token used to
+#     be matched by a class with no \r in it, so the trailing \r broke the
+#     match entirely and the gate read "unclear" instead of the real verdict.
+#     Built with printf (not a shell here-doc) so the \r bytes are real, not a
+#     literal backslash-r.
+CRLF_BODY=$(printf 'Reviewed SHA: 7dc57cc06\r\n\r\n## Behavioral QC crlf review\r\n\r\n## Verdict\r\n\r\nNEEDS_REWORK\r\n')
+check "CRLF body still reads its own verdict" \
+  rework "$(_gate "$(reviews "$CRLF_BODY")" behavioral "$TIP")"
+
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"
   exit 1
 fi
-printf 'OK: pr_gate_status -- %d tests clean.\n' 19
+printf 'OK: pr_gate_status -- %d tests clean.\n' 21

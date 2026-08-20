@@ -857,6 +857,53 @@ finding kept below for the record.
 
 ## Completed work
 
+### `pr_gate_status.sh` — last-unfenced-Verdict fix (#2421)
+
+**Status:** DONE (2026-08-20) — `harness/gate-verdict-last-match`
+
+`_gate` in `dev/scripts/pr_gate_status.sh` reads a QC review's verdict from its
+"## Verdict" section using jq's `capture()`, which has no `/g` and returns only
+the **first** match in the (fence-stripped) body. A review that quotes another
+gate's sign-off flush left — no fence, no indent, nothing the existing fence
+stripper or indent guards touch — has that quotation's "## Verdict" heading
+read as the review's own, because it sits above the review's real verdict.
+Found by qc-behavioral while reviewing #2420; reproduces at merge-base
+`f8d7e4da` as well as current main, so it predates and is independent of the
+#2419/#2420 fence work. On the autonomous merge path this is `pass:ok:ok →
+MERGE` on a PR that was told to rework.
+
+**Fix:** take the **last** unfenced "## Verdict" match instead of the first
+(`[$clean | match(...; "g")] | last`), mirroring the `| last` pattern already
+used for review selection. Because `$clean` is already fence-stripped before
+this match runs, "last match in `$clean`" already *is* "last top-level Verdict
+not inside a fence" — no separate fence-awareness needed in the new code.
+
+**Known, deliberately unfixed gap:** a review that states its own verdict
+first and appends an addendum quoting a *different* verdict below it will have
+the addendum win instead — last-match and first-match are symmetric failure
+modes and neither is correct in general. Fixing this needs quotation markers
+(e.g. blockquote `>`) that no review body in this repo uses today. Pinned as a
+documented (non-asserting) case in the test suite rather than silently
+reintroduced later; empirical exposure is nil either way (88/88 recent QC
+reviews carry exactly one "## Verdict" section).
+
+Also in this PR: fixed CRLF line endings producing `unclear` (the gap class
+between the "## Verdict" heading and its token now includes `\r`, a one-char,
+fence-logic-independent addition); restored the script's exec bit
+(100644 → 100755, dropped by an earlier rework commit); corrected several
+stale in-code comments left over from the #2420 fallback deletion (both in
+`pr_gate_status.sh`'s `_gate` function and in `pr_gate_status_test.sh`'s case
+17); confirmed the two declared-and-not-fixed residuals (a heading inside an
+HTML comment, and a heading between a nested fence's outer-open and
+inner-open) still reproduce exactly as described, so they are not
+rediscovered as new.
+
+Verify: `sh dev/scripts/pr_gate_status_test.sh` — 21/21 cases pass (19
+pre-existing + the #2421 reproduction case + the CRLF case), plus one
+documented non-asserting note for the symmetric addendum gap.
+`sh trading/devtools/checks/posix_sh_check.sh` stays green (no non-POSIX
+constructs introduced).
+
 ### Orchestrator idempotency — Step 1.5 dispatch guard + structured summary format
 
 **Status:** DONE (2026-04-16) — `harness/orchestrator-idempotency`
