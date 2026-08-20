@@ -71,7 +71,7 @@ and is beaten by nothing.
 
 **Does not settle:** which value live should use. Both horizons put live's
 `15.0` below `2.0` on return and Calmar, which points at **changing live to
-2.0** rather than re-pinning 82 backtest specs to 15.0 — but that is a
+2.0** rather than re-pinning the 81 committed specs to 15.0 — but that is a
 fidelity decision for the user, and it is a *ranking* claim on one universe and
 one base scenario, not a promotion-grade result.
 
@@ -92,3 +92,13 @@ evidence; it is the horizon control the 1-year surface needed.
   building concurrently, so 2 rather than H1's measured-best 3).
 - `walk_forward_report_3y.md` — full per-fold table, stability, sensitivity, verdict.
 - `aggregate_3y.sexp` — machine-readable aggregate.
+- `aggregate_1y.sexp`, `fold_actuals_1y.sexp` — **the 1-year surface this one
+  controls for**, archived on QC's recommendation so the whole two-horizon table
+  above is falsifiable rather than half-quoted from a `/tmp` log. #2411 merged
+  the 1y spec without its outputs.
+
+  These confirm the 1y column exactly (`fold_count 16`; means 7.8676 / 8.6817 /
+  7.8676 / 6.4359 / 6.7392 / 6.6796 for baseline / 1.0 / 2.0 / 5.0 / 10.0 /
+  15.0) — and they show the **null tripwire held at 1 year too**: `2.0` and
+  `baseline` are the same value to the last digit there as well, so the axis
+  bound identically on both surfaces.
