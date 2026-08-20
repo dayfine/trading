@@ -20,9 +20,9 @@
 >
 > Stated precisely, because the count matters: **three** metrics cleared Rule 4
 > at 26y (ulcer, win rate, MaxDD). On broad-5y MaxDD holds, ulcer holds its
-> direction, and **win rate is contradicted** — it flips sign, with s1 at 2.24×
-> its own null. So the broad cell **splits** the 26y result rather than simply
-> confirming it.
+> direction, and **win rate FAILS Rule 4** — s0 and s2 agree with the 26y
+> direction above null, but s1 opposes at 2.24x, so the leg is not unanimous.
+> So the broad cell **splits** the 26y result rather than simply confirming it.
 >
 > **The measured cause.** The nulls do not transfer between universes, and they
 > do not even move in the same *direction* per metric:
@@ -35,9 +35,15 @@
 > | win rate pp | 0.4167 | 1.3706 | 3.3× |
 > | MaxDD pp | 0.3616 | **0.1581** | **0.44×** |
 >
-> Breadth makes return noisier and drawdown *more stable*. Against this cell's
-> 0.99pp return null a −6pp gap reads as decisive; against the true broad null
-> of 14.65pp the same gap is invisible.
+> Breadth makes return noisier and drawdown *more stable*. The consequence is
+> visible in this cell's own headline: its measured return gap was **−67.20pp
+> against a 0.9862pp null — 68×**, which reads as overwhelming. The same arm on
+> broad-5y produces −6.219 / −16.576 / **+7.826** pp against a 14.650pp null
+> (0.42× / 1.13× / 0.53×) — only s1 outside the null, and s2 flipping sign.
+>
+> The 0.9862pp null is **not** the error here; it is the correct null for
+> sp500-500. What does not carry is the *inference*, because the surface it was
+> measured on does not generalise.
 >
 > **What still stands.** The null-measurement *method* is sound and the numbers
 > in this file are correct as measurements of the sp500-500 testbed — **0.9862pp
@@ -46,8 +52,8 @@
 > any inference from these numbers about `Range_top_breakout`.
 >
 > #2433's **drawdown** finding is not contradicted — MaxDD now agrees across both
-> windows. Its **win-rate** leg is contradicted by the broad cell and should not
-> be quoted as a Rule-4 survivor without that counter-evidence.
+> windows. Its **win-rate** leg fails Rule 4 on the broad cell (s1 opposes above
+> null) and should not be quoted as a Rule-4 survivor without that evidence.
 >
 > **Rule that came out of it:** `.claude/rules/universe-discipline.md` (#2444) —
 > sp500 is a sanity-check / rule-validation fixture, never a measurement

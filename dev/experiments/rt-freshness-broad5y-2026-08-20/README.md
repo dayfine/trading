@@ -106,7 +106,7 @@ noisier on breadth; **MaxDD gets 2.3× more stable.**
 | ulcer | −0.985 | −1.381 | −2.265 | **0.88×** / 1.2× / 2.0× | direction holds 3/3; s0 inside its null |
 | return | −6.219 | −16.576 | **+7.826** | — | sign flips |
 | Sharpe | −0.078 | −0.221 | **+0.089** | — | sign flips |
-| **win rate** | +3.318 | **−3.068** | +2.196 | s1 = **2.24×** null | **sign flips — see below, this one is a CONTRADICTION** |
+| **win rate** | +3.318 | **−3.068** | +2.196 | s1 = **2.24x** null | **FAILS Rule 4** — 2 salts agree above null, s1 opposes; see below |
 | trades | −5 | **+4** | −12 | — | sign flips |
 | holding days | −0.317 | −4.965 | **+1.204** | — | sign flips |
 | sortino | −0.1061 | −0.2990 | **+0.1308** | — | sign flips |
@@ -138,7 +138,7 @@ MaxDD 1.02×), not two. Of those three, on broad-5y:
 |---|---|
 | MaxDD | **holds** — passes Rule 4 here too, 14.9× / 1.4× / 19.3× |
 | ulcer | **direction holds** 3/3, but s0 sits inside its null (0.88×) |
-| **win rate** | **CONTRADICTED** — sign flips, and s1's −3.068pp is **2.24×** its own null |
+| **win rate** | **FAILS Rule 4** — s0 (+3.318, 2.42x) and s2 (+2.196, 1.60x) agree with the 26y direction above null; **s1 (-3.068) actively opposes at 2.24x**. Not unanimous, so the leg does not carry. |
 
 So this cell does not simply fail to reverse; it **splits** the 26y result.
 
@@ -147,8 +147,9 @@ Consequences, as pre-registered:
 - **#2436's headline claim is wrong as stated** and is retracted; see the
   correction appended to `dev/experiments/rt-freshness-5y-null-2026-08-20/README.md`.
 - **#2433's drawdown finding is not contradicted** — MaxDD now agrees across
-  both windows. **Its win-rate leg IS contradicted** and should no longer be
-  quoted as a Rule-4 survivor without this cell's counter-evidence. An earlier
+  both windows. **Its win-rate leg FAILS Rule 4 here** — s0 and s2 agree with the 26y direction
+  above null, s1 opposes at 2.24x, so the leg is not unanimous and should no
+  longer be quoted as a Rule-4 survivor without this cell's counter-evidence. An earlier
   version of this section said "#2433's 26y result stands un-contradicted",
   which was false.
 - `Range_top_breakout` is still **not promotable** — nothing here changes that,
@@ -200,7 +201,7 @@ metric families.
 It also states the cost of the universe error concretely. On sp500-5y the
 measured return gap was **−67.20pp against a 0.9862pp null — 68×**, which reads
 as overwhelming. The same *arm* on broad-5y produces gaps of −6.219 / −16.576 /
-**+7.826** pp against a 14.650pp null: two inside the null and a sign flip.
+**+7.826** pp against a 14.650pp null — 0.42x, 1.13x and 0.53x of it. Only s1 exceeds the null; s0 and s2 sit inside it, and s2 also flips sign.
 
 An earlier version of this paragraph wrote "on sp500-5y a −6pp gap sits at 6× a
 0.99pp null." That mislabelled scope — −6.219pp is *this* cell's s0 figure, not
