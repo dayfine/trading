@@ -59,14 +59,31 @@ if [ "$n_pnl" -lt "$n_trades" ]; then
   echo "!! Every cohort figure below is over the joinable subset only. On a post-#2317 run this should be 0."
 fi
 
-# --- 3. work list: placement state + fill date, one row per round trip ------
+# --- 3. work list: placement state + fill date, one row per position_id -----
+# ⚠ position_id is NOT unique in trades.csv. On this run `FARM-wein-914` carries
+# two round trips (−1,586.38 and +2,164.52, same fill date). Keying P&L by id
+# with last-wins therefore double-counted one and dropped the other — a +3,750.90
+# overstatement that showed up as an unexplained 3,751 gap between two totals.
+# So: SUM P&L per id, and take the earliest fill date. `position_id` remains the
+# right join key (symbols repeat far more), but it is not a unique key, and a
+# join that assumes it is will silently lose rows.
 awk -F'\t' '
-  FNR==NR { sym[$1]=$2; place[$1]=$3; e[$1]=$5; stop[$1]=$6; lrt[$1]=$7; kind[$1]=$8; age[$1]=$9; next }
-  ($1 in place) { printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", $1, sym[$1], place[$1], $3, e[$1], stop[$1], lrt[$1], kind[$1], $2; next }
-  { unjoined++ }
-  END { if (unjoined) printf "!! %d round trips had no entry decision\n", unjoined > "/dev/stderr" }
-' "$WORK/tickets.tsv" "$WORK/pnl.tsv" > "$WORK/work.tsv"
-echo "joined (position_id): $(wc -l < "$WORK/work.tsv")"
+  FNR==NR { sym[$1]=$2; place[$1]=$3; e[$1]=$5; stop[$1]=$6; lrt[$1]=$7; kind[$1]=$8; next }
+  {
+    if (!($1 in place)) { unjoined++; next }
+    pnl[$1] += $2
+    if (!($1 in fill) || $3 < fill[$1]) fill[$1] = $3
+    seen[$1]++
+  }
+  END {
+    for (pid in pnl) {
+      printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%.2f\n", pid, sym[pid], place[pid], fill[pid], e[pid], stop[pid], lrt[pid], kind[pid], pnl[pid]
+      if (seen[pid] > 1) printf "!! %s carries %d round trips; their P&L is summed\n", pid, seen[pid] > "/dev/stderr"
+    }
+    if (unjoined) printf "!! %d round trips had no entry decision\n", unjoined > "/dev/stderr"
+  }
+' "$WORK/tickets.tsv" "$WORK/pnl.tsv" | sort > "$WORK/work.tsv"
+echo "joined (unique position_id): $(wc -l < "$WORK/work.tsv")"
 
 # --- 4. per-ticket bar reduction over [placement, fill] --------------------
 : > "$WORK/bars.tsv"
@@ -133,19 +150,26 @@ done
 # --- 7. is "broken base" just age in disguise? -----------------------------
 # The whole premise of #2407 is that these are DIFFERENT variables. If the
 # cross-tab is diagonal, the mechanism is the clock wearing a new name.
-echo ""
-echo "=== cross-tab: rest (trading bars) vs broken_4w ==="
-awk -F'\t' '
-  { band = ($4<=5?"0-1wk":($4<=25?"1-5wk":($4<=65?"5-13wk":($4<=130?"13-26wk":">26wk"))))
-    k = band "|" ($6?"BROKEN":"held"); n[k]++; s[k]+=$8 }
-  END {
-    printf "%-8s %-7s %6s %14s\n", "rest","base","n","pnl"
-    split("0-1wk 1-5wk 5-13wk 13-26wk >26wk", ord, " ")
-    for (i=1;i<=5;i++) for (j=1;j<=2;j++) {
-      st = (j==1?"held":"BROKEN"); k = ord[i] "|" st
-      if (k in n) printf "%-8s %-7s %6d %14.0f\n", ord[i], st, n[k], s[k]
-    }
-  }' "$WORK/joined.tsv"
+# Emit the cross-tab for BOTH the 4w and the 8w flag. The first version printed
+# only the 4w one while the writeup reported the 8w table, so re-running the
+# committed script did not reproduce the committed result — a future session
+# would have read that as a reproduction failure.
+for xcol in 6 7; do
+  case $xcol in 6) xlabel=broken_4w;; 7) xlabel=broken_8w;; esac
+  echo ""
+  echo "=== cross-tab: rest (trading bars) vs $xlabel ==="
+  awk -F'\t' -v c=$xcol '
+    { band = ($4<=5?"0-1wk":($4<=25?"1-5wk":($4<=65?"5-13wk":($4<=130?"13-26wk":">26wk"))))
+      k = band "|" ($c?"BROKEN":"held"); n[k]++; s[k]+=$8 }
+    END {
+      printf "%-8s %-7s %6s %14s %12s\n", "rest","base","n","pnl","per_trade"
+      split("0-1wk 1-5wk 5-13wk 13-26wk >26wk", ord, " ")
+      for (i=1;i<=5;i++) for (j=1;j<=2;j++) {
+        st = (j==1?"held":"BROKEN"); k = ord[i] "|" st
+        if (k in n) printf "%-8s %-7s %6d %14.0f %12.0f\n", ord[i], st, n[k], s[k], s[k]/n[k]
+      }
+    }' "$WORK/joined.tsv"
+done
 
 # --- 8. concentration check ------------------------------------------------
 # 85% of this strategy's return is ~10 trades; a cohort verdict that flips when

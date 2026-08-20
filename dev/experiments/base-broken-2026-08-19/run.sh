@@ -20,7 +20,13 @@
 #   -- then reads weekly bars between placement and fill to split fills into
 #   base-held vs base-broken and attribute P&L to each.
 #
-# Pinned-worktree + flock + memory/disk guards per sweep-hygiene.md.
+# Pinned-worktree + memory/disk guards per sweep-hygiene.md.
+#
+# NO flock: macOS has no flock(1), so the single-instance guard that rule asks
+# for is NOT implemented here (an earlier version of this header claimed it was).
+# Concurrency safety for this script rests on the pinned worktree and on the
+# caller not launching it twice; if you extend it into a multi-arm chain, add a
+# real mutex first.
 set -e
 
 C=trading-1-dev

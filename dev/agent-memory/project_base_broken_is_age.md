@@ -5,16 +5,16 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 7959dddf-3101-4cab-8f02-c90b77a7d8fd
-  modified: 2026-08-20T00:53:41.958Z
+  modified: 2026-08-20T01:14:19.992Z
 ---
 
 **"Cancel when the base breaks" is the clock with extra steps.** Measured on the
 26y record base (`ttl-retest-00-null` at pinned `59b26c3bf`, tripwire
-`total_return_pct 281.707836178685`, 1147/1147 joined on `position_id`).
+`total_return_pct 281.707836178685`, 1,147 round trips over 1,146 `position_id`s).
 
 #2407's claim was that a structural test **dominates** the clock by keeping the
 long-but-valid bases age destroys. That population is **10 fills, +17,678,
-0.76%** of the run's 2,318,703 — and half of them lost money, because **79 of
+0.764%** of the run's 2,314,952 — and half of them lost money, because **79 of
 the 89 fills resting >26wk had already broken their 8-week base low.**
 
 | rule | cuts | cohort P&L |
@@ -40,8 +40,9 @@ test, never the ticket's own stop.
 
 Robustness: minus the top 3 trades, `broken_stop` goes +1,048,334 → **−65,575**
 and `broken_4w` +320,073 → **−160,671**; `broken_8w` goes −222,667 →
-**−587,105**. The shallow flags' positive sign is one trade (MSTR +661,246 =
-63% of `broken_stop`). Only the deepest flag's sign is real.
+**−587,105**. Both shallow flags *survive* minus-top-1 (+387,087 / +116,235) and
+flip at three — their sign rests on a handful of trades, not on one. Only the
+deepest flag's sign is untouchable by a tail argument.
 
 ## Transferable
 
@@ -59,6 +60,19 @@ and `broken_4w` +320,073 → **−160,671**; `broken_8w` goes −222,667 →
   [[project-stale-order-fills-are-not-an-edge]]. The clock's remaining risk is
   tail-lottery variance in any one window, which is a confirmation-grid problem
   ([[project-promotion-confirmation-grid]]), not a discriminator problem.
+
+## `position_id` is the right join key but NOT a unique one
+
+`trades.csv` had 1,147 rows over **1,146** ids — `FARM-wein-914` carries two
+round trips. Keying P&L into an awk array by id overwrote one with the other:
+total overstated by **+3,750.90**. Sum per id, and warn on any id with >1 round
+trip. Qualifies [[feedback-position-id-is-the-only-join-key]]: *only valid* ≠
+*unique*.
+
+The tell was visible and explained away — two totals off the same file differed
+by 3,751 and I recorded it as my own arithmetic slip instead of chasing it.
+qc-behavioral on #2417 found it. **An unexplained discrepancy between two
+computations of the same quantity is a defect until proven otherwise.**
 
 ## Instrumentation trap this uncovered
 

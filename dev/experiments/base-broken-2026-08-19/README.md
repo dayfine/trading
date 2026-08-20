@@ -13,8 +13,11 @@ population** — 79 of the 89 fills resting >26 weeks had already broken their
 
 Run: `ttl-retest-00-null` at pinned `59b26c3bf`, 26y × top-3000, wall 6877s.
 **Tripwire passed exactly** — `total_return_pct 281.707836178685`, 1147 trades,
-so these artifacts describe the record base. 1147 of 1147 round trips joined on
-`position_id`; zero blanks.
+so these artifacts describe the record base. All 1,147 round trips joined, with
+zero blank `position_id`s — over **1,146 unique ids**, because one id
+(`FARM-wein-914`) carries two round trips. See the join note at the bottom: the
+first version of this measurement keyed P&L by id with last-wins and so
+overstated the total by 3,750.90.
 
 ## The question, stated as an estimand
 
@@ -103,21 +106,27 @@ a finding.
 
 ## Results
 
-Total realized P&L on the base: **2,318,703** over 1,147 round trips.
+Total realized P&L on the base: **2,314,952** over 1,146 position ids.
 
 ### The three flags disagree on sign — and the disagreement is structured
 
 | flag | breach depth | n | cohort P&L | per trade | % of total |
 |---|---|---:|---:|---:|---:|
-| `broken_stop` | below the ticket's own stop (shallowest) | 339 | **+1,048,334** | +3,092 | +45.2% |
+| `broken_stop` | below the ticket's own stop (shallowest) | 339 | **+1,048,334** | +3,092 | +45.3% |
 | `broken_4w` | below the 4-week base low | 195 | +320,073 | +1,641 | +13.8% |
 | `broken_8w` | below the 8-week base low (deepest) | 131 | **−222,667** | −1,700 | −9.6% |
 
 Monotone in breach depth: **+3,092 → +1,641 → −1,700 per trade.** A shallow dip
 below the resting ticket's own stop is not a broken base — those fills *beat*
-the average (held: +1,572/trade). That is the same lesson the re-screen REJECT
+the average (held: +1,570/trade). That is the same lesson the re-screen REJECT
 taught at −137pp: a pullback that resumes **is** the base-building pattern.
 A break below the 8-week low is a different animal.
+
+⚠ **The per-trade means in that table are underpowered** at n=195 and n=131,
+below the ~230 this strategy's dispersion needs
+(`feedback_perturb_before_believing_a_cohort_split`). They are reported because
+the *ordering* is what the dose-response claim rests on, and because the verdict
+below rests on counts and totals (89, 79, 10, 52) rather than on any mean.
 
 ### Only the deepest flag is robust to the tail
 
@@ -127,16 +136,20 @@ A break below the 8-week low is a different animal.
 | `broken_4w` | +320,073 | +116,235 | **−160,671** |
 | `broken_8w` | −222,667 | **−371,317** | **−587,105** |
 
-The two shallow flags' positive totals are one and three trades respectively —
-MSTR alone (+661,246) is 63% of `broken_stop`. Their sign is a tail artifact.
-`broken_8w` gets *more* negative as winners are removed, so its negative sign is
-the one real result here.
+Both shallow flags survive losing their single best trade and **flip at the top
+three** — `broken_stop` at +387,087 minus-top-1 is still positive, and only
+−65,575 once three are gone; `broken_4w` likewise. So their positive sign rests
+on a handful of trades, not on one (an earlier draft of this file said "one
+trade", which overstated it — MSTR's +661,246 is 63% of `broken_stop`'s total
+but not the whole of its sign). `broken_8w` gets *more* negative as winners are
+removed, so its negative sign is the one result here that a tail argument cannot
+touch.
 
 ### But it is age wearing a structural mask
 
 | rest | base | n | P&L | per trade |
 |---|---|---:|---:|---:|
-| 0-1wk | held | 608 | +1,724,084 | +2,836 |
+| 0-1wk | held | 607 | +1,720,333 | +2,834 |
 | 1-5wk | held | 269 | −186,567 | −694 |
 | 1-5wk | BROKEN | 3 | −22,107 | −7,369 |
 | 5-13wk | held | 97 | +946,522 | +9,758 |
@@ -223,3 +236,21 @@ reported base-HELD and all three flags were identically zero** — a clean,
 plausible, entirely false null. What caught it was not the tables (which looked
 fine) but the contradiction between `placement == entry` on every row and a
 non-zero age column two fields away.
+
+## And the join trap underneath it: `position_id` is not UNIQUE
+
+`trades.csv` has 1,147 rows over **1,146** distinct `position_id`s —
+`FARM-wein-914` carries two round trips (−1,586.38 and +2,164.52, same fill
+date). The first version keyed P&L into an array by id, so the second row
+overwrote the first: one P&L double-counted, one dropped, total overstated by
+**+3,750.90**.
+
+`position_id` is still the right join key — symbols repeat far more
+(`feedback_position_id_is_the_only_join_key`) — but "the only valid key" does
+not mean "a unique key", and an assignment-style join silently loses rows.
+`measure.sh` now **sums** P&L per id and prints a warning naming any id with
+more than one round trip.
+
+The tell was there and I explained it away: two totals computed from the same
+file differed by 3,751, and I recorded that as my own arithmetic slip rather
+than chasing it. It was this. Found by qc-behavioral on #2417, not by me.
