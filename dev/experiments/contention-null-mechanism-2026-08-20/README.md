@@ -22,10 +22,13 @@ s0-vs-s1 and **228 (95.0%)** for s0-vs-s2; per field on s0-vs-s1,
 `pnl_dollars` 94.6% / `entry_price` 74.2% / `quantity` 65.0%. Pooled across both
 pairs that is 455 of 480.
 
-⚠ An earlier version said "454 of 480", which was **227 doubled** — one pair
-counted twice and mislabelled as the pooled figure, the same double-count this
-PR corrects in the divergence metric. It escaped notice because 454/480 =
-94.58% is accidentally within rounding of the true 94.6% per-pair rate. The seed moves fill prices *within* a fixed trade set, which
+⚠ An earlier version said "454 of 480" with no scope named. The figures above
+name every scope; that is the fix. **No causal account of where 454 came from
+is offered here** — 2×227, a truncated 94.58% of 480, and an off-by-one against
+455 all reproduce it, and the sibling record (#2441) dropped its own "227
+doubled" explanation for exactly that reason.
+
+The seed moves fill prices *within* a fixed trade set, which
 is exactly why the control still has a 0.99pp return null. At 26y the seed
 re-rolls a large fraction of *which trades happen* — a different channel
 entirely. ⚠ The table above quotes #2436 as it read at the time; both records
@@ -199,11 +202,33 @@ dispersion.
 is no capital field in `trading/trading/backtest/scenarios/scenario.mli` —
 `initial_cash` is a module constant (`trading/trading/backtest/lib/runner.ml:14`,
 `let initial_cash = 1_000_000.0`) and is unreachable from `config_overrides`.
-The spec-expressible equivalents are lowering `max_long_exposure_pct` or raising
-`min_cash_pct`, both of which raise admission pressure at fixed per-position
-sizing — and both are already set in this PR's own spec
-(`specs/contention-tight.sexp:60-61`), so the next session should vary them
-rather than start by patching the runner.
+⚠ **And not by the two knobs the previous version then recommended.** It said
+"lowering `max_long_exposure_pct` or raising `min_cash_pct`, both of which raise
+admission pressure at fixed per-position sizing". **Both are wrong**, verified
+in source:
+
+- **`min_cash_pct` is dead code.**
+  `trading/trading/weinstein/portfolio_risk/lib/portfolio_risk.mli:155-161`:
+  *"Deprecated as of 2026-05-01: never wired into the entry walk's
+  `check_cash_and_deduct`. … Field retained for sexp compat."* The evidence I
+  cited in its favour is in fact the disproof — `contention-tight.sexp:61`
+  already sets it to 0.30 in **both** arms, and the control still has a 0.99pp
+  null.
+- **`max_long_exposure_pct` is not "at fixed per-position sizing".** It enters
+  per-position sizing directly: `portfolio_risk.ml:_max_shares_by_caps` computes
+  `dollar_cap = Float.min exposure_cap position_cap` with
+  `exposure_cap = portfolio_value × max_long_exposure_pct`. Lowering it toward
+  or below `max_position_pct_long = 0.33` caps **every** position and compresses
+  size dispersion — precisely the confound this cell exists to avoid.
+
+**So there is currently NO spec-expressible knob that raises admission pressure
+without also moving per-position sizing.** The discriminating cell needs either
+a code change (make `initial_cash` reachable from the spec) or a different
+design. Saying so is more useful than a recommendation that does not work.
+
+This correction is the same defect class as the one it replaces, one layer
+down: a confident mechanism claim about code, asserted without reading the
+code. Found by qc-behavioral.
 
 ## Cell metrics
 
