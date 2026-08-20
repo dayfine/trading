@@ -31,8 +31,7 @@
 # Each checker below runs a probe against a known-present fact of the real
 # repo BEFORE trusting its own output, and aborts nonzero if the probe fails.
 # This is not decorative: on 2026-08-20 a flag-eligibility check used a `\s`
-# pattern, which BSD grep (the local dev machine) does not expand inside a
-# POSIX/extended regex -- it silently matched nothing, so EVERY flag's
+# pattern that matched nothing on the local dev machine, so EVERY flag's
 # live-reference count read as zero, and the check reported a false clean
 # bill of health ("every flag already unreferenced, safe to remove"). A
 # checker whose match primitive is broken must not be allowed to report an
@@ -41,13 +40,22 @@
 # assert is true today, and refuses to proceed if it isn't.
 #
 # Every regex below uses the POSIX bracket class [[:space:]], never \s,
-# because BSD grep does not expand \s inside a POSIX/extended regex and a
-# \s pattern there matches nothing -- which for a checker means reporting
-# "found none", i.e. a false clean bill of health.
+# because \s is a GNU extension with no meaning in POSIX ERE: an
+# implementation may read it as the whitespace class, as a literal `s`, or
+# as undefined. When it does not mean whitespace, an indented-declaration
+# grep matches nothing -- which for a checker means reporting "found none",
+# i.e. a false clean bill of health. Do not rely on which way any given
+# grep jumps; use the bracket class, whose meaning is specified.
+#
+# ⚠ Do NOT restate this as "BSD grep does not expand \s" -- an earlier draft
+# of this comment did, and it is FALSE as measured on 2026-08-20: Apple's
+# /usr/bin/grep (BSD grep 2.6.0-FreeBSD) DOES expand it in -E, verified by
+# discriminating the whitespace class from a literal `s`. The argument above
+# is the portable one and needs no claim about any particular grep.
 #
 # What the suite can actually pin is TAB TOLERANCE, not the absence of \s:
-# GNU grep in the CI container does expand \s, so the portability rule
-# itself is unreachable from a test. The checker-3 fixture is therefore
+# every grep on hand expands \s, so the portability rule itself is
+# unreachable from a test. The checker-3 fixture is therefore
 # tab-indented on the line the anchored grep scans; mutating
 # ^[[:space:]]* to ^ * turns 26/0 into 23/3. Do not "simplify" that tab.
 #

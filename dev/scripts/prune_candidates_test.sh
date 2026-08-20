@@ -186,8 +186,9 @@ type config = {
           four places and was pinned in none.
 
           Note (not testable here): [[:space:]] is also the portable choice
-          because BSD grep does not expand [\s] in a POSIX/extended regex.
-          CI cannot pin that — GNU grep in the container does expand it — so
+          because [\s] is a GNU extension with no meaning in POSIX ERE, so an
+          implementation may read it as whitespace, as a literal [s], or as
+          undefined. Every grep on hand expands it, so CI cannot pin that —
           tab tolerance is the property this fixture actually proves. *)
   enable_test_unclassified_flag : bool; [@sexp.default false]
       (** A flag with a ledger REJECT but NO recorded do-not-revive
