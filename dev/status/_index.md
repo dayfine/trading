@@ -9,8 +9,10 @@ Last updated: 2026-08-20 (orchestrator **run 2**, run id 32369033387; main
 #2423 (cap-refusal tally — **merged by a concurrent actor at a tip carrying an
 open NEEDS_REWORK**, see #2432), and #2431 (the rework #2423 merged without,
 recovered and landed). #2430 (sexp.default drift linter) is open in rework.
-Four issues filed from measurement: **#2427** the 15y golden has never completed
-(all 5 runs cancelled at a 90-min timeout), **#2428** the orchestrator spec still
+Four issues filed from measurement: **#2427** the 15y golden has been cancelled
+at the 90-min cap 96 times running since 2026-05-17 — it completed until then
+(9 of 108 runs succeeded, last `0a845340`), so bisect 05-16→05-17 before raising
+the cap, **#2428** the orchestrator spec still
 lacks the `do-not-merge` / draft hold that #2396 cost -40.91pp, **#2429** the
 daily-summary auto-merge polls 10 min for a ~13 min check then silently attempts
 a doomed merge, **#2432** a later APPROVED from a concurrent QC pipeline clears
