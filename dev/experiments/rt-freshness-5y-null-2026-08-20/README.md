@@ -186,14 +186,41 @@ Union-basis (symmetric difference ÷ |s0 ∪ sx|) for 26y core: 47.5% / 33.1%.
 **At 5y the core trade SET is identical across all three salts** — 0 under
 every convention. Every metric difference there comes from fill *prices* moving
 within a fixed set of trades, which is why the 5y nulls are tiny and why win
-rate moves by exactly one trade (37.9167 / 37.9167 / 38.3333). (The *rows* are not identical: **227 of the 240 rows (94.6%)** differ in at
-least one of `pnl_dollars` / `entry_price` / `quantity` — per field, 94.6% /
-74.2% / 65.0%. It is the key set that is fixed, not the values.
+rate moves by exactly one trade (37.9167 / 37.9167 / 38.3333).
 
-⚠ An earlier version said "454 of 480", which is **the same double-count this
-section exists to correct** — 227 rows counted twice, once on each side of the
-diff, against a 480 = 2×240 denominator. Caught while acting on a reviewer note
-that proposed 455; neither is right, and the framing was the actual defect.)
+The *rows* are not identical. Every figure below is joined on `(symbol,
+entry_date)`, n=240 per pair, and **names its pair explicitly** — the defect
+corrected here was an unnamed scope, so leaving a new figure unnamed would
+repeat it:
+
+| comparison | differ in ≥1 of pnl/entry/qty | `pnl_dollars` | `entry_price` | `quantity` |
+|---|---:|---:|---:|---:|
+| **s0 vs s1** | **227 of 240 (94.6%)** | 94.6% | 74.2% | 65.0% |
+| **s0 vs s2** | **228 of 240 (95.0%)** | 95.0% | 75.8% | 72.9% |
+| **pooled (both pairs)** | **455 of 480 (94.8%)** | 94.8% | 75.0% | 69.0% |
+
+It is the key set that is fixed, not the values.
+
+⚠ **Correction history for this parenthetical, which needed three passes.**
+v1 said "**454 of 480**" with no pair named. v2 replaced it with "227 of the 240
+rows", called the old figure "227 doubled", and said of a reviewer's proposed
+455 that "neither is right".
+
+Two things wrong with v2, both found by qc-behavioral:
+
+- **455 IS right** — it is exactly the pooled count under the 480 denominator
+  v1 itself used. Dismissing a correct figure as wrong, inside a note about
+  wrong figures, is the error this note exists to record.
+- **"227 doubled" is arithmetically exact (227×2 = 454) but evidentially
+  unsupported.** This section compares each salt against s0 in *two* columns, so
+  `480 = 2 pairs × 240` is the natural reading of v1's own denominator — under
+  which 454 is simply one short of the true 455 (s2 differs on 228, not 227).
+  Both stories fit; v2 asserted one in the indicative.
+- And v2 **did not fix the defect it named**: "227 of the 240 rows" sits under a
+  two-column table and names no pair either.
+
+The table above is the actual fix: every scope labelled, so no reading is left
+to inference.
 
 **At 26y, 19–32% of each run's trades do not occur in the other salt.** Smaller
 than the retracted figure, and still a discrete channel rather than a
