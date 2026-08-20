@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-20",
+  "feature": "cap-refusal-tally",
+  "branch": "feat/cap-refusal-tally",
+  "sha": "2f06127e3b8b97b127392e4170d34d7770c276d5",
+  "recorded_at_ns": 1787217547156153708,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "No check catches a saturating counter: the .mli claimed the tally counts bar-events across bars, and a counter pinned to 1 left the whole suite green. Separately, no unused-public-export linter over lib/*.mli exists, which is what let a dead export ship in a code-health-motivated PR.",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "Rework iteration 1 of 2. Round 1: structural APPROVED(4), behavioral NEEDS_REWORK(2). NOT merged: 3/3 gates green at 2f06127e but mergeable_state=behind; update-branch would restale both verdicts."
+}
