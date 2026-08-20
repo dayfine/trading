@@ -279,8 +279,50 @@ NEEDS_REWORK"
 check "over-stripping never yields ok" \
   unclear "$(_gate "$(reviews "$OVERSTRIP_WITH_QUOTED_VERDICT")" behavioral "$TIP")"
 
+# 18. The shape case 17 MISSED. Case 17 embeds its quoted verdict mid-sentence,
+#     so anchoring the inline fallback to `^` appeared to fix it — while a
+#     quotation pasted FLUSH LEFT, which is how quotations normally arrive,
+#     still matched at column 0. That was a regression against the pre-fence
+#     code (rework -> ok), not a leftover residual: the anchor moved the hole
+#     rather than closing it. The inline fallback is now deleted outright, and
+#     this fixture is the one that forced it. Found by qc-behavioral on #2420.
+OVERSTRIP_FLUSH_LEFT_QUOTE="Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — quoting the other gate at column zero
+
+The structural pass signed off with:
+
+Verdict: APPROVED
+
+~~~
+
+## Verdict
+
+NEEDS_REWORK"
+
+check "flush-left quoted verdict + unpaired fence never yields ok" \
+  unclear "$(_gate "$(reviews "$OVERSTRIP_FLUSH_LEFT_QUOTE")" behavioral "$TIP")"
+
+# 19. ...and with the stray separator removed, the same body reads its OWN
+#     verdict correctly. Isolates the mechanism: it is the over-strip that
+#     hides the real heading, not the quotation itself.
+FLUSH_LEFT_QUOTE_NO_FENCE="Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — quoting the other gate at column zero
+
+The structural pass signed off with:
+
+Verdict: APPROVED
+
+## Verdict
+
+NEEDS_REWORK"
+
+check "same body without the stray fence reads its own verdict" \
+  rework "$(_gate "$(reviews "$FLUSH_LEFT_QUOTE_NO_FENCE")" behavioral "$TIP")"
+
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"
   exit 1
 fi
-printf 'OK: pr_gate_status -- %d tests clean.\n' 17
+printf 'OK: pr_gate_status -- %d tests clean.\n' 19

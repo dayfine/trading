@@ -80,8 +80,12 @@ _gate() {
     # a ~~~ fence or a 4-space-indented one leak a quoted heading straight back
     # through -- the same false-green this function exists to stop, one notation
     # over. An indented fence is not a fence in strict CommonMark, but a review
-    # body is prose, and being over-eager here can only produce a false RED
-    # (an ignored verdict reads "unclear"), never a false green.
+    # body is prose, so over-eager is the right default HERE -- but only because
+    # the inline verdict fallback below was deleted. While that fallback existed,
+    # over-stripping could reach a QUOTED foreign verdict and return a false
+    # GREEN; an earlier version of this comment claimed the opposite and was
+    # wrong. With "## Verdict" as the sole verdict source, an over-stripped body
+    # loses its own heading and reads "unclear" -> "inspect manually".
     def strip_fences:
       split("\n")
       | reduce .[] as $l ({out: [], inside: false};
@@ -113,12 +117,17 @@ _gate() {
         | ( ($clean | capture("(?ism)^#+ +Verdict[ *`\\n]+(?<v>APPROVED|NEEDS_REWORK)").v)
             # `^` here too, for the same reason as the heading form above. Left
             # unanchored, this fallback made OVER-stripping produce a false
-            # GREEN rather than the false red claimed: if the stripper eats the
-            # reviews OWN "## Verdict" (a lone ~~~ separator is enough), this
-            # line then matches a QUOTED foreign "Verdict: APPROVED" anywhere in
-            # the body. Anchored, an over-stripped body reaches "unclear" and
-            # routes to "inspect manually", which is the safe direction.
-            // ($clean | capture("(?im)^Verdict:[ *`]*(?<v>APPROVED|NEEDS_REWORK)").v)
+            # THE INLINE "Verdict: X" FALLBACK IS DELETED, not fixed. It was the
+            # only path by which over-stripping could go GREEN: when the
+            # stripper eats a reviews own "## Verdict" (a lone ~~~ is enough),
+            # the fallback matched a QUOTED FOREIGN verdict instead. Anchoring
+            # it to ^ did not close that -- it moved the hole from "anywhere in
+            # the line" to "column 0", which is exactly where a pasted block
+            # quotation sits, and left a REGRESSION against the pre-fence code
+            # (rework -> ok on a flush-left quotation plus an unpaired fence).
+            # Nothing in the suite depends on the branch: the inline form
+            # appears in one fixture, negatively. A review with no "## Verdict"
+            # heading now reads "unclear" -> "inspect manually", fail-safe.
             // "" ) as $raw
         | (if $raw == "NEEDS_REWORK" then "rework"
            elif $raw == "APPROVED" then "ok"
