@@ -18,6 +18,12 @@ For Weinstein domain features (stage classifiers, screener, stops, simulation):
 - `docs/design/weinstein-book-reference.md` — primary authority for all
   domain rules (Stage definitions, buy/sell criteria, stop-loss rules,
   macro indicators, sector analysis, short-side rules).
+- **The book itself** — the authority *behind* that reference, available
+  locally as plain text. When the reference is silent, ambiguous, or a
+  faithfulness claim is contested, read the source and then write the answer
+  back into the reference. Path, OCR caveat, and protocol:
+  `.claude/rules/book-as-authority.md`. A reference is a summary and cannot
+  settle a dispute about its own scope.
 - `docs/design/eng-design-2-screener-analysis.md` — screener / analysis spec
 - `docs/design/eng-design-3-portfolio-stops.md` — portfolio / stops spec
 - `docs/design/eng-design-4-simulation-tuning.md` — simulation spec

@@ -64,6 +64,10 @@ For any PR that adds or changes strategy logic:
 - **W2 — adaptation is a dial, and config-expressed.** Any adaptation is one of
   the listed dials, lands as a config field (per `experiment-flag-discipline.md`),
   and cites Weinstein authority (book reference section) for why it is faithful.
+  If the reference does not cover the case, **read the book** — it is available
+  locally; see `.claude/rules/book-as-authority.md` for the path, the OCR
+  caveat, and the requirement to write the resolved answer back into the
+  reference.
   A mechanism that is *not* a documented dial or a faithful adaptation of one is
   out of scope — it must be justified against the book, not invented.
 - **W3 — experiments are Weinstein-faithful presets.** Population-search arms and
