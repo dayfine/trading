@@ -726,3 +726,18 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:prior_cell_check_test_runner.sh})))
+
+; prune_candidates test (2026-08-20): dev/scripts/prune_candidates.sh's
+; sanity probes are the whole point of the script -- see its header -- so
+; they must be exercised in CI, not only on the weekly cron
+; (dev/plans/arc-readiness-2026-08-20.md Axis 3). Same shim + (universe)
+; pattern as prior_cell_check_test_runner.sh above: the script lives
+; outside the dune workspace root and is resolved via repo_root() at run
+; time, and the test builds throwaway git-repo fixtures at runtime so it
+; needs (universe) to see script edits.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:prune_candidates_test_runner.sh})))

@@ -1,0 +1,130 @@
+# Weekly prune-candidates report — offline verification of the repo-compression
+# worklist (dev/plans/arc-readiness-2026-08-20.md Axis 3).
+#
+# Runs dev/scripts/prune_candidates.sh, a POSIX-sh script that PROPOSES
+# (never deletes) three checkers' worth of verified candidate rows:
+#   1. superseded dev/notes/next-session-priorities-* docs
+#   2. orphaned dev/experiments/ dirs (uncited AND >= 30 days untouched)
+#   3. Rule-4 flag eligibility (default-off mechanism flags with a ledger
+#      REJECT, checked against live *.sexp references and .ml assignments)
+#
+# The script's sanity probes (see its header) make silent-empty a hard
+# failure -- if a probe trips, this workflow reports the failure instead of
+# opening a report PR, so a broken checker never reads as "nothing to prune".
+#
+# This workflow does NOT act on the report. It writes
+# dev/health/prune-candidates-<date>.md and opens a PR for human review, same
+# shape as weekly-start-sweep.yml and health-deep-weekly.yml. The per-row
+# verification the plan calls for IS the report; acting on it is a separate,
+# mechanical, human-reviewed docs-only PR.
+#
+# SECRETS REQUIRED
+#   BOT_GITHUB_TOKEN — fine-grained PAT; Contents R+W, Pull requests R+W.
+#   (Shared with orchestrator.yml / weekly-start-sweep.yml.)
+name: Prune candidates weekly
+
+on:
+  schedule:
+    - cron: "17 16 * * 1" # Monday 16:17 UTC (09:17 PT) -- offset from the
+      # other Monday crons (health-deep-weekly 15:17, weekly-start-sweep
+      # 14:00) so this pure-shell, seconds-long job never queues behind a
+      # multi-hour agent or sweep run for no reason.
+  workflow_dispatch:
+
+concurrency:
+  group: prune-candidates-weekly
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  prune-candidates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/trading-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --user 0
+    env:
+      HOME: /home/opam
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history required: checker 1/2 date via
+          # `git log -1 --format=%cd -- <path>`, which needs the real commit
+          # history, not a shallow clone's synthetic single commit.
+          token: ${{ secrets.BOT_GITHUB_TOKEN }}
+
+      - name: Compute today's date
+        id: today
+        run: echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Run prune_candidates.sh
+        id: run
+        run: |
+          mkdir -p dev/health
+          if sh dev/scripts/prune_candidates.sh > "dev/health/prune-candidates-${{ steps.today.outputs.date }}.md"; then
+            echo "probe_failed=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "probe_failed=1" >> "$GITHUB_OUTPUT"
+            echo "::error::prune_candidates.sh exited nonzero -- a sanity probe failed. See the step log above; the report is NOT trustworthy and will not be opened as a PR."
+          fi
+
+      - name: Fail the job if a sanity probe tripped
+        if: steps.run.outputs.probe_failed == '1'
+        run: exit 1
+
+      - name: Push branch and open PR
+        if: always() && steps.run.outputs.probe_failed == '0'
+        env:
+          DATE: ${{ steps.today.outputs.date }}
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BRANCH="ops/prune-candidates-${DATE}"
+          REPORT="dev/health/prune-candidates-${DATE}.md"
+
+          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+          git config user.email "bot@github-actions"
+          git config user.name "GitHub Actions Bot"
+
+          if git diff --quiet HEAD -- "${REPORT}" 2>/dev/null && \
+             ! git ls-files --others --exclude-standard "${REPORT}" | grep -q .; then
+            echo "No changes vs main -- report is unchanged or empty; nothing to open."
+            exit 0
+          fi
+
+          git checkout -b "${BRANCH}"
+          git add "${REPORT}"
+          git commit -m "ops(health): weekly prune-candidates report ${DATE}"
+          git push origin "${BRANCH}"
+
+          C1=$(grep -m1 '^Candidates:.*files.*total lines' "${REPORT}" || echo '')
+          C2=$(grep -m1 '^Candidates:.*dirs.*total files' "${REPORT}" || echo '')
+          C3=$(grep -m1 '^Flags with a ledger REJECT' "${REPORT}" || echo '')
+
+          BODY="## Weekly prune-candidates report -- ${DATE}
+
+          - Checker 1 (superseded priorities docs): ${C1}
+          - Checker 2 (orphaned experiment dirs): ${C2}
+          - Checker 3 (Rule-4 flag eligibility): ${C3}
+
+          Full report: [\`${REPORT}\`](https://github.com/${REPO}/blob/${BRANCH}/${REPORT})
+
+          > This report PROPOSES rows for human review; it deletes nothing.
+          > Advisory: review and merge (or close if nothing is actionable this
+          > week). See dev/scripts/prune_candidates.sh header for method, and
+          > dev/plans/arc-readiness-2026-08-20.md Axis 3 for why this exists."
+
+          gh pr create \
+            --title "ops(health): prune-candidates report ${DATE}" \
+            --body "${BODY}" \
+            --base main \
+            --head "${BRANCH}"
