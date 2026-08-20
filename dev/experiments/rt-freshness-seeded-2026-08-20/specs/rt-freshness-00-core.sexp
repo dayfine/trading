@@ -23,8 +23,8 @@
 ;;   --no-emit-all-eligible, --parallel 1, universe top-3000 PIT-2000,
 ;;   window 2000-01-01 -> 2026-06-26, TRADING_PATH_SEED_SALT=0.
 ;; NOT a golden — staging scenario, sentinel bands.
-((name "ttl-retest-00-null")
- (description "TTL re-test null: both F2 halves off — reproduces ladder-v4 cell 00 exactly. Determinism tripwire.")
+((name "rt-freshness-00-core")
+ (description "F1 freshness core arm: Ma_cross, the shipped default. Config-identical to ttl-retest-00-null (ladder-v4 cell 00), so its salt-0 draw of 281.71 doubles as a determinism tripwire.")
  (period ((start_date 2000-01-01) (end_date 2026-06-26)))
  (universe_path "../goldens-custom-universe/composition/top-3000-2000.sexp")
  (universe_size 3000)

@@ -49,11 +49,13 @@ let submit_single_order order_mgr order =
 
 (* Common test setup: creates engine, order manager, submits order, updates market *)
 let setup_order_test ~order_type ~side ?(symbol = "AAPL") ?(quantity = 100.0)
-    ~quote () =
+    ?(time_in_force = Day) ~quote () =
   let config = make_config () in
   let engine = create config in
   let order_mgr = OrderManager.create () in
-  let params = make_order_params ~symbol ~side ~order_type ~quantity () in
+  let params =
+    make_order_params ~symbol ~side ~order_type ~quantity ~time_in_force ()
+  in
   let order =
     match create_order ~now_time:test_timestamp params with
     | Ok order -> order
@@ -904,6 +906,40 @@ let test_blocked_count_is_fresh_per_engine _ =
   let config = make_config () in
   assert_that (stop_limit_blocked_count (create config)) (equal_to 0)
 
+let test_blocked_count_accumulates_across_bars _ =
+  (* The tally counts BAR-EVENTS, not orders: one GTC ticket blocked on two
+     separate bars contributes two, and the count never decreases. Every other
+     tally test drives a single bar and asserts 0 or 1, so a counter that
+     latched at 1 — never accumulating — would pass all of them while
+     under-reporting the cap's cost by the entire magnitude of the feature.
+     This is the arm that pins that magnitude. *)
+  let path_config = { default_config with seed = Some 42 } in
+  let engine, order_mgr, _ =
+    setup_order_test
+      ~order_type:(StopLimit (110.0, 117.0))
+      ~side:Buy ~time_in_force:GTC
+      ~quote:
+        (make_bar "AAPL" ~open_price:120.0 ~high_price:130.0 ~low_price:118.0
+           ~close_price:125.0)
+      ()
+  in
+  (* Bar 1: the stop triggers at 120.0 but the whole bar stays above the 117.0
+     limit. [assert_order_not_executed] also pins that the ticket stays active,
+     which is what makes a second blocked bar possible. *)
+  assert_order_not_executed engine order_mgr;
+  let after_first_bar = stop_limit_blocked_count engine in
+  assert_that after_first_bar (equal_to 1);
+  (* Bar 2: a different, higher bar blocks the same still-active ticket again. *)
+  update_market ~path_config engine
+    [
+      make_bar "AAPL" ~open_price:126.0 ~high_price:135.0 ~low_price:124.0
+        ~close_price:132.0;
+    ];
+  assert_order_not_executed engine order_mgr;
+  assert_that
+    (stop_limit_blocked_count engine)
+    (all_of [ equal_to 2; ge (module Int_ord) after_first_bar ])
+
 let test_sell_stop_limit_gap_down_fills_at_open _ =
   (* Gap down with stop-limit: stop triggers, limit allows open price *)
   let bar =
@@ -1256,6 +1292,8 @@ let suite =
          >:: test_blocked_count_not_incremented_on_fill;
          "test_blocked_count_is_fresh_per_engine"
          >:: test_blocked_count_is_fresh_per_engine;
+         "test_blocked_count_accumulates_across_bars"
+         >:: test_blocked_count_accumulates_across_bars;
          "test_sell_stop_limit_gap_down_fills_at_open"
          >:: test_sell_stop_limit_gap_down_fills_at_open;
          "test_sell_stop_limit_gap_down_limit_not_reached"

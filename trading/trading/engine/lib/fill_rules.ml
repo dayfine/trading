@@ -129,12 +129,3 @@ let classify_stop_limit ~(path : intraday_path) ~side ~stop_price ~limit_price :
         match would_fill_limit ~path:activation_path ~side ~limit_price with
         | Some fill -> Fills fill
         | None -> Limit_blocked)
-
-(* Kept as the single fill predicate, defined in terms of the classifier above
-   so the two can never disagree: every [Fills] maps to [Some] and both
-   non-fill cases map to [None], which is exactly the prior behaviour. *)
-let would_fill_stop_limit ~(path : intraday_path) ~side ~stop_price ~limit_price
-    : fill_result option =
-  match classify_stop_limit ~path ~side ~stop_price ~limit_price with
-  | Fills fill -> Some fill
-  | Stop_not_triggered | Limit_blocked -> None

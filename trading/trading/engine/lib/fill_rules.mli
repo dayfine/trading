@@ -53,15 +53,8 @@ val classify_stop_limit :
   stop_limit_outcome
 (** Two-stage: the stop must trigger, then the limit must be reachable. When the
     trigger price itself meets the limit the fill is at the trigger price;
-    otherwise the remainder of the path is searched for the limit. *)
+    otherwise the remainder of the path is searched for the limit.
 
-val would_fill_stop_limit :
-  path:intraday_path ->
-  side:Trading_base.Types.side ->
-  stop_price:float ->
-  limit_price:float ->
-  fill_result option
-(** {!classify_stop_limit} collapsed to an option — [Fills] maps to [Some], both
-    non-fill cases to [None]. Defined in terms of the classifier so the two can
-    never disagree; prefer the classifier when the {i reason} for a non-fill
-    matters. *)
+    This is the only StopLimit predicate exported: a caller that wants a plain
+    [fill_result option] collapses [Fills] itself, keeping the {i reason} for a
+    non-fill available at the one place that can still tell the difference. *)

@@ -99,11 +99,11 @@ val stop_limit_blocked_count : t -> int
 
     {b Why it exists.} Under [entry_extension_max_pct] the limit {i is} the
     do-not-chase cap, so a [Limit_blocked] event is the cap refusing an entry.
-    That refusal is otherwise invisible: it is not a screener [reason_skipped]
-    (those are Insufficient_cash / Stop_too_wide / Sized_to_zero), not a cancel,
-    and never a trade. The cap's cost side has therefore never been directly
-    measured — only inferred from top-line differences that sit inside the
-    run-to-run path-noise floor.
+    That refusal is otherwise invisible: it is never a trade, never a cancel,
+    and not one of the screener's own skip reasons (those are the screener's to
+    enumerate, not this module's). The cap's cost side has therefore never been
+    directly measured — only inferred from top-line differences that sit inside
+    the run-to-run path-noise floor.
 
     Distinct from a stop that simply never triggered, which is not a cost of the
     cap and is not counted.
