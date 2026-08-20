@@ -27,6 +27,22 @@ cat > "$FIXTURE/dev/experiments/sample-2026-01-01/results/actual.sexp" <<'EOF'
 ((total_return_pct 42.4242424242) (max_drawdown_pct 9.99))
 EOF
 
+# --- fixtures for the three search-surface elements (cases 9-11) -------------
+# Each of these was an UNPINNED element of the find expression: deleting it
+# from the script killed ZERO test cases. That is exactly how the prefix-only
+# `results*.txt` glob shipped, silently missing a real file of measured cells
+# (dev/experiments/clock26-golden-ab-2026-08-19/raw-results.txt). One element
+# of the search surface was pinned; the category was not.
+cat > "$FIXTURE/dev/experiments/sample-2026-01-01/raw-results.txt" <<'EOF'
+suffix-named table => return 77.7777777777 | trades 12
+EOF
+cat > "$FIXTURE/dev/notes/some-read-2026-01-01.md" <<'EOF'
+notes-dir results table => return 88.8888888888
+EOF
+cat > "$FIXTURE/dev/experiments/sample-2026-01-01/deep-results.md" <<'EOF'
+md results table => return 99.9999999999
+EOF
+
 check() { # name expected_rc expected_substring command...
   name=$1; want_rc=$2; want_sub=$3; shift 3
   out=$("$@" 2>&1); rc=$?
@@ -50,12 +66,12 @@ check "known draw names its file" 1 "sample-2026-01-01/results.txt" sh "$S" 281.
 #    cries wolf on every genuinely-new cell and gets ignored.
 check "unseen draw exits 0" 0 "no prior record" sh "$S" 123.456789012345
 
-# 4. Substring safety. A short needle must not match a LONGER draw it happens to
-#    prefix — "281.70" is not evidence that 281.707836178685 was measured, and
-#    treating it as such would produce a false "already done".
-#    (This asserts the current -F substring semantics honestly: it DOES match.
-#    The case exists so the behaviour is pinned and a future exact-match change
-#    is a deliberate decision, not a silent one.)
+# 4. Substring semantics, pinned as they are. `grep -F` means a short needle
+#    DOES match a longer draw it prefixes: "281.70" reports a hit on
+#    281.707836178685. That is a documented limitation, not desired behaviour —
+#    it errs toward a false "already measured", which costs a wasted look at a
+#    real file rather than a missed one. The case exists so the behaviour is
+#    pinned and a future exact-match change is deliberate, not silent.
 check "short prefix matches (documented substring semantics)" 1 "PRIOR RECORD FOUND" \
   sh "$S" 281.70
 
@@ -72,6 +88,17 @@ check "--metrics lists recorded metrics" 1 "maxDD 39.034688012227853" \
 #    a mistyped invocation must never read as "no prior record".
 check "no args exits 2" 2 "usage:" sh "$S"
 check "too many args exits 2" 2 "usage:" sh "$S" a b
+
+# 9-11. Each search-surface element gets its own case. Before these, removing
+#       `*results*.md`, or `dev/notes/`, or widening `results*.txt`, changed no
+#       test outcome — the coverage stopped at one element of a three-element
+#       category, and a real file was invisible to the guard as a result.
+check "suffix-named *-results.txt is found" 1 "raw-results.txt" \
+  sh "$S" 77.7777777777
+check "dev/notes/ is searched" 1 "some-read-2026-01-01.md" \
+  sh "$S" 88.8888888888
+check "*results*.md is searched" 1 "deep-results.md" \
+  sh "$S" 99.9999999999
 
 echo
 echo "prior_cell_check_test: $PASS passed, $FAIL failed"

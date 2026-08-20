@@ -46,12 +46,28 @@ fi
 NEEDLE="$1"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
-# Archived result tables live as results*.txt / *-results.txt under
-# dev/experiments/, plus per-cell actual.sexp files committed with a writeup.
-HITS=$(find "$ROOT/dev/experiments" "$ROOT/dev/notes" \
-         -type f \( -name 'results*.txt' -o -name '*results*.md' \
-                    -o -name 'actual.sexp' \) 2>/dev/null \
-       | xargs grep -l -F -- "$NEEDLE" 2>/dev/null | sort)
+# Archived result tables live under dev/experiments/ and dev/notes/ as *.txt
+# and *.md files with "results" ANYWHERE in the name, plus per-cell actual.sexp
+# files committed with a writeup.
+#
+# All three name globs are wildcarded on BOTH sides deliberately. The first
+# version of this script used a prefix-only `results*.txt`, which silently
+# missed `dev/experiments/clock26-golden-ab-2026-08-19/raw-results.txt` — a
+# file of real measured cells — while the comment above it advertised
+# `*-results.txt`. A guard whose documented surface is wider than its actual
+# one produces exactly the false "no prior record" this script exists to
+# prevent. Found by qc-behavioral on #2437; pinned by test cases 9-11.
+# dev/notes/ is searched WHOLESALE, not by name glob. Its writeups routinely
+# carry measured draws in prose (e.g. dev/notes/ladder-v4-read-2026-08-12.md,
+# cited in #2433 for a drawdown pair) and almost none of them have "results" in
+# the filename — the name-glob version reached 7 of 363 files, ~2% of the
+# corpus, while claiming to search the directory. It is 3.6 MB; grep -F over it
+# is instant, so there is no reason to filter by name at all.
+HITS=$( { find "$ROOT/dev/experiments" -type f \
+            \( -name '*results*.txt' -o -name '*results*.md' \
+               -o -name 'actual.sexp' \) 2>/dev/null
+          find "$ROOT/dev/notes" -type f -name '*.md' 2>/dev/null
+        } | xargs grep -l -F -- "$NEEDLE" 2>/dev/null | sort)
 
 if [ -z "$HITS" ]; then
   echo "no prior record of '$NEEDLE' under dev/experiments/ or dev/notes/"

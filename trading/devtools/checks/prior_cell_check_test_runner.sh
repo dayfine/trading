@@ -25,10 +25,23 @@ set -eu
 TEST="$(repo_root)/dev/scripts/prior_cell_check_test.sh"
 
 if [ ! -f "$TEST" ]; then
-  # Degrade gracefully rather than reddening CI on a checkout that legitimately
-  # lacks dev/ (same posture as rule_promotion_check.sh's missing-doc path).
-  echo "WARNING: prior_cell_check_test.sh not found at $TEST -- skipping."
-  exit 0
+  # FAIL, do not skip. An earlier version of this shim printed a WARNING and
+  # exited 0 here, citing rule_promotion_check.sh's missing-doc precedent.
+  # qc-behavioral was right to call that a vacuity hole (#2437):
+  #
+  #   - rule_promotion_check.sh guards an OPTIONAL doc, so absence is a
+  #     legitimate state. This guards a test file that ships in the SAME
+  #     COMMIT, so the only way it can go missing is deletion — which is
+  #     precisely the rot this dune wiring exists to catch.
+  #   - And a PR whose whole thesis is "unverified absence must not read as
+  #     OK" cannot itself treat absence as OK.
+  #
+  # repo_root() already hard-errors on a failed walk-up, so a wrong root
+  # cannot reach this line silently.
+  echo "FAIL: prior_cell_check_test.sh not found at $TEST" >&2
+  echo "  The test ships alongside dev/scripts/prior_cell_check.sh; if it is" >&2
+  echo "  gone, the guard is unpinned. Restore it or remove this dune rule." >&2
+  exit 1
 fi
 
 sh "$TEST"
