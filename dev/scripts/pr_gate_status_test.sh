@@ -201,12 +201,17 @@ check "tilde-fenced heading does not satisfy the quoted gate" \
   none "$(_gate "$(reviews "$TILDE_FENCED")" behavioral "$TIP")"
 
 # 13. An indented fence is still a fence.
+#     ⚠ The quoted heading is FLUSH LEFT while the fence markers are indented.
+#     The first version of this fixture indented the heading too, which made it
+#     pass on pre-fix code (the heading regex needs `^#`, so an indented heading
+#     never matched in the first place) — a vacuous test that looked green for
+#     the wrong reason. Found by qc-behavioral on #2420.
 INDENTED_FENCE="Reviewed SHA: 7dc57cc06
 
 ## Structural QC — quoting inside a list item
 
     \`\`\`
-    ## Behavioral QC — some other PR
+## Behavioral QC — some other PR
     \`\`\`
 
 ## Verdict
@@ -252,8 +257,30 @@ offline_probe() {
 }
 check "sourcing makes no gh call" offline "$(offline_probe)"
 
+# 17. OVER-STRIPPING MUST NOT GO GREEN. A lone `~~~` opens a fence that never
+#     closes, so the stripper eats the rest of the body including this review's
+#     own "## Verdict". With the inline `Verdict:` fallback left unanchored,
+#     that fallback then matched a QUOTED foreign verdict and returned `ok` —
+#     the exact false green the fence work exists to prevent, reached by being
+#     too eager rather than too lax. The safety claim ("over-stripping can only
+#     produce a false RED") was therefore false until the fallback was anchored.
+OVERSTRIP_WITH_QUOTED_VERDICT="Reviewed SHA: 7dc57cc06
+
+## Behavioral QC — over-stripped by a stray separator
+
+The prior pass ended with Verdict: APPROVED, which I disagree with.
+
+~~~
+
+## Verdict
+
+NEEDS_REWORK"
+
+check "over-stripping never yields ok" \
+  unclear "$(_gate "$(reviews "$OVERSTRIP_WITH_QUOTED_VERDICT")" behavioral "$TIP")"
+
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"
   exit 1
 fi
-printf 'OK: pr_gate_status -- %d tests clean.\n' 16
+printf 'OK: pr_gate_status -- %d tests clean.\n' 17

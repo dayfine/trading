@@ -111,7 +111,14 @@ _gate() {
         # of another review (four spaces, so not a fence at all) supplied this
         # gate its verdict.
         | ( ($clean | capture("(?ism)^#+ +Verdict[ *`\\n]+(?<v>APPROVED|NEEDS_REWORK)").v)
-            // ($clean | capture("(?i)Verdict:[ *`]*(?<v>APPROVED|NEEDS_REWORK)").v)
+            # `^` here too, for the same reason as the heading form above. Left
+            # unanchored, this fallback made OVER-stripping produce a false
+            # GREEN rather than the false red claimed: if the stripper eats the
+            # reviews OWN "## Verdict" (a lone ~~~ separator is enough), this
+            # line then matches a QUOTED foreign "Verdict: APPROVED" anywhere in
+            # the body. Anchored, an over-stripped body reaches "unclear" and
+            # routes to "inspect manually", which is the safe direction.
+            // ($clean | capture("(?im)^Verdict:[ *`]*(?<v>APPROVED|NEEDS_REWORK)").v)
             // "" ) as $raw
         | (if $raw == "NEEDS_REWORK" then "rework"
            elif $raw == "APPROVED" then "ok"
