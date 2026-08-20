@@ -35,10 +35,19 @@ Two metrics **fail** Rule 4 and must not be quoted as moved — see
   means, which Rule 3 forbids. Corrected below.
 - **v2** also claimed the finding *"reconciles the horizon contradiction."* It
   does not — measured since, and it is the reverse.
+- **v3** (the previous rework) said `nearfloor` beat rt *"on every leg"* and that
+  the signature is *"a generic consequence of reduced turnover."* **Wrong on
+  MaxDD (1.2×, not 4–15×)** — and the table three lines below it said so, so the
+  file contradicted itself while the memory carried the wrong version forward.
+  Scoped in "Drawdown is the exception" below.
 
-All three corrections came from qc-behavioral. The pattern is worth naming
-because it recurred three times: **each rework fixed the instances found and not
-the rule that generated them** — Rule 4 kept being applied only where it passed.
+All four corrections came from qc-behavioral. The pattern is worth naming
+because it has now recurred **four** times, including inside the rework that
+named it: **each pass fixes the instances found and not the rule that generated
+them.** The rule, stated plainly: *when a claim quantifies several legs, score
+every leg before choosing the summary adjective* — v1 skipped the metrics that
+moved, v2 skipped the ones that failed Rule 4, v3 skipped the one leg that did
+not fit "every".
 
 ## Instrument validation — stronger than first claimed
 
@@ -194,7 +203,8 @@ phrasing does not survive.
 
 The open question this file left ("salt the 5y testbed and measure its floor")
 was **answered the same morning**:
-`../rt-freshness-5y-null-2026-08-20/` (PR #2436), same six-cell design.
+`../rt-freshness-5y-null-2026-08-20/` — **PR #2436, open, NOT yet on `main`**,
+so that path does not resolve until it merges. Same six-cell design.
 
 **The 5y drawdown null is 0.3616pp.** The contradiction it poses is +4.60pp —
 **12.7× its own null**. The horizons genuinely disagree, and the "5 years of 187
@@ -235,7 +245,8 @@ same base and these same three salts, scored by this document's own Rule 4:
 
 **`nearfloor` produces the identical "selectivity" signature — fewer trades,
 much longer holds, higher win rate, lower drawdown, return unmoved — with an
-order of magnitude more headroom on every leg.** And `nearfloor` **failed its
+order of magnitude more headroom on three of four legs — but NOT on drawdown.**
+And `nearfloor` **failed its
 confirmation grid 0 of 3** (`project_nearfloor_is_risk_not_return`).
 
 This record cited that rejection only under "Not bundled", as a reason to keep
@@ -244,10 +255,40 @@ itself.** The pattern this file calls a finding is one a rejected mechanism
 produces more strongly, which means the signature is weak evidence for a
 mechanism being good — plausibly just what trading less looks like on this base.
 
-Taken with the 5y reversal, the honest reading is: **"fewer, longer, higher-win,
-lower-drawdown, return-unmoved" is a generic consequence of reduced turnover on
-the 26y top-3000 base, not a mechanism-specific virtue.** Any future mechanism
-producing it should be treated as unproven until a second cell agrees.
+### ⚠ Drawdown is the exception, and it breaks the "generic" framing
+
+An earlier version of this section said the headroom advantage held **"on every
+leg"**, and concluded flatly that the signature is *"a generic consequence of
+reduced turnover"*. The table three lines above **prints 1.8–2.4× for MaxDD** —
+the file contradicted itself on the page, and the memory file carried the wrong
+version forward, which is what future sessions actually read. Found by
+qc-behavioral; this is the **third** recurrence of the pattern this document
+already names, which is why it is stated here rather than quietly patched.
+
+Per-leg, `nearfloor`'s advantage over rt:
+
+| nf ÷ rt | trades | holds | win rate | **MaxDD** |
+|---|---:|---:|---:|---:|
+| | 3.8× | 10.2× | 4.0× | **1.2×** |
+
+Drawdown does **not** scale with turnover reduction the way the other legs do.
+Concretely: **rt buys 81.6% of nearfloor's drawdown improvement (7.95pp of
+9.74pp) for 26.4% of its turnover cut (46 trades of 175).** Drawdown improvement
+is strongly *sublinear* in turnover reduction.
+
+**So the scoped claim, and it is weaker than the one it replaces:** on the 26y
+top-3000 base, **trade count, holding time and win rate** move together with
+turnover and are therefore near-worthless as evidence for a mechanism — a
+rejected mechanism produces them 4–10× more strongly. **Drawdown is not in that
+package**, so a drawdown improvement is not explained away by "it traded less",
+and rt's is unusually efficient per unit of turnover forgone.
+
+That makes the 26y drawdown result *more* interesting than the generic framing
+allowed — and it changes nothing about the verdict, because the **5y cell
+reverses drawdown too**. The mechanism fails on independent evidence, not on
+this argument. Any future mechanism showing the fewer/longer/higher-win package
+should still be treated as unproven until a second cell agrees; a drawdown move
+deserves its own look.
 
 ## What this does and does not license
 

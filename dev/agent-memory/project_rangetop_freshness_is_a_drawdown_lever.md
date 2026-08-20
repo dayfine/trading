@@ -48,27 +48,59 @@ Cells differ in **period AND universe**, so the reversal is unattributed.
 ## The signature is generic — `nearfloor` prior
 
 `dev/experiments/nearfloor-26y-salts-2026-08-13/results.txt`, same base, same
-salts: `09-nearfloor` produces the **identical** signature (fewer trades, much
-longer holds, higher win rate, lower MaxDD, return unmoved) at **4–15× headroom**
-on every leg vs rt's 1.0–2.0×. And nearfloor **failed its confirmation grid
-0-of-3** ([[project-nearfloor-is-risk-not-return]]).
+salts: `09-nearfloor` produces the same signature (fewer trades, much longer
+holds, higher win rate, lower MaxDD, return unmoved) and it **failed its
+confirmation grid 0-of-3** ([[project-nearfloor-is-risk-not-return]]).
 
-⇒ **"fewer / longer / higher-win / lower-drawdown / return-unmoved" is what
-reduced turnover looks like on the 26y top-3000 base, not a mechanism-specific
-virtue.** Treat any future mechanism producing it as unproven until a second cell
-agrees. This is the transferable finding.
+**But the advantage is NOT uniform, and the exception is the whole point.**
+`nearfloor ÷ rt` per leg: trades **3.8×**, holds **10.2×**, win rate **4.0×**,
+**MaxDD only 1.2×**. rt buys **81.6%** of nearfloor's drawdown improvement
+(7.95pp of 9.74pp) for **26.4%** of its turnover cut (46 trades of 175) —
+drawdown improvement is strongly **sublinear** in turnover reduction.
 
-## A noise floor is a function of tail exposure
+⇒ **Trade count, holding time and win rate travel with turnover** and are
+near-worthless as evidence for a mechanism on this base — a rejected mechanism
+produces them 4–10× more strongly. **Drawdown does not travel with turnover**,
+so a drawdown move is NOT explained away by "it traded less". This is the
+transferable finding.
 
-Relative return noise: **42%** at 26y (132.51/315.0) vs **0.9%** at 5y
-(0.99/112.7) — 48×, on ~5× the trades. Not sample size: the fat tail
-([[project-edge-is-the-fat-tail]]). At 26y a few monsters dominate and their
-fills are path-dependent, so the seed re-rolls the answer; at 5y on 500
-bull-market names there are none to win or lose.
+⚠ An earlier version of this memory claimed "4–15× headroom **on every leg**"
+and concluded the whole signature was "a generic consequence of reduced
+turnover". Both were wrong on the MaxDD leg, and the experiment README's own
+table said so — the memory carried the wrong version forward. Third recurrence
+of the fix-the-instance-not-the-rule pattern; caught by qc-behavioral.
 
-1. **Never import a null across scales** — 13–134× apart by metric.
-2. **A tight null is not a better instrument** — it means low tail exposure,
-   which is what makes that cell's answer regime-specific.
+## Nulls are NOT comparable across scales — and the pattern is structured
+
+26y null ÷ 5y null, by metric: win rate **1.2×**, Sharpe **11.6×**, MaxDD
+**13.2×**, ulcer **18.0×**, return **134.4×**.
+
+⚠ An earlier version said "13–134× apart by metric" — wrong at the bottom end;
+win rate is **1.19×**, i.e. essentially scale-invariant, and that is the most
+informative cell in the table.
+
+**Sample size is refuted with the right sign.** 1151 trades (26y) vs 240 (5y)
+⇒ naive 1/√n predicts the 26y null should be **0.46×** the 5y one, i.e.
+*quieter*. Every metric is noisier; return by 292× the prediction.
+
+**Structure:** the seed barely changes *what fraction* of trades win (win rate
+flat); it changes *what they are worth*, and 26 years of multiplicative
+compounding makes that the dominant term. Consistent with
+[[project-edge-is-the-fat-tail]], but **two scales cannot separate "heavy tail"
+from "long compounding horizon"** — the long window has both. Open question, not
+a law. Falsifiable cheaply: a mean-type, non-compounded statistic (median trade
+P&L, mean holding days) should stay scale-invariant like win rate.
+
+1. **Never import a null across scales** — 1.2× to 134× apart depending on the
+   metric, and the ordering is not guessable in advance.
+2. **A tight null is not a better instrument** — the 5y cell measures precisely,
+   and what it measures precisely is one bull market.
+3. **⭐ Return is a near-useless A/B metric on the 26y base** — ~10× worse SNR
+   than any risk metric. So the program's recurring "**X is a risk lever, not a
+   return lever**" conclusion is partly an instrument artefact: "return did not
+   move" is what a low-powered test looks like. Honest phrasing is "risk moved;
+   return is not measurable here at this effect size." Worth auditing ledger
+   entries that turn on a return-in-null reading.
 
 ## Status
 
