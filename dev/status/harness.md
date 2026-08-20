@@ -558,3 +558,30 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   - **Correction (this rework, iteration 1 of 2, qc-behavioral B1/B2 2026-08-20):** two claims above were wrong, both caught by measurement rather than assertion.
     - **B1 — the `min_group_fields = 6` size floor (undocumented in the original PR) has been REMOVED, not just documented.** Measured live: of 909 record declarations extracted from the shipped tree, the floor silently dropped 614 (67.5%) before grouping, cutting multi-file duplicate-group coverage from 402 groups (no floor) to 134 (floor 6) — for **zero** precision gain: running with no floor at all produces the exact same 2 live findings (both already-exempted `margin_config` fields) as running with the floor, on the shipped tree, on a reconstructed #2384 (attribute dropped from 1 of 3 copies), and on a reverted #2388 (value mismatch reintroduced) — all three re-verified live post-removal. The linter's own grouping key — `(type_name, ordered field-name list)`, plus the `has_any_default` opted-in filter (>=2 declarations must each carry a real attribute before any comparison happens) — already makes a false-positive collision require an implausible coincidence (same type name, same exact ordered field list, `[@sexp.default]` on the same field in >=2 unrelated declarations, with different values); a size floor bought no additional protection against that and cost two-thirds of the check's coverage. The module docstring now documents this removal and the measurement behind it in place of the removed constant.
     - **B2 — the `liquidity_config.ml`/`.mli` exclusion rationale above ("separate, single-declaration record", "opaque in its own `.mli`", "0 sexp.default there") is FACTUALLY WRONG on both grounds and is superseded by this paragraph, not corrected in place (kept above, verbatim, for audit trail).** `Liquidity_config.t` is declared in BOTH `liquidity_config.ml` (line 28) and `liquidity_config.mli` (line 37) — a two-declaration, 5-field record, exactly the shape this linter is designed to check. The `.mli` is not opaque: it exposes the full record with prose-documented defaults per field. It carries 0 `[@sexp.default ...]` attributes; the `.ml` carries 2 (`adv_aggregation`, `adv_trim_pct`). It is correctly excluded, but by **the `has_any_default` opted-in filter** (only 1 of its 2 declarations is opted-in; the filter requires >=2) — not by being single-declaration or opaque. This matters beyond bookkeeping: `Liquidity_config` shipped in the same 2026-07-10 realism-defaults flip that produced the #2388 bug this linter exists to catch, and a future promotion of one of the `.ml`'s two defaults (e.g. `default_adv_trim_pct`) without updating the `.mli`'s prose is exactly the #2384/#2388 shape, in the adjacent record family — and today's linter would not fire on it, because only 1 of 2 declarations is opted in. If a future change adds even one real `[@sexp.default ...]` to the `.mli`, `opted_in` reaches 2 and the type starts being checked automatically, no code change required. Measured distribution across all 402 no-floor duplicate groups: 376 opted_in=0 (never compared, intentional-style), **6 opted_in=1 (blind spot — `Liquidity_config.t` is one of the 6)**, 19 opted_in=2 (compared), 1 opted_in=3+ (compared). This distribution is now recorded directly in the linter's module docstring next to the `has_any_default` filter.
+
+- [ ] H-SEXP-DRIFT-VACUOUS-PASS: `sexp_default_drift_linter.ml` prints `OK:` and
+  exits 0 when it scans **nothing**. `collect_lib_files` swallows a failed
+  `Sys.readdir` (`| exception _ -> ()`, line 137) and the reporting branch keys
+  only on `live_violations = []` (line 472) — so an empty root, a moved
+  `trading/` dir, or a wrong-cwd invocation is indistinguishable from a clean
+  tree. **Masking consequence:** the check would report green across a rename or
+  a dune-rule path change while enforcing nothing, which is precisely the
+  vacuity shape #2424 / #2390 hit. **Fix:** fail (or at minimum warn loudly) when
+  the scanned-file count is 0, and assert a plausible floor. `review_at: 2026-09-20`.
+
+- [ ] H-SEXP-DRIFT-SILENT-PARSE-SKIP: an unparseable file is dropped with no
+  signal — `parse_ml` / `parse_mli` end `| exception _ -> ([], [])`
+  (lines 257 / ~266), so a file that fails `Parse.implementation` contributes
+  zero records and the linter still exits 0. **Masking consequence:** a live
+  `[@sexp.default]` divergence inside a file that the linter cannot parse is
+  invisible, and the greenness is indistinguishable from real coverage. Note
+  the linter parses source the compiler has *already* accepted, so this should
+  be unreachable in practice — which is the argument for making it loud rather
+  than for tolerating it. **Fix:** collect parse failures and report them
+  (non-zero exit, or a printed count alongside the `OK:` line).
+  `review_at: 2026-09-20`.
+  - Both residuals were raised by qc-behavioral at `394069be` and re-raised at
+    `3ac33c28` (CP2) because the PR body claimed them "now tracked" while the
+    diff filed nothing. They are the reason CP4 passes on precedent
+    (`fn_length_linter` / `nesting_linter` also ship without self-tests); filing
+    them is what keeps that precedent honest.
