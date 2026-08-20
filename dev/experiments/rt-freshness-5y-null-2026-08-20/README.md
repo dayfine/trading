@@ -159,39 +159,74 @@ magnitude.** Replaced below with what the committed `trades.csv` files actually
 show. Found by qc-behavioral; the superseded text is retained above in git
 history rather than being the version anyone reads.
 
-### The seed does not perturb fills at 26y. It re-rolls half the trade set.
+### At 26y the seed re-rolls which trades happen; at 5y it does not
 
-Joining each arm's `trades.csv` on `(symbol, entry_date)` against its own salt-0
-run:
+⚠ **Definition, because an earlier version of this table had none and its prose
+over-read it by ~2×.** Each arm's `trades.csv` is keyed on `(symbol,
+entry_date)` and compared against its own salt-0 run. The column below is
+**trades present in s0 and absent from the other salt, as a fraction of s0** —
+the honest "how much of this run didn't happen in that one" figure.
 
-| scale / arm | s0 vs s1 | s0 vs s2 | of N rows |
-|---|---:|---:|---:|
-| **5y core** | **0 (0.0%)** | **0 (0.0%)** | 240 |
-| 5y rangetop | 3 (1.3%) | 5 (2.1%) | 233 |
-| **26y core** | **710 (61.9%)** | **459 (40.0%)** | 1147 |
-| 26y rangetop | 689 (63.0%) | 554 (50.6%) | 1094 |
+The earlier version reported the **symmetric difference** over |s0|, which
+counts a substituted trade **twice** in the numerator and once in the
+denominator, and then described it as "40–62% of trades are different trades".
+No convention yields that. Corrected, with all three conventions shown so the
+reader can check:
 
-**At 5y the core trade set is bit-identical across all three salts.** Every
-metric difference there comes from fill *prices* moving within a fixed set of
-trades — which is why the 5y nulls are tiny, and why win rate moves by exactly
-one trade (37.9167 / 37.9167 / 38.3333).
+| scale / arm | absent-from-other, s0 vs s1 | s0 vs s2 | of N | (symmetric diff ÷ s0, as previously reported) |
+|---|---:|---:|---:|---:|
+| **5y core** | **0 (0.0%)** | **0 (0.0%)** | 240 | 0.0% / 0.0% |
+| 5y rangetop | 2 (0.9%) | 3 (1.3%) | 233 | 1.3% / 2.1% |
+| **26y core** | **361 (31.5%)** | **217 (18.9%)** | 1147 | 61.9% / 40.0% |
+| 26y rangetop | 327 (29.9%) | 278 (25.4%) | 1094 | 63.0% / 50.6% |
 
-**At 26y, 40–62% of trades are different trades.** That is a discrete channel,
-not a perturbation, and it is what the large 26y nulls are made of.
+Union-basis (symmetric difference ÷ |s0 ∪ sx|) for 26y core: 47.5% / 33.1%.
+
+**At 5y the core trade SET is identical across all three salts** — 0 under
+every convention. Every metric difference there comes from fill *prices* moving
+within a fixed set of trades, which is why the 5y nulls are tiny and why win
+rate moves by exactly one trade (37.9167 / 37.9167 / 38.3333). (The *rows* are
+not identical: 454 of 480 differ in `pnl_dollars` / `entry_price` / `quantity`.
+It is the key set that is fixed.)
+
+**At 26y, 19–32% of each run's trades do not occur in the other salt.** Smaller
+than the retracted figure, and still a discrete channel rather than a
+perturbation — which is what the argument needs. The section heading previously
+said "re-rolls half the trade set"; ~a quarter is the right order.
+
+⚠ Each 26y `trades.csv` contains **one** duplicate `(symbol, entry_date)` key,
+so the join collapses one row per file. Immaterial at these magnitudes, but
+noted per `feedback_position_id_is_the_only_join_key`. `position_id` is *not*
+usable as the key here: it carries a run-relative counter that shifts for every
+downstream trade once the set churns, which would report ~72% for a set that is
+~30% different.
 
 ### Why the channel opens at 26y and not 5y
 
 `force_liquidations_count`, same runs: **26y = 4 / 3 / 4; 5y = 0 / 0 / 0.**
 
-The 26y cell runs a binding capital constraint and the 5y cell does not. Per
-`project_ticket_dies_on_cash_shortfall`, an unfundable triggered ticket is
-destroyed outright and selection at trigger is effectively arrival order — so a
-tiny path-induced P&L difference changes what is affordable, which changes which
-tickets fund, which cascades. At 5y on 187 traded names the constraint rarely
-binds, so everything that triggers gets funded regardless of path.
+⚠ **This section listed that count under "directly measured, not inferred", and
+then inferred from it that the 26y cell "runs a binding capital constraint".
+The inference has since been falsified — by a deliberate test, PR #2438.** That
+run took the *same 5y cell*, changed `max_position_pct_long` 0.14 → 0.33, and
+opened the channel (0% → 7.4%/18.9% absent-from-other) **with
+`force_liquidations_count` still 0/0/0**. So the count is a symptom of cash
+exhaustion *at the selling end* and **is not a proxy for admission contention**;
+its 4/3/4-vs-0/0/0 split cannot carry the attribution this section rested on it.
+
+What survives, stated as the hypothesis it is rather than in the indicative:
+per `project_ticket_dies_on_cash_shortfall`, an unfundable triggered ticket is
+destroyed outright and selection at trigger is effectively arrival order, so a
+tiny path-induced P&L difference can change which tickets fund and cascade. That
+remains the leading candidate — and #2438 shows *some* binding admission
+constraint is sufficient to open the channel — but #2438 also leaves a second
+candidate live (concentration raising the stakes of each admission), and neither
+run separates them. Read #2438's result section before quoting a mechanism from
+here.
 
 This also explains the one metric that stays flat: **win rate is
-scale-invariant (1.2×) even though half the 26y trade set churns**, because a
+scale-invariant (1.2×) even though ~a quarter of the 26y trade set churns**,
+because a
 re-rolled set is drawn from the same population with the same base rate. The
 seed changes *which* names are held, not *what fraction* of them work.
 
@@ -204,9 +239,21 @@ counts.
 ### The 48× headline is the most extreme framing available
 
 Relative return noise is 42% at 26y (132.51/315.0) vs 0.9% at 5y (0.99/112.7).
-That 48× is real but horizon-inflated: **annualised, the return-null ratio is
-≈33×, and the horizon-free Sharpe null ratio is 12×.** Quote 12× if you want the
-conservative number.
+That 48× is real but horizon-inflated. Two less-inflated framings, **with the
+arithmetic spelled out** — an earlier version quoted "≈33×" with no formula and
+a reviewer could not reproduce it:
+
+- **Annualised: 33.8×.** Convert each salt's total return to CAGR over its own
+  span (26.48y / 4.99y), take max−min, express as a fraction of the mean CAGR.
+  26y: 5.016–6.250%, mean 5.521 ⇒ null 1.234pp = **22.35%**. 5y: 16.282–16.391%,
+  mean 16.326 ⇒ null 0.108pp = **0.66%**. Ratio **33.8×**. (On *absolute* CAGR
+  points it is only **11.4×** — 1.234 vs 0.108.)
+- **Horizon-free: 12×** on the Sharpe null (0.0797 vs 0.0069), which needs no
+  annualisation convention at all.
+
+**Quote 12× if you want the conservative, convention-free number.** The three
+figures differ by a factor of four purely in how the horizon is handled, which
+is itself the point: none of them is "the" answer.
 
 ⚠ **The nulls are 3-draw ranges.** A max−min over three samples is a
 *downward-biased* estimator of spread, so every null here is more likely too
