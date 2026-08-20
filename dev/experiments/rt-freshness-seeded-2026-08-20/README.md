@@ -4,10 +4,10 @@
 rate and max drawdown past their own nulls at all three salts, and moves return
 and Sharpe not at all. It does NOT survive its first independent cell, and the
 same signature is produced more strongly by a mechanism that already failed
-confirmation 0-of-3.** Completed 05:39.
+confirmation on every broad cell tested.** Completed 05:39.
 
 ⚠ **Read the two sections "It reverses at 5 years" and "`nearfloor` produces
-this same signature, and it failed 0-of-3" before quoting anything below.** They
+this same signature, and it failed 0-of-2 broad cells" before quoting anything below.** They
 are what the record is actually for. The 26y measurement is sound and
 reproduces; what it licenses is much narrower than the first two versions of
 this file claimed.
@@ -67,6 +67,15 @@ it was available for free — the understatement cost the record its strongest
 evidence.
 
 ## Results
+
+⚠ **Units are NOT uniform across these metrics, and the table never said so.**
+`total_return_pct` is `(final − initial)/initial × 100` — a **total over the
+whole 26.48-year window**, not annualized. `sharpe_ratio` **is** annualized
+(`metric_computers.mli`: *"Annualized Sharpe ratio"*). Each Rule-4 ratio below is
+internally valid (gap and null share the metric's own units), but **cross-metric
+and cross-horizon comparisons are not** — return's null is a 26-year compounded
+quantity. This is why the horizon-free framing elsewhere is the **Sharpe** ratio,
+not return. Raised by the user 2026-08-20.
 
 | salt | core return | rt return | core DD | rt DD | core trades | rt trades |
 |---|---:|---:|---:|---:|---:|---:|
@@ -166,8 +175,20 @@ never scored against Rule 4. Scored properly, **both fail**:
 
 | metric | null (core, 3 salts) | s0 | s1 | s2 | Rule 4 |
 |---|---:|---|---|---|---|
-| total trades | **37** | −53 (1.43×) ✓ | **−6 (0.16×)** ✗ | −80 (2.16×) ✓ | **FAILS** |
-| avg holding days | **1.8768** | +2.853 (1.52×) ✓ | **+1.504 (0.80×)** ✗ | +3.456 (1.84×) ✓ | **FAILS** |
+| total trades (tested direction: FEWER) | **37** | −53 (1.43×) ✓ | **−6 (0.16×)** ✗ | −80 (2.16×) ✓ | **FAILS** |
+| avg holding days (tested direction: LONGER) | **1.8768** | +2.853 (1.52×) ✓ | **+1.504 (0.80×)** ✗ | +3.456 (1.84×) ✓ | **FAILS** |
+
+⚠ **These two rows test a CLAIM, not a quality.** Trade count and holding time
+are descriptive; neither "fewer" nor "longer" is a priori better. The direction
+scored is simply the one this document had asserted ("trades FEWER, HOLDS
+LONGER"), so the row answers *"is the asserted direction real?"* — no, both fail
+at s1 — and must **not** be read as rt being better or worse on turnover. Raised
+by the user 2026-08-20; the original table gave a signed ratio with no stated
+direction.
+
+The nulls themselves are unremarkable once put in relative terms: holding days
+1.877 d on a mean of 47.2 = **4.0%**, trades 37 on 1151 = **3.2%** — consistent
+with each other, not anomalous.
 
 Neither may be stated as an effect. The selection was one-directional and that
 is the real defect: every metric that *passes* Rule 4 was tabulated with its
@@ -229,7 +250,7 @@ in one cell and its opposite in another. What it can be is regime-conditional.
 Neither cell is wrong. Both reproduce. The two differ in **period AND universe**,
 so nothing yet says which axis carries the reversal.
 
-## `nearfloor` produces this same signature, and it failed 0-of-3
+## `nearfloor` produces this same signature, and it failed 0-of-2 broad cells
 
 The strongest objection to this record is not about its arithmetic. From the
 committed `dev/experiments/nearfloor-26y-salts-2026-08-13/results.txt`, on this
@@ -247,7 +268,17 @@ same base and these same three salts, scored by this document's own Rule 4:
 much longer holds, higher win rate, lower drawdown, return unmoved — with an
 order of magnitude more headroom on three of four legs — but NOT on drawdown.**
 And `nearfloor` **failed its
-confirmation grid 0 of 3** (`project_nearfloor_is_risk_not_return`).
+confirmation grid **0 of 2 BROAD cells** (`project_nearfloor_is_risk_not_return`).
+
+⚠ **The original said "0 of 3". That counted an sp500 cell** (B: sp500 ×
+2000-2026), which `.claude/rules/universe-discipline.md` (#2444) disallows as a
+measurement cell. The honest count is **0 of 2 broad cells**, and the rejection
+is unweakened: B reported *no effect* either way, so dropping it removes a null
+result rather than a supporting one, and the decisive cell C (top-3000 ×
+2010-2026, −69.2pp = 2.0× its null on return) is broad. Note also that B had the
+**largest** core null of the three (180.1pp vs 132.5pp on top-3000) — the index
+universe was noisier, not tighter, so it could never have resolved the effect.
+Raised by the user 2026-08-20.
 
 This record cited that rejection only under "Not bundled", as a reason to keep
 the axes separate. It is much more than that: it is a **prior on the signature
@@ -428,12 +459,12 @@ spread **132.5pp** on a mean of 315.0 — ±21% from the seed alone.
 One axis. The best seeded cell of the whole ladder was `13-rt-nearfloor` (568.10)
 and it contains `rt` — but bundling would make the result unattributable, which
 is the pre-#2349 composite-knob failure. `nearfloor` also already failed its own
-confirmation grid **0 of 3** (`project_nearfloor_is_risk_not_return`).
+confirmation grid **0 of 2 BROAD cells** (`project_nearfloor_is_risk_not_return`).
 
 **Path-dependence caveat (raised by the user, 2026-08-19).** A confirmation grid
 is evaluated against *a baseline*, so `nearfloor`'s REJECT is conditional on the
 current default. If `rt` were ever promoted, the baseline moves and nearfloor's
-0-of-3 could legitimately come back different. Grid verdicts are not absolute —
+0-of-2 could legitimately come back different. Grid verdicts are not absolute —
 worth carrying into `promotion-confirmation.md` rather than leaving in a log.
 
 ## What this run cannot answer
