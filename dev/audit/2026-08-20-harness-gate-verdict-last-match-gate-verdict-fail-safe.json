@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-20",
+  "feature": "gate-verdict-fail-safe",
+  "branch": "harness/gate-verdict-last-match",
+  "sha": "a724a75d61efcf7a161a66793bb0b834279a2a36",
+  "recorded_at_ns": 1787216982417888114,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "The merge gate's own reader had no property test over the real review corpus; a quoted verdict could be read as the review's own. Round 1's last-match fix made two fence leaks WORSE in the after-position and no automated check caught that either.",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "Rework iteration 1 of 2 changed the design from last-match to disagreement->unclear. Round 1: structural APPROVED(5), behavioral NEEDS_REWORK(2). Merged 2acc39e0."
+}

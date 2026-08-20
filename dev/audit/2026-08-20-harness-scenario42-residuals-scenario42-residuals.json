@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-20",
+  "feature": "scenario42-residuals",
+  "branch": "harness/scenario42-residuals",
+  "sha": "552aed42e37f90c767c6938f0cf0efbaf62b6b64",
+  "recorded_at_ns": 1787216982375585487,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "A pin's own preconditions can be incomplete in ways no linter checks: [[ -e ]] silently accepts a dangling symlink, so scenario 42 passed vacuously with the guard it pins fully stripped. Found only by an adversarial reviewer enumerating 23 filesystem states.",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "Rework iteration 1 of 2. Round 1: structural APPROVED(4), behavioral NEEDS_REWORK(2). Merged e5ebce26."
+}

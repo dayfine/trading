@@ -4,26 +4,27 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-19 (orchestrator run 32228074121; main `184f563f` ->
-`5c278bb7`). Merged two: #2390 (harness `_glob_count` pin) and #2384 (clock-26
-default promotion, 2 rework commits + full re-QC). A harness agent finished its
-work then stalled before committing, leaving it uncommitted with no branch on
-origin -- recovered dispatcher-side. #2384 shipped a public signature that
-contradicted its own implementation: `weinstein_strategy.mli` re-declares the
-whole `config` record and still said `[@sexp.default 0]`; sexp attributes do not
-participate in signature matching, so it compiled green and no gate could catch
-it. Two new unreviewed PRs (#2391, #2392) arrived after the dispatch window.
-Full narrative: `dev/daily/2026-08-19.md`.
+Last updated: 2026-08-20 (orchestrator run 32344313210; main `74aefdeb` ->
+`2acc39e0`). Merged two, both harness, **both after a NEEDS_REWORK round**:
+#2424 (scenario-42 residuals) and #2425 (gate-reader fail-safe). Every one of
+this run's three behavioral reviews returned NEEDS_REWORK on a **mutation-proven**
+finding, and in each case the fix under review was itself incomplete: #2424's
+vacuity fix still passed with the guard stripped when the target path was a
+**dangling symlink** (`[[ -e ]]` dereferences); #2425's first fix made two known
+fence leaks **worse** in the after-position, so it was redesigned from last-match
+to **disagreement -> `unclear`**, fail-safe on either side; #2423's `.mli`
+claim that the tally "counts bar-events, not orders" was unpinned — a counter
+saturating at 1 left the whole suite green. Full narrative:
+`dev/daily/2026-08-20.md`.
 
-**Superseded the same day, by the local session (2026-08-19 PM):** #2384's
-clock-26 promotion was **reverted** by #2397 after the sp500 golden regressed
-−40.91pp, and the cron had merged it 30 minutes after it was drafted under an
-explicit hold — draft status is not a hold, which is why #2402 added a
-`do-not-merge` label the gate script enforces. The mechanism itself is not
-dead: the larger sample favours it (`project_stale_order_fills_are_not_an_edge`),
-the re-flip is framed in #2405, and #2407 proposes a better discriminator than
-age. Also merged: #2411 (entry-cap axis + handoff). Open: #2413, the axis's
-3-year-fold horizon control, which reverses its reading (#2404).
+**Carried context (2026-08-19 PM, still current):** #2384's clock-26 promotion
+was **reverted** by #2397 after the sp500 golden regressed −40.91pp; the cron had
+merged it 30 minutes after it was drafted under an explicit hold. Draft status is
+not a hold, which is why #2402 added the `do-not-merge` label the gate script
+enforces — **but `lead-orchestrator.md` still contains neither a label check nor
+the draft-as-hold rule, and still tells the orchestrator to flip drafts to ready
+(Step 5 Stage 3).** The tooling is ahead of the spec. The mechanism itself is not
+dead: re-flip framed in #2405, better discriminator in #2407. Open: #2413.
 
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
@@ -71,9 +72,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2390 `5a8af145` MERGED — `_glob_count` guard pinned (R1+R2/R3), mutation-verified; next: F1 unguarded `declare -f` read + F2 vacuity precondition |
-| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 8 open; A-NOOP-BUDGET-ORPHAN new (5 records recovered); A-FASTEXIT-VACUOUS now has measured cost; six items share the `workflow`-token blocker |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | segmentation weight caveats MERGED #2324 `4f602d0d`; 5 open; top item `linter_coverage` is a HUMAN POLICY DECISION (header half already shipped), not agent work |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2424 `e5ebce26` MERGED — the four #2390 scenario-42 residuals closed + filed; the vacuity fix itself needed a rework (`-e` misses a dangling symlink); next: none queued |
+| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | #2425 `2acc39e0` MERGED — gate reader fail-safe (#2421): disagreeing verdicts read `unclear`; 8 open, six `workflow`-token blocked |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | segmentation weight caveats MERGED #2324 `4f602d0d`; 6 open; top item `linter_coverage` is a HUMAN POLICY DECISION (header half already shipped), not agent work |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |

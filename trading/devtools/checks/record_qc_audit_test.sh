@@ -58,11 +58,12 @@ fail() { echo "  FAIL: $*" >&2; FAIL_COUNT=$(( FAIL_COUNT + 1 )); }
 # runs this function's body in a subshell where `errexit` is inactive
 # (`shopt inherit_errexit` is off in this suite), so at those sites a
 # non-zero `find`/pipeline status inside the body is NOT what aborts the
-# caller -- the function-call wrapping itself already absorbs it, `|| true`
-# or not. `|| true` below is load-bearing only for a DIRECT, non-command-
-# substitution invocation of `_glob_count` (errexit active in the caller's
-# frame) -- see scenario 42, the pin for H-AUDIT-GLOB-COUNT-GUARD-UNPINNED,
-# for the call shape where removing it actually turns this suite red.
+# caller -- the COMMAND SUBSTITUTION SUBSHELL itself already absorbs it,
+# `|| true` or not. `|| true` below is load-bearing only for a DIRECT,
+# non-command-substitution invocation of `_glob_count` (errexit active in
+# the caller's frame) -- see scenario 42, the pin for
+# H-AUDIT-GLOB-COUNT-GUARD-UNPINNED, for the call shape where removing it
+# actually turns this suite red.
 # Optional 3rd arg: an extra `find` predicate appended verbatim (e.g.
 # "-type f") for call sites that also filter by entry type.
 _glob_count() {
@@ -2782,21 +2783,65 @@ fi
 # call instead of returning "0". We extract the function's CURRENT body
 # via `declare -f` (rather than duplicating its source here) so this pin
 # tracks whatever `_glob_count` actually does, not a copy that can drift.
+#
+# Three preconditions guard the pin itself (residuals from the qc-behavioral
+# review that added this scenario, filed as H-AUDIT-GLOB-COUNT-GUARD-UNPINNED
+# residuals in dev/status/harness.md):
+#   1. The `declare -f _glob_count` read below runs under this suite's own
+#      `set -euo pipefail`. If `_glob_count` were ever renamed or removed,
+#      `declare -f` exits non-zero and, unguarded, would abort the ENTIRE
+#      suite right here with no summary line -- the exact failure class this
+#      file has already been patched for twice
+#      (H-AUDIT-TEST-FIND-PIPELINE-UNGUARDED; the scenario-25b `cat` guard).
+#      Guarded the same way as scenario 25b: `2>/dev/null || echo MISSING`,
+#      then an explicit precondition check turns a missing function into an
+#      orderly scenario-42 FAIL instead of a silent suite death.
+#   2. The scenario's entire discriminating power rests on `find` actually
+#      erroring against `SCENARIO42_MISSING_DIR`. That was previously
+#      positional (a fresh `mktemp -d` TMP_REPO never contains it) rather
+#      than asserted -- with mutation M-A applied (guard stripped from
+#      `_glob_count`) AND that directory pre-created, the suite passed
+#      vacuously (60/0/rc=0), which is exactly the "pin that doesn't pin
+#      what it claims" failure this scenario exists to prevent. Asserted
+#      via `[[ -e ... || -L ... ]]`, not `-e` alone: `-e` dereferences
+#      symlinks, so a DANGLING symlink at that path satisfies `! -e` while
+#      `find` on it still exits 0 -- the same vacuous-pass shape, one layer
+#      down. `-e || -L` covers exactly the states in which `find` exits 0
+#      (any real path, or a symlink whether or not its target resolves).
+#      `-d` alone would leave a different route open (a regular file also
+#      makes `find -maxdepth 1 -name ...` exit 0), so plain existence,
+#      not directory-ness, is the right check.
+#   3. Writing the generated script (`cat > "${SCENARIO42_SCRIPT}"`) runs
+#      under the same `set -euo pipefail` as (1); an unwritable `TMP_REPO`
+#      would otherwise abort the suite right here with no summary line --
+#      the identical class (1) exists to prevent, reintroduced one line
+#      below it. Guarded with `if ! cat > ... <<EOF ... EOF then fail ...`.
 # ---------------------------------------------------------------------------
-GLOB_COUNT_DEF="$(declare -f _glob_count)"
+GLOB_COUNT_DEF="$(declare -f _glob_count 2>/dev/null || echo MISSING)"
 SCENARIO42_MISSING_DIR="${TMP_REPO}/dev/audit/nonexistent-dir-42"
-SCENARIO42_SCRIPT="${TMP_REPO}/scenario42_direct_call.sh"
-cat > "${SCENARIO42_SCRIPT}" <<EOF
+
+if [[ "${GLOB_COUNT_DEF}" == "MISSING" ]]; then
+  fail "scenario 42 — precondition failed: _glob_count is not defined (renamed or removed?); cannot construct the direct-invocation pin"
+elif [[ -e "${SCENARIO42_MISSING_DIR}" || -L "${SCENARIO42_MISSING_DIR}" ]]; then
+  fail "scenario 42 — precondition failed: ${SCENARIO42_MISSING_DIR} unexpectedly exists; the pin requires a genuinely missing directory to exercise the guard"
+else
+  SCENARIO42_SCRIPT="${TMP_REPO}/scenario42_direct_call.sh"
+  if ! cat > "${SCENARIO42_SCRIPT}" <<EOF
 set -euo pipefail
 ${GLOB_COUNT_DEF}
 _glob_count "${SCENARIO42_MISSING_DIR}" "*.json"
 EOF
-out42="$(bash "${SCENARIO42_SCRIPT}" 2>&1)" && rc42=0 || rc42=$?
+  then
+    fail "scenario 42 — precondition failed: cannot write ${SCENARIO42_SCRIPT}"
+  else
+    out42="$(bash "${SCENARIO42_SCRIPT}" 2>&1)" && rc42=0 || rc42=$?
 
-if [[ "${rc42}" -eq 0 ]] && [[ "${out42}" == "0" ]]; then
-  pass "scenario 42 — _glob_count called DIRECTLY (not via command substitution) against a nonexistent directory prints a clean 0 and does not abort (H-AUDIT-GLOB-COUNT-GUARD-UNPINNED)"
-else
-  fail "scenario 42 — expected direct _glob_count call against a missing dir to print '0' and exit 0; got rc=${rc42} output=${out42}"
+    if [[ "${rc42}" -eq 0 ]] && [[ "${out42}" == "0" ]]; then
+      pass "scenario 42 — _glob_count called DIRECTLY (not via command substitution) against a nonexistent directory prints a clean 0 and does not abort (H-AUDIT-GLOB-COUNT-GUARD-UNPINNED)"
+    else
+      fail "scenario 42 — expected direct _glob_count call against a missing dir to print '0' and exit 0; got rc=${rc42} output=${out42}"
+    fi
+  fi
 fi
 
 # ---------------------------------------------------------------------------
