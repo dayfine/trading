@@ -2,6 +2,13 @@
  (public_name trading.engine)
  (name trading_engine)
  (libraries trading.base trading.orders status)
- (modules types engine market_state price_path bar_shape buffer_pool)
+ (modules
+  types
+  engine
+  fill_rules
+  market_state
+  price_path
+  bar_shape
+  buffer_pool)
  (preprocess
   (pps ppx_let ppx_deriving.show ppx_deriving.eq)))

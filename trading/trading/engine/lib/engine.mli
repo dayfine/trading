@@ -87,3 +87,26 @@ val process_orders :
         Portfolio.apply_trades portfolio trades
     | Error err -> (* handle error *)
     ]} *)
+
+val stop_limit_blocked_count : t -> int
+(** Diagnostic tally: StopLimit orders whose stop {b triggered} on a bar but
+    whose limit was never reachable, so no fill happened.
+
+    Counts {b bar-events, not orders}. A GTC ticket blocked on three separate
+    bars contributes three, and a ticket blocked once and filled later
+    contributes one — so this is an upper bound on distinct refused tickets, not
+    a count of them.
+
+    {b Why it exists.} Under [entry_extension_max_pct] the limit {i is} the
+    do-not-chase cap, so a [Limit_blocked] event is the cap refusing an entry.
+    That refusal is otherwise invisible: it is not a screener [reason_skipped]
+    (those are Insufficient_cash / Stop_too_wide / Sized_to_zero), not a cancel,
+    and never a trade. The cap's cost side has therefore never been directly
+    measured — only inferred from top-line differences that sit inside the
+    run-to-run path-noise floor.
+
+    Distinct from a stop that simply never triggered, which is not a cost of the
+    cap and is not counted.
+
+    Monotonically non-decreasing over an engine's lifetime; [0] for a fresh
+    {!create}. Purely observational — no decision reads it. *)

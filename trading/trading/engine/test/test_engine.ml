@@ -844,6 +844,66 @@ let test_buy_stop_limit_gap_up_limit_not_reached _ =
   (* Stop triggers at 120.0, but 120.0 > limit 117.0. Low is 118.0, still > 117.0 *)
   assert_order_not_executed engine order_mgr
 
+(* ===== stop_limit_blocked_count: the cap-refusal tally (observational) =====
+
+   The point of the tally is that it separates the two ways a StopLimit fails to
+   fill. Under [entry_extension_max_pct] the limit IS the do-not-chase cap, so
+   only the limit-blocked case is a cost of the cap; a stop that never triggered
+   is not. Each test below pins one arm of that distinction, so a change that
+   collapsed them would fail here rather than silently mis-report the cap's
+   cost. *)
+
+let test_blocked_count_increments_when_limit_blocks _ =
+  (* Same bar as test_buy_stop_limit_gap_up_limit_not_reached: the stop DOES
+     trigger at 120.0, but the whole bar stays above the 117.0 limit. *)
+  let bar =
+    make_bar "AAPL" ~open_price:120.0 ~high_price:130.0 ~low_price:118.0
+      ~close_price:125.0
+  in
+  let engine, order_mgr, _ =
+    setup_order_test
+      ~order_type:(StopLimit (110.0, 117.0))
+      ~side:Buy ~quote:bar ()
+  in
+  assert_that (stop_limit_blocked_count engine) (equal_to 0);
+  assert_order_not_executed engine order_mgr;
+  assert_that (stop_limit_blocked_count engine) (equal_to 1)
+
+let test_blocked_count_ignores_untriggered_stop _ =
+  (* Bar never reaches the 150.0 stop, so nothing happened: not a cap refusal
+     and must NOT be tallied. This is the arm that fails if the two non-fill
+     reasons are ever conflated. *)
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:105.0 ~low_price:98.0
+      ~close_price:102.0
+  in
+  let engine, order_mgr, _ =
+    setup_order_test
+      ~order_type:(StopLimit (150.0, 160.0))
+      ~side:Buy ~quote:bar ()
+  in
+  assert_order_not_executed engine order_mgr;
+  assert_that (stop_limit_blocked_count engine) (equal_to 0)
+
+let test_blocked_count_not_incremented_on_fill _ =
+  (* Stop triggers and the limit is reachable, so the order fills and nothing is
+     tallied. Pins that the tally counts refusals, not evaluations. *)
+  let bar =
+    make_bar "AAPL" ~open_price:100.0 ~high_price:115.0 ~low_price:99.0
+      ~close_price:112.0
+  in
+  let engine, order_mgr, _ =
+    setup_order_test
+      ~order_type:(StopLimit (110.0, 120.0))
+      ~side:Buy ~quote:bar ()
+  in
+  assert_that (process_orders engine order_mgr) (is_ok_and_holds (size_is 1));
+  assert_that (stop_limit_blocked_count engine) (equal_to 0)
+
+let test_blocked_count_is_fresh_per_engine _ =
+  let config = make_config () in
+  assert_that (stop_limit_blocked_count (create config)) (equal_to 0)
+
 let test_sell_stop_limit_gap_down_fills_at_open _ =
   (* Gap down with stop-limit: stop triggers, limit allows open price *)
   let bar =
@@ -1188,6 +1248,14 @@ let suite =
          >:: test_buy_stop_limit_gap_up_fills_at_open;
          "test_buy_stop_limit_gap_up_limit_not_reached"
          >:: test_buy_stop_limit_gap_up_limit_not_reached;
+         "test_blocked_count_increments_when_limit_blocks"
+         >:: test_blocked_count_increments_when_limit_blocks;
+         "test_blocked_count_ignores_untriggered_stop"
+         >:: test_blocked_count_ignores_untriggered_stop;
+         "test_blocked_count_not_incremented_on_fill"
+         >:: test_blocked_count_not_incremented_on_fill;
+         "test_blocked_count_is_fresh_per_engine"
+         >:: test_blocked_count_is_fresh_per_engine;
          "test_sell_stop_limit_gap_down_fills_at_open"
          >:: test_sell_stop_limit_gap_down_fills_at_open;
          "test_sell_stop_limit_gap_down_limit_not_reached"

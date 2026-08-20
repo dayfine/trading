@@ -9,9 +9,18 @@ type t = {
   market_state : Market_state.t;
       (** Per-symbol bars + lazy intraday-path generation; see {!Market_state}.
       *)
+  stop_limit_blocked_count : int ref;
+      (** Cap-refusal tally; contract in the .mli. Observational only. *)
 }
 
-let create config = { config; market_state = Market_state.create () }
+let create config =
+  {
+    config;
+    market_state = Market_state.create ();
+    stop_limit_blocked_count = ref 0;
+  }
+
+let stop_limit_blocked_count engine = !(engine.stop_limit_blocked_count)
 
 (* Store today's bars; intraday [Price_path] generation is deferred to
    [Market_state.path_for] at order-processing time, so paths are materialized
@@ -34,120 +43,6 @@ let _apply_slippage ~slippage_bps ~side fill_price =
     match side with Buy -> fill_price *. factor | Sell -> fill_price /. factor
 
 let _generate_trade_id order_id = "trade_" ^ order_id
-
-(** {1 Path-based Fill Checking}
-
-    The following functions check if orders would fill on a given intraday path.
-
-    Fill logic:
-    - Limit orders: Fill at limit price when crossing (conservative, guaranteed
-      price)
-    - Stop orders: Fill at current point price when triggered (natural slippage)
-    - Market orders: Fill at first available point (open price)
-
-    Natural slippage is modeled by path granularity: stop orders fill at the
-    observed price when triggered, not the trigger price. (~390 points/day.) *)
-
-let _would_fill_market (path : intraday_path) : fill_result option =
-  (* Market orders always fill at open *)
-  match List.hd path with
-  | Some point -> Some { price = point.price }
-  | None -> None
-
-let _meets_limit ~side ~limit_price price =
-  match side with
-  | Buy -> Float.(price <= limit_price)
-  | Sell -> Float.(price >= limit_price)
-
-let _crosses_limit ~side ~limit_price ~prev_price ~curr_price =
-  match side with
-  | Buy -> Float.(prev_price > limit_price && curr_price <= limit_price)
-  | Sell -> Float.(prev_price < limit_price && curr_price >= limit_price)
-
-let rec _search_order_fill ~(crosses : float -> float -> bool)
-    ~(meets : float -> bool) ~cross_price ~(prev_point : path_point) = function
-  | [] -> None
-  | (curr_point : path_point) :: tail ->
-      if crosses prev_point.price curr_point.price then
-        (* Limit orders fill at limit price (conservative) *)
-        Some { price = cross_price }
-      else if meets curr_point.price then
-        (* Price meets threshold exactly *)
-        Some { price = curr_point.price }
-      else
-        _search_order_fill ~crosses ~meets ~cross_price ~prev_point:curr_point
-          tail
-
-let _would_fill_limit ~(path : intraday_path) ~side ~limit_price :
-    fill_result option =
-  match path with
-  | [] -> None
-  | (first : path_point) :: rest ->
-      let meets = _meets_limit ~side ~limit_price in
-      if meets first.price then Some { price = first.price }
-      else
-        let crosses prev curr =
-          _crosses_limit ~side ~limit_price ~prev_price:prev ~curr_price:curr
-        in
-        _search_order_fill ~crosses ~meets ~cross_price:limit_price
-          ~prev_point:first rest
-
-let _meets_stop ~side ~stop_price price =
-  match side with
-  | Buy -> Float.(price >= stop_price)
-  | Sell -> Float.(price <= stop_price)
-
-let _crosses_stop ~side ~stop_price ~prev_price ~curr_price =
-  match side with
-  | Buy -> Float.(prev_price < stop_price && curr_price >= stop_price)
-  | Sell -> Float.(prev_price > stop_price && curr_price <= stop_price)
-
-let rec _search_stop_with_path ~(crosses : float -> float -> bool)
-    ~(meets : float -> bool) ~(prev_point : path_point) = function
-  | [] -> None
-  | (curr_point : path_point) :: _tail as remaining ->
-      if crosses prev_point.price curr_point.price then
-        (* Stop triggers, fill at current point price (natural slippage) *)
-        Some ({ price = curr_point.price }, remaining)
-      else if meets curr_point.price then
-        (* Stop triggers at exact price *)
-        Some ({ price = curr_point.price }, remaining)
-      else _search_stop_with_path ~crosses ~meets ~prev_point:curr_point _tail
-
-let _stop_activation_path ~(path : intraday_path) ~side ~stop_price :
-    (fill_result * intraday_path) option =
-  match path with
-  | [] -> None
-  | (first : path_point) :: _rest ->
-      let meets = _meets_stop ~side ~stop_price in
-      if meets first.price then
-        let fill = { price = first.price } in
-        Some (fill, path)
-      else
-        let crosses prev curr =
-          _crosses_stop ~side ~stop_price ~prev_price:prev ~curr_price:curr
-        in
-        _search_stop_with_path ~crosses ~meets ~prev_point:first _rest
-
-let _would_fill_stop ~(path : intraday_path) ~side ~stop_price :
-    fill_result option =
-  match _stop_activation_path ~path ~side ~stop_price with
-  | Some (fill, _) -> Some fill
-  | None -> None
-
-let _would_fill_stop_limit ~(path : intraday_path) ~side ~stop_price
-    ~limit_price : fill_result option =
-  (* Two-stage: first stop triggers, then limit must be reached *)
-  match _stop_activation_path ~path ~side ~stop_price with
-  | None -> None
-  | Some (stop_fill, activation_path) ->
-      let meets_limit = _meets_limit ~side ~limit_price in
-      if meets_limit stop_fill.price then
-        (* Trigger price meets limit, fill at trigger price (natural slippage) *)
-        Some stop_fill
-      else
-        (* Trigger price doesn't meet limit; search remaining path for limit price *)
-        _would_fill_limit ~path:activation_path ~side ~limit_price
 
 let _create_trade order_id symbol side quantity price commission =
   {
@@ -172,7 +67,7 @@ let _execute_market_order engine (ord : Trading_orders.Types.order) =
   let%bind path =
     Market_state.path_for engine.market_state ~symbol:ord.symbol
   in
-  let%bind fill = _would_fill_market path in
+  let%bind fill = Fill_rules.would_fill_market path in
   let commission = _calculate_commission engine.config ord.quantity in
   let price = _apply_slippage_to_fill engine ~side:ord.side fill in
   return
@@ -184,7 +79,9 @@ let _execute_limit_order engine (ord : Trading_orders.Types.order) limit_price =
   let%bind path =
     Market_state.path_for engine.market_state ~symbol:ord.symbol
   in
-  let%bind fill = _would_fill_limit ~path ~side:ord.side ~limit_price in
+  let%bind fill =
+    Fill_rules.would_fill_limit ~path ~side:ord.side ~limit_price
+  in
   let commission = _calculate_commission engine.config ord.quantity in
   let price = _apply_slippage_to_fill engine ~side:ord.side fill in
   return
@@ -217,7 +114,7 @@ let _execute_stop_order engine (ord : Trading_orders.Types.order) stop_price =
   let%bind path =
     Market_state.path_for engine.market_state ~symbol:ord.symbol
   in
-  let%bind fill = _would_fill_stop ~path ~side:ord.side ~stop_price in
+  let%bind fill = Fill_rules.would_fill_stop ~path ~side:ord.side ~stop_price in
   let commission = _calculate_commission engine.config ord.quantity in
   let price = _apply_slippage_to_fill engine ~side:ord.side fill in
   return
@@ -236,8 +133,18 @@ let _execute_stop_limit_order engine (ord : Trading_orders.Types.order)
   let%bind path =
     Market_state.path_for engine.market_state ~symbol:ord.symbol
   in
+  (* Tally the cap-refusal case before collapsing to an option: past this
+     [%bind] the two non-fill reasons are indistinguishable. *)
   let%bind fill =
-    _would_fill_stop_limit ~path ~side:ord.side ~stop_price ~limit_price
+    match
+      Fill_rules.classify_stop_limit ~path ~side:ord.side ~stop_price
+        ~limit_price
+    with
+    | Fill_rules.Fills fill -> Some fill
+    | Fill_rules.Stop_not_triggered -> None
+    | Fill_rules.Limit_blocked ->
+        Int.incr engine.stop_limit_blocked_count;
+        None
   in
   let commission = _calculate_commission engine.config ord.quantity in
   let price = _apply_slippage_to_fill engine ~side:ord.side fill in
