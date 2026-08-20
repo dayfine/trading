@@ -23,6 +23,69 @@ Before launching any sweep that will run > 1 hour:
 - [ ] **`/tmp/sweeps/` is bind-mounted to host** — verify with `docker inspect trading-1-dev | grep -A1 '/tmp/sweeps'`. If not bind-mounted, recreate the container via `.devcontainer/setup.sh rebuild && .devcontainer/setup.sh start`.
 - [ ] **No locked worktrees > 24h old** — `ls -lt .claude/worktrees/` and remove any whose owning agent has long since completed.
 
+## Pinning the worktree isolates the CODE, not the INPUTS (2026-08-20)
+
+A pinned worktree protects what the chain *builds*. It does nothing for what
+the chain *reads* if the script resolves inputs through the parent tree:
+
+```sh
+SPECS_HOST="$REPO/dev/experiments/<exp>/specs"    # parent path — NOT pinned
+docker cp "$SPECS_HOST/<arm>.sexp" $C:$d/
+```
+
+On 2026-08-20 the broad-5y chain ran salt 0 fine, then a `jj new main@origin`
+in the parent workspace (to start an unrelated docs commit) moved `@` off the
+branch holding the specs. Salts 1 and 2 died **1 second** apart with
+`lstat .../specs: no such file or directory`. The build was pinned and healthy
+throughout; only the inputs vanished. ~35 min of run time lost.
+
+Two rules:
+
+- **Stage inputs outside any VCS tree before launching** — copy specs to
+  `/tmp/<exp>-run/specs` and point the chain there. Then no jj/git operation
+  anywhere can reach them.
+- **"No concurrent jj ops" still applies** (below), and it applies to the
+  *interactive* session too. A pinned worktree is not a licence to resume
+  normal VCS work in the parent while a chain is live.
+
+Diagnostic note: a 1-second cell is **not** an OOM. OOM takes time and leaves
+an empty child log after real work. An instant failure is a missing input or a
+bad argument — read the launch log's stderr before reaching for the OOM
+explanation the chain's own message suggests.
+
+## A metric glob must be scoped to ONE arm (2026-08-20)
+
+Concurrent arms share a single timestamped output root with a subdir per arm,
+so this spans both:
+
+```sh
+out=$(grep 'Output root' $WORK/$tag.log | tail -1 | sed 's/.*: //')
+m=$(grep -hoE 'total_return_pct ...' ${out}/*/actual.sexp)     # WRONG
+m=$(grep -hoE 'total_return_pct ...' ${out}/<scenario>/actual.sexp)   # right
+```
+
+The arm that finishes **second** gets a summary line carrying **both arms'
+metrics concatenated**, which reads as one plausible result. Found in three of
+four chains (26y rt #2433, 5y sp500 rt #2436, broad-5y); absent only where arms
+ran sequentially (#2438).
+
+**It corrupted no conclusion** — every affected record was verified
+digit-for-digit against its per-arm `actual.sexp`. The reason is worth stating
+because it is the actual control: **each experiment commits
+`results/s<N>-<arm>-actual.sexp` and the writeups were built from those files,
+not from the log line.** Artifact discipline absorbed a bug that review missed.
+
+Readability also depended on two orderings cooperating — the clean line belongs
+to whichever arm finishes first, and the contaminated line leads with whichever
+arm sorts first alphabetically (`00-core` < `02-rangetop`). Rename the arms and
+the leading numbers silently belong to the wrong one.
+
+Tripwire for any results file:
+
+```sh
+awk '{n=gsub(/total_return_pct/,"&"); if(n>1) print FILENAME": "n" per line"}' <file>
+```
+
 ## Pinned-worktree builds (mandatory since 2026-07-27)
 
 Chain scripts MUST NOT build or run from the parent working copy. The
