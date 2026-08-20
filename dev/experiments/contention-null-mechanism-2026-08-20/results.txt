@@ -1,0 +1,4 @@
+[08-20 09:02:20] RESULT contention-tight-s0 => total_return_pct 35.173507290022052 total_trades 175 win_rate 36.571428571428569 sharpe_ratio 0.51459301517385792 max_drawdown_pct 19.35299841743009 avg_holding_days 62.485714285714288 ulcer_index 7.445701050676151  (wall 213s)
+[08-20 09:05:56] RESULT contention-tight-s1 => total_return_pct 34.419560224089743 total_trades 172 win_rate 38.372093023255815 sharpe_ratio 0.5095261758788211 max_drawdown_pct 18.373995076848317 avg_holding_days 64.116279069767444 ulcer_index 7.2021811119414849  (wall 215s)
+[08-20 09:09:28] RESULT contention-tight-s2 => total_return_pct 45.176364902541557 total_trades 172 win_rate 36.046511627906973 sharpe_ratio 0.60669019900277488 max_drawdown_pct 17.790446222957431 avg_holding_days 58.27325581395349 ulcer_index 7.0601326808127514  (wall 211s)
+[08-20 09:09:28] CONTENTION DONE
