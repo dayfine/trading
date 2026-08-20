@@ -611,12 +611,19 @@ type config = {
           [enable_macro_bearish_exposure_trim = true]; default [0.70] mirrors
           the normal long-exposure cap (a no-op cap). See
           [Weinstein_strategy_config]. *)
-  stale_exit_after_days : int option; [@sexp.default None]
+  stale_exit_after_days : int option;
+      [@sexp.default Some default_stale_exit_days]
       (** [Some n] force-sells a stale/delisted held position at its last close
           after an [n]-day bar gap, as a realised trade — instead of carrying it
-          open at a stale mark indefinitely (issue #1484). [None] (default) is a
-          no-op (detector-only, byte-identical to pre-#1484). Threaded into the
-          simulator's [Trading_simulation.Stale_hold.config]. Searchable as a
+          open at a stale mark indefinitely (issue #1484). [None] is the
+          pre-#1484 no-op (detector-only).
+          {b Default flipped [None] -> [Some 5] on 2026-07-10}
+          (realism/faithfulness basis change, see [Weinstein_strategy_config]
+          for the full rationale and ledger citation) — this re-export
+          previously still said [None], which was stale documentation only
+          (issue #2388); the shipped default has been [Some 5] since the
+          2026-07-10 flip. Threaded into the simulator's
+          [Trading_simulation.Stale_hold.config]. Searchable as a
           [Variant_matrix] flag axis. See [Weinstein_strategy_config]. *)
   short_sleeve_fraction : float; [@sexp.default 0.0]
       (** Fraction of portfolio value reserved as a dedicated short-only cash

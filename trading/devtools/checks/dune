@@ -132,6 +132,27 @@
    %{workspace_root}
    %{dep:linter_exceptions.conf})))
 
+; Sexp-default drift: a record type declared more than once (an .mli
+; re-declaring another module's record via [include], or an ordinary
+; .ml/.mli pair) must agree on every field's [@sexp.default ...] value --
+; the attribute is invisible to OCaml signature matching, so a stale copy
+; compiles cleanly and only reads wrong. See
+; devtools/sexp_default_drift_linter/sexp_default_drift_linter.ml header
+; (bugs #2384, #2388). Scans lib/*.ml and lib/*.mli files across the
+; workspace via Sys.readdir at runtime.
+
+(rule
+ (alias runtest)
+ (deps
+  (glob_files_rec %{workspace_root}/*.ml)
+  (glob_files_rec %{workspace_root}/*.mli)
+  %{dep:linter_exceptions.conf})
+ (action
+  (run
+   %{exe:../sexp_default_drift_linter/sexp_default_drift_linter.exe}
+   %{workspace_root}
+   %{dep:linter_exceptions.conf})))
+
 ; @testing-only enforcement: libraries annotated "; @testing-only" must not
 ; appear in (library ...) stanza dependencies — only (test ...) / (tests ...)
 ; Scans all dune files across the workspace.
