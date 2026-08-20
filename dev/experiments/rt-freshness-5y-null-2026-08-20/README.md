@@ -88,7 +88,8 @@ Null = max − min across core's three salts, exactly as pre-registered.
 ⚠ **Three draws.** max−min over three samples is a **downward-biased** estimator
 of spread, so every null below is more likely too small than too large, and the
 ×null ratios that follow are correspondingly optimistic. The verdict tolerates
-this — MaxDD's margin is 12.7× and survives a several-fold wider null — but do
+this — the verdict rests on a 12.31× margin (4.45 ÷ 0.3616) and survives a
+several-fold wider null — but do
 not read the 4-significant-figure nulls as precise quantities.
 
 | metric | **5y null** | 26y null (for scale) | ratio |
@@ -185,9 +186,14 @@ Union-basis (symmetric difference ÷ |s0 ∪ sx|) for 26y core: 47.5% / 33.1%.
 **At 5y the core trade SET is identical across all three salts** — 0 under
 every convention. Every metric difference there comes from fill *prices* moving
 within a fixed set of trades, which is why the 5y nulls are tiny and why win
-rate moves by exactly one trade (37.9167 / 37.9167 / 38.3333). (The *rows* are
-not identical: 454 of 480 differ in `pnl_dollars` / `entry_price` / `quantity`.
-It is the key set that is fixed.)
+rate moves by exactly one trade (37.9167 / 37.9167 / 38.3333). (The *rows* are not identical: **227 of the 240 rows (94.6%)** differ in at
+least one of `pnl_dollars` / `entry_price` / `quantity` — per field, 94.6% /
+74.2% / 65.0%. It is the key set that is fixed, not the values.
+
+⚠ An earlier version said "454 of 480", which is **the same double-count this
+section exists to correct** — 227 rows counted twice, once on each side of the
+diff, against a 480 = 2×240 denominator. Caught while acting on a reviewer note
+that proposed 455; neither is right, and the framing was the actual defect.)
 
 **At 26y, 19–32% of each run's trades do not occur in the other salt.** Smaller
 than the retracted figure, and still a discrete channel rather than a
@@ -258,7 +264,7 @@ is itself the point: none of them is "the" answer.
 ⚠ **The nulls are 3-draw ranges.** A max−min over three samples is a
 *downward-biased* estimator of spread, so every null here is more likely too
 small than too large, and the ×null ratios are correspondingly optimistic. This
-does not threaten the verdict — the MaxDD margin is 12.7× and would survive a
+does not threaten the verdict — the margin is 12.31× and would survive a
 several-fold wider null — but the 4-significant-figure nulls should not be read
 as precise quantities.
 
