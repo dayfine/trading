@@ -42,12 +42,22 @@ spanning two axes:
     `fetch-historical-data` skill + `dev/scripts/build_deep_universe.sh` if it
     isn't already present. A grid that never sees a bear-dominated regime can
     only certify a bull-regime artifact.
-- **Universe diversity** — the canonical universe **plus ≥1 different universe**
-  (different breadth or a different point-in-time snapshot, e.g. SP500-510 vs
-  top-3000). A different snapshot of the same index counts; a survivor-biased
-  composition golden is fine here because the bias hits baseline and candidate
-  equally — the *relative* comparison still holds (see
-  `project_composition_golden_survivor_bias`).
+- **Universe diversity — BROAD vs BROAD only.** The canonical universe **plus ≥1
+  different broad universe**: a different PIT composition vintage
+  (`top-3000-2019` vs `top-3000-2000`), or a different breadth tier (top-1000 vs
+  top-3000). A survivor-biased composition golden is fine here because the bias
+  hits baseline and candidate equally — the *relative* comparison still holds
+  (see `project_composition_golden_survivor_bias`).
+
+  ⚠ **An earlier version of this clause offered "SP500-510 vs top-3000" as the
+  example. That is superseded by `.claude/rules/universe-discipline.md`**
+  (user instruction 2026-08-20: never measure performance on sp500; use it only
+  for sanity checks and rule validation). Narrowing to a large-cap index is not
+  a diversity axis — it is a different experiment, and it silently moves breadth
+  while you think you are moving period. PR #2436 shipped a conclusion resting
+  on exactly that confound. **The worked example below used SP500 cells and
+  stays as historical record; a grid built that way today does not satisfy the
+  rule.**
 
 Minimum viable grid: the long full-history window (gave the ACCEPT) + one
 period-disjoint window + one different-universe window = 3 cells. More is better.
