@@ -26,7 +26,7 @@ PIN=9cce2ff11
 WT=/workspaces/trading-1/.claude/worktrees/sweep-broad5y
 ROOT=$WT/trading
 HOST_WT="$REPO/.claude/worktrees/sweep-broad5y"
-SPECS_HOST="$REPO/dev/experiments/rt-freshness-broad5y-2026-08-20/specs"
+SPECS_HOST="/tmp/broad5y-run/specs"   # was $REPO/... — a parent-tree jj op deleted it mid-run (2026-08-20)
 FIX=$ROOT/test_data/backtest_scenarios
 WORK=/tmp/broad5y
 LOG_HOST=/tmp/broad5y-chain.log
@@ -87,7 +87,7 @@ run_cell() {
       --no-emit-all-eligible --parallel 1 --progress-every 26 \
       > $WORK/$tag.log 2>&1; echo exit=\$? >> $WORK/$tag.log"
   out=$(docker exec $C sh -c "grep 'Output root' $WORK/$tag.log | tail -1 | sed 's/.*: //'")
-  m=$(docker exec $C sh -c "grep -hoE 'total_return_pct [0-9.-]+|total_trades [0-9]+|sharpe_ratio [0-9.-]+|max_drawdown_pct [0-9.-]+' ${out}/*/actual.sexp 2>/dev/null | tr '\n' ' '")
+  m=$(docker exec $C sh -c "grep -hoE 'total_return_pct [0-9.eE+-]+|total_trades [0-9]+|sharpe_ratio [0-9.eE+-]+|max_drawdown_pct [0-9.eE+-]+|ulcer_index [0-9.eE+-]+|win_rate [0-9.eE+-]+' ${out}/broad5y-${arm}/actual.sexp 2>/dev/null | tr '\n' ' '")
   log "RESULT $tag => ${m:-<no result — CHECK FOR OOM: empty child log + no stack is the signature>} (wall $(( $(date +%s) - start ))s)"
 }
 
