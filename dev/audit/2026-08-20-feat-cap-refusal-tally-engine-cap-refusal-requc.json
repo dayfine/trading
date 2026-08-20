@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-20",
+  "feature": "engine-cap-refusal-requc",
+  "branch": "feat/cap-refusal-tally",
+  "sha": "26b2b0fc1cdb4e768ba38134f13f74fcc9742629",
+  "recorded_at_ns": 1787234056272550382,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "LINTER_CANDIDATE: engine.mli's two-clause tally contract had only its first clause pinned; a reset-on-fill mutation left the whole 56-test suite green. Also: a later APPROVED from a concurrent QC pipeline cleared this NEEDS_REWORK and the PR merged 74s later (issue #2432).",
+  "quality_score": 2,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": "Re-QC at the post-sync tip. Diff-vs-base byte-identical to the previously-APPROVED 2f06127e (md5 48ceb01b55f87ececff868d7d43e1c1b), yet behavioral found a NEW mutation-proven CP4 gap -- the artifact did not change, the mutation sweep did."
+}

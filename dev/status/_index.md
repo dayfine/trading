@@ -4,18 +4,17 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-20 (orchestrator run 32344313210; main `74aefdeb` ->
-`2acc39e0`). Merged two, both harness, **both after a NEEDS_REWORK round**:
-#2424 (scenario-42 residuals) and #2425 (gate-reader fail-safe). Every one of
-this run's three behavioral reviews returned NEEDS_REWORK on a **mutation-proven**
-finding, and in each case the fix under review was itself incomplete: #2424's
-vacuity fix still passed with the guard stripped when the target path was a
-**dangling symlink** (`[[ -e ]]` dereferences); #2425's first fix made two known
-fence leaks **worse** in the after-position, so it was redesigned from last-match
-to **disagreement -> `unclear`**, fail-safe on either side; #2423's `.mli`
-claim that the tally "counts bar-events, not orders" was unpinned — a counter
-saturating at 1 left the whole suite green. Full narrative:
-`dev/daily/2026-08-20.md`.
+Last updated: 2026-08-20 (orchestrator **run 2**, run id 32369033387; main
+`2acc39e0` -> `74b16fae`). Merged three: the stranded run-1 summary PR #2426,
+#2423 (cap-refusal tally — **merged by a concurrent actor at a tip carrying an
+open NEEDS_REWORK**, see #2432), and #2431 (the rework #2423 merged without,
+recovered and landed). #2430 (sexp.default drift linter) is open in rework.
+Four issues filed from measurement: **#2427** the 15y golden has never completed
+(all 5 runs cancelled at a 90-min timeout), **#2428** the orchestrator spec still
+lacks the `do-not-merge` / draft hold that #2396 cost -40.91pp, **#2429** the
+daily-summary auto-merge polls 10 min for a ~13 min check then silently attempts
+a doomed merge, **#2432** a later APPROVED from a concurrent QC pipeline clears
+an unresolved NEEDS_REWORK. Full narrative: `dev/daily/2026-08-20-run2.md`.
 
 **Carried context (2026-08-19 PM, still current):** #2384's clock-26 promotion
 was **reverted** by #2397 after the sp500 golden regressed −40.91pp; the cron had
@@ -72,8 +71,8 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2424 `e5ebce26` MERGED — the four #2390 scenario-42 residuals closed + filed; the vacuity fix itself needed a rework (`-e` misses a dangling symlink); next: none queued |
-| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | #2425 `2acc39e0` MERGED — gate reader fail-safe (#2421): disagreeing verdicts read `unclear`; 8 open, six `workflow`-token blocked |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | **#2430** | sexp.default drift linter (closes #2388); struct APPROVED, behav NEEDS_REWORK — rework 1/2; next: re-QC then merge |
+| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 4 issues filed run 2 (#2427 #2428 #2429 #2432); next: #2432 gate-reader fix (landable — not workflow-scoped) |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | segmentation weight caveats MERGED #2324 `4f602d0d`; 6 open; top item `linter_coverage` is a HUMAN POLICY DECISION (header half already shipped), not agent work |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
