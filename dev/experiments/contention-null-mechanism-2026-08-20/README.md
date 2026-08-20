@@ -232,20 +232,36 @@ sent the next session to patch `runner.ml`. **That negative claim is false**,
 and the counterexample is the same field name plus a suffix:
 
 **`max_long_exposure_pct_entry`** (`weinstein_strategy_config.mli:524`,
-`[@sexp.default 0.0]`) — whose docstring reads *"The working replacement for the
+`[@sexp.default 0.0]` — and note **`<= 0.0` is an EXACT no-op**: the cap becomes
+`Float.infinity`, so the default means the gate is OFF, not "capped at zero")
+— whose docstring reads *"The working replacement for the
 dead `Portfolio_risk.max_long_exposure_pct`"*. It caps aggregate new-entry
 notional at the Friday entry walk, and it is a **post-sizing admission gate**:
 `_apply_long_notional_gate` (`entry_audit_capture.ml:319`) receives the
 already-sized `(trans, meta)` and **refunds the tentatively deducted cash** on
-rejection, emitting a `Long_exposure_cap` skip. Sizing is bit-identical; only
-which tickets are admitted changes.
+rejection, emitting a `Long_exposure_cap` skip.
+
+**The per-position sizing RULE is untouched** — that is the property the cell
+needs. ⚠ But do not read that as "the realized size distribution is unchanged":
+`check_long_notional_cap` is greedy in walk order and leaves the accumulator
+unbumped on rejection, so smaller later candidates still fit and the admitted
+set biases small. That is a milder form of the same dispersion confound this
+cell exists to avoid, and it must be measured rather than assumed away. (Third
+loose use of "bit-identical" in this document's history — the word keeps
+smuggling in a stronger claim than the one being made.)
 
 That is exactly the discriminating cell — raise admission pressure at fixed
-per-position sizing — and it needs no code change. `max_sector_exposure_pct`
+per-position sizing — and it needs no code change. It is **exercised, not just
+expressible**: `((max_long_exposure_pct_entry 1.0))` already appears in **six
+committed scenario specs**.
+
+⚠ **But 1.0 is the value chosen NOT to bind.** Whoever runs the cell must
+calibrate a value *below* the arm's realized committed-long fraction, or the
+gate never fires and the cell is a no-op with extra steps. `max_sector_exposure_pct`
 (default `None`) has the same shape, narrower.
 
-**I had the answer in memory and did not check it.**
-`project_envelope_knobs_dead` records both halves of the correction above
+**I had the DISPROOFS in memory and did not check them.**
+`project_envelope_knobs_dead` (07-05) records both halves of the correction above
 (`min_cash_pct` bit-identical in a 3/3-window smoke A/B; `max_long_exposure_pct`
 live only as a per-position `min()` that "never binds at prod values"). Reading
 it first would have skipped two wrong recommendations.
