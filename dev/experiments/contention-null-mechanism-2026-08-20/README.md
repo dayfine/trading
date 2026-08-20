@@ -25,8 +25,11 @@ pairs that is 455 of 480.
 ⚠ An earlier version said "454 of 480" with no scope named. The figures above
 name every scope; that is the fix. **No causal account of where 454 came from
 is offered here** — 2×227, a truncated 94.58% of 480, and an off-by-one against
-455 all reproduce it, and the sibling record (#2441) dropped its own "227
-doubled" explanation for exactly that reason.
+455 all reproduce it, and the sibling record (#2441) **retracted** its own "227
+doubled" explanation for exactly that reason — it keeps the phrase on `main` as
+marked correction-history, labelled "evidentially unsupported", rather than
+deleting it. (An earlier version of this sentence said "dropped", which is not
+what #2441 did.)
 
 The seed moves fill prices *within* a fixed trade set, which
 is exactly why the control still has a 0.99pp return null. At 26y the seed
@@ -221,10 +224,31 @@ in source:
   or below `max_position_pct_long = 0.33` caps **every** position and compresses
   size dispersion — precisely the confound this cell exists to avoid.
 
-**So there is currently NO spec-expressible knob that raises admission pressure
-without also moving per-position sizing.** The discriminating cell needs either
-a code change (make `initial_cash` reachable from the spec) or a different
-design. Saying so is more useful than a recommendation that does not work.
+### The cell IS runnable today — `max_long_exposure_pct_entry`
+
+⚠ A previous version concluded "there is currently **NO** spec-expressible knob
+that raises admission pressure without also moving per-position sizing", and
+sent the next session to patch `runner.ml`. **That negative claim is false**,
+and the counterexample is the same field name plus a suffix:
+
+**`max_long_exposure_pct_entry`** (`weinstein_strategy_config.mli:524`,
+`[@sexp.default 0.0]`) — whose docstring reads *"The working replacement for the
+dead `Portfolio_risk.max_long_exposure_pct`"*. It caps aggregate new-entry
+notional at the Friday entry walk, and it is a **post-sizing admission gate**:
+`_apply_long_notional_gate` (`entry_audit_capture.ml:319`) receives the
+already-sized `(trans, meta)` and **refunds the tentatively deducted cash** on
+rejection, emitting a `Long_exposure_cap` skip. Sizing is bit-identical; only
+which tickets are admitted changes.
+
+That is exactly the discriminating cell — raise admission pressure at fixed
+per-position sizing — and it needs no code change. `max_sector_exposure_pct`
+(default `None`) has the same shape, narrower.
+
+**I had the answer in memory and did not check it.**
+`project_envelope_knobs_dead` records both halves of the correction above
+(`min_cash_pct` bit-identical in a 3/3-window smoke A/B; `max_long_exposure_pct`
+live only as a per-position `min()` that "never binds at prod values"). Reading
+it first would have skipped two wrong recommendations.
 
 This correction is the same defect class as the one it replaces, one layer
 down: a confident mechanism claim about code, asserted without reading the
