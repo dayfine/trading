@@ -1,5 +1,66 @@
 # Does the 5-year testbed have a drawdown null? — 2 arms × 3 salts
 
+> # ⚠ RETRACTED 2026-08-20 — this cell's headline is wrong
+>
+> **What was claimed:** that `Range_top_breakout` "fails its first independent
+> cell", because a 5-year window reversed all five metrics against the 26-year
+> result.
+>
+> **Why it is wrong:** the comparison moved **period AND universe at once** —
+> this cell ran on **sp500-500 (187 traded names)** while the 26y cell ran on
+> top-3000. The record hedged this ("does not attribute the reversal") and
+> shipped anyway. Hedging is not fixing.
+>
+> **What settled it:** `../rt-freshness-broad5y-2026-08-20/` re-ran the same
+> six-cell design at the **same period** on **top-3000 PIT-2019**, isolating the
+> universe axis. `Range_top_breakout` does **not** reverse there in the way this
+> cell reported — MaxDD passes Rule 4 at all three salts (14.9× / 1.4× / 19.3×
+> its null) and ulcer holds its direction 3-of-3. **The reversal was a universe
+> effect, not a period effect.**
+>
+> Stated precisely, because the count matters: **three** metrics cleared Rule 4
+> at 26y (ulcer, win rate, MaxDD). On broad-5y MaxDD holds, ulcer holds its
+> direction, and **win rate FAILS Rule 4** — s0 and s2 agree with the 26y
+> direction above null, but s1 opposes at 2.24x, so the leg is not unanimous.
+> So the broad cell **splits** the 26y result rather than simply confirming it.
+>
+> **The measured cause.** The nulls do not transfer between universes, and they
+> do not even move in the same *direction* per metric:
+>
+> | metric | this cell (sp500-5y) | broad-5y | ratio |
+> |---|---:|---:|---:|
+> | return pp | 0.9862 | **14.650** | 14.9× |
+> | Sharpe | 0.0069 | 0.1738 | 25.2× |
+> | ulcer | 0.1029 | 1.1186 | 10.9× |
+> | win rate pp | 0.4167 | 1.3706 | 3.3× |
+> | MaxDD pp | 0.3616 | **0.1581** | **0.44×** |
+>
+> Breadth makes return noisier and drawdown *more stable*. The consequence is
+> visible in this cell's own headline: its measured return gap was **−67.20pp
+> against a 0.9862pp null — 68×**, which reads as overwhelming. The same arm on
+> broad-5y produces −6.219 / −16.576 / **+7.826** pp against a 14.650pp null
+> (0.42× / 1.13× / 0.53×) — only s1 outside the null, and s2 flipping sign.
+>
+> The 0.9862pp null is **not** the error here; it is the correct null for
+> sp500-500. What does not carry is the *inference*, because the surface it was
+> measured on does not generalise.
+>
+> **What still stands.** The null-measurement *method* is sound and the numbers
+> in this file are correct as measurements of the sp500-500 testbed — **0.9862pp
+> was the right return null for sp500-500.** The error was never the null; it was
+> measuring on a surface whose result does not generalise. What does not stand is
+> any inference from these numbers about `Range_top_breakout`.
+>
+> #2433's **drawdown** finding is not contradicted — MaxDD now agrees across both
+> windows. Its **win-rate** leg fails Rule 4 on the broad cell (s1 opposes above
+> null) and should not be quoted as a Rule-4 survivor without that evidence.
+>
+> **Rule that came out of it:** `.claude/rules/universe-discipline.md` (#2444) —
+> sp500 is a sanity-check / rule-validation fixture, never a measurement
+> surface. Per user instruction 2026-08-20: *"we do NOT care about running on
+> S&P500 universe. even 5y should run on broad."* That instruction was in fact
+> first given **2026-07-04** and had lapsed; see `#2445`.
+
 **Status at commit time: NOT YET RUN.** Everything below is pre-registered.
 Results and the verdict land in a later commit, so the decision rule provably
 predates the numbers.
