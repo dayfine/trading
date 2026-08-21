@@ -125,6 +125,38 @@ let is_excluded_dir entry =
   || String.equal entry "ta_ocaml"
   || String.equal entry ".claude"
 
+(* Below this many scanned lib/*.ml + lib/*.mli files, the scan is treated as
+   implausible rather than "a clean tree happens to be small". Measured on
+   the shipped tree (2026-08-21): 862 files match the collection filter
+   below. 500 leaves >40% headroom for ordinary file deletions/refactors
+   while still catching the failure modes this guards against -- an empty or
+   absent [trading-root] argument, a moved trading/ dir, or a wrong-cwd
+   invocation, all of which collapse the count to 0 or near it. This is a
+   floor, not a target: it only needs to sit comfortably below "normal" and
+   comfortably above "the scan found basically nothing". *)
+let min_expected_lib_files = 500
+
+(* [Sys.readdir] on a subdirectory discovered mid-walk can fail for benign
+   reasons (a symlink race, a directory removed between listing and
+   recursing) -- those failures are swallowed by [walk] itself, same as
+   before. What must NOT be swallowed is the walk finding nothing at all:
+   [collect_lib_files] validates [root] up front, and its caller enforces
+   [min_expected_lib_files] on the total. A directory that is legitimately
+   absent (bad CLI arg, moved trading/ dir) is reported here with a specific
+   message; a directory that exists but the scan still turns up too few
+   files under is caught downstream by the floor -- either way the run is
+   loud, never a silent "OK: nothing to report". *)
+let validate_root_readable root =
+  if not (Sys.file_exists root) then
+    Some (Printf.sprintf "trading-root does not exist: %s" root)
+  else if not (Sys.is_directory root) then
+    Some (Printf.sprintf "trading-root is not a directory: %s" root)
+  else
+    match Sys.readdir root with
+    | exception Sys_error msg ->
+        Some (Printf.sprintf "trading-root is not readable: %s (%s)" root msg)
+    | _ -> None
+
 (* [lib/*.ml] and [lib/*.mli] under [root] -- exactly the surface every
    known instance of this defect class lives on (record types with
    [@@deriving sexp] and .mli companions), and matches the scope other
@@ -445,6 +477,27 @@ let format_violation v =
 
 (* --- Main ---------------------------------------------------------------------- *)
 
+(* Fails loudly (never a silent "OK") whenever the scan itself looks broken --
+   see [validate_root_readable] and [min_expected_lib_files] above. This is
+   what turns "an empty root, a moved trading/ dir, or a wrong-cwd invocation"
+   from an indistinguishable clean-tree pass into an explicit FAIL. *)
+let _check_scan_integrity trading_root files =
+  match validate_root_readable trading_root with
+  | Some msg ->
+      Printf.printf "FAIL: sexp_default_drift linter -- %s\n" msg;
+      exit 1
+  | None ->
+      let n = List.length files in
+      if n < min_expected_lib_files then begin
+        Printf.printf
+          "FAIL: sexp_default_drift linter -- scanned only %d lib/*.ml + \
+           lib/*.mli file(s) under %s, below the expected floor of %d. This \
+           usually means the trading-root argument is wrong or moved, not that \
+           the tree genuinely shrank this much.\n"
+          n trading_root min_expected_lib_files;
+        exit 1
+      end
+
 let () =
   let trading_root =
     if Array.length Sys.argv > 1 then Sys.argv.(1)
@@ -458,6 +511,7 @@ let () =
     if Array.length Sys.argv > 2 then read_exceptions Sys.argv.(2) else []
   in
   let files = List.sort String.compare (collect_lib_files trading_root) in
+  _check_scan_integrity trading_root files;
   let parsed = List.map (fun f -> (f, parse_file f)) files in
   let records = List.concat_map (fun (_, (recs, _)) -> recs) parsed in
   let constants = List.concat_map (fun (_, (_, consts)) -> consts) parsed in
@@ -470,8 +524,10 @@ let () =
       all_violations
   in
   if live_violations = [] then
-    print_endline
-      "OK: no sexp.default drift across duplicated record declarations."
+    Printf.printf
+      "OK: no sexp.default drift across duplicated record declarations \
+       (scanned %d files).\n"
+      (List.length files)
   else begin
     Printf.printf
       "FAIL: sexp_default_drift linter -- %d field(s) with a [@sexp.default \

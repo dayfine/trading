@@ -1,0 +1,11 @@
+; Self-tests for sexp_default_drift_linter. Follows the sibling pattern in
+; devtools/cc_linter/test/: a plain executable that shells out to the built
+; linter binary and asserts on its exit code / stdout, not an OUnit suite --
+; these are smoke tests of the linter's own process-level contract (exit
+; code, loud failure), not of its OCaml internals.
+
+(test
+ (name test_scan_integrity)
+ (libraries unix)
+ (deps
+  (file ../sexp_default_drift_linter.exe)))
