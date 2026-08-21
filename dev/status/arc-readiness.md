@@ -1,6 +1,6 @@
 # Status: arc-readiness
 
-## Last updated: 2026-08-20
+## Last updated: 2026-08-21
 
 ## Status
 IN_PROGRESS
@@ -93,14 +93,27 @@ The hole is the **funding leg**, whose plan
 |---|---|
 | G1 — land `ticket_age_weeks_at_cancel` + `cancel_reason` (#2348) | ✅ done (3 impl, 5 test files) |
 | step 2 — measure the cohort from artifacts | ✅ done — 3,530 rejections, median shortfall 52%, 63% in bursts |
-| step 3 — build each axis behind its own flag | **1 of 3** |
-| step 4 — one grid over all three + null | **blocked** |
+| step 3 — build each axis behind its own flag | **2 of 3** (G3, G2a) |
+| step 4 — one grid over all three + null | **blocked on A1-2** |
 
 ### Sub-tasks
 
-- [ ] **A1-1 — Build G2a `entry_fill_reject_retries`** (retry). Does not exist:
-      0 mli, 0 impl, 0 tests. Default-off `int`, default `0`, per
-      `experiment-flag-discipline.md` R1/R2. Same shape as the built G3.
+- [x] **A1-1 — Build G2a `entry_fill_reject_retries`** (retry). Built on
+      `feat/arc-g2a-fill-retries`. Default-off `int`, default `0`
+      (`experiment-flag-discipline.md` R1/R2/R3 — no ledger verdict exists, so
+      it ships off). New `Trading_simulation.Entry_fill_retry` holds the run's
+      budget + per-ticket ledger; on a refused entry fill it leaves the
+      `Entering` position alone and re-submits a copy of the refused order so
+      the engine re-offers it next tick, up to N times, instead of the ticket
+      being destroyed. Threaded through `Simulator.create_deps` from
+      `panel_runner`. At `0` `handle_rejected_entries` returns its input list
+      itself — no ledger write, no order-manager call — so the cancel path is
+      bit-identical and no golden moved. Axis reachability through the real
+      `Overlay_validator.apply_overrides` is pinned for `(0 1 2)` in
+      `test_runner_hypothesis_overrides.ml`. Also pays back the file-length
+      budget it consumed: `Simulator._compute_benchmark_return` moved to the
+      existing `Simulator_metrics` (simulator.ml 500 → 493, its declared-large
+      cap is 500).
 - [ ] **A1-2 — Build G2b `entry_fill_size_to_available`** (resize). Does not
       exist. Default-off `bool`, default `false`. Independent of A1-1.
 - [ ] **A1-3 — Arm G3 `reserve_cash_for_resting_tickets` in a combined arc
@@ -232,10 +245,14 @@ nobody budgets it. That is why the flag inventory sat unworked from 08-09.
 
 ## Next task
 
-Read the 26y arc-bundle result (in flight, PR #2452) against `fullbook-graded`'s
-recorded +287% / MaxDD 23.2% — it isolates what rt + volume-at-fill add. Then
-A1-1 / A1-2 (build G2a and G2b), the arc's only genuine feature hole, unblocked
-by the noise floor since step 4 is an internal three-way comparison.
+**A1-2 — build G2b `entry_fill_size_to_available`**, the last piece of the
+funding leg. A1-1 (G2a) is built on `feat/arc-g2a-fill-retries`; once G2b lands,
+A1-4's three-way grid (G2a vs G2b vs G3 + null) unblocks — an internal
+comparison, so the noise floor does not gate it.
+
+Also read the 26y arc-bundle result (in flight, PR #2452) against
+`fullbook-graded`'s recorded +287% / MaxDD 23.2% — it isolates what rt +
+volume-at-fill add.
 
 Queued behind the container: the chart work (A2-4, PR #2453) and the
 `.claude/worktrees` fix that unblocks A3-2 — both need `dune runtest`, and
