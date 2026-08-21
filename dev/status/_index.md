@@ -43,6 +43,7 @@ Each row: one line; deeper task detail in the linked status file.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
+| [arc-readiness](arc-readiness.md) | IN_PROGRESS | dayfine (LOCAL) | #2449 | A1: build G2a+G2b (funding leg 1-of-3); A2: null-report + fill-model A/B (USER); A3: #2449 then delete 84 uncited docs |
 | [resistance-v2](resistance-v2.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | grid 3/3 ACCEPT w=30; BUNDLE PROMOTED default-on #2047 (R3 human-approved 07-23); next: WF-CV vs w30 (data-gated) + lever-b axis |
 | [margin-realism](margin-realism.md) | IN_PROGRESS | dayfine (maintainer LOCAL) + feat-backtest | — | M4 MERGED #2063; #2057 exit labels MERGED #2074; trade_audit half MERGED #2085; #2076 CLOSED (report fallback #2196) |
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
