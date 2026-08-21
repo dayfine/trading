@@ -1,0 +1,12 @@
+symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry,position_id,stop_fill_distance_pct
+NWN,LONG,2019-04-26,2019-04-27,1,67.34,67.19,2115,-318.87,-0.22,,,volume_eject,Stage2,2.3757,0.0435,non_stop_exit,,100,NWN-wein-1056,0.0440
+IT,LONG,2019-04-01,2019-04-06,5,153.09,153.81,920,662.40,0.47,,,volume_eject,Stage2,3.5176,0.0400,non_stop_exit,,100,IT-wein-1016,0.0431
+EGHT,LONG,2019-04-11,2019-04-13,2,21.30,21.81,6624,3383.87,2.40,,,volume_eject,Stage2,2.2618,0.0400,non_stop_exit,,100,EGHT-wein-1015,0.0440
+CY,LONG,2019-02-25,2019-02-28,3,15.93,15.35,8788,-5097.04,-3.64,,,stop_loss,Stage2,2.3749,0.0400,intraday,3,90,CY-wein-901,0.0400
+CSL,LONG,2019-03-18,2019-03-23,5,125.80,122.78,1113,-3362.51,-2.40,,,stop_loss,Stage2,2.1442,0.0400,intraday,5,90,CSL-wein-900,0.0402
+CNMD,LONG,2019-03-13,2019-03-16,3,79.33,78.00,1785,-2380.72,-1.68,,,volume_eject,Stage2,5.2589,0.0400,non_stop_exit,,100,CNMD-wein-936,0.0404
+CNH,LONG,2019-04-16,2019-04-25,9,9.78,9.29,14574,-7186.41,-5.04,,,stop_loss,Stage2,2.7930,0.0400,gap_down,9,100,CNH-wein-1055,0.0414
+CHH,LONG,2019-04-24,2019-04-27,3,83.24,82.63,1682,-1023.52,-0.73,,,volume_eject,Stage2,3.0701,0.0400,non_stop_exit,,90,CHH-wein-898,0.0402
+BDN,LONG,2019-02-19,2019-02-23,4,16.17,15.67,8663,-4291.51,-3.06,,,volume_eject,Stage2,1.5850,0.0486,non_stop_exit,,90,BDN-wein-897,0.0489
+BBY,LONG,2019-04-04,2019-04-06,2,73.71,74.95,1893,2346.49,1.68,,,volume_eject,Stage2,3.1287,0.0400,non_stop_exit,,100,BBY-wein-995,0.0400
+AZPN,LONG,2019-03-21,2019-03-23,2,104.01,105.32,1346,1761.84,1.26,,,volume_eject,Stage2,2.0709,0.0400,non_stop_exit,,90,AZPN-wein-896,0.0401
