@@ -42,6 +42,45 @@ Design rationale: `dev/plans/arc-readiness-2026-08-20.md` (#2447).
 
 ## Axis 1 — arc features built and working (~85%)
 
+### 2026-08-20 — the book-faithful entry bundle is assembled (PR #2452)
+
+`staging-arc-2026-08/top3000-2000-2026-arc-faithful.sexp`. Most of it already
+existed: `staging-record-convention/...-fullbook-graded.sexp` carried the whole
+**entry-ticket** half (`sim_entry_trigger_at_suggested` so the trigger RESTS at
+E rather than the current close, `enable_sim_entry_stoplimit` +
+`entry_extension_max_pct 2.0`, `stop_anchor_at_entry_base`). The bundle adds the
+**screening** half: `entry_anchor_local_range_weeks 4`,
+`entry_freshness_basis Range_top_breakout`, `volume_confirm_at_fill true`.
+
+The **2pp band is the book's number**, not a tuned one — §"Buying Within
+Limits" specifies a buy-stop at the breakout with a limit ¼ point above it,
+= 2.06% on Weinstein's own 12⅛ example. He rejects both neighbours: no limit
+gives *"the proud owner of XYZ at 15"*; limit == trigger gives *"one out of
+four, the stock will break out without your ever buying it"* — the fat-tail-miss
+objection, anticipated and priced by the author at 1-in-4.
+
+**Live picks regenerated at as-of 2026-08-14** (control reproduces the committed
+`f88c277d5` report **bit-identical**, validating universe / bars / as-of /
+invocation together): **17 of 20 unchanged**; out PAY, TPC, INVX; in DRI, BLK,
+NDAQ. Tickets now carry the 2pp band (`trigger $86.68 limit $88.41`) vs the old
+15pp. Extended/watch-only rows 4 → 1.
+
+**26y run in flight** against this bundle. Because `fullbook-graded`'s 26y
+result is already recorded (**+287%, MaxDD 23.2%**), it measures specifically
+what **rt + volume-at-fill add on top** — not what the bundle does from zero.
+
+⚠ **Defect found during assembly:** `Range_top_breakout` was armed **without
+`entry_anchor_local_range_weeks`**, the knob defining the `local_range_top` its
+freshness test measures against. Live picks went to **zero candidates**; adding
+`4` restored 20. `staging-record-convention/*` and the live picks config set
+that knob **zero times**, so any bundle built on that base inherits the `0`
+default. **A backtest smoke did not catch it** — armed without the anchor a
+1-year cell gave 93 trades vs 35 for the control, a large plausible-looking
+delta. That proved the field was *read*, not *correctly configured*.
+**Liveness is not correctness.** (`project_rt_needs_its_anchor_knob`.)
+
+---
+
 Seven mechanisms, all built and tested (1–4 test files each). **Six of seven
 verified running together** — `ladder-v4-async-ticket-2026-08-10` cell `v4-16`
 arms `Range_top_breakout` + rescreen + rest-4wk + `Drop_over_max` + volconf
@@ -118,12 +157,26 @@ judgment, not a predicate over source.
       **write the answer back**, so the reference becomes a cache of resolved
       questions. Cited from `weinstein-faithful-core.md` W2 and
       `qc-behavioral-authority.md`.
-- [ ] **A2-3 — Resolve the fill-model A/B** ⚠ **USER DECISION.** The record
-      convention uses a **non-book** market + deep-floor fill rule; the honest
-      book rule scores ≈ **+310%** (`project_fill_model_inversion`). This
-      determines whether the arc is iterating against a baseline whose
-      execution model is the one the book specifies — so it changes what every
-      other measurement on this track means.
+- [x] **A2-3 — Fill-model A/B: DECIDED 2026-08-20 as option B.**
+      `project_fill_model_inversion` posed it as an explicit either/or — **(A)**
+      align live to the record rule (market entry + deep floor: +8,367%, MaxDD
+      37%, **one trade = 76% of it**) or **(B)** re-base records to the book
+      ticket (~+280%, MaxDD 23%). The user's directive *"we will get faithful
+      right first and then later chase down the performance gap"* **is** option
+      B. Executed as the arc bundle below.
+
+      **The deferred gap, stated plainly:** book ticket **+287%** vs record
+      **+8,367%** vs **SPY-TR +687%** over the same 26y. The faithful arm
+      currently runs *below buy-and-hold*. That is what "chase the gap later"
+      means concretely.
+
+- [ ] **A2-4 — Make the picks chart answer "how was entry picked?"**
+      (`dev/plans/picks-chart-informative-2026-08-20.md`, PR #2453). The chart
+      draws the **ticket** level (`entry`) while the level that governs
+      **admission** (`breakout_price`) is invisible, and there is no date axis.
+      Phase A (dates) needs no schema change; Phase B needs `schema_version`
+      1 → 2 to emit `breakout_price` / `local_range_top` / Stage-2 start.
+      Execution-correctness work, not a return lever.
 
 ---
 
@@ -179,8 +232,14 @@ nobody budgets it. That is why the flag inventory sat unworked from 08-09.
 
 ## Next task
 
-A1-1 and A1-2 (build G2a and G2b) — the arc's only genuine feature hole, and
-unblocked by the noise floor since step 4 is an internal three-way comparison.
+Read the 26y arc-bundle result (in flight, PR #2452) against `fullbook-graded`'s
+recorded +287% / MaxDD 23.2% — it isolates what rt + volume-at-fill add. Then
+A1-1 / A1-2 (build G2a and G2b), the arc's only genuine feature hole, unblocked
+by the noise floor since step 4 is an internal three-way comparison.
+
+Queued behind the container: the chart work (A2-4, PR #2453) and the
+`.claude/worktrees` fix that unblocks A3-2 — both need `dune runtest`, and
+agent waves cannot share the box with a backtest.
 
 ## Follow-ups
 
