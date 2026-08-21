@@ -2,8 +2,14 @@
 
 Second 26y run of the arc-faithful bundle, now with all four overrides
 (`initial_stop_buffer 1.0` included, merged #2452). Same window
-(2000-01-01 → 2026-06-26), universe (top-3000-2000), warehouse, and runner as
-the pre-correction run. Artifacts:
+(2000-01-01 → 2026-06-26), universe (top-3000-2000), snapshot warehouse
+(`/tmp/snap_top3000_dedup_v5thin_adj`, log-verified both runs), and runner
+binary. **NOT a controlled pair beyond that:** the committed `params.sexp`
+files differ in `data_dir` — pre-correction read the pinned worktree's
+`test_data`, the corrected run's cwd-derived default resolved to
+`/workspaces/trading-1/data` (the live store), so non-snapshot reads (sector
+map, AD breadth) came from different roots. One more reason the intra-pair
+delta is non-claimable (below). Artifacts:
 `dev/experiments/inspect-6mo-2026-08-21/results/arc26y-corrected-*`
 (pre-correction record: `arc26y-precorrection-*`).
 
@@ -13,7 +19,7 @@ the pre-correction run. Artifacts:
 | trades | 3,172 | 3,029 |
 | mean hold | 7.6d | 9.3d |
 | MaxDD | 90.3% | 67.7% |
-| Sharpe | — | −0.26 |
+| Sharpe | +0.14 | −0.26 |
 
 ## What may NOT be concluded
 
@@ -33,7 +39,7 @@ Exit mix of the corrected run:
 | volume_eject | **2,192 (72%)** | +$354,957 |
 | stop_loss | 668 | **−$2,194,178** |
 | laggard_rotation | 154 | +$1,286,464 |
-| extension/stage3/liquidity/open | 15 | +$135,692 |
+| extension/stage3/liquidity/open | 15 | +$135,693 |
 
 1. **The stop fix arrived as designed** — modal `stop_initial_distance_pct`
    0.0400 on 1,764 of 3,029 trades. The mechanism verified in the 6-month arm
@@ -61,9 +67,13 @@ Exit mix of the corrected run:
   26y while the non-book record convention makes +287%.
 - **The licensed dial:** `weinstein-faithful-core.md` explicitly licenses
   *numeric thresholds tuned for the modern regime* as a dial. The volume
-  config's `strong_threshold` (2×) is a real config field — a
-  `Variant_matrix` axis today ({1.2, 1.5, 2.0} would answer whether the 2×
-  weekly bar is era-appropriate for a broad modern universe) — as is the
-  eject-timing nuance (book sells into the advance; runner sells next open).
+  config's `strong_threshold` (2×) is a real config field, **but it is NOT a
+  `Variant_matrix` axis today**: it lives in `Volume.config`, which is not
+  reachable from `Weinstein_strategy.config`, and `Overlay_validator` raises on
+  unresolvable keys (QC finding, 2026-08-21 — the `rt_needs_its_anchor_knob`
+  shape). Sweeping {1.2, 1.5, 2.0} to answer whether the 2× weekly bar is
+  era-appropriate first requires plumbing `Volume.config` into the overlay
+  surface. The eject-timing nuance (book sells into the advance; runner sells
+  next open) is likewise a future dial, not a settable knob.
 - **Not proposed:** weakening the gate by default, or reading any intra-bundle
   22pp delta as signal.
