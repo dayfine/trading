@@ -20,17 +20,20 @@ bundle adds the **screening** half plus the fill-time volume test:
 | `entry_freshness_basis` | `Range_top_breakout` | screen while still UNDER the range top |
 | `volume_confirm_at_fill` | `true` | §4.2 confirmation applies to the week the ticket FILLS |
 
-> **Amendment 2026-08-21** — the 6-month inspection run
-> (`dev/notes/inspect-6mo-trade-dissection-2026-08-21.md`, PR #2455) found two
-> of these knobs implicated in known defects. (1) `volume_confirm_at_fill`
-> ejects **83% of fills**: stop-limit fills trigger days after the breakout on
-> quiet tape, so the fill-day spike test refuses the mechanism's own entries
-> (CHDN ejected +6.69% green at 3 days); the fill-week reading of §4.2 above is
-> contested — the breakout week's volume may be the faithful basis. (2) The
-> initial stop most entries receive is the **pre-existing** `floor_stop`
-> fallback at 2.08% — half the book §5.3 band — independent of any bundle knob.
-> The bundle is unchanged here; this note exists so the record does not
-> present either knob as settled-faithful.
+> **Amendment 2026-08-21** (supersedes an earlier same-day revision that
+> called the volconf basis contested) — per the 6-month inspection run
+> (`dev/notes/inspect-6mo-trade-dissection-2026-08-21.md`, PR #2455):
+> (1) `volume_confirm_at_fill` is **confirmed faithful** by a primary book
+> read: it measures the fill week's completed weekly bar, which under rt IS
+> the breakout week, and the eject is §4.2's own instruction ("sell it for a
+> fast profit when it advances" — CHDN ejected +6.69% green is that rule
+> executing). Its high eject rate in quiet melt-up regimes (83% in 2019H1) is
+> the gate's faithful cost, and the `bothfix` arm bounds that cost at ≈0 for
+> the window. (2) The initial stop most entries receive was the
+> **pre-existing** `floor_stop` fallback at 2.08% — half the book §5.3 band —
+> independent of any bundle knob; fixed bundle-scoped by
+> `((initial_stop_buffer 1.0))` (second commit), verified by the `bookstop`
+> arm (modal stop 0.0208 → 0.0400 exactly).
 
 ### The 2pp band is the book's number, not a tuned one
 
