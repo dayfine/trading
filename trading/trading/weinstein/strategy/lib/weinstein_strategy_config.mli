@@ -1736,8 +1736,13 @@ type config = {
 
           Read only when {!entry_fill_size_to_available} is [true]; inert
           otherwise, so the default [0.5] changes no behaviour on its own (R1).
-          [0.0] accepts any positive clamp; [1.0] accepts none, making the
-          mechanism a no-op even when armed.
+          [0.0] accepts any positive clamp. [1.0] is {b not} a no-op: the guard
+          is a strict [<] against [fraction *. designed], so a clamp {e equal}
+          to the designed quantity still books — reachable, because the
+          rejection batch is folded in order and an accepted exit later in the
+          same batch can raise cash back to the full designed cost. A grid's
+          control cell is the [entry_fill_size_to_available = false] flag, never
+          [1.0].
 
           The designed quantity is the [Entering] position's [target_quantity],
           i.e. [Weinstein_portfolio_risk.compute_position_size]'s output — so

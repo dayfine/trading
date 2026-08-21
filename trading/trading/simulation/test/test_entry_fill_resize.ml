@@ -194,6 +194,30 @@ let test_clamp_never_exceeds_the_designed_quantity _ =
     (_quantities accepted, _quantities still_rejected)
     (equal_to ([ _designed_quantity ], []))
 
+(** [min_size_fraction = 1.0] is {b not} a no-op — the config docstring pins
+    this. The guard is a strict [<] against [fraction *. designed], so a clamp
+    {e equal} to the designed quantity books (ample-cash case), while one share
+    short of designed is refused. A grid control cell must use the disabled
+    flag, never [1.0]. *)
+let test_fraction_one_books_only_a_full_size_clamp _ =
+  let full_portfolio, full_accepted, full_rejected =
+    _claim_one ~policy:(_armed ~min_size_fraction:1.0 ()) ~cash:1_000_000.0 ()
+  in
+  ignore full_portfolio;
+  assert_that
+    (_quantities full_accepted, _quantities full_rejected)
+    (equal_to ([ _designed_quantity ], []));
+  let short_portfolio, short_accepted, short_rejected =
+    _claim_one
+      ~policy:(_armed ~min_size_fraction:1.0 ())
+      ~cash:(_designed_cost *. 0.997) ()
+  in
+  assert_that
+    ( _quantities short_accepted,
+      _quantities short_rejected,
+      short_portfolio.current_cash )
+    (equal_to ([], [ _designed_quantity ], _designed_cost *. 0.997))
+
 (** A refused {e short} entry is never claimed: its cash change is an inflow, so
     shrinking the quantity makes the floor {e harder} to satisfy and no clamp
     can rescue it. It passes straight through to the unchanged path. *)
@@ -354,6 +378,8 @@ let suite =
          >:: test_minimum_fraction_zero_accepts_the_deep_clamp;
          "clamp never exceeds the designed quantity"
          >:: test_clamp_never_exceeds_the_designed_quantity;
+         "fraction 1.0 books only a full-size clamp"
+         >:: test_fraction_one_books_only_a_full_size_clamp;
          "short entry refusal is never claimed"
          >:: test_short_entry_refusal_is_never_claimed;
          "affordable_quantity solves the cash floor"

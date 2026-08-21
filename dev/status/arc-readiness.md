@@ -136,7 +136,7 @@ The hole is the **funding leg**, whose plan
       reverted). Axis reachability for both fields pinned through the real
       `Overlay_validator.apply_overrides`. Pays back its own file-length budget:
       `Simulator._apply_transitions` moved to the existing `Cancel_handler`
-      (simulator.ml 493 → 484, declared-large cap 500).
+      (simulator.ml 493 → 487, declared-large cap 500).
 - [ ] **A1-3 — Arm G3 `reserve_cash_for_resting_tickets` in a combined arc
       cell.** It is built and tested (`Entry_walk._spendable_cash`) but armed
       in **zero specs** — the only arc mechanism never exercised.
