@@ -31,12 +31,8 @@ type dependencies = {
       (** See .mli. #2158 Phase 2 fill model. *)
   sim_entry_fill_next_open : bool;
       (** See .mli. Fix #1 next-bar-open Market-entry fill (default-off). *)
-  entry_fill_reject_retries : int;
-      (** See .mli. G2a retry budget for a portfolio-refused entry fill
-          (default-off at [0]). *)
-  entry_fill_retry_ledger : Entry_fill_retry.t;
-      (** See .mli. Run-scoped ledger backing [entry_fill_reject_retries]; never
-          read at the default budget. *)
+  entry_fill_retry : Entry_fill_retry.t;
+      (** See .mli. G2a retry budget + ledger; a no-op at [0] retries. *)
 }
 
 let create_deps ~symbols ~data_dir ~strategy ~commission
@@ -48,8 +44,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(maintenance_long_pct = 0.0)
     ?(exempt_closing_trades_from_cash_floor = false) ?on_trade_fill
     ?active_through_for ?on_transitions ?entry_extension_max_pct
-    ?(sim_entry_fill_next_open = false) ?(entry_fill_reject_retries = 0)
-    ?entry_fill_retry_ledger () =
+    ?(sim_entry_fill_next_open = false) ?(entry_fill_reject_retries = 0) () =
   let engine_config = { Trading_engine.Types.commission; slippage_bps } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
@@ -60,9 +55,6 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
   in
   let stale_hold_log =
     Option.value stale_hold_log ~default:(Stale_hold.Log.create ())
-  in
-  let entry_fill_retry_ledger =
-    Option.value entry_fill_retry_ledger ~default:(Entry_fill_retry.create ())
   in
   {
     symbols;
@@ -85,8 +77,8 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     on_transitions;
     entry_extension_max_pct;
     sim_entry_fill_next_open;
-    entry_fill_reject_retries;
-    entry_fill_retry_ledger;
+    entry_fill_retry =
+      Entry_fill_retry.create ~max_retries:entry_fill_reject_retries;
   }
 
 (* See .mli. Win #4 point-in-time pruning. *)
@@ -186,25 +178,6 @@ let _to_price_bar (symbol : string) (daily_price : Types.Daily_price.t) :
     low_price = daily_price.low_price;
     close_price = daily_price.close_price;
   }
-
-(** Per-step benchmark return for the configured benchmark symbol, computed from
-    [adjusted_close]. [None] when no benchmark or either bar is missing. *)
-let _compute_benchmark_return t : float option =
-  let%bind.Option symbol = t.deps.benchmark_symbol in
-  let adapter = t.deps.market_data_adapter in
-  let date = t.current_date in
-  let%bind.Option curr =
-    Trading_simulation_data.Market_data_adapter.get_price adapter ~symbol ~date
-  in
-  let%bind.Option prev =
-    Trading_simulation_data.Market_data_adapter.get_previous_bar adapter ~symbol
-      ~date
-  in
-  let prev_close = prev.Types.Daily_price.adjusted_close in
-  if Float.(prev_close <= 0.0) then None
-  else
-    let curr_close = curr.Types.Daily_price.adjusted_close in
-    Some ((curr_close -. prev_close) /. prev_close *. 100.0)
 
 (** Get all price bars for today using market data adapter *)
 let _get_today_bars t =
@@ -370,7 +343,9 @@ let _build_step_result t ~portfolio ~portfolio_value ~trades ~orders ~today_bars
     trades;
     orders_submitted = _submit_orders t orders;
     splits_applied = split_events;
-    benchmark_return = _compute_benchmark_return t;
+    benchmark_return =
+      Simulator_metrics.benchmark_return ~adapter:t.deps.market_data_adapter
+        ~benchmark_symbol:t.deps.benchmark_symbol ~date:t.current_date;
     had_market_bars = not (List.is_empty today_bars);
   }
 
@@ -408,17 +383,14 @@ let _process_fills_and_cancels t ~portfolio ~positions ~today_bars =
       ~date:t.current_date ~positions ~trades ()
   in
   (* G2a: re-offer the refused entry orders that still have retry budget; what
-     comes back is the sub-list that must still die. At the default budget of 0
-     this returns [rejected_trades] itself, so the cancel path below is
-     bit-identical to the pre-G2a one. *)
-  let unretried_rejects =
-    Entry_fill_retry.handle_rejected_entries t.deps.entry_fill_retry_ledger
-      ~max_retries:t.deps.entry_fill_reject_retries
-      ~order_manager:t.deps.order_manager ~positions ~rejected_trades
-  in
+     comes back is the sub-list that must still die — [rejected_trades] itself
+     at the default budget of 0, so the cancel below is bit-identical. *)
   let cancel_transitions =
     Cancel_handler.transitions_for_rejected_trades ~date:t.current_date
-      ~positions ~rejected_trades:unretried_rejects
+      ~positions
+      ~rejected_trades:
+        (Entry_fill_retry.handle_rejected_entries t.deps.entry_fill_retry
+           ~order_manager:t.deps.order_manager ~positions ~rejected_trades)
   in
   (* The ONLY resolution a portfolio-rejected entry ticket gets; unannounced,
      they left a quarter of all placed tickets resolving to nothing in

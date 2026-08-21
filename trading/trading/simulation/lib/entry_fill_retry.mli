@@ -38,15 +38,19 @@ open Core
 module Position = Trading_strategy.Position
 
 type t
-(** Per-run ledger of retries already spent, keyed by position id. Mutable and
-    reference-shared, like {!Stale_hold.Log.t}: one value lives in the
-    simulator's dependencies for the life of a run. *)
+(** The run's retry budget plus the ledger of retries already spent, keyed by
+    position id. Mutable and reference-shared, like {!Stale_hold.Log.t}: one
+    value lives in the simulator's dependencies for the life of a run. Budget
+    and ledger are one value because they are never meaningful apart — a budget
+    with no ledger cannot bound anything. *)
 
-val create : unit -> t
-(** An empty ledger — no ticket has been retried yet. *)
+val create : max_retries:int -> t
+(** An empty ledger with the run's budget. [max_retries = 0] (the default
+    threaded from [Weinstein_strategy_config.entry_fill_reject_retries]) makes
+    every operation below a no-op. *)
 
 val retries_used : t -> position_id:string -> int
-(** [retries_used ledger ~position_id] is how many retries the ticket held by
+(** [retries_used t ~position_id] is how many retries the ticket held by
     [position_id] has already consumed; [0] for a ticket that has never been
     refused (or has never been retried). Entries are kept after the ticket is
     finally destroyed, so a post-run reader can still see what a dead ticket
@@ -54,27 +58,26 @@ val retries_used : t -> position_id:string -> int
 
 val handle_rejected_entries :
   t ->
-  max_retries:int ->
   order_manager:Trading_orders.Manager.order_manager ->
   positions:Position.t String.Map.t ->
   rejected_trades:Trading_base.Types.trade list ->
   Trading_base.Types.trade list
-(** [handle_rejected_entries ledger ~max_retries ~order_manager ~positions
-     ~rejected_trades] re-offers the refused entry orders that still have retry
-    budget and returns, {b in input order}, the trades that were {e not} retried
-    and must therefore follow the unchanged cancel path
+(** [handle_rejected_entries t ~order_manager ~positions ~rejected_trades]
+    re-offers the refused entry orders that still have retry budget and returns,
+    {b in input order}, the trades that were {e not} retried and must therefore
+    follow the unchanged cancel path
     ({!Cancel_handler.transitions_for_rejected_trades}).
 
     A trade is retried only when all of the following hold. Any failure falls
     through to the returned list, so the worst case is exactly today's behaviour
     and never a ticket left resting with no order behind it:
 
-    + [max_retries > 0].
+    + [t]'s budget is positive.
     + Some [Entering] position in [positions] carries the trade's symbol. A
       refused {e exit} matches none, so it passes straight through — the exit
       side has its own revert ({!Cancel_handler.revert_rejected_exits}) and must
       keep seeing the full rejected list.
-    + That position has spent fewer than [max_retries] retries.
+    + That position has spent fewer than [t]'s budget of retries.
     + The refused order is still known to [order_manager] and the re-submitted
       copy is accepted by it.
 

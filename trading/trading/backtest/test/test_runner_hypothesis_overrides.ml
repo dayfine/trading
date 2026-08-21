@@ -952,9 +952,86 @@ let test_strategy_config_parses_with_lifecycle_fields_absent _ =
            (equal_to 0);
        ])
 
+(* -------------------------------------------------------------------- *)
+(* G2a: entry_fill_reject_retries                                        *)
+(* -------------------------------------------------------------------- *)
+
+(** G2a R1: the retry budget defaults to [0], which is the behaviour the system
+    had before the mechanism existed — a portfolio-refused entry fill cancels
+    the ticket outright. No ledger verdict exists for G2a, so a non-zero default
+    would be a promotion with no evidence behind it
+    ([experiment-flag-discipline.md] R1/R3). *)
+let test_default_entry_fill_reject_retries_is_zero _ =
+  assert_that (_default_config ()).entry_fill_reject_retries (equal_to 0)
+
+(** G2a drift guard, same shape as the clock's above:
+    [Weinstein_strategy.config]'s hand-written re-declaration must carry the
+    same [[@sexp.default]] the running config ships. Sexp attributes are not
+    part of signature matching, so nothing in the build catches a one-sided
+    change. *)
+let test_strategy_mli_redeclares_retry_default_consistently _ =
+  let path =
+    match
+      _walk_up_to_file (Stdlib.Sys.getcwd ()) _weinstein_strategy_mli_rel 10
+    with
+    | Some p -> p
+    | None ->
+        assert_failure
+          (sprintf "%s not found from cwd=%s" _weinstein_strategy_mli_rel
+             (Stdlib.Sys.getcwd ()))
+  in
+  assert_that
+    (_declared_sexp_default ~path ~field:"entry_fill_reject_retries")
+    (is_some_and (equal_to (_default_config ()).entry_fill_reject_retries))
+
+(** G2a R2 (axis reachability): every value of the planned axis
+    [((flag entry_fill_reject_retries) (values (0 1 2)))] must resolve through
+    the {b real} {!Backtest.Overlay_validator.apply_overrides} with no
+    unknown-key error. A mechanism gated by anything the validator cannot
+    resolve is unsearchable and therefore untestable — the failure mode QC
+    caught on [Volume.config] in #2459. *)
+let test_entry_fill_reject_retries_axis_resolves_via_overlay_validator _ =
+  let retries_to n =
+    (Backtest.Overlay_validator.apply_overrides (_default_config ())
+       [ Sexp.of_string (Printf.sprintf "((entry_fill_reject_retries %d))" n) ])
+      .entry_fill_reject_retries
+  in
+  assert_that
+    [ retries_to 0; retries_to 1; retries_to 2 ]
+    (equal_to [ 0; 1; 2 ])
+
+(** Back-compat: a strategy config sexp written before G2a existed still parses,
+    taking the field's [[@sexp.default]] — so every archived spec reproduces the
+    behaviour it had when it was written. *)
+let test_strategy_config_parses_without_retry_field _ =
+  let stripped =
+    match Weinstein_strategy.sexp_of_config (_default_config ()) with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List [ Sexp.Atom name; _ ] ->
+                not (String.equal name "entry_fill_reject_retries")
+            | _ -> true))
+    | other -> other
+  in
+  assert_that
+    (Weinstein_strategy.config_of_sexp stripped)
+    (field
+       (fun (c : Weinstein_strategy.config) -> c.entry_fill_reject_retries)
+       (equal_to 0))
+
 let suite =
   "Runner_hypothesis_overrides"
   >::: [
+         "G2a: entry_fill_reject_retries defaults to 0"
+         >:: test_default_entry_fill_reject_retries_is_zero;
+         "G2a: weinstein_strategy.mli re-declares the retry default \
+          consistently"
+         >:: test_strategy_mli_redeclares_retry_default_consistently;
+         "G2a: entry_fill_reject_retries resolves as a Variant_matrix axis"
+         >:: test_entry_fill_reject_retries_axis_resolves_via_overlay_validator;
+         "G2a: config parses with entry_fill_reject_retries absent"
+         >:: test_strategy_config_parses_without_retry_field;
          "F2: re-screen and clock both default to off"
          >:: test_default_entry_ticket_lifecycle_is_off;
          "F2: weinstein_strategy.mli re-declares the clock default consistently"
