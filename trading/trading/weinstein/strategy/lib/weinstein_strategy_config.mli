@@ -1570,6 +1570,28 @@ type config = {
           [((flag entry_order_max_rest_weeks) (values (0 13 26 52 156)))].
 
           Full record: [dev/experiments/clock26-golden-ab-2026-08-19/]. *)
+  entry_fill_reject_retries : int; [@sexp.default 0]
+      (** G2a of [dev/plans/ticket-funding-2026-08-16.md]: how many times a
+          triggered entry ticket whose fill the {b portfolio} refused (cash
+          shortfall) is re-offered on later ticks before it is destroyed.
+
+          [N] is a per-ticket budget, counted per [position_id]: the first [N]
+          rejections put the resting order back to [Pending] so
+          {!Trading_engine.Engine.process_orders} matches it again next tick;
+          rejection [N+1] falls through to the existing [CancelEntry] path
+          unchanged, keeping [cancel_reason] and [ticket_age_weeks_at_cancel]
+          (#2348). The position never leaves [Entering] while retries remain.
+
+          {b The same order is re-offered} — same type, trigger and limit price.
+          So [entry_extension_max_pct] (with [enable_sim_entry_stoplimit]) still
+          binds on every retry fill: a ticket whose price has run past the
+          do-not-chase cap simply does not fill, it is not chased. That
+          interaction is the axis's main expected cost, since a later fill is by
+          construction at a worse price than the one that triggered.
+
+          [0] (default) = every rejection destroys the ticket, bit-identical to
+          the prior behaviour (R1). R2: axis-expressible as
+          [((flag entry_fill_reject_retries) (values (0 1 2 4)))]. *)
   reserve_cash_for_resting_tickets : bool; [@sexp.default false]
       (** G3 of [dev/plans/ticket-funding-2026-08-16.md]: subtract the cost the
           book has already committed to {b resting} entry tickets from the cash

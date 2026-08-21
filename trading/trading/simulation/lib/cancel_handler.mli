@@ -123,6 +123,39 @@ val apply_trades_best_effort :
     floor-rejected. At the default the apply is bit-equal to
     [Portfolio.apply_single_trade]. *)
 
+val handle_rejected_trades :
+  date:Date.t ->
+  positions:Position.t String.Map.t ->
+  rejected_trades:Trading_base.Types.trade list ->
+  entry_retries:Entry_retry.t ->
+  on_transitions:(Position.transition list -> unit) option ->
+  Position.t String.Map.t Status.status_or
+(** [handle_rejected_trades ~date ~positions ~rejected_trades ~entry_retries
+     ~on_transitions] is the whole resolution of one tick's portfolio-rejected
+    fills, in the order the simulator needs it:
+
+    + {b Retry} ({!Entry_retry.withhold_retryable}) — a rejected entry with
+      budget left keeps its ticket and gets its resting order put back to
+      [Pending]; the remaining trades feed steps 2-4. Inert at the default
+      [entry_fill_reject_retries = 0], where the remainder is the whole list.
+    + {b Cancel} ({!transitions_for_rejected_trades}) — a [CancelEntry] per
+      remaining rejected entry.
+    + {b Announce} — [on_transitions] is called with those cancels {i before}
+      the strategy runs, which is why the simulator notifies twice per step
+      rather than once (#2348). [Backtest.Trade_audit] is the observer that
+      turns this into [cancel_reason] / [ticket_age_weeks_at_cancel].
+    + {b Revert exits} ({!revert_rejected_exits}) — an [Exiting] position whose
+      exit fill was rejected goes back to [Holding] so the stop re-fires
+      (#1553).
+
+    Steps 2 and 4 both see the {e post-retry} list. That matters beyond the
+    entry side: {!revert_rejected_exits} matches on symbol alone, so a trade
+    step 1 claimed as an entry retry would otherwise revert an unrelated
+    [Exiting] sibling on the same symbol.
+
+    Returns the updated position map, with [CancelEntry]-closed positions
+    dropped per {!apply_to_positions}. *)
+
 val revert_rejected_exits :
   date:Date.t ->
   positions:Position.t String.Map.t ->

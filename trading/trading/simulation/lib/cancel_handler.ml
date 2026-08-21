@@ -148,6 +148,34 @@ let revert_rejected_exits ~date ~positions ~rejected_trades =
   List.fold rejected_trades ~init:positions ~f:(fun acc trade ->
       _revert_one ~date ~acc ~symbol:trade.Trading_base.Types.symbol)
 
+(* Apply a [CancelEntry]-only transition list. The simulator's general
+   [_apply_transitions] routes [CancelEntry] to [apply_to_positions] and nothing
+   else here produces another kind, so folding it directly is the same
+   computation with none of the unreachable branches. *)
+let _apply_cancels positions transitions =
+  List.fold_result transitions ~init:positions ~f:apply_to_positions
+
+let handle_rejected_trades ~date ~positions ~rejected_trades ~entry_retries
+    ~on_transitions =
+  let open Result.Let_syntax in
+  (* G2a first: a rejection with retry budget left keeps its ticket, and its
+     order goes back to [Pending] to be matched again next tick. The remainder
+     is what the two paths below see — identical to the whole list at the
+     default [entry_fill_reject_retries = 0]. *)
+  let rejected_trades =
+    Entry_retry.withhold_retryable entry_retries ~positions ~rejected_trades
+  in
+  let cancels =
+    transitions_for_rejected_trades ~date ~positions ~rejected_trades
+  in
+  (* The ONLY resolution a portfolio-rejected entry ticket gets; unannounced,
+     these left a quarter of all placed tickets resolving to nothing in
+     [trade_audit.sexp] (dev/notes/ticket-death-on-cash-2026-08-16.md G1).
+     Observational: [Stop_log] ignores [CancelEntry], no metric reads it. *)
+  Option.iter on_transitions ~f:(fun observe -> observe cancels);
+  let%bind positions = _apply_cancels positions cancels in
+  Ok (revert_rejected_exits ~date ~positions ~rejected_trades)
+
 (* Apply one trade to the portfolio; tag it accepted (portfolio booked it) or
    rejected (carrying the rejection [err] for the WARN). Routed through the
    long-margin-aware apply so a levered long BUY funds its cash shortfall into

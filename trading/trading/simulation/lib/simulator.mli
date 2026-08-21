@@ -161,6 +161,15 @@ type dependencies = {
           config ([Weinstein_strategy_config.sim_entry_fill_next_open]); a
           fill-model basis change, so any default flip routes through WF-CV +
           deliberate golden re-pins per experiment-flag discipline. *)
+  entry_fill_reject_retries : int;
+      (** G2a retry budget for entry fills the {b portfolio} refuses
+          ([dev/plans/ticket-funding-2026-08-16.md]). [0] (the default) destroys
+          the ticket on the first rejection — bit-identical to every existing
+          baseline. [n > 0] lets each ticket be re-offered on up to [n] later
+          ticks before the same [CancelEntry] path destroys it; see
+          {!Entry_retry} for the mechanism and
+          [Weinstein_strategy_config.entry_fill_reject_retries] for the
+          contract. Armed by the backtest runner from the strategy config. *)
 }
 
 val create_deps :
@@ -184,6 +193,7 @@ val create_deps :
   ?on_transitions:(Trading_strategy.Position.transition list -> unit) ->
   ?entry_extension_max_pct:float ->
   ?sim_entry_fill_next_open:bool ->
+  ?entry_fill_reject_retries:int ->
   unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and

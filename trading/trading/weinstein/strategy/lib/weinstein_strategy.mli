@@ -899,6 +899,14 @@ type config = {
           grants the authority and names no number. Split from the re-screen
           above on 2026-08-16 (defect C) — one knob used to arm both. See also
           {!Entry_ticket_ttl}. *)
+  entry_fill_reject_retries : int; [@sexp.default 0]
+      (** G2a: how many times a triggered entry ticket whose fill the portfolio
+          refused for want of cash is re-offered on later ticks before the
+          existing [CancelEntry] path destroys it. The {e same} resting order is
+          re-offered, so [entry_extension_max_pct] still binds on the retry
+          fill. [0] (default) destroys on the first rejection, bit-identical to
+          prior behaviour. See
+          [Weinstein_strategy_config.entry_fill_reject_retries]. *)
   reserve_cash_for_resting_tickets : bool; [@sexp.default false]
       (** G3: hold back the unfilled cost of still-resting entry tickets from
           the cash the entry walk may commit this tick. [false] (default) leaves

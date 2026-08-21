@@ -31,6 +31,8 @@ type dependencies = {
       (** See .mli. #2158 Phase 2 fill model. *)
   sim_entry_fill_next_open : bool;
       (** See .mli. Fix #1 next-bar-open Market-entry fill (default-off). *)
+  entry_fill_reject_retries : int;
+      (** See .mli. G2a retry budget per entry ticket (default-off at [0]). *)
 }
 
 let create_deps ~symbols ~data_dir ~strategy ~commission
@@ -42,7 +44,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(maintenance_long_pct = 0.0)
     ?(exempt_closing_trades_from_cash_floor = false) ?on_trade_fill
     ?active_through_for ?on_transitions ?entry_extension_max_pct
-    ?(sim_entry_fill_next_open = false) () =
+    ?(sim_entry_fill_next_open = false) ?(entry_fill_reject_retries = 0) () =
   let engine_config = { Trading_engine.Types.commission; slippage_bps } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
@@ -75,6 +77,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     on_transitions;
     entry_extension_max_pct;
     sim_entry_fill_next_open;
+    entry_fill_reject_retries;
   }
 
 (* See .mli. Win #4 point-in-time pruning. *)
@@ -108,6 +111,8 @@ and t = {
           across per-step copies of [t]. *)
   valuation_failure_count : int ref;
       (** Counter for fallback-to-avg-cost valuations; [0] in healthy runs. *)
+  entry_retries : Entry_retry.t;
+      (** G2a retry ledger; reference-shared like [last_known_prices]. *)
 }
 
 (** {1 Creation} *)
@@ -141,6 +146,9 @@ let _build_initial_state ~config ~deps =
     last_known_prices = String.Table.create ();
     order_links = Fill_router.create_links ();
     valuation_failure_count = ref 0;
+    entry_retries =
+      Entry_retry.create ~max_retries:deps.entry_fill_reject_retries
+        ~order_manager:deps.order_manager;
   }
 
 let _date_range_error_of ~config =
@@ -395,24 +403,12 @@ let _process_fills_and_cancels t ~portfolio ~positions ~today_bars =
     Fill_router.update_positions_from_trades ~order_links:t.order_links
       ~date:t.current_date ~positions ~trades ()
   in
-  let cancel_transitions =
-    Cancel_handler.transitions_for_rejected_trades ~date:t.current_date
-      ~positions ~rejected_trades
-  in
-  (* The ONLY resolution a portfolio-rejected entry ticket gets; unannounced,
-     they left a quarter of all placed tickets resolving to nothing in
-     [trade_audit.sexp] (dev/notes/ticket-death-on-cash-2026-08-16.md G1).
-     Observational: [Stop_log] ignores [CancelEntry], no metric reads it. *)
-  _notify_transitions ~on_transitions:t.deps.on_transitions cancel_transitions;
+  (* Retry / cancel / announce / revert-exit — the whole resolution of this
+     tick's rejected fills, in that order. *)
   let%bind positions =
-    _apply_transitions ~positions ~transitions:cancel_transitions
-  in
-  (* Exit-side mirror (#1553): an [Exiting] position whose exit fill was rejected
-     would otherwise stay stuck forever (stops only re-evaluate [Holding]).
-     Revert it to [Holding] so the stop re-fires next cycle. *)
-  let positions =
-    Cancel_handler.revert_rejected_exits ~date:t.current_date ~positions
-      ~rejected_trades
+    Cancel_handler.handle_rejected_trades ~date:t.current_date ~positions
+      ~rejected_trades ~entry_retries:t.entry_retries
+      ~on_transitions:t.deps.on_transitions
   in
   Ok (portfolio, positions, trades)
 

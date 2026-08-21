@@ -489,3 +489,22 @@
   trading.base
   trading.strategy
   matchers))
+
+(test
+ (name test_entry_retry)
+ (modules test_entry_retry)
+ (libraries
+  ounit2
+  core
+  core_unix.time_ns_unix
+  status
+  trading.simulation
+  trading.simulation.types
+  trading.simulation.data
+  trading.base
+  trading.engine
+  trading.orders
+  trading.strategy
+  types
+  matchers
+  simulation_test_helpers))
