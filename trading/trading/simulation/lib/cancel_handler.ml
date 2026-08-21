@@ -104,6 +104,30 @@ let apply_to_positions positions trans =
       if Position.is_closed updated then Ok (Map.remove positions key)
       else Ok (Map.set positions ~key ~data:updated)
 
+(* Apply a [TriggerExit] / [TriggerPartialExit] to its named position, dropping
+   it from the map when the transition closes it. A transition naming a
+   position that is no longer present is a no-op (defensive). *)
+let _apply_trigger_exit acc trans =
+  let open Result.Let_syntax in
+  match Map.find acc trans.Position.position_id with
+  | None -> Ok acc
+  | Some pos ->
+      let%bind updated = Position.apply_transition pos trans in
+      Ok
+        (Fill_router.set_or_drop_if_closed acc ~key:trans.position_id
+           ~data:updated)
+
+let apply_transitions ~positions ~transitions =
+  let open Result.Let_syntax in
+  List.fold_result transitions ~init:positions ~f:(fun acc trans ->
+      match trans.Position.kind with
+      | CreateEntering _ ->
+          let%bind pos = Position.create_entering trans in
+          Ok (Map.set acc ~key:pos.id ~data:pos)
+      | TriggerExit _ | TriggerPartialExit _ -> _apply_trigger_exit acc trans
+      | CancelEntry _ -> apply_to_positions acc trans
+      | _ -> Ok acc)
+
 (** Build a [CancelExit] transition for [position_id] on [date]. The exit-side
     mirror of [_cancel_entry_transition]: it reverts an unfilled [Exiting]
     position back to [Holding] via the core [Position] state machine. The reason

@@ -93,8 +93,8 @@ The hole is the **funding leg**, whose plan
 |---|---|
 | G1 — land `ticket_age_weeks_at_cancel` + `cancel_reason` (#2348) | ✅ done (3 impl, 5 test files) |
 | step 2 — measure the cohort from artifacts | ✅ done — 3,530 rejections, median shortfall 52%, 63% in bursts |
-| step 3 — build each axis behind its own flag | **2 of 3** (G3, G2a) |
-| step 4 — one grid over all three + null | **blocked on A1-2** |
+| step 3 — build each axis behind its own flag | ✅ **3 of 3** (G3, G2a, G2b) |
+| step 4 — one grid over all three + null | ready — A1-3 arms G3, then A1-4 |
 
 ### Sub-tasks
 
@@ -114,8 +114,29 @@ The hole is the **funding leg**, whose plan
       budget it consumed: `Simulator._compute_benchmark_return` moved to the
       existing `Simulator_metrics` (simulator.ml 500 → 493, its declared-large
       cap is 500).
-- [ ] **A1-2 — Build G2b `entry_fill_size_to_available`** (resize). Does not
-      exist. Default-off `bool`, default `false`. Independent of A1-1.
+- [x] **A1-2 — Build G2b `entry_fill_size_to_available`** (resize). Built on
+      `feat/funding-g2b`. Two default-off fields: `entry_fill_size_to_available`
+      (`bool`, `false`) and its guard `entry_fill_min_size_fraction` (`float`,
+      `0.5`, inert while the flag is off) — `experiment-flag-discipline.md`
+      R1/R2/R3, no ledger verdict exists so it ships off. New
+      `Trading_simulation.Entry_fill_resize` clamps a portfolio-refused entry
+      fill to the largest whole-share quantity the cash floor accepts (paper-loss
+      drag included) and books it **at the price the ticket triggered at**, so
+      unlike G2a it pays no timing tax. Clamps below `min_size_fraction` of the
+      designed quantity fall through to the unchanged destroy path. Threaded
+      through `Simulator.create_deps` from `panel_runner` as one
+      `?entry_fill_resize` value rather than two more optional scalars.
+      **Precedence:** the resize runs *before* `Entry_fill_retry`, so retry
+      budget is only spent on refusals the resize declined — pinned by a test
+      that runs the real chain both ways (`(0, 1)` retries used). Also carries
+      the #2466 guard: the `Entering` match requires the *entry* side, so a
+      rejected exit is never claimed, and a claimed entry is removed from the
+      list `Cancel_handler.revert_rejected_exits` scans (that scan matches on
+      symbol alone, so an `Exiting` sibling on the same symbol would otherwise be
+      reverted). Axis reachability for both fields pinned through the real
+      `Overlay_validator.apply_overrides`. Pays back its own file-length budget:
+      `Simulator._apply_transitions` moved to the existing `Cancel_handler`
+      (simulator.ml 493 → 487, declared-large cap 500).
 - [ ] **A1-3 — Arm G3 `reserve_cash_for_resting_tickets` in a combined arc
       cell.** It is built and tested (`Entry_walk._spendable_cash`) but armed
       in **zero specs** — the only arc mechanism never exercised.
@@ -245,10 +266,13 @@ nobody budgets it. That is why the flag inventory sat unworked from 08-09.
 
 ## Next task
 
-**A1-2 — build G2b `entry_fill_size_to_available`**, the last piece of the
-funding leg. A1-1 (G2a) is built on `feat/arc-g2a-fill-retries`; once G2b lands,
-A1-4's three-way grid (G2a vs G2b vs G3 + null) unblocks — an internal
-comparison, so the noise floor does not gate it.
+**A1-4 — run the funding three-way grid** (G2a vs G2b vs G3 + null). All three
+axes now exist: G3 was already built, G2a landed as #2463, G2b is built on
+`feat/funding-g2b`. The comparison is *internal*, so the noise floor does not
+gate it; A1-3 (arm G3 in a cell) is the only remaining set-up step. Sweep G2b's
+`entry_fill_min_size_fraction` over `(0.25 0.5 0.75)` — the plan names it as the
+knob to sweep, and it is the one dial that trades near-miss recovery against
+undersized entries into the fat tail.
 
 Also read the 26y arc-bundle result (in flight, PR #2452) against
 `fullbook-graded`'s recorded +287% / MaxDD 23.2% — it isolates what rt +

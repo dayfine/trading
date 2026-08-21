@@ -33,6 +33,8 @@ type dependencies = {
       (** See .mli. Fix #1 next-bar-open Market-entry fill (default-off). *)
   entry_fill_retry : Entry_fill_retry.t;
       (** See .mli. G2a retry budget + ledger; a no-op at [0] retries. *)
+  entry_fill_resize : Entry_fill_resize.t;
+      (** See .mli. G2b affordable-size clamp; a no-op when disabled. *)
 }
 
 let create_deps ~symbols ~data_dir ~strategy ~commission
@@ -44,7 +46,8 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(maintenance_long_pct = 0.0)
     ?(exempt_closing_trades_from_cash_floor = false) ?on_trade_fill
     ?active_through_for ?on_transitions ?entry_extension_max_pct
-    ?(sim_entry_fill_next_open = false) ?(entry_fill_reject_retries = 0) () =
+    ?(sim_entry_fill_next_open = false) ?(entry_fill_reject_retries = 0)
+    ?(entry_fill_resize = Entry_fill_resize.disabled) () =
   let engine_config = { Trading_engine.Types.commission; slippage_bps } in
   let engine = Trading_engine.Engine.create engine_config in
   let order_manager = Trading_orders.Manager.create () in
@@ -79,6 +82,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     sim_entry_fill_next_open;
     entry_fill_retry =
       Entry_fill_retry.create ~max_retries:entry_fill_reject_retries;
+    entry_fill_resize;
   }
 
 (* See .mli. Win #4 point-in-time pruning. *)
@@ -246,29 +250,6 @@ let _count_stop_eligible positions =
    contribute 0 to valuation; audit trails live in [Trade_audit] / [Stop_log] /
    [final_portfolio.positions]. *)
 
-let _apply_trigger_exit acc trans =
-  let open Result.Let_syntax in
-  match Map.find acc trans.Trading_strategy.Position.position_id with
-  | None -> Ok acc
-  | Some pos ->
-      let%bind updated = Trading_strategy.Position.apply_transition pos trans in
-      Ok
-        (Fill_router.set_or_drop_if_closed acc ~key:trans.position_id
-           ~data:updated)
-
-(** Apply transitions to positions. [CancelEntry] is delegated to
-    {!Cancel_handler.apply_to_positions}; the rest are inline. *)
-let _apply_transitions ~positions ~transitions =
-  let open Result.Let_syntax in
-  List.fold_result transitions ~init:positions ~f:(fun acc trans ->
-      match trans.Trading_strategy.Position.kind with
-      | CreateEntering _ ->
-          let%bind pos = Trading_strategy.Position.create_entering trans in
-          Ok (Map.set acc ~key:pos.id ~data:pos)
-      | TriggerExit _ | TriggerPartialExit _ -> _apply_trigger_exit acc trans
-      | CancelEntry _ -> Cancel_handler.apply_to_positions acc trans
-      | _ -> Ok acc)
-
 (** Build run_result from accumulated state. [final_portfolio] is the full
     {!Trading_portfolio.Portfolio.t} so reconciler writers read it directly. *)
 let _build_run_result t =
@@ -357,6 +338,34 @@ let _build_step_result t ~portfolio ~portfolio_value ~trades ~orders ~today_bars
 let _notify_transitions ~on_transitions transitions =
   Option.iter on_transitions ~f:(fun observe -> observe transitions)
 
+(* Settle the refused fills that survived G2b's resize: spend G2a's retry budget
+   on what it can save, cancel the rest, then revert the stuck exits.
+
+   The [CancelEntry]s are the ONLY resolution a portfolio-rejected entry ticket
+   gets; unannounced, they left a quarter of all placed tickets resolving to
+   nothing in [trade_audit.sexp] (dev/notes/ticket-death-on-cash-2026-08-16.md
+   G1). Observational: [Stop_log] ignores [CancelEntry], no metric reads it.
+
+   The revert is the exit-side mirror (#1553): an [Exiting] position whose exit
+   fill was rejected would otherwise stay stuck forever (stops only re-evaluate
+   [Holding]), so it goes back to [Holding] and the stop re-fires next cycle. *)
+let _settle_rejected_fills t ~positions ~rejected_trades =
+  let open Result.Let_syntax in
+  let cancel_transitions =
+    Cancel_handler.transitions_for_rejected_trades ~date:t.current_date
+      ~positions
+      ~rejected_trades:
+        (Entry_fill_retry.handle_rejected_entries t.deps.entry_fill_retry
+           ~order_manager:t.deps.order_manager ~positions ~rejected_trades)
+  in
+  _notify_transitions ~on_transitions:t.deps.on_transitions cancel_transitions;
+  let%bind positions =
+    Cancel_handler.apply_transitions ~positions ~transitions:cancel_transitions
+  in
+  Ok
+    (Cancel_handler.revert_rejected_exits ~date:t.current_date ~positions
+       ~rejected_trades)
+
 (* Execute pending orders, apply fills, and route rejected fills through
    {!Cancel_handler}. Returns post-fill (portfolio, positions, accepted). The
    Fix #1 next-open gate (default-off) defers Market entry fills past stale-bar
@@ -378,35 +387,18 @@ let _process_fills_and_cancels t ~portfolio ~positions ~today_bars =
       ~initial_long_margin_req:t.deps.initial_long_margin_req portfolio
       all_trades
   in
+  (* G2b, ahead of G2a's budget: refill each refused entry at a size the book
+     can afford. Disabled (the default) returns its own inputs. *)
+  let portfolio, trades, rejected_trades =
+    Entry_fill_resize.claim t.deps.entry_fill_resize
+      ~initial_long_margin_req:t.deps.initial_long_margin_req ~portfolio
+      ~positions ~accepted:trades ~rejected_trades
+  in
   let%bind positions =
     Fill_router.update_positions_from_trades ~order_links:t.order_links
       ~date:t.current_date ~positions ~trades ()
   in
-  (* G2a: re-offer the refused entry orders that still have retry budget; what
-     comes back is the sub-list that must still die — [rejected_trades] itself
-     at the default budget of 0, so the cancel below is bit-identical. *)
-  let cancel_transitions =
-    Cancel_handler.transitions_for_rejected_trades ~date:t.current_date
-      ~positions
-      ~rejected_trades:
-        (Entry_fill_retry.handle_rejected_entries t.deps.entry_fill_retry
-           ~order_manager:t.deps.order_manager ~positions ~rejected_trades)
-  in
-  (* The ONLY resolution a portfolio-rejected entry ticket gets; unannounced,
-     they left a quarter of all placed tickets resolving to nothing in
-     [trade_audit.sexp] (dev/notes/ticket-death-on-cash-2026-08-16.md G1).
-     Observational: [Stop_log] ignores [CancelEntry], no metric reads it. *)
-  _notify_transitions ~on_transitions:t.deps.on_transitions cancel_transitions;
-  let%bind positions =
-    _apply_transitions ~positions ~transitions:cancel_transitions
-  in
-  (* Exit-side mirror (#1553): an [Exiting] position whose exit fill was rejected
-     would otherwise stay stuck forever (stops only re-evaluate [Holding]).
-     Revert it to [Holding] so the stop re-fires next cycle. *)
-  let positions =
-    Cancel_handler.revert_rejected_exits ~date:t.current_date ~positions
-      ~rejected_trades
-  in
+  let%bind positions = _settle_rejected_fills t ~positions ~rejected_trades in
   Ok (portfolio, positions, trades)
 
 (* F2 ticket lifecycle: retire the resting orders of any strategy-cancelled
@@ -444,7 +436,9 @@ let _process_step_day t ~portfolio ~positions ~today_bars ~split_events
   (* Strategy-side half only; the fill-rejection cancels were announced above. *)
   _notify_transitions ~on_transitions:t.deps.on_transitions transitions;
   _retire_cancelled_entry_orders t ~positions ~transitions;
-  let%bind positions = _apply_transitions ~positions ~transitions in
+  let%bind positions =
+    Cancel_handler.apply_transitions ~positions ~transitions
+  in
   let%bind orders, order_links =
     Order_generator.transitions_to_orders ~current_date:t.current_date
       ~positions ?entry_extension_max_pct:t.deps.entry_extension_max_pct

@@ -108,7 +108,12 @@ let _make_simulator (input : input) ~stop_log ~trade_audit ~stale_hold_log
       ~on_transitions:(_on_transitions ~stop_log ~trade_audit)
       ?entry_extension_max_pct:(_entry_cap_for_sim input.config)
       ~sim_entry_fill_next_open:input.config.sim_entry_fill_next_open
-      ~entry_fill_reject_retries:input.config.entry_fill_reject_retries ()
+      ~entry_fill_reject_retries:input.config.entry_fill_reject_retries
+      ~entry_fill_resize:
+        (Entry_fill_resize.create
+           ~enabled:input.config.entry_fill_size_to_available
+           ~min_size_fraction:input.config.entry_fill_min_size_fraction)
+      ()
   in
   let config =
     Simulator.

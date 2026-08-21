@@ -1020,9 +1020,127 @@ let test_strategy_config_parses_without_retry_field _ =
        (fun (c : Weinstein_strategy.config) -> c.entry_fill_reject_retries)
        (equal_to 0))
 
+(* -------------------------------------------------------------------- *)
+(* G2b: entry_fill_size_to_available + entry_fill_min_size_fraction      *)
+(* -------------------------------------------------------------------- *)
+
+(** G2b R1: the resize ships off and its guard ships at [0.5]. Off is the
+    behaviour the system had before the mechanism existed — a portfolio-refused
+    entry fill cancels the ticket outright — and the guard is inert while the
+    flag is off, so the pair changes nothing on merge. No ledger verdict exists
+    for G2b, so a non-default here would be a promotion with no evidence behind
+    it ([experiment-flag-discipline.md] R1/R3). *)
+let test_default_entry_fill_resize_is_off _ =
+  assert_that
+    ( (_default_config ()).entry_fill_size_to_available,
+      (_default_config ()).entry_fill_min_size_fraction )
+    (equal_to (false, 0.5))
+
+(* Like [_declared_sexp_default], but reads the default as its literal text so
+   bool / float fields are covered too (that helper parses digits only). *)
+let _declared_sexp_default_text ~path ~field =
+  let marker = "[@sexp.default " in
+  In_channel.read_lines path
+  |> List.find_map ~f:(fun line ->
+      let trimmed = String.strip line in
+      if String.is_prefix trimmed ~prefix:(field ^ " :") then
+        match String.substr_index trimmed ~pattern:marker with
+        | None -> None
+        | Some i ->
+            Some
+              (String.subo trimmed ~pos:(i + String.length marker)
+              |> String.take_while ~f:(fun c -> not (Char.equal c ']')))
+      else None)
+
+(** G2b drift guard, same shape as the clock's and G2a's:
+    [Weinstein_strategy.config]'s hand-written re-declaration must carry the
+    same [[@sexp.default]]s the running config ships. Sexp attributes are not
+    part of signature matching, so nothing in the build catches a one-sided
+    change. *)
+let test_strategy_mli_redeclares_resize_defaults_consistently _ =
+  let path =
+    match
+      _walk_up_to_file (Stdlib.Sys.getcwd ()) _weinstein_strategy_mli_rel 10
+    with
+    | Some p -> p
+    | None ->
+        assert_failure
+          (sprintf "%s not found from cwd=%s" _weinstein_strategy_mli_rel
+             (Stdlib.Sys.getcwd ()))
+  in
+  assert_that
+    ( _declared_sexp_default_text ~path ~field:"entry_fill_size_to_available",
+      _declared_sexp_default_text ~path ~field:"entry_fill_min_size_fraction" )
+    (equal_to (Some "false", Some "0.5"))
+
+(** G2b R2 (axis reachability): every value of the planned axes
+    [((flag entry_fill_size_to_available) (values (true false)))] and
+    [((flag entry_fill_min_size_fraction) (values (0.25 0.5 0.75)))] must
+    resolve through the {b real} {!Backtest.Overlay_validator.apply_overrides}
+    with no unknown-key error. A mechanism gated by anything the validator
+    cannot resolve is unsearchable and therefore untestable — the failure mode
+    QC caught on [Volume.config] in #2459. *)
+let test_entry_fill_resize_axes_resolve_via_overlay_validator _ =
+  let override sexp =
+    Backtest.Overlay_validator.apply_overrides (_default_config ())
+      [ Sexp.of_string sexp ]
+  in
+  let enabled_to b =
+    (override (Printf.sprintf "((entry_fill_size_to_available %b))" b))
+      .entry_fill_size_to_available
+  in
+  let fraction_to f =
+    (override (Printf.sprintf "((entry_fill_min_size_fraction %g))" f))
+      .entry_fill_min_size_fraction
+  in
+  assert_that
+    ( [ enabled_to true; enabled_to false ],
+      [ fraction_to 0.25; fraction_to 0.75 ] )
+    (equal_to ([ true; false ], [ 0.25; 0.75 ]))
+
+(** Back-compat: a strategy config sexp written before G2b existed still parses,
+    taking both fields' [[@sexp.default]] — so every archived spec reproduces
+    the behaviour it had when it was written. *)
+let test_strategy_config_parses_without_resize_fields _ =
+  let dropped =
+    [ "entry_fill_size_to_available"; "entry_fill_min_size_fraction" ]
+  in
+  let stripped =
+    match Weinstein_strategy.sexp_of_config (_default_config ()) with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List [ Sexp.Atom name; _ ] ->
+                not (List.mem dropped name ~equal:String.equal)
+            | _ -> true))
+    | other -> other
+  in
+  assert_that
+    (Weinstein_strategy.config_of_sexp stripped)
+    (all_of
+       [
+         field
+           (fun (c : Weinstein_strategy.config) ->
+             c.entry_fill_size_to_available)
+           (equal_to false);
+         field
+           (fun (c : Weinstein_strategy.config) ->
+             c.entry_fill_min_size_fraction)
+           (float_equal 0.5);
+       ])
+
 let suite =
   "Runner_hypothesis_overrides"
   >::: [
+         "G2b: entry_fill resize defaults to off with a 0.5 guard"
+         >:: test_default_entry_fill_resize_is_off;
+         "G2b: weinstein_strategy.mli re-declares the resize defaults \
+          consistently"
+         >:: test_strategy_mli_redeclares_resize_defaults_consistently;
+         "G2b: entry_fill resize fields resolve as Variant_matrix axes"
+         >:: test_entry_fill_resize_axes_resolve_via_overlay_validator;
+         "G2b: config parses with the resize fields absent"
+         >:: test_strategy_config_parses_without_resize_fields;
          "G2a: entry_fill_reject_retries defaults to 0"
          >:: test_default_entry_fill_reject_retries_is_zero;
          "G2a: weinstein_strategy.mli re-declares the retry default \

@@ -915,6 +915,18 @@ type config = {
           [Weinstein_strategy_config.entry_fill_reject_retries] for the measured
           cohort, the timing tax that may sink it, and why it is an alternative
           to G3 rather than a complement. *)
+  entry_fill_size_to_available : bool; [@sexp.default false]
+      (** G2b: when [true], an entry fill the portfolio refuses for want of cash
+          is re-offered at the largest quantity the book can fund — at the price
+          the ticket triggered at, so unlike G2a it pays no timing tax — instead
+          of the ticket being destroyed. [false] (default) is today's behaviour.
+          Offered {e before} {!entry_fill_reject_retries} on each refusal. See
+          [Weinstein_strategy_config.entry_fill_size_to_available]. *)
+  entry_fill_min_size_fraction : float; [@sexp.default 0.5]
+      (** G2b's guard: the smallest fraction of a ticket's designed quantity a
+          clamped fill may be; below it the ticket takes the unchanged destroy
+          path. Inert unless {!entry_fill_size_to_available} is [true]. See
+          [Weinstein_strategy_config.entry_fill_min_size_fraction]. *)
   stop_width_mode : Stop_width_mode.t;
       [@sexp.default Stop_width_mode.Drop_over_max]
       (** F3 wide-stop admission policy (plan
