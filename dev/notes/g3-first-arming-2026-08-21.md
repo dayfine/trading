@@ -1,4 +1,4 @@
-# G3 first arming — reservation removes the failure mode; the cost is breadth (2026-08-21)
+# G3 first arming — reservation removes the failure mode; the isolated cost is breadth (2026-08-21)
 
 `reserve_cash_for_resting_tickets` (G3) had been built and tested since
 2026-08-16 but **armed in zero specs** — the only arc mechanism never
@@ -7,34 +7,47 @@ the four-override arc bundle + `initial_stop_buffer 1.0` + G3, on the 6-month
 inspection window (2019H1, top-3000, non-binding metrics per the inspection
 harness convention).
 
-| | arc (no G3) | g3 |
-|---|---:|---:|
-| `Insufficient cash` rejections | 6 | **0** |
-| trades | 59 | **11** |
-| return | −4.17% | +2.66% |
-| mean hold | 4.4d | 3.5d |
-| exits | 24 stop / 35 eject | 3 stop / 8 eject |
+> **Comparator note (QC rework):** the g3 spec differs from the `arc` arm by
+> **two** overrides — the stop-buffer fix moved alongside G3 — so `arc` is not
+> the isolating control. The control is `inspect-6mo-bookstop` (arc +
+> `initial_stop_buffer 1.0` alone), already committed in the same results
+> directory. An earlier revision of this note credited the whole arc→g3 delta
+> to G3; that framing was wrong.
 
-## The two liveness answers
+The three arms nest exactly (verified by `symbol|entry_date` join:
+11 ⊂ 39 ⊂ 59):
 
-1. **The mechanism works as designed:** zero portfolio rejections — the plan's
-   claim that G3 "removes the failure rather than handling it" is confirmed
-   live. Placement-time reservation means a triggered ticket always has its
-   cash.
-2. **The idle-cash cost is not a rounding error — it is the dominant effect.**
-   Trade count collapses 59 → 11: every resting ticket locks its designed cost
-   (~14% of NAV each), so ~5 concurrent reservations exhaust the 70%
-   deployable pool and the screener's subsequent tickets never place. The plan
-   predicted "reserved cash is idle cash"; the observed form is **fewer
-   concurrent tickets**, not idle drag on the same tickets.
+| arm | delta vs previous row | trades | return | stop / eject exits |
+|---|---|---:|---:|---|
+| arc | — | 59 | −4.17% | 24 / 35 |
+| bookstop | + `initial_stop_buffer 1.0` | 39 | +4.83% | 4 / 35 |
+| **g3** | **+ G3 reservation** | **11** | **+2.66%** | 3 / 8 |
 
-No performance claim from either number (single 6-month window, inspection
-purpose). The return sign difference is dominated by which 11-of-59 tickets
-survived — a selection effect of the reservation queue, exactly what the
-three-way grid (A1-4) exists to measure properly against G2a (retry) and G2b
-(resize), which handle the same failure without locking the pool.
+## The two liveness answers (G3 isolated = g3 vs bookstop)
 
-Artifacts: `dev/experiments/inspect-6mo-2026-08-21/results/g3-{actual.sexp,trades.csv}`.
+1. **The mechanism works as designed:** zero `Insufficient cash` rejections
+   with G3 armed. *Provenance:* the rejection counts (g3: 0, bookstop/arc
+   window: 6) are **log-sourced** (`grep -c 'Insufficient cash'` on the run
+   logs), not present in any committed artifact — unlike every other number in
+   this note, which reproduces from the committed `results/` files.
+2. **The isolated cost is breadth, and it is large:** trades 39 → **11** and
+   return +4.83% → **+2.66%** (−2.17pp) from arming G3 alone. Reservation
+   locks each resting ticket's designed cost at placement, so concurrent
+   tickets collapse. *Config arithmetic, not a measurement:* at the configured
+   `max_position_pct_long 0.14` against the 70% pool, 0.70 / 0.14 = 5 tickets
+   would exhaust it. *The measured analogue:* max concurrent positions is 8 in
+   the arc arm vs **2** in g3 — the measured collapse is even deeper than the
+   nominal arithmetic suggests (in-flight reservations stack on top of held
+   positions' exposure).
+
+No performance claim from any of these numbers (single 6-month window,
+inspection purpose). Which tickets survive the reservation queue is a
+selection effect — exactly what the three-way grid (A1-4) exists to measure
+against G2a (retry, #2463) and G2b (resize, #2468), which handle the same
+failure without locking the pool.
+
+Artifacts: `dev/experiments/inspect-6mo-2026-08-21/results/g3-{actual.sexp,trades.csv}`
+(controls: `bookstop-*`, `arc-*` in the same directory).
 Spec: `trading/test_data/backtest_scenarios/staging-arc-2026-08/inspect/inspect-6mo-g3.sexp`.
 
 A1-4 note: the grid needs a build containing G2a (#2463) + G2b (#2468) — i.e.
