@@ -1,6 +1,7 @@
 (tests
  (names
   test_weinstein_stops
+  test_fallback_stop_width
   regression_test
   test_support_floor
   test_stop_split_adjust
