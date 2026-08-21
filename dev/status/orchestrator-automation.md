@@ -1,6 +1,6 @@
 # Status: Orchestrator Automation
 
-## Last updated: 2026-07-28
+## Last updated: 2026-08-21
 
 ## Status
 IN_PROGRESS
@@ -1051,3 +1051,48 @@ operational) has a clean reference instead of inheriting stale text.
   Blocked on the same `workflow`-scoped token as `A-GIT-SAFE-DIRECTORY`,
   `A-WORKTREE-BLOCKS-BUNDLE`, `A-BUDGET-ORPHAN`, `A-SUMMARY-STALE-FALLBACK` and
   `H-BLAS` (#1636) — six filed defects now share that one blocker.
+
+### A-MERGEABLE-STATE-NOT-A-CLOSE-TELL — an "unknown" merge state does not mean the PR closed
+
+- [x] **Corrects guidance written into `dev/daily/2026-08-21.md` (run 1) the same
+  day.** Owner: lead-orchestrator. Measured 2026-08-21 run 2
+  (GHA run `32482056746`).
+
+  Run 1 reconstructed a merge it did not perform, and offered a cheap tell for
+  the next run to reuse:
+
+  > **Poll `state` in any watch loop.** ... `mergeable_state` flipping to
+  > `unknown` is the tell.
+
+  It supported that with three controls (#2430, #2452, #2455 — all
+  `closed/merged/unknown`). Those observations are correct. **The inference from
+  them is not**, because it uses the converse: *closed ⇒ unknown* does not give
+  *unknown ⇒ closed*.
+
+  **Measured counter-example.** On this run, PRs **#2456** and **#2433** — both
+  demonstrably `state=open`, `merged=false`, and sitting under a `do-not-merge`
+  hold — **both returned `mergeable_state: unknown` on a cold first read**, then
+  resolved to `behind` on the very next request, and stayed `behind` across three
+  further polls. Same shape on #2461 (`unknown` → `clean`).
+
+  The cause is GitHub's documented **lazy computation** of mergeability: the
+  first request after the background merge-commit job is invalidated returns
+  `unknown` and *triggers* the computation. A merge landing on the base branch is
+  exactly such an invalidation — which is why run 1 saw `unknown` four seconds
+  after `merged_at`, and read it as the close.
+
+  **Consequence.** `mergeable_state == "unknown"` is a false-positive generator
+  for "this PR closed under me": 3 of 3 open PRs sampled here produced it. A watch
+  loop keying on it would report phantom closes.
+
+  **The correct control is run 1's *other* recommendation, which stands
+  unqualified:** read `state` / `merged` / `merged_at` directly — those are
+  authoritative and require no inference. Run 1's conclusion about #2455 also
+  stands, because it rests on `merged_at` (08:08:21Z) preceding the request by
+  ~9 minutes, which is independent of the `mergeable_state` corroboration that
+  falls here.
+
+  **Practical note for any mergeability check:** treat `unknown` as *"not
+  computed yet"* and **poll again** (2–3 tries, a few seconds apart) before
+  branching on it. Both merge attempts this run did so, and both resolved on the
+  second read.
