@@ -612,6 +612,47 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
     modes). Verify: `dune runtest devtools/sexp_default_drift_linter/`.
     (fixed 2026-08-21 harness-maintainer on harness/sexp-drift-vacuity,
     commit `19910274`)
+  - **Rework (CP4, qc-behavioral review 4993747068, 2026-08-21):** the fix
+    above left one instance of the same disease alive. `walk`'s inner
+    `Sys.readdir` failure handler (`| exception _ -> ()`) was untouched by
+    the vacuity-guard fix, and the module docstring claimed "either way the
+    run is loud, never a silent `OK: nothing to report`" — false for any
+    partial loss that stayed above `min_expected_lib_files`. Reproduced
+    live: an 820-file fixture (520 readable `lib/*.ml` + 300 behind an
+    unreadable subdirectory) printed `OK: ... (scanned 520 files)` and
+    exited 0, silently dropping 300 files' worth of coverage. **Fix (option
+    (a), the reviewer's preferred fix):** `collect_lib_files` now returns
+    the failed directories alongside the collected files instead of
+    swallowing the exception; `_check_walk_failures`, wired into `main`
+    right after `_check_scan_integrity` and before parsing, names every
+    directory that failed to read and exits 1, independent of how many
+    files were lost under it. The `min_expected_lib_files` and
+    `validate_root_readable` docstrings were corrected to state the actual
+    bound honestly (the floor alone tolerates a large partial loss; walk
+    failures are now caught by a separate, unconditional mechanism instead)
+    rather than repeating the "always loud" overclaim. Mutation-verified
+    live: with `_check_walk_failures failed_dirs;` replaced by
+    `ignore failed_dirs;` in `main`, the new self-test goes red (`FAIL:
+    fixture with an unreadable directory exited 0`); restored, it passes.
+    Self-test: `devtools/sexp_default_drift_linter/test/test_walk_failure_reporting.ml`
+    (same process-level pattern as the sibling self-tests; invokes the
+    linter as the unprivileged `nobody` account via `setpriv` when the test
+    process itself is root, since `chmod 000` alone is a no-op under root —
+    confirmed live by the reviewer's own repro). Verify:
+    `dune runtest devtools/sexp_default_drift_linter/`. **Residual, by
+    design, not filed as a new item:** a partial loss from some OTHER cause
+    that never raises inside `walk` (i.e. not a readdir failure and not a
+    parse failure) is still caught only by the floor, and only once it
+    exceeds roughly `scanned - min_expected_lib_files` files. No known
+    failure mode currently produces that shape (every named failure mode —
+    absent root, empty root, wrong-cwd, walk failure, parse failure — now
+    routes through an unconditional check), so this is documented in the
+    `min_expected_lib_files` docstring rather than tracked as an open item.
+    The floor's 500 constant is also not re-measured automatically as the
+    tree grows; documented as a docstring note (not built as an active
+    check — would require its own linter, out of scope for this rework).
+    (fixed 2026-08-21 harness-maintainer on harness/sexp-drift-vacuity,
+    rework commit follows this entry)
 
 - [x] H-SEXP-DRIFT-SILENT-PARSE-SKIP: an unparseable file is dropped with no
   signal — `parse_ml` / `parse_mli` end `| exception _ -> ([], [])`
@@ -650,9 +691,15 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
     the vacuity-guard fix), and full-repo `dune build && dune runtest` are
     clean (exit 0, zero `FAIL:` lines). Mutation-verified live: a fixture
     root with 520 trivial parseable `lib/*.ml` files plus one syntactically
-    invalid file exits 1 post-fix, naming the broken file; the pre-fix
-    binary (`git stash`) on the identical fixture exits 0 with `OK: ...
-    (scanned 521 files)`. Self-test:
+    invalid file exits 1 post-fix, naming the broken file; the genuine
+    pre-fix binary (before this PR) on the identical 521-file fixture exits
+    0 with the same `OK: no sexp.default drift ...` line but **no
+    scanned-count suffix** — that print is itself new in this PR, so it
+    never appears in real pre-fix output. `OK: ... (scanned 521 files)` is
+    reproducible only by removing the parse-failure guard from the tip
+    (post-fix mutation testing, not the genuine pre-fix binary) — corrected
+    here after qc-behavioral flagged the original wording as not literally
+    reproducible. Self-test:
     `devtools/sexp_default_drift_linter/test/test_parse_failure_reporting.ml`
     (same process-level pattern as the vacuity-guard test; builds its own
     520-file fixture to clear `min_expected_lib_files` so the parse-failure
