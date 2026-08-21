@@ -161,7 +161,21 @@ let validate_root_readable root =
    known instance of this defect class lives on (record types with
    [@@deriving sexp] and .mli companions), and matches the scope other
    dune-wired structural linters in this repo use (linter_file_length.sh,
-   linter_mli_coverage.sh). *)
+   linter_mli_coverage.sh).
+
+   Both [.pp.ml] and [.pp.mli] are excluded: these are ppx-preprocessed
+   build byproducts (post-rewrite output of a .ml/.mli that carries a ppx
+   deriver), not source. They only appear on disk under [_build/], but this
+   linter runs as a dune rule whose sandbox mirrors the relevant slice of
+   [_build/default/] -- so when [root] resolves to that sandbox, plain
+   [lib/*.mli] globbing picks up ppx output sitting alongside the real
+   source in the same [lib/] directory. Discovered via
+   H-SEXP-DRIFT-SILENT-PARSE-SKIP: before that fix, [.pp.mli] files (the
+   [.ml] half was already excluded, but [.mli] was not) silently failed to
+   parse and were dropped with no signal; making parse failures loud
+   surfaced this as a real, reproducible FAIL on every `dune runtest`
+   invocation of this rule, which is what motivated excluding them here
+   rather than merely reporting on them. *)
 let collect_lib_files root =
   let result = ref [] in
   let rec walk dir =
@@ -178,7 +192,8 @@ let collect_lib_files root =
                 String.equal (Filename.basename dir) "lib"
                 && (Filename.check_suffix path ".ml"
                    || Filename.check_suffix path ".mli")
-                && not (Filename.check_suffix path ".pp.ml")
+                && (not (Filename.check_suffix path ".pp.ml"))
+                && not (Filename.check_suffix path ".pp.mli")
               then result := path :: !result)
           entries
   in
@@ -278,23 +293,57 @@ let records_of_signature file content signature =
 
 (* --- Per-file parsing ---------------------------------------------------------- *)
 
+(* [parse_error = Some msg] means the file's records/constants were NOT
+   collected -- this linter only ever parses source [ocamlc] has already
+   accepted (every scanned file is a workspace .ml/.mli, so the build would
+   have failed first if it were genuinely malformed), so a parse failure
+   here means the linter's OWN parser (compiler-libs, pinned to a specific
+   compiler version) is out of step with the toolchain actually building the
+   tree -- not that the file is bad. See [_check_parse_failures]: this is
+   reported loudly rather than silently dropped, because a live
+   [@sexp.default] divergence inside an unparseable file would otherwise be
+   invisible while the linter still reports OK. *)
+type parse_outcome = {
+  records : record_decl list;
+  constants : (string * string) list;
+  parse_error : string option;
+}
+
 let parse_ml path =
   let content = read_file path in
   let lexbuf = Lexing.from_string content in
   lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with Lexing.pos_fname = path };
   match Parse.implementation lexbuf with
   | structure ->
-      ( records_of_structure path content structure,
-        constants_of_structure content structure )
-  | exception _ -> ([], [])
+      {
+        records = records_of_structure path content structure;
+        constants = constants_of_structure content structure;
+        parse_error = None;
+      }
+  | exception exn ->
+      {
+        records = [];
+        constants = [];
+        parse_error = Some (Printexc.to_string exn);
+      }
 
 let parse_mli path =
   let content = read_file path in
   let lexbuf = Lexing.from_string content in
   lexbuf.lex_curr_p <- { lexbuf.lex_curr_p with Lexing.pos_fname = path };
   match Parse.interface lexbuf with
-  | signature -> (records_of_signature path content signature, [])
-  | exception _ -> ([], [])
+  | signature ->
+      {
+        records = records_of_signature path content signature;
+        constants = [];
+        parse_error = None;
+      }
+  | exception exn ->
+      {
+        records = [];
+        constants = [];
+        parse_error = Some (Printexc.to_string exn);
+      }
 
 let parse_file path =
   if Filename.check_suffix path ".mli" then parse_mli path else parse_ml path
@@ -498,6 +547,35 @@ let _check_scan_integrity trading_root files =
         exit 1
       end
 
+(* Fails loudly on any unparseable scanned file rather than silently
+   dropping its records (the pre-fix behavior: [parse_ml]/[parse_mli] caught
+   every exception and returned empty results, so a live drift bug hiding in
+   an unparseable file was indistinguishable from a clean scan). See the
+   [parse_outcome] docstring for why "unreachable in practice" argues for
+   loud, not tolerated. *)
+let _check_parse_failures parsed =
+  let failures =
+    List.filter_map
+      (fun (f, (po : parse_outcome)) ->
+        Option.map (fun msg -> (f, msg)) po.parse_error)
+      parsed
+  in
+  if failures <> [] then begin
+    Printf.printf
+      "FAIL: sexp_default_drift linter -- %d file(s) failed to parse and were \
+       excluded from the scan (any [@sexp.default] drift inside them would \
+       have gone undetected):\n\n"
+      (List.length failures);
+    List.iter (fun (f, msg) -> Printf.printf "  %s: %s\n" f msg) failures;
+    Printf.printf
+      "\n\
+       This linter only parses source the compiler has already accepted (every \
+       file above is a workspace lib/*.ml or lib/*.mli), so a parse failure \
+       here means the linter's own compiler-libs parser is out of step with \
+       the toolchain -- fix the linter, do not add an exception for it.\n";
+    exit 1
+  end
+
 let () =
   let trading_root =
     if Array.length Sys.argv > 1 then Sys.argv.(1)
@@ -513,8 +591,13 @@ let () =
   let files = List.sort String.compare (collect_lib_files trading_root) in
   _check_scan_integrity trading_root files;
   let parsed = List.map (fun f -> (f, parse_file f)) files in
-  let records = List.concat_map (fun (_, (recs, _)) -> recs) parsed in
-  let constants = List.concat_map (fun (_, (_, consts)) -> consts) parsed in
+  _check_parse_failures parsed;
+  let records =
+    List.concat_map (fun (_, (po : parse_outcome)) -> po.records) parsed
+  in
+  let constants =
+    List.concat_map (fun (_, (po : parse_outcome)) -> po.constants) parsed
+  in
   let table = build_constant_table constants in
   let groups = group_records records in
   let all_violations = List.concat_map (check_group table) groups in
