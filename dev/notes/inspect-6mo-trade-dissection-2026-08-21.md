@@ -122,7 +122,7 @@ The eject leg is net **positive** ($+17k) — it is not the loss; it is the
 tail-killer.
 
 **Control result — `novolconf` confirms the isolation.** With the eject off:
-mean hold 3.6 → **15.0 days** (max 62), `laggard_rotation` exits reappear, 5
+mean hold 4.4 → **15.0 days** (max 62), `laggard_rotation` exits reappear, 5
 positions open at period end — and **CHDN is still open and riding** instead of
 being ejected +6.69% at 3 days. Return is still −4.48% because the tight-stop
 bleed remains (29 tight stop-outs, −$61k): the eject caps the tail, the

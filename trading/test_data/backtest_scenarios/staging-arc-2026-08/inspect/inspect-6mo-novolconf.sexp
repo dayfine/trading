@@ -1,5 +1,5 @@
 ((name "inspect-6mo-novolconf")
- (description "INSPECTION arm — arc bundle WITHOUT volume_confirm_at_fill: control bounding what the (faithful) sec-4.2 eject forgoes; restores holding (mean 3.6 to 15.0 days).")
+ (description "INSPECTION arm — arc bundle WITHOUT volume_confirm_at_fill: control bounding what the (faithful) sec-4.2 eject forgoes; restores holding (mean 4.4 to 15.0 days).")
  (period ((start_date 2019-01-02) (end_date 2019-06-28)))
  (universe_path "../goldens-custom-universe/composition/top-3000-2019.sexp")
  (universe_size 3000)
