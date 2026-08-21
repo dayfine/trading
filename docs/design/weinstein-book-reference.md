@@ -158,19 +158,33 @@ Only after macro and sector pass do we evaluate individual stocks.
 
 **The low-volume-breakout SELL rule (buy-stop fills without confirmation):**
 When a buy-stop order fills on a breakout whose volume does NOT confirm, the
-book's instruction is to exit, not hold: do not buy a stock with poor volume
-characteristics on the breakout — and if it was bought automatically via a
-resting buy-stop order, sell it quickly. Exact secondary-source wording: "If
-volume is not significant on breakout, sell the stock on the first rally, or
-sell when it breaks below the breakout level."
-*Provenance (2026-08-10):* verified against two independent secondary sources
-([detailed chapter review](https://whatheheckaboom.wordpress.com/2012/01/01/book-review-of-stan-weinsteins-secrets-for-profiting-in-bull-and-bear-markets/),
-"Buy Orders / Going Long" section, i.e. the Ch. 3 buy-stop discussion;
-corroborated by [TraderLion's summary](https://traderlion.com/trading-books/secrets-for-profiting-in-bull-and-bear-markets/)).
-Page-level primary cite pending physical book — mark SECONDARY-VERIFIED until
-then. This is the passage that licenses F5 `volume_confirm_at_fill`'s eject
-branch (async-v2 plan §3-F5): a held volume-unconfirmed breakout is a spine
-item-3 violation; the eject is inseparable from the flag.
+book's instruction is to exit, not hold. **PRIMARY-VERIFIED (2026-08-21,
+local book text, Ch. 4 "Refining the Buying Process"):** *"Whatever the exact
+number, if there is no significant increase in volume when the breakout
+occurs, then avoid that stock. If you have purchased it with a buy-stop
+order, then sell it for a fast profit when it advances after the breakout
+(which it will usually do)."* Note the primary wording sells **into the
+post-breakout advance** ("for a fast profit when it advances"), slightly
+softer than the secondary paraphrase's "first rally or on break below the
+breakout level". This is the passage that licenses F5
+`volume_confirm_at_fill`'s eject branch (async-v2 plan §3-F5): a held
+volume-unconfirmed breakout is a spine item-3 violation; the eject is
+inseparable from the flag. Known implementation nuance: the F5 runner sells
+at the next open unconditionally rather than into the advance — a timing
+dial, not a faithfulness violation of the sell rule itself.
+
+**Resolved question (2026-08-21) — which week does at-fill confirmation
+measure?** The fill week's *completed weekly bar*, which under
+screen-below-the-anchor entry (rt) is the breakout week itself — the same bar
+§4.2's rules above address. A pre-breakout screening week's ratio (measured by
+the screener) and the fill/breakout week's ratio are different weeks and can
+legitimately disagree. The daily-chart variant is a footnote in Ch. 4: *"look
+for a volume increase on the breakout day of better than twice the average
+volume of the prior week"* — daily is the exception, weekly the default
+instrument. Consequence observed in backtest: in quiet-volume melt-up regimes
+(e.g. 2019H1) most breakouts genuinely fail 2×, so a high eject rate is the
+faithful cost of the gate, not a defect
+(`dev/notes/inspect-6mo-trade-dissection-2026-08-21.md`).
 
 ### 4.3 Overhead Resistance (Ch. 4)
 
