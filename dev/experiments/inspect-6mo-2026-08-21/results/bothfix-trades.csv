@@ -1,0 +1,14 @@
+symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry,position_id,stop_fill_distance_pct
+SHOO,LONG,2019-04-25,2019-05-18,23,35.51,31.72,2288,-8662.83,-10.66,,,laggard_rotation,Stage2,1.7055,0.1274,non_stop_exit,,90,SHOO-wein-1045,0.1445
+ROL,LONG,2019-03-12,2019-04-25,44,40.80,39.36,3408,-4907.52,-3.53,,,stop_loss,Stage2,3.5289,0.0400,intraday,44,100,ROL-wein-960,0.0405
+RAMP,LONG,2019-03-11,2019-03-27,16,58.99,55.90,2356,-7280.04,-5.24,,,stop_loss,Stage2,3.1249,0.0400,gap_down,16,100,RAMP-wein-959,0.0400
+R,LONG,2019-04-05,2019-05-18,43,65.22,59.52,1065,-6074.19,-8.74,,,laggard_rotation,Stage2,2.4565,0.1429,non_stop_exit,,100,R-wein-958,0.1433
+PSA,LONG,2019-03-11,2019-03-23,12,217.10,222.44,320,1709.24,2.46,,,laggard_rotation,Stage2,1.5688,0.1425,non_stop_exit,,90,PSA-wein-965,0.1426
+NSIT,LONG,2019-03-15,2019-03-23,8,58.18,56.85,2400,-3194.24,-2.29,,,stop_loss,Stage2,2.5254,0.0400,gap_down,8,100,NSIT-wein-920,0.0402
+NHI,LONG,2019-06-20,2019-06-27,7,81.65,76.21,975,-5305.85,-6.66,,,stop_loss,Stage2,1.8856,0.1303,gap_down,7,75,NHI-wein-1200,0.1344
+LHX,LONG,2019-02-25,2019-03-08,11,166.97,160.33,836,-5551.04,-3.98,,,stop_loss,Stage2,2.3204,0.0400,gap_down,11,100,LHX-wein-918,0.0404
+HUBB,LONG,2019-02-25,2019-03-06,9,121.51,118.45,1149,-3513.14,-2.52,,,stop_loss,Stage2,2.3079,0.0400,intraday,9,100,HUBB-wein-916,0.0401
+FUN,LONG,2019-05-06,2019-05-30,24,56.33,50.54,1266,-7326.49,-10.27,,,stop_loss,Stage2,2.9154,0.1394,gap_down,24,85,FUN-wein-1002,0.1408
+CY,LONG,2019-02-25,2019-02-28,3,15.93,15.35,8788,-5097.04,-3.64,,,stop_loss,Stage2,2.3749,0.0400,intraday,3,90,CY-wein-902,0.0400
+BF-B,LONG,2019-03-26,2019-04-06,11,52.54,53.06,1400,728.00,0.99,,,laggard_rotation,Stage2,2.9846,0.1359,non_stop_exit,,90,BF-B-wein-978,0.1374
+BDN,LONG,2019-02-19,2019-03-02,11,16.17,15.76,8663,-3511.84,-2.51,,,stop_loss,Stage2,1.5850,0.0486,intraday,11,90,BDN-wein-898,0.0489

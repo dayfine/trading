@@ -20,6 +20,12 @@ the scenario runner is used purely as a trade/audit generator.
 | `inspect-6mo-nobasestop` | minus `stop_anchor_at_entry_base` | −3.06% | 63 |
 | `inspect-6mo-novolconf` | minus `volume_confirm_at_fill` | −4.48% | 32 |
 | `inspect-6mo-bookstop` | + `initial_stop_buffer 1.0` (book-band stop) | +4.83% | 39 |
+| `inspect-6mo-bothfix` | bookstop + volconf OFF (bounds the §4.2 premium) | +3.93% | 13 |
+
+`bothfix` (mean hold 17.1d, 6 open at end) restores real holding but returns
+**no more** than `bookstop` with the faithful gate on — in this window §4.2's
+eject cost nothing net. That bounds the melt-up premium at ≈0 for 2019H1 and
+removes any pressure to weaken the gate.
 
 ## Finding 1 — the fallback initial stop is 2.08%, half the book band ⭐
 
@@ -79,13 +85,29 @@ stops (CSGP +7.25% after a 2-day run). The stop-leg damage is
 death-by-a-thousand (24 stops averaging −1.87%), not single deep cuts. No
 defect here — mechanics working as designed.
 
-## Finding 3 — `volume_confirm_at_fill` ejects 83% of fills; nothing survives past 11 days
+## Finding 3 — the volume eject is §4.2's own rule; 83% is the regime cost, not a defect
+
+**Corrected 2026-08-21 after the full book read** (an earlier revision of this
+section called the basis wrong; it is not). `volume_eject_runner` evaluates the
+**fill week's completed weekly bar** with both §4.2 branches at 2× (lookback
+4wk) — and under rt the fill week *is* the breakout week. The apparent
+contradiction (ADP screener ratio 1.65× vs eject `spike_ratio 0.74`) is two
+different weeks, both correctly measured: rt screens **under** the anchor, so
+the screening week is pre-breakout; the fill week is the true breakout week,
+and its volume genuinely failed 2×.
+
+The eject itself is the book's explicit instruction (Ch. 4): *"if there is no
+significant increase in volume when the breakout occurs, then avoid that
+stock. If you have purchased it with a buy-stop order, then sell it for a fast
+profit when it advances after the breakout (which it will usually do)."* CHDN
+ejected at **+6.69% green** is literally that sentence executing.
 
 Of 42 fills with a recorded lifecycle outcome in the arc arm: **35 Ejected, 4
-Held, 3 Skipped_other_exit** — only 5 fills ever produce a Confirmed verdict.
-Fills land days after the breakout on quieter tape, so the fill-day spike test
-(`Unconfirmed spike_ratio ~0.74` on ADP, whose *breakout-week* ratio was 1.65)
-almost never passes.
+Held, 3 Skipped_other_exit** — only 5 confirm. That 83% is the **faithful cost
+of §4.2 in a quiet-volume melt-up regime** (2019H1 V-recovery; the melt-up-lag
+law — monsters run on quiet tape and Weinstein's volume gate refuses them).
+The remaining faithfulness gap is timing only: the book sells *into the
+post-breakout advance*; the runner sells at the next open unconditionally.
 
 Consequences in the rows: CHDN ejected +6.69% green at 3 days, RAMP +3.48% at
 5 days. Only two exit triggers exist in the entire arm (stop_loss 24 /
@@ -122,8 +144,10 @@ pattern (unit-pin the arithmetic chain; a goldens-small scenario changes
 ranking/sector-RS/macro and tests the wrong thing):
 
 1. ✅ ADP fallback-stop chain — `test_fallback_stop_width.ml` (this PR).
-2. ☐ volume-eject canonical (CHDN +6.69% ejected green at 3 days; `novolconf`
-   confirms the isolation — same entry rides to period end with the flag off).
+2. ☐ volume-eject canonical (CHDN +6.69% ejected green at 3 days) — now a pin
+   of *faithful* behaviour (§4.2's "sell it for a fast profit when it
+   advances"), not of a defect; `novolconf` shows the same entry riding to
+   period end with the gate off.
 3. ☐ funding rejection canonical — belongs with the G2a/G2b build (A1-1/2).
 
 ## Fix ordering (the controls' answer)
@@ -137,9 +161,10 @@ ranking/sector-RS/macro and tests the wrong thing):
    The **global default flip** (moves every fallback-path golden, breaks
    record-baseline comparability) is a separate user decision; the
    characterisation test flips to in-band when that lands.
-2. **Fill-day volume confirmation** — the eject premise (fill-day spike) is
-   structurally wrong for stop-limit fills that trigger days after the breakout
-   on quiet tape; 83% eject rate is the mechanism refusing its own entries.
-   Candidate faithful form: confirm on the *breakout week's* volume (already
-   measured at screen time — ADP's was 1.65×) rather than the fill day's.
+2. **Volume eject — NO FIX; the rule is faithful** (see the corrected Finding
+   3). The mechanism measures the fill week = the breakout week on weekly bars
+   and executes the book's own low-volume sell instruction. What remains is a
+   *measurement* (the melt-up premium the gate forgoes, bounded by the
+   `novolconf` / `bothfix` arms) and one timing nuance (sell-into-advance vs
+   next-open) — a possible future dial, not a bug.
 3. Funding (G2a/G2b/G3) — already tracked, unchanged by these results.
