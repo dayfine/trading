@@ -133,19 +133,32 @@ let is_excluded_dir entry =
    absent [trading-root] argument, a moved trading/ dir, or a wrong-cwd
    invocation, all of which collapse the count to 0 or near it. This is a
    floor, not a target: it only needs to sit comfortably below "normal" and
-   comfortably above "the scan found basically nothing". *)
+   comfortably above "the scan found basically nothing".
+
+   What this floor does NOT do on its own: catch an arbitrary partial loss.
+   A subtree lost because a directory failed to read is now caught
+   separately and unconditionally by [_check_walk_failures] below (loud
+   regardless of how many files were under it -- see [collect_lib_files]).
+   A partial loss from some OTHER cause that never raises inside [walk] is
+   only caught here, and only once it is large enough to push the total
+   below this floor -- e.g. against the 862-file tree, roughly 362 files
+   would have to vanish silently and by some path other than a walk failure
+   before this floor alone would notice. Nothing currently re-measures 500
+   as the tree grows; if the real count drifts far out of step with it
+   (`find trading -path '*/lib/*.ml' -o -path '*/lib/*.mli' | wc -l`),
+   tighten the constant. *)
 let min_expected_lib_files = 500
 
 (* [Sys.readdir] on a subdirectory discovered mid-walk can fail for benign
    reasons (a symlink race, a directory removed between listing and
-   recursing) -- those failures are swallowed by [walk] itself, same as
-   before. What must NOT be swallowed is the walk finding nothing at all:
-   [collect_lib_files] validates [root] up front, and its caller enforces
-   [min_expected_lib_files] on the total. A directory that is legitimately
-   absent (bad CLI arg, moved trading/ dir) is reported here with a specific
-   message; a directory that exists but the scan still turns up too few
-   files under is caught downstream by the floor -- either way the run is
-   loud, never a silent "OK: nothing to report". *)
+   recursing, or unreadable permissions). These are no longer swallowed:
+   [collect_lib_files] records each one and [_check_walk_failures] reports
+   it by name and exits 1 regardless of how many files were lost under it --
+   partial loss from a walk failure is loud by construction, not merely
+   caught when it happens to breach [min_expected_lib_files]. What remains
+   here is the separate top-level case: the [trading-root] argument itself
+   missing, not-a-directory, or unreadable, which needs its own specific
+   message because [collect_lib_files] never gets to walk anything. *)
 let validate_root_readable root =
   if not (Sys.file_exists root) then
     Some (Printf.sprintf "trading-root does not exist: %s" root)
@@ -176,11 +189,16 @@ let validate_root_readable root =
    surfaced this as a real, reproducible FAIL on every `dune runtest`
    invocation of this rule, which is what motivated excluding them here
    rather than merely reporting on them. *)
+(* Returns the collected files alongside every directory [Sys.readdir]
+   failed on during the walk, paired with the raw error message -- see the
+   docstring above [min_expected_lib_files] for why this must be surfaced
+   rather than swallowed. *)
 let collect_lib_files root =
   let result = ref [] in
+  let failed_dirs = ref [] in
   let rec walk dir =
     match Sys.readdir dir with
-    | exception _ -> ()
+    | exception Sys_error msg -> failed_dirs := (dir, msg) :: !failed_dirs
     | entries ->
         Array.iter
           (fun entry ->
@@ -198,7 +216,7 @@ let collect_lib_files root =
           entries
   in
   walk root;
-  !result
+  (!result, !failed_dirs)
 
 let read_file path =
   let ic = open_in path in
@@ -547,6 +565,29 @@ let _check_scan_integrity trading_root files =
         exit 1
       end
 
+(* Fails loudly on any subdirectory whose [Sys.readdir] failed mid-walk,
+   rather than silently omitting whatever was under it from the scan. This
+   is the fix for the residual defect found in review of
+   H-SEXP-DRIFT-VACUOUS-PASS: with only [_check_scan_integrity]'s floor
+   guarding the total, a partial loss up to (scanned - min_expected_lib_files)
+   files passed silently -- e.g. an 820-file tree losing a 300-file subtree
+   to a permission error still reported "OK: ... (scanned 520 files)". Every
+   walk failure is now named explicitly, independent of how large the loss
+   under it turns out to be. *)
+let _check_walk_failures failed_dirs =
+  if failed_dirs <> [] then begin
+    Printf.printf
+      "FAIL: sexp_default_drift linter -- %d director%s could not be read and \
+       were excluded from the scan (any [@sexp.default] drift inside them \
+       would have gone undetected):\n\n"
+      (List.length failed_dirs)
+      (if List.length failed_dirs = 1 then "y" else "ies");
+    List.iter
+      (fun (dir, msg) -> Printf.printf "  %s: %s\n" dir msg)
+      (List.rev failed_dirs);
+    exit 1
+  end
+
 (* Fails loudly on any unparseable scanned file rather than silently
    dropping its records (the pre-fix behavior: [parse_ml]/[parse_mli] caught
    every exception and returned empty results, so a live drift bug hiding in
@@ -588,8 +629,10 @@ let () =
   let exceptions =
     if Array.length Sys.argv > 2 then read_exceptions Sys.argv.(2) else []
   in
-  let files = List.sort String.compare (collect_lib_files trading_root) in
+  let collected_files, failed_dirs = collect_lib_files trading_root in
+  let files = List.sort String.compare collected_files in
   _check_scan_integrity trading_root files;
+  _check_walk_failures failed_dirs;
   let parsed = List.map (fun f -> (f, parse_file f)) files in
   _check_parse_failures parsed;
   let records =
