@@ -14,8 +14,12 @@ harness convention).
 > directory. An earlier revision of this note credited the whole arc→g3 delta
 > to G3; that framing was wrong.
 
-The three arms nest exactly (verified by `symbol|entry_date` join:
-11 ⊂ 39 ⊂ 59):
+By `symbol|entry_date` join (no duplicate keys in any file): g3's 11 trades
+are an exact subset of bookstop's 39; bookstop is **not** a subset of arc —
+arc ∩ bookstop = 37, arc-only 22, bookstop-only 2 (AKAM 2019-06-07,
+WWW 2019-04-24, both with wide structural stops ≈ 0.11 — the stop-buffer
+override *substitutes* trades as well as filtering them). An earlier revision
+claimed 11 ⊂ 39 ⊂ 59; the outer inclusion is false:
 
 | arm | delta vs previous row | trades | return | stop / eject exits |
 |---|---|---:|---:|---|
@@ -35,10 +39,11 @@ The three arms nest exactly (verified by `symbol|entry_date` join:
    locks each resting ticket's designed cost at placement, so concurrent
    tickets collapse. *Config arithmetic, not a measurement:* at the configured
    `max_position_pct_long 0.14` against the 70% pool, 0.70 / 0.14 = 5 tickets
-   would exhaust it. *The measured analogue:* max concurrent positions is 8 in
-   the arc arm vs **2** in g3 — the measured collapse is even deeper than the
-   nominal arithmetic suggests (in-flight reservations stack on top of held
-   positions' exposure).
+   would exhaust it. *The measured analogue* (isolated, against the right
+   control): max concurrent positions is arc 8 / **bookstop 5** / g3 **2**.
+   The control already sits at the nominal 0.70/0.14 = 5 ceiling, and arming
+   G3 more than halves it — the reservation's own footprint, not the
+   stop-buffer's.
 
 No performance claim from any of these numbers (single 6-month window,
 inspection purpose). Which tickets survive the reservation queue is a
