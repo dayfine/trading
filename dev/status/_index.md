@@ -4,20 +4,32 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-21 (orchestrator run 1, run id 32458970760; main
-`87f659a4` -> `ec6f06ee`). All six of the prior run's pending PRs landed
-(#2430 `646710e0`, #2434 `bf9fbbcd`) — **zero drift**. This run: #2455
-(6mo inspection harness + fallback-stop pin) and #2452 (book-faithful entry
-bundle) merged; **#2456** opened — the #2432 gate-reader fix — then taken through
-two rework rounds and **deliberately HELD with `do-not-merge`** at `489b34a2`.
-Its review measured the thing that matters: replaying both readers over 166 real
-reviews, `unclear` fires on **~14% of PRs**, and 4 of 5 observed cases are healthy
-rework loops while the 5th (#2397) was a one-character parsing bug — since fixed
-(`{8,40}`→`{7,40}`). **Whether `unclear` should ship at all is now a human
-decision**, since it is terminal and its only exit is `--admin`, the habit that
-caused #2384. **#2457** filed — `book-as-authority.md` points every GHA reviewer at
-a macOS path that cannot exist on the runner, silently disabling the one validation
-axis with no tooling. Full narrative: `dev/daily/2026-08-21.md`.
+Last updated: 2026-08-21 (orchestrator run 2, run id 32482056746; main
+`d60b057e` -> `a5a95243`). **The queue was empty of dispatchable work, not
+saturated** — both open PRs (#2456, #2433) sit under `do-not-merge` Rule-0 holds
+awaiting human decisions, so this run spent its whole capacity opening new work:
+**#2461** (backtest subdir appendix reconciled — 4 missing rows, docs-only,
+**MERGED** `3fb20c16`), **#2462**+**#2464** (sexp-drift linter vacuity fix + its CP4 residual), **#2463**
+(**A1-1 / G2a `entry_fill_reject_retries`** — the first of the arc's two missing
+funding legs, closing the user's stated P0 by half; `ticket-funding` step 3 goes
+1-of-3 to 2-of-3).
+
+**Two findings worth carrying.** #2462's behavioral review found **the same
+disease surviving inside its own fix** — `walk`'s `| exception _ -> ()` still
+drops unreadable dirs silently (820 files -> 520, still exit 0), while the
+docstring claims the run is "never a silent OK". #2462 was merged 44s after that
+NEEDS_REWORK; the rework landed separately as #2464. And the
+**concurrent QC pipeline (#2432) is confirmed again** — a second behavioral review
+landed on #2462 **9 seconds** after mine, at the same SHA, with the opposite
+verdict. I adjudicated for NEEDS_REWORK because the APPROVED never examined the
+path the other demonstrated a defect in.
+
+**Correction to run 1's own guidance:** `mergeable_state: unknown` is **not** a
+tell that a PR closed under you — 3 of 3 open PRs sampled this run returned
+`unknown` on a cold read and resolved on the next (GitHub computes it lazily).
+Filed as `A-MERGEABLE-STATE-NOT-A-CLOSE-TELL`. Run 1's *other* control — read
+`state`/`merged`/`merged_at` directly — stands, and both merges this run used it.
+Full narrative: `dev/daily/2026-08-21-run2.md`.
 
 **Carried context (2026-08-19 PM, still current):** #2384's clock-26 promotion
 was **reverted** by #2397 after the sp500 golden regressed −40.91pp; the cron had
@@ -44,7 +56,7 @@ Each row: one line; deeper task detail in the linked status file.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
-| [arc-readiness](arc-readiness.md) | IN_PROGRESS | dayfine (LOCAL) | — | #2455 + #2452 MERGED (6mo inspection harness, book-faithful bundle); next: A1 G2a+G2b funding leg, A2 null-report + fill-model A/B (USER) |
+| [arc-readiness](arc-readiness.md) | IN_PROGRESS | dayfine (LOCAL) + feat-weinstein | #2463 | A1-1 G2a BUILT — PR #2463, structural APPROVED; next: A1-2 G2b (simulator.ml at 493/500, extract first), then A1-4 grid (LOCAL, needs container) |
 | [resistance-v2](resistance-v2.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | grid 3/3 ACCEPT w=30; BUNDLE PROMOTED default-on #2047 (R3 human-approved 07-23); next: WF-CV vs w30 (data-gated) + lever-b axis |
 | [margin-realism](margin-realism.md) | IN_PROGRESS | dayfine (maintainer LOCAL) + feat-backtest | — | M4 MERGED #2063; #2057 exit labels MERGED #2074; trade_audit half MERGED #2085; #2076 CLOSED (report fallback #2196) |
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
@@ -75,9 +87,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | **#2456** | #2430 MERGED `646710e0`; #2456 gate-reader fix HELD `do-not-merge` at `489b34a2` (rework 2/2) — needs human call on shipping `unclear` (~14% of PRs) |
-| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | #2432 fix in flight as #2456; #2457 filed (book path unreachable in GHA); open: #2427 #2428 #2429 — all need `workflow` scope or a human |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | segmentation weight caveats MERGED #2324 `4f602d0d`; 6 open; top item `linter_coverage` is a HUMAN POLICY DECISION (header half already shipped), not agent work |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | **#2456** | #2462 + #2464 MERGED (sexp-drift linter no longer passes vacuously); #2456 gate-reader HELD `do-not-merge` — human call on `unclear` |
+| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | A-MERGEABLE-STATE-NOT-A-CLOSE-TELL filed (run-1 guidance corrected); open: #2427 #2428 #2429 #2432 — need `workflow` scope or a human |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2461 MERGED (backtest subdir appendix reconciled, 4 missing rows); top item `linter_coverage` is a HUMAN POLICY DECISION, not agent work |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
