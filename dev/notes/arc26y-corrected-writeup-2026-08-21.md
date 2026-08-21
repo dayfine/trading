@@ -7,8 +7,8 @@ Second 26y run of the arc-faithful bundle, now with all four overrides
 binary. **NOT a controlled pair beyond that:** the committed `params.sexp`
 files differ in `data_dir` — pre-correction read the pinned worktree's
 `test_data`, the corrected run's cwd-derived default resolved to
-`/workspaces/trading-1/data` (the live store), so non-snapshot reads (sector
-map, AD breadth) came from different roots. One more reason the intra-pair
+`/workspaces/trading-1/data` (the live store), so non-snapshot reads (AD
+breadth) came from different roots. One more reason the intra-pair
 delta is non-claimable (below). Artifacts:
 `dev/experiments/inspect-6mo-2026-08-21/results/arc26y-corrected-*`
 (pre-correction record: `arc26y-precorrection-*`).
