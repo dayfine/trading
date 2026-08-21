@@ -19,6 +19,7 @@ the scenario runner is used purely as a trade/audit generator.
 | `inspect-6mo-anchor26` | anchor 26wk | +0.57% | 45 |
 | `inspect-6mo-nobasestop` | minus `stop_anchor_at_entry_base` | −3.06% | 63 |
 | `inspect-6mo-novolconf` | minus `volume_confirm_at_fill` | −4.48% | 32 |
+| `inspect-6mo-bookstop` | + `initial_stop_buffer 1.0` (book-band stop) | +4.83% | 39 |
 
 ## Finding 1 — the fallback initial stop is 2.08%, half the book band ⭐
 
@@ -127,9 +128,15 @@ ranking/sector-RS/macro and tests the wrong thing):
 
 ## Fix ordering (the controls' answer)
 
-1. **Fallback stop direction** (`floor_stop._fallback_reference`) — pervasive,
-   every arm, the whole loss. Behaviour change on the common path → own PR with
-   golden repins; the characterisation test flips to in-band on landing.
+1. **Fallback stop direction — VERIFIED zero-code fix.** The defect is the
+   *value* of the existing `initial_stop_buffer` config field (1.02 = reference
+   above entry), not missing code (`project_stop_anchor_flag_already_exists`).
+   The `bookstop` arm arms `((initial_stop_buffer 1.0))` in the bundle: modal
+   stop lands at exactly 0.0400 (25/39), stop_loss exits collapse 24 → 4,
+   return −4.17% → +4.83% on the same window. Bundle-scoped, no goldens moved.
+   The **global default flip** (moves every fallback-path golden, breaks
+   record-baseline comparability) is a separate user decision; the
+   characterisation test flips to in-band when that lands.
 2. **Fill-day volume confirmation** — the eject premise (fill-day spike) is
    structurally wrong for stop-limit fills that trigger days after the breakout
    on quiet tape; 83% eject rate is the mechanism refusing its own entries.
