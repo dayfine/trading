@@ -56,6 +56,12 @@
    ((volume_confirm_at_fill true))
    ((stop_anchor_at_entry_base true))
    ((entry_extension_max_pct 2.0))
+   ;; Book §5.3 flat stop when no structural floor qualifies: reference =
+   ;; entry (buffer 1.0) -> stop 4.0% below entry, the band low. The 1.02
+   ;; default puts the support stand-in ABOVE a long's entry and halves the
+   ;; stop to 2.08% (dev/notes/inspect-6mo-trade-dissection-2026-08-21.md,
+   ;; verified by the inspect-6mo-bookstop arm: modal stop 0.0208 -> 0.0400).
+   ((initial_stop_buffer 1.0))
    ((extension_stop_config ((trigger_ratio 2.0) (trail_pct 0.25))))
    ((reject_declining_ma_long_entry true))
    ((enable_short_side false))
