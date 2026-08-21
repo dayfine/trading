@@ -1,6 +1,6 @@
 # Status: harness
 
-## Last updated: 2026-08-17
+## Last updated: 2026-08-20
 
 ## Recent activity (2026-05-09..22, since last refresh)
 
@@ -277,6 +277,30 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 ---
 
 ## Completed
+
+### Repo-compression verification tooling (2026-08-20)
+
+- [x] `dev/scripts/prune_candidates.sh` — verified, never-delete repo-compression
+  worklist per `dev/plans/arc-readiness-2026-08-20.md` Axis 3. Three checkers:
+  (1) superseded `dev/notes/next-session-priorities-*` docs cited by nothing
+  under `dev/experiments/_ledger/`, `dev/plans/`, `dev/status/`, `.claude/`, or
+  `CLAUDE.md`; (2) orphaned `dev/experiments/` dirs (uncited AND >= 30 days
+  untouched by git-log dating, not filesystem mtime); (3) Rule-4 flag
+  eligibility for default-off mechanism flags with a ledger REJECT, checked
+  against live `*.sexp` references and `.ml` assignments. Every checker
+  carries a mandatory sanity probe against a known-present fact and aborts
+  nonzero rather than silently reporting a false-clean result — see the
+  script's header for the concrete bugs this caught during development
+  (a `tr -d '[:space:]'` call that concatenated all flag names into one
+  string, and a `find | xargs grep` empty-input pattern that made BSD xargs
+  report every empty citation-source dir as "cited"). Test suite:
+  `dev/scripts/prune_candidates_test.sh` (18 cases, fixture-built throwaway
+  git repos with controlled commit dates), wired into `dune runtest` via
+  `trading/devtools/checks/prune_candidates_test_runner.sh`. Scheduled
+  weekly via `.github/workflows/prune-candidates-weekly.yml`, writing
+  `dev/health/prune-candidates-<date>.md` and opening an advisory PR.
+  Verify: `sh dev/scripts/prune_candidates.sh` (real-repo run); `dune runtest
+  trading/devtools/checks/` (test suite).
 
 ### Agent definitions
 
