@@ -4,19 +4,18 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-20 (orchestrator **run 2**, run id 32369033387; main
-`2acc39e0` -> `74b16fae`). Merged three: the stranded run-1 summary PR #2426,
-#2423 (cap-refusal tally — **merged by a concurrent actor at a tip carrying an
-open NEEDS_REWORK**, see #2432), and #2431 (the rework #2423 merged without,
-recovered and landed). #2430 (sexp.default drift linter) is open in rework.
-Four issues filed from measurement: **#2427** the 15y golden has been cancelled
-at the 90-min cap 96 times running since 2026-05-17 — it completed until then
-(9 of 108 runs succeeded, last `0a845340`), so bisect 05-16→05-17 before raising
-the cap, **#2428** the orchestrator spec still
-lacks the `do-not-merge` / draft hold that #2396 cost -40.91pp, **#2429** the
-daily-summary auto-merge polls 10 min for a ~13 min check then silently attempts
-a doomed merge, **#2432** a later APPROVED from a concurrent QC pipeline clears
-an unresolved NEEDS_REWORK. Full narrative: `dev/daily/2026-08-20-run2.md`.
+Last updated: 2026-08-21 (orchestrator run 1, run id 32458970760; main
+`87f659a4` -> `ec6f06ee`). All six of the prior run's pending PRs landed
+(#2430 `646710e0`, #2434 `bf9fbbcd`) — **zero drift**. This run: #2455
+(6mo inspection harness + fallback-stop pin) and #2452 (book-faithful entry
+bundle) merged; **#2456** opened — the #2432 gate-reader fix, which now returns
+`unclear`/`ADJUDICATE` when two verdicts disagree at one SHA instead of letting
+recency clear a finding. That branch fired **three times today** (#2452, #2455
+twice), and #2452 proved a naive rule would false-block: its later APPROVED was a
+legitimate body-only resolution. **#2457** filed — `book-as-authority.md` points
+every GHA reviewer at a macOS path that cannot exist on the runner, silently
+disabling the one validation axis with no tooling. Full narrative:
+`dev/daily/2026-08-21.md`.
 
 **Carried context (2026-08-19 PM, still current):** #2384's clock-26 promotion
 was **reverted** by #2397 after the sp500 golden regressed −40.91pp; the cron had
@@ -43,7 +42,7 @@ Each row: one line; deeper task detail in the linked status file.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
-| [arc-readiness](arc-readiness.md) | IN_PROGRESS | dayfine (LOCAL) | #2449 | A1: build G2a+G2b (funding leg 1-of-3); A2: null-report + fill-model A/B (USER); A3: #2449 then delete 84 uncited docs |
+| [arc-readiness](arc-readiness.md) | IN_PROGRESS | dayfine (LOCAL) | — | #2455 + #2452 MERGED (6mo inspection harness, book-faithful bundle); next: A1 G2a+G2b funding leg, A2 null-report + fill-model A/B (USER) |
 | [resistance-v2](resistance-v2.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | grid 3/3 ACCEPT w=30; BUNDLE PROMOTED default-on #2047 (R3 human-approved 07-23); next: WF-CV vs w30 (data-gated) + lever-b axis |
 | [margin-realism](margin-realism.md) | IN_PROGRESS | dayfine (maintainer LOCAL) + feat-backtest | — | M4 MERGED #2063; #2057 exit labels MERGED #2074; trade_audit half MERGED #2085; #2076 CLOSED (report fallback #2196) |
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
@@ -74,8 +73,8 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | **#2430** | sexp.default drift linter (closes #2388); struct APPROVED, behav NEEDS_REWORK — rework 1/2; next: re-QC then merge |
-| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | 4 issues filed run 2 (#2427 #2428 #2429 #2432); next: #2432 gate-reader fix (landable — not workflow-scoped) |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | **#2456** | #2430 sexp.default drift linter MERGED `646710e0`; #2456 = pr_gate_status.sh gate-reader fix (#2432), in QC; next: gates then merge |
+| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | #2432 fix in flight as #2456; #2457 filed (book path unreachable in GHA); open: #2427 #2428 #2429 — all need `workflow` scope or a human |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | segmentation weight caveats MERGED #2324 `4f602d0d`; 6 open; top item `linter_coverage` is a HUMAN POLICY DECISION (header half already shipped), not agent work |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
