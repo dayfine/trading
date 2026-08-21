@@ -1,6 +1,6 @@
 # Status: arc-readiness
 
-## Last updated: 2026-08-20
+## Last updated: 2026-08-21
 
 ## Status
 IN_PROGRESS
@@ -93,14 +93,22 @@ The hole is the **funding leg**, whose plan
 |---|---|
 | G1 — land `ticket_age_weeks_at_cancel` + `cancel_reason` (#2348) | ✅ done (3 impl, 5 test files) |
 | step 2 — measure the cohort from artifacts | ✅ done — 3,530 rejections, median shortfall 52%, 63% in bursts |
-| step 3 — build each axis behind its own flag | **1 of 3** |
+| step 3 — build each axis behind its own flag | **2 of 3** — G2a in review (#2465) |
 | step 4 — one grid over all three + null | **blocked** |
 
 ### Sub-tasks
 
-- [ ] **A1-1 — Build G2a `entry_fill_reject_retries`** (retry). Does not exist:
-      0 mli, 0 impl, 0 tests. Default-off `int`, default `0`, per
-      `experiment-flag-discipline.md` R1/R2. Same shape as the built G3.
+- [x] **A1-1 — Build G2a `entry_fill_reject_retries`** (retry). Built in
+      **#2465** (in review): default-off `int`, default `0`, new module
+      `Trading_simulation.Entry_retry`. The plan's ordering prerequisite turned
+      out to be order-side only — a rejected entry's *position* never leaves
+      `Entering` (`Fill_router` only sees accepted trades); what the engine
+      destroys is the order, whose `Filled` stamp is now provisional and
+      reversed to `Pending` for a retried ticket. The same order is re-offered,
+      so `entry_extension_max_pct` still binds on the retry fill.
+      No core module touched. Also net −4 lines on `simulator.ml`, which was at
+      its 500-line hard limit: the rejection-routing tail moved into
+      `Cancel_handler.handle_rejected_trades`.
 - [ ] **A1-2 — Build G2b `entry_fill_size_to_available`** (resize). Does not
       exist. Default-off `bool`, default `false`. Independent of A1-1.
 - [ ] **A1-3 — Arm G3 `reserve_cash_for_resting_tickets` in a combined arc
