@@ -162,8 +162,20 @@ only steps 1-3 above (universe tiering, tracing, tiered loading) were in scope
 in 2026-04-17. The tree has since grown a couple dozen more subdirectories via
 later, separately-planned work (experiment ledger, walk-forward CV, tuner,
 trade audits, etc.). This is a **point-in-time inventory, not a living spec**:
-accurate as of main `c37a9e65` (2026-07-26); re-derive from each dir's `.mli`
+accurate as of main `d60b057e` (2026-08-21); re-derive from each dir's `.mli`
 doc-comments rather than trusting this list if it looks stale.
+
+**Scope note (added 2026-08-21, reconciling a recurrence of this drift — see
+`dev/status/cleanup.md`):** this table intentionally omits `lib/`, `test/`,
+`scenarios/`, and `bin/`'s original scope — the foundational package layout
+that predates this plan (April 2026, before the plan itself). `bin/` is listed
+below only because two of its three executables were added later; the
+directory's presence isn't "new work," but its *contents* grew via later work
+the same way the tables below did. Every other subdirectory here was created
+as its own separately-planned unit of work and is in scope for this table by
+construction. When adding a new subdir under `trading/trading/backtest/` in a
+feature PR, add its row here in the same PR — the recurrence this note
+documents is exactly what happens when that step gets skipped.
 
 | Subdir | What it does |
 |---|---|
@@ -174,6 +186,7 @@ doc-comments rather than trusting this list if it looks stale.
 | `decision_audit/` | Per-screen decision-audit ("faithfulness lens") — reports whether any captured screener feature separates funded entries from cash-rejected near-misses. |
 | `decision_grading/` | Exit-decision grading — turns post-exit price movement into a verdict (`Premature` vs `Good_exit`) on each exit decision. |
 | `experiment_ledger/` | Append-only ledger of every backtest experiment + verdict, keyed by config-hash, so a matrix run can skip re-testing an already-rejected config. |
+| `faithfulness_report/` | Faithfulness / sensibility profiling of backtest trade logs — profiles HOW a run traded (whipsaw rate, hold-time distribution, stop-width distribution) and, given a second run, per-year/per-symbol P&L divergence between the two arms, rather than judging by topline return alone. |
 | `feature_screen/` | Read-only, in-sample multivariate regression screen over the all-eligible `trades.csv`, testing whether a joint entry-selection signal survives that univariate screens missed. |
 | `fork_pool/` | Generic fork-based worker pool for CPU-bound, embarrassingly-parallel backtest jobs (walk-forward folds, Bayesian-opt evals) — sidesteps per-call heap residue in a long-lived parent process. |
 | `optimal/` | Optimal-strategy counterfactual — compares the actual run's round-trips against Constrained/Score_picked/Relaxed_macro variants and renders the comparison as markdown. |
@@ -181,9 +194,12 @@ doc-comments rather than trusting this list if it looks stale.
 | `release_report/` | Release perf report — compares two batches of scenario runs (current vs. prior release-gate run) and emits a markdown report. |
 | `rolling_start/` | Rolling-start factor-decomposition lens — reads precomputed snapshot-warehouse cells and computes dispersion/convexity stats across many simulated start dates. |
 | `runner_args/` | CLI argument parsing for `backtest_runner.exe`, extracted into its own library so parsing is unit-testable independent of the executable's `main`. |
+| `scripts/` | Standalone diagnostic/aggregation binaries that don't belong in `bin/`'s CLI-runner surface — e.g. `bah_baseline_aggregator` (produces a BAH baseline `aggregate.sexp` for a walk-forward window spec). |
 | `snapshot_warehouse/` | Pure derivation of the snapshot-warehouse build parameters (warmup-windowed date range + complete symbol set) a scenario needs to run correctly in snapshot mode; includes `audit_bars`/twin-detector sub-libraries. |
 | `stats/` | Statistical primitives shared across the backtest tree — Deflated Sharpe Ratio (Bailey/Lopez de Prado), normal-distribution helpers. |
 | `sweep_weekly_start/` | Weekly-start sweep — for each Monday in a trailing window, runs a Buy-and-Hold simulation through `end_date` and collects the resulting return/drawdown/Sharpe dispersion. |
+| `tax_lens/` | Pure post-run report layer over an existing scenario output directory (`trades.csv` + `equity_curve.csv`) — re-reads realized trades and the pre-tax equity path and projects an after-tax equity path under a configurable tax model. Runs no simulation and touches no core trading module. |
+| `trade_audit_basis/` | Price-basis selection for the trade-audit report's on-demand bar reads — chooses between the snapshot daily view's raw vs. split-adjusted close columns depending on whether the consumer compares prices across time or multiplies by a share count. |
 | `trade_audit_html/` | Pure serializer rendering a scenario's trade-audit data into a complete, self-contained interactive HTML document. |
 | `trade_audit_report/` | Trade-audit markdown renderer — joins the per-trade decision trail with round-trip P&L records and summarizes what the strategy decided on each entry. |
 | `tuner/` | Bayesian-optimization tuner — each BO iteration drives the walk-forward CV harness once per suggestion and scores the cell. |
