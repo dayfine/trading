@@ -1679,6 +1679,73 @@ type config = {
 
           R2: axis-expressible as
           [((flag entry_fill_reject_retries) (values (0 1 2)))]. *)
+  entry_fill_size_to_available : bool; [@sexp.default false]
+      (** G2b of [dev/plans/ticket-funding-2026-08-16.md]: when [true], an entry
+          fill the portfolio refuses for want of cash is re-offered at the
+          largest quantity the book {e can} fund, instead of the ticket being
+          destroyed. [false] (default) is today's behaviour.
+
+          {b The failure it addresses} is the same one G2a
+          ({!entry_fill_reject_retries}) addresses — the engine marks the
+          resting order [Filled] before
+          {!Trading_portfolio.Portfolio.apply_single_trade} agrees to book it,
+          so a refusal cancels a ticket that may have rested for months, at a
+          rate of {b ~25% of would-be entries}. The margin can be arbitrarily
+          small: [PRGS] needed \$138,244 against \$137,847, short by {b 0.3%}.
+
+          {b How it differs from G2a.} A resize enters
+          {b now, at the price the ticket triggered at}, so it pays none of the
+          timing tax that sinks the retry — the entry is simply smaller. That
+          makes it the smallest possible change to the failure mode, and it
+          turns the near-miss cohort (5.1% of refusals are within 5% of
+          fundable) into near-full fills.
+
+          {b What it costs.} It silently breaks fixed-risk sizing: the position
+          no longer carries {!Weinstein_portfolio_risk.risk_per_trade_pct} of
+          the book, and a systematically undersized entry into the largest
+          winners is its own tail tax ([project_edge_is_the_fat_tail]).
+          {!entry_fill_min_size_fraction} is the guard on that, and is the knob
+          to sweep.
+
+          {b Precedence with G2a.} When both are armed the simulator offers the
+          resize {e first} on each refusal; only a refusal the resize declines
+          (below the minimum fraction) consumes retry budget. Spending a retry
+          ahead of a resize would pay the timing tax for a fill that was
+          available immediately.
+
+          {b Interacts with} {!stop_width_mode}'s [Size_down], which also
+          decouples the filled size from the designed size — with both armed,
+          two independent mechanisms shrink the same position and the resulting
+          size attributes to neither. Not special-cased in code: a cell arming
+          both must say why.
+
+          {b Alternatives, not complements.} G2a (retry), G2b (resize) and G3
+          ({!reserve_cash_for_resting_tickets}, prevent) are three policies for
+          one failure; arm one at a time so the grid can tell them apart.
+
+          {b No ledger verdict exists.} Default-off until one does (R3).
+
+          R2: axis-expressible as
+          [((flag entry_fill_size_to_available) (values (true false)))]. *)
+  entry_fill_min_size_fraction : float; [@sexp.default 0.5]
+      (** G2b's minimum viable size: the smallest fraction of a ticket's
+          {e designed} quantity that a clamped fill may be. A clamp below it is
+          refused and the ticket takes the unchanged destroy path, so the
+          mechanism buys back the near-miss cohort without booking token
+          positions that carry the trade's costs and none of its exposure.
+
+          Read only when {!entry_fill_size_to_available} is [true]; inert
+          otherwise, so the default [0.5] changes no behaviour on its own (R1).
+          [0.0] accepts any positive clamp; [1.0] accepts none, making the
+          mechanism a no-op even when armed.
+
+          The designed quantity is the [Entering] position's [target_quantity],
+          i.e. [Weinstein_portfolio_risk.compute_position_size]'s output — so
+          the fraction is measured against a number that already respects the
+          risk-based, side-exposure, per-position and sizing-cash caps.
+
+          R2: axis-expressible as
+          [((flag entry_fill_min_size_fraction) (values (0.25 0.5 0.75)))]. *)
   stop_width_mode : Stop_width_mode.t;
       [@sexp.default Stop_width_mode.Drop_over_max]
       (** F3 ([dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F3): what the

@@ -173,6 +173,21 @@ type dependencies = {
           as it has been since PR #1172. [n > 0] leaves the [Entering] position
           alone and re-submits a copy of the refused order so the engine
           re-offers it next tick, up to [n] times. See {!Entry_fill_retry}. *)
+  entry_fill_resize : Entry_fill_resize.t;
+      (** G2b resize policy ([dev/plans/ticket-funding-2026-08-16.md] §G2b):
+          whether a portfolio-refused entry fill is re-offered at a quantity the
+          book can afford, and the minimum fraction of the designed quantity
+          such a clamp must reach. Built by the backtest runner from
+          [Weinstein_strategy_config.entry_fill_size_to_available] /
+          [Weinstein_strategy_config.entry_fill_min_size_fraction]. Defaults to
+          {!Entry_fill_resize.disabled}, under which the refused ticket is
+          cancelled outright as it has been since PR #1172 and the run is
+          bit-identical to every existing baseline.
+
+          Consulted {e before} {!entry_fill_retry}: a resize enters now at the
+          triggered price, so it is strictly cheaper than a retry, and retry
+          budget is only spent on refusals the resize declined. See
+          {!Entry_fill_resize}. *)
 }
 
 val create_deps :
@@ -197,6 +212,7 @@ val create_deps :
   ?entry_extension_max_pct:float ->
   ?sim_entry_fill_next_open:bool ->
   ?entry_fill_reject_retries:int ->
+  ?entry_fill_resize:Entry_fill_resize.t ->
   unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and

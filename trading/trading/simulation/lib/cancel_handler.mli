@@ -123,6 +123,22 @@ val apply_trades_best_effort :
     floor-rejected. At the default the apply is bit-equal to
     [Portfolio.apply_single_trade]. *)
 
+val apply_transitions :
+  positions:Position.t String.Map.t ->
+  transitions:Position.transition list ->
+  Position.t String.Map.t Status.status_or
+(** [apply_transitions ~positions ~transitions] folds [transitions] over
+    [positions] in list order, stopping at the first invalid transition.
+    [CreateEntering] installs a fresh [Entering]; [TriggerExit] /
+    [TriggerPartialExit] move a position toward [Exiting] and drop it if the
+    transition closes it; [CancelEntry] routes through {!apply_to_positions};
+    every other kind (fills, [UpdateRiskParams], …) is a no-op here because it
+    is applied elsewhere — {!Fill_router} owns fills.
+
+    Lives beside the cancel builders because [CancelEntry] application is its
+    only non-trivial case and this module is where {!Simulator} keeps the
+    transition-application half of its pipeline. *)
+
 val revert_rejected_exits :
   date:Date.t ->
   positions:Position.t String.Map.t ->
