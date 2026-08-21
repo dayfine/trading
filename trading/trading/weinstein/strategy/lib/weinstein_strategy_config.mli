@@ -1627,6 +1627,58 @@ type config = {
 
           R2: axis-expressible as
           [((flag reserve_cash_for_resting_tickets) (values (true false)))]. *)
+  entry_fill_reject_retries : int; [@sexp.default 0]
+      (** G2a of [dev/plans/ticket-funding-2026-08-16.md]: how many further
+          attempts a triggered entry ticket gets after the portfolio refuses to
+          fund its fill. [0] (default) is today's behaviour — one refusal
+          destroys the ticket.
+
+          {b The failure it addresses.} The engine marks a resting entry order
+          [Filled] the moment the fill function returns a trade, {i before}
+          {!Trading_portfolio.Portfolio.apply_single_trade} has agreed to book
+          it. When the portfolio then refuses (insufficient cash),
+          {!Trading_simulation.Cancel_handler.transitions_for_rejected_trades}
+          emits a [CancelEntry] and the [Entering] position is deleted. The
+          order is gone (marked filled) and the ticket is gone (cancelled), so
+          {b one cash-tight instant permanently destroys a ticket} that may have
+          rested for months — and the margin of destruction can be arbitrarily
+          small: in the 2.5-year diagnostic run [PRGS] needed \$138,244 against
+          \$137,847 in the book, short by {b 0.3%}.
+
+          Rate: {b ~25% of would-be entries}, stable across universes and
+          periods. Measured over 3,530 rejections the median shortfall is
+          {b 52%} of the ticket's cost and {b 63%} arrive in bursts against a
+          single cash balance.
+
+          {b What [n > 0] does.} The ticket is put {b back} rather than
+          destroyed: the [Entering] position is left alone (it never filled, so
+          there is nothing to unwind) and a fresh copy of the refused order is
+          re-submitted to the order manager, so the engine re-offers it on the
+          next tick against whatever cash the book has by then. After the [n]-th
+          refusal the ticket dies exactly as it does today. This is the
+          entry-side mirror of
+          {!Trading_simulation.Cancel_handler.revert_rejected_exits}, which has
+          done the same for {e exits} since issue #1553.
+
+          {b Why it may fail, stated up front.} A retry changes {e when} we
+          enter, and the price the retry eventually gets is worse than the one
+          the ticket triggered at — at which point the do-not-chase cap
+          ({!entry_extension_max_pct}) starts refusing the retry itself. That is
+          the entry-side fat-tail tax the StopLimit surface already found
+          ([[project-sim-entry-stoplimit-reject]]). Of the three funding axes
+          this is the one most likely to fail, and for a known reason.
+
+          {b Alternatives, not complements.} G2a (retry), G2b
+          ([entry_fill_size_to_available], resize) and G3
+          ({!reserve_cash_for_resting_tickets}, prevent) are three different
+          policies for one failure. G3 removes the over-commitment that causes
+          the burst; G2a and G2b arbitrate it after the fact. Arm one at a time
+          — the grid is meant to tell them apart.
+
+          {b No ledger verdict exists.} Default-off until one does (R3).
+
+          R2: axis-expressible as
+          [((flag entry_fill_reject_retries) (values (0 1 2)))]. *)
   stop_width_mode : Stop_width_mode.t;
       [@sexp.default Stop_width_mode.Drop_over_max]
       (** F3 ([dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F3): what the

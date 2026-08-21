@@ -905,6 +905,16 @@ type config = {
           [spendable] at [portfolio.cash], bit-identical to prior behaviour. See
           [Weinstein_strategy_config.reserve_cash_for_resting_tickets] for the
           leak it closes and the measured cohort that motivates it. *)
+  entry_fill_reject_retries : int; [@sexp.default 0]
+      (** G2a: how many further attempts a triggered entry ticket gets after the
+          portfolio refuses to fund its fill. [0] (default) is today's behaviour
+          — one refusal cancels the ticket outright and its already-[Filled]
+          order is gone with it, so a 0.3% shortfall destroys a setup that
+          rested for months. [n > 0] leaves the [Entering] position alone and
+          re-submits a copy of the refused order, up to [n] times. See
+          [Weinstein_strategy_config.entry_fill_reject_retries] for the measured
+          cohort, the timing tax that may sink it, and why it is an alternative
+          to G3 rather than a complement. *)
   stop_width_mode : Stop_width_mode.t;
       [@sexp.default Stop_width_mode.Drop_over_max]
       (** F3 wide-stop admission policy (plan

@@ -463,6 +463,19 @@
   matchers))
 
 (test
+ (name test_entry_fill_retry)
+ (modules test_entry_fill_retry)
+ (libraries
+  ounit2
+  core
+  core_unix.time_ns_unix
+  trading.simulation
+  trading.base
+  trading.orders
+  trading.strategy
+  matchers))
+
+(test
  (name test_portfolio_valuation)
  (modules test_portfolio_valuation)
  (libraries

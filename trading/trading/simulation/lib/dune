@@ -18,6 +18,7 @@
   fill_date_stamp
   split_handler
   cancel_handler
+  entry_fill_retry
   order_generator
   metrics
   round_trip_pairing
