@@ -138,6 +138,7 @@ type config = {
   entry_order_max_rest_weeks : int; [@sexp.default 0]  (** See [.mli]. *)
   reserve_cash_for_resting_tickets : bool; [@sexp.default false]
       (** See [.mli]. *)
+  entry_fill_reject_retries : int; [@sexp.default 0]  (** See [.mli]. *)
   stop_width_mode : Stop_width_mode.t;
       [@sexp.default Stop_width_mode.Drop_over_max]
       (** See [.mli]. *)
@@ -246,6 +247,7 @@ let default_config ~universe ~index_symbol =
     enable_entry_ticket_rescreen = false;
     entry_order_max_rest_weeks = 0;
     reserve_cash_for_resting_tickets = false;
+    entry_fill_reject_retries = 0;
     stop_width_mode = Stop_width_mode.Drop_over_max;
     stop_width_size_down_max_pct = 0.0;
     volume_confirm_at_fill = false;

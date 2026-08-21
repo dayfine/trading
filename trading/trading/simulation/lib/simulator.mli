@@ -161,6 +161,22 @@ type dependencies = {
           config ([Weinstein_strategy_config.sim_entry_fill_next_open]); a
           fill-model basis change, so any default flip routes through WF-CV +
           deliberate golden re-pins per experiment-flag discipline. *)
+  entry_fill_reject_retries : int;
+      (** G2a retry budget ([dev/plans/ticket-funding-2026-08-16.md] §G2a): how
+          many further attempts a triggered entry ticket gets after the
+          portfolio refuses to fund its fill. [0] (the default) is bit-identical
+          to every existing baseline — the refused ticket is cancelled outright,
+          as it has been since PR #1172. [n > 0] leaves the [Entering] position
+          alone and re-submits a copy of the refused order so the engine
+          re-offers it next tick, up to [n] times; see {!Entry_fill_retry}.
+          Armed by the backtest runner from the strategy config
+          ([Weinstein_strategy_config.entry_fill_reject_retries]). *)
+  entry_fill_retry_ledger : Entry_fill_retry.t;
+      (** Run-scoped ledger of retries already spent, backing
+          [entry_fill_reject_retries]. Mutable and reference-shared across the
+          run's per-step states, like [stale_hold_log]. Never read or written at
+          the default budget of [0]; a caller that wants to inspect ticket
+          retries after a run may pass its own via {!create_deps}. *)
 }
 
 val create_deps :
@@ -184,6 +200,8 @@ val create_deps :
   ?on_transitions:(Trading_strategy.Position.transition list -> unit) ->
   ?entry_extension_max_pct:float ->
   ?sim_entry_fill_next_open:bool ->
+  ?entry_fill_reject_retries:int ->
+  ?entry_fill_retry_ledger:Entry_fill_retry.t ->
   unit ->
   dependencies
 (** Create standard dependencies with default engine, order manager, and
