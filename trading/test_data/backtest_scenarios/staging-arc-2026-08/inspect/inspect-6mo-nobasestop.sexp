@@ -1,5 +1,5 @@
 ((name "inspect-6mo-nobasestop")
- (description "ARC BUNDLE — book-faithful entry end to end: screen UNDER the range top (Range_top_breakout), rest an E-anchored StopLimit band 2pp, judge volume AT the fill. fullbook-graded + entry_freshness_basis + volume_confirm_at_fill.")
+ (description "INSPECTION arm — arc bundle WITHOUT stop_anchor_at_entry_base: control proving the 2.08 pct fallback stop is the common path, not routed in by the re-anchor flag.")
  (period ((start_date 2019-01-02) (end_date 2019-06-28)))
  (universe_path "../goldens-custom-universe/composition/top-3000-2019.sexp")
  (universe_size 3000)

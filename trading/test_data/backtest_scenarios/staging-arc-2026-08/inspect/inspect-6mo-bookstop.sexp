@@ -1,5 +1,5 @@
 ((name "inspect-6mo-bookstop")
- (description "ARC BUNDLE — book-faithful entry end to end: screen UNDER the range top (Range_top_breakout), rest an E-anchored StopLimit band 2pp, judge volume AT the fill. fullbook-graded + entry_freshness_basis + volume_confirm_at_fill.")
+ (description "INSPECTION arm — arc bundle plus initial_stop_buffer 1.0 (book sec-5.3 band-low 4 pct fallback stop): verifies the zero-code stop fix (modal stop 0.0208 to 0.0400 exactly).")
  (period ((start_date 2019-01-02) (end_date 2019-06-28)))
  (universe_path "../goldens-custom-universe/composition/top-3000-2019.sexp")
  (universe_size 3000)

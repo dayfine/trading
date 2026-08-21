@@ -1,5 +1,5 @@
 ((name "inspect-6mo-novolconf")
- (description "ARC BUNDLE — book-faithful entry end to end: screen UNDER the range top (Range_top_breakout), rest an E-anchored StopLimit band 2pp, judge volume AT the fill. fullbook-graded + entry_freshness_basis + volume_confirm_at_fill.")
+ (description "INSPECTION arm — arc bundle WITHOUT volume_confirm_at_fill: control bounding what the (faithful) sec-4.2 eject forgoes; restores holding (mean 3.6 to 15.0 days).")
  (period ((start_date 2019-01-02) (end_date 2019-06-28)))
  (universe_path "../goldens-custom-universe/composition/top-3000-2019.sexp")
  (universe_size 3000)

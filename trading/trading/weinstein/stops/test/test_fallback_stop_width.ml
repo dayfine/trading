@@ -2,14 +2,16 @@
     book's §5.3 flat-stop band of 4-6%.
 
     {b Why this file exists when [test_support_floor.ml] already covers the
-       fallback path.} That coverage is a {i delegation identity}: it builds its
-    expectation with
-    [compute_initial_stop ~reference_level:(entry_price *. fallback_buffer)] —
-    the very formula under test — and asserts the wrapper agrees. Both sides of
-    that assertion move together, so it verifies the wrapper delegates but can
-    never detect that the buffer is applied in the wrong direction. The false-OK
-    survived in the element with the most tests. This file pins the {b absolute}
-    resulting distance instead, which is an independent predicate.
+       fallback path.} That coverage pins the reference {i convention} — it
+    rebuilds the expectation from its own local [1.02] literal, so a direction
+    flip in [floor_stop._fallback_reference] {i would} break it. What it cannot
+    express is whether the resulting stop {b width} is in-band: it is
+    hand-re-baselined against whatever the convention currently produces, and no
+    assertion anywhere related the produced distance to the book's §5.3 band.
+    The too-narrow predicate survived in the element with the most tests
+    ([feedback_pin_every_element_of_a_category]). This file pins the width
+    itself — the absolute distance against the band — which is the independent
+    predicate the existing tests lack.
 
     {b The chain, exact.} With no qualifying counter-move in the bar history the
     reference falls back to [entry *. fallback_buffer], which for a {i long}
@@ -33,11 +35,11 @@
     and the value below reproduces it exactly from the config defaults alone —
     no bar fixture required, because the fallback path never reads the bars.
 
-    {b Why it matters.} In that run the fallback stop covered 42 of 59 trades,
-    and 23 of the 24 [stop_loss] exits fell in that cohort at a 17% win rate,
-    accounting for essentially the whole arm's loss. Note the cohort is
-    confounded — these are also the crash-recovery shapes that the re-anchor
-    admits — so this file pins the {i arithmetic}, not a P&L claim.
+    {b Why it matters.} In that run the fallback stop covered 42 of 59 trades;
+    19 of the 24 [stop_loss] exits fell on the exact 0.0208 fallback width (23
+    of 24 within the <=5% tight cohort) at a 17% win rate, accounting for
+    essentially the whole arm's loss. This file pins the {i arithmetic}, not a
+    P&L claim.
 
     {b This test is expected to change.} It characterises current behaviour so
     that any change to the fallback direction fires loudly. When the fix lands,
@@ -84,7 +86,7 @@ let test_adp_fallback_level_is_exact _ =
   in
   assert_that (get_stop_level state) (float_equal ~epsilon:1e-9 150.777216)
 
-(* The independent predicate the delegation identity cannot express: the
+(* The independent predicate the convention tests cannot express: the
    resulting distance is BELOW the book's flat-stop minimum. *)
 let test_long_fallback_is_below_book_band _ =
   assert_that

@@ -1,5 +1,5 @@
 ((name "inspect-6mo-anchor26")
- (description "ARC BUNDLE — book-faithful entry end to end: screen UNDER the range top (Range_top_breakout), rest an E-anchored StopLimit band 2pp, judge volume AT the fill. fullbook-graded + entry_freshness_basis + volume_confirm_at_fill.")
+ (description "INSPECTION arm — arc bundle with entry_anchor_local_range_weeks 26 instead of 4: isolates the anchor window's effect on entry level and stop placement.")
  (period ((start_date 2019-01-02) (end_date 2019-06-28)))
  (universe_path "../goldens-custom-universe/composition/top-3000-2019.sexp")
  (universe_size 3000)

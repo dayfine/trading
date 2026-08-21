@@ -8,7 +8,8 @@ verdict; every number is a mechanism observation.
 
 ## The harness
 
-Four arms, period 2019-01-02 → 2019-06-28, universe top-3000-2019, $1M initial
+Six arms (four isolators + two fix-verification arms added same-day), period
+2019-01-02 → 2019-06-28, universe top-3000-2019, $1M initial
 cash. Specs: `trading/test_data/backtest_scenarios/staging-arc-2026-08/inspect/`.
 All `expected` ranges are non-binding (only `total_trades min 1` can fail), so
 the scenario runner is used purely as a trade/audit generator.
@@ -51,9 +52,10 @@ lands exactly on 157.00 so the 0.125 round-number nudge fires → 2.0425%).
 
 **Blast radius in the arc arm:** 42 of 59 trades carry the 0.0208 stop
 (`Buffer_fallback` 70:16 over `Support_floor`); the distribution is bimodal
-with nothing between 0.04 and 0.124. 23 of 24 `stop_loss` exits are in the
-tight cohort (17% win rate, −$48k of the arm's −$55k stop-leg loss). Perturbing
-the cohort cutoff 0.05→0.10 changes nothing (the gap makes it robust).
+with nothing between 0.04 and 0.124. 19 of 24 `stop_loss` exits sit on the
+exact 0.0208 fallback width; 23 of 24 within the ≤5% tight cohort (17% win
+rate, −$48k of the arm's −$55k stop-leg loss). Perturbing the cohort cutoff
+0.05→0.10 changes nothing (the gap makes it robust).
 
 **Control result — the arc flag is NOT the router.** `nobasestop` (flag off)
 still shows 40 of 63 trades at exactly 0.0208 and `Buffer_fallback` 73:23. The
@@ -63,13 +65,14 @@ fires in any config. `stop_anchor_at_entry_base` only affects the rare
 `Stop_too_wide` (>15%) cases — a handful of trades in six months. The bug is
 fully pre-arc and pervasive.
 
-**Why existing tests missed it** (`test_support_floor.ml`): the fallback
-coverage is a *delegation identity* — the expectation is built from
-`compute_initial_stop ~reference_level:(entry × fallback_buffer)`, the same
-formula under test, so both sides move together and a direction error is
-undetectable by construction. Same class as
-`feedback_pin_every_element_of_a_category`: the false-OK lived in the element
-with the most tests.
+**Why existing tests missed it** (`test_support_floor.ml`) — corrected in QC
+rework: the fallback coverage rebuilds its expectation from its own local
+`1.02` literal, so a direction flip in `_fallback_reference` *would* break it —
+it pins the reference *convention*. What no assertion anywhere expressed is
+whether the resulting stop **width** is in-band: the convention tests are
+hand-re-baselined against whatever the code currently produces. Too-narrow
+predicate, same class as `feedback_pin_every_element_of_a_category`: it
+survived in the element with the most tests.
 
 **Pinned:** `trading/weinstein/stops/test/test_fallback_stop_width.ml` — exact
 level 150.777216, both sides' distances below the book band, and the
