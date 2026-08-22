@@ -17,3 +17,10 @@
  (libraries core backtest_stats walk_forward)
  (preprocess
   (pps ppx_sexp_conv)))
+
+(executable
+ (name effect_null_report)
+ (modules effect_null_report)
+ (libraries core status walk_forward)
+ (preprocess
+  (pps ppx_sexp_conv)))
