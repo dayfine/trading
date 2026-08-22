@@ -2,15 +2,20 @@
 
 **RESULT: on the 26-year base, `Range_top_breakout` improves ulcer index, win
 rate and max drawdown past their own nulls at all three salts, and moves return
-and Sharpe not at all. It does NOT survive its first independent cell, and the
-same signature is produced more strongly by a mechanism that already failed
-confirmation on every broad cell tested.** Completed 05:39.
+and Sharpe not at all. The MaxDD improvement also holds on the broad-5y cell
+(#2448) — the earlier "fails its first independent cell" reading rested on an
+sp500 cell (#2436) that was RETRACTED as a universe artifact. Still NOT
+promotable: both 5y windows nest inside the 26y window, so no valid
+independent grid cell exists yet, and the same signature is produced more
+strongly by `nearfloor`, which failed confirmation on every broad cell
+tested.** Completed 05:39; headline corrected in the 2026-08-22 reframe.
 
-⚠ **Read the two sections "It reverses at 5 years" and "`nearfloor` produces
-this same signature, and it failed 0-of-2 broad cells" before quoting anything below.** They
-are what the record is actually for. The 26y measurement is sound and
-reproduces; what it licenses is much narrower than the first two versions of
-this file claimed.
+⚠ **Read "The 5y 'reversal' was retracted — it was the universe, not the
+horizon" and "`nearfloor` produces this same signature, and it failed 0-of-2
+broad cells" before quoting anything below.** They are what the record is
+actually for. The 26y measurement is sound and reproduces; what it licenses is
+narrower than the first two versions of this file claimed, but wider than the
+retracted third version implied.
 
 Three metrics clear their own null at all three salts (Rule 4):
 
@@ -216,8 +221,10 @@ verdict should not have been stated as broadly as it was. The re-framing Rule 5
 demands is supplied by the two sections that follow, from a different direction
 than anticipated.
 
-Note the 5-year testbed inverts the holding-time direction outright: rt held
-*shorter* there (45.4 → 34.4 days).
+Note the sp500 5-year testbed inverted the holding-time direction outright
+(rt held *shorter* there, 45.4 → 34.4 days) — but that cell's universe makes
+it a non-measurement per `universe-discipline.md` (see the retraction section
+below), so the inversion is an sp500 observation, not a horizon claim.
 
 ## What the 26y cell establishes on its own
 
@@ -227,35 +234,34 @@ not an exposure artifact.** That is the whole of it. ⚠ A previous version call
 this "a drawdown lever", unqualified — the two sections that follow are why that
 phrasing does not survive.
 
-## It reverses at 5 years — measured, not assumed
+## The 5y "reversal" was retracted — it was the universe, not the horizon
 
-The open question this file left ("salt the 5y testbed and measure its floor")
-was **answered the same morning**:
-`../rt-freshness-5y-null-2026-08-20/` — **PR #2436, open, NOT yet on `main`**,
-so that path does not resolve until it merges. Same six-cell design.
+*(This section previously read "It reverses at 5 years — measured, not
+assumed" and presented the table below as an independent-cell failure. The
+retraction is kept in the file's correction-history style.)*
 
-**The 5y drawdown null is 0.3616pp.** The contradiction it poses is +4.60pp —
-**12.7× its own null**. The horizons genuinely disagree, and the "5 years of 187
-names cannot resolve a ~3pp effect" dismissal is refuted by measurement: that
-cell resolves a **0.36pp** effect.
+The same-morning 5y run (`../rt-freshness-5y-null-2026-08-20/`, PR #2436) did
+show rt losing on every metric at 13–73× that cell's null. **But that cell ran
+on sp500-500 (187 traded names)** — and moving period AND universe at once
+means it never isolated the horizon. Re-running the **same 5y period on
+top-3000** (`../rt-freshness-broad5y-2026-08-20/`, PR #2448, merged) shows
+**no reversal**: MaxDD improves past its own null there too, so **MaxDD passes
+Rule 4 at both 26y and broad-5y**. `.claude/rules/universe-discipline.md`
+(#2444, user rule 2026-08-20) now bans sp500 as a measurement surface
+outright; the #2436 table survives only as the episode that motivated the
+rule.
 
-And rt does not merely lose on drawdown there. It loses on **every** metric, at
-13–73× the 5y null, with all three salts agreeing in sign:
+The retraction produced a durable law of its own (recorded in
+`project_rangetop_freshness_is_a_drawdown_lever`): **breadth moves noise
+floors in opposite directions** — same period, universe only: return's floor
+14.9× noisier on broad, Sharpe 25.2×, but **MaxDD 0.44× (2.3× more stable)**.
+Drawdown's SNR *improves* with breadth, which is why the MaxDD finding
+survives both cells while nothing else does.
 
-| metric | core | rt | gap | ÷ 5y null |
-|---|---:|---:|---:|---:|
-| return | 112.68 | **45.49** | −67.20pp | 68× |
-| Sharpe | 1.1075 | **0.6044** | −0.5031 | 73× |
-| ulcer | 6.937 | **10.531** | +3.594 | 35× |
-| win rate | 38.06% | **28.55%** | −9.50pp | 23× |
-| MaxDD | 16.758 | **21.360** | +4.601 | 13× |
-
-**Ulcer flips hardest** — rt's strongest leg here (−26.5%, 1.43× null) is
-**+51.8% worse** there at 35× null. A metric cannot be a mechanism's signature
-in one cell and its opposite in another. What it can be is regime-conditional.
-
-Neither cell is wrong. Both reproduce. The two differ in **period AND universe**,
-so nothing yet says which axis carries the reversal.
+**Why this still does not promote rt:** both 5y windows are **nested** inside
+the 26y window. Period-diverse means disjoint (`promotion-confirmation.md`);
+there is no valid independent grid cell yet, and building one (a pre-2009
+disjoint broad window) is the only path to a promotion case.
 
 ## `nearfloor` produces this same signature, and it failed 0-of-2 broad cells
 
@@ -330,10 +336,12 @@ deserves its own look.
 
 ## What this does and does not license
 
-**Does not — (a) reconcile the horizons.** ⚠ Superseded by the measurement
-above; the text below is retained for the audit trail. The 5y testbed moved
-drawdown **+4.45pp the other
-way** (16.98 → 21.43). ⚠ An earlier version claimed reconciliation, on the
+**Does not — (a) reconcile the horizons.** ⚠ Twice superseded; retained for
+the audit trail. The apparent horizon disagreement below was resolved by the
+broad-5y re-run (#2448): the sp500 5y testbed's contradiction was a
+**universe** artifact, and on top-3000 the drawdown improvement holds at both
+horizons (see the retraction section above). Original text: the 5y testbed
+moved drawdown **+4.45pp the other way** (16.98 → 21.43). ⚠ An earlier version claimed reconciliation, on the
 grounds that "5 years of 187 names cannot resolve a ~3pp drawdown effect."
 **That threshold was asserted, never derived** — the 5y testbed is
 single-realization deterministic, so *its* drawdown null has never been
