@@ -171,12 +171,30 @@ Three capabilities. Two are strong; one had no tooling at all.
 `variant_matrix`, `variant_ranking` (Pareto), `deflated_sharpe`, `fold_health`,
 `rolling_start` + convexity/dispersion stats; 15 artifacts per scenario run.
 
-- [ ] **A2-1 — Automate effect-vs-null reporting.** The gap is not a missing
-      tool: **nothing reports effect-vs-null automatically.** Nulls are
-      hand-built with salted re-runs every time and are the binding constraint
-      on every verdict. Emit per-metric gap, that metric's own null, and the
-      ratio — the Rule-4 table currently written by hand in every writeup.
-      Must refuse to import a null across scales **or** universes.
+- [x] **A2-1 — Automate effect-vs-null reporting.** Shipped
+      `Walk_forward.Effect_null_report`
+      (`trading/trading/backtest/walk_forward/lib/effect_null_report.{ml,mli}`)
+      + the `effect_null_report.exe` CLI
+      (`trading/trading/backtest/walk_forward/bin/effect_null_report.ml`), 18
+      tests in `test/test_effect_null_report.ml`. Reads the standard per-arm
+      `actual.sexp` artifacts, pairs arm against null **by position** (salt
+      *i* with salt *i*), and emits the Rule-4 table — per metric: the mean
+      paired gap, every per-pair gap (so a sign flip is visible), that
+      metric's own null band (the null set's salt-to-salt `max−min`), the
+      ratio, and a verdict. PASS requires same sign on every salt **and**
+      every |gap| above the band; anything else is INSIDE-NOISE. Metrics
+      passed to `--no-direction` are reported but never judged. A single pair,
+      or a null whose salts are identical, yields NO-BAND rather than a
+      verdict — an unmeasured noise floor is not a floor of zero. **Guardrail:
+      run contexts (`params.sexp` beside each result, or a scenario spec via
+      `--arm-params`/`--null-params`) are compared on `universe_size` and the
+      date window; any difference is a non-zero exit citing
+      `universe-discipline.md`, and no context at all is a loud WARNING, not a
+      silent pass.** Verify:
+      `dune exec trading/backtest/walk_forward/bin/effect_null_report.exe -- --arm <a.sexp,...> --null <n.sexp,...>`;
+      re-run against `dev/experiments/rt-freshness-broad5y-2026-08-20/results/`
+      (3 salts, rangetop vs core) and it reproduces the recorded finding —
+      `max_drawdown_pct` PASS at ratio 11.8, every other metric INSIDE-NOISE.
 
 ### (b) Execution correctness — ✅ covered, no action
 
@@ -283,12 +301,14 @@ verdict, sweeping its guard has no decision to feed and is not queued.
 
 Remaining open work is Axis 2/3 + user decisions:
 
-1. **A2-1 — automate effect-vs-null reporting** (the Rule-4 table is still
-   hand-built every time; the grid writeup needed it again).
-2. **A3-2 — delete the 84 uncited priorities docs** (tool-verified list via
+1. **A3-2 — delete the 84 uncited priorities docs** (tool-verified list via
    #2449) and **A3-3 — compress `weinstein_strategy_config.mli`**.
-3. USER DECISIONS carried: global `initial_stop_buffer` flip; #2433 framing;
+2. USER DECISIONS carried: global `initial_stop_buffer` flip; #2433 framing;
    `Volume.config` overlay plumbing for the `strong_threshold` era axis.
+3. A2-1 follow-up (not blocking): the funding-grid results dir commits no
+   `params.sexp` beside its `actual.sexp` files, so `effect_null_report.exe`
+   can only WARN there rather than verify. Committing a per-arm `params.sexp`
+   alongside future results would make the guardrail bite by default.
 
 ## Follow-ups
 
