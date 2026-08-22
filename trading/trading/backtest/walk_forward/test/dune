@@ -9,7 +9,8 @@
   test_spec
   test_variant_matrix
   test_variant_ranking
-  test_rank_variants)
+  test_rank_variants
+  test_effect_null_report)
  (libraries
   ounit2
   core
@@ -30,4 +31,5 @@
   (pps ppx_sexp_conv))
  (deps
   (glob_files_rec %{workspace_root}/test_data/walk_forward/*.sexp)
-  (file ../bin/rank_variants.exe)))
+  (file ../bin/rank_variants.exe)
+  (file ../bin/effect_null_report.exe)))
