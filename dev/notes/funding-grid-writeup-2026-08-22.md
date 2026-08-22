@@ -7,8 +7,18 @@ record-convention `fullbook-graded` base (26y, top-3000, build `1281dab97`
 with G2a #2463 + G2b #2468). Sequential, single worker, same warehouse and
 data root for all five. Specs + per-arm artifacts committed under
 `dev/experiments/funding-grid-2026-08-22/` (raw `trades.csv` + `actual.sexp` +
-ticket-level `*-tickets.tsv` extracted from the audits; join key is
-`symbol|placement_date` for tickets, `position_id` for trades).
+ticket-level `*-tickets.tsv` extracted from the audits by the committed
+`extract_tickets.awk`).
+
+**TSV columns** (headerless): 1 symbol · 2 **placement date** (the audit
+header's `entry_date` — verified the true placement two ways: 0 descents when
+sorted by the sequential `-wein-N` id, and `trade entry_date ≥ it` for
+1,236/1,236 fills) · 3 position_id · 4 the lifecycle `placement_date` field
+(NOT the placement — 45 sequence descents, 7 entries-before-"placement";
+retained for forensics only) · 5 outcome. **Join keys: `symbol|col2` for
+tickets, `position_id` for trades.** An earlier revision joined on col 4;
+corrected in QC rework — direction of every finding survives, g2a2's saved-P&L
+magnitude does not (see table).
 
 ## Top line (context only — NOT the verdict surface)
 
@@ -21,8 +31,10 @@ ticket-level `*-tickets.tsv` extracted from the audits; join key is
 | g3 | reserve at placement | **−1.1%** | **53** | 6.6% | 51.2d |
 
 The 86–131pp gaps of the three handling arms sit at or inside the 132.5pp 26y
-return null on this base — **no top-line verdict**. The trade-level record
-below is the verdict surface.
+return-noise floor measured on this base (three-salt null of the rt-freshness
+A/B, `dev/experiments` rt record / PR #2448; carried in
+`project_rangetop_freshness_is_a_drawdown_lever`) — **no top-line verdict**.
+The trade-level record below is the verdict surface.
 
 ## Event-level findings (the actual dissection)
 
@@ -32,17 +44,24 @@ for funding, filled 1,486. The handling arms destroy fewer (g2a1 431, g2a2
 years** — reservation moves starvation upstream from fill to placement.
 
 **1. The mechanisms work on their targets, and the saved tickets MAKE money.**
-Tracing the null's 527 destroyed tickets into each arm:
+The cohort is the null's cancelled tickets **minus 5 impure keys** whose
+position_ids also appear in `null-trades.csv` (cancelled-then-traded ids —
+`CNA-wein-689`, `BEC-wein-1115`, `APOL-wein-387`, `ASNA-wein-6977`,
+`GEF-wein-6944`; the bare `cancelled` status in the TSV is any
+`entry_fill_rejected_by_portfolio` occurrence in the record, and these ids
+carry both a cancel and a later fill). Pure cohort = **522** keys. Tracing
+them into each arm (corrected col-2 join):
 
 | arm | cohort keys present | saved (filled) | saved closed trades | saved P&L |
 |---|---:|---:|---:|---:|
-| g2a1 | 390 | 159 | 103 | **+$538,710** |
-| g2a2 | 382 | 187 | 107 | +$166,300 |
-| g2b | 390 | 166 | 163 | +$288,458 |
+| g2a1 | 392 | 159 | 104 | **+$490,089** |
+| g2a2 | 382 | 186 | 104 | +$47,284 |
+| g2b | 391 | 167 | 165 | +$295,322 |
 
-Direct effect: +17 to +54pp of the $1M book, positive in all three arms. The
-funding failure was destroying net-profitable entries — the plan's premise is
-confirmed at the event level (the AXTI class of loss is real).
+Direct effect: **+5 to +49pp** of the $1M book, positive in all three arms —
+though g2a2's is small enough to be fragile. The funding failure was
+destroying net-profitable entries — the plan's premise is confirmed at the
+event level (the AXTI class of loss is real).
 
 **2. The top-line gaps are a monster lottery, not mechanism cost.** The
 ticket-identity displacement join initially showed $1.0–1.6M of "lost" null
@@ -62,10 +81,12 @@ perturbation re-rolls which fat-tail name gets caught
 funding mechanisms are, at the top line, exactly such a perturbation.
 
 **3. One extra retry rewrites a third of the trade set.** g2a1 vs g2a2 share
-only 895 of ~1,370 `symbol|entry_date` pairs (473/484 arm-only; divergence
-starts 2003-10-27; of the shared pairs only 209 have identical P&L). The
-cascade through the shared cash pool dominates everything downstream of the
-first divergence.
+only 895 of ~1,370 `symbol|entry_date` pairs (472/484 arm-only —
+`FELE|2004-06-15` is a duplicated key in g2a1; first divergence **RYAAY
+2003-10-20**, a g2a2-only entry — the earlier-quoted 2003-10-27 was the first
+*g2a1-only* pair, a one-sided search; of the shared pairs only 209 have
+identical P&L). The cascade through the shared cash pool dominates everything
+downstream of the first divergence.
 
 ## Verdicts (per `experiment-flag-discipline.md` / `mechanism-validation-rigor.md`)
 
@@ -92,9 +113,11 @@ first divergence.
 - Raw WARN-line counts are NOT comparable across arms (each failed retry logs
   its own line: g2a1 975 vs g2a2 1,351 lines describe *fewer* distinct starved
   tickets, 431 vs 371).
-- The audit-extracted ticket tables (527 cancelled) differ from a raw
-  `grep -c cancel_reason` (530) by 3 — records whose header pattern the
-  extractor's line-anchored parser missed; the 527 keys are the join
-  population and all joins are internally consistent.
+- The audit-extracted ticket tables (527 cancelled rows) differ from a raw
+  `grep -c cancel_reason` (530) by 3 (line-anchored parser misses), and 5 of
+  the 527 are impure (cancelled-then-traded ids, listed above) — the join
+  population is the **522 pure keys**. The extractor is committed
+  (`extract_tickets.awk`); its `cancelled` status means "record contains an
+  `entry_fill_rejected_by_portfolio`", not "never traded".
 - g3's 6.6% MaxDD / −1.1% return is a portfolio that held ~98% cash for 26
   years — not a defensive success.

@@ -1,5 +1,5 @@
 ;; HONEST LADDER — E-anchored arm (band 2pp). Identical to
-;; top3000-2000-2026-record-convention.sexp PLUS sim_entry_trigger_at_suggested
+ (description "FUNDING GRID null arm — fullbook-graded base verbatim, renamed for the shared output root. The control every mechanism arm is diffed against; same build, warehouse and data root.")
 ;; (#2209): entries are StopLimit(E, E×(1±2/100)) genuinely RESTING at the
 ;; screener breakout level E, per the 2026-08-05 user decision (Step 0 = b).
 ;; (enable_sim_entry_stoplimit + entry_extension_max_pct, PR #2202).
