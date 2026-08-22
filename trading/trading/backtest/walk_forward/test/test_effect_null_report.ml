@@ -306,6 +306,9 @@ let test_render_markdown_single_pair _ =
          contains_substring "1 pair(s), matched by position";
          contains_substring "no noise claim is possible";
          contains_substring "| sharpe_ratio | +0.1000 |";
+         (* The .mli contract: a non-finite cell prints as "n/a", never
+            "0.0000" — the band and ratio cells of a single-pair row. *)
+         contains_substring "| n/a | n/a | NO-BAND |";
          contains_substring "NO-BAND";
        ])
 
@@ -414,6 +417,30 @@ let test_cli_accepts_matching_context _ =
          field (fun r -> r.stderr) (not_ (contains_substring "WARNING"));
        ])
 
+(* 19. No context available on either side: the binary WARNS and continues —
+   exit 0, a loud stderr line, and the warning carried into the table as a
+   blockquote note so the pasted markdown cannot read as verified. This is the
+   most-travelled path (committed result sets usually ship no params.sexp), so
+   it is pinned in its presence, not only its absence. *)
+let test_cli_warns_and_continues_without_context _ =
+  let dir = _make_tmpdir () in
+  let arm = _write ~dir ~name:"arm.sexp" (_result_sexp [ ("m", "2.0") ]) in
+  let null = _write ~dir ~name:"null.sexp" (_result_sexp [ ("m", "1.0") ]) in
+  let res = _invoke ~dir [ "--arm"; arm; "--null"; null ] in
+  assert_that res
+    (all_of
+       [
+         field (fun r -> r.exit_code) (equal_to 0);
+         field (fun r -> r.stderr) (contains_substring "could not be verified");
+         field
+           (fun r -> r.stdout)
+           (all_of
+              [
+                contains_substring "> WARNING: run context could not be";
+                contains_substring "| m | +1.0000 |";
+              ]);
+       ])
+
 (* -------------- suite -------------- *)
 
 let suite =
@@ -449,6 +476,8 @@ let suite =
          "render_markdown_single_pair" >:: test_render_markdown_single_pair;
          "cli_refuses_universe_mismatch" >:: test_cli_refuses_universe_mismatch;
          "cli_accepts_matching_context" >:: test_cli_accepts_matching_context;
+         "cli_warns_and_continues_without_context"
+         >:: test_cli_warns_and_continues_without_context;
        ]
 
 let () = run_test_tt_main suite
