@@ -1,6 +1,6 @@
 # Status: harness
 
-## Last updated: 2026-08-20
+## Last updated: 2026-08-21
 
 ## Recent activity (2026-05-09..22, since last refresh)
 
@@ -706,3 +706,174 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
     path is exercised in isolation from the floor check). Verify:
     `dune runtest devtools/sexp_default_drift_linter/`. (fixed 2026-08-21
     harness-maintainer on harness/sexp-drift-vacuity, commit `61921c86`)
+
+## Added 2026-08-21 (harness-maintainer, harness/gate-reader-2432)
+
+- [x] #2432 defect 1 -- `_gate` in `dev/scripts/pr_gate_status.sh` used to pick
+  the LAST matching review at a gate outright and trust its verdict alone.
+  That is unsafe in exactly one direction: an earlier NEEDS_REWORK followed by
+  a LATER APPROVED **at the same sha** (nothing "stale" about it) read
+  straight through as `ok` -- PR #2423 merged past an unresolved finding this
+  way. **Fix:** `_gate` now aggregates every CURRENT-tip review per gate
+  (`review_result` extracts each review's own verdict + Reviewed SHA; a
+  `$current` filter drops reviews whose sha does not match the tip). If all
+  current reviews agree, that verdict stands unchanged (covers the
+  overwhelming common case -- one review -- and the pre-existing "escalate to
+  rework" direction, APPROVED then NEEDS_REWORK, which was never unsafe). If
+  they disagree and the LATEST is `rework`, report `rework` (unchanged,
+  matches the old behaviour, since escalating to a fresh finding is safe to
+  surface). If they disagree and the latest is `ok`, report **`unclear`** --
+  the new state -- rather than guessing whether the later APPROVED
+  legitimately superseded the earlier finding or silently overwrote it.
+  Confirmed live that text-matching can't reliably tell the two apart: PR
+  #2452 (found the same morning as #2423) has the identical NEEDS_REWORK-then-
+  APPROVED-at-the-same-sha shape, but the later review explicitly cited the
+  prior review by id and re-verified its finding -- a genuine, correctly
+  cured body-only fix. Both shapes are pinned as `unclear` by design (not
+  `ok`, and not a permanently stuck `rework`): NEXT-ACTION reads `ADJUDICATE
+  -- conflicting verdicts at <sha> (structural|behavioral)`, routing to a
+  ~2-minute human read of both bodies instead of an automated guess either
+  way -- exactly how #2452 was actually resolved.
+  **Correction to the dispatch framing (verified live, both dash and bash, `gh`
+  genuinely absent, `set -eu` in effect):** defect 2's originally-described
+  symptom ("prints an empty table and exits 0") does not reproduce --
+  `PRS=$(gh pr list ...)` DOES trip `set -e` on a failed command substitution
+  in a bare assignment, in both shells. What the OLD code actually does is
+  arg-dependent and still bad, just a different shape: no args -> dies at the
+  `gh pr list` line itself (exit 127, raw `gh: not found`, no table header
+  ever printed -- already non-zero, but no diagnosis, easy to mistake for a
+  transient glitch); explicit PR numbers -> prints the header + separator
+  FIRST (that branch needs no `gh` call), THEN dies on the first PR's `gh pr
+  view` -- a misleading partial table followed by a crash. Reproduced both
+  shapes directly against `origin/main`'s script in this exact environment
+  before writing the fix.
+  **Fix:** `_detect_backend` (new) checks explicitly, before any output, for
+  `gh` on PATH, then `curl` + `$GH_TOKEN`; if neither is available the script
+  exits 2 with a clear stderr message citing #2432 and the two remediation
+  paths, before printing anything -- no header, no partial table, no crash
+  cryptic enough to be mistaken for infra flake. Nice-to-have also landed (not
+  just the required loud failure): `_list_open_prs_curl` / `_pr_meta_curl` /
+  `_pr_checks_curl` implement the same three GitHub reads via `curl` + REST
+  when `gh` is absent, reshaping each response into the same field names the
+  `gh --json` backend produces so every downstream consumer (`_gate`,
+  `_is_docs_only`, the do-not-merge label check) is backend-agnostic.
+  `PR_GATE_STATUS_BACKEND=gh|curl` overrides auto-detection for testing.
+  **Regression coverage:** `dev/scripts/pr_gate_status_test.sh` grew from 26
+  to 39 assertions -- all 26 pre-existing ones pass unchanged (no regression
+  in the intra-body disagreement machinery #2421/#2425 shipped). New: 3 unit
+  cases for the multi-review aggregation (#2423 shape -> unclear, #2452 shape
+  -> unclear, clean single APPROVED -> ok unchanged); 4 unit cases for
+  `_detect_backend` (gh preferred, curl fallback, curl-without-token fails,
+  neither fails); 3 end-to-end probes running the REAL script (stubbed
+  `gh`/`curl` on a controlled PATH, no network) proving gh-backend
+  `#2423`-shape reaches `ADJUDICATE` never `MERGE`, gh-backend clean-approvals
+  reaches `MERGE`, and curl-backend (gh entirely absent) also reaches `MERGE`
+  end to end -- plus 3 more pinning the loud-failure path (non-zero exit,
+  stderr message present, table header never printed). Verify: `sh
+  dev/scripts/pr_gate_status_test.sh` (39 assertions); `dash -n dev/scripts/
+  pr_gate_status.sh` (posix_sh_check.sh coverage, wired into `dune runtest`).
+
+  **Rework iteration 1 (qc-behavioral NEEDS_REWORK, review 4991549803) --
+  test-and-docs only, no code-path change:**
+  - **B1 (fixed):** both e2e stubs hardcoded `labels: []`, so none of the 39
+    assertions ever exercised a non-empty label list -- meaning the
+    **do-not-merge HARD hold** (`.claude/rules/pr-merge-gates.md` Rule 0, the
+    guard whose absence let #2384 merge 30 min after being drafted, a
+    **-40.91pp regression**, #2396) was the one curl-reshape field left
+    unpinned. Fix: both stubs now take the label array from
+    `GATE_LABELS_JSON` (default `[]`); two new e2e cases assert `HOLD --
+    do-not-merge label` (never `MERGE`) at `pass/ok/ok` on **both** backends.
+    Rule 0 is a real consumer of the curl reshape (line 662 above already said
+    so; it just wasn't tested).
+  - **B2 (fixed, docs + fixtures):** the `_gate` docstring claimed a sha-less
+    review being "always-current" is "same as the single-review behaviour this
+    replaces." **That was inverted.** Under the old last-review-wins reader a
+    sha-less review was harmless (a later review always superseded it); under
+    aggregation, always-current means current at every tip forever -- it can
+    disagree with a later review and pin the gate to `unclear` unclearably.
+    Live instance: PR #2397 carries `Reviewed SHA: 9346b3b` (7 chars, one
+    short of the `{8,40}` capture bound, so it parses as no sha at all). Fixed
+    the docstring in `pr_gate_status.sh` to say what the code actually does,
+    and added `pr_gate_status_test.sh` cases 37-38 pinning it: a sha-less
+    review reads identically at two unrelated tips (never goes stale), and the
+    exact #2397 shape (two 7-char-sha reviews disagreeing) reads `unclear` and
+    **stays `unclear`** even after a third, real, current-tip APPROVED is
+    added. **Left as a known, documented limitation, not fixed in code** --
+    widening the sha bound (e.g. to `{7,40}`) or excluding sha-less reviews
+    from aggregation instead of treating them as always-current are both real
+    fixes, but both are behavior changes to `_gate`'s matching logic, out of
+    scope for a test-and-docs rework. **Open follow-up:** pick one of those two
+    fixes in a follow-on PR.
+  - **B3 (documented, no new mechanism):** qc-behavioral replayed old vs. new
+    `_gate` over 166 real gate-matching reviews across the 35
+    most-recently-updated PRs and measured the `unclear` base rate: **5 of 70
+    gate reads flip `ok` -> `unclear`, 5 of 35 PRs (~14%)**. That headline
+    still stands. **Correction (rework iteration 2, qc-behavioral review
+    4991759359, F1): the original writeup here claimed "all five are the
+    healthy terminal state of a completed rework loop" -- that was false, and
+    the reviewer's own prior review helped seed it.** Only **four** of the
+    five (#2417, #2437, #2448, #2452) are genuine rework loops -- each a
+    NEEDS_REWORK cured by a later APPROVED at the same sha, headed "final
+    pass" / "confirmation pass" / "re-review, body-only change" /
+    "re-verdict". **#2397 is NOT a rework loop; it is a parse artifact.** Its
+    tip DID move (`9346b3b` -> `de734f2d1960`), exactly as the process
+    intends -- its `unclear` came from two gate-matching reviews carrying a
+    7-character "Reviewed SHA", one character short of the (then) `{8,40}`
+    capture bound, so both parsed as sha-less and were treated as
+    current-at-every-tip-forever, permanently disagreeing with a real
+    current-tip APPROVED that should have superseded them cleanly. **Stated
+    plainly because it cuts against the fix: 1 in 5 observed `unclear`s was a
+    one-character parsing bug, not a design tension -- which makes the
+    ~14% false-positive rate LESS defensible, not more.** Zero blind-supersedes
+    (the real #2423 shape) appeared in the window either way. The mechanism
+    behind the other four is structural: qc-behavioral's own CP2 row
+    (`.claude/rules/qc-behavioral-authority.md`) routinely produces PR-body-only
+    findings, and curing a body-only finding cannot move the tip -- so the
+    repo's own review checklist manufactures the flagged shape on the
+    *success* path more often than on the *failure* path (#2423) the rule was
+    built for. This measurement, and the fact that **`unclear` is terminal**
+    (no number of later current-tip APPROVEDs clears it; the only exits are a
+    tip-moving commit or an `--admin` merge past the reader -- the latter being
+    precisely the habit that produced #2384 and #2423), is now recorded in the
+    script header (`pr_gate_status.sh`, above `set -eu`), corrected in place.
+    **Deliberately NOT done:** no `gate-adjudicated` label or other new
+    sentinel was added. That would give the reader an in-band exit but adds
+    new automation vocabulary to the merge-gate contract (Rule 0's own
+    domain) -- a design decision for a human to make explicitly, not something
+    to slip in as part of a test-and-docs rework. **Open question for the
+    human:** should `unclear` get an in-band adjudication exit (e.g. a label),
+    or does documenting the base rate + terminal behavior suffice for now?
+  - **F2 (fixed, rework iteration 2):** the #2397 parse artifact itself is now
+    fixed -- `_gate`'s `Reviewed SHA` capture bound widened from `{8,40}` to
+    `{7,40}` hex characters, a pure parsing fix with no interaction with the
+    `unclear` aggregation design (that design question, and the separate
+    "exclude sha-less reviews from aggregation" alternative fix, remain
+    deliberately deferred to the human per B2 above). Verified against the
+    real PR: #2397's behavioral gate now reads `ok`, not `unclear`. Test cases
+    37-38 in `pr_gate_status_test.sh` retargeted: case 37 (no SHA field at
+    all) is unaffected and still pins sha-less-is-current-forever; case 38's
+    two assertions previously pinned the *buggy* `unclear` result and now pin
+    the *fixed* result instead (`stale(9346b3b)` at an unrelated tip, `ok`
+    once a real current-tip APPROVED is added) -- retargeted, not weakened,
+    because the fix necessarily changes what those two assertions must assert.
+  - **F3 (fixed, nit):** the suite's closing `printf` hardcoded the total
+    assertion count as a literal (`45`), which could silently drift from the
+    real count as cases are added/removed (43 literal `check` calls vs. 45
+    printed, because `check_backend_fails` is also an assertion entry point
+    but greps differently). Fix: both `check` and `check_backend_fails` now
+    increment a shared `total` counter; the closing `printf` prints `$total`
+    instead of a literal.
+  - **Verify (rework iteration 2):** `sh dev/scripts/pr_gate_status_test.sh`
+    (45 assertions, count now derived from the `total` counter, not a
+    hardcoded literal); `dash -n dev/scripts/pr_gate_status.sh` and
+    `dash -n dev/scripts/pr_gate_status_test.sh` (posix_sh_check.sh coverage).
+  - **Post-review probe (2026-08-22, qc-behavioral at 489b34a2):** the
+    unparseable-verdict shapes are fail-safe under the new aggregation,
+    verified by execution against the real `_gate`: unparseable + APPROVED at
+    one SHA → `unclear`; APPROVED + unparseable → `unclear`; unparseable +
+    rework → `rework`. None can reach `MERGE`. The "latest is unclear" case
+    is not fixture-pinned (the aggregation's three documented branches omit
+    it) — folded into the standing open question above about `unclear`
+    adjudication. Same review also surfaced the practical cost: a body-only
+    rework finding at an approved SHA would aggregate rework+ok → `unclear`
+    terminally, which is why this very note rides a tip-moving commit.
