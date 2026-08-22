@@ -2,13 +2,18 @@
 
 **RESULT: on the 26-year base, `Range_top_breakout` improves ulcer index, win
 rate and max drawdown past their own nulls at all three salts, and moves return
-and Sharpe not at all. The MaxDD improvement also holds on the broad-5y cell
-(#2448) — the earlier "fails its first independent cell" reading rested on an
+and Sharpe not at all. The broad-5y cell (#2448) SPLITS that result rather
+than confirming it: MaxDD improves past its own null there too, but win rate
+FAILS Rule 4 there (an opposing s1 leg at 2.24× null) and ulcer's s0 sits
+inside its own null — so of the three 26y survivors, only MaxDD survives both
+cells. The earlier "fails its first independent cell" reading rested on an
 sp500 cell (#2436) that was RETRACTED as a universe artifact. Still NOT
 promotable: both 5y windows nest inside the 26y window, so no valid
 independent grid cell exists yet, and the same signature is produced more
 strongly by `nearfloor`, which failed confirmation on every broad cell
-tested.** Completed 05:39; headline corrected in the 2026-08-22 reframe.
+tested.** Completed 05:39; headline corrected in the 2026-08-22 reframe
+(scoring every leg of the broad cell, not only the one that passed —
+recurrence #5 of this file's own named rule, caught by qc-behavioral).
 
 ⚠ **Read "The 5y 'reversal' was retracted — it was the universe, not the
 horizon" and "`nearfloor` produces this same signature, and it failed 0-of-2
@@ -245,8 +250,12 @@ show rt losing on every metric at 13–73× that cell's null. **But that cell ra
 on sp500-500 (187 traded names)** — and moving period AND universe at once
 means it never isolated the horizon. Re-running the **same 5y period on
 top-3000** (`../rt-freshness-broad5y-2026-08-20/`, PR #2448, merged) shows
-**no reversal**: MaxDD improves past its own null there too, so **MaxDD passes
-Rule 4 at both 26y and broad-5y**. `.claude/rules/universe-discipline.md`
+**no reversal — but a SPLIT, not a confirmation**: MaxDD improves past its own
+null there too (**MaxDD passes Rule 4 at both 26y and broad-5y**), while **win
+rate FAILS Rule 4 on the broad cell** (opposing s1 leg, 2.24× its null — per
+#2448's own record it "should no longer be quoted as a Rule-4 survivor without
+this cell's counter-evidence") and **ulcer's s0 sits inside its own null**
+(0.88×). `.claude/rules/universe-discipline.md`
 (#2444, user rule 2026-08-20) now bans sp500 as a measurement surface
 outright; the #2436 table survives only as the episode that motivated the
 rule.
@@ -271,8 +280,8 @@ same base and these same three salts, scored by this document's own Rule 4:
 
 | metric (26y) | rt (this PR) | `09-nearfloor` |
 |---|---|---|
-| trades | **fails** s1 (0.16×) | −177/−162/−187 → **4.4–5.1×** ✓ |
-| holding days | **fails** s1 (0.80×) | +26.5/+27.2/+26.3 → **14×** ✓ |
+| trades | s1 in-null (0.16×) — descriptive, no verdict | −177/−162/−187 → **4.4–5.1×** |
+| holding days | s1 in-null (0.80×) — descriptive, no verdict | +26.5/+27.2/+26.3 → **14×** |
 | win rate | +0.97 → 1.96× ✓ | +7.6/+7.1/+5.9 → **11.9–15.3×** ✓ |
 | MaxDD | +4.83 → 1.02× ✓ | +9.2/+8.5/+11.6 → **1.8–2.4×** ✓ |
 | return | in-null, sign flips | in-null at s2 → **not moved** |
@@ -328,11 +337,13 @@ package**, so a drawdown improvement is not explained away by "it traded less",
 and rt's is unusually efficient per unit of turnover forgone.
 
 That makes the 26y drawdown result *more* interesting than the generic framing
-allowed — and it changes nothing about the verdict, because the **5y cell
-reverses drawdown too**. The mechanism fails on independent evidence, not on
-this argument. Any future mechanism showing the fewer/longer/higher-win package
-should still be treated as unproven until a second cell agrees; a drawdown move
-deserves its own look.
+allowed. ⚠ *This paragraph previously ended "…and it changes nothing about the
+verdict, because the 5y cell reverses drawdown too; the mechanism fails on
+independent evidence" — superseded by the retraction section: the reversing
+cell was sp500, and the broad-5y cell agrees with the 26y drawdown direction.*
+The still-valid remainder: any future mechanism showing the
+fewer/longer/higher-win package should be treated as unproven until a second
+cell agrees; a drawdown move deserves its own look.
 
 ## What this does and does not license
 

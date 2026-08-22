@@ -25,9 +25,10 @@ Three six-cell paired seeded runs (2 arms × 3 path-seed salts), 2026-08-20:
 | MaxDD | 38.76 → **30.81** (−21%) | **1.02×** null (4.76pp) |
 | return / Sharpe | sign flips | **not moved** (nulls 132.51pp / 0.0797) |
 
-**trades and holding days FAIL Rule 4** (s1 legs 0.16× and 0.80×) — asserted as
-"trades fewer, holds longer" from a difference of means before qc-behavioral
-caught it. Concurrency neither falls nor rises (gaps in-null at 0.187).
+**trades and holding days: descriptive only, no verdict** (s1 legs in-null at
+0.16× and 0.80×; direction consistent, magnitude unresolved) — not performance
+metrics, Rule 4 does not apply (user rule 2026-08-20; an earlier version
+stamped them "FAIL", a category error). Concurrency neither falls nor rises (gaps in-null at 0.187).
 
 ## ⚠ RETRACTED — "5y reverses everything" was a UNIVERSE artifact
 
