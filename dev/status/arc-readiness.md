@@ -1,6 +1,6 @@
 # Status: arc-readiness
 
-## Last updated: 2026-08-21
+## Last updated: 2026-08-22
 
 ## Status
 IN_PROGRESS
@@ -40,7 +40,7 @@ Design rationale: `dev/plans/arc-readiness-2026-08-20.md` (#2447).
 
 ---
 
-## Axis 1 — arc features built and working (~85%)
+## Axis 1 — arc features built and working — COMPLETE
 
 ### 2026-08-20 — the book-faithful entry bundle is assembled (PR #2452)
 
@@ -65,9 +65,7 @@ invocation together): **17 of 20 unchanged**; out PAY, TPC, INVX; in DRI, BLK,
 NDAQ. Tickets now carry the 2pp band (`trigger $86.68 limit $88.41`) vs the old
 15pp. Extended/watch-only rows 4 → 1.
 
-**26y run in flight** against this bundle. Because `fullbook-graded`'s 26y
-result is already recorded (**+287%, MaxDD 23.2%**), it measures specifically
-what **rt + volume-at-fill add on top** — not what the bundle does from zero.
+**26y runs complete** (pre-correction −40.1%, corrected four-override bundle −62.4%; #2459). The anatomy — §4.2 fill-week gate ejecting 72% of entries — is the record; see `dev/notes/arc26y-corrected-writeup-2026-08-21.md`.
 
 ⚠ **Defect found during assembly:** `Range_top_breakout` was armed **without
 `entry_anchor_local_range_weeks`**, the knob defining the `local_range_top` its
@@ -94,7 +92,7 @@ The hole is the **funding leg**, whose plan
 | G1 — land `ticket_age_weeks_at_cancel` + `cancel_reason` (#2348) | ✅ done (3 impl, 5 test files) |
 | step 2 — measure the cohort from artifacts | ✅ done — 3,530 rejections, median shortfall 52%, 63% in bursts |
 | step 3 — build each axis behind its own flag | ✅ **3 of 3** (G3, G2a, G2b) |
-| step 4 — one grid over all three + null | ready — A1-3 arms G3, then A1-4 |
+| step 4 — one grid over all three + null | ✅ done — #2473, program CLOSED |
 
 ### Sub-tasks
 
@@ -137,14 +135,25 @@ The hole is the **funding leg**, whose plan
       `Overlay_validator.apply_overrides`. Pays back its own file-length budget:
       `Simulator._apply_transitions` moved to the existing `Cancel_handler`
       (simulator.ml 493 → 487, declared-large cap 500).
-- [ ] **A1-3 — Arm G3 `reserve_cash_for_resting_tickets` in a combined arc
-      cell.** It is built and tested (`Entry_walk._spendable_cash`) but armed
-      in **zero specs** — the only arc mechanism never exercised.
-- [ ] **A1-4 — Run the funding three-way grid** (G2a vs G2b vs G3 + null).
-      Blocked on A1-1 + A1-2. The three are **alternatives, not complements**,
-      so arming G3 alone cannot answer it. This is an *internal* comparison, so
-      it is **not** blocked by the noise floor. Broad universe only
-      (`universe-discipline.md`).
+- [x] **A1-3 — Arm G3 `reserve_cash_for_resting_tickets`** (#2469). First
+      arming anywhere: `inspect-6mo-g3`. Liveness confirmed (0 cash
+      rejections); isolated cost vs the `bookstop` control: trades 39 → 11,
+      max concurrency 5 → 2 (the control sits at the nominal 0.70/0.14 = 5
+      ceiling and G3 more than halves it).
+- [x] **A1-4 — The funding grid ran and the program is CLOSED** (#2473;
+      `dev/notes/funding-grid-writeup-2026-08-22.md`;
+      `project_funding_grid_monster_lottery`). Five arms × 26y on the
+      record-convention base. Verdicts: **saved tickets are net-profitable in
+      every arm** (+$47k…+$490k on the pure 522-key cohort — the AXTI-class
+      premise holds) but **top-line gaps are monster-lottery reshuffling**
+      inside the 132.5pp floor (CLS-2023 +$658k null-only vs SKYW-2023 +$428k
+      arm-only; one monster ≈ 66pp ≈ the whole spread). **G3 = REJECT as a
+      global default, terminal** (53 trades in 26y — reservation exhausts the
+      pool; flag stays as the R1 no-op). **G2a/G2b = keep default-off as
+      axes**, no promotion case at this power. Transferable why: funding
+      handling is tail-preserving in intent, tail-reshuffling in effect —
+      future funding levers must protect *monster* entries specifically, not
+      ticket counts.
 
 **Why G3 matters beyond bookkeeping:** an unfundable triggered ticket is
 silently **destroyed** — not retried, not resized. `Entry_walk`'s per-tick
@@ -266,21 +275,20 @@ nobody budgets it. That is why the flag inventory sat unworked from 08-09.
 
 ## Next task
 
-**A1-4 — run the funding three-way grid** (G2a vs G2b vs G3 + null). All three
-axes now exist: G3 was already built, G2a landed as #2463, G2b is built on
-`feat/funding-g2b`. The comparison is *internal*, so the noise floor does not
-gate it; A1-3 (arm G3 in a cell) is the only remaining set-up step. Sweep G2b's
-`entry_fill_min_size_fraction` over `(0.25 0.5 0.75)` — the plan names it as the
-knob to sweep, and it is the one dial that trades near-miss recovery against
-undersized entries into the fat tail.
+**Axis 1 is feature-complete** — all seven arc mechanisms plus the funding
+trio built, exercised, and verdicted; the funding program is closed (#2473).
+The `entry_fill_min_size_fraction` sweep the plan named is folded into the
+grid's outcome: with the whole G2b axis kept default-off on a no-promotion
+verdict, sweeping its guard has no decision to feed and is not queued.
 
-Also read the 26y arc-bundle result (in flight, PR #2452) against
-`fullbook-graded`'s recorded +287% / MaxDD 23.2% — it isolates what rt +
-volume-at-fill add.
+Remaining open work is Axis 2/3 + user decisions:
 
-Queued behind the container: the chart work (A2-4, PR #2453) and the
-`.claude/worktrees` fix that unblocks A3-2 — both need `dune runtest`, and
-agent waves cannot share the box with a backtest.
+1. **A2-1 — automate effect-vs-null reporting** (the Rule-4 table is still
+   hand-built every time; the grid writeup needed it again).
+2. **A3-2 — delete the 84 uncited priorities docs** (tool-verified list via
+   #2449) and **A3-3 — compress `weinstein_strategy_config.mli`**.
+3. USER DECISIONS carried: global `initial_stop_buffer` flip; #2433 framing;
+   `Volume.config` overlay plumbing for the `strong_threshold` era axis.
 
 ## Follow-ups
 
