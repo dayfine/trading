@@ -256,6 +256,7 @@ let test_zero_funded_week_still_carries_its_candidates _ =
       entered = 0;
       candidates =
         [ { AR.candidate = _scored_candidate; reason = AR.Insufficient_cash } ];
+      drops = [];
     };
   assert_that (CL.weeks c)
     (elements_are
@@ -282,10 +283,151 @@ let test_zero_funded_week_still_carries_its_candidates _ =
            ];
        ])
 
+(* ------------------------------------------------------------------ *)
+(* G2 — the cascade population                                          *)
+(* ------------------------------------------------------------------ *)
+
+let _drop ~ticker ~(phase : Screener.cascade_phase) : AR.cascade_drop =
+  {
+    analysis = { _stock_analysis with ticker };
+    sector =
+      {
+        sector_name = "Technology";
+        rating = Neutral;
+        stage = Weinstein_types.Stage2 { weeks_advancing = 9; late = false };
+      };
+    side = Trading_base.Types.Long;
+    outcome = { ticker; phase; score = 71; grade = Weinstein_types.A };
+  }
+
+let _week_with ~drops ~candidates =
+  let c = CL.create () in
+  (_recorder ~candidate_log:c ()).record_cascade_summary
+    {
+      date = _date "2024-06-14";
+      diagnostics = _diagnostics ~long_top_n:1;
+      entered = 0;
+      candidates;
+      drops;
+    };
+  match CL.weeks c with
+  | [ w ] -> w.candidates
+  | ws ->
+      assert_failure
+        (sprintf "expected exactly one week, got %d" (List.length ws))
+
+(** Every cascade phase reaches the artefact under its own name — the drops are
+    what G2 adds over G1's top-N-only view. A mapping that collapsed two phases
+    would fail here rather than silently mislabel a candidate. *)
+let test_drops_carry_their_cascade_phase _ =
+  assert_that
+    (_week_with ~candidates:[]
+       ~drops:
+         [
+           _drop ~ticker:"AAAA" ~phase:Admitted;
+           _drop ~ticker:"BBBB" ~phase:Dropped_at_breakout;
+           _drop ~ticker:"CCCC" ~phase:Dropped_at_sector;
+           _drop ~ticker:"DDDD" ~phase:Dropped_at_top_n;
+         ])
+    (elements_are
+       [
+         all_of
+           [
+             field (fun (x : CL.candidate) -> x.symbol) (equal_to "AAAA");
+             field (fun (x : CL.candidate) -> x.outcome) (equal_to CL.Admitted);
+           ];
+         all_of
+           [
+             field (fun (x : CL.candidate) -> x.symbol) (equal_to "BBBB");
+             field
+               (fun (x : CL.candidate) -> x.outcome)
+               (equal_to CL.Dropped_at_breakout);
+           ];
+         all_of
+           [
+             field (fun (x : CL.candidate) -> x.symbol) (equal_to "CCCC");
+             field
+               (fun (x : CL.candidate) -> x.outcome)
+               (equal_to CL.Dropped_at_sector);
+           ];
+         all_of
+           [
+             field (fun (x : CL.candidate) -> x.symbol) (equal_to "DDDD");
+             field
+               (fun (x : CL.candidate) -> x.outcome)
+               (equal_to CL.Dropped_at_top_n);
+           ];
+       ])
+
+(** The cascade population already contains the entry walk's top-N as its
+    [Admitted] tail, so emitting the G1 list alongside it would double-count
+    those names under two different outcome vocabularies. *)
+let test_drops_supersede_the_entry_walk_list _ =
+  assert_that
+    (_week_with
+       ~candidates:
+         [ { AR.candidate = _scored_candidate; reason = AR.Insufficient_cash } ]
+       ~drops:[ _drop ~ticker:"AAAA" ~phase:Admitted ])
+    (elements_are
+       [ field (fun (x : CL.candidate) -> x.symbol) (equal_to "AAAA") ])
+
+(** A G1-only caller — no trace captured — keeps the pre-G2 behaviour exactly:
+    the entry-walk list is still the week's population. *)
+let test_no_drops_falls_back_to_the_entry_walk_list _ =
+  assert_that
+    (_week_with ~drops:[]
+       ~candidates:
+         [ { AR.candidate = _scored_candidate; reason = AR.Insufficient_cash } ])
+    (elements_are
+       [ field (fun (x : CL.candidate) -> x.symbol) (equal_to _ticker) ])
+
+(** The two projections into {!CL.signals} — one off an [alternative_candidate]
+    (entry-walk rows), one off a [Stock_analysis.t] (cascade rows) — must agree
+    on a candidate reachable through both, or one artefact would describe the
+    same name two ways depending on how far it got.
+
+    The analysis fixture carries real [rs] / [volume] results rather than
+    [None], so the two extractions are compared where they actually do work:
+    with both absent, an [rs_value] / [volume_ratio] swap would be invisible. *)
+let test_both_signal_projections_agree _ =
+  let analysis =
+    {
+      _stock_analysis with
+      rs =
+        Some
+          {
+            current_rs = 1.05;
+            current_normalized = 1.31;
+            trend = Weinstein_types.Positive_rising;
+            history = [];
+          };
+      volume =
+        Some
+          {
+            confirmation = Weinstein_types.Strong 2.4;
+            event_volume = 2400;
+            avg_volume = 1000.0;
+            volume_ratio = 2.4;
+          };
+    }
+  in
+  assert_that
+    (CL.signals_of_analysis ~analysis ~sector_name:_alternative.sector_name
+       ~score:_alternative.score ~grade:_alternative.grade)
+    (equal_to (CL.signals_of_alternative _alternative))
+
 let () =
   run_test_tt_main
     ("candidate_log"
     >::: [
+           "G2: drops carry their cascade phase"
+           >:: test_drops_carry_their_cascade_phase;
+           "G2: drops supersede the entry-walk list"
+           >:: test_drops_supersede_the_entry_walk_list;
+           "G2: no drops falls back to the entry-walk list"
+           >:: test_no_drops_falls_back_to_the_entry_walk_list;
+           "G2: both signal projections agree"
+           >:: test_both_signal_projections_agree;
            "signals project field-for-field onto alternative_candidate"
            >:: test_signals_project_field_for_field;
            "collector keeps record order" >:: test_collector_keeps_record_order;

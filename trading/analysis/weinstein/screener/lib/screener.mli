@@ -12,23 +12,41 @@
 
     All functions are pure. *)
 
-include module type of Screener_scoring
+(** {b Why [struct include ... end] rather than a bare [module type of].} A bare
+    [include module type of M] copies [M]'s type {e definitions} without
+    recording that they {e are} [M]'s types, so [Screener.scoring_weights] and
+    [Screener_scoring.scoring_weights] end up nominally distinct. That makes the
+    re-export a half-truth: a caller can name [Screener.config.weights] and can
+    name [Screener.long_outcomes], but cannot pass the first to the second,
+    because the latter's signature was copied verbatim and still mentions
+    [Screener_scoring.scoring_weights]. Wrapping in [struct include M end] adds
+    the type equalities, which is what the re-export claims to provide. It only
+    widens the signature, so no existing caller can be broken by it. *)
+
 (** Scoring types, signal functions, and price utilities — re-exported from
     {!Screener_scoring} so callers can use [Screener.sector_rating],
     [Screener.scoring_weights], etc. without importing the sub-module directly.
 *)
+include module type of struct
+  include Screener_scoring
+end
 
-include module type of Screener_admission
-(** Per-candidate admission predicates, cascade-phase counters, and the
-    {!Screener_admission.volume_ratio_band} type — re-exported from
+(** Per-candidate admission predicates, cascade-phase counters, the named
+    cascade trace ({!Screener_admission.long_outcomes} / [short_outcomes]), and
+    the {!Screener_admission.volume_ratio_band} type — re-exported from
     {!Screener_admission} so callers continue to reference them as
     [Screener.volume_ratio_band], [Screener.passes_score_floor], etc. *)
+include module type of struct
+  include Screener_admission
+end
 
-include module type of Screener_ranking
 (** The {!Screener_ranking.candidate_ranking} mode and the
     {!Screener_ranking.compare_rankable} total order — re-exported so callers
     reference them as [Screener.candidate_ranking] / [Screener.Alphabetical] /
     [Screener.Quality]. *)
+include module type of struct
+  include Screener_ranking
+end
 
 type candidate_params = {
   entry_buffer_pct : float;
@@ -521,6 +539,7 @@ val screen :
 val screen_with_cooldown :
   ?membership_at:(string -> Core.Date.t -> bool) ->
   ?decline_is_slow_grind:bool ->
+  ?on_candidates:((Stock_analysis.t * sector_context) list -> unit) ->
   config:config ->
   macro_trend:Weinstein_types.market_trend ->
   sector_map:(string, sector_context) Core.Hashtbl.t ->
@@ -542,6 +561,17 @@ val screen_with_cooldown :
       pre-gate behaviour. The caller (the strategy lib) computes this via its
       decline-character classifier; passing a plain bool keeps this lib
       macro-agnostic.
+
+    @param on_candidates
+      Issue #2490 gap G2. Called once, before evaluation, with the candidate
+      list as it stands {b after} the held / cooldown / membership filters — the
+      cascade's actual input, which is otherwise private to this function.
+      Paired with {!long_outcomes} / {!short_outcomes} it yields the named
+      per-phase trace the count-only {!cascade_diagnostics} cannot give.
+
+    Absent (the default) it is a provable no-op: no shape change, no allocation,
+    no behaviour change. It is a callback rather than a {!result} field
+    precisely so the default path does not pay for a trace nobody asked for.
 
     @param membership_at
       Optional point-in-time universe-membership predicate. When supplied, the

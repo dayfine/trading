@@ -229,13 +229,16 @@ let _cascade_summary_of_event (e : AR.cascade_event) :
 (** Drain one cascade event into [candidate_log] as a week. The near-miss
     projection is {!_alternative_of_event}, the same one [trade_audit.sexp]'s
     [alternatives_considered] uses, so the two artefacts cannot disagree about a
-    candidate's decision-time signals. *)
+    candidate's decision-time signals.
+
+    The G2 cascade rows ride through untranslated: {!Candidate_log.week_of} owns
+    both the phase→outcome mapping and the supersede rule between the two
+    populations, because both are properties of the on-disk schema. *)
 let _record_candidate_week ~candidate_log (e : AR.cascade_event) =
-  match candidate_log with
-  | None -> ()
-  | Some c ->
+  Option.iter candidate_log ~f:(fun c ->
       let alternatives = List.map e.candidates ~f:_alternative_of_event in
-      Candidate_log.record c (Candidate_log.week_of ~date:e.date ~alternatives)
+      Candidate_log.record c
+        (Candidate_log.week_of ~date:e.date ~alternatives ~drops:e.drops))
 
 let of_collector ?candidate_log ~(trade_audit : Trade_audit.t)
     ~(force_liquidation_log : Force_liquidation_log.t) () : AR.t =

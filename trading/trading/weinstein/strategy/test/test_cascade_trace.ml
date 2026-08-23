@@ -118,6 +118,19 @@ let _capturing_recorder ~capture_candidates =
   in
   (recorder, captured)
 
+(* A minimal screener result carrying the diagnostics under test. The
+   candidate lists are empty, so [record]'s drop derivation is a no-op and the
+   unit under test stays the walk-capture hop (G2's drop derivation is pinned
+   by the screener anti-drift tests). *)
+let _screen_result : Screener.result =
+  {
+    buy_candidates = [];
+    short_candidates = [];
+    watchlist = [];
+    macro_trend = Weinstein_types.Bullish;
+    cascade_diagnostics = _diagnostics;
+  }
+
 (** Drive one Friday: create the handle, feed the sink whatever the entry walk
     would have passed over (when the handle offers one), then record. Returns
     the sink option and the event the recorder saw. *)
@@ -127,7 +140,8 @@ let _run_one_friday ~capture_candidates =
   let sink = Cascade_trace.on_walk_candidates t in
   Option.iter sink ~f:(fun f -> f _walk_contents);
   Cascade_trace.record t ~audit_recorder:recorder ~date:_current_date
-    ~diagnostics:_diagnostics ~entered:0;
+    ~config:Screener.default_config ~macro_trend:Weinstein_types.Bullish
+    ~result:_screen_result ~entered:0;
   (sink, !captured)
 
 (* ------------------------------------------------------------------ *)

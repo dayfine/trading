@@ -49,6 +49,26 @@ let signals_of_alternative (a : Trade_audit.alternative_candidate) : signals =
     sector_name = a.sector_name;
   }
 
+(* Mirrors [Trade_audit_recorder]'s near-miss extraction, on the same source
+   fields, so a cascade row and an entry-walk row describe a candidate
+   identically. *)
+let signals_of_analysis ~(analysis : Stock_analysis.t) ~sector_name ~score
+    ~grade =
+  {
+    score;
+    grade;
+    stage = analysis.stage.stage;
+    weeks_advancing =
+      (match analysis.stage.stage with
+      | Stage2 { weeks_advancing; _ } -> Some weeks_advancing
+      | Stage1 _ | Stage3 _ | Stage4 _ -> None);
+    rs_value =
+      Option.map analysis.rs ~f:(fun (r : Rs.result) -> r.current_normalized);
+    volume_ratio =
+      Option.map analysis.volume ~f:(fun (v : Volume.result) -> v.volume_ratio);
+    sector_name;
+  }
+
 type collector = { weeks : week Queue.t }
 
 let create () = { weeks = Queue.create () }
@@ -74,8 +94,40 @@ let _candidate_of_alternative (a : Trade_audit.alternative_candidate) =
     signals = signals_of_alternative a;
   }
 
-let week_of ~date ~alternatives =
-  { date; candidates = List.map alternatives ~f:_candidate_of_alternative }
+(* Total mapping from the screener's cascade phase onto the artefact's outcome.
+   The two enums are deliberately separate types — this module owns the on-disk
+   schema, exactly as [Trade_audit] owns [stop_floor_kind] — so this function is
+   the single seam where they meet, and a phase added upstream forces a compile
+   error here rather than a silent schema gap. *)
+let _outcome_of_phase : Screener.cascade_phase -> cascade_outcome = function
+  | Admitted -> Admitted
+  | Dropped_at_macro -> Dropped_at_macro
+  | Dropped_at_breakout -> Dropped_at_breakout
+  | Dropped_at_sector -> Dropped_at_sector
+  | Dropped_at_rs -> Dropped_at_rs
+  | Dropped_at_grade -> Dropped_at_grade
+  | Dropped_at_top_n -> Dropped_at_top_n
+
+(* A G2 cascade row: its candidate never reached the entry walk, so the signals
+   come off the analysis plus the screener's own trace rather than an
+   [alternative_candidate]. *)
+let _candidate_of_drop (d : Weinstein_strategy.Audit_recorder.cascade_drop) =
+  {
+    symbol = d.outcome.ticker;
+    side = d.side;
+    outcome = _outcome_of_phase d.outcome.phase;
+    signals =
+      signals_of_analysis ~analysis:d.analysis ~sector_name:d.sector.sector_name
+        ~score:d.outcome.score ~grade:d.outcome.grade;
+  }
+
+let week_of ~date ~alternatives ~drops =
+  let candidates =
+    match drops with
+    | [] -> List.map alternatives ~f:_candidate_of_alternative
+    | drops -> List.map drops ~f:_candidate_of_drop
+  in
+  { date; candidates }
 
 let _candidates_path ~scenario_dir =
   Filename.concat scenario_dir "candidates.sexp"

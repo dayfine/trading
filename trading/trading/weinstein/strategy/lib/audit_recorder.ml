@@ -65,11 +65,19 @@ type exit_event = {
   max_adverse_excursion_pct : float;
 }
 
+type cascade_drop = {
+  analysis : Stock_analysis.t;
+  sector : Screener.sector_context;
+  side : Trading_base.Types.position_side;
+  outcome : Screener.candidate_outcome;
+}
+
 type cascade_event = {
   date : Date.t;
   diagnostics : Screener.cascade_diagnostics;
   entered : int;
   candidates : alternative_input list;
+  drops : cascade_drop list;
 }
 
 type force_liquidation_event = Portfolio_risk.Force_liquidation.event

@@ -217,6 +217,25 @@ type exit_event = {
 }
 (** Event captured at exit-decision time. *)
 
+type cascade_drop = {
+  analysis : Stock_analysis.t;
+      (** The candidate's decision-time analysis — stage, RS, volume. The
+          screener's own outcome record carries only what the analysis does not
+          (score / grade), so the two together are the full row. *)
+  sector : Screener.sector_context;
+  side : Trading_base.Types.position_side;
+      (** Which cascade evaluated it. The two sides score and gate the same name
+          differently, so a candidate can appear once per side. *)
+  outcome : Screener.candidate_outcome;
+}
+(** One candidate the cascade {b evaluated}, with the phase that dropped it — or
+    [Admitted] if it survived to the top-N (issue #2490 gap G2).
+
+    Distinct from {!alternative_input}, which covers only candidates that
+    reached the {i entry walk} and carries an entry-walk [skip_reason]. This
+    covers the full pre-top-N population, whose members were never scored for
+    entry at all. Together they span every name the cascade looked at. *)
+
 type cascade_event = {
   date : Date.t;
       (** Friday on which the screen ran — same as [current_date] passed into
@@ -242,6 +261,14 @@ type cascade_event = {
           [[]] when [capture_candidates] is [false], which is the default and
           every non-audit context — the projection is not even computed, so the
           default path allocates nothing. *)
+  drops : cascade_drop list;
+      (** Every candidate the {i cascade} evaluated this Friday and where each
+          one fell out (G2). Supersedes {!candidates} as the artefact's
+          population: it covers the whole post-held/cooldown universe, of which
+          the entry walk's top-N is the [Admitted] tail.
+
+          [[]] when [capture_candidates] is [false] — the screener callback is
+          not even installed, so the cascade allocates nothing extra. *)
 }
 (** Event captured at the end of one Friday's cascade. Complements
     [entry_event]: where [entry_event] records a single chosen candidate plus

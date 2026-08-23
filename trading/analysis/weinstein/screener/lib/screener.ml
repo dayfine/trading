@@ -417,8 +417,8 @@ let _evaluate_candidates ~config ~decline_is_slow_grind ~candidates ~macro_trend
   in
   (buy_candidates, short_candidates)
 
-let _screen ~config ~decline_is_slow_grind ~macro_trend ~sector_map ~stocks
-    ~held_tickers ~cooldown_set ~is_member : result =
+let _screen ~on_candidates ~config ~decline_is_slow_grind ~macro_trend
+    ~sector_map ~stocks ~held_tickers ~cooldown_set ~is_member : result =
   let held_set = String.Set.of_list held_tickers in
   let buys_active =
     _longs_admitted_by_macro ~neutral_blocks_longs:config.neutral_blocks_longs
@@ -428,6 +428,10 @@ let _screen ~config ~decline_is_slow_grind ~macro_trend ~sector_map ~stocks
   let candidates =
     _prepare_candidates ~stocks ~held_set ~cooldown_set ~sector_map ~is_member
   in
+  (* G2 (#2490): the only place the post-held / cooldown / membership candidate
+     list is in scope. Handing it out here — rather than growing [result] with a
+     field every run would have to compute — keeps the default path untouched. *)
+  Option.iter on_candidates ~f:(fun f -> f candidates);
   let candidates_after_held = List.length candidates in
   let buy_candidates, short_candidates =
     _evaluate_candidates ~config ~decline_is_slow_grind ~candidates ~macro_trend
@@ -460,12 +464,13 @@ let _screen ~config ~decline_is_slow_grind ~macro_trend ~sector_map ~stocks
   }
 
 let screen ~config ~macro_trend ~sector_map ~stocks ~held_tickers : result =
-  _screen ~config ~decline_is_slow_grind:true ~macro_trend ~sector_map ~stocks
-    ~held_tickers ~cooldown_set:String.Set.empty ~is_member:(fun _ -> true)
+  _screen ~on_candidates:None ~config ~decline_is_slow_grind:true ~macro_trend
+    ~sector_map ~stocks ~held_tickers ~cooldown_set:String.Set.empty
+    ~is_member:(fun _ -> true)
 
-let screen_with_cooldown ?membership_at ?(decline_is_slow_grind = true) ~config
-    ~macro_trend ~sector_map ~stocks ~held_tickers ~as_of ~last_stop_out_dates
-    () : result =
+let screen_with_cooldown ?membership_at ?(decline_is_slow_grind = true)
+    ?on_candidates ~config ~macro_trend ~sector_map ~stocks ~held_tickers ~as_of
+    ~last_stop_out_dates () : result =
   let cooldown_set =
     _cooldown_block_set ~cooldown_weeks:config.cascade_post_stop_cooldown_weeks
       ~as_of ~last_stop_out_dates
@@ -473,5 +478,5 @@ let screen_with_cooldown ?membership_at ?(decline_is_slow_grind = true) ~config
   let is_member ticker =
     match membership_at with None -> true | Some m -> m ticker as_of
   in
-  _screen ~config ~decline_is_slow_grind ~macro_trend ~sector_map ~stocks
-    ~held_tickers ~cooldown_set ~is_member
+  _screen ~on_candidates ~config ~decline_is_slow_grind ~macro_trend ~sector_map
+    ~stocks ~held_tickers ~cooldown_set ~is_member

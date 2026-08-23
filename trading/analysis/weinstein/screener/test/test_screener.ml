@@ -2612,6 +2612,144 @@ let test_entry_anchor_local_top_when_armed _ =
            ];
        ])
 
+(* ------------------------------------------------------------------ *)
+(* G2 (#2490): named cascade trace                                      *)
+(* ------------------------------------------------------------------ *)
+
+(* A mixed set: two clean breakout candidates and two decliners that cannot
+   pass the breakout phase, so the phase counts below are non-trivial and a
+   trace that collapsed every candidate to one phase would fail. *)
+let _mixed_stocks () =
+  let up t =
+    make_analysis t
+      (Some (Stage1 { weeks_in_base = 10 }))
+      (rising_bars_with_spike ~n:35 50.0 100.0 ~spike_idx:31)
+  in
+  let down t =
+    make_analysis t
+      (Some (Stage2 { weeks_advancing = 6; late = false }))
+      (declining_bars_with_spike ~n:35 100.0 50.0 ~spike_idx:31)
+  in
+  [ up "AAAA"; up "BBBB"; down "CCCC"; down "DDDD" ]
+
+(** Run one screen and hand back both the result and the candidate list the
+    cascade actually evaluated, via the G2 [?on_candidates] callback. *)
+let _screen_capturing_candidates ~macro_trend ~stocks =
+  let captured = ref [] in
+  let result =
+    screen_with_cooldown
+      ~on_candidates:(fun cs -> captured := cs)
+      ~config:cfg ~macro_trend ~sector_map:(empty_sector_map ()) ~stocks
+      ~held_tickers:[] ~as_of ~last_stop_out_dates:[] ()
+  in
+  (result, !captured)
+
+let _long_trace ~macro_trend ~candidates ~(result : Screener.result) =
+  Screener.long_outcomes ~weights:cfg.weights ~thresholds:cfg.grade_thresholds
+    ~min_grade:cfg.min_grade ~min_score_override:cfg.min_score_override
+    ~max_score_override:cfg.max_score_override
+    ~volume_ratio_exclude_range:cfg.volume_ratio_exclude_range
+    ~min_price:cfg.min_price
+    ~failed_breakout_tolerance_pct:cfg.failed_breakout_tolerance_pct
+    ~early_stage2_max_weeks:cfg.early_stage2_max_weeks
+    ~min_rs_normalized:cfg.min_rs_normalized
+    ~macro_admits:(not (equal_market_trend macro_trend Bearish))
+    ~top_n_tickers:
+      (String.Set.of_list
+         (List.map result.buy_candidates ~f:(fun c -> c.ticker)))
+    ~candidates
+
+(* Survivors at or past a phase: the trace is ordered breakout -> sector ->
+   grade -> top_n, so "reached phase P" is "was not dropped before P". *)
+let _reached_breakout (o : Screener.candidate_outcome) =
+  match o.phase with
+  | Dropped_at_macro | Dropped_at_breakout -> false
+  | _ -> true
+
+let _reached_sector (o : Screener.candidate_outcome) =
+  _reached_breakout o
+  && match o.phase with Dropped_at_sector -> false | _ -> true
+
+let _reached_grade (o : Screener.candidate_outcome) =
+  _reached_sector o
+  && match o.phase with Dropped_at_grade | Dropped_at_rs -> false | _ -> true
+
+let _is_admitted (o : Screener.candidate_outcome) =
+  match o.phase with Screener.Admitted -> true | _ -> false
+
+(** The anti-drift pin. The named trace and the counted [cascade_diagnostics]
+    run the same admission predicates, so for any candidate set the trace's
+    per-phase survivor counts must reproduce the diagnostics exactly. If they
+    ever disagree, one of the two paths has been changed without the other —
+    which is the failure mode that made a count-only diagnostic untrustworthy as
+    a description of named candidates. *)
+let test_trace_survivor_counts_match_cascade_diagnostics _ =
+  let macro_trend = Bullish in
+  let result, candidates =
+    _screen_capturing_candidates ~macro_trend ~stocks:(_mixed_stocks ())
+  in
+  let trace = _long_trace ~macro_trend ~candidates ~result in
+  let d = result.cascade_diagnostics in
+  assert_that
+    ( List.count trace ~f:_reached_breakout,
+      List.count trace ~f:_reached_sector,
+      List.count trace ~f:_reached_grade,
+      List.count trace ~f:_is_admitted )
+    (equal_to
+       ( d.long_breakout_admitted,
+         d.long_sector_admitted,
+         d.long_grade_admitted,
+         d.long_top_n_admitted ))
+
+(** The trace must be a description of a real screen, not of an empty one — a
+    version of the pin above that passed on all-zero counts would be vacuous.
+    Pins that this fixture genuinely exercises both a survivor and a drop. *)
+let test_trace_fixture_exercises_both_outcomes _ =
+  let result, candidates =
+    _screen_capturing_candidates ~macro_trend:Bullish ~stocks:(_mixed_stocks ())
+  in
+  let trace = _long_trace ~macro_trend:Bullish ~candidates ~result in
+  assert_that
+    (List.count trace ~f:_is_admitted, List.count trace ~f:_reached_breakout)
+    (all_of
+       [
+         field (fun (admitted, _) -> admitted) (gt (module Int_ord) 0);
+         field
+           (fun (_, reached) -> List.length trace - reached)
+           (gt (module Int_ord) 0);
+       ])
+
+(** A bearish tape zeroes the long side's downstream counts
+    ([Screener_cascade_diagnostics.build]); the trace must agree by reporting
+    every candidate as [Dropped_at_macro] rather than silently tracing gates the
+    live cascade never reached. *)
+let test_trace_macro_blocked_side_matches_zeroed_counts _ =
+  let macro_trend = Bearish in
+  let result, candidates =
+    _screen_capturing_candidates ~macro_trend ~stocks:(_mixed_stocks ())
+  in
+  let trace = _long_trace ~macro_trend ~candidates ~result in
+  assert_that
+    ( List.count trace ~f:(fun o ->
+          match o.Screener.phase with Dropped_at_macro -> true | _ -> false),
+      List.count trace ~f:_reached_breakout,
+      result.cascade_diagnostics.long_breakout_admitted )
+    (equal_to (List.length candidates, 0, 0))
+
+(** [?on_candidates] is opt-in: omitting it must not perturb the screen. The
+    default path is what every existing caller and golden runs. *)
+let test_on_candidates_absent_is_a_no_op _ =
+  let stocks = _mixed_stocks () in
+  let with_cb, _ = _screen_capturing_candidates ~macro_trend:Bullish ~stocks in
+  let without_cb =
+    screen_with_cooldown ~config:cfg ~macro_trend:Bullish
+      ~sector_map:(empty_sector_map ()) ~stocks ~held_tickers:[] ~as_of
+      ~last_stop_out_dates:[] ()
+  in
+  assert_that
+    (List.map without_cb.buy_candidates ~f:(fun c -> c.ticker))
+    (equal_to (List.map with_cb.buy_candidates ~f:(fun c -> c.ticker)))
+
 let suite =
   "screener_tests"
   >::: [
@@ -2827,6 +2965,14 @@ let suite =
          >:: test_rs_gate_improving_but_still_negative_is_blocked;
          "RS gate: min_rs_normalized sexp round-trips"
          >:: test_rs_gate_sexp_round_trips;
+         "G2 trace: survivor counts match cascade_diagnostics"
+         >:: test_trace_survivor_counts_match_cascade_diagnostics;
+         "G2 trace: fixture exercises both a survivor and a drop"
+         >:: test_trace_fixture_exercises_both_outcomes;
+         "G2 trace: macro-blocked side matches the zeroed counts"
+         >:: test_trace_macro_blocked_side_matches_zeroed_counts;
+         "G2 trace: on_candidates absent is a no-op"
+         >:: test_on_candidates_absent_is_a_no_op;
        ]
 
 let () = run_test_tt_main suite
