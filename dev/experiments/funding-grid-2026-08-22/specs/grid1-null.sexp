@@ -1,5 +1,5 @@
 ;; HONEST LADDER — E-anchored arm (band 2pp). Identical to
- (description "FUNDING GRID null arm — fullbook-graded base verbatim, renamed for the shared output root. The control every mechanism arm is diffed against; same build, warehouse and data root.")
+;; top3000-2000-2026-record-convention.sexp PLUS sim_entry_trigger_at_suggested
 ;; (#2209): entries are StopLimit(E, E×(1±2/100)) genuinely RESTING at the
 ;; screener breakout level E, per the 2026-08-05 user decision (Step 0 = b).
 ;; (enable_sim_entry_stoplimit + entry_extension_max_pct, PR #2202).
@@ -9,6 +9,18 @@
 ;; Run with the split-safe warehouse (/tmp/snap_top3000_dedup_v5thin_adj),
 ;; SNAPSHOT_CACHE_MB=1024, --no-emit-all-eligible, --parallel 1.
 ;; NOT a golden — staging scenario, sentinel bands.
+;;
+;; 2026-08-23 COMMENT-SYNTAX FIX (docs reconcile) — no semantic change.
+;; Line 2 of this header was overwritten in #2473 by an UNCOMMENTED form:
+;;   (description "FUNDING GRID null arm — fullbook-graded base verbatim,
+;;    renamed for the shared output root. The control every mechanism arm is
+;;    diffed against; same build, warehouse and data root.")
+;; Because it carried no `;;`, it parsed as a stray SECOND top-level sexp
+;; ahead of the real `((name "grid1-null") ...)` form below. `effect_null_report`
+;; tolerated it, but the file was malformed. Line 2 is restored verbatim from
+;; the four sibling `grid1-*.sexp` specs, which all share this header; the
+;; orphaned text is preserved above as a comment. The spec's own
+;; `(description ...)` field below is UNCHANGED — nothing that parses moved.
 ((name "grid1-null")
  (description "FULL BOOK TICKET: E-anchored StopLimit band 2pp + stop re-anchored to entry base (#2219 stop_anchor_at_entry_base; ladder-3 graded arm).")
  (period ((start_date 2000-01-01) (end_date 2026-06-26)))

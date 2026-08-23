@@ -4,18 +4,57 @@
 
 IN_PROGRESS
 
-## Last updated: 2026-07-13
+## Last updated: 2026-08-23
 
 ## Interface stable
 
-NO
+YES
 
-(`Twin_detector.Config` field set may still change when the
-dispatcher-side warehouse rebuild exercises it on real data.)
+`Twin_detector.Config`'s field set was provisional pending the dispatcher-side
+warehouse rebuild on real data. **That rebuild ran on 2026-07-13** (see
+"Rebuild + re-run executed" below) and the config was not changed by it;
+`twin_detector.{ml,mli}` has had **zero commits since**. Verified on main
+2026-08-23. Marker flipped `NO` → `YES` accordingly.
 
 ## Owner
 
 feat-backtest
+
+## Reconcile note (2026-08-23) — finished in all but name; NOT closed here
+
+The track pacer describes this track as *"finished in all but name"* and
+recommends closure. This reconcile **does not close it**, because the file's own
+content contradicts an unqualified "done": `## Next task` carries an explicit
+optional item and `## Follow-ups` carries two open caveats. Per the reconcile
+brief, an ambiguity gets reported rather than resolved.
+
+**What is verified:**
+
+- The mechanism shipped and was exercised end to end: #1940 (v1 pass, default-off),
+  #1946 (v2 returns-basis), #1949 (the deep rebuild + 28y re-run writeup). The
+  deduped warehouse is the record basis.
+- **`twin_detector.{ml,mli}` has taken no commit since 2026-07-13**, and this
+  status file has not been touched since #1949 the same day.
+
+**One correction to the pacer's read.** It attributes "last PR #2302
+(2026-08-13)" to this track. #2302 (`700bdcda`) touched
+`weinstein/snapshot/gen/test/test_rename_detector.ml` plus `dev/status/cleanup.md`
+— a **different module** (`Rename_detector`, the snapshot-gen ticker-rename
+mapper) booked to the `cleanup` track. It is not this track's `Twin_detector`.
+So this track's true idle period runs from 2026-07-13, not 2026-08-13 — 41 days,
+not 10.
+
+**Recommendation (maintainer's call, three options):**
+
+1. **Close it** — set `## Status: MERGED` and re-home the optional V6
+   report-consult tweak plus the two follow-up caveats onto
+   `post-run-validation` (which owns V6) and `backtest-infra`.
+2. **Keep it open** as the owner of the V6 tweak, and say so in `## Next task`
+   so the item has a real home.
+3. **Keep it open pending** the follow-up caveats, if either is judged a real
+   risk to the record basis.
+
+Option 1 matches the file's content most closely; nothing here decides it.
 
 ## Summary
 
@@ -113,11 +152,16 @@ audit join 1171/1171, V5 PASS, V6 down to its 2 known false positives.
 
 ## Next task
 
-None on this track — deduped warehouse is the record basis. Optional:
-V6's trade-level heuristic could consult the builder report to drop its
-2 standing false positives.
+None required — the deduped warehouse is the record basis and the mechanism is
+complete. **One optional item stands:** V6's trade-level heuristic could consult
+the builder report to drop its 2 standing false positives. It has no owner and
+is not dispatched; whether it lives here or on `post-run-validation` is part of
+the open question in the reconcile note above.
 
 ## Follow-ups
+
+Both are design caveats recorded at build time, not known defects. Neither has
+been observed to bite on the real warehouse rebuild.
 
 - v1 drops the whole losing leg, not just the overlapping window. For
   true rename-twins (duplicated series) this is correct; if a partial

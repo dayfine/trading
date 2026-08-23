@@ -1,9 +1,43 @@
 # Status: backtest-perf
 
-## Last updated: 2026-06-16
+## Last updated: 2026-08-23
 
 ## Status
 IN_PROGRESS
+
+## Ownership boundary — READ FIRST (reconciled 2026-08-23)
+
+**This track's subject matter has been shipping under other tracks for about
+six weeks, and this file did not record that.** Stated plainly rather than
+resolved, because folding a track into another one is a maintainer decision.
+
+Verified on main 2026-08-23:
+
+- **Last PR booked to this track: #2024 (`77465e8a`, 2026-07-21)** — and it
+  touched one file, `dump_snap.ml`, i.e. warehouse tooling rather than the perf
+  tier system this file describes.
+- **The perf tier system itself is alive and untouched.** All four scripts
+  (`dev/scripts/perf_tier{1,2,3,4}_*.sh`) and all three workflows
+  (`perf-tier1.yml`, `perf-nightly.yml`, `perf-weekly.yml`) exist and report
+  `active` from the Actions API. `perf-tier1-smoke` remains a required PR check
+  (`.claude/rules/pr-merge-gates.md`). Exactly **one** commit has touched any of
+  those eight paths since 2026-06-16: `871513dc` (#1953).
+- **Where the work actually went:** performance and capacity work now lands
+  under `backtest-infra` (snapshot warehouse, panel loading), `arc-readiness`
+  (container capacity, run scheduling) and `sweep-perf`. The track pacer has
+  carried this drift for six consecutive weeks.
+
+Two stale claims are corrected in place below: `## Branch` named two "active"
+branches that **no longer exist on origin**, and `## References` described
+`backtest-infra` as MERGED when it is `IN_PROGRESS`
+(`dev/status/backtest-infra.md`, last updated 2026-08-13).
+
+**Recommendation (not a decision).** Either (a) fold this track into
+`backtest-infra`, keeping only the tier-catalog reference here, or (b) give it
+an explicit narrow boundary — "the perf tier system and its budgets, nothing
+else" — plus an owner. Option (b) has one genuinely live item behind it: Next
+step 1 below (pinning per-cell tier budgets), actionable for months. Leaving
+the track as-is is the option that has been taken by default six weeks running.
 
 ### Recent activity (2026-06-16) — Snapshot_columnar reader: ONE mmap per file (Rosetta VMA fix)
 
@@ -1012,6 +1046,47 @@ mechanics + release-gate procedure.
 
 ## Next steps
 
+Reconciled 2026-08-23. The previous list opened with three `(DONE)` entries
+dating from **April 2026** — items 1, 2, 3, plus 4, 6 and 7 were all completed
+work, leaving one live item buried at position 5. The completed entries are
+preserved verbatim under `## Tier build-out — completed record (April 2026)`
+below; only genuinely pending work appears here.
+
+1. **Pin per-cell tier budgets.** After ~10 PR cycles of *real* tier-1 perf
+   data, replace the provisional budgets with measured ones. The same flip
+   applies to `perf-nightly.yml` once tier-2 budgets are pinned (~10 weeks of
+   nightly data) and to `perf-weekly.yml` once tier-3 budgets are pinned (~10
+   weekly cycles). **Long past the stated data threshold** — `perf-tier1.yml`
+   has been a required per-PR gate since April 2026, so far more than 10 cycles
+   of data exist. This is the one item on this track that is actionable today
+   and is not blocked on anything. Note tier-2/tier-3 remain
+   `continue-on-error` VISIBILITY-first until their budgets are pinned.
+2. **Tier-4 expected ranges are still `BASELINE_PENDING`.** The four
+   `goldens-broad/` cells shipped with intentionally wide ranges pending a first
+   manual dispatch to produce the canonical baseline. Whether that dispatch ever
+   ran is **not verified by this reconcile** — treat the ranges as unpinned
+   until someone checks. Tier-4 is local-only (release-cut), so no CI record
+   settles it.
+3. **Expand the tier-3 scenario catalog** — tier-3 ships 2 cells against the
+   plan's 4 (`perf-sweep/{bull-1y, bull-3y}`); the plan's Tier-3 table also
+   names bull-crash 1000×6y, covid-recovery 300×4y and six-year 300×6y. A
+   scenario-authoring task, not a workflow change. Carried from the original
+   item-2 note; never started.
+
+**Blocked (see `## Blocked on`):** tier-4 release gate at N≥5000, on
+daily-snapshot streaming.
+
+⚠ Every performance figure quoted anywhere in this file is a **budget /
+capacity** measurement (RSS, wall time), not a strategy-performance
+measurement, so `.claude/rules/universe-discipline.md` does not bear on it.
+The one exception is Next-step-7's goldens note in the completed record below,
+which quotes strategy returns on sp500 cells — those figures are **not**
+quotable as evidence about strategy behaviour.
+
+## Tier build-out — completed record (April 2026)
+
+Historical. Kept verbatim; none of this is pending work.
+
 1. (DONE) Tier 2 (nightly) — `perf-nightly.yml` +
    `perf_tier2_nightly.sh` merged in PR #622 on 2026-04-27. Six
    tier-2 cells, 30 min budget per cell, cron `0 5 * * *` (22:00 PT).
@@ -1050,11 +1125,8 @@ mechanics + release-gate procedure.
    stay VISIBILITY-first). Set `PERF_CATALOG_CHECK_STRICT=1` in
    `trading/devtools/checks/dune`. Verified: 4/4 PASS post-fix. Plan:
    `dev/plans/perf-tier1-universe-path-2026-04-28.md`.
-5. After ~10 PR cycles of *real* tier-1 perf data: pin per-cell
-   budgets. Same flip applies to `perf-nightly.yml` once tier-2
-   budgets are pinned (~10 weeks of nightly data) and to
-   `perf-weekly.yml` once tier-3 budgets are pinned (~10 weekly
-   cycles).
+5. **MOVED — this was the only live item in the old list.** See
+   `## Next steps` item 1 above (pin per-cell tier budgets).
 6. (DONE on `feat/backtest-perf-release-report`) **`release_perf_report`
    OCaml exe.** New library
    `trading/trading/backtest/release_report/` (`release_report.{ml,mli}`,
@@ -1109,15 +1181,22 @@ mechanics + release-gate procedure.
 
 ## Ownership
 
-`feat-backtest` agent (sibling of backtest-infra and backtest-scale).
-Pure infra work — scenario cataloging, GHA workflows, report
+Nominally the `feat-backtest` agent (sibling of backtest-infra and
+backtest-scale). Pure infra work — scenario cataloging, GHA workflows, report
 generators.
+
+**In practice this boundary has drifted** — see "Ownership boundary" at the top
+of this file. No PR has been booked to this track since #2024 (2026-07-21), and
+that one touched warehouse tooling, not the perf tiers.
 
 ## Branch
 
-`feat/backtest-perf-<step>` per item above. Active:
-`feat/backtest-perf-tier4-release-gate` (Step 5 — tier-4 release-gate
-at N=1000) and `feat/backtest-perf-tier3-weekly` (Step 4).
+`feat/backtest-perf-<step>` per item above.
+
+**No active branch (verified 2026-08-23).** This section previously listed
+`feat/backtest-perf-tier4-release-gate` and `feat/backtest-perf-tier3-weekly`
+as active; `git ls-remote --heads origin` matches neither, and both steps'
+work is recorded as DONE in the completed record above. The entries were stale.
 
 ## Blocked on
 
@@ -1153,5 +1232,7 @@ Carried verbatim from `dev/plans/perf-scenario-catalog-2026-04-25.md`:
   `dev/scripts/run_perf_sweep.sh` (#547)
 - Sibling track: `dev/status/data-panels.md` — tier 4 blocker
   (supersedes the older `incremental-indicators` track)
-- Predecessor: `dev/status/backtest-infra.md` (MERGED) for the
-  experiments/analysis side this builds on
+- Sibling track: `dev/status/backtest-infra.md` — **`IN_PROGRESS`**, last
+  updated 2026-08-13 (this file previously called it a MERGED predecessor;
+  that was stale). It is also where most of this track's subject matter now
+  lands — see "Ownership boundary" at the top.
