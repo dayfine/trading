@@ -5,6 +5,7 @@
   test_trace
   test_trade_audit
   test_trade_audit_recorder
+  test_candidate_log
   test_split_safe_metric
   test_trade_audit_capture
   test_trade_audit_basis

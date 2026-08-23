@@ -226,9 +226,21 @@ let _cascade_summary_of_event (e : AR.cascade_event) :
     entered = e.entered;
   }
 
-let of_collector ~(trade_audit : Trade_audit.t)
-    ~(force_liquidation_log : Force_liquidation_log.t) : AR.t =
+(** Drain one cascade event into [candidate_log] as a week. The near-miss
+    projection is {!_alternative_of_event}, the same one [trade_audit.sexp]'s
+    [alternatives_considered] uses, so the two artefacts cannot disagree about a
+    candidate's decision-time signals. *)
+let _record_candidate_week ~candidate_log (e : AR.cascade_event) =
+  match candidate_log with
+  | None -> ()
+  | Some c ->
+      let alternatives = List.map e.candidates ~f:_alternative_of_event in
+      Candidate_log.record c (Candidate_log.week_of ~date:e.date ~alternatives)
+
+let of_collector ?candidate_log ~(trade_audit : Trade_audit.t)
+    ~(force_liquidation_log : Force_liquidation_log.t) () : AR.t =
   {
+    capture_candidates = Option.is_some candidate_log;
     record_entry =
       (fun event ->
         Trade_audit.record_entry trade_audit (_entry_decision_of_event event));
@@ -238,7 +250,8 @@ let of_collector ~(trade_audit : Trade_audit.t)
     record_cascade_summary =
       (fun event ->
         Trade_audit.record_cascade_summary trade_audit
-          (_cascade_summary_of_event event));
+          (_cascade_summary_of_event event);
+        _record_candidate_week ~candidate_log event);
     record_force_liquidation =
       Force_liquidation_log.record force_liquidation_log;
     record_fill_volume =

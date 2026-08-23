@@ -232,6 +232,16 @@ type cascade_event = {
           because cash limits, sector concentration, and round-share sizing all
           drop further candidates between the screener output and the actual
           entry list. *)
+  candidates : alternative_input list;
+      (** Every top-N candidate the entry walk passed over this Friday, with the
+          reason — {b unconditionally}, including on Fridays that funded nothing
+          (issue #2490 gap G1). Funded candidates are not repeated here: they
+          already have their own {!entry_event} / [Trade_audit.entry_decision]
+          row, and cross-artefact joins key on [position_id].
+
+          [[]] when [capture_candidates] is [false], which is the default and
+          every non-audit context — the projection is not even computed, so the
+          default path allocates nothing. *)
 }
 (** Event captured at the end of one Friday's cascade. Complements
     [entry_event]: where [entry_event] records a single chosen candidate plus
@@ -255,6 +265,18 @@ type t = {
   record_fill_volume : fill_volume_event -> unit;
       (** Invoked once per position the F5 at-fill check evaluates. Never
           invoked under the default (unarmed) config. *)
+  capture_candidates : bool;
+      (** Whether the strategy should populate {!cascade_event.candidates}.
+          [false] in {!noop}, and therefore in live mode and every test that
+          does not opt in — the strategy skips the projection entirely, so the
+          default path is bit-identical and allocation-free.
+
+          This is a {b recorder} flag, deliberately not a
+          [Weinstein_strategy.config] or [Screener.config] field: candidate
+          emission is observability, so it must never become a [Variant_matrix]
+          axis, never route through [Overlay_validator], and never appear in a
+          golden's [config_overrides]. See
+          [dev/plans/candidate-emission-2026-08-23.md]. *)
 }
 (** Recorder bundle. All callbacks are invoked unconditionally by the strategy
     at entry / exit / per-Friday sites; the implementation decides whether to

@@ -99,6 +99,7 @@ let _make_result ?(steps = []) ?(final_prices = []) ?(stop_infos = [])
     stop_infos;
     audit = [];
     cascade_summaries = [];
+    candidate_weeks = [];
     force_liquidations;
     stale_holds = [];
     final_prices;
@@ -680,6 +681,7 @@ let test_trades_csv_populates_context_from_audit_and_stop_log _ =
       stop_infos = [ stop_info ];
       audit;
       cascade_summaries = [];
+      candidate_weeks = [];
       force_liquidations = [];
       stale_holds = [];
       final_prices = [];
@@ -851,6 +853,7 @@ let test_retraded_symbol_keys_triggers_by_position_id _ =
           };
         ];
       cascade_summaries = [];
+      candidate_weeks = [];
       force_liquidations = [];
       stale_holds = [];
       final_prices = [];

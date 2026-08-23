@@ -84,6 +84,17 @@ type result = {
           field records the per-cascade-phase activity for every Friday,
           including those where the cascade filtered everything. Persisted
           alongside [audit] in [trade_audit.sexp] when either is non-empty. *)
+  candidate_weeks : Candidate_log.t;
+      (** Per-Friday {b named} candidate populations (issue #2490). Where
+          [cascade_summaries] carries the same Fridays as counts, this carries
+          the names and their decision-time signals — and unlike [audit]'s
+          [alternatives_considered], it is emitted even on a Friday that funded
+          nothing, which is the gap it exists to close.
+
+          [[]] unless the run was started with a [~candidate_log]; the default
+          is off and costs nothing. Filtered to weeks at or after
+          [start_date], matching [cascade_summaries]. Persisted as
+          [candidates.sexp] by {!Candidate_log.emit}. *)
   force_liquidations : Portfolio_risk.Force_liquidation.event list;
       (** Per-position force-liquidation events recorded by the strategy (G4 —
           see [dev/notes/short-side-gaps-2026-04-29.md]). Empty when no forced
@@ -216,10 +227,19 @@ val run_backtest :
   ?progress_emitter:Backtest_progress.emitter ->
   ?slippage_bps:int ->
   ?cost_model:Backtest_cost_model.Cost_model.t ->
+  ?candidate_log:Candidate_log.collector ->
   unit ->
   result
 (** Run the simulator from [start_date - warmup] to [end_date], filter to the
     requested range and to trading days only, and return the [result].
+
+    [candidate_log] opts into per-week candidate capture (issue #2490),
+    populating [result.candidate_weeks] as well as the passed collector. Build
+    it with {!Candidate_log.create_if} from whatever flag the caller already
+    has. Observability only: the gate reaches the strategy on the audit
+    recorder, never on the strategy config, so it moves no strategy behaviour
+    and no golden. Omitted (the default) the strategy computes no candidate
+    projection and [candidate_weeks] is [[]].
 
     [overrides] are partial config sexps deep-merged into the default config in
     order. Each must be a record sexp with fields matching

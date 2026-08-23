@@ -87,6 +87,7 @@ let _make_result ?(summary = _empty_summary) ~n_open ~n_stop_eligible () :
     stop_infos = [];
     audit = [];
     cascade_summaries = [];
+    candidate_weeks = [];
     force_liquidations = [];
     stale_holds = [];
     final_prices = [];

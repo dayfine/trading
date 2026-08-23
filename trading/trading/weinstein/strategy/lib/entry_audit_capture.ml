@@ -408,6 +408,13 @@ let alternatives_of_decisions ~decisions ~exclude_position_id :
     Audit_recorder.alternative_input list =
   List.filter_map decisions ~f:(_alternative_of_decision ~exclude_position_id)
 
+let all_alternatives_of_decisions ~decisions :
+    Audit_recorder.alternative_input list =
+  List.filter_map decisions ~f:(fun (candidate, decision) ->
+      match decision with
+      | Skipped reason -> Some { Audit_recorder.candidate; reason }
+      | Kept _ -> None)
+
 let build_entry_event ~(macro : Macro.result) ~current_date
     ~(candidate : Screener.scored_candidate) ~(meta : entry_meta)
     ~(alternatives : Audit_recorder.alternative_input list) :

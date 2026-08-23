@@ -1100,6 +1100,7 @@ val entries_from_candidates :
   current_date:Date.t ->
   ?audit_recorder:Audit_recorder.t ->
   ?macro:Macro.result ->
+  ?on_candidates_considered:(Audit_recorder.alternative_input list -> unit) ->
   unit ->
   Trading_strategy.Position.transition list
 (** Generate [CreateEntering] transitions for a list of screener candidates.

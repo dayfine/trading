@@ -313,13 +313,14 @@ type _recorders = {
   audit_recorder : Weinstein_strategy.Audit_recorder.t;
 }
 
-let _create_recorders () : _recorders =
+let _create_recorders ?candidate_log () : _recorders =
   let stop_log = Stop_log.create () in
   let trade_audit = Trade_audit.create () in
   let force_liquidation_log = Force_liquidation_log.create () in
   let stale_hold_log = Trading_simulation.Stale_hold.Log.create () in
   let audit_recorder =
-    Trade_audit_recorder.of_collector ~trade_audit ~force_liquidation_log
+    Trade_audit_recorder.of_collector ?candidate_log ~trade_audit
+      ~force_liquidation_log ()
   in
   {
     stop_log;
@@ -375,7 +376,7 @@ let _build_sim input ~r ~start_date ~warmup_start ~end_date ~initial_cash
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     ~commission ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
     ?bar_data_source ?shared_panels ?progress_emitter ?slippage_bps ?cost_model
-    ?(prune_universe_by_active_through = false) () =
+    ?(prune_universe_by_active_through = false) ?candidate_log () =
   let fold_start_date =
     fold_start_date_of_opt_in ~prune_universe_by_active_through ~start_date
   in
@@ -385,7 +386,7 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     (Date.to_string warmup_start)
     (Date.to_string end_date) warmup_days
     (Strategy_choice.name strategy_choice);
-  let r = _create_recorders () in
+  let r = _create_recorders ?candidate_log () in
   let n_all_symbols = List.length input.all_symbols in
   let snapshot_dir, manifest =
     _resolve_snapshot_source input ~warmup_start ~end_date ~bar_data_source

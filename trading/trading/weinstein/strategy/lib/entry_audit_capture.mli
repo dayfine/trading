@@ -113,6 +113,24 @@ val alternatives_of_decisions :
       own [entry_decision] records, and cross-trade analysis joins on
       [position_id]. *)
 
+val all_alternatives_of_decisions :
+  decisions:(Screener.scored_candidate * candidate_decision) list ->
+  Audit_recorder.alternative_input list
+(** Project the {b whole} walk's passed-over candidates, unscoped to any chosen
+    entry — the per-Friday counterpart to {!alternatives_of_decisions}.
+
+    Same per-candidate content, different addressing:
+    [alternatives_of_decisions] answers "what did {i this} funded entry
+    outrank?" and so is only reachable when something was funded, while this
+    answers "what did the walk pass over {i this Friday}?" and is therefore
+    emitted even on a Friday that funded nothing. That is issue #2490's gap G1;
+    the caller hands the result to {!Audit_recorder.cascade_event.candidates}.
+
+    [Kept] decisions are excluded — a funded candidate has its own
+    {!Audit_recorder.entry_event}, and cross-artefact joins key on
+    [position_id]. So the emitted list plus the week's [entered] count together
+    account for the screener's top-N population. *)
+
 val build_entry_event :
   macro:Macro.result ->
   current_date:Core.Date.t ->
