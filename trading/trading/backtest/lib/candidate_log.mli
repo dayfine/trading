@@ -20,8 +20,9 @@
     Nothing here is on any default path. Emission is gated by
     [scenario_runner.exe --emit-candidates] (default OFF, mirroring
     [--no-emit-all-eligible]), which routes into
-    [Runner.run_backtest ~capture_candidates:true]. The gate lives on the
-    {b recorder} ([Audit_recorder.t.capture_candidates]), never on
+    [Runner.run_backtest ?candidate_log] with a {!collector} built by
+    {!create_if}. The gate reaching the strategy lives on the {b recorder}
+    ([Audit_recorder.t.capture_candidates]), never on
     [Weinstein_strategy.config] or [Screener.config] — so it can never become a
     [Variant_matrix] axis, never routes through [Overlay_validator], and never
     appears in a golden's [config_overrides]. With the gate off the strategy

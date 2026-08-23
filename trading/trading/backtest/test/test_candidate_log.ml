@@ -206,6 +206,25 @@ let test_emit_enabled_round_trips _ =
         (CL.t_of_sexp (Sexp.load_sexp (_candidates_path dir)))
         (equal_to weeks ~cmp:(List.equal CL.equal_week)))
 
+(** Pins the failure-isolation contract ([candidate_log.mli]
+    {i Failure isolation}): a writer failure — here an unwritable [scenario_dir]
+    that does not exist — is logged to [stderr] and swallowed, never raised. The
+    caller ([scenario_runner]) invokes [emit] unguarded {i after} [actual.sexp]
+    is already on disk, so a raising diagnostic would abort a finished
+    multi-hour backtest. Same shape as
+    [test_scenario_post_step.ml::test_emit_swallows_runner_failure], whose
+    contract this one claims parity with. *)
+let test_emit_swallows_writer_failure _ =
+  let raised =
+    try
+      CL.emit ~enabled:true
+        ~scenario_dir:"/nonexistent-dir-for-candidate-log-test"
+        [ _week "2024-06-14" ];
+      false
+    with _ -> true
+  in
+  assert_that raised (equal_to false)
+
 (* ------------------------------------------------------------------ *)
 (* Recorder wiring — the no-op and the G1 regression                    *)
 (* ------------------------------------------------------------------ *)
@@ -274,6 +293,8 @@ let () =
            >:: test_filter_from_drops_warmup_weeks;
            "emit disabled writes no file" >:: test_emit_disabled_writes_no_file;
            "emit enabled round-trips" >:: test_emit_enabled_round_trips;
+           "emit swallows writer failures (does not raise)"
+           >:: test_emit_swallows_writer_failure;
            "capture is off without a collector"
            >:: test_capture_is_off_without_a_collector;
            "capture is on with a collector"

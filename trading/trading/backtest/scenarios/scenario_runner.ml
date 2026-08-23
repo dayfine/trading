@@ -478,7 +478,8 @@ type _cli_args = {
          score cost. *)
   emit_candidates : bool;
       (* When [true], each scenario runs with
-         [Backtest.Runner.run_backtest ~capture_candidates:true] and its child
+         [Backtest.Runner.run_backtest ?candidate_log] (a collector built by
+         [Backtest.Candidate_log.create_if]) and its child
          writes [<scenario_dir>/candidates.sexp] (#2490). Default [false]: this
          one opts IN, because unlike the all-eligible diagnostic it costs
          strategy-side work on every screened Friday. *)
