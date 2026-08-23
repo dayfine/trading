@@ -1,0 +1,57 @@
+# goldens-affected: PR-time detector for a config-default change that only
+# a postsubmit golden (golden-runs-*.yml, `on: push: branches: [main]`)
+# would notice. Closes the gap issue #2393 documents: PR #2384 flipped
+# `entry_order_max_rest_weeks` 0 -> 26 with fully green CI, and the one
+# golden that change actually moved (-38.42pp) only runs post-merge, with
+# `continue-on-error: true` during soak — CI green gave zero signal about
+# it.
+#
+# This job is a thin wrapper around
+# trading/devtools/checks/goldens_affected_check.sh — see that script's
+# header for the full detection algorithm (config-default surface files,
+# knob extraction, the best-effort docstring cross-reference step, and its
+# documented limitations).
+#
+# DESIGN CHOICE (option 2 vs option 3 from issue #2393): on a match, this
+# job FAILS WITH A LIST rather than running the affected golden(s) itself.
+# The sp500 5y goldens take tens of minutes each (see
+# golden-runs-sp500-5y.yml's own runtime comments) — too slow to add to
+# every PR's critical path, and running only "the affected one" still adds
+# an unpredictable multi-minute tail to whichever PR happens to trip it.
+# A fast, deterministic FAIL-and-list turns the silent gap into a blocking
+# signal without that cost: it points the author at
+# .claude/rules/config-default-blast-radius.md, whose step 2 is the actual
+# paired run this job doesn't perform.
+#
+# The overwhelmingly common case is zero cost: no config-default surface
+# file changed, or no golden arms the changed knob -> the check script
+# exits 0 in well under a second (git diff + grep, no dune, no docker).
+name: goldens-affected
+
+on:
+  pull_request:
+
+jobs:
+  goldens-affected:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so `git merge-base` below can resolve the PR's
+          # actual merge-base with its target branch, not just the tip
+          # that happened to be shallow-fetched.
+          fetch-depth: 0
+
+      - name: Resolve merge-base and run goldens_affected_check.sh
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -eu
+          git fetch origin "$BASE_SHA" "$HEAD_SHA" --quiet || true
+          MERGE_BASE="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+          echo "merge-base: $MERGE_BASE"
+          echo "head:       $HEAD_SHA"
+          sh trading/devtools/checks/goldens_affected_check.sh "$MERGE_BASE" "$HEAD_SHA"

@@ -741,3 +741,23 @@
  (deps _check_lib.sh (universe))
  (action
   (run sh %{dep:prune_candidates_test_runner.sh})))
+
+; goldens_affected_check test (issue #2393): pins the PR-time detector
+; for a config-default change that only a postsubmit golden would notice
+; (the #2384 clock26 -38.42pp episode). goldens_affected_check.sh itself
+; is NOT wired as a run-target here -- like record_qc_audit.sh, it takes
+; positional <base-ref> <head-ref> CLI args that don't make sense inside
+; `dune runtest`; only the .github/workflows/goldens-affected.yml PR job
+; invokes it directly, against the real PR diff. This rule exercises its
+; logic via 9 fixture-driven git-repo scenarios instead, including a
+; regression pin built from the real 5c278bb78 (#2384) diff during
+; development. No (universe): every fixture is a fresh git repo under a
+; temp dir with REPO_ROOT overridden, so the only real-repo file read is
+; goldens_affected_check.sh itself, which is an explicit dep below --
+; same simpler (non-universe) wiring as record_qc_audit_test.sh.
+
+(rule
+ (alias runtest)
+ (deps goldens_affected_check.sh _check_lib.sh)
+ (action
+  (run sh %{dep:goldens_affected_check_test.sh})))
