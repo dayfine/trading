@@ -150,6 +150,15 @@ rm -rf "$AGENT_WS"
 - Reference: `memory/project_jj_worktree_root_cause.md` +
   `memory/project_jj_workspace_docker_path.md` (root cause writeups).
 
+**QC agents (`qc-structural`, `qc-behavioral`) are the same hazard class**,
+but with a different fix: they don't write jj history, so they check out the
+PR with plain `git` inside their own dispatched worktree — never `jj edit`,
+which (like the cd-to-parent bug above) reaches the parent workspace instead
+of the agent's own checkout. `.claude/rules/qc-structural-authority.md` and
+`.claude/rules/qc-behavioral-authority.md` §"Operational requirements for QC
+agents in this repo" defer to this section as the authority on both the dune
+`cwd` rule and the git-not-jj checkout rule (issue #2386).
+
 ## Finish Protocol (required — prevents lost-work / un-opened PRs)
 
 The 2026-06-07 session lost three feat-agent commits because agents (a)

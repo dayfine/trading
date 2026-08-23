@@ -37,30 +37,51 @@ After completing the generic checklist (H1–H3, P1–P5), append these rows:
 
 QC agents dispatched on this repo MUST be invoked with both of:
 
-1. **`isolation: "worktree"`** — qc-structural and qc-behavioral aren't
-   read-only. They run `jj edit <branch>` to check out the PR. Without
-   isolation, those edits mutate the parent workspace's shared `.jj/repo/`
-   and snapshot unrelated files into surprise commits. Observed
+1. **`isolation: "worktree"`, checked out with plain `git`, never `jj`.**
+   qc-structural and qc-behavioral aren't read-only — they must check out the
+   PR into their own dispatched worktree, e.g. `git fetch origin <branch> &&
+   git checkout FETCH_HEAD` or `gh pr checkout <N>`. Do **not** run `jj edit
+   <branch>`: `jj` run inside a dispatched worktree addresses and mutates the
+   **parent** workspace, not the agent's own checkout
+   (`memory/project_jj_unreachable_from_dispatched_worktree`) — exactly the
+   contamination `isolation: "worktree"` exists to prevent. Observed
    2026-05-14: two non-isolated QC agents rebased the parent `@` onto
    `experiments/continuation-tuning` and reverted `dev/status/screener.md`
    to pre-fix content on disk. Same rule as `feat-*` per
    `.claude/rules/worktree-isolation.md`.
 
-2. **Run `dune` inside docker** — the dispatch prompt must explicitly
-   instruct the agent to run every `dune build` / `dune build @fmt` /
-   `dune runtest` via:
+2. **Run `dune` inside docker, against the agent's OWN checkout — never the
+   parent tree.** The dispatch prompt must explicitly instruct the agent to
+   run every `dune build` / `dune build @fmt` / `dune runtest` with the
+   container `cwd` set to the worktree the agent itself checked out the PR
+   into (its dispatched `isolation: "worktree"` path, or a checkout it makes
+   under `.claude/worktrees/` — repo-local so the container's bind-mount can
+   see it; a `/tmp` path is invisible to `docker exec`):
 
    ```bash
    docker exec trading-1-dev bash -c \
-     'cd /workspaces/trading-1/trading && eval $(opam env) && dune build'
+     'cd /workspaces/trading-1/<your-worktree-relative-path>/trading && eval $(opam env) && dune build'
    ```
 
-   Running natively against the host's opam state produces ENVFAIL
+   **`cd /workspaces/trading-1/trading` (the parent tree) is WRONG for a QC
+   agent** — it builds whatever the dispatcher happens to have checked out,
+   not the PR under review, and it contends for the parent's dune lock.
+   `.claude/rules/worktree-isolation.md` §"jj workspace isolation" is the
+   authority on this cwd rule: the same "cd to the parent builds the parent,
+   not your edits" hazard that section documents for feat-agents applies
+   identically to QC agents. See issue #2386.
+
+   Running natively against the host's opam state produces separate ENVFAIL
    reports (ocamlformat 0.27.0 vs 0.29.0 skew, missing `core` / `owl`
    libraries) that aren't about the PR. The container is named
-   `trading-1-dev`; dune root is `/workspaces/trading-1/trading`.
-   Observed 2026-05-14 PR #1090: qc-structural reported ENVFAIL despite
-   the PR being clean and its CI green.
+   `trading-1-dev`. Observed 2026-05-14 PR #1090: qc-structural reported
+   ENVFAIL despite the PR being clean and its CI green.
+
+   Two consequences of building the agent's own checkout, accepted
+   deliberately: (a) each QC agent pays its own full build (~minutes) into
+   its own `_build`, rather than sharing the parent's build cache; (b) the
+   parent's dune lock is no longer contended by QC agents. Both are the
+   price of the build gate meaning what it claims — see issue #2386.
 
 If a QC review comes back ENVFAIL or with bookmark conflicts after the
 agent ran, suspect one of these was skipped — re-dispatch with the
