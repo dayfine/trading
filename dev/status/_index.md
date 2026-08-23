@@ -4,15 +4,29 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-21 (orchestrator run 2, run id 32482056746; main
-`d60b057e` -> `a5a95243`). **The queue was empty of dispatchable work, not
-saturated** — both open PRs (#2456, #2433) sit under `do-not-merge` Rule-0 holds
-awaiting human decisions, so this run spent its whole capacity opening new work:
-**#2461** (backtest subdir appendix reconciled — 4 missing rows, docs-only,
-**MERGED** `3fb20c16`), **#2462**+**#2464** (sexp-drift linter vacuity fix + its CP4 residual), **#2463**
-(**A1-1 / G2a `entry_fill_reject_retries`** — the first of the arc's two missing
-funding legs, closing the user's stated P0 by half; `ticket-funding` step 3 goes
-1-of-3 to 2-of-3).
+Last updated: 2026-08-23 (orchestrator run 32625658534; main `e64f8655` ->
+`4141beda`). **The queue was EMPTY, not saturated** — zero open PRs at start,
+which is maximum dispatch capacity, so the Step 0.5 fast-exit was correctly
+declined on its own precondition. Three tracks dispatched, three PRs opened,
+**two merged**: **#2493** (7 stale status files reconciled — pacer rec #6
+discharged, #7 partial) and **#2492** (**#2486** stop-ratchet freeze CONFIRMED
+as a *provable deadlock* and fixed default-off). **#2494** (appendix-drift
+linter) is mid QC-rework 1/2.
+
+**The finding worth carrying:** #2486 is real and stronger than filed — for a
+long in `Trailing`, `reachable_stop <= A0 x (1 - trailing_stop_buffer_pct)` is
+monotone non-increasing, so once it sits at or below the installed stop the
+machine can never raise, never reset the anchor, and never recover. A rising MA
+cannot rescue it (it enters through a dominated `min`). Fallback stops trip this
+whenever the entry bar's low is >1.09% below entry — near-certain weekly.
+Default-off fix verified byte-identical against merge-base over 20,000 `update`
+calls. The **real-data half is owned by the local session** (#2486+#2489+#2490
+share one instrumented 26y run) — see the scope fence on #2492.
+
+**Also:** qc-behavioral caught a **fourth** instance of this repo's recurring
+vacuous-pass defect on #2494 *before* it shipped (a later `## Appendix B` row
+silently credited a nonexistent subdir) — the pacer's rec #9 pattern, caught by
+the gate rather than by a follow-up PR.
 
 **Two findings worth carrying.** #2462's behavioral review found **the same
 disease surviving inside its own fix** — `walk`'s `| exception _ -> ()` still
@@ -56,7 +70,7 @@ Each row: one line; deeper task detail in the linked status file.
 
 | Track | Status | Owner | Open PR(s) | Next task |
 |---|---|---|---|---|
-| [arc-readiness](arc-readiness.md) | IN_PROGRESS | dayfine (LOCAL) + feat-weinstein | #2463 | A1-1 G2a BUILT — PR #2463, structural APPROVED; next: A1-2 G2b (simulator.ml at 493/500, extract first), then A1-4 grid (LOCAL, needs container) |
+| [arc-readiness](arc-readiness.md) | IN_PROGRESS | dayfine (LOCAL) + feat-weinstein | — | Funding program CLOSED (A1-1..A1-4); G3 terminal REJECT as default, G2a/G2b default-off axes; Axis 1+3 complete; next: A2-4 |
 | [resistance-v2](resistance-v2.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | grid 3/3 ACCEPT w=30; BUNDLE PROMOTED default-on #2047 (R3 human-approved 07-23); next: WF-CV vs w30 (data-gated) + lever-b axis |
 | [margin-realism](margin-realism.md) | IN_PROGRESS | dayfine (maintainer LOCAL) + feat-backtest | — | M4 MERGED #2063; #2057 exit labels MERGED #2074; trade_audit half MERGED #2085; #2076 CLOSED (report fallback #2196) |
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
@@ -78,18 +92,18 @@ Each row: one line; deeper task detail in the linked status file.
 | [decision-audit](decision-audit.md) | MERGED | feat-backtest | — | #1799/#1806/#1811 MERGED (report+counterfactual+weekly-picks adapter); selection FAITHFUL; live-picks pipeline ready (#1812); next: matured weekly counterfactual |
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
-| [support-floor-stops](support-floor-stops.md) | IN_PROGRESS | feat-weinstein | — | G4 basis split MERGED #2265 `1d2a94fd` (2 reworks); next: G7 (exe-side `_bar_close_of_reader` untested end-to-end) then G8 |
+| [support-floor-stops](support-floor-stops.md) | IN_PROGRESS | feat-weinstein | — | #2486 ratchet-freeze CONFIRMED + fixed default-off, MERGED #2492 `4141beda`; next: H1 `_ratchet_tightened` twin defect |
 | [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | #2081 robust dollar-ADV (#2060) MERGED `9670e49a`; next: short-leg regime-P&L decomposition (LOCAL) |
 | [extension-stop](extension-stop.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | arming + insurance-ACCEPT MERGED (#1960, ext_stop 2.0/0.25, default-off); next: default-flip only on further insurance-ACCEPT (R3, human-gated) |
-| [decline-character](decline-character.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | All builds + A-D flip merged; arming-speed A-D-live WF-CV REJECTED (#1729 ledger 06-24); decline mechanisms stay default-off axes; exhausted (#1739) |
+| [decline-character](decline-character.md) | MERGED | — | — | WORKSTREAM EXHAUSTED (#1739); closed in #2493 after 8 pacer asks; one EODHD-gated item to re-home |
 | [spy-only-reference](spy-only-reference.md) | IN_PROGRESS | feat-weinstein | — | WF-CV on sector-rotation testbed; top-1000 bankability gate; long-short verification (human session) |
 | [stage-accuracy](stage-accuracy.md) | IN_PROGRESS | feat-weinstein | — | force_exit_off grid REJECTED (#1503); cascade-selection inversion documented (#1509 merged); broad-universe WF-CV re-run data-gated |
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | **#2456** | #2462 + #2464 MERGED (sexp-drift linter no longer passes vacuously); #2456 gate-reader HELD `do-not-merge` — human call on `unclear` |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2494 | #2456 gate-reader MERGED 08-22 (human call on `unclear` made); #2494 appendix-drift check in QC rework 1/2 |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | A-MERGEABLE-STATE-NOT-A-CLOSE-TELL filed (run-1 guidance corrected); open: #2427 #2428 #2429 #2432 — need `workflow` scope or a human |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2461 MERGED (backtest subdir appendix reconciled, 4 missing rows); top item `linter_coverage` is a HUMAN POLICY DECISION, not agent work |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | `design_doc_drift_mechanization` mechanized via #2494 (harness scope); top item `linter_coverage` is a HUMAN POLICY DECISION |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |

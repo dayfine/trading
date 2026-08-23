@@ -855,6 +855,57 @@ finding kept below for the record.
   prohibition without addressing the incentive that defeats it.
   (source: 2026-07-28 lead-orchestrator runs 3-4, 4/4 reproduction)
 
+### A-AUDIT-SHA-BACKTICK — `record_qc_audit.sh` captures a Markdown backtick into the `sha` field
+
+- [ ] **The reviewed-SHA extractor does not strip Markdown formatting, so a
+  backticked `Reviewed SHA:` line yields a corrupt, truncated SHA.**
+  Owner: harness-maintainer. ~1 line + a test scenario.
+
+  **Measured 2026-08-23** (orchestrator run 32625658534), file mode, on
+  `dev/reviews/status-reconcile-2026-08-23.md`. The record written was correct
+  on every verdict field (`structural_qc: APPROVED`, `behavioral_qc: APPROVED`,
+  `overall_qc: APPROVED`, `quality_score: 4`) but carried:
+
+  ```json
+  "sha": "`6c86d37eb2f"
+  ```
+
+  — a leading backtick and an 11-char truncation of
+  `6c86d37eb2fb7b45a3528186836c5656cc7b7b70`.
+
+  **Root cause.** The script documents (its own header, "Reviewed SHA" block)
+  that it takes the **last** occurrence of `Reviewed SHA: <sha>`. qc-structural
+  wrote line 1 bare — `Reviewed SHA: 6c86d37e...` — and qc-behavioral, appending
+  its section below, wrote its own at line 64 **in backticks**:
+  `` Reviewed SHA: `6c86d37eb2fb...` ``. The extractor took the last one and its
+  character-class/length handling captured the backtick, then truncated.
+
+  **Why it matters rather than being cosmetic.** The header states the `sha` is
+  passed to `write_audit.sh` specifically so it "can tell a genuine rework (new
+  sha, same branch) apart from a retried invocation of the same review (same
+  sha)" — see `H-AUDIT-REWORK-COUNT-BLIND`. A value that depends on whether a
+  reviewer happened to use backticks makes two records at the *same real SHA*
+  compare unequal, which silently inflates `consecutive_rework_count` — the field
+  that drives the `>= 3` escalation. So the corruption lands precisely on the
+  signal the field exists to produce.
+
+  **Fix shape:** strip surrounding backticks/whitespace before validating, and
+  reject rather than truncate a value that fails the hex-SHA shape (a silent
+  truncation to 11 chars is the same fail-quiet class as the vacuous-pass family
+  this suite keeps re-learning). Add a `record_qc_audit_test.sh` scenario with a
+  backticked second `Reviewed SHA:` line.
+
+  **Same family as** `H-AUDIT-SHA-FILE-LEAK` (`dev/status/harness.md`), which
+  hardened *which file* the SHA is read from; this one is about *how the captured
+  text is cleaned*. Filed here rather than in `harness.md` only because a
+  concurrent rework agent held that file at filing time — **re-home to
+  `harness.md` on next touch.**
+
+  Mitigation already applied this run: QC briefs now instruct reviewers to write
+  any SHA reference in their appended section **bare, not backticked**. That is a
+  workaround in prose, not a fix — the extractor should not depend on it.
+  (source: 2026-08-23 lead-orchestrator run 32625658534, Step 5 Stage 4)
+
 ## Completed work
 
 ### `pr_gate_status.sh` — last-unfenced-Verdict fix (#2421)

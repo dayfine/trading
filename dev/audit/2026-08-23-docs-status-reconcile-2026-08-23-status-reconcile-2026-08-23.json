@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-23",
+  "feature": "status-reconcile-2026-08-23",
+  "branch": "docs/status-reconcile-2026-08-23",
+  "sha": "`6c86d37eb2f",
+  "recorded_at_ns": 1787474325503425254,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
