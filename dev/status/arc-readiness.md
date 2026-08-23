@@ -1,6 +1,6 @@
 # Status: arc-readiness
 
-## Last updated: 2026-08-22
+## Last updated: 2026-08-23
 
 ## Status
 IN_PROGRESS
@@ -8,8 +8,8 @@ IN_PROGRESS
 ## Interface stable
 NO
 
-G2a/G2b add two new config fields, and the config `.mli` is slated for
-docstring compression (A3-3).
+G2a/G2b add two new config fields. (A3-3, the config `.mli` docstring
+compression, has since shipped — #2477.)
 
 ---
 
@@ -92,12 +92,12 @@ The hole is the **funding leg**, whose plan
 | G1 — land `ticket_age_weeks_at_cancel` + `cancel_reason` (#2348) | ✅ done (3 impl, 5 test files) |
 | step 2 — measure the cohort from artifacts | ✅ done — 3,530 rejections, median shortfall 52%, 63% in bursts |
 | step 3 — build each axis behind its own flag | ✅ **3 of 3** (G3, G2a, G2b) |
-| step 4 — one grid over all three + null | ✅ done — #2473, program CLOSED |
+| step 4 — one grid over all three + null | ✅ done — #2473 `aa70c876`, program CLOSED |
 
 ### Sub-tasks
 
-- [x] **A1-1 — Build G2a `entry_fill_reject_retries`** (retry). Built on
-      `feat/arc-g2a-fill-retries`. Default-off `int`, default `0`
+- [x] **A1-1 — Build G2a `entry_fill_reject_retries`** (retry). **MERGED
+      #2463 `d7c3d295` 2026-08-21**, branch `feat/arc-g2a-fill-retries`. Default-off `int`, default `0`
       (`experiment-flag-discipline.md` R1/R2/R3 — no ledger verdict exists, so
       it ships off). New `Trading_simulation.Entry_fill_retry` holds the run's
       budget + per-ticket ledger; on a refused entry fill it leaves the
@@ -112,8 +112,8 @@ The hole is the **funding leg**, whose plan
       budget it consumed: `Simulator._compute_benchmark_return` moved to the
       existing `Simulator_metrics` (simulator.ml 500 → 493, its declared-large
       cap is 500).
-- [x] **A1-2 — Build G2b `entry_fill_size_to_available`** (resize). Built on
-      `feat/funding-g2b`. Two default-off fields: `entry_fill_size_to_available`
+- [x] **A1-2 — Build G2b `entry_fill_size_to_available`** (resize). **MERGED
+      #2468 `094b91b0` 2026-08-21**, branch `feat/funding-g2b`. Two default-off fields: `entry_fill_size_to_available`
       (`bool`, `false`) and its guard `entry_fill_min_size_fraction` (`float`,
       `0.5`, inert while the flag is off) — `experiment-flag-discipline.md`
       R1/R2/R3, no ledger verdict exists so it ships off. New
@@ -273,25 +273,35 @@ nobody budgets it. That is why the flag inventory sat unworked from 08-09.
       retire. **Caught by the tool below reading the record and reporting it as
       the one `ELIGIBLE` row** — making the claim operational is what exposed
       an assertion that had sat unchallenged for 11 days.
-- [ ] **A3-1 — Land `prune_candidates.sh` + weekly GHA** (#2449, in flight).
+- [x] **A3-1 — Land `prune_candidates.sh` + weekly GHA** — **MERGED #2449
+      `48c6315e` 2026-08-21** (marker corrected 2026-08-23; the entry still
+      read "in flight").
       Automates the *verification*, not the deletion: proposes, never deletes.
       Three checkers, each encoding a trap that cost a real error —
       `[[:space:]]` not `\s`; sanity probes that hard-abort rather than report
       an empty list as clean; a 30-day quarantine (a "cited by nothing" test
       also catches *this week's* work, so it measures citation **age**, not
       deadness); and a path name is not its content.
-- [ ] **A3-2 — Delete the 84 uncited priorities docs** (9,579 lines). Blocked
-      on A3-1 so the list is tool-verified. `session-rampup.md` already says
-      only the newest is load-bearing. Deletion loses nothing — git history
-      keeps them.
-- [ ] **A3-3 — Compress `weinstein_strategy_config.mli` docstrings.** Move
-      mechanism *histories* out (they already live in the ledger and experiment
-      records) and leave the contract. **Not** a Rule-4 retirement — the flags
-      stay, only the prose moves.
+- [x] **A3-2 — Delete the uncited priorities docs** — **MERGED #2476
+      `cd116d80` 2026-08-22**. Was blocked on A3-1 so the list would be
+      tool-verified; A3-1 landed 08-21 and this followed the next day.
+      `session-rampup.md` already says only the newest is load-bearing;
+      git history keeps the rest.
+- [x] **A3-3 — Compress `weinstein_strategy_config.mli` docstrings** —
+      **MERGED #2477 `3871a143` 2026-08-23**, 1,911 → 1,362 lines. Mechanism
+      *histories* moved out (they live in the ledger and experiment records),
+      contract left in place. **Not** a Rule-4 retirement — the flags stayed,
+      only the prose moved.
 
 ---
 
 ## Next task
+
+*Reconciled 2026-08-23. The previous version of this section named A3-2, A3-3
+and the #2433 framing decision as open; all three had landed, two of them the
+same day the section was written (#2474 merged ahead of #2476/#2477/#2433).
+A same-day ordering artifact, not neglect — but the file misdescribed its own
+track, so the claims are re-stated against verified merge state below.*
 
 **Axis 1 is feature-complete** — all seven arc mechanisms plus the funding
 trio built, exercised, and verdicted; the funding program is closed (#2473).
@@ -299,12 +309,18 @@ The `entry_fill_min_size_fraction` sweep the plan named is folded into the
 grid's outcome: with the whole G2b axis kept default-off on a no-promotion
 verdict, sweeping its guard has no decision to feed and is not queued.
 
-Remaining open work is Axis 2/3 + user decisions:
+**Axis 3 is complete as scoped.** A3-0 (#2450), A3-1 (#2449 `48c6315e`),
+A3-2 (#2476 `cd116d80`) and A3-3 (#2477 `3871a143`) have all merged.
 
-1. **A3-2 — delete the 84 uncited priorities docs** (tool-verified list via
-   #2449) and **A3-3 — compress `weinstein_strategy_config.mli`**.
-2. USER DECISIONS carried: global `initial_stop_buffer` flip; #2433 framing;
-   `Volume.config` overlay plumbing for the `strong_threshold` era axis.
+Remaining open work:
+
+1. **A2-4 — make the picks chart answer "how was entry picked?"** The *plan*
+   merged (#2453, 2026-08-21); the implementation has not. Phase A (date axis)
+   needs no schema change; Phase B needs `schema_version` 1 → 2. This is the
+   only unchecked sub-task left on the whole track.
+2. USER DECISIONS carried: global `initial_stop_buffer` flip; `Volume.config`
+   overlay plumbing for the `strong_threshold` era axis. (**The #2433 framing
+   decision is no longer carried** — see `## Follow-ups`.)
 3. A2-1 follow-up (not blocking): the funding-grid results dir commits no
    `params.sexp` beside its `actual.sexp` files, so `effect_null_report.exe`
    can only WARN there rather than verify. Committing a per-arm `params.sexp`
@@ -312,10 +328,14 @@ Remaining open work is Axis 2/3 + user decisions:
 
 ## Follow-ups
 
-- **#2433 framing** ⚠ USER DECISION — held under `do-not-merge`. Both gates
-  stale at `42da124b6`. The broad-5y result (#2448) bears on it: MaxDD agrees
-  across both windows, but the **win-rate leg fails Rule 4 on broad-5y** and
-  should no longer be quoted as a Rule-4 survivor without that counter-evidence.
+- **#2433 framing — RESOLVED. MERGED `d7087e0a` 2026-08-22, reframed.** This
+  entry previously read "⚠ USER DECISION — held under `do-not-merge`"; the hold
+  was lifted and the PR landed with its framing corrected. As merged: the
+  sp500 "reversal" is **retracted as a universe artifact** (#2448 `35aa1397`),
+  and **only MaxDD survives both cells**. The win-rate leg fails Rule 4 on
+  broad-5y and must not be quoted as a Rule-4 survivor. `Range_top_breakout`
+  is **not promotable** on this evidence.
+  See also `.claude/rules/universe-discipline.md`, which the episode produced.
 - Two non-blocking observations on #2449 recorded rather than fixed: checker 3's
   two sanity probes mutually mask, and the `newest`-by-git-log-vs-filename bound
   is not discriminated because the fixture's filename order coincides with its
