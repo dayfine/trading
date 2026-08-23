@@ -52,6 +52,11 @@ jobs:
       TRADING_DATA_DIR: ${{ github.workspace }}/trading/test_data
       # Restrict to 15y historical goldens.
       GOLDEN_SP500_SUBDIRS: goldens-sp500-historical
+      # Per-cell timeout (seconds). The script default is 90 min per cell,
+      # so three pathological hangs would take 270 min — racing the job's
+      # 240-min cap instead of being bounded by it. 70 min/cell keeps the
+      # worst case (~210 min + build) inside the cap by construction.
+      GOLDEN_SP500_TIMEOUT: "4200"
     steps:
       - uses: actions/checkout@v4
 
@@ -79,12 +84,14 @@ jobs:
               echo '```'
             } >>"$GITHUB_STEP_SUMMARY"
           else
-            # A summary-less run means the harness itself failed (timeout,
-            # OOM, build error) — not a scenario-level FAIL, which the soak
-            # policy (continue-on-error above) deliberately tolerates. Fail
-            # the job so the outage is visible: 96 consecutive timeout
-            # cancellations went unnoticed because this branch reported
-            # success (#2427).
+            # A summary-less run means the harness itself failed (OOM,
+            # build error, per-cell timeout) — not a scenario-level FAIL,
+            # which the soak policy (continue-on-error above) deliberately
+            # tolerates and which always writes a summary. Fail the job so
+            # the outage is visible. Note the job-timeout case is fixed by
+            # the 240-min cap above, not by this exit: a job-level cancel
+            # yields conclusion=cancelled regardless of step exit codes,
+            # and nothing watches that conclusion (#2427).
             echo "SP500 15y golden run: no summary produced." >>"$GITHUB_STEP_SUMMARY"
             exit 1
           fi
