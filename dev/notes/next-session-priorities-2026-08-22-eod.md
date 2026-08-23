@@ -71,3 +71,24 @@ making decisions from §2, not by dispatching work.
 - Container hygiene: TaskStop does not kill the in-container half of a
   docker exec — check `pgrep -x dune` + zombie count before build-heavy
   dispatches.
+
+---
+
+## Addendum (2026-08-22 ~24:00 PT) — issue burn-down after the pause
+
+A post-handoff burn-down closed **7 issues**, all through full gates:
+
+| closed | via | what |
+|---|---|---|
+| #2428, #2470 | PR #2480 | orchestrator merge-gate + Stage 3 now honour do-not-merge/draft/timeline holds; GHA subagents get their own `git worktree` + `_build` |
+| #2386 | PR #2479 | QC agents build their OWN checkout with plain git — parent-tree contradiction resolved in the rules |
+| #2427 | PR #2481 | 15y golden: root cause = 3 scenarios > 90-min cap (since #1050, 05-13); cap 240 + per-cell 4200s + summary-less runs fail loudly. First honest nightly run = next cron |
+| #2457 | PR #2484 | book-as-authority: environment-aware protocol (BOOK-CHECK-NEEDED queue for GHA reviewers; book never leaves the local machine) |
+| #2393 | PR #2482 | `goldens-affected` PR check is LIVE on every PR — config-default changes touching a postsubmit golden now block; `paired-run-done` label = documented ack path; rule `config-default-blast-radius.md` |
+| #2412 | PR #2485 | `fold_actual` carries `total_trades` + `max_trade_pnl_dollars` — the fewer-positions-vs-better-picks columns for the next surface |
+
+Also: issue-grading taxonomy (`kind/*`, `P0-P4`, `impact/*`, `size/*`) created, applied to all open issues, codified in `.claude/skills/triage-labels.md` (PR #2483). Filter: `gh issue list --label P1`.
+
+**⚠ New for the decision menu:** **#2486 (kind/bug P1 impact/H)** — the #2485 rework agent proved (in fixture) that a fallback initial stop FREEZES the trailing ratchet: the correction-cycle anchor candidate sits permanently below the stop, so fallback-stop positions never trail. Fallback is the common path (`project_fallback_stop_half_book_band`). **Verify on real data before or alongside decision §2.1 (`initial_stop_buffer` flip)** — the flip widens exactly the stop that this bug says is also frozen; the two interact.
+
+Remaining open issues: 13. P1 set: #2408 (stop surface, feeds §2.1), #2403 (goldens track live), #2440 (CI flake), #2486 (ratchet freeze).
