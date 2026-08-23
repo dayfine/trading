@@ -49,6 +49,43 @@ val noop_progress : progress_callback
 (** A {!progress_callback} that does nothing. Default for callers that don't
     want progress noise. *)
 
+val total_trades_of_metrics :
+  Trading_simulation_types.Metric_types.metric_set -> int
+(** [total_trades_of_metrics metrics] is the
+    {!Walk_forward_report.fold_actual.total_trades} column: the [NumTrades]
+    metric — the number of closed round-trips the fold's backtest produced —
+    rounded toward zero.
+
+    [NumTrades] is a count carried as a float in the metric set. A key that is
+    absent, or present but NaN, yields [0] — the same default the
+    {!Walk_forward_report.fold_actual} sexp deserialiser applies, so a
+    pre-column fixture and a genuine zero-trade fold both read [0].
+
+    Named and exported (rather than inlined into the private per-fold
+    projection) so the metric-key → column mapping can be pinned by a direct
+    unit test against a synthetic metric set. An end-to-end comparison against a
+    re-run backtest cannot do that job on its own: when a fold trades zero times
+    the trade-aggregate computer emits every one of its sixteen aggregates as
+    [0.0], so a wrong-key read compares equal to the right one. *)
+
+val max_trade_pnl_dollars_of_metrics :
+  Trading_simulation_types.Metric_types.metric_set -> float
+(** [max_trade_pnl_dollars_of_metrics metrics] is the
+    {!Walk_forward_report.fold_actual.max_trade_pnl_dollars} column: the
+    [LargestWinDollar] metric — the largest single closed round-trip gain, in
+    dollars.
+
+    Dollars rather than percent because the metric set carries no
+    percent-denominated largest-win member: [AvgWinPct] / [AvgLossPct] /
+    [AvgTradeSizePct] are its only per-trade percent metrics, and the [Best*Pct]
+    family is calendar-period portfolio return.
+
+    An absent key yields [Float.nan], which the report renderer prints as [n/a]
+    — deliberately distinct from a measured [$0]. Note the producer itself emits
+    [0.0], not NaN, for a fold that closed round-trips but had no winner. Named
+    and exported for the same key-pinning reason as {!total_trades_of_metrics}.
+*)
+
 type fold_runner = Scenario_lib.Scenario.t -> Walk_forward_report.fold_actual
 (** Per-scenario evaluator. Production wiring (when [?run_one] is omitted) calls
     {!Backtest.Runner.run_backtest} and projects its summary metrics into a
