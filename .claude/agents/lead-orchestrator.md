@@ -922,21 +922,59 @@ Dispatch shape depends on environment. Inspect `$TRADING_IN_CONTAINER` (set by t
 ### GHA (TRADING_IN_CONTAINER=1)
 
 - Use **git** for VCS (jj is not available in the GHA container).
-- Cap: **2 parallel subagents** per Agent message batch. Each subagent works on a
-  separate branch (`git checkout -b feat/<feature> origin/main`) — branches are
-  independent so parallel runs do not collide on the working tree. The Agent tool
-  spawns them concurrently via a single message with multiple sub-items; each
-  subagent operates in its own subprocess with its own git working copy state.
+- Cap: **2 parallel subagents** per Agent message batch. **Every concurrent
+  subagent gets its own `git worktree`, created by the orchestrator BEFORE
+  dispatch — never a bare `git checkout -b` in the shared checkout.** A git
+  repository has one working tree and one HEAD; N subagents running
+  `git checkout -b` in the same directory do not get N independent trees —
+  they get one tree whose HEAD is whichever agent checked out last, plus one
+  shared `trading/_build/.lock` that serializes their `dune build` calls (a
+  concurrent caller can stall on the lock indefinitely rather than fail
+  loudly — the same background-wait-stall shape as
+  `.claude/rules/pr-gate-loop.md` "The rework brief"). Measured 2026-08-22
+  (issue #2470): four agents dispatched with `git checkout -b` in the shared
+  tree ended with all four branches present on disk but only the LAST
+  agent's checkout as HEAD; one agent's finished work (400 lines, six
+  mutation-verified guards) sat uncommitted on a DIFFERENT agent's branch,
+  and a third agent stalled indefinitely on the shared `_build` lock,
+  returning nothing but a one-line status flip after 150k tokens.
+
+  Before dispatching, for each concurrent subagent:
+  ```sh
+  git worktree add --detach /__w/trading/wt-<branch> origin/main
+  ```
+  Pass `/__w/trading/wt-<branch>` as the subagent's working directory in its
+  brief, plus: **"cd into your worktree path immediately; never `cd
+  /__w/trading/trading`; do not run `git checkout -b <branch>` — create and
+  switch to your branch inside your own worktree with `git switch -c
+  <branch>`."** Each worktree gets its own `trading/_build/`, so `dune
+  build` calls no longer contend on one lock.
 - If the Agent tool does not support concurrent spawning in the container runtime,
   fall back to **3 sequential subagents** per run (dispatch the next one
   immediately after the prior returns, without waiting for human review). 3
-  sequential agents can easily reach 60-80% of a $50 daily cap.
-- Each subagent does: `git fetch origin && git checkout -b <branch> origin/main`
-  at session start. No cleanup needed — pushed branches persist; stale local
-  state from a prior sequential agent does not carry over because each subagent
-  starts with a fresh checkout command.
+  sequential agents can easily reach 60-80% of a $50 daily cap. Sequential
+  dispatch has no worktree-collision risk (only one agent holds a tree at a
+  time), but still create a worktree per the pattern above so a prior
+  agent's `_build` state and branch checkout can't leak into the next.
+- Each subagent does, inside its own worktree: `git fetch origin`, then
+  `git switch -c <branch> origin/main` — never `git checkout -b` against the
+  shared `/__w/trading/trading` checkout.
+- **Cleanup:** after a subagent's PR is pushed (or the agent fails), remove
+  its worktree: `git worktree remove --force /__w/trading/wt-<branch>`.
+  Stale worktrees consume runner disk across GHA runs.
 
-Do NOT set `isolation: "worktree"` on the Agent tool in either path. Local uses `jj workspace add`; GHA doesn't need isolation at all. Mixing git-worktree with jj caused the 2026-04-15 "worktree has no .jj/" failure; mixing at all is the confusion source we're fixing.
+Do NOT set `isolation: "worktree"` on the Agent tool in either path — Claude
+Code's `isolation: "worktree"` mechanism creates a *git* worktree backed by a
+shared `.jj/repo/`, which is the wrong isolation primitive here regardless of
+path (see `.claude/rules/worktree-isolation.md` "jj workspace isolation").
+Local gets its isolation from `jj workspace add`. **GHA needs worktree
+isolation too — it gets it from the plain `git worktree add` step above,
+created by the orchestrator, not from the Agent tool's `isolation:`
+parameter, and NOT from "no isolation at all."** (An earlier version of this
+file claimed GHA needs no isolation; #2470 measured that claim is false —
+see the incident above.) Mixing git-worktree with jj caused the 2026-04-15
+"worktree has no .jj/" failure; mixing at all is the confusion source we're
+fixing.
 
 **Parallel write conflict policy**: parallel feat-agents must not write to any shared file.
 The files `dev/decisions.md`, `CLAUDE.md`, and `docs/design/*.md` are read-only during
@@ -983,10 +1021,13 @@ Your branch: feat/<feature>
   jj new feat/<feature>@origin
   # If bookmark doesn't exist yet: jj bookmark create feat/<feature> -r @
 
-  # GHA path (TRADING_IN_CONTAINER=1) — plain git, sequential, no isolation:
+  # GHA path (TRADING_IN_CONTAINER=1) — plain git, own worktree (see Step 4):
+  #   cd /__w/trading/wt-<branch>   # path the orchestrator passed you; NEVER cd to /__w/trading/trading
   #   git fetch origin
-  #   git checkout -b feat/<feature> origin/main
-  # No workspace / worktree cleanup required.
+  #   git switch -c feat/<feature> origin/main   # NOT `git checkout -b` in the shared tree
+  # Do not remove your own worktree mid-session; report your worktree path as
+  # ready for cleanup when you finish (orchestrator runs
+  # `git worktree remove --force /__w/trading/wt-<branch>` after your PR is pushed).
 
 Work using TDD (CLAUDE.md workflow):
   1. .mli interface + skeleton → dune build passes
@@ -1301,6 +1342,22 @@ so the PR cosmetically looks un-reviewed (`gh pr list` default filter
 excludes drafts). That confused human reviewers in run-4: QC had APPROVED
 #447 but the PR remained draft.
 
+**⚠ HOLD CHECK — run this before the mutation, every time, with no
+exception.** A PR that a human deliberately converted to draft is a hold,
+not an "un-flip me" request — `overall_qc: APPROVED` does not override it.
+This is the exact action that overrode the #2384 hold on 2026-08-19 (draft
+flip → merge in 7 seconds) and caused a −40.91pp golden regression
+(#2396/#2397). Run the hold-detection snippet from Step 6.5
+("Hold detection — do not merge or flip through a human hold") against this
+`PR_NUMBER` first. If it reports a hold (`do-not-merge` label, or a
+`convert_to_draft` event post-dating the PR's first review), **do NOT run
+the mutation below.** Leave the PR in draft, record
+`draft-flip skipped: PR #<N> held (<reason>)` in `## Dispatched this run`,
+and surface it in `## Escalations`. Never clear the hold yourself — see
+`.claude/rules/pr-merge-gates.md` Rule 0.
+
+If (and only if) the hold check comes back clear, proceed:
+
 GitHub's REST API does not expose a draft→ready endpoint. Use the GraphQL
 `markPullRequestReadyForReview` mutation, which takes the PR's node ID
 (distinct from the integer number). The pattern:
@@ -1581,11 +1638,78 @@ failure mode this step exists to prevent.
 
 All three must be green before merge. Re-verify CI immediately before merge — never trust a stale "CI was green" read from earlier in the run.
 
-**Per-PR procedure:**
+**Hold detection — do not merge or flip through a human hold (`.claude/rules/pr-merge-gates.md` Rule 0).**
+A PR carrying the `do-not-merge` label, or one a human deliberately converted
+to draft, is a HARD hold that outranks all three gates above — CI green +
+double QC APPROVED does NOT authorize a merge through it. This is not
+optional defense-in-depth: on 2026-08-19 the orchestrator merged PR #2384
+~30 minutes after a human drafted it with an explicit hold comment, because
+the merge gate at the time read only `check-runs` and `mergeable_state` and
+never looked at `labels` or `draft` — a −40.91pp golden regression (#2396,
+reverted by #2397). Run this check as the FIRST thing below, and run it
+AGAIN immediately before the merge call in step 3 (QC or CI state can be
+stale, but so can a hold check read minutes earlier in the same run).
+
+The REST `pulls` payload already exposes both `draft` and `labels` — no
+extra call needed for the label check. Distinguishing "opened as draft,
+legitimately not yet flipped" from "deliberately converted to draft as a
+hold" needs one more call, the issue timeline: a PR opened as a draft never
+emits a `convert_to_draft` event, so a `convert_to_draft` event that
+post-dates the PR's first review is unambiguously a deliberate human hold.
+**Why label/timeline and not actor:** the orchestrator authenticates as the
+same GitHub account as the human (`dayfine`), so the timeline's `actor`
+field cannot separate "the orchestrator did this" from "the human did
+this" — the control has to be expressed in a vocabulary automation can read
+unambiguously (label presence, event ordering), not in who performed the
+action.
 
 ```bash
 REPO="${GITHUB_REPOSITORY:-dayfine/trading}"
 PR_NUMBER="<N>"   # from Step 5's Stage 1/2 output
+
+check_hold() {
+  # Sets HELD=true/false and HOLD_REASON. Call before any merge or
+  # draft->ready action; call again immediately before the merge PUT.
+  local pr_json
+  pr_json="$(curl -sSL \
+    -H "Authorization: Bearer ${GH_TOKEN}" \
+    -H "Accept: application/vnd.github+json" \
+    "https://api.github.com/repos/${REPO}/pulls/${PR_NUMBER}")"
+  local has_label is_draft
+  has_label="$(printf '%s' "$pr_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("true" if any(l.get("name")=="do-not-merge" for l in d.get("labels",[])) else "false")' 2>/dev/null || echo false)"
+  is_draft="$(printf '%s' "$pr_json" | python3 -c 'import json,sys; print("true" if json.load(sys.stdin).get("draft") else "false")' 2>/dev/null || echo false)"
+
+  local deliberate_draft_hold="false"
+  if [ "$is_draft" = "true" ]; then
+    local timeline
+    timeline="$(curl -sSL \
+      -H "Authorization: Bearer ${GH_TOKEN}" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}/timeline?per_page=100")"
+    deliberate_draft_hold="$(printf '%s' "$timeline" | python3 -c '
+import json,sys
+events = json.load(sys.stdin)
+first_review = next((e["created_at"] for e in events if e.get("event")=="reviewed"), None)
+converts = [e["created_at"] for e in events if e.get("event")=="convert_to_draft"]
+print("true" if first_review and any(c > first_review for c in converts) else "false")
+' 2>/dev/null || echo false)"
+  fi
+
+  if [ "$has_label" = "true" ] || [ "$deliberate_draft_hold" = "true" ]; then
+    HELD=true
+    HOLD_REASON="do-not-merge-label=${has_label} deliberate-draft-hold=${deliberate_draft_hold}"
+  else
+    HELD=false
+    HOLD_REASON=""
+  fi
+}
+
+check_hold
+if [ "$HELD" = "true" ]; then
+  echo "MERGE_SKIP: PR #${PR_NUMBER} — HELD (${HOLD_REASON}). Never auto-clear a hold."
+  # → surface as escalation (see below); do NOT merge, do NOT touch draft state
+  # Skip the rest of this procedure for this PR.
+fi
 
 # 1. Get the PR's tip SHA, then verify all required CI checks are COMPLETED SUCCESS.
 #    Poll up to 15 minutes (90 × 10s).
@@ -1651,7 +1775,15 @@ else
     echo "MERGE_SKIP: PR #${PR_NUMBER} — mergeable_state=${MERGE_STATE} (not clean after update)"
     # → surface as escalation
   else
-    # 3. Merge.
+    # 3. Re-check the hold immediately before merging — a human can add the
+    # label or convert to draft at any point during the CI-poll / branch-update
+    # wait above. Never merge on a hold read taken minutes earlier.
+    check_hold
+    if [ "$HELD" = "true" ]; then
+      echo "MERGE_SKIP: PR #${PR_NUMBER} — HELD (${HOLD_REASON}) as of pre-merge re-check. Never auto-clear a hold."
+      # → surface as escalation; do NOT merge
+    else
+    # 4. Merge.
     MERGE_RESPONSE="$(curl -sSL -X PUT \
       -H "Authorization: Bearer ${GH_TOKEN}" \
       -H "Accept: application/vnd.github+json" \
@@ -1663,6 +1795,7 @@ else
     else
       echo "MERGE_FAILED: PR #${PR_NUMBER} response: ${MERGE_RESPONSE}"
       # → surface as escalation
+    fi
     fi
   fi
 fi
