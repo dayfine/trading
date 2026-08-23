@@ -92,3 +92,30 @@ Also: issue-grading taxonomy (`kind/*`, `P0-P4`, `impact/*`, `size/*`) created, 
 **⚠ New for the decision menu:** **#2486 (kind/bug P1 impact/H)** — the #2485 rework agent proved (in fixture) that a fallback initial stop FREEZES the trailing ratchet: the correction-cycle anchor candidate sits permanently below the stop, so fallback-stop positions never trail. Fallback is the common path (`project_fallback_stop_half_book_band`). **Verify on real data before or alongside decision §2.1 (`initial_stop_buffer` flip)** — the flip widens exactly the stop that this bug says is also frozen; the two interact.
 
 Remaining open issues: 13. P1 set: #2408 (stop surface, feeds §2.1), #2403 (goldens track live), #2440 (CI flake), #2486 (ratchet freeze).
+
+---
+
+## Addendum 2 (2026-08-23 ~00:30 PT) — user-queued research pair, and the opening move
+
+The user queued two analysis programs (filed + labeled `kind/research P1 impact/H`):
+
+- **#2489 — representative-trade audit** (`size/M`): are our realized trades the
+  book's population? Three populations on distribution tables — executed trades,
+  the §4.2 fill-week ejections (72%), funding-death tickets — across base length,
+  breakout volume ratio, stage/RS at entry, holding weeks, exit reason. Feeds
+  decision §2.2 directly (are we ejecting the representative trades?).
+- **#2490 — monster capture funnel** (`size/L`): the counterfactual, scoped to
+  CAPTURE not picks (pick-selection is a closed powered null — do not re-measure)
+  and to decision-time-visible monster criteria (no hindsight oracles). Funnel per
+  rule-visible monster: existed → surfaced → gated → ticketed → funded → filled →
+  held. Output = per-stage leak table, each stage mapped to an existing dial.
+  This operationalizes "protect MONSTER entries" from the funding-grid why.
+
+**Opening move for the next session:** #2486 (did the installed stop ever rise,
+split fallback-vs-support), #2489, and #2490 all want per-position fields from
+the same instrumented 26y record-convention run. **Design the instrumentation
+once, run once, analyze three ways** — then take decisions §2.1/§2.2 with all
+three results in hand. Do not launch three separate multi-hour runs.
+
+P1 queue after this addendum: #2486 → #2489/#2490 (shared run) → decisions
+§2.1/§2.2; then #2408, #2403, #2440. Filter: `gh issue list --label P1`.
