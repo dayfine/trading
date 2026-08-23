@@ -358,6 +358,22 @@ STATE: EXITED
     — treat the lost points as insurance premium
 ```
 
+**Resolved question (2026-08-23, from #2492's BOOK-CHECK-NEEDED):** *When a
+correction cycle completes but the stop it implies is at/below the resting
+stop, does the reference point advance to the new cycle's structure, or stay
+pinned to the older, deeper low?* — **It advances.** In the Ch. 6 XYZ
+walk-through every successive raise is computed from that cycle's own
+correction low and the current (risen) MA ("The next decline to point G
+terminates right at the MA at 32⅛… the stop should be raised to 31⅞"), and a
+cycle whose implied raise is trivial still hands the reference to the new
+structure — the stop simply doesn't move: "Since point M is at 46½, which is
+so close to the 46 stop, you need not raise the stop for such a trivial
+change." There is no case where a reference stays anchored to an older low
+across completed cycles. The never-lower rule constrains the STOP, not the
+anchor. (Implication: an implementation whose anchor is a monotone min seeded
+at entry, never resetting on a completed-but-non-improving cycle, is an
+artifact — the book's anchor is per-cycle. See issue #2486 / PR #2492.)
+
 ### 5.3 Trailing Stop — Trader Method
 
 More aggressive than investor:
