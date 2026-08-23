@@ -1,12 +1,54 @@
 # Status: decline-character
 
-## Last updated: 2026-06-25
+## Last updated: 2026-08-23
 
 ## Status
-IN_PROGRESS
+MERGED
 
 ## Interface stable
-NO
+YES
+
+## WORKSTREAM EXHAUSTED (self-declared 2026-06-25, #1739)
+
+**This track is closed. It was self-declared exhausted on 2026-06-25 and the
+declaration sat buried under `## Next steps` for 59 days**, while the track
+pacer asked eight consecutive times that the status be marked accordingly. This
+reconcile is that bookkeeping — the exhaustion is the track's own call
+(`#1739 e57c69e9`, with the memory snapshot refreshed in `#1740 f563cd96` the
+same day), not a strategy judgment made here. The full reasoning stays verbatim
+under `## Next steps` below.
+
+Summary of the terminal state:
+
+- **All four builds merged.** Build 1 classifier (#1692), the A-D-default flip
+  (#1725, confirmation-grid 3/3 ACCEPT), the faithful short gate (#1696), the
+  arming-speed knob (#1708).
+- **Every mechanism ends as a default-off axis, none default-on** —
+  `catastrophic_stop_pct` armed on `Fast_v`, `neutral_blocks_shorts`,
+  `enable_slow_grind_short_gate`, `fast_v_arm_on_rate_alone`. This is the
+  intended terminal state for faithful narrow-niche tail-RISK insurance, not a
+  failure (`memory/project_decline_character_builds`,
+  `project_edge_is_the_fat_tail`).
+- **The last open empirical question was answered NO** — ledger
+  `dev/experiments/_ledger/2026-06-24-arming-speed-adlive-wfcv.sexp`, verdict
+  Reject.
+- **No further mechanism search is planned.** Any revival is a new hypothesis
+  with its own ledger entry.
+
+Verified on main 2026-08-23: `decline_character.{ml,mli}` has taken exactly one
+commit since closure — `c42da690` (#1904), which widened
+`[@@deriving sexp]` to `[@@deriving show, eq, sexp]` on the config record.
+Additive only, no signature change; hence `## Interface stable: YES` (it read
+`NO` while the track was still building).
+
+**One item is deferred rather than done** — the heavy-tier golden re-pin's
+OOM/snapshot-mode cells, EODHD-data-gated (see `## Next steps` item 1). It is
+data-gated infrastructure work, not decline-character mechanism work, and does
+not keep this track open. **Recommendation:** re-home it under
+`backtest-infra` or `data-foundations` rather than leaving it as the sole
+resident of a closed track.
+
+---
 
 A lookahead-free classifier of the current market decline
 (`Slow_grind | Fast_v | Not_declining`) — the shared primitive that two later
