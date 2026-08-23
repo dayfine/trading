@@ -5,6 +5,53 @@ open Matchers
 
 let date = Date.of_string "2024-01-15"
 
+(* Compact builders for the stop-ratchet tests below. The older tests inline
+   their transition literals; these would be unreadable at four transitions a
+   piece. *)
+let _create_entering ~position_id ~side : Position.transition =
+  {
+    position_id;
+    date;
+    kind =
+      CreateEntering
+        {
+          symbol = "AAPL";
+          side;
+          target_quantity = 100.0;
+          entry_price = 150.0;
+          reasoning = ManualDecision { description = "test" };
+        };
+  }
+
+let _risk_params stop_loss_price : Position.risk_params =
+  { stop_loss_price; take_profit_price = None; max_hold_days = None }
+
+let _entry_complete ~position_id ~stop : Position.transition =
+  {
+    position_id;
+    date;
+    kind = EntryComplete { risk_params = _risk_params stop };
+  }
+
+let _update_stop ~position_id ~stop : Position.transition =
+  {
+    position_id;
+    date;
+    kind = UpdateRiskParams { new_risk_params = _risk_params stop };
+  }
+
+(* Drive one position's transitions through a fresh collector and return its
+   single [stop_info]. *)
+let _run_one transitions : Backtest.Stop_log.stop_info =
+  let log = Backtest.Stop_log.create () in
+  Backtest.Stop_log.record_transitions log transitions;
+  match Backtest.Stop_log.get_stop_infos log with
+  | [ info ] -> info
+  | infos ->
+      assert_failure
+        (Printf.sprintf "expected exactly one stop_info, got %d"
+           (List.length infos))
+
 let test_create_entering_records_symbol _ =
   let log = Backtest.Stop_log.create () in
   Backtest.Stop_log.record_transitions log
@@ -608,6 +655,167 @@ let test_classify_custom_threshold_changes_classification _ =
     (default_kind, strict_kind)
     (equal_to (Backtest.Stop_log.Intraday, Backtest.Stop_log.Gap_down))
 
+(* Stop-ratchet observability (max_stop / n_stop_raises) ---------------- *)
+
+let _pid = "AAPL-wein-1"
+
+let test_ratchet_counts_each_strict_raise _ =
+  assert_that
+    (_run_one
+       [
+         _create_entering ~position_id:_pid ~side:Long;
+         _entry_complete ~position_id:_pid ~stop:(Some 142.50);
+         _update_stop ~position_id:_pid ~stop:(Some 148.00);
+         _update_stop ~position_id:_pid ~stop:(Some 152.00);
+       ])
+    (all_of
+       [
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
+           (equal_to 2);
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.max_stop)
+           (is_some_and (float_equal 152.00));
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.exit_stop)
+           (is_some_and (float_equal 152.00));
+       ])
+
+(* A stop that never moves after entry: zero raises, and the high-water mark is
+   the entry stop itself (not [None]). *)
+let test_ratchet_zero_when_stop_never_moves _ =
+  assert_that
+    (_run_one
+       [
+         _create_entering ~position_id:_pid ~side:Long;
+         _entry_complete ~position_id:_pid ~stop:(Some 142.50);
+       ])
+    (all_of
+       [
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
+           (equal_to 0);
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.max_stop)
+           (is_some_and (float_equal 142.50));
+       ])
+
+(* Re-installing the same level is not a raise — the comparison is strict. *)
+let test_ratchet_ignores_unchanged_reinstall _ =
+  assert_that
+    (_run_one
+       [
+         _create_entering ~position_id:_pid ~side:Long;
+         _entry_complete ~position_id:_pid ~stop:(Some 142.50);
+         _update_stop ~position_id:_pid ~stop:(Some 142.50);
+       ])
+    (field
+       (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
+       (equal_to 0))
+
+(* A split rescales price and stop DOWN together. For a long that is strictly
+   less protective, so it cannot inflate the count — but a genuine ratchet
+   after the split still counts, being compared against the rescaled level.
+   [max_stop] stays on the pre-split scale (documented caveat in the .mli). *)
+let test_ratchet_split_rescale_does_not_count_but_later_raise_does _ =
+  assert_that
+    (_run_one
+       [
+         _create_entering ~position_id:_pid ~side:Long;
+         _entry_complete ~position_id:_pid ~stop:(Some 142.50);
+         _update_stop ~position_id:_pid ~stop:(Some 71.25);
+         _update_stop ~position_id:_pid ~stop:(Some 75.00);
+       ])
+    (all_of
+       [
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
+           (equal_to 1);
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.max_stop)
+           (is_some_and (float_equal 142.50));
+       ])
+
+(* For a short, "more protective" is DOWNWARD: a falling stop is the raise and
+   [max_stop] is the running minimum. *)
+let test_ratchet_short_side_counts_downward_moves _ =
+  assert_that
+    (_run_one
+       [
+         _create_entering ~position_id:_pid ~side:Short;
+         _entry_complete ~position_id:_pid ~stop:(Some 160.00);
+         _update_stop ~position_id:_pid ~stop:(Some 155.00);
+         _update_stop ~position_id:_pid ~stop:(Some 158.00);
+       ])
+    (all_of
+       [
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
+           (equal_to 1);
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.max_stop)
+           (is_some_and (float_equal 155.00));
+       ])
+
+(* The first level ever installed on a position is an install, not a raise —
+   even when it arrives as an [UpdateRiskParams] with no [EntryComplete]
+   before it. *)
+let test_ratchet_first_install_is_not_a_raise _ =
+  assert_that
+    (_run_one
+       [
+         _create_entering ~position_id:_pid ~side:Long;
+         _update_stop ~position_id:_pid ~stop:(Some 142.50);
+       ])
+    (all_of
+       [
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
+           (equal_to 0);
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.max_stop)
+           (is_some_and (float_equal 142.50));
+       ])
+
+(* A position that reaches [EntryComplete] carrying no stop, and never gets one
+   installed afterwards, has no high-water mark at all — [max_stop] is [None]
+   rather than some seeded level, and nothing was ever raised. *)
+let test_ratchet_max_stop_none_when_no_stop_ever_installed _ =
+  assert_that
+    (_run_one
+       [
+         _create_entering ~position_id:_pid ~side:Long;
+         _entry_complete ~position_id:_pid ~stop:None;
+       ])
+    (all_of
+       [
+         field (fun (i : Backtest.Stop_log.stop_info) -> i.max_stop) is_none;
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
+           (equal_to 0);
+       ])
+
+(* The collector tolerates a transition stream whose [CreateEntering] it never
+   observed, and treats such a position as [Long]. This pins the SIGN of that
+   default: a rising stop is the raise and [max_stop] is the running maximum.
+   Were the default [Short], both fields would read 0 / 142.50 instead. *)
+let test_ratchet_side_defaults_to_long_without_create_entering _ =
+  assert_that
+    (_run_one
+       [
+         _entry_complete ~position_id:_pid ~stop:(Some 142.50);
+         _update_stop ~position_id:_pid ~stop:(Some 148.00);
+       ])
+    (all_of
+       [
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
+           (equal_to 1);
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.max_stop)
+           (is_some_and (float_equal 148.00));
+       ])
+
 let suite =
   "Stop_log"
   >::: [
@@ -643,6 +851,22 @@ let suite =
          >:: test_classify_signal_reversal_is_non_stop_exit;
          "classify custom threshold changes outcome"
          >:: test_classify_custom_threshold_changes_classification;
+         "ratchet counts each strict raise"
+         >:: test_ratchet_counts_each_strict_raise;
+         "ratchet is zero when the stop never moves"
+         >:: test_ratchet_zero_when_stop_never_moves;
+         "ratchet ignores an unchanged re-install"
+         >:: test_ratchet_ignores_unchanged_reinstall;
+         "ratchet: split rescale does not count, later raise does"
+         >:: test_ratchet_split_rescale_does_not_count_but_later_raise_does;
+         "ratchet: short side counts downward moves"
+         >:: test_ratchet_short_side_counts_downward_moves;
+         "ratchet: first install is not a raise"
+         >:: test_ratchet_first_install_is_not_a_raise;
+         "ratchet: max_stop is None when no stop was ever installed"
+         >:: test_ratchet_max_stop_none_when_no_stop_ever_installed;
+         "ratchet: side defaults to Long without CreateEntering"
+         >:: test_ratchet_side_defaults_to_long_without_create_entering;
        ]
 
 let () = run_test_tt_main suite

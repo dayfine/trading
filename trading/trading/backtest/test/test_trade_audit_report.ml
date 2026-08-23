@@ -1004,10 +1004,11 @@ let test_load_missing_trades_csv_raises _ =
     adds 6 trailing per-trade context columns (entry_stage, entry_volume_ratio,
     stop_initial_distance_pct, stop_trigger_kind, days_to_first_stop_trigger,
     screener_score_at_entry); the trades.csv export-join fix appends
-    position_id; the fill-model confound fix appends stop_fill_distance_pct (new
+    position_id; the fill-model confound fix appends stop_fill_distance_pct; the
+    stop-ratchet observability columns append max_stop + n_stop_raises (new
     columns are appended so positional readers stay valid). *)
 let _canonical_post_g2_header =
-  "symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry,position_id,stop_fill_distance_pct"
+  "symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry,position_id,stop_fill_distance_pct,max_stop,n_stop_raises"
 
 (* AAPL LONG round-trip: bought at 280, sold at 404, +12 400 / +44.20%. *)
 let _post_g2_long_row =

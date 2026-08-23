@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-08-13
+## Last updated: 2026-08-23
 
 ## Status
 IN_PROGRESS
@@ -18,6 +18,43 @@ landed 2026-04-25. Continuous perf monitoring + benchmark-suite work
 moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
+
+## 2026-08-23 — observability instrumentation (#2486, #2490)
+
+- [x] **Stop-ratchet columns on `trades.csv` (#2486)** — `Stop_log.stop_info`
+  gained `max_stop : float option` (most-protective level ever installed —
+  running max for a long, running min for a short) and `n_stop_raises : int`
+  (count of `UpdateRiskParams` installing a strictly-more-protective level).
+  Before this, every `UpdateRiskParams` overwrote `pos_current_stop`
+  (`stop_log.ml:99-106`) and the intermediate levels were destroyed, so
+  `trades.csv` could not distinguish "the trailing ratchet never moved" from
+  "it ratcheted five times and then a rescale gave the ground back" — which
+  is exactly the question #2486's fallback-stop-freezes-the-ratchet
+  hypothesis asks. Both surface as two columns **appended** at the end of
+  `trades.csv` via `Trade_context` (empty cell when no stop-log record
+  joined; `n_stop_raises` stays `None` rather than `Some 0` so "never moved"
+  and "no record" stay distinguishable).
+  Side comes from the position's `CreateEntering` transition, defaulting to
+  `Long`. The comparison is **strict**, which is what makes split adjustments
+  safe: a split rescales price and stop downward together, so the post-split
+  level is strictly *less* protective for a long and cannot inflate the
+  count, while a genuine ratchet after the split still counts (it is compared
+  against the already-rescaled level). Documented caveat: `max_stop` is a
+  high-water mark over raw installed levels, so on a split-crossing position
+  it stays on the pre-split scale while `exit_stop` is post-split.
+  No behaviour change — pure observation of transitions the collector already
+  saw. Lives at `trading/trading/backtest/lib/{stop_log,trade_context}.{ml,mli}`.
+  `trade_context.ml` sat exactly on the 300-line cap, so the two new columns
+  would have broken it; the index-bundle construction (`precomputed` + its five
+  `_build_*` folds) is extracted to a new
+  `trading/trading/backtest/lib/trade_context_index.{ml,mli}` rather than
+  raising the limit or adding an `@large-module` marker
+  (`code-health-discipline.md`). `Trade_context.precomputed` stays abstract, so
+  the public join contract is unchanged; only construction moved, the lookup /
+  fallback policy stayed. `trade_context.ml` is now 241 lines.
+  Verify: `dune runtest trading/backtest` (six new `Stop_log` ratchet tests,
+  two new `Trade_context` join tests, `trades.csv` header pin updated in
+  `test_trade_audit_report.ml`).
 
 ## 2026-08-13 — trade-audit join keyed by position_id (closes the 51%-loss join)
 

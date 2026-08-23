@@ -13,6 +13,8 @@ type t = {
   screener_score_at_entry : int option;
   position_id : string option;
   stop_fill_distance_pct : float option;
+  max_stop : float option;
+  n_stop_raises : int option;
 }
 [@@deriving sexp]
 
@@ -41,9 +43,15 @@ let csv_header_fields =
     "screener_score_at_entry";
     Trades_csv_schema.position_id_column_name;
     "stop_fill_distance_pct";
+    "max_stop";
+    "n_stop_raises";
   ]
 
 let _fmt_float4_opt = function Some f -> Printf.sprintf "%.4f" f | None -> ""
+
+(* Price precision, matching the [entry_stop] / [exit_stop] columns the result
+   writer emits, rather than the ratio precision used above. *)
+let _fmt_price_opt = function Some f -> Printf.sprintf "%.2f" f | None -> ""
 let _fmt_int_opt = function Some i -> Int.to_string i | None -> ""
 let _fmt_string_opt = function Some s -> s | None -> ""
 
@@ -57,94 +65,17 @@ let csv_row_fields (t : t) =
     _fmt_int_opt t.screener_score_at_entry;
     _fmt_string_opt t.position_id;
     _fmt_float4_opt t.stop_fill_distance_pct;
+    _fmt_price_opt t.max_stop;
+    _fmt_int_opt t.n_stop_raises;
   ]
 
-type precomputed = {
-  audit_by_position_id :
-    (string, Trade_audit.audit_record, String.comparator_witness) Map.t;
-      (** [entry.position_id] → audit_record. The exact join — immune to any
-          decision→fill date gap. See the [.mli]'s join-order section. *)
-  audit_by_key :
-    (string, Trade_audit.audit_record, String.comparator_witness) Map.t;
-      (** Exact (symbol, entry_date) → audit_record. *)
-  audit_by_symbol :
-    (string, Trade_audit.audit_record list, String.comparator_witness) Map.t;
-      (** symbol → audit_records sorted by [entry.entry_date] descending. Used
-          as fallback when the exact-date key misses: the audit records the
-          {b decision} date (typically a Friday), while [trade.entry_date]
-          reflects the simulator step on which the order's fill was recorded —
-          which can be a calendar day or two later because the simulator
-          increments [current_date] by 1 calendar day per step and fills GTC
-          orders on the next step that has price-path state. We pick the most
-          recent audit record whose [entry.entry_date] is ≤ [trade.entry_date]
-          and within a small window (1 week). *)
-  stop_by_position_id :
-    (string, Stop_log.stop_info, String.comparator_witness) Map.t;
-  stop_first_by_symbol :
-    (string, Stop_log.stop_info, String.comparator_witness) Map.t;
-}
+(* Index construction lives in [Trade_context_index]; the lookup / fallback
+   policy that reads those maps stays here, where the join-order contract is
+   documented. *)
+type precomputed = Trade_context_index.t
 
-let _audit_key ~symbol ~entry_date = symbol ^ "|" ^ Date.to_string entry_date
-
-(* Position ids are unique per strategy position, so at most one record lands
-   per key. *)
-let _build_audit_by_position_id (audit : Trade_audit.audit_record list) =
-  List.fold audit
-    ~init:(Map.empty (module String))
-    ~f:(fun acc (record : Trade_audit.audit_record) ->
-      Map.set acc ~key:record.entry.position_id ~data:record)
-
-let _build_audit_by_key (audit : Trade_audit.audit_record list) =
-  List.fold audit
-    ~init:(Map.empty (module String))
-    ~f:(fun acc (record : Trade_audit.audit_record) ->
-      let key =
-        _audit_key ~symbol:record.entry.symbol
-          ~entry_date:record.entry.entry_date
-      in
-      Map.set acc ~key ~data:record)
-
-(** Group audit records by symbol, sorted by [entry.entry_date] descending
-    (newest first). Used by [_lookup_audit_for_trade] for the date-window
-    fallback. *)
-let _build_audit_by_symbol (audit : Trade_audit.audit_record list) =
-  List.fold audit
-    ~init:(Map.empty (module String))
-    ~f:(fun acc (record : Trade_audit.audit_record) ->
-      Map.update acc record.entry.symbol ~f:(function
-        | None -> [ record ]
-        | Some xs -> record :: xs))
-  |> Map.map ~f:(fun records ->
-      List.sort records ~compare:(fun (a : Trade_audit.audit_record) b ->
-          Date.compare b.entry.entry_date a.entry.entry_date))
-
-let _build_stop_by_position_id (stop_infos : Stop_log.stop_info list) =
-  List.fold stop_infos
-    ~init:(Map.empty (module String))
-    ~f:(fun acc (info : Stop_log.stop_info) ->
-      Map.set acc ~key:info.position_id ~data:info)
-
-(** Map symbol -> first {!Stop_log.stop_info} encountered for that symbol. The
-    fallback path in [_stop_info_for] picks the first matching info via
-    [List.find]; preserving the head-first semantics here means we only insert
-    when the key is absent. *)
-let _build_stop_first_by_symbol (stop_infos : Stop_log.stop_info list) =
-  List.fold stop_infos
-    ~init:(Map.empty (module String))
-    ~f:(fun acc (info : Stop_log.stop_info) ->
-      Map.update acc info.symbol ~f:(function
-        | Some existing -> existing
-        | None -> info))
-
-let precompute ~(audit : Trade_audit.audit_record list)
-    ~(stop_infos : Stop_log.stop_info list) : precomputed =
-  {
-    audit_by_position_id = _build_audit_by_position_id audit;
-    audit_by_key = _build_audit_by_key audit;
-    audit_by_symbol = _build_audit_by_symbol audit;
-    stop_by_position_id = _build_stop_by_position_id stop_infos;
-    stop_first_by_symbol = _build_stop_first_by_symbol stop_infos;
-  }
+let precompute = Trade_context_index.build
+let _audit_key = Trade_context_index.audit_key
 
 (* Tolerance for the date-window fallback: a Friday decision whose fill lands a
    step or two later, plus long-weekend / holiday slack. Deliberately NOT
@@ -248,6 +179,13 @@ let _stop_columns ~entry ~stop_info ~entry_date ~exit_date =
         stop_trigger_kind_label (Stop_log.classify_stop_trigger_kind ~side t)),
     _days_to_first_stop_trigger ~entry_date ~exit_date ~trigger )
 
+(* The two stop-ratchet observability columns. [n_stop_raises] stays [None] —
+   not [Some 0] — when no stop-log record joined, so "never ratcheted" and "no
+   record" remain distinguishable in the export. *)
+let _stop_ratchet_columns (stop_info : Stop_log.stop_info option) =
+  ( Option.bind stop_info ~f:(fun (i : Stop_log.stop_info) -> i.max_stop),
+    Option.map stop_info ~f:(fun (i : Stop_log.stop_info) -> i.n_stop_raises) )
+
 let of_precomputed (pre : precomputed)
     ~(trade : Trading_simulation.Metrics.trade_metrics) : t =
   let audit_record =
@@ -277,6 +215,7 @@ let of_precomputed (pre : precomputed)
     _stop_columns ~entry ~stop_info ~entry_date:trade.entry_date
       ~exit_date:trade.exit_date
   in
+  let max_stop, n_stop_raises = _stop_ratchet_columns stop_info in
   {
     symbol = trade.symbol;
     entry_date = trade.entry_date;
@@ -288,6 +227,8 @@ let of_precomputed (pre : precomputed)
     screener_score_at_entry;
     position_id;
     stop_fill_distance_pct;
+    max_stop;
+    n_stop_raises;
   }
 
 (** Convenience wrapper: builds [precomputed] inline. Per-trade callers in a
