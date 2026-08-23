@@ -25,6 +25,31 @@
 #   7. A golden-runs-*.yml workflow with NO explicit
 #      GOLDEN_SP500_SUBDIRS line still finds a match via the documented
 #      default ("goldens-sp500 goldens-sp500-historical").
+#   8. Docstring cross-reference (Step 2.5) catches a golden that arms a
+#      RELATED knob (cited via "[bracket]" syntax), not the changed one
+#      -> FAIL naming "related-via:<changed knob>".
+#   9. Non-snake_case bracket citations ("[E]", "[Entering]") are NOT
+#      treated as related-knob citations -> OK, exit 0.
+#   10. A docstring containing prose "Word:" lines (e.g. "Motivation:",
+#       "bug:") BEFORE its genuine "[bracket]" citation does not
+#       falsely end the field-declaration block early -> still FAIL,
+#       naming the related knob. Mutation-tested: loosening the Step 2.5
+#       anchor to match any-indentation "identifier:" makes this
+#       assertion (and only this one) fail while the rest of the suite
+#       stays green -- see PR #2482 review + this fixture's own comment.
+#   11. live-config-overrides.sexp: a NESTED config-record line
+#       ("((portfolio_config ((max_position_pct_long 0.14))))") is
+#       matched at the OUTER identifier ("portfolio_config") -> FAIL
+#       naming "portfolio_config".
+#   12. Same nested-record line, but the golden references only the
+#       NESTED field name ("max_position_pct_long") and never the outer
+#       identifier -> OK, exit 0. Pins the documented known-gap: outer-
+#       identifier-only extraction is a false negative for a golden
+#       keyed on the nested name alone.
+#   13. Acknowledgment path (GOLDENS_AFFECTED_ACK=1): the same
+#       knob+golden match that produces a FAIL in assertion 4 instead
+#       exits 0 with an "OK (acknowledged)" notice that still lists the
+#       affected golden and points at the PR-body requirement.
 #
 # Run:
 #   sh trading/devtools/checks/goldens_affected_check_test.sh
@@ -70,17 +95,24 @@ _commit() {
   git -C "$repo" rev-parse HEAD
 }
 
-# _run <repo> <base-sha> <head-sha> — invokes the real script with
+# _run <repo> <base-sha> <head-sha> [ack] — invokes the real script with
 # REPO_ROOT pinned to the fixture repo; captures combined output + exit
 # code into globals OUT / RC (POSIX sh has no local return-by-value, and
 # this test never runs assertions concurrently, so plain globals are
-# safe here).
+# safe here). Optional 4th arg "ack" sets GOLDENS_AFFECTED_ACK=1, mirroring
+# what goldens-affected.yml does when the PR carries the 'paired-run-done'
+# label (assertion 13).
 _run() {
   repo="$1"
   base="$2"
   head="$3"
+  ack="${4:-}"
   set +e
-  OUT="$(REPO_ROOT="$repo" sh "$SCRIPT" "$base" "$head" 2>&1)"
+  if [ "$ack" = "ack" ]; then
+    OUT="$(REPO_ROOT="$repo" GOLDENS_AFFECTED_ACK=1 sh "$SCRIPT" "$base" "$head" 2>&1)"
+  else
+    OUT="$(REPO_ROOT="$repo" sh "$SCRIPT" "$base" "$head" 2>&1)"
+  fi
   RC=$?
   set -e
 }
@@ -325,6 +357,141 @@ else
   fail "assertion 9: expected OK/exit0 (non-snake_case citations excluded), got rc=$RC output=$OUT"
 fi
 rm -rf "$REPO9"
+
+echo "=== Assertion 10: docstring prose 'Word:' lines before the genuine [bracket] citation do not truncate the field-declaration block early ==="
+# Pins the CP4 gap qc-behavioral flagged on PR #2482: the Step 2.5 field-
+# declaration anchor requires EXACTLY two leading spaces so that prose
+# lines like "Motivation:" / "bug:" -- indented as docstring BODY text,
+# not as a field declaration -- are never mistaken for the next field
+# and don't falsely end the block before its real [bracket] citation.
+# Mirrors the actual entry_order_max_rest_weeks docstring shape that
+# motivated this guard (see goldens_affected_check.sh's own comment at
+# the anchor). MUTATION-TESTED: replacing the anchor with the looser
+# `^[ \t]*[A-Za-z_][A-Za-z0-9_]*[ \t]*:[ \t]*[A-Za-z(]` form (any
+# indentation) makes ONLY this assertion fail -- the "Motivation:" line
+# below satisfies that looser pattern and ends the block before reaching
+# "[knob_b]" -- while assertions 1-9 and 11-13 stay green.
+REPO10="$(_new_repo)"
+mkdir -p "$(dirname "$REPO10/$SURFACE_MLI_REL")" "$REPO10/.github/workflows"
+mkdir -p "$REPO10/trading/test_data/backtest_scenarios/goldens-sp500"
+{
+  echo "type config = {"
+  echo "  knob_a : int; [@sexp.default 0]"
+  echo "      (** Old-format long docstring."
+  echo ""
+  echo "          Motivation: in a fast V-crash the ticket rests too long."
+  echo ""
+  echo "          bug: a ticket placed on review week N would linger."
+  echo ""
+  echo "          See [knob_b] -- the only place a clock can bite. *)"
+  echo "  knob_b : bool; [@sexp.default false]"
+  echo "      (** Unrelated field. *)"
+  echo "}"
+} > "$REPO10/$SURFACE_MLI_REL"
+{
+  echo "      GOLDEN_SP500_SUBDIRS: goldens-sp500"
+} > "$REPO10/.github/workflows/golden-runs-fixture.yml"
+{
+  echo "((name \"fixture-golden\")"
+  echo " (config_overrides (((knob_b true)))))"
+} > "$REPO10/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden.sexp"
+SHA10A="$(_commit "$REPO10" "base")"
+sed -i.bak 's/knob_a : int; \[@sexp.default 0\]/knob_a : int; [@sexp.default 26]/' "$REPO10/$SURFACE_MLI_REL"
+rm -f "$REPO10/$SURFACE_MLI_REL.bak"
+SHA10B="$(_commit "$REPO10" "head: flip knob_a default 0 -> 26")"
+_run "$REPO10" "$SHA10A" "$SHA10B"
+if [ "$RC" -eq 1 ] \
+  && echo "$OUT" | grep -q "knob_b" \
+  && echo "$OUT" | grep -q "related-via:knob_a" \
+  && echo "$OUT" | grep -q "fixture-golden.sexp"; then
+  pass "assertion 10: prose 'Word:' lines do not truncate the block before [knob_b]"
+else
+  fail "assertion 10: expected FAIL/exit1 naming knob_b via related-via:knob_a despite prose colons, got rc=$RC output=$OUT"
+fi
+rm -rf "$REPO10"
+
+echo "=== Assertion 11: live-config-overrides.sexp nested config-record line is matched at the OUTER identifier -> FAIL ==="
+# Pins the header comment's documented claim (Step 2, "Nested config
+# records ... are only matched at the OUTER identifier"): a change that
+# adds "((portfolio_config ((max_position_pct_long 0.14))))" is detected
+# as a change to "portfolio_config", the outer name -- which is exactly
+# what a golden's config_overrides entry keys on.
+REPO11="$(_new_repo)"
+mkdir -p "$REPO11/dev/weekly-picks" "$REPO11/.github/workflows"
+mkdir -p "$REPO11/trading/test_data/backtest_scenarios/goldens-sp500"
+{
+  echo "; live overrides, empty at base"
+} > "$REPO11/$SURFACE_OVERRIDES_REL"
+{
+  echo "      GOLDEN_SP500_SUBDIRS: goldens-sp500"
+} > "$REPO11/.github/workflows/golden-runs-fixture.yml"
+{
+  echo "((name \"fixture-golden\")"
+  echo " (config_overrides (((portfolio_config ((max_position_pct_long 0.20)))))))"
+} > "$REPO11/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden.sexp"
+SHA11A="$(_commit "$REPO11" "base")"
+echo "((portfolio_config ((max_position_pct_long 0.14))))" >> "$REPO11/$SURFACE_OVERRIDES_REL"
+SHA11B="$(_commit "$REPO11" "head: arm nested portfolio_config override")"
+_run "$REPO11" "$SHA11A" "$SHA11B"
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "'portfolio_config'"; then
+  pass "assertion 11: nested config-record line matched at the outer identifier -> FAIL"
+else
+  fail "assertion 11: expected FAIL/exit1 naming portfolio_config, got rc=$RC output=$OUT"
+fi
+rm -rf "$REPO11"
+
+echo "=== Assertion 12: golden references ONLY the nested field name, never the outer identifier -> OK (documented known gap) ==="
+# Same nested-record change as assertion 11, but the golden's text
+# contains only "max_position_pct_long", never "portfolio_config". Per
+# the header comment this is a known false negative, not a defect --
+# this assertion pins that the documented gap is real current behaviour
+# rather than an accidental claim with no fixture.
+REPO12="$(_new_repo)"
+mkdir -p "$REPO12/dev/weekly-picks" "$REPO12/.github/workflows"
+mkdir -p "$REPO12/trading/test_data/backtest_scenarios/goldens-sp500"
+{
+  echo "; live overrides, empty at base"
+} > "$REPO12/$SURFACE_OVERRIDES_REL"
+{
+  echo "      GOLDEN_SP500_SUBDIRS: goldens-sp500"
+} > "$REPO12/.github/workflows/golden-runs-fixture.yml"
+{
+  echo "((name \"fixture-golden\")"
+  echo " (config_overrides (((max_position_pct_long 0.20)))))"
+} > "$REPO12/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden.sexp"
+SHA12A="$(_commit "$REPO12" "base")"
+echo "((portfolio_config ((max_position_pct_long 0.14))))" >> "$REPO12/$SURFACE_OVERRIDES_REL"
+SHA12B="$(_commit "$REPO12" "head: arm nested portfolio_config override")"
+_run "$REPO12" "$SHA12A" "$SHA12B"
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "zero postsubmit golden specs"; then
+  pass "assertion 12: nested-field-only golden not matched (known gap) -> OK"
+else
+  fail "assertion 12: expected OK/exit0 (outer-only extraction misses nested-only reference), got rc=$RC output=$OUT"
+fi
+rm -rf "$REPO12"
+
+echo "=== Assertion 13: GOLDENS_AFFECTED_ACK=1 downgrades a real match to OK (acknowledged) ==="
+# Reuses assertion 4's exact fixture (a real FAIL) but runs it with the
+# ack env var goldens-affected.yml sets from the 'paired-run-done' label
+# (B3 resolution path, PR #2482 rework). Exit must flip to 0, and the
+# notice must still name the affected golden plus point at the PR-body
+# requirement -- the label acknowledges the paired run happened, it
+# doesn't hide which golden was affected.
+REPO13="$(_make_default_change_repo yes yes yes goldens-sp500)"
+SHA13A="$(_commit "$REPO13" "base")"
+sed -i.bak 's/\[@sexp.default 0\]/[@sexp.default 26]/' "$REPO13/$SURFACE_MLI_REL"
+rm -f "$REPO13/$SURFACE_MLI_REL.bak"
+SHA13B="$(_commit "$REPO13" "head: flip default 0 -> 26")"
+_run "$REPO13" "$SHA13A" "$SHA13B" ack
+if [ "$RC" -eq 0 ] \
+  && echo "$OUT" | grep -q "acknowledged" \
+  && echo "$OUT" | grep -q "fixture-golden.sexp" \
+  && echo "$OUT" | grep -q "PR body"; then
+  pass "assertion 13: GOLDENS_AFFECTED_ACK=1 downgrades FAIL to OK (acknowledged), still naming the golden"
+else
+  fail "assertion 13: expected OK/exit0 acknowledged notice naming the golden, got rc=$RC output=$OUT"
+fi
+rm -rf "$REPO13"
 
 echo ""
 echo "=== Results: ${PASS_COUNT} passed, ${FAIL_COUNT} failed ==="

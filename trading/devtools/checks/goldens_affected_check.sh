@@ -103,7 +103,13 @@
 #   result for the overwhelming majority of PRs (26 of 27 goldens were
 #   structurally unaffected by #2384 — this script exists for the 27th).
 #   Any match -> FAIL, exit 1, listing every match and pointing at the
-#   manual paired-run requirement.
+#   manual paired-run requirement -- UNLESS GOLDENS_AFFECTED_ACK=1 is set
+#   in the environment, in which case the same match list is printed as
+#   an "OK (acknowledged)" pass-with-notice instead. goldens-affected.yml
+#   sets that var from the PR's `paired-run-done` label, which a human
+#   applies after eyeballing the pasted paired-run table
+#   (`.claude/rules/config-default-blast-radius.md`) -- this script never
+#   verifies the table itself, only that the label is present.
 #
 # KNOWN LIMITATION
 #
@@ -208,7 +214,7 @@ fi
 sort -u "$DIRECT_KNOBS_FILE" -o "$DIRECT_KNOBS_FILE"
 
 if [ ! -s "$DIRECT_KNOBS_FILE" ]; then
-  echo "OK: goldens_affected_check -- config-default surface file(s) changed, but no [@sexp.default value / override knob was added or removed ($BASE_REF..$HEAD_REF)."
+  echo "OK: goldens_affected_check -- no [@sexp.default value / override knob was added or removed in any config-default surface file ($BASE_REF..$HEAD_REF)."
   exit 0
 fi
 
@@ -341,6 +347,27 @@ if [ "$MATCH_COUNT" -eq 0 ]; then
   exit 0
 fi
 
+# --- Acknowledgment path (B3): a PR that legitimately trips this check has
+# no way to make the diff-derived FAIL above go away on its own -- see
+# goldens-affected.yml's "ACKNOWLEDGMENT PATH" comment and
+# .claude/rules/config-default-blast-radius.md. A human applies the
+# 'paired-run-done' label AFTER eyeballing the pasted paired-run table;
+# the workflow then sets this env var. This downgrades the verdict to a
+# pass-with-notice -- it does NOT verify the table's contents, only that
+# the label (an explicit human act) is present.
+if [ "${GOLDENS_AFFECTED_ACK:-}" = "1" ]; then
+  echo "OK (acknowledged): goldens_affected_check -- this PR changes a config default that a POSTSUBMIT-ONLY golden arms, but the 'paired-run-done' label is present."
+  echo ""
+  printf '%b' "$MATCHES"
+  echo ""
+  echo "The paired golden run table required by"
+  echo ".claude/rules/config-default-blast-radius.md must already be pasted in"
+  echo "the PR body -- this downgrade only records that a maintainer applied the"
+  echo "'paired-run-done' label after eyeballing that table; it does not verify"
+  echo "the table's contents."
+  exit 0
+fi
+
 echo "FAIL: goldens_affected_check -- this PR changes a config default that a POSTSUBMIT-ONLY golden arms."
 echo ""
 printf '%b' "$MATCHES"
@@ -351,5 +378,6 @@ echo ".claude/rules/config-default-blast-radius.md, run each affected golden by"
 echo "hand, PAIRED (base vs this PR, one-line spec diff), and paste the paired"
 echo "table in the PR body before merging. See issue #2393 / PR #2384"
 echo "(-38.42pp merged on green CI) for why this is a hard requirement, not"
-echo "a suggestion."
+echo "a suggestion. Once the table is pasted, apply the 'paired-run-done' label"
+echo "to acknowledge it and turn this check green."
 exit 1
