@@ -125,10 +125,17 @@ let test_compute_bah_aggregate_2fold _ =
 
 (* ---------- sexp round-trip ---------- *)
 
-(** Belt-and-suspenders that the aggregate the lib produces is a fixed point of
-    [sexp_of_aggregate |> aggregate_of_sexp]. The bayesian_runner consumes the
-    aggregate from disk via [aggregate_of_sexp], so a non-round-trippable shape
-    would silently block the v7 sweep. *)
+(** Belt-and-suspenders that the aggregate the lib produces survives
+    [sexp_of_aggregate |> aggregate_of_sexp] losslessly. The bayesian_runner
+    consumes the aggregate from disk via [aggregate_of_sexp], so a
+    non-round-trippable shape would silently block the v7 sweep.
+
+    The comparison is on the {b sexps}, not the values: this aggregator does not
+    measure per-trade dollar P&L (it reads an adjusted-close series, not a
+    portfolio), so [max_trade_pnl_dollars] is [Float.nan] — and structural
+    equality on a record holding NaN is false even for a perfect round-trip.
+    Sexp equality states the losslessness property the docstring above cares
+    about without inheriting that NaN artifact. *)
 let test_aggregate_roundtrips_through_sexp _ =
   let start_date = _date 2020 1 1 in
   let end_date = _date 2020 6 28 in
@@ -142,7 +149,7 @@ let test_aggregate_roundtrips_through_sexp _ =
   let agg = Lib.compute_bah_aggregate ~prices ~spec ~label:"cell-E" in
   let sexp = Wf_types.sexp_of_aggregate agg in
   let agg' = Wf_types.aggregate_of_sexp sexp in
-  assert_that agg' (equal_to agg)
+  assert_that (Wf_types.sexp_of_aggregate agg') (equal_to sexp)
 
 let suite =
   "test_bah_baseline_aggregator"
