@@ -877,3 +877,79 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
     adjudication. Same review also surfaced the practical cost: a body-only
     rework finding at an approved SHA would aggregate rework+ok → `unclear`
     terminally, which is why this very note rides a tip-moving commit.
+
+## Added 2026-08-23 (harness-maintainer, harness/design-doc-drift-check)
+
+- [x] design_doc_drift_mechanization (`dev/status/cleanup.md`) — new
+  PR-time linter closing the recurring appendix-drift gap in
+  `dev/plans/backtest-scale-optimization-2026-04-17.md`. Before building
+  anything, re-measured the claimed drift by hand
+  (`comm -23` between `ls -1 trading/trading/backtest/` (minus
+  `lib/`/`test/`/`scenarios/`) and the appendix table's row names, on
+  `main@e64f8655`): **zero drift** — PR #2461 (2026-08-21) had already
+  reconciled it, 27 on-disk subdirs / 27 rows, exact match. The dispatch
+  brief's claimed third-drift set (`trade_audit_report`, `tuner`,
+  `validation`, `walk_forward`, `warmup_gate` allegedly missing) did not
+  reproduce; all five already have rows. So this PR adds no appendix rows
+  — it lands the mechanized check on an already-clean tree, closing the
+  gap *before* a fourth drift can happen rather than reacting to one.
+  Files: `trading/devtools/checks/backtest_appendix_drift_check.sh` (the
+  check, wired into `dune runtest` via `trading/devtools/checks/dune`),
+  `trading/devtools/checks/backtest_appendix_drift_check_test.sh` (9
+  fixture scenarios: clean, missing-row, no-heading, no-rows,
+  empty-backtest-dir, exclusions, section-scoped, outside-appendix,
+  exclusion-not-broad). Distinct from the pre-existing
+  `deep_scan/check_02_design_doc_drift.sh` backtest block: that one runs
+  only on the weekly deep-scan cadence and is warning-only (`add_warning`,
+  never fails the build; loose substring grep against the whole doc
+  text). This new check runs on every `dune runtest`, requires an actual
+  appendix TABLE ROW under the appendix heading (not just a text mention
+  anywhere in the doc), and FAILs the build. Three vacuous-pass guards
+  (appendix heading not found / zero table rows parsed / zero on-disk
+  subdirectories after exclusions), each mutation-tested by hand: guard
+  deleted from a scratch copy, re-run against the fixture that guard
+  exists to catch, confirmed the result flips from FAIL to a false OK.
+  Guard 3 alone flips "FAIL: found ZERO subdirectories ... expected
+  several" to "OK: backtest_appendix_drift_check — 0 on-disk
+  subdirectories ... all have an appendix row" when deleted — the exact
+  "0 drifted, all good" failure shape the dispatch brief warned about, now
+  reproduced and closed. Guards 1+2 (heading/rows) turned out to have a
+  natural backstop from guard 3 + the diff logic under most conditions
+  (an empty appendix-rows set with non-empty on-disk dirs still fails via
+  the normal diff, just with a less specific message) — verified this
+  directly rather than assuming it, and kept both guards anyway for the
+  clearer diagnostic and as defense-in-depth; the combined
+  all-three-guards-removed mutant (heading absent, backtest dir with only
+  excluded subdirs) does reproduce a genuine silent OK. Verify:
+  `dune build @devtools/checks/runtest --force` from `trading/` (both
+  rules print `OK:`), or directly: `sh
+  trading/devtools/checks/backtest_appendix_drift_check.sh` and `sh
+  trading/devtools/checks/backtest_appendix_drift_check_test.sh`.
+
+  **2026-08-23 rework (qc-behavioral NEEDS_REWORK, iteration 1, quality
+  score 2/5 → addressed):** the reviewer found a real vacuous-pass gap and
+  an unpinned headline claim, both now fixed. (1) The original appendix-row
+  extraction ran "heading to EOF" rather than to the next `## ` section
+  boundary — a later section (e.g. an "Appendix B") containing an unrelated
+  table row was silently credited as an appendix row. Fixed to stop at the
+  next `## ` heading; pinned by new scenario 7 (`section-scoped`).
+  Reproduced the reviewer's exact fixture before/after: old logic → `OK ...
+  2 on-disk subdirectories ... all have an appendix row` (exit 0, silently
+  crediting a smuggled row); new logic → `FAIL ... smuggled/` (exit 1). (2)
+  The script's differentiating claim over `check_02` (table row under the
+  appendix, not a prose/whole-doc match) was true but unpinned by any
+  scenario — added scenario 8 (`outside-appendix`: prose mention + a table
+  row in an unrelated table before the appendix, neither satisfies the
+  check). Also addressed the four non-blocking findings: corrected the test
+  file's own header (it previously claimed all three guard deletions flip
+  to a false OK; only guard 3 does — guards 1/2 flip the message but the
+  suite stays FAIL via the normal diff backstop, which the PR body and this
+  entry already stated correctly); added a header line making the
+  check's one-directionality (missing-row only, not stale-row) explicit
+  and citing PR #2461's measurement that the reverse direction has never
+  occurred; added scenario 9 (`exclusion-not-broad`) pinning that
+  `EXCLUDED_SUBDIRS` matching is exact, not substring; widened the row-name
+  character class from `[A-Za-z0-9_]` to `[A-Za-z0-9_.-]` so a hyphenated
+  subdirectory with a correct row would not be misreported as missing.
+  Verify: `sh trading/devtools/checks/backtest_appendix_drift_check_test.sh`
+  (prints "all 9 scenarios passed").
