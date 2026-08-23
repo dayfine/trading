@@ -84,14 +84,16 @@ jobs:
               echo '```'
             } >>"$GITHUB_STEP_SUMMARY"
           else
-            # A summary-less run means the harness itself failed (OOM,
-            # build error, per-cell timeout) — not a scenario-level FAIL,
-            # which the soak policy (continue-on-error above) deliberately
-            # tolerates and which always writes a summary. Fail the job so
-            # the outage is visible. Note the job-timeout case is fixed by
-            # the 240-min cap above, not by this exit: a job-level cancel
-            # yields conclusion=cancelled regardless of step exit codes,
-            # and nothing watches that conclusion (#2427).
+            # The script writes summary.txt UNCONDITIONALLY after its
+            # scenario loop — cells that FAIL or hit the per-cell timeout
+            # still land there as FAIL rows, which is the soak policy
+            # (continue-on-error above) working as intended. A MISSING
+            # summary therefore means the script died before finishing the
+            # loop; fail the job so that outage is visible instead of the
+            # silent green this branch used to report (#2427). The
+            # job-timeout case is separate: a job-level cancel yields
+            # conclusion=cancelled regardless of step exit codes — that
+            # case is fixed by the 240-min cap above, not by this exit.
             echo "SP500 15y golden run: no summary produced." >>"$GITHUB_STEP_SUMMARY"
             exit 1
           fi
