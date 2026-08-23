@@ -41,12 +41,13 @@ let _sector_map_override (s : Scenario.t) =
   let resolved = Filename.concat (_fixtures_root ()) s.universe_path in
   Universe_file.to_sector_map_override (Universe_file.load resolved)
 
-let _run_scenario () =
+let _run_scenario ?candidate_log ?(extra_overrides = []) () =
   let s = _load_scenario () in
   let sector_map_override = _sector_map_override s in
   Backtest.Runner.run_backtest ~start_date:s.period.start_date
-    ~end_date:s.period.end_date ~overrides:s.config_overrides
-    ?sector_map_override ()
+    ~end_date:s.period.end_date
+    ~overrides:(s.config_overrides @ extra_overrides)
+    ?sector_map_override ?candidate_log ()
 
 (* -------------------------------------------------------------------- *)
 (* Smoke: audit is populated when the run produces entries               *)
@@ -236,6 +237,64 @@ let test_cascade_entered_sum_matches_audit_records _ =
   in
   assert_that total_entered (equal_to (List.length result.audit))
 
+(* -------------------------------------------------------------------- *)
+(* Per-week candidate capture (#2490) — the flag-ON path, end to end     *)
+(* -------------------------------------------------------------------- *)
+
+module Candidate_log = Backtest.Candidate_log
+
+let _run_with_candidate_log () =
+  _run_scenario ~candidate_log:(Candidate_log.create ()) ()
+
+(** Capture is opt-in, so the default run — every other test in this file — must
+    leave [candidate_weeks] empty. Pins the half of [cascade_trace.mli]'s inert
+    claim that is observable from the runner. *)
+let test_candidate_weeks_are_empty_without_a_collector _ =
+  let result = _run_scenario () in
+  assert_that result.candidate_weeks (size_is 0)
+
+(** With a collector passed, one week is drained per screened Friday
+    ([panel_runner.mli]: "one [Candidate_log.week] is drained into the collector
+    per screened Friday"), so the week count must match the per-Friday
+    [cascade_summaries] the same run produces. Both are filtered to [start_date]
+    by [Runner._assemble_result], so the equality is exact. *)
+let test_candidate_weeks_track_cascade_summaries _ =
+  let result = _run_with_candidate_log () in
+  assert_that
+    (List.length result.candidate_weeks)
+    (equal_to (List.length result.cascade_summaries))
+
+(** The load-bearing pin for the whole flag-ON chain: walk →
+    [?on_candidates_considered] → [Cascade_trace.record] → recorder → collector
+    → [result.candidate_weeks]. Week {i count} alone is not enough — a
+    [Cascade_trace.record] emitting a constant [[]], or a deleted [Option.iter]
+    in the entry walk, still yields one plausible-looking week per Friday with
+    every candidate list empty, which reads as "the walk passed nothing over".
+    So this asserts at least one week carries at least one {b named} candidate.
+
+    The unmodified smoke fixture funds every candidate it screens, and a funded
+    ([Kept]) candidate is deliberately excluded from the artefact — it has its
+    own audit row. So the run is given a hard long-notional cap
+    ([max_long_exposure_pct_entry], default [0.0] = no-op) tight enough that
+    every long is rejected at the P0b gate and recorded as
+    [Skipped Long_exposure_cap]. That makes named candidates deterministic and
+    lands the assertion squarely on the G1 shape: Fridays that funded nothing
+    still carry their walk. *)
+let test_candidate_weeks_carry_named_candidates _ =
+  let result =
+    _run_scenario ~candidate_log:(Candidate_log.create ())
+      ~extra_overrides:
+        [ Sexp.of_string "((max_long_exposure_pct_entry 0.001))" ]
+      ()
+  in
+  let named =
+    List.concat_map result.candidate_weeks ~f:(fun (w : Candidate_log.week) ->
+        w.candidates)
+    |> List.count ~f:(fun (c : Candidate_log.candidate) ->
+        String.length c.symbol > 0)
+  in
+  assert_that named (gt (module Int_ord) 0)
+
 let suite =
   "Trade_audit_capture"
   >::: [
@@ -254,6 +313,12 @@ let suite =
          >:: test_cascade_summary_counts_are_coherent;
          "cascade entered sum matches audit records"
          >:: test_cascade_entered_sum_matches_audit_records;
+         "candidate weeks are empty without a collector"
+         >:: test_candidate_weeks_are_empty_without_a_collector;
+         "candidate weeks track cascade summaries"
+         >:: test_candidate_weeks_track_cascade_summaries;
+         "candidate weeks carry named candidates"
+         >:: test_candidate_weeks_carry_named_candidates;
        ]
 
 let () = run_test_tt_main suite

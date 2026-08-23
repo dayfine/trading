@@ -4,7 +4,7 @@
     Usage: scenario_runner
     [--goldens-small | --goldens-broad | --goldens | --smoke | --dir <path>]
     [--parallel N] [--fixtures-root <path>] [--snapshot-dir <path>]
-    [--progress-every N] [--no-emit-all-eligible]
+    [--progress-every N] [--no-emit-all-eligible] [--emit-candidates]
 
     [--goldens-small] — small-universe goldens (~300 symbols; local-friendly).
     [--goldens-broad] — broad-universe goldens (full sector-map; nightly/GHA).
@@ -39,6 +39,15 @@
     a per-trade alpha snapshot of every Stage-1→2 breakout that fired across the
     run window. Use [--no-emit-all-eligible] to suppress for perf sweeps / quick
     smoke pipelines that don't want to pay the diagnostic's scan + score cost.
+
+    [--emit-candidates] — opt into the per-week candidate list (issue #2490),
+    writing [<scenario_dir>/candidates.sexp]: for every screened Friday, the
+    names the entry walk passed over and their decision-time signals — emitted
+    even on Fridays that funded nothing, which is the gap [trade_audit.sexp]
+    cannot fill. Default OFF, mirroring [--no-emit-all-eligible]'s polarity in
+    reverse: this one costs strategy-side work per Friday, so it opts in rather
+    than out. Observability only — the gate lives on the audit recorder, moves
+    no strategy behaviour, and cannot change a golden.
 
     Reads all *.sexp files from the selected directory, runs each via
     {!Backtest.Runner.run_backtest}, prints a pass/fail table, and writes
@@ -276,7 +285,8 @@ let _emit_fold_health ~scenario_dir ~(result : Backtest.Runner.result) =
   Backtest.Fold_health_runner.emit ~output_dir:scenario_dir result
 
 let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
-    ~emit_all_eligible ~bar_data_source ~scenario_path (s : Scenario.t) =
+    ~emit_all_eligible ~emit_candidates ~bar_data_source ~scenario_path
+    (s : Scenario.t) =
   eprintf "\n>>> Running %s: %s (%s to %s)\n%!" s.name s.description
     (Date.to_string s.period.start_date)
     (Date.to_string s.period.end_date);
@@ -293,12 +303,19 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
     Backtest.Runner.run_backtest ~start_date:s.period.start_date
       ~end_date:s.period.end_date ~overrides:s.config_overrides
       ?sector_map_override ~strategy_choice:s.strategy ~progress_emitter
-      ?slippage_bps:s.slippage_bps ?cost_model:s.cost_model ?bar_data_source ()
+      ?slippage_bps:s.slippage_bps ?cost_model:s.cost_model ?bar_data_source
+      ?candidate_log:(Backtest.Candidate_log.create_if emit_candidates)
+      ()
   in
   let wall_seconds =
     Time_ns.Span.to_sec (Time_ns.diff (Time_ns_unix.now ()) t_start)
   in
   Backtest.Result_writer.write ~output_dir:scenario_dir result;
+  (* Post-step: per-week candidate list (#2490). Runs after the canonical
+     artefacts are on disk and swallows its own failures, so a writer problem
+     cannot cost the scenario its result. No-op when the flag is off. *)
+  Backtest.Candidate_log.emit ~enabled:emit_candidates ~scenario_dir
+    result.candidate_weeks;
   let a = _actual_of_result result in
   Sexp.save_hum (_actual_path ~output_root s) (sexp_of_actual a);
   (* Degenerate-fold guard: surface the silent-garbage signature (zero in-window
@@ -346,12 +363,13 @@ let _write_crashed_actual ~output_root (s : Scenario.t) ~msg =
     (sexp_of_actual (_crashed_actual ~msg))
 
 let _fork_scenario ~output_root ~fixtures_root ~progress_every
-    ~emit_all_eligible ~bar_data_source ~scenario_path (s : Scenario.t) =
+    ~emit_all_eligible ~emit_candidates ~bar_data_source ~scenario_path
+    (s : Scenario.t) =
   match Core_unix.fork () with
   | `In_the_child -> (
       try
         _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
-          ~emit_all_eligible ~bar_data_source ~scenario_path s;
+          ~emit_all_eligible ~emit_candidates ~bar_data_source ~scenario_path s;
         Stdlib.exit 0
       with e ->
         let msg = Exn.to_string e in
@@ -375,7 +393,7 @@ let _await_one running =
   match Core_unix.waitpid pid with Ok () -> Succeeded | Error _ -> Crashed
 
 let _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
-    ~progress_every ~emit_all_eligible ~bar_data_source
+    ~progress_every ~emit_all_eligible ~emit_candidates ~bar_data_source
     (scenarios : (string * Scenario.t) list) =
   let running = Queue.create () in
   let statuses = Hashtbl.create (module String) in
@@ -389,7 +407,7 @@ let _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
       if Queue.length running >= parallel then reap ();
       let pid =
         _fork_scenario ~output_root ~fixtures_root ~progress_every
-          ~emit_all_eligible ~bar_data_source ~scenario_path s
+          ~emit_all_eligible ~emit_candidates ~bar_data_source ~scenario_path s
       in
       Queue.enqueue running (s, pid));
   while not (Queue.is_empty running) do
@@ -458,6 +476,13 @@ type _cli_args = {
          The [--no-emit-all-eligible] flag flips this off for perf sweeps /
          quick smoke pipelines that don't want to pay the diagnostic's scan +
          score cost. *)
+  emit_candidates : bool;
+      (* When [true], each scenario runs with
+         [Backtest.Runner.run_backtest ?candidate_log] (a collector built by
+         [Backtest.Candidate_log.create_if]) and its child
+         writes [<scenario_dir>/candidates.sexp] (#2490). Default [false]: this
+         one opts IN, because unlike the all-eligible diagnostic it costs
+         strategy-side work on every screened Friday. *)
 }
 
 let _default_parallel = 4
@@ -466,7 +491,8 @@ let _usage () =
   eprintf
     "Usage: scenario_runner [--goldens-small | --goldens-broad | --goldens | \
      --smoke | --dir <path>] [--parallel N] [--fixtures-root <path>] \
-     [--snapshot-dir <path>] [--progress-every N] [--no-emit-all-eligible]\n";
+     [--snapshot-dir <path>] [--progress-every N] [--no-emit-all-eligible] \
+     [--emit-candidates]\n";
   Stdlib.exit 1
 
 let _parse_progress_every n_str =
@@ -486,6 +512,7 @@ type _parse_acc = {
   mutable snapshot_dir : string option;
   mutable progress_every : int option;
   mutable emit_all_eligible : bool;
+  mutable emit_candidates : bool;
 }
 
 let _finalize_acc (acc : _parse_acc) : _cli_args =
@@ -498,6 +525,7 @@ let _finalize_acc (acc : _parse_acc) : _cli_args =
       Option.value acc.progress_every
         ~default:Scenario_progress.default_every_n_fridays;
     emit_all_eligible = acc.emit_all_eligible;
+    emit_candidates = acc.emit_candidates;
   }
 
 let _parse_flag args =
@@ -509,6 +537,7 @@ let _parse_flag args =
       snapshot_dir = None;
       progress_every = None;
       emit_all_eligible = true;
+      emit_candidates = false;
     }
   in
   let rec loop args =
@@ -544,6 +573,9 @@ let _parse_flag args =
     | "--no-emit-all-eligible" :: rest ->
         acc.emit_all_eligible <- false;
         loop rest
+    | "--emit-candidates" :: rest ->
+        acc.emit_candidates <- true;
+        loop rest
     | _ -> _usage ()
   in
   loop args
@@ -560,6 +592,7 @@ let () =
          snapshot_dir;
          progress_every;
          emit_all_eligible;
+         emit_candidates;
        }
         : _cli_args) =
     _parse_args ()
@@ -586,6 +619,8 @@ let () =
     progress_every;
   eprintf "All-eligible diagnostic: %s\n%!"
     (if emit_all_eligible then "enabled" else "disabled");
+  eprintf "Per-week candidate emission: %s\n%!"
+    (if emit_candidates then "enabled" else "disabled");
   let scenarios_with_paths =
     List.map files ~f:(fun file -> (file, Scenario.load file))
   in
@@ -593,7 +628,8 @@ let () =
   eprintf "Output root: %s\n%!" output_root;
   let results =
     _run_scenarios_parallel ~output_root ~fixtures_root ~parallel
-      ~progress_every ~emit_all_eligible ~bar_data_source scenarios_with_paths
+      ~progress_every ~emit_all_eligible ~emit_candidates ~bar_data_source
+      scenarios_with_paths
   in
   _print_header ();
   let pass_flags = List.map results ~f:(_process_result ~output_root) in

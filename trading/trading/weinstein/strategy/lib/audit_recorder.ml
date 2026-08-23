@@ -69,6 +69,7 @@ type cascade_event = {
   date : Date.t;
   diagnostics : Screener.cascade_diagnostics;
   entered : int;
+  candidates : alternative_input list;
 }
 
 type force_liquidation_event = Portfolio_risk.Force_liquidation.event
@@ -79,6 +80,7 @@ type t = {
   record_cascade_summary : cascade_event -> unit;
   record_force_liquidation : force_liquidation_event -> unit;
   record_fill_volume : fill_volume_event -> unit;
+  capture_candidates : bool;
 }
 
 let noop : t =
@@ -88,4 +90,5 @@ let noop : t =
     record_cascade_summary = (fun _ -> ());
     record_force_liquidation = (fun _ -> ());
     record_fill_volume = (fun _ -> ());
+    capture_candidates = false;
   }

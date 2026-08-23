@@ -189,7 +189,8 @@ let _spendable_cash ~config (portfolio : Portfolio_view.t) =
 let entries_from_candidates ?sector_lookup
     ?(pending_entry_e = Entry_freeze.create ()) ~config ~candidates ~stop_states
     ~bar_reader ~(portfolio : Portfolio_view.t) ~get_price ~current_date
-    ?(audit_recorder = Audit_recorder.noop) ?macro () =
+    ?(audit_recorder = Audit_recorder.noop) ?macro ?on_candidates_considered ()
+    =
   let held_set = String.Set.of_list (held_symbols portfolio) in
   let candidates =
     _prepare_candidates ~config ~pending_entry_e ~held_set ~bar_reader
@@ -227,4 +228,9 @@ let entries_from_candidates ?sector_lookup
   in
   Entry_audit_capture.emit_entries ~audit_recorder ~macro ~current_date
     ~decisions;
+  (* G1 (#2490): hand the whole walk's passed-over candidates to the caller so
+     they land on this Friday's cascade event even when [kept] is empty. Absent
+     callback = the projection is never computed. *)
+  Option.iter on_candidates_considered ~f:(fun f ->
+      f (Entry_audit_capture.all_alternatives_of_decisions ~decisions));
   kept

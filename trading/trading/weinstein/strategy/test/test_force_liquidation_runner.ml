@@ -115,11 +115,8 @@ let _capturing_recorder () =
   let captured = ref [] in
   let recorder : Audit_recorder.t =
     {
-      record_entry = (fun _ -> ());
-      record_exit = (fun _ -> ());
-      record_cascade_summary = (fun _ -> ());
+      Audit_recorder.noop with
       record_force_liquidation = (fun e -> captured := e :: !captured);
-      record_fill_volume = (fun _ -> ());
     }
   in
   (recorder, captured)

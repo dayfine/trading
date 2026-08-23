@@ -1167,6 +1167,7 @@ let _make_runner_result ~start_date ~end_date ~round_trips :
     stop_infos = [];
     audit = [];
     cascade_summaries = [];
+    candidate_weeks = [];
     force_liquidations = [];
     stale_holds = [];
     final_prices = [];

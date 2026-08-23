@@ -183,6 +183,12 @@ module Audit_recorder = Audit_recorder
     strategy emits raw events; backtest layers wrap a {!Backtest.Trade_audit.t}
     collector. See {!Audit_recorder}. *)
 
+module Cascade_trace = Cascade_trace
+(** Per-Friday candidate-capture handle for the [candidates.sexp] artefact
+    (#2490). Re-exposed alongside {!Audit_recorder} so tests can drive the
+    handle directly and pin both arms — the inert default and the capturing one
+    — without running a whole backtest. See {!Cascade_trace}. *)
+
 module Stop_width_mode = Stop_width_mode
 (** F3 wide-stop admission policy ([Drop_over_max] vs [Size_down]). Re-exposed
     so callers driving {!Entry_audit_capture.make_entry_transition} out-of-band
@@ -1100,6 +1106,7 @@ val entries_from_candidates :
   current_date:Date.t ->
   ?audit_recorder:Audit_recorder.t ->
   ?macro:Macro.result ->
+  ?on_candidates_considered:(Audit_recorder.alternative_input list -> unit) ->
   unit ->
   Trading_strategy.Position.transition list
 (** Generate [CreateEntering] transitions for a list of screener candidates.

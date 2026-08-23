@@ -2146,10 +2146,102 @@ let test_borrowed_balance_derives_from_debit _ =
   state.remaining_cash := -3_000.0;
   assert_that (Screening_notional.borrowed_balance state) (float_equal 3_000.0)
 
+(** G1 (#2490). The gap was that a Friday funding nothing emitted no candidate
+    list at all: [alternatives_of_decisions] is only ever reached from a [Kept]
+    entry's audit row, so with zero [Kept] the whole walk's decisions were lost.
+    This pins the replacement — a projection addressed by {i week}, not by a
+    chosen entry, which therefore survives a zero-funded walk. *)
+let test_all_alternatives_survive_a_zero_funded_walk _ =
+  let as_of_date = Date.of_string "2020-06-05" in
+  let cand ticker =
+    _long_candidate ~ticker ~suggested_entry:100.0 ~suggested_stop:90.0
+      ~as_of_date
+  in
+  let decisions =
+    [
+      (cand "AAAA", Entry_audit_capture.Skipped Audit_recorder.Insufficient_cash);
+      (cand "BBBB", Entry_audit_capture.Skipped Audit_recorder.Sized_to_zero);
+    ]
+  in
+  assert_that
+    (Entry_audit_capture.all_alternatives_of_decisions ~decisions)
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (a : Audit_recorder.alternative_input) ->
+                 a.candidate.ticker)
+               (equal_to "AAAA");
+             field
+               (fun (a : Audit_recorder.alternative_input) -> a.reason)
+               (equal_to Audit_recorder.Insufficient_cash);
+           ];
+         all_of
+           [
+             field
+               (fun (a : Audit_recorder.alternative_input) ->
+                 a.candidate.ticker)
+               (equal_to "BBBB");
+             field
+               (fun (a : Audit_recorder.alternative_input) -> a.reason)
+               (equal_to Audit_recorder.Sized_to_zero);
+           ];
+       ])
+
+(** Funded candidates are deliberately absent: each has its own [entry_event] /
+    [Trade_audit.entry_decision] row and cross-artefact joins key on
+    [position_id], so repeating them here would double-count the week. *)
+let test_all_alternatives_excludes_kept _ =
+  let as_of_date = Date.of_string "2020-06-05" in
+  let cand ticker =
+    _long_candidate ~ticker ~suggested_entry:100.0 ~suggested_stop:90.0
+      ~as_of_date
+  in
+  let kept_trans, kept_meta =
+    match
+      Entry_audit_capture.make_entry_transition
+        ~portfolio_risk_config:Portfolio_risk.default_config
+        ~stops_config:Weinstein_stops.default_config ~initial_stop_buffer:1.02
+        ~stop_states:(ref String.Map.empty)
+        ~bar_reader:(Bar_reader.of_in_memory_bars [])
+        ~portfolio_value:100_000.0 ~current_date:as_of_date (cand "KEPT")
+    with
+    | Entry_audit_capture.Entry_ok (t, m) -> (t, m)
+    | Stop_too_wide | Sized_zero ->
+        OUnit2.assert_failure "fixture candidate failed to build an entry"
+  in
+  let decisions =
+    [
+      (cand "KEPT", Entry_audit_capture.Kept (kept_trans, kept_meta));
+      (cand "SKIP", Entry_audit_capture.Skipped Audit_recorder.Already_held);
+    ]
+  in
+  assert_that
+    (Entry_audit_capture.all_alternatives_of_decisions ~decisions)
+    (elements_are
+       [
+         field
+           (fun (a : Audit_recorder.alternative_input) -> a.candidate.ticker)
+           (equal_to "SKIP");
+       ])
+
+(** The default recorder must not opt any run into candidate capture: [noop] is
+    what live mode and every non-audit test get, and the strategy skips the
+    projection entirely on [false]. *)
+let test_noop_recorder_does_not_capture_candidates _ =
+  assert_that Audit_recorder.noop.capture_candidates (equal_to false)
+
 let () =
   run_test_tt_main
     ("entry_audit_capture"
     >::: [
+           "G1: all_alternatives survives a zero-funded walk"
+           >:: test_all_alternatives_survive_a_zero_funded_walk;
+           "G1: all_alternatives excludes Kept"
+           >:: test_all_alternatives_excludes_kept;
+           "G1: noop recorder does not capture candidates"
+           >:: test_noop_recorder_does_not_capture_candidates;
            "G14: effective_entry overrides cand.suggested_entry"
            >:: test_effective_entry_overrides_suggested_entry;
            "G14: build_entry_event audit dollars use effective_entry"

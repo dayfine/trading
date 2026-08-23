@@ -54,6 +54,7 @@ val run :
   ?slippage_bps:int ->
   ?cost_model:Backtest_cost_model.Cost_model.t ->
   ?prune_universe_by_active_through:bool ->
+  ?candidate_log:Candidate_log.collector ->
   unit ->
   Trading_simulation_types.Simulator_types.run_result
   * Stop_log.t
@@ -77,6 +78,14 @@ val run :
     [end_date] for every universe symbol with a non-NaN close on that date. The
     consumer ([Runner]) filters [final_close_prices] to symbols still held at
     end of run when populating [Runner.result.final_prices].
+
+    [candidate_log], when passed, opts the run into per-week candidate capture
+    (issue #2490): the recorder bundle is built with [capture_candidates = true]
+    and one {!Candidate_log.week} is drained into the collector per screened
+    Friday. Filled by side effect rather than returned, so the result tuple's
+    shape is unchanged; the caller ([Runner]) owns the collector and reads it at
+    teardown. Omitted (the default) is the pre-#2490 path exactly — the strategy
+    computes no candidate projection.
 
     [gc_trace], when passed, snapshots [Gc.stat] before and after every
     simulator step (one step = one calendar day = one [Engine.update_market]

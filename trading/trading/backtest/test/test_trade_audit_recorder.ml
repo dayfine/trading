@@ -132,6 +132,7 @@ let _recorded_entry_of (event : AR.entry_event) =
   let recorder =
     Backtest.Trade_audit_recorder.of_collector ~trade_audit
       ~force_liquidation_log:(Backtest.Force_liquidation_log.create ())
+      ()
   in
   recorder.record_entry event;
   match TA.get_audit_records trade_audit with
@@ -324,6 +325,7 @@ let test_fill_volume_projects_every_verdict_class _ =
     let recorder =
       Backtest.Trade_audit_recorder.of_collector ~trade_audit
         ~force_liquidation_log:(Backtest.Force_liquidation_log.create ())
+        ()
     in
     recorder.record_entry
       (_entry_event ~split_safe_basis:AR.Flag_off
