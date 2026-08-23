@@ -24,6 +24,45 @@ gh label create --repo dayfine/trading wontfix           --color CCCCCC --descri
 
 (Idempotent — `gh label create` exits non-zero if the label already exists; suppress with `|| true` when scripting.)
 
+## Grading taxonomy (added 2026-08-22, user-requested)
+
+Orthogonal to the triage roles above. Every open issue carries **one label from
+each of the four dimensions**; the triage roles continue to track workflow
+state independently.
+
+| Dimension | Labels | Meaning |
+|---|---|---|
+| Nature | `kind/bug` | Defect in trading/analysis code |
+| | `kind/feat` | New capability |
+| | `kind/harness` | Process / CI / agent-infra fix or improvement |
+| | `kind/research` | Experiment or measurement question |
+| | `kind/data` | Data provisioning / integrity |
+| Urgency | `P0` | Drop everything (red main / blocking all work) |
+| | `P1` | Next session(s) — schedule deliberately |
+| | `P2` | Queued, agent-sized |
+| | `P3` | Backlog |
+| | `P4` | Someday / parked |
+| Impact | `impact/H` | Moves decisions, correctness, or measurement materially |
+| | `impact/M` | Meaningful but bounded |
+| | `impact/L` | Nicety / hygiene |
+| Complexity | `size/S` | One sitting |
+| | `size/M` | Agent + gates |
+| | `size/L` | Multi-PR project |
+
+Conventions:
+
+- **Urgency ≠ impact.** A `P3 impact/H` item (e.g. a heavy data project) is
+  real but not scheduled; a `P2 impact/L` quick fix may ship first because it
+  is nearly free. Priority ordering for a session: P-level first, then
+  impact within it, with `size/S` items usable as gap-fillers.
+- **One `kind/*` per issue** — pick the dominant nature. A CI bug is
+  `kind/harness` (the area), not `kind/bug` (reserved for trading/analysis
+  code defects).
+- **Re-grade on new evidence** — a blocked item keeps its P-level with the
+  blocker named in a comment (e.g. #2405 is P3 while blocked by #2403).
+- Apply via REST (`gh api -X POST repos/dayfine/trading/issues/<N>/labels`)
+  — this repo's token lacks the GraphQL scopes `gh issue edit` needs.
+
 ## Adjacent state outside the label system
 
 - **PR review verdicts** (APPROVED / CHANGES_REQUESTED / COMMENTED) are tracked separately via `gh pr review` — see `docs/agents/issue-tracker.md` and `.claude/agents/qc-structural.md` for the contract.
