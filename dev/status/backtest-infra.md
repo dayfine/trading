@@ -56,6 +56,38 @@ Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
   two new `Trade_context` join tests, `trades.csv` header pin updated in
   `test_trade_audit_report.ml`).
 
+- [ ] **Per-week candidate emission `candidates.sexp` (#2490)** — designed,
+  **not implemented**. Full design in
+  `dev/plans/candidate-emission-2026-08-23.md`, including the two distinct
+  sub-gaps (G1: zero-funded Fridays drop the entry-walk decision list
+  entirely, because `entry_audit_capture.ml`'s `_dispatch_one_decision`
+  emits skipped candidates only attached to a `Kept` entry; G2: the
+  cascade's own per-phase drops are nameless — `cascade_summary` carries
+  counts only), the opt-in `--emit-candidates` gate, and the record shapes.
+
+  **Not started here because it crosses ownership and the PR-size cap.** The
+  plumbing needs `screener_admission.ml`, `screener.ml`,
+  `entry_audit_capture.ml` and `weinstein_strategy_screening.ml` — all
+  `feat-weinstein` surfaces this track is briefed to *propose* changes to,
+  not edit — and G1 + G2 together run ~650-900 LOC across two libraries with
+  two new modules, against a ≤500 LOC / one-new-module cap. The plan is that
+  proposal. Two design decisions are already resolved in it and should not be
+  relitigated:
+  - the capture flag lives on `Audit_recorder.t`, **not** on
+    `Weinstein_strategy.config` or `Screener.config`, so it never becomes a
+    `Variant_matrix` axis, never routes through `Overlay_validator`, and
+    never trips `config-default-blast-radius.md`;
+  - the post-held/cooldown candidate list (private to `Screener._screen`)
+    is reached by an **optional `?on_candidates` callback**, so the default
+    path keeps its exact shape and allocates nothing.
+
+  Split for execution: **PR-A = G1** (new `Backtest.Candidate_log` module +
+  zero-funded-Friday emission + `--emit-candidates`), **PR-B = G2** (screener
+  per-candidate trace, built on the same `_long_admission` /
+  `_short_admission` the counters fold so the named trace and
+  `cascade_diagnostics` cannot drift).
+
+
 ## 2026-08-13 — trade-audit join keyed by position_id (closes the 51%-loss join)
 
 - [x] **`Trade_context` joins on `position_id`, not date proximity** —
