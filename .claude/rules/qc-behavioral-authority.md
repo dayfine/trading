@@ -19,9 +19,15 @@ For Weinstein domain features (stage classifiers, screener, stops, simulation):
   domain rules (Stage definitions, buy/sell criteria, stop-loss rules,
   macro indicators, sector analysis, short-side rules).
 - **The book itself** — the authority *behind* that reference, available
-  locally as plain text. When the reference is silent, ambiguous, or a
-  faithfulness claim is contested, read the source and then write the answer
-  back into the reference. Path, OCR caveat, and protocol:
+  as plain text **in local dev sessions only** (it is a macOS local path,
+  unreachable from GHA/remote runners — issue #2457). When the reference is
+  silent, ambiguous, or a faithfulness claim is contested: in a local
+  session, read the source and write the answer back into the reference; in
+  a GHA/remote session where the source is unreachable, do not guess and do
+  not treat the reference's silence as a negative answer — record
+  `BOOK-CHECK-NEEDED: <question>` in the review and mark the row
+  `PLAUSIBLE-pending-book` instead of PASS/FAIL, for a later local session to
+  resolve. Path, OCR caveat, and the full environment-aware protocol:
   `.claude/rules/book-as-authority.md`. A reference is a summary and cannot
   settle a dispute about its own scope.
 - `docs/design/eng-design-2-screener-analysis.md` — screener / analysis spec
@@ -43,6 +49,13 @@ below do not apply):
 For Weinstein-feature PRs, append these rows below the CP1–CP4 rows. For
 non-Weinstein PRs (infra / refactor / harness), skip the entire block —
 mark every row NA with one explanatory note.
+
+**Status values for S/L/C rows in a GHA/remote session** (book unreachable,
+per `.claude/rules/book-as-authority.md` "Environment-aware protocol"): PASS
+and FAIL still apply whenever tier 1 (`weinstein-book-reference.md`) actually
+settles the question. Use `PLAUSIBLE-pending-book` only for the case tier 1
+leaves genuinely open, alongside a `BOOK-CHECK-NEEDED: <question>` line in the
+review body — never PASS or FAIL on a guess.
 
 ```
 ## Behavioral Checklist
