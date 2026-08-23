@@ -290,6 +290,51 @@ type config = {
           [.claude/rules/weinstein-faithful-core.md]). Default-off experiment
           axis per [.claude/rules/experiment-flag-discipline.md]; promoted only
           on a ledger ACCEPT. *)
+  reset_anchor_on_stalled_cycle : bool; [@sexp.default false]
+      (** When [true], a correction cycle that completes but whose derived stop
+          candidate does {b not} improve on the resting stop (a {e stalled}
+          cycle) still resets the [Trailing] cycle bookkeeping —
+          [last_correction_extreme] and [last_trend_extreme] both move to the
+          bar close, [correction_count] increments, and
+          [correction_observed_since_reset] returns to [false] — while
+          [stop_level] is left exactly where it was. Default [false] discards
+          the stalled cycle entirely: the running extremes are kept and no cycle
+          is counted.
+
+          {b Why (issue #2486).} Under the default, the reset is reachable only
+          through the raise branch, so cycle bookkeeping is coupled to whether
+          the stop happened to improve. [last_correction_extreme] is seeded from
+          the entry bar's extreme and thereafter only ever moves {e against} the
+          position ([Float.min] for a long in [_advance_tracking]), so the cycle
+          stop candidate — [below (min (correction_low, MA))] — is bounded above
+          (for a long) by [entry_bar_low *. (1 -. trailing_stop_buffer_pct)] and
+          that bound is monotone non-increasing. Whenever that bound already
+          sits below the installed initial stop,
+          {b no cycle can ever raise the stop, so no cycle can ever reset the
+             anchor, so the bound never recovers} — the trailing stop is frozen
+          at its initial level for the life of the position, however far price
+          advances.
+
+          The precondition is the {b fallback} initial stop, not the structural
+          one. A fallback stop is
+          [entry *. fallback_buffer *. (1 -. min_correction_pct /. 2)] — with
+          the shipped 1.02 / 0.08 defaults, [0.9792 *. entry] — so the freeze
+          arms as soon as the entry bar's low sits more than ~1.09% below the
+          entry price. A structural support-floor stop derives from a prior
+          correction low well below entry, leaving the entry-bar anchor
+          comfortably above it, and ratchets normally.
+
+          Faithful-core: this is a {b defect fix expressed as a dial}, not a new
+          mechanism. Book §5.2's TRAILING block specifies a ratchet "for each
+          correction cycle" whose successive stops "trend upward across
+          correction cycles"; a cycle that the machine silently discards is not
+          that. The never-lower rule (§5.2, qc-behavioral L2) is untouched — the
+          flag moves only bookkeeping, never [stop_level], and the phantom-cycle
+          guard still applies because the reset restores
+          [correction_observed_since_reset = false]. Default [false] is an exact
+          no-op so every existing golden replays bit-identically. Default-off
+          experiment axis per [.claude/rules/experiment-flag-discipline.md];
+          promoted only on a ledger ACCEPT. *)
 }
 [@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable

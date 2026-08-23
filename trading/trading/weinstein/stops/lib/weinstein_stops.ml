@@ -288,15 +288,7 @@ let _advance_tracking ~side ~last_correction_extreme ~last_trend_extreme ~bar =
   in
   (new_trend_extreme, new_correction_extreme)
 
-(* Returns [Some new_stop] if a correction cycle just completed and the
-   candidate stop is better than the current stop, otherwise [None].
-
-   Per Weinstein Ch. 6: the stop is placed below min(correction_low, MA) —
-   "the sell-stop was always kept below the MA even if the correction low
-   held above it." When the correction dips below the MA (common in a
-   healthy Stage 2), the correction low is the binding constraint.  When
-   the correction holds above the MA (shallow pullback), the MA is lower
-   and becomes the reference. Either way, the stop stays below BOTH.
+(* Did a correction cycle just complete on this bar?
 
    Phantom-cycle guard: the cycle math operates on the running correction
    extreme without any awareness of WHEN that extreme was last observed.
@@ -308,9 +300,8 @@ let _advance_tracking ~side ~last_correction_extreme ~last_trend_extreme ~bar =
    for short → cycle math tries to phantom-fire) needs an actual counter-move
    bar — [correction_observed_since_reset = true] — to refresh the anchor.
    Without it, the stale reset value is rejected as a cycle anchor. *)
-let _completed_cycle_stop ~config ~side ~stop_level ~trend_extreme
-    ~correction_extreme ~correction_count ~correction_observed_since_reset
-    ~ma_value ~bar =
+let _cycle_completed ~config ~side ~trend_extreme ~correction_extreme
+    ~correction_count ~correction_observed_since_reset ~bar =
   let had_correction =
     _is_correction ~config ~side ~trend_extreme ~correction_extreme
   in
@@ -320,19 +311,49 @@ let _completed_cycle_stop ~config ~side ~stop_level ~trend_extreme
   let anchor_is_fresh =
     correction_count = 0 || correction_observed_since_reset
   in
-  if had_correction && recovered && anchor_is_fresh then
-    (* Use whichever reference is more conservative: correction low or MA *)
-    let effective_ref =
-      match side with
-      | Long -> Float.min correction_extreme ma_value
-      | Short -> Float.max correction_extreme ma_value
-    in
+  had_correction && recovered && anchor_is_fresh
+
+(* The stop a completed cycle would install.
+
+   Per Weinstein Ch. 6: the stop is placed below min(correction_low, MA) —
+   "the sell-stop was always kept below the MA even if the correction low
+   held above it." When the correction dips below the MA (common in a
+   healthy Stage 2), the correction low is the binding constraint.  When
+   the correction holds above the MA (shallow pullback), the MA is lower
+   and becomes the reference. Either way, the stop stays below BOTH. *)
+let _cycle_stop_candidate ~config ~side ~correction_extreme ~ma_value =
+  let effective_ref =
+    match side with
+    | Long -> Float.min correction_extreme ma_value
+    | Short -> Float.max correction_extreme ma_value
+  in
+  _stop_candidate ~config ~side ~correction_extreme:effective_ref
+
+(* What the cycle math produced this bar.
+
+   [Stalled] is the case issue #2486 turns on: a correction cycle genuinely
+   completed, but its candidate does not improve on the resting stop, so the
+   never-lower rule (book §5.2) forbids installing it. The candidate is
+   discarded either way — what [config.reset_anchor_on_stalled_cycle] decides
+   is whether the cycle still counts for BOOKKEEPING purposes. See that field's
+   docstring for why the default answer ("no") freezes the ratchet outright on
+   a fallback-stop position. *)
+type cycle_outcome = No_cycle | Stalled | Raised of float
+
+let _cycle_outcome ~config ~side ~stop_level ~trend_extreme ~correction_extreme
+    ~correction_count ~correction_observed_since_reset ~ma_value ~bar =
+  if
+    not
+      (_cycle_completed ~config ~side ~trend_extreme ~correction_extreme
+         ~correction_count ~correction_observed_since_reset ~bar)
+  then No_cycle
+  else
     let candidate =
-      _stop_candidate ~config ~side ~correction_extreme:effective_ref
+      _cycle_stop_candidate ~config ~side ~correction_extreme ~ma_value
     in
-    if _is_better_stop ~side ~current:stop_level ~candidate then Some candidate
-    else None
-  else None
+    if _is_better_stop ~side ~current:stop_level ~candidate then
+      Raised candidate
+    else Stalled
 
 (* Build a Trailing state after a completed correction cycle.
    Both extremes reset to close_price so the next cycle starts fresh — no phantom
@@ -349,6 +370,31 @@ let _raised_trailing ~side:_ ~new_stop ~ma_value ~correction_count ~bar =
       correction_count = correction_count + 1;
       correction_observed_since_reset = false;
     }
+
+(* Build a Trailing state for a STALLED cycle: the same reset [_raised_trailing]
+   performs, minus the stop move. [stop_level] and [ma_at_last_adjustment] are
+   carried through verbatim — no stop was adjusted, so recording this bar's MA
+   as the adjustment MA would be a lie. Reached only under
+   [config.reset_anchor_on_stalled_cycle]. *)
+let _stalled_trailing ~stop_level ~ma_at_last_adjustment ~correction_count ~bar
+    =
+  Trailing
+    {
+      stop_level;
+      last_correction_extreme = bar.Types.Daily_price.close_price;
+      last_trend_extreme = bar.Types.Daily_price.close_price;
+      ma_at_last_adjustment;
+      correction_count = correction_count + 1;
+      correction_observed_since_reset = false;
+    }
+
+(* Raise branch: install the better stop and reset the cycle bookkeeping. *)
+let _apply_raise ~side ~ma_value ~correction_count ~stop_level ~new_stop ~bar =
+  let reason =
+    Printf.sprintf "Correction cycle %d complete" (correction_count + 1)
+  in
+  ( _raised_trailing ~side ~new_stop ~ma_value ~correction_count ~bar,
+    Stop_raised { old_level = stop_level; new_level = new_stop; reason } )
 
 (* Advances tracking and adjusts stop if a correction cycle completed. *)
 let _raise_after_cycle ~config ~side ~ma_value ~correction_count
@@ -373,21 +419,18 @@ let _raise_after_cycle ~config ~side ~ma_value ~correction_count
       }
   in
   match
-    _completed_cycle_stop ~config ~side ~stop_level
-      ~trend_extreme:last_trend_extreme
+    _cycle_outcome ~config ~side ~stop_level ~trend_extreme:last_trend_extreme
       ~correction_extreme:new_correction_extreme ~correction_count
       ~correction_observed_since_reset:new_observed ~ma_value ~bar
   with
-  | None -> (no_change, No_change)
-  | Some new_stop ->
-      let reason =
-        Printf.sprintf "Correction cycle %d complete" (correction_count + 1)
-      in
-      let new_state =
-        _raised_trailing ~side ~new_stop ~ma_value ~correction_count ~bar
-      in
-      ( new_state,
-        Stop_raised { old_level = stop_level; new_level = new_stop; reason } )
+  | No_cycle -> (no_change, No_change)
+  | Stalled when config.reset_anchor_on_stalled_cycle ->
+      ( _stalled_trailing ~stop_level ~ma_at_last_adjustment ~correction_count
+          ~bar,
+        No_change )
+  | Stalled -> (no_change, No_change)
+  | Raised new_stop ->
+      _apply_raise ~side ~ma_value ~correction_count ~stop_level ~new_stop ~bar
 
 (* ---- Update: Trailing state ---- *)
 
