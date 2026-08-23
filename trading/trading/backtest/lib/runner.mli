@@ -92,9 +92,9 @@ type result = {
           nothing, which is the gap it exists to close.
 
           [[]] unless the run was started with a [~candidate_log]; the default
-          is off and costs nothing. Filtered to weeks at or after
-          [start_date], matching [cascade_summaries]. Persisted as
-          [candidates.sexp] by {!Candidate_log.emit}. *)
+          is off and costs nothing. Filtered to weeks at or after [start_date],
+          matching [cascade_summaries]. Persisted as [candidates.sexp] by
+          {!Candidate_log.emit}. *)
   force_liquidations : Portfolio_risk.Force_liquidation.event list;
       (** Per-position force-liquidation events recorded by the strategy (G4 —
           see [dev/notes/short-side-gaps-2026-04-29.md]). Empty when no forced
