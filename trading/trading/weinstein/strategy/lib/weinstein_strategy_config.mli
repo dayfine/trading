@@ -30,10 +30,9 @@ type config = {
           value are dropped before they join the entry candidate list.
 
           Default [0.0] = no gating: the gate short-circuits to the identity
-          when [short_min_price <= 0.0], so the candidate list is bit-identical
-          to prior behaviour and every existing golden replays unchanged.
-          Encodes the sub-$17 economic-margin floor on shorts as a default-off,
-          searchable {!Walk_forward.Variant_matrix} axis; not wired into any
+          when [short_min_price <= 0.0], so every existing golden replays
+          unchanged (R1). Encodes the sub-$17 economic-margin floor on shorts as
+          a default-off, searchable [Variant_matrix] axis; not wired into any
           default config or preset. See
           [dev/notes/long-short-margin-mechanics-2026-06-12.md]. *)
   short_borrow_min_dollar_adv : float; [@sexp.default 0.0]
@@ -46,22 +45,17 @@ type config = {
           affected (borrow is a short-only concern).
 
           Default [0.0] = no gating: {!Short_borrow_gate.filter} short-circuits
-          to the identity when [short_borrow_min_dollar_adv <= 0.0], so every
-          existing golden replays unchanged. Dollar-ADV is the borrow-supply
-          proxy (we have no locate feed). Bar-cadence caveat (intraweek borrow
-          recall / gap squeeze invisible) is documented in {!Short_borrow_gate}.
-          See [dev/notes/long-short-margin-mechanics-2026-06-12.md] §4 item 6.
-      *)
+          to the identity, so every existing golden replays unchanged (R1).
+          Dollar-ADV is the borrow-supply proxy (we have no locate feed); the
+          bar-cadence caveat (intraweek borrow recall / gap squeeze invisible)
+          is documented in {!Short_borrow_gate}. See
+          [dev/notes/long-short-margin-mechanics-2026-06-12.md] §4 item 6. *)
   suppress_warmup_trading : bool; [@sexp.default true]
       (** When [true] (the default), the backtest runner suppresses all new
           position entries (long and short) before the measurement [start_date],
           so the warmup window builds indicators/data only and the measurement
-          window opens with an all-cash portfolio.
-
-          Default [true] = measurement-correctness invariant (user directive
-          2026-06-13): a backtest's measured window must contain only that
-          window's activity. In live/forward mode it is a no-op (no entries are
-          dated before "now").
+          window opens with an all-cash portfolio. In live/forward mode it is a
+          no-op (no entries are dated before "now").
 
           [false] = legacy "running start": the simulator runs from
           [start_date - warmup_days] and the strategy trades during warmup, so
@@ -70,9 +64,10 @@ type config = {
 
           Implemented runner-side by {!Backtest.Warmup_trade_gate}, which drops
           [CreateEntering] transitions dated before [start_date]; exits/stops/
-          fills are never suppressed. A measurement-semantics correction, not an
-          alpha mechanism, so the R1/R3 ledger gate does not apply. See
-          [Backtest.Fold_health]. *)
+          fills are never suppressed. Default [true] is a measurement-semantics
+          correction (user directive 2026-06-13, "measured window = window
+          only"), not an alpha mechanism, so the R1/R3 ledger gate does not
+          apply. See [Backtest.Fold_health]. *)
   stop_update_cadence : Stops_runner.stop_update_cadence;
       [@sexp.default Stops_runner.Daily]
   stage3_force_exit_config : Stage3_force_exit.config;
@@ -87,8 +82,8 @@ type config = {
           count): both must be satisfied for an exit to fire.
 
           The runner suppresses the exit when
-          [(ma_value -. close_price) /. ma_value < stage3_exit_margin_pct].
-          Negative values (close above MA) are likewise suppressed when the
+          [(ma_value -. close_price) /. ma_value < stage3_exit_margin_pct], so
+          negative values (close above MA) are likewise suppressed when the
           threshold is positive. The hysteresis streak counter is unaffected —
           only the emission decision is gated by margin.
 
@@ -96,8 +91,7 @@ type config = {
           inequality, so the runner emits whenever
           {!Stage3_force_exit.observe_position} returns [Force_exit].
           Recommended panel values: [0.02..0.05] paired with
-          [hysteresis_weeks >= 2]
-          ([dev/notes/next-session-priorities-2026-05-29-PM.md] §P0). *)
+          [hysteresis_weeks >= 2]. *)
   laggard_rotation_config : Laggard_rotation.config;
       [@sexp.default Laggard_rotation.default_config]
   enable_laggard_rotation : bool; [@sexp.default false]
@@ -149,13 +143,10 @@ type config = {
           This tightens the short side to the book's confirmed-bear rule
           (weinstein-book-reference.md §Short-Selling Rules) — a faithful dial,
           not a spine change. Default flipped [false] -> [true] on 2026-07-09
-          (user mandate) as a {b faithfulness} flip, not an alpha claim. Ledger
-          ACCEPT: [2026-06-22-neutral-blocks-shorts-wfcv]; deep-cell
-          re-attribution [dev/notes/p1a-deep-short-screens-364-2026-07-09.md].
-
-          Wired by threading into [screening_config.neutral_blocks_shorts] at
-          screen time, so it is a single-component [Variant_matrix] flag axis.
-      *)
+          (user mandate) as a {b faithfulness} flip, not an alpha claim; ledger
+          ACCEPT [2026-06-22-neutral-blocks-shorts-wfcv]. Wired by threading
+          into [screening_config.neutral_blocks_shorts] at screen time, so it is
+          a single-component [Variant_matrix] flag axis. *)
   enable_slow_grind_short_gate : bool; [@sexp.default false]
       (** Faithful-short decline-character gate (default-off). When [true],
           shorts are admitted only when the current primary-index decline is a
@@ -177,15 +168,11 @@ type config = {
           (the decline classifier behaves exactly as before). When [true], the
           primary-index [Decline_character.Fast_v] classification may arm on the
           {b rate of decline alone}, without waiting for the weekly MA to roll
-          over and price to fall below it.
-
-          Motivation: in a fast V-crash the structural gap-down stop has already
-          exited every long before the weekly MA rolls over, so the
-          [Fast_v]-gated absolute stop never fires — the binding constraint is
-          arming {b latency}, not stop width. The flag drops the falling-MA
-          precondition for the fast-V path only (slow-grind untouched) and is
-          threaded into [Decline_character.fast_v_ignores_ma_filter] at both
-          classify sites.
+          over and price to fall below it — in a fast V-crash the binding
+          constraint is arming {b latency}, not stop width. The falling-MA
+          precondition is dropped for the fast-V path only (slow-grind
+          untouched); threaded into [Decline_character.fast_v_ignores_ma_filter]
+          at both classify sites.
 
           {b Faithfulness}: changes no buy/sell rule — only {b when} the
           absolute tail-risk-insurance stop arms — so it is the sanctioned
@@ -201,22 +188,20 @@ type config = {
           [Decline_character.default_config.fast_v_min_rate_pct], so it is a
           no-op (bit-identical classification).
 
-          Whipsaw-suppression dial: raising the threshold (e.g. to 0.16)
-          requires a steeper drawdown before [Fast_v] is declared, at the cost
-          of arming later in a genuine crash. A higher value never widens the
-          [Fast_v] band, so the spine is untouched. Single-component
-          [Variant_matrix] float axis; default no-op until a ledger ACCEPT. *)
+          Whipsaw-suppression dial: raising the threshold requires a steeper
+          drawdown before [Fast_v] is declared, at the cost of arming later in a
+          genuine crash. A higher value never widens the [Fast_v] band, so the
+          spine is untouched. Single-component [Variant_matrix] float axis;
+          default no-op until a ledger ACCEPT. *)
   reject_declining_ma_long_entry : bool; [@sexp.default false]
       (** Long-entry faithfulness gate (default-off): when [true], drop any long
           candidate whose stage-classification MA direction is
           [Weinstein_types.Declining] at entry. Weinstein Stage 2 is defined as
           price above a {b rising} 30-week MA; the classifier nonetheless tags a
           minority of breakouts [Stage2] while the MA is still declining — these
-          are counter-trend bounces in a Stage-4 downtrend, which the broad
-          top-3000 audit shows win only ~13% vs ~34% for rising-MA entries
-          (n=30, avg P&L −0.1% vs +2.6%). Default [false] preserves all
-          baselines bit-for-bit. Shorts are unaffected — a declining MA is
-          correct for a Stage-4 short.
+          are counter-trend bounces in a Stage-4 downtrend. Default [false]
+          preserves all baselines bit-for-bit. Shorts are unaffected — a
+          declining MA is correct for a Stage-4 short.
 
           Spine intact: it {e tightens} the Stage-2-only buy rule toward the
           book's rising-MA definition. Single-component [Variant_matrix] flag
@@ -235,8 +220,7 @@ type config = {
           §Stage 3 detail (Ch. 2). Spine untouched — only the trailing stop of
           an existing held position moves, and it is only ever raised.
           Single-component [Variant_matrix] flag axis; default-off until a
-          confirmation-grid ACCEPT. Evidence:
-          [dev/notes/stage-lifecycle-pivot-diagnosis-2026-06-03.md]. *)
+          confirmation-grid ACCEPT. *)
   late_stage2_stop_buffer_pct : float; [@sexp.default 0.0]
       (** Buffer (fraction) below the current close at which
           {!Late_stage2_stop_runner.update} raises the trailing stop on a held
@@ -282,25 +266,22 @@ type config = {
   short_sleeve_fraction : float; [@sexp.default 0.0]
       (** Fraction of portfolio value reserved as a dedicated short-only cash
           budget in the per-Friday entry walk
-          ({!Weinstein_strategy.entries_from_candidates}).
-
-          {b Motivation.} The screener appends shorts after longs
+          ({!Weinstein_strategy.entries_from_candidates}). Addresses shorts
+          being crowded out: the screener appends shorts after longs
           ([buy_candidates @ short_candidates]) against a single shared
           [remaining_cash] ref, so longs consume the budget first and the walk
-          rarely reaches the shorts — over a 28y long-short backtest the short
-          cascade offered 1,662 candidate-slots and only 37 entered, with zero
-          short fills rejected (memory [project_short_funnel_crowded_out]).
+          rarely reaches the shorts (memory [project_short_funnel_crowded_out]).
 
           {b Semantics.}
           - [<= 0.0] (default): {b bit-identical to baseline} — one combined
             entry walk against a single [remaining_cash] seeded at
             [portfolio.cash].
-          - [> 0.0]: the per-Friday cash budget is partitioned. A short-only
-            budget [short_sleeve_fraction *. portfolio_value] is reserved; long
+          - [> 0.0]: a short-only budget
+            [short_sleeve_fraction *. portfolio_value] is reserved; long
             candidates walk against [max 0 (portfolio.cash -. short_budget)] and
             shorts against the reserved budget — two independent
             [remaining_cash] refs. The {!Portfolio_risk} short-notional cap and
-            the shared per-sector accumulator still apply across both walks; the
+            the shared per-sector accumulator still apply across both walks;
             kept transitions are re-emitted in the order the candidates
             {e entered} the walk, so audit ordering matches the single-walk
             path. That is screener order under the defaults, and post-demotion
@@ -322,12 +303,11 @@ type config = {
           [trigger_ratio ×] the WMA30 and has since fallen [trail_pct] below the
           post-trigger running peak weekly close (weekly-close semantics, L3).
 
-          {b Tail-insurance, not an alpha axis.} A catastrophic-stop-class dial
-          (same class as [stops_config.catastrophic_stop_pct]). Extension events
-          are rare (~0.6-1% of episodes reach [2.0×] WMA30 over a
-          quarter-century), so a walk-forward CV on this axis is structurally
-          powerless; its acceptance basis is the left-tail / event-level audit,
-          {b never} fold Sharpe.
+          {b Tail-insurance, not an alpha axis} — same class as
+          [stops_config.catastrophic_stop_pct]. Extension events are rare
+          (~0.6-1% of episodes over a quarter-century), so a walk-forward CV on
+          this axis is structurally powerless; its acceptance basis is the
+          left-tail / event-level audit, {b never} fold Sharpe.
 
           {b Default-off.} Default
           {!Weinstein_stops.Extension_stop.default_config}
@@ -342,24 +322,18 @@ type config = {
 
           {b Faithfulness (W2).} A faithful trader exit-aggressiveness dial
           ([docs/design/weinstein-book-reference.md] §5.3). Screen evidence pins
-          the width: [trail_pct 0.25] survives the on-ramp shakeouts; tighter
-          [0.10-0.20] trails are on-ramp killers
-          ([dev/backtest/extension-screen-2026-07-11/FINDINGS.md]).
-
-          Searchable as a nested {!Walk_forward.Variant_matrix} axis, e.g.
-          [((key (extension_stop_config trigger_ratio)) (values (2.0 2.25)))].
-          Default-off until an experiment-ledger ACCEPT. *)
+          the width — tight [0.10-0.20] trails are on-ramp killers
+          ([dev/backtest/extension-screen-2026-07-11/FINDINGS.md]). Searchable
+          as a nested [Variant_matrix] axis, e.g.
+          [((key (extension_stop_config trigger_ratio)) (values (2.0 2.25)))];
+          default-off until an experiment-ledger ACCEPT. *)
   liquidity_config : Liquidity_config.t;
       [@sexp.default Liquidity_config.default_config]
       (** Liquidity-realism overlay parameters — the held-position liquidity
           degradation exit ({!Liquidity_exit_runner}) and the entry liquidity
-          gate ({!Liquidity_gate}).
-
-          {b Motivation.} A deep broad-universe long-short backtest produced a
-          −48% single-day NAV crash traced to ONE short: a delisted micro-cap
-          trading ~2 shares/day whose stale high-tick tripped the short stop's
-          worst-case cover fill. The overlay detects collapsing dollar-ADV from
-          data at decision time and exits before the name becomes untradeable.
+          gate ({!Liquidity_gate}). Detects a name whose dollar-ADV is
+          collapsing, from data at decision time, and refuses / exits it before
+          it becomes untradeable.
 
           {b Semantics.} Default [Liquidity_config.default_config]
           ([min_entry_dollar_adv = 1_000_000.0] since the 2026-07-10 realism
@@ -383,24 +357,20 @@ type config = {
           [Holding] longs plus the candidates funded this walk may not exceed
           [max_long_exposure_pct_entry * portfolio_value].
 
-          {b The working replacement for the dead
-             [Portfolio_risk.max_long_exposure_pct]}, which has no production
-          consumer since [Portfolio_risk.check_limits] was deleted 2026-07-09
-          (memory [project_envelope_knobs_dead]) — a scenario override of it
-          does nothing. This field is consumed at the one seam that actually
-          gates entry funding, mirroring {!check_short_notional_cap}'s
-          machinery.
+          {b ⚠ Use this, not [Portfolio_risk.max_long_exposure_pct]}, which has
+          had no production consumer since [Portfolio_risk.check_limits] was
+          deleted 2026-07-09 (memory [project_envelope_knobs_dead]) — a scenario
+          override of that field does nothing. This one is consumed at the seam
+          that actually gates entry funding, mirroring
+          {!check_short_notional_cap}'s machinery.
 
           {b Basis — entry-price-denominated notional, NOT marked value.} The
           cap counts [shares * entry_price] committed at entry, matching the
           short cap. Marked exposure exceeding 100% of NAV purely from
           {e unrealized appreciation} of held winners is legitimate and must NOT
-          trigger the cap.
-
-          {b Margin convention for long-short runs.} Short proceeds credit cash
-          (unchanged); NEW long entries are then capped at
-          [max_long_exposure_pct_entry * portfolio_value] of committed-at-entry
-          notional — shorts can fund longs, but only up to this cap.
+          trigger the cap. This is also THE margin convention for long-short
+          runs: short proceeds credit cash (unchanged) and can fund longs, but
+          only up to this cap.
 
           {b Scope — NEW entries only.} Exits, covers, stop orders and
           force-liquidations do not flow through the entry walk, so the cap can
@@ -433,11 +403,11 @@ type config = {
             buying-power term is [Float.infinity], so the combined ceiling is
             governed solely by {!max_long_exposure_pct_entry} (also disabled at
             its default) and every existing golden replays bit-identically (R1).
-            The reachable [portfolio_value] ceiling of a strict cash account is
-            the explicit [max_long_exposure_pct_entry = 1.0] opt-in, NOT this
-            default: imposing an equity ceiling by default would newly cap the
-            legitimate held-winner-appreciation and short-proceeds cases #1965
-            deliberately leaves to that opt-in.
+            Note this default imposes {e no} equity ceiling: the
+            [portfolio_value] ceiling of a strict cash account is the explicit
+            [max_long_exposure_pct_entry = 1.0] opt-in, deliberately, so the
+            legitimate held-winner-appreciation and short-proceeds cases are not
+            newly capped.
           - [0.0 < req < 1.0]: leverage opted in — the buying-power ceiling
             rises to [portfolio_value /. req].
 
@@ -446,11 +416,8 @@ type config = {
           per-tick interest accrual are M1b; until then a fractional requirement
           is inert (the available-cash gate binds first). See
           {!Long_buying_power} and
-          [dev/plans/levered-longshort-margin-realism-2026-07-14.md] §M1.
-
-          {b R2 searchability.} A real config field resolved by
-          [Overlay_validator.apply_overrides]; default-off until a ledger
-          ACCEPT. *)
+          [dev/plans/levered-longshort-margin-realism-2026-07-14.md] §M1. R2:
+          real config field; default-off until a ledger ACCEPT. *)
   long_margin_rate_annual_pct : float; [@sexp.default 0.0]
       (** Annualized interest rate charged on a long-margin debit balance
           (borrowed cash funding the long book beyond equity), the
@@ -460,16 +427,15 @@ type config = {
           {!Long_buying_power.long_margin_interest_charge}, the same 252
           day-count the short borrow fee uses.
 
-          {b Semantics.}
-          - [0.0] (default): {b EXACT no-op} — no interest accrues on any
-            balance (R1).
-          - [> 0.0]: a positive debit balance carries this financing cost.
+          [0.0] (default) = {b EXACT no-op}, no interest accrues on any balance
+          (R1); [> 0.0] means a positive debit balance carries this financing
+          cost.
 
           {b Scope (M1a).} This field defines the {e priced-debit convention};
           the per-tick accrual and the cash-gate relaxation that creates a
           nonzero debit balance are M1b, so until then the charge is always
-          [0.0]. See {!Long_buying_power}. R2: real config field, expressible as
-          a [Variant_matrix] float axis; default-off until a ledger ACCEPT. *)
+          [0.0]. See {!Long_buying_power}. R2: real config field; default-off
+          until a ledger ACCEPT. *)
   maintenance_long_pct : float; [@sexp.default 0.0]
       (** Long-side maintenance-margin requirement — the marked-basis loan-call
           threshold for a levered long book (M2). When
@@ -486,7 +452,7 @@ type config = {
           - [0.0] (default): {b EXACT no-op} — a cash account has no maintenance
             requirement, so the reduce never fires (R1). An unlevered book never
             fires even at a positive value, since
-            [equity >= marked_long_ exposure] keeps the ratio [>= 1.0].
+            [equity >= marked_long_exposure] keeps the ratio [>= 1.0].
           - [> 0.0] (e.g. [0.25]): a levered long book whose equity falls below
             [maintenance_long_pct] of its marked long exposure is deleveraged
             incrementally on the next weekly close.
@@ -498,7 +464,6 @@ type config = {
           block an exit (the #1553 lesson). {b Cadence caveat:} daily-close
           marks cannot see an intraweek gap-through-maintenance move; those
           paths are M3/M4, documented in {!Trading_simulation.Long_maintenance}.
-
           R2: real config field; default-off until a ledger ACCEPT plus the
           promotion-confirmation grid. *)
   resistance_min_history_bars : int; [@sexp.default 0]
@@ -519,15 +484,12 @@ type config = {
           - [> 0] (typically [520], the full virgin-lookback): a symbol with
             fewer bars produces the [Insufficient_history] grade at screen time.
 
-          {b R2 searchability.} Real config field → resolves through
-          [Overlay_validator.apply_overrides]; expressible as a [Variant_matrix]
-          int axis and in scenario [config_overrides]. Threaded into the
-          per-screen [Stock_analysis.config] by [_stock_analysis_config_for]
-          (weinstein_strategy_screening.ml).
-
-          {b Faithfulness} (W1/W2): a data-hygiene dial that {e tightens} the
-          breakout-above-resistance criterion; spine untouched. Default-off
-          until an experiment-ledger ACCEPT. *)
+          Threaded into the per-screen [Stock_analysis.config] by
+          [_stock_analysis_config_for] (weinstein_strategy_screening.ml). A
+          data-hygiene dial that {e tightens} the breakout-above-resistance
+          criterion; spine untouched. R2: real config field, expressible as a
+          [Variant_matrix] int axis and in scenario [config_overrides];
+          default-off until an experiment-ledger ACCEPT. *)
   resistance_lookback_bars : int; [@sexp.default 0]
       (** Resistance-specific weekly-history depth: when [> 0], the Phase-2
           screen fetches a {e second, deeper} weekly view of this many bars for
@@ -535,15 +497,12 @@ type config = {
           detection keep reading the standard [lookback_bars] view, so screening
           decisions other than the resistance grade are unaffected.
 
-          {b Why} (armed-run matrix 2026-07-13, Run C): backtest panels carry
-          only ~[lookback_bars] weekly bars, so the resistance mapper's 520-bar
-          virgin lookback claims [Virgin_territory] off a starved window (the
-          CWST-class false-virgin defect, validator V7). The
-          [resistance_min_history_bars] label floor is NOT the fix — arming it
-          marks every name [Insufficient_history] and deletes the signal
-          wholesale (Run C halved the return).
-          {b Feeding real history is the fix}: this field widens the data the
-          mapper sees.
+          {b Why.} Backtest panels carry only ~[lookback_bars] weekly bars, so
+          the resistance mapper's 520-bar virgin lookback claims
+          [Virgin_territory] off a starved window (the false-virgin defect,
+          validator V7). {b Feeding real history is the fix}, not the
+          [resistance_min_history_bars] label floor — arming that marks every
+          name [Insufficient_history] and deletes the signal wholesale.
 
           {b Semantics.}
           - [0] (default): {b bit-identical to baseline} — resistance callbacks
@@ -552,10 +511,9 @@ type config = {
             support callbacks read a [resistance_lookback_bars]-deep weekly
             view. Values [<= lookback_bars] are harmless but pointless.
 
-          {b R2 searchability.} Real config field → [Variant_matrix] int axis
-          and scenario [config_overrides]. {b Faithfulness} (W1/W2): pure
-          data-hygiene, no spine item touched. Default-off until a ledger
-          ACCEPT. *)
+          Pure data-hygiene, no spine item touched. R2: real config field →
+          [Variant_matrix] int axis and scenario [config_overrides]; default-off
+          until a ledger ACCEPT. *)
   overhead_supply : Resistance_supply.config option; [@sexp.default None]
       (** Continuous overhead-supply score (resistance-v2 PR-D). When
           [Some cfg], the strategy copies [cfg] into the per-screen
@@ -569,19 +527,16 @@ type config = {
              on 2026-07-23} by the BUNDLE promotion (user-approved, R3):
           [overhead_supply armed + w_overhead_supply=30 +
            virgin_crossing_readmission], with [Resistance_supply.default_config]
-          floors also zeroed. Evidence: ledger
-          [2026-07-17-resistance-supply-confirmation-grid] (3/3) +
-          [2026-07-20-bundle-promotion-studies] +
-          [2026-07-22-leverf-age-band-surface]. Memo:
+          floors also zeroed. Evidence and the full chain:
           [dev/notes/resistance-supply-promotion-memo-2026-07-19.md].
 
           {b Semantics.}
           - [Some cfg] (new default): the continuous score runs for survivors
             whose panel carries the sketch columns. The live CSV report path has
-            no warehouse sketch, so [Stock_analysis.t.supply] is [None] there
-            and the screener degrades gracefully to the bit-identical v1 binary
-            grade (the live weekly-review generator computes a real sketch, so
-            its displayed grade switches to the v2 score).
+            no warehouse sketch, so [supply] is [None] there and the screener
+            degrades gracefully to the bit-identical v1 binary grade (the live
+            weekly-review generator computes a real sketch, so its displayed
+            grade switches to the v2 score).
           - [None] (the deserialization fallback): {b bit-identical to baseline}
             — [supply] is always [None], no sketch reads occur. This is what a
             config sexp written {e before} the promotion parses to, and the
@@ -597,10 +552,8 @@ type config = {
           its 520-week max high) on volume is re-admitted by
           [Stock_analysis.is_breakout_candidate] even when it is past the
           [early_stage2_max_weeks] window. This restores access to the
-          crash-recovery "redeemed monster" cohort the [overhead_supply] penalty
-          correctly demotes at their supplied breakout but which becomes
-          genuinely virgin later
-          ([dev/notes/resistance-supply-divergence-forensic-2026-07-17.md]).
+          crash-recovery cohort the [overhead_supply] penalty correctly demotes
+          at their supplied breakout but which becomes genuinely virgin later.
 
           {b Default flipped [false] -> [true] on 2026-07-23} by the BUNDLE
           promotion (user-approved, R3) — see [overhead_supply] for the evidence
@@ -641,6 +594,13 @@ type config = {
           floor-rejected rather than funded. {!Leverage_dawn.validate} enforces
           [base <= dawn]. See {!Leverage_dawn.dawn_effective_config}.
 
+          {b ⚠ Margin-armed convention.} Dawn leverage runs margin-armed
+          ([margin_config.enabled = true]) so borrowed dollars are priced and
+          maintenance applies; {!Leverage_dawn.validate} (called at
+          {!Weinstein_strategy.make}) raises when this flag is [true] with
+          [margin_config] disarmed or [dawn_initial_long_margin_req] outside the
+          interval [0.0 < req <= 1.0].
+
           {b Default [false] = EXACT no-op} (R1): the wiring short-circuits to
           the unchanged config before any bar fetch or signal computation, so a
           scenario is bit-identical with the field absent and with it explicitly
@@ -649,18 +609,8 @@ type config = {
           {b Faithfulness} (W1/W2): a {b deployment-intensity dial} conditioned
           on a {b trailing} (never forward-looking) regime label off the weekly
           MA. Spine untouched; not reversal timing — the MA-flip-age signal is
-          lagging by construction.
-
-          {b Margin-armed convention.} Dawn leverage runs margin-armed
-          ([margin_config.enabled = true]) so borrowed dollars are priced and
-          maintenance applies; {!Leverage_dawn.validate} (called at
-          {!Weinstein_strategy.make}) raises when [dawn_leverage_enabled = true]
-          with [margin_config] disarmed or [dawn_initial_long_margin_req]
-          outside 0.0 < req <= 1.0.
-
-          R2: real config field → [Variant_matrix] flag axis. Default-off until
-          a promotion-confirmation grid ACCEPT. Memo:
-          [dev/notes/regime-dependency-evaluation-2026-07-24.md] §1/§3. *)
+          lagging by construction. R2: real config field → [Variant_matrix] flag
+          axis; default-off until a promotion-confirmation grid ACCEPT. *)
   dawn_initial_long_margin_req : float; [@sexp.default 1.0]
       (** The long-side initial-margin requirement the {b entry walk} sizes
           against during a "dawn" week when [dawn_leverage_enabled = true] — the
@@ -671,8 +621,7 @@ type config = {
           {b Default [1.0] = no-op}: even with [dawn_leverage_enabled = true],
           the dawn week sizes cash-account until a spec sets a fractional value.
           Only consulted on dawn weeks with the mechanism enabled; a non-dawn
-          week raises the entry-walk requirement to a cash account (see
-          {!dawn_leverage_enabled}).
+          week raises the entry-walk requirement to a cash account.
 
           {b ⚠ Armed cells must set the base [initial_long_margin_req] to match
              (or be more permissive than) this value} — the simulator funds
@@ -688,10 +637,8 @@ type config = {
       (** Maximum age (in weeks) of the primary index's most recent
           negative->positive weekly-MA slope flip for the "dawn" label to be
           active. Default [78] (~1.5y) matches the P1b memo's lagging-label
-          definition.
-
-          Larger = a longer post-bear window counts as "dawn" (more levered
-          weeks); [0] = only the exact flip week qualifies. Inert while
+          definition. Larger = a longer post-bear window counts as "dawn" (more
+          levered weeks); [0] = only the exact flip week qualifies. Inert while
           [dawn_leverage_enabled = false]. R2: real config field →
           single-component [Variant_matrix] int axis. *)
   sparse_tail_min_bars : int; [@sexp.default 0]
@@ -705,13 +652,14 @@ type config = {
           right-hand edge while the middle is almost empty.
 
           Default [0] = gate disabled (no-op, R1): every candidate is eligible
-          regardless of tail density. Consumed only by
-          [Weekly_snapshot_generator.generate] via [Sparse_tail_gate.check] —
-          the backtest/live strategy path ([on_market_close]) never reads this
-          field, so arming it cannot move a backtest number. Paired with
-          [sparse_tail_window_trading_days]; both must be [> 0] to activate. R2:
-          resolves through [Backtest.Overlay_validator.apply_overrides], armed
-          today via [dev/weekly-picks/live-config-overrides.sexp]. *)
+          regardless of tail density. Paired with
+          [sparse_tail_window_trading_days]; both must be [> 0] to activate.
+          Consumed only by [Weekly_snapshot_generator.generate] via
+          [Sparse_tail_gate.check] — the backtest/live strategy path
+          ([on_market_close]) never reads this field, so arming it cannot move a
+          backtest number. R2: resolves through
+          [Backtest.Overlay_validator.apply_overrides], armed today via
+          [dev/weekly-picks/live-config-overrides.sexp]. *)
   sparse_tail_window_trading_days : int; [@sexp.default 0]
       (** Trailing window width, in trading days per the bar reader's own
           calendar (real holiday calendar in production; synthesized Mon-Fri
@@ -772,9 +720,9 @@ type config = {
           Above it the ticket re-anchors to a market fill at the close and is
           {b re-sized on that fill}. See [Entry_reconciliation.classify].
 
-          Paired with [entry_extension_max_pct], which is the arming switch —
-          this field alone activates nothing. [1.0] (one percentage point) is
-          the armed value. R2: resolves through
+          {b ⚠ Paired with [entry_extension_max_pct], which is the arming
+             switch} — this field alone activates nothing. [1.0] (one percentage
+          point) is the armed value. R2: resolves through
           [Backtest.Overlay_validator.apply_overrides], armed via
           [dev/weekly-picks/live-config-overrides.sexp]. *)
   entry_extension_max_pct : float; [@sexp.default 0.0]
@@ -786,17 +734,16 @@ type config = {
 
           Execution correctness, not a new strategy mechanic:
           [Weekly_snapshot.candidate.entry] is the breakout level from the
-          {e transition} week, and the <=4-week early-Stage-2 window admits a
-          name for weeks afterwards, so a printed buy-stop far below the current
+          {e transition} week and the <=4-week early-Stage-2 window admits a
+          name for weeks afterwards, so a buy-stop printed far below the current
           price is an instantly-filling market order whose displayed risk
           understates the real risk. The suppression follows
           [docs/design/weinstein-book-reference.md] §1 "Stage 2 detail (Ch. 2)",
           which locates the buy at the breakout or on "at least one pullback
-          close to the breakout point": a name trading far above its breakout is
-          at neither. No admission rule changes, and no pullback-timing mechanic
-          is implied — see [Entry_reconciliation] for why the section's "Late
-          Stage 2 warning" is deliberately NOT the citation. Specimen:
-          [dev/plans/picks-entry-reconciliation-2026-07-27.md].
+          close to the breakout point". No admission rule changes and no
+          pullback-timing mechanic is implied — see [Entry_reconciliation] for
+          why the section's "Late Stage 2 warning" is deliberately NOT the
+          citation.
 
           {b Default [0.0] = reconciliation disabled} (no-op, R1): every
           candidate carries [Entry_reconciliation.Not_reconciled], sizing uses
@@ -820,35 +767,35 @@ type config = {
           [Entry_reconciliation] semantics.
 
           {b Default [false] = Market fills, bit-identical to every existing
-             baseline/golden} (R1). This is a fill-model basis change when
-          armed: route it through its own WF-CV surface and deliberate golden
-          re-pins before any default flip — NEVER bundle it with another
-          mechanism (user directive 2026-08-04, issue #2158). R2:
-          axis-expressible as
+             baseline/golden} (R1).
+          {b ⚠ This is a fill-model basis change when armed}: route it through
+          its own WF-CV surface and deliberate golden re-pins before any default
+          flip — NEVER bundle it with another mechanism (user directive
+          2026-08-04, issue #2158). R2: axis-expressible as
           [((flag enable_sim_entry_stoplimit) (values (true false)))]. Weinstein
           authority: the book locates the buy at the breakout or a pullback
           close to it, so an unfilled order (missing > chasing) is the faithful
           failure mode. *)
   sim_entry_trigger_at_suggested : bool; [@sexp.default false]
-      (** Book-faithful E-anchored entry trigger (user decision 2026-08-05, plan
-          [dev/plans/gtc-breakout-orders-2026-08-05.md] Step 0 option (b)). When
-          [true] AND [enable_sim_entry_stoplimit] is on, the strategy's
+      (** Book-faithful E-anchored entry trigger. When [true] AND
+          [enable_sim_entry_stoplimit] is on, the strategy's
           [CreateEntering.entry_price] is set to the candidate's
           [suggested_entry] (the graded breakout level [E]) instead of the most
           recent raw close (the G14 fix-B default). The emitted order is then a
           genuine [StopLimit (E, E * (1 +/- entry_extension_max_pct/100))]
-          resting AT the breakout level — matching the book's ticket (Ch.3
-          p.67-68, [docs/design/weinstein-book-reference.md] §4.7) and the live
-          report's tickets. Sizing follows automatically:
-          [make_entry_transition] anchors [compute_position_size ~entry_price]
-          at the same [effective_entry].
+          resting AT the breakout level — matching the book's ticket
+          ([docs/design/weinstein-book-reference.md] §4.7) and the live report's
+          tickets. Sizing follows automatically: [make_entry_transition] anchors
+          [compute_position_size ~entry_price] at the same [effective_entry].
 
           {b Default [false] = current-close trigger, bit-identical to every
              existing baseline/golden} (R1). Because it also gates on
           [enable_sim_entry_stoplimit], arming this field alone cannot move a
-          backtest number. A fill-model basis change when armed — its own WF-CV
-          surface, never bundled. R2: axis-expressible as
+          backtest number. {b ⚠ A fill-model basis change when armed} — its own
+          WF-CV surface, never bundled. R2: axis-expressible as
           [((flag sim_entry_trigger_at_suggested) (values (true false)))].
+          Decision record: [dev/plans/gtc-breakout-orders-2026-08-05.md] Step 0
+          option (b).
 
           {b Split-safety} (why the G14 fix-B default exists): fix-B pinned the
           trigger to the current close because [suggested_entry] {i could} land
@@ -861,15 +808,14 @@ type config = {
           is by design {i above} the close for a long breakout, so such a guard
           would misfire on every normal breakout.) *)
   entry_anchor_local_range_weeks : int; [@sexp.default 0]
-      (** Book-faithful local-range entry anchor (2026-08-05 user decision,
-          option (b); note [dev/notes/honest-ladder-2026-08-05.md], PR #2216).
-          When [> 0], the screener anchors each candidate's [suggested_entry] at
-          the top of the {i current} trading range — the split-safe maximum high
-          over the most recent [entry_anchor_local_range_weeks] bars
+      (** Book-faithful local-range entry anchor. When [> 0], the screener
+          anchors each candidate's [suggested_entry] at the top of the
+          {i current} trading range — the split-safe maximum high over the most
+          recent [entry_anchor_local_range_weeks] bars
           ([Stock_analysis.t.local_range_top]) — instead of the 520-week graded
           resistance top. This is the book's "write down the price it would need
-          to break out" ticket (Ch. 3; [docs/design/weinstein-book-reference.md]
-          §4.1): a nearer, earlier-triggering buy-stop. Example value: [26].
+          to break out" ticket ([docs/design/weinstein-book-reference.md] §4.1):
+          a nearer, earlier-triggering buy-stop. Example value: [26].
 
           {b ⚠ Prerequisite for [entry_freshness_basis = Range_top_breakout].}
           That basis measures freshness against
@@ -897,21 +843,21 @@ type config = {
           {b Default [0] = off, bit-identical to every existing baseline/golden}
           (R1): [local_range_top = None] and the screener uses the graded
           breakout top exactly as before. R2: axis-expressible as
-          [((flag entry_anchor_local_range_weeks) (values (13 26 52)))].
-          Default-off until a ledger ACCEPT. *)
+          [((flag entry_anchor_local_range_weeks) (values (13 26 52)))];
+          default-off until a ledger ACCEPT. Note:
+          [dev/notes/honest-ladder-2026-08-05.md]. *)
   entry_freshness_basis : Entry_freshness.basis;
       [@sexp.default Entry_freshness.Ma_cross]
-      (** F1 — which event starts the Stage-2 admission clock (plan
-          [dev/plans/entry-ticket-async-v2-2026-08-10.md] §2 M1 / §3 F1).
+      (** F1 — which event starts the Stage-2 admission clock.
 
-          {b The mis-mapping.} [docs/design/weinstein-book-reference.md] §1 says
-          Stage 2 {i begins} when the stock breaks out above the top of the
-          resistance zone AND above the 30-week MA; Stage 1 explicitly has price
-          tossed above and below the MA for months while it bases. Our stage
-          classifier starts [weeks_advancing] at the {b MA cross}, so a name
-          that crossed its MA ten weeks ago but is still coiled under its range
-          top has aged out of the [early_stage2_max_weeks <= 4] admission window
-          before the book's Stage-2 week one has happened.
+          {b The mis-mapping it addresses.}
+          [docs/design/weinstein-book-reference.md] §1 says Stage 2 {i begins}
+          when the stock breaks out above the top of the resistance zone AND
+          above the 30-week MA. Our stage classifier instead starts
+          [weeks_advancing] at the {b MA cross}, so a name that crossed its MA
+          ten weeks ago but is still coiled under its range top has aged out of
+          the [early_stage2_max_weeks <= 4] window before the book's Stage-2
+          week one has happened.
 
           {b [Ma_cross] (default, no-op).} Today's clock, verbatim. R1: every
           existing golden is bit-identical — [range_top_freshness] is [None] and
@@ -927,38 +873,35 @@ type config = {
           close is at or within [Entry_freshness.proximity_pct] (5%) below the
           anchor {b and} the MA is not declining {b and} the anchor clears the
           MA — §4.1 requirements 1–3 kept explicit, because "a breakout below a
-          declining MA is a trap, not a buy" (Ch. 3). The MA-cross age is not
-          consulted: the basis {b replaces} that window rather than widening it,
-          so this is not a stealth re-run of the rejected continuation (#1366)
-          or early-admission axes — the [<= 4] value itself is untouched.
+          declining MA is a trap, not a buy". The MA-cross age is not consulted:
+          the basis {b replaces} that window rather than widening it, so this is
+          not a stealth re-run of the rejected continuation (#1366) or
+          early-admission axes — the [<= 4] value itself is untouched.
 
-          {b Interaction with [reject_declining_ma_long_entry] (#1775).} That
-          flag is a later strategy-level veto on long entries taken while the MA
-          declines. F1 enforces the same §4.1 condition earlier and against the
-          {i anchor}, so the two compose without conflict.
+          {b Composes with [reject_declining_ma_long_entry] (#1775)} without
+          conflict: F1 enforces the same §4.1 MA condition earlier and against
+          the {i anchor}, so an armed basis never admits a candidate that gate
+          would then reject.
 
           {b Faithfulness (W1/W2).} Spine intact — Stage-2-only, volume
-          confirmation, and the macro/sector gates are untouched; this moves the
-          admission clock onto the book's own Stage-2 start event.
-
-          R2: axis-expressible as
+          confirmation, and the macro/sector gates are untouched. R2:
+          axis-expressible as
           [((flag entry_freshness_basis) (values (Ma_cross
            Range_top_breakout)))]. R3: stays [Ma_cross] until a ledger ACCEPT
-          plus the promotion-confirmation grid. *)
+          plus the promotion-confirmation grid. Plan:
+          [dev/plans/entry-ticket-async-v2-2026-08-10.md] §3 F1. *)
   stop_anchor_at_entry_base : bool; [@sexp.default false]
-      (** Book-faithful initial-stop re-anchoring for E-anchored entries (user
-          go 2026-08-06; note [dev/notes/honest-ladder-2026-08-05.md]). The
+      (** Book-faithful initial-stop re-anchoring for E-anchored entries — the
           faithfulness fix that PAIRS with the E-anchored entry family
-          ([sim_entry_trigger_at_suggested] + [enable_sim_entry_stoplimit],
-          #2209): those tickets rest the entry at the breakout level [E], but
-          the initial stop still comes from the deep support-floor machinery
-          anchored to crash lows. For a crash-recovery name the mismatched pair
-          (E-entry × crash-floor-stop) inflates risk% so the entry walk's 15%
-          [max_stop_distance_pct] gate ([G15] step 3) rejects the ticket as
-          [Stop_too_wide]. That is unfaithful to the book, which places the
+          ([sim_entry_trigger_at_suggested] + [enable_sim_entry_stoplimit]).
+          Those tickets rest the entry at the breakout level [E], but the
+          initial stop still comes from the deep support-floor machinery
+          anchored to crash lows; for a crash-recovery name that mismatched pair
+          inflates risk% so the entry walk's 15% [max_stop_distance_pct] gate
+          rejects the ticket as [Stop_too_wide]. That is unfaithful to
+          [docs/design/weinstein-book-reference.md] §5.1, which places the
           breakout buy's initial stop just under the breakout base / below the
-          MA, NOT under the entire multi-year crash floor
-          ([docs/design/weinstein-book-reference.md] §5.1).
+          MA, not under the entire multi-year crash floor.
 
           When [true] AND the entry is E-anchored (the effective
           [trigger_at_suggested] the strategy derives from
@@ -982,23 +925,20 @@ type config = {
           verbatim. Because it additionally gates on the E-family being armed
           (both StopLimit flags default [false]), arming this field alone cannot
           move a backtest number. R2: axis-expressible as
-          [((flag stop_anchor_at_entry_base) (values (true false)))].
-          Default-off until a ledger ACCEPT. *)
+          [((flag stop_anchor_at_entry_base) (values (true false)))];
+          default-off until a ledger ACCEPT. Note:
+          [dev/notes/honest-ladder-2026-08-05.md]. *)
   sim_entry_fill_next_open : bool; [@sexp.default false]
-      (** Next-bar-open fill realism for Market entries (Fix #1, plan
-          [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream C).
-          Threaded from this config into the simulator dependencies by the
-          backtest runner (same route as [entry_extension_max_pct]).
+      (** Next-bar-open fill realism for Market entries (Fix #1). Threaded from
+          this config into the simulator dependencies by the backtest runner
+          (same route as [entry_extension_max_pct]).
 
-          {b The realism gap it closes.} The record entry is a Market order (the
-          default fill model). The strategy decides on a weekly signal bar's
-          close and the order rests in the manager until the engine matches it
-          against a bar. Because the engine retains the last bar per symbol on
-          non-trading (weekend/holiday) steps, a Market entry created from a
-          Friday-close decision is filled on the following non-trading step
-          against the {i stale} signal bar — i.e. at that same bar's open, a
-          price observed {i before} the close the decision was made on. That is
-          an optimistic, effectively look-back fill.
+          {b The realism gap it closes.} Because the engine retains the last bar
+          per symbol on non-trading (weekend/holiday) steps, a Market entry
+          created from a Friday-close decision is filled on the following
+          non-trading step against the {i stale} signal bar — i.e. at that same
+          bar's open, a price observed {i before} the close the decision was
+          made on. That is an optimistic, effectively look-back fill.
 
           When [true], a Market order that would route to an [Entering] position
           is NOT filled on a step where its symbol has no fresh bar; it stays
@@ -1012,15 +952,16 @@ type config = {
           close by construction.
 
           {b Default [false] = current stale-bar fill, bit-identical to every
-             existing baseline/golden} (R1). A fill-model basis change when
-          armed — its own WF-CV surface and deliberate golden re-pins before any
-          default flip; NEVER bundled. R2: axis-expressible as
+             existing baseline/golden} (R1).
+          {b ⚠ A fill-model basis change when armed} — its own WF-CV surface and
+          deliberate golden re-pins before any default flip; NEVER bundled. R2:
+          axis-expressible as
           [((flag sim_entry_fill_next_open) (values (true false)))].
           Weinstein-faithful: spine untouched, only the {i fill assumption}
-          changes. *)
+          changes. Plan: [dev/plans/fill-model-faithfulness-2026-08-07.md]
+          Workstream C. *)
   freeze_entry_at_first_breakout : bool; [@sexp.default false]
-      (** No-chase entry-[E] freeze (Fix #2, plan
-          [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream D).
+      (** No-chase entry-[E] freeze (Fix #2).
 
           {b The faithfulness gap it closes.} The screener recomputes each
           candidate's [suggested_entry] — [E] =
@@ -1029,9 +970,7 @@ type config = {
           over week, so the resting entry ticket ratchets upward with the trend:
           from the screener's view each Friday is a "fresh breakout," but from a
           Weinstein-purist view it is {b buying an extended stock}
-          ([docs/design/weinstein-book-reference.md] §4.1, §3). The record vs
-          book fill-basis gap is dragged up by this E-chase; specimen in
-          [dev/plans/fill-model-faithfulness-2026-08-07.md].
+          ([docs/design/weinstein-book-reference.md] §4.1, §3).
 
           {b Behaviour when [true].} The first Friday a symbol qualifies
           (appears as an actionable entry candidate with a suggested [E]), that
@@ -1044,32 +983,30 @@ type config = {
           entry order stays held, so its pin persists (dormant) until the
           position closes.
 
-          {b Faithfulness (W2): this INCREASES faithfulness.} It restores the
-          book's "buy {i the} breakout, not every successive higher high" rule.
-          Spine untouched — Stage-2 admission, volume confirmation, grading,
-          stage classification, and the stop machinery are all UNCHANGED.
-
           {b Strictly ticket-level and the entry [E] only.} Freezing overrides
           the candidate's [suggested_entry]; the installed initial stop is
           re-derived from the effective entry as before. The paired
           suggested-stop / [risk_pct] audit metadata reflect the current week's
           screener output.
 
+          {b Faithfulness (W2): this INCREASES faithfulness.} It restores the
+          book's "buy {i the} breakout, not every successive higher high" rule.
+          Spine untouched — Stage-2 admission, volume confirmation, grading,
+          stage classification, and the stop machinery are all UNCHANGED.
+
           {b Default [false] = off, bit-identical to every existing
              baseline/golden} (R1): {!Entry_freeze.apply} returns the candidate
           list untouched and never allocates a pin. R2: axis-expressible as
-          [((flag freeze_entry_at_first_breakout) (values (true false)))].
-          Default-off until a ledger ACCEPT. *)
+          [((flag freeze_entry_at_first_breakout) (values (true false)))];
+          default-off until a ledger ACCEPT. Plan:
+          [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream D. *)
   enable_entry_ticket_rescreen : bool; [@sexp.default false]
       (** F2 {b primary}, the book-supported half: re-validate every unfilled
           entry ticket on each weekly review, and cancel the ones whose setup no
-          longer exists.
-
-          Split out of the former [entry_order_ttl_weeks] on 2026-08-16 (defect
-          C of [dev/plans/entry-anchor-and-ttl-2026-08-15.md]), which armed
-          {b two} mechanisms at once — this re-screen and the arbitrary clock
-          below — with no way to have the faithful half without the invented
-          one.
+          longer exists. Split out of the former [entry_order_ttl_weeks] on
+          2026-08-16, which armed {b two} mechanisms at once — this re-screen
+          and the arbitrary clock below — with no way to have the faithful half
+          without the invented one.
 
           {b Behaviour when [true].} On each weekly review an unfilled
           [Entering] position is cancelled when its symbol no longer classifies
@@ -1101,9 +1038,8 @@ type config = {
   entry_order_max_rest_weeks : int; [@sexp.default 0]
       (** F2 {b backstop}, the invented half: the clock. An unfilled ticket that
           has rested more than this many whole weeks is cancelled regardless of
-          whether it still qualifies. [0] = {b unbounded} = the default.
-
-          A ticket placed on review week 0 survives review week
+          whether it still qualifies. [0] = {b unbounded} = the default. A
+          ticket placed on review week 0 survives review week
           [entry_order_max_rest_weeks] and is cancelled at week
           [entry_order_max_rest_weeks + 1].
 
@@ -1116,28 +1052,24 @@ type config = {
           [enable_sim_entry_stoplimit] (the only place a clock can bite, since
           Market entries fill immediately and never rest), clock=26 measured
           {b −40.91pp} against clock=0 across three salts with
-          {b complete separation} — the armed arm's best draw sat 37.94pp below
-          the control's worst.
-
-          {b The mechanism — a tail-touching lever.} The clock cuts the
-          resting-ticket population blind, and that population is where the
-          fat-tail winners live: the removed cohort's entire positive total was
-          a single trade larger than the cohort's net. 12th+ confirmation of
-          [project_edge_is_the_fat_tail].
+          {b complete separation}. The mechanism is a {b tail-touching lever}:
+          the clock cuts the resting-ticket population blind, and that
+          population is where the fat-tail winners live — the removed cohort's
+          entire positive total was a single trade larger than the cohort's net.
+          Nth confirmation of [project_edge_is_the_fat_tail].
 
           {b The calibration lesson.} The promotion rested on a 26-year base
-          whose gap (+126.7pp) sat {i inside} that base's own 132.5pp seed
-          spread, while the golden's base measures 4.07pp — ~33x quieter.
-          {b Every base needs its own null}; never import one base's noise floor
-          to judge another's gap.
+          whose gap sat {i inside} that base's own seed spread, while the
+          golden's base is ~33x quieter. {b Every base needs its own null};
+          never import one base's noise floor to judge another's gap.
 
           {b If a bound is wanted}, the evidence points at {b 156 weeks} rather
           than 26 — but as a value to test first, not a measured winner: one of
-          three bases inverts the ranking, and all of it is static bucket
-          subtraction, which is not the counterfactual (this PR's own
-          decomposition removed 59 trades and {i added} 48). Any future
-          promotion needs a ledger ACCEPT plus the [promotion-confirmation.md]
-          grid, neither of which the 26 flip had.
+          three bases inverts the ranking, and the supporting arithmetic is
+          static bucket subtraction, which is not the counterfactual (cutting at
+          26 removed 59 trades and {i added} 48). Any future promotion needs a
+          ledger ACCEPT plus the [promotion-confirmation.md] grid, neither of
+          which the 26 flip had.
 
           {b Faithfulness (W2): BOOK-NEUTRAL dial.} The book grants the cancel
           authority (§4.7 / §7) but names no number, so every value here is a
@@ -1146,31 +1078,23 @@ type config = {
           {b opposite} populations, and the re-screen was itself REJECTED.
 
           R2: axis-expressible as
-          [((flag entry_order_max_rest_weeks) (values (0 13 26 52 156)))].
-
-          Full record: [dev/experiments/clock26-golden-ab-2026-08-19/]. *)
+          [((flag entry_order_max_rest_weeks) (values (0 13 26 52 156)))]. Full
+          record: [dev/experiments/clock26-golden-ab-2026-08-19/]. *)
   reserve_cash_for_resting_tickets : bool; [@sexp.default false]
       (** G3 of [dev/plans/ticket-funding-2026-08-16.md]: subtract the cost the
           book has already committed to {b resting} entry tickets from the cash
           the entry walk is allowed to spend this tick.
 
           {b The leak it closes.} {!Entry_audit_capture.check_cash_and_deduct}
-          already enforces cash discipline {i within} one tick — the walk
-          threads a [remaining_cash] ref and each admitted [CreateEntering]
-          deducts its designed cost. But the ref is re-seeded from
-          [portfolio.cash] every tick, and a ticket placed in week [N] and still
-          resting in week [N+1] has taken {b no} cash. So the next walk sees
-          that money as available and commits it again; repeat weekly and the
-          book carries more claims than cash.
-
-          {b What that costs today.} When several over-committed tickets trigger
-          in the same week, the first ones consume the balance and the rest are
+          already enforces cash discipline {i within} one tick, but its
+          [remaining_cash] ref is re-seeded from [portfolio.cash] every tick,
+          and a ticket placed in week [N] and still resting in week [N+1] has
+          taken {b no} cash. So the next walk sees that money as available and
+          commits it again; repeat weekly and the book carries more claims than
+          cash. When several over-committed tickets then trigger in the same
+          week, the first ones consume the balance and the rest are
           {b destroyed} — not retried, not resized
-          ([[project-ticket-dies-on-cash-shortfall]]). Over 3,530 rejections the
-          median shortfall is {b 52%} of the ticket's cost, only 5.1% are within
-          5% of fundable, and {b 63%} arrive in bursts against a single cash
-          balance — the signature of aggregate over-commitment rather than
-          per-ticket bad luck.
+          ([[project-ticket-dies-on-cash-shortfall]]).
 
           {b Reserved amount} is the {b unfilled remainder},
           [(target_quantity - filled_quantity) * entry_price], summed over
@@ -1191,7 +1115,7 @@ type config = {
 
           {b The cost, stated up front.} Reserved cash is idle cash. Deployment
           already sits near the exposure cap, so this plausibly pushes
-          utilisation {i below} it. Report deployment alongside return.
+          utilisation {i below} it — report deployment alongside return.
 
           [false] (default) = [spendable] is [portfolio.cash], bit-identical to
           the prior behaviour (R1). R2: axis-expressible as
@@ -1210,9 +1134,8 @@ type config = {
           emits a [CancelEntry] and the [Entering] position is deleted — so
           {b one cash-tight instant permanently destroys a ticket} that may have
           rested for months, and the margin of destruction can be arbitrarily
-          small (a diagnostic case was short by {b 0.3%}; see
-          [dev/plans/ticket-funding-2026-08-16.md]). Rate:
-          {b ~25% of would-be entries}, stable across universes and periods.
+          small. Rate: {b ~25% of would-be entries}, stable across universes and
+          periods.
 
           {b What [n > 0] does.} The ticket is put {b back} rather than
           destroyed: the [Entering] position is left alone (it never filled) and
@@ -1228,7 +1151,7 @@ type config = {
           ({!entry_extension_max_pct}) starts refusing the retry itself
           ([[project-sim-entry-stoplimit-reject]]).
 
-          {b Alternatives, not complements.} G2a (retry), G2b
+          {b ⚠ Alternatives, not complements.} G2a (retry), G2b
           ([entry_fill_size_to_available], resize) and G3
           ({!reserve_cash_for_resting_tickets}, prevent) are three policies for
           one failure. Arm one at a time. {b No ledger verdict exists} —
@@ -1241,18 +1164,15 @@ type config = {
           destroyed. [false] (default) is today's behaviour.
 
           {b The failure it addresses} is the same one G2a
-          ({!entry_fill_reject_retries}) addresses — the engine marks the
-          resting order [Filled] before
-          {!Trading_portfolio.Portfolio.apply_single_trade} agrees to book it,
-          so a refusal cancels a ticket that may have rested for months, at a
-          rate of {b ~25% of would-be entries}.
+          ({!entry_fill_reject_retries}) addresses — a refusal cancels a ticket
+          that may have rested for months, at a rate of
+          {b ~25% of would-be entries}.
 
           {b How it differs from G2a.} A resize enters
           {b now, at the price the ticket triggered at}, so it pays none of the
           timing tax that sinks the retry — the entry is simply smaller. That
           makes it the smallest possible change to the failure mode, and it
-          turns the near-miss cohort (5.1% of refusals are within 5% of
-          fundable) into near-full fills.
+          turns the near-miss cohort into near-full fills.
 
           {b What it costs.} It silently breaks fixed-risk sizing: the position
           no longer carries {!Weinstein_portfolio_risk.risk_per_trade_pct} of
@@ -1264,15 +1184,16 @@ type config = {
           resize {e first} on each refusal; only a refusal the resize declines
           (below the minimum fraction) consumes retry budget.
 
-          {b Interacts with} {!stop_width_mode}'s [Size_down], which also
+          {b ⚠ Interacts with} {!stop_width_mode}'s [Size_down], which also
           decouples the filled size from the designed size — with both armed,
           two independent mechanisms shrink the same position and the resulting
           size attributes to neither. Not special-cased in code: a cell arming
           both must say why.
 
-          {b Alternatives, not complements} (see {!entry_fill_reject_retries});
-          arm one at a time. {b No ledger verdict exists} — default-off until
-          one does (R3). R2: axis-expressible as
+          {b ⚠ Alternatives, not complements} (see
+          {!entry_fill_reject_retries}); arm one at a time.
+          {b No ledger verdict exists} — default-off until one does (R3). R2:
+          axis-expressible as
           [((flag entry_fill_size_to_available) (values (true false)))]. *)
   entry_fill_min_size_fraction : float; [@sexp.default 0.5]
       (** G2b's minimum viable size: the smallest fraction of a ticket's
@@ -1283,28 +1204,25 @@ type config = {
 
           Read only when {!entry_fill_size_to_available} is [true]; inert
           otherwise, so the default [0.5] changes no behaviour on its own (R1).
-          [0.0] accepts any positive clamp. {b [1.0] is NOT a no-op}: the guard
-          is a strict [<] against [fraction *. designed], so a clamp {e equal}
-          to the designed quantity still books — reachable, because the
-          rejection batch is folded in order and an accepted exit later in the
-          same batch can raise cash back to the full designed cost. A grid's
+          [0.0] accepts any positive clamp. {b ⚠ [1.0] is NOT a no-op}: the
+          guard is a strict [<] against [fraction *. designed], so a clamp
+          {e equal} to the designed quantity still books — reachable, because
+          the rejection batch is folded in order and an accepted exit later in
+          the same batch can raise cash back to the full designed cost. A grid's
           control cell is the [entry_fill_size_to_available = false] flag, never
           [1.0].
 
           The designed quantity is the [Entering] position's [target_quantity],
           i.e. [Weinstein_portfolio_risk.compute_position_size]'s output — so
           the fraction is measured against a number that already respects the
-          risk-based, side-exposure, per-position and sizing-cash caps.
-
-          R2: axis-expressible as
+          risk-based, side-exposure, per-position and sizing-cash caps. R2:
+          axis-expressible as
           [((flag entry_fill_min_size_fraction) (values (0.25 0.5 0.75)))]. *)
   stop_width_mode : Stop_width_mode.t;
       [@sexp.default Stop_width_mode.Drop_over_max]
-      (** F3 ([dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F3): what the
-          entry walk does with a candidate whose structural initial stop sits
-          further than [stops_config.max_stop_distance_pct] from entry.
-
-          Three readings of one book sentence:
+      (** F3: what the entry walk does with a candidate whose structural initial
+          stop sits further than [stops_config.max_stop_distance_pct] from
+          entry. Three readings of one book sentence:
 
           - [Drop_over_max] (default) is today's G15 step-3 drop — the candidate
             is skipped with [Audit_recorder.Stop_too_wide]. §5.1 read as a ban.
@@ -1315,20 +1233,21 @@ type config = {
             shrinks the share count ~[1 / stop_distance] under {b every} mode —
             sizing never reads the mode — so what [Size_down] adds over the
             default is the admission and the tag, not the shrink.
-          - [Demote_over_max] (added 2026-08-16, defect B) admits the identical
-            candidate at the identical size, but walks it {e after} every
-            candidate whose stop is within the limit, so wide stops are funded
-            only with what is left ({!Entry_stop_width_order}). The delta
-            against [Size_down] is {b order only}, which means the two diverge
-            exactly when capital binds. Also bounded by
-            {!stop_width_size_down_max_pct} — leaving that at [0.0] makes this
-            mode a no-op, so a spec must set the ceiling for it to bite.
+          - [Demote_over_max] admits the identical candidate at the identical
+            size, but walks it {e after} every candidate whose stop is within
+            the limit, so wide stops are funded only with what is left
+            ({!Entry_stop_width_order}). The delta against [Size_down] is
+            {b order only}, which means the two diverge exactly when capital
+            binds.
+            {b ⚠ Also bounded by {!stop_width_size_down_max_pct} — leaving that
+               at [0.0] makes this mode a no-op}, so a spec must set the ceiling
+            for it to bite.
 
           {b Honest citation.} §5.1 says "prefer other candidates", which is
           comparative rather than an absolute ban — and the book reserves ban
           vocabulary for the cases it means as bans (§4.4 on negative RS) while
           {e grading} the rest (§4.3 A+/A/B/C). Of the three, [Demote_over_max]
-          is the closest to §5.1's wording. [Size_down] is NOT a documented book
+          is closest to §5.1's wording. [Size_down] is NOT a documented book
           mechanism: the book's remedies for a wide stop are (i) anchor at the
           nearest prior correction low
           ([stops_config.support_floor_anchor_scope = Nearest], the competing
@@ -1336,17 +1255,13 @@ type config = {
           — never risk-parity size-down. It remains a tolerated-participation
           {e reading}, labelled as such; see {!Stop_width_mode}.
 
-          {b What [Demote_over_max] is responding to.} On the 26-year top-3000
-          core arm one name was rejected {b 21 times} with [Stop_too_wide] at a
-          correct, fresh entry anchor — and became the single largest winner in
-          the record run. The width gate, not the entry anchor, is what excludes
-          that cohort ([dev/notes/entry-anchor-defect-a-refuted-2026-08-16.md]).
-
           {b Default [Drop_over_max] = bit-identical to every existing
              baseline/golden} (R1). R2: axis-expressible as
           [((flag stop_width_mode) (values (Drop_over_max Size_down
-           Demote_over_max)))]. Stays default-off until a ledger ACCEPT plus the
-          promotion-confirmation grid (R3). *)
+           Demote_over_max)))]; stays default-off until a ledger ACCEPT plus the
+          promotion-confirmation grid (R3). Evidence that the width gate — not
+          the entry anchor — excludes the crash-recovery cohort:
+          [dev/notes/entry-anchor-defect-a-refuted-2026-08-16.md]. *)
   stop_width_size_down_max_pct : float; [@sexp.default 0.0]
       (** Sanity ceiling for {!stop_width_mode} — {b both} [Size_down] and
           [Demote_over_max]: stop distances above this fraction of entry are
@@ -1354,21 +1269,20 @@ type config = {
           risk. [0.0] (the default) falls back to
           [stops_config.max_stop_distance_pct], which makes an
           armed-but-unconfigured mode admit exactly the population
-          [Drop_over_max] admits. The field name predates [Demote_over_max]
-          (2026-08-16); it was not renamed because 26 committed specs set it.
+          [Drop_over_max] admits. The field name predates [Demote_over_max]; it
+          was not renamed because 26 committed specs set it.
 
           It exists as its own knob rather than reusing [max_stop_distance_pct]
           so a sweep can widen the {e admission} boundary without also moving
           the §5.1 15% line that other mechanisms read (the
           [stop_anchor_at_entry_base] re-anchor threshold, and the
-          [Sized_down_wide_stop] tag boundary itself) — the two roles are
-          separated so a wide-admission cell is not confounded with a re-anchor
-          change. Unread under [Drop_over_max]. Default [0.0] is an exact no-op
-          (R1); axis-expressible (R2). *)
+          [Sized_down_wide_stop] tag boundary itself) — so a wide-admission cell
+          is not confounded with a re-anchor change. Unread under
+          [Drop_over_max]. Default [0.0] is an exact no-op (R1);
+          axis-expressible (R2). *)
   volume_confirm_at_fill : bool; [@sexp.default false]
       (** F5 — judge the breakout's volume {b at the fill}, not at placement
-          (plan [dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F5;
-          [docs/design/weinstein-book-reference.md] §4.2 + §4.7).
+          ([docs/design/weinstein-book-reference.md] §4.2 + §4.7).
 
           {b The faithfulness gap it closes.} Book §4.7's GTC buy-stop is
           written {i before} the breakout, so breakout-week volume is unknowable
@@ -1393,7 +1307,7 @@ type config = {
             lookahead). Unconfirmed ⇒ the position is ejected, audit tag
             [Volume_eject]; confirmed ⇒ held.
 
-          {b The eject is INSEPARABLE from the flag.} There is deliberately no
+          {b ⚠ The eject is INSEPARABLE from the flag.} There is deliberately no
           eject-off cell: holding a volume-unconfirmed breakout would be a W1
           spine item-3 violation, and §4.2's low-volume-breakout SELL rule is
           explicit that a buy-stop filled without volume confirmation is sold,
@@ -1414,7 +1328,7 @@ type config = {
           {b Future work (NOT built)}: plan §3-F5 amendment (iv) notes a later
           trader/investor variant of the unconfirmed branch
           ([eject | hold_with_stop_at_breakout]); v4 implements the eject only.
-      *)
+          Plan: [dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F5. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for
