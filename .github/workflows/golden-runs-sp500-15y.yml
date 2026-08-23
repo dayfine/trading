@@ -1,5 +1,7 @@
-# SP500 15y golden-run: runs sp500-2010-2026 (perf-tier 3) under
-# goldens-sp500-historical/ on a nightly cron.
+# SP500 15y golden-run: runs EVERY perf-tier-3 scenario under
+# goldens-sp500-historical/ on a nightly cron — as of 2026-08 that is
+# three sequential scenarios: sp500-2010-2026, sp500-2010-2026-longshort
+# (#1050), and sp500-2011-2026-bah-brk-b (#1166).
 #
 # Split out of golden-runs-sp500.yml on 2026-05-08 because the 15y
 # scenario currently OOMs on 8 GB GHA runners (peak RSS ~11.4 GB,
@@ -30,7 +32,11 @@ on:
 jobs:
   golden-sp500-15y:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # 240 min: the job runs three ~55-min scenarios sequentially. The old
+    # 90-min cap fitted only the original single scenario; when #1050 added
+    # the long-short golden (2026-05-12) every subsequent run was cancelled
+    # at the cap — 96+ consecutive silent cancellations (#2427).
+    timeout-minutes: 240
     permissions:
       contents: read
       packages: read
@@ -46,6 +52,11 @@ jobs:
       TRADING_DATA_DIR: ${{ github.workspace }}/trading/test_data
       # Restrict to 15y historical goldens.
       GOLDEN_SP500_SUBDIRS: goldens-sp500-historical
+      # Per-cell timeout (seconds). The script default is 90 min per cell,
+      # so three pathological hangs would take 270 min — racing the job's
+      # 240-min cap instead of being bounded by it. 70 min/cell keeps the
+      # worst case (~210 min + build) inside the cap by construction.
+      GOLDEN_SP500_TIMEOUT: "4200"
     steps:
       - uses: actions/checkout@v4
 
@@ -73,7 +84,18 @@ jobs:
               echo '```'
             } >>"$GITHUB_STEP_SUMMARY"
           else
+            # The script writes summary.txt UNCONDITIONALLY after its
+            # scenario loop — cells that FAIL or hit the per-cell timeout
+            # still land there as FAIL rows, which is the soak policy
+            # (continue-on-error above) working as intended. A MISSING
+            # summary therefore means the script died before finishing the
+            # loop; fail the job so that outage is visible instead of the
+            # silent green this branch used to report (#2427). The
+            # job-timeout case is separate: a job-level cancel yields
+            # conclusion=cancelled regardless of step exit codes — that
+            # case is fixed by the 240-min cap above, not by this exit.
             echo "SP500 15y golden run: no summary produced." >>"$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
 
       # Upload run artefacts (equity_curve.csv, splits.csv, trades.csv, actual.sexp,
