@@ -1,6 +1,6 @@
 # Status: simulation
 
-## Last updated: 2026-08-19
+## Last updated: 2026-08-23
 
 ### 2026-08-18 — F2 clock default promoted 0 → 26 (PR #2384) — **REVERTED 2026-08-19 by #2397**
 
@@ -25,8 +25,13 @@
 >
 > **But age may be the wrong variable entirely.** #2407 proposes cancelling on
 > whether the *base* that defined `E` still holds, which would supersede the
-> clock rather than tune it; its companion measurement is in flight
-> (`dev/experiments/base-broken-2026-08-19/`).
+> clock rather than tune it. **Update 2026-08-23: that companion measurement is
+> no longer in flight — it completed and returned NO BUILD as specified**
+> (`dev/experiments/base-broken-2026-08-19/README.md`). At this holding cadence
+> "the base broke" and "the ticket rested a long time" are nearly the same
+> population — 79 of the 89 fills resting >26 weeks had already broken their
+> 8-week base low — so the structural test would rescue 10 fills worth 0.76% of
+> realized P&L. Issue #2407 is still open; see `## Next Steps`.
 >
 > Everything below is kept verbatim as the record of what was promoted and what
 > it owed.
@@ -101,7 +106,7 @@ fill-week-window helper), and two new leaf modules — `Entry_ticket_tags`
 sub-schema + its two resolution merges, the way `Stop_log` owns
 `exit_trigger`).
 
-**Status: READY_FOR_REVIEW.** Capture-only — no config field, no gate, no
+**Status: MERGED #2270 `a03f2a4e` 2026-08-11.** Capture-only — no config field, no gate, no
 behaviour change; goldens move only in sexp shape. Discharges two deferrals:
 #2258's `Sized_down_wide_stop` (was `entry_meta` + trace only) and
 qc-behavioral #2267's held-without-verdict recommendation
@@ -786,15 +791,79 @@ favour of a discrete event on the position ledger. Four PRs landed:
 
 ## Next Steps
 
-### Future slices
+Reconciled 2026-08-23. The list below had not been touched since the May
+"Future slices" framing while ~13 simulation PRs shipped; every claim here was
+re-verified against the merge commits on main before being kept.
 
-- Position-level assertions: verify AAPL open position, PnL direction
-- ~~Walk-forward backtest (M5): parameter tuner with validation period~~
-  — **DONE** via `walk-forward-cv` track (#1100/#1111/#1116, MERGED
-  2026-05-16) + `tuning` track Bayesian Phase 3 (#1126/#1132/#1136/#1143/#1145,
-  MERGED 2026-05-17). Cross-scenario validation as the next promote-gate
-  surface owned by `tuning` per PR #1237.
-- Performance gate test (T2-B)
-- Local sp500-2019-2023 baseline rerun — still deferred (needs full
-  491-symbol universe data not present in GHA)
+### Shipped since the May list (verified on main 2026-08-23)
+
+Recorded here because the narrative sections above do not cover most of it.
+This is a merge-state reconcile, not a re-review — see each PR for the contract.
+
+**Entry-ticket TTL / cancellation.** The knob split landed as
+`#2349 59b26c3b` (2026-08-16, re-screen vs clock separated), with the cancel
+precedence pinned and 40 archived specs migrated in `#2355 41f982ca`
+(2026-08-17). The re-test ran (`#2353 29af15dd`, narrowed by
+`#2368 a994b7bc`) and returned a **REJECT** — `#2376 56c6b9eb` (2026-08-19):
+condition-based cancellation, not the re-screen, is the operative lever.
+
+**The clock-26 promotion and its revert.** `#2384 5c278bb7` flipped
+`entry_order_max_rest_weeks` 0 → 26; `#2397 283ec468` reverted it the same day
+after the `goldens-sp500/sp500-2019-2023-armed-stoplimit.sexp` golden regressed
+**−40.91pp**. A second cell confirmed the direction at **−38.42pp**
+(`#2392 3ec73568`). Full framing in the top-of-file section; the default on
+main is `0`. Re-flip is tracked as **open issue #2405** (gated on re-pinning the
+goldens to the live convention). Open issue **#2407** proposes cancelling on
+whether the base that defined `E` still holds; its companion measurement is
+**done and is a NO BUILD as specified** —
+`dev/experiments/base-broken-2026-08-19/README.md` finds only 10 fills / 0.76%
+of realized P&L would be rescued, because 79 of the 89 fills resting >26 weeks
+had already broken their 8-week base low. The issue is still open; whether to
+close it is a maintainer call (see recommendation below).
+
+**Ticket-funding leg (`arc-readiness` plan, all default-off).**
+`#2378 2e8bd315` G3 `reserve_cash_for_resting_tickets`; `#2463 d7c3d295` G2a
+`entry_fill_reject_retries`; `#2468 094b91b0` G2b
+`entry_fill_size_to_available`. The three-way grid closed the program
+(`#2473 aa70c876`): **G3 is a terminal REJECT as a global default**
+(53 trades over 26y — reservation exhausts the pool); **G2a/G2b stay
+default-off axes** with no promotion case at current power. Design + verdict
+live on the `arc-readiness` track, not here.
+
+**Engine-side instrumentation.** `#2423 a9f4c419` counts cap-refused StopLimit
+entries and extracts `Fill_rules`; `#2431 74b16fae` pins the
+blocked-then-filled clause of that tally.
+
+### Still open
+
+- **Position-level assertions** — verify the AAPL open position and PnL
+  direction in the strategy smoke test. Carried unchanged from the May list;
+  still not done, still small. (Also listed under `## Follow-up`.)
+- **Performance gate test (T2-B)** — carried from `## Known gaps`; unchanged.
+- **The demoted-wide cohort is not greppable from the trace** (residual R-c of
+  `#2352`, merged 2026-08-17) — see `## Follow-up`. Needed *before* any ladder
+  cell running `Demote_over_max` is read for attribution, so this is the one
+  item here with a real ordering constraint.
+- **`Trade_audit.alternatives_considered` docstring is wrong** — documented as
+  "Top-N candidates", but `Entry_audit_capture.alternatives_of_decisions` emits
+  every `Skipped` decision with no top-N cut. Found during `#2352` rework,
+  deliberately left out of scope. Docstring-only fix.
+- **Local sp500-2019-2023 baseline rerun** — still deferred; needs the full
+  491-symbol universe, absent in GHA. Note this is a **golden re-pin**, which
+  `.claude/rules/universe-discipline.md` explicitly permits on sp500; it is not
+  a measurement and must not be quoted as evidence about strategy behaviour.
+- The `TODO(simulation/*)` items under `## Follow-up` (price-cache data source,
+  StopLimit order generation, monthly cadence, bar granularity) — all unchanged
+  and unverified against current code in this reconcile; treat their status as
+  unknown rather than confirmed-open.
+
+### Recommendations (not decisions)
+
+- **Issue #2407 should probably be closed or re-scoped**, since its own
+  companion measurement returned NO BUILD as specified. Left open here because
+  closing a tracked issue is a maintainer call, not a bookkeeping reconcile.
+- **This track's boundary is drifting.** The TTL, funding and engine work above
+  is mostly owned in practice by `arc-readiness` and `backtest-infra`; this file
+  records it only because the code lives under `simulation/` and `engine/`.
+  Worth an explicit ownership decision rather than continuing to mirror.
 
