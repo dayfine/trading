@@ -2,10 +2,9 @@ open Core
 open Stop_types
 open Trading_base.Types
 
-(* Round-number nudging lives in {!Stop_nudge}. This adapts it to the stops
-   config's [round_number_nudge] distance. *)
-let _nudge_round_number ~config ~side price =
-  Stop_nudge.nudge_round_number ~nudge:config.round_number_nudge ~side price
+(* Round-number nudging lives in {!Stop_nudge}, adapted to the stops config's
+   [round_number_nudge] distance by {!Stop_geometry}. *)
+let _nudge_round_number = Stop_geometry.nudge_round_number
 
 let compute_initial_stop ~config ~side ~reference_level =
   (* Half the min-correction threshold: places the initial stop modestly inside

@@ -746,6 +746,43 @@ let test_split_safe_floors_nested_axis_expands _ =
               ]);
        ])
 
+(* Proves R2 for the stalled-cycle anchor reset (issue #2486):
+   [reset_anchor_on_stalled_cycle] is a real bool field on
+   [Weinstein_stops.config] (the [stops_config] field of
+   [Weinstein_strategy.config]), so the nested key path
+   [stops_config.reset_anchor_on_stalled_cycle] expands and validates with no
+   overlay-validator change. The no-op default [false] and the experimental
+   [true] sit on the same axis. *)
+let test_reset_anchor_on_stalled_cycle_nested_axis_expands _ =
+  let axis =
+    VM.Key
+      {
+        path = [ "stops_config"; "reset_anchor_on_stalled_cycle" ];
+        values = Sexp.[ Atom "false"; Atom "true" ];
+      }
+  in
+  let t = { VM.axes = [ axis ]; expansion = VM.Cartesian } in
+  assert_that (VM.expand t)
+    (elements_are
+       [
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string
+                     "((stops_config ((reset_anchor_on_stalled_cycle false))))");
+              ]);
+         field
+           (fun (v : WFR.variant) -> v.overrides)
+           (elements_are
+              [
+                equal_to
+                  (Sexp.of_string
+                     "((stops_config ((reset_anchor_on_stalled_cycle true))))");
+              ]);
+       ])
+
 (* ---------- Sampled determinism + fallback ---------- *)
 
 let test_sampled_determinism _ =
@@ -919,6 +956,8 @@ let suite =
          >:: test_support_floor_anchor_mode_nested_axis_expands;
          "split_safe_floors_nested_axis_expands"
          >:: test_split_safe_floors_nested_axis_expands;
+         "reset_anchor_on_stalled_cycle_nested_axis_expands"
+         >:: test_reset_anchor_on_stalled_cycle_nested_axis_expands;
          "sampled determinism (same seed -> same labels)"
          >:: test_sampled_determinism;
          "sampled different seed -> different subset"
