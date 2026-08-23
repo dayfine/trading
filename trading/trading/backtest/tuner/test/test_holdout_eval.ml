@@ -26,6 +26,8 @@ let _fold_actual ?(total_return_pct = 0.0) ?(calmar_ratio = 0.0)
     calmar_ratio;
     cagr_pct;
     avg_holding_days;
+    total_trades = 0;
+    max_trade_pnl_dollars = Float.nan;
   }
 
 (* ---------- classify_verdict ---------- *)

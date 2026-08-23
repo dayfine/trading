@@ -48,6 +48,8 @@ let _fold_actual ?(variant_label = "cell-E") ?(total_return_pct = Float.nan)
     calmar_ratio;
     cagr_pct;
     avg_holding_days;
+    total_trades = 0;
+    max_trade_pnl_dollars = Float.nan;
   }
 
 let _write_fold_actuals path (actuals : Wf.fold_actual list) =

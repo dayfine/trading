@@ -18,6 +18,8 @@ let _fa_cagr ~fold ~variant ~ret ~sharpe ~maxdd ~calmar ~cagr :
     calmar_ratio = calmar;
     cagr_pct = cagr;
     avg_holding_days = Float.nan;
+    total_trades = 0;
+    max_trade_pnl_dollars = Float.nan;
   }
 
 let _fa ~fold ~variant ~ret ~sharpe ~maxdd ~calmar : Report.fold_actual =
@@ -538,6 +540,157 @@ let test_cagr_renders_as_na_when_missing _ =
   let md = Report.render ~baseline_label:"baseline" ~gate ~fold_actuals:folds in
   assert_that md (contains_substring "n/a")
 
+(* ---------- Trade-count + max-trade-P&L columns (#2412) ---------- *)
+
+(** A [fold_actual] whose only interesting columns are the two trade ones; every
+    other metric is fixed filler, so a change in the rendered row can only come
+    from [total_trades] / [max_trade_pnl_dollars]. *)
+let _fa_trades ~fold ~variant ~total_trades ~max_trade_pnl_dollars :
+    Report.fold_actual =
+  {
+    (_fa ~fold ~variant ~ret:5.0 ~sharpe:0.5 ~maxdd:5.0 ~calmar:1.0) with
+    total_trades;
+    max_trade_pnl_dollars;
+  }
+
+(** Three folds of one variant carrying distinct trade counts and max-trade P&L
+    figures, so the cross-fold stats are not degenerate: counts 10/20/30 (mean
+    20) and max-trade P&L 100/200/300 (mean 200). *)
+let _trade_column_setup () =
+  List.map
+    [
+      ("fold-000", 10, 100.0); ("fold-001", 20, 200.0); ("fold-002", 30, 300.0);
+    ]
+    ~f:(fun (fold, total_trades, max_trade_pnl_dollars) ->
+      _fa_trades ~fold ~variant:"baseline" ~total_trades ~max_trade_pnl_dollars)
+
+let test_fold_actual_round_trips_trade_columns _ =
+  let fa =
+    _fa_trades ~fold:"fold-007" ~variant:"X" ~total_trades:42
+      ~max_trade_pnl_dollars:1234.5
+  in
+  let parsed = Report.fold_actual_of_sexp (Report.sexp_of_fold_actual fa) in
+  assert_that parsed
+    (all_of
+       [
+         field (fun (f : Report.fold_actual) -> f.total_trades) (equal_to 42);
+         field
+           (fun (f : Report.fold_actual) -> f.max_trade_pnl_dollars)
+           (float_equal 1234.5);
+       ])
+
+(** Back-compat: a [fold_actual] sexp written before the two columns existed
+    (i.e. lacking both fields) must still parse, landing on the documented
+    defaults — [0] trades and NaN max-trade P&L. *)
+let test_fold_actual_parses_pre_trade_column_sexp _ =
+  let legacy =
+    Sexp.of_string
+      "((fold_name fold-000) (variant_label baseline) (total_return_pct 5.0) \
+       (sharpe_ratio 0.5) (max_drawdown_pct 5.0) (calmar_ratio 1.0) (cagr_pct \
+       5.0) (avg_holding_days 30.0))"
+  in
+  assert_that
+    (Report.fold_actual_of_sexp legacy)
+    (all_of
+       [
+         field (fun (f : Report.fold_actual) -> f.total_trades) (equal_to 0);
+         field
+           (fun (f : Report.fold_actual) ->
+             Float.is_nan f.max_trade_pnl_dollars)
+           (equal_to true);
+       ])
+
+(** Same back-compat contract one level up: an [aggregate] whose
+    [variant_stability] rows predate the two columns parses with the NaN
+    per-metric-stats default rather than raising. *)
+let test_aggregate_parses_pre_trade_column_stability _ =
+  let legacy =
+    Sexp.of_string
+      "((fold_count 1) (baseline_label baseline) (metric_label Sharpe) \
+       (stability (((variant_label baseline) (total_return_pct ((mean 5.0) \
+       (stdev 0.0) (min 5.0) (max 5.0))) (sharpe_ratio ((mean 0.5) (stdev 0.0) \
+       (min 0.5) (max 0.5))) (max_drawdown_pct ((mean 5.0) (stdev 0.0) (min \
+       5.0) (max 5.0))) (calmar_ratio ((mean 1.0) (stdev 0.0) (min 1.0) (max \
+       1.0))) (cagr_pct ((mean 5.0) (stdev 0.0) (min 5.0) (max 5.0))) \
+       (avg_holding_days ((mean 30.0) (stdev 0.0) (min 30.0) (max 30.0)))))) \
+       (sensitivity ()) (verdicts ()))"
+  in
+  assert_that
+    (Report.aggregate_of_sexp legacy)
+    (field
+       (fun (a : Report.aggregate) -> a.stability)
+       (elements_are
+          [
+            all_of
+              [
+                field
+                  (fun (s : Report.variant_stability) ->
+                    Float.is_nan s.total_trades.mean)
+                  (equal_to true);
+                field
+                  (fun (s : Report.variant_stability) ->
+                    Float.is_nan s.max_trade_pnl_dollars.mean)
+                  (equal_to true);
+              ];
+          ]))
+
+let test_compute_summarises_trade_columns_across_folds _ =
+  let agg =
+    Report.compute ~baseline_label:"baseline"
+      ~gate:(_baseline_gate ~m:1 ~n:3 ())
+      ~fold_actuals:(_trade_column_setup ())
+  in
+  assert_that agg.stability
+    (elements_are
+       [
+         all_of
+           [
+             field
+               (fun (s : Report.variant_stability) -> s.total_trades.mean)
+               (float_equal 20.0);
+             field
+               (fun (s : Report.variant_stability) -> s.total_trades.max)
+               (float_equal 30.0);
+             field
+               (fun (s : Report.variant_stability) ->
+                 s.max_trade_pnl_dollars.mean)
+               (float_equal 200.0);
+             field
+               (fun (s : Report.variant_stability) ->
+                 s.max_trade_pnl_dollars.max)
+               (float_equal 300.0);
+           ];
+       ])
+
+let test_render_shows_trade_columns _ =
+  let gate = _baseline_gate ~m:1 ~n:3 () in
+  let md =
+    Report.render ~baseline_label:"baseline" ~gate
+      ~fold_actuals:(_trade_column_setup ())
+  in
+  assert_that md
+    (all_of
+       [
+         (* Per-fold table: header + fold-000's own count and max-trade P&L. *)
+         contains_substring "| Trades | Max trade $ |";
+         contains_substring "| fold-000 | baseline | 5.00 |";
+         contains_substring "| 10 | 100 |";
+         (* Stability table: header + the cross-fold means. *)
+         contains_substring "| Trades (μ ± σ) | Max trade $ (μ ± σ) |";
+         contains_substring "| 20.0 ± 10.0 | 200.0 ± 100.0 |";
+       ])
+
+(** A fold_actual carrying the NaN default (an old fixture replayed through the
+    renderer) prints "n/a", never "$0" — a missing measurement must not read as
+    a measured zero. *)
+let test_render_shows_na_for_missing_max_trade_pnl _ =
+  let gate = _baseline_gate ~m:2 ~n:3 () in
+  let md =
+    Report.render ~baseline_label:"baseline" ~gate
+      ~fold_actuals:(_three_fold_two_variant_setup ())
+  in
+  assert_that md (contains_substring "| 0 | n/a |")
+
 let suite =
   "Walk_forward_report"
   >::: [
@@ -575,6 +728,17 @@ let suite =
          >:: test_cagr_propagates_through_aggregate;
          "CAGR renders n/a when missing"
          >:: test_cagr_renders_as_na_when_missing;
+         "fold_actual round-trips trade columns"
+         >:: test_fold_actual_round_trips_trade_columns;
+         "fold_actual parses pre-trade-column sexp"
+         >:: test_fold_actual_parses_pre_trade_column_sexp;
+         "aggregate parses pre-trade-column stability"
+         >:: test_aggregate_parses_pre_trade_column_stability;
+         "compute summarises trade columns across folds"
+         >:: test_compute_summarises_trade_columns_across_folds;
+         "render shows trade columns" >:: test_render_shows_trade_columns;
+         "render shows n/a for missing max trade P&L"
+         >:: test_render_shows_na_for_missing_max_trade_pnl;
        ]
 
 let () = run_test_tt_main suite

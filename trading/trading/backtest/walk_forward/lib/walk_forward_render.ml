@@ -5,16 +5,23 @@ module T = Walk_forward_types
     table reader sees the gap without misinterpreting [Float.nan]. *)
 let _fmt_cagr f = if Float.is_nan f then "  n/a" else sprintf "%.2f" f
 
+(** Format a dollar figure: "n/a" when NaN (the sexp default for a fixture that
+    predates the column) so a missing measurement never reads as $0. *)
+let _fmt_dollars f = if Float.is_nan f then "n/a" else sprintf "%.0f" f
+
 let _per_fold_table (folds : T.fold_actual list) =
   let header =
-    "| Fold | Variant | Return % | CAGR % | Sharpe | MaxDD % | Calmar |\n\
-     |------|---------|---------:|-------:|-------:|--------:|-------:|"
+    "| Fold | Variant | Return % | CAGR % | Sharpe | MaxDD % | Calmar | Trades \
+     | Max trade $ |\n\
+     |------|---------|---------:|-------:|-------:|--------:|-------:|-------:|------------:|"
   in
   let rows =
     List.map folds ~f:(fun (fa : T.fold_actual) ->
-        sprintf "| %s | %s | %.2f | %s | %.3f | %.2f | %.3f |" fa.fold_name
-          fa.variant_label fa.total_return_pct (_fmt_cagr fa.cagr_pct)
-          fa.sharpe_ratio fa.max_drawdown_pct fa.calmar_ratio)
+        sprintf "| %s | %s | %.2f | %s | %.3f | %.2f | %.3f | %d | %s |"
+          fa.fold_name fa.variant_label fa.total_return_pct
+          (_fmt_cagr fa.cagr_pct) fa.sharpe_ratio fa.max_drawdown_pct
+          fa.calmar_ratio fa.total_trades
+          (_fmt_dollars fa.max_trade_pnl_dollars))
   in
   String.concat ~sep:"\n" (header :: rows)
 
@@ -22,18 +29,27 @@ let _fmt_mean_pm_stdev_cagr (s : T.per_metric_stats) =
   if Float.is_nan s.mean then "    n/a"
   else sprintf "%.2f ± %.2f" s.mean s.stdev
 
+(** Same "n/a on NaN mean" rule as {!_fmt_mean_pm_stdev_cagr}, at a precision
+    suited to whole-dollar and whole-trade counts. *)
+let _fmt_mean_pm_stdev_coarse (s : T.per_metric_stats) =
+  if Float.is_nan s.mean then "n/a" else sprintf "%.1f ± %.1f" s.mean s.stdev
+
 let _stability_row (s : T.variant_stability) =
-  sprintf "| %s | %.2f ± %.2f | %s | %.3f ± %.3f | %.2f ± %.2f | %.3f ± %.3f |"
+  sprintf
+    "| %s | %.2f ± %.2f | %s | %.3f ± %.3f | %.2f ± %.2f | %.3f ± %.3f | %s | \
+     %s |"
     s.variant_label s.total_return_pct.mean s.total_return_pct.stdev
     (_fmt_mean_pm_stdev_cagr s.cagr_pct)
     s.sharpe_ratio.mean s.sharpe_ratio.stdev s.max_drawdown_pct.mean
     s.max_drawdown_pct.stdev s.calmar_ratio.mean s.calmar_ratio.stdev
+    (_fmt_mean_pm_stdev_coarse s.total_trades)
+    (_fmt_mean_pm_stdev_coarse s.max_trade_pnl_dollars)
 
 let _stability_table (agg : T.aggregate) =
   let header =
     "| Variant | Return % (μ ± σ) | CAGR % (μ ± σ) | Sharpe (μ ± σ) | MaxDD % \
-     (μ ± σ) | Calmar (μ ± σ) |\n\
-     |---------|-----------------:|---------------:|---------------:|----------------:|--------------:|"
+     (μ ± σ) | Calmar (μ ± σ) | Trades (μ ± σ) | Max trade $ (μ ± σ) |\n\
+     |---------|-----------------:|---------------:|---------------:|----------------:|--------------:|--------------:|--------------------:|"
   in
   let rows = List.map agg.stability ~f:_stability_row in
   String.concat ~sep:"\n" (header :: rows)

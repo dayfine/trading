@@ -59,6 +59,8 @@ let _stability_record ~label ~sharpe_mean ~maxdd_mean ?(calmar_mean = 0.0)
     calmar_ratio = _stats ~mean:calmar_mean ();
     cagr_pct = _stats ~mean:cagr_mean ();
     avg_holding_days = _stats ~mean:avg_holding_days_mean ();
+    total_trades = _stats ~mean:Float.nan ();
+    max_trade_pnl_dollars = _stats ~mean:Float.nan ();
   }
 
 let _pass_verdict ?(wins = 3) ?(n = 3) () : FG.verdict = Pass { wins; n }

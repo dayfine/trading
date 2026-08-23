@@ -502,6 +502,8 @@ let _stub_runner (s : Scenario.t) : Wf_types.fold_actual =
     calmar_ratio = (f /. 50.0) +. 0.1;
     cagr_pct = (f /. 2.0) +. 0.5;
     avg_holding_days = (f /. 5.0) +. 7.0;
+    total_trades = Int.of_float f;
+    max_trade_pnl_dollars = f *. 10.0;
   }
 
 let _stub_base () : Scenario.t =

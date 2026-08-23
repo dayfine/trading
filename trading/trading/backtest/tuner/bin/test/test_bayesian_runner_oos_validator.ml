@@ -39,6 +39,8 @@ let _fa ~fold_name ~variant_label ~sharpe : Wf_types.fold_actual =
     calmar_ratio = 0.0;
     cagr_pct = Float.nan;
     avg_holding_days = Float.nan;
+    total_trades = 0;
+    max_trade_pnl_dollars = Float.nan;
   }
 
 (** Build N candidate-variant fold_actuals named "fold-000".."fold-(N-1)" with

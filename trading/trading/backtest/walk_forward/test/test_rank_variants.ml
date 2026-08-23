@@ -43,6 +43,8 @@ let _make_stability ~label ~sharpe ~calmar ~max_dd : T.variant_stability =
     calmar_ratio = _stat calmar;
     cagr_pct = _stat 0.0;
     avg_holding_days = _stat 0.0;
+    total_trades = _stat 0.0;
+    max_trade_pnl_dollars = _stat 0.0;
   }
 
 let _make_aggregate ~stability : T.aggregate =
@@ -65,6 +67,8 @@ let _make_fold_actual ~fold_name ~variant_label ~total_return : T.fold_actual =
     calmar_ratio = 0.0;
     cagr_pct = 0.0;
     avg_holding_days = Float.nan;
+    total_trades = 0;
+    max_trade_pnl_dollars = Float.nan;
   }
 
 (* -------------- invocation helper -------------- *)

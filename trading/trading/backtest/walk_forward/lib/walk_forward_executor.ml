@@ -25,6 +25,25 @@ let noop_progress ~variant_label:_ ~fold_name:_ ~test_start:_ ~test_end:_ = ()
 let _test_days (period : Scenario.period) =
   Date.diff period.end_date period.start_date + 1
 
+(* The two trade columns are projected by their own named functions rather than
+   inline in [_extract_fold] so the metric-key -> column mapping is pinnable by
+   a direct unit test. An end-to-end comparison against a re-run backtest cannot
+   discriminate between keys on a fold that trades zero times: the trade-
+   aggregate computer emits ALL sixteen aggregates as 0.0 there, so every
+   candidate key compares equal. See the .mli for the per-column contract. *)
+
+let total_trades_of_metrics
+    (metrics : Trading_simulation_types.Metric_types.metric_set) =
+  let open Trading_simulation_types.Metric_types in
+  Map.find metrics NumTrades
+  |> Option.bind ~f:Float.iround_towards_zero
+  |> Option.value ~default:0
+
+let max_trade_pnl_dollars_of_metrics
+    (metrics : Trading_simulation_types.Metric_types.metric_set) =
+  let open Trading_simulation_types.Metric_types in
+  Map.find metrics LargestWinDollar |> Option.value ~default:Float.nan
+
 (** Run a single scenario via {!Backtest.Runner.run_backtest} and project its
     summary metrics into a {!Report.fold_actual}. The [fold_name] and
     [variant_label] fields are filled by the caller — {!_evaluate_one_pair}.
@@ -65,6 +84,8 @@ let[@inline never] _extract_fold ~fixtures_root ~bar_data_source ~shared_panels
     calmar_ratio = get CalmarRatio;
     cagr_pct = WFR.cagr_pct ~test_days ~total_return_pct:total_return;
     avg_holding_days = get AvgHoldingDays;
+    total_trades = total_trades_of_metrics summary.metrics;
+    max_trade_pnl_dollars = max_trade_pnl_dollars_of_metrics summary.metrics;
   }
 
 let _run_one ~fixtures_root ~bar_data_source ~shared_panels (s : Scenario.t) :
