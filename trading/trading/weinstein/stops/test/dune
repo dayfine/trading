@@ -7,6 +7,7 @@
   test_stop_split_adjust
   test_vol_scaled_stop
   test_extension_stop
+  test_stop_ratchet_freeze
   test_weinstein_stops_callbacks_parity)
  (libraries
   weinstein_trading.stops

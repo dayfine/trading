@@ -1,6 +1,6 @@
 # Status: support-floor-stops
 
-## Last updated: 2026-08-10
+## Last updated: 2026-08-23
 
 ## Status
 IN_PROGRESS
@@ -9,6 +9,12 @@ IN_PROGRESS
 YES
 
 ## Open PR
+- `fix/stop-ratchet-freeze-2486` — **issue #2486 CONFIRMED** at the code level,
+  plus the default-off fix. The trailing ratchet is provably frozen for the life
+  of any position whose initial stop came from the **buffer fallback**. See the
+  2026-08-23 addendum below for the full derivation, the exact code path, and
+  the one open BOOK-CHECK-NEEDED item. Branch pushed; PR to be opened by the
+  orchestrator (no `gh` in this environment).
 - `feat/html-report-basis-split` — **G4**, the per-series price-basis split in
   `Html_report.load` (2026-08-10 addendum below). `?bar_close` now takes
   `basis:price_basis` (`Adjusted | Raw`); the benchmark asks for `Adjusted`,
@@ -969,6 +975,30 @@ fixture), which is a larger piece of work than F3. Filed below.
 
 ## Follow-ups
 
+- **H1 (2026-08-23, from #2486) — `_ratchet_tightened` cannot ratchet.** Same
+  defect shape as #2486, different state. `_ratchet_tightened` recomputes its
+  candidate from `Float.min last_correction_extreme bar_extreme`, so for a long
+  the candidate is monotone non-increasing; after the single raise available on
+  the first `Tightened` bar (the `tightened_stop_buffer_pct 0.005` vs
+  `trailing_stop_buffer_pct 0.01` step), `_is_better_stop` can never be true
+  again. The function's name and docstring both claim it trails. Needs the same
+  treatment as #2486 — decide whether `Tightened` is meant to trail the *current*
+  pullback low (book §5.2 STAGE3_TIGHTENING: "pull stop tighter — below
+  correction_low even if ABOVE MA", which reads as a one-shot tighten, not a
+  trail) — then either fix it behind a default-off flag or correct the docstring
+  to say it is one-shot. Deliberately out of scope for the #2486 PR.
+- **H2 (2026-08-23, from #2486) — real-data verification of the freeze.** The
+  code-level proof is complete; what is missing is the population figure: what
+  fraction of live positions carry a fallback stop AND spend their whole hold in
+  a frozen `Trailing` state. Needs a container backtest (`trade_audit` already
+  records `stop_floor_kind Buffer_fallback`; cross it with `Stop_raised` event
+  counts per position). Not runnable on a GHA runner — `docker` is absent.
+  Blocks any ledger ACCEPT for `reset_anchor_on_stalled_cycle`.
+- **H3 (2026-08-23, from #2486) — resolve the queued `BOOK-CHECK-NEEDED`.** See
+  the 2026-08-23 addendum. A local session with the book text should settle
+  whether a completed-but-non-improving cycle advances Weinstein's reference
+  point, and write the answer back into `docs/design/weinstein-book-reference.md`
+  §5.2 per `.claude/rules/book-as-authority.md` tier 3.
 - ~~**B5 (qc-behavioral, PR #2220 rework) — `Empty_window` pinned on only one of
   two paths.** Filed late: raised in #2220's rework and recorded in
   `dev/daily/2026-08-06.md` §Follow-up Queue, but the status-file edit was lost
@@ -1495,6 +1525,140 @@ manufacturing a golden.
 
 `dune build @fmt` exit 0, `dune build` exit 0, **full** `dune runtest` exit 0
 (not just the backtest test dir). Exit codes read directly, not grepped.
+
+## 2026-08-23 addendum — issue #2486, the frozen trailing ratchet (PR branch `fix/stop-ratchet-freeze-2486`)
+
+### Verdict: CONFIRMED
+
+The mechanism reported in #2486 is real, and it is stronger than the issue
+claimed — it is a **provable deadlock**, not a probabilistic one, and it is
+**not specific to the fallback stop's arithmetic**; the fallback is only what
+makes the precondition true in practice.
+
+### The invariant
+
+For a long in `Trailing`, the cycle stop candidate is
+`below (min (last_correction_extreme, ma_value))`. Two facts about
+`last_correction_extreme`:
+
+1. `_advance_tracking` (`weinstein_stops.ml:270-289`, the `Float.min` at
+   :277) only ever moves it **against** the position.
+2. The only writer that moves it back **for** the position is the cycle reset in
+   `_raised_trailing` (`:342-351`), and that reset is reachable **only through
+   the raise branch** of `_raise_after_cycle`.
+
+Therefore, writing `A0` for the bar extreme seeded at the `Initial → Trailing`
+transition (`_to_trailing`, `:202-211`, `last_correction_extreme = _bar_extreme`):
+
+```
+reachable_stop  <=  min(correction_extreme, ma) * (1 - trailing_stop_buffer_pct)
+                <=  A0 * (1 - trailing_stop_buffer_pct)          [monotone non-increasing]
+```
+
+If that bound already sits at or below the installed initial stop `S0`, then
+`_is_better_stop` is false on **every** cycle, so no cycle ever raises the stop,
+so no cycle ever resets the anchor, so the bound never recovers. **The trailing
+stop is frozen at `S0` for the life of the position**, however far price
+advances — and every stop-exit is then a ~initial-stop-width loss by
+construction. There is no escape inside `Trailing`; a rising MA does not help,
+because the MA enters through a `min` that is already dominated by `A0`.
+
+### The precondition, exactly
+
+```
+freeze  <=>  A0 * (1 - trailing_stop_buffer_pct)  <=  S0
+```
+
+- **Fallback stop.** `S0 = entry * initial_stop_buffer * (1 - min_correction_pct/2)`
+  = `0.9792 * entry` on the shipped 1.02 / 0.08 defaults (pinned independently
+  by `test_fallback_stop_width.ml`). With `trailing_stop_buffer_pct = 0.01` the
+  freeze arms whenever `A0 <= 0.98909 * entry` — i.e. as soon as the entry bar's
+  low sits more than **~1.09%** below the entry price. On a weekly bar that is
+  near-certain; on the daily backtest cadence the running `min` of lows reaches
+  it within days, and it is then permanent. `project_fallback_stop_half_book_band`
+  records that the fallback is the **common** path.
+- **Structural stop.** `S0` derives from a prior correction low well below entry,
+  so `A0` (an entry-bar extreme) sits comfortably above `S0 / (1 - buf)`, the
+  first cycle raises, the anchor resets, and the machine ratchets normally.
+  Pinned on the *same* tape by
+  `test_structural_stop_ratchets_on_the_same_tape` — the contrast isolates the
+  fallback as the cause rather than the fixture.
+
+### Classification: implementation artifact
+
+Book §5.2's TRAILING block specifies a ratchet "for each correction cycle" whose
+successive stops "trend upward across correction cycles" (`weinstein-book-
+reference.md` §5.2). A machine in which `correction_count` provably stays at `0`
+for the life of a multi-cycle advance is not implementing that. The defect is a
+**conflation**: `_raise_after_cycle` used one `option` to answer two different
+questions — "did a correction cycle complete?" (a fact about price) and "may we
+install the resulting stop?" (the never-lower rule). Coupling the cycle
+bookkeeping to the second answer is what makes the first answer unreachable
+forever.
+
+### The fix (default-off)
+
+`stops_config.reset_anchor_on_stalled_cycle : bool` — default `false`.
+
+`_cycle_outcome` now returns `No_cycle | Stalled | Raised of float`. `Stalled`
+means a cycle genuinely completed but its candidate cannot improve the resting
+stop. Under the flag, that case still resets the extremes to the bar close,
+increments `correction_count`, and clears `correction_observed_since_reset`,
+while `stop_level` and `ma_at_last_adjustment` are carried through verbatim.
+
+- **Never-lower rule (L2) untouched** — the flag moves only bookkeeping.
+- **Phantom-cycle guard untouched** — `Stalled` is reachable only when
+  `_cycle_completed` (which contains the `correction_count = 0 ||
+  correction_observed_since_reset` gate) has already fired. Pinned by
+  `test_stale_anchor_still_blocked_under_flag`, which asserts the frozen and
+  unfrozen configs agree exactly on a stale-anchor bar.
+- **Default path bit-identical** — the only new branch is `Stalled when
+  config.reset_anchor_on_stalled_cycle`. All 41 pre-existing
+  `test_weinstein_stops` cases and the rest of the stops suite pass unchanged;
+  no golden moved.
+- **R2 (searchable axis)** — proved by
+  `test_reset_anchor_on_stalled_cycle_nested_axis_expands` in
+  `test_variant_matrix.ml`, mirroring the `split_safe_floors` precedent.
+
+**Not done here, deliberately:** no default flip, no real-data verification
+(needs a container backtest; `docker` is absent on the GHA runner), no change to
+`initial_stop_buffer` — there is an open human decision on that value
+(1.02 → 1.0) that interacts directly with this issue's precondition.
+
+### BOOK-CHECK-NEEDED (queued for a local session)
+
+```
+BOOK-CHECK-NEEDED: When a correction cycle completes (>= 8-10% pullback, then a
+rally back through the prior peak) but the resulting stop would be BELOW the
+stop already resting, does Weinstein treat the cycle as having happened — i.e.
+does the next cycle measure its pullback from the NEW peak and place its stop
+under the NEW correction low — or does the reference point stay pinned to the
+older, deeper low until a raise actually occurs? §5.2's TRAILING block covers
+the raise case and says "BETWEEN corrections: stop stays put", but it does not
+address a completed cycle whose stop would move DOWN.
+```
+
+Tier 1 (`weinstein-book-reference.md`) settles that stops must trend upward
+across cycles, which is what makes the freeze a defect; it does **not** settle
+the bookkeeping question above, which is what fixes the size of the flag's
+effect. Conclusion status on that sub-question: `PLAUSIBLE-pending-book`.
+
+### Secondary finding — `_ratchet_tightened` has the same shape (NOT fixed here)
+
+`_ratchet_tightened` (`weinstein_stops.ml`, the `Float.min` on
+`last_correction_extreme`) recomputes its candidate from a running min as well,
+so for a long its candidate is **monotone non-increasing** too. After the single
+buffer-tightening raise available on the first bar in `Tightened`
+(`tightened_stop_buffer_pct 0.005` vs `trailing_stop_buffer_pct 0.01`), the
+function can never raise the stop again despite its name and its docstring
+("Ratchets the tightened stop in the position's favour as new extremes are
+set"). Same class of defect, different state; left out of this PR for scope.
+Filed under Follow-ups.
+
+### Verification
+
+`dune build @fmt` exit 0, `dune build` exit 0, **full** `dune runtest` exit 0.
+Exit codes read directly, not grepped.
 
 ## QC
 
