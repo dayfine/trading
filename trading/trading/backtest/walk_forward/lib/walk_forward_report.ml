@@ -85,6 +85,10 @@ let _stability_for_variant (folds : fold_actual list) label : variant_stability
     calmar_ratio = _stats (List.map vs ~f:(fun fa -> fa.calmar_ratio));
     cagr_pct = _stats (List.map vs ~f:(fun fa -> fa.cagr_pct));
     avg_holding_days = _stats (List.map vs ~f:(fun fa -> fa.avg_holding_days));
+    total_trades =
+      _stats (List.map vs ~f:(fun fa -> Float.of_int fa.total_trades));
+    max_trade_pnl_dollars =
+      _stats (List.map vs ~f:(fun fa -> fa.max_trade_pnl_dollars));
   }
 
 let _find_fold_actual (folds : fold_actual list) ~fold_name ~variant_label =

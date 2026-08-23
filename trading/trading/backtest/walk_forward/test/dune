@@ -25,6 +25,7 @@
   weinstein.snapshot_pipeline
   weinstein.snapshot_runtime
   trading.data_panel.snapshot
+  trading.simulation.types
   types
   status)
  (preprocess

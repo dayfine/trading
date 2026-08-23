@@ -18,6 +18,8 @@ let make_variant ~label ~sharpe ~calmar ~max_dd : T.variant_stability =
     calmar_ratio = stat calmar;
     cagr_pct = stat 0.0;
     avg_holding_days = stat 0.0;
+    total_trades = stat 0.0;
+    max_trade_pnl_dollars = stat 0.0;
   }
 
 (* Four-variant set with a known frontier (objectives: Sharpe up, Calmar up,

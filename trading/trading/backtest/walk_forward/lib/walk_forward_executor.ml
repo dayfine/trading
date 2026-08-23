@@ -65,6 +65,12 @@ let[@inline never] _extract_fold ~fixtures_root ~bar_data_source ~shared_panels
     calmar_ratio = get CalmarRatio;
     cagr_pct = WFR.cagr_pct ~test_days ~total_return_pct:total_return;
     avg_holding_days = get AvgHoldingDays;
+    (* [NumTrades] is a count carried as a float in the metric set; a missing
+       key reads back as NaN, which [Float.iround_towards_zero] rejects — so an
+       absent key lands on 0, matching the field's sexp default. *)
+    total_trades =
+      Float.iround_towards_zero (get NumTrades) |> Option.value ~default:0;
+    max_trade_pnl_dollars = get LargestWinDollar;
   }
 
 let _run_one ~fixtures_root ~bar_data_source ~shared_panels (s : Scenario.t) :

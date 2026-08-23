@@ -29,6 +29,8 @@ let _stability ~label ~sharpe ~calmar ~return_pct ~maxdd : T.variant_stability =
     calmar_ratio = _stats calmar;
     cagr_pct = _stats return_pct;
     avg_holding_days = T.nan_per_metric_stats;
+    total_trades = T.nan_per_metric_stats;
+    max_trade_pnl_dollars = T.nan_per_metric_stats;
   }
 
 (* A two-variant aggregate: a finite baseline and a finite knob variant. *)

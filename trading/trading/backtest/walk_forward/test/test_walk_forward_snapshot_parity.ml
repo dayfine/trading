@@ -285,6 +285,8 @@ let _stub_runner (s : Scenario.t) : Report.fold_actual =
     calmar_ratio = (f /. 50.0) +. 0.1;
     cagr_pct = (f /. 2.0) +. 0.5;
     avg_holding_days = (f /. 5.0) +. 7.0;
+    total_trades = Int.of_float f;
+    max_trade_pnl_dollars = f *. 10.0;
   }
 
 let _stub_aggregate ?bar_data_source () : Sexp.t =
@@ -365,11 +367,53 @@ let test_shared_panels_reused_across_backtests _ =
   assert_that second_run_miss_delta (lt (module Int_ord) misses_after_first);
   assert_that stats.evictions (equal_to 0)
 
+(* ---- §4 Trade-count / max-trade-P&L projection (#2412) ------------- *)
+
+(* [Walk_forward_executor._extract_fold] is private and runs its backtest
+   inline, so the only way to pin WHICH summary-metric key each column reads is
+   to re-run the same backtest here and compare. Snapshot mode is used on both
+   sides so neither depends on [TRADING_DATA_DIR]. *)
+let test_trade_columns_projected_from_summary_metrics _ =
+  let _data_dir, snapshot_dir, manifest = _setup_dual_fixtures () in
+  let fixtures_root = _make_tmp_dir "wf_trade_cols_fixtures_" in
+  let universe_path = _write_universe ~fixtures_root in
+  let base = _make_base ~universe_path in
+  let bar_data_source = Bar_data_source.Snapshot { snapshot_dir; manifest } in
+  let result = _run_mode ~fixtures_root ~base ~bar_data_source () in
+  (* fold_actuals is variants-outer / folds-inner and the spec has one variant,
+     so the head row is fold-000's — the window re-run directly below. *)
+  let fold_0 = List.hd_exn result.fold_actuals in
+  let direct =
+    Backtest.Runner.run_backtest ~start_date:(_ymd 2020 4 1)
+      ~end_date:(_ymd 2020 8 1) ~sector_map_override:(_fixture_sector_map ())
+      ~bar_data_source ()
+  in
+  let metrics = direct.summary.metrics in
+  let metric k = Map.find metrics k |> Option.value ~default:Float.nan in
+  let open Trading_simulation_types.Metric_types in
+  (* Both keys must exist: a metric rename would otherwise leave the columns
+     silently defaulted forever, with the equality below still passing. *)
+  assert_that
+    (List.map [ NumTrades; LargestWinDollar ] ~f:(Map.mem metrics))
+    (elements_are [ equal_to true; equal_to true ]);
+  assert_that fold_0
+    (all_of
+       [
+         field
+           (fun (fa : Report.fold_actual) -> fa.total_trades)
+           (equal_to (Int.of_float (metric NumTrades)));
+         field
+           (fun (fa : Report.fold_actual) -> fa.max_trade_pnl_dollars)
+           (float_equal (metric LargestWinDollar));
+       ])
+
 let suite =
   "Walk_forward_snapshot_parity"
   >::: [
          "test_snapshot_csv_aggregate_parity"
          >:: test_snapshot_csv_aggregate_parity;
+         "test_trade_columns_projected_from_summary_metrics"
+         >:: test_trade_columns_projected_from_summary_metrics;
          "test_flag_off_is_byte_identical_to_none"
          >:: test_flag_off_is_byte_identical_to_none;
          "test_shared_panels_reused_across_backtests"

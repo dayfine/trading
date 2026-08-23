@@ -65,6 +65,8 @@ let _stability_record ~label ~sharpe_mean ~maxdd_mean : Wf.variant_stability =
     calmar_ratio = _stats ~mean:0.0 ();
     cagr_pct = _stats ~mean:Float.nan ();
     avg_holding_days = _stats ~mean:Float.nan ();
+    total_trades = _stats ~mean:Float.nan ();
+    max_trade_pnl_dollars = _stats ~mean:Float.nan ();
   }
 
 (** Fuller builder that lets composite + single-metric-relative tests pin the
@@ -81,6 +83,8 @@ let _stability_full ?(avg_holding_days_mean = Float.nan) ~label ~sharpe_mean
     calmar_ratio = _stats ~mean:calmar_mean ();
     cagr_pct = _stats ~mean:Float.nan ();
     avg_holding_days = _stats ~mean:avg_holding_days_mean ();
+    total_trades = _stats ~mean:Float.nan ();
+    max_trade_pnl_dollars = _stats ~mean:Float.nan ();
   }
 
 (** Build a synthetic aggregate with full-column variants (Sharpe, MaxDD,
@@ -1034,6 +1038,8 @@ let _fold_actual ?(variant_label = _candidate_label)
     calmar_ratio;
     cagr_pct;
     avg_holding_days;
+    total_trades = 0;
+    max_trade_pnl_dollars = Float.nan;
   }
 
 (** When candidate == baseline, every Δ_i is 0.0 → mean = 0, stdev = 0,

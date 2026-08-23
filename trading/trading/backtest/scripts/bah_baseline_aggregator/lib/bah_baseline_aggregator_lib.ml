@@ -81,6 +81,11 @@ let _prices_in_window ~(start_date : Date.t) ~(end_date : Date.t)
 let _test_days_calendar (fold : Window_spec.fold) : int =
   Date.diff fold.test_period.end_date fold.test_period.start_date + 1
 
+(* Buy-and-hold is one position opened at the fold's start and held to its end —
+   exactly one round-trip, which is the same convention [avg_holding_days =
+   test_days_calendar] below already encodes. *)
+let _bah_round_trips = 1
+
 (* ---------- per-fold + aggregate ---------- *)
 
 let compute_fold_actual ~(prices : Types.Daily_price.t list)
@@ -106,6 +111,10 @@ let compute_fold_actual ~(prices : Types.Daily_price.t list)
     calmar_ratio;
     cagr_pct;
     avg_holding_days = Float.of_int test_days_calendar;
+    total_trades = _bah_round_trips;
+    (* This aggregator works off an adjusted-close series, not a portfolio, so
+       there is no dollar-denominated per-trade P&L to report. *)
+    max_trade_pnl_dollars = Float.nan;
   }
 
 (** Non-firing placeholder gate that mirrors the v7 fixture's shape
