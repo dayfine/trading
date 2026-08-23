@@ -777,6 +777,45 @@ let test_ratchet_first_install_is_not_a_raise _ =
            (is_some_and (float_equal 142.50));
        ])
 
+(* A position that reaches [EntryComplete] carrying no stop, and never gets one
+   installed afterwards, has no high-water mark at all — [max_stop] is [None]
+   rather than some seeded level, and nothing was ever raised. *)
+let test_ratchet_max_stop_none_when_no_stop_ever_installed _ =
+  assert_that
+    (_run_one
+       [
+         _create_entering ~position_id:_pid ~side:Long;
+         _entry_complete ~position_id:_pid ~stop:None;
+       ])
+    (all_of
+       [
+         field (fun (i : Backtest.Stop_log.stop_info) -> i.max_stop) is_none;
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
+           (equal_to 0);
+       ])
+
+(* The collector tolerates a transition stream whose [CreateEntering] it never
+   observed, and treats such a position as [Long]. This pins the SIGN of that
+   default: a rising stop is the raise and [max_stop] is the running maximum.
+   Were the default [Short], both fields would read 0 / 142.50 instead. *)
+let test_ratchet_side_defaults_to_long_without_create_entering _ =
+  assert_that
+    (_run_one
+       [
+         _entry_complete ~position_id:_pid ~stop:(Some 142.50);
+         _update_stop ~position_id:_pid ~stop:(Some 148.00);
+       ])
+    (all_of
+       [
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.n_stop_raises)
+           (equal_to 1);
+         field
+           (fun (i : Backtest.Stop_log.stop_info) -> i.max_stop)
+           (is_some_and (float_equal 148.00));
+       ])
+
 let suite =
   "Stop_log"
   >::: [
@@ -824,6 +863,10 @@ let suite =
          >:: test_ratchet_short_side_counts_downward_moves;
          "ratchet: first install is not a raise"
          >:: test_ratchet_first_install_is_not_a_raise;
+         "ratchet: max_stop is None when no stop was ever installed"
+         >:: test_ratchet_max_stop_none_when_no_stop_ever_installed;
+         "ratchet: side defaults to Long without CreateEntering"
+         >:: test_ratchet_side_defaults_to_long_without_create_entering;
        ]
 
 let () = run_test_tt_main suite

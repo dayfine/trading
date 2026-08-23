@@ -125,11 +125,12 @@ type stop_info = {
           level. [None] when no stop was ever installed (no [EntryComplete] and
           no [UpdateRiskParams] carrying a [stop_loss_price]).
 
-          Side is taken from the position's [CreateEntering] transition and
-          defaults to [Long] for a position whose [CreateEntering] the collector
-          never observed (transition-level unit tests that start at
-          [EntryComplete]). The record convention is long-only, so that default
-          is the common path rather than a fallback.
+          Side is taken from the position's [CreateEntering] transition. The
+          collector tolerates a stream that never carries one — a position first
+          seen at [EntryComplete] or [UpdateRiskParams] — and treats it as
+          [Long]. The record convention is long-only, so that default is the
+          common path rather than a fallback. It decides the direction of both
+          this field and {!n_stop_raises}.
 
           Distinct from {!exit_stop}, which is the {e last} installed level: a
           split adjustment or any other rescale-downward rewrites [exit_stop]

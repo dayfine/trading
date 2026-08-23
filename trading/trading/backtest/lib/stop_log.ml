@@ -87,8 +87,8 @@ let _fresh_record ~symbol =
   {
     pos_symbol = symbol;
     (* The record convention is long-only; a position whose [CreateEntering] we
-       never observed (transition-level unit tests starting at [EntryComplete])
-       is treated as long. *)
+       never observed — the stream starts at [EntryComplete] or
+       [UpdateRiskParams] — is treated as long. *)
     pos_side = Trading_base.Types.Long;
     pos_entry_date = None;
     pos_entry_stop = None;
