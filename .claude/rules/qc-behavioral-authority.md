@@ -127,12 +127,20 @@ Same invariants as qc-structural — see
 `.claude/rules/qc-structural-authority.md` §"Operational requirements
 for QC agents in this repo":
 
-1. Dispatch with **`isolation: "worktree"`**. qc-behavioral may run
-   `jj edit` on the PR branch to inspect; without isolation the parent
-   workspace's shared `.jj/repo/` is mutated.
-2. Run every `dune build` / `dune runtest` via `docker exec trading-1-dev`.
-   Native invocations produce ENVFAIL on the ocamlformat / opam skew
-   between host and container.
+1. Dispatch with **`isolation: "worktree"`, checked out with plain `git`**
+   (`git fetch origin <branch> && git checkout FETCH_HEAD`, or `gh pr
+   checkout <N>`) — **never `jj`**. `jj edit` run inside a dispatched
+   worktree addresses and mutates the parent workspace, not the agent's own
+   checkout; that is the exact contamination `isolation: "worktree"` exists
+   to prevent.
+2. Run every `dune build` / `dune runtest` via `docker exec trading-1-dev`,
+   with the container `cwd` set to the **agent's own checkout** — never
+   `cd /workspaces/trading-1/trading` (the parent tree). Native invocations
+   produce ENVFAIL on the ocamlformat / opam skew between host and
+   container; parent-tree invocations build the wrong PR entirely. See
+   `.claude/rules/qc-structural-authority.md` item 2 for the exact
+   incantation and `.claude/rules/worktree-isolation.md` §"jj workspace
+   isolation" for the authority on dune cwd (issue #2386).
 
 ## What the generic agent doesn't know about
 
