@@ -42,6 +42,11 @@ name: goldens-affected
 
 on:
   pull_request:
+    # labeled/unlabeled are required for the acknowledgment path: applying
+    # paired-run-done must re-run this check, or a red verdict can never
+    # turn green without an unrelated push. Bare `pull_request` fires only
+    # on opened/synchronize/reopened.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 jobs:
   goldens-affected:
