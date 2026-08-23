@@ -117,6 +117,47 @@ type stop_info = {
           trailing) *)
   exit_trigger : exit_trigger option;
       (** What caused the exit. [None] if position is still open. *)
+  max_stop : float option;
+      (** The {b most-protective} stop level ever installed on this position —
+          the running maximum of every installed level for a long, the running
+          minimum for a short. Seeded from the [EntryComplete] stop, then
+          advanced by each [UpdateRiskParams] that installs a more protective
+          level. [None] when no stop was ever installed (no [EntryComplete] and
+          no [UpdateRiskParams] carrying a [stop_loss_price]).
+
+          Side is taken from the position's [CreateEntering] transition and
+          defaults to [Long] for a position whose [CreateEntering] the collector
+          never observed (transition-level unit tests that start at
+          [EntryComplete]). The record convention is long-only, so that default
+          is the common path rather than a fallback.
+
+          Distinct from {!exit_stop}, which is the {e last} installed level: a
+          split adjustment or any other rescale-downward rewrites [exit_stop]
+          but leaves [max_stop] at the high-water mark, so the two together show
+          whether the ratchet ever moved and whether it later gave ground.
+
+          {b Caveat}: it is a high-water mark over raw installed levels, so on a
+          position that went through a split it stays on the pre-split price
+          scale while [exit_stop] is post-split. Compare the two only within one
+          price scale; for a split-crossing position their ratio is not
+          meaningful. *)
+  n_stop_raises : int;
+      (** How many [UpdateRiskParams] transitions installed a stop level
+          {b strictly more protective} than the level installed immediately
+          before it (strictly higher for a long, strictly lower for a short).
+
+          Excludes the initial [EntryComplete] install — a position whose stop
+          never moves after entry scores 0. Also excludes the first install seen
+          on a position that had no prior level (an [UpdateRiskParams] arriving
+          before any [EntryComplete]): that is an install, not a raise.
+
+          {b Split adjustments cannot inflate this for longs.} A split rescales
+          price {e and} stop {b downward} together, so the post-split level is
+          strictly {e less} protective than the pre-split one and the
+          strictly-more-protective test rejects it. A genuine ratchet that
+          happens to occur after a split still counts, because it is compared
+          against the (already rescaled) previous level, not against a pre-split
+          one. *)
 }
 [@@deriving show, eq, sexp]
 (** Stop information for a single round-trip trade. Keyed by position_id so it
@@ -141,10 +182,15 @@ val set_current_date : t -> Core.Date.t -> unit
 val record_transitions : t -> Position.transition list -> unit
 (** Observe a batch of transitions (from one [on_market_close] call) and update
     internal state. Extracts:
-    - [CreateEntering] records symbol and position_id
-    - [EntryComplete] records initial stop-loss price from risk_params and
-      stamps {!stop_info.entry_date} with the most recent {!set_current_date}.
-    - [UpdateRiskParams] updates current stop-loss price
+    - [CreateEntering] records symbol, position_id and the position's side (the
+      side decides which direction counts as "more protective" for
+      {!stop_info.max_stop} / {!stop_info.n_stop_raises})
+    - [EntryComplete] records initial stop-loss price from risk_params, seeds
+      {!stop_info.max_stop} with it, and stamps {!stop_info.entry_date} with the
+      most recent {!set_current_date}.
+    - [UpdateRiskParams] updates current stop-loss price, advances
+      {!stop_info.max_stop} when the new level is more protective, and
+      increments {!stop_info.n_stop_raises} when it is strictly so
     - [TriggerExit] records exit trigger and final stop level
     - [ExitComplete] without a preceding [TriggerExit] tags
       [exit_trigger = End_of_period] (simulator end-of-run auto-close). An

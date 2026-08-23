@@ -37,6 +37,15 @@
       a trade row back to its {!Trade_audit} / {!Stop_log} record by position
       rather than by the ambiguous [(symbol, entry_date)] tuple — the latter
       misaligns on re-traded symbols. [None] when neither source has one.
+    - [max_stop] — the most-protective stop level ever installed on the
+      position, straight from {!Stop_log.stop_info.max_stop}. Read against the
+      [exit_stop] column it shows whether the trailing ratchet ever moved and
+      whether the level in force at exit had given ground since.
+    - [n_stop_raises] — how many times the stop ratcheted strictly more
+      protective after entry, from {!Stop_log.stop_info.n_stop_raises}. [None]
+      (empty cell) — not [Some 0] — when no stop-log record joined to the trade,
+      so "the ratchet never moved" stays distinguishable from "we have no
+      stop-log record at all".
 
     {2 How a trade is joined to its audit record}
 
@@ -76,10 +85,16 @@ type t = {
   screener_score_at_entry : int option;
   position_id : string option;
   stop_fill_distance_pct : float option;
+  max_stop : float option;
+  n_stop_raises : int option;
 }
 [@@deriving sexp]
 (** One per-trade context row, keyed by [(symbol, entry_date)] for join with
-    {!Trading_simulation.Metrics.trade_metrics}. *)
+    {!Trading_simulation.Metrics.trade_metrics}.
+
+    A flat CSV-row projection, not a domain object — it is wide because
+    [trades.csv] is wide, and every field is rendered independently by
+    {!csv_row_fields}. *)
 
 val stage_label : Weinstein_types.stage -> string
 (** Render a {!Weinstein_types.stage} as the canonical export label. The
@@ -91,11 +106,12 @@ val stop_trigger_kind_label : Stop_log.stop_trigger_kind -> string
     label: [gap_down] / [intraday] / [end_of_period] / [non_stop_exit]. *)
 
 val csv_header_fields : string list
-(** The 8 trailing column names for [trades.csv]: the 6 M5.2e columns
+(** The 10 trailing column names for [trades.csv]: the 6 M5.2e columns
     ([entry_stage], [entry_volume_ratio], [stop_initial_distance_pct],
     [stop_trigger_kind], [days_to_first_stop_trigger],
     [screener_score_at_entry]), then [position_id], then
-    [stop_fill_distance_pct]. Producers concatenate these onto the legacy
+    [stop_fill_distance_pct], then the two stop-ratchet observability columns
+    [max_stop] and [n_stop_raises]. Producers concatenate these onto the legacy
     13-column header so consumers can locate columns by name — see
     {!Trades_csv_schema} for the reader side of that lookup. New columns are
     {b appended} so every fixed base-column index used by positional readers
@@ -107,10 +123,13 @@ val csv_header_fields : string list
     of the format resolve by name via {!Trades_csv_schema} instead. *)
 
 val csv_row_fields : t -> string list
-(** Render a {!t} as the 8 trailing CSV cells in the same order as
-    {!csv_header_fields}. Floats render at %.4f, ints as decimal, string labels
-    verbatim. [None] renders as the empty cell — consumers must tolerate empty
-    cells (the canonical M5.2e missing-data sentinel). *)
+(** Render a {!t} as the 10 trailing CSV cells in the same order as
+    {!csv_header_fields}. Ratio-valued floats render at %.4f, ints as decimal,
+    string labels verbatim. [max_stop] is a {b price}, so it renders at %.2f to
+    match the sibling [entry_stop] / [exit_stop] price columns the result writer
+    emits, not at the ratio precision. [None] renders as the empty cell —
+    consumers must tolerate empty cells (the canonical M5.2e missing-data
+    sentinel). *)
 
 type precomputed
 (** Index bundle amortising the audit + stop-log scans across many trades.
@@ -118,7 +137,10 @@ type precomputed
     {!of_audit_and_stop_log} rebuilt the audit index per trade — at Cell E 15 y
     scale (~3 700 round-trips × ~3 700 audit records) the per-row build pushed
     [trades.csv] writing into O(N²). Loop callers must hoist {!precompute}
-    outside the iter and feed each iteration via {!of_precomputed}. *)
+    outside the iter and feed each iteration via {!of_precomputed}.
+
+    Construction lives in {!Trade_context_index}; the join policy that reads the
+    indexes stays here. *)
 
 val precompute :
   audit:Trade_audit.audit_record list ->

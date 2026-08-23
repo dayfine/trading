@@ -12,7 +12,10 @@
       decision the ticket filled), date proximity only as the fallback
     - days_to_first_stop_trigger is [None] when exit was not a stop trigger
     - csv_header_fields shape pin
-    - csv_row_fields formatting (None → empty cell, %.4f for floats) *)
+    - Stop-ratchet columns (max_stop / n_stop_raises) join from the stop_info,
+      and stay [None] when no stop-log record joined
+    - csv_row_fields formatting (None → empty cell, %.4f for ratio floats, %.2f
+      for the max_stop price) *)
 
 open OUnit2
 open Core
@@ -92,8 +95,18 @@ let make_record ?exit_ entry : TA.audit_record =
 
 let make_stop_info ~position_id ~symbol
     ?(entry_date = Some (_date "2024-01-15")) ?(entry_stop = Some 138.0)
-    ?(exit_stop = Some 138.0) ?exit_trigger () : SL.stop_info =
-  { position_id; symbol; entry_date; entry_stop; exit_stop; exit_trigger }
+    ?(exit_stop = Some 138.0) ?exit_trigger ?(max_stop = Some 138.0)
+    ?(n_stop_raises = 0) () : SL.stop_info =
+  {
+    position_id;
+    symbol;
+    entry_date;
+    entry_stop;
+    exit_stop;
+    exit_trigger;
+    max_stop;
+    n_stop_raises;
+  }
 
 (* stage_label --------------------------------------------------------- *)
 
@@ -132,6 +145,8 @@ let test_csv_header_fields_pinned _ =
          equal_to "screener_score_at_entry";
          equal_to "position_id";
          equal_to "stop_fill_distance_pct";
+         equal_to "max_stop";
+         equal_to "n_stop_raises";
        ])
 
 (* of_audit_and_stop_log: full join ----------------------------------- *)
@@ -463,6 +478,42 @@ let test_unknown_position_id_falls_back_to_date _ =
   assert_that ctx
     (field (fun (c : TC.t) -> c.entry_stage) (is_some_and (equal_to "Stage2")))
 
+(* Stop-ratchet columns ------------------------------------------------ *)
+
+(* max_stop / n_stop_raises pass through from the joined stop_info. *)
+let test_stop_ratchet_columns_join_from_stop_info _ =
+  let trade = make_trade () in
+  let stop_info =
+    make_stop_info ~position_id:"AAPL-wein-1" ~symbol:"AAPL"
+      ~max_stop:(Some 144.5) ~n_stop_raises:2 ()
+  in
+  let ctx =
+    TC.of_audit_and_stop_log
+      ~audit:[ make_record (make_entry ()) ]
+      ~stop_infos:[ stop_info ] ~trade
+  in
+  assert_that ctx
+    (all_of
+       [
+         field (fun (c : TC.t) -> c.max_stop) (is_some_and (float_equal 144.5));
+         field (fun (c : TC.t) -> c.n_stop_raises) (is_some_and (equal_to 2));
+       ])
+
+(* With no stop_info to join, n_stop_raises is [None] rather than [Some 0] —
+   "no stop-log record" must stay distinguishable from "ratchet never moved". *)
+let test_stop_ratchet_columns_none_without_stop_info _ =
+  let ctx =
+    TC.of_audit_and_stop_log
+      ~audit:[ make_record (make_entry ()) ]
+      ~stop_infos:[] ~trade:(make_trade ())
+  in
+  assert_that ctx
+    (all_of
+       [
+         field (fun (c : TC.t) -> c.max_stop) is_none;
+         field (fun (c : TC.t) -> c.n_stop_raises) is_none;
+       ])
+
 (* csv_row_fields formatting ----------------------------------------- *)
 
 let test_csv_row_fields_formats_correctly _ =
@@ -478,6 +529,8 @@ let test_csv_row_fields_formats_correctly _ =
       screener_score_at_entry = Some 75;
       position_id = Some "AAPL-wein-1";
       stop_fill_distance_pct = Some 0.065;
+      max_stop = Some 144.5;
+      n_stop_raises = Some 2;
     }
   in
   assert_that (TC.csv_row_fields ctx)
@@ -491,6 +544,9 @@ let test_csv_row_fields_formats_correctly _ =
          equal_to "75";
          equal_to "AAPL-wein-1";
          equal_to "0.0650";
+         (* price precision, not the %.4f ratio precision above *)
+         equal_to "144.50";
+         equal_to "2";
        ])
 
 let test_csv_row_fields_renders_none_as_empty _ =
@@ -506,11 +562,15 @@ let test_csv_row_fields_renders_none_as_empty _ =
       screener_score_at_entry = None;
       position_id = None;
       stop_fill_distance_pct = None;
+      max_stop = None;
+      n_stop_raises = None;
     }
   in
   assert_that (TC.csv_row_fields ctx)
     (elements_are
        [
+         equal_to "";
+         equal_to "";
          equal_to "";
          equal_to "";
          equal_to "";
@@ -551,6 +611,10 @@ let suite =
          >:: test_date_fallback_still_joins_within_window;
          "unknown position_id falls back to date"
          >:: test_unknown_position_id_falls_back_to_date;
+         "stop-ratchet columns join from stop_info"
+         >:: test_stop_ratchet_columns_join_from_stop_info;
+         "stop-ratchet columns are None without a stop_info"
+         >:: test_stop_ratchet_columns_none_without_stop_info;
          "csv_row_fields formats correctly"
          >:: test_csv_row_fields_formats_correctly;
          "csv_row_fields renders None as empty"

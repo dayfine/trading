@@ -21,15 +21,20 @@ type stop_info = {
   entry_stop : float option;
   exit_stop : float option;
   exit_trigger : exit_trigger option;
+  max_stop : float option;
+  n_stop_raises : int;
 }
 [@@deriving show, eq, sexp]
 
 type _pos_record = {
   mutable pos_symbol : string;
+  mutable pos_side : Trading_base.Types.position_side;
   mutable pos_entry_date : Date.t option;
   mutable pos_entry_stop : float option;
   mutable pos_current_stop : float option;
   mutable pos_exit_trigger : exit_trigger option;
+  mutable pos_max_stop : float option;
+  mutable pos_n_stop_raises : int;
 }
 
 type t = {
@@ -81,28 +86,74 @@ let classify_stop_trigger_kind ?(gap_threshold_pct = gap_down_threshold_pct)
 let _fresh_record ~symbol =
   {
     pos_symbol = symbol;
+    (* The record convention is long-only; a position whose [CreateEntering] we
+       never observed (transition-level unit tests starting at [EntryComplete])
+       is treated as long. *)
+    pos_side = Trading_base.Types.Long;
     pos_entry_date = None;
     pos_entry_stop = None;
     pos_current_stop = None;
     pos_exit_trigger = None;
+    pos_max_stop = None;
+    pos_n_stop_raises = 0;
   }
 
 let _ensure_record t ~position_id ~symbol =
   Hashtbl.find_or_add t.positions position_id ~default:(fun () ->
       _fresh_record ~symbol)
 
+(* "More protective" is directional: a long's stop protects by rising, a
+   short's by falling. Strict comparison, so a re-install of the same level is
+   not a raise — and a split rescale (which moves price and stop down together)
+   is strictly less protective for a long, hence never counted. *)
+let _is_more_protective ~(side : Trading_base.Types.position_side) ~previous
+    ~next =
+  match side with
+  | Long -> Float.( > ) next previous
+  | Short -> Float.( < ) next previous
+
+(* Advance the high-water mark. An absent mark takes the new level as-is: that
+   is the seed, not a raise. *)
+let _more_protective_of ~side ~current ~next =
+  match current with
+  | None -> Some next
+  | Some previous ->
+      if _is_more_protective ~side ~previous ~next then Some next else current
+
+(* One installed stop level. [is_raise_candidate] is false for the
+   [EntryComplete] seed (which can never be a raise) and true for every
+   [UpdateRiskParams]. *)
+let _install_stop record ~level ~is_raise_candidate =
+  let raised =
+    is_raise_candidate
+    &&
+    match record.pos_current_stop with
+    | None -> false (* first level on this position: an install, not a raise *)
+    | Some previous ->
+        _is_more_protective ~side:record.pos_side ~previous ~next:level
+  in
+  if raised then record.pos_n_stop_raises <- record.pos_n_stop_raises + 1;
+  record.pos_max_stop <-
+    _more_protective_of ~side:record.pos_side ~current:record.pos_max_stop
+      ~next:level;
+  record.pos_current_stop <- Some level
+
 let _process_transition t (trans : Position.transition) =
   match trans.kind with
-  | CreateEntering { symbol; _ } ->
-      let _record = _ensure_record t ~position_id:trans.position_id ~symbol in
-      ()
+  | CreateEntering { symbol; side; _ } ->
+      let record = _ensure_record t ~position_id:trans.position_id ~symbol in
+      record.pos_side <- side
   | EntryComplete { risk_params } ->
       let record = _ensure_record t ~position_id:trans.position_id ~symbol:"" in
       record.pos_entry_date <- t.current_date;
       record.pos_entry_stop <- risk_params.stop_loss_price;
+      Option.iter risk_params.stop_loss_price ~f:(fun level ->
+          _install_stop record ~level ~is_raise_candidate:false);
       record.pos_current_stop <- risk_params.stop_loss_price
   | UpdateRiskParams { new_risk_params } ->
       let record = _ensure_record t ~position_id:trans.position_id ~symbol:"" in
+      Option.iter new_risk_params.stop_loss_price ~f:(fun level ->
+          _install_stop record ~level ~is_raise_candidate:true);
       record.pos_current_stop <- new_risk_params.stop_loss_price
   | TriggerExit { exit_reason; _ } | TriggerPartialExit { exit_reason; _ } ->
       let record = _ensure_record t ~position_id:trans.position_id ~symbol:"" in
@@ -130,6 +181,8 @@ let _record_to_info ~position_id record : stop_info =
     entry_stop = record.pos_entry_stop;
     exit_stop = record.pos_current_stop;
     exit_trigger = record.pos_exit_trigger;
+    max_stop = record.pos_max_stop;
+    n_stop_raises = record.pos_n_stop_raises;
   }
 
 let _compare_by_position_id (a : stop_info) (b : stop_info) =

@@ -49,11 +49,11 @@ let _canonical_header =
 let _legacy_header =
   "symbol,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger"
 
-(* 21 cells matching [_canonical_header], with [position_id] parameterised. *)
+(* 23 cells matching [_canonical_header], with [position_id] parameterised. *)
 let _canonical_row ~position_id =
   String.split ~on:','
     ("AAPL,LONG,2024-01-15,2024-02-20,36,150.00,165.00,10,150.00,10.00,140.00,160.00,signal_reversal,Stage2,2.4000,0.0800,intraday,36,75,"
-   ^ position_id ^ ",0.0650")
+   ^ position_id ^ ",0.0650,160.00,3")
 
 (* The 13 base cells only — a row written before the trailing context block
    existed. *)
