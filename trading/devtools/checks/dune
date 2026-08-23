@@ -749,7 +749,7 @@
 ; positional <base-ref> <head-ref> CLI args that don't make sense inside
 ; `dune runtest`; only the .github/workflows/goldens-affected.yml PR job
 ; invokes it directly, against the real PR diff. This rule exercises its
-; logic via 9 fixture-driven git-repo scenarios instead, including a
+; logic via fixture-driven git-repo scenarios instead, including a
 ; regression pin built from the real 5c278bb78 (#2384) diff during
 ; development. No (universe): every fixture is a fresh git repo under a
 ; temp dir with REPO_ROOT overridden, so the only real-repo file read is

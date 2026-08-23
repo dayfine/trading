@@ -121,9 +121,10 @@ also has to be expressed in automation vocabulary):
 
 `sh dev/scripts/pr_gate_status.sh` treats an acknowledged (label-driven)
 green identically to a plain green — both read as `ci=pass` once the job
-exits 0. Removing the label after the job last ran does NOT retroactively
-fail it; a rework commit re-triggers the job and re-evaluates the label at
-the new tip, same as any other CI check.
+exits 0. The workflow triggers on `labeled`/`unlabeled` as well as pushes,
+so removing the label re-runs the job at the same SHA without the ack and
+turns the check red again — an acknowledgment is revocable in automation
+vocabulary, not just in prose.
 
 ## Relationship to the automated check
 
