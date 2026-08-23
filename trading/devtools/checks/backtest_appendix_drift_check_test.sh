@@ -6,24 +6,48 @@
 # never depends on the real repo's current appendix content or backtest/
 # subdirectory list — it pins the LOGIC, not a snapshot of today's state.
 #
-# Six scenarios:
-#   1. clean:            every on-disk subdir has a row            -> OK
-#   2. missing-row:       one subdir has no row                    -> FAIL, names it
-#   3. no-heading:        plan file exists, appendix heading absent -> FAIL (guard 1)
-#   4. no-rows:            heading present, zero parseable rows     -> FAIL (guard 2)
-#   5. empty-backtest-dir: backtest dir exists but is empty          -> FAIL (guard 3)
+# Nine scenarios:
+#   1. clean:              every on-disk subdir has a row             -> OK
+#   2. missing-row:        one subdir has no row                      -> FAIL, names it
+#   3. no-heading:         plan file exists, appendix heading absent   -> FAIL (guard 1)
+#   4. no-rows:            heading present, zero parseable rows       -> FAIL (guard 2)
+#   5. empty-backtest-dir: backtest dir exists but is empty            -> FAIL (guard 3)
 #   6. exclusions:         lib/test/scenarios present with NO rows,
-#                          everything else covered                  -> OK (proves the
+#                          everything else covered                    -> OK (proves the
 #                          hardcoded exclusion list actually excludes)
+#   7. section-scoped:     a subdir's row lives under a LATER "## "
+#                          section (not the appendix), plus a real
+#                          appendix row for a different subdir         -> FAIL, names
+#                          the smuggled subdir (pins that the appendix
+#                          extraction stops at the next "## " heading,
+#                          not at EOF -- see PR #2494 rework)
+#   8. outside-appendix:   a subdir is mentioned in prose AND has a
+#                          row in a table BEFORE the appendix heading,
+#                          but has no row in the appendix itself       -> FAIL, names it
+#                          (pins the check's headline differentiating
+#                          claim over check_02's loose whole-doc grep)
+#   9. exclusion-not-broad: subdirs whose names merely CONTAIN an
+#                          excluded name as a substring (lib_extra,
+#                          test_harness, scenarios_v2), with no rows   -> FAIL, names
+#                          all three (pins that EXCLUDED_SUBDIRS
+#                          matching is exact, not substring)
 #
-# Scenarios 3-5 also serve as the "mutation test" for the three vacuous-pass
+# Scenarios 3-5 serve as the mutation test for the three vacuous-pass
 # guards: each fixture is exactly the input state that guard exists to catch
-# (heading missing / table unparsed / directory listing empty), so if a
-# guard were deleted from the script, the corresponding scenario would flip
-# from "FAIL as expected" to a false OK — which is exactly what this test
-# was run against by hand (guard commented out, script re-run against these
-# same fixtures) before landing; see the harness dispatch report for the
-# recorded before/after transcript.
+# (heading missing / table unparsed / directory listing empty). This was
+# verified by hand before landing (guard commented out, script re-run
+# against these same fixtures; see the harness dispatch report for the
+# recorded before/after transcript) with the following actual outcome, not
+# a uniform one: deleting guard 3 flips scenario 5 from "FAIL as expected"
+# to a false OK (the true vacuous pass this whole suite exists to prevent).
+# Deleting guard 1 or guard 2 does NOT produce a false OK -- scenarios 3/4
+# still FAIL, because the normal diff logic (an empty appendix-rows set
+# against non-empty on-disk dirs) is itself a natural backstop; only the
+# FAIL *message* changes (from the guard's specific diagnostic to the
+# generic "no row" list), not the exit code. Guards 1+2 are kept anyway for
+# the clearer diagnostic and as defense-in-depth against the combined
+# all-three-guards-removed case, which does still reproduce a genuine
+# silent OK.
 
 set -eu
 
@@ -202,9 +226,112 @@ RESULT6="$(_run_check "$ROOT6")"
 _assert_exit "exclusions" "0" "$RESULT6"
 _assert_contains "exclusions" "OK: backtest_appendix_drift_check" "$RESULT6"
 
+# ---- Scenario 7: section-scoped -- a row for an on-disk subdir lives under
+# a LATER "## " section, not the appendix itself. This must NOT be credited
+# as an appendix row -- pins that appendix-row extraction stops at the next
+# "## " heading rather than running to EOF (PR #2494 rework, finding B1).
+# 'alpha' has a real appendix row; 'smuggled' has on-disk presence and a
+# table row, but that row is under an unrelated later section.
+
+ROOT7="$(_make_fixture section-scoped)"
+mkdir -p \
+  "${ROOT7}/trading/trading/backtest/alpha" \
+  "${ROOT7}/trading/trading/backtest/smuggled"
+cat > "${ROOT7}/dev/plans/backtest-scale-optimization-2026-04-17.md" << EOF
+# Plan
+
+${APPENDIX_HEADER}
+
+| Subdir | What it does |
+|---|---|
+| \`alpha/\` | Does alpha things. |
+
+## Appendix B: something else entirely
+
+| Subdir | What it does |
+|---|---|
+| \`smuggled/\` | not the subdirectory inventory |
+EOF
+
+RESULT7="$(_run_check "$ROOT7")"
+_assert_exit "section-scoped" "1" "$RESULT7"
+_assert_contains "section-scoped" "FAIL: backtest_appendix_drift_check" "$RESULT7"
+_assert_contains "section-scoped" "trading/trading/backtest/smuggled/" "$RESULT7"
+if printf '%s' "$RESULT7" | grep -q 'backtest/alpha/$'; then
+  echo "FAIL: backtest_appendix_drift_check_test [section-scoped] -- 'alpha' (which HAS a real appendix row) was wrongly reported as missing"
+  FAILURES=$((FAILURES + 1))
+fi
+
+# ---- Scenario 8: outside-appendix -- a subdir is mentioned in prose AND
+# has a row in a DIFFERENT table BEFORE the appendix heading, but has no row
+# in the appendix itself. Neither a prose mention nor a pre-appendix table
+# row may satisfy the check -- pins the script's headline differentiating
+# claim over deep_scan/check_02's loose whole-doc substring grep (PR #2494
+# rework, finding B2).
+
+ROOT8="$(_make_fixture outside-appendix)"
+mkdir -p \
+  "${ROOT8}/trading/trading/backtest/alpha" \
+  "${ROOT8}/trading/trading/backtest/ghostwritten"
+cat > "${ROOT8}/dev/plans/backtest-scale-optimization-2026-04-17.md" << EOF
+# Plan
+
+Some prose here mentions \`ghostwritten/\` as a subdir we use.
+
+## Some Other Table
+
+| Subdir | What it does |
+|---|---|
+| \`ghostwritten/\` | wrong table, before the appendix |
+
+${APPENDIX_HEADER}
+
+| Subdir | What it does |
+|---|---|
+| \`alpha/\` | Does alpha things. |
+EOF
+
+RESULT8="$(_run_check "$ROOT8")"
+_assert_exit "outside-appendix" "1" "$RESULT8"
+_assert_contains "outside-appendix" "FAIL: backtest_appendix_drift_check" "$RESULT8"
+_assert_contains "outside-appendix" "trading/trading/backtest/ghostwritten/" "$RESULT8"
+if printf '%s' "$RESULT8" | grep -q 'backtest/alpha/$'; then
+  echo "FAIL: backtest_appendix_drift_check_test [outside-appendix] -- 'alpha' (which HAS a real appendix row) was wrongly reported as missing"
+  FAILURES=$((FAILURES + 1))
+fi
+
+# ---- Scenario 9: exclusion-not-broad -- subdirs whose names merely CONTAIN
+# an excluded name as a substring (lib_extra, test_harness, scenarios_v2),
+# with no appendix rows for them. All three must be reported -- pins that
+# EXCLUDED_SUBDIRS matching is exact equality, not substring/prefix (PR
+# #2494 rework, finding B5). A regression to substring matching would
+# silently under-report these forever.
+
+ROOT9="$(_make_fixture exclusion-not-broad)"
+mkdir -p \
+  "${ROOT9}/trading/trading/backtest/lib_extra" \
+  "${ROOT9}/trading/trading/backtest/test_harness" \
+  "${ROOT9}/trading/trading/backtest/scenarios_v2" \
+  "${ROOT9}/trading/trading/backtest/alpha"
+cat > "${ROOT9}/dev/plans/backtest-scale-optimization-2026-04-17.md" << EOF
+# Plan
+
+${APPENDIX_HEADER}
+
+| Subdir | What it does |
+|---|---|
+| \`alpha/\` | Does alpha things. |
+EOF
+
+RESULT9="$(_run_check "$ROOT9")"
+_assert_exit "exclusion-not-broad" "1" "$RESULT9"
+_assert_contains "exclusion-not-broad" "trading/trading/backtest/lib_extra/" "$RESULT9"
+_assert_contains "exclusion-not-broad" "trading/trading/backtest/test_harness/" "$RESULT9"
+_assert_contains "exclusion-not-broad" "trading/trading/backtest/scenarios_v2/" "$RESULT9"
+
 if [ "$FAILURES" -ne 0 ]; then
   echo "FAIL: backtest_appendix_drift_check_test -- ${FAILURES} scenario(s) failed"
   exit 1
 fi
 
-echo "OK: backtest_appendix_drift_check_test -- all 6 scenarios passed (clean, missing-row, no-heading, no-rows, empty-backtest-dir, exclusions)."
+echo "OK: backtest_appendix_drift_check_test -- all 9 scenarios passed (clean, missing-row, no-heading, no-rows, empty-backtest-dir, exclusions, section-scoped, outside-appendix, exclusion-not-broad)."

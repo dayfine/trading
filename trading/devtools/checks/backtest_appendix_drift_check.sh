@@ -41,8 +41,19 @@
 #   greps the whole plan-file TEXT for the subdir name (a loose substring
 #   match anywhere in the doc, including prose); this script requires an
 #   actual TABLE ROW under the appendix heading specifically. A subdir name
-#   that merely happens to appear in a sentence elsewhere in the plan does
-#   NOT satisfy this check.
+#   that merely happens to appear in a sentence elsewhere in the plan, or in
+#   a table BEFORE the appendix heading, or in a table under some OTHER
+#   later "## " section, does NOT satisfy this check (see test scenarios 7
+#   and 8).
+#
+#   ONE-DIRECTIONAL BY DESIGN: this only checks on-disk-subdir -> missing-row
+#   drift. It does NOT check the reverse (an appendix row for a subdirectory
+#   that no longer exists on disk) — a stale row is not flagged. This is
+#   deliberate, not an oversight: PR #2461's own reconciliation measurement
+#   found 7 discrepancies, all missing rows, zero stale rows pointing at
+#   deleted dirs — the reverse direction has never actually occurred in this
+#   repo's history. If that changes, add a `comm -13` check as a follow-up;
+#   until then the asymmetry is intentional scope, not a gap.
 #
 # VACUOUS-PASS GUARDS
 #
@@ -98,16 +109,22 @@ if ! grep -qF "$APPENDIX_HEADING" "$PLAN_FILE"; then
   die "backtest_appendix_drift_check: appendix heading not found in $PLAN_FILE (expected exactly: $APPENDIX_HEADING). Has the section been renamed or removed? Refusing to report a vacuous pass — fix the heading or this script's APPENDIX_HEADING constant, don't ignore this."
 fi
 
-# --- Extract table rows from the heading to EOF ---
-# The appendix is the last section in the file today, so "heading to EOF" is
-# sufficient; a match failure downstream (guard 2, or a real drift) is the
-# fallback if that ever stops being true — never a silent pass.
+# --- Extract table rows scoped to the appendix section only ---
+# Starts at the heading line and stops at the NEXT "## " heading (or EOF, if
+# the appendix is the last section, which is true today). This is a real
+# section boundary, not "heading to EOF" — a later "## " section containing
+# an unrelated table (e.g. an "Appendix B" someone adds afterwards) must not
+# be credited as appendix rows. Earlier revisions of this script scanned
+# heading-to-EOF, which silently swallowed any later section's table rows as
+# if they were appendix rows (fixed 2026-08-23 rework of PR #2494 — see
+# scenario 7, "section-scoped", in the test file).
 
 awk -v heading="$APPENDIX_HEADING" '
-  $0 == heading { found = 1 }
+  $0 == heading { found = 1; next }
+  found && /^## / { exit }
   found { print }
 ' "$PLAN_FILE" \
-  | sed -n 's/^| `\([A-Za-z0-9_]*\)\/` |.*/\1/p' \
+  | sed -n 's/^| `\([A-Za-z0-9_.-]*\)\/` |.*/\1/p' \
   > "$APPENDIX_ROWS_FILE"
 
 # --- Guard 2: at least one row must have parsed ---
