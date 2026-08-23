@@ -877,3 +877,50 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
     adjudication. Same review also surfaced the practical cost: a body-only
     rework finding at an approved SHA would aggregate rework+ok → `unclear`
     terminally, which is why this very note rides a tip-moving commit.
+
+## Added 2026-08-23 (harness-maintainer, harness/design-doc-drift-check)
+
+- [x] design_doc_drift_mechanization (`dev/status/cleanup.md`) — new
+  PR-time linter closing the recurring appendix-drift gap in
+  `dev/plans/backtest-scale-optimization-2026-04-17.md`. Before building
+  anything, re-measured the claimed drift by hand
+  (`comm -23` between `ls -1 trading/trading/backtest/` (minus
+  `lib/`/`test/`/`scenarios/`) and the appendix table's row names, on
+  `main@e64f8655`): **zero drift** — PR #2461 (2026-08-21) had already
+  reconciled it, 27 on-disk subdirs / 27 rows, exact match. The dispatch
+  brief's claimed third-drift set (`trade_audit_report`, `tuner`,
+  `validation`, `walk_forward`, `warmup_gate` allegedly missing) did not
+  reproduce; all five already have rows. So this PR adds no appendix rows
+  — it lands the mechanized check on an already-clean tree, closing the
+  gap *before* a fourth drift can happen rather than reacting to one.
+  Files: `trading/devtools/checks/backtest_appendix_drift_check.sh` (the
+  check, wired into `dune runtest` via `trading/devtools/checks/dune`),
+  `trading/devtools/checks/backtest_appendix_drift_check_test.sh` (6
+  fixture scenarios: clean, missing-row, no-heading, no-rows,
+  empty-backtest-dir, exclusions). Distinct from the pre-existing
+  `deep_scan/check_02_design_doc_drift.sh` backtest block: that one runs
+  only on the weekly deep-scan cadence and is warning-only (`add_warning`,
+  never fails the build; loose substring grep against the whole doc
+  text). This new check runs on every `dune runtest`, requires an actual
+  appendix TABLE ROW under the appendix heading (not just a text mention
+  anywhere in the doc), and FAILs the build. Three vacuous-pass guards
+  (appendix heading not found / zero table rows parsed / zero on-disk
+  subdirectories after exclusions), each mutation-tested by hand: guard
+  deleted from a scratch copy, re-run against the fixture that guard
+  exists to catch, confirmed the result flips from FAIL to a false OK.
+  Guard 3 alone flips "FAIL: found ZERO subdirectories ... expected
+  several" to "OK: backtest_appendix_drift_check — 0 on-disk
+  subdirectories ... all have an appendix row" when deleted — the exact
+  "0 drifted, all good" failure shape the dispatch brief warned about, now
+  reproduced and closed. Guards 1+2 (heading/rows) turned out to have a
+  natural backstop from guard 3 + the diff logic under most conditions
+  (an empty appendix-rows set with non-empty on-disk dirs still fails via
+  the normal diff, just with a less specific message) — verified this
+  directly rather than assuming it, and kept both guards anyway for the
+  clearer diagnostic and as defense-in-depth; the combined
+  all-three-guards-removed mutant (heading absent, backtest dir with only
+  excluded subdirs) does reproduce a genuine silent OK. Verify:
+  `dune build @devtools/checks/runtest --force` from `trading/` (both
+  rules print `OK:`), or directly: `sh
+  trading/devtools/checks/backtest_appendix_drift_check.sh` and `sh
+  trading/devtools/checks/backtest_appendix_drift_check_test.sh`.

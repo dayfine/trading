@@ -761,3 +761,37 @@
  (deps goldens_affected_check.sh _check_lib.sh)
  (action
   (run sh %{dep:goldens_affected_check_test.sh})))
+
+; Backtest appendix drift check (design_doc_drift_mechanization,
+; dev/status/cleanup.md): PR-time gate that the
+; dev/plans/backtest-scale-optimization-2026-04-17.md appendix table has a
+; row for every trading/trading/backtest/ subdirectory (excluding the
+; documented lib/test/scenarios exclusion). The appendix drifted twice
+; already (PR #2096 -> PR #2461) because the only prior detector for this
+; class (deep_scan/check_02_design_doc_drift.sh) runs weekly and is
+; warning-only. This rule fails the build instead, on every PR.
+; Reads dev/plans/*.md and trading/trading/backtest/* via repo_root() in
+; _check_lib.sh (both outside/escaping the dune sandbox mirror -- the plan
+; file is above the workspace root, and the backtest listing must be read
+; from the same real tree for the two to be compared consistently), so
+; (universe) is required per H-CHECK-CACHE-BLIND (see
+; check_universe_deps.sh).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:backtest_appendix_drift_check.sh})))
+
+; Fixture-driven self-test for backtest_appendix_drift_check.sh: 6
+; scenarios (clean, missing-row, no-heading, no-rows, empty-backtest-dir,
+; exclusions) via synthetic REPO_ROOT-overridden repo trees under mktemp --
+; same non-universe wiring as goldens_affected_check_test.sh above, since
+; every fixture is self-contained and the only real-repo file read is the
+; check script itself (an explicit dep below).
+
+(rule
+ (alias runtest)
+ (deps backtest_appendix_drift_check.sh _check_lib.sh)
+ (action
+  (run sh %{dep:backtest_appendix_drift_check_test.sh})))
