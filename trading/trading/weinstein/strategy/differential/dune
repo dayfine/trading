@@ -1,0 +1,15 @@
+(library
+ (name selection_trace)
+ (public_name weinstein_trading.selection_trace)
+ (libraries
+  core
+  types
+  trading.base
+  trading.strategy
+  weinstein.types
+  weinstein.screener
+  weinstein.stage
+  weinstein.stock_analysis
+  weinstein_trading.strategy)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

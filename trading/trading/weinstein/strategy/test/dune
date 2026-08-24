@@ -45,7 +45,8 @@
   test_weekly_ma_cache
   test_weinstein_strategy
   test_weinstein_strategy_smoke
-  test_stock_analysis_config_wiring)
+  test_stock_analysis_config_wiring
+  test_selection_trace)
  (libraries
   core
   core_unix
@@ -63,6 +64,7 @@
   trading.simulation.types
   trading.strategy
   weinstein_trading.strategy
+  weinstein_trading.selection_trace
   weinstein.snapshot_pipeline
   weinstein.snapshot_runtime
   weinstein.types

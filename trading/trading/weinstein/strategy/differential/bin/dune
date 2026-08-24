@@ -1,0 +1,3 @@
+(executable
+ (name selection_trace_dump)
+ (libraries core weinstein_trading.selection_trace))
