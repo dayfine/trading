@@ -63,3 +63,26 @@ issue-backlog burn-down ran 08-24 (user-directed 8-10h session).
   volume basis, unguarded widest-window crash, zero-volume junk). The gates
   are earning their cost.
 - Memory snapshot exported (139 memories → dev/agent-memory/).
+
+---
+
+## Amendment (~16:00 PT) — afternoon completions
+
+- **#2489 FULLY delivered** (PR #2526): fill-week vol ratio med 1.20× vs book
+  2× — resting StopLimit tickets decouple confirmation from execution, which
+  mechanically explains the arc's 72% §4.2 ejection rate. base_weeks med
+  24-35wk; p25=0 for a quarter of executed entries. Adds a third leg to the
+  §2.2 decision: the faithful gate ejects the NORMAL consequence of resting
+  tickets, not unusually bad entries.
+- **#2466 closed** (PR #2525): both salvage guards landed — incl. a mirror
+  defect the issue didn't name (rejected exit could spend a long ticket's
+  retry budget AND re-submit the exit order). Mutation-verified both gates.
+  #2524 filed (simulator.ml headroom trigger).
+- **#2440 fixed-and-monitoring** (PR #2527, P1→P3): scenario 22 was passing
+  by ACCIDENT (ls directory-header word-split); find-based enumeration fixes
+  it + a silent directory-drop. Grep-on-directory image variance remains the
+  one open intermittency candidate; per-conjunct diagnostics will name it on
+  recurrence.
+- Day totals: **13 PRs merged**, 6 issues closed (+2 filed: #2521, #2524),
+  2 downgraded on measurement (#2382, #2440). All six QC NEEDS_REWORK
+  verdicts today were genuine catches.
