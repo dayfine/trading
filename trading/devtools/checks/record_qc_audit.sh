@@ -21,17 +21,53 @@
 #
 #   Structural verdict:
 #     Last occurrence of "structural_qc: APPROVED|NEEDS_REWORK" in the file,
-#     or the first "## Verdict" block value (bare or **bold** format).
+#     or (fallback) the LAST "## Verdict"/"### Verdict" block found while a
+#     "Structural" heading is the section currently in scope (bare or
+#     **bold** format; see H-AUDIT-REWORK-VERDICT-STALE, #2509 -- a rework
+#     appends a second pass, so "first"/"last" in the whole document no
+#     longer mean "structural"/"behavioral", only "oldest"/"newest"; the
+#     verdict must instead be scoped to the section heading that owns it).
 #     Defaults to SKIPPED if not found.
 #
 #   Behavioral verdict:
 #     Last occurrence of "behavioral_qc: APPROVED|NEEDS_REWORK" in the file,
-#     or the last "## Verdict" block value (behavioral appends after structural).
-#     Defaults to SKIPPED if not found.
+#     or (fallback) the LAST "## Verdict"/"### Verdict" block found while a
+#     "Behavioral" heading is the section currently in scope. Same
+#     section-scoping as the structural verdict above. Defaults to SKIPPED
+#     if not found.
+#
+#   Combined-review fallback (#2518): when the file discusses BOTH gates
+#     (a Structural heading and a Behavioral heading both appear somewhere
+#     in the file) but records only ONE shared "## Verdict" for both --
+#     the legacy single-pass "combined review" shape, e.g.
+#     dev/reviews/snapshot-pipeline-perf.md's
+#     "## Structural Checklist" / "## Behavioral Checklist" / "## Verdict" --
+#     that lone verdict is section-scoped to whichever heading precedes it
+#     (see above) and would otherwise leave the OTHER gate's verdict empty.
+#     In that specific case (both heading types seen, one side still empty),
+#     the found verdict is copied into the empty side too. This does NOT
+#     apply to a file that only ever has ONE gate's heading (a split
+#     companion file, e.g. dev/reviews/resistance-v2-pr1997.md, which is
+#     genuinely behavioral-only) -- there the missing gate stays SKIPPED
+#     rather than fabricating a verdict for a gate the file never reviewed
+#     (that fabrication is the exact #2509 corruption class this rule must
+#     not reintroduce).
+#
+#   Sectionless verdict (undocumented corner, kept intentional): a
+#     "## Verdict" reached before EITHER heading type has ever appeared in
+#     the file (so neither section is "current") is discarded -- there is
+#     no gate to attribute it to. This only matters for a degenerate file
+#     with no Structural/Behavioral heading anywhere; both verdicts stay
+#     SKIPPED and the overall-derivation below correctly fails loudly
+#     rather than guessing.
 #
 #   Overall verdict (required):
 #     "overall_qc: APPROVED|NEEDS_REWORK" field in the file.
-#     Derived from structural + behavioral if not present.
+#     Derived from structural + behavioral if not present: NEEDS_REWORK if
+#     either is NEEDS_REWORK; else APPROVED if EITHER is APPROVED (not just
+#     structural -- symmetric as of #2518, see H-AUDIT-SPLIT-FILE-OVERALL
+#     below for why a lone-APPROVED split file must not fail); else the
+#     verdict genuinely cannot be determined and the script exits 1.
 #
 #   Quality score:
 #     The integer on the first non-blank line after "## Quality Score" or
@@ -392,26 +428,102 @@ fi
 # edge case, so leaving these unguarded would read a possibly-unrelated
 # dev/reviews/<feature>.md and populate the still-unresolved verdict from
 # it instead of the correct SKIPPED default below).
-# The structural section uses the first ## Verdict; behavioral uses the last.
-# Both bare (APPROVED) and bold (**APPROVED**) formats are supported.
-
-if [ "$FILE_MODE" -eq 1 ] && [ -z "$STRUCTURAL" ]; then
-  STRUCTURAL=$(awk '
-    /^## Verdict/{found=1; next}
-    found && /^(APPROVED|NEEDS_REWORK|\*\*(APPROVED|NEEDS_REWORK)\*\*)/ {
-      v=$0; gsub(/^\*\*|\*\*$/, "", v); print v; exit
+#
+# H-AUDIT-REWORK-VERDICT-STALE (#2509): a review file that went through a
+# rework contains MORE THAN ONE pass -- e.g. structural APPROVED, behavioral
+# NEEDS_REWORK, then a re-review appends a second structural APPROVED and a
+# second behavioral APPROVED. The OLD extraction took "the first ## Verdict
+# in the file" for structural and "the last ## Verdict in the file" for
+# behavioral -- that only means "structural"/"behavioral" in a SINGLE-pass
+# file. In a multi-pass file "first"/"last" mean "oldest"/"newest" instead,
+# so a rework whose first pass's BEHAVIORAL verdict happens to precede its
+# own re-review's STRUCTURAL verdict gets STRUCTURAL filled from the stale
+# first-pass BEHAVIORAL block. Live reproduction: PR #2504's review file
+# (dev/reviews/audit-scenario22-diagnosability-2440.md) -- both gates ended
+# APPROVED, but the old logic recorded structural_qc: NEEDS_REWORK.
+#
+# Fix: scope every verdict to the section that OWNS it, the same way the
+# PR-mode parser above (the awk populating $PARSED) already scopes verdicts
+# to "## Structural QC" / "## Behavioral QC" review bodies -- walk the file
+# top to bottom, track which of structural/behavioral is "current" from the
+# nearest preceding heading (any "#" depth) that names it, and keep the LAST
+# verdict recorded for that section rather than the first/last verdict in
+# the whole document. Headings are matched at ANY depth ("## Structural QC",
+# "### Structural re-check", "## Verdict", "### Verdict", ...) because real
+# rework review files mix heading levels across re-review subsections. Both
+# bare (APPROVED) and bold (**APPROVED**) verdict formats are supported.
+#
+# The section keyword must be the FIRST word after the "#"s (e.g.
+# "## Structural QC", "### Structural re-check") -- NOT merely present
+# anywhere on the heading line. Headings commonly append the feature name
+# after an em dash ("## Behavioral QC -- <feature-name>"), and a feature
+# name can itself contain the substring "structural" or "behavioral" (this
+# was caught by this fix's own regression test: a feature literally named
+# "...-structural-fixed-by-rework" made a loose anywhere-on-the-line match
+# misdetect its "## Behavioral QC -- ..." heading as a STRUCTURAL section).
+#
+# H-AUDIT-COMBINED-VERDICT-FALLBACK (#2518): the section-scoped rule above
+# is exactly right for a MULTI-pass rework file, but it silently regressed
+# a different, real shape -- a legacy single-pass COMBINED review, where
+# "## Structural Checklist" and "## Behavioral Checklist" both appear but
+# only ONE shared "## Verdict" covers both (dev/reviews/snapshot-pipeline-
+# perf.md is the canonical example). Under the section-scoped rule alone,
+# that lone verdict lands under whichever heading is nearest-preceding
+# (behavioral, since it's physically last) and the OTHER gate's verdict
+# (struct_v) is left empty -- correct per section-scoping, but wrong for a
+# combined review, where the reviewer clearly evaluated both. The
+# END block below detects this shape (both a Structural heading and a
+# Behavioral heading were seen SOMEWHERE in the file -- saw_struct &&
+# saw_behav) and copies the found verdict into the still-empty side.
+#
+# This must NOT fire for a file that only ever has ONE gate's heading (a
+# split companion file, e.g. dev/reviews/resistance-v2-pr1997.md, which is
+# genuinely behavioral-only -- its own text says structural was reviewed
+# via the PR dispatch, not this file). There saw_struct is 0, so the
+# borrow condition never triggers and the missing gate correctly stays
+# empty -> SKIPPED. Fabricating a verdict for a gate the file never
+# discussed at all is the exact #2509 corruption class this fallback must
+# not reintroduce (the pre-#2509 code did exactly that, unconditionally).
+if [ "$FILE_MODE" -eq 1 ] && { [ -z "$STRUCTURAL" ] || [ -z "$BEHAVIORAL" ]; }; then
+  FILE_PARSED="$(awk '
+    BEGIN { section = ""; struct_v = ""; behav_v = ""; in_verdict = 0; saw_struct = 0; saw_behav = 0 }
+    /^#+[ \t]/ {
+      is_struct = ($0 ~ /^#+[ \t]+\**[Ss]tructural/)
+      is_behav = ($0 ~ /^#+[ \t]+\**[Bb]ehavioral/)
+      if (is_struct && !is_behav) { section = "structural"; saw_struct = 1 }
+      else if (is_behav && !is_struct) { section = "behavioral"; saw_behav = 1 }
+      if ($0 ~ /Verdict/) { in_verdict = 1 } else { in_verdict = 0 }
+      next
     }
-  ' "$REVIEW_FILE" 2>/dev/null || true)
-fi
-
-if [ "$FILE_MODE" -eq 1 ] && [ -z "$BEHAVIORAL" ]; then
-  BEHAVIORAL=$(awk '
-    /^## Verdict/{found=1; next}
-    found && /^(APPROVED|NEEDS_REWORK|\*\*(APPROVED|NEEDS_REWORK)\*\*)/ {
-      v=$0; gsub(/^\*\*|\*\*$/, "", v); last=v; found=0
+    in_verdict && /^[[:space:]]*$/ { next }
+    in_verdict {
+      v = $0
+      gsub(/^\*\*|\*\*$/, "", v)
+      if (v ~ /^APPROVED/) { val = "APPROVED" }
+      else if (v ~ /^NEEDS_REWORK/) { val = "NEEDS_REWORK" }
+      else { in_verdict = 0; next }
+      if (section == "structural") { struct_v = val }
+      else if (section == "behavioral") { behav_v = val }
+      in_verdict = 0
     }
-    END { if (last != "") print last }
-  ' "$REVIEW_FILE" 2>/dev/null || true)
+    END {
+      # Combined-review fallback -- see H-AUDIT-COMBINED-VERDICT-FALLBACK
+      # comment above this awk invocation. Only borrows when BOTH heading
+      # types were seen anywhere in the file, so a genuinely single-gate
+      # split file (saw_struct or saw_behav still 0) is never fabricated.
+      if (saw_struct && saw_behav) {
+        if (struct_v == "" && behav_v != "") struct_v = behav_v
+        if (behav_v == "" && struct_v != "") behav_v = struct_v
+      }
+      print struct_v "|" behav_v
+    }
+  ' "$REVIEW_FILE" 2>/dev/null || true)"
+
+  FILE_STRUCTURAL="${FILE_PARSED%%|*}"
+  FILE_BEHAVIORAL="${FILE_PARSED#*|}"
+
+  [ -z "$STRUCTURAL" ] && STRUCTURAL="$FILE_STRUCTURAL"
+  [ -z "$BEHAVIORAL" ] && BEHAVIORAL="$FILE_BEHAVIORAL"
 fi
 
 # Defaults if still empty
@@ -419,10 +531,25 @@ STRUCTURAL="${STRUCTURAL:-SKIPPED}"
 BEHAVIORAL="${BEHAVIORAL:-SKIPPED}"
 
 # Overall is required -- derive if still empty
+#
+# H-AUDIT-SPLIT-FILE-OVERALL (#2518): a genuine split companion file (only
+# one gate's heading present at all, e.g. a "-behavioral"-suffixed
+# dev/reviews/ file whose structural companion lives in a separate file or
+# was reviewed via the PR dispatch) correctly leaves the OTHER gate as
+# SKIPPED per the no-fabrication rule above. The derivation must therefore
+# be symmetric: APPROVED is derivable from EITHER gate reading APPROVED
+# (with the other not NEEDS_REWORK), not only from structural. The old
+# structural-only check meant a lone behavioral-only record (structural
+# SKIPPED, behavioral APPROVED) could never resolve an overall verdict and
+# hard-failed -- even though the exact same shape with the gates reversed
+# (structural APPROVED, behavioral SKIPPED, e.g. "structural ran, behavioral
+# hasn't yet") was always accepted. Both are legitimate partial-coverage
+# records in file mode; only a file where NEITHER gate resolved to anything
+# (both SKIPPED) is genuinely undeterminable and still exits 1 below.
 if [ -z "$OVERALL" ]; then
   if [ "$STRUCTURAL" = "NEEDS_REWORK" ] || [ "$BEHAVIORAL" = "NEEDS_REWORK" ]; then
     OVERALL="NEEDS_REWORK"
-  elif [ "$STRUCTURAL" = "APPROVED" ]; then
+  elif [ "$STRUCTURAL" = "APPROVED" ] || [ "$BEHAVIORAL" = "APPROVED" ]; then
     OVERALL="APPROVED"
   else
     echo "FAIL: could not determine overall verdict from $REVIEW_FILE" >&2
