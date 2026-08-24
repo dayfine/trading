@@ -441,31 +441,82 @@ jobs:
           # ---------------------------------------------------------------
           # Poll a PR until GitHub reports it mergeable+clean, then squash-
           # merge it via REST PUT /merge. Shared by the daily-summary path
-          # and the ops/budget-* fallback path below. Timeout 10 min
-          # (120 x 5s) covers the typical CI runtime; on timeout the PUT
-          # fires anyway and the caller's warning path reports the failure.
+          # and the ops/budget-* fallback path below.
+          #
+          # Timeout 25 min (300 x 5s). Bumped from 10 min on 2026-08-24
+          # (#2429): build-and-test is the long pole and was measured
+          # completing at ~13-15 min -- i.e. routinely *after* the old
+          # 10-min budget expired. That was the normal path, not a
+          # slow-CI edge case: 9 of the last 10 ops/daily-* PRs missed
+          # the old window (see #2429 for the measured table). #2429
+          # asked for >= 25-30 min; 25 min leaves ~10-12 min of margin
+          # above the measured pole.
+          #
+          # On timeout: DO NOT fall through to a PUT /merge that is known
+          # to fail (the pre-#2429 behaviour) -- that turns a timeout into
+          # a silent no-op, since the merge is refused, .merged is false,
+          # and nothing else logs why (#2429's actual failure mode: PR
+          # #2426 sat open 201 minutes with no explanation). Instead log
+          # ::warning:: with the PR number and the last observed
+          # mergeable_state, and return "false" without attempting the
+          # merge. The caller's existing failure-reporting path (its own
+          # ::warning:: + "human merge required" message) still fires
+          # unconditionally whenever this function returns anything other
+          # than "true" -- the *reason* is reported by this function
+          # directly to stderr (both on timeout, above, and on a refused
+          # PUT /merge below), never threaded through a MERGE_RESPONSE
+          # variable. Every caller invokes this function only via command
+          # substitution ($(...)), which forks a subshell: any variable
+          # this function assigns is subshell-local and invisible to the
+          # caller. (Rework #2517: an earlier revision assigned
+          # MERGE_RESPONSE here expecting a caller to read it -- that
+          # assignment was unreachable dead code, and worse, it left the
+          # daily-path caller's pre-existing "Response: ${MERGE_RESPONSE}"
+          # expansion referencing a variable that is never set in the
+          # caller's shell, which aborts under this step's `set -u`
+          # before either failure message can print.) This is a soft
+          # failure -- the step itself does not exit non-zero, matching
+          # the convention already used elsewhere in this block (budget-
+          # PR-creation failure, fallback-merge failure) where auto-merge
+          # issues are surfaced via ::warning:: and left for a subsequent
+          # run's PR pickup rather than failing the job outright.
           # ---------------------------------------------------------------
           merge_pr_when_clean() {
             _PR_NUMBER="$1"
-            for _ in $(seq 1 120); do
+            _TIMED_OUT=1
+            _LAST_MERGEABLE_STATE="unknown"
+            for _ in $(seq 1 300); do
               RESPONSE="$(curl -sSL \
                 -H "Authorization: Bearer ${GH_TOKEN}" \
                 -H "Accept: application/vnd.github+json" \
                 "https://api.github.com/repos/${REPO}/pulls/${_PR_NUMBER}")"
               MERGEABLE="$(printf '%s' "$RESPONSE" | jq -r '.mergeable // "null"')"
               MERGEABLE_STATE="$(printf '%s' "$RESPONSE" | jq -r '.mergeable_state // "unknown"')"
-              [ "$MERGEABLE" = "true" ] && [ "$MERGEABLE_STATE" = "clean" ] && break
+              _LAST_MERGEABLE_STATE="$MERGEABLE_STATE"
+              if [ "$MERGEABLE" = "true" ] && [ "$MERGEABLE_STATE" = "clean" ]; then
+                _TIMED_OUT=0
+                break
+              fi
               # Progress goes to stderr: callers capture this function's
               # stdout with $(...), which must yield only the merged bool.
               echo "Waiting for GitHub (mergeable=${MERGEABLE}, state=${MERGEABLE_STATE})..." >&2
               sleep 5
             done
-            MERGE_RESPONSE="$(curl -sSL -X PUT \
+            if [ "$_TIMED_OUT" = "1" ]; then
+              echo "::warning::merge_pr_when_clean: poll budget (25 min) exhausted for PR #${_PR_NUMBER}; last observed mergeable_state=${_LAST_MERGEABLE_STATE}. Not attempting merge -- a subsequent run's PR-pickup path must handle it." >&2
+              printf '%s' "false"
+              return 0
+            fi
+            _MERGE_RESPONSE="$(curl -sSL -X PUT \
               -H "Authorization: Bearer ${GH_TOKEN}" \
               -H "Accept: application/vnd.github+json" \
               -d '{"merge_method":"squash"}' \
               "https://api.github.com/repos/${REPO}/pulls/${_PR_NUMBER}/merge")"
-            printf '%s' "$MERGE_RESPONSE" | jq -r '.merged // false | tostring'
+            _MERGED="$(printf '%s' "$_MERGE_RESPONSE" | jq -r '.merged // false | tostring')"
+            if [ "$_MERGED" != "true" ]; then
+              echo "::warning::merge_pr_when_clean: PUT /merge refused for PR #${_PR_NUMBER}. Response: ${_MERGE_RESPONSE}" >&2
+            fi
+            printf '%s' "$_MERGED"
           }
 
           if [ -z "$DAILY_PR_NUMBER" ] || [ -z "$DAILY_BRANCH" ]; then
@@ -559,16 +610,18 @@ jobs:
           # "Pull Request is not mergeable" or 409 "Head branch is out of
           # date" — that was the silent failure mode 2026-04-26..2026-05-01
           # (see dev/notes/orchestrator-auto-merge-regression-2026-05-01.md).
-          # Timeout 10 min: bumped from 6 min → 10 min on 2026-05-09 after
-          # PR #1008 hit the 6-min timeout while CI completed at ~7m49s
-          # (~77s past the original budget; see workflow run 25595939612).
+          # Timeout history: 6 min -> 10 min on 2026-05-09 (PR #1008 hit the
+          # 6-min timeout while CI completed at ~7m49s; workflow run
+          # 25595939612) -> 25 min on 2026-08-24 (#2429; see the timeout
+          # value and no-fallthrough-merge behaviour documented on
+          # merge_pr_when_clean's definition above).
           # See run 24996059895 for the original "still computing" failure
           # mode this poll was originally introduced to handle.
           MERGED="$(merge_pr_when_clean "$DAILY_PR_NUMBER")"
           if [ "$MERGED" = "true" ]; then
             echo "Auto-merged PR #${DAILY_PR_NUMBER} (daily summary + budget JSON)."
           else
-            echo "::warning::Auto-merge failed for PR #${DAILY_PR_NUMBER}. Response: ${MERGE_RESPONSE}"
+            echo "::warning::Auto-merge failed for PR #${DAILY_PR_NUMBER} -- see merge_pr_when_clean's ::warning:: above for the reason."
             echo "Human merge required for the daily summary PR. Budget JSON is already on the branch."
           fi
 
