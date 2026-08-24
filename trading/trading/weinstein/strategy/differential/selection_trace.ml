@@ -158,6 +158,20 @@ let _tie_group_b = [ "MIDX"; "MIDB"; "MIDN" ]
 let _late_group = [ "LATEP"; "LATED" ]
 let _short_group = [ "FALLR"; "FALLA"; "FALLK" ]
 
+(* Two symbols that exist ONLY to make the sector gate bite, one per arm. Each is
+   shape-identical to a group that IS admitted, so the sector rating is the
+   single thing separating it from admission — which is what makes a
+   sector-gate change observable at all.
+
+   Without them the gate was invisible (found in review of #2507): deleting
+   BOTH sector conjuncts from [screener_admission.ml] left the trace
+   byte-identical, because [Weak] was carried only by [_short_group] (whose
+   members are Stage-4 and never long candidates) and [Strong] only by
+   [_tie_group_a] (whose members are Stage-2 and never short candidates). A
+   gate that never fires cannot discriminate two builds of itself. *)
+let _weak_sector_long = "WEAKB"
+let _strong_sector_short = "STRGD"
+
 let _universe_spec =
   List.concat
     [
@@ -165,6 +179,7 @@ let _universe_spec =
       List.map _tie_group_b ~f:(fun t -> (t, Modest_breakout));
       List.map _late_group ~f:(fun t -> (t, Late_breakout));
       List.map _short_group ~f:(fun t -> (t, Declining));
+      [ (_weak_sector_long, Early_breakout); (_strong_sector_short, Declining) ];
       [ ("BASE1", Basing); ("BASE2", Basing) ];
     ]
 
@@ -173,8 +188,10 @@ let _stocks =
 
 let _universe_tickers = List.map _universe_spec ~f:fst
 
-(* Sector ratings are assigned by group, not round-robin, so each group probes a
-   distinct arm of the sector gate: Weak blocks longs, Strong blocks shorts. *)
+(* Sector ratings are assigned by group, not round-robin, so each arm of the
+   sector gate has a symbol it actually rejects: [WEAKB] is a Stage-2 breakout
+   in a Weak sector (the long arm), [STRGD] a Stage-4 decliner in a Strong
+   sector (the short arm). *)
 let _sector ~rating name : Screener.sector_context =
   {
     sector_name = name;
@@ -189,6 +206,10 @@ let _sector_of_ticker ticker =
     _sector ~rating:Screener.Neutral "Industrials"
   else if List.mem _short_group ticker ~equal:String.equal then
     _sector ~rating:Screener.Weak "Energy"
+  else if String.equal ticker _weak_sector_long then
+    _sector ~rating:Screener.Weak "Materials"
+  else if String.equal ticker _strong_sector_short then
+    _sector ~rating:Screener.Strong "Healthcare"
   else _sector ~rating:Screener.Neutral "Utilities"
 
 let _sector_map () =
@@ -237,15 +258,20 @@ type case = {
   macro : market_trend;
   held : string list;
   stop_outs : (string * Date.t) list;
+  non_members : string list;
+      (** Tickers the point-in-time membership closure reports as absent from
+          the index at [_as_of]. Empty means [?membership_at] is not supplied at
+          all, which is the production default — so the gate is armed only by
+          the cases that mean to arm it. *)
   use_plain_screen : bool;
       (** [true] drives {!Screener.screen} directly rather than
           {!Screener.screen_with_cooldown}, so the thin wrapper is covered as
           its own entry point rather than assumed equivalent. *)
 }
 
-let _case ?(held = []) ?(stop_outs = []) ?(use_plain_screen = false) ~label
-    ~config ~macro () =
-  { label; config; macro; held; stop_outs; use_plain_screen }
+let _case ?(held = []) ?(stop_outs = []) ?(non_members = [])
+    ?(use_plain_screen = false) ~label ~config ~macro () =
+  { label; config; macro; held; stop_outs; non_members; use_plain_screen }
 
 let _base_config = Screener.default_config
 let _all_trends = [ Bullish; Neutral; Bearish ]
@@ -309,6 +335,21 @@ let _cooldown_cases () =
           ~stop_outs:[ (victim, d) ]
           ();
       ])
+
+(** Point-in-time membership gate. [?membership_at] is a real gate on the
+    default path — the backtest supplies it from the universe snapshot — and it
+    is the one gate whose {e absence} is indistinguishable from a gate that
+    admits everything. Arming it on one admitted long and one admitted short
+    makes a change to the gate observable in the candidate lists. *)
+let _membership_cases () =
+  [
+    _case ~label:"membership/drops-long" ~config:_base_config ~macro:Bullish
+      ~non_members:[ List.hd_exn _tie_group_a ]
+      ();
+    _case ~label:"membership/drops-short" ~config:_base_config ~macro:Bearish
+      ~non_members:[ List.hd_exn _short_group ]
+      ();
+  ]
 
 let _held_cases () =
   [
@@ -375,6 +416,8 @@ let stocks = _stocks
 let universe_tickers = _universe_tickers
 let sector_map = _sector_map
 let tie_group = List.sort _tie_group_a ~compare:String.compare
+let weak_sector_long = _weak_sector_long
+let strong_sector_short = _strong_sector_short
 
 let _all_cases () =
   List.concat
@@ -383,6 +426,7 @@ let _all_cases () =
       _ranking_cases ();
       _cap_cases ();
       _cooldown_cases ();
+      _membership_cases ();
       _held_cases ();
       _score_boundary_cases ();
       _price_boundary_cases ();
@@ -394,14 +438,26 @@ let case_count = List.length (_all_cases ())
 (* Execution                                                            *)
 (* ------------------------------------------------------------------ *)
 
+(** [None] when the case names no non-members, so the gate stays exactly as
+    unsupplied as it is on the default path — an always-true closure would be
+    functionally equivalent but would silently change which code path the other
+    cases take. *)
+let _membership_at case =
+  if List.is_empty case.non_members then None
+  else
+    Some
+      (fun ticker _date ->
+        not (List.mem case.non_members ticker ~equal:String.equal))
+
 let _run_screen case =
   if case.use_plain_screen then
     Screener.screen ~config:case.config ~macro_trend:case.macro
       ~sector_map:(_sector_map ()) ~stocks:_stocks ~held_tickers:case.held
   else
-    Screener.screen_with_cooldown ~config:case.config ~macro_trend:case.macro
-      ~sector_map:(_sector_map ()) ~stocks:_stocks ~held_tickers:case.held
-      ~as_of:_as_of ~last_stop_out_dates:case.stop_outs ()
+    Screener.screen_with_cooldown ?membership_at:(_membership_at case)
+      ~config:case.config ~macro_trend:case.macro ~sector_map:(_sector_map ())
+      ~stocks:_stocks ~held_tickers:case.held ~as_of:_as_of
+      ~last_stop_out_dates:case.stop_outs ()
 
 let _empty_portfolio : Trading_strategy.Portfolio_view.t =
   { cash = _portfolio_cash; positions = String.Map.empty }

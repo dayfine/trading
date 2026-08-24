@@ -7,21 +7,30 @@
     entered from day one. The suspects were two PRs (#2500, #2501) framed as
     pure instrumentation. A cross-commit differential built on
     {!Selection_trace} cleared both — the rendered trace is byte-identical
-    (129,084 bytes) at [bdcb257b], [b128b1d9] and [2b11c60d], across 45 screener
-    / entry-walk cases plus 200 replayed screening days.
+    (133,512 bytes) at [bdcb257b], [b128b1d9] and [2b11c60d], across 49 screener
+    / entry-walk cases plus 200 replayed screening days. The verdict is scoped
+    to the gates that instrument actually discriminates; [selection_trace.mli]
+    §"Which gates actually bite" enumerates them, and names the ones it does not
+    cover.
 
     A differential is only worth its verdict if it can detect the defect it
-    claims to exclude, so the harness was mutation-tested against the four
-    failure modes an "observational" refactor can actually hide. All four were
-    caught:
+    claims to exclude, so the harness is mutation-tested against the failure
+    modes an "observational" refactor can hide. Against the 893-line trace:
 
-    - a score threshold flipped from [>=] to [>] (21 trace lines moved),
+    - the sector gate deleted on both arms (94 trace lines moved),
+    - a score threshold flipped from [>=] to [>] (21),
     - a price threshold flipped from [>=] to [>] (17),
-    - the equal-score tiebreak reversed (490),
-    - the top-N cap off by one (834).
+    - the equal-score tiebreak reversed (540),
+    - the top-N cap off by one (35, in either direction).
+
+    That last figure was published as {b 834} in #2507's first revision. It was
+    an artefact: the mutant failed to run (an unguarded [n - 1] raises on the
+    zero-cap case), the dump wrote no bytes, and [diff] then reports the whole
+    baseline as removed — 834 was simply that fixture's line count. A mutation's
+    line count is only evidence if the mutant built {e and} produced output.
 
     The cross-commit differential is a one-shot instrument; these tests are the
-    durable residue. Each one fails under exactly one of those mutations, so the
+    durable residue. Each fails under at least one of those mutations, so the
     suite carries the differential's detection power forward without a golden
     trace file — which would move on every legitimate config-default change and
     train readers to re-bless it unread.
@@ -147,6 +156,79 @@ let test_min_price_floor_is_inclusive _ =
     (gt (module Int_ord) 0)
 
 (* ------------------------------------------------------------------ *)
+(* Gates that must actually reject something                            *)
+(* ------------------------------------------------------------------ *)
+
+(* A gate the fixture never trips cannot discriminate two builds of itself. The
+   sector gate was in exactly that state until review of #2507: deleting both
+   its conjuncts left the trace byte-identical and this suite green. These two
+   tests are the durable version of that mutation — each fails if its arm of the
+   gate stops rejecting. *)
+
+let _screen_bearish config =
+  Screener.screen_with_cooldown ~config ~macro_trend:Bearish
+    ~sector_map:(_sector_map ()) ~stocks:_stocks ~held_tickers:[] ~as_of:_as_of
+    ~last_stop_out_dates:[] ()
+
+(** The long arm ([Weak] blocks longs) rejects at least one candidate that
+    cleared the breakout gate, and the Weak-sector breakout never reaches the
+    buy list. [long_failed_breakout_dropped] is asserted zero so the drop is
+    attributable to the sector gate and not to the gate ahead of it. *)
+let test_sector_gate_rejects_a_weak_sector_long _ =
+  let r = _screen _cfg in
+  let d = r.cascade_diagnostics in
+  assert_that
+    ( d.long_breakout_admitted - d.long_sector_admitted,
+      d.long_failed_breakout_dropped,
+      List.count
+        (_tickers r.buy_candidates)
+        ~f:(String.equal Selection_trace.weak_sector_long) )
+    (all_of
+       [
+         field (fun (dropped, _, _) -> dropped) (gt (module Int_ord) 0);
+         field (fun (_, failed, _) -> failed) (equal_to 0);
+         field (fun (_, _, admitted) -> admitted) (equal_to 0);
+       ])
+
+(** The short arm ([Strong] blocks shorts), under the only macro tape that
+    admits shorts at all. *)
+let test_sector_gate_rejects_a_strong_sector_short _ =
+  let r = _screen_bearish _cfg in
+  let d = r.cascade_diagnostics in
+  assert_that
+    ( d.short_breakdown_admitted - d.short_sector_admitted,
+      List.count
+        (_tickers r.short_candidates)
+        ~f:(String.equal Selection_trace.strong_sector_short) )
+    (all_of [ field fst (gt (module Int_ord) 0); field snd (equal_to 0) ])
+
+(** The point-in-time membership gate drops exactly the non-member and leaves
+    every other admitted candidate in place. The second field is the non-vacuity
+    guard: the victim really was admitted with the gate unsupplied, so its
+    absence is the gate's doing and not the fixture's. *)
+let test_membership_gate_drops_exactly_the_non_member _ =
+  let victim = List.hd_exn Selection_trace.tie_group in
+  let ungated = _tickers (_screen _cfg).buy_candidates in
+  let gated =
+    _tickers
+      (Screener.screen_with_cooldown
+         ~membership_at:(fun ticker _as_of -> not (String.equal ticker victim))
+         ~config:_cfg ~macro_trend:Bullish ~sector_map:(_sector_map ())
+         ~stocks:_stocks ~held_tickers:[] ~as_of:_as_of ~last_stop_out_dates:[]
+         ())
+        .buy_candidates
+  in
+  assert_that
+    (gated, List.count ungated ~f:(String.equal victim))
+    (all_of
+       [
+         field fst
+           (equal_to
+              (List.filter ungated ~f:(fun t -> not (String.equal t victim))));
+         field snd (equal_to 1);
+       ])
+
+(* ------------------------------------------------------------------ *)
 (* Observational equivalence — the instrumentation contract             *)
 (* ------------------------------------------------------------------ *)
 
@@ -270,6 +352,12 @@ let suite =
          "max_score_override is exclusive"
          >:: test_max_score_override_is_exclusive;
          "min_price floor is inclusive" >:: test_min_price_floor_is_inclusive;
+         "sector gate rejects a weak-sector long"
+         >:: test_sector_gate_rejects_a_weak_sector_long;
+         "sector gate rejects a strong-sector short"
+         >:: test_sector_gate_rejects_a_strong_sector_short;
+         "membership gate drops exactly the non-member"
+         >:: test_membership_gate_drops_exactly_the_non_member;
          "screener on_candidates is observational"
          >:: test_screener_on_candidates_does_not_change_selection;
          "entry walk callback is observational"
