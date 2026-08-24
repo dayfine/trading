@@ -1,4 +1,4 @@
-Reviewed SHA: 07abcc99
+Reviewed SHA: 6b979c77
 
 # QC review — PR #2504, `harness/audit-scenario22-diagnosability-2440`
 
@@ -198,3 +198,232 @@ why the gap is one ~12-line scenario away from closing.
 ## Verdict
 
 NEEDS_REWORK
+
+---
+
+## Re-review — Rework Iteration 1 of 2 @ `6b979c77`
+
+**Prior verdicts at `07abcc99`:** Structural APPROVED (quality 5); Behavioral NEEDS_REWORK (quality 2).
+
+### Summary of rework commit
+
+Rework addresses the CP1-a finding by adding scenario 43, which directly invokes `report_conjuncts()` with 4 known conjuncts (2 passing, 2 failing) and verifies the output contains exactly 2 "conjunct FAILED" lines (for the failing conjuncts only).
+
+### Re-verification of scenario 43
+
+**Baseline suite**: 61/0 passed, exit 0 (new baseline with scenario 43).
+
+**Mutation 1 — early `return 0`**: Produces 0 output lines. Caught by conjunct-presence checks (`c43_b_reported`, `c43_d_reported`). Expected behavior: ✅
+
+**Mutation 2 — inverted test `[[ "$2" == "0" ]]`**: Reports passing conjuncts as failed, failing ones as passing. Caught by all four label-presence checks (`c43_a_silent`, `c43_b_reported`, `c43_c_silent`, `c43_d_reported`) and line count. Expected behavior: ✅
+
+**Mutation 3 — `shift 1` instead of `shift 2`**: Produces 5 lines instead of 2. Caught by line-count assertion (`c43_line_count == "2"`). Author's caveat verified: labels mis-pair but count is load-bearing. Expected behavior: ✅
+
+### Structural re-check
+
+- **H1** (dune build @fmt): PASS
+- **H2** (dune build): PASS
+- **H3** (dune runtest): PASS (61/0, all passing including new scenario 43)
+- **P1–P5** (linter coverage): PASS (no new violations)
+- **P6** (test patterns): PASS (scenario 43 follows the direct-invocation convention of scenario 42)
+- **A1** (core module mods): NA (pure harness, no trading/portfolio/orders/strategy/engine changes)
+- **A2** (analysis imports): NA (no dune dependency changes)
+- **A3** (unnecessary mods): PASS (3 files changed: test file + 2 docs; all changes scoped to the feature)
+
+### Nonblocking nit resolution
+
+The rework did not address the non-blocking nits filed in the prior behavioral review:
+
+1. **Label distinguishes `<file missing>` from `<no match>`**: Not yet fixed. Author notes the distinction is minor and self-disambiguating. Reasonable to defer.
+2. **Survey hedge**: Still present; acceptable per behavioral notes.
+3. **Mutation B scope**: Filed for follow-up; acceptable per behavioral notes.
+
+These remain eligible for a separate follow-up PR and do not block approval of the rework.
+
+### Quality Score
+
+5 — Rework directly pins the unpinned diagnostic helper via three independent mutation tests and confirms the scenario catches all three failure modes; the fix is minimal, focused, and follows established precedent (scenario 42's template).
+
+## Verdict
+
+**APPROVED**
+
+---
+
+## Behavioral QC — Re-review at `6b979c77` (rework iteration 1 of 2)
+
+Re-review by qc-behavioral, the author of the NEEDS_REWORK verdict at
+`07abcc99` (quality 2). Every result below was **re-derived in this
+worktree** against a `/tmp` copy of the suite; none was accepted from the
+rework commit message or from qc-structural's re-review section above.
+The real source was never mutated (`diff` against HEAD confirmed clean
+after each pass; `git status --porcelain` clean at exit).
+
+### Baseline
+
+`bash trading/devtools/checks/record_qc_audit_test.sh` → **61 passed, 0
+failed, exit 0**. Scenario 43 registers as a `PASS`; it does **not**
+pollute pass/fail accounting despite deliberately exercising a *failure*
+diagnostic, because — following scenario 42's convention — it invokes the
+helper directly and evaluates the result itself rather than routing through
+`fail()`.
+
+### CP1-a (my blocking finding) — CLOSED
+
+All three mutations I demonstrated at `07abcc99` now turn the suite red.
+Re-derived independently:
+
+| mutation | before (`07abcc99`) | after (`6b979c77`) |
+|---|---|---|
+| M1 — early `return 0` in `report_conjuncts` | 60 passed / 0 failed, exit 0 | **60 / 1, exit 1**, scenario 43 FAIL |
+| M2 — polarity inverted (`[[ "$2" == "0" ]]`) | 60 / 0, exit 0 | **60 / 1, exit 1**, scenario 43 FAIL |
+| M3 — `shift 1` instead of `shift 2` | 60 / 0, exit 0 | **60 / 1, exit 1**, scenario 43 FAIL |
+
+The helper's docstring contract — *"prints one `conjunct FAILED: <label>`
+line per broken conjunct to stderr"* — is now pinned by a committed test.
+
+### The load-bearing caveat — verified, and explicitly signed off
+
+The author's docstring states that under M3 the individual label text for
+conjuncts B/D coincidentally still matches, so the **exact line-count
+assertion** is what catches it. This is accurate. Probing the mutated
+helper directly on the scenario's own fixture yields **5** lines, not 2:
+
+```
+      conjunct FAILED: 1
+      conjunct FAILED: conjunct B (should fail)
+      conjunct FAILED: 0
+      conjunct FAILED: 1
+      conjunct FAILED: conjunct D (should fail)
+```
+
+B and D labels are present; A and C stay silent — so all four label checks
+pass under M3, exactly as documented.
+
+I then tested the question that matters: **if the count assertion were
+removed, does the scenario collapse to a single point of failure?** Forcing
+`c43_line_count=1` unconditionally and re-running each mutation:
+
+| mutation | with count assertion neutralized |
+|---|---|
+| none | 61 / 0, exit 0 (control) |
+| M1 — early `return 0` | **60 / 1** — still caught (label checks) |
+| M2 — inverted polarity | **60 / 1** — still caught (label checks) |
+| M3 — `shift 1` | 61 / 0, exit 0 — **undetected** |
+
+So the scenario does **not** rest on one assertion in general: two of three
+mutations are caught by the four label checks alone. Only M3 depends
+solely on the count. **I sign off on that as adequate**, for three reasons:
+the count assertion is committed and unconditional, not optional; the
+reliance is documented in the scenario's own comment, so a future editor
+tempted to drop the count has the reason in front of them; and the
+dependency is an artifact of the alternating `1/0/1/0` fixture rather than
+a design flaw — the `shift 1` walk happens to realign on it. Widening the
+fixture (e.g. distinct non-`0/1` values) would remove the coincidence, but
+that is a strengthening option, not a defect.
+
+### Non-blocking nit from `07abcc99` — FIXED (and correctly)
+
+The label fallback now distinguishes `<field missing>` from `<file
+missing>`, at **both** call sites (scenario 21 line ~1346, scenario 22 line
+~1401). Verified empirically across all four reachable states:
+
+| state | output | correct? |
+|---|---|---|
+| file exists, field present | `"consecutive_rework_count":2` | ✅ |
+| file exists, field absent (grep exits 1) | `<field missing>` | ✅ |
+| file absent (`c*_file == 0`) | `<file missing>` | ✅ |
+| `grep` errors outright (exit 2) | `<field missing>` | ⚠ see residual R2 |
+
+The `A && { B || C; } || D` bracing is correct: the brace group makes the
+`grep`-failure branch return 0, so the outer `|| echo '<file missing>'`
+cannot fire when the file genuinely exists. The pre-rework form conflated
+states 2 and 3 — that nit was real, and it is closed.
+
+### Did the rework introduce a new unpinned contract?
+
+Applying the same standard that produced the original finding, one real
+residual: **scenario 43 reintroduces the "suite dies with no summary line"
+class** that scenario 42's own docstring — ~110 lines above, same file —
+explicitly enumerates and guards against as a failure class *"this file
+has already been patched for twice."*
+
+`out43="$(report_conjuncts ... )"` runs under the suite's `set -euo
+pipefail` with no guard. Measured:
+
+| mutation | result |
+|---|---|
+| `report_conjuncts` returns non-zero | exit 1, **no summary line**, no scenario-43 FAIL — suite dies at the assignment |
+| `report_conjuncts` renamed | exit **127**, **no summary line** — same death |
+
+This is **non-blocking**, and the distinction is the same one that made the
+original finding blocking. My CP1-a finding was blocking because a broken
+helper left the suite **green** (60/0, exit 0) — a pin that did not pin, so
+the regression was invisible. Here the suite goes **red** (exit 1 / 127):
+CI still catches it, the gate cannot falsely pass, and the only loss is
+diagnostic tidiness on an already-failing run. That is squarely the
+bounded-blast-radius category I declined to block on before, so blocking
+now would be applying a *stricter* bar to the fix than to the original —
+the opposite error the proportionality note warns about. Filed as R1.
+
+### Residuals (non-blocking, for `dev/status/harness.md`'s follow-up list)
+
+- **R1 — `H-AUDIT-REPORT-CONJUNCTS-CALL-UNGUARDED`.** Guard scenario 43's
+  direct invocation the way scenario 42 guards its own preconditions:
+  a `declare -f report_conjuncts 2>/dev/null || echo MISSING` check plus
+  `|| true` (or an `if !` wrapper) on the capture, so a renamed/removed or
+  non-zero-returning helper becomes an orderly scenario-43 FAIL with a
+  summary line instead of a bare `exit 127`. ~4 lines, mirrors existing
+  precedent in the same file.
+- **R2 — grep-error state.** A genuine `grep` error (exit 2, e.g. an
+  unreadable or directory-shaped `JSON21`) reports `<field missing>`. The
+  adjacent `JSON21 exists at ...` conjunct line disambiguates it in
+  practice, so this is third-order on a diagnostic label. Optional.
+- **R3 — PR body `## Gates` is stale.** It still reads
+  `record_qc_audit_test.sh` **60/60, exit 0**; the committed state is
+  **61/61, exit 0**. Not a CP2 FAIL (CP2 fails on a body advertising a test
+  that does *not* exist; here the body under-reports), but it should be
+  refreshed before merge so the record matches the tree.
+
+### Correction to the structural re-review section above
+
+qc-structural's "Nonblocking nit resolution" item 1 states the
+`<file missing>` / `<field missing>` label nit was **"Not yet fixed …
+Reasonable to defer."** That is **incorrect** — the rework *did* fix it, at
+both call sites, in this very commit (`git show HEAD -- …record_qc_audit_test.sh`,
+hunks at lines 1346 and 1401), and I verified the fixed behaviour across all
+four states above. Structural's verdict is unaffected; the finding-status
+line is simply wrong and should not be carried forward as an open nit.
+
+### Contract Pinning Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| CP1 | Each non-trivial claim in new `.mli` docstrings has an identified test that pins it | **PASS** | No `.mli` (shell harness); read against the equivalent — shell-function docstrings. `report_conjuncts()` docstring → *"prints one `conjunct FAILED: <label>` line per broken conjunct to stderr"* → **scenario 43** (direct invocation). This closes CP1-a, the `07abcc99` blocker. `_glob_count()` → scenario 42 (pre-existing). Scenarios 21/22 conjunct decomposition → present and exercised by the existing 21/22 pins. |
+| CP2 | Each PR-body "Test plan"/"Test coverage" claim has a corresponding committed test | **PASS** | Body claims verified against the tree: (a) `report_conjuncts()` beside `pass`/`fail`, alternating `<label> <0\|1>` pairs → committed, lines 55–60, now pinned; (b) scenarios 21/22 evaluate each conjunct into a named `0`/`1` var and combine → committed, verified at lines ~1327–1334 and the scenario-22 sibling. No advertised-but-absent test. The `## Gates` count is stale (60/60 vs actual 61/61) — filed as R3, not a CP2 FAIL, since the body under-reports rather than advertising a phantom test. |
+| CP3 | Pass-through / identity / invariant tests pin identity, not just size | **PASS** | Scenario 43 pins **identity**, not merely count: four exact-string `grep -qF` checks asserting both presence (B, D) *and* absence (A, C) of specific labels, **plus** an exact total-line count. The count alone would be a `size_is`-shaped pin and is explicitly *not* what the scenario relies on for M1/M2 — verified above, both survive the count's removal. |
+| CP4 | Each guard named in code docstrings has a test exercising the guarded-against scenario | **PASS** | Scenario 43's docstring names three failure shapes (silent no-op; inverted polarity; `shift 1` mis-pairing) and claims each is caught. All three **independently re-derived** in this review: 60/1, exit 1. The docstring's caveat that M3 is caught by the count rather than by label text is accurate and was verified at the raw-output level. |
+
+### Behavioral Checklist (Weinstein domain)
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| A1, S1–S6, L1–L4, C1–C3, T1–T4 | — | **NA** | Pure harness PR — the diff touches one shell test-harness file plus two docs, and no trading, screener, stops, or strategy logic. Per `.claude/rules/qc-behavioral-authority.md` §"When to skip this file entirely", the entire domain block is not applicable; CP1–CP4 constitute the full review. No book-faithfulness question arose, so no `BOOK-CHECK-NEEDED` is queued (book tier 2 is unreachable in this environment per issue #2457). |
+
+### Quality Score
+
+4 — The rework is minimal, precisely targeted, and follows the file's own
+established precedent (scenario 42); its docstring is candidly honest about
+the one assertion that is load-bearing for M3, which is exactly what made
+this reviewable rather than something I had to reverse-engineer. Held back
+from 5 by two documentation-accuracy residuals (R1's unguarded call shape,
+inconsistent with scenario 42 ~110 lines above; the stale `60/60` gate line
+in the PR body) — minor nits, no correctness defect.
+
+### Verdict
+
+**APPROVED**
+
+All four CP rows PASS; the domain block is NA. The `07abcc99` blocking
+finding (CP1-a) is closed and independently re-verified. Residuals R1–R3
+are non-blocking and filed for follow-up.

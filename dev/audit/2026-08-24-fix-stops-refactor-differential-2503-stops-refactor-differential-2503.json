@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-24",
+  "feature": "stops-refactor-differential-2503",
+  "branch": "fix/stops-refactor-differential-2503",
+  "sha": "0efa6214",
+  "recorded_at_ns": 1787568187494752524,
+  "structural_qc": "NEEDS_REWORK",
+  "behavioral_qc": "SKIPPED",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "",
+  "quality_score": null,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": "A2 FAIL adjudicated a FALSE POSITIVE by the orchestrator: the new dune's deps are a strict subset of what stops/lib and stops/test already declare on main; 16 non-backtest trading/trading dirs already declare weinstein.*, and the A2 row as written would FAIL main itself on types + indicators.*. A second reviewer marked the same situation A2 PASS on #2507 the same run. Rule correction filed as issue #2508 with a ready-to-paste row; deliberately NOT applied (rules dir is permission-protected, and amending the QC authority to clear a FAIL on this run's own PR is a conflict of interest). PR content needs no change: re-dispatch qc-structural at the same tip once #2508 lands. rework_outcome: blocked_on_human."
+}
