@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-08-23
+## Last updated: 2026-08-24
 
 ## Status
 IN_PROGRESS
@@ -55,6 +55,37 @@ Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
   Verify: `dune runtest trading/backtest` (six new `Stop_log` ratchet tests,
   two new `Trade_context` join tests, `trades.csv` header pin updated in
   `test_trade_audit_report.ml`).
+
+- [x] **`monster_scan` — offline rule-visible breakout scanner (#2490, #2489)**
+  — new read-only exe tree
+  `trading/trading/backtest/monster_scan/{lib,bin,test}`, the **left edge** of
+  #2490's funnel: it defines the monster universe (step 1 of the issue) from
+  the warehouse alone, so the funnel has a denominator before any of the
+  in-runner candidate emission below lands. Same shape as the `feature_screen`
+  precedent (read-only exe, no strategy config, no goldens).
+  Per symbol it loads the `.snap` daily columns via
+  `Data_panel_snapshot.Snapshot_columnar`, rescales to the adjusted basis via
+  `Snapshot_pipeline.Adjusted_basis`, folds to complete ISO weeks via
+  `Snapshot_pipeline.Weekly_prefix` (no new binary parser, no second
+  aggregation), then at each week computes **decision-time-only** facts:
+  trailing 26w prior high, volume ratio vs the trailing mean, a base-length
+  proxy, and the **production** `Stage.classify` — a breakout is
+  `close > prior_high && vol_ratio >= 1.5 && Stage2`, i.e. the Weinstein spine
+  (`weinstein-faithful-core` items 2-3). The forward run (max close over the
+  next 52w) is hindsight **by design** — it is the ex-post monster set the
+  issue measures capture against, and it never feeds detection. All four
+  thresholds are CLI flags; nothing is hardcoded.
+  `--pairs symbol,date` mode emits the same decision-time features at
+  requested weeks, which is #2489's two pending dimensions (fill-week volume
+  ratio, base length).
+  Documented reduction, in the `.mli`: `prior_stage` is `None` at every week
+  rather than threaded, because threading it is quadratic per symbol across a
+  top-3000 warehouse. It affects only flat-MA disambiguation, not the
+  rising-MA Stage-2 weeks the scanner admits.
+  Verify: `dune runtest trading/backtest/monster_scan` (10 tests, pure over
+  synthetic weekly series — no warehouse fixture committed). Smoke-run against
+  `/tmp/snap_top3000_dedup_v5thin_adj`: AAPL 2004-03-05 breakout, vol_ratio
+  2.25, +233% over 52w — the real 2004-05 AAPL run, on the adjusted basis.
 
 - [ ] **Per-week candidate emission `candidates.sexp` (#2490)** — designed,
   **not implemented**. Full design in

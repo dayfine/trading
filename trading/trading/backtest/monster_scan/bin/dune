@@ -1,0 +1,11 @@
+(executable
+ (name monster_scan)
+ (libraries
+  core
+  core_unix.command_unix
+  monster_scan_lib
+  status
+  types
+  weinstein.stage)
+ (preprocess
+  (pps ppx_jane)))
