@@ -91,3 +91,14 @@ top-N 40.5% / grade 0.5%; admitted 3.9%; filled 0.8%; **held ≥13wk 0.24%**
 collides with the concentration law. Full table + rigor caveats: issue #2490
 comment 08-24. Artifacts (raw 40k-event CSV reproducible via `monster_scan -snapshot-dir <warehouse> -end 2026-06-26`; not committed, 2.5MB):
 `results/monster-ep{100,200}-outcomes.tsv`.
+
+## Addendum 3 (08-24) — funnel v2, book-faithful definition
+
+qc-behavioral on PR #2519 caught the scanner's volume rule (26wk×1.5) was not
+the book's (4wk×2.0). Re-run with book defaults after the rework: 20,721
+events → 1,303 episodes ≥100%. Funnel: never-surfaced 9.1% / production
+breakout gate **51.0%** / top-N **36.4%** / grade 0 / admitted 3.5% / held
+≥13wk 0.6% (8). ≥200% tier agrees. v1's conclusion survives the correction and
+sharpens — the remaining breakout-gate share is genuine production strictness,
+not volume-basis mismatch. v1 tables retained for the record; v2 supersedes.
+Full table: issue #2490 comment (v2, 08-24).
