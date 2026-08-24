@@ -57,20 +57,31 @@
 ;   34% larger than sized, and the risk against the $44.88 stop ~$11k — 14x the
 ;   displayed figure. Armed at the issue's own boundaries: a 1-point de-minimis
 ;   band (a stop resting a few cents under the market fills at the stop, so
-;   re-anchoring inside the band buys nothing) and a 15-point chase cap (3 of
-;   that day's 20 picks were past it: CRNX +43.7%, MBX +34.5%, SAFT +26.0%).
-;   Through-entry names re-anchor to a MARKET fill at the close and are RE-SIZED
-;   on it (mirrors the backtest's Entry_walk); extended names lose their ticket
-;   with a do-not-chase reason and keep their row for watch. Execution
-;   correctness for the human artifact, NOT a return lever: the fields are read
-;   only by Weekly_snapshot_generator.generate, never by on_market_close, so
-;   arming them cannot move a backtest number. The suppression follows
-;   weinstein-book-reference.md §1 "Stage 2 detail (Ch. 2)" — the breakout point
-;   (and the pullback back to it) is the buy, and a name that has run on is "no
-;   longer a buy; reward/risk has shifted against you". Code defaults stay 0.0
-;   (off) per experiment-flag R1. See [Weinstein_snapshot.Entry_reconciliation].
-((entry_through_band_pct 1.0) (entry_extension_max_pct 15.0))
-;   (off) per experiment-flag R1. See [Weinstein_snapshot.Entry_reconciliation].
+;   re-anchoring inside the band buys nothing) and a 15-point fill cap.
+;   Through-entry names re-anchor to a LIMIT fill at the close, capped, and are
+;   RE-SIZED on the cap.
+; ⚠ entry_extension_max_pct is NO LONGER A SUPPRESSION THRESHOLD (issue #2404,
+;   user decision 2026-08-24). It is purely the limit leg of the
+;   StopLimit(E, E x (1 + pct/100)) ticket. A pick past the cap KEEPS its row,
+;   its rank and its ticket, annotated "will not fill at current price" — which
+;   is exactly what the order does (limit below the market, so it rests
+;   unfilled and is re-evaluated next week), and exactly what the simulator
+;   does under enable_sim_entry_stoplimit. One rule, two views. The old
+;   behaviour dropped the ticket and moved the row to a do-not-chase watch
+;   section, so a confirmed breakout (CRNX +43.7%, MBX +34.5%, SAFT +26.0% on
+;   the 2026-07-24 list) vanished from the actionable report.
+;   The VALUE is still open: live arms 15.0, the committed backtest specs use
+;   2.0. #2404 unified the semantics, not the number; both the 1y and 3y
+;   horizon surfaces rank 15.0 below 2.0, but moving live to 2.0 is a separate
+;   user decision with no confirmation grid behind it, so 15.0 stands here.
+;   Execution correctness for the human artifact, NOT a return lever: the
+;   fields are read only by Weekly_snapshot_generator.generate, never by
+;   on_market_close, so arming them cannot move a backtest number. The cap
+;   follows weinstein-book-reference.md §1 "Stage 2 detail (Ch. 2)" — the
+;   breakout point (and the pullback back to it) is the buy, which is also why
+;   the row stays visible: the pullback back into the band is that second
+;   chance. Code defaults stay 0.0 (off) per experiment-flag R1. See
+;   [Weinstein_snapshot.Entry_reconciliation].
 ((entry_through_band_pct 1.0) (entry_extension_max_pct 15.0))
 ; live rename detection: issue #2083 fix 2 (armed 2026-08-04) — returns-basis
 ;   succession detector (#2100, reuses the #1946 Twin_detector scorer at

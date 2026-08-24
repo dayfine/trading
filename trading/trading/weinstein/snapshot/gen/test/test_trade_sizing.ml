@@ -173,33 +173,22 @@ let test_valid_stop_sized_on_the_cap _ =
          field _risk (float_equal 1000.0);
        ])
 
-(* An EXTENDED candidate has its ticket suppressed, so it carries no size at
-   all — not a size computed at the stale entry, and not one computed at a fill
-   the reader is being told NOT to take. All four numeric fields are zero and
-   the note is empty (the do-not-chase reason is the instruction's job, not the
-   sizing note's). *)
-let test_extended_is_left_unsized _ =
+(* Issue #2404: an EXTENDED candidate is sized like every other class — on the
+   same $115.00 cap. Its order is the same capped [StopLimit]; it merely will
+   not fill at today's price and would fill at the cap if price returned into
+   the band, so the cap is its honest basis too. Identical numbers to the
+   valid-stop and through-entry cases above; before #2404 all four read zero. *)
+let test_extended_is_sized_on_the_cap _ =
   assert_that
     (_size ~reconciliation:(_classify ~close:134.5) ())
     (all_of
        [
-         field _shares (equal_to 0);
-         field _value (float_equal 0.0);
-         field _pct (float_equal 0.0);
-         field _risk (float_equal 0.0);
+         field _shares (equal_to 40);
+         field _value (float_equal 4600.0);
+         field _pct (float_equal 0.046);
+         field _risk (float_equal 1000.0);
          field _note is_none;
        ])
-
-(* Re-sizing an ALREADY-SIZED candidate into the extended class clears the stale
-   numbers rather than leaving them beside a suppressed order. *)
-let test_extended_clears_a_previous_size _ =
-  let sized = _size () in
-  assert_that
-    (Trade_sizing.size_candidate ~risk_config:Portfolio_risk.default_config
-       ~portfolio_value:100_000.0 ~sizing_cash:100_000.0 ~side:`Long
-       ~placeholder:false
-       { sized with reconciliation = _classify ~close:134.5 })
-    (all_of [ field _shares (equal_to 0); field _value (float_equal 0.0) ])
 
 let suite =
   "trade_sizing"
@@ -213,9 +202,7 @@ let suite =
          "size is on the cap, not the close"
          >:: test_size_is_on_the_cap_not_the_close;
          "valid-stop is sized on the cap" >:: test_valid_stop_sized_on_the_cap;
-         "extended is left unsized" >:: test_extended_is_left_unsized;
-         "extended clears a previous size"
-         >:: test_extended_clears_a_previous_size;
+         "extended is sized on the cap" >:: test_extended_is_sized_on_the_cap;
        ]
 
 let () = run_test_tt_main suite

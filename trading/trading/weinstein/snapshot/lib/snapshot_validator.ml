@@ -108,16 +108,6 @@ let _reconciliation_class_finding ~side ~through_band_pct ~extension_max_pct
   @ _class_finding ~through_band_pct ~extension_max_pct c ~class_name
       ~stored:levels.overshoot_pct
 
-(* An EXTENDED candidate is suppressed upstream, so it must carry no ticket. *)
-let _extended_suppression_finding (c : Weekly_snapshot.candidate) =
-  let detail =
-    Printf.sprintf
-      "EXTENDED candidate carries a sized ticket (%d sh, risk %.2f)"
-      c.sized_shares c.sized_risk_amount
-  in
-  let sized = c.sized_shares <> 0 || Float.( <> ) c.sized_risk_amount 0.0 in
-  _if_err sized ~symbol:c.symbol ~check:"extended_not_suppressed" detail
-
 let _check_reconciliation ~side ~through_band_pct ~extension_max_pct
     (c : Weekly_snapshot.candidate) =
   let cls ~levels ~class_name =
@@ -128,8 +118,7 @@ let _check_reconciliation ~side ~through_band_pct ~extension_max_pct
   | Entry_reconciliation.Not_reconciled -> []
   | Valid_stop levels -> cls ~levels ~class_name:`Valid
   | Through_entry levels -> cls ~levels ~class_name:`Through
-  | Extended levels ->
-      cls ~levels ~class_name:`Extended @ _extended_suppression_finding c
+  | Extended levels -> cls ~levels ~class_name:`Extended
 
 (* ---- Sizing checks ----------------------------------------------------- *)
 

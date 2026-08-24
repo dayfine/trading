@@ -208,33 +208,22 @@ let render ?(long_limit = default_long_display_limit)
   Buffer.add_string buf
     (_section ~title:"Strong sectors" (_sector_list t.sectors_strong));
   Buffer.add_string buf "\n\n";
-  let long_actionable, long_extended =
-    Report_shared.partition_extended t.long_candidates
-  in
-  let short_actionable, short_extended =
-    Report_shared.partition_extended t.short_candidates
-  in
-  let extended = long_extended @ short_extended in
+  (* Issue #2404: every candidate — including one whose price has run past the
+     do-not-chase cap — keeps its ticket and its rank in the candidate table.
+     A past-cap row's order simply will not fill at the current price and says
+     so; it is no longer split into a separate do-not-chase watch section. *)
   Buffer.add_string buf
     (_section
        ~title:(Printf.sprintf "Long candidates (top %d)" long_limit)
-       (_candidate_table ~beyond_cap:t.long_eligible_beyond_cap long_actionable
-          ~limit:long_limit));
+       (_candidate_table ~beyond_cap:t.long_eligible_beyond_cap
+          t.long_candidates ~limit:long_limit));
   Buffer.add_string buf "\n\n";
   Buffer.add_string buf
     (_section
        ~title:(Printf.sprintf "Short candidates (top %d)" short_limit)
        (_candidate_table ~beyond_cap:t.short_eligible_beyond_cap
-          short_actionable ~limit:short_limit));
+          t.short_candidates ~limit:short_limit));
   Buffer.add_string buf "\n\n";
-  (* Extended candidates carry no ticket (do-not-chase), so they live in their
-     own watch section instead of consuming actionable display slots. Omitted
-     entirely when nothing is extended. *)
-  if not (List.is_empty extended) then (
-    Buffer.add_string buf
-      (_section ~title:Report_shared.watch_section_title
-         (_candidate_table extended ~limit:(List.length extended)));
-    Buffer.add_string buf "\n\n");
   Buffer.add_string buf
     (_section ~title:"Held positions" (_held_table t.held_positions));
   Buffer.add_string buf "\n\n";

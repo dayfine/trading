@@ -51,10 +51,14 @@ val instruction : Weekly_snapshot.candidate -> string
       through the trigger, so rather than a MARKET order that chases the open,
       the ticket fills at or below the cap and refuses to chase past it. Risk is
       again the worst case (the cap).
-    - {!Entry_reconciliation.Extended} — {b no order at all}: a do-not-chase
-      line naming the overshoot, the entry level and the close. This arm takes
-      precedence over every [sized_*] fallback below, because an extended
-      candidate is deliberately left unsized by {!Trade_sizing}.
+    - {!Entry_reconciliation.Extended} — the {e same} resting stop-limit ticket
+      as {!Entry_reconciliation.Valid_stop}, suffixed with a
+      ["— WILL NOT FILL AT CURRENT PRICE: …"] clause naming the close, the
+      overshoot, the entry and the limit, and stating that the order rests
+      unfilled unless price returns into the entry-to-limit band. Issue #2404:
+      the ticket used to be replaced by a do-not-chase suppression line, which
+      made the artifact disagree with the order the backtest actually places and
+      removed a confirmed breakout from the reader's view.
 
     A [0]-share candidate with no note (e.g. a short, which the live strategy
     leaves unsized) renders ["-"]; a [0]-share result {e with} a note renders
@@ -65,14 +69,14 @@ val instruction : Weekly_snapshot.candidate -> string
 val close_vs_entry : Weekly_snapshot.candidate -> string
 (** Cell text for the "Close vs entry" column: the current close and the
     side-signed overshoot past the entry level, tagged with the class —
-    ["$62.00 (+34.5% EXTENDED)"], ["$25.44 (+7.3% through)"],
+    ["$62.00 (+34.5% NO FILL)"], ["$25.44 (+7.3% through)"],
     ["$135.78 (-3.9%)"]. ["-"] when the candidate is
     {!Entry_reconciliation.Not_reconciled} (mechanism disarmed, or no resident
     bar to price it against). *)
 
 val entry_reconciliation : string
-(** Explains the "Close vs entry" column, the ["through"] / ["EXTENDED"] tags
-    and why an extended row carries no order. Rendered below a candidate table
+(** Explains the "Close vs entry" column, the ["through"] / ["NO FILL"] tags and
+    why a no-fill row still carries its order. Rendered below a candidate table
     iff {!any_reconciled} holds for the shown rows. *)
 
 val any_reconciled : Weekly_snapshot.candidate list -> bool
@@ -163,31 +167,11 @@ val weaknesses : Weekly_snapshot.candidate -> string list
 (** The weakest links in a candidate's setup, derived purely from data already
     on the row (no new scoring): an ["adequate (not strong) volume"]
     confirmation, a ["fallback stop (no structural floor)"], a ["wide risk N%"]
-    to the stop, a ["paying up +N% through entry"] / ["extended +N% past entry"]
-    reconciliation, and — for long candidates — a ["sector not strong"]. Empty
-    when the setup has none of these. Each phrase is factual and unwrapped (no
-    markup). *)
+    to the stop, a ["paying up +N% through entry"] /
+    ["+N% past cap, will not fill"] reconciliation, and — for long candidates —
+    a ["sector not strong"]. Empty when the setup has none of these. Each phrase
+    is factual and unwrapped (no markup). *)
 
 val weakness_line : Weekly_snapshot.candidate -> string option
 (** [weaknesses] joined with ["; "], or [None] when there are none — a single
     per-candidate line both renderers show so they cannot drift. *)
-
-val is_extended : Weekly_snapshot.candidate -> bool
-(** [is_extended c] is [true] iff [c]'s reconciliation class is
-    {!Entry_reconciliation.Extended} — its close has outrun the entry level past
-    the do-not-chase threshold, so its ticket is suppressed. *)
-
-val partition_extended :
-  Weekly_snapshot.candidate list ->
-  Weekly_snapshot.candidate list * Weekly_snapshot.candidate list
-(** [partition_extended cs] splits candidates into [(actionable, extended)],
-    both preserving the incoming rank order. Actionable = every
-    non-{!is_extended} candidate (valid-stop, through-entry, and not-reconciled
-    legacy records). Extended candidates carry no order ticket, so they are
-    rendered in their own watch section rather than consuming actionable display
-    slots (2026-07-27 user feedback: the 07-24 v2 report spent 2 of 7 visible
-    rows on suppressed EXTENDED names). *)
-
-val watch_section_title : string
-(** Section title both renderers use for the extended watch list — shared so the
-    Markdown and HTML reports cannot drift. *)

@@ -24,26 +24,13 @@ let _note ~placeholder ~side ~entry ~stop ~shares =
   else if shares = 0 then Some (_zero_reason ~side ~entry ~stop)
   else None
 
-(* An over-extended candidate has no ticket, so it has no size. Zeroed
-   explicitly rather than left alone: a caller re-sizing an already-sized
-   candidate must not keep a stale share count beside a suppressed order. *)
-let _unsized (c : Weekly_snapshot.candidate) =
-  {
-    c with
-    sized_shares = 0;
-    sized_position_value = 0.0;
-    sized_position_pct = 0.0;
-    sized_risk_amount = 0.0;
-    sizing_note = None;
-  }
-
 (* Issue #2103 / #2158: sizing is anchored to the WORST admissible fill — the
    do-not-chase cap the live [StopLimit] order caps at — never to the
    (possibly weeks-stale) breakout level in [c.entry]. Falls back to the
    expected fill when the candidate carries no cap (disarmed default), so the
    default path is unchanged. See [Weekly_snapshot.sizing_basis_price]. *)
-let _sized ~risk_config ~portfolio_value ~sizing_cash ~side ~placeholder
-    (c : Weekly_snapshot.candidate) =
+let size_candidate ~risk_config ~portfolio_value ~sizing_cash ~side ~placeholder
+    (c : Weekly_snapshot.candidate) : Weekly_snapshot.candidate =
   let fill = Weekly_snapshot.sizing_basis_price c in
   let sizing =
     Portfolio_risk.compute_position_size ~config:risk_config ~portfolio_value
@@ -58,10 +45,3 @@ let _sized ~risk_config ~portfolio_value ~sizing_cash ~side ~placeholder
     sizing_note =
       _note ~placeholder ~side ~entry:fill ~stop:c.stop ~shares:sizing.shares;
   }
-
-let size_candidate ~risk_config ~portfolio_value ~sizing_cash ~side ~placeholder
-    (c : Weekly_snapshot.candidate) : Weekly_snapshot.candidate =
-  match c.reconciliation with
-  | Entry_reconciliation.Extended _ -> _unsized c
-  | Not_reconciled | Valid_stop _ | Through_entry _ ->
-      _sized ~risk_config ~portfolio_value ~sizing_cash ~side ~placeholder c

@@ -146,19 +146,38 @@ let test_overshoot_exactly_at_the_extension_cap_is_through_entry _ =
   in
   assert_that (Snapshot_validator.validate (_snapshot ~longs ())) _no_findings
 
-let test_extended_with_a_sized_ticket_is_an_error _ =
+(* Issue #2404: an EXTENDED candidate carries a normal sized ticket — its order
+   simply will not fill at the current price — so a consistent one is clean.
+   Sized on the cap $115.00: 10 x |115.00 - 90.00| = 250.00. The old
+   [extended_not_suppressed] check, which required exactly the opposite, is
+   gone. *)
+let test_extended_with_a_consistent_sized_ticket_is_clean _ =
   let longs =
     [
       _candidate
         ~reconciliation:
           (Entry_reconciliation.Extended
-             { close = 134.5; overshoot_pct = 34.5; cap = 0.0 })
+             { close = 134.5; overshoot_pct = 34.5; cap = 115.0 })
+        ~sized_shares:10 ~sized_risk_amount:250.0 ();
+    ]
+  in
+  assert_that (Snapshot_validator.validate (_snapshot ~longs ())) _no_findings
+
+(* And the risk identity still binds on that ticket: a stored 445.00 against the
+   same 250.00 basis is an inconsistency the validator must catch. *)
+let test_extended_with_inconsistent_risk_is_an_error _ =
+  let longs =
+    [
+      _candidate
+        ~reconciliation:
+          (Entry_reconciliation.Extended
+             { close = 134.5; overshoot_pct = 34.5; cap = 115.0 })
         ~sized_shares:10 ~sized_risk_amount:445.0 ();
     ]
   in
   assert_that
     (_checks (Snapshot_validator.validate (_snapshot ~longs ())))
-    (equal_to [ "extended_not_suppressed"; "risk_consistency" ])
+    (equal_to [ "risk_consistency" ])
 
 (* ------- Sizing invariants ------- *)
 
@@ -396,8 +415,10 @@ let suite =
          >:: test_overshoot_exactly_at_the_band_is_valid_stop;
          "overshoot_exactly_at_the_extension_cap_is_through_entry"
          >:: test_overshoot_exactly_at_the_extension_cap_is_through_entry;
-         "extended_with_a_sized_ticket_is_an_error"
-         >:: test_extended_with_a_sized_ticket_is_an_error;
+         "extended_with_a_consistent_sized_ticket_is_clean"
+         >:: test_extended_with_a_consistent_sized_ticket_is_clean;
+         "extended_with_inconsistent_risk_is_an_error"
+         >:: test_extended_with_inconsistent_risk_is_an_error;
          "risk_arithmetic_must_agree" >:: test_risk_arithmetic_must_agree;
          "risk_consistency_on_the_cap_passes"
          >:: test_risk_consistency_on_the_cap_passes;

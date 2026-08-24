@@ -19,9 +19,11 @@
       [through_band_pct] is still [Valid_stop], and one exactly at
       [extension_max_pct] is still [Through_entry]. The conventions must stay in
       lockstep — a stricter comparison here would flag a legitimate boundary
-      artifact as a [reconciliation_class] error.
-    - [extended_not_suppressed] — an EXTENDED candidate must carry no sized
-      ticket (#2103).
+      artifact as a [reconciliation_class] error. (There is no
+      [extended_not_suppressed] check: issue #2404 stopped the report
+      suppressing past-cap tickets, so an EXTENDED candidate carries a
+      normally-sized ticket and is covered by [risk_consistency] like any
+      other.)
     - [risk_consistency] — [sized_risk_amount = shares x |expected fill - stop|]
       for sized candidates; [risk_budget] (optional) upper-bounds it.
     - With [bars_for]: [chart_coverage] (>= 2 bars or the chart cell degrades)

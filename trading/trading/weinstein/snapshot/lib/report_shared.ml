@@ -79,36 +79,44 @@ let _limit_order (c : Weekly_snapshot.candidate)
   | Some cap -> _capped_limit_order c l ~cap
   | None -> _legacy_market_order c l
 
-(* Suppressed ticket (issue #2103): the name has run too far past its own
-   breakout to buy. The row is kept so the reader can watch it, but there is no
-   order — see weinstein-book-reference.md §1 "Stage 2 detail (Ch. 2)". *)
-let _do_not_chase (c : Weekly_snapshot.candidate)
+(* Issue #2404: price is past the cap, so the limit sits below the market and
+   cannot fill today. The order is still the one the backtest places, so it is
+   shown and annotated, not suppressed: it rests, and fills only if price
+   returns into the band. A pre-#2158 snapshot has no cap — entry alone then. *)
+let _rests_clause (c : Weekly_snapshot.candidate) =
+  match _cap_of c with
+  | Some cap ->
+      Printf.sprintf
+        ", beyond the $%.2f limit; the order rests unfilled unless price \
+         returns into the $%.2f-$%.2f band."
+        cap c.entry cap
+  | None ->
+      "; the order rests unfilled unless price returns to the entry level."
+
+let _will_not_fill (c : Weekly_snapshot.candidate)
     (l : Entry_reconciliation.levels) =
   Printf.sprintf
-    "NO ORDER — do not chase: %+.1f%% past the $%.2f entry level (close \
-     $%.2f). Reward/risk has shifted against a fresh entry here; keep it on \
-     the watch list for a pullback toward the entry level."
-    l.overshoot_pct c.entry l.close
+    " — WILL NOT FILL AT CURRENT PRICE: close $%.2f is %+.1f%% past the $%.2f \
+     entry%s"
+    l.close l.overshoot_pct c.entry (_rests_clause c)
 
-(* The ticket body for a candidate that still has one, before the 0-share /
-   sizing-note fallbacks are applied. *)
+(* The ticket body for one candidate, before the 0-share / sizing-note
+   fallbacks are applied. *)
 let _order (c : Weekly_snapshot.candidate) =
   match c.reconciliation with
   | Entry_reconciliation.Through_entry l -> _limit_order c l
-  | Not_reconciled | Valid_stop _ | Extended _ -> _stop_order c
+  | Extended l -> _stop_order c ^ _will_not_fill c l
+  | Not_reconciled | Valid_stop _ -> _stop_order c
 
 (* Executable order instruction for one candidate. Kept here rather than in a
    renderer because it is the artifact the user copies into their broker: the
    Markdown and HTML reports must carry character-identical order text. *)
 let instruction (c : Weekly_snapshot.candidate) =
-  match c.reconciliation with
-  | Entry_reconciliation.Extended l -> _do_not_chase c l
-  | Not_reconciled | Valid_stop _ | Through_entry _ -> (
-      match (c.sized_shares, c.sizing_note) with
-      | 0, None -> "-"
-      | 0, Some note -> note
-      | _, None -> _order c
-      | _, Some note -> Printf.sprintf "%s: %s" note (_order c))
+  match (c.sized_shares, c.sizing_note) with
+  | 0, None -> "-"
+  | 0, Some note -> note
+  | _, None -> _order c
+  | _, Some note -> Printf.sprintf "%s: %s" note (_order c)
 
 let close_vs_entry (c : Weekly_snapshot.candidate) =
   match c.reconciliation with
@@ -117,7 +125,7 @@ let close_vs_entry (c : Weekly_snapshot.candidate) =
   | Through_entry l ->
       Printf.sprintf "$%.2f (%+.1f%% through)" l.close l.overshoot_pct
   | Extended l ->
-      Printf.sprintf "$%.2f (%+.1f%% EXTENDED)" l.close l.overshoot_pct
+      Printf.sprintf "$%.2f (%+.1f%% NO FILL)" l.close l.overshoot_pct
 
 let entry_reconciliation =
   "close vs entry: the Entry column is the BREAKOUT level from the week the \
@@ -125,9 +133,10 @@ let entry_reconciliation =
    outrun by weeks; this column reconciles it against the current close (issue \
    #2103). A row marked \"through\" is already past its trigger, so the order \
    is a LIMIT buy at ~the close capped at the do-not-chase ceiling rather than \
-   a resting stop at the level. A row marked \"EXTENDED\" is past the \
-   configured chase cap: no order is issued and the row is kept for watch \
-   only."
+   a resting stop at the level. A row marked \"NO FILL\" is past that ceiling: \
+   its order is still the right one and is still shown, but the limit now sits \
+   below the market, so it rests unfilled unless price returns into the \
+   entry-to-limit band (issue #2404)."
 
 let any_reconciled shown =
   List.exists shown ~f:(fun (c : Weekly_snapshot.candidate) ->
@@ -267,7 +276,7 @@ let _chase_weakness (c : Weekly_snapshot.candidate) =
   | Entry_reconciliation.Through_entry l ->
       Some (Printf.sprintf "paying up %+.1f%% through entry" l.overshoot_pct)
   | Extended l ->
-      Some (Printf.sprintf "extended %+.1f%% past entry" l.overshoot_pct)
+      Some (Printf.sprintf "%+.1f%% past cap, will not fill" l.overshoot_pct)
   | Not_reconciled | Valid_stop _ -> None
 
 let _sector_weakness (c : Weekly_snapshot.candidate) =
@@ -288,13 +297,3 @@ let weaknesses (c : Weekly_snapshot.candidate) =
 
 let weakness_line c =
   match weaknesses c with [] -> None | ws -> Some (String.concat ~sep:"; " ws)
-
-let is_extended (c : Weekly_snapshot.candidate) =
-  match c.reconciliation with
-  | Entry_reconciliation.Extended _ -> true
-  | Not_reconciled | Valid_stop _ | Through_entry _ -> false
-
-let partition_extended candidates =
-  List.partition_tf candidates ~f:(Fn.non is_extended)
-
-let watch_section_title = "Watch — extended, do not chase"

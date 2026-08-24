@@ -65,7 +65,9 @@ let _candidate ~symbol ~score ~reconciliation ~sized_shares ~sizing_note :
    - [Not_reconciled] sized ...... BUY STOP
    - [Valid_stop] with a cap ...... BUY STOPLIMIT (issue #2158)
    - [Through_entry] with a cap ... BUY LIMIT (issue #2103/#2158)
-   - [Extended] ................... NO ORDER — do not chase (rendered in watch)
+   - [Extended] ................... BUY STOPLIMIT + a WILL NOT FILL clause
+                                    (issue #2404 — the ticket is kept, not
+                                    suppressed)
    - a 0-share short with a note .. the note verbatim
    The share counts / notes are distinct so no two instructions collide. *)
 let _buy_stop =
@@ -92,7 +94,7 @@ let _extended =
     ~reconciliation:
       (Entry_reconciliation.Extended
          { close = 40.0; overshoot_pct = 40.4; cap = 30.05 })
-    ~sized_shares:0 ~sizing_note:None
+    ~sized_shares:52 ~sizing_note:None
 
 let _short_note =
   _candidate ~symbol:"EEE" ~score:80.0
@@ -140,7 +142,8 @@ let test_synthetic_fixture_covers_every_ticket_verb _ =
          _has_substring "BUY STOP 55 sh";
          _has_substring "BUY STOPLIMIT 54 sh";
          _has_substring "BUY LIMIT 53 sh";
-         _has_substring "NO ORDER — do not chase";
+         _has_substring "BUY STOPLIMIT 52 sh";
+         _has_substring "WILL NOT FILL AT CURRENT PRICE";
          _has_substring "0 sh — cash / caps exhausted";
        ])
 

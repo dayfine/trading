@@ -199,65 +199,25 @@ let _sector_list sectors =
       Chip.group ~cls:"sectors"
         (List.map sectors ~f:(Chip.make ~modifier:"sector"))
 
-(* Extended candidates carry no ticket (do-not-chase), so they render in their
-   own watch section instead of consuming actionable display slots. The section
-   is omitted when nothing is extended.
-
-   Both sides share one section but NOT one arm tag: each card keeps its own
-   side's tag, so an extended short's chart cell is addressed [short:SYM], not
-   [long:SYM]. Ranks run continuously across the two groups — longs first, then
-   shorts — because the section reads as a single list. *)
-let _watch_cards ~bars_for ~long_extended ~short_extended =
-  let cards ~arm ~offset candidates =
-    List.mapi candidates ~f:(fun i c ->
-        _candidate_card ~arm ~bars_for ~rank:(offset + i + 1) c)
-  in
-  cards ~arm:"long" ~offset:0 long_extended
-  @ cards ~arm:"short" ~offset:(List.length long_extended) short_extended
-  |> String.concat ~sep:"\n"
-
-let _watch_body ~bars_for ~long_extended ~short_extended =
-  Printf.sprintf "%s\n<div class=\"cands\">%s</div>"
-    (Report_masthead.chart_legend ~ma_period:_ma_period_weeks)
-    (_watch_cards ~bars_for ~long_extended ~short_extended)
-  |> _append_notes
-       ~shown:(long_extended @ short_extended)
-       ~hidden:[] ~beyond_cap:0
-
-let _watch_section ~bars_for ~long_extended ~short_extended =
-  match (long_extended, short_extended) with
-  | [], [] -> None
-  | _ ->
-      let body = _watch_body ~bars_for ~long_extended ~short_extended in
-      Some (_section ~title:Report_shared.watch_section_title body)
-
+(* Issue #2404: every candidate — including one whose price has run past the
+   do-not-chase cap — keeps its ticket and its rank in its own side's section.
+   A past-cap card's order simply will not fill at the current price and says
+   so; it is no longer split into a separate do-not-chase watch section. *)
 let _body (t : Weekly_snapshot.t) ~title ~long_limit ~short_limit ~bars_for =
-  let long_actionable, long_extended =
-    Report_shared.partition_extended t.long_candidates
-  in
-  let short_actionable, short_extended =
-    Report_shared.partition_extended t.short_candidates
-  in
-  List.filter_opt
+  String.concat ~sep:"\n"
     [
-      Some (Report_masthead.header t ~title);
-      Some (Report_masthead.counts_strip t);
-      Some (_section ~title:"Strong sectors" (_sector_list t.sectors_strong));
-      Some
-        (_candidate_section ~beyond_cap:t.long_eligible_beyond_cap ~arm:"long"
-           ~label:"Long candidates" ~bars_for long_actionable ~limit:long_limit);
-      Some
-        (_candidate_section ~beyond_cap:t.short_eligible_beyond_cap ~arm:"short"
-           ~label:"Short candidates" ~bars_for short_actionable
-           ~limit:short_limit);
-      _watch_section ~bars_for ~long_extended ~short_extended;
-      Some
-        (_section ~title:"Held positions"
-           (_held_list ~bars_for t.held_positions));
-      Some (_section ~title:"Warnings" (_bullet_list t.warnings));
-      Some Report_masthead.closing_notes;
+      Report_masthead.header t ~title;
+      Report_masthead.counts_strip t;
+      _section ~title:"Strong sectors" (_sector_list t.sectors_strong);
+      _candidate_section ~beyond_cap:t.long_eligible_beyond_cap ~arm:"long"
+        ~label:"Long candidates" ~bars_for t.long_candidates ~limit:long_limit;
+      _candidate_section ~beyond_cap:t.short_eligible_beyond_cap ~arm:"short"
+        ~label:"Short candidates" ~bars_for t.short_candidates
+        ~limit:short_limit;
+      _section ~title:"Held positions" (_held_list ~bars_for t.held_positions);
+      _section ~title:"Warnings" (_bullet_list t.warnings);
+      Report_masthead.closing_notes;
     ]
-  |> String.concat ~sep:"\n"
 
 let render ?(long_limit = Report_renderer.default_long_display_limit)
     ?(short_limit = Report_renderer.default_short_display_limit)
