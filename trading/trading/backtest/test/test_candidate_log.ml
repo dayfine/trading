@@ -316,48 +316,38 @@ let _week_with ~drops ~candidates =
       assert_failure
         (sprintf "expected exactly one week, got %d" (List.length ws))
 
+(* One ticker per [Screener.cascade_phase] constructor, paired with the
+   artefact outcome [_outcome_of_phase] must produce for it. Exhaustive by
+   construction: the phase enum is closed at seven, and this list names all
+   seven, so a transposition of two adjacent constructors (the failure mode a
+   compile error cannot catch, since both arms typecheck either way) moves a
+   ticker's outcome and fails the pin. *)
+let _phase_cases : (string * Screener.cascade_phase * CL.cascade_outcome) list =
+  [
+    ("AAAA", Admitted, CL.Admitted);
+    ("BBBB", Dropped_at_macro, CL.Dropped_at_macro);
+    ("CCCC", Dropped_at_breakout, CL.Dropped_at_breakout);
+    ("DDDD", Dropped_at_sector, CL.Dropped_at_sector);
+    ("EEEE", Dropped_at_rs, CL.Dropped_at_rs);
+    ("FFFF", Dropped_at_grade, CL.Dropped_at_grade);
+    ("GGGG", Dropped_at_top_n, CL.Dropped_at_top_n);
+  ]
+
 (** Every cascade phase reaches the artefact under its own name — the drops are
-    what G2 adds over G1's top-N-only view. A mapping that collapsed two phases
-    would fail here rather than silently mislabel a candidate. *)
+    what G2 adds over G1's top-N-only view. A mapping that collapsed two phases,
+    or swapped two of them, would fail here rather than silently mislabel a
+    candidate. All seven constructors are exercised; see {!_phase_cases}. *)
 let test_drops_carry_their_cascade_phase _ =
+  let week =
+    _week_with ~candidates:[]
+      ~drops:
+        (List.map _phase_cases ~f:(fun (ticker, phase, _) ->
+             _drop ~ticker ~phase))
+  in
   assert_that
-    (_week_with ~candidates:[]
-       ~drops:
-         [
-           _drop ~ticker:"AAAA" ~phase:Admitted;
-           _drop ~ticker:"BBBB" ~phase:Dropped_at_breakout;
-           _drop ~ticker:"CCCC" ~phase:Dropped_at_sector;
-           _drop ~ticker:"DDDD" ~phase:Dropped_at_top_n;
-         ])
-    (elements_are
-       [
-         all_of
-           [
-             field (fun (x : CL.candidate) -> x.symbol) (equal_to "AAAA");
-             field (fun (x : CL.candidate) -> x.outcome) (equal_to CL.Admitted);
-           ];
-         all_of
-           [
-             field (fun (x : CL.candidate) -> x.symbol) (equal_to "BBBB");
-             field
-               (fun (x : CL.candidate) -> x.outcome)
-               (equal_to CL.Dropped_at_breakout);
-           ];
-         all_of
-           [
-             field (fun (x : CL.candidate) -> x.symbol) (equal_to "CCCC");
-             field
-               (fun (x : CL.candidate) -> x.outcome)
-               (equal_to CL.Dropped_at_sector);
-           ];
-         all_of
-           [
-             field (fun (x : CL.candidate) -> x.symbol) (equal_to "DDDD");
-             field
-               (fun (x : CL.candidate) -> x.outcome)
-               (equal_to CL.Dropped_at_top_n);
-           ];
-       ])
+    (List.map week ~f:(fun (x : CL.candidate) -> (x.symbol, x.outcome)))
+    (equal_to
+       (List.map _phase_cases ~f:(fun (ticker, _, outcome) -> (ticker, outcome))))
 
 (** The cascade population already contains the entry walk's top-N as its
     [Admitted] tail, so emitting the G1 list alongside it would double-count
