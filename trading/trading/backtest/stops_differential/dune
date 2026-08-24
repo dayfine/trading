@@ -14,6 +14,12 @@
 ; Regenerate deliberately, never reflexively: `dune promote` after a diff means
 ; "I intend to change live stop behaviour", which needs a golden re-pin and an
 ; experiment-ledger entry, not a promote.
+;
+; Lives under trading/trading/backtest/ rather than beside the stops library
+; because the trace links `weinstein.types` (analysis/weinstein/), and
+; `.claude/rules/qc-structural-authority.md` A2 allow-lists analysis/ imports
+; into trading/trading/ only under trading/trading/backtest/**. It is a
+; regression pin over the stops surface, so it belongs with the other goldens.
 
 (executable
  (name stops_surface_trace)

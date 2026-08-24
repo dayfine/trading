@@ -1694,7 +1694,7 @@ symbols enter.
 
 ### The measurement
 
-`trading/trading/weinstein/stops/differential/stops_surface_trace.ml` drives
+`trading/trading/backtest/stops_differential/stops_surface_trace.ml` drives
 every `val` in `weinstein_stops.mli` through the **public API only**, printing
 every float in `%.17g` (which round-trips an IEEE double exactly, so the
 comparison is bit-for-bit, not eyeball-equal).
@@ -1747,7 +1747,7 @@ compiler versions and platforms.
 ### The pin
 
 The golden is the **merge-base** output, diffed by a `runtest` rule in
-`trading/trading/weinstein/stops/differential/dune`. Negative control: mutating
+`trading/trading/backtest/stops_differential/dune`. Negative control: mutating
 one character of one line out of 3,721 makes `dune runtest` exit **1**;
 restoring it returns exit **0**. So the same measurement that exonerates #2492
 now blocks the next stops refactor from silently reassociating this arithmetic.
