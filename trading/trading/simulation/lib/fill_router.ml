@@ -21,12 +21,12 @@ let record t pairs =
 
 let archived t = Hashtbl.to_alist t.archive |> String.Map.of_alist_exn
 
-let _entry_trade_side :
+let entry_trade_side :
     Trading_base.Types.position_side -> Trading_base.Types.side = function
   | Long -> Buy
   | Short -> Sell
 
-let _exit_trade_side :
+let exit_trade_side :
     Trading_base.Types.position_side -> Trading_base.Types.side = function
   | Long -> Sell
   | Short -> Buy
@@ -64,13 +64,13 @@ let _find_fill_position positions ~symbol ~trade_side ~state_match
 let _find_fill_target positions ~symbol ~trade_side =
   match
     _find_fill_position positions ~symbol ~trade_side
-      ~state_match:_is_entering_state ~expected_side:_entry_trade_side
+      ~state_match:_is_entering_state ~expected_side:entry_trade_side
       ~is_entry:true
   with
   | Some _ as r -> r
   | None ->
       _find_fill_position positions ~symbol ~trade_side
-        ~state_match:_is_exiting_state ~expected_side:_exit_trade_side
+        ~state_match:_is_exiting_state ~expected_side:exit_trade_side
         ~is_entry:false
 
 let _no_risk_params =

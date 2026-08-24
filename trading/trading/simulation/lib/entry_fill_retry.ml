@@ -23,15 +23,39 @@ let _base_order_id order_id =
 let retry_order_id ~order_id ~attempt =
   sprintf "%s%s%d" (_base_order_id order_id) _retry_suffix attempt
 
-(* The [Entering] position holding a ticket for [symbol], if any. Same
-   (symbol, state) match {!Cancel_handler} uses to find the position a refused
-   entry belongs to, so the two agree on which trades are entry rejections. *)
-let _entering_position_id ~positions ~symbol =
+(* True when [pos] is a resting ticket that [trade] could be a refused entry
+   fill of: [Entering], same symbol, and a trade side that {e opens} a position
+   of that side ([Fill_router.entry_trade_side] — a long ticket rests as a Buy,
+   a short as a Sell).
+
+   The side check (#2466) is what keeps a rejected {e exit} off this path. Were
+   an [Exiting] and an [Entering] to coexist on one symbol, symbol-and-state
+   matching alone would let a refused Sell claim the long ticket's budget and
+   re-submit a copy of the {e exit} order — which, once the exit is separately
+   reverted to [Holding] and its stop re-fires, leaves two live sell orders for
+   one position. That pairing is unreachable under the shipped Weinstein
+   strategy ([Entry_walk.held_symbols] counts [Exiting] as held), and the whole
+   module is inert at the default budget, so this changes no run; it is enforced
+   because the module is strategy-agnostic and must not rely on a caller's
+   invariant.
+
+   Split from [_entering_position_id] rather than written as a [when] guard on
+   its [find_map]: the guard form trips the nesting linter. *)
+let _is_ticket_for ~(trade : Trading_base.Types.trade) (pos : Position.t) =
+  match pos.state with
+  | Entering _ ->
+      String.equal pos.symbol trade.symbol
+      && Trading_base.Types.equal_side trade.side
+           (Fill_router.entry_trade_side pos.side)
+  | _ -> false
+
+(* The id of the ticket [trade] belongs to, if any. First match wins, as
+   {!Cancel_handler} does — with the side check above, at most one open ticket
+   per (symbol, side) can qualify. *)
+let _entering_position_id ~positions ~trade =
   Map.to_alist positions
-  |> List.find_map ~f:(fun (id, (pos : Position.t)) ->
-      match pos.state with
-      | Entering _ when String.equal pos.symbol symbol -> Some id
-      | _ -> None)
+  |> List.find ~f:(fun (_, pos) -> _is_ticket_for ~trade pos)
+  |> Option.map ~f:fst
 
 (* A fresh, unfilled copy of [order] under [id]. Everything the engine matches
    on is carried over verbatim — in particular a [StopLimit]'s trigger and cap,
@@ -78,7 +102,7 @@ let _spend_retry t ~order_manager ~position_id trade =
 
 (* Decide one refused trade: [None] to retry it, [Some trade] to let it die. *)
 let _handle_one t ~order_manager ~positions (trade : Trading_base.Types.trade) =
-  match _entering_position_id ~positions ~symbol:trade.symbol with
+  match _entering_position_id ~positions ~trade with
   | Some position_id when retries_used t ~position_id < t.max_retries ->
       _spend_retry t ~order_manager ~position_id trade
   | Some _ | None -> Some trade

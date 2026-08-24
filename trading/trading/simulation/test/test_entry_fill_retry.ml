@@ -19,9 +19,10 @@
       ticket's cost is claimed once. (The double-commit this guards against is
       the G3 leak: a ticket resting from week N is invisible to week N+1's
       [remaining_cash], which is re-seeded from [portfolio.cash].)
-    - {b Exits pass through.} A refused trade with no [Entering] match is never
-      retried, so {!Cancel_handler.revert_rejected_exits} keeps seeing the full
-      rejected list.
+    - {b Exits pass through.} A refused trade is never retried when no
+      [Entering] position matches its symbol, nor when one does but on the wrong
+      side (#2466) — so {!Cancel_handler.revert_rejected_exits} keeps seeing the
+      full rejected list. Two tests, one per half of that match.
     - {b Ids are derived, not minted.} Retry ids are a pure function of the
       original id and the attempt number — no clock, no counter — so two
       structurally identical runs produce identical ids. *)
@@ -83,12 +84,15 @@ let _positions_with entries : Position.t String.Map.t =
   List.fold entries ~init:String.Map.empty ~f:(fun acc (pos : Position.t) ->
       Map.set acc ~key:pos.id ~data:pos)
 
-let _make_trade ~symbol ~order_id : Trading_base.Types.trade =
+(* [side] defaults to [Buy] — the side that opens the [Long] ticket
+   [_make_entering_position] builds. Pass [Sell] for the wrong-side case. *)
+let _make_trade ?(side = Trading_base.Types.Buy) ~symbol ~order_id () :
+    Trading_base.Types.trade =
   {
     id = Printf.sprintf "%s-trade-1" symbol;
     order_id;
     symbol;
-    side = Trading_base.Types.Buy;
+    side;
     quantity = 100.0;
     price = 50.0;
     commission = 1.0;
@@ -126,10 +130,10 @@ let _active_orders manager = Manager.list_orders manager ~filter:ActiveOnly
 
 (* One refusal of the standard fixture ticket. Returns the trades the caller
    must still cancel. *)
-let _refuse_once ledger ~manager ~positions ~order_id =
+let _refuse_once ?side ledger ~manager ~positions ~order_id =
   Entry_fill_retry.handle_rejected_entries ledger ~order_manager:manager
     ~positions
-    ~rejected_trades:[ _make_trade ~symbol:"SPY" ~order_id ]
+    ~rejected_trades:[ _make_trade ?side ~symbol:"SPY" ~order_id () ]
 
 (* Refuse the ticket repeatedly, always re-refusing whatever order the previous
    round left resting. Returns the number of rounds that were retried (i.e. the
@@ -293,6 +297,36 @@ let test_unknown_order_falls_back_to_cancel _ =
       Entry_fill_retry.retries_used ledger ~position_id:"SPY-pos-1" )
     (equal_to ([ "SPY" ], 0))
 
+(** A refused trade on the {e wrong side} for the [Entering] position sharing
+    its symbol is not a retry candidate: a [Long] ticket rests as a Buy, so this
+    [Sell] is an exit fill, whose resolution is
+    {!Cancel_handler.revert_rejected_exits}. It passes straight through, spends
+    no budget, and submits no order.
+
+    Without the side check (#2466) this trade would claim the long ticket's
+    budget {e and} re-submit a copy of the {e exit} order — which, once the exit
+    is separately reverted to [Holding] and its stop re-fires, leaves two live
+    sell orders behind one position. The pairing is unreachable under the
+    shipped Weinstein strategy ([Entry_walk.held_symbols] counts [Exiting] as
+    held, so no entry ticket is written for a symbol that is exiting), so this
+    pins a guard rather than a live bug — but the [.mli] states "a refused exit
+    matches none" as a contract, and this module is strategy-agnostic. *)
+let test_wrong_side_trade_is_not_retried _ =
+  let ledger = Entry_fill_retry.create ~max_retries:2 in
+  let manager = _manager_with_order ~id:"2024-01-10-001" ~symbol:"SPY" in
+  let positions =
+    _positions_with [ _make_entering_position ~id:"SPY-pos-1" ~symbol:"SPY" ]
+  in
+  let still_dying =
+    _refuse_once ~side:Trading_base.Types.Sell ledger ~manager ~positions
+      ~order_id:"2024-01-10-001"
+  in
+  assert_that
+    ( List.map still_dying ~f:(fun (t : Trading_base.Types.trade) -> t.symbol),
+      Entry_fill_retry.retries_used ledger ~position_id:"SPY-pos-1",
+      List.length (_active_orders manager) )
+    (equal_to ([ "SPY" ], 0, 0))
+
 (** Retry ids are derived from the original, and the suffix does not nest: the
     second retry of ["X"] is ["X#retry2"], not ["X#retry1#retry2"]. Pinned
     because the id is the only trace a re-offer leaves in [trade_audit.sexp],
@@ -321,6 +355,8 @@ let suite =
          >:: test_non_entering_symbol_passes_through;
          "unknown order falls back to cancel"
          >:: test_unknown_order_falls_back_to_cancel;
+         "a wrong-side (exit) trade is not retried"
+         >:: test_wrong_side_trade_is_not_retried;
          "retry ids are derived and do not nest"
          >:: test_retry_ids_are_derived_and_do_not_nest;
        ]

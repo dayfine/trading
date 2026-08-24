@@ -34,6 +34,21 @@ type links
     Mutable and reference-shared: a simulator's per-step state copies alias one
     value. *)
 
+val entry_trade_side :
+  Trading_base.Types.position_side -> Trading_base.Types.side
+(** The broker side of the trade that {b opens} a position of this side: a long
+    is entered by buying, a short by selling to open.
+
+    Exported so the rest of the rejection path can apply the same side check
+    this module's routing already does, instead of matching on symbol and state
+    alone. {!Cancel_handler} is the consumer. *)
+
+val exit_trade_side :
+  Trading_base.Types.position_side -> Trading_base.Types.side
+(** The broker side of the trade that {b closes} a position of this side: a long
+    is exited by selling, a short by buying to cover. The mirror of
+    {!entry_trade_side}; see its note for why both are exported. *)
+
 val create_links : unit -> links
 (** Empty links — no orders generated yet. *)
 
