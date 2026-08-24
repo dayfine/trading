@@ -132,6 +132,46 @@ let _dispatch ~params ~snapshot_dir ~start ~end_ ~symbols ~pairs ~out =
       let start = Date.of_string start and end_ = Date.of_string end_ in
       _run_scan ~params ~stage_config ~snapshot_dir ~start ~end_ ~symbols ~out
 
+(* The three trailing windows are separate flags on purpose: the volume
+   denominator defaults to the book's four weeks (weinstein-book-reference.md
+   §4.2) while the resistance proxy and base-length reference default to 26, and
+   moving one must not silently move the others. *)
+let _params_flags =
+  let%map_open.Command breakout_lookback_weeks =
+    flag "-breakout-lookback-weeks"
+      (optional_with_default Analytics.default_params.breakout_lookback_weeks
+         int)
+      ~doc:"N trailing weeks for the prior-high (resistance proxy) level"
+  and vol_lookback_weeks =
+    flag "-vol-lookback-weeks"
+      (optional_with_default Analytics.default_params.vol_lookback_weeks int)
+      ~doc:"N trailing weeks averaged for the volume-ratio denominator"
+  and base_lookback_weeks =
+    flag "-base-lookback-weeks"
+      (optional_with_default Analytics.default_params.base_lookback_weeks int)
+      ~doc:"N trailing weeks whose median close anchors the base band"
+  and min_vol_ratio =
+    flag "-min-vol-ratio"
+      (optional_with_default Analytics.default_params.min_vol_ratio float)
+      ~doc:"X minimum volume ratio confirming a breakout"
+  and base_band_pct =
+    flag "-base-band-pct"
+      (optional_with_default Analytics.default_params.base_band_pct float)
+      ~doc:"P half-width in percent of the base band around the median close"
+  and fwd_weeks =
+    flag "-fwd-weeks"
+      (optional_with_default Analytics.default_params.fwd_weeks int)
+      ~doc:"N forward weeks over which the run is measured"
+  in
+  {
+    Analytics.breakout_lookback_weeks;
+    vol_lookback_weeks;
+    base_lookback_weeks;
+    min_vol_ratio;
+    base_band_pct;
+    fwd_weeks;
+  }
+
 let command =
   Command.basic
     ~summary:
@@ -143,10 +183,16 @@ let command =
        at or before that week only, the trailing prior high, the volume ratio, \
        the base length and the production stage. A week is a breakout when \
        close exceeds the prior high, volume confirms, and the stage is Stage \
-       2. The forward run (max close over --fwd-weeks) uses hindsight on \
-       purpose: it defines the ex-post monster set and never feeds detection. \
-       With --pairs FILE (headerless 'symbol,date' lines) it instead emits the \
-       decision-time features at each requested week.")
+       2. That three-condition rule is a REDUCED, warehouse-only proxy for the \
+       capture funnel's denominator - it is deliberately wider than what the \
+       production screener admits (no macro gate, no sector/RS gating, no \
+       extension cap, no fill-week check). Volume confirmation defaults to the \
+       book's basis: at least 2.0x the average of the prior 4 weeks; the prior \
+       high and the base-band reference are separate 26-week windows, each on \
+       its own flag. The forward run (max close over -fwd-weeks) uses \
+       hindsight on purpose: it defines the ex-post monster set and never \
+       feeds detection. With -pairs FILE (headerless 'symbol,date' lines) it \
+       instead emits the decision-time features at each requested week.")
     (let%map_open.Command snapshot_dir =
        flag "-snapshot-dir" (required string)
          ~doc:"DIR snapshot warehouse holding SYM.snap panels"
@@ -165,33 +211,7 @@ let command =
      and symbols =
        flag "-symbols" (optional string)
          ~doc:"SYM,SYM restrict the scan to these symbols (default: all)"
-     and breakout_lookback_weeks =
-       flag "-breakout-lookback-weeks"
-         (optional_with_default Analytics.default_params.breakout_lookback_weeks
-            int)
-         ~doc:"N trailing weeks for the prior high and average volume"
-     and min_vol_ratio =
-       flag "-min-vol-ratio"
-         (optional_with_default Analytics.default_params.min_vol_ratio float)
-         ~doc:"X minimum volume ratio confirming a breakout"
-     and base_band_pct =
-       flag "-base-band-pct"
-         (optional_with_default Analytics.default_params.base_band_pct float)
-         ~doc:"P half-width in percent of the base band around the median close"
-     and fwd_weeks =
-       flag "-fwd-weeks"
-         (optional_with_default Analytics.default_params.fwd_weeks int)
-         ~doc:"N forward weeks over which the run is measured"
-     in
-     fun () ->
-       let params =
-         {
-           Analytics.breakout_lookback_weeks;
-           min_vol_ratio;
-           base_band_pct;
-           fwd_weeks;
-         }
-       in
-       _dispatch ~params ~snapshot_dir ~start ~end_ ~symbols ~pairs ~out)
+     and params = _params_flags in
+     fun () -> _dispatch ~params ~snapshot_dir ~start ~end_ ~symbols ~pairs ~out)
 
 let () = Command_unix.run command

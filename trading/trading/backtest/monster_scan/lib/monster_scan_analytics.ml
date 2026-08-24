@@ -3,13 +3,23 @@ module Bar = Types.Daily_price
 
 type params = {
   breakout_lookback_weeks : int;
+  vol_lookback_weeks : int;
+  base_lookback_weeks : int;
   min_vol_ratio : float;
   base_band_pct : float;
   fwd_weeks : int;
 }
 
 let _default_breakout_lookback_weeks = 26
-let _default_min_vol_ratio = 1.5
+
+(* Book basis: Weinstein's breakout volume confirmation is >= 2x the average
+   volume of the prior FOUR weeks (weinstein-book-reference.md §4.2), which is
+   also what the production [Volume.default_config] encodes (lookback_bars = 4,
+   strong_threshold = 2.0). Kept on its own knob so the book-comparable ratio is
+   producible without also moving the resistance window. *)
+let _default_vol_lookback_weeks = 4
+let _default_min_vol_ratio = 2.0
+let _default_base_lookback_weeks = 26
 let _default_base_band_pct = 15.0
 let _default_fwd_weeks = 52
 let _percent_scale = 100.0
@@ -17,6 +27,8 @@ let _percent_scale = 100.0
 let default_params =
   {
     breakout_lookback_weeks = _default_breakout_lookback_weeks;
+    vol_lookback_weeks = _default_vol_lookback_weeks;
+    base_lookback_weeks = _default_base_lookback_weeks;
     min_vol_ratio = _default_min_vol_ratio;
     base_band_pct = _default_base_band_pct;
     fwd_weeks = _default_fwd_weeks;
@@ -57,30 +69,35 @@ let _is_stage2 : Weinstein_types.stage -> bool = function
   | Stage2 _ -> true
   | Stage1 _ | Stage3 _ | Stage4 _ -> false
 
-(* Start of the trailing window [idx - lookback, idx - 1]. Callers gate on
-   [_has_full_window] first, so this is >= 0 wherever it is used. *)
-let _window_lo ~params ~idx = idx - params.breakout_lookback_weeks
+(* The three trailing windows are independent knobs; a week is only measurable
+   once the widest of them fits entirely before [idx]. Callers gate on
+   [_has_full_window] first, so every [idx - weeks] below is >= 0. *)
+let _required_history ~params =
+  Int.max params.breakout_lookback_weeks
+    (Int.max params.vol_lookback_weeks params.base_lookback_weeks)
 
 let _has_full_window ~params ~bars ~idx =
-  idx >= 0 && idx < Array.length bars && _window_lo ~params ~idx >= 0
+  idx >= 0 && idx < Array.length bars && idx - _required_history ~params >= 0
 
-let _fold_window ~params ~bars ~idx ~init ~f =
+let _fold_window ~weeks ~bars ~idx ~init ~f =
   let acc = ref init in
-  for j = _window_lo ~params ~idx to idx - 1 do
+  for j = idx - weeks to idx - 1 do
     acc := f !acc bars.(j)
   done;
   !acc
 
 let _prior_high ~params ~bars ~idx =
-  _fold_window ~params ~bars ~idx ~init:Float.neg_infinity
-    ~f:(fun acc (b : Bar.t) -> Float.max acc b.high_price)
+  _fold_window ~weeks:params.breakout_lookback_weeks ~bars ~idx
+    ~init:Float.neg_infinity ~f:(fun acc (b : Bar.t) ->
+      Float.max acc b.high_price)
 
 let _vol_ratio ~params ~bars ~idx =
+  let weeks = params.vol_lookback_weeks in
   let total =
-    _fold_window ~params ~bars ~idx ~init:0.0 ~f:(fun acc (b : Bar.t) ->
+    _fold_window ~weeks ~bars ~idx ~init:0.0 ~f:(fun acc (b : Bar.t) ->
         acc +. Float.of_int b.volume)
   in
-  let mean = total /. Float.of_int params.breakout_lookback_weeks in
+  let mean = total /. Float.of_int weeks in
   if Float.( <= ) mean 0.0 then Float.nan
   else Float.of_int bars.(idx).Bar.volume /. mean
 
@@ -94,10 +111,10 @@ let _median_of_nonempty (xs : float array) =
 let _median xs = if Array.is_empty xs then Float.nan else _median_of_nonempty xs
 
 (* Walk back from [idx - 1] while each close stays within [±base_band_pct] of
-   one fixed reference — the median close over the trailing window. Stops at the
-   first week outside the band, or at bar 0. *)
+   one fixed reference — the median close over [base_lookback_weeks]. Stops at
+   the first week outside the band, or at bar 0. *)
 let _base_weeks ~params ~bars ~idx =
-  let lo = _window_lo ~params ~idx in
+  let lo = idx - params.base_lookback_weeks in
   let closes =
     Array.init (idx - lo) ~f:(fun k -> bars.(lo + k).Bar.close_price)
   in
@@ -116,6 +133,9 @@ let _base_weeks ~params ~bars ~idx =
     done;
     idx - 1 - !j
 
+(* The ONLY place [features_at] could leak the future: the classifier is handed
+   a prefix ending at [idx], never the whole series. The prefix-invariance test
+   in the test suite kills any widening of this slice. *)
 let _classify ~stage_config ~bars ~idx =
   let prefix = Array.sub bars ~pos:0 ~len:(idx + 1) |> Array.to_list in
   Stage.classify ~config:stage_config ~bars:prefix ~prior_stage:None
