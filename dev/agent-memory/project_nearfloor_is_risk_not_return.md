@@ -175,3 +175,55 @@ to an arbitrary buffer for most candidates.
 
 Writeup: `dev/notes/ladder-v4-read-2026-08-12.md` §3c. Related:
 [[project-edge-is-the-fat-tail]], [[project-backtest-nondeterminism-intraday-path]].
+
+## ⚠ Amendment 2026-08-20 — the grid contains an sp500 cell
+
+Under the new [[project-never-measure-on-sp500]] rule
+(`.claude/rules/universe-discipline.md`, #2444), **cell B (sp500 × 2000-2026) is
+not a valid measurement cell.** Quote the grid as **0 of 2 BROAD cells**, not
+0 of 3.
+
+The verdict is unchanged and if anything cleaner:
+
+- **A** (top-3000 × 2000-2026) — return unresolved, risk better.
+- **C** (top-3000 × 2010-2026) — **decisive**: −69.2pp = 2.0× the null on
+  return, maxDD −5.2pp = 4.8× the null.
+- ~~B (sp500)~~ — reported "no effect", i.e. it was the least informative cell
+  anyway. Dropping it removes a null result, not a supporting one.
+
+Also note **cell B had the largest core null of the three (180.1pp vs 132.5pp on
+top-3000)** — an index universe was noisier here, not tighter, so it could not
+have resolved the effect even on its own terms.
+
+Anything citing "nearfloor failed 0-of-3" (including
+[[project-rangetop-freshness-is-a-drawdown-lever]]) overstates the grid by one
+cell and leans on a cell the rule disallows.
+
+## ⚠ Amendment 2 (2026-08-20) — the grid has TWO structural defects, not one
+
+Beyond cell B being sp500 (Amendment 1), the user surfaced a second problem:
+
+- **C is NESTED inside A.** A = top-3000 × **2000-2026**; C = top-3000 ×
+  **2010-2026**. `promotion-confirmation.md` states in its own words that
+  *"Overlapping windows are NOT independent"* — so the grid's period-diversity
+  axis is violated by the rule that defines it. C is a sub-window of A, not an
+  independent context.
+- **C's null is n=2.** 34.2pp from **two** salts. A 2-draw range is a weaker
+  spread estimator than 3, and 3 is already downward-biased. The **decisive**
+  cell therefore has the **thinnest and least reliable null** in the grid, and
+  the headline "2.0× the null" rests on it.
+
+**Net:** strip the disallowed cell (B, sp500) and the nested one (C) and the
+grid reduces to **one clean cell (A)**, where return was *unresolved*.
+
+The REJECT may still be correct — the mechanism story is coherent (remove bear
+regimes and the tighter stop fires on winners instead of saving from crashes) —
+but **"nearfloor failed its confirmation grid" is a much weaker prior than its
+writeup implies.** Anything leaning on it as settled (notably
+[[project-rangetop-freshness-is-a-drawdown-lever]]'s argument that the
+selectivity signature is generic) inherits that weakness.
+
+**Grid-construction lesson:** a confirmation grid needs *disjoint* windows and
+*broad* universes, and each cell needs enough salts to have a real null. This
+one had a nested window, an index universe, and an n=2 null — three of the
+things the grid exists to prevent. Check the cells before citing the verdict.
