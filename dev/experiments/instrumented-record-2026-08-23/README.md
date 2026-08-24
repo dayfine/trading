@@ -69,3 +69,13 @@ no absolute comparison across the 08-23 boundary; within-build pairs valid.
 - #2489 representative-trade audit + #2490 monster capture funnel — all inputs
   on disk (candidates.sexp per week per candidate with cascade outcomes).
 - #2486 decision items (§2.1 `initial_stop_buffer` flip; flag promotion path).
+
+## Addendum (08-24 ~05:50 PT) — #2503 bisect: suspects EXONERATED
+
+6-month probes (`bisect_2503.sh`, results committed as
+`results/bisect-<sha>-probe6mo-trades.csv`): the **e64f8655b control (08-22 EOD
+main)** reproduces current main's trades, NOT the recorded baseline's — so
+nothing merged 08-23 moved the default path. The recorded grid1-null baseline
+descends from an earlier (ladder-3-era) build whose params were never
+committed. Proposed: `instr-null` here becomes the pinned record-convention
+baseline (params.sexp committed). Full reasoning: issue #2503.
