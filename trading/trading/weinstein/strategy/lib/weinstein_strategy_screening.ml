@@ -368,9 +368,9 @@ let _decline_is_slow_grind ~config ~macro_result ~index_view =
     Default [false] on all three leaves the screener config untouched
     bit-equally. Factored out of {!screen_universe} to keep that function under
     the 50-line linter cap. *)
-let _run_screener ?membership_at ~config ~(macro_result : Macro.result)
-    ~index_view ~sector_map ~stocks ~portfolio ~last_stop_out_dates
-    ~current_date () =
+let _run_screener ?membership_at ?on_candidates ~config
+    ~(macro_result : Macro.result) ~index_view ~sector_map ~stocks ~portfolio
+    ~last_stop_out_dates ~current_date () =
   let screening_config =
     {
       config.screening_config with
@@ -383,9 +383,9 @@ let _run_screener ?membership_at ~config ~(macro_result : Macro.result)
   let decline_is_slow_grind =
     _decline_is_slow_grind ~config ~macro_result ~index_view
   in
-  Screener.screen_with_cooldown ?membership_at ~decline_is_slow_grind
-    ~config:screening_config ~macro_trend:macro_result.Macro.trend ~sector_map
-    ~stocks
+  Screener.screen_with_cooldown ?membership_at ?on_candidates
+    ~decline_is_slow_grind ~config:screening_config
+    ~macro_trend:macro_result.Macro.trend ~sector_map ~stocks
     ~held_tickers:(Entry_walk.held_symbols portfolio)
     ~as_of:current_date
     ~last_stop_out_dates:(Hashtbl.to_alist last_stop_out_dates)
@@ -447,10 +447,13 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at
     |> List.map ~f:analyze
   in
   _commit_prior_stages ~prior_stages classified;
+  (* G1 + G2 (#2490): inert unless the recorder opted into capture. *)
   let trace = Cascade_trace.create audit_recorder in
   let screen_result =
-    _run_screener ?membership_at ~config ~macro_result ~index_view ~sector_map
-      ~stocks ~portfolio ~last_stop_out_dates ~current_date ()
+    _run_screener ?membership_at
+      ?on_candidates:(Cascade_trace.on_candidates trace)
+      ~config ~macro_result ~index_view ~sector_map ~stocks ~portfolio
+      ~last_stop_out_dates ~current_date ()
   in
   (* F2: retire stale resting tickets before the walk, so the pin release lands
      ahead of [Entry_freeze.apply]. [[]] at the default TTL of 0. *)
@@ -468,8 +471,8 @@ let screen_universe ?active_through_for ?fold_start_date ?membership_at
      actual transitions emitted, not the screener's top-N. Inert when the
      recorder did not opt in — live mode and every test. *)
   Cascade_trace.record trace ~audit_recorder ~date:current_date
-    ~diagnostics:screen_result.Screener.cascade_diagnostics
-    ~entered:(List.length entries);
+    ~config:config.screening_config ~macro_trend:macro_result.Macro.trend
+    ~result:screen_result ~entered:(List.length entries);
   ticket_cancellations @ entries
 
 (** Stops are adjusted daily; screening runs only on Fridays (weekly review).

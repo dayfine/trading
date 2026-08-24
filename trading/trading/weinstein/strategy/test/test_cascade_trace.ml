@@ -15,7 +15,12 @@
     - {b Inert.} With [capture_candidates = false] (the default, and every
       non-audit context) {!Cascade_trace.on_walk_candidates} is [None], so the
       entry walk never computes the projection, and the emitted event carries
-      [candidates = []] — bit-identical to the pre-#2490 cascade event. *)
+      [candidates = []] — bit-identical to the pre-#2490 cascade event.
+
+    A third arm pins {!Cascade_trace.of_screen} directly: which sides a given
+    macro tape traces, in what order, and that a macro-blocked side is omitted
+    rather than traced. It is a pure function, so no handle or recorder is
+    involved. *)
 
 open OUnit2
 open Core
@@ -118,6 +123,19 @@ let _capturing_recorder ~capture_candidates =
   in
   (recorder, captured)
 
+(* A minimal screener result carrying the diagnostics under test. The
+   candidate lists are empty, so [record]'s drop derivation is a no-op and the
+   unit under test stays the walk-capture hop (G2's drop derivation is pinned
+   by the screener anti-drift tests). *)
+let _screen_result : Screener.result =
+  {
+    buy_candidates = [];
+    short_candidates = [];
+    watchlist = [];
+    macro_trend = Weinstein_types.Bullish;
+    cascade_diagnostics = _diagnostics;
+  }
+
 (** Drive one Friday: create the handle, feed the sink whatever the entry walk
     would have passed over (when the handle offers one), then record. Returns
     the sink option and the event the recorder saw. *)
@@ -127,7 +145,8 @@ let _run_one_friday ~capture_candidates =
   let sink = Cascade_trace.on_walk_candidates t in
   Option.iter sink ~f:(fun f -> f _walk_contents);
   Cascade_trace.record t ~audit_recorder:recorder ~date:_current_date
-    ~diagnostics:_diagnostics ~entered:0;
+    ~config:Screener.default_config ~macro_trend:Weinstein_types.Bullish
+    ~result:_screen_result ~entered:0;
   (sink, !captured)
 
 (* ------------------------------------------------------------------ *)
@@ -206,6 +225,70 @@ let test_capture_off_records_an_empty_candidate_list _ =
             field (fun (e : AR.cascade_event) -> e.candidates) (size_is 0);
           ]))
 
+(* ------------------------------------------------------------------ *)
+(* of_screen — which sides are traced, and in what order                *)
+(* ------------------------------------------------------------------ *)
+
+let _sector : Screener.sector_context =
+  {
+    sector_name = "Test";
+    rating = Neutral;
+    stage = Weinstein_types.Stage2 { weeks_advancing = 8; late = false };
+  }
+
+(* Two names, so "one row per candidate per admitted side" is distinguishable
+   from a constant-length result. Which phase each lands in is irrelevant here
+   and is pinned by the screener's anti-drift tests; what this fixture isolates
+   is the side-selection and ordering [of_screen] itself owns. *)
+let _cascade_candidates =
+  [
+    (_stock_analysis ~ticker:"AAAA", _sector);
+    (_stock_analysis ~ticker:"BBBB", _sector);
+  ]
+
+(** Every traced row as [(ticker, side)], in emission order. *)
+let _traced ~macro_trend =
+  Cascade_trace.of_screen ~config:Screener.default_config ~macro_trend
+    ~candidates:_cascade_candidates ~result:_screen_result
+  |> List.map ~f:(fun (d : AR.cascade_drop) -> (d.outcome.ticker, d.side))
+
+(** A Bearish tape blocks the long side, and {!Cascade_trace.of_screen} omits a
+    blocked side {b entirely} rather than emitting a run of [Dropped_at_macro]
+    rows (the same Friday's [cascade_summary] already reports
+    [long_macro_admitted = 0]). The short side is unblocked and still traced, so
+    this pins omission rather than emptiness: a version that traced the blocked
+    side would report gate outcomes the live cascade never evaluated. *)
+let test_of_screen_bearish_tape_omits_the_long_side _ =
+  assert_that
+    (_traced ~macro_trend:Weinstein_types.Bearish)
+    (equal_to
+       [
+         ("AAAA", Trading_base.Types.Short); ("BBBB", Trading_base.Types.Short);
+       ])
+
+(** The mirror: a Bullish tape blocks shorts ([macro_trend <> Bullish]), so only
+    the long side is traced. *)
+let test_of_screen_bullish_tape_omits_the_short_side _ =
+  assert_that
+    (_traced ~macro_trend:Weinstein_types.Bullish)
+    (equal_to
+       [ ("AAAA", Trading_base.Types.Long); ("BBBB", Trading_base.Types.Long) ])
+
+(** A Neutral tape admits both sides, so every candidate appears twice —
+    distinguished only by [side], because the two sides score and gate the same
+    name differently and collapsing them would silently pick one. Longs come
+    first, then shorts. *)
+let test_of_screen_neutral_tape_traces_both_sides _ =
+  assert_that
+    (_traced ~macro_trend:Weinstein_types.Neutral)
+    (equal_to
+       [
+         ("AAAA", Trading_base.Types.Long);
+         ("BBBB", Trading_base.Types.Long);
+         ("AAAA", Trading_base.Types.Short);
+         ("BBBB", Trading_base.Types.Short);
+       ])
+
 let () =
   run_test_tt_main
     ("cascade_trace"
@@ -216,4 +299,10 @@ let () =
            "capture off offers no sink" >:: test_capture_off_offers_no_sink;
            "capture off records an empty candidate list"
            >:: test_capture_off_records_an_empty_candidate_list;
+           "of_screen: bearish tape omits the long side"
+           >:: test_of_screen_bearish_tape_omits_the_long_side;
+           "of_screen: bullish tape omits the short side"
+           >:: test_of_screen_bullish_tape_omits_the_short_side;
+           "of_screen: neutral tape traces both sides"
+           >:: test_of_screen_neutral_tape_traces_both_sides;
          ])

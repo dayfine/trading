@@ -94,9 +94,24 @@ type t = week list [@@deriving sexp]
 
 val signals_of_alternative : Trade_audit.alternative_candidate -> signals
 (** Project a near-miss row onto {!signals}, field-for-field. Every [signals]
-    value in an emitted artefact comes through here, so the candidate log and
+    value on an {b entry-walk} row comes through here, so the candidate log and
     [trade_audit.sexp]'s [alternatives_considered] cannot disagree about a
     candidate's decision-time signals. *)
+
+val signals_of_analysis :
+  analysis:Stock_analysis.t ->
+  sector_name:string ->
+  score:int ->
+  grade:Weinstein_types.grade ->
+  signals
+(** The same projection for a {b cascade} row, whose candidate never reached the
+    entry walk and so has no [alternative_candidate] to read from — the score
+    and grade come from the screener's own trace instead.
+
+    Reads the identical fields off [analysis] that {!Trade_audit_recorder}'s
+    near-miss projection does, so the two row kinds in one artefact describe a
+    candidate the same way. A test pins that they agree on a candidate reachable
+    through both paths. *)
 
 (** {1 Collector} *)
 
@@ -126,13 +141,26 @@ val weeks_in_window : collector option -> start_date:Date.t -> t
     teardown regardless of whether capture was on. *)
 
 val week_of :
-  date:Date.t -> alternatives:Trade_audit.alternative_candidate list -> week
+  date:Date.t ->
+  alternatives:Trade_audit.alternative_candidate list ->
+  drops:Weinstein_strategy.Audit_recorder.cascade_drop list ->
+  week
 (** Assemble one screened Friday's row set.
 
-    [alternatives] are the candidates the {i entry walk} passed over, already
-    projected by the caller (which owns the near-miss projection). Emitted even
-    when empty: a Friday that funded nothing is still a screened Friday, and
-    eliding it would make "no week" and "no candidates" indistinguishable. *)
+    [alternatives] are the candidates the {i entry walk} passed over (G1),
+    already projected by the caller (which owns the near-miss projection);
+    [drops] are the candidates the {i cascade} evaluated (G2), each carrying the
+    phase that dropped it.
+
+    Emitted even when both are empty: a Friday that funded nothing is still a
+    screened Friday, and eliding it would make "no week" and "no candidates"
+    indistinguishable.
+
+    {b A non-empty [drops] supersedes [alternatives].} The cascade population
+    already contains the entry walk's top-N as its [Admitted] tail, so emitting
+    both would double-count those names under two different outcome
+    vocabularies. [alternatives] remains the sole source when no cascade trace
+    was captured — which is what keeps a G1-only caller working unchanged. *)
 
 (** {1 Emission} *)
 
