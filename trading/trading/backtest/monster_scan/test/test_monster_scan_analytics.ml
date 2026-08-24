@@ -119,6 +119,31 @@ let test_vol_ratio_honours_an_overridden_window _ =
        ~vol_lookback_weeks:weeks)
     (is_some_and (float_equal (Float.of_int _loud_volume /. mean)))
 
+(* No volume history at all: the trailing mean is zero, so [vol_ratio] is
+   [Float.nan] rather than [infinity]. The closes are [_breakout_series]'s, whose
+   price gate provably clears at [_breakout_week] (the first test above), so the
+   guard is the only thing keeping the week out of [scan]. Drop it and the
+   division yields [infinity]; [infinity >= min_vol_ratio] holds, admitting a
+   junk row carrying an infinite ratio into the #2490 funnel denominator. *)
+let _no_volume = 0
+
+let _zero_volume_history_series () =
+  _series ~n:76 ~close:_rising_close ~volume:(fun i ->
+      if i = _breakout_week then _loud_volume else _no_volume)
+
+let test_vol_ratio_is_nan_without_volume_history _ =
+  assert_that
+    (_features_at (_zero_volume_history_series ()) _breakout_week)
+    (is_some_and
+       (field
+          (fun (f : Analytics.features) -> Float.is_nan f.vol_ratio)
+          (equal_to
+             ~msg:"vol_ratio must be NaN when the trailing mean is not positive"
+             true)))
+
+let test_scan_admits_no_breakout_without_volume_history _ =
+  assert_that (_scan (_zero_volume_history_series ())) (size_is 0)
+
 (* 10 weeks at 50, then 40 at 100. At the last index the trailing-window median
    is 100 and the band is +/-15, so the walk back counts every 100-week and
    stops at the last 50-week. *)
@@ -141,6 +166,42 @@ let test_features_declines_a_short_window _ =
     _series ~n:76 ~close:_rising_close ~volume:(fun _ -> _quiet_volume)
   in
   assert_that (_features_at bars (_lookback - 1)) is_none
+
+(* The history requirement is the {e widest} of the three windows, not
+   [breakout_lookback_weeks] alone — which is what the test above, run at the
+   defaults, cannot distinguish. Widen the volume (or base) window past the
+   breakout window and a week that clears 26 but not 60 must still decline;
+   collapsing the requirement to the breakout window admits it and then folds
+   [bars] from a negative index. *)
+let _wide_window_weeks = 60
+let _inside_wide_window_idx = 40
+
+let _features_with ~params bars idx =
+  Analytics.features_at ~params ~stage_config:Stage.default_config ~bars ~idx
+
+let _wide_vol_params =
+  { Analytics.default_params with vol_lookback_weeks = _wide_window_weeks }
+
+let _wide_base_params =
+  { Analytics.default_params with base_lookback_weeks = _wide_window_weeks }
+
+let test_features_decline_until_the_widest_window_fits _ =
+  let bars = _breakout_series () in
+  assert_that
+    [
+      _features_with ~params:_wide_vol_params bars _inside_wide_window_idx;
+      _features_with ~params:_wide_base_params bars _inside_wide_window_idx;
+    ]
+    (elements_are [ is_none; is_none ])
+
+let test_features_admit_once_the_widest_window_fits _ =
+  let bars = _breakout_series () in
+  assert_that
+    [
+      _features_with ~params:_wide_vol_params bars _wide_window_weeks;
+      _features_with ~params:_wide_base_params bars _wide_window_weeks;
+    ]
+    (elements_are [ is_some_and __; is_some_and __ ])
 
 let _forward_run bars ~idx ~fwd_weeks =
   Analytics.forward_run_at
@@ -278,6 +339,10 @@ let suite =
          >:: test_vol_ratio_uses_the_book_four_week_denominator;
          "vol_ratio honours an overridden window"
          >:: test_vol_ratio_honours_an_overridden_window;
+         "vol_ratio is nan without volume history"
+         >:: test_vol_ratio_is_nan_without_volume_history;
+         "scan admits no breakout without volume history"
+         >:: test_scan_admits_no_breakout_without_volume_history;
          "features are invariant to bars after idx"
          >:: test_features_are_invariant_to_bars_after_idx;
          "forward run does read bars after idx"
@@ -286,6 +351,10 @@ let suite =
          >:: test_base_weeks_counts_consecutive_in_band_weeks;
          "features declines a short window"
          >:: test_features_declines_a_short_window;
+         "features decline until the widest window fits"
+         >:: test_features_decline_until_the_widest_window_fits;
+         "features admit once the widest window fits"
+         >:: test_features_admit_once_the_widest_window_fits;
          "forward run measures the horizon max"
          >:: test_forward_run_measures_the_horizon_max;
          "forward run at the last bar is empty"
