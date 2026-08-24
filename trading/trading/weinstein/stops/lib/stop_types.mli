@@ -290,18 +290,18 @@ type config = {
           [.claude/rules/weinstein-faithful-core.md]). Default-off experiment
           axis per [.claude/rules/experiment-flag-discipline.md]; promoted only
           on a ledger ACCEPT. *)
-  reset_anchor_on_stalled_cycle : bool; [@sexp.default false]
-      (** When [true], a correction cycle that completes but whose derived stop
-          candidate does {b not} improve on the resting stop (a {e stalled}
-          cycle) still resets the [Trailing] cycle bookkeeping —
-          [last_correction_extreme] and [last_trend_extreme] both move to the
-          bar close, [correction_count] increments, and
+  reset_anchor_on_stalled_cycle : bool; [@sexp.default true]
+      (** When [true] {b (the default since 2026-08-24)}, a correction cycle that
+          completes but whose derived stop candidate does {b not} improve on the
+          resting stop (a {e stalled} cycle) still resets the [Trailing] cycle
+          bookkeeping — [last_correction_extreme] and [last_trend_extreme] both
+          move to the bar close, [correction_count] increments, and
           [correction_observed_since_reset] returns to [false] — while
-          [stop_level] is left exactly where it was. Default [false] discards
-          the stalled cycle entirely: the running extremes are kept and no cycle
-          is counted.
+          [stop_level] is left exactly where it was. Setting it [false] restores
+          the pre-2026-08-24 behaviour: the stalled cycle is discarded entirely,
+          the running extremes are kept and no cycle is counted.
 
-          {b Why (issue #2486).} Under the default, the reset is reachable only
+          {b Why (issue #2486).} Under [false] the reset is reachable only
           through the raise branch, so cycle bookkeeping is coupled to whether
           the stop happened to improve. [last_correction_extreme] is seeded from
           the entry bar's extreme and thereafter only ever moves {e against} the
@@ -317,24 +317,37 @@ type config = {
 
           The precondition is the {b fallback} initial stop, not the structural
           one. A fallback stop is
-          [entry *. fallback_buffer *. (1 -. min_correction_pct /. 2)] — with
-          the shipped 1.02 / 0.08 defaults, [0.9792 *. entry] — so the freeze
-          arms as soon as the entry bar's low sits more than ~1.09% below the
-          entry price. A structural support-floor stop derives from a prior
-          correction low well below entry, leaving the entry-bar anchor
-          comfortably above it, and ratchets normally.
+          [entry *. fallback_buffer *. (1 -. min_correction_pct /. 2)] — at the
+          current [initial_stop_buffer = 1.0] / [min_correction_pct = 0.08]
+          defaults, [0.96 *. entry] — so the freeze arms as soon as the entry
+          bar's low sits more than ~3.03% below the entry price (it armed at
+          ~1.09% under the former [1.02] buffer). A structural support-floor
+          stop derives from a prior correction low well below entry, leaving the
+          entry-bar anchor comfortably above it, and ratchets normally.
+
+          {b Measured footprint (26y top-3000, issue #2486 comment 2026-08-24).}
+          The fallback is the common path — 1,621 of 1,827 audited entries
+          (88.7%) — and among positions held ≥13 weeks it ratcheted 9% of the
+          time versus 49% for support-floor stops. The unfreeze's {e per-trade}
+          effect is nonetheless ~nil: 937 of 949 paired entries were
+          bit-identical, mean Δ −0.005pp (PR #2511). The flip is therefore a
+          faithfulness correction, not a performance promotion.
 
           Faithful-core: this is a {b defect fix expressed as a dial}, not a new
           mechanism. Book §5.2's TRAILING block specifies a ratchet "for each
           correction cycle" whose successive stops "trend upward across
           correction cycles"; a cycle that the machine silently discards is not
-          that. The never-lower rule (§5.2, qc-behavioral L2) is untouched — the
-          flag moves only bookkeeping, never [stop_level], and the phantom-cycle
+          that, and the Ch. 6 XYZ walk-through advances the reference to each
+          new cycle's structure even when the implied raise is trivial (resolved
+          book question, [docs/design/weinstein-book-reference.md] §5.2). The
+          never-lower rule (§5.2, qc-behavioral L2) is untouched — the flag
+          moves only bookkeeping, never [stop_level], and the phantom-cycle
           guard still applies because the reset restores
-          [correction_observed_since_reset = false]. Default [false] is an exact
-          no-op so every existing golden replays bit-identically. Default-off
-          experiment axis per [.claude/rules/experiment-flag-discipline.md];
-          promoted only on a ledger ACCEPT. *)
+          [correction_observed_since_reset = false]. Default flipped
+          [false -> true] by user decision on 2026-08-24 without a ledger
+          ACCEPT, as a book-faithfulness correction; recorded in
+          [dev/experiments/_ledger/2026-08-24-stops-basis-book-faithful.sexp]
+          per [.claude/rules/experiment-flag-discipline.md] R3. *)
 }
 [@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable

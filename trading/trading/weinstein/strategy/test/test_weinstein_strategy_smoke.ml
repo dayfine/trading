@@ -425,19 +425,28 @@ let test_weinstein_breakout_trade _ =
          cap based on sp500-2019-2023 evidence that long compounding wants
          looser concentration). Portfolio_value=$100K → long cap $30K.
 
-         Phase F.3.a-4 (2026-05-04, this PR): the strategy's bar reads now
-         route through the snapshot path ({!Bar_reader.of_in_memory_bars})
-         rather than the legacy panel path ({!Bar_reader.of_panels} +
+         Phase F.3.a-4 (2026-05-04): the strategy's bar reads now route
+         through the snapshot path ({!Bar_reader.of_in_memory_bars}) rather
+         than the legacy panel path ({!Bar_reader.of_panels} +
          {!Data_panel.Bar_panels}). The two paths agree on raw OHLCV values
          but their weekly aggregation cache warmup produces slightly
          different stage-classification timing on this synthetic Stage-2
          Breakout — the snapshot-backed reader fires the entry one Friday
-         earlier (price 162.44 vs the legacy 166.38) and risk-bound sizing
-         settles at 184 shares (vs 180 cap-bound previously). The
+         earlier (price 162.44 vs the legacy 166.38). The
          [test_weinstein_backtest] integration tests on real multi-year
          data continue to pin identical n_buys / n_sells / final_value
          across the same migration, so this is a synthetic-pattern edge
-         effect, not a strategy regression. *)
+         effect, not a strategy regression.
+
+         Book-faithful stops basis (2026-08-24, issue #2486 §2.1): this
+         synthetic tape has no qualifying prior correction, so the initial
+         stop is the FALLBACK. Flipping [initial_stop_buffer] 1.02 -> 1.0
+         widens that stop from 2.08% to 4% of entry, which roughly doubles
+         risk-per-share. The position was previously cap-bound at 184 shares
+         (0.30 * $100k / 162.44 = 184.7); at the wider stop the 1%-of-equity
+         risk budget binds first and sizing settles at 148 shares. Trade.price
+         (market fill) is unchanged, which is the tell that only the sizing
+         input moved. *)
       let all_trades =
         List.concat_map result.steps ~f:(fun step -> step.trades)
       in
@@ -452,7 +461,7 @@ let test_weinstein_breakout_trade _ =
                    (equal_to Trading_base.Types.Buy);
                  field
                    (fun t -> t.Trading_base.Types.quantity)
-                   (float_equal ~epsilon:0.5 184.0);
+                   (float_equal ~epsilon:0.5 148.0);
                  field
                    (fun t -> t.Trading_base.Types.price)
                    (float_equal ~epsilon:0.1 162.445264);

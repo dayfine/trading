@@ -686,11 +686,23 @@ let _count_entering_side transitions side =
           Trading_base.Types.equal_position_side s side
       | _ -> false)
 
-(** Three longs + one short fed at $30k cash, sized so each long costs $9k (0.30
-    per-position exposure cap) and the short costs $6k (0.20 cap). The three
-    longs exhaust cash to $3k before the appended short is reached, so the short
-    is crowded out. Shared by the default-off and sleeve-active tests so they
-    exercise identical inputs. *)
+(** Four longs + one short fed at $30k cash. The candidates' own [stop] is a
+    screener nominal that the entry walk discards: with an empty [Bar_reader]
+    the support scan finds nothing, so every stop here is the {b fallback}
+    ([entry *. initial_stop_buffer], then the half-correction inset), which
+    makes each long risk-bound at ~$7.2k and the short cap-bound at $6k (0.20).
+    The four longs exhaust cash below $6k before the appended short is reached,
+    so the short is crowded out. Shared by the default-off and sleeve-active
+    tests so they exercise identical inputs.
+
+    {b Why four longs and not three} (2026-08-24): at the former
+    [initial_stop_buffer = 1.02] the fallback stop was only 2.08% wide, so each
+    long was {i cap}-bound at $9k (0.30) and three of them exhausted the budget.
+    The book-faithful 4% fallback (issue #2486 §2.1) roughly doubles
+    risk-per-share, so longs are now risk-bound and smaller; a fourth is needed
+    to reproduce the crowd-out this fixture exists to exercise. The invariant
+    under test — longs consume the combined budget before the short is
+    reached — is unchanged. *)
 let _sleeve_candidates () =
   let long ticker =
     make_scored_candidate ~ticker ~side:Trading_base.Types.Long ~entry:100.0
@@ -701,7 +713,7 @@ let _sleeve_candidates () =
       ~entry:80.0 ~stop:88.0 ~grade:Weinstein_types.C
   in
   (* Screener order: longs first, then the appended short. *)
-  [ long "LNGA"; long "LNGB"; long "LNGC"; short ]
+  [ long "LNGA"; long "LNGB"; long "LNGC"; long "LNGD"; short ]
 
 let _sleeve_portfolio : Trading_strategy.Portfolio_view.t =
   { cash = 30_000.0; positions = String.Map.empty }
@@ -712,6 +724,7 @@ let _sleeve_get_price =
       ("LNGA", make_bar "2024-01-05" 100.0);
       ("LNGB", make_bar "2024-01-05" 100.0);
       ("LNGC", make_bar "2024-01-05" 100.0);
+      ("LNGD", make_bar "2024-01-05" 100.0);
       ("SHRT", make_bar "2024-01-05" 80.0);
     ]
 
@@ -724,7 +737,7 @@ let _run_sleeve_entries cfg =
     ()
 
 (** Default [short_sleeve_fraction = 0.0]: the single combined walk consumes the
-    long-only cash budget on the three longs before reaching the appended short,
+    long-only cash budget on the four longs before reaching the appended short,
     so zero shorts enter — bit-identical to the pre-sleeve crowd-out. *)
 let test_short_sleeve_default_crowds_out_shorts _ =
   let cfg = default_config ~universe:[ "X" ] ~index_symbol:"GSPCX" in
@@ -736,17 +749,17 @@ let test_short_sleeve_default_crowds_out_shorts _ =
            (fun ts -> _count_entering_side ts Trading_base.Types.Short)
            (equal_to 0);
          (* Pins that the shorts are crowded out by FUNDED longs, not by a
-            wrongly-zeroed [spendable]: all three $9k longs fit the $30k
+            wrongly-zeroed [spendable]: all four risk-bound longs fit the $30k
             budget. *)
          field
            (fun ts -> _count_entering_side ts Trading_base.Types.Long)
-           (equal_to 3);
+           (equal_to 4);
        ])
 
 (** [short_sleeve_fraction = 0.3] reserves $9k (0.30 * $30k PV) for a short-only
     walk, so the $6k short now enters where it was crowded out at 0.0; the longs
-    walk against the reduced $21k budget so only two of the three $9k longs fit.
-    Pins the count flip on both sides. *)
+    walk against the reduced $21k budget so only two of the four longs fit. Pins
+    the count flip on both sides. *)
 let test_short_sleeve_active_admits_short _ =
   let cfg =
     {
