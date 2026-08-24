@@ -1815,3 +1815,15 @@ behavioral_qc: APPROVED
 Reviewers when work lands:
 - qc-structural — module boundaries, pure-function discipline, test coverage for degenerate inputs (empty bars, single bar, all-flat prices); symmetry of long/short branches in the primitive.
 - qc-behavioral — spot-check against Weinstein Ch. 6 examples (Merck, Anthony Industries, National Semiconductor) — does the identified correction low match what the book calls out? For the short side, spot-check against Ch. 11 short-sell examples (resistance ceiling identification).
+
+## 2026-08-24 — book-faithful stops basis SHIPPED (user-directed, #2486)
+
+`initial_stop_buffer` 1.02→1.0 (fallback width 2.08%→4.0%, §5.3 band floor)
+and `reset_anchor_on_stalled_cycle` default→true, one PR. Ledger:
+`dev/experiments/_ledger/2026-08-24-stops-basis-book-faithful.sexp`
+(Inconclusive = user-gated R3 override, house convention). Evidence: freeze
+real-data split (PR #2511), book checks (PR #2498/#2492), unfreeze per-trade
+neutrality (937/949 paired identical). Canonical record baseline re-pins AFTER
+this flip (#2503). Known tooling gap: goldens-affected was green here — false
+negative (record-literal default + stop_types.ml outside its scan); follow-up
+issue filed.
