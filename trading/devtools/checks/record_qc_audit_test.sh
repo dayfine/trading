@@ -40,6 +40,25 @@ FAIL_COUNT=0
 pass() { echo "  PASS: $*"; PASS_COUNT=$(( PASS_COUNT + 1 )); }
 fail() { echo "  FAIL: $*" >&2; FAIL_COUNT=$(( FAIL_COUNT + 1 )); }
 
+# report_conjuncts <label1> <ok1> [<label2> <ok2> ...]
+#
+# For a multi-conjunct `if A && B && C ...; then pass; else fail; fi`
+# assertion, a bare "expected X; got rc=Y" fail message can't say WHICH
+# conjunct broke -- issue #2440 (scenario 22) hit exactly this: three
+# grep-based conjuncts collapsed into one undifferentiated failure, so a
+# real CI failure could only be guessed at, not diagnosed. Call this from
+# the `else` branch with each conjunct's human-readable label and its
+# already-evaluated 0/1 result (1 = passed, 0 = failed); it prints one
+# "conjunct FAILED: <label>" line per broken conjunct to stderr, so the
+# label itself should carry the actual observed value (e.g.
+# "field X == 2 (actual: <value>)"), not just repeat the expectation.
+report_conjuncts() {
+  while (( "$#" >= 2 )); do
+    [[ "$2" == "1" ]] || echo "      conjunct FAILED: $1" >&2
+    shift 2
+  done
+}
+
 # _glob_count <dir> <name-pattern> [extra-find-predicate]
 #
 # Counts entries under <dir> (maxdepth 1) matching glob <name-pattern>,
@@ -1304,13 +1323,29 @@ out21_3=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=3000000000000000000
     --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK 2>&1) && rc21_3=0 || rc21_3=$?
 JSON21="${TMP_REPO}/dev/audit/2026-07-30-feat-new-${FEATURE21}.json"
 
-if (( rc21_1 == 0 )) && (( rc21_3 == 0 )) && [[ -f "${JSON21}" ]] \
-   && grep -q '"consecutive_rework_count": *2' "${JSON21}" \
-   && echo "${out21_3}" | grep -q 'consecutive_rework_count=2' \
-   && ! echo "${out21_3}" | grep -q 'WARNING'; then
+c21_rc1=1; (( rc21_1 == 0 )) || c21_rc1=0
+c21_rc3=1; (( rc21_3 == 0 )) || c21_rc3=0
+c21_file=1; [[ -f "${JSON21}" ]] || c21_file=0
+c21_json_count=1
+if [[ "${c21_file}" == "1" ]]; then
+  grep -q '"consecutive_rework_count": *2' "${JSON21}" || c21_json_count=0
+else
+  c21_json_count=0
+fi
+c21_out_count=1; echo "${out21_3}" | grep -q 'consecutive_rework_count=2' || c21_out_count=0
+c21_no_warn=1; echo "${out21_3}" | grep -q 'WARNING' && c21_no_warn=0
+
+if [[ "${c21_rc1}${c21_rc3}${c21_file}${c21_json_count}${c21_out_count}${c21_no_warn}" == "111111" ]]; then
   pass "scenario 21 — truncated prior record (no overall_qc) does not abort the script, is skipped not counted as a streak break, and emits NO warning (silent skip, H-PREV-VERDICT-PIPEFAIL)"
 else
   fail "scenario 21 — expected rc=0/0, consecutive_rework_count=2 for feat/new record, and NO 'WARNING' in output (silent skip); got rc=${rc21_1}/${rc21_3}"
+  report_conjuncts \
+    "rc21_1==0 (write_audit for feat/old exit code, actual=${rc21_1})" "${c21_rc1}" \
+    "rc21_3==0 (write_audit for feat/new exit code, actual=${rc21_3})" "${c21_rc3}" \
+    "JSON21 exists at ${JSON21}" "${c21_file}" \
+    "consecutive_rework_count==2 in JSON21 (actual: $([[ "${c21_file}" == "1" ]] && { grep -o '"consecutive_rework_count":[^,}]*' "${JSON21}" 2>/dev/null || echo '<field missing>'; } || echo '<file missing>'))" "${c21_json_count}" \
+    "stdout contains 'consecutive_rework_count=2' (out21_3 had: $(echo "${out21_3}" | grep -o 'consecutive_rework_count=[0-9]*' || echo '<not found>'))" "${c21_out_count}" \
+    "stdout/stderr contains NO 'WARNING' (should be silent skip)" "${c21_no_warn}"
   echo "${out21_1}" | sed 's/^/      /'
   echo "${out21_3}" | sed 's/^/      /'
   [[ -f "${JSON21}" ]] && echo "      json: $(cat "${JSON21}")"
@@ -1343,13 +1378,29 @@ out22_3=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=3000000000000000000
     --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK 2>&1) && rc22_3=0 || rc22_3=$?
 JSON22="${TMP_REPO}/dev/audit/2026-07-30-feat-new-${FEATURE22}.json"
 
-if (( rc22_1 == 0 )) && (( rc22_3 == 0 )) && [[ -f "${JSON22}" ]] \
-   && grep -q '"consecutive_rework_count": *2' "${JSON22}" \
-   && echo "${out22_3}" | grep -q 'WARNING: could not read prior audit record' \
-   && echo "${out22_3}" | grep -qF "${UNREADABLE_PATH_22}"; then
+c22_rc1=1; (( rc22_1 == 0 )) || c22_rc1=0
+c22_rc3=1; (( rc22_3 == 0 )) || c22_rc3=0
+c22_file=1; [[ -f "${JSON22}" ]] || c22_file=0
+c22_count=1
+if [[ "${c22_file}" == "1" ]]; then
+  grep -q '"consecutive_rework_count": *2' "${JSON22}" || c22_count=0
+else
+  c22_count=0
+fi
+c22_warn=1; echo "${out22_3}" | grep -q 'WARNING: could not read prior audit record' || c22_warn=0
+c22_path=1; echo "${out22_3}" | grep -qF "${UNREADABLE_PATH_22}" || c22_path=0
+
+if [[ "${c22_rc1}${c22_rc3}${c22_file}${c22_count}${c22_warn}${c22_path}" == "111111" ]]; then
   pass "scenario 22 — unreadable prior record (grep exit 2) does not abort the script, warns loudly naming the offending file, still skipped from the streak (H-PREV-VERDICT-PIPEFAIL)"
 else
   fail "scenario 22 — expected rc=0/0, consecutive_rework_count=2, a WARNING naming ${UNREADABLE_PATH_22}; got rc=${rc22_1}/${rc22_3}"
+  report_conjuncts \
+    "rc22_1==0 (write_audit for feat/old exit code, actual=${rc22_1})" "${c22_rc1}" \
+    "rc22_3==0 (write_audit for feat/new exit code, actual=${rc22_3})" "${c22_rc3}" \
+    "JSON22 exists at ${JSON22}" "${c22_file}" \
+    "consecutive_rework_count==2 in JSON22 (actual: $([[ "${c22_file}" == "1" ]] && { grep -o '"consecutive_rework_count":[^,}]*' "${JSON22}" 2>/dev/null || echo '<field missing>'; } || echo '<file missing>'))" "${c22_count}" \
+    "stderr contains 'WARNING: could not read prior audit record' (out22_3 had WARNING line: $(echo "${out22_3}" | grep 'WARNING' || echo '<none>'))" "${c22_warn}" \
+    "WARNING names ${UNREADABLE_PATH_22} (out22_3 had WARNING line: $(echo "${out22_3}" | grep 'WARNING' || echo '<none>'))" "${c22_path}"
   echo "${out22_1}" | sed 's/^/      /'
   echo "${out22_3}" | sed 's/^/      /'
   [[ -f "${JSON22}" ]] && echo "      json: $(cat "${JSON22}")"
@@ -2842,6 +2893,61 @@ EOF
       fail "scenario 42 — expected direct _glob_count call against a missing dir to print '0' and exit 0; got rc=${rc42} output=${out42}"
     fi
   fi
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 43 — report_conjuncts contract pin, DIRECT invocation
+# (H-AUDIT-REPORT-CONJUNCTS-UNPINNED)
+#
+# report_conjuncts() is the multi-conjunct diagnostic helper scenarios 21/22
+# call from their `else` branch (see its docstring above, ~line 43) -- but
+# that branch only runs when scenario 21/22 itself FAILS, which never
+# happens on a green tree. Nothing in this suite previously exercised
+# report_conjuncts directly, so its own correctness rested entirely on
+# manual mutation testing done once during behavioral review of #2440 and
+# never re-run automatically -- the diagnostic this PR exists to add was
+# itself unpinned. This scenario calls report_conjuncts DIRECTLY with known
+# conjunct data and checks its stderr, so a regression in the helper turns
+# this suite red instead of silently degrading diagnostics back to the
+# pre-#2440 baseline.
+#
+# Verified (by hand, via mutation) to catch all three shapes a broken
+# report_conjuncts could take:
+#   - a silent no-op (early `return 0`) -- no "conjunct FAILED" lines at
+#     all, caught by c43_b_reported/c43_d_reported/c43_line_count.
+#   - the polarity test inverted (`[[ "$2" == "0" ]]` instead of `== "1"`)
+#     -- passing conjuncts get reported as failed and failing ones go
+#     silent, caught by all four label checks (c43_a_silent/c43_b_reported/
+#     c43_c_silent/c43_d_reported).
+#   - `shift 1` instead of `shift 2` -- mis-pairs every label with the
+#     wrong value; individual label text can coincidentally still appear
+#     (the mis-pairing happens to realign on this 4-conjunct fixture), but
+#     it also emits bogus extra lines, so c43_line_count (exact count of
+#     "conjunct FAILED" lines == 2) catches it where label-text matching
+#     alone would not.
+# ---------------------------------------------------------------------------
+out43="$(report_conjuncts \
+  "conjunct A (should pass)" "1" \
+  "conjunct B (should fail)" "0" \
+  "conjunct C (should pass)" "1" \
+  "conjunct D (should fail)" "0" 2>&1 1>/dev/null)"
+
+c43_b_reported=1; echo "${out43}" | grep -qF "conjunct FAILED: conjunct B (should fail)" || c43_b_reported=0
+c43_d_reported=1; echo "${out43}" | grep -qF "conjunct FAILED: conjunct D (should fail)" || c43_d_reported=0
+c43_a_silent=1; echo "${out43}" | grep -qF "conjunct FAILED: conjunct A (should pass)" && c43_a_silent=0
+c43_c_silent=1; echo "${out43}" | grep -qF "conjunct FAILED: conjunct C (should pass)" && c43_c_silent=0
+c43_line_count=1; [[ "$(echo "${out43}" | grep -c 'conjunct FAILED')" == "2" ]] || c43_line_count=0
+
+if [[ "${c43_b_reported}${c43_d_reported}${c43_a_silent}${c43_c_silent}${c43_line_count}" == "11111" ]]; then
+  pass "scenario 43 — report_conjuncts reports exactly the failed conjuncts by label, stays silent on passing ones (H-AUDIT-REPORT-CONJUNCTS-UNPINNED)"
+else
+  fail "scenario 43 — expected report_conjuncts to report ONLY conjunct B and conjunct D as FAILED (2 lines total); got:"
+  echo "${out43}" | sed 's/^/      /'
+  [[ "${c43_b_reported}" == "0" ]] && echo "      conjunct FAILED: 'conjunct B (should fail)' missing from output"
+  [[ "${c43_d_reported}" == "0" ]] && echo "      conjunct FAILED: 'conjunct D (should fail)' missing from output"
+  [[ "${c43_a_silent}" == "0" ]] && echo "      conjunct A (should pass) was wrongly reported as FAILED"
+  [[ "${c43_c_silent}" == "0" ]] && echo "      conjunct C (should pass) was wrongly reported as FAILED"
+  [[ "${c43_line_count}" == "0" ]] && echo "      expected exactly 2 'conjunct FAILED' lines, got $(echo "${out43}" | grep -c 'conjunct FAILED')"
 fi
 
 # ---------------------------------------------------------------------------

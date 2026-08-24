@@ -953,3 +953,115 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   subdirectory with a correct row would not be misreported as missing.
   Verify: `sh trading/devtools/checks/backtest_appendix_drift_check_test.sh`
   (prints "all 9 scenarios passed").
+
+## Added 2026-08-24 (harness-maintainer, harness/audit-scenario22-diagnosability-2440, issue #2440)
+
+- [x] **Scenario 22 (and sibling scenario 21) failure diagnosability** —
+  issue #2440 reported that scenario 22 of
+  `trading/devtools/checks/record_qc_audit_test.sh` failed in the
+  `build-and-test` CI job with only `rc=0/0` in the message, unable to say
+  which of the `if`'s remaining conjuncts broke. Re-measured first: on
+  this run's runner (`main@2b11c60d`, GNU grep 3.7, Ubuntu), scenario 22
+  did **not** reproduce — `bash trading/devtools/checks/record_qc_audit_test.sh`
+  → `record_qc_audit_test: 60 passed, 0 failed`, exit 0, matching the
+  orchestrator's own pre-dispatch measurement. So the fix here addresses
+  the diagnosability gap the issue asked for; it does not (and cannot)
+  confirm the original CI failure's exact trigger, which never
+  reproduced locally.
+  Added a `report_conjuncts()` helper (next to `pass`/`fail`) that takes
+  alternating `<label> <0-or-1>` pairs and prints one
+  `conjunct FAILED: <label>` line per broken conjunct — the label carries
+  the actual observed value, not just the restated expectation (e.g.
+  `"consecutive_rework_count==2 in JSON22 (actual: \"consecutive_rework_count\": 1)"`).
+  Rewrote scenarios 21 and 22 (the two H-PREV-VERDICT-PIPEFAIL siblings —
+  21 is the silent-skip/no-warning case, 22 is the loud-WARNING case) to
+  evaluate each conjunct into a named `0`/`1` variable first, combine them
+  via string concatenation instead of a literal `&&` chain, and call
+  `report_conjuncts` from the `else` branch on failure. Both scenarios
+  still pass unchanged (60/60 green).
+  **Mutation-tested every conjunct** via a standalone driver (not
+  committed — built in `/tmp`, applied mutations only to a **copy** of
+  `write_audit.sh`, real source untouched throughout): for scenario 22,
+  6 mutations (bad first-call arg, bad third-call arg, broken
+  `CONSECUTIVE` increment, dropped `WARNING` line, `WARNING` without the
+  path) each produced a `report_conjuncts` output naming exactly the
+  conjunct(s) that mutation breaks, with the actual observed value
+  inline — confirmed no false positives/negatives across all 6. Same for
+  scenario 21 (2 mutations: broken increment, spurious `WARNING` on the
+  tolerated exit-1 path) — both correctly isolated to the right conjunct.
+- [x] **Latent bug found while diagnosing: `write_audit.sh`'s
+  `consecutive_rework_count` scan silently loses records when `ls -1
+  glob` matches only ONE entry and that entry is a directory** — verified
+  live on this runner (not fixed here; filed below). The scan does
+  `for f in $(ls -1 "$AUDIT_DIR"/*-"$FEATURE".json 2>/dev/null || true)`.
+  GNU `ls`'s output format for this changes with the NUMBER and TYPE of
+  glob matches: with 2+ matches including a directory, `ls -1` prints a
+  `<dirname>:` header line (colon-suffixed) for the directory entry,
+  which the `for` loop's word-splitting picks up as a bogus filename
+  (verified: the real WARNING text scenario 22 currently produces reads
+  `...unreadable-record-warns.json: (grep exit 2)` — note the trailing
+  colon before ` (grep exit 2)`, from `ls`'s header format, not the real
+  path; `grep -qF` in the test still matches because it's a substring
+  check). But when the glob matches ONLY the directory (no sibling
+  record file present), `ls -1 <dir>` lists the directory's CONTENTS
+  (empty), producing **zero words** — the `for` loop never iterates, the
+  directory-shaped record is invisible to the scan entirely, no WARNING
+  fires, and `consecutive_rework_count` comes out silently
+  under-counted. Reproduced directly: with only the unreadable directory
+  present (no `feat/old` sibling), the third `write_audit.sh` call
+  returns `consecutive_rework_count=1` with **no** WARNING at all —
+  exactly the "unsafe direction" (silently under-counting the escalation
+  streak) H-PREV-VERDICT-PIPEFAIL's own design note says must never
+  happen silently. This is a genuine, environment-**independent**
+  fragility (same GNU coreutils `ls` this whole run), distinct from the
+  issue's suspected grep-behavior-differs-across-images cause, and a
+  stronger candidate explanation for a future occurrence of #2440 than
+  pure image drift — but it requires a specific state shape (audit dir
+  has ONLY a directory-shaped record for a feature, no sibling file) that
+  the CURRENT scenario 22 fixture never produces (it always seeds the
+  `feat/old` sibling file first), so it does not explain the originally
+  reported failure either. **Filed as a follow-up below rather than
+  fixed here** — the fix (replace the `ls -1 glob` enumeration with a
+  `find`-based one that doesn't depend on `ls`'s multi-arg formatting)
+  is a real behavior change to a carefully-reviewed H-PREV-VERDICT-PIPEFAIL
+  code path and deserves its own PR + its own regression scenario, not a
+  bundled fix inside a test-diagnosability PR.
+- [x] **Survey of other blind multi-conjunct assertions** — grepped
+  `record_qc_audit_test.sh` for `if (...) && (...) && ...; then` shaped
+  assertions across all scenarios: **~50 `if` blocks combine 2 or more
+  `&&`-joined conjuncts under one pass/fail**, the same diagnosability gap
+  #2440 flagged for scenario 22. A crude line-count survey is unreliable
+  here (false `&&` matches inside embedded strings, e.g. scenario 23's
+  `bash -c 'umask 077 && exec "$0" "$@"'` throws off any naive grep/awk
+  count), so no attempt was made to produce an exact per-scenario count —
+  that would need a manual per-block read, which is out of scope for this
+  PR per the bounded-scope instruction. Fixed the two directly implicated
+  by #2440 (scenarios 21/22, above); the remaining ~48 are filed as a
+  tracked follow-up item immediately below rather than bulk-edited here.
+
+- [ ] **Follow-up: apply `report_conjuncts()` to the remaining multi-conjunct
+  assertions in `record_qc_audit_test.sh`** (filed 2026-08-24, from the
+  survey above). `report_conjuncts()` now exists in the file (added by
+  the #2440 diagnosability fix) and is proven correct by mutation testing
+  on scenarios 21/22. Apply the same pattern to the highest-conjunct-count
+  remaining scenarios first (spot-checked candidates in the 5-8 conjunct
+  range exist throughout the file — re-verify exact counts by hand per
+  block, the crude grep/awk survey above is not reliable for this). Do
+  this as its own PR, scenario-by-scenario, each with its own
+  mutation-test proof per the standard this file's H-PREV-VERDICT-PIPEFAIL
+  entry and the #2440 fix were held to — don't bulk-transform without
+  per-conjunct verification.
+- [ ] **Follow-up: `write_audit.sh` `consecutive_rework_count` scan's
+  `ls -1 glob` fragility** (filed 2026-08-24, found while diagnosing
+  #2440 — see above). Replace `for f in $(ls -1
+  "$AUDIT_DIR"/*-"$FEATURE".json 2>/dev/null || true)` with a `find`-based
+  enumeration (e.g. `find "$AUDIT_DIR" -maxdepth 1 -name "*-$FEATURE.json"
+  -print`) that does not depend on `ls`'s multi-argument, mixed
+  file/directory formatting. Needs a new regression scenario that seeds
+  ONLY a directory-shaped record (no sibling file) for a feature and
+  asserts the WARNING still fires with the correct (non-colon-suffixed)
+  path and the streak is still safely skipped, not silently dropped.
+  Verify current behavior first with:
+  `mkdir -p "$AUDIT_DIR/<date>-feat-x-<feature>.json"` as the ONLY match
+  for that feature, then call `write_audit.sh` — currently produces
+  `consecutive_rework_count` one lower than expected with zero WARNING.
