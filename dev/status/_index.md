@@ -4,55 +4,42 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-23 (orchestrator run 32625658534; main `e64f8655` ->
-`4141beda`). **The queue was EMPTY, not saturated** — zero open PRs at start,
-which is maximum dispatch capacity, so the Step 0.5 fast-exit was correctly
-declined on its own precondition. Three tracks dispatched, three PRs opened,
-**two merged**: **#2493** (7 stale status files reconciled — pacer rec #6
-discharged, #7 partial) and **#2492** (**#2486** stop-ratchet freeze CONFIRMED
-as a *provable deadlock* and fixed default-off). **#2494** (appendix-drift
-linter) is mid QC-rework 1/2.
+Last updated: 2026-08-24 (orchestrator run 32702560562; main `2b11c60d` ->
+`90455866`). **Queue empty again at start** — zero open PRs, so the Step 0.5
+fast-exit was correctly declined on its own A-FASTEXIT-VACUOUS precondition for
+the second run running. Three tracks dispatched, three PRs opened, **two merged**
+(**#2504**, **#2507**); **#2505** is held by a stale QC rule (#2508).
 
-**The finding worth carrying:** #2486 is real and stronger than filed — for a
-long in `Trailing`, `reachable_stop <= A0 x (1 - trailing_stop_buffer_pct)` is
-monotone non-increasing, so once it sits at or below the installed stop the
-machine can never raise, never reset the anchor, and never recover. A rising MA
-cannot rescue it (it enters through a dominated `min`). Fallback stops trip this
-whenever the entry bar's low is >1.09% below entry — near-certain weekly.
-Default-off fix verified byte-identical against merge-base over 20,000 `update`
-calls. The **real-data half is owned by the local session** (#2486+#2489+#2490
-share one instrumented 26y run) — see the scope fence on #2492.
+**The finding worth carrying: all three of #2503's named suspects are cleared at
+the code level.** #2503 (P1, filed 06:29Z today) reports main's default path
+changed — same config, same warehouse, 305.25 -> 243.06 return, divergent entered
+symbol set from the first weeks of 2000. Two differential harnesses were built
+against the merge-bases and both came back byte-identical: **#2505** cleared
+#2492's `Stop_geometry` extraction over **4,968 public-API calls** (`cmp` exit 0,
+md5 `ef99e0c1...`), and **#2507** cleared #2500 + #2501 over the selection path at
+three commits (`cmp` exit 0 on all three pairs). **The leading remaining
+hypothesis is baseline provenance** — the funding-grid run committed no
+`params.sexp`, so its `code_version` is *inferred, not recorded*, and the
+"verbatim config clone" may be compared against a run from a different commit.
+#2503's own bisect plan anticipates this. **Do not spend container time
+re-auditing the stops.**
 
-**Also:** qc-behavioral caught a **fourth** instance of this repo's recurring
-vacuous-pass defect on #2494 *before* it shipped (a later `## Appendix B` row
-silently credited a nonexistent subdir) — the pacer's rec #9 pattern, caught by
-the gate rather than by a follow-up PR.
+**Both differentials now land as permanent `runtest` pins**, so this class of
+question is answerable by CI rather than by a multi-hour bisect.
 
-**Two findings worth carrying.** #2462's behavioral review found **the same
-disease surviving inside its own fix** — `walk`'s `| exception _ -> ()` still
-drops unreadable dirs silently (820 files -> 520, still exit 0), while the
-docstring claims the run is "never a silent OK". #2462 was merged 44s after that
-NEEDS_REWORK; the rework landed separately as #2464. And the
-**concurrent QC pipeline (#2432) is confirmed again** — a second behavioral review
-landed on #2462 **9 seconds** after mine, at the same SHA, with the opposite
-verdict. I adjudicated for NEEDS_REWORK because the APPROVED never examined the
-path the other demonstrated a defect in.
+**Governance finding — qc-structural's A2 row is factually stale (issue #2508).**
+It allow-lists `analysis/` -> `trading/trading/` imports only under `backtest/**`,
+but 16 non-backtest dirs already declare `weinstein.*`, and the row as written
+would **FAIL main itself** on `types` and `indicators.*`. It produced a false A2
+FAIL on #2505. **Deliberately filed, not fixed:** `.claude/rules/**` is
+permission-protected, and amending the QC authority to clear a FAIL on this run's
+own PR is a conflict of interest a human should adjudicate.
 
-**Correction to run 1's own guidance:** `mergeable_state: unknown` is **not** a
-tell that a PR closed under you — 3 of 3 open PRs sampled this run returned
-`unknown` on a cold read and resolved on the next (GitHub computes it lazily).
-Filed as `A-MERGEABLE-STATE-NOT-A-CLOSE-TELL`. Run 1's *other* control — read
-`state`/`merged`/`merged_at` directly — stands, and both merges this run used it.
-Full narrative: `dev/daily/2026-08-21-run2.md`.
-
-**Carried context (2026-08-19 PM, still current):** #2384's clock-26 promotion
-was **reverted** by #2397 after the sp500 golden regressed −40.91pp; the cron had
-merged it 30 minutes after it was drafted under an explicit hold. Draft status is
-not a hold, which is why #2402 added the `do-not-merge` label the gate script
-enforces — **but `lead-orchestrator.md` still contains neither a label check nor
-the draft-as-hold rule, and still tells the orchestrator to flip drafts to ready
-(Step 5 Stage 3).** The tooling is ahead of the spec. The mechanism itself is not
-dead: re-flip framed in #2405, better discriminator in #2407. Open: #2413.
+**Audit defect, corrected by hand (issue #2509).** `record_qc_audit.sh` file mode
+inverts verdicts on any *reworked* PR: #2504 merged with both gates APPROVED and
+was recorded `NEEDS_REWORK`. Positional "first/last `## Verdict`" extraction
+breaks once a review file holds two passes. Sibling of last run's
+`A-AUDIT-REWORK-SHA-STALE` — the `sha` field is now correct; the verdict is not.
 
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
@@ -92,7 +79,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [decision-audit](decision-audit.md) | MERGED | feat-backtest | — | #1799/#1806/#1811 MERGED (report+counterfactual+weekly-picks adapter); selection FAITHFUL; live-picks pipeline ready (#1812); next: matured weekly counterfactual |
 | [optimal-strategy](optimal-strategy.md) | MERGED | — | — | — |
 | [all-eligible](all-eligible.md) | MERGED | — | — | — |
-| [support-floor-stops](support-floor-stops.md) | IN_PROGRESS | feat-weinstein | — | #2486 ratchet-freeze CONFIRMED + fixed default-off, MERGED #2492 `4141beda`; next: H1 `_ratchet_tightened` twin defect |
+| [support-floor-stops](support-floor-stops.md) | IN_PROGRESS | feat-weinstein | #2505 | #2505 stops differential pin: #2492 exonerated for #2503 (4,968 calls byte-identical); blocked on A2 rule fix #2508 |
 | [short-side-strategy](short-side-strategy.md) | IN_PROGRESS | feat-weinstein | — | #2081 robust dollar-ADV (#2060) MERGED `9670e49a`; next: short-leg regime-P&L decomposition (LOCAL) |
 | [extension-stop](extension-stop.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | arming + insurance-ACCEPT MERGED (#1960, ext_stop 2.0/0.25, default-off); next: default-flip only on further insurance-ACCEPT (R3, human-gated) |
 | [decline-character](decline-character.md) | MERGED | — | — | WORKSTREAM EXHAUSTED (#1739); closed in #2493 after 8 pacer asks; one EODHD-gated item to re-home |
@@ -101,13 +88,13 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2494 | #2456 gate-reader MERGED 08-22 (human call on `unclear` made); #2494 appendix-drift check in QC rework 1/2 |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2504 scenario-21/22 diagnosability MERGED `1b6a7ae8` after rework 1/2; next: #2509 audit verdict inversion |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | A-MERGEABLE-STATE-NOT-A-CLOSE-TELL filed (run-1 guidance corrected); open: #2427 #2428 #2429 #2432 — need `workflow` scope or a human |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | `design_doc_drift_mechanization` mechanized via #2494 (harness scope); top item `linter_coverage` is a HUMAN POLICY DECISION |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
-| [screener](screener.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | local-range entry anchor MERGED #2217 (default-off axis `entry_anchor_local_range_weeks`); next: re-run honest ladder with local-top-E arms, then WF-CV |
+| [screener](screener.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | #2507 selection differential MERGED `90455866`: #2500/#2501 exonerated for #2503; next: honest ladder w/ local-top-E arms |
 | [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | clock-26 REVERTED to 0 by #2397 (golden −40.91pp); re-flip framed in #2405, superseded discriminator in #2407; next: base-held measurement |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |

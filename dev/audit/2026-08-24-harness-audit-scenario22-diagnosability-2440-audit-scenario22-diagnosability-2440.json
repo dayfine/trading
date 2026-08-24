@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-24",
+  "feature": "audit-scenario22-diagnosability-2440",
+  "branch": "harness/audit-scenario22-diagnosability-2440",
+  "sha": "6b979c77",
+  "recorded_at_ns": 1787564194834728285,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "Rework iter 1 of 2. Verdicts at final tip 6b979c77: structural APPROVED (5), behavioral APPROVED (4). Merged 1b6a7ae8. CORRECTED BY HAND: record_qc_audit.sh file-mode extraction inverted structural/overall to NEEDS_REWORK by reading the first-pass 07abcc99 verdict block out of a multi-pass review file (new defect, A-AUDIT-REWORK-VERDICT-STALE; sibling of last run's A-AUDIT-REWORK-SHA-STALE, which was the sha field and is now correct)."
+}

@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-24",
+  "feature": "screener-refactor-differential-2503",
+  "branch": "fix/screener-refactor-differential-2503",
+  "sha": "25b4f550",
+  "recorded_at_ns": 1787568187462885056,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "Rework iter 1 of 2. Verdicts at final reviewed tip 25b4f550: structural APPROVED (5), behavioral APPROVED (4). Merged 90455866 after update-branch to 532f7e50 (reviewed-surface intersection with what main gained empty, so verdicts hold in substance). Written explicitly rather than via record_qc_audit.sh file mode, which inverts verdicts on reworked PRs (#2509)."
+}
