@@ -84,28 +84,32 @@ let _vol_ratio ~params ~bars ~idx =
   if Float.( <= ) mean 0.0 then Float.nan
   else Float.of_int bars.(idx).Bar.volume /. mean
 
-let _median (xs : float array) =
-  if Array.is_empty xs then Float.nan
-  else
-    let sorted = Array.copy xs in
-    Array.sort sorted ~compare:Float.compare;
-    let n = Array.length sorted in
-    if n % 2 = 1 then sorted.(n / 2)
-    else (sorted.((n / 2) - 1) +. sorted.(n / 2)) /. 2.0
+let _median_of_nonempty (xs : float array) =
+  let sorted = Array.copy xs in
+  Array.sort sorted ~compare:Float.compare;
+  let n = Array.length sorted in
+  if n % 2 = 1 then sorted.(n / 2)
+  else (sorted.((n / 2) - 1) +. sorted.(n / 2)) /. 2.0
+
+let _median xs = if Array.is_empty xs then Float.nan else _median_of_nonempty xs
 
 (* Walk back from [idx - 1] while each close stays within [±base_band_pct] of
    one fixed reference — the median close over the trailing window. Stops at the
    first week outside the band, or at bar 0. *)
 let _base_weeks ~params ~bars ~idx =
   let lo = _window_lo ~params ~idx in
-  let closes = Array.init (idx - lo) ~f:(fun k -> bars.(lo + k).Bar.close_price) in
+  let closes =
+    Array.init (idx - lo) ~f:(fun k -> bars.(lo + k).Bar.close_price)
+  in
   let median = _median closes in
   if Float.is_nan median then 0
   else
     let tolerance =
       Float.abs (median *. params.base_band_pct /. _percent_scale)
     in
-    let in_band j = Float.( <= ) (Float.abs (bars.(j).Bar.close_price -. median)) tolerance in
+    let in_band j =
+      Float.( <= ) (Float.abs (bars.(j).Bar.close_price -. median)) tolerance
+    in
     let j = ref (idx - 1) in
     while !j >= 0 && in_band !j do
       decr j
@@ -157,19 +161,21 @@ let _passes_price_volume_gate ~params ~bars ~idx =
   && Float.( > ) bars.(idx).Bar.close_price (_prior_high ~params ~bars ~idx)
   && Float.( >= ) (_vol_ratio ~params ~bars ~idx) params.min_vol_ratio
 
+let _breakout_of ~params ~bars ~idx features =
+  {
+    week_date = bars.(idx).Bar.date;
+    close = bars.(idx).Bar.close_price;
+    features;
+    forward = forward_run_at ~params ~bars ~idx;
+  }
+
 let _breakout_at ~params ~stage_config ~bars ~idx =
-  match features_at ~params ~stage_config ~bars ~idx with
-  | Some features when _is_stage2 features.stage ->
-      Some
-        {
-          week_date = bars.(idx).Bar.date;
-          close = bars.(idx).Bar.close_price;
-          features;
-          forward = forward_run_at ~params ~bars ~idx;
-        }
-  | Some _ | None -> None
+  features_at ~params ~stage_config ~bars ~idx
+  |> Option.filter ~f:(fun features -> _is_stage2 features.stage)
+  |> Option.map ~f:(_breakout_of ~params ~bars ~idx)
 
 let scan ~params ~stage_config ~bars =
   List.range 0 (Array.length bars)
   |> List.filter ~f:(fun idx -> _passes_price_volume_gate ~params ~bars ~idx)
-  |> List.filter_map ~f:(fun idx -> _breakout_at ~params ~stage_config ~bars ~idx)
+  |> List.filter_map ~f:(fun idx ->
+      _breakout_at ~params ~stage_config ~bars ~idx)

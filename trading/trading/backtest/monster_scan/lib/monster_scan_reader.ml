@@ -28,7 +28,8 @@ let symbols ~snapshot_dir =
         (Printf.sprintf "monster_scan: cannot list %s: %s" snapshot_dir msg)
   | entries ->
       Array.to_list entries
-      |> List.filter_map ~f:(fun e -> Filename.chop_suffix_opt ~suffix:_snap_ext e)
+      |> List.filter_map ~f:(fun e ->
+          Filename.chop_suffix_opt ~suffix:_snap_ext e)
       |> List.sort ~compare:String.compare
       |> Result.return
 
@@ -48,6 +49,5 @@ let weekly_bars ~snapshot_dir ~symbol =
     if List.is_empty daily then [||]
     else
       List.map daily ~f:Snapshot_pipeline.Adjusted_basis.to_adjusted_basis
-      |> Array.of_list
-      |> Snapshot_pipeline.Weekly_prefix.build
+      |> Array.of_list |> Snapshot_pipeline.Weekly_prefix.build
       |> fun prefix -> prefix.Snapshot_pipeline.Weekly_prefix.finalized

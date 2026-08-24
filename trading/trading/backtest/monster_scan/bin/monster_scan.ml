@@ -8,7 +8,6 @@
 
    No strategy config, no goldens, no writes outside --out. *)
 open Core
-
 module Analytics = Monster_scan_lib.Monster_scan_analytics
 module Reader = Monster_scan_lib.Monster_scan_reader
 
@@ -40,7 +39,8 @@ let _breakout_row ~symbol (b : Analytics.breakout) =
 let _breakout_header =
   "symbol,week_date,close,prior_high_26w,vol_ratio,ma30,base_weeks,fwd_max_close,fwd_run_pct,weeks_to_max"
 
-let _pairs_header = "symbol,date,vol_ratio_at_date,base_weeks_at_date,stage_at_date"
+let _pairs_header =
+  "symbol,date,vol_ratio_at_date,base_weeks_at_date,stage_at_date"
 
 let _selected_symbols ~snapshot_dir ~symbols =
   match symbols with
@@ -69,7 +69,7 @@ let _scan_symbol ~params ~stage_config ~snapshot_dir ~start ~end_ ~symbol =
   | Some bars ->
       Analytics.scan ~params ~stage_config ~bars
       |> List.filter ~f:(fun (b : Analytics.breakout) ->
-             _in_window ~start ~end_ b.week_date)
+          _in_window ~start ~end_ b.week_date)
       |> List.map ~f:(_breakout_row ~symbol)
 
 let _emit ~out ~header rows =
@@ -99,10 +99,10 @@ let _pair_row ~params ~stage_config ~snapshot_dir ~symbol ~date =
       symbol;
       Date.to_string date;
       _opt_f (Option.map features ~f:(fun f -> f.Analytics.vol_ratio));
-      Option.value_map features ~default:""
-        ~f:(fun f -> Int.to_string f.Analytics.base_weeks);
-      Option.value_map features ~default:""
-        ~f:(fun f -> Analytics.stage_label f.Analytics.stage);
+      Option.value_map features ~default:"" ~f:(fun f ->
+          Int.to_string f.Analytics.base_weeks);
+      Option.value_map features ~default:"" ~f:(fun f ->
+          Analytics.stage_label f.Analytics.stage);
     ]
 
 let _parse_pair line =
@@ -151,10 +151,12 @@ let command =
        flag "-snapshot-dir" (required string)
          ~doc:"DIR snapshot warehouse holding SYM.snap panels"
      and start =
-       flag "-start" (optional_with_default "1990-01-01" string)
+       flag "-start"
+         (optional_with_default "1990-01-01" string)
          ~doc:"DATE earliest breakout week to emit (ignored with -pairs)"
      and end_ =
-       flag "-end" (optional_with_default "2100-01-01" string)
+       flag "-end"
+         (optional_with_default "2100-01-01" string)
          ~doc:"DATE latest breakout week to emit (ignored with -pairs)"
      and out = flag "-out" (required string) ~doc:"FILE CSV output path"
      and pairs =
@@ -165,8 +167,8 @@ let command =
          ~doc:"SYM,SYM restrict the scan to these symbols (default: all)"
      and breakout_lookback_weeks =
        flag "-breakout-lookback-weeks"
-         (optional_with_default
-            Analytics.default_params.breakout_lookback_weeks int)
+         (optional_with_default Analytics.default_params.breakout_lookback_weeks
+            int)
          ~doc:"N trailing weeks for the prior high and average volume"
      and min_vol_ratio =
        flag "-min-vol-ratio"

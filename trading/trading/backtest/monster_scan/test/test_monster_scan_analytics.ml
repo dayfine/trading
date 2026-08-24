@@ -48,7 +48,8 @@ let _features_at bars idx =
    new-high weeks around it, so "exactly one breakout, at week 70" pins both the
    price test and the volume test at once. *)
 let test_scan_fires_on_the_constructed_week _ =
-  assert_that (_scan (_breakout_series ()))
+  assert_that
+    (_scan (_breakout_series ()))
     (elements_are
        [
          all_of
@@ -71,7 +72,9 @@ let test_scan_fires_on_the_constructed_week _ =
 
 (* A new high on quiet volume is not a breakout: same series, volume flattened. *)
 let test_scan_requires_volume_confirmation _ =
-  let bars = _series ~n:76 ~close:_rising_close ~volume:(fun _ -> _quiet_volume) in
+  let bars =
+    _series ~n:76 ~close:_rising_close ~volume:(fun _ -> _quiet_volume)
+  in
   assert_that (_scan bars) (size_is 0)
 
 (* Ratio is week volume over the mean of the [_lookback] weeks before it. All
@@ -125,11 +128,14 @@ let test_forward_run_measures_the_horizon_max _ =
     (_forward_run bars ~idx:_breakout_week ~fwd_weeks)
     (all_of
        [
-         field (fun (r : Analytics.forward_run) -> r.fwd_max_close)
+         field
+           (fun (r : Analytics.forward_run) -> r.fwd_max_close)
            (float_equal peak);
-         field (fun (r : Analytics.forward_run) -> r.fwd_run_pct)
+         field
+           (fun (r : Analytics.forward_run) -> r.fwd_run_pct)
            (float_equal (((peak /. entry) -. 1.0) *. 100.0));
-         field (fun (r : Analytics.forward_run) -> r.weeks_to_max)
+         field
+           (fun (r : Analytics.forward_run) -> r.weeks_to_max)
            (equal_to fwd_weeks);
        ])
 
@@ -158,9 +164,7 @@ let test_index_for_date_is_exact_on_a_week_end _ =
 
 let test_index_for_date_after_the_series_is_none _ =
   let bars = _breakout_series () in
-  assert_that
-    (Analytics.index_for_date ~bars ~date:(_week_date 500))
-    is_none
+  assert_that (Analytics.index_for_date ~bars ~date:(_week_date 500)) is_none
 
 let suite =
   "monster_scan_analytics"

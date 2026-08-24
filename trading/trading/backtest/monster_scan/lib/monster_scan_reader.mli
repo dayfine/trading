@@ -16,7 +16,9 @@ val symbols : snapshot_dir:string -> string list Status.status_or
     read. *)
 
 val weekly_bars :
-  snapshot_dir:string -> symbol:string -> Types.Daily_price.t array Status.status_or
+  snapshot_dir:string ->
+  symbol:string ->
+  Types.Daily_price.t array Status.status_or
 (** [weekly_bars ~snapshot_dir ~symbol] reads [<snapshot_dir>/<symbol>.snap] and
     returns its complete ISO weeks, chronological oldest first, on the adjusted
     price basis (open/high/low rescaled by [adjusted_close /. close];

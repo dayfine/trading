@@ -4,8 +4,9 @@
 
     {b Rule-visible.} Every quantity in {!features} reads bars at indices
     [<= idx] only — the information set the screener holds at that week's close.
-    {!forward_run} deliberately DOES look forward: it is what defines the ex-post
-    monster set capture is measured against, and it never feeds {!features_at}.
+    {!forward_run} deliberately DOES look forward: it is what defines the
+    ex-post monster set capture is measured against, and it never feeds
+    {!features_at}.
 
     {b Classifier.} The production {!Stage.classify} is reused, not
     reimplemented, so [Stage2] means what it means to the screener and [ma30] is
@@ -78,8 +79,8 @@ type forward_run = {
       (** [(fwd_max_close /. close(idx) - 1.) * 100.]. [Float.nan] when
           [fwd_max_close] is, or when [close(idx)] is not positive. *)
   weeks_to_max : int;
-      (** Number of weekly bars from [idx] to the bar achieving
-          [fwd_max_close]; [0] when there is no forward bar. *)
+      (** Number of weekly bars from [idx] to the bar achieving [fwd_max_close];
+          [0] when there is no forward bar. *)
 }
 (** Ex-post outcome of a week. Hindsight by construction — this is the estimand
     (#2490 measures capture of ex-post winners), never a detection input. *)
@@ -107,10 +108,7 @@ val features_at :
     Pure function. *)
 
 val forward_run_at :
-  params:params ->
-  bars:Types.Daily_price.t array ->
-  idx:int ->
-  forward_run
+  params:params -> bars:Types.Daily_price.t array -> idx:int -> forward_run
 (** [forward_run_at ~params ~bars ~idx] measures the forward run following
     weekly bar [idx], over at most [params.fwd_weeks] following bars. Looks
     forward; see {!forward_run}. Pure function. *)

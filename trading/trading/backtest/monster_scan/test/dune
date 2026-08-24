@@ -1,12 +1,6 @@
 (tests
  (names test_monster_scan_analytics)
  (modules test_monster_scan_analytics)
- (libraries
-  core
-  matchers
-  monster_scan_lib
-  ounit2
-  types
-  weinstein.stage)
+ (libraries core matchers monster_scan_lib ounit2 types weinstein.stage)
  (preprocess
   (pps ppx_jane)))
