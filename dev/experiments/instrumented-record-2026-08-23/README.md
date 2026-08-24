@@ -102,3 +102,14 @@ breakout gate **51.0%** / top-N **36.4%** / grade 0 / admitted 3.5% / held
 sharpens — the remaining breakout-gate share is genuine production strictness,
 not volume-basis mismatch. v1 tables retained for the record; v2 supersedes.
 Full table: issue #2490 comment (v2, 08-24).
+
+## Addendum 4 (08-24) — #2489 pending dimensions
+
+`monster_scan -pairs` (merged tool, 4wk×2.0 book basis) over all four
+populations. Headline: executed fills' FILL-week volume ratio med 1.20×
+(placement week was 2.27×) — only ~15% clear the book's 2× at fill; resting
+StopLimit tickets decouple confirmation from execution, which mechanically
+explains the arc's 72% §4.2 ejection rate. Ejected 0.99 vs kept 1.46 = the
+gate discriminates as designed. base_weeks med 24-35wk everywhere; p25=0 for
+executed/kept (a quarter of entries base-less under the ±15% proxy). Tables:
+`results/feat-{p1,p2eject,p2kept,p3}.csv`; full read: issue #2489 (08-24).
