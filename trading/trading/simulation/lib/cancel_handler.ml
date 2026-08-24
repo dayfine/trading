@@ -53,7 +53,7 @@ let _order_route_key ~symbol ~(side : Trading_base.Types.side) =
   symbol ^ "|" ^ Trading_base.Types.show_side side
 
 let _entry_route_key ~symbol ~(side : Trading_base.Types.position_side) =
-  _order_route_key ~symbol ~side:(match side with Long -> Buy | Short -> Sell)
+  _order_route_key ~symbol ~side:(Fill_router.entry_trade_side side)
 
 (* The position a [CancelEntry] names, if it is still present. Other transition
    kinds resolve to [None]. *)
@@ -136,41 +136,62 @@ let _cancel_exit_transition ~date ~position_id ~symbol : Position.transition =
   let reason = Printf.sprintf "exit fill rejected by portfolio for %s" symbol in
   { position_id; date; kind = CancelExit { reason } }
 
-(** True if [pos] is in the [Exiting] state for [symbol] with no partial fills
-    yet — the stuck-exit signature. A partially-filled exit is deliberately NOT
-    reverted: reverting would resurrect a [Holding] at the full pre-exit
-    quantity while the portfolio already booked the partial cover, desyncing
-    strategy and portfolio. Partial-fill recovery is out of scope; the common
-    (zero-fill) cash-floor rejection is what this handler targets. *)
-let _is_unfilled_exiting_for_symbol ~symbol (pos : Position.t) =
+(** True if [pos] is the position [trade] was the exit fill of: same symbol,
+    [Exiting] with no partial fills yet — the stuck-exit signature — and a trade
+    side that {e closes} a position of [pos]'s side.
+
+    A partially-filled exit is deliberately NOT reverted: reverting would
+    resurrect a [Holding] at the full pre-exit quantity while the portfolio
+    already booked the partial cover, desyncing strategy and portfolio.
+    Partial-fill recovery is out of scope; the common (zero-fill) cash-floor
+    rejection is what this handler targets.
+
+    The side check (#2466) is the same one {!Fill_router} applies when routing
+    accepted fills, for the same reason its header gives: when an entry and an
+    exit coexist on one symbol — sibling positions, e.g. a scale-in add
+    [Entering] while the original [Exiting] — matching on symbol and state alone
+    lets a rejected {e entry} Buy revert the unrelated exit back to [Holding],
+    silently cancelling a stop-out the portfolio never refused. Today the
+    Weinstein strategy blocks that pairing upstream ([Entry_walk.held_symbols]
+    counts [Exiting] as held, so no entry ticket is written for a symbol that is
+    exiting), which is why this is a no-op on every current run rather than a
+    bug fix with a golden behind it. It belongs here regardless: this module is
+    strategy-agnostic and must not depend on a caller's invariant. *)
+let _is_unfilled_exiting_for_trade ~(trade : Trading_base.Types.trade)
+    (pos : Position.t) =
   match pos.state with
   | Exiting { filled_quantity; _ } ->
-      String.equal pos.symbol symbol && Float.equal filled_quantity 0.0
+      String.equal pos.symbol trade.symbol
+      && Float.equal filled_quantity 0.0
+      && Trading_base.Types.equal_side trade.side
+           (Fill_router.exit_trade_side pos.side)
   | _ -> false
 
-(* Revert the first unfilled [Exiting] position matching [symbol] in [acc] back
-   to [Holding] by routing a [CancelExit] transition through the core
+(* Revert the first unfilled [Exiting] position [trade] could be the exit fill
+   of back to [Holding], by routing a [CancelExit] transition through the core
    [Position.apply_transition] (via [apply_to_positions]) — the exit-side mirror
    of the [CancelEntry] path. Leaves [acc] unchanged when there is no matching
-   unfilled-[Exiting] position. The match guard [_is_unfilled_exiting_for_symbol]
-   ensures we only attempt the transition on an unfilled exit; the core
-   [CancelExit] validator is a second backstop (it rejects a partially-filled
-   [Exiting]). On the (unexpected) validator error we leave [acc] unchanged. *)
-let _revert_one ~date ~acc ~symbol =
+   unfilled-[Exiting] position. The match guard [_is_unfilled_exiting_for_trade]
+   ensures we only attempt the transition on an unfilled exit whose side the
+   trade closes; the core [CancelExit] validator is a second backstop (it
+   rejects a partially-filled [Exiting]). On the (unexpected) validator error we
+   leave [acc] unchanged. *)
+let _revert_one ~date ~acc ~(trade : Trading_base.Types.trade) =
   let target =
     Map.to_alist acc
-    |> List.find ~f:(fun (_, pos) ->
-        _is_unfilled_exiting_for_symbol ~symbol pos)
+    |> List.find ~f:(fun (_, pos) -> _is_unfilled_exiting_for_trade ~trade pos)
   in
   match target with
   | None -> acc
   | Some (id, _) -> (
-      let trans = _cancel_exit_transition ~date ~position_id:id ~symbol in
+      let trans =
+        _cancel_exit_transition ~date ~position_id:id ~symbol:trade.symbol
+      in
       match apply_to_positions acc trans with Ok acc' -> acc' | Error _ -> acc)
 
 let revert_rejected_exits ~date ~positions ~rejected_trades =
   List.fold rejected_trades ~init:positions ~f:(fun acc trade ->
-      _revert_one ~date ~acc ~symbol:trade.Trading_base.Types.symbol)
+      _revert_one ~date ~acc ~trade)
 
 (* Apply one trade to the portfolio; tag it accepted (portfolio booked it) or
    rejected (carrying the rejection [err] for the WARN). Routed through the

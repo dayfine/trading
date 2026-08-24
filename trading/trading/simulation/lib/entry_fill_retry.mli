@@ -73,13 +73,23 @@ val handle_rejected_entries :
     and never a ticket left resting with no order behind it:
 
     + [t]'s budget is positive.
-    + Some [Entering] position in [positions] carries the trade's symbol. A
-      refused {e exit} matches none, so it passes straight through — the exit
-      side has its own revert ({!Cancel_handler.revert_rejected_exits}) and must
-      keep seeing the full rejected list.
+    + Some [Entering] position in [positions] carries the trade's symbol {e and}
+      is opened by the trade's side ({!Fill_router.entry_trade_side}: a long
+      ticket rests as a Buy, a short as a Sell). A refused {e exit} matches
+      none, so it passes straight through — the exit side has its own revert
+      ({!Cancel_handler.revert_rejected_exits}) and must keep seeing the full
+      rejected list.
     + That position has spent fewer than [t]'s budget of retries.
     + The refused order is still known to [order_manager] and the re-submitted
       copy is accepted by it.
+
+    The side half of the second condition is a guard added by #2466;
+    symbol-and-state alone would let a refused Sell on a symbol carrying a long
+    ticket spend the ticket's budget and re-submit a copy of the {e exit} order.
+    It is unreachable under the shipped Weinstein strategy, which writes no
+    entry ticket for a symbol it is exiting, and inert at the default budget —
+    but this module is strategy-agnostic and that condition is a contract, so it
+    is enforced rather than assumed.
 
     The copy carries the original's symbol, side, order type (including a
     [StopLimit]'s trigger and cap) and quantity, with a derived id, [Pending]

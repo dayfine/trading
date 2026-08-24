@@ -476,6 +476,21 @@
   matchers))
 
 (test
+ (name test_entry_fill_retry_e2e)
+ (modules test_entry_fill_retry_e2e)
+ (libraries
+  ounit2
+  core
+  trading.simulation
+  trading.simulation.types
+  trading.base
+  trading.engine
+  trading.strategy
+  types
+  matchers
+  simulation_test_helpers))
+
+(test
  (name test_entry_fill_resize)
  (modules test_entry_fill_resize)
  (libraries

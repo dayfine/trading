@@ -147,10 +147,25 @@ val revert_rejected_exits :
 (** [revert_rejected_exits ~date ~positions ~rejected_trades] reverts each
     [Exiting] position whose exit fill was rejected back to [Holding], so the
     stop machinery re-evaluates it next cycle and re-triggers the exit (issue
-    #1553). For each rejected trade it finds the first [Exiting] position
-    matching the trade's symbol {e with [filled_quantity = 0.0]} and reverts it
-    to [Holding] — carrying the [Exiting] state's fields (quantity, entry
-    price/date, risk params), with [last_updated] set to [date].
+    #1553). For each rejected trade it finds the first [Exiting] position that
+    trade could be the exit fill of — same symbol, [filled_quantity = 0.0], and
+    a trade side that {e closes} a position of that side
+    ({!Fill_router.exit_trade_side}: a long is closed by a Sell, a short by a
+    Buy) — and reverts it to [Holding], carrying the [Exiting] state's fields
+    (quantity, entry price/date, risk params), with [last_updated] set to
+    [date].
+
+    {b The side check is a guard, not a behaviour change (#2466).} The caller
+    hands this function the {e whole} rejected-trade list, entries included, so
+    on symbol-and-state matching alone a rejected {e entry} Buy would revert an
+    unrelated [Exiting] sibling on that symbol back to [Holding] — cancelling a
+    stop-out the portfolio never refused. That pairing (an [Entering] and an
+    [Exiting] on one symbol) is unreachable under the shipped Weinstein
+    strategy, which counts [Exiting] as held and writes no entry ticket for such
+    a symbol, so every current run is bit-identical with and without the check.
+    It is enforced here anyway because this module is strategy-agnostic and
+    {!Fill_router} already applies exactly this check when routing the accepted
+    fills — see its header on sibling positions.
 
     A {e partially} filled [Exiting] position is deliberately left untouched:
     reverting it would resurrect a [Holding] at the full pre-exit quantity while

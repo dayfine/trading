@@ -3,8 +3,9 @@
     contracts (matched-symbol [CancelEntry] emit, no-match drop, Closed-removal,
     unknown-id identity) and the exit-side [revert_rejected_exits] contracts
     (#1553): unfilled [Exiting] reverts to [Holding] preserving the stop,
-    partially-filled [Exiting] is left untouched, and a non-[Exiting] match is a
-    no-op. Each contract has one dedicated test below. *)
+    partially-filled [Exiting] is left untouched, a non-[Exiting] match is a
+    no-op, and a wrong-side trade on the symbol is a no-op (#2466). Each
+    contract has one dedicated test below. *)
 
 open OUnit2
 open Core
@@ -97,12 +98,16 @@ let _make_exiting_position ~id ~symbol ?(filled_quantity = 0.0) () : Position.t
     portfolio_lot_ids = [];
   }
 
-let _make_trade ~symbol : Trading_base.Types.trade =
+(* [side] defaults to [Buy], which {e closes} the [Short] position
+   [_make_exiting_position] builds — the shape the exit-revert contracts below
+   assume. Pass [Sell] for the wrong-side case (contract 8). *)
+let _make_trade ?(side = Trading_base.Types.Buy) ~symbol () :
+    Trading_base.Types.trade =
   {
     id = Printf.sprintf "%s-trade-1" symbol;
     order_id = Printf.sprintf "%s-order-1" symbol;
     symbol;
-    side = Trading_base.Types.Buy;
+    side;
     quantity = 100.0;
     price = 50.0;
     commission = 1.0;
@@ -124,7 +129,9 @@ let test_transitions_for_rejected_trades_emits_per_symbol _ =
           _make_entering_position ~id:"QQQ-pos-1" ~symbol:"QQQ";
         ]
   in
-  let rejected = [ _make_trade ~symbol:"SPY"; _make_trade ~symbol:"QQQ" ] in
+  let rejected =
+    [ _make_trade ~symbol:"SPY" (); _make_trade ~symbol:"QQQ" () ]
+  in
   let transitions =
     Cancel_handler.transitions_for_rejected_trades ~date:_build_date ~positions
       ~rejected_trades:rejected
@@ -149,7 +156,7 @@ let test_transitions_for_rejected_trades_drops_no_match _ =
     _positions_with
       ~entries:[ _make_holding_position ~id:"SPY-pos-1" ~symbol:"SPY" ]
   in
-  let rejected = [ _make_trade ~symbol:"SPY" ] in
+  let rejected = [ _make_trade ~symbol:"SPY" () ] in
   let transitions =
     Cancel_handler.transitions_for_rejected_trades ~date:_build_date ~positions
       ~rejected_trades:rejected
@@ -205,7 +212,7 @@ let test_revert_rejected_exits_reverts_unfilled_exiting _ =
     _positions_with
       ~entries:[ _make_exiting_position ~id:"THM-pos-1" ~symbol:"THM" () ]
   in
-  let rejected = [ _make_trade ~symbol:"THM" ] in
+  let rejected = [ _make_trade ~symbol:"THM" () ] in
   let positions =
     Cancel_handler.revert_rejected_exits ~date:_build_date ~positions
       ~rejected_trades:rejected
@@ -242,7 +249,7 @@ let test_revert_rejected_exits_skips_partially_filled _ =
             ~filled_quantity:300.0 ();
         ]
   in
-  let rejected = [ _make_trade ~symbol:"THM" ] in
+  let rejected = [ _make_trade ~symbol:"THM" () ] in
   let positions =
     Cancel_handler.revert_rejected_exits ~date:_build_date ~positions
       ~rejected_trades:rejected
@@ -266,7 +273,7 @@ let test_revert_rejected_exits_ignores_non_exiting _ =
     _positions_with
       ~entries:[ _make_holding_position ~id:"SPY-pos-1" ~symbol:"SPY" ]
   in
-  let rejected = [ _make_trade ~symbol:"SPY" ] in
+  let rejected = [ _make_trade ~symbol:"SPY" () ] in
   let positions =
     Cancel_handler.revert_rejected_exits ~date:_build_date ~positions
       ~rejected_trades:rejected
@@ -280,6 +287,42 @@ let test_revert_rejected_exits_ignores_non_exiting _ =
              (function
                | Position.Holding { quantity; _ } -> Some quantity | _ -> None)
              (float_equal 100.0))))
+
+(** Contract 8 (#2466): a rejected trade on the {e wrong side} for the [Exiting]
+    position sharing its symbol does not revert it. The fixture position is
+    [Short], so its exit fill is a Buy; the [Sell] here is an {e entry} fill (a
+    short ticket opening on the same symbol) that the portfolio refused.
+
+    This is the guard, not a regression: [revert_rejected_exits] is handed the
+    whole rejected list — entries included ([Simulator._settle_rejected_fills]
+    passes [rejected_trades], not the retry-filtered remainder) — so on
+    symbol-and-state matching alone this Sell would cancel a stop-out the
+    portfolio never refused. The [Entering]/[Exiting]-on-one-symbol pairing is
+    unreachable under the shipped Weinstein strategy, which is why no golden
+    moves; the check belongs here because this module is strategy-agnostic and
+    {!Fill_router} already applies it to the accepted fills. *)
+let test_revert_rejected_exits_ignores_wrong_side_trade _ =
+  let positions =
+    _positions_with
+      ~entries:[ _make_exiting_position ~id:"THM-pos-1" ~symbol:"THM" () ]
+  in
+  let rejected =
+    [ _make_trade ~side:Trading_base.Types.Sell ~symbol:"THM" () ]
+  in
+  let positions =
+    Cancel_handler.revert_rejected_exits ~date:_build_date ~positions
+      ~rejected_trades:rejected
+  in
+  assert_that
+    (Map.find positions "THM-pos-1")
+    (is_some_and
+       (field
+          (fun (p : Position.t) -> p.state)
+          (matching ~msg:"Expected position to stay Exiting"
+             (function
+               | Position.Exiting { filled_quantity; _ } -> Some filled_quantity
+               | _ -> None)
+             (float_equal 0.0))))
 
 let suite =
   "Cancel_handler"
@@ -299,6 +342,8 @@ let suite =
          >:: test_revert_rejected_exits_skips_partially_filled;
          "revert_rejected_exits ignores a non-Exiting (Holding) position"
          >:: test_revert_rejected_exits_ignores_non_exiting;
+         "revert_rejected_exits ignores a wrong-side trade on the symbol"
+         >:: test_revert_rejected_exits_ignores_wrong_side_trade;
        ]
 
 let () = run_test_tt_main suite
