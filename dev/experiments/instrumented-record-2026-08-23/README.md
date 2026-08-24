@@ -79,3 +79,15 @@ nothing merged 08-23 moved the default path. The recorded grid1-null baseline
 descends from an earlier (ladder-3-era) build whose params were never
 committed. Proposed: `instr-null` here becomes the pinned record-convention
 baseline (params.sexp committed). Full reasoning: issue #2503.
+
+## Addendum 2 (08-24) — monster capture funnel (#2490)
+
+Scanner: `monster_scan` (PR #2519) over the same warehouse. 38,215 rule-visible
+breakout events → 1,686 episodes ≥100% fwd run (564 ≥200%). Funnel vs the
+instr-null artifacts: never-surfaced 9.4% / production-breakout-gate 45.7% /
+top-N 40.5% / grade 0.5%; admitted 3.9%; filled 0.8%; **held ≥13wk 0.24%**
+(4 of 1,686). RS drops = zero. Funding and stop levers operate below the leak —
+~86% of monsters die at breakout-gate strictness + top-N capacity, and capacity
+collides with the concentration law. Full table + rigor caveats: issue #2490
+comment 08-24. Artifacts (raw 40k-event CSV reproducible via `monster_scan -snapshot-dir <warehouse> -end 2026-06-26`; not committed, 2.5MB):
+`results/monster-ep{100,200}-outcomes.tsv`.
