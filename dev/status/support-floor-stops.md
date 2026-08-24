@@ -1,6 +1,6 @@
 # Status: support-floor-stops
 
-## Last updated: 2026-08-23
+## Last updated: 2026-08-24
 
 ## Status
 IN_PROGRESS
@@ -9,6 +9,14 @@ IN_PROGRESS
 YES
 
 ## Open PR
+- `fix/stops-refactor-differential-2503` — **issue #2503, suspect #1 (PR #2492)
+  EXONERATED, with a permanent pin.** A 3,721-line deterministic trace of the
+  whole public stops surface (4,968 API calls) is **byte-identical** between
+  `2b11c60d` and `3782920a`, the parent of #2492's squash merge — so the
+  `Stop_geometry` extraction did not change default-path behaviour and cannot be
+  the cause of the from-day-one divergence #2503 reports. The trace ships as a
+  golden-diff `runtest` rule so the next stops refactor cannot silently do this.
+  See the 2026-08-24 addendum below. No behaviour change; new files only.
 - `fix/stop-ratchet-freeze-2486` — **issue #2486 CONFIRMED** at the code level,
   plus the default-off fix. The trailing ratchet is provably frozen for the life
   of any position whose initial stop came from the **buffer fallback**. See the
@@ -999,6 +1007,14 @@ fixture), which is a larger piece of work than F3. Filed below.
   whether a completed-but-non-improving cycle advances Weinstein's reference
   point, and write the answer back into `docs/design/weinstein-book-reference.md`
   §5.2 per `.claude/rules/book-as-authority.md` tier 3.
+- **H4 (2026-08-24, from #2503) — extend the surface trace to the re-exported
+  sub-modules.** `stops_surface_trace.ml` pins every `val` in
+  `weinstein_stops.mli` but drives none of `Stop_split_adjust`, `Stop_widen`,
+  `Vol_scaled_stop`, `Catastrophic_stop`, `Extension_stop` directly, and the
+  traced functions never reach them. Each is a small pure surface, so the
+  extension is cheap; without it a refactor confined to one of those five would
+  not move a single golden line. Not blocking for #2503 — #2492 touched none of
+  them.
 - ~~**B5 (qc-behavioral, PR #2220 rework) — `Empty_window` pinned on only one of
   two paths.** Filed late: raised in #2220's rework and recorded in
   `dev/daily/2026-08-06.md` §Follow-up Queue, but the status-file edit was lost
@@ -1659,6 +1675,136 @@ Filed under Follow-ups.
 
 `dune build @fmt` exit 0, `dune build` exit 0, **full** `dune runtest` exit 0.
 Exit codes read directly, not grepped.
+
+## 2026-08-24 addendum — issue #2503 suspect #1: #2492 is NOT the cause (PR branch `fix/stops-refactor-differential-2503`)
+
+### Verdict: EXONERATED — the `Stop_geometry` extraction is bit-identical on the default path
+
+Issue #2503 reports that a verbatim config clone of
+`funding-grid-2026-08-22/specs/grid1-null.sexp` diverges from its baseline from
+the first weeks of 2000 (305.25% → 243.06% total return, 1270 → 1182 trades),
+with warehouse, composition, period and config all controlled. PR **#2492** was
+prime suspect because it bundled a `Stop_geometry` extraction with its
+default-off flag, and a reassociated multiply / round / `Float.min` chain can
+shift a stop by one ULP — enough to flip a StopLimit fill and change which
+symbols enter.
+
+**It did not.** A deterministic trace of the whole public stops surface is
+**byte-identical** between HEAD and the merge-base.
+
+### The measurement
+
+`trading/trading/backtest/stops_differential/stops_surface_trace.ml` drives
+every `val` in `weinstein_stops.mli` through the **public API only**, printing
+every float in `%.17g` (which round-trips an IEEE double exactly, so the
+comparison is bit-for-bit, not eyeball-equal).
+
+| | |
+|---|---|
+| HEAD | `2b11c60d` |
+| merge-base | **`3782920a`** — the parent of #2492's squash merge `4141beda` |
+| trace lines | 3,721 |
+| public-API calls | **4,968** |
+| `cmp` | **exit 0** — byte-identical |
+| md5 (both) | `ef99e0c11250860664ec6e40339de2e2` |
+
+Per entry point:
+
+| entry point | calls | notes |
+|---|---:|---|
+| `compute_initial_stop` | 2,072 | 1,672 direct + 400 via the floor wrappers |
+| `update` | 1,536 | 104 `Stop_raised`, 76 `Stop_hit`, 56 `Entered_tightening`; all three states reached |
+| `check_stop_hit` | 180 | both `on_close` values |
+| `get_stop_level` | 180 | all three state constructors |
+| `callbacks_from_bars` | 600 | 200 explicit + 400 via the bar-list wrappers |
+| `compute_initial_stop_with_floor{,_with_callbacks}` | 200 / 400 | |
+| `floor_is_structural{,_with_callbacks}` | 200 / 400 | |
+| `split_safe_basis_of_{bars,callbacks}` | 200 / 400 | all four basis outcomes: 64 `Adjusted`, 100 `Flag_off`, 18 `Raw_fallback`, 18 `Empty_window` |
+
+Input sweep, chosen for the specific hazard (the deduped nudge adapter):
+
+- **Both sides**, `Long` and `Short`, everywhere.
+- **Both initial-stop flavours** — 84 structural-floor and 46 fallback
+  constructions in S3, plus a dedicated fallback grid over
+  `entry_price ∈ {100.0, 37.13, 4.07} × fallback_buffer ∈ {1.0, 1.02, 1.05}`
+  (the short-side fallback is a *division*, a distinct rounding site).
+- **Round-number nudge boundaries straddled deliberately.** The nudge predicate
+  is `|price − nearest_half| ≤ nudge`. S1 walks reference levels whose raw stop
+  lands at `k × 0.5 + e` for `k ∈ [1,10]` and `e ∈ {±0.13, ±0.126, ±0.125,
+  ±0.124, ±0.0625, 0}` — i.e. dead on the boundary and one step either side —
+  across `round_number_nudge ∈ {0.05, 0.125, 0.25}` and
+  `min_correction_pct ∈ {0.08, 0.10}`. **428 of 1,320 boundary cases and 90 of
+  352 sweep cases actually fire the nudge**, so both branches are exercised, not
+  just reached.
+- **All four stages × MA rising / flat / declining**, over two config arms
+  (shipped defaults, and a wide-buffer arm with `tighten_on_flat_ma = false`).
+- **All four `support_floor` config combinations**
+  (`Wick|Close` × `Window_extreme|Nearest` × `split_safe_floors`).
+
+The trace uses a hand-rolled LCG and no libm, so the golden is stable across
+compiler versions and platforms.
+
+### The pin
+
+The golden is the **merge-base** output, diffed by a `runtest` rule in
+`trading/trading/backtest/stops_differential/dune`. Negative control: mutating
+one character of one line out of 3,721 makes `dune runtest` exit **1**;
+restoring it returns exit **0**. So the same measurement that exonerates #2492
+now blocks the next stops refactor from silently reassociating this arithmetic.
+`dune promote` on this golden means "I intend to change live stop behaviour" —
+which needs a golden re-pin and a ledger entry, not a promote.
+
+### Residual surface — what this does NOT cover
+
+- The five re-exported sub-modules (`Stop_split_adjust`, `Stop_widen`,
+  `Vol_scaled_stop`, `Catastrophic_stop`, `Extension_stop`) are not driven
+  directly. #2492 did not touch them (its whole non-test diff is `floor_stop.ml`,
+  `stop_geometry.{ml,mli}`, `stop_types.{ml,mli}`, `weinstein_stops.ml`), so this
+  is not a gap for #2503 — but it is a gap in the pin, and a natural extension.
+- The `config` record gained a field, which changes its derived `show` / `equal`
+  / `sexp`. Audited separately and **inert**: every non-stops reference is a
+  test, a docstring, or `Overlay_validator`, which resolves overrides by *name*.
+  In particular the intraday-path seed is `Bar_shape.seed_for_bar`, a pure
+  function of the bar's ticker and four prices — **not** of any config — so the
+  new field cannot have re-drawn the seeded paths #2279 introduced.
+
+### Corrections to the dispatch brief (re-measured, all three)
+
+1. **Merge-base SHA.** The brief named `e64f8655`. The actual parent of
+   `4141beda` is **`3782920a`**. `e64f8655..3782920a` is docs-only (9 files, all
+   `dev/status/*`), so the stops sources are identical between them and the
+   brief's SHA would have given the same answer — but the measurement above used
+   the true parent.
+2. **Line counts.** The brief said `weinstein_stops.ml` went "522 → 474". On
+   *main* it went **479 → 474**, a net −5. The 522 figure is the PR body's
+   description of an intermediate state (the fix applied before the extraction),
+   which never existed on main. The extraction removed ~48 lines of geometry
+   while the fix added ~43 back.
+3. **What the prior QC harness covered.** The brief's hypothesis — that
+   qc-behavioral's 20,000-call differential exercised only `Weinstein_stops.update`
+   and left `compute_initial_stop` uncovered — **does not reproduce.**
+   `dev/reviews/stop-ratchet-freeze-2486.md:188` states it covered "both sides,
+   **both initial-stop flavours (fallback and structural)**", and line 180 states
+   "the differential below includes **500 fallback-initial-stop constructions**
+   with byte-identical output". The initial-stop path was already covered, which
+   materially weakened suspect #1 before this run started. What was genuinely
+   missing is that the harness was **thrown away** ("removed afterwards"), so
+   nothing pinned it — that gap is what this PR closes.
+
+### Handoff
+
+Suspicion for #2503 passes to **#2500** (`entry_walk` / screening threading) and
+**#2501** (`Screener_admission` extraction), audited concurrently. Both sit on
+the entry-decision path, which is where a from-day-one change in the *entered
+symbol set* — #2503's actual symptom, `AGN_old` entered by the new run and never
+by the baseline — would naturally originate. Nothing in the stops surface can
+produce that divergence without also moving at least one of the 3,721 lines
+above.
+
+### Verification
+
+`dune build @fmt` exit 0, `dune build` exit 0, **full** `dune runtest` exit 0.
+Exit codes read directly, not grepped, not piped.
 
 ## QC
 

@@ -1,0 +1,36 @@
+; Whole-surface regression pin for the stops public API (issue #2503).
+;
+; stops_surface_trace.exe prints one line per call over a deterministic sweep
+; of every `val` in weinstein_stops.mli, with floats in %.17g. The golden
+; (stops_surface_trace.expected) was generated at 3782920a — the parent of
+; PR #2492's squash merge 4141beda — so the diff below is simultaneously:
+;
+;   (a) the proof that #2492's Stop_geometry extraction left the DEFAULT path
+;       bit-identical (the golden is the pre-#2492 output and HEAD reproduces
+;       it byte-for-byte), and
+;   (b) a standing pin, so the next stops refactor cannot silently reassociate
+;       a multiply / round / Float.min chain and shift a stop by one ULP.
+;
+; Regenerate deliberately, never reflexively: `dune promote` after a diff means
+; "I intend to change live stop behaviour", which needs a golden re-pin and an
+; experiment-ledger entry, not a promote.
+;
+; Lives under trading/trading/backtest/ rather than beside the stops library
+; because the trace links `weinstein.types` (analysis/weinstein/), and
+; `.claude/rules/qc-structural-authority.md` A2 allow-lists analysis/ imports
+; into trading/trading/ only under trading/trading/backtest/**. It is a
+; regression pin over the stops surface, so it belongs with the other goldens.
+
+(executable
+ (name stops_surface_trace)
+ (libraries core weinstein_trading.stops weinstein.types types trading.base))
+
+(rule
+ (with-stdout-to
+  stops_surface_trace.actual
+  (run %{exe:stops_surface_trace.exe})))
+
+(rule
+ (alias runtest)
+ (action
+  (diff stops_surface_trace.expected stops_surface_trace.actual)))
