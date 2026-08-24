@@ -2951,6 +2951,161 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 44 — H-AUDIT-REWORK-VERDICT-STALE (#2509) regression, live
+# reproduction: file mode against the ACTUAL committed PR #2504 review file
+# (dev/reviews/audit-scenario22-diagnosability-2440.md), which contains TWO
+# QC passes -- structural APPROVED (quality 5, no "## Verdict" heading, just
+# prose) + behavioral NEEDS_REWORK (quality 2) at `07abcc99`, then a
+# re-review with structural re-APPROVED and behavioral re-APPROVED (quality
+# 4) at `6b979c77`. Before the fix, the "first ## Verdict in the file wins
+# for structural / last ## Verdict wins for behavioral" positional rule
+# landed structural_qc: NEEDS_REWORK (it picked up the first pass's
+# BEHAVIORAL block, the first "## Verdict" heading physically in the
+# document) and overall_qc: NEEDS_REWORK, even though both gates had
+# actually ended APPROVED. This is the exact record that had to be corrected
+# by hand in production (see the issue's "Corrected by hand this run" note).
+# ---------------------------------------------------------------------------
+FEATURE44="audit-final-pass-live-repro-2504"
+cp "${REPO_ROOT}/dev/reviews/audit-scenario22-diagnosability-2440.md" \
+  "${TMP_REPO}/dev/reviews/${FEATURE44}.md"
+
+out44=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE44}" "harness/audit-scenario22-diagnosability-2440" "2026-08-24" 2>&1) && rc44=0 || rc44=$?
+JSON44="${TMP_REPO}/dev/audit/2026-08-24-harness-audit-scenario22-diagnosability-2440-${FEATURE44}.json"
+if (( rc44 == 0 )) && [[ -f "${JSON44}" ]] \
+   && grep -q '"sha": *"6b979c77"' "${JSON44}" \
+   && grep -q '"structural_qc": *"APPROVED"' "${JSON44}" \
+   && grep -q '"behavioral_qc": *"APPROVED"' "${JSON44}" \
+   && grep -q '"overall_qc": *"APPROVED"' "${JSON44}" \
+   && grep -q '"consecutive_rework_count": *0,' "${JSON44}"; then
+  pass "scenario 44 — PR #2504's real two-pass review file extracts APPROVED/APPROVED/APPROVED (sha 6b979c77, consecutive_rework_count=0), not the pre-fix NEEDS_REWORK/APPROVED/NEEDS_REWORK inversion (H-AUDIT-REWORK-VERDICT-STALE, #2509)"
+else
+  fail "scenario 44 — expected rc=0 + structural/behavioral/overall all APPROVED + sha 6b979c77 + consecutive_rework_count=0; got rc=${rc44}, output:"
+  echo "${out44}" | sed 's/^/      /'
+  [[ -f "${JSON44}" ]] && echo "      json: $(cat "${JSON44}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 45 — H-AUDIT-REWORK-VERDICT-STALE (#2509), synthetic minimal
+# repro: structural NEEDS_REWORK on pass 1, THEN fixed to APPROVED on the
+# rework re-review; behavioral runs for the first time on the rework (a
+# normal shape per pr-gate-loop.md -- "Behavioral does not run until
+# structural APPROVES"). The physically FIRST "## Verdict" heading in this
+# file is pass 1's stale structural NEEDS_REWORK. Before the fix, the
+# "first ## Verdict wins" rule for structural read that stale value forever,
+# regardless of the rework -- a rework that fixes a STRUCTURAL finding could
+# never clear structural_qc in the audit record. The section-scoped fix
+# takes the LAST verdict recorded specifically under a "Structural" heading.
+# ---------------------------------------------------------------------------
+FEATURE45="audit-final-pass-structural-fixed-by-rework"
+cat > "${TMP_REPO}/dev/reviews/${FEATURE45}.md" <<'EOF'
+Reviewed SHA: sha1aaa45
+
+## Structural QC — audit-final-pass-structural-fixed-by-rework
+
+## Verdict
+NEEDS_REWORK
+
+---
+
+## Re-review — Rework Iteration 1 of 2 @ `sha2bbb45`
+
+Reviewed SHA: sha2bbb45
+
+## Structural QC — Re-review at `sha2bbb45`
+
+## Verdict
+APPROVED
+
+---
+
+## Behavioral QC — audit-final-pass-structural-fixed-by-rework
+
+## Quality Score
+5 — clean, first behavioral pass now that structural approved
+
+## Verdict
+APPROVED
+EOF
+
+out45=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE45}" "feat/dummy45" "2026-08-24" 2>&1) && rc45=0 || rc45=$?
+JSON45="${TMP_REPO}/dev/audit/2026-08-24-feat-dummy45-${FEATURE45}.json"
+if (( rc45 == 0 )) && [[ -f "${JSON45}" ]] \
+   && grep -q '"sha": *"sha2bbb45"' "${JSON45}" \
+   && grep -q '"structural_qc": *"APPROVED"' "${JSON45}" \
+   && grep -q '"behavioral_qc": *"APPROVED"' "${JSON45}" \
+   && grep -q '"overall_qc": *"APPROVED"' "${JSON45}" \
+   && grep -q '"consecutive_rework_count": *0,' "${JSON45}"; then
+  pass "scenario 45 — a rework that fixes a STRUCTURAL finding clears structural_qc to APPROVED instead of freezing on pass 1's stale NEEDS_REWORK (H-AUDIT-REWORK-VERDICT-STALE, #2509)"
+else
+  fail "scenario 45 — expected rc=0 + structural/behavioral/overall all APPROVED + consecutive_rework_count=0; got rc=${rc45}, output:"
+  echo "${out45}" | sed 's/^/      /'
+  [[ -f "${JSON45}" ]] && echo "      json: $(cat "${JSON45}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 46 — H-AUDIT-REWORK-VERDICT-STALE (#2509), the inverse case the
+# issue explicitly warns is still latent after only fixing structural: "If a
+# future rework ended on a structural re-review, behavioral would break the
+# same way." This file's rework writes BEHAVIORAL's re-review (its first
+# ever pass, APPROVED) BEFORE structural's own re-check (which is still
+# NEEDS_REWORK -- the structural finding is NOT yet fixed), so the
+# physically LAST "## Verdict" heading in the document belongs to
+# STRUCTURAL, not behavioral. Before the fix, "last ## Verdict wins" for
+# behavioral would have read structural's still-failing NEEDS_REWORK into
+# behavioral_qc, even though behavioral itself is clean. The correct record
+# is structural NEEDS_REWORK (genuinely still failing) / behavioral APPROVED
+# (genuinely clean) / overall NEEDS_REWORK.
+# ---------------------------------------------------------------------------
+FEATURE46="audit-final-pass-behavioral-not-inherited-from-structural"
+cat > "${TMP_REPO}/dev/reviews/${FEATURE46}.md" <<'EOF'
+Reviewed SHA: sha1ccc46
+
+## Structural QC — audit-final-pass-behavioral-not-inherited-from-structural
+
+## Verdict
+NEEDS_REWORK
+
+---
+
+## Re-review — Rework Iteration 1 of 2 @ `sha2ddd46`
+
+Reviewed SHA: sha2ddd46
+
+## Behavioral QC — Re-review at `sha2ddd46`
+
+## Quality Score
+5 — first behavioral pass, clean
+
+## Verdict
+APPROVED
+
+---
+
+## Structural QC — Re-review at `sha2ddd46`
+
+## Verdict
+NEEDS_REWORK
+EOF
+
+out46=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE46}" "feat/dummy46" "2026-08-24" 2>&1) && rc46=0 || rc46=$?
+JSON46="${TMP_REPO}/dev/audit/2026-08-24-feat-dummy46-${FEATURE46}.json"
+if (( rc46 == 0 )) && [[ -f "${JSON46}" ]] \
+   && grep -q '"sha": *"sha2ddd46"' "${JSON46}" \
+   && grep -q '"structural_qc": *"NEEDS_REWORK"' "${JSON46}" \
+   && grep -q '"behavioral_qc": *"APPROVED"' "${JSON46}" \
+   && grep -q '"overall_qc": *"NEEDS_REWORK"' "${JSON46}" \
+   && grep -q '"consecutive_rework_count": *1,' "${JSON46}"; then
+  pass "scenario 46 — behavioral_qc reads its OWN clean APPROVED, not inherited from a still-failing structural re-check that happens to be written last in the file (H-AUDIT-REWORK-VERDICT-STALE, #2509)"
+else
+  fail "scenario 46 — expected rc=0 + structural NEEDS_REWORK + behavioral APPROVED + overall NEEDS_REWORK + consecutive_rework_count=1; got rc=${rc46}, output:"
+  echo "${out46}" | sed 's/^/      /'
+  [[ -f "${JSON46}" ]] && echo "      json: $(cat "${JSON46}")"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""

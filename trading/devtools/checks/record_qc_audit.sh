@@ -21,13 +21,20 @@
 #
 #   Structural verdict:
 #     Last occurrence of "structural_qc: APPROVED|NEEDS_REWORK" in the file,
-#     or the first "## Verdict" block value (bare or **bold** format).
+#     or (fallback) the LAST "## Verdict"/"### Verdict" block found while a
+#     "Structural" heading is the section currently in scope (bare or
+#     **bold** format; see H-AUDIT-REWORK-VERDICT-STALE, #2509 -- a rework
+#     appends a second pass, so "first"/"last" in the whole document no
+#     longer mean "structural"/"behavioral", only "oldest"/"newest"; the
+#     verdict must instead be scoped to the section heading that owns it).
 #     Defaults to SKIPPED if not found.
 #
 #   Behavioral verdict:
 #     Last occurrence of "behavioral_qc: APPROVED|NEEDS_REWORK" in the file,
-#     or the last "## Verdict" block value (behavioral appends after structural).
-#     Defaults to SKIPPED if not found.
+#     or (fallback) the LAST "## Verdict"/"### Verdict" block found while a
+#     "Behavioral" heading is the section currently in scope. Same
+#     section-scoping as the structural verdict above. Defaults to SKIPPED
+#     if not found.
 #
 #   Overall verdict (required):
 #     "overall_qc: APPROVED|NEEDS_REWORK" field in the file.
@@ -392,26 +399,69 @@ fi
 # edge case, so leaving these unguarded would read a possibly-unrelated
 # dev/reviews/<feature>.md and populate the still-unresolved verdict from
 # it instead of the correct SKIPPED default below).
-# The structural section uses the first ## Verdict; behavioral uses the last.
-# Both bare (APPROVED) and bold (**APPROVED**) formats are supported.
-
-if [ "$FILE_MODE" -eq 1 ] && [ -z "$STRUCTURAL" ]; then
-  STRUCTURAL=$(awk '
-    /^## Verdict/{found=1; next}
-    found && /^(APPROVED|NEEDS_REWORK|\*\*(APPROVED|NEEDS_REWORK)\*\*)/ {
-      v=$0; gsub(/^\*\*|\*\*$/, "", v); print v; exit
+#
+# H-AUDIT-REWORK-VERDICT-STALE (#2509): a review file that went through a
+# rework contains MORE THAN ONE pass -- e.g. structural APPROVED, behavioral
+# NEEDS_REWORK, then a re-review appends a second structural APPROVED and a
+# second behavioral APPROVED. The OLD extraction took "the first ## Verdict
+# in the file" for structural and "the last ## Verdict in the file" for
+# behavioral -- that only means "structural"/"behavioral" in a SINGLE-pass
+# file. In a multi-pass file "first"/"last" mean "oldest"/"newest" instead,
+# so a rework whose first pass's BEHAVIORAL verdict happens to precede its
+# own re-review's STRUCTURAL verdict gets STRUCTURAL filled from the stale
+# first-pass BEHAVIORAL block. Live reproduction: PR #2504's review file
+# (dev/reviews/audit-scenario22-diagnosability-2440.md) -- both gates ended
+# APPROVED, but the old logic recorded structural_qc: NEEDS_REWORK.
+#
+# Fix: scope every verdict to the section that OWNS it, the same way the
+# PR-mode parser above (the awk populating $PARSED) already scopes verdicts
+# to "## Structural QC" / "## Behavioral QC" review bodies -- walk the file
+# top to bottom, track which of structural/behavioral is "current" from the
+# nearest preceding heading (any "#" depth) that names it, and keep the LAST
+# verdict recorded for that section rather than the first/last verdict in
+# the whole document. Headings are matched at ANY depth ("## Structural QC",
+# "### Structural re-check", "## Verdict", "### Verdict", ...) because real
+# rework review files mix heading levels across re-review subsections. Both
+# bare (APPROVED) and bold (**APPROVED**) verdict formats are supported.
+#
+# The section keyword must be the FIRST word after the "#"s (e.g.
+# "## Structural QC", "### Structural re-check") -- NOT merely present
+# anywhere on the heading line. Headings commonly append the feature name
+# after an em dash ("## Behavioral QC -- <feature-name>"), and a feature
+# name can itself contain the substring "structural" or "behavioral" (this
+# was caught by this fix's own regression test: a feature literally named
+# "...-structural-fixed-by-rework" made a loose anywhere-on-the-line match
+# misdetect its "## Behavioral QC -- ..." heading as a STRUCTURAL section).
+if [ "$FILE_MODE" -eq 1 ] && { [ -z "$STRUCTURAL" ] || [ -z "$BEHAVIORAL" ]; }; then
+  FILE_PARSED="$(awk '
+    BEGIN { section = ""; struct_v = ""; behav_v = ""; in_verdict = 0 }
+    /^#+[ \t]/ {
+      is_struct = ($0 ~ /^#+[ \t]+\**[Ss]tructural/)
+      is_behav = ($0 ~ /^#+[ \t]+\**[Bb]ehavioral/)
+      if (is_struct && !is_behav) { section = "structural" }
+      else if (is_behav && !is_struct) { section = "behavioral" }
+      if ($0 ~ /Verdict/) { in_verdict = 1 } else { in_verdict = 0 }
+      next
     }
-  ' "$REVIEW_FILE" 2>/dev/null || true)
-fi
-
-if [ "$FILE_MODE" -eq 1 ] && [ -z "$BEHAVIORAL" ]; then
-  BEHAVIORAL=$(awk '
-    /^## Verdict/{found=1; next}
-    found && /^(APPROVED|NEEDS_REWORK|\*\*(APPROVED|NEEDS_REWORK)\*\*)/ {
-      v=$0; gsub(/^\*\*|\*\*$/, "", v); last=v; found=0
+    in_verdict && /^[[:space:]]*$/ { next }
+    in_verdict {
+      v = $0
+      gsub(/^\*\*|\*\*$/, "", v)
+      if (v ~ /^APPROVED/) { val = "APPROVED" }
+      else if (v ~ /^NEEDS_REWORK/) { val = "NEEDS_REWORK" }
+      else { in_verdict = 0; next }
+      if (section == "structural") { struct_v = val }
+      else if (section == "behavioral") { behav_v = val }
+      in_verdict = 0
     }
-    END { if (last != "") print last }
-  ' "$REVIEW_FILE" 2>/dev/null || true)
+    END { print struct_v "|" behav_v }
+  ' "$REVIEW_FILE" 2>/dev/null || true)"
+
+  FILE_STRUCTURAL="${FILE_PARSED%%|*}"
+  FILE_BEHAVIORAL="${FILE_PARSED#*|}"
+
+  [ -z "$STRUCTURAL" ] && STRUCTURAL="$FILE_STRUCTURAL"
+  [ -z "$BEHAVIORAL" ] && BEHAVIORAL="$FILE_BEHAVIORAL"
 fi
 
 # Defaults if still empty
