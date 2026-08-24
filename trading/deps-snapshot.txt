@@ -24,8 +24,8 @@ camlp-streams               5.0.1
 camlzip                     1.14
 capitalization              v0.17.0
 cmdliner                    2.1.1
-cohttp                      6.2.1
-cohttp-async                6.2.1
+cohttp                      6.3.0
+cohttp-async                6.3.0
 conduit                     8.0.0
 conduit-async               8.0.0
 conf-libffi                 2.0.0
@@ -54,7 +54,7 @@ fix                         20250919
 fmt                         0.11.0
 fpath                       0.7.3
 gel                         v0.17.0
-http                        6.2.1
+http                        6.3.0
 int_repr                    v0.17.0
 integers                    0.8.0
 ipaddr                      5.6.2
