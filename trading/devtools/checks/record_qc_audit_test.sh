@@ -2952,22 +2952,101 @@ fi
 
 # ---------------------------------------------------------------------------
 # Scenario 44 — H-AUDIT-REWORK-VERDICT-STALE (#2509) regression, live
-# reproduction: file mode against the ACTUAL committed PR #2504 review file
-# (dev/reviews/audit-scenario22-diagnosability-2440.md), which contains TWO
-# QC passes -- structural APPROVED (quality 5, no "## Verdict" heading, just
-# prose) + behavioral NEEDS_REWORK (quality 2) at `07abcc99`, then a
-# re-review with structural re-APPROVED and behavioral re-APPROVED (quality
-# 4) at `6b979c77`. Before the fix, the "first ## Verdict in the file wins
-# for structural / last ## Verdict wins for behavioral" positional rule
-# landed structural_qc: NEEDS_REWORK (it picked up the first pass's
-# BEHAVIORAL block, the first "## Verdict" heading physically in the
-# document) and overall_qc: NEEDS_REWORK, even though both gates had
-# actually ended APPROVED. This is the exact record that had to be corrected
-# by hand in production (see the issue's "Corrected by hand this run" note).
+# reproduction: file mode against a fixture reproducing the STRUCTURE of the
+# real PR #2504 review file (dev/reviews/audit-scenario22-diagnosability-2440.md
+# as it stood at merge), which contains TWO QC passes -- structural APPROVED
+# (quality 5, no "## Verdict" heading, just prose) + behavioral NEEDS_REWORK
+# (quality 2) at `07abcc99`, then a re-review with structural re-APPROVED
+# (under a "### Structural re-check" sub-heading, "## Verdict" at depth 2)
+# and behavioral re-APPROVED (quality 4, under "### Verdict" at depth 3) at
+# `6b979c77`. Before the fix, the "first ## Verdict in the file wins for
+# structural / last ## Verdict wins for behavioral" positional rule landed
+# structural_qc: NEEDS_REWORK (it picked up the first pass's BEHAVIORAL
+# block, the first "## Verdict" heading physically in the document) and
+# overall_qc: NEEDS_REWORK, even though both gates had actually ended
+# APPROVED. This is the exact record that had to be corrected by hand in
+# production (see the issue's "Corrected by hand this run" note).
+#
+# The fixture is embedded verbatim below (heredoc, prose trimmed) rather
+# than `cp`'d from dev/reviews/ -- CI's dune sandbox does not expose
+# dev/reviews/ (it is not a declared dune dep, and those files churn), so a
+# `cp` from it works locally but 404s in the CI sandbox. Embedding keeps this
+# scenario hermetic. The heading/verdict SKELETON below is character-for-
+# character the same shape as the real file at the lines that matter for
+# this bug (headings, verdict depths, and the em-dash-appended feature-name
+# suffix on the Behavioral headings, which is what scenario 45 below caught
+# as a false-positive risk in the naive fix).
 # ---------------------------------------------------------------------------
 FEATURE44="audit-final-pass-live-repro-2504"
-cp "${REPO_ROOT}/dev/reviews/audit-scenario22-diagnosability-2440.md" \
-  "${TMP_REPO}/dev/reviews/${FEATURE44}.md"
+cat > "${TMP_REPO}/dev/reviews/${FEATURE44}.md" <<'EOF'
+Reviewed SHA: 6b979c77
+
+# QC review — PR #2504, `harness/audit-scenario22-diagnosability-2440`
+
+## Structural QC
+
+APPROVED (quality 5). Full checklist posted as a PR review on
+#2504; this file was not committed on the branch, so only the
+verdict is mirrored here.
+
+---
+
+## Behavioral QC — audit-scenario22-diagnosability (#2440)
+
+Scope: pure harness PR. CP1 finding: report_conjuncts()'s docstring
+claim is not pinned by any committed test.
+
+## Quality Score
+
+2 — Below the bar on one fixable point: the new diagnostic helper
+ships without the direct scenario the file's own precedent calls for.
+
+## Verdict
+
+NEEDS_REWORK
+
+---
+
+## Re-review — Rework Iteration 1 of 2 @ `6b979c77`
+
+**Prior verdicts at `07abcc99`:** Structural APPROVED (quality 5);
+Behavioral NEEDS_REWORK (quality 2).
+
+### Structural re-check
+
+- **H1** (dune build @fmt): PASS
+- **H2** (dune build): PASS
+- **H3** (dune runtest): PASS
+
+### Quality Score
+
+5 — Rework directly pins the unpinned diagnostic helper via three
+independent mutation tests.
+
+## Verdict
+
+**APPROVED**
+
+---
+
+## Behavioral QC — Re-review at `6b979c77` (rework iteration 1 of 2)
+
+Re-review by qc-behavioral, the author of the NEEDS_REWORK verdict at
+`07abcc99` (quality 2). Every result below was re-derived in this
+worktree against a /tmp copy of the suite.
+
+### Quality Score
+
+4 — The rework is minimal, precisely targeted, and follows the
+file's own established precedent.
+
+### Verdict
+
+**APPROVED**
+
+All four CP rows PASS; the domain block is NA. The `07abcc99` blocking
+finding (CP1-a) is closed and independently re-verified.
+EOF
 
 out44=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE44}" "harness/audit-scenario22-diagnosability-2440" "2026-08-24" 2>&1) && rc44=0 || rc44=$?
