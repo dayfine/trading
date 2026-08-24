@@ -413,8 +413,35 @@ if [ "$OVERALL" = "NEEDS_REWORK" ]; then
   # this feature, then sort by recorded_at_ns descending (true write
   # order). Records predating this field have no recorded_at_ns and
   # default to 0 (oldest).
+  #
+  # H-AUDIT-LS-GLOB-HEADER-UNSAFE (dev/status/harness.md, issue #2440):
+  # this used to enumerate with `ls -1 "$AUDIT_DIR"/*-"$FEATURE".json`.
+  # GNU `ls` given MULTIPLE positional arguments groups plain files into
+  # one unheaded block, then prints each DIRECTORY argument as its own
+  # "<name>:" header line followed by that directory's (possibly empty)
+  # contents. A record can legitimately be a directory here -- see
+  # H-PREV-VERDICT-PIPEFAIL just below, whose own regression fixture
+  # (record_qc_audit_test.sh scenario 22) plants exactly that shape. Two
+  # concrete failures follow from `ls`'s header format: (a) when the glob
+  # matches a mix of files and one directory, the for-loop below
+  # word-splits the header line into a bogus "<name>.json:" (colon
+  # attached) that does not exist on disk, so every downstream read of
+  # that "file" fails with ENOENT rather than the real "Is a directory"
+  # condition the record actually has -- the two happen to share exit
+  # code 2, which is why this was invisible until traced by hand; (b)
+  # when the glob matches ONLY the directory, `ls -1 <dir>` lists the
+  # DIRECTORY'S OWN CONTENTS (empty) instead of the directory's name,
+  # producing zero words -- the record silently vanishes from the scan,
+  # under-counting consecutive_rework_count with no warning at all
+  # (verified live; see the harness.md entry for repro). `find` walks the
+  # directory itself and prints one matched PATH per line regardless of
+  # entry type or match count -- no header, no grouping, no dependence on
+  # how many of the matches are directories. Mirrors the `_glob_count`
+  # helper's established convention in record_qc_audit_test.sh
+  # (H-AUDIT-GLOB-COUNT-GUARD-UNPINNED), which exists for the same class
+  # of bug.
   candidate_pairs=""
-  for f in $(ls -1 "$AUDIT_DIR"/*-"$FEATURE".json 2>/dev/null || true); do
+  for f in $(find "$AUDIT_DIR" -maxdepth 1 -name "*-$FEATURE.json" 2>/dev/null || true); do
     # Skip the file we are about to write (same date+branch+feature --
     # this is what makes re-running for the SAME review idempotent
     # rather than counting itself as a prior NEEDS_REWORK).

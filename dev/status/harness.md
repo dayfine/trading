@@ -1051,17 +1051,136 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   mutation-test proof per the standard this file's H-PREV-VERDICT-PIPEFAIL
   entry and the #2440 fix were held to — don't bulk-transform without
   per-conjunct verification.
-- [ ] **Follow-up: `write_audit.sh` `consecutive_rework_count` scan's
-  `ls -1 glob` fragility** (filed 2026-08-24, found while diagnosing
-  #2440 — see above). Replace `for f in $(ls -1
-  "$AUDIT_DIR"/*-"$FEATURE".json 2>/dev/null || true)` with a `find`-based
-  enumeration (e.g. `find "$AUDIT_DIR" -maxdepth 1 -name "*-$FEATURE.json"
-  -print`) that does not depend on `ls`'s multi-argument, mixed
-  file/directory formatting. Needs a new regression scenario that seeds
-  ONLY a directory-shaped record (no sibling file) for a feature and
-  asserts the WARNING still fires with the correct (non-colon-suffixed)
-  path and the streak is still safely skipped, not silently dropped.
-  Verify current behavior first with:
-  `mkdir -p "$AUDIT_DIR/<date>-feat-x-<feature>.json"` as the ONLY match
-  for that feature, then call `write_audit.sh` — currently produces
-  `consecutive_rework_count` one lower than expected with zero WARNING.
+- [x] **Follow-up: `write_audit.sh` `consecutive_rework_count` scan's
+  `ls -1 glob` fragility** — fixed 2026-08-24 (harness-maintainer,
+  harness/scenario22-race-2440, issue #2440). This turned out to BE the
+  root cause investigated for #2440, not just an adjacent bug found while
+  diagnosing it — see the write-up under "Added 2026-08-24 (harness-
+  maintainer, harness/scenario22-race-2440, issue #2440)" below for the
+  full mechanism. One-line summary: `write_audit.sh`'s
+  `consecutive_rework_count` prior-record scan replaced `for f in $(ls -1
+  "$AUDIT_DIR"/*-"$FEATURE".json 2>/dev/null || true)` with `for f in
+  $(find "$AUDIT_DIR" -maxdepth 1 -name "*-$FEATURE.json" 2>/dev/null ||
+  true)`, mirroring the `_glob_count` helper's established convention in
+  `record_qc_audit_test.sh` (H-AUDIT-GLOB-COUNT-GUARD-UNPINNED). Fixes
+  both: (a) the sole-directory-match silent under-count this item
+  originally described, and (b) a previously-undetected fragility in
+  scenario 22 itself — it was passing for an ACCIDENTAL reason (`ls -1`'s
+  directory-argument header format happening to produce a bogus
+  colon-suffixed path whose ENOENT also exits 2), not the documented
+  "grep hits a real directory" mechanism. New regression: scenario 50
+  (sole-directory-match, no sibling file) — mutation-verified red
+  pre-fix, green post-fix. Verify:
+  `bash trading/devtools/checks/record_qc_audit_test.sh` (68 scenarios,
+  was 61).
+
+## Added 2026-08-24 (harness-maintainer, harness/scenario22-race-2440, issue #2440)
+
+- [x] **Diagnosed and fixed the mechanism behind #2440's intermittent
+  scenario 22 CI failure** — issue #2440 reported that
+  `record_qc_audit_test.sh` scenario 22 failed once in CI
+  (`build-and-test` on PR #2436, sha `b8f7511a8`), then passed on a
+  bit-identical re-run of the same job at the same sha, and never
+  reproduced locally across three separate environments (`trading-1-dev`,
+  the orchestrator's own sandbox, a later GHA run). The prior PR (#2504)
+  shipped per-conjunct diagnostics for scenarios 21/22 so the *next*
+  occurrence would be a fact instead of a guess, but explicitly did not
+  attempt a fix and left #2440 open.
+
+  **Root cause found by tracing scenario 22's fixture through
+  `write_audit.sh`'s prior-record scan, not by reproducing the CI
+  failure directly** (still never reproduced on demand — see honesty
+  note below). `write_audit.sh`'s `consecutive_rework_count` computation
+  enumerates prior records for a feature with:
+  ```
+  for f in $(ls -1 "$AUDIT_DIR"/*-"$FEATURE".json 2>/dev/null || true)
+  ```
+  Scenario 22's fixture seeds two glob matches for one feature: a real
+  file (`feat/old`, a valid NEEDS_REWORK record) and a directory
+  (`UNREADABLE_PATH_22`, simulating a corrupted/unreadable record). GNU
+  `ls`, given MULTIPLE positional path arguments where at least one is a
+  directory, groups all plain-file arguments into one unheaded listing
+  block, then prints EACH directory argument as its own `<name>:`
+  header line (colon attached) followed by that directory's contents.
+  Verified directly in `trading-1-dev` (both as the default `opam` user
+  and as `root` — identical): `ls -1 file.json dir.json` prints
+  `file.json`, a blank line, then `dir.json:`. The test's `for f in
+  $(...)` word-splits that colon-suffixed header line into a WORD that is
+  NOT a real path — `.../unreadable-record-warns.json:`, trailing colon
+  included — which does not exist on disk.
+
+  Two consequences follow, both confirmed live:
+  1. **Scenario 22 was passing for the wrong reason.** The subsequent
+     `grep -o ... "$f"` call on that bogus, nonexistent path fails with
+     ENOENT — also grep exit code 2, the SAME exit code the scenario's
+     own comment claims to be testing ("genuinely unreadable... GNU grep
+     refuses with exit 2 -- 'Is a directory'"). The WARNING message that
+     `write_audit.sh` prints echoes `$f` verbatim, so it still contains
+     `UNREADABLE_PATH_22` as a text substring (the colon is just
+     appended), which is enough for the test's `grep -qF` check to pass.
+     Both the exit-code coincidence AND the substring-match coincidence
+     had to hold for scenario 22 to stay green — the scenario was never
+     actually exercising "grep hits a real directory," it was exercising
+     "grep hits a nonexistent colon-suffixed path that happens to share
+     an exit code and a text substring with the real one." This is
+     environment-fragile by construction: it depends on `ls`'s exact
+     multi-argument grouping/header behaviour, which is a real
+     cross-version, cross-locale, cross-coreutils-implementation
+     surface — precisely the kind of thing that could differ between an
+     ubuntu-latest GHA runner image refresh and a long-lived dev
+     container without any change to this repository's own code.
+  2. **A second, independently-real bug** (already filed as a follow-up
+     from PR #2504's diagnosis, closed by this same fix): when the glob
+     matches ONLY a directory (no sibling file), `ls -1 <that-directory>`
+     lists the DIRECTORY'S OWN CONTENTS (empty) instead of printing the
+     directory's name — the for-loop iterates zero times, the corrupted
+     record vanishes from the scan with NO warning at all. Reproduced
+     live pre-fix (see scenario 50 below).
+
+  **Honesty about what this does and doesn't establish:** the exact
+  original CI failure was never reproduced under controlled conditions
+  (rc=0/0 with one of the OTHER three conjuncts false — which one is
+  unknown, since #2436's original run predates #2504's per-conjunct
+  diagnostics). What this session establishes is a CONCRETE,
+  demonstrated defect in the mechanism scenario 22 depends on: the test
+  was passing by coincidence, not by design, and the coincidence rests
+  on `ls` formatting behaviour that is not guaranteed stable across
+  environments or coreutils versions. Fixing it removes that entire
+  fragility class regardless of whether it was the literal trigger of
+  the one observed failure, and it independently fixes a second,
+  already-filed, root-cause-verified bug in the same code path. No
+  chmod/permission-based mechanism is involved anywhere in this fix (the
+  directory-based "unreadable" fixture was already root-safe -- `grep`
+  reports "Is a directory" identically for `root` and non-root, verified
+  live in both users -- so the root-bypass hypothesis from the issue's
+  "prime suspects" list does not apply to this scenario as built).
+
+  **Fix** (`trading/devtools/checks/write_audit.sh`): replaced the
+  `ls -1 <glob>` enumeration with `find "$AUDIT_DIR" -maxdepth 1 -name
+  "*-$FEATURE.json" 2>/dev/null || true`, mirroring the `_glob_count`
+  helper's established convention in `record_qc_audit_test.sh`
+  (H-AUDIT-GLOB-COUNT-GUARD-UNPINNED, added for the exact same bug
+  class). `find` prints one matched path per line regardless of entry
+  type or match count — no header, no grouping, so neither failure mode
+  above can occur. Tagged `H-AUDIT-LS-GLOB-HEADER-UNSAFE`.
+
+  **Regression coverage:**
+  - Scenario 22's own comment block updated to record the accidental
+    pre-fix mechanism, so a future reader doesn't re-derive it.
+  - New **scenario 50**: a corrupted (directory) record that is the
+    ONLY glob match for its feature (no sibling file) — asserts rc=0,
+    `consecutive_rework_count=1`, and a WARNING naming the real
+    (non-colon-suffixed) path. Mutation-verified: reverted only
+    `write_audit.sh` to its pre-fix `ls -1` shape (keeping the new
+    scenario) — scenario 50 failed exactly as predicted (67 passed, 1
+    failed; the failure showed ZERO WARNING output, confirming the
+    silent-drop bug live), while scenario 22 stayed green throughout
+    (confirming it passes for the accidental reason described above,
+    not the fix). Re-applied the fix — 68/68 green.
+  - Stability: ran the full suite 20x in a loop inside `trading-1-dev`
+    as the default user, and 20x as `root` (`docker exec -u root`) —
+    all 40 runs green, `record_qc_audit_test: 68 passed, 0 failed` every
+    time.
+
+  Verify: `bash trading/devtools/checks/record_qc_audit_test.sh` (68
+  scenarios, up from 61 after PR #2504).

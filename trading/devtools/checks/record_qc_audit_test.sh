@@ -1358,6 +1358,20 @@ fi
 # "Is a directory" -- as opposed to exit 1 for "no match") must ALSO not
 # abort the script, but should be surfaced with a stderr WARNING naming the
 # file, distinguishing it from the silent-skip exit-1 case in scenario 21.
+#
+# H-AUDIT-LS-GLOB-HEADER-UNSAFE note (issue #2440): before the enumeration
+# fix in write_audit.sh (find-based, replacing `ls -1 <glob>`), this
+# scenario's glob match set (one real file + one directory) happened to
+# still turn grep exit-2 -- but via a DIFFERENT, accidental path: `ls -1`
+# printed the directory argument as a "<name>.json:" header line (colon
+# attached), the for-loop word-split that into a bogus filename that does
+# not exist on disk, and grep's ENOENT on THAT nonexistent path (also
+# exit 2) was indistinguishable from the real "Is a directory" this
+# scenario's comment above claims to test. Both the exit code and the
+# WARNING's path-substring check happened to still pass, which is why
+# this scenario's own coverage never caught the bug -- see scenario 50
+# for the shape (sole glob match is the directory) that DOES distinguish
+# them, and dev/status/harness.md for the live repro.
 # ---------------------------------------------------------------------------
 FEATURE22="unreadable-record-warns"
 mkdir -p "${TMP_REPO}/dev/audit"
@@ -3327,6 +3341,63 @@ if (( rc49 != 0 )) && echo "${out49}" | grep -q "could not determine overall ver
 else
   fail "scenario 49 — expected rc!=0 with 'could not determine overall verdict'; got rc=${rc49}, output:"
   echo "${out49}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 50 — H-AUDIT-LS-GLOB-HEADER-UNSAFE (issue #2440, filed as a
+# follow-up in dev/status/harness.md while diagnosing #2440): a corrupted
+# prior record (directory sitting at the glob-matched path, same shape as
+# scenario 22) whose glob match is the ONLY one for this feature -- unlike
+# scenario 22, no sibling "feat/old" file exists. This is the shape
+# scenario 22 never exercises, and the shape that broke the pre-fix `ls
+# -1 "$AUDIT_DIR"/*-"$FEATURE".json` enumeration in write_audit.sh:
+# `ls -1 <single-directory-argument>` lists that DIRECTORY'S OWN CONTENTS
+# (empty), not the directory's name, so the for-loop iterates ZERO times
+# -- the corrupted record vanishes from the scan with NO warning at all,
+# silently. That is a real instance of the "unsafe direction"
+# H-PREV-VERDICT-PIPEFAIL's own design note forbids: a skip must always be
+# visible, never silent. The fix (find-based enumeration, same commit)
+# prints the directory's own path regardless of match count, so the
+# existing per-file grep-exit->1 handling reaches it and the WARNING
+# fires exactly as it does in scenario 22.
+# ---------------------------------------------------------------------------
+FEATURE50="sole-directory-match-warns"
+mkdir -p "${TMP_REPO}/dev/audit"
+
+# No prior write_audit.sh call for this feature -- the corrupted directory
+# is the ONLY thing that will match "*-${FEATURE50}.json".
+UNREADABLE_PATH_50="${TMP_REPO}/dev/audit/2026-07-30-feat-corrupt-${FEATURE50}.json"
+mkdir -p "${UNREADABLE_PATH_50}"
+
+out50=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=3000000000000000000 \
+  bash "${WRITE_AUDIT}" \
+    --date 2026-07-30 --feature "${FEATURE50}" --branch "feat/new" \
+    --structural APPROVED --behavioral NEEDS_REWORK --overall NEEDS_REWORK 2>&1) && rc50=0 || rc50=$?
+JSON50="${TMP_REPO}/dev/audit/2026-07-30-feat-new-${FEATURE50}.json"
+
+c50_rc=1; (( rc50 == 0 )) || c50_rc=0
+c50_file=1; [[ -f "${JSON50}" ]] || c50_file=0
+c50_count=1
+if [[ "${c50_file}" == "1" ]]; then
+  grep -q '"consecutive_rework_count": *1' "${JSON50}" || c50_count=0
+else
+  c50_count=0
+fi
+c50_warn=1; echo "${out50}" | grep -q 'WARNING: could not read prior audit record' || c50_warn=0
+c50_path=1; echo "${out50}" | grep -qF "${UNREADABLE_PATH_50}" || c50_path=0
+
+if [[ "${c50_rc}${c50_file}${c50_count}${c50_warn}${c50_path}" == "11111" ]]; then
+  pass "scenario 50 — a corrupted prior record that is the ONLY glob match for its feature does not vanish silently: still does not abort, still warns loudly naming the offending directory, still counted correctly at 1 (H-AUDIT-LS-GLOB-HEADER-UNSAFE, #2440)"
+else
+  fail "scenario 50 — expected rc=0, consecutive_rework_count=1, a WARNING naming ${UNREADABLE_PATH_50}; got rc=${rc50}"
+  report_conjuncts \
+    "rc50==0 (write_audit for feat/new exit code, actual=${rc50})" "${c50_rc}" \
+    "JSON50 exists at ${JSON50}" "${c50_file}" \
+    "consecutive_rework_count==1 in JSON50 (actual: $([[ "${c50_file}" == "1" ]] && { grep -o '"consecutive_rework_count":[^,}]*' "${JSON50}" 2>/dev/null || echo '<field missing>'; } || echo '<file missing>'))" "${c50_count}" \
+    "stderr contains 'WARNING: could not read prior audit record' (out50 had WARNING line: $(echo "${out50}" | grep 'WARNING' || echo '<none>'))" "${c50_warn}" \
+    "WARNING names ${UNREADABLE_PATH_50} (out50 had WARNING line: $(echo "${out50}" | grep 'WARNING' || echo '<none>'))" "${c50_path}"
+  echo "${out50}" | sed 's/^/      /'
+  [[ -f "${JSON50}" ]] && echo "      json: $(cat "${JSON50}")"
 fi
 
 # ---------------------------------------------------------------------------
