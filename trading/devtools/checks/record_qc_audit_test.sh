@@ -2975,7 +2975,13 @@ fi
 # character the same shape as the real file at the lines that matter for
 # this bug (headings, verdict depths, and the em-dash-appended feature-name
 # suffix on the Behavioral headings, which is what scenario 45 below caught
-# as a false-positive risk in the naive fix).
+# as a false-positive risk in the naive fix). It also carries the real
+# file's line-388 "### Correction to the structural re-review section
+# above" subheading (trimmed prose) -- a live first-word-anchoring trigger:
+# its first word is "Correction", not "Structural"/"Behavioral", so the
+# anchored regex correctly ignores it, but a loosened "anywhere on the
+# line" match would misdetect it as a STRUCTURAL heading mid-behavioral-
+# section (CP2-b, PR #2518 review).
 # ---------------------------------------------------------------------------
 FEATURE44="audit-final-pass-live-repro-2504"
 cat > "${TMP_REPO}/dev/reviews/${FEATURE44}.md" <<'EOF'
@@ -3034,6 +3040,11 @@ independent mutation tests.
 Re-review by qc-behavioral, the author of the NEEDS_REWORK verdict at
 `07abcc99` (quality 2). Every result below was re-derived in this
 worktree against a /tmp copy of the suite.
+
+### Correction to the structural re-review section above
+
+Noting a typo in the structural re-check timestamp above; does not
+change any verdict.
 
 ### Quality Score
 
@@ -3182,6 +3193,140 @@ else
   fail "scenario 46 — expected rc=0 + structural NEEDS_REWORK + behavioral APPROVED + overall NEEDS_REWORK + consecutive_rework_count=1; got rc=${rc46}, output:"
   echo "${out46}" | sed 's/^/      /'
   [[ -f "${JSON46}" ]] && echo "      json: $(cat "${JSON46}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 47 — H-AUDIT-COMBINED-VERDICT-FALLBACK (#2518): a legacy
+# single-pass COMBINED review -- "## Structural Checklist" and
+# "## Behavioral Checklist" both present, but only ONE shared "## Verdict"
+# covers both gates. This is the shape of the real, committed
+# dev/reviews/snapshot-pipeline-perf.md (trimmed skeleton below, same
+# heading order: Structural Checklist -> Behavioral Checklist -> Verdict ->
+# Summary). Before this fix, the section-scoped rule from #2509 left
+# struct_v empty (the lone verdict is scoped to "behavioral", the
+# nearest-preceding heading) -- structural_qc fell to the SKIPPED default,
+# and the overall-derivation, which at the time only derived APPROVED from
+# STRUCTURAL == APPROVED, hard-failed with "could not determine overall
+# verdict" even though the review plainly approved both gates. The
+# combined-review fallback (both headings seen anywhere in the file, one
+# side still empty -> borrow the found verdict into it) restores the
+# pre-#2509 "one verdict covers both gates" semantic for this shape.
+# ---------------------------------------------------------------------------
+FEATURE47="audit-combined-verdict-snapshot-pipeline-perf-shape"
+cat > "${TMP_REPO}/dev/reviews/${FEATURE47}.md" <<'EOF'
+Reviewed SHA: 5474a511
+
+## Structural Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| H1 | dune build @fmt | PASS | |
+| H2 | dune build | PASS | |
+| H3 | dune runtest | PASS | |
+
+## Behavioral Checklist
+
+| # | Check | Status | Notes |
+|---|-------|--------|-------|
+| CP1 | Every public function pinned by tests | PASS | |
+| CP2 | PR body claims match diff | PASS | |
+
+## Verdict
+
+APPROVED
+
+## Summary
+
+Phase B refactor is structurally and behaviorally sound. Ready for merge.
+EOF
+
+out47=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE47}" "feat/dummy47" "2026-08-24" 2>&1) && rc47=0 || rc47=$?
+JSON47="${TMP_REPO}/dev/audit/2026-08-24-feat-dummy47-${FEATURE47}.json"
+if (( rc47 == 0 )) && [[ -f "${JSON47}" ]] \
+   && grep -q '"sha": *"5474a511"' "${JSON47}" \
+   && grep -q '"structural_qc": *"APPROVED"' "${JSON47}" \
+   && grep -q '"behavioral_qc": *"APPROVED"' "${JSON47}" \
+   && grep -q '"overall_qc": *"APPROVED"' "${JSON47}"; then
+  pass "scenario 47 — combined single-verdict review (snapshot-pipeline-perf.md's shape) resolves structural/behavioral/overall all APPROVED, not a SKIPPED-structural exit-1 (H-AUDIT-COMBINED-VERDICT-FALLBACK, #2518)"
+else
+  fail "scenario 47 — expected rc=0 + structural/behavioral/overall all APPROVED; got rc=${rc47}, output:"
+  echo "${out47}" | sed 's/^/      /'
+  [[ -f "${JSON47}" ]] && echo "      json: $(cat "${JSON47}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 48 — H-AUDIT-SPLIT-FILE-OVERALL (#2518): a genuine split
+# companion file that ONLY ever has a Behavioral heading (no Structural
+# heading anywhere), matching dev/reviews/resistance-v2-pr1997.md's real
+# shape ("structural APPROVED was taken from the dispatch" -- not this
+# file). Two things must both hold: (1) the combined-review fallback from
+# scenario 47 must NOT fire here (saw_struct is 0) -- structural_qc must
+# stay SKIPPED, not be fabricated from behavioral's verdict (that
+# fabrication is the #2509 corruption class); (2) the overall-derivation
+# must still resolve APPROVED from behavioral alone (symmetric with the
+# long-accepted structural-alone case, scenario 38) rather than hard-
+# failing on (SKIPPED, APPROVED).
+# ---------------------------------------------------------------------------
+FEATURE48="audit-split-behavioral-only-shape"
+cat > "${TMP_REPO}/dev/reviews/${FEATURE48}.md" <<'EOF'
+Reviewed SHA: b3h48only
+
+## Behavioral QC — audit-split-behavioral-only-shape
+
+Structural APPROVED was taken from the dispatch; this file is
+behavioral-only, mirroring dev/reviews/resistance-v2-pr1997.md.
+
+## Quality Score
+
+5 — clean.
+
+## Verdict
+
+APPROVED
+EOF
+
+out48=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE48}" "feat/dummy48" "2026-08-24" 2>&1) && rc48=0 || rc48=$?
+JSON48="${TMP_REPO}/dev/audit/2026-08-24-feat-dummy48-${FEATURE48}.json"
+if (( rc48 == 0 )) && [[ -f "${JSON48}" ]] \
+   && grep -q '"sha": *"b3h48only"' "${JSON48}" \
+   && grep -q '"structural_qc": *"SKIPPED"' "${JSON48}" \
+   && grep -q '"behavioral_qc": *"APPROVED"' "${JSON48}" \
+   && grep -q '"overall_qc": *"APPROVED"' "${JSON48}"; then
+  pass "scenario 48 — behavioral-only split file: structural_qc stays honestly SKIPPED (not fabricated) AND overall still resolves APPROVED from behavioral alone, symmetric with the structural-only case (H-AUDIT-SPLIT-FILE-OVERALL, #2518)"
+else
+  fail "scenario 48 — expected rc=0 + structural SKIPPED + behavioral APPROVED + overall APPROVED; got rc=${rc48}, output:"
+  echo "${out48}" | sed 's/^/      /'
+  [[ -f "${JSON48}" ]] && echo "      json: $(cat "${JSON48}")"
+fi
+
+# ---------------------------------------------------------------------------
+# Scenario 49 — the CP4-a corollary, pinned as intentional: a "## Verdict"
+# reached while NEITHER a Structural nor a Behavioral heading has ever
+# appeared in the file has no section to attribute it to and is discarded.
+# This is a genuinely degenerate file (no gate heading anywhere) -- both
+# verdicts stay SKIPPED and the overall-derivation correctly exits 1
+# rather than guessing which gate, if any, the lone verdict belongs to.
+# ---------------------------------------------------------------------------
+FEATURE49="audit-sectionless-verdict-degenerate"
+cat > "${TMP_REPO}/dev/reviews/${FEATURE49}.md" <<'EOF'
+Reviewed SHA: deadsec49
+
+# Some unrelated preamble heading
+
+## Verdict
+
+APPROVED
+EOF
+
+out49=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE49}" "feat/dummy49" "2026-08-24" 2>&1) && rc49=0 || rc49=$?
+if (( rc49 != 0 )) && echo "${out49}" | grep -q "could not determine overall verdict"; then
+  pass "scenario 49 — a '## Verdict' with no Structural/Behavioral heading anywhere in the file is discarded (unattributable), and the script exits 1 rather than guessing (H-AUDIT-SECTIONLESS-VERDICT-DISCARDED, CP4-a)"
+else
+  fail "scenario 49 — expected rc!=0 with 'could not determine overall verdict'; got rc=${rc49}, output:"
+  echo "${out49}" | sed 's/^/      /'
 fi
 
 # ---------------------------------------------------------------------------
