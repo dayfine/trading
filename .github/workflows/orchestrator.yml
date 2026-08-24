@@ -459,14 +459,27 @@ jobs:
           # #2426 sat open 201 minutes with no explanation). Instead log
           # ::warning:: with the PR number and the last observed
           # mergeable_state, and return "false" without attempting the
-          # merge, so the caller's existing failure-reporting path (its
-          # own ::warning:: + "human merge required" message) fires with
-          # an accurate reason. This is a soft failure -- the step itself
-          # does not exit non-zero, matching the convention already used
-          # elsewhere in this block (budget-PR-creation failure, fallback-
-          # merge failure) where auto-merge issues are surfaced via
-          # ::warning:: and left for a subsequent run's PR pickup rather
-          # than failing the job outright.
+          # merge. The caller's existing failure-reporting path (its own
+          # ::warning:: + "human merge required" message) still fires
+          # unconditionally whenever this function returns anything other
+          # than "true" -- the *reason* is reported by this function
+          # directly to stderr (both on timeout, above, and on a refused
+          # PUT /merge below), never threaded through a MERGE_RESPONSE
+          # variable. Every caller invokes this function only via command
+          # substitution ($(...)), which forks a subshell: any variable
+          # this function assigns is subshell-local and invisible to the
+          # caller. (Rework #2517: an earlier revision assigned
+          # MERGE_RESPONSE here expecting a caller to read it -- that
+          # assignment was unreachable dead code, and worse, it left the
+          # daily-path caller's pre-existing "Response: ${MERGE_RESPONSE}"
+          # expansion referencing a variable that is never set in the
+          # caller's shell, which aborts under this step's `set -u`
+          # before either failure message can print.) This is a soft
+          # failure -- the step itself does not exit non-zero, matching
+          # the convention already used elsewhere in this block (budget-
+          # PR-creation failure, fallback-merge failure) where auto-merge
+          # issues are surfaced via ::warning:: and left for a subsequent
+          # run's PR pickup rather than failing the job outright.
           # ---------------------------------------------------------------
           merge_pr_when_clean() {
             _PR_NUMBER="$1"
@@ -491,16 +504,19 @@ jobs:
             done
             if [ "$_TIMED_OUT" = "1" ]; then
               echo "::warning::merge_pr_when_clean: poll budget (25 min) exhausted for PR #${_PR_NUMBER}; last observed mergeable_state=${_LAST_MERGEABLE_STATE}. Not attempting merge -- a subsequent run's PR-pickup path must handle it." >&2
-              MERGE_RESPONSE="{\"merged\":false,\"message\":\"merge_pr_when_clean poll budget exhausted; last mergeable_state=${_LAST_MERGEABLE_STATE}\"}"
               printf '%s' "false"
               return 0
             fi
-            MERGE_RESPONSE="$(curl -sSL -X PUT \
+            _MERGE_RESPONSE="$(curl -sSL -X PUT \
               -H "Authorization: Bearer ${GH_TOKEN}" \
               -H "Accept: application/vnd.github+json" \
               -d '{"merge_method":"squash"}' \
               "https://api.github.com/repos/${REPO}/pulls/${_PR_NUMBER}/merge")"
-            printf '%s' "$MERGE_RESPONSE" | jq -r '.merged // false | tostring'
+            _MERGED="$(printf '%s' "$_MERGE_RESPONSE" | jq -r '.merged // false | tostring')"
+            if [ "$_MERGED" != "true" ]; then
+              echo "::warning::merge_pr_when_clean: PUT /merge refused for PR #${_PR_NUMBER}. Response: ${_MERGE_RESPONSE}" >&2
+            fi
+            printf '%s' "$_MERGED"
           }
 
           if [ -z "$DAILY_PR_NUMBER" ] || [ -z "$DAILY_BRANCH" ]; then
@@ -605,7 +621,7 @@ jobs:
           if [ "$MERGED" = "true" ]; then
             echo "Auto-merged PR #${DAILY_PR_NUMBER} (daily summary + budget JSON)."
           else
-            echo "::warning::Auto-merge failed for PR #${DAILY_PR_NUMBER}. Response: ${MERGE_RESPONSE}"
+            echo "::warning::Auto-merge failed for PR #${DAILY_PR_NUMBER} -- see merge_pr_when_clean's ::warning:: above for the reason."
             echo "Human merge required for the daily summary PR. Budget JSON is already on the branch."
           fi
 
