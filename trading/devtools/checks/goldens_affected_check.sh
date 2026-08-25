@@ -34,19 +34,55 @@
 #
 # WHAT IT SCANS
 #
-#   Config-default surface (Step 1) — the files a config default can
-#   change in today:
-#     trading/trading/weinstein/strategy/lib/weinstein_strategy_config.ml
-#     trading/trading/weinstein/strategy/lib/weinstein_strategy_config.mli
+#   Config-default surface (Step 1) — everywhere a strategy-config
+#   default can change today (issue #2531 closed the file-list gap that
+#   let #2530's two flips through green):
+#     trading/trading/weinstein/**/lib/*.ml{,i}   — strategy config + the
+#         nested config records embedded in it (Weinstein_stops.config,
+#         Portfolio_risk.config, Extension_stop.config, ...)
+#     trading/analysis/weinstein/**/lib/*.ml{,i}  — the analysis-side
+#         embedded configs (Stage, Macro, Screener, Stage3_force_exit,
+#         Laggard_rotation, ...)
 #     dev/weekly-picks/live-config-overrides.sexp
-#   A file in this list that doesn't exist at the current revision is
-#   skipped, not a FAIL (keeps this script forward-compatible with a
-#   future rename/move of the config module).
+#   test/ and bin/ directories are deliberately outside the surface
+#   (fixture [@sexp.default lines in tests are not defaults anyone
+#   inherits). A surface directory that doesn't exist at the current
+#   revision is skipped, not a FAIL (keeps this script forward-compatible
+#   with a future rename/move of the config tree).
 #
 #   Knob extraction (Step 2) — only ADDED/REMOVED diff lines count (a
 #   context line is not a change):
 #     .ml / .mli  — a changed line containing "[@sexp.default" carries the
 #                   field name as the identifier immediately before ":".
+#     .ml default-record literals (Step 2b) — a REQUIRED field has no
+#                   [@sexp.default]; its default lives only in the
+#                   module's default value binding (e.g.
+#                   `initial_stop_buffer = 1.0;` inside `let
+#                   default_config`, weinstein_strategy_config.ml —
+#                   the exact #2530/#2531 blind spot). For every changed
+#                   surface .ml, the region under any top-level
+#                   `let default*` / `let _default*` binding is
+#                   extracted at BOTH revisions as `field = value;`
+#                   lines, and a field whose line differs (added,
+#                   removed, or value changed) counts as a changed knob.
+#                   Known residuals: a field whose value spans multiple
+#                   lines (no `;` at end-of-line) and a default routed
+#                   through a renamed top-level constant
+#                   (`let default_foo = 5` feeding field `bar`) are
+#                   still invisible — the manual rule remains the
+#                   backstop.
+#     nested-config embedding (Step 2c) — when a changed knob comes from
+#                   a file that defines a config record EMBEDDED in the
+#                   strategy config (stops, portfolio_risk, stage, macro,
+#                   screener, ...), the OUTER strategy-config field name
+#                   (`stops_config`, `portfolio_config`, ...) is also
+#                   emitted as a related knob, because a golden's
+#                   config_overrides keys on the outer name and inherits
+#                   the inner default silently — the historical #2530
+#                   shape (armed-stoplimit armed `stops_config` while
+#                   `reset_anchor_on_stalled_cycle` flipped underneath).
+#                   The file→field map is maintained by hand in
+#                   `_embedding_field`.
 #     live-config-overrides.sexp — a changed line shaped "((<knob> ...)"
 #                   carries the field name as the identifier immediately
 #                   after "((". Nested config records (e.g.
@@ -156,20 +192,26 @@ if ! command -v git >/dev/null 2>&1; then
   exit 1
 fi
 
-# --- Step 1: config-default surface files present at this revision ---
+# --- Step 1: config-default surface present at this revision ---
 
-SURFACE_ML="trading/trading/weinstein/strategy/lib/weinstein_strategy_config.ml"
+# The whole weinstein config tree, not a hand-picked file pair — issue
+# #2531: initial_stop_buffer (default_config record literal) and
+# reset_anchor_on_stalled_cycle (stops/lib/stop_types.ml, outside the old
+# two-file list) both changed defaults invisibly to the old scan.
+SURFACE_DIRS="trading/trading/weinstein trading/analysis/weinstein"
+# Step 2.5 (docstring cross-references) still reads the top-level strategy
+# config .mli only — that is where the [bracket]-citation convention lives.
 SURFACE_MLI="trading/trading/weinstein/strategy/lib/weinstein_strategy_config.mli"
 SURFACE_OVERRIDES="dev/weekly-picks/live-config-overrides.sexp"
 
-SEXP_DEFAULT_FILES=""
-for f in "$SURFACE_ML" "$SURFACE_MLI"; do
-  [ -f "$f" ] && SEXP_DEFAULT_FILES="$SEXP_DEFAULT_FILES $f"
+SURFACE_DIR_PRESENT=0
+for d in $SURFACE_DIRS; do
+  [ -d "$d" ] && SURFACE_DIR_PRESENT=1
 done
 OVERRIDES_FILE=""
 [ -f "$SURFACE_OVERRIDES" ] && OVERRIDES_FILE="$SURFACE_OVERRIDES"
 
-if [ -z "$SEXP_DEFAULT_FILES" ] && [ -z "$OVERRIDES_FILE" ]; then
+if [ "$SURFACE_DIR_PRESENT" -eq 0 ] && [ -z "$OVERRIDES_FILE" ]; then
   echo "OK: goldens_affected_check -- no known config-default surface file exists at this revision (nothing to scan)."
   exit 0
 fi
@@ -194,16 +236,110 @@ _changed_body_lines() {
     | grep -E '^[+-][^+-]' | cut -c2- || true
 }
 
-# DIRECT_KNOBS_FILE: field names changed via [@sexp.default (Step 1's
-# SEXP_DEFAULT_FILES). Kept separate from the overrides-file extraction
-# below because ONLY these have a docstring for Step 2.5 to read.
-if [ -n "$SEXP_DEFAULT_FILES" ]; then
-  # shellcheck disable=SC2086 -- SEXP_DEFAULT_FILES is a space-separated path list
-  _changed_body_lines "$BASE_REF" "$HEAD_REF" $SEXP_DEFAULT_FILES \
+# Changed config files: every changed lib .ml/.mli under the surface
+# dirs. The /lib/ filter keeps test fixtures and bin mains out of the
+# surface (a [@sexp.default in a test file is not a default anyone
+# inherits).
+CHANGED_CONFIG_FILES=""
+if [ "$SURFACE_DIR_PRESENT" -eq 1 ]; then
+  # shellcheck disable=SC2086 -- SURFACE_DIRS is a space-separated path list
+  CHANGED_CONFIG_FILES="$(git diff --name-only "$BASE_REF" "$HEAD_REF" -- $SURFACE_DIRS 2>/dev/null \
+    | grep -E '/lib/[^/]+\.mli?$' || true)"
+fi
+
+# --- Step 2b helpers: default-record-literal extraction + embedding map ---
+# A required field's default lives only in the module's default value
+# binding (`let default_config = { ...; initial_stop_buffer = 1.0; ... }`).
+# Extract every `field = value;` line under any top-level `let default*` /
+# `let _default*` binding at BOTH revisions; a field whose line differs is
+# a changed knob. See the header's Step 2b notes for the known residuals.
+
+# _default_literal_pairs <ref> <file>
+# Prints "<field>\t<field = value;>" for each single-line record field
+# inside a top-level default binding of <file> at <ref>. Missing file at
+# that ref -> empty (added/removed files are handled by the set diff).
+_default_literal_pairs() {
+  git show "$1:$2" 2>/dev/null | awk '
+    /^let / { in_def = ($0 ~ /^let _?default/) }
+    in_def && $0 ~ /^[ \t]+[a-z_][a-z0-9_]* = .*;[ \t]*$/ {
+      line = $0
+      sub(/^[ \t]+/, "", line)
+      name = line
+      sub(/[ \t]*=.*/, "", name)
+      print name "\t" line
+    }
+  ' || true
+}
+
+# _embedding_field <file>
+# The strategy-config field name that EMBEDS the nested config record
+# defined in <file> ("" for the top-level strategy config itself, and for
+# files that define no embedded config). A golden's config_overrides keys
+# on this OUTER name (`((stops_config ((...))))`), so a default change
+# inside the nested record affects every golden that arms the outer field
+# even though the golden never names the inner knob — the exact
+# historical #2530 shape (armed-stoplimit armed `stops_config` while
+# `reset_anchor_on_stalled_cycle` flipped underneath it). This map is
+# maintained by hand against weinstein_strategy_config.ml's default_config
+# literal (each `<field> = <Module>.default_config;` line); a new embedded
+# config needs a row here, which the paired test assertion pins for the
+# known ones.
+_embedding_field() {
+  case "$1" in
+    trading/trading/weinstein/stops/lib/extension_stop.*) echo "extension_stop_config" ;;
+    trading/trading/weinstein/stops/lib/*) echo "stops_config" ;;
+    trading/trading/weinstein/portfolio_risk/lib/*) echo "portfolio_config" ;;
+    trading/trading/weinstein/strategy/lib/liquidity_config.*) echo "liquidity_config" ;;
+    trading/analysis/weinstein/stage/lib/*) echo "stage_config" ;;
+    trading/analysis/weinstein/macro/lib/*) echo "macro_config" ;;
+    trading/analysis/weinstein/screener/lib/*) echo "screening_config" ;;
+    trading/analysis/weinstein/stage3_force_exit/lib/*) echo "stage3_force_exit_config" ;;
+    trading/analysis/weinstein/laggard_rotation/lib/*) echo "laggard_rotation_config" ;;
+    *) echo "" ;;
+  esac
+}
+
+LIT_BASE="$(mktemp)"
+LIT_HEAD="$(mktemp)"
+FILE_KNOBS="$(mktemp)"
+trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT" "$LIT_BASE" "$LIT_HEAD" "$FILE_KNOBS"' EXIT
+
+# --- Steps 2 + 2b + 2c, per changed surface file ---
+# 2  : field names changed via [@sexp.default lines.
+# 2b : field names whose default-record-literal line changed (.ml only).
+# 2c : if the file contributed any changed knob AND defines an EMBEDDED
+#      config, also emit the embedding strategy-config field as a related
+#      knob — goldens key on the outer name, not the inner one.
+for f in $CHANGED_CONFIG_FILES; do
+  : > "$FILE_KNOBS"
+
+  _changed_body_lines "$BASE_REF" "$HEAD_REF" "$f" \
     | grep -F '[@sexp.default' \
     | sed -n 's/^[[:space:]]*\([A-Za-z_][A-Za-z0-9_]*\)[[:space:]]*:.*$/\1/p' \
-    >> "$DIRECT_KNOBS_FILE" || true
-fi
+    >> "$FILE_KNOBS" || true
+
+  case "$f" in
+    *.mli) ;;  # default literals live in .ml implementations only
+    *)
+      _default_literal_pairs "$BASE_REF" "$f" | sort -u > "$LIT_BASE"
+      _default_literal_pairs "$HEAD_REF" "$f" | sort -u > "$LIT_HEAD"
+      # Symmetric difference: any field line present at only one rev names
+      # a changed knob (comm prefixes column 2 with a tab; strip, field 1).
+      comm -3 "$LIT_BASE" "$LIT_HEAD" \
+        | sed 's/^[[:space:]]*//' \
+        | cut -f1 \
+        >> "$FILE_KNOBS" || true
+      ;;
+  esac
+
+  if [ -s "$FILE_KNOBS" ]; then
+    cat "$FILE_KNOBS" >> "$DIRECT_KNOBS_FILE"
+    outer="$(_embedding_field "$f")"
+    if [ -n "$outer" ]; then
+      printf '%s\tembeds:%s\n' "$outer" "$(basename "$f")" >> "$RELATED_KNOBS_FILE"
+    fi
+  fi
+done
 
 if [ -n "$OVERRIDES_FILE" ]; then
   _changed_body_lines "$BASE_REF" "$HEAD_REF" "$OVERRIDES_FILE" \
@@ -214,7 +350,7 @@ fi
 sort -u "$DIRECT_KNOBS_FILE" -o "$DIRECT_KNOBS_FILE"
 
 if [ ! -s "$DIRECT_KNOBS_FILE" ]; then
-  echo "OK: goldens_affected_check -- no [@sexp.default value / override knob was added or removed in any config-default surface file ($BASE_REF..$HEAD_REF)."
+  echo "OK: goldens_affected_check -- no [@sexp.default value, default-record-literal value, or override knob was added or removed in any config-default surface file ($BASE_REF..$HEAD_REF)."
   exit 0
 fi
 
@@ -289,7 +425,7 @@ sort -u "$KNOBS_FILE" -o "$KNOBS_FILE"
 
 WORKFLOWS_DIR="${REPO_ROOT}/.github/workflows"
 SUBDIRS_FILE="$(mktemp)"
-trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT" "$SUBDIRS_FILE"' EXIT
+trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT" "$LIT_BASE" "$LIT_HEAD" "$SUBDIRS_FILE"' EXIT
 
 WORKFLOW_MATCHED=0
 for wf in "$WORKFLOWS_DIR"/golden-runs-*.yml; do
@@ -331,6 +467,9 @@ while IFS="$TAB" read -r knob reason; do
         case "$reason" in
           direct)
             MATCHES="${MATCHES}  knob '${knob}' is armed by ${rel}\n"
+            ;;
+          embeds:*)
+            MATCHES="${MATCHES}  knob '${knob}' is armed by ${rel} (${reason} -- embedding field of a nested config whose default changed)\n"
             ;;
           *)
             MATCHES="${MATCHES}  knob '${knob}' is armed by ${rel} (${reason} -- docstring cross-reference, best-effort)\n"

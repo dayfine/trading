@@ -50,6 +50,20 @@
 #       knob+golden match that produces a FAIL in assertion 4 instead
 #       exits 0 with an "OK (acknowledged)" notice that still lists the
 #       affected golden and points at the PR-body requirement.
+#   14. (#2531 gap a) A [@sexp.default flip in a NESTED config file
+#       (stops/lib/stop_types.mli — outside the old two-file list) that
+#       a golden arms -> FAIL.
+#   15. (#2531 gap b) A default_config record-literal value change for
+#       a REQUIRED field (no [@sexp.default] anywhere) that a golden
+#       arms -> FAIL (Step 2b).
+#   16. A field-shaped assignment changed inside ORDINARY (non-default)
+#       code in a surface .ml -> OK (Step 2b extracts only from
+#       top-level `let default*` bindings — no false positive).
+#   17. A [@sexp.default change in a test/ file -> OK (the /lib/ filter
+#       keeps test fixtures outside the surface).
+#   18. (#2531 gap a, historical shape) The golden names only the OUTER
+#       embedding field ("stops_config"), never the flipped inner knob
+#       -> still FAIL via Step 2c's embedding-field emission.
 #
 # Run:
 #   sh trading/devtools/checks/goldens_affected_check_test.sh
@@ -492,6 +506,178 @@ else
   fail "assertion 13: expected OK/exit0 acknowledged notice naming the golden, got rc=$RC output=$OUT"
 fi
 rm -rf "$REPO13"
+
+echo "=== Assertion 14: nested-config file (stops/lib/stop_types.mli) [@sexp.default flip armed by a golden -> FAIL ==="
+# Pins the #2531 gap (b-file): reset_anchor_on_stalled_cycle's default
+# lives in trading/trading/weinstein/stops/lib/stop_types.{ml,mli} —
+# entirely outside the old two-file scan list. The whole-subtree surface
+# must catch a default flip there.
+NESTED_MLI_REL="trading/trading/weinstein/stops/lib/stop_types.mli"
+REPO14="$(_new_repo)"
+mkdir -p "$(dirname "$REPO14/$NESTED_MLI_REL")" "$REPO14/.github/workflows"
+mkdir -p "$REPO14/trading/test_data/backtest_scenarios/goldens-sp500"
+{
+  echo "type config = {"
+  echo "  reset_anchor_on_stalled_cycle : bool; [@sexp.default false]"
+  echo "}"
+} > "$REPO14/$NESTED_MLI_REL"
+{
+  echo "      GOLDEN_SP500_SUBDIRS: goldens-sp500"
+} > "$REPO14/.github/workflows/golden-runs-fixture.yml"
+{
+  echo "((name \"fixture-golden\")"
+  echo " (config_overrides (((stops_config ((reset_anchor_on_stalled_cycle false)))))))"
+} > "$REPO14/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden.sexp"
+SHA14A="$(_commit "$REPO14" "base")"
+sed -i.bak 's/\[@sexp.default false\]/[@sexp.default true]/' "$REPO14/$NESTED_MLI_REL"
+rm -f "$REPO14/$NESTED_MLI_REL.bak"
+SHA14B="$(_commit "$REPO14" "head: flip reset_anchor_on_stalled_cycle default")"
+_run "$REPO14" "$SHA14A" "$SHA14B"
+if [ "$RC" -eq 1 ] \
+  && echo "$OUT" | grep -q "reset_anchor_on_stalled_cycle" \
+  && echo "$OUT" | grep -q "fixture-golden.sexp"; then
+  pass "assertion 14: nested-config-file default flip caught"
+else
+  fail "assertion 14: expected FAIL/exit1 naming reset_anchor_on_stalled_cycle, got rc=$RC output=$OUT"
+fi
+rm -rf "$REPO14"
+
+echo "=== Assertion 15: default_config record-literal value change (no [@sexp.default]) armed by a golden -> FAIL ==="
+# Pins the #2531 gap (b-shape): initial_stop_buffer is a REQUIRED field;
+# its default lives only in the default_config record literal. Step 2b
+# must extract the changed field from the literal region.
+REPO15="$(_new_repo)"
+mkdir -p "$(dirname "$REPO15/$SURFACE_ML_REL")" "$REPO15/.github/workflows"
+mkdir -p "$REPO15/trading/test_data/backtest_scenarios/goldens-sp500"
+{
+  echo "let default_config ~universe ~index_symbol ="
+  echo "  {"
+  echo "    universe;"
+  echo "    initial_stop_buffer = 1.02;"
+  echo "    lookback_bars = 52;"
+  echo "  }"
+} > "$REPO15/$SURFACE_ML_REL"
+{
+  echo "      GOLDEN_SP500_SUBDIRS: goldens-sp500"
+} > "$REPO15/.github/workflows/golden-runs-fixture.yml"
+{
+  echo "((name \"fixture-golden\")"
+  echo " (config_overrides (((initial_stop_buffer 1.02)))))"
+} > "$REPO15/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden.sexp"
+SHA15A="$(_commit "$REPO15" "base")"
+sed -i.bak 's/initial_stop_buffer = 1.02;/initial_stop_buffer = 1.0;/' "$REPO15/$SURFACE_ML_REL"
+rm -f "$REPO15/$SURFACE_ML_REL.bak"
+SHA15B="$(_commit "$REPO15" "head: flip initial_stop_buffer literal 1.02 -> 1.0")"
+_run "$REPO15" "$SHA15A" "$SHA15B"
+if [ "$RC" -eq 1 ] \
+  && echo "$OUT" | grep -q "initial_stop_buffer" \
+  && echo "$OUT" | grep -q "fixture-golden.sexp"; then
+  pass "assertion 15: default_config record-literal change caught"
+else
+  fail "assertion 15: expected FAIL/exit1 naming initial_stop_buffer, got rc=$RC output=$OUT"
+fi
+rm -rf "$REPO15"
+
+echo "=== Assertion 16: surface .ml change OUTSIDE any default binding -> OK (no false positive) ==="
+# Guards Step 2b's precision: a field-shaped assignment inside ordinary
+# (non-default) code must not be extracted as a knob.
+REPO16="$(_new_repo)"
+mkdir -p "$(dirname "$REPO16/$SURFACE_ML_REL")" "$REPO16/.github/workflows"
+mkdir -p "$REPO16/trading/test_data/backtest_scenarios/goldens-sp500"
+{
+  echo "let default_config ~universe ~index_symbol ="
+  echo "  {"
+  echo "    initial_stop_buffer = 1.0;"
+  echo "  }"
+  echo "let apply_thing t ="
+  echo "  {"
+  echo "    initial_stop_buffer = t.buffer;"
+  echo "  }"
+} > "$REPO16/$SURFACE_ML_REL"
+{
+  echo "      GOLDEN_SP500_SUBDIRS: goldens-sp500"
+} > "$REPO16/.github/workflows/golden-runs-fixture.yml"
+{
+  echo "((name \"fixture-golden\")"
+  echo " (config_overrides (((initial_stop_buffer 1.02)))))"
+} > "$REPO16/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden.sexp"
+SHA16A="$(_commit "$REPO16" "base")"
+sed -i.bak 's/initial_stop_buffer = t.buffer;/initial_stop_buffer = t.buffer2;/' "$REPO16/$SURFACE_ML_REL"
+rm -f "$REPO16/$SURFACE_ML_REL.bak"
+SHA16B="$(_commit "$REPO16" "head: change non-default code only")"
+_run "$REPO16" "$SHA16A" "$SHA16B"
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "no \[@sexp.default"; then
+  pass "assertion 16: non-default-binding change not extracted -> OK"
+else
+  fail "assertion 16: expected OK/exit0, got rc=$RC output=$OUT"
+fi
+rm -rf "$REPO16"
+
+echo "=== Assertion 17: [@sexp.default change in a test/ file is outside the surface -> OK ==="
+# The /lib/ filter keeps test fixtures out: a [@sexp.default line in a
+# test .ml is not a default anyone inherits.
+TEST_ML_REL="trading/trading/weinstein/stops/test/test_fixture.ml"
+REPO17="$(_new_repo)"
+mkdir -p "$(dirname "$REPO17/$TEST_ML_REL")" "$REPO17/.github/workflows"
+mkdir -p "$REPO17/trading/test_data/backtest_scenarios/goldens-sp500"
+{
+  echo "type fixture = {"
+  echo "  catastrophic_stop_pct : float; [@sexp.default 0.0]"
+  echo "}"
+} > "$REPO17/$TEST_ML_REL"
+{
+  echo "      GOLDEN_SP500_SUBDIRS: goldens-sp500"
+} > "$REPO17/.github/workflows/golden-runs-fixture.yml"
+{
+  echo "((name \"fixture-golden\")"
+  echo " (config_overrides (((stops_config ((catastrophic_stop_pct 0.10)))))))"
+} > "$REPO17/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden.sexp"
+SHA17A="$(_commit "$REPO17" "base")"
+sed -i.bak 's/\[@sexp.default 0.0\]/[@sexp.default 0.5]/' "$REPO17/$TEST_ML_REL"
+rm -f "$REPO17/$TEST_ML_REL.bak"
+SHA17B="$(_commit "$REPO17" "head: change test fixture default")"
+_run "$REPO17" "$SHA17A" "$SHA17B"
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "no \[@sexp.default"; then
+  pass "assertion 17: test-file default change outside surface -> OK"
+else
+  fail "assertion 17: expected OK/exit0 (test files excluded), got rc=$RC output=$OUT"
+fi
+rm -rf "$REPO17"
+
+echo "=== Assertion 18: nested-config default change caught via the EMBEDDING field when the golden names only the outer identifier -> FAIL ==="
+# The historical #2530 shape exactly: the golden's config_overrides arms
+# ((stops_config ((catastrophic_stop_pct 0.10)))) and never names the
+# flipped inner knob; the inner default changes in stop_types.mli. Step
+# 2c must flag it via the outer `stops_config` embedding field.
+REPO18="$(_new_repo)"
+mkdir -p "$(dirname "$REPO18/$NESTED_MLI_REL")" "$REPO18/.github/workflows"
+mkdir -p "$REPO18/trading/test_data/backtest_scenarios/goldens-sp500"
+{
+  echo "type config = {"
+  echo "  reset_anchor_on_stalled_cycle : bool; [@sexp.default false]"
+  echo "}"
+} > "$REPO18/$NESTED_MLI_REL"
+{
+  echo "      GOLDEN_SP500_SUBDIRS: goldens-sp500"
+} > "$REPO18/.github/workflows/golden-runs-fixture.yml"
+{
+  echo "((name \"fixture-golden\")"
+  echo " (config_overrides (((stops_config ((catastrophic_stop_pct 0.10)))))))"
+} > "$REPO18/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden.sexp"
+SHA18A="$(_commit "$REPO18" "base")"
+sed -i.bak 's/\[@sexp.default false\]/[@sexp.default true]/' "$REPO18/$NESTED_MLI_REL"
+rm -f "$REPO18/$NESTED_MLI_REL.bak"
+SHA18B="$(_commit "$REPO18" "head: flip nested default")"
+_run "$REPO18" "$SHA18A" "$SHA18B"
+if [ "$RC" -eq 1 ] \
+  && echo "$OUT" | grep -q "'stops_config'" \
+  && echo "$OUT" | grep -q "embeds:stop_types.mli" \
+  && echo "$OUT" | grep -q "fixture-golden.sexp"; then
+  pass "assertion 18: outer embedding field flags the golden that never names the inner knob"
+else
+  fail "assertion 18: expected FAIL/exit1 naming stops_config via embeds:stop_types.mli, got rc=$RC output=$OUT"
+fi
+rm -rf "$REPO18"
 
 echo ""
 echo "=== Results: ${PASS_COUNT} passed, ${FAIL_COUNT} failed ==="

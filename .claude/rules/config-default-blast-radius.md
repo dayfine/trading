@@ -23,11 +23,21 @@ is invisible to CI exactly where it would show up.
 
 ## The rule
 
-A PR is a **config-default change** if it touches a `[@sexp.default ...]`
-value in `trading/trading/weinstein/strategy/lib/weinstein_strategy_config.ml`
-or `.mli`, or adds/changes a knob in
-`dev/weekly-picks/live-config-overrides.sexp`. For such a PR, before
-requesting merge:
+A PR is a **config-default change** if it changes any strategy-config
+default (issue #2531 widened this from the original two-file definition,
+which let #2530's two flips through green):
+
+- a `[@sexp.default ...]` value in ANY `lib/*.ml{,i}` under
+  `trading/trading/weinstein/` or `trading/analysis/weinstein/` — the
+  strategy config itself AND every nested config embedded in it
+  (`Weinstein_stops.config` in `stops/lib/stop_types.ml`,
+  `Portfolio_risk.config`, `Stage`/`Macro`/`Screener` configs, ...);
+- a field's value in a `let default*` record literal in those files
+  (required fields have no `[@sexp.default]` — e.g. `initial_stop_buffer`
+  in `weinstein_strategy_config.ml`'s `default_config`);
+- a knob in `dev/weekly-picks/live-config-overrides.sexp`.
+
+For such a PR, before requesting merge:
 
 1. **Grep the golden/scenario specs for the affected knob:**
    ```sh

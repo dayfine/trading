@@ -161,16 +161,27 @@
   ;; pin (102.39% / 250 / 34.0 / 0.87 / 30.07 / 41.00 / OPV 1,669,042 / force_liqs 0).
   ;; The top-500-by-cap composition is liquid over this window → gate + stale-exit
   ;; no-op. Bands unchanged.
-  ((total_return_pct   ((min  87.0)         (max 117.7)))
-   (total_trades       ((min 213)           (max 288)))
-   (win_rate           ((min  28.9)         (max  39.1)))
-   (sharpe_ratio       ((min   0.74)        (max   1.00)))
-   (max_drawdown_pct   ((min  25.6)         (max  34.6)))
-   (avg_holding_days   ((min  34.9)         (max  47.2)))
-   (open_positions_value ((min 1418700.0)   (max 1919400.0)))
-   (sortino_ratio_annualized ((min  1.00)   (max   1.36)))
-   (calmar_ratio       ((min   0.43)        (max   0.58)))
-   (ulcer_index        ((min  10.4)         (max  14.0)))
+  ;; RE-PINNED 2026-08-25 to the book-faithful stops basis shipped in #2530
+  ;; (initial_stop_buffer 1.02→1.0 + reset_anchor_on_stalled_cycle default-on,
+  ;; ledger 2026-08-24-stops-basis-book-faithful) — part of the #2403 broad/
+  ;; custom re-pin. Bands ±15% around the 2026-08-25 local run at main
+  ;; e2f69bc69 (postsubmit script, --parallel 1, survivor-subset test_data
+  ;; store — same store the GHA workflow runs against):
+  ;;   ret 103.35  trades 191  win 38.22  sharpe 0.878  maxDD 29.83
+  ;;   hold 57.24  OPV 1,662,331  sortino 1.225  calmar 0.513  ulcer 11.53
+  ;; Signature matches the basis flip's known direction (fewer trades,
+  ;; longer holds — see dev/experiments/record-baseline-2026-08-24): the
+  ;; prior pin FAILed exactly on total_trades low + avg_holding_days high.
+  ((total_return_pct   ((min  87.847)       (max 118.852)))
+   (total_trades       ((min 162.35)        (max 219.65)))
+   (win_rate           ((min  32.487)       (max  43.953)))
+   (sharpe_ratio       ((min   0.7465)      (max   1.0100)))
+   (max_drawdown_pct   ((min  25.353)       (max  34.301)))
+   (avg_holding_days   ((min  48.655)       (max  65.827)))
+   (open_positions_value ((min 1412981.2)   (max 1911680.4)))
+   (sortino_ratio_annualized ((min  1.0413) (max   1.4088)))
+   (calmar_ratio       ((min   0.4357)      (max   0.5895)))
+   (ulcer_index        ((min   9.799)       (max  13.258)))
    ;; wall_seconds wide (CI ~5x local, local ~190s) — catches only
    ;; catastrophic 2x slowdowns per design intent.
    (wall_seconds       ((min 100.0)         (max 1800.0))))))
