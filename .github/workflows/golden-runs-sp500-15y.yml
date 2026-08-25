@@ -36,7 +36,13 @@ jobs:
     # 90-min cap fitted only the original single scenario; when #1050 added
     # the long-short golden (2026-05-12) every subsequent run was cancelled
     # at the cap — 96+ consecutive silent cancellations (#2427).
-    timeout-minutes: 240
+    # Raised 240 -> 600 (2026-08-25, #2537): the two 15y strategy cells
+    # MEASURE 90-102 min per cell locally (backtest proper is only
+    # ~430-470s; the bulk is the all_eligible diagnostic scanning 852
+    # Fridays), so 70 min/cell was structurally unreachable and every
+    # completed run since at least 08-23 timed out both cells. Worst case
+    # now: 2 x 240 min + bah + build ~= 520 min, inside the cap.
+    timeout-minutes: 600
     permissions:
       contents: read
       packages: read
@@ -52,11 +58,12 @@ jobs:
       TRADING_DATA_DIR: ${{ github.workspace }}/trading/test_data
       # Restrict to 15y historical goldens.
       GOLDEN_SP500_SUBDIRS: goldens-sp500-historical
-      # Per-cell timeout (seconds). The script default is 90 min per cell,
-      # so three pathological hangs would take 270 min — racing the job's
-      # 240-min cap instead of being bounded by it. 70 min/cell keeps the
-      # worst case (~210 min + build) inside the cap by construction.
-      GOLDEN_SP500_TIMEOUT: "4200"
+      # Per-cell timeout (seconds). Measured 2026-08-25 (#2537): the two
+      # 15y cells take 5374s / 6127s locally end-to-end (true RSS ~1.7GB —
+      # the 12.4GB figures in older kill reports were mmap-inflated RSS).
+      # GHA runners are typically slower, so 4h/cell; the 600-min job cap
+      # above still bounds two pathological hangs.
+      GOLDEN_SP500_TIMEOUT: "14400"
     steps:
       - uses: actions/checkout@v4
 
