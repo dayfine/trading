@@ -78,6 +78,10 @@
    (bid_ask_spread_bps 5.0)
    (market_impact_bps_per_pct_adv 0.0)))
  (expected
+  ;; Re-pinned 2026-08-24 for the book-faithful stops basis (PR #2530:
+  ;; initial_stop_buffer 1.0 + reset_anchor_on_stalled_cycle default-on;
+  ;; user-directed #2486; ledger 2026-08-24-stops-basis-book-faithful).
+  ;; ±15% around new-basis actuals at c7660cac3 (dev/experiments/record-baseline-2026-08-24/).
   ;; Re-pinned 2026-06-23 for the A-D-live default flip (synthetic breadth tail).
   ;; A-D-live's conservative COVID gate raised risk metrics here (MaxDD 21.6→31.3,
   ;; Calmar 0.46→0.26); return held (in band). Longshort still beats its long-only twin.
@@ -95,16 +99,16 @@
   ;; center (45.73), all metrics comfortably in-band. SP500 names are liquid, so
   ;; the entry gate is near-inert here (STOP-rule >20% not triggered). Bands
   ;; unchanged.
-  ((total_return_pct   ((min  38.9)        (max  52.6)))
-   (total_trades       ((min 233)          (max 315)))
-   (win_rate           ((min  31.0)        (max  42.0)))
-   (sharpe_ratio       ((min   0.47)       (max   0.64)))
-   (max_drawdown_pct   ((min  21.2)        (max  28.6)))
-   (avg_holding_days   ((min  32.9)        (max  44.5)))
-   (open_positions_value ((min 1003500.0)  (max 1357700.0)))
-   (sortino_ratio_annualized ((min 0.59)   (max 0.80)))
-   (calmar_ratio       ((min   0.27)       (max   0.36)))
-   (ulcer_index        ((min   8.2)        (max  11.1)))
+  ((total_return_pct ((min 47.8907) (max 64.7934)))
+   (total_trades ((min 171.7) (max 232.3)))
+   (win_rate ((min 31.1386) (max 42.1287)))
+   (sharpe_ratio ((min 0.544709) (max 0.736959)))
+   (max_drawdown_pct ((min 26.248) (max 35.512)))
+   (avg_holding_days ((min 46.527) (max 62.9483)))
+   (open_positions_value ((min 1.32454e+06) (max 1.79202e+06)))
+   (sortino_ratio_annualized ((min 0.697788) (max 0.944067)))
+   (calmar_ratio ((min 0.257969) (max 0.349017)))
+   (ulcer_index ((min 10.397) (max 14.0665)))
    ;; wall_seconds pin sized wide (CI ~920s, local parallel ~200s) —
    ;; catches only catastrophic 2x slowdowns per design intent.
    (wall_seconds       ((min 100.0)        (max 1500.0))))))

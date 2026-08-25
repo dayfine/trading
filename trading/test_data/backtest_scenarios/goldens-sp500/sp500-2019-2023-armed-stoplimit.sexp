@@ -145,11 +145,15 @@
    (bid_ask_spread_bps 5.0)
    (market_impact_bps_per_pct_adv 0.0)))
  (expected
-  ((total_return_pct     ((min 110.78323995525771) (max 113.78323995525771)))
-   (total_trades         ((min 239.5)       (max 240.5)))
-   (win_rate             ((min  34.12)      (max  41.71)))
-   (sharpe_ratio         ((min   0.994)     (max   1.215)))
-   (max_drawdown_pct     ((min  15.29)      (max  18.68)))
-   (avg_holding_days     ((min  40.83)      (max  49.90)))
-   (open_positions_value ((min 1878875.0)   (max 2296403.0)))
+  ;; Re-pinned 2026-08-24 for the book-faithful stops basis (PR #2530:
+  ;; initial_stop_buffer 1.0 + reset_anchor_on_stalled_cycle default-on;
+  ;; user-directed #2486; ledger 2026-08-24-stops-basis-book-faithful).
+  ;; ±15% around new-basis actuals at c7660cac3 (dev/experiments/record-baseline-2026-08-24/).
+  ((total_return_pct ((min 79.765) (max 107.917)))
+   (total_trades ((min 145.35) (max 196.65)))
+   (win_rate ((min 30.3216) (max 41.0234)))
+   (sharpe_ratio ((min 0.809249) (max 1.09487)))
+   (max_drawdown_pct ((min 19.4754) (max 26.3491)))
+   (avg_holding_days ((min 55.0561) (max 74.4877)))
+   (open_positions_value ((min 1.60793e+06) (max 2.17544e+06)))
    (wall_seconds         ((min 100.0)       (max 1500.0))))))
