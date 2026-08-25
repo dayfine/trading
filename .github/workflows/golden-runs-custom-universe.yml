@@ -79,3 +79,18 @@ jobs:
           else
             echo "No summary file found" >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      # Per-cell logs (<scenario>.log/.error/.wall_sec/.peak_rss) carry the
+      # actual failure reason (band violation vs crash, per-metric detail,
+      # symbol-load counts); without this upload a soak FAIL is undiagnosable
+      # from the run page — the 2026-08-25 flake investigation (#2547) needed
+      # a full local reproduction + a paid rerun purely because these files
+      # were discarded.
+      - name: Upload per-cell artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-custom-universe-cells-${{ github.run_id }}
+          path: dev/perf/golden-sp500-postsubmit-*/
+          retention-days: 14
+          if-no-files-found: warn
