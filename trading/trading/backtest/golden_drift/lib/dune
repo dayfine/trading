@@ -1,0 +1,6 @@
+(library
+ (name golden_live_drift_lib)
+ (modules golden_live_drift)
+ (libraries core scenario_lib backtest weinstein_trading.strategy)
+ (preprocess
+  (pps ppx_sexp_conv)))

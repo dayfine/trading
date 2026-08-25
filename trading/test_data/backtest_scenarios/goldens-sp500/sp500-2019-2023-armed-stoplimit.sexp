@@ -135,6 +135,32 @@
    ((liquidity_config ((min_entry_dollar_adv 1000000.0))))
    ((liquidity_config ((min_hold_dollar_adv 500000.0))))
    ((stale_exit_after_days (5)))))
+ ;; Deviations from the live weekly-picks config
+ ;; (dev/weekly-picks/live-config-overrides.sexp), enforced by the
+ ;; golden_live_drift linter (#2403). Data-only: Scenario.t is
+ ;; [@@sexp.allow_extra_fields], so the runner parses and ignores this block.
+ (deviates_from_live
+  ((enable_sim_entry_stoplimit "the armed StopLimit entry stack this cell exists to pin; live does not arm the simulator entry model")
+   (sim_entry_trigger_at_suggested "part of the armed StopLimit entry stack above")
+   (sim_entry_fill_next_open "part of the armed StopLimit entry stack above (a no-op here, kept to match the intended production config)")
+   (entry_anchor_local_range_weeks "part of the armed StopLimit entry stack above")
+   (freeze_entry_at_first_breakout "part of the armed StopLimit entry stack above")
+   (entry_extension_max_pct "the corpus 2.0 vs live 15.0 -- the #2403 census finding. Load-bearing here: under enable_sim_entry_stoplimit it is the simulated fill cap, not a report-side threshold. Neither value has a defensible provenance; unification is the open #2404 decision")
+   (enable_short_side "long-only cell: arms the short leg off; the code default (and therefore live) is on")
+   (stops_config "catastrophic-stop arming (catastrophic_stop_pct 0.10); live runs the 0.0 default")
+   (liquidity_config "min_hold_dollar_adv 500000 arming; live runs the code default")
+   (portfolio_config "record-convention concentration arming (position 0.14 / exposure 0.70 / min_cash 0.30); live runs the code defaults")
+   (enable_stage3_force_exit "record-convention Stage-3 force-exit arming; live leaves it default-off")
+   (stage3_force_exit_config "hysteresis_weeks 1 belongs to the arming above; the code default is 2")
+   (enable_laggard_rotation "record-convention laggard-rotation arming; live leaves it default-off")
+   (laggard_rotation_config "hysteresis_weeks 2 belongs to the arming above; the code default is 4")
+   (screening_config "live arms candidate_ranking=Quality (#1782, report ordering) and failed_breakout_tolerance_pct=0.05 (#2084); the backtest defaults stay unarmed per experiment-flag R1")
+   (resistance_lookback_bars "live feeds the resistance/support mapper 520 weekly bars for the human report only")
+   (entry_through_band_pct "live-only entry-reconciliation band for the printed ticket (#2103); read by Weekly_snapshot_generator, never by on_market_close")
+   (sparse_tail_min_bars "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
+   (sparse_tail_window_trading_days "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
+   (rename_detect_min_overlap_days "live-only ticker-rename detector (#2083 fix 2); report-layer data hygiene, no backtest consumer")
+   (rename_detect_match_fraction "live-only ticker-rename detector (#2083 fix 2); report-layer data hygiene, no backtest consumer")))
  ;; Cost-model overlay (PR #1260 wiring). See goldens-small/bull-crash-2015-2020.sexp
  ;; for the full rationale. [retail_default] with per_trade=0 is byte-equal
  ;; to [None] under current wiring; spread / per_share activate once

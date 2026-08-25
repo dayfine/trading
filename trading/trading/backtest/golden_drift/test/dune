@@ -1,0 +1,21 @@
+; Declares (universe) because the corpus test reads two things dune cannot
+; track: the committed golden specs under trading/test_data/, and
+; dev/weekly-picks/live-config-overrides.sexp, which lives OUTSIDE the dune
+; root (the root is trading/, and dev/ is its sibling). Without it, editing a
+; golden or the live overrides would not invalidate the cached test result and
+; the drift check would silently stop enforcing. Same reasoning as the
+; (universe) branch taken by the devtools checks in
+; trading/devtools/checks/dune.
+
+(tests
+ (names test_golden_live_drift)
+ (modules test_golden_live_drift)
+ (deps (universe))
+ (libraries
+  ounit2
+  core
+  core_unix.filename_unix
+  matchers
+  golden_live_drift_lib
+  backtest
+  weinstein_trading.strategy))

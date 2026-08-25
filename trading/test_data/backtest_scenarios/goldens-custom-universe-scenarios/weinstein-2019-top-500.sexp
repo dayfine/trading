@@ -79,6 +79,26 @@
    ((stage3_force_exit_config ((hysteresis_weeks 1))))
    ((enable_laggard_rotation true))
    ((laggard_rotation_config ((hysteresis_weeks 2))))))
+ ;; Deviations from the live weekly-picks config
+ ;; (dev/weekly-picks/live-config-overrides.sexp), enforced by the
+ ;; golden_live_drift linter (#2403). Data-only: Scenario.t is
+ ;; [@@sexp.allow_extra_fields], so the runner parses and ignores this block.
+ (deviates_from_live
+  ((portfolio_config "record-convention concentration arming (position 0.14 / exposure 0.70 / min_cash 0.30); live runs the code defaults")
+   (enable_stage3_force_exit "record-convention Stage-3 force-exit arming; live leaves it default-off")
+   (stage3_force_exit_config "hysteresis_weeks 1 belongs to the arming above; the code default is 2")
+   (enable_laggard_rotation "record-convention laggard-rotation arming; live leaves it default-off")
+   (laggard_rotation_config "hysteresis_weeks 2 belongs to the arming above; the code default is 4")
+   (extension_stop_config "live arms the extension-stop insurance (trigger 2.0 / trail 0.25, ledger 2026-07-14-extension-stop-insurance-accept); this cell pins the pre-insurance basis")
+   (reject_declining_ma_long_entry "live arms the declining-MA long-entry rejection (#1775); this cell pins the pre-arming basis")
+   (screening_config "live arms candidate_ranking=Quality (#1782, report ordering) and failed_breakout_tolerance_pct=0.05 (#2084); the backtest defaults stay unarmed per experiment-flag R1")
+   (resistance_lookback_bars "live feeds the resistance/support mapper 520 weekly bars for the human report only")
+   (entry_through_band_pct "live-only entry-reconciliation band for the printed ticket (#2103); read by Weekly_snapshot_generator, never by on_market_close")
+   (entry_extension_max_pct "live arms 15.0, this cell runs the 0.0 default (uncapped); neither value has a defensible provenance -- unification is the open #2404 decision (#2403)")
+   (sparse_tail_min_bars "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
+   (sparse_tail_window_trading_days "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
+   (rename_detect_min_overlap_days "live-only ticker-rename detector (#2083 fix 2); report-layer data hygiene, no backtest consumer")
+   (rename_detect_match_fraction "live-only ticker-rename detector (#2083 fix 2); report-layer data hygiene, no backtest consumer")))
  ;; **Re-pinned 2026-05-18 after the delisted-aware composition rebuild
  ;; (P1 #1184 + P2 #1185 + P3 #1186 + ergonomics #1187 + post-P2 pipeline
  ;; run). The new top-500-2019 universe now includes ~101 names that
