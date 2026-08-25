@@ -91,7 +91,7 @@
  ;;   - sharpe_ratio: -2 to 5 — same; NaN/inf would fail in_range too.
  ;;   - total_trades: 0 to 100000 — 3000-symbol pool over 5y can easily
  ;;     fire thousands of breakouts.
- ;;   - wall_seconds: 100 to 36000 (10 hrs) — full-pool weekly cadence
+ ;;   - wall_seconds: 0 to 36000 (10 hrs; min floored at 0 per #2547 — a min guards nothing) — full-pool weekly cadence
  ;;     is multi-hour by design.
  (expected
   ((total_return_pct  ((min -50.0)         (max 200.0)))
