@@ -74,6 +74,10 @@
    (bid_ask_spread_bps 5.0)
    (market_impact_bps_per_pct_adv 0.0)))
  (expected
+  ;; Re-pinned 2026-08-24 for the book-faithful stops basis (PR #2530:
+  ;; initial_stop_buffer 1.0 + reset_anchor_on_stalled_cycle default-on;
+  ;; user-directed #2486; ledger 2026-08-24-stops-basis-book-faithful).
+  ;; ±15% around new-basis actuals at c7660cac3 (dev/experiments/record-baseline-2026-08-24/).
   ;; Re-pinned 2026-06-25 for the concentration=0.30 promotion (max_position_pct_long
   ;; 0.14 -> 0.30, the production default; broad top-3000 WF-CV ACCEPT, ledger
   ;; 2026-06-25-capacity-concentration-broad). Measured against test_data (the
@@ -94,14 +98,14 @@
   ;; 2026-07-10-realism-defaults-flip): re-measured = BIT-IDENTICAL to the 364 pin
   ;; (16.38% / 203 / 38.42 / 0.26 / 41.69 / 43.14 / OPV 870,207 / force_liqs 2).
   ;; SP500 universe is liquid → entry gate + stale-exit no-op. Bands unchanged.
-  ((total_return_pct   ((min  13.9)        (max  18.8)))
-   (total_trades       ((min 173)          (max 233)))
-   (win_rate           ((min  32.7)        (max  44.2)))
-   (sharpe_ratio       ((min   0.22)       (max   0.30)))
-   (max_drawdown_pct   ((min  35.4)        (max  47.9)))
-   (avg_holding_days   ((min  36.7)        (max  49.6)))
-   (open_positions_value ((min 739700.0)   (max 1000700.0)))
-   (sortino_ratio_annualized ((min 0.21)   (max 0.29)))
-   (calmar_ratio       ((min   0.063)      (max   0.085)))
-   (ulcer_index        ((min  13.9)        (max  18.8)))
+  ((total_return_pct ((min 66.3774) (max 89.8047)))
+   (total_trades ((min 134.3) (max 181.7)))
+   (win_rate ((min 32.8165) (max 44.3987)))
+   (sharpe_ratio ((min 0.648289) (max 0.877097)))
+   (max_drawdown_pct ((min 26.205) (max 35.4538)))
+   (avg_holding_days ((min 49.0687) (max 66.387)))
+   (open_positions_value ((min 980046) (max 1.32594e+06)))
+   (sortino_ratio_annualized ((min 0.852937) (max 1.15397)))
+   (calmar_ratio ((min 0.338167) (max 0.45752)))
+   (ulcer_index ((min 11.3931) (max 15.4142)))
    (wall_seconds       ((min 100.0)        (max 1500.0))))))
