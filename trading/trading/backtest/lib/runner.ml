@@ -252,14 +252,14 @@ let _panel_input_of_deps (deps : _deps) : Panel_runner.input =
     all_symbols = deps.all_symbols;
   }
 
-let _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days
+let _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days ?on_step_setup
     ?strategy_choice ?trace ?gc_trace ?bar_data_source ?shared_panels
     ?progress_emitter ?slippage_bps ?cost_model ?candidate_log () =
   Panel_runner.run
     ~input:(_panel_input_of_deps deps)
     ~start_date ~end_date ~warmup_days ~initial_cash ~commission
     ?strategy_choice ?trace ?gc_trace ?bar_data_source ?shared_panels
-    ?progress_emitter ?slippage_bps ?cost_model ?candidate_log ()
+    ?progress_emitter ?slippage_bps ?cost_model ?candidate_log ?on_step_setup ()
 
 (** Drop simulator-side [stop_info]s whose [entry_date] is before [start_date] —
     i.e. positions opened during the warmup window. The simulator runs from
@@ -478,7 +478,7 @@ let _assemble_result ~start_date ~end_date ~deps ~overrides
 let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
     ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
     ?bar_data_source ?shared_panels ?progress_emitter ?slippage_bps ?cost_model
-    ?candidate_log () =
+    ?candidate_log ?on_step_setup () =
   let deps = _load_deps ?trace ?gc_trace ~overrides ~sector_map_override () in
   let warmup_days = warmup_days_for strategy_choice in
   let warmup_start = Date.add_days start_date (-warmup_days) in
@@ -490,7 +490,7 @@ let run_backtest ~start_date ~end_date ?(overrides = []) ?sector_map_override
         force_liquidation_log,
         stale_hold_log,
         final_close_prices ) =
-    _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days
+    _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days ?on_step_setup
       ~strategy_choice ?trace ?gc_trace ?bar_data_source ?shared_panels
       ?progress_emitter ?slippage_bps ?cost_model ?candidate_log ()
   in

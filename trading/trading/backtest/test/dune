@@ -15,6 +15,7 @@
   test_trade_score
   test_trade_context
   test_trades_csv_schema
+  test_trades_stream
   test_execution_faithfulness
   test_result_writer
   test_runner_hypothesis_overrides

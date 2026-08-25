@@ -38,6 +38,22 @@ type input = {
     record so [Runner] can build it without exporting its private [_deps] type.
 *)
 
+type step_hook_setup =
+  stop_log:Stop_log.t ->
+  trade_audit:Trade_audit.t ->
+  force_liquidation_log:Force_liquidation_log.t ->
+  date:Date.t ->
+  step:Trading_simulation_types.Simulator_types.step_result ->
+  unit
+(** A caller-supplied per-step observer, given the run's recorder collectors.
+    [Panel_runner] owns recorder construction, so a caller that needs to read
+    them mid-run (rather than at teardown) cannot close over them itself — it
+    supplies this and {!run} binds them in.
+
+    Used by [Runner] to feed {!Trades_stream} the run window's closed
+    round-trips every few Friday cycles (#2502). Observability only: an
+    implementation must not mutate simulator or recorder state. *)
+
 val run :
   input:input ->
   start_date:Date.t ->
@@ -55,6 +71,7 @@ val run :
   ?cost_model:Backtest_cost_model.Cost_model.t ->
   ?prune_universe_by_active_through:bool ->
   ?candidate_log:Candidate_log.collector ->
+  ?on_step_setup:step_hook_setup ->
   unit ->
   Trading_simulation_types.Simulator_types.run_result
   * Stop_log.t
