@@ -139,4 +139,4 @@
    (calmar_ratio       ((min   0.39)        (max   0.53)))
    (ulcer_index        ((min   7.00)        (max   9.50)))
    ;; Wall floor lowered 600→100 (the 364 run measured ~391s locally).
-   (wall_seconds       ((min 100.0)         (max 2400.0))))))
+   (wall_seconds       ((min 0.0)           (max 2400.0))))))

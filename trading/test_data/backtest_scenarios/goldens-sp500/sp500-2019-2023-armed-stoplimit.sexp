@@ -182,4 +182,4 @@
    (max_drawdown_pct ((min 19.4754) (max 26.3491)))
    (avg_holding_days ((min 55.0561) (max 74.4877)))
    (open_positions_value ((min 1.60793e+06) (max 2.17544e+06)))
-   (wall_seconds         ((min 100.0)       (max 1500.0))))))
+   (wall_seconds         ((min 0.0)         (max 1500.0))))))

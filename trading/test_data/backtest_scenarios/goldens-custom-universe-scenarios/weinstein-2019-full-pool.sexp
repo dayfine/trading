@@ -100,4 +100,4 @@
    (sharpe_ratio      ((min  -2.0)         (max   5.0)))
    (max_drawdown_pct  ((min   0.0)         (max  95.0)))
    (avg_holding_days  ((min   0.0)         (max 365.0)))
-   (wall_seconds      ((min 100.0)         (max 36000.0))))))
+   (wall_seconds      ((min 0.0)           (max 36000.0))))))

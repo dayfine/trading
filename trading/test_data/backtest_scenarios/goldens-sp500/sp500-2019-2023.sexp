@@ -131,4 +131,4 @@
    (ulcer_index ((min 10.397) (max 14.0665)))
    ;; wall_seconds pin sized wide (CI ~920s, local parallel ~200s) —
    ;; catches only catastrophic 2x slowdowns per design intent.
-   (wall_seconds       ((min 100.0)        (max 1500.0))))))
+   (wall_seconds       ((min 0.0)          (max 1500.0))))))

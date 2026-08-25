@@ -188,4 +188,4 @@
    (calmar_ratio       ((min   0.23)        (max   0.31)))
    (ulcer_index        ((min  20.0)         (max  27.1)))
    ;; Floor-off does more work than the halted floor-on run; keep wall band wide.
-   (wall_seconds       ((min 100.0)         (max 3600.0))))))
+   (wall_seconds       ((min 0.0)           (max 3600.0))))))

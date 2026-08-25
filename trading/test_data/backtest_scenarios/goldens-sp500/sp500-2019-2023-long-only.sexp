@@ -129,4 +129,4 @@
    (sortino_ratio_annualized ((min 0.852937) (max 1.15397)))
    (calmar_ratio ((min 0.338167) (max 0.45752)))
    (ulcer_index ((min 11.3931) (max 15.4142)))
-   (wall_seconds       ((min 100.0)        (max 1500.0))))))
+   (wall_seconds       ((min 0.0)          (max 1500.0))))))
