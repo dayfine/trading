@@ -110,8 +110,10 @@ val record_step : t -> date:Date.t -> step:Sim_types.step_result -> unit
     and {!Trading_simulation.Metrics.extract_round_trips} produces a per-symbol
     chronological sequence that only ever grows at its tail (later trades cannot
     change an earlier pairing), so "everything past the count already written"
-    is a sound identity. A whole-list index would {e not} be — the extractor
-    groups by symbol, so a newly-traded symbol inserts rows mid-list. *)
+    is a sound identity. A whole-list index would {e not} be: the extractor
+    folds a symbol-keyed map and prepends each symbol's block, so its output
+    runs descending by symbol and a newly-traded symbol can insert {e ahead} of
+    rows already written. *)
 
 val close : t -> unit
 (** [close t] closes the underlying channel. Does not flush a final batch — the
