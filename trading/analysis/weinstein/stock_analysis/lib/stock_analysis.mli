@@ -328,10 +328,53 @@ val analyze_with_callbacks :
     [(bars, benchmark_bars)] input by constructing callbacks that index the same
     pre-computed series the bar-list path computes internally. *)
 
+(** Which half of {!is_breakout_candidate} rejected a candidate.
+
+    The predicate is a conjunction of three independent gates; this names the
+    {b first} one that failed, in the evaluation order below. That order is a
+    contract, not an implementation detail — a candidate failing two gates is
+    attributed to the earlier one, so a consumer counting rejections by reason
+    gets a partition of the rejected population rather than a multiset.
+
+    Order: [Stage_setup] → [Breakout_volume] → [Rs_declining]. *)
+type breakout_rejection =
+  | Stage_setup
+      (** No admission arm fired: neither the freshness arm (MA-cross window or
+          the F1 range-top clock), nor the continuation arm, nor the
+          virgin-crossing re-admission arm. This is the stage/structure gate —
+          spine item 2 (buy only in Stage 2) plus the entry-freshness clock. *)
+  | Breakout_volume
+      (** Breakout-week volume confirmation below [Adequate] (spine item 3).
+          Unreachable when [t.require_breakout_volume] is [false] (F5), which
+          relocates the check to the fill week. *)
+  | Rs_declining
+      (** Relative strength classified [Negative_declining]. Absent RS data does
+          not reject. *)
+[@@deriving sexp, eq, show]
+
+val breakout_candidate_rejection :
+  ?early_stage2_max_weeks:int -> t -> breakout_rejection option
+(** [None] iff {!is_breakout_candidate} admits the candidate; [Some r] naming
+    the first failing gate otherwise (see {!breakout_rejection} for the order).
+
+    This is the single source of truth for long-side breakout admission:
+    {!is_breakout_candidate} is defined as [Option.is_none] of this, exactly as
+    [Screener_admission.passes_failed_breakout] is defined over
+    [failed_breakout_reason]. The boolean and the reason therefore cannot drift.
+
+    Exists so the screener's cascade trace can decompose its
+    [Dropped_at_breakout] bucket into the dial that produced each drop (#2533):
+    the production breakout gate is the funnel's dominant filter (#2490), and a
+    single bucket cannot say which of stage-freshness, volume confirmation, or
+    RS did the killing.
+
+    Pure: same [t] and [early_stage2_max_weeks] always give the same result. *)
+
 val is_breakout_candidate : ?early_stage2_max_weeks:int -> t -> bool
 (** [is_breakout_candidate ?early_stage2_max_weeks analysis] returns true if the
     stock shows a potential Stage 2 breakout: transitioning from Stage 1, with
-    rising MA and strong volume.
+    rising MA and strong volume. Defined as
+    [Option.is_none (breakout_candidate_rejection ...)].
 
     [early_stage2_max_weeks] is the early-Stage2 admission window: a fresh
     Stage2 (no observed Stage1→Stage2 transition) qualifies only while

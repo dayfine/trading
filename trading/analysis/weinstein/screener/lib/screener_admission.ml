@@ -97,7 +97,72 @@ let count_long_failed_breakouts ~tolerance_pct ~early_stage2_max_weeks
       Stock_analysis.is_breakout_candidate ~early_stage2_max_weeks a
       && not (_long_passes_failed_breakout ~tolerance_pct a))
 
-let _long_admission ~weights ~thresholds ~min_grade ~min_score_override
+type breakout_gate =
+  | Price_floor
+  | Stage_setup
+  | Breakout_volume
+  | Rs_declining
+  | Failed_breakout
+  | Volume_band
+[@@deriving sexp, eq, show]
+
+(* Total mapping from the analysis-layer rejection onto this module's gate
+   vocabulary. Separate types on purpose: [Stock_analysis] owns the three gates
+   inside its own predicate, while [Price_floor] / [Failed_breakout] /
+   [Volume_band] are screener-config gates it knows nothing about. A
+   constructor added upstream fails to compile here rather than silently
+   collapsing into a neighbouring bucket. *)
+let _gate_of_rejection : Stock_analysis.breakout_rejection -> breakout_gate =
+  function
+  | Stage_setup -> Stage_setup
+  | Breakout_volume -> Breakout_volume
+  | Rs_declining -> Rs_declining
+
+(* First-failing long-side breakout gate, or [None] when the candidate clears
+   the whole phase. The order below IS the contract documented on
+   {!breakout_gate}; [long_admission]'s [passes_breakout] is [Option.is_none]
+   of this, so the boolean cascade and the named sub-reason cannot drift. *)
+let _long_setup_gate ~early_stage2_max_weeks a =
+  Option.map
+    (Stock_analysis.breakout_candidate_rejection ~early_stage2_max_weeks a)
+    ~f:_gate_of_rejection
+
+let _long_post_setup_gate ~volume_ratio_exclude_range
+    ~failed_breakout_tolerance_pct a =
+  if
+    not
+      (_long_passes_failed_breakout ~tolerance_pct:failed_breakout_tolerance_pct
+         a)
+  then Some Failed_breakout
+  else if not (passes_volume_band ~excl:volume_ratio_exclude_range a) then
+    Some Volume_band
+  else None
+
+let _long_breakout_gate ~volume_ratio_exclude_range ~min_price
+    ~failed_breakout_tolerance_pct ~early_stage2_max_weeks
+    (a : Stock_analysis.t) =
+  if not (passes_price_floor ~min_price ~price:a.breakout_price) then
+    Some Price_floor
+  else
+    match _long_setup_gate ~early_stage2_max_weeks a with
+    | Some gate -> Some gate
+    | None ->
+        _long_post_setup_gate ~volume_ratio_exclude_range
+          ~failed_breakout_tolerance_pct a
+
+(* Short-side mirror. No failed-breakdown re-validation exists, and
+   [is_breakdown_candidate] is a single stage predicate with no sub-gates, so
+   the short phase can only ever report three of the six constructors. *)
+let _short_breakdown_gate ~volume_ratio_exclude_range ~min_price
+    (a : Stock_analysis.t) =
+  if not (passes_price_floor ~min_price ~price:a.breakdown_price) then
+    Some Price_floor
+  else if not (Stock_analysis.is_breakdown_candidate a) then Some Stage_setup
+  else if not (passes_volume_band ~excl:volume_ratio_exclude_range a) then
+    Some Volume_band
+  else None
+
+let long_admission ~weights ~thresholds ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price
     ~failed_breakout_tolerance_pct ~early_stage2_max_weeks ~min_rs_normalized
     (a, sector) =
@@ -109,18 +174,16 @@ let _long_admission ~weights ~thresholds ~min_grade ~min_score_override
      [breakout_price]. [early_stage2_max_weeks] is threaded into both the
      breakout gate and the score so this diagnostic count tracks the same
      early-Stage2 window the live cascade admits on. *)
-  let passes_breakout =
-    passes_price_floor ~min_price ~price:a.Stock_analysis.breakout_price
-    && Stock_analysis.is_breakout_candidate ~early_stage2_max_weeks a
-    && _long_passes_failed_breakout ~tolerance_pct:failed_breakout_tolerance_pct
-         a
-    && passes_volume_band ~excl:volume_ratio_exclude_range a
+  let breakout_gate =
+    _long_breakout_gate ~volume_ratio_exclude_range ~min_price
+      ~failed_breakout_tolerance_pct ~early_stage2_max_weeks a
   in
+  let passes_breakout = Option.is_none breakout_gate in
   let passes_sector =
     passes_breakout && not (equal_sector_rating sector.rating Weak)
   in
   (* Book §4.4 rule 2. The short side reports its RS gate as a phase of its own
-     ([_short_admission] returns a 4-tuple); the long triple is kept as-is so
+     ([short_admission] returns a 4-tuple); the long triple is kept as-is so
      the cascade-diagnostics record and every report built on it are untouched,
      which is what lets the [min_rs_normalized = 0.0] default stay a provable
      no-op. The cost is attribution: with the gate armed, its drops land in
@@ -135,7 +198,7 @@ let _long_admission ~weights ~thresholds ~min_grade ~min_score_override
       passes_score_floor ~thresholds ~min_grade ~min_score_override
         ~max_score_override score
   in
-  (passes_breakout, passes_sector, passes_grade)
+  (breakout_gate, passes_sector, passes_grade)
 
 let _bump n b = if b then n + 1 else n
 
@@ -146,25 +209,24 @@ let count_long_phases ~weights ~thresholds ~min_grade ~min_score_override
   (* Partially applied so the fold body stays a two-liner — the gate list is
      long enough that inlining it inside the closure trips the nesting linter. *)
   let admit =
-    _long_admission ~weights ~thresholds ~min_grade ~min_score_override
+    long_admission ~weights ~thresholds ~min_grade ~min_score_override
       ~max_score_override ~volume_ratio_exclude_range ~min_price
       ~failed_breakout_tolerance_pct ~early_stage2_max_weeks ~min_rs_normalized
   in
   let step (breakout, sector_ok, grade_ok) pair =
-    let pb, ps, pg = admit pair in
-    (_bump breakout pb, _bump sector_ok ps, _bump grade_ok pg)
+    let gate, ps, pg = admit pair in
+    (_bump breakout (Option.is_none gate), _bump sector_ok ps, _bump grade_ok pg)
   in
   List.fold candidates ~init:(0, 0, 0) ~f:step
 
-let _short_admission ~weights ~thresholds ~min_grade ~min_score_override
+let short_admission ~weights ~thresholds ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price (a, sector) =
   (* The short-side setup price is [breakdown_price]; the floor folds into the
-     breakdown phase, mirroring [_long_admission]. *)
-  let passes_breakdown =
-    passes_price_floor ~min_price ~price:a.Stock_analysis.breakdown_price
-    && Stock_analysis.is_breakdown_candidate a
-    && passes_volume_band ~excl:volume_ratio_exclude_range a
+     breakdown phase, mirroring [long_admission]. *)
+  let breakdown_gate =
+    _short_breakdown_gate ~volume_ratio_exclude_range ~min_price a
   in
+  let passes_breakdown = Option.is_none breakdown_gate in
   let passes_sector =
     passes_breakdown && not (equal_sector_rating sector.rating Strong)
   in
@@ -176,94 +238,23 @@ let _short_admission ~weights ~thresholds ~min_grade ~min_score_override
       passes_score_floor ~thresholds ~min_grade ~min_score_override
         ~max_score_override score
   in
-  (passes_breakdown, passes_sector, passes_rs, passes_grade)
+  (breakdown_gate, passes_sector, passes_rs, passes_grade)
 
 let count_short_phases ~weights ~thresholds ~min_grade ~min_score_override
     ~max_score_override ~volume_ratio_exclude_range ~min_price ~candidates =
-  List.fold candidates ~init:(0, 0, 0, 0)
-    ~f:(fun (breakdown, sector_ok, rs_ok, grade_ok) pair ->
-      let pb, ps, pr, pg =
-        _short_admission ~weights ~thresholds ~min_grade ~min_score_override
-          ~max_score_override ~volume_ratio_exclude_range ~min_price pair
-      in
-      (_bump breakdown pb, _bump sector_ok ps, _bump rs_ok pr, _bump grade_ok pg))
-
-type cascade_phase =
-  | Admitted
-  | Dropped_at_macro
-  | Dropped_at_breakout
-  | Dropped_at_sector
-  | Dropped_at_rs
-  | Dropped_at_grade
-  | Dropped_at_top_n
-[@@deriving sexp, eq, show]
-
-type candidate_outcome = {
-  ticker : string;
-  phase : cascade_phase;
-  score : int;
-  grade : Weinstein_types.grade;
-}
-[@@deriving sexp, eq]
-
-(* Resolve a phase from the monotone gate flags, innermost first. [in_top_n]
-   only decides between the last two, because a candidate that failed an
-   earlier gate never reached the cap. *)
-let _phase_of_gates ~gates ~in_top_n =
-  match gates with
-  | `Macro_blocked -> Dropped_at_macro
-  | `Gates (false, _, _, _) -> Dropped_at_breakout
-  | `Gates (_, false, _, _) -> Dropped_at_sector
-  | `Gates (_, _, false, _) -> Dropped_at_rs
-  | `Gates (_, _, _, false) -> Dropped_at_grade
-  | `Gates (true, true, true, true) ->
-      if in_top_n then Admitted else Dropped_at_top_n
-
-let _outcome_of ~gates ~top_n_tickers ~score ~thresholds ticker =
-  {
-    ticker;
-    phase = _phase_of_gates ~gates ~in_top_n:(Set.mem top_n_tickers ticker);
-    score;
-    grade = grade_of_score ~thresholds score;
-  }
-
-let long_outcomes ~weights ~thresholds ~min_grade ~min_score_override
-    ~max_score_override ~volume_ratio_exclude_range ~min_price
-    ~failed_breakout_tolerance_pct ~early_stage2_max_weeks ~min_rs_normalized
-    ~macro_admits ~top_n_tickers ~candidates =
+  (* Partially applied for the same reason as [count_long_phases]. *)
   let admit =
-    _long_admission ~weights ~thresholds ~min_grade ~min_score_override
-      ~max_score_override ~volume_ratio_exclude_range ~min_price
-      ~failed_breakout_tolerance_pct ~early_stage2_max_weeks ~min_rs_normalized
-  in
-  List.map candidates ~f:(fun ((a : Stock_analysis.t), sector) ->
-      (* The long triple folds RS into grade, so the RS slot is always [true]
-         here — [Dropped_at_rs] is short-side-only, per the .mli. *)
-      let gates =
-        if not macro_admits then `Macro_blocked
-        else
-          let pb, ps, pg = admit (a, sector) in
-          `Gates (pb, ps, true, pg)
-      in
-      let score, _ = score_long ~early_stage2_max_weeks ~weights ~sector a in
-      _outcome_of ~gates ~top_n_tickers ~score ~thresholds a.ticker)
-
-let short_outcomes ~weights ~thresholds ~min_grade ~min_score_override
-    ~max_score_override ~volume_ratio_exclude_range ~min_price ~macro_admits
-    ~top_n_tickers ~candidates =
-  let admit =
-    _short_admission ~weights ~thresholds ~min_grade ~min_score_override
+    short_admission ~weights ~thresholds ~min_grade ~min_score_override
       ~max_score_override ~volume_ratio_exclude_range ~min_price
   in
-  List.map candidates ~f:(fun ((a : Stock_analysis.t), sector) ->
-      let gates =
-        if not macro_admits then `Macro_blocked
-        else
-          let pb, ps, pr, pg = admit (a, sector) in
-          `Gates (pb, ps, pr, pg)
-      in
-      let score, _ = score_short ~weights ~sector a in
-      _outcome_of ~gates ~top_n_tickers ~score ~thresholds a.ticker)
+  let step (breakdown, sector_ok, rs_ok, grade_ok) pair =
+    let gate, ps, pr, pg = admit pair in
+    ( _bump breakdown (Option.is_none gate),
+      _bump sector_ok ps,
+      _bump rs_ok pr,
+      _bump grade_ok pg )
+  in
+  List.fold candidates ~init:(0, 0, 0, 0) ~f:step
 
 (** Compute the cascade-diagnostics record for one screen call. Decoupled from
     [screen] so the latter stays within the 50-line linter cap. *)

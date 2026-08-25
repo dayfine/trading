@@ -456,34 +456,38 @@ let _continuation_arm (a : t) : bool =
 let _virgin_readmission_arm (a : t) : bool =
   match a.stage.stage with Stage2 _ -> a.virgin_readmission | _ -> false
 
-let is_breakout_candidate ?(early_stage2_max_weeks = 4) (a : t) : bool =
+type breakout_rejection = Stage_setup | Breakout_volume | Rs_declining
+[@@deriving sexp, eq, show]
+
+(* Three independent gates, reported first-failing in the order below — see the
+   .mli, which owns the contract. F5 ([require_breakout_volume = false]) waives
+   the volume gate only, relocating that spine item-3 check to the fill week
+   where [Volume_eject_runner] enforces it. *)
+let breakout_candidate_rejection ?(early_stage2_max_weeks = 4) (a : t) :
+    breakout_rejection option =
   let stage_ok =
     _freshness_arm ~early_stage2_max_weeks a
     || _continuation_arm a || _virgin_readmission_arm a
   in
-  (* Volume confirmation: at least Adequate. F5 armed
-     ([require_breakout_volume = false]) relocates this spine item-3 check to
-     the fill week — the GTC ticket is written BEFORE the breakout, so
-     breakout-week volume cannot be known at placement (book §4.7). Volume is
-     not dropped: {!Weinstein_strategy.Volume_eject_runner} confirms it at the
-     fill and ejects when it fails. *)
   let volume_ok =
     (not a.require_breakout_volume)
     ||
     match a.volume with
-    | Some { confirmation = Strong _; _ }
-    | Some { confirmation = Adequate _; _ } ->
-        true
-    | _ -> false
+    | Some { confirmation = Strong _ | Adequate _; _ } -> true
+    | Some _ | None -> false
   in
-  (* RS not negative_declining *)
   let rs_ok =
     match a.rs with
-    | None -> true (* no data — don't disqualify *)
     | Some { trend = Negative_declining; _ } -> false
-    | _ -> true
+    | Some _ | None -> true
   in
-  stage_ok && volume_ok && rs_ok
+  if not stage_ok then Some Stage_setup
+  else if not volume_ok then Some Breakout_volume
+  else if not rs_ok then Some Rs_declining
+  else None
+
+let is_breakout_candidate ?(early_stage2_max_weeks = 4) (a : t) : bool =
+  Option.is_none (breakout_candidate_rejection ~early_stage2_max_weeks a)
 
 let is_breakdown_candidate (a : t) : bool =
   (* Stage 4 transition from Stage 3 *)

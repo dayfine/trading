@@ -2684,7 +2684,7 @@ let _short_trace ?(config = cfg) ~macro_trend ~candidates
    grade -> top_n, so "reached phase P" is "was not dropped before P". *)
 let _reached_breakout (o : Screener.candidate_outcome) =
   match o.phase with
-  | Dropped_at_macro | Dropped_at_breakout -> false
+  | Dropped_at_macro | Dropped_at_breakout _ -> false
   | _ -> true
 
 let _reached_sector (o : Screener.candidate_outcome) =
@@ -2949,8 +2949,154 @@ let test_short_trace_names_every_phase_it_reaches _ =
          equal_to ("SRSB", (Screener.Dropped_at_rs : Screener.cascade_phase));
          equal_to ("SGRD", (Screener.Dropped_at_grade : Screener.cascade_phase));
          equal_to
-           ("SUPP", (Screener.Dropped_at_breakout : Screener.cascade_phase));
+           ( "SUPP",
+             (Screener.Dropped_at_breakout Stage_setup : Screener.cascade_phase)
+           );
        ])
+
+(* ------------------------------------------------------------------ *)
+(* Breakout sub-reason (#2533)                                          *)
+(* ------------------------------------------------------------------ *)
+
+(* A clean Stage1 -> Stage2 breakout on rising bars with a volume spike: the
+   name every sub-gate case below perturbs by exactly one dial. *)
+let _gate_stock ticker =
+  make_analysis ticker
+    (Some (Stage1 { weeks_in_base = 10 }))
+    (rising_bars_with_spike ~n:35 50.0 100.0 ~spike_idx:31)
+
+let _gate_trace ?config ~candidates () =
+  let macro_trend = Bullish in
+  let result, screened =
+    _screen_capturing_candidates ?config ~macro_trend
+      ~sector_map:
+        (sector_map_of
+           (List.map candidates ~f:(fun (a : Stock_analysis.t) ->
+                (a.ticker, make_sector ~rating:Neutral "Technology"))))
+      ~stocks:candidates ()
+  in
+  _long_trace ?config ~macro_trend ~candidates:screened ~result ()
+
+let _phases_of trace =
+  List.map trace ~f:(fun (o : Screener.candidate_outcome) ->
+      (o.ticker, o.phase))
+
+(** The admitted control for the sub-gate cases: with every dial at its default
+    no-op, the fixture reaches the top-N. Without it, a fixture that failed for
+    an unrelated reason would still "pass" each sub-gate assertion below. *)
+let test_breakout_gate_control_is_admitted _ =
+  assert_that
+    (_phases_of (_gate_trace ~candidates:[ _gate_stock "GATE" ] ()))
+    (elements_are
+       [ equal_to ("GATE", (Screener.Admitted : Screener.cascade_phase)) ])
+
+(** [Price_floor] outranks every later gate: the fixture is a valid breakout, so
+    only the armed liquidity floor can reject it. *)
+let test_breakout_gate_names_price_floor _ =
+  assert_that
+    (_phases_of
+       (_gate_trace
+          ~config:{ cfg with min_price = 1_000_000.0 }
+          ~candidates:[ _gate_stock "GATE" ]
+          ()))
+    (elements_are
+       [
+         equal_to
+           ( "GATE",
+             (Screener.Dropped_at_breakout Price_floor : Screener.cascade_phase)
+           );
+       ])
+
+(** [Stage_setup] — the stage/entry-freshness arm, which #2490 identified as the
+    funnel's dominant filter. A declining name off a prior Stage 2 fires no
+    admission arm, so it is rejected before any volume or RS consideration. *)
+let test_breakout_gate_names_stage_setup _ =
+  assert_that
+    (_phases_of
+       (_gate_trace
+          ~candidates:
+            [
+              make_analysis "GATE"
+                (Some (Stage2 { weeks_advancing = 6; late = false }))
+                (declining_bars_with_spike ~n:35 100.0 50.0 ~spike_idx:31);
+            ]
+          ()))
+    (elements_are
+       [
+         equal_to
+           ( "GATE",
+             (Screener.Dropped_at_breakout Stage_setup : Screener.cascade_phase)
+           );
+       ])
+
+(** [Volume_band] is the screener's own exclusion window, distinct from the
+    breakout-bar volume confirmation ([Breakout_volume]). Excluding the whole
+    ratio range rejects the otherwise-admitted control. *)
+let test_breakout_gate_names_volume_band _ =
+  assert_that
+    (_phases_of
+       (_gate_trace
+          ~config:
+            {
+              cfg with
+              volume_ratio_exclude_range =
+                Some { low = 0.0; high = 1_000_000.0 };
+            }
+          ~candidates:[ _gate_stock "GATE" ]
+          ()))
+    (elements_are
+       [
+         equal_to
+           ( "GATE",
+             (Screener.Dropped_at_breakout Volume_band : Screener.cascade_phase)
+           );
+       ])
+
+(** The order pin. [Price_floor] and [Volume_band] are both armed and both would
+    reject the control; the trace must name the {b earlier} gate. Reordering the
+    two in [_long_breakout_gate] changes no admission decision, so only an
+    assertion on a candidate failing both can catch it — which is what makes the
+    per-constructor counts a partition rather than a multiset. *)
+let test_breakout_gate_reports_first_failing_gate _ =
+  assert_that
+    (_phases_of
+       (_gate_trace
+          ~config:
+            {
+              cfg with
+              min_price = 1_000_000.0;
+              volume_ratio_exclude_range =
+                Some { low = 0.0; high = 1_000_000.0 };
+            }
+          ~candidates:[ _gate_stock "GATE" ]
+          ()))
+    (elements_are
+       [
+         equal_to
+           ( "GATE",
+             (Screener.Dropped_at_breakout Price_floor : Screener.cascade_phase)
+           );
+       ])
+
+(** The sub-reason must not disturb the phase counts: with a sub-gate armed, the
+    named trace still reproduces [cascade_diagnostics] exactly. This is
+    {!test_trace_survivor_counts_match_cascade_diagnostics}'s pin re-run inside
+    the decomposed bucket. *)
+let test_breakout_gate_preserves_diagnostics_agreement _ =
+  let config = { cfg with min_price = 1_000_000.0 } in
+  let macro_trend = Bullish in
+  let result, candidates =
+    _screen_capturing_candidates ~config ~macro_trend ~stocks:(_mixed_stocks ())
+      ()
+  in
+  let trace = _long_trace ~config ~macro_trend ~candidates ~result () in
+  let d = result.cascade_diagnostics in
+  assert_that
+    ( List.count trace ~f:_reached_breakout,
+      List.count trace ~f:_reached_sector,
+      List.count trace ~f:_reached_grade )
+    (equal_to
+       (d.long_breakout_admitted, d.long_sector_admitted, d.long_grade_admitted))
 
 let suite =
   "screener_tests"
@@ -3183,6 +3329,18 @@ let suite =
          >:: test_short_trace_survivor_counts_match_cascade_diagnostics;
          "G2 trace: short trace names every phase it reaches"
          >:: test_short_trace_names_every_phase_it_reaches;
+         "G3 breakout gate: control fixture is admitted"
+         >:: test_breakout_gate_control_is_admitted;
+         "G3 breakout gate: names Price_floor"
+         >:: test_breakout_gate_names_price_floor;
+         "G3 breakout gate: names Stage_setup"
+         >:: test_breakout_gate_names_stage_setup;
+         "G3 breakout gate: names Volume_band"
+         >:: test_breakout_gate_names_volume_band;
+         "G3 breakout gate: reports the first failing gate"
+         >:: test_breakout_gate_reports_first_failing_gate;
+         "G3 breakout gate: still agrees with cascade_diagnostics"
+         >:: test_breakout_gate_preserves_diagnostics_agreement;
        ]
 
 let () = run_test_tt_main suite
