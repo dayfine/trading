@@ -182,6 +182,10 @@
    (sortino_ratio_annualized ((min  1.0413) (max   1.4088)))
    (calmar_ratio       ((min   0.4357)      (max   0.5895)))
    (ulcer_index        ((min   9.799)       (max  13.258)))
-   ;; wall_seconds wide (CI ~5x local, local ~190s) — catches only
-   ;; catastrophic 2x slowdowns per design intent.
-   (wall_seconds       ((min 100.0)         (max 1800.0))))))
+   ;; wall_seconds guards only the MAX (catastrophic slowdown). The old
+   ;; min 100.0 was the 2026-08-25 "GHA flake" (#2547 root cause, read
+   ;; from the first #2549-uploaded per-cell artifact): fast warm-cache
+   ;; runners finish the backtest in ~96s and FAILed the band from
+   ;; BELOW with digit-identical metrics. A minimum wall time guards
+   ;; nothing — floor it at 0.
+   (wall_seconds       ((min 0.0)           (max 1800.0))))))

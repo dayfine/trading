@@ -93,7 +93,7 @@
 ;; no pre-#2279 wander data was captured for them, so tightening them here
 ;; would be inventing precision this golden cannot back up.
 ;;
-;; wall_seconds is pinned [100, 1500], mirroring [sp500-2019-2023.sexp]'s
+;; wall_seconds is pinned [0, 1500] (min floored at 0 per #2547 — a min guards nothing), mirroring [sp500-2019-2023.sexp]'s
 ;; convention. This golden is the entry-path-heaviest scenario in the suite
 ;; — every entry walks the intraday path — so it is the golden most exposed
 ;; to a performance regression there; measured ~4 min locally (see the
@@ -182,4 +182,4 @@
    (max_drawdown_pct ((min 19.4754) (max 26.3491)))
    (avg_holding_days ((min 55.0561) (max 74.4877)))
    (open_positions_value ((min 1.60793e+06) (max 2.17544e+06)))
-   (wall_seconds         ((min 100.0)       (max 1500.0))))))
+   (wall_seconds         ((min 0.0)         (max 1500.0))))))
