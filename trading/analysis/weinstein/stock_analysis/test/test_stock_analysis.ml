@@ -380,6 +380,73 @@ let test_volume_waiver_does_not_widen_other_gates _ =
   in
   assert_that (is_breakout_candidate weak_rs) (equal_to false)
 
+(* ------------------------------------------------------------------ *)
+(* Breakout rejection reason (#2533)                                    *)
+(* ------------------------------------------------------------------ *)
+
+let _declining_rs (a : Stock_analysis.t) =
+  {
+    a with
+    Stock_analysis.rs =
+      Some
+        {
+          current_rs = 0.5;
+          current_normalized = 0.5;
+          trend = Negative_declining;
+          history = [];
+        };
+  }
+
+(* One fixture per constructor, plus the admitted control. Named so the
+   equivalence and order pins below can share them. *)
+let _rejection_cases () =
+  [
+    ("admitted", fresh_stage2 ~weeks_advancing:2 (), None);
+    ("stale stage", fresh_stage2 ~weeks_advancing:50 (), Some Stage_setup);
+    ( "dried-up base",
+      fresh_stage2 ~weeks_advancing:2 ~volume_confirmation:(Weak 0.4) (),
+      Some Breakout_volume );
+    ( "declining rs",
+      _declining_rs (fresh_stage2 ~weeks_advancing:2 ()),
+      Some Rs_declining );
+  ]
+
+(** Each gate inside {!is_breakout_candidate} is named by
+    {!breakout_candidate_rejection}, and the admitted control returns [None]. *)
+let test_rejection_names_each_gate _ =
+  assert_that
+    (List.map (_rejection_cases ()) ~f:(fun (label, a, _) ->
+         (label, breakout_candidate_rejection a)))
+    (equal_to
+       (List.map (_rejection_cases ()) ~f:(fun (label, _, expected) ->
+            (label, expected))))
+
+(** The equivalence the .mli claims: [is_breakout_candidate] is exactly
+    [Option.is_none] of the reason. Pinned over every fixture rather than
+    asserted once, so a future gate added to one function but not the other
+    fails here. *)
+let test_rejection_agrees_with_the_boolean _ =
+  assert_that
+    (List.map (_rejection_cases ()) ~f:(fun (label, a, _) ->
+         ( label,
+           is_breakout_candidate a,
+           Option.is_none (breakout_candidate_rejection a) )))
+    (equal_to
+       (List.map (_rejection_cases ()) ~f:(fun (label, a, _) ->
+            let admitted = is_breakout_candidate a in
+            (label, admitted, admitted))))
+
+(** The order pin. A candidate failing all three gates is attributed to the
+    first — [Stage_setup]. Reordering the three changes no admission decision,
+    so only a candidate failing several of them can catch it; that ordering is
+    what makes per-reason counts a partition of the rejected population. *)
+let test_rejection_reports_the_first_failing_gate _ =
+  assert_that
+    (breakout_candidate_rejection
+       (_declining_rs
+          (fresh_stage2 ~weeks_advancing:50 ~volume_confirmation:(Weak 0.4) ())))
+    (is_some_and (equal_to Stage_setup))
+
 (* End-to-end threading through [analyze]: the flag lands on the analysis so
    [is_breakout_candidate], which sees only [t], can honour it. *)
 let test_analyze_threads_require_breakout_volume _ =
@@ -1088,6 +1155,11 @@ let suite =
          >:: test_volume_waiver_does_not_widen_other_gates;
          "analyze threads require_breakout_volume"
          >:: test_analyze_threads_require_breakout_volume;
+         "breakout rejection names each gate" >:: test_rejection_names_each_gate;
+         "breakout rejection agrees with the boolean"
+         >:: test_rejection_agrees_with_the_boolean;
+         "breakout rejection reports the first failing gate"
+         >:: test_rejection_reports_the_first_failing_gate;
        ]
 
 let () = run_test_tt_main suite

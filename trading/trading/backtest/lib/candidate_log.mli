@@ -43,13 +43,37 @@ type cascade_outcome =
   | Dropped_at_macro
   | Dropped_at_breakout
       (** Long side: breakout predicate / price floor / volume band / the
-          failed-breakout gate. Short side: the mirrored breakdown phase. *)
+          failed-breakout gate. Short side: the mirrored breakdown phase. Which
+          of those dials fired is the row's {!candidate.breakout_gate}. *)
   | Dropped_at_sector
   | Dropped_at_rs
       (** Short side only today — the long side's relative strength folds into
           the grade rather than a standalone phase. See [Screener_admission]. *)
   | Dropped_at_grade
   | Dropped_at_top_n
+[@@deriving sexp, eq, show]
+
+(** Which dial inside the breakout / breakdown phase rejected the candidate —
+    the decomposition of [Dropped_at_breakout] (issue #2533).
+
+    Mirrors [Screener.breakout_gate] constructor-for-constructor, including its
+    {b first-failing-gate} contract: a candidate that fails several gates is
+    attributed to the earliest in evaluation order, so counting rows by
+    constructor partitions the [Dropped_at_breakout] population rather than
+    double-counting it. That module's docstring is the authority on the order
+    and on which constructors each side can emit; this type is the on-disk
+    mirror, kept separate for the same reason {!cascade_outcome} is — the
+    artefact owns its own schema, and the mapping between them is one total
+    function that fails to compile if either enum moves.
+
+    Non-[None] only on rows whose [outcome] is [Dropped_at_breakout]. *)
+type breakout_gate =
+  | Price_floor
+  | Stage_setup  (** Stage / entry-freshness setup predicate. *)
+  | Breakout_volume  (** Breakout-week volume confirmation; long side only. *)
+  | Rs_declining  (** RS trend [Negative_declining]; long side only. *)
+  | Failed_breakout  (** Failed-breakout re-validation; long side only. *)
+  | Volume_band  (** The screener's volume-ratio exclusion window. *)
 [@@deriving sexp, eq, show]
 
 type signals = {
@@ -80,6 +104,18 @@ type candidate = {
   symbol : string;
   side : Trading_base.Types.position_side;
   outcome : cascade_outcome;
+  breakout_gate : breakout_gate option; [@sexp.option]
+      (** Which breakout/breakdown dial dropped this candidate. [Some _] exactly
+          when [outcome] is [Dropped_at_breakout]; [None] on every other row,
+          including every entry-walk (G1) row.
+
+          {b Additive on disk.} [@sexp.option] omits the field entirely when it
+          is [None] and accepts its absence when parsing, so this module still
+          reads a [candidates.sexp] written before #2533 (every row parses with
+          [breakout_gate = None]) and a file written today is unchanged from the
+          pre-#2533 shape except on the breakout-drop rows that now carry the
+          extra field. The alternative — a payload on [Dropped_at_breakout] —
+          would have moved the outcome's own sexp shape and broken that. *)
   signals : signals;
 }
 [@@deriving sexp, eq]

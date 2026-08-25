@@ -3,6 +3,7 @@ open Core
 open Weinstein_types
 include Screener_scoring
 include Screener_admission
+include Screener_candidate_trace
 include Screener_ranking
 
 type candidate_params = {

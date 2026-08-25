@@ -195,6 +195,7 @@ let test_emit_enabled_round_trips _ =
                   CL.symbol = "ZZZZ";
                   side = Trading_base.Types.Long;
                   outcome = CL.Admitted;
+                  breakout_gate = None;
                   signals = CL.signals_of_alternative _alternative;
                 };
               ];
@@ -326,7 +327,7 @@ let _phase_cases : (string * Screener.cascade_phase * CL.cascade_outcome) list =
   [
     ("AAAA", Admitted, CL.Admitted);
     ("BBBB", Dropped_at_macro, CL.Dropped_at_macro);
-    ("CCCC", Dropped_at_breakout, CL.Dropped_at_breakout);
+    ("CCCC", Dropped_at_breakout Price_floor, CL.Dropped_at_breakout);
     ("DDDD", Dropped_at_sector, CL.Dropped_at_sector);
     ("EEEE", Dropped_at_rs, CL.Dropped_at_rs);
     ("FFFF", Dropped_at_grade, CL.Dropped_at_grade);
@@ -406,10 +407,118 @@ let test_both_signal_projections_agree _ =
        ~score:_alternative.score ~grade:_alternative.grade)
     (equal_to (CL.signals_of_alternative _alternative))
 
+(* ------------------------------------------------------------------ *)
+(* G3 — the breakout sub-reason (#2533)                                 *)
+(* ------------------------------------------------------------------ *)
+
+(* One ticker per [Screener.breakout_gate] constructor, paired with the
+   artefact gate [_gate_of_screener_gate] must produce for it. Exhaustive by
+   construction: the gate enum is closed at six and this list names all six, so
+   a transposition of two adjacent constructors — which typechecks either way,
+   and which would silently reattribute drops between dials — moves a ticker's
+   gate and fails the pin. *)
+let _gate_cases : (string * Screener.breakout_gate * CL.breakout_gate) list =
+  [
+    ("HAAA", Price_floor, CL.Price_floor);
+    ("HBBB", Stage_setup, CL.Stage_setup);
+    ("HCCC", Breakout_volume, CL.Breakout_volume);
+    ("HDDD", Rs_declining, CL.Rs_declining);
+    ("HEEE", Failed_breakout, CL.Failed_breakout);
+    ("HFFF", Volume_band, CL.Volume_band);
+  ]
+
+(** Each breakout sub-gate reaches the artefact under its own name. Without
+    this, [Dropped_at_breakout] stays the single opaque bucket #2490 measured
+    killing 51% of book-conformant candidates. *)
+let test_breakout_drops_carry_their_sub_gate _ =
+  let week =
+    _week_with ~candidates:[]
+      ~drops:
+        (List.map _gate_cases ~f:(fun (ticker, gate, _) ->
+             _drop ~ticker ~phase:(Dropped_at_breakout gate)))
+  in
+  assert_that
+    (List.map week ~f:(fun (x : CL.candidate) -> (x.symbol, x.breakout_gate)))
+    (equal_to
+       (List.map _gate_cases ~f:(fun (ticker, _, gate) -> (ticker, Some gate))))
+
+(** The sub-gate is [None] on every non-breakout row, so a reader can treat
+    [Some _] as "this row was dropped in the breakout phase" without also
+    consulting [outcome]. Covers all six non-breakout phases plus a G1
+    entry-walk row, which has no cascade phase at all. *)
+let test_non_breakout_rows_carry_no_sub_gate _ =
+  let week =
+    _week_with
+      ~candidates:
+        [ { AR.candidate = _scored_candidate; reason = AR.Insufficient_cash } ]
+      ~drops:
+        (List.filter_map _phase_cases ~f:(fun (ticker, phase, _) ->
+             match phase with
+             | Screener.Dropped_at_breakout _ -> None
+             | _ -> Some (_drop ~ticker ~phase)))
+  in
+  assert_that
+    (List.count week ~f:(fun (x : CL.candidate) ->
+         Option.is_some x.breakout_gate))
+    (equal_to 0)
+
+(** Back-compat pin: a [candidates.sexp] written before #2533 has no
+    [breakout_gate] field on any row, and this module must still read it —
+    [@sexp.option] accepts the absent field as [None]. Written as a literal
+    rather than round-tripped through {!CL.sexp_of_week}, because the point is
+    to hold the {i old} on-disk shape fixed even as the type grows. *)
+let test_parses_pre_g3_candidates_sexp _ =
+  let legacy =
+    Sexp.of_string
+      {|((date 2024-06-14)
+         (candidates
+           (((symbol ZZZZ) (side Long) (outcome Dropped_at_breakout)
+             (signals ((score 71) (grade A)
+                       (stage (Stage2 (weeks_advancing 9) (late false)))
+                       (weeks_advancing (9)) (rs_value (1.31))
+                       (volume_ratio (2.4)) (sector_name Technology)))))))|}
+  in
+  assert_that
+    (List.map (CL.week_of_sexp legacy).candidates ~f:(fun (x : CL.candidate) ->
+         (x.outcome, x.breakout_gate)))
+    (elements_are [ equal_to (CL.Dropped_at_breakout, None) ])
+
+(** The write half of the additive-format claim: a row with no sub-gate emits no
+    [breakout_gate] field, so a file whose rows all pre-date the decomposition
+    is byte-identical to what the pre-#2533 writer produced. *)
+let test_absent_sub_gate_is_omitted_from_the_sexp _ =
+  let sexp =
+    CL.sexp_of_week
+      {
+        CL.date = _date "2024-06-14";
+        candidates =
+          [
+            {
+              CL.symbol = "ZZZZ";
+              side = Trading_base.Types.Long;
+              outcome = CL.Admitted;
+              breakout_gate = None;
+              signals = CL.signals_of_alternative _alternative;
+            };
+          ];
+      }
+  in
+  assert_that
+    (String.is_substring (Sexp.to_string sexp) ~substring:"breakout_gate")
+    (equal_to false)
+
 let () =
   run_test_tt_main
     ("candidate_log"
     >::: [
+           "G3: breakout drops carry their sub-gate"
+           >:: test_breakout_drops_carry_their_sub_gate;
+           "G3: non-breakout rows carry no sub-gate"
+           >:: test_non_breakout_rows_carry_no_sub_gate;
+           "G3: parses a pre-#2533 candidates.sexp"
+           >:: test_parses_pre_g3_candidates_sexp;
+           "G3: absent sub-gate is omitted from the sexp"
+           >:: test_absent_sub_gate_is_omitted_from_the_sexp;
            "G2: drops carry their cascade phase"
            >:: test_drops_carry_their_cascade_phase;
            "G2: drops supersede the entry-walk list"

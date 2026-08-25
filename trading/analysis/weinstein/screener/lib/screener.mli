@@ -31,13 +31,24 @@ include module type of struct
   include Screener_scoring
 end
 
-(** Per-candidate admission predicates, cascade-phase counters, the named
-    cascade trace ({!Screener_admission.long_outcomes} / [short_outcomes]), and
-    the {!Screener_admission.volume_ratio_band} type — re-exported from
+(** Per-candidate admission predicates, cascade-phase counters, the
+    {!Screener_admission.breakout_gate} drop sub-reason, and the
+    {!Screener_admission.volume_ratio_band} type — re-exported from
     {!Screener_admission} so callers continue to reference them as
     [Screener.volume_ratio_band], [Screener.passes_score_floor], etc. *)
 include module type of struct
   include Screener_admission
+end
+
+(** The named per-candidate cascade trace
+    ({!Screener_candidate_trace.long_outcomes} / [short_outcomes]) and its
+    {!Screener_candidate_trace.cascade_phase} /
+    {!Screener_candidate_trace.candidate_outcome} types — re-exported so callers
+    continue to reference them as [Screener.long_outcomes],
+    [Screener.cascade_phase], etc. Split out of {!Screener_admission} on the
+    counts-vs-names seam when that file hit the 300-line cap. *)
+include module type of struct
+  include Screener_candidate_trace
 end
 
 (** The {!Screener_ranking.candidate_ranking} mode and the

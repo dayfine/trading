@@ -204,48 +204,67 @@ val count_short_phases :
     {!count_long_phases}, with the RS hard gate inserted between sector and
     grade. The [min_price] liquidity floor folds into the breakdown phase. *)
 
-(** {1 Named per-candidate cascade trace}
+(** {1 Per-candidate admission, for the named trace}
 
-    The counters above answer {i how many} candidates each phase dropped. These
-    answer {i which ones} — the same question for the same candidates, off the
-    same predicates, so the named trace and the counted diagnostics cannot
-    drift. Issue #2490 gap G2. *)
+    The counters above answer {i how many} candidates each phase dropped;
+    {!Screener_candidate_trace} answers {i which ones}, built on the two
+    functions below — the same predicates the counters fold, so the named trace
+    and the counted diagnostics cannot drift. Issue #2490 gap G2, and the
+    per-drop breakout sub-reason of issue #2533. *)
 
-(** Where in the cascade a candidate stopped.
+(** Which dial inside the breakout (long) / breakdown (short) phase rejected a
+    candidate — the sub-reason carried by
+    {!Screener_candidate_trace.cascade_phase.Dropped_at_breakout}.
 
-    The long side has no [Dropped_at_rs] case: book §4.4 rule 2 folds into the
-    grade phase there (see {!count_long_phases}), so only {!short_outcomes} ever
-    emits it. *)
-type cascade_phase =
-  | Admitted  (** Survived every phase and reached the screener's top-N. *)
-  | Dropped_at_macro
-  | Dropped_at_breakout
-      (** Long: breakout predicate, price floor, volume band, or the
-          failed-breakout gate. Short: the mirrored breakdown phase. *)
-  | Dropped_at_sector
-  | Dropped_at_rs  (** Short side only. *)
-  | Dropped_at_grade
-  | Dropped_at_top_n
-      (** Passed every gate but fell outside [max_buy_candidates] /
-          [max_short_candidates]. *)
+    The phase is not one gate: it folds the liquidity floor, the stage/setup
+    predicate (itself three sub-gates on the long side, see
+    {!Stock_analysis.breakout_rejection}), the failed-breakout re-validation and
+    the volume-band exclusion into a single admitted/rejected bit. That bit is
+    the funnel's dominant filter (#2490 measured it killing 51% of
+    book-conformant candidates), so a trace that only says "dropped at breakout"
+    cannot say which dial to turn. Issue #2533.
+
+    {b Order-dependence is part of the contract.} A candidate failing several
+    gates is attributed to the {b first} one in evaluation order:
+
+    - long: [Price_floor] → [Stage_setup] → [Breakout_volume] → [Rs_declining] →
+      [Failed_breakout] → [Volume_band]
+    - short: [Price_floor] → [Stage_setup] → [Volume_band]
+
+    Counting drops by constructor therefore {b partitions} the rejected
+    population (each candidate is counted once) rather than producing a
+    multiset. Reordering the gates would move candidates between buckets without
+    changing any admission decision, so the order is pinned by a test rather
+    than left to the reader. *)
+type breakout_gate =
+  | Price_floor
+      (** {!passes_price_floor} against [breakout_price] (long) /
+          [breakdown_price] (short). Only reachable when the floor is armed
+          ([min_price > 0.0]); the default [0.0] never emits this. *)
+  | Stage_setup
+      (** The stage/setup predicate: no admission arm fired on the long side
+          ({!Stock_analysis.breakout_rejection.Stage_setup}), or
+          {!Stock_analysis.is_breakdown_candidate} was false on the short side.
+      *)
+  | Breakout_volume
+      (** Long only: breakout-week volume confirmation below [Adequate]
+          ({!Stock_analysis.breakout_rejection.Breakout_volume}). Distinct from
+          {!Volume_band}, which is the screener's own exclusion window. *)
+  | Rs_declining
+      (** Long only: RS trend [Negative_declining]
+          ({!Stock_analysis.breakout_rejection.Rs_declining}). Distinct from
+          {!Screener_candidate_trace.cascade_phase.Dropped_at_rs}, which is the
+          short side's Ch. 11 hard gate; this one lives {i inside} the long
+          breakout predicate. *)
+  | Failed_breakout
+      (** Long only: {!passes_failed_breakout}. Only reachable when the gate is
+          armed ([failed_breakout_tolerance_pct > 0.0]). *)
+  | Volume_band
+      (** {!passes_volume_band}. Only reachable when
+          [volume_ratio_exclude_range] is [Some _]. *)
 [@@deriving sexp, eq, show]
 
-type candidate_outcome = {
-  ticker : string;
-  phase : cascade_phase;
-  score : int;
-      (** The candidate's cascade score. Computed for {b every} candidate,
-          including ones dropped before the grade phase — the counting path
-          skips that work, but a trace row without a score cannot be compared
-          against an admitted one. *)
-  grade : Weinstein_types.grade;  (** [grade_of_score] applied to [score]. *)
-}
-[@@deriving sexp, eq]
-(** One candidate's cascade outcome plus the scoring the screener knows and
-    {!Stock_analysis.t} does not. Everything else a consumer needs (stage, RS,
-    volume, sector) is already on the candidate's own analysis. *)
-
-val long_outcomes :
+val long_admission :
   weights:scoring_weights ->
   thresholds:grade_thresholds ->
   min_grade:Weinstein_types.grade ->
@@ -256,28 +275,18 @@ val long_outcomes :
   failed_breakout_tolerance_pct:float ->
   early_stage2_max_weeks:int ->
   min_rs_normalized:float ->
-  macro_admits:bool ->
-  top_n_tickers:Core.String.Set.t ->
-  candidates:(Stock_analysis.t * sector_context) list ->
-  candidate_outcome list
-(** Per-candidate long-side cascade outcome, in [candidates] order.
+  Stock_analysis.t * sector_context ->
+  breakout_gate option * bool * bool
+(** One long candidate's per-phase admission: [(breakout_gate, sector, grade)],
+    where the first component is [None] when the breakout phase admitted the
+    candidate and [Some gate] naming the first failing dial otherwise.
 
-    Built on the same private admission predicate {!count_long_phases} folds, so
-    the two agree by construction: for any candidate set, the number of outcomes
-    at or past a phase equals that phase's count in
-    {!Screener_cascade_diagnostics.t}.
+    The single source of truth for the long cascade: {!count_long_phases} folds
+    it into counts and {!Screener_candidate_trace.long_outcomes} maps it into
+    named phases, so the two cannot disagree. The later components are monotone
+    — a rejected breakout keeps [sector] and [grade] [false]. *)
 
-    [macro_admits] must be the {b same} gate the diagnostics record applies —
-    [macro_trend <> Bearish], {e not} the [neutral_blocks_longs] variant the
-    live evaluation uses — or the trace and the counts disagree on a Neutral
-    tape. When [false], every candidate is [Dropped_at_macro], mirroring
-    [Screener_cascade_diagnostics.build]'s zeroing of the downstream counts.
-
-    [top_n_tickers] is the ticker set of the screener's emitted
-    [buy_candidates]. A candidate that clears the grade phase but is not in the
-    set was truncated by the top-N cap. *)
-
-val short_outcomes :
+val short_admission :
   weights:scoring_weights ->
   thresholds:grade_thresholds ->
   min_grade:Weinstein_types.grade ->
@@ -285,14 +294,11 @@ val short_outcomes :
   max_score_override:int option ->
   volume_ratio_exclude_range:volume_ratio_band option ->
   min_price:float ->
-  macro_admits:bool ->
-  top_n_tickers:Core.String.Set.t ->
-  candidates:(Stock_analysis.t * sector_context) list ->
-  candidate_outcome list
-(** Short-side mirror of {!long_outcomes}, over {!count_short_phases}'
-    predicate. [macro_admits] is [macro_trend <> Bullish] here. Emits
-    [Dropped_at_rs] for the Ch. 11 hard gate, which the long side folds into the
-    grade phase. *)
+  Stock_analysis.t * sector_context ->
+  breakout_gate option * bool * bool * bool
+(** Short-side mirror of {!long_admission}:
+    [(breakdown_gate, sector, rs, grade)], with the Ch. 11 RS hard gate as a
+    phase of its own rather than folded into the grade. *)
 
 val diagnostics_for_screen :
   weights:scoring_weights ->

@@ -140,36 +140,70 @@ Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
   `/tmp/snap_top3000_dedup_v5thin_adj`: AAPL 2004-03-05 breakout, vol_ratio
   2.25, +233% over 52w — the real 2004-05 AAPL run, on the adjusted basis.
 
-- [ ] **Per-week candidate emission `candidates.sexp` (#2490)** — designed,
-  **not implemented**. Full design in
-  `dev/plans/candidate-emission-2026-08-23.md`, including the two distinct
-  sub-gaps (G1: zero-funded Fridays drop the entry-walk decision list
-  entirely, because `entry_audit_capture.ml`'s `_dispatch_one_decision`
-  emits skipped candidates only attached to a `Kept` entry; G2: the
-  cascade's own per-phase drops are nameless — `cascade_summary` carries
-  counts only), the opt-in `--emit-candidates` gate, and the record shapes.
+- [x] **Per-week candidate emission `candidates.sexp` (#2490)** — SHIPPED in
+  three PRs against `dev/plans/candidate-emission-2026-08-23.md`. The header
+  above this line previously read "designed, **not implemented**"; that was
+  stale from 2026-08-23 and is corrected here.
+  - **G1** (#2500) — zero-funded Fridays keep their entry-walk decision list.
+    New `Backtest.Candidate_log` module + the opt-in `--emit-candidates` gate.
+  - **G2** (#2501) — the cascade's own per-phase drops are named, via
+    `Screener.long_outcomes` / `short_outcomes` built on the same
+    `_long_admission` / `_short_admission` the counters fold, so the named
+    trace and `cascade_diagnostics` cannot drift.
+  - **G3** (#2533, this PR) — the `Dropped_at_breakout` bucket decomposes into
+    the dial that produced each drop. See the entry below.
 
-  **Not started here because it crosses ownership and the PR-size cap.** The
-  plumbing needs `screener_admission.ml`, `screener.ml`,
-  `entry_audit_capture.ml` and `weinstein_strategy_screening.ml` — all
-  `feat-weinstein` surfaces this track is briefed to *propose* changes to,
-  not edit — and G1 + G2 together run ~650-900 LOC across two libraries with
-  two new modules, against a ≤500 LOC / one-new-module cap. The plan is that
-  proposal. Two design decisions are already resolved in it and should not be
-  relitigated:
-  - the capture flag lives on `Audit_recorder.t`, **not** on
-    `Weinstein_strategy.config` or `Screener.config`, so it never becomes a
-    `Variant_matrix` axis, never routes through `Overlay_validator`, and
-    never trips `config-default-blast-radius.md`;
-  - the post-held/cooldown candidate list (private to `Screener._screen`)
-    is reached by an **optional `?on_candidates` callback**, so the default
-    path keeps its exact shape and allocates nothing.
+  Both design decisions from the plan held through implementation and should
+  not be relitigated: the capture flag lives on `Audit_recorder.t` (never a
+  `Variant_matrix` axis, never routes through `Overlay_validator`, never trips
+  `config-default-blast-radius.md`), and the post-held/cooldown candidate list
+  is reached by an optional `?on_candidates` callback so the default path
+  keeps its exact shape.
 
-  Split for execution: **PR-A = G1** (new `Backtest.Candidate_log` module +
-  zero-funded-Friday emission + `--emit-candidates`), **PR-B = G2** (screener
-  per-candidate trace, built on the same `_long_admission` /
-  `_short_admission` the counters fold so the named trace and
-  `cascade_diagnostics` cannot drift).
+- [x] **G3 — per-drop breakout sub-reason (#2533)** — `Dropped_at_breakout`
+  was one opaque bucket holding ~93% of all cascade drops, so the funnel
+  finding (#2490: the breakout gate kills 51% of book-conformant monsters)
+  named no dial to turn. It now carries which gate fired.
+
+  Six sub-reasons, read off the code rather than guessed —
+  `Screener.breakout_gate` = `Price_floor | Stage_setup | Breakout_volume |
+  Rs_declining | Failed_breakout | Volume_band`. The middle three are the
+  decomposition of `Stock_analysis.is_breakout_candidate`, which is itself
+  three gates; the outer three are screener-config gates. The **first**
+  failing gate in evaluation order is the sub-reason, so counting rows by
+  constructor **partitions** the dropped population instead of double-counting
+  it — that order is a documented contract and is pinned by a test on each
+  side (a candidate failing two gates must report the earlier one).
+
+  Single source of truth on both layers, following the existing
+  `failed_breakout_reason` / `passes_failed_breakout` idiom:
+  `Stock_analysis.is_breakout_candidate` is now defined as `Option.is_none
+  (breakout_candidate_rejection …)`, and `Screener_admission.long_admission`'s
+  breakout bit is `Option.is_none` of the gate. Boolean and reason cannot
+  drift.
+
+  On disk the change is **additive**: `Candidate_log.cascade_outcome` stays a
+  nullary enum and the sub-reason is a `[@sexp.option]` field on `candidate`,
+  so this module still parses a pre-#2533 `candidates.sexp` and omits the
+  field entirely on rows that have no gate. A payload on `Dropped_at_breakout`
+  would have moved the outcome's own sexp shape; a test pins both directions.
+
+  Code health: the addition pushed `screener_admission.ml` past the 300-line
+  cap, so the named trace was extracted into a new
+  `Screener_candidate_trace` module along the counts-vs-names seam
+  (`code-health-discipline.md`: extract, do not raise the limit).
+  `Screener` re-exports it, so no caller moved.
+
+  Verify: `dune runtest analysis/weinstein/stock_analysis/test
+  analysis/weinstein/screener/test trading/backtest/test` (13 new tests).
+  Default-path no-op verified empirically, not just argued: all five smoke
+  goldens run on this branch produce `actual.sexp` **byte-identical** to the
+  same specs run with the source changes stashed. With `--emit-candidates` on
+  `recovery-2023` the bucket splits 11,112 `Stage_setup` / 677
+  `Breakout_volume` = 11,789, exactly the `Dropped_at_breakout` count — the
+  partition claim, measured. The other four constructors emit zero there
+  because their gates sit at their no-op defaults, which is what the `.mli`
+  says to expect.
 
 
 ## 2026-08-13 — trade-audit join keyed by position_id (closes the 51%-loss join)
