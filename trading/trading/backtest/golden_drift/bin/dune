@@ -1,0 +1,6 @@
+(executable
+ (name golden_live_drift_check)
+ (modules golden_live_drift_check)
+ (libraries core core_unix.command_unix golden_live_drift_lib)
+ (preprocess
+  (pps ppx_jane)))
