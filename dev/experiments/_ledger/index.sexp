@@ -357,4 +357,9 @@
   (base_scenario
    "ladder-v4 cell 00 base (top-3000 PIT-2000, 2000-2026), split-safe v5thin warehouse, pinned worktree @59b26c3bf")
   (window_id top3000-2000-2026-single-window-3salt)
-  (verdict Inconclusive) (entry_slug entry-ticket-clock26-promotion)))
+  (verdict Inconclusive) (entry_slug entry-ticket-clock26-promotion))
+ ((config_hash buffer-1.0-reset-true)
+  (base_scenario
+   "book-faithful stops-basis default flip (user-directed 2026-08-24, #2486); 4-arm per-flip decomposition on test_weinstein_backtest + paired armed-stoplimit golden at the PR build")
+  (window_id weinstein-backtest-6y-covid-positive)
+  (verdict Inconclusive) (entry_slug stops-basis-book-faithful)))

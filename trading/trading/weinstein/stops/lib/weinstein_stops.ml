@@ -284,9 +284,10 @@ let _cycle_stop_candidate ~config ~side ~correction_extreme ~ma_value =
    completed, but its candidate does not improve on the resting stop, so the
    never-lower rule (book §5.2) forbids installing it. The candidate is
    discarded either way — what [config.reset_anchor_on_stalled_cycle] decides
-   is whether the cycle still counts for BOOKKEEPING purposes. See that field's
-   docstring for why the default answer ("no") freezes the ratchet outright on
-   a fallback-stop position. *)
+   is whether the cycle still counts for BOOKKEEPING purposes. The default
+   answer is "yes" (book-faithful, since 2026-08-24); see that field's docstring
+   for why answering "no" freezes the ratchet outright on a fallback-stop
+   position. *)
 type cycle_outcome = No_cycle | Stalled | Raised of float
 
 (* The outcome for a cycle that HAS completed: [Raised] when the candidate

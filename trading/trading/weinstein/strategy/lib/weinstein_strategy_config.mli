@@ -17,6 +17,30 @@ type config = {
   portfolio_config : Portfolio_risk.config;
   stops_config : Weinstein_stops.config;
   initial_stop_buffer : float;
+      (** Multiplier applied to the entry price to build the {b fallback} stop
+          reference when the support scan finds no qualifying correction low:
+          [entry *. initial_stop_buffer] for a long,
+          [entry /. initial_stop_buffer] for a short
+          ({!Weinstein_stops.compute_initial_stop_with_floor}). The reference is
+          then inset by [min_correction_pct /. 2] to give the stop.
+
+          {b Default [1.0] (since 2026-08-24, issue #2486 §2.1).} At [1.0] the
+          reference is the entry price itself, so the fallback stop lands
+          exactly [min_correction_pct /. 2] = 4% away — the floor of the book's
+          §5.3 flat-stop band ("Use 4-6% initial stop if no nearby prior peak").
+          Values [> 1.0] push the reference {i in the position's favour} before
+          the inset, which {b narrows} the stop: the previous [1.02] default
+          produced 2.08%, roughly half the band, on what
+          [dev/agent-memory/project_fallback_stop_half_book_band.md] measures as
+          the common path (88.7% of entries take the fallback). Width is pinned
+          against the band by
+          [trading/trading/weinstein/stops/test/test_fallback_stop_width.ml].
+
+          The flip is a book-faithfulness correction, not a tuned value —
+          user-directed, recorded in
+          [dev/experiments/_ledger/2026-08-24-stops-basis-book-faithful.sexp].
+          Structural (support-floor) stops are unaffected: this multiplier is
+          read only on the fallback branch. *)
   lookback_bars : int;
   bar_history_max_lookback_days : int option;
   skip_ad_breadth : bool;

@@ -183,9 +183,26 @@ let test_six_year_full_lifecycle _ =
      from the G15 era; the loose < 0.60 assertion masked it). Delta is small,
      consistent with the ~0-cost deep-cell attribution
      (dev/notes/p1a-deep-short-screens-364-2026-07-09.md §Attribution). *)
+  (* Book-faithful stops basis (2026-08-24, issue #2486): two default flips,
+     decomposed by running each arm alone on this exact window —
+
+       arm                       buys/sells  rts  W/L    final       maxDD
+       baseline (1.02, false)      28/25      25  4/21   484,753.99  5.54%
+       reset_anchor=true only      28/25      25  5/20   489,926.68  4.52%
+       initial_stop_buffer=1.0 only 26/22     22  2/20   501,292.61  3.69%
+       BOTH (shipped)              28/24      24  4/20   491,691.09  3.65%
+
+     [initial_stop_buffer] 1.02 -> 1.0 widens the fallback stop 2.08% -> 4%,
+     which halves risk-bound entry sizes and moves stops below the tight
+     cluster that was cutting positions at ~2%; [reset_anchor_on_stalled_cycle]
+     false -> true lets fallback positions ratchet from their SECOND completed
+     cycle. Combined, one 2018-2023 round-trip that previously closed at a loss
+     is still open at the window end (sells/rts 25 -> 24, losses 21 -> 20) and
+     the realized max drawdown drops 5.54% -> 3.65%. Same 7-symbol set, same
+     28 buys. *)
   assert_that (List.length result.steps) (equal_to 2187);
   assert_that n_buys (equal_to 28);
-  assert_that n_sells (equal_to 25);
+  assert_that n_sells (equal_to 24);
   assert_that symbols
     (elements_are
        [
@@ -197,20 +214,19 @@ let test_six_year_full_lifecycle _ =
          equal_to "KO";
          equal_to "MSFT";
        ]);
-  assert_that (List.length round_trips) (equal_to 25);
+  assert_that (List.length round_trips) (equal_to 24);
   assert_that stats
     (is_some_and
        (all_of
           [
             field (fun s -> s.Metrics.win_count) (equal_to 4);
-            field (fun s -> s.Metrics.loss_count) (equal_to 21);
+            field (fun s -> s.Metrics.loss_count) (equal_to 20);
           ]));
-  (* Final value $484,753.99 under the 2026-07-09 flip (was $485,285.88 at the
-     G15 step-3 pin); band kept at ±$3K around the G15 centre, which still
-     contains the new value. *)
+  (* Final value $491,691.09 under the 2026-08-24 stops-basis flips (was
+     $484,753.99); band re-centred at ±$3K around the new value. *)
   assert_that final_value
-    (is_between (module Float_ord) ~low:482_285.88 ~high:488_285.88);
-  (* Realized max drawdown ~5.5% under the flip; pin loose at < 0.60. *)
+    (is_between (module Float_ord) ~low:488_691.09 ~high:494_691.09);
+  (* Realized max drawdown ~3.7% under the flips; pin loose at < 0.60. *)
   assert_that max_drawdown_pct (lt (module Float_ord) 0.60)
 
 (* ------------------------------------------------------------------ *)
@@ -243,7 +259,23 @@ let test_entry_exit_cycle_around_covid _ =
      same symbol set; final value drops to $506,145 because sizing-
      uses-installed-stop trims per-entry size on the longs that worked,
      reducing compounding upside. Max drawdown 48.6% (down from 54.4%
-     pre-G15-step-3) for the same reason. *)
+     pre-G15-step-3) for the same reason.
+
+     Book-faithful stops basis (2026-08-24, issue #2486), decomposed on this
+     window —
+
+       arm                        buys/sells rts W/L   final
+       baseline (1.02, false)       8/7       7  2/5   506,145.21
+       reset_anchor=true only       8/8       8  3/5   495,458.77
+       initial_stop_buffer=1.0 only 8/6       6  0/6   505,130.26
+       BOTH (shipped)               8/7       7  1/6   494,474.24
+
+     The two flips pull the exit count in opposite directions here — the
+     unfreeze lets a ratcheted trailing stop close one extra position, the
+     wider fallback stop keeps two positions alive past the COVID low — and
+     land back on 7 sells with a different win/loss split (2W/5L -> 1W/6L):
+     one winner that used to be trailed out now runs into the crash and closes
+     red. Entry count and symbol set are unchanged. *)
   assert_that (List.length result.steps) (equal_to 545);
   assert_that n_buys (equal_to 8);
   assert_that n_sells (equal_to 7);
@@ -255,12 +287,13 @@ let test_entry_exit_cycle_around_covid _ =
     (is_some_and
        (all_of
           [
-            field (fun s -> s.Metrics.win_count) (equal_to 2);
-            field (fun s -> s.Metrics.loss_count) (equal_to 5);
+            field (fun s -> s.Metrics.win_count) (equal_to 1);
+            field (fun s -> s.Metrics.loss_count) (equal_to 6);
           ]));
-  (* G15 step 3 (2026-05-01): final value $506,145.21 ± $5K. *)
+  (* 2026-08-24 stops-basis flips: final value $494,474.24 ± $5K (was
+     $506,145.21 at the G15 step-3 pin). *)
   assert_that final_value
-    (is_between (module Float_ord) ~low:501_145.21 ~high:511_145.21);
+    (is_between (module Float_ord) ~low:489_474.24 ~high:499_474.24);
   (* G15 step 3 (2026-05-01): max drawdown 48.59%; pin loose at < 0.52. *)
   assert_that max_drawdown_pct (lt (module Float_ord) 0.52)
 
@@ -295,7 +328,16 @@ let test_portfolio_value_stays_positive _ =
      round-trips with 1W/2L on same {HD, KO} symbol set. Final
      $523,068; max drawdown 16.94% (up from 9.63% — the additional
      entry is a loser whose MTM swing dominates the new minimum PV).
-     PV still stays positive throughout. *)
+     PV still stays positive throughout.
+
+     Book-faithful stops basis (2026-08-24, issue #2486): trade counts, symbol
+     set and W/L are all UNCHANGED here — only the final value moves,
+     $523,067.89 -> $511,354.54, and it moves entirely under the
+     [initial_stop_buffer] flip (the [reset_anchor_on_stalled_cycle] arm run
+     alone reproduces $523,067.89 to the cent). Smaller risk-bound sizes on the
+     same three round-trips means less compounding upside; the minimum PV
+     actually improves, $496,490.82 -> $497,514.40, so max drawdown falls
+     0.70% -> 0.50%. *)
   assert_that (List.length result.steps) (equal_to 729);
   assert_that n_buys (equal_to 4);
   assert_that n_sells (equal_to 3);
@@ -309,11 +351,13 @@ let test_portfolio_value_stays_positive _ =
             field (fun s -> s.Metrics.loss_count) (equal_to 2);
           ]));
   assert_that min_value (gt (module Float_ord) 0.0);
-  (* G15 step 3 (2026-05-01): max drawdown 16.94%; cap at < 0.20. *)
+  (* Max drawdown ~0.50% under the 2026-08-24 flips; cap kept loose at < 0.20
+     (the "16.94%" figure in the comment above is stale from the G15 era). *)
   assert_that max_drawdown_pct (lt (module Float_ord) 0.20);
-  (* G15 step 3: final value $523,067.89 ± $3K. *)
+  (* 2026-08-24 stops-basis flips: final value $511,354.54 ± $3K (was
+     $523,067.89 at the G15 step-3 pin). *)
   assert_that final_value
-    (is_between (module Float_ord) ~low:520_067.89 ~high:526_067.89)
+    (is_between (module Float_ord) ~low:508_354.54 ~high:514_354.54)
 
 (* ------------------------------------------------------------------ *)
 (* Suite                                                                *)

@@ -22,11 +22,18 @@
     {b The precondition is the fallback stop, not the structural one.} A
     fallback stop is
     [entry *. fallback_buffer *. (1 -. min_correction_pct /. 2.)] — with the
-    shipped 1.02 / 0.08 defaults, [0.9792 *. entry] (pinned in
-    [test_fallback_stop_width.ml]). The freeze therefore arms as soon as the
-    entry bar's low sits more than ~1.09% below the entry price:
+    shipped 1.0 / 0.08 defaults, [0.96 *. entry] before the round-number nudge
+    (pinned in [test_fallback_stop_width.ml]). The freeze therefore arms as soon
+    as the entry bar's low sits more than ~3.03% below the entry price:
 
-    {v   A0 *. 0.99 <= 0.9792 *. entry   <=>   A0 <= 0.98909 *. entry v}
+    {v   A0 *. 0.99 <= 0.96 *. entry   <=>   A0 <= 0.969697 *. entry v}
+
+    {b The 2026-08-24 [initial_stop_buffer] flip 1.02 -> 1.0 narrows this
+       precondition but does not remove it} — it moved the arming threshold from
+    ~1.09% to ~3.03%, which is why the tape below seeds a 3.5%-below-entry bar
+    where the pre-flip version of this file used 1.5%. The freeze remains
+    reachable at the shipped defaults; that is what makes the flag's own default
+    load-bearing rather than cosmetic.
 
     A {i structural} support-floor stop derives from a prior correction low well
     below entry, which leaves the entry-bar anchor comfortably above the stop,
@@ -34,13 +41,15 @@
     is pinned by [test_structural_stop_ratchets_on_the_same_tape] below — same
     tape, same anchor, only the initial stop differs.
 
-    {b What the flag does.} [reset_anchor_on_stalled_cycle] (default [false])
-    decouples the cycle {i bookkeeping} from the never-lower rule: a cycle that
-    completes but cannot improve the stop still resets the extremes and counts,
-    while [stop_level] is left exactly where it was. The phantom-cycle guard is
-    unaffected — [Stalled] is only reachable when the cycle predicate (which
-    {i includes} that guard) already fired; see
-    [test_stale_anchor_still_blocked_under_flag]. *)
+    {b What the flag does.} [reset_anchor_on_stalled_cycle] (default [true]
+    since 2026-08-24) decouples the cycle {i bookkeeping} from the never-lower
+    rule: a cycle that completes but cannot improve the stop still resets the
+    extremes and counts, while [stop_level] is left exactly where it was. The
+    phantom-cycle guard is unaffected — [Stalled] is only reachable when the
+    cycle predicate (which {i includes} that guard) already fired; see
+    [test_stale_anchor_still_blocked_under_flag]. Both configs are named
+    explicitly below so this file keeps pinning the contrast whichever way the
+    default points. *)
 
 open OUnit2
 open Core
@@ -49,12 +58,17 @@ open Weinstein_types
 open Weinstein_stops
 open Matchers
 
-(* The strategy layer's [initial_stop_buffer] default (1.02) — the value
-   actually threaded into the fallback on the production path. *)
-let fallback_buffer = 1.02
+(* The strategy layer's [initial_stop_buffer] default (1.0 since 2026-08-24) —
+   the value actually threaded into the fallback on the production path. *)
+let fallback_buffer = 1.0
 let as_of = Date.of_string "2024-01-05"
 let stage2 = Stage2 { weeks_advancing = 4; late = false }
-let frozen_config = default_config
+
+(* Both arms are named against the flag explicitly rather than one of them
+   being [default_config], so the contrast this file pins survives a default
+   flip in either direction. [unfrozen_config] is the shipped default today. *)
+let frozen_config =
+  { default_config with reset_anchor_on_stalled_cycle = false }
 
 let unfrozen_config =
   { default_config with reset_anchor_on_stalled_cycle = true }
@@ -78,9 +92,13 @@ let bar ~low ~close =
    complete (>= 8% pullback from the running trend extreme, then a close back
    through it) while price closes 101 -> 140, +38.6%.
 
-   Period 3 is the first completed cycle: trend extreme 110, anchor 98.5 =>
-   10.45% pullback, close 115 recovers through it. Its candidate is
-   [min (98.5, ma 100) *. 0.99] = 97.515, nudged to 97.375 — BELOW the 97.92
+   Period 1's low, 96.5, is the entry-bar anchor A0. It sits 3.5% below the
+   entry price of 100 — inside the ~3.03% arming threshold of the header, so the
+   freeze arms at the SHIPPED [initial_stop_buffer = 1.0] defaults.
+
+   Period 3 is the first completed cycle: trend extreme 110, anchor 96.5 =>
+   12.27% pullback, close 115 recovers through it. Its candidate is
+   [min (96.5, ma 100) *. 0.99] = 95.535, nudged to 95.375 — BELOW the 95.875
    initial stop, so it stalls.
 
    Periods 4-5 are a second, shallower cycle (115 -> 105 -> 120) whose low, 105,
@@ -88,7 +106,7 @@ let bar ~low ~close =
    was reset at period 3. *)
 let tape =
   [
-    (98.5, 101.0, 100.0);
+    (96.5, 101.0, 100.0);
     (100.0, 110.0, 100.0);
     (108.0, 115.0, 100.0);
     (105.0, 106.0, 106.0);
@@ -121,12 +139,13 @@ let final_correction_count ~config ~state =
   | Trailing { correction_count; _ } -> Some correction_count
   | Initial _ | Tightened _ -> None
 
-(* The seed: entry 100 => reference 102 => stop 97.92 (100 * 1.02 * 0.96, no
-   nudge because the raw level sits just BELOW the 98.0 round number). *)
+(* The seed: entry 100 => reference 100 => raw stop 96.0 (100 * 1.0 * 0.96),
+   which lands exactly ON the 96.0 round number, so the nudge pushes it to
+   95.875. *)
 let test_fallback_seed_is_the_frozen_level _ =
   assert_that
     (get_stop_level (fallback_initial_stop ~entry_price:100.0))
-    (float_equal ~epsilon:1e-9 97.92)
+    (float_equal ~epsilon:1e-9 95.875)
 
 (* THE DEFECT. Price closes 101 -> 140 across three completed correction cycles
    and the installed stop never moves off its initial level. *)
@@ -136,12 +155,12 @@ let test_fallback_stop_never_ratchets _ =
        ~state:(fallback_initial_stop ~entry_price:100.0))
     (elements_are
        [
-         float_equal ~epsilon:1e-9 97.92;
-         float_equal ~epsilon:1e-9 97.92;
-         float_equal ~epsilon:1e-9 97.92;
-         float_equal ~epsilon:1e-9 97.92;
-         float_equal ~epsilon:1e-9 97.92;
-         float_equal ~epsilon:1e-9 97.92;
+         float_equal ~epsilon:1e-9 95.875;
+         float_equal ~epsilon:1e-9 95.875;
+         float_equal ~epsilon:1e-9 95.875;
+         float_equal ~epsilon:1e-9 95.875;
+         float_equal ~epsilon:1e-9 95.875;
+         float_equal ~epsilon:1e-9 95.875;
        ])
 
 (* The mechanism, isolated from the stop level: not one of the completed cycles
@@ -154,8 +173,8 @@ let test_no_correction_cycle_is_ever_counted _ =
 
 (* Same tape, same entry-bar anchor — only the initial stop is structural
    (reference 90 => stop 86.4) instead of the fallback. The first cycle's
-   candidate, 97.375, now beats it, so the machine ratchets AND resets, and the
-   shallow second cycle then lifts it again to 103.95 under the DEFAULT config.
+   candidate, 95.375, now beats it, so the machine ratchets AND resets, and the
+   shallow second cycle then lifts it again to 103.95 — all WITHOUT the flag.
    This is why the freeze is a fallback-path defect, not a property of the
    tape. *)
 let test_structural_stop_ratchets_on_the_same_tape _ =
@@ -168,8 +187,8 @@ let test_structural_stop_ratchets_on_the_same_tape _ =
        [
          float_equal ~epsilon:1e-9 86.4;
          float_equal ~epsilon:1e-9 86.4;
-         float_equal ~epsilon:1e-9 97.375;
-         float_equal ~epsilon:1e-9 97.375;
+         float_equal ~epsilon:1e-9 95.375;
+         float_equal ~epsilon:1e-9 95.375;
          float_equal ~epsilon:1e-9 103.95;
          float_equal ~epsilon:1e-9 103.95;
        ])
@@ -185,10 +204,10 @@ let test_flag_unfreezes_the_ratchet _ =
        ~state:(fallback_initial_stop ~entry_price:100.0))
     (elements_are
        [
-         float_equal ~epsilon:1e-9 97.92;
-         float_equal ~epsilon:1e-9 97.92;
-         float_equal ~epsilon:1e-9 97.92;
-         float_equal ~epsilon:1e-9 97.92;
+         float_equal ~epsilon:1e-9 95.875;
+         float_equal ~epsilon:1e-9 95.875;
+         float_equal ~epsilon:1e-9 95.875;
+         float_equal ~epsilon:1e-9 95.875;
          float_equal ~epsilon:1e-9 103.95;
          float_equal ~epsilon:1e-9 103.95;
        ])

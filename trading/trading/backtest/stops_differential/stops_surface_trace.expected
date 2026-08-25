@@ -3149,96 +3149,96 @@ S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Risi
 S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 106.36972 99 -> Trailing(97.920000000000002|100.99796000000001|106.664|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 108.36167999999999 100 -> Trailing(97.920000000000002|100.99796000000001|108.36167999999999|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 101.44436 101 -> Trailing(97.920000000000002|98.944360000000003|108.36167999999999|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 108.48688 102 -> Trailing(97.920000000000002|98.944360000000003|108.48688|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 111.13979999999999 103 -> Trailing(97.920000000000002|98.944360000000003|111.13979999999999|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 115.1036 104 -> Trailing(97.920000000000002|98.944360000000003|115.1036|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 118.27588 105 -> Trailing(97.920000000000002|98.944360000000003|118.27588|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 115.02144 106 -> Trailing(97.920000000000002|98.944360000000003|118.27588|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 120.62156 107 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 115.14471999999999 108 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 113.76852 109 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 118.41871999999999 110 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 126.70876 111 -> Trailing(97.920000000000002|98.944360000000003|126.70876|97|0|true) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 108.48688 102 -> Trailing(97.920000000000002|108.48688|108.48688|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 111.13979999999999 103 -> Trailing(97.920000000000002|108.48688|111.13979999999999|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 115.1036 104 -> Trailing(97.920000000000002|108.48688|115.1036|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 118.27588 105 -> Trailing(97.920000000000002|108.48688|118.27588|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 115.02144 106 -> Trailing(97.920000000000002|108.48688|118.27588|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 120.62156 107 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 115.14471999999999 108 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 113.76852 109 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 118.41871999999999 110 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Rising 126.70876 111 -> Trailing(97.920000000000002|108.48688|126.70876|97|1|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 96.009519999999995 96 -> Initial(97.920000000000002|102) Hit(93.509519999999995|97.920000000000002)
 S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 103.49796000000001 97 -> Trailing(97.920000000000002|100.99796000000001|103.49796000000001|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 106.664 98 -> Trailing(97.920000000000002|100.99796000000001|106.664|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 106.36972 99 -> Trailing(97.920000000000002|100.99796000000001|106.664|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 108.36167999999999 100 -> Trailing(97.920000000000002|100.99796000000001|108.36167999999999|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 101.44436 101 -> Trailing(97.920000000000002|98.944360000000003|108.36167999999999|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 108.48688 102 -> Trailing(97.920000000000002|98.944360000000003|108.48688|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 111.13979999999999 103 -> Trailing(97.920000000000002|98.944360000000003|111.13979999999999|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 115.1036 104 -> Trailing(97.920000000000002|98.944360000000003|115.1036|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 118.27588 105 -> Trailing(97.920000000000002|98.944360000000003|118.27588|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 115.02144 106 -> Trailing(97.920000000000002|98.944360000000003|118.27588|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 120.62156 107 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 115.14471999999999 108 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 113.76852 109 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 118.41871999999999 110 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 126.70876 111 -> Trailing(97.920000000000002|98.944360000000003|126.70876|97|0|true) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 108.48688 102 -> Trailing(97.920000000000002|108.48688|108.48688|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 111.13979999999999 103 -> Trailing(97.920000000000002|108.48688|111.13979999999999|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 115.1036 104 -> Trailing(97.920000000000002|108.48688|115.1036|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 118.27588 105 -> Trailing(97.920000000000002|108.48688|118.27588|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 115.02144 106 -> Trailing(97.920000000000002|108.48688|118.27588|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 120.62156 107 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 115.14471999999999 108 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 113.76852 109 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 118.41871999999999 110 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Flat 126.70876 111 -> Trailing(97.920000000000002|108.48688|126.70876|97|1|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 96.009519999999995 96 -> Initial(97.920000000000002|102) Hit(93.509519999999995|97.920000000000002)
 S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 103.49796000000001 97 -> Trailing(97.920000000000002|100.99796000000001|103.49796000000001|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 106.664 98 -> Trailing(97.920000000000002|100.99796000000001|106.664|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 106.36972 99 -> Trailing(97.920000000000002|100.99796000000001|106.664|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 108.36167999999999 100 -> Trailing(97.920000000000002|100.99796000000001|108.36167999999999|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 101.44436 101 -> Trailing(97.920000000000002|98.944360000000003|108.36167999999999|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 108.48688 102 -> Trailing(97.920000000000002|98.944360000000003|108.48688|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 111.13979999999999 103 -> Trailing(97.920000000000002|98.944360000000003|111.13979999999999|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 115.1036 104 -> Trailing(97.920000000000002|98.944360000000003|115.1036|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 118.27588 105 -> Trailing(97.920000000000002|98.944360000000003|118.27588|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 115.02144 106 -> Trailing(97.920000000000002|98.944360000000003|118.27588|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 120.62156 107 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 115.14471999999999 108 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 113.76852 109 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 118.41871999999999 110 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 126.70876 111 -> Trailing(97.920000000000002|98.944360000000003|126.70876|97|0|true) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 108.48688 102 -> Trailing(97.920000000000002|108.48688|108.48688|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 111.13979999999999 103 -> Trailing(97.920000000000002|108.48688|111.13979999999999|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 115.1036 104 -> Trailing(97.920000000000002|108.48688|115.1036|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 118.27588 105 -> Trailing(97.920000000000002|108.48688|118.27588|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 115.02144 106 -> Trailing(97.920000000000002|108.48688|118.27588|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 120.62156 107 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 115.14471999999999 108 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 113.76852 109 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 118.41871999999999 110 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage1 {weeks_in_base = 6}/Weinstein_types.Declining 126.70876 111 -> Trailing(97.920000000000002|108.48688|126.70876|97|1|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 96.009519999999995 96 -> Initial(97.920000000000002|102) Hit(93.509519999999995|97.920000000000002)
 S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 103.49796000000001 97 -> Trailing(97.920000000000002|100.99796000000001|103.49796000000001|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 106.664 98 -> Trailing(97.920000000000002|100.99796000000001|106.664|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 106.36972 99 -> Trailing(97.920000000000002|100.99796000000001|106.664|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 108.36167999999999 100 -> Trailing(97.920000000000002|100.99796000000001|108.36167999999999|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 101.44436 101 -> Trailing(97.920000000000002|98.944360000000003|108.36167999999999|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 108.48688 102 -> Trailing(97.920000000000002|98.944360000000003|108.48688|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 111.13979999999999 103 -> Trailing(97.920000000000002|98.944360000000003|111.13979999999999|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 115.1036 104 -> Trailing(97.920000000000002|98.944360000000003|115.1036|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 118.27588 105 -> Trailing(97.920000000000002|98.944360000000003|118.27588|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 115.02144 106 -> Trailing(97.920000000000002|98.944360000000003|118.27588|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 120.62156 107 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 115.14471999999999 108 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 113.76852 109 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 118.41871999999999 110 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 126.70876 111 -> Trailing(97.920000000000002|98.944360000000003|126.70876|97|0|true) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 108.48688 102 -> Trailing(97.920000000000002|108.48688|108.48688|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 111.13979999999999 103 -> Trailing(97.920000000000002|108.48688|111.13979999999999|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 115.1036 104 -> Trailing(97.920000000000002|108.48688|115.1036|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 118.27588 105 -> Trailing(97.920000000000002|108.48688|118.27588|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 115.02144 106 -> Trailing(97.920000000000002|108.48688|118.27588|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 120.62156 107 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 115.14471999999999 108 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 113.76852 109 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 118.41871999999999 110 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Rising 126.70876 111 -> Trailing(97.920000000000002|108.48688|126.70876|97|1|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 96.009519999999995 96 -> Initial(97.920000000000002|102) Hit(93.509519999999995|97.920000000000002)
 S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 103.49796000000001 97 -> Trailing(97.920000000000002|100.99796000000001|103.49796000000001|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 106.664 98 -> Trailing(97.920000000000002|100.99796000000001|106.664|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 106.36972 99 -> Trailing(97.920000000000002|100.99796000000001|106.664|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 108.36167999999999 100 -> Trailing(97.920000000000002|100.99796000000001|108.36167999999999|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 101.44436 101 -> Trailing(97.920000000000002|98.944360000000003|108.36167999999999|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 108.48688 102 -> Trailing(97.920000000000002|98.944360000000003|108.48688|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 111.13979999999999 103 -> Trailing(97.920000000000002|98.944360000000003|111.13979999999999|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 115.1036 104 -> Trailing(97.920000000000002|98.944360000000003|115.1036|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 118.27588 105 -> Trailing(97.920000000000002|98.944360000000003|118.27588|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 115.02144 106 -> Trailing(97.920000000000002|98.944360000000003|118.27588|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 120.62156 107 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 115.14471999999999 108 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 113.76852 109 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 118.41871999999999 110 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 126.70876 111 -> Trailing(97.920000000000002|98.944360000000003|126.70876|97|0|true) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 108.48688 102 -> Trailing(97.920000000000002|108.48688|108.48688|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 111.13979999999999 103 -> Trailing(97.920000000000002|108.48688|111.13979999999999|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 115.1036 104 -> Trailing(97.920000000000002|108.48688|115.1036|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 118.27588 105 -> Trailing(97.920000000000002|108.48688|118.27588|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 115.02144 106 -> Trailing(97.920000000000002|108.48688|118.27588|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 120.62156 107 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 115.14471999999999 108 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 113.76852 109 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 118.41871999999999 110 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Flat 126.70876 111 -> Trailing(97.920000000000002|108.48688|126.70876|97|1|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 96.009519999999995 96 -> Initial(97.920000000000002|102) Hit(93.509519999999995|97.920000000000002)
 S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 103.49796000000001 97 -> Trailing(97.920000000000002|100.99796000000001|103.49796000000001|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 106.664 98 -> Trailing(97.920000000000002|100.99796000000001|106.664|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 106.36972 99 -> Trailing(97.920000000000002|100.99796000000001|106.664|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 108.36167999999999 100 -> Trailing(97.920000000000002|100.99796000000001|108.36167999999999|97|0|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 101.44436 101 -> Trailing(97.920000000000002|98.944360000000003|108.36167999999999|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 108.48688 102 -> Trailing(97.920000000000002|98.944360000000003|108.48688|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 111.13979999999999 103 -> Trailing(97.920000000000002|98.944360000000003|111.13979999999999|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 115.1036 104 -> Trailing(97.920000000000002|98.944360000000003|115.1036|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 118.27588 105 -> Trailing(97.920000000000002|98.944360000000003|118.27588|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 115.02144 106 -> Trailing(97.920000000000002|98.944360000000003|118.27588|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 120.62156 107 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 115.14471999999999 108 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 113.76852 109 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 118.41871999999999 110 -> Trailing(97.920000000000002|98.944360000000003|120.62156|97|0|true) NoChange
-S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 126.70876 111 -> Trailing(97.920000000000002|98.944360000000003|126.70876|97|0|true) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 108.48688 102 -> Trailing(97.920000000000002|108.48688|108.48688|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 111.13979999999999 103 -> Trailing(97.920000000000002|108.48688|111.13979999999999|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 115.1036 104 -> Trailing(97.920000000000002|108.48688|115.1036|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 118.27588 105 -> Trailing(97.920000000000002|108.48688|118.27588|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 115.02144 106 -> Trailing(97.920000000000002|108.48688|118.27588|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 120.62156 107 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 115.14471999999999 108 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 113.76852 109 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 118.41871999999999 110 -> Trailing(97.920000000000002|108.48688|120.62156|97|1|false) NoChange
+S4 wide/L/fallbk/Weinstein_types.Stage2 {weeks_advancing = 4; late = false}/Weinstein_types.Declining 126.70876 111 -> Trailing(97.920000000000002|108.48688|126.70876|97|1|false) NoChange
 S4 wide/L/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 96.009519999999995 96 -> Initial(97.920000000000002|102) Hit(93.509519999999995|97.920000000000002)
 S4 wide/L/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 103.49796000000001 97 -> Tightened(98.473011|100.99796000000001|"Stage 3/4 detected") Tighten("Stage 3/4 detected")
 S4 wide/L/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 106.664 98 -> Tightened(99.78598448000001|100.99796000000001|"Stage 3/4 detected") Raised(98.473011|99.78598448000001|"Stage 3/4 detected (tightened ratchet)")
@@ -3629,93 +3629,93 @@ S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Risi
 S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 93.630279999999999 101 -> Trailing(102.125|99.002039999999994|93.335999999999999|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 91.638320000000007 100 -> Trailing(102.125|99.002039999999994|91.638320000000007|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 98.555639999999997 99 -> Trailing(102.125|101.05564|91.638320000000007|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 91.513120000000001 98 -> Trailing(102.125|101.05564|91.513120000000001|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 88.860200000000006 97 -> Trailing(102.125|101.05564|88.860200000000006|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 84.8964 96 -> Trailing(102.125|101.05564|84.8964|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 81.724119999999999 95 -> Trailing(102.125|101.05564|81.724119999999999|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 84.978560000000002 94 -> Trailing(102.125|101.05564|81.724119999999999|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 79.378439999999998 93 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 84.855280000000008 92 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 86.231480000000005 91 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 81.581280000000007 90 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 73.291240000000002 89 -> Trailing(102.125|101.05564|73.291240000000002|103|0|true) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 91.513120000000001 98 -> Trailing(102.125|91.513120000000001|91.513120000000001|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 88.860200000000006 97 -> Trailing(102.125|91.513120000000001|88.860200000000006|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 84.8964 96 -> Trailing(102.125|91.513120000000001|84.8964|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 81.724119999999999 95 -> Trailing(102.125|91.513120000000001|81.724119999999999|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 84.978560000000002 94 -> Trailing(102.125|91.513120000000001|81.724119999999999|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 79.378439999999998 93 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 84.855280000000008 92 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 86.231480000000005 91 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 81.581280000000007 90 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Rising 73.291240000000002 89 -> Trailing(102.125|91.513120000000001|73.291240000000002|103|1|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 103.99048000000001 104 -> Initial(102.125|98.039215686274503) Hit(106.49048000000001|102.125)
 S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 96.502039999999994 103 -> Trailing(102.125|99.002039999999994|96.502039999999994|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 93.335999999999999 102 -> Trailing(102.125|99.002039999999994|93.335999999999999|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 93.630279999999999 101 -> Trailing(102.125|99.002039999999994|93.335999999999999|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 91.638320000000007 100 -> Trailing(102.125|99.002039999999994|91.638320000000007|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 98.555639999999997 99 -> Trailing(102.125|101.05564|91.638320000000007|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 91.513120000000001 98 -> Trailing(102.125|101.05564|91.513120000000001|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 88.860200000000006 97 -> Trailing(102.125|101.05564|88.860200000000006|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 84.8964 96 -> Trailing(102.125|101.05564|84.8964|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 81.724119999999999 95 -> Trailing(102.125|101.05564|81.724119999999999|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 84.978560000000002 94 -> Trailing(102.125|101.05564|81.724119999999999|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 79.378439999999998 93 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 84.855280000000008 92 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 86.231480000000005 91 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 81.581280000000007 90 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 73.291240000000002 89 -> Trailing(102.125|101.05564|73.291240000000002|103|0|true) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 91.513120000000001 98 -> Trailing(102.125|91.513120000000001|91.513120000000001|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 88.860200000000006 97 -> Trailing(102.125|91.513120000000001|88.860200000000006|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 84.8964 96 -> Trailing(102.125|91.513120000000001|84.8964|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 81.724119999999999 95 -> Trailing(102.125|91.513120000000001|81.724119999999999|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 84.978560000000002 94 -> Trailing(102.125|91.513120000000001|81.724119999999999|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 79.378439999999998 93 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 84.855280000000008 92 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 86.231480000000005 91 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 81.581280000000007 90 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Flat 73.291240000000002 89 -> Trailing(102.125|91.513120000000001|73.291240000000002|103|1|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 103.99048000000001 104 -> Initial(102.125|98.039215686274503) Hit(106.49048000000001|102.125)
 S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 96.502039999999994 103 -> Trailing(102.125|99.002039999999994|96.502039999999994|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 93.335999999999999 102 -> Trailing(102.125|99.002039999999994|93.335999999999999|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 93.630279999999999 101 -> Trailing(102.125|99.002039999999994|93.335999999999999|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 91.638320000000007 100 -> Trailing(102.125|99.002039999999994|91.638320000000007|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 98.555639999999997 99 -> Trailing(102.125|101.05564|91.638320000000007|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 91.513120000000001 98 -> Trailing(102.125|101.05564|91.513120000000001|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 88.860200000000006 97 -> Trailing(102.125|101.05564|88.860200000000006|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 84.8964 96 -> Trailing(102.125|101.05564|84.8964|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 81.724119999999999 95 -> Trailing(102.125|101.05564|81.724119999999999|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 84.978560000000002 94 -> Trailing(102.125|101.05564|81.724119999999999|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 79.378439999999998 93 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 84.855280000000008 92 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 86.231480000000005 91 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 81.581280000000007 90 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 73.291240000000002 89 -> Trailing(102.125|101.05564|73.291240000000002|103|0|true) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 91.513120000000001 98 -> Trailing(102.125|91.513120000000001|91.513120000000001|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 88.860200000000006 97 -> Trailing(102.125|91.513120000000001|88.860200000000006|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 84.8964 96 -> Trailing(102.125|91.513120000000001|84.8964|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 81.724119999999999 95 -> Trailing(102.125|91.513120000000001|81.724119999999999|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 84.978560000000002 94 -> Trailing(102.125|91.513120000000001|81.724119999999999|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 79.378439999999998 93 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 84.855280000000008 92 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 86.231480000000005 91 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 81.581280000000007 90 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage3 {weeks_topping = 3}/Weinstein_types.Declining 73.291240000000002 89 -> Trailing(102.125|91.513120000000001|73.291240000000002|103|1|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 103.99048000000001 104 -> Initial(102.125|98.039215686274503) Hit(106.49048000000001|102.125)
 S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 96.502039999999994 103 -> Trailing(102.125|99.002039999999994|96.502039999999994|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 93.335999999999999 102 -> Trailing(102.125|99.002039999999994|93.335999999999999|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 93.630279999999999 101 -> Trailing(102.125|99.002039999999994|93.335999999999999|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 91.638320000000007 100 -> Trailing(102.125|99.002039999999994|91.638320000000007|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 98.555639999999997 99 -> Trailing(102.125|101.05564|91.638320000000007|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 91.513120000000001 98 -> Trailing(102.125|101.05564|91.513120000000001|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 88.860200000000006 97 -> Trailing(102.125|101.05564|88.860200000000006|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 84.8964 96 -> Trailing(102.125|101.05564|84.8964|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 81.724119999999999 95 -> Trailing(102.125|101.05564|81.724119999999999|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 84.978560000000002 94 -> Trailing(102.125|101.05564|81.724119999999999|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 79.378439999999998 93 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 84.855280000000008 92 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 86.231480000000005 91 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 81.581280000000007 90 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 73.291240000000002 89 -> Trailing(102.125|101.05564|73.291240000000002|103|0|true) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 91.513120000000001 98 -> Trailing(102.125|91.513120000000001|91.513120000000001|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 88.860200000000006 97 -> Trailing(102.125|91.513120000000001|88.860200000000006|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 84.8964 96 -> Trailing(102.125|91.513120000000001|84.8964|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 81.724119999999999 95 -> Trailing(102.125|91.513120000000001|81.724119999999999|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 84.978560000000002 94 -> Trailing(102.125|91.513120000000001|81.724119999999999|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 79.378439999999998 93 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 84.855280000000008 92 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 86.231480000000005 91 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 81.581280000000007 90 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Rising 73.291240000000002 89 -> Trailing(102.125|91.513120000000001|73.291240000000002|103|1|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 103.99048000000001 104 -> Initial(102.125|98.039215686274503) Hit(106.49048000000001|102.125)
 S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 96.502039999999994 103 -> Trailing(102.125|99.002039999999994|96.502039999999994|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 93.335999999999999 102 -> Trailing(102.125|99.002039999999994|93.335999999999999|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 93.630279999999999 101 -> Trailing(102.125|99.002039999999994|93.335999999999999|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 91.638320000000007 100 -> Trailing(102.125|99.002039999999994|91.638320000000007|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 98.555639999999997 99 -> Trailing(102.125|101.05564|91.638320000000007|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 91.513120000000001 98 -> Trailing(102.125|101.05564|91.513120000000001|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 88.860200000000006 97 -> Trailing(102.125|101.05564|88.860200000000006|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 84.8964 96 -> Trailing(102.125|101.05564|84.8964|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 81.724119999999999 95 -> Trailing(102.125|101.05564|81.724119999999999|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 84.978560000000002 94 -> Trailing(102.125|101.05564|81.724119999999999|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 79.378439999999998 93 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 84.855280000000008 92 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 86.231480000000005 91 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 81.581280000000007 90 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 73.291240000000002 89 -> Trailing(102.125|101.05564|73.291240000000002|103|0|true) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 91.513120000000001 98 -> Trailing(102.125|91.513120000000001|91.513120000000001|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 88.860200000000006 97 -> Trailing(102.125|91.513120000000001|88.860200000000006|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 84.8964 96 -> Trailing(102.125|91.513120000000001|84.8964|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 81.724119999999999 95 -> Trailing(102.125|91.513120000000001|81.724119999999999|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 84.978560000000002 94 -> Trailing(102.125|91.513120000000001|81.724119999999999|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 79.378439999999998 93 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 84.855280000000008 92 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 86.231480000000005 91 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 81.581280000000007 90 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Flat 73.291240000000002 89 -> Trailing(102.125|91.513120000000001|73.291240000000002|103|1|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 103.99048000000001 104 -> Initial(102.125|98.039215686274503) Hit(106.49048000000001|102.125)
 S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 96.502039999999994 103 -> Trailing(102.125|99.002039999999994|96.502039999999994|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 93.335999999999999 102 -> Trailing(102.125|99.002039999999994|93.335999999999999|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 93.630279999999999 101 -> Trailing(102.125|99.002039999999994|93.335999999999999|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 91.638320000000007 100 -> Trailing(102.125|99.002039999999994|91.638320000000007|103|0|false) NoChange
 S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 98.555639999999997 99 -> Trailing(102.125|101.05564|91.638320000000007|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 91.513120000000001 98 -> Trailing(102.125|101.05564|91.513120000000001|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 88.860200000000006 97 -> Trailing(102.125|101.05564|88.860200000000006|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 84.8964 96 -> Trailing(102.125|101.05564|84.8964|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 81.724119999999999 95 -> Trailing(102.125|101.05564|81.724119999999999|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 84.978560000000002 94 -> Trailing(102.125|101.05564|81.724119999999999|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 79.378439999999998 93 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 84.855280000000008 92 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 86.231480000000005 91 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 81.581280000000007 90 -> Trailing(102.125|101.05564|79.378439999999998|103|0|true) NoChange
-S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 73.291240000000002 89 -> Trailing(102.125|101.05564|73.291240000000002|103|0|true) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 91.513120000000001 98 -> Trailing(102.125|91.513120000000001|91.513120000000001|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 88.860200000000006 97 -> Trailing(102.125|91.513120000000001|88.860200000000006|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 84.8964 96 -> Trailing(102.125|91.513120000000001|84.8964|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 81.724119999999999 95 -> Trailing(102.125|91.513120000000001|81.724119999999999|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 84.978560000000002 94 -> Trailing(102.125|91.513120000000001|81.724119999999999|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 79.378439999999998 93 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 84.855280000000008 92 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 86.231480000000005 91 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 81.581280000000007 90 -> Trailing(102.125|91.513120000000001|79.378439999999998|103|1|false) NoChange
+S4 wide/S/fallbk/Weinstein_types.Stage4 {weeks_declining = 5}/Weinstein_types.Declining 73.291240000000002 89 -> Trailing(102.125|91.513120000000001|73.291240000000002|103|1|false) NoChange
