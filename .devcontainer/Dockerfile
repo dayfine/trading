@@ -69,6 +69,7 @@ RUN sudo apt-get update && sudo apt-get install -y \
     libtool \
     time \
     jq \
+    shellcheck \
     && sudo rm -rf /var/lib/apt/lists/*
 
 # -----------------------------------------------------------------------------

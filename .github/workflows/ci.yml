@@ -98,17 +98,17 @@ jobs:
 
       - name: dune build
         run: |
-          eval $(opam env)
+          eval "$(opam env)"
           dune build
 
       - name: dune runtest
         run: |
-          eval $(opam env)
+          eval "$(opam env)"
           dune runtest
 
       - name: dune fmt (check only)
         run: |
-          eval $(opam env)
+          eval "$(opam env)"
           # @fmt fails if formatting would change anything; no --auto-promote.
           dune build @fmt
 

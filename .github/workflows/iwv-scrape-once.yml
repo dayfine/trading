@@ -65,12 +65,12 @@ jobs:
 
       - name: Build fetch_iwv_history.exe
         run: |
-          eval $(opam env)
+          eval "$(opam env)"
           dune build analysis/data/sources/ishares/bin/fetch_iwv_history.exe
 
       - name: Run IWV scraper
         run: |
-          eval $(opam env)
+          eval "$(opam env)"
           # Cache dir relative to /workspaces/trading-1/ (repo root).
           # GitHub Actions mounts the checkout at $GITHUB_WORKSPACE (/__w/…),
           # so we use an absolute path derived from the workspace.

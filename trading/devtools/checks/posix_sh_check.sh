@@ -7,10 +7,15 @@
 # substitution <(...) -- dash parse-fails on these with exit 2.
 #
 # Note: dash -n catches parse-time failures only. Runtime-only bash-isms
-# (mapfile, [[ ]], ${BASH_SOURCE[0]}) are NOT caught at syntax-check time.
-# shellcheck would catch these too; it is not installed in the
-# trading-devcontainer base image. Add shellcheck to the image for richer
-# coverage (see Follow-up in dev/status/harness.md).
+# (mapfile, [[ ]], ${BASH_SOURCE[0]}) are NOT caught at syntax-check time,
+# nor are variable-scoping defects (subshell-modified vars, unbound-under-
+# set-u shapes). shellcheck would catch these; it is not yet installed in
+# the trading-devcontainer base image (added to .devcontainer/Dockerfile
+# alongside #2521 -- takes effect after the image rebuild workflow next
+# runs). See workflow_shell_check.sh (#2521) for shellcheck coverage of
+# GitHub Actions workflow `run:` blocks specifically -- this script and
+# that one are complementary, not overlapping: this one lints repo *.sh
+# files, that one lints embedded YAML workflow shell.
 #
 # Scope:
 #   INCLUDED:

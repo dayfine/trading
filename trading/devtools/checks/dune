@@ -523,6 +523,41 @@
  (action
   (run sh %{dep:posix_sh_check_test.sh})))
 
+; Workflow shellcheck linter (#2521): extracts every `run:` body from
+; .github/workflows/*.yml and lints it with shellcheck. Catches variable-
+; scoping defects (subshell-modified vars, unbound-under-set-u shapes) that
+; `dash -n` (posix_sh_check.sh above) is parse-only and never evaluates, and
+; that no other CI gate lints at all. Gracefully SKIPs (exit 0) when
+; shellcheck is not on PATH -- not yet in the trading-devcontainer base
+; image as of this check's introduction; see workflow_shell_check.sh's own
+; header and .devcontainer/Dockerfile.
+; Deps: .github/workflows/ is outside the dune workspace root (workspace
+; root is trading/) and cannot be tracked via glob_files here, same
+; reasoning as posix_sh_check.sh's dev/lib + dev/scripts note above; the
+; script reads it via repo_root(), so (universe) forces a re-run whenever
+; anything in the repo changes rather than caching a stale PASS.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:workflow_shell_check.sh})))
+
+; Fixture-driven smoke test for workflow_shell_check.sh: builds throwaway
+; workflow YAML under a temp dir (never reads real .github/workflows/*.yml),
+; and asserts OK on a clean fixture, FAIL naming the file+step on a
+; subshell-scope defect (SC2030/SC2031 -- the ce88954 defect class), GH
+; ${{ }} expression neutralization, single-line `run:` handling, and the
+; shellcheck-absent SKIP path. SKIPs its own shellcheck-dependent assertions
+; (still exits 0) when shellcheck is not installed in the running
+; environment, so the test itself is green in both worlds.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh workflow_shell_check.sh)
+ (action
+  (run sh %{dep:workflow_shell_check_test.sh})))
+
 ; No-Python enforcement: fails if any *.py file exists in the repo (outside
 ; .git/, _build/, node_modules/, vendor/, .devcontainer/). The two previously
 ; grandfathered scripts (perf_sweep_report.py, perf_hypothesis_report.py) were
