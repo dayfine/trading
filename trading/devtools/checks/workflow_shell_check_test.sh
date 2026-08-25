@@ -241,6 +241,12 @@ if [ "$HAVE_SHELLCHECK" = "1" ]; then
 
   GAP_OUTPUT="$(WORKFLOW_SHELL_CHECK_DIR="$GAP_DIR" sh "$LINTER" 2>&1)" && GAP_EXIT=0 || GAP_EXIT=$?
 
+  if ! printf '%s' "$GAP_OUTPUT" | grep -q "1 run: block(s) clean"; then
+    echo "FAIL: workflow_shell_check_test -- known-gap fixture was not extracted as exactly one clean run: block."
+    echo "  A zero-fragment extraction would make the gap pin vacuous. output: $GAP_OUTPUT"
+    exit 1
+  fi
+
   if [ "$GAP_EXIT" -ne 0 ]; then
     echo "FAIL: workflow_shell_check_test -- known-gap fixture (ce88954 shape) now trips the linter."
     echo "  This means shellcheck may have gained command-substitution-into-function"

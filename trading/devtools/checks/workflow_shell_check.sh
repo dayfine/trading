@@ -26,11 +26,7 @@
 # ZERO findings -- even with the `check-unassigned-uppercase` optional
 # rule enabled, because the assignment is lexically present somewhere in
 # the file and shellcheck does not track which shell process actually
-# performs it. Separately, shellcheck's SC2154 (and
-# check-unassigned-uppercase) never fire on a genuinely-unassigned
-# ALL-CAPS variable name -- it is treated as possibly environment-
-# provided -- and the real ce88954 variable (`MERGE_RESPONSE`) was
-# ALL-CAPS, so that path was never going to catch it either. The class of
+# performs it. The class of
 # bug that MOTIVATED this issue therefore remains open; see #2521 for the
 # residual gap and its follow-up. What this check DOES reliably catch:
 # pipeline-subshell scope loss (SC2030/SC2031) and shellcheck's general
