@@ -44,6 +44,7 @@ basis for continuity must pin `((initial_stop_buffer 1.02))` +
 
 ## Also in this change
 
-The five `goldens-sp500/` postsubmit golden expected values re-pinned to the
-new basis (they run soak-mode postsubmit; the armed-stoplimit one was already
+Three of the five `goldens-sp500/` postsubmit goldens re-pinned to the
+new basis; the two `bah-*` arms hold no strategy positions and needed no
+change (they run soak-mode postsubmit; the armed-stoplimit one was already
 red on main at the pre-flip basis — see PR #2530's post-review note).
