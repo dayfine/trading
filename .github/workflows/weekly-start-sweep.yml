@@ -56,13 +56,13 @@ jobs:
       - name: Build sweep tool
         working-directory: trading
         run: |
-          eval $(opam env)
+          eval "$(opam env)"
           dune build trading/backtest/sweep_weekly_start/bin/main.exe
 
       - name: Run weekly-start sweep
         working-directory: trading
         run: |
-          eval $(opam env)
+          eval "$(opam env)"
           ./_build/default/trading/backtest/sweep_weekly_start/bin/main.exe \
             --symbol SPY \
             --init-cash 100000 \

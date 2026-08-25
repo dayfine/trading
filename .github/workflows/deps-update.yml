@@ -38,7 +38,7 @@ jobs:
 
       - name: Capture installed package versions
         run: |
-          eval $(opam env)
+          eval "$(opam env)"
           opam list --installed --columns=name,version --short \
             | sort > trading/deps-snapshot.txt
 

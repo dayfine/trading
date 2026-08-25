@@ -423,7 +423,6 @@ jobs:
           # PR whose head branch starts with ops/daily-$(date +%F).
           # ---------------------------------------------------------------
           DATE="$(date +%F)"
-          OWNER="${REPO%/*}"
           # Single API fetch; jq picks number + branch from first matching PR.
           PRS_JSON="$(curl -sSL \
             -H "Authorization: Bearer ${GH_TOKEN}" \
