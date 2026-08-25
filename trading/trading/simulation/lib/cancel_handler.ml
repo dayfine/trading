@@ -193,6 +193,34 @@ let revert_rejected_exits ~date ~positions ~rejected_trades =
   List.fold rejected_trades ~init:positions ~f:(fun acc trade ->
       _revert_one ~date ~acc ~trade)
 
+(* Settle the refused fills that survived G2b's resize: spend G2a's retry
+   budget on what it can save, cancel the rest, then revert the stuck exits.
+
+   The [CancelEntry]s are the ONLY resolution a portfolio-rejected entry
+   ticket gets; unannounced, they left a quarter of all placed tickets
+   resolving to nothing in [trade_audit.sexp]
+   (dev/notes/ticket-death-on-cash-2026-08-16.md G1). Observational: [Stop_log]
+   ignores [CancelEntry], no metric reads it.
+
+   The revert is the exit-side mirror (#1553): an [Exiting] position whose
+   exit fill was rejected would otherwise stay stuck forever (stops only
+   re-evaluate [Holding]), so it goes back to [Holding] and the stop re-fires
+   next cycle. *)
+let handle_rejected_trades ~date ~positions ~rejected_trades ~order_manager
+    ~entry_fill_retry ~on_transitions =
+  let open Result.Let_syntax in
+  let cancel_transitions =
+    transitions_for_rejected_trades ~date ~positions
+      ~rejected_trades:
+        (Entry_fill_retry.handle_rejected_entries entry_fill_retry
+           ~order_manager ~positions ~rejected_trades)
+  in
+  Option.iter on_transitions ~f:(fun observe -> observe cancel_transitions);
+  let%bind positions =
+    apply_transitions ~positions ~transitions:cancel_transitions
+  in
+  Ok (revert_rejected_exits ~date ~positions ~rejected_trades)
+
 (* Apply one trade to the portfolio; tag it accepted (portfolio booked it) or
    rejected (carrying the rejection [err] for the WARN). Routed through the
    long-margin-aware apply so a levered long BUY funds its cash shortfall into
