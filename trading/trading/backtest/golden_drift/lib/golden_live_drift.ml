@@ -88,12 +88,17 @@ let live_config ~overrides_path =
   in
   Backtest.Overlay_validator.apply_overrides (_base_config ()) overlays
 
+(* The reason is required, not decorative. Accepting a bare [(field)] would let
+   a spec silence the check while recording nothing — the "nothing was written
+   down" state this module exists to end. *)
 let _declared_field_name spec_path = function
-  | Sexp.List (Sexp.Atom field :: _) -> field
+  | Sexp.List [ Sexp.Atom field; Sexp.Atom reason ]
+    when not (String.is_empty (String.strip reason)) ->
+      field
   | entry ->
       failwithf
         "%s: malformed deviates_from_live entry %s (expected (<field> \
-         \"<reason>\"))"
+         \"<reason>\") with a non-empty reason)"
         spec_path (Sexp.to_string entry) ()
 
 (* Top-level [(key rest)] pairs of the raw spec sexp. Read directly rather than

@@ -10,7 +10,8 @@
 
     This module makes the drift {b declared}. A golden may deviate — scenarios
     that isolate a mechanism {e should} — but each deviating field must be named
-    in the spec's [deviates_from_live] block together with a one-line reason:
+    in the spec's [deviates_from_live] block together with a one-line reason
+    (which is enforced, not merely conventional — see {!declared_deviations}):
 
     {v
     (deviates_from_live
@@ -79,7 +80,10 @@ val diff_configs :
 val declared_deviations : string -> string list
 (** [declared_deviations spec_path] is the field names listed in the spec's
     [deviates_from_live] block, or [[]] when the block is absent. Raises
-    [Failure] if the block is present but malformed. *)
+    [Failure] if the block is present but malformed — it must be a list of
+    [(<field> "<reason>")] pairs, and the reason is required: a bare [(field)]
+    or an empty reason would silence the check while recording nothing, so both
+    are rejected. *)
 
 val check_spec : live:Weinstein_strategy.config -> string -> spec_report
 (** [check_spec ~live spec_path] loads the scenario, resolves its

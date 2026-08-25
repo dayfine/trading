@@ -46,6 +46,12 @@ let _fixture ?strategy ?overrides ?deviates ~live_overrides () =
   Out_channel.write_all live_path ~data:live_overrides;
   (spec_path, Drift.live_config ~overrides_path:live_path)
 
+(* The [Failure] message raised by [f]. A marker string when [f] returns, so a
+   guard that silently stopped raising fails the assertion rather than the
+   test harness. *)
+let _failure_message f =
+  match f () with () -> "no exception raised" | exception Failure msg -> msg
+
 let _finding_labels (report : Drift.spec_report) =
   List.map report.findings ~f:(function
     | Drift.Undeclared_deviation d -> "undeclared:" ^ d.field
@@ -53,6 +59,15 @@ let _finding_labels (report : Drift.spec_report) =
 
 (* Live arms one report-side knob; the golden leaves it at its default. *)
 let _live_arms_extension_cap = "((entry_extension_max_pct 15.0))"
+
+(* (spec_path, the [Failure] message [check_spec] raises on it). *)
+let _check_spec_failure ?overrides ?deviates () =
+  let spec_path, live =
+    _fixture ?overrides ?deviates ~live_overrides:_live_arms_extension_cap ()
+  in
+  ( spec_path,
+    _failure_message (fun () ->
+        ignore (Drift.check_spec ~live spec_path : Drift.spec_report)) )
 
 let test_undeclared_deviation_is_reported _ =
   let spec_path, live = _fixture ~live_overrides:_live_arms_extension_cap () in
@@ -126,6 +141,105 @@ let test_nested_deviation_names_the_differing_leaf _ =
            ];
        ])
 
+(* --- Guards named in the .mli ---------------------------------------------- *)
+
+(* A declaration with no reason would silence the check while recording
+   nothing — the state #2403 exists to end — so it must not parse. *)
+let test_reasonless_declaration_is_rejected _ =
+  let spec_path, message =
+    _check_spec_failure
+      ~deviates:"(deviates_from_live ((entry_extension_max_pct)))" ()
+  in
+  assert_that message
+    (all_of
+       [
+         contains_substring spec_path;
+         contains_substring "entry_extension_max_pct";
+       ])
+
+(* Same rule for a present-but-blank reason. *)
+let test_empty_reason_declaration_is_rejected _ =
+  let _, message =
+    _check_spec_failure
+      ~deviates:{|(deviates_from_live ((entry_extension_max_pct "  ")))|} ()
+  in
+  assert_that message (contains_substring "entry_extension_max_pct")
+
+let test_non_list_deviates_block_is_rejected _ =
+  let _, message =
+    _check_spec_failure ~deviates:"(deviates_from_live not-a-list)" ()
+  in
+  assert_that message (contains_substring "must be a list of")
+
+let test_unresolvable_override_key_is_rejected _ =
+  let _, message =
+    _check_spec_failure ~overrides:"((not_a_real_knob 1.0))" ()
+  in
+  assert_that message (contains_substring "not_a_real_knob")
+
+let test_non_record_spec_is_rejected _ =
+  let dir = Filename_unix.temp_dir "golden_drift_test" "" in
+  let spec_path = Filename.concat dir "atom.sexp" in
+  Out_channel.write_all spec_path ~data:"not-a-record";
+  assert_that
+    (_failure_message (fun () ->
+         ignore (Drift.declared_deviations spec_path : string list)))
+    (contains_substring "not a record")
+
+(* A missing directory must fail loudly: a silently-empty sweep reads exactly
+   like a clean run, which is the failure mode the guard exists to prevent. *)
+let test_missing_directory_is_rejected _ =
+  let _, live = _fixture ~live_overrides:_live_arms_extension_cap () in
+  assert_that
+    (_failure_message (fun () ->
+         ignore
+           (Drift.check_dirs ~live [ "/no/such/golden/dir" ]
+             : Drift.spec_report list)))
+    (contains_substring "golden directory not found")
+
+let test_live_config_rejects_bad_overrides _ =
+  let dir = Filename_unix.temp_dir "golden_drift_test" "" in
+  let bogus_path = Filename.concat dir "bogus-overrides.sexp" in
+  Out_channel.write_all bogus_path ~data:"((not_a_real_knob 1.0))";
+  assert_that
+    (_failure_message (fun () ->
+         ignore
+           (Drift.live_config
+              ~overrides_path:(Filename.concat dir "absent.sexp")
+             : Weinstein_strategy.config)))
+    (contains_substring "Failed to load live config overrides");
+  assert_that
+    (_failure_message (fun () ->
+         ignore
+           (Drift.live_config ~overrides_path:bogus_path
+             : Weinstein_strategy.config)))
+    (contains_substring "not_a_real_knob")
+
+(* Mirrors [_max_rendered_chars] in the implementation: a whole config
+   sub-record would otherwise bury the message. *)
+let _expected_render_limit = 160
+
+let test_long_rendering_is_truncated _ =
+  let config universe =
+    Weinstein_strategy.default_config ~universe ~index_symbol:"SPY"
+  in
+  let symbols = List.init 40 ~f:(sprintf "SYMBOL%04d") in
+  let full =
+    Sexp.to_string (Sexp.List (List.map symbols ~f:(fun s -> Sexp.Atom s)))
+  in
+  assert_that
+    (Drift.diff_configs ~golden:(config symbols) ~live:(config []))
+    (elements_are
+       [
+         all_of
+           [
+             field (fun (d : Drift.deviation) -> d.field) (equal_to "universe");
+             field
+               (fun (d : Drift.deviation) -> d.golden)
+               (equal_to (String.prefix full _expected_render_limit ^ "..."));
+           ];
+       ])
+
 (* --- The gate: every committed postsubmit golden declares its drift ------- *)
 
 let _repo_relative_dirs =
@@ -178,6 +292,19 @@ let suite =
          "bah_scenario_is_skipped" >:: test_bah_scenario_is_skipped;
          "nested_deviation_names_the_differing_leaf"
          >:: test_nested_deviation_names_the_differing_leaf;
+         "reasonless_declaration_is_rejected"
+         >:: test_reasonless_declaration_is_rejected;
+         "empty_reason_declaration_is_rejected"
+         >:: test_empty_reason_declaration_is_rejected;
+         "non_list_deviates_block_is_rejected"
+         >:: test_non_list_deviates_block_is_rejected;
+         "unresolvable_override_key_is_rejected"
+         >:: test_unresolvable_override_key_is_rejected;
+         "non_record_spec_is_rejected" >:: test_non_record_spec_is_rejected;
+         "missing_directory_is_rejected" >:: test_missing_directory_is_rejected;
+         "live_config_rejects_bad_overrides"
+         >:: test_live_config_rejects_bad_overrides;
+         "long_rendering_is_truncated" >:: test_long_rendering_is_truncated;
          "committed_goldens_declare_every_deviation"
          >:: test_committed_goldens_declare_every_deviation;
        ]
