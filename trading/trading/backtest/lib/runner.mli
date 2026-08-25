@@ -228,6 +228,7 @@ val run_backtest :
   ?slippage_bps:int ->
   ?cost_model:Backtest_cost_model.Cost_model.t ->
   ?candidate_log:Candidate_log.collector ->
+  ?on_step_setup:Panel_runner.step_hook_setup ->
   unit ->
   result
 (** Run the simulator from [start_date - warmup] to [end_date], filter to the
@@ -326,6 +327,13 @@ val run_backtest :
     read-only progress information; restartability of the simulator state is a
     follow-up (deferred per the data-pipeline-automation plan, §"Open question
     4").
+
+    [on_step_setup], when passed, is threaded to {!Panel_runner.run} as its
+    per-step observer — the mid-run artefact-streaming seam (#2502). Build it
+    with {!Result_writer.with_trades_stream}, which owns the [trades.csv]
+    stream's lifecycle; this function only forwards. Observability only: the
+    hook reads the run's recorders and moves no metric, no golden, and no
+    strategy behaviour, and omitting it is bit-identical.
 
     [cost_model], when passed, threads a {!Backtest_cost_model.Cost_model.t}
     overlay through the simulator. The runner builds a per-trade post-fill

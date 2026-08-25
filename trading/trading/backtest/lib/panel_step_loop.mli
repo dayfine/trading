@@ -43,9 +43,19 @@ val record_step_into_progress :
 val run_simulator_with_gc_trace :
   ?gc_trace:Gc_trace.t ->
   ?progress_acc:Backtest_progress.accumulator ->
+  ?on_step:
+    (date:Date.t ->
+    step:Trading_simulation_types.Simulator_types.step_result ->
+    unit) ->
   stop_log:Stop_log.t ->
   Simulator.t ->
   Trading_simulation_types.Simulator_types.run_result
 (** Drive the simulator to completion, GC-tracing each step. Calls
     [Backtest_progress.record_step] on every completed step when [progress_acc]
-    is provided. *)
+    is provided.
+
+    [on_step], when provided, is called with the same [(date, step_result)]
+    right after the progress hook. It is the mid-run artefact-streaming seam
+    (#2502) — [Runner] uses it to feed {!Trades_stream}. Observability only: the
+    callback must not mutate simulator state, and omitting it is bit-identical
+    to the pre-#2502 loop. *)

@@ -81,13 +81,14 @@ let _snapshot ~steps_rev : Trades_stream.batch =
 
 let _rm_f path = try Core_unix.remove path with _ -> ()
 
+let _rm_rf dir =
+  (try Sys_unix.ls_dir dir |> List.iter ~f:(fun e -> _rm_f (dir ^ "/" ^ e))
+   with _ -> ());
+  try Core_unix.rmdir dir with _ -> ()
+
 let _with_temp_dir f =
   let dir = Filename_unix.temp_dir "trades_stream_test" "" in
-  Exn.protect
-    ~f:(fun () -> f dir)
-    ~finally:(fun () ->
-      _rm_f (dir ^ "/trades.csv");
-      try Core_unix.rmdir dir with _ -> ())
+  Exn.protect ~f:(fun () -> f dir) ~finally:(fun () -> _rm_rf dir)
 
 let _read_lines dir =
   In_channel.read_lines (dir ^ "/trades.csv")
@@ -268,6 +269,61 @@ let test_header_only_file_and_idempotent_close _ =
       assert_that (_read_lines dir)
         (elements_are [ equal_to Trades_stream.header ]))
 
+(* ------------------------------------------------------------------ *)
+(* End-to-end: Runner.run_backtest ~stream_trades_dir                   *)
+(* ------------------------------------------------------------------ *)
+
+let _fixtures_root () =
+  Filename.concat
+    (Data_path.default_data_dir () |> Fpath.to_string)
+    "backtest_scenarios"
+
+(* The catalog's smallest scenario (perf-tier-1, 7 symbols, ~6 months) — the
+   same one [test_backtest_progress] drives, so the e2e stays cheap. *)
+let _scenario_rel = "smoke/tiered-loader-parity.sexp"
+
+let _load_smoke_scenario () =
+  Scenario_lib.Scenario.load (Filename.concat (_fixtures_root ()) _scenario_rel)
+
+let _sector_map_override (s : Scenario_lib.Scenario.t) =
+  Filename.concat (_fixtures_root ()) s.universe_path
+  |> Scenario_lib.Universe_file.load
+  |> Scenario_lib.Universe_file.to_sector_map_override
+
+let _run_streamed ~dir (s : Scenario_lib.Scenario.t) =
+  Backtest.Result_writer.with_trades_stream ~output_dir:dir ~every_n_fridays:1
+    ~start_date:s.period.start_date ~f:(fun ~on_step_setup ->
+      Backtest.Runner.run_backtest ~start_date:s.period.start_date
+        ~end_date:s.period.end_date ~overrides:s.config_overrides
+        ?sector_map_override:(_sector_map_override s) ~on_step_setup ())
+
+(** The wiring pin: once {!Backtest.Result_writer.with_trades_stream} has driven
+    a backtest and {b before} any {!Backtest.Result_writer.write}, [trades.csv]
+    already exists and is well-formed. Without the hook reaching the step loop
+    there would be no file at all at this point, so a dropped link anywhere in
+    [Result_writer -> Runner -> Panel_runner -> Panel_step_loop] fails here. *)
+let test_runner_streams_trades_csv_before_result_writer _ =
+  _with_temp_dir (fun dir ->
+      let result = _run_streamed ~dir (_load_smoke_scenario ()) in
+      assert_that (_read_lines dir)
+        (all_of
+           [
+             field List.hd (is_some_and (equal_to Trades_stream.header));
+             each
+               (field
+                  (fun l -> List.length (String.split ~on:',' l))
+                  (equal_to _n_header_fields));
+           ]);
+      (* And the completed-run contract on real data: finalising over a
+         streamed directory yields the same bytes as writing into a virgin
+         one. *)
+      _with_temp_dir (fun plain_dir ->
+          Backtest.Result_writer.write ~output_dir:dir result;
+          Backtest.Result_writer.write ~output_dir:plain_dir result;
+          assert_that
+            (In_channel.read_all (dir ^ "/trades.csv"))
+            (equal_to (In_channel.read_all (plain_dir ^ "/trades.csv")))))
+
 let suite =
   "trades_stream"
   >::: [
@@ -286,6 +342,8 @@ let suite =
          >:: test_finalised_file_is_byte_identical_to_unstreamed;
          "header-only file and idempotent close"
          >:: test_header_only_file_and_idempotent_close;
+         "runner streams trades.csv before Result_writer runs"
+         >:: test_runner_streams_trades_csv_before_result_writer;
        ]
 
 let () = run_test_tt_main suite

@@ -299,13 +299,21 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
     Scenario_progress.make_emitter ~scenario_dir ~every_n_fridays:progress_every
   in
   let t_start = Time_ns_unix.now () in
+  (* Stream closed round-trips into [trades.csv] as the run progresses (#2502),
+     on the same Friday cadence as [progress.sexp]. The [Result_writer.write]
+     below truncates and rewrites the file, so a completed scenario's artefact
+     is unchanged; the value is a crashed or OOM-killed scenario keeping the
+     trades it had already closed. *)
   let result =
-    Backtest.Runner.run_backtest ~start_date:s.period.start_date
-      ~end_date:s.period.end_date ~overrides:s.config_overrides
-      ?sector_map_override ~strategy_choice:s.strategy ~progress_emitter
-      ?slippage_bps:s.slippage_bps ?cost_model:s.cost_model ?bar_data_source
-      ?candidate_log:(Backtest.Candidate_log.create_if emit_candidates)
-      ()
+    Backtest.Result_writer.with_trades_stream ~output_dir:scenario_dir
+      ~every_n_fridays:progress_every ~start_date:s.period.start_date
+      ~f:(fun ~on_step_setup ->
+        Backtest.Runner.run_backtest ~start_date:s.period.start_date
+          ~end_date:s.period.end_date ~overrides:s.config_overrides
+          ?sector_map_override ~strategy_choice:s.strategy ~progress_emitter
+          ?slippage_bps:s.slippage_bps ?cost_model:s.cost_model ?bar_data_source
+          ?candidate_log:(Backtest.Candidate_log.create_if emit_candidates)
+          ~on_step_setup ())
   in
   let wall_seconds =
     Time_ns.Span.to_sec (Time_ns.diff (Time_ns_unix.now ()) t_start)

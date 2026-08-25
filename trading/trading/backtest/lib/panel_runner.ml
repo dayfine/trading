@@ -313,6 +313,22 @@ type _recorders = {
   audit_recorder : Weinstein_strategy.Audit_recorder.t;
 }
 
+type step_hook_setup =
+  stop_log:Stop_log.t ->
+  trade_audit:Trade_audit.t ->
+  force_liquidation_log:Force_liquidation_log.t ->
+  date:Date.t ->
+  step:Trading_simulation_types.Simulator_types.step_result ->
+  unit
+
+(* Bind the run's recorders into the caller's step hook, yielding the per-step
+   callback the step loop takes. [None] in, [None] out — the loop then runs its
+   pre-#2502 path. *)
+let _bind_step_hook ~(r : _recorders) setup =
+  Option.map setup ~f:(fun f ->
+      f ~stop_log:r.stop_log ~trade_audit:r.trade_audit
+        ~force_liquidation_log:r.force_liquidation_log)
+
 let _create_recorders ?candidate_log () : _recorders =
   let stop_log = Stop_log.create () in
   let trade_audit = Trade_audit.create () in
@@ -373,10 +389,21 @@ let _build_sim input ~r ~start_date ~warmup_start ~end_date ~initial_cash
     ?slippage_bps:effective_slippage_bps ?on_trade_fill ?active_through_for
     ~strategy ~market_data_adapter ()
 
+(* The Fill-phase step loop inside its trace span, with the caller's step hook
+   bound to this run's recorders. Extracted so [run] stays under the
+   function-length cap. *)
+let _run_steps ~r ~trace ~gc_trace ~progress_acc ~on_step_setup ~n_all_symbols
+    sim =
+  Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->
+      Panel_step_loop.run_simulator_with_gc_trace ?gc_trace ?progress_acc
+        ?on_step:(_bind_step_hook ~r on_step_setup)
+        ~stop_log:r.stop_log sim)
+
 let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     ~commission ?(strategy_choice = Strategy_choice.default) ?trace ?gc_trace
     ?bar_data_source ?shared_panels ?progress_emitter ?slippage_bps ?cost_model
-    ?(prune_universe_by_active_through = false) ?candidate_log () =
+    ?(prune_universe_by_active_through = false) ?candidate_log ?on_step_setup ()
+    =
   let fold_start_date =
     fold_start_date_of_opt_in ~prune_universe_by_active_through ~start_date
   in
@@ -409,9 +436,8 @@ let run ~(input : input) ~start_date ~end_date ~warmup_days ~initial_cash
     Panel_step_loop.build_progress_acc ~progress_emitter ~warmup_start ~end_date
   in
   let sim_result =
-    Trace.record ?trace ~symbols_in:n_all_symbols Trace.Phase.Fill (fun () ->
-        Panel_step_loop.run_simulator_with_gc_trace ?gc_trace ?progress_acc
-          ~stop_log:r.stop_log sim)
+    _run_steps ~r ~trace ~gc_trace ~progress_acc ~on_step_setup ~n_all_symbols
+      sim
   in
   Option.iter progress_acc ~f:Backtest_progress.emit_final;
   let final_close_prices = final_close_prices_thunk () in

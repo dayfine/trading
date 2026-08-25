@@ -63,8 +63,10 @@ let record_step_into_progress ~progress_acc ~date
     snapshot is labeled with the step's date *before* [Simulator.step] is
     invoked. [progress_acc], when passed, has [Backtest_progress.record_step]
     invoked after every completed step; the caller is responsible for the final
-    {!Backtest_progress.emit_final} call after the loop returns. *)
-let run_simulator_with_gc_trace ?gc_trace ?progress_acc ~stop_log sim =
+    {!Backtest_progress.emit_final} call after the loop returns. [on_step], when
+    passed, is invoked with the same completed step — the artefact-streaming
+    hook (#2502). *)
+let run_simulator_with_gc_trace ?gc_trace ?progress_acc ?on_step ~stop_log sim =
   let start_date = (Simulator.get_config sim).start_date in
   let rec loop sim ~pending_date =
     Stop_log.set_current_date stop_log pending_date;
@@ -72,6 +74,7 @@ let run_simulator_with_gc_trace ?gc_trace ?progress_acc ~stop_log sim =
     | `Done result -> result
     | `Continue (sim', step_result) ->
         record_step_into_progress ~progress_acc ~date:pending_date ~step_result;
+        Option.iter on_step ~f:(fun f -> f ~date:pending_date ~step:step_result);
         loop sim' ~pending_date:(Date.add_days pending_date 1)
   in
   loop sim ~pending_date:start_date

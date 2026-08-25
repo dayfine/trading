@@ -146,3 +146,52 @@ let write ~output_dir (result : Runner.result) =
   Reconciler_writer.write_splits ~output_dir ~steps:result.steps;
   _write_universe ~output_dir ~universe:result.universe;
   Macro_trend_writer.write ~output_dir result.cascade_summaries
+
+(* --- Mid-run [trades.csv] streaming (#2502) ------------------------- *)
+
+(** {!Trades_stream}'s snapshot callback: the in-window artefacts a [trades.csv]
+    row needs, extracted from the steps recorded so far with the very same
+    {!Runner} window filters teardown uses — so a streamed row and its finalised
+    counterpart are computed from one definition of "in window".
+
+    No [order_links] exist mid-run (the simulator publishes
+    [run_result.order_position_links] only on its terminal result), hence no
+    [position_id] on streamed rows. The end-of-run rewrite restores it. *)
+let _stream_batch ~stop_log ~trade_audit ~force_liquidation_log ~start_date
+    ~steps_rev : Trades_stream.batch =
+  {
+    round_trips = Runner.round_trips_in_window (List.rev steps_rev) ~start_date;
+    stop_infos =
+      Runner.filter_stop_infos_in_window
+        (Stop_log.get_stop_infos stop_log)
+        ~start_date;
+    audit =
+      Runner.filter_audit_records_in_window
+        (Trade_audit.get_audit_records trade_audit)
+        ~start_date;
+    force_liquidations =
+      Runner.filter_force_liquidations_in_window
+        (Force_liquidation_log.events force_liquidation_log)
+        ~start_date;
+  }
+
+let _open_stream ~output_dir ~every_n_fridays ~start_date ~stop_log ~trade_audit
+    ~force_liquidation_log =
+  Trades_stream.create ~output_dir ~every_n_fridays
+    ~snapshot:
+      (_stream_batch ~stop_log ~trade_audit ~force_liquidation_log ~start_date)
+    ()
+
+let with_trades_stream ~output_dir ~every_n_fridays ~start_date ~f =
+  let opened = ref None in
+  let on_step_setup ~stop_log ~trade_audit ~force_liquidation_log =
+    let t =
+      _open_stream ~output_dir ~every_n_fridays ~start_date ~stop_log
+        ~trade_audit ~force_liquidation_log
+    in
+    opened := Some t;
+    fun ~date ~step -> Trades_stream.record_step t ~date ~step
+  in
+  Exn.protect
+    ~f:(fun () -> f ~on_step_setup)
+    ~finally:(fun () -> Option.iter !opened ~f:Trades_stream.close)
