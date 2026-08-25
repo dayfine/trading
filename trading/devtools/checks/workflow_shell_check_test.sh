@@ -10,10 +10,11 @@
 # this test runs in (it is not yet in the trading-devcontainer base image
 # as of #2521 -- see workflow_shell_check.sh's own header). The
 # shellcheck-dependent assertions (OK-fixture, FAIL-fixture, GH-expression
-# neutralization, single-line run:) SKIP cleanly with a printed notice when
-# shellcheck is absent, so this test passes in both worlds. The SKIP-path
-# assertion itself (shellcheck absent via PATH override) does not depend on
-# the real environment and always runs.
+# neutralization, single-line run:, known-gap, dialect resolution) SKIP
+# cleanly with a printed notice when shellcheck is absent, so this test
+# passes in both worlds. The SKIP-path assertion itself (shellcheck absent
+# via PATH override) does not depend on the real environment and always
+# runs.
 
 set -e
 
@@ -70,8 +71,14 @@ EOF
 
 # ---- Fixture dir: FAIL -- a step whose variable is modified only inside a
 # pipeline subshell then read back in the caller scope (shellcheck
-# SC2030/SC2031 -- the same "assignment invisible outside its subshell"
-# shape as the ce88954 defect that motivated this check, #2521). ----
+# SC2030/SC2031). This is a DIFFERENT shellcheck detection mechanism than
+# the ce88954 defect that motivated this check -- ce88954's variable was
+# lost across a *command-substitution* subshell invoking a function, which
+# shellcheck 0.8.0 does not model (see workflow_shell_check.sh's header
+# "IMPORTANT SCOPE LIMITATION" note and #2521 for the residual gap). This
+# fixture still pins a real, useful shellcheck guard -- pipeline-subshell
+# scope loss -- even though it is not the ce88954 shape itself; see the
+# "known gap" fixture below for that shape. ----
 
 FAIL_DIR="${TMPDIR_BASE}/fail"
 mkdir -p "$FAIL_DIR"
@@ -90,6 +97,82 @@ jobs:
             COUNT=$((COUNT + 1))
           done
           echo "Count: ${COUNT}"
+EOF
+
+# ---- Fixture dir: KNOWN GAP -- reconstructs the exact ce88954 shape: a
+# function assigns an ALL-CAPS variable, invoked via command substitution
+# (`X="$(fn)"`), and the caller reads the function-assigned variable back
+# under `set -u`. Verified against shellcheck 0.8.0 (see
+# workflow_shell_check.sh's header "IMPORTANT SCOPE LIMITATION"): this is
+# NOT caught -- neither by SC2154 nor by the check-unassigned-uppercase
+# optional rule, both of which see the assignment lexically present in
+# the file and don't track which shell process performs it. This fixture
+# pins that CURRENT (limited) behavior as a regression test: if a future
+# shellcheck version gains this detection, the assertion below starts
+# failing -- that is a signal to revisit #2521 and correct the header +
+# this comment, not a bug in the test. ----
+
+GAP_DIR="${TMPDIR_BASE}/known_gap"
+mkdir -p "$GAP_DIR"
+cat > "${GAP_DIR}/ce88954_shape.yml" << 'EOF'
+name: Known gap
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Command-substitution-into-function scope loss (ce88954 shape)
+        run: |
+          set -euo pipefail
+          merge_pr_when_clean() {
+            local pr="$1"
+            MERGE_RESPONSE="merged-${pr}"
+          }
+          MERGED="$(merge_pr_when_clean 123)"
+          echo "result: ${MERGED}"
+          echo "leaked: ${MERGE_RESPONSE}"
+EOF
+
+# ---- Fixture dirs: DIALECT RESOLUTION -- one step-level `shell: sh`
+# override, one job-level `defaults: run: shell: sh`. Both bodies contain
+# a bash array (`arr=(a b c)`), which shellcheck accepts under `-s bash`
+# (no finding) but flags under `-s sh` as SC3030/SC3054 ("In POSIX sh,
+# arrays [references] are undefined") -- verified directly. So a PASS
+# here proves the resolved dialect actually reached shellcheck as `sh`,
+# not that the linter silently fell back to its bash default. ----
+
+DIALECT_STEP_DIR="${TMPDIR_BASE}/dialect_step"
+mkdir -p "$DIALECT_STEP_DIR"
+cat > "${DIALECT_STEP_DIR}/step_override.yml" << 'EOF'
+name: Step-level shell override
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bash-ism under a step-level sh override
+        shell: sh
+        run: |
+          arr=(a b c)
+          echo "${arr[0]}"
+EOF
+
+DIALECT_DEFAULT_DIR="${TMPDIR_BASE}/dialect_default"
+mkdir -p "$DIALECT_DEFAULT_DIR"
+cat > "${DIALECT_DEFAULT_DIR}/job_default.yml" << 'EOF'
+name: Job-level default shell
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: sh
+    steps:
+      - name: Bash-ism inheriting the job-level sh default
+        run: |
+          arr=(a b c)
+          echo "${arr[0]}"
 EOF
 
 if [ "$HAVE_SHELLCHECK" = "1" ]; then
@@ -149,8 +232,69 @@ if [ "$HAVE_SHELLCHECK" = "1" ]; then
   fi
   _pass
 
+  # ---- Known-gap fixture: pins the CURRENT (limited) shellcheck behavior
+  # on the reconstructed ce88954 shape -- see the fixture comment above and
+  # workflow_shell_check.sh's header "IMPORTANT SCOPE LIMITATION". Expected
+  # exit 0 (clean) TODAY; a non-zero exit here means shellcheck gained
+  # detection for this shape and #2521 + both header comments need an
+  # update, not that this test is broken. ----
+
+  GAP_OUTPUT="$(WORKFLOW_SHELL_CHECK_DIR="$GAP_DIR" sh "$LINTER" 2>&1)" && GAP_EXIT=0 || GAP_EXIT=$?
+
+  if [ "$GAP_EXIT" -ne 0 ]; then
+    echo "FAIL: workflow_shell_check_test -- known-gap fixture (ce88954 shape) now trips the linter."
+    echo "  This means shellcheck may have gained command-substitution-into-function"
+    echo "  scope-loss detection -- if so, this is GOOD NEWS: update #2521, remove the"
+    echo "  'IMPORTANT SCOPE LIMITATION' note in workflow_shell_check.sh, and update this"
+    echo "  fixture's comment. This is not a bug in the test as written."
+    echo "  output: $GAP_OUTPUT"
+    exit 1
+  fi
+  _pass
+
+  # ---- Dialect resolution: step-level `shell: sh` override. A clean exit
+  # (dialect silently defaulted to bash) would mean the override was never
+  # threaded through to shellcheck -- the exact bug this fixture exists to
+  # catch. ----
+
+  DSTEP_OUTPUT="$(WORKFLOW_SHELL_CHECK_DIR="$DIALECT_STEP_DIR" sh "$LINTER" 2>&1)" && DSTEP_EXIT=0 || DSTEP_EXIT=$?
+
+  if [ "$DSTEP_EXIT" -eq 0 ]; then
+    echo "FAIL: workflow_shell_check_test -- step-level 'shell: sh' override did not reach shellcheck (linter exited 0 on a bash-only construct under sh)"
+    echo "  output: $DSTEP_OUTPUT"
+    exit 1
+  fi
+  _pass
+
+  if ! printf '%s' "$DSTEP_OUTPUT" | grep -Eq "SC3030|SC3054"; then
+    echo "FAIL: workflow_shell_check_test -- expected SC3030/SC3054 (POSIX sh array warnings) when step-level shell: sh is resolved correctly"
+    echo "  output: $DSTEP_OUTPUT"
+    exit 1
+  fi
+  _pass
+
+  # ---- Dialect resolution: job-level `defaults: run: shell: sh`, no
+  # step-level override -- same proof, different resolution path (pass 1's
+  # step_idx == 0 default_shell branch). ----
+
+  DDEFAULT_OUTPUT="$(WORKFLOW_SHELL_CHECK_DIR="$DIALECT_DEFAULT_DIR" sh "$LINTER" 2>&1)" && DDEFAULT_EXIT=0 || DDEFAULT_EXIT=$?
+
+  if [ "$DDEFAULT_EXIT" -eq 0 ]; then
+    echo "FAIL: workflow_shell_check_test -- job-level 'defaults: run: shell: sh' did not reach shellcheck (linter exited 0 on a bash-only construct under sh)"
+    echo "  output: $DDEFAULT_OUTPUT"
+    exit 1
+  fi
+  _pass
+
+  if ! printf '%s' "$DDEFAULT_OUTPUT" | grep -Eq "SC3030|SC3054"; then
+    echo "FAIL: workflow_shell_check_test -- expected SC3030/SC3054 (POSIX sh array warnings) when job-level defaults: run: shell: sh is resolved correctly"
+    echo "  output: $DDEFAULT_OUTPUT"
+    exit 1
+  fi
+  _pass
+
 else
-  echo "SKIP: workflow_shell_check_test -- shellcheck not installed; skipping fixture-based OK/FAIL/GHEXPR assertions (see workflow_shell_check.sh header)"
+  echo "SKIP: workflow_shell_check_test -- shellcheck not installed; skipping fixture-based OK/FAIL/GHEXPR/known-gap/dialect assertions (see workflow_shell_check.sh header)"
 fi
 
 # ---- Assertion d: shellcheck absent (PATH override) -> SKIP, exit 0.

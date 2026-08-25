@@ -4,16 +4,40 @@
 # Motivation (issue #2521): a `run:` step in orchestrator.yml referenced a
 # variable that was only assigned inside a subshell (command substitution
 # forks a subshell; any variable it assigns is invisible to the caller),
-# and the step ran under `set -euo pipefail`. That shape -- a var read
-# under `set -u` that is never assigned in the reading shell's own scope --
-# is exactly what shellcheck's SC2154 (and friends) exists to catch. It was
-# invisible to every other gate: `bash -n` (posix_sh_check.sh's dash -n
-# sibling check) is parse-only and never evaluates variable scoping; CI
-# never lints workflow YAML at all; and nothing runs shellcheck over
-# embedded `run:` bodies, because they live inside YAML, not as standalone
-# `.sh` files posix_sh_check.sh's *.sh glob would ever see. See commit
-# ce88954 for the motivating defect and its fix (#2517, cited inline in
-# orchestrator.yml's merge_pr_when_clean comment).
+# and the step ran under `set -euo pipefail`. It was invisible to every
+# other gate: `bash -n` (posix_sh_check.sh's dash -n sibling check) is
+# parse-only and never evaluates variable scoping; CI never lints workflow
+# YAML at all; and nothing runs shellcheck over embedded `run:` bodies,
+# because they live inside YAML, not as standalone `.sh` files
+# posix_sh_check.sh's *.sh glob would ever see. See commit ce88954 for the
+# motivating defect and its fix (#2517, cited inline in orchestrator.yml's
+# merge_pr_when_clean comment).
+#
+# IMPORTANT SCOPE LIMITATION (verified against shellcheck 0.8.0, the
+# version installed by this repo's Dockerfile): this check does NOT catch
+# the exact ce88954 defect shape. shellcheck models scope loss across a
+# *pipeline* subshell (SC2030/SC2031 -- see the defect fixture in
+# workflow_shell_check_test.sh) but has no model for scope loss across a
+# *command-substitution* subshell that invokes a function
+# (`X="$(some_fn)"` where `some_fn` assigns a variable the caller reads).
+# Verified directly: reconstructing the ce88954 shape (a function
+# assigning MERGE_RESPONSE, invoked as `MERGED="$(fn)"`, caller reading
+# `${MERGE_RESPONSE}`) and running `shellcheck -s bash` on it produces
+# ZERO findings -- even with the `check-unassigned-uppercase` optional
+# rule enabled, because the assignment is lexically present somewhere in
+# the file and shellcheck does not track which shell process actually
+# performs it. Separately, shellcheck's SC2154 (and
+# check-unassigned-uppercase) never fire on a genuinely-unassigned
+# ALL-CAPS variable name -- it is treated as possibly environment-
+# provided -- and the real ce88954 variable (`MERGE_RESPONSE`) was
+# ALL-CAPS, so that path was never going to catch it either. The class of
+# bug that MOTIVATED this issue therefore remains open; see #2521 for the
+# residual gap and its follow-up. What this check DOES reliably catch:
+# pipeline-subshell scope loss (SC2030/SC2031) and shellcheck's general
+# hygiene ruleset over every workflow `run:` body -- a real and useful
+# guard, just narrower than the issue originally asked for. See the
+# "known gap" fixture in workflow_shell_check_test.sh, which pins this
+# limitation as a regression test.
 #
 # What this script does:
 #   1. Extracts every step's `run:` body (block-scalar `run: |` and
