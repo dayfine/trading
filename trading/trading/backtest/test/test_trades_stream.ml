@@ -13,7 +13,12 @@
       time;
     - the completed-run contract is unchanged: {!Trades_stream.write_all} (what
       {!Backtest.Result_writer.write} calls) truncates and rewrites, so the
-      finalised file is byte-identical to one a never-streamed run produces. *)
+      finalised file is byte-identical to one a never-streamed run produces.
+
+    Three further claims are pinned below: the batch row order
+    [(exit_date, symbol, entry_date)], the [default_every_n_fridays] parity with
+    [Scenario_progress], and {!Backtest.Result_writer.with_trades_stream}
+    closing the stream when its body {b raises} rather than returns. *)
 
 open Core
 open OUnit2
@@ -98,6 +103,14 @@ let _data_rows dir =
   _read_lines dir
   |> List.filter ~f:(fun l -> not (String.equal l Trades_stream.header))
 
+(** A rendered row reduced to the three keys the batch comparator sorts on,
+    rendered [symbol|entry_date|exit_date]. Columns 0 / 2 / 3 of the header are
+    [symbol] / [entry_date] / [exit_date]. *)
+let _row_key row =
+  let cells = String.split ~on:',' row in
+  let cell i = List.nth_exn cells i in
+  String.concat ~sep:"|" [ cell 0; cell 2; cell 3 ]
+
 (** Feed [steps] into a fresh stream and return the (still-open) handle. A
     caller that wants the crash shape simply never calls {!Trades_stream.close}.
 *)
@@ -121,7 +134,40 @@ let _two_round_trip_steps ~first ~second =
   _round_trip_steps ~symbol:first ~entry:_fri1 ~exit_:_fri2 ~price:100.0
   @ _round_trip_steps ~symbol:second ~entry:_fri3 ~exit_:_fri4 ~price:200.0
 
+(* Non-Friday dates that open the batch-ordering fixture's positions. *)
+let _mon1 = _date "2024-01-01"
+let _tue1 = _date "2024-01-02"
+let _wed1 = _date "2024-01-03"
+let _mon2 = _date "2024-01-08"
+
+(** Four round-trips that all become fresh at {b one} flush — a cadence of 2
+    flushes on [_fri2] only — chosen so the batch comparator's three keys are
+    each discriminated: [BBB] exits first though it sorts last by symbol; [AAA]
+    and [ZZZ] share an exit date; and the two [AAA] legs share both exit date
+    and symbol, differing only in entry date. The [AAA] entries carry distinct
+    quantities so the pairing is quantity-matched rather than dependent on the
+    order of the two same-day sells. *)
+let _one_batch_ordering_steps =
+  let buy symbol quantity price =
+    _trade ~symbol ~side:Trading_base.Types.Buy ~quantity ~price
+  in
+  let sell symbol quantity price =
+    _trade ~symbol ~side:Trading_base.Types.Sell ~quantity ~price
+  in
+  [
+    _step ~date:_mon1 ~trades:[ buy "BBB" 10.0 100.0 ];
+    _step ~date:_tue1 ~trades:[ buy "AAA" 10.0 50.0 ];
+    _step ~date:_wed1 ~trades:[ buy "ZZZ" 5.0 70.0 ];
+    _step ~date:_fri1 ~trades:[ sell "BBB" 10.0 110.0 ];
+    _step ~date:_mon2 ~trades:[ buy "AAA" 7.0 60.0 ];
+    _step ~date:_fri2
+      ~trades:[ sell "AAA" 10.0 70.0; sell "AAA" 7.0 71.0; sell "ZZZ" 5.0 80.0 ];
+  ]
+
 let _n_header_fields = List.length (String.split ~on:',' Trades_stream.header)
+
+(* Message the raise-path test throws and matches on. *)
+let _boom = "trades_stream_test: deliberate failure"
 
 (* ------------------------------------------------------------------ *)
 (* Tests                                                               *)
@@ -206,6 +252,33 @@ let test_retraded_symbol_emits_both_round_trips _ =
         (unordered_elements_are
            [ equal_to "2024-01-05"; equal_to "2024-01-12" ]))
 
+(** Batch row order. A single flush carrying four fresh round-trips must land
+    sorted by [(exit_date, symbol, entry_date)] — not in the extractor's own
+    order, which prepends per-symbol blocks and so runs {b descending} by symbol
+    ([ZZZ], [BBB], then the two [AAA] legs). Determinism of the salvage artefact
+    is what is at stake: a mid-run file whose line order varies between runs
+    undercuts the reproducibility the file exists to provide. *)
+let test_batch_rows_are_sorted_by_exit_symbol_entry _ =
+  _with_temp_dir (fun dir ->
+      let t = _stream_steps ~dir ~every_n_fridays:2 _one_batch_ordering_steps in
+      Trades_stream.close t;
+      assert_that
+        (List.map (_data_rows dir) ~f:_row_key)
+        (elements_are
+           [
+             equal_to "BBB|2024-01-01|2024-01-05";
+             equal_to "AAA|2024-01-02|2024-01-12";
+             equal_to "AAA|2024-01-08|2024-01-12";
+             equal_to "ZZZ|2024-01-03|2024-01-12";
+           ]))
+
+(** The [.mli] claims this default matches [Scenario_progress]' own so
+    [trades.csv] and [progress.sexp] advance together. They are independent
+    literals in two libraries; only this assertion keeps them in step. *)
+let test_default_cadence_matches_scenario_progress _ =
+  assert_that Trades_stream.default_every_n_fridays
+    (equal_to Scenario_lib.Scenario_progress.default_every_n_fridays)
+
 (** Flush cadence: with [every_n_fridays = 3] the round-trip that closed on the
     second Friday is not on disk yet — only the header is. *)
 let test_flush_cadence_defers_write _ =
@@ -268,6 +341,45 @@ let test_header_only_file_and_idempotent_close _ =
       Trades_stream.close t;
       assert_that (_read_lines dir)
         (elements_are [ equal_to Trades_stream.header ]))
+
+(** {!Backtest.Result_writer.with_trades_stream} closes the stream when its body
+    {b raises}, not only when it returns. The exception propagates unchanged,
+    and the close genuinely happened: a closed {!Trades_stream.t} ignores
+    [record_step], so replaying steps through the recorder the body captured
+    appends nothing after the unwind. Drop the [Exn.protect] and the channel
+    outlives the raise, so the replayed MSFT round-trip lands in the file. *)
+let test_stream_is_closed_when_body_raises _ =
+  _with_temp_dir (fun dir ->
+      let recorder = ref None in
+      let record_all record steps =
+        List.iter steps ~f:(fun (s : Sim_types.step_result) ->
+            record ~date:s.date ~step:s)
+      in
+      assert_raises (Failure _boom) (fun () ->
+          Backtest.Result_writer.with_trades_stream ~output_dir:dir
+            ~every_n_fridays:1 ~start_date:_mon1 ~f:(fun ~on_step_setup ->
+              let record =
+                on_step_setup
+                  ~stop_log:(Backtest.Stop_log.create ())
+                  ~trade_audit:(Backtest.Trade_audit.create ())
+                  ~force_liquidation_log:
+                    (Backtest.Force_liquidation_log.create ())
+              in
+              recorder := Some record;
+              record_all record
+                (_round_trip_steps ~symbol:"AAPL" ~entry:_fri1 ~exit_:_fri2
+                   ~price:100.0);
+              failwith _boom));
+      Option.iter !recorder ~f:(fun record ->
+          record_all record
+            (_round_trip_steps ~symbol:"MSFT" ~entry:_fri3 ~exit_:_fri4
+               ~price:200.0));
+      assert_that
+        (List.count (_read_lines dir) ~f:(String.equal Trades_stream.header))
+        (equal_to 1);
+      assert_that
+        (List.map (_data_rows dir) ~f:_row_key)
+        (elements_are [ equal_to "AAPL|2024-01-05|2024-01-12" ]))
 
 (* ------------------------------------------------------------------ *)
 (* End-to-end: Runner.run_backtest ~stream_trades_dir                   *)
@@ -339,6 +451,10 @@ let suite =
          >:: test_new_symbol_mid_run_emits_each_round_trip_once;
          "a re-traded symbol emits both round-trips"
          >:: test_retraded_symbol_emits_both_round_trips;
+         "a batch is sorted by (exit_date, symbol, entry_date)"
+         >:: test_batch_rows_are_sorted_by_exit_symbol_entry;
+         "default cadence matches Scenario_progress"
+         >:: test_default_cadence_matches_scenario_progress;
          "flush cadence defers the write" >:: test_flush_cadence_defers_write;
          "non-Friday steps do not flush" >:: test_non_friday_steps_do_not_flush;
          "non-positive cadence is clamped to 1"
@@ -347,6 +463,8 @@ let suite =
          >:: test_finalised_file_is_byte_identical_to_unstreamed;
          "header-only file and idempotent close"
          >:: test_header_only_file_and_idempotent_close;
+         "with_trades_stream closes the stream when its body raises"
+         >:: test_stream_is_closed_when_body_raises;
          "runner streams trades.csv before Result_writer runs"
          >:: test_runner_streams_trades_csv_before_result_writer;
        ]
