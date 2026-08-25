@@ -3052,6 +3052,102 @@ let test_breakout_gate_names_volume_band _ =
            );
        ])
 
+(** The control with its breakout-bar volume confirmation demoted below
+    [Adequate]. This is the analysis-layer [Breakout_volume] arm reaching the
+    screener through [_gate_of_rejection] — distinct from {!Volume_band} above,
+    which is the screener's own exclusion window. *)
+let _weak_breakout_volume (a : Stock_analysis.t) =
+  {
+    a with
+    Stock_analysis.volume =
+      Some
+        {
+          confirmation = Weak 0.4;
+          event_volume = 400;
+          avg_volume = 1000.0;
+          volume_ratio = 0.4;
+        };
+  }
+
+(** The control with negative-declining RS: the third [_gate_of_rejection] arm.
+    [min_rs_normalized] stays at its [0.0] no-op, so the only gate this trips is
+    the one {i inside} the long breakout predicate. *)
+let _declining_rs (a : Stock_analysis.t) =
+  {
+    a with
+    Stock_analysis.rs =
+      Some
+        {
+          current_rs = 0.5;
+          current_normalized = 0.5;
+          trend = Negative_declining;
+          history = [];
+        };
+  }
+
+(** The control with its close collapsed far below the breakout level: armed at
+    k = 5%, 50.0 sits well under 100.0 * 0.95. *)
+let _collapsed_breakout (a : Stock_analysis.t) =
+  {
+    a with
+    Stock_analysis.breakout_price = Some 100.0;
+    current_close = Some 50.0;
+  }
+
+(** [Breakout_volume] driven end-to-end from the screener, which
+    {!test_breakout_gate_names_stage_setup} could not reach: it is the second of
+    [_gate_of_rejection]'s three arms. Transposing this arm with [Rs_declining]
+    in that mapping typechecks and moves candidates between buckets, so only a
+    fixture failing exactly one of the two can see the swap. *)
+let test_breakout_gate_names_breakout_volume _ =
+  assert_that
+    (_phases_of
+       (_gate_trace
+          ~candidates:[ _weak_breakout_volume (_gate_stock "GATE") ]
+          ()))
+    (elements_are
+       [
+         equal_to
+           ( "GATE",
+             (Screener.Dropped_at_breakout Breakout_volume
+               : Screener.cascade_phase) );
+       ])
+
+(** [Rs_declining] — the pair to the test above, and [_gate_of_rejection]'s
+    third arm. Not to be confused with [Dropped_at_rs], which is the short
+    side's Ch. 11 hard gate; this one lives inside the long breakout predicate.
+*)
+let test_breakout_gate_names_rs_declining _ =
+  assert_that
+    (_phases_of
+       (_gate_trace ~candidates:[ _declining_rs (_gate_stock "GATE") ] ()))
+    (elements_are
+       [
+         equal_to
+           ( "GATE",
+             (Screener.Dropped_at_breakout Rs_declining
+               : Screener.cascade_phase) );
+       ])
+
+(** [Failed_breakout] is only reachable with
+    [failed_breakout_tolerance_pct > 0.0] — the arming condition its own
+    docstring names. The gate's {i admission} effect is pinned elsewhere in this
+    file; this is the pin on which dial the trace {i attributes} the drop to. *)
+let test_breakout_gate_names_failed_breakout _ =
+  assert_that
+    (_phases_of
+       (_gate_trace
+          ~config:{ cfg with failed_breakout_tolerance_pct = 0.05 }
+          ~candidates:[ _collapsed_breakout (_gate_stock "GATE") ]
+          ()))
+    (elements_are
+       [
+         equal_to
+           ( "GATE",
+             (Screener.Dropped_at_breakout Failed_breakout
+               : Screener.cascade_phase) );
+       ])
+
 (** The order pin. [Price_floor] and [Volume_band] are both armed and both would
     reject the control; the trace must name the {b earlier} gate. Reordering the
     two in [_long_breakout_gate] changes no admission decision, so only an
@@ -3069,6 +3165,55 @@ let test_breakout_gate_reports_first_failing_gate _ =
                 Some { low = 0.0; high = 1_000_000.0 };
             }
           ~candidates:[ _gate_stock "GATE" ]
+          ()))
+    (elements_are
+       [
+         equal_to
+           ( "GATE",
+             (Screener.Dropped_at_breakout Price_floor : Screener.cascade_phase)
+           );
+       ])
+
+(** The adjacent pair the order contract left unpinned: [Failed_breakout] and
+    [Volume_band] are the two screener-config gates, evaluated in that order
+    inside [_long_post_setup_gate]. Both armed, both would reject this fixture —
+    the trace must name the earlier one. *)
+let test_breakout_gate_failed_breakout_outranks_volume_band _ =
+  assert_that
+    (_phases_of
+       (_gate_trace
+          ~config:
+            {
+              cfg with
+              failed_breakout_tolerance_pct = 0.05;
+              volume_ratio_exclude_range =
+                Some { low = 0.0; high = 1_000_000.0 };
+            }
+          ~candidates:[ _collapsed_breakout (_gate_stock "GATE") ]
+          ()))
+    (elements_are
+       [
+         equal_to
+           ( "GATE",
+             (Screener.Dropped_at_breakout Failed_breakout
+               : Screener.cascade_phase) );
+       ])
+
+(** [Price_floor] outranks [Stage_setup].
+    {!test_breakout_gate_names_price_floor} arms the floor over a {i valid}
+    breakout, which clears the setup gate — so that assertion survives a swap of
+    the two. This fixture fails both and does not. *)
+let test_breakout_gate_price_floor_outranks_stage_setup _ =
+  assert_that
+    (_phases_of
+       (_gate_trace
+          ~config:{ cfg with min_price = 1_000_000.0 }
+          ~candidates:
+            [
+              make_analysis "GATE"
+                (Some (Stage2 { weeks_advancing = 6; late = false }))
+                (declining_bars_with_spike ~n:35 100.0 50.0 ~spike_idx:31);
+            ]
           ()))
     (elements_are
        [
@@ -3337,8 +3482,18 @@ let suite =
          >:: test_breakout_gate_names_stage_setup;
          "G3 breakout gate: names Volume_band"
          >:: test_breakout_gate_names_volume_band;
+         "G3 breakout gate: names Breakout_volume"
+         >:: test_breakout_gate_names_breakout_volume;
+         "G3 breakout gate: names Rs_declining"
+         >:: test_breakout_gate_names_rs_declining;
+         "G3 breakout gate: names Failed_breakout"
+         >:: test_breakout_gate_names_failed_breakout;
          "G3 breakout gate: reports the first failing gate"
          >:: test_breakout_gate_reports_first_failing_gate;
+         "G3 breakout gate: Failed_breakout outranks Volume_band"
+         >:: test_breakout_gate_failed_breakout_outranks_volume_band;
+         "G3 breakout gate: Price_floor outranks Stage_setup"
+         >:: test_breakout_gate_price_floor_outranks_stage_setup;
          "G3 breakout gate: still agrees with cascade_diagnostics"
          >:: test_breakout_gate_preserves_diagnostics_agreement;
        ]
