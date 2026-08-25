@@ -124,19 +124,37 @@
   ;; Neutral-tape short the gate would block, so the flip is inert here —
   ;; bands unchanged. Confirms the ≈0-cost deep-cell attribution
   ;; (dev/notes/p1a-deep-short-screens-364-2026-07-09.md §Attribution).
-  ((total_return_pct   ((min 307.8)         (max 416.4)))
-   (total_trades       ((min 665)           (max  899)))
-   (win_rate           ((min  30.4)         (max  41.2)))
-   (sharpe_ratio       ((min   0.64)        (max   0.86)))
-   (max_drawdown_pct   ((min  18.1)         (max  24.6)))
-   (avg_holding_days   ((min  38.6)         (max  52.2)))
+  ;; RE-PINNED 2026-08-25 to the book-faithful stops basis shipped in
+  ;; #2530 (initial_stop_buffer 1.0 + reset_anchor_on_stalled_cycle on,
+  ;; ledger 2026-08-24-stops-basis-book-faithful) — the #2403 historical
+  ;; re-pin, measured from the #2537 diagnostic run (local, pinned
+  ;; worktree at 0ebe5fd8b, committed test_data store, 5374s total /
+  ;; 472s backtest proper / ~745MB GNU-time peak RSS — the harness
+  ;; summary printed 1745192kB, which fuses GNU time's exit-status "1"
+  ;; onto the digits on failing cells; see the postsubmit-script issue
+  ;; filed off #2552's review). Single local run; the
+  ;; runner's determinism was pinned 3x independently on the custom
+  ;; cell at this build family. Bands ±15% around:
+  ;;   ret 844.10  trades 619  win 35.70  sharpe 0.566  maxDD 60.99
+  ;;   hold 58.08  OPV 4,606,165  sortino 0.781  calmar 0.242  ulcer 20.90
+  ;; The LONG-SHORT cell moved far more than long-only under the new
+  ;; basis: return band 307-416 -> 717-971, maxDD 18-25 -> 52-70. A
+  ;; PLAUSIBLE mechanism is the short side interacting with the wider
+  ;; initial stop + ratchet reset — hypothesis only; no trade-level
+  ;; dissection was run (see mechanism-validation rigor).
+  ((total_return_pct   ((min 717.484)       (max 970.715)))
+   (total_trades       ((min 526.15)        (max 711.85)))
+   (win_rate           ((min  30.347)       (max  41.059)))
+   (sharpe_ratio       ((min   0.4814)      (max   0.6514)))
+   (max_drawdown_pct   ((min  51.839)       (max  70.136)))
+   (avg_holding_days   ((min  49.367)       (max  66.792)))
    ;; OPV re-pinned ~2.18M under the realism-defaults flip (ledger
    ;; 2026-07-10-realism-defaults-flip): $1M-ADV entry gate + stale-exit 5d
    ;; lighten the terminal book. Headline metrics stayed in-band (ret 387.5 /
    ;; 784 / Sharpe 0.777 / DD 21.35). Was ~3.76M pre-flip.
-   (open_positions_value ((min 1857000.0)   (max 2512000.0)))
-   (sortino_ratio_annualized ((min  0.95)   (max   1.28)))
-   (calmar_ratio       ((min   0.39)        (max   0.53)))
-   (ulcer_index        ((min   7.00)        (max   9.50)))
+   (open_positions_value ((min 3915240.5)   (max 5297090.3)))
+   (sortino_ratio_annualized ((min  0.6640) (max   0.8984)))
+   (calmar_ratio       ((min   0.2054)      (max   0.2780)))
+   (ulcer_index        ((min  17.762)       (max  24.032)))
    ;; Wall floor lowered 600→100, then floored at 0 per #2547 (a min guards nothing; the 364 run measured ~391s locally).
    (wall_seconds       ((min 0.0)           (max 2400.0))))))
