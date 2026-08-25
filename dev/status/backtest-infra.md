@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-08-24
+## Last updated: 2026-08-25
 
 ## Status
 IN_PROGRESS
@@ -18,6 +18,59 @@ landed 2026-04-25. Continuous perf monitoring + benchmark-suite work
 moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
+
+## 2026-08-25 — incremental `trades.csv` streaming (#2502)
+
+- [x] **`trades.csv` is now written incrementally during a run.** Previously
+  every artefact was written in one shot by `Result_writer.write` at scenario
+  end, so mid-run the output directory held only `progress.sexp` — and a
+  crash/OOM (which `.claude/rules/container-capacity-scheduling.md` documents
+  as a silent, recurring failure on multi-hour arms) lost the arm's entire
+  trade record. Closed round-trips now land on disk every N Friday cycles, on
+  the same cadence as `progress.sexp`.
+  - **New module** `trading/trading/backtest/lib/trades_stream.{ml,mli}` —
+    owns the *sole* definition of the `trades.csv` header + row renderer
+    (moved out of `result_writer.ml`) plus an incremental appender. Both the
+    one-shot `write_all` (what `Result_writer.write` calls) and the streaming
+    path render rows through the same private function, so the mid-run and
+    end-of-run row formats cannot drift.
+  - **Lifecycle owner** `Result_writer.with_trades_stream` — opens the stream,
+    yields a `Panel_runner.step_hook_setup` for `Runner.run_backtest`'s new
+    `?on_step_setup`, and closes on return or exception. It builds each flush's
+    batch with `Runner`'s own in-window filters, so "in window" has one
+    definition for streamed and finalised rows alike.
+  - **Plumbing**: `Runner.run_backtest ?on_step_setup` →
+    `Panel_runner.run ?on_step_setup` (bound to the run's recorders) →
+    `Panel_step_loop.run_simulator_with_gc_trace ?on_step`. Omitting the hook
+    is bit-identical to the pre-#2502 loop.
+  - **`scenario_runner`** wraps every scenario in `with_trades_stream` at the
+    scenario's `progress_every` cadence. Always on; no new flag.
+  - **Completed-run contract unchanged.** `Result_writer.write` still truncates
+    and rewrites `trades.csv`, so a run that finishes produces exactly the bytes
+    it did before. Pinned twice: a unit test comparing a streamed-then-finalised
+    file against a virgin `write_all`, and an end-to-end test doing the same on
+    the smoke scenario's real result.
+  - **Two accepted mid-run differences** (documented on `Trades_stream`):
+    streamed rows carry no `position_id` (the simulator only publishes
+    `order_position_links` on its terminal `run_result`), and batch row order is
+    `(exit_date, symbol, entry_date)` rather than the extractor's per-symbol
+    grouping. The end-of-run rewrite restores both.
+  - **Consequence to know:** `trades.csv`'s presence no longer implies a run
+    finished. The completion sentinel is unchanged — `actual.sexp` under
+    `scenario_runner` (it writes a `crashed = true` sentinel on an exception),
+    `summary.sexp` under `backtest_runner.exe`.
+  - Verify: `dune build && dune runtest` (10 cases in
+    `trading/trading/backtest/test/test_trades_stream.ml`, incl. the
+    Runner→Panel_step_loop wiring pin and the byte-identity check).
+- [ ] **Follow-up: `backtest_runner.exe` does not stream.** Only
+  `scenario_runner` is wired. The binary already parses `--progress-every`;
+  wrapping its `run_backtest` call in `Result_writer.with_trades_stream` is
+  ~5 lines and would cover ad-hoc long runs launched outside the catalog.
+- [ ] **Follow-up: the `scenario_runner` call site itself is not pinned by a
+  test.** The `Result_writer → Runner → Panel_runner → Panel_step_loop` chain is
+  (`test_trades_stream.ml`), but nothing fails if the `with_trades_stream`
+  wrapper is deleted from `scenario_runner.ml` — that would need the scenario
+  binary driven under test.
 
 ## 2026-08-23 — observability instrumentation (#2486, #2490)
 

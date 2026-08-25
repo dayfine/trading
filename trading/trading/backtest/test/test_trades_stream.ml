@@ -309,6 +309,11 @@ let test_runner_streams_trades_csv_before_result_writer _ =
         (all_of
            [
              field List.hd (is_some_and (equal_to Trades_stream.header));
+             (* Strictly more than the header: the smoke scenario closes at
+                least one round-trip inside the run, so a hook that is wired but
+                records nothing is caught here rather than passing on an
+                empty-but-present file. *)
+             field List.length (gt (module Int_ord) 1);
              each
                (field
                   (fun l -> List.length (String.split ~on:',' l))
