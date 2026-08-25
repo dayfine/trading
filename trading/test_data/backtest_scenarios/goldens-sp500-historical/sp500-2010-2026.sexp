@@ -176,7 +176,9 @@
   ;; ledger 2026-08-24-stops-basis-book-faithful) — the #2403 historical
   ;; re-pin, from the #2537 diagnostic run (local, pinned worktree at
   ;; 0ebe5fd8b, committed test_data store, 6127s total / 430s backtest
-  ;; proper / 1.74GB true RSS). Bands ±15% around:
+  ;; proper / ~743MB GNU-time peak RSS; summary-line 1743468kB carries
+  ;; the fused exit-status digit — see the postsubmit-script issue filed
+  ;; off #2552's review). Bands ±15% around:
   ;;   ret 2270.36  trades 474  win 42.62  sharpe 0.611  maxDD 78.39
   ;;   hold 58.77  OPV 4,771,079  sortino 0.859  calmar 0.273  ulcer 22.91
   ;; This long-only cell moved only mildly (prior pin failed on just

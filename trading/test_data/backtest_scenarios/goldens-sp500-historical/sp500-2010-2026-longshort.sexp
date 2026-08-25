@@ -129,14 +129,19 @@
   ;; ledger 2026-08-24-stops-basis-book-faithful) — the #2403 historical
   ;; re-pin, measured from the #2537 diagnostic run (local, pinned
   ;; worktree at 0ebe5fd8b, committed test_data store, 5374s total /
-  ;; 472s backtest proper / 1.75GB true RSS). Single local run; the
+  ;; 472s backtest proper / ~745MB GNU-time peak RSS — the harness
+  ;; summary printed 1745192kB, which fuses GNU time's exit-status "1"
+  ;; onto the digits on failing cells; see the postsubmit-script issue
+  ;; filed off #2552's review). Single local run; the
   ;; runner's determinism was pinned 3x independently on the custom
   ;; cell at this build family. Bands ±15% around:
   ;;   ret 844.10  trades 619  win 35.70  sharpe 0.566  maxDD 60.99
   ;;   hold 58.08  OPV 4,606,165  sortino 0.781  calmar 0.242  ulcer 20.90
   ;; The LONG-SHORT cell moved far more than long-only under the new
-  ;; basis (short side interacts with the wider initial stop + ratchet
-  ;; reset): return band 307-416 -> 717-971, maxDD 18-25 -> 52-70.
+  ;; basis: return band 307-416 -> 717-971, maxDD 18-25 -> 52-70. A
+  ;; PLAUSIBLE mechanism is the short side interacting with the wider
+  ;; initial stop + ratchet reset — hypothesis only; no trade-level
+  ;; dissection was run (see mechanism-validation rigor).
   ((total_return_pct   ((min 717.484)       (max 970.715)))
    (total_trades       ((min 526.15)        (max 711.85)))
    (win_rate           ((min  30.347)       (max  41.059)))

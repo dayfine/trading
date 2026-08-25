@@ -59,8 +59,10 @@ jobs:
       # Restrict to 15y historical goldens.
       GOLDEN_SP500_SUBDIRS: goldens-sp500-historical
       # Per-cell timeout (seconds). Measured 2026-08-25 (#2537): the two
-      # 15y cells take 5374s / 6127s locally end-to-end (true RSS ~1.7GB —
-      # the 12.4GB figures in older kill reports were mmap-inflated RSS).
+      # 15y cells take 5374s / 6127s locally end-to-end (GNU-time peak RSS
+      # ~745MB per cell; the 12.4GB figures in older kill reports came from
+      # the same per-process RSS surface and remain unexplained-but-moot —
+      # the cells demonstrably fit; memory is not the constraint).
       # GHA runners are typically slower, so 4h/cell; the 600-min job cap
       # above still bounds two pathological hangs.
       GOLDEN_SP500_TIMEOUT: "14400"
