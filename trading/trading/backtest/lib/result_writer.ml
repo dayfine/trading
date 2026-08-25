@@ -41,125 +41,16 @@ let _write_params ~output_dir (result : Runner.result) =
   in
   Sexp.save_hum (output_dir ^ "/params.sexp") (Sexp.List with_overrides)
 
-let _exit_trigger_label (trigger : Stop_log.exit_trigger) =
-  match trigger with
-  | Stop_loss _ -> "stop_loss"
-  | Take_profit _ -> "take_profit"
-  | Signal_reversal _ -> "signal_reversal"
-  | Time_expired _ -> "time_expired"
-  | Underperforming _ -> "underperforming"
-  | Portfolio_rebalancing -> "rebalancing"
-  | Strategy_signal { label; _ } -> label
-  | End_of_period -> "end_of_period"
-
-(** Build a (symbol, exit_date) -> reason map from force-liquidation events.
-    [trades.csv] rows are post-processed: when a row's (symbol, exit_date)
-    matches a recorded force-liquidation, the [exit_trigger] column is
-    overridden from the generic stop-loss label to the force-liquidation label.
-    The pair (symbol, exit_date) is unique enough in practice — a single
-    position cannot be force-closed twice and the same symbol can only re-enter
-    on a different date. *)
-let _build_force_liq_index
-    (events : Portfolio_risk.Force_liquidation.event list) =
-  List.fold events
-    ~init:(Map.empty (module String))
-    ~f:(fun acc (e : Portfolio_risk.Force_liquidation.event) ->
-      let key = e.symbol ^ "|" ^ Date.to_string e.date in
-      Map.set acc ~key ~data:e.reason)
-
-let _force_liq_label (reason : Portfolio_risk.Force_liquidation.reason) =
-  match reason with
-  | Per_position -> "force_liquidation_position"
-  | Portfolio_floor -> "force_liquidation_portfolio"
-
-let _fmt_float_opt = function Some s -> sprintf "%.2f" s | None -> ""
-
-let _stop_fields (info : Stop_log.stop_info option) =
-  match info with
-  | None -> ("", "", "")
-  | Some i ->
-      ( _fmt_float_opt i.entry_stop,
-        _fmt_float_opt i.exit_stop,
-        Option.value_map i.exit_trigger ~default:"" ~f:_exit_trigger_label )
-
-(** Direction label for a round-trip's entry leg, surfaced as the [side] column
-    in [trades.csv]. [LONG] = Buy→Sell round-trip; [SHORT] = Sell→Buy round-trip
-    (closing buy covers the short). *)
-let _side_label = function
-  | Trading_base.Types.Buy -> "LONG"
-  | Trading_base.Types.Sell -> "SHORT"
-
-let _trades_csv_header =
-  let base =
-    [
-      "symbol";
-      "side";
-      "entry_date";
-      "exit_date";
-      "days_held";
-      "entry_price";
-      "exit_price";
-      "quantity";
-      "pnl_dollars";
-      "pnl_percent";
-      "entry_stop";
-      "exit_stop";
-      "exit_trigger";
-    ]
-  in
-  String.concat ~sep:"," (base @ Trade_context.csv_header_fields)
-
-let _write_trade_row oc force_liq_index ~ctx_pre (t : Metrics.trade_metrics) =
-  (* Resolve the stop_info via the same position-keyed join {!Trade_context}
-     uses for [stop_trigger_kind], so [entry_stop] / [exit_stop] / [exit_trigger]
-     stay consistent with it. The prior symbol-keyed FIFO pop misaligned against
-     that join on re-traded symbols (Nth position got the wrong trigger). *)
-  let info = Trade_context.stop_info_for_trade ctx_pre ~trade:t in
-  let entry_stop, exit_stop, base_exit_trigger = _stop_fields info in
-  let force_liq_key = t.symbol ^ "|" ^ Date.to_string t.exit_date in
-  let exit_trigger =
-    match Map.find force_liq_index force_liq_key with
-    | Some reason -> _force_liq_label reason
-    | None -> base_exit_trigger
-  in
-  let ctx = Trade_context.of_precomputed ctx_pre ~trade:t in
-  let base_cells =
-    [
-      t.symbol;
-      _side_label t.side;
-      Date.to_string t.entry_date;
-      Date.to_string t.exit_date;
-      Int.to_string t.days_held;
-      sprintf "%.2f" t.entry_price;
-      sprintf "%.2f" t.exit_price;
-      sprintf "%.0f" t.quantity;
-      sprintf "%.2f" t.pnl_dollars;
-      sprintf "%.2f" t.pnl_percent;
-      entry_stop;
-      exit_stop;
-      exit_trigger;
-    ]
-  in
-  let cells = base_cells @ Trade_context.csv_row_fields ctx in
-  fprintf oc "%s\n" (String.concat ~sep:"," cells)
-
+(* [trades.csv] header + row rendering live in {!Trades_stream}, shared with the
+   mid-run incremental appender (#2502) so a streamed row and this final row are
+   produced by one renderer. This is the end-of-run authority write: it
+   truncates whatever the stream left behind and rewrites the whole file. *)
 let _write_trades ~output_dir ~(round_trips : Metrics.trade_metrics list)
     ~(stop_infos : Stop_log.stop_info list)
     ~(audit : Trade_audit.audit_record list)
     ~(force_liquidations : Portfolio_risk.Force_liquidation.event list) =
-  let path = output_dir ^ "/trades.csv" in
-  let oc = Out_channel.create path in
-  fprintf oc "%s\n" _trades_csv_header;
-  let force_liq_index = _build_force_liq_index force_liquidations in
-  (* Build the audit + stop-log indexes once, not per row. Without this hoist,
-     [Trade_context.of_audit_and_stop_log] rebuilt the audit_idx Map every
-     call — turning [trades.csv] writing into O(N²) on Cell E 15 y
-     (~3 700 round-trips × ~3 700 audit records). The same [ctx_pre] also backs
-     the per-row stop_info join, so [exit_trigger] and [stop_trigger_kind]
-     resolve against one index. *)
-  let ctx_pre = Trade_context.precompute ~audit ~stop_infos in
-  List.iter round_trips ~f:(_write_trade_row oc force_liq_index ~ctx_pre);
-  Out_channel.close oc
+  Trades_stream.write_all ~output_dir
+    { Trades_stream.round_trips; stop_infos; audit; force_liquidations }
 
 let _write_equity_curve ~output_dir
     ~(steps : Trading_simulation_types.Simulator_types.step_result list) =
