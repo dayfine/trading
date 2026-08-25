@@ -291,11 +291,11 @@ type config = {
           axis per [.claude/rules/experiment-flag-discipline.md]; promoted only
           on a ledger ACCEPT. *)
   reset_anchor_on_stalled_cycle : bool; [@sexp.default true]
-      (** When [true] {b (the default since 2026-08-24)}, a correction cycle that
-          completes but whose derived stop candidate does {b not} improve on the
-          resting stop (a {e stalled} cycle) still resets the [Trailing] cycle
-          bookkeeping — [last_correction_extreme] and [last_trend_extreme] both
-          move to the bar close, [correction_count] increments, and
+      (** When [true] {b (the default since 2026-08-24)}, a correction cycle
+          that completes but whose derived stop candidate does {b not} improve
+          on the resting stop (a {e stalled} cycle) still resets the [Trailing]
+          cycle bookkeeping — [last_correction_extreme] and [last_trend_extreme]
+          both move to the bar close, [correction_count] increments, and
           [correction_observed_since_reset] returns to [false] — while
           [stop_level] is left exactly where it was. Setting it [false] restores
           the pre-2026-08-24 behaviour: the stalled cycle is discarded entirely,

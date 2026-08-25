@@ -19,14 +19,15 @@ type config = {
   initial_stop_buffer : float;
       (** Multiplier applied to the entry price to build the {b fallback} stop
           reference when the support scan finds no qualifying correction low:
-          [entry *. initial_stop_buffer] for a long, [entry /. initial_stop_buffer]
-          for a short ({!Weinstein_stops.compute_initial_stop_with_floor}). The
-          reference is then inset by [min_correction_pct /. 2] to give the stop.
+          [entry *. initial_stop_buffer] for a long,
+          [entry /. initial_stop_buffer] for a short
+          ({!Weinstein_stops.compute_initial_stop_with_floor}). The reference is
+          then inset by [min_correction_pct /. 2] to give the stop.
 
           {b Default [1.0] (since 2026-08-24, issue #2486 §2.1).} At [1.0] the
-          reference is the entry price itself, so the fallback stop lands exactly
-          [min_correction_pct /. 2] = 4% away — the floor of the book's §5.3
-          flat-stop band ("Use 4-6% initial stop if no nearby prior peak").
+          reference is the entry price itself, so the fallback stop lands
+          exactly [min_correction_pct /. 2] = 4% away — the floor of the book's
+          §5.3 flat-stop band ("Use 4-6% initial stop if no nearby prior peak").
           Values [> 1.0] push the reference {i in the position's favour} before
           the inset, which {b narrows} the stop: the previous [1.02] default
           produced 2.08%, roughly half the band, on what

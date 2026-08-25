@@ -701,8 +701,8 @@ let _count_entering_side transitions side =
     The book-faithful 4% fallback (issue #2486 §2.1) roughly doubles
     risk-per-share, so longs are now risk-bound and smaller; a fourth is needed
     to reproduce the crowd-out this fixture exists to exercise. The invariant
-    under test — longs consume the combined budget before the short is
-    reached — is unchanged. *)
+    under test — longs consume the combined budget before the short is reached —
+    is unchanged. *)
 let _sleeve_candidates () =
   let long ticker =
     make_scored_candidate ~ticker ~side:Trading_base.Types.Long ~entry:100.0
