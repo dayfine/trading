@@ -294,8 +294,8 @@ let test_revert_rejected_exits_ignores_non_exiting _ =
     short ticket opening on the same symbol) that the portfolio refused.
 
     This is the guard, not a regression: [revert_rejected_exits] is handed the
-    whole rejected list — entries included ([Simulator._settle_rejected_fills]
-    passes [rejected_trades], not the retry-filtered remainder) — so on
+    whole rejected list — entries included ([handle_rejected_trades] passes the
+    outer [rejected_trades], not the retry-filtered remainder) — so on
     symbol-and-state matching alone this Sell would cancel a stop-out the
     portfolio never refused. The [Entering]/[Exiting]-on-one-symbol pairing is
     unreachable under the shipped Weinstein strategy, which is why no golden
