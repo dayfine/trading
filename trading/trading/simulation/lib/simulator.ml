@@ -330,11 +330,16 @@ let _build_step_result t ~portfolio ~portfolio_value ~trades ~orders ~today_bars
     had_market_bars = not (List.is_empty today_bars);
   }
 
-(* Notify the optional [on_transitions] observer. Called twice per step, and
-   deliberately not once: the portfolio-rejection cancels are applied in
-   [_process_fills_and_cancels], before the strategy is even called, so folding
-   them into the later notification would report them out of order. The second
-   call carries the strategy + margin transitions (#2057). *)
+(* Notify the optional [on_transitions] observer with the strategy + margin
+   transitions (#2057).
+
+   The observer is still called TWICE per step, deliberately and not once — but
+   only one of those calls is here. Since #2524 the other lives inside
+   {!Cancel_handler.handle_rejected_trades}, which announces the
+   portfolio-rejection cancels itself. That call must stay separate and must
+   stay first: those cancels are applied in [_process_fills_and_cancels],
+   before the strategy is even called, so folding them into this later
+   notification would report them out of order. *)
 let _notify_transitions ~on_transitions transitions =
   Option.iter on_transitions ~f:(fun observe -> observe transitions)
 
