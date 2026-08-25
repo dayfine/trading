@@ -338,34 +338,6 @@ let _build_step_result t ~portfolio ~portfolio_value ~trades ~orders ~today_bars
 let _notify_transitions ~on_transitions transitions =
   Option.iter on_transitions ~f:(fun observe -> observe transitions)
 
-(* Settle the refused fills that survived G2b's resize: spend G2a's retry budget
-   on what it can save, cancel the rest, then revert the stuck exits.
-
-   The [CancelEntry]s are the ONLY resolution a portfolio-rejected entry ticket
-   gets; unannounced, they left a quarter of all placed tickets resolving to
-   nothing in [trade_audit.sexp] (dev/notes/ticket-death-on-cash-2026-08-16.md
-   G1). Observational: [Stop_log] ignores [CancelEntry], no metric reads it.
-
-   The revert is the exit-side mirror (#1553): an [Exiting] position whose exit
-   fill was rejected would otherwise stay stuck forever (stops only re-evaluate
-   [Holding]), so it goes back to [Holding] and the stop re-fires next cycle. *)
-let _settle_rejected_fills t ~positions ~rejected_trades =
-  let open Result.Let_syntax in
-  let cancel_transitions =
-    Cancel_handler.transitions_for_rejected_trades ~date:t.current_date
-      ~positions
-      ~rejected_trades:
-        (Entry_fill_retry.handle_rejected_entries t.deps.entry_fill_retry
-           ~order_manager:t.deps.order_manager ~positions ~rejected_trades)
-  in
-  _notify_transitions ~on_transitions:t.deps.on_transitions cancel_transitions;
-  let%bind positions =
-    Cancel_handler.apply_transitions ~positions ~transitions:cancel_transitions
-  in
-  Ok
-    (Cancel_handler.revert_rejected_exits ~date:t.current_date ~positions
-       ~rejected_trades)
-
 (* Execute pending orders, apply fills, and route rejected fills through
    {!Cancel_handler}. Returns post-fill (portfolio, positions, accepted). The
    Fix #1 next-open gate (default-off) defers Market entry fills past stale-bar
@@ -398,7 +370,12 @@ let _process_fills_and_cancels t ~portfolio ~positions ~today_bars =
     Fill_router.update_positions_from_trades ~order_links:t.order_links
       ~date:t.current_date ~positions ~trades ()
   in
-  let%bind positions = _settle_rejected_fills t ~positions ~rejected_trades in
+  let%bind positions =
+    Cancel_handler.handle_rejected_trades ~date:t.current_date ~positions
+      ~rejected_trades ~order_manager:t.deps.order_manager
+      ~entry_fill_retry:t.deps.entry_fill_retry
+      ~on_transitions:t.deps.on_transitions
+  in
   Ok (portfolio, positions, trades)
 
 (* F2 ticket lifecycle: retire the resting orders of any strategy-cancelled

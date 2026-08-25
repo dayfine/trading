@@ -179,3 +179,41 @@ val revert_rejected_exits :
     reversion and entry cancellation share the same state-machine path. The
     [CancelExit] validator independently rejects a partially-filled [Exiting], a
     backstop to the [filled_quantity = 0.0] match guard above. *)
+
+val handle_rejected_trades :
+  date:Date.t ->
+  positions:Position.t String.Map.t ->
+  rejected_trades:Trading_base.Types.trade list ->
+  order_manager:Trading_orders.Manager.order_manager ->
+  entry_fill_retry:Entry_fill_retry.t ->
+  on_transitions:(Position.transition list -> unit) option ->
+  Position.t String.Map.t Status.status_or
+(** [handle_rejected_trades ~date ~positions ~rejected_trades ~order_manager
+     ~entry_fill_retry ~on_transitions] settles the fills the portfolio refused,
+    in order: {b (1) retry} — spend [entry_fill_retry]'s G2a budget re-offering
+    what it can afford ({!Entry_fill_retry.handle_rejected_entries});
+    {b (2) cancel} — build a [CancelEntry] transition for each trade that
+    survives the retry ({!transitions_for_rejected_trades}); {b (3) announce} —
+    hand those transitions to [on_transitions] (when present) {e before}
+    applying them, matching the caller's existing announce-before-apply ordering
+    for every other transition source; {b (4) apply} — fold them onto
+    [positions] via {!apply_transitions}; {b (5) revert} — walk the
+    {e full, unfiltered} [rejected_trades] (entries included) through
+    {!revert_rejected_exits} so any stranded [Exiting] position goes back to
+    [Holding] for the stop to re-fire next cycle.
+
+    The [CancelEntry]s built in step 2 are the ONLY resolution a
+    portfolio-rejected entry ticket gets; unannounced, they left a quarter of
+    all placed tickets resolving to nothing in [trade_audit.sexp]
+    (dev/notes/ticket-death-on-cash-2026-08-16.md G1). The revert in step 5 is
+    the exit-side mirror (#1553): an [Exiting] position whose exit fill was
+    rejected would otherwise stay stuck forever, since stops only re-evaluate
+    [Holding] positions.
+
+    Ordering is load-bearing: retry must run before cancel (a retried trade must
+    not also be cancelled), announce must run before apply (so an observer sees
+    the transition before the position it names is mutated), and apply must run
+    before revert only incidentally — the two touch disjoint position states
+    ([Entering] vs. unfilled [Exiting]) so their relative order does not change
+    the result, but revert must see [positions] post-cancel so a position closed
+    by step 4 cannot be resurrected by step 5. *)
