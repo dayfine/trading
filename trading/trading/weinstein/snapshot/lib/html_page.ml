@@ -135,7 +135,7 @@ let _card_style =
     ".ticket { background: var(--surface-alt); border-top: 1px solid \
      var(--rule);";
     "          font-size: 12px; padding: 7px 12px; }";
-    ".ticket-suppressed { color: var(--flag); }";
+    ".ticket-nofill { color: var(--flag); }";
     ".legend { color: var(--ink-soft); display: flex; flex-wrap: wrap;";
     "          font-size: 12px; gap: 14px; margin: 6px 0 0; }";
     ".legend .sw { border-top: 2.5px solid; display: inline-block;";

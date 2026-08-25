@@ -1523,6 +1523,46 @@ let test_long_candidate_reconciled_and_sized_on_the_cap _ =
               (gt (module Float_ord) 0.01);
           ]))
 
+(* Issue #2404 at the generate seam: a candidate whose close has run PAST the
+   fill cap is neither dropped nor stripped of its ticket. The same fixture that
+   classifies [through-entry] at a 15-point cap classifies [EXTENDED] at a
+   half-point one, and at that classification it still appears in
+   [long_candidates], still carries a positive size (on the cap, like every
+   other class), and its instruction carries the will-not-fill clause naming the
+   band it is waiting to re-enter.
+
+   Before #2404 the same inputs produced [sized_shares = 0] and a
+   "NO ORDER — do not chase" instruction, so all three matchers below flip. *)
+let test_past_cap_candidate_keeps_its_ticket_at_the_generate_seam _ =
+  let snap =
+    Generator.generate
+      (_armed_inputs ~bar_reader:(_breakout_bar_reader ())
+         ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+         ~through_band_pct:0.1 ~extension_max_pct:0.5)
+  in
+  assert_that
+    (_find_candidate (snap : Weekly_snapshot.t).long_candidates "AAPL")
+    (is_some_and
+       (all_of
+          [
+            field _class_label (is_some_and (equal_to "EXTENDED"));
+            field
+              (fun (c : Weekly_snapshot.candidate) -> c.sized_shares)
+              (gt (module Int_ord) 0);
+            field
+              (fun (c : Weekly_snapshot.candidate) ->
+                Report_shared.instruction c)
+              (matching ~msg:"instruction must carry the will-not-fill clause"
+                 (fun s ->
+                   if
+                     String.is_substring s
+                       ~substring:"WILL NOT FILL AT CURRENT PRICE"
+                     && String.is_substring s ~substring:"BUY STOPLIMIT"
+                   then Some ()
+                   else None)
+                 (equal_to ()));
+          ]))
+
 (* R1 no-op: with the default config (both thresholds [0.0]) the same fixture
    produces an UNRECONCILED candidate sized on its entry level — bit-identical
    to pre-#2103 behaviour. *)
@@ -1756,6 +1796,8 @@ let suite =
          >:: test_held_with_triggered_stop_reports_the_exit;
          "long candidate reconciled and sized on the cap"
          >:: test_long_candidate_reconciled_and_sized_on_the_cap;
+         "past-cap candidate keeps its ticket at the generate seam"
+         >:: test_past_cap_candidate_keeps_its_ticket_at_the_generate_seam;
          "default config leaves candidates unreconciled"
          >:: test_default_config_leaves_candidates_unreconciled;
          "short candidate reconciled at the generate seam"

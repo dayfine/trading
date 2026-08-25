@@ -149,7 +149,10 @@ let _nums (c : Weekly_snapshot.candidate) =
   ]
   @ _last_num c
 
-let _is_extended (c : Weekly_snapshot.candidate) =
+(* Price has run past the do-not-chase cap, so this card's order will not fill
+   at the current price (issue #2404). It still carries a ticket — the mark is a
+   heads-up, not a suppression. *)
+let _is_no_fill (c : Weekly_snapshot.candidate) =
   match c.reconciliation with
   | Entry_reconciliation.Extended _ -> true
   | Not_reconciled | Valid_stop _ | Through_entry _ -> false
@@ -157,13 +160,13 @@ let _is_extended (c : Weekly_snapshot.candidate) =
 (* The order line, verbatim from [Report_shared] so the broker-facing text is
    character-identical across the two report formats. *)
 let _footer (c : Weekly_snapshot.candidate) =
-  let modifier = if _is_extended c then Some "suppressed" else None in
+  let modifier = if _is_no_fill c then Some "nofill" else None in
   Report_card.footer ?modifier (Html_page.escape (Report_shared.instruction c))
 
 let render ~arm ~rank ~chart (c : Weekly_snapshot.candidate) =
   Report_card.render
     {
-      modifier = (if _is_extended c then Some "extended" else None);
+      modifier = (if _is_no_fill c then Some "extended" else None);
       arm;
       rank = Some rank;
       symbol = c.symbol;

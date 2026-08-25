@@ -633,11 +633,11 @@ let test_armed_valid_stop_row_renders_stoplimit _ =
            (_has_substring "BUY STOP 40");
        ])
 
-(* Extended candidates leave the actionable table entirely: a mixed snapshot
-   renders the valid candidate under "Long candidates" and the extended one
-   under the watch section, each ranked within its own table (2026-07-27 user
-   feedback: extended names must not consume actionable display slots). *)
-let test_extended_candidate_moves_to_watch_section _ =
+(* Issue #2404: an extended candidate keeps its ACTIONABLE rank in the ordinary
+   candidate table. It is a confirmed breakout whose order rests unfilled, not a
+   name to hide, so SYM01 ranks 2 among the longs and no separate watch section
+   exists at all. *)
+let test_extended_candidate_keeps_its_actionable_rank _ =
   let snap =
     _long_snap ~n:2 ~score_of:(fun i -> 1.0 -. (Float.of_int i *. 0.01))
   in
@@ -656,61 +656,46 @@ let test_extended_candidate_moves_to_watch_section _ =
             else c);
     }
   in
-  let md = Report_renderer.render snap in
-  let watch_at =
-    String.substr_index_exn md ~pattern:"## Watch — extended, do not chase"
-  in
-  let sym01_at = String.substr_index_exn md ~pattern:"| SYM01 |" in
-  assert_that md
+  assert_that
+    (Report_renderer.render snap)
     (all_of
        [
          _has_substring "| 1 | SYM00 |";
-         (* The extended candidate ranks 1 within the watch table, not 2 in
-            the actionable table. *)
-         _has_substring "| 1 | SYM01 |";
-         not_ ~msg:"extended must not hold an actionable rank"
-           (_has_substring "| 2 | SYM01 |");
-         (* And its row sits below the watch heading. *)
-         matching ~msg:"SYM01 must render inside the watch section"
-           (fun _ -> if sym01_at > watch_at then Some () else None)
-           __;
+         _has_substring "| 2 | SYM01 |";
+         not_ ~msg:"the do-not-chase watch section is gone (#2404)"
+           (_has_substring "Watch — extended");
        ])
 
-let test_no_watch_section_without_extended _ =
-  let snap =
-    _long_snap ~n:2 ~score_of:(fun i -> 1.0 -. (Float.of_int i *. 0.01))
-  in
-  assert_that
-    (Report_renderer.render snap)
-    (not_ ~msg:"watch section only exists when something is extended"
-       (_has_substring "Watch — extended"))
-
-(* An EXTENDED row KEEPS its place in the report (the issue is explicit about
-   watch value) but carries NO executable order — only the do-not-chase reason,
-   naming the overshoot, the entry level and the close. This is the MBX shape
-   from the 2026-07-24 report. Since the watch-section split it renders under
-   "Watch — extended, do not chase" rather than the actionable table. *)
-let test_extended_row_is_kept_but_ticket_suppressed _ =
+(* Issue #2404: the MBX shape from the 2026-07-24 report. The row keeps its
+   ticket — the same capped STOPLIMIT a valid-stop row gets, because it is the
+   same order the backtest places — plus the will-not-fill clause naming the
+   close, the overshoot, the entry and the limit. Sized like any other row, on
+   the cap: (115.00 - 90.00) / 115.00 = 21.7% risk. *)
+let test_extended_row_keeps_its_ticket_with_a_will_not_fill_note _ =
   let md =
     Report_renderer.render
       (_reconciled_snap
          ~reconciliation:
            (Entry_reconciliation.Extended
-              { close = 134.5; overshoot_pct = 34.5; cap = 0.0 })
-         ~sized_shares:0 ~sized_position_value:0.0 ~sized_position_pct:0.0
-         ~sized_risk_amount:0.0)
+              { close = 134.5; overshoot_pct = 34.5; cap = 115.0 })
+         ~sized_shares:40 ~sized_position_value:4600.0 ~sized_position_pct:0.046
+         ~sized_risk_amount:1000.0)
   in
   assert_that md
     (all_of
        [
          _has_substring
-           "| 1 | TEST | B | 0.50 | $100.00 | $134.50 (+34.5% EXTENDED) | \
-            $90.00 | 10.0% |";
+           "| 1 | TEST | B | 0.50 | $100.00 | $134.50 (+34.5% NO FILL) | \
+            $90.00 | 21.7% |";
          _has_substring
-           "NO ORDER — do not chase: +34.5% past the $100.00 entry level \
-            (close $134.50).";
-         not_ ~msg:"an extended candidate must emit no buy order"
-           (_has_substring "BUY ");
+           "BUY STOPLIMIT 40 sh, trigger $100.00 limit $115.00 (~$4600, 4.6% \
+            of book, worst-case risk $1000)";
+         _has_substring
+           "— WILL NOT FILL AT CURRENT PRICE: close $134.50 is +34.5% past the \
+            $100.00 entry, beyond the $115.00 limit; the order rests unfilled \
+            unless price returns into the $100.00-$115.00 band.";
+         not_ ~msg:"the do-not-chase suppression line is gone (#2404)"
+           (_has_substring "NO ORDER — do not chase");
          _has_substring "close vs entry:";
        ])
 
@@ -791,12 +776,10 @@ let suite =
          >:: test_armed_through_entry_row_renders_limit_at_close;
          "armed_valid_stop_row_renders_stoplimit"
          >:: test_armed_valid_stop_row_renders_stoplimit;
-         "extended_candidate_moves_to_watch_section"
-         >:: test_extended_candidate_moves_to_watch_section;
-         "no_watch_section_without_extended"
-         >:: test_no_watch_section_without_extended;
-         "extended_row_is_kept_but_ticket_suppressed"
-         >:: test_extended_row_is_kept_but_ticket_suppressed;
+         "extended_candidate_keeps_its_actionable_rank"
+         >:: test_extended_candidate_keeps_its_actionable_rank;
+         "extended_row_keeps_its_ticket_with_a_will_not_fill_note"
+         >:: test_extended_row_keeps_its_ticket_with_a_will_not_fill_note;
          "valid_stop_row_keeps_resting_ticket_and_needs_no_legend"
          >:: test_valid_stop_row_keeps_resting_ticket_and_needs_no_legend;
          "unreconciled_row_renders_dash_and_todays_ticket"

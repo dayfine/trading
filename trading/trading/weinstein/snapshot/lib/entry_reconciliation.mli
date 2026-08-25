@@ -37,9 +37,13 @@
       ticket is re-anchored to [C] and {b re-sized on [C] vs the stop}. This
       mirrors the backtest's [Entry_walk], which fills at the price observed on
       signal evaluation and sizes at that fill.
-    - {!Extended} — [overshoot > extension_max_pct]. Too far past the breakout
-      to buy: the ticket is suppressed with a do-not-chase reason and the row is
-      kept for watch purposes.
+    - {!Extended} — [overshoot > extension_max_pct]. The order's limit now sits
+      {e below} the market, so it {b will not fill at the current price}. The
+      ticket is still issued and still shown: it is the same
+      [StopLimit (E, cap)] the backtest places, which simply rests unfilled and
+      is re-evaluated next week (issue #2404 — the report used to suppress the
+      ticket, which made the artifact disagree with the executable rule and hid
+      confirmed breakouts from the reader entirely).
 
     {b Weinstein authority}: [docs/design/weinstein-book-reference.md] §1 "Stage
     2 detail (Ch. 2)" — "Begins when stock breaks out above the top of the
@@ -48,11 +52,13 @@
 
     That clause is the whole support for the cap: the book locates the buy
     {e at} the breakout, or on a pullback back {e close to} it. A name trading
-    far above its breakout is at neither, so there is no Weinstein buy point to
-    write a ticket against. (The section's "Late Stage 2 warning" reads
-    similarly but is {b not} cited here: it is conditioned on the stock sagging
-    toward its MA with the MA's ascent flattening, which is a different
-    predicate from distance past the breakout.)
+    far above its breakout is at neither — which is exactly why the resting
+    order refuses to chase it, and equally why the row stays visible: the
+    pullback back to the band {e is} the second chance the clause describes.
+    (The section's "Late Stage 2 warning" reads similarly but is {b not} cited
+    here: it is conditioned on the stock sagging toward its MA with the MA's
+    ascent flattening, which is a different predicate from distance past the
+    breakout.)
 
     This module changes no admission rule and schedules no re-entry: it
     describes the executable ticket attached to an already-admitted candidate.
@@ -99,8 +105,9 @@ type t =
           re-anchors to a market order at [levels.close] and is re-sized on that
           fill. *)
   | Extended of levels
-      (** Price is past the extension cap: the ticket is suppressed
-          (do-not-chase) and the row kept for watch purposes. *)
+      (** Price is past the extension cap: the resting [StopLimit] will not fill
+          at the current price (its limit is below the market). The ticket is
+          kept and annotated, not suppressed (issue #2404). *)
 [@@deriving sexp, eq, show]
 
 val overshoot_pct :
@@ -148,9 +155,11 @@ val classify :
     de-minimis tolerance — any overshoot at all re-anchors the ticket). *)
 
 val label : t -> string option
-(** Short display label for the class — [None] for {!Not_reconciled} (nothing to
-    show), ["valid-stop"] / ["through-entry"] / ["EXTENDED"] otherwise. Used for
-    the HTML tag chip and its CSS modifier. *)
+(** Short class token — [None] for {!Not_reconciled} (nothing to show),
+    ["valid-stop"] / ["through-entry"] / ["EXTENDED"] otherwise. Used only as
+    the HTML chip's CSS modifier (lowercased); the chip's visible text is
+    {!Weekly_snapshot}-derived via [Report_shared.close_vs_entry], so the token
+    names the {e price condition} (extended past the cap), not an outcome. *)
 
 val levels_of : t -> levels option
 (** [levels_of t] is the price context of a reconciled class, [None] for

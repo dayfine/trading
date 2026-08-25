@@ -59,7 +59,9 @@
     - {b Entry reconciliation.} A reconciled candidate carries a chip whose text
       is {!Report_shared.close_vs_entry}; an {!Entry_reconciliation.Extended}
       one additionally marks its card and its ticket strip, and the section
-      gains {!Report_shared.entry_reconciliation} (issue #2103).
+      gains {!Report_shared.entry_reconciliation} (issue #2103). The extended
+      card keeps its rank in its own side's section and keeps its ticket — the
+      order simply will not fill at the current price (issue #2404).
     - {b Order ticket.} Each card's bottom strip is {!Report_shared.instruction}
       verbatim — the broker-facing text is character-identical across the two
       formats.

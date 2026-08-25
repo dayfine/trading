@@ -726,18 +726,26 @@ type config = {
           [Backtest.Overlay_validator.apply_overrides], armed via
           [dev/weekly-picks/live-config-overrides.sexp]. *)
   entry_extension_max_pct : float; [@sexp.default 0.0]
-      (** Entry reconciliation (issue #2103) — the maximum overshoot past the
-          breakout entry, in percentage points of the entry level, at which the
-          system will still issue an order. Beyond it the ticket is
-          {b suppressed} with a do-not-chase reason and the row is kept for
-          watch purposes.
+      (** Entry reconciliation (issue #2103) — the do-not-chase cap: the
+          furthest past the breakout entry, in percentage points of the entry
+          level, that an entry order may fill. It is the limit leg of the
+          [StopLimit (E, E * (1 +/- pct/100))] ticket, and nothing else.
+
+          {b ⚠ It is no longer a suppression threshold} (issue #2404). The picks
+          artifact used to drop the ticket of any candidate past this cap and
+          move its row into a do-not-chase watch section. It now keeps the
+          ticket and annotates it "will not fill at current price" — which is
+          exactly what the order does: the limit sits below the market, so it
+          rests unfilled and is re-evaluated next week, the same behaviour the
+          simulator gives under [enable_sim_entry_stoplimit]. One rule, two
+          views; there is no separate suppression dial to tune.
 
           Execution correctness, not a new strategy mechanic:
           [Weekly_snapshot.candidate.entry] is the breakout level from the
           {e transition} week and the <=4-week early-Stage-2 window admits a
           name for weeks afterwards, so a buy-stop printed far below the current
           price is an instantly-filling market order whose displayed risk
-          understates the real risk. The suppression follows
+          understates the real risk. The cap follows
           [docs/design/weinstein-book-reference.md] §1 "Stage 2 detail (Ch. 2)",
           which locates the buy at the breakout or on "at least one pullback
           close to the breakout point". No admission rule changes and no
@@ -747,8 +755,14 @@ type config = {
 
           {b Default [0.0] = reconciliation disabled} (no-op, R1): every
           candidate carries [Entry_reconciliation.Not_reconciled], sizing uses
-          [entry] exactly as before, and the reports render unchanged. [15.0] is
-          the armed value. Consumed by [Weekly_snapshot_generator.generate]
+          [entry] exactly as before, and the reports render unchanged. The live
+          picks config arms [15.0]; the committed backtest specs use [2.0].
+          {b That value divergence is still open} — issue #2404 unified the
+          {e semantics} (one fill cap, two views), not the number. Both the 1y
+          and 3y horizon surfaces rank [15.0] below [2.0] on return and Calmar,
+          so moving live to [2.0] is the cheap fidelity fix, but it is a user
+          decision on one universe and one base scenario with no confirmation
+          grid behind it. Consumed by [Weekly_snapshot_generator.generate]
           (report/live-ticket path), and — only when
           [enable_sim_entry_stoplimit] is also on — by the backtest runner as
           the simulator's entry-fill cap; with that flag at its default [false],

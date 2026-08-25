@@ -286,7 +286,7 @@ let test_new_marks_are_styled _ =
          _has_substring ".chip-through-entry";
          _has_substring ".chip-extended";
          _has_substring ".cand-extended";
-         _has_substring ".ticket-suppressed";
+         _has_substring ".ticket-nofill";
        ])
 
 let test_masthead _ =
@@ -904,6 +904,12 @@ let _reconciled_snapshot =
           reconciliation =
             Entry_reconciliation.Extended
               { close = 65.5; overshoot_pct = 34.5; cap = 0.0 };
+          (* Issue #2404: an extended candidate is sized like any other, so the
+             fixture carries a real ticket to assert against. *)
+          sized_shares = 20;
+          sized_position_value = 1000.0;
+          sized_position_pct = 0.01;
+          sized_risk_amount = 100.0;
         };
       ];
   }
@@ -970,14 +976,14 @@ let test_armed_through_entry_draws_the_cap_chart_line _ =
        [ _has_substring "class=\"lvl lvl-cap\""; _has_substring "cap $115.00" ])
 
 (* The SHORT arm gets the mirrored treatment: an over-extended short carries the
-   EXTENDED chip, its card and its ticket strip are marked, and its ticket is
-   suppressed.
+   past-cap chip, and its card and ticket strip are marked — but the ticket is
+   KEPT and annotated, not suppressed (issue #2404).
 
-   Risk for an EXTENDED row stays quoted against the ENTRY, because there is no
-   order and therefore no fill to price: entry $50.00 / stop $55.00, so
-   (50 - 55) / 50 = -10.0%. Re-anchoring every reconciled class to the close
-   indiscriminately would give (65.50 - 55) / 65.50 = 16.0% instead. *)
-let test_extended_chip_and_suppression_on_the_short_arm _ =
+   Risk for this row stays quoted against the ENTRY because the fixture carries
+   no cap: entry $50.00 / stop $55.00, so (50 - 55) / 50 = -10.0%. Re-anchoring
+   every reconciled class to the close indiscriminately would give
+   (65.50 - 55) / 65.50 = 16.0% instead. *)
+let test_extended_chip_and_no_fill_note_on_the_short_arm _ =
   let html = Html_report_renderer.render _reconciled_snapshot in
   assert_that html
     (all_of
@@ -986,56 +992,36 @@ let test_extended_chip_and_suppression_on_the_short_arm _ =
          _has_substring
            ("<span class=\"chip chip-extended\" title=\""
            ^ Html_page.escape Report_shared.entry_reconciliation
-           ^ "\">$65.50 (+34.5% EXTENDED)</span>");
+           ^ "\">$65.50 (+34.5% NO FILL)</span>");
          _has_substring "<span class=\"num-value\">-10.0%</span>";
          _has_substring "<div class=\"cand cand-extended\">";
+         _has_substring "<div class=\"ticket ticket-nofill\">BUY STOP 20 sh";
          _has_substring
-           "<div class=\"ticket ticket-suppressed\">NO ORDER — do not chase: \
-            +34.5% past the";
+           "— WILL NOT FILL AT CURRENT PRICE: close $65.50 is +34.5% past the \
+            $50.00 entry";
+         not_ ~msg:"the do-not-chase suppression line is gone (#2404)"
+           (_has_substring "NO ORDER — do not chase");
        ])
 
-(* Extended candidates leave the actionable sections: the short arm's only
-   candidate is EXTENDED, so the Short section renders the empty marker and
-   the extended card renders below the watch heading instead (2026-07-27 user
-   feedback: extended names must not consume actionable display slots). *)
-let test_extended_card_moves_to_watch_section _ =
-  let html = Html_report_renderer.render _reconciled_snapshot in
-  let watch_at =
-    String.substr_index_exn html
-      ~pattern:"<h2>Watch — extended, do not chase</h2>"
-  in
-  let card_at =
-    String.substr_index_exn html ~pattern:"<div class=\"cand cand-extended\">"
-  in
-  assert_that html
-    (all_of
-       [
-         _has_substring
-           "<h2>Short candidates (top 5)</h2>\n<p class=\"empty\">(none)</p>";
-         matching ~msg:"the extended card must render inside the watch section"
-           (fun _ -> if card_at > watch_at then Some () else None)
-           __;
-       ])
-
-(* Sharing the watch section does not mean sharing an arm tag: the extended
-   SHORT's chart cell must still be addressed "short:SHRTB". Tagging every watch
-   card "long" would make a short's chart indistinguishable from a long's to any
-   consumer keying off [data-chart]. *)
-let test_watch_card_keeps_its_own_arm_tag _ =
+(* Issue #2404: the extended card stays in its OWN side's section — the short
+   arm's only candidate is extended, so the Short section renders it rather than
+   the empty marker, and no watch section exists. Its chart cell keeps the
+   short arm tag, so a consumer keying off [data-chart] still separates the two
+   arms. *)
+let test_extended_card_stays_in_its_own_arm_section _ =
   assert_that
     (Html_report_renderer.render _reconciled_snapshot)
     (all_of
        [
+         not_ ~msg:"the short section must not render as empty"
+           (_has_substring
+              "<h2>Short candidates (top 5)</h2>\n<p class=\"empty\">(none)</p>");
          _has_substring "data-chart=\"short:SHRTB\"";
          not_ ~msg:"an extended short must not be tagged as a long"
            (_has_substring "data-chart=\"long:SHRTB\"");
+         not_ ~msg:"the do-not-chase watch section is gone (#2404)"
+           (_has_substring "Watch — extended");
        ])
-
-let test_no_watch_section_without_extended _ =
-  assert_that
-    (Html_report_renderer.render _full_snapshot)
-    (not_ ~msg:"watch section only exists when something is extended"
-       (_has_substring "Watch — extended"))
 
 (* An unreconciled snapshot (the disarmed default) carries no chip, no Last
    figure and no legend. *)
@@ -1140,14 +1126,10 @@ let suite =
          >:: test_through_entry_chip_on_the_long_arm;
          "armed_through_entry_draws_the_cap_chart_line"
          >:: test_armed_through_entry_draws_the_cap_chart_line;
-         "extended_chip_and_suppression_on_the_short_arm"
-         >:: test_extended_chip_and_suppression_on_the_short_arm;
-         "extended_card_moves_to_watch_section"
-         >:: test_extended_card_moves_to_watch_section;
-         "watch_card_keeps_its_own_arm_tag"
-         >:: test_watch_card_keeps_its_own_arm_tag;
-         "no_watch_section_without_extended"
-         >:: test_no_watch_section_without_extended;
+         "extended_chip_and_no_fill_note_on_the_short_arm"
+         >:: test_extended_chip_and_no_fill_note_on_the_short_arm;
+         "extended_card_stays_in_its_own_arm_section"
+         >:: test_extended_card_stays_in_its_own_arm_section;
          "unreconciled_cards_are_plain" >:: test_unreconciled_cards_are_plain;
        ]
 

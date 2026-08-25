@@ -144,14 +144,13 @@ type candidate = {
           {!Weinstein_snapshot_gen.Entry_reconcile}; see {!Entry_reconciliation}
           for the classification and its Weinstein authority.
 
-          Drives {!expected_fill_price}, and through it the [sized_*] fields and
-          the rendered order ticket: a {!Entry_reconciliation.Through_entry}
-          candidate is sized on its close (the price it would actually fill at),
-          and an {!Entry_reconciliation.Extended} one is not sized at all
-          because its ticket is suppressed. Additive field defaulting to
-          {!Entry_reconciliation.Not_reconciled}: old snapshots — and any run
-          with the mechanism disarmed — parse and behave exactly as before the
-          fix. *)
+          Drives {!expected_fill_price} and {!sizing_basis_price}, and through
+          them the [sized_*] fields and the rendered order ticket. Every class
+          carries a ticket: an {!Entry_reconciliation.Extended} candidate's
+          simply will not fill at the current price and says so (issue #2404).
+          Additive field defaulting to {!Entry_reconciliation.Not_reconciled}:
+          old snapshots — and any run with the mechanism disarmed — parse and
+          behave exactly as before the fix. *)
   score_components : (string * int) list; [@sexp.default []]
       (** Per-signal [(label, points)] decomposition of {!score} — the screener
           scoring signals that summed to this candidate's total, in scoring
@@ -188,19 +187,20 @@ val sizing_basis_price : candidate -> float
     {b worst admissible fill}, not the expected one (issue #2158, "size on the
     cap").
 
-    For a reconciled candidate carrying a do-not-chase cap
-    ({!Entry_reconciliation.Valid_stop} / {!Entry_reconciliation.Through_entry}
-    with [cap > 0.0]) this is that cap: the live {!Weinstein_order_gen} order
-    can fill anywhere up to the cap, so sizing on the cap makes the displayed
-    risk the {e worst} case ([cap - stop]) rather than an optimistic one — the
-    honest-conservative choice the user settled on 2026-07-29.
+    For {e any} reconciled candidate carrying a do-not-chase cap ([cap > 0.0])
+    this is that cap: the live {!Weinstein_order_gen} order can fill anywhere up
+    to the cap, so sizing on the cap makes the displayed risk the {e worst} case
+    ([cap - stop]) rather than an optimistic one — the honest-conservative
+    choice the user settled on 2026-07-29. This includes
+    {!Entry_reconciliation.Extended}, whose order is the same capped [StopLimit]
+    and would fill at the cap if price returned into the band (issue #2404 —
+    before it, an extended candidate was left unsized).
 
-    Falls back to {!expected_fill_price} for every other case: a
-    {!Entry_reconciliation.Not_reconciled} candidate (the disarmed default), an
-    {!Entry_reconciliation.Extended} one (unsized anyway), and any snapshot
-    written before #2158 (whose [cap] defaults to [0.0]) all size exactly as
-    they did before this feature — so the default path and historical snapshots
-    are unchanged. *)
+    Falls back to {!expected_fill_price} otherwise: a
+    {!Entry_reconciliation.Not_reconciled} candidate (the disarmed default) and
+    any snapshot written before #2158 (whose [cap] defaults to [0.0]) size
+    exactly as they did before this feature — so the default path and historical
+    snapshots are unchanged. *)
 
 type held_position = {
   symbol : string;  (** Ticker of the held position. *)

@@ -1,9 +1,38 @@
 # Status: weekly-snapshot
 
-## Last updated: 2026-08-03
+## Last updated: 2026-08-24
 
 ## Status
 IN_PROGRESS
+
+**2026-08-24 (issue #2404 — past-band picks are shown, not suppressed; branch
+`feat/picks-nofill-2404`):** user decision 2026-08-24, adopting the issue's
+proposal. `Entry_reconciliation.Extended` stops being a suppression class and
+becomes a plain statement about price: the resting `StopLimit (E, cap)`'s limit
+now sits below the market, so it **will not fill at the current price**. The
+picks artifact therefore KEEPS the ticket and annotates it
+`"— WILL NOT FILL AT CURRENT PRICE: close $X is +N% past the $E entry, beyond
+the $cap limit; the order rests unfilled unless price returns into the $E-$cap
+band."` — which is exactly what the simulator does under
+`enable_sim_entry_stoplimit` (order rests, no fill, re-evaluated next week).
+One rule, two views. Concretely: (a) `Report_shared.instruction` no longer has
+an `Extended` arm — the do-not-chase line is deleted and the class routes
+through the normal stop-limit ticket plus the annotation; (b) `Trade_sizing`
+sizes every class alike and `Weekly_snapshot.sizing_basis_price` returns the cap
+for `Extended` too (worst admissible fill, #2158 basis); (c) the
+`"Watch — extended, do not chase"` section is gone from BOTH renderers —
+`Report_shared.{is_extended,partition_extended,watch_section_title}` deleted,
+past-cap rows keep their rank in their own side's table/section; (d) the
+`extended_not_suppressed` validator check (which required the opposite) is
+deleted — `risk_consistency` now covers those tickets like any other; (e) the
+HTML ticket modifier `ticket-suppressed` → `ticket-nofill`. **The VALUE is
+untouched and still open**: live arms `entry_extension_max_pct 15.0`, committed
+backtest specs use `2.0`; #2404 unified the semantics, not the number. The live
+override is KEPT — it is the arming switch for reconciliation *and* the printed
+StopLimit's limit leg, so removing it would disarm #2103 entirely (a duplicated
+copy of the same override line was removed). No backtest/golden numbers move:
+these fields are read only by `Weekly_snapshot_generator.generate`, never by
+`on_market_close`, and no `[@sexp.default]` changed.
 
 **2026-08-03 (report improvements — user request, branch `feat/report-improvements`, PR #2189):**
 four reader-facing report improvements, presentation + snapshot-field only

@@ -35,7 +35,9 @@ let expected_fill_price c =
 
 let sizing_basis_price c =
   match c.reconciliation with
-  | (Entry_reconciliation.Valid_stop { cap; _ } | Through_entry { cap; _ })
+  | Entry_reconciliation.Valid_stop { cap; _ }
+  | Through_entry { cap; _ }
+  | Extended { cap; _ }
     when Float.( > ) cap 0.0 ->
       cap
   | Not_reconciled | Valid_stop _ | Through_entry _ | Extended _ ->

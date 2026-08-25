@@ -38,10 +38,11 @@
 
     The bottom strip is {!Report_shared.instruction} verbatim, so the order text
     a reader copies into their broker is character-identical to the Markdown
-    report's. An {!Entry_reconciliation.Extended} candidate — whose ticket
-    {!Report_shared.instruction} suppresses — additionally marks the card and
-    the strip, so a do-not-chase name reads as a different kind of row rather
-    than as one more chip.
+    report's. An {!Entry_reconciliation.Extended} candidate — whose ticket will
+    not fill at the current price (issue #2404) — additionally marks the card
+    and the strip, so a no-fill name reads as a different kind of row rather
+    than as one more chip. It still carries a real, sized ticket: the mark is a
+    heads-up, not a suppression.
 
     Presentation only: no admission, entry, stop or sizing rule is evaluated
     here. Every number rendered is read off the snapshot or off

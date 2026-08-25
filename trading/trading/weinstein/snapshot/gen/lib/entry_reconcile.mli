@@ -48,4 +48,5 @@ val for_candidates :
   Weinstein_snapshot.Weekly_snapshot.candidate list
 (** {!for_candidate} mapped over a ranked candidate list. Order and membership
     are preserved: reconciliation annotates, it never drops a candidate (an
-    over-extended name keeps its row for watch purposes). *)
+    over-extended name keeps its row, its rank {b and} its ticket — the order
+    just will not fill at the current price, issue #2404). *)

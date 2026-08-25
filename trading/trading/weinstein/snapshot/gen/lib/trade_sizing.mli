@@ -51,11 +51,12 @@ val size_candidate :
       {!Weekly_snapshot.sizing_basis_price} [c] — the do-not-chase cap for a
       reconciled candidate (issue #2158), and [c.entry] for an unreconciled one
       (the disarmed default) or a pre-#2158 snapshot with no cap.
-    - An {!Entry_reconciliation.Extended} candidate is returned
-      {b explicitly unsized} ([sized_shares = 0], all [sized_*] zeroed,
-      [sizing_note = None]): its ticket is suppressed with a do-not-chase
-      reason, so there is no order to size. The candidate itself is returned
-      unchanged otherwise — the row is kept for watch purposes, never dropped.
+    - {b Every} reconciliation class is sized the same way, including
+      {!Entry_reconciliation.Extended} (issue #2404). An extended candidate's
+      order is the same capped [StopLimit]; it merely will not fill at the
+      current price, and would fill at the cap if price returned into the band —
+      so the cap is its honest sizing basis too. Before #2404 it was returned
+      explicitly unsized because its ticket was suppressed.
     - [placeholder = true] stamps [sizing_note] with the
       ["UNSIZED — set portfolio.sexp"] label (the generator had no live
       portfolio and sized against the template default); the numeric fields are

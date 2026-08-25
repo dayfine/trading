@@ -77,7 +77,7 @@ let test_extended_is_a_weakness _ =
             (Entry_reconciliation.Extended
                { close = 112.3; overshoot_pct = 12.3; cap = 0.0 })
           ()))
-    (elements_are [ equal_to "extended +12.3% past entry" ])
+    (elements_are [ equal_to "+12.3% past cap, will not fill" ])
 
 let test_sector_not_strong_is_a_long_weakness _ =
   (* A long setup (stop below entry) whose rationale lacks "Strong sector". *)
