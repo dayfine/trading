@@ -1,0 +1,3 @@
+== ratchet liveness: share of round-trips with n_stop_raises >= 1 ==
+record-baseline(pinned)    n=780  >=1 raise 5.4%  >=2 raises 3.8%
+instr-null(retired)        n=1182  >=1 raise 3.3%  >=2 raises 1.8%

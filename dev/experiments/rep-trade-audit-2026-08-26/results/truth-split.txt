@@ -1,0 +1,7 @@
+== retired basis, split on COMMITTED stop_floor_kind (ground truth) ==
+   bucket           n     <=7d   >=13wk stop_loss raised>=1  mean pnl%
+   structural     164     8.5%    33.5%     41.5%     17.1%      3.50
+   fallback      1018    58.2%    11.4%     84.6%      1.1%      0.73
+
+  Compare with results/stopwidth.txt's retired-basis (proxy) rows to see
+  how much the proxy's contaminated structural bucket compresses the gap.

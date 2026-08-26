@@ -1,0 +1,2 @@
+== (symbol, entry_date) overlap: pinned record baseline vs feat-p1 feature rows ==
+pinned entries n=780, with a feat-p1 row: 502 (64.4%)

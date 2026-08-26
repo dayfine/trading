@@ -1,0 +1,27 @@
+== decision-time entry features (monster_scan -pairs, book 4wk x 2.0 basis) ==
+-- p1
+  fill-week vol ratio        n=1182  p10=0.6723     p25=0.886      med=1.201      p75=1.685      p90=2.423      (dropped 0)
+  base_weeks                 n=1182  p10=0          p25=0          med=28         p75=48         p90=70         (dropped 0)
+  stage Stage2                1136   96.1%
+  stage Stage1                  31    2.6%
+  stage Stage4                  11    0.9%
+  stage Stage3                   4    0.3%
+-- p2eject
+  fill-week vol ratio        n=2190  p10=0.6005     p25=0.7719     med=0.9857     p75=1.258      p90=1.546      (dropped 2)
+  base_weeks                 n=2190  p10=0          p25=13         med=35         p75=55         p90=77         (dropped 2)
+  stage Stage2                2128   97.1%
+  stage Stage1                  60    2.7%
+  stage Stage4                   2    0.1%
+  stage                          2    0.1%
+-- p2kept
+  fill-week vol ratio        n=834   p10=0.6955     p25=0.9562     med=1.464      p75=2.344      p90=3.09       (dropped 2)
+  base_weeks                 n=834   p10=0          p25=0          med=24         p75=42         p90=64         (dropped 2)
+  stage Stage2                 751   89.8%
+  stage Stage1                  71    8.5%
+  stage Stage4                   9    1.1%
+  stage Stage3                   3    0.4%
+  stage                          2    0.2%
+-- p3
+  fill-week vol ratio        n=397   p10=0.5647     p25=0.7017     med=0.8941     p75=1.236      p90=2.074      (dropped 0)
+  base_weeks                 n=397   p10=0          p25=12         med=30         p75=45         p90=71         (dropped 0)
+  stage Stage2                 397  100.0%

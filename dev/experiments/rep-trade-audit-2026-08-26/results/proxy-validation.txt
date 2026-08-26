@@ -1,0 +1,7 @@
+== stop-width proxy vs committed stop_floor_kind (retired basis, join on position_id) ==
+  joined 1182 trades (0 had no floorkind row)
+  proxy=structural/fallback         232
+  proxy=fallback/structural           4
+  proxy=fallback/fallback           786
+  proxy=structural/structural       160
+  AGREEMENT: 80.03%

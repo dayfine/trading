@@ -1,0 +1,11 @@
+== entry features on the PINNED-basis subset of executed trades ==
+(feat-p1 rows whose (symbol, entry_date) also appears in the pinned run)
+  fill-week vol ratio        n=502   p10=0.6966     p25=0.9023     med=1.236      p75=1.776      p90=2.717      (dropped 0)
+  base_weeks                 n=502   p10=0          p25=0          med=27         p75=51         p90=75         (dropped 0)
+
+== share of executed fills clearing the book's 2x volume bar AT FILL ==
+  p1 pinned subset       n=502   clears 2x:  20.1%
+  p1 retired basis       n=1182  clears 2x:  17.0%
+  p2 kept                n=834   clears 2x:  36.1%
+  p2 ejected             n=2190  clears 2x:   0.0%
+  p3 funding-death       n=397   clears 2x:  11.3%

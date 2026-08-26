@@ -1,0 +1,17 @@
+== P1 executed, PINNED record baseline (record-baseline-2026-08-24, 780 round-trips) ==
+days_held                    n=780   p10=1          p25=5          med=25         p75=93         p90=157        (dropped 0)
+pnl_percent                  n=780   p10=-7.51      p25=-4.65      med=-2.1       p75=2.77       p90=16.09      (dropped 0)
+entry_volume_ratio           n=780   p10=1.646      p25=1.967      med=2.267      p75=2.768      p90=3.686      (dropped 0)
+stop_initial_distance_pct    n=780   p10=0.04       p25=0.04       med=0.04       p75=0.0465     p90=0.1311     (dropped 0)
+n_stop_raises                n=780   p10=0          p25=0          med=0          p75=0          p90=0          (dropped 0)
+screener_score_at_entry      n=780   p10=75         p25=85         med=90         p75=100        p90=100        (dropped 0)
+stop_fill_distance_pct       n=780   p10=0.0402     p25=0.0407     med=0.0436     p75=0.0588     p90=0.1377     (dropped 0)
+
+== P1 executed, RETIRED pre-flip basis (instr-null, 1182 round-trips) ==
+days_held                    n=1182  p10=1          p25=1          med=7          p75=40         p90=110        (dropped 0)
+pnl_percent                  n=1182  p10=-5.74      p25=-2.99      med=-1.37      p75=0.97       p90=8.25       (dropped 0)
+entry_volume_ratio           n=1182  p10=1.627      p25=1.998      med=2.258      p75=2.803      p90=3.631      (dropped 0)
+stop_initial_distance_pct    n=1182  p10=0.0208     p25=0.0208     med=0.0208     p75=0.0242     p90=0.1152     (dropped 0)
+n_stop_raises                n=1182  p10=0          p25=0          med=0          p75=0          p90=0          (dropped 0)
+screener_score_at_entry      n=1182  p10=75         p25=85         med=90         p75=100        p90=100        (dropped 0)
+stop_fill_distance_pct       n=1182  p10=0.021      p25=0.0214     med=0.0237     p75=0.0364     p90=0.1235     (dropped 0)
