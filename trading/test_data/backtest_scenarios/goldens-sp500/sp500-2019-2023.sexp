@@ -126,16 +126,31 @@
   ;; record, NO return-improvement claim attaches to these deltas -- the
   ;; large top-line swings are tail-path reshuffling on a pin, not evidence.
 
-  ((total_return_pct ((min 81.3266) (max 110.0302)))
-   (total_trades ((min 169.15) (max 228.85)))
-   (win_rate ((min 29.4723) (max 39.8744)))
-   (sharpe_ratio ((min 0.7593) (max 1.0274)))
-   (max_drawdown_pct ((min 19.7593) (max 26.7333)))
-   (avg_holding_days ((min 49.9791) (max 67.6189)))
-   (open_positions_value ((min 1350989.6) (max 1827809.6)))
-   (sortino_ratio_annualized ((min 1.0463) (max 1.4158)))
-   (calmar_ratio ((min 0.5267) (max 0.7127)))
-   (ulcer_index ((min 8.0507) (max 10.8923)))
+  ;; RE-PINNED 2026-08-26 for the fill-model default flip (PR #2569:
+
+  ;; enable_sim_entry_stoplimit + entry_extension_max_pct 2.0 as the
+
+  ;; default pair -- USER-directed fidelity decision, #2405 precondition;
+
+  ;; entries now rest as StopLimit tickets like live). +-15% around the
+
+  ;; paired-sweep actuals at PR tip aa4a513e2 (local pinned worktree,
+
+  ;; committed store). NO return claim: the swings are entry-timing
+
+  ;; reshuffles on regression pins, not evidence about the fill model.
+
+
+  ((total_return_pct ((min 65.2837) (max 88.3252)))
+   (total_trades ((min 153.85) (max 208.15)))
+   (win_rate ((min 23.4806) (max 31.7680)))
+   (sharpe_ratio ((min 0.6036) (max 0.8168)))
+   (max_drawdown_pct ((min 20.2885) (max 27.4493)))
+   (avg_holding_days ((min 53.8646) (max 72.8757)))
+   (open_positions_value ((min 1450074.3) (max 1961865.3)))
+   (sortino_ratio_annualized ((min 0.8187) (max 1.1078)))
+   (calmar_ratio ((min 0.4309) (max 0.5831)))
+   (ulcer_index ((min 8.0853) (max 10.9391)))
    ;; wall_seconds pin sized wide (CI ~920s, local parallel ~200s) —
    ;; catches only catastrophic 2x slowdowns per design intent.
    (wall_seconds       ((min 0.0)          (max 1500.0))))))

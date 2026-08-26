@@ -179,16 +179,31 @@
   ;; record, NO return-improvement claim attaches to these deltas -- the
   ;; large top-line swings are tail-path reshuffling on a pin, not evidence.
 
-  ((total_return_pct   ((min 91.2520)       (max 123.4587)))
-   (total_trades       ((min 152.15)        (max 205.85)))
-   (win_rate           ((min 27.0670)       (max 36.6202)))
-   (sharpe_ratio       ((min 0.7769)      (max 1.0513)))
-   (max_drawdown_pct   ((min 21.7513)       (max 29.4284)))
-   (avg_holding_days   ((min 55.4399)       (max 75.0070)))
-   (open_positions_value ((min 1182652.3)   (max 1600059.1)))
-   (sortino_ratio_annualized ((min 1.0819) (max 1.4638)))
-   (calmar_ratio       ((min 0.5228)      (max 0.7075)))
-   (ulcer_index        ((min 9.2746)       (max 12.5481)))
+  ;; RE-PINNED 2026-08-26 for the fill-model default flip (PR #2569:
+
+  ;; enable_sim_entry_stoplimit + entry_extension_max_pct 2.0 as the
+
+  ;; default pair -- USER-directed fidelity decision, #2405 precondition;
+
+  ;; entries now rest as StopLimit tickets like live). +-15% around the
+
+  ;; paired-sweep actuals at PR tip aa4a513e2 (local pinned worktree,
+
+  ;; committed store). NO return claim: the swings are entry-timing
+
+  ;; reshuffles on regression pins, not evidence about the fill model.
+
+
+  ((total_return_pct   ((min 404.1556)       (max 546.7989)))
+   (total_trades       ((min 147.05)        (max 198.95)))
+   (win_rate           ((min 21.1271)       (max 28.5839)))
+   (sharpe_ratio       ((min 0.6670)      (max 0.9025)))
+   (max_drawdown_pct   ((min 65.6494)       (max 88.8200)))
+   (avg_holding_days   ((min 52.9849)       (max 71.6856)))
+   (open_positions_value ((min 3980687.0)   (max 5385635.5)))
+   (sortino_ratio_annualized ((min 0.7875) (max 1.0656)))
+   (calmar_ratio       ((min 0.4624)      (max 0.6258)))
+   (ulcer_index        ((min 29.7351)       (max 40.2300)))
    ;; wall_seconds guards only the MAX (catastrophic slowdown). The old
    ;; min 100.0 was the 2026-08-25 "GHA flake" (#2547 root cause, read
    ;; from the first #2549-uploaded per-cell artifact): fast warm-cache

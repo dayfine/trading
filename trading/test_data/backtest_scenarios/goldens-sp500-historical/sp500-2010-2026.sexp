@@ -192,20 +192,35 @@
   ;; record, NO return-improvement claim attaches to these deltas -- the
   ;; large top-line swings are tail-path reshuffling on a pin, not evidence.
 
-  ((total_return_pct   ((min 281.0736)      (max 380.2762)))
-   (total_trades       ((min 390.14)         (max 527.86)))
-   (win_rate           ((min 36.8518)       (max 49.8584)))
-   (sharpe_ratio       ((min 0.5478)      (max 0.7413)))
-   (max_drawdown_pct   ((min 18.0692)       (max 24.4466)))
-   (avg_holding_days   ((min 51.2629)       (max 69.3558)))
+  ;; RE-PINNED 2026-08-26 for the fill-model default flip (PR #2569:
+
+  ;; enable_sim_entry_stoplimit + entry_extension_max_pct 2.0 as the
+
+  ;; default pair -- USER-directed fidelity decision, #2405 precondition;
+
+  ;; entries now rest as StopLimit tickets like live). +-15% around the
+
+  ;; paired-sweep actuals at PR tip aa4a513e2 (local pinned worktree,
+
+  ;; committed store). NO return claim: the swings are entry-timing
+
+  ;; reshuffles on regression pins, not evidence about the fill model.
+
+
+  ((total_return_pct   ((min 460.5661)      (max 623.1189)))
+   (total_trades       ((min 384.20)         (max 519.80)))
+   (win_rate           ((min 33.4734)       (max 45.2877)))
+   (sharpe_ratio       ((min 0.4204)      (max 0.5689)))
+   (max_drawdown_pct   ((min 53.8791)       (max 72.8954)))
+   (avg_holding_days   ((min 52.7188)       (max 71.3255)))
    ;; OPV re-pinned ~9.88M under the realism-defaults flip (ledger
    ;; 2026-07-10-realism-defaults-flip): the $1M-ADV entry gate drops marginal
    ;; fills and stale-exit 5d clears ghost MTM, so terminal book is lighter.
    ;; Headline metrics (return/Sharpe/DD/trades) stayed in-band — only the
    ;; terminal-MTM composition moved. Was ~18.1M floor-off pre-flip.
-   (open_positions_value ((min 2323051.9) (max 3142952.7)))
-   (sortino_ratio_annualized ((min 0.7707) (max 1.0428)))
-   (calmar_ratio       ((min 0.3741)      (max 0.5062)))
-   (ulcer_index        ((min 7.0081)       (max 9.4816)))
+   (open_positions_value ((min 3486343.7) (max 4716818.0)))
+   (sortino_ratio_annualized ((min 0.5261) (max 0.7119)))
+   (calmar_ratio       ((min 0.1617)      (max 0.2189)))
+   (ulcer_index        ((min 19.3781)       (max 26.2176)))
    ;; Floor-off does more work than the halted floor-on run; keep wall band wide.
    (wall_seconds       ((min 0.0)           (max 3600.0))))))
