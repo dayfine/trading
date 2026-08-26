@@ -29,6 +29,26 @@ val default_config : config
 (** Sensible defaults:
     [rs_ma_period = 52; trend_lookback = 4; flat_threshold = 0.98]. *)
 
+val min_aligned_bars_for_trend : config -> int
+(** [min_aligned_bars_for_trend config] is the smallest number of date-aligned
+    weekly bars a caller must supply for the {!result.trend} to be a real
+    classification rather than a degenerate default.
+
+    [= rs_ma_period - 1 + trend_lookback + 1]; [56] at {!default_config}.
+
+    Two facts compose into that floor:
+    - The zero-line MA consumes [rs_ma_period - 1] bars, so [n] aligned bars
+      yield an RS history of [n - rs_ma_period + 1] entries.
+    - Classification compares the newest history entry against the one
+      [trend_lookback] entries back, so it needs [trend_lookback + 1] entries.
+      With fewer than [2] it short-circuits to [Positive_flat]; with
+      [2.. trend_lookback] the comparison silently clamps to a shorter span.
+
+    Callers that build their own weekly view (the strategy's [lookback_bars])
+    must size it at least this deep — under-sizing does not error, it degrades
+    to a constant [Positive_flat] for every symbol, which is what issue #2380
+    recorded across 4,231 tickets. *)
+
 type raw_rs = Relative_strength.raw_rs
 (** Re-export of {!Relative_strength.raw_rs}. *)
 

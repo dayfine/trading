@@ -213,6 +213,10 @@ Formula: `RS = price_of_stock / price_of_market_average` (computed weekly, same 
 
 **Mansfield zero line:** RS divided by its own long-term average. Above 1.0 = positive territory, below = negative.
 
+**Territory and direction are two separate reads** (resolved against the book 2026-08-25, issue #2380). Being above the zero line is not by itself a buy qualification — a *declining* RS line disqualifies a stock even in positive territory: "when you see inferior action in the RS line compared to the price performance, don't ever buy that stock" (Ch. 4). Chart 4-16 is the worked case: price trending sideways in a range while "the RS line is telling us to look out below. It is trending lower." Conversely the zero line is not an absolute veto in either direction — "don't think, however, that you can never buy a stock below the zero RS line, or that you can never short a stock above the zero line. If the relative strength is in good shape and improving and all other criteria are positive, then go for it" (Ch. 4) — the hard rule is only: never buy when RS "is in negative territory *and it remains in poor shape*."
+
+*Implementation gap this exposes:* `Weinstein_types.rs_trend` has no positive-territory-declining state, so `Rs._classify_trend` collapses that case into `Positive_flat`, which the screener admits. Adding the state changes admission + scoring for a real cohort and so needs an experiment-gated change rather than a drive-by.
+
 ### 4.5 Big Winner Detection — Triple Confirmation (Ch. 5)
 
 A stock gets A+ rating if ALL THREE present:

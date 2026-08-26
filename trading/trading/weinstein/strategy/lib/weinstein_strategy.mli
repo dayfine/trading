@@ -319,8 +319,12 @@ type config = {
           level for a new entry. Default: 1.02 (2% buffer above the screener
           stop). *)
   lookback_bars : int;
-      (** Number of weekly bars to pass to stage/macro analysers (default: 52).
-          Must be >= 30 (one MA period). *)
+      (** Number of weekly bars to pass to stage / RS / volume / breakout
+          analysers (default: [56] since issue #2380 — was [52], which left
+          {!Rs} with a 1-entry history and pinned every trend to
+          [Positive_flat]). Must be >= 30 (one MA period) for the stage
+          classifier and >= 56 for a live RS trend. Full derivation:
+          {!Weinstein_strategy_config.config.lookback_bars}. *)
   bar_history_max_lookback_days : int option;
       (** Hypothesis-testing field (perf workstream C1). Vestigial after the
           Stage 3 PR 3.2 deletion of [Bar_history] — the parallel cache no
