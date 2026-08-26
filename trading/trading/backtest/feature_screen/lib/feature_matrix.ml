@@ -32,6 +32,7 @@ let _rs_trend_categories =
     "Bullish_crossover";
     "Positive_rising";
     "Positive_flat";
+    "Positive_declining";
     "Negative_improving";
     "Negative_declining";
     "Bearish_crossover";

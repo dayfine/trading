@@ -244,6 +244,106 @@ let test_flat_threshold_configurable _ =
     (not_ is_none)
 
 (* ------------------------------------------------------------------ *)
+(* Positive_declining (issue #2556)                                     *)
+(*                                                                      *)
+(* A compact classifier config — a 3-bar zero-line MA and a 1-entry     *)
+(* trend lookback — so each fixture is 8 hand-checkable bars against a  *)
+(* flat 100 benchmark, and the two compared history entries are the     *)
+(* last two. Under the shipped 52/4 config the same shapes would need   *)
+(* ~56 bars and the arithmetic would not be readable.                   *)
+(* ------------------------------------------------------------------ *)
+
+let _compact = { cfg with rs_ma_period = 3; trend_lookback = 1 }
+let _flat_bench n = const_bars ~n 100.0
+
+let _classify ?(config = _compact) prices =
+  let stock = weekly_bars prices in
+  analyze ~config ~stock_bars:stock
+    ~benchmark_bars:(_flat_bench (List.length prices))
+  |> Option.map ~f:(fun (r : result) -> r.trend)
+
+(** Positive RS that is rolling over: prices compound at 10%/week for seven
+    bars, then the eighth rises only 2%. Geometric growth against a flat
+    benchmark holds normalized RS CONSTANT (each bar's raw value and its own
+    trailing average grow by the same factor), so the kink — not the level, and
+    not the price direction, which is still up — is what moves the
+    classification.
+
+    Normalized RS goes 1.0967 -> 1.0447, a 4.74% drop, with both points above
+    1.0. That lands strictly inside the default [flat_threshold = 0.98] band's
+    declining side. *)
+let _positive_declining_prices =
+  let geometric i = 100.0 *. (1.1 ** Float.of_int i) in
+  List.init 8 ~f:(fun i -> if i < 7 then geometric i else geometric 6 *. 1.02)
+
+(** Armed, the rolling-over fixture is [Positive_declining]. *)
+let test_positive_declining_when_armed _ =
+  assert_that
+    (_classify
+       ~config:{ _compact with enable_positive_declining = true }
+       _positive_declining_prices)
+    (is_some_and (equal_to Positive_declining))
+
+(** R1: the SAME fixture with the flag off is [Positive_flat] — the state this
+    cohort has always been reported as. This is the bit-identity half of the
+    default-off contract, asserted on the one input that can tell the two
+    branches apart. *)
+let test_positive_declining_folds_to_flat_when_off _ =
+  assert_that
+    (_classify _positive_declining_prices)
+    (is_some_and (equal_to Positive_flat))
+
+(** [flat_threshold] becomes OBSERVABLE once the state is armed — before this
+    change both sides of that comparison returned [Positive_flat], so the knob
+    could not affect any output. The measured 4.74% drop straddles the two
+    thresholds: at 0.98 it is declining, at 0.95 it is still flat. Asserted as a
+    pair so a failure names which side moved. *)
+let test_flat_threshold_is_observable_when_armed _ =
+  let at threshold =
+    _classify
+      ~config:
+        {
+          _compact with
+          enable_positive_declining = true;
+          flat_threshold = threshold;
+        }
+      _positive_declining_prices
+  in
+  assert_that
+    (at 0.98, at 0.95)
+    (equal_to (Some Positive_declining, Some Positive_flat))
+
+(** Arming the flag must not disturb any OTHER classification. One fixture per
+    remaining constructor plus the [n < 2] degenerate fallback, all run with the
+    flag ON: only the positive-zone sub-threshold arm may change, so every one
+    of these must land exactly where it did before.
+
+    Note the geometric case: constant-ratio growth is [Positive_flat], not
+    [Positive_rising] — normalized RS is flat because the price and its own
+    trailing average grow together. *)
+let test_arming_leaves_other_classifications_unchanged _ =
+  let armed = { _compact with enable_positive_declining = true } in
+  let at prices = _classify ~config:armed prices in
+  assert_that
+    [
+      at [ 100.0; 102.0; 106.0; 112.0; 122.0; 140.0; 175.0; 240.0 ];
+      at [ 100.0; 100.0; 100.0; 100.0; 100.0; 100.0; 99.0; 140.0 ];
+      at [ 100.0; 100.0; 100.0; 100.0; 100.0; 120.0; 140.0; 100.0 ];
+      at [ 100.0; 95.0; 90.0; 85.0; 80.0; 75.0; 70.0; 65.0 ];
+      at [ 100.0; 90.0; 81.0; 73.0; 66.0; 60.0; 58.0; 57.0 ];
+      at [ 100.0; 110.0; 121.0 ];
+    ]
+    (elements_are
+       [
+         is_some_and (equal_to Positive_rising);
+         is_some_and (equal_to Bullish_crossover);
+         is_some_and (equal_to Bearish_crossover);
+         is_some_and (equal_to Negative_declining);
+         is_some_and (equal_to Negative_improving);
+         is_some_and (equal_to Positive_flat);
+       ])
+
+(* ------------------------------------------------------------------ *)
 (* Purity                                                               *)
 (* ------------------------------------------------------------------ *)
 
@@ -451,6 +551,13 @@ let suite =
          "bullish_crossover_implies_positive_territory"
          >:: test_bullish_crossover_implies_positive_territory;
          "flat_threshold_configurable" >:: test_flat_threshold_configurable;
+         "positive_declining_when_armed" >:: test_positive_declining_when_armed;
+         "positive_declining_folds_to_flat_when_off"
+         >:: test_positive_declining_folds_to_flat_when_off;
+         "flat_threshold_is_observable_when_armed"
+         >:: test_flat_threshold_is_observable_when_armed;
+         "arming_leaves_other_classifications_unchanged"
+         >:: test_arming_leaves_other_classifications_unchanged;
          "pure_same_inputs_same_output" >:: test_pure_same_inputs_same_output;
          "parity_positive_rs" >:: test_parity_positive_rs;
          "parity_negative_rs" >:: test_parity_negative_rs;

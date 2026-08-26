@@ -146,6 +146,7 @@ type config = {
       (** See [.mli]. *)
   stop_width_size_down_max_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
   volume_confirm_at_fill : bool; [@sexp.default false]  (** See [.mli]. *)
+  enable_rs_positive_declining : bool; [@sexp.default false]  (** See [.mli]. *)
 }
 [@@deriving sexp]
 
@@ -256,6 +257,7 @@ let default_config ~universe ~index_symbol =
     stop_width_mode = Stop_width_mode.Drop_over_max;
     stop_width_size_down_max_pct = 0.0;
     volume_confirm_at_fill = false;
+    enable_rs_positive_declining = false;
   }
 
 (* F5 arming predicate — the single source of truth for both halves of the

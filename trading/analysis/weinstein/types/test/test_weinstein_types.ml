@@ -71,9 +71,51 @@ let test_normalize_sector_name _ =
     (equal_to "Information Technology");
   assert_that (normalize_sector_name "Bogus") (equal_to "Bogus")
 
+(* [rs_trend]'s sexp encoding is by CONSTRUCTOR NAME, not by position, so
+   inserting [Positive_declining] in the middle of the variant (issue #2556)
+   cannot change how any previously-written atom decodes. That is the property
+   that makes the placement free — and it is worth pinning, because the obvious
+   alternative assumption (positional encoding) would make every archived sexp
+   carrying a post-[Positive_flat] state decode to the wrong constructor.
+
+   Asserted over ALL SIX pre-existing atoms in one shot rather than a
+   representative one: a positional encoding would leave the three atoms that
+   sort before the insertion point correct and only corrupt the three after it,
+   so a single-atom check could pass on exactly the bug it is meant to catch. *)
+let test_rs_trend_sexp_is_name_encoded _ =
+  let decode name = rs_trend_of_sexp (Sexplib.Sexp.Atom name) in
+  assert_that
+    (List.map decode
+       [
+         "Bullish_crossover";
+         "Positive_rising";
+         "Positive_flat";
+         "Negative_improving";
+         "Negative_declining";
+         "Bearish_crossover";
+       ])
+    (equal_to
+       [
+         Bullish_crossover;
+         Positive_rising;
+         Positive_flat;
+         Negative_improving;
+         Negative_declining;
+         Bearish_crossover;
+       ])
+
+(* The new constructor round-trips like any other. *)
+let test_positive_declining_sexp_round_trips _ =
+  assert_that
+    (rs_trend_of_sexp (sexp_of_rs_trend Positive_declining))
+    (equal_to Positive_declining)
+
 let suite =
   "weinstein_types"
   >::: [
+         "rs_trend sexp is name-encoded" >:: test_rs_trend_sexp_is_name_encoded;
+         "Positive_declining sexp round-trips"
+         >:: test_positive_declining_sexp_round_trips;
          "stage_eq" >:: test_stage_eq;
          "ma_direction_eq" >:: test_ma_direction_eq;
          "gics_of_string canonical" >:: test_gics_of_string_canonical;

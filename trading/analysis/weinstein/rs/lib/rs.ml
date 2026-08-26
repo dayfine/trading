@@ -9,10 +9,16 @@ type config = {
   rs_ma_period : int;
   trend_lookback : int;
   flat_threshold : float;
+  enable_positive_declining : bool;
 }
 
 let default_config =
-  { rs_ma_period = 52; trend_lookback = 4; flat_threshold = 0.98 }
+  {
+    rs_ma_period = 52;
+    trend_lookback = 4;
+    flat_threshold = 0.98;
+    enable_positive_declining = false;
+  }
 
 (* The MA eats [rs_ma_period - 1] bars before the first history entry exists,
    and [_classify_trend] needs [trend_lookback + 1] entries to compare across
@@ -53,19 +59,15 @@ type result = {
     fewer than 2 history entries this returns [Positive_flat] unconditionally —
     a degenerate default, not a classification.
 
-    Known gap, deliberately left as-is (issue #2380): in the positive zone both
-    arms of the [flat_threshold] test return [Positive_flat], so only
-    [Positive_rising] is distinguishable there and [flat_threshold] is inert.
-    {!Weinstein_types.rs_trend} has no positive-territory-declining state, yet
-    the book gives that case a distinct meaning — Ch. 4, "when you see inferior
-    action in the RS line compared to the price performance, don't ever buy that
-    stock" (Chart 4-16: price range-bound while "the RS line is telling us to
-    look out below ... trending lower"). Adding the state would change screener
-    admission and scoring for a real cohort, so it belongs in an
-    experiment-gated change rather than a correctness fix. See
-    [docs/design/weinstein-book-reference.md] §4.4. *)
-let _classify_trend ~trend_lookback ~flat_threshold (history : raw_rs list) :
-    rs_trend =
+    The gap issue #2380 recorded — both arms of the positive-zone
+    [flat_threshold] test collapsing to [Positive_flat], leaving that threshold
+    inert — is closed {b behind a flag}: with [enable_positive_declining] the
+    sub-threshold arm emits [Positive_declining] instead (book §4.4, "inferior
+    action in the RS line ... don't ever buy that stock"). Default [false]
+    reproduces the pre-flag behaviour exactly, so no run can observe the new
+    constructor and [flat_threshold] stays inert. See the [.mli]. *)
+let _classify_trend ~trend_lookback ~flat_threshold ~enable_positive_declining
+    (history : raw_rs list) : rs_trend =
   let n = List.length history in
   if n < 2 then Positive_flat
   else
@@ -79,6 +81,7 @@ let _classify_trend ~trend_lookback ~flat_threshold (history : raw_rs list) :
     | true, true ->
         if Float.(cur > prev) then Positive_rising
         else if Float.(cur >= prev *. flat_threshold) then Positive_flat
+        else if enable_positive_declining then Positive_declining
         else Positive_flat
     | false, false ->
         if Float.(cur > prev) then Negative_improving else Negative_declining
@@ -141,10 +144,13 @@ let _history_of_aligned ~rs_ma_period (aligned : (Date.t * float * float) list)
     Some history
 
 (** Build the trend-classification result from a non-empty raw_rs history. *)
-let _result_of_history ~trend_lookback ~flat_threshold (history : raw_rs list) :
-    result =
+let _result_of_history ~trend_lookback ~flat_threshold
+    ~enable_positive_declining (history : raw_rs list) : result =
   let current = List.last_exn history in
-  let trend = _classify_trend ~trend_lookback ~flat_threshold history in
+  let trend =
+    _classify_trend ~trend_lookback ~flat_threshold ~enable_positive_declining
+      history
+  in
   {
     current_rs = current.rs_value;
     current_normalized = current.rs_normalized;
@@ -186,7 +192,14 @@ let _collect_aligned_from_callbacks ~get_stock_close ~get_benchmark_close
 
 let analyze_with_callbacks ~config ~get_stock_close ~get_benchmark_close
     ~get_date : result option =
-  let { rs_ma_period; trend_lookback; flat_threshold } = config in
+  let {
+    rs_ma_period;
+    trend_lookback;
+    flat_threshold;
+    enable_positive_declining;
+  } =
+    config
+  in
   let aligned =
     _collect_aligned_from_callbacks ~get_stock_close ~get_benchmark_close
       ~get_date
@@ -194,7 +207,9 @@ let analyze_with_callbacks ~config ~get_stock_close ~get_benchmark_close
   match _history_of_aligned ~rs_ma_period aligned with
   | None -> None
   | Some history ->
-      Some (_result_of_history ~trend_lookback ~flat_threshold history)
+      Some
+        (_result_of_history ~trend_lookback ~flat_threshold
+           ~enable_positive_declining history)
 
 (* ------------------------------------------------------------------ *)
 (* Callback bundle — used by panel-backed callers                       *)

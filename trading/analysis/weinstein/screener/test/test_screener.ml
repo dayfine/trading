@@ -2501,6 +2501,71 @@ let test_rs_gate_improving_but_still_negative_is_blocked _ =
   in
   assert_that result.buy_candidates is_empty
 
+(* ------------------------------------------------------------------ *)
+(* Positive_declining consumers (issue #2556)                           *)
+(*                                                                      *)
+(* The state itself is produced by [Rs] behind                          *)
+(* [Rs.config.enable_positive_declining] and pinned there; these three  *)
+(* pin what the SCREENER does with it once produced. Fixtures inject    *)
+(* the trend directly (the same construction the surrounding RS-gate    *)
+(* tests use), so each consumer is exercised independently of the       *)
+(* classifier's arming.                                                 *)
+(*                                                                      *)
+(* Every case is asserted as a PAIR against [Positive_flat] — the state *)
+(* this cohort used to be reported as — so a failure names the          *)
+(* divergence rather than an absolute value that could drift with a     *)
+(* weight change.                                                       *)
+(* ------------------------------------------------------------------ *)
+
+(* Long admission: [Positive_declining] is rejected while [Positive_flat] at the
+   same (comfortably positive) level is admitted. The RS LEVEL is identical
+   across the pair, so the rejection is attributable to the trend alone and not
+   to [min_rs_normalized]. Book §4.4 Ch. 4: "don't ever buy that stock". *)
+let test_positive_declining_blocks_long_admission _ =
+  let admitted_count trend =
+    List.length
+      (_screen_long ~min_rs_normalized:default_config.min_rs_normalized
+         ~stock:(_long_stock_with_rs ~trend (Some 1.05)))
+        .buy_candidates
+  in
+  assert_that
+    (admitted_count Positive_flat, admitted_count Positive_declining)
+    (equal_to (1, 0))
+
+(* Scoring: the long-side RS signal contributes nothing for
+   [Positive_declining], against [w_positive_rs / 2] for [Positive_flat]. Zero
+   rather than a negative penalty because the book dictates no magnitude — a
+   graded penalty would be a scoring axis, not part of arming the state. *)
+let test_positive_declining_scores_no_rs_points _ =
+  let sector = make_sector "Tech" in
+  let rs_points trend =
+    long_score_components ~weights:default_scoring_weights ~sector
+      (_long_stock_with_rs ~trend (Some 1.05))
+    |> List.filter ~f:(fun (label, _) -> String.is_prefix label ~prefix:"RS ")
+    |> List.sum (module Int) ~f:snd
+  in
+  assert_that
+    (rs_points Positive_flat, rs_points Positive_declining)
+    (equal_to (default_scoring_weights.w_positive_rs / 2, 0))
+
+(* Short admission: [Positive_declining] does NOT block, though [Positive_flat]
+   at the same level does. Ch. 7's short-selling criterion 4 draws exactly that
+   line: "While it's OK if the relative strength is above the zero line on the
+   Mansfield chart, it must have clearly topped out and started trending
+   lower." [Positive_declining] satisfies the permission clause; [Positive_flat]
+   has not "clearly topped out", so it stays blocked. This is the one consumer
+   where the new state sides with the negative group. *)
+let test_positive_declining_does_not_block_shorts _ =
+  let blocks trend =
+    Screener_admission.rs_blocks_short
+      (Some
+         ({ current_rs = 1.05; current_normalized = 1.05; trend; history = [] }
+           : Rs.result))
+  in
+  assert_that
+    (blocks Positive_flat, blocks Positive_declining)
+    (equal_to (true, false))
+
 let test_rs_gate_sexp_round_trips _ =
   let armed = { default_config with min_rs_normalized = 1.0 } in
   let omitted =
@@ -3458,6 +3523,12 @@ let suite =
          >:: test_rs_gate_improving_but_still_negative_is_blocked;
          "RS gate: min_rs_normalized sexp round-trips"
          >:: test_rs_gate_sexp_round_trips;
+         "Positive_declining: blocked from long admission"
+         >:: test_positive_declining_blocks_long_admission;
+         "Positive_declining: contributes no long RS score"
+         >:: test_positive_declining_scores_no_rs_points;
+         "Positive_declining: does not block shorts"
+         >:: test_positive_declining_does_not_block_shorts;
          "G2 trace: survivor counts match cascade_diagnostics"
          >:: test_trace_survivor_counts_match_cascade_diagnostics;
          "G2 trace: fixture exercises both a survivor and a drop"

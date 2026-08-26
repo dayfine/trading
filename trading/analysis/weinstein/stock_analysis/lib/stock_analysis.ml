@@ -476,9 +476,12 @@ let breakout_candidate_rejection ?(early_stage2_max_weeks = 4) (a : t) :
     | Some { confirmation = Strong _ | Adequate _; _ } -> true
     | Some _ | None -> false
   in
+  (* [Positive_declining] joins this gate on the same authority as
+     [Negative_declining] — book §4.4 Ch. 4, "don't ever buy that stock". It is
+     unreachable unless [Rs.config.enable_positive_declining] is armed. *)
   let rs_ok =
     match a.rs with
-    | Some { trend = Negative_declining; _ } -> false
+    | Some { trend = Negative_declining | Positive_declining; _ } -> false
     | Some _ | None -> true
   in
   if not stage_ok then Some Stage_setup

@@ -55,7 +55,14 @@ let callbacks_from_bars ~(config : config) ~(sector_bars : Daily_price.t list)
 (* Internal helpers                                                     *)
 (* ------------------------------------------------------------------ *)
 
-(** Compute a 0.0–1.0 confidence score for the sector being bullish. *)
+(** Compute a 0.0–1.0 confidence score for the sector being bullish.
+
+    [Positive_declining] scores 0.0 alongside the two negative states: a sector
+    whose RS line is falling is not one to rotate into, whichever side of the
+    zero line it sits on (§4.4). Forward-looking only — every call site builds
+    {!default_config} for the sector's own [Rs.config], so
+    [Rs.config.enable_positive_declining] never reaches this module today and
+    the bucket is empty in production. *)
 let _sector_confidence ~config ~stage ~rs ~constituent_pct : float =
   let stage_score =
     match stage.Stage.stage with
@@ -71,7 +78,12 @@ let _sector_confidence ~config ~stage ~rs ~constituent_pct : float =
     | Some { Rs.trend = Bullish_crossover | Positive_rising; _ } -> 1.0
     | Some { Rs.trend = Positive_flat; _ } -> 0.7
     | Some { Rs.trend = Negative_improving; _ } -> 0.4
-    | Some { Rs.trend = Negative_declining | Bearish_crossover; _ } -> 0.0
+    | Some
+        {
+          Rs.trend = Negative_declining | Bearish_crossover | Positive_declining;
+          _;
+        } ->
+        0.0
   in
   (stage_score *. config.stage_weight)
   +. (rs_score *. config.rs_weight)

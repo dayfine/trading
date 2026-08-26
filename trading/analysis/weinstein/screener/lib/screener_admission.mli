@@ -105,7 +105,21 @@ val rs_blocks_short : Rs.result option -> bool
     strength, even if it breaks down. Returns [true] for candidates whose RS
     trend is positive ([Positive_rising], [Positive_flat], [Bullish_crossover]).
     [Negative_improving] stays eligible; absent RS data is treated as not-strong
-    (doesn't block shorts). *)
+    (doesn't block shorts).
+
+    [Positive_declining] (armed via {!Rs.config.enable_positive_declining}, off
+    by default) does {b not} block — this is the one consumer where the new
+    state sides with the {i negative} group rather than with [Positive_flat].
+    Ch. 7's short-selling criterion 4 states that permission directly rather
+    than by inference from §4.4: "While it's OK if the relative strength is
+    above the zero line on the Mansfield chart, it must have clearly topped out
+    and started trending lower." Above the zero line is therefore a veto only
+    until the line has topped and turned down, which is exactly
+    [Positive_declining]. The same clause is why the two blocking positives stay
+    blocked: [Positive_rising] is the "especially if the RS line is trending
+    higher" case, and [Positive_flat] has not "clearly topped out", so it fails
+    the permission clause. See [docs/design/weinstein-book-reference.md] §4.4
+    "Short side — the direction read is the permission clause". *)
 
 val rs_blocks_long : min_rs_normalized:float -> Rs.result option -> bool
 (** Long-side mirror of {!rs_blocks_short}: book §4.4 rule 2,

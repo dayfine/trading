@@ -1129,9 +1129,86 @@ let test_strategy_config_parses_without_resize_fields _ =
            (float_equal 0.5);
        ])
 
+(* -------------------------------------------------------------------- *)
+(* enable_rs_positive_declining — R1/R2 wiring for #2556                 *)
+(* -------------------------------------------------------------------- *)
+
+(** R1: the RS [Positive_declining] state ships off, which is the behaviour the
+    classifier had before it existed — [Rs] folds the cohort back into
+    [Positive_flat], so no consumer sees the new constructor and every golden
+    replays unchanged ([.claude/rules/experiment-flag-discipline.md] R1). No
+    ledger verdict exists for this mechanism, so any other default would be a
+    promotion with no evidence behind it (R3). *)
+let test_default_enable_rs_positive_declining_is_false _ =
+  assert_that (_default_config ()).enable_rs_positive_declining (equal_to false)
+
+(** Drift guard, same shape as the clock's / G2a's / G2b's:
+    [Weinstein_strategy.config]'s hand-written re-declaration must carry the
+    same [[@sexp.default]] the running config ships. Sexp attributes are not
+    part of signature matching, so nothing else in the build catches a one-sided
+    change. *)
+let test_strategy_mli_redeclares_rs_declining_default_consistently _ =
+  let path =
+    match
+      _walk_up_to_file (Stdlib.Sys.getcwd ()) _weinstein_strategy_mli_rel 10
+    with
+    | Some p -> p
+    | None ->
+        assert_failure
+          (sprintf "%s not found from cwd=%s" _weinstein_strategy_mli_rel
+             (Stdlib.Sys.getcwd ()))
+  in
+  assert_that
+    (_declared_sexp_default_text ~path ~field:"enable_rs_positive_declining")
+    (equal_to (Some "false"))
+
+(** R2 (axis reachability): both values of
+    [((flag enable_rs_positive_declining) (values (true false)))] must resolve
+    through the {b real} {!Backtest.Overlay_validator.apply_overrides} with no
+    unknown-key error. A mechanism gated by anything the validator cannot
+    resolve is unsearchable and therefore untestable — the failure mode QC
+    caught on [Volume.config] in #2459. *)
+let test_rs_positive_declining_axis_resolves_via_overlay_validator _ =
+  let armed_to b =
+    (Backtest.Overlay_validator.apply_overrides (_default_config ())
+       [
+         Sexp.of_string (Printf.sprintf "((enable_rs_positive_declining %b))" b);
+       ])
+      .enable_rs_positive_declining
+  in
+  assert_that [ armed_to true; armed_to false ] (equal_to [ true; false ])
+
+(** Back-compat: a strategy config sexp written before this field existed still
+    parses, taking its [[@sexp.default]] — so every archived spec reproduces the
+    behaviour it had when it was written. *)
+let test_strategy_config_parses_without_rs_declining_field _ =
+  let stripped =
+    match Weinstein_strategy.sexp_of_config (_default_config ()) with
+    | Sexp.List fields ->
+        Sexp.List
+          (List.filter fields ~f:(function
+            | Sexp.List [ Sexp.Atom name; _ ] ->
+                not (String.equal name "enable_rs_positive_declining")
+            | _ -> true))
+    | other -> other
+  in
+  assert_that
+    (Weinstein_strategy.config_of_sexp stripped)
+    (field
+       (fun (c : Weinstein_strategy.config) -> c.enable_rs_positive_declining)
+       (equal_to false))
+
 let suite =
   "Runner_hypothesis_overrides"
   >::: [
+         "#2556: enable_rs_positive_declining defaults to false"
+         >:: test_default_enable_rs_positive_declining_is_false;
+         "#2556: weinstein_strategy.mli re-declares the default consistently"
+         >:: test_strategy_mli_redeclares_rs_declining_default_consistently;
+         "#2556: enable_rs_positive_declining resolves as a Variant_matrix axis"
+         >:: test_rs_positive_declining_axis_resolves_via_overlay_validator;
+         "#2556: config parses with enable_rs_positive_declining absent"
+         >:: test_strategy_config_parses_without_rs_declining_field;
          "G2b: entry_fill resize defaults to off with a 0.5 guard"
          >:: test_default_entry_fill_resize_is_off;
          "G2b: weinstein_strategy.mli re-declares the resize defaults \

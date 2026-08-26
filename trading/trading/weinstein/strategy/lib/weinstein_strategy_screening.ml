@@ -66,6 +66,15 @@ let _classify_stage_for_screening ~config ~bar_reader ~prior_stages
     in
     Some (ticker, stock_view, prior_stage, stage_result)
 
+(** The screen pass's [Rs.config]: {!Rs.default_config} plus
+    [Weinstein_strategy_config.enable_rs_positive_declining] (default [false] ⇒
+    byte-identical). Top-level to keep the caller's literal one level deep. *)
+let _rs_config_for ~(config : Weinstein_strategy_config.config) : Rs.config =
+  {
+    Rs.default_config with
+    enable_positive_declining = config.enable_rs_positive_declining;
+  }
+
 (** Build the per-screen-pass [Stock_analysis.config]. Differs from
     {!Stock_analysis.default_config} only by (a) toggling the continuation
     detector based on [Weinstein_strategy_config.enable_continuation_buys] and
@@ -85,7 +94,8 @@ let _classify_stage_for_screening ~config ~bar_reader ~prior_stages
     the gate stays [true] and admission is bit-identical). The waiver's
     counterpart, {!Volume_eject_runner}, reads the {i same} predicate, so volume
     is never dropped: it moves from the screen week to the fill week (book §4.7
-    / §4.2).
+    / §4.2), and (g) threading the RS [Positive_declining] state via
+    {!_rs_config_for} (default off ⇒ [Rs.default_config], bit-identical).
 
     The [min_history_bars] override sets [config.resistance.min_history_bars];
     because {!Stock_analysis} reuses the same [Resistance.config] record for the
@@ -109,6 +119,7 @@ let _stock_analysis_config_for ~(config : Weinstein_strategy_config.config) :
       entry_freshness_basis = config.entry_freshness_basis;
       require_breakout_volume =
         not (Weinstein_strategy_config.volume_confirm_at_fill_armed config);
+      rs = _rs_config_for ~config;
     }
   in
   if config.resistance_min_history_bars = 0 then base

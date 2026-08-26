@@ -324,6 +324,7 @@ let _rs_trend_label (rs : Weinstein_types.rs_trend) =
   | Bullish_crossover -> "Bullish_xover"
   | Positive_rising -> "Pos_rising"
   | Positive_flat -> "Pos_flat"
+  | Positive_declining -> "Pos_declining"
   | Negative_improving -> "Neg_improving"
   | Negative_declining -> "Neg_declining"
   | Bearish_crossover -> "Bearish_xover"
