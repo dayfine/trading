@@ -2549,10 +2549,12 @@ let test_positive_declining_scores_no_rs_points _ =
     (equal_to (default_scoring_weights.w_positive_rs / 2, 0))
 
 (* Short admission: [Positive_declining] does NOT block, though [Positive_flat]
-   at the same level does. §4.4's short-side exemption is for RS "in good shape
-   and improving"; a line above the zero line but trending lower fails the
-   second half, so it keeps none of the protection its level alone suggests.
-   This is the one consumer where the new state sides with the negative group. *)
+   at the same level does. Ch. 7's short-selling criterion 4 draws exactly that
+   line: "While it's OK if the relative strength is above the zero line on the
+   Mansfield chart, it must have clearly topped out and started trending
+   lower." [Positive_declining] satisfies the permission clause; [Positive_flat]
+   has not "clearly topped out", so it stays blocked. This is the one consumer
+   where the new state sides with the negative group. *)
 let test_positive_declining_does_not_block_shorts _ =
   let blocks trend =
     Screener_admission.rs_blocks_short

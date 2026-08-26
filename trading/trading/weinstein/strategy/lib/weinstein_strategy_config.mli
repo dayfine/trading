@@ -1438,7 +1438,12 @@ type config = {
       (** Arms {!Weinstein_types.Positive_declining} — RS above the Mansfield
           zero line but {b falling} — as a distinct classifier state (issue
           #2556). Threaded into [Rs.config.enable_positive_declining] by
-          [Weinstein_strategy_screening._rs_config_for].
+          [Weinstein_strategy_screening._rs_config_for]. That thread is pinned
+          end-to-end by [test_rs_trend_live.positive_declining_needs_the_flag],
+          which sets {i this} field and reads the classifier's output through
+          [Weinstein_strategy.stock_analysis_config_for] — severing the
+          assignment turns it red, so the flag cannot become a silent null that
+          an axis sweep would ledger as a REJECT.
 
           {b The gap it closes.} [Rs._classify_trend]'s positive-zone branch
           returned [Positive_flat] on {i both} sides of its [flat_threshold]
@@ -1459,8 +1464,10 @@ type config = {
             invented; a graded penalty is a future scoring axis, not part of
             this landing.
           - {b Short admission} — does {b not} block
-            ([Screener_admission.rs_blocks_short]). §4.4's exemption needs RS
-            "in good shape {i and improving}"; a falling line fails that.
+            ([Screener_admission.rs_blocks_short]). Ch. 7 criterion 4: "it's OK
+            if the relative strength is above the zero line ... it must have
+            clearly topped out and started trending lower" — the permission
+            clause this state satisfies verbatim.
           - {b Sector} — [Sector] buckets it at [0.0], forward-looking only:
             every call site passes [Sector.default_config], so this flag does
             not reach that module today.

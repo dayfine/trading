@@ -123,26 +123,31 @@ let _as_of = Date.add_days _start_friday ((_min_bars - 1) * 7)
     consumer ({!Screener_admission.rs_blocks_short}) be exercised on exactly the
     value the screener would hand it.
 
-    [?armed] arms [Rs.config.enable_positive_declining] (#2556) the same way
-    [Weinstein_strategy_screening._rs_config_for] does from
-    [Weinstein_strategy_config.enable_rs_positive_declining]; it defaults to the
-    shipped [false] so every other pin here reads the production classifier. *)
+    [?armed] sets the {b strategy-level} flag
+    [Weinstein_strategy_config.enable_rs_positive_declining] (#2556) and lets
+    {!Weinstein_strategy.stock_analysis_config_for} — the production seam, i.e.
+    [Weinstein_strategy_screening._stock_analysis_config_for] composed with
+    [_rs_config_for] — derive the [Stock_analysis.config]. Nothing here
+    hand-builds an [Rs.config], so the {i thread} from the strategy config down
+    to the classifier is under test, not merely reproduced: mutating
+    [_rs_config_for] to drop the flag turns
+    {!test_positive_declining_needs_the_flag} red. It defaults to the shipped
+    [false] so every other pin here reads the production classifier. *)
 let _rs_of ?depth ?(armed = false) reader symbol =
   let config =
-    Weinstein_strategy.default_config
-      ~universe:(List.map _fixtures ~f:fst)
-      ~index_symbol:_index_symbol
+    {
+      (Weinstein_strategy.default_config
+         ~universe:(List.map _fixtures ~f:fst)
+         ~index_symbol:_index_symbol)
+      with
+      Weinstein_strategy.enable_rs_positive_declining = armed;
+    }
   in
   let n = Option.value depth ~default:config.lookback_bars in
   let view_for s =
     Bar_reader.weekly_view_for reader ~symbol:s ~n ~as_of:_as_of
   in
-  let analysis_config =
-    {
-      Stock_analysis.default_config with
-      rs = { Rs.default_config with enable_positive_declining = armed };
-    }
-  in
+  let analysis_config = Weinstein_strategy.stock_analysis_config_for ~config in
   let callbacks =
     Panel_callbacks.stock_analysis_callbacks_of_weekly_views
       ~config:analysis_config ~stock:(view_for symbol)
@@ -238,6 +243,18 @@ let test_trend_distribution_is_not_degenerate _ =
     armed. Asserted as a PAIR against the unarmed reading of the identical bars,
     so the difference is attributable to the flag alone and the R1 no-op claim
     is pinned by the same assertion that pins the mechanism.
+
+    The flag set here is the {b strategy-level}
+    [Weinstein_strategy_config.enable_rs_positive_declining], and the
+    [Stock_analysis.config] comes from
+    {!Weinstein_strategy.stock_analysis_config_for} — so this is the pin on the
+    {i thread} ([_stock_analysis_config_for] -> [_rs_config_for] ->
+    [Rs.config.enable_positive_declining]) that both [.mli]s claim. Severing it
+    (e.g. [enable_positive_declining = config.enable_rs_positive_declining &&
+     false]) fails here, where before it was a silent null: the flag stayed
+    settable and sexp-round-trippable while the mechanism never ran, and an
+    armed axis sweep would have ledgered a REJECT for a mechanism that was off.
+    Same class as the [Volume.config] thread (#2459) and the [rt] anchor knob.
 
     The unit suite pins this branch on 8 hand-checkable bars; this pins that the
     strategy's own depth and wiring actually reach it — the distinction issue

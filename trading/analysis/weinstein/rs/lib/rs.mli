@@ -46,9 +46,10 @@ type config = {
             of any penalty is not book-dictated, so none is invented here);
           - {b sector confidence} — [Sector] scores the bucket [0.0];
           - {b short admission} — [Screener_admission.rs_blocks_short] does
-            {b not} block, since §4.4's short-side exemption requires RS "in
-            good shape {i and improving}" and a falling line fails the second
-            half.
+            {b not} block. Ch. 7's short-selling criterion 4 permits it
+            outright: "While it's OK if the relative strength is above the zero
+            line on the Mansfield chart, it must have clearly topped out and
+            started trending lower" — a literal description of this state.
 
           Default-off per [.claude/rules/experiment-flag-discipline.md] R1;
           searchable as a {!Weinstein_strategy_config} axis (R2). No default

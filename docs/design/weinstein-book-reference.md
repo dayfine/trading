@@ -215,7 +215,21 @@ Formula: `RS = price_of_stock / price_of_market_average` (computed weekly, same 
 
 **Territory and direction are two separate reads** (resolved against the book 2026-08-25, issue #2380). Being above the zero line is not by itself a buy qualification — a *declining* RS line disqualifies a stock even in positive territory: "when you see inferior action in the RS line compared to the price performance, don't ever buy that stock" (Ch. 4). Chart 4-16 is the worked case: price trending sideways in a range while "the RS line is telling us to look out below. It is trending lower." Conversely the zero line is not an absolute veto in either direction — "don't think, however, that you can never buy a stock below the zero RS line, or that you can never short a stock above the zero line. If the relative strength is in good shape and improving and all other criteria are positive, then go for it" (Ch. 4) — the hard rule is only: never buy when RS "is in negative territory *and it remains in poor shape*."
 
-*Implementation gap this exposes:* `Weinstein_types.rs_trend` has no positive-territory-declining state, so `Rs._classify_trend` collapses that case into `Positive_flat`, which the screener admits. Adding the state changes admission + scoring for a real cohort and so needs an experiment-gated change rather than a drive-by.
+*Implementation gap this exposes:* `Weinstein_types.rs_trend` has no positive-territory-declining state, so `Rs._classify_trend` collapses that case into `Positive_flat`, which the screener admits. Adding the state changes admission + scoring for a real cohort and so needs an experiment-gated change rather than a drive-by. (Addressed by #2556: `Positive_declining`, behind default-off `enable_rs_positive_declining`.)
+
+**Short side — the direction read is the permission clause (resolved against the book 2026-08-26, PR #2563 review).** The §4.4 long-side text above only reaches the short side by inference ("in good shape *and improving*" — a falling line fails the second conjunct). Ch. 7's short-selling criterion 4, "Relative Strength", states the rule directly and is the stronger authority:
+
+> "Never sell a stock short that has very positive relative strength (RS), especially if the RS line is trending higher. If such a stock breaks down and you own it, of course you'll sell it; but you do not want to sell that stock short. **While it's OK if the relative strength is above the zero line on the Mansfield chart, it must have clearly topped out and started trending lower.** It is even more negative if a breakdown on the price chart is accompanied by a drop into negative territory by the RS line." (Ch. 7)
+
+So being above the zero line is *not* by itself a short veto — it is a veto only until the line has "clearly topped out and started trending lower". That yields a three-way split over the positive-territory states, all of it book-stated rather than inferred:
+
+| RS state | short? | why |
+| --- | --- | --- |
+| `Positive_rising` | **blocked** | "especially if the RS line is trending higher" |
+| `Positive_flat` | **blocked** | has not "clearly topped out and started trending lower" — fails the permission clause |
+| `Positive_declining` | **allowed** | above the zero line, topped out, trending lower — the permission clause verbatim |
+
+Chart 7-20 (U.S. Steel 1974) is the counter-case the criterion is built on: strong, still-healthy RS at the support violation, and the short did not work. Chart 7-21 (Allen, late 1972) is the positive case — RS "weakened badly and pierced the zero line" (the "even more negative" variant, i.e. a *further* qualification beyond the minimum, not the minimum itself).
 
 ### 4.5 Big Winner Detection — Triple Confirmation (Ch. 5)
 
@@ -434,7 +448,7 @@ An active position-management rule that fires *before* the trailing stop is hit 
 2. **Group** is negative (below 30-week MA, RS trending lower, several individual charts weak)
 3. **Individual stock** had substantial prior advance, now in Stage 3 with flat/declining MA
 4. Stock breaks below support AND below 30-week MA → Stage 4 entry
-5. **RS is negative and deteriorating** — NEVER short a stock with strong RS, even if it breaks down
+5. **RS has at minimum "clearly topped out and started trending lower"** — NEVER short a stock whose RS is strong *and rising*, even if it breaks down. Negative-and-deteriorating RS is the *ideal* ("even more negative"), not the threshold: above the zero line is acceptable once the line has topped and turned down. Full quote + the three-way state mapping: §4.4 "Short side — the direction read is the permission clause"
 6. Minimal nearby support below breakdown point (steep prior advance with small congestion = ideal)
 
 ### 6.2 Key Differences from Buying
