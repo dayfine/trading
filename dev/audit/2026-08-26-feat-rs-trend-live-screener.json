@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-26",
+  "feature": "screener",
+  "branch": "feat/rs-trend-live",
+  "sha": "a8831839",
+  "recorded_at_ns": 1787736770237601154,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "LINTER_CANDIDATE: UTF-8 double-encoding in golden .sexp (description ...) fields is invisible to dune runtest (exit 0) and to CI. Found by hand; repaired at 88b60dc9. A byte-level mojibake check over trading/test_data/**.sexp would make it deterministic.",
+  "quality_score": 3,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": "Concurrent local pipeline moved the tip 3x under review (5b6472af->d03c1858->a8831839->88b60dc9). Structural APPROVED at d03c1858; behavioral NEEDS_REWORK self-repinned to a8831839. Both verdicts stale at 88b60dc9; PR left open, not merged, labels untouched."
+}
