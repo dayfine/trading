@@ -83,11 +83,25 @@ let _rising_price i =
     lower at the newer one. *)
 let _falling_price i = 100.0 -. (0.5 *. Float.of_int i)
 
+(** Flat, then a strong advance to a peak at [i = 51], then a decline that never
+    gets back below the 52-week average — normalized RS is above 1.0 at BOTH
+    comparison points (1.75 four entries back, 1.264 now) and lower at the newer
+    one. That is the positive-zone-but-falling shape issue #2556 arms
+    {!Weinstein_types.Positive_declining} for; every other fixture here sits in
+    a different quadrant, so none of them can reach that branch. *)
+let _pos_declining_price i =
+  if i < 40 then 100.0
+  else if i <= 51 then 100.0 +. (8.0 *. Float.of_int (i - 39))
+  else 196.0 -. (12.0 *. Float.of_int (i - 51))
+
 let _flat_price _ = 100.0
 
 let _fixtures =
   [
-    ("XOVR", _crossing_price); ("RISE", _rising_price); ("FALL", _falling_price);
+    ("XOVR", _crossing_price);
+    ("RISE", _rising_price);
+    ("FALL", _falling_price);
+    ("PDEC", _pos_declining_price);
   ]
 
 (** A reader carrying every fixture symbol plus the flat benchmark, each
@@ -107,8 +121,13 @@ let _as_of = Date.add_days _start_friday ((_min_bars - 1) * 7)
 
     Returning the result rather than just its [trend] lets the admission
     consumer ({!Screener_admission.rs_blocks_short}) be exercised on exactly the
-    value the screener would hand it. *)
-let _rs_of ?depth reader symbol =
+    value the screener would hand it.
+
+    [?armed] arms [Rs.config.enable_positive_declining] (#2556) the same way
+    [Weinstein_strategy_screening._rs_config_for] does from
+    [Weinstein_strategy_config.enable_rs_positive_declining]; it defaults to the
+    shipped [false] so every other pin here reads the production classifier. *)
+let _rs_of ?depth ?(armed = false) reader symbol =
   let config =
     Weinstein_strategy.default_config
       ~universe:(List.map _fixtures ~f:fst)
@@ -118,7 +137,12 @@ let _rs_of ?depth reader symbol =
   let view_for s =
     Bar_reader.weekly_view_for reader ~symbol:s ~n ~as_of:_as_of
   in
-  let analysis_config = Stock_analysis.default_config in
+  let analysis_config =
+    {
+      Stock_analysis.default_config with
+      rs = { Rs.default_config with enable_positive_declining = armed };
+    }
+  in
   let callbacks =
     Panel_callbacks.stock_analysis_callbacks_of_weekly_views
       ~config:analysis_config ~stock:(view_for symbol)
@@ -130,8 +154,8 @@ let _rs_of ?depth reader symbol =
   in
   analysis.Stock_analysis.rs
 
-let _trend_of ?depth reader symbol =
-  Option.map (_rs_of ?depth reader symbol) ~f:(fun r -> r.Rs.trend)
+let _trend_of ?depth ?armed reader symbol =
+  Option.map (_rs_of ?depth ?armed reader symbol) ~f:(fun r -> r.Rs.trend)
 
 (* ------------------------------------------------------------------ *)
 (* 1. The arithmetic tripwire                                           *)
@@ -199,7 +223,47 @@ let test_trend_distribution_is_not_degenerate _ =
                 is_some_and (equal_to Weinstein_types.Bullish_crossover);
                 is_some_and (equal_to Weinstein_types.Positive_rising);
                 is_some_and (equal_to Weinstein_types.Negative_declining);
+                (* "PDEC" is positive-zone-but-falling. UNARMED — which is what
+                   the default config ships — it folds into [Positive_flat],
+                   exactly as it did before #2556. Its armed reading is pinned
+                   separately below; keeping it in this list makes the R1
+                   no-op claim visible on the production path. *)
+                is_some_and (equal_to Weinstein_types.Positive_flat);
               ]);
+       ])
+
+(** #2556, through the same real panel path: at the shipped depth, "PDEC"'s
+    normalized RS runs 1.75 -> 1.264 — both above the Mansfield zero line, the
+    newer one lower — and the classifier reports [Positive_declining] once
+    armed. Asserted as a PAIR against the unarmed reading of the identical bars,
+    so the difference is attributable to the flag alone and the R1 no-op claim
+    is pinned by the same assertion that pins the mechanism.
+
+    The unit suite pins this branch on 8 hand-checkable bars; this pins that the
+    strategy's own depth and wiring actually reach it — the distinction issue
+    #2380 was created by, where a classifier correct in isolation was degenerate
+    in production. *)
+let test_positive_declining_needs_the_flag _ =
+  let reader = _reader () in
+  assert_that
+    (_trend_of reader "PDEC", _trend_of ~armed:true reader "PDEC")
+    (equal_to
+       ( Some Weinstein_types.Positive_flat,
+         Some Weinstein_types.Positive_declining ))
+
+(** Arming must not disturb the other three fixtures: only the positive-zone
+    sub-threshold arm changes, so every classification pinned above must survive
+    the flag being on. Without this, the pair above could be satisfied by a flag
+    that broke the classifier generally. *)
+let test_arming_leaves_other_fixtures_unchanged _ =
+  let reader = _reader () in
+  assert_that
+    (List.map [ "XOVR"; "RISE"; "FALL" ] ~f:(_trend_of ~armed:true reader))
+    (elements_are
+       [
+         is_some_and (equal_to Weinstein_types.Bullish_crossover);
+         is_some_and (equal_to Weinstein_types.Positive_rising);
+         is_some_and (equal_to Weinstein_types.Negative_declining);
        ])
 
 (* ------------------------------------------------------------------ *)
@@ -290,6 +354,10 @@ let suite =
          >:: test_accelerating_advance_classifies_positive_rising;
          "trend_distribution_is_not_degenerate"
          >:: test_trend_distribution_is_not_degenerate;
+         "positive_declining_needs_the_flag"
+         >:: test_positive_declining_needs_the_flag;
+         "arming_leaves_other_fixtures_unchanged"
+         >:: test_arming_leaves_other_fixtures_unchanged;
          "old_depth_collapses_to_positive_flat"
          >:: test_old_depth_collapses_to_positive_flat;
          "below_ma_period_yields_no_rs" >:: test_below_ma_period_yields_no_rs;

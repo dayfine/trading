@@ -1434,6 +1434,48 @@ type config = {
           trader/investor variant of the unconfirmed branch
           ([eject | hold_with_stop_at_breakout]); v4 implements the eject only.
           Plan: [dev/plans/entry-ticket-async-v2-2026-08-10.md] §3-F5. *)
+  enable_rs_positive_declining : bool; [@sexp.default false]
+      (** Arms {!Weinstein_types.Positive_declining} — RS above the Mansfield
+          zero line but {b falling} — as a distinct classifier state (issue
+          #2556). Threaded into [Rs.config.enable_positive_declining] by
+          [Weinstein_strategy_screening._rs_config_for].
+
+          {b The gap it closes.} [Rs._classify_trend]'s positive-zone branch
+          returned [Positive_flat] on {i both} sides of its [flat_threshold]
+          test, so a stock whose RS line was rolling over while still above the
+          line was indistinguishable from one holding steady — and
+          [flat_threshold] was inert. Book §4.4 (Ch. 4, "when you see inferior
+          action in the RS line compared to the price performance, don't ever
+          buy that stock"; Chart 4-16) treats that cohort as a stand-aside, not
+          a hold.
+
+          {b Armed behaviour}, by consumer:
+          - {b Long admission} — rejected, reported as
+            [Stock_analysis.Rs_declining], the same bucket [Negative_declining]
+            falls into. This is the mechanism's real effect: it narrows the
+            admitted long population.
+          - {b Scoring} — zero points ([Screener_scoring._rs_long_signal]). The
+            {i magnitude} of any penalty is not book-dictated, so none is
+            invented; a graded penalty is a future scoring axis, not part of
+            this landing.
+          - {b Short admission} — does {b not} block
+            ([Screener_admission.rs_blocks_short]). §4.4's exemption needs RS
+            "in good shape {i and improving}"; a falling line fails that.
+          - {b Sector} — [Sector] buckets it at [0.0], forward-looking only:
+            every call site passes [Sector.default_config], so this flag does
+            not reach that module today.
+
+          {b Scope note (#2380).} The RS-value ranking null recorded there says
+          [rs_value] carries no {i ranking} signal. That is not evidence about
+          an {i admission filter} keyed on RS {i direction} — different
+          statistic, different decision. Neither result implies the other.
+
+          {b Default [false] = bit-identical} (R1): [Rs] folds the cohort back
+          into [Positive_flat], no consumer sees the new constructor, and every
+          golden replays unchanged. R2: axis-expressible as
+          [((flag enable_rs_positive_declining) (values (true false)))]. R3: no
+          default flip without a ledger ACCEPT plus a confirmation grid — this
+          PR claims no performance result whatsoever. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

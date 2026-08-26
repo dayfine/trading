@@ -105,7 +105,14 @@ val rs_blocks_short : Rs.result option -> bool
     strength, even if it breaks down. Returns [true] for candidates whose RS
     trend is positive ([Positive_rising], [Positive_flat], [Bullish_crossover]).
     [Negative_improving] stays eligible; absent RS data is treated as not-strong
-    (doesn't block shorts). *)
+    (doesn't block shorts).
+
+    [Positive_declining] (armed via {!Rs.config.enable_positive_declining}, off
+    by default) does {b not} block. §4.4's short-side exemption is for RS "in
+    good shape {i and improving}" — a line above the zero line but trending
+    lower fails the second half, so it carries none of the protection the level
+    alone would suggest. This is the one consumer where the new state sides with
+    the {i negative} group rather than with [Positive_flat]. *)
 
 val rs_blocks_long : min_rs_normalized:float -> Rs.result option -> bool
 (** Long-side mirror of {!rs_blocks_short}: book §4.4 rule 2,

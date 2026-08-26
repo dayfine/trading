@@ -974,6 +974,15 @@ type config = {
           [false] = today's screen-time volume requirement, bit-identical
           baselines (R1). See
           [Weinstein_strategy_config.volume_confirm_at_fill]. *)
+  enable_rs_positive_declining : bool; [@sexp.default false]
+      (** Arms {!Weinstein_types.Positive_declining} — RS above the Mansfield
+          zero line but falling — as a distinct classifier state (issue #2556),
+          threaded into [Rs.config.enable_positive_declining]. Armed, the cohort
+          is rejected from long admission as [Stock_analysis.Rs_declining] (book
+          §4.4, "don't ever buy that stock") and scores zero; it does {b not}
+          block shorts. Default [false] folds it back into [Positive_flat], so
+          baselines are bit-identical (R1). See
+          [Weinstein_strategy_config.enable_rs_positive_declining]. *)
 }
 [@@deriving sexp]
 (** Complete Weinstein strategy configuration. All parameters configurable for

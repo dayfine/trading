@@ -21,13 +21,45 @@ type config = {
   flat_threshold : float;
       (** Within the positive zone, RS is "flat" (rather than declining) if the
           current value is at least [flat_threshold × prior_value]. Default:
-          0.98 (i.e., a drop of less than 2% is still flat). *)
+          0.98 (i.e., a drop of less than 2% is still flat).
+
+          Observable {b only} when [enable_positive_declining] is [true]: with
+          the flag off both sides of this comparison classify [Positive_flat],
+          so the threshold has no effect on any output. *)
+  enable_positive_declining : bool;
+      (** Arms the {!Weinstein_types.Positive_declining} state (issue #2556).
+
+          [false] (default) is the behaviour the classifier had before the state
+          existed: a positive-zone value that has fallen by more than
+          [1 - flat_threshold] is reported as [Positive_flat], indistinguishable
+          from a genuinely flat one. [true] reports it as [Positive_declining] —
+          RS above the Mansfield zero line but trending lower, which book §4.4
+          (Ch. 4, "inferior action in the RS line compared to the price
+          performance ... don't ever buy that stock") treats as a reason to
+          stand aside rather than a hold.
+
+          Consumers reached only when armed:
+          - {b long admission} — [Stock_analysis.breakout_candidate_rejection]
+            rejects the candidate with [Rs_declining], same as
+            [Negative_declining];
+          - {b scoring} — [Screener_scoring] awards zero points (the magnitude
+            of any penalty is not book-dictated, so none is invented here);
+          - {b sector confidence} — [Sector] scores the bucket [0.0];
+          - {b short admission} — [Screener_admission.rs_blocks_short] does
+            {b not} block, since §4.4's short-side exemption requires RS "in
+            good shape {i and improving}" and a falling line fails the second
+            half.
+
+          Default-off per [.claude/rules/experiment-flag-discipline.md] R1;
+          searchable as a {!Weinstein_strategy_config} axis (R2). No default
+          flip without a ledger ACCEPT plus a confirmation grid (R3). *)
 }
 (** Configuration for RS trend analysis. *)
 
 val default_config : config
 (** Sensible defaults:
-    [rs_ma_period = 52; trend_lookback = 4; flat_threshold = 0.98]. *)
+    [rs_ma_period = 52; trend_lookback = 4; flat_threshold = 0.98;
+     enable_positive_declining = false]. *)
 
 val min_aligned_bars_for_trend : config -> int
 (** [min_aligned_bars_for_trend config] is the smallest number of date-aligned

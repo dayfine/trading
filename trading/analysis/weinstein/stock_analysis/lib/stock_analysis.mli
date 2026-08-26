@@ -348,8 +348,11 @@ type breakout_rejection =
           Unreachable when [t.require_breakout_volume] is [false] (F5), which
           relocates the check to the fill week. *)
   | Rs_declining
-      (** Relative strength classified [Negative_declining]. Absent RS data does
-          not reject. *)
+      (** Relative strength classified [Negative_declining], or
+          [Positive_declining] when {!Rs.config.enable_positive_declining} is
+          armed (default off, so the second cohort is empty on every unarmed
+          run). Both are book §4.4's "inferior action in the RS line" — the zone
+          differs, the verdict does not. Absent RS data does not reject. *)
 [@@deriving sexp, eq, show]
 
 val breakout_candidate_rejection :

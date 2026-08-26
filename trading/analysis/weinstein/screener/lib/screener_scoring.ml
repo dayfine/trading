@@ -122,7 +122,7 @@ let _volume_short_signal ~w ~(a : Stock_analysis.t) =
       [ (w.w_adequate_volume, "Adequate breakdown volume") ]
   | _ -> []
 
-(** Bullish RS signal for long setups. *)
+(** Bullish RS signal for long setups; [Positive_declining] scores zero. *)
 let _rs_long_signal ~w ~(a : Stock_analysis.t) =
   match a.rs with
   | Some { trend = Bullish_crossover; _ } ->
@@ -131,7 +131,7 @@ let _rs_long_signal ~w ~(a : Stock_analysis.t) =
       [ (w.w_positive_rs, "RS positive & rising") ]
   | Some { trend = Positive_flat; _ } ->
       [ (w.w_positive_rs / 2, "RS positive") ]
-  | _ -> []
+  | Some { trend = Positive_declining; _ } | Some _ | None -> []
 
 (** Bearish RS signal for short setups. *)
 let _rs_short_signal ~w ~(a : Stock_analysis.t) =
