@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-26",
+  "feature": "harness",
+  "branch": "harness/2553-postsubmit-rss-parse",
+  "sha": "4f32b9ab59580363fdbf87f46683cde88b37d9f8",
+  "recorded_at_ns": 1787736770202907065,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "LINTER_CANDIDATE: five sibling scripts carry the byte-identical RSS digit-fusion bug, incl. perf_tier1_smoke.sh which backs the required perf-tier1-smoke gate (#2559). No check covers them.",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "Merged 3a51cb6b. Zero rework iterations. Both reviewers reproduced the RED-then-GREEN mutation independently rather than accepting the author's report."
+}
