@@ -15,8 +15,8 @@
 
     {v
     (deviates_from_live
-     ((entry_extension_max_pct "corpus value 2.0; live 15.0 — open #2404")
-      (enable_sim_entry_stoplimit "record-convention arming")))
+     ((enable_short_side "long-only cell; the code default (and live) is on")
+      (enable_stage3_force_exit "record-convention arming; live leaves it off")))
     v}
 
     [deviates_from_live] is data-only: {!Scenario.t} carries

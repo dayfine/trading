@@ -817,7 +817,8 @@ type config = {
           point) is the armed value. R2: resolves through
           [Backtest.Overlay_validator.apply_overrides], armed via
           [dev/weekly-picks/live-config-overrides.sexp]. *)
-  entry_extension_max_pct : float; [@sexp.default 0.0]
+  entry_extension_max_pct : float;
+      [@sexp.default default_entry_extension_max_pct]
       (** Entry reconciliation (issue #2103) — the do-not-chase cap: the
           furthest past the breakout entry, in percentage points of the entry
           level, that an entry order may fill. It is the limit leg of the
@@ -845,21 +846,33 @@ type config = {
           why the section's "Late Stage 2 warning" is deliberately NOT the
           citation.
 
-          {b Default [0.0] = reconciliation disabled} (no-op, R1): every
-          candidate carries [Entry_reconciliation.Not_reconciled], sizing uses
-          [entry] exactly as before, and the reports render unchanged. The live
-          picks config and the committed backtest specs both arm [2.0]
-          ({b value unified by user decision 2026-08-25}, issue #2404: live's
-          old [15.0] was a one-day eyeball calibration; both the 1y and 3y
-          horizon surfaces rank [15.0] below [2.0] on return and Calmar — a
-          one-universe/one-base ranking, accepted over the weaker provenance).
-          Consumed by [Weekly_snapshot_generator.generate] (report/live-ticket
-          path), and — only when [enable_sim_entry_stoplimit] is also on — by
-          the backtest runner as the simulator's entry-fill cap; with that flag
-          at its default [false], arming this field alone cannot move a backtest
-          number. R2: resolves through
+          {b Default [2.0] = the live value} ({!default_entry_extension_max_pct};
+          {b flipped from the [0.0] no-op on 2026-08-26} together with
+          [enable_sim_entry_stoplimit] — user-directed fidelity decision recorded
+          on issue #2405). [2.0] is the #2404-unified live value (user decision
+          2026-08-25: live's old [15.0] was a one-day eyeball calibration, and
+          [2.0] is the corpus value the staged record-convention specs already
+          used). The default and
+          [dev/weekly-picks/live-config-overrides.sexp] now agree, so a backtest
+          run from the default config prices its entry tickets the way the weekly
+          picks do.
+
+          {b The flip is a fidelity change, not a return claim.} The
+          [2026-08-04] entry-ledger entry REJECTED this pair on returns; that
+          surface compared sim-vs-sim, which is the wrong estimand for "does the
+          simulator model the orders we actually place". See
+          [enable_sim_entry_stoplimit] for the full R3 basis. No golden moves
+          {i because} the numbers improved — they move because the basis changed.
+
+          Setting [0.0] restores the pre-flip no-op: every candidate carries
+          [Entry_reconciliation.Not_reconciled], sizing uses [entry] exactly as
+          before, and (with the cap absent) the backtest runner falls back to
+          Market entry fills. Consumed by
+          [Weekly_snapshot_generator.generate] (report/live-ticket path), and —
+          only when [enable_sim_entry_stoplimit] is also on — by the backtest
+          runner as the simulator's entry-fill cap. R2: resolves through
           [Backtest.Overlay_validator.apply_overrides]. *)
-  enable_sim_entry_stoplimit : bool; [@sexp.default false]
+  enable_sim_entry_stoplimit : bool; [@sexp.default true]
       (** Simulator entry fill model (#2158 Phase 2) — when [true] AND
           [entry_extension_max_pct > 0], the backtest runner threads the cap
           into the simulator so entries fill as
@@ -871,16 +884,36 @@ type config = {
           [Weinstein_order_gen] StopLimit(E, cap) tickets and the report's
           [Entry_reconciliation] semantics.
 
-          {b Default [false] = Market fills, bit-identical to every existing
-             baseline/golden} (R1).
-          {b ⚠ This is a fill-model basis change when armed}: route it through
-          its own WF-CV surface and deliberate golden re-pins before any default
-          flip — NEVER bundle it with another mechanism (user directive
-          2026-08-04, issue #2158). R2: axis-expressible as
-          [((flag enable_sim_entry_stoplimit) (values (true false)))]. Weinstein
-          authority: the book locates the buy at the breakout or a pullback
-          close to it, so an unfilled order (missing > chasing) is the faithful
-          failure mode. *)
+          {b Default [true] since 2026-08-26} — flipped as a PAIR with
+          [entry_extension_max_pct] ([0.0] -> [2.0]), because the runner arms the
+          StopLimit path iff
+          [enable_sim_entry_stoplimit && entry_extension_max_pct > 0.0]
+          ([Backtest.Panel_runner] [_entry_cap_for_sim];
+          [Backtest.Execution_faithfulness.entry_order_kind_of_config]), so a
+          lone flag flip would be a half-mechanism that changes nothing. Before
+          the flip the default was [false] (Market fills).
+
+          {b R3 basis — a user-directed FIDELITY decision, NOT a return claim}
+          (recorded on issue #2405, 2026-08-26; same class as the #2530
+          stops-basis flip). The [2026-08-04] entry in
+          [dev/experiments/_ledger/] REJECTED this flip {i on returns}, and that
+          verdict is not disputed here: it is overridden, openly, because the
+          surface that produced it compared {b sim-vs-sim} — the wrong estimand
+          for the question actually being decided, which is whether the simulator
+          models the orders live actually places. Live emits
+          [Weinstein_order_gen] [StopLimit (E, cap)] tickets; before this flip
+          the default backtest filled the same decisions as Market orders, so
+          every default-config number described an execution model nobody runs.
+          {b No return improvement is claimed anywhere} — goldens move because
+          the basis moved.
+
+          {b ⚠ This is a fill-model basis change}: every golden not already
+          arming the pair is re-pinned by the flip. Weinstein authority: the book
+          locates the buy at the breakout or a pullback close to it, so an
+          unfilled order (missing > chasing) is the faithful failure mode. R2:
+          still axis-expressible as
+          [((flag enable_sim_entry_stoplimit) (values (true false)))]; setting
+          [false] (or the cap to [0.0]) restores Market fills. *)
   sim_entry_trigger_at_suggested : bool; [@sexp.default false]
       (** Book-faithful E-anchored entry trigger. When [true] AND
           [enable_sim_entry_stoplimit] is on, the strategy's
@@ -894,9 +927,11 @@ type config = {
           [compute_position_size ~entry_price] at the same [effective_entry].
 
           {b Default [false] = current-close trigger, bit-identical to every
-             existing baseline/golden} (R1). Because it also gates on
-          [enable_sim_entry_stoplimit], arming this field alone cannot move a
-          backtest number. {b ⚠ A fill-model basis change when armed} — its own
+             existing baseline/golden} (R1). {b ⚠ Since the 2026-08-26 fill-model
+          flip, [enable_sim_entry_stoplimit] is default-[true]}, so arming this
+          field alone DOES move a backtest number — the previous
+          "gated on a default-off flag, therefore inert" note no longer holds.
+          {b ⚠ A fill-model basis change when armed} — its own
           WF-CV surface, never bundled. R2: axis-expressible as
           [((flag sim_entry_trigger_at_suggested) (values (true false)))].
           Decision record: [dev/plans/gtc-breakout-orders-2026-08-05.md] Step 0
@@ -1028,8 +1063,10 @@ type config = {
           {b Default [false] = off, bit-identical to every existing
              baseline/golden} (R1): the support-floor stop is installed
           verbatim. Because it additionally gates on the E-family being armed
-          (both StopLimit flags default [false]), arming this field alone cannot
-          move a backtest number. R2: axis-expressible as
+          ([sim_entry_trigger_at_suggested] still defaults [false], even though
+          [enable_sim_entry_stoplimit] is default-[true] since the 2026-08-26
+          fill-model flip), arming this field alone cannot move a backtest
+          number. R2: axis-expressible as
           [((flag stop_anchor_at_entry_base) (values (true false)))];
           default-off until a ledger ACCEPT. Note:
           [dev/notes/honest-ladder-2026-08-05.md]. *)
@@ -1154,8 +1191,11 @@ type config = {
 
           {b ⚠ Promoted to 26 on 2026-08-18, REVERTED on 2026-08-19} — the
           reversal is the more useful fact. On the one golden that arms
-          [enable_sim_entry_stoplimit] (the only place a clock can bite, since
-          Market entries fill immediately and never rest), clock=26 measured
+          [enable_sim_entry_stoplimit] {i as of that date} (the only place a
+          clock can bite, since Market entries fill immediately and never rest —
+          {b since the 2026-08-26 fill-model flip made that flag default-[true],
+          every default-config run rests tickets}, so the clock now bites
+          everywhere; it stays at the unbounded [0] default), clock=26 measured
           {b −40.91pp} against clock=0 across three salts with
           {b complete separation}. The mechanism is a {b tail-touching lever}:
           the clock cuts the resting-ticket population blind, and that
@@ -1443,6 +1483,12 @@ val default_dawn_max_flip_age_weeks : int
 (** Default value for {!config.dawn_max_ma_flip_age_weeks} (78 weeks ~= 1.5y),
     the P1b-memo lagging dawn-label window. Exposed as the named no-op so the
     sexp default and the {!config} literal share one source of truth. *)
+
+val default_entry_extension_max_pct : float
+(** Default value for {!config.entry_extension_max_pct} ([2.0] percentage
+    points), the #2404-unified live do-not-chase cap. Exposed as the named
+    default so the sexp default and the {!config} literal share one source of
+    truth. *)
 
 val default_config : universe:string list -> index_symbol:string -> config
 (** Build a default config with Weinstein book values. *)

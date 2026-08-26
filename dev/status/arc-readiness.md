@@ -1,6 +1,6 @@
 # Status: arc-readiness
 
-## Last updated: 2026-08-23
+## Last updated: 2026-08-26
 
 ## Status
 IN_PROGRESS
@@ -154,6 +154,31 @@ The hole is the **funding leg**, whose plan
       handling is tail-preserving in intent, tail-reshuffling in effect —
       future funding levers must protect *monster* entries specifically, not
       ticket counts.
+
+- [x] **A1-3 — Fill-model default flip: sim entries now match live.**
+      Branch `feat/fill-model-default`. `enable_sim_entry_stoplimit`
+      `false -> true` and `entry_extension_max_pct` `0.0 -> 2.0`, flipped as a
+      **pair** because the runner arms the StopLimit path iff
+      `enable_sim_entry_stoplimit && entry_extension_max_pct > 0.0`
+      (`trading/trading/backtest/lib/panel_runner.ml` `_entry_cap_for_sim`;
+      mirrored in `execution_faithfulness.ml`
+      `entry_order_kind_of_config`) — a lone flag flip would be a
+      half-mechanism. `2.0` is the #2404-unified live value (user decision
+      2026-08-25, PR #2554), so the code default and
+      `dev/weekly-picks/live-config-overrides.sexp` now agree.
+      **R3 basis: user-directed FIDELITY decision recorded on #2405
+      (2026-08-26)**, same class as the #2530 stops-basis flip. The
+      `2026-08-04` entry ledger REJECTED this flip *on returns*; that verdict
+      is overridden openly, not quietly — its surface compared sim-vs-sim,
+      which is the wrong estimand for "does the simulator model the orders we
+      actually place". **No return-improvement claim is made anywhere.**
+      Golden bands move because the basis moved. Verify:
+      `dune runtest trading/backtest/test/` (`test_execution_faithfulness.ml`
+      "kind: default config arms the StopLimit path" runs the DEFAULT config
+      through the arming predicate and asserts a `Stop_limit_band 0.02` comes
+      out — per the #2567 silent-null lesson, reading the two fields is not
+      enough) and `dune runtest trading/backtest/golden_drift/` (stale
+      `deviates_from_live` declarations removed from 12 goldens).
 
 **Why G3 matters beyond bookkeeping:** an unfundable triggered ticket is
 silently **destroyed** — not retried, not resized. `Entry_walk`'s per-tick
@@ -318,10 +343,18 @@ Remaining open work:
    merged (#2453, 2026-08-21); the implementation has not. Phase A (date axis)
    needs no schema change; Phase B needs `schema_version` 1 → 2. This is the
    only unchecked sub-task left on the whole track.
-2. USER DECISIONS carried: global `initial_stop_buffer` flip; `Volume.config`
-   overlay plumbing for the `strong_threshold` era axis. (**The #2433 framing
-   decision is no longer carried** — see `## Follow-ups`.)
-3. A2-1 follow-up (not blocking): the funding-grid results dir commits no
+2. USER DECISIONS carried: `Volume.config` overlay plumbing for the
+   `strong_threshold` era axis. (**The #2433 framing decision is no longer
+   carried** — see `## Follow-ups`. The global `initial_stop_buffer` flip
+   shipped in #2530; the fill-model default flip shipped as A1-3 above.)
+3. **Post-A1-3 golden re-pin (dispatcher-owned, sequenced AFTER the PR is up).**
+   The fill-model flip moves every golden not already arming the pair. Only the
+   pins PR CI itself runs are re-pinned in the A1-3 PR (tier-1 smoke +
+   `dune runtest`-pinned cells); the postsubmit sp500 / historical /
+   custom-universe goldens are re-pinned from the dispatcher's paired sweep,
+   after which `paired-run-done` is applied. `goldens-affected` SHOULD flag the
+   A1-3 PR — that is the rule working, not a defect.
+4. A2-1 follow-up (not blocking): the funding-grid results dir commits no
    `params.sexp` beside its `actual.sexp` files, so `effect_null_report.exe`
    can only WARN there rather than verify. Committing a per-arm `params.sexp`
    alongside future results would make the guardrail bite by default.

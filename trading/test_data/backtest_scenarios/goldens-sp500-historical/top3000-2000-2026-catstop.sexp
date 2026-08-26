@@ -40,7 +40,6 @@
    (screening_config "live arms candidate_ranking=Quality (#1782, report ordering) and failed_breakout_tolerance_pct=0.05 (#2084); the backtest defaults stay unarmed per experiment-flag R1")
    (resistance_lookback_bars "live feeds the resistance/support mapper 520 weekly bars for the human report only")
    (entry_through_band_pct "live-only entry-reconciliation band for the printed ticket (#2103); read by Weekly_snapshot_generator, never by on_market_close")
-   (entry_extension_max_pct "live arms 2.0 (#2404 user decision 2026-08-25, measured winner); this cell runs the 0.0 default (uncapped) — report-side ticket cap, never read by on_market_close unless enable_sim_entry_stoplimit arms it")
    (sparse_tail_min_bars "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
    (sparse_tail_window_trading_days "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
    (rename_detect_min_overlap_days "live-only ticker-rename detector (#2083 fix 2); report-layer data hygiene, no backtest consumer")
