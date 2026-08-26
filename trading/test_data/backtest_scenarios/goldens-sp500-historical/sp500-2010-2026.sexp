@@ -185,20 +185,28 @@
   ;; trades/hold/OPV; ret+sharpe+DD were still in the old band) —
   ;; consistent with the basis flip's fewer-trades/longer-holds
   ;; signature.
-  ((total_return_pct   ((min 1929.810)      (max 2610.920)))
-   (total_trades       ((min 402.9)         (max 545.1)))
-   (win_rate           ((min  36.223)       (max  49.009)))
-   (sharpe_ratio       ((min   0.5193)      (max   0.7027)))
-   (max_drawdown_pct   ((min  66.628)       (max  90.145)))
-   (avg_holding_days   ((min  49.952)       (max  67.584)))
+  ;; RE-PINNED 2026-08-26 for the #2380 RS-trend fix (PR #2555: lookback_bars
+  ;; 52->56 makes the trend classifier + its three consumers live for the
+  ;; first time; the 4 deeper bars also reach volume/breakout detection).
+  ;; +-15% around actuals from the paired run at PR tip 5b6472afd (local,
+  ;; pinned worktree, committed store). CORRECTNESS re-pin: per the #2380
+  ;; record, NO return-improvement claim attaches to these deltas -- the
+  ;; large top-line swings are tail-path reshuffling on a pin, not evidence.
+
+  ((total_return_pct   ((min 281.0736)      (max 380.2762)))
+   (total_trades       ((min 390.14)         (max 527.86)))
+   (win_rate           ((min 36.8518)       (max 49.8584)))
+   (sharpe_ratio       ((min 0.5478)      (max 0.7413)))
+   (max_drawdown_pct   ((min 18.0692)       (max 24.4466)))
+   (avg_holding_days   ((min 51.2629)       (max 69.3558)))
    ;; OPV re-pinned ~9.88M under the realism-defaults flip (ledger
    ;; 2026-07-10-realism-defaults-flip): the $1M-ADV entry gate drops marginal
    ;; fills and stale-exit 5d clears ghost MTM, so terminal book is lighter.
    ;; Headline metrics (return/Sharpe/DD/trades) stayed in-band — only the
    ;; terminal-MTM composition moved. Was ~18.1M floor-off pre-flip.
-   (open_positions_value ((min 4055416.8) (max 5486740.5)))
-   (sortino_ratio_annualized ((min  0.7303) (max   0.9882)))
-   (calmar_ratio       ((min   0.2320)      (max   0.3140)))
-   (ulcer_index        ((min  19.473)       (max  26.347)))
+   (open_positions_value ((min 2323051.9) (max 3142952.7)))
+   (sortino_ratio_annualized ((min 0.7707) (max 1.0428)))
+   (calmar_ratio       ((min 0.3741)      (max 0.5062)))
+   (ulcer_index        ((min 7.0081)       (max 9.4816)))
    ;; Floor-off does more work than the halted floor-on run; keep wall band wide.
    (wall_seconds       ((min 0.0)           (max 3600.0))))))

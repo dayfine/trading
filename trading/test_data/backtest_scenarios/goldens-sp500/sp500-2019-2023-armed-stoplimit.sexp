@@ -1,40 +1,40 @@
 ;; perf-tier: 3
 ;; perf-tier-rationale: ~500-symbol S&P 500 universe over 5 years, same period
 ;; and universe as [sp500-2019-2023-long-only]; the difference is the ARMED
-;; StopLimit entry family. Weekly cadence, ≤2 h budget; measured ~4 min.
+;; StopLimit entry family. Weekly cadence, â¤2 h budget; measured ~4 min.
 ;;
 ;; WHY THIS GOLDEN EXISTS
 ;;
 ;; Every other golden runs the DEFAULT entry model, in which the simulator
-;; resolves entries to Market fills — see [panel_runner.ml] `_entry_cap_for_sim`,
+;; resolves entries to Market fills â see [panel_runner.ml] `_entry_cap_for_sim`,
 ;; whose own comment states the consequence: "either alone is inert, so the
 ;; default config keeps Market fills and every existing baseline bit-identical".
 ;; A Market fill never walks the intraday path. Only a resting stop/limit order
 ;; does.
 ;;
-;; So the entire armed-StopLimit regime — the family that F2 (`entry_order_ttl_weeks`),
+;; So the entire armed-StopLimit regime â the family that F2 (`entry_order_ttl_weeks`),
 ;; F3 (`stop_width_mode`), F5 (`volume_confirm_at_fill`) and the sim-entry
-;; fill model are all scoped to — had NO golden coverage at all. Their
+;; fill model are all scoped to â had NO golden coverage at all. Their
 ;; bit-identity guarantees were verified by unit tests plus default-config
 ;; goldens, i.e. only where those mechanisms are inert by construction. That
 ;; structural hole hid a real defect for as long as it existed: the intraday
 ;; path RNG was unseeded (`Price_path.default_config.seed = None` ->
 ;; `Random.State.make_self_init ()`), so armed runs returned a different answer
-;; every time — four runs of one binary spread 0.774pp on a 6y/302 probe, and
+;; every time â four runs of one binary spread 0.774pp on a 6y/302 probe, and
 ;; ~278pp at 26y/top-3000. Fixed in PR #2279; recorded in
 ;; dev/notes/backtest-nondeterminism-2026-08-11.md and
 ;; dev/notes/ladder-v4-read-2026-08-12.md.
 ;;
-;; This scenario closes the hole. It is the ladder v2-core entry stack — a
+;; This scenario closes the hole. It is the ladder v2-core entry stack â a
 ;; resting StopLimit at the top of the current 4-week trading range, E frozen
-;; at the first qualifying breakout (#2241), support-floor stop — on the
+;; at the first qualifying breakout (#2241), support-floor stop â on the
 ;; canonical sp500 5-year universe. [sim_entry_fill_next_open] (#2238,
 ;; "honest next-open Market-leg fills") is also set below to match the
 ;; intended production config, but it is a NO-OP in this specific scenario:
 ;; every entry here resolves to StopLimit via [enable_sim_entry_stoplimit],
 ;; and that flag only changes fill semantics for Market-entry orders (see
 ;; [_entry_cap_for_sim] in panel_runner.ml). It does not contribute to the
-;; behaviour this golden measures — see the inline comment at its config
+;; behaviour this golden measures â see the inline comment at its config
 ;; site below.
 ;;
 ;; WHAT IT PROTECTS
@@ -49,7 +49,7 @@
 ;; BANDS
 ;;
 ;; Measured 2026-08-12 on the PR #2279 build with TRADING_DATA_DIR pointed at
-;; trading/test_data (CI's committed bar data — the same path every workflow
+;; trading/test_data (CI's committed bar data â the same path every workflow
 ;; sets), which reproduces CI exactly: the six-year-2018-2023 golden read
 ;; 79.134696483942491 / 321 trades under that env, dead on its pinned band.
 ;;
@@ -61,18 +61,18 @@
 ;; Determinism verified on the post-#2279 build under CI's data path: two
 ;; consecutive runs returned total_return_pct 112.28323995525771 / 240 trades
 ;; with byte-identical trades.csv. Pre-#2279 the same spec wandered (114.5 /
-;; 239, then 112.755 / 241, then 112.670 / 240) — that spread is exactly what
+;; 239, then 112.755 / 241, then 112.670 / 240) â that spread is exactly what
 ;; this golden now guards against.
 ;;
-;; BAND ARITHMETIC (tightened 2026-08-13 — the original ±10% pins were wide
+;; BAND ARITHMETIC (tightened 2026-08-13 â the original Â±10% pins were wide
 ;; enough that a recurrence of the pre-#2279 wander would sail through
-;; undetected; ±10% around 112.28 spans [101.05, 123.51], well outside even
+;; undetected; Â±10% around 112.28 spans [101.05, 123.51], well outside even
 ;; 114.5):
 ;;
-;;   total_return_pct: center 112.28323995525771, band ±1.5 percentage points
+;;   total_return_pct: center 112.28323995525771, band Â±1.5 percentage points
 ;;   -> [110.78323995525771, 113.78323995525771]. Matches this directory's
 ;;   tightest existing convention for a claimed-deterministic run
-;;   ([sp500-2019-2023-bah-brk-b.sexp]'s ±1.5pp scheme).
+;;   ([sp500-2019-2023-bah-brk-b.sexp]'s Â±1.5pp scheme).
 ;;
 ;;   total_trades: pinned to exactly 240 via a half-trade buffer
 ;;   -> [239.5, 240.5], the same integer-pin idiom the BAH goldens use for
@@ -81,7 +81,7 @@
 ;; Coverage against the three pre-#2279 draws: (114.5, 239) fails BOTH fields
 ;; (114.5 > 113.78 and 239 < 239.5); (112.755, 241) fails the trades field
 ;; (241 > 240.5) even though its return sits inside the return band; (112.670,
-;; 240) is the one draw that slips through both fields — its return sits only
+;; 240) is the one draw that slips through both fields â its return sits only
 ;; 0.39pp below the deterministic center and its trade count matches exactly,
 ;; so it is honestly the smallest and least distinguishable of the three
 ;; wanders. Two of the three documented pre-fix draws now fail the pins
@@ -89,21 +89,21 @@
 ;; floating-point equality, which is out of scope for a range-pinned golden.
 ;;
 ;; The remaining metrics (win_rate, sharpe_ratio, max_drawdown_pct,
-;; avg_holding_days, open_positions_value) keep their original ±10% bands —
+;; avg_holding_days, open_positions_value) keep their original Â±10% bands â
 ;; no pre-#2279 wander data was captured for them, so tightening them here
 ;; would be inventing precision this golden cannot back up.
 ;;
-;; wall_seconds is pinned [0, 1500] (min floored at 0 per #2547 — a min guards nothing), mirroring [sp500-2019-2023.sexp]'s
+;; wall_seconds is pinned [0, 1500] (min floored at 0 per #2547 â a min guards nothing), mirroring [sp500-2019-2023.sexp]'s
 ;; convention. This golden is the entry-path-heaviest scenario in the suite
-;; — every entry walks the intraday path — so it is the golden most exposed
+;; â every entry walks the intraday path â so it is the golden most exposed
 ;; to a performance regression there; measured ~4 min locally (see the
 ;; perf-tier rationale above), comfortably inside this band. Sized to catch
 ;; only a catastrophic (~2x+) slowdown, not routine CI-vs-local variance.
 ;;
-;; If a postsubmit run lands outside these bands, do NOT widen them — that is
+;; If a postsubmit run lands outside these bands, do NOT widen them â that is
 ;; the signal this golden exists to raise.
 ((name "sp500-2019-2023-armed-stoplimit")
- (description "Armed StopLimit entry stack (ladder v2-core) on the sp500 5-year universe — the entry regime no other golden covers.")
+ (description "Armed StopLimit entry stack (ladder v2-core) on the sp500 5-year universe â the entry regime no other golden covers.")
  (period ((start_date 2019-01-02) (end_date 2023-12-29)))
  (universe_path "universes/sp500.sexp")
  (universe_size 500)
@@ -173,12 +173,20 @@
   ;; Re-pinned 2026-08-24 for the book-faithful stops basis (PR #2530:
   ;; initial_stop_buffer 1.0 + reset_anchor_on_stalled_cycle default-on;
   ;; user-directed #2486; ledger 2026-08-24-stops-basis-book-faithful).
-  ;; ±15% around new-basis actuals at c7660cac3 (dev/experiments/record-baseline-2026-08-24/).
-  ((total_return_pct ((min 79.765) (max 107.917)))
-   (total_trades ((min 145.35) (max 196.65)))
-   (win_rate ((min 30.3216) (max 41.0234)))
-   (sharpe_ratio ((min 0.809249) (max 1.09487)))
-   (max_drawdown_pct ((min 19.4754) (max 26.3491)))
-   (avg_holding_days ((min 55.0561) (max 74.4877)))
-   (open_positions_value ((min 1.60793e+06) (max 2.17544e+06)))
+  ;; Â±15% around new-basis actuals at c7660cac3 (dev/experiments/record-baseline-2026-08-24/).
+  ;; RE-PINNED 2026-08-26 for the #2380 RS-trend fix (PR #2555: lookback_bars
+  ;; 52->56 makes the trend classifier + its three consumers live for the
+  ;; first time; the 4 deeper bars also reach volume/breakout detection).
+  ;; +-15% around actuals from the paired run at PR tip 5b6472afd (local,
+  ;; pinned worktree, committed store). CORRECTNESS re-pin: per the #2380
+  ;; record, NO return-improvement claim attaches to these deltas -- the
+  ;; large top-line swings are tail-path reshuffling on a pin, not evidence.
+
+  ((total_return_pct ((min 36.3288) (max 49.1509)))
+   (total_trades ((min 163.20) (max 220.80)))
+   (win_rate ((min 27.8906) (max 37.7344)))
+   (sharpe_ratio ((min 0.4719) (max 0.6386)))
+   (max_drawdown_pct ((min 18.2406) (max 24.6785)))
+   (avg_holding_days ((min 45.9973) (max 62.2318)))
+   (open_positions_value ((min 1200049.4) (max 1623596.4)))
    (wall_seconds         ((min 0.0)         (max 1500.0))))))
