@@ -174,11 +174,19 @@
   ;; initial_stop_buffer 1.0 + reset_anchor_on_stalled_cycle default-on;
   ;; user-directed #2486; ledger 2026-08-24-stops-basis-book-faithful).
   ;; ±15% around new-basis actuals at c7660cac3 (dev/experiments/record-baseline-2026-08-24/).
-  ((total_return_pct ((min 79.765) (max 107.917)))
-   (total_trades ((min 145.35) (max 196.65)))
-   (win_rate ((min 30.3216) (max 41.0234)))
-   (sharpe_ratio ((min 0.809249) (max 1.09487)))
-   (max_drawdown_pct ((min 19.4754) (max 26.3491)))
-   (avg_holding_days ((min 55.0561) (max 74.4877)))
-   (open_positions_value ((min 1.60793e+06) (max 2.17544e+06)))
+  ;; RE-PINNED 2026-08-26 for the #2380 RS-trend fix (PR #2555: lookback_bars
+  ;; 52->56 makes the trend classifier + its FOUR consumers live for the
+  ;; first time; the 4 deeper bars also reach volume/breakout detection).
+  ;; +-15% around actuals from the paired run at PR tip 5b6472afd (local,
+  ;; pinned worktree, committed store). CORRECTNESS re-pin: per the #2380
+  ;; record, NO return-improvement claim attaches to these deltas -- the
+  ;; large top-line swings are tail-path reshuffling on a pin, not evidence.
+
+  ((total_return_pct ((min 36.3288) (max 49.1509)))
+   (total_trades ((min 163.20) (max 220.80)))
+   (win_rate ((min 27.8906) (max 37.7344)))
+   (sharpe_ratio ((min 0.4719) (max 0.6386)))
+   (max_drawdown_pct ((min 18.2406) (max 24.6785)))
+   (avg_holding_days ((min 45.9973) (max 62.2318)))
+   (open_positions_value ((min 1200049.4) (max 1623596.4)))
    (wall_seconds         ((min 0.0)         (max 1500.0))))))

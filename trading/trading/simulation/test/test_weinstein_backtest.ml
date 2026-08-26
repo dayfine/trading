@@ -200,9 +200,31 @@ let test_six_year_full_lifecycle _ =
      is still open at the window end (sells/rts 25 -> 24, losses 21 -> 20) and
      the realized max drawdown drops 5.54% -> 3.65%. Same 7-symbol set, same
      28 buys. *)
+  (* RS-trend fix (2026-08-25, issue #2380): [lookback_bars] 52 -> 56, the
+     minimum weekly depth at which [Rs._classify_trend] can classify at all.
+     Before it, the RS history was one entry long and EVERY candidate in EVERY
+     run came back [Positive_flat], so the screener's RS scoring term was a
+     constant [w_positive_rs / 2] carrying zero ranking information.
+
+     Observed here: buys 28 -> 30, sells 24 -> 26, round-trips 24 -> 26, losses
+     20 -> 22 (wins unchanged at 4), final value 491,691.09 -> 487,853.30,
+     realized max drawdown 3.65% -> 4.41%. Same 7-symbol set, same 2187 steps.
+
+     NOT ATTRIBUTED to the RS term. The 4-bar-deeper view moves every standard
+     weekly consumer at once — volume and breakout/resistance zones as well as
+     RS — and the two were not varied independently, so no mechanism is claimed
+     for the delta ([.claude/rules/mechanism-validation-rigor.md]). A plausible
+     reading is that a now-differentiating ranking lets two more entries clear
+     the top-N, but this fixture cannot distinguish that from the widening
+     alone.
+
+     This is a CORRECTNESS re-pin, not a result claim: the direction of the
+     move on one 7-symbol fixture is noise, and no return improvement was
+     expected or is asserted (rs_value carries no measurable ranking edge —
+     permutation p = 0.182, issue #2380). *)
   assert_that (List.length result.steps) (equal_to 2187);
-  assert_that n_buys (equal_to 28);
-  assert_that n_sells (equal_to 24);
+  assert_that n_buys (equal_to 30);
+  assert_that n_sells (equal_to 26);
   assert_that symbols
     (elements_are
        [
@@ -214,19 +236,19 @@ let test_six_year_full_lifecycle _ =
          equal_to "KO";
          equal_to "MSFT";
        ]);
-  assert_that (List.length round_trips) (equal_to 24);
+  assert_that (List.length round_trips) (equal_to 26);
   assert_that stats
     (is_some_and
        (all_of
           [
             field (fun s -> s.Metrics.win_count) (equal_to 4);
-            field (fun s -> s.Metrics.loss_count) (equal_to 20);
+            field (fun s -> s.Metrics.loss_count) (equal_to 22);
           ]));
-  (* Final value $491,691.09 under the 2026-08-24 stops-basis flips (was
-     $484,753.99); band re-centred at ±$3K around the new value. *)
+  (* Final value $487,853.30 under the 2026-08-25 RS-trend fix (was
+     $491,691.09); band re-centred at ±$3K around the new value. *)
   assert_that final_value
-    (is_between (module Float_ord) ~low:488_691.09 ~high:494_691.09);
-  (* Realized max drawdown ~3.7% under the flips; pin loose at < 0.60. *)
+    (is_between (module Float_ord) ~low:484_853.30 ~high:490_853.30);
+  (* Realized max drawdown ~4.4% under the fix; pin loose at < 0.60. *)
   assert_that max_drawdown_pct (lt (module Float_ord) 0.60)
 
 (* ------------------------------------------------------------------ *)

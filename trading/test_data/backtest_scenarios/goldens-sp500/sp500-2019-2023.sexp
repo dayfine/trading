@@ -80,7 +80,7 @@
    (screening_config "live arms candidate_ranking=Quality (#1782, report ordering) and failed_breakout_tolerance_pct=0.05 (#2084); the backtest defaults stay unarmed per experiment-flag R1")
    (resistance_lookback_bars "live feeds the resistance/support mapper 520 weekly bars for the human report only")
    (entry_through_band_pct "live-only entry-reconciliation band for the printed ticket (#2103); read by Weekly_snapshot_generator, never by on_market_close")
-   (entry_extension_max_pct "live arms 2.0 (#2404 user decision 2026-08-25, measured winner); this cell runs the 0.0 default (uncapped) — report-side ticket cap, never read by on_market_close unless enable_sim_entry_stoplimit arms it")
+   (entry_extension_max_pct "live arms 2.0 (#2404 user decision 2026-08-25, measured winner); this cell runs the 0.0 default (uncapped) -- report-side ticket cap, never read by on_market_close unless enable_sim_entry_stoplimit arms it")
    (sparse_tail_min_bars "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
    (sparse_tail_window_trading_days "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
    (rename_detect_min_overlap_days "live-only ticker-rename detector (#2083 fix 2); report-layer data hygiene, no backtest consumer")
@@ -119,16 +119,24 @@
   ;; center (45.73), all metrics comfortably in-band. SP500 names are liquid, so
   ;; the entry gate is near-inert here (STOP-rule >20% not triggered). Bands
   ;; unchanged.
-  ((total_return_pct ((min 47.8907) (max 64.7934)))
-   (total_trades ((min 171.7) (max 232.3)))
-   (win_rate ((min 31.1386) (max 42.1287)))
-   (sharpe_ratio ((min 0.544709) (max 0.736959)))
-   (max_drawdown_pct ((min 26.248) (max 35.512)))
-   (avg_holding_days ((min 46.527) (max 62.9483)))
-   (open_positions_value ((min 1.32454e+06) (max 1.79202e+06)))
-   (sortino_ratio_annualized ((min 0.697788) (max 0.944067)))
-   (calmar_ratio ((min 0.257969) (max 0.349017)))
-   (ulcer_index ((min 10.397) (max 14.0665)))
+  ;; RE-PINNED 2026-08-26 for the #2380 RS-trend fix (PR #2555: lookback_bars
+  ;; 52->56 makes the trend classifier + its FOUR consumers live for the
+  ;; first time; the 4 deeper bars also reach volume/breakout detection).
+  ;; +-15% around actuals from the paired run at PR tip 5b6472afd (local,
+  ;; pinned worktree, committed store). CORRECTNESS re-pin: per the #2380
+  ;; record, NO return-improvement claim attaches to these deltas -- the
+  ;; large top-line swings are tail-path reshuffling on a pin, not evidence.
+
+  ((total_return_pct ((min 81.3266) (max 110.0302)))
+   (total_trades ((min 169.15) (max 228.85)))
+   (win_rate ((min 29.4723) (max 39.8744)))
+   (sharpe_ratio ((min 0.7593) (max 1.0274)))
+   (max_drawdown_pct ((min 19.7593) (max 26.7333)))
+   (avg_holding_days ((min 49.9791) (max 67.6189)))
+   (open_positions_value ((min 1350989.6) (max 1827809.6)))
+   (sortino_ratio_annualized ((min 1.0463) (max 1.4158)))
+   (calmar_ratio ((min 0.5267) (max 0.7127)))
+   (ulcer_index ((min 8.0507) (max 10.8923)))
    ;; wall_seconds pin sized wide (CI ~920s, local parallel ~200s) —
    ;; catches only catastrophic 2x slowdowns per design intent.
    (wall_seconds       ((min 0.0)          (max 1500.0))))))
