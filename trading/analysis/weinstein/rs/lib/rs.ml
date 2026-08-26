@@ -14,6 +14,12 @@ type config = {
 let default_config =
   { rs_ma_period = 52; trend_lookback = 4; flat_threshold = 0.98 }
 
+(* The MA eats [rs_ma_period - 1] bars before the first history entry exists,
+   and [_classify_trend] needs [trend_lookback + 1] entries to compare across
+   the full span. See the [.mli] for why under-sizing is silent. *)
+let min_aligned_bars_for_trend { rs_ma_period; trend_lookback; _ } =
+  rs_ma_period - 1 + trend_lookback + 1
+
 (* ------------------------------------------------------------------ *)
 (* Result types                                                         *)
 (* ------------------------------------------------------------------ *)
@@ -41,7 +47,23 @@ type result = {
     - A zone change between then and now is a crossover.
     - Within the positive zone, the stock is "flat" if its RS has not declined
       by more than [flat_threshold] (e.g., 0.98 means a < 2% drop is still
-      considered flat). *)
+      considered flat).
+
+    Requires [min_aligned_bars_for_trend] bars upstream; see that function. With
+    fewer than 2 history entries this returns [Positive_flat] unconditionally —
+    a degenerate default, not a classification.
+
+    Known gap, deliberately left as-is (issue #2380): in the positive zone both
+    arms of the [flat_threshold] test return [Positive_flat], so only
+    [Positive_rising] is distinguishable there and [flat_threshold] is inert.
+    {!Weinstein_types.rs_trend} has no positive-territory-declining state, yet
+    the book gives that case a distinct meaning — Ch. 4, "when you see inferior
+    action in the RS line compared to the price performance, don't ever buy that
+    stock" (Chart 4-16: price range-bound while "the RS line is telling us to
+    look out below ... trending lower"). Adding the state would change screener
+    admission and scoring for a real cohort, so it belongs in an
+    experiment-gated change rather than a correctness fix. See
+    [docs/design/weinstein-book-reference.md] §4.4. *)
 let _classify_trend ~trend_lookback ~flat_threshold (history : raw_rs list) :
     rs_trend =
   let n = List.length history in

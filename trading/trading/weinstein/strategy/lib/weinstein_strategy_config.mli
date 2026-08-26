@@ -42,6 +42,41 @@ type config = {
           Structural (support-floor) stops are unaffected: this multiplier is
           read only on the fallback branch. *)
   lookback_bars : int;
+      (** Depth, in weekly bars, of the standard per-symbol weekly view the
+          screen reads ([Bar_reader.weekly_view_for ~n:lookback_bars]). Every
+          weekly analysis except resistance/support — stage classification, RS,
+          volume, breakout detection — sees exactly this many weeks.
+
+          {b Default [56] (since 2026-08-25, issue #2380).} It was [52], which
+          silently disabled {!Rs} trend classification entirely. Derivation of
+          the [56] floor, from {!Rs.default_config} ([rs_ma_period = 52],
+          [trend_lookback = 4]):
+
+          - [Sma.calculate_sma] over [n] aligned weeks emits
+            [n - rs_ma_period + 1] values, so {!Rs} builds an RS history of that
+            length ([rs.ml] [_history_of_aligned]).
+          - [Rs._classify_trend] compares the newest history entry against the
+            one [trend_lookback] entries back, so it needs
+            [trend_lookback + 1 = 5] history entries; below [2] it
+            short-circuits to [Positive_flat] and between [2] and [4] the
+            comparison is clamped to a shorter span than [trend_lookback].
+          - Hence [n >= rs_ma_period - 1 + trend_lookback + 1 = 56].
+
+          At [52] the history was exactly [1] entry long, so {b every} candidate
+          in {b every} run classified [Positive_flat] — 4,231 tickets across
+          three independently-run arms, zero non-flat. That made the
+          [Bullish_crossover] scoring bonus
+          ({!Screener.w_bullish_rs_crossover}), the §4.5 [rs_zero_cross] ticket
+          tag, and the [Rs]-trend term of the sector rating all unreachable.
+          This is a correctness fix, not a performance lever — see issue #2380.
+
+          {b Warmup interaction.} [Backtest.Runner._weekly_strategy_warmup_days]
+          is [364] (~52 weeks), so at the very start of a measurement window
+          only ~52 aligned weeks exist and the trend stays [Positive_flat] for
+          the first few weeks regardless of this value; it becomes live once the
+          window has advanced past 56 weekly bars. Raising the warmup to match
+          is a separate basis change (it re-pins every golden) and is not done
+          here. *)
   bar_history_max_lookback_days : int option;
   skip_ad_breadth : bool;
   skip_sector_etf_load : bool;
