@@ -1,0 +1,4 @@
+== survival: share of round-trips still open at N weeks ==
+basis                             n    >=4wk   >=13wk   >=26wk   >=52wk     <=7d
+record-baseline(pinned)         780    48.8%    25.8%     7.4%     1.0%    28.7%
+instr-null(retired)            1182    30.0%    14.5%     3.8%     0.5%    51.3%

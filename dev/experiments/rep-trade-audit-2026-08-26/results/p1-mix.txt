@@ -1,0 +1,39 @@
+== exit_trigger mix ==
+-- record-baseline(pinned)
+  TOTAL                        780
+  stop_loss                    503   64.5%
+  laggard_rotation             269   34.5%
+  stage3_force_exit              3    0.4%
+  liquidity_exit                 2    0.3%
+  extension_stop                 1    0.1%
+                                 2    0.3%
+-- instr-null(retired)
+  TOTAL                       1182
+  stop_loss                    929   78.6%
+  laggard_rotation             240   20.3%
+  liquidity_exit                 5    0.4%
+  stage3_force_exit              3    0.3%
+  extension_stop                 1    0.1%
+                                 4    0.3%
+
+== stop_trigger_kind mix ==
+-- record-baseline(pinned)
+  TOTAL                        780
+  gap_down                     357   45.8%
+  non_stop_exit                275   35.3%
+  intraday                     146   18.7%
+                                 2    0.3%
+-- instr-null(retired)
+  TOTAL                       1182
+  gap_down                     664   56.2%
+  intraday                     265   22.4%
+  non_stop_exit                249   21.1%
+                                 4    0.3%
+
+== entry_stage mix (spine item 2: buy ONLY in Stage 2) ==
+-- record-baseline(pinned)
+  Stage2                       779   99.9%
+  Stage2_late                    1    0.1%
+-- instr-null(retired)
+  Stage2                      1181   99.9%
+  Stage2_late                    1    0.1%

@@ -1,0 +1,12 @@
+== P1 holding/exit shape by STOP PROVENANCE ==
+(fallback width is constant per basis: 4.00% pinned, 2.08% retired)
+
+-- record-baseline (pinned) (bucket edge 0.0401)
+   bucket           n     <=7d   >=13wk stop_loss raised>=1  mean pnl%
+   structural     322    18.9%    31.1%     54.3%      7.8%      3.17
+   fallback       458    35.6%    22.1%     71.6%      3.7%      1.54
+
+-- instr-null (retired) (bucket edge 0.0209)
+   bucket           n     <=7d   >=13wk stop_loss raised>=1  mean pnl%
+   structural     392    35.2%    22.7%     64.5%      8.2%      2.62
+   fallback       790    59.2%    10.4%     85.6%      0.9%      0.37
