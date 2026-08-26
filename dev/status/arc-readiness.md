@@ -361,6 +361,20 @@ Remaining open work:
 
 ## Follow-ups
 
+- **Does a non-Weinstein benchmark sleeve belong under the Weinstein entry
+  cap?** Surfaced by the A1-3 fill-model flip: `Panel_runner._entry_cap_for_sim`
+  reads the run's *Weinstein* config and threads the cap into
+  `Simulator.create_deps` regardless of `strategy_choice` — as it already does
+  for `margin_config`, `stale_hold_policy` and `sim_entry_fill_next_open`. So
+  the BAH-SPY / BAH-BRK-B benchmark cells moved (−0.42% / −0.79%) on a flip
+  that is conceptually about Weinstein entry tickets, and their `dune runtest`
+  pins were re-anchored in that PR. Consistent with existing wiring, so **not**
+  fixed there; but a benchmark used as a comparison baseline moving on a
+  strategy-side default is worth a deliberate decision (gate
+  `_entry_cap_for_sim` on `Strategy_choice.Weinstein`, or keep the current
+  strategy-agnostic threading and say so). Note the golden-drift linter already
+  treats these cells as having no Weinstein config to compare (it skips
+  non-Weinstein scenarios), which is mild evidence for gating.
 - **#2433 framing — RESOLVED. MERGED `d7087e0a` 2026-08-22, reframed.** This
   entry previously read "⚠ USER DECISION — held under `do-not-merge`"; the hold
   was lifted and the PR landed with its framing corrected. As merged: the

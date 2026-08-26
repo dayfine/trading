@@ -104,8 +104,21 @@ let _sector_map_override fixtures_root (s : Scenario.t) =
     See [sp500-2019-2023-bah-spy.sexp] §"Measurement" for the full breakdown —
     fill happens at next-day open ($248.23) and final MtM uses 2023-12-28's
     close ($476.69) since the simulator's [is_complete] check fires when
-    [current_date >= end_date]. *)
-let _expected_final_equity = 1_903_976.65
+    [current_date >= end_date].
+
+    {b Re-pinned 2026-08-26} (1_903_976.65 -> 1_896_010.32, -0.42%): the
+    fill-model default flip (#2405 — [enable_sim_entry_stoplimit] [true] +
+    [entry_extension_max_pct] [2.0]) moved this cell. {b Cause, and why a BAH
+    cell moved at all:} [Panel_runner._entry_cap_for_sim] reads the run's
+    {i Weinstein} config and threads the cap into [Simulator.create_deps]
+    {b regardless of [strategy_choice]} — as it already does for
+    [margin_config], [stale_hold_policy] and [sim_entry_fill_next_open] — so
+    the BAH sleeve's single day-1 Market entry now resolves to
+    [StopLimit (E, E * 1.02)] and fills at a different price. User-directed
+    fidelity change; {b no return-improvement claim}. Whether a non-Weinstein
+    benchmark {i should} inherit that cap is recorded as an open follow-up on
+    [dev/status/arc-readiness.md]. *)
+let _expected_final_equity = 1_896_010.32
 
 (** Pinned closed-form final equity for BAH-BRK-B 2019-2023. Re-anchored
     2026-05-17 after the BAH gap-buffer fix.
@@ -114,14 +127,20 @@ let _expected_final_equity = 1_903_976.65
     sizing close 2019-01-02 = $202.80 → 4882 shares at next-day open $199.97
     with $48.82 commission; final MtM at 2023-12-28 close $357.57 produces
     $1,769,354.38. Same [current_date >= end_date] [is_complete] semantics as
-    the SPY cell. *)
-let _expected_final_equity_brk_b_5y = 1_769_354.38
+    the SPY cell.
+
+    {b Re-pinned 2026-08-26} (1_769_354.38 -> 1_755_319.48, -0.79%): same
+    cause as the SPY cell above — the fill-model default flip (#2405) routes
+    this sleeve's day-1 entry through [StopLimit (E, E * 1.02)]. *)
+let _expected_final_equity_brk_b_5y = 1_755_319.48
 
 (** ±0.05% band around the expected equity. The number is fully deterministic
     against pinned SPY data — no parameter sensitivity, no stochasticity.
     Anything beyond 0.05% drift is a real regression in the runner's wiring
     (commission tier change, fill-pricing convention shift, end-date semantics
-    drift). *)
+    drift). Deliberately NOT widened by the 2026-08-26 re-pin: a closed-form
+    determinism check that tolerates the size of the change it just absorbed
+    would stop being one. *)
 let _equity_tolerance_pct = 0.05
 
 let _resolve_fixtures_root () =
