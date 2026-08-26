@@ -70,10 +70,14 @@
 ;   behaviour dropped the ticket and moved the row to a do-not-chase watch
 ;   section, so a confirmed breakout (CRNX +43.7%, MBX +34.5%, SAFT +26.0% on
 ;   the 2026-07-24 list) vanished from the actionable report.
-;   The VALUE is still open: live arms 15.0, the committed backtest specs use
-;   2.0. #2404 unified the semantics, not the number; both the 1y and 3y
-;   horizon surfaces rank 15.0 below 2.0, but moving live to 2.0 is a separate
-;   user decision with no confirmation grid behind it, so 15.0 stands here.
+;   VALUE UNIFIED at 2.0 (USER DECISION 2026-08-25, #2404): the old 15.0 was
+;   calibrated by eye on one day's picks (2026-07-24, 3 of 20 past it) and
+;   predates the current arc; both the 1y and 3y horizon surfaces rank 15.0
+;   below 2.0 on return and Calmar, and 2.0 is the corpus value. Caveat on
+;   record: that ranking is one universe/one base with no confirmation grid
+;   — accepted because 15.0's provenance was strictly weaker. Effect at 2.0:
+;   tickets rest unfilled more often (limit sits closer to E); rows stay
+;   visible with the will-not-fill note per #2404 semantics.
 ;   Execution correctness for the human artifact, NOT a return lever: the
 ;   fields are read only by Weekly_snapshot_generator.generate, never by
 ;   on_market_close, so arming them cannot move a backtest number. The cap
@@ -82,7 +86,7 @@
 ;   the row stays visible: the pullback back into the band is that second
 ;   chance. Code defaults stay 0.0 (off) per experiment-flag R1. See
 ;   [Weinstein_snapshot.Entry_reconciliation].
-((entry_through_band_pct 1.0) (entry_extension_max_pct 15.0))
+((entry_through_band_pct 1.0) (entry_extension_max_pct 2.0))
 ; live rename detection: issue #2083 fix 2 (armed 2026-08-04) — returns-basis
 ;   succession detector (#2100, reuses the #1946 Twin_detector scorer at
 ;   ret_epsilon 1e-3). When a universe ticker goes sparse at the right-hand

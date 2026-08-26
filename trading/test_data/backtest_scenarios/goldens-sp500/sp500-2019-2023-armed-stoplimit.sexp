@@ -145,7 +145,6 @@
    (sim_entry_fill_next_open "part of the armed StopLimit entry stack above (a no-op here, kept to match the intended production config)")
    (entry_anchor_local_range_weeks "part of the armed StopLimit entry stack above")
    (freeze_entry_at_first_breakout "part of the armed StopLimit entry stack above")
-   (entry_extension_max_pct "the corpus 2.0 vs live 15.0 -- the #2403 census finding. Load-bearing here: under enable_sim_entry_stoplimit it is the simulated fill cap, not a report-side threshold. Neither value has a defensible provenance; unification is the open #2404 decision")
    (enable_short_side "long-only cell: arms the short leg off; the code default (and therefore live) is on")
    (stops_config "catastrophic-stop arming (catastrophic_stop_pct 0.10); live runs the 0.0 default")
    (liquidity_config "min_hold_dollar_adv 500000 arming; live runs the code default")

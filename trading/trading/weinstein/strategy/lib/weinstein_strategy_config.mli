@@ -848,18 +848,17 @@ type config = {
           {b Default [0.0] = reconciliation disabled} (no-op, R1): every
           candidate carries [Entry_reconciliation.Not_reconciled], sizing uses
           [entry] exactly as before, and the reports render unchanged. The live
-          picks config arms [15.0]; the committed backtest specs use [2.0].
-          {b That value divergence is still open} — issue #2404 unified the
-          {e semantics} (one fill cap, two views), not the number. Both the 1y
-          and 3y horizon surfaces rank [15.0] below [2.0] on return and Calmar,
-          so moving live to [2.0] is the cheap fidelity fix, but it is a user
-          decision on one universe and one base scenario with no confirmation
-          grid behind it. Consumed by [Weekly_snapshot_generator.generate]
-          (report/live-ticket path), and — only when
-          [enable_sim_entry_stoplimit] is also on — by the backtest runner as
-          the simulator's entry-fill cap; with that flag at its default [false],
-          arming this field alone cannot move a backtest number. R2: resolves
-          through [Backtest.Overlay_validator.apply_overrides]. *)
+          picks config and the committed backtest specs both arm [2.0]
+          ({b value unified by user decision 2026-08-25}, issue #2404: live's
+          old [15.0] was a one-day eyeball calibration; both the 1y and 3y
+          horizon surfaces rank [15.0] below [2.0] on return and Calmar — a
+          one-universe/one-base ranking, accepted over the weaker provenance).
+          Consumed by [Weekly_snapshot_generator.generate] (report/live-ticket
+          path), and — only when [enable_sim_entry_stoplimit] is also on — by
+          the backtest runner as the simulator's entry-fill cap; with that flag
+          at its default [false], arming this field alone cannot move a backtest
+          number. R2: resolves through
+          [Backtest.Overlay_validator.apply_overrides]. *)
   enable_sim_entry_stoplimit : bool; [@sexp.default false]
       (** Simulator entry fill model (#2158 Phase 2) — when [true] AND
           [entry_extension_max_pct > 0], the backtest runner threads the cap
