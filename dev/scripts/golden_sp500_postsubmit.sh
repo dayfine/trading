@@ -34,6 +34,37 @@
 
 set -e
 
+# _parse_gnu_time_rss <rss-file> — extract the peak-RSS kB value written by
+# GNU /usr/bin/time -f '%M' into <rss-file>.
+#
+# The file has one of two shapes depending on whether the timed command
+# exited zero or non-zero:
+#   zero exit:     the file is exactly the %M value, e.g. "745192\n"
+#   non-zero exit: GNU time additionally writes a leading status line, e.g.
+#                  "Command exited with non-zero status 1\n745192\n" (or
+#                  "Command terminated by signal N\n<value>\n" if killed)
+# In both shapes the %M value is the LAST line. Read that line specifically
+# rather than stripping all newlines from the whole file: `tr -d '\n'` over
+# the two-line non-zero-exit shape concatenates the trailing status digit
+# onto the RSS digits (e.g. "...status 1" + "745192" -> "1745192", off by
+# ~1GB) -- and only on FAILING cells, exactly when someone reads the number.
+# See issue #2553.
+#
+# The UNAVAILABLE sentinel (written when GNU time isn't present at all) is a
+# single line and passes through unchanged.
+_parse_gnu_time_rss() {
+  tail -n 1 "$1" | tr -d '\n'
+}
+
+# Test hook: golden_sp500_postsubmit_rss_smoke.sh dot-sources this file with
+# POSTSUBMIT_RSS_PARSE_TEST set to exercise _parse_gnu_time_rss directly
+# against fixture files, without discovering scenarios or invoking
+# scenario_runner (this script assumes standalone execution past this point,
+# not sourcing).
+if [ -n "${POSTSUBMIT_RSS_PARSE_TEST:-}" ]; then
+  return 0 2>/dev/null || exit 0
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 SCENARIO_ROOT="${REPO_ROOT}/trading/test_data/backtest_scenarios"
@@ -140,7 +171,7 @@ _run_one() {
 
   rss_value="?"
   if [ -f "$rss_path" ]; then
-    rss_value=$(tr -d '\n' <"$rss_path")
+    rss_value=$(_parse_gnu_time_rss "$rss_path")
   fi
 
   if [ "$rc" -ne 0 ]; then
