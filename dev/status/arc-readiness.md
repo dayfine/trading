@@ -361,6 +361,17 @@ Remaining open work:
 
 ## Follow-ups
 
+- **`goldens_affected_check.sh` is blind to a default *flip*.** On the A1-3 PR
+  it named exactly one golden — `sp500-2019-2023-armed-stoplimit.sexp`, the one
+  cell that already arms both knobs at the new default values and therefore
+  does **not** move. The ~15 cells that do move are precisely the ones that
+  never named the knobs and silently inherited the old defaults, which the
+  check's exact-name match on `config_overrides` cannot see. Not a defect in
+  the #2384 case it was built for (there the affected golden armed a *related*
+  knob, and the docstring cross-reference caught it), but a default-flip
+  inverts the population: "arms the knob" and "is affected by the knob" become
+  disjoint. Worth teaching the check that a changed `[@sexp.default]` affects
+  every Weinstein golden that does NOT arm the knob.
 - **Does a non-Weinstein benchmark sleeve belong under the Weinstein entry
   cap?** Surfaced by the A1-3 fill-model flip: `Panel_runner._entry_cap_for_sim`
   reads the run's *Weinstein* config and threads the cap into
