@@ -186,7 +186,7 @@
   ;; consistent with the basis flip's fewer-trades/longer-holds
   ;; signature.
   ;; RE-PINNED 2026-08-26 for the #2380 RS-trend fix (PR #2555: lookback_bars
-  ;; 52->56 makes the trend classifier + its three consumers live for the
+  ;; 52->56 makes the trend classifier + its FOUR consumers live for the
   ;; first time; the 4 deeper bars also reach volume/breakout detection).
   ;; +-15% around actuals from the paired run at PR tip 5b6472afd (local,
   ;; pinned worktree, committed store). CORRECTNESS re-pin: per the #2380

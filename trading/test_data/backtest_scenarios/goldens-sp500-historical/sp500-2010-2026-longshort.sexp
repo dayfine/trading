@@ -143,12 +143,17 @@
   ;; initial stop + ratchet reset — hypothesis only; no trade-level
   ;; dissection was run (see mechanism-validation rigor).
   ;; RE-PINNED 2026-08-26 for the #2380 RS-trend fix (PR #2555: lookback_bars
-  ;; 52->56 makes the trend classifier + its three consumers live for the
+  ;; 52->56 makes the trend classifier + its FOUR consumers live for the
   ;; first time; the 4 deeper bars also reach volume/breakout detection).
   ;; +-15% around actuals from the paired run at PR tip 5b6472afd (local,
   ;; pinned worktree, committed store). CORRECTNESS re-pin: per the #2380
   ;; record, NO return-improvement claim attaches to these deltas -- the
   ;; large top-line swings are tail-path reshuffling on a pin, not evidence.
+  ;; This LONG-SHORT cell additionally feels rs_blocks_short going from
+  ;; universally-blocking (every candidate Positive_flat, which the gate
+  ;; passes) to genuinely discriminating -- the fourth consumer named in
+  ;; weinstein_strategy_config.mli; the mechanism its docstring predicted
+  ;; would move this cell (+205pp ret / +18pp maxDD here, still a pin).
 
   ((total_return_pct   ((min 892.1403)       (max 1207.0135)))
    (total_trades       ((min 559.29)        (max 756.71)))
