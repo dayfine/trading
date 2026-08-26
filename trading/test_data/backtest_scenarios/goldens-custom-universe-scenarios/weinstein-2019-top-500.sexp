@@ -172,16 +172,24 @@
   ;; Signature matches the basis flip's known direction (fewer trades,
   ;; longer holds — see dev/experiments/record-baseline-2026-08-24): the
   ;; prior pin FAILed exactly on total_trades low + avg_holding_days high.
-  ((total_return_pct   ((min  87.847)       (max 118.852)))
-   (total_trades       ((min 162.35)        (max 219.65)))
-   (win_rate           ((min  32.487)       (max  43.953)))
-   (sharpe_ratio       ((min   0.7465)      (max   1.0100)))
-   (max_drawdown_pct   ((min  25.353)       (max  34.301)))
-   (avg_holding_days   ((min  48.655)       (max  65.827)))
-   (open_positions_value ((min 1412981.2)   (max 1911680.4)))
-   (sortino_ratio_annualized ((min  1.0413) (max   1.4088)))
-   (calmar_ratio       ((min   0.4357)      (max   0.5895)))
-   (ulcer_index        ((min   9.799)       (max  13.258)))
+  ;; RE-PINNED 2026-08-26 for the #2380 RS-trend fix (PR #2555: lookback_bars
+  ;; 52->56 makes the trend classifier + its three consumers live for the
+  ;; first time; the 4 deeper bars also reach volume/breakout detection).
+  ;; +-15% around actuals from the paired run at PR tip 5b6472afd (local,
+  ;; pinned worktree, committed store). CORRECTNESS re-pin: per the #2380
+  ;; record, NO return-improvement claim attaches to these deltas -- the
+  ;; large top-line swings are tail-path reshuffling on a pin, not evidence.
+
+  ((total_return_pct   ((min 91.2520)       (max 123.4587)))
+   (total_trades       ((min 152.15)        (max 205.85)))
+   (win_rate           ((min 27.0670)       (max 36.6202)))
+   (sharpe_ratio       ((min 0.7769)      (max 1.0513)))
+   (max_drawdown_pct   ((min 21.7513)       (max 29.4284)))
+   (avg_holding_days   ((min 55.4399)       (max 75.0070)))
+   (open_positions_value ((min 1182652.3)   (max 1600059.1)))
+   (sortino_ratio_annualized ((min 1.0819) (max 1.4638)))
+   (calmar_ratio       ((min 0.5228)      (max 0.7075)))
+   (ulcer_index        ((min 9.2746)       (max 12.5481)))
    ;; wall_seconds guards only the MAX (catastrophic slowdown). The old
    ;; min 100.0 was the 2026-08-25 "GHA flake" (#2547 root cause, read
    ;; from the first #2549-uploaded per-cell artifact): fast warm-cache

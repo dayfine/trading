@@ -142,19 +142,27 @@
   ;; PLAUSIBLE mechanism is the short side interacting with the wider
   ;; initial stop + ratchet reset — hypothesis only; no trade-level
   ;; dissection was run (see mechanism-validation rigor).
-  ((total_return_pct   ((min 717.484)       (max 970.715)))
-   (total_trades       ((min 526.15)        (max 711.85)))
-   (win_rate           ((min  30.347)       (max  41.059)))
-   (sharpe_ratio       ((min   0.4814)      (max   0.6514)))
-   (max_drawdown_pct   ((min  51.839)       (max  70.136)))
-   (avg_holding_days   ((min  49.367)       (max  66.792)))
+  ;; RE-PINNED 2026-08-26 for the #2380 RS-trend fix (PR #2555: lookback_bars
+  ;; 52->56 makes the trend classifier + its three consumers live for the
+  ;; first time; the 4 deeper bars also reach volume/breakout detection).
+  ;; +-15% around actuals from the paired run at PR tip 5b6472afd (local,
+  ;; pinned worktree, committed store). CORRECTNESS re-pin: per the #2380
+  ;; record, NO return-improvement claim attaches to these deltas -- the
+  ;; large top-line swings are tail-path reshuffling on a pin, not evidence.
+
+  ((total_return_pct   ((min 892.1403)       (max 1207.0135)))
+   (total_trades       ((min 559.29)        (max 756.71)))
+   (win_rate           ((min 31.7781)       (max 42.9940)))
+   (sharpe_ratio       ((min 0.4410)      (max 0.5967)))
+   (max_drawdown_pct   ((min 67.2422)       (max 90.9749)))
+   (avg_holding_days   ((min 51.3552)       (max 69.4807)))
    ;; OPV re-pinned ~2.18M under the realism-defaults flip (ledger
    ;; 2026-07-10-realism-defaults-flip): $1M-ADV entry gate + stale-exit 5d
    ;; lighten the terminal book. Headline metrics stayed in-band (ret 387.5 /
    ;; 784 / Sharpe 0.777 / DD 21.35). Was ~3.76M pre-flip.
-   (open_positions_value ((min 3915240.5)   (max 5297090.3)))
-   (sortino_ratio_annualized ((min  0.6640) (max   0.8984)))
-   (calmar_ratio       ((min   0.2054)      (max   0.2780)))
-   (ulcer_index        ((min  17.762)       (max  24.032)))
+   (open_positions_value ((min 2260873.0)   (max 3058828.4)))
+   (sortino_ratio_annualized ((min 0.5523) (max 0.7474)))
+   (calmar_ratio       ((min 0.1733)      (max 0.2346)))
+   (ulcer_index        ((min 22.4697)       (max 30.4002)))
    ;; Wall floor lowered 600→100, then floored at 0 per #2547 (a min guards nothing; the 364 run measured ~391s locally).
    (wall_seconds       ((min 0.0)           (max 2400.0))))))
