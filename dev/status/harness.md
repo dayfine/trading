@@ -278,6 +278,33 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 
 ## Completed
 
+### golden_sp500_postsubmit.sh peak-RSS parse fix (issue #2553, 2026-08-26)
+
+- [x] Fixed `dev/scripts/golden_sp500_postsubmit.sh` mis-reporting peak RSS on
+  every FAILING cell: GNU `/usr/bin/time`'s exit-status line ("Command exited
+  with non-zero status 1") fused onto the `%M` value because
+  `rss_value=$(tr -d '\n' <"$rss_path")` stripped ALL newlines from the
+  output file, e.g. real `745192` kB read as `1745192` — off by ~1 GB, and
+  only on failing cells, exactly when someone reads the number. Fix: new
+  `_parse_gnu_time_rss()` helper reads the file's LAST line (`tail -n 1`)
+  instead, which is always the `%M` value regardless of whether a status
+  line precedes it; the `UNAVAILABLE` sentinel path is unaffected (single
+  line, passes through unchanged). Regression test:
+  `trading/devtools/checks/golden_sp500_postsubmit_rss_smoke.sh` (4 fixture
+  cases: failing-cell status-line shape, passing-cell bare-value shape,
+  `UNAVAILABLE` sentinel, killed-by-signal shape), dot-sourcing the real
+  script with `POSTSUBMIT_RSS_PARSE_TEST=1` so the helper is exercised
+  directly without a real scenario_runner invocation; wired into `dune
+  runtest` via `trading/devtools/checks/dune`. Verified RED against the
+  pre-fix `tr -d '\n'` body (2 of 4 assertions failed, reproducing the exact
+  fused-digit bug) then GREEN after the fix. Added a note to
+  `.claude/rules/container-capacity-scheduling.md` (adjacent to "Measure
+  with `docker stats`, not per-process RSS") flagging that pre-fix
+  failing-cell RSS figures — including the 2026-08-24/25 "12.4 GB" figures
+  in issue #2537 — are suspect, not data. Verify: `dune runtest
+  trading/devtools/checks/` (or `sh
+  trading/devtools/checks/golden_sp500_postsubmit_rss_smoke.sh` directly).
+
 ### Repo-compression verification tooling (2026-08-20)
 
 - [x] `dev/scripts/prune_candidates.sh` — verified, never-delete repo-compression

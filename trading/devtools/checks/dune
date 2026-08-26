@@ -464,6 +464,23 @@
  (action
   (run sh %{dep:docker_dune_smoke.sh})))
 
+; Smoke test for dev/scripts/golden_sp500_postsubmit.sh's peak-RSS parsing
+; (issue #2553): `tr -d '\n'` over GNU /usr/bin/time's output file fused the
+; trailing status-line digit onto the %M value on FAILING cells only (e.g.
+; "Command exited with non-zero status 1" + "745192" -> "1745192", off by
+; ~1GB) -- exactly when someone reads the number. Dot-sources the real
+; script with POSTSUBMIT_RSS_PARSE_TEST=1 to call its _parse_gnu_time_rss()
+; helper directly against fixture files. golden_sp500_postsubmit.sh lives
+; under dev/scripts/, outside the dune workspace root, and is read via
+; repo_root() in _check_lib.sh at RUN TIME, so (universe) is required for
+; the same reason as docker_dune_smoke.sh above (H-CHECK-CACHE-BLIND).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:golden_sp500_postsubmit_rss_smoke.sh})))
+
 ; Rule promotion check (T3-F): verify every Lifecycle: enforced rule in
 ; docs/design/dependency-rules.md has a corresponding check script that
 ; exists on disk and is referenced by this dune file.

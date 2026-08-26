@@ -103,6 +103,27 @@ opens the warehouse. Two operational consequences:
 - An **RSS-based post-mortem would misattribute an OOM** — a 10 GB peak-RSS line
   in a log is not evidence the process was near the limit.
 
+### ⚠ Pre-#2553 kill-report RSS figures are suspect on failing cells
+
+`dev/scripts/golden_sp500_postsubmit.sh` reported peak RSS via
+`rss_value=$(tr -d '\n' <"$rss_path")`, which strips ALL newlines from GNU
+`/usr/bin/time`'s output file. On a zero-exit cell that file is just the
+`%M` value and this is harmless; on a **non-zero-exit cell**, GNU time
+additionally writes a leading status line ("Command exited with non-zero
+status 1"), and stripping newlines fuses the trailing status digit onto the
+RSS digits — e.g. a real `745192` kB reads as `1745192`, off by ~1 GB — and
+only on **FAILING** cells, exactly when someone is reading the number to
+diagnose a kill. Fixed in #2553 by parsing the file's last line instead of
+stripping all newlines (`trading/devtools/checks/golden_sp500_postsubmit_rss_smoke.sh`
+pins the fix with a fixture-driven RED/GREEN regression test).
+
+Consequence: any peak-RSS figure quoted from this script's output **on a
+failing cell, from before the #2553 fix landed**, should be read as
+suspect rather than as data — including the 2026-08-24/25 GHA "12.4 GB"
+figures cited in issue #2537 (unverifiable now, since those runs uploaded no
+artifacts pre-#2549; a `1` + `2450164` split would put the real figure at
+~2.4 GB). Passing-cell RSS figures from the same script were never affected.
+
 ## Diagnosing an OOM kill (it does not announce itself)
 
 Symptoms: scenario reports `FAIL (scenario crashed or did not write
