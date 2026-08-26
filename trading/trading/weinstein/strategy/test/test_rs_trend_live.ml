@@ -17,7 +17,7 @@
     {!Stock_analysis.analyze_with_callbacks} — so the depth actually under test
     is the one the strategy ships.
 
-    Four pins:
+    Five pins:
     - the config default covers {!Rs.min_aligned_bars_for_trend} (the arithmetic
       tripwire that would have caught the defect at its source);
     - a constructed zero-cross series classifies [Bullish_crossover] and a
@@ -25,8 +25,11 @@
     - across a multi-symbol run the enum takes more than one value (the
       distribution tripwire that was missing);
     - the degenerate paths still degrade as documented: at the old depth the
-      same series collapses to [Positive_flat], and below [rs_ma_period] the
-      analysis is [None]. *)
+      same series collapses to [Positive_flat], below [rs_ma_period] the
+      analysis is [None], and in the [rs_ma_period + 1 .. floor - 1] band the
+      comparison silently clamps to a shorter span;
+    - {!Screener_admission.rs_blocks_short} — the admission consumer whose
+      verdict flips with the depth — is pinned on both sides of the floor. *)
 
 open OUnit2
 open Core
@@ -98,10 +101,14 @@ let _reader () =
 let _as_of = Date.add_days _start_friday ((_min_bars - 1) * 7)
 
 (** Run the screener's own Phase-2 wiring for [symbol] over a [depth]-week
-    weekly view and return the RS trend it classified. [depth] defaults to the
-    shipped [lookback_bars]; passing a smaller value reproduces a shallower
-    config without changing the underlying bars. *)
-let _trend_of ?depth reader symbol =
+    weekly view and return the whole {!Rs.result} it produced. [depth] defaults
+    to the shipped [lookback_bars]; passing a smaller value reproduces a
+    shallower config without changing the underlying bars.
+
+    Returning the result rather than just its [trend] lets the admission
+    consumer ({!Screener_admission.rs_blocks_short}) be exercised on exactly the
+    value the screener would hand it. *)
+let _rs_of ?depth reader symbol =
   let config =
     Weinstein_strategy.default_config
       ~universe:(List.map _fixtures ~f:fst)
@@ -121,7 +128,10 @@ let _trend_of ?depth reader symbol =
     Stock_analysis.analyze_with_callbacks ~config:analysis_config ~ticker:symbol
       ~callbacks ~prior_stage:None ~as_of_date:_as_of
   in
-  Option.map analysis.Stock_analysis.rs ~f:(fun r -> r.Rs.trend)
+  analysis.Stock_analysis.rs
+
+let _trend_of ?depth reader symbol =
+  Option.map (_rs_of ?depth reader symbol) ~f:(fun r -> r.Rs.trend)
 
 (* ------------------------------------------------------------------ *)
 (* 1. The arithmetic tripwire                                           *)
@@ -212,6 +222,62 @@ let test_below_ma_period_yields_no_rs _ =
     (_trend_of ~depth:(_rs_cfg.rs_ma_period - 1) (_reader ()) "XOVR")
     is_none
 
+(** The third degenerate regime, the one between the other two:
+    [rs_ma_period + 1 .. min_aligned_bars_for_trend - 1] weekly bars (53-55 at
+    the defaults) leave [2..trend_lookback] history entries, so
+    [Rs._classify_trend]'s
+    [List.nth_exn history (max 0 (n - 1 - trend_lookback))] saturates at index
+    [0] and compares across a {i shorter} span than [trend_lookback]. It does
+    not error and it does not return [None] — it returns a plausible-looking
+    classification computed over the wrong window, which is the same failure
+    mode this whole pin exists to close.
+
+    "XOVR" makes the clamp observable: its zero-line cross sits between four and
+    five history entries back, so the full [trend_lookback]-span comparison
+    reaches under the line and reports [Bullish_crossover] (pinned above), while
+    every clamped span stays inside the final advance and reports
+    [Positive_rising] instead. The whole band is asserted so the boundary cannot
+    drift on one side unnoticed. *)
+let test_clamp_band_compares_over_a_shorter_span _ =
+  let reader = _reader () in
+  let band =
+    List.init
+      (_min_bars - 1 - _rs_cfg.rs_ma_period)
+      ~f:(fun i -> _rs_cfg.rs_ma_period + 1 + i)
+  in
+  assert_that
+    (List.map band ~f:(fun depth -> _trend_of ~depth reader "XOVR"))
+    (elements_are
+       (List.map band ~f:(fun _ ->
+            is_some_and (equal_to Weinstein_types.Positive_rising))))
+
+(* ------------------------------------------------------------------ *)
+(* 5. The admission consumer whose verdict flips with the depth        *)
+(* ------------------------------------------------------------------ *)
+
+(** {!Screener_admission.rs_blocks_short} is a {b hard} gate — [screener.ml]'s
+    short branch is an unconditional [-> None] on it — and it returns [true] for
+    [Positive_rising | Positive_flat | Bullish_crossover]. At the old depth the
+    trend was [Positive_flat] for every candidate carrying RS data, so the gate
+    was universally [true] and no such candidate could ever be shorted. At the
+    shipped depth the same bars classify [Negative_declining] and the gate
+    admits them.
+
+    "FALL" is the fixture whose deeper view is [Negative_declining] (pinned by
+    the distribution test above), so both arms below read the same bars and the
+    flip is attributable to depth alone — the same construction as
+    {!test_old_depth_collapses_to_positive_flat}, carried one step further into
+    the consumer. The existing short-side suite cannot see this: its fixture has
+    {i absent} RS ([test_short_side_bear_window.ml]), which takes the
+    [rs_blocks_short None = false] path either way. *)
+let test_rs_blocks_short_flips_with_depth _ =
+  let reader = _reader () in
+  assert_that
+    ( Screener_admission.rs_blocks_short
+        (_rs_of ~depth:_rs_cfg.rs_ma_period reader "FALL"),
+      Screener_admission.rs_blocks_short (_rs_of reader "FALL") )
+    (equal_to (true, false))
+
 let suite =
   "rs_trend_live"
   >::: [
@@ -227,6 +293,10 @@ let suite =
          "old_depth_collapses_to_positive_flat"
          >:: test_old_depth_collapses_to_positive_flat;
          "below_ma_period_yields_no_rs" >:: test_below_ma_period_yields_no_rs;
+         "clamp_band_compares_over_a_shorter_span"
+         >:: test_clamp_band_compares_over_a_shorter_span;
+         "rs_blocks_short_flips_with_depth"
+         >:: test_rs_blocks_short_flips_with_depth;
        ]
 
 let () = run_test_tt_main suite

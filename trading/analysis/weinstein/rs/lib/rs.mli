@@ -42,7 +42,14 @@ val min_aligned_bars_for_trend : config -> int
     - Classification compares the newest history entry against the one
       [trend_lookback] entries back, so it needs [trend_lookback + 1] entries.
       With fewer than [2] it short-circuits to [Positive_flat]; with
-      [2.. trend_lookback] the comparison silently clamps to a shorter span.
+      [2.. trend_lookback] the comparison silently clamps to a shorter span — it
+      neither errors nor returns [None], it returns a plausible classification
+      computed over the wrong window.
+
+    Both degenerate regimes are pinned end-to-end through the strategy's own
+    panel path by [test_rs_trend_live.ml]
+    ([old_depth_collapses_to_positive_flat] for the [n < 2] guard,
+    [clamp_band_compares_over_a_shorter_span] for the clamp band).
 
     Callers that build their own weekly view (the strategy's [lookback_bars])
     must size it at least this deep — under-sizing does not error, it degrades
