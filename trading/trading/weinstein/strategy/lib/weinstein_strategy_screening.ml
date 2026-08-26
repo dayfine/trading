@@ -66,14 +66,9 @@ let _classify_stage_for_screening ~config ~bar_reader ~prior_stages
     in
     Some (ticker, stock_view, prior_stage, stage_result)
 
-(** The screen pass's [Rs.config]: {!Rs.default_config} with the
-    [Positive_declining] state armed iff
-    [Weinstein_strategy_config.enable_rs_positive_declining] is set (default
-    [false] ⇒ byte-identical to {!Rs.default_config}).
-
-    Extracted to top level rather than inlined into
-    {!_stock_analysis_config_for}'s record literal so that function keeps one
-    level of record nesting; see its own note on the nesting cap. *)
+(** The screen pass's [Rs.config]: {!Rs.default_config} plus
+    [Weinstein_strategy_config.enable_rs_positive_declining] (default [false] ⇒
+    byte-identical). Top-level to keep the caller's literal one level deep. *)
 let _rs_config_for ~(config : Weinstein_strategy_config.config) : Rs.config =
   {
     Rs.default_config with
@@ -100,8 +95,7 @@ let _rs_config_for ~(config : Weinstein_strategy_config.config) : Rs.config =
     counterpart, {!Volume_eject_runner}, reads the {i same} predicate, so volume
     is never dropped: it moves from the screen week to the fill week (book §4.7
     / §4.2), and (g) threading the RS [Positive_declining] state via
-    {!_rs_config_for} ([Weinstein_strategy_config.enable_rs_positive_declining],
-    default off ⇒ [Rs.default_config], bit-identical).
+    {!_rs_config_for} (default off ⇒ [Rs.default_config], bit-identical).
 
     The [min_history_bars] override sets [config.resistance.min_history_bars];
     because {!Stock_analysis} reuses the same [Resistance.config] record for the
