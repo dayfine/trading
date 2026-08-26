@@ -44,8 +44,11 @@ type config = {
   lookback_bars : int;
       (** Depth, in weekly bars, of the standard per-symbol weekly view the
           screen reads ([Bar_reader.weekly_view_for ~n:lookback_bars]). Every
-          weekly analysis except resistance/support — stage classification, RS,
-          volume, breakout detection — sees exactly this many weeks.
+          weekly analysis — stage classification, RS, volume, breakout detection
+          — sees exactly this many weeks, except resistance/support {i when}
+          [resistance_lookback_bars] is armed. At that knob's [0] default the
+          separate resistance view is [None] ([Weinstein_strategy_screening]),
+          so breakout/resistance-zone detection reads this depth too.
 
           {b Default [56] (since 2026-08-25, issue #2380).} It was [52], which
           silently disabled {!Rs} trend classification entirely. Derivation of
@@ -64,11 +67,41 @@ type config = {
 
           At [52] the history was exactly [1] entry long, so {b every} candidate
           in {b every} run classified [Positive_flat] — 4,231 tickets across
-          three independently-run arms, zero non-flat. That made the
-          [Bullish_crossover] scoring bonus
-          ({!Screener.w_bullish_rs_crossover}), the §4.5 [rs_zero_cross] ticket
-          tag, and the [Rs]-trend term of the sector rating all unreachable.
-          This is a correctness fix, not a performance lever — see issue #2380.
+          three independently-run arms, zero non-flat.
+
+          {b Scope of that claim:} it covers everything reading {i this} view.
+          The [all_eligible] / [optimal] feature-capture path is {b not}
+          affected — it builds its own per-Friday weekly slice at
+          [bar_lookback_weeks = 90] and calls [Stock_analysis.analyze] directly,
+          never reading this field, so [rs_trend] was live there throughout.
+
+          {b Four} consumers of {!Rs.result.trend} were affected, three
+          unreachable and one stuck:
+
+          - the [Bullish_crossover] scoring bonus
+            ({!Screener_scoring.w_bullish_rs_crossover}) — unreachable;
+          - the §4.5 [rs_zero_cross] ticket tag — unreachable;
+          - the [Rs]-trend term of the sector rating — unreachable;
+          - {b {!Screener_admission.rs_blocks_short}} — {b stuck at [true]}.
+            This one is not a scoring input but a {b hard admission gate}:
+            [Screener]'s short branch is an unconditional [-> None] on it, and
+            it returns [true] for
+            [Positive_rising | Positive_flat | Bullish_crossover]. With the
+            trend pinned at [Positive_flat], it rejected {b every} short
+            candidate carrying an RS series, so the short side was structurally
+            dead rather than merely conservative
+            ([dev/notes/short-side-real-data-verification-2026-04-27.md]: 0
+            shorts in 133 trades over 2019-2023, including zero in the 2022
+            bear). At [56] the negative states become reachable and the gate
+            starts discriminating — which is what Ch. 11's "never short a stock
+            with strong relative strength" actually asks for; a gate that blocks
+            {i all} shorts is not that rule. Pinned by
+            [test_rs_blocks_short_flips_with_depth].
+
+          The first three are why this is framed as a correctness fix rather
+          than a performance lever. The fourth is {b not} return-neutral by
+          construction — re-enabling the short side has a return impact, and the
+          long-short goldens are expected to move. See issue #2380.
 
           {b Warmup interaction.} [Backtest.Runner._weekly_strategy_warmup_days]
           is [364] (~52 weeks), so at the very start of a measurement window

@@ -204,18 +204,24 @@ let test_six_year_full_lifecycle _ =
      minimum weekly depth at which [Rs._classify_trend] can classify at all.
      Before it, the RS history was one entry long and EVERY candidate in EVERY
      run came back [Positive_flat], so the screener's RS scoring term was a
-     constant [w_positive_rs / 2] carrying zero ranking information. With the
-     term live, ranking differentiates and two more entries clear the top-N on
-     this window: buys 28 -> 30, sells 24 -> 26, round-trips 24 -> 26, losses
+     constant [w_positive_rs / 2] carrying zero ranking information.
+
+     Observed here: buys 28 -> 30, sells 24 -> 26, round-trips 24 -> 26, losses
      20 -> 22 (wins unchanged at 4), final value 491,691.09 -> 487,853.30,
      realized max drawdown 3.65% -> 4.41%. Same 7-symbol set, same 2187 steps.
+
+     NOT ATTRIBUTED to the RS term. The 4-bar-deeper view moves every standard
+     weekly consumer at once — volume and breakout/resistance zones as well as
+     RS — and the two were not varied independently, so no mechanism is claimed
+     for the delta ([.claude/rules/mechanism-validation-rigor.md]). A plausible
+     reading is that a now-differentiating ranking lets two more entries clear
+     the top-N, but this fixture cannot distinguish that from the widening
+     alone.
 
      This is a CORRECTNESS re-pin, not a result claim: the direction of the
      move on one 7-symbol fixture is noise, and no return improvement was
      expected or is asserted (rs_value carries no measurable ranking edge —
-     permutation p = 0.182, issue #2380). The deeper view also reaches every
-     other standard weekly consumer (volume, breakout/resistance zones), so
-     part of the delta is that widening rather than the RS term alone. *)
+     permutation p = 0.182, issue #2380). *)
   assert_that (List.length result.steps) (equal_to 2187);
   assert_that n_buys (equal_to 30);
   assert_that n_sells (equal_to 26);
