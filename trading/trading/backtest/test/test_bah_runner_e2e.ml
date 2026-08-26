@@ -108,12 +108,13 @@ let _sector_map_override fixtures_root (s : Scenario.t) =
 
     {b Re-pinned 2026-08-26} (1_903_976.65 -> 1_896_010.32, -0.42%): the
     fill-model default flip (#2405 — [enable_sim_entry_stoplimit] [true] +
-    [entry_extension_max_pct] [2.0]) moved this cell. {b Cause, and why a BAH
-    cell moved at all:} [Panel_runner._entry_cap_for_sim] reads the run's
-    {i Weinstein} config and threads the cap into [Simulator.create_deps]
+    [entry_extension_max_pct] [2.0]) moved this cell.
+    {b Cause, and why a BAH cell moved at all:}
+    [Panel_runner._entry_cap_for_sim] reads the run's {i Weinstein} config and
+    threads the cap into [Simulator.create_deps]
     {b regardless of [strategy_choice]} — as it already does for
-    [margin_config], [stale_hold_policy] and [sim_entry_fill_next_open] — so
-    the BAH sleeve's single day-1 Market entry now resolves to
+    [margin_config], [stale_hold_policy] and [sim_entry_fill_next_open] — so the
+    BAH sleeve's single day-1 Market entry now resolves to
     [StopLimit (E, E * 1.02)] and fills at a different price. User-directed
     fidelity change; {b no return-improvement claim}. Whether a non-Weinstein
     benchmark {i should} inherit that cap is recorded as an open follow-up on
@@ -129,9 +130,9 @@ let _expected_final_equity = 1_896_010.32
     $1,769,354.38. Same [current_date >= end_date] [is_complete] semantics as
     the SPY cell.
 
-    {b Re-pinned 2026-08-26} (1_769_354.38 -> 1_755_319.48, -0.79%): same
-    cause as the SPY cell above — the fill-model default flip (#2405) routes
-    this sleeve's day-1 entry through [StopLimit (E, E * 1.02)]. *)
+    {b Re-pinned 2026-08-26} (1_769_354.38 -> 1_755_319.48, -0.79%): same cause
+    as the SPY cell above — the fill-model default flip (#2405) routes this
+    sleeve's day-1 entry through [StopLimit (E, E * 1.02)]. *)
 let _expected_final_equity_brk_b_5y = 1_755_319.48
 
 (** ±0.05% band around the expected equity. The number is fully deterministic

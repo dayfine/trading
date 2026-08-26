@@ -846,31 +846,33 @@ type config = {
           why the section's "Late Stage 2 warning" is deliberately NOT the
           citation.
 
-          {b Default [2.0] = the live value} ({!default_entry_extension_max_pct};
+          {b Default [2.0] = the live value}
+          ({!default_entry_extension_max_pct};
           {b flipped from the [0.0] no-op on 2026-08-26} together with
-          [enable_sim_entry_stoplimit] — user-directed fidelity decision recorded
-          on issue #2405). [2.0] is the #2404-unified live value (user decision
-          2026-08-25: live's old [15.0] was a one-day eyeball calibration, and
-          [2.0] is the corpus value the staged record-convention specs already
-          used). The default and
+          [enable_sim_entry_stoplimit] — user-directed fidelity decision
+          recorded on issue #2405). [2.0] is the #2404-unified live value (user
+          decision 2026-08-25: live's old [15.0] was a one-day eyeball
+          calibration, and [2.0] is the corpus value the staged
+          record-convention specs already used). The default and
           [dev/weekly-picks/live-config-overrides.sexp] now agree, so a backtest
-          run from the default config prices its entry tickets the way the weekly
-          picks do.
+          run from the default config prices its entry tickets the way the
+          weekly picks do.
 
           {b The flip is a fidelity change, not a return claim.} The
           [2026-08-04] entry-ledger entry REJECTED this pair on returns; that
           surface compared sim-vs-sim, which is the wrong estimand for "does the
           simulator model the orders we actually place". See
           [enable_sim_entry_stoplimit] for the full R3 basis. No golden moves
-          {i because} the numbers improved — they move because the basis changed.
+          {i because} the numbers improved — they move because the basis
+          changed.
 
           Setting [0.0] restores the pre-flip no-op: every candidate carries
           [Entry_reconciliation.Not_reconciled], sizing uses [entry] exactly as
           before, and (with the cap absent) the backtest runner falls back to
-          Market entry fills. Consumed by
-          [Weekly_snapshot_generator.generate] (report/live-ticket path), and —
-          only when [enable_sim_entry_stoplimit] is also on — by the backtest
-          runner as the simulator's entry-fill cap. R2: resolves through
+          Market entry fills. Consumed by [Weekly_snapshot_generator.generate]
+          (report/live-ticket path), and — only when
+          [enable_sim_entry_stoplimit] is also on — by the backtest runner as
+          the simulator's entry-fill cap. R2: resolves through
           [Backtest.Overlay_validator.apply_overrides]. *)
   enable_sim_entry_stoplimit : bool; [@sexp.default true]
       (** Simulator entry fill model (#2158 Phase 2) — when [true] AND
@@ -885,8 +887,8 @@ type config = {
           [Entry_reconciliation] semantics.
 
           {b Default [true] since 2026-08-26} — flipped as a PAIR with
-          [entry_extension_max_pct] ([0.0] -> [2.0]), because the runner arms the
-          StopLimit path iff
+          [entry_extension_max_pct] ([0.0] -> [2.0]), because the runner arms
+          the StopLimit path iff
           [enable_sim_entry_stoplimit && entry_extension_max_pct > 0.0]
           ([Backtest.Panel_runner] [_entry_cap_for_sim];
           [Backtest.Execution_faithfulness.entry_order_kind_of_config]), so a
@@ -899,8 +901,8 @@ type config = {
           [dev/experiments/_ledger/] REJECTED this flip {i on returns}, and that
           verdict is not disputed here: it is overridden, openly, because the
           surface that produced it compared {b sim-vs-sim} — the wrong estimand
-          for the question actually being decided, which is whether the simulator
-          models the orders live actually places. Live emits
+          for the question actually being decided, which is whether the
+          simulator models the orders live actually places. Live emits
           [Weinstein_order_gen] [StopLimit (E, cap)] tickets; before this flip
           the default backtest filled the same decisions as Market orders, so
           every default-config number described an execution model nobody runs.
@@ -908,8 +910,8 @@ type config = {
           the basis moved.
 
           {b ⚠ This is a fill-model basis change}: every golden not already
-          arming the pair is re-pinned by the flip. Weinstein authority: the book
-          locates the buy at the breakout or a pullback close to it, so an
+          arming the pair is re-pinned by the flip. Weinstein authority: the
+          book locates the buy at the breakout or a pullback close to it, so an
           unfilled order (missing > chasing) is the faithful failure mode. R2:
           still axis-expressible as
           [((flag enable_sim_entry_stoplimit) (values (true false)))]; setting
@@ -927,12 +929,13 @@ type config = {
           [compute_position_size ~entry_price] at the same [effective_entry].
 
           {b Default [false] = current-close trigger, bit-identical to every
-             existing baseline/golden} (R1). {b ⚠ Since the 2026-08-26 fill-model
-          flip, [enable_sim_entry_stoplimit] is default-[true]}, so arming this
-          field alone DOES move a backtest number — the previous
-          "gated on a default-off flag, therefore inert" note no longer holds.
-          {b ⚠ A fill-model basis change when armed} — its own
-          WF-CV surface, never bundled. R2: axis-expressible as
+             existing baseline/golden} (R1).
+          {b ⚠ Since the 2026-08-26 fill-model flip,
+             [enable_sim_entry_stoplimit] is default-[true]}, so arming this
+          field alone DOES move a backtest number — the previous "gated on a
+          default-off flag, therefore inert" note no longer holds.
+          {b ⚠ A fill-model basis change when armed} — its own WF-CV surface,
+          never bundled. R2: axis-expressible as
           [((flag sim_entry_trigger_at_suggested) (values (true false)))].
           Decision record: [dev/plans/gtc-breakout-orders-2026-08-05.md] Step 0
           option (b).
@@ -1194,7 +1197,7 @@ type config = {
           [enable_sim_entry_stoplimit] {i as of that date} (the only place a
           clock can bite, since Market entries fill immediately and never rest —
           {b since the 2026-08-26 fill-model flip made that flag default-[true],
-          every default-config run rests tickets}, so the clock now bites
+             every default-config run rests tickets}, so the clock now bites
           everywhere; it stays at the unbounded [0] default), clock=26 measured
           {b −40.91pp} against clock=0 across three salts with
           {b complete separation}. The mechanism is a {b tail-touching lever}:
