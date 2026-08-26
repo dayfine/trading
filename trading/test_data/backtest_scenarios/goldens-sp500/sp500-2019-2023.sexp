@@ -1,29 +1,29 @@
 ;; perf-tier: 3
-;; perf-tier-rationale: ~500-symbol S&P 500 universe over 5 years (2019-2023, includes COVID + recovery + 2022 bear). Weekly cadence (â¤2 h budget). See dev/plans/perf-scenario-catalog-2026-04-25.md tier 3.
+;; perf-tier-rationale: ~500-symbol S&P 500 universe over 5 years (2019-2023, includes COVID + recovery + 2022 bear). Weekly cadence (≤2 h budget). See dev/plans/perf-scenario-catalog-2026-04-25.md tier 3.
 ;;
-;; S&P 500 golden â regression-pinned trading + performance benchmark.
+;; S&P 500 golden — regression-pinned trading + performance benchmark.
 ;; Universe is a 491-symbol S&P 500 snapshot (universes/sp500.sexp,
 ;; generated 2026-04-26). Period covers a full Weinstein cycle:
 ;;   * 2019: late-cycle advance.
 ;;   * 2020 H1: COVID crash (Stage 4 trigger).
-;;   * 2020 H2 - 2021: V-shaped recovery (Stage 1 â Stage 2 transitions).
+;;   * 2020 H2 - 2021: V-shaped recovery (Stage 1 → Stage 2 transitions).
 ;;   * 2022: bear (Stage 4 across most names).
 ;;   * 2023: recovery, leadership rotation.
 ;;
-;; This is the foundation benchmark for downstream feature work â short-side
+;; This is the foundation benchmark for downstream feature work — short-side
 ;; strategy, segmentation-based stage classifier, stop-buffer tuning, etc.
 ;; Once metrics here are pinned, follow-on PRs measure against this baseline.
 ;;
 ;; Expected ranges are pinned around the canonical run with cushion sized to
 ;; absorb the start-date IQR observed in the PR #788 fuzz (5 variants at
-;; Â±2w around 2019-01-02). Re-pin with each deliberate strategy behaviour
+;; ±2w around 2019-01-02). Re-pin with each deliberate strategy behaviour
 ;; change; don't bump these to absorb regressions.
 ;;
 ;; Measured baseline (2026-05-02, post-#744+#745+#746+#771):
 ;;   total_return_pct  +60.86  total_trades 86   win_rate ~22.35
 ;;   sharpe_ratio       0.55   max_drawdown 34.15
 ;;
-;; Verified via PR #788 fuzz: 5 variants Â±2w start_date all returned
+;; Verified via PR #788 fuzz: 5 variants ±2w start_date all returned
 ;; +37.92% to +60.86% / Sharpe 0.41-0.56 / MaxDD 31.28-35.99 / 82-99 trades
 ;; (see dev/experiments/fuzz-startdate-canonical-full/fuzz_distribution.md).
 ;; The pin shift from the prior 2026-04-30 baseline (-0.01% / 32 trades /
@@ -33,7 +33,7 @@
 ;; small drift (start-date sensitivity, calendar rolls) does not flap CI.
 ;;
 ;; (Pre-rename: this metric was named [unrealized_pnl] but its semantics
-;; matched the renamed [Metric_types.OpenPositionsValue] â signed mtm value
+;; matched the renamed [Metric_types.OpenPositionsValue] — signed mtm value
 ;; of open positions, NOT true paper P&L. The rename in PR
 ;; feat/metrics-unrealized-pnl-rename clarifies the distinction; the
 ;; corrected [UnrealizedPnl] metric (= OpenPositionsValue minus position
@@ -43,7 +43,7 @@
 ;; so reruns are reproducible. Refresh the universe via the build script
 ;; (TODO: dev/scripts/build_sp500_universe.sh) when re-baselining.
 ((name "sp500-2019-2023")
- (description "S&P 500 over 2019-2023 â full Weinstein cycle benchmark â Cell E config")
+ (description "S&P 500 over 2019-2023 — full Weinstein cycle benchmark — Cell E config")
  (period ((start_date 2019-01-02) (end_date 2023-12-29)))
  (universe_path "universes/sp500.sexp")
  (universe_size 500)
@@ -56,7 +56,7 @@
  ;;   sharpe_ratio       0.56   max_drawdown 21.56 avg_holding_days  40.78
  ;;   open_positions_value 1,221,041
  ;;   sortino_ratio_annualized 0.75   calmar_ratio 0.40   ulcer_index 8.41
- ;; MaxDD cut 12pp (34 â 22), trade count 3.3x. Tolerances Â±15%.
+ ;; MaxDD cut 12pp (34 → 22), trade count 3.3x. Tolerances ±15%.
  (config_overrides
   (((portfolio_config ((max_position_pct_long 0.14))))
    ((portfolio_config ((max_long_exposure_pct 0.70))))
@@ -80,7 +80,7 @@
    (screening_config "live arms candidate_ranking=Quality (#1782, report ordering) and failed_breakout_tolerance_pct=0.05 (#2084); the backtest defaults stay unarmed per experiment-flag R1")
    (resistance_lookback_bars "live feeds the resistance/support mapper 520 weekly bars for the human report only")
    (entry_through_band_pct "live-only entry-reconciliation band for the printed ticket (#2103); read by Weekly_snapshot_generator, never by on_market_close")
-   (entry_extension_max_pct "live arms 2.0 (#2404 user decision 2026-08-25, measured winner); this cell runs the 0.0 default (uncapped) — report-side ticket cap, never read by on_market_close unless enable_sim_entry_stoplimit arms it")
+   (entry_extension_max_pct "live arms 2.0 (#2404 user decision 2026-08-25, measured winner); this cell runs the 0.0 default (uncapped) -- report-side ticket cap, never read by on_market_close unless enable_sim_entry_stoplimit arms it")
    (sparse_tail_min_bars "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
    (sparse_tail_window_trading_days "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
    (rename_detect_min_overlap_days "live-only ticker-rename detector (#2083 fix 2); report-layer data hygiene, no backtest consumer")
@@ -89,7 +89,7 @@
  ;; for the full rationale. [retail_default] with per_trade=0 is byte-equal
  ;; to [None] under current wiring (only [apply_per_trade_commission] is
  ;; hooked); spread / per_share will activate once
- ;; [Cost_model.to_engine_costs] is wired into [Panel_runner] â Open work
+ ;; [Cost_model.to_engine_costs] is wired into [Panel_runner] — Open work
  ;; item in `dev/status/cost-model.md`. Pinning the overlay declaratively now
  ;; means future wiring lands without touching every golden again.
  (cost_model
@@ -101,26 +101,26 @@
   ;; Re-pinned 2026-08-24 for the book-faithful stops basis (PR #2530:
   ;; initial_stop_buffer 1.0 + reset_anchor_on_stalled_cycle default-on;
   ;; user-directed #2486; ledger 2026-08-24-stops-basis-book-faithful).
-  ;; Â±15% around new-basis actuals at c7660cac3 (dev/experiments/record-baseline-2026-08-24/).
+  ;; ±15% around new-basis actuals at c7660cac3 (dev/experiments/record-baseline-2026-08-24/).
   ;; Re-pinned 2026-06-23 for the A-D-live default flip (synthetic breadth tail).
-  ;; A-D-live's conservative COVID gate raised risk metrics here (MaxDD 21.6â31.3,
-  ;; Calmar 0.46â0.26); return held (in band). Longshort still beats its long-only twin.
-  ;; Re-pinned 2026-07-08 for the warmup 210â364 fix (RS present from the first
-  ;; screen; dev/notes/warmup-364-repin-2026-07-08.md), Â±15% around 364 actuals:
+  ;; A-D-live's conservative COVID gate raised risk metrics here (MaxDD 21.6→31.3,
+  ;; Calmar 0.46→0.26); return held (in band). Longshort still beats its long-only twin.
+  ;; Re-pinned 2026-07-08 for the warmup 210→364 fix (RS present from the first
+  ;; screen; dev/notes/warmup-364-repin-2026-07-08.md), ±15% around 364 actuals:
   ;;   ret 45.73  trades 274  win 36.50  sharpe 0.56  maxDD 24.90  hold 38.67
   ;;   OPV 1,180,589  sortino 0.69  calmar 0.31  ulcer 9.67
-  ;; Risk metrics IMPROVED here (DD 31.3â24.9) â the RS-honest early-window
+  ;; Risk metrics IMPROVED here (DD 31.3→24.9) — the RS-honest early-window
   ;; cohort holds a less crash-exposed 2019 book into COVID on this window.
   ;; Verified IN-BAND under the 2026-07-11 REALISM-DEFAULTS flip (user mandate;
-  ;; min_entry_dollar_adv 0.0â1e6 + stale_exit_after_days NoneâSome 5; ledger
+  ;; min_entry_dollar_adv 0.0→1e6 + stale_exit_after_days None→Some 5; ledger
   ;; 2026-07-10-realism-defaults-flip): re-measured against test_data (--parallel 3)
   ;; = 44.43% / 276 / 35.14 / 0.541 / 24.95 / 40.28 / OPV 1,169,563 / sortino 0.670
-  ;; / calmar 0.306 / ulcer 10.19 / force_liqs 1 â a â2.8% return drift vs the 364
+  ;; / calmar 0.306 / ulcer 10.19 / force_liqs 1 — a −2.8% return drift vs the 364
   ;; center (45.73), all metrics comfortably in-band. SP500 names are liquid, so
   ;; the entry gate is near-inert here (STOP-rule >20% not triggered). Bands
   ;; unchanged.
   ;; RE-PINNED 2026-08-26 for the #2380 RS-trend fix (PR #2555: lookback_bars
-  ;; 52->56 makes the trend classifier + its three consumers live for the
+  ;; 52->56 makes the trend classifier + its FOUR consumers live for the
   ;; first time; the 4 deeper bars also reach volume/breakout detection).
   ;; +-15% around actuals from the paired run at PR tip 5b6472afd (local,
   ;; pinned worktree, committed store). CORRECTNESS re-pin: per the #2380
@@ -137,6 +137,6 @@
    (sortino_ratio_annualized ((min 1.0463) (max 1.4158)))
    (calmar_ratio ((min 0.5267) (max 0.7127)))
    (ulcer_index ((min 8.0507) (max 10.8923)))
-   ;; wall_seconds pin sized wide (CI ~920s, local parallel ~200s) â
+   ;; wall_seconds pin sized wide (CI ~920s, local parallel ~200s) —
    ;; catches only catastrophic 2x slowdowns per design intent.
    (wall_seconds       ((min 0.0)          (max 1500.0))))))

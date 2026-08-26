@@ -1,25 +1,25 @@
 ;; perf-tier: 3
 ;; perf-tier-rationale: ~500-symbol S&P 500 universe over 5 years, long-only
 ;; variant of [sp500-2019-2023]. Same period (2019-2023) and universe; only
-;; difference is [enable_short_side = false]. Weekly cadence, â¤2 h budget.
+;; difference is [enable_short_side = false]. Weekly cadence, ≤2 h budget.
 ;;
 ;; Long-only counterpart to [sp500-2019-2023.sexp]. Tracking both lets us
 ;; isolate whether strategy issues are short-side-specific or general:
 ;;
-;;   * If long-only PASSes pins but the with-shorts variant FAILs â issue is
+;;   * If long-only PASSes pins but the with-shorts variant FAILs → issue is
 ;;     in short-side machinery (e.g., G15 short-side risk control).
-;;   * If both FAIL similarly â issue is in shared strategy components
+;;   * If both FAIL similarly → issue is in shared strategy components
 ;;     (e.g., G14 screener resistance calc / Position.t entry_price).
 ;;
-;; Pinned ranges intentionally TIGHT â they target the "fully fixed" state,
+;; Pinned ranges intentionally TIGHT — they target the "fully fixed" state,
 ;; not current behavior. Both variants currently FAIL these pins. The
 ;; long-only FAIL surfaces G14 explicitly (~6 spurious Per_position
-;; force-liqs from the screener / Position.t price-space mismatch â see
+;; force-liqs from the screener / Position.t price-space mismatch — see
 ;; dev/notes/g14-deep-dive-2026-05-01.md).
 ;;
 ;; Pinned values mirror [sp500-2019-2023.sexp] expected ranges: same 5-year
 ;; period, same universe, and the long-only side is a strict subset of the
-;; with-shorts strategy. The "ideal" long-only profile should be â the
+;; with-shorts strategy. The "ideal" long-only profile should be ≈ the
 ;; with-shorts baseline modulo the short-side contribution, which has
 ;; historically been small (PR #711 measured 4 short trades / 32 total).
 ;; If long-only diverges meaningfully from this target post-fix, re-pin
@@ -30,7 +30,7 @@
 ;;   sharpe_ratio       0.62   max_drawdown 31.78  avg_holding_days 69.51
 ;;   open_positions_value 1,481,963  force_liquidations 6 (all Per_position, G14)
 ;;
-;; (Pre-rename the [unrealized_pnl] field above carried mtm-value semantics â
+;; (Pre-rename the [unrealized_pnl] field above carried mtm-value semantics —
 ;; the same quantity now exposed as [Metric_types.OpenPositionsValue]. The
 ;; corrected [UnrealizedPnl] metric (open positions value minus cost basis)
 ;; was first emitted in PR feat/metrics-unrealized-pnl-rename; on the
@@ -41,7 +41,7 @@
 ;; that gap is closed by fixing G14 alone, or whether it requires a real
 ;; risk control (G15-style for longs), is part of what these pins surface.
 ((name "sp500-2019-2023-long-only")
- (description "S&P 500 over 2019-2023 â long-only â Cell E config")
+ (description "S&P 500 over 2019-2023 — long-only — Cell E config")
  (period ((start_date 2019-01-02) (end_date 2023-12-29)))
  (universe_path "universes/sp500.sexp")
  (universe_size 503)
@@ -54,7 +54,7 @@
  ;;   sharpe_ratio       0.68   max_drawdown 24.09 avg_holding_days  41.95
  ;;   open_positions_value 1,401,130
  ;;   sortino_ratio_annualized 0.95   calmar_ratio 0.45   ulcer_index 8.61
- ;; MaxDD cut 6.7pp (31 â 24), trade count 3.4x. Tolerances Â±15%.
+ ;; MaxDD cut 6.7pp (31 → 24), trade count 3.4x. Tolerances ±15%.
  (config_overrides
   (((enable_short_side false))
    ((portfolio_config ((max_position_pct_long 0.30))))
@@ -80,7 +80,7 @@
    (screening_config "live arms candidate_ranking=Quality (#1782, report ordering) and failed_breakout_tolerance_pct=0.05 (#2084); the backtest defaults stay unarmed per experiment-flag R1")
    (resistance_lookback_bars "live feeds the resistance/support mapper 520 weekly bars for the human report only")
    (entry_through_band_pct "live-only entry-reconciliation band for the printed ticket (#2103); read by Weekly_snapshot_generator, never by on_market_close")
-   (entry_extension_max_pct "live arms 2.0 (#2404 user decision 2026-08-25, measured winner); this cell runs the 0.0 default (uncapped) — report-side ticket cap, never read by on_market_close unless enable_sim_entry_stoplimit arms it")
+   (entry_extension_max_pct "live arms 2.0 (#2404 user decision 2026-08-25, measured winner); this cell runs the 0.0 default (uncapped) -- report-side ticket cap, never read by on_market_close unless enable_sim_entry_stoplimit arms it")
    (sparse_tail_min_bars "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
    (sparse_tail_window_trading_days "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
    (rename_detect_min_overlap_days "live-only ticker-rename detector (#2083 fix 2); report-layer data hygiene, no backtest consumer")
@@ -98,29 +98,29 @@
   ;; Re-pinned 2026-08-24 for the book-faithful stops basis (PR #2530:
   ;; initial_stop_buffer 1.0 + reset_anchor_on_stalled_cycle default-on;
   ;; user-directed #2486; ledger 2026-08-24-stops-basis-book-faithful).
-  ;; Â±15% around new-basis actuals at c7660cac3 (dev/experiments/record-baseline-2026-08-24/).
+  ;; ±15% around new-basis actuals at c7660cac3 (dev/experiments/record-baseline-2026-08-24/).
   ;; Re-pinned 2026-06-25 for the concentration=0.30 promotion (max_position_pct_long
   ;; 0.14 -> 0.30, the production default; broad top-3000 WF-CV ACCEPT, ledger
   ;; 2026-06-25-capacity-concentration-broad). Measured against test_data (the
-  ;; golden-runs-sp500-15y store), Â±15% around 0.30 actuals:
+  ;; golden-runs-sp500-15y store), ±15% around 0.30 actuals:
   ;;   ret 41.13  trades 207  win 37.2  sharpe 0.47  maxDD 38.96  hold 45.86
   ;;   sortino 0.58  calmar 0.18  ulcer 15.46
   ;; vs prior 0.14 pin (ret 26 / maxDD 31): 0.30 = the honest production risk profile
   ;; (higher return AND higher DD); the 0.14 override understated it.
-  ;; Re-pinned 2026-07-08 for the warmup 210â364 fix (RS present from the first
-  ;; screen; dev/notes/warmup-364-repin-2026-07-08.md), Â±15% around 364 actuals:
+  ;; Re-pinned 2026-07-08 for the warmup 210→364 fix (RS present from the first
+  ;; screen; dev/notes/warmup-364-repin-2026-07-08.md), ±15% around 364 actuals:
   ;;   ret 16.38  trades 203  win 38.42  sharpe 0.26  maxDD 41.69  hold 43.14
   ;;   OPV 870,207  sortino 0.25  calmar 0.074  ulcer 16.31
-  ;; Return 41â16% while the with-shorts twin held ~46%: on this window the
-  ;; RS-honest early-2019 cohort rides COVID unhedged (DD ~42%) â the known
+  ;; Return 41→16% while the with-shorts twin held ~46%: on this window the
+  ;; RS-honest early-2019 cohort rides COVID unhedged (DD ~42%) — the known
   ;; high-dispersion signature of concentration 0.30, now on the honest RS basis.
   ;; Verified INERT under the 2026-07-11 REALISM-DEFAULTS flip (user mandate;
-  ;; min_entry_dollar_adv 0.0â1e6 + stale_exit_after_days NoneâSome 5; ledger
+  ;; min_entry_dollar_adv 0.0→1e6 + stale_exit_after_days None→Some 5; ledger
   ;; 2026-07-10-realism-defaults-flip): re-measured = BIT-IDENTICAL to the 364 pin
   ;; (16.38% / 203 / 38.42 / 0.26 / 41.69 / 43.14 / OPV 870,207 / force_liqs 2).
-  ;; SP500 universe is liquid â entry gate + stale-exit no-op. Bands unchanged.
+  ;; SP500 universe is liquid → entry gate + stale-exit no-op. Bands unchanged.
   ;; RE-PINNED 2026-08-26 for the #2380 RS-trend fix (PR #2555: lookback_bars
-  ;; 52->56 makes the trend classifier + its three consumers live for the
+  ;; 52->56 makes the trend classifier + its FOUR consumers live for the
   ;; first time; the 4 deeper bars also reach volume/breakout detection).
   ;; +-15% around actuals from the paired run at PR tip 5b6472afd (local,
   ;; pinned worktree, committed store). CORRECTNESS re-pin: per the #2380
