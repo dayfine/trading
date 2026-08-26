@@ -250,11 +250,12 @@ let test_trend_distribution_is_not_degenerate _ =
     {!Weinstein_strategy.stock_analysis_config_for} — so this is the pin on the
     {i thread} ([_stock_analysis_config_for] -> [_rs_config_for] ->
     [Rs.config.enable_positive_declining]) that both [.mli]s claim. Severing it
-    (e.g. [enable_positive_declining = config.enable_rs_positive_declining &&
-     false]) fails here, where before it was a silent null: the flag stayed
-    settable and sexp-round-trippable while the mechanism never ran, and an
-    armed axis sweep would have ledgered a REJECT for a mechanism that was off.
-    Same class as the [Volume.config] thread (#2459) and the [rt] anchor knob.
+    (e.g.
+    [enable_positive_declining = config.enable_rs_positive_declining && false])
+    fails here, where before it was a silent null: the flag stayed settable and
+    sexp-round-trippable while the mechanism never ran, and an armed axis sweep
+    would have ledgered a REJECT for a mechanism that was off. Same class as the
+    [Volume.config] thread (#2459) and the [rt] anchor knob.
 
     The unit suite pins this branch on 8 hand-checkable bars; this pins that the
     strategy's own depth and wiring actually reach it — the distinction issue

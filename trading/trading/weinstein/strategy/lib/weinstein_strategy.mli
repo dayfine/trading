@@ -981,9 +981,9 @@ type config = {
           is rejected from long admission as [Stock_analysis.Rs_declining] (book
           §4.4, "don't ever buy that stock") and scores zero; it does {b not}
           block shorts (Ch. 7 criterion 4 permits shorting RS that has "clearly
-          topped out and started trending lower"). Default [false] folds it
-          back into [Positive_flat], so baselines are bit-identical (R1). The
-          thread through {!stock_analysis_config_for} is pinned by
+          topped out and started trending lower"). Default [false] folds it back
+          into [Positive_flat], so baselines are bit-identical (R1). The thread
+          through {!stock_analysis_config_for} is pinned by
           [test_rs_trend_live.positive_declining_needs_the_flag], which sets
           {i this} field rather than [Rs.config]'s. See
           [Weinstein_strategy_config.enable_rs_positive_declining]. *)
