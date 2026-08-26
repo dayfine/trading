@@ -118,28 +118,30 @@ let test_default_keeps_screen_time_volume_gate _ =
 
 (** The flag alone does not arm F5 — the mechanism is defined only for the
     resting E-anchored ticket family. Each StopLimit half on its own leaves the
-    screen-time gate in place. *)
+    screen-time gate in place.
+
+    Every arm pins {b both} StopLimit fields explicitly rather than leaning on
+    their defaults, so the isolation this test asserts survives a default flip:
+    since 2026-08-26 [enable_sim_entry_stoplimit] defaults to [true] (#2405),
+    and an arm that only set [sim_entry_trigger_at_suggested] would silently
+    become the fully-armed family. *)
 let test_flag_without_stoplimit_family_keeps_gate _ =
-  let with_overrides overrides =
-    let config = overrides (_default_config ()) in
+  let with_overrides ~stoplimit ~trigger_at_suggested =
+    let config =
+      {
+        (_default_config ()) with
+        Weinstein_strategy.volume_confirm_at_fill = true;
+        enable_sim_entry_stoplimit = stoplimit;
+        sim_entry_trigger_at_suggested = trigger_at_suggested;
+      }
+    in
     (Weinstein_strategy.stock_analysis_config_for ~config)
       .require_breakout_volume
   in
   assert_that
-    ( with_overrides (fun c ->
-          { c with Weinstein_strategy.volume_confirm_at_fill = true }),
-      with_overrides (fun c ->
-          {
-            c with
-            Weinstein_strategy.volume_confirm_at_fill = true;
-            enable_sim_entry_stoplimit = true;
-          }),
-      with_overrides (fun c ->
-          {
-            c with
-            Weinstein_strategy.volume_confirm_at_fill = true;
-            sim_entry_trigger_at_suggested = true;
-          }) )
+    ( with_overrides ~stoplimit:false ~trigger_at_suggested:false,
+      with_overrides ~stoplimit:true ~trigger_at_suggested:false,
+      with_overrides ~stoplimit:false ~trigger_at_suggested:true )
     (equal_to (true, true, true))
 
 let suite =

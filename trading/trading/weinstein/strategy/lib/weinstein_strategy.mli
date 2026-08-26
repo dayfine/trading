@@ -798,8 +798,7 @@ type config = {
           unless [entry_extension_max_pct > 0.0]. Consumed only by
           [Weekly_snapshot_generator.generate]. See
           [Weinstein_strategy_config.entry_through_band_pct]. *)
-  entry_extension_max_pct : float;
-      [@sexp.default Weinstein_strategy_config.default_entry_extension_max_pct]
+  entry_extension_max_pct : float; [@sexp.default 2.0]
       (** Entry reconciliation (issue #2103) — the do-not-chase cap: the
           furthest past the breakout entry, in percentage points, that an entry
           order may fill. It is the limit leg of the
