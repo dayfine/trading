@@ -313,7 +313,21 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
     pipeline is not caught); only `*.sh` files are scanned (no inline shell
     in GitHub Actions `run:` YAML blocks, Makefiles, etc.); only the literal
     `tr -d '\n'` idiom is matched (a different newline-fusing idiom, e.g.
-    `awk 'BEGIN{RS="\0"}'`, would not trip it).
+    `awk 'BEGIN{RS="\0"}'`, would not trip it); and the "safe shape" check is
+    co-occurrence, not causal precedence — a line where `tail -n 1` and
+    `tr -d '\n'` both appear for unrelated reasons (e.g. two
+    semicolon-separated statements) is waved through as a false negative,
+    which is a real gap in the check's logic, not just its scope.
+  - Rework (2026-08-27, qc-behavioral iteration 1): assertion 6 previously
+    ran only against the live repo, which is clean, so its passing state
+    proved nothing about whether the detector itself still worked — a
+    regex re-scoped to a specific variable name (the exact #2576 blind
+    spot) or reduced to a no-op both stayed green. Fixed by extracting the
+    sweep body into `_sweep_dir_for_tr_d_bug()` and adding assertion 7
+    (runs it against a `$WORK` fixture: an arbitrary-name bug file must be
+    detected, a `tail -n 1`-reduced safe file must not be) and assertion 8
+    (pins the co-occurrence false negative above as a measured fixture
+    result rather than prose only).
   - Verify: `sh trading/devtools/checks/gnu_time_rss_smoke.sh`, or `dune
     runtest trading/devtools/checks/`.
 

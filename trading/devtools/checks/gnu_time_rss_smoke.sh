@@ -57,6 +57,17 @@
 # locations, and does not reference any variable name at all -- see its own
 # header comment below for exactly what it does and does not catch.
 #
+# Assertions 7 and 8 close a gap in assertion 6 ITSELF (NEEDS_REWORK review
+# on PR #2580, CP2/CP4): assertion 6 only ever runs against the live repo,
+# which is clean, so a pass proves nothing about whether the detector still
+# works -- a regex re-scoped to a specific variable name, or reduced to a
+# no-op, both left the repo sweep green. The sweep body is extracted into
+# `_sweep_dir_for_tr_d_bug()` (takes a directory argument) so it can also be
+# run against a disposable fixture directory: assertion 7 plants an
+# arbitrary-name bug (must be caught) and a `tail -n 1`-reduced safe file
+# (must not be), and assertion 8 plants the documented co-occurrence false
+# negative so that residual is a measured suite result, not just prose.
+#
 # Run:
 #   sh trading/devtools/checks/gnu_time_rss_smoke.sh
 
@@ -219,9 +230,14 @@ IFS="$OLD_IFS"
 # trip the sweep.
 #
 # KNOWN RESIDUAL -- read before trusting this as exhaustive:
-#   - Same-LINE match only. A `tr -d '\n'` and its `tail -n 1` reduction (or
-#     its file redirection) split across two lines/a multi-step pipeline
-#     built via intermediate variables is NOT caught.
+#   - Same-LINE match only, and it fails SAFE, not permissive: a genuine
+#     multi-line/intermediate-variable BUG (no `tail`/`head -n 1` reduction
+#     anywhere near it) is still caught, because there is nothing on that
+#     line to match the "already reduced" exemption. What the same-line
+#     restriction actually produces is the opposite of a missed bug: SAFE
+#     code that splits its `tail -n 1` reduction onto a separate line/an
+#     intermediate variable is flagged as a false POSITIVE (working code
+#     reported as buggy). This is over-cautious, not a hole.
 #   - Only `*.sh` files are scanned. Shell embedded inline in a GitHub
 #     Actions `run:` block (YAML), a Makefile recipe, or any non-".sh"
 #     script is NOT covered -- a grep of the full repo tree while writing
@@ -247,47 +263,78 @@ IFS="$OLD_IFS"
 # ---------------------------------------------------------------------------
 EXCLUDE_HELPER="${REPO_ROOT_REAL}/dev/lib/gnu_time_rss.sh"
 EXCLUDE_SELF="${REPO_ROOT_REAL}/trading/devtools/checks/gnu_time_rss_smoke.sh"
-SWEEP_HITS_FILE="${WORK}/sweep_hits.txt"
-SWEEP_MATCHES_FILE="${WORK}/sweep_matches.txt"
-: >"$SWEEP_HITS_FILE"
 
-SWEEP_FILES="$(find "$REPO_ROOT_REAL" \
-  \( -name '.git' -o -name '_build' -o -name 'node_modules' \
-     -o -name 'vendor' -o -name '.devcontainer' -o -name 'worktrees' \) -prune -o \
-  -name '*.sh' -type f -print 2>/dev/null || true)"
+# ---------------------------------------------------------------------------
+# _sweep_dir_for_tr_d_bug <dir> <out_file> [exclude_path ...]
+#
+# Shared sweep body for assertions 6 and 7, extracted so the SAME shape
+# detector can be run against both the real repo (assertion 6: must find
+# nothing) and a disposable fixture directory (assertion 7: must find a
+# planted bug and must NOT find a planted safe file). Before this
+# extraction assertion 6 ran ONLY against the live repo, which is clean --
+# so its passing state proved nothing about whether the detector still
+# worked. Re-scoping the grep below to a specific variable name (the
+# #2576 blind spot) or reducing it to a no-op regex both stayed green
+# against the repo alone (NEEDS_REWORK review on PR #2580, CP2/CP4).
+#
+# Writes one "path:lineno:content" line per hit to <out_file> (truncated
+# first). Caller decides pass/fail.
+# ---------------------------------------------------------------------------
+_sweep_dir_for_tr_d_bug() {
+  sweep_dir="$1"
+  out_file="$2"
+  shift 2
+  : >"$out_file"
+  sweep_matches_file="${WORK}/_sweep_matches_tmp.txt"
 
-OLD_IFS="$IFS"
-IFS='
-'
-for f in $SWEEP_FILES; do
-  IFS="$OLD_IFS"
-  if [ "$f" = "$EXCLUDE_HELPER" ] || [ "$f" = "$EXCLUDE_SELF" ]; then
-    IFS='
-'
-    continue
-  fi
+  sweep_files="$(find "$sweep_dir" \
+    \( -name '.git' -o -name '_build' -o -name 'node_modules' \
+       -o -name 'vendor' -o -name '.devcontainer' -o -name 'worktrees' \) -prune -o \
+    -name '*.sh' -type f -print 2>/dev/null || true)"
 
-  : >"$SWEEP_MATCHES_FILE"
-  grep -nE "tr -d '\\\\n'" "$f" 2>/dev/null >"$SWEEP_MATCHES_FILE" || true
-  if [ -s "$SWEEP_MATCHES_FILE" ]; then
-    while IFS= read -r hitline; do
-      lineno="${hitline%%:*}"
-      content="${hitline#*:}"
-      # Skip comment lines.
-      if printf '%s\n' "$content" | grep -qE '^[[:space:]]*#'; then
-        continue
-      fi
-      # Skip the safe shape: already reduced to one line on the same line.
-      case "$content" in
-      *'tail -n 1'* | *'tail -n1'* | *'head -n 1'* | *'head -n1'*) continue ;;
-      esac
-      printf '%s:%s:%s\n' "$f" "$lineno" "$content" >>"$SWEEP_HITS_FILE"
-    done <"$SWEEP_MATCHES_FILE"
-  fi
+  sweep_old_ifs="$IFS"
   IFS='
 '
-done
-IFS="$OLD_IFS"
+  for sweep_f in $sweep_files; do
+    IFS="$sweep_old_ifs"
+    sweep_skip=0
+    for sweep_ex in "$@"; do
+      if [ "$sweep_f" = "$sweep_ex" ]; then
+        sweep_skip=1
+        break
+      fi
+    done
+    if [ "$sweep_skip" -eq 1 ]; then
+      IFS='
+'
+      continue
+    fi
+
+    : >"$sweep_matches_file"
+    grep -nE "tr -d '\\\\n'" "$sweep_f" 2>/dev/null >"$sweep_matches_file" || true
+    if [ -s "$sweep_matches_file" ]; then
+      while IFS= read -r sweep_hitline; do
+        sweep_lineno="${sweep_hitline%%:*}"
+        sweep_content="${sweep_hitline#*:}"
+        # Skip comment lines.
+        if printf '%s\n' "$sweep_content" | grep -qE '^[[:space:]]*#'; then
+          continue
+        fi
+        # Skip the safe shape: already reduced to one line on the same line.
+        case "$sweep_content" in
+        *'tail -n 1'* | *'tail -n1'* | *'head -n 1'* | *'head -n1'*) continue ;;
+        esac
+        printf '%s:%s:%s\n' "$sweep_f" "$sweep_lineno" "$sweep_content" >>"$out_file"
+      done <"$sweep_matches_file"
+    fi
+    IFS='
+'
+  done
+  IFS="$sweep_old_ifs"
+}
+
+SWEEP_HITS_FILE="${WORK}/sweep_hits.txt"
+_sweep_dir_for_tr_d_bug "$REPO_ROOT_REAL" "$SWEEP_HITS_FILE" "$EXCLUDE_HELPER" "$EXCLUDE_SELF"
 
 if [ -s "$SWEEP_HITS_FILE" ]; then
   bad "${LABEL} — repo sweep: raw newline-fusing 'tr -d' shape found outside the shared helper"
@@ -296,6 +343,76 @@ if [ -s "$SWEEP_HITS_FILE" ]; then
   done <"$SWEEP_HITS_FILE"
 else
   ok "${LABEL} — repo sweep: no raw newline-fusing 'tr -d' shape found outside the shared helper (dev/lib/gnu_time_rss.sh)"
+fi
+
+# ---------------------------------------------------------------------------
+# Assertion 7: pins that the SWEEP DETECTOR ITSELF still works, against a
+# disposable fixture directory rather than only the (always-clean) live
+# repo -- closing the gap NEEDS_REWORK review on PR #2580 (CP2/CP4)
+# identified: a pass against the repo alone carries no information about
+# whether the detector still catches the bug shape, since re-scoping the
+# grep to a specific variable name or a no-op regex both left the repo
+# sweep green.
+#
+# Fixture contains:
+#   (a) a bug-shaped file using an ARBITRARY variable name (deliberately
+#       containing no substring of "rss_path" or "rss" at all, so a
+#       narrowing mutation that re-scopes the regex to those names would
+#       miss it) -- must be DETECTED.
+#   (b) a `tail -n 1`-reduced safe file, same idiom as the shared helper
+#       -- must NOT be detected.
+# ---------------------------------------------------------------------------
+FIXTURE7="${WORK}/fixture7"
+mkdir -p "$FIXTURE7"
+
+BUG7="${FIXTURE7}/bug_arbitrary_name.sh"
+cat >"$BUG7" <<'EOF'
+#!/bin/sh
+my_totally_unrelated_metric=$(tr -d '\n' <"$whatever_file")
+EOF
+
+SAFE7="${FIXTURE7}/safe_reduced.sh"
+cat >"$SAFE7" <<'EOF'
+#!/bin/sh
+rss_value=$(tail -n 1 "$rss_path" | tr -d '\n')
+EOF
+
+FIXTURE7_HITS="${WORK}/fixture7_hits.txt"
+_sweep_dir_for_tr_d_bug "$FIXTURE7" "$FIXTURE7_HITS"
+
+if grep -q 'bug_arbitrary_name\.sh' "$FIXTURE7_HITS" 2>/dev/null \
+  && ! grep -q 'safe_reduced\.sh' "$FIXTURE7_HITS" 2>/dev/null; then
+  ok "${LABEL} — fixture sweep: arbitrary-name bug detected, tail-reduced safe file not flagged"
+else
+  bad "${LABEL} — fixture sweep: expected only bug_arbitrary_name.sh flagged; got: $(cat "$FIXTURE7_HITS" 2>/dev/null)"
+fi
+
+# ---------------------------------------------------------------------------
+# Assertion 8: pins the documented co-occurrence false negative (KNOWN
+# RESIDUAL above) as a measured suite result instead of an unverified prose
+# claim. A line where `tail -n 1` and `tr -d '\n'` both appear for UNRELATED
+# reasons (two semicolon-separated statements) is waved through today --
+# the "safe shape" check is co-occurrence, not causal precedence. This
+# assertion does not fix that gap; it measures it, so a future fix to the
+# detection logic has to update this assertion (and the residual comment
+# above) rather than leaving them silently wrong.
+# ---------------------------------------------------------------------------
+FIXTURE8="${WORK}/fixture8"
+mkdir -p "$FIXTURE8"
+
+COOCCUR8="${FIXTURE8}/cooccurrence_false_negative.sh"
+cat >"$COOCCUR8" <<'EOF'
+#!/bin/sh
+last_log=$(tail -n 1 /var/log/x); rss_value=$(tr -d '\n' <"$rss_path")
+EOF
+
+FIXTURE8_HITS="${WORK}/fixture8_hits.txt"
+_sweep_dir_for_tr_d_bug "$FIXTURE8" "$FIXTURE8_HITS"
+
+if [ ! -s "$FIXTURE8_HITS" ]; then
+  ok "${LABEL} — fixture sweep: documented co-occurrence false negative reproduces (unrelated-statement line waved through, as KNOWN RESIDUAL above describes)"
+else
+  bad "${LABEL} — fixture sweep: expected the co-occurrence false negative to reproduce (waved through); got a hit instead -- KNOWN RESIDUAL comment above is now stale, update it"
 fi
 
 echo ""
