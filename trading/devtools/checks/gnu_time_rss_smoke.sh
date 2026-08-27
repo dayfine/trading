@@ -155,12 +155,22 @@ for rel in $CALL_SITES; do
 '
     continue
   fi
-  if grep -q 'dev/lib/gnu_time_rss\.sh' "$path"; then
+  # Anchored to the actual `. "${REPO_ROOT}/dev/lib/gnu_time_rss.sh"` source
+  # statement, not to any mention of the path -- a bare grep for the path
+  # string also matches the doc comment naming it, which stays present even
+  # after the source line is deleted and the parser re-inlined (the #2559
+  # regression this assertion exists to catch). See NEEDS_REWORK review on
+  # PR #2572, CP4.
+  if grep -qE '^[[:space:]]*\.[[:space:]]+"\$\{REPO_ROOT\}/dev/lib/gnu_time_rss\.sh"' "$path"; then
     ok "${LABEL} — ${rel}: sources the shared gnu_time_rss.sh helper"
   else
     bad "${LABEL} — ${rel}: does not source dev/lib/gnu_time_rss.sh (re-inlined copy? #2559 regression)"
   fi
-  if grep -qE "tr -d '\\\\n' <\"\\\$rss_path\"" "$path"; then
+  # Widened from the `$rss_path`-specific form: a re-inlined copy of the bug
+  # is a *function* taking `$1` (`_parse_gnu_time_rss() { tr -d '\n' <"$1"; }`,
+  # exactly how #2553's original private helper was written), which the
+  # narrower `<"$rss_path"` grep would miss entirely.
+  if grep -qE "tr -d '\\\\n'[[:space:]]*<" "$path"; then
     bad "${LABEL} — ${rel}: still contains the raw buggy 'tr -d' parse inline"
   fi
   IFS='
