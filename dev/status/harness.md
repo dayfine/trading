@@ -309,8 +309,13 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
     removed the scratch file — GREEN again (exit 0), confirming the guard is
     shape-based, not a longer hardcoded list.
   - Documented residual explicitly in the check's own header comment: same-
-    line match only (a bug split across lines/variables in a multi-step
-    pipeline is not caught); only `*.sh` files are scanned (no inline shell
+    line match only, which fails SAFE rather than permissive — a genuine
+    multi-line/intermediate-variable bug IS still caught (there is nothing
+    on that line to match the "already reduced" exemption); what the
+    same-line restriction actually produces is the opposite of a missed
+    bug, a false POSITIVE on safe code that splits its `tail -n 1`
+    reduction onto a separate line. Over-cautious, not a hole; only
+    `*.sh` files are scanned (no inline shell
     in GitHub Actions `run:` YAML blocks, Makefiles, etc.); only the literal
     `tr -d '\n'` idiom is matched (a different newline-fusing idiom, e.g.
     `awk 'BEGIN{RS="\0"}'`, would not trip it); and the "safe shape" check is
