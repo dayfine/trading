@@ -23,7 +23,7 @@
 ;;
 ;;   2. Accounting sanity check. BAH-BRK-B's final equity should track
 ;;      BRK-B's raw-close price-only return very tightly (modulo the
-;;      day-2-open fill convention documented below). Sub-basis-point
+;;      StopLimit-trigger fill convention since #2569, documented below). Sub-basis-point
 ;;      drift from the closed-form indicates the simulator's broker /
 ;;      MtM / cash-accounting path is working symmetrically across the
 ;;      SPY and BRK-B instances of the same strategy.
@@ -51,7 +51,8 @@
 ;;     pre-#2569; +$2.8748/share = $14,034.90 total across 4882 shares)
 ;;   entry commission:         $48.82 ($0.01/share * 4882)
 ;;   leftover cash:            $9,662.74
-;;     (= 1,000,000 - 4882 * 202.8448 - 48.82)
+;;     (= 1,000,000 - 4882 * 202.844826 - 48.82; fill printed above is
+;;      rounded to 4dp -- the exact runner leftover is 9,662.74)
 ;;   final close 2023-12-28:   $357.57
 ;;     (last bar processed; end_date 2023-12-29 is not stepped — same
 ;;     [current_date >= end_date] [is_complete] semantics as bah-spy)
@@ -64,12 +65,14 @@
 ;;   BRK-B raw return (sizing 2019-01-02 close to MtM 2023-12-28 close):
 ;;                             +76.32%  (= 357.57 / 202.80 - 1)
 ;;
-;; (Pre-#2569 note, kept for history: the then +0.6 pp delta vs the raw-close
-;; ratio reflected the day-2 open ($199.97) being below the day-1 close
-;; ($202.80) — the
-;; strategy gets a slightly cheaper effective entry — offset by 1% of
-;; cash sitting uninvested as gap-buffer headroom. The commission drag
-;; (~$49) is structurally identical to the SPY pin.
+;; (Pre-#2569 note, kept for history: the then +0.6 pp delta vs the
+;; raw-close ratio reflected the day-2 open ($199.97) being below the
+;; day-1 close ($202.80) -- a slightly cheaper effective entry -- offset
+;; by 1% of cash sitting uninvested as gap-buffer headroom.)
+;; POST-#2569 the delta runs the other way: the StopLimit trigger
+;; ($202.8448) sits ABOVE the day-2 open, so the sleeve pays -0.79pp vs
+;; the raw-close ratio -- the gap-down open is forfeited. The commission
+;; drag (~$49) is structurally identical to the SPY pin.
 ;;
 ;; {1 Comparison to BAH-SPY 2019-2023}
 ;;
