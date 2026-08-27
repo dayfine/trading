@@ -4,22 +4,26 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-26 (orchestrator run 32943299640; main `55605922` ->
-`3a51cb6b`). One PR inherited (**#2555**, from the 00:17 cron), one opened and
-**merged** (**#2557**). Two issues filed: **#2558**, **#2559**.
+Last updated: 2026-08-27 (orchestrator run 33090715656; main `8230d67e` ->
+`f875fe64`). Queue was **empty** at run start (0 open PRs), so the Step 0.5
+fast-exit was correctly skipped by its own non-vacuous precondition and this
+ran as a full dispatch. Two PRs opened and **both merged**: **#2581**
+(cleanup, `0d9122c8`) and **#2580** (harness/#2576, `f875fe64`, 2 rework
+iterations). One issue filed: **#2579**. Zero open PRs at run end.
 
-**#2555 was driven by a concurrent local pipeline throughout this run.** Its tip
-moved three times under review — `5b6472af` -> `d03c1858` (my rework dispatch) ->
-`a8831839` (someone else's golden re-pin + a #2554 cherry-pick) -> `88b60dc9`.
-Every QC verdict this run is therefore stale at the current tip. The reviewer
-dispatched against `d03c1858` **noticed the branch had moved and re-pinned itself
-to the tip it actually read** rather than issuing a verdict on the SHA it was
-handed — which is the only reason its blocking finding (byte-proven UTF-8
-double-encoding in three golden `(description ...)` fields, invisible to a green
-`dune runtest`) was found at all. That finding is now **repaired at `88b60dc9`**,
-independently verified here: 0 mojibake sequences, em dashes intact in all six
-re-pinned cells. `#2432`'s claim-marker gap is what made this luck rather than
-process.
+**Both substantive QC findings this run were about guards that do not guard.**
+#2581 closed a mutation-proven hole where breaking `handle_rejected_trades`'
+step-5 revert asymmetry left **416/416 tests green**. #2580's first behavioral
+pass found the sharper case: its new shape-based guard swept only the *live,
+clean* repo, so re-scoping its regex back to the exact #2576 blind spot — or
+to a regex matching nothing at all — kept the suite green. The PR had
+reproduced the very failure mode it was fixing, one level up; the rework pins
+it against a fixture root.
+
+Two orchestrator capabilities were **measured, not inferred**, this run:
+writing `.github/workflows/` is **403** while an identical non-workflow write
+is **200** (so #2539 and H-BLAS are structurally undispatchable here), and
+issue comments are **403** (create-only). See `2026-08-27.md`.
 
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
@@ -68,13 +72,13 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2553 RSS digit-fusion MERGED `3a51cb6b` (#2557, both gates clean, no rework); next: #2559 same bug in 5 siblings incl. the perf-tier1-smoke gate |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2576 CLOSED — 7th RSS call site ported + shape-based guard now fixture-pinned, MERGED `f875fe64` (#2580); next: #2567 silent-null effectiveness linter |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | A-MERGEABLE-STATE-NOT-A-CLOSE-TELL filed (run-1 guidance corrected); open: #2427 #2428 #2429 #2432 — need `workflow` scope or a human |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | `design_doc_drift_mechanization` mechanized via #2494 (harness scope); top item `linter_coverage` is a HUMAN POLICY DECISION |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | `cancel_handler` step-5 revert asymmetry now pinned, MERGED `0d9122c8` (#2581); top item `linter_coverage` still a HUMAN POLICY DECISION (13 runs) |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
-| [screener](screener.md) | IN_PROGRESS | dayfine (LOCAL) + feat-weinstein | #2555 | #2555 RS trend live (`lookback_bars` 52->56, #2380) at `88b60dc9`, rework 2/2, paired goldens landed; next: re-QC at tip, then merge |
+| [screener](screener.md) | IN_PROGRESS | dayfine (LOCAL) + feat-weinstein | — | RS trend live (`lookback_bars` 52->56) landed via **#2561** (#2555 closed unmerged, superseded); #2380 closed; next: none queued |
 | [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | clock-26 REVERTED to 0 by #2397 (golden −40.91pp); re-flip framed in #2405, superseded discriminator in #2407; next: base-held measurement |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
