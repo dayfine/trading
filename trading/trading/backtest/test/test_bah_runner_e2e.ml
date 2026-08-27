@@ -9,8 +9,8 @@
       the scenario's [strategy] field (#882) and constructs
       {!Trading_strategy.Bah_benchmark_strategy.make}, not Weinstein.
     - The single-symbol BAH path returns the pinned baseline from
-      [sp500-2019-2023-bah-spy.sexp]: ~+91.31% total return, 0 closed
-      round-trips, final equity ~$1,913,114.
+      [sp500-2019-2023-bah-spy.sexp]: ~+89.60% total return, 0 closed
+      round-trips, final equity ~$1,896,010 (post-#2569 fill model).
 
     Skips gracefully when SPY's CSV is not present in [data/S/Y/SPY/]. The
     in-repo [test_data/] subset doesn't include SPY by default; the test runs
@@ -125,9 +125,10 @@ let _expected_final_equity = 1_896_010.32
     2026-05-17 after the BAH gap-buffer fix.
 
     See [sp500-2019-2023-bah-brk-b.sexp] §"Measurement" for the breakdown —
-    sizing close 2019-01-02 = $202.80 → 4882 shares at next-day open $199.97
-    with $48.82 commission; final MtM at 2023-12-28 close $357.57 produces
-    $1,769,354.38. Same [current_date >= end_date] [is_complete] semantics as
+    sizing close 2019-01-02 = $202.80 → 4882 shares at the StopLimit trigger
+    $202.8448 since #2569 (pre-flip: next-day open $199.97 → $1,769,354.38) with
+    $48.82 commission; final MtM at 2023-12-28 close $357.57 produces
+    $1,755,319.48. Same [current_date >= end_date] [is_complete] semantics as
     the SPY cell.
 
     {b Re-pinned 2026-08-26} (1_769_354.38 -> 1_755_319.48, -0.79%): same cause
@@ -202,7 +203,8 @@ let test_bah_runner_e2e ctx =
      The position itself stays open and contributes the bulk of equity. *)
   assert_that (List.length result.round_trips) (equal_to 0);
   (* Day-1 entry pin: the strategy fires exactly one BUY trade for SPY,
-     executed at the next bar's open. A zero-trade run signals the BAH
+     executed at the StopLimit trigger since #2569 (pre-flip: the next
+     bar's open). A zero-trade run signals the BAH
      strategy never entered (the original 2026-05-08 regression — the
      panel runner's snapshot had an empty SPY column so
      [get_price "SPY"] returned None). *)

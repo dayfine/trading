@@ -21,10 +21,11 @@
 ;;   2. Performance benchmark / alpha bar. Any active-trading strategy run on
 ;;      the same window must beat this number to claim alpha. The pinned
 ;;      [total_return_pct] here is the bar [sp500-2019-2023.sexp] is measured
-;;      against (sp500-2019-2023 currently pins +58.34%; SPY BAH posts
-;;      +91.31% via Backtest.Runner, so the active strategy is currently
-;;      ~33 pp behind passive SPY over this window — a finding the BAH-SPY
-;;      pin makes visible at every postsubmit run).
+;;      against (comparison vintages drift as pins move; post-#2569 SPY
+;;      BAH posts +89.60% via Backtest.Runner while the Weinstein cell
+;;      pins ~+76.8%, so the active strategy trails passive SPY by
+;;      ~13 pp over this window — a finding the BAH-SPY pin makes
+;;      visible at every postsubmit run).
 ;;
 ;; {1 Strategy}
 ;;
@@ -95,10 +96,11 @@
 ;;
 ;; {1 Pinned ranges}
 ;;
-;; total_return_pct: 89.0..93.0 -- centred on the PRE-flip runner-actual
-;; +91.31% and DELIBERATELY not re-centred for #2569: the post-flip
-;; actual +89.60% sits inside, and the +-2pp determinism scheme is the
-;; contract; re-centre only if a future change pushes it out.
+;; total_return_pct: 89.0..93.0 -- DELIBERATELY not re-centred for
+;; #2569; the post-flip actual +89.60% sits inside, and the +-2pp
+;; determinism scheme is the contract; re-centre only if a future
+;; change pushes it out. (See the closed-form history above for the
+;; per-era actuals.)
 ;; Tighter than the Weinstein scenario's +/- 13 pp because BAH is mechanical
 ;; — no parameter sensitivity, no stop slippage, no cash-deployment timing.
 ;; The only sources of drift are SPY's day-1 close (deterministic against
