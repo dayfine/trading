@@ -813,11 +813,15 @@ type config = {
           [entry_extension_max_pct > 0], backtest entries fill as
           [StopLimit (entry, cap)] with the do-not-chase cap instead of Market
           orders. {b Default [true] since 2026-08-26} — flipped as a pair with
-          [entry_extension_max_pct] so simulated entries match the live
-          [StopLimit (E, cap)] tickets. User-directed fidelity decision (issue
-          #2405), overriding the 2026-08-04 ledger REJECT, which measured
-          returns on a sim-vs-sim surface; no return improvement is claimed. See
-          [Weinstein_strategy_config.enable_sim_entry_stoplimit]. *)
+          [entry_extension_max_pct] so simulated entries use the live ticket
+          FAMILY, [StopLimit (trigger, cap)]. Not yet byte-faithful: the sim
+          anchors at [effective_entry_price] while live anchors at the screen's
+          [E] -- the three-layer anchor divergence recorded in
+          weinstein-book-reference.md S4.7 remains open. User-directed fidelity
+          decision (issue #2405), overriding the 2026-08-04 ledger REJECT, which
+          measured returns on a sim-vs-sim surface; no return improvement is
+          claimed. See [Weinstein_strategy_config.enable_sim_entry_stoplimit].
+      *)
   sim_entry_trigger_at_suggested : bool; [@sexp.default false]
       (** Book-faithful E-anchored entry trigger (user decision 2026-08-05):
           when [true] AND [enable_sim_entry_stoplimit] is on,

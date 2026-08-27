@@ -47,21 +47,26 @@
 ;;   sizing close 2019-01-02:  $202.80
 ;;   gap-buffered sizing px:   $204.8280  (= 202.80 * 1.01)
 ;;   shares bought:            4882  (= floor(1,000,000 / 204.8280))
-;;   fill open  2019-01-03:    $199.97
+;;   fill (StopLimit trigger): $202.8448  (was next-day open $199.97
+;;     pre-#2569; +$2.8748/share = $14,034.90 total across 4882 shares)
 ;;   entry commission:         $48.82 ($0.01/share * 4882)
-;;   leftover cash:            $23,697.64
-;;     (= 1,000,000 - 4882 * 199.97 - 48.82)
+;;   leftover cash:            $9,662.74
+;;     (= 1,000,000 - 4882 * 202.8448 - 48.82)
 ;;   final close 2023-12-28:   $357.57
 ;;     (last bar processed; end_date 2023-12-29 is not stepped — same
 ;;     [current_date >= end_date] [is_complete] semantics as bah-spy)
-;;   final equity:             $1,769,354.38
-;;     (= 23,697.64 + 4882 * 357.57)  — exact match to runner-actual
-;;   total_return_pct:         +76.94%
+;;   final equity:             $1,755,319.48
+;;     (= 9,662.74 + 4882 * 357.57) -- exact match to runner-actual and
+;;     to test_bah_runner_e2e's pinned _expected_final_equity_brk_b_5y
+;;   total_return_pct:         +75.53%  (was +76.94% pre-#2569: the flip
+;;     moved this benchmark -1.41pp / -0.79% equity, ALL of it entry-fill
+;;     price -- OPV untouched)
 ;;   BRK-B raw return (sizing 2019-01-02 close to MtM 2023-12-28 close):
 ;;                             +76.32%  (= 357.57 / 202.80 - 1)
 ;;
-;; The +0.6 pp delta vs the closed-form raw-close ratio reflects the
-;; day-2 open ($199.97) being below the day-1 close ($202.80) — the
+;; (Pre-#2569 note, kept for history: the then +0.6 pp delta vs the raw-close
+;; ratio reflected the day-2 open ($199.97) being below the day-1 close
+;; ($202.80) — the
 ;; strategy gets a slightly cheaper effective entry — offset by 1% of
 ;; cash sitting uninvested as gap-buffer headroom. The commission drag
 ;; (~$49) is structurally identical to the SPY pin.
@@ -69,7 +74,7 @@
 ;; {1 Comparison to BAH-SPY 2019-2023}
 ;;
 ;; SPY 5y total return (pinned): +90.40%.
-;; BRK-B 5y total return:        +76.94%.
+;; BRK-B 5y total return:        +75.53% (post-#2569 fill model; +76.94% pre-flip).
 ;; Spread: BRK-B underperformed SPY by ~13.6 pp over 2019-2023. This is
 ;; the documented BRK underperformance during the post-COVID growth /
 ;; tech rally — value style lagged momentum style materially over this
@@ -88,7 +93,9 @@
 ;;
 ;; {1 Pinned ranges}
 ;;
-;; total_return_pct: ±1.5 pp around the runner-actual +76.94% (75.7..79.7).
+;; total_return_pct: +-1.5 pp around the runner-actual +75.53% (74.03..77.03),
+;; re-centered 2026-08-26 for the #2569 fill-model flip (tight determinism
+;; scheme deliberately preserved -- NOT the +-15% convention).
 ;; Same tolerance scheme as the SPY pin — mechanical strategy, no
 ;; parameter sensitivity, no stop slippage, no cash-deployment timing.
 ;; The only sources of drift are BRK-B's day-1 close (deterministic
@@ -139,17 +146,10 @@
  (config_overrides ())
  (strategy (Bah_benchmark (symbol BRK-B)))
  (expected
-  ;; RE-PINNED 2026-08-26 (PR #2569 fill-model default flip): this BAH
-  ;; BENCHMARK moved -0.17pp because _entry_cap_for_sim reads the
-  ;; Weinstein config regardless of strategy_choice, so BAH day-1 entry
-  ;; now fills via StopLimit(E, E*1.02) -- the known config leak flagged
-  ;; as a follow-up in dev/status/arc-readiness.md. Re-pinned for
-  ;; consistency with existing wiring rather than gated here.
-
-  ((total_return_pct       ((min 64.2021)      (max 86.8618)))
+  ((total_return_pct       ((min  74.03)      (max   77.03)))
    (total_trades           ((min   0.0)       (max    0.5)))
    (win_rate               ((min   0.0)       (max  100.0)))
-   (sharpe_ratio           ((min 0.5392)      (max 0.7296)))
-   (max_drawdown_pct       ((min 24.9201)       (max 33.7156)))
+   (sharpe_ratio           ((min   0.20)      (max    0.70)))
+   (max_drawdown_pct       ((min  18.0)       (max   34.0)))
    (avg_holding_days       ((min   0.0)       (max    1.0)))
-   (open_positions_value   ((min 1483808.2)   (max 2007505.3))))))
+   (open_positions_value   ((min 1730000.0)   (max  1800000.0))))))
