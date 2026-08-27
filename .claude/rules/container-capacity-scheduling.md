@@ -114,15 +114,28 @@ status 1"), and stripping newlines fuses the trailing status digit onto the
 RSS digits — e.g. a real `745192` kB reads as `1745192`, off by ~1 GB — and
 only on **FAILING** cells, exactly when someone is reading the number to
 diagnose a kill. Fixed in #2553 by parsing the file's last line instead of
-stripping all newlines (`trading/devtools/checks/golden_sp500_postsubmit_rss_smoke.sh`
-pins the fix with a fixture-driven RED/GREEN regression test).
+stripping all newlines.
 
-Consequence: any peak-RSS figure quoted from this script's output **on a
-failing cell, from before the #2553 fix landed**, should be read as
-suspect rather than as data — including the 2026-08-24/25 GHA "12.4 GB"
-figures cited in issue #2537 (unverifiable now, since those runs uploaded no
-artifacts pre-#2549; a `1` + `2450164` split would put the real figure at
-~2.4 GB). Passing-cell RSS figures from the same script were never affected.
+**#2559 (2026-08-27): the same bug was independently present in FIVE sibling
+scripts** — `#2553` fixed only `golden_sp500_postsubmit.sh`; the identical
+`rss_value=$(tr -d '\n' <"$rss_path")` line was still live in
+`perf_tier1_smoke.sh` (which backs the **REQUIRED** `perf-tier1-smoke` PR
+gate — the highest-stakes instance), `perf_tier2_nightly.sh`,
+`perf_tier3_weekly.sh`, `perf_tier4_release_gate.sh`, and
+`run_tier4_release_gate.sh`. The parser is now extracted to the single
+shared `dev/lib/gnu_time_rss.sh` (`_parse_gnu_time_rss()`), sourced by all
+six scripts, and pinned by one fixture-driven RED/GREEN regression test:
+`trading/devtools/checks/gnu_time_rss_smoke.sh` (renamed from
+`golden_sp500_postsubmit_rss_smoke.sh`, which tested only the
+`golden_sp500_postsubmit.sh` copy).
+
+Consequence: any peak-RSS figure quoted from **any of these six scripts'**
+output **on a failing cell, from before its #2553/#2559 fix landed**,
+should be read as suspect rather than as data — including the 2026-08-24/25
+GHA "12.4 GB" figures cited in issue #2537 (unverifiable now, since those
+runs uploaded no artifacts pre-#2549; a `1` + `2450164` split would put the
+real figure at ~2.4 GB). Passing-cell RSS figures were never affected on any
+of the six.
 
 ## Diagnosing an OOM kill (it does not announce itself)
 
