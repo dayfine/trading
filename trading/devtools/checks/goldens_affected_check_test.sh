@@ -64,6 +64,24 @@
 #   18. (#2531 gap a, historical shape) The golden names only the OUTER
 #       embedding field ("stops_config"), never the flipped inner knob
 #       -> still FAIL via Step 2c's embedding-field emission.
+#   19. (#2558) A default_config record-literal VALUE change
+#       (lookback_bars 52 -> 56) with ZERO goldens overriding the changed
+#       knob itself -- only an UNRELATED knob that happens to share a
+#       substring (resistance_lookback_bars) -- is now the MAXIMAL blast
+#       radius: FAIL naming "AFFECTS-ALL" and listing every golden in the
+#       scanned subdirs, not silently OK. Mirrors the real PR #2555 shape
+#       (12 grep hits, all for the wrong knob).
+#   20. (#2570) A [@sexp.default] default-flip (false -> true) where ONE
+#       golden already arms the knob at the NEW value (unaffected -- it
+#       ran that way before too) and TWO goldens never mention the knob at
+#       all (they silently inherit the flip) -> FAIL naming "default-flip"
+#       and listing the two inheriting goldens, not just the arming one.
+#   21. A genuinely NEW field (added fresh, no prior default anywhere) with
+#       zero goldens ever mentioning it -> OK, exit 0. Pins that Step 4b's
+#       widening does NOT fire for field ADDITIONS (only for a real
+#       old-vs-new VALUE change) -- otherwise every
+#       experiment-flag-discipline default-off mechanism landing would
+#       trip an affects-all FAIL for no reason.
 #
 # Run:
 #   sh trading/devtools/checks/goldens_affected_check_test.sh
@@ -343,13 +361,19 @@ echo "=== Assertion 9: non-snake_case bracket citations ([E], [Entering]) are NO
 # false-positive FAILs against goldens that merely contain the letter
 # "E" somewhere in their text. The bracket-citation extraction requires
 # a lowercase snake_case identifier (at least one underscore).
+#
+# knob_c is added FRESH here (not a value flip of a pre-existing field)
+# so Step 4b's affects-all/default-flip widening (assertions 19/20)
+# never applies to it -- a genuinely new field has no old value to
+# widen from (see assertion 21). A value-flip shape here would
+# legitimately trip AFFECTS-ALL under the corrected #2558 semantics
+# (zero goldens override knob_c), which would be a real, not spurious,
+# FAIL and would defeat the point of this assertion.
 REPO9="$(_new_repo)"
 mkdir -p "$(dirname "$REPO9/$SURFACE_MLI_REL")" "$REPO9/.github/workflows"
 mkdir -p "$REPO9/trading/test_data/backtest_scenarios/goldens-sp500"
 {
   echo "type config = {"
-  echo "  knob_c : int; [@sexp.default 0]"
-  echo "      (** Entering a position at price [E] is unrelated to [knob_d]. *)"
   echo "  knob_d : bool; [@sexp.default false]"
   echo "}"
 } > "$REPO9/$SURFACE_MLI_REL"
@@ -361,9 +385,14 @@ mkdir -p "$REPO9/trading/test_data/backtest_scenarios/goldens-sp500"
   echo " (description \"mentions the letter E and the word Entering in prose\"))"
 } > "$REPO9/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden.sexp"
 SHA9A="$(_commit "$REPO9" "base")"
-sed -i.bak 's/knob_c : int; \[@sexp.default 0\]/knob_c : int; [@sexp.default 26]/' "$REPO9/$SURFACE_MLI_REL"
-rm -f "$REPO9/$SURFACE_MLI_REL.bak"
-SHA9B="$(_commit "$REPO9" "head: flip knob_c default 0 -> 26")"
+{
+  echo "type config = {"
+  echo "  knob_c : int; [@sexp.default 26]"
+  echo "      (** Entering a position at price [E] is unrelated to [knob_d]. *)"
+  echo "  knob_d : bool; [@sexp.default false]"
+  echo "}"
+} > "$REPO9/$SURFACE_MLI_REL"
+SHA9B="$(_commit "$REPO9" "head: add new knob_c field with [E]/[Entering] prose")"
 _run "$REPO9" "$SHA9A" "$SHA9B"
 if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "zero postsubmit golden specs"; then
   pass "assertion 9: [E] / [Entering] excluded from related-knob extraction -> OK"
@@ -678,6 +707,131 @@ else
   fail "assertion 18: expected FAIL/exit1 naming stops_config via embeds:stop_types.mli, got rc=$RC output=$OUT"
 fi
 rm -rf "$REPO18"
+
+echo "=== Assertion 19: default_config literal VALUE change, zero goldens override it (only an UNRELATED knob does) -> FAIL AFFECTS-ALL ==="
+# Pins #2558: lookback_bars 52 -> 56, mirroring the real PR #2555 diff.
+# Two goldens exist; neither overrides lookback_bars -- one overrides only
+# the unrelated resistance_lookback_bars (word-boundary distinct, so the
+# old presence-only Step 4 correctly found zero matches and said OK). Step
+# 4b must now treat zero-overriding-goldens as the MAXIMAL blast radius.
+REPO19="$(_new_repo)"
+mkdir -p "$(dirname "$REPO19/$SURFACE_ML_REL")" "$REPO19/.github/workflows"
+mkdir -p "$REPO19/trading/test_data/backtest_scenarios/goldens-sp500"
+{
+  echo "let default_config ~universe ~index_symbol ="
+  echo "  {"
+  echo "    universe;"
+  echo "    lookback_bars = 52;"
+  echo "  }"
+} > "$REPO19/$SURFACE_ML_REL"
+{
+  echo "      GOLDEN_SP500_SUBDIRS: goldens-sp500"
+} > "$REPO19/.github/workflows/golden-runs-fixture.yml"
+{
+  echo "((name \"fixture-golden-a\")"
+  echo " (config_overrides (((resistance_lookback_bars 30)))))"
+} > "$REPO19/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden-a.sexp"
+{
+  echo "((name \"fixture-golden-b\")"
+  echo " (config_overrides (((reject_declining_ma_long_entry true)))))"
+} > "$REPO19/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden-b.sexp"
+SHA19A="$(_commit "$REPO19" "base")"
+sed -i.bak 's/lookback_bars = 52;/lookback_bars = 56;/' "$REPO19/$SURFACE_ML_REL"
+rm -f "$REPO19/$SURFACE_ML_REL.bak"
+SHA19B="$(_commit "$REPO19" "head: flip lookback_bars literal 52 -> 56")"
+_run "$REPO19" "$SHA19A" "$SHA19B"
+if [ "$RC" -eq 1 ] \
+  && echo "$OUT" | grep -q "lookback_bars" \
+  && echo "$OUT" | grep -q "AFFECTS-ALL" \
+  && echo "$OUT" | grep -q "fixture-golden-a.sexp" \
+  && echo "$OUT" | grep -q "fixture-golden-b.sexp"; then
+  pass "assertion 19: zero-override default-literal change -> FAIL AFFECTS-ALL naming all goldens"
+else
+  fail "assertion 19: expected FAIL/exit1 AFFECTS-ALL naming both goldens, got rc=$RC output=$OUT"
+fi
+rm -rf "$REPO19"
+
+echo "=== Assertion 20: [@sexp.default] default-flip, one golden arms the NEW value, two never mention it -> FAIL default-flip naming the two inheriting goldens ==="
+# Pins #2570: enable_sim_entry_stoplimit-shaped false -> true flip.
+# fixture-golden-arms already pins the knob at true (the NEW value) -- it
+# ran that way before the flip too, so it must NOT be the golden named by
+# the fix. fixture-golden-inherit-1/2 never mention the knob at all -- per
+# #2570 these are the ones whose behaviour actually changes and must be
+# named.
+REPO20="$(_new_repo)"
+mkdir -p "$(dirname "$REPO20/$SURFACE_MLI_REL")" "$REPO20/.github/workflows"
+mkdir -p "$REPO20/trading/test_data/backtest_scenarios/goldens-sp500"
+{
+  echo "type config = {"
+  echo "  enable_sim_entry_stoplimit : bool; [@sexp.default false]"
+  echo "}"
+} > "$REPO20/$SURFACE_MLI_REL"
+{
+  echo "      GOLDEN_SP500_SUBDIRS: goldens-sp500"
+} > "$REPO20/.github/workflows/golden-runs-fixture.yml"
+{
+  echo "((name \"fixture-golden-arms\")"
+  echo " (config_overrides (((enable_sim_entry_stoplimit true)))))"
+} > "$REPO20/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden-arms.sexp"
+{
+  echo "((name \"fixture-golden-inherit-1\")"
+  echo " (config_overrides (((reject_declining_ma_long_entry true)))))"
+} > "$REPO20/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden-inherit-1.sexp"
+{
+  echo "((name \"fixture-golden-inherit-2\")"
+  echo " (config_overrides (((max_position_pct_long 0.20)))))"
+} > "$REPO20/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden-inherit-2.sexp"
+SHA20A="$(_commit "$REPO20" "base")"
+sed -i.bak 's/\[@sexp.default false\]/[@sexp.default true]/' "$REPO20/$SURFACE_MLI_REL"
+rm -f "$REPO20/$SURFACE_MLI_REL.bak"
+SHA20B="$(_commit "$REPO20" "head: flip enable_sim_entry_stoplimit default false -> true")"
+_run "$REPO20" "$SHA20A" "$SHA20B"
+if [ "$RC" -eq 1 ] \
+  && echo "$OUT" | grep -q "default-flip" \
+  && echo "$OUT" | grep -q "fixture-golden-inherit-1.sexp" \
+  && echo "$OUT" | grep -q "fixture-golden-inherit-2.sexp"; then
+  pass "assertion 20: default-flip names the goldens that inherit, not just the one that already arms the new value"
+else
+  fail "assertion 20: expected FAIL/exit1 default-flip naming both inheriting goldens, got rc=$RC output=$OUT"
+fi
+rm -rf "$REPO20"
+
+echo "=== Assertion 21: genuinely NEW field (no prior default anywhere), zero goldens mention it -> OK (no false AFFECTS-ALL on additions) ==="
+# Guards Step 4b precision: a brand-new [@sexp.default] field must not be
+# treated as a value change (it has no "old" value at BASE_REF at all --
+# see _sexp_default_value_in_file) -- otherwise every default-off
+# mechanism landing per experiment-flag-discipline.md would trip a false
+# affects-all FAIL.
+REPO21="$(_new_repo)"
+mkdir -p "$(dirname "$REPO21/$SURFACE_MLI_REL")" "$REPO21/.github/workflows"
+mkdir -p "$REPO21/trading/test_data/backtest_scenarios/goldens-sp500"
+{
+  echo "type config = {"
+  echo "  reject_declining_ma_long_entry : bool; [@sexp.default true]"
+  echo "}"
+} > "$REPO21/$SURFACE_MLI_REL"
+{
+  echo "      GOLDEN_SP500_SUBDIRS: goldens-sp500"
+} > "$REPO21/.github/workflows/golden-runs-fixture.yml"
+{
+  echo "((name \"fixture-golden\")"
+  echo " (config_overrides (((reject_declining_ma_long_entry true)))))"
+} > "$REPO21/trading/test_data/backtest_scenarios/goldens-sp500/fixture-golden.sexp"
+SHA21A="$(_commit "$REPO21" "base")"
+{
+  echo "type config = {"
+  echo "  reject_declining_ma_long_entry : bool; [@sexp.default true]"
+  echo "  enable_new_mechanism : bool; [@sexp.default false]"
+  echo "}"
+} > "$REPO21/$SURFACE_MLI_REL"
+SHA21B="$(_commit "$REPO21" "head: add brand-new enable_new_mechanism field")"
+_run "$REPO21" "$SHA21A" "$SHA21B"
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "zero postsubmit golden specs"; then
+  pass "assertion 21: brand-new field addition does not trigger affects-all -> OK"
+else
+  fail "assertion 21: expected OK/exit0 (new field, not a value change), got rc=$RC output=$OUT"
+fi
+rm -rf "$REPO21"
 
 echo ""
 echo "=== Results: ${PASS_COUNT} passed, ${FAIL_COUNT} failed ==="
