@@ -70,7 +70,14 @@
 #                   through a renamed top-level constant
 #                   (`let default_foo = 5` feeding field `bar`) are
 #                   still invisible — the manual rule remains the
-#                   backstop.
+#                   backstop. Also invisible: a REQUIRED field migrated
+#                   to `[@sexp.default]` in the SAME diff its value
+#                   changes (e.g. `initial_stop_buffer = 1.02;` becoming
+#                   `initial_stop_buffer : float; [@sexp.default 1.0]`)
+#                   -- old and new values are extracted via different
+#                   syntactic paths (default-record literal vs.
+#                   [@sexp.default]) and are never paired, so this is
+#                   silent-green like the other residuals above.
 #     nested-config embedding (Step 2c) — when a changed knob comes from
 #                   a file that defines a config record EMBEDDED in the
 #                   strategy config (stops, portfolio_risk, stage, macro,
@@ -133,9 +140,39 @@
 #   explicit override). Every *.sexp file under each discovered subdir is
 #   grepped (whole-word) for each knob name from Steps 2 + 2.5.
 #
+#   Inheritance widening for VALUE CHANGES (Step 4b, issues #2558/#2570) —
+#   Step 4's name-matching answers "does any golden mention this knob",
+#   which is backwards for a knob whose default VALUE changed (as opposed
+#   to a brand-new field, which no golden could have referenced before):
+#     - zero goldens mention it -> Step 4 says OK, but that is the MAXIMAL
+#       radius, not the minimal one: every golden silently inherits the
+#       new value (#2558 — a `lookback_bars` 52->56 default flip produced
+#       12 grep hits, all for the unrelated `resistance_lookback_bars`,
+#       and zero for the changed knob itself).
+#     - a golden overrides the knob AT THE NEW VALUE already (it ran that
+#       way before the flip too, so it does not actually change) -> Step 4
+#       flags exactly that golden and says nothing about the goldens that
+#       never mention the knob, which are the ones whose behaviour DOES
+#       change (#2570 — a StopLimit-pair default flip was reported against
+#       the one golden that already armed the new value, missing ~15 that
+#       silently inherit it).
+#   For every knob Step 2/2b determined has a REAL old-AND-new default
+#   (never for a newly-added field, whose "old value" is simply "the
+#   field did not exist" — nothing can inherit FROM that), Step 4b scans
+#   every golden spec under the Step-3-discovered subdirs and treats it as
+#   AFFECTED unless it contains the literal substring
+#   "(<knob> <new_value>)" — i.e. affected = does not override the knob,
+#   OR overrides it at the old value (or any value other than the new
+#   one). Zero of the affected set's specs override the knob at all ->
+#   "AFFECTS-ALL" wording; some do (just not all, or not at the new
+#   value) -> "default-flip" wording. Both feed the same FAIL/MATCH_COUNT
+#   path as Step 4, so either shape turns an otherwise-OK verdict into a
+#   FAIL.
+#
 # DECISION
 #
-#   Zero (knob, golden-spec) matches -> OK, exit 0. This is the expected
+#   Zero (knob, golden-spec) matches from Step 4, AND zero AFFECTS-ALL /
+#   default-flip findings from Step 4b -> OK, exit 0. This is the expected
 #   result for the overwhelming majority of PRs (26 of 27 goldens were
 #   structurally unaffected by #2384 — this script exists for the 27th).
 #   Any match -> FAIL, exit 1, listing every match and pointing at the
@@ -222,7 +259,8 @@ DIRECT_KNOBS_FILE="$(mktemp)"
 RELATED_KNOBS_FILE="$(mktemp)"
 KNOBS_FILE="$(mktemp)"
 MLI_HEAD_CONTENT="$(mktemp)"
-trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT"' EXIT
+VALUECHANGE_KNOBS_FILE="$(mktemp)"
+trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT" "$VALUECHANGE_KNOBS_FILE"' EXIT
 
 # _changed_body_lines <ref> <ref> <files...>
 # Prints the text (post "+"/"-" marker stripped) of every ADDED/REMOVED
@@ -234,6 +272,26 @@ _changed_body_lines() {
   # shellcheck disable=SC2068 -- $@ (the remaining file paths) must word-split
   git diff -U0 --no-color "$base" "$head" -- $@ 2>/dev/null \
     | grep -E '^[+-][^+-]' | cut -c2- || true
+}
+
+# _sexp_default_value_in_file <ref> <file> <field>
+# Prints the VALUE inside a "<field> : ...; [@sexp.default VALUE]"
+# annotation for <field>, read from the WHOLE file content of <file> at
+# <ref> (a plain `git show`, not a diff) -- Step 4b needs the field's
+# value at a specific revision regardless of whether the changed line and
+# the value-bearing line are the same line in the diff. Empty if the
+# field, its default, or the file itself doesn't exist at that revision --
+# e.g. a brand-new field has no value at BASE_REF, which is exactly how
+# Step 4b tells "added" (skip inheritance widening) apart from "value
+# changed" (apply it).
+_sexp_default_value_in_file() {
+  ref="$1"
+  file="$2"
+  field="$3"
+  git show "${ref}:${file}" 2>/dev/null | sed -n \
+    "s/^[[:space:]]*${field}[[:space:]]*:.*\[@sexp\.default[[:space:]]*\([^]]*\)\].*\$/\1/p" \
+    | head -1 \
+    | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
 }
 
 # Changed config files: every changed lib .ml/.mli under the surface
@@ -302,7 +360,8 @@ _embedding_field() {
 LIT_BASE="$(mktemp)"
 LIT_HEAD="$(mktemp)"
 FILE_KNOBS="$(mktemp)"
-trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT" "$LIT_BASE" "$LIT_HEAD" "$FILE_KNOBS"' EXIT
+LIT_CHANGED_FIELDS="$(mktemp)"
+trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT" "$VALUECHANGE_KNOBS_FILE" "$LIT_BASE" "$LIT_HEAD" "$FILE_KNOBS" "$LIT_CHANGED_FIELDS"' EXIT
 
 # --- Steps 2 + 2b + 2c, per changed surface file ---
 # 2  : field names changed via [@sexp.default lines.
@@ -310,13 +369,30 @@ trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_
 # 2c : if the file contributed any changed knob AND defines an EMBEDDED
 #      config, also emit the embedding strategy-config field as a related
 #      knob — goldens key on the outer name, not the inner one.
+# Both 2 and 2b also populate VALUECHANGE_KNOBS_FILE ("<knob><TAB><old
+# value><TAB><new value>") for Step 4b, but ONLY when a REAL old value
+# exists and differs from the new one -- a newly-added field (no old
+# value at BASE_REF) is deliberately excluded, since nothing can inherit
+# FROM a field that did not exist (see _sexp_default_value_in_file).
 for f in $CHANGED_CONFIG_FILES; do
   : > "$FILE_KNOBS"
 
+  SEXP_DEFAULT_FIELDS="$(mktemp)"
   _changed_body_lines "$BASE_REF" "$HEAD_REF" "$f" \
     | grep -F '[@sexp.default' \
     | sed -n 's/^[[:space:]]*\([A-Za-z_][A-Za-z0-9_]*\)[[:space:]]*:.*$/\1/p' \
-    >> "$FILE_KNOBS" || true
+    | sort -u > "$SEXP_DEFAULT_FIELDS" || true
+  cat "$SEXP_DEFAULT_FIELDS" >> "$FILE_KNOBS"
+
+  while IFS= read -r field; do
+    [ -n "$field" ] || continue
+    old_val="$(_sexp_default_value_in_file "$BASE_REF" "$f" "$field")"
+    new_val="$(_sexp_default_value_in_file "$HEAD_REF" "$f" "$field")"
+    if [ -n "$old_val" ] && [ -n "$new_val" ] && [ "$old_val" != "$new_val" ]; then
+      printf '%s\t%s\t%s\n' "$field" "$old_val" "$new_val" >> "$VALUECHANGE_KNOBS_FILE"
+    fi
+  done < "$SEXP_DEFAULT_FIELDS"
+  rm -f "$SEXP_DEFAULT_FIELDS"
 
   case "$f" in
     *.mli) ;;  # default literals live in .ml implementations only
@@ -328,7 +404,24 @@ for f in $CHANGED_CONFIG_FILES; do
       comm -3 "$LIT_BASE" "$LIT_HEAD" \
         | sed 's/^[[:space:]]*//' \
         | cut -f1 \
-        >> "$FILE_KNOBS" || true
+        | sort -u > "$LIT_CHANGED_FIELDS"
+      cat "$LIT_CHANGED_FIELDS" >> "$FILE_KNOBS"
+
+      # Same add-vs-value-change classification as above, but reading the
+      # already-extracted LIT_BASE/LIT_HEAD field=value lines directly
+      # (the literal region is multi-line record syntax, not a single
+      # annotated declaration, so a fresh per-field git-show lookup
+      # doesn't apply here).
+      while IFS= read -r field; do
+        [ -n "$field" ] || continue
+        old_line="$(awk -F'\t' -v f="$field" '$1==f {print $2}' "$LIT_BASE")"
+        new_line="$(awk -F'\t' -v f="$field" '$1==f {print $2}' "$LIT_HEAD")"
+        if [ -n "$old_line" ] && [ -n "$new_line" ] && [ "$old_line" != "$new_line" ]; then
+          old_val="$(printf '%s\n' "$old_line" | sed -e 's/^[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=[[:space:]]*//' -e 's/;[[:space:]]*$//')"
+          new_val="$(printf '%s\n' "$new_line" | sed -e 's/^[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=[[:space:]]*//' -e 's/;[[:space:]]*$//')"
+          printf '%s\t%s\t%s\n' "$field" "$old_val" "$new_val" >> "$VALUECHANGE_KNOBS_FILE"
+        fi
+      done < "$LIT_CHANGED_FIELDS"
       ;;
   esac
 
@@ -425,7 +518,7 @@ sort -u "$KNOBS_FILE" -o "$KNOBS_FILE"
 
 WORKFLOWS_DIR="${REPO_ROOT}/.github/workflows"
 SUBDIRS_FILE="$(mktemp)"
-trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT" "$LIT_BASE" "$LIT_HEAD" "$SUBDIRS_FILE"' EXIT
+trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT" "$VALUECHANGE_KNOBS_FILE" "$LIT_BASE" "$LIT_HEAD" "$LIT_CHANGED_FIELDS" "$SUBDIRS_FILE"' EXIT
 
 WORKFLOW_MATCHED=0
 for wf in "$WORKFLOWS_DIR"/golden-runs-*.yml; do
@@ -480,6 +573,59 @@ while IFS="$TAB" read -r knob reason; do
     done
   done < "$SUBDIRS_FILE"
 done < "$KNOBS_FILE"
+
+sort -u "$VALUECHANGE_KNOBS_FILE" -o "$VALUECHANGE_KNOBS_FILE"
+
+# --- Step 4b: inheritance / affects-all widening for VALUE-CHANGED knobs ---
+# See the header comment "Inheritance widening for VALUE CHANGES (Step 4b,
+# issues #2558/#2570)" for the full rationale. In short: Step 4 above asks
+# "does any golden mention this knob", which is the wrong question for a
+# knob whose default VALUE changed -- the affected set is every golden
+# that does NOT pin the knob at the NEW value, because config_overrides
+# always wins over the compiled-in default, so anything that doesn't pin
+# the knob silently inherits whatever the new default is.
+ALL_SPECS_FILE="$(mktemp)"
+trap 'rm -f "$DIRECT_KNOBS_FILE" "$RELATED_KNOBS_FILE" "$KNOBS_FILE" "$MLI_HEAD_CONTENT" "$VALUECHANGE_KNOBS_FILE" "$LIT_BASE" "$LIT_HEAD" "$LIT_CHANGED_FIELDS" "$SUBDIRS_FILE" "$ALL_SPECS_FILE"' EXIT
+: > "$ALL_SPECS_FILE"
+while IFS= read -r subdir; do
+  [ -n "$subdir" ] || continue
+  dir="${SCENARIO_ROOT}/${subdir}"
+  [ -d "$dir" ] || continue
+  for spec in "$dir"/*.sexp; do
+    [ -f "$spec" ] || continue
+    printf '%s\n' "$spec" >> "$ALL_SPECS_FILE"
+  done
+done < "$SUBDIRS_FILE"
+sort -u "$ALL_SPECS_FILE" -o "$ALL_SPECS_FILE"
+TOTAL_SPECS="$(wc -l < "$ALL_SPECS_FILE" | tr -d ' ')"
+
+while IFS="$TAB" read -r vknob old_val new_val; do
+  [ -n "$vknob" ] || continue
+  OVERRIDDEN_COUNT=0
+  AFFECTED_SPECS=""
+  AFFECTED_COUNT=0
+  NEW_VALUE_PATTERN="(${vknob} ${new_val})"
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    if grep -q -w -- "$vknob" "$spec" 2>/dev/null; then
+      OVERRIDDEN_COUNT=$((OVERRIDDEN_COUNT + 1))
+    fi
+    if ! grep -F -q -- "$NEW_VALUE_PATTERN" "$spec" 2>/dev/null; then
+      rel="${spec#"${REPO_ROOT}"/}"
+      AFFECTED_SPECS="${AFFECTED_SPECS}    ${rel} (inherits new default -- does not pin ${vknob}=${new_val})\n"
+      AFFECTED_COUNT=$((AFFECTED_COUNT + 1))
+    fi
+  done < "$ALL_SPECS_FILE"
+
+  if [ "$AFFECTED_COUNT" -gt 0 ]; then
+    if [ "$OVERRIDDEN_COUNT" -eq 0 ]; then
+      MATCHES="${MATCHES}  knob '${vknob}' default changed ${old_val} -> ${new_val}: 0 of ${TOTAL_SPECS} golden(s) override this knob -- no cell overrides it, so all ${TOTAL_SPECS} inherit it (AFFECTS-ALL)\n${AFFECTED_SPECS}"
+    else
+      MATCHES="${MATCHES}  knob '${vknob}' default changed ${old_val} -> ${new_val} (default-flip): ${OVERRIDDEN_COUNT} golden(s) override this knob explicitly; ${AFFECTED_COUNT} golden(s) inherit the new value and were NOT previously flagged\n${AFFECTED_SPECS}"
+    fi
+    MATCH_COUNT=$((MATCH_COUNT + AFFECTED_COUNT))
+  fi
+done < "$VALUECHANGE_KNOBS_FILE"
 
 if [ "$MATCH_COUNT" -eq 0 ]; then
   echo "OK: goldens_affected_check -- $(wc -l < "$KNOBS_FILE" | tr -d ' ') changed/related knob(s), zero postsubmit golden specs arm any of them."

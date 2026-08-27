@@ -91,7 +91,15 @@ For such a PR, before requesting merge:
   (the common case), or (b) the job found one, the author did the paired
   run (steps 2-3 above) and pasted the table in the PR body, and a
   maintainer applied the `paired-run-done` label after eyeballing that
-  table — see "Resolving a legitimate FAIL" below. A red job with no
+  table — see "Resolving a legitimate FAIL" below. Two FAIL shapes exist
+  beyond plain name-matching (issues #2558/#2570): **`AFFECTS-ALL`**
+  (a default VALUE changed and ZERO goldens override the knob at all —
+  the maximal blast radius, not "nothing to see") and **`default-flip`**
+  (a default VALUE changed and SOME goldens override it, but the FAIL
+  lists the goldens that do NOT pin the new value — i.e. the ones that
+  silently inherit the flip — rather than the golden that already armed
+  it). Both route to the same manual-paired-run requirement as a plain
+  name match; only the message shape differs. A red job with no
   label is a FAIL; a green job (plain or acknowledged) is a PASS. See
   that job's own header for what it can and cannot detect; it does not
   replace this rule, it enforces the trigger condition for it.
