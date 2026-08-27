@@ -45,6 +45,10 @@ SCENARIO_ROOT="${REPO_ROOT}/trading/test_data/backtest_scenarios"
 RUN_IN_ENV="${REPO_ROOT}/dev/lib/run-in-env.sh"
 TIMEOUT="${PERF_TIER4_TIMEOUT:-28800}"
 
+# Shared GNU /usr/bin/time peak-RSS parser -- see dev/lib/gnu_time_rss.sh for
+# the fused-digit bug this guards against (#2553, #2559).
+. "${REPO_ROOT}/dev/lib/gnu_time_rss.sh"
+
 # Aggressive major-GC + smaller minor heap. Same rationale as tier-1/tier-2/tier-3
 # (dev/notes/panels-rss-matrix-post602-gc-tuned-2026-04-26.md): without this,
 # the GC steady-state high-water mark inflates peak RSS by ~25-37% for runs
@@ -154,7 +158,7 @@ _run_one() {
 
   rss_value="?"
   if [ -f "$rss_path" ]; then
-    rss_value=$(tr -d '\n' <"$rss_path")
+    rss_value=$(_parse_gnu_time_rss "$rss_path")
   fi
 
   if [ "$rc" -ne 0 ]; then

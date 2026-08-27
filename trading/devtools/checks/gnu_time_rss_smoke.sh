@@ -1,6 +1,7 @@
 #!/bin/sh
-# golden_sp500_postsubmit_rss_smoke.sh -- fixture-driven regression test for
-# dev/scripts/golden_sp500_postsubmit.sh's _parse_gnu_time_rss() (issue #2553).
+# gnu_time_rss_smoke.sh -- fixture-driven regression test for the SHARED
+# _parse_gnu_time_rss() helper in dev/lib/gnu_time_rss.sh (issues #2553,
+# #2559).
 #
 # Bug: `rss_value=$(tr -d '\n' <"$rss_path")` stripped ALL newlines from the
 # GNU /usr/bin/time output file. On a zero-exit cell that file is a single
@@ -13,29 +14,44 @@
 # Fix: read the LAST line of the file (`tail -n 1`), which is always the %M
 # value regardless of whether a status line precedes it.
 #
-# This test dot-sources the real script (dev/scripts/golden_sp500_postsubmit.sh,
-# outside the dune workspace root, resolved via repo_root() -- same pattern as
-# docker_dune_smoke.sh) with POSTSUBMIT_RSS_PARSE_TEST=1, which makes the
-# script define _parse_gnu_time_rss() and then `return` before running its
-# scenario-discovery / scenario_runner logic. That lets this test call
-# _parse_gnu_time_rss directly against small fixture files instead of driving
-# a full postsubmit run.
+# History: the fix originally landed ONLY in
+# dev/scripts/golden_sp500_postsubmit.sh (#2553), as a private
+# _parse_gnu_time_rss() function, tested by dot-sourcing that one script.
+# #2559 found the identical bug still present in five sibling scripts
+# (perf_tier1_smoke.sh -- which backs the REQUIRED perf-tier1-smoke PR gate
+# -- perf_tier2_nightly.sh, perf_tier3_weekly.sh, perf_tier4_release_gate.sh,
+# run_tier4_release_gate.sh) because the helper had never been shared.
+# _parse_gnu_time_rss() is now extracted to dev/lib/gnu_time_rss.sh and
+# sourced by all six call sites; this test exercises the shared
+# implementation ONCE rather than duplicating fixture coverage per caller.
 #
-# Assertions:
+# Assertions against the shared helper:
 #   1. Failing-cell shape (status line + value) -> value only, no fused digit.
 #   2. Passing-cell shape (bare value, no status line) -> value unchanged.
 #   3. UNAVAILABLE sentinel (no GNU time available) -> passes through unchanged.
 #   4. Killed-by-signal shape (status line names a signal, not an exit code)
 #      -> value only, same as assertion 1.
 #
+# Change-detector verification performed when this test was generalized
+# (#2559): the shared helper's body was temporarily reverted to the old
+# buggy `tr -d '\n' <"$1"` form -- assertions 1 and 4 (the two shapes with a
+# leading GNU-time status line) went RED with the exact fused-digit output
+# ("1745192" / "92450164"), assertions 2 and 3 stayed GREEN (single-line
+# inputs are unaffected by either implementation) -- then the helper was
+# restored byte-identical and all four assertions went GREEN again.
+#
+# Assertion 5 below additionally pins that every one of the six known call
+# sites sources the shared library (not a re-inlined copy) -- this is what
+# actually prevents the six-way duplication #2559 fixed from recurring.
+#
 # Run:
-#   sh trading/devtools/checks/golden_sp500_postsubmit_rss_smoke.sh
+#   sh trading/devtools/checks/gnu_time_rss_smoke.sh
 
 set -eu
 
 . "$(dirname "$0")/_check_lib.sh"
 
-LABEL="golden_sp500_postsubmit_rss_smoke"
+LABEL="gnu_time_rss_smoke"
 PASS=0
 FAIL=0
 
@@ -50,14 +66,13 @@ bad() {
 }
 
 REPO_ROOT_REAL="$(repo_root)"
-TARGET="${REPO_ROOT_REAL}/dev/scripts/golden_sp500_postsubmit.sh"
-[ -f "$TARGET" ] || die "${LABEL}: $TARGET does not exist"
+LIB="${REPO_ROOT_REAL}/dev/lib/gnu_time_rss.sh"
+[ -f "$LIB" ] || die "${LABEL}: $LIB does not exist"
 
-# Source the real script in test mode: defines _parse_gnu_time_rss() and
-# returns before running any discovery / scenario_runner logic.
-POSTSUBMIT_RSS_PARSE_TEST=1
-export POSTSUBMIT_RSS_PARSE_TEST
-. "$TARGET"
+# Source the shared library directly -- it defines _parse_gnu_time_rss()
+# with no side effects and no discovery / scenario_runner logic to guard
+# against, unlike the pre-#2559 dot-source-a-whole-script approach.
+. "$LIB"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT INT TERM
@@ -113,6 +128,45 @@ if [ "$V4" = "2450164" ]; then
 else
   bad "${LABEL} — killed-by-signal shape: expected '2450164', got '${V4}'"
 fi
+
+# ---------------------------------------------------------------------------
+# Assertion 5: every known GNU-time RSS caller sources the shared library
+# (dev/lib/gnu_time_rss.sh) rather than carrying its own inlined copy of the
+# parse logic. This is the mechanical guard against the #2559 regression
+# (the fix landing once in #2553 and quietly failing to propagate to five
+# siblings) recurring a third time.
+# ---------------------------------------------------------------------------
+CALL_SITES="dev/scripts/golden_sp500_postsubmit.sh
+dev/scripts/perf_tier1_smoke.sh
+dev/scripts/perf_tier2_nightly.sh
+dev/scripts/perf_tier3_weekly.sh
+dev/scripts/perf_tier4_release_gate.sh
+dev/scripts/run_tier4_release_gate.sh"
+
+OLD_IFS="$IFS"
+IFS='
+'
+for rel in $CALL_SITES; do
+  IFS="$OLD_IFS"
+  path="${REPO_ROOT_REAL}/${rel}"
+  if [ ! -f "$path" ]; then
+    bad "${LABEL} — ${rel}: file does not exist"
+    IFS='
+'
+    continue
+  fi
+  if grep -q 'dev/lib/gnu_time_rss\.sh' "$path"; then
+    ok "${LABEL} — ${rel}: sources the shared gnu_time_rss.sh helper"
+  else
+    bad "${LABEL} — ${rel}: does not source dev/lib/gnu_time_rss.sh (re-inlined copy? #2559 regression)"
+  fi
+  if grep -qE "tr -d '\\\\n' <\"\\\$rss_path\"" "$path"; then
+    bad "${LABEL} — ${rel}: still contains the raw buggy 'tr -d' parse inline"
+  fi
+  IFS='
+'
+done
+IFS="$OLD_IFS"
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="

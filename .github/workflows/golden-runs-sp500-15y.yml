@@ -60,9 +60,17 @@ jobs:
       GOLDEN_SP500_SUBDIRS: goldens-sp500-historical
       # Per-cell timeout (seconds). Measured 2026-08-25 (#2537): the two
       # 15y cells take 5374s / 6127s locally end-to-end (GNU-time peak RSS
-      # ~745MB per cell; the 12.4GB figures in older kill reports came from
-      # the same per-process RSS surface and remain unexplained-but-moot —
-      # the cells demonstrably fit; memory is not the constraint).
+      # ~745MB per cell). The 12.4GB figures in older kill reports are NOT
+      # an unexplained separate RSS surface — they are the #2553 digit-fusion
+      # bug: `rss_value=$(tr -d '\n' <"$rss_path")` fused GNU time's leading
+      # "Command exited with non-zero status 1" line onto the %M value on
+      # FAILING cells, e.g. real 745192 kB reading as ...1745192-shaped
+      # output. Those 2026-08-24/25 runs predate the #2549 artifact-upload
+      # fix, so the raw peak_rss files are gone and the true figure is
+      # unverifiable now; a "1" + a ~745MB-scale value would put it around
+      # ~1.7-2.4 GB, not 12.4 GB. See #2553, #2559,
+      # .claude/rules/container-capacity-scheduling.md
+      # "Pre-#2553 kill-report RSS figures are suspect on failing cells".
       # GHA runners are typically slower, so 4h/cell; the 600-min job cap
       # above still bounds two pathological hangs.
       GOLDEN_SP500_TIMEOUT: "14400"

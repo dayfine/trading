@@ -278,7 +278,47 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 
 ## Completed
 
+### Shared GNU-time RSS parser across all 6 call sites (issue #2559, 2026-08-27)
+
+- [x] #2553 (below) fixed the digit-fusion peak-RSS bug only in
+  `dev/scripts/golden_sp500_postsubmit.sh`. qc-behavioral on #2557 (the
+  #2553 PR) flagged that the identical `rss_value=$(tr -d '\n'
+  <"$rss_path")` line was still live, unfixed, in five sibling scripts:
+  `perf_tier1_smoke.sh` (backs the **REQUIRED** `perf-tier1-smoke` PR gate
+  — the highest-stakes instance, since a fused-digit misread there could
+  misinform a merge-blocking perf regression call), `perf_tier2_nightly.sh`,
+  `perf_tier3_weekly.sh`, `perf_tier4_release_gate.sh`, and
+  `run_tier4_release_gate.sh`. Fix: extracted `_parse_gnu_time_rss()` into a
+  shared `dev/lib/gnu_time_rss.sh` (sourced, not executed — same convention
+  as `dev/lib/heartbeat.sh`) and pointed all six scripts at it, removing
+  each script's private inline copy (including the
+  `POSTSUBMIT_RSS_PARSE_TEST` dot-source-guard hack in
+  `golden_sp500_postsubmit.sh`, no longer needed once the helper lives in
+  its own file). Regression test generalized + renamed:
+  `trading/devtools/checks/golden_sp500_postsubmit_rss_smoke.sh` →
+  `trading/devtools/checks/gnu_time_rss_smoke.sh`, now sourcing
+  `dev/lib/gnu_time_rss.sh` directly (4 fixture-shape assertions, unchanged
+  from #2553) plus a 5th assertion that greps all six known call sites to
+  confirm each sources the shared helper rather than re-inlining it (the
+  mechanical guard against this exact bug recurring a third time). Verified
+  RED (reverted the helper to the pre-#2553 `tr -d '\n'` body — assertions
+  1 and 4, the two shapes with a leading GNU-time status line, failed with
+  the fused-digit output) then GREEN (restored byte-identical). Corrected
+  `.github/workflows/golden-runs-sp500-15y.yml`'s stale
+  "unexplained-but-moot" framing of the 2026-08-24/25 "12.4 GB" figures to
+  cite the digit-fusion bug as the likely explanation instead. Widened
+  `.claude/rules/container-capacity-scheduling.md`'s "Pre-#2553 kill-report
+  RSS figures are suspect" section to name all six scripts, not just
+  `golden_sp500_postsubmit.sh`. Verify: `dune runtest
+  trading/devtools/checks/` (or `sh
+  trading/devtools/checks/gnu_time_rss_smoke.sh` directly).
+
 ### golden_sp500_postsubmit.sh peak-RSS parse fix (issue #2553, 2026-08-26)
+
+> Superseded by #2559 (above): `_parse_gnu_time_rss()` moved out of this
+> script into shared `dev/lib/gnu_time_rss.sh`, and the regression test
+> below was renamed to `trading/devtools/checks/gnu_time_rss_smoke.sh`.
+> Kept here as the historical record of the original fix.
 
 - [x] Fixed `dev/scripts/golden_sp500_postsubmit.sh` mis-reporting peak RSS on
   every FAILING cell: GNU `/usr/bin/time`'s exit-status line ("Command exited
