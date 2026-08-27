@@ -5,24 +5,33 @@
     (#1553): unfilled [Exiting] reverts to [Holding] preserving the stop,
     partially-filled [Exiting] is left untouched, a non-[Exiting] match is a
     no-op, and a wrong-side trade on the symbol is a no-op (#2466). Each
-    contract has one dedicated test below. *)
+    contract has one dedicated test below. Contract 9 additionally pins
+    [handle_rejected_trades]'s composed pipeline directly: step 5 (revert) must
+    see the FULL [rejected_trades] rather than step 2 (cancel)'s retry-filtered
+    remainder (2026-08-25 qc-behavioral finding on PR #2542). *)
 
 open OUnit2
 open Core
 open Matchers
 module Cancel_handler = Trading_simulation.Cancel_handler
+module Entry_fill_retry = Trading_simulation.Entry_fill_retry
 module Position = Trading_strategy.Position
+module Manager = Trading_orders.Manager
+module Order_types = Trading_orders.Types
 
 let _date ~y ~m ~d = Date.create_exn ~y ~m ~d
 let _build_date = _date ~y:2024 ~m:Month.Jan ~d:15
 
 (** Build an [Entering] position for [symbol] keyed by [id]. Mirrors the shape
-    strategies emit via [CreateEntering] then [Position.create_entering]. *)
-let _make_entering_position ~id ~symbol : Position.t =
+    strategies emit via [CreateEntering] then [Position.create_entering]. [side]
+    defaults to [Long]; pass [Short] to build a ticket whose entry trade side is
+    [Sell] instead of [Buy]. *)
+let _make_entering_position ?(side = Position.Long) ~id ~symbol () : Position.t
+    =
   {
     id;
     symbol;
-    side = Position.Long;
+    side;
     entry_reasoning = Position.ManualDecision { description = "test fixture" };
     exit_reason = None;
     state =
@@ -63,15 +72,16 @@ let _make_holding_position ~id ~symbol : Position.t =
 
 (** Build an [Exiting] position for [symbol] keyed by [id]. [filled_quantity]
     defaults to 0.0 (the stuck-exit signature #1553 targets); pass a positive
-    value to model a partially-filled exit that must NOT be reverted. The
-    carried [entry_date]/[risk_params] are the fields the revert reconstructs
-    [Holding] from. *)
-let _make_exiting_position ~id ~symbol ?(filled_quantity = 0.0) () : Position.t
-    =
+    value to model a partially-filled exit that must NOT be reverted. [side]
+    defaults to [Short] (exit trade side [Buy]); pass [Long] to build one whose
+    exit trade side is [Sell] instead. The carried [entry_date]/[risk_params]
+    are the fields the revert reconstructs [Holding] from. *)
+let _make_exiting_position ?(side = Position.Short) ~id ~symbol
+    ?(filled_quantity = 0.0) () : Position.t =
   {
     id;
     symbol;
-    side = Position.Short;
+    side;
     entry_reasoning = Position.ManualDecision { description = "test fixture" };
     exit_reason =
       Some
@@ -125,8 +135,8 @@ let test_transitions_for_rejected_trades_emits_per_symbol _ =
     _positions_with
       ~entries:
         [
-          _make_entering_position ~id:"SPY-pos-1" ~symbol:"SPY";
-          _make_entering_position ~id:"QQQ-pos-1" ~symbol:"QQQ";
+          _make_entering_position ~id:"SPY-pos-1" ~symbol:"SPY" ();
+          _make_entering_position ~id:"QQQ-pos-1" ~symbol:"QQQ" ();
         ]
   in
   let rejected =
@@ -167,7 +177,7 @@ let test_transitions_for_rejected_trades_drops_no_match _ =
     position and removes it from the map (the position reaches the [Closed]
     state, which the simulator drops to keep the positions Map bounded). *)
 let test_apply_to_positions_removes_on_closed _ =
-  let entering = _make_entering_position ~id:"SPY-pos-1" ~symbol:"SPY" in
+  let entering = _make_entering_position ~id:"SPY-pos-1" ~symbol:"SPY" () in
   let positions = _positions_with ~entries:[ entering ] in
   let cancel : Position.transition =
     {
@@ -182,7 +192,7 @@ let test_apply_to_positions_removes_on_closed _ =
 (** Contract 4: [apply_to_positions] returns the input map unchanged when the
     transition's [position_id] has no entry in [positions]. *)
 let test_apply_to_positions_unknown_id_is_noop _ =
-  let entering = _make_entering_position ~id:"SPY-pos-1" ~symbol:"SPY" in
+  let entering = _make_entering_position ~id:"SPY-pos-1" ~symbol:"SPY" () in
   let positions = _positions_with ~entries:[ entering ] in
   let cancel : Position.transition =
     {
@@ -324,6 +334,105 @@ let test_revert_rejected_exits_ignores_wrong_side_trade _ =
                | _ -> None)
              (float_equal 0.0))))
 
+(* A restable order for [id]/[symbol]/[side] — enough for
+   [Entry_fill_retry._reoffer] to find it via [Manager.get_order] and accept a
+   fresh copy. Field values otherwise don't matter to the contract below. *)
+let _make_restable_order ~id ~symbol ~side : Order_types.order =
+  {
+    id;
+    symbol;
+    side;
+    order_type = Trading_base.Types.Market;
+    quantity = 100.0;
+    time_in_force = Order_types.Day;
+    status = Order_types.Pending;
+    filled_quantity = 0.0;
+    avg_fill_price = None;
+    created_at = Time_ns_unix.epoch;
+    updated_at = Time_ns_unix.epoch;
+  }
+
+(** Contract 9 (BACKLOG-1/M-B, 2026-08-25 qc-behavioral finding on PR #2542):
+    [handle_rejected_trades] deliberately feeds step 2 (cancel) the
+    retry-filtered remainder but step 5 (revert) the FULL, unfiltered
+    [rejected_trades] (see the [.mli]'s ordering note). Swapping step 5's input
+    to the filtered list compiles cleanly and was undetected by all 416
+    pre-existing tests, because no fixture had a retried entry trade whose
+    (symbol, side) also satisfied an unrelated [Exiting] sibling's revert match
+    — the one case where the two lists actually disagree.
+
+    This fixture manufactures that overlap directly (bypassing the strategy
+    invariant that keeps the pairing unreachable in a real run, exactly as
+    contract 8 and the [.mli] both note this module must not rely on): on symbol
+    "AAPL", [AAPL-pos-2] is an [Entering] [Short] ticket whose entry trade side
+    is [Sell]; [AAPL-pos-3] is an unrelated, unfilled [Exiting] [Long] sibling
+    whose exit trade side is also [Sell]. The one rejected Sell trade for "AAPL"
+    both (a) gets retried — spending [AAPL-pos-2]'s budget, so it is absent from
+    the retry-filtered remainder step 2 uses — and (b) is the trade that must
+    revert [AAPL-pos-3] to [Holding], which only happens if step 5 sees the FULL
+    list. A third, disjoint ticket ([MSFT-pos-1], whose order is unknown to the
+    manager and so is never retried) exercises the ordinary cancel path so the
+    fixture is not reducible to the two-position AAPL pair alone. *)
+let test_handle_rejected_trades_reverts_off_the_full_list_not_the_filtered_one
+    _test_ctxt =
+  let positions =
+    _positions_with
+      ~entries:
+        [
+          _make_entering_position ~id:"MSFT-pos-1" ~symbol:"MSFT" ();
+          _make_entering_position ~id:"AAPL-pos-2" ~symbol:"AAPL"
+            ~side:Position.Short ();
+          _make_exiting_position ~id:"AAPL-pos-3" ~symbol:"AAPL"
+            ~side:Position.Long ();
+        ]
+  in
+  let order_manager = Manager.create () in
+  let (_ : Status.status list) =
+    Manager.submit_orders order_manager
+      [
+        _make_restable_order ~id:"AAPL-order-1" ~symbol:"AAPL"
+          ~side:Trading_base.Types.Sell;
+      ]
+  in
+  let entry_fill_retry = Entry_fill_retry.create ~max_retries:1 in
+  let rejected =
+    [
+      _make_trade ~symbol:"MSFT" ();
+      _make_trade ~symbol:"AAPL" ~side:Trading_base.Types.Sell ();
+    ]
+  in
+  let result =
+    Cancel_handler.handle_rejected_trades ~date:_build_date ~positions
+      ~rejected_trades:rejected ~order_manager ~entry_fill_retry
+      ~on_transitions:None
+  in
+  assert_that result
+    (is_ok_and_holds
+       (all_of
+          [
+            field Map.length (equal_to 2);
+            map_includes
+              [
+                ( "AAPL-pos-2",
+                  field
+                    (fun (p : Position.t) -> p.state)
+                    (matching
+                       ~msg:"Expected the retried ticket to stay Entering"
+                       (function Position.Entering _ -> Some () | _ -> None)
+                       (equal_to ())) );
+                ( "AAPL-pos-3",
+                  field
+                    (fun (p : Position.t) -> p.state)
+                    (matching
+                       ~msg:
+                         "Expected the sibling Exiting position to revert to \
+                          Holding off the FULL rejected-trades list, not the \
+                          retry-filtered remainder"
+                       (function Position.Holding _ -> Some () | _ -> None)
+                       (equal_to ())) );
+              ];
+          ]))
+
 let suite =
   "Cancel_handler"
   >::: [
@@ -344,6 +453,9 @@ let suite =
          >:: test_revert_rejected_exits_ignores_non_exiting;
          "revert_rejected_exits ignores a wrong-side trade on the symbol"
          >:: test_revert_rejected_exits_ignores_wrong_side_trade;
+         "handle_rejected_trades reverts off the full rejected-trades list, \
+          not the retry-filtered remainder"
+         >:: test_handle_rejected_trades_reverts_off_the_full_list_not_the_filtered_one;
        ]
 
 let () = run_test_tt_main suite

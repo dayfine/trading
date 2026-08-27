@@ -459,6 +459,7 @@
   status
   trading.simulation
   trading.base
+  trading.orders
   trading.strategy
   matchers))
 
