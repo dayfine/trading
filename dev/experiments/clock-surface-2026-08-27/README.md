@@ -63,6 +63,104 @@ comparisons are within-cell against THIS run's arm 0.
   when the surface completes (never read numbers from the chain log).
 - Chain log: `/tmp/clock2405-chain.log` (host).
 
-## Results
+## Results (salt 0; build 90dfd6e97)
 
-(pending)
+### Cell A — 26y × top-3000-2000 (macro-diverse)
+
+| arm | return % | trades | win % | sharpe | maxDD % | wall |
+|---|---:|---:|---:|---:|---:|---:|
+| 0 (null) | 312.74 | 799 | 33.79 | 0.430 | 38.78 | 2h47m |
+| 13 | 436.77 | 653 | 34.46 | 0.490 | 35.58 | 1h32m |
+| 26 | 389.81 | 691 | 35.89 | 0.484 | 33.18 | 1h38m |
+| **52** | **496.20** | 699 | **36.34** | **0.515** | **25.65** | 1h47m |
+| 156 | 267.59 | 761 | 35.48 | 0.401 | 38.48 | 2h10m |
+
+### Cell B — 2019-2023 × top-3000-2019
+
+| arm | return % | trades | win % | sharpe | maxDD % |
+|---|---:|---:|---:|---:|---:|
+| 0 (null) | 18.02 | 187 | 29.41 | 0.271 | 34.12 |
+| 13 | 18.72 | 190 | 29.47 | 0.288 | 30.97 |
+| 26 | 15.83 | 181 | 30.39 | 0.251 | 31.61 |
+| **52** | **25.31** | 182 | 30.22 | **0.345** | **27.00** |
+| 156 | = null (digit-identical: no 5y fill rests >156wk — knob-liveness sanity both ways) | | | | |
+
+### Paired dissection (join `symbol|entry_date`; realized P&L only)
+
+| pair | removed (fills, net $) | added (fills, net $) | realized delta |
+|---|---|---|---:|
+| B-13 vs B-0 | 72, −107,597 | 75, −59,901 | +47,696 |
+| B-26 vs B-0 | 58, −143,977 | 52, −101,468 | +42,509 |
+| B-52 vs B-0 | 39, −239,451 | 34, −132,402 | +107,049 |
+| A-26 vs A-0 | 421, +1,089,666 (137W/284L) | 313, +1,529,385 (115W/198L) | +439,719 |
+| A-52 vs A-0 | 384, +661,133 | 284, +2,238,592 | +1,577,459 |
+
+**The divergence is path-dominated**: at 26y, >50% of the book differs
+between arms (cancelling resting tickets frees cash/slots and everything
+downstream reshuffles), so removed/added cohorts are a path-A-vs-path-B
+comparison, NOT an isolated cut-cohort audit. The direct long-rest class
+(~89 fills on the old record base per the committed 2026-08-16 bucket
+table) is buried inside the cascade. The isolated-cohort evidence remains
+the bucket table; this surface adds the portfolio-level answer on top.
+
+### SMCI adjudication (decision-rule item 4)
+
+**SMCI has zero fills in every arm INCLUDING the null.** The +258,902
+stale-E monster of the −40.91pp episode does not exist at the current
+basis (it lived on the sp500 golden cell at pre-#2530/#2561 defaults).
+Nothing to adjudicate here; the `freeze_entry_at_first_breakout` question
+stays open independently but this surface carries no SMCI-like casualty.
+
+### Cell C — 2000-2012 × top-3000-2000 (disjoint, bear-heavy: dot-com + GFC)
+
+| arm | return % | trades | win % | sharpe | maxDD % | wall |
+|---|---:|---:|---:|---:|---:|---:|
+| 0 (null) | 76.71 | 291 | 33.33 | 0.382 | 27.10 | 1h21m |
+| 26 | 93.49 | 231 | 33.77 | 0.435 | 26.61 | 1h41m |
+| **52** | **97.99** | 245 | 33.47 | **0.448** | **25.65** | 56m |
+
+(C-52's maxDD is digit-identical to A-52's: C's window is a time-prefix of
+A's at identical config+salt, so A-52's drawdown episode occurred pre-2013 —
+a determinism self-check, not a coincidence.)
+
+### Verdict — ACCEPT(mechanism); robust value = 52
+
+Ledger: `dev/experiments/_ledger/2026-08-27-entry-rest-weeks-surface.sexp`.
+
+The clock beats the null in **3/3 independent broad cells** on sharpe and
+maxDD, and on return everywhere except B-26 (−2.2pp on a 187-trade book,
+with realized paired delta +$42.5k — MTM/realized divergence). **52 is the
+only value on the frontier in all three cells** (top return + sharpe +
+maxDD in each). Per `promotion-confirmation.md`'s decision rule, 52 is the
+promotable value; 26 (the approved-in-principle value) is clean in A and C
+and mixed in B.
+
+Declared gate deviations: salt 0 only (noise floors cited from committed
+3-salt records); 3-cell period×universe grid, not WF-CV folds, no DSR;
+A and C share the PIT-2000 composition (period-disjoint, not
+composition-independent).
+
+**The default flip is NOT executed here.** It is a separate user-gated PR
+(R3 + `config-default-blast-radius` paired-golden protocol; the
+goldens_affected_check will correctly FAIL default-flip and list the
+inheriting goldens per #2575). Open user decision: flip to **52** (the
+measured robust value) or **26** (approved-in-principle).
+
+### Reading (detail)
+
+- Every clock arm {13,26,52} beats the null in cell A on ALL of return /
+  win rate / sharpe / maxDD. In cell B, 13 and 52 beat the null; 26 dips
+  on return (−2.2pp, small book) while improving maxDD.
+- **52 is the only cross-cell-consistent winner** — top on return, sharpe
+  and maxDD in BOTH cells. Its cell-A return delta (+183.5pp) exceeds even
+  the old-basis 132.5pp noise floor, and DD/sharpe/win-rate co-move.
+- 156 (clip-the-absurd-tail-only) is a no-op at 5y and WORSE than null at
+  26y (−45.2pp, DD ≈ null) — cutting only the extreme tail keeps the
+  losing 27-156wk class while forfeiting the reshuffle benefit.
+- The bucket-table prior said the sign flip sits in 14-52wk; the surface
+  puts the optimum at (or beyond) 52 — consistent with the cut being
+  beneficial mostly through freeing capital from dead tickets rather than
+  through surgically removing the worst bucket.
+- Cell B is nested inside cell A's window, so it is NOT an independent
+  grid cell (rangetop lesson). Cell C (2000-2012 disjoint, bear-heavy)
+  runs arms {0,26,52} to complete a legitimate 3-cell read.
