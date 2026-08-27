@@ -21,10 +21,11 @@
 ;;   2. Performance benchmark / alpha bar. Any active-trading strategy run on
 ;;      the same window must beat this number to claim alpha. The pinned
 ;;      [total_return_pct] here is the bar [sp500-2019-2023.sexp] is measured
-;;      against (sp500-2019-2023 currently pins +58.34%; SPY BAH posts
-;;      +91.31% via Backtest.Runner, so the active strategy is currently
-;;      ~33 pp behind passive SPY over this window — a finding the BAH-SPY
-;;      pin makes visible at every postsubmit run).
+;;      against (comparison vintages drift as pins move; post-#2569 SPY
+;;      BAH posts +89.60% via Backtest.Runner while the Weinstein cell
+;;      pins ~+76.8%, so the active strategy trails passive SPY by
+;;      ~13 pp over this window — a finding the BAH-SPY pin makes
+;;      visible at every postsubmit run).
 ;;
 ;; {1 Strategy}
 ;;
@@ -38,9 +39,10 @@
 ;; Verified through {!Backtest.Runner.run_backtest} with [strategy_choice =
 ;; Bah_benchmark { symbol = "SPY" }]. Entry sizing happens at day-1 close
 ;; with a 1% gap-buffer headroom (see [_entry_gap_buffer_pct] in
-;; [bah_benchmark_strategy.ml]), trade fills at next-day open (the
-;; simulator's standard order-routing semantics — orders placed in
-;; [on_market_close] execute against the next bar). The simulator stops one
+;; [bah_benchmark_strategy.ml]), trade fills at the StopLimit trigger
+;; since #2569 (pre-flip: next-day open — orders placed in
+;; [on_market_close] execute against the next bar; the fill-model default
+;; flip routes even BAH through the entry cap). The simulator stops one
 ;; bar before [end_date] (the [is_complete] check fires when
 ;; [current_date >= end_date]), so the final mark-to-market uses
 ;; [end_date - 1 trading day]'s close.
@@ -48,20 +50,26 @@
 ;;   sizing close 2019-01-02:  $250.18
 ;;   gap-buffered sizing px:   $252.6818  (= 250.18 * 1.01)
 ;;   shares bought:            3957 (= floor(1,000,000 / 252.6818))
-;;   fill open  2019-01-03:    $248.23
+;;   fill (StopLimit trigger): ~$250.24  (was next-day open $248.23
+;;     pre-#2569: the fill-model default flip routes even BAH sleeves
+;;     through the StopLimit entry cap -- see the brk-b twin + the
+;;     arc-readiness follow-up; closed form here is APPROXIMATE, the
+;;     runner-actual is the pin)
 ;;   entry commission:         $39.57 ($0.01/share * 3957)
-;;   leftover cash:            $17,754.32  (closed-form approximation)
-;;     (= 1,000,000 - 3957 * 248.23 - 39.57)
+;;   leftover cash:            ~$9,800  (closed-form approximation)
+;;     (~= 1,000,000 - 3957 * 250.24 - 39.57)
 ;;   final close 2023-12-28:   $476.69
 ;;     (last bar processed; end_date 2023-12-29 is not stepped)
-;;   final equity:             $1,903,976.65  (runner-actual)
-;;   total_return_pct:         +90.40%
+;;   final equity:             $1,896,010.32  (runner-actual, post-#2569;
+;;     was $1,903,976.65 pre-flip -- matches test_bah_runner_e2e's pin)
+;;   total_return_pct:         +89.60%  (was +90.40% pre-#2569)
 ;;   SPY raw return (sizing 2019-01-02 close to MtM 2023-12-28 close):
 ;;                             +90.5%  (= 476.69 / 250.18 - 1)
 ;;
-;; The ~$140 delta between the closed-form $1,904,115.65 and the
-;; runner-actual $1,903,976.65 is residual slippage / commission-tier
-;; rounding the closed-form math doesn't capture; runner output is the
+;; POST-#2569 the runner-actual is $1,896,010.32 and the approximate
+;; closed form above lands within ~$13 of it (fill-price rounding).
+;; Pre-flip record: closed-form $1,904,115.65 vs runner $1,903,976.65
+;; (~$140 residual). In both eras the runner output is the
 ;; authoritative pin.
 ;;
 ;; The 1% gap buffer was introduced in PR #1172 to fix the weekly-start
@@ -73,10 +81,14 @@
 ;;
 ;; {1 Accounting findings}
 ;;
-;; None. Day-1 commission (~$40) and next-day-open fill behavior are both
-;; deterministic against the pinned SPY data. Both are pinned into
-;; [total_return_pct] so a regression that drops commission or changes
-;; fill semantics would surface here.
+;; Day-1 commission (~$40) is deterministic against the pinned SPY data.
+;; HISTORY NOTE (2026-08-26): the original text here claimed a fill-
+;; semantics change "would surface" in [total_return_pct] -- PR #2569
+;; (fill-model default flip) is the counterexample: the fill moved from
+;; next-day open to the StopLimit trigger (-0.80pp return) and the cell
+;; PASSED silently inside its 89.00..93.00 band. Band-width regression
+;; detection has a floor; the closed-form comments above are the record
+;; that catches sub-band drifts.
 ;;
 ;; Adjusted close 2019-01-02 = $224.38 -> 2023-12-29 = $462.57 = +106.16%
 ;; is the dividend-reinvested return; we do NOT pin against this number
@@ -84,7 +96,11 @@
 ;;
 ;; {1 Pinned ranges}
 ;;
-;; total_return_pct: +/- 2 pp around the runner-actual +91.31% (89.0..93.0).
+;; total_return_pct: 89.0..93.0 -- DELIBERATELY not re-centred for
+;; #2569; the post-flip actual +89.60% sits inside, and the +-2pp
+;; determinism scheme is the contract; re-centre only if a future
+;; change pushes it out. (See the closed-form history above for the
+;; per-era actuals.)
 ;; Tighter than the Weinstein scenario's +/- 13 pp because BAH is mechanical
 ;; — no parameter sensitivity, no stop slippage, no cash-deployment timing.
 ;; The only sources of drift are SPY's day-1 close (deterministic against

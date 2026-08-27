@@ -140,7 +140,10 @@
  ;; golden_live_drift linter (#2403). Data-only: Scenario.t is
  ;; [@@sexp.allow_extra_fields], so the runner parses and ignores this block.
  (deviates_from_live
-  ((enable_sim_entry_stoplimit "the armed StopLimit entry stack this cell exists to pin; live does not arm the simulator entry model")
+  (;; NOTE (2026-08-26): enable_sim_entry_stoplimit + entry_extension_max_pct
+   ;; are no longer declared here — the fill-model default flip (#2405) made
+   ;; both the code default AND live, and this cell arms them at exactly those
+   ;; values, so a declaration would be a stale one and fail the drift check.
    (sim_entry_trigger_at_suggested "part of the armed StopLimit entry stack above")
    (sim_entry_fill_next_open "part of the armed StopLimit entry stack above (a no-op here, kept to match the intended production config)")
    (entry_anchor_local_range_weeks "part of the armed StopLimit entry stack above")

@@ -80,7 +80,6 @@
    (screening_config "live arms candidate_ranking=Quality (#1782, report ordering) and failed_breakout_tolerance_pct=0.05 (#2084); the backtest defaults stay unarmed per experiment-flag R1")
    (resistance_lookback_bars "live feeds the resistance/support mapper 520 weekly bars for the human report only")
    (entry_through_band_pct "live-only entry-reconciliation band for the printed ticket (#2103); read by Weekly_snapshot_generator, never by on_market_close")
-   (entry_extension_max_pct "live arms 2.0 (#2404 user decision 2026-08-25, measured winner); this cell runs the 0.0 default (uncapped) -- report-side ticket cap, never read by on_market_close unless enable_sim_entry_stoplimit arms it")
    (sparse_tail_min_bars "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
    (sparse_tail_window_trading_days "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
    (rename_detect_min_overlap_days "live-only ticker-rename detector (#2083 fix 2); report-layer data hygiene, no backtest consumer")
@@ -127,14 +126,29 @@
   ;; record, NO return-improvement claim attaches to these deltas -- the
   ;; large top-line swings are tail-path reshuffling on a pin, not evidence.
 
-  ((total_return_pct ((min 70.8823) (max 95.8997)))
-   (total_trades ((min 127.49) (max 172.51)))
-   (win_rate ((min 35.1333) (max 47.5334)))
-   (sharpe_ratio ((min 0.6183) (max 0.8366)))
-   (max_drawdown_pct ((min 22.1979) (max 30.0326)))
-   (avg_holding_days ((min 49.6570) (max 67.1830)))
-   (open_positions_value ((min 1320648.9) (max 1786760.4)))
-   (sortino_ratio_annualized ((min 0.7955) (max 1.0763)))
-   (calmar_ratio ((min 0.4207) (max 0.5693)))
-   (ulcer_index ((min 8.0205) (max 10.8514)))
+  ;; RE-PINNED 2026-08-26 for the fill-model default flip (PR #2569:
+
+  ;; enable_sim_entry_stoplimit + entry_extension_max_pct 2.0 as the
+
+  ;; default pair -- USER-directed fidelity decision, #2405 precondition;
+
+  ;; entries now rest as StopLimit tickets like live). +-15% around the
+
+  ;; paired-sweep actuals at PR tip aa4a513e2 (local pinned worktree,
+
+  ;; committed store). NO return claim: the swings are entry-timing
+
+  ;; reshuffles on regression pins, not evidence about the fill model.
+
+
+  ((total_return_pct ((min 64.6565) (max 87.4765)))
+   (total_trades ((min 107.09) (max 144.91)))
+   (win_rate ((min 31.7063) (max 42.8969)))
+   (sharpe_ratio ((min 0.5800) (max 0.7848)))
+   (max_drawdown_pct ((min 30.4957) (max 41.2590)))
+   (avg_holding_days ((min 53.2329) (max 72.0211)))
+   (open_positions_value ((min 1253651.5) (max 1696116.8)))
+   (sortino_ratio_annualized ((min 0.7328) (max 0.9915)))
+   (calmar_ratio ((min 0.2844) (max 0.3850)))
+   (ulcer_index ((min 11.9658) (max 16.1892)))
    (wall_seconds       ((min 0.0)          (max 1500.0))))))

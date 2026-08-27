@@ -83,7 +83,6 @@
    (screening_config "live arms candidate_ranking=Quality (#1782, report ordering) and failed_breakout_tolerance_pct=0.05 (#2084); the backtest defaults stay unarmed per experiment-flag R1")
    (resistance_lookback_bars "live feeds the resistance/support mapper 520 weekly bars for the human report only")
    (entry_through_band_pct "live-only entry-reconciliation band for the printed ticket (#2103); read by Weekly_snapshot_generator, never by on_market_close")
-   (entry_extension_max_pct "live arms 2.0 (#2404 user decision 2026-08-25, measured winner); this cell runs the 0.0 default (uncapped) — report-side ticket cap, never read by on_market_close unless enable_sim_entry_stoplimit arms it")
    (sparse_tail_min_bars "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
    (sparse_tail_window_trading_days "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
    (rename_detect_min_overlap_days "live-only ticker-rename detector (#2083 fix 2); report-layer data hygiene, no backtest consumer")
@@ -155,19 +154,34 @@
   ;; weinstein_strategy_config.mli; the mechanism its docstring predicted
   ;; would move this cell (+205pp ret / +18pp maxDD here, still a pin).
 
-  ((total_return_pct   ((min 892.1403)       (max 1207.0135)))
-   (total_trades       ((min 559.29)        (max 756.71)))
-   (win_rate           ((min 31.7781)       (max 42.9940)))
-   (sharpe_ratio       ((min 0.4410)      (max 0.5967)))
-   (max_drawdown_pct   ((min 67.2422)       (max 90.9749)))
-   (avg_holding_days   ((min 51.3552)       (max 69.4807)))
+  ;; RE-PINNED 2026-08-26 for the fill-model default flip (PR #2569:
+
+  ;; enable_sim_entry_stoplimit + entry_extension_max_pct 2.0 as the
+
+  ;; default pair -- USER-directed fidelity decision, #2405 precondition;
+
+  ;; entries now rest as StopLimit tickets like live). +-15% around the
+
+  ;; paired-sweep actuals at PR tip aa4a513e2 (local pinned worktree,
+
+  ;; committed store). NO return claim: the swings are entry-timing
+
+  ;; reshuffles on regression pins, not evidence about the fill model.
+
+
+  ((total_return_pct   ((min 626.7551)       (max 847.9629)))
+   (total_trades       ((min 550.79)        (max 745.21)))
+   (win_rate           ((min 28.7268)       (max 38.8658)))
+   (sharpe_ratio       ((min 0.4072)      (max 0.5510)))
+   (max_drawdown_pct   ((min 67.0858)       (max 90.7632)))
+   (avg_holding_days   ((min 52.1307)       (max 70.5298)))
    ;; OPV re-pinned ~2.18M under the realism-defaults flip (ledger
    ;; 2026-07-10-realism-defaults-flip): $1M-ADV entry gate + stale-exit 5d
    ;; lighten the terminal book. Headline metrics stayed in-band (ret 387.5 /
    ;; 784 / Sharpe 0.777 / DD 21.35). Was ~3.76M pre-flip.
-   (open_positions_value ((min 2260873.0)   (max 3058828.4)))
-   (sortino_ratio_annualized ((min 0.5523) (max 0.7474)))
-   (calmar_ratio       ((min 0.1733)      (max 0.2346)))
-   (ulcer_index        ((min 22.4697)       (max 30.4002)))
+   (open_positions_value ((min 949040.7)   (max 1283996.4)))
+   (sortino_ratio_annualized ((min 0.4761) (max 0.6443)))
+   (calmar_ratio       ((min 0.1497)      (max 0.2026)))
+   (ulcer_index        ((min 24.5811)       (max 33.2569)))
    ;; Wall floor lowered 600→100, then floored at 0 per #2547 (a min guards nothing; the 364 run measured ~391s locally).
    (wall_seconds       ((min 0.0)           (max 2400.0))))))

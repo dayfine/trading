@@ -31,6 +31,13 @@ let bundle_w_overhead_supply = 30
    default and the [default_config] literal share one source of truth. *)
 let default_dawn_max_flip_age_weeks = 78
 
+(* Default do-not-chase cap (percentage points) for [entry_extension_max_pct]:
+   2.0, the value live arms in [dev/weekly-picks/live-config-overrides.sexp]
+   (user decision 2026-08-25, issue #2404) and the corpus value the staged
+   record-convention specs already use. Named so the sexp default and the
+   [default_config] literal share one source of truth. *)
+let default_entry_extension_max_pct = 2.0
+
 type index_config = { primary : string; global : (string * string) list }
 [@@deriving sexp]
 
@@ -122,8 +129,10 @@ type config = {
   rename_detect_min_overlap_days : int; [@sexp.default 0]  (** See [.mli]. *)
   rename_detect_match_fraction : float; [@sexp.default 0.0]  (** See [.mli]. *)
   entry_through_band_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
-  entry_extension_max_pct : float; [@sexp.default 0.0]  (** See [.mli]. *)
-  enable_sim_entry_stoplimit : bool; [@sexp.default false]  (** See [.mli]. *)
+  entry_extension_max_pct : float;
+      [@sexp.default default_entry_extension_max_pct]
+      (** See [.mli]. *)
+  enable_sim_entry_stoplimit : bool; [@sexp.default true]  (** See [.mli]. *)
   sim_entry_trigger_at_suggested : bool; [@sexp.default false]
       (** See [.mli]. *)
   entry_anchor_local_range_weeks : int; [@sexp.default 0]  (** See [.mli]. *)
@@ -240,8 +249,8 @@ let default_config ~universe ~index_symbol =
     rename_detect_min_overlap_days = 0;
     rename_detect_match_fraction = 0.0;
     entry_through_band_pct = 0.0;
-    entry_extension_max_pct = 0.0;
-    enable_sim_entry_stoplimit = false;
+    entry_extension_max_pct = default_entry_extension_max_pct;
+    enable_sim_entry_stoplimit = true;
     sim_entry_trigger_at_suggested = false;
     entry_anchor_local_range_weeks = 0;
     entry_freshness_basis = Entry_freshness.Ma_cross;

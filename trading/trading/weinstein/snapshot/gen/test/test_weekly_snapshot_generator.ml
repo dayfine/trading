@@ -423,11 +423,23 @@ let test_fallback_stop_differs_from_screener_flat_proxy _ =
    [_size_long] runs before [_overlay_structural_stop] -- [sized_risk_amount]
    is then computed from the screener's pre-overlay [suggested_stop], while
    [c.stop] displays the post-overlay value; the two diverge and this test
-   goes red. *)
+   goes red.
+
+   [entry_extension_max_pct] is pinned to [0.0] so the property under test is
+   the OVERLAY ORDER alone. Since the 2026-08-26 fill-model flip (#2405) the
+   default is [2.0], which reconciles the candidate and re-anchors sizing on
+   the capped entry rather than [c.entry] — a real and intended behaviour, but
+   a second moving part this equality was never meant to measure. The armed-cap
+   sizing contract is pinned separately by
+   [test_long_candidate_reconciled_and_sized_on_the_cap]. *)
 let test_sizing_uses_overlaid_stop_distance _ =
-  let snap =
-    _generate ~bar_reader:(_breakout_bar_reader ())
+  let base =
+    _inputs ~bar_reader:(_breakout_bar_reader ())
       ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  let snap =
+    Generator.generate
+      { base with config = { base.config with entry_extension_max_pct = 0.0 } }
   in
   let aapl =
     List.find (snap : Weekly_snapshot.t).long_candidates
@@ -1563,13 +1575,32 @@ let test_past_cap_candidate_keeps_its_ticket_at_the_generate_seam _ =
                  (equal_to ()));
           ]))
 
-(* R1 no-op: with the default config (both thresholds [0.0]) the same fixture
-   produces an UNRECONCILED candidate sized on its entry level — bit-identical
-   to pre-#2103 behaviour. *)
-let test_default_config_leaves_candidates_unreconciled _ =
-  let snap =
-    _generate ~bar_reader:(_breakout_bar_reader ())
+(* R1 no-op: with both thresholds at [0.0] the same fixture produces an
+   UNRECONCILED candidate sized on its entry level — bit-identical to pre-#2103
+   behaviour.
+
+   The [0.0] cap is set EXPLICITLY rather than inherited from the default
+   config: since the 2026-08-26 fill-model flip (#2405)
+   [entry_extension_max_pct] defaults to [2.0], so reading this contract off
+   [default_config] would pin the armed path instead of the no-op it is named
+   for. The no-op is still reachable and still the pre-#2103 behaviour; only
+   the route to it moved. *)
+let test_zero_cap_leaves_candidates_unreconciled _ =
+  let base =
+    _inputs ~bar_reader:(_breakout_bar_reader ())
       ~ticker_sectors:[ ("AAPL", "Information Technology") ]
+  in
+  let snap =
+    Generator.generate
+      {
+        base with
+        config =
+          {
+            base.config with
+            entry_through_band_pct = 0.0;
+            entry_extension_max_pct = 0.0;
+          };
+      }
   in
   assert_that
     (_find_candidate (snap : Weekly_snapshot.t).long_candidates "AAPL")
@@ -1798,8 +1829,8 @@ let suite =
          >:: test_long_candidate_reconciled_and_sized_on_the_cap;
          "past-cap candidate keeps its ticket at the generate seam"
          >:: test_past_cap_candidate_keeps_its_ticket_at_the_generate_seam;
-         "default config leaves candidates unreconciled"
-         >:: test_default_config_leaves_candidates_unreconciled;
+         "zero cap leaves candidates unreconciled"
+         >:: test_zero_cap_leaves_candidates_unreconciled;
          "short candidate reconciled at the generate seam"
          >:: test_short_candidate_reconciled_at_generate_seam;
          "short candidate stop recomputed above entry"

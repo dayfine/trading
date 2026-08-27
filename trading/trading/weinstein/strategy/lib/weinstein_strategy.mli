@@ -798,21 +798,30 @@ type config = {
           unless [entry_extension_max_pct > 0.0]. Consumed only by
           [Weekly_snapshot_generator.generate]. See
           [Weinstein_strategy_config.entry_through_band_pct]. *)
-  entry_extension_max_pct : float; [@sexp.default 0.0]
-      (** Entry reconciliation (issue #2103) — maximum overshoot past the
-          breakout entry at which an order is still issued; beyond it the ticket
-          is suppressed (do-not-chase) and the row kept for watch. Default [0.0]
-          = reconciliation disabled, no-op: sizing uses [entry] as before.
-          Consumed by [Weekly_snapshot_generator.generate], and (with
+  entry_extension_max_pct : float; [@sexp.default 2.0]
+      (** Entry reconciliation (issue #2103) — the do-not-chase cap: the
+          furthest past the breakout entry, in percentage points, that an entry
+          order may fill. It is the limit leg of the
+          [StopLimit (E, E * (1 +/- pct/100))] ticket. Default [2.0] = the
+          #2404-unified live value (flipped from the [0.0] no-op on 2026-08-26
+          as a pair with [enable_sim_entry_stoplimit]). Consumed by
+          [Weekly_snapshot_generator.generate], and (with
           [enable_sim_entry_stoplimit]) as the simulator entry-fill cap. See
           [Weinstein_strategy_config.entry_extension_max_pct]. *)
-  enable_sim_entry_stoplimit : bool; [@sexp.default false]
+  enable_sim_entry_stoplimit : bool; [@sexp.default true]
       (** Simulator entry fill model (#2158 Phase 2): when [true] AND
           [entry_extension_max_pct > 0], backtest entries fill as
           [StopLimit (entry, cap)] with the do-not-chase cap instead of Market
-          orders. Default [false] = bit-identical baselines; fill-model basis
-          change when armed — own WF-CV surface, never bundled. See
-          [Weinstein_strategy_config.enable_sim_entry_stoplimit]. *)
+          orders. {b Default [true] since 2026-08-26} — flipped as a pair with
+          [entry_extension_max_pct] so simulated entries use the live ticket
+          FAMILY, [StopLimit (trigger, cap)]. Not yet byte-faithful: the sim
+          anchors at [effective_entry_price] while live anchors at the screen's
+          [E] -- the three-layer anchor divergence recorded in
+          weinstein-book-reference.md S4.7 remains open. User-directed fidelity
+          decision (issue #2405), overriding the 2026-08-04 ledger REJECT, which
+          measured returns on a sim-vs-sim surface; no return improvement is
+          claimed. See [Weinstein_strategy_config.enable_sim_entry_stoplimit].
+      *)
   sim_entry_trigger_at_suggested : bool; [@sexp.default false]
       (** Book-faithful E-anchored entry trigger (user decision 2026-08-05):
           when [true] AND [enable_sim_entry_stoplimit] is on,
@@ -821,8 +830,9 @@ type config = {
           order rests as
           [StopLimit (E, E * (1 +/- entry_extension_max_pct/100))] at the
           breakout and sizes at [E]. Default [false] = current-close trigger,
-          bit-identical baselines (R1); gated on [enable_sim_entry_stoplimit] so
-          arming alone is a no-op. See
+          bit-identical baselines (R1). Since [enable_sim_entry_stoplimit]
+          became default-[true] (2026-08-26) arming this field alone DOES move a
+          backtest number. See
           [Weinstein_strategy_config.sim_entry_trigger_at_suggested]. *)
   entry_anchor_local_range_weeks : int; [@sexp.default 0]
       (** Book-faithful local-range entry anchor (2026-08-05 user decision):

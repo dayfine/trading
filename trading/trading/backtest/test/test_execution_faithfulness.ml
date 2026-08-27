@@ -124,6 +124,33 @@ let test_kind_stoplimit_when_armed _ =
        (config_with ~stoplimit:true ~extension_pct:15.0))
     (equal_to (EF.Stop_limit_band 0.15 : EF.entry_order_kind))
 
+(* The fill-model default flip (#2405, 2026-08-26). The pair matters more than
+   either field: the runner arms the StopLimit path iff
+   [enable_sim_entry_stoplimit && entry_extension_max_pct > 0.0]
+   ([Panel_runner._entry_cap_for_sim], mirrored by
+   [entry_order_kind_of_config]), so a flag flip with the cap left at [0.0]
+   would read as "defaulted on" while silently still filling at Market. Reading
+   the two fields is not enough — the assertion has to run the DEFAULT config
+   through the arming predicate and see a band come out. *)
+let test_default_config_arms_the_stoplimit_path _ =
+  let default =
+    Weinstein_strategy.default_config ~universe:[ "AAPL" ]
+      ~index_symbol:"GSPC.INDX"
+  in
+  assert_that default
+    (all_of
+       [
+         field
+           (fun (c : Weinstein_strategy.config) -> c.enable_sim_entry_stoplimit)
+           (equal_to true);
+         field
+           (fun (c : Weinstein_strategy.config) -> c.entry_extension_max_pct)
+           (float_equal 2.0);
+       ]);
+  assert_that
+    (EF.entry_order_kind_of_config default)
+    (equal_to (EF.Stop_limit_band 0.02 : EF.entry_order_kind))
+
 (* enrich: Market ----------------------------------------------------- *)
 
 let test_market_fill_is_faithful _ =
@@ -434,6 +461,8 @@ let suite =
          "kind: Market when extension 0"
          >:: test_kind_market_when_extension_zero;
          "kind: StopLimit when armed" >:: test_kind_stoplimit_when_armed;
+         "kind: default config arms the StopLimit path"
+         >:: test_default_config_arms_the_stoplimit_path;
          "Market fill is faithful" >:: test_market_fill_is_faithful;
          "StopLimit fill at trigger is faithful"
          >:: test_stoplimit_fill_at_trigger_is_faithful;
