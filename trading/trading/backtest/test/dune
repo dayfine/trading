@@ -82,7 +82,14 @@
   matchers
   simulation_test_helpers)
  (preprocess
-  (pps ppx_sexp_conv ppx_deriving.eq ppx_deriving.show)))
+  (pps ppx_sexp_conv ppx_deriving.eq ppx_deriving.show))
+ (deps
+  ; test_csv_snapshot_builder_cleanup spawns this helper as a subprocess and
+  ; locates it as a sibling of its own exe in _build. Nothing else in the repo
+  ; links or runs it, so without this dep dune is free to skip building it and
+  ; the test silently reads the shell's "not found" text as the tmp-dir path
+  ; (issue #2565).
+  csv_snapshot_builder_cleanup_subject.exe))
 
 ; Subject binary for test_csv_snapshot_builder_cleanup's subprocess tests.
 ; Allocates a /tmp/panel_runner_csv_snapshot_* dir, registers it for

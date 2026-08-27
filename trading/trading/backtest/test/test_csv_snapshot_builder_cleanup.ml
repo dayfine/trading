@@ -21,8 +21,10 @@ module Builder = Backtest.Csv_snapshot_builder
 
 (* -------------- subject binary path -------------- *)
 
-(* The subject binary lives next to this test exe in the _build tree (per
-   the [executables] stanza in test/dune). It supports two modes via argv:
+(* The subject binary lives next to this test exe in the _build tree — it is
+   kept there by the (deps ...) field of the [tests] stanza in test/dune,
+   without which dune is free to skip building it (issue #2565). It supports
+   two modes via argv:
    "raise" — registers a tmp dir then raises an exception;
    "sigterm" — registers a tmp dir then kills itself with SIGTERM.
    In both cases it prints the dir path on stdout BEFORE the abnormal exit
@@ -31,6 +33,14 @@ let _subject_binary =
   Filename.concat
     (Filename.dirname Stdlib.Sys.executable_name)
     "csv_snapshot_builder_cleanup_subject.exe"
+
+(* Shell exit codes meaning "could not execute the command at all": 126 =
+   found but not executable, 127 = not found. These are the ONLY shapes we
+   treat as a harness failure — the subject's own abnormal exits (2 for the
+   uncaught exception, 130 for SIGTERM) are the behaviour under test and must
+   stay observable to the callers. *)
+let _exit_code_not_executable = 126
+let _exit_code_not_found = 127
 
 (* -------------- unit tests on the cleanup ledger -------------- *)
 
@@ -153,13 +163,24 @@ let _run_subject ~arg =
   let exit_code = Stdlib.Sys.command cmd in
   let stdout = In_channel.read_all stdout_path in
   _rm_rf stdout_path;
+  if exit_code = _exit_code_not_executable || exit_code = _exit_code_not_found
+  then
+    assert_failure
+      (Printf.sprintf
+         "could not execute subject binary %s (shell exit %d): it was not \
+          built. The [tests] stanza in test/dune must keep it in its (deps \
+          ...). Shell output: %s"
+         _subject_binary exit_code (String.strip stdout));
   (* The subject prints the dir on its FIRST line (always), then EITHER
      raises (uncaught -> exit 2) OR sigterms itself (exit 130 via our handler
      OR raw 143 if our handler didn't install). *)
   let dir =
     match String.split_lines stdout with
     | first :: _ -> String.strip first
-    | [] -> failwith "subject produced no output"
+    | [] ->
+        assert_failure
+          (Printf.sprintf "subject binary %s (shell exit %d) produced no output"
+             _subject_binary exit_code)
   in
   (dir, exit_code, stdout)
 
