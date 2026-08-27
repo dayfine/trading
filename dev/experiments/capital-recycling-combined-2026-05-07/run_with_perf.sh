@@ -25,6 +25,10 @@ SCENARIO_ROOT="${REPO_ROOT}/trading/test_data/backtest_scenarios"
 EXP_SCENARIOS="${SCRIPT_DIR}/scenarios"
 TIMEOUT="${PERF_TIMEOUT:-1800}"
 
+# Shared GNU /usr/bin/time peak-RSS parser -- see dev/lib/gnu_time_rss.sh for
+# the fused-digit bug this guards against (#2553, #2559, #2576).
+. "${REPO_ROOT}/dev/lib/gnu_time_rss.sh"
+
 export OCAMLRUNPARAM="${PERF_OCAMLRUNPARAM:-o=60,s=512k}"
 
 if [ -x /usr/bin/time ]; then
@@ -87,7 +91,7 @@ for sexp in "$EXP_SCENARIOS"/*.sexp; do
   printf '%s\n' "$wall_sec" >"$wall"
 
   rss_value="?"
-  [ -f "$rss" ] && rss_value=$(tr -d '\n' <"$rss")
+  [ -f "$rss" ] && rss_value=$(_parse_gnu_time_rss "$rss")
 
   if [ "$rc" -ne 0 ]; then
     TABLE_ROWS="${TABLE_ROWS}FAIL  ${base}  ${wall_sec}s  ${rss_value}kB
