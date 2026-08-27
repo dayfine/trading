@@ -14,6 +14,13 @@
 
 set -euo pipefail
 
+# NEVER write `echo "${var}" | grep -q ...` in this file (issue #2564). Under
+# `pipefail`, `grep -q` exits as soon as it finds its first match, closing the
+# read end of the pipe; if the forked `echo` hasn't finished writing yet, it
+# gets SIGPIPE and the pipeline's reported status becomes 141 -- which then
+# fails a `&&` assertion chain even though both the real exit code and the
+# real output were correct. Use `grep -q '...' <<<"${var}"` (herestring)
+# instead -- it hands grep the same bytes without a pipe to race.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT="${SCRIPT_DIR}/record_qc_audit.sh"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
@@ -524,7 +531,7 @@ JSON7E="${TMP_REPO}/dev/audit/2026-07-28-feat-streaky-${FEATURE7E}.json"
 if (( rc7e_1 == 0 )) && (( rc7e_2 == 0 )) && (( rc7e_3 == 0 )) \
    && [[ -f "${JSON7E}" ]] \
    && grep -q '"consecutive_rework_count": *3' "${JSON7E}" \
-   && echo "${out7e_3}" | grep -q 'consecutive_rework_count=3'; then
+   && grep -q 'consecutive_rework_count=3' <<<"${out7e_3}"; then
   pass "scenario 7e — 3 consecutive same-day NEEDS_REWORK calls on one branch reach consecutive_rework_count=3 (was capped at 1 pre-fix, H-AUDIT-REWORK-COUNT-BLIND)"
 else
   fail "scenario 7e — expected consecutive_rework_count=3 on the third call; got rc=${rc7e_1}/${rc7e_2}/${rc7e_3}"
@@ -684,7 +691,7 @@ JSON8="${TMP_REPO}/dev/audit/2026-07-27-feat-mmm-${FEATURE8}.json"
 if (( rc8_1 == 0 )) && (( rc8_2 == 0 )) && (( rc8_3 == 0 )) \
    && [[ -f "${JSON8}" ]] \
    && grep -q '"consecutive_rework_count": *1' "${JSON8}" \
-   && echo "${out8_3}" | grep -q 'consecutive_rework_count=1'; then
+   && grep -q 'consecutive_rework_count=1' <<<"${out8_3}"; then
   pass "scenario 8 — same-day records consulted in write order (recorded_at_ns), not filename order (F1 rework fix)"
 else
   fail "scenario 8 — expected consecutive_rework_count=1 for feat/mmm record (streak broken by feat/aaa=APPROVED immediately preceding in write order); got rc=${rc8_1}/${rc8_2}/${rc8_3}"
@@ -735,7 +742,7 @@ JSON9="${TMP_REPO}/dev/audit/2026-07-27-harness-new-${FEATURE9}.json"
 
 if (( rc9 == 0 )) && [[ -f "${JSON9}" ]] \
    && grep -q '"consecutive_rework_count": *2' "${JSON9}" \
-   && echo "${out9}" | grep -q 'consecutive_rework_count=2'; then
+   && grep -q 'consecutive_rework_count=2' <<<"${out9}"; then
   pass "scenario 9 — legacy record with no recorded_at_ns does not abort the script (F1 rework-2 fix)"
 else
   fail "scenario 9 — expected rc=0, record written, consecutive_rework_count=2; got rc=${rc9}"
@@ -761,7 +768,7 @@ out10=$(REPO_ROOT="${TMP_REPO}" WRITE_AUDIT_RECORDED_AT_NS=oops \
 audit_count_after_10="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE10}.json")"
 
 if (( rc10 == 1 )) && [[ "${audit_count_before_10}" == "0" ]] && [[ "${audit_count_after_10}" == "0" ]] \
-   && echo "${out10}" | grep -q 'must be a nonnegative integer'; then
+   && grep -q 'must be a nonnegative integer' <<<"${out10}"; then
   pass "scenario 10 — non-numeric WRITE_AUDIT_RECORDED_AT_NS rejected, no record written (N2 fix)"
 else
   fail "scenario 10 — expected rc=1, no file written, 'must be a nonnegative integer' message; got rc=${rc10}, before=${audit_count_before_10}, after=${audit_count_after_10}"
@@ -837,7 +844,7 @@ out12=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record
 audit_count_after_12="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE12}.json")"
 
 if (( rc12 == 1 )) && [[ "${audit_count_before_12}" == "0" ]] && [[ "${audit_count_after_12}" == "0" ]] \
-   && echo "${out12}" | grep -q "quality score '7' is not an integer in 1..5"; then
+   && grep -q "quality score '7' is not an integer in 1..5" <<<"${out12}"; then
   pass "scenario 12 — out-of-range quality score (file-mode) rejected with exit 1, no record written (H-QC-SCALE)"
 else
   fail "scenario 12 — expected rc=1, no file written, message naming '7'; got rc=${rc12}, before=${audit_count_before_12}, after=${audit_count_after_12}"
@@ -862,8 +869,8 @@ out13=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
 audit_count_after_13="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE13}.json")"
 
 if (( rc13 == 1 )) && [[ "${audit_count_before_13}" == "0" ]] && [[ "${audit_count_after_13}" == "0" ]] \
-   && echo "${out13}" | grep -q "must be an integer 1..5" \
-   && echo "${out13}" | grep -q "got: '0'"; then
+   && grep -q "must be an integer 1..5" <<<"${out13}" \
+   && grep -q "got: '0'" <<<"${out13}"; then
   pass "scenario 13 — write_audit.sh rejects out-of-range --quality-score directly, no record written (H-QC-SCALE)"
 else
   fail "scenario 13 — expected rc=1, no file written, message naming '0'; got rc=${rc13}, before=${audit_count_before_13}, after=${audit_count_after_13}"
@@ -906,8 +913,8 @@ out14=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="/nonexistent/gh-binary-t
 audit_count_after_14="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE14}.json")"
 
 if (( rc14 == 1 )) && [[ "${audit_count_before_14}" == "0" ]] && [[ "${audit_count_after_14}" == "0" ]] \
-   && echo "${out14}" | grep -q "not available on PATH" \
-   && echo "${out14}" | grep -q "dev/reviews/${FEATURE14}.md"; then
+   && grep -q "not available on PATH" <<<"${out14}" \
+   && grep -q "dev/reviews/${FEATURE14}.md" <<<"${out14}"; then
   pass "scenario 14 — missing gh binary with --pr-number refuses file-mode fallback, no record written (H-AUDIT-GH-FALLBACK)"
 else
   fail "scenario 14 — expected rc=1, no file written, message naming missing gh + review path; got rc=${rc14}, before=${audit_count_before_14}, after=${audit_count_after_14}"
@@ -944,7 +951,7 @@ out15=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record
 audit_count_after_15="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE15}.json")"
 
 if (( rc15 == 1 )) && [[ "${audit_count_before_15}" == "0" ]] && [[ "${audit_count_after_15}" == "0" ]] \
-   && echo "${out15}" | grep -q "quality score '0' is not an integer in 1..5"; then
+   && grep -q "quality score '0' is not an integer in 1..5" <<<"${out15}"; then
   pass "scenario 15 — zero quality score (file-mode) rejected with exit 1, no record written (H-QC-SCALE lower bound)"
 else
   fail "scenario 15 — expected rc=1, no file written, message naming '0'; got rc=${rc15}, before=${audit_count_before_15}, after=${audit_count_after_15}"
@@ -983,7 +990,7 @@ out16=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record
 audit_count_after_16="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE16}.json")"
 
 if (( rc16 == 1 )) && [[ "${audit_count_before_16}" == "0" ]] && [[ "${audit_count_after_16}" == "0" ]] \
-   && echo "${out16}" | grep -q "quality score '10' is not an integer in 1..5"; then
+   && grep -q "quality score '10' is not an integer in 1..5" <<<"${out16}"; then
   pass "scenario 16 — double-digit quality score '10' (file-mode) rejected, pins multi-digit capture + end-anchored range check"
 else
   fail "scenario 16 — expected rc=1, no file written, message naming '10'; got rc=${rc16}, before=${audit_count_before_16}, after=${audit_count_after_16}"
@@ -1010,8 +1017,8 @@ out17=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
 audit_count_after_17="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE17}.json")"
 
 if (( rc17 == 1 )) && [[ "${audit_count_before_17}" == "0" ]] && [[ "${audit_count_after_17}" == "0" ]] \
-   && echo "${out17}" | grep -q "must be an integer 1..5" \
-   && echo "${out17}" | grep -q "got: '6'"; then
+   && grep -q "must be an integer 1..5" <<<"${out17}" \
+   && grep -q "got: '6'" <<<"${out17}"; then
   pass "scenario 17 — write_audit.sh rejects --quality-score 6 directly, no record written (H-QC-SCALE upper bound)"
 else
   fail "scenario 17 — expected rc=1, no file written, message naming '6'; got rc=${rc17}, before=${audit_count_before_17}, after=${audit_count_after_17}"
@@ -1037,8 +1044,8 @@ out18=$(REPO_ROOT="${TMP_REPO}" bash "${WRITE_AUDIT}" \
 audit_count_after_18="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE18}.json")"
 
 if (( rc18 == 1 )) && [[ "${audit_count_before_18}" == "0" ]] && [[ "${audit_count_after_18}" == "0" ]] \
-   && echo "${out18}" | grep -q "must be an integer 1..5" \
-   && echo "${out18}" | grep -q "got: '3.5'"; then
+   && grep -q "must be an integer 1..5" <<<"${out18}" \
+   && grep -q "got: '3.5'" <<<"${out18}"; then
   pass "scenario 18 — write_audit.sh rejects --quality-score 3.5 directly, no record written (H-QC-SCALE non-integer)"
 else
   fail "scenario 18 — expected rc=1, no file written, message naming '3.5'; got rc=${rc18}, before=${audit_count_before_18}, after=${audit_count_after_18}"
@@ -1065,7 +1072,7 @@ JSON18B="${TMP_REPO}/dev/audit/2026-07-27-harness-z-${FEATURE18B}.json"
 
 if (( rc18b == 0 )) && [[ -f "${JSON18B}" ]] \
    && grep -q '"harness_gap": *"LINTER_CANDIDATE: golden scenario would have caught this"' "${JSON18B}" \
-   && ! echo "${out18b}" | grep -q "harness-gap is only meaningful"; then
+   && ! grep -q "harness-gap is only meaningful" <<<"${out18b}"; then
   pass "scenario 18b — --harness-gap survives an APPROVED verdict, no longer discarded (H-AUDIT-HARNESS-GAP-DROPPED-ON-APPROVED fix)"
 else
   fail "scenario 18b — expected the harness_gap text to survive in the record with no WARNING; got rc=${rc18b}"
@@ -1168,7 +1175,7 @@ else
   if (( rc19_2 != 0 )) \
      && [[ "${CONTENT_AFTER}" == "${CONTENT_A}" ]] \
      && [[ "${stray_tmp_count}" == "0" ]] \
-     && echo "${out19_2}" | grep -q "simulating interruption before rename" \
+     && grep -q "simulating interruption before rename" <<<"${out19_2}" \
      && [[ -n "${TMP_FILE_19}" ]] \
      && [[ "${TMP_FILE_19_DIR}" == "${TMP_REPO}/dev/audit" ]] \
      && [[ "${TMP_FILE_19_BASENAME}" != *.json ]]; then
@@ -1260,7 +1267,7 @@ else
   if (( rc20b_2 != 0 )) \
      && [[ "${CONTENT_AFTER_20B}" == "${CONTENT_A_20B}" ]] \
      && [[ "${audit_count_20b}" == "1" ]] \
-     && echo "${out20b_2}" | grep -q "nonexistent-dir-for-write-audit-test"; then
+     && grep -q "nonexistent-dir-for-write-audit-test" <<<"${out20b_2}"; then
     pass "scenario 20b — forced cp -p preservation-copy failure leaves the pre-existing target byte-identical and creates no second record (H-AUDIT-REWORK-COUNT-BLIND, cp -p failure-safety)"
   else
     fail "scenario 20b — expected rc2!=0, target unchanged (content A), exactly 1 record for ${FEATURE20B}, cp error naming the injected path; got rc2=${rc20b_2}, audit_count=${audit_count_20b}"
@@ -1332,8 +1339,8 @@ if [[ "${c21_file}" == "1" ]]; then
 else
   c21_json_count=0
 fi
-c21_out_count=1; echo "${out21_3}" | grep -q 'consecutive_rework_count=2' || c21_out_count=0
-c21_no_warn=1; echo "${out21_3}" | grep -q 'WARNING' && c21_no_warn=0
+c21_out_count=1; grep -q 'consecutive_rework_count=2' <<<"${out21_3}" || c21_out_count=0
+c21_no_warn=1; grep -q 'WARNING' <<<"${out21_3}" && c21_no_warn=0
 
 if [[ "${c21_rc1}${c21_rc3}${c21_file}${c21_json_count}${c21_out_count}${c21_no_warn}" == "111111" ]]; then
   pass "scenario 21 — truncated prior record (no overall_qc) does not abort the script, is skipped not counted as a streak break, and emits NO warning (silent skip, H-PREV-VERDICT-PIPEFAIL)"
@@ -1401,8 +1408,8 @@ if [[ "${c22_file}" == "1" ]]; then
 else
   c22_count=0
 fi
-c22_warn=1; echo "${out22_3}" | grep -q 'WARNING: could not read prior audit record' || c22_warn=0
-c22_path=1; echo "${out22_3}" | grep -qF "${UNREADABLE_PATH_22}" || c22_path=0
+c22_warn=1; grep -q 'WARNING: could not read prior audit record' <<<"${out22_3}" || c22_warn=0
+c22_path=1; grep -qF "${UNREADABLE_PATH_22}" <<<"${out22_3}" || c22_path=0
 
 if [[ "${c22_rc1}${c22_rc3}${c22_file}${c22_count}${c22_warn}${c22_path}" == "111111" ]]; then
   pass "scenario 22 — unreadable prior record (grep exit 2) does not abort the script, warns loudly naming the offending file, still skipped from the streak (H-PREV-VERDICT-PIPEFAIL)"
@@ -1553,7 +1560,7 @@ fi
 if (( rc24 != 0 )) \
    && [[ -f "${JSON24}" ]] \
    && [[ "${mode24}" == "644" ]] \
-   && echo "${out24}" | grep -q "simulating interruption right after rename" \
+   && grep -q "simulating interruption right after rename" <<<"${out24}" \
    && (( source_order_ok == 1 )); then
   pass "scenario 24 — \$OUTPUT_FILE already mode 0644 at the instant of first visibility right after the rename, AND source-order check confirms chmod 644 \"\$TMP_FILE\" precedes mv with no chmod ever targeting \$OUTPUT_FILE (H-AUDIT-MODE-ORDER-UNPINNED)"
 else
@@ -1690,7 +1697,7 @@ for hookval25 in "${HOOK_DISABLE_VALUES[@]}"; do
     && rc25=0 || rc25=$?
   present25=$([[ -f "${JSON25}" ]] && echo yes || echo no)
   if (( rc25 != 0 )) || [[ "${present25}" != "yes" ]] \
-     || ! echo "${out25}" | grep -q "^OK: wrote"; then
+     || ! grep -q "^OK: wrote" <<<"${out25}"; then
     offenders25="${offenders25} [${hookval25}](rc=${rc25},record=${present25})"
   fi
 done
@@ -1720,7 +1727,7 @@ CONTENT_25_AFTER="$(cat "${JSON25}" 2>/dev/null || echo MISSING)"
 # vacuously: with no prior record on disk, MISSING == MISSING would satisfy
 # "unchanged" without ever exercising the property.
 if (( rc25_one != 0 )) \
-   && echo "${out25_one}" | grep -q "simulating interruption before rename" \
+   && grep -q "simulating interruption before rename" <<<"${out25_one}" \
    && [[ "${CONTENT_25_BEFORE}" != "MISSING" ]] \
    && [[ "${CONTENT_25_AFTER}" == "${CONTENT_25_BEFORE}" ]]; then
   pass "scenario 25b — WRITE_AUDIT_TEST_ABORT_BEFORE_RENAME=1 still fires: aborts before publishing, prior record untouched (hook not fixed into permanently dead)"
@@ -1748,7 +1755,7 @@ seen26=0
 for hookval26 in "${HOOK_DISABLE_VALUES[@]}"; do
   seen26=$(( seen26 + 1 ))
   out26=$(_run_write_audit_26 "${hookval26}") && rc26=0 || rc26=$?
-  if (( rc26 != 0 )) || ! echo "${out26}" | grep -q "^OK: wrote"; then
+  if (( rc26 != 0 )) || ! grep -q "^OK: wrote" <<<"${out26}"; then
     offenders26="${offenders26} [${hookval26}](rc=${rc26})"
   fi
 done
@@ -1764,8 +1771,8 @@ fi
 out26_one=$(_run_write_audit_26 1) && rc26_one=0 || rc26_one=$?
 
 if (( rc26_one != 0 )) \
-   && echo "${out26_one}" | grep -q "simulating interruption right after rename" \
-   && ! echo "${out26_one}" | grep -q "^OK: wrote"; then
+   && grep -q "simulating interruption right after rename" <<<"${out26_one}" \
+   && ! grep -q "^OK: wrote" <<<"${out26_one}"; then
   pass "scenario 26b — WRITE_AUDIT_TEST_ABORT_AFTER_RENAME=1 still fires: aborts right after the rename with no 'OK:' line (hook not fixed into permanently dead; scenario 24 depends on this)"
 else
   fail "scenario 26b — expected rc!=0 + 'simulating interruption right after rename' + no 'OK: wrote'; got rc=${rc26_one}"
@@ -1812,7 +1819,7 @@ out27=$(REPO_ROOT="${TARGET_ROOT}" \
 target_count27="$(_glob_count "${TARGET_ROOT}/dev/audit" '*.json' '-type f')"
 walkup_count27="$(_glob_count "${WALKUP_ROOT}/dev/audit" '*.json' '-type f')"
 
-if (( rc27 == 0 )) && echo "${out27}" | grep -q "^OK: wrote" \
+if (( rc27 == 0 )) && grep -q "^OK: wrote" <<<"${out27}" \
    && [[ "${target_count27}" == "1" ]] && [[ "${walkup_count27}" == "0" ]]; then
   pass "scenario 27 — REPO_ROOT override wins over a SUCCESSFUL walk-up to a different root: record lands under \$REPO_ROOT/dev/audit only, never the walked-up root (H-WRITE-AUDIT-REPO-ROOT-NOT-REDIRECTABLE)"
 else
@@ -1839,7 +1846,7 @@ out27b=$(env -u REPO_ROOT \
 
 walkup_count27b="$(_glob_count "${WALKUP_ROOT}/dev/audit" '*.json' '-type f')"
 
-if (( rc27b == 0 )) && echo "${out27b}" | grep -q "^OK: wrote" && [[ "${walkup_count27b}" == "1" ]]; then
+if (( rc27b == 0 )) && grep -q "^OK: wrote" <<<"${out27b}" && [[ "${walkup_count27b}" == "1" ]]; then
   pass "scenario 27b — REPO_ROOT unset: the walk-up still locates the root and publishes the record (H-WRITE-AUDIT-REPO-ROOT-NOT-REDIRECTABLE, pins the fallback branch production actually uses)"
 else
   fail "scenario 27b — expected rc=0 + 'OK: wrote' + exactly 1 record under WALKUP_ROOT; got rc=${rc27b}, walkup_count=${walkup_count27b}"
@@ -2137,7 +2144,7 @@ fi
 # walk-up succeeds and the record is published under WALKUP5_ROOT.
 out30c=$(_run_write_audit_30 "" "empty") && rc30c=0 || rc30c=$?
 walkup_count30c="$(_glob_count "${WALKUP5_ROOT}/dev/audit" '*.json' '-type f')"
-if (( rc30c == 0 )) && echo "${out30c}" | grep -q "^OK: wrote" && [[ "${walkup_count30c}" == "1" ]]; then
+if (( rc30c == 0 )) && grep -q "^OK: wrote" <<<"${out30c}" && [[ "${walkup_count30c}" == "1" ]]; then
   pass "scenario 30c — write_audit.sh: REPO_ROOT='' (empty string) is treated as unset: the walk-up still succeeds and publishes the record (deliberate, not a regression of 30a/30b)"
 else
   fail "scenario 30c — expected rc=0 + 'OK: wrote' + exactly 1 record under WALKUP5_ROOT (30a/30b wrote none); got rc=${rc30c}, walkup_count=${walkup_count30c}"
@@ -2201,7 +2208,7 @@ _run_record_qc_audit_31() {  # $1 = REPO_ROOT value, $2 = feature suffix
 out31a=$(_run_record_qc_audit_31 "${BOGUS_MISSING31}" "missing") && rc31a=0 || rc31a=$?
 walkup_count31a="$(_glob_count "${WALKUP6_ROOT}/dev/audit" '*.json' '-type f')"
 if (( rc31a != 0 )) \
-   && echo "${out31a}" | grep -qF "FAIL: REPO_ROOT is set to '${BOGUS_MISSING31}' but is not a directory" \
+   && grep -qF "FAIL: REPO_ROOT is set to '${BOGUS_MISSING31}' but is not a directory" <<<"${out31a}" \
    && [[ "${walkup_count31a}" == "0" ]]; then
   pass "scenario 31a — record_qc_audit.sh: REPO_ROOT set to a nonexistent path is a hard error, zero records written under the walked-up root end-to-end through the write_audit.sh child (H-REPO-ROOT-SET-BUT-INVALID-SILENT-FALLTHROUGH)"
 else
@@ -2213,7 +2220,7 @@ fi
 out31b=$(_run_record_qc_audit_31 "${BOGUS_FILE31}" "file") && rc31b=0 || rc31b=$?
 walkup_count31b="$(_glob_count "${WALKUP6_ROOT}/dev/audit" '*.json' '-type f')"
 if (( rc31b != 0 )) \
-   && echo "${out31b}" | grep -qF "FAIL: REPO_ROOT is set to '${BOGUS_FILE31}' but is not a directory" \
+   && grep -qF "FAIL: REPO_ROOT is set to '${BOGUS_FILE31}' but is not a directory" <<<"${out31b}" \
    && [[ "${walkup_count31b}" == "0" ]]; then
   pass "scenario 31b — record_qc_audit.sh: REPO_ROOT set to a regular file (not a directory) is a hard error, zero records written under the walked-up root end-to-end (cumulative with 31a)"
 else
@@ -2284,9 +2291,9 @@ out32=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S32_DIR}/gh" \
 audit_count_after_32="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE32}.json")"
 
 if (( rc32 == 1 )) && [[ "${audit_count_before_32}" == "0" ]] && [[ "${audit_count_after_32}" == "0" ]] \
-   && echo "${out32}" | grep -q "failed (exit 1)" \
-   && echo "${out32}" | grep -q "rate limit exceeded" \
-   && echo "${out32}" | grep -q "dev/reviews/${FEATURE32}.md"; then
+   && grep -q "failed (exit 1)" <<<"${out32}" \
+   && grep -q "rate limit exceeded" <<<"${out32}" \
+   && grep -q "dev/reviews/${FEATURE32}.md" <<<"${out32}"; then
   pass "scenario 32 — gh nonzero exit + stderr (rate-limited) refuses file-mode fallback, no record written (H-AUDIT-GH-FALLBACK-RESIDUAL)"
 else
   fail "scenario 32 — expected rc=1, no file written, message naming exit code + stderr + review path; got rc=${rc32}, before=${audit_count_before_32}, after=${audit_count_after_32}"
@@ -2329,8 +2336,8 @@ out33=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S33_DIR}/gh" \
 audit_count_after_33="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE33}.json")"
 
 if (( rc33 == 1 )) && [[ "${audit_count_before_33}" == "0" ]] && [[ "${audit_count_after_33}" == "0" ]] \
-   && echo "${out33}" | grep -q "failed (exit 1)" \
-   && echo "${out33}" | grep -q "dev/reviews/${FEATURE33}.md"; then
+   && grep -q "failed (exit 1)" <<<"${out33}" \
+   && grep -q "dev/reviews/${FEATURE33}.md" <<<"${out33}"; then
   pass "scenario 33 — gh nonzero exit, silent (no stderr) refuses file-mode fallback, no record written (H-AUDIT-GH-FALLBACK-RESIDUAL)"
 else
   fail "scenario 33 — expected rc=1, no file written, message naming exit code + review path; got rc=${rc33}, before=${audit_count_before_33}, after=${audit_count_after_33}"
@@ -2377,9 +2384,9 @@ out34=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S34_DIR}/gh" \
 audit_count_after_34="$(_glob_count "${TMP_REPO}/dev/audit" "*-${FEATURE34}.json")"
 
 if (( rc34 == 1 )) && [[ "${audit_count_before_34}" == "0" ]] && [[ "${audit_count_after_34}" == "0" ]] \
-   && echo "${out34}" | grep -q "returned no reviews and wrote to stderr (exit 0)" \
-   && echo "${out34}" | grep -q "deprecated API version" \
-   && echo "${out34}" | grep -q "dev/reviews/${FEATURE34}.md"; then
+   && grep -q "returned no reviews and wrote to stderr (exit 0)" <<<"${out34}" \
+   && grep -q "deprecated API version" <<<"${out34}" \
+   && grep -q "dev/reviews/${FEATURE34}.md" <<<"${out34}"; then
   pass "scenario 34 — gh exit 0 + stderr warning (empty stdout) refuses file-mode fallback, no record written (H-AUDIT-GH-FALLBACK-RESIDUAL)"
 else
   fail "scenario 34 — expected rc=1, no file written, message naming exit code + stderr + review path; got rc=${rc34}, before=${audit_count_before_34}, after=${audit_count_after_34}"
@@ -2759,7 +2766,7 @@ if (( rc40_1 == 0 )) && (( rc40_2 == 0 )) && (( rc40_3 == 0 )) \
    && grep -q '"sha": *""' "${JSON40}" \
    && grep -q '"overall_qc": *"NEEDS_REWORK"' "${JSON40}" \
    && grep -q '"consecutive_rework_count": *1,' "${JSON40}" \
-   && echo "${out40_3}" | grep -q 'consecutive_rework_count=1'; then
+   && grep -q 'consecutive_rework_count=1' <<<"${out40_3}"; then
   pass "scenario 40 — 3 consecutive PR-mode NEEDS_REWORK calls with no Reviewed SHA line: sha stays empty AND consecutive_rework_count stays 1 (not 3) end to end, no preserved-aside file (H-AUDIT-REWORK-COUNT-COMPOSITION-UNPINNED, empty-sha degrade-to-overwrite path)"
 else
   fail "scenario 40 — expected rc=0/0/0 + exactly 1 audit file + sha \"\" + overall NEEDS_REWORK + consecutive_rework_count=1; got rc=${rc40_1}/${rc40_2}/${rc40_3}, audit_count=${audit_count_40}"
@@ -2820,7 +2827,7 @@ if (( rc41_1 == 0 )) && (( rc41_2 == 0 )) \
    && [[ -f "${JSON41A}" ]] && [[ -f "${JSON41B}" ]] \
    && grep -q '"consecutive_rework_count": *1,' "${JSON41A}" \
    && grep -q '"consecutive_rework_count": *2,' "${JSON41B}" \
-   && echo "${out41_2}" | grep -q 'consecutive_rework_count=2'; then
+   && grep -q 'consecutive_rework_count=2' <<<"${out41_2}"; then
   pass "scenario 41 — 2 consecutive PR-mode NEEDS_REWORK calls on successive dates, same branch, no Reviewed SHA line: consecutive_rework_count ACCUMULATES 1 -> 2 across dates (H-AUDIT-REWORK-COUNT-COMPOSITION-UNPINNED, cross-date half)"
 else
   fail "scenario 41 — expected rc=0/0 + day A consecutive_rework_count=1 + day B consecutive_rework_count=2; got rc=${rc41_1}/${rc41_2}"
@@ -2946,10 +2953,10 @@ out43="$(report_conjuncts \
   "conjunct C (should pass)" "1" \
   "conjunct D (should fail)" "0" 2>&1 1>/dev/null)"
 
-c43_b_reported=1; echo "${out43}" | grep -qF "conjunct FAILED: conjunct B (should fail)" || c43_b_reported=0
-c43_d_reported=1; echo "${out43}" | grep -qF "conjunct FAILED: conjunct D (should fail)" || c43_d_reported=0
-c43_a_silent=1; echo "${out43}" | grep -qF "conjunct FAILED: conjunct A (should pass)" && c43_a_silent=0
-c43_c_silent=1; echo "${out43}" | grep -qF "conjunct FAILED: conjunct C (should pass)" && c43_c_silent=0
+c43_b_reported=1; grep -qF "conjunct FAILED: conjunct B (should fail)" <<<"${out43}" || c43_b_reported=0
+c43_d_reported=1; grep -qF "conjunct FAILED: conjunct D (should fail)" <<<"${out43}" || c43_d_reported=0
+c43_a_silent=1; grep -qF "conjunct FAILED: conjunct A (should pass)" <<<"${out43}" && c43_a_silent=0
+c43_c_silent=1; grep -qF "conjunct FAILED: conjunct C (should pass)" <<<"${out43}" && c43_c_silent=0
 c43_line_count=1; [[ "$(echo "${out43}" | grep -c 'conjunct FAILED')" == "2" ]] || c43_line_count=0
 
 if [[ "${c43_b_reported}${c43_d_reported}${c43_a_silent}${c43_c_silent}${c43_line_count}" == "11111" ]]; then
@@ -3336,7 +3343,7 @@ EOF
 
 out49=$(REPO_ROOT="${TMP_REPO}" bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
         "${FEATURE49}" "feat/dummy49" "2026-08-24" 2>&1) && rc49=0 || rc49=$?
-if (( rc49 != 0 )) && echo "${out49}" | grep -q "could not determine overall verdict"; then
+if (( rc49 != 0 )) && grep -q "could not determine overall verdict" <<<"${out49}"; then
   pass "scenario 49 — a '## Verdict' with no Structural/Behavioral heading anywhere in the file is discarded (unattributable), and the script exits 1 rather than guessing (H-AUDIT-SECTIONLESS-VERDICT-DISCARDED, CP4-a)"
 else
   fail "scenario 49 — expected rc!=0 with 'could not determine overall verdict'; got rc=${rc49}, output:"
@@ -3383,8 +3390,8 @@ if [[ "${c50_file}" == "1" ]]; then
 else
   c50_count=0
 fi
-c50_warn=1; echo "${out50}" | grep -q 'WARNING: could not read prior audit record' || c50_warn=0
-c50_path=1; echo "${out50}" | grep -qF "${UNREADABLE_PATH_50}" || c50_path=0
+c50_warn=1; grep -q 'WARNING: could not read prior audit record' <<<"${out50}" || c50_warn=0
+c50_path=1; grep -qF "${UNREADABLE_PATH_50}" <<<"${out50}" || c50_path=0
 
 if [[ "${c50_rc}${c50_file}${c50_count}${c50_warn}${c50_path}" == "11111" ]]; then
   pass "scenario 50 — a corrupted prior record that is the ONLY glob match for its feature does not vanish silently: still does not abort, still warns loudly naming the offending directory, still counted correctly at 1 (H-AUDIT-LS-GLOB-HEADER-UNSAFE, #2440)"
