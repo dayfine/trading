@@ -58,3 +58,27 @@ gates, no docs-only skips.
    (custom gated on #2547 flake understanding).
 4. P4s: #2407, #2409, #2006, #2406; #1729 (P3/L data); #2408 (P1 research
    surface, needs container-exclusive time).
+
+---
+
+## Outcome (session close, 2026-08-27 ~01:00 PT)
+
+All four burn-down PRs merged same-session; five issues closed, one filed.
+
+| PR | Issue(s) | Gates | Notes |
+|---|---|---|---|
+| #2573 | #2564 ✅ | CI + struct + behav, 0 rework | 50 sites (issue undercounted at 32); #2440 linkage commented (scenario 22 was the same racy shape — plausibly fixed, left open) |
+| #2574 | #2565 ✅ | CI + struct + behav, 0 rework | Recovered dispatcher-side after the feat-agent's worktree was reaped pre-commit (report + /tmp backups); control-arm evidence from the agent's fresh-build-dir run. The suspected sibling at weinstein/snapshot/test/dune:33 is a FALSE ALARM (already declares its dep via %{exe:...}, per QC) |
+| #2572 | #2559 ✅ | 1 rework iteration (CP4: guard grep matched the comment, not the source line — mutation-proven fix) | #2576 filed for the 7th unfixed copy (experiment script, `$rss` var) |
+| #2575 | #2558 ✅ #2570 ✅ | 1 rework iteration (CP3/CP4: arming-golden exclusion unpinned — mutation D now killed) | goldens_affected_check now FAILs affects-all on zero-override default changes and lists the inheriting (not arming) goldens on default flips |
+
+Also: #2562 stale watchdog closed (recovery verified); main green throughout.
+
+Residuals carried forward:
+- **#2576** — 7th `tr -d '\n'` copy in `dev/experiments/capital-recycling-combined-2026-05-07/run_with_perf.sh` (non-gate, low priority).
+- goldens_affected_check documented residuals: required-field-literal → `[@sexp.default]` migration with value change is silent-green (documented in check header, not detected); constant-routed defaults over-report on flips (safe direction).
+- `dev/scripts/launch_sweep.sh:195` has the same `echo | grep -q` + pipefail shape #2564 fixed (flagged by QC, out of scope — non-gate script).
+- QC noted the #2564 SIGPIPE root-cause diagnosis is plausible but not reproduced (64KiB pipe buffer argument); fix is safe regardless. If the flake recurs post-#2573, that's the thread to pull.
+- `.claude/worktrees/paired2569` (Aug 26) left in place — belongs to the prior session's paired-run work.
+
+Parked arcs unchanged (see above): #2405 clock re-flip day, #2489 decision, #2403 residual, #2567, #2382, #2394, #2547, #2539.
