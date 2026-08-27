@@ -786,13 +786,22 @@ sed -i.bak 's/\[@sexp.default false\]/[@sexp.default true]/' "$REPO20/$SURFACE_M
 rm -f "$REPO20/$SURFACE_MLI_REL.bak"
 SHA20B="$(_commit "$REPO20" "head: flip enable_sim_entry_stoplimit default false -> true")"
 _run "$REPO20" "$SHA20A" "$SHA20B"
+# MUTATION-TESTED: mutation D (goldens_affected_check.sh:606, replacing
+# `if ! grep -F -q -- "$NEW_VALUE_PATTERN" "$spec"` with `if true`) severs the
+# #2570 exclusion predicate entirely. Membership-only assertions (the first
+# three greps below) survive that mutation unchanged -- the arming golden is
+# simply appended as a fourth inherit-list entry -- so the negative grep below
+# is required to actually kill it. Scoped to the inherit-list line specifically
+# (the literal "(inherits new default" suffix Step 4b emits) because Step 4
+# legitimately names the same golden elsewhere in the output as "is armed by".
 if [ "$RC" -eq 1 ] \
   && echo "$OUT" | grep -q "default-flip" \
   && echo "$OUT" | grep -q "fixture-golden-inherit-1.sexp" \
-  && echo "$OUT" | grep -q "fixture-golden-inherit-2.sexp"; then
+  && echo "$OUT" | grep -q "fixture-golden-inherit-2.sexp" \
+  && ! echo "$OUT" | grep -q "fixture-golden-arms.sexp (inherits new default"; then
   pass "assertion 20: default-flip names the goldens that inherit, not just the one that already arms the new value"
 else
-  fail "assertion 20: expected FAIL/exit1 default-flip naming both inheriting goldens, got rc=$RC output=$OUT"
+  fail "assertion 20: expected FAIL/exit1 default-flip naming both inheriting goldens and excluding the arming golden, got rc=$RC output=$OUT"
 fi
 rm -rf "$REPO20"
 

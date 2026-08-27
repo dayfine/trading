@@ -70,7 +70,14 @@
 #                   through a renamed top-level constant
 #                   (`let default_foo = 5` feeding field `bar`) are
 #                   still invisible — the manual rule remains the
-#                   backstop.
+#                   backstop. Also invisible: a REQUIRED field migrated
+#                   to `[@sexp.default]` in the SAME diff its value
+#                   changes (e.g. `initial_stop_buffer = 1.02;` becoming
+#                   `initial_stop_buffer : float; [@sexp.default 1.0]`)
+#                   -- old and new values are extracted via different
+#                   syntactic paths (default-record literal vs.
+#                   [@sexp.default]) and are never paired, so this is
+#                   silent-green like the other residuals above.
 #     nested-config embedding (Step 2c) — when a changed knob comes from
 #                   a file that defines a config record EMBEDDED in the
 #                   strategy config (stops, portfolio_risk, stage, macro,
