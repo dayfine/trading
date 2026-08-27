@@ -278,6 +278,64 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 
 ## Completed
 
+### 7th gnu_time_rss copy + shape-based structural guard (issue #2576, 2026-08-27)
+
+- [x] qc-behavioral reviewing #2572 (the rework of #2559) found a 7th,
+  unfixed copy of the identical fused-digit `tr -d '\n'` bug in
+  `dev/experiments/capital-recycling-combined-2026-05-07/run_with_perf.sh`
+  (line 90, variable `$rss` — not `$rss_path`, which is exactly why #2559's
+  discovery grep and the smoke test's old assertion 5 (hardcoded to the 6
+  known call sites) both missed it). Branch: `harness/2576-rss-seventh-copy`.
+  Fix, two parts:
+  1. **Instance:** ported `run_with_perf.sh` to source
+     `dev/lib/gnu_time_rss.sh` and call `_parse_gnu_time_rss`, same as the
+     other 6 call sites; added it to `gnu_time_rss_smoke.sh`'s
+     `CALL_SITES` list.
+  2. **Class (the actual point of #2576):** added a new Assertion 6 to
+     `trading/devtools/checks/gnu_time_rss_smoke.sh` that sweeps every
+     `*.sh` file in the repo (pruning `.git`/`_build`/`node_modules`/
+     `vendor`/`.devcontainer`/`worktrees`, same as `no_python_check.sh`) for
+     the raw bug SHAPE — a same-line `tr -d '\n'` not already reduced to one
+     line via `tail -n 1`/`head -n 1` — rather than a hardcoded path list.
+     The regex names no variable, so it cannot be evaded by variable-name
+     choice the way the old assertion 5 was. `dev/lib/gnu_time_rss.sh` (the
+     canonical implementation) and the smoke-test script itself (which
+     necessarily quotes the buggy shape in its own doc-comments/regex
+     literal) are excluded by path; comment lines are skipped everywhere
+     else.
+  - Verified RED→GREEN→RED→GREEN by mutation: added a scratch script with a
+    third, novel variable name (`$rssfile`/`$rssvalue`) reproducing the bug
+    shape — Assertion 6 failed and named the exact file/line (RED, exit 1);
+    removed the scratch file — GREEN again (exit 0), confirming the guard is
+    shape-based, not a longer hardcoded list.
+  - Documented residual explicitly in the check's own header comment: same-
+    line match only, which fails SAFE rather than permissive — a genuine
+    multi-line/intermediate-variable bug IS still caught (there is nothing
+    on that line to match the "already reduced" exemption); what the
+    same-line restriction actually produces is the opposite of a missed
+    bug, a false POSITIVE on safe code that splits its `tail -n 1`
+    reduction onto a separate line. Over-cautious, not a hole; only
+    `*.sh` files are scanned (no inline shell
+    in GitHub Actions `run:` YAML blocks, Makefiles, etc.); only the literal
+    `tr -d '\n'` idiom is matched (a different newline-fusing idiom, e.g.
+    `awk 'BEGIN{RS="\0"}'`, would not trip it); and the "safe shape" check is
+    co-occurrence, not causal precedence — a line where `tail -n 1` and
+    `tr -d '\n'` both appear for unrelated reasons (e.g. two
+    semicolon-separated statements) is waved through as a false negative,
+    which is a real gap in the check's logic, not just its scope.
+  - Rework (2026-08-27, qc-behavioral iteration 1): assertion 6 previously
+    ran only against the live repo, which is clean, so its passing state
+    proved nothing about whether the detector itself still worked — a
+    regex re-scoped to a specific variable name (the exact #2576 blind
+    spot) or reduced to a no-op both stayed green. Fixed by extracting the
+    sweep body into `_sweep_dir_for_tr_d_bug()` and adding assertion 7
+    (runs it against a `$WORK` fixture: an arbitrary-name bug file must be
+    detected, a `tail -n 1`-reduced safe file must not be) and assertion 8
+    (pins the co-occurrence false negative above as a measured fixture
+    result rather than prose only).
+  - Verify: `sh trading/devtools/checks/gnu_time_rss_smoke.sh`, or `dune
+    runtest trading/devtools/checks/`.
+
 ### Shared GNU-time RSS parser across all 6 call sites (issue #2559, 2026-08-27)
 
 - [x] #2553 (below) fixed the digit-fusion peak-RSS bug only in
