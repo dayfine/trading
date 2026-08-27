@@ -102,7 +102,7 @@ let _sector_map_override fixtures_root (s : Scenario.t) =
     [close * 1.01] to absorb overnight gap-ups, leaving ~1% cash uninvested.
 
     See [sp500-2019-2023-bah-spy.sexp] §"Measurement" for the full breakdown —
-    fill happens at next-day open ($248.23) and final MtM uses 2023-12-28's
+    fill at the StopLimit trigger since #2569 (~$250.24; pre-flip: next-day open $248.23) and final MtM uses 2023-12-28's
     close ($476.69) since the simulator's [is_complete] check fires when
     [current_date >= end_date].
 

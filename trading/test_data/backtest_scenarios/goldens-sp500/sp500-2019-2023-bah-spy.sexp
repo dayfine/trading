@@ -38,9 +38,10 @@
 ;; Verified through {!Backtest.Runner.run_backtest} with [strategy_choice =
 ;; Bah_benchmark { symbol = "SPY" }]. Entry sizing happens at day-1 close
 ;; with a 1% gap-buffer headroom (see [_entry_gap_buffer_pct] in
-;; [bah_benchmark_strategy.ml]), trade fills at next-day open (the
-;; simulator's standard order-routing semantics — orders placed in
-;; [on_market_close] execute against the next bar). The simulator stops one
+;; [bah_benchmark_strategy.ml]), trade fills at the StopLimit trigger
+;; since #2569 (pre-flip: next-day open — orders placed in
+;; [on_market_close] execute against the next bar; the fill-model default
+;; flip routes even BAH through the entry cap). The simulator stops one
 ;; bar before [end_date] (the [is_complete] check fires when
 ;; [current_date >= end_date]), so the final mark-to-market uses
 ;; [end_date - 1 trading day]'s close.
@@ -64,9 +65,10 @@
 ;;   SPY raw return (sizing 2019-01-02 close to MtM 2023-12-28 close):
 ;;                             +90.5%  (= 476.69 / 250.18 - 1)
 ;;
-;; The ~$140 delta between the closed-form $1,904,115.65 and the
-;; runner-actual $1,903,976.65 is residual slippage / commission-tier
-;; rounding the closed-form math doesn't capture; runner output is the
+;; POST-#2569 the runner-actual is $1,896,010.32 and the approximate
+;; closed form above lands within ~$13 of it (fill-price rounding).
+;; Pre-flip record: closed-form $1,904,115.65 vs runner $1,903,976.65
+;; (~$140 residual). In both eras the runner output is the
 ;; authoritative pin.
 ;;
 ;; The 1% gap buffer was introduced in PR #1172 to fix the weekly-start
@@ -93,7 +95,10 @@
 ;;
 ;; {1 Pinned ranges}
 ;;
-;; total_return_pct: +/- 2 pp around the runner-actual +91.31% (89.0..93.0).
+;; total_return_pct: 89.0..93.0 -- centred on the PRE-flip runner-actual
+;; +91.31% and DELIBERATELY not re-centred for #2569: the post-flip
+;; actual +89.60% sits inside, and the +-2pp determinism scheme is the
+;; contract; re-centre only if a future change pushes it out.
 ;; Tighter than the Weinstein scenario's +/- 13 pp because BAH is mechanical
 ;; — no parameter sensitivity, no stop slippage, no cash-deployment timing.
 ;; The only sources of drift are SPY's day-1 close (deterministic against

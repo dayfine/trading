@@ -40,8 +40,9 @@
 ;;
 ;; {1 Measurement (2026-05-17, $1,000,000 initial cash, via Backtest.Runner)}
 ;;
-;; Closed-form sanity using the simulator's day-2-open fill convention
-;; (entry sizing at day-1 close with 1% gap buffer, fill at next-day open,
+;; Closed-form sanity using the simulator's fill convention (since #2569:
+;; StopLimit trigger; pre-#2569: next-day open)
+;; (entry sizing at day-1 close with 1% gap buffer,
 ;; final mark uses [end_date - 1 trading day]'s close):
 ;;
 ;;   sizing close 2019-01-02:  $202.80
@@ -76,9 +77,9 @@
 ;;
 ;; {1 Comparison to BAH-SPY 2019-2023}
 ;;
-;; SPY 5y total return (pinned): +90.40%.
-;; BRK-B 5y total return:        +75.53% (post-#2569 fill model; +76.94% pre-flip).
-;; Spread: BRK-B underperformed SPY by ~13.6 pp over 2019-2023. This is
+;; SPY 5y total return (pinned): +89.60% (post-#2569; +90.40% pre-flip).
+;; BRK-B 5y total return:        +75.53% (post-#2569; +76.94% pre-flip).
+;; Spread: BRK-B underperformed SPY by 14.07 pp over 2019-2023. This is
 ;; the documented BRK underperformance during the post-COVID growth /
 ;; tech rally — value style lagged momentum style materially over this
 ;; window. The 15y companion (post-split start) shows a different
