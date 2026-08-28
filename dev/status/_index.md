@@ -4,26 +4,29 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-27 (orchestrator run 33090715656; main `8230d67e` ->
-`f875fe64`). Queue was **empty** at run start (0 open PRs), so the Step 0.5
-fast-exit was correctly skipped by its own non-vacuous precondition and this
-ran as a full dispatch. Two PRs opened and **both merged**: **#2581**
-(cleanup, `0d9122c8`) and **#2580** (harness/#2576, `f875fe64`, 2 rework
-iterations). One issue filed: **#2579**. Zero open PRs at run end.
+Last updated: 2026-08-28 (orchestrator run 33165247888; main `cbac374f` ->
+`b1f10412` -> **`3ca3fa2d`**). Queue was **empty** at run start (0 open PRs),
+so the Step 0.5 fast-exit was again correctly skipped by its own non-vacuous
+precondition — this is the check #2579 says does not reliably bind, and it
+bound this run. Two PRs opened and **both merged**: **#2584** (cleanup,
+`b1f10412`) and **#2585** (harness/#2567, `3ca3fa2d`, 1 rework iteration).
+Zero open PRs at run end.
 
-**Both substantive QC findings this run were about guards that do not guard.**
-#2581 closed a mutation-proven hole where breaking `handle_rejected_trades`'
-step-5 revert asymmetry left **416/416 tests green**. #2580's first behavioral
-pass found the sharper case: its new shape-based guard swept only the *live,
-clean* repo, so re-scoping its regex back to the exact #2576 blind spot — or
-to a regex matching nothing at all — kept the suite green. The PR had
-reproduced the very failure mode it was fixing, one level up; the rework pins
-it against a fixture root.
+**This run's theme was durable records that disagreed with the tree.** #2584's
+backlog entry claimed 26 malformed odoc warnings across 11 files; the true
+population was **18 / 10** — the 9-warning cluster in the file the item was
+originally filed against had already been fixed by an unrecorded prior PR, and
+a cleanup agent would have gone hunting warnings that no longer existed.
+#2585's blocker was the same shape one level up: it shipped 9 grandfathered
+exceptions carrying `review_at` dates that **nothing scanned** — an entry dated
+2019-01-01 exited 0 silently — while the plan's §Risks asserted they were
+checked. Both were caught by re-measurement, not by review of the prose.
 
-Two orchestrator capabilities were **measured, not inferred**, this run:
-writing `.github/workflows/` is **403** while an identical non-workflow write
-is **200** (so #2539 and H-BLAS are structurally undispatchable here), and
-issue comments are **403** (create-only). See `2026-08-27.md`.
+`review_at` dates on exceptions files now **report** (weekly deep scan) rather
+than gate; that matches both pre-existing sibling scans and is deliberate.
+Capabilities re-measured this run, not copied: issue writes **403**
+(create-only, live probe), `.github/workflows/` writes **403**,
+`record_qc_audit.sh --pr-number` **exit 1** without `gh`. See `2026-08-28.md`.
 
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
@@ -72,9 +75,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2576 CLOSED — 7th RSS call site ported + shape-based guard now fixture-pinned, MERGED `f875fe64` (#2580); next: #2567 silent-null effectiveness linter |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2567 CLOSED — adapter-effectiveness linter + expiry wiring MERGED `3ca3fa2d` (#2585, 1 rework); next: R-1a one-line log string at `adapter_effectiveness_check_test.sh:323` |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | A-MERGEABLE-STATE-NOT-A-CLOSE-TELL filed (run-1 guidance corrected); open: #2427 #2428 #2429 #2432 — need `workflow` scope or a human |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | `cancel_handler` step-5 revert asymmetry now pinned, MERGED `0d9122c8` (#2581); top item `linter_coverage` still a HUMAN POLICY DECISION (13 runs) |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | 18 malformed odoc comments across 10 files fixed, MERGED `b1f10412` (#2584); top item `linter_coverage` still a HUMAN POLICY DECISION (14 runs) |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |

@@ -1428,3 +1428,46 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   confirmed live on `enable_slow_grind_short_gate` in
   `weinstein_strategy_screening.ml`, documented in the script header and
   as a comment (not an active entry) in the exceptions file.
+
+- [ ] **H-ADAPTER-ASSERT8-LOG-STRING (R-1a)**: filed by qc-behavioral on the
+  #2585 re-review (2026-08-28, non-blocking — the sole reason the score was
+  held at 4 rather than 5). The R-1 descriptive correction stopped one line
+  short. `adapter_effectiveness_check_test.sh`'s header now correctly says
+  *"Do NOT cite assertion 8 as the mutation-proof"*, but the **runtime `ok`
+  string at line 323 still prints** *"proving the real regex is
+  load-bearing"* — the original non-sequitur (a mutation producing a *false
+  PASS* shows the regex is fragile, not load-bearing), and it is in the copy
+  that appears in **every CI log**. So the file contradicts itself with the
+  wrong claim in the louder place. Fix shape: reword that one `ok` string to
+  match the header — e.g. "assertion 8 — MUTATION A (regex narrowed to a
+  nonexistent field name) produces the expected false-PASS message;
+  characterization only, NOT the mutation-proof (that is assertion 1)".
+  One-line prose change to a log string; no logic change; goldens and exit
+  codes unaffected. Deliberately **not** folded into #2585: the PR already
+  held a clean CI + double-APPROVED gate pinned to `7aada7ec`, and touching
+  a script would have invalidated both verdicts and consumed rework
+  iteration 2 of 2 for a log string. `harness_gap: NONE`.
+  (source: 2026-08-28 run 1, qc-behavioral re-review of PR #2585)
+
+- [ ] **H-EXPIRY-GLOB-CLOSES-CLASS (R-4)**: recorded by qc-behavioral on the
+  #2585 re-review as explicitly non-blocking. `check_11_linter_expiry.sh` now
+  scans **all three** `*exceptions*.conf` files that exist repo-wide, so there
+  is **zero** currently-unprotected surface — but the list is three hardcoded
+  `_scan_exceptions_conf()` calls, so a **fourth** exceptions file added later
+  would again be silently unscanned. That hardcoded-list shape is exactly what
+  allowed BQ-1. The author's reason for not globbing holds on inspection: each
+  block carries its own accumulator quartet *and* file-specific report prose
+  naming a *different* sibling guard, so a glob needs a data-driven
+  `(path, label, guard)` table — a refactor, not two lines. Closes the
+  instance, not the class. Fix shape: that table. `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-08-28 run 1, qc-behavioral re-review of PR #2585)
+
+- [ ] **H-EXPIRY-ROLLUP-WARNING-UNPINNED (R-5)**: pre-existing, surfaced (not
+  introduced) by #2585's review and out of scope there. Deleting `add_warning`
+  in the date branch of `_scan_exceptions_conf()` leaves the report section
+  intact and every test green — so the **roll-up warning path is unpinned for
+  all three conf files**, identically before and after #2585. The per-file
+  `[EXPIRED]` detail lines *are* pinned; it is only the roll-up that is not.
+  Fix shape: assert the `W:` roll-up line, not just the detail line, in
+  `deep_scan_linter_expiry_check.sh`. `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-08-28 run 1, qc-behavioral re-review of PR #2585)
