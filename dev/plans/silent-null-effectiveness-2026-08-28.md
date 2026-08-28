@@ -215,9 +215,20 @@ neutral-blocks gates, the stop-width-mode threads) within budget.
   writes the tag (and with QC review), the same trust model
   `goldens_affected_check.sh`'s `paired-run-done` label already uses.
 - **Exceptions file is a real, if bounded, escape hatch.** Mitigated by
-  mandatory `review_at` dates (checked by the existing
-  `deep_scan_linter_expiry_check.sh` machinery pattern) and by this PR
-  closing the highest-confidence 6 of 15 outright.
+  mandatory `review_at` dates and by this PR closing the
+  highest-confidence 6 of 15 outright.
+  **Corrected in rework (BQ-1, dev/reviews/harness-2567-2585.md,
+  2026-08-28):** this bullet originally claimed the dates were "checked
+  by the existing `deep_scan_linter_expiry_check.sh` machinery pattern."
+  That was not true as shipped — `check_11_linter_expiry.sh` only ever
+  called `_scan_exceptions_conf()` for `linter_exceptions.conf` and
+  `universe_deps_exceptions.conf`; `adapter_effectiveness_exceptions.conf`
+  was never scanned, so all 8 grandfathered entries' `review_at` dates
+  were decorative. PR #2585's rework iteration 1 added a third
+  `_scan_exceptions_conf()` call (mirroring the `universe_deps_exceptions.conf`
+  precedent) plus a mutation-proof regression test
+  (`deep_scan_linter_expiry_check.sh` Part 3) that goes RED if that call
+  is ever removed — the claim is accurate now, and pinned.
 
 ## Acceptance criteria
 

@@ -30,19 +30,42 @@
 #
 # Mutation-proof of the detector itself (issue #2567 dispatch "Acceptance"
 # requirement -- the #2580 lesson: a check must not be reducible to
-# matching nothing while staying green). Two independent mutations are
-# applied to a WORKING COPY of the real script (never the fixture data);
-# together with assertion 1 (a real fixture with an untested field-copy
-# pair -- the positive control) that is >= 3 independent break-directions:
+# matching nothing while staying green).
+#
+# CORRECTED 2026-08-28 (PR #2585 rework, R-1/R-2 in
+# dev/reviews/harness-2567-2585.md): the paragraph below originally
+# described assertions 8-9 as THE mutation-proof. That overstates
+# assertion 8 specifically. The dune rule for this file always runs
+# against the REAL, current adapter_effectiveness_check.sh (via
+# `$(dirname "$0")/adapter_effectiveness_check.sh`) -- so if a future
+# edit actually narrows the live regex, assertion 1 (a real fixture
+# guaranteed to contain a violating field-copy, asserted to FAIL) is
+# what catches it, and it cascades to assertions 2, 3, 6, 7, 9, 11 too
+# (all of them exercise $CHECK directly). Assertion 1 is the vacuity
+# backstop -- the same fixture-guarantees-a-violation shape that closed
+# #2580.
+#
+# Assertion 8, by contrast, mutates a SEPARATE COPY of the script via a
+# `sed` regex-narrowing and only checks that copy's specific output
+# message. It is a characterization test of the false-PASS message
+# shape, not a proof the live detector is load-bearing: a regex break
+# that `sed`'s own substitution pattern cannot see (verified by
+# reviewer Probe 3, e.g. breaking `config\.[a-z][A-Za-z0-9_]*` via a
+# different mechanism than the one this file's own mutation targets)
+# produces a copy byte-identical to the already-broken original, and
+# assertion 8 passes vacuously in that case -- while assertions
+# 1/2/3/6/7/9/11 still correctly go RED against the real $CHECK. Do NOT
+# cite assertion 8 as the mutation-proof; cite assertion 1.
+#
 #   8. MUTATION A ("matches nothing") -- narrow the field-copy regex to
 #      only match a literal field name that cannot appear in any real
 #      fixture ("this_field_does_not_exist") instead of the general
 #      shape -- the violating fixture must go from FAIL to a false PASS,
 #      AND the false-PASS output must be the DISTINCT "no field-copy
 #      lines found" message, not the "every field is pinned or excepted"
-#      message a real, fully-audited clean tree would print. This is the
-#      #2580 regression shape pinned directly: a detector silently
-#      narrowed to vacuous must not read the same as a genuine clean pass.
+#      message a real, fully-audited clean tree would print. Useful as a
+#      characterization test of that message distinction; NOT the
+#      vacuity backstop (see correction above -- that's assertion 1).
 #   9. MUTATION B (pin-lookup corrupted) -- change the live pin-lookup's
 #      literal tag prefix so it can never match a real fixture comment --
 #      every previously-pinned field must revert to FAIL, proving the pin

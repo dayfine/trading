@@ -55,8 +55,19 @@
 #       enable_slow_grind_short_gate;" in weinstein_strategy_screening.ml
 #       -- this occurrence is invisible to the check entirely, not even
 #       counted, which is why it does not appear in
-#       adapter_effectiveness_exceptions.conf as an active entry either).
-#   Both are known, documented residuals (see the plan's "Risks"
+#       adapter_effectiveness_exceptions.conf as an active entry either);
+#     - R-3 (dev/reviews/harness-2567-2585.md, 2026-08-28, recorded
+#       non-blocking): a narrowed DOMAIN_ROOTS. If DOMAIN_ROOTS below is
+#       ever edited to a narrower scope than the two domain roots it
+#       currently lists, fields outside the new scope silently drop out
+#       of the audit -- the self-test's fixtures live under
+#       trading/trading/weinstein/strategy/lib, so a narrowing to just
+#       that subtree keeps the self-test green while the real tree's
+#       coverage shrinks. Inherent to any allowlist-scoped linter; a
+#       future hardening could assert a minimum found-field count
+#       against the live tree. Not attempted here -- out of scope for
+#       this PR.
+#   All three are known, documented residuals (see the plan's "Risks"
 #   section), same class of gap goldens_affected_check.sh's own header
 #   documents for its [@sexp.default] scan.
 #
