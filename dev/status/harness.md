@@ -1429,7 +1429,7 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   `weinstein_strategy_screening.ml`, documented in the script header and
   as a comment (not an active entry) in the exceptions file.
 
-- [ ] **H-ADAPTER-ASSERT8-LOG-STRING (R-1a)**: filed by qc-behavioral on the
+- [x] **H-ADAPTER-ASSERT8-LOG-STRING (R-1a)**: filed by qc-behavioral on the
   #2585 re-review (2026-08-28, non-blocking — the sole reason the score was
   held at 4 rather than 5). The R-1 descriptive correction stopped one line
   short. `adapter_effectiveness_check_test.sh`'s header now correctly says
@@ -1448,6 +1448,17 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   a script would have invalidated both verdicts and consumed rework
   iteration 2 of 2 for a log string. `harness_gap: NONE`.
   (source: 2026-08-28 run 1, qc-behavioral re-review of PR #2585)
+  **DONE (2026-08-28, harness/2585-residuals-r1a-r5):** re-measured the
+  claim before editing — the header (lines 35-58) already carried the
+  correct framing and the `ok` string at line 323 was confirmed to still say
+  "proving the real regex is load-bearing", exactly as filed. Reworded to
+  "assertion 8 — MUTATION A (regex narrowed to a nonexistent field name)
+  produces the expected false-PASS message; characterization only, NOT the
+  mutation-proof (that is assertion 1)" — the exact text the finding
+  suggested. One-line change, no logic touched. Lives at
+  `trading/devtools/checks/adapter_effectiveness_check_test.sh:323`. Verify:
+  `sh trading/devtools/checks/adapter_effectiveness_check_test.sh` (or
+  `dune runtest trading/devtools/checks/`) — all 9 assertions pass, exit 0.
 
 - [ ] **H-EXPIRY-GLOB-CLOSES-CLASS (R-4)**: recorded by qc-behavioral on the
   #2585 re-review as explicitly non-blocking. `check_11_linter_expiry.sh` now

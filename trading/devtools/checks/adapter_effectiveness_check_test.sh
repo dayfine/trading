@@ -320,7 +320,7 @@ CODE8=$?
 set -e
 
 if [ "$CODE8" -eq 0 ] && echo "$OUT8" | grep -q "no field-copy-into-sub-config lines found"; then
-  ok "assertion 8 — MUTATION A (regex narrowed to a nonexistent field name) flips FAIL -> false PASS, proving the real regex is load-bearing"
+  ok "assertion 8 — MUTATION A (regex narrowed to a nonexistent field name) produces the expected false-PASS message; characterization only, NOT the mutation-proof (that is assertion 1)"
 else
   bad "assertion 8 — expected the narrowed-regex mutation to produce a false PASS (no lines found); got exit=$CODE8 output=<<$OUT8>>"
 fi
