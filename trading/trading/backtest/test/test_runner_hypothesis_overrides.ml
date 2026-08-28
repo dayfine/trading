@@ -802,25 +802,26 @@ let test_failed_breakout_tolerance_axis_resolves_via_overlay_validator _ =
     not either field alone, is what the retired [entry_order_ttl_weeks] used to
     control.
 
-    {b Both halves default to off.} The re-screen stays [false] — REJECTED at
-    −137pp (PR #2376, ledger [2026-08-18-entry-ticket-rescreen]; condition-based
-    cancellation removes the pullback-then-resume winners). The clock returns to
-    [0] after a one-day round trip: promoted to 26 on 2026-08-18 (PR #2384,
-    user-directed) and {b reverted on 2026-08-19} when the one golden that arms
-    the StopLimit entry family measured {b −40.91pp} against it at three salts
-    per arm, with complete separation, reproduced to the cent by CI's own run
-    artefacts.
+    {b Defaults: re-screen off, clock 52.} The re-screen stays [false] —
+    REJECTED at −137pp (PR #2376, ledger [2026-08-18-entry-ticket-rescreen];
+    condition-based cancellation removes the pullback-then-resume winners). The
+    clock's default history: [0] → 26 (2026-08-18, PR #2384, outside the gate) →
+    [0] (2026-08-19 revert, the −40.91pp golden episode) →
+    {b [52] on 2026-08-27}, this time WITH the ledger ACCEPT + 3-cell grid the
+    revert said any future promotion needs
+    ([dev/experiments/_ledger/2026-08-27-entry-rest-weeks-surface.sexp]; 52 top
+    on return, sharpe and maxDD in all three broad cells).
 
-    So GTC-forever persistence is the default again, and this assertion is back
-    to pinning the R1 no-op claim. It moved 0 → 26 → 0 across two days; both
-    moves failed it first, which is exactly what it is for. See
-    [Weinstein_strategy_config.entry_order_max_rest_weeks] for the full
-    measurement and [dev/experiments/clock26-golden-ab-2026-08-19/]. *)
-let test_default_entry_ticket_lifecycle_is_off _ =
+    This assertion pins the PROMOTED pair — a change to either default must fail
+    here first and cite its ledger entry, exactly as the 0→26→0 round trip and
+    the 0→52 promotion each did. See
+    [Weinstein_strategy_config.entry_order_max_rest_weeks] for the full record.
+*)
+let test_default_entry_ticket_lifecycle _ =
   assert_that
     ( (_default_config ()).enable_entry_ticket_rescreen,
       (_default_config ()).entry_order_max_rest_weeks )
-    (equal_to (false, 0))
+    (equal_to (false, 52))
 
 (* -------------------------------------------------------------------- *)
 (* F2: the two [config] declarations must agree on the clock's default   *)
@@ -917,14 +918,13 @@ let test_entry_ticket_lifecycle_axes_resolve_via_overlay_validator _ =
     still parses, taking each field's [@sexp.default]. Proven by stripping both
     fields from the serialized default config and parsing the result.
 
-    {b Back-compat is whole again after the 2026-08-19 revert.} An old sexp that
-    omits [entry_order_max_rest_weeks] resolves to [0], which is the behaviour
-    it had when it was written. During the one day the default sat at 26 that
-    was not true — such a sexp still parsed but did {i not} reproduce itself,
-    which is the intended semantics of a default change and precisely why the 13
-    archived StopLimit specs pin [0] explicitly rather than rely on omission.
-    Those pins are kept: they cost nothing and they make each recorded arm
-    reproducible no matter what the default does next. *)
+    {b Since the 2026-08-27 promotion the clock's default is [52]}, so an old
+    sexp that omits [entry_order_max_rest_weeks] resolves to [52] — it parses
+    but does {i not} reproduce its original clock=0 behaviour. That is the
+    intended semantics of a default change and precisely why the archived
+    StopLimit specs pin [0] explicitly rather than rely on omission: pins make
+    each recorded arm reproducible no matter what the default does next. This
+    assertion pins the CURRENT defaults an omitting sexp resolves to. *)
 let test_strategy_config_parses_with_lifecycle_fields_absent _ =
   let dropped =
     [ "enable_entry_ticket_rescreen"; "entry_order_max_rest_weeks" ]
@@ -949,7 +949,7 @@ let test_strategy_config_parses_with_lifecycle_fields_absent _ =
            (equal_to false);
          field
            (fun (c : Weinstein_strategy.config) -> c.entry_order_max_rest_weeks)
-           (equal_to 0);
+           (equal_to 52);
        ])
 
 (* -------------------------------------------------------------------- *)
@@ -1228,7 +1228,7 @@ let suite =
          "G2a: config parses with entry_fill_reject_retries absent"
          >:: test_strategy_config_parses_without_retry_field;
          "F2: re-screen and clock both default to off"
-         >:: test_default_entry_ticket_lifecycle_is_off;
+         >:: test_default_entry_ticket_lifecycle;
          "F2: weinstein_strategy.mli re-declares the clock default consistently"
          >:: test_strategy_mli_redeclares_clock_default_consistently;
          "F2: both lifecycle fields resolve as Variant_matrix axes"

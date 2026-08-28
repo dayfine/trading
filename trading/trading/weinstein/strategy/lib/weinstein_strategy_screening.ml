@@ -303,10 +303,12 @@ let _still_qualifies ~config ~macro_result ~sector_map ~stage_by_ticker ~symbol
     {!Entry_freeze.apply}. The cancelled symbol is not re-placed on this same
     tick — its [Entering] position is still held until the transition is
     applied, so the cascade still excludes it — which is the intent: cancel now,
-    re-qualify (at a fresh [E]) on a later week. No-op at the defaults
-    ([enable_entry_ticket_rescreen = false], [entry_order_max_rest_weeks = 0]),
-    where the guard below returns before the predicate is even built. The clock
-    briefly defaulted to 26 (2026-08-18) and was reverted the next day — see
+    re-qualify (at a fresh [E]) on a later week. No-op only when BOTH halves are
+    off ([enable_entry_ticket_rescreen = false] AND
+    [entry_order_max_rest_weeks <= 0]), where the guard below returns before the
+    predicate is even built. Since the 2026-08-27 promotion the clock defaults
+    to [52], so the default path DOES build the predicate — the 2026-08-18
+    26-flip (reverted next day) predates the ledger ACCEPT that 52 carries; see
     [Weinstein_strategy_config.entry_order_max_rest_weeks].
 
     The two halves are independently armed (defect C, 2026-08-16): the
