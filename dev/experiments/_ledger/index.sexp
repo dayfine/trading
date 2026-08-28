@@ -362,4 +362,5 @@
   (base_scenario
    "book-faithful stops-basis default flip (user-directed 2026-08-24, #2486); 4-arm per-flip decomposition on test_weinstein_backtest + paired armed-stoplimit golden at the PR build")
   (window_id weinstein-backtest-6y-covid-positive)
-  (verdict Inconclusive) (entry_slug stops-basis-book-faithful)))
+  (verdict Inconclusive) (entry_slug stops-basis-book-faithful))
+ ((config_hash clock-surface-3cell) (base_scenario "entry_order_max_rest_weeks surface {0,13,26,52,156} x 3 broad cells at build 90dfd6e97 (fill-model pair on); robust value 52") (window_id clock-surface-3cell-broad) (verdict Accept) (entry_slug entry-rest-weeks-surface)))

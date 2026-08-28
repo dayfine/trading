@@ -1,0 +1,27 @@
+((date 2026-08-27) (slug entry-rest-weeks-surface)
+ (hypothesis
+  "entry_order_max_rest_weeks (the resting-ticket cancel clock, #2405): cancelling StopLimit entry tickets that have rested longer than w weeks improves the portfolio at the current book-faithful basis (fill-model pair ON by default, #2569). Pre-registered prior: the position_id-keyed bucket table (ttl-retest-2026-08-16, record base) -- rest>26wk = 89 fills, -349,132, -3,923/trade vs +2,518/trade for the healthy population; boundary expected inside 14-52wk. Value re-opened, not assumed (26 was never derived).")
+ (base_scenario
+  "clock-surface-2026-08-27: arms {0,13,26,52,156} x 3 broad cells, salt 0, build 90dfd6e97, split-safe warehouse. Cell A = record-baseline lineage 26y x top-3000-2000 (macro-diverse); cell B = broad5y core lineage 2019-2023 x top-3000-2019; cell C = 2000-2012 x top-3000-2000 (bear-heavy, disjoint from B, time-prefix of A; arms {0,26,52}). One-knob arm diffs; arm 0 = fresh null per cell (committed baselines predate #2561/#2569).")
+ (window_id clock-surface-3cell-broad) (baseline_label rest-weeks-0)
+ (variants
+  (((label rest-weeks-0-A) (config_hash clockA-0)
+    (aggregate (((total_return_pct 312.74) (max_drawdown_pct 38.78)))))
+   ((label rest-weeks-13-A) (config_hash clockA-13)
+    (aggregate (((total_return_pct 436.77) (max_drawdown_pct 35.58)))))
+   ((label rest-weeks-26-A) (config_hash clockA-26)
+    (aggregate (((total_return_pct 389.81) (max_drawdown_pct 33.18)))))
+   ((label rest-weeks-52-A) (config_hash clockA-52)
+    (aggregate (((total_return_pct 496.20) (max_drawdown_pct 25.65)))))
+   ((label rest-weeks-156-A) (config_hash clockA-156)
+    (aggregate (((total_return_pct 267.59) (max_drawdown_pct 38.48)))))
+   ((label rest-weeks-0-C) (config_hash clockC-0)
+    (aggregate (((total_return_pct 76.71) (max_drawdown_pct 27.10)))))
+   ((label rest-weeks-26-C) (config_hash clockC-26)
+    (aggregate (((total_return_pct 93.49) (max_drawdown_pct 26.61)))))
+   ((label rest-weeks-52-C) (config_hash clockC-52)
+    (aggregate (((total_return_pct 97.99) (max_drawdown_pct 25.65)))))))
+ (verdict Accept)
+ (notes
+  "ACCEPT(mechanism): the clock beats the null on return+sharpe+maxDD in cells A and C; in cell B, w52 beats the null on all three while w26 dips on return (-2.2pp) AND sharpe (0.251 vs 0.271) on a 187-trade book (realized paired delta +42.5k -- MTM vs realized divergence). CELL INDEPENDENCE, precisely: B and C are sub-windows of A (C a strict time-prefix on the same PIT-2000 vintage -- proven by 100% fill overlap); only the (B,C) pair is mutually disjoint. The grid = one full-history macro-diverse cell + two mutually disjoint regime cells (recent-bull, bear-heavy); a composition-independent cell (different PIT vintage/breadth) remains open for the flip PR. Cell B omitted from the variants table for space (null 18.02/0.271/34.12; w52 25.31/0.345/27.00; full table + trades.csv in dev/experiments/clock-surface-2026-08-27/). ROBUST VALUE = 52, not the approved-in-principle 26: w52 is top on return AND sharpe AND maxDD in all three cells (A: +183.5pp / +0.085 / -13.1pp vs null, above even the old-basis 132.5pp 26y noise floor; C bear-heavy: +21.3pp / +0.066 / -1.5pp; B: +7.3pp / +0.075 / -7.1pp). w26 beats the null in A and C on everything and is mixed in B. w156 is a no-op at 5y (digit-identical to null) and WORSE than null at 26y -- clipping only the absurd tail keeps the losing 27-156wk class while forfeiting the reshuffle. MECHANISM (dissected, not assumed): the paired cross-arm join (symbol|entry_date) shows path-dominated divergence -- at 26y >50% of the book differs between arms; removed cohorts are NOT mostly the direct long-rest class (which is ~89 fills per the bucket table) but the downstream reshuffle from freed cash/slots. The isolated-cohort evidence remains the committed bucket table; this surface adds that the portfolio-level effect of the cut is positive in every tested regime including 2000-2012 bear-heavy. SMCI ADJUDICATION (owed by #2405): SMCI has ZERO fills in every arm INCLUDING the null at this basis -- the -40.91pp episode's stale-E monster lived on the sp500 golden at pre-#2530/#2561 defaults and does not exist in the current broad book; the freeze_entry_at_first_breakout question stays open with no casualty here. DEVIATIONS FROM THE FULL GATE, declared: salt 0 only (noise floors cited from committed 3-salt records, not re-measured); no WF-CV folds and no Deflated Sharpe (the surface is a 3-cell period x universe grid per promotion-confirmation.md, macro-diverse cell present, not a fold ensemble); grid cells A/C share the PIT-2000 composition and C is a time-prefix of A (not period-disjoint; see CELL INDEPENDENCE above). DEFAULT FLIP NOT EXECUTED: per R3 + config-default-blast-radius the flip PR is a separate user-gated step with the paired-golden protocol (goldens_affected_check will correctly FAIL default-flip listing inheriting goldens per #2575). USER DECISION REQUIRED: flip to 52 (the measured robust value) vs 26 (the approved-in-principle value; also clean in A+C). Artifacts: dev/experiments/clock-surface-2026-08-27/results/ (30+9 files, per-arm actual/trades/params).")
+)
