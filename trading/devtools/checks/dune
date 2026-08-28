@@ -771,6 +771,41 @@
  (action
   (run sh %{dep:check_universe_deps_test.sh})))
 
+; adapter_effectiveness_check.sh (issue #2567): guards against the
+; "silent-null config thread" defect class -- a Weinstein_strategy.config
+; field threaded into a sub-config via a "field = config.field2" copy,
+; severable with the whole suite staying green. Scans the live weinstein
+; source tree (not just this directory), so it needs repo_root() +
+; (universe) like check_universe_deps.sh above. See
+; dev/plans/silent-null-effectiveness-2026-08-28.md for the full design
+; and census.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh adapter_effectiveness_exceptions.conf (universe))
+ (action
+  (run sh %{dep:adapter_effectiveness_check.sh})))
+
+; Self-test for adapter_effectiveness_check.sh: pins the scanning +
+; decision logic (field-copy shape detection, pin lookup, exceptions-list
+; handling, test/bin exclusion) against a synthetic fixture tree via the
+; REPO_ROOT override, plus two mutation-proof assertions against a working
+; copy of the real script -- independent of whatever the real weinstein
+; tree currently contains.
+;
+; Also declares (universe): its fixture heredocs embed
+; "config.<field>"-shaped text (used to exercise the guard under test)
+; that adapter_effectiveness_check.sh's own scan would otherwise pick up
+; if this file's containing directory were ever inside its scan roots (it
+; is not today, but the guard's own correctness should not depend on
+; that).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh adapter_effectiveness_check.sh (universe))
+ (action
+  (run sh %{dep:adapter_effectiveness_check_test.sh})))
+
 ; prior_cell_check test (2026-08-20): dev/scripts/prior_cell_check.sh guards
 ; against claiming a metric unmeasured when a committed results file already
 ; carries it -- the qc-behavioral B3 finding on PR #2433. Same shim + (universe)

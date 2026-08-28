@@ -1309,3 +1309,122 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 
   Verify: `bash trading/devtools/checks/record_qc_audit_test.sh` (68
   scenarios, up from 61 after PR #2504).
+
+## Added 2026-08-28 (harness-maintainer, harness/2567-silent-null-effectiveness, issue #2567)
+
+- [x] **Mechanical guard for the "silent-null config thread" defect
+  class.** qc-behavioral on #2563 named a recurring pattern: a
+  `Weinstein_strategy.config` field threads into a sub-config (`Rs.config`,
+  `Volume.config`, ...) via a `field = config.field2` copy, the thread is
+  severable with the WHOLE SUITE staying green, and the failure mode is a
+  silent null — an armed axis sweep measures the baseline and the
+  experiment ledger records a REJECT for a mechanism that never ran (three
+  prior instances: `Volume.config` #2459, the rt anchor knob, and #2563's
+  `enable_rs_positive_declining`, each caught only by manual review, never
+  mechanically). Per `.claude/rules/experiment-flag-discipline.md` Rule 4
+  a terminal REJECT can get the mechanism's code deleted — so this defect
+  class can delete working code on false evidence.
+
+  **Plan-first, per the dispatch's design fork:** wrote
+  `dev/plans/silent-null-effectiveness-2026-08-28.md` before any code,
+  deciding between the issue's two enforcement options (a linter vs. a
+  `qc-structural` convention row) via a real census rather than intuition.
+  Grepped the two domain roots (`trading/trading/weinstein/`,
+  `trading/analysis/weinstein/`) for the literal field-copy shape:
+  **17 occurrence sites, 15 distinct field names, across 6 files** — not a
+  handful, and NOT confined to `_config_for`-named adapters (`_run_screener`
+  threads 3 of the 17 with no `_config_for` in its name, which would have
+  been a false-negative gap even for a name-keyed version of option (a)).
+  The two files with the most copies had 42 and 23 commits in the prior 60
+  days — high, rising churn. Doing the census by hand also found a 16th,
+  then-live gap on `main` (`entry_freshness_basis`, F1) — concrete evidence
+  that per-PR vigilance had already failed a 4th time. **Decision: (a), a
+  linter** — the convention-only path (b) relies on exactly the mechanism
+  that had already failed three (now four) times.
+
+  **Built** (`trading/devtools/checks/adapter_effectiveness_check.sh`):
+  scans both domain roots (excluding `*/test/*`, `*/bin/*`) for the shape
+  `<module-prefix>?field = config.field2[;]` — SHAPE-based (any function,
+  not just `_config_for`-named ones), matching the false-negative the
+  census found. For every unique `field2`, requires either an
+  `EFFECTIVENESS-PIN: <field2>` tag in some `*/test/*.ml` file repo-wide,
+  or an entry in the new `adapter_effectiveness_exceptions.conf`
+  (mandatory `review_at`, same convention as `universe_deps_exceptions.conf`
+  / `linter_exceptions.conf`). Wired into `dune runtest` via
+  `trading/devtools/checks/dune` (mirrors the `check_universe_deps.sh`
+  rule pair, both `(universe)`).
+
+  **Closed the real gap the census found**: added
+  `test_threads_entry_freshness_basis` to
+  `test_stock_analysis_config_wiring.ml` (arms
+  `entry_freshness_basis = Range_top_breakout`, asserts the built
+  `Stock_analysis.config` differs) — before this PR, nothing in the suite
+  would have caught that thread being severed. Retrofitted
+  `EFFECTIVENESS-PIN` tags onto 5 more fields with pre-existing adequate
+  tests (`overhead_supply`, `virgin_crossing_readmission`,
+  `entry_anchor_local_range_weeks`, `resistance_min_history_bars` in
+  `test_stock_analysis_config_wiring.ml`; `enable_rs_positive_declining` in
+  `test_rs_trend_live.ml`, already a real downstream-behavior pin).
+  Grandfathered the remaining 9 fields in
+  `adapter_effectiveness_exceptions.conf` with `review_at` dates 30-45 days
+  out (`neutral_blocks_longs`, `neutral_blocks_shorts`,
+  `enable_slow_grind_short_gate`, `stop_width_mode`,
+  `stop_width_size_down_max_pct`, `match_fraction`, `ret_epsilon`,
+  `require_breakout_volume`, `insufficient_score`) rather than blocking
+  this PR on retrofitting all 17 sites — per
+  `.claude/rules/code-health-discipline.md`'s allowance for a bounded
+  exception paired with dated follow-up, not an open-ended bump.
+
+  **Found and fixed a real bug in the checker's own first run**
+  (H-ADAPTER-PIN-LINEWRAP): `dune build @fmt --auto-promote` reflowed the
+  `virgin_crossing_readmission` doc comment so `EFFECTIVENESS-PIN:` and
+  the field name landed on different physical lines — a naive per-line
+  `grep -E` missed it (false FAIL on a field that WAS genuinely pinned).
+  Fixed by joining each test file's content before the pin search (so
+  ocamlformat's wrapping can never split a tag from its field name), and
+  pinned the fix with a dedicated fixture assertion (11) reproducing the
+  exact wrapped-comment shape.
+
+  **Acceptance verification (all against the real repo AND a synthetic
+  fixture root, per the dispatch's "must not be vacuously green" bar):**
+  - Positive control, REAL production code: hand-severed
+    `entry_freshness_basis = config.entry_freshness_basis` to a hardcoded
+    `Entry_freshness.Ma_cross` in `weinstein_strategy_screening.ml` —
+    `test_stock_analysis_config_wiring.exe` went RED (`FAILED: ... Failures:
+    1`) exactly on `test_threads_entry_freshness_basis`. Reverted; reran
+    green (8/8).
+  - Positive control, linter fixture: an unpinned fixture field-copy pair
+    -> FAIL naming field + file:line (assertion 1).
+  - Fixture root has both a violating case (assertion 1) and multiple
+    conforming cases (assertions 2, 3, 7, 11) — never just the live,
+    already-clean repo.
+  - Mutation table (3 independent break-directions, `adapter_effectiveness_check_test.sh`
+    assertions 8-9 run against a WORKING COPY of the real script, never
+    the fixture data):
+
+    | mutation | direction | result |
+    |---|---|---|
+    | fixture: add an untested field-copy pair | positive control | RED (assertion 1) |
+    | narrow the field-copy regex to a literal nonexistent field name ("matches nothing") | detector self-check | RED->false-PASS, distinguishable message ("no field-copy lines found" vs. the real audit-pass text) (assertion 8) |
+    | corrupt the pin-lookup tag prefix | detector self-check | previously-pinned field reverts to FAIL (assertion 9) |
+
+  - `adapter_effectiveness_check_test.sh`: 10/10 assertions pass.
+  - Full `dune build`: exit 0 (~1 min, warm cache). Full `dune runtest`:
+    exit 0, 0 `^FAIL:` lines (~1 min). `dune build @fmt`: exit 0, no diff.
+
+  Verify: `sh trading/devtools/checks/adapter_effectiveness_check.sh` (OK
+  against current main); `sh
+  trading/devtools/checks/adapter_effectiveness_check_test.sh` (10
+  passed); `dune runtest trading/weinstein/strategy/test/` (includes the
+  new `test_threads_entry_freshness_basis`).
+
+  **Follow-ups** (tracked via the exceptions file's `review_at` dates,
+  2026-10-01 / 2026-10-13): retrofit real `EFFECTIVENESS-PIN` tests for
+  the 9 grandfathered fields. Also documented, not fixed: (a) a
+  derived/conditional thread (e.g. `require_breakout_volume = not (...)`)
+  is invisible to the regex — syntactic, not semantic; (b) a field-copy
+  whose two halves are split across two lines by ocamlfmt is invisible to
+  the SCAN (as opposed to the PIN lookup, which is now line-wrap-safe) —
+  confirmed live on `enable_slow_grind_short_gate` in
+  `weinstein_strategy_screening.ml`, documented in the script header and
+  as a comment (not an active entry) in the exceptions file.
