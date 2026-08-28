@@ -1227,7 +1227,7 @@ let suite =
          >:: test_entry_fill_reject_retries_axis_resolves_via_overlay_validator;
          "G2a: config parses with entry_fill_reject_retries absent"
          >:: test_strategy_config_parses_without_retry_field;
-         "F2: re-screen and clock both default to off"
+         "F2: re-screen defaults off, clock defaults to 52"
          >:: test_default_entry_ticket_lifecycle;
          "F2: weinstein_strategy.mli re-declares the clock default consistently"
          >:: test_strategy_mli_redeclares_clock_default_consistently;
