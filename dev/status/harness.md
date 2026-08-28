@@ -1460,6 +1460,80 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   `sh trading/devtools/checks/adapter_effectiveness_check_test.sh` (or
   `dune runtest trading/devtools/checks/`) — all 9 assertions pass, exit 0.
 
+- [ ] **H-EXPIRY-ROLLUP-SHARED-FN-ASSUMED (O2)**: filed by qc-behavioral on
+  PR #2589 (2026-08-28 run 2) — the **only green-while-broken evasion found in
+  13 independent attacks** on the new R-5 assertions. `_scan_exceptions_conf()`
+  is shared by all three conf files, and the R-5 test fixture arms only
+  `adapter_effectiveness_exceptions.conf`. A **per-label special-case inside
+  the shared function** — e.g. `case "${label}" in Adapter*) : ;; *) continue ;;
+  esac` before `add_warning` — kills the roll-up for `linter_exceptions.conf`
+  and `universe_deps_exceptions.conf` while the whole suite stays **exit 0**.
+  The R-5 script header argues the break "drops identically for all three
+  files (the function is shared)", which is true of the accidental shape R-5
+  actually observed and is a fair explanation of why that bug was systemic —
+  but it reads as though the AE fixture therefore protects all three, and it
+  does not. Requires a deliberate targeted edit, not the accidental shape, so
+  it is a real but narrow residual. Cheap to close: the fake root already
+  creates an empty `linter_exceptions.conf` (`:158`); put one expired line in
+  it and add a second `^W: ` assertion for the `Linter exception expiry` label.
+  `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-08-28 run 2, qc-behavioral on PR #2589, attack E2)
+
+- [ ] **H-EXPIRY-ADDWARNING-SITES-UNPINNED (O3)**: filed by qc-behavioral on
+  PR #2589. #2589's completion note declares two uncovered branches
+  (missing-`review_at`, and the milestone branch ~`:166`) and **both
+  declarations were verified accurate** — credit for stating them. But the
+  real uncovered set is **two branches wider**: `_scan_exceptions_conf` has
+  two further `add_warning` call sites nothing exercises — conf-file-not-found
+  (`:113`, all three files exist in the fixture) and unrecognised-`review_at`
+  -format (`:184`). The note is phrased non-exhaustively so it is not false,
+  but the accurate summary is: **the date-expired branch is the only one of
+  the five `add_warning` sites in this function that is pinned.**
+  `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-08-28 run 2, qc-behavioral on PR #2589, observation O3)
+
+- [ ] **H-EXPIRY-MUTATION-DIAGNOSTIC-MISLEADS (O1)**: filed by qc-behavioral on
+  PR #2589, non-blocking. Assertions 3c/3d/3e **fail closed** on a benign
+  reword of the call site (verified: three separate rewordings all go RED, none
+  goes vacuously green — the safe direction, and the #2580 shape specifically
+  attacked). But the printed diagnosis misleads: 3c prints "expired
+  fixture_expired_field entry was NOT surfaced in the roll-up W: findings line"
+  while the dumped findings file two lines below plainly shows the correct `W:`
+  line, and 3e prints "MUTATION D did not produce the expected split" without
+  naming the real cause (its own `sed` pattern no longer matches the source).
+  Recoverable in seconds because the assertions dump the findings/report
+  contents, so this costs a future reworder minutes, not correctness. Fix
+  shape: have 3d/3e assert their `sed` actually changed the file
+  (`! diff -q "$CHECK_11" "$AE_MUT_CHECK2"`) and fail with "the mutation's sed
+  pattern no longer matches — update the pattern, the protection may be fine".
+  `harness_gap: NONE`.
+  (source: 2026-08-28 run 2, qc-behavioral on PR #2589, observation O1)
+
+- [ ] **H-EXPIRY-CONSUMER-HALF-UNPINNED (O4)**: filed by qc-behavioral on PR
+  #2589, non-blocking, and **out of R-5's declared scope** (the header does not
+  claim otherwise). Part 4 models `deep_scan/main.sh`'s calling convention but
+  pins only the **producer** half: nothing asserts that `main.sh:47` still
+  passes a findings file as `$2`, nor that `main.sh:110-111` still routes
+  `W: ` into the `## Warnings` section (`:174`). Breaking either would silently
+  drop check_11's roll-up in production with Part 4 fully green. Mitigating and
+  the reason this is low priority: `_run_check` is shared by all 12 deep-scan
+  checks, so that break is far broader and louder than the one R-5 targets.
+  `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-08-28 run 2, qc-behavioral on PR #2589, observation O4)
+
+- [ ] **H-EXPIRY-NOTE-OFFBYONE-COUNTS (O5)**: filed by qc-behavioral on PR
+  #2589, cosmetic. Two off-by-one counts in this file's own #2589 completion
+  notes: the R-1a note says "all 9 assertions pass" but the runner reports
+  **10** (assertions 1-9 plus 11); the R-5 note says the check "prints 5 `OK:`
+  lines" but it prints **6** (five assertions plus the trailing summary). Both
+  are in *verification instructions* — the numbers a future reader would use to
+  decide whether the check still works — not contract claims. Everything else
+  in both notes was checked line by line against the tree and is accurate.
+  Noting rather than silently fixing, since this file is the durable record and
+  four consecutive runs have now found a record disagreeing with the tree.
+  `harness_gap: NONE`.
+  (source: 2026-08-28 run 2, qc-behavioral on PR #2589, observation O5)
+
 - [ ] **H-EXPIRY-GLOB-CLOSES-CLASS (R-4)**: recorded by qc-behavioral on the
   #2585 re-review as explicitly non-blocking. `check_11_linter_expiry.sh` now
   scans **all three** `*exceptions*.conf` files that exist repo-wide, so there

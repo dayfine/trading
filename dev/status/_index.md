@@ -4,29 +4,31 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-28 (orchestrator run 33165247888; main `cbac374f` ->
-`b1f10412` -> **`3ca3fa2d`**). Queue was **empty** at run start (0 open PRs),
-so the Step 0.5 fast-exit was again correctly skipped by its own non-vacuous
-precondition — this is the check #2579 says does not reliably bind, and it
-bound this run. Two PRs opened and **both merged**: **#2584** (cleanup,
-`b1f10412`) and **#2585** (harness/#2567, `3ca3fa2d`, 1 rework iteration).
-Zero open PRs at run end.
+Last updated: 2026-08-28 **run 2** (orchestrator run 33189885747; main
+unchanged at **`5c20fe07`**, green: build 0, runtest 0, 0 `^FAIL:`). Unlike
+run 1, the queue was **not** empty: the maintainer opened **#2587** (clock
+`0 -> 52` promotion) at 14:49Z with red CI and zero reviews, so the Step 0.5
+fast-exit correctly did not fire. Two PRs in flight at run end — **#2587**
+(fixed to green, QC'd, **deliberately not merged**) and **#2589** (harness,
+#2585 residuals R-1a + R-5).
 
-**This run's theme was durable records that disagreed with the tree.** #2584's
-backlog entry claimed 26 malformed odoc warnings across 11 files; the true
-population was **18 / 10** — the 9-warning cluster in the file the item was
-originally filed against had already been fixed by an unrecorded prior PR, and
-a cleanup agent would have gone hunting warnings that no longer existed.
-#2585's blocker was the same shape one level up: it shipped 9 grandfathered
-exceptions carrying `review_at` dates that **nothing scanned** — an entry dated
-2019-01-01 exited 0 silently — while the plan's §Risks asserted they were
-checked. Both were caught by re-measurement, not by review of the prose.
+**This run's theme was a fix silently reverted by a stale branch point.**
+#2587 branched from `cbac374f`, the direct parent of `b1f10412` (#2584,
+merged 05:10 PT the same morning), so it never contained that PR's odoc
+fixes; its docstring rewrite carried the pre-fix text forward and
+**un-escaped 2 of #2584's 18 `\{...\}` sequences, 2h38m after they landed**.
+Neither PR gate caught it: `ci.yml:109`'s `dune build @fmt` never ran because
+`dune runtest` (line 104) failed first on an unrelated unpinned default, and
+after the author's own `dune fmt` promotion `@fmt` went green **without**
+restoring the escapes. There is no odoc linter, so the revert was about to
+merge fully green. Restored in `5044eb5f`; class filed as **#2588**.
 
-`review_at` dates on exceptions files now **report** (weekly deep scan) rather
-than gate; that matches both pre-existing sibling scans and is deliberate.
 Capabilities re-measured this run, not copied: issue writes **403**
-(create-only, live probe), `.github/workflows/` writes **403**,
-`record_qc_audit.sh --pr-number` **exit 1** without `gh`. See `2026-08-28.md`.
+(live `PATCH /issues/2556`), `.github/workflows/` writes **403** — now by a
+**non-mutating** probe (`PUT /contents` with a deliberately wrong blob sha:
+workflow path **403**, `dev/notes/data-gaps.md` **409** on the same branch),
+which supersedes the throwaway-branch method used on 08-27. See
+`2026-08-28-run2.md`.
 
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
@@ -75,14 +77,14 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2567 CLOSED — adapter-effectiveness linter + expiry wiring MERGED `3ca3fa2d` (#2585, 1 rework); next: R-1a one-line log string at `adapter_effectiveness_check_test.sh:323` |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2585 residuals R-1a + R-5 MERGED `409b85f4` (#2589; 13-attack QC, 12 caught); next: O2 shared-fn evasion, then R-4 expiry table |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | A-MERGEABLE-STATE-NOT-A-CLOSE-TELL filed (run-1 guidance corrected); open: #2427 #2428 #2429 #2432 — need `workflow` scope or a human |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | 18 malformed odoc comments across 10 files fixed, MERGED `b1f10412` (#2584); top item `linter_coverage` still a HUMAN POLICY DECISION (14 runs) |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
 | [screener](screener.md) | IN_PROGRESS | dayfine (LOCAL) + feat-weinstein | — | RS trend live (`lookback_bars` 52->56) landed via **#2561** (#2555 closed unmerged, superseded); #2380 closed; next: none queued |
-| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | clock-26 REVERTED to 0 by #2397 (golden −40.91pp); re-flip framed in #2405, superseded discriminator in #2407; next: base-held measurement |
+| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | #2587 | #2587 flips clock 0 → 52 (ledger ACCEPT + 3-cell grid); CI green, `goldens-affected` red by design; next: paired-golden table + `paired-run-done` |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
 | [experiment-platform](experiment-platform.md) | IN_PROGRESS | feat-backtest | — | force-exit-off grid REJECTED for promotion (#1503); single-dial surface exhausted; next: continuation-buy recheck on top-3000 (data-gated) |
