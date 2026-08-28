@@ -1,4 +1,4 @@
-# clock-surface — entry_order_max_rest_weeks {0,13,26,52,156} on two broad cells (#2405)
+# clock-surface — entry_order_max_rest_weeks {0,13,26,52,156} on three broad cells (#2405)
 
 The re-flip test #2405's own record demands: the clock measured as a SURFACE
 (value re-opened, not assumed — 26 was never derived), multi-cell, with the
@@ -11,10 +11,11 @@ USER approval-in-principle 2026-08-25; fill-model decision 2026-08-26.
 |---|---|---|---|
 | **B** | `broad5y-00-core` (ladder-v4 cell-00) | 2019-01-02..2023-12-29 × top-3000 PIT-2019 | fast read; the window family where the −40.91pp sp500 episode lived |
 | **A** | `record-baseline` (2026-08-24 canonical) | 2000-01-01..2026-06-26 × top-3000 PIT-2000 | macro-diverse (dot-com + GFC); the 26y record convention |
+| **C** | `record-baseline` lineage, end_date 2012-12-31 | 2000-01-01..2012-12-31 × top-3000 PIT-2000 | bear-heavy; disjoint from B, time-prefix of A. Added after A+B to strengthen the grid — the pre-registered rule text below predates it and is kept as registered |
 
-Both cells: one-knob arm diffs (`entry_order_max_rest_weeks` only), salt 0,
+All cells: one-knob arm diffs (`entry_order_max_rest_weeks` only), salt 0,
 split-safe warehouse `/tmp/snap_top3000_dedup_v5thin_adj`, `--parallel 1`
-per run. Universe discipline: both cells broad (top-3000) — no sp500 cell.
+per run. Universe discipline: all cells broad (top-3000) — no sp500 cell.
 
 ## Fresh nulls (arm 0), not tripwires
 
@@ -111,7 +112,7 @@ basis (it lived on the sp500 golden cell at pre-#2530/#2561 defaults).
 Nothing to adjudicate here; the `freeze_entry_at_first_breakout` question
 stays open independently but this surface carries no SMCI-like casualty.
 
-### Cell C — 2000-2012 × top-3000-2000 (disjoint, bear-heavy: dot-com + GFC)
+### Cell C — 2000-2012 × top-3000-2000 (bear-heavy: dot-com + GFC; disjoint from B, time-prefix of A)
 
 | arm | return % | trades | win % | sharpe | maxDD % | wall |
 |---|---:|---:|---:|---:|---:|---:|
@@ -127,18 +128,40 @@ a determinism self-check, not a coincidence.)
 
 Ledger: `dev/experiments/_ledger/2026-08-27-entry-rest-weeks-surface.sexp`.
 
-The clock beats the null in **3/3 independent broad cells** on sharpe and
-maxDD, and on return everywhere except B-26 (−2.2pp on a 187-trade book,
-with realized paired delta +$42.5k — MTM/realized divergence). **52 is the
+The clock beats the null on return, sharpe AND maxDD in cells A and C. In
+cell B, **w52** beats the null on all three, while **w26 dips on both
+return (−2.2pp) and sharpe (0.251 vs 0.271)** on a 187-trade book (its
+realized paired delta is +$42.5k — MTM/realized divergence). **52 is the
 only value on the frontier in all three cells** (top return + sharpe +
-maxDD in each). Per `promotion-confirmation.md`'s decision rule, 52 is the
-promotable value; 26 (the approved-in-principle value) is clean in A and C
-and mixed in B.
+maxDD in each — verified independently by qc-behavioral). 26 is clean in
+A and C and mixed in B.
+
+**Cell-independence, stated precisely**: the three cells are pairwise
+distinct contexts but NOT mutually independent — B (2019-23) and C
+(2000-12) are both sub-windows of A on shared compositions, and C is a
+strict time-prefix of A on the same PIT-2000 vintage (the determinism
+self-check above is the proof). Only the (B, C) pair is disjoint. The grid
+therefore has: one full-history macro-diverse cell (A), and two mutually
+disjoint regime cells (B recent-bull, C bear-heavy). A fully
+composition-independent cell (different PIT vintage or breadth tier)
+remains open for the flip PR if belt-and-braces is wanted.
+
+**Pre-registered rule item 2, negative branch (named explicitly)**: in
+cell A the removed cohorts came out net-POSITIVE (+$1.09M at w26), i.e.
+the isolated-cohort trigger did NOT fire as written — because the paired
+join measures the path reshuffle, not the direct long-rest class the rule
+was written for. The verdict therefore rests on (a) the portfolio-level
+outcome in all three cells and (b) the committed 2026-08-16 bucket table
+(rest>26wk: 89 fills, −349,132) as the isolated-cohort evidence — a
+deviation from the rule as pre-registered, recorded rather than papered
+over.
 
 Declared gate deviations: salt 0 only (noise floors cited from committed
 3-salt records); 3-cell period×universe grid, not WF-CV folds, no DSR;
-A and C share the PIT-2000 composition (period-disjoint, not
-composition-independent).
+A and C share the PIT-2000 composition AND overlap in time (C is a strict
+time-prefix of A — NOT period-disjoint; see "Cell-independence, stated
+precisely" above). The grid's period-diversity axis rests on the (B, C)
+pair alone.
 
 **The default flip is NOT executed here.** It is a separate user-gated PR
 (R3 + `config-default-blast-radius` paired-golden protocol; the
@@ -150,10 +173,11 @@ measured robust value) or **26** (approved-in-principle).
 
 - Every clock arm {13,26,52} beats the null in cell A on ALL of return /
   win rate / sharpe / maxDD. In cell B, 13 and 52 beat the null; 26 dips
-  on return (−2.2pp, small book) while improving maxDD.
+  on return (−2.2pp, small book) AND sharpe (0.251 vs 0.271) while
+  improving maxDD.
 - **52 is the only cross-cell-consistent winner** — top on return, sharpe
-  and maxDD in BOTH cells. Its cell-A return delta (+183.5pp) exceeds even
-  the old-basis 132.5pp noise floor, and DD/sharpe/win-rate co-move.
+  and maxDD in all THREE cells. Its cell-A return delta (+183.5pp) exceeds
+  even the old-basis 132.5pp noise floor, and DD/sharpe/win-rate co-move.
 - 156 (clip-the-absurd-tail-only) is a no-op at 5y and WORSE than null at
   26y (−45.2pp, DD ≈ null) — cutting only the extreme tail keeps the
   losing 27-156wk class while forfeiting the reshuffle benefit.
@@ -161,6 +185,8 @@ measured robust value) or **26** (approved-in-principle).
   puts the optimum at (or beyond) 52 — consistent with the cut being
   beneficial mostly through freeing capital from dead tickets rather than
   through surgically removing the worst bucket.
-- Cell B is nested inside cell A's window, so it is NOT an independent
-  grid cell (rangetop lesson). Cell C (2000-2012 disjoint, bear-heavy)
-  runs arms {0,26,52} to complete a legitimate 3-cell read.
+- Neither B nor C is independent of A (both are sub-windows of it; C is a
+  strict time-prefix on the same PIT-2000 vintage — rangetop lesson). The
+  (B, C) pair IS mutually disjoint, so the grid's regime contrast
+  (recent-bull vs bear-heavy) rests on that pair, with A as the
+  full-history macro-diverse cell.

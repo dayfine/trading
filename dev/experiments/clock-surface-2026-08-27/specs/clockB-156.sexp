@@ -16,11 +16,11 @@
 ;;
 ;; THE NULL: 132.5pp on this exact base/window/universe, from three path salts
 ;;   (dev/experiments/ladder-v4-seeded-2026-08-14/results.md). No gap below it
-;;   is interpretable. Cell 00 here re-runs the null's salt-0 draw (281.71) as a
-;;   determinism tripwire — a different number means the binary moved.
+;;   is interpretable. (Inherited tripwire note retired: this surface arm runs at
+;;   build 90dfd6e97, where arm clockB-0 IS the fresh null -- see README "Fresh nulls".)
 ;;
 ;; PROVENANCE: split-safe warehouse /tmp/snap_top3000_dedup_v5thin_adj,
-;;   --no-emit-all-eligible, --parallel 1, universe top-3000 PIT-2000,
+;;   --no-emit-all-eligible, --parallel 1, universe top-3000 PIT-2019,
 ;;   window 2000-01-01 -> 2026-06-26, TRADING_PATH_SEED_SALT=0.
 ;; NOT a golden — staging scenario, sentinel bands.
 ((name "clockB-156")

@@ -3,7 +3,7 @@
 ;; (same overrides as the funding-grid grid1-null lineage) with the two
 ;; #2530 flips (initial_stop_buffer 1.0, reset_anchor_on_stalled_cycle true)
 ;; inherited as build defaults — deliberately NOT pinned in config_overrides.
-;; Build: c7660cac3 (post-#2530). Results + params.sexp in ../results/.
+;; Build: 90dfd6e97 (this surface run; the inherited c7660cac3 header retired).
 ;; Every arm after 2026-08-24 diffs against this run (supersedes the
 ;; unreproducible grid1-null 305% record, #2503).
 ;; Run with the split-safe warehouse (/tmp/snap_top3000_dedup_v5thin_adj),

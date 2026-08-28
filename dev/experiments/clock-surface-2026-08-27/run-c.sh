@@ -1,6 +1,6 @@
 #!/bin/sh
 # clock-surface (#2405) -- entry_order_max_rest_weeks surface {0,13,26,52,156}
-# on two broad cells. See README.md for the pre-registered decision rule.
+# cell C follow-on (2000-2012). See README.md for the decision rule.
 #
 # Cell B: broad5y core lineage, 2019-01-02..2023-12-29, top-3000 PIT-2019.
 # Cell A: record-baseline lineage, 2000-01-01..2026-06-26, top-3000 PIT-2000
