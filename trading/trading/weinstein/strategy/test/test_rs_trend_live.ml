@@ -260,7 +260,12 @@ let test_trend_distribution_is_not_degenerate _ =
     The unit suite pins this branch on 8 hand-checkable bars; this pins that the
     strategy's own depth and wiring actually reach it — the distinction issue
     #2380 was created by, where a classifier correct in isolation was degenerate
-    in production. *)
+    in production.
+
+    EFFECTIVENESS-PIN: enable_rs_positive_declining -- this is the field name on
+    the right-hand side of [_rs_config_for]'s
+    [enable_positive_declining = config.enable_rs_positive_declining] copy; the
+    paired assertion below is what a severed copy fails. *)
 let test_positive_declining_needs_the_flag _ =
   let reader = _reader () in
   assert_that

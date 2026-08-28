@@ -24,7 +24,14 @@ let _default_config () =
     [virgin_crossing_readmission = true], so the built config equals
     {!Stock_analysis.default_config} with exactly those two fields armed (every
     other field, including [resistance_min_history_bars = 0], keeps its default
-    — the [Insufficient_history] floor is still never engaged). *)
+    — the [Insufficient_history] floor is still never engaged).
+
+    EFFECTIVENESS-PIN: overhead_supply -- severing
+    [overhead_supply = config.overhead_supply] in [_stock_analysis_config_for]
+    would leave [built.overhead_supply = None] (the pre-2026-07-23 default),
+    which this equality assertion catches. EFFECTIVENESS-PIN:
+    virgin_crossing_readmission -- same mechanism; a severed thread would leave
+    [built.virgin_crossing_readmission = false]. *)
 let test_default_builds_stock_analysis_default_config _ =
   let built =
     Weinstein_strategy.stock_analysis_config_for ~config:(_default_config ())
@@ -41,7 +48,12 @@ let test_default_builds_stock_analysis_default_config _ =
 (** Non-zero [resistance_min_history_bars = 520] sets exactly
     [resistance.min_history_bars]; every other resistance field keeps its
     default, so the built resistance config equals
-    [{ Resistance.default_config with min_history_bars = 520 }]. *)
+    [{ Resistance.default_config with min_history_bars = 520 }].
+
+    EFFECTIVENESS-PIN: resistance_min_history_bars -- arms the field away from
+    its [0] default and asserts the built value; severing the copy in
+    [_stock_analysis_config_for] would leave
+    [built.resistance.min_history_bars = 0] and fail this assertion. *)
 let test_override_sets_resistance_min_history_bars _ =
   let config =
     {
@@ -74,7 +86,11 @@ let test_override_mirrors_into_support_via_shared_record _ =
     [test_default_builds_stock_analysis_default_config], which pins the built
     config equal to {!Stock_analysis.default_config} (whose
     [entry_anchor_local_range_weeks] is also [0]). A non-zero value flows
-    through unchanged. *)
+    through unchanged.
+
+    EFFECTIVENESS-PIN: entry_anchor_local_range_weeks -- arms the field away
+    from its [0] default; severing the copy would leave
+    [built. entry_anchor_local_range_weeks = 0] and fail the assertion below. *)
 let test_threads_entry_anchor_local_range_weeks _ =
   let config =
     {
@@ -84,6 +100,32 @@ let test_threads_entry_anchor_local_range_weeks _ =
   in
   let built = Weinstein_strategy.stock_analysis_config_for ~config in
   assert_that built.entry_anchor_local_range_weeks (equal_to 26)
+
+(** The seam threads [entry_freshness_basis] (F1, the admission-clock basis —
+    {!Entry_freshness.basis}) verbatim into the built per-screen
+    [Stock_analysis.config]. Found uncovered by the 2026-08-28 census
+    (dev/plans/silent-null-effectiveness-2026-08-28.md): unlike its sibling
+    fields above, nothing previously armed this field away from its default and
+    checked the built config, so a severed copy
+    ([entry_freshness_basis = Entry_freshness.Ma_cross], hardcoded) would have
+    stayed invisible to the whole suite — the exact silent-null shape issue
+    #2567 is about.
+
+    EFFECTIVENESS-PIN: entry_freshness_basis -- arms the field away from its
+    [Ma_cross] default; severing the copy would leave
+    [built. entry_freshness_basis = Entry_freshness.Ma_cross] and fail the
+    assertion below. *)
+let test_threads_entry_freshness_basis _ =
+  let config =
+    {
+      (_default_config ()) with
+      Weinstein_strategy.entry_freshness_basis =
+        Entry_freshness.Range_top_breakout;
+    }
+  in
+  let built = Weinstein_strategy.stock_analysis_config_for ~config in
+  assert_that built.entry_freshness_basis
+    (equal_to Entry_freshness.Range_top_breakout)
 
 (* ------------------------------------------------------------------ *)
 (* F5 — volume_confirm_at_fill => require_breakout_volume = false       *)
@@ -161,6 +203,8 @@ let suite =
          >:: test_override_mirrors_into_support_via_shared_record;
          "threads entry_anchor_local_range_weeks into built config"
          >:: test_threads_entry_anchor_local_range_weeks;
+         "threads entry_freshness_basis into built config"
+         >:: test_threads_entry_freshness_basis;
        ]
 
 let () = run_test_tt_main suite
