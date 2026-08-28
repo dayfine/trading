@@ -23,9 +23,10 @@ type summary = {
 }
 [@@deriving show, eq, sexp]
 
-(** Forward returns of the [entries] opened in [(dumped_date, dumped_date +
-    alloc_window_days]] — the redeployment cohort the freed cash plausibly
-    funded. Lifted out of {!build_events} to keep its pipeline flat (nesting). *)
+(** Forward returns of the [entries] opened in
+    [(dumped_date, dumped_date + alloc_window_days\]] — the redeployment cohort
+    the freed cash plausibly funded. Lifted out of {!build_events} to keep its
+    pipeline flat (nesting). *)
 let _funded_in_window ~alloc_window_days ~dumped_date entries =
   List.filter_map entries ~f:(fun (entry_date, fwd) ->
       let gap = Date.diff entry_date dumped_date in

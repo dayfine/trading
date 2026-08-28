@@ -77,12 +77,12 @@ val build_events :
   event list
 (** [build_events ~alloc_window_days ~laggard_exits ~entries] pairs each
     [(symbol, exit_date, forward)] laggard exit with the [(entry_date, forward)]
-    entries whose [entry_date] lies in [(exit_date, exit_date +
-    alloc_window_days]] (exclusive of the exit day itself, inclusive of the
-    window end). One {!event} per laggard exit, in input order. An entry may fund
-    more than one rotation event (the freed-cash pool is shared); that is
-    expected and not double-counted incorrectly — each event measures the
-    redeployment opportunity available to it. Pure. *)
+    entries whose [entry_date] lies in
+    [(exit_date, exit_date + alloc_window_days\]] (exclusive of the exit day
+    itself, inclusive of the window end). One {!event} per laggard exit, in
+    input order. An entry may fund more than one rotation event (the freed-cash
+    pool is shared); that is expected and not double-counted incorrectly — each
+    event measures the redeployment opportunity available to it. Pure. *)
 
 val summarize : event list -> summary
 (** [summarize events] computes the paired counterfactual {!summary}. Events
