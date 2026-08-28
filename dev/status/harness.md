@@ -1473,7 +1473,7 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   instance, not the class. Fix shape: that table. `harness_gap: LINTER_CANDIDATE`.
   (source: 2026-08-28 run 1, qc-behavioral re-review of PR #2585)
 
-- [ ] **H-EXPIRY-ROLLUP-WARNING-UNPINNED (R-5)**: pre-existing, surfaced (not
+- [x] **H-EXPIRY-ROLLUP-WARNING-UNPINNED (R-5)**: pre-existing, surfaced (not
   introduced) by #2585's review and out of scope there. Deleting `add_warning`
   in the date branch of `_scan_exceptions_conf()` leaves the report section
   intact and every test green — so the **roll-up warning path is unpinned for
@@ -1482,3 +1482,31 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   Fix shape: assert the `W:` roll-up line, not just the detail line, in
   `deep_scan_linter_expiry_check.sh`. `harness_gap: LINTER_CANDIDATE`.
   (source: 2026-08-28 run 1, qc-behavioral re-review of PR #2585)
+  **DONE (2026-08-28, harness/2585-residuals-r1a-r5):** confirmed the gap by
+  hand first (mutating the real `check_11_linter_expiry.sh`, deleting the
+  date-branch `add_warning` call — the pre-fix suite stayed fully green).
+  Added Part 4 to `trading/devtools/checks/deep_scan_linter_expiry_check.sh`
+  (assertions 3c-3e): 3c runs `check_11_linter_expiry.sh` with a
+  `FINDINGS_FILE` argument (`deep_scan/main.sh`'s real calling convention)
+  and asserts a `^W: .*fixture_expired_field.*has passed` line is present —
+  the roll-up, not just the `[EXPIRED]` detail line. 3d mutates a working
+  copy by deleting the date-branch `add_warning` call (the exact finding
+  repro) and asserts the detail line survives but the `W:` line vanishes.
+  3e is a second, independent break direction — corrupts the `add_warning`
+  message content (keeps the call) so the field name drops out of the
+  roll-up text while the call still fires; asserts the same split. Both
+  mutations were also re-verified by hand directly against the real
+  `check_11_linter_expiry.sh` (not just the test's internal copies): RED on
+  mutation, clean revert (`diff` identical to pre-mutation), GREEN again.
+  **Known gap NOT covered** (found during this fix, not asked for in R-5,
+  left as-is per scope): the *missing-review_at* branch of
+  `_scan_exceptions_conf()` never calls `add_warning` at all (only the
+  per-file `### Missing review_at annotation` detail section is populated)
+  — so a missing-review_at roll-up warning has never existed and this PR
+  does not add one. Similarly, 3c/3d/3e's fixture is date-based only; a
+  break in the **milestone** branch's `add_warning` (line ~166, "was due
+  for review at ... — retire or re-annotate") is not exercised by these
+  assertions. Both are candidates for a follow-up in the same shape as R-5
+  if they turn out to matter. Verify:
+  `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh` (or `dune
+  runtest trading/devtools/checks/`) — prints 5 `OK:` lines, exit 0.
