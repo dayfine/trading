@@ -207,7 +207,7 @@ let test_reserve_shrinks_the_admitted_set _ =
     && List.for_all reserved ~f:(List.mem unreserved ~equal:String.equal))
     (equal_to true)
 
-(** Only the UNFILLED remainder is reserved. The ticket is 500 @ $100, but 400
+(** Only the UNFILLED remainder is reserved. The ticket is 500 \@ $100, but 400
     are already filled — that $40,000 left [portfolio.cash] when the fill was
     applied, so reserving it again would charge it twice.
 

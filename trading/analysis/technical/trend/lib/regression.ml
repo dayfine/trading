@@ -15,9 +15,9 @@ type regression_stats = {
 }
 [@@deriving show, eq]
 
-(** Sequential, fixed-order sum over [0, n). Deterministic by construction.
-    Used instead of Owl reductions or List.fold_left on a Seq, both of
-    which open the door to backend-dependent reordering. *)
+(** Sequential, fixed-order sum over \[0, n). Deterministic by construction.
+    Used instead of Owl reductions or List.fold_left on a Seq, both of which
+    open the door to backend-dependent reordering. *)
 let _sum_to n f =
   let s = ref 0.0 in
   for i = 0 to n - 1 do

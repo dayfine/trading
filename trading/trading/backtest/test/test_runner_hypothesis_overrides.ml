@@ -892,9 +892,9 @@ let test_strategy_mli_redeclares_clock_default_consistently _ =
 (** F2 R2 (axis reachability): both fields must be valid [Variant_matrix] axes,
     which requires each value to resolve through the {b real}
     [Overlay_validator.apply_overrides] with no unknown-key error. The clock's
-    values are the defect-D re-test range {13, 26, 52} — the range the original
-    {0, 4, 8} axis never reached (28 days cuts the lower edge of the 29-91d
-    bucket, 16% of trades and 28% of realized P&L). *)
+    values are the defect-D re-test range \{13, 26, 52\} — the range the
+    original \{0, 4, 8\} axis never reached (28 days cuts the lower edge of the
+    29-91d bucket, 16% of trades and 28% of realized P&L). *)
 let test_entry_ticket_lifecycle_axes_resolve_via_overlay_validator _ =
   let apply s =
     Backtest.Overlay_validator.apply_overrides (_default_config ())
