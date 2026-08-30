@@ -4,31 +4,38 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-28 **run 2** (orchestrator run 33189885747; main
-unchanged at **`5c20fe07`**, green: build 0, runtest 0, 0 `^FAIL:`). Unlike
-run 1, the queue was **not** empty: the maintainer opened **#2587** (clock
-`0 -> 52` promotion) at 14:49Z with red CI and zero reviews, so the Step 0.5
-fast-exit correctly did not fire. Two PRs in flight at run end — **#2587**
-(fixed to green, QC'd, **deliberately not merged**) and **#2589** (harness,
-#2585 residuals R-1a + R-5).
+Last updated: 2026-08-30 (orchestrator run 33311750900; main **`950a392f`
+-> `e4945655`**, three PRs merged. Green after each merge and at run end:
+build 0, runtest 0, 0 `^FAIL:`, `status_file_integrity` 0, `index_size_linter`
+0 — every exit code read **unpiped**).
 
-**This run's theme was a fix silently reverted by a stale branch point.**
-#2587 branched from `cbac374f`, the direct parent of `b1f10412` (#2584,
-merged 05:10 PT the same morning), so it never contained that PR's odoc
-fixes; its docstring rewrite carried the pre-fix text forward and
-**un-escaped 2 of #2584's 18 `\{...\}` sequences, 2h38m after they landed**.
-Neither PR gate caught it: `ci.yml:109`'s `dune build @fmt` never ran because
-`dune runtest` (line 104) failed first on an unrelated unpinned default, and
-after the author's own `dune fmt` promotion `@fmt` went green **without**
-restoring the escapes. There is no odoc linter, so the revert was about to
-merge fully green. Restored in `5044eb5f`; class filed as **#2588**.
+**Merged this run:** **#2596** (new WARN-only dangling-odoc-reference check),
+**#2597** (the 11 real findings that check reported, fixed to 0), **#2595**
+(#2589 residuals O2+O3 — all 5 `add_warning` sites in `_scan_exceptions_conf`
+now pinned against three distinct mutation classes, after **two** rework
+iterations). #2596 -> #2597 is a full find-then-fix cycle inside one run.
 
-Capabilities re-measured this run, not copied: issue writes **403**
-(live `PATCH /issues/2556`), `.github/workflows/` writes **403** — now by a
-**non-mutating** probe (`PUT /contents` with a deliberately wrong blob sha:
-workflow path **403**, `dev/notes/data-gaps.md` **409** on the same branch),
-which supersedes the throwaway-branch method used on 08-27. See
-`2026-08-28-run2.md`.
+**The theme was gates that report green without checking anything.** #2596
+closes one such hole by construction (`[...]` is an odoc *code span*, so a
+deleted identifier survives in a doc reference with nothing catching it — the
+#2584/#2587 class). And **#2588's root cause is now pinned** and filed as
+**#2598**: `fmt_check.sh`, wired into `dune runtest`, is a **permanent silent
+no-op** — `.ocamlformat` sits at `trading/`, the nearest `dune-project` one
+level *deeper*, so ocamlformat resolves a root below its own config, disables
+itself and passes every file. Reproduced live on PR #2597: `dune build @fmt`
+exit 1 on 10 files while `fmt_check.sh` in the same `dune runtest` said OK.
+
+**Three prior runs left nothing on main** (08-29 x2, 08-30 07:25). Two ended
+`is_error: true` — one after 44 turns and $8.20, one at init with $0.00 — and
+`cleanup/csv-snapshot-sweep-flake` is an orphan branch from the first,
+carrying only a `[~]` marker. Recorded so the gap is not read as three
+quiet days.
+
+Capabilities re-measured live, not copied: issue **state** writes **403**
+(`PATCH /issues/2556`) and issue **comments** also **403**
+(`POST /issues/2588/comments`) — refining the prior "create-only" claim:
+`POST /issues` works (**201**, #2598), `PATCH /pulls/<n>` works (**200**).
+See `2026-08-30.md`.
 
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
@@ -77,9 +84,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2585 residuals R-1a + R-5 MERGED `409b85f4` (#2589; 13-attack QC, 12 caught); next: O2 shared-fn evasion, then R-4 expiry table |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | O2+O3 MERGED `45d964a7` (#2595; 2 reworks, 3 mutation classes pinned); next: R-4 expiry table, then O1/O4/O5 |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | A-MERGEABLE-STATE-NOT-A-CLOSE-TELL filed (run-1 guidance corrected); open: #2427 #2428 #2429 #2432 — need `workflow` scope or a human |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | 18 malformed odoc comments across 10 files fixed, MERGED `b1f10412` (#2584); top item `linter_coverage` still a HUMAN POLICY DECISION (14 runs) |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | odoc dangling-ref check MERGED `d5247fd5` (#2596) + its 11 findings fixed to 0 `e4945655` (#2597); top item `linter_coverage` still a HUMAN POLICY DECISION (15 runs) |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
