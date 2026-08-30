@@ -264,8 +264,8 @@ let _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days ?on_step_setup
 (** Drop simulator-side [stop_info]s whose [entry_date] is before [start_date] —
     i.e. positions opened during the warmup window. The simulator runs from
     [warmup_start] so [Stop_log] observes [EntryComplete] transitions for
-    positions opened during warmup, then [Result_writer._pop_stop_info] pops by
-    symbol-FIFO when rendering [trades.csv]. When the same symbol re-trades
+    positions opened during warmup, then [Trade_context._stop_info_for] falls
+    back to a symbol-first match when rendering [trades.csv]. When the same symbol re-trades
     across the [start_date] boundary (warmup-window stop_info comes first by
     [position_id] sort), the warmup stop_info gets attached to the in-window
     round-trip's row, corrupting [entry_stop] / [exit_stop] / [exit_trigger]

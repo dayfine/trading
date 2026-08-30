@@ -2,11 +2,12 @@
 
     Holds the data shapes and builders the strategy uses to populate
     {!Audit_recorder.entry_event}s when the entry walk produces a kept
-    candidate. The strategy keeps {!Weinstein_strategy._make_entry_transition} /
-    {!Weinstein_strategy.entries_from_candidates} but delegates the
-    audit-emission bookkeeping (the candidate-decision tagging, the alternatives
-    projection, the entry-event construction) to this module so the strategy
-    file stays under its file-length cap. *)
+    candidate. {!make_entry_transition} itself now lives here (moved out of
+    the strategy file alongside {!Weinstein_strategy.entries_from_candidates},
+    which calls it via {!Entry_walk.entries_from_candidates}); this module
+    also owns the audit-emission bookkeeping (the candidate-decision tagging,
+    the alternatives projection, the entry-event construction) so the
+    strategy file stays under its file-length cap. *)
 
 type entry_meta = {
   position_id : string;

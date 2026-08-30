@@ -4,7 +4,7 @@ open Trading_strategy
 type stop_update_cadence = Daily | Weekly [@@deriving show, eq, sexp]
 
 (** Friday is the cadence anchor: the strategy's screening pass uses the same
-    marker (see {!Weinstein_strategy._is_screening_day_view}). Keeping the
+    marker (see {!Weinstein_strategy_screening.is_screening_day_view}). Keeping the
     runner's weekly-cadence check on Friday matches that authority — book
     §Stop-Loss Rules describes weekly re-evaluation, and Friday is the
     week-bucket boundary used everywhere else in the strategy. *)

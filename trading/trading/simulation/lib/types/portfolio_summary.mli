@@ -36,7 +36,7 @@ type t = {
           [positions] list (insertion-ordered). *)
   position_value_total : float;
       (** Sum of position market values at this step's mark-to-market prices,
-          forward-filled per [Simulator._compute_portfolio_value]. Equals
+          forward-filled per [Portfolio_valuation.compute]. Equals
           [step_result.portfolio_value -. current_cash] on bar-bearing days
           {b for a cash account}; under a long-margin debit (margin M1b-2)
           [portfolio_value] reads

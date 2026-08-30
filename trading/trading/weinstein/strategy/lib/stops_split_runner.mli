@@ -3,7 +3,7 @@
     The Weinstein strategy stores stop levels as {b absolute} dollar prices in
     [stop_states : Weinstein_stops.stop_state Map.M(String).t ref]. When the
     issuer splits a held symbol the broker-side share count rescales (handled in
-    [Simulator._apply_splits_to_positions]) but the strategy's [stop_state] does
+    [Split_handler.apply_events]) but the strategy's [stop_state] does
     not — so the next call to {!Weinstein_stops.check_stop_hit} compares
     pre-split stop prices against post-split bar prices and fires spuriously on
     the very first post-split bar.

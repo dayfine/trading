@@ -191,7 +191,7 @@ val daily_bars_for :
     including [as_of], in chronological order (oldest first). Used by
     {!Bar_reader.of_snapshot_views} to satisfy the [Bar_reader.daily_bars_for]
     surface (consumed by [Stops_split_runner._last_two_bars] for split detection
-    and [Entry_audit_capture._effective_entry_price]).
+    and [Entry_audit_helpers.effective_entry_price]).
 
     Reads the [Adjusted_close], [Close], [High], [Low], and [Volume] field
     histories from [cb] over a fixed-width calendar window (10 years ≈ 3653

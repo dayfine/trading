@@ -9,7 +9,7 @@
     per-strategy [make] is dispatched in {!Panel_runner}.
 
     The variant is intentionally small — adding a new strategy means adding one
-    constructor here and one match arm in {!Panel_runner._build_strategy} (plus,
+    constructor here and one match arm in {!Panel_strategy_builder.build} (plus,
     for any strategy that has its own config record, a sexp serialiser). *)
 
 type t =
