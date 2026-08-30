@@ -442,6 +442,16 @@ fi
 # linter_exceptions.conf above for :161/:184; MS_FAKE_ROOT's
 # linter_exceptions.conf for :166; a second missing conf file in
 # NF_FAKE_ROOT for :113), and 6b2/6d3/6f3 add the matching mutation-proof.
+#
+# O3-3 (2026-08-30, qc-behavioral rework iteration 2 on PR #2595): all of
+# Part 6's mutation-proofs above delete the whole add_warning() call. A
+# narrower corruption — deleting ONLY the _SCAN_COUNT increment at a site,
+# leaving add_warning() and _SCAN_DETAILS intact — desyncs the roll-up
+# "W:" line (still correct) from the REPORT_FILE's own per-entry detail
+# line (silently dropped, because the report's print gate is the
+# per-conf-file COUNT, not _SCAN_DETAILS non-emptiness). None of 6a-6f2
+# would catch this since they only ever assert against the roll-up
+# findings file, never REPORT_FILE, for these four sites. See Part 7 below.
 
 # --- 6a: the REAL (unmutated) script surfaces both the milestone-unknown
 # and unrecognised-format universe_deps_exceptions.conf fixture entries in
@@ -805,4 +815,309 @@ else
   fail "vacuity check FAILED — 6e2's :113 assertion still matched after the message was reworded, so it does not actually pin the message content: $(cat "$NF_FINDINGS_REWORD")"
 fi
 
+
+# ── Part 7: report DETAIL LINE desync from the roll-up "W:" line (rework
+# iteration 2, qc-behavioral re-review of PR #2595 at commit d83d1243) ────
+#
+# Iteration 1 (Part 6 above) pinned each add_warning() call site against
+# "delete the whole call". A narrower corruption survives: delete ONLY the
+# _SCAN_COUNT increment at a site, leaving add_warning() and the
+# _SCAN_DETAILS append untouched. The roll-up "W:" line (Part 4/5/6's
+# assertions) stays correct — add_warning() still ran — but the
+# REPORT_FILE's own gate is different: the "### Expired or due-for-review
+# entries (%d)" block only prints when the per-conf-file COUNT
+# (EXPIRY_COUNT / UD_EXPIRY_COUNT / AE_EXPIRY_COUNT) is > 0, never when
+# _SCAN_DETAILS is merely non-empty (check_11_linter_expiry.sh's report
+# emission, each guarded by "$..._COUNT" -gt 0). If the corrupted entry is
+# that conf file's ONLY expired entry, the count stays 0, the whole block
+# is skipped, and the report prints "No expired or missing review_at
+# annotations found" — the ## Linter Exception Expiry section silently
+# claims nothing is wrong while a real entry is expired. This is the exact
+# green-while-broken shape the qc-behavioral re-review found.
+#
+# Confirmed by hand: the corruption is INVISIBLE when a SIBLING entry in
+# the same conf file still increments the count — Part 6's
+# AE_FAKE_ROOT universe_deps_exceptions.conf / linter_exceptions.conf
+# fixtures both carry >1 entry per file, and _SCAN_DETAILS is one
+# accumulated string printed as a whole once the gate opens, so a
+# sibling's increment reopens the gate and the corrupted entry's own
+# detail line prints anyway. 7a-7l below therefore use fresh, deliberately
+# SINGLE-entry-per-conf-file fixtures — one isolated conf file per
+# affected site — so the corruption is actually observable.
+#
+# Coverage against this corruption shape, site by site:
+#   :113  conf-file-not-found  — N/A. This branch returns before the
+#         per-entry while loop runs at all; there is no per-entry
+#         _SCAN_COUNT to corrupt independently of the add_warning() call
+#         itself. Already fully covered by Part 6's 6e/6e2 (call deletion)
+#         and 6f2/6f3 (per-label guard + vacuity reword).
+#   :161  milestone-unknown    — GAP. Closed by 7a-7c (MU_FAKE_ROOT).
+#   :166  milestone-landed     — GAP. Closed by 7d-7f (reuses
+#         MS_FAKE_ROOT, already single-entry-per-conf-file from Part 6).
+#   :176  date-expired         — closed only INCIDENTALLY before this
+#         Part: Part 3a's REPORT_FILE assertion already runs against
+#         AE_FAKE_ROOT's adapter_effectiveness_exceptions.conf, which
+#         happens to carry exactly one entry, so the identical count-only
+#         corruption already makes 3a fail (verified by hand while
+#         drafting this rework — 3a's own pattern, `[EXPIRED\].*fixture_
+#         expired_field`, is loose enough to still fail under this
+#         mutation since the whole detail line vanishes). 7g-7i below
+#         makes that deliberate: an explicit count-only mutation-proof
+#         plus vacuity reword against the same fixture, rather than
+#         relying on 3a's single-entry shape being an accident of an
+#         unrelated fixture's design.
+#   :184  unrecognised-format  — GAP. Closed by 7j-7l (UF_FAKE_ROOT).
+
+# --- 7a: MU_FAKE_ROOT — isolated single-entry milestone-unknown fixture.
+# No design doc (mirrors AE_FAKE_ROOT) so CURRENT_MILESTONE_NUM stays 0.
+# The conf line is deliberately free of any trailing "(...)" annotation
+# comment — that text would be captured into review_at_val (and therefore
+# into entry_label / the REPORT_FILE detail line) verbatim, since
+# _scan_exceptions_conf() takes everything after "# review_at:" to end of
+# line, not just the milestone/date token.
+MU_FAKE_ROOT="$(mktemp -d)"
+trap 'rm -rf "$AE_FAKE_ROOT" "$MS_FAKE_ROOT" "$NF_FAKE_ROOT" "$MU_FAKE_ROOT" "$UF_FAKE_ROOT"' EXIT
+
+mkdir -p "$MU_FAKE_ROOT/trading/devtools/checks/deep_scan"
+cat > "$MU_FAKE_ROOT/trading/devtools/checks/linter_exceptions.conf" <<'EOF'
+fixture_isolated_unknown_milestone  # review_at: M5
+EOF
+: > "$MU_FAKE_ROOT/trading/devtools/checks/universe_deps_exceptions.conf"
+: > "$MU_FAKE_ROOT/trading/devtools/checks/adapter_effectiveness_exceptions.conf"
+cp "${DEEP_SCAN_DIR}/_lib.sh" "$MU_FAKE_ROOT/trading/devtools/checks/deep_scan/_lib.sh"
+cp "$(dirname "$0")/_check_lib.sh" "$MU_FAKE_ROOT/trading/devtools/checks/_check_lib.sh"
+cp "$CHECK_11" "$MU_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh"
+
+MU_REPORT="$(mktemp)"
+MU_FINDINGS="$(mktemp)"
+set +e
+REPO_ROOT="$MU_FAKE_ROOT" sh "$MU_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh" \
+  "$MU_REPORT" "$MU_FINDINGS" >/dev/null 2>&1
+set -e
+
+MU_DETAIL_TEXT='[MANUAL REVIEW — milestone unknown] fixture_isolated_unknown_milestone (review_at: M5)'
+if grep -qF "$MU_DETAIL_TEXT" "$MU_REPORT"; then
+  echo "OK: the REPORT_FILE detail line for the milestone-unknown site (:~161) is present for an isolated single-entry conf file"
+else
+  fail "the milestone-unknown detail line was NOT present in REPORT_FILE: $(cat "$MU_REPORT")"
+fi
+
+# --- 7b: MUTATION (count-only) — delete ONLY the _SCAN_COUNT increment at
+# the milestone-unknown site, leaving add_warning() and _SCAN_DETAILS
+# intact. This must desync: the roll-up W: line survives, but the
+# REPORT_FILE detail line disappears and the section falls back to
+# "No expired or missing review_at annotations found".
+MU_MUT_COUNTONLY="$MU_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_161_countonly.sh"
+sed '/_SCAN_COUNT=\$((_SCAN_COUNT + 1))/{N;/MANUAL REVIEW/{s/.*\n//}}' "$CHECK_11" > "$MU_MUT_COUNTONLY"
+chmod +x "$MU_MUT_COUNTONLY"
+
+MU_REPORT2="$(mktemp)"
+MU_FINDINGS2="$(mktemp)"
+set +e
+REPO_ROOT="$MU_FAKE_ROOT" sh "$MU_MUT_COUNTONLY" "$MU_REPORT2" "$MU_FINDINGS2" >/dev/null 2>&1
+MU_CODE2=$?
+set -e
+
+if [ "$MU_CODE2" -eq 0 ] \
+  && ! grep -qF "$MU_DETAIL_TEXT" "$MU_REPORT2" \
+  && grep -qF 'No expired or missing review_at annotations found' "$MU_REPORT2" \
+  && grep -qF 'W: Linter exception expiry (milestone unknown): fixture_isolated_unknown_milestone pinned to M5' "$MU_FINDINGS2"; then
+  echo "OK: MUTATION (count-only removal at :161) leaves exit 0 and the roll-up W: line intact, but the REPORT_FILE detail line disappears and the section falsely reports 'No expired...' — reproduces the qc-behavioral rework-2 finding and proves 7a's assertion catches it"
+else
+  fail "MUTATION (count-only removal at :161) did not produce the expected desync (exit=$MU_CODE2) — report: $(cat "$MU_REPORT2"); findings: $(cat "$MU_FINDINGS2")"
+fi
+
+# --- 7c: vacuity direction — reword the milestone-unknown REPORT_FILE
+# detail-line tag (call, count, and add_warning left untouched) and
+# confirm 7a's exact-text assertion fails closed rather than matching a
+# looser pattern vacuously.
+MU_MUT_REWORD="$MU_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_161_reword.sh"
+sed 's/\[MANUAL REVIEW — milestone unknown\] \${entry_label}/[NEEDS MANUAL REVIEW] \${entry_label}/' \
+  "$CHECK_11" > "$MU_MUT_REWORD"
+chmod +x "$MU_MUT_REWORD"
+MU_REPORT3="$(mktemp)"
+set +e
+REPO_ROOT="$MU_FAKE_ROOT" sh "$MU_MUT_REWORD" "$MU_REPORT3" "$(mktemp)" >/dev/null 2>&1
+set -e
+if ! grep -qF "$MU_DETAIL_TEXT" "$MU_REPORT3"; then
+  echo "OK: vacuity check — benignly rewording the :161 REPORT_FILE detail tag (call left in place) makes 7a's exact-text assertion fail closed rather than pass"
+else
+  fail "vacuity check FAILED — 7a's :161 REPORT_FILE assertion still matched after the tag was reworded: $(cat "$MU_REPORT3")"
+fi
+
+# --- 7d: reuse MS_FAKE_ROOT (already single-entry-per-conf-file from Part
+# 6) — the milestone-landed site (:~166), REPORT_FILE detail line. Its
+# fixture_milestone_landed_le entry carries a trailing descriptive comment
+# inside the review_at field itself ("M1 (O3-2 dual-conf-file fixture for
+# :166)"), which _scan_exceptions_conf() captures verbatim into
+# entry_label — the exact text below reflects that, not a clean "M1".
+ML_DETAIL_TEXT='[EXPIRED] fixture_milestone_landed_le (review_at: M1 (O3-2 dual-conf-file fixture for :166)) — M1 <= current milestone M3'
+ML_REPORT="$(mktemp)"
+ML_FINDINGS="$(mktemp)"
+set +e
+REPO_ROOT="$MS_FAKE_ROOT" sh "$MS_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh" \
+  "$ML_REPORT" "$ML_FINDINGS" >/dev/null 2>&1
+set -e
+
+if grep -qF "$ML_DETAIL_TEXT" "$ML_REPORT"; then
+  echo "OK: the REPORT_FILE detail line for the milestone-landed site (:~166) is present for MS_FAKE_ROOT's single-entry linter_exceptions.conf"
+else
+  fail "the milestone-landed detail line was NOT present in REPORT_FILE: $(cat "$ML_REPORT")"
+fi
+
+# --- 7e: MUTATION (count-only) at :166.
+ML_MUT_COUNTONLY="$MS_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_166_countonly.sh"
+sed '/_SCAN_COUNT=\$((_SCAN_COUNT + 1))/{N;/<= current milestone/{s/.*\n//}}' "$CHECK_11" > "$ML_MUT_COUNTONLY"
+chmod +x "$ML_MUT_COUNTONLY"
+
+ML_REPORT2="$(mktemp)"
+ML_FINDINGS2="$(mktemp)"
+set +e
+REPO_ROOT="$MS_FAKE_ROOT" sh "$ML_MUT_COUNTONLY" "$ML_REPORT2" "$ML_FINDINGS2" >/dev/null 2>&1
+ML_CODE2=$?
+set -e
+
+if [ "$ML_CODE2" -eq 0 ] \
+  && ! grep -qF "$ML_DETAIL_TEXT" "$ML_REPORT2" \
+  && grep -qF 'No expired or missing review_at annotations found' "$ML_REPORT2" \
+  && grep -qF 'W: Linter exception expiry: fixture_milestone_landed_le was due for review at M1' "$ML_FINDINGS2"; then
+  echo "OK: MUTATION (count-only removal at :166) leaves exit 0 and the roll-up W: line intact, but the REPORT_FILE detail line disappears and the section falsely reports 'No expired...' — reproduces the qc-behavioral rework-2 finding and proves 7d's assertion catches it"
+else
+  fail "MUTATION (count-only removal at :166) did not produce the expected desync (exit=$ML_CODE2) — report: $(cat "$ML_REPORT2"); findings: $(cat "$ML_FINDINGS2")"
+fi
+
+# --- 7f: vacuity direction for :166 — reword the unique trailing text in
+# the REPORT_FILE detail line (call, count, add_warning untouched).
+ML_MUT_REWORD="$MS_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_166_reword.sh"
+sed 's/<= current milestone \${CURRENT_MILESTONE}/<= current MS \${CURRENT_MILESTONE}/' \
+  "$CHECK_11" > "$ML_MUT_REWORD"
+chmod +x "$ML_MUT_REWORD"
+ML_REPORT3="$(mktemp)"
+set +e
+REPO_ROOT="$MS_FAKE_ROOT" sh "$ML_MUT_REWORD" "$ML_REPORT3" "$(mktemp)" >/dev/null 2>&1
+set -e
+if ! grep -qF "$ML_DETAIL_TEXT" "$ML_REPORT3"; then
+  echo "OK: vacuity check — benignly rewording the :166 REPORT_FILE detail text (call left in place) makes 7d's exact-text assertion fail closed rather than pass"
+else
+  fail "vacuity check FAILED — 7d's :166 REPORT_FILE assertion still matched after the text was reworded: $(cat "$ML_REPORT3")"
+fi
+
+# --- 7g: reuse AE_FAKE_ROOT (already single-entry in
+# adapter_effectiveness_exceptions.conf) — the date-expired site (:~176),
+# REPORT_FILE detail line. Makes deliberate what Part 3a only caught
+# incidentally (3a's own pattern is loose — `[EXPIRED\].*fixture_expired_
+# field` — and does not pin the review-date text this exact-text check
+# does). fixture_expired_field's review_at field also carries a trailing
+# "(BQ-1 fixture)" comment, captured verbatim into entry_label same as
+# the :166 fixture above.
+DE_DETAIL_TEXT='[EXPIRED] fixture_expired_field (review_at: 2019-01-01 (BQ-1 fixture)) — review date 2019-01-01 has passed'
+DE_REPORT="$(mktemp)"
+set +e
+REPO_ROOT="$AE_FAKE_ROOT" sh "$AE_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh" \
+  "$DE_REPORT" "$(mktemp)" >/dev/null 2>&1
+set -e
+if grep -qF "$DE_DETAIL_TEXT" "$DE_REPORT"; then
+  echo "OK: the REPORT_FILE detail line for the date-expired site (:~176) is present for AE_FAKE_ROOT's single-entry adapter_effectiveness_exceptions.conf"
+else
+  fail "the date-expired detail line was NOT present in REPORT_FILE: $(cat "$DE_REPORT")"
+fi
+
+# --- 7h: MUTATION (count-only) at :176 — deliberate, not incidental.
+DE_MUT_COUNTONLY="$AE_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_176_countonly.sh"
+sed '/_SCAN_COUNT=\$((_SCAN_COUNT + 1))/{N;/has passed (today/{s/.*\n//}}' "$CHECK_11" > "$DE_MUT_COUNTONLY"
+chmod +x "$DE_MUT_COUNTONLY"
+
+DE_REPORT2="$(mktemp)"
+DE_FINDINGS2="$(mktemp)"
+set +e
+REPO_ROOT="$AE_FAKE_ROOT" sh "$DE_MUT_COUNTONLY" "$DE_REPORT2" "$DE_FINDINGS2" >/dev/null 2>&1
+DE_CODE2=$?
+set -e
+
+if [ "$DE_CODE2" -eq 0 ] \
+  && ! grep -qF "$DE_DETAIL_TEXT" "$DE_REPORT2" \
+  && grep -qF 'No expired or missing review_at annotations found' "$DE_REPORT2" \
+  && grep -q '^W: .*fixture_expired_field.*has passed' "$DE_FINDINGS2"; then
+  echo "OK: MUTATION (count-only removal at :176) leaves exit 0 and the roll-up W: line intact, but the REPORT_FILE detail line disappears and the section falsely reports 'No expired...' — makes deliberate what Part 3a only caught incidentally"
+else
+  fail "MUTATION (count-only removal at :176) did not produce the expected desync (exit=$DE_CODE2) — report: $(cat "$DE_REPORT2"); findings: $(cat "$DE_FINDINGS2")"
+fi
+
+# --- 7i: vacuity direction for :176.
+DE_MUT_REWORD="$AE_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_176_reword.sh"
+sed 's/review date \${review_date} has passed (today/review date \${review_date} has elapsed (today/' \
+  "$CHECK_11" > "$DE_MUT_REWORD"
+chmod +x "$DE_MUT_REWORD"
+DE_REPORT3="$(mktemp)"
+set +e
+REPO_ROOT="$AE_FAKE_ROOT" sh "$DE_MUT_REWORD" "$DE_REPORT3" "$(mktemp)" >/dev/null 2>&1
+set -e
+if ! grep -qF "$DE_DETAIL_TEXT" "$DE_REPORT3"; then
+  echo "OK: vacuity check — benignly rewording the :176 REPORT_FILE detail text (call left in place) makes 7g's exact-text assertion fail closed rather than pass"
+else
+  fail "vacuity check FAILED — 7g's :176 REPORT_FILE assertion still matched after the text was reworded: $(cat "$DE_REPORT3")"
+fi
+
+# --- 7j: UF_FAKE_ROOT — isolated single-entry unrecognised-format
+# fixture. Same no-trailing-comment discipline as MU_FAKE_ROOT (7a) above.
+UF_FAKE_ROOT="$(mktemp -d)"
+mkdir -p "$UF_FAKE_ROOT/trading/devtools/checks/deep_scan"
+cat > "$UF_FAKE_ROOT/trading/devtools/checks/linter_exceptions.conf" <<'EOF'
+fixture_isolated_unrecognised  # review_at: someday
+EOF
+: > "$UF_FAKE_ROOT/trading/devtools/checks/universe_deps_exceptions.conf"
+: > "$UF_FAKE_ROOT/trading/devtools/checks/adapter_effectiveness_exceptions.conf"
+cp "${DEEP_SCAN_DIR}/_lib.sh" "$UF_FAKE_ROOT/trading/devtools/checks/deep_scan/_lib.sh"
+cp "$(dirname "$0")/_check_lib.sh" "$UF_FAKE_ROOT/trading/devtools/checks/_check_lib.sh"
+cp "$CHECK_11" "$UF_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh"
+
+UF_DETAIL_TEXT='[UNRECOGNISED format] fixture_isolated_unrecognised (review_at: someday) — review_at value not a milestone'
+UF_REPORT="$(mktemp)"
+UF_FINDINGS="$(mktemp)"
+set +e
+REPO_ROOT="$UF_FAKE_ROOT" sh "$UF_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh" \
+  "$UF_REPORT" "$UF_FINDINGS" >/dev/null 2>&1
+set -e
+
+if grep -qF "$UF_DETAIL_TEXT" "$UF_REPORT"; then
+  echo "OK: the REPORT_FILE detail line for the unrecognised-format site (:~184) is present for an isolated single-entry conf file"
+else
+  fail "the unrecognised-format detail line was NOT present in REPORT_FILE: $(cat "$UF_REPORT")"
+fi
+
+# --- 7k: MUTATION (count-only) at :184.
+UF_MUT_COUNTONLY="$UF_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_184_countonly.sh"
+sed '/_SCAN_COUNT=\$((_SCAN_COUNT + 1))/{N;/UNRECOGNISED format/{s/.*\n//}}' "$CHECK_11" > "$UF_MUT_COUNTONLY"
+chmod +x "$UF_MUT_COUNTONLY"
+
+UF_REPORT2="$(mktemp)"
+UF_FINDINGS2="$(mktemp)"
+set +e
+REPO_ROOT="$UF_FAKE_ROOT" sh "$UF_MUT_COUNTONLY" "$UF_REPORT2" "$UF_FINDINGS2" >/dev/null 2>&1
+UF_CODE2=$?
+set -e
+
+if [ "$UF_CODE2" -eq 0 ] \
+  && ! grep -qF "$UF_DETAIL_TEXT" "$UF_REPORT2" \
+  && grep -qF 'No expired or missing review_at annotations found' "$UF_REPORT2" \
+  && grep -qF 'W: Linter exception expiry: fixture_isolated_unrecognised has unrecognised review_at format:' "$UF_FINDINGS2"; then
+  echo "OK: MUTATION (count-only removal at :184) leaves exit 0 and the roll-up W: line intact, but the REPORT_FILE detail line disappears and the section falsely reports 'No expired...' — reproduces the qc-behavioral rework-2 finding and proves 7j's assertion catches it"
+else
+  fail "MUTATION (count-only removal at :184) did not produce the expected desync (exit=$UF_CODE2) — report: $(cat "$UF_REPORT2"); findings: $(cat "$UF_FINDINGS2")"
+fi
+
+# --- 7l: vacuity direction for :184.
+UF_MUT_REWORD="$UF_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_184_reword.sh"
+sed 's/review_at value not a milestone/review_at is not a milestone/' \
+  "$CHECK_11" > "$UF_MUT_REWORD"
+chmod +x "$UF_MUT_REWORD"
+UF_REPORT3="$(mktemp)"
+set +e
+REPO_ROOT="$UF_FAKE_ROOT" sh "$UF_MUT_REWORD" "$UF_REPORT3" "$(mktemp)" >/dev/null 2>&1
+set -e
+if ! grep -qF "$UF_DETAIL_TEXT" "$UF_REPORT3"; then
+  echo "OK: vacuity check — benignly rewording the :184 REPORT_FILE detail text (call left in place) makes 7j's exact-text assertion fail closed rather than pass"
+else
+  fail "vacuity check FAILED — 7j's :184 REPORT_FILE assertion still matched after the text was reworded: $(cat "$UF_REPORT3")"
+fi
 echo "OK: deep scan Linter Exception Expiry section (T1-K) structural + functional check passed."

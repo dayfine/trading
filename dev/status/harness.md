@@ -1578,6 +1578,53 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   Verify: `sh trading/devtools/checks/
   deep_scan_linter_expiry_check.sh` (28 `OK:` lines, exit 0) or
   `dune runtest trading/devtools/checks/`.
+  **Rework iteration 2 (2026-08-30, PR #2595 qc-behavioral re-review at
+  `d83d1243`, NEEDS_REWORK, quality score 2):** iteration 1's per-label
+  evasion class was confirmed fully closed (both reviewers independently
+  re-checked, including a `conf_path`-keyed variant — also caught). The
+  re-review escalated to a DIFFERENT mutation shape: deleting ONLY the
+  `_SCAN_COUNT` increment at a site (leaving `add_warning()` and
+  `_SCAN_DETAILS` intact) desyncs the roll-up `W:` line (still correct)
+  from the `REPORT_FILE`'s own per-entry detail line, because the report's
+  "### Expired or due-for-review entries" block is gated on the
+  per-conf-file COUNT, never on `_SCAN_DETAILS` non-emptiness. Confirmed
+  the gap by hand for `:161` (milestone-unknown), `:166` (milestone-landed),
+  and `:184` (unrecognised-format): with the corrupted entry as the ONLY
+  expired entry in its conf file, the section falls back to printing "No
+  expired or missing review_at annotations found" while the roll-up
+  finding survives unchanged — the exact green-while-broken shape the
+  guard exists to prevent, and none of Part 6's assertions (all roll-up-only
+  for these sites) would have caught it. Also confirmed the shape is
+  MASKED by a fixture with >1 entry per conf file (a sibling entry's
+  increment keeps the report's print gate open, so the corrupted entry's
+  detail line still prints via the shared `_SCAN_DETAILS` accumulator) —
+  which is why none of Part 6's multi-entry `AE_FAKE_ROOT`/`MS_FAKE_ROOT`
+  fixtures exposed it even though they share the same underlying function.
+  **Fix (Part 7, new):** added three fresh, deliberately single-entry-per-
+  conf-file fixtures (`MU_FAKE_ROOT` for `:161`, reused `MS_FAKE_ROOT` for
+  `:166`, `UF_FAKE_ROOT` for `:184`) and, for each, a `REPORT_FILE`
+  exact-text detail-line assertion, a count-only-removal mutation-proof
+  (confirms exit 0 + roll-up survives + detail line vanishes + report
+  falsely says "No expired..."), and a vacuity reword check (confirms the
+  assertion fails closed on a benign text change, not just a functional
+  one). `:113` (conf-file-not-found) is **not applicable** to this
+  corruption class — that branch returns before the per-entry loop, so
+  there is no per-entry `_SCAN_COUNT` to corrupt independently of the
+  `add_warning()` call itself; it remains fully covered by Part 6's
+  existing call-deletion + vacuity tests. `:176` (date-expired) was
+  previously closed only INCIDENTALLY — Part 3a's `REPORT_FILE` assertion
+  happens to run against `AE_FAKE_ROOT`'s single-entry
+  `adapter_effectiveness_exceptions.conf`, so the same corruption already
+  failed it — and this rework makes that deliberate with an explicit
+  count-only mutation-proof plus vacuity reword against the same fixture
+  (Part 7g-7i), rather than leaving the coverage as an accident of an
+  unrelated fixture's shape. The production `check_11_linter_expiry.sh`
+  was never edited in place — every mutation in this suite (Parts 3-7)
+  reads it via `sed`/`awk` into a separate generated copy, matching the
+  file's existing convention, so there was nothing to revert; confirmed
+  with `git status --porcelain` showing only the test file changed.
+  Verify: `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh`
+  (40 `OK:` lines, exit 0) or `dune runtest trading/devtools/checks/`.
 
 - [ ] **H-EXPIRY-MISSING-REVIEWAT-UNPINNED**: filed while closing O2/O3
   (2026-08-30). `_scan_exceptions_conf`'s "missing `review_at` annotation"
