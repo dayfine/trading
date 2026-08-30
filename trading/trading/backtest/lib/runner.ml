@@ -265,13 +265,13 @@ let _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days ?on_step_setup
     i.e. positions opened during the warmup window. The simulator runs from
     [warmup_start] so [Stop_log] observes [EntryComplete] transitions for
     positions opened during warmup, then [Trade_context._stop_info_for] falls
-    back to a symbol-first match when rendering [trades.csv]. When the same symbol re-trades
-    across the [start_date] boundary (warmup-window stop_info comes first by
-    [position_id] sort), the warmup stop_info gets attached to the in-window
-    round-trip's row, corrupting [entry_stop] / [exit_stop] / [exit_trigger]
-    columns. Round-trips are filtered analogously by {!round_trips_in_window};
-    this [stop_log] filter is the parallel surface with no date-driven
-    extraction API of its own.
+    back to a symbol-first match when rendering [trades.csv]. When the same
+    symbol re-trades across the [start_date] boundary (warmup-window stop_info
+    comes first by [position_id] sort), the warmup stop_info gets attached to
+    the in-window round-trip's row, corrupting [entry_stop] / [exit_stop] /
+    [exit_trigger] columns. Round-trips are filtered analogously by
+    {!round_trips_in_window}; this [stop_log] filter is the parallel surface
+    with no date-driven extraction API of its own.
 
     Stop_infos with [entry_date = None] are kept (test fixtures that don't drive
     {!Stop_log.set_current_date}). *)

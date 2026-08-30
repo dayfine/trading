@@ -2,9 +2,9 @@
     consistency.
 
     Background. PR-3 of the broker-model split redesign (#664) wired
-    [Split_handler.detect_for_held_positions] + [_apply_split_events] into
-    the daily step. On a split day the held [Trading_portfolio.Portfolio.t]'s
-    lots are rescaled (×factor), keeping [Portfolio_valuation.compute] continuous.
+    [Split_handler.detect_for_held_positions] + [_apply_split_events] into the
+    daily step. On a split day the held [Trading_portfolio.Portfolio.t]'s lots
+    are rescaled (×factor), keeping [Portfolio_valuation.compute] continuous.
     Verified by [test_split_day_mtm.ml] (3/3 PASS).
 
     What PR-3 missed. The simulator only adjusts the

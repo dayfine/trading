@@ -162,9 +162,9 @@ val filter_stop_infos_in_window :
 (** Drop [stop_info]s whose [entry_date] is before [start_date] — i.e. positions
     opened during the warmup window. Used at runner teardown to keep
     warmup-window stop events from corrupting [trades.csv] columns (the
-    symbol-first fallback in [Trade_context._stop_info_for] would otherwise attach a warmup-window
-    stop_info to an in-window round-trip when the same symbol re-trades across
-    the boundary).
+    symbol-first fallback in [Trade_context._stop_info_for] would otherwise
+    attach a warmup-window stop_info to an in-window round-trip when the same
+    symbol re-trades across the boundary).
 
     Stop_infos with [entry_date = None] are kept (test fixtures that don't drive
     {!Stop_log.set_current_date}). *)
