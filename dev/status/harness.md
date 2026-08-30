@@ -1460,7 +1460,7 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   `sh trading/devtools/checks/adapter_effectiveness_check_test.sh` (or
   `dune runtest trading/devtools/checks/`) — all 9 assertions pass, exit 0.
 
-- [ ] **H-EXPIRY-ROLLUP-SHARED-FN-ASSUMED (O2)**: filed by qc-behavioral on
+- [x] **H-EXPIRY-ROLLUP-SHARED-FN-ASSUMED (O2)**: filed by qc-behavioral on
   PR #2589 (2026-08-28 run 2) — the **only green-while-broken evasion found in
   13 independent attacks** on the new R-5 assertions. `_scan_exceptions_conf()`
   is shared by all three conf files, and the R-5 test fixture arms only
@@ -1478,8 +1478,30 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   it and add a second `^W: ` assertion for the `Linter exception expiry` label.
   `harness_gap: LINTER_CANDIDATE`.
   (source: 2026-08-28 run 2, qc-behavioral on PR #2589, attack E2)
+  **DONE (2026-08-30, harness/2589-expiry-o2-o3):** confirmed the evasion by
+  hand first — applied the exact `case "${label}" in Adapter*) : ;; *)
+  continue ;; esac` guard (via `awk`, inserted before the date-branch
+  `add_warning` call) to a working copy of the real
+  `check_11_linter_expiry.sh`, ran it against a fixture with an expired entry
+  in BOTH `adapter_effectiveness_exceptions.conf` and (now-populated)
+  `linter_exceptions.conf`: exit 0, AE roll-up line present, LE roll-up line
+  silently gone — the exact evasion. Also confirmed a naive fix (asserting
+  only `^W: Linter exception expiry:` with no fixture-name anchor) would have
+  been vacuous: that pattern still matches the unrelated "Design doc ... not
+  found" milestone-parse-warning line, which carries the same label prefix
+  and survives the mutation. Added `trading/devtools/checks/
+  deep_scan_linter_expiry_check.sh` Part 5 (5a positive assertion anchored on
+  label + fixture name `fixture_stale_le_entry` + "has passed"; 5b
+  mutation-proof re-applying the exact case-guard shape as MUTATION E,
+  confirming exit 0 / AE-line-survives / LE-line-gone). Re-verified: applying
+  the mutation to the finished suite → 5b's new assertion FAILs (red);
+  reverting → suite passes (green, all 16 `OK:` lines, exit 0). Vacuity
+  double-check: reworded the date-branch `add_warning` message text while
+  preserving behaviour → 5a correctly fails closed (red), not vacuously
+  green. Verify: `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh`
+  or `dune runtest trading/devtools/checks/`.
 
-- [ ] **H-EXPIRY-ADDWARNING-SITES-UNPINNED (O3)**: filed by qc-behavioral on
+- [x] **H-EXPIRY-ADDWARNING-SITES-UNPINNED (O3)**: filed by qc-behavioral on
   PR #2589. #2589's completion note declares two uncovered branches
   (missing-`review_at`, and the milestone branch ~`:166`) and **both
   declarations were verified accurate** — credit for stating them. But the
@@ -1491,6 +1513,54 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   the five `add_warning` sites in this function that is pinned.**
   `harness_gap: LINTER_CANDIDATE`.
   (source: 2026-08-28 run 2, qc-behavioral on PR #2589, observation O3)
+  **DONE (2026-08-30, harness/2589-expiry-o2-o3):** re-verified all four
+  gaps by hand first (each confirmed exit 0 / silent before adding its
+  assertion). Pinned all four of `_scan_exceptions_conf`'s remaining
+  `add_warning` sites, each with a positive assertion + an independent
+  mutation-proof (delete that site's `add_warning` call, confirm the specific
+  finding disappears while its sibling in the same fixture survives) in
+  `deep_scan_linter_expiry_check.sh`:
+  - `:113` conf-file-not-found — Part 6, new fixture omitting
+    `universe_deps_exceptions.conf` entirely (all prior fixtures require the
+    file to exist, since a missing file short-circuits the function via
+    `return 0` before any entry is read).
+  - `:161` milestone-unknown (manual review) — Part 6a, reuses the existing
+    `AE_FAKE_ROOT` (no design doc there, so `CURRENT_MILESTONE_NUM` is
+    already 0/unknown, matching production's unparseable-doc path).
+  - `:166` milestone-landed (expired) — Part 6c, new fixture with a fake
+    `docs/design/weinstein-trading-system-v2.md` declaring `Current
+    milestone: M3` (mutually exclusive with `:161`'s precondition in the same
+    fixture, hence the separate root).
+  - `:184` unrecognised-`review_at`-format — Part 6a, same `AE_FAKE_ROOT`.
+  All four assertions vacuity-checked by hand (benign reword of the
+  production message, same behaviour) and confirmed to fail closed rather
+  than passing vacuously. **Correction to this file's own accounting:** the
+  five `add_warning` sites are `:113`, `:161`, `:166`, `:176` (date-expired,
+  already pinned), `:184` — "missing-`review_at`" from the original #2589
+  completion note is a SIXTH, separate branch (`_SCAN_MISSING`, lines
+  ~130-137) that never calls `add_warning` at all; it only ever surfaces in
+  the per-file `REPORT_FILE` "Missing review_at annotation" section, never in
+  the roll-up. It was never one of "the five `add_warning` sites" despite
+  reading that way in prior notes; filed as a new residual below
+  (H-EXPIRY-MISSING-REVIEWAT-UNPINNED) since it remains genuinely untested by
+  this suite. Verify: `sh trading/devtools/checks/
+  deep_scan_linter_expiry_check.sh` (16 `OK:` lines, exit 0) or
+  `dune runtest trading/devtools/checks/`.
+
+- [ ] **H-EXPIRY-MISSING-REVIEWAT-UNPINNED**: filed while closing O2/O3
+  (2026-08-30). `_scan_exceptions_conf`'s "missing `review_at` annotation"
+  branch (`check_11_linter_expiry.sh:130-137`, populates `_SCAN_MISSING` /
+  `_SCAN_MISSING_COUNT`) never calls `add_warning` — it is invisible to the
+  roll-up `W:` findings line entirely and only ever surfaces in the per-file
+  `REPORT_FILE` "### Missing review_at annotation — policy violation T1-K"
+  section. `deep_scan_linter_expiry_check.sh` has no assertion pinning this
+  branch at all (structurally or functionally) for any of the three conf
+  files. Note this is a different failure mode than the five `add_warning`
+  sites O3 closed: a regression here would silently drop the per-file
+  MISSING section from the report, not the roll-up warning — `main.sh`'s
+  top-level "## Warnings" would stay unaffected either way since this branch
+  was never wired into it. `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-08-30, harness-maintainer while closing PR #2589's O2/O3)
 
 - [ ] **H-EXPIRY-MUTATION-DIAGNOSTIC-MISLEADS (O1)**: filed by qc-behavioral on
   PR #2589, non-blocking. Assertions 3c/3d/3e **fail closed** on a benign

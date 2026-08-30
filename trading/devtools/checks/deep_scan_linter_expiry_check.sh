@@ -51,6 +51,30 @@
 # mutations: removing the add_warning() call (3d) and corrupting its
 # message content while leaving the call in place (3e).
 #
+# O2 (2026-08-28, qc-behavioral on PR #2589, attack E2,
+# H-EXPIRY-ROLLUP-SHARED-FN-ASSUMED): Part 4 only ever populated the
+# adapter_effectiveness_exceptions.conf fixture with an expired entry, so
+# nothing distinguished "the roll-up is wired for all three conf files"
+# from "the roll-up is wired for adapter-effectiveness specifically". A
+# per-label special case inside the shared _scan_exceptions_conf() function
+# (e.g. `case "${label}" in Adapter*) : ;; *) continue ;; esac` placed
+# right before an add_warning() call) suppresses the roll-up for
+# linter_exceptions.conf and universe_deps_exceptions.conf while the AE
+# roll-up — and therefore the whole suite — stays green. Part 5 below adds
+# an expired entry to linter_exceptions.conf too (the fixture already
+# created it empty for Part 3/4's sibling-file noise suppression; it is no
+# longer empty) and pins the "Linter exception expiry" roll-up line
+# specifically, with its own mutation-proof of the exact evasion shape
+# above.
+#
+# O3 (2026-08-28, qc-behavioral on PR #2589, observation O3,
+# H-EXPIRY-ADDWARNING-SITES-UNPINNED): _scan_exceptions_conf() has FIVE
+# add_warning() call sites total — conf-file-not-found, milestone-unknown
+# (manual review), milestone-landed (expired), date-expired, and
+# unrecognised-review_at-format — and before Part 6 below, only the
+# date-expired site (the one Part 3/4 exercise) was pinned. Part 6 adds a
+# fixture + assertion + mutation-proof for each of the other four sites.
+#
 # How to re-verify the output by hand:
 #   sh trading/devtools/checks/deep_scan.sh
 #   grep '## Linter Exception Expiry' dev/health/$(date +%Y-%m-%d)-deep.md
@@ -153,10 +177,32 @@ trap 'rm -rf "$AE_FAKE_ROOT"' EXIT
 mkdir -p "$AE_FAKE_ROOT/.claude"
 mkdir -p "$AE_FAKE_ROOT/trading/devtools/checks/deep_scan"
 
-# Empty-but-present sibling conf files so their own _scan_exceptions_conf
-# calls report "no expired/missing" cleanly rather than "not found" noise.
-: > "$AE_FAKE_ROOT/trading/devtools/checks/linter_exceptions.conf"
-: > "$AE_FAKE_ROOT/trading/devtools/checks/universe_deps_exceptions.conf"
+# Present sibling conf files. Both now carry fixture entries of their own
+# (O2/O3 below) rather than being left empty — each entry below is named
+# distinctly from adapter_effectiveness_exceptions.conf's
+# "fixture_expired_field" so grep patterns anchored to one fixture cannot
+# accidentally match another's finding line.
+#
+# linter_exceptions.conf: one date-expired entry (O2 fixture — same shape
+# as the AE entry below, used to pin the "Linter exception expiry" roll-up
+# label specifically in Part 5).
+cat > "$AE_FAKE_ROOT/trading/devtools/checks/linter_exceptions.conf" <<'EOF'
+fixture_stale_le_entry  # review_at: 2019-01-01 (O2 fixture)
+EOF
+
+# universe_deps_exceptions.conf: two entries exercising the two
+# add_warning() sites that don't need a parseable docs/design/
+# weinstein-trading-system-v2.md (which this fake root does not create —
+# CURRENT_MILESTONE_NUM stays 0 = unknown, matching production behaviour
+# when the design doc's milestone marker can't be parsed):
+#   - a milestone-pinned entry, surfaced via the "milestone unknown /
+#     manual review" branch (O3, check_11_linter_expiry.sh:~161)
+#   - an entry whose review_at is neither a milestone nor a date, surfaced
+#     via the "unrecognised format" branch (O3, ~:184)
+cat > "$AE_FAKE_ROOT/trading/devtools/checks/universe_deps_exceptions.conf" <<'EOF'
+fixture_unknown_milestone_ud  # review_at: M2 (O3 milestone-unknown fixture)
+fixture_unrecognised_format_ud  # review_at: whenever-someone-notices (O3 unrecognised fixture)
+EOF
 
 # One entry, seven years expired — the exact BQ-1 repro (match_fraction
 # with review_at: 2019-01-01, per dev/reviews/harness-2567-2585.md).
@@ -285,6 +331,227 @@ if grep -q '\[EXPIRED\].*fixture_expired_field' "$AE_REPORT5" \
   echo "OK: MUTATION D (roll-up message content corrupted, call left in place) leaves the detail line intact but the W: line no longer names fixture_expired_field — second, independent break direction caught"
 else
   fail "MUTATION D did not produce the expected split — detail report: $(cat "$AE_REPORT5"); findings: $(cat "$AE_FINDINGS5")"
+fi
+
+# ── Part 5: O2 closure — the roll-up is per-CONF-FILE wired, not just
+# per-adapter-effectiveness (2026-08-28, qc-behavioral on PR #2589,
+# attack E2, H-EXPIRY-ROLLUP-SHARED-FN-ASSUMED) ───────────────────────
+#
+# Parts 3/4 above only ever populate adapter_effectiveness_exceptions.conf
+# with an expired entry, so nothing in the suite distinguishes "the roll-up
+# is wired for all three conf files that share _scan_exceptions_conf()"
+# from "the roll-up is wired for adapter-effectiveness specifically". A
+# per-label special case inside the shared function — e.g.
+# `case "${label}" in Adapter*) : ;; *) continue ;; esac` placed right
+# before an add_warning() call — suppresses the roll-up for
+# linter_exceptions.conf (and universe_deps_exceptions.conf) while the AE
+# roll-up, and therefore the whole suite, stays green. This was confirmed
+# by hand before writing 5a/5b below: applying that exact case guard
+# before the date-branch add_warning() call in a working copy of the real
+# script leaves the AE_FINDINGS3-style output at exit 0 with the AE line
+# intact and the "Linter exception expiry" line for fixture_stale_le_entry
+# gone — the silent evasion this part exists to close.
+
+# --- 5a: the REAL (unmutated) script populates the roll-up "W:" line for
+# the linter_exceptions.conf fixture entry too, not just AE's. Anchored on
+# the label PLUS the fixture name plus the date-branch tail ("has passed")
+# — not a bare "^W: Linter exception expiry:" check, which would also
+# match the milestone-parse-warning line ("Design doc ... not found") that
+# carries the same label prefix and is present in this fixture regardless
+# of whether the date-branch roll-up fires. (Verified by hand: a
+# label-only anchor wrongly matches under the 5b mutation below; the
+# fixture-name-anchored form below correctly does not.)
+if [ "$AE_CODE3" -eq 0 ] \
+  && grep -q '^W: Linter exception expiry: fixture_stale_le_entry review date .* has passed' "$AE_FINDINGS3"; then
+  echo "OK: expired linter_exceptions.conf entry is ALSO surfaced in the roll-up W: findings line, alongside adapter-effectiveness's (O2 fix verified — the roll-up is wired per conf file, not just for AE)"
+else
+  fail "expired fixture_stale_le_entry entry was NOT surfaced in the roll-up W: findings line (exit=$AE_CODE3) — either the roll-up wiring regressed for linter_exceptions.conf specifically, or a per-label special case is suppressing it: $(cat "$AE_FINDINGS3")"
+fi
+
+# --- 5b: MUTATION E (the exact O2 evasion shape) — insert a per-label
+# case guard before the date-branch add_warning() call so only labels
+# starting with "Adapter" reach it. If 5a is pinning real per-conf-file
+# wiring (not a coincidental match), this must make the LE line disappear
+# while the AE line — same branch, different label — survives untouched.
+AE_MUT_CHECK4="$AE_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated4.sh"
+awk '
+  /add_warning "\$\{label\}: \$\{decl\} review date \$\{review_date\} has passed/ {
+    print "        case \"${label}\" in Adapter*) : ;; *) continue ;; esac"
+  }
+  { print }
+' "$CHECK_11" > "$AE_MUT_CHECK4"
+chmod +x "$AE_MUT_CHECK4"
+
+AE_REPORT6="$(mktemp)"
+AE_FINDINGS6="$(mktemp)"
+set +e
+REPO_ROOT="$AE_FAKE_ROOT" sh "$AE_MUT_CHECK4" "$AE_REPORT6" "$AE_FINDINGS6" >/dev/null 2>&1
+AE_CODE6=$?
+set -e
+
+if [ "$AE_CODE6" -eq 0 ] \
+  && grep -q '^W: Adapter-effectiveness exception expiry: fixture_expired_field' "$AE_FINDINGS6" \
+  && ! grep -q '^W: Linter exception expiry: fixture_stale_le_entry' "$AE_FINDINGS6"; then
+  echo "OK: MUTATION E (per-label case guard restricting add_warning to Adapter* labels) leaves the exit code at 0 and the AE roll-up intact but drops the linter_exceptions.conf roll-up — reproduces H-EXPIRY-ROLLUP-SHARED-FN-ASSUMED and proves 5a catches it"
+else
+  fail "MUTATION E did not produce the expected split (exit=$AE_CODE6) — findings: $(cat "$AE_FINDINGS6")"
+fi
+
+# ── Part 6: O3 closure — the four remaining add_warning() call sites
+# (2026-08-28, qc-behavioral on PR #2589, observation O3,
+# H-EXPIRY-ADDWARNING-SITES-UNPINNED) ─────────────────────────────────
+#
+# _scan_exceptions_conf() has FIVE add_warning() call sites. Before this
+# part, only the date-expired site (Parts 3/4 above) was pinned:
+#   :113  conf-file-not-found         -> Part 6, fixture 6e/6f below
+#   :161  milestone-unknown           -> 6a/6b below (AE_FAKE_ROOT fixture)
+#   :166  milestone-landed (expired)  -> 6c/6d below (separate fixture:
+#                                        needs a parseable design doc,
+#                                        which conflicts with :161's
+#                                        "milestone unknown" precondition
+#                                        in the same fixture root)
+#   :176  date-expired                -> already pinned by Part 3/4
+#   :184  unrecognised-review_at-format -> 6a/6b below (AE_FAKE_ROOT fixture)
+
+# --- 6a: the REAL (unmutated) script surfaces both the milestone-unknown
+# and unrecognised-format universe_deps_exceptions.conf fixture entries in
+# the roll-up. Reuses AE_FINDINGS3 (Part 4's 3c run already exercised the
+# full fixture, which now includes both entries).
+if grep -q '^W: Universe-deps exception expiry (milestone unknown): fixture_unknown_milestone_ud pinned to M2' "$AE_FINDINGS3"; then
+  echo "OK: milestone-pinned entry with an unresolvable current-milestone is surfaced via the 'milestone unknown / manual review' add_warning site (:~161)"
+else
+  fail "fixture_unknown_milestone_ud was NOT surfaced via the milestone-unknown add_warning site: $(cat "$AE_FINDINGS3")"
+fi
+
+if grep -q '^W: Universe-deps exception expiry: fixture_unrecognised_format_ud has unrecognised review_at format:' "$AE_FINDINGS3"; then
+  echo "OK: an entry whose review_at is neither a milestone nor a date is surfaced via the 'unrecognised format' add_warning site (:~184)"
+else
+  fail "fixture_unrecognised_format_ud was NOT surfaced via the unrecognised-format add_warning site: $(cat "$AE_FINDINGS3")"
+fi
+
+# --- 6b: mutation-proof for both 6a sites — delete each add_warning() call
+# independently and confirm its own line disappears while the sibling
+# stays, proving each assertion pins its own site rather than the pair
+# passing/failing together coincidentally.
+AE_MUT_161="$AE_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_161.sh"
+sed '/milestone unknown): ${decl} pinned to/d' "$CHECK_11" > "$AE_MUT_161"
+chmod +x "$AE_MUT_161"
+AE_FINDINGS_161="$(mktemp)"
+set +e
+REPO_ROOT="$AE_FAKE_ROOT" sh "$AE_MUT_161" "$(mktemp)" "$AE_FINDINGS_161" >/dev/null 2>&1
+set -e
+if ! grep -q 'fixture_unknown_milestone_ud pinned to' "$AE_FINDINGS_161" \
+  && grep -q 'fixture_unrecognised_format_ud has unrecognised' "$AE_FINDINGS_161"; then
+  echo "OK: MUTATION (milestone-unknown add_warning call removed) drops only the milestone-unknown finding, confirming 6a's first assertion pins that site specifically"
+else
+  fail "MUTATION (milestone-unknown add_warning removed) did not produce the expected split: $(cat "$AE_FINDINGS_161")"
+fi
+
+AE_MUT_184="$AE_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_184.sh"
+sed '/has unrecognised review_at format/d' "$CHECK_11" > "$AE_MUT_184"
+chmod +x "$AE_MUT_184"
+AE_FINDINGS_184="$(mktemp)"
+set +e
+REPO_ROOT="$AE_FAKE_ROOT" sh "$AE_MUT_184" "$(mktemp)" "$AE_FINDINGS_184" >/dev/null 2>&1
+set -e
+if grep -q 'fixture_unknown_milestone_ud pinned to' "$AE_FINDINGS_184" \
+  && ! grep -q 'fixture_unrecognised_format_ud has unrecognised' "$AE_FINDINGS_184"; then
+  echo "OK: MUTATION (unrecognised-format add_warning call removed) drops only the unrecognised-format finding, confirming 6a's second assertion pins that site specifically"
+else
+  fail "MUTATION (unrecognised-format add_warning removed) did not produce the expected split: $(cat "$AE_FINDINGS_184")"
+fi
+
+# --- 6c/6d: milestone-landed (:166) needs its own fixture — a parseable
+# "Current milestone" marker in a fake docs/design/weinstein-trading-system
+# -v2.md, which would change AE_FAKE_ROOT's "milestone unknown" fixture
+# (6a above) from unresolvable to resolvable if added there. Separate root.
+MS_FAKE_ROOT="$(mktemp -d)"
+trap 'rm -rf "$AE_FAKE_ROOT" "$MS_FAKE_ROOT"' EXIT
+
+mkdir -p "$MS_FAKE_ROOT/trading/devtools/checks/deep_scan"
+mkdir -p "$MS_FAKE_ROOT/docs/design"
+cat > "$MS_FAKE_ROOT/docs/design/weinstein-trading-system-v2.md" <<'EOF'
+# Weinstein Trading System v2
+
+**Current milestone:** M3
+EOF
+: > "$MS_FAKE_ROOT/trading/devtools/checks/linter_exceptions.conf"
+cat > "$MS_FAKE_ROOT/trading/devtools/checks/universe_deps_exceptions.conf" <<'EOF'
+fixture_milestone_landed_ud  # review_at: M2 (O3 milestone-landed fixture)
+EOF
+: > "$MS_FAKE_ROOT/trading/devtools/checks/adapter_effectiveness_exceptions.conf"
+cp "${DEEP_SCAN_DIR}/_lib.sh" "$MS_FAKE_ROOT/trading/devtools/checks/deep_scan/_lib.sh"
+cp "$(dirname "$0")/_check_lib.sh" "$MS_FAKE_ROOT/trading/devtools/checks/_check_lib.sh"
+cp "$CHECK_11" "$MS_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh"
+
+MS_FINDINGS="$(mktemp)"
+set +e
+REPO_ROOT="$MS_FAKE_ROOT" sh "$MS_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh" \
+  "$(mktemp)" "$MS_FINDINGS" >/dev/null 2>&1
+MS_CODE=$?
+set -e
+
+if [ "$MS_CODE" -eq 0 ] \
+  && grep -q '^W: Universe-deps exception expiry: fixture_milestone_landed_ud was due for review at M2 (current: M3)' "$MS_FINDINGS"; then
+  echo "OK: an entry pinned to a milestone <= the current milestone is surfaced via the 'milestone landed / expired' add_warning site (:~166)"
+else
+  fail "fixture_milestone_landed_ud was NOT surfaced via the milestone-landed add_warning site (exit=$MS_CODE): $(cat "$MS_FINDINGS")"
+fi
+
+MS_MUT="$MS_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_166.sh"
+sed '/was due for review at ${entry_milestone}/d' "$CHECK_11" > "$MS_MUT"
+chmod +x "$MS_MUT"
+MS_FINDINGS2="$(mktemp)"
+set +e
+REPO_ROOT="$MS_FAKE_ROOT" sh "$MS_MUT" "$(mktemp)" "$MS_FINDINGS2" >/dev/null 2>&1
+set -e
+if ! grep -q 'fixture_milestone_landed_ud was due for review' "$MS_FINDINGS2"; then
+  echo "OK: MUTATION (milestone-landed add_warning call removed) makes the finding disappear, confirming 6c pins that site rather than some other coincidental match"
+else
+  fail "MUTATION (milestone-landed add_warning removed) did not remove the finding: $(cat "$MS_FINDINGS2")"
+fi
+
+# --- 6e/6f: conf-file-not-found (:113) needs a fixture that OMITS one of
+# the three conf files entirely — incompatible with every fixture above,
+# which all rely on the files existing (a missing file short-circuits
+# _scan_exceptions_conf() via `return 0` before any entry is read, per
+# check_11_linter_expiry.sh:112-115). Separate root, third fixture.
+NF_FAKE_ROOT="$(mktemp -d)"
+trap 'rm -rf "$AE_FAKE_ROOT" "$MS_FAKE_ROOT" "$NF_FAKE_ROOT"' EXIT
+
+mkdir -p "$NF_FAKE_ROOT/trading/devtools/checks/deep_scan"
+: > "$NF_FAKE_ROOT/trading/devtools/checks/linter_exceptions.conf"
+: > "$NF_FAKE_ROOT/trading/devtools/checks/adapter_effectiveness_exceptions.conf"
+# universe_deps_exceptions.conf is deliberately NOT created.
+cp "${DEEP_SCAN_DIR}/_lib.sh" "$NF_FAKE_ROOT/trading/devtools/checks/deep_scan/_lib.sh"
+cp "$(dirname "$0")/_check_lib.sh" "$NF_FAKE_ROOT/trading/devtools/checks/_check_lib.sh"
+cp "$CHECK_11" "$NF_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh"
+
+NF_FINDINGS="$(mktemp)"
+set +e
+REPO_ROOT="$NF_FAKE_ROOT" sh "$NF_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh" \
+  "$(mktemp)" "$NF_FINDINGS" >/dev/null 2>&1
+NF_CODE=$?
+set -e
+
+if [ "$NF_CODE" -eq 0 ] \
+  && grep -q '^W: Universe-deps exception expiry: universe_deps_exceptions.conf not found — cannot check exception policy' "$NF_FINDINGS"; then
+  echo "OK: a missing conf file is surfaced via the 'conf-file-not-found' add_warning site (:~113)"
+else
+  fail "a missing universe_deps_exceptions.conf was NOT surfaced via the conf-not-found add_warning site (exit=$NF_CODE): $(cat "$NF_FINDINGS")"
+fi
+
+NF_MUT="$NF_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_113.sh"
+sed '/not found — cannot check exception policy/d' "$CHECK_11" > "$NF_MUT"
+chmod +x "$NF_MUT"
+NF_FINDINGS2="$(mktemp)"
+set +e
+REPO_ROOT="$NF_FAKE_ROOT" sh "$NF_MUT" "$(mktemp)" "$NF_FINDINGS2" >/dev/null 2>&1
+set -e
+if ! grep -q 'universe_deps_exceptions.conf not found' "$NF_FINDINGS2"; then
+  echo "OK: MUTATION (conf-not-found add_warning call removed) makes the finding disappear, confirming 6e pins that site rather than some other coincidental match"
+else
+  fail "MUTATION (conf-not-found add_warning removed) did not remove the finding: $(cat "$NF_FINDINGS2")"
 fi
 
 echo "OK: deep scan Linter Exception Expiry section (T1-K) structural + functional check passed."
