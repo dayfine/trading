@@ -1543,8 +1543,40 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   the roll-up. It was never one of "the five `add_warning` sites" despite
   reading that way in prior notes; filed as a new residual below
   (H-EXPIRY-MISSING-REVIEWAT-UNPINNED) since it remains genuinely untested by
-  this suite. Verify: `sh trading/devtools/checks/
-  deep_scan_linter_expiry_check.sh` (16 `OK:` lines, exit 0) or
+  this suite.
+  **Rework iteration 1 (2026-08-30, PR #2595 qc-behavioral NEEDS_REWORK,
+  quality score 2):** qc-behavioral independently constructed and ran the
+  identical per-label case-guard evasion
+  (`case "${label}" in Universe-deps*) : ;; *) continue|return 0 ;; esac`,
+  the mirror image of Part 5's `Adapter*` guard) at each of the four
+  Part-6 sites and confirmed all four left the suite green — because every
+  Part-6 fixture before this iteration only ever populated
+  `universe_deps_exceptions.conf`, so nothing distinguished "the site fires
+  for every conf file" from "the site fires for universe-deps specifically."
+  Confirmed each of the four evasions by hand first (exit 0, silent), then
+  closed all four by extending Part 5's mutation-proof pattern rather than
+  narrowing the PR's "pin all 5" claim:
+  - `:161` / `:184` — added a second, differently-labelled fixture entry to
+    the existing `AE_FAKE_ROOT`'s `linter_exceptions.conf` (already present
+    for Part 5's date-expired fixture) hitting the same two branches, plus a
+    same-shape case-guard mutation-proof (6a2/6b2) restricted to
+    `Universe-deps*` for each site independently.
+  - `:166` — added a milestone-landed `linter_exceptions.conf` entry to the
+    existing `MS_FAKE_ROOT` (6c2), plus the matching case-guard
+    mutation-proof (6d2).
+  - `:113` — extended `NF_FAKE_ROOT` to omit `linter_exceptions.conf` in
+    addition to `universe_deps_exceptions.conf` (two missing files instead
+    of one), so both conf-not-found labels fire; added the matching
+    case-guard mutation-proof (6f2), using `return 0` rather than
+    `continue` since this site runs before the `while` loop.
+  Every new assertion also vacuity-checked (benign reword of its production
+  message, call left in place, confirmed to fail closed). End-to-end sanity
+  check: applied the real four-site `Universe-deps*`-only case guard
+  directly to the production `check_11_linter_expiry.sh` and confirmed the
+  full suite goes RED with an actionable diagnosis (missing
+  `fixture_unknown_milestone_le`); reverted and confirmed green again.
+  Verify: `sh trading/devtools/checks/
+  deep_scan_linter_expiry_check.sh` (28 `OK:` lines, exit 0) or
   `dune runtest trading/devtools/checks/`.
 
 - [ ] **H-EXPIRY-MISSING-REVIEWAT-UNPINNED**: filed while closing O2/O3

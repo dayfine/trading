@@ -183,11 +183,23 @@ mkdir -p "$AE_FAKE_ROOT/trading/devtools/checks/deep_scan"
 # "fixture_expired_field" so grep patterns anchored to one fixture cannot
 # accidentally match another's finding line.
 #
-# linter_exceptions.conf: one date-expired entry (O2 fixture — same shape
+# linter_exceptions.conf: a date-expired entry (O2 fixture — same shape
 # as the AE entry below, used to pin the "Linter exception expiry" roll-up
-# label specifically in Part 5).
+# label specifically in Part 5), PLUS two more entries (O3-2,
+# 2026-08-30, qc-behavioral rework on PR #2595) that hit the SAME
+# milestone-unknown (:161) and unrecognised-format (:184) branches as
+# universe_deps_exceptions.conf's fixtures below, under a DIFFERENT
+# label ("Linter exception expiry" vs "Universe-deps exception expiry").
+# Without a second conf file exercising these two branches, a per-label
+# case guard restricted to `Universe-deps*` right before either
+# add_warning() call would leave 6a/6b (below) fully green while
+# silently dropping the finding for every other conf file — the exact
+# residual qc-behavioral found on PR #2595 (all four Part-6 sites were
+# only ever exercised via universe_deps_exceptions.conf fixtures).
 cat > "$AE_FAKE_ROOT/trading/devtools/checks/linter_exceptions.conf" <<'EOF'
 fixture_stale_le_entry  # review_at: 2019-01-01 (O2 fixture)
+fixture_unknown_milestone_le  # review_at: M4 (O3-2 dual-conf-file fixture for :161)
+fixture_unrecognised_format_le  # review_at: no-clue (O3-2 dual-conf-file fixture for :184)
 EOF
 
 # universe_deps_exceptions.conf: two entries exercising the two
@@ -412,6 +424,24 @@ fi
 #                                        in the same fixture root)
 #   :176  date-expired                -> already pinned by Part 3/4
 #   :184  unrecognised-review_at-format -> 6a/6b below (AE_FAKE_ROOT fixture)
+#
+# O3-2 (2026-08-30, qc-behavioral rework on PR #2595,
+# H-EXPIRY-ADDWARNING-SITES-UNPINNED residual): O3 above closed each site
+# against "delete the add_warning() call entirely", but every one of the
+# four fixtures used only a SINGLE conf file's label (Universe-deps for
+# :113/:161/:166/:184). A per-label case guard restricted to allow only
+# `Universe-deps*` labels — the mirror image of Part 5's `Adapter*` guard
+# — left the whole suite green at all four sites (confirmed by hand
+# before writing 6a2/6b2/6d2/6f2 below: applying
+# `case "${label}" in Universe-deps*) : ;; *) continue ;; esac` (or
+# `return 0` for :113, which runs before the while loop) immediately
+# before each site's add_warning() call reproduces exit 0 with the
+# Universe-deps finding intact and every other conf file's finding at
+# that site silently gone). 6a2/6d2/6f2 add a second, differently-labelled
+# fixture entry hitting the SAME branch (reusing AE_FAKE_ROOT's
+# linter_exceptions.conf above for :161/:184; MS_FAKE_ROOT's
+# linter_exceptions.conf for :166; a second missing conf file in
+# NF_FAKE_ROOT for :113), and 6b2/6d3/6f3 add the matching mutation-proof.
 
 # --- 6a: the REAL (unmutated) script surfaces both the milestone-unknown
 # and unrecognised-format universe_deps_exceptions.conf fixture entries in
@@ -427,6 +457,108 @@ if grep -q '^W: Universe-deps exception expiry: fixture_unrecognised_format_ud h
   echo "OK: an entry whose review_at is neither a milestone nor a date is surfaced via the 'unrecognised format' add_warning site (:~184)"
 else
   fail "fixture_unrecognised_format_ud was NOT surfaced via the unrecognised-format add_warning site: $(cat "$AE_FINDINGS3")"
+fi
+
+# --- 6a2 (O3-2): the SAME two branches, exercised via a DIFFERENT conf
+# file (linter_exceptions.conf) and label ("Linter exception expiry"),
+# not just universe_deps_exceptions.conf. Without this, a per-label case
+# guard restricted to `Universe-deps*` would leave 6a green while
+# silently dropping the finding for every other conf file at these
+# two sites.
+if grep -q '^W: Linter exception expiry (milestone unknown): fixture_unknown_milestone_le pinned to M4' "$AE_FINDINGS3"; then
+  echo "OK: the milestone-unknown add_warning site (:~161) also fires for a linter_exceptions.conf entry, not just universe_deps_exceptions.conf's (O3-2 dual-conf-file fix)"
+else
+  fail "fixture_unknown_milestone_le was NOT surfaced via the milestone-unknown add_warning site: $(cat "$AE_FINDINGS3")"
+fi
+
+if grep -q '^W: Linter exception expiry: fixture_unrecognised_format_le has unrecognised review_at format:' "$AE_FINDINGS3"; then
+  echo "OK: the unrecognised-format add_warning site (:~184) also fires for a linter_exceptions.conf entry, not just universe_deps_exceptions.conf's (O3-2 dual-conf-file fix)"
+else
+  fail "fixture_unrecognised_format_le was NOT surfaced via the unrecognised-format add_warning site: $(cat "$AE_FINDINGS3")"
+fi
+
+# --- 6b2 (O3-2): mutation-proof for the exact H-EXPIRY-ADDWARNING-SITES
+# residual — a per-label case guard restricted to `Universe-deps*`,
+# placed right before each site's add_warning() call, must make the
+# linter_exceptions.conf-labelled line disappear while the
+# universe_deps_exceptions.conf-labelled line (same branch, different
+# label) survives untouched. Confirmed by hand before writing this
+# assertion: without the case guard, both lines are present; with it,
+# only the Universe-deps line remains and the process still exits 0.
+AE_MUT_161_UD_GUARD="$AE_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_161_udguard.sh"
+awk '
+  /add_warning "\$\{label\} \(milestone unknown\)/ {
+    print "        case \"${label}\" in Universe-deps*) : ;; *) continue ;; esac"
+  }
+  { print }
+' "$CHECK_11" > "$AE_MUT_161_UD_GUARD"
+chmod +x "$AE_MUT_161_UD_GUARD"
+
+AE_FINDINGS_161_UD_GUARD="$(mktemp)"
+set +e
+REPO_ROOT="$AE_FAKE_ROOT" sh "$AE_MUT_161_UD_GUARD" "$(mktemp)" "$AE_FINDINGS_161_UD_GUARD" >/dev/null 2>&1
+AE_CODE_161_UD_GUARD=$?
+set -e
+
+if [ "$AE_CODE_161_UD_GUARD" -eq 0 ] \
+  && grep -q '^W: Universe-deps exception expiry (milestone unknown): fixture_unknown_milestone_ud pinned to M2' "$AE_FINDINGS_161_UD_GUARD" \
+  && ! grep -q 'fixture_unknown_milestone_le pinned to' "$AE_FINDINGS_161_UD_GUARD"; then
+  echo "OK: MUTATION (per-label case guard restricting :161's add_warning to Universe-deps* labels) leaves exit 0 and the Universe-deps finding intact but drops the linter_exceptions.conf finding — reproduces the PR #2595 residual and proves 6a2's first assertion catches it"
+else
+  fail "MUTATION (Universe-deps-only case guard at :161) did not produce the expected split (exit=$AE_CODE_161_UD_GUARD): $(cat "$AE_FINDINGS_161_UD_GUARD")"
+fi
+
+AE_MUT_184_UD_GUARD="$AE_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_184_udguard.sh"
+awk '
+  /add_warning "\$\{label\}: \$\{decl\} has unrecognised review_at format/ {
+    print "      case \"${label}\" in Universe-deps*) : ;; *) continue ;; esac"
+  }
+  { print }
+' "$CHECK_11" > "$AE_MUT_184_UD_GUARD"
+chmod +x "$AE_MUT_184_UD_GUARD"
+
+AE_FINDINGS_184_UD_GUARD="$(mktemp)"
+set +e
+REPO_ROOT="$AE_FAKE_ROOT" sh "$AE_MUT_184_UD_GUARD" "$(mktemp)" "$AE_FINDINGS_184_UD_GUARD" >/dev/null 2>&1
+AE_CODE_184_UD_GUARD=$?
+set -e
+
+if [ "$AE_CODE_184_UD_GUARD" -eq 0 ] \
+  && grep -q '^W: Universe-deps exception expiry: fixture_unrecognised_format_ud has unrecognised review_at format:' "$AE_FINDINGS_184_UD_GUARD" \
+  && ! grep -q 'fixture_unrecognised_format_le has unrecognised' "$AE_FINDINGS_184_UD_GUARD"; then
+  echo "OK: MUTATION (per-label case guard restricting :184's add_warning to Universe-deps* labels) leaves exit 0 and the Universe-deps finding intact but drops the linter_exceptions.conf finding — reproduces the PR #2595 residual and proves 6a2's second assertion catches it"
+else
+  fail "MUTATION (Universe-deps-only case guard at :184) did not produce the expected split (exit=$AE_CODE_184_UD_GUARD): $(cat "$AE_FINDINGS_184_UD_GUARD")"
+fi
+
+# --- 6a3 (vacuity direction, O3-2): reword the :161/:184 production
+# messages benignly (call left in place, content changed) and confirm
+# 6a2's assertions fail CLOSED rather than passing vacuously — mirrors
+# the vacuity check already applied to 5a/5b (see comment at Part 5).
+AE_MUT_161_REWORD="$AE_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_161_reword.sh"
+sed 's/cannot auto-compare; review manually/needs manual triage/' "$CHECK_11" > "$AE_MUT_161_REWORD"
+chmod +x "$AE_MUT_161_REWORD"
+AE_FINDINGS_161_REWORD="$(mktemp)"
+set +e
+REPO_ROOT="$AE_FAKE_ROOT" sh "$AE_MUT_161_REWORD" "$(mktemp)" "$AE_FINDINGS_161_REWORD" >/dev/null 2>&1
+set -e
+if ! grep -q '^W: Linter exception expiry (milestone unknown): fixture_unknown_milestone_le pinned to M4 — cannot auto-compare; review manually' "$AE_FINDINGS_161_REWORD"; then
+  echo "OK: vacuity check — benignly rewording the :161 message (call left in place) makes 6a2's exact-text assertion fail closed rather than pass"
+else
+  fail "vacuity check FAILED — 6a2's :161 assertion still matched after the message was reworded, so it does not actually pin the message content: $(cat "$AE_FINDINGS_161_REWORD")"
+fi
+
+AE_MUT_184_REWORD="$AE_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_184_reword.sh"
+sed 's/has unrecognised review_at format/has an unparseable review_at value/' "$CHECK_11" > "$AE_MUT_184_REWORD"
+chmod +x "$AE_MUT_184_REWORD"
+AE_FINDINGS_184_REWORD="$(mktemp)"
+set +e
+REPO_ROOT="$AE_FAKE_ROOT" sh "$AE_MUT_184_REWORD" "$(mktemp)" "$AE_FINDINGS_184_REWORD" >/dev/null 2>&1
+set -e
+if ! grep -q '^W: Linter exception expiry: fixture_unrecognised_format_le has unrecognised review_at format:' "$AE_FINDINGS_184_REWORD"; then
+  echo "OK: vacuity check — benignly rewording the :184 message (call left in place) makes 6a2's exact-text assertion fail closed rather than pass"
+else
+  fail "vacuity check FAILED — 6a2's :184 assertion still matched after the message was reworded, so it does not actually pin the message content: $(cat "$AE_FINDINGS_184_REWORD")"
 fi
 
 # --- 6b: mutation-proof for both 6a sites — delete each add_warning() call
@@ -475,7 +607,13 @@ cat > "$MS_FAKE_ROOT/docs/design/weinstein-trading-system-v2.md" <<'EOF'
 
 **Current milestone:** M3
 EOF
-: > "$MS_FAKE_ROOT/trading/devtools/checks/linter_exceptions.conf"
+# linter_exceptions.conf also carries a milestone-landed entry (O3-2,
+# 2026-08-30) so the :166 site is exercised via a SECOND conf file /
+# label pair, not just universe_deps_exceptions.conf's — see the O3-2
+# note above Part 6 for why this is required to close the residual.
+cat > "$MS_FAKE_ROOT/trading/devtools/checks/linter_exceptions.conf" <<'EOF'
+fixture_milestone_landed_le  # review_at: M1 (O3-2 dual-conf-file fixture for :166)
+EOF
 cat > "$MS_FAKE_ROOT/trading/devtools/checks/universe_deps_exceptions.conf" <<'EOF'
 fixture_milestone_landed_ud  # review_at: M2 (O3 milestone-landed fixture)
 EOF
@@ -498,6 +636,14 @@ else
   fail "fixture_milestone_landed_ud was NOT surfaced via the milestone-landed add_warning site (exit=$MS_CODE): $(cat "$MS_FINDINGS")"
 fi
 
+# --- 6c2 (O3-2): the SAME branch, exercised via linter_exceptions.conf /
+# "Linter exception expiry" too — see the O3-2 note above Part 6.
+if grep -q '^W: Linter exception expiry: fixture_milestone_landed_le was due for review at M1 (current: M3)' "$MS_FINDINGS"; then
+  echo "OK: the milestone-landed add_warning site (:~166) also fires for a linter_exceptions.conf entry, not just universe_deps_exceptions.conf's (O3-2 dual-conf-file fix)"
+else
+  fail "fixture_milestone_landed_le was NOT surfaced via the milestone-landed add_warning site: $(cat "$MS_FINDINGS")"
+fi
+
 MS_MUT="$MS_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_166.sh"
 sed '/was due for review at ${entry_milestone}/d' "$CHECK_11" > "$MS_MUT"
 chmod +x "$MS_MUT"
@@ -505,10 +651,56 @@ MS_FINDINGS2="$(mktemp)"
 set +e
 REPO_ROOT="$MS_FAKE_ROOT" sh "$MS_MUT" "$(mktemp)" "$MS_FINDINGS2" >/dev/null 2>&1
 set -e
-if ! grep -q 'fixture_milestone_landed_ud was due for review' "$MS_FINDINGS2"; then
-  echo "OK: MUTATION (milestone-landed add_warning call removed) makes the finding disappear, confirming 6c pins that site rather than some other coincidental match"
+if ! grep -q 'fixture_milestone_landed_ud was due for review' "$MS_FINDINGS2" \
+  && ! grep -q 'fixture_milestone_landed_le was due for review' "$MS_FINDINGS2"; then
+  echo "OK: MUTATION (milestone-landed add_warning call removed) makes BOTH the universe_deps_exceptions.conf and linter_exceptions.conf findings disappear, confirming 6c/6c2 pin that site rather than some other coincidental match"
 else
-  fail "MUTATION (milestone-landed add_warning removed) did not remove the finding: $(cat "$MS_FINDINGS2")"
+  fail "MUTATION (milestone-landed add_warning removed) did not remove both findings: $(cat "$MS_FINDINGS2")"
+fi
+
+# --- 6d2 (O3-2): mutation-proof for the exact per-label-guard evasion at
+# :166 — a case guard restricted to `Universe-deps*` right before this
+# site's add_warning() call must drop the linter_exceptions.conf finding
+# while leaving the universe_deps_exceptions.conf finding (same branch,
+# different label) intact, at exit 0. Confirmed by hand before writing
+# this assertion.
+MS_MUT_UD_GUARD="$MS_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_166_udguard.sh"
+awk '
+  /add_warning "\$\{label\}: \$\{decl\} was due for review at/ {
+    print "        case \"${label}\" in Universe-deps*) : ;; *) continue ;; esac"
+  }
+  { print }
+' "$CHECK_11" > "$MS_MUT_UD_GUARD"
+chmod +x "$MS_MUT_UD_GUARD"
+
+MS_FINDINGS_UD_GUARD="$(mktemp)"
+set +e
+REPO_ROOT="$MS_FAKE_ROOT" sh "$MS_MUT_UD_GUARD" "$(mktemp)" "$MS_FINDINGS_UD_GUARD" >/dev/null 2>&1
+MS_CODE_UD_GUARD=$?
+set -e
+
+if [ "$MS_CODE_UD_GUARD" -eq 0 ] \
+  && grep -q '^W: Universe-deps exception expiry: fixture_milestone_landed_ud was due for review at M2 (current: M3)' "$MS_FINDINGS_UD_GUARD" \
+  && ! grep -q 'fixture_milestone_landed_le was due for review' "$MS_FINDINGS_UD_GUARD"; then
+  echo "OK: MUTATION (per-label case guard restricting :166's add_warning to Universe-deps* labels) leaves exit 0 and the Universe-deps finding intact but drops the linter_exceptions.conf finding — reproduces the PR #2595 residual and proves 6c2 catches it"
+else
+  fail "MUTATION (Universe-deps-only case guard at :166) did not produce the expected split (exit=$MS_CODE_UD_GUARD): $(cat "$MS_FINDINGS_UD_GUARD")"
+fi
+
+# --- 6d3 (vacuity direction, O3-2): reword the :166 production message
+# benignly (call left in place) and confirm 6c2's exact-text assertion
+# fails closed rather than passing vacuously.
+MS_MUT_REWORD="$MS_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_166_reword.sh"
+sed 's/retire or re-annotate/retire or update the annotation/' "$CHECK_11" > "$MS_MUT_REWORD"
+chmod +x "$MS_MUT_REWORD"
+MS_FINDINGS_REWORD="$(mktemp)"
+set +e
+REPO_ROOT="$MS_FAKE_ROOT" sh "$MS_MUT_REWORD" "$(mktemp)" "$MS_FINDINGS_REWORD" >/dev/null 2>&1
+set -e
+if ! grep -q '^W: Linter exception expiry: fixture_milestone_landed_le was due for review at M1 (current: M3) — retire or re-annotate' "$MS_FINDINGS_REWORD"; then
+  echo "OK: vacuity check — benignly rewording the :166 message (call left in place) makes 6c2's exact-text assertion fail closed rather than pass"
+else
+  fail "vacuity check FAILED — 6c2's :166 assertion still matched after the message was reworded, so it does not actually pin the message content: $(cat "$MS_FINDINGS_REWORD")"
 fi
 
 # --- 6e/6f: conf-file-not-found (:113) needs a fixture that OMITS one of
@@ -520,9 +712,12 @@ NF_FAKE_ROOT="$(mktemp -d)"
 trap 'rm -rf "$AE_FAKE_ROOT" "$MS_FAKE_ROOT" "$NF_FAKE_ROOT"' EXIT
 
 mkdir -p "$NF_FAKE_ROOT/trading/devtools/checks/deep_scan"
-: > "$NF_FAKE_ROOT/trading/devtools/checks/linter_exceptions.conf"
 : > "$NF_FAKE_ROOT/trading/devtools/checks/adapter_effectiveness_exceptions.conf"
-# universe_deps_exceptions.conf is deliberately NOT created.
+# universe_deps_exceptions.conf AND linter_exceptions.conf are both
+# deliberately NOT created (O3-2, 2026-08-30) — TWO missing conf files
+# so the :113 site is exercised via a SECOND conf file / label pair,
+# not just universe_deps_exceptions.conf's. See the O3-2 note above
+# Part 6 for why this is required to close the residual.
 cp "${DEEP_SCAN_DIR}/_lib.sh" "$NF_FAKE_ROOT/trading/devtools/checks/deep_scan/_lib.sh"
 cp "$(dirname "$0")/_check_lib.sh" "$NF_FAKE_ROOT/trading/devtools/checks/_check_lib.sh"
 cp "$CHECK_11" "$NF_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh"
@@ -541,6 +736,15 @@ else
   fail "a missing universe_deps_exceptions.conf was NOT surfaced via the conf-not-found add_warning site (exit=$NF_CODE): $(cat "$NF_FINDINGS")"
 fi
 
+# --- 6e2 (O3-2): the SAME branch, exercised via a second missing conf
+# file (linter_exceptions.conf / "Linter exception expiry") — see the
+# O3-2 note above Part 6.
+if grep -q '^W: Linter exception expiry: linter_exceptions.conf not found — cannot check exception policy' "$NF_FINDINGS"; then
+  echo "OK: the conf-file-not-found add_warning site (:~113) also fires for a missing linter_exceptions.conf, not just universe_deps_exceptions.conf's (O3-2 dual-conf-file fix)"
+else
+  fail "a missing linter_exceptions.conf was NOT surfaced via the conf-not-found add_warning site: $(cat "$NF_FINDINGS")"
+fi
+
 NF_MUT="$NF_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_113.sh"
 sed '/not found — cannot check exception policy/d' "$CHECK_11" > "$NF_MUT"
 chmod +x "$NF_MUT"
@@ -548,10 +752,57 @@ NF_FINDINGS2="$(mktemp)"
 set +e
 REPO_ROOT="$NF_FAKE_ROOT" sh "$NF_MUT" "$(mktemp)" "$NF_FINDINGS2" >/dev/null 2>&1
 set -e
-if ! grep -q 'universe_deps_exceptions.conf not found' "$NF_FINDINGS2"; then
-  echo "OK: MUTATION (conf-not-found add_warning call removed) makes the finding disappear, confirming 6e pins that site rather than some other coincidental match"
+if ! grep -q 'universe_deps_exceptions.conf not found' "$NF_FINDINGS2" \
+  && ! grep -q 'linter_exceptions.conf not found' "$NF_FINDINGS2"; then
+  echo "OK: MUTATION (conf-not-found add_warning call removed) makes BOTH the universe_deps_exceptions.conf and linter_exceptions.conf findings disappear, confirming 6e/6e2 pin that site rather than some other coincidental match"
 else
-  fail "MUTATION (conf-not-found add_warning removed) did not remove the finding: $(cat "$NF_FINDINGS2")"
+  fail "MUTATION (conf-not-found add_warning removed) did not remove both findings: $(cat "$NF_FINDINGS2")"
+fi
+
+# --- 6f2 (O3-2): mutation-proof for the exact per-label-guard evasion at
+# :113 — a case guard restricted to `Universe-deps*` right before this
+# site's add_warning() call (note: this site runs BEFORE the while loop,
+# so the non-matching branch must `return 0`, not `continue`) must drop
+# the linter_exceptions.conf finding while leaving the
+# universe_deps_exceptions.conf finding (same branch, different label)
+# intact, at exit 0. Confirmed by hand before writing this assertion.
+NF_MUT_UD_GUARD="$NF_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_113_udguard.sh"
+awk '
+  /add_warning "\$\{label\}: \$\(basename "\$conf_path"\) not found/ {
+    print "    case \"${label}\" in Universe-deps*) : ;; *) return 0 ;; esac"
+  }
+  { print }
+' "$CHECK_11" > "$NF_MUT_UD_GUARD"
+chmod +x "$NF_MUT_UD_GUARD"
+
+NF_FINDINGS_UD_GUARD="$(mktemp)"
+set +e
+REPO_ROOT="$NF_FAKE_ROOT" sh "$NF_MUT_UD_GUARD" "$(mktemp)" "$NF_FINDINGS_UD_GUARD" >/dev/null 2>&1
+NF_CODE_UD_GUARD=$?
+set -e
+
+if [ "$NF_CODE_UD_GUARD" -eq 0 ] \
+  && grep -q '^W: Universe-deps exception expiry: universe_deps_exceptions.conf not found — cannot check exception policy' "$NF_FINDINGS_UD_GUARD" \
+  && ! grep -q 'linter_exceptions.conf not found' "$NF_FINDINGS_UD_GUARD"; then
+  echo "OK: MUTATION (per-label case guard restricting :113's add_warning to Universe-deps* labels) leaves exit 0 and the Universe-deps finding intact but drops the linter_exceptions.conf finding — reproduces the PR #2595 residual and proves 6e2 catches it"
+else
+  fail "MUTATION (Universe-deps-only case guard at :113) did not produce the expected split (exit=$NF_CODE_UD_GUARD): $(cat "$NF_FINDINGS_UD_GUARD")"
+fi
+
+# --- 6f3 (vacuity direction, O3-2): reword the :113 production message
+# benignly (call left in place) and confirm 6e2's exact-text assertion
+# fails closed rather than passing vacuously.
+NF_MUT_REWORD="$NF_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_113_reword.sh"
+sed 's/not found — cannot check exception policy/not found — skipping expiry check/' "$CHECK_11" > "$NF_MUT_REWORD"
+chmod +x "$NF_MUT_REWORD"
+NF_FINDINGS_REWORD="$(mktemp)"
+set +e
+REPO_ROOT="$NF_FAKE_ROOT" sh "$NF_MUT_REWORD" "$(mktemp)" "$NF_FINDINGS_REWORD" >/dev/null 2>&1
+set -e
+if ! grep -q '^W: Linter exception expiry: linter_exceptions.conf not found — cannot check exception policy' "$NF_FINDINGS_REWORD"; then
+  echo "OK: vacuity check — benignly rewording the :113 message (call left in place) makes 6e2's exact-text assertion fail closed rather than pass"
+else
+  fail "vacuity check FAILED — 6e2's :113 assertion still matched after the message was reworded, so it does not actually pin the message content: $(cat "$NF_FINDINGS_REWORD")"
 fi
 
 echo "OK: deep scan Linter Exception Expiry section (T1-K) structural + functional check passed."
