@@ -1,7 +1,7 @@
 (** Regression: split-day mark-to-market on open positions.
 
     Bug: prior to PR-3 of the broker-model split redesign,
-    [Simulator._compute_portfolio_value] used [Daily_price.close_price] (raw,
+    [Portfolio_valuation.compute] used [Daily_price.close_price] (raw,
     unadjusted) to mark held positions to market, but the position quantity
     stored in [Trading_portfolio.Portfolio.positions] was the
     pre-corporate-action share count. On the day of a stock split, the raw close

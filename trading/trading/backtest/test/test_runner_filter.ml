@@ -425,11 +425,11 @@ let test_round_trips_in_window_no_short_from_warmup_straddle _ =
 
 (** Regression: warmup-emit leak in [stop_log]. The simulator runs from
     [warmup_start] so [Stop_log] observes [EntryComplete] transitions for
-    positions opened during warmup. [Result_writer._pop_stop_info] pops by
-    symbol-FIFO when rendering [trades.csv]; if the same symbol re-trades across
-    the [start_date] boundary, the warmup stop_info (sorted first by
-    [position_id]) gets attached to the in-window round-trip's row, corrupting
-    [entry_stop] / [exit_stop] / [exit_trigger] columns.
+    positions opened during warmup. [Trade_context._stop_info_for] falls back to
+    a symbol-first match when rendering [trades.csv]; if the same symbol
+    re-trades across the [start_date] boundary, the warmup stop_info (sorted
+    first by [position_id]) gets attached to the in-window round-trip's row,
+    corrupting [entry_stop] / [exit_stop] / [exit_trigger] columns.
 
     [Runner.filter_stop_infos_in_window] drops [stop_info]s whose
     [entry_date < start_date] before the writer sees them, so only in-window

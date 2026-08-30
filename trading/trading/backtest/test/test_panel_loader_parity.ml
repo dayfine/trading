@@ -1,7 +1,7 @@
 (** Panel-mode round-trips golden parity gate — see
     [dev/plans/data-panels-stage3-2026-04-25.md] §PR 3.1.
 
-    Stage 3 PR 3.1 wired [~bar_panels] into [Panel_runner._build_strategy] so
+    Stage 3 PR 3.1 wired [~bar_panels] into [Panel_strategy_builder.build] so
     the inner Weinstein strategy reads bars from a shared bar source instead of
     the parallel {!Bar_history} cache. Stage 3 PR 3.3 then deleted the Tiered
     runner + bar_loader subsystem entirely. Stage 3 PR 3.4 deleted the Legacy
