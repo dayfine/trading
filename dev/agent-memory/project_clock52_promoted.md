@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: c11b2096-8ab9-4b27-9dc8-fd68436f65f5
-  modified: 2026-08-31T18:22:49.433Z
+  modified: 2026-08-31T19:52:27.912Z
 ---
 
 `entry_order_max_rest_weeks` default 0→52 **merged 2026-08-31** (PR #2587,
@@ -37,10 +37,14 @@ promoted VALUE is composition-sensitive (breadth-dependent return cost,
 robust risk reduction). Mechanism hypothesis: >52w resting tickets that
 fill are crash-recovery monsters; at top-1000 the candidate pool is too
 shallow to replace a cancelled monster ([[project_edge_is_the_fat_tail]]).
-**Default decision OPEN (ASKABLE)**: revert to 0 / keep 52 / keep+require
-record-convention specs to pin — safe to defer because the default-path
-blast radius is empty. Cell B's own null: paired Δ +7.3/+6.5/+9.6pp every
-salt (pairing worked there; at D it convicts instead).
+**Default decision RESOLVED 2026-08-31 — USER: KEEP 52** ("i think promo
+is fine"): top-1000 is the composition probe, not the deployment breadth;
+top-3000 (deployment) wins in all tested cells; default-path radius
+measured empty. Ledger amended (#2611). Optional residual: cell A's
++183.5pp is salt-0-only — an A-null (clockA-{0,52} salts 1,2, ~10-14h)
+would pin the deployment-breadth win the way B/D are pinned. Cell B's own
+null: paired Δ +7.3/+6.5/+9.6pp every salt (pairing worked there; at D it
+convicts instead).
 
 **Book-check (tier-2 VERIFIED):** the book's only GTC-cancel criterion is
 "cancel it if the pattern changes and you later change your mind" (Ch. 3
