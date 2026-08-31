@@ -38,3 +38,15 @@ quantifies that trade instead of sloganeering it.
 Artifacts: `dev/experiments/instrumented-record-2026-08-23/results/monster-ep{100,200}-outcomes.tsv`
 (+ README addendum 2, issue comment 08-24). Estimand = capture of ex-post
 winners; NOT a tradable signal.
+
+**08-25 update — the 51% bucket is now decomposable (#2533 / PR #2550):**
+`Dropped_at_breakout` rows in candidates.sexp carry a sub-reason
+(first-failing gate, a true partition): `Price_floor | Stage_setup |
+Breakout_volume | Rs_declining | Failed_breakout | Volume_band`.
+First liveness read (recovery-2023 smoke, NOT the 26y broad funnel —
+direction only, not a verdict): 11,789 drops = **94% Stage_setup + 6%
+Breakout_volume**, other four zero at no-op defaults — pointing at the
+stage/entry-FRESHNESS clock, not volume confirmation. The real
+decomposition needs the 26y instrumented regeneration (~4.5h,
+run_chain.sh) against the record baseline — that run is the #2490
+follow-up's next step.
