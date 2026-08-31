@@ -737,9 +737,21 @@
 ; dev/audit/ content is ever read by this rule. See
 ; universe_deps_exceptions.conf.
 
+; record_qc_audit_test.sh's scenario 51 (issue #2591) extracts the
+; write_audit.sh FALLBACK code block live from
+; .claude/agents/lead-orchestrator.md at the repo root (found via the
+; script's own REPO_ROOT walk-up, same as agent_compliance_check.sh below)
+; and executes it for real. .claude/agents/*.md is outside the dune
+; workspace root, so it can't be declared as a normal glob/file dep (see
+; the header note above, line ~18); (universe) is the established pattern
+; in this file for exactly that case (agent_compliance_check.sh /
+; agent_compliance_test.sh below) -- it also disables dune's per-rule
+; sandbox for this rule, so the walk-up can actually reach the real
+; .claude/agents/ directory instead of an empty sandboxed one.
+
 (rule
  (alias runtest)
- (deps record_qc_audit.sh write_audit.sh _check_lib.sh)
+ (deps record_qc_audit.sh write_audit.sh _check_lib.sh (universe))
  (action
   (run bash %{dep:record_qc_audit_test.sh})))
 

@@ -3408,6 +3408,127 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 51 — issue #2591: lead-orchestrator.md's documented write_audit.sh
+# FALLBACK invocation (used when record_qc_audit.sh fails or is bypassed --
+# the ONLY path a GHA orchestrator run takes, since GHA has no `gh` binary,
+# per the issue's root-cause) must pass --sha, not omit it. Every audit
+# record written since 2026-08-27 had an empty "sha" field, which silently
+# degrades write_audit.sh's rework-collision guard back to pre-fix overwrite
+# behavior (H-AUDIT-REWORK-COUNT-BLIND) whenever two reviews of the SAME
+# branch land on the SAME date -- exactly the shape a real rework cycle
+# produces.
+#
+# This scenario extracts the ACTUAL bash code block that follows the
+# "**Fallback**" heading in .claude/agents/lead-orchestrator.md live from
+# that file (not a hand-copied duplicate that could silently drift from the
+# doc, per the `declare -f` technique in scenario 42) and executes it for
+# real against a throwaway git repo, then asserts the written record's
+# "sha" field is non-empty and equals the reviewed tip
+# (`git rev-parse HEAD`). RED against the pre-#2591 doc (no --sha in the
+# fallback block -> write_audit.sh's own SHA="" default -> "sha": "" in the
+# record); GREEN once the doc's fallback block carries
+# --sha "$(git rev-parse HEAD)".
+#
+# REPO_ROOT (computed at the top of this file via a FIXED 3-level
+# `cd "${SCRIPT_DIR}/../../.."`) is NOT used here: under `dune runtest`,
+# this script runs from a dune sandbox at
+# `_build/.sandbox/<hash>/devtools/checks/`, one directory level DEEPER
+# than a direct `bash` invocation's `<repo>/trading/devtools/checks/` --
+# so the fixed-depth walk lands on `_build/.sandbox/<hash>/` itself, not
+# the real repo root, and `.claude/agents/` is never found there (dune's
+# sandbox only ever contains the rule's declared/universe-visible files,
+# never the outer checkout). Instead, walk up looking for `.git` or
+# `.claude` -- an UNBOUNDED walk, same strategy as
+# `_check_lib.sh:repo_root()`'s own comment: "the walk crosses the sandbox
+# boundary and reaches the real repo root either way", since the sandbox
+# directory itself is still a real directory nested inside the real repo
+# checkout on disk.
+# ---------------------------------------------------------------------------
+_scenario51_find_repo_root() {
+  dir="$1"
+  while [ -n "$dir" ] && [ "$dir" != "/" ]; do
+    if [ -d "$dir/.git" ] || [ -d "$dir/.claude" ]; then
+      echo "$dir"
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+  return 1
+}
+
+SCENARIO51_REPO_ROOT="$(_scenario51_find_repo_root "${SCRIPT_DIR}")" || SCENARIO51_REPO_ROOT=""
+LEAD_ORCH_MD="${SCENARIO51_REPO_ROOT}/.claude/agents/lead-orchestrator.md"
+
+if [[ -z "${SCENARIO51_REPO_ROOT}" ]]; then
+  fail "scenario 51 — precondition failed: could not walk up from ${SCRIPT_DIR} to a directory containing .git or .claude"
+elif [[ ! -f "${LEAD_ORCH_MD}" ]]; then
+  fail "scenario 51 — precondition failed: ${LEAD_ORCH_MD} not found"
+else
+  FALLBACK_BLOCK="$(awk '
+    /^\*\*Fallback\*\*/ { infallback=1 }
+    infallback && /^```bash/ { incode=1; next }
+    incode && /^```/ { exit }
+    incode { print }
+  ' "${LEAD_ORCH_MD}")"
+
+  if [[ -z "${FALLBACK_BLOCK}" ]]; then
+    fail "scenario 51 — precondition failed: could not extract a bash code block following '**Fallback**' in ${LEAD_ORCH_MD} (heading renamed/removed?)"
+  else
+    SCENARIO51_REPO="$(mktemp -d -t record_qc_audit_scenario51.XXXXXX)"
+    mkdir -p "${SCENARIO51_REPO}/dev/audit" "${SCENARIO51_REPO}/trading/devtools/checks"
+    cp "${SCRIPT_DIR}/write_audit.sh" "${SCENARIO51_REPO}/trading/devtools/checks/"
+    chmod +x "${SCENARIO51_REPO}/trading/devtools/checks/write_audit.sh"
+
+    # A real (throwaway) git repo so `git rev-parse HEAD` -- the exact
+    # command the doc's own fallback block uses to populate --sha --
+    # resolves to a real, deterministic sha: the "reviewed tip" the
+    # fallback is meant to capture.
+    ( cd "${SCENARIO51_REPO}" \
+        && git init -q \
+        && git -c user.email=test@example.com -c user.name=test \
+             commit -q --allow-empty -m init ) >/dev/null 2>&1
+    EXPECTED_SHA51="$(cd "${SCENARIO51_REPO}" && git rev-parse HEAD)"
+
+    SCENARIO51_SCRIPT="${SCENARIO51_REPO}/fallback_block.sh"
+    {
+      echo 'set -euo pipefail'
+      echo 'DATE=2026-08-30'
+      echo 'FEATURE=sha2591-scenario51'
+      echo 'BRANCH=harness/audit-sha-2591'
+      printf '%s\n' "${FALLBACK_BLOCK}"
+    } > "${SCENARIO51_SCRIPT}"
+
+    out51=$(cd "${SCENARIO51_REPO}" \
+      && REPO_ROOT="${SCENARIO51_REPO}" bash "${SCENARIO51_SCRIPT}" 2>&1) && rc51=0 || rc51=$?
+
+    JSON51="${SCENARIO51_REPO}/dev/audit/2026-08-30-harness-audit-sha-2591-sha2591-scenario51.json"
+
+    c51_rc=1; (( rc51 == 0 )) || c51_rc=0
+    c51_file=1; [[ -f "${JSON51}" ]] || c51_file=0
+    c51_sha=1
+    if [[ "${c51_file}" == "1" ]]; then
+      grep -q "\"sha\": \"${EXPECTED_SHA51}\"" "${JSON51}" || c51_sha=0
+    else
+      c51_sha=0
+    fi
+
+    if [[ "${c51_rc}${c51_file}${c51_sha}" == "111" ]]; then
+      pass "scenario 51 — lead-orchestrator.md's documented write_audit.sh FALLBACK block (extracted live from the .md, not a hand copy) passes --sha; the written record carries the reviewed tip's non-empty sha (issue #2591)"
+    else
+      fail "scenario 51 — expected rc=0, record written, sha field == ${EXPECTED_SHA51}; got rc=${rc51}"
+      report_conjuncts \
+        "rc51==0 (fallback block exit code, actual=${rc51})" "${c51_rc}" \
+        "JSON51 exists at ${JSON51}" "${c51_file}" \
+        "sha field == ${EXPECTED_SHA51} (actual: $([[ "${c51_file}" == "1" ]] && grep -o '"sha": *"[^"]*"' "${JSON51}" || echo '<file missing>'))" "${c51_sha}"
+      echo "${out51}" | sed 's/^/      /'
+      [[ -f "${JSON51}" ]] && echo "      json: $(cat "${JSON51}")"
+    fi
+
+    rm -rf "${SCENARIO51_REPO}"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
