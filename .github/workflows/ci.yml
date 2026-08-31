@@ -123,3 +123,13 @@ jobs:
       - name: pr_gate_status guards
         working-directory: .
         run: sh dev/scripts/pr_gate_status_test.sh
+
+      # Same rationale as the pr_gate_status guard above: this script sits
+      # outside the dune root, and it's the mechanical backstop for
+      # A-FASTEXIT-VACUOUS (#2579) -- a regression here would silently
+      # re-open the exact hole the script exists to close. Offline: PR
+      # counts come from a mocked `curl`, dev/status/ drift comes from a
+      # real fixture git repo with controlled commit dates -- no network.
+      - name: orchestrator_fastexit_gate guards
+        working-directory: .
+        run: sh dev/scripts/orchestrator_fastexit_gate_test.sh
