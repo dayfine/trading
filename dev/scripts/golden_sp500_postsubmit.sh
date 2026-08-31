@@ -117,6 +117,15 @@ _run_one() {
 
   printf '[run]  %s\n' "$base_name"
 
+  # --no-emit-all-eligible: the all_eligible diagnostic is opt-OUT and no
+  # postsubmit consumer reads its output (goldens compare actual.sexp to
+  # pins; actual.sexp is written before the diagnostic starts). On broad
+  # cells the scan dwarfs the backtest — measured 2026-08-31 on the
+  # 3001-symbol weinstein-2019-armed-e cell: backtest ~321s, diagnostic
+  # still running at 48+ min, threatening the job's timeout-minutes: 60
+  # (qc-behavioral review 5064470899 on PR #2601). Dropping it also cuts
+  # the sp500 cells' walls substantially (their ~55-min figures were
+  # mostly scan).
   start_epoch=$(date +%s)
   rc=0
   if [ "$HAVE_GNU_TIME" = "1" ]; then
@@ -127,6 +136,7 @@ _run_one() {
           trading/backtest/scenarios/scenario_runner.exe -- \
           --dir "$stage_dir" --parallel 1 \
           --fixtures-root "$SCENARIO_ROOT" \
+          --no-emit-all-eligible \
         >"$log_path" 2>&1 || rc=$?
   else
     timeout "$TIMEOUT" \
@@ -135,6 +145,7 @@ _run_one() {
           trading/backtest/scenarios/scenario_runner.exe -- \
           --dir "$stage_dir" --parallel 1 \
           --fixtures-root "$SCENARIO_ROOT" \
+          --no-emit-all-eligible \
         >"$log_path" 2>&1 || rc=$?
     printf 'UNAVAILABLE\n' >"$rss_path"
   fi

@@ -43,8 +43,13 @@
 ;; return as evidence about the strategy). Cross-basis comparisons are
 ;; invalid in either direction.
 ;;
-;; wall_seconds pinned [0, 1800]: 221s measured locally, ~8x headroom for
-;; a GHA runner (min floored at 0 per #2547 — a min guards nothing).
+;; wall_seconds pinned [0, 1800]: 221s measured locally WITH
+;; --no-emit-all-eligible, ~8x headroom for a GHA runner (min floored at 0
+;; per #2547 — a min guards nothing). ⚠ Without that flag the runner's
+;; opt-OUT all_eligible diagnostic scans 3,001 symbols after actual.sexp is
+;; written (measured 48+ min, qc-behavioral review 5064470899) — the
+;; postsubmit script passes the flag as of this PR; ad-hoc local runs of
+;; this cell should too.
 ((name "weinstein-2019-armed-e")
  (description
    "Broad E-anchored entry golden: top-3000 PIT-2019 composition, 2019-01-02 → 2023-12-29, with the armed StopLimit entry stack (enable_sim_entry_stoplimit + sim_entry_trigger_at_suggested + local-range anchor 4w) over the record-convention base. Pins the book-ticket resting-entry path — the only configuration where the entry-ticket lifecycle knobs execute — on a broad universe; companion to goldens-sp500/sp500-2019-2023-armed-stoplimit.sexp (5y sp500).")
