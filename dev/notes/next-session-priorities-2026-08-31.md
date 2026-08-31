@@ -3,7 +3,19 @@
 Supersedes `next-session-priorities-2026-08-27.md`. Written at the close of
 the 08-30/31 overnight session (user-directed "find 12h of work" run).
 
-## P0 — the clock-52 default decision (ASKABLE, blocks nothing)
+## P0 — the clock-52 default decision — RESOLVED 2026-08-31
+
+**USER DECISION ("i think promo is fine"): KEEP default 52.** Rationale:
+top-1000 is the composition probe, not the deployment breadth; top-3000
+(deployment) wins in all tested cells; blast radius on default paths
+measured empty. Ledger amended
+(`_ledger/2026-08-27-entry-rest-weeks-surface.sexp` AMENDMENT 2026-08-31).
+Residual evidence gap, optional not urgent: cell A's +183.5pp is
+salt-0-only — an A-null (clockA-{0,52} at salts 1,2, ~10-14h
+container-exclusive, `run-b-null.sh` pattern on the clockA specs) would
+pin the deployment-breadth win the way B/D are pinned.
+
+### (superseded, for the record) the decision as originally framed
 
 `entry_order_max_rest_weeks=52` was promoted (#2587) on a grid whose one
 composition-independent cell had no null. The D-null now exists
