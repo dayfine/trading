@@ -1173,20 +1173,34 @@ type config = {
           ([dev/experiments/_ledger/2026-08-18-entry-ticket-rescreen.sexp]) —
           kept as an axis, not a recommendation.
 
-          {b Default [false] = off} (R1), which with
+          {b Default [false] = off} (R1). The combination [false] +
           [entry_order_max_rest_weeks = 0] reproduces the old
           [entry_order_ttl_weeks = 0] exactly: no cancels, weekly re-issue and
           GTC-forever persistence as pinned by
-          [trading/simulation/test/test_gtc_entry_persistence.ml]. R2:
-          axis-expressible as
+          [trading/simulation/test/test_gtc_entry_persistence.ml]. (Since the
+          2026-08-27 clock promotion the DEFAULT pair is [false]/[52], so the
+          default path cancels ≥52-week tickets — pin rest_weeks 0 explicitly to
+          recover GTC-forever.) R2: axis-expressible as
           [((flag enable_entry_ticket_rescreen) (values (true false)))]. *)
-  entry_order_max_rest_weeks : int; [@sexp.default 0]
+  entry_order_max_rest_weeks : int; [@sexp.default 52]
       (** F2 {b backstop}, the invented half: the clock. An unfilled ticket that
           has rested more than this many whole weeks is cancelled regardless of
-          whether it still qualifies. [0] = {b unbounded} = the default. A
-          ticket placed on review week 0 survives review week
-          [entry_order_max_rest_weeks] and is cancelled at week
-          [entry_order_max_rest_weeks + 1].
+          whether it still qualifies. [0] = {b unbounded}; {b default [52]}
+          (promoted 2026-08-27, see below). A ticket placed on review week 0
+          survives review week [entry_order_max_rest_weeks] and is cancelled at
+          week [entry_order_max_rest_weeks + 1].
+
+          {b ⚠ PROMOTED 0 → 52 on 2026-08-27} — ledger ACCEPT
+          [dev/experiments/_ledger/2026-08-27-entry-rest-weeks-surface.sexp]:
+          surface [{0,13,26,52,156}] on three broad cells at the post-#2569
+          fill-model-on basis (26y macro-diverse, 2019-23, 2000-12 bear-heavy;
+          [dev/experiments/clock-surface-2026-08-27/]).
+          {b 52 was top on return, sharpe AND maxDD in all three cells} — the
+          only arm on the frontier everywhere (26y: 496.20% / 0.515 / 25.65 vs
+          null 312.74% / 0.430 / 38.78). This supplies the
+          ledger-ACCEPT-plus-grid the two paragraphs below said any future
+          promotion needs; they are kept as the history of how the value was NOT
+          chosen.
 
           {b Why it exists at all.} Unbounded is genuinely wrong at the extreme:
           a resting order has been observed surviving {b 21.7 years} before
@@ -1198,26 +1212,28 @@ type config = {
           clock can bite, since Market entries fill immediately and never rest —
           {b since the 2026-08-26 fill-model flip made that flag default-[true],
              every default-config run rests tickets}, so the clock now bites
-          everywhere; it stays at the unbounded [0] default), clock=26 measured
-          {b −40.91pp} against clock=0 across three salts with
-          {b complete separation}. The mechanism is a {b tail-touching lever}:
-          the clock cuts the resting-ticket population blind, and that
-          population is where the fat-tail winners live — the removed cohort's
-          entire positive total was a single trade larger than the cohort's net.
-          Nth confirmation of [project_edge_is_the_fat_tail].
+          everywhere; it stayed at the unbounded [0] default until the
+          2026-08-27 promotion above), clock=26 measured {b −40.91pp} against
+          clock=0 across three salts with {b complete separation}. The mechanism
+          is a {b tail-touching lever}: the clock cuts the resting-ticket
+          population blind, and that population is where the fat-tail winners
+          live — the removed cohort's entire positive total was a single trade
+          larger than the cohort's net. Nth confirmation of
+          [project_edge_is_the_fat_tail].
 
           {b The calibration lesson.} The promotion rested on a 26-year base
           whose gap sat {i inside} that base's own seed spread, while the
           golden's base is ~33x quieter. {b Every base needs its own null};
           never import one base's noise floor to judge another's gap.
 
-          {b If a bound is wanted}, the evidence points at {b 156 weeks} rather
-          than 26 — but as a value to test first, not a measured winner: one of
-          three bases inverts the ranking, and the supporting arithmetic is
-          static bucket subtraction, which is not the counterfactual (cutting at
-          26 removed 59 trades and {i added} 48). Any future promotion needs a
+          {b If a bound is wanted}, the evidence pointed at {b 156 weeks} rather
+          than 26 — but as a value to test first, not a measured winner.
+          {i Superseded by the 2026-08-27 surface}: 156 measured WORSE than the
+          null at 26y (267.59% vs 312.74%) and is a digit-identical no-op at 5y
+          — clipping only the absurd tail keeps the losing 27-156wk class while
+          forfeiting the freed-capital reshuffle. Any future promotion needs a
           ledger ACCEPT plus the [promotion-confirmation.md] grid, neither of
-          which the 26 flip had.
+          which the 26 flip had — the 52 promotion above has both.
 
           {b Faithfulness (W2): BOOK-NEUTRAL dial.} The book grants the cancel
           authority (§4.7 / §7) but names no number, so every value here is a

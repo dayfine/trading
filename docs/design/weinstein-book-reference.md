@@ -324,7 +324,24 @@ NEARBY. Our resistance mapper's 520-week graded top is a deliberately
 conservative alternative anchoring (false-virgins protection) — an open design
 axis, not book-settled.
 
-## 5. Stop-Loss and Selling Rules (Ch. 6)
+**Resolved (2026-08-30, BOOK-CHECK from PR #2587): what cancels a resting GTC
+buy-stop?** The book's only cancellation criterion is **pattern change plus
+discretion, never elapsed time**. Ch. 3 quiz answer 5: *"A GTC order means
+just that—good-'til-canceled. But don't forget to keep records and cancel it
+if the pattern changes and you later change your mind."* No time-based cancel
+appears anywhere; there is also **no weekly-lapse protocol** — the "surprised
+two or three weeks later" passage assumes orders rest multi-week unattended,
+so an unbounded sim rest is not obviously a simulation artifact. Consequences
+for the two mechanisms tested under #2405: (a) the **condition-based** cancel
+(weekly re-screen of the resting ticket) is the closer reading of the book's
+criterion — it was measured at −137pp and REJECTED (ledger
+`2026-08-18-entry-ticket-rescreen`); (b) a **time-based backstop** is NOT a
+book rule but is a faithful *adaptation* only in the outer-bound sense: a
+base that has produced no fill for 52 weeks (~17× the book's stated rest
+horizon) has, with near certainty, "changed" in the book's sense, so a
+52-week backstop approximates the record-keeping discipline the book demands
+without re-introducing the rejected re-screen. Shorter clocks (13/26w) sit
+closer to trading-range noise and carry no such argument.
 
 ### 5.1 Initial Stop Placement
 
