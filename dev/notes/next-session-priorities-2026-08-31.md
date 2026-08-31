@@ -42,8 +42,10 @@ mechanism hypothesis.
 
 ## Durable lessons this session (already in memory)
 
-- **The clock binds only behind trigger-at-E arming** — default-path
-  blast radius empty by construction; 11/12 goldens bit-identical.
+- **The clock's effect concentrates behind trigger-at-E arming** — on the
+  default path the predicate runs but finds nothing (trigger-at-close
+  tickets fill within a bar); 11/12 goldens bit-identical = MEASURED
+  emptiness over the golden set, not a structural guarantee.
 - **Warehouse vs committed-CSV basis gap is ~54pp** on a 5y broad book
   (25.31% vs 79.2%, identical config/salt/build) — never compare across
   bases (`weinstein-2019-armed-e.sexp` header carries the warning).

@@ -1,11 +1,11 @@
 ---
 name: project_clock52_promoted
-description: "entry_order_max_rest_weeks 0→52 MERGED (#2587, 08-31); clock binds ONLY behind trigger-at-E arming — default-path blast radius empty by construction (11/12 goldens bit-identical); D-null follow-up #2600"
+description: "entry_order_max_rest_weeks 0→52 MERGED (#2587); predicate RUNS on default path but finds nothing — MEASURED empty over goldens (11/12 bit-identical), effect concentrates behind trigger-at-E; D-null (#2610) contests the value on return"
 metadata: 
   node_type: memory
   type: project
   originSessionId: c11b2096-8ab9-4b27-9dc8-fd68436f65f5
-  modified: 2026-08-31T17:58:39.586Z
+  modified: 2026-08-31T18:22:49.433Z
 ---
 
 `entry_order_max_rest_weeks` default 0→52 **merged 2026-08-31** (PR #2587,

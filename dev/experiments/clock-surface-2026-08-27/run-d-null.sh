@@ -3,7 +3,9 @@
 # recorded on PR #2587. Cell D's paired delta at salt 0 was return −39.1pp /
 # sharpe +0.02 / maxDD −6.84pp with NO null to size the return figure
 # against. Runs clockD-0 and clockD-52 at salts {1,2} — 4 cells (salt 0 is
-# already committed: results/goldens/clockD-{0,52}-s0-*) — giving cell D its
+# already committed: results/goldens/clockD-{0,52}-{actual,params,trades}.*
+# — the s0 arms, committed without a salt suffix by the original run-d.sh
+# chain) — giving cell D its
 # own paired salt spread exactly as run-b-null.sh did for cell B ("every
 # base needs its own null"). Same build as every #2587 arm (the clock52
 # pinned worktree at 5dc61da07); 26y top-1000 cells run strictly ONE at a
@@ -58,7 +60,7 @@ docker exec $C mkdir -p $WORK
 run "test -x ./_build/default/trading/backtest/scenarios/scenario_runner.exe" \
   || { log "ABORT: not built"; exit 1; }
 
-# $1 = arm (clockB-0|clockB-52), $2 = salt
+# $1 = arm (clockD-0|clockD-52), $2 = salt
 run_cell() {
   arm=$1; salt=$2
   tag="${arm}-s${salt}"
