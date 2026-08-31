@@ -1,6 +1,7 @@
 #!/bin/sh
-# clock-52 flip (#2405 / PR #2587): run the 13 inheriting strategy goldens at
-# the flipped default. The current pinned expectations ARE the old arm, so one
+# clock-52 flip (#2405 / PR #2587): run the 12 inheriting strategy goldens at
+# the flipped default (15 goldens inherit; 3 are Bah_benchmark and carry no
+# strategy config — the loops below enumerate all 12 strategy cells). The current pinned expectations ARE the old arm, so one
 # run per cell + compare-to-pin = the paired table config-default-blast-radius
 # requires. 5y cells first (fast read), then the historical multi-hour cells.
 # Mirrors golden_sp500_postsubmit.sh's invocation (stage dir, --parallel 1,

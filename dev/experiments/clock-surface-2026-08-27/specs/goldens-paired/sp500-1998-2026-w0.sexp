@@ -1,0 +1,105 @@
+;; perf-tier: research
+;;
+;; ⚠⚠ NUMBERS FROM DIRECT RUNS OF THIS FILE ARE ARTIFACTS — DO NOT CITE. ⚠⚠
+;; Two compounding reasons (2026-07-08, after the ~227% "28y deep baseline"
+;; was almost quoted as a real number during the warmup-364 re-pin):
+;;   1. The universe pointer is a T4.1 PLACEHOLDER: the top-3000-1998 PIT
+;;      snapshot held STATIC for 28 years (no per-fold rotation — names age
+;;      out, nothing rotates in).
+;;   2. A direct scenario_runner run resolves bars from the committed
+;;      test_data CSV store, which only holds the survivor subset — most of
+;;      the 3000 names (especially delisted ones) have no bars and are
+;;      silently skipped. The run effectively trades a shrinking survivor
+;;      sliver of a frozen 1998 list.
+;; Honest deep numbers come from warehouse-backed runs (--snapshot-dir over
+;; /tmp/snap_top3000_1998_2026, delisting-complete) — e.g. the 28y contiguous
+;; Cell-E record in dev/agent-memory (realized +1552%, 2026-06-14) or the
+;; walk-forward harness this file exists to scaffold. This file's only jobs:
+;; parse as the 28-fold fixture's base and pass catch-only sentinel bands.
+;;
+;; perf-tier-rationale: M4 T4.1 SCAFFOLDING ONLY — base scenario for the
+;; 1998-2026 28-fold walk-forward fixture
+;; (`trading/test_data/walk_forward/cell_e_full_history_28fold_2026_05_25.sexp`).
+;; NOT itself a regression cell — research-tier, runs are M4 T4.4+
+;; sanity-backtest / T4.5 BO sweep work (multi-hour wall, not in CI).
+;;
+;; Why the wide 1998-2026 window: per
+;; `dev/plans/tuning-research-driven-program-v2-2026-05-25.md` §M4, the
+;; primary tuning sweep evaluates the 11-knob surface against a 28-year
+;; delisted-aware top-3000 universe to validate findings across multiple
+;; market regimes (1998-2000 tech boom / bust, 2008 GFC, 2020 COVID,
+;; 2022 bear). 2010-2026 alone is one bull cycle plus tail noise.
+;;
+;; **Universe pointer (T4.1 placeholder):** points at the top-3000-1998
+;; composition snapshot as a static universe for fixture parsability.
+;; T4.2 (per-fold universe rotation in Panel_runner) is responsible for
+;; rotating through the top-3000-YYYY snapshots per fold start year.
+;; T4.1 only needs the fixture sexp to load + the Window_spec to generate
+;; folds; this base scenario's universe is therefore not load-bearing for
+;; the T4.1 tests.
+;;
+;; **Cell E config**: identical to `sp500-2010-2026.sexp` and
+;; `weinstein-2019-full-pool.sexp` (the canonical Cell E config across
+;; all goldens since 2026-05-11 promotion). The constant we hold across
+;; the walk-forward is the *config*; the window rotates per fold.
+;;
+;; **No expected bands** beyond catch-only sentinels — this is a
+;; research scenario; per-fold metrics are evaluated downstream by the
+;; walk-forward harness, not against per-scenario bands here.
+((name "sp500-1998-2026-historical")
+ (description
+   "28y top-3000 historical scaffolding scenario — base for the 1998-2026 28-fold walk-forward fixture (M4 T4.1). Universe pointer is a T4.1 placeholder; T4.2 plumbs per-fold rotation.")
+ (period ((start_date 1998-01-01) (end_date 2026-04-30)))
+ (universe_path "../goldens-custom-universe/composition/top-3000-1998.sexp")
+ (universe_size 3000)
+ ;; Cell E config — identical to sp500-2010-2026.sexp.
+ (config_overrides
+  (((entry_order_max_rest_weeks 0))
+   ((enable_short_side false))
+   ((portfolio_config ((max_position_pct_long 0.30))))
+   ((portfolio_config ((max_long_exposure_pct 0.70))))
+   ((portfolio_config ((min_cash_pct 0.30))))
+   ((enable_stage3_force_exit true))
+   ((stage3_force_exit_config ((hysteresis_weeks 1))))
+   ((enable_laggard_rotation true))
+   ((laggard_rotation_config ((hysteresis_weeks 2))))))
+ ;; Deviations from the live weekly-picks config
+ ;; (dev/weekly-picks/live-config-overrides.sexp), enforced by the
+ ;; golden_live_drift linter (#2403). Data-only: Scenario.t is
+ ;; [@@sexp.allow_extra_fields], so the runner parses and ignores this block.
+ (deviates_from_live
+  ((enable_short_side "long-only cell: arms the short leg off; the code default (and therefore live) is on")
+   (portfolio_config "record-convention concentration arming (exposure 0.70 / min_cash 0.30, plus position 0.14 where armed); live runs the code defaults")
+   (enable_stage3_force_exit "record-convention Stage-3 force-exit arming; live leaves it default-off")
+   (stage3_force_exit_config "hysteresis_weeks 1 belongs to the arming above; the code default is 2")
+   (enable_laggard_rotation "record-convention laggard-rotation arming; live leaves it default-off")
+   (laggard_rotation_config "hysteresis_weeks 2 belongs to the arming above; the code default is 4")
+   (extension_stop_config "live arms the extension-stop insurance (trigger 2.0 / trail 0.25, ledger 2026-07-14-extension-stop-insurance-accept); this cell pins the pre-insurance basis")
+   (reject_declining_ma_long_entry "live arms the declining-MA long-entry rejection (#1775); this cell pins the pre-arming basis")
+   (screening_config "live arms candidate_ranking=Quality (#1782, report ordering) and failed_breakout_tolerance_pct=0.05 (#2084); the backtest defaults stay unarmed per experiment-flag R1")
+   (resistance_lookback_bars "live feeds the resistance/support mapper 520 weekly bars for the human report only")
+   (entry_through_band_pct "live-only entry-reconciliation band for the printed ticket (#2103); read by Weekly_snapshot_generator, never by on_market_close")
+   (sparse_tail_min_bars "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
+   (sparse_tail_window_trading_days "live-only sparse-tail eligibility gate (#2083 fix 1); report-layer data hygiene, no backtest consumer")
+   (rename_detect_min_overlap_days "live-only ticker-rename detector (#2083 fix 2); report-layer data hygiene, no backtest consumer")
+   (rename_detect_match_fraction "live-only ticker-rename detector (#2083 fix 2); report-layer data hygiene, no backtest consumer")))
+ ;; Cost-model overlay mirroring sp500-2010-2026.sexp.
+ (cost_model
+  ((per_trade_commission 0.0)
+   (per_share_commission 0.0)
+   (bid_ask_spread_bps 5.0)
+   (market_impact_bps_per_pct_adv 0.0)))
+ ;; Research bands — intentionally WIDE, catch only catastrophic
+ ;; crashes / NaN sentinels. Tightening per-fold bands is downstream of
+ ;; T4.4 (sanity backtest) and T4.5 (sweep harvest).
+ (expected
+  ;; Concentration=0.30 promotion 2026-06-25 (max_position_pct_long 0.14 -> 0.30, the
+  ;; production default; ledger 2026-06-25-capacity-concentration-broad). Catch-only
+  ;; sentinel bands; 0.30 measured ret 227.5% / 673 trades / 40.6% win / 28.5% DD (PASS).
+  ((total_return_pct  ((min -90.0)  (max 5000.0)))
+   (total_trades      ((min   0.0)  (max 100000.0)))
+   (win_rate          ((min   0.0)  (max 100.0)))
+   (sharpe_ratio      ((min  -2.0)  (max   5.0)))
+   (max_drawdown_pct  ((min   0.0)  (max  95.0)))
+   (avg_holding_days  ((min   0.0)  (max 365.0)))
+   (wall_seconds      ((min 0.0)    (max 360000.0))))))
