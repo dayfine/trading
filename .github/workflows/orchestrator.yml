@@ -174,6 +174,31 @@ jobs:
           # auto-imports them — so no remote fetch is needed here.
           jj git init --colocate
 
+      - name: Compute fast-exit gate facts (A-FASTEXIT-VACUOUS, #2579)
+        # A-FASTEXIT-VACUOUS was "fixed" 2026-08-02 by adding a prose
+        # precondition to lead-orchestrator.md Step 0.5 ("if the open-PR
+        # queue is empty, skip the fast-exit entirely"). Run 33063628087
+        # (2026-08-27) proved prose does not bind: the orchestrator took the
+        # no-op path with an empty queue anyway. Per pr-merge-gates.md
+        # Rule 0's lesson, the fix moves the precondition's key fact out of
+        # agent judgment into the workflow itself, computed BEFORE the agent
+        # runs and injected into its prompt as a fact rather than an
+        # instruction it could skip reading. This is the soft half of the
+        # fix -- the model can still, in principle, ignore an injected fact
+        # -- the hard half is the "Locate daily summary + detect no-op"
+        # step below, which independently re-derives the same fact AFTER
+        # the run and fails the job on a contradiction, with no dependency
+        # on the model at all.
+        id: fastexit-precheck
+        env:
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          COUNT="$(dev/scripts/orchestrator_fastexit_gate.sh open_pr_count)"
+          echo "Open PR count at run start: ${COUNT}"
+          echo "open_pr_count=${COUNT}" >> "$GITHUB_OUTPUT"
+
       - name: Run lead-orchestrator
         id: run-orchestrator
         uses: anthropics/claude-code-action@v1
@@ -188,6 +213,16 @@ jobs:
           prompt: |
             Run the daily orchestrator session. Today is ${{ steps.today.outputs.date }}.
             Read .claude/agents/lead-orchestrator.md and follow it end to end.
+
+            Computed fact (not your own read -- the workflow queried this via
+            the GitHub API before you started): QUEUE_NON_EMPTY=${{ steps.fastexit-precheck.outputs.open_pr_count }}
+            open PRs exist right now. Per Step 0.5's "Precondition -- the
+            queue must be non-empty", if this number is 0 you MUST skip the
+            saturated-queue fast-exit check entirely and proceed straight to
+            Step 2 (a full pass) -- do not evaluate the four fast-exit
+            conditions. This fact is also verified mechanically after your
+            run finishes (dev/scripts/orchestrator_fastexit_gate.sh verify);
+            a NO-OP summary that contradicts it fails the whole job (#2579).
           claude_args: |
             --agent lead-orchestrator
             --allowedTools Agent,Bash,Read,Write,Edit,Glob,Grep
@@ -299,6 +334,10 @@ jobs:
       - name: Locate daily summary + detect no-op
         id: publish-summary
         shell: bash
+        env:
+          # For the A-FASTEXIT-VACUOUS mechanical verify call at the end of
+          # this step's script -- see that block's comment.
+          GH_TOKEN: ${{ secrets.BOT_GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           DATE="$(date +%F)"
@@ -363,6 +402,18 @@ jobs:
             NOOP=false
           fi
           echo "noop=$NOOP" >> "$GITHUB_OUTPUT"
+
+          # A-FASTEXIT-VACUOUS mechanical backstop (#2579). The prose
+          # precondition in lead-orchestrator.md Step 0.5 and the prompt
+          # fact injected by the "Compute fast-exit gate facts" step above
+          # both depend on the model reading and applying them. This does
+          # not: it independently re-derives whether a NO-OP verdict was
+          # actually justified (the open-PR queue was really empty of
+          # unreviewed work, AND no dev/status/*.md drifted since the prior
+          # summary) and fails the job outright on a contradiction, with no
+          # dependency on model behaviour. This is the actual fix for
+          # #2579 -- the prompt fact is a courtesy, this is the gate.
+          dev/scripts/orchestrator_fastexit_gate.sh verify "$SUMMARY"
 
       - name: Bundle budget into daily summary and auto-merge
         # The cost-capture step writes dev/budget/<date>-<run_id>.json.

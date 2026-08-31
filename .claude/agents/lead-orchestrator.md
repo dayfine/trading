@@ -401,6 +401,31 @@ while #2166/#2169 sat stranded). If the count of open orchestrator-dispatched
 PRs across all tracks is 0, **skip the fast-exit entirely and proceed to
 Step 2** — do not evaluate the four conditions.
 
+**This precondition is mechanically enforced, not just documented.** The
+2026-08-02 fix that first added this block was prose only — run
+33063628087 (2026-08-27) took the no-op path with an empty queue anyway,
+proving prose does not bind (issue #2579). Two things now check this fact
+independently of whether you read or apply this paragraph:
+
+1. **Before you start**, `.github/workflows/orchestrator.yml`'s "Compute
+   fast-exit gate facts" step queries the live open-PR count via the GitHub
+   API and injects it into your prompt as `QUEUE_NON_EMPTY=<n>` — a computed
+   fact, not an instruction, so you don't have to (re-)derive it yourself.
+2. **After you finish**, the workflow's "Locate daily summary + detect
+   no-op" step runs `dev/scripts/orchestrator_fastexit_gate.sh verify` on
+   the summary you wrote. If it declares `**Mode:** NO-OP` while the open-PR
+   queue was actually empty, or while `dev/status/*.md` drifted since the
+   prior summary (Condition 2), that step fails the entire job — loudly,
+   with an `::error::` line, regardless of what you concluded.
+
+Getting this precondition (and Condition 2 below) right the first time still
+matters — a failed job means a lost dispatch slot, not a silent no-op — but
+the backstop means getting it wrong now surfaces as a hard failure instead of
+an invisible cost. `dev/scripts/orchestrator_fastexit_gate.sh` is the single
+source of truth for both checks; if you want to sanity-check either condition
+yourself mid-run, call it directly (`open_pr_count`, `status_changed_since
+<iso-ts>`) rather than re-deriving the logic inline.
+
 ### Four conditions for no-op exit
 
 Evaluate all four. If ANY fails, proceed to Step 2 normally.
@@ -424,12 +449,11 @@ PREV_SUMMARY="$(ls -t dev/daily/*.md 2>/dev/null | grep -v '\-plan\.md' | head -
 PREV_TS="$(date -r "$PREV_SUMMARY" +%s 2>/dev/null || stat -f %m "$PREV_SUMMARY")"
 PREV_ISO="$(date -r "$PREV_SUMMARY" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || date -d "@$PREV_TS" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null)"
 
-# Check for any status file changes since that timestamp,
-# EXCLUDING commits whose subject is an orchestrator summary (those are the prior
-# run's own output landing on main via auto-merge — not new drift).
-STATUS_CHANGED="$(git log --since="$PREV_ISO" --name-only --pretty="%s" -- dev/status/ \
-  | grep -v '^ops: daily orchestrator summary ' \
-  | grep -c '\.' || true)"
+# Single source of truth for this check — see the exemption note below for
+# why a bare grep pipeline over `git log --name-only` does NOT correctly
+# implement the exemption (the file-path lines still contain a literal '.'
+# even after the subject line is filtered out).
+STATUS_CHANGED="$(dev/scripts/orchestrator_fastexit_gate.sh status_changed_since "$PREV_ISO")"
 if [ "${STATUS_CHANGED:-0}" -gt 0 ]; then
   CONDITION_2=FAIL
 fi
@@ -437,7 +461,7 @@ fi
 
 If any `dev/status/*.md` was committed after the prior summary — by a non-summary commit — Condition 2 fails. This catches: new features picked up, status transitions (IN_PROGRESS → READY_FOR_REVIEW), new follow-up items added.
 
-**Exemption:** commits whose subject line matches `ops: daily orchestrator summary ` are the prior run's own output auto-merging to main (Step 8a). These commits update `dev/status/_index.md` and sometimes `dev/status/harness.md` as part of the orchestrator's Step 5.5 reconciliation. They do not represent new track drift — the run that generated them already evaluated all tracks. Exempting them prevents a prior run's auto-merge from falsely tripping Condition 2 on the next run.
+**Exemption:** commits whose subject line matches `ops: daily orchestrator summary ` are the prior run's own output auto-merging to main (Step 8a). These commits update `dev/status/_index.md` and sometimes `dev/status/harness.md` as part of the orchestrator's Step 5.5 reconciliation. They do not represent new track drift — the run that generated them already evaluated all tracks. Exempting them prevents a prior run's auto-merge from falsely tripping Condition 2 on the next run. `orchestrator_fastexit_gate.sh status_changed_since` implements this by walking commits one at a time and skipping an exempted commit's file lines along with its subject — not by grepping the interleaved `--name-only` stream, which was found (while building the #2579 mechanical gate) to still count the exempted commit's own file lines.
 
 **Condition 3 — Step 1b drift cross-reference emitted no `[drift]` warnings.**
 
