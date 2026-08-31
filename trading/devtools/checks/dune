@@ -152,6 +152,18 @@
  (action
   (run sh %{dep:fmt_check.sh})))
 
+; Fixture-driven RED/GREEN regression test for fmt_check.sh's --root fix
+; (issue #2598): .ocamlformat lives at the workspace root but ocamlformat's
+; ancestor search stops at the nearest dune-project, which for real source
+; paths is one level below -- ocamlformat silently disables itself and
+; fmt_check.sh reported false "OK" forever. See fmt_check_smoke.sh header.
+
+(rule
+ (alias runtest)
+ (deps fmt_check.sh)
+ (action
+  (run sh %{dep:fmt_check_smoke.sh})))
+
 ; Nesting depth: fn avg > 3.0 or max > 5, file avg > 2.5 → FAIL (AST-based)
 ; Exempt a function with (* @nesting-ok: reason *) before the let keyword.
 ; Scans all .ml files across the workspace via Sys.readdir at runtime.
