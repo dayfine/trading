@@ -9,11 +9,14 @@ the 08-30/31 overnight session (user-directed "find 12h of work" run).
 composition-independent cell had no null. The D-null now exists
 (#2600 → PR #2610, `d-null-2026-08-31.md`): paired Δreturn at top-1000 =
 **−39 / −395 / −310pp** across salts — value-52 fails
-promotion-confirmation's "never badly dominated" rule; only maxDD is
-composition-robust. **Safe to defer** (default-path blast radius proven
-empty by #2587's paired-golden table — the clock binds only behind
-default-off `sim_entry_trigger_at_suggested`), but every future
-trigger-at-E / record-convention experiment inherits the contested value.
+promotion-confirmation's "never badly dominated" rule **on return** (it
+still wins maxDD on all three salts — not Pareto-dominated); only maxDD
+is composition-robust. **Safe to defer** — the #2587 paired-golden table
+MEASURED the default-path blast radius as empty (the clock predicate runs
+on every default tick but finds nothing: trigger-at-close tickets fill
+within a bar and never rest 52w; empirical over the golden set, not a
+structural guarantee) — but every future trigger-at-E / record-convention
+experiment inherits the contested value.
 Options (writeup §Verdict implication): revert to 0 / keep 52 documented /
 keep 52 + require record-convention specs to pin the knob. Amend the
 ledger entry with the D-null table whichever way. Also worth queuing: the

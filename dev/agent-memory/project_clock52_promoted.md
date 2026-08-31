@@ -5,23 +5,27 @@ metadata:
   node_type: memory
   type: project
   originSessionId: c11b2096-8ab9-4b27-9dc8-fd68436f65f5
-  modified: 2026-08-31T17:15:47.326Z
+  modified: 2026-08-31T17:58:39.586Z
 ---
 
 `entry_order_max_rest_weeks` default 0→52 **merged 2026-08-31** (PR #2587,
 ledger ACCEPT `2026-08-27-entry-rest-weeks-surface.sexp`, user "OK 52" on
 #2405). Full three gates + paired-run-done.
 
-**The transferable mechanism finding:** the clock is DEAD CODE on the
-default path. `sim_entry_trigger_at_suggested` defaults false → tickets
-trigger at current close, fill within a bar, never rest 52w. Paired goldens
-(12 cells, one build, `goldens-paired-2026-08-30.md`): **11/12
-bit-identical**; only `sp500-2019-2023-armed-stoplimit` (the one golden
-arming trigger-at-E) moved — −3.94pp in-band, maxDD unchanged, dissected to
-admission reshuffle (both divergent cohorts net losers). The entire 183pp
-surface effect lives behind `sim_entry_trigger_at_suggested=true`
-(record-convention lineage). Live path arms neither knob + tickets lapse
-weekly → no live effect.
+**The transferable mechanism finding (corrected per qc-behavioral
+5069567666 — do NOT say "dead code"):** the clock predicate RUNS on every
+default-config tick (`enable_sim_entry_stoplimit` defaults true since
+#2569) but finds nothing to cancel on the default path:
+`sim_entry_trigger_at_suggested` defaults false → tickets trigger at the
+current close, fill within a bar, never rest 52w. Paired goldens (12
+cells, one build, `goldens-paired-2026-08-30.md`): **11/12
+bit-identical** — a MEASURED emptiness over the golden set, not a
+structural guarantee; only `sp500-2019-2023-armed-stoplimit` (the one
+golden arming trigger-at-E) moved — −3.94pp in-band, maxDD unchanged,
+dissected to admission reshuffle (both divergent cohorts net losers). The
+entire 183pp surface effect lives behind
+`sim_entry_trigger_at_suggested=true` (record-convention lineage). Live
+path: tickets lapse weekly → no live effect.
 
 **Grid state — AMENDED 08-31 (D-null ran, #2600/#2610):** the −39.1pp at
 D salt 0 was the FLOOR: paired Δreturn = −39/−395/−310pp across salts
