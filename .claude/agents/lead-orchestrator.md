@@ -1490,12 +1490,26 @@ awk '
 ```
 
 **Fallback** — if `record_qc_audit.sh` fails (missing review file, no verdict),
-call `write_audit.sh` directly with explicit flags:
+call `write_audit.sh` directly with explicit flags. **`--sha` is required, not
+optional, on this call** — omitting it degrades write_audit.sh's rework-collision
+guard back to pre-fix overwrite behavior (see write_audit.sh's own header,
+H-AUDIT-REWORK-COUNT-BLIND) whenever two reviews of the SAME branch land on the
+SAME date: the second call silently clobbers the first record instead of
+preserving it under a `-prev<ts>-` name, and the `consecutive_rework_count`
+scan never sees the destroyed record — making the orchestrator's >=3-in-a-row
+human-escalation trigger unreachable within a single day for that branch, no
+matter how many times it actually got reworked. This is why `record_qc_audit.sh`
+passes `--sha` unconditionally on its own preferred path (`--pr-number` mode,
+via `gh pr view`) — GHA runners have no `gh`, so every GHA run takes this
+fallback, and this fallback must carry the same identity key. Use the reviewed
+tip (`git rev-parse HEAD` in the checkout being reviewed — plain `git`, not
+`jj`, since GHA runs in `$TRADING_IN_CONTAINER` mode):
 ```bash
 bash trading/devtools/checks/write_audit.sh \
   --date "$DATE" \
   --feature "$FEATURE" \
   --branch "$BRANCH" \
+  --sha "$(git rev-parse HEAD)" \
   --structural APPROVED \
   --behavioral APPROVED \
   --overall APPROVED \

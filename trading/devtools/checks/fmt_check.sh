@@ -6,6 +6,19 @@
 # reformatting, without modifying it.
 #
 # Run `dune fmt` to fix all violations at once.
+#
+# --root (issue #2598): `.ocamlformat` lives at the workspace root
+# ($TRADING_DIR, e.g. `trading/.ocamlformat`), but ocamlformat's ancestor
+# search for a project root stops at the nearest `dune-project` -- which
+# for real source paths under `trading/trading/...` is `trading/trading/`,
+# ONE LEVEL BELOW where `.ocamlformat` lives. With no project root
+# containing `.ocamlformat`, ocamlformat prints "Ocamlformat disabled" and
+# exits 0 on every file -- a permanent, silent no-op. `--root="$TRADING_DIR"`
+# pins the project root explicitly to where `.ocamlformat` actually is, so
+# `--check` performs the real check instead of silently passing. (`dune
+# build @fmt` never hit this: dune's `_build/default` tree contains a copy
+# of `.ocamlformat` but no `dune-project`, so its own ancestor search
+# resolves cleanly.)
 
 set -e
 
@@ -33,7 +46,7 @@ for f in $(find "$TRADING_DIR" \
     -not -name "*.pp.ml" \
     -not -name "*.pp.mli" \
     -print 2>/dev/null || true); do
-  if ! ocamlformat --check "$f" 2>/dev/null; then
+  if ! ocamlformat --root="$TRADING_DIR" --check "$f" 2>/dev/null; then
     VIOLATIONS="${VIOLATIONS}  ${f}\n"
   fi
 done
