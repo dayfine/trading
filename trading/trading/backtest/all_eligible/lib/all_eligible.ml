@@ -241,7 +241,8 @@ let dedup_first_admission (scored : OT.scored_candidate list) :
 
 (** Whether [actual] meets-or-beats [floor] in the standard cascade quality
     ordering [A_plus > A > B > C > D > F]. Mirrors the gate
-    [Screener._passes_score_floor] uses with [min_score_override = None]. *)
+    [Screener_admission.passes_score_floor] uses with
+    [min_score_override = None]. *)
 let _grade_passes ~floor (actual : Weinstein_types.grade) : bool =
   Weinstein_types.compare_grade actual floor <= 0
 

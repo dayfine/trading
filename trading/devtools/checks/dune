@@ -73,6 +73,41 @@
  (action
   (run sh %{dep:linter_mli_coverage.sh} %{dep:linter_exceptions.conf})))
 
+; Dangling odoc-reference check (WARN-only, non-gating -- see the script's
+; own header for the full design rationale): a `[Module._identifier]` or
+; `{!Module._identifier}` doc-comment reference to a private, underscore-
+; prefixed symbol that no longer exists anywhere in the tree under that
+; name (renamed, moved, or deleted with the doc comment never updated).
+; Filed by qc-behavioral on PR #2542 (finding B1, harness_gap:
+; LINTER_CANDIDATE); see dev/status/cleanup.md `linter_candidate` entry.
+; Always exits 0 (the pre-existing backlog of 11 real dangling references
+; on main is tracked as its own cleanup.md item, not gated here) unless
+; ODOC_DANGLING_REF_CHECK_STRICT=1 is set in the environment -- not done by
+; this rule, so CI always sees the non-gating default.
+
+(rule
+ (alias runtest)
+ (deps
+  _check_lib.sh
+  (glob_files_rec %{workspace_root}/*.ml)
+  (glob_files_rec %{workspace_root}/*.mli))
+ (action
+  (run sh %{dep:odoc_dangling_ref_check.sh})))
+
+; Fixture-driven self-test for odoc_dangling_ref_check.sh: builds private
+; throwaway "trading dirs" under mktemp -d, so it never depends on the real
+; repo's current population of dangling/live doc references. See
+; odoc_dangling_ref_check_test.sh's header for the 5 fixtures (clean tree,
+; PR #2542's exact regression shape, binding-site regex robustness for
+; `let rec` / glued `let[@attr]`, a fails-closed vacuity-mutant backstop,
+; and the STRICT-mode toggle).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh odoc_dangling_ref_check.sh)
+ (action
+  (run sh %{dep:odoc_dangling_ref_check_test.sh})))
+
 ; Magic numbers: numeric literals must be routed through config records
 ; Scans all lib/*.ml files across the workspace via Sys.readdir at runtime.
 ; OCaml exe (devtools/magic_numbers_linter/), not a shell script: the former
@@ -770,6 +805,41 @@
  (deps _check_lib.sh check_universe_deps.sh (universe))
  (action
   (run sh %{dep:check_universe_deps_test.sh})))
+
+; adapter_effectiveness_check.sh (issue #2567): guards against the
+; "silent-null config thread" defect class -- a Weinstein_strategy.config
+; field threaded into a sub-config via a "field = config.field2" copy,
+; severable with the whole suite staying green. Scans the live weinstein
+; source tree (not just this directory), so it needs repo_root() +
+; (universe) like check_universe_deps.sh above. See
+; dev/plans/silent-null-effectiveness-2026-08-28.md for the full design
+; and census.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh adapter_effectiveness_exceptions.conf (universe))
+ (action
+  (run sh %{dep:adapter_effectiveness_check.sh})))
+
+; Self-test for adapter_effectiveness_check.sh: pins the scanning +
+; decision logic (field-copy shape detection, pin lookup, exceptions-list
+; handling, test/bin exclusion) against a synthetic fixture tree via the
+; REPO_ROOT override, plus two mutation-proof assertions against a working
+; copy of the real script -- independent of whatever the real weinstein
+; tree currently contains.
+;
+; Also declares (universe): its fixture heredocs embed
+; "config.<field>"-shaped text (used to exercise the guard under test)
+; that adapter_effectiveness_check.sh's own scan would otherwise pick up
+; if this file's containing directory were ever inside its scan roots (it
+; is not today, but the guard's own correctness should not depend on
+; that).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh adapter_effectiveness_check.sh (universe))
+ (action
+  (run sh %{dep:adapter_effectiveness_check_test.sh})))
 
 ; prior_cell_check test (2026-08-20): dev/scripts/prior_cell_check.sh guards
 ; against claiming a metric unmeasured when a committed results file already

@@ -1309,3 +1309,427 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 
   Verify: `bash trading/devtools/checks/record_qc_audit_test.sh` (68
   scenarios, up from 61 after PR #2504).
+
+## Added 2026-08-28 (harness-maintainer, harness/2567-silent-null-effectiveness, issue #2567)
+
+- [x] **Mechanical guard for the "silent-null config thread" defect
+  class.** qc-behavioral on #2563 named a recurring pattern: a
+  `Weinstein_strategy.config` field threads into a sub-config (`Rs.config`,
+  `Volume.config`, ...) via a `field = config.field2` copy, the thread is
+  severable with the WHOLE SUITE staying green, and the failure mode is a
+  silent null — an armed axis sweep measures the baseline and the
+  experiment ledger records a REJECT for a mechanism that never ran (three
+  prior instances: `Volume.config` #2459, the rt anchor knob, and #2563's
+  `enable_rs_positive_declining`, each caught only by manual review, never
+  mechanically). Per `.claude/rules/experiment-flag-discipline.md` Rule 4
+  a terminal REJECT can get the mechanism's code deleted — so this defect
+  class can delete working code on false evidence.
+
+  **Plan-first, per the dispatch's design fork:** wrote
+  `dev/plans/silent-null-effectiveness-2026-08-28.md` before any code,
+  deciding between the issue's two enforcement options (a linter vs. a
+  `qc-structural` convention row) via a real census rather than intuition.
+  Grepped the two domain roots (`trading/trading/weinstein/`,
+  `trading/analysis/weinstein/`) for the literal field-copy shape:
+  **17 occurrence sites, 15 distinct field names, across 6 files** — not a
+  handful, and NOT confined to `_config_for`-named adapters (`_run_screener`
+  threads 3 of the 17 with no `_config_for` in its name, which would have
+  been a false-negative gap even for a name-keyed version of option (a)).
+  The two files with the most copies had 42 and 23 commits in the prior 60
+  days — high, rising churn. Doing the census by hand also found a 16th,
+  then-live gap on `main` (`entry_freshness_basis`, F1) — concrete evidence
+  that per-PR vigilance had already failed a 4th time. **Decision: (a), a
+  linter** — the convention-only path (b) relies on exactly the mechanism
+  that had already failed three (now four) times.
+
+  **Built** (`trading/devtools/checks/adapter_effectiveness_check.sh`):
+  scans both domain roots (excluding `*/test/*`, `*/bin/*`) for the shape
+  `<module-prefix>?field = config.field2[;]` — SHAPE-based (any function,
+  not just `_config_for`-named ones), matching the false-negative the
+  census found. For every unique `field2`, requires either an
+  `EFFECTIVENESS-PIN: <field2>` tag in some `*/test/*.ml` file repo-wide,
+  or an entry in the new `adapter_effectiveness_exceptions.conf`
+  (mandatory `review_at`, same convention as `universe_deps_exceptions.conf`
+  / `linter_exceptions.conf`). Wired into `dune runtest` via
+  `trading/devtools/checks/dune` (mirrors the `check_universe_deps.sh`
+  rule pair, both `(universe)`).
+
+  **Closed the real gap the census found**: added
+  `test_threads_entry_freshness_basis` to
+  `test_stock_analysis_config_wiring.ml` (arms
+  `entry_freshness_basis = Range_top_breakout`, asserts the built
+  `Stock_analysis.config` differs) — before this PR, nothing in the suite
+  would have caught that thread being severed. Retrofitted
+  `EFFECTIVENESS-PIN` tags onto 5 more fields with pre-existing adequate
+  tests (`overhead_supply`, `virgin_crossing_readmission`,
+  `entry_anchor_local_range_weeks`, `resistance_min_history_bars` in
+  `test_stock_analysis_config_wiring.ml`; `enable_rs_positive_declining` in
+  `test_rs_trend_live.ml`, already a real downstream-behavior pin).
+  Grandfathered the remaining 9 fields in
+  `adapter_effectiveness_exceptions.conf` with `review_at` dates 30-45 days
+  out (`neutral_blocks_longs`, `neutral_blocks_shorts`,
+  `enable_slow_grind_short_gate`, `stop_width_mode`,
+  `stop_width_size_down_max_pct`, `match_fraction`, `ret_epsilon`,
+  `require_breakout_volume`, `insufficient_score`) rather than blocking
+  this PR on retrofitting all 17 sites — per
+  `.claude/rules/code-health-discipline.md`'s allowance for a bounded
+  exception paired with dated follow-up, not an open-ended bump.
+
+  **Found and fixed a real bug in the checker's own first run**
+  (H-ADAPTER-PIN-LINEWRAP): `dune build @fmt --auto-promote` reflowed the
+  `virgin_crossing_readmission` doc comment so `EFFECTIVENESS-PIN:` and
+  the field name landed on different physical lines — a naive per-line
+  `grep -E` missed it (false FAIL on a field that WAS genuinely pinned).
+  Fixed by joining each test file's content before the pin search (so
+  ocamlformat's wrapping can never split a tag from its field name), and
+  pinned the fix with a dedicated fixture assertion (11) reproducing the
+  exact wrapped-comment shape.
+
+  **Acceptance verification (all against the real repo AND a synthetic
+  fixture root, per the dispatch's "must not be vacuously green" bar):**
+  - Positive control, REAL production code: hand-severed
+    `entry_freshness_basis = config.entry_freshness_basis` to a hardcoded
+    `Entry_freshness.Ma_cross` in `weinstein_strategy_screening.ml` —
+    `test_stock_analysis_config_wiring.exe` went RED (`FAILED: ... Failures:
+    1`) exactly on `test_threads_entry_freshness_basis`. Reverted; reran
+    green (8/8).
+  - Positive control, linter fixture: an unpinned fixture field-copy pair
+    -> FAIL naming field + file:line (assertion 1).
+  - Fixture root has both a violating case (assertion 1) and multiple
+    conforming cases (assertions 2, 3, 7, 11) — never just the live,
+    already-clean repo.
+  - Mutation table (3 independent break-directions, `adapter_effectiveness_check_test.sh`
+    assertions 8-9 run against a WORKING COPY of the real script, never
+    the fixture data):
+
+    | mutation | direction | result |
+    |---|---|---|
+    | fixture: add an untested field-copy pair | positive control | RED (assertion 1) |
+    | narrow the field-copy regex to a literal nonexistent field name ("matches nothing") | detector self-check | RED->false-PASS, distinguishable message ("no field-copy lines found" vs. the real audit-pass text) (assertion 8) |
+    | corrupt the pin-lookup tag prefix | detector self-check | previously-pinned field reverts to FAIL (assertion 9) |
+
+  - `adapter_effectiveness_check_test.sh`: 10/10 assertions pass.
+  - Full `dune build`: exit 0 (~1 min, warm cache). Full `dune runtest`:
+    exit 0, 0 `^FAIL:` lines (~1 min). `dune build @fmt`: exit 0, no diff.
+
+  Verify: `sh trading/devtools/checks/adapter_effectiveness_check.sh` (OK
+  against current main); `sh
+  trading/devtools/checks/adapter_effectiveness_check_test.sh` (10
+  passed); `dune runtest trading/weinstein/strategy/test/` (includes the
+  new `test_threads_entry_freshness_basis`).
+
+  **Follow-ups** (tracked via the exceptions file's `review_at` dates,
+  2026-10-01 / 2026-10-13): retrofit real `EFFECTIVENESS-PIN` tests for
+  the 9 grandfathered fields. Also documented, not fixed: (a) a
+  derived/conditional thread (e.g. `require_breakout_volume = not (...)`)
+  is invisible to the regex — syntactic, not semantic; (b) a field-copy
+  whose two halves are split across two lines by ocamlfmt is invisible to
+  the SCAN (as opposed to the PIN lookup, which is now line-wrap-safe) —
+  confirmed live on `enable_slow_grind_short_gate` in
+  `weinstein_strategy_screening.ml`, documented in the script header and
+  as a comment (not an active entry) in the exceptions file.
+
+- [x] **H-ADAPTER-ASSERT8-LOG-STRING (R-1a)**: filed by qc-behavioral on the
+  #2585 re-review (2026-08-28, non-blocking — the sole reason the score was
+  held at 4 rather than 5). The R-1 descriptive correction stopped one line
+  short. `adapter_effectiveness_check_test.sh`'s header now correctly says
+  *"Do NOT cite assertion 8 as the mutation-proof"*, but the **runtime `ok`
+  string at line 323 still prints** *"proving the real regex is
+  load-bearing"* — the original non-sequitur (a mutation producing a *false
+  PASS* shows the regex is fragile, not load-bearing), and it is in the copy
+  that appears in **every CI log**. So the file contradicts itself with the
+  wrong claim in the louder place. Fix shape: reword that one `ok` string to
+  match the header — e.g. "assertion 8 — MUTATION A (regex narrowed to a
+  nonexistent field name) produces the expected false-PASS message;
+  characterization only, NOT the mutation-proof (that is assertion 1)".
+  One-line prose change to a log string; no logic change; goldens and exit
+  codes unaffected. Deliberately **not** folded into #2585: the PR already
+  held a clean CI + double-APPROVED gate pinned to `7aada7ec`, and touching
+  a script would have invalidated both verdicts and consumed rework
+  iteration 2 of 2 for a log string. `harness_gap: NONE`.
+  (source: 2026-08-28 run 1, qc-behavioral re-review of PR #2585)
+  **DONE (2026-08-28, harness/2585-residuals-r1a-r5):** re-measured the
+  claim before editing — the header (lines 35-58) already carried the
+  correct framing and the `ok` string at line 323 was confirmed to still say
+  "proving the real regex is load-bearing", exactly as filed. Reworded to
+  "assertion 8 — MUTATION A (regex narrowed to a nonexistent field name)
+  produces the expected false-PASS message; characterization only, NOT the
+  mutation-proof (that is assertion 1)" — the exact text the finding
+  suggested. One-line change, no logic touched. Lives at
+  `trading/devtools/checks/adapter_effectiveness_check_test.sh:323`. Verify:
+  `sh trading/devtools/checks/adapter_effectiveness_check_test.sh` (or
+  `dune runtest trading/devtools/checks/`) — all 9 assertions pass, exit 0.
+
+- [x] **H-EXPIRY-ROLLUP-SHARED-FN-ASSUMED (O2)**: filed by qc-behavioral on
+  PR #2589 (2026-08-28 run 2) — the **only green-while-broken evasion found in
+  13 independent attacks** on the new R-5 assertions. `_scan_exceptions_conf()`
+  is shared by all three conf files, and the R-5 test fixture arms only
+  `adapter_effectiveness_exceptions.conf`. A **per-label special-case inside
+  the shared function** — e.g. `case "${label}" in Adapter*) : ;; *) continue ;;
+  esac` before `add_warning` — kills the roll-up for `linter_exceptions.conf`
+  and `universe_deps_exceptions.conf` while the whole suite stays **exit 0**.
+  The R-5 script header argues the break "drops identically for all three
+  files (the function is shared)", which is true of the accidental shape R-5
+  actually observed and is a fair explanation of why that bug was systemic —
+  but it reads as though the AE fixture therefore protects all three, and it
+  does not. Requires a deliberate targeted edit, not the accidental shape, so
+  it is a real but narrow residual. Cheap to close: the fake root already
+  creates an empty `linter_exceptions.conf` (`:158`); put one expired line in
+  it and add a second `^W: ` assertion for the `Linter exception expiry` label.
+  `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-08-28 run 2, qc-behavioral on PR #2589, attack E2)
+  **DONE (2026-08-30, harness/2589-expiry-o2-o3):** confirmed the evasion by
+  hand first — applied the exact `case "${label}" in Adapter*) : ;; *)
+  continue ;; esac` guard (via `awk`, inserted before the date-branch
+  `add_warning` call) to a working copy of the real
+  `check_11_linter_expiry.sh`, ran it against a fixture with an expired entry
+  in BOTH `adapter_effectiveness_exceptions.conf` and (now-populated)
+  `linter_exceptions.conf`: exit 0, AE roll-up line present, LE roll-up line
+  silently gone — the exact evasion. Also confirmed a naive fix (asserting
+  only `^W: Linter exception expiry:` with no fixture-name anchor) would have
+  been vacuous: that pattern still matches the unrelated "Design doc ... not
+  found" milestone-parse-warning line, which carries the same label prefix
+  and survives the mutation. Added `trading/devtools/checks/
+  deep_scan_linter_expiry_check.sh` Part 5 (5a positive assertion anchored on
+  label + fixture name `fixture_stale_le_entry` + "has passed"; 5b
+  mutation-proof re-applying the exact case-guard shape as MUTATION E,
+  confirming exit 0 / AE-line-survives / LE-line-gone). Re-verified: applying
+  the mutation to the finished suite → 5b's new assertion FAILs (red);
+  reverting → suite passes (green, all 16 `OK:` lines, exit 0). Vacuity
+  double-check: reworded the date-branch `add_warning` message text while
+  preserving behaviour → 5a correctly fails closed (red), not vacuously
+  green. Verify: `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh`
+  or `dune runtest trading/devtools/checks/`.
+
+- [x] **H-EXPIRY-ADDWARNING-SITES-UNPINNED (O3)**: filed by qc-behavioral on
+  PR #2589. #2589's completion note declares two uncovered branches
+  (missing-`review_at`, and the milestone branch ~`:166`) and **both
+  declarations were verified accurate** — credit for stating them. But the
+  real uncovered set is **two branches wider**: `_scan_exceptions_conf` has
+  two further `add_warning` call sites nothing exercises — conf-file-not-found
+  (`:113`, all three files exist in the fixture) and unrecognised-`review_at`
+  -format (`:184`). The note is phrased non-exhaustively so it is not false,
+  but the accurate summary is: **the date-expired branch is the only one of
+  the five `add_warning` sites in this function that is pinned.**
+  `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-08-28 run 2, qc-behavioral on PR #2589, observation O3)
+  **DONE (2026-08-30, harness/2589-expiry-o2-o3):** re-verified all four
+  gaps by hand first (each confirmed exit 0 / silent before adding its
+  assertion). Pinned all four of `_scan_exceptions_conf`'s remaining
+  `add_warning` sites, each with a positive assertion + an independent
+  mutation-proof (delete that site's `add_warning` call, confirm the specific
+  finding disappears while its sibling in the same fixture survives) in
+  `deep_scan_linter_expiry_check.sh`:
+  - `:113` conf-file-not-found — Part 6, new fixture omitting
+    `universe_deps_exceptions.conf` entirely (all prior fixtures require the
+    file to exist, since a missing file short-circuits the function via
+    `return 0` before any entry is read).
+  - `:161` milestone-unknown (manual review) — Part 6a, reuses the existing
+    `AE_FAKE_ROOT` (no design doc there, so `CURRENT_MILESTONE_NUM` is
+    already 0/unknown, matching production's unparseable-doc path).
+  - `:166` milestone-landed (expired) — Part 6c, new fixture with a fake
+    `docs/design/weinstein-trading-system-v2.md` declaring `Current
+    milestone: M3` (mutually exclusive with `:161`'s precondition in the same
+    fixture, hence the separate root).
+  - `:184` unrecognised-`review_at`-format — Part 6a, same `AE_FAKE_ROOT`.
+  All four assertions vacuity-checked by hand (benign reword of the
+  production message, same behaviour) and confirmed to fail closed rather
+  than passing vacuously. **Correction to this file's own accounting:** the
+  five `add_warning` sites are `:113`, `:161`, `:166`, `:176` (date-expired,
+  already pinned), `:184` — "missing-`review_at`" from the original #2589
+  completion note is a SIXTH, separate branch (`_SCAN_MISSING`, lines
+  ~130-137) that never calls `add_warning` at all; it only ever surfaces in
+  the per-file `REPORT_FILE` "Missing review_at annotation" section, never in
+  the roll-up. It was never one of "the five `add_warning` sites" despite
+  reading that way in prior notes; filed as a new residual below
+  (H-EXPIRY-MISSING-REVIEWAT-UNPINNED) since it remains genuinely untested by
+  this suite.
+  **Rework iteration 1 (2026-08-30, PR #2595 qc-behavioral NEEDS_REWORK,
+  quality score 2):** qc-behavioral independently constructed and ran the
+  identical per-label case-guard evasion
+  (`case "${label}" in Universe-deps*) : ;; *) continue|return 0 ;; esac`,
+  the mirror image of Part 5's `Adapter*` guard) at each of the four
+  Part-6 sites and confirmed all four left the suite green — because every
+  Part-6 fixture before this iteration only ever populated
+  `universe_deps_exceptions.conf`, so nothing distinguished "the site fires
+  for every conf file" from "the site fires for universe-deps specifically."
+  Confirmed each of the four evasions by hand first (exit 0, silent), then
+  closed all four by extending Part 5's mutation-proof pattern rather than
+  narrowing the PR's "pin all 5" claim:
+  - `:161` / `:184` — added a second, differently-labelled fixture entry to
+    the existing `AE_FAKE_ROOT`'s `linter_exceptions.conf` (already present
+    for Part 5's date-expired fixture) hitting the same two branches, plus a
+    same-shape case-guard mutation-proof (6a2/6b2) restricted to
+    `Universe-deps*` for each site independently.
+  - `:166` — added a milestone-landed `linter_exceptions.conf` entry to the
+    existing `MS_FAKE_ROOT` (6c2), plus the matching case-guard
+    mutation-proof (6d2).
+  - `:113` — extended `NF_FAKE_ROOT` to omit `linter_exceptions.conf` in
+    addition to `universe_deps_exceptions.conf` (two missing files instead
+    of one), so both conf-not-found labels fire; added the matching
+    case-guard mutation-proof (6f2), using `return 0` rather than
+    `continue` since this site runs before the `while` loop.
+  Every new assertion also vacuity-checked (benign reword of its production
+  message, call left in place, confirmed to fail closed). End-to-end sanity
+  check: applied the real four-site `Universe-deps*`-only case guard
+  directly to the production `check_11_linter_expiry.sh` and confirmed the
+  full suite goes RED with an actionable diagnosis (missing
+  `fixture_unknown_milestone_le`); reverted and confirmed green again.
+  Verify: `sh trading/devtools/checks/
+  deep_scan_linter_expiry_check.sh` (28 `OK:` lines, exit 0) or
+  `dune runtest trading/devtools/checks/`.
+  **Rework iteration 2 (2026-08-30, PR #2595 qc-behavioral re-review at
+  `d83d1243`, NEEDS_REWORK, quality score 2):** iteration 1's per-label
+  evasion class was confirmed fully closed (both reviewers independently
+  re-checked, including a `conf_path`-keyed variant — also caught). The
+  re-review escalated to a DIFFERENT mutation shape: deleting ONLY the
+  `_SCAN_COUNT` increment at a site (leaving `add_warning()` and
+  `_SCAN_DETAILS` intact) desyncs the roll-up `W:` line (still correct)
+  from the `REPORT_FILE`'s own per-entry detail line, because the report's
+  "### Expired or due-for-review entries" block is gated on the
+  per-conf-file COUNT, never on `_SCAN_DETAILS` non-emptiness. Confirmed
+  the gap by hand for `:161` (milestone-unknown), `:166` (milestone-landed),
+  and `:184` (unrecognised-format): with the corrupted entry as the ONLY
+  expired entry in its conf file, the section falls back to printing "No
+  expired or missing review_at annotations found" while the roll-up
+  finding survives unchanged — the exact green-while-broken shape the
+  guard exists to prevent, and none of Part 6's assertions (all roll-up-only
+  for these sites) would have caught it. Also confirmed the shape is
+  MASKED by a fixture with >1 entry per conf file (a sibling entry's
+  increment keeps the report's print gate open, so the corrupted entry's
+  detail line still prints via the shared `_SCAN_DETAILS` accumulator) —
+  which is why none of Part 6's multi-entry `AE_FAKE_ROOT`/`MS_FAKE_ROOT`
+  fixtures exposed it even though they share the same underlying function.
+  **Fix (Part 7, new):** added three fresh, deliberately single-entry-per-
+  conf-file fixtures (`MU_FAKE_ROOT` for `:161`, reused `MS_FAKE_ROOT` for
+  `:166`, `UF_FAKE_ROOT` for `:184`) and, for each, a `REPORT_FILE`
+  exact-text detail-line assertion, a count-only-removal mutation-proof
+  (confirms exit 0 + roll-up survives + detail line vanishes + report
+  falsely says "No expired..."), and a vacuity reword check (confirms the
+  assertion fails closed on a benign text change, not just a functional
+  one). `:113` (conf-file-not-found) is **not applicable** to this
+  corruption class — that branch returns before the per-entry loop, so
+  there is no per-entry `_SCAN_COUNT` to corrupt independently of the
+  `add_warning()` call itself; it remains fully covered by Part 6's
+  existing call-deletion + vacuity tests. `:176` (date-expired) was
+  previously closed only INCIDENTALLY — Part 3a's `REPORT_FILE` assertion
+  happens to run against `AE_FAKE_ROOT`'s single-entry
+  `adapter_effectiveness_exceptions.conf`, so the same corruption already
+  failed it — and this rework makes that deliberate with an explicit
+  count-only mutation-proof plus vacuity reword against the same fixture
+  (Part 7g-7i), rather than leaving the coverage as an accident of an
+  unrelated fixture's shape. The production `check_11_linter_expiry.sh`
+  was never edited in place — every mutation in this suite (Parts 3-7)
+  reads it via `sed`/`awk` into a separate generated copy, matching the
+  file's existing convention, so there was nothing to revert; confirmed
+  with `git status --porcelain` showing only the test file changed.
+  Verify: `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh`
+  (40 `OK:` lines, exit 0) or `dune runtest trading/devtools/checks/`.
+
+- [ ] **H-EXPIRY-MISSING-REVIEWAT-UNPINNED**: filed while closing O2/O3
+  (2026-08-30). `_scan_exceptions_conf`'s "missing `review_at` annotation"
+  branch (`check_11_linter_expiry.sh:130-137`, populates `_SCAN_MISSING` /
+  `_SCAN_MISSING_COUNT`) never calls `add_warning` — it is invisible to the
+  roll-up `W:` findings line entirely and only ever surfaces in the per-file
+  `REPORT_FILE` "### Missing review_at annotation — policy violation T1-K"
+  section. `deep_scan_linter_expiry_check.sh` has no assertion pinning this
+  branch at all (structurally or functionally) for any of the three conf
+  files. Note this is a different failure mode than the five `add_warning`
+  sites O3 closed: a regression here would silently drop the per-file
+  MISSING section from the report, not the roll-up warning — `main.sh`'s
+  top-level "## Warnings" would stay unaffected either way since this branch
+  was never wired into it. `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-08-30, harness-maintainer while closing PR #2589's O2/O3)
+
+- [ ] **H-EXPIRY-MUTATION-DIAGNOSTIC-MISLEADS (O1)**: filed by qc-behavioral on
+  PR #2589, non-blocking. Assertions 3c/3d/3e **fail closed** on a benign
+  reword of the call site (verified: three separate rewordings all go RED, none
+  goes vacuously green — the safe direction, and the #2580 shape specifically
+  attacked). But the printed diagnosis misleads: 3c prints "expired
+  fixture_expired_field entry was NOT surfaced in the roll-up W: findings line"
+  while the dumped findings file two lines below plainly shows the correct `W:`
+  line, and 3e prints "MUTATION D did not produce the expected split" without
+  naming the real cause (its own `sed` pattern no longer matches the source).
+  Recoverable in seconds because the assertions dump the findings/report
+  contents, so this costs a future reworder minutes, not correctness. Fix
+  shape: have 3d/3e assert their `sed` actually changed the file
+  (`! diff -q "$CHECK_11" "$AE_MUT_CHECK2"`) and fail with "the mutation's sed
+  pattern no longer matches — update the pattern, the protection may be fine".
+  `harness_gap: NONE`.
+  (source: 2026-08-28 run 2, qc-behavioral on PR #2589, observation O1)
+
+- [ ] **H-EXPIRY-CONSUMER-HALF-UNPINNED (O4)**: filed by qc-behavioral on PR
+  #2589, non-blocking, and **out of R-5's declared scope** (the header does not
+  claim otherwise). Part 4 models `deep_scan/main.sh`'s calling convention but
+  pins only the **producer** half: nothing asserts that `main.sh:47` still
+  passes a findings file as `$2`, nor that `main.sh:110-111` still routes
+  `W: ` into the `## Warnings` section (`:174`). Breaking either would silently
+  drop check_11's roll-up in production with Part 4 fully green. Mitigating and
+  the reason this is low priority: `_run_check` is shared by all 12 deep-scan
+  checks, so that break is far broader and louder than the one R-5 targets.
+  `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-08-28 run 2, qc-behavioral on PR #2589, observation O4)
+
+- [ ] **H-EXPIRY-NOTE-OFFBYONE-COUNTS (O5)**: filed by qc-behavioral on PR
+  #2589, cosmetic. Two off-by-one counts in this file's own #2589 completion
+  notes: the R-1a note says "all 9 assertions pass" but the runner reports
+  **10** (assertions 1-9 plus 11); the R-5 note says the check "prints 5 `OK:`
+  lines" but it prints **6** (five assertions plus the trailing summary). Both
+  are in *verification instructions* — the numbers a future reader would use to
+  decide whether the check still works — not contract claims. Everything else
+  in both notes was checked line by line against the tree and is accurate.
+  Noting rather than silently fixing, since this file is the durable record and
+  four consecutive runs have now found a record disagreeing with the tree.
+  `harness_gap: NONE`.
+  (source: 2026-08-28 run 2, qc-behavioral on PR #2589, observation O5)
+
+- [ ] **H-EXPIRY-GLOB-CLOSES-CLASS (R-4)**: recorded by qc-behavioral on the
+  #2585 re-review as explicitly non-blocking. `check_11_linter_expiry.sh` now
+  scans **all three** `*exceptions*.conf` files that exist repo-wide, so there
+  is **zero** currently-unprotected surface — but the list is three hardcoded
+  `_scan_exceptions_conf()` calls, so a **fourth** exceptions file added later
+  would again be silently unscanned. That hardcoded-list shape is exactly what
+  allowed BQ-1. The author's reason for not globbing holds on inspection: each
+  block carries its own accumulator quartet *and* file-specific report prose
+  naming a *different* sibling guard, so a glob needs a data-driven
+  `(path, label, guard)` table — a refactor, not two lines. Closes the
+  instance, not the class. Fix shape: that table. `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-08-28 run 1, qc-behavioral re-review of PR #2585)
+
+- [x] **H-EXPIRY-ROLLUP-WARNING-UNPINNED (R-5)**: pre-existing, surfaced (not
+  introduced) by #2585's review and out of scope there. Deleting `add_warning`
+  in the date branch of `_scan_exceptions_conf()` leaves the report section
+  intact and every test green — so the **roll-up warning path is unpinned for
+  all three conf files**, identically before and after #2585. The per-file
+  `[EXPIRED]` detail lines *are* pinned; it is only the roll-up that is not.
+  Fix shape: assert the `W:` roll-up line, not just the detail line, in
+  `deep_scan_linter_expiry_check.sh`. `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-08-28 run 1, qc-behavioral re-review of PR #2585)
+  **DONE (2026-08-28, harness/2585-residuals-r1a-r5):** confirmed the gap by
+  hand first (mutating the real `check_11_linter_expiry.sh`, deleting the
+  date-branch `add_warning` call — the pre-fix suite stayed fully green).
+  Added Part 4 to `trading/devtools/checks/deep_scan_linter_expiry_check.sh`
+  (assertions 3c-3e): 3c runs `check_11_linter_expiry.sh` with a
+  `FINDINGS_FILE` argument (`deep_scan/main.sh`'s real calling convention)
+  and asserts a `^W: .*fixture_expired_field.*has passed` line is present —
+  the roll-up, not just the `[EXPIRED]` detail line. 3d mutates a working
+  copy by deleting the date-branch `add_warning` call (the exact finding
+  repro) and asserts the detail line survives but the `W:` line vanishes.
+  3e is a second, independent break direction — corrupts the `add_warning`
+  message content (keeps the call) so the field name drops out of the
+  roll-up text while the call still fires; asserts the same split. Both
+  mutations were also re-verified by hand directly against the real
+  `check_11_linter_expiry.sh` (not just the test's internal copies): RED on
+  mutation, clean revert (`diff` identical to pre-mutation), GREEN again.
+  **Known gap NOT covered** (found during this fix, not asked for in R-5,
+  left as-is per scope): the *missing-review_at* branch of
+  `_scan_exceptions_conf()` never calls `add_warning` at all (only the
+  per-file `### Missing review_at annotation` detail section is populated)
+  — so a missing-review_at roll-up warning has never existed and this PR
+  does not add one. Similarly, 3c/3d/3e's fixture is date-based only; a
+  break in the **milestone** branch's `add_warning` (line ~166, "was due
+  for review at ... — retire or re-annotate") is not exercised by these
+  assertions. Both are candidates for a follow-up in the same shape as R-5
+  if they turn out to matter. Verify:
+  `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh` (or `dune
+  runtest trading/devtools/checks/`) — prints 5 `OK:` lines, exit 0.

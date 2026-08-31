@@ -22,14 +22,21 @@
 #
 # Also scans universe_deps_exceptions.conf (H-CHECK-CACHE-BLIND guard's
 # own exceptions file, extended with a mandatory "# review_at:" field per
-# the #2148 FLAG-1 residual — see .claude/rules/code-health-discipline.md).
-# The two conf files share this check's date/milestone-expiry logic via
-# the _scan_exceptions_conf() function below; check_universe_deps.sh (the
-# per-PR guard) separately enforces that every universe_deps_exceptions.conf
-# entry HAS a parseable review_at at all — this check only asks whether an
-# already-present one has expired. Split rationale: presence/parseability is
-# cheap and belongs on the per-PR hot path that adds new entries; expiry
-# (has enough time passed to warrant a look) is a slower-moving signal that
+# the #2148 FLAG-1 residual — see .claude/rules/code-health-discipline.md)
+# and adapter_effectiveness_exceptions.conf (the silent-null config-thread
+# guard's own exceptions file, issue #2567 — wired in by PR #2585 rework
+# after review found the file's `review_at` dates were decorative: nothing
+# scanned it, so an expired date never surfaced. See BQ-1 in
+# dev/reviews/harness-2567-2585.md and the corrected note in
+# dev/plans/silent-null-effectiveness-2026-08-28.md §Risks). All three conf
+# files share this check's date/milestone-expiry logic via the
+# _scan_exceptions_conf() function below; each conf file's own per-PR guard
+# (check_universe_deps.sh, adapter_effectiveness_check.sh) separately
+# enforces that every entry HAS a parseable review_at at all — this check
+# only asks whether an already-present one has expired. Split rationale:
+# presence/parseability is cheap and belongs on the per-PR hot path that
+# adds new entries; expiry (has enough time passed to warrant a look) is a
+# slower-moving signal that
 # matches this weekly deep-scan's existing cadence and precedent.
 
 set -e
@@ -194,10 +201,19 @@ UD_EXPIRY_MISSING_COUNT="$_SCAN_MISSING_COUNT"
 UD_EXPIRY_DETAILS="$_SCAN_DETAILS"
 UD_EXPIRY_MISSING="$_SCAN_MISSING"
 
+# ── adapter_effectiveness_exceptions.conf (issue #2567 / BQ-1) ─────
+_scan_exceptions_conf "${TRADING_DIR}/devtools/checks/adapter_effectiveness_exceptions.conf" "Adapter-effectiveness exception expiry"
+AE_EXPIRY_COUNT="$_SCAN_COUNT"
+AE_EXPIRY_MISSING_COUNT="$_SCAN_MISSING_COUNT"
+AE_EXPIRY_DETAILS="$_SCAN_DETAILS"
+AE_EXPIRY_MISSING="$_SCAN_MISSING"
+
 add_metric EXPIRY_COUNT "$EXPIRY_COUNT"
 add_metric EXPIRY_MISSING_COUNT "$EXPIRY_MISSING_COUNT"
 add_metric UD_EXPIRY_COUNT "$UD_EXPIRY_COUNT"
 add_metric UD_EXPIRY_MISSING_COUNT "$UD_EXPIRY_MISSING_COUNT"
+add_metric AE_EXPIRY_COUNT "$AE_EXPIRY_COUNT"
+add_metric AE_EXPIRY_MISSING_COUNT "$AE_EXPIRY_MISSING_COUNT"
 flush_findings
 
 # Always emit the Linter Exception Expiry section (Check 11).
@@ -251,6 +267,33 @@ flush_findings
       printf "should already be failing the build for these — if this section is\n"
       printf "non-empty, the per-PR guard's presence check has a bug.\n\n"
       printf '%b' "$UD_EXPIRY_MISSING"
+      printf "\n"
+    fi
+  fi
+
+  printf "\n## Adapter-Effectiveness Exception Expiry\n\n"
+  printf "Checks trading/devtools/checks/adapter_effectiveness_exceptions.conf\n"
+  printf "entries (the silent-null config-thread guard's exceptions list, issue\n"
+  printf "#2567) against current milestone and today's date, same policy and\n"
+  printf "format as linter_exceptions.conf. adapter_effectiveness_check.sh (the\n"
+  printf "per-PR guard) separately enforces that every entry HAS a parseable\n"
+  printf "review_at at all; this section only reports whether an already-present\n"
+  printf "one has expired.\n\n"
+
+  if [ "$AE_EXPIRY_COUNT" -eq 0 ] && [ "$AE_EXPIRY_MISSING_COUNT" -eq 0 ]; then
+    printf "No expired or missing review_at annotations found.\n"
+  else
+    if [ "$AE_EXPIRY_COUNT" -gt 0 ]; then
+      printf "### Expired or due-for-review entries (%d)\n\n" "$AE_EXPIRY_COUNT"
+      printf '%b' "$AE_EXPIRY_DETAILS"
+      printf "\n"
+    fi
+    if [ "$AE_EXPIRY_MISSING_COUNT" -gt 0 ]; then
+      printf "### Missing review_at annotation (%d)\n\n" "$AE_EXPIRY_MISSING_COUNT"
+      printf "These entries have no '# review_at:' comment. adapter_effectiveness_check.sh\n"
+      printf "should already be failing the build for these — if this section is\n"
+      printf "non-empty, the per-PR guard's presence check has a bug.\n\n"
+      printf '%b' "$AE_EXPIRY_MISSING"
       printf "\n"
     fi
   fi

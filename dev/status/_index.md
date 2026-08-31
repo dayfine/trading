@@ -4,26 +4,38 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-27 (orchestrator run 33090715656; main `8230d67e` ->
-`f875fe64`). Queue was **empty** at run start (0 open PRs), so the Step 0.5
-fast-exit was correctly skipped by its own non-vacuous precondition and this
-ran as a full dispatch. Two PRs opened and **both merged**: **#2581**
-(cleanup, `0d9122c8`) and **#2580** (harness/#2576, `f875fe64`, 2 rework
-iterations). One issue filed: **#2579**. Zero open PRs at run end.
+Last updated: 2026-08-30 (orchestrator run 33311750900; main **`950a392f`
+-> `e4945655`**, three PRs merged. Green after each merge and at run end:
+build 0, runtest 0, 0 `^FAIL:`, `status_file_integrity` 0, `index_size_linter`
+0 — every exit code read **unpiped**).
 
-**Both substantive QC findings this run were about guards that do not guard.**
-#2581 closed a mutation-proven hole where breaking `handle_rejected_trades`'
-step-5 revert asymmetry left **416/416 tests green**. #2580's first behavioral
-pass found the sharper case: its new shape-based guard swept only the *live,
-clean* repo, so re-scoping its regex back to the exact #2576 blind spot — or
-to a regex matching nothing at all — kept the suite green. The PR had
-reproduced the very failure mode it was fixing, one level up; the rework pins
-it against a fixture root.
+**Merged this run:** **#2596** (new WARN-only dangling-odoc-reference check),
+**#2597** (the 11 real findings that check reported, fixed to 0), **#2595**
+(#2589 residuals O2+O3 — all 5 `add_warning` sites in `_scan_exceptions_conf`
+now pinned against three distinct mutation classes, after **two** rework
+iterations). #2596 -> #2597 is a full find-then-fix cycle inside one run.
 
-Two orchestrator capabilities were **measured, not inferred**, this run:
-writing `.github/workflows/` is **403** while an identical non-workflow write
-is **200** (so #2539 and H-BLAS are structurally undispatchable here), and
-issue comments are **403** (create-only). See `2026-08-27.md`.
+**The theme was gates that report green without checking anything.** #2596
+closes one such hole by construction (`[...]` is an odoc *code span*, so a
+deleted identifier survives in a doc reference with nothing catching it — the
+#2584/#2587 class). And **#2588's root cause is now pinned** and filed as
+**#2598**: `fmt_check.sh`, wired into `dune runtest`, is a **permanent silent
+no-op** — `.ocamlformat` sits at `trading/`, the nearest `dune-project` one
+level *deeper*, so ocamlformat resolves a root below its own config, disables
+itself and passes every file. Reproduced live on PR #2597: `dune build @fmt`
+exit 1 on 10 files while `fmt_check.sh` in the same `dune runtest` said OK.
+
+**Three prior runs left nothing on main** (08-29 x2, 08-30 07:25). Two ended
+`is_error: true` — one after 44 turns and $8.20, one at init with $0.00 — and
+`cleanup/csv-snapshot-sweep-flake` is an orphan branch from the first,
+carrying only a `[~]` marker. Recorded so the gap is not read as three
+quiet days.
+
+Capabilities re-measured live, not copied: issue **state** writes **403**
+(`PATCH /issues/2556`) and issue **comments** also **403**
+(`POST /issues/2588/comments`) — refining the prior "create-only" claim:
+`POST /issues` works (**201**, #2598), `PATCH /pulls/<n>` works (**200**).
+See `2026-08-30.md`.
 
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
@@ -72,14 +84,14 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2576 CLOSED — 7th RSS call site ported + shape-based guard now fixture-pinned, MERGED `f875fe64` (#2580); next: #2567 silent-null effectiveness linter |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | O2+O3 MERGED `45d964a7` (#2595; 2 reworks, 3 mutation classes pinned); next: R-4 expiry table, then O1/O4/O5 |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | A-MERGEABLE-STATE-NOT-A-CLOSE-TELL filed (run-1 guidance corrected); open: #2427 #2428 #2429 #2432 — need `workflow` scope or a human |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | `cancel_handler` step-5 revert asymmetry now pinned, MERGED `0d9122c8` (#2581); top item `linter_coverage` still a HUMAN POLICY DECISION (13 runs) |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | odoc dangling-ref check MERGED `d5247fd5` (#2596) + its 11 findings fixed to 0 `e4945655` (#2597); top item `linter_coverage` still a HUMAN POLICY DECISION (15 runs) |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
 | [screener](screener.md) | IN_PROGRESS | dayfine (LOCAL) + feat-weinstein | — | RS trend live (`lookback_bars` 52->56) landed via **#2561** (#2555 closed unmerged, superseded); #2380 closed; next: none queued |
-| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | — | clock-26 REVERTED to 0 by #2397 (golden −40.91pp); re-flip framed in #2405, superseded discriminator in #2407; next: base-held measurement |
+| [simulation](simulation.md) | IN_PROGRESS | dayfine (maintainer LOCAL) | #2587 | #2587 flips clock 0 → 52 (ledger ACCEPT + 3-cell grid); CI green, `goldens-affected` red by design; next: paired-golden table + `paired-run-done` |
 | [trade-autopsy](trade-autopsy.md) | MERGED | — | — | — |
 | [stage3-hysteresis](stage3-hysteresis.md) | MERGED | — | — | — |
 | [experiment-platform](experiment-platform.md) | IN_PROGRESS | feat-backtest | — | force-exit-off grid REJECTED for promotion (#1503); single-dial surface exhausted; next: continuation-buy recheck on top-3000 (data-gated) |

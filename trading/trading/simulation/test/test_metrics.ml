@@ -1903,7 +1903,7 @@ let test_portfolio_state_long_unrealized_pnl _ =
     [long_margin_debit], so [portfolio_value] is debit-net and
     [portfolio_value - current_cash] no longer equals the marked position value.
     OpenPositionsValue must read the debit-free [position_value_total]. Fixture:
-    cash $1,000 buys 20 @ $100 = $2,000 (borrow $1,000); marked flat at $100 →
+    cash $1,000 buys 20 \@ $100 = $2,000 (borrow $1,000); marked flat at $100 →
     positions $2,000, debit $1,000, cash $0, so debit-net NAV = $1,000.
     - correct OpenPositionsValue = position_value_total = $2,000 (Σqty*close)
     - the pre-fix [portfolio_value - cash] would read $1,000 (debit leaked in)

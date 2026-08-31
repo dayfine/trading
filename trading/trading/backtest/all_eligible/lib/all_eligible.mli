@@ -232,8 +232,8 @@ val filter_by_min_grade :
 
     Uses {!Weinstein_types.compare_grade}, the same ordering the live cascade
     uses internally for its [min_grade] gate (see
-    {!Screener._passes_score_floor}). Pure function; preserves input order;
-    passing [min_grade = F] is the identity (every grade passes). *)
+    {!Screener_admission.passes_score_floor}). Pure function; preserves input
+    order; passing [min_grade = F] is the identity (every grade passes). *)
 
 val dedup_first_admission :
   Backtest_optimal.Optimal_types.scored_candidate list ->

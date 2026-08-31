@@ -6,7 +6,7 @@ let _float_opt s = if String.is_empty s then None else Float.of_string_opt s
 let _cell a i = if i < Array.length a then a.(i) else ""
 let _str_opt s = if String.is_empty s then None else Some s
 
-(* trades.csv column indices (see [Result_writer._trades_csv_header]). *)
+(* trades.csv column indices (see [Trades_stream.header]). *)
 let _t_symbol = 0
 let _t_side = 1
 let _t_entry_date = 2

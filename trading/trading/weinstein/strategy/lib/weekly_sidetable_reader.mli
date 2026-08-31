@@ -37,12 +37,13 @@ val sketch_of_entries :
   close:float ->
   Resistance_supply.sketch
 (** [sketch_of_entries ~entries ~as_of ~close] derives the sketch a breakout
-    scored on [as_of] at raw close [close] would face, from the weekly side-table
-    [entries] (oldest-first, one per weekly bar — the {!Weekly_sidetable_builder}
-    order; the binary-search windowing requires ascending [week_end_date]).
+    scored on [as_of] at raw close [close] would face, from the weekly
+    side-table [entries] (oldest-first, one per weekly bar — the
+    {!Weekly_sidetable_builder} order; the binary-search windowing requires
+    ascending [week_end_date]).
 
-    The window is the trailing at-most-520 entries whose [week_end_date <= as_of]
-    (the current/age-0 week last). Then, mirroring
+    The window is the trailing at-most-520 entries whose
+    [week_end_date <= as_of] (the current/age-0 week last). Then, mirroring
     {!Snapshot_pipeline.Resistance_sketch}:
     - [max_high_130w/260w/520w]: max raw [high] over the trailing 130/260/520
       window entries (age-0 week included);
@@ -50,13 +51,13 @@ val sketch_of_entries :
     - [hist_bands.(b).(k)]: count of window entries of age band [b]
       ([0-26w / 26-78w / 78-130w / 130-520w], age = distance in weekly bars from
       the age-0 week) whose raw [high > close] and whose [mid] lands in the log
-      bucket [k] of [[close * 2^(k/20), close * 2^((k+1)/20))]; mids at or beyond
-      [2 * close] are dropped;
+      bucket [k] of [\[close * 2^(k/20), close * 2^((k+1)/20))]; mids at or
+      beyond [2 * close] are dropped;
     - [anchor_close]: [close].
 
-    Corrupt anchor: when [close] is non-positive or non-finite every derived cell
-    is [Float.nan] (mirroring the v4 corrupt-bar row), with [anchor_close = close]
-    verbatim. Pure function. *)
+    Corrupt anchor: when [close] is non-positive or non-finite every derived
+    cell is [Float.nan] (mirroring the v4 corrupt-bar row), with
+    [anchor_close = close] verbatim. Pure function. *)
 
 (** Price basis of a warehouse's weekly side-tables (#2133). [Raw] side-tables
     (pre-migration, {!Weekly_sidetable.format_hash_raw_basis}) carry raw weekly

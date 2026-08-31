@@ -226,9 +226,9 @@ let _factor_at_offset ~closes ~raw_closes ~n ~week_offset : float option =
     (adjusted) and [raw_closes] (unadjusted). Returns [None] when [raw_closes]
     is empty (e.g., the empty weekly_view) or when the raw close at this offset
     is non-positive. The factor stays constant across spans without splits and
-    changes at split boundaries — used by
-    {!Stock_analysis._scan_max_high_callback} / [_scan_min_low_callback] to
-    truncate the lookback window at the most recent split (G14). *)
+    changes at split boundaries — used by {!Stock_analysis_scans.scan_max_high}
+    / [scan_min_low] to truncate the lookback window at the most recent split
+    (G14). *)
 let _split_factor_of_weekly_view (weekly : Snapshot_bar_views.weekly_view) :
     week_offset:int -> float option =
   let n = Array.length weekly.raw_closes in

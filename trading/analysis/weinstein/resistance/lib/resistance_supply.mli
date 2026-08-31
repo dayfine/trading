@@ -22,7 +22,7 @@ type sketch = {
       (** Age-banded histogram (lever f): [hist_bands.(b).(k)] counts weekly
           bars of age band [b] (0..{!n_age_bands}-1, youngest first —
           [0-26w / 26-78w / 78-130w / 130-520w]) whose mid-price lies in
-          [anchor * 2^(k/n), anchor * 2^((k+1)/n)) where [n] is the per-band
+          \[anchor * 2^(k/n), anchor * 2^((k+1)/n)) where [n] is the per-band
           bucket count. {!analyze} collapses the bands into one effective
           histogram via the [config] band weights at score time. A v3 warehouse
           / age-blind histogram maps to the youngest band with the rest zero —
