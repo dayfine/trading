@@ -101,11 +101,28 @@ _open_pr_count_gh() {
 }
 
 _open_pr_count_curl() {
-  curl -sS -f \
-    -H "Authorization: Bearer ${GH_TOKEN}" \
-    -H "Accept: application/vnd.github+json" \
-    "https://api.github.com/repos/${REPO}/pulls?state=open&per_page=100" \
-    | jq 'length'
+  # Capture the body FIRST and check curl's own exit status before piping to
+  # jq. `sh` has no `pipefail`, so `curl -f ... | jq 'length'` swallows a
+  # failing curl: on a 401/403/5xx, `-f` makes curl exit non-zero and print
+  # NOTHING to stdout, but the pipeline's exit status is jq's -- and jq on
+  # empty input prints nothing and exits 0. That turned a curl failure into
+  # `open_pr_count` silently returning rc=0 with an EMPTY count, which
+  # `verify` could not distinguish from "queue is empty" (issue #2605
+  # rework). Splitting the pipe closes that gap.
+  _body=$(
+    curl -sS -f \
+      -H "Authorization: Bearer ${GH_TOKEN}" \
+      -H "Accept: application/vnd.github+json" \
+      "https://api.github.com/repos/${REPO}/pulls?state=open&per_page=100"
+  ) || return 2
+  _count=$(printf '%s' "$_body" | jq 'length') || return 2
+  # Belt-and-braces: refuse to return anything that isn't a plain non-negative
+  # integer, so a malformed/empty jq result can never be mistaken for a real
+  # PR count by a caller that only checks the exit status.
+  case "$_count" in
+    '' | *[!0-9]*) return 2 ;;
+  esac
+  printf '%s' "$_count"
 }
 
 open_pr_count() {
@@ -130,13 +147,24 @@ open_pr_count() {
 # --- dev/status/ drift (Condition 2, mirrored from lead-orchestrator.md) ----
 
 # _prior_summary_path <current-summary-path>
-# Newest dev/daily/*.md (excluding -plan.md and the current summary itself),
-# by mtime. Empty output means no prior summary exists (first run ever) --
-# callers must treat that as "nothing to compare against", not a violation.
+# Newest dev/daily/*.md (excluding -plan.md, -summary.md, and the current
+# summary itself), by mtime. Empty output means no prior summary exists
+# (first run ever) -- callers must treat that as "nothing to compare
+# against", not a violation.
+#
+# -summary.md (the consolidated multi-run rollup the orchestrator also
+# writes) is excluded for the same reason the workflow's own "Locate daily
+# summary" step excludes it (.github/workflows/orchestrator.yml, run
+# 24745079773 post-mortem): it is written LAST, minutes after this run's own
+# per-run summary, by the SAME run. Without this exclusion, `ls -t` can pick
+# the current run's own rollup as its "prior" summary -- comparing a
+# timestamp against itself and independently zeroing the drift window,
+# regardless of the mtime-vs-commit-date fix below.
 _prior_summary_path() {
   _current="$1"
   ls -t dev/daily/*.md 2>/dev/null \
     | grep -v -- '-plan\.md$' \
+    | grep -v -- '-summary\.md$' \
     | grep -vxF "$_current" \
     | head -1 || true
 }
@@ -145,6 +173,26 @@ _prior_summary_path() {
 _file_iso_mtime() {
   date -r "$1" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null \
     || date -d "@$(stat -f %m "$1" 2>/dev/null || stat -c %Y "$1")" '+%Y-%m-%dT%H:%M:%S'
+}
+
+# _prior_summary_timestamp <path>
+# Prefer the file's last COMMIT date over its mtime: `actions/checkout@v4`
+# (the tree the GHA orchestrator job runs on) writes every file at checkout
+# time and does not preserve mtimes, so on that runner `_file_iso_mtime`
+# always reads as "a few seconds ago" regardless of how old the prior
+# summary actually is -- making `_status_changed_since` structurally return
+# 0 and the Condition-2 half of `verify` permanently inert where it is
+# deployed (issue #2605 rework). Fall back to mtime only when the file has
+# no commit history at all (e.g. a summary this run just wrote and has not
+# committed yet).
+_prior_summary_timestamp() {
+  _path="$1"
+  _committed=$(git log -1 --format='%cI' -- "$_path" 2>/dev/null || true)
+  if [ -n "$_committed" ]; then
+    printf '%s' "$_committed"
+  else
+    _file_iso_mtime "$_path"
+  fi
 }
 
 # _status_changed_since <iso-timestamp>
@@ -192,11 +240,24 @@ verify() {
     echo "::error::orchestrator_fastexit_gate verify: $_summary declares NO-OP but the open-PR count could not be determined -- refusing to validate a no-op run blind." >&2
     return 2
   }
+  # Belt-and-braces on top of _open_pr_count_curl's own numeric guard: even
+  # if some future backend returns rc=0 with a blank/garbage count, `verify`
+  # itself refuses to treat it as a trustworthy number rather than letting
+  # `[ "$_pr_count" -eq 0 ]` below silently read as false under `set -e`
+  # (a non-numeric operand makes `[` error, but inside an `if` condition
+  # that error is suppressed and reads as "condition false" -- exactly how
+  # the original defect went undetected).
+  case "$_pr_count" in
+    '' | *[!0-9]*)
+      echo "::error::orchestrator_fastexit_gate verify: $_summary declares NO-OP but open_pr_count returned a non-numeric value ('$_pr_count') -- refusing to validate a no-op run blind." >&2
+      return 2
+      ;;
+  esac
 
   _prior=$(_prior_summary_path "$_summary")
   _status_changed=0
   if [ -n "$_prior" ]; then
-    _prior_iso=$(_file_iso_mtime "$_prior")
+    _prior_iso=$(_prior_summary_timestamp "$_prior")
     _status_changed=$(_status_changed_since "$_prior_iso")
   fi
 
