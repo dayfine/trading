@@ -811,9 +811,15 @@ condition-based cancellation, not the re-screen, is the operative lever.
 `entry_order_max_rest_weeks` 0 → 26; `#2397 283ec468` reverted it the same day
 after the `goldens-sp500/sp500-2019-2023-armed-stoplimit.sexp` golden regressed
 **−40.91pp**. A second cell confirmed the direction at **−38.42pp**
-(`#2392 3ec73568`). Full framing in the top-of-file section; the default on
-main is `0`. Re-flip is tracked as **open issue #2405** (gated on re-pinning the
-goldens to the live convention). Open issue **#2407** proposes cancelling on
+(`#2392 3ec73568`). **Superseded 2026-08-31: the clock re-promoted 0 → 52 and
+MERGED as `#2587`** (ledger ACCEPT `2026-08-27-entry-rest-weeks-surface.sexp`,
+3-cell broad grid, robust value 52, paired 12-golden table 11/12 bit-identical;
+#2405 closed). The follow-up D-null (top-1000, `#2610`) found the return effect
+breadth-sensitive (−39/−395/−310pp paired across salts) while maxDD stays
+robust; **USER DECISION 2026-08-31: keep 52** (ledger amended `#2611` — top-1000
+is the composition probe, not the deployment breadth). Default on main is `52`.
+Optional residual: an A-null (clockA-{0,52} at salts 1,2) to pin cell A's
+salt-0-only +183.5pp. Open issue **#2407** proposes cancelling on
 whether the base that defined `E` still holds; its companion measurement is
 **done and is a NO BUILD as specified** —
 `dev/experiments/base-broken-2026-08-19/README.md` finds only 10 fills / 0.76%
