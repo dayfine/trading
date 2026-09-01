@@ -105,12 +105,15 @@ jobs:
             # either that early-exit (nothing ran) or the script died
             # mid-loop; both are failures worth surfacing rather than a
             # silent green (#2427's shape on the 15y file; residual #2618
-            # on this one). The job-timeout case is separate: a job-level
-            # cancel yields conclusion=cancelled regardless of step exit
-            # codes and SKIPS this if:always() branch entirely -- that is
-            # prevented only by the COHERENCE INVARIANT above the job block
-            # (per_cell * n_cells + overhead <= timeout-minutes), not by
-            # this exit code.
+            # on this one). The job-timeout case is separate: on a
+            # job-level cancel this if:always() step DOES still run
+            # (measured on cancelled runs 32564083760 / 29885457584 — the
+            # step completed success), but the JOB conclusion stays
+            # cancelled regardless of any step's exit code, so nothing
+            # this branch does can rescue or redden that run. The cancel
+            # case is governed only by the COHERENCE INVARIANT above the
+            # job block (per_cell * n_cells + overhead <= timeout-minutes),
+            # not by this exit code.
             echo "Custom-universe golden postsubmit: no summary produced." >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi

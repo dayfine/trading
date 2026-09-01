@@ -67,8 +67,10 @@ jobs:
     # NOT hold as written): the job cap must bound the script's REALISTIC
     # worst case -- two HEAVY cells hanging (the third,
     # sp500-2011-2026-bah-brk-b, is structurally ~13s, not a full-timeout
-    # risk) -- or a hung cell turns into a job-level cancel that skips the
-    # if:always() no-summary net below (#2427's silent-failure shape). With
+    # risk) -- or a hung cell turns into a job-level cancel, whose
+    # conclusion stays `cancelled` no matter what any step exits (#2427's
+    # silent-failure shape; the if:always() steps below still run on a
+    # cancel but cannot change that conclusion). With
     # GOLDEN_SP500_TIMEOUT=7200 (120 min/cell): two heavy cells hung = 240
     # min + the ~13s third cell + ~2.1 min overhead ~= 242 min < 300. When
     # touching either value, keep `(per_cell * count_of_heavy_cells) +
@@ -109,7 +111,9 @@ jobs:
       # and only coheres with the OLD 600-min job cap (one hang = 328 min,
       # two = 483 — both < 600). At the new 300-min cap a 240-min hung cell
       # left ~57 min for a ~85-min sibling -> job-level cancel mid-cell-2,
-      # which skips the if:always() no-summary net (#2427's silent shape).
+      # whose conclusion stays `cancelled` regardless of step exits
+      # (#2427's silent shape; the always() steps still run but cannot
+      # redden or rescue a cancelled job).
       # 120 min/cell is ~1.37x the measured 87.7-min max cell wall
       # (streak-max run 33244787240, 08-29 -- corrected 2026-09-01, #2618,
       # from an earlier "~1.4x the 80-85 min" figure). See the
@@ -156,10 +160,12 @@ jobs:
             # summary therefore means the script died before finishing the
             # loop; fail the job so that outage is visible instead of the
             # silent green this branch used to report (#2427). The
-            # job-timeout case is separate: a job-level cancel yields
-            # conclusion=cancelled regardless of step exit codes, and it
-            # SKIPS this if:always() branch entirely — no cap "fixes" it;
-            # it is prevented only by the COHERENCE INVARIANT at
+            # job-timeout case is separate: on a job-level cancel this
+            # if:always() step DOES still run (measured, run 32564083760:
+            # Publish summary completed success on a cancelled job), but
+            # the JOB conclusion stays cancelled regardless of step exit
+            # codes — nothing here can rescue or redden that run; the
+            # cancel case is governed only by the COHERENCE INVARIANT at
             # timeout-minutes above (bound the REALISTIC worst case -- two
             # heavy cells hung at 7200s/120min each + the trivial third
             # cell + overhead ~= 242 min < the 300-min cap -- not the
