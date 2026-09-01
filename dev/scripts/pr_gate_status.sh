@@ -247,7 +247,28 @@ _gate() {
     # (No apostrophes in this jq program: it is single-quoted in sh.)
     def review_result:
       (.body | strip_fences) as $clean
-      | ($clean | capture("(?i)Reviewed SHA:?[ `*]*(?<s>[0-9a-f]{7,40})").s // "") as $sha
+      | ($clean | capture("(?i)Reviewed SHA:?[ `*]*(?<s>[0-9a-f]{7,40})").s // "") as $body_sha
+      #
+      # (#2626) FALLBACK TO commit_id WHEN THE BODY HAS NO "Reviewed SHA" LINE.
+      # A sha-less review used to be treated as current-at-every-tip-forever
+      # (see MULTI-REVIEW AGGREGATION below) -- reachable simply by an agent
+      # forgetting one line of prose, no malice or mutation required. Every
+      # review the GitHub API returns carries `commit_id`, the exact commit it
+      # was POSTed against -- structurally present, impossible to forget the
+      # way a prose line is. Fall back to it ONLY when the body yields nothing,
+      # so a review can still explicitly declare it reviewed a different sha
+      # than the one it was posted against (the body stays primary). This does
+      # not, on its own, make the always-current path unreachable in every
+      # backend: `gh pr view --json reviews` DOES supply the per-review sha,
+      # but under the key `.commit.oid`, whereas this reader looks for
+      # `.commit_id` -- so a sha-less LOCAL review under the gh backend still
+      # falls through to "" here. The gap is a key-name mismatch, not a
+      # missing field: closing it needs only a normalisation on data
+      # `_pr_meta_gh` already receives (e.g. reading
+      # (.commit_id // .commit.oid // "")), not a switch to the REST
+      # endpoint. Only the curl/REST backend (`_pr_meta_curl`, which is what
+      # the GHA orchestrator actually runs) is covered by this fallback today.
+      | (if ($body_sha != "") then $body_sha else (.commit_id // "") end) as $sha
       #
       # DISAGREEING matches within ONE review body read "unclear", not
       # "whichever position wins" (#2425 rework of #2421). #2421 shipped "take
@@ -337,6 +358,15 @@ _gate() {
         # deliberately deferred: it is entangled with the `unclear` design
         # question the human owns (see dev/status/harness.md), not a pure
         # parsing defect like this one was.
+        #
+        # (#2626) A narrower version of that deferred fix landed instead of
+        # touching the aggregation logic here: `review_result` above now
+        # falls back to the reviews `commit_id` field (curl/REST backend only --
+        # see the comment on that fallback) whenever the body has no
+        # "Reviewed SHA" line, so $sha == "" from a MISSING line is no longer
+        # reachable on that backend at all -- the always-current branch below
+        # still exists (a review whose commit_id ALSO comes back empty still
+        # hits it), but "forgot the prose line" no longer routes through it.
         # `.sha as $s | ...` (not a bare `.sha` inline): piping a value INTO
         # `startswith(.sha)` rebinds `.` to that piped value for the rest of
         # the expression, so `.sha` there would read `.sha` OF THE PIPED VALUE
@@ -463,7 +493,11 @@ _pr_meta_curl() {
   jq -n --argjson pr "$_pr" --argjson files "$_files" --argjson reviews "$_reviews" '{
     headRefOid: $pr.head.sha,
     files: ($files | map({path: .filename})),
-    reviews: ($reviews | map({body: .body})),
+    # commit_id (#2626): the REST review payload carries the exact commit the
+    # review was POSTed against. Widened here so the body-sha-fallback inside
+    # `_gate` can reach it -- an earlier version projected only `.body`, which
+    # silently dropped the field before it ever reached the jq that needed it.
+    reviews: ($reviews | map({body: .body, commit_id: .commit_id})),
     labels: ($pr.labels | map({name: .name}))
   }'
 }

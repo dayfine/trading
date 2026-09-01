@@ -60,7 +60,14 @@ check() {
 }
 
 # One review body per fixture, wrapped as the [{body}] shape _gate expects.
-reviews() { jq -nc --arg b "$1" '[{body: $b}]'; }
+# Optional $2 sets commit_id (#2626: the curl backend's REST-projected field
+# that review_result falls back to when the body has no "Reviewed SHA" line) --
+# omitted by every pre-existing call site, which keeps them producing the
+# exact same {body: ...}-only shape as before this addition.
+reviews() {
+  jq -nc --arg b "$1" --arg c "${2:-}" \
+    '[{body: $b} + (if $c == "" then {} else {commit_id: $c} end)]'
+}
 
 STRUCT_WITH_BEHAV_SECTION="Reviewed SHA: 7dc57cc06
 
@@ -1066,6 +1073,54 @@ APPROVED"
 
 check "#2622: a first heading with the gate word NOT at its start does not satisfy the gate (anchor guard)" \
   none "$(_gate "$(reviews "$FIRST_HEADING_NOT_GATE_WORD")" behavioral "$TIP")"
+
+# 43-45. #2626: a review whose body carries no "Reviewed SHA" line at all used
+# to be treated as current-at-every-tip-forever -- reachable simply by an
+# agent forgetting one line of prose (observed live on PR #2625: one
+# gate-matching review had no "Reviewed SHA" line and read "ok" against a tip
+# a rework had already moved past). `review_result` now falls back to the
+# review's `commit_id` field (the REST API always supplies it; the curl
+# backend projects it into the reviews array `_gate` consumes) whenever the
+# body yields no sha.
+NO_SHA_LINE_STALE_COMMIT="## Behavioral QC — PR #2626, no Reviewed SHA line
+
+Reviewed the diff end to end; no findings.
+
+## Verdict
+
+APPROVED"
+
+# 43. RED/GREEN pin: with the body carrying no sha and commit_id pointing at
+#     an OLD commit (not the current tip), the review must read stale, not
+#     "ok forever". Reverting the commit_id fallback in review_result (so
+#     $sha stays "" whenever the body has none) turns this case RED: the
+#     review is then treated as always-current and reads "ok" against a tip
+#     it was never posted against.
+check "#2626: sha-less review body falls back to a STALE commit_id" \
+  "stale(aaaaaaaa)" \
+  "$(_gate "$(reviews "$NO_SHA_LINE_STALE_COMMIT" "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")" behavioral "$TIP")"
+
+# 44. Happy-path guard: the same sha-less body, but commit_id matches the
+#     current tip -- the fallback must also correctly read "ok", not just
+#     correctly detect staleness.
+check "#2626: sha-less review body falls back to a CURRENT commit_id" \
+  ok \
+  "$(_gate "$(reviews "$NO_SHA_LINE_STALE_COMMIT" "$TIP")" behavioral "$TIP")"
+
+# 45. Precedence guard: when the body DOES carry a "Reviewed SHA" line, that
+#     value wins even if commit_id disagrees -- a review can still explicitly
+#     declare it reviewed a different sha than the one it was posted against.
+BODY_SHA_WINS_OVER_COMMIT_ID="Reviewed SHA: deadbeef
+
+## Behavioral QC — PR #2626, body sha overrides commit_id
+
+## Verdict
+
+APPROVED"
+
+check "#2626: body Reviewed SHA line takes precedence over commit_id" \
+  "stale(deadbeef)" \
+  "$(_gate "$(reviews "$BODY_SHA_WINS_OVER_COMMIT_ID" "$TIP")" behavioral "$TIP")"
 
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"
