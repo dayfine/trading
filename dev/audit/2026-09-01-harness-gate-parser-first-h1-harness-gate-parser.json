@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-01",
+  "feature": "harness-gate-parser",
+  "branch": "harness/gate-parser-first-h1",
+  "sha": "68cd9750733b55ccc508356a69929e62f7b0f45f",
+  "recorded_at_ns": 1788253130131437620,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "H-GATEPARSER-NO-MUTATION-COVERAGE",
+  "quality_score": 2,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": "11-mutation sweep; survivors (d) strip_fences and (j) ^ anchor are live. Merged by maintainer at 07:49Z on structural-only, before this verdict posted; findings addressed in follow-up PR #2625."
+}

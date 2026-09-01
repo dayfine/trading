@@ -4,38 +4,44 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-08-30 (orchestrator run 33311750900; main **`950a392f`
--> `e4945655`**, three PRs merged. Green after each merge and at run end:
+Last updated: 2026-09-01 (orchestrator run 33482398132; main **`c0f40ecb`
+-> `6da52064`**, one PR merged. Green at run start and at run end:
 build 0, runtest 0, 0 `^FAIL:`, `status_file_integrity` 0, `index_size_linter`
 0 — every exit code read **unpiped**).
 
-**Merged this run:** **#2596** (new WARN-only dangling-odoc-reference check),
-**#2597** (the 11 real findings that check reported, fixed to 0), **#2595**
-(#2589 residuals O2+O3 — all 5 `add_warning` sites in `_scan_exceptions_conf`
-now pinned against three distinct mutation classes, after **two** rework
-iterations). #2596 -> #2597 is a full find-then-fix cycle inside one run.
+**Merged this run:** **#2623** (the four #2618 workflow-cap residuals). Its
+qc-behavioral NEEDS_REWORK finding — the added comment claiming a job-level
+cancel *"SKIPS this `if: always()` branch entirely"*, refuted across all nine
+measured timeout cancellations in both workflows — was fixed by the
+maintainer's parallel local session (two reworks) because the fix lives in
+`.github/workflows/**`, which this token cannot push.
 
-**The theme was gates that report green without checking anything.** #2596
-closes one such hole by construction (`[...]` is an odoc *code span*, so a
-deleted identifier survives in a doc reference with nothing catching it — the
-#2584/#2587 class). And **#2588's root cause is now pinned** and filed as
-**#2598**: `fmt_check.sh`, wired into `dune runtest`, is a **permanent silent
-no-op** — `.ocamlformat` sits at `trading/`, the nearest `dune-project` one
-level *deeper*, so ocamlformat resolves a root below its own config, disables
-itself and passes every file. Reproduced live on PR #2597: `dune build @fmt`
-exit 1 on 10 files while `fmt_check.sh` in the same `dune runtest` said OK.
+**The theme was the merge gate reading itself wrong.** Four QC passes on
+`pr_gate_status.sh` produced **four** distinct defects in the file that decides
+whether a PR may merge: #2620's interior-heading leak (fixed, #2622), two
+surviving mutations of that fix (**(d)** dropping `strip_fences` is a live
+false-MERGE/false-BLOCK pair; **(j)** the `^` anchor lost its pin) now closed by
+**#2625**, three further **live** unpinned mutations recorded there
+(**(k)**, **(f)**, **(g)**), and a new one filed as **#2626** — a review with no
+`Reviewed SHA:` line in its body is *current-at-every-tip-forever*, observed
+live on #2625 itself. The API's `commit_id` already carries the answer the
+parser tries to recover from prose.
 
-**Three prior runs left nothing on main** (08-29 x2, 08-30 07:25). Two ended
-`is_error: true` — one after 44 turns and $8.20, one at init with $0.00 — and
-`cleanup/csv-snapshot-sweep-flake` is an orphan branch from the first,
-carrying only a `[~]` marker. Recorded so the gap is not read as three
-quiet days.
+**Two PRs open and reworked, awaiting re-QC:** **#2624** (pins the
+missing-`review_at` branch of `check_11`) and **#2625**. Both were recovered
+dispatcher-side after their authoring agents stalled on backgrounded `dune`
+calls, so both carry **no author self-attestation** — the commit messages and
+PR bodies say so explicitly.
 
-Capabilities re-measured live, not copied: issue **state** writes **403**
-(`PATCH /issues/2556`) and issue **comments** also **403**
-(`POST /issues/2588/comments`) — refining the prior "create-only" claim:
-`POST /issues` works (**201**, #2598), `PATCH /pulls/<n>` works (**200**).
-See `2026-08-30.md`.
+Capabilities re-measured live, not copied. `.github/workflows/**` **pushes**
+are rejected (`refusing to allow a Personal Access Token to create or update
+workflow ... without \`workflow\` scope`) — but a **server-side PR merge of a
+workflow-touching PR succeeds** (#2623 merged fine), which is a sharper
+statement than "workflows are 403". Comment writes are **PR-scoped, not
+issue-scoped**: `POST /issues/<n>/comments` returned **201** for a PR number
+and **403** for an issue number, same endpoint, same token. `POST /issues`
+works (**201**, #2626); `PATCH /pulls/<n>` works (**200**).
+`.claude/agents/**` writes remain gated by the harness.
 
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
@@ -84,7 +90,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | O2+O3 MERGED `45d964a7` (#2595; 2 reworks, 3 mutation classes pinned); next: R-4 expiry table, then O1/O4/O5 |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2624, #2625 | Both reworked, awaiting re-QC; gate-parser has 3 live unpinned mutations + #2626; next: re-QC then R-4 expiry table |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | A-MERGEABLE-STATE-NOT-A-CLOSE-TELL filed (run-1 guidance corrected); open: #2427 #2428 #2429 #2432 — need `workflow` scope or a human |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | odoc dangling-ref check MERGED `d5247fd5` (#2596) + its 11 findings fixed to 0 `e4945655` (#2597); top item `linter_coverage` still a HUMAN POLICY DECISION (15 runs) |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |

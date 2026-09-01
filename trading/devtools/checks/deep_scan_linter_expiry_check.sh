@@ -1120,4 +1120,162 @@ if ! grep -qF "$UF_DETAIL_TEXT" "$UF_REPORT3"; then
 else
   fail "vacuity check FAILED — 7j's :184 REPORT_FILE assertion still matched after the text was reworded: $(cat "$UF_REPORT3")"
 fi
+
+# ── Part 8: the missing-review_at branch itself (H-EXPIRY-MISSING-REVIEWAT
+# -UNPINNED, filed 2026-08-30 while closing PR #2589's O2/O3) ─────────────
+#
+# Parts 1-7 above all pin the branches inside _scan_exceptions_conf() that
+# fire when a review_at annotation IS present (expired / milestone-unknown /
+# milestone-landed / unrecognised-format / conf-file-not-found). None of
+# them exercise the SIBLING branch at check_11_linter_expiry.sh:130-137,
+# which fires when review_at is ABSENT entirely — a T1-K policy violation —
+# and populates _SCAN_MISSING / _SCAN_MISSING_COUNT. That branch never calls
+# add_warning() (confirmed by reading the branch: no add_warning call
+# appears between the `if [ -z "$review_at_val" ]` guard and its
+# `continue`), so it is invisible to the roll-up "W:" findings line and
+# main.sh's top-level "## Warnings" section entirely — it only ever
+# surfaces via the per-file REPORT_FILE "### Missing review_at annotation —
+# policy violation T1-K" section. This is a DIFFERENT failure mode than
+# BQ-1/R-5/O2/O3 above: a regression here silently drops that per-file
+# section, not a roll-up warning line, and main.sh's "## Warnings" stays
+# unaffected either way (verified directly below in 8d, not assumed).
+#
+# Confirmed by hand before writing 8a-8d: deleting the two population
+# lines inside the branch (the _SCAN_MISSING_COUNT increment and the
+# _SCAN_MISSING append) from a working copy of the real script left the
+# ENTIRE pre-existing suite (Parts 1-7, all 39 assertions) green at exit 0
+# — none of them touch this branch. That is the gap this Part closes.
+#
+# Fixture cardinality: TWO entries, deliberately — and NOT for the reason an
+# earlier revision of this comment gave. That revision claimed a single-entry
+# fixture was required as a "masking-hazard guard per Part 7's precedent," so
+# that a sibling entry's _SCAN_MISSING_COUNT increment could not mask a
+# per-entry corruption. qc-behavioral (PR #2624, review 5075929429) measured
+# that claim and found it FALSE AND INVERTED here:
+#
+#   - Part 7's masking hazard does not apply. 8b and 8c produce byte-identical
+#     outcomes at one entry and at two, because this branch carries no
+#     per-entry state to corrupt independently of the call — it is one branch
+#     with one accumulator pair.
+#   - Single-entry was, in fact, the SOLE reason a real mutation escaped:
+#     hardcoding the header's count to "(1)" is invisible against a one-entry
+#     fixture and goes RED at two.
+#
+# So the single-entry choice bought nothing and cost coverage. Two entries it
+# is, and the header assertion below pins the count as "(2)" — which is what
+# makes the hardcoded-count mutation fail closed.
+
+MR_FAKE_ROOT="$(mktemp -d)"
+trap 'rm -rf "$AE_FAKE_ROOT" "$MS_FAKE_ROOT" "$NF_FAKE_ROOT" "$MU_FAKE_ROOT" "$UF_FAKE_ROOT" "$MR_FAKE_ROOT"' EXIT
+
+mkdir -p "$MR_FAKE_ROOT/trading/devtools/checks/deep_scan"
+# Two entries, neither carrying a "# review_at:" annotation — the T1-K
+# violation. The second entry exists to pin the count (see above).
+cat > "$MR_FAKE_ROOT/trading/devtools/checks/linter_exceptions.conf" <<'EOF'
+fixture_missing_review_at
+fixture_missing_review_at_second
+EOF
+: > "$MR_FAKE_ROOT/trading/devtools/checks/universe_deps_exceptions.conf"
+: > "$MR_FAKE_ROOT/trading/devtools/checks/adapter_effectiveness_exceptions.conf"
+cp "${DEEP_SCAN_DIR}/_lib.sh" "$MR_FAKE_ROOT/trading/devtools/checks/deep_scan/_lib.sh"
+cp "$(dirname "$0")/_check_lib.sh" "$MR_FAKE_ROOT/trading/devtools/checks/_check_lib.sh"
+cp "$CHECK_11" "$MR_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh"
+
+# --- 8a: functional pin — the REAL script surfaces the per-file
+# "### Missing review_at annotation — policy violation T1-K" section,
+# naming the fixture entry, for an entry with no review_at annotation.
+# The "policy violation T1-K" suffix is unique to linter_exceptions.conf's
+# section (universe_deps/adapter_effectiveness sections omit the T1-K
+# suffix — see check_11_linter_expiry.sh:241 vs :265/:292), so this also
+# confirms the section belongs to the right conf file.
+MR_REPORT="$(mktemp)"
+MR_FINDINGS="$(mktemp)"
+set +e
+REPO_ROOT="$MR_FAKE_ROOT" sh "$MR_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh" \
+  "$MR_REPORT" "$MR_FINDINGS" >/dev/null 2>&1
+MR_CODE=$?
+set -e
+
+MR_HEADER_TEXT='### Missing review_at annotation — policy violation T1-K (2)'
+MR_DETAIL_TEXT='Missing review_at on: fixture_missing_review_at'
+if [ "$MR_CODE" -eq 0 ] \
+  && grep -qF -- "$MR_HEADER_TEXT" "$MR_REPORT" \
+  && grep -qF -- "$MR_DETAIL_TEXT" "$MR_REPORT"; then
+  echo "OK: an entry with no review_at annotation is surfaced via the per-file 'Missing review_at annotation — policy violation T1-K' REPORT_FILE section (H-EXPIRY-MISSING-REVIEWAT-UNPINNED functional pin)"
+else
+  fail "fixture_missing_review_at was NOT surfaced via the missing-review_at REPORT_FILE section (exit=$MR_CODE): $(cat "$MR_REPORT")"
+fi
+
+# --- 8b: MUTATION (population removed) — the exact gap this Part closes.
+# Delete ONLY the two lines that populate _SCAN_MISSING_COUNT / _SCAN_MISSING
+# inside the missing-review_at branch, leaving the branch's `continue` (and
+# every other branch) intact. Hand-verified before writing this assertion:
+# with this exact mutation applied to the real script, Parts 1-7's full
+# suite stays green — this assertion is what makes that gap fail red.
+# Also confirms the mutation is ISOLATED to this branch, not a wholesale
+# script failure: the report still renders its "No expired or missing
+# review_at annotations found" fallback (proving the script ran to
+# completion and the surrounding report structure survived) and exits 0,
+# not crashed.
+MR_MUT_NOPOP="$MR_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_missing_nopop.sh"
+sed '/_SCAN_MISSING_COUNT=\$((_SCAN_MISSING_COUNT + 1))/d; /_SCAN_MISSING="\${_SCAN_MISSING}  - Missing review_at on: \${decl}\\n"/d' \
+  "$CHECK_11" > "$MR_MUT_NOPOP"
+chmod +x "$MR_MUT_NOPOP"
+
+MR_REPORT2="$(mktemp)"
+MR_FINDINGS2="$(mktemp)"
+set +e
+REPO_ROOT="$MR_FAKE_ROOT" sh "$MR_MUT_NOPOP" "$MR_REPORT2" "$MR_FINDINGS2" >/dev/null 2>&1
+MR_CODE2=$?
+set -e
+
+if [ "$MR_CODE2" -eq 0 ] \
+  && ! grep -qF -- "$MR_HEADER_TEXT" "$MR_REPORT2" \
+  && ! grep -qF -- "$MR_DETAIL_TEXT" "$MR_REPORT2" \
+  && grep -qF 'No expired or missing review_at annotations found' "$MR_REPORT2"; then
+  echo "OK: MUTATION (missing-review_at population removed) makes the per-file T1-K section vanish while the surrounding report survives intact and exit stays 0 — reproduces H-EXPIRY-MISSING-REVIEWAT-UNPINNED and proves 8a's assertion catches it"
+else
+  fail "MUTATION (missing-review_at population removed) did not produce the expected result (exit=$MR_CODE2): $(cat "$MR_REPORT2")"
+fi
+
+# --- 8c: second, independent break direction — corrupt the section's
+# message content while LEAVING the population in place (mirrors Part 4's
+# Mutation D / 3e shape). The count still fires and the section still
+# prints, but the entry's declaration text no longer reads "Missing
+# review_at on: ...". Confirms 8a pins the exact detail text, not merely
+# "some line under this header exists" — the count-present, text-corrupted
+# escape the masking-hazard note warns about.
+MR_MUT_REWORD="$MR_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_missing_reword.sh"
+sed 's/- Missing review_at on: \${decl}/- No review_at annotation present on: ${decl}/' \
+  "$CHECK_11" > "$MR_MUT_REWORD"
+chmod +x "$MR_MUT_REWORD"
+
+MR_REPORT3="$(mktemp)"
+set +e
+REPO_ROOT="$MR_FAKE_ROOT" sh "$MR_MUT_REWORD" "$MR_REPORT3" "$(mktemp)" >/dev/null 2>&1
+MR_CODE3=$?
+set -e
+
+if [ "$MR_CODE3" -eq 0 ] \
+  && grep -qF -- "$MR_HEADER_TEXT" "$MR_REPORT3" \
+  && ! grep -qF -- "$MR_DETAIL_TEXT" "$MR_REPORT3"; then
+  echo "OK: MUTATION (message content corrupted, population left in place) keeps the T1-K header/count intact but the entry's detail text no longer matches — second, independent break direction caught; proves 8a's assertion is not vacuous against a count-only check"
+else
+  fail "MUTATION (missing-review_at message corrupted) did not produce the expected split (exit=$MR_CODE3): $(cat "$MR_REPORT3")"
+fi
+
+# --- 8d: the entry's own caveat, VERIFIED rather than assumed — the
+# missing-review_at branch never calls add_warning(), so it must be
+# entirely absent from the roll-up FINDINGS_FILE (and therefore from
+# main.sh's "## Warnings" section, which is built only from "W: " lines —
+# see deep_scan/main.sh's findings-file loop). If a future edit wires
+# add_warning() into this branch, that is a deliberate behaviour change
+# (out of scope for this Part — see dev/status/harness.md) and this
+# assertion should be updated alongside it, not silently left stale.
+if ! grep -q 'fixture_missing_review_at' "$MR_FINDINGS"; then
+  echo "OK: the missing-review_at branch does NOT emit a roll-up 'W:' findings line for the fixture entry — confirms main.sh's '## Warnings' section is unaffected either way, as the harness.md item's caveat claims (verified, not assumed)"
+else
+  fail "fixture_missing_review_at unexpectedly appeared in the roll-up FINDINGS_FILE — the missing-review_at branch now calls add_warning(), which contradicts the harness.md item's caveat and is a behaviour change out of this Part's scope: $(cat "$MR_FINDINGS")"
+fi
+
 echo "OK: deep scan Linter Exception Expiry section (T1-K) structural + functional check passed."
