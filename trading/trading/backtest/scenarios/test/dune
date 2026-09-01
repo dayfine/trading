@@ -6,6 +6,7 @@
   test_fixtures_root
   test_scenario_runner_isolation
   test_scenario_runner_actual_sexp
+  test_scenario_runner_wall_span
   test_scenario_progress
   test_bar_source_resolver
   test_ladder_v4_overlays)
@@ -16,6 +17,7 @@
   test_fixtures_root
   test_scenario_runner_isolation
   test_scenario_runner_actual_sexp
+  test_scenario_runner_wall_span
   test_scenario_progress
   test_bar_source_resolver
   test_ladder_v4_overlays)
@@ -39,4 +41,12 @@
   types
   status)
  (preprocess
-  (pps ppx_sexp_conv ppx_deriving.eq ppx_deriving.show)))
+  (pps ppx_sexp_conv ppx_deriving.eq ppx_deriving.show))
+ (deps
+  ; test_scenario_runner_wall_span.ml runs the real scenario_runner.exe as a
+  ; subprocess (issue #2606 regression) and reads scenario_runner.ml's source
+  ; for its structural check. Without these deps dune is free to skip
+  ; building the exe / mirroring the source into this test's sandbox (same
+  ; hazard as issue #2565's csv_snapshot_builder_cleanup_subject.exe).
+  ../scenario_runner.exe
+  ../scenario_runner.ml))
