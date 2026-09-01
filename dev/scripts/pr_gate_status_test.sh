@@ -8,6 +8,28 @@
 # behavioral verdict as well, and the PR printed `pass / ok / ok  MERGE` while
 # qc-behavioral had never been dispatched. On an autonomous merge path that is a
 # PR merged with one gate silently unrun.
+#
+# Cases 41-42 (PR #2622 rework iteration 1, qc-behavioral review 5075369988)
+# exist because #2620's fix moved gate attribution onto `first_heading_text`
+# (the review's OWN first heading, fence-stripped) without a fixture landing
+# alongside it that actually exercises the fence-stripping *inside that
+# function specifically*. Every pre-existing fenced fixture (TILDE_FENCED,
+# OVERSTRIP_*, STRUCT_QUOTING_A_BEHAVIORAL_HEADING) places its real heading
+# BEFORE the fence, so `first_heading_text` returns before ever reaching the
+# fence -- deleting `strip_fences` from inside `first_heading_text` (leaving
+# `review_result`'s separate copy untouched) left the whole suite green while
+# producing a live false-MERGE/false-BLOCK pair. Case 41
+# (FENCE_BEFORE_FIRST_HEADING) puts the fence FIRST, so it is the only
+# fixture that can reach that fence-strip call at all.
+#
+# Case 42 (FIRST_HEADING_NOT_GATE_WORD) exists because the SAME #2620 change
+# left the `^`-anchor guard in the kind test (the #2417 fix, cases 1-2 above)
+# without a pin: case 1's interior "### Notes for Behavioral QC" is no longer
+# even consulted post-#2620 (only the first heading is), so it now passes for
+# an unrelated reason and the anchor itself goes untested. Case 42 puts the
+# non-anchored gate-word text in the review's FIRST heading instead, so
+# dropping the `^` anchor (matching "behavioral" anywhere in the heading
+# rather than only at its start) is the one and only thing that flips it.
 set -eu
 
 HERE=$(dirname "$0")
@@ -992,6 +1014,58 @@ APPROVED"
 
 check "well-formed behavioral review (first heading names the gate) still reads ok" \
   ok "$(_gate "$(reviews "$WELL_FORMED_BEHAVIORAL_REVIEW")" behavioral "$TIP")"
+
+# 41. #2622 rework (qc-behavioral 5075369988, CP4 finding 1): the fence comes
+#     FIRST, quoting the OTHER gate's heading, and the review's OWN real
+#     heading follows, unfenced. Every pre-existing fenced fixture places the
+#     real heading before the fence, so none of them can reach the
+#     fence-strip call inside `first_heading_text` -- this one is built
+#     specifically so `first_heading_text` cannot return before it does.
+#     Confirmed RED (both assertions) with `strip_fences` deleted from inside
+#     `first_heading_text` only (`review_result`'s copy left intact) --
+#     without the strip, the fenced "Structural QC" heading becomes the
+#     unmutated body's first raw heading line, so structural wrongly reads
+#     "ok" (false-MERGE) and behavioral wrongly reads "none" (false-BLOCK).
+FENCE_BEFORE_FIRST_HEADING="Reviewed SHA: $TIP
+
+\`\`\`
+## Structural QC — quoted from the other review
+\`\`\`
+
+## Behavioral QC — PR #2622
+
+## Verdict
+
+APPROVED"
+
+check "#2622: a heading quoted in a fence BEFORE the real first heading does not satisfy the quoted gate" \
+  none "$(_gate "$(reviews "$FENCE_BEFORE_FIRST_HEADING")" structural "$TIP")"
+check "#2622: ...and the real first heading after the fence still satisfies its own gate" \
+  ok "$(_gate "$(reviews "$FENCE_BEFORE_FIRST_HEADING")" behavioral "$TIP")"
+
+# 42. #2622 rework (qc-behavioral 5075369988, CP4 finding 2): the #2417
+#     anchor guard (cases 1-2) lost its only pin as a side effect of #2620 --
+#     case 1's interior heading is no longer consulted at all post-#2620, so
+#     it now passes for a different reason and never exercises the `^`
+#     anchor in the kind test. This fixture puts the gate word inside the
+#     review's FIRST heading, but not at its start, so it is the anchor
+#     itself -- not the interior-vs-first distinction #39/#40 already pin --
+#     that decides the outcome. Confirmed RED with the `^` dropped from the
+#     kind test (`^(qc[- ])?" + $kind + "\\b"` -> `(qc[- ])?" + $kind +
+#     "\\b"`): the gate word then matches anywhere in the heading, so this
+#     review wrongly satisfies the behavioral gate.
+FIRST_HEADING_NOT_GATE_WORD="Reviewed SHA: $TIP
+
+### Notes for Behavioral QC
+
+Recompute the cohort totals from joined.tsv.
+
+## Verdict
+
+APPROVED"
+
+check "#2622: a first heading with the gate word NOT at its start does not satisfy the gate (anchor guard)" \
+  none "$(_gate "$(reviews "$FIRST_HEADING_NOT_GATE_WORD")" behavioral "$TIP")"
 
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"

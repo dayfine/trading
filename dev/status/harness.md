@@ -1811,3 +1811,68 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   if they turn out to matter. Verify:
   `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh` (or `dune
   runtest trading/devtools/checks/`) — prints 5 `OK:` lines, exit 0.
+
+- [ ] **H-GATEPARSER-SHALESS-REVIEW-NEVER-STALE** (issue #2626): `pr_gate_status.sh`
+  recovers each review's SHA by parsing a `Reviewed SHA:` line out of the review's
+  **prose body**. When the line is absent the review parses as sha-less, and the
+  script's own header documents the result: *"a sha-less review was simply
+  current-at-every-tip-forever — it can never go stale and can never be outvoted."*
+  So a QC verdict whose author forgot one line of prose can never be invalidated by
+  a rework, and if BOTH gates are sha-less the script prints `MERGE` for a tip
+  nobody reviewed. **Observed live on PR #2625 itself, 2026-09-01:** both reviews
+  sat at `7b1adb5b` after a rework moved the tip to `a9e32f87`, and the script
+  printed `ok` for structural (body had no `Reviewed SHA:`) alongside
+  `stale(7b1adb5b)` for behavioral (body had it) — two verdicts, one superseded
+  SHA, two different staleness answers. Only the behavioral reviewer's having
+  included the line kept it from reading `MERGE`; both agents were dispatched with
+  prompts that required it. Root cause is that the SHA is being recovered from
+  prose when the API already supplies it structurally: every review object carries
+  **`commit_id`**, the commit it was submitted against — authoritative, always
+  present, impossible for an agent to forget. Fix shape: fall back to
+  `$review.commit_id` when the body yields no match, which makes the sha-less
+  branch unreachable; plus a fixture asserting a sha-less review against a moved
+  tip reads `stale(...)`, not `ok`. Note this is the **fourth** independent defect
+  on this one parser (after the 7-vs-8 hex-length bug #2397, the fence-quoting
+  misattribution, and #2620's interior-heading leak) and the **third** to arise
+  specifically from parsing prose. `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-09-01 orchestrator run 33482398132, found while re-QCing PR #2625)
+
+- [ ] **H-GATEPARSER-NO-MUTATION-COVERAGE**: `pr_gate_status.sh` is the merge-gate
+  reader, yet its suite is verified only by hand. A ~30-line mutation harness
+  around the existing `PR_GATE_STATUS_LIB=1` seam, run in CI against a fixed
+  mutation list, would surface the unkilled mutations **mechanically**. For the
+  file that *is* the merge gate, mutation coverage is the check that matches the
+  stakes. `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-09-01 qc-behavioral on PR #2622, corrected by qc-behavioral on
+  PR #2625)
+
+  **The mutation list is the load-bearing part of this item, so it is recorded
+  in full — a harness seeded from a short list goes green and the omitted
+  mutations are never rediscovered.** The #2622 sweep's prose said "8 of 11
+  killed, 3 survivors"; its own table has **5 GREEN rows**. The corrected
+  figure is **5 survivors, and every one of them is live** — each flips a real
+  gate attribution, not an equivalent mutant:
+
+  | mutation | status after PR #2625 |
+  |---|---|
+  | (d) drop `strip_fences` inside `first_heading_text` | **killed** (case 41) |
+  | (j) drop the `^` anchor in the kind test | **killed** (case 42) |
+  | (k) drop `\b` from the kind test | **LIVE, unpinned** — first heading `## Behaviorally equivalent refactor` reads `ok`; two letters from the actual #2620 incident text |
+  | (f) `#{1,4}` → `#{1,6}` | **LIVE, unpinned** — flips in both directions (`###### Structural QC (quoted)` before the real heading reads `ok`; `###### scratch note` first reads `none`) |
+  | (g) required space `" +"` → `" *"` | **LIVE, unpinned** — both directions (`#2622 follow-up notes` reads `ok`; `#Behavioral QC` reads `none`) |
+
+  Note (k) especially: with the `^` anchor restored by case 42, `\b` is the
+  **sole** remaining guard against a first heading that merely *starts with*
+  the gate word.
+
+  Two scoping notes for whoever builds this. First, "mechanically" above is
+  deliberate and narrower than the original wording ("with no inferential
+  judgment", now removed): a harness surfaces an unkilled mutation
+  mechanically, but classifying a survivor as **defect vs. equivalent mutant**
+  is exactly an inferential step — and it was performed imperfectly here, since
+  (f) and (g) were originally dismissed as not-real. Second, a related gap the
+  harness would *not* catch: the false-negative surface #2622 introduced —
+  a review opening with a preamble heading (`# Review of PR #N`, `## Context`,
+  `# Summary`) attributes to **no** gate, a false-BLOCK. It is fail-safe and
+  currently unrealised (27/27 real review bodies across 10 recent PRs attribute
+  correctly, in 3 heading families), so it is recorded here rather than pinned.
