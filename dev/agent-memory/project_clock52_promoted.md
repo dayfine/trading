@@ -1,11 +1,11 @@
 ---
 name: project_clock52_promoted
-description: "entry_order_max_rest_weeks 0→52 MERGED (#2587); predicate RUNS on default path but finds nothing — MEASURED empty over goldens (11/12 bit-identical), effect concentrates behind trigger-at-E; D-null (#2610) contests the value on return"
+description: "entry_order_max_rest_weeks 0→52 MERGED (#2587), decision SETTLED keep-52; return effect regime-dependent (B small win, A 26y salt-lottery ±287pp, D loss); maxDD win is the ONE salt+composition-robust property; predicate runs but measured empty on default path"
 metadata: 
   node_type: memory
   type: project
   originSessionId: c11b2096-8ab9-4b27-9dc8-fd68436f65f5
-  modified: 2026-08-31T19:52:27.912Z
+  modified: 2026-09-01T22:06:05.196Z
 ---
 
 `entry_order_max_rest_weeks` default 0→52 **merged 2026-08-31** (PR #2587,
@@ -39,12 +39,17 @@ fill are crash-recovery monsters; at top-1000 the candidate pool is too
 shallow to replace a cancelled monster ([[project_edge_is_the_fat_tail]]).
 **Default decision RESOLVED 2026-08-31 — USER: KEEP 52** ("i think promo
 is fine"): top-1000 is the composition probe, not the deployment breadth;
-top-3000 (deployment) wins in all tested cells; default-path radius
-measured empty. Ledger amended (#2611). Optional residual: cell A's
-+183.5pp is salt-0-only — an A-null (clockA-{0,52} salts 1,2, ~10-14h)
-would pin the deployment-breadth win the way B/D are pinned. Cell B's own
-null: paired Δ +7.3/+6.5/+9.6pp every salt (pairing worked there; at D it
-convicts instead).
+default-path radius measured empty. Ledger amended (#2611).
+**A-null RAN 2026-09-01 (residual closed): cell A's return effect is
+SIGN-INCONSISTENT** — paired Δ +183.5/+232.1/−54.7pp across salts (287pp
+range, a 26y path-lottery cell); NEVER quote +183.5 as a robust win.
+maxDD improves at every salt in every MULTI-SALT cell (A/B/D; cell C is
+salt-0-only, directionally consistent) — the clock's one fully-robust
+property is drawdown reduction. Per-cell return truth:
+B = consistent small win (+7.3/+6.5/+9.6, 5y broad); A = majority-positive
+lottery (26y broad); D = consistent loss (top-1000). KEEP-52 stands on the
+empty default-path radius + weekly live re-issue + universal maxDD win.
+Record: `a-null-2026-09-01.md`, second ledger amendment.
 
 **Book-check (tier-2 VERIFIED):** the book's only GTC-cancel criterion is
 "cancel it if the pattern changes and you later change your mind" (Ch. 3
