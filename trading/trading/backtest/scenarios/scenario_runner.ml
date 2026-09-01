@@ -315,9 +315,6 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
           ?candidate_log:(Backtest.Candidate_log.create_if emit_candidates)
           ~on_step_setup ())
   in
-  let wall_seconds =
-    Time_ns.Span.to_sec (Time_ns.diff (Time_ns_unix.now ()) t_start)
-  in
   Backtest.Result_writer.write ~output_dir:scenario_dir result;
   (* Post-step: per-week candidate list (#2490). Runs after the canonical
      artefacts are on disk and swallows its own failures, so a writer problem
@@ -331,13 +328,6 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
      leak class) loudly to stderr and as [fold_health.sexp]. Purely a reporting
      post-step; it changes no metric and never aborts the run. *)
   _emit_fold_health ~scenario_dir ~result;
-  (* Emit wall_seconds.txt — the canonical perf-report convention
-     (release_report._read_optional_float). Goldens may pin
-     [expected.wall_seconds] to catch runtime regressions; scenarios that
-     don't pin are unaffected. *)
-  Out_channel.write_all
-    (Filename.concat scenario_dir "wall_seconds.txt")
-    ~data:(sprintf "%.3f\n" wall_seconds);
   (* Post-step: emit the all-eligible diagnostic alongside actual.sexp /
      summary.sexp so every scenario surfaces raw-signal alpha without manual
      [all_eligible_runner.exe] invocation. Failures inside the runner are
@@ -352,7 +342,23 @@ let _run_scenario_in_child ~output_root ~fixtures_root ~progress_every
     | Some Backtest.Bar_data_source.Csv | None -> None
   in
   Backtest_all_eligible.Scenario_post_step.emit ~enabled:emit_all_eligible
-    ~scenario_path ~scenario_dir ~warehouse_dir
+    ~scenario_path ~scenario_dir ~warehouse_dir;
+  (* Emit wall_seconds.txt — the canonical perf-report convention
+     (release_report._read_optional_float). Goldens may pin
+     [expected.wall_seconds] to catch runtime regressions; scenarios that
+     don't pin are unaffected. Measured from [t_start] (before
+     [run_backtest]) through here — i.e. AFTER every post-step above,
+     including the all-eligible diagnostic — so the pinned band covers the
+     full wall a human waits for, not just the backtest core. A prior
+     version stopped the clock immediately after [run_backtest], which let
+     the all-eligible diagnostic's cost (48+ min when enabled — issue #2606)
+     run entirely outside the measured span. *)
+  let wall_seconds =
+    Time_ns.Span.to_sec (Time_ns.diff (Time_ns_unix.now ()) t_start)
+  in
+  Out_channel.write_all
+    (Filename.concat scenario_dir "wall_seconds.txt")
+    ~data:(sprintf "%.3f\n" wall_seconds)
 
 (* Fork-based worker pool. Scenarios run in parallel child processes up to
    [parallel] at a time. *)

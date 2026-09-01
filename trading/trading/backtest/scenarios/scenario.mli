@@ -50,11 +50,16 @@ type expected = {
           spikes add up to a high ulcer index even though MaxDrawdown stays the
           same. [None] skips. *)
   wall_seconds : range option; [@sexp.option]
-      (** Wall-clock duration of [Backtest.Runner.run_backtest] in seconds —
-          read from [wall_seconds.txt] under each scenario's output dir
-          (canonical perf-report convention; see
-          {!Backtest.Release_report.load_scenario_run}). Pinned range catches CI
-          runtime regressions and overflows of the 8 GB / 2h GHA budget. [None]
+      (** Wall-clock duration of the full per-scenario child run in seconds —
+          [Backtest.Runner.run_backtest] PLUS every post-step that follows it
+          (result-writer flush, candidate log, fold-health guard, and the
+          all-eligible diagnostic when enabled) — read from [wall_seconds.txt]
+          under each scenario's output dir (canonical perf-report convention;
+          see {!Backtest.Release_report.load_scenario_run}). Pinned range
+          catches CI runtime regressions and overflows of the 8 GB / 2h GHA
+          budget. Covering the post-steps matters: before issue #2606's fix, the
+          span stopped at [run_backtest] and a 48+ minute all-eligible
+          diagnostic could run entirely outside the measured window. [None]
           skips. *)
 }
 [@@deriving sexp]
