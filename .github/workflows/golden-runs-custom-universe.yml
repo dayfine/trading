@@ -29,9 +29,11 @@
 # (weinstein-2019-armed-e, weinstein-2019-top-500). The script's per-cell
 # timeout default (GOLDEN_SP500_TIMEOUT, 5400s = 90 min in
 # dev/scripts/golden_sp500_postsubmit.sh) would give 2*90 = 180 min against
-# this job's 60-min cap on paper — a job-level cancel on that path would
-# skip the if:always() no-summary net below, same #2427 silent-failure
-# shape the 15y file guards against. Cells run in ~minutes in practice
+# this job's 60-min cap on paper — a job-level cancel on that path ends the
+# run with conclusion=cancelled no matter what any step exits (the
+# if:always() no-summary net below still runs on a cancel but cannot redden
+# or rescue it — measured, see the note on that branch), same #2427
+# silent-failure shape the 15y file guards against. Cells run in ~minutes in practice
 # (measured wall 7 min for the whole job), so this was never hit, but the
 # invariant should hold on paper. Overridden below to
 # GOLDEN_SP500_TIMEOUT=1200 (20 min/cell, ~4-6x the measured per-cell wall):
