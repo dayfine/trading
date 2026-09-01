@@ -1734,6 +1734,31 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh` (or `dune
   runtest trading/devtools/checks/`) — prints 5 `OK:` lines, exit 0.
 
+- [ ] **H-GATEPARSER-SHALESS-REVIEW-NEVER-STALE** (issue #2626): `pr_gate_status.sh`
+  recovers each review's SHA by parsing a `Reviewed SHA:` line out of the review's
+  **prose body**. When the line is absent the review parses as sha-less, and the
+  script's own header documents the result: *"a sha-less review was simply
+  current-at-every-tip-forever — it can never go stale and can never be outvoted."*
+  So a QC verdict whose author forgot one line of prose can never be invalidated by
+  a rework, and if BOTH gates are sha-less the script prints `MERGE` for a tip
+  nobody reviewed. **Observed live on PR #2625 itself, 2026-09-01:** both reviews
+  sat at `7b1adb5b` after a rework moved the tip to `a9e32f87`, and the script
+  printed `ok` for structural (body had no `Reviewed SHA:`) alongside
+  `stale(7b1adb5b)` for behavioral (body had it) — two verdicts, one superseded
+  SHA, two different staleness answers. Only the behavioral reviewer's having
+  included the line kept it from reading `MERGE`; both agents were dispatched with
+  prompts that required it. Root cause is that the SHA is being recovered from
+  prose when the API already supplies it structurally: every review object carries
+  **`commit_id`**, the commit it was submitted against — authoritative, always
+  present, impossible for an agent to forget. Fix shape: fall back to
+  `$review.commit_id` when the body yields no match, which makes the sha-less
+  branch unreachable; plus a fixture asserting a sha-less review against a moved
+  tip reads `stale(...)`, not `ok`. Note this is the **fourth** independent defect
+  on this one parser (after the 7-vs-8 hex-length bug #2397, the fence-quoting
+  misattribution, and #2620's interior-heading leak) and the **third** to arise
+  specifically from parsing prose. `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-09-01 orchestrator run 33482398132, found while re-QCing PR #2625)
+
 - [ ] **H-GATEPARSER-NO-MUTATION-COVERAGE**: `pr_gate_status.sh` is the merge-gate
   reader, yet its suite is verified only by hand. A ~30-line mutation harness
   around the existing `PR_GATE_STATUS_LIB=1` seam, run in CI against a fixed
