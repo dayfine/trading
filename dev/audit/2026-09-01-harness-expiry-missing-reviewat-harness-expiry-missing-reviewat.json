@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-01",
+  "feature": "harness-expiry-missing-reviewat",
+  "branch": "harness/expiry-missing-reviewat",
+  "sha": "9da28293276c0eee0e8e08c2761430182523c751",
+  "recorded_at_ns": 1788253130199955404,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "H-EXPIRY-NEVER-BRANCH-UNPINNED: the never*) continue branch is unpinned in both directions; first over-reporting gap on this surface.",
+  "quality_score": 2,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": "PR #2624. Author agent stalled on a backgrounded dune build; work recovered dispatcher-side, landed UNATTESTED. Rework 1 applied: single-entry fixture rationale measured false and inverted (1-entry MISSED the hardcoded-count mutation, 2-entry CAUGHT it). Awaiting re-QC at this tip."
+}

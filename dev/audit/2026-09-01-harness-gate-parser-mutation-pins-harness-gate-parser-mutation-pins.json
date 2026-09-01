@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-01",
+  "feature": "harness-gate-parser-mutation-pins",
+  "branch": "harness/gate-parser-mutation-pins",
+  "sha": "b2950471",
+  "recorded_at_ns": 1788253130235278672,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
+  "harness_gap": "H-GATEPARSER-SHALESS-REVIEW-NEVER-STALE (#2626) + 3 live unpinned mutations (k)(f)(g).",
+  "quality_score": 2,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 1,
+  "notes": "PR #2625. Author agent stalled; recovered dispatcher-side, UNATTESTED. Rework 1 corrected the survivor count (5 live, not 3 -- the cited #2622 review's prose contradicted its own table). Its structural verdict reads a FALSE ok at this tip because that review body omitted a Reviewed SHA: line -- the #2626 defect, demonstrated on this PR itself."
+}
