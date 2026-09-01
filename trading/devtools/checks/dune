@@ -745,9 +745,13 @@
 ; workspace root, so it can't be declared as a normal glob/file dep (see
 ; the header note above, line ~18); (universe) is the established pattern
 ; in this file for exactly that case (agent_compliance_check.sh /
-; agent_compliance_test.sh below) -- it also disables dune's per-rule
-; sandbox for this rule, so the walk-up can actually reach the real
-; .claude/agents/ directory instead of an empty sandboxed one.
+; agent_compliance_test.sh below) -- it forces the rule to always rerun,
+; since .claude/agents/*.md isn't a normal dune dep dune can hash. It does
+; NOT disable dune's per-rule sandbox (CI logs show `_build/.sandbox/...`
+; for this rule); the walk-up reaches the real .claude/agents/ directory
+; because the sandbox directory is still a real directory nested inside
+; the actual repo checkout on disk, so the walk-up crosses the sandbox
+; boundary and lands on the real repo root either way.
 
 (rule
  (alias runtest)

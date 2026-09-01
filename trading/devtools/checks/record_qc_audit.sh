@@ -633,12 +633,25 @@ fi
 # unconditionally (both APPROVED and NEEDS_REWORK calls), same reasoning
 # as the H-AUDIT-HARNESS-GAP-DROPPED-ON-APPROVED fix just above this one
 # in the ledger: identity metadata should never be gated on the verdict.
+#
+# Bold-tolerant (issue #2607): both qc-structural.md and qc-behavioral.md
+# permit posting the label as bold Markdown ("**Reviewed SHA:** <sha>"),
+# and that IS what QC agents actually post in practice. The raw
+# `^Reviewed SHA: ` anchor below does not match that -- it only matched
+# the plain, unbolded label -- so every sibling extractor in this script
+# already tolerates bold (see the quality-score `gsub(/^\*\*|\*\*$/, ...)`
+# calls above) except this one had been left behind. Strip a leading
+# "**"/trailing "**" wrapped around exactly the "Reviewed SHA:" label
+# before matching, so both forms normalize to the same plain-text line.
+_strip_bold_reviewed_sha() {
+  sed 's/^\*\*\(Reviewed SHA:\)\*\*/\1/'
+}
 SHA=""
 if [ -n "${BODIES:-}" ]; then
-  SHA="$(echo "$BODIES" | grep -oE '^Reviewed SHA: .*' | tail -1 | sed 's/^Reviewed SHA: *//' | cut -c1-12 || true)"
+  SHA="$(echo "$BODIES" | _strip_bold_reviewed_sha | grep -oE '^Reviewed SHA: .*' | tail -1 | sed 's/^Reviewed SHA: *//' | cut -c1-12 || true)"
 fi
 if [ "$FILE_MODE" -eq 1 ] && [ -z "$SHA" ] && [ -f "$REVIEW_FILE" ]; then
-  SHA="$(grep -oE '^Reviewed SHA: .*' "$REVIEW_FILE" 2>/dev/null | tail -1 | sed 's/^Reviewed SHA: *//' | cut -c1-12 || true)"
+  SHA="$(_strip_bold_reviewed_sha <"$REVIEW_FILE" 2>/dev/null | grep -oE '^Reviewed SHA: .*' | tail -1 | sed 's/^Reviewed SHA: *//' | cut -c1-12 || true)"
 fi
 
 # --- Call write_audit.sh ---
