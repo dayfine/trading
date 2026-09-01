@@ -23,6 +23,22 @@
 # Graduated from soak 2026-08-31 (#2403): continue-on-error flipped to false
 # after 45/45 consecutive clean runs (latest wall 7 min) — see issue #2403
 # comment log for the flip condition and evidence.
+#
+# COHERENCE INVARIANT (#2618, residual from #2615's qc-behavioral review):
+# 2 tier-3 cells live under goldens-custom-universe-scenarios/
+# (weinstein-2019-armed-e, weinstein-2019-top-500). The script's per-cell
+# timeout default (GOLDEN_SP500_TIMEOUT, 5400s = 90 min in
+# dev/scripts/golden_sp500_postsubmit.sh) would give 2*90 = 180 min against
+# this job's 60-min cap on paper — a job-level cancel on that path ends the
+# run with conclusion=cancelled no matter what any step exits (the
+# if:always() no-summary net below still runs on a cancel but cannot redden
+# or rescue it — measured, see the note on that branch), same #2427
+# silent-failure shape the 15y file guards against. Cells run in ~minutes in practice
+# (measured wall 7 min for the whole job), so this was never hit, but the
+# invariant should hold on paper. Overridden below to
+# GOLDEN_SP500_TIMEOUT=1200 (20 min/cell, ~4-6x the measured per-cell wall):
+# 2*20 + ~15 min overhead (checkout/cache/build) = 55 min < 60-min cap.
+# Keep per_cell * n_cells + overhead <= timeout-minutes when touching either.
 
 name: golden-runs-custom-universe
 
@@ -51,6 +67,11 @@ jobs:
       # Reuse the existing postsubmit script — it discovers ;; perf-tier: 3
       # cells under each named subdir.
       GOLDEN_SP500_SUBDIRS: goldens-custom-universe-scenarios
+      # Per-cell timeout (seconds). See the COHERENCE INVARIANT comment
+      # above the job block: 2 cells * 1200s = 40 min + ~15 min overhead
+      # stays under the 60-min job cap, while remaining ~4-6x the measured
+      # per-cell wall (job wall 7 min total for 2 cells, i.e. ~3-4 min/cell).
+      GOLDEN_SP500_TIMEOUT: "1200"
     steps:
       - uses: actions/checkout@v4
 
@@ -78,7 +99,25 @@ jobs:
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "No summary file found" >> "$GITHUB_STEP_SUMMARY"
+            # dev/scripts/golden_sp500_postsubmit.sh writes summary.txt
+            # UNCONDITIONALLY at the end of its scenario loop -- EXCEPT on
+            # the "no scenarios found with [;; perf-tier: 3]" early-exit
+            # path (exit 0 before the loop runs), which previously reported
+            # green here having run nothing. A missing summary now means
+            # either that early-exit (nothing ran) or the script died
+            # mid-loop; both are failures worth surfacing rather than a
+            # silent green (#2427's shape on the 15y file; residual #2618
+            # on this one). The job-timeout case is separate: on a
+            # job-level cancel this if:always() step DOES still run
+            # (measured on cancelled runs 32564083760 / 29885457584 — the
+            # step completed success), but the JOB conclusion stays
+            # cancelled regardless of any step's exit code, so nothing
+            # this branch does can rescue or redden that run. The cancel
+            # case is governed only by the COHERENCE INVARIANT above the
+            # job block (per_cell * n_cells + overhead <= timeout-minutes),
+            # not by this exit code.
+            echo "Custom-universe golden postsubmit: no summary produced." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
 
       # Per-cell logs (<scenario>.log/.error/.wall_sec/.peak_rss) carry the
