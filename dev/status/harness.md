@@ -1735,9 +1735,41 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   runtest trading/devtools/checks/`) — prints 5 `OK:` lines, exit 0.
 
 - [ ] **H-GATEPARSER-NO-MUTATION-COVERAGE**: `pr_gate_status.sh` is the merge-gate
-  reader, yet its 48-case suite is verified only by hand. A ~30-line mutation
-  harness around the existing `PR_GATE_STATUS_LIB=1` seam, run in CI against a
-  fixed mutation list, would have caught findings (d), (j) and (k) with no
-  inferential judgment. For the file that *is* the merge gate, mutation
-  coverage is the check that matches the stakes. `harness_gap: LINTER_CANDIDATE`.
-  (source: 2026-09-01 qc-behavioral on PR #2622)
+  reader, yet its suite is verified only by hand. A ~30-line mutation harness
+  around the existing `PR_GATE_STATUS_LIB=1` seam, run in CI against a fixed
+  mutation list, would surface the unkilled mutations **mechanically**. For the
+  file that *is* the merge gate, mutation coverage is the check that matches the
+  stakes. `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-09-01 qc-behavioral on PR #2622, corrected by qc-behavioral on
+  PR #2625)
+
+  **The mutation list is the load-bearing part of this item, so it is recorded
+  in full — a harness seeded from a short list goes green and the omitted
+  mutations are never rediscovered.** The #2622 sweep's prose said "8 of 11
+  killed, 3 survivors"; its own table has **5 GREEN rows**. The corrected
+  figure is **5 survivors, and every one of them is live** — each flips a real
+  gate attribution, not an equivalent mutant:
+
+  | mutation | status after PR #2625 |
+  |---|---|
+  | (d) drop `strip_fences` inside `first_heading_text` | **killed** (case 41) |
+  | (j) drop the `^` anchor in the kind test | **killed** (case 42) |
+  | (k) drop `\b` from the kind test | **LIVE, unpinned** — first heading `## Behaviorally equivalent refactor` reads `ok`; two letters from the actual #2620 incident text |
+  | (f) `#{1,4}` → `#{1,6}` | **LIVE, unpinned** — flips in both directions (`###### Structural QC (quoted)` before the real heading reads `ok`; `###### scratch note` first reads `none`) |
+  | (g) required space `" +"` → `" *"` | **LIVE, unpinned** — both directions (`#2622 follow-up notes` reads `ok`; `#Behavioral QC` reads `none`) |
+
+  Note (k) especially: with the `^` anchor restored by case 42, `\b` is the
+  **sole** remaining guard against a first heading that merely *starts with*
+  the gate word.
+
+  Two scoping notes for whoever builds this. First, "mechanically" above is
+  deliberate and narrower than the original wording ("with no inferential
+  judgment", now removed): a harness surfaces an unkilled mutation
+  mechanically, but classifying a survivor as **defect vs. equivalent mutant**
+  is exactly an inferential step — and it was performed imperfectly here, since
+  (f) and (g) were originally dismissed as not-real. Second, a related gap the
+  harness would *not* catch: the false-negative surface #2622 introduced —
+  a review opening with a preamble heading (`# Review of PR #N`, `## Context`,
+  `# Summary`) attributes to **no** gate, a false-BLOCK. It is fail-safe and
+  currently unrealised (27/27 real review bodies across 10 recent PRs attribute
+  correctly, in 3 heading families), so it is recorded here rather than pinned.
