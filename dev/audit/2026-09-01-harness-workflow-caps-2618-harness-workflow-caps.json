@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-01",
+  "feature": "harness-workflow-caps",
+  "branch": "harness/workflow-caps-2618",
+  "sha": "cfd70fb327986b1f87abe7ddc9de166a0ddde2fc",
+  "recorded_at_ns": 1788253130168003185,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": "PR #2623. First behavioral pass NEEDS_REWORK (3): the added comment claimed a job cancel skips the if:always() branch, refuted across 9 measured timeout cancellations. Fix lives in .github/workflows/** which this token cannot push; maintainer's parallel session reworked twice. MERGED 6da52064."
+}
