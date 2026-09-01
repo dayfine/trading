@@ -1847,13 +1847,13 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   orchestrator actually runs under) was widened to project `commit_id` into
   each review object alongside `body`, since the prior projection dropped the
   field before `_gate` ever saw it. **Scoped gap, documented in both the code
-  comment and here:** the `gh` backend's *current projection* (`_pr_meta_gh`,
-  `gh pr view --json reviews`) does not carry a per-review commit sha — that
-  particular JSON shape omits it, but the gap is a backend-selection
-  consequence, not an API limitation: the REST endpoint (`gh api
-  repos/.../pulls/N/reviews`) returns `commit_id` directly and GraphQL
-  `PullRequestReview` exposes a `commit` field, so the gh path is closeable
-  in about one line by switching its review projection to the REST endpoint.
+  comment and here:** `gh pr view --json reviews` does supply the per-review
+  sha, but under the key `.commit.oid`, whereas the reader looks for
+  `.commit_id` — the gap is a key-name mismatch, not a missing field
+  (measured on gh 2.89.0 during #2628's QC: `.reviews[].commit.oid` present
+  and correct). Closing it needs only a normalisation on data `_pr_meta_gh`
+  already receives (e.g. reading `(.commit_id // .commit.oid // "")`), not a
+  switch to the REST endpoint.
   Until then a sha-less review under a *local* `gh`-backed session still
   falls through to the pre-existing always-current path. The curl/REST
   backend is fully covered; that is the backend the orchestrator cron runs

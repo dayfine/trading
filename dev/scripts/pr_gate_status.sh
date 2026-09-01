@@ -259,14 +259,15 @@ _gate() {
       # so a review can still explicitly declare it reviewed a different sha
       # than the one it was posted against (the body stays primary). This does
       # not, on its own, make the always-current path unreachable in every
-      # backend: the CURRENT projection used by `_pr_meta_gh` (`gh pr view
-      # --json reviews`) does not carry a per-review commit sha, so a sha-less LOCAL
-      # review under the gh backend still falls through to "" here. That is a
-      # projection choice, not an API limitation -- the REST endpoint
-      # (`gh api repos/.../pulls/N/reviews`) returns `commit_id` directly, so
-      # the gh path is closeable by switching its review projection to REST.
-      # Only the curl/REST backend (`_pr_meta_curl`, which is what the GHA
-      # orchestrator actually runs) is covered by this fallback today.
+      # backend: `gh pr view --json reviews` DOES supply the per-review sha,
+      # but under the key `.commit.oid`, whereas this reader looks for
+      # `.commit_id` -- so a sha-less LOCAL review under the gh backend still
+      # falls through to "" here. The gap is a key-name mismatch, not a
+      # missing field: closing it needs only a normalisation on data
+      # `_pr_meta_gh` already receives (e.g. reading
+      # (.commit_id // .commit.oid // "")), not a switch to the REST
+      # endpoint. Only the curl/REST backend (`_pr_meta_curl`, which is what
+      # the GHA orchestrator actually runs) is covered by this fallback today.
       | (if ($body_sha != "") then $body_sha else (.commit_id // "") end) as $sha
       #
       # DISAGREEING matches within ONE review body read "unclear", not
