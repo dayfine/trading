@@ -1626,7 +1626,7 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   Verify: `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh`
   (40 `OK:` lines, exit 0) or `dune runtest trading/devtools/checks/`.
 
-- [ ] **H-EXPIRY-MISSING-REVIEWAT-UNPINNED**: filed while closing O2/O3
+- [x] **H-EXPIRY-MISSING-REVIEWAT-UNPINNED**: filed while closing O2/O3
   (2026-08-30). `_scan_exceptions_conf`'s "missing `review_at` annotation"
   branch (`check_11_linter_expiry.sh:130-137`, populates `_SCAN_MISSING` /
   `_SCAN_MISSING_COUNT`) never calls `add_warning` — it is invisible to the
@@ -1640,6 +1640,42 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   top-level "## Warnings" would stay unaffected either way since this branch
   was never wired into it. `harness_gap: LINTER_CANDIDATE`.
   (source: 2026-08-30, harness-maintainer while closing PR #2589's O2/O3)
+  **DONE (2026-09-01, harness/expiry-missing-reviewat):** confirmed the gap
+  by hand first — deleted the two lines that populate `_SCAN_MISSING_COUNT`
+  / `_SCAN_MISSING` inside the missing-review_at branch of a working copy
+  of the real `check_11_linter_expiry.sh` (leaving its `continue` and every
+  other branch untouched), reran the pre-existing
+  `deep_scan_linter_expiry_check.sh` suite (Parts 1-7, 39 assertions)
+  against that mutated copy, and it stayed fully green at exit 0 — none of
+  the existing assertions touch this branch. Reverted before writing any
+  fix (`git status --porcelain` showed no diff on the production file
+  afterward). Added Part 8 (assertions 8a-8d) to
+  `deep_scan_linter_expiry_check.sh`, using a single-entry
+  `linter_exceptions.conf` fixture (masking-hazard guard, per Part 7's
+  precedent — a multi-entry fixture would let a sibling entry's count mask
+  a per-entry defect in this branch):
+  - 8a (functional pin): an entry with no `# review_at:` annotation at all
+    surfaces via the per-file "### Missing review_at annotation — policy
+    violation T1-K" `REPORT_FILE` section, naming the entry.
+  - 8b (break direction 1 — population removed): mutating a copy to drop
+    the `_SCAN_MISSING_COUNT` / `_SCAN_MISSING` population (the exact gap
+    confirmed above) makes the T1-K section vanish while the report still
+    renders its "No expired or missing review_at annotations found"
+    fallback and exits 0 — proving the mutation is isolated to this branch,
+    not a wholesale script crash.
+  - 8c (break direction 2 — message content corrupted, population left in
+    place): rewording the `_SCAN_MISSING` append text keeps the header/count
+    intact but the exact detail text no longer matches, proving 8a pins the
+    entry's text and not merely "the header count is > 0."
+  - 8d: verified (not assumed) the item's own caveat — the `FINDINGS_FILE`
+    for the 8a run contains no `W:` line mentioning the fixture entry,
+    confirming `main.sh`'s "## Warnings" section is genuinely unaffected by
+    this branch, both before and after this fix.
+  Production `trading/devtools/checks/deep_scan/check_11_linter_expiry.sh`
+  is untouched by this PR — `git status --porcelain` shows only
+  `deep_scan_linter_expiry_check.sh` and this status file changed.
+  Verify: `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh`
+  (44 `OK:` lines, exit 0) or `dune runtest trading/devtools/checks/`.
 
 - [ ] **H-EXPIRY-MUTATION-DIAGNOSTIC-MISLEADS (O1)**: filed by qc-behavioral on
   PR #2589, non-blocking. Assertions 3c/3d/3e **fail closed** on a benign
