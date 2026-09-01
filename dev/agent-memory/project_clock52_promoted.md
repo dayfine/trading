@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: c11b2096-8ab9-4b27-9dc8-fd68436f65f5
-  modified: 2026-09-01T21:02:06.891Z
+  modified: 2026-09-01T22:06:05.196Z
 ---
 
 `entry_order_max_rest_weeks` default 0→52 **merged 2026-08-31** (PR #2587,
@@ -43,8 +43,9 @@ default-path radius measured empty. Ledger amended (#2611).
 **A-null RAN 2026-09-01 (residual closed): cell A's return effect is
 SIGN-INCONSISTENT** — paired Δ +183.5/+232.1/−54.7pp across salts (287pp
 range, a 26y path-lottery cell); NEVER quote +183.5 as a robust win.
-maxDD improves at every salt in EVERY cell (A/B/C/D) — the clock's one
-fully-robust property is drawdown reduction. Per-cell return truth:
+maxDD improves at every salt in every MULTI-SALT cell (A/B/D; cell C is
+salt-0-only, directionally consistent) — the clock's one fully-robust
+property is drawdown reduction. Per-cell return truth:
 B = consistent small win (+7.3/+6.5/+9.6, 5y broad); A = majority-positive
 lottery (26y broad); D = consistent loss (top-1000). KEEP-52 stands on the
 empty default-path radius + weekly live re-issue + universal maxDD win.
