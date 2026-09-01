@@ -114,7 +114,7 @@ jobs:
       - name: Publish summary
         if: always()
         run: |
-          summary_file=$(ls -1t dev/perf/golden-sp500-postsubmit-*/summary.txt 2>/dev/null | head -1)
+          summary_file=$(find dev/perf -maxdepth 2 -path 'dev/perf/golden-sp500-postsubmit-*/summary.txt' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)
           if [ -n "$summary_file" ] && [ -f "$summary_file" ]; then
             {
               echo "## SP500 15y golden run"

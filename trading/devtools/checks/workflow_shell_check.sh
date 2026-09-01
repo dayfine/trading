@@ -260,11 +260,13 @@ _extract_one() {
 # Remove a line here once its last occurrence is fixed (see #2539).
 # ---------------------------------------------------------------------
 SHELLCHECK_EXCLUDES="-e SC2012 -e SC2086 -e SC2010"
-# SC2012 (info, "use find instead of ls"): 7 occurrences, the
-#   `ls -1t <dir-glob>/summary.txt | head -1` pattern in
-#   golden-runs-{custom-universe,sp500-15y,sp500-5y}.yml,
-#   perf-{nightly,tier1,weekly}.yml, and orchestrator.yml. These only run
-#   on push:main / cron -- no PR-time signal to verify a fix against.
+# SC2012 (info, "use find instead of ls"): remaining occurrence is
+#   orchestrator.yml only (#2539) -- the `ls -1t <dir-glob>/summary.txt |
+#   head -1` pattern in golden-runs-{custom-universe,sp500-15y,sp500-5y}.yml
+#   and perf-{nightly,tier1,weekly}.yml was burned down to a `find
+#   -printf '%T@ %p\n' | sort -rn | head -n 1 | cut -d' ' -f2-` form in a
+#   follow-up PR to #2539. Remove this exclusion line once the
+#   orchestrator.yml occurrence is fixed too.
 # SC2086 (info, "double quote to prevent globbing/word splitting"): 2
 #   occurrences in orchestrator.yml's daily-summary-file lookup. The
 #   surrounding block has its own inline comments documenting a prior
