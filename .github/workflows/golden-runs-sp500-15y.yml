@@ -10,8 +10,11 @@
 # completes within budget, this workflow can be promoted back to a
 # per-push trigger.
 #
-# Non-blocking by design: continue-on-error: true. Failure here does
-# not gate merges; it surfaces as a nightly signal that 15y regressed.
+# Graduated from soak 2026-08-31 (#2403): continue-on-error flipped to false
+# after 9 consecutive clean runs since 2026-08-23 (latest wall 165 min,
+# 09:14->11:59 UTC, on the post-#2601 --no-emit-all-eligible basis). Failure
+# here now surfaces as a real check on the run; see issue #2403 comment log
+# for the flip condition and evidence.
 #
 # Prerequisite: bar data for the SP500 universe (full history back to
 # ~2009) must be committed under trading/test_data/.
@@ -40,9 +43,22 @@ jobs:
     # MEASURE 90-102 min per cell locally (backtest proper is only
     # ~430-470s; the bulk is the all_eligible diagnostic scanning 852
     # Fridays), so 70 min/cell was structurally unreachable and every
-    # completed run since at least 08-23 timed out both cells. Worst case
-    # now: 2 x 240 min + bah + build ~= 520 min, inside the cap.
-    timeout-minutes: 600
+    # completed run since at least 08-23 timed out both cells.
+    # Retightened 600 -> 300 (2026-08-31, #2403): sized empirically off the
+    # post-#2601 (--no-emit-all-eligible) streak — walls 165-175.5 min over
+    # the 9-run green streak, so 300 gives ~1.7x headroom over the streak
+    # MAX. (Attribution caveat from the qc-behavioral review: cells still
+    # measure ~80-85 min each with the flag on, so the #2537 "the bulk is
+    # all_eligible" causal story overstated; the empirical wall, not the
+    # attribution, is the basis for 300.)
+    # COHERENCE INVARIANT (qc-behavioral on #2615): the job cap must bound
+    # the script's own worst case, or a hung cell turns into a job-level
+    # cancel that skips the if:always() no-summary net below (#2427's
+    # silent-failure shape). With GOLDEN_SP500_TIMEOUT=7200 (120 min/cell,
+    # retightened in the same review): two heavy cells hung = 240 min + the
+    # ~13s third cell + overhead ~= 243 min < 300. Keep
+    # per_cell * n_cells + overhead <= timeout-minutes when touching either.
+    timeout-minutes: 300
     permissions:
       contents: read
       packages: read
@@ -71,9 +87,16 @@ jobs:
       # ~1.7-2.4 GB, not 12.4 GB. See #2553, #2559,
       # .claude/rules/container-capacity-scheduling.md
       # "Pre-#2553 kill-report RSS figures are suspect on failing cells".
-      # GHA runners are typically slower, so 4h/cell; the 600-min job cap
-      # above still bounds two pathological hangs.
-      GOLDEN_SP500_TIMEOUT: "14400"
+      # Retightened 14400 -> 7200 (2026-08-31, #2615 qc-behavioral): the
+      # 4h/cell value was sized for the all_eligible-era 90-102 min cells
+      # and only coheres with the OLD 600-min job cap (one hang = 328 min,
+      # two = 483 — both < 600). At the new 300-min cap a 240-min hung cell
+      # left ~57 min for a ~85-min sibling -> job-level cancel mid-cell-2,
+      # which skips the if:always() no-summary net (#2427's silent shape).
+      # 120 min/cell is ~1.4x the 80-85 min measured post-#2601 GHA cells
+      # and keeps the worst case (two heavy hangs ~= 243 min incl. the 13s
+      # cell + overhead) inside the 300-min cap above.
+      GOLDEN_SP500_TIMEOUT: "7200"
     steps:
       - uses: actions/checkout@v4
 
@@ -85,7 +108,7 @@ jobs:
 
       - name: Run SP500 15y golden
         id: golden_sp500_15y
-        continue-on-error: true
+        continue-on-error: false
         run: dev/scripts/golden_sp500_postsubmit.sh
 
       - name: Publish summary
@@ -103,14 +126,20 @@ jobs:
           else
             # The script writes summary.txt UNCONDITIONALLY after its
             # scenario loop — cells that FAIL or hit the per-cell timeout
-            # still land there as FAIL rows, which is the soak policy
-            # (continue-on-error above) working as intended. A MISSING
+            # still land there as FAIL rows; that per-cell accounting is
+            # internal to golden_sp500_postsubmit.sh and independent of the
+            # step-level continue-on-error above (graduated to false
+            # 2026-08-31, #2403 — a script-level failure now fails the job,
+            # which is the point of graduating out of soak). A MISSING
             # summary therefore means the script died before finishing the
             # loop; fail the job so that outage is visible instead of the
             # silent green this branch used to report (#2427). The
             # job-timeout case is separate: a job-level cancel yields
-            # conclusion=cancelled regardless of step exit codes — that
-            # case is fixed by the 240-min cap above, not by this exit.
+            # conclusion=cancelled regardless of step exit codes, and it
+            # SKIPS this if:always() branch entirely — no cap "fixes" it;
+            # it is prevented only by the coherence invariant at
+            # timeout-minutes (per_cell * n_cells + overhead <= job cap,
+            # currently 7200s-per-cell vs 300 min).
             echo "SP500 15y golden run: no summary produced." >>"$GITHUB_STEP_SUMMARY"
             exit 1
           fi

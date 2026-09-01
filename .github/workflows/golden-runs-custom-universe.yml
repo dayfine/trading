@@ -20,8 +20,9 @@
 # Expected runtime: ~3-5 min (local was 186 s; CI is ~3-5x).
 # Wall budget: 60 min (matches goldens-sp500-5y).
 #
-# Non-blocking during initial soak (continue-on-error: true) — flip to false
-# after 4 consecutive clean runs.
+# Graduated from soak 2026-08-31 (#2403): continue-on-error flipped to false
+# after 45/45 consecutive clean runs (latest wall 7 min) — see issue #2403
+# comment log for the flip condition and evidence.
 
 name: golden-runs-custom-universe
 
@@ -61,7 +62,7 @@ jobs:
 
       - name: Run custom-universe golden postsubmit
         id: golden_custom_universe
-        continue-on-error: true
+        continue-on-error: false
         run: dev/scripts/golden_sp500_postsubmit.sh
 
       - name: Publish summary
