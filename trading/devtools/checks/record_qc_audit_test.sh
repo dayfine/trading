@@ -3529,6 +3529,73 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 52 — PR-mode: bolded "**Reviewed SHA:** <sha>" line is extracted
+# (issue #2607).
+#
+# qc-structural.md / qc-behavioral.md permit posting the "Reviewed SHA"
+# label as bold Markdown, and that IS what QC agents actually post in
+# practice -- the plain "Reviewed SHA: <sha>" form used by every other
+# scenario in this file is not the only real shape. Before the #2607 fix,
+# the gh-path extractor's `grep -oE '^Reviewed SHA: .*'` anchor did not
+# match a line starting "**Reviewed SHA:**", so SHA stayed empty and the
+# written record carried `"sha": ""` -- silently re-opening the #2591
+# escalation-counter-blind regression this same field exists to prevent.
+# RED against the pre-#2607 script (sha field empty); GREEN once the
+# extractor strips the bold wrapper before matching.
+# ---------------------------------------------------------------------------
+FEATURE52="pr-mode-bold-sha"
+S52_DIR="${TMP_REPO}/s52"
+mkdir -p "${S52_DIR}"
+cat > "${S52_DIR}/reviews.jsonl" <<'EOF'
+STATE:APPROVED
+**Reviewed SHA:** boldsha52
+
+## Structural QC — pr-mode-bold-sha
+
+## Verdict
+APPROVED
+ENDBODY
+STATE:APPROVED
+**Reviewed SHA:** boldsha52
+
+## Behavioral QC — pr-mode-bold-sha
+
+## Quality Score
+5 — clean
+
+## Verdict
+APPROVED
+ENDBODY
+EOF
+make_gh_mock "${S52_DIR}" "${S52_DIR}/reviews.jsonl"
+
+out52=$(REPO_ROOT="${TMP_REPO}" RECORD_QC_AUDIT_GH_BIN="${S52_DIR}/gh" \
+        bash "${TMP_REPO}/trading/devtools/checks/record_qc_audit.sh" \
+        "${FEATURE52}" "feat/dummy" "2026-08-31" --pr-number 1237 2>&1) && rc52=0 || rc52=$?
+JSON52="${TMP_REPO}/dev/audit/2026-08-31-feat-dummy-${FEATURE52}.json"
+
+c52_rc=1; (( rc52 == 0 )) || c52_rc=0
+c52_file=1; [[ -f "${JSON52}" ]] || c52_file=0
+c52_sha=1
+if [[ "${c52_file}" == "1" ]]; then
+  grep -q '"sha": *"boldsha52"' "${JSON52}" || c52_sha=0
+else
+  c52_sha=0
+fi
+
+if [[ "${c52_rc}${c52_file}${c52_sha}" == "111" ]]; then
+  pass "scenario 52 — pr-mode bolded '**Reviewed SHA:**' line is extracted; sha field == boldsha52, not empty (issue #2607)"
+else
+  fail "scenario 52 — expected rc=0, record written, sha field == boldsha52; got rc=${rc52}"
+  report_conjuncts \
+    "rc52==0 (record_qc_audit.sh exit code, actual=${rc52})" "${c52_rc}" \
+    "JSON52 exists at ${JSON52}" "${c52_file}" \
+    "sha field == boldsha52 (actual: $([[ "${c52_file}" == "1" ]] && grep -o '"sha": *"[^"]*"' "${JSON52}" || echo '<file missing>'))" "${c52_sha}"
+  echo "${out52}" | sed 's/^/      /'
+  [[ -f "${JSON52}" ]] && echo "      json: $(cat "${JSON52}")"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
