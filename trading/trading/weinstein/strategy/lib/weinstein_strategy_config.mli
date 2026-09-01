@@ -1246,8 +1246,12 @@ type config = {
           record: [dev/experiments/clock26-golden-ab-2026-08-19/]. *)
   reserve_cash_for_resting_tickets : bool; [@sexp.default false]
       (** G3 of [dev/plans/ticket-funding-2026-08-16.md]: subtract the cost the
-          book has already committed to {b resting} entry tickets from the cash
-          the entry walk is allowed to spend this tick.
+          book has committed {b at the ticket's limit price} to {b resting}
+          entry tickets from the cash the entry walk is allowed to spend this
+          tick. The reserve is an {i estimate}: cash actually drawn at fill is
+          the realized fill price plus commission, so each ticket's reserve is
+          slightly off in either direction (second-order against the 52%-median
+          shortfall it guards, #2382).
 
           {b The leak it closes.} {!Entry_audit_capture.check_cash_and_deduct}
           already enforces cash discipline {i within} one tick, but its
