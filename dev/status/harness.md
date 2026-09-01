@@ -1847,20 +1847,27 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   orchestrator actually runs under) was widened to project `commit_id` into
   each review object alongside `body`, since the prior projection dropped the
   field before `_gate` ever saw it. **Scoped gap, documented in both the code
-  comment and here:** the `gh` backend (`_pr_meta_gh`, `gh pr view --json
-  reviews`) has no `commit_id` field to widen into — `gh`'s `reviews` JSON
-  shape does not expose per-review commit sha — so a sha-less review under a
-  *local* `gh`-backed session still falls through to the pre-existing
-  always-current path. Only the curl/REST backend is fully covered; that is
-  the backend the orchestrator cron runs under, which is where the live #2625
-  incident happened.
+  comment and here:** the `gh` backend's *current projection* (`_pr_meta_gh`,
+  `gh pr view --json reviews`) does not carry a per-review commit sha — that
+  particular JSON shape omits it, but the gap is a backend-selection
+  consequence, not an API limitation: the REST endpoint (`gh api
+  repos/.../pulls/N/reviews`) returns `commit_id` directly and GraphQL
+  `PullRequestReview` exposes a `commit` field, so the gh path is closeable
+  in about one line by switching its review projection to the REST endpoint.
+  Until then a sha-less review under a *local* `gh`-backed session still
+  falls through to the pre-existing always-current path. The curl/REST
+  backend is fully covered; that is the backend the orchestrator cron runs
+  under, which is where the live #2625 incident happened. **Residual, filed
+  below as H-GATEPARSER-CURL-PROJECTION-UNPINNED:** the projection half of
+  this fix is unpinned — reverting the `_pr_meta_curl` widening alone leaves
+  the suite green — so this entry is not fully closed by tests.
 
   Non-vacuity proof (RED/GREEN), both measured directly by reverting only the
   production fallback line and re-running the full suite:
 
   | state | fixture (case 43, sha-less body + STALE `commit_id`) | full suite |
   |---|---|---|
-  | RED (fallback reverted, fixture present) | `want stale(aaaaaaaa), got ok` | exit 1 (1 failed of 55 total) |
+  | RED (fallback reverted, fixture present) | `want stale(aaaaaaaa), got ok` | exit 1 (1 failed of 54 total) |
   | GREEN (fallback restored) | `stale(aaaaaaaa)` — matches | exit 0 (54 tests clean) |
 
   Before this PR (base tip `b2950471`, PR #2625): 51 tests clean, exit 0.
@@ -1872,6 +1879,15 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   `dev/scripts/pr_gate_status.sh`, `dev/scripts/pr_gate_status_test.sh`, this
   entry. Mutations (k)/(f)/(g) from H-GATEPARSER-NO-MUTATION-COVERAGE below are
   deliberately out of scope here — left to that item's own PR.
+
+- [ ] **H-GATEPARSER-CURL-PROJECTION-UNPINNED** (from #2628's review): the
+  `_pr_meta_curl` `commit_id` projection widening — the half of the #2626 fix
+  that makes the fallback reachable — has no regression pin: reverting that
+  one line alone leaves the suite exit 0 / 54 clean (measured during #2628's
+  QC), silently restoring the #2626 defect behind a green suite. Closing this
+  needs a fixture that drives the REST projection itself (mock `curl` JSON →
+  assert the review objects reaching `_gate` carry `commit_id`), not just the
+  `review_result` fallback the current cases 43-45 pin.
 
 - [ ] **H-GATEPARSER-NO-MUTATION-COVERAGE**: `pr_gate_status.sh` is the merge-gate
   reader, yet its suite is verified only by hand. A ~30-line mutation harness
