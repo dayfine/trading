@@ -78,7 +78,7 @@ jobs:
       - name: Publish summary
         if: always()
         run: |
-          summary_file=$(ls -1t dev/perf/tier3-weekly-*/summary.txt 2>/dev/null | head -1)
+          summary_file=$(find dev/perf -maxdepth 2 -path 'dev/perf/tier3-weekly-*/summary.txt' -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)
           if [ -n "$summary_file" ] && [ -f "$summary_file" ]; then
             {
               echo "## Tier-3 perf weekly"
