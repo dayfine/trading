@@ -88,4 +88,17 @@ val make_entry_walk_state :
     ({!initial_long_notional}), and the sector-exposure accumulator at held
     positions' notional (empty when [sector_lookup] is [None]). The short/sector
     caps come from [config.portfolio_config]; the long cap comes from
-    [config.max_long_exposure_pct_entry] ([Float.infinity] when [<= 0.0]). *)
+    [config.max_long_exposure_pct_entry] ([Float.infinity] when [<= 0.0]).
+
+    {b Deliberate asymmetry vs the cash budget (#2382).} Resting [Entering]
+    tickets contribute {i nothing} to these notional/sector accumulators, while
+    the cash budget {i can} reserve against them
+    ([reserve_cash_for_resting_tickets], G3). This is the same across-tick shape
+    G3 closed on cash, left open here {b on measurement}: over the 26y
+    record-convention audit (instr-null, PR #2511 artifacts) the exposure caps
+    bound {b zero} times at the entry walk ([Sector_exposure_cap 0],
+    [Long_exposure_cap 0], vs [Insufficient_cash 24,054]) — cash is the binding
+    constraint, so seeding resting claims into never-binding accumulators would
+    add state for no observable effect. If a config regime ever makes these caps
+    bind at the walk, revisit under the G3 flag (one "reserve against resting
+    tickets" concept, not a second knob). *)
