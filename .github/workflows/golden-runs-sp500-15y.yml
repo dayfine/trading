@@ -12,9 +12,11 @@
 #
 # Graduated from soak 2026-08-31 (#2403): continue-on-error flipped to false
 # after 9 consecutive clean runs since 2026-08-23 (latest wall 165 min,
-# 09:14->11:59 UTC, on the post-#2601 --no-emit-all-eligible basis). Failure
-# here now surfaces as a real check on the run; see issue #2403 comment log
-# for the flip condition and evidence.
+# 09:14->11:59 UTC). Failure here now surfaces as a real check on the run;
+# see issue #2403 comment log for the flip condition and evidence.
+# (PROVENANCE, #2618: all 9 of those runs predate #2601's
+# --no-emit-all-eligible flag -- see the job-level COHERENCE INVARIANT
+# comment below for the corrected basis.)
 #
 # Prerequisite: bar data for the SP500 universe (full history back to
 # ~2009) must be committed under trading/test_data/.
@@ -45,19 +47,34 @@ jobs:
     # Fridays), so 70 min/cell was structurally unreachable and every
     # completed run since at least 08-23 timed out both cells.
     # Retightened 600 -> 300 (2026-08-31, #2403): sized empirically off the
-    # post-#2601 (--no-emit-all-eligible) streak — walls 165-175.5 min over
-    # the 9-run green streak, so 300 gives ~1.7x headroom over the streak
-    # MAX. (Attribution caveat from the qc-behavioral review: cells still
-    # measure ~80-85 min each with the flag on, so the #2537 "the bulk is
-    # all_eligible" causal story overstated; the empirical wall, not the
-    # attribution, is the basis for 300.)
-    # COHERENCE INVARIANT (qc-behavioral on #2615): the job cap must bound
-    # the script's own worst case, or a hung cell turns into a job-level
-    # cancel that skips the if:always() no-summary net below (#2427's
-    # silent-failure shape). With GOLDEN_SP500_TIMEOUT=7200 (120 min/cell,
-    # retightened in the same review): two heavy cells hung = 240 min + the
-    # ~13s third cell + overhead ~= 243 min < 300. Keep
-    # per_cell * n_cells + overhead <= timeout-minutes when touching either.
+    # 9-run green streak (job-level walls 96.6 -> 175.5 min; MAX = 175.5 min,
+    # run 33244787240, 08-29), so 300 gives ~1.7x headroom over the streak
+    # MAX.
+    # PROVENANCE (corrected 2026-09-01, #2618 -- discharges qc-behavioral N5
+    # on #2615): all 9 streak runs executed the PRE-#2601 script. #2601
+    # (which added --no-emit-all-eligible) merged 2026-08-31T09:36:55Z, 23
+    # min AFTER the latest streak run started (09:13:56Z). There is
+    # currently NO measurement of a 15y cell with the flag active; the
+    # #2537 "the bulk is all_eligible" attribution is UNTESTED, not
+    # refuted. 300/7200 are sized off the slower pre-flag basis, so this
+    # direction is safe -- post-flag walls, once measured, can only come in
+    # under it -- but do not cite the flag as proven-ineffective anywhere.
+    # The first post-#2601 workflow_dispatch run will give the first
+    # flagged measurement.
+    # COHERENCE INVARIANT (qc-behavioral on #2615; restated 2026-09-01,
+    # #2618, per N7 -- the literal `per_cell * n_cells + overhead <= cap`
+    # form gives 120*3 + 2.1 = 362 > 300 for the values below, i.e. it does
+    # NOT hold as written): the job cap must bound the script's REALISTIC
+    # worst case -- two HEAVY cells hanging (the third,
+    # sp500-2011-2026-bah-brk-b, is structurally ~13s, not a full-timeout
+    # risk) -- or a hung cell turns into a job-level cancel that skips the
+    # if:always() no-summary net below (#2427's silent-failure shape). With
+    # GOLDEN_SP500_TIMEOUT=7200 (120 min/cell): two heavy cells hung = 240
+    # min + the ~13s third cell + ~2.1 min overhead ~= 242 min < 300. When
+    # touching either value, keep `(per_cell * count_of_heavy_cells) +
+    # trivial_cell_walls + overhead <= timeout-minutes` -- NOT the literal
+    # `per_cell * n_cells` form, which this config already violates on
+    # paper for the trivial cell.
     timeout-minutes: 300
     permissions:
       contents: read
@@ -93,8 +110,13 @@ jobs:
       # two = 483 — both < 600). At the new 300-min cap a 240-min hung cell
       # left ~57 min for a ~85-min sibling -> job-level cancel mid-cell-2,
       # which skips the if:always() no-summary net (#2427's silent shape).
-      # 120 min/cell is ~1.4x the 80-85 min measured post-#2601 GHA cells
-      # and keeps the worst case (two heavy hangs ~= 243 min incl. the 13s
+      # 120 min/cell is ~1.37x the measured 87.7-min max cell wall
+      # (streak-max run 33244787240, 08-29 -- corrected 2026-09-01, #2618,
+      # from an earlier "~1.4x the 80-85 min" figure). See the
+      # PROVENANCE note on the timeout-minutes comment above: this
+      # measurement, like the whole 9-run streak, predates #2601's
+      # --no-emit-all-eligible flag -- it is not a "post-#2601" figure.
+      # Keeps the worst case (two heavy hangs ~= 242 min incl. the 13s
       # cell + overhead) inside the 300-min cap above.
       GOLDEN_SP500_TIMEOUT: "7200"
     steps:
@@ -137,9 +159,12 @@ jobs:
             # job-timeout case is separate: a job-level cancel yields
             # conclusion=cancelled regardless of step exit codes, and it
             # SKIPS this if:always() branch entirely — no cap "fixes" it;
-            # it is prevented only by the coherence invariant at
-            # timeout-minutes (per_cell * n_cells + overhead <= job cap,
-            # currently 7200s-per-cell vs 300 min).
+            # it is prevented only by the COHERENCE INVARIANT at
+            # timeout-minutes above (bound the REALISTIC worst case -- two
+            # heavy cells hung at 7200s/120min each + the trivial third
+            # cell + overhead ~= 242 min < the 300-min cap -- not the
+            # literal per_cell * n_cells form, which this config does not
+            # satisfy).
             echo "SP500 15y golden run: no summary produced." >>"$GITHUB_STEP_SUMMARY"
             exit 1
           fi
