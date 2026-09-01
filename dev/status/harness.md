@@ -1733,3 +1733,11 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   if they turn out to matter. Verify:
   `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh` (or `dune
   runtest trading/devtools/checks/`) — prints 5 `OK:` lines, exit 0.
+
+- [ ] **H-GATEPARSER-NO-MUTATION-COVERAGE**: `pr_gate_status.sh` is the merge-gate
+  reader, yet its 48-case suite is verified only by hand. A ~30-line mutation
+  harness around the existing `PR_GATE_STATUS_LIB=1` seam, run in CI against a
+  fixed mutation list, would have caught findings (d), (j) and (k) with no
+  inferential judgment. For the file that *is* the merge gate, mutation
+  coverage is the check that matches the stakes. `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-09-01 qc-behavioral on PR #2622)
