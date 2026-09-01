@@ -1812,7 +1812,7 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh` (or `dune
   runtest trading/devtools/checks/`) — prints 5 `OK:` lines, exit 0.
 
-- [ ] **H-GATEPARSER-SHALESS-REVIEW-NEVER-STALE** (issue #2626): `pr_gate_status.sh`
+- [x] **H-GATEPARSER-SHALESS-REVIEW-NEVER-STALE** (issue #2626): `pr_gate_status.sh`
   recovers each review's SHA by parsing a `Reviewed SHA:` line out of the review's
   **prose body**. When the line is absent the review parses as sha-less, and the
   script's own header documents the result: *"a sha-less review was simply
@@ -1836,6 +1836,42 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   misattribution, and #2620's interior-heading leak) and the **third** to arise
   specifically from parsing prose. `harness_gap: LINTER_CANDIDATE`.
   (source: 2026-09-01 orchestrator run 33482398132, found while re-QCing PR #2625)
+
+  **DONE (2026-09-01, PR stacked on #2625, branch `harness/gate-sha-from-commit-id`).**
+  What shipped: in `dev/scripts/pr_gate_status.sh`'s `_gate` function, the
+  `review_result` jq helper now computes `$body_sha` from the `Reviewed SHA:`
+  prose match as before, then falls back to the review's `.commit_id` field
+  ONLY when `$body_sha == ""` — body stays primary, `commit_id` is strictly the
+  fallback, so a review can still explicitly declare it reviewed a sha other
+  than the one it was POSTed against. `_pr_meta_curl` (the REST backend the GHA
+  orchestrator actually runs under) was widened to project `commit_id` into
+  each review object alongside `body`, since the prior projection dropped the
+  field before `_gate` ever saw it. **Scoped gap, documented in both the code
+  comment and here:** the `gh` backend (`_pr_meta_gh`, `gh pr view --json
+  reviews`) has no `commit_id` field to widen into — `gh`'s `reviews` JSON
+  shape does not expose per-review commit sha — so a sha-less review under a
+  *local* `gh`-backed session still falls through to the pre-existing
+  always-current path. Only the curl/REST backend is fully covered; that is
+  the backend the orchestrator cron runs under, which is where the live #2625
+  incident happened.
+
+  Non-vacuity proof (RED/GREEN), both measured directly by reverting only the
+  production fallback line and re-running the full suite:
+
+  | state | fixture (case 43, sha-less body + STALE `commit_id`) | full suite |
+  |---|---|---|
+  | RED (fallback reverted, fixture present) | `want stale(aaaaaaaa), got ok` | exit 1 (1 failed of 55 total) |
+  | GREEN (fallback restored) | `stale(aaaaaaaa)` — matches | exit 0 (54 tests clean) |
+
+  Before this PR (base tip `b2950471`, PR #2625): 51 tests clean, exit 0.
+  After: 54 tests clean, exit 0 — 3 new cases (43: sha-less + stale commit_id
+  → `stale(...)`; 44: sha-less + current-tip commit_id → `ok`; 45: body SHA
+  line present takes precedence over a disagreeing `commit_id` →
+  `stale(deadbeef)`, pinning that the fallback is strictly secondary).
+  Verify: `sh dev/scripts/pr_gate_status_test.sh`. Files touched:
+  `dev/scripts/pr_gate_status.sh`, `dev/scripts/pr_gate_status_test.sh`, this
+  entry. Mutations (k)/(f)/(g) from H-GATEPARSER-NO-MUTATION-COVERAGE below are
+  deliberately out of scope here — left to that item's own PR.
 
 - [ ] **H-GATEPARSER-NO-MUTATION-COVERAGE**: `pr_gate_status.sh` is the merge-gate
   reader, yet its suite is verified only by hand. A ~30-line mutation harness
