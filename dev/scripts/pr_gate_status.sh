@@ -168,6 +168,17 @@ _is_docs_only() {
 #     behavioral verdict too and the PR printed `pass / ok / ok  MERGE` while
 #     qc-behavioral had never run. Real verdict reviews open with
 #     "## <Kind> QC — ..." or "## qc-<kind>", which is what the anchor allows.
+#   - The anchor-to-heading-start check above is NOT enough on its own: it says
+#     nothing about WHERE in the body the matching heading sits. #2620: PR
+#     #2619's structural review carried an INTERIOR heading "## Behavioral
+#     equivalence verification" (legitimate structural content -- verifying a
+#     find-replacement preserved an ls-pattern's behaviour) that happens to
+#     START with the word "Behavioral". With zero qc-behavioral reviews
+#     posted, that interior heading alone satisfied the behavioral gate and
+#     the PR printed `pass / ok / ok  MERGE`. Fixed by consulting ONLY the
+#     review's FIRST heading (`first_heading_text`, computed after fence
+#     stripping) for gate attribution -- every interior heading, however it is
+#     phrased, is prose from here on, never a gate name.
 #   - Ignore headings inside FENCED CODE BLOCKS. A review that quotes another
 #     review's headings as evidence would otherwise satisfy that other gate.
 #     Found the hard way: qc-behavioral's review of this very PR pasted #2417's
@@ -214,6 +225,17 @@ _gate() {
           elif .inside then .
           else .out += [$l] end)
       | .out | join("\n");
+
+    # The top-level heading a review opens with -- the FIRST line matching
+    # "#{1,4} <text>" in the fence-stripped body, or null if there is none.
+    # Gate attribution below tests ONLY this heading, never any later one
+    # (see the #2620 bullet above) -- `match` without the "g" flag yields at
+    # most one result, so wrapping it in `[...]` gives a 0-or-1-element array
+    # without needing a separate "no match" branch of its own.
+    def first_heading_text:
+      strip_fences
+      | [match("(?m)^#{1,4} +(?<h>.*)$")]
+      | if length == 0 then null else .[0].captures[0].string end;
 
     # Per-review verdict extraction. Applied to EACH review whose body names
     # this gate (not just the last one -- see MULTI-REVIEW AGGREGATION below).
@@ -277,8 +299,10 @@ _gate() {
          else "unclear" end) as $verdict
       | { sha: $sha, verdict: $verdict };
 
-    [ .[] | select(.body | strip_fences
-                         | test("(?im)^#{1,4} +(qc[- ])?" + $kind + "\\b")) ]
+    [ .[] | select(
+        (.body | first_heading_text) as $h
+        | ($h != null) and ($h | test("(?i)^(qc[- ])?" + $kind + "\\b"))
+      ) ]
     | if length == 0 then "none"
       else
         map(review_result) as $results
