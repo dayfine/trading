@@ -4,44 +4,40 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-01 (orchestrator run 33482398132; main **`c0f40ecb`
--> `6da52064`**, one PR merged. Green at run start and at run end:
-build 0, runtest 0, 0 `^FAIL:`, `status_file_integrity` 0, `index_size_linter`
-0 — every exit code read **unpiped**).
+Last updated: 2026-09-01 (orchestrator run 33508633150 — run 2 of the day;
+main **`9fa471a0`** -> **`34b4e7c2`**, two PRs merged. Green at run start
+(`9fa471a0`) and at run end: build 0, runtest 0, 0 `^FAIL:`,
+`status_file_integrity` 0, `index_size_linter` 0 — every exit code read
+**unpiped**).
 
-**Merged this run:** **#2623** (the four #2618 workflow-cap residuals). Its
-qc-behavioral NEEDS_REWORK finding — the added comment claiming a job-level
-cancel *"SKIPS this `if: always()` branch entirely"*, refuted across all nine
-measured timeout cancellations in both workflows — was fixed by the
-maintainer's parallel local session (two reworks) because the fix lives in
-`.github/workflows/**`, which this token cannot push.
+**Merged this run:** **#2624** (`e4c59ed6`, pins the missing-`review_at`
+branch of `check_11`) and **#2625** (`34b4e7c2`, pins `strip_fences` + the
+`^` anchor in the gate parser). Both entered the run reworked-but-unreviewed
+with **both** gates stale at a superseded SHA; both went through a full
+re-QC round this run and reached structural APPROVED + behavioral APPROVED
+at their current tips before merging.
 
-**The theme was the merge gate reading itself wrong.** Four QC passes on
-`pr_gate_status.sh` produced **four** distinct defects in the file that decides
-whether a PR may merge: #2620's interior-heading leak (fixed, #2622), two
-surviving mutations of that fix (**(d)** dropping `strip_fences` is a live
-false-MERGE/false-BLOCK pair; **(j)** the `^` anchor lost its pin) now closed by
-**#2625**, three further **live** unpinned mutations recorded there
-(**(k)**, **(f)**, **(g)**), and a new one filed as **#2626** — a review with no
-`Reviewed SHA:` line in its body is *current-at-every-tip-forever*, observed
-live on #2625 itself. The API's `commit_id` already carries the answer the
-parser tries to recover from prose.
+**The merge gate's fourth defect is now fixed, not just filed.** #2626 — a
+review body with no `Reviewed SHA:` line parses as sha-less and is therefore
+*current-at-every-tip-forever*, a live false-MERGE path observed on #2625
+itself — is closed by **#2628** (open): `review_result` now falls back to the
+review's `commit_id`, which the REST API always supplies, and `_pr_meta_curl`
+was widened to actually project that field (the prior projection dropped it
+before the parser could see it). Suite 51 -> 54 cases. **Known residual,
+measured and filed rather than glossed:** reverting *only* the projection
+leaves the suite green, so half that fix has no regression pin.
 
-**Two PRs open and reworked, awaiting re-QC:** **#2624** (pins the
-missing-`review_at` branch of `check_11`) and **#2625**. Both were recovered
-dispatcher-side after their authoring agents stalled on backgrounded `dune`
-calls, so both carry **no author self-attestation** — the commit messages and
-PR bodies say so explicitly.
+**Three mutations of the gate parser remain live and unpinned** — **(k)**
+dropping `\b`, **(f)** `#{1,4}`->`#{1,6}`, **(g)** the required space —
+recorded in `H-GATEPARSER-NO-MUTATION-COVERAGE`. (k) is the sharp one: a
+first heading `## Behaviorally equivalent refactor` reads `ok`, two letters
+from the actual #2620 incident text.
 
-Capabilities re-measured live, not copied. `.github/workflows/**` **pushes**
-are rejected (`refusing to allow a Personal Access Token to create or update
-workflow ... without \`workflow\` scope`) — but a **server-side PR merge of a
-workflow-touching PR succeeds** (#2623 merged fine), which is a sharper
-statement than "workflows are 403". Comment writes are **PR-scoped, not
-issue-scoped**: `POST /issues/<n>/comments` returned **201** for a PR number
-and **403** for an issue number, same endpoint, same token. `POST /issues`
-works (**201**, #2626); `PATCH /pulls/<n>` works (**200**).
-`.claude/agents/**` writes remain gated by the harness.
+Capabilities unchanged from run 1 and not re-probed this run:
+`.github/workflows/**` **pushes** rejected (no `workflow` scope) though a
+server-side **merge** of a workflow-touching PR succeeds; comment writes are
+PR-scoped not issue-scoped; `POST /issues` and `PATCH /pulls/<n>` work.
+`.claude/agents/**` writes remain gated by the harness — **5th run**.
 
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
@@ -90,9 +86,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2624, #2625 | Both reworked, awaiting re-QC; gate-parser has 3 live unpinned mutations + #2626; next: re-QC then R-4 expiry table |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2628 | #2624 + #2625 MERGED after full re-QC; #2628 fixes #2626 (sha-less-review staleness); next: (k)/(f)/(g) mutation pins, then R-4 expiry table |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | A-MERGEABLE-STATE-NOT-A-CLOSE-TELL filed (run-1 guidance corrected); open: #2427 #2428 #2429 #2432 — need `workflow` scope or a human |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | odoc dangling-ref check MERGED `d5247fd5` (#2596) + its 11 findings fixed to 0 `e4945655` (#2597); top item `linter_coverage` still a HUMAN POLICY DECISION (15 runs) |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | top item `linter_coverage` still a HUMAN POLICY DECISION (17 runs); orphan branch `cleanup/csv-snapshot-sweep-flake` verified to hold no work — reclaim or delete to unblock `flaky_test` |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
