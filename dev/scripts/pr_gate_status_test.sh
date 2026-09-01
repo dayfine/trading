@@ -949,6 +949,50 @@ APPROVED" '[{body: $a}, {body: $b}, {body: $c}]')
 check "...adding a third, real, current-tip APPROVED now clears it cleanly: the two short-sha reviews go stale and only the current one counts -- ok, not unclear (this is the actual #2397 fix)" \
   ok "$(_gate "$SHORT_SHA_PLUS_REAL_CURRENT_APPROVAL" behavioral cccccccc3333)"
 
+# 39. #2620, THE LIVE SHAPE on PR #2619: a structural review carries an
+#     INTERIOR heading -- "## Behavioral equivalence verification" -- that
+#     happens to START with the gate word "Behavioral". The heading-anchor
+#     guard (cases 1-2 above) only checks that a matching heading starts with
+#     the gate word; it says nothing about WHERE in the body that heading
+#     sits, so this interior one used to satisfy the behavioral gate on its
+#     own even with ZERO qc-behavioral reviews posted, and the PR printed
+#     `pass / ok / ok  MERGE`. Confirmed RED against the unfixed matcher
+#     (reads "ok" there) before landing `first_heading_text`. Fixed: only the
+#     review's own FIRST heading is ever consulted for gate attribution.
+STRUCT_WITH_INTERIOR_BEHAVIORAL_WORD_HEADING="Reviewed SHA: $TIP
+
+## Structural QC — SC2012 burn-down (PR #2619)
+
+### Behavioral equivalence verification
+
+Confirmed the find-replacement preserves the ls-pattern's exclusion semantics.
+
+## Verdict
+
+APPROVED"
+
+check "#2620: interior heading starting with the gate word does not satisfy the behavioral gate" \
+  none "$(_gate "$(reviews "$STRUCT_WITH_INTERIOR_BEHAVIORAL_WORD_HEADING")" behavioral "$TIP")"
+check "#2620: same review still satisfies its own (structural) gate" \
+  ok "$(_gate "$(reviews "$STRUCT_WITH_INTERIOR_BEHAVIORAL_WORD_HEADING")" structural "$TIP")"
+
+# 40. Happy-path guard for the #39 fix: a well-formed behavioral review, whose
+#     OWN first heading names the gate, must still be matched -- proves
+#     `first_heading_text` did not narrow attribution so far that a real
+#     review stops counting.
+WELL_FORMED_BEHAVIORAL_REVIEW="Reviewed SHA: $TIP
+
+## qc-behavioral review — PR #2619
+
+Reviewed the diff end to end; no findings.
+
+## Verdict
+
+APPROVED"
+
+check "well-formed behavioral review (first heading names the gate) still reads ok" \
+  ok "$(_gate "$(reviews "$WELL_FORMED_BEHAVIORAL_REVIEW")" behavioral "$TIP")"
+
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"
   exit 1
