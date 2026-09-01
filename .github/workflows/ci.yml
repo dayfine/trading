@@ -101,16 +101,21 @@ jobs:
           eval "$(opam env)"
           dune build
 
-      - name: dune runtest
-        run: |
-          eval "$(opam env)"
-          dune runtest
-
+      # Runs BEFORE `dune runtest` (#2588): when this step sat after runtest,
+      # a formatting/odoc regression on a PR whose tests were red for an
+      # unrelated reason never executed the fmt gate at all — #2587 silently
+      # reverted two of #2584's odoc escapes behind exactly that shadow.
+      # Cheap gate first; a red fmt is also the faster signal.
       - name: dune fmt (check only)
         run: |
           eval "$(opam env)"
           # @fmt fails if formatting would change anything; no --auto-promote.
           dune build @fmt
+
+      - name: dune runtest
+        run: |
+          eval "$(opam env)"
+          dune runtest
 
       # dev/scripts/ sits OUTSIDE the dune root (trading/), so `dune runtest`
       # cannot depend on it and these guards would otherwise be enforced by
