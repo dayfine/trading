@@ -1650,10 +1650,8 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   the existing assertions touch this branch. Reverted before writing any
   fix (`git status --porcelain` showed no diff on the production file
   afterward). Added Part 8 (assertions 8a-8d) to
-  `deep_scan_linter_expiry_check.sh`, using a single-entry
-  `linter_exceptions.conf` fixture (masking-hazard guard, per Part 7's
-  precedent — a multi-entry fixture would let a sibling entry's count mask
-  a per-entry defect in this branch):
+  `deep_scan_linter_expiry_check.sh`, using a **two-entry**
+  `linter_exceptions.conf` fixture:
   - 8a (functional pin): an entry with no `# review_at:` annotation at all
     surfaces via the per-file "### Missing review_at annotation — policy
     violation T1-K" `REPORT_FILE` section, naming the entry.
@@ -1671,11 +1669,55 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
     for the 8a run contains no `W:` line mentioning the fixture entry,
     confirming `main.sh`'s "## Warnings" section is genuinely unaffected by
     this branch, both before and after this fix.
+  **Fixture cardinality — corrected during QC rework 1** (qc-behavioral on
+  PR #2624, review 5075929429). The first revision used a SINGLE-entry
+  fixture and justified it as a "masking-hazard guard, per Part 7's
+  precedent." That justification was measured and is **false, and
+  inverted**: 8b and 8c produce byte-identical outcomes at one entry and at
+  two (this branch has no per-entry state to corrupt independently of the
+  call — one branch, one accumulator pair), so Part 7's hazard does not
+  apply here at all. Worse, single-entry was the *sole* reason a real
+  mutation escaped: **hardcoding the header's count to `(1)`** is invisible
+  against a one-entry fixture. Re-measured both ways during the rework —
+  1-entry check vs that mutation: **exit 0 (MISSED)**; 2-entry check vs the
+  same mutation: **exit 1 (CAUGHT)**. The fixture is now two entries and
+  `MR_HEADER_TEXT` pins the count as `(2)`.
+
+  **This Part does NOT close the last unpinned branch of
+  `_scan_exceptions_conf`** — an earlier draft of this note and of #2624's
+  PR body both claimed it did. See `H-EXPIRY-NEVER-BRANCH-UNPINNED` below,
+  filed from the same review.
+
   Production `trading/devtools/checks/deep_scan/check_11_linter_expiry.sh`
   is untouched by this PR — `git status --porcelain` shows only
   `deep_scan_linter_expiry_check.sh` and this status file changed.
   Verify: `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh`
   (44 `OK:` lines, exit 0) or `dune runtest trading/devtools/checks/`.
+  ⚠ **Count-drift note (folds in the O5 class, below):** this file now
+  carries **three** different `Verify: (N OK: lines)` figures for this one
+  script — 28 at the BQ-1 entry, 40 at R-5, 44 here — because each was
+  written when true and never revisited. **Only 44 is true as of
+  2026-09-01.** A stale figure in a *verification instruction* is the
+  number a future reader uses to decide whether the check still works, so
+  the earlier two now read as failures. Same class as
+  `H-EXPIRY-NOTE-OFFBYONE-COUNTS (O5)`; whoever closes O5 should sweep all
+  three rather than fixing one.
+
+- [ ] **H-EXPIRY-NEVER-BRANCH-UNPINNED**: filed by qc-behavioral on PR #2624
+  (review 5075929429), non-blocking. The `never*) continue` branch at
+  `check_11_linter_expiry.sh:141` — which intentionally exempts permanent
+  exceptions from expiry reporting — is unpinned **in both directions**:
+  deleting the branch entirely leaves the whole suite (Parts 1-8, 44
+  assertions) green. It is also the first **over-reporting** gap recorded on
+  this surface: all 44 existing assertions are false-*negative* pins (they
+  check that a violation IS surfaced), and **nothing pins that a clean entry
+  produces no finding**. So a mutation that flags `review_at: never` entries
+  as T1-K violations, or that flags every entry as missing, passes the parts
+  of the suite that would plausibly be thought to cover it. Fix shape: an
+  assertion that a fixture whose entries all carry valid or `never`
+  annotations yields an empty T1-K section and the "No expired or missing
+  review_at annotations found" fallback. `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-09-01 qc-behavioral on PR #2624, residuals O-A / O-B)
 
 - [ ] **H-EXPIRY-MUTATION-DIAGNOSTIC-MISLEADS (O1)**: filed by qc-behavioral on
   PR #2589, non-blocking. Assertions 3c/3d/3e **fail closed** on a benign

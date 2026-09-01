@@ -1146,17 +1146,34 @@ fi
 # ENTIRE pre-existing suite (Parts 1-7, all 39 assertions) green at exit 0
 # — none of them touch this branch. That is the gap this Part closes.
 #
-# Masking-hazard guard (per Part 7's precedent): uses a SINGLE-entry
-# linter_exceptions.conf so a sibling entry incrementing _SCAN_MISSING_COUNT
-# cannot mask a per-entry corruption of this branch.
+# Fixture cardinality: TWO entries, deliberately — and NOT for the reason an
+# earlier revision of this comment gave. That revision claimed a single-entry
+# fixture was required as a "masking-hazard guard per Part 7's precedent," so
+# that a sibling entry's _SCAN_MISSING_COUNT increment could not mask a
+# per-entry corruption. qc-behavioral (PR #2624, review 5075929429) measured
+# that claim and found it FALSE AND INVERTED here:
+#
+#   - Part 7's masking hazard does not apply. 8b and 8c produce byte-identical
+#     outcomes at one entry and at two, because this branch carries no
+#     per-entry state to corrupt independently of the call — it is one branch
+#     with one accumulator pair.
+#   - Single-entry was, in fact, the SOLE reason a real mutation escaped:
+#     hardcoding the header's count to "(1)" is invisible against a one-entry
+#     fixture and goes RED at two.
+#
+# So the single-entry choice bought nothing and cost coverage. Two entries it
+# is, and the header assertion below pins the count as "(2)" — which is what
+# makes the hardcoded-count mutation fail closed.
 
 MR_FAKE_ROOT="$(mktemp -d)"
 trap 'rm -rf "$AE_FAKE_ROOT" "$MS_FAKE_ROOT" "$NF_FAKE_ROOT" "$MU_FAKE_ROOT" "$UF_FAKE_ROOT" "$MR_FAKE_ROOT"' EXIT
 
 mkdir -p "$MR_FAKE_ROOT/trading/devtools/checks/deep_scan"
-# Single entry, no "# review_at:" annotation at all — the T1-K violation.
+# Two entries, neither carrying a "# review_at:" annotation — the T1-K
+# violation. The second entry exists to pin the count (see above).
 cat > "$MR_FAKE_ROOT/trading/devtools/checks/linter_exceptions.conf" <<'EOF'
 fixture_missing_review_at
+fixture_missing_review_at_second
 EOF
 : > "$MR_FAKE_ROOT/trading/devtools/checks/universe_deps_exceptions.conf"
 : > "$MR_FAKE_ROOT/trading/devtools/checks/adapter_effectiveness_exceptions.conf"
@@ -1179,7 +1196,7 @@ REPO_ROOT="$MR_FAKE_ROOT" sh "$MR_FAKE_ROOT/trading/devtools/checks/deep_scan/ch
 MR_CODE=$?
 set -e
 
-MR_HEADER_TEXT='### Missing review_at annotation — policy violation T1-K (1)'
+MR_HEADER_TEXT='### Missing review_at annotation — policy violation T1-K (2)'
 MR_DETAIL_TEXT='Missing review_at on: fixture_missing_review_at'
 if [ "$MR_CODE" -eq 0 ] \
   && grep -qF -- "$MR_HEADER_TEXT" "$MR_REPORT" \
