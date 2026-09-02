@@ -121,7 +121,7 @@ do not rush inline.**
 
 Fix #1 as shipped covers Market **entries** only and deliberately exempts exits.
 Measurement on the 26y arc run (`dev/experiments/arc-rerun-2026-09-01/README.md`
-§D1) showed the exit side carries the same defect, and at far higher volume:
+§D1, landing in PR #2645) showed the exit side carries the same defect, and at far higher volume:
 **2192/2192 `volume_eject`, 154/154 `laggard_rotation` and 148/668 `stop_loss`
 exits were Saturday-dated at Friday's open**; the record convention shows the
 same shape (269/269 laggard exits). The mechanism is identical — the simulator

@@ -538,6 +538,21 @@
   matchers))
 
 (test
+ (name test_next_open_fill_gate)
+ (modules test_next_open_fill_gate)
+ (libraries
+  ounit2
+  core
+  core_unix.time_ns_unix
+  status
+  trading.simulation
+  trading.base
+  trading.engine
+  trading.orders
+  trading.strategy
+  matchers))
+
+(test
  (name test_fill_routing)
  (modules test_fill_routing)
  (libraries

@@ -1120,10 +1120,10 @@ type config = {
           exit decision was made on — and the resulting trade is re-stamped with
           the Saturday date. That is a look-back fill on a day the market was
           not open. Measured on the 26y arc run
-          ([dev/experiments/arc-rerun-2026-09-01/README.md] §D1): 2192/2192
-          [volume_eject], 154/154 [laggard_rotation] and 148/668 [stop_loss]
-          exits were Saturday-dated at Friday's open; the record convention
-          shows the same shape (269/269 laggard exits).
+          ([dev/experiments/arc-rerun-2026-09-01/README.md] §D1, landing in PR
+          #2645): 2192/2192 [volume_eject], 154/154 [laggard_rotation] and
+          148/668 [stop_loss] exits were Saturday-dated at Friday's open; the
+          record convention shows the same shape (269/269 laggard exits).
 
           When [true], a Market order that would CLOSE an [Exiting] position is
           NOT filled on a step where its symbol has no fresh bar; it stays

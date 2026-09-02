@@ -261,7 +261,8 @@ is the plan's **PR-5** audit-fields step (which owns the golden-shape change).
 ### 2026-09-02 — next-bar-open Market-EXIT fill (Fix #1b, branch `feat/sim-exit-fill-next-open`)
 
 Plan: `dev/plans/fill-model-faithfulness-2026-08-07.md` Workstream C, "Fix #1b —
-exits". Measurement: `dev/experiments/arc-rerun-2026-09-01/README.md` §D1.
+exits". Measurement: `dev/experiments/arc-rerun-2026-09-01/README.md` §D1
+(landing in PR #2645).
 
 **What.** New default-off strategy config flag `sim_exit_fill_next_open : bool
 [@sexp.default false]` — the exit sibling of `sim_entry_fill_next_open` below.
