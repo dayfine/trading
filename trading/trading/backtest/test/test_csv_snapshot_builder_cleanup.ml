@@ -114,43 +114,82 @@ let test_register_is_idempotent _ =
 
 (* -------------- orphan sweep unit tests -------------- *)
 
+(* [startup_orphan_sweep] scans [Filename.get_temp_dir_name ()] by PREFIX AND
+   MTIME ONLY — by design (it is a belt-and-suspenders sweep for orphans left
+   by a SIGKILLed process, so it cannot know which live process, if any, owns
+   a given dir). That means it is not safe to point at a temp root any other
+   concurrently-running process might also be using: it cannot tell "old
+   orphan" from "live dir that merely hasn't been touched in a while."
+
+   Under OUnit2's default "processes" runner (confirmed here, not assumed:
+   `-runner processes -shards N`, the default, forks N worker OS processes
+   that run disjoint subsets of this suite's tests IN PARALLEL — see
+   `-list-test`/`-verbose true` output), the three tests below and every
+   other test file's panel_runner_csv_snapshot_ dir (created by any
+   concurrently-running CSV-mode Panel_runner test under the SAME
+   dune-invocation-shared TMPDIR) are all fair game for each other's sweeps.
+
+   Root-caused 2026-09-02 (dev/status/cleanup.md flaky_test entry, 4th
+   observation): with an artificial delay reproducing plausible
+   load-induced scheduling jitter between two OUnit worker processes,
+   [test_orphan_sweep_removes_old_panel_runner_dirs]'s aggressive 3.6s-old
+   threshold deleted [test_orphan_sweep_spares_fresh_panel_runner_dirs]'s
+   still-fresh fixture before that test's own assertion ran — a genuine,
+   deterministic OUnitAssert failure, not a fluke of the sweep's own
+   dir. Issue #1884's fix only protected the "removes old" test's own
+   assertion (by not asserting on the returned count); it did not close
+   this reverse direction.
+
+   Fix: point [Filename.get_temp_dir_name ()] at a PRIVATE, per-test root via
+   [Filename.set_temp_dir_name] for the duration of each orphan-sweep test, so
+   its sweep can only ever see fixtures it created itself. This is a test-only
+   change — [startup_orphan_sweep]'s production contract (scan whatever
+   [get_temp_dir_name ()] currently resolves to) is unchanged. *)
+let _with_private_tmp_root f =
+  let saved = Stdlib.Filename.get_temp_dir_name () in
+  let private_root = _make_tmpdir () in
+  Stdlib.Filename.set_temp_dir_name private_root;
+  Exn.protect ~f ~finally:(fun () ->
+      Stdlib.Filename.set_temp_dir_name saved;
+      _rm_rf private_root)
+
 let test_orphan_sweep_removes_old_panel_runner_dirs _ =
-  (* Create a dir that matches the prefix and backdate its mtime. The
-     sweep should remove it. We use a 0.001-hour threshold (3.6 seconds)
-     to avoid flakiness with the system clock. *)
-  let dir =
-    Stdlib.Filename.temp_dir "panel_runner_csv_snapshot_" "_test_orphan_old"
-  in
-  (* Backdate mtime to 1 hour ago. *)
-  let one_hour_ago = Core_unix.gettimeofday () -. 3600.0 in
-  Core_unix.utimes dir ~access:one_hour_ago ~modif:one_hour_ago;
-  let (_ : int) = Builder.startup_orphan_sweep ~max_age_hours:0.001 () in
-  (* The load-bearing postcondition is that OUR backdated dir is gone. We do
-     NOT assert the returned count is >= 1: under parallel dune a concurrent
-     test's sweep can legitimately remove our dir first, so this sweep sees it
-     already gone and returns 0 while [file_exists dir = false] still holds
-     (issue #1884). The count is unassertable across concurrent sweeps sharing
-     [Filename.temp_dir_name]; the dir-absence is the contract. *)
-  assert_that (Stdlib.Sys.file_exists dir) (equal_to false)
+  _with_private_tmp_root (fun () ->
+      (* Create a dir that matches the prefix and backdate its mtime. The
+         sweep should remove it. We use a 0.001-hour threshold (3.6 seconds)
+         to avoid flakiness with the system clock. *)
+      let dir =
+        Stdlib.Filename.temp_dir "panel_runner_csv_snapshot_" "_test_orphan_old"
+      in
+      (* Backdate mtime to 1 hour ago. *)
+      let one_hour_ago = Core_unix.gettimeofday () -. 3600.0 in
+      Core_unix.utimes dir ~access:one_hour_ago ~modif:one_hour_ago;
+      let (_ : int) = Builder.startup_orphan_sweep ~max_age_hours:0.001 () in
+      assert_that (Stdlib.Sys.file_exists dir) (equal_to false))
 
 let test_orphan_sweep_spares_fresh_panel_runner_dirs _ =
-  (* A freshly-created dir (mtime ~now) should be spared by a 1-hour
-     threshold sweep. *)
-  let dir =
-    Stdlib.Filename.temp_dir "panel_runner_csv_snapshot_" "_test_orphan_fresh"
-  in
-  let _ = Builder.startup_orphan_sweep ~max_age_hours:1.0 () in
-  assert_that (Stdlib.Sys.file_exists dir) (equal_to true);
-  _rm_rf dir
+  _with_private_tmp_root (fun () ->
+      (* A freshly-created dir (mtime ~now) should be spared by a 1-hour
+         threshold sweep. *)
+      let dir =
+        Stdlib.Filename.temp_dir "panel_runner_csv_snapshot_"
+          "_test_orphan_fresh"
+      in
+      let _ = Builder.startup_orphan_sweep ~max_age_hours:1.0 () in
+      assert_that (Stdlib.Sys.file_exists dir) (equal_to true))
 
 let test_orphan_sweep_ignores_non_matching_dirs _ =
-  let dir = _make_tmpdir () in
-  (* Backdate so we'd remove if the prefix matched. *)
-  let one_hour_ago = Core_unix.gettimeofday () -. 3600.0 in
-  Core_unix.utimes dir ~access:one_hour_ago ~modif:one_hour_ago;
-  let _ = Builder.startup_orphan_sweep ~max_age_hours:0.001 () in
-  assert_that (Stdlib.Sys.file_exists dir) (equal_to true);
-  _rm_rf dir
+  _with_private_tmp_root (fun () ->
+      (* Non-matching prefix, but created (like the matching-prefix fixtures
+         above) under the swept [get_temp_dir_name ()] itself — this proves
+         the sweep's prefix filter, not merely that the dir sits outside the
+         scanned directory. *)
+      let dir = Stdlib.Filename.temp_dir "not_a_panel_runner_dir_" "_test" in
+      (* Backdate so we'd remove if the prefix matched. *)
+      let one_hour_ago = Core_unix.gettimeofday () -. 3600.0 in
+      Core_unix.utimes dir ~access:one_hour_ago ~modif:one_hour_ago;
+      let _ = Builder.startup_orphan_sweep ~max_age_hours:0.001 () in
+      assert_that (Stdlib.Sys.file_exists dir) (equal_to true))
 
 (* -------------- integration tests via subject subprocess -------------- *)
 
