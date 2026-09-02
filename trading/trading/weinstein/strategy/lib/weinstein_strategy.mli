@@ -880,6 +880,21 @@ type config = {
           [false] = current stale-bar fill, bit-identical baselines (R1);
           fill-model basis change when armed — own WF-CV surface, never bundled.
           See [Weinstein_strategy_config.sim_entry_fill_next_open]. *)
+  sim_exit_fill_next_open : bool; [@sexp.default false]
+      (** Next-bar-open fill realism for Market EXITS (Fix #1b, plan
+          [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream C). The
+          simulator steps one calendar day and the engine retains the previous
+          session's bar on non-trading steps, so a Market exit created from a
+          Friday-close decision fills on the Saturday step at the stale Friday
+          bar's OPEN — a price that predates the decision — and is stamped
+          Saturday. When [true], a Market order closing an [Exiting] position
+          waits for the next fresh trading bar and fills at that bar's open.
+          Scope: Market EXIT orders only (entries are governed separately by
+          [sim_entry_fill_next_open]; stops / [StopLimit] untouched);
+          decision-time [exit_price] is unchanged. Default [false] = current
+          stale-bar fill, bit-identical baselines (R1); fill-model basis change
+          when armed — own WF-CV surface, never bundled. See
+          [Weinstein_strategy_config.sim_exit_fill_next_open]. *)
   freeze_entry_at_first_breakout : bool; [@sexp.default false]
       (** No-chase entry-[E] freeze (Fix #2, plan
           [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream D). The

@@ -1,6 +1,6 @@
 # Status: simulation
 
-## Last updated: 2026-08-23
+## Last updated: 2026-09-02
 
 ### 2026-08-18 — F2 clock default promoted 0 → 26 (PR #2384) — **REVERTED 2026-08-19 by #2397**
 
@@ -257,6 +257,55 @@ strategy-internal `entry_meta` and the `PANEL_GOLDEN_DEBUG` candidate trace.
 Projecting it into the persisted `Backtest.Trade_audit.entry_decision` sexp row
 is the plan's **PR-5** audit-fields step (which owns the golden-shape change).
 
+
+### 2026-09-02 — next-bar-open Market-EXIT fill (Fix #1b, branch `feat/sim-exit-fill-next-open`)
+
+Plan: `dev/plans/fill-model-faithfulness-2026-08-07.md` Workstream C, "Fix #1b —
+exits". Measurement: `dev/experiments/arc-rerun-2026-09-01/README.md` §D1.
+
+**What.** New default-off strategy config flag `sim_exit_fill_next_open : bool
+[@sexp.default false]` — the exit sibling of `sim_entry_fill_next_open` below.
+When true, a **Market EXIT** order routing to an `Exiting` position (full exit or
+partial trim) is held back on any step where its symbol has no fresh bar, so it
+fills at the **next fresh trading bar's open**. Scope: Market exits only —
+entries stay governed independently by `sim_entry_fill_next_open`, stops and
+StopLimit orders are untouched, and the decision-time `exit_price` is unchanged.
+
+**The defect.** Fix #1 deliberately exempted exits, and the exit side carries the
+same look-back fill at far higher volume: on the 26y arc run **2192/2192
+`volume_eject`, 154/154 `laggard_rotation` and 148/668 `stop_loss` exits were
+Saturday-dated at Friday's open** (record convention: 269/269 laggard exits). The
+simulator steps one *calendar* day; `Market_state.update` retains the previous
+session's bars on a barless step; `Fill_date_stamp.restamp` stamps the trade with
+the Saturday step date. So a Friday-close decision executes at a price from
+*before* the decision, on a day the market was not open.
+
+**Seam — the gate, not the engine.** `Next_open_fill_gate.make` already receives
+`~positions` + `~today_bars` and returns the `?can_fill` predicate
+`Engine.process_orders` consults, so no engine change was needed. `make` now
+takes `~defer_entries` / `~defer_exits` and matches an exit the same way it
+matches an entry: a **Market** order whose (symbol, side) routes to an `Exiting`
+position, side-checked via `Fill_router.exit_trade_side` so a scale-in add
+`Entering` on the same symbol is not confused with the original. Non-Market
+orders stay exempt by construction (`Order_generator` emits exits only as Market)
+and by intent (a StopLimit carries its own trigger, so a stale bar cannot fill it
+at a look-back price). `panel_runner` threads the flag from the strategy config
+alongside `sim_entry_fill_next_open`.
+
+**Status: DONE (PR pending).** R1 — with **both** flags off no `?can_fill` is
+supplied at all, bit-identical to every baseline; `defer_entries:true,
+defer_exits:false` reproduces shipped Fix #1 exactly, and
+`test_sim_entry_next_open.test_exit_unaffected_when_flag_on` stays green. R2 —
+axis-expressible `((flag sim_exit_fill_next_open) (values (true false)))`. No
+default changed and `trading/test_data/**` is untouched, so no golden moves.
+Tests (`test_sim_exit_next_open.ml`, 4): OFF stale-Friday-open exit fill, ON
+Monday-open exit fill, exit flag leaves entry fills bit-identical, and a
+two-round-trip multi-week scenario (two weekends + a mid-week hole) asserting
+that with both flags on **no trade is dated on a day the symbol had no bar**.
+
+**Next.** Both flags remain default-off pending the honest-ladder re-run under
+WF-CV + the confirmation grid; the entry/exit pair should be swept together, since
+arming only one moves the fill basis asymmetrically.
 
 ### 2026-08-07 — next-bar-open Market-entry fill (Fix #1, branch `feat/sim-entry-next-open`, PR #2238)
 
