@@ -756,6 +756,195 @@ let test_sibling_positions_advance_state_once _ =
   assert_that sibling (equal_to single)
 
 (* ------------------------------------------------------------------ *)
+(* stop_skip_entry_bar — never stop a position on its own entry bar     *)
+(*                                                                      *)
+(* The simulator fills BEFORE the strategy runs, so a ticket filled     *)
+(* intraday on day D is already Holding{entry_date=D} when the runner   *)
+(* reads day D's COMPLETED bar — whose low (long) / high (short) was    *)
+(* printed before the fill. With the flag armed no stop-driven exit is  *)
+(* emitted on that bar (structural, weekly trigger-only, and            *)
+(* catastrophic alike); from the next bar the stop behaves as before.   *)
+(* Default false is an exact no-op (the R1 pins below).                 *)
+(* ------------------------------------------------------------------ *)
+
+let _skip_entry_bar_cfg ?(base = default_cfg) skip =
+  { base with Weinstein_stops.stop_skip_entry_bar = skip }
+
+(** Drive [Stops_runner.update] over [bars] for one [Holding] opened on
+    [entry_date], threading [stop_states] across calls (the runner never applies
+    the transitions it returns, so the position stays [Holding] throughout).
+    Returns the concatenated exit transitions — each carries the date of the bar
+    that produced it, which is what the assertions read. *)
+let _run_entry_bar_seq ?(side = Trading_base.Types.Long) ?stop_update_cadence
+    ?catastrophic_armed ~stops_config ~entry_date ~stop_state ~bars () =
+  let ticker = "AAPL" in
+  let positions =
+    String.Map.singleton ticker
+      (make_holding_pos ~side ticker 100.0 (Date.of_string entry_date))
+  in
+  let stop_states = ref (String.Map.singleton ticker stop_state) in
+  let prior_stages = Hashtbl.create (module String) in
+  List.concat_map bars ~f:(fun bar ->
+      let exits, _adjusts =
+        Stops_runner.update ?stop_update_cadence ?catastrophic_armed
+          ~stops_config ~stage_config:default_stage_cfg ~lookback_bars:52
+          ~positions
+          ~get_price:(get_price_of [ (ticker, bar) ])
+          ~stop_states ~bar_reader:(Bar_reader.empty ())
+          ~as_of:bar.Types.Daily_price.date ~prior_stages ()
+      in
+      exits)
+
+let _exit_dates (transitions : Trading_strategy.Position.transition list) =
+  List.map transitions ~f:(fun tr -> tr.Trading_strategy.Position.date)
+
+(** A long [Initial] stop at $96 under a $100 entry. *)
+let _long_initial_state =
+  Weinstein_stops.Initial { stop_level = 96.0; reference_level = 96.0 }
+
+(** The WSM shape: the entry bar's low ($95) pierces the $96 stop but the bar
+    closes above it ($101) — the low was printed before the buy-stop filled. *)
+let _long_entry_bar =
+  make_bar "2024-01-08" ~close:101.0 ~low:95.0 ~high:102.0 ()
+
+(** The bar after the entry bar, also breaching the $96 stop. *)
+let _long_next_bar = make_bar "2024-01-09" ~close:95.0 ~low:94.0 ~high:97.0 ()
+
+let _run_long_entry_bar ?stop_update_cadence ~skip ~bars () =
+  _run_entry_bar_seq ?stop_update_cadence
+    ~stops_config:(_skip_entry_bar_cfg skip) ~entry_date:"2024-01-08"
+    ~stop_state:_long_initial_state ~bars ()
+
+(** R1 pin — flag OFF reproduces today's behaviour: the entry bar's pre-fill low
+    stops the position out on its own entry bar. *)
+let test_skip_entry_bar_off_exits_on_entry_bar _ =
+  assert_that
+    (_exit_dates (_run_long_entry_bar ~skip:false ~bars:[ _long_entry_bar ] ()))
+    (elements_are [ equal_to (Date.of_string "2024-01-08") ])
+
+(** Flag ON: no exit on the entry bar, and the skip is for that bar ONLY — the
+    next bar's breach still exits. *)
+let test_skip_entry_bar_on_skips_entry_bar_only _ =
+  assert_that
+    (_exit_dates
+       (_run_long_entry_bar ~skip:true
+          ~bars:[ _long_entry_bar; _long_next_bar ]
+          ()))
+    (elements_are [ equal_to (Date.of_string "2024-01-09") ])
+
+(** Weekly cadence, Monday entry bar (non-Friday → the trigger-only path in
+    [Stop_transitions.handle_trigger_only], no state advance). Flag OFF still
+    exits on the entry bar. *)
+let test_skip_entry_bar_off_weekly_trigger_only_exits _ =
+  assert_that
+    (_exit_dates
+       (_run_long_entry_bar ~stop_update_cadence:Stops_runner.Weekly ~skip:false
+          ~bars:[ _long_entry_bar ] ()))
+    (elements_are [ equal_to (Date.of_string "2024-01-08") ])
+
+(** Same weekly trigger-only path with the flag ON: the entry bar emits nothing,
+    the following mid-week bar still exits. *)
+let test_skip_entry_bar_on_weekly_trigger_only_skips_entry_bar _ =
+  assert_that
+    (_exit_dates
+       (_run_long_entry_bar ~stop_update_cadence:Stops_runner.Weekly ~skip:true
+          ~bars:[ _long_entry_bar; _long_next_bar ]
+          ()))
+    (elements_are [ equal_to (Date.of_string "2024-01-09") ])
+
+(** Catastrophic-stop path: a Trailing state whose structural stop ($80) is far
+    below the bar, so [catastrophic_stop_pct] is the only possible exit. Bar low
+    $88 breaches trailing_high($100) * (1 - 0.10) = $90. *)
+let _run_catastrophic_entry_bar ~skip =
+  let base =
+    { default_cfg with Weinstein_stops.catastrophic_stop_pct = 0.10 }
+  in
+  _run_entry_bar_seq ~catastrophic_armed:true
+    ~stops_config:(_skip_entry_bar_cfg ~base skip)
+    ~entry_date:"2024-01-08"
+    ~stop_state:(_trailing_state ~stop_level:80.0 ~trend_extreme:100.0)
+    ~bars:
+      [
+        make_bar "2024-01-08" ~close:89.0 ~low:88.0 ~high:90.0 ();
+        make_bar "2024-01-09" ~close:89.0 ~low:88.0 ~high:90.0 ();
+      ]
+    ()
+
+(** R1 pin — flag OFF: the catastrophic stop fires on both bars, entry bar
+    included. *)
+let test_skip_entry_bar_off_catastrophic_exits_on_entry_bar _ =
+  assert_that
+    (_exit_dates (_run_catastrophic_entry_bar ~skip:false))
+    (elements_are
+       [
+         equal_to (Date.of_string "2024-01-08");
+         equal_to (Date.of_string "2024-01-09");
+       ])
+
+(** Flag ON: the catastrophic stop honours the guard on the entry bar and fires
+    normally on the next one. *)
+let test_skip_entry_bar_on_catastrophic_skips_entry_bar _ =
+  assert_that
+    (_exit_dates (_run_catastrophic_entry_bar ~skip:true))
+    (elements_are [ equal_to (Date.of_string "2024-01-09") ])
+
+(** Short mirror: a sell-stop fill's entry-bar HIGH predates the fill, so the
+    same artifact runs upward. Stop $104 above a $100 short entry; the entry
+    bar's high ($105) pierces it while the bar closes back below ($99). *)
+let _run_short_entry_bar ~skip =
+  _run_entry_bar_seq ~side:Trading_base.Types.Short
+    ~stops_config:(_skip_entry_bar_cfg skip) ~entry_date:"2024-01-08"
+    ~stop_state:
+      (Weinstein_stops.Initial { stop_level = 104.0; reference_level = 104.0 })
+    ~bars:
+      [
+        make_bar "2024-01-08" ~close:99.0 ~low:98.0 ~high:105.0 ();
+        make_bar "2024-01-09" ~close:104.0 ~low:99.0 ~high:106.0 ();
+      ]
+    ()
+
+let test_skip_entry_bar_off_short_exits_on_entry_bar _ =
+  assert_that
+    (_exit_dates (_run_short_entry_bar ~skip:false))
+    (elements_are
+       [
+         equal_to (Date.of_string "2024-01-08");
+         equal_to (Date.of_string "2024-01-09");
+       ])
+
+let test_skip_entry_bar_on_short_skips_entry_bar _ =
+  assert_that
+    (_exit_dates (_run_short_entry_bar ~skip:true))
+    (elements_are [ equal_to (Date.of_string "2024-01-09") ])
+
+(** The guard withholds the EXIT only — the state machine still advances on the
+    entry bar. Pinned by comparing the post-bar state against the flag-off run
+    over a bar that produces no exit either way (no stop breach), so the only
+    difference between the two runs could be the guard itself. *)
+let test_skip_entry_bar_still_advances_state_machine _ =
+  let state_after skip =
+    let ticker = "AAPL" in
+    let positions =
+      String.Map.singleton ticker
+        (make_holding_pos ticker 100.0 (Date.of_string "2024-01-08"))
+    in
+    let stop_states = ref (String.Map.singleton ticker _long_initial_state) in
+    let _ =
+      Stops_runner.update ~stops_config:(_skip_entry_bar_cfg skip)
+        ~stage_config:default_stage_cfg ~lookback_bars:52 ~positions
+        ~get_price:
+          (get_price_of
+             [ (ticker, make_bar "2024-01-08" ~close:101.0 ~low:99.0 ()) ])
+        ~stop_states ~bar_reader:(Bar_reader.empty ())
+        ~as_of:(Date.of_string "2024-01-08")
+        ~prior_stages:(Hashtbl.create (module String))
+        ()
+    in
+    Map.find_exn !stop_states ticker
+  in
+  assert_that (state_after true) (equal_to (state_after false))
+
+(* ------------------------------------------------------------------ *)
 (* Suite                                                                *)
 (* ------------------------------------------------------------------ *)
 
@@ -797,4 +986,22 @@ let () =
            >:: test_sibling_positions_raise_adjusts_both;
            "siblings: shared state machine advances once"
            >:: test_sibling_positions_advance_state_once;
+           "skip_entry_bar OFF: entry bar still stops out (R1 pin)"
+           >:: test_skip_entry_bar_off_exits_on_entry_bar;
+           "skip_entry_bar ON: entry bar skipped, next bar exits"
+           >:: test_skip_entry_bar_on_skips_entry_bar_only;
+           "skip_entry_bar OFF: weekly trigger-only exits on entry bar"
+           >:: test_skip_entry_bar_off_weekly_trigger_only_exits;
+           "skip_entry_bar ON: weekly trigger-only skips entry bar"
+           >:: test_skip_entry_bar_on_weekly_trigger_only_skips_entry_bar;
+           "skip_entry_bar OFF: catastrophic stop exits on entry bar"
+           >:: test_skip_entry_bar_off_catastrophic_exits_on_entry_bar;
+           "skip_entry_bar ON: catastrophic stop skips entry bar"
+           >:: test_skip_entry_bar_on_catastrophic_skips_entry_bar;
+           "skip_entry_bar OFF: short exits on entry bar"
+           >:: test_skip_entry_bar_off_short_exits_on_entry_bar;
+           "skip_entry_bar ON: short skips entry bar"
+           >:: test_skip_entry_bar_on_short_skips_entry_bar;
+           "skip_entry_bar ON: state machine still advances on entry bar"
+           >:: test_skip_entry_bar_still_advances_state_machine;
          ])

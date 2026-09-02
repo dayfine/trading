@@ -1,6 +1,6 @@
 # Status: arc-readiness
 
-## Last updated: 2026-08-26
+## Last updated: 2026-09-02
 
 ## Status
 IN_PROGRESS
@@ -228,6 +228,36 @@ Three capabilities. Two are strong; one had no tooling at all.
 `entry_audit_capture` / `exit_audit_capture` / `audit_recorder`,
 `screener_cascade_diagnostics`, HTML report.
 
+#### 2026-09-01 — D2: positions stopped out on their own entry bar
+
+The audit surface above did its job: the arc rerun's §D2 pass found that
+**261 of 668 stop-losses exit within one day**, of which **173 are a pure
+bar-alignment artifact** — the entry-day low pierced the stop, the bar closed
+*above* it, and the position was sold at the next open *above* the stop (WSM
+2010-09-20: open 30.07 / low 29.73 / close 31.23, filled 31.29 = E, stop 30.04,
+sold 09-21 at 31.29).
+
+Cause is step ordering, not stop logic: `Simulator._process_step_day` runs
+fills **before** the strategy, so a ticket that fills intraday on day D is
+already `Holding { entry_date = D }` when `Stops_runner` reads day D's
+*completed* bar — and for an E-anchored buy-stop that bar's low was printed
+before the fill. Shorts mirror on the high.
+
+Fix landed as `stops_config.stop_skip_entry_bar` (default-off; branch
+`feat/stop-skip-entry-bar`): when armed, no stop-driven exit is emitted on the
+bar whose date equals the position's `entry_date` — structural `Stop_hit`, the
+weekly trigger-only check, and the catastrophic stop alike — while the state
+machine still advances so the trail does not desynchronise. Default `false` is
+an exact no-op; goldens bit-identical. Pinned by 9 unit tests in
+`test_stops_runner.ml` (long / short / weekly-trigger-only / catastrophic /
+state-still-advances, each with an OFF R1 pin) and 2 simulator-level
+integration tests in `test_stop_skip_entry_bar_sim.ml` that reproduce the
+fill-before-strategy ordering end to end.
+
+**Not promoted** — it stays default-off pending a ledger ACCEPT
+(`.claude/rules/experiment-flag-discipline.md` R3). The A/B that measures what
+the 173 artifact exits were costing is the next step.
+
 ### (c) Book faithfulness — was absent; partly addressed
 
 No automated check exists anywhere in `trading/devtools/` or `.github/`;
@@ -354,7 +384,12 @@ Remaining open work:
    custom-universe goldens are re-pinned from the dispatcher's paired sweep,
    after which `paired-run-done` is applied. `goldens-affected` SHOULD flag the
    A1-3 PR — that is the rule working, not a defect.
-4. A2-1 follow-up (not blocking): the funding-grid results dir commits no
+4. **`stop_skip_entry_bar` A/B (default-off, awaiting a verdict).** The
+   mechanism shipped on `feat/stop-skip-entry-bar` (see Axis 2 (b) §D2). What
+   is NOT yet measured: what the 173 entry-bar artifact exits cost on the 26y
+   broad arc. Run it as a surface (flag `{false,true}`) per
+   `.claude/rules/experiment-flag-discipline.md` R2 before any default flip.
+5. A2-1 follow-up (not blocking): the funding-grid results dir commits no
    `params.sexp` beside its `actual.sexp` files, so `effect_null_report.exe`
    can only WARN there rather than verify. Committing a per-arm `params.sexp`
    alongside future results would make the guardrail bite by default.

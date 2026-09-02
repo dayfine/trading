@@ -40,6 +40,7 @@
   test_macro_bearish_trim_runner
   test_laggard_rotation_runner
   test_stops_runner
+  test_stop_skip_entry_bar_sim
   test_long_buying_power
   test_leverage_dawn
   test_stops_split_runner

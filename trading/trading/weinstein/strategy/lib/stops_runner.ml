@@ -166,6 +166,34 @@ let _catastrophic_exit ~catastrophic_armed ~stops_config ~(pos : Position.t)
          ~current_date ~state ~bar ())
   else None
 
+(** The structural stop takes precedence; the fast-crash absolute stop
+    ([_catastrophic_exit]) is consulted only when the structural path produced
+    no exit. Both emit the same [TriggerExit] kind, so OR-ing them here keeps
+    one exit per position per bar. *)
+let _structural_or_catastrophic ~catastrophic_armed ~stops_config ~pos ~state
+    ~bar ~current_date ~exit_tr =
+  match exit_tr with
+  | Some _ -> exit_tr
+  | None ->
+      _catastrophic_exit ~catastrophic_armed ~stops_config ~pos ~state ~bar
+        ~current_date
+
+(** Whether every stop-driven {b exit} must be withheld for this bar because it
+    is the position's own entry bar and [stops_config.stop_skip_entry_bar] is
+    armed.
+
+    The simulator runs fills BEFORE the strategy, so a ticket that filled
+    intraday on day D is already [Holding { entry_date = D }] when this runner
+    reads day D's completed bar — and for an E-anchored buy-stop entry that
+    bar's low was printed before the fill. Evaluating the stop against it
+    measures price the position never held. See the [stop_skip_entry_bar]
+    docstring in [stop_types.mli] for the measured footprint
+    ([dev/experiments/arc-rerun-2026-09-01/README.md] §D2). Default [false] →
+    always [false] here, i.e. an exact no-op. *)
+let _skip_entry_bar_exit ~stops_config ~entry_date ~current_date =
+  stops_config.Weinstein_stops.stop_skip_entry_bar
+  && Date.equal current_date entry_date
+
 (** Process stop logic for one held position. Returns (exit_transition option,
     adjust_transition option).
 
@@ -177,11 +205,20 @@ let _catastrophic_exit ~catastrophic_armed ~stops_config ~(pos : Position.t)
     The fast-crash absolute stop ([_catastrophic_exit]) is OR'd alongside both
     branches: if the structural path produced no exit but the catastrophic stop
     fires, its exit is emitted instead. The structural exit takes precedence
-    when both fire (same [TriggerExit] kind). *)
+    when both fire (same [TriggerExit] kind).
+
+    When {!_skip_entry_bar_exit} holds, every exit above is withheld — the
+    structural [Stop_hit], the [Weekly] trigger-only check, and the catastrophic
+    stop alike. The state machine is deliberately still advanced (the [Daily] /
+    Friday branch runs unchanged and [stop_states] is written): trailing and
+    tightening read the bar's structure, not the stop trigger, so suppressing
+    one hit check must not desynchronise the trail. Only the {b exit event} is
+    dropped; an [UpdateRiskParams] adjust still flows. *)
 let _handle_stop ?ma_cache ?prior_stage_ma_values ?(stop_update_cadence = Daily)
     ?(catastrophic_armed = false) ~advanced ~stops_config ~stage_config
     ~lookback_bars ~(pos : Position.t) ~(risk_params : Position.risk_params)
-    ~state ~bar ~stop_states ~ticker ~bar_reader ~as_of ~prior_stages () =
+    ~entry_date ~state ~bar ~stop_states ~ticker ~bar_reader ~as_of
+    ~prior_stages () =
   let current_date = bar.Types.Daily_price.date in
   let advance_state_machine =
     match stop_update_cadence with
@@ -198,14 +235,12 @@ let _handle_stop ?ma_cache ?prior_stage_ma_values ?(stop_update_cadence = Daily)
         ~stage_config ~lookback_bars ~pos ~risk_params ~state ~bar ~stop_states
         ~ticker ~bar_reader ~as_of ~prior_stages ~current_date ()
   in
-  match exit_tr with
-  | Some _ -> (exit_tr, adjust_tr)
-  | None ->
-      let catastrophic_tr =
-        _catastrophic_exit ~catastrophic_armed ~stops_config ~pos ~state ~bar
-          ~current_date
-      in
-      (catastrophic_tr, adjust_tr)
+  if _skip_entry_bar_exit ~stops_config ~entry_date ~current_date then
+    (None, adjust_tr)
+  else
+    ( _structural_or_catastrophic ~catastrophic_armed ~stops_config ~pos ~state
+        ~bar ~current_date ~exit_tr,
+      adjust_tr )
 
 (** Process stop for one position; returns updated (exits, adjusts) accumulator.
 *)
@@ -221,8 +256,9 @@ let _process_stop ?ma_cache ?prior_stage_ma_values ?stop_update_cadence
       match
         _handle_stop ?ma_cache ?prior_stage_ma_values ?stop_update_cadence
           ?catastrophic_armed ~advanced ~stops_config ~stage_config
-          ~lookback_bars ~pos ~risk_params:h.risk_params ~state ~bar
-          ~stop_states ~ticker ~bar_reader ~as_of ~prior_stages ()
+          ~lookback_bars ~pos ~risk_params:h.risk_params
+          ~entry_date:h.entry_date ~state ~bar ~stop_states ~ticker ~bar_reader
+          ~as_of ~prior_stages ()
       with
       | Some exit_tr, _ -> (exit_tr :: exits, adjusts)
       | _, Some adj_tr -> (exits, adj_tr :: adjusts)

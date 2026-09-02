@@ -348,6 +348,45 @@ type config = {
           ACCEPT, as a book-faithfulness correction; recorded in
           [dev/experiments/_ledger/2026-08-24-stops-basis-book-faithful.sexp]
           per [.claude/rules/experiment-flag-discipline.md] R3. *)
+  stop_skip_entry_bar : bool; [@sexp.default false]
+      (** When [true], a position's stop is never allowed to produce an {b exit}
+          on the bar whose date equals the position's own [entry_date]. The
+          state machine still advances on that bar (the trail / tighten logic is
+          unaffected); only the {e exit} transition is withheld — the structural
+          [Stop_hit], the weekly trigger-only check, and the catastrophic stop
+          alike. From the next bar onward the stop behaves exactly as before.
+
+          {b Why (measured 2026-09-01,
+             [dev/experiments/arc-rerun-2026-09-01/README.md] §D2).} Each
+          simulator step runs {e fills before the strategy}, so a ticket that
+          fills intraday on day D is already [Holding { entry_date = D }] when
+          the stop runner reads day D's {b completed} bar. For an E-anchored
+          buy-stop entry the day's low is, by construction, printed {e before}
+          the fill (price has to rise through E to fill), so
+          {!Weinstein_stops.check_stop_hit} on [bar.low_price] evaluates the
+          position against a price it never held. Any entry bar with more than
+          the entry-to-stop distance of intraday range below E therefore "stops
+          out" on its own entry bar. On the 26y arc run, 261 of 668 stop-losses
+          exited within one day and 173 of those were this pure artifact — the
+          entry-day low pierced the stop, the bar {e closed above} it, and the
+          position was sold at the next open {e above} the stop (e.g. WSM
+          2010-09-20: open 30.07 / low 29.73 / close 31.23, filled 31.29 = E,
+          stop 30.04, "stopped" on that bar, sold 09-21 at 31.29). Shorts
+          mirror: a sell-stop fill's entry-bar {b high} likewise predates the
+          fill.
+
+          Faithful-core: this is {b bar-alignment hygiene}, not a strategy
+          change. Book §5.1 places the protective stop below the base to be
+          honoured {e from the position's inception forward}; a stop cannot be
+          hit by price action that occurred before the shares were owned. Spine
+          item 5 is untouched — the stop level, its placement rule, the
+          never-lower rule and the weekly cadence are all unchanged; only the
+          first bar's {e trigger evaluation} is suppressed
+          ([.claude/rules/weinstein-faithful-core.md] W1/W2). Default [false]
+          reproduces the current behaviour bit-for-bit, so every existing golden
+          replays unchanged. Default-off experiment axis per
+          [.claude/rules/experiment-flag-discipline.md]; promoted only on a
+          ledger ACCEPT. *)
 }
 [@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable

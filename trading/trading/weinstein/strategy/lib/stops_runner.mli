@@ -80,4 +80,13 @@ val update :
     decision is made one level up in the strategy lib from the prior cycle's
     {!Decline_character.t} (a fast-V decline), keeping this runner and the stops
     lib macro-agnostic. The default [false] (and the knob's default [0.0]) is an
-    exact no-op, so every existing caller and golden replays bit-identically. *)
+    exact no-op, so every existing caller and golden replays bit-identically.
+
+    [stops_config.stop_skip_entry_bar] (default [false]) withholds {b every}
+    stop-driven exit — structural [Stop_hit], the [Weekly] trigger-only check,
+    and the catastrophic stop — on the bar whose date equals the position's own
+    [entry_date]. The state machine still advances on that bar and [stop_states]
+    is still written; an [UpdateRiskParams] adjust still flows. Rationale (the
+    simulator fills before the strategy runs, so the entry bar's low/high
+    predates the fill): see that field's docstring in {!Weinstein_stops} /
+    [stop_types.mli]. Default [false] is an exact no-op. *)
