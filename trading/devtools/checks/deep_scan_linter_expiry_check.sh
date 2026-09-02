@@ -1278,4 +1278,237 @@ else
   fail "fixture_missing_review_at unexpectedly appeared in the roll-up FINDINGS_FILE — the missing-review_at branch now calls add_warning(), which contradicts the harness.md item's caveat and is a behaviour change out of this Part's scope: $(cat "$MR_FINDINGS")"
 fi
 
+
+# ── Part 9: over-reporting direction — the "never" branch, unpinned in
+# BOTH directions (H-EXPIRY-NEVER-BRANCH-UNPINNED, filed 2026-09-01,
+# qc-behavioral on PR #2624, residuals O-A / O-B) ─────────────────────
+#
+# Parts 1-8 above are all false-NEGATIVE pins: each checks that a real
+# violation IS surfaced. None of them exercise the opposite direction —
+# that a CLEAN entry (a valid future date, or an intentionally permanent
+# "review_at: never" entry) produces NO finding at all. The `never*)
+# continue ;;` branch at check_11_linter_expiry.sh:141 exists specifically
+# to suppress reporting for permanent exceptions; deleting it entirely, or
+# inverting it to actively flag `never` entries, or blanket-flagging every
+# entry regardless of its review_at value, all left the whole suite green
+# before this Part, because nothing asserted the ABSENCE of a finding.
+#
+# One fixture kills all three mutations below (a valid future-dated entry
+# plus a "review_at: never" entry, in the same linter_exceptions.conf) —
+# no need for three separate fixtures.
+
+NB_FAKE_ROOT="$(mktemp -d)"
+trap 'rm -rf "$AE_FAKE_ROOT" "$MS_FAKE_ROOT" "$NF_FAKE_ROOT" "$MU_FAKE_ROOT" "$UF_FAKE_ROOT" "$MR_FAKE_ROOT" "$NB_FAKE_ROOT"' EXIT
+
+mkdir -p "$NB_FAKE_ROOT/trading/devtools/checks/deep_scan"
+cat > "$NB_FAKE_ROOT/trading/devtools/checks/linter_exceptions.conf" <<'EOF'
+fixture_valid_future_date  # review_at: 2099-01-01
+fixture_never_permanent  # review_at: never (permanent exception, harness fixture)
+EOF
+: > "$NB_FAKE_ROOT/trading/devtools/checks/universe_deps_exceptions.conf"
+: > "$NB_FAKE_ROOT/trading/devtools/checks/adapter_effectiveness_exceptions.conf"
+cp "${DEEP_SCAN_DIR}/_lib.sh" "$NB_FAKE_ROOT/trading/devtools/checks/deep_scan/_lib.sh"
+cp "$(dirname "$0")/_check_lib.sh" "$NB_FAKE_ROOT/trading/devtools/checks/_check_lib.sh"
+cp "$CHECK_11" "$NB_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh"
+
+# --- 9a: functional pin — the REAL (unmutated) script produces NO finding
+# for either entry: the future-dated entry is not expired, and the
+# never-annotated entry is intentionally permanent. Checks both the
+# REPORT_FILE (neither fixture name appears anywhere, and the section
+# falls back to "No expired or missing...") and the roll-up FINDINGS_FILE
+# (no W: line names either fixture).
+NB_REPORT="$(mktemp)"
+NB_FINDINGS="$(mktemp)"
+set +e
+REPO_ROOT="$NB_FAKE_ROOT" sh "$NB_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh" \
+  "$NB_REPORT" "$NB_FINDINGS" >/dev/null 2>&1
+NB_CODE=$?
+set -e
+
+# The fallback-sentence grep MUST be scoped to the Linter Exception Expiry
+# section. check_11 emits the identical sentence "No expired or missing
+# review_at annotations found." THREE times — once per conf file (Linter at
+# :233, Universe-Deps at :257, Adapter-Effectiveness at :284) — and this
+# fixture leaves the two sibling confs empty, so both of those sections emit
+# it unconditionally. An unscoped `grep -q` therefore passes no matter what
+# the Linter section does. Measured by qc-behavioral on PR #2636: changing
+# ONLY line 233 (this section's own fallback) left the suite GREEN 48/48.
+# Extract this section (heading -> next "## " heading) and grep inside it.
+_nb_linter_section() {
+  awk '/^## Linter Exception Expiry/{f=1;next} f&&/^## /{exit} f' "$1"
+}
+
+if [ "$NB_CODE" -eq 0 ] \
+  && _nb_linter_section "$NB_REPORT" \
+    | grep -q 'No expired or missing review_at annotations found' \
+  && ! grep -q 'fixture_valid_future_date\|fixture_never_permanent' "$NB_REPORT" \
+  && ! grep -q 'fixture_valid_future_date\|fixture_never_permanent' "$NB_FINDINGS"; then
+  echo "OK: a clean fixture (valid future date + review_at: never) produces NO finding in either REPORT_FILE or the roll-up FINDINGS_FILE, and the LINTER section specifically falls back to the no-findings sentence (H-EXPIRY-NEVER-BRANCH-UNPINNED positive pin)"
+else
+  fail "the clean fixture unexpectedly produced a finding (exit=$NB_CODE) — report: $(cat "$NB_REPORT"); findings: $(cat "$NB_FINDINGS")"
+fi
+
+# --- 9b: MUTATION (i) — the filed mutation: delete the `never*) continue`
+# branch (and its guarding case/esac) entirely. The never-annotated entry
+# then falls through to the "unrecognised review_at format" branch (its
+# value is neither a milestone token nor an ISO date), and IS surfaced.
+NB_MUT_I="$NB_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_neverdel.sh"
+sed '/# Skip "never" review_at values/,/esac/d' "$CHECK_11" > "$NB_MUT_I"
+chmod +x "$NB_MUT_I"
+
+NB_REPORT_I="$(mktemp)"
+NB_FINDINGS_I="$(mktemp)"
+set +e
+REPO_ROOT="$NB_FAKE_ROOT" sh "$NB_MUT_I" "$NB_REPORT_I" "$NB_FINDINGS_I" >/dev/null 2>&1
+NB_CODE_I=$?
+set -e
+
+if [ "$NB_CODE_I" -eq 0 ] \
+  && grep -q '\[UNRECOGNISED format\].*fixture_never_permanent' "$NB_REPORT_I" \
+  && ! grep -q 'fixture_valid_future_date' "$NB_REPORT_I"; then
+  echo "OK: MUTATION (i) (never-branch deleted entirely — the filed mutation) makes the never-annotated entry surface as an UNRECOGNISED-format finding while the valid future-dated entry stays clean — proves 9a catches the filed mutation"
+else
+  fail "MUTATION (i) (never-branch deleted) did not produce the expected finding (exit=$NB_CODE_I): $(cat "$NB_REPORT_I")"
+fi
+
+# --- 9c: MUTATION (ii) — invert the never-branch so `review_at: never`
+# entries are actively reported as a missing-review_at (T1-K) violation,
+# instead of being skipped. Same shape as check_11_linter_expiry.sh's own
+# missing-review_at branch (lines 130-137), transplanted into the
+# never-case so it fires only for never* values.
+NB_START="$(grep -n '# Skip "never" review_at values' "$CHECK_11" | head -1 | cut -d: -f1)"
+NB_END=$((NB_START + 3))
+NB_MUT_II="$NB_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_neverinvert.sh"
+head -n $((NB_START - 1)) "$CHECK_11" > "$NB_MUT_II"
+cat >> "$NB_MUT_II" <<'BLOCK'
+    # Skip "never" review_at values — these are intentionally permanent.
+    # MUTATION (ii): inverted — never* entries are now reported as a
+    # missing-review_at (T1-K) violation instead of being skipped.
+    case "$review_at_val" in
+      never*)
+        _SCAN_MISSING_COUNT=$((_SCAN_MISSING_COUNT + 1))
+        decl="$(echo "$raw_line" | sed 's/#.*//' | sed 's/[[:space:]]*$//')"
+        _SCAN_MISSING="${_SCAN_MISSING}  - Missing review_at on: ${decl}\n"
+        continue
+        ;;
+    esac
+BLOCK
+tail -n +$((NB_END + 1)) "$CHECK_11" >> "$NB_MUT_II"
+chmod +x "$NB_MUT_II"
+
+NB_REPORT_II="$(mktemp)"
+NB_FINDINGS_II="$(mktemp)"
+set +e
+REPO_ROOT="$NB_FAKE_ROOT" sh "$NB_MUT_II" "$NB_REPORT_II" "$NB_FINDINGS_II" >/dev/null 2>&1
+NB_CODE_II=$?
+set -e
+
+if [ "$NB_CODE_II" -eq 0 ] \
+  && grep -q 'Missing review_at on: fixture_never_permanent' "$NB_REPORT_II" \
+  && ! grep -q 'fixture_valid_future_date' "$NB_REPORT_II"; then
+  echo "OK: MUTATION (ii) (never-branch inverted to flag never* entries as a T1-K missing-review_at violation) surfaces the never-annotated entry as a violation while the valid future-dated entry stays clean — proves 9a catches this over-reporting direction too"
+else
+  fail "MUTATION (ii) (never-branch inverted) did not produce the expected finding (exit=$NB_CODE_II): $(cat "$NB_REPORT_II")"
+fi
+
+# --- 9d: MUTATION (iii) — blanket over-report: force every entry
+# (regardless of its review_at value) through the missing-review_at
+# branch, by making its guard unconditionally true.
+NB_MUT_III="$NB_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_blanket.sh"
+sed 's/if \[ -z "\$review_at_val" \]; then/if true; then/' "$CHECK_11" > "$NB_MUT_III"
+chmod +x "$NB_MUT_III"
+
+NB_REPORT_III="$(mktemp)"
+NB_FINDINGS_III="$(mktemp)"
+set +e
+REPO_ROOT="$NB_FAKE_ROOT" sh "$NB_MUT_III" "$NB_REPORT_III" "$NB_FINDINGS_III" >/dev/null 2>&1
+NB_CODE_III=$?
+set -e
+
+if [ "$NB_CODE_III" -eq 0 ] \
+  && grep -q 'Missing review_at on: fixture_valid_future_date' "$NB_REPORT_III" \
+  && grep -q 'Missing review_at on: fixture_never_permanent' "$NB_REPORT_III"; then
+  echo "OK: MUTATION (iii) (blanket over-report — every entry forced through the missing-review_at branch) flags BOTH fixture entries as violations — proves 9a catches the maximal over-reporting shape, not just the never-specific ones"
+else
+  fail "MUTATION (iii) (blanket over-report) did not flag both entries as expected (exit=$NB_CODE_III): $(cat "$NB_REPORT_III")"
+fi
+
+# --- 9e: MUTATION (iv) — `never*) continue` -> `never*) break`.
+#
+# Found LIVE by qc-behavioral on PR #2636, after 9a-9d were written: the
+# whole suite (including the new Part 9) stayed GREEN with `break` applied.
+#
+# `break` exits the enclosing `while read` loop outright, so EVERY entry
+# after the first `review_at: never` is silently never scanned. In the live
+# trading/devtools/checks/linter_exceptions.conf that is not a corner case:
+# 28 active entries, the first `never` at line 15, so 24 of 28 (86%) fall
+# after it and would stop being checked at all.
+#
+# 9a-9d cannot catch it because their fixture puts `fixture_never_permanent`
+# on the LAST line — at the end of input, `break` and `continue` are
+# indistinguishable. This is the UNDER-reporting half of the "unpinned in
+# both directions" the item claims to close; 9a-9d pin only the
+# over-reporting half.
+#
+# It needs its own fixture (a `never` entry followed by an entry that MUST
+# be reported), because 9a's fixture is asserted to produce no finding at
+# all and adding an expired entry to it would contradict that.
+NB2_FAKE_ROOT="$(mktemp -d)"
+trap 'rm -rf "$AE_FAKE_ROOT" "$MS_FAKE_ROOT" "$NF_FAKE_ROOT" "$MU_FAKE_ROOT" "$UF_FAKE_ROOT" "$MR_FAKE_ROOT" "$NB_FAKE_ROOT" "$NB2_FAKE_ROOT"' EXIT
+
+mkdir -p "$NB2_FAKE_ROOT/trading/devtools/checks/deep_scan"
+cat > "$NB2_FAKE_ROOT/trading/devtools/checks/linter_exceptions.conf" <<'EOF'
+fixture_never_first  # review_at: never (permanent exception, harness fixture)
+fixture_expired_after_never  # review_at: 2020-01-01
+EOF
+: > "$NB2_FAKE_ROOT/trading/devtools/checks/universe_deps_exceptions.conf"
+: > "$NB2_FAKE_ROOT/trading/devtools/checks/adapter_effectiveness_exceptions.conf"
+cp "${DEEP_SCAN_DIR}/_lib.sh" "$NB2_FAKE_ROOT/trading/devtools/checks/deep_scan/_lib.sh"
+cp "$(dirname "$0")/_check_lib.sh" "$NB2_FAKE_ROOT/trading/devtools/checks/_check_lib.sh"
+cp "$CHECK_11" "$NB2_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh"
+
+# 9e-1: the REAL script scans PAST the `never` entry and surfaces the
+# expired one that follows it.
+NB2_REPORT="$(mktemp)"
+NB2_FINDINGS="$(mktemp)"
+set +e
+REPO_ROOT="$NB2_FAKE_ROOT" sh "$NB2_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry.sh" \
+  "$NB2_REPORT" "$NB2_FINDINGS" >/dev/null 2>&1
+NB2_CODE=$?
+set -e
+
+if [ "$NB2_CODE" -eq 0 ] \
+  && grep -q 'fixture_expired_after_never' "$NB2_REPORT" \
+  && ! grep -q 'fixture_never_first' "$NB2_REPORT"; then
+  echo "OK: an entry AFTER a 'review_at: never' entry is still scanned and surfaced as expired, while the never entry itself stays exempt — pins that the never branch skips ONE entry, not the rest of the file"
+else
+  fail "the real script did not surface fixture_expired_after_never (exit=$NB2_CODE) — report: $(cat "$NB2_REPORT")"
+fi
+
+# 9e-2: MUTATION (iv) — swap `continue` for `break` in the never branch.
+NB2_MUT_IV="$NB2_FAKE_ROOT/trading/devtools/checks/deep_scan/check_11_linter_expiry_mutated_neverbreak.sh"
+sed 's/never\*) continue ;;/never*) break ;;/' "$CHECK_11" > "$NB2_MUT_IV"
+chmod +x "$NB2_MUT_IV"
+
+# Vacuity guard: a `sed` that matched nothing would leave the "mutant"
+# byte-identical to the production script, and the assertion below would
+# then be testing nothing. Fail loudly instead.
+if cmp -s "$CHECK_11" "$NB2_MUT_IV"; then
+  fail "MUTATION (iv) sed matched nothing — the mutant is identical to the production script, so 9e-2 would pass vacuously. The 'never*) continue ;;' text has probably been reformatted; update the pattern."
+fi
+
+NB2_REPORT_IV="$(mktemp)"
+NB2_FINDINGS_IV="$(mktemp)"
+set +e
+REPO_ROOT="$NB2_FAKE_ROOT" sh "$NB2_MUT_IV" "$NB2_REPORT_IV" "$NB2_FINDINGS_IV" >/dev/null 2>&1
+NB2_CODE_IV=$?
+set -e
+
+if [ "$NB2_CODE_IV" -eq 0 ] \
+  && ! grep -q 'fixture_expired_after_never' "$NB2_REPORT_IV"; then
+  echo "OK: MUTATION (iv) ('never*) continue' -> 'never*) break') silently stops scanning every entry after the first never entry — 9e-1 catches the UNDER-reporting direction, which 9a-9d could not (their never entry is last, where break == continue)"
+else
+  fail "MUTATION (iv) (never-branch break) did not suppress the trailing expired entry as expected (exit=$NB2_CODE_IV): $(cat "$NB2_REPORT_IV")"
+fi
+
 echo "OK: deep scan Linter Exception Expiry section (T1-K) structural + functional check passed."
