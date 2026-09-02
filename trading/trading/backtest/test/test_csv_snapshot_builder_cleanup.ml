@@ -191,6 +191,46 @@ let test_orphan_sweep_ignores_non_matching_dirs _ =
       let _ = Builder.startup_orphan_sweep ~max_age_hours:0.001 () in
       assert_that (Stdlib.Sys.file_exists dir) (equal_to true))
 
+(* [_with_private_tmp_root]'s docstring states a CONTRACT — "its sweep can only
+   ever see fixtures it created itself" — and that contract is the entire fix
+   for this flake. Nothing above pins it: the three tests each create their
+   fixture INSIDE the private root, so they pass identically whether the root
+   is private or shared. Verified by qc-behavioral on PR #2637 (CP4): replacing
+   the helper body with [let _with_private_tmp_root f = f ()] — the exact shape
+   of a silent future regression — left the suite at 3/3, exit 0.
+
+   This test pins the guard directly, from the outside in: plant a backdated
+   [panel_runner_csv_snapshot_*] dir in the SHARED temp root (the dune-wide
+   TMPDIR every other test file also writes to), then run the most aggressive
+   sweep from INSIDE the private root. The outside dir must survive — that is
+   precisely the cross-worker deletion that caused the flake.
+
+   Deterministic: no delays, no concurrency, no dependence on scheduling. *)
+let test_private_tmp_root_hides_the_shared_root_from_the_sweep _ =
+  let shared_root = Stdlib.Filename.get_temp_dir_name () in
+  let outsider =
+    Stdlib.Filename.temp_dir "panel_runner_csv_snapshot_" "_test_outsider"
+  in
+  (* Backdate well past any threshold used below, so survival can only be
+     explained by the sweep never seeing it — not by it looking too fresh. *)
+  let one_hour_ago = Core_unix.gettimeofday () -. 3600.0 in
+  Core_unix.utimes outsider ~access:one_hour_ago ~modif:one_hour_ago;
+  Exn.protect
+    ~f:(fun () ->
+      _with_private_tmp_root (fun () ->
+          (* Sanity: we really are somewhere else. If this ever fails, the
+             assertion below would pass vacuously (sweeping the shared root
+             from the shared root, finding nothing to do). *)
+          assert_that
+            (String.equal (Stdlib.Filename.get_temp_dir_name ()) shared_root)
+            (equal_to false);
+          let (_ : int) =
+            Builder.startup_orphan_sweep ~max_age_hours:0.001 ()
+          in
+          ());
+      assert_that (Stdlib.Sys.file_exists outsider) (equal_to true))
+    ~finally:(fun () -> _rm_rf outsider)
+
 (* -------------- integration tests via subject subprocess -------------- *)
 
 let _run_subject ~arg =
@@ -261,6 +301,8 @@ let suite =
          >:: test_orphan_sweep_spares_fresh_panel_runner_dirs;
          "orphan sweep ignores non-panel_runner dirs"
          >:: test_orphan_sweep_ignores_non_matching_dirs;
+         "private tmp root hides the shared root from the sweep"
+         >:: test_private_tmp_root_hides_the_shared_root_from_the_sweep;
          "abnormal exit (uncaught exception) cleans up dir"
          >:: test_abnormal_exit_via_uncaught_exception;
          "abnormal exit (SIGTERM) cleans up dir"
