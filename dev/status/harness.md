@@ -1909,13 +1909,31 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   |---|---|
   | (d) drop `strip_fences` inside `first_heading_text` | **killed** (case 41) |
   | (j) drop the `^` anchor in the kind test | **killed** (case 42) |
-  | (k) drop `\b` from the kind test | **LIVE, unpinned** — first heading `## Behaviorally equivalent refactor` reads `ok`; two letters from the actual #2620 incident text |
-  | (f) `#{1,4}` → `#{1,6}` | **LIVE, unpinned** — flips in both directions (`###### Structural QC (quoted)` before the real heading reads `ok`; `###### scratch note` first reads `none`) |
-  | (g) required space `" +"` → `" *"` | **LIVE, unpinned** — both directions (`#2622 follow-up notes` reads `ok`; `#Behavioral QC` reads `none`) |
+  | (k) drop `\b` from the kind test | **killed** (case 46) |
+  | (f) `#{1,4}` → `#{1,6}` | **killed**, both directions (case 47 false-`ok`, case 48 false-`none`) |
+  | (g) required space `" +"` → `" *"` | **killed**, both directions (case 49 false-`ok`, case 50 false-`none`) |
+
+  All three were measured RED/GREEN by hand (2026-09-02): the pre-existing
+  54-case suite stayed GREEN with each mutation applied (confirming each was a
+  genuine live survivor, not already caught incidentally); cases 46-50 turn
+  each RED; reverting the mutation restores a clean `git diff` on the
+  production script and a GREEN 59-case suite. One incidental overlap worth
+  recording: mutation (g) also flips case 48 (built for (f)'s false-`none`
+  direction) — both mutations relax the same `first_heading_text` line in a
+  way that lets a bare `"###### scratch note"` line partially match once the
+  space requirement is dropped, so case 48 ended up pinning two mutations, not
+  one. Mutation (f) does not reciprocally trip cases 49/50.
 
   Note (k) especially: with the `^` anchor restored by case 42, `\b` is the
   **sole** remaining guard against a first heading that merely *starts with*
   the gate word.
+
+  **Still open: the harness itself.** The five cases above pin these specific
+  survivors by hand, the same way cases 41-45 pin (d)/(j)/etc. — they are not
+  the ~30-line automated `PR_GATE_STATUS_LIB=1`-seam mutation harness this
+  item originally asked for, which would surface *future* unlisted mutations
+  mechanically rather than requiring a human to enumerate them. That harness
+  is not built; this item stays open for it.
 
   Two scoping notes for whoever builds this. First, "mechanically" above is
   deliberate and narrower than the original wording ("with no inferential

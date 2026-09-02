@@ -1122,6 +1122,114 @@ check "#2626: body Reviewed SHA line takes precedence over commit_id" \
   "stale(deadbeef)" \
   "$(_gate "$(reviews "$BODY_SHA_WINS_OVER_COMMIT_ID" "$TIP")" behavioral "$TIP")"
 
+# 46-50. H-GATEPARSER-NO-MUTATION-COVERAGE (dev/status/harness.md): three
+# mutations of the kind test / heading regex survived the #2622/#2625 sweep
+# unpinned -- (k) dropping `\b` from the kind test, (f) widening `#{1,4}` to
+# `#{1,6}`, (g) relaxing the required `" +"` after the hashes to `" *"`. Each
+# was confirmed to flip a real gate attribution by hand-applying the mutation
+# and re-running this file; see the harness.md entry for the measured table.
+#
+# 46. (k): drop `\b` from the kind test. "Behaviorally" shares its first ten
+#     letters with "behavioral" -- with the `\b` boundary guard in place
+#     (post-#2622 case 42 restored the `^` anchor but not this guard), the
+#     match correctly fails because a word character ('l') follows on both
+#     sides of the would-be boundary. Confirmed RED (reads "ok" instead of
+#     "none") with `\\b` deleted from the kind-test pattern.
+HEADING_STARTS_WITH_KIND_WORD_PLUS_MORE="Reviewed SHA: $TIP
+
+## Behaviorally equivalent refactor
+
+## Verdict
+
+APPROVED"
+
+check "(k): a first heading that merely STARTS WITH the kind word (no boundary after it) does not satisfy the gate" \
+  none "$(_gate "$(reviews "$HEADING_STARTS_WITH_KIND_WORD_PLUS_MORE")" behavioral "$TIP")"
+
+# 47. (f) direction 1 -- false-MERGE: a stray six-hash line ("######") is not
+#     a markdown heading under `#{1,4}` (after consuming up to 4 '#', the
+#     remaining '#' characters block the required run of spaces, so the line
+#     never matches) and is correctly skipped; the next matching line is
+#     "## Verdict", which does not name any gate, so structural correctly
+#     reads "none". Confirmed RED (reads "ok") with `#{1,4}` widened to
+#     `#{1,6}`: the six-hash line then matches as the first heading, its
+#     captured text starts with "Structural", and the review's own (unrelated)
+#     Verdict gets attributed to the structural gate.
+SIX_HASH_LINE_READS_AS_STRUCTURAL_HEADING="Reviewed SHA: $TIP
+
+###### Structural QC (quoted)
+
+Some quoted text under a deep heading level, not this review's real content.
+
+## Verdict
+
+APPROVED"
+
+check "(f) 1/2: a six-hash line is not a heading under #{1,4} -- does not satisfy the structural gate" \
+  none "$(_gate "$(reviews "$SIX_HASH_LINE_READS_AS_STRUCTURAL_HEADING")" structural "$TIP")"
+
+# 48. (f) direction 2 -- false-BLOCK: same defect, opposite failure mode. A
+#     six-hash "scratch note" line precedes the review's real
+#     "## Behavioral QC" heading; under `#{1,4}` it is skipped and the real
+#     heading is used, correctly reading "ok". Confirmed RED (reads "none")
+#     with `#{1,4}` widened to `#{1,6}`: the scratch-note line becomes the
+#     FIRST heading (masking the real one, per `first_heading_text`'s
+#     first-match-only contract from case 39/40), and "scratch note" does not
+#     name the behavioral gate.
+SIX_HASH_LINE_MASKS_REAL_HEADING="Reviewed SHA: $TIP
+
+###### scratch note
+
+## Behavioral QC — PR #2622
+
+## Verdict
+
+APPROVED"
+
+check "(f) 2/2: a six-hash line before the real heading does not mask it -- behavioral gate still reads ok" \
+  ok "$(_gate "$(reviews "$SIX_HASH_LINE_MASKS_REAL_HEADING")" behavioral "$TIP")"
+
+# 49. (g) direction 1 -- false-MERGE: "#structural notes worth reading later"
+#     has a single '#' immediately followed by text, no space -- under the
+#     required `" +"` this is NOT a heading (an issue-reference-style line,
+#     not markdown), so it is skipped and the review's real first heading
+#     ("## Behavioral QC ...") is used, correctly reading "none" for the
+#     structural gate. Confirmed RED (reads "ok") with `" +"` relaxed to
+#     `" *"`: the no-space line then matches, its captured text starts with
+#     "structural", and it wins as the first heading over the real one.
+NO_SPACE_AFTER_HASH_READS_AS_HEADING="Reviewed SHA: $TIP
+
+#structural notes worth reading later
+
+## Behavioral QC — PR #XXXX real heading
+
+## Verdict
+
+APPROVED"
+
+check "(g) 1/2: a hash with no following space is not a heading -- does not satisfy the structural gate" \
+  none "$(_gate "$(reviews "$NO_SPACE_AFTER_HASH_READS_AS_HEADING")" structural "$TIP")"
+
+# 50. (g) direction 2 -- false-BLOCK: same defect, opposite failure mode. A
+#     stray "#2622 follow-up notes" line (also no space after the single '#')
+#     precedes the review's real "## Behavioral QC" heading; under `" +"` it
+#     is skipped and the real heading wins, correctly reading "ok". Confirmed
+#     RED (reads "none") with `" +"` relaxed to `" *"`: the stray line becomes
+#     the first heading, masking the real one, and "2622 follow-up notes"
+#     does not name the behavioral gate.
+NO_SPACE_AFTER_HASH_MASKS_REAL_HEADING="Reviewed SHA: $TIP
+
+#2622 follow-up notes
+
+## Behavioral QC — PR #XXXX real heading
+
+## Verdict
+
+APPROVED"
+
+check "(g) 2/2: a hash with no following space before the real heading does not mask it -- behavioral gate still reads ok" \
+  ok "$(_gate "$(reviews "$NO_SPACE_AFTER_HASH_MASKS_REAL_HEADING")" behavioral "$TIP")"
+
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"
   exit 1
