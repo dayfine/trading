@@ -32,11 +32,45 @@ log `/tmp/arc0901-chain.log`, artifacts `/tmp/sweeps/arc0901/<cell>-s0/`
 | `b5-fullbook` | as `b5-arc` | anchor / rt / vol-at-fill all removed | the `fullbook-graded` ticket-half alone on this cell |
 | `b5-arc-anchor26` | as `b5-arc` | `entry_anchor_local_range_weeks 26` | added 23:40 after D5: the ticket anchor as a 26-week range top (the knob's documented example) instead of a 4-week high |
 | `arc26y-novol` | as `arc26y` | `volume_confirm_at_fill false` | 26y control for the eject gate (runs last, if time allows) |
+| `b5-arc-fix` | as `b5-arc` | `sim_exit_fill_next_open true` + `stops_config.stop_skip_entry_bar true` | D1 + D2 fixes armed — build pinned at main `94a8c6857` (#2642 + #2644 merged), chain `run3.sh`, worktree `sweep-arc0901fix` |
+| `arc26y-fix` | as `arc26y` | same two flags | **the definitive size of D1 + D2** on the 26y arc (the first-order repricing said +$1.05M realised) |
 
 Order in the chain: `b5-arc` → `arc26y` → 5y ladder → `arc26y-novol`
 (`run.sh`); the chain is stopped after `arc26y` for the agent wave and
 relaunched as `run2.sh` (same cells + `b5-arc-anchor26`; completed cells are
 skipped off the log's RESULT lines).
+
+## Fast grid (2026-09-02 evening, user: iterate on 1y/3y/5y before more 26y)
+
+Three disjoint broad 5y windows × four arms, all on the **fixed simulator**
+(D1 + D2 flags armed, build `94a8c6857`), chain `run4.sh`, ~25 min per cell.
+26y runs become confirmation-only. `g19-fix` = the `b5-arc-fix` cell above.
+
+| window | universe | regime | warehouse coverage |
+|---|---|---|---:|
+| `g00` 2000-01-03..2004-12-31 | top-3000-2000 | dot-com bust + recovery | 94% |
+| `g05` 2005-01-03..2009-12-31 | top-3000-2005 | pre-GFC run-up + GFC | 54% |
+| `g19` 2019-01-02..2023-12-29 | top-3000-2019 | covid + 2022 bear | 32% |
+
+Arms: `fix` (arc + both fixes, the base), `novol` (fill-week eject off),
+`s6` (`initial_stop_buffer 0.98` → 5.9% fallback stop, the book band's upper
+half), `novol-s6`. Decision rule (pre-registered): a lever is promoted to one
+26y confirmation only if it beats the window's `fix` base in ≥2 of 3 windows
+by ≥1.5× the broad-5y return null (~15pp, `rt-freshness-broad5y-2026-08-20`),
+is never badly dominated in any window, and does not worsen MaxDD; the winner
+then gets salts {1,2}.
+
+**⚠ Warehouse-vintage caveat (measured 2026-09-02, not previously written
+down).** `/tmp/snap_top3000_dedup_v5thin_adj` holds 2,908 snaps = the
+**2000-vintage** composition. Coverage of `top-3000-<v>` decays monotonically:
+2000 94%, 2001 72%, 2004 58%, 2005 54%, 2009 44%, 2013 39%, 2019 32%, 2023
+28%. The runner silently skips absent symbols, so every "broad-5y cell B"
+result in this and prior experiments (sa2408, clock cell B, today's ladder)
+effectively ran on ~980 names that are 2000-vintage members surviving into
+2019 — survivor-tilted in level. Within-cell A/B comparisons stay valid
+(`project_composition_golden_survivor_bias`: the bias hits both arms); absolute
+levels and cross-window comparisons do not. Proper fix = vintage-specific
+warehouses (a warehouse-rebuild task, not tonight).
 
 ## Read-before-verdict obligations
 
