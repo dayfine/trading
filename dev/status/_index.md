@@ -4,11 +4,13 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-01 (orchestrator run 33508633150 — run 2 of the day;
-main **`9fa471a0`** -> **`34b4e7c2`**, two PRs merged. Green at run start
-(`9fa471a0`) and at run end: build 0, runtest 0, 0 `^FAIL:`,
+Last updated: 2026-09-02 (orchestrator run 33628203337; main **`deb45a7e`**
+-> **`425b2fcb`**, two PRs merged. The open-PR queue was EMPTY at run start, so
+Step 0.5 was skipped per its non-empty precondition. Green at run start
+(`deb45a7e`: `dune build @runtest --force` 0, 0 `^FAIL:`,
 `status_file_integrity` 0, `index_size_linter` 0 — every exit code read
-**unpiped**).
+**unpiped** — plus GitHub CI green on the same SHA) and re-verified at run
+end.
 
 **Merged this run:** **#2624** (`e4c59ed6`, pins the missing-`review_at`
 branch of `check_11`) and **#2625** (`34b4e7c2`, pins `strip_fences` + the
@@ -86,9 +88,9 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2628 | #2624 + #2625 MERGED after full re-QC; #2628 fixes #2626 (sha-less-review staleness); next: (k)/(f)/(g) mutation pins, then R-4 expiry table |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2635 + #2636 MERGED after rework; QC found 6 more live gate-parser mutations + a 4th live expiry mutation — next: the automated mutation harness |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | A-MERGEABLE-STATE-NOT-A-CLOSE-TELL filed (run-1 guidance corrected); open: #2427 #2428 #2429 #2432 — need `workflow` scope or a human |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | top item `linter_coverage` still a HUMAN POLICY DECISION (17 runs); orphan branch `cleanup/csv-snapshot-sweep-flake` verified to hold no work — reclaim or delete to unblock `flaky_test` |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | #2637 | #2637 root-causes the csv-snapshot flake (OUnit2 parallel shards, NOT the recorded SIGTERM race); reworked, needs re-QC |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
