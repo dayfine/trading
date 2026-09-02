@@ -1,6 +1,6 @@
 (** Checks that need the per-symbol bar store: V3 (dollar-ADV floor), V4 (stale
     open position), V7 (virgin-territory vs history), V9 (overhead supply), V10
-    (entry-week spike). *)
+    (entry-week spike), V13 (fill causality), V14 (entry-bar stop-out). *)
 
 open Validator_types
 
@@ -23,3 +23,43 @@ val check_v9 : inputs -> Validator_step.finding
 val check_v10 : inputs -> Validator_step.finding
 (** V10 (EXP): no LONG entry whose entry-week close is more than [spike_pct]
     above the [spike_lookback_weeks]-ago close. *)
+
+val check_v13 : inputs -> Validator_step.finding
+(** V13 (INV): every trade's [entry_date] and [exit_date] have a bar for that
+    symbol, and [entry_price] / [exit_price] lie inside their bar's
+    [[low, high]] widened by [config.fill_price_epsilon_pct].
+
+    Both sides are checked; the first failing leg (entry before exit) supplies
+    the specimen. A missing-bar specimen names the nearest earlier bar date so
+    the size of the slip is visible. Rows whose symbol is absent from the bar
+    store — or whose store entry carries no daily bars — are {!Skip}ped and
+    counted in the finding's skip count, not flagged. The price leg alone is
+    additionally waived (treated as clean) when the bar's close and the fill
+    price fail {!Validator_step.price_basis_ok}, since a re-based store would
+    otherwise flag every fill for the symbol; the date leg is basis-free and
+    always runs.
+
+    Motivating defect: [dev/experiments/arc-rerun-2026-09-01/README.md] §D1 —
+    2,500+ exits dated on a Saturday at the preceding Friday's open. *)
+
+val check_v14 : inputs -> Validator_step.finding
+(** V14 (EXP): no [stop_loss] exit that happens within
+    [config.entry_bar_stopout_max_bars] trading bars of entry while the entry
+    bar itself {b closed on the safe side of the installed stop} — at or above
+    it for a LONG, at or below it for a SHORT. Such a position never closed
+    through its stop, so the trigger was judged against the entry bar's pre-fill
+    low.
+
+    The stop is reconstructed as [entry_price * (1 - d)] for a LONG ([1 + d] for
+    a SHORT), where [d] is [stop_fill_distance_pct] when present (fill-basis,
+    exact) and [stop_initial_distance_pct] otherwise (E-basis, approximate).
+    Rows with neither column, no bar on the entry date, no bar store for the
+    symbol, or a basis mismatch between bar and fill are {!Skip}ped.
+    Non-[stop_loss] exits pass untouched.
+
+    EXP rather than INV because a genuine gap-down entry day — one that closes
+    {i past} the stop — is a legitimate same-bar stop-out and must not flag.
+
+    Motivating defect: [dev/experiments/arc-rerun-2026-09-01/README.md] §D2 —
+    173 of 261 one-day stop-losses had entry-day low < stop <= entry-day close
+    and were sold at the next open above the stop. *)

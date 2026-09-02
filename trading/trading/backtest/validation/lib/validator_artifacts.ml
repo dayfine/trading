@@ -22,6 +22,10 @@ let _t_stop_kind = 16
    rows, where [_cell] returns "" and the join falls back to symbol|entry_date. *)
 let _t_position_id = 19
 
+(* [stop_fill_distance_pct] (Trade_context column 8 of 10); absent on legacy
+   rows, where [_cell] returns "" and V14 falls back to the E-basis column. *)
+let _t_stop_fill_distance = 20
+
 (* open_positions.csv column indices (symbol,side,entry_date,entry_price,qty). *)
 let _o_symbol = 0
 let _o_side = 1
@@ -42,6 +46,7 @@ let _mk_trade a =
     stop_trigger_kind = _cell a _t_stop_kind;
     stop_initial_distance_pct = _float_opt (_cell a _t_stop_distance);
     position_id = _str_opt (_cell a _t_position_id);
+    stop_fill_distance_pct = _float_opt (_cell a _t_stop_fill_distance);
   }
 
 (* A trades.csv row is well-formed when its date + numeric cells all parse. *)
@@ -173,6 +178,20 @@ let _weekly_last_bars (daily : Types.Daily_price.t list) =
   in
   _drop_trailing_partial (List.filter_map groups ~f:List.last)
 
+(* Raw OHLCV, deliberately unadjusted: the simulator fills against
+   [Daily_price.open_price/high_price/low_price/close_price], so V13's
+   fill-in-range check must compare against the same numbers. Only
+   [weekly_closes] above is on the adjusted basis. *)
+let _daily_bar_of (b : Types.Daily_price.t) =
+  {
+    date = b.date;
+    open_price = b.open_price;
+    high = b.high_price;
+    low = b.low_price;
+    close = b.close_price;
+    volume = b.volume;
+  }
+
 let _bars_of_daily daily =
   let weekly = _weekly_last_bars daily in
   {
@@ -180,9 +199,7 @@ let _bars_of_daily daily =
       Array.of_list_map weekly ~f:(fun b -> b.Types.Daily_price.date);
     weekly_closes =
       Array.of_list_map weekly ~f:(fun b -> b.Types.Daily_price.adjusted_close);
-    daily =
-      Array.of_list_map daily ~f:(fun (b : Types.Daily_price.t) ->
-          (b.date, b.close_price, b.volume));
+    daily = Array.of_list_map daily ~f:_daily_bar_of;
   }
 
 let _load_one ~data_dir ~run_end symbol =

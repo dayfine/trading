@@ -9,8 +9,8 @@ module Va = Post_run_validator.Validator_artifacts
 
 let trade ?(side = "LONG") ?(exit_trigger = "") ?(stop_trigger_kind = "")
     ?(entry_price = 100.0) ?(exit_price = 100.0) ?(exit_date = "2020-06-01")
-    ?(stop_initial_distance_pct = None) ?(position_id = None) ~symbol
-    ~entry_date () : Vt.trade_row =
+    ?(stop_initial_distance_pct = None) ?(position_id = None)
+    ?(stop_fill_distance_pct = None) ~symbol ~entry_date () : Vt.trade_row =
   {
     symbol;
     side;
@@ -23,6 +23,7 @@ let trade ?(side = "LONG") ?(exit_trigger = "") ?(stop_trigger_kind = "")
     stop_trigger_kind;
     stop_initial_distance_pct;
     position_id;
+    stop_fill_distance_pct;
   }
 
 let ctx ?(stage = Weinstein_types.Stage2 { weeks_advancing = 3; late = false })
@@ -170,12 +171,23 @@ let test_v6_price_noise_twin _ =
 
 (* ---- V3/V4: armed-only realism checks ----------------------------------- *)
 
+(* A flat bar: OHLC all equal, so it carries a close + volume and nothing else.
+   V13/V14 build their own OHLC bars via [ohlc] below. *)
+let flat_bar (d, c, v) : Vt.daily_bar =
+  {
+    date = Date.of_string d;
+    open_price = c;
+    high = c;
+    low = c;
+    close = c;
+    volume = v;
+  }
+
 let with_daily pairs : Vt.bars =
   {
     weekly_dates = [||];
     weekly_closes = [||];
-    daily =
-      Array.of_list_map pairs ~f:(fun (d, c, v) -> (Date.of_string d, c, v));
+    daily = Array.of_list_map pairs ~f:flat_bar;
   }
 
 let test_v3_armed_flags_thin_adv _ =
@@ -388,6 +400,172 @@ let test_v12_respects_config_gate _ =
   in
   assert_that (result ~id:"V12" inputs) (violations_and_pass 0 true)
 
+(* ---- V13: fill dates and prices must lie on a real bar ----------------- *)
+
+let ohlc ~date ~o ~h ~l ~c : Vt.daily_bar =
+  {
+    date = Date.of_string date;
+    open_price = o;
+    high = h;
+    low = l;
+    close = c;
+    volume = 1000;
+  }
+
+let ohlc_bars lst : Vt.bars =
+  { weekly_dates = [||]; weekly_closes = [||]; daily = Array.of_list lst }
+
+let skipped_and_pass n_skipped passed =
+  all_of
+    [
+      field (fun (r : Vt.check_result) -> r.n_skipped) (equal_to n_skipped);
+      field (fun (r : Vt.check_result) -> r.passed) (equal_to passed);
+    ]
+
+(* Mon 2020-06-01 entry at 100 (inside [98,102]), Fri 2020-06-05 exit at 110
+   (inside [108,112]) — both fills sit on a real bar, inside its range. *)
+let test_v13_clean _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"OK" ~entry_date:"2020-06-01" ~entry_price:100.0
+            ~exit_date:"2020-06-05" ~exit_price:110.0 ();
+        ];
+      bars =
+        bars_of
+          [
+            ( "OK",
+              ohlc_bars
+                [
+                  ohlc ~date:"2020-06-01" ~o:99.0 ~h:102.0 ~l:98.0 ~c:100.0;
+                  ohlc ~date:"2020-06-05" ~o:109.0 ~h:112.0 ~l:108.0 ~c:110.0;
+                ] );
+          ];
+    }
+  in
+  assert_that (result ~id:"V13" inputs) (violations_and_pass 0 true)
+
+(* The §D1 defect: the exit is dated Saturday 2020-06-06, a day on which no bar
+   exists, at the preceding Friday's price. *)
+let test_v13_flags_saturday_exit _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"SAT" ~entry_date:"2020-06-01" ~entry_price:100.0
+            ~exit_date:"2020-06-06" ~exit_price:105.0 ();
+        ];
+      bars =
+        bars_of
+          [
+            ( "SAT",
+              ohlc_bars
+                [
+                  ohlc ~date:"2020-06-01" ~o:99.0 ~h:102.0 ~l:98.0 ~c:100.0;
+                  ohlc ~date:"2020-06-05" ~o:104.0 ~h:107.0 ~l:103.0 ~c:105.0;
+                ] );
+          ];
+    }
+  in
+  assert_that (result ~id:"V13" inputs) (violations_and_pass 1 false)
+
+(* The exit day HAS a bar, but the fill at 130 sits above its high of 112. *)
+let test_v13_flags_price_outside_bar _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"OOR" ~entry_date:"2020-06-01" ~entry_price:100.0
+            ~exit_date:"2020-06-05" ~exit_price:130.0 ();
+        ];
+      bars =
+        bars_of
+          [
+            ( "OOR",
+              ohlc_bars
+                [
+                  ohlc ~date:"2020-06-01" ~o:99.0 ~h:102.0 ~l:98.0 ~c:100.0;
+                  ohlc ~date:"2020-06-05" ~o:109.0 ~h:112.0 ~l:108.0 ~c:110.0;
+                ] );
+          ];
+    }
+  in
+  assert_that (result ~id:"V13" inputs) (violations_and_pass 1 false)
+
+(* A symbol the bar store does not carry is un-evaluable, not a violation: it
+   is skipped and surfaces in the finding's skip count. *)
+let test_v13_skips_absent_symbol _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades = [ trade ~symbol:"GONE" ~entry_date:"2020-06-01" () ];
+    }
+  in
+  assert_that (result ~id:"V13" inputs) (skipped_and_pass 1 true)
+
+(* ---- V14: stop-out judged against the entry bar ------------------------ *)
+
+(* The §D2 artifact shape: fill 100 with a 5% stop at 95; the entry bar dipped
+   to 94 (below the stop) but CLOSED at 99, above it — the position never
+   closed through its stop, yet it was sold the next day at 98, also above the
+   stop. The stop was judged against the entry bar's pre-fill low. *)
+let entry_bar_stopout_inputs ~entry_low ~entry_close =
+  {
+    (Vt.empty_inputs ()) with
+    trades =
+      [
+        trade ~symbol:"EBS" ~entry_date:"2020-06-01" ~entry_price:100.0
+          ~exit_date:"2020-06-02" ~exit_price:98.0 ~exit_trigger:"stop_loss"
+          ~stop_fill_distance_pct:(Some 0.05) ();
+      ];
+    bars =
+      bars_of
+        [
+          ( "EBS",
+            ohlc_bars
+              [
+                ohlc ~date:"2020-06-01" ~o:100.0 ~h:101.0 ~l:entry_low
+                  ~c:entry_close;
+                ohlc ~date:"2020-06-02" ~o:98.0 ~h:99.0 ~l:97.0 ~c:98.0;
+              ] );
+        ];
+  }
+
+let test_v14_flags_entry_bar_stopout _ =
+  assert_that
+    (result ~id:"V14"
+       (entry_bar_stopout_inputs ~entry_low:94.0 ~entry_close:99.0))
+    (violations_and_pass 1 false)
+
+(* A genuine gap-down entry day closes PAST the stop (90 < 95): the stop-out is
+   legitimate and must not flag. *)
+let test_v14_allows_genuine_gap_down _ =
+  assert_that
+    (result ~id:"V14"
+       (entry_bar_stopout_inputs ~entry_low:88.0 ~entry_close:90.0))
+    (violations_and_pass 0 true)
+
+(* Same bar shape, but the exit was a rotation rather than a stop — V14 has no
+   stop to reason about and passes the row untouched. *)
+let test_v14_ignores_non_stop_exit _ =
+  let inputs =
+    {
+      (entry_bar_stopout_inputs ~entry_low:94.0 ~entry_close:99.0) with
+      trades =
+        [
+          trade ~symbol:"EBS" ~entry_date:"2020-06-01" ~entry_price:100.0
+            ~exit_date:"2020-06-02" ~exit_price:98.0
+            ~exit_trigger:"laggard_rotation" ~stop_fill_distance_pct:(Some 0.05)
+            ();
+        ];
+    }
+  in
+  assert_that (result ~id:"V14" inputs) (violations_and_pass 0 true)
+
 (* ---- audit join: position_id vs symbol|date ---------------------------- *)
 
 let join_row ?(context = ctx ()) ~position_id ~symbol ~entry_date () :
@@ -490,6 +668,13 @@ let suite =
          "v12_gate_consistency" >:: test_v12;
          "v12_skips_unevaluable" >:: test_v12_skips_unevaluable;
          "v12_respects_config_gate" >:: test_v12_respects_config_gate;
+         "v13_clean" >:: test_v13_clean;
+         "v13_flags_saturday_exit" >:: test_v13_flags_saturday_exit;
+         "v13_flags_price_outside_bar" >:: test_v13_flags_price_outside_bar;
+         "v13_skips_absent_symbol" >:: test_v13_skips_absent_symbol;
+         "v14_flags_entry_bar_stopout" >:: test_v14_flags_entry_bar_stopout;
+         "v14_allows_genuine_gap_down" >:: test_v14_allows_genuine_gap_down;
+         "v14_ignores_non_stop_exit" >:: test_v14_ignores_non_stop_exit;
          "join_by_position_id_survives_date_skew"
          >:: test_join_by_position_id_survives_date_skew;
          "join_legacy_falls_back_to_symbol_date"

@@ -99,7 +99,7 @@ let _v4_detail last_date gap run_end stale =
     (Date.to_string last_date) gap (Date.to_string run_end) stale
 
 let _v4_gap stale run_end (op : open_row) (b : bars) =
-  let last_date, _, _ = b.daily.(Array.length b.daily - 1) in
+  let last_date = b.daily.(Array.length b.daily - 1).date in
   let gap = Date.diff run_end last_date in
   if gap > stale then
     Fail (open_spec op (_v4_detail last_date gap run_end stale))
@@ -115,3 +115,122 @@ let check_v4 inputs =
   match inputs.config.stale_exit_after_days with
   | None -> empty_finding
   | Some stale -> fold_steps inputs.open_positions ~f:(_v4_step stale inputs)
+
+(* ---- V13: fill dates and prices must lie on a real bar ----------------- *)
+
+(* A fill can only happen on a day the symbol actually traded, at a price the
+   day's range contains. The 26y arc run (dev/experiments/arc-rerun-2026-09-01
+   §D1) dated 2,500+ exits on a SATURDAY at the preceding Friday's open — a
+   fill on a day with no bar, at a price that predates the Friday-close
+   decision. Nothing in V1-V12 could see it. *)
+
+let _v13_missing_detail (b : bars) ~leg ~date =
+  let nearest =
+    match nearest_daily_date b date with
+    | Some d -> Date.to_string d
+    | None -> "none"
+  in
+  sprintf "no bar on %s_date %s (nearest earlier bar: %s)" leg
+    (Date.to_string date) nearest
+
+let _v13_range_detail ~leg ~price (bar : daily_bar) =
+  sprintf "%s_price=%.4f outside %s bar [%.4f, %.4f]" leg price
+    (Date.to_string bar.date) bar.low bar.high
+
+let _v13_in_range (c : check_config) ~price (bar : daily_bar) =
+  let eps = c.fill_price_epsilon_pct in
+  Float.( >= ) price (bar.low *. (1.0 -. eps))
+  && Float.( <= ) price (bar.high *. (1.0 +. eps))
+
+(* The price leg is evaluated only when the stored bar shares the run's price
+   basis; a post-run re-basing of the CSV store shifts every price for the
+   symbol, which would flag every one of its fills. The date leg is
+   basis-free and always runs. *)
+let _v13_leg (c : check_config) (b : bars) ~leg ~date ~price =
+  match daily_on b date with
+  | None -> Some (_v13_missing_detail b ~leg ~date)
+  | Some bar
+    when (not (price_basis_ok ~bar_price:bar.close ~fill_price:price))
+         || _v13_in_range c ~price bar ->
+      None
+  | Some bar -> Some (_v13_range_detail ~leg ~price bar)
+
+let _v13_violation (c : check_config) (b : bars) (row : trade_row) =
+  Option.first_some
+    (_v13_leg c b ~leg:"entry" ~date:row.entry_date ~price:row.entry_price)
+    (_v13_leg c b ~leg:"exit" ~date:row.exit_date ~price:row.exit_price)
+
+let _v13_step inputs (row : trade_row) =
+  match inputs.bars row.symbol with
+  | None -> Skip
+  | Some b when Array.is_empty b.daily -> Skip
+  | Some b -> (
+      match _v13_violation inputs.config b row with
+      | Some detail -> Fail (spec row detail)
+      | None -> Pass)
+
+let check_v13 inputs = fold_steps inputs.trades ~f:(_v13_step inputs)
+
+(* ---- V14: stop-out judged against the entry bar ------------------------ *)
+
+(* 261 of 668 stop-losses on the 26y arc run exited within one day, and 173 of
+   those had entry-day low < stop <= entry-day close, then sold at the next
+   open ABOVE the stop (dev/experiments/arc-rerun-2026-09-01 §D2): the stop was
+   evaluated against the entry bar's PRE-FILL low, which the position did not
+   hold through. A real gap-down entry-day stop-out is legitimate and closes
+   BELOW the stop — hence EXP, not INV. *)
+
+let _stop_loss_trigger = "stop_loss"
+let _is_short (row : trade_row) = String.equal row.side "SHORT"
+
+(* Fill-basis first: [stop_fill_distance_pct] is |installed_stop - fill| / fill,
+   so it reconstructs the installed stop exactly. [stop_initial_distance_pct] is
+   E-basis (measured from the screener's suggested entry) and only approximates
+   it when the fill diverges from E. *)
+let _v14_stop_distance (row : trade_row) =
+  Option.first_some row.stop_fill_distance_pct row.stop_initial_distance_pct
+
+let _v14_stop_level (row : trade_row) ~dist =
+  if _is_short row then row.entry_price *. (1.0 +. dist)
+  else row.entry_price *. (1.0 -. dist)
+
+(* True when the entry bar CLOSED on the protected side of the stop — at or
+   above it for a LONG, at or below it for a SHORT. Such a position never
+   closed through its stop, so a stop-out on that bar had nothing to fire on. *)
+let _v14_closed_on_safe_side (row : trade_row) ~stop (bar : daily_bar) =
+  if _is_short row then Float.( <= ) bar.close stop
+  else Float.( >= ) bar.close stop
+
+let _v14_detail (row : trade_row) ~stop (bar : daily_bar) =
+  sprintf "entry bar %s open=%.4f low=%.4f close=%.4f vs stop=%.4f, exit=%.4f"
+    (Date.to_string bar.date) bar.open_price bar.low bar.close stop
+    row.exit_price
+
+let _v14_judge (row : trade_row) ~stop (bar : daily_bar) =
+  if not (price_basis_ok ~bar_price:bar.close ~fill_price:row.entry_price) then
+    Skip
+  else if _v14_closed_on_safe_side row ~stop bar then
+    Fail (spec row (_v14_detail row ~stop bar))
+  else Pass
+
+let _v14_prompt_exit (c : check_config) (b : bars) (row : trade_row) =
+  bars_in_window b ~after:row.entry_date ~upto:row.exit_date
+  <= c.entry_bar_stopout_max_bars
+
+let _v14_verdict (c : check_config) (b : bars) (row : trade_row) =
+  if not (_v14_prompt_exit c b row) then Pass
+  else
+    match (daily_on b row.entry_date, _v14_stop_distance row) with
+    | Some bar, Some dist ->
+        _v14_judge row ~stop:(_v14_stop_level row ~dist) bar
+    | _ -> Skip
+
+let _v14_step inputs (row : trade_row) =
+  if not (String.equal row.exit_trigger _stop_loss_trigger) then Pass
+  else
+    match inputs.bars row.symbol with
+    | None -> Skip
+    | Some b when Array.is_empty b.daily -> Skip
+    | Some b -> _v14_verdict inputs.config b row
+
+let check_v14 inputs = fold_steps inputs.trades ~f:(_v14_step inputs)

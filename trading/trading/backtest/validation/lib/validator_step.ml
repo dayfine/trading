@@ -33,11 +33,14 @@ let _entry_week_idx (b : bars) ~entry_date =
   Array.findi b.weekly_dates ~f:(fun _ d -> Date.( >= ) d entry_date)
   |> Option.map ~f:fst
 
-let _basis_ok (b : bars) i ~entry_price =
-  Float.( > ) entry_price 0.0
+let price_basis_ok ~bar_price ~fill_price =
+  Float.( > ) fill_price 0.0
   &&
-  let r = b.weekly_closes.(i) /. entry_price in
+  let r = bar_price /. fill_price in
   Float.( >= ) r _basis_lo && Float.( <= ) r _basis_hi
+
+let _basis_ok (b : bars) i ~entry_price =
+  price_basis_ok ~bar_price:b.weekly_closes.(i) ~fill_price:entry_price
 
 let bars_context inputs (row : trade_row) =
   match inputs.bars row.symbol with
@@ -53,14 +56,29 @@ let wbars_step inputs ~pred (row : trade_row) =
   | Some (b, i) -> pred row b i
 
 let dollar_adv (b : bars) ~as_of ~lookback =
-  let upto = Array.filter b.daily ~f:(fun (d, _, _) -> Date.( <= ) d as_of) in
+  let upto = Array.filter b.daily ~f:(fun d -> Date.( <= ) d.date as_of) in
   let n = Array.length upto in
   if n = 0 then None
   else
     let pos = Int.max 0 (n - lookback) in
     let window = Array.sub upto ~pos ~len:(n - pos) in
     let sum =
-      Array.fold window ~init:0.0 ~f:(fun a (_, close, vol) ->
-          a +. (close *. Float.of_int vol))
+      Array.fold window ~init:0.0 ~f:(fun a d ->
+          a +. (d.close *. Float.of_int d.volume))
     in
     Some (sum /. Float.of_int (Array.length window))
+
+(* Daily bars are ascending by date, so both lookups binary-search. *)
+let _by_date (bar : daily_bar) date = Date.compare bar.date date
+
+let daily_on (b : bars) date =
+  Array.binary_search b.daily ~compare:_by_date `First_equal_to date
+  |> Option.map ~f:(fun i -> b.daily.(i))
+
+let nearest_daily_date (b : bars) date =
+  Array.binary_search b.daily ~compare:_by_date `Last_less_than_or_equal_to date
+  |> Option.map ~f:(fun i -> b.daily.(i).date)
+
+let bars_in_window (b : bars) ~after ~upto =
+  Array.count b.daily ~f:(fun d ->
+      Date.( > ) d.date after && Date.( <= ) d.date upto)

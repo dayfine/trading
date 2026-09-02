@@ -1,8 +1,9 @@
 (** Shared types + config for the post-run trade validator (v1).
 
     See [dev/plans/post-run-validation-2026-07-12.md] for the design and the
-    11-check table, and [dev/notes/visual-trade-audit-2026-07-12.md] for the
-    audit that derived V5/V6/V7/V9/V10 from real defect specimens. *)
+    check table (V1-V11 in v1, V12-V14 by amendment), and
+    [dev/notes/visual-trade-audit-2026-07-12.md] for the audit that derived
+    V5/V6/V7/V9/V10 from real defect specimens. *)
 
 open Core
 
@@ -29,6 +30,12 @@ type trade_row = {
           ["A-wein-5618"]. [None] for legacy runs whose [trades.csv] predates
           the column; the audit join falls back to [(symbol, entry_date)] for
           those. *)
+  stop_fill_distance_pct : float option;
+      (** [stop_fill_distance_pct] column: [|installed_stop - fill| / fill] —
+          the fill-basis stop distance the [Stop_too_wide] gate bounds. V14
+          reconstructs the installed stop from it, preferring it over the
+          E-basis [stop_initial_distance_pct]. [None] when the cell is empty
+          (legacy runs whose [trades.csv] predates the column). *)
 }
 (** A parsed [trades.csv] round-trip row (only the fields the checks read). *)
 
@@ -59,14 +66,29 @@ type entry_context = {
 (** Decision-time features a check reads from a {!Trade_audit.entry_decision},
     keyed by [(symbol, entry_date)]. *)
 
+type daily_bar = {
+  date : Date.t;
+  open_price : float;
+  high : float;
+  low : float;
+  close : float;
+  volume : int;
+}
+(** One daily OHLCV bar. Prices are the {b raw} (unadjusted) OHLC the simulator
+    itself fills against ([Simulator] reads [Daily_price.open_price] /
+    [.high_price] / [.low_price] / [.close_price], never [adjusted_close]), so
+    V13's fill-in-range check and the fill prices in [trades.csv] share one
+    basis. [volume] is likewise raw, which is what V3's dollar-ADV needs. *)
+
 type bars = {
   weekly_dates : Date.t array;  (** Ascending weekly-bar dates. *)
   weekly_closes : float array;
       (** Adjusted weekly closes, parallel to dates. *)
-  daily : (Date.t * float * int) array;
-      (** Ascending [(date, close_price, volume)] daily bars for dollar-ADV. *)
+  daily : daily_bar array;  (** Ascending daily OHLCV bars. *)
 }
-(** Per-symbol bar series used by the bar-dependent checks (V3, V7, V9, V10). *)
+(** Per-symbol bar series used by the bar-dependent checks (V3, V7, V9, V10,
+    V13, V14). Note the two series are on {b different} price bases:
+    [weekly_closes] is adjusted, [daily] is raw. *)
 
 type check_config = {
   overhead_pct : float;
@@ -94,6 +116,17 @@ type check_config = {
           [Stop_too_wide] gate (default 0.15). A filled entry whose installed
           stop sits farther than this from its fill price is an invariant break
           — the gate that should have rejected it did not fire. *)
+  fill_price_epsilon_pct : float;
+      (** V13: relative slack allowed when testing a fill price against its
+          bar's [[low, high]] — the range is widened to
+          [[low * (1 - eps), high * (1 + eps)]]. Absorbs the last-digit rounding
+          of the CSV price columns, not a real out-of-range fill. *)
+  entry_bar_stopout_max_bars : int;
+      (** V14: how many trading bars may elapse after the entry bar (through the
+          exit bar inclusive) for an exit to still count as "on or right after
+          the entry bar". [1] = same-day or next-trading-day exits. Bar counted,
+          not calendar days, so a Friday entry exiting Monday is one bar and a
+          Saturday-dated exit is zero. *)
   disabled_checks : string list;  (** Check ids to omit from the report. *)
   severity_overrides : (string * string) list;
       (** [(check_id, "INVARIANT" | "EXPECTATION")] overrides of the default

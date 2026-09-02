@@ -9,6 +9,8 @@ let _default_adv_lookback_bars = 20
 let _default_stop_distance_min_pct = 0.0
 let _default_stop_distance_max_pct = 0.30
 let _default_gate_max_stop_distance_pct = 0.15
+let _default_fill_price_epsilon_pct = 1e-6
+let _default_entry_bar_stopout_max_bars = 1
 let far_future = Date.of_string "2100-01-01"
 
 type severity = Invariant | Expectation [@@deriving sexp, equal]
@@ -25,6 +27,7 @@ type trade_row = {
   stop_trigger_kind : string;
   stop_initial_distance_pct : float option;
   position_id : string option;
+  stop_fill_distance_pct : float option;
 }
 
 type open_row = {
@@ -45,10 +48,19 @@ type entry_context = {
 }
 [@@deriving sexp]
 
+type daily_bar = {
+  date : Date.t;
+  open_price : float;
+  high : float;
+  low : float;
+  close : float;
+  volume : int;
+}
+
 type bars = {
   weekly_dates : Date.t array;
   weekly_closes : float array;
-  daily : (Date.t * float * int) array;
+  daily : daily_bar array;
 }
 
 type check_config = {
@@ -64,6 +76,10 @@ type check_config = {
   stop_distance_max_pct : float; [@sexp.default _default_stop_distance_max_pct]
   gate_max_stop_distance_pct : float;
       [@sexp.default _default_gate_max_stop_distance_pct]
+  fill_price_epsilon_pct : float;
+      [@sexp.default _default_fill_price_epsilon_pct]
+  entry_bar_stopout_max_bars : int;
+      [@sexp.default _default_entry_bar_stopout_max_bars]
   disabled_checks : string list; [@sexp.default []]
   severity_overrides : (string * string) list; [@sexp.default []]
 }
@@ -109,6 +125,8 @@ let default_config =
     stop_distance_min_pct = _default_stop_distance_min_pct;
     stop_distance_max_pct = _default_stop_distance_max_pct;
     gate_max_stop_distance_pct = _default_gate_max_stop_distance_pct;
+    fill_price_epsilon_pct = _default_fill_price_epsilon_pct;
+    entry_bar_stopout_max_bars = _default_entry_bar_stopout_max_bars;
     disabled_checks = [];
     severity_overrides = [];
   }
