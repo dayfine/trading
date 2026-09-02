@@ -53,6 +53,7 @@ type config = {
       [@sexp.default Support_floor.Window_extreme]
   split_safe_floors : bool; [@sexp.default false]
   reset_anchor_on_stalled_cycle : bool; [@sexp.default true]
+  stop_skip_entry_bar : bool; [@sexp.default false]
 }
 [@@deriving show, eq, sexp]
 
@@ -74,4 +75,5 @@ let default_config =
     support_floor_anchor_scope = Support_floor.Window_extreme;
     split_safe_floors = false;
     reset_anchor_on_stalled_cycle = true;
+    stop_skip_entry_bar = false;
   }
