@@ -1703,21 +1703,62 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   `H-EXPIRY-NOTE-OFFBYONE-COUNTS (O5)`; whoever closes O5 should sweep all
   three rather than fixing one.
 
-- [ ] **H-EXPIRY-NEVER-BRANCH-UNPINNED**: filed by qc-behavioral on PR #2624
+- [x] **H-EXPIRY-NEVER-BRANCH-UNPINNED**: filed by qc-behavioral on PR #2624
   (review 5075929429), non-blocking. The `never*) continue` branch at
   `check_11_linter_expiry.sh:141` — which intentionally exempts permanent
-  exceptions from expiry reporting — is unpinned **in both directions**:
-  deleting the branch entirely leaves the whole suite (Parts 1-8, 44
-  assertions) green. It is also the first **over-reporting** gap recorded on
-  this surface: all 44 existing assertions are false-*negative* pins (they
-  check that a violation IS surfaced), and **nothing pins that a clean entry
-  produces no finding**. So a mutation that flags `review_at: never` entries
-  as T1-K violations, or that flags every entry as missing, passes the parts
-  of the suite that would plausibly be thought to cover it. Fix shape: an
-  assertion that a fixture whose entries all carry valid or `never`
-  annotations yields an empty T1-K section and the "No expired or missing
-  review_at annotations found" fallback. `harness_gap: LINTER_CANDIDATE`.
-  (source: 2026-09-01 qc-behavioral on PR #2624, residuals O-A / O-B)
+  exceptions from expiry reporting — was unpinned **in both directions**:
+  deleting the branch entirely left the whole suite green. It was also the
+  first **over-reporting** gap recorded on this surface: every existing
+  assertion was a false-*negative* pin (checks that a violation IS
+  surfaced), and **nothing pinned that a clean entry produces no finding**.
+
+  **Count correction:** the filed item's "44 assertions" figure (and this
+  file's own prior habit of quoting `OK:` line counts as the assertion
+  count) is off by one — `echo "OK: ..."` appears 44 times pre-fix, but one
+  of those is the unconditional final summary line
+  (`echo "OK: deep scan Linter Exception Expiry section (T1-K) ... passed."`),
+  not a `fail`-branch assertion. Measured directly:
+  `grep -c 'echo "OK:' deep_scan_linter_expiry_check.sh` = 44,
+  `grep -c '  fail "'` = 43. **43 real assertions pre-fix, not 44.**
+
+  Closed by adding Part 9 (assertions 9a-9d) to
+  `deep_scan_linter_expiry_check.sh`, using ONE fixture (a
+  `linter_exceptions.conf` with a valid future-dated entry plus a
+  `review_at: never` entry — both clean, no separate all-`never` fixture
+  needed) to pin the absence direction and kill all three swept mutations:
+  - 9a (positive/functional pin): the real script produces no finding for
+    either entry — neither fixture name appears anywhere in `REPORT_FILE`
+    or the roll-up `FINDINGS_FILE`, and the section falls back to
+    "No expired or missing review_at annotations found."
+  - 9b/9c/9d: mutation-proofs for the three swept mutations (table below).
+
+  **RED/GREEN proof — mutation applied directly to the production file
+  `check_11_linter_expiry.sh`, suite run, then reverted (`git diff` on the
+  production file empty afterward, verified by sha256sum match each time;
+  file mode `644` also restored after an incidental `chmod +x`):**
+
+  | mutation | suite on origin/main (pre-fix) | suite with Part 9 | killing assertion |
+  |---|---|---|---|
+  | (i) delete `never*) continue` branch entirely (the filed mutation) | exit 0 (GREEN — unpinned, confirms the filed claim) | exit 1 (RED) | 9a: never-entry surfaces as `[UNRECOGNISED format]` |
+  | (ii) invert — `never*` entries actively reported as a T1-K missing-review_at violation | exit 0 (GREEN) | exit 1 (RED) | 9a: `Missing review_at on: fixture_never_permanent` appears |
+  | (iii) blanket over-report — force every entry through the missing-review_at branch (`if [ -z "$review_at_val" ]` → `if true`) | exit 1 (RED) — **already caught pre-fix**, but incidentally: it also breaks the unrelated `adapter_effectiveness_exceptions.conf` fixture used by pre-existing Part 3a, so the suite fails there first, before ever reaching where Part 9 would sit | exit 1 (RED) | pre-fix: Part 3a (`expired fixture_expired_field entry was NOT surfaced`); with Part 9: same Part 3a fires first (script order, `set -e`) — **verified independently** that 9a alone also catches it in isolation (ran the fixture standalone against the mutated production script, outside the full suite: finding present, would fail 9a) |
+
+  No equivalent mutant: all three mutations are killed, (iii) by a
+  pre-existing assertion for an unrelated reason plus Part 9 independently
+  in isolation — see the isolation note above, not asserted new because
+  Part 3a's `set -e` exit pre-empts it when running the full suite in
+  order.
+
+  Production `trading/devtools/checks/deep_scan/check_11_linter_expiry.sh`
+  is untouched by this PR — `git diff --stat` shows only
+  `deep_scan_linter_expiry_check.sh` and this status file changed.
+  Verify: `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh`
+  (48 `OK:` lines / 47 real assertions + 1 summary line, exit 0) or
+  `dune runtest trading/devtools/checks/`.
+  `harness_gap: LINTER_CANDIDATE` — closed by this fix.
+  (source: 2026-09-01 qc-behavioral on PR #2624, residuals O-A / O-B;
+  closed: 2026-09-02, harness-maintainer, branch
+  `harness/expiry-never-branch-pin`)
 
 - [ ] **H-EXPIRY-MUTATION-DIAGNOSTIC-MISLEADS (O1)**: filed by qc-behavioral on
   PR #2589, non-blocking. Assertions 3c/3d/3e **fail closed** on a benign
