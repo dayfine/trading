@@ -1749,16 +1749,65 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   Part 3a's `set -e` exit pre-empts it when running the full suite in
   order.
 
+  **Rework iteration 1 (qc-behavioral on PR #2636, quality 2) — 9a-9d did
+  NOT close the item as filed; the closure above was premature until 9e.**
+  Two findings, both measured, both fixed in this same PR:
+
+  - **A FOURTH live mutation: `never*) continue` → `never*) break`.** The
+    whole suite, Part 9 included, stayed **GREEN** with it applied. `break`
+    exits the enclosing `while read` loop, so **every entry after the first
+    `review_at: never` is silently never scanned**. Not a corner case in
+    the live conf: **28 active entries, first `never` at line 15, so 24 of
+    28 (86%) fall after it.** 9a-9d could not catch it because their
+    fixture puts the `never` entry **last**, where `break` and `continue`
+    are indistinguishable. This is the **under**-reporting half of the
+    "unpinned in both directions" that the item, the PR body and this entry
+    all claimed to close — 9a-9d pinned only the over-reporting half.
+    Closed by **9e**, which needs its own fixture (a `never` entry followed
+    by an expired entry) because 9a's fixture is asserted to produce *no*
+    finding at all. Control, measured directly:
+
+    | suite | + `break` mutation |
+    |---|---|
+    | pre-rework (9a-9d only) | **exit 0 — GREEN, missed** |
+    | with 9e | **exit 1 — RED** at 9e-1 |
+
+    9e carries a `cmp -s` vacuity guard: a `sed` that stopped matching
+    would leave the "mutant" byte-identical to production and 9e-2 would
+    test nothing, so that now fails loudly instead of passing.
+
+  - **9a's fallback grep was itself vacuous.** `check_11` emits the
+    sentence "No expired or missing review_at annotations found." **three
+    times**, once per conf file (Linter `:233`, Universe-Deps `:257`,
+    Adapter-Effectiveness `:284`), and this fixture leaves the two sibling
+    confs empty, so both of those emit it unconditionally. An unscoped
+    `grep -q` therefore passed regardless of what the Linter section did —
+    measured by changing **only** line 233: suite stayed **GREEN, 48/48**.
+    The claim "the section falls back to …" appeared in the PR body, the 9a
+    code comment, and this entry. Fixed by scoping the grep to the Linter
+    section (heading → next `## ` heading) with a small `awk` helper; with
+    only line 233 mutated the suite now exits **1**. 9a's other
+    discriminating power was never in doubt — its name-scoped negative
+    greps already worked.
+
   Production `trading/devtools/checks/deep_scan/check_11_linter_expiry.sh`
   is untouched by this PR — `git diff --stat` shows only
   `deep_scan_linter_expiry_check.sh` and this status file changed.
   Verify: `sh trading/devtools/checks/deep_scan_linter_expiry_check.sh`
-  (48 `OK:` lines / 47 real assertions + 1 summary line, exit 0) or
+  (**50** `OK:` lines / 49 real assertions + 1 summary line, exit 0) or
   `dune runtest trading/devtools/checks/`.
+
+  ⚠ **Counting convention, for the O5 sweep.** The 43 / 47 / 50 figures in
+  this entry are all `echo "OK:"` counts minus the single unconditional
+  summary line. **None of them counts the 12 silent `grep … || fail`
+  structural assertions in Parts 1-2** (qc-behavioral, #2636). O5 must
+  state which convention it uses, or these numbers will diverge a fifth
+  time — which is exactly how this surface accumulated 28 / 40 / 44 / 16.
+
   `harness_gap: LINTER_CANDIDATE` — closed by this fix.
   (source: 2026-09-01 qc-behavioral on PR #2624, residuals O-A / O-B;
-  closed: 2026-09-02, harness-maintainer, branch
-  `harness/expiry-never-branch-pin`)
+  closed: 2026-09-02, branch `harness/expiry-never-branch-pin`, after one
+  rework iteration driven by qc-behavioral on PR #2636)
 
 - [ ] **H-EXPIRY-MUTATION-DIAGNOSTIC-MISLEADS (O1)**: filed by qc-behavioral on
   PR #2589, non-blocking. Assertions 3c/3d/3e **fail closed** on a benign
