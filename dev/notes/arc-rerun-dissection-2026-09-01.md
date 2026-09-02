@@ -14,7 +14,7 @@ modern data:
 |---|---|---|---|
 | D1 | Friday-decided exits fill at **Friday's open**, dated Saturday (stale bar on a calendar-day step) | simulator defect | arc **+$525k** if filled Monday open (its whole realised loss is −$417k); record **−$601k** |
 | D2 | a fresh position's stop is judged against its **own entry bar's pre-fill low** | strategy-plumbing defect | 173 of 3,029 entries killed on day 0 with the stock closing above the stop |
-| D3 | only **6.6%** of fill weeks carry §4.2 volume; the resting buy-stop fills on the first intraday touch of the range top, which is rarely the volume week | faithful mechanism × data | 72% of all entries ejected at ≈ +$400/trade; the fills that survive are then 4%-stopped |
+| D3 | only **6.5%** of fill weeks carry §4.2 volume; the resting buy-stop fills on the first intraday touch of the range top, which is rarely the volume week | faithful mechanism × data | 72% of all entries ejected at ≈ +$400/trade; the fills that survive are then 4%-stopped |
 | D4 | 58–84% of tickets get the flat 4% fallback stop (no qualifying structural floor) | known (#2408) | 151/162 stop-outs on the 5y cell are fallback-stop trades |
 
 Fresh numbers (build `deb45a7ee`, split-safe warehouse, salt 0):
@@ -33,9 +33,9 @@ Tue–Sat with 148 Saturday and **zero Monday**. Same on the fresh 5y cell
 (517/517 ejects Saturday) and on the record convention (269/269 laggard
 exits, 98/503 stops). The warehouse has no weekend bars.
 
-**Price basis.** 2,495 of 2,500 Saturday-dated arc exits equal the preceding
-Friday's OPEN to 4 dp (the other 5 are 2-dp rounding); none equal Friday's
-close or Monday's open. E.g. ZQKSQ ejected 2011-07-23 at 5.50 = Fri open
+**Price basis.** All 2,500 Saturday-dated arc exits equal the preceding
+Friday's OPEN at 2 dp (2,231 exact at 4 dp, 268 within rounding, one 2-dp
+tie with Friday's close — PCTI 2023-12-09); none equal Monday's open. E.g. ZQKSQ ejected 2011-07-23 at 5.50 = Fri open
 (close 5.45, Mon open 5.36); WAFD entered Fri 2024-08-23 at 37.49 and
 "stopped" Sat at 35.35 = that Friday's open.
 
@@ -90,11 +90,11 @@ construction before the fill.
 
 ## 3. D3 — volume arrives in a different week than the fill (faithful × data)
 
-**Observation (5y cell, `results/b5-arc-s0/audit_extract.csv`).** 588 fill
-weeks evaluated: 545 Unconfirmed (spike ratio p50 0.97 / p90 1.58), 39
-confirmed (34 spike, 5 build-up). The runner judges the right bar — hand
+**Observation (5y cell, `results/b5-arc-s0/audit_extract.csv`).** 583 fill
+weeks evaluated: 545 Unconfirmed (spike ratio p50 0.97 / p90 1.58), 38
+confirmed (34 spike, 4 build-up). The runner judges the right bar — hand
 recomputation from daily bars matches the audit to 4 dp (AAON 1.0966, AB
-1.3815, ABT 0.7855). The confirmed 39 did not rescue the arm: 28 of their 36
+1.3815, ABT 0.7855). The confirmed 38 did not rescue the arm: 28 of their 36
 closed trades were 4%-stopped.
 
 **What the screener's "volume" number is.** `trades.csv.entry_volume_ratio`
@@ -114,8 +114,9 @@ and crossed intraday, 13% opened inside the band, 1% above.
 **Standing reading.** The resting buy-stop fills on the *first intraday
 touch* of the local range top. That is an early poke; the §4.2 volume week,
 when it comes, comes later (`results/b5-arc-s0/fwdvol.csv`: within the next
-4 weeks a ≥2× week follows only ~13% of fills, ≥1.5× ~33%, and 4-week
-forward price is up only ~46% of the time). The eject rule then sells the
+4 weeks a ≥2× week follows only 11.5% of fills, ≥1.5× 33%, and the 4-week
+forward close is up 52.4% of the time, mean +0.6% — no exploitable edge
+either way). The eject rule then sells the
 poke at ordinary volume for ≈ +$400, and the position that would have been
 there for the real breakout is gone. The bundle is structurally unable to
 hold anything: the fill event and the book's confirmation event are

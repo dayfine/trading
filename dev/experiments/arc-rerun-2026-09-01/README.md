@@ -88,9 +88,9 @@ first-order, no path/compounding effect):
 
 | arm | Saturday exits | at Friday open | Δ realised P&L if filled Monday open | arm's total realised P&L |
 |---|---:|---:|---:|---:|
-| arc 08-21 (26y) | 2,500 | 2,495 (5 = 4-dp rounding) | **+$524,745** (ejects +$534,581; laggards −$23,075; stops +$29,185) | −$417,063 |
+| arc 08-21 (26y) | 2,500 | 2,500 at 2 dp (2,231 exact at 4 dp, 268 within rounding, 1 tie with Friday's close) | **+$524,745** (ejects +$534,581; laggards −$23,075; stops +$29,185) | −$417,063 |
 | record 08-24 (26y) | 373 | 373 | **−$601,280** (stops −$336,865; laggards −$262,955) | +$5,566,862 |
-| arc fresh 09-02 (26y, `results/arc26y-s0/`) | 2,144 | 1,905 (+239 rounding) | **+$1,051,441** (ejects +$1,223,346; laggards −$58,228; stops −$93,733) | −$85,545 |
+| arc fresh 09-02 (26y, `results/arc26y-s0/`) | 2,144 | 2,144 at 2 dp (1,904 exact at 4 dp, 239 within rounding, 1 tie with Friday's close) | **+$1,051,441** (ejects +$1,223,346; laggards −$58,228; stops −$93,733) | −$85,545 |
 
 The defect moves the two arms in opposite directions: the arc's ejected
 weak-volume breakouts keep rising into Monday (selling at Friday's open
@@ -115,19 +115,19 @@ harmless in dollars, but 173 breakout entries (5.7% of all) destroyed on
 their first day); 156 had the entry-day OPEN below the stop (the stock opened
 >4% under E and ran up through it — the breakout-day shape).
 
-### D3 (revised on the fresh 5y cell) — 6.6% of fill weeks are volume-confirmed
+### D3 (revised on the fresh 5y cell) — 6.5% of fill weeks are volume-confirmed
 
 `b5-arc-s0` audit (`results/b5-arc-s0/audit_extract.csv`, 795 tickets, 689
 trades; extractor `audit_extract.pl` — note the audit renders confirmed
 verdicts as `Confirmed_spike` / `Confirmed_buildup`, an earlier pass of this
-note mis-parsed them as zero): of 588 evaluated fill weeks, **545 Unconfirmed
-(513 ejected, 32 skipped by a same-tick exit), 39 confirmed** (34 spike, 5
-build-up; 29 held, 10 skipped), plus 112 tickets never filled and ~100 trades
+note mis-parsed them as zero): of 583 evaluated fill weeks, **545 Unconfirmed
+(513 ejected, 32 skipped by a same-tick exit), 38 confirmed** (34 spike, 4
+build-up; 29 held, 9 skipped), plus 112 tickets never filled and ~100 trades
 closed before their first Friday evaluation. The runner judges the RIGHT bar —
 hand recomputation from raw daily bars matches the audit's `spike_ratio` to
 4 decimals on AAON (1.0966), AB (1.3815), ABT (0.7855). The Unconfirmed spike
 ratios sit at p50 0.97 / p90 1.58: fill weeks are *average-volume weeks*. The
-39 confirmed fills did not save the arm either: 28 of their 36 closed trades
+38 confirmed fills did not save the arm either: 28 of their 36 closed trades
 ended in `stop_loss` (−$82k), 8 in `laggard_rotation` (+$108k).
 
 Two things the 08-21 reading got wrong, corrected here:
