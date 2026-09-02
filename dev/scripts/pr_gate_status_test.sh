@@ -1147,9 +1147,14 @@ check "(k): a first heading that merely STARTS WITH the kind word (no boundary a
   none "$(_gate "$(reviews "$HEADING_STARTS_WITH_KIND_WORD_PLUS_MORE")" behavioral "$TIP")"
 
 # 47. (f) direction 1 -- false-MERGE: a stray six-hash line ("######") is not
-#     a markdown heading under `#{1,4}` (after consuming up to 4 '#', the
-#     remaining '#' characters block the required run of spaces, so the line
-#     never matches) and is correctly skipped; the next matching line is
+#     a heading *under this parser's deliberate `#{1,4}` window* (after
+#     consuming up to 4 '#', the remaining '#' characters block the required
+#     run of spaces, so the line never matches) and is correctly skipped.
+#     NOTE: "######" IS a valid h6 in CommonMark. The reason it does not count
+#     here is this parser's own 1..4 window, NOT markdown syntax. An earlier
+#     draft of this comment said "is not a markdown heading", which is false
+#     and would mislead anyone reasoning about widening the window
+#     (qc-behavioral, PR #2635). The next matching line is
 #     "## Verdict", which does not name any gate, so structural correctly
 #     reads "none". Confirmed RED (reads "ok") with `#{1,4}` widened to
 #     `#{1,6}`: the six-hash line then matches as the first heading, its
@@ -1176,6 +1181,14 @@ check "(f) 1/2: a six-hash line is not a heading under #{1,4} -- does not satisf
 #     FIRST heading (masking the real one, per `first_heading_text`'s
 #     first-match-only contract from case 39/40), and "scratch note" does not
 #     name the behavioral gate.
+#
+#     THIS CASE PINS TWO MUTATIONS, NOT ONE. It also goes RED under mutation
+#     (g) (`" +"` -> `" *"`, pinned by cases 49/50): dropping the required
+#     space likewise lets "###### scratch note" match and mask the real
+#     heading. Do NOT delete this case as "(f)-redundant" if (f) is ever
+#     re-pinned elsewhere -- doing so silently unpins (g)'s masking direction
+#     too. (Mutation (f) does not reciprocally trip 49/50.) See
+#     dev/status/harness.md, H-GATEPARSER-NO-MUTATION-COVERAGE.
 SIX_HASH_LINE_MASKS_REAL_HEADING="Reviewed SHA: $TIP
 
 ###### scratch note

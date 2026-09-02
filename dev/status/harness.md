@@ -1900,40 +1900,78 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
 
   **The mutation list is the load-bearing part of this item, so it is recorded
   in full — a harness seeded from a short list goes green and the omitted
-  mutations are never rediscovered.** The #2622 sweep's prose said "8 of 11
-  killed, 3 survivors"; its own table has **5 GREEN rows**. The corrected
-  figure is **5 survivors, and every one of them is live** — each flips a real
-  gate attribution, not an equivalent mutant:
+  mutations are never rediscovered.** This entry *is* that seed list, and it
+  has now been undercounted **twice, in the same direction**, by successive
+  reviews:
 
-  | mutation | status after PR #2625 |
+  - #2622's sweep said in prose "8 of 11 killed, 3 survivors"; its own table
+    carried **5 GREEN rows**. #2625 corrected it to *"5 survivors, every one
+    live."*
+  - **That corrected figure was also wrong.** qc-behavioral on PR #2635
+    (2026-09-02) swept degrees of freedom no prior review had listed — `(?m)`,
+    the heading regex's own `^`/`$`, the `.*` capture, the **lower** bound of
+    `#{1,4}`, `(?i)`, the `(qc[- ])?` group — and found **four more live
+    survivors**. Its sweep is calibrated, not lucky: 7 sibling mutations were
+    killed loudly (drop `(?m)` → 37 failures, first→last match → 34, drop
+    `(?i)` → 35, require `(qc[- ])` → 35, `#{1,4}`→`#+` → 2).
+
+  So the honest statement is **not a survivor count**. It is that **nobody has
+  yet enumerated this regex exhaustively, and every attempt so far has
+  undercounted.** That is the argument for the automated harness. Treat the
+  tables below as a floor, not a census.
+
+  ### Killed (pinned by a regression case)
+
+  | mutation | status |
   |---|---|
   | (d) drop `strip_fences` inside `first_heading_text` | **killed** (case 41) |
-  | (j) drop the `^` anchor in the kind test | **killed** (case 42) |
+  | (j) drop the `^` anchor in the **kind test** (line ~325) | **killed** (case 42) |
   | (k) drop `\b` from the kind test | **killed** (case 46) |
   | (f) `#{1,4}` → `#{1,6}` | **killed**, both directions (case 47 false-`ok`, case 48 false-`none`) |
   | (g) required space `" +"` → `" *"` | **killed**, both directions (case 49 false-`ok`, case 50 false-`none`) |
+  | (m) drop the `^` from the **heading regex** (line ~237) | **killed** by cases 47/48 — found live on main by #2635's sweep. Distinct from (j), which is the line-325 anchor. #2635 closes **four** mutations but was credited for three |
 
-  All three were measured RED/GREEN by hand (2026-09-02): the pre-existing
-  54-case suite stayed GREEN with each mutation applied (confirming each was a
-  genuine live survivor, not already caught incidentally); cases 46-50 turn
-  each RED; reverting the mutation restores a clean `git diff` on the
-  production script and a GREEN 59-case suite. One incidental overlap worth
-  recording: mutation (g) also flips case 48 (built for (f)'s false-`none`
-  direction) — both mutations relax the same `first_heading_text` line in a
-  way that lets a bare `"###### scratch note"` line partially match once the
-  space requirement is dropped, so case 48 ended up pinning two mutations, not
-  one. Mutation (f) does not reciprocally trip cases 49/50.
+  (k)/(f)/(g) were measured RED/GREEN by hand (2026-09-02): the pre-existing
+  54-case suite stayed GREEN with each applied (each was a genuine live
+  survivor, not incidentally caught); cases 46-50 turn each RED; reverting
+  restores a clean `git diff` on the production script and a GREEN 59-case
+  suite. Confirmed independently by qc-structural and qc-behavioral on #2635.
+
+  **Overlap, recorded because a future editor will otherwise get it wrong:**
+  mutation (g) *also* flips case 48, which was built for (f)'s false-`none`
+  direction — both relax the same `first_heading_text` line, so once the space
+  requirement is dropped a bare `"###### scratch note"` partially matches.
+  **Case 48 therefore pins two mutations, not one**; deleting it as
+  "(f)-redundant" would silently unpin (g) as well. (f) does *not* reciprocally
+  trip cases 49/50.
+
+  ### LIVE and unpinned — found by #2635's sweep, 2026-09-02
+
+  | mutation | live effect (production → mutant) |
+  |---|---|
+  | **`#{1,4}` → `#{1,3}`** | **both directions.** false-MERGE: `#### scratch note` masking a real `## Behavioral QC` → `none` → **`ok`**. false-BLOCK: a real `#### Behavioral QC` → `ok` → **`none`** |
+  | **`(?<h>.*)` → `(?<h>.+)`** | **false-MERGE**: a bare `## ` line (no text) masks the real heading → `none` → **`ok`** |
+  | **`" +"` → `" "`** (exactly one space) | false-BLOCK: `##  Behavioral QC` (two spaces) → `ok` → **`none`** |
+  | **`[- ]` → `[-]`** | false-BLOCK: `## QC Behavioral notes` → `ok` → **`none`** |
+
+  The first is the **mirror image of (f)**: cases 47/48 pin the *upper* bound
+  of `#{1,4}`, and **nothing pins the `4` from below** — and it is the unpinned
+  half that carries a false-MERGE. That asymmetry is the strongest single
+  argument in this entry for building the harness rather than continuing to
+  enumerate by hand.
 
   Note (k) especially: with the `^` anchor restored by case 42, `\b` is the
   **sole** remaining guard against a first heading that merely *starts with*
   the gate word.
 
-  **Still open: the harness itself.** The five cases above pin these specific
-  survivors by hand, the same way cases 41-45 pin (d)/(j)/etc. — they are not
-  the ~30-line automated `PR_GATE_STATUS_LIB=1`-seam mutation harness this
-  item originally asked for, which would surface *future* unlisted mutations
-  mechanically rather than requiring a human to enumerate them. That harness
-  is not built; this item stays open for it.
+  **Still open: the harness itself, and the four survivors above.** Cases 46-50
+  pin the *known* survivors by hand, the same way cases 41-45 pin (d)/(j)/etc.
+  They are not the ~30-line automated `PR_GATE_STATUS_LIB=1`-seam harness this
+  item asks for, which would surface *future, unlisted* mutations mechanically
+  instead of requiring a human to enumerate them — and the fact that the
+  enumeration has now been wrong twice is the evidence that humans should stop
+  doing it. Fixtures for the four live survivors are deliberately **not** in
+  #2635 (that PR's scope was (k)/(f)/(g)); they belong to the harness work.
 
   Two scoping notes for whoever builds this. First, "mechanically" above is
   deliberate and narrower than the original wording ("with no inferential
