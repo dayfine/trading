@@ -142,32 +142,45 @@ let _v13_in_range (c : check_config) ~price (bar : daily_bar) =
   Float.( >= ) price (bar.low *. (1.0 -. eps))
   && Float.( <= ) price (bar.high *. (1.0 +. eps))
 
-(* The price leg is evaluated only when the stored bar shares the run's price
-   basis; a post-run re-basing of the CSV store shifts every price for the
-   symbol, which would flag every one of its fills. The date leg is
-   basis-free and always runs. *)
+(* Per-leg outcome. [Leg_waived] is un-evaluable rather than clean: the price
+   leg is only meaningful when the stored bar shares the run's price basis, and
+   a post-run re-basing of the CSV store shifts every price for the symbol at
+   once. The date leg is basis-free and always runs, so a waived price leg
+   never suppresses a missing-bar violation. *)
+type _leg_outcome = Leg_clean | Leg_waived | Leg_violation of string
+
 let _v13_leg (c : check_config) (b : bars) ~leg ~date ~price =
   match daily_on b date with
-  | None -> Some (_v13_missing_detail b ~leg ~date)
-  | Some bar
-    when (not (price_basis_ok ~bar_price:bar.close ~fill_price:price))
-         || _v13_in_range c ~price bar ->
-      None
-  | Some bar -> Some (_v13_range_detail ~leg ~price bar)
+  | None -> Leg_violation (_v13_missing_detail b ~leg ~date)
+  | Some bar when not (price_basis_ok ~bar_price:bar.close ~fill_price:price) ->
+      Leg_waived
+  | Some bar when _v13_in_range c ~price bar -> Leg_clean
+  | Some bar -> Leg_violation (_v13_range_detail ~leg ~price bar)
 
-let _v13_violation (c : check_config) (b : bars) (row : trade_row) =
-  Option.first_some
-    (_v13_leg c b ~leg:"entry" ~date:row.entry_date ~price:row.entry_price)
-    (_v13_leg c b ~leg:"exit" ~date:row.exit_date ~price:row.exit_price)
+let _v13_first_violation legs =
+  List.find_map legs ~f:(function Leg_violation d -> Some d | _ -> None)
+
+let _v13_any_waived legs =
+  List.exists legs ~f:(function Leg_waived -> true | _ -> false)
+
+(* Entry leg first, so it supplies the specimen when both legs fail. *)
+let _v13_legs (c : check_config) (b : bars) (row : trade_row) =
+  [
+    _v13_leg c b ~leg:"entry" ~date:row.entry_date ~price:row.entry_price;
+    _v13_leg c b ~leg:"exit" ~date:row.exit_date ~price:row.exit_price;
+  ]
+
+let _v13_verdict (c : check_config) (b : bars) (row : trade_row) =
+  let legs = _v13_legs c b row in
+  match _v13_first_violation legs with
+  | Some detail -> Fail (spec row detail)
+  | None -> if _v13_any_waived legs then Skip else Pass
 
 let _v13_step inputs (row : trade_row) =
   match inputs.bars row.symbol with
   | None -> Skip
   | Some b when Array.is_empty b.daily -> Skip
-  | Some b -> (
-      match _v13_violation inputs.config b row with
-      | Some detail -> Fail (spec row detail)
-      | None -> Pass)
+  | Some b -> _v13_verdict inputs.config b row
 
 let check_v13 inputs = fold_steps inputs.trades ~f:(_v13_step inputs)
 

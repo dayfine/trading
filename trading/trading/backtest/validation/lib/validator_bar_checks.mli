@@ -34,13 +34,21 @@ val check_v13 : inputs -> Validator_step.finding
     the size of the slip is visible. Rows whose symbol is absent from the bar
     store — or whose store entry carries no daily bars — are {!Skip}ped and
     counted in the finding's skip count, not flagged. The price leg alone is
-    additionally waived (treated as clean) when the bar's close and the fill
-    price fail {!Validator_step.price_basis_ok}, since a re-based store would
-    otherwise flag every fill for the symbol; the date leg is basis-free and
-    always runs.
+    additionally waived when the bar's close and the fill price fail
+    {!Validator_step.price_basis_ok}, since a re-based store would otherwise
+    flag every fill for the symbol; a row waived that way is {!Skip}ped (and so
+    counted) rather than passed, so no un-evaluable row is invisible in the
+    report. The date leg is basis-free and always runs — a waived price leg
+    never suppresses a missing-bar violation.
 
-    Motivating defect: [dev/experiments/arc-rerun-2026-09-01/README.md] §D1 —
-    2,500+ exits dated on a Saturday at the preceding Friday's open. *)
+    Note the direction of the waiver: it fires on {i large} bar/fill ratios, so
+    a fill more than ~50% above (or ~34% below) its bar's close is waived rather
+    than flagged. The price leg therefore cannot report the extreme end of its
+    own violation class; that end is indistinguishable from a re-based store.
+
+    Motivating defect: [dev/experiments/arc-rerun-2026-09-01/README.md] §D1
+    (landing in PR #2645) — 2,500+ exits dated on a Saturday at the preceding
+    Friday's open. *)
 
 val check_v14 : inputs -> Validator_step.finding
 (** V14 (EXP): no [stop_loss] exit that happens within
@@ -60,6 +68,6 @@ val check_v14 : inputs -> Validator_step.finding
     EXP rather than INV because a genuine gap-down entry day — one that closes
     {i past} the stop — is a legitimate same-bar stop-out and must not flag.
 
-    Motivating defect: [dev/experiments/arc-rerun-2026-09-01/README.md] §D2 —
-    173 of 261 one-day stop-losses had entry-day low < stop <= entry-day close
-    and were sold at the next open above the stop. *)
+    Motivating defect: [dev/experiments/arc-rerun-2026-09-01/README.md] §D2
+    (landing in PR #2645) — 173 of 261 one-day stop-losses had entry-day low <
+    stop <= entry-day close and were sold at the next open above the stop. *)

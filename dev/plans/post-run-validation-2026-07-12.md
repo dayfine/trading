@@ -44,8 +44,9 @@ snapshots (deployment checklist).
 V12 (stop-distance gate consistency) landed after v1. V13 and V14 close a
 different blind spot: **V1–V12 all reason about the entry DECISION, none about
 whether the resulting FILL is physically possible.** Two defects on the 26y arc
-run (`dev/experiments/arc-rerun-2026-09-01/README.md`) had to be found by hand
-on the artifacts because the validator was structurally unable to see them.
+run (`dev/experiments/arc-rerun-2026-09-01/README.md`, landing in PR #2645) had
+to be found by hand on the artifacts because the validator was structurally
+unable to see them.
 
 | id | class | check | catches |
 |---|---|---|---|
@@ -61,19 +62,24 @@ severity can be promoted via `severity_overrides` once the entry-bar stop
 evaluation is fixed and the expected count is 0.
 
 **Skips (un-evaluable, not violations).** V13 skips rows whose symbol is absent
-from the bar store, or whose store entry has no daily bars; V14 additionally
-skips rows carrying neither stop-distance column and rows with no bar on the
-entry date. Both are counted in the check's `n_skipped`, which the report
-renders as `(N skipped)` — so "PASS because everything was skipped" stays
-visible, per the same principle as the audit-join coverage line.
+from the bar store, whose store entry has no daily bars, or whose price leg is
+basis-waived (see below); V14 additionally skips rows carrying neither
+stop-distance column and rows with no bar on the entry date. All are counted in
+the check's `n_skipped`, which the report renders as `(N skipped)` — so "PASS
+because everything was skipped" stays visible, per the same principle as the
+audit-join coverage line. No un-evaluable path reports `Pass`.
 
 **Basis guard.** `bars.daily` carries RAW (unadjusted) OHLC, because the
 simulator fills against `Daily_price.open_price/high_price/low_price/
 close_price` and never `adjusted_close`. Should the CSV store nevertheless be
 re-based after a run, every price for that symbol shifts at once; V13's price
 leg and V14's stop comparison are therefore waived when the bar's close and the
-fill price fail `Validator_step.price_basis_ok`. V13's date leg is basis-free
-and always runs — which is the leg that catches §D1.
+fill price fail `Validator_step.price_basis_ok`. A waived row is `Skip`ped, not
+passed, so it stays counted in `n_skipped`. V13's date leg is basis-free and
+always runs — which is the leg that catches §D1, and it still fires on a
+re-based symbol. Note the waiver's direction: it triggers on *large* bar/fill
+ratios, so a fill far outside its bar's range is waived rather than flagged —
+that shape is indistinguishable from a re-based store.
 
 **Reconstructing the stop (V14).** `entry_price × (1 − d)` for LONG, `(1 + d)`
 for SHORT, with `d` = `stop_fill_distance_pct` when the column is present

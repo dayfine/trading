@@ -91,7 +91,8 @@ docker exec trading-1-dev bash -c \
 - [x] **V13 + V14: execution-causality checks** (feat/validator-v13-v14).
   V1-V12 all reason about the entry DECISION; none could see whether the
   resulting FILL is physically possible, so both arc-run defects
-  (`dev/experiments/arc-rerun-2026-09-01/README.md` §D1 Saturday-dated exits at
+  (`dev/experiments/arc-rerun-2026-09-01/README.md`, landing in PR #2645;
+  §D1 Saturday-dated exits at
   the prior Friday's open; §D2 one-day stop-losses whose entry bar closed above
   the stop) had to be found by hand. V13 (INV) pins bar existence on
   `entry_date`/`exit_date` plus fill-price-in-`[low, high]`; V14 (EXP) flags a
@@ -99,11 +100,15 @@ docker exec trading-1-dev bash -c \
   reconstructed stop. `bars.daily` now carries raw OHLC (the basis the
   simulator fills against) instead of `(date, close, volume)`; new config knobs
   `fill_price_epsilon_pct` (1e-6) and `entry_bar_stopout_max_bars` (1), both
-  `[@sexp.default]` so existing validator configs keep parsing. Verify:
-  `dune runtest trading/backtest/validation/test/` (`v13_clean`,
-  `v13_flags_saturday_exit`, `v13_flags_price_outside_bar`,
-  `v13_skips_absent_symbol`, `v14_flags_entry_bar_stopout`,
-  `v14_allows_genuine_gap_down`, `v14_ignores_non_stop_exit`).
+  `[@sexp.default]` so existing validator configs keep parsing. A price leg
+  waived by the basis guard reports `Skip`, not `Pass`, so it stays counted in
+  `n_skipped`. Verify: `dune runtest trading/backtest/validation/test/` — 18
+  V13/V14 cases, covering the two headline defect shapes, both sides of the
+  `entry_bar_stopout_max_bars` window (including the `bars_in_window`
+  Friday-to-Monday = 1 / Saturday = 0 semantics), the E-basis
+  `stop_initial_distance_pct` fallback and its preference order, the SHORT
+  mirror of both V14 outcomes, the re-based-store price-leg waiver in both
+  directions, and every documented Skip branch.
 
 ## Follow-ups
 

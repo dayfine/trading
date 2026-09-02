@@ -422,6 +422,16 @@ let skipped_and_pass n_skipped passed =
       field (fun (r : Vt.check_result) -> r.passed) (equal_to passed);
     ]
 
+(* Full outcome: violations, un-evaluable rows, and the pass verdict together.
+   Discriminates a genuine Pass from a Skip that also leaves the violation
+   count at zero. *)
+let violations_skipped_pass n_viol n_skipped passed =
+  all_of
+    [
+      violations_and_pass n_viol passed;
+      field (fun (r : Vt.check_result) -> r.n_skipped) (equal_to n_skipped);
+    ]
+
 (* Mon 2020-06-01 entry at 100 (inside [98,102]), Fri 2020-06-05 exit at 110
    (inside [108,112]) — both fills sit on a real bar, inside its range. *)
 let test_v13_clean _ =
@@ -507,33 +517,96 @@ let test_v13_skips_absent_symbol _ =
   in
   assert_that (result ~id:"V13" inputs) (skipped_and_pass 1 true)
 
+(* A store entry the loader produced with no daily bars at all is un-evaluable
+   for the same reason an absent symbol is. *)
+let test_v13_skips_store_with_no_daily_bars _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades = [ trade ~symbol:"EMPTY" ~entry_date:"2020-06-01" () ];
+      bars = bars_of [ ("EMPTY", ohlc_bars []) ];
+    }
+  in
+  assert_that (result ~id:"V13" inputs) (skipped_and_pass 1 true)
+
+(* Bars re-based 4:1 after the run: the stored close of 25 against a fill of 100
+   is a ratio of 0.25, far outside the basis band, so comparing the two would
+   flag every fill for the symbol. Both legs land on a real bar, so the row is
+   un-evaluable (skipped + counted), not a violation and not a silent pass. *)
+let rebased_bars =
+  ohlc_bars
+    [
+      ohlc ~date:"2020-06-01" ~o:24.75 ~h:25.5 ~l:24.5 ~c:25.0;
+      ohlc ~date:"2020-06-05" ~o:27.25 ~h:28.0 ~l:27.0 ~c:27.5;
+    ]
+
+let rebased_trade ~exit_date =
+  trade ~symbol:"SPLIT" ~entry_date:"2020-06-01" ~entry_price:100.0 ~exit_date
+    ~exit_price:110.0 ()
+
+let test_v13_rebased_store_waives_price_leg _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades = [ rebased_trade ~exit_date:"2020-06-05" ];
+      bars = bars_of [ ("SPLIT", rebased_bars) ];
+    }
+  in
+  assert_that (result ~id:"V13" inputs) (violations_skipped_pass 0 1 true)
+
+(* Same re-based store, but the exit is dated on a Saturday. The date leg is
+   basis-free, so it still fires: waiving the price leg must not disable §D1
+   detection for a re-based symbol. *)
+let test_v13_rebased_store_still_flags_saturday_exit _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades = [ rebased_trade ~exit_date:"2020-06-06" ];
+      bars = bars_of [ ("SPLIT", rebased_bars) ];
+    }
+  in
+  assert_that (result ~id:"V13" inputs) (violations_skipped_pass 1 0 false)
+
 (* ---- V14: stop-out judged against the entry bar ------------------------ *)
 
 (* The §D2 artifact shape: fill 100 with a 5% stop at 95; the entry bar dipped
    to 94 (below the stop) but CLOSED at 99, above it — the position never
    closed through its stop, yet it was sold the next day at 98, also above the
    stop. The stop was judged against the entry bar's pre-fill low. *)
-let entry_bar_stopout_inputs ~entry_low ~entry_close =
+(* The entry bar carries the caller's low/high/close; every [later] date gets an
+   ordinary bar so [bars_in_window] has real trading days to count. *)
+let ebs_bars ~entry_date ~entry_low ~entry_high ~entry_close ~later =
+  ohlc_bars
+    (ohlc ~date:entry_date ~o:100.0 ~h:entry_high ~l:entry_low ~c:entry_close
+    :: List.map later ~f:(fun d -> ohlc ~date:d ~o:98.0 ~h:99.0 ~l:97.0 ~c:98.0)
+    )
+
+let stopout_inputs ?(config = Vt.default_config) ?(side = "LONG")
+    ?(stop_fill_distance_pct = Some 0.05) ?(stop_initial_distance_pct = None)
+    ?(entry_date = "2020-06-01") ?(exit_date = "2020-06-02")
+    ?(later = [ "2020-06-02" ]) ?(entry_high = 101.0) ~entry_low ~entry_close ()
+    =
   {
-    (Vt.empty_inputs ()) with
+    (Vt.empty_inputs ~config ()) with
     trades =
       [
-        trade ~symbol:"EBS" ~entry_date:"2020-06-01" ~entry_price:100.0
-          ~exit_date:"2020-06-02" ~exit_price:98.0 ~exit_trigger:"stop_loss"
-          ~stop_fill_distance_pct:(Some 0.05) ();
+        trade ~symbol:"EBS" ~side ~entry_date ~entry_price:100.0 ~exit_date
+          ~exit_price:98.0 ~exit_trigger:"stop_loss" ~stop_fill_distance_pct
+          ~stop_initial_distance_pct ();
       ];
     bars =
       bars_of
         [
           ( "EBS",
-            ohlc_bars
-              [
-                ohlc ~date:"2020-06-01" ~o:100.0 ~h:101.0 ~l:entry_low
-                  ~c:entry_close;
-                ohlc ~date:"2020-06-02" ~o:98.0 ~h:99.0 ~l:97.0 ~c:98.0;
-              ] );
+            ebs_bars ~entry_date ~entry_low ~entry_high ~entry_close ~later );
         ];
   }
+
+let entry_bar_stopout_inputs ~entry_low ~entry_close =
+  stopout_inputs ~entry_low ~entry_close ()
+
+let config_max_bars n =
+  { Vt.default_config with entry_bar_stopout_max_bars = n }
 
 let test_v14_flags_entry_bar_stopout _ =
   assert_that
@@ -565,6 +638,99 @@ let test_v14_ignores_non_stop_exit _ =
     }
   in
   assert_that (result ~id:"V14" inputs) (violations_and_pass 0 true)
+
+(* An ordinary stop-loss several bars after entry. Its entry bar closed above
+   the stop, exactly like the §D2 shape — only the bar window keeps V14 from
+   flagging it, so this is the test that fails if the window guard is dropped. *)
+let late_stop_exit_inputs config =
+  stopout_inputs ~config ~entry_low:94.0 ~entry_close:99.0
+    ~exit_date:"2020-06-05"
+    ~later:[ "2020-06-02"; "2020-06-03"; "2020-06-04"; "2020-06-05" ]
+    ()
+
+let test_v14_ignores_late_stop_exit _ =
+  assert_that
+    (result ~id:"V14" (late_stop_exit_inputs Vt.default_config))
+    (violations_skipped_pass 0 0 true)
+
+(* Same trade, window widened past the four intervening bars: now in scope and
+   flagged. Together with the previous test this pins the knob itself. *)
+let test_v14_widened_window_flags_late_exit _ =
+  assert_that
+    (result ~id:"V14" (late_stop_exit_inputs (config_max_bars 4)))
+    (violations_skipped_pass 1 0 false)
+
+(* [bars_in_window] counts BARS, not calendar days. With the window at zero, a
+   Friday entry and a Monday exit are one bar apart and out of scope... *)
+let friday_entry_inputs ~config ~exit_date ~later =
+  stopout_inputs ~config ~entry_low:94.0 ~entry_close:99.0
+    ~entry_date:"2020-06-05" ~exit_date ~later ()
+
+let test_v14_friday_to_monday_counts_one_bar _ =
+  assert_that
+    (result ~id:"V14"
+       (friday_entry_inputs ~config:(config_max_bars 0) ~exit_date:"2020-06-08"
+          ~later:[ "2020-06-08" ]))
+    (violations_skipped_pass 0 0 true)
+
+(* ...while a Saturday-dated exit counts ZERO bars (no bar exists that day), so
+   it stays in scope even at a zero-bar window. *)
+let test_v14_saturday_exit_counts_zero_bars _ =
+  assert_that
+    (result ~id:"V14"
+       (friday_entry_inputs ~config:(config_max_bars 0) ~exit_date:"2020-06-06"
+          ~later:[ "2020-06-08" ]))
+    (violations_skipped_pass 1 0 false)
+
+(* A legacy trades.csv row predating the stop_fill_distance_pct column: the
+   E-basis stop_initial_distance_pct reconstructs the same 95 stop. *)
+let test_v14_falls_back_to_initial_distance _ =
+  assert_that
+    (result ~id:"V14"
+       (stopout_inputs ~stop_fill_distance_pct:None
+          ~stop_initial_distance_pct:(Some 0.05) ~entry_low:94.0
+          ~entry_close:99.0 ()))
+    (violations_skipped_pass 1 0 false)
+
+(* Both columns present, with stops on opposite sides of the entry close: the
+   fill-basis 0.5% gives a stop of 99.5 (close 99 is BELOW it — a real
+   stop-out), the E-basis 5% would give 95 and flag. Preferring fill-basis is
+   what makes this row clean. *)
+let test_v14_prefers_fill_distance_over_initial _ =
+  assert_that
+    (result ~id:"V14"
+       (stopout_inputs ~stop_fill_distance_pct:(Some 0.005)
+          ~stop_initial_distance_pct:(Some 0.05) ~entry_low:94.0
+          ~entry_close:99.0 ()))
+    (violations_skipped_pass 0 0 true)
+
+(* Neither stop-distance column: the stop cannot be reconstructed, so the row is
+   un-evaluable rather than clean. *)
+let test_v14_skips_row_with_no_stop_distance _ =
+  assert_that
+    (result ~id:"V14"
+       (stopout_inputs ~stop_fill_distance_pct:None
+          ~stop_initial_distance_pct:None ~entry_low:94.0 ~entry_close:99.0 ()))
+    (violations_skipped_pass 0 1 true)
+
+(* SHORT mirror of the §D2 shape: the stop sits ABOVE the fill at 105, the entry
+   bar spiked through it to 106 but closed at 99 — below the stop, the protected
+   side for a short — so the same-bar stop-out had nothing to fire on. *)
+let test_v14_short_flags_entry_bar_stopout _ =
+  assert_that
+    (result ~id:"V14"
+       (stopout_inputs ~side:"SHORT" ~entry_low:98.0 ~entry_high:106.0
+          ~entry_close:99.0 ()))
+    (violations_skipped_pass 1 0 false)
+
+(* SHORT mirror of the genuine gap: the entry day closed at 110, PAST the 105
+   stop, so the stop-out is legitimate. *)
+let test_v14_short_allows_genuine_gap_up _ =
+  assert_that
+    (result ~id:"V14"
+       (stopout_inputs ~side:"SHORT" ~entry_low:100.0 ~entry_high:112.0
+          ~entry_close:110.0 ()))
+    (violations_skipped_pass 0 0 true)
 
 (* ---- audit join: position_id vs symbol|date ---------------------------- *)
 
@@ -672,9 +838,32 @@ let suite =
          "v13_flags_saturday_exit" >:: test_v13_flags_saturday_exit;
          "v13_flags_price_outside_bar" >:: test_v13_flags_price_outside_bar;
          "v13_skips_absent_symbol" >:: test_v13_skips_absent_symbol;
+         "v13_skips_store_with_no_daily_bars"
+         >:: test_v13_skips_store_with_no_daily_bars;
+         "v13_rebased_store_waives_price_leg"
+         >:: test_v13_rebased_store_waives_price_leg;
+         "v13_rebased_store_still_flags_saturday_exit"
+         >:: test_v13_rebased_store_still_flags_saturday_exit;
          "v14_flags_entry_bar_stopout" >:: test_v14_flags_entry_bar_stopout;
          "v14_allows_genuine_gap_down" >:: test_v14_allows_genuine_gap_down;
          "v14_ignores_non_stop_exit" >:: test_v14_ignores_non_stop_exit;
+         "v14_ignores_late_stop_exit" >:: test_v14_ignores_late_stop_exit;
+         "v14_widened_window_flags_late_exit"
+         >:: test_v14_widened_window_flags_late_exit;
+         "v14_friday_to_monday_counts_one_bar"
+         >:: test_v14_friday_to_monday_counts_one_bar;
+         "v14_saturday_exit_counts_zero_bars"
+         >:: test_v14_saturday_exit_counts_zero_bars;
+         "v14_falls_back_to_initial_distance"
+         >:: test_v14_falls_back_to_initial_distance;
+         "v14_prefers_fill_distance_over_initial"
+         >:: test_v14_prefers_fill_distance_over_initial;
+         "v14_skips_row_with_no_stop_distance"
+         >:: test_v14_skips_row_with_no_stop_distance;
+         "v14_short_flags_entry_bar_stopout"
+         >:: test_v14_short_flags_entry_bar_stopout;
+         "v14_short_allows_genuine_gap_up"
+         >:: test_v14_short_allows_genuine_gap_up;
          "join_by_position_id_survives_date_skew"
          >:: test_join_by_position_id_survives_date_skew;
          "join_legacy_falls_back_to_symbol_date"
