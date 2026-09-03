@@ -59,7 +59,7 @@ Skipped on purpose: `goldens-hybrid-tier-experiment/*` (no CI consumer;
 
 ## Results
 
-All 28 cells landed 2026-09-03 01:09–03:44 PDT (2h35m wall, `chain.log`; raw per-arm artifacts under `results/`).
+All 27 cells landed 2026-09-03 01:09–03:44 PDT (2h35m wall, `chain.log`; raw per-arm artifacts under `results/`).
 
 ### Lineage check — armed-stoplimit old arm vs the #2587 artifact
 
@@ -180,7 +180,7 @@ gaps are missed monsters.** No claim attaches to the level.
 
 ### Re-pin decisions
 
-- **Re-pinned (15, all FAIL-at-old-pin or tight-pinned):** goldens-sp500
+- **Re-pinned (14, all FAIL-at-old-pin or tight-pinned):** goldens-sp500
   armed-stoplimit, long-only (PASS but tight-pinned; re-centred), sp500-2019-2023;
   goldens-custom-universe-scenarios top-500, armed-e; goldens-sp500-historical
   sp500-2010-2026, sp500-2010-2026-longshort; goldens-small ×3; goldens-broad
@@ -198,7 +198,9 @@ gaps are missed monsters.** No claim attaches to the level.
 
 ### Direction of the deltas (what the corrected basis did)
 
-15 of 28 cells move down, 10 up, 3 flat (perf-sweep/smoke). Shared-trade
+19 of 27 cells move down, 7 up, 1 flat (bull-1y, bit-identical) — a ~3:1 skew
+to the downside, as the record repricing (−$601k first-order) predicted for
+stop/laggard-heavy books. Shared-trade
 drift (same `symbol|entry_date` in both arms) is small and mixed-sign
 (−$314k on sp500-2010-2026's 396 shared trades, +$79k on six-year's 143);
 every large level gap dissected to a **missed or gained monster** after the
