@@ -514,6 +514,81 @@ check "checker3: inventory bare-RETIRE (no confirm) row is ELIGIBLE" 0 "| enable
 rm -rf "$FIXTURE"
 
 # ==============================================================================
+# FIXTURE F: the git safe.directory / dubious-ownership regression (issue
+# #2633). prune-candidates-weekly failed its last 2 scheduled GHA runs
+# because actions/checkout@v4 registers its safe.directory exception under a
+# TEMPORARY HOME and restores the real HOME before this script's step runs,
+# so every `git log` call here died with "fatal: detected dubious ownership"
+# under the container's `--user 0`. The old call sites redirected git's
+# stderr to /dev/null and never checked its exit status, so the failure
+# surfaced as checker2's sanity probe reporting a FABRICATED cause ("was not
+# flagged as an orphan candidate") instead of the real one.
+#
+# git's own GIT_TEST_ASSUME_DIFFERENT_OWNER=1 (a documented git test-support
+# env var, present since the safe.directory feature landed) reproduces
+# "dubious ownership" without needing an actual UID mismatch -- exactly the
+# failure mode a differently-privileged GHA container hits. Paired with a
+# throwaway, empty HOME (so no ambient `git config --global safe.directory`
+# exception can mask the bug), this fixture is a faithful, portable
+# reproduction of the GHA failure that needs no container or root.
+# ==============================================================================
+_init_fixture_repo
+echo "newest doc" >"$FIXTURE/dev/notes/next-session-priorities-2026-08-19.md"
+_git_commit "2026-08-19" "newest doc" dev/notes/next-session-priorities-2026-08-19.md
+echo "See dev/notes/next-session-priorities-2026-05-15.md for context." >"$FIXTURE/dev/plans/sector-concentration-cap-2026-05-15.md"
+_git_commit "2026-05-15" "anchor file (satisfies checker1)" dev/plans/sector-concentration-cap-2026-05-15.md
+mkdir -p "$FIXTURE/dev/experiments/fuzz-startdate-crash"
+echo "a" >"$FIXTURE/dev/experiments/fuzz-startdate-crash/a.txt"
+_git_commit "2026-01-01" "fuzz-startdate-crash (satisfies checker2)" dev/experiments/fuzz-startdate-crash/a.txt
+
+cat >"$FIXTURE/trading/trading/weinstein/strategy/lib/weinstein_strategy_config.mli" <<'EOF'
+type config = {
+  stops_config : Stop_types_fixture.config;
+      (** Nested fast-crash stop, referenced below as
+          [stops_config.catastrophic_stop_pct]; satisfies checker3's own
+          live-flag sanity probe so the whole script can reach exit 0. *)
+}
+EOF
+_git_commit "2026-01-01" "fixture strategy config" trading/trading/weinstein/strategy/lib/weinstein_strategy_config.mli
+mkdir -p "$FIXTURE/trading/trading/weinstein/stops/lib"
+cat >"$FIXTURE/trading/trading/weinstein/stops/lib/stop_types_fixture.mli" <<'EOF'
+type config = {
+  catastrophic_stop_pct : float; [@sexp.default 0.0]
+}
+EOF
+_git_commit "2026-01-01" "fixture nested stop config" trading/trading/weinstein/stops/lib/stop_types_fixture.mli
+cat >"$FIXTURE/dev/experiments/_ledger/2026-01-03-catstop.sexp" <<'EOF'
+((date 2026-01-03) (slug catstop) (verdict Reject)
+ (notes "fixture entry for catastrophic_stop_pct."))
+EOF
+_git_commit "2026-01-03" "ledger reject" dev/experiments/_ledger/2026-01-03-catstop.sexp
+echo "((stops_config ((catastrophic_stop_pct 0.10))))" >"$FIXTURE/trading/test_data/live-scenario.sexp"
+_git_commit "2026-01-05" "live spec referencing catastrophic_stop_pct" trading/test_data/live-scenario.sexp
+
+# GIT_TEST_ASSUME_DIFFERENT_OWNER=1 is git's own test-support switch for the
+# safe.directory ownership check (present in this git binary -- verified via
+# `strings $(command -v git) | grep GIT_TEST_ASSUME_DIFFERENT_OWNER`). A
+# throwaway empty HOME means no ambient safe.directory exception is present,
+# matching the GHA step exactly.
+CLEAN_HOME=$(mktemp -d)
+
+check "exits 0 under forced dubious ownership with a clean HOME (the GHA failure mode)" 0 "" \
+  env HOME="$CLEAN_HOME" GIT_TEST_ASSUME_DIFFERENT_OWNER=1 \
+  PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY=2026-08-20 sh "$SCRIPT"
+
+check "checker2 still dates fuzz-startdate-crash correctly under forced dubious ownership" 0 \
+  "| dev/experiments/fuzz-startdate-crash | 1 | 231 | 2026-01-01 |" \
+  env HOME="$CLEAN_HOME" GIT_TEST_ASSUME_DIFFERENT_OWNER=1 \
+  PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY=2026-08-20 sh "$SCRIPT"
+
+check_not "no git dubious-ownership fatal leaks into the report" 0 "dubious ownership" \
+  env HOME="$CLEAN_HOME" GIT_TEST_ASSUME_DIFFERENT_OWNER=1 \
+  PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY=2026-08-20 sh "$SCRIPT"
+
+rm -rf "$CLEAN_HOME"
+rm -rf "$FIXTURE"
+
+# ==============================================================================
 # Usage errors
 # ==============================================================================
 check "unexpected argument exits 2" 2 "usage:" sh "$SCRIPT" some-argument
