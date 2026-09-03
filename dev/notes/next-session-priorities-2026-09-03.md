@@ -33,7 +33,7 @@ or its exit-lever reads are contaminated (`project_lever_reads_invert_on_fixed_s
 `CHS` 2004-12-20 is a different security under the same symbol (adj_close
 4.07→15.88, volume 5M→1M) and produced a +$513,550 phantom trade the moment
 the Monday-open fill hit that bar. 184 tradeable splices / 145 symbols in
-`/tmp/snap_top3000_dedup_v5thin_adj`; 9 trades across this session's runs
+`/tmp/snap_top3000_dedup_v5thin_adj`; 10 trades across this session's runs
 were affected, both signs (ICT −$169k in the unfixed 26y arc, AGR −$220k,
 STMP −$200k). Build-time continuity gate + a V15 post-run check (|pnl| >
 100% with days_held ≤ 5 and an adj_close jump on the entry/exit bar). Any
