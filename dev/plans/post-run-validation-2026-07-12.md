@@ -39,6 +39,54 @@ snapshots (deployment checklist).
 | V10 | EXP | entry-week close > Y% above 4-weeks-ago close (default 60) | monitored statistic ONLY |
 | V11 | EXP | stop_initial_distance_pct within bounds | stop placement sanity |
 
+## Amendment 2026-09-01: V13 + V14 — execution-causality checks
+
+V12 (stop-distance gate consistency) landed after v1. V13 and V14 close a
+different blind spot: **V1–V12 all reason about the entry DECISION, none about
+whether the resulting FILL is physically possible.** Two defects on the 26y arc
+run (`dev/experiments/arc-rerun-2026-09-01/README.md`, landing in PR #2645) had
+to be found by hand on the artifacts because the validator was structurally
+unable to see them.
+
+| id | class | check | catches |
+|---|---|---|---|
+| V13 | INV | every trade's `entry_date` / `exit_date` has a bar for that symbol, and `entry_price` / `exit_price` lie inside that bar's `[low, high]` (± `fill_price_epsilon_pct`) | §D1 — 2,500+ exits dated on a SATURDAY (no bar exists) at the preceding Friday's OPEN, i.e. a fill at a price that predates the Friday-close decision. Also true of the record convention (269/269 laggard exits). |
+| V14 | EXP | no `stop_loss` exit within `entry_bar_stopout_max_bars` trading bars of entry whose **entry-day close sits on the safe side of the installed stop** (≥ stop for LONG, ≤ for SHORT) | §D2 — 261/668 stop-losses exit within one day; 173 had entry-day low < stop ≤ entry-day close and were sold next open ABOVE the stop. The stop was evaluated against the entry bar's PRE-FILL low, which the position never held through. |
+
+**Why V13 is INV and V14 is EXP.** A fill on a day the symbol did not trade, or
+outside the day's range, is impossible under any fill model — an invariant. A
+same-bar stop-out, by contrast, is legitimate when the entry day genuinely
+gaps down and *closes past* the stop; only the closed-on-the-safe-side shape is
+suspect, and its rate is a statistic to watch rather than a hard zero. V14's
+severity can be promoted via `severity_overrides` once the entry-bar stop
+evaluation is fixed and the expected count is 0.
+
+**Skips (un-evaluable, not violations).** V13 skips rows whose symbol is absent
+from the bar store, whose store entry has no daily bars, or whose price leg is
+basis-waived (see below); V14 additionally skips rows carrying neither
+stop-distance column and rows with no bar on the entry date. All are counted in
+the check's `n_skipped`, which the report renders as `(N skipped)` — so "PASS
+because everything was skipped" stays visible, per the same principle as the
+audit-join coverage line. No un-evaluable path reports `Pass`.
+
+**Basis guard.** `bars.daily` carries RAW (unadjusted) OHLC, because the
+simulator fills against `Daily_price.open_price/high_price/low_price/
+close_price` and never `adjusted_close`. Should the CSV store nevertheless be
+re-based after a run, every price for that symbol shifts at once; V13's price
+leg and V14's stop comparison are therefore waived when the bar's close and the
+fill price fail `Validator_step.price_basis_ok`. A waived row is `Skip`ped, not
+passed, so it stays counted in `n_skipped`. V13's date leg is basis-free and
+always runs — which is the leg that catches §D1, and it still fires on a
+re-based symbol. Note the waiver's direction: it triggers on *large* bar/fill
+ratios, so a fill far outside its bar's range is waived rather than flagged —
+that shape is indistinguishable from a re-based store.
+
+**Reconstructing the stop (V14).** `entry_price × (1 − d)` for LONG, `(1 + d)`
+for SHORT, with `d` = `stop_fill_distance_pct` when the column is present
+(fill-basis, exactly the quantity the `Stop_too_wide` gate bounds and V12
+checks) and `stop_initial_distance_pct` otherwise (E-basis, approximate when
+the fill diverges from the screener's `E`).
+
 ## ⚠ Amendment (same session, post-screens): V9 and V10 are PERMANENTLY report-only
 
 Both were screened as prospective entry gates the same night and

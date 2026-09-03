@@ -1,6 +1,6 @@
 (** CLI for the post-run trade validator (v1, report-only).
 
-    Parses a completed scenario run's artifacts + the bar store, runs the 11
+    Parses a completed scenario run's artifacts + the bar store, runs the 14
     invariant / expectation checks, and writes [<out>.sexp] + [<out>.md]. Exit
     code is always 0 — the verdicts live in the report. *)
 
