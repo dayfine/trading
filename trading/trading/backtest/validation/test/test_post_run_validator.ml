@@ -732,6 +732,42 @@ let test_v14_short_allows_genuine_gap_up _ =
           ~entry_close:110.0 ()))
     (violations_skipped_pass 0 0 true)
 
+(* A stop-loss row whose symbol the bar store does not carry: there is no entry
+   bar to judge the reconstructed stop against, so the row is un-evaluable
+   rather than clean, and the skip is counted. *)
+let test_v14_skips_absent_symbol _ =
+  let inputs =
+    {
+      (entry_bar_stopout_inputs ~entry_low:94.0 ~entry_close:99.0) with
+      bars = (fun _ -> None);
+    }
+  in
+  assert_that (result ~id:"V14" inputs) (violations_skipped_pass 0 1 true)
+
+(* The same row against a store entry the loader produced with no daily bars at
+   all — un-evaluable for the same reason an absent symbol is. *)
+let test_v14_skips_store_with_no_daily_bars _ =
+  let inputs =
+    {
+      (entry_bar_stopout_inputs ~entry_low:94.0 ~entry_close:99.0) with
+      bars = bars_of [ ("EBS", ohlc_bars []) ];
+    }
+  in
+  assert_that (result ~id:"V14" inputs) (violations_skipped_pass 0 1 true)
+
+(* Bars re-based after the run: the entry bar's close of 24.75 against a fill of
+   100 is a ratio of 0.2475, far outside the basis band, so the bar and the
+   reconstructed stop are not on the same scale. The row is the §D2 shape in
+   miniature — the 80% stop distance puts the stop at 20 and the entry bar
+   closed above it, so WITHOUT the basis guard this row would flag. The guard is
+   what keeps a re-based symbol from flagging every one of its stop-losses. *)
+let test_v14_rebased_store_skips_stop_comparison _ =
+  assert_that
+    (result ~id:"V14"
+       (stopout_inputs ~stop_fill_distance_pct:(Some 0.80) ~entry_low:19.0
+          ~entry_high:25.5 ~entry_close:24.75 ()))
+    (violations_skipped_pass 0 1 true)
+
 (* ---- audit join: position_id vs symbol|date ---------------------------- *)
 
 let join_row ?(context = ctx ()) ~position_id ~symbol ~entry_date () :
@@ -864,6 +900,11 @@ let suite =
          >:: test_v14_short_flags_entry_bar_stopout;
          "v14_short_allows_genuine_gap_up"
          >:: test_v14_short_allows_genuine_gap_up;
+         "v14_skips_absent_symbol" >:: test_v14_skips_absent_symbol;
+         "v14_skips_store_with_no_daily_bars"
+         >:: test_v14_skips_store_with_no_daily_bars;
+         "v14_rebased_store_skips_stop_comparison"
+         >:: test_v14_rebased_store_skips_stop_comparison;
          "join_by_position_id_survives_date_skew"
          >:: test_join_by_position_id_survives_date_skew;
          "join_legacy_falls_back_to_symbol_date"

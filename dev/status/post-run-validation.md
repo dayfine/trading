@@ -102,13 +102,17 @@ docker exec trading-1-dev bash -c \
   `fill_price_epsilon_pct` (1e-6) and `entry_bar_stopout_max_bars` (1), both
   `[@sexp.default]` so existing validator configs keep parsing. A price leg
   waived by the basis guard reports `Skip`, not `Pass`, so it stays counted in
-  `n_skipped`. Verify: `dune runtest trading/backtest/validation/test/` — 18
-  V13/V14 cases, covering the two headline defect shapes, both sides of the
-  `entry_bar_stopout_max_bars` window (including the `bars_in_window`
-  Friday-to-Monday = 1 / Saturday = 0 semantics), the E-basis
+  `n_skipped`. Verify: `dune runtest trading/backtest/validation/test/` — 22
+  V13/V14 cases (7 V13 + 15 V14), covering the two headline defect shapes, both
+  sides of the `entry_bar_stopout_max_bars` window (including the
+  `bars_in_window` Friday-to-Monday = 1 / Saturday = 0 semantics), the E-basis
   `stop_initial_distance_pct` fallback and its preference order, the SHORT
   mirror of both V14 outcomes, the re-based-store price-leg waiver in both
-  directions, and every documented Skip branch.
+  directions, and every documented Skip branch of both checks — absent symbol,
+  empty daily array, and basis mismatch each pinned separately for V13 and for
+  V14, with V14's missing-stop-column and no-entry-bar branches sharing one
+  match arm and so one case. Each Skip branch was verified by mutating it to
+  `Pass` and confirming a test goes red.
 
 ## Follow-ups
 
