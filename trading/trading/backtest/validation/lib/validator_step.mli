@@ -60,6 +60,14 @@ val daily_on : bars -> Date.t -> daily_bar option
 (** The daily bar dated exactly [date], or [None] when the symbol did not trade
     that day (a weekend, a holiday, or a gap in the store). *)
 
+val daily_with_prev : bars -> Date.t -> (daily_bar * daily_bar) option
+(** [daily_with_prev b date] is [Some (prev, bar)] where [bar] is dated exactly
+    [date] and [prev] is the bar immediately before it in the store. [None] when
+    no bar falls on [date] {b or} when that bar is the first of the series — a
+    day-over-day comparison needs a predecessor, and the very first bar has
+    none. Callers therefore cannot distinguish the two [None] shapes; both are
+    "not evaluable here", which is all V15 needs. *)
+
 val nearest_daily_date : bars -> Date.t -> Date.t option
 (** The latest daily-bar date at or before [date]; [None] when every bar is
     later. Used to describe {i how far off} a fill date landed. *)

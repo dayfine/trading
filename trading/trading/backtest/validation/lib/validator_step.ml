@@ -75,6 +75,11 @@ let daily_on (b : bars) date =
   Array.binary_search b.daily ~compare:_by_date `First_equal_to date
   |> Option.map ~f:(fun i -> b.daily.(i))
 
+let daily_with_prev (b : bars) date =
+  match Array.binary_search b.daily ~compare:_by_date `First_equal_to date with
+  | Some i when i > 0 -> Some (b.daily.(i - 1), b.daily.(i))
+  | _ -> None
+
 let nearest_daily_date (b : bars) date =
   Array.binary_search b.daily ~compare:_by_date `Last_less_than_or_equal_to date
   |> Option.map ~f:(fun i -> b.daily.(i).date)

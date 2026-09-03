@@ -1,7 +1,7 @@
 (** Shared types + config for the post-run trade validator (v1).
 
     See [dev/plans/post-run-validation-2026-07-12.md] for the design and the
-    check table (V1-V11 in v1, V12-V14 by amendment), and
+    check table (V1-V11 in v1, V12-V15 by amendment), and
     [dev/notes/visual-trade-audit-2026-07-12.md] for the audit that derived
     V5/V6/V7/V9/V10 from real defect specimens. *)
 
@@ -72,13 +72,20 @@ type daily_bar = {
   high : float;
   low : float;
   close : float;
+  adjusted_close : float;
+      (** The bar's {b adjusted} close — the one non-raw field on this record,
+          carried for V15. Splits and dividends are back-rolled out of it, so a
+          day-over-day jump in {i this} series is a corporate-action-free price
+          discontinuity (a feed splice), whereas the same jump in [close] is
+          just as likely to be an ordinary split. *)
   volume : int;
 }
-(** One daily OHLCV bar. Prices are the {b raw} (unadjusted) OHLC the simulator
-    itself fills against ([Simulator] reads [Daily_price.open_price] /
+(** One daily OHLCV bar. The OHLC prices are the {b raw} (unadjusted) ones the
+    simulator itself fills against ([Simulator] reads [Daily_price.open_price] /
     [.high_price] / [.low_price] / [.close_price], never [adjusted_close]), so
     V13's fill-in-range check and the fill prices in [trades.csv] share one
-    basis. [volume] is likewise raw, which is what V3's dollar-ADV needs. *)
+    basis. [volume] is likewise raw, which is what V3's dollar-ADV needs.
+    [adjusted_close] is the lone exception, and only V15 reads it. *)
 
 type bars = {
   weekly_dates : Date.t array;  (** Ascending weekly-bar dates. *)
@@ -87,8 +94,9 @@ type bars = {
   daily : daily_bar array;  (** Ascending daily OHLCV bars. *)
 }
 (** Per-symbol bar series used by the bar-dependent checks (V3, V7, V9, V10,
-    V13, V14). Note the two series are on {b different} price bases:
-    [weekly_closes] is adjusted, [daily] is raw. *)
+    V13, V14, V15). Note the two series are on {b different} price bases:
+    [weekly_closes] is adjusted, [daily] is raw apart from its [adjusted_close]
+    field. *)
 
 type check_config = {
   overhead_pct : float;
@@ -127,6 +135,23 @@ type check_config = {
           the entry bar". [1] = same-day or next-trading-day exits. Bar counted,
           not calendar days, so a Friday entry exiting Monday is one bar and a
           Saturday-dated exit is zero. *)
+  splice_pnl_pct_threshold : float;
+      (** V15: only a round trip whose |P&L| exceeds this many percent is a
+          splice candidate. Default [100.0] — a >100% move is the shape a
+          ticker-reuse splice produces, not an ordinary few-day trade. *)
+  splice_max_days_held : int;
+      (** V15: and only when it was held at most this many {b calendar} days.
+          Default [5]. Calendar rather than bar count so a Friday-to-Monday
+          three-day hold reads as 3, matching how the CHS specimen was
+          described. *)
+  splice_adj_ratio_min : float;
+      (** V15: lower bound of the acceptable day-over-day [adjusted_close]
+          ratio. Default [0.4]. *)
+  splice_adj_ratio_max : float;
+      (** V15: upper bound of the same ratio. Default [2.5] — the CHS 2004-12-20
+          splice was 3.9x. A ratio {i strictly} outside
+          [[splice_adj_ratio_min, splice_adj_ratio_max]] flags; the bounds
+          themselves pass. *)
   disabled_checks : string list;  (** Check ids to omit from the report. *)
   severity_overrides : (string * string) list;
       (** [(check_id, "INVARIANT" | "EXPECTATION")] overrides of the default

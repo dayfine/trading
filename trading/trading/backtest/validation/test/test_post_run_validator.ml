@@ -171,8 +171,9 @@ let test_v6_price_noise_twin _ =
 
 (* ---- V3/V4: armed-only realism checks ----------------------------------- *)
 
-(* A flat bar: OHLC all equal, so it carries a close + volume and nothing else.
-   V13/V14 build their own OHLC bars via [ohlc] below. *)
+(* A flat bar: OHLC all equal and unadjusted, so it carries a close + volume
+   and nothing else. V13/V14 build their own OHLC bars via [ohlc] below; V15
+   builds adjusted ones via [adj_bar]. *)
 let flat_bar (d, c, v) : Vt.daily_bar =
   {
     date = Date.of_string d;
@@ -180,6 +181,7 @@ let flat_bar (d, c, v) : Vt.daily_bar =
     high = c;
     low = c;
     close = c;
+    adjusted_close = c;
     volume = v;
   }
 
@@ -409,6 +411,7 @@ let ohlc ~date ~o ~h ~l ~c : Vt.daily_bar =
     high = h;
     low = l;
     close = c;
+    adjusted_close = c;
     volume = 1000;
   }
 
@@ -768,6 +771,206 @@ let test_v14_rebased_store_skips_stop_comparison _ =
           ~entry_high:25.5 ~entry_close:24.75 ()))
     (violations_skipped_pass 0 1 true)
 
+(* ---- V15: huge, brief round trip whose fill bar sits on a data splice --- *)
+
+(* V15 reads only [adjusted_close]; the raw OHLC is filled in from it so the
+   fixtures say nothing this check does not use. *)
+let adj_bar ~date ~adj : Vt.daily_bar =
+  {
+    date = Date.of_string date;
+    open_price = adj;
+    high = adj;
+    low = adj;
+    close = adj;
+    adjusted_close = adj;
+    volume = 1000;
+  }
+
+let adj_bars lst : Vt.bars =
+  { weekly_dates = [||]; weekly_closes = [||]; daily = Array.of_list lst }
+
+(* The issue-#2646 specimen. CHS's adjusted close steps 4.0693 -> 15.8803
+   (x3.902) on 2004-12-20 with no split behind it: from that bar the series is
+   a different security under a recycled ticker. Bought Friday at 11.2875,
+   "sold" Monday at 45.16 — +300% on a three-day hold. *)
+let chs_bars =
+  adj_bars
+    [
+      adj_bar ~date:"2004-12-15" ~adj:4.05;
+      adj_bar ~date:"2004-12-16" ~adj:4.06;
+      adj_bar ~date:"2004-12-17" ~adj:4.0693;
+      adj_bar ~date:"2004-12-20" ~adj:15.8803;
+    ]
+
+let chs_inputs ?(config = Vt.default_config) ?(side = "LONG")
+    ?(exit_date = "2004-12-20") ?(exit_price = 45.16) ?(bars = chs_bars) () =
+  {
+    (Vt.empty_inputs ~config ()) with
+    trades =
+      [
+        trade ~side ~symbol:"CHS" ~entry_date:"2004-12-17" ~entry_price:11.2875
+          ~exit_date ~exit_price ();
+      ];
+    bars = bars_of [ ("CHS", bars) ];
+  }
+
+let test_v15_flags_chs_exit_splice _ =
+  assert_that
+    (result ~id:"V15" (chs_inputs ()))
+    (violations_skipped_pass 1 0 false)
+
+(* The same artifact on the short side: the SHORT loses 300% instead of gaining
+   it, and the unsigned P&L test flags it identically. *)
+let test_v15_flags_short_side_of_same_splice _ =
+  assert_that
+    (result ~id:"V15" (chs_inputs ~side:"SHORT" ()))
+    (violations_skipped_pass 1 0 false)
+
+(* A real +120% four-day trade on a continuous series. It clears BOTH halves of
+   the candidate predicate, so only the bar-continuity test keeps it clean —
+   this is what separates V15 from "flag every implausible-looking trade". *)
+let test_v15_clean_fast_double _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"REAL" ~entry_date:"2020-06-01" ~entry_price:10.0
+            ~exit_date:"2020-06-05" ~exit_price:22.0 ();
+        ];
+      bars =
+        bars_of
+          [
+            ( "REAL",
+              adj_bars
+                [
+                  adj_bar ~date:"2020-05-29" ~adj:9.8;
+                  adj_bar ~date:"2020-06-01" ~adj:10.0;
+                  adj_bar ~date:"2020-06-02" ~adj:13.0;
+                  adj_bar ~date:"2020-06-03" ~adj:16.5;
+                  adj_bar ~date:"2020-06-04" ~adj:20.0;
+                  adj_bar ~date:"2020-06-05" ~adj:22.0;
+                ] );
+          ];
+    }
+  in
+  assert_that (result ~id:"V15" inputs) (violations_skipped_pass 0 0 true)
+
+(* The entry bar is the FIRST of the series, so it has no predecessor to
+   measure against. Un-evaluable, not clean: the row is Skipped and counted,
+   even though the exit leg on its own is continuous. *)
+let test_v15_skips_fill_bar_without_prior _ =
+  let bars =
+    adj_bars
+      [
+        adj_bar ~date:"2004-12-17" ~adj:4.0693;
+        adj_bar ~date:"2004-12-20" ~adj:4.1;
+      ]
+  in
+  assert_that
+    (result ~id:"V15" (chs_inputs ~bars ~exit_price:34.0 ()))
+    (violations_skipped_pass 0 1 true)
+
+(* Boundary: a ratio of exactly [splice_adj_ratio_max] (10.0 / 4.0 = 2.5) is
+   inside the band and passes; a hair past it flags. *)
+let bounded_inputs ~exit_adj =
+  {
+    (Vt.empty_inputs ()) with
+    trades =
+      [
+        trade ~symbol:"EDGE" ~entry_date:"2020-06-02" ~entry_price:10.0
+          ~exit_date:"2020-06-03" ~exit_price:25.0 ();
+      ];
+    bars =
+      bars_of
+        [
+          ( "EDGE",
+            adj_bars
+              [
+                adj_bar ~date:"2020-06-01" ~adj:3.9;
+                adj_bar ~date:"2020-06-02" ~adj:4.0;
+                adj_bar ~date:"2020-06-03" ~adj:exit_adj;
+              ] );
+        ];
+  }
+
+let test_v15_ratio_at_upper_bound_passes _ =
+  assert_that
+    (result ~id:"V15" (bounded_inputs ~exit_adj:10.0))
+    (violations_skipped_pass 0 0 true)
+
+let test_v15_ratio_just_past_upper_bound_flags _ =
+  assert_that
+    (result ~id:"V15" (bounded_inputs ~exit_adj:10.1))
+    (violations_skipped_pass 1 0 false)
+
+(* The other bound, on the entry leg: the entry bar's adjusted close collapses
+   to a quarter of the prior bar's (a cheaper security taking over the ticker),
+   after which the "price" quadruples back. Ratio 0.25 < 0.4 flags. *)
+let test_v15_flags_entry_bar_collapse _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"REUSE" ~entry_date:"2020-06-02" ~entry_price:10.0
+            ~exit_date:"2020-06-03" ~exit_price:41.0 ();
+        ];
+      bars =
+        bars_of
+          [
+            ( "REUSE",
+              adj_bars
+                [
+                  adj_bar ~date:"2020-06-01" ~adj:40.0;
+                  adj_bar ~date:"2020-06-02" ~adj:10.0;
+                  adj_bar ~date:"2020-06-03" ~adj:11.0;
+                ] );
+          ];
+    }
+  in
+  assert_that (result ~id:"V15" inputs) (violations_skipped_pass 1 0 false)
+
+(* Candidate predicate, hold-length half: the same spliced exit bar held past
+   [splice_max_days_held] is not a candidate at all — passed, not skipped. *)
+let test_v15_ignores_long_hold _ =
+  let bars =
+    adj_bars
+      [
+        adj_bar ~date:"2004-12-16" ~adj:4.06;
+        adj_bar ~date:"2004-12-17" ~adj:4.0693;
+        adj_bar ~date:"2004-12-27" ~adj:15.8803;
+      ]
+  in
+  assert_that
+    (result ~id:"V15" (chs_inputs ~bars ~exit_date:"2004-12-27" ()))
+    (violations_skipped_pass 0 0 true)
+
+(* Candidate predicate, P&L half: a modest move over the same spliced bar is
+   not a candidate. *)
+let test_v15_ignores_modest_move _ =
+  assert_that
+    (result ~id:"V15" (chs_inputs ~exit_price:12.0 ()))
+    (violations_skipped_pass 0 0 true)
+
+let test_v15_skips_absent_symbol _ =
+  assert_that
+    (result ~id:"V15" { (chs_inputs ()) with bars = (fun _ -> None) })
+    (violations_skipped_pass 0 1 true)
+
+let test_v15_skips_store_with_no_daily_bars _ =
+  assert_that
+    (result ~id:"V15" (chs_inputs ~bars:(adj_bars []) ()))
+    (violations_skipped_pass 0 1 true)
+
+(* The band is config-routed, not a literal: widening the ceiling past the
+   3.902 CHS ratio makes the same row pass. *)
+let test_v15_respects_configured_bounds _ =
+  let config = { Vt.default_config with splice_adj_ratio_max = 5.0 } in
+  assert_that
+    (result ~id:"V15" (chs_inputs ~config ()))
+    (violations_skipped_pass 0 0 true)
+
 (* ---- audit join: position_id vs symbol|date ---------------------------- *)
 
 let join_row ?(context = ctx ()) ~position_id ~symbol ~entry_date () :
@@ -905,6 +1108,24 @@ let suite =
          >:: test_v14_skips_store_with_no_daily_bars;
          "v14_rebased_store_skips_stop_comparison"
          >:: test_v14_rebased_store_skips_stop_comparison;
+         "v15_flags_chs_exit_splice" >:: test_v15_flags_chs_exit_splice;
+         "v15_flags_short_side_of_same_splice"
+         >:: test_v15_flags_short_side_of_same_splice;
+         "v15_clean_fast_double" >:: test_v15_clean_fast_double;
+         "v15_skips_fill_bar_without_prior"
+         >:: test_v15_skips_fill_bar_without_prior;
+         "v15_ratio_at_upper_bound_passes"
+         >:: test_v15_ratio_at_upper_bound_passes;
+         "v15_ratio_just_past_upper_bound_flags"
+         >:: test_v15_ratio_just_past_upper_bound_flags;
+         "v15_flags_entry_bar_collapse" >:: test_v15_flags_entry_bar_collapse;
+         "v15_ignores_long_hold" >:: test_v15_ignores_long_hold;
+         "v15_ignores_modest_move" >:: test_v15_ignores_modest_move;
+         "v15_skips_absent_symbol" >:: test_v15_skips_absent_symbol;
+         "v15_skips_store_with_no_daily_bars"
+         >:: test_v15_skips_store_with_no_daily_bars;
+         "v15_respects_configured_bounds"
+         >:: test_v15_respects_configured_bounds;
          "join_by_position_id_survives_date_skew"
          >:: test_join_by_position_id_survives_date_skew;
          "join_legacy_falls_back_to_symbol_date"

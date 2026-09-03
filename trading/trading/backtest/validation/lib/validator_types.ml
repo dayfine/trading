@@ -11,6 +11,10 @@ let _default_stop_distance_max_pct = 0.30
 let _default_gate_max_stop_distance_pct = 0.15
 let _default_fill_price_epsilon_pct = 1e-6
 let _default_entry_bar_stopout_max_bars = 1
+let _default_splice_pnl_pct_threshold = 100.0
+let _default_splice_max_days_held = 5
+let _default_splice_adj_ratio_min = 0.4
+let _default_splice_adj_ratio_max = 2.5
 let far_future = Date.of_string "2100-01-01"
 
 type severity = Invariant | Expectation [@@deriving sexp, equal]
@@ -54,6 +58,7 @@ type daily_bar = {
   high : float;
   low : float;
   close : float;
+  adjusted_close : float;
   volume : int;
 }
 
@@ -80,6 +85,11 @@ type check_config = {
       [@sexp.default _default_fill_price_epsilon_pct]
   entry_bar_stopout_max_bars : int;
       [@sexp.default _default_entry_bar_stopout_max_bars]
+  splice_pnl_pct_threshold : float;
+      [@sexp.default _default_splice_pnl_pct_threshold]
+  splice_max_days_held : int; [@sexp.default _default_splice_max_days_held]
+  splice_adj_ratio_min : float; [@sexp.default _default_splice_adj_ratio_min]
+  splice_adj_ratio_max : float; [@sexp.default _default_splice_adj_ratio_max]
   disabled_checks : string list; [@sexp.default []]
   severity_overrides : (string * string) list; [@sexp.default []]
 }
@@ -127,6 +137,10 @@ let default_config =
     gate_max_stop_distance_pct = _default_gate_max_stop_distance_pct;
     fill_price_epsilon_pct = _default_fill_price_epsilon_pct;
     entry_bar_stopout_max_bars = _default_entry_bar_stopout_max_bars;
+    splice_pnl_pct_threshold = _default_splice_pnl_pct_threshold;
+    splice_max_days_held = _default_splice_max_days_held;
+    splice_adj_ratio_min = _default_splice_adj_ratio_min;
+    splice_adj_ratio_max = _default_splice_adj_ratio_max;
     disabled_checks = [];
     severity_overrides = [];
   }
