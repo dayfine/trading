@@ -565,6 +565,15 @@ _git_commit "2026-01-03" "ledger reject" dev/experiments/_ledger/2026-01-03-cats
 echo "((stops_config ((catastrophic_stop_pct 0.10))))" >"$FIXTURE/trading/test_data/live-scenario.sexp"
 _git_commit "2026-01-05" "live spec referencing catastrophic_stop_pct" trading/test_data/live-scenario.sexp
 
+# Claim-(c) content: a directory that exists on disk under dev/experiments/
+# but has NEVER been committed. `git log` on it succeeds (exit 0) with empty
+# output -- a legitimate "no history" outcome that checker2's caller must
+# SKIP, never abort on (see the two "claim (c)" checks below, run against
+# this same fixture with plain ambient git config, no forced-ownership
+# override).
+mkdir -p "$FIXTURE/dev/experiments/never-committed-no-history"
+echo "b" >"$FIXTURE/dev/experiments/never-committed-no-history/b.txt"
+
 # GIT_TEST_ASSUME_DIFFERENT_OWNER=1 is git's own test-support switch for the
 # safe.directory ownership check (present in this git binary -- verified via
 # `strings $(command -v git) | grep GIT_TEST_ASSUME_DIFFERENT_OWNER`). A
@@ -586,6 +595,53 @@ check_not "no git dubious-ownership fatal leaks into the report" 0 "dubious owne
   PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY=2026-08-20 sh "$SCRIPT"
 
 rm -rf "$CLEAN_HOME"
+
+# claim (c): under PLAIN ambient git config (no forced-ownership override),
+# the never-committed-no-history dir added above must be silently SKIPPED,
+# never reported as a FAIL -- git succeeded, it just has no history, which
+# the docstring calls "a legitimate, expected outcome callers already
+# handle". Mutating the no-history branch to `return 1` instead of `return
+# 0` turns both of these red: exit flips to 1 and the FAIL line appears.
+check "checker2 treats a genuinely history-less tracked-repo dir as a skip, not an abort (claim c)" 0 "" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY=2026-08-20 sh "$SCRIPT"
+
+check_not "the history-less dir never produces a checker2 FAIL (claim c)" 0 "FAIL(checker2)" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY=2026-08-20 sh "$SCRIPT"
+
+rm -rf "$FIXTURE"
+
+# ==============================================================================
+# FIXTURE G: a REAL git failure (as opposed to Fixture F's simulated dubious-
+# ownership, which the fix's `-c safe.directory` clears) must ABORT the
+# checker -- never silently degrade into the "no history" skip path. That
+# collapse is precisely the defect class this PR exists to fix (a git
+# failure and "no history" were indistinguishable before this change); a
+# test suite that cannot tell the two apart has not actually pinned the fix.
+#
+# PRUNE_CANDIDATES_ROOT here points at a PLAIN, non-git directory. `git log`
+# fails there ("fatal: not a git repository") even WITH `-c safe.directory=
+# $ROOT` in effect -- safe.directory only papers over an ownership mismatch
+# inside a real repository, it does nothing for "this is not a git
+# repository at all". That makes this fixture deterministic without needing
+# GIT_TEST_ASSUME_DIFFERENT_OWNER, and independent of Fixture F's simulation.
+# ==============================================================================
+FIXTURE=$(mktemp -d)
+mkdir -p "$FIXTURE/dev/notes" "$FIXTURE/dev/experiments/fuzz-startdate-crash"
+echo "newest doc" >"$FIXTURE/dev/notes/next-session-priorities-2026-08-19.md"
+echo "a" >"$FIXTURE/dev/experiments/fuzz-startdate-crash/a.txt"
+
+check "checker1 aborts (does not degrade to a skip) on a real git failure" 1 \
+  "FAIL(checker1): git log failed dating dev/notes/next-session-priorities-2026-08-19.md" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY=2026-08-20 sh "$SCRIPT"
+
+check "checker2 aborts (does not degrade to a skip) on a real git failure" 1 \
+  "FAIL(checker2): git log failed dating dev/experiments/fuzz-startdate-crash" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY=2026-08-20 sh "$SCRIPT"
+
+check "git's own failure message is surfaced, not swallowed, on a real failure" 1 \
+  "not a git repository" \
+  env PRUNE_CANDIDATES_ROOT="$FIXTURE" PRUNE_CANDIDATES_TODAY=2026-08-20 sh "$SCRIPT"
+
 rm -rf "$FIXTURE"
 
 # ==============================================================================
