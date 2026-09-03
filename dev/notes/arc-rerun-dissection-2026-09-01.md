@@ -12,8 +12,8 @@ modern data:
 
 | # | what | kind | first-order size (26y arc, 08-21 artifacts) |
 |---|---|---|---|
-| D1 | Friday-decided exits fill at **Friday's open**, dated Saturday (stale bar on a calendar-day step) | simulator defect | arc **+$525k** if filled Monday open (its whole realised loss is −$417k); record **−$601k** |
-| D2 | a fresh position's stop is judged against its **own entry bar's pre-fill low** | strategy-plumbing defect | 173 of 3,029 entries killed on day 0 with the stock closing above the stop |
+| D1 | Friday-decided exits fill at **Friday's open**, dated Saturday (stale bar on a calendar-day step) | simulator defect — **fixed, #2644** | first-order: arc +$525k (08-21) / +$1.05M (fresh) if filled Monday open; record −$601k. **Measured with the fix armed (26y, §5): ejects +$763k → +$1.66M ex-phantom, realised ex-all-phantom +$84k → +$86k — **neutral at 26y** (raw +$217k / −0.6% carries a +$513k CHS splice phantom exposed by the Monday-open fill, and both runs carry a −$0.17M ICT phantom; issue #2646); the fixes are honest and the arc still loses** |
+| D2 | a fresh position's stop is judged against its **own entry bar's pre-fill low** | strategy-plumbing defect — **fixed, #2642** | 173 of 3,029 (08-21) / 166 of 2,625 (fresh) entries killed on day 0 with the stock closing above the stop. **Measured with the fix armed: day-0 stops 233 → 1**; the survivors stop later and larger (stops −$2.54M → −$3.68M), MaxDD 57 → 61% |
 | D3 | only **6.5%** of fill weeks carry §4.2 volume; the resting buy-stop fills on the first intraday touch of the range top, which is rarely the volume week | faithful mechanism × data | 72% of all entries ejected at ≈ +$400/trade; the fills that survive are then 4%-stopped |
 | D4 | 58–84% of tickets get the flat 4% fallback stop (no qualifying structural floor) | known (#2408) | 151/162 stop-outs on the 5y cell are fallback-stop trades |
 
@@ -23,7 +23,7 @@ Fresh numbers (build `deb45a7ee`, split-safe warehouse, salt 0):
 |---|---:|---:|---:|---:|---:|---|
 | `b5-arc` (2019–2023 × top-3000-2019) | **−24.4%** | 689 | 41.1% | −0.53 | 38.0% | exit mix: 517 eject / 162 stop / 10 laggard |
 | `arc26y` (2000–2026 × top-3000-2000) | **−29.2%** | 2,625 | 40.7% | −0.06 | 57.4% | 15.0h wall (an 11h stall inside it, see §8); realised −$85.5k; exit mix 1,899 eject (+$763k) / 617 stop (−$2.54M, 233 same-day) / 100 laggard (+$1.50M); fill-week confirmed 221/2,210 (10%); fallback stop 2,350/2,835 (83%). Prior basis 08-21: −62.4% / 3,029 / MaxDD 67.7% — the 33pp move sits inside the 132.5pp 26y null and rides the #2530 `reset_anchor_on_stalled_cycle` flip; not a claim. |
-| 5y ladder + 26y no-volume control | _pending_ | | | | | |
+| 5y ladder, fix-armed cells, 3-window fast grid | see §5 | | | | | dup-null bit-identical; eject gate is the whole 5y deficit (novol +48pp); anchor window and freshness basis are not levers; fixes verified at 5y and 26y |
 
 ## 1. D1 — the Saturday fill (simulator)
 
@@ -35,7 +35,9 @@ exits, 98/503 stops). The warehouse has no weekend bars.
 
 **Price basis.** All 2,500 Saturday-dated arc exits equal the preceding
 Friday's OPEN at 2 dp (2,231 exact at 4 dp, 268 within rounding, one 2-dp
-tie with Friday's close — PCTI 2023-12-09); none equal Monday's open. E.g. ZQKSQ ejected 2011-07-23 at 5.50 = Fri open
+tie with Friday's close — PCTI 2023-12-09); none is explained by Monday's
+open (40 rows coincide with it at 2 dp only where Friday's and Monday's
+opens round alike). E.g. ZQKSQ ejected 2011-07-23 at 5.50 = Fri open
 (close 5.45, Mon open 5.36); WAFD entered Fri 2024-08-23 at 37.49 and
 "stopped" Sat at 35.35 = that Friday's open.
 
@@ -145,8 +147,55 @@ implementation installs a 4% flat stop instead.
 
 ## 5. What the ladder says (filled in when cells land)
 
-_pending: b5-arc-dup (determinism), b5-arc-novol, b5-arc-macross,
-b5-fullbook, arc26y, arc26y-novol._
+| cell | return | trades | win | Sharpe | MaxDD | read |
+|---|---:|---:|---:|---:|---:|---|
+| `b5-arc` | −24.39% | 689 | 41.1% | −0.533 | 38.0% | base |
+| `b5-arc-dup` | −24.39% | 689 | 41.1% | −0.533 | 38.0% | **bit-identical** — determinism tripwire passes on the fresh build |
+| `b5-arc-novol` | **+23.64%** | 199 | 29.6% | +0.348 | 28.8% | eject gate OFF (same fills): **+48pp** vs base, ≈3× the broad-5y return null (14.65pp, `rt-freshness-broad5y-2026-08-20`, different base config — order of magnitude only). Exit mix 61 laggard (+$755k) / 137 stop (−$732k); realised +$29k, the rest is open-position MTM. Trades 689→199: the positions that were being ejected and re-entered are simply held. Still 71% fallback stops (215/302) and 137 stops paying $732k — D3 is the biggest single lever on this cell, D4 the next. Salt-0 only. |
+| `b5-arc-macross` | −26.60% | 686 | 41.1% | −0.536 | 40.9% | freshness basis `Ma_cross` instead of `Range_top_breakout` (anchor 4 kept): **≈ base** (−2.2pp, inside the 5y null). The screen basis is not the lever on this cell; the same tickets fill and the same eject gate removes them. |
+| `b5-fullbook` | **+13.81%** | 174 | 33.9% | +0.234 | 33.9% | the `fullbook-graded` ticket-half alone (no 4-week anchor, no range-top basis, no fill-week eject). Arc − fullbook = −38pp; novol − fullbook = +10pp (inside the 5y null). Read: on this cell the eject gate accounts for the whole arc deficit; anchor-4 + range-top screening without the eject is indistinguishable from the plain ticket. Salt-0 only. |
+| `b5-arc-anchor26` | −13.05% | 627 | 40.2% | −0.154 | 34.7% | ticket anchor = 26-week range top instead of 4-week: +11pp vs base (inside the 5y null), tickets 689→627 only, same eject-dominated exit mix. The anchor window moves little on this cell; D5 is a faithfulness point, not the P&L lever. Salt-0 only. |
+| `b5-arc-fix` | **−10.38%** | 670 | 47.5% | −0.159 | 26.4% | D1 + D2 fixes armed on main `94a8c6857` (`sim_exit_fill_next_open` + `stops_config.stop_skip_entry_bar`): +14pp vs base (≈ the 5y null), win rate +6.4pp, MaxDD −11.6pp. **Both defects verified absent in the artifacts:** zero Saturday-dated exits (ejects fill Monday 486 / Tuesday-after-holiday 45), stops 162 → 129 and day-0 stops 66 → 1 (a genuine gap-down). Ejects +$531k vs +$223k on the base (the Monday-open effect, first-order predicted); stops −$756k vs −$589k (day-0 artifacts become later real stops); realised −$119k vs −$258k. D3 still dominates: 531 ejects of 670 trades. Salt-0 only. |
+| `arc26y-fix` | −0.59% ⚠ | 2,518 | 46.4% | +0.065 | 61.2% | **D1 + D2 fixes armed at 26y** (build `94a8c6857`). **⚠ CONTAMINATED: one trade, CHS 2004-12-17→12-20, is a +$513,550 ticker-splice phantom (raw close 11.29→45.16 AND adj_close 4.07→15.88 on 12-20, volume 5M→1M — a different security under the same symbol; issue filed). The unfixed run exited CHS on the Saturday step at Friday's open (−$1,155); the Monday-open fill landed on the splice bar. The −0.6% return compounds on the phantom from Dec-2004 and is NOT a number; ex-ALL-phantom (CHS +$514k, ICT −$161k, AGR −$220k in this run; ICT −$169k in the unfixed run — `results/phantom-trades.txt` — 10 splice-affected trades across all cells, issue #2646) realised is **+$85.6k fixed vs +$83.6k unfixed: the fixes are realised-NEUTRAL at 26y on salt 0** — the eject leg gains +$0.9M and the stop leg loses it back (day-0 artifacts become later, larger real stops).** +28.6pp raw vs the unfixed arc is inside the 132.5pp null anyway. The trade level is: zero Saturday-dated exits (ejects now fill Monday 1,753 / Tuesday-after-holiday 170), same-day stops 617→480 with 233→**1** on day 0, realised P&L −$85,545 → +$217,320 raw / **+$83.6k → +$85.6k ex-all-phantom (neutral)**, ejects +$763k → +$2,176k raw / **+$1,662k ex-phantom** (the first-order repricing said +$1,223k — direction confirmed, magnitude on the high side), stops −$2,544k → −$3,681k (day-0 artifacts become later, larger real stops), laggards +$1,504k → +$1,477k. MaxDD 57.4 → 61.2% (worse: positions that used to be killed on day 0 now ride drawdowns). 12 of 27 years positive on exit-year realised (was 10). Fill-week confirmation still 10% (212/2,212); 1,924 ejects of 2,518 trades — D3 remains the binding constraint. Wall 2h21m. Salt-0 only. |
+| `arc26y-novol` | not run | | | | | dropped 2026-09-02 evening: user demoted 26y to confirmation-only ("try to make money in 1y/3y/5y before doing more 26ys"); the eject-off lever is measured on the 3-window fast grid instead (README §"Fast grid"). |
+
+### 5b. The 3-window fast grid (fixed simulator, build `94a8c6857`, salt 0)
+
+All arms carry `sim_exit_fill_next_open` + `stops_config.stop_skip_entry_bar`. Base = `fix`.
+Warehouse-vintage caveat applies (README §"Fast grid"): g19 runs on ~980 names.
+
+| cell | return | trades | win | Sharpe | MaxDD | read |
+|---|---:|---:|---:|---:|---:|---|
+| `g19-fix` (= `b5-arc-fix`) | −10.38% | 670 | 47.5% | −0.159 | 26.4% | base |
+| `g19-novol` | −10.22% | 207 | 21.3% | −0.053 | 43.3% | eject OFF on the fixed sim: **≈ base** (+0.2pp). On the defective sim the same flip was −24.4 → +23.6. The +48pp was a D1/D2 artifact: stale Friday-open fills made ejects lose money, so holding looked better; with Monday-open fills the ejects earn what the held positions would have. Realised −$238k vs −$119k for the base (stops 141 at −$857k vs 129 at −$756k; laggards 64 at +$614k). MaxDD worse (43%) — held positions ride drawdowns. Salt-0 only. |
+| `g19-s6` | **+30.18%** | 638 | 46.2% | +0.374 | 35.4% | fallback stop 4% → 5.9% (`initial_stop_buffer 0.98`, the book band's upper half) on the fixed sim: **+40.6pp vs base**, ≈2.7× the cell null; win rate unchanged, MaxDD +9pp. Realised +$274k — but **one `extension_stop` trade — MSTR 2020-09-15 → 2021-03-01, 152.56 → 798.40, 167 days — is +$542k**; ex that trade the cell is −$268k, below base. Exit mix 545 eject (+$344k) / 81 stop (−$723k) / 11 laggard (+$111k). The wider stop let one monster survive its first week: a tail-lottery shape (`project_edge_is_the_fat_tail`), not yet a lever verdict — needs the other two windows and salts. Salt-0 only. |
+| `g19-novol-s6` | +6.79% | 163 | 31.9% | +0.162 | 39.5% | both levers: +17pp vs base, below `s6` alone. Exit mix 70 laggard (+$991k) / 93 stop (−$1,023k); realised −$32k raw, **+$176k ex-phantom** (a −$208k STMP 2021-10-05 splice, `phantom-trades.txt`); no MSTR-class trade. Salt-0 only. |
+| `g00-fix` | **+75.21%** | 278 | 48.9% | +0.611 | **10.8%** | base, 2000–04 × top-3000-2000 (94% warehouse coverage — the one properly-PIT window). **⚠ 70% of the realised P&L (+$513,550 of +$736,024) is the CHS ticker-splice phantom (issue #2646); ex-phantom realised +$222k (203 ejects +$368k / 64 stops −$357k / 8 laggards +$161k) — still positive, but the +75% return compounds on the phantom and is not a number.** Every g00 arm carries the same trade; compare g00 arms on ex-phantom realised only. 278 trades in 5y (vs 670 on 2019–23). Salt-0 only. |
+| `g00-novol` | +92.28% | 103 | 30.1% | +0.669 | 19.3% | eject OFF, 2000–04: no phantom trade (CHS never entered). Realised +$238k (25 laggards +$290k / 78 stops −$52k) vs base ex-phantom +$222k — **≈ equal realised**, same read as g19 (eject on/off is not a P&L lever on the fixed sim); MaxDD 19% vs 11% (held book rides drawdowns). The +92% vs +75% return gap is uninterpretable (base return compounds on the phantom). Salt-0 only. |
+| `g00-s6` | +64.33% ⚠ | 264 | 48.9% | +0.546 | 12.8% | fallback stop 5.9%, 2000–04: CHS phantom +$481k again; **ex-phantom realised +$144k vs base +$222k — the wider stop LOSES −$78k here**, the opposite sign of g19 (+40pp, one MSTR trade). 207 ejects +$739k (incl. phantom) / 43 stops −$291k / 12 laggards +$162k. Salt-0 only. |
+| `g00-novol-s6` | +32.08% | 102 | 25.5% | +0.332 | 30.3% | both levers, 2000–04: no phantom; **realised −$155k** (31 laggards +$252k / 70 stops −$430k) — the +32% return is open-position MTM; MaxDD 30%, the worst of the g00 arms. 2000–04 read on ex-phantom realised: base +$222k ≈ novol +$238k > s6 +$144k > novol-s6 −$155k. Salt-0 only. |
+| `g05-fix` | +4.17% | 365 | 45.5% | +0.129 | 17.8% | base, 2005–09 × top-3000-2005 (54% coverage), through the GFC: no phantom; realised +$82k (270 ejects +$198k / 76 stops −$505k / 17 laggards +$336k); yearly −$66k / +$98k / +$58k / −$70k (2008) / +$62k. Salt-0 only. |
+| `g05-novol` | +11.38% | 141 | 31.2% | +0.215 | 29.2% | eject OFF, 2005–09: no phantom; realised +$70k (38 laggards +$576k / 97 stops −$615k) vs base +$82k — **≈ equal, third window in a row**; MaxDD 29% vs 18%. Salt-0 only. |
+| `g05-s6` | +33.28% | 315 | 46.7% | +0.566 | 22.3% | fallback stop 5.9%, 2005–09: no phantom; realised +$147k vs base +$82k (**+$65k**, the one window where the wider stop wins on realised without a single-trade driver: top trades CGIP +$93k, SHOO +$65k); 259 ejects −$11k / 33 stops −$325k / 22 laggards +$463k; MaxDD 22% vs 18%. Salt-0 only. |
+| `g05-novol-s6` | +9.85% | 120 | 30.8% | +0.199 | 33.5% | both levers, 2005–09: no phantom; realised −$92k (37 laggards +$405k / 78 stops −$588k) vs base +$82k; MaxDD 34% — worst of the g05 arms. Salt-0 only. |
+
+#### Decision table (pre-registered rule, README §"Fast grid"): ex-phantom realised P&L and MaxDD vs the window's `fix` base
+
+| lever | 2019–23 (g19, ~980 names) | 2000–04 (g00, 94% coverage) | 2005–09 (g05, 54%) | verdict |
+|---|---|---|---|---|
+| base `fix` | −$119k / MaxDD 26.4% | +$222k / 10.8% | +$82k / 17.8% | — |
+| eject OFF (`novol`) | −$238k / 43.3% (worse) | +$238k / 19.3% (≈, MaxDD worse) | +$70k / 29.2% (≈, MaxDD worse) | **REJECT as a lever**: realised-neutral in 3/3 windows, MaxDD worse in 3/3. The +48pp read on the defective simulator was the D1 tax on the eject leg. |
+| stop 5.9% (`s6`) | +$274k / 35.4% — but −$268k ex one MSTR trade (worse) | +$144k / 12.8% (worse, −$78k) | +$147k / 22.3% (better, +$65k, diversified) | **NOT PROMOTABLE**: wins 1 of 3 windows on non-lottery realised; MaxDD worse in 3/3. Keep as an axis (the book band is 4–6%; 5.9% is inside it). |
+| both (`novol-s6`) | +$176k ex-phantom (raw −$32k carries a −$208k STMP splice) / 39.5% — the best non-lottery realised in this window | −$155k / 30.3% (worst) | −$92k / 33.5% (worst) | **REJECT**: worst realised in 2/3 windows and **MaxDD worst in 3/3** (39.5/30.3/33.5 vs 26.4/10.8/17.8); the g19 realised win does not survive the MaxDD prong of the rule. |
+
+No lever clears the rule → no 26y confirmation run, no salts. What the grid
+DID settle: with honest fills the arc's 5y realised is roughly flat to
+mildly positive in all three windows (2000–04 makes money through the
+dot-com bust with an 11% drawdown), and neither the eject gate nor the
+fallback-stop width is the lever — the deficit vs the record is structural
+(D3/D5: what the ticket buys and when), consistent with
+`project_edge_is_the_fat_tail`. Every number here is salt-0 and, for g19,
+on a 32%-covered universe (README §"Fast grid" caveat).
 
 ## 6. Guards built (integration tests) and the fix-armed rerun
 
@@ -155,9 +204,10 @@ Three PRs, all default-off / behaviour-preserving, goldens untouched
 
 | PR | what | tests |
 |---|---|---|
-| #2644 `feat/sim-exit-fill-next-open` | `sim_exit_fill_next_open` — `Next_open_fill_gate.make ~defer_entries ~defer_exits`; a Market order closing an `Exiting` position is held until a fresh bar. No engine change. | `test_sim_exit_next_open.ml`: OFF pins the Friday-open/Saturday fill (R1); ON fills Monday open; entries unaffected; two round trips across two weekends + a mid-week hole assert no trade date without a bar. Paired run of both docstring-flagged goldens bit-identical (table in PR). |
-| #2642 `feat/stop-skip-entry-bar` | `stops_config.stop_skip_entry_bar` — the stop-hit exit is masked on the bar whose date = the position's entry_date (structural, weekly trigger-only, catastrophic; short mirror); state machine still advances. | `test_stops_runner.ml` +9 (each ON case paired with an OFF R1 pin); `test_stop_skip_entry_bar_sim.ml` drives `Simulator.run` over four days: fills per step `[0;1;1;0]` OFF vs `[0;1;0;1]` ON. |
-| #2641 `feat/validator-v13-v14` | V13 (INV): every trade's entry/exit date has a bar for that symbol and the fill price lies inside that bar's [low, high]; V14 (EXP): a ≤1-day stop-out whose entry-day close is at/above the installed stop. `bars.daily` became a raw-OHLC record; V14 reads `stop_fill_distance_pct` (fill-basis) first. | `test_post_run_validator.ml` +7 (32 total), injected lookups. |
+| #2644 `feat/sim-exit-fill-next-open` — **MERGED 94a8c68 (17:18 PDT)**; rework 1 added the gate-level sibling-routing test (mutation-verified by both reviewers) | `sim_exit_fill_next_open` — `Next_open_fill_gate.make ~defer_entries ~defer_exits`; a Market order closing an `Exiting` position is held until a fresh bar. No engine change. | `test_sim_exit_next_open.ml`: OFF pins the Friday-open/Saturday fill (R1); ON fills Monday open; entries unaffected; two round trips across two weekends + a mid-week hole assert no trade date without a bar. Paired run of both docstring-flagged goldens bit-identical (table in PR). |
+| #2645 `exp/arc-rerun-2026-09-01` — **MERGED 6444eba (17:08 PDT)**: this record (README, specs, chain, per-arm artifacts), one text-only rework | — | — |
+| #2642 `feat/stop-skip-entry-bar` — **MERGED 60d5086 (16:44 PDT)** | `stops_config.stop_skip_entry_bar` — the stop-hit exit is masked on the bar whose date = the position's entry_date (structural, weekly trigger-only, catastrophic; short mirror); state machine still advances. | `test_stops_runner.ml` +9 (each ON case paired with an OFF R1 pin); `test_stop_skip_entry_bar_sim.ml` drives `Simulator.run` over four days: fills per step `[0;1;1;0]` OFF vs `[0;1;0;1]` ON. |
+| #2641 `feat/validator-v13-v14` — **MERGED 7da7f24 (17:40 PDT)** after two rework rounds (12 + 3 tests; 47 total; every V13/V14 Skip branch mutation-caught by exactly one test). Residuals recorded by the final reviewer, not blocking: the status file's "(32 tests)" line (fixed in the follow-up commit) and a dedicated test for V14's "no bar on the entry date" input shape, which today shares the `\| _ -> Skip` arm | V13 (INV): every trade's entry/exit date has a bar for that symbol and the fill price lies inside that bar's [low, high]; V14 (EXP): a ≤1-day stop-out whose entry-day close is at/above the installed stop. `bars.daily` became a raw-OHLC record; V14 reads `stop_fill_distance_pct` (fill-basis) first. | `test_post_run_validator.ml` +7 (32 total), injected lookups. |
 
 Side findings from the wave: `goldens_affected_check.sh` false-positives on
 a NEW nested `[@sexp.default]` field under an armed outer knob (issue

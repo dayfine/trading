@@ -1,0 +1,10 @@
+arc26y-fix-s0: AGR 2006-07-03->2006-07-06 3d pnl=-220482 stop_loss splice=2006-07-05
+arc26y-fix-s0: CHS 2004-12-17->2004-12-20 3d pnl=513550 volume_eject splice=2004-12-20
+arc26y-fix-s0: ICT 2014-10-28->2014-10-30 2d pnl=-161182 stop_loss splice=2014-10-28
+arc26y-fix-s0: NLCS 2014-05-14->2014-05-16 2d pnl=-211 stop_loss splice=2014-05-14
+arc26y-s0: ICT 2014-10-28->2014-10-30 2d pnl=-168933 stop_loss splice=2014-10-28
+arc26y-s0: NLCS 2014-05-14->2014-05-16 2d pnl=-222 stop_loss splice=2014-05-14
+b5-fullbook-s0: STMP 2021-07-30->2021-10-06 68d pnl=-197343 stop_loss splice=2021-10-05
+g00-fix-s0: CHS 2004-12-17->2004-12-20 3d pnl=513550 volume_eject splice=2004-12-20
+g00-s6-s0: CHS 2004-12-17->2004-12-20 3d pnl=481383 volume_eject splice=2004-12-20
+g19-novol-s6-s0: STMP 2021-07-30->2021-10-06 68d pnl=-208421 stop_loss splice=2021-10-05

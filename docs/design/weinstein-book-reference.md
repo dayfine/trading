@@ -351,6 +351,21 @@ closer to trading-range noise and carry no such argument.
 - Enter stop immediately as GTC (good-til-canceled) when you buy
 - **Pre-calculate stop before buying.** If stop requires >15% risk from entry → prefer other candidates.
 
+**Resolved question (2026-09-02) — can a stop entered at purchase be
+triggered by the entry bar's pre-fill range?** No. The book's instruction
+(Ch. 6) is to enter the protective GTC sell-stop *as soon as the stock is
+bought*, so that the position is never unprotected; the stop is a resting
+order that exists only from the fill forward. A low printed earlier on the
+entry day — which for an E-anchored buy-stop is the normal case, since the
+fill happens on the way up through E — cannot execute an order that did not
+yet exist. The simulator's step order (fills before the strategy) had been
+judging the freshly-filled position against that day's completed bar and
+stopping it on the pre-fill low (`dev/experiments/arc-rerun-2026-09-01/README.md`
+§D2: 173 of 3,029 entries on the 26y arc). Implementation:
+`stops_config.stop_skip_entry_bar` (PR #2642, default-off pending the A/B);
+post-run guard V14 (PR #2641). Settled by qc-behavioral review 5096349477
+reading the source text (local session).
+
 ### 5.2 Trailing Stop — Investor Method
 
 State machine with explicit transitions:

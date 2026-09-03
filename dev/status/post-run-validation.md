@@ -38,7 +38,7 @@ expectations so we never make these kinds of trades again."
   (`-run-dir -data-dir [-config] -out`).
 - `trading/trading/backtest/validation/test/test_post_run_validator.ml` — unit
   tests for V1-V14 (except the armed-only V3/V4 real-artifact path),
-  audit-join + severity/validate wiring (32 tests).
+  audit-join + severity/validate wiring (47 tests).
 
 ## Checks (V1-V14)
 
