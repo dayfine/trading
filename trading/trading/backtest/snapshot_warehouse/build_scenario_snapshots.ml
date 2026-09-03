@@ -22,7 +22,14 @@
     (which reuses {!Backtest.Runner.warmup_days_for} +
     {!Backtest.Runner.all_snapshot_symbols}), and delegates the warehouse build
     to the shared {!Build_runner.build}. Unblocks running large-N (e.g. N=3000)
-    goldens locally in snapshot mode. *)
+    goldens locally in snapshot mode.
+
+    Two optional, {b default-off} data-integrity passes run over the same
+    windowed bars before the build: {!Twin_detector} (cross-symbol rename twins;
+    when armed it {e drops} the losing leg) and {!Splice_detector}
+    (within-symbol ticker-reuse splices; report-only — it writes [splices.csv]
+    and never changes the symbol set). With both unarmed the tool is
+    bit-identical to its pre-#2646 behaviour. *)
 
 open Core
 module Scenario = Scenario_lib.Scenario
@@ -60,32 +67,52 @@ let _log_plan (plan : Plan.t) ~scenario_path =
     (Date.to_string plan.end_date)
     plan.benchmark_symbol
 
-(* Load a symbol's windowed adjusted-close series for twin detection. Returns
-   [None] when the CSV is missing / unreadable / empty in-window (that symbol
-   simply cannot be a twin candidate). *)
-let _load_series ~data_dir ~warmup_start ~end_date symbol =
+(* Load a symbol's windowed daily bars, ascending by date. Returns [None] when
+   the CSV is missing / unreadable / empty in-window — such a symbol simply
+   cannot be a candidate for either data-integrity pass below. *)
+let _load_windowed_bars ~data_dir ~warmup_start ~end_date symbol =
   let open Option.Let_syntax in
   let%bind storage = Result.ok (Csv.Csv_storage.create ~data_dir symbol) in
   let%bind bars = Result.ok (Csv.Csv_storage.get storage ()) in
   match Bar_window.filter ~start:warmup_start ~end_:end_date bars with
   | [] -> None
   | windowed ->
-      let closes =
-        List.map windowed ~f:(fun (b : Types.Daily_price.t) ->
-            (b.date, b.adjusted_close))
-        |> Array.of_list
+      let sorted =
+        Array.of_list windowed
+        |> Array.sorted_copy ~compare:(fun (a : Types.Daily_price.t) b ->
+            Date.compare a.date b.date)
       in
-      Array.sort closes ~compare:(fun (d1, _) (d2, _) -> Date.compare d1 d2);
-      let last_date, _ = closes.(Array.length closes - 1) in
-      Some { Twin_detector.symbol; data_end = last_date; closes }
+      Some sorted
 
-let _write_twin_report ~output_dir report =
+(* Project a symbol's windowed bars to the (date, adjusted_close) series the
+   cross-symbol twin pass compares. *)
+let _load_twin_series ~data_dir ~warmup_start ~end_date symbol =
+  let open Option.Let_syntax in
+  let%map bars = _load_windowed_bars ~data_dir ~warmup_start ~end_date symbol in
+  let closes =
+    Array.map bars ~f:(fun (b : Types.Daily_price.t) ->
+        (b.date, b.adjusted_close))
+  in
+  let last_date, _ = closes.(Array.length closes - 1) in
+  { Twin_detector.symbol; data_end = last_date; closes }
+
+(* The within-symbol continuity pass reads whole bars: the adjusted close for
+   the ratio, the raw close for the split guard, the volume for the report. *)
+let _load_splice_series ~data_dir ~warmup_start ~end_date symbol =
+  let open Option.Let_syntax in
+  let%map bars = _load_windowed_bars ~data_dir ~warmup_start ~end_date symbol in
+  { Splice_detector.symbol; bars }
+
+let _write_sidecar ~output_dir ~name ~data =
   (if not (Stdlib.Sys.file_exists output_dir) then
      try Stdlib.Sys.mkdir output_dir 0o755 with _ -> ());
-  let path = Filename.concat output_dir "rename_twin_report.txt" in
+  let path = Filename.concat output_dir name in
+  try Out_channel.write_all path ~data
+  with Sys_error msg -> Printf.eprintf "%s write failed: %s\n%!" name msg
+
+let _write_twin_report ~output_dir report =
   let text = Twin_detector.render report in
-  (try Out_channel.write_all path ~data:(text ^ "\n")
-   with Sys_error msg -> Printf.eprintf "twin report write failed: %s\n%!" msg);
+  _write_sidecar ~output_dir ~name:"rename_twin_report.txt" ~data:(text ^ "\n");
   Printf.eprintf "%s\n%!" text
 
 (* When armed, detect rename-twins across [all_symbols] and drop the losing
@@ -97,26 +124,47 @@ let _dedupe_symbols ~config ~data_dir ~warmup_start ~end_date ~output_dir
   else begin
     let series =
       List.filter_map all_symbols
-        ~f:(_load_series ~data_dir ~warmup_start ~end_date)
+        ~f:(_load_twin_series ~data_dir ~warmup_start ~end_date)
     in
     let report = Twin_detector.detect config series in
     _write_twin_report ~output_dir report;
     Twin_detector.survivors report ~all_symbols
   end
 
+(* When armed, scan every symbol's adjusted-close series for ticker-reuse
+   splices and write the [splices.csv] sidecar. REPORT-ONLY by construction:
+   the return type is [unit], so no symbol is dropped and no bar is truncated
+   whatever the scan finds. Default-off config → no scan, no file, no I/O. *)
+let _scan_splices ~config ~data_dir ~warmup_start ~end_date ~output_dir
+    all_symbols =
+  if config.Splice_detector.Config.enabled then begin
+    let series =
+      List.filter_map all_symbols
+        ~f:(_load_splice_series ~data_dir ~warmup_start ~end_date)
+    in
+    let report = Splice_detector.detect config series in
+    _write_sidecar ~output_dir ~name:"splices.csv"
+      ~data:(Splice_detector.to_csv report);
+    Printf.eprintf "%s\n%!" (Splice_detector.summary report)
+  end
+
 let main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
-    ~sketch_deep_days ~incremental ~progress_every ~twin_config () =
+    ~sketch_deep_days ~incremental ~progress_every ~twin_config ~splice_config
+    () =
   let scenario = Scenario.load scenario_path in
   let universe =
     _resolve_universe ~fixtures_root ~universe_path:scenario.universe_path
   in
   let plan = Plan.derive ~scenario ~universe in
   _log_plan plan ~scenario_path;
+  let data_dir = Fpath.v csv_data_dir in
   let symbols =
-    _dedupe_symbols ~config:twin_config ~data_dir:(Fpath.v csv_data_dir)
+    _dedupe_symbols ~config:twin_config ~data_dir
       ~warmup_start:plan.warmup_start ~end_date:plan.end_date ~output_dir
       plan.all_symbols
   in
+  _scan_splices ~config:splice_config ~data_dir ~warmup_start:plan.warmup_start
+    ~end_date:plan.end_date ~output_dir symbols;
   Build_runner.build ~symbols ~csv_data_dir ~output_dir
     ~benchmark_symbol:(Some plan.benchmark_symbol)
     ~start_date:(Some plan.warmup_start) ~end_date:(Some plan.end_date)
@@ -201,6 +249,26 @@ let command =
          (optional_with_default Twin_detector.Config.default.ret_epsilon float)
          ~doc:
            "E Absolute tolerance on the daily-return difference (basis=returns)"
+     and detect_splices =
+       flag "detect-splices" no_arg
+         ~doc:
+           "Scan each symbol for ticker-reuse splices (day-over-day adjusted \
+            close outside the band with no split behind it) and write \
+            splices.csv. REPORT-ONLY: never drops or truncates a symbol. \
+            Default off."
+     and splice_min_ratio =
+       flag "splice-min-ratio"
+         (optional_with_default Splice_detector.Config.default.min_ratio float)
+         ~doc:"R Lower bound of the accepted day-over-day adjusted-close ratio"
+     and splice_max_ratio =
+       flag "splice-max-ratio"
+         (optional_with_default Splice_detector.Config.default.max_ratio float)
+         ~doc:"R Upper bound of the accepted day-over-day adjusted-close ratio"
+     and splice_include_split_days =
+       flag "splice-include-split-days" no_arg
+         ~doc:
+           "Report out-of-band days even when a split is recoverable from the \
+            raw-vs-adjusted divergence (default: suppress those)"
      in
      fun () ->
        let basis =
@@ -222,7 +290,16 @@ let command =
            prefilter_rel_tol = Twin_detector.Config.default.prefilter_rel_tol;
          }
        in
+       let splice_config =
+         {
+           Splice_detector.Config.enabled = detect_splices;
+           min_ratio = splice_min_ratio;
+           max_ratio = splice_max_ratio;
+           skip_split_days = not splice_include_split_days;
+         }
+       in
        main ~scenario_path ~fixtures_root ~csv_data_dir ~output_dir
-         ~sketch_deep_days ~incremental ~progress_every ~twin_config ())
+         ~sketch_deep_days ~incremental ~progress_every ~twin_config
+         ~splice_config ())
 
 let () = Command_unix.run command

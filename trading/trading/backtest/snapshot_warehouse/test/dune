@@ -11,3 +11,10 @@
  (libraries core ounit2 matchers twin_detector)
  (preprocess
   (pps ppx_jane)))
+
+(test
+ (name test_splice_detector)
+ (modules test_splice_detector)
+ (libraries core ounit2 matchers types splice_detector)
+ (preprocess
+  (pps ppx_jane)))

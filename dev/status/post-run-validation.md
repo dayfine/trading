@@ -19,7 +19,7 @@ feat-backtest
 A read-only **post-run trade validator** (v1, report-only) that consumes a
 completed scenario run's artifacts (`trades.csv`, `trade_audit.sexp`,
 `open_positions.csv`) plus the per-symbol bar store, checks every trade against
-14 declared invariants / expectations (V1-V14), and emits a validation report
+15 declared invariants / expectations (V1-V15), and emits a validation report
 (`<out>.sexp` + human `<out>.md`).
 
 Derived from the 2026-07-12 visual trade audit
@@ -32,15 +32,18 @@ expectations so we never make these kinds of trades again."
 ## Surface
 
 - `trading/trading/backtest/validation/lib/validator_{types,step,artifacts,
-  row_checks,bar_checks,checks,report}.{ml,mli}` — 14 pure check functions over
-  parsed rows + injected lookups, plus a `run` orchestrator.
+  row_checks,bar_checks,splice_check,checks,report}.{ml,mli}` — 15 pure check
+  functions over parsed rows + injected lookups, plus a `run` orchestrator.
+- `trading/trading/backtest/snapshot_warehouse/splice_detector.{ml,mli}` — the
+  build-time sibling of V15: a pure within-symbol continuity scan, wired
+  default-off + report-only into `build_scenario_snapshots`.
 - `trading/trading/backtest/validation/bin/post_run_validator_cli.ml` — CLI
   (`-run-dir -data-dir [-config] -out`).
 - `trading/trading/backtest/validation/test/test_post_run_validator.ml` — unit
-  tests for V1-V14 (except the armed-only V3/V4 real-artifact path),
-  audit-join + severity/validate wiring (47 tests).
+  tests for V1-V15 (except the armed-only V3/V4 real-artifact path),
+  audit-join + severity/validate wiring (59 tests).
 
-## Checks (V1-V14)
+## Checks (V1-V15)
 
 | id | class | catches |
 |---|---|---|
@@ -58,9 +61,10 @@ expectations so we never make these kinds of trades again."
 | V12 | INVARIANT | installed stop wider than the `Stop_too_wide` gate would allow |
 | V13 | INVARIANT | fill dated on a day with no bar, or priced outside that bar's `[low, high]` (arc §D1 Saturday exits) |
 | V14 | EXPECTATION | `stop_loss` exit within 1 bar of entry whose entry-day close sat on the safe side of the installed stop (arc §D2) |
+| V15 | EXPECTATION | round trip with `\|pnl_pct\| > 100%` held <= 5 days whose entry or exit bar's `adjusted_close` jumped outside `[0.4, 2.5]` vs the prior bar — a data splice, not a trade (issue #2646, CHS) |
 
 v1 is **report-only** (exit code always 0). Severity default: V1-V7 + V12/V13
-INVARIANT, V8-V11 + V14 EXPECTATION; every check's severity is
+INVARIANT, V8-V11 + V14/V15 EXPECTATION; every check's severity is
 config-overridable
 (`severity_overrides`), which is the EXP→INV promotion path as prevention gates
 (declining-MA, overhead-resistance) get armed.
@@ -114,8 +118,67 @@ docker exec trading-1-dev bash -c \
   match arm and so one case. Each Skip branch was verified by mutating it to
   `Pass` and confirming a test goes red.
 
+- [x] **V15 + a build-time warehouse continuity gate** (feat/splice-gate-2646,
+  issue #2646). `CHS` 2004-12-17 -> 2004-12-20 stepped from an **adjusted**
+  close of 4.0693 to 15.8803 (x3.9) on volume ~5M -> ~1M, with the raw close
+  moving x4.0 — the adjustment factor barely changes, so no split is
+  recoverable and from that bar the series is a different security under a
+  recycled ticker. The arc's volume-eject bought Friday and "sold" Monday for
+  **+$513,550 on a three-day hold**: 70% of the g00-fix cell's realised P&L,
+  and enough to flip the sign of the 26y fix-armed cell. V13/V14 could not see
+  it — every bar exists and every fill is inside its bar's range; the bars are
+  simply the wrong company's.
+  - **V15 (EXP)**, `validator_bar_checks.check_v15`: a round trip that is both
+    implausibly profitable and implausibly brief (`|pnl_pct| >
+    splice_pnl_pct_threshold`, default 100.0, held at most
+    `splice_max_days_held`, default 5 calendar days) whose entry **or** exit
+    bar's `adjusted_close` moved by a factor strictly outside
+    `[splice_adj_ratio_min, splice_adj_ratio_max]` (0.4 / 2.5) against the
+    immediately preceding daily bar. The ratio is on the **adjusted** series so
+    ordinary splits — which move the raw close and leave the adjusted one
+    continuous — cannot flag. All four knobs are `[@sexp.default]` config
+    fields, so existing validator configs keep parsing. `bars.daily` gains an
+    `adjusted_close` field (its only non-raw column) to carry the series.
+  - **`Splice_detector`** (`trading/trading/backtest/snapshot_warehouse/
+    splice_detector.{ml,mli}`), a pure sibling of `Twin_detector`: that pass
+    compares whole series *across* symbols to find one company listed twice,
+    this one compares consecutive bars *within* one symbol to find two
+    companies listed once. Neither sees the other's defect — the CHS splice sat
+    in a warehouse the twin pass had already cleaned. When a candidate day's
+    raw-vs-adjusted divergence snaps to a small rational,
+    `Types.Split_detector.detect_split` recovers it and the finding is
+    suppressed (`skip_split_days`, default true) — this only fires on a feed
+    carrying an un-back-rolled corporate action, since a correctly adjusted
+    split never becomes a candidate at all.
+  - **Wiring is default-off and report-only** (`experiment-flag-discipline.md`
+    R1): `build_scenario_snapshots -detect-splices` (plus `-splice-min-ratio`,
+    `-splice-max-ratio`, `-splice-include-split-days`) writes
+    `<warehouse>/splices.csv` in the committed scan's exact columns and
+    precision, and `_scan_splices` returns `unit` — no symbol is dropped and no
+    bar truncated whatever it finds. Unarmed, the builder is bit-identical to
+    its pre-#2646 behaviour. A `truncate_at_splice`-style action, if ever
+    wanted, is a separate default-off flag.
+  - Verify: `dune runtest trading/backtest/validation
+    trading/backtest/snapshot_warehouse` — 12 V15 cases (the CHS specimen and
+    its SHORT mirror, a legitimate +120%/4-day trade on continuous bars, both
+    ends of the ratio band at and just past the bound, the entry-leg collapse,
+    both halves of the candidate predicate, the config-routed band, and every
+    Skip branch) plus 18 `Splice_detector` cases (including a correctly
+    adjusted 4:1 split that stays clean *even with the guard disabled*, and a
+    late-back-rolled 3:1 that is clean only *because* of the guard). Each V15
+    Skip branch was verified by mutating it to `Pass` and confirming a test
+    goes red.
+
 ## Follow-ups
 
+- Run V15 over the arc run as first acceptance: expect the CHS specimen to
+  reproduce, and cross-check the flagged set against the 184 tradeable rows in
+  `dev/experiments/arc-rerun-2026-09-01/results/splice-scan-tradeable.csv`.
+- Re-run any g00 / 2004-window arc result ex-CHS before citing it (issue #2646
+  ask 3) — still open; V15 makes the artifact detectable, it does not restate
+  the affected numbers.
+- Arm `-detect-splices` on the next warehouse rebuild and review `splices.csv`
+  before deciding whether a truncate-at-splice action is worth building.
 - Wire `scenario_runner --validate` post-step (out of scope for v1 per plan).
 - Promote V14 to INVARIANT via `severity_overrides` once the entry-bar stop
   evaluation is fixed and its expected count is 0.
@@ -128,7 +191,7 @@ docker exec trading-1-dev bash -c \
   the bar-dependent V3/V4/V7 are covered structurally but want a golden-run
   integration test.
 
-## Last updated: 2026-09-01
+## Last updated: 2026-09-03
 
 ## Interface stable
 
