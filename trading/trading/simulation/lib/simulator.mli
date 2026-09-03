@@ -165,15 +165,17 @@ type dependencies = {
       (** Next-bar-open Market-EXIT fill realism (Fix #1b, the exit sibling of
           {!sim_entry_fill_next_open};
           [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream C).
-          [false] (the default) is bit-identical to every existing baseline: a
-          Market exit order fills whenever the engine next matches it, including
-          against the stale signal bar retained on non-trading steps — so a
-          Friday-close exit decision fills on the Saturday step at Friday's own
-          open, a price that predates the decision, and the trade is stamped
-          Saturday. [true] holds a Market order routing to an [Exiting] position
-          back on any step where its symbol has no fresh bar, so it fills at the
-          next fresh trading bar's open. Scope: Market EXIT orders only (full
-          exits and partial trims alike); entries are governed independently by
+          [false] (this library's own default; the backtest runner threads the
+          strategy config, whose default is [true] since 2026-09-03, PR #2648)
+          reproduces the pre-flip basis bit-for-bit: a Market exit order fills
+          whenever the engine next matches it, including against the stale
+          signal bar retained on non-trading steps — so a Friday-close exit
+          decision fills on the Saturday step at Friday's own open, a price that
+          predates the decision, and the trade is stamped Saturday. [true] holds
+          a Market order routing to an [Exiting] position back on any step where
+          its symbol has no fresh bar, so it fills at the next fresh trading
+          bar's open. Scope: Market EXIT orders only (full exits and partial
+          trims alike); entries are governed independently by
           {!sim_entry_fill_next_open}, and stops / [StopLimit] orders are
           untouched. The decision-time [exit_price] is unchanged. Armed by the
           backtest runner from the strategy config

@@ -1,0 +1,4 @@
+symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry,position_id,stop_fill_distance_pct,max_stop,n_stop_raises
+AAPL,LONG,2018-03-03,2018-03-23,20,176.25,168.39,1418,-11143.99,-4.46,,,stop_loss,Stage2,1.8353,0.0501,intraday,20,70,AAPL-wein-12,0.0402,,0
+AAPL,LONG,2018-05-19,2018-11-21,186,187.19,179.73,1326,-9891.96,-3.99,,,stop_loss,Stage2,1.6213,0.0302,gap_down,186,70,AAPL-wein-13,0.0445,,0
+AAPL,SHORT,2018-11-24,2018-11-29,5,172.28,182.66,1136,-11796.73,-6.03,,,stop_loss,Stage4,1.6185,0.2237,gap_down,5,75,AAPL-wein-14,0.0401,,0

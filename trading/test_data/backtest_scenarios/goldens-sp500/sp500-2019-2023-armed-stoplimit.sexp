@@ -185,11 +185,12 @@
   ;; record, NO return-improvement claim attaches to these deltas -- the
   ;; large top-line swings are tail-path reshuffling on a pin, not evidence.
 
-  ((total_return_pct ((min 36.3288) (max 49.1509)))
-   (total_trades ((min 163.20) (max 220.80)))
-   (win_rate ((min 27.8906) (max 37.7344)))
-   (sharpe_ratio ((min 0.4719) (max 0.6386)))
-   (max_drawdown_pct ((min 18.2406) (max 24.6785)))
-   (avg_holding_days ((min 45.9973) (max 62.2318)))
-   (open_positions_value ((min 1200049.4) (max 1623596.4)))
+  ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111; paired old arm + dissection in dev/experiments/exit-basis-flip-2026-09-03/. Correctness re-pin: no return claim attaches to the delta.
+  ((total_return_pct ((min 24.9936) (max 33.8148)))
+   (total_trades ((min 157.2500) (max 212.7500)))
+   (win_rate ((min 23.8919) (max 32.3243)))
+   (sharpe_ratio ((min 0.3516) (max 0.4757)))
+   (max_drawdown_pct ((min 22.4950) (max 30.4344)))
+   (avg_holding_days ((min 47.9078) (max 64.8165)))
+   (open_positions_value ((min 983853.6055) (max 1331096.0545)))
    (wall_seconds         ((min 0.0)         (max 1500.0))))))

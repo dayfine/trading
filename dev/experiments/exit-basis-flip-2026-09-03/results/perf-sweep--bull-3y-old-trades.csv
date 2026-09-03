@@ -1,0 +1,13 @@
+symbol,side,entry_date,exit_date,days_held,entry_price,exit_price,quantity,pnl_dollars,pnl_percent,entry_stop,exit_stop,exit_trigger,entry_stage,entry_volume_ratio,stop_initial_distance_pct,stop_trigger_kind,days_to_first_stop_trigger,screener_score_at_entry,position_id,stop_fill_distance_pct,max_stop,n_stop_raises
+KO,LONG,2020-09-19,2020-09-24,5,50.75,48.21,4582,-11638.28,-5.00,,,stop_loss,Stage2,1.7249,0.1985,gap_down,5,40,KO-wein-24,0.0457,,0
+JPM,SHORT,2018-12-08,2019-01-19,42,103.23,103.77,674,-363.87,-0.52,,104.70,stop_loss,Stage4,1.1353,0.0192,intraday,42,60,JPM-wein-15,0.1394,104.70,0
+JPM,LONG,2019-04-27,2019-05-14,17,114.52,109.55,2113,-10496.38,-4.34,,,stop_loss,Stage2,1.5802,0.0830,gap_down,17,85,JPM-wein-19,0.0404,,0
+JNJ,LONG,2019-06-22,2019-07-13,21,142.12,140.12,1631,-3266.99,-1.41,,,stop_loss,Stage2,1.6924,0.0890,gap_down,21,40,JNJ-wein-20,0.0402,,0
+JNJ,LONG,2020-05-02,2020-06-12,41,149.62,142.84,1524,-10332.72,-4.53,,,stop_loss,Stage2,1.5765,0.0832,gap_down,41,65,JNJ-wein-22,0.0485,,0
+HD,LONG,2019-04-06,2019-05-08,32,202.27,194.49,1207,-9390.72,-3.85,,,stop_loss,Stage2,2.3430,0.1041,gap_down,32,95,HD-wein-17,0.0410,,0
+HD,LONG,2020-02-08,2020-02-28,20,238.84,218.63,973,-19664.33,-8.46,,,stop_loss,Stage2,2.0454,0.0528,gap_down,20,80,HD-wein-21,0.0462,,0
+CVX,LONG,2019-03-09,2019-04-27,49,121.74,118.40,1987,-6632.23,-2.74,,,stop_loss,Stage2,1.5722,0.1137,gap_down,49,60,CVX-wein-16,0.0409,,0
+AAPL,LONG,2018-03-03,2018-03-23,20,176.25,168.39,1418,-11143.99,-4.46,,,stop_loss,Stage2,1.8353,0.0501,intraday,20,70,AAPL-wein-12,0.0402,,0
+AAPL,LONG,2018-05-19,2018-11-21,186,187.19,179.73,1326,-9891.96,-3.99,,,stop_loss,Stage2,1.6213,0.0302,gap_down,186,70,AAPL-wein-13,0.0445,,0
+AAPL,SHORT,2018-11-24,2018-11-29,5,172.28,182.66,1136,-11796.73,-6.03,,,stop_loss,Stage4,1.6185,0.2237,gap_down,5,75,AAPL-wein-14,0.0401,,0
+AAPL,LONG,2019-04-06,2019-05-14,38,197.01,186.41,1201,-12730.07,-5.38,,,stop_loss,Stage2,1.5289,0.1950,gap_down,38,85,AAPL-wein-18,0.0413,,0

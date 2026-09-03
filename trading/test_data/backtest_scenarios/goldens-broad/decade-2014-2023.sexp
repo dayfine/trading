@@ -64,9 +64,10 @@
   ;; illiquid tail of the prior entry set. Some prior "return" here was
   ;; unrealizable ghost/illiquid MTM the flip exists to remove; the rest is
   ;; path divergence on a 10y compounding window. Covid twin BIT-IDENTICAL.
-  ((total_return_pct   ((min 29.5) (max 44.2)))
-   (total_trades       ((min 333) (max 499)))
-   (win_rate           ((min 28.1) (max 42.1)))
-   (sharpe_ratio       ((min 0.21) (max 0.32)))
-   (max_drawdown_pct   ((min 26.2) (max 39.3)))
-   (avg_holding_days   ((min 40.0) (max 60.0))))))
+  ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111 (total_return_pct: at least ±5pp); paired old arm (both knobs pinned false, run directly) + dissection in dev/experiments/exit-basis-flip-2026-09-03/. NOTE: the prior pin was already stale — it predates the 2026-08-24 (#2530) and 2026-08-26 (#2569) default flips; tier 4 is a local release gate with no CI consumer. Correctness re-pin: no return claim attaches to the delta.
+  ((total_return_pct ((min 92.4723) (max 125.1095)))
+   (total_trades ((min 244.8000) (max 331.2000)))
+   (win_rate ((min 33.6458) (max 45.5208)))
+   (sharpe_ratio ((min 0.4030) (max 0.5452)))
+   (max_drawdown_pct ((min 30.0098) (max 40.6015)))
+   (avg_holding_days ((min 54.8191) (max 74.1670))))))

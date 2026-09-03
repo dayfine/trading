@@ -141,16 +141,17 @@
   ;; reshuffles on regression pins, not evidence about the fill model.
 
 
-  ((total_return_pct ((min 65.2837) (max 88.3252)))
-   (total_trades ((min 153.85) (max 208.15)))
-   (win_rate ((min 23.4806) (max 31.7680)))
-   (sharpe_ratio ((min 0.6036) (max 0.8168)))
-   (max_drawdown_pct ((min 20.2885) (max 27.4493)))
-   (avg_holding_days ((min 53.8646) (max 72.8757)))
-   (open_positions_value ((min 1450074.3) (max 1961865.3)))
-   (sortino_ratio_annualized ((min 0.8187) (max 1.1078)))
-   (calmar_ratio ((min 0.4309) (max 0.5831)))
-   (ulcer_index ((min 8.0853) (max 10.9391)))
+  ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111; paired old arm + dissection in dev/experiments/exit-basis-flip-2026-09-03/. Correctness re-pin: no return claim attaches to the delta.
+  ((total_return_pct ((min 52.5457) (max 71.0912)))
+   (total_trades ((min 156.4000) (max 211.6000)))
+   (win_rate ((min 22.1739) (max 30.0000)))
+   (sharpe_ratio ((min 0.5204) (max 0.7041)))
+   (max_drawdown_pct ((min 21.2648) (max 28.7701)))
+   (avg_holding_days ((min 53.9242) (max 72.9562)))
+   (open_positions_value ((min 1331439.4713) (max 1801359.2847)))
+   (sortino_ratio_annualized ((min 0.6809) (max 0.9212)))
+   (calmar_ratio ((min 0.3442) (max 0.4656)))
+   (ulcer_index ((min 9.5003) (max 12.8533)))
    ;; wall_seconds pin sized wide (CI ~920s, local parallel ~200s) —
    ;; catches only catastrophic 2x slowdowns per design intent.
    (wall_seconds       ((min 0.0)          (max 1500.0))))))

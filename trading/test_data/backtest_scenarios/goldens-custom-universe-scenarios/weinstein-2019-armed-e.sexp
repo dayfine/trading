@@ -116,10 +116,11 @@
    (rename_detect_min_overlap_days "live-only ticker-rename detector (#2083 fix 2); report-layer data hygiene, no backtest consumer")
    (rename_detect_match_fraction "live-only ticker-rename detector (#2083 fix 2); report-layer data hygiene, no backtest consumer")))
  (expected
-  ((total_return_pct  ((min 67.3160)  (max 91.0746)))
-   (total_trades      ((min 158.95)   (max 215.05)))
-   (win_rate          ((min 25.9091)  (max 35.0535)))
-   (sharpe_ratio      ((min 0.6812)   (max 0.9216)))
-   (max_drawdown_pct  ((min 16.8977)  (max 22.8617)))
-   (avg_holding_days  ((min 46.5864)  (max 63.0286)))
+  ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111; paired old arm + dissection in dev/experiments/exit-basis-flip-2026-09-03/. Correctness re-pin: no return claim attaches to the delta.
+  ((total_return_pct ((min 50.4125) (max 68.2052)))
+   (total_trades ((min 150.4500) (max 203.5500)))
+   (win_rate ((min 24.4915) (max 33.1356)))
+   (sharpe_ratio ((min 0.5610) (max 0.7590)))
+   (max_drawdown_pct ((min 16.8530) (max 22.8011)))
+   (avg_holding_days ((min 50.4141) (max 68.2073)))
    (wall_seconds      ((min 0.0)      (max 1800.0))))))

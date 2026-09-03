@@ -66,9 +66,10 @@
   ;; ghost-position cash into live entries (trades 205→225) and the ADV gate
   ;; reshapes the entry set — path divergence, not an alpha claim. The
   ;; covid-recovery twin re-ran BIT-IDENTICAL (no ghost/gate hit there).
-  ((total_return_pct   ((min 61.9)  (max 92.8)))
-   (total_trades       ((min 180)   (max 270)))
-   (win_rate           ((min 31.6)  (max 47.5)))
-   (sharpe_ratio       ((min  0.49) (max 0.73)))
-   (max_drawdown_pct   ((min 19.7)  (max 29.5)))
-   (avg_holding_days   ((min 37.5)  (max 56.3))))))
+  ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111 (total_return_pct: at least ±5pp); paired old arm (both knobs pinned false, run directly) + dissection in dev/experiments/exit-basis-flip-2026-09-03/. NOTE: the prior pin was already stale — it predates the 2026-08-24 (#2530) and 2026-08-26 (#2569) default flips; tier 4 is a local release gate with no CI consumer. Correctness re-pin: no return claim attaches to the delta.
+  ((total_return_pct ((min 48.3640) (max 65.4336)))
+   (total_trades ((min 156.4000) (max 211.6000)))
+   (win_rate ((min 33.2609) (max 45.0000)))
+   (sharpe_ratio ((min 0.4423) (max 0.5984)))
+   (max_drawdown_pct ((min 29.8039) (max 40.3230)))
+   (avg_holding_days ((min 50.0761) (max 67.7500))))))

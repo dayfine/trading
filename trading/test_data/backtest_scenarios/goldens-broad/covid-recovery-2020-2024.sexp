@@ -64,9 +64,10 @@
   ;; 2026-07-10-realism-defaults-flip): BIT-IDENTICAL actuals (134.01 / 193 /
   ;; 42.49 / 0.84 / 31.50 / 49.46) — no ghost or sub-$1M-ADV fill in this
   ;; window's path. Bands unchanged.
-  ((total_return_pct   ((min 107.2)  (max 160.8)))
-   (total_trades       ((min 154)    (max 232)))
-   (win_rate           ((min  34.0)  (max  51.0)))
-   (sharpe_ratio       ((min   0.67) (max   1.00)))
-   (max_drawdown_pct   ((min  25.2)  (max  37.8)))
-   (avg_holding_days   ((min  39.6)  (max  59.4))))))
+  ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111 (total_return_pct: at least ±5pp); paired old arm (both knobs pinned false, run directly) + dissection in dev/experiments/exit-basis-flip-2026-09-03/. NOTE: the prior pin was already stale — it predates the 2026-08-24 (#2530) and 2026-08-26 (#2569) default flips; tier 4 is a local release gate with no CI consumer. Correctness re-pin: no return claim attaches to the delta.
+  ((total_return_pct ((min 37.5044) (max 50.7412)))
+   (total_trades ((min 125.8000) (max 170.2000)))
+   (win_rate ((min 29.2905) (max 39.6284)))
+   (sharpe_ratio ((min 0.4018) (max 0.5436)))
+   (max_drawdown_pct ((min 27.2340) (max 36.8459)))
+   (avg_holding_days ((min 49.7595) (max 67.3216))))))
