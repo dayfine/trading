@@ -194,6 +194,53 @@ _is_cited() {
   return 1
 }
 
+_git_log_date() {
+  # $1 = path, relative to ROOT, to date via git history.
+  #
+  # Prints the YYYY-MM-DD of the path's most recent commit on stdout, or
+  # nothing (exit 0) if git ran successfully but the path has no history --
+  # that is a legitimate, expected outcome callers already handle. On a
+  # REAL git failure, prints nothing to stdout, prints git's own message to
+  # stderr, and returns 1 -- callers MUST check the return value and treat
+  # 1 as fatal, never as "no history" (see the two call sites below).
+  #
+  # WHY THE INLINE `-c safe.directory=`. The 2026-09 prune-candidates-weekly
+  # GHA failures (issue #2633) were this exact call site dying with "fatal:
+  # detected dubious ownership in repository at '$ROOT'": actions/checkout@v4
+  # adds a safe.directory exception via `git config --global`, but it does so
+  # under a TEMPORARILY overridden HOME and restores the real HOME
+  # (/home/opam) before any later step runs -- so the exception never
+  # reaches this script, which then runs `git` against a workspace owned by
+  # a different UID than the container's `--user 0`. Passing
+  # `-c safe.directory="$ROOT"` makes every call self-sufficient regardless
+  # of ambient git config, with no side effect on the invoking environment
+  # (no `--global` write, unlike checkout's approach). Reproduced locally by
+  # forcing the same failure with GIT_TEST_ASSUME_DIFFERENT_OWNER=1 (git's
+  # own test-support env var for exactly this code path) -- see
+  # prune_candidates_test.sh Fixture F, which pins both that the failure is
+  # reproducible and that this fix clears it.
+  #
+  # WHY THE EXIT-STATUS CHECK. The old call sites piped git's stderr to
+  # /dev/null and never checked $?, so a real git failure and "no history
+  # for this path" were indistinguishable -- both produced an empty
+  # $cdate. Checker 2's own sanity probe then fired on the resulting
+  # all-empty-dates state, but blamed a fabricated cause ("was not flagged
+  # as an orphan candidate") instead of the real one (every git call
+  # failing). Surfacing git's actual exit status and stderr here is what
+  # makes the reported reason match the real one.
+  local path out rc
+  path="$1"
+  out=$(cd "$ROOT" && git -c safe.directory="$ROOT" log -1 --format=%cd \
+    --date=format:%Y-%m-%d -- "$path" 2>&1)
+  rc=$?
+  if [ "$rc" -ne 0 ]; then
+    echo "git log -- '$path' failed (exit $rc): $out" >&2
+    return 1
+  fi
+  printf '%s' "$out"
+  return 0
+}
+
 _flag_classification() {
   # $1 = flag name (already known to have a ledger REJECT and to pass the
   # live-reference test -- callers should not bother invoking this
@@ -316,7 +363,10 @@ checker1() {
   newest=""
   newest_epoch=-1
   for f in $all_docs; do
-    cdate=$(cd "$ROOT" && git log -1 --format=%cd --date=format:%Y-%m-%d -- "dev/notes/$f" 2>/dev/null)
+    if ! cdate=$(_git_log_date "dev/notes/$f"); then
+      echo "FAIL(checker1): git log failed dating dev/notes/$f -- see the git error above; refusing to report a dating decision built on a missing/failed lookup." >&2
+      return 1
+    fi
     [ -n "$cdate" ] || cdate="$TODAY"
     ce=$(_to_epoch "$cdate") || ce=0
     if [ "$ce" -gt "$newest_epoch" ]; then
@@ -407,10 +457,14 @@ checker2() {
   probed_known_orphan=0
   for base in $all_dirs; do
     d="dev/experiments/$base"
-    cdate=$(cd "$ROOT" && git log -1 --format=%cd --date=format:%Y-%m-%d -- "$d" 2>/dev/null)
+    if ! cdate=$(_git_log_date "$d"); then
+      echo "FAIL(checker2): git log failed dating $d -- see the git error above; refusing to report a dating decision built on a missing/failed lookup." >&2
+      return 1
+    fi
     if [ -z "$cdate" ]; then
-      # No git history for a tracked path is unexpected; err toward NOT
-      # proposing it rather than risk quarantine-bypassing an untraceable dir.
+      # git ran fine but the path genuinely has no history -- unexpected for
+      # a tracked path; err toward NOT proposing it rather than risk
+      # quarantine-bypassing an untraceable dir.
       continue
     fi
     age=$(_age_days "$cdate")
