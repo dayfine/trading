@@ -1,5 +1,5 @@
 (test
  (name test_post_run_validator)
- (libraries core ounit2 matchers post_run_validator weinstein.types)
+ (libraries core ounit2 matchers post_run_validator types weinstein.types)
  (preprocess
   (pps ppx_jane)))

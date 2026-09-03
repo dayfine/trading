@@ -180,8 +180,10 @@ let _weekly_last_bars (daily : Types.Daily_price.t list) =
 
 (* Raw OHLCV, deliberately unadjusted: the simulator fills against
    [Daily_price.open_price/high_price/low_price/close_price], so V13's
-   fill-in-range check must compare against the same numbers. Only
-   [weekly_closes] above is on the adjusted basis. *)
+   fill-in-range check must compare against the same numbers. [weekly_closes]
+   above and the [adjusted_close] field below are the adjusted-basis
+   exceptions; V15 needs the latter to tell a feed splice (adjusted series
+   jumps) from an ordinary split (only the raw series jumps). *)
 let _daily_bar_of (b : Types.Daily_price.t) =
   {
     date = b.date;
@@ -189,10 +191,11 @@ let _daily_bar_of (b : Types.Daily_price.t) =
     high = b.high_price;
     low = b.low_price;
     close = b.close_price;
+    adjusted_close = b.adjusted_close;
     volume = b.volume;
   }
 
-let _bars_of_daily daily =
+let bars_of_daily daily =
   let weekly = _weekly_last_bars daily in
   {
     weekly_dates =
@@ -208,7 +211,7 @@ let _load_one ~data_dir ~run_end symbol =
     Csv.Csv_storage.create ~data_dir:(Fpath.v data_dir) symbol
   in
   let%map daily = Csv.Csv_storage.get storage ~end_date:run_end () in
-  _bars_of_daily daily
+  bars_of_daily daily
 
 let load_bars ~data_dir ~run_end =
   let cache = Hashtbl.create (module String) in

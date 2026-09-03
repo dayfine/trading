@@ -13,6 +13,14 @@
  (preprocess
   (pps ppx_jane)))
 
+(library
+ (name splice_detector)
+ (public_name trading.backtest.splice_detector)
+ (modules splice_detector)
+ (libraries core types)
+ (preprocess
+  (pps ppx_jane)))
+
 (executable
  (name build_scenario_snapshots)
  (modules build_scenario_snapshots)
@@ -29,6 +37,7 @@
   scenario_lib
   scripts.build_runner
   scenario_snapshot_plan
+  splice_detector
   twin_detector)
  (preprocess
   (pps ppx_jane)))

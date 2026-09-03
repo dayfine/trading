@@ -1,6 +1,10 @@
 (** Checks that need the per-symbol bar store: V3 (dollar-ADV floor), V4 (stale
     open position), V7 (virgin-territory vs history), V9 (overhead supply), V10
-    (entry-week spike), V13 (fill causality), V14 (entry-bar stop-out). *)
+    (entry-week spike), V13 (fill causality), V14 (entry-bar stop-out).
+
+    V15 (data-store splices) is a different concern — the bar store's own
+    integrity rather than a strategy decision or fill — and lives in
+    {!Validator_splice_check}. *)
 
 open Validator_types
 
