@@ -3,6 +3,7 @@
   test_stop_log
   test_runner_filter
   test_window_filter
+  test_runner_empty_window
   test_trace
   test_trade_audit
   test_trade_audit_recorder
@@ -59,6 +60,7 @@
   trading.backtest.runner_args
   release_report
   scenario_lib
+  sweep_weekly_start
   weinstein.data_source
   weinstein.snapshot_pipeline
   weinstein.snapshot_runtime

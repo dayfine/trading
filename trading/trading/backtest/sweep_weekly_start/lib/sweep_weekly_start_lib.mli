@@ -22,90 +22,11 @@
 
 open Core
 
-type cell = {
-  start_date : Date.t;
-      (** Monday on which the simulation starts. The BAH strategy itself enters
-          on the first trading day at or after [start_date], so when this Monday
-          is a US market holiday the actual fill happens on Tuesday — see
-          {!Backtest.Runner.run_backtest} fill semantics. *)
-  final_value : float;
-      (** Final portfolio value at [end_date], in dollars. Equal to
-          [Summary.final_portfolio_value]. *)
-  total_return : float;
-      (** Total return as a fraction (not percent):
-          [(final_value - initial_cash) / initial_cash]. Convert to percent by
-          multiplying by 100. *)
-  cagr : float;
-      (** Compound annual growth rate as a fraction. Equal to the simulator's
-          [CAGR] metric divided by 100 (the simulator stores CAGR in percent;
-          this field stores it as a fraction for parity with [total_return]). *)
-  max_dd : float;
-      (** Maximum peak-to-trough drawdown as a fraction (always ≥ 0). Equal to
-          the simulator's [MaxDrawdown] metric divided by 100. *)
-  sharpe : float;
-      (** Annualized Sharpe ratio (dimensionless). Equal to the simulator's
-          [SharpeRatio] metric. *)
-}
-[@@deriving sexp, eq, show]
-(** One cell of the sweep: the metrics for a single (start_date, end_date) BAH
-    run. *)
-
-type summary = {
-  best_cell_start : Date.t;
-      (** Start date of the cell with the highest CAGR. *)
-  best_cagr : float;  (** Best CAGR (fraction). *)
-  worst_cell_start : Date.t;
-      (** Start date of the cell with the lowest CAGR. *)
-  worst_cagr : float;  (** Worst CAGR (fraction). *)
-  median_cagr : float;
-      (** Median CAGR across all cells (fraction). For an even cell count the
-          median is the arithmetic mean of the two central values. *)
-  mean_cagr : float;  (** Arithmetic mean CAGR across all cells (fraction). *)
-  stddev_cagr : float;
-      (** Sample standard deviation of CAGR across cells. [0.0] when fewer than
-          2 cells. *)
-  n_cells : int;
-      (** Total number of cells in the sweep. May differ from
-          [config.years_back × 52] when the calendar window starts mid-week or
-          includes leap-week artefacts; the source of truth is [cells]. *)
-}
-[@@deriving sexp, eq, show]
-(** Aggregate stats across the cell list. Computed by {!summarize}; serialized
-    as part of {!sweep_result}. *)
-
-type sweep_result = {
-  run_date : Date.t;  (** Date the sweep was generated. *)
-  end_date : Date.t;
-      (** End date used for every cell. Equal to [run_date] when the user does
-          not override [--end-date]; settable via the CLI / API for reproducible
-          tests and replay. *)
-  symbol : string;  (** Symbol used by the BAH strategy. *)
-  initial_cash : float;
-      (** Starting cash for every cell. Same value across cells — the sweep
-          intentionally normalises capital so the only varying axis is
-          start-date. *)
-  years_back : int;  (** Configured trailing-window length, in years. *)
-  cells : cell list;
-      (** Cells in chronological order (earliest start_date first). *)
-  summary : summary;
-      (** Aggregate stats. Derived from [cells] — recomputable. *)
-}
-[@@deriving sexp, eq, show]
-(** Full result of one sweep invocation, serializable as the golden artifact. *)
-
-type config = {
-  symbol : string;  (** Symbol for the BAH strategy, e.g. ["SPY"]. *)
-  initial_cash : float;  (** Starting cash for every cell. *)
-  years_back : int;  (** Trailing-window length in years. *)
-  end_date : Date.t;  (** End date for every cell. *)
-  fixtures_root : string;
-      (** Path to [trading/test_data/backtest_scenarios] used to resolve the
-          single-symbol universe file. *)
-  universe_path : string;
-      (** Universe-file path relative to [fixtures_root], e.g.
-          ["universes/spy-only.sexp"]. *)
-}
-(** Inputs to {!run}. *)
+include module type of Sweep_types
+(** The data model — {!Sweep_types.cell}, {!Sweep_types.summary},
+    {!Sweep_types.sweep_result} and {!Sweep_types.config}, with their [sexp] /
+    [eq] / [show] derivations. Re-exported so every caller can keep naming them
+    through this module; {!Sweep_types} carries the per-field documentation. *)
 
 val mondays_in_window : end_date:Date.t -> years_back:int -> Date.t list
 (** Enumerate every Monday in [(end_date - years_back years) .. end_date],
@@ -136,12 +57,29 @@ val format_markdown : ?max_cells:int -> sweep_result -> string
     every cell is rendered. *)
 
 val run_one :
-  config -> Date.t -> sector_map_override:(string, string) Hashtbl.t -> cell
+  config ->
+  Date.t ->
+  sector_map_override:(string, string) Hashtbl.t ->
+  cell option
 (** Run a single BAH cell starting on [start_date]. Loads SPY bars via
     {!Backtest.Runner.run_backtest} with the configured [sector_map_override]
     and [strategy_choice = Bah_benchmark { symbol }]. Pure with respect to its
     inputs (modulo CSV loading) — the same arguments always produce the same
-    cell.
+    result.
+
+    [None] when [start_date .. cfg.end_date] holds no trading day, i.e. the
+    runner raised {!Backtest.Window_filter.Empty_measurement_window}. That
+    happens routinely here: [end_date] defaults to the run date while the
+    committed bars stop at a fixed floor, so every Monday past the floor is
+    unmeasurable. Such a cell carries no entry-timing information, and
+    fabricating a flat 0%-return cell for it would drag the sweep's median /
+    mean / stddev toward zero — so it is dropped, with a line on stderr naming
+    the skipped date (issue #2632; before the fix the whole sweep died with
+    [Invalid_argument "List.last"] on the first such Monday, taking every other
+    cell down with it).
+
+    Any other exception propagates: only the degenerate-window case is
+    tolerated, never a genuine failure.
 
     [sector_map_override] is passed in (rather than constructed internally) so
     {!run} can load the universe file once and reuse it across cells. *)
@@ -150,4 +88,9 @@ val run : config -> sweep_result
 (** Top-level entry point: enumerate Mondays, run one cell per Monday,
     summarise, and return the result. Calls {!Universe_file.load} on
     [config.fixtures_root ^ "/" ^ config.universe_path] to build the sector-map
-    override. Sets [run_date] to [config.end_date] (today by default). *)
+    override. Sets [run_date] to [config.end_date] (today by default).
+
+    Mondays whose window holds no trading day are skipped (see {!run_one}), so
+    [summary.n_cells] can be smaller than the Monday count — and is [0], with
+    the markdown renderer emitting its "no cells" notice, when every Monday in
+    the window is past the data floor. *)
