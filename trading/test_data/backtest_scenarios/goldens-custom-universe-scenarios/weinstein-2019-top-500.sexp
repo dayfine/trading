@@ -194,16 +194,17 @@
   ;; reshuffles on regression pins, not evidence about the fill model.
 
 
-  ((total_return_pct   ((min 404.1556)       (max 546.7989)))
-   (total_trades       ((min 147.05)        (max 198.95)))
-   (win_rate           ((min 21.1271)       (max 28.5839)))
-   (sharpe_ratio       ((min 0.6670)      (max 0.9025)))
-   (max_drawdown_pct   ((min 65.6494)       (max 88.8200)))
-   (avg_holding_days   ((min 52.9849)       (max 71.6856)))
-   (open_positions_value ((min 3980687.0)   (max 5385635.5)))
-   (sortino_ratio_annualized ((min 0.7875) (max 1.0656)))
-   (calmar_ratio       ((min 0.4624)      (max 0.6258)))
-   (ulcer_index        ((min 29.7351)       (max 40.2300)))
+  ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111; paired old arm + dissection in dev/experiments/exit-basis-flip-2026-09-03/. Correctness re-pin: no return claim attaches to the delta.
+  ((total_return_pct ((min 34.5120) (max 46.6927)))
+   (total_trades ((min 160.6500) (max 217.3500)))
+   (win_rate ((min 23.8360) (max 32.2487)))
+   (sharpe_ratio ((min 0.4109) (max 0.5559)))
+   (max_drawdown_pct ((min 32.4418) (max 43.8918)))
+   (avg_holding_days ((min 52.3177) (max 70.7828)))
+   (open_positions_value ((min 972125.3395) (max 1315228.4005)))
+   (sortino_ratio_annualized ((min 0.4938) (max 0.6681)))
+   (calmar_ratio ((min 0.1575) (max 0.2130)))
+   (ulcer_index ((min 13.6071) (max 18.4096)))
    ;; wall_seconds guards only the MAX (catastrophic slowdown). The old
    ;; min 100.0 was the 2026-08-25 "GHA flake" (#2547 root cause, read
    ;; from the first #2549-uploaded per-cell artifact): fast warm-cache
