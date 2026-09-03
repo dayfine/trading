@@ -1,0 +1,106 @@
+[09-03 01:09:38] run tree HEAD=398f57111 (expect 398f57111)
+[09-03 01:09:41] RUN goldens-sp500--sp500-2019-2023-armed-stoplimit-new
+[09-03 01:25:39] RESULT goldens-sp500--sp500-2019-2023-armed-stoplimit-new => total_return_pct 29.404204388899498 total_trades 185 win_rate 28.108108108108109 sharpe_ratio 0.41363448722144608 max_drawdown_pct 26.464714506624397  [FAIL (total_return_pct low (29.40 < 36.33); sharpe_ratio low (0.41 < 0.47); max_drawdown_pct high (26.46 > 24.68); open_positions_value low (1157474.83 < 1200049.40))] (wall 958s)
+[09-03 01:25:39] RUN goldens-sp500--sp500-2019-2023-armed-stoplimit-old
+[09-03 01:26:25] RESTART with --no-emit-all-eligible (postsubmit parity; metrics unaffected — actual.sexp is written before the diagnostic)
+[09-03 01:26:25] run tree HEAD=398f57111 (expect 398f57111)
+[09-03 01:26:28] SKIP goldens-sp500--sp500-2019-2023-armed-stoplimit-new
+[09-03 01:26:28] RUN goldens-sp500--sp500-2019-2023-armed-stoplimit-old
+[09-03 01:30:04] RESULT goldens-sp500--sp500-2019-2023-armed-stoplimit-old => total_return_pct 38.800852319920438 total_trades 187 win_rate 31.550802139037433 sharpe_ratio 0.51774917358632655 max_drawdown_pct 21.459555977954711  [FAIL (open_positions_value low (1197985.47 < 1200049.40))] (wall 215s)
+[09-03 01:30:04] RUN goldens-sp500--sp500-2019-2023-long-only-new
+[09-03 01:32:46] RESULT goldens-sp500--sp500-2019-2023-long-only-new => total_return_pct 78.084228061558889 total_trades 125 win_rate 35.199999999999996 sharpe_ratio 0.6969390333389518 max_drawdown_pct 33.594018333623019  [PASS] (wall 162s)
+[09-03 01:32:46] RUN goldens-sp500--sp500-2019-2023-new
+[09-03 01:35:45] RESULT goldens-sp500--sp500-2019-2023-new => total_return_pct 61.818413426377717 total_trades 184 win_rate 26.086956521739129 sharpe_ratio 0.61224920428878982 max_drawdown_pct 25.01744675037359  [FAIL (total_return_pct low (61.82 < 65.28); sortino_ratio_annualized low (0.80 < 0.82); calmar_ratio low (0.40 < 0.43); ulcer_index high (11.18 > 10.94))] (wall 179s)
+[09-03 01:35:45] RUN goldens-custom-universe-scenarios--weinstein-2019-full-pool-new
+[09-03 01:39:23] RESULT goldens-custom-universe-scenarios--weinstein-2019-full-pool-new => <no result - see /tmp/sweeps/d1d2g/goldens-custom-universe-scenarios--weinstein-2019-full-pool-new.log; OOM leaves empty log> [PASS] (wall 218s)
+[09-03 01:39:23] RUN goldens-custom-universe-scenarios--weinstein-2019-top-500-new
+[09-03 01:40:24] RESULT-CORRECTED goldens-custom-universe-scenarios--weinstein-2019-full-pool-new => total_return_pct 41.749708622161812 total_trades 198 win_rate 26.262626262626267 sharpe_ratio 0.47937687067501089 max_drawdown_pct 26.391712838304603  [PASS] (salvaged by hand: spec name weinstein-2019-full-pool-composition)
+[09-03 01:40:24] run tree HEAD=398f57111 (expect 398f57111)
+[09-03 01:40:28] SKIP goldens-sp500--sp500-2019-2023-armed-stoplimit-new
+[09-03 01:40:28] SKIP goldens-sp500--sp500-2019-2023-armed-stoplimit-old
+[09-03 01:40:28] SKIP goldens-sp500--sp500-2019-2023-long-only-new
+[09-03 01:40:28] SKIP goldens-sp500--sp500-2019-2023-new
+[09-03 01:40:28] SKIP goldens-custom-universe-scenarios--weinstein-2019-full-pool-new
+[09-03 01:40:28] RUN goldens-custom-universe-scenarios--weinstein-2019-top-500-new (spec name weinstein-2019-top-500-composition)
+[09-03 01:42:41] RESULT goldens-custom-universe-scenarios--weinstein-2019-top-500-new => total_return_pct 40.602381936076981 total_trades 189 win_rate 28.042328042328041 sharpe_ratio 0.48342830125797021 max_drawdown_pct 38.166765848092574  [FAIL (total_return_pct low (40.60 < 404.16); sharpe_ratio low (0.48 < 0.67); max_drawdown_pct low (38.17 < 65.65); open_positions_value low (1143676.87 < 3980687.00); sortino_ratio_annualized low (0.58 < 0.79); calmar_ratio low (0.19 < 0.46); ulcer_index low (16.01 < 29.74))] (wall 133s)
+[09-03 01:42:41] RUN goldens-custom-universe-scenarios--weinstein-2019-armed-e-new (spec name weinstein-2019-armed-e)
+[09-03 01:46:23] RESULT goldens-custom-universe-scenarios--weinstein-2019-armed-e-new => total_return_pct 59.308838485752858 total_trades 177 win_rate 28.8135593220339 sharpe_ratio 0.6600374268457323 max_drawdown_pct 19.827051447710552  [FAIL (total_return_pct low (59.31 < 67.32); sharpe_ratio low (0.66 < 0.68))] (wall 222s)
+[09-03 01:46:23] RUN goldens-custom-universe-scenarios--weinstein-2019-armed-e-old (spec name weinstein-2019-armed-e)
+[09-03 01:50:00] RESULT goldens-custom-universe-scenarios--weinstein-2019-armed-e-old => total_return_pct 79.195347573398735 total_trades 187 win_rate 30.481283422459892 sharpe_ratio 0.80136249966212836 max_drawdown_pct 19.879725255758775  [PASS] (wall 217s)
+[09-03 01:50:00] PHASE 1 COMPLETE
+[09-03 01:50:01] RUN goldens-sp500-historical--sp500-2010-2026-new (spec name sp500-2010-2026-historical)
+[09-03 01:56:51] RESULT goldens-sp500-historical--sp500-2010-2026-new => total_return_pct 388.78841951651611 total_trades 462 win_rate 36.796536796536792 sharpe_ratio 0.44832926429590536 max_drawdown_pct 62.325711356934953  [FAIL (total_return_pct low (388.79 < 460.57); open_positions_value low (2017886.33 < 3486343.70))] (wall 410s)
+[09-03 01:56:51] RUN goldens-sp500-historical--sp500-2010-2026-longshort-new (spec name sp500-2010-2026-longshort-historical)
+[09-03 02:04:28] RESULT goldens-sp500-historical--sp500-2010-2026-longshort-new => total_return_pct 406.0160645117424 total_trades 668 win_rate 32.934131736526943 sharpe_ratio 0.41655549452173646 max_drawdown_pct 79.0837487504599  [FAIL (total_return_pct low (406.02 < 626.76); open_positions_value high (1726252.85 > 1283996.40); sortino_ratio_annualized low (0.42 < 0.48); calmar_ratio low (0.13 < 0.15); ulcer_index high (33.52 > 33.26))] (wall 457s)
+[09-03 02:04:28] PHASE 2 COMPLETE
+[09-03 02:04:29] RUN goldens-small--bull-crash-2015-2020-new (spec name bull-crash-2015-2020)
+[09-03 02:06:38] RESULT goldens-small--bull-crash-2015-2020-new => total_return_pct -9.9138952772449116 total_trades 235 win_rate 28.510638297872344 sharpe_ratio -0.042961370518606094 max_drawdown_pct 36.406924890815056  [FAIL (total_return_pct low (-9.91 < 41.40); total_trades low (235.00 < 248.00); win_rate low (28.51 < 31.40); sharpe_ratio low (-0.04 < 0.48); max_drawdown_pct high (36.41 > 22.70); avg_holding_days high (57.60 > 48.60); open_positions_value low (646178.85 < 1130000.00))] (wall 129s)
+[09-03 02:06:38] RUN goldens-small--bull-crash-2015-2020-old (spec name bull-crash-2015-2020)
+[09-03 02:08:46] RESULT goldens-small--bull-crash-2015-2020-old => total_return_pct 3.6481445614320691 total_trades 232 win_rate 30.603448275862068 sharpe_ratio 0.1145612741603175 max_drawdown_pct 33.565987712138956  [FAIL (total_return_pct low (3.65 < 41.40); total_trades low (232.00 < 248.00); win_rate low (30.60 < 31.40); sharpe_ratio low (0.11 < 0.48); max_drawdown_pct high (33.57 > 22.70); avg_holding_days high (55.92 > 48.60); open_positions_value low (657720.93 < 1130000.00))] (wall 128s)
+[09-03 02:08:46] RUN goldens-small--covid-recovery-2020-2024-new (spec name covid-recovery-2020-2024)
+[09-03 02:10:35] RESULT goldens-small--covid-recovery-2020-2024-new => total_return_pct 5.4410276832740285 total_trades 206 win_rate 27.669902912621357 sharpe_ratio 0.14659402620958603 max_drawdown_pct 35.677100569249362  [FAIL (total_return_pct low (5.44 < 90.40); total_trades low (206.00 < 232.00); win_rate low (27.67 < 33.00); sharpe_ratio low (0.15 < 0.86); max_drawdown_pct high (35.68 > 20.30); avg_holding_days high (53.56 > 46.60); open_positions_value low (971737.44 < 1309000.00))] (wall 109s)
+[09-03 02:10:36] RUN goldens-small--covid-recovery-2020-2024-old (spec name covid-recovery-2020-2024)
+[09-03 02:12:24] RESULT goldens-small--covid-recovery-2020-2024-old => total_return_pct 3.86334344279808 total_trades 217 win_rate 29.032258064516132 sharpe_ratio 0.12705617651987783 max_drawdown_pct 32.485953204109123  [FAIL (total_return_pct low (3.86 < 90.40); total_trades low (217.00 < 232.00); win_rate low (29.03 < 33.00); sharpe_ratio low (0.13 < 0.86); max_drawdown_pct high (32.49 > 20.30); avg_holding_days high (49.02 > 46.60); open_positions_value low (1023990.74 < 1309000.00))] (wall 108s)
+[09-03 02:12:24] RUN goldens-small--six-year-2018-2023-new (spec name six-year-2018-2023)
+[09-03 02:14:34] RESULT goldens-small--six-year-2018-2023-new => total_return_pct -26.594724759459609 total_trades 255 win_rate 27.450980392156865 sharpe_ratio -0.25873435439654296 max_drawdown_pct 35.717654539625343  [FAIL (total_return_pct low (-26.59 < 67.30); total_trades low (255.00 < 273.00); win_rate low (27.45 < 32.30); sharpe_ratio low (-0.26 < 0.61); max_drawdown_pct high (35.72 > 21.90); avg_holding_days high (53.25 > 46.60); open_positions_value low (478511.10 < 1245000.00))] (wall 130s)
+[09-03 02:14:35] RUN goldens-small--six-year-2018-2023-old (spec name six-year-2018-2023)
+[09-03 02:17:07] RESULT goldens-small--six-year-2018-2023-old => total_return_pct -17.552251616412857 total_trades 261 win_rate 26.819923371647509 sharpe_ratio -0.1421310916897737 max_drawdown_pct 32.490131299856131  [FAIL (total_return_pct low (-17.55 < 67.30); total_trades low (261.00 < 273.00); win_rate low (26.82 < 32.30); sharpe_ratio low (-0.14 < 0.61); max_drawdown_pct high (32.49 > 21.90); avg_holding_days high (51.25 > 46.60); open_positions_value low (536974.06 < 1245000.00))] (wall 152s)
+[09-03 02:17:07] RUN smoke--bull-2019h2-new (spec name bull-2019h2)
+[09-03 02:17:27] RESULT smoke--bull-2019h2-new => total_return_pct -4.488552622250281 total_trades 22 win_rate 31.818181818181817 sharpe_ratio -0.65612875327696318 max_drawdown_pct 8.2530276723761666  [PASS] (wall 20s)
+[09-03 02:17:27] RUN smoke--bull-2019h2-old (spec name bull-2019h2)
+[09-03 02:17:46] RESULT smoke--bull-2019h2-old => total_return_pct -2.7961550018552224 total_trades 22 win_rate 31.818181818181817 sharpe_ratio -0.37198998110280018 max_drawdown_pct 6.3788009088166158  [PASS] (wall 19s)
+[09-03 02:17:47] RUN smoke--crash-2020h1-new (spec name crash-2020h1)
+[09-03 02:18:05] RESULT smoke--crash-2020h1-new => total_return_pct -9.68963903309881 total_trades 27 win_rate 14.814814814814813 sharpe_ratio -0.67927926942127492 max_drawdown_pct 19.592465846657841  [PASS] (wall 18s)
+[09-03 02:18:05] RUN smoke--crash-2020h1-old (spec name crash-2020h1)
+[09-03 02:18:21] RESULT smoke--crash-2020h1-old => total_return_pct -9.206842434962164 total_trades 27 win_rate 22.222222222222221 sharpe_ratio -0.63656232093249865 max_drawdown_pct 19.464714026912581  [PASS] (wall 16s)
+[09-03 02:18:22] RUN smoke--recovery-2023-new (spec name recovery-2023)
+[09-03 02:18:46] RESULT smoke--recovery-2023-new => total_return_pct -4.735448628727708 total_trades 49 win_rate 28.571428571428569 sharpe_ratio -0.27994905444425544 max_drawdown_pct 15.66814518618399  [PASS] (wall 24s)
+[09-03 02:18:47] RUN smoke--recovery-2023-old (spec name recovery-2023)
+[09-03 02:19:11] RESULT smoke--recovery-2023-old => total_return_pct -4.2545587100532609 total_trades 49 win_rate 28.571428571428569 sharpe_ratio -0.24165291390778842 max_drawdown_pct 16.013154690316895  [PASS] (wall 24s)
+[09-03 02:19:11] PHASE 3 COMPLETE
+[09-03 02:19:13] RUN perf-sweep--bull-1y-new (spec name bull-1y)
+[09-03 02:19:15] RESULT perf-sweep--bull-1y-new => total_return_pct -2.9135791146930305 total_trades 3 win_rate 0 sharpe_ratio -0.51764277956027671 max_drawdown_pct 7.7490785382422516  [PASS] (wall 2s)
+[09-03 02:19:15] RUN perf-sweep--bull-1y-old (spec name bull-1y)
+[09-03 02:19:17] RESULT perf-sweep--bull-1y-old => total_return_pct -2.9135791146930305 total_trades 3 win_rate 0 sharpe_ratio -0.51764277956027671 max_drawdown_pct 7.7490785382422516  [PASS] (wall 2s)
+[09-03 02:19:17] RUN perf-sweep--bull-3y-new (spec name bull-3y)
+[09-03 02:19:21] RESULT perf-sweep--bull-3y-new => total_return_pct -10.559727672562422 total_trades 12 win_rate 8.3333333333333321 sharpe_ratio -0.69847311213479091 max_drawdown_pct 16.142618316903185  [PASS] (wall 4s)
+[09-03 02:19:22] RUN perf-sweep--bull-3y-old (spec name bull-3y)
+[09-03 02:19:26] RESULT perf-sweep--bull-3y-old => total_return_pct -9.58152146983334 total_trades 12 win_rate 0 sharpe_ratio -0.62280654591145723 max_drawdown_pct 15.2254752985268  [PASS] (wall 4s)
+[09-03 02:19:26] PHASE 4 COMPLETE
+[09-03 02:19:28] RUN goldens-sp500-historical--sp500-2000-2026-catstop-new (spec name sp500-2000-2026-catstop-deep)
+[09-03 02:26:44] RESULT goldens-sp500-historical--sp500-2000-2026-catstop-new => total_return_pct 150.04177813165393 total_trades 608 win_rate 36.348684210526315 sharpe_ratio 0.42067464037731372 max_drawdown_pct 25.414136846406816  [PASS] (wall 436s)
+[09-03 02:26:46] RUN goldens-sp500-historical--sp500-2000-2026-catstop-armon-new (spec name sp500-2000-2026-catstop-armon-deep)
+[09-03 02:34:11] RESULT goldens-sp500-historical--sp500-2000-2026-catstop-armon-new => total_return_pct 146.45047806620124 total_trades 608 win_rate 36.513157894736842 sharpe_ratio 0.41806124987222787 max_drawdown_pct 25.41484322264801  [PASS] (wall 445s)
+[09-03 02:34:12] RUN goldens-sp500-historical--sp500-2000-2026-longshort-new (spec name sp500-2000-2026-longshort-deep)
+[09-03 02:41:37] RESULT goldens-sp500-historical--sp500-2000-2026-longshort-new => total_return_pct 73.625652747161681 total_trades 692 win_rate 34.393063583815028 sharpe_ratio 0.28413170941927146 max_drawdown_pct 28.661362028765307  [PASS] (wall 445s)
+[09-03 02:41:39] RUN goldens-sp500-historical--sp500-1998-2026-new (spec name sp500-1998-2026-historical)
+[09-03 02:49:47] RESULT goldens-sp500-historical--sp500-1998-2026-new => total_return_pct 55.051704189502047 total_trades 468 win_rate 35.470085470085472 sharpe_ratio 0.24064515685831731 max_drawdown_pct 47.185850056793925  [PASS] (wall 488s)
+[09-03 02:49:49] RUN goldens-sp500-historical--top3000-2000-2026-catstop-new (spec name top3000-2000-2026-catstop-deep)
+[09-03 03:00:00] RESULT goldens-sp500-historical--top3000-2000-2026-catstop-new => total_return_pct 1640.2618453255425 total_trades 568 win_rate 36.091549295774648 sharpe_ratio 0.3275198727569591 max_drawdown_pct 29.330013873413545  [PASS] (wall 611s)
+[09-03 03:00:00] PHASE 5 COMPLETE
+[09-03 03:00:02] RUN goldens-broad--tier4-broad-1y-new (spec name tier4-broad-1y)
+[09-03 03:00:57] RESULT goldens-broad--tier4-broad-1y-new => total_return_pct -19.073656666778248 total_trades 24 win_rate 0 sharpe_ratio -1.3737321192355474 max_drawdown_pct 20.081387571187122  [PASS] (wall 55s)
+[09-03 03:00:57] RUN goldens-broad--tier4-broad-1y-old (spec name tier4-broad-1y)
+[09-03 03:01:49] RESULT goldens-broad--tier4-broad-1y-old => total_return_pct -15.477511673334266 total_trades 24 win_rate 0 sharpe_ratio -1.0776842134327871 max_drawdown_pct 18.189082130788854  [PASS] (wall 52s)
+[09-03 03:01:51] RUN goldens-broad--bull-crash-2015-2020-new (spec name bull-crash-2015-2020)
+[09-03 03:05:04] RESULT goldens-broad--bull-crash-2015-2020-new => total_return_pct 56.898795410580327 total_trades 184 win_rate 39.130434782608695 sharpe_ratio 0.520340542081251 max_drawdown_pct 35.063437792931353  [FAIL (total_return_pct low (56.90 < 61.90); max_drawdown_pct high (35.06 > 29.50); avg_holding_days high (58.91 > 56.30))] (wall 193s)
+[09-03 03:05:04] RUN goldens-broad--bull-crash-2015-2020-old (spec name bull-crash-2015-2020)
+[09-03 03:08:12] RESULT goldens-broad--bull-crash-2015-2020-old => total_return_pct 10.633041220179457 total_trades 179 win_rate 35.754189944134076 sharpe_ratio 0.18540441955482223 max_drawdown_pct 39.783899671895909  [FAIL (total_return_pct low (10.63 < 61.90); total_trades low (179.00 < 180.00); sharpe_ratio low (0.19 < 0.49); max_drawdown_pct high (39.78 > 29.50); avg_holding_days high (57.97 > 56.30))] (wall 188s)
+[09-03 03:08:13] RUN goldens-broad--covid-recovery-2020-2024-new (spec name covid-recovery-2020-2024)
+[09-03 03:11:17] RESULT goldens-broad--covid-recovery-2020-2024-new => total_return_pct 44.122792445833745 total_trades 148 win_rate 34.45945945945946 sharpe_ratio 0.4726909509092766 max_drawdown_pct 32.03994330672564  [FAIL (total_return_pct low (44.12 < 107.20); total_trades low (148.00 < 154.00); sharpe_ratio low (0.47 < 0.67))] (wall 184s)
+[09-03 03:11:17] RUN goldens-broad--covid-recovery-2020-2024-old (spec name covid-recovery-2020-2024)
+[09-03 03:14:21] RESULT goldens-broad--covid-recovery-2020-2024-old => total_return_pct 41.347262559137235 total_trades 161 win_rate 32.919254658385093 sharpe_ratio 0.45424341587191241 max_drawdown_pct 32.221045549146083  [FAIL (total_return_pct low (41.35 < 107.20); win_rate low (32.92 < 34.00); sharpe_ratio low (0.45 < 0.67))] (wall 184s)
+[09-03 03:14:22] RUN goldens-broad--six-year-2018-2023-new (spec name six-year-2018-2023)
+[09-03 03:17:51] RESULT goldens-broad--six-year-2018-2023-new => total_return_pct -20.291493594475952 total_trades 221 win_rate 25.339366515837103 sharpe_ratio -0.12184513123452087 max_drawdown_pct 39.473060712499816  [FAIL (total_return_pct low (-20.29 < 83.20); win_rate low (25.34 < 32.40); sharpe_ratio low (-0.12 < 0.52); max_drawdown_pct high (39.47 > 33.10))] (wall 209s)
+[09-03 03:17:51] RUN goldens-broad--six-year-2018-2023-old (spec name six-year-2018-2023)
+[09-03 03:21:18] RESULT goldens-broad--six-year-2018-2023-old => total_return_pct 76.92569038983099 total_trades 193 win_rate 27.461139896373055 sharpe_ratio 0.541939010991721 max_drawdown_pct 36.895855678327663  [FAIL (total_return_pct low (76.93 < 83.20); total_trades low (193.00 < 203.00); win_rate low (27.46 < 32.40); max_drawdown_pct high (36.90 > 33.10))] (wall 207s)
+[09-03 03:21:20] RUN goldens-broad--decade-2014-2023-new (spec name decade-2014-2023)
+[09-03 03:26:42] RESULT goldens-broad--decade-2014-2023-new => total_return_pct 108.79090622979584 total_trades 288 win_rate 39.583333333333329 sharpe_ratio 0.474069422869348 max_drawdown_pct 35.305665608996463  [FAIL (total_return_pct high (108.79 > 44.20); total_trades low (288.00 < 333.00); sharpe_ratio high (0.47 > 0.32); avg_holding_days high (64.49 > 60.00))] (wall 322s)
+[09-03 03:26:42] RUN goldens-broad--decade-2014-2023-old (spec name decade-2014-2023)
+[09-03 03:32:02] RESULT goldens-broad--decade-2014-2023-old => total_return_pct 154.39209827861731 total_trades 304 win_rate 35.526315789473685 sharpe_ratio 0.54013417058163848 max_drawdown_pct 35.8108564751167  [FAIL (total_return_pct high (154.39 > 44.20); total_trades low (304.00 < 333.00); sharpe_ratio high (0.54 > 0.32))] (wall 320s)
+[09-03 03:32:03] RUN goldens-broad--tier4-broad-10y-new (spec name tier4-broad-10y)
+[09-03 03:38:01] RESULT goldens-broad--tier4-broad-10y-new => total_return_pct 77.364648835588284 total_trades 77 win_rate 19.480519480519483 sharpe_ratio 0.42333618401094675 max_drawdown_pct 29.962709347702305  [PASS] (wall 358s)
+[09-03 03:38:01] RUN goldens-broad--tier4-broad-10y-old (spec name tier4-broad-10y)
+[09-03 03:44:03] RESULT goldens-broad--tier4-broad-10y-old => total_return_pct 229.03825195904872 total_trades 49 win_rate 24.489795918367346 sharpe_ratio 0.474631002096987 max_drawdown_pct 63.791044622214244  [PASS] (wall 362s)
+[09-03 03:44:03] PHASE 6 COMPLETE
+[09-03 03:44:03] D1D2 GOLDEN CHAIN DONE

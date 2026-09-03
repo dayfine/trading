@@ -141,7 +141,7 @@ type config = {
       (** See [.mli]. *)
   stop_anchor_at_entry_base : bool; [@sexp.default false]  (** See [.mli]. *)
   sim_entry_fill_next_open : bool; [@sexp.default false]  (** See [.mli]. *)
-  sim_exit_fill_next_open : bool; [@sexp.default false]  (** See [.mli]. *)
+  sim_exit_fill_next_open : bool; [@sexp.default true]  (** See [.mli]. *)
   freeze_entry_at_first_breakout : bool; [@sexp.default false]
       (** See [.mli]. *)
   enable_entry_ticket_rescreen : bool; [@sexp.default false]  (** See [.mli]. *)
@@ -257,7 +257,7 @@ let default_config ~universe ~index_symbol =
     entry_freshness_basis = Entry_freshness.Ma_cross;
     stop_anchor_at_entry_base = false;
     sim_entry_fill_next_open = false;
-    sim_exit_fill_next_open = false;
+    sim_exit_fill_next_open = true;
     freeze_entry_at_first_breakout = false;
     enable_entry_ticket_rescreen = false;
     entry_order_max_rest_weeks = 52;

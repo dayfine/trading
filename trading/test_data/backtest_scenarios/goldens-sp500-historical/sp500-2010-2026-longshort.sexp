@@ -169,19 +169,20 @@
   ;; reshuffles on regression pins, not evidence about the fill model.
 
 
-  ((total_return_pct   ((min 626.7551)       (max 847.9629)))
-   (total_trades       ((min 550.79)        (max 745.21)))
-   (win_rate           ((min 28.7268)       (max 38.8658)))
-   (sharpe_ratio       ((min 0.4072)      (max 0.5510)))
-   (max_drawdown_pct   ((min 67.0858)       (max 90.7632)))
-   (avg_holding_days   ((min 52.1307)       (max 70.5298)))
+  ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111; paired old arm + dissection in dev/experiments/exit-basis-flip-2026-09-03/. Correctness re-pin: no return claim attaches to the delta.
+  ((total_return_pct ((min 345.1137) (max 466.9185)))
+   (total_trades ((min 567.8000) (max 768.2000)))
+   (win_rate ((min 27.9940) (max 37.8743)))
+   (sharpe_ratio ((min 0.3541) (max 0.4790)))
+   (max_drawdown_pct ((min 67.2212) (max 90.9463)))
+   (avg_holding_days ((min 52.9329) (max 71.6150)))
    ;; OPV re-pinned ~2.18M under the realism-defaults flip (ledger
    ;; 2026-07-10-realism-defaults-flip): $1M-ADV entry gate + stale-exit 5d
    ;; lighten the terminal book. Headline metrics stayed in-band (ret 387.5 /
    ;; 784 / Sharpe 0.777 / DD 21.35). Was ~3.76M pre-flip.
-   (open_positions_value ((min 949040.7)   (max 1283996.4)))
-   (sortino_ratio_annualized ((min 0.4761) (max 0.6443)))
-   (calmar_ratio       ((min 0.1497)      (max 0.2026)))
-   (ulcer_index        ((min 24.5811)       (max 33.2569)))
+   (open_positions_value ((min 1467314.9225) (max 1985190.7775)))
+   (sortino_ratio_annualized ((min 0.3587) (max 0.4853)))
+   (calmar_ratio ((min 0.1122) (max 0.1518)))
+   (ulcer_index ((min 28.4961) (max 38.5536)))
    ;; Wall floor lowered 600→100, then floored at 0 per #2547 (a min guards nothing; the 364 run measured ~391s locally).
    (wall_seconds       ((min 0.0)           (max 2400.0))))))

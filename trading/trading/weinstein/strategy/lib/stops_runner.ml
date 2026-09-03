@@ -188,8 +188,9 @@ let _structural_or_catastrophic ~catastrophic_armed ~stops_config ~pos ~state
     bar's low was printed before the fill. Evaluating the stop against it
     measures price the position never held. See the [stop_skip_entry_bar]
     docstring in [stop_types.mli] for the measured footprint
-    ([dev/experiments/arc-rerun-2026-09-01/README.md] §D2). Default [false] →
-    always [false] here, i.e. an exact no-op. *)
+    ([dev/experiments/arc-rerun-2026-09-01/README.md] §D2). Default [true] since
+    2026-09-03 (PR #2648); under [false] this is always [false], i.e. the
+    pre-flip no-op. *)
 let _skip_entry_bar_exit ~stops_config ~entry_date ~current_date =
   stops_config.Weinstein_stops.stop_skip_entry_bar
   && Date.equal current_date entry_date

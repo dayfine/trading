@@ -362,7 +362,7 @@ yet exist. The simulator's step order (fills before the strategy) had been
 judging the freshly-filled position against that day's completed bar and
 stopping it on the pre-fill low (`dev/experiments/arc-rerun-2026-09-01/README.md`
 §D2: 173 of 3,029 entries on the 26y arc). Implementation:
-`stops_config.stop_skip_entry_bar` (PR #2642, default-off pending the A/B);
+`stops_config.stop_skip_entry_bar` (PR #2642; default-on since 2026-09-03, PR #2648, with paired goldens);
 post-run guard V14 (PR #2641). Settled by qc-behavioral review 5096349477
 reading the source text (local session).
 
