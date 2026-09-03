@@ -348,7 +348,7 @@ type config = {
           ACCEPT, as a book-faithfulness correction; recorded in
           [dev/experiments/_ledger/2026-08-24-stops-basis-book-faithful.sexp]
           per [.claude/rules/experiment-flag-discipline.md] R3. *)
-  stop_skip_entry_bar : bool; [@sexp.default false]
+  stop_skip_entry_bar : bool; [@sexp.default true]
       (** When [true], a position's stop is never allowed to produce an {b exit}
           on the bar whose date equals the position's own [entry_date]. The
           state machine still advances on that bar (the trail / tighten logic is
@@ -382,11 +382,16 @@ type config = {
           item 5 is untouched — the stop level, its placement rule, the
           never-lower rule and the weekly cadence are all unchanged; only the
           first bar's {e trigger evaluation} is suppressed
-          ([.claude/rules/weinstein-faithful-core.md] W1/W2). Default [false]
-          reproduces the current behaviour bit-for-bit, so every existing golden
-          replays unchanged. Default-off experiment axis per
-          [.claude/rules/experiment-flag-discipline.md]; promoted only on a
-          ledger ACCEPT. *)
+          ([.claude/rules/weinstein-faithful-core.md] W1/W2).
+
+          {b Default [true] since 2026-09-03} (USER DECISION, D2 of the arc
+          rerun; ledger
+          [dev/experiments/_ledger/2026-09-03-exit-basis-d1d2-correctness.sexp]).
+          A bar-alignment correctness flip, not a performance promotion; every
+          golden was re-pinned PAIRED (flag off vs on at one build) in the
+          promotion PR. Set [false] to reproduce a pre-2026-09-03 baseline
+          bit-for-bit. Remains an experiment axis per
+          [.claude/rules/experiment-flag-discipline.md] R2. *)
 }
 [@@deriving show, eq, sexp]
 (** Configuration for stop management behavior. All thresholds are configurable

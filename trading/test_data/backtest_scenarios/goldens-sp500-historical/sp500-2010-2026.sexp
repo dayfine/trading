@@ -207,20 +207,21 @@
   ;; reshuffles on regression pins, not evidence about the fill model.
 
 
-  ((total_return_pct   ((min 460.5661)      (max 623.1189)))
-   (total_trades       ((min 384.20)         (max 519.80)))
-   (win_rate           ((min 33.4734)       (max 45.2877)))
-   (sharpe_ratio       ((min 0.4204)      (max 0.5689)))
-   (max_drawdown_pct   ((min 53.8791)       (max 72.8954)))
-   (avg_holding_days   ((min 52.7188)       (max 71.3255)))
+  ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111; paired old arm + dissection in dev/experiments/exit-basis-flip-2026-09-03/. Correctness re-pin: no return claim attaches to the delta.
+  ((total_return_pct ((min 330.4702) (max 447.1067)))
+   (total_trades ((min 392.7000) (max 531.3000)))
+   (win_rate ((min 31.2771) (max 42.3160)))
+   (sharpe_ratio ((min 0.3811) (max 0.5156)))
+   (max_drawdown_pct ((min 52.9769) (max 71.6746)))
+   (avg_holding_days ((min 52.5933) (max 71.1556)))
    ;; OPV re-pinned ~9.88M under the realism-defaults flip (ledger
    ;; 2026-07-10-realism-defaults-flip): the $1M-ADV entry gate drops marginal
    ;; fills and stale-exit 5d clears ghost MTM, so terminal book is lighter.
    ;; Headline metrics (return/Sharpe/DD/trades) stayed in-band — only the
    ;; terminal-MTM composition moved. Was ~18.1M floor-off pre-flip.
-   (open_positions_value ((min 3486343.7) (max 4716818.0)))
-   (sortino_ratio_annualized ((min 0.5261) (max 0.7119)))
-   (calmar_ratio       ((min 0.1617)      (max 0.2189)))
-   (ulcer_index        ((min 19.3781)       (max 26.2176)))
+   (open_positions_value ((min 1715203.3805) (max 2320569.2795)))
+   (sortino_ratio_annualized ((min 0.4514) (max 0.6108)))
+   (calmar_ratio ((min 0.1392) (max 0.1883)))
+   (ulcer_index ((min 20.1068) (max 27.2034)))
    ;; Floor-off does more work than the halted floor-on run; keep wall band wide.
    (wall_seconds       ((min 0.0)           (max 3600.0))))))

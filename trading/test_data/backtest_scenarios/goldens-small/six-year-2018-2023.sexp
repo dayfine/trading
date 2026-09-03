@@ -70,10 +70,11 @@
   ;; 2026-07-10-realism-defaults-flip): re-measured = BIT-IDENTICAL (79.13% / 321 /
   ;; 38.01 / 0.72 / 19.05 / 40.55 / OPV 1,465,187 / force_liqs 0). Liquid 302-symbol
   ;; universe → gate + stale-exit no-op. Bands unchanged.
-  ((total_return_pct   ((min  67.3)        (max  91.0)))
-   (total_trades       ((min 273)          (max 369)))
-   (win_rate           ((min  32.3)        (max  43.7)))
-   (sharpe_ratio       ((min   0.61)       (max   0.83)))
-   (max_drawdown_pct   ((min  16.2)        (max  21.9)))
-   (avg_holding_days   ((min  34.5)        (max  46.6)))
-   (open_positions_value ((min 1245000.0)  (max 1685000.0))))))
+  ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111 (total_return_pct: at least ±5pp); paired old arm (both knobs pinned false, run directly) + notes in dev/experiments/exit-basis-flip-2026-09-03/. NOTE: the prior pin was already stale — it predates the 2026-08-24 (#2530) and 2026-08-26 (#2569) default flips and the tier-2 nightly runs continue-on-error. Correctness re-pin: no return claim attaches to the delta.
+  ((total_return_pct ((min -31.5947) (max -21.5947)))
+   (total_trades ((min 216.7500) (max 293.2500)))
+   (win_rate ((min 23.3333) (max 31.5686)))
+   (sharpe_ratio ((min -0.2975) (max -0.2199)))
+   (max_drawdown_pct ((min 30.3600) (max 41.0753)))
+   (avg_holding_days ((min 45.2633) (max 61.2386)))
+   (open_positions_value ((min 406734.4350) (max 550287.7650))))))

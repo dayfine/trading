@@ -77,10 +77,11 @@
   ;; universe is liquid over this window — no sub-$1M-ADV entry dropped, no delisted
   ;; ghost realized in-window — so the entry gate + stale-exit are no-ops. Bands
   ;; unchanged.
-  ((total_return_pct   ((min  90.4)        (max 122.3)))
-   (total_trades       ((min 232)          (max 314)))
-   (win_rate           ((min  33.0)        (max  44.7)))
-   (sharpe_ratio       ((min   0.86)       (max   1.17)))
-   (max_drawdown_pct   ((min  15.0)        (max  20.3)))
-   (avg_holding_days   ((min  34.5)        (max  46.6)))
-   (open_positions_value ((min 1309000.0)  (max 1771000.0))))))
+  ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111 (total_return_pct: at least ±5pp); paired old arm (both knobs pinned false, run directly) + notes in dev/experiments/exit-basis-flip-2026-09-03/. NOTE: the prior pin was already stale — it predates the 2026-08-24 (#2530) and 2026-08-26 (#2569) default flips and the tier-2 nightly runs continue-on-error. Correctness re-pin: no return claim attaches to the delta.
+  ((total_return_pct ((min 0.4410) (max 10.4410)))
+   (total_trades ((min 175.1000) (max 236.9000)))
+   (win_rate ((min 23.5194) (max 31.8204)))
+   (sharpe_ratio ((min 0.1246) (max 0.1686)))
+   (max_drawdown_pct ((min 30.3255) (max 41.0287)))
+   (avg_holding_days ((min 45.5286) (max 61.5976)))
+   (open_positions_value ((min 825976.8240) (max 1117498.0560))))))

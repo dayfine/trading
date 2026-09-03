@@ -890,6 +890,62 @@ let test_strategy_mli_redeclares_clock_default_consistently _ =
     (_declared_sexp_default ~path ~field:"entry_order_max_rest_weeks")
     (is_some_and (equal_to (_default_config ()).entry_order_max_rest_weeks))
 
+(* -------------------------------------------------------------------- *)
+(* D1/D2 exit-basis defaults (PR #2648, user decision 2026-09-03)         *)
+(* -------------------------------------------------------------------- *)
+
+(** Default pin for the 2026-09-03 exit-basis correctness flip: Market EXITS
+    fill at the next fresh bar's open ([sim_exit_fill_next_open]) and a stop
+    never exits a position on its own entry bar
+    ([stops_config.stop_skip_entry_bar]). Both ship [true]; [false] on either
+    reproduces the pre-flip basis. A silent revert of either default fails here
+    first and must cite the ledger
+    ([dev/experiments/_ledger/2026-09-03-exit-basis-d1d2-correctness.sexp]). *)
+let test_default_exit_basis_is_d1d2_fixed _ =
+  let c = _default_config () in
+  assert_that
+    ( c.sim_exit_fill_next_open,
+      c.stops_config.Weinstein_stops.stop_skip_entry_bar )
+    (equal_to (true, true))
+
+(* Bool twin of [_declared_sexp_default]: the [[@sexp.default true|false]]
+   attached to [field] in the given .mli text. *)
+let _declared_sexp_default_bool ~path ~field =
+  let marker = "[@sexp.default " in
+  In_channel.read_lines path
+  |> List.find_map ~f:(fun line ->
+      let trimmed = String.strip line in
+      if String.is_prefix trimmed ~prefix:(field ^ " :") then
+        match String.substr_index trimmed ~pattern:marker with
+        | None -> None
+        | Some i ->
+            let word =
+              String.subo trimmed ~pos:(i + String.length marker)
+              |> String.take_while ~f:Char.is_alpha
+            in
+            Option.try_with (fun () -> Bool.of_string word)
+      else None)
+
+(** Drift guard, bool edition (same hazard as the clock's above): the
+    hand-written re-declaration of [sim_exit_fill_next_open] in
+    [weinstein_strategy.mli] must carry the same [[@sexp.default]] as the value
+    [Weinstein_strategy_config] ships. Sexp attributes are inert in signature
+    matching, so only a text read catches a one-sided default change. *)
+let test_strategy_mli_redeclares_exit_fill_default_consistently _ =
+  let path =
+    match
+      _walk_up_to_file (Stdlib.Sys.getcwd ()) _weinstein_strategy_mli_rel 10
+    with
+    | Some p -> p
+    | None ->
+        assert_failure
+          (sprintf "%s not found from cwd=%s" _weinstein_strategy_mli_rel
+             (Stdlib.Sys.getcwd ()))
+  in
+  assert_that
+    (_declared_sexp_default_bool ~path ~field:"sim_exit_fill_next_open")
+    (is_some_and (equal_to (_default_config ()).sim_exit_fill_next_open))
+
 (** F2 R2 (axis reachability): both fields must be valid [Variant_matrix] axes,
     which requires each value to resolve through the {b real}
     [Overlay_validator.apply_overrides] with no unknown-key error. The clock's
@@ -1231,6 +1287,11 @@ let suite =
          >:: test_default_entry_ticket_lifecycle;
          "F2: weinstein_strategy.mli re-declares the clock default consistently"
          >:: test_strategy_mli_redeclares_clock_default_consistently;
+         "D1/D2: exit-basis defaults ship on (next-open exit fill, skip \
+          entry-bar stop)" >:: test_default_exit_basis_is_d1d2_fixed;
+         "D1/D2: weinstein_strategy.mli re-declares the exit-fill default \
+          consistently"
+         >:: test_strategy_mli_redeclares_exit_fill_default_consistently;
          "F2: both lifecycle fields resolve as Variant_matrix axes"
          >:: test_entry_ticket_lifecycle_axes_resolve_via_overlay_validator;
          "F2: config parses with both lifecycle fields absent"

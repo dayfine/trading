@@ -77,10 +77,11 @@
   ;; (--parallel 3), ±15% around the flip actuals:
   ;;   ret 48.72  trades 292  win 36.99  sharpe 0.562  maxDD 19.72  hold 42.25
   ;;   OPV 1,330,211  sortino 0.72  calmar 0.35  ulcer 6.68  force_liqs 0
-  ((total_return_pct   ((min  41.4)        (max  56.0)))
-   (total_trades       ((min 248)          (max 336)))
-   (win_rate           ((min  31.4)        (max  42.5)))
-   (sharpe_ratio       ((min   0.48)       (max   0.65)))
-   (max_drawdown_pct   ((min  16.8)        (max  22.7)))
-   (avg_holding_days   ((min  35.9)        (max  48.6)))
-   (open_positions_value ((min 1130000.0)  (max 1530000.0))))))
+  ;; RE-PINNED 2026-09-03 for the D1/D2 exit-basis default flip (PR #2648: sim_exit_fill_next_open + stop_skip_entry_bar on). ±15% around the NEW-arm actual at pinned build 398f57111 (total_return_pct: at least ±5pp); paired old arm (both knobs pinned false, run directly) + notes in dev/experiments/exit-basis-flip-2026-09-03/. NOTE: the prior pin was already stale — it predates the 2026-08-24 (#2530) and 2026-08-26 (#2569) default flips and the tier-2 nightly runs continue-on-error. Correctness re-pin: no return claim attaches to the delta.
+  ((total_return_pct ((min -14.9139) (max -4.9139)))
+   (total_trades ((min 199.7500) (max 270.2500)))
+   (win_rate ((min 24.2340) (max 32.7872)))
+   (sharpe_ratio ((min -0.0494) (max -0.0365)))
+   (max_drawdown_pct ((min 30.9459) (max 41.8680)))
+   (avg_holding_days ((min 48.9636) (max 66.2449)))
+   (open_positions_value ((min 549252.0225) (max 743105.6775))))))
