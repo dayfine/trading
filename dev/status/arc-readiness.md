@@ -243,7 +243,7 @@ already `Holding { entry_date = D }` when `Stops_runner` reads day D's
 *completed* bar — and for an E-anchored buy-stop that bar's low was printed
 before the fill. Shorts mirror on the high.
 
-Fix landed as `stops_config.stop_skip_entry_bar` (default-off; branch
+Fix landed as `stops_config.stop_skip_entry_bar` (default-on since 2026-09-03, #2648; branch
 `feat/stop-skip-entry-bar`): when armed, no stop-driven exit is emitted on the
 bar whose date equals the position's `entry_date` — structural `Stop_hit`, the
 weekly trigger-only check, and the catastrophic stop alike — while the state
@@ -384,11 +384,13 @@ Remaining open work:
    custom-universe goldens are re-pinned from the dispatcher's paired sweep,
    after which `paired-run-done` is applied. `goldens-affected` SHOULD flag the
    A1-3 PR — that is the rule working, not a defect.
-4. **`stop_skip_entry_bar` A/B (default-off, awaiting a verdict).** The
-   mechanism shipped on `feat/stop-skip-entry-bar` (see Axis 2 (b) §D2). What
-   is NOT yet measured: what the 173 entry-bar artifact exits cost on the 26y
-   broad arc. Run it as a surface (flag `{false,true}`) per
-   `.claude/rules/experiment-flag-discipline.md` R2 before any default flip.
+4. **`stop_skip_entry_bar` — DONE, default-on since 2026-09-03 (PR #2648).**
+   Flipped together with `sim_exit_fill_next_open` as a user-directed
+   correctness fix (ledger `2026-09-03-exit-basis-d1d2-correctness`, verdict
+   Inconclusive = human-gated R3 override), with 27 paired golden cells at the
+   flip build (`dev/experiments/exit-basis-flip-2026-09-03/`). The A/B this
+   item asked for is superseded: the paired table IS the measurement, and the
+   level gaps dissect to missed monsters, not to the mechanism.
 5. A2-1 follow-up (not blocking): the funding-grid results dir commits no
    `params.sexp` beside its `actual.sexp` files, so `effect_null_report.exe`
    can only WARN there rather than verify. Committing a per-arm `params.sexp`
