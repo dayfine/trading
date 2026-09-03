@@ -1105,6 +1105,44 @@ type config = {
           Weinstein-faithful: spine untouched, only the {i fill assumption}
           changes. Plan: [dev/plans/fill-model-faithfulness-2026-08-07.md]
           Workstream C. *)
+  sim_exit_fill_next_open : bool; [@sexp.default false]
+      (** Next-bar-open fill realism for Market EXITS (Fix #1b — the exit
+          sibling of [sim_entry_fill_next_open]). Threaded from this config into
+          the simulator dependencies by the backtest runner (same route as
+          [sim_entry_fill_next_open]).
+
+          {b The realism gap it closes.} The simulator advances one {i calendar}
+          day per step, and on a non-trading (weekend/holiday) step the engine
+          receives no bars and RETAINS the previous session's bar per symbol. A
+          Market exit order created from a Friday-close decision is therefore
+          filled on the following Saturday step against that {i stale} Friday
+          bar — at that bar's OPEN, a price observed {i before} the close the
+          exit decision was made on — and the resulting trade is re-stamped with
+          the Saturday date. That is a look-back fill on a day the market was
+          not open. Measured on the 26y arc run
+          ([dev/experiments/arc-rerun-2026-09-01/README.md] §D1, landing in PR
+          #2645): 2192/2192 [volume_eject], 154/154 [laggard_rotation] and
+          148/668 [stop_loss] exits were Saturday-dated at Friday's open; the
+          record convention shows the same shape (269/269 laggard exits).
+
+          When [true], a Market order that would CLOSE an [Exiting] position is
+          NOT filled on a step where its symbol has no fresh bar; it stays
+          pending until the next {i fresh} trading bar and fills at that bar's
+          open. {b Scope: Market EXIT orders only.} Entries (governed
+          independently by [sim_entry_fill_next_open]), stops, and [StopLimit]
+          orders are untouched; with both flags on, both classes are deferred.
+          The strategy's decision-time [exit_price] is UNCHANGED — only the
+          executed engine fill price/date move.
+
+          {b Default [false] = current stale-bar exit fill, bit-identical to
+             every existing baseline/golden} (R1).
+          {b ⚠ A fill-model basis change when armed} — its own WF-CV surface and
+          deliberate golden re-pins before any default flip; NEVER bundled. R2:
+          axis-expressible as
+          [((flag sim_exit_fill_next_open) (values (true false)))].
+          Weinstein-faithful: spine untouched, only the {i fill assumption}
+          changes. Plan: [dev/plans/fill-model-faithfulness-2026-08-07.md]
+          Workstream C, Fix #1b. *)
   freeze_entry_at_first_breakout : bool; [@sexp.default false]
       (** No-chase entry-[E] freeze (Fix #2).
 

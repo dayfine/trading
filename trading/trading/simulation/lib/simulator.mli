@@ -161,6 +161,25 @@ type dependencies = {
           config ([Weinstein_strategy_config.sim_entry_fill_next_open]); a
           fill-model basis change, so any default flip routes through WF-CV +
           deliberate golden re-pins per experiment-flag discipline. *)
+  sim_exit_fill_next_open : bool;
+      (** Next-bar-open Market-EXIT fill realism (Fix #1b, the exit sibling of
+          {!sim_entry_fill_next_open};
+          [dev/plans/fill-model-faithfulness-2026-08-07.md] Workstream C).
+          [false] (the default) is bit-identical to every existing baseline: a
+          Market exit order fills whenever the engine next matches it, including
+          against the stale signal bar retained on non-trading steps — so a
+          Friday-close exit decision fills on the Saturday step at Friday's own
+          open, a price that predates the decision, and the trade is stamped
+          Saturday. [true] holds a Market order routing to an [Exiting] position
+          back on any step where its symbol has no fresh bar, so it fills at the
+          next fresh trading bar's open. Scope: Market EXIT orders only (full
+          exits and partial trims alike); entries are governed independently by
+          {!sim_entry_fill_next_open}, and stops / [StopLimit] orders are
+          untouched. The decision-time [exit_price] is unchanged. Armed by the
+          backtest runner from the strategy config
+          ([Weinstein_strategy_config.sim_exit_fill_next_open]); a fill-model
+          basis change, so any default flip routes through WF-CV + deliberate
+          golden re-pins per experiment-flag discipline. *)
   entry_fill_retry : Entry_fill_retry.t;
       (** G2a retry budget + ledger ([dev/plans/ticket-funding-2026-08-16.md]
           §G2a): how many further attempts a triggered entry ticket gets after
@@ -211,6 +230,7 @@ val create_deps :
   ?on_transitions:(Trading_strategy.Position.transition list -> unit) ->
   ?entry_extension_max_pct:float ->
   ?sim_entry_fill_next_open:bool ->
+  ?sim_exit_fill_next_open:bool ->
   ?entry_fill_reject_retries:int ->
   ?entry_fill_resize:Entry_fill_resize.t ->
   unit ->

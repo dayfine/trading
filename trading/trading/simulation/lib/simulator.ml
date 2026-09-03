@@ -31,6 +31,8 @@ type dependencies = {
       (** See .mli. #2158 Phase 2 fill model. *)
   sim_entry_fill_next_open : bool;
       (** See .mli. Fix #1 next-bar-open Market-entry fill (default-off). *)
+  sim_exit_fill_next_open : bool;
+      (** See .mli. Fix #1b next-bar-open Market-exit fill (default-off). *)
   entry_fill_retry : Entry_fill_retry.t;
       (** See .mli. G2a retry budget + ledger; a no-op at [0] retries. *)
   entry_fill_resize : Entry_fill_resize.t;
@@ -46,7 +48,8 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     ?(maintenance_long_pct = 0.0)
     ?(exempt_closing_trades_from_cash_floor = false) ?on_trade_fill
     ?active_through_for ?on_transitions ?entry_extension_max_pct
-    ?(sim_entry_fill_next_open = false) ?(entry_fill_reject_retries = 0)
+    ?(sim_entry_fill_next_open = false) ?(sim_exit_fill_next_open = false)
+    ?(entry_fill_reject_retries = 0)
     ?(entry_fill_resize = Entry_fill_resize.disabled) () =
   let engine_config = { Trading_engine.Types.commission; slippage_bps } in
   let engine = Trading_engine.Engine.create engine_config in
@@ -80,6 +83,7 @@ let create_deps ~symbols ~data_dir ~strategy ~commission
     on_transitions;
     entry_extension_max_pct;
     sim_entry_fill_next_open;
+    sim_exit_fill_next_open;
     entry_fill_retry =
       Entry_fill_retry.create ~max_retries:entry_fill_reject_retries;
     entry_fill_resize;
@@ -345,13 +349,17 @@ let _notify_transitions ~on_transitions transitions =
 
 (* Execute pending orders, apply fills, and route rejected fills through
    {!Cancel_handler}. Returns post-fill (portfolio, positions, accepted). The
-   Fix #1 next-open gate (default-off) defers Market entry fills past stale-bar
-   steps; see {!Next_open_fill_gate}. *)
+   Fix #1 / #1b next-open gate (both default-off) defers Market entry and/or
+   Market exit fills past stale-bar steps; see {!Next_open_fill_gate}. *)
 let _process_fills_and_cancels t ~portfolio ~positions ~today_bars =
   let open Result.Let_syntax in
+  let defer_entries = t.deps.sim_entry_fill_next_open in
+  let defer_exits = t.deps.sim_exit_fill_next_open in
   let can_fill =
-    if t.deps.sim_entry_fill_next_open then
-      Some (Next_open_fill_gate.make ~positions ~today_bars)
+    if defer_entries || defer_exits then
+      Some
+        (Next_open_fill_gate.make ~defer_entries ~defer_exits ~positions
+           ~today_bars)
     else None
   in
   let%bind execution_reports =

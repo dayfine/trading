@@ -117,6 +117,46 @@ do not rush inline.**
 - Tests: a synthetic case where next-open ≠ signal-close proves the branch;
   off-path bit-identity test.
 
+### Fix #1b — exits (default-off `sim_exit_fill_next_open`)
+
+Fix #1 as shipped covers Market **entries** only and deliberately exempts exits.
+Measurement on the 26y arc run (`dev/experiments/arc-rerun-2026-09-01/README.md`
+§D1, landing in PR #2645) showed the exit side carries the same defect, and at far higher volume:
+**2192/2192 `volume_eject`, 154/154 `laggard_rotation` and 148/668 `stop_loss`
+exits were Saturday-dated at Friday's open**; the record convention shows the
+same shape (269/269 laggard exits). The mechanism is identical — the simulator
+steps one *calendar* day (`simulator.ml`), `Market_state.update` retains the
+previous session's bars when a step supplies none (`market_state.ml`), so a
+Market exit submitted at the Friday tick matches the stale Friday bar on the
+Saturday step and is re-stamped Saturday by `Fill_date_stamp.restamp`. A
+Friday-close decision executing at a price from *before* the decision is a
+look-back fill, and the trade lands on a day the market was not open.
+
+**The seam is the gate, not the engine.** `Next_open_fill_gate.make` already
+receives `~positions` and `~today_bars` and returns the `?can_fill` predicate
+`Engine.process_orders` consults, so Fix #1b needed no engine change: the gate
+now takes `~defer_entries` / `~defer_exits` and matches an exit the way it
+matches an entry — a **Market** order whose (symbol, side) routes to an
+`Exiting` position, using `Fill_router.exit_trade_side` so a scale-in add
+`Entering` on the same symbol is not confused with the original `Exiting` one.
+Full exits and partial trims are treated alike (both rest one Market order while
+`Exiting`). Non-Market orders stay exempt by construction and by intent:
+`Order_generator._exit_order_for_position` emits exits only as Market today, and
+a `StopLimit` carries its own trigger price, so a retained stale bar cannot fill
+it at a look-back price the way an unconditional Market order can.
+
+- R1: **both** flags off ⇒ no `?can_fill` is supplied at all ⇒ bit-identical;
+  `defer_entries:true, defer_exits:false` reproduces shipped Fix #1 exactly.
+- R2: real config field ⇒ axis `((flag sim_exit_fill_next_open) (values (true
+  false)))`, threaded config → `panel_runner` → `Simulator.deps` alongside
+  `sim_entry_fill_next_open`.
+- Faithful: spine untouched; only the fill assumption moves. W1 pass.
+- Tests: `trading/trading/simulation/test/test_sim_exit_next_open.ml` — OFF pins
+  the stale-Friday-open fill, ON pins the Monday-open fill, the exit flag alone
+  leaves entries bit-identical, and a two-round-trip multi-week scenario (two
+  weekends + a mid-week hole) asserts that with both flags on **no trade is
+  dated on a day the symbol had no bar**.
+
 ## Workstream D — Fix #2: no-chase entry E (default-off)
 
 The chase is `suggested_entry = breakout_price × (1+buffer)` recomputed weekly
