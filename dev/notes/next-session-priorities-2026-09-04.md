@@ -48,12 +48,18 @@ simulator. Re-run them as surfaces on the new default (no flags needed now)
 Start with the two the arc program most depends on: the §4.2 fill-week eject
 gate and the fallback-stop width. The re-pinned goldens are the null.
 
-## P1 — canonical record baseline on the fixed basis (#2503 lineage)
+## P1 — canonical record baseline on the fixed basis — DONE 2026-09-03
 
-`record-baseline-2026-08-24` is on the old basis (its −$601k first-order
-Saturday-fill exposure is now realised as a real path change). Re-run the
-record convention at current main, commit params + actual + trades per arm,
-and make it the pinned baseline every writeup compares against.
+`dev/experiments/record-rebase-2026-09-03/`: the record convention PAIRED at
+`e4984c5fe`. **New canonical record = 302.65% / 723 trades / Sharpe 0.397 /
+MaxDD 36.26** (`results/rec26y-new-s0-*`, params committed). The paired old arm
+(312.74) equals the 08-27 clock cell-A null digit-for-digit, so the 08-24
+731.64% figure was #2555 build drift; the exit basis costs −10pp, and on shared
+trades it is a wash (stop tax −$565k vs D2-saved monsters +$814k). Mechanism
+read in `project_d1d2_mechanism_decomposition`: D1 ≈ −1pp per stop exit; D2
+saves 15–20% of entries from day-one death, most re-stop within days, a few
+become monsters (WNC +160%, UGP +69%). Every writeup after today diffs against
+rec26y-new.
 
 ## P1 — vintage warehouses (carried)
 
