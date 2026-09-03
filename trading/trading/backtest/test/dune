@@ -2,6 +2,7 @@
  (names
   test_stop_log
   test_runner_filter
+  test_window_filter
   test_trace
   test_trade_audit
   test_trade_audit_recorder

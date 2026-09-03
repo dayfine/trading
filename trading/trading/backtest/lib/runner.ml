@@ -66,25 +66,25 @@ type result = {
           picked). *)
 }
 
-(* Trading-day filter *)
+(* Measurement-window restriction — the whole family (the trading-day
+   predicate, the two step views, and the per-recorder warmup-prefix drops)
+   lives in {!Window_filter}. Re-exported here because these five were already
+   part of the public [Backtest.Runner] surface ([Result_writer] and
+   [test_runner_filter] call them by that name); [Window_filter] owns the
+   contracts. *)
 
-(** True if [step] represents a real trading day — i.e. the simulator saw at
-    least one bar for any symbol on [step.date]. Reads the authoritative
-    [step_result.had_market_bars] flag set in {!Trading_simulation.Simulator}
-    from the per-tick [today_bars] list.
+let is_trading_day = Window_filter.is_trading_day
+let round_trips_in_window = Window_filter.round_trips_in_window
+let filter_stop_infos_in_window = Window_filter.filter_stop_infos_in_window
 
-    Replaces the prior portfolio-value-vs-cash heuristic, which falsely
-    classified post-corporate-action days (held symbol with no further bars →
-    [Calculations.portfolio_value] errors → caller silently substitutes [cash])
-    as non-trading and silently truncated [equity_curve.csv]
-    /[summary.final_portfolio_value] at the day before the gap.
+let filter_audit_records_in_window =
+  Window_filter.filter_audit_records_in_window
 
-    Must NOT be applied to round-trip extraction — round-trips derive from
-    position-state transitions (fills) recorded independently of bar presence.
-    Applying this filter before [Metrics.extract_round_trips] silently drops
-    every trade whose entry *and* exit landed on steps where
-    [had_market_bars = false]. *)
-let is_trading_day (step : Sim_types.step_result) = step.had_market_bars
+let filter_cascade_summaries_in_window =
+  Window_filter.filter_cascade_summaries_in_window
+
+let filter_force_liquidations_in_window =
+  Window_filter.filter_force_liquidations_in_window
 
 (* Config overrides via sexp deep-merge — see {!Overlay_validator} for the
    deep-merge + unknown-key validation. Extracted to a sibling module to keep
@@ -261,59 +261,6 @@ let _run_panel_backtest ~deps ~start_date ~end_date ~warmup_days ?on_step_setup
     ?strategy_choice ?trace ?gc_trace ?bar_data_source ?shared_panels
     ?progress_emitter ?slippage_bps ?cost_model ?candidate_log ?on_step_setup ()
 
-(** Drop simulator-side [stop_info]s whose [entry_date] is before [start_date] —
-    i.e. positions opened during the warmup window. The simulator runs from
-    [warmup_start] so [Stop_log] observes [EntryComplete] transitions for
-    positions opened during warmup, then [Trade_context._stop_info_for] falls
-    back to a symbol-first match when rendering [trades.csv]. When the same
-    symbol re-trades across the [start_date] boundary (warmup-window stop_info
-    comes first by [position_id] sort), the warmup stop_info gets attached to
-    the in-window round-trip's row, corrupting [entry_stop] / [exit_stop] /
-    [exit_trigger] columns. Round-trips are filtered analogously by
-    {!round_trips_in_window}; this [stop_log] filter is the parallel surface
-    with no date-driven extraction API of its own.
-
-    Stop_infos with [entry_date = None] are kept (test fixtures that don't drive
-    {!Stop_log.set_current_date}). *)
-let filter_stop_infos_in_window stop_infos ~start_date =
-  List.filter stop_infos ~f:(fun (info : Stop_log.stop_info) ->
-      match info.entry_date with
-      | Some d -> Date.( >= ) d start_date
-      | None -> true)
-
-(** Drop force-liquidation events whose [date] is before [start_date] — i.e.
-    events that fired during the warmup window. The simulator runs from
-    [warmup_start] so [Force_liquidation_log] observes events from days before
-    [start_date]; without this filter, warmup-window force-liqs appear in
-    [force_liquidations.sexp] and the [_build_force_liq_index] layer in
-    [Result_writer] inflates the visible force-liq count for release-gate
-    consumers. Round-trip rows in [trades.csv] would not directly attach these
-    events (the index keys on [(symbol, exit_date)] which is in the warmup
-    window for warmup events), but downstream tooling that loads
-    [force_liquidations.sexp] independently still over-counts. *)
-let filter_force_liquidations_in_window events ~start_date =
-  List.filter events ~f:(fun (e : Portfolio_risk.Force_liquidation.event) ->
-      Date.( >= ) e.date start_date)
-
-(** Drop trade-audit records whose entry-decision date is before [start_date] —
-    i.e. positions whose entry decision was made during the warmup window. The
-    strategy's audit recorder is wired from [warmup_start], so without this
-    filter [trade_audit.sexp] picks up entry/exit decision pairs whose
-    round-trips were never reported to [trades.csv]. *)
-let filter_audit_records_in_window records ~start_date =
-  List.filter records ~f:(fun (r : Trade_audit.audit_record) ->
-      Date.( >= ) r.entry.entry_date start_date)
-
-(** Drop cascade-summary rows whose Friday [date] is before [start_date] — i.e.
-    cascade evaluations that ran during the warmup window. The strategy's audit
-    recorder calls [record_cascade_summary] every Friday from [warmup_start], so
-    without this filter [trade_audit.sexp] reports activity counts that include
-    warmup-window screen calls (no candidates of which were ever entered into
-    [trades.csv]). *)
-let filter_cascade_summaries_in_window summaries ~start_date =
-  List.filter summaries ~f:(fun (s : Trade_audit.cascade_summary) ->
-      Date.( >= ) s.date start_date)
-
 let _make_summary ~start_date ~end_date ~deps ~steps_in_range ~steps
     ~final_value ~round_trips ~sim_result ~stale_holds : Summary.t =
   let stale_held_symbols =
@@ -352,34 +299,6 @@ let _final_prices_for_held_symbols
   in
   List.filter final_close_prices ~f:(fun (sym, _) -> Set.mem held sym)
 
-(** Split [sim_result.steps] into two views over [start_date..end_date]:
-    [steps_in_range] includes every calendar day (needed for round-trip
-    extraction) and [steps] keeps only real trading days (needed for
-    mark-to-market consumers such as the equity curve). *)
-let _filter_steps ~(sim_result : Sim_types.run_result) ~start_date =
-  (* Steps in the requested date range, all days included. Round-trip
-     extraction derives trades from position-state transitions recorded on
-     these steps, so it must see *every* step where a trade fill happened —
-     including days the [is_trading_day] mark-to-market heuristic would
-     otherwise discard. *)
-  let steps_in_range =
-    List.filter sim_result.steps ~f:(fun s -> Date.( >= ) s.date start_date)
-  in
-  (* Steps on real trading days only — used for [OpenPositionsValue] /
-     [UnrealizedPnl] consumers and anything else that needs a meaningful
-     mark-to-market portfolio value. Simulator reports [portfolio_value = cash]
-     on weekends/holidays even when positions are open, so filter them out
-     before mark-to-market consumers use the series. *)
-  let steps = List.filter steps_in_range ~f:is_trading_day in
-  (steps_in_range, steps)
-
-(* Round-trips over FULL warmup-inclusive [all_steps]; keep in-window entries
-   only. Full rationale (the warmup-orphan SHORT bug) in the .mli. *)
-let round_trips_in_window ?order_links all_steps ~start_date =
-  Metrics.extract_round_trips ?order_links all_steps
-  |> List.filter ~f:(fun (t : Metrics.trade_metrics) ->
-      Date.( >= ) t.entry_date start_date)
-
 (** Collect all in-window teardown artefacts (round trips, stop infos, audit
     records, cascade summaries, force liquidations) from the simulation logs.
     [all_steps] is the warmup-inclusive step series ([sim_result.steps]). *)
@@ -397,12 +316,6 @@ let _collect_teardown_artefacts ~stop_log ~trade_audit ~force_liquidation_log
       (Force_liquidation_log.events force_liquidation_log)
       ~start_date )
 
-(** Filter stale-hold events to those at or after [start_date]. *)
-let _filter_stale_holds ~stale_hold_log ~start_date =
-  Trading_simulation.Stale_hold.Log.events stale_hold_log
-  |> List.filter ~f:(fun (e : Trading_simulation.Stale_hold.event) ->
-      Date.( >= ) e.date start_date)
-
 (** Extract and in-window-filter all post-simulation artefacts: round trips,
     stop infos, audit records, cascade summaries, force liquidations, and stale
     holds. Wrapped in a [Trace.Teardown] span. *)
@@ -415,7 +328,11 @@ let _extract_filtered_logs ?trace ?gc_trace ~stop_log ~trade_audit
           ~force_liquidation_log ~all_steps ~order_links ~start_date)
   in
   Gc_trace.record ?trace:gc_trace ~phase:"teardown_done" ();
-  let stale_holds = _filter_stale_holds ~stale_hold_log ~start_date in
+  let stale_holds =
+    Window_filter.filter_stale_holds_in_window
+      (Trading_simulation.Stale_hold.Log.events stale_hold_log)
+      ~start_date
+  in
   ( round_trips,
     stop_infos,
     audit,
@@ -433,13 +350,22 @@ let _log_backtest_window ~start_date ~end_date ~warmup_start ~all_symbols =
 
 (* Post-simulation assembly: filter steps to the requested window, extract the
    teardown artefacts, and build the [result] record. Split out of
-   [run_backtest] to keep that function under the length limit. *)
+   [run_backtest] to keep that function under the length limit.
+
+   Raises {!Window_filter.Empty_measurement_window} when the requested window
+   holds no trading day (previously a raw [Invalid_argument "List.last"] from
+   the final-value read — issue #2632). *)
 let _assemble_result ~start_date ~end_date ~deps ~overrides
     ~(sim_result : Sim_types.run_result) ~stop_log ~trade_audit
     ~force_liquidation_log ~stale_hold_log ~final_close_prices ~candidate_log
     ?trace ?gc_trace () =
-  let steps_in_range, steps = _filter_steps ~sim_result ~start_date in
-  let final_value = (List.last_exn steps).portfolio_value in
+  let {
+    Window_filter.steps_in_range;
+    steps;
+    final_portfolio_value = final_value;
+  } =
+    Window_filter.of_steps sim_result.steps ~start_date ~end_date
+  in
   let ( round_trips,
         stop_infos,
         audit_raw,
