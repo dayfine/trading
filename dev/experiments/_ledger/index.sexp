@@ -363,4 +363,5 @@
    "book-faithful stops-basis default flip (user-directed 2026-08-24, #2486); 4-arm per-flip decomposition on test_weinstein_backtest + paired armed-stoplimit golden at the PR build")
   (window_id weinstein-backtest-6y-covid-positive)
   (verdict Inconclusive) (entry_slug stops-basis-book-faithful))
- ((config_hash clock-surface-3cell) (base_scenario "entry_order_max_rest_weeks surface {0,13,26,52,156} x 3 broad cells at build 90dfd6e97 (fill-model pair on); robust value 52") (window_id clock-surface-3cell-broad) (verdict Accept) (entry_slug entry-rest-weeks-surface)))
+ ((config_hash clock-surface-3cell) (base_scenario "entry_order_max_rest_weeks surface {0,13,26,52,156} x 3 broad cells at build 90dfd6e97 (fill-model pair on); robust value 52") (window_id clock-surface-3cell-broad) (verdict Accept) (entry_slug entry-rest-weeks-surface))
+ ((config_hash exit-nextopen-skip-true) (base_scenario "exit-basis correctness default flip (user-directed 2026-09-03): sim_exit_fill_next_open + stops_config.stop_skip_entry_bar false -> true; evidence = arc-rerun-2026-09-01 D1/D2 first-order repricing + paired goldens at the promotion PR build") (window_id top3000-2000-2026-arc-and-record-26y) (verdict Inconclusive) (entry_slug exit-basis-d1d2-correctness)))

@@ -1105,7 +1105,7 @@ type config = {
           Weinstein-faithful: spine untouched, only the {i fill assumption}
           changes. Plan: [dev/plans/fill-model-faithfulness-2026-08-07.md]
           Workstream C. *)
-  sim_exit_fill_next_open : bool; [@sexp.default false]
+  sim_exit_fill_next_open : bool; [@sexp.default true]
       (** Next-bar-open fill realism for Market EXITS (Fix #1b — the exit
           sibling of [sim_entry_fill_next_open]). Threaded from this config into
           the simulator dependencies by the backtest runner (same route as
@@ -1134,11 +1134,14 @@ type config = {
           The strategy's decision-time [exit_price] is UNCHANGED — only the
           executed engine fill price/date move.
 
-          {b Default [false] = current stale-bar exit fill, bit-identical to
-             every existing baseline/golden} (R1).
-          {b ⚠ A fill-model basis change when armed} — its own WF-CV surface and
-          deliberate golden re-pins before any default flip; NEVER bundled. R2:
-          axis-expressible as
+          {b Default [true] since 2026-09-03} (USER DECISION, D1 of
+          [dev/experiments/arc-rerun-2026-09-01/README.md]; ledger
+          [dev/experiments/_ledger/2026-09-03-exit-basis-d1d2-correctness.sexp]).
+          A correctness flip, not a performance promotion: the stale-bar exit
+          fill priced Friday-decided exits at Friday's OPEN (−$0.6M first-order
+          on the 26y record). Every golden was re-pinned PAIRED (flag off vs on
+          at one build) in the promotion PR. Set [false] to reproduce a
+          pre-2026-09-03 baseline bit-for-bit. R2: axis-expressible as
           [((flag sim_exit_fill_next_open) (values (true false)))].
           Weinstein-faithful: spine untouched, only the {i fill assumption}
           changes. Plan: [dev/plans/fill-model-faithfulness-2026-08-07.md]
