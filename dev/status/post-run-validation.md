@@ -41,7 +41,8 @@ expectations so we never make these kinds of trades again."
   (`-run-dir -data-dir [-config] -out`).
 - `trading/trading/backtest/validation/test/test_post_run_validator.ml` — unit
   tests for V1-V15 (except the armed-only V3/V4 real-artifact path),
-  audit-join + severity/validate wiring (59 tests).
+  audit-join + severity/validate wiring, plus the `bars_of_daily` price-basis
+  pin (62 tests).
 
 ## Checks (V1-V15)
 
@@ -128,8 +129,8 @@ docker exec trading-1-dev bash -c \
   and enough to flip the sign of the 26y fix-armed cell. V13/V14 could not see
   it — every bar exists and every fill is inside its bar's range; the bars are
   simply the wrong company's.
-  - **V15 (EXP)**, `validator_bar_checks.check_v15`: a round trip that is both
-    implausibly profitable and implausibly brief (`|pnl_pct| >
+  - **V15 (EXP)**, `validator_splice_check.check_v15`: a round trip that is
+    both implausibly profitable and implausibly brief (`|pnl_pct| >
     splice_pnl_pct_threshold`, default 100.0, held at most
     `splice_max_days_held`, default 5 calendar days) whose entry **or** exit
     bar's `adjusted_close` moved by a factor strictly outside
@@ -159,15 +160,23 @@ docker exec trading-1-dev bash -c \
     its pre-#2646 behaviour. A `truncate_at_splice`-style action, if ever
     wanted, is a separate default-off flag.
   - Verify: `dune runtest trading/backtest/validation
-    trading/backtest/snapshot_warehouse` — 12 V15 cases (the CHS specimen and
-    its SHORT mirror, a legitimate +120%/4-day trade on continuous bars, both
-    ends of the ratio band at and just past the bound, the entry-leg collapse,
-    both halves of the candidate predicate, the config-routed band, and every
-    Skip branch) plus 18 `Splice_detector` cases (including a correctly
-    adjusted 4:1 split that stays clean *even with the guard disabled*, and a
-    late-back-rolled 3:1 that is clean only *because* of the guard). Each V15
-    Skip branch was verified by mutating it to `Pass` and confirming a test
-    goes red.
+    trading/backtest/snapshot_warehouse` — 14 V15 cases (the CHS specimen and
+    its SHORT mirror, a legitimate +120%/4-day trade on continuous bars, a
+    correctly adjusted 4:1 split whose **raw** close steps x0.25 while the
+    adjusted one holds — clean only because the ratio is on the adjusted
+    series, both ends of the ratio band at and just past the bound, the
+    entry-leg collapse, both halves of the candidate predicate, the
+    config-routed band, and all five documented Skip branches) plus one
+    `Validator_artifacts.bars_of_daily` case pinning that the loader keeps the
+    raw OHLC and the adjusted close on separate bases, plus 18
+    `Splice_detector` cases (including a correctly adjusted 4:1 split that
+    stays clean *even with the guard disabled*, and a late-back-rolled 3:1 that
+    is clean only *because* of the guard). Every V15 Skip branch was
+    mutation-verified — each rewritten to `Pass` (or, for the non-positive
+    prior `adjusted_close`, deleted outright) with a test confirmed red — as
+    were both halves of the adjusted-vs-raw basis contract: reading `close` in
+    `_v15_ratio`, and populating `adjusted_close` from `close_price` in the
+    loader.
 
 ## Follow-ups
 

@@ -195,7 +195,7 @@ let _daily_bar_of (b : Types.Daily_price.t) =
     volume = b.volume;
   }
 
-let _bars_of_daily daily =
+let bars_of_daily daily =
   let weekly = _weekly_last_bars daily in
   {
     weekly_dates =
@@ -211,7 +211,7 @@ let _load_one ~data_dir ~run_end symbol =
     Csv.Csv_storage.create ~data_dir:(Fpath.v data_dir) symbol
   in
   let%map daily = Csv.Csv_storage.get storage ~end_date:run_end () in
-  _bars_of_daily daily
+  bars_of_daily daily
 
 let load_bars ~data_dir ~run_end =
   let cache = Hashtbl.create (module String) in

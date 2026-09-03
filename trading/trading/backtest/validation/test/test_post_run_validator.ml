@@ -773,15 +773,18 @@ let test_v14_rebased_store_skips_stop_comparison _ =
 
 (* ---- V15: huge, brief round trip whose fill bar sits on a data splice --- *)
 
-(* V15 reads only [adjusted_close]; the raw OHLC is filled in from it so the
-   fixtures say nothing this check does not use. *)
-let adj_bar ~date ~adj : Vt.daily_bar =
+(* A bar carrying an explicit raw close and adjusted close (mirroring
+   [Test_splice_detector.bar]). The two are equal by default — no corporate
+   action in the window — so a fixture spells out [raw] only when it is testing
+   the split path, where the whole point is that the two bases disagree. *)
+let adj_bar ~date ~adj ?raw () : Vt.daily_bar =
+  let close = Option.value raw ~default:adj in
   {
     date = Date.of_string date;
-    open_price = adj;
-    high = adj;
-    low = adj;
-    close = adj;
+    open_price = close;
+    high = close;
+    low = close;
+    close;
     adjusted_close = adj;
     volume = 1000;
   }
@@ -796,10 +799,10 @@ let adj_bars lst : Vt.bars =
 let chs_bars =
   adj_bars
     [
-      adj_bar ~date:"2004-12-15" ~adj:4.05;
-      adj_bar ~date:"2004-12-16" ~adj:4.06;
-      adj_bar ~date:"2004-12-17" ~adj:4.0693;
-      adj_bar ~date:"2004-12-20" ~adj:15.8803;
+      adj_bar ~date:"2004-12-15" ~adj:4.05 ();
+      adj_bar ~date:"2004-12-16" ~adj:4.06 ();
+      adj_bar ~date:"2004-12-17" ~adj:4.0693 ();
+      adj_bar ~date:"2004-12-20" ~adj:15.8803 ();
     ]
 
 let chs_inputs ?(config = Vt.default_config) ?(side = "LONG")
@@ -844,12 +847,45 @@ let test_v15_clean_fast_double _ =
             ( "REAL",
               adj_bars
                 [
-                  adj_bar ~date:"2020-05-29" ~adj:9.8;
-                  adj_bar ~date:"2020-06-01" ~adj:10.0;
-                  adj_bar ~date:"2020-06-02" ~adj:13.0;
-                  adj_bar ~date:"2020-06-03" ~adj:16.5;
-                  adj_bar ~date:"2020-06-04" ~adj:20.0;
-                  adj_bar ~date:"2020-06-05" ~adj:22.0;
+                  adj_bar ~date:"2020-05-29" ~adj:9.8 ();
+                  adj_bar ~date:"2020-06-01" ~adj:10.0 ();
+                  adj_bar ~date:"2020-06-02" ~adj:13.0 ();
+                  adj_bar ~date:"2020-06-03" ~adj:16.5 ();
+                  adj_bar ~date:"2020-06-04" ~adj:20.0 ();
+                  adj_bar ~date:"2020-06-05" ~adj:22.0 ();
+                ] );
+          ];
+    }
+  in
+  assert_that (result ~id:"V15" inputs) (violations_skipped_pass 0 0 true)
+
+(* A correctly adjusted 4:1 split on the ENTRY bar: the raw close steps
+   400 -> 100 (x0.25, far below [splice_adj_ratio_min]) while the adjusted close
+   holds at 100 (x1.0), because the back-roll has already absorbed the split.
+   The row is a genuine candidate — a +120% four-day round trip on the
+   post-split basis the simulator fills at — so only the choice of series keeps
+   it clean. Reading [close] here instead of [adjusted_close] would flag every
+   split in the store; this is the one V15 fixture where the two bases
+   disagree, and it is what makes the "ordinary corporate actions do not flag"
+   claim testable. *)
+let test_v15_clean_across_adjusted_split _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"SPLIT4" ~entry_date:"2020-08-31" ~entry_price:100.0
+            ~exit_date:"2020-09-04" ~exit_price:220.0 ();
+        ];
+      bars =
+        bars_of
+          [
+            ( "SPLIT4",
+              adj_bars
+                [
+                  adj_bar ~date:"2020-08-28" ~adj:100.0 ~raw:400.0 ();
+                  adj_bar ~date:"2020-08-31" ~adj:100.0 ~raw:100.0 ();
+                  adj_bar ~date:"2020-09-04" ~adj:220.0 ();
                 ] );
           ];
     }
@@ -863,8 +899,8 @@ let test_v15_skips_fill_bar_without_prior _ =
   let bars =
     adj_bars
       [
-        adj_bar ~date:"2004-12-17" ~adj:4.0693;
-        adj_bar ~date:"2004-12-20" ~adj:4.1;
+        adj_bar ~date:"2004-12-17" ~adj:4.0693 ();
+        adj_bar ~date:"2004-12-20" ~adj:4.1 ();
       ]
   in
   assert_that
@@ -887,9 +923,9 @@ let bounded_inputs ~exit_adj =
           ( "EDGE",
             adj_bars
               [
-                adj_bar ~date:"2020-06-01" ~adj:3.9;
-                adj_bar ~date:"2020-06-02" ~adj:4.0;
-                adj_bar ~date:"2020-06-03" ~adj:exit_adj;
+                adj_bar ~date:"2020-06-01" ~adj:3.9 ();
+                adj_bar ~date:"2020-06-02" ~adj:4.0 ();
+                adj_bar ~date:"2020-06-03" ~adj:exit_adj ();
               ] );
         ];
   }
@@ -922,9 +958,9 @@ let test_v15_flags_entry_bar_collapse _ =
             ( "REUSE",
               adj_bars
                 [
-                  adj_bar ~date:"2020-06-01" ~adj:40.0;
-                  adj_bar ~date:"2020-06-02" ~adj:10.0;
-                  adj_bar ~date:"2020-06-03" ~adj:11.0;
+                  adj_bar ~date:"2020-06-01" ~adj:40.0 ();
+                  adj_bar ~date:"2020-06-02" ~adj:10.0 ();
+                  adj_bar ~date:"2020-06-03" ~adj:11.0 ();
                 ] );
           ];
     }
@@ -937,9 +973,9 @@ let test_v15_ignores_long_hold _ =
   let bars =
     adj_bars
       [
-        adj_bar ~date:"2004-12-16" ~adj:4.06;
-        adj_bar ~date:"2004-12-17" ~adj:4.0693;
-        adj_bar ~date:"2004-12-27" ~adj:15.8803;
+        adj_bar ~date:"2004-12-16" ~adj:4.06 ();
+        adj_bar ~date:"2004-12-17" ~adj:4.0693 ();
+        adj_bar ~date:"2004-12-27" ~adj:15.8803 ();
       ]
   in
   assert_that
@@ -963,6 +999,37 @@ let test_v15_skips_store_with_no_daily_bars _ =
     (result ~id:"V15" (chs_inputs ~bars:(adj_bars []) ()))
     (violations_skipped_pass 0 1 true)
 
+(* The entry bar's predecessor carries a zero [adjusted_close] — a vendor row
+   with no adjustment recorded. The ratio is undefined there, so the row is
+   un-evaluable and Skipped. Without the non-positive guard the division would
+   yield [infinity], which is outside every band and would report this
+   data-quality hole as a splice VIOLATION rather than an un-evaluable
+   candidate. The exit leg (10.0 -> 22.0, x2.2) is inside the band, so the Skip
+   can only come from the entry leg. *)
+let test_v15_skips_non_positive_prior_close _ =
+  let inputs =
+    {
+      (Vt.empty_inputs ()) with
+      trades =
+        [
+          trade ~symbol:"ZEROADJ" ~entry_date:"2020-06-02" ~entry_price:10.0
+            ~exit_date:"2020-06-03" ~exit_price:22.0 ();
+        ];
+      bars =
+        bars_of
+          [
+            ( "ZEROADJ",
+              adj_bars
+                [
+                  adj_bar ~date:"2020-06-01" ~adj:0.0 ();
+                  adj_bar ~date:"2020-06-02" ~adj:10.0 ();
+                  adj_bar ~date:"2020-06-03" ~adj:22.0 ();
+                ] );
+          ];
+    }
+  in
+  assert_that (result ~id:"V15" inputs) (violations_skipped_pass 0 1 true)
+
 (* The band is config-routed, not a literal: widening the ceiling past the
    3.902 CHS ratio makes the same row pass. *)
 let test_v15_respects_configured_bounds _ =
@@ -970,6 +1037,50 @@ let test_v15_respects_configured_bounds _ =
   assert_that
     (result ~id:"V15" (chs_inputs ~config ()))
     (violations_skipped_pass 0 0 true)
+
+(* ---- bar loading: the raw-vs-adjusted price basis ---------------------- *)
+
+(* A stored bar with a live adjustment: [raw] is what the tape printed, [adj]
+   is the back-rolled close. *)
+let stored_bar ~date ~raw ~adj =
+  Types.Daily_price.make ~date:(Date.of_string date) ~open_price:raw
+    ~high_price:raw ~low_price:raw ~close_price:raw ~volume:1000
+    ~adjusted_close:adj ()
+
+(* The construction site every bar-dependent check inherits its basis from.
+   A 4:1 split: Thursday's raw close is 400 against an adjusted 100, Friday's
+   raw close is 100 with the adjusted close unchanged. [close] must carry the
+   RAW series (V13 compares [trades.csv] fills to it) and [adjusted_close] the
+   ADJUSTED one (V15's day-over-day ratio has to be blind to splits).
+   Populating [adjusted_close] from [close_price] would collapse both onto one
+   basis, and every V15 fixture — which sets the two equal — would still
+   pass. *)
+let test_bars_of_daily_keeps_raw_and_adjusted_apart _ =
+  let bars =
+    Va.bars_of_daily
+      [
+        stored_bar ~date:"2020-08-27" ~raw:400.0 ~adj:100.0;
+        stored_bar ~date:"2020-08-28" ~raw:100.0 ~adj:100.0;
+      ]
+  in
+  assert_that (Array.to_list bars.daily)
+    (elements_are
+       [
+         all_of
+           [
+             field (fun (b : Vt.daily_bar) -> b.close) (float_equal 400.0);
+             field
+               (fun (b : Vt.daily_bar) -> b.adjusted_close)
+               (float_equal 100.0);
+           ];
+         all_of
+           [
+             field (fun (b : Vt.daily_bar) -> b.close) (float_equal 100.0);
+             field
+               (fun (b : Vt.daily_bar) -> b.adjusted_close)
+               (float_equal 100.0);
+           ];
+       ])
 
 (* ---- audit join: position_id vs symbol|date ---------------------------- *)
 
@@ -1112,6 +1223,8 @@ let suite =
          "v15_flags_short_side_of_same_splice"
          >:: test_v15_flags_short_side_of_same_splice;
          "v15_clean_fast_double" >:: test_v15_clean_fast_double;
+         "v15_clean_across_adjusted_split"
+         >:: test_v15_clean_across_adjusted_split;
          "v15_skips_fill_bar_without_prior"
          >:: test_v15_skips_fill_bar_without_prior;
          "v15_ratio_at_upper_bound_passes"
@@ -1124,8 +1237,12 @@ let suite =
          "v15_skips_absent_symbol" >:: test_v15_skips_absent_symbol;
          "v15_skips_store_with_no_daily_bars"
          >:: test_v15_skips_store_with_no_daily_bars;
+         "v15_skips_non_positive_prior_close"
+         >:: test_v15_skips_non_positive_prior_close;
          "v15_respects_configured_bounds"
          >:: test_v15_respects_configured_bounds;
+         "bars_of_daily_keeps_raw_and_adjusted_apart"
+         >:: test_bars_of_daily_keeps_raw_and_adjusted_apart;
          "join_by_position_id_survives_date_skew"
          >:: test_join_by_position_id_survives_date_skew;
          "join_legacy_falls_back_to_symbol_date"
