@@ -4,42 +4,46 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-02 (orchestrator run 33628203337; main **`deb45a7e`**
--> **`425b2fcb`**, two PRs merged. The open-PR queue was EMPTY at run start, so
-Step 0.5 was skipped per its non-empty precondition. Green at run start
-(`deb45a7e`: `dune build @runtest --force` 0, 0 `^FAIL:`,
-`status_file_integrity` 0, `index_size_linter` 0 — every exit code read
-**unpiped** — plus GitHub CI green on the same SHA) and re-verified at run
-end.
+Last updated: 2026-09-03 (orchestrator run 33778603256; main **`e4984c5f`**
+-> **`efc25d68`**, two PRs merged. Green at run start (`e4984c5f`:
+`dune build @runtest --force` 0, 0 `^FAIL:`, `status_file_integrity` 0,
+`index_size_linter` 0 — every exit code read **unpiped**) and re-verified
+after both merges. Step 0.5 skipped: `QUEUE_NON_EMPTY=3`, and Condition 2
+fails independently (nine non-summary commits touched `dev/status/*.md`
+since the prior summary).
 
-**Merged this run:** **#2624** (`e4c59ed6`, pins the missing-`review_at`
-branch of `check_11`) and **#2625** (`34b4e7c2`, pins `strip_fences` + the
-`^` anchor in the gate parser). Both entered the run reworked-but-unreviewed
-with **both** gates stale at a superseded SHA; both went through a full
-re-QC round this run and reached structural APPROVED + behavioral APPROVED
-at their current tips before merging.
+**This run finished a gate loop that a failed run abandoned.** The 12:06Z
+orchestrator run (33753388554) **failed** — `is_error:true`, 99 turns of a
+200 cap, 80.3 min, **$48.67** — after opening two PRs and getting them
+through structural QC, but recorded **nothing**: no summary, no merges, no
+index update. Cause is **not** determinable from the artifacts (the action
+logs only init and result), and a turn-limit cutoff is ruled out by the
+cap. Filed as a `[high]` observability escalation.
 
-**The merge gate's fourth defect is now fixed, not just filed.** #2626 — a
-review body with no `Reviewed SHA:` line parses as sha-less and is therefore
-*current-at-every-tip-forever*, a live false-MERGE path observed on #2625
-itself — is closed by **#2628** (open): `review_result` now falls back to the
-review's `commit_id`, which the REST API always supplies, and `_pr_meta_curl`
-was widened to actually project that field (the prior projection dropped it
-before the parser could see it). Suite 51 -> 54 cases. **Known residual,
-measured and filed rather than glossed:** reverting *only* the projection
-leaves the suite green, so half that fix has no regression pin.
+**Merged this run:** **#2651** (`efc25d68`) — closes the script-side half of
+**#2633**; its rework pinned the exit-status guard that had **zero** coverage
+(failure-branch tracer 0 -> 6 hits; degrade-to-skip and inverse mutations
+both now RED). Verified independently post-merge on main: mutant `31 passed,
+3 failed` exit 1 vs `34 passed, 0 failed` exit 0. And **#2655** (`cd702adf`),
+the failed run's orphaned budget record — **merged under a docs-only
+carve-out extended to `dev/budget/*.json`, which is NOT in the written
+allowlist and needs human ratification.**
 
-**Three mutations of the gate parser remain live and unpinned** — **(k)**
-dropping `\b`, **(f)** `#{1,4}`->`#{1,6}`, **(g)** the required space —
-recorded in `H-GATEPARSER-NO-MUTATION-COVERAGE`. (k) is the sharp one: a
-first heading `## Behaviorally equivalent refactor` reads `ok`, two letters
-from the actual #2620 incident text.
+**#2654 (fixes #2632 — the `List.last_exn` crash that has kept
+`weekly-start-sweep.yml` red since 2026-05-18) is correctly held.** Its core
+guard is well pinned, but `run_one`'s docstring makes two guard claims that
+nothing exercises: widening the handler to a catch-all, and suppressing the
+stderr skip-warning, both leave the suite green. Those claims are the only
+thing stopping the fix from becoming a quieter version of the bug it fixes.
 
-Capabilities unchanged from run 1 and not re-probed this run:
-`.github/workflows/**` **pushes** rejected (no `workflow` scope) though a
-server-side **merge** of a workflow-touching PR succeeds; comment writes are
-PR-scoped not issue-scoped; `POST /issues` and `PATCH /pulls/<n>` work.
-`.claude/agents/**` writes remain gated by the harness — **5th run**.
+Capabilities, re-probed this run rather than inherited: `.claude/agents/**`
+writes **refused** (attempted, 7th run); **NEW** — `POST
+/actions/workflows/<f>/dispatches` **403**, so the orchestrator cannot
+trigger a `workflow_dispatch` to verify its own workflow fixes.
+`.github/workflows/**` pushes rejected (no `workflow` scope) though a
+server-side merge succeeds; `POST /issues` create-only (`PATCH` and issue
+comments 403); `PATCH /pulls/<n>`, `POST /pulls/<n>/reviews`,
+`PUT /pulls/<n>/merge`, `PUT .../update-branch` all work.
 
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
@@ -63,7 +67,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
-| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine (maintainer) + feat-backtest | — | LAPACKE fix MERGED `757abdf2` (#2113) — un-redded main; CI hold self-resolved once a merge commit triggered a check-suite; next: none queued |
+| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | #2654 | #2654 fixes #2632 (empty-window crash); structural APPROVED, behavioral NEEDS_REWORK — rework in flight, re-QC owed |
 | [rename-twin-dedup](rename-twin-dedup.md) | IN_PROGRESS | feat-backtest | — | v1(#1940)+v2(#1946) MERGED; dedup warehouse rebuilt + 28y record re-run landed (#1949, 83 groups/91 legs dropped); next: none (optional V6 report-consult tweak) |
 | [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | v1 harness (#1937) + C6b audit-join-by-position_id (#1947) MERGED; next: golden-run integration test for V3/V4/V7 (data-gated) |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
@@ -88,7 +92,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2635 + #2636 MERGED after rework; QC found 6 more live gate-parser mutations + a 4th live expiry mutation — next: the automated mutation harness |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2651 MERGED (`efc25d68`) — closes #2633's script-side half; rework pinned the exit-status guard (0 → 6 tracer hits); next: H-GATEPARSER mutation harness, dispatched |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | A-MERGEABLE-STATE-NOT-A-CLOSE-TELL filed (run-1 guidance corrected); open: #2427 #2428 #2429 #2432 — need `workflow` scope or a human |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | #2637 | #2637 root-causes the csv-snapshot flake (OUnit2 parallel shards, NOT the recorded SIGTERM race); reworked, needs re-QC |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |

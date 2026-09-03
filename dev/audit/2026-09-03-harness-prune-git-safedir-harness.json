@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-03",
+  "feature": "harness",
+  "branch": "harness/prune-git-safedir",
+  "sha": "8de76b21c984614ef07d402487ee43d9cd03ce20",
+  "recorded_at_ns": 1788454640658416008,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
