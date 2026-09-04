@@ -60,9 +60,10 @@ open_positions dropped for size; regenerable from the committed specs).
 rec26y-old (312.74 / 0.430 / 38.78) is digit-for-digit the clock-surface
 cell-A null of 2026-08-27 (`clockA-0`, build 90dfd6e97) — the record spec pins
 the clock at 0, and nothing between that build and e4984c5fe moved the old-
-basis default path. So the 08-24 record's 731.64% → 312.74% is the #2555
-RS-trend build delta (already recorded as a correctness re-pin with no
-return claim), and the exit basis costs a further −10.1pp on top.
+basis default path. So the 08-24 record's 731.64% → 312.74% is the RS-trend build delta of #2561 (v2 of #2555; already recorded as a
+correctness re-pin with no return claim) — #2569's fill-model flip also sits
+in that window but is a no-op here because the spec pins its knobs — and the
+exit basis costs a further −10.1pp on top.
 
 ### 26y dissection
 
@@ -74,7 +75,7 @@ Realised $2.95M → $2.21M (−$747k). Join on `symbol|entry_date`: 462 shared /
 | shared: stop_loss price effect (306 trades) | −565k | −0.5pp per stop (vs −1.0…−1.2pp on the 5y cells) |
 | shared: laggard_rotation price effect (144) | +814k | includes the D2-saved entries that lived to become laggard exits |
 | shared total (all triggers, incl. sizing) | **−40k** | the mechanism is ≈ neutral at 26y |
-| cohort: old-only 337 entries | +804k | AEIS 2025-06-24 +$548k (screened grade B in the new arm, book was 4 deep and never funded it), IONS 2013 +$246k, CLB 2005 +$231k |
+| cohort: old-only 337 entries | +804k | AEIS 2025-06-24 +$548k (old-only: the new-basis book never entered it; the audit trail showing why lives in the uncommitted `trade_audit.sexp`, regenerable from `specs/rec26y-new.sexp`), IONS 2013 +$246k, CLB 2005 +$231k |
 | cohort: new-only 261 entries | +97k | BBWI 2020-08 +$414k, IPIXQ 2004 +$256k, GILT 2025 +$157k |
 
 D2 saved 63 of the old arm's 108 entry-bar deaths (13.5% of its trades):
@@ -136,10 +137,10 @@ trades in 2000–04, 18 of 174 in 2019–23 — and most of them die anyway a fe
 days later at a worse price.** Fate of the old arm's entry-bar stop-outs in
 the new arm (same `symbol|entry_date`):
 
-| window | saved | old pnl $ | new pnl $ | stopped again ≤ 14d | winners | monsters |
+| window | saved (same `symbol|entry_date` in new arm) | old pnl $ of the saved subset | new pnl $ of the same | re-stopped (stop_loss, ≤ 14d) | winners | monsters |
 |---|---:|---:|---:|---:|---:|---|
-| 2000–04 | 18 of 23 | −8,791 | +225,316 (**−46k ex-WNC**) | 12 | 5 | WNC 2003-05-09 +160% (+$271k) |
-| 2019–23 | 16 of 18 | −49,116 | −98,885 | 13 | 3 | none (best POOL +17%) |
+| 2000–04 | 18 of 23 (all 23: −$8,791) | −7,887 | +225,316 (**−45.9k ex-WNC**) | 11 | 5 | WNC 2003-05-09 +160% (+$271k) |
+| 2019–23 | 16 of 18 (all 18: −$49,116) | −39,511 | −98,885 | 14 | 3 | none (best POOL +17%) |
 
 So the artifact was, on average, a *lucky* exit: it sold breakouts that were
 about to fail at a −2% day-one loss instead of the −4…−12% real stop. The

@@ -54,11 +54,12 @@ gate and the fallback-stop width. The re-pinned goldens are the null.
 `e4984c5fe`. **New canonical record = 302.65% / 723 trades / Sharpe 0.397 /
 MaxDD 36.26** (`results/rec26y-new-s0-*`, params committed). The paired old arm
 (312.74) equals the 08-27 clock cell-A null digit-for-digit, so the 08-24
-731.64% figure was #2555 build drift; the exit basis costs −10pp, and on shared
+731.64% figure was the #2561 (v2 of #2555) RS-trend build delta; the exit basis costs −10pp, and on shared
 trades it is a wash (stop tax −$565k vs D2-saved monsters +$814k). Mechanism
-read in `project_d1d2_mechanism_decomposition`: D1 ≈ −1pp per stop exit; D2
-saves 15–20% of entries from day-one death, most re-stop within days, a few
-become monsters (WNC +160%, UGP +69%). Every writeup after today diffs against
+read in `project_d1d2_mechanism_decomposition`: D1 ≈ −1pp per stop exit on the 5y cells (−0.5pp at 26y); D2 removes the
+entry-bar stop-outs (10–21% of an arm's trades; 8–16% survive as the same
+entry), most of which re-stop within days, and a few become monsters (WNC
++160%, UGP +69%). Every writeup after today diffs against
 rec26y-new.
 
 ## P1 — vintage warehouses (carried)
