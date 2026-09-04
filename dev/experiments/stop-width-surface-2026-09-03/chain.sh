@@ -3,16 +3,18 @@
 # Six cells at ONE build (pinned worktree sweep-record0903 @ e4984c5fe = main
 # after #2648/#2652): the record-baseline spec (2026-08-24 lineage, clock 0
 # pin retained) with the period/universe swapped per window, in two arms —
-#   new = as committed (inherits the flipped defaults: next-open exit fill,
-#         no entry-bar stop-out)
-#   old = + ((sim_exit_fill_next_open false)) ((stops_config ((stop_skip_entry_bar false))))
-# Windows: rec5y-2019 (top-3000-2019, 2019-01-02..2023-12-29),
-#          rec5y-2000 (top-3000-2000, 2000-01-03..2004-12-31),
-#          rec26y     (top-3000-2000, 2000-01-01..2026-06-26 — the canonical record).
-# 5y pairs run 2-concurrent (capacity table); the 26y arms run one at a time.
+#   null = the record-baseline spec with the window swapped (default
+#          initial_stop_buffer 1.0, ≈4% fallback stop)
+#   wide = the same + ((initial_stop_buffer 0.98)) prepended (≈5.9%, §5.3 band ceiling)
+# Both arms inherit the fixed exit basis (post #2648); anchor off (spec default).
+# Windows: sw5y-2019 (top-3000-2019, 2019-01-02..2023-12-29) both arms salts {0,1,2},
+#          sw5y-2000 (top-3000-2000, 2000-01-03..2004-12-31) both arms salts {0,1,2},
+#          sw26y     (top-3000-2000, 2000-01-01..2026-06-26) wide arm salt 0 only.
+# Salt-0 nulls are NOT re-run: they are record-rebase-2026-09-03's rec5y-2019-new-s0,
+# rec5y-2000-new-s0 and rec26y-new-s0 (identical spec, build, salt).
+# 5y pairs run 2-concurrent (capacity table); the 26y arm runs alone.
 # Warehouse /tmp/snap_top3000_dedup_v5thin_adj (2000 vintage — within-cell A/B
-# valid, levels survivor-tilted on the 2019 window). Salt 0 only; salts are a
-# follow-up if a lever read hangs on this null.
+# valid, levels survivor-tilted on the 2019 window).
 set -u
 
 C=trading-1-dev

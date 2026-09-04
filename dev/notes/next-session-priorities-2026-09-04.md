@@ -57,7 +57,8 @@ null-only loser (STMP −$166k) is half the delta, and ex-STMP it still wins 3/3
 not a single admitted monster** on that base. Its surface on the RECORD convention
 (`dev/experiments/stop-width-surface-2026-09-03/`, 2019–23 + 2000–04 × salts {0,1,2}
 + 26y) came back **regime-dependent**: 2000–04 wins 3/3 salts ex-monster with
-positive shared-trade drift (+$78–87k) and ~8pp better maxDD; 2019–23 loses 3/3
+positive shared-trade drift (+$78–87k) and better maxDD at two of three salts
+(−7.8 / +1.0 / −7.7pp); 2019–23 loses 3/3
 ex-monster (its raw +46pp is MSTR, wide-arm-only at every salt) with ~10pp worse
 maxDD. Pre-registered rule not met → **keep `initial_stop_buffer 1.0` as default;
 0.98 is a trader-mode / regime dial**, not a promotion candidate

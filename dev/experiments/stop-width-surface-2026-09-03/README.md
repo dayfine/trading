@@ -146,7 +146,7 @@ band ceiling) is a legitimate regime / trader-mode dial, not a promotion candida
 
 - Pre-registered rule (wide beats null ex-monster in ≥2/3 salts on BOTH 5y windows,
   26y maxDD not worse): **not met** — 2000–04 3/3 yes, 2019–23 0/3, 26y maxDD +1.4pp.
-- The structural effect is the same everywhere: −20…−30 stop exits per 5y window,
+- The structural effect is the same everywhere: −18…−29 stop exits per 5y window,
   −93 at 26y (whipsaw deaths become held positions). Whether the held positions pay
   is regime-dependent — positive shared drift and calmer book in the 2000–04 bust,
   negative shared drift and more drawdown in the 2019–23 melt-up, negative shared
