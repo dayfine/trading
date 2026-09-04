@@ -18,13 +18,29 @@ runs.** Everything the last two runs left in flight has landed (#2654 merged
 (`git merge-base --is-ancestor` reports every squash-merged branch as
 "not in main" and would have manufactured eight phantom orphans.)
 
-**Dispatched:** **#2664** — mutation-coverage harness for
-`dev/scripts/pr_gate_status.sh`, the merge gate itself (16 pinned mutations,
-11 killed / 5 survivor, **6 not previously named**; gating on a pinned
-expected-outcome list, failing in either direction). Re-dispatch: the
-2026-09-03 dispatch of this item produced no branch and no PR.
-**#2663** — the scheduled-workflow health check as a committed script with a
-hermetic 10-assertion fixture test (script half of **#2634**).
+**#2663 MERGED `2310b6b8`** — the scheduled-workflow health check as a
+committed script (script half of **#2634**), after a rework that took it from
+10 to **16** assertions. Behavioral had found the monitor could **report green
+when nothing was measurable**: the cannot-measure signal was pinned on the
+workflow-list call site but not the per-workflow one, so a one-line mutation
+silently reclassified both known-red workflows as NO-SCHEDULE and the suite
+still passed 10/10. Merged only once `pr_gate_status.sh` itself printed `MERGE`.
+
+**#2664 open, all-green, held for human adjudication** — mutation-coverage
+harness for `dev/scripts/pr_gate_status.sh`, the merge gate itself (16 pinned
+mutations, 11 killed / **4 live survivor / 1 verified equivalent mutant**, 6 not
+previously named; the split is now **derived by the harness at run time**, not
+restated in prose). CI + structural(5) + behavioral(5) all green at `8775df22`,
+but the gate reader says `ADJUDICATE`: two behavioral verdicts exist at that SHA
+after a body-only fix, and the orchestrator made that body edit — so it declined
+to break the tie in favour of its own work. Re-dispatch: the 2026-09-03 dispatch
+of this item produced no branch and no PR.
+
+**Two new merge-gate defects, found by hand in the run that built the harness
+for finding them mechanically:** `H-QC-VERDICT-NEWLINE-COLLAPSE` (a QC verdict
+can post with all newlines stripped — unreadable to the gate parser, though it
+failed safe as *stale*) and `H-GATE-TWO-VERDICTS-ONE-SHA` (a body-only fix
+necessarily yields two verdicts at one SHA, which a SHA-keyed reader cannot rank).
 
 **`workflow` scope is blocked on EVERY route — measured with a control, not
 inferred.** `PUT /contents/.github/workflows/.scope-probe.txt` → **403**;
@@ -96,7 +112,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [harvest-rotate](harvest-rotate.md) | MERGED | — | — | WF-CV REJECT (#1532) — dispersion-amplifying noise, not Sharpe edge; mechanism stays default-off, axis not promoted |
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
-| [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2651 MERGED (`efc25d68`) — closes #2633's script-side half; rework pinned the exit-status guard (0 → 6 tracer hits); next: H-GATEPARSER mutation harness, dispatched |
+| [harness](harness.md) | IN_PROGRESS | harness-maintainer | #2664 | #2663 MERGED `2310b6b8` (#2634 script half); #2664 gate-parser mutation harness all-green but `ADJUDICATE` — 2 behavioral verdicts at one SHA |
 | [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
 | [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2637 MERGED 09-03; backlog has no actionable item — top is the test-file-length policy decision, human-gated 20 runs |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
