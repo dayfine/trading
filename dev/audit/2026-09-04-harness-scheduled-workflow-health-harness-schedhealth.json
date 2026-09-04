@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-04",
+  "feature": "harness-schedhealth",
+  "branch": "harness/scheduled-workflow-health",
+  "sha": "a142243f986b5e67ce0744c72b628a09e27f03b9",
+  "recorded_at_ns": 1788547350831800783,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 4,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}

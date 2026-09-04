@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-04",
+  "feature": "harness-gateparser",
+  "branch": "harness/gateparser-mutation-harness",
+  "sha": "8775df2202ef4e20195eb1b75af29241aaa97b05",
+  "recorded_at_ns": 1788547350869938994,
+  "structural_qc": "APPROVED",
+  "behavioral_qc": "APPROVED",
+  "overall_qc": "APPROVED",
+  "harness_gap": "",
+  "quality_score": 5,
+  "findings_count": {
+    "PASS": 0,
+    "FAIL": 0,
+    "FLAG": 0
+  },
+  "consecutive_rework_count": 0,
+  "notes": ""
+}
