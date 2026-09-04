@@ -1,0 +1,43 @@
+[09-04 15:21:57] run tree HEAD=e4984c5fe (expect e4984c5fe)
+[09-04 15:22:01] RUN xl5y-2000-lagoff-s0
+[09-04 15:22:01] RUN xl5y-2019-lagoff-s0
+[09-04 15:40:46] RESULT xl5y-2019-lagoff-s0 => total_return_pct 100.06077421476296 total_trades 97 win_rate 35.051546391752574 sharpe_ratio 0.73189394338730229 max_drawdown_pct 32.939474286626627  (wall 1125s)
+[09-04 15:44:39] RESULT xl5y-2000-lagoff-s0 => total_return_pct 19.667504839687258 total_trades 70 win_rate 27.142857142857142 sharpe_ratio 0.29419297822759266 max_drawdown_pct 28.285592386096326  (wall 1358s)
+[09-04 15:44:41] RUN xl5y-2019-s3off-s0
+[09-04 15:44:41] RUN xl5y-2000-s3off-s0
+[09-04 16:06:56] RESULT xl5y-2000-s3off-s0 => total_return_pct 75.985273825916508 total_trades 98 win_rate 31.632653061224492 sharpe_ratio 0.65155438864177173 max_drawdown_pct 28.365009053621066  (wall 1335s)
+[09-04 16:07:04] RESULT xl5y-2019-s3off-s0 => total_return_pct 3.0188213366726764 total_trades 184 win_rate 33.695652173913047 sharpe_ratio 0.11797461118681514 max_drawdown_pct 30.325476441552606  (wall 1343s)
+[09-04 16:07:05] RUN xl5y-2000-extoff-s0
+[09-04 16:07:05] RUN xl5y-2019-extoff-s0
+[09-04 16:30:47] RESULT xl5y-2019-extoff-s0 => total_return_pct 3.0188213366726764 total_trades 184 win_rate 33.695652173913047 sharpe_ratio 0.11797461118681514 max_drawdown_pct 30.325476441552606  (wall 1422s)
+[09-04 16:31:08] RESULT xl5y-2000-extoff-s0 => total_return_pct 48.574251697362349 total_trades 94 win_rate 32.978723404255319 sharpe_ratio 0.458779326706967 max_drawdown_pct 32.553527007146755  (wall 1442s)
+[09-04 16:31:10] RUN xl5y-2019-clock52-s0
+[09-04 16:31:10] RUN xl5y-2000-clock52-s0
+[09-04 16:55:54] RESULT xl5y-2019-clock52-s0 => total_return_pct 54.542034846551765 total_trades 182 win_rate 35.164835164835168 sharpe_ratio 0.50807177547393056 max_drawdown_pct 41.133076364954647  (wall 1484s)
+[09-04 16:58:12] RESULT xl5y-2000-clock52-s0 => total_return_pct 73.652920289594022 total_trades 91 win_rate 29.670329670329672 sharpe_ratio 0.64162657456414618 max_drawdown_pct 28.48398573696279  (wall 1622s)
+[09-04 16:58:12] SALT 0 COMPLETE
+[09-04 16:58:14] RUN xl5y-2019-lagoff-s1
+[09-04 16:58:14] RUN xl5y-2000-lagoff-s1
+[09-04 16:59:27] run tree HEAD=e4984c5fe (expect e4984c5fe)
+[09-04 17:21:02] RESULT xl5y-2019-lagoff-s1 => total_return_pct 111.4415973646002 total_trades 96 win_rate 34.375 sharpe_ratio 0.78173973358460092 max_drawdown_pct 33.262344142177852  (wall 1368s)
+[09-04 17:26:50] RESULT xl5y-2000-lagoff-s1 => total_return_pct 19.011478931549355 total_trades 70 win_rate 25.714285714285712 sharpe_ratio 0.28765170560339975 max_drawdown_pct 28.589027447635161  (wall 1716s)
+[09-04 17:27:01] v2 resume after lagoff-s1
+[09-04 17:27:02] RUN xl5y-2000-extoff-s1
+[09-04 17:27:02] RUN xl5y-2019-clock52-s1
+[09-04 17:53:06] RESULT xl5y-2019-clock52-s1 => total_return_pct 54.363013819341873 total_trades 182 win_rate 35.164835164835168 sharpe_ratio 0.50707091855331177 max_drawdown_pct 41.442753835137232  (wall 1564s)
+[09-04 17:56:27] RESULT xl5y-2000-extoff-s1 => total_return_pct 33.981792690672123 total_trades 95 win_rate 30.526315789473685 sharpe_ratio 0.439430276239654 max_drawdown_pct 28.223876139716843  (wall 1765s)
+[09-04 17:56:28] RUN xl5y-2000-clock52-s1
+[09-04 17:56:28] RUN xl5y-2019-lagoff-s2
+[09-04 18:16:53] RESULT xl5y-2019-lagoff-s2 => total_return_pct 100.72792282541934 total_trades 97 win_rate 34.020618556701031 sharpe_ratio 0.73540233959102752 max_drawdown_pct 32.921304624056368  (wall 1225s)
+[09-04 18:19:59] RESULT xl5y-2000-clock52-s1 => total_return_pct 53.639988369741943 total_trades 86 win_rate 29.069767441860467 sharpe_ratio 0.62930995124506839 max_drawdown_pct 19.5601963584074  (wall 1411s)
+[09-04 18:19:59] SALT 1 COMPLETE
+[09-04 18:20:01] RUN xl5y-2000-extoff-s2
+[09-04 18:20:01] RUN xl5y-2000-lagoff-s2
+[09-04 18:44:31] RESULT xl5y-2000-lagoff-s2 => total_return_pct 18.957104544474117 total_trades 70 win_rate 25.714285714285712 sharpe_ratio 0.28697970655060451 max_drawdown_pct 28.480521179263885  (wall 1470s)
+[09-04 18:44:48] RESULT xl5y-2000-extoff-s2 => total_return_pct 47.936126100696811 total_trades 94 win_rate 31.914893617021278 sharpe_ratio 0.45479588471893229 max_drawdown_pct 32.568156853173335  (wall 1487s)
+[09-04 18:44:49] RUN xl5y-2000-clock52-s2
+[09-04 18:44:49] RUN xl5y-2019-clock52-s2
+[09-04 19:05:03] RESULT xl5y-2019-clock52-s2 => total_return_pct 54.358269516457334 total_trades 182 win_rate 34.615384615384613 sharpe_ratio 0.50706711141982641 max_drawdown_pct 41.375651177729488  (wall 1214s)
+[09-04 19:05:51] RESULT xl5y-2000-clock52-s2 => total_return_pct 72.651193211874315 total_trades 91 win_rate 28.571428571428569 sharpe_ratio 0.63548586125491235 max_drawdown_pct 28.501771772201757  (wall 1262s)
+[09-04 19:05:51] SALT 2 COMPLETE
+[09-04 19:05:51] XL0904 CHAIN DONE
