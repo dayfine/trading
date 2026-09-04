@@ -54,9 +54,17 @@ shared-trade drift ≈ 0 and no shared monster — the edge is the null's extra
 4%-stop whipsaw deaths (19 / 31 / 26 more stops per salt); at salt 2 one
 null-only loser (STMP −$166k) is half the delta, and ex-STMP it still wins 3/3
 (+$155k / +$76k / +$175k). **The first fixed-basis lever candidate whose edge is
-not a single admitted monster**; its surface on the record convention across 2000–04 / 26y
-with salts is the next chain (`dev/experiments/stop-width-surface-2026-09-03/`
-if it ran overnight — read it first).
+not a single admitted monster** on that base. Its surface on the RECORD convention
+(`dev/experiments/stop-width-surface-2026-09-03/`, 2019–23 + 2000–04 × salts {0,1,2}
++ 26y) came back **regime-dependent**: 2000–04 wins 3/3 salts ex-monster with
+positive shared-trade drift (+$78–87k) and ~8pp better maxDD; 2019–23 loses 3/3
+ex-monster (its raw +46pp is MSTR, wide-arm-only at every salt) with ~10pp worse
+maxDD. Pre-registered rule not met → **keep `initial_stop_buffer 1.0` as default;
+0.98 is a trader-mode / regime dial**, not a promotion candidate
+(`project_stop_width_regime_dependent`). The recurring shape across every lever
+re-measured today: the structural footprint is consistent, the level is set by
+which monster a slightly different book funds — read shared-trade drift and the
+ex-monster delta per salt, never the raw return.
 
 
 Every pre-09-03 exit-lever verdict (eject on/off, stop width, TTL/clock,
