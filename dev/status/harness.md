@@ -1987,7 +1987,7 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   assert the review objects reaching `_gate` carry `commit_id`), not just the
   `review_result` fallback the current cases 43-45 pin.
 
-- [ ] **H-GATEPARSER-NO-MUTATION-COVERAGE**: `pr_gate_status.sh` is the merge-gate
+- [x] **H-GATEPARSER-NO-MUTATION-COVERAGE**: `pr_gate_status.sh` is the merge-gate
   reader, yet its suite is verified only by hand. A ~30-line mutation harness
   around the existing `PR_GATE_STATUS_LIB=1` seam, run in CI against a fixed
   mutation list, would surface the unkilled mutations **mechanically**. For the
@@ -2082,3 +2082,88 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   `# Summary`) attributes to **no** gate, a false-BLOCK. It is fail-safe and
   currently unrealised (27/27 real review bodies across 10 recent PRs attribute
   correctly, in 3 heading families), so it is recorded here rather than pinned.
+
+  **CLOSED (2026-09-04).** Built `trading/devtools/checks/pr_gate_status_mutation_test.sh`
+  (the harness) and `trading/devtools/checks/pr_gate_status_mutation_test_selftest.sh`
+  (a fixture-driven self-test of the harness's own non-vacuity guard), both wired
+  into `dune runtest` via `trading/devtools/checks/dune` with `(universe)` deps
+  (they read `dev/scripts/pr_gate_status.sh` / `pr_gate_status_test.sh` via
+  `repo_root()` at run time, outside the dune workspace root — see
+  H-CHECK-CACHE-BLIND). Verify:
+  `dev/lib/run-in-env.sh dune runtest trading/devtools/checks/` (or the standalone
+  `sh trading/devtools/checks/pr_gate_status_mutation_test.sh`).
+
+  **How it works:** copies the real `pr_gate_status.sh` to a scratch `mktemp -d`
+  dir alongside the real (unmodified) `pr_gate_status_test.sh`, applies one `sed`
+  mutation per pinned entry, asserts the mutation actually changed the file
+  (`cmp -s` — a no-op sed hard-fails with the distinct message
+  `MUTATION DID NOT APPLY`, never silently reads as a result), then re-runs the
+  existing offline suite (its pre-existing `PR_GATE_STATUS_LIB=1` seam, unmodified
+  — no new sourcing mechanism invented) against the mutant. Suite exits non-zero
+  → KILLED; suite stays green → SURVIVOR. The real, tracked `pr_gate_status.sh`
+  is never written to (mutations only ever touch the scratch copy); a final `cmp`
+  against a pristine snapshot taken at the start is a tripwire proving that held,
+  since `git diff --quiet` was avoided deliberately (unreliable under GHA's
+  safe.directory setup — see `_check_lib.sh`'s own `repo_root()` comment).
+
+  **Gating shape: (b), a pinned expected-outcome list**, not WARN-only. Known
+  survivors exist today (5 of 16); the check fails only when an OBSERVED
+  KILLED/SURVIVOR outcome diverges from its PIN, in either direction — a pinned
+  KILLED mutation newly surviving is a live regression (hard stop); a pinned
+  SURVIVOR newly killed means this file's own pin is stale (fix the pin in the
+  same PR). This tolerates the documented backlog by name rather than a blanket
+  exception, per `.claude/rules/code-health-discipline.md`.
+
+  **Mutation table — 16 total, seeded from the FULL record above plus this
+  harness's own further enumeration of the same three regexes** (first_heading_text's
+  heading match, review_result's verdict/sha capture, the kind test):
+
+  | id | expected | mutation | source |
+  |---|---|---|---|
+  | d1 | killed | (d) drop `strip_fences` in `first_heading_text` | record |
+  | j1 | killed | (j) drop `^` anchor, kind test | record |
+  | k1 | killed | (k) drop `\b`, kind test | record |
+  | f1 | killed | (f) `#{1,4}` → `#{1,6}` | record |
+  | g1 | killed | (g) `" +"` → `" *"` (heading) | record |
+  | m1 | killed | (m) drop `^` from heading regex | record |
+  | s1 | survivor | `#{1,4}` → `#{1,3}` (lower bound) | record (#2635 sweep) |
+  | s2 | survivor | `(?<h>.*)` → `(?<h>.+)` | record (#2635 sweep) |
+  | s3 | survivor | `" +"` → `" "` (heading) | record (#2635 sweep) |
+  | s4 | survivor | `[- ]` → `[-]` (kind test) | record (#2635 sweep) |
+  | x1 | killed | drop `(?m)` flag entirely, heading regex | new (this PR) |
+  | x2 | killed | drop `(?i)` flag, kind test | new (this PR) |
+  | x3 | killed | require `(qc[- ])` (drop the `?`) | new (this PR) |
+  | x4 | killed | `#{1,4}` → `#+` (unbounded) | new (this PR) |
+  | x5 | killed | sha bound `{7,40}` → `{8,40}` (the #2397 regression) | new (this PR) |
+  | s5 | survivor | drop `$` end-anchor, heading regex | new (this PR) — likely an **equivalent mutant** (`(?m)` + `.` already stop at the newline), recorded rather than silently dropped |
+
+  Total: **11 killed / 5 survivor**, all 16 independently re-measured against
+  current `main` while building this harness (not transcribed from the record
+  blindly) — every record-sourced entry reproduced its documented outcome
+  exactly. Of the record's own two tables (6 killed + 4 survivor = 10 named
+  mutations), all 10 are represented; the 6 new entries (x1–x5, s5) are this
+  harness's own sweep and were not previously named anywhere, per the item's
+  instruction that new findings are "a success, not scope creep." x1/x2/x3/x4
+  correspond to (a strict subset of) the "7 sibling mutations killed loudly"
+  the #2635 review mentions but does not fully enumerate; the exact 7th and a
+  structural "first→last match wins" mutation (a rewrite of the multi-match
+  disagreement-detection logic, not a single-line `sed`) were left out as not
+  mechanically expressible within this harness's `sed`-based design — noted
+  here rather than silently dropped, future work if wanted.
+
+  **RED/GREEN non-vacuity proof**, both measured directly against the final
+  files: (RED) flipping `d1`'s pin from `killed` to `survivor` in a scratch
+  copy → `FAIL d1: pinned survivor, observed killed` + `FAIL: pr_gate_status
+  mutation harness -- 1/16 mutation(s) off-pin.`, exit 1. (GREEN) the real,
+  unmodified file → all 16 `ok`, `OK: pr_gate_status mutation harness -- 16
+  mutation(s) match pin.`, exit 0. The self-test
+  (`pr_gate_status_mutation_test_selftest.sh`) separately proves the
+  non-vacuity guard itself: an injected unmatchable `sed` (via the harness's
+  opt-in `PR_GATE_STATUS_MUTATION_SELFTEST_NOOP`/`_ONLY` hooks) reports the
+  distinct `MUTATION DID NOT APPLY` message and a non-zero exit, confirmed
+  both ways (present under the hook, absent under the harness's normal run).
+
+  **Out of scope, left for follow-up:** fixing any of the 5 live survivors
+  (that is separate work, not this item — H-GATEPARSER-CURL-PROJECTION-UNPINNED
+  remains untouched too), and the "first→last match" structural mutation noted
+  above. `pr_gate_status.sh`'s production logic was not modified by this PR.

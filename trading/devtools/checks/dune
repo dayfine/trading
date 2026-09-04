@@ -949,3 +949,42 @@
  (deps backtest_appendix_drift_check.sh _check_lib.sh)
  (action
   (run sh %{dep:backtest_appendix_drift_check_test.sh})))
+
+; Mutation-coverage harness for dev/scripts/pr_gate_status.sh, the
+; merge-gate reader (H-GATEPARSER-NO-MUTATION-COVERAGE, dev/status/
+; harness.md; .claude/rules/pr-gate-loop.md). Applies a fixed, pinned list
+; of sed mutations to a scratch copy of pr_gate_status.sh and re-runs the
+; EXISTING dev/scripts/pr_gate_status_test.sh (offline, via its
+; PR_GATE_STATUS_LIB=1 seam) against each mutant, gating on whether the
+; observed KILLED/SURVIVOR outcome matches this file's own pin -- not on
+; a blanket "no survivors allowed" rule, since several are known, named,
+; live gaps (see the harness's own header for the gating-policy rationale
+; and .claude/rules/code-health-discipline.md for why a blanket exception
+; is not an option). Both pr_gate_status.sh and pr_gate_status_test.sh
+; live outside the dune workspace root and are read via repo_root() in
+; _check_lib.sh at RUN TIME, so (universe) is required per
+; H-CHECK-CACHE-BLIND (same reasoning as docker_dune_smoke.sh above).
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh (universe))
+ (action
+  (run sh %{dep:pr_gate_status_mutation_test.sh})))
+
+; Fixture-driven self-test for pr_gate_status_mutation_test.sh's own
+; non-vacuity guard (a mutation whose sed applies to nothing must never
+; read as a clean KILLED/SURVIVOR result). Drives the real harness script
+; with an injected, deliberately-unmatchable mutation via its
+; PR_GATE_STATUS_MUTATION_SELFTEST_NOOP/_ONLY hooks and asserts the
+; distinct "MUTATION DID NOT APPLY" message and non-zero exit -- so a
+; broken harness can never be mistaken for a clean sweep. Fast (skips the
+; 16 real mutations); does not need its own (universe) dep beyond the
+; harness script it drives, since dune already re-runs the harness rule
+; above on every invocation via (universe) and this rule's only file read
+; is that script.
+
+(rule
+ (alias runtest)
+ (deps _check_lib.sh pr_gate_status_mutation_test.sh)
+ (action
+  (run sh %{dep:pr_gate_status_mutation_test_selftest.sh})))
