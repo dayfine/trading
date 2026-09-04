@@ -1,0 +1,16 @@
+[09-03 10:51:18] run tree HEAD=e4984c5fe (expect e4984c5fe)
+[09-03 10:51:23] RUN rec5y-2019-new-s0
+[09-03 10:51:23] RUN rec5y-2019-old-s0
+[09-03 11:13:32] RESULT rec5y-2019-old-s0 => total_return_pct 13.809479980254638 total_trades 174 win_rate 33.90804597701149 sharpe_ratio 0.23361221096313597 max_drawdown_pct 33.911527755254689  (wall 1329s)
+[09-03 11:14:05] RESULT rec5y-2019-new-s0 => total_return_pct 3.0188213366726764 total_trades 184 win_rate 33.695652173913047 sharpe_ratio 0.11797461118681514 max_drawdown_pct 30.325476441552606  (wall 1362s)
+[09-03 11:14:05] PAIR rec5y-2019 COMPLETE
+[09-03 11:14:06] RUN rec5y-2000-old-s0
+[09-03 11:14:06] RUN rec5y-2000-new-s0
+[09-03 11:36:06] RESULT rec5y-2000-new-s0 => total_return_pct 76.640156517308768 total_trades 98 win_rate 31.632653061224492 sharpe_ratio 0.655286820900357 max_drawdown_pct 28.36466885499761  (wall 1320s)
+[09-03 11:36:23] RESULT rec5y-2000-old-s0 => total_return_pct 35.761697404564032 total_trades 110 win_rate 37.272727272727273 sharpe_ratio 0.50541665081438714 max_drawdown_pct 16.636238042781425  (wall 1337s)
+[09-03 11:36:23] PAIR rec5y-2000 COMPLETE
+[09-03 11:36:24] RUN rec26y-new-s0
+[09-03 14:40:25] RESULT rec26y-new-s0 => total_return_pct 302.6531612992386 total_trades 723 win_rate 34.3015214384509 sharpe_ratio 0.3969625221631925 max_drawdown_pct 36.257307926529784  (wall 11041s)
+[09-03 14:40:27] RUN rec26y-old-s0
+[09-03 17:31:18] RESULT rec26y-old-s0 => total_return_pct 312.74060566806583 total_trades 799 win_rate 33.792240300375468 sharpe_ratio 0.4302365301756601 max_drawdown_pct 38.78055159903186  (wall 10251s)
+[09-03 17:31:18] REC0903 CHAIN DONE
