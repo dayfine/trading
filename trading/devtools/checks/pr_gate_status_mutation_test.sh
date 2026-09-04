@@ -35,11 +35,13 @@
 #
 # GATING POLICY -- option (b) of the H-GATEPARSER-NO-MUTATION-COVERAGE
 # item: gate on a PINNED expected-outcome list, not a blanket
-# WARN-or-FAIL. Known-live survivors exist today (5 of the 16 below); a
-# harness that hard-fails on any survivor would turn main red on merge,
-# and .claude/rules/code-health-discipline.md forbids dodging that with a
-# limit bump or an escape-hatch marker. Instead, this check fails ONLY
-# when a mutation's OBSERVED outcome differs from its PINNED expectation,
+# WARN-or-FAIL. Known-live survivors exist today (4 of the 16 below --
+# s1-s4; s5 is a verified equivalent mutant, not a live defect -- see its
+# own entry below); a harness that hard-fails on any survivor would turn
+# main red on merge, and .claude/rules/code-health-discipline.md forbids
+# dodging that with a limit bump or an escape-hatch marker. Instead, this
+# check fails ONLY when a mutation's OBSERVED outcome differs from its
+# PINNED expectation,
 # in either direction:
 #   a pinned KILLED mutation now SURVIVES -> a live regression: something
 #     the suite used to catch, it no longer does. Hard stop.
@@ -94,12 +96,24 @@ cp "$SUITE" "$WORK/pr_gate_status_test.sh"
 
 fails=0
 total=0
+killed_count=0
+live_survivor_count=0
+equivalent_count=0
 
-# run_mutation <id> <killed|survivor> <sed-expr> <description>
+# run_mutation <id> <killed|survivor> <sed-expr> <description> [equivalent]
 # <sed-expr> is applied (GNU sed -i, BRE) to a fresh copy of the pristine
-# script on every call -- mutations never compound across calls.
+# script on every call -- mutations never compound across calls. The
+# optional 5th arg, literally "equivalent", marks a `survivor`-pinned
+# mutation as a VERIFIED EQUIVALENT MUTANT rather than a live defect (no
+# test can ever distinguish it from the unmutated script -- see s5 below
+# for the one case that uses it). This is the mechanical source of the
+# killed/live-survivor/equivalent-mutant split printed in the final
+# summary line -- read the split from that line, not from prose restating
+# it, so the two can never drift out of sync again (dev/status/harness.md
+# H-GATEPARSER-NO-MUTATION-COVERAGE's own "Out of scope" note got this
+# split wrong once already).
 run_mutation() {
-  id=$1; expected=$2; sedexpr=$3; desc=$4
+  id=$1; expected=$2; sedexpr=$3; desc=$4; equivalent=${5:-}
   total=$((total + 1))
   cp "$WORK/pr_gate_status.sh.orig" "$WORK/pr_gate_status.sh"
   sed -i "$sedexpr" "$WORK/pr_gate_status.sh"
@@ -115,6 +129,13 @@ run_mutation() {
     got=killed
   fi
   if [ "$got" = "$expected" ]; then
+    if [ "$got" = "killed" ]; then
+      killed_count=$((killed_count + 1))
+    elif [ "$equivalent" = "equivalent" ]; then
+      equivalent_count=$((equivalent_count + 1))
+    else
+      live_survivor_count=$((live_survivor_count + 1))
+    fi
     printf 'ok   %s (%s, as pinned): %s\n' "$id" "$got" "$desc"
   else
     printf 'FAIL %s: pinned %s, observed %s -- %s\n' \
@@ -143,10 +164,13 @@ if [ "${PR_GATE_STATUS_MUTATION_SELFTEST_ONLY:-0}" != "1" ]; then
 # further degrees of freedom this harness's own construction swept across
 # the same three regexes (first_heading_text's heading match, review_result's
 # sha capture, and the kind test): x1-x5 and s5 below are not named in the
-# status entry. s5 in particular reads as a likely EQUIVALENT MUTANT (see its
+# status entry. s5 in particular is a verified EQUIVALENT MUTANT (see its
 # own note) rather than a live defect -- recorded rather than silently
 # dropped, per this repo's own standard for classifying a survivor
-# (odoc_dangling_ref_check.sh's header makes the same distinction).
+# (odoc_dangling_ref_check.sh's header makes the same distinction). Of the
+# 5 pinned `survivor` outcomes below (s1-s5), 4 (s1-s4) are live defects
+# and 1 (s5) is this equivalent mutant -- see "Out of scope" in the status
+# entry, which scopes follow-up to the 4.
 
 run_mutation d1 killed \
   's/^      strip_fences$/      ./' \
@@ -214,7 +238,8 @@ run_mutation x5 killed \
 
 run_mutation s5 survivor \
   's/(?<h>\.\*)\$")\]/(?<h>.*)")]/' \
-  'UNPINNED: drop the trailing $ end-anchor from the heading regex -- likely an EQUIVALENT MUTANT ((?m) + "." already stop at the newline), not a live defect, but the suite pins neither reading'
+  'UNPINNED: drop the trailing $ end-anchor from the heading regex -- a VERIFIED EQUIVALENT MUTANT, not a live defect. What bounds "." at end-of-line is the ABSENCE of dot-all ((?s)), not (?m): confirmed in this container jq-1.6/Oniguruma, `"a\nb" | test("(?m)a.b")` is false but `"a\nb" | test("(?ms)a.b")` is true, so with only (?m) set the capture is line-bounded with or without the trailing $, making it redundant here. (Also a jq-semantics tripwire: if a future jq made "." dot-all by default, s5 would stop being equivalent.) The suite pins neither reading, but no test can ever distinguish them -- this is not left-for-follow-up work.' \
+  equivalent
 
 fi
 
@@ -229,4 +254,7 @@ fi
 cmp -s "$SCRIPT" "$WORK/pr_gate_status.sh.orig" \
   || die "pr_gate_status_mutation_test: the tracked $SCRIPT was modified by this run"
 
-printf 'OK: pr_gate_status mutation harness -- %d mutation(s) match pin.\n' "$total"
+# The split below is derived from the per-mutation tallies above, not
+# restated by hand -- see the run_mutation doc comment for why.
+printf 'OK: pr_gate_status mutation harness -- %d mutation(s) match pin (%d killed / %d live survivor / %d equivalent mutant).\n' \
+  "$total" "$killed_count" "$live_survivor_count" "$equivalent_count"

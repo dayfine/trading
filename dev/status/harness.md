@@ -2106,8 +2106,10 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   since `git diff --quiet` was avoided deliberately (unreliable under GHA's
   safe.directory setup — see `_check_lib.sh`'s own `repo_root()` comment).
 
-  **Gating shape: (b), a pinned expected-outcome list**, not WARN-only. Known
-  survivors exist today (5 of 16); the check fails only when an OBSERVED
+  **Gating shape: (b), a pinned expected-outcome list**, not WARN-only. 5 of
+  the 16 pinned mutations are expected to SURVIVE today (s1–s5): 4 are live
+  defects (s1–s4) and 1 (s5) is a verified equivalent mutant, not a live
+  defect — see its own table row below. The check fails only when an OBSERVED
   KILLED/SURVIVOR outcome diverges from its PIN, in either direction — a pinned
   KILLED mutation newly surviving is a live regression (hard stop); a pinned
   SURVIVOR newly killed means this file's own pin is stale (fix the pin in the
@@ -2135,21 +2137,23 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   | x3 | killed | require `(qc[- ])` (drop the `?`) | new (this PR) |
   | x4 | killed | `#{1,4}` → `#+` (unbounded) | new (this PR) |
   | x5 | killed | sha bound `{7,40}` → `{8,40}` (the #2397 regression) | new (this PR) |
-  | s5 | survivor | drop `$` end-anchor, heading regex | new (this PR) — likely an **equivalent mutant** (`(?m)` + `.` already stop at the newline), recorded rather than silently dropped |
+  | s5 | survivor | drop `$` end-anchor, heading regex | new (this PR) — **verified equivalent mutant**: what bounds `.` at end-of-line is the absence of dot-all (`(?s)`), not `(?m)` — confirmed directly (`"a\nb" | test("(?m)a.b")` → false, `"a\nb" | test("(?ms)a.b")` → true, this container's jq-1.6/Oniguruma), so the trailing `$` is redundant and no test can ever distinguish the two readings. Also a jq-semantics tripwire: a future jq making `.` dot-all by default would make s5 a live defect. |
 
-  Total: **11 killed / 5 survivor**, all 16 independently re-measured against
+  Total: **11 killed / 5 survivor**, of which **4 (s1–s4) are live defects and
+  1 (s5) is a verified equivalent mutant** — all 16 independently re-measured against
   current `main` while building this harness (not transcribed from the record
   blindly) — every record-sourced entry reproduced its documented outcome
   exactly. Of the record's own two tables (6 killed + 4 survivor = 10 named
   mutations), all 10 are represented; the 6 new entries (x1–x5, s5) are this
   harness's own sweep and were not previously named anywhere, per the item's
-  instruction that new findings are "a success, not scope creep." x1/x2/x3/x4
-  correspond to (a strict subset of) the "7 sibling mutations killed loudly"
-  the #2635 review mentions but does not fully enumerate; the exact 7th and a
+  instruction that new findings are "a success, not scope creep." x1–x4 cover
+  4 of the "7 sibling mutations killed loudly" the #2635 review mentions but
+  does not fully enumerate (drop `(?m)`, drop `(?i)`, require `(qc[- ])`,
+  `#{1,4}`→`#+`) — **the 6th and 7th remain unnamed anywhere**, alongside a
   structural "first→last match wins" mutation (a rewrite of the multi-match
-  disagreement-detection logic, not a single-line `sed`) were left out as not
-  mechanically expressible within this harness's `sed`-based design — noted
-  here rather than silently dropped, future work if wanted.
+  disagreement-detection logic, not a single-line `sed`) that was left out as
+  not mechanically expressible within this harness's `sed`-based design —
+  noted here rather than silently dropped, future work if wanted.
 
   **RED/GREEN non-vacuity proof**, both measured directly against the final
   files: (RED) flipping `d1`'s pin from `killed` to `survivor` in a scratch
@@ -2163,7 +2167,8 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   distinct `MUTATION DID NOT APPLY` message and a non-zero exit, confirmed
   both ways (present under the hook, absent under the harness's normal run).
 
-  **Out of scope, left for follow-up:** fixing any of the 5 live survivors
-  (that is separate work, not this item — H-GATEPARSER-CURL-PROJECTION-UNPINNED
+  **Out of scope, left for follow-up:** fixing any of the 4 live survivors
+  (s1–s4 — s5 is a verified equivalent mutant, not a defect, and cannot be
+  "fixed") (that is separate work, not this item — H-GATEPARSER-CURL-PROJECTION-UNPINNED
   remains untouched too), and the "first→last match" structural mutation noted
   above. `pr_gate_status.sh`'s production logic was not modified by this PR.
