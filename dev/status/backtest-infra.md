@@ -1,6 +1,6 @@
 # Status: Backtest Infrastructure
 
-## Last updated: 2026-08-25
+## Last updated: 2026-09-03
 
 ## Status
 IN_PROGRESS
@@ -18,6 +18,78 @@ landed 2026-04-25. Continuous perf monitoring + benchmark-suite work
 moved to its own track at `dev/status/backtest-perf.md`. The 12-step
 incremental-indicators refactor (the follow-on architecture for
 Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
+
+## 2026-09-03 — empty measurement window no longer crashes the runner (#2632)
+
+- [x] **`Runner.run_backtest` on a window with no trading day now raises a
+  typed, documented `Window_filter.Empty_measurement_window` instead of a raw
+  stdlib `Invalid_argument "List.last"`.** `_assemble_result` read the run's
+  final equity as `(List.last_exn steps).portfolio_value`; when the requested
+  window contained no trading day that killed the process with no indication of
+  which window was at fault. `.github/workflows/weekly-start-sweep.yml` maps a
+  BAH cell over every Monday in a trailing 3-year window with `end_date`
+  floating at the run date, while the committed SPY bars stop at a fixed floor
+  (`2026-05-01` at time of writing) — so every Monday past the floor is
+  unmeasurable, and **one such Monday aborted the entire sweep**. The workflow
+  had failed ≥16 consecutive scheduled runs, back to 2026-05-18. No committed
+  golden produces an empty step list, which is why CI never caught it.
+  - **New module** `trading/trading/backtest/lib/window_filter.{ml,mli}` — owns
+    the whole measurement-window-restriction family lifted out of `runner.ml`:
+    `is_trading_day`, `of_steps` (the two step views + final equity, with the
+    guard), `round_trips_in_window`, and the four `filter_*_in_window` drops
+    plus `filter_stale_holds_in_window`. `Runner` re-exports the five that were
+    already public, so `Result_writer` / `test_runner_filter` are untouched.
+  - **Headroom, not a limit bump.** `runner.ml` was at exactly 500 lines — the
+    `@large-module` hard limit — so adding a guard would have redded the build.
+    Per `.claude/rules/code-health-discipline.md` the fix is the paired
+    extraction above (500 → 426), not a `HARD_LIMIT` bump or a new marker.
+  - **Behaviour on a non-empty window is bit-identical** — `List.last_exn` →
+    `List.last` with a `Some` branch that reads the same field. Every golden
+    and every existing test is unchanged.
+  - **Caller-side:** `Sweep_weekly_start_lib.run_one` now returns `cell option`
+    and returns `None` (with a stderr line naming the skipped date) for the
+    degenerate case, so `run` drops that Monday via `List.filter_map` and every
+    other cell still completes. Only `Empty_measurement_window` is caught; any
+    other exception still propagates. Fabricating a flat 0%-return cell was
+    rejected — it would drag the sweep's median / mean / stddev toward zero
+    while looking like a measurement.
+  - `sweep_weekly_start_lib.{ml,mli}` crossed the 300-line soft limit with the
+    above, so its data model moved to
+    `trading/trading/backtest/sweep_weekly_start/lib/sweep_types.{ml,mli}`
+    (`include`d / `include module type of`'d back, so no caller changes).
+  - **Tests:** `trading/trading/backtest/test/test_window_filter.ml` (unit —
+    both empty shapes, the payload's two step counts, and three pins that the
+    non-empty path is unchanged) and `test_runner_empty_window.ml` (end-to-end
+    through `run_backtest` **and** through `Sweep_weekly_start_lib.run_one`, on
+    a 2035 window that no data refresh can ever make non-empty).
+  - **Change-detector evidence.** With the guard reverted to `List.last_exn`,
+    `test_window_filter.exe` exits 1 (4 of 6 failures, one reporting
+    `Invalid_argument("List.last")` by name) and `test_runner_empty_window.exe`
+    exits 1 (both cases). With the guard restored both exit 0.
+  - **Verify:**
+    `dev/lib/run-in-env.sh dune runtest trading/backtest/test` and
+    `dev/lib/run-in-env.sh sh devtools/checks/linter_file_length.sh`.
+  - **QC rework iteration 1 (2026-09-03).** qc-behavioral CP4 found both
+    `run_one` guard claims unpinned: widening the handler to
+    `| exception exn ->` (a one-token edit that leaves the body byte-identical)
+    and suppressing `_warn_skipped_cell` each left every suite at exit 0. Added
+    `test_sweep_run_one_propagates_a_genuine_failure` — drives a genuine
+    non-window failure through `run_one` via a sector map whose only symbol is
+    `""` (rejected by `Csv_storage.create` inside the panel build, so it fails
+    before the window is ever judged) and asserts it propagates rather than
+    becoming `None`. Extracted the warning's text into the pure
+    `Sweep_weekly_start_lib.skip_message` and pinned it with
+    `test_skip_message_names_the_cell_and_the_reason`. Mutation-verified: the
+    widened handler and a date-less `skip_message` each turn the suite RED; the
+    `eprintf` side effect itself remains unasserted (the message content is
+    what the test defends).
+  - **Not fixed here:** the other multi-window callers
+    (`Walk_forward_executor`, `Rolling_start_runner`, the grid/Bayesian tuner
+    evaluators) still abort a whole sweep on a degenerate fold — they now get a
+    diagnosable exception instead of `Invalid_argument`, but none of them
+    catches it. Also unfixed: the sweep's SPY bars are ~4 months behind the
+    floating `end_date`, which is what makes the degenerate cells appear at all
+    (an `ops-data` refresh, not a code fix).
 
 ## 2026-08-25 — incremental `trades.csv` streaming (#2502)
 

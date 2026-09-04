@@ -132,6 +132,13 @@ type result = {
           picked). *)
 }
 
+(** {1 Measurement-window restriction}
+
+    The five values below are re-exports of {!Window_filter}, which owns the
+    whole warmup-window-restriction family and documents each contract in full.
+    They keep their historical [Backtest.Runner.*] names because [Result_writer]
+    and [test_runner_filter] call them that way. *)
+
 val round_trips_in_window :
   ?order_links:string String.Map.t ->
   Trading_simulation_types.Simulator_types.step_result list ->
@@ -139,80 +146,43 @@ val round_trips_in_window :
   Trading_simulation.Metrics.trade_metrics list
 (** Extract round-trips from the full (warmup-inclusive) step series, then keep
     only those whose entry landed in-window ([entry_date >= start_date]).
-
-    [order_links] is the run's
-    [Simulator_types.run_result.order_position_links]; it only stamps
-    [position_id] on each round-trip (see
-    {!Trading_simulation.Metrics.extract_round_trips}) and never changes which
-    round-trips are produced or kept.
-
-    Pairing must see the warmup steps: a position opened in the warmup window
-    has its opening fill on a step before [start_date]. Extracting over the
-    [start_date]-truncated step list drops that opening fill, orphaning the
-    in-window closing [Sell], which
-    {!Trading_simulation.Metrics.extract_round_trips} then reads as a short-open
-    (correct for a genuine short, wrong for a warmup-opened long) — producing a
-    spurious SHORT round-trip with inverted P&L even in an
-    [enable_short_side = false] backtest. Pairing over the full series keeps the
-    warmup long a correct LONG, which this filter then drops as out-of-window.
-    Symbols with no warmup position are unaffected. *)
+    Pairing must see the warmup steps or a warmup-opened long is mis-read as a
+    short — full rationale in {!Window_filter.round_trips_in_window}. *)
 
 val filter_stop_infos_in_window :
   Stop_log.stop_info list -> start_date:Date.t -> Stop_log.stop_info list
 (** Drop [stop_info]s whose [entry_date] is before [start_date] — i.e. positions
-    opened during the warmup window. Used at runner teardown to keep
-    warmup-window stop events from corrupting [trades.csv] columns (the
-    symbol-first fallback in [Trade_context._stop_info_for] would otherwise
-    attach a warmup-window stop_info to an in-window round-trip when the same
-    symbol re-trades across the boundary).
-
-    Stop_infos with [entry_date = None] are kept (test fixtures that don't drive
-    {!Stop_log.set_current_date}). *)
+    opened during the warmup window, which would otherwise corrupt [trades.csv]
+    stop columns. See {!Window_filter.filter_stop_infos_in_window}. *)
 
 val filter_force_liquidations_in_window :
   Portfolio_risk.Force_liquidation.event list ->
   start_date:Date.t ->
   Portfolio_risk.Force_liquidation.event list
-(** Drop force-liquidation events whose [date] is before [start_date] — i.e.
-    events that fired during the warmup window. The simulator runs from
-    [warmup_start] so [Force_liquidation_log] observes events from days before
-    [start_date]; without this filter, warmup-window force-liqs leak into
-    [force_liquidations.sexp] and inflate the visible event count. *)
+(** Drop force-liquidation events that fired during the warmup window, which
+    would otherwise inflate the visible event count. See
+    {!Window_filter.filter_force_liquidations_in_window}. *)
 
 val filter_audit_records_in_window :
   Trade_audit.audit_record list ->
   start_date:Date.t ->
   Trade_audit.audit_record list
-(** Drop audit records whose entry-decision date is before [start_date]. The
-    strategy's audit recorder fires from [warmup_start], so without this filter
-    [trade_audit.sexp] picks up entries whose round-trips were never reported to
-    [trades.csv]. *)
+(** Drop audit records whose entry-decision date is before [start_date]. See
+    {!Window_filter.filter_audit_records_in_window}. *)
 
 val filter_cascade_summaries_in_window :
   Trade_audit.cascade_summary list ->
   start_date:Date.t ->
   Trade_audit.cascade_summary list
-(** Drop cascade-summary rows whose Friday [date] is before [start_date] —
-    cascade evaluations that ran during the warmup window. The strategy records
-    summaries every Friday from [warmup_start], so without this filter
-    [trade_audit.sexp] reports activity counts that include warmup- window
-    screen calls. *)
+(** Drop cascade-summary rows whose Friday [date] is before [start_date]. See
+    {!Window_filter.filter_cascade_summaries_in_window}. *)
 
 val is_trading_day :
   Trading_simulation_types.Simulator_types.step_result -> bool
 (** True if [step] represents a real trading day — i.e. the simulator saw at
-    least one bar for any symbol on [step.date]. Reads the authoritative
-    [step_result.had_market_bars] flag set in {!Trading_simulation.Simulator}.
-
-    Replaces the prior portfolio-value-vs-cash heuristic, which falsely
-    classified post-corporate-action days (held symbol with no further bars) as
-    non-trading and silently truncated [equity_curve.csv] /
-    [summary.final_portfolio_value] at the day before the gap.
-
-    Must NOT be applied before [Metrics.extract_round_trips] — round-trips
-    derive from position-state transitions recorded independently of bar
-    presence; filtering on [had_market_bars = false] silently drops trades whose
-    entry/exit landed on bar-less days. *)
+    least one bar for any symbol on [step.date], per the authoritative
+    [step_result.had_market_bars] flag. Must NOT be applied before
+    [Metrics.extract_round_trips]. See {!Window_filter.is_trading_day}. *)
 
 val run_backtest :
   start_date:Date.t ->
@@ -233,6 +203,16 @@ val run_backtest :
   result
 (** Run the simulator from [start_date - warmup] to [end_date], filter to the
     requested range and to trading days only, and return the [result].
+
+    @raise Window_filter.Empty_measurement_window
+      when [start_date..end_date] contains no trading day — typically because
+      [start_date] is past the last bar in the loaded data. Callers that map
+      this function over many windows (the weekly-start sweep, walk-forward
+      folds, rolling-start cells) should catch it per window so one degenerate
+      window does not abort the others; see
+      {!Window_filter.Empty_measurement_window} for why the runner raises rather
+      than returning a flat, zero-return [result]. Before issue #2632 this case
+      escaped as a raw stdlib [Invalid_argument "List.last"].
 
     [candidate_log] opts into per-week candidate capture (issue #2490),
     populating [result.candidate_weeks] as well as the passed collector. Build

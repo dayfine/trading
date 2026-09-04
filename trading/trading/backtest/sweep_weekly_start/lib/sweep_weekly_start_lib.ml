@@ -2,47 +2,9 @@ open Core
 module Scenario_strategy = Backtest.Strategy_choice
 module Metric_types = Trading_simulation_types.Metric_types
 
-type cell = {
-  start_date : Date.t;
-  final_value : float;
-  total_return : float;
-  cagr : float;
-  max_dd : float;
-  sharpe : float;
-}
-[@@deriving sexp, eq, show]
-
-type summary = {
-  best_cell_start : Date.t;
-  best_cagr : float;
-  worst_cell_start : Date.t;
-  worst_cagr : float;
-  median_cagr : float;
-  mean_cagr : float;
-  stddev_cagr : float;
-  n_cells : int;
-}
-[@@deriving sexp, eq, show]
-
-type sweep_result = {
-  run_date : Date.t;
-  end_date : Date.t;
-  symbol : string;
-  initial_cash : float;
-  years_back : int;
-  cells : cell list;
-  summary : summary;
-}
-[@@deriving sexp, eq, show]
-
-type config = {
-  symbol : string;
-  initial_cash : float;
-  years_back : int;
-  end_date : Date.t;
-  fixtures_root : string;
-  universe_path : string;
-}
+(* The data model lives in {!Sweep_types}; re-exported so callers keep using
+   [Sweep_weekly_start_lib.cell] etc. *)
+include Sweep_types
 
 let _epoch = Date.create_exn ~y:1970 ~m:Jan ~d:1
 
@@ -230,7 +192,7 @@ let _metrics_to_cell_fields ~final_value ~initial_cash
   let total_return = (final_value -. initial_cash) /. initial_cash in
   (total_return, cagr_pct /. 100.0, Float.abs max_dd_pct /. 100.0, sharpe)
 
-let run_one (cfg : config) (start_date : Date.t) ~sector_map_override =
+let _run_one_exn (cfg : config) (start_date : Date.t) ~sector_map_override =
   let strategy_choice : Scenario_strategy.t =
     Scenario_strategy.Bah_benchmark { symbol = cfg.symbol }
   in
@@ -256,6 +218,27 @@ let run_one (cfg : config) (start_date : Date.t) ~sector_map_override =
       ~initial_cash:runner_initial summary.metrics
   in
   { start_date; final_value = scaled_final; total_return; cagr; max_dd; sharpe }
+
+let skip_message (start_date : Date.t) (exn : exn) =
+  Printf.sprintf "sweep_weekly_start: skipping cell start_date=%s -- %s"
+    (Date.to_string start_date)
+    (Stdlib.Printexc.to_string exn)
+
+(** Report a cell dropped because its window held no trading day. Printed rather
+    than swallowed: the artefact's [n_cells] shrinks silently otherwise, and the
+    usual cause (the committed bars stop before the floating [end_date]) is a
+    data-floor problem the workflow log should surface. The content lives in the
+    pure {!skip_message} so a test can pin what the line says without capturing
+    stderr. *)
+let _warn_skipped_cell (start_date : Date.t) (exn : exn) =
+  eprintf "%s\n%!" (skip_message start_date exn)
+
+let run_one (cfg : config) (start_date : Date.t) ~sector_map_override =
+  match _run_one_exn cfg start_date ~sector_map_override with
+  | cell -> Some cell
+  | exception (Backtest.Window_filter.Empty_measurement_window _ as exn) ->
+      _warn_skipped_cell start_date exn;
+      None
 
 let _full_sector_map_unsupported path =
   failwith
@@ -284,7 +267,7 @@ let run (cfg : config) =
     mondays_in_window ~end_date:cfg.end_date ~years_back:cfg.years_back
   in
   let cells =
-    List.map mondays ~f:(fun start_date ->
+    List.filter_map mondays ~f:(fun start_date ->
         run_one cfg start_date ~sector_map_override)
   in
   {
