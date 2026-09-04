@@ -2,18 +2,18 @@
   "date": "2026-09-04",
   "feature": "harness-schedhealth",
   "branch": "harness/scheduled-workflow-health",
-  "sha": "a142243f986b5e67ce0744c72b628a09e27f03b9",
-  "recorded_at_ns": 1788547350831800783,
+  "sha": "25d1a9388bdcebc44b2aeea4a0d188aac0efb0fe",
+  "recorded_at_ns": 1788544149731242705,
   "structural_qc": "APPROVED",
-  "behavioral_qc": "APPROVED",
-  "overall_qc": "APPROVED",
+  "behavioral_qc": "NEEDS_REWORK",
+  "overall_qc": "NEEDS_REWORK",
   "harness_gap": "",
-  "quality_score": 4,
+  "quality_score": 2,
   "findings_count": {
     "PASS": 0,
     "FAIL": 0,
     "FLAG": 0
   },
-  "consecutive_rework_count": 0,
+  "consecutive_rework_count": 1,
   "notes": ""
 }
