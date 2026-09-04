@@ -25,6 +25,16 @@ started); P2 carries.
 - **#2650 filed** — tier-2 (goldens-small) and tier-4 (goldens-broad) pins
   were stale since the 08-24/08-26 flips; `perf-nightly` `continue-on-error`
   hid it. Fixed by the #2648 re-pins; the asks are about the gate.
+- **#2652** — this handoff (first version); **#2660** — committed memory snapshot
+  refreshed with the four new project memories below.
+- **#2654** — orchestrator's Window_filter fix for the never-green
+  `weekly-start-sweep` (#2632); one QC rework pinned `run_one`'s catch scope.
+- **#2657** — canonical record re-based onto the fixed basis
+  (`dev/experiments/record-rebase-2026-09-03/`, see P1 below).
+- **#2658** — #2408 stop-anchor surface re-measured on the fixed basis
+  (`dev/experiments/stop-anchor-rebase-2026-09-03/`, see P0 progress).
+- **#2659** — stop-width surface on the record convention
+  (`dev/experiments/stop-width-surface-2026-09-03/`, see P0 progress).
 
 ## What the paired goldens said (read before any exit-lever claim)
 
@@ -60,8 +70,12 @@ not a single admitted monster** on that base. Its surface on the RECORD conventi
 positive shared-trade drift (+$78–87k) and better maxDD at two of three salts
 (−7.8 / +1.0 / −7.7pp); 2019–23 loses 3/3
 ex-monster (its raw +46pp is MSTR, wide-arm-only at every salt) with ~10pp worse
-maxDD. Pre-registered rule not met → **keep `initial_stop_buffer 1.0` as default;
-0.98 is a trader-mode / regime dial**, not a promotion candidate
+maxDD. The 26y confirmation arm (salt 0) read 376.38% / 626 / Sharpe 0.445 / maxDD 37.65
+vs the record's 302.65 / 723 / 0.397 / 36.26 — +74pp, but shared-trade drift
+−$34k and the gap is wide-only monsters (MOS 2006 +$795k) plus larger shared
+monsters; 93 fewer stop exits; maxDD +1.4pp. Pre-registered rule not met →
+**keep `initial_stop_buffer 1.0` as default; 0.98 is a trader-mode / regime
+dial**, not a promotion candidate
 (`project_stop_width_regime_dependent`). The recurring shape across every lever
 re-measured today: the structural footprint is consistent, the level is set by
 which monster a slightly different book funds — read shared-trade drift and the
