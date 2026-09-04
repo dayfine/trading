@@ -21,7 +21,15 @@
     this test is meaningful.
 
     The unit-level companion, covering both empty-window shapes and the pin that
-    the non-empty path is unchanged, is [test_window_filter.ml]. *)
+    the non-empty path is unchanged, is [test_window_filter.ml].
+
+    The sweep-side cases here pin both halves of
+    [Sweep_weekly_start_lib.run_one]'s documented contract: the degenerate
+    window is absorbed into [None], and {i only} the degenerate window is — any
+    other failure propagates. The second half needs its own case because the
+    mutation that breaks it (widening the handler to [| exception exn ->])
+    leaves the handler body byte-identical and is exactly the shape a later
+    simplification would take. *)
 
 open OUnit2
 open Core
@@ -102,34 +110,116 @@ let _run_empty_window () =
 let test_run_backtest_raises_typed_empty_window _ =
   assert_that (_run_empty_window ()) (equal_to (Empty_window _start_date))
 
+let _sweep_config () : Sweep_weekly_start.Sweep_weekly_start_lib.config =
+  {
+    symbol = "SPY";
+    initial_cash = 100_000.0;
+    years_back = 3;
+    end_date = Date.of_string _end_date;
+    fixtures_root = _resolve_fixtures_root ();
+    universe_path = "universes/spy-only.sexp";
+  }
+
+let _pinned_spy_sector_map () =
+  match _spy_sector_map () with
+  | Some tbl -> tbl
+  | None ->
+      assert_failure
+        "universes/spy-only.sexp resolved to Full_sector_map; expected a \
+         pinned single-symbol universe"
+
+(** A sector map whose only symbol is the empty string — an invalid symbol
+    rather than a merely absent one. [Csv_snapshot_builder] rejects it outright
+    ([Csv_storage.create ""] → ["Symbol cannot be empty"]) while building the
+    run's in-process snapshot, so the failure surfaces from deep inside the
+    panel build, well before {!Backtest.Window_filter.of_steps} ever judges the
+    window. That is what makes it the right probe here: it is the cheapest input
+    reachable from [run_one]'s own arguments that fails for a reason other than
+    the degenerate window, with no dependence on which bar series happen to be
+    on disk. *)
+let _invalid_sector_map () =
+  let tbl = Hashtbl.create (module String) in
+  Hashtbl.set tbl ~key:"" ~data:"Technology";
+  tbl
+
+(** Flattened outcome of one [Sweep_weekly_start_lib.run_one] call.
+    Distinguishes the four things that can happen to a cell, so a test can
+    assert {i which} one occurred instead of only that the call did not crash.
+*)
+type run_one_outcome =
+  | Cell_produced
+  | Cell_skipped  (** [None] — the documented degenerate-window tolerance *)
+  | Empty_window_propagated
+  | Other_exn_propagated of string  (** the exception text *)
+[@@deriving eq, show]
+
+let _run_one_outcome cfg start_date ~sector_map_override =
+  match
+    Sweep_weekly_start.Sweep_weekly_start_lib.run_one cfg start_date
+      ~sector_map_override
+  with
+  | Some (_ : Sweep_weekly_start.Sweep_weekly_start_lib.cell) -> Cell_produced
+  | None -> Cell_skipped
+  | exception Backtest.Window_filter.Empty_measurement_window _ ->
+      Empty_window_propagated
+  | exception e -> Other_exn_propagated (Stdlib.Printexc.to_string e)
+
 (** The sweep's own cell runner — the caller that #2632 killed — must absorb the
     degenerate window and return [None] rather than propagate. This is the "one
     arm must not take down the others" contract, checked at the exact function
     [Sweep_weekly_start_lib.run] maps over the Mondays. *)
 let test_sweep_run_one_skips_the_cell _ =
-  let cfg : Sweep_weekly_start.Sweep_weekly_start_lib.config =
-    {
-      symbol = "SPY";
-      initial_cash = 100_000.0;
-      years_back = 3;
-      end_date = Date.of_string _end_date;
-      fixtures_root = _resolve_fixtures_root ();
-      universe_path = "universes/spy-only.sexp";
-    }
-  in
-  let sector_map_override =
-    match _spy_sector_map () with
-    | Some tbl -> tbl
-    | None ->
-        assert_failure
-          "universes/spy-only.sexp resolved to Full_sector_map; expected a \
-           pinned single-symbol universe"
-  in
   assert_that
-    (Sweep_weekly_start.Sweep_weekly_start_lib.run_one cfg
+    (_run_one_outcome (_sweep_config ())
        (Date.of_string _start_date)
-       ~sector_map_override)
-    is_none
+       ~sector_map_override:(_pinned_spy_sector_map ()))
+    (equal_to Cell_skipped)
+
+(** The other half of the same contract, and the one that is easy to lose: the
+    tolerance is scoped to the degenerate window {i only}. Widening [run_one]'s
+    handler to [| exception exn ->] leaves its body byte-identical, so nothing
+    about the code looks wrong afterwards — but every genuine failure would then
+    become a silently-dropped cell, and [run]'s [List.filter_map] would report a
+    successful sweep over an arm it never actually measured. That is the same
+    "silently wrong data, not an error" hazard the typed exception exists to
+    prevent, moved one layer up. *)
+let test_sweep_run_one_propagates_a_genuine_failure _ =
+  assert_that
+    (_run_one_outcome (_sweep_config ())
+       (Date.of_string _start_date)
+       ~sector_map_override:(_invalid_sector_map ()))
+    (matching
+       ~msg:
+         "a non-Empty_measurement_window failure must propagate out of \
+          run_one, never be swallowed into None"
+       (function Other_exn_propagated msg -> Some msg | _ -> None)
+       (contains_substring "Symbol cannot be empty"))
+
+(** What the skipped cell reports. [run] drops the cell from [cells], so
+    [summary.n_cells] shrinks with no other trace — the stderr line is the only
+    record that a Monday was dropped and why. Pinning the pure
+    {!Sweep_weekly_start_lib.skip_message} pins that content; the [eprintf] side
+    effect itself is not asserted (capturing the process's stderr from inside
+    OUnit is not worth the fixture), so a mutation that stops {i printing} the
+    message still passes — what this test defends is that the message keeps
+    naming the cell and the reason. *)
+let test_skip_message_names_the_cell_and_the_reason _ =
+  assert_that
+    (Sweep_weekly_start.Sweep_weekly_start_lib.skip_message
+       (Date.of_string _start_date)
+       (Backtest.Window_filter.Empty_measurement_window
+          {
+            start_date = Date.of_string _start_date;
+            end_date = Date.of_string _end_date;
+            n_sim_steps = 0;
+            n_steps_in_range = 0;
+          }))
+    (all_of
+       [
+         contains_substring ("start_date=" ^ _start_date);
+         contains_substring
+           (Printf.sprintf "measurement window %s..%s" _start_date _end_date);
+       ])
 
 let suite =
   "Runner_empty_window"
@@ -139,6 +229,10 @@ let suite =
          >:: test_run_backtest_raises_typed_empty_window;
          "Sweep_weekly_start.run_one returns None instead of aborting the sweep"
          >:: test_sweep_run_one_skips_the_cell;
+         "Sweep_weekly_start.run_one propagates a non-empty-window failure"
+         >:: test_sweep_run_one_propagates_a_genuine_failure;
+         "Sweep_weekly_start.skip_message names the skipped cell and the reason"
+         >:: test_skip_message_names_the_cell_and_the_reason;
        ]
 
 let () = run_test_tt_main suite

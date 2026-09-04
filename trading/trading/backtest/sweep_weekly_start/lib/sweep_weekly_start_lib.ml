@@ -219,14 +219,19 @@ let _run_one_exn (cfg : config) (start_date : Date.t) ~sector_map_override =
   in
   { start_date; final_value = scaled_final; total_return; cagr; max_dd; sharpe }
 
+let skip_message (start_date : Date.t) (exn : exn) =
+  Printf.sprintf "sweep_weekly_start: skipping cell start_date=%s -- %s"
+    (Date.to_string start_date)
+    (Stdlib.Printexc.to_string exn)
+
 (** Report a cell dropped because its window held no trading day. Printed rather
     than swallowed: the artefact's [n_cells] shrinks silently otherwise, and the
     usual cause (the committed bars stop before the floating [end_date]) is a
-    data-floor problem the workflow log should surface. *)
+    data-floor problem the workflow log should surface. The content lives in the
+    pure {!skip_message} so a test can pin what the line says without capturing
+    stderr. *)
 let _warn_skipped_cell (start_date : Date.t) (exn : exn) =
-  eprintf "sweep_weekly_start: skipping cell start_date=%s -- %s\n%!"
-    (Date.to_string start_date)
-    (Stdlib.Printexc.to_string exn)
+  eprintf "%s\n%!" (skip_message start_date exn)
 
 let run_one (cfg : config) (start_date : Date.t) ~sector_map_override =
   match _run_one_exn cfg start_date ~sector_map_override with

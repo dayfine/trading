@@ -69,6 +69,20 @@ Tier 3) tracked separately at `dev/status/incremental-indicators.md`.
   - **Verify:**
     `dev/lib/run-in-env.sh dune runtest trading/backtest/test` and
     `dev/lib/run-in-env.sh sh devtools/checks/linter_file_length.sh`.
+  - **QC rework iteration 1 (2026-09-03).** qc-behavioral CP4 found both
+    `run_one` guard claims unpinned: widening the handler to
+    `| exception exn ->` (a one-token edit that leaves the body byte-identical)
+    and suppressing `_warn_skipped_cell` each left every suite at exit 0. Added
+    `test_sweep_run_one_propagates_a_genuine_failure` — drives a genuine
+    non-window failure through `run_one` via a sector map whose only symbol is
+    `""` (rejected by `Csv_storage.create` inside the panel build, so it fails
+    before the window is ever judged) and asserts it propagates rather than
+    becoming `None`. Extracted the warning's text into the pure
+    `Sweep_weekly_start_lib.skip_message` and pinned it with
+    `test_skip_message_names_the_cell_and_the_reason`. Mutation-verified: the
+    widened handler and a date-less `skip_message` each turn the suite RED; the
+    `eprintf` side effect itself remains unasserted (the message content is
+    what the test defends).
   - **Not fixed here:** the other multi-window callers
     (`Walk_forward_executor`, `Rolling_start_runner`, the grid/Bayesian tuner
     evaluators) still abort a whole sweep on a degenerate fold — they now get a

@@ -56,6 +56,18 @@ val format_markdown : ?max_cells:int -> sweep_result -> string
     ~30 and the table would otherwise be unreadable. When [None] (the default),
     every cell is rendered. *)
 
+val skip_message : Date.t -> exn -> string
+(** [skip_message start_date exn] is the diagnostic line {!run_one} writes to
+    stderr when it drops a cell. It names the skipped [start_date] and renders
+    [exn] through [Printexc.to_string] — for
+    {!Backtest.Window_filter.Empty_measurement_window} that expands to the
+    registered printer's window description, so the line carries both the cell
+    that was dropped and why.
+
+    Pure and exposed so the {i content} of the report is testable without
+    capturing stderr: a cell disappearing from [summary.n_cells] with no line
+    naming it is the silent-shrink failure the warning exists to prevent. *)
+
 val run_one :
   config ->
   Date.t ->
