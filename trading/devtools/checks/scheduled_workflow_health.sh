@@ -88,6 +88,13 @@
 #        for: "the single newest scheduled run's conclusion", not "how
 #        many of the last N runs failed". There is no floor to mislabel.
 #
+#   The LIST loop is also BOUNDED (SCHEDULED_WF_HEALTH_MAX_PAGES, default
+#   1000): if a propagation bug or a pathological API response ever let
+#   the loop see a non-shrinking or non-numeric page count, it exits 3
+#   ("cannot measure") once the bound is hit, instead of spinning forever.
+#   A monitor that hangs is worse than one that fails outright -- nothing
+#   alerts on a hung cron job. See _list_active_workflows.
+#
 # INJECTABLE HTTP CALL (for hermetic, no-network fixture testing)
 #
 #   Every API call goes through _api_get(), which by default shells out to
@@ -113,6 +120,9 @@
 #   SCHEDULED_WF_HEALTH_STALE_HOURS   default staleness window in hours
 #   SCHEDULED_WF_HEALTH_FETCH         injectable fetch hook (see above)
 #   SCHEDULED_WF_HEALTH_NOW_EPOCH     injectable "now", unix seconds (test only)
+#   SCHEDULED_WF_HEALTH_MAX_PAGES     bound on the workflow-list pagination
+#                                     loop (default 1000; see
+#                                     PAGINATION-IS-A-FLOOR above)
 
 set -eu
 
@@ -129,6 +139,7 @@ EOF
 
 REPO="${SCHEDULED_WF_HEALTH_REPO:-dayfine/trading}"
 STALE_HOURS="${SCHEDULED_WF_HEALTH_STALE_HOURS:-216}"
+MAX_PAGES="${SCHEDULED_WF_HEALTH_MAX_PAGES:-1000}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -258,11 +269,21 @@ _list_active_workflows() {
   _per_page=100
   _pages=0
   while :; do
+    if [ "$_page" -gt "$MAX_PAGES" ]; then
+      echo "FAIL: workflow list pagination exceeded ${MAX_PAGES} page(s) (repo=${REPO}) -- refusing to loop forever. This almost certainly means a propagation bug or a malformed/pathological API response, not a repo with tens of thousands of workflows. Refusing to report (cannot measure)." >&2
+      return 3
+    fi
     if ! _resp=$(_api_get_json "repos/${REPO}/actions/workflows?per_page=${_per_page}&page=${_page}"); then
       return 3
     fi
     _pages=$((_pages + 1))
     _count=$(printf '%s' "$_resp" | jq '.workflows | length')
+    case "$_count" in
+      ''|*[!0-9]*)
+        echo "FAIL: workflow list page ${_page} (repo=${REPO}) did not yield a numeric workflow count -- cannot safely determine whether pagination is complete. Refusing to report (cannot measure)." >&2
+        return 3
+        ;;
+    esac
     printf '%s' "$_resp" | jq -r '.workflows[] | select(.state == "active") | [(.id | tostring), .name] | join("\t")'
     if [ "$_count" -lt "$_per_page" ]; then
       break

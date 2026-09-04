@@ -48,6 +48,38 @@
 #      threaded through, not just documented.
 #  10. Malformed --stale-hours argument -> exit 64 (usage error), distinct
 #      from every "cannot measure" / "found a problem" code above.
+#  11. All four RED conclusion values (failure, cancelled, timed_out,
+#      action_required), one workflow each -> all four classified RED and
+#      all four named in the SUMMARY RED list. Assertion 2 only exercises
+#      "failure"; this closes the other three, which a prior review found
+#      silently unpinned (dropping any of them from the RED set left the
+#      suite green).
+#  12. The workflow LIST call succeeds but the per-workflow RUNS call
+#      fails (network/non-2xx) -> exit 3, "GitHub API request failed"
+#      naming the runs path. This is the exact fixture shape a prior
+#      review built by hand and found missing: assertions 6/7 fail on
+#      *every* path, so the list call fails first and the runs-call
+#      failure path (main()'s `if ! _run_line=$(_newest_scheduled_run
+#      ...)` and that function's own `if ! _resp=$(_api_get_json ...)`)
+#      was never exercised, on the higher-frequency of the two call
+#      sites (once per workflow vs. once per list page).
+#  13. Same shape as 12, but the RUNS call returns non-JSON garbage
+#      instead of failing outright -> exit 3, "was not valid JSON",
+#      again on the runs path specifically.
+#  14. SCHEDULED_WF_HEALTH_STALE_HOURS env var (not the --stale-hours
+#      flag) reclassifies the same stale run age as OK -- the documented
+#      env-var half of assertion 9's claim, which a prior review found
+#      untested (only the flag was exercised).
+#  15. SCHEDULED_WF_HEALTH_REPO env var is actually threaded into the API
+#      path and the printed header -- a shim that only answers for a
+#      specific non-default repo name proves the override takes effect,
+#      not just that a header line echoes it.
+#  16. Pagination is BOUNDED: a shim that always returns a full
+#      (non-shrinking) page forever, with SCHEDULED_WF_HEALTH_MAX_PAGES
+#      lowered so the test terminates quickly, -> exit 3 once the bound
+#      is hit, rather than hanging. A prior review found the unbounded
+#      loop hangs (not fails) under a propagation-severed mutation --
+#      this pins the defensive bound added in response.
 #
 # Run: sh trading/devtools/checks/scheduled_workflow_health_test.sh
 
@@ -317,6 +349,195 @@ if [ "$RC" -eq 64 ] && echo "$OUT" | grep -q 'must be a positive integer'; then
   pass "assertion 10: malformed --stale-hours -> exit 64, distinct usage-error message"
 else
   fail "assertion 10: expected exit64 with the usage-error message, got rc=$RC output=$OUT"
+fi
+
+echo "=== Assertion 11: all four RED conclusion values classify RED, not just 'failure' ==="
+SHIM11="${TMPDIR_ROOT}/fetch11.sh"
+cat > "$SHIM11" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"actions/workflows?per_page=100&page=1")
+    echo '{"total_count":4,"workflows":[{"id":1,"name":"Failure wf","state":"active"},{"id":2,"name":"Cancelled wf","state":"active"},{"id":3,"name":"Timed out wf","state":"active"},{"id":4,"name":"Action required wf","state":"active"}]}'
+    ;;
+  *"actions/workflows/1/runs?event=schedule&per_page=1")
+    echo '{"workflow_runs":[{"id":111,"conclusion":"failure","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+    ;;
+  *"actions/workflows/2/runs?event=schedule&per_page=1")
+    echo '{"workflow_runs":[{"id":222,"conclusion":"cancelled","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+    ;;
+  *"actions/workflows/3/runs?event=schedule&per_page=1")
+    echo '{"workflow_runs":[{"id":333,"conclusion":"timed_out","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+    ;;
+  *"actions/workflows/4/runs?event=schedule&per_page=1")
+    echo '{"workflow_runs":[{"id":444,"conclusion":"action_required","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+    ;;
+  *)
+    echo "unmatched path: $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM11"
+NOW11="$(date -u -d "2026-09-04T06:00:00Z" +%s)"
+_run "$SHIM11" "$NOW11"
+if [ "$RC" -ne 0 ] \
+  && echo "$OUT" | grep -q '^RED	Failure wf' \
+  && echo "$OUT" | grep -q '^RED	Cancelled wf' \
+  && echo "$OUT" | grep -q '^RED	Timed out wf' \
+  && echo "$OUT" | grep -q '^RED	Action required wf' \
+  && echo "$OUT" | grep -q 'red=4'; then
+  pass "assertion 11: failure/cancelled/timed_out/action_required all classify RED"
+else
+  fail "assertion 11: expected all four conclusions RED, got rc=$RC output=$OUT"
+fi
+
+echo "=== Assertion 12: list call OK, per-workflow RUNS call fails -> exit 3, not NO-SCHEDULE ==="
+SHIM12="${TMPDIR_ROOT}/fetch12.sh"
+cat > "$SHIM12" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"actions/workflows?per_page=100&page=1")
+    echo '{"total_count":2,"workflows":[{"id":1,"name":"Prune candidates weekly","state":"active"},{"id":2,"name":"Weekly track pacer","state":"active"}]}'
+    ;;
+  *"actions/workflows/1/runs?event=schedule&per_page=1")
+    echo "simulated network failure on runs call" >&2
+    exit 22
+    ;;
+  *"actions/workflows/2/runs?event=schedule&per_page=1")
+    echo "simulated network failure on runs call" >&2
+    exit 22
+    ;;
+  *)
+    echo "unmatched path: $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM12"
+_run "$SHIM12" ""
+if [ "$RC" -eq 3 ] \
+  && echo "$OUT" | grep -q 'GitHub API request failed' \
+  && echo "$OUT" | grep -q 'runs?event=schedule' \
+  && ! echo "$OUT" | grep -q 'NO-SCHEDULE'; then
+  pass "assertion 12: RUNS call failure (list succeeded) -> exit 3, never silently reclassified NO-SCHEDULE"
+else
+  fail "assertion 12: expected exit3 naming the runs path and no NO-SCHEDULE line, got rc=$RC output=$OUT"
+fi
+
+echo "=== Assertion 13: list call OK, per-workflow RUNS call returns non-JSON -> exit 3 ==="
+SHIM13="${TMPDIR_ROOT}/fetch13.sh"
+cat > "$SHIM13" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"actions/workflows?per_page=100&page=1")
+    echo '{"total_count":1,"workflows":[{"id":1,"name":"Weekly start sweep (BAH SPY)","state":"active"}]}'
+    ;;
+  *"actions/workflows/1/runs?event=schedule&per_page=1")
+    echo "<html>not json</html>"
+    ;;
+  *)
+    echo "unmatched path: $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM13"
+_run "$SHIM13" ""
+if [ "$RC" -eq 3 ] \
+  && echo "$OUT" | grep -q 'was not valid JSON' \
+  && echo "$OUT" | grep -q 'runs?event=schedule' \
+  && ! echo "$OUT" | grep -q 'NO-SCHEDULE'; then
+  pass "assertion 13: RUNS call malformed JSON (list succeeded) -> exit 3, never silently reclassified NO-SCHEDULE"
+else
+  fail "assertion 13: expected exit3 naming the runs path and no NO-SCHEDULE line, got rc=$RC output=$OUT"
+fi
+
+echo "=== Assertion 14: SCHEDULED_WF_HEALTH_STALE_HOURS env var reclassifies the same age as OK ==="
+# Same fixture/age as assertion 3/9 (40 days old), but the widened window
+# is supplied via the ENV VAR this time, not the --stale-hours flag --
+# closes the documented-but-untested env-var half of assertion 9's claim.
+set +e
+OUT14="$(SCHEDULED_WF_HEALTH_FETCH="$SHIM3" SCHEDULED_WF_HEALTH_NOW_EPOCH="$NOW3" SCHEDULED_WF_HEALTH_STALE_HOURS=2000 env -u GH_TOKEN sh "$SCRIPT" 2>&1)"
+RC14=$?
+set -e
+if [ "$RC14" -eq 0 ] && echo "$OUT14" | grep -q '^OK	Weekly track pacer'; then
+  pass "assertion 14: SCHEDULED_WF_HEALTH_STALE_HOURS env var reclassifies the same run age as OK"
+else
+  fail "assertion 14: expected OK classification under widened env-var staleness window, got rc=$RC14 output=$OUT14"
+fi
+
+echo "=== Assertion 15: SCHEDULED_WF_HEALTH_REPO env var is threaded into the API path ==="
+SHIM15="${TMPDIR_ROOT}/fetch15.sh"
+cat > "$SHIM15" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"repos/some-org/some-other-repo/actions/workflows?per_page=100&page=1")
+    echo '{"total_count":1,"workflows":[{"id":1,"name":"Override repo wf","state":"active"}]}'
+    ;;
+  *"repos/some-org/some-other-repo/actions/workflows/1/runs?event=schedule&per_page=1")
+    echo '{"workflow_runs":[{"id":111,"conclusion":"success","status":"completed","created_at":"2026-09-04T00:00:00Z"}]}'
+    ;;
+  *)
+    echo "unmatched path (REPO override not threaded through?): $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM15"
+set +e
+OUT15="$(SCHEDULED_WF_HEALTH_FETCH="$SHIM15" SCHEDULED_WF_HEALTH_NOW_EPOCH="$NOW1" SCHEDULED_WF_HEALTH_REPO="some-org/some-other-repo" env -u GH_TOKEN sh "$SCRIPT" 2>&1)"
+RC15=$?
+set -e
+if [ "$RC15" -eq 0 ] \
+  && echo "$OUT15" | grep -q 'repo=some-org/some-other-repo' \
+  && echo "$OUT15" | grep -q '^OK	Override repo wf'; then
+  pass "assertion 15: SCHEDULED_WF_HEALTH_REPO env var is threaded into both the header and the API path"
+else
+  fail "assertion 15: expected exit0 against the overridden repo, got rc=$RC15 output=$OUT15"
+fi
+
+echo "=== Assertion 16: pagination loop is bounded, not infinite ==="
+# A shim that always returns a FULL (non-shrinking) page, forever -- with
+# SCHEDULED_WF_HEALTH_MAX_PAGES lowered so the test terminates quickly
+# instead of waiting out the production default (1000). Wrapped in
+# `timeout` as a hard backstop: if the bound regresses, this assertion
+# must fail loudly rather than hang the whole suite.
+SHIM16="${TMPDIR_ROOT}/fetch16.sh"
+cat > "$SHIM16" <<'EOF'
+#!/bin/sh
+path="$1"
+case "$path" in
+  *"actions/workflows?per_page=100&page="*)
+    i=1
+    wfs=""
+    while [ "$i" -le 100 ]; do
+      wfs="${wfs}${wfs:+,}{\"id\":${i},\"name\":\"wf${i}\",\"state\":\"active\"}"
+      i=$((i + 1))
+    done
+    printf '{"total_count":999999,"workflows":[%s]}' "$wfs"
+    ;;
+  *"runs?event=schedule"*)
+    echo '{"workflow_runs":[]}'
+    ;;
+  *)
+    echo "unmatched path: $path" >&2
+    exit 1
+    ;;
+esac
+EOF
+_finish_shim "$SHIM16"
+set +e
+OUT16="$(SCHEDULED_WF_HEALTH_FETCH="$SHIM16" SCHEDULED_WF_HEALTH_MAX_PAGES=3 env -u GH_TOKEN timeout 30 sh "$SCRIPT" 2>&1)"
+RC16=$?
+set -e
+if [ "$RC16" -eq 3 ] && echo "$OUT16" | grep -q 'pagination exceeded 3 page(s)'; then
+  pass "assertion 16: unbounded-looking pagination is bounded -- exits 3 instead of hanging"
+else
+  fail "assertion 16: expected exit3 with the pagination-bound message, got rc=$RC16 output=$OUT16"
 fi
 
 echo ""
