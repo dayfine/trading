@@ -1,0 +1,39 @@
+[09-03 17:33:14] run tree HEAD=e4984c5fe (expect e4984c5fe)
+[09-03 17:33:18] RUN sa-null-dup-s0
+[09-03 17:33:18] RUN sa-off-b1.0-s0
+[09-03 17:49:37] RESULT sa-off-b1.0-s0 => total_return_pct 9.3020191379364583 total_trades 179 win_rate 27.932960893854748 sharpe_ratio 0.18733845363114937 max_drawdown_pct 36.564868883318262  (wall 979s)
+[09-03 17:49:37] RESULT sa-null-dup-s0 => total_return_pct 9.3020191379364583 total_trades 179 win_rate 27.932960893854748 sharpe_ratio 0.18733845363114937 max_drawdown_pct 36.564868883318262  (wall 979s)
+[09-03 17:49:39] RUN sa-on-b0.92-s0
+[09-03 17:49:39] RUN sa-on-b1.0-s0
+[09-03 18:05:38] RESULT sa-on-b1.0-s0 => total_return_pct 73.349571158220343 total_trades 173 win_rate 28.323699421965319 sharpe_ratio 0.63301631752856735 max_drawdown_pct 39.504782966087426  (wall 959s)
+[09-03 18:06:28] RESULT sa-on-b0.92-s0 => total_return_pct 55.585286025257453 total_trades 180 win_rate 36.111111111111107 sharpe_ratio 0.53921424274818119 max_drawdown_pct 36.623463882256914  (wall 1009s)
+[09-03 18:06:29] RUN sa-off-b0.98-s0
+[09-03 18:06:29] RUN sa-on-b0.98-s0
+[09-03 18:22:16] RESULT sa-off-b0.98-s0 => total_return_pct 21.532043416415618 total_trades 165 win_rate 30.303030303030305 sharpe_ratio 0.30784766519738316 max_drawdown_pct 28.269895596267585  (wall 947s)
+[09-03 18:22:31] RESULT sa-on-b0.98-s0 => total_return_pct 83.119131042784474 total_trades 147 win_rate 30.612244897959183 sharpe_ratio 0.68950448081569427 max_drawdown_pct 45.263493960822643  (wall 962s)
+[09-03 18:22:32] RUN sa-off-b0.96-s0
+[09-03 18:22:32] RUN sa-on-b0.96-s0
+[09-03 18:42:26] RESULT sa-off-b0.96-s0 => total_return_pct -15.717453759813656 total_trades 177 win_rate 28.8135593220339 sharpe_ratio -0.1141324053378108 max_drawdown_pct 35.918683205433091  (wall 1194s)
+[09-03 18:42:35] RESULT sa-on-b0.96-s0 => total_return_pct 66.090948400836112 total_trades 156 win_rate 33.333333333333329 sharpe_ratio 0.5820789810864101 max_drawdown_pct 40.292978445532583  (wall 1203s)
+[09-03 18:42:38] RUN sa-off-b0.92-s0
+[09-03 18:42:38] RUN sa-on-b0.885-s0
+[09-03 18:58:54] RESULT sa-on-b0.885-s0 => total_return_pct 23.827427524084598 total_trades 187 win_rate 36.898395721925134 sharpe_ratio 0.34445442652343405 max_drawdown_pct 25.294978692255583  (wall 976s)
+[09-03 18:59:06] RESULT sa-off-b0.92-s0 => total_return_pct 22.236498405345621 total_trades 190 win_rate 34.210526315789473 sharpe_ratio 0.31095413399362465 max_drawdown_pct 35.316310603638925  (wall 988s)
+[09-03 18:59:08] RUN sa-on-b0.92-s1
+[09-03 18:59:08] RUN sa-off-b0.885-s0
+[09-03 19:15:05] RESULT sa-off-b0.885-s0 => total_return_pct 23.827427524084598 total_trades 187 win_rate 36.898395721925134 sharpe_ratio 0.34445442652343405 max_drawdown_pct 25.294978692255583  (wall 957s)
+[09-03 19:15:44] RESULT sa-on-b0.92-s1 => total_return_pct 71.0291900209957 total_trades 173 win_rate 34.682080924855491 sharpe_ratio 0.64832462179014 max_drawdown_pct 38.290975903920589  (wall 996s)
+[09-03 19:15:44] SURFACE S0 COMPLETE
+[09-03 19:15:45] RUN sa-off-b1.0-s1
+[09-03 19:15:45] RUN sa-off-b1.0-s2
+[09-03 19:34:45] RESULT sa-off-b1.0-s1 => total_return_pct 7.9341662624202671 total_trades 183 win_rate 28.415300546448087 sharpe_ratio 0.17266713359246089 max_drawdown_pct 26.759665513484354  (wall 1140s)
+[09-03 19:35:01] RESULT sa-off-b1.0-s2 => total_return_pct -6.4015110666526018 total_trades 180 win_rate 27.222222222222221 sharpe_ratio 0.013566561789766592 max_drawdown_pct 34.435828939675872  (wall 1156s)
+[09-03 19:35:02] RUN sa-on-b0.92-s2
+[09-03 19:35:02] RUN sa-off-b0.98-s1
+[09-03 19:52:11] RESULT sa-off-b0.98-s1 => total_return_pct 21.816533240424469 total_trades 164 win_rate 31.707317073170731 sharpe_ratio 0.31118400724895467 max_drawdown_pct 32.923447006584624  (wall 1029s)
+[09-03 19:53:36] RESULT sa-on-b0.92-s2 => total_return_pct 102.46071101660405 total_trades 172 win_rate 34.883720930232556 sharpe_ratio 0.81277984512030355 max_drawdown_pct 32.424617335713336  (wall 1114s)
+[09-03 19:53:37] RUN sa-on-b1.0-s1
+[09-03 19:53:37] RUN sa-off-b0.98-s2
+[09-03 20:08:15] RESULT sa-off-b0.98-s2 => total_return_pct 40.252407533258335 total_trades 158 win_rate 34.177215189873415 sharpe_ratio 0.4714471183016038 max_drawdown_pct 25.109602549690042  (wall 878s)
+[09-03 20:08:59] RESULT sa-on-b1.0-s1 => total_return_pct 64.0488936924186 total_trades 179 win_rate 30.726256983240223 sharpe_ratio 0.58393260297196836 max_drawdown_pct 40.970877491023614  (wall 922s)
+[09-03 20:08:59] SA2408B CHAIN DONE
