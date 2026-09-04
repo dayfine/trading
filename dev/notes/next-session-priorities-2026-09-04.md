@@ -41,6 +41,20 @@ flip.** Memories: `project_top500_composition_golden_is_gme`,
 
 ## P0 — re-measure the exit levers on the fixed basis
 
+**Progress 2026-09-03 evening.** Two of the suspect reads are now re-measured
+(`dev/experiments/stop-anchor-rebase-2026-09-03/`): (1) `stop_anchor_at_entry_base`
+— the old salt-robust +60pp was ONE admission (DDS 2020-10-05, in every
+anchor-on arm at every salt, absent from every anchor-off arm) plus the D2
+artifact killing it at narrow widths; ex-DDS the anchor is inside the null's
+own spread → REJECT as promotion candidate, keep as axis. (2) `initial_stop_buffer
+0.98` (≈5.9% fallback, anchor off) beats the null 3/3 salts on 2019–23 with
+no monster and shared-trade drift ≈ 0 — the edge is ~20 fewer 4%-stop whipsaw
+deaths per salt. **This is the first fixed-basis lever candidate that is not a
+lottery ticket**; its surface on the record convention across 2000–04 / 26y
+with salts is the next chain (`dev/experiments/stop-width-surface-2026-09-03/`
+if it ran overnight — read it first).
+
+
 Every pre-09-03 exit-lever verdict (eject on/off, stop width, TTL/clock,
 laggard timing, the #2408 stop-anchor read) was measured on the defective
 simulator. Re-run them as surfaces on the new default (no flags needed now)
