@@ -1,6 +1,6 @@
 # Status: Orchestrator Automation
 
-## Last updated: 2026-08-21
+## Last updated: 2026-09-04
 
 ## Status
 IN_PROGRESS
@@ -55,7 +55,32 @@ prioritized. Track stays IN_PROGRESS pending those experiments; not
 blocking anything else.
 
 ## Blocked on
-- None. Phase 2 items are scoped-work, not blockers.
+- **`workflow` token scope — hard-blocked on EVERY route, measured with a
+  control 2026-09-04 (orchestrator run 33894722318).** Prior runs recorded only
+  that `git push` touching `.github/workflows/**` is rejected, leaving open
+  whether the REST contents API was a way around it. It is not. Two
+  `PUT /repos/dayfine/trading/contents/<path>` calls, **same token, same scratch
+  branch, seconds apart**:
+
+  | contents-API `PUT` | result |
+  |---|---|
+  | `.github/workflows/.scope-probe.txt` | **403** `Resource not accessible by personal access token` |
+  | `dev/notes/.scope-probe.txt` (**control**) | **201 Created** |
+
+  The control is load-bearing: a bare 403 is equally consistent with "the token
+  cannot write at all" and "the contents API is blocked". The 201 on a
+  non-workflow path in the same breath eliminates both and isolates the cause to
+  **the path**. Cleanup: both blobs existed only on the scratch ref
+  `probe/workflow-scope-2026-09-04`, deleted (`204`); `main` was never a target.
+
+  Consequence — these are **not** "not yet attempted", they are unreachable
+  without a re-scoped token: **#2653** (safe.directory step ordering in all five
+  container workflows, the root cause of #2633), the cron-wiring half of
+  **#2634**, and **#2662** (track-pacer's pre-flight failure). Paired with the
+  standing `actions: write` gap (`POST /actions/workflows/<f>/dispatches` → 403,
+  measured 2026-09-03), so even a human-applied workflow fix cannot be verified
+  before its next scheduled firing.
+- Otherwise: none. Phase 2 items are scoped-work, not blockers.
 
 ## Interface stable
 NO

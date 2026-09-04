@@ -4,46 +4,50 @@ Single-source view of all tracked work. Detail belongs in the per-track
 status files linked in column 1. Keep every "Next task" cell to one line
 (<=160 chars); the `index_size_linter.sh` CI check enforces this.
 
-Last updated: 2026-09-03 (orchestrator run 33778603256; main **`e4984c5f`**
--> **`efc25d68`**, two PRs merged. Green at run start (`e4984c5f`:
-`dune build @runtest --force` 0, 0 `^FAIL:`, `status_file_integrity` 0,
-`index_size_linter` 0 — every exit code read **unpiped**) and re-verified
-after both merges. Step 0.5 skipped: `QUEUE_NON_EMPTY=3`, and Condition 2
-fails independently (nine non-summary commits touched `dev/status/*.md`
-since the prior summary).
+Last updated: 2026-09-04 (orchestrator run 33894722318; main **`20ed1788`**.
+Green at run start: `dune build @runtest --force` **0**, 0 `^FAIL:`,
+`status_file_integrity` **0**, `index_size_linter` **0** — every exit code
+read **unpiped**. Step 0.5 skipped: `QUEUE_NON_EMPTY=0`, and per the
+precondition an **empty** queue is the opposite of saturated — maximum
+dispatch capacity, not a reason to no-op.
 
-**This run finished a gate loop that a failed run abandoned.** The 12:06Z
-orchestrator run (33753388554) **failed** — `is_error:true`, 99 turns of a
-200 cap, 80.3 min, **$48.67** — after opening two PRs and getting them
-through structural QC, but recorded **nothing**: no summary, no merges, no
-index update. Cause is **not** determinable from the artifacts (the action
-logs only init and result), and a turn-limit cutoff is ruled out by the
-cap. Filed as a `[high]` observability escalation.
+**The queue was empty and main was green — the first clean start in several
+runs.** Everything the last two runs left in flight has landed (#2654 merged
+02:41Z, plus four experiment PRs). All eight remote branches were checked
+**individually** against their PR state: every one merged, zero orphans.
+(`git merge-base --is-ancestor` reports every squash-merged branch as
+"not in main" and would have manufactured eight phantom orphans.)
 
-**Merged this run:** **#2651** (`efc25d68`) — closes the script-side half of
-**#2633**; its rework pinned the exit-status guard that had **zero** coverage
-(failure-branch tracer 0 -> 6 hits; degrade-to-skip and inverse mutations
-both now RED). Verified independently post-merge on main: mutant `31 passed,
-3 failed` exit 1 vs `34 passed, 0 failed` exit 0. And **#2655** (`cd702adf`),
-the failed run's orphaned budget record — **merged under a docs-only
-carve-out extended to `dev/budget/*.json`, which is NOT in the written
-allowlist and needs human ratification.**
+**Dispatched:** **#2664** — mutation-coverage harness for
+`dev/scripts/pr_gate_status.sh`, the merge gate itself (16 pinned mutations,
+11 killed / 5 survivor, **6 not previously named**; gating on a pinned
+expected-outcome list, failing in either direction). Re-dispatch: the
+2026-09-03 dispatch of this item produced no branch and no PR.
+**#2663** — the scheduled-workflow health check as a committed script with a
+hermetic 10-assertion fixture test (script half of **#2634**).
 
-**#2654 (fixes #2632 — the `List.last_exn` crash that has kept
-`weekly-start-sweep.yml` red since 2026-05-18) is correctly held.** Its core
-guard is well pinned, but `run_one`'s docstring makes two guard claims that
-nothing exercises: widening the handler to a catch-all, and suppressing the
-stderr skip-warning, both leave the suite green. Those claims are the only
-thing stopping the fix from becoming a quieter version of the bug it fixes.
+**`workflow` scope is blocked on EVERY route — measured with a control, not
+inferred.** `PUT /contents/.github/workflows/.scope-probe.txt` → **403**;
+`PUT /contents/dev/notes/.scope-probe.txt` (control) → **201**, same token,
+same scratch branch, seconds apart. The control is what makes it a
+measurement: a bare 403 is equally consistent with "cannot write at all".
+This hard-blocks **#2653**, **#2662** and #2634's wiring half. Scratch ref
+deleted (`204`); `main` never targeted.
 
-Capabilities, re-probed this run rather than inherited: `.claude/agents/**`
-writes **refused** (attempted, 7th run); **NEW** — `POST
-/actions/workflows/<f>/dispatches` **403**, so the orchestrator cannot
-trigger a `workflow_dispatch` to verify its own workflow fixes.
-`.github/workflows/**` pushes rejected (no `workflow` scope) though a
-server-side merge succeeds; `POST /issues` create-only (`PATCH` and issue
-comments 403); `PATCH /pulls/<n>`, `POST /pulls/<n>/reviews`,
-`PUT /pulls/<n>/merge`, `PUT .../update-branch` all work.
+**Filed #2662** — `track-pacer-weekly` red since 2026-08-30: the CLI fails
+pre-flight in **552 ms at $0 with `modelUsage: {}`**, so the model is never
+invoked. Prime suspect (stated as a suspect): `--allowedTools` is missing
+`Agent`, the one line differing from its two working siblings. Note the
+2026-09-03 orchestrator failure carries the **byte-identical**
+`subtype:"success"` + `is_error:true` shell after 80 min and $48.67 —
+one boolean, provably different failure modes.
+
+Capabilities: `.claude/agents/**` writes **refused** (8th run); `workflow`
+scope unavailable by push **and** contents API (above); `POST
+/actions/workflows/<f>/dispatches` **403**; `POST /issues` create-only
+(`PATCH` and issue comments 403); `PATCH /pulls/<n>`,
+`POST /pulls/<n>/reviews`, `PUT /pulls/<n>/merge`, `PUT .../update-branch`
+all work.
 
 Per-run history lives in `dev/daily/YYYY-MM-DD*.md`, one file per
 orchestrator run — not here. This header carries the current run only.
@@ -67,7 +71,7 @@ Each row: one line; deeper task detail in the linked status file.
 | [leverage-dawn](leverage-dawn.md) | MERGED | feat-weinstein | — | MERGED default-off #2077 after B1 permissive-funding rework; next: WF-CV surface + promotion-confirmation grid before any R3 flip |
 | [capital-management-scale-in](capital-management-scale-in.md) | MERGED | — | — | PROGRAM CLOSED: v1 (#1840) + v2 (#1860) both REJECTED; mechanisms merged default-off, searchable; class exhausted (2026-07-06) |
 | [cash-reserve](cash-reserve.md) | MERGED | — | — | CLOSED: mechanism MERGED default-off (#1867); WF-CV surface {0,.1,.2,.3} REJECT (ledger 2026-07-06, #1872); envelope program closed both directions (2026-07-06) |
-| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | #2654 | #2654 fixes #2632 (empty-window crash); structural APPROVED, behavioral NEEDS_REWORK — rework in flight, re-QC owed |
+| [backtest-infra](backtest-infra.md) | IN_PROGRESS | dayfine + feat-backtest | — | #2654 MERGED `bf552095` (fixes #2632 empty-window crash); weekly-start-sweep unverified until its next cron |
 | [rename-twin-dedup](rename-twin-dedup.md) | IN_PROGRESS | feat-backtest | — | v1(#1940)+v2(#1946) MERGED; dedup warehouse rebuilt + 28y record re-run landed (#1949, 83 groups/91 legs dropped); next: none (optional V6 report-consult tweak) |
 | [post-run-validation](post-run-validation.md) | IN_PROGRESS | feat-backtest | — | v1 harness (#1937) + C6b audit-join-by-position_id (#1947) MERGED; next: golden-run integration test for V3/V4/V7 (data-gated) |
 | [cash-floor-correctness](cash-floor-correctness.md) | IN_PROGRESS | feat-weinstein | — | NS1 impl+flip ON (#1567/#1582 correctness), NS2 design+NS3 MERGED (#1569/#1575); next: NS2 impl (human-gated), NS4 optional DD-validation (data-gated) |
@@ -93,8 +97,8 @@ Each row: one line; deeper task detail in the linked status file.
 | [strategy-wiring](strategy-wiring.md) | MERGED | — | — | — |
 | [sector-data](sector-data.md) | MERGED | — | — | — |
 | [harness](harness.md) | IN_PROGRESS | harness-maintainer | — | #2651 MERGED (`efc25d68`) — closes #2633's script-side half; rework pinned the exit-status guard (0 → 6 tracer hits); next: H-GATEPARSER mutation harness, dispatched |
-| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | A-MERGEABLE-STATE-NOT-A-CLOSE-TELL filed (run-1 guidance corrected); open: #2427 #2428 #2429 #2432 — need `workflow` scope or a human |
-| [cleanup](cleanup.md) | IN_PROGRESS | code-health | #2637 | #2637 root-causes the csv-snapshot flake (OUnit2 parallel shards, NOT the recorded SIGTERM race); reworked, needs re-QC |
+| [orchestrator-automation](orchestrator-automation.md) | IN_PROGRESS | harness-maintainer | — | `workflow` scope proven blocked on EVERY route (403 path vs 201 control, 09-04); blocks #2653 #2662 + #2634 wiring, #2427-#2432 |
+| [cleanup](cleanup.md) | IN_PROGRESS | code-health | — | #2637 MERGED 09-03; backlog has no actionable item — top is the test-file-length policy decision, human-gated 20 runs |
 | [cost-tracking](cost-tracking.md) | MERGED | — | — | — |
 | [data-layer](data-layer.md) | MERGED | — | — | — |
 | [portfolio-stops](portfolio-stops.md) | MERGED | — | — | — |
