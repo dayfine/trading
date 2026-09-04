@@ -1,6 +1,6 @@
 # stop-anchor-rebase-2026-09-03 — the #2408 surface re-measured on the fixed exit basis
 
-The 2026-08-31 stop-anchor surface (`wip/sa2408`, never PR'd:
+The 2026-08-31 stop-anchor surface (`wip/sa2408-specs`, never PR'd:
 `stop_anchor_at_entry_base` {off,on} × `initial_stop_buffer` {1.0, 0.98, 0.96,
 0.92, 0.885}, 2019–23 × top-3000-2019, record-lineage cell-B base) read
 **anchor-on × buffer 0.92 = +81 / +95 / +91% across salts 0–2 vs a
@@ -65,7 +65,7 @@ salt spreads (on-b0.92 s1/s2, null s1/s2) and, per
 | 1.0 (null) | **9.30** / 179 / 0.19 / 36.6 | 73.35 / 173 / 0.63 / 39.5 | +445,638 | +664,790 | **−219k** |
 | 0.98 | 21.53 / 165 / 0.31 / 28.3 | 83.12 / 147 / 0.69 / 45.3 | +624,796 | +796,275 | **−171k** |
 | 0.96 | −15.72 / 177 / −0.11 / 35.9 | 66.09 / 156 / 0.58 / 40.3 | +527,297 | +682,041 | **−155k** |
-| 0.92 | _pending_ | 55.59 / 180 / 0.54 / 36.6 | +383,191 | +496,068 | **−113k** |
+| 0.92 | 22.24 / 190 / 0.31 / 35.3 | 55.59 / 180 / 0.54 / 36.6 | +383,191 | +496,068 | **−113k** |
 
 Null realised is −$75,597. **DDS 2020-10-05 → 2022-02-14 (a laggard-rotation
 exit after 16 months) is present in every anchor-on arm and absent from every
@@ -88,12 +88,12 @@ cell.
 
 ### Why the old surface showed a "salt-robust" buffer effect — resolved
 
-Old-basis trades (wip/sa2408 results): `on-b1.0-s0` entered DDS on 2020-10-05
+Old-basis trades (`wip/sa2408-specs` bookmark, `stop-anchor-surface-2026-08-31/results/`): `on-b1.0-s0` entered DDS on 2020-10-05
 and exited **2020-10-06 for +$824** — an entry-bar stop-out (D2), the pre-fill
 low of the entry day piercing the 4% stop; `on-b0.92` (≈11.7% width) survived
-that bar and rode DDS to +$564k / +$564k / +$547k at salts 0/1/2. The salts
-moved paths but never that first-day decision, which is why the +60pp looked
-robust. **The old buffer "signal" was the D2 artifact interacting with one
+that bar and rode DDS to +$564k / +$564k / +$547k at salts 0/1/2 (b0.92 over b1.0 by
+89.8 / 77.8 / 72.8pp — "robust" in sign, not in size). The salts moved paths
+but never that first-day decision. **The old buffer "signal" was the D2 artifact interacting with one
 monster**, not a property of stop width. With D2 fixed, every buffer keeps
 DDS and the buffer axis is flat within path noise; the only thing the anchor
 flag still does is *admit* DDS through the `Stop_too_wide` gate.
@@ -101,7 +101,7 @@ flag still does is *admit* DDS through the `Stop_too_wide` gate.
 This is the cleanest instance yet of `project_lever_reads_invert_on_fixed_sim`:
 a lever whose arms differed in entry-bar-stop exposure read as +60pp of alpha.
 
-## Results — all 17 cells (2026-09-03 17:33–20:09 PDT, `chain.log`)
+## Results — all 18 cells incl. the null-dup control (2026-09-03 17:33–20:09 PDT, `chain.log`)
 
 Fixed basis, build `e4984c5fe`, 2019–23 × top-3000-2019, warehouse. Raw per-arm
 `actual` / `params` / `summary` / `trades` under `results/`; old-basis actuals
@@ -135,9 +135,10 @@ under `old-basis/`.
   arms are bit-identical, pinning the mechanism: the anchor acts only where it
   moves an entry across the `Stop_too_wide` gate.
 - Ex-DDS, anchor-on realised vs the null at the same salt: −$37k / +$74k /
-  +$298k (s0 / s1 / s2, on-b0.92) — mixed sign, inside the null's own
-  salt spread (−$176k … −$62k). The salt-robust +46 to +109pp margin is one
-  admission that the path perturbation never touches.
+  +$298k (s0 / s1 / s2, on-b0.92) — sign-indeterminate, and its own spread
+  ($335k) is three times the null's ($114k): there is no stable ex-DDS margin
+  to read. The salt-robust +46 to +109pp headline is one admission that the
+  path perturbation never touches.
 - The old-basis "buffer 0.92 beats 1.0 by 90pp at every salt" was D2 stopping
   DDS out on its entry bar at the narrow width (old on-b1.0: DDS held one day,
   +$824). With D2 fixed the buffer axis is flat under the anchor.
@@ -153,10 +154,15 @@ under `old-basis/`.
 trades 165 / 164 / 158 vs 179 / 183 / 180. Dissection vs the null per salt
 (`symbol|entry_date`): shared ~105 trades drift ≈ **0** (+5.6k / +6.4k /
 −6.8k); the same LOGI 2020-05 monster tops both arms; the edge is the null's
-**unique** cohort — its ~20 extra 4%-stop exits per salt (112 / 122 / 115
-stops vs 93 / 91 / 89) lose −$212k / −$125k / −$358k, while the wider stop's
-unique cohort loses −$63k / −$56k / −$10k. **No monster, same direction every
-salt, mechanism = fewer whipsaw deaths at the book-band ceiling.** This agrees
+**unique** cohort — its unique cohort (70 / 75 / 79 trades, carrying the 19 / 31 / 26 extra
+4%-stop exits: 112 / 122 / 115 stops vs 93 / 91 / 89) loses −$212k / −$125k /
+−$358k, while the wider stop's
+unique cohort loses −$63k / −$56k / −$10k (the extra stop exits themselves
+are 19 / 31 / 26; the dollar figures are the whole 70 / 75 / 79-trade unique
+cohorts). **No shared monster and the same direction at every salt** — with one
+qualification: at salt 2 a single null-only loser, STMP 2021-07-30 (−$166k),
+is 49% of the +$341k delta; ex-STMP the deltas are **+$155k / +$76k / +$175k,
+still 3/3**. Mechanism = fewer whipsaw deaths at the book-band ceiling. This agrees
 with the arc grid's `s6` "keep-as-axis" read (`arc-rerun-2026-09-01`) on a
 different preset and window, and with `project_fallback_stop_half_book_band`.
 Neighbours: 0.96 (7.8%, past the band) is −$296k at s0 — the effect is not

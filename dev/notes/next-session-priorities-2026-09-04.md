@@ -48,9 +48,11 @@ anchor-on arm at every salt, absent from every anchor-off arm) plus the D2
 artifact killing it at narrow widths; ex-DDS the anchor is inside the null's
 own spread → REJECT as promotion candidate, keep as axis. (2) `initial_stop_buffer
 0.98` (≈5.9% fallback, anchor off) beats the null 3/3 salts on 2019–23 with
-no monster and shared-trade drift ≈ 0 — the edge is ~20 fewer 4%-stop whipsaw
-deaths per salt. **This is the first fixed-basis lever candidate that is not a
-lottery ticket**; its surface on the record convention across 2000–04 / 26y
+shared-trade drift ≈ 0 and no shared monster — the edge is the null's extra
+4%-stop whipsaw deaths (19 / 31 / 26 more stops per salt); at salt 2 one
+null-only loser (STMP −$166k) is half the delta, and ex-STMP it still wins 3/3
+(+$155k / +$76k / +$175k). **The first fixed-basis lever candidate whose edge is
+not a single admitted monster**; its surface on the record convention across 2000–04 / 26y
 with salts is the next chain (`dev/experiments/stop-width-surface-2026-09-03/`
 if it ran overnight — read it first).
 
