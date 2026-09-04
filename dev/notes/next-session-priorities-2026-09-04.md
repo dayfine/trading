@@ -45,8 +45,10 @@ flip.** Memories: `project_top500_composition_golden_is_gme`,
 (`dev/experiments/stop-anchor-rebase-2026-09-03/`): (1) `stop_anchor_at_entry_base`
 — the old salt-robust +60pp was ONE admission (DDS 2020-10-05, in every
 anchor-on arm at every salt, absent from every anchor-off arm) plus the D2
-artifact killing it at narrow widths; ex-DDS the anchor is inside the null's
-own spread → REJECT as promotion candidate, keep as axis. (2) `initial_stop_buffer
+artifact killing it at narrow widths; ex-DDS the anchor is sign-indeterminate
+across salts (−$37k / +$74k / +$298k, a spread 3× the null's own) → REJECT as
+promotion candidate, keep as axis; at buffer 0.885 (≈15%) on and off are
+bit-identical, pinning the gate mechanism. (2) `initial_stop_buffer
 0.98` (≈5.9% fallback, anchor off) beats the null 3/3 salts on 2019–23 with
 shared-trade drift ≈ 0 and no shared monster — the edge is the null's extra
 4%-stop whipsaw deaths (19 / 31 / 26 more stops per salt); at salt 2 one

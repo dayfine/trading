@@ -139,8 +139,8 @@ under `old-basis/`.
   ($335k) is three times the null's ($114k): there is no stable ex-DDS margin
   to read. The salt-robust +46 to +109pp headline is one admission that the
   path perturbation never touches.
-- The old-basis "buffer 0.92 beats 1.0 by 90pp at every salt" was D2 stopping
-  DDS out on its entry bar at the narrow width (old on-b1.0: DDS held one day,
+- The old-basis "buffer 0.92 beats 1.0 at every salt" (by 89.8 / 77.8 /
+  72.8pp) was D2 stopping DDS out on its entry bar at the narrow width (old on-b1.0: DDS held one day,
   +$824). With D2 fixed the buffer axis is flat under the anchor.
 - A promotion case would have to show the *admission* change is systematically
   right (blind-judge #2389 on DDS-like names; ≥1 more broad window; ex-monster
