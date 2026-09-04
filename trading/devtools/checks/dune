@@ -988,6 +988,7 @@
  (deps _check_lib.sh pr_gate_status_mutation_test.sh)
  (action
   (run sh %{dep:pr_gate_status_mutation_test_selftest.sh})))
+
 ; scheduled_workflow_health.sh test (issue #2634, script half): fixture-
 ; driven, hermetic self-test for the scheduled-cron-workflow health check.
 ; scheduled_workflow_health.sh itself is NOT wired as a run-target here --
