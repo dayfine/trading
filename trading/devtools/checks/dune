@@ -949,3 +949,28 @@
  (deps backtest_appendix_drift_check.sh _check_lib.sh)
  (action
   (run sh %{dep:backtest_appendix_drift_check_test.sh})))
+
+; scheduled_workflow_health.sh test (issue #2634, script half): fixture-
+; driven, hermetic self-test for the scheduled-cron-workflow health check.
+; scheduled_workflow_health.sh itself is NOT wired as a run-target here --
+; like goldens_affected_check.sh / record_qc_audit.sh, it needs live
+; network access (GH_TOKEN + the real GitHub API) to do anything useful,
+; which doesn't make sense inside `dune runtest`. This rule instead drives
+; the real script entirely through its SCHEDULED_WF_HEALTH_FETCH injection
+; hook with canned JSON fixtures (see that script's own header for the
+; hook contract) -- 10 scenarios covering all-green, one RED (named),
+; STALE, NO-SCHEDULE, missing-token (exit 2), API-error (exit 3),
+; malformed-JSON (exit 3), full pagination across 2 pages (proving the
+; workflow-list call doesn't mistake a first page for the whole answer --
+; the PAGINATION-IS-A-FLOOR trap this repo has been burned by before),
+; --stale-hours override, and a malformed-argument usage error (exit 64).
+; No (universe): every fixture is a canned-JSON shell shim under mktemp,
+; the only real-repo file read is scheduled_workflow_health.sh itself,
+; declared as an explicit dep below (H-CHECK-CACHE-BLIND) -- same
+; non-universe wiring as goldens_affected_check_test.sh above.
+
+(rule
+ (alias runtest)
+ (deps scheduled_workflow_health.sh)
+ (action
+  (run sh %{dep:scheduled_workflow_health_test.sh})))
