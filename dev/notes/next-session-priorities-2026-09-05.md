@@ -55,6 +55,32 @@ salts 0–2, 2019–23 + 2000–04; the 5y cells take ~22 min 2-concurrent) befo
 warehouse for the 2019 window** (first level-valid 2019 cells). If maxDD is
 worse there too, the KEEP-52 decision needs re-opening with the user.
 
+## P0 (new, 2026-09-04 late) — the two levers with measured headroom, and the stub-print defect
+
+From `dev/notes/yearly-trade-review-2000-2026.md` (#2673; memory
+`project_yearly_trade_review_2026_09_04`): 162 A-trades = +$9.05M, the other 561 =
+−$6.4M; stop exits are 31% whipsaws worth ≈ +$6.9M if held 13 more weeks; the
+year-start RS signal has zero cross-sectional power; the record caught 1.1% of
+each sector-year's top-5 winners.
+
+1. **#2672 — delisting stub prints.** STMP 2021 ($327.75 → $0.04) and CLE 2014
+   sit in the canonical record as −$741k of phantom loss; STMP also manufactured
+   the clock's salt-0 "maxDD win" in `clock-default-fixed-basis-2026-09-04`.
+   Fix = delisting-aware exit fill (last real print, tag `delisted`), V15 sweep
+   over both vintage warehouses, paired re-run of `rec26y-new`, re-base the record.
+   Cheapest real improvement on the table; do it FIRST — every later measurement
+   inherits it.
+2. **Fallback-stop width as a surface on the 2019-vintage warehouse** (the
+   `initial_stop_buffer` axis, `project_fallback_stop_half_book_band`): the
+   141 D-grade whipsaws are 4%-ticket exits; the 09-03 stop-width surface was
+   regime-split on the survivor-tilted 2000-vintage warehouse — re-run it
+   level-valid, 1y/3y/5y broad, salts 0–2, ex-monster reads.
+3. **Funnel admission** (`project_monster_funnel_top_of_funnel`): breakout-gate
+   strictness and top-N as a surface, same cells. The review's catch rate
+   (1.1% of sector top-5 winners) is the number to move.
+
+All three as surfaces per `experiment-flag-discipline.md`, never flips.
+
 ## P1 — vintage warehouse gap fetch (carried)
 
 ~600 (2009) / ~730 (2019) names in each composition have no CSV — delisted
