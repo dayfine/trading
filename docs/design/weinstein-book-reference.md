@@ -453,6 +453,27 @@ SHORT target: high_in_top (B) → drops to low (A)
 
 "Usually quite accurate" — use to know when to take partial profits.
 
+### 5.7 Stop trigger vs. stop update — resolved 2026-09-05 (Ch. 6, "Stop-Loss Rules")
+
+**Question (from the #2678 review):** does Weinstein's protective stop fire only on a
+weekly close below the level, or intraday when the level trades?
+
+**Answer: intraday, as a resting order.** Ch. 6 describes the protective sell-stop as a
+good-til-cancelled order placed with the broker at a specific price that executes when that
+price is hit (it converts to a market sell at that moment). What is *weekly* in the method is
+the re-evaluation of the stop's LEVEL: the trailing stop is moved up only after a weekly bar
+confirms a new correction low above the previous one (§5.2/§5.3). So the two cadences are
+separate concerns — trigger = continuous, level update = weekly — and the implementation
+contract in `trading/trading/weinstein/strategy/lib/stops_runner.mli` (`stop_update_cadence`:
+`Daily` raises the trail every tick, `Weekly` raises it only on the week's final trading day;
+both check the trigger every tick) mirrors the book. An earlier version of the qc-behavioral
+L3 row ("stop triggers on weekly close, not intraday") conflated the two and is retired.
+
+Measured consequence (`dev/experiments/stop-width-cadence-surface-2026-09-05/`, §Correction):
+under `Weekly` the trail rests lower between Fridays, so at wide initial widths fewer shakeout
+lows reach it — a level effect, not a timing effect; stop exits fall on Mon–Thu in the same
+proportion under both cadences.
+
 ### 5.6 Laggard Rotation (Ch. 4, ~lines 4929–4933)
 
 An active position-management rule that fires *before* the trailing stop is hit — exits a lagging position mid-Stage-2 to redeploy into a stronger candidate. Complements §5.2 STAGE3_TIGHTENING, which tightens the stop once the MA flattens; laggard rotation operates earlier in the position lifecycle, while the MA is still rising.

@@ -71,7 +71,7 @@ review body — never PASS or FAIL on a guess.
 | S6 | No buy signals generated during Stage 1, 3, or 4 | PASS/FAIL/NA | |
 | L1 | Initial stop placed below the base (Stage 1 low) | PASS/FAIL/NA | weinstein-book-reference.md §Stop-Loss Rules |
 | L2 | Trailing stop rises as price advances (never lowered) | PASS/FAIL/NA | |
-| L3 | Stop triggers on weekly close below stop level (not intraday) | PASS/FAIL/NA | |
+| L3 | Stop TRIGGER is a resting sell-stop hit intraday at its level; the trailing stop LEVEL is re-evaluated on the weekly cycle (raised only when a weekly bar confirms) — the trigger is never deferred to a weekly close | PASS/FAIL/NA | weinstein-book-reference.md §5.1/§5.7 (Ch. 6); `stops_runner.mli` `stop_update_cadence`: trigger continuous in both cadences, `Weekly` = trail updated on the week's final bar |
 | L4 | Stop state machine transitions are correct (INITIAL → TRAILING → TRIGGERED) | PASS/FAIL/NA | eng-design-3-portfolio-stops.md |
 | C1 | Screener cascade order: macro gate → sector filter → individual scoring → ranking | PASS/FAIL/NA | eng-design-2-screener-analysis.md |
 | C2 | Bearish macro score blocks all buy candidates (macro gate is unconditional) | PASS/FAIL/NA | weinstein-book-reference.md §Macro Analysis |
@@ -97,7 +97,7 @@ review body — never PASS or FAIL on a guess.
 | S6 | No buy signals in Stage 1/3/4 | PASS | |
 | L1 | Initial stop below base | NA | Stops not in this feature |
 | L2 | Trailing stop never lowered | NA | |
-| L3 | Stop triggers on weekly close | NA | |
+| L3 | Stop trigger intraday; trail level updated weekly | NA | |
 | L4 | Stop state machine transitions | NA | |
 | C1 | Screener cascade order | PASS | eng-design-2-screener-analysis.md §Cascade Filter |
 | C2 | Bearish macro blocks all buys | PASS | |
