@@ -1,0 +1,23 @@
+[09-04 20:40:57] run tree HEAD=e4984c5fe (expect e4984c5fe)
+[09-04 20:41:01] RUN cd5y-2019-c0-s0
+[09-04 20:41:01] RUN cd5y-2019-c52-s0
+[09-04 21:00:01] RESULT cd5y-2019-c52-s0 => total_return_pct 20.552393967973629 total_trades 204 win_rate 28.431372549019606 sharpe_ratio 0.29841012928076127 max_drawdown_pct 30.074932125019238  (wall 1140s)
+[09-04 21:00:18] RESULT cd5y-2019-c0-s0 => total_return_pct 0.23319478573125088 total_trades 198 win_rate 27.777777777777779 sharpe_ratio 0.0961363943196874 max_drawdown_pct 41.734205467440617  (wall 1157s)
+[09-04 21:00:19] RUN cd5y-2000-c0-s0
+[09-04 21:00:19] RUN cd5y-2000-c52-s0
+[09-04 21:21:42] RESULT cd5y-2000-c52-s0 => total_return_pct 73.652920289594022 total_trades 91 win_rate 29.670329670329672 sharpe_ratio 0.64162657456414618 max_drawdown_pct 28.48398573696279  (wall 1283s)
+[09-04 21:22:54] RESULT cd5y-2000-c0-s0 => total_return_pct 76.640156517308768 total_trades 98 win_rate 31.632653061224492 sharpe_ratio 0.655286820900357 max_drawdown_pct 28.36466885499761  (wall 1355s)
+[09-04 21:22:54] SALT 0 COMPLETE
+[09-04 21:22:56] RUN cd5y-2019-c0-s1
+[09-04 21:22:56] RUN cd5y-2019-c52-s1
+[09-04 21:23:22] run tree HEAD=e4984c5fe (expect e4984c5fe)
+[09-04 21:39:59] RESULT cd5y-2019-c52-s1 => total_return_pct 8.95577587749518 total_trades 195 win_rate 25.128205128205128 sharpe_ratio 0.18381646907712071 max_drawdown_pct 33.3274457344261  (wall 1023s)
+[09-04 21:40:22] RESULT cd5y-2019-c0-s1 => total_return_pct 11.856305593519028 total_trades 196 win_rate 25.510204081632654 sharpe_ratio 0.21413511556950579 max_drawdown_pct 32.774049098466861  (wall 1046s)
+[09-04 21:40:25] v2 resume after 2019-s1
+[09-04 21:40:25] SALT 1 COMPLETE (2019 only; 2000-04 s1 = sw5y-2000-b1.0-s1 / xl5y-2000-clock52-s1)
+[09-04 21:40:26] RUN cd5y-2019-c0-s2
+[09-04 21:40:26] RUN cd5y-2019-c52-s2
+[09-04 21:57:28] RESULT cd5y-2019-c52-s2 => total_return_pct 3.1297151495192548 total_trades 197 win_rate 24.36548223350254 sharpe_ratio 0.12206966565252106 max_drawdown_pct 32.809346428379946  (wall 1022s)
+[09-04 21:57:51] RESULT cd5y-2019-c0-s2 => total_return_pct 5.4036964631255486 total_trades 198 win_rate 24.747474747474747 sharpe_ratio 0.14631709347462626 max_drawdown_pct 32.482178066365229  (wall 1045s)
+[09-04 21:57:51] SALT 2 COMPLETE (2019 only)
+[09-04 21:57:51] CD0904 CHAIN DONE
