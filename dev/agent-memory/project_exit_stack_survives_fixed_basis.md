@@ -37,11 +37,7 @@ so their nulls were reused.
 ([[project_lever_reads_invert_on_fixed_sim]]); the record's mechanisms are not —
 their footprint is the same named trades at every salt.
 
-**Flag (user decision):** [[project_clock52_promoted]] leans on a "universal
-maxDD win" measured pre-fix on the default bundle; on the record convention,
-fixed basis, the clock's maxDD is 11–13pp WORSE on 2019–23. Different base, so
-not overturned — but the default-bundle paired re-measure (0 vs 52, fixed basis,
-3 salts, both windows) is owed before 52 is quoted as a drawdown lever again.
+**Flag — RESOLVED the same evening** (`dev/experiments/clock-default-fixed-basis-2026-09-04/`): on the DEFAULT bundle, fixed basis, 2019-vintage warehouse, the clock is maxDD −11.7 / +0.55 / +0.33pp across salts — never materially worse; the record-convention worsening was the record's pins (MSTR slot), not the clock. KEEP-52 stands; cite the clock as a drawdown floor, not a win ([[project_clock52_promoted]]).
 
 **Method notes:** the hold-longer arm's return gap lived in OPEN positions —
 invisible to the closed-trade `symbol|entry_date` join; read `unreal.sh`
