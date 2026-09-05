@@ -1,12 +1,12 @@
-# stop-width-cadence-surface-2026-09-05 — fallback stop width {4, 8, 10, 12, 14}% × stop cadence {daily, weekly-close}, record convention, fixed basis
+# stop-width-cadence-surface-2026-09-05 — fallback stop width {4, 8, 10, 12, 14}% × stop cadence {daily trail update, weekly trail update}, record convention, fixed basis
 
 Motivated by `dev/notes/yearly-trade-review-2000-2026.md` (#2673): 389 of the record's 469
 stop exits are the ~4% fallback ticket and carry −$5.8M of the −$6.7M stop total; 121 losers
 exit within five days; the unselected width counterfactual over all stop exits puts 8–12%
 initial width at roughly half the loss at 13 weeks. The 09-03 stop-width surface only moved
 4% → 5.9% and ran on the survivor-tilted 2000-vintage warehouse. The book (§5.3 4–6% band
-for the percentage fallback; L3 stops evaluated on the weekly close) is the authority for the
-cadence axis and a *trader-mode* licence for widths beyond the band
+for the percentage fallback; Ch. 6's weekly re-evaluation of the trail — trigger continuous,
+update weekly, per `stops_runner.mli`) is the authority for the cadence axis and a *trader-mode* licence for widths beyond the band
 (`.claude/rules/weinstein-faithful-core.md` dials; `project_fallback_stop_half_book_band`).
 
 ## Design
@@ -47,7 +47,8 @@ ex-monster (join `symbol|entry_date`, remove any single one-arm trade > 50% of |
 - Fails (1) everywhere → the counterfactual was the proxy's artefact (tied capital, later
   exits); record the loss-dollar and whipsaw counts per arm anyway — that is the mechanism read.
 - The cadence axis is read separately: Weekly vs Daily at the same width, same three tests.
-  Weekly is the book's L3; if it passes it is the more faithful default regardless of size.
+  Weekly mirrors the book's weekly trail update (the trigger stays intraday in BOTH arms);
+  if it passes it is the more faithful default regardless of size.
 
 Nothing here flips a default (`experiment-flag-discipline.md` R3;
 `config-default-blast-radius.md`).
@@ -61,15 +62,16 @@ _(filled in as cells land — `chain.log`)_
 | arm | return % | trades | sharpe | maxDD % | realised $ | unrealised $ | loss $ (losers) | exits ≤ 5d | stops |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | w4-D (record, daily) | **16.79** | 179 | 0.261 | **22.04** | +11,565 | +171,175 | −1,054,114 (126) | 52 | 139 |
-| w4-W (weekly close) | 3.50 | 189 | 0.133 | 27.36 | −52,096 | +102,381 | −1,121,473 (132) | 47 | 142 |
+| w4-W (weekly update) | 3.50 | 189 | 0.133 | 27.36 | −52,096 | +102,381 | −1,121,473 (132) | 47 | 142 |
 
 The daily 4% arm is the **first level-valid record-convention 2019 cell** (16.8% vs 3.0% for
 the same spec on the 2000-vintage warehouse — different name set, not comparable, but this is
-the base every 2019 arm below diffs against). Weekly-close cadence at the 4% width **fails all
+the base every 2019 arm below diffs against). Weekly-update cadence at the 4% width **fails all
 three tests** at this salt: loss dollars +6%, equity −$132k, maxDD +5.3pp. Shared 145 trades
 drift +$49k in the weekly arm's favour (the exits it does take are later and better), but it
 takes 3 more stops and its unique cohort earns a third of the null's. Cadence alone does not
-remove the ≤ 5-day exits (47 vs 52): a 4% stop is still through by Friday. The cadence axis
+remove the ≤ 5-day exits (47 vs 52): a 4% stop is hit intraday in both arms; the only difference is that the Weekly arm's trail is
+not raised mid-week. The cadence axis
 is re-read at each wider width below.
 
 ### Interim — 2019–23 w8-D and 2000–04 w4-W, salt 0 (00:57 PDT)
@@ -135,7 +137,7 @@ channel. Passes tests (2) and (3); test (1) passes in direction (−6%) but not 
 2000–04 at 12% overshoots: the bear tape's survivors from an 8–10% stop were the recovery,
 its survivors from a 12% stop include the next leg down (shared drift −$143k; WNC-class
 trades sized smaller). Width that suits the tape: 2019–23 wants ≥ 14%, 2000–04 wants 8–10%.
-Remaining: 2000–04 at 14%, and the weekly-close cadence at 8–14% on both windows.
+Remaining: 2000–04 at 14%, and the weekly-update cadence at 8–14% on both windows.
 
 ### Interim — 2000–04 w14-D and 2019–23 w8-W, salt 0 (02:28 PDT)
 
@@ -158,20 +160,20 @@ drawdown gain (−2.5pp); the cadence axis has not passed anywhere yet.
 equity is understated by that amount. Every wide-stop arm is more exposed to this defect
 because it holds delisted names longer.
 
-### Interim — cadence axis at 8–10%, salt 0 (02:50 PDT): weekly-close does not pass
+### Interim — cadence axis at 8–10%, salt 0 (02:50 PDT): weekly-update does not pass
 
 | cell (weekly vs daily, same width) | daily | weekly | Δ realised | Δ unrealised | shared drift | loss $ (losers) | maxDD | stops / rotations |
 |---|---|---|---:|---:|---:|---|---|---|
 | 2019 w10 | 18.93 / 184 / 30.94 | 18.64 / 179 / 27.63 | +$61k | −$63k | +$18k (132) | −1.19M (129) → −1.17M (123) | **−3.3pp** | 118 / 64 → 98 / 76 |
 | 2000 w8 | 79.86 / 90 / 18.22 | 64.32 / 89 / 18.22 | −$102k | −$55k | −$41k (86) | −728k (57) → −682k (55) | 0.0 | 62 / 24 → 59 / 24 |
 
-With 4 arms read (4%, 8%, 10% on 2019–23; 4%, 8% on 2000–04), the weekly-close cadence is
+With 4 arms read (4%, 8%, 10% on 2019–23; 4%, 8% on 2000–04), the weekly-update cadence is
 equity-neutral to negative at every width and buys at most 3pp of drawdown on the melt-up
-tape. The book's L3 rule delays a stop that is already through; at these widths the daily
-level IS the decision. The cadence axis is not a promotion candidate; it remains a
+tape. The weekly update leaves the trail lower mid-week; at these widths that lower level changes
+almost nothing. The cadence axis is not a promotion candidate; it remains a
 faithfulness dial. Remaining: 2000–04 w10-W / w12-W / w14-W, 2019–23 w12-W / w14-W.
 
-### Interim — 2019–23 w12-W and 2000–04 w10-W, salt 0 (03:11 PDT): at wide widths the weekly close starts to pay
+### Interim — 2019–23 w12-W and 2000–04 w10-W, salt 0 (03:11 PDT): at wide widths the weekly update starts to pay
 
 | cell | vs | Δ realised | Δ unrealised | shared drift | unique cohorts (null / arm) | loss $ (losers) | exits ≤ 5d | maxDD | stops / rot |
 |---|---|---:|---:|---:|---|---|---:|---|---|
@@ -180,12 +182,12 @@ faithfulness dial. Remaining: 2000–04 w10-W / w12-W / w14-W, 2019–23 w12-W /
 | 2000 w10-W (88.81 / 98 / 17.53, win 45%, Sharpe 0.91) | w10-D | +$91k | +$1k | −$7k (93) | −$49k (6) / +$49k (5) | −577k → −594k (54) | 11 → 11 | 0.0 | 59/33 → 56/35 |
 
 No single trade exceeds half the 2019 delta (POWL is 44%, APPS 39%), and the open book is
-clean (FCNCA +$56k top). Against the daily twin at the same width the weekly close is worth
+clean (FCNCA +$56k top). Against the daily twin at the same width the weekly update is worth
 +$130k on the trades both hold and 7pp of drawdown — the opposite of its reads at 4–10%,
 where it only delayed a stop that was already through. The interpretation to test with
-salts: at 12%+ the intraday low breaches the level on shakeout days that the weekly close
-does not, so the cadence stops mattering only once the width is wide enough for the close to
-sit above it. Fragility: two of the three arm-only monsters are 2020 names; salts 1–2 decide.
+salts: at 12%+ the once-a-week trail update leaves the stop far enough below the shakeout lows that
+the (intraday) trigger is not hit where the daily-raised trail is; the cadence matters only
+once the width makes that gap large. Fragility: two of the three arm-only monsters are 2020 names; salts 1–2 decide.
 
 ### Interim — 2019–23 w14-W and 2000–04 w12-W, salt 0 (03:33 PDT): the cadence effect flips sign across the grid
 
@@ -301,7 +303,7 @@ unique cohorts roughly cancelling. Two mechanisms, one direction.
 | 2000 w12-W | 3/3 | 3/3 | −8.1 / +0.7 / −8.1 | −140k (vs null) / — / −131k | wins through 57–58 extra entries and a held AEO every salt |
 | 2000 w14-D | 3/3 | 3/3 | −8.3 / +0.5 / −8.2 | −29k / −61k / −23k | wins through 61–67 extra entries; s0's ADSK hold was path-specific, the win was not |
 
-**Two widths clear both windows at ≥ 2 of 3 salts: 14% daily and 12% weekly-close.** Their
+**Two widths clear both windows at ≥ 2 of 3 salts: 14% daily and 12% weekly-update.** Their
 26y confirmation arms (`sw26y-w14-D`, `sw26y-w12-W`, salt 0, vs `rec26y-new-s0` = 302.65% /
 maxDD 36.26) decide promotion-candidacy per the pre-registered bar (26y maxDD not worse).
 Nothing is flipped here.
@@ -320,14 +322,15 @@ Nothing is flipped here.
   2000–04 the gain is capacity: 55–67 extra entries the 4% book never funded (the 4% book
   churned its slots into whipsaws), plus a drawdown floor of 17.5–20% vs 28% because the
   book is not stopped out en masse into the 2001–02 legs down.
-- **Cadence is width-dependent, not a mechanism of its own.** Weekly-close loses at 4–8%,
+- **Cadence is width-dependent, not a mechanism of its own.** Weekly-update loses at 4–8%,
   is neutral at 10%, wins at 12% on both windows every salt, loses again at 14% on 2019–23.
   The 12%-weekly cohort (APPS, NVDA, HVT on 2019; AEO, SNDK, BRSL on 2000) is salt-stable,
   so it is not a lottery — but there is no monotone story to promote.
 - **Book-faithfulness.** §5.3's 4–6% band is the *investor* fallback; 12–14% is a trader-mode
   adaptation with the book's own §5.1 15% ceiling as its limit (`max_stop_distance_pct`).
-  The weekly-close evaluation is the book's L3 rule; this surface says it only matters once
-  the width is wide enough for the close to sit above the level.
+  The weekly trail update is the book's Ch. 6 cadence (trigger intraday in both arms — see
+  the correction below); this surface says it only matters once the width is wide enough that
+  a lower-resting trail is not hit.
 
 ### Caveats
 
@@ -349,7 +352,7 @@ Nothing is flipped here.
 
 Shared 393 trades drift **+$1.14M**; null-only 330 trades +$747k (BBWI +414k, NVDA +338k,
 IPIXQ +256k, PCYC +245k); arm-only 616 trades +$1.31M (BFX +702k, NOVT +681k, SWKS +478k,
-KTOS +383k — none over a quarter of the delta). Open book at 2026-06: VIAV +$1.01M of the
+KTOS +383k — BFX alone is 41% of the realised delta and 33% of the equity delta). Open book at 2026-06: VIAV +$1.01M of the
 +$1.38M unrealised. Realised by exit year: the arm is ahead in 17 of 27 years; behind in 2004
 (IPIXQ), 2008 (−$239k vs +$2k), 2016, 2017, 2020 (**−$670k vs −$145k**), 2022 (−$589k vs
 −$137k), 2026 H1.
@@ -382,8 +385,9 @@ NVDA +338k, IPIXQ +256k); arm-only 482 trades +$4.84M (BFX +1.05M, MSTR 2023 +82
 +$1.08M of the +$1.32M unrealised (the record's open book is +$982k with its own holds).
 The STMP stub print (#2672) is in both arms (−$624k here, −$594k in the record). Drawdown
 window 2018-01-26 → **2020-03-25**, 29.7% — 6.5pp *better* than the record's 36.3%: with
-weekly evaluation the crash-week entries are not stopped at intraday lows, and the book
-that survives March rides the April recovery (2020 realised +$359k vs −$145k). Behind the
+the trail raised only weekly the stops rest lower going into crash week, fewer positions are
+stopped (the trigger is still intraday), and the book that survives March rides the April
+recovery (2020 realised +$359k vs −$145k). Behind the
 record in 2010 (−$213k), 2016, 2022 (−$644k vs −$137k), 2025 (−$602k vs −$201k).
 
 **Pre-registered promotion bar: met.** 5y: (2) 3/3 and (3) 2/3 on 2019–23, 3/3 + 3/3 on
@@ -424,3 +428,27 @@ Bearish) from indicators it already computes (A-D, NH-NL, percent-above-MA), and
 width and entry admission read that state — width 12–14% when Bullish/Recovering, the
 4–6% band or no entries when Deteriorating. That is the paired surface, with the state
 machine in `Macro` and the width map in the stops config, each an axis.
+
+## Correction (qc-behavioral rework 1, 16:10 PDT): what the cadence knob actually does
+
+Earlier sections described the `stop_update_cadence Weekly` arms as evaluating the stop on
+the weekly close. That is wrong. `stops_runner.mli` (lines 15–25) is explicit: the trigger is
+**continuous (intraday) in both cadences**; `Weekly` only advances the trail state machine
+on the week's final trading day, so mid-week ticks still fire a stop when the bar's low
+crosses it but do **not** raise it. The PR's own artifacts confirm it — weekday of stop
+exits, Mon..Fri: `sw5y-2019-w12-W-s0` 24 / 24 / 14 / 14 / 18 vs its daily twin 25 / 23 /
+13 / 15 / 22; `sw26y-w12-W-s0` 66 / 77 / 59 / 52 / 74. Friday-only triggering would put
+nearly every exit on Monday.
+
+So the mechanism of the "W" arms is a **level effect**: between Fridays the trail rests
+where it was last raised, i.e. lower than the daily-raised trail, and fewer shakeout lows
+reach it. That is why the cadence only matters at wide widths (at 4–8% the resting level is
+hit either way) and why the 26y `w12-W` arm's drawdown improvement comes from fewer
+crash-week stop-outs, not from skipping intraday lows. The book-faithfulness reading is
+unchanged in substance: Ch. 6 has the protective stop as a resting order executed when its
+level is hit, with the trail moved on the weekly correction cycle — the `Weekly` arm mirrors
+that contract, the `Daily` arm does not. The `.claude/rules/qc-behavioral-authority.md` L3
+row ("stop triggers on weekly close, not intraday") is not supported by the reference doc
+§5.1 and needs its own docs write-back (filed separately). Nothing numeric above changes;
+every "weekly-close" phrase now reads "weekly-update" and the three mechanism sentences in
+§Interim 03:11, §Mechanism and §26y `w12-W` were rewritten.
