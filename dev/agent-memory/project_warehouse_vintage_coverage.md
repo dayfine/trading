@@ -38,3 +38,18 @@ level, and label every cell-B number with its effective name count.
 
 Related: [[project_never_measure_on_sp500]], [[project_broad_universe_semantics]],
 [[project_pit_survivorship_inflation]].
+
+**AMENDMENT 2026-09-04 — vintage warehouses BUILT.** Fresh from the CSV
+store (current adjusted basis by construction), superset universe
+(composition + `GSPC.INDX`), build `e4984c5fe`'s `build_snapshots.exe`:
+- `/tmp/snap_top3000_2019` — 2,209 snaps (2,208 names of the 2,904-name
+  2019 composition ≈ **76%**, vs 32% on the 2000-vintage warehouse), bars
+  2018-01-01..2026-09-04, 513 MB, 12 min.
+- `/tmp/snap_top3000_2009` — 2,033 snaps (≈ **73%** of 2,780), bars
+  2008-01-01.., 891 MB, 21 min.
+Missing names (≈700 per vintage) are delisted symbols with no CSV — an
+EODHD delisted fetch closes the gap ([[project_eodhd_delisted_unlock]]).
+First consumer: `dev/experiments/clock-default-fixed-basis-2026-09-04/`.
+Gotcha on the way: [[project_build_snapshots_incremental_clobbers_manifest]].
+Levels across the 2000-vintage and 2019-vintage warehouses are still
+different universes — never compare a 2019-window level across them.

@@ -84,3 +84,16 @@ WORSE by 10.8 / 13.0 / 10.8pp**. 2000–04 neutral (+$4–15k realised). The
 (record pins) → KEEP-52 not overturned, but the default-bundle paired
 re-measure on the fixed basis is owed before the maxDD rationale is cited
 again. See [[project_exit_stack_survives_fixed_basis]].
+
+**AMENDMENT 2026-09-04 evening (DEFAULT bundle, fixed basis, 2019-vintage
+warehouse — `dev/experiments/clock-default-fixed-basis-2026-09-04/`):** paired
+c0/c52 at salts 0–2 on 2019–23 (first level-valid 2019 cells, 2,208 names) +
+the 2000–04 record-lineage pairs. maxDD Δ = **−11.66 / +0.55 / +0.33pp** on
+2019–23, +0.1 / 0.0 / +0.1 on 2000–04; equity +$203k / −$29k / −$23k. At salts
+1–2 the clock cancels 4–5 tickets and the books are otherwise identical; the
+salt-0 win is the null drawing a 2021-02 → 2023-10 grind (41.7%) that the
+reshuffled c52 book avoided. **The "universal maxDD win" is really "never
+materially worse, occasionally much better" — a drawdown FLOOR, not a win.**
+The record-convention 10.8–13pp worsening (09-04 exit-lever surface) does not
+appear on the default bundle: that was the record's pins (MSTR slot). KEEP-52
+stands; no re-open. Cite "no added drawdown", never a drawdown win.
