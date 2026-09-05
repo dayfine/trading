@@ -80,6 +80,30 @@ blocking anything else.
   standing `actions: write` gap (`POST /actions/workflows/<f>/dispatches` → 403,
   measured 2026-09-03), so even a human-applied workflow fix cannot be verified
   before its next scheduled firing.
+
+  **#2662 diagnosis CORRECTED 2026-09-05 (run 33962894987) — the 09-04 prime
+  suspect is not supported by its own evidence.** Full writeup in
+  `dev/daily/2026-09-05.md` §"#2662 re-diagnosed"; it could not be posted to the
+  issue itself (`POST /issues/<n>/comments` → **403**, re-tested this run, so
+  issue comments remain create-only). Summary of what changed:
+  - **Eliminated (i):** the `$0` / `modelUsage:{}` / sub-second signature is the
+    *generic* pre-flight-failure shape, not evidence for `--allowedTools`. A
+    local control arm with **no `--agent` and `--allowedTools Bash`** reproduces
+    it identically (776 ms, $0, `modelUsage:{}`).
+  - **Eliminated (ii):** the `configureGitAuth` → `fatal: not in a git
+    directory` / exit 128 failure in the failing run's log is benign — **present
+    in both successful siblings' logs** (runs 33408488106, 33894722318).
+  - **Corrected:** the model *is* initialized (`"model":"claude-opus-5"` init
+    event); the 09-04 note that "the model is never invoked" is wrong. The
+    failure is after init, before any model call, at `num_turns: 1`.
+  - **Remaining:** SDK options differ in exactly two fields — `maxTurns`
+    (60 vs 80) and `allowedTools`. `allowedTools` stays a *narrowed suspect
+    with no confirming evidence*, not a diagnosis.
+  - **Blocker is now specific:** the action suppresses the streaming JSONL
+    (`full output hidden for security`), which is the only place the rejection
+    text can be. `show_full_output: true` in the workflow would settle it — and
+    a maintainer applying the `Agent,Edit` tools change should set that flag in
+    the *same* commit, so a non-fix still yields the reason.
 - Otherwise: none. Phase 2 items are scoped-work, not blockers.
 
 ## Interface stable
