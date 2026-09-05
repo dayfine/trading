@@ -339,3 +339,88 @@ Nothing is flipped here.
   +$255k blow-off that the wide book had no slot for); their drawdown wins are not.
 - No cell is on sp500; no level is compared across warehouses; nothing in this record flips
   a default (`experiment-flag-discipline.md` R3, `config-default-blast-radius.md`).
+
+## 26y confirmation — `sw26y-w14-D` (10:12 PDT)
+
+| arm | return % | trades | win % | Sharpe | maxDD % | realised $ | unrealised $ | loss $ (losers) | ≤ 5d | stops / rotations |
+|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---|
+| `rec26y-new-s0` (record) | 302.65 | 723 | 34 | 0.40 | 36.26 | +2,205,226 | +982,040 | −9.02M (475) | 131 | 469 / 237 |
+| `sw26y-w14-D-s0` | **513.02** | 1,009 | 42 | 0.51 | **40.37** | +3,909,304 | +1,383,305 | −14.50M (581) | 52 | 407 / 573 |
+
+Shared 393 trades drift **+$1.14M**; null-only 330 trades +$747k (BBWI +414k, NVDA +338k,
+IPIXQ +256k, PCYC +245k); arm-only 616 trades +$1.31M (BFX +702k, NOVT +681k, SWKS +478k,
+KTOS +383k — none over a quarter of the delta). Open book at 2026-06: VIAV +$1.01M of the
++$1.38M unrealised. Realised by exit year: the arm is ahead in 17 of 27 years; behind in 2004
+(IPIXQ), 2008 (−$239k vs +$2k), 2016, 2017, 2020 (**−$670k vs −$145k**), 2022 (−$589k vs
+−$137k), 2026 H1.
+
+**maxDD 40.4% vs 36.3%: the pre-registered 26y bar ("does not worsen maxDD") is NOT met**
+(+4.1pp). The arm's drawdown runs from the 2018-01-26 peak to the **2020-05-01** trough. In
+2020 the arm has 48 losers for −$1.80M vs the record's 30 for −$727k; the Feb 15 – Mar 31
+crash-window entries alone lose −$623k vs −$313k (CNMD −$114k in two days, AGR, AEE, MSI
+−$64–68k each — every one a 14% stop where the record paid 4%). The mechanism that pays in
+2003–05, 2013–15 and 2021 (hold through the shakeout, exit by rotation) costs a full extra
+leg in the two fastest bear tapes (2008, 2020); the 5y 2000–04 window never saw one.
+
+**Read:** 14% daily is a large, robust return lever (+210pp, shared drift +$1.14M across
+393 trades, win rate 34 → 42%, rotations 237 → 573) that buys its return with ~4pp of extra
+drawdown concentrated in crash years. Not a promotion candidate under the bar as written.
+The natural follow-up is a paired axis, not a flip: wide initial stop **plus** a crash-tape
+gate (the yearly review's index-state read — entries after a > +10% index run lose — or the
+macro gate itself), tested as its own surface.
+
+## 26y confirmation — `sw26y-w12-W` (15:40 PDT): clears the bar
+
+| arm | return % | trades | win % | Sharpe | maxDD % | realised $ | unrealised $ | loss $ (losers) | ≤ 5d | stops / rotations |
+|---|---:|---:|---:|---:|---:|---:|---:|---|---:|---|
+| `rec26y-new-s0` (record) | 302.65 | 723 | 34 | 0.40 | 36.26 | +2,205,226 | +982,040 | −9.02M (475) | 131 | 469 / 237 |
+| `sw26y-w12-W-s0` | **761.20** | 862 | 44 | 0.58 | **29.73** | +6,489,892 | +1,316,706 | −15.10M (483) | 42 | 328 / 496 |
+
+Shared 380 trades drift **+$1.67M**; null-only 343 trades +$2.23M (LOGI +424k, BBWI +414k,
+NVDA +338k, IPIXQ +256k); arm-only 482 trades +$4.84M (BFX +1.05M, MSTR 2023 +827k, KLIC
++381k, LUV +319k — the largest is 24% of the realised delta). Open book: KLAC 2025-06
++$1.08M of the +$1.32M unrealised (the record's open book is +$982k with its own holds).
+The STMP stub print (#2672) is in both arms (−$624k here, −$594k in the record). Drawdown
+window 2018-01-26 → **2020-03-25**, 29.7% — 6.5pp *better* than the record's 36.3%: with
+weekly evaluation the crash-week entries are not stopped at intraday lows, and the book
+that survives March rides the April recovery (2020 realised +$359k vs −$145k). Behind the
+record in 2010 (−$213k), 2016, 2022 (−$644k vs −$137k), 2025 (−$602k vs −$201k).
+
+**Pre-registered promotion bar: met.** 5y: (2) 3/3 and (3) 2/3 on 2019–23, 3/3 + 3/3 on
+2000–04; 26y: maxDD not worse (−6.5pp). `initial_stop_buffer 0.9167` +
+`stop_update_cadence Weekly` is a **promotion candidate**, subject to the standing rules
+before any flip: #2672 fixed and the pair re-run on the fix; a ledger entry; the
+confirmation-grid check (this surface's three cells: 2019–23 on the 2019-vintage
+warehouse, 2000–04 and 26y on the 2000-vintage — two vintages, one macro-diverse deep
+cell); `config-default-blast-radius.md` paired goldens for both knobs. It is a two-knob
+change; the salt-0 grid says neither knob alone clears both windows at 26y (14% daily
+fails maxDD; 12% daily was +$32k / +10pp on 2019–23).
+
+## Breadth state across 27 years (the macro-gate question)
+
+Weekly breadth over the per-year PIT universes (`/tmp/yr-run/breadth_all_daily.csv`,
+5,788 histories): percent above the 150-day MA, new 52-week highs/lows, advance–decline.
+A "crash" state defined on *level* alone (e.g. < 40% above MA or > 8% new lows) is **net
+positive** in both books (record +$449k over 105 entries; 14% arm +$845k over 127), because
+it lumps the collapse with the recovery — April 2020, 2003 and 2009 entries are among the
+best in the run. The losing state is **breadth deteriorating**: below 45% above MA *and*
+falling ≥ 5 points over 20 days (or new lows > 8% and rising):
+
+| state at entry | record n / win / P&L / A | 14% arm n / win / P&L / A |
+|---|---|---|
+| ok (≥ 55% above MA) | 495 / 35% / +$1.58M / 40 | 715 / 45% / +$3.58M / 84 |
+| mid (45–55%) | 93 / 35% / +$249k / 7 | 135 / 37% / −$522k / 14 |
+| weak, flat | 19 / 37% / +$351k / 2 | 16 / 25% / −$293k / 0 |
+| **deteriorating** | **80 / 29% / −$604k / 1** | **94 / 35% / −$668k / 2** |
+| recovering | 36 / 39% / +$627k / 4 | 49 / 45% / **+$1.81M** / 9 |
+
+Deteriorating-state entries by year (record / arm): 2020 −$217k / −$412k, 2023 −$190k /
++$193k, 2018 −$91k / −$174k, 2025 −$123k / −$74k, 2007 −$52k / −$60k; false positives 2022
++$77k / +$67k, 2014 +$45k / +$50k. Under the macro gate's own labels those entries were
+Neutral 31 / Bearish 22 / Bullish 27 in the record — the gate's Neutral band is where the
+damage sits. **Design implication (keep concerns separate):** the macro gate should emit
+the breadth *direction* as a state (Bullish / Neutral / Deteriorating / Recovering /
+Bearish) from indicators it already computes (A-D, NH-NL, percent-above-MA), and the stop
+width and entry admission read that state — width 12–14% when Bullish/Recovering, the
+4–6% band or no entries when Deteriorating. That is the paired surface, with the state
+machine in `Macro` and the width map in the stops config, each an axis.

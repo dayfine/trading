@@ -79,3 +79,7 @@
 [09-05 06:50:12] run tree HEAD=e4984c5fe (expect e4984c5fe)
 [09-05 06:50:14] v3 26y confirmation start
 [09-05 06:50:14] RUN sw26y-w14-D-s0
+[09-05 10:11:45] RESULT sw26y-w14-D-s0 => total_return_pct 513.02346502952082 total_trades 1009 win_rate 42.418235877106049 sharpe_ratio 0.5110926572339255 max_drawdown_pct 40.368313695903957  (wall 12091s)
+[09-05 10:11:45] RUN sw26y-w12-W-s0
+[09-05 15:39:28] RESULT sw26y-w12-W-s0 => total_return_pct 761.20047326058034 total_trades 862 win_rate 43.967517401392108 sharpe_ratio 0.57846038146061818 max_drawdown_pct 29.727413139570213  (wall 19663s)
+[09-05 15:39:28] SW0905 V3 DONE
