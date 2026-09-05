@@ -3,7 +3,7 @@
 # data/sectors.csv, graded.csv (record trades). Signal = trailing-26wk return vs GSPC (rs_start at Y-1 Dec 31,
 # rs_mid at Y Jun 30); outcome = calendar-year return (ret_y) and H2 return (ret_h2). Stale last-bars
 # (bardate > 45 days before the key) are dropped so delisted names do not carry a frozen price.
-W=/tmp/yr-run; cd /Users/difan/Projects/trading-1
+W=${W:-/tmp/yr-run}; cd "${REPO:-$(git rev-parse --show-toplevel)}"
 awk -F, '
   function dnum(d,  a){ split(d,a,"-"); return a[1]*372+a[2]*31+a[3] }
   FILENAME==ARGV[1] { sec[$1]=$2; next }

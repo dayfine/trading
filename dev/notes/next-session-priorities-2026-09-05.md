@@ -58,10 +58,10 @@ worse there too, the KEEP-52 decision needs re-opening with the user.
 ## P0 (new, 2026-09-04 late) — the two levers with measured headroom, and the stub-print defect
 
 From `dev/notes/yearly-trade-review-2000-2026.md` (#2673; memory
-`project_yearly_trade_review_2026_09_04`): 162 A-trades = +$9.05M, the other 561 =
-−$6.4M; stop exits are 31% whipsaws worth ≈ +$6.9M if held 13 more weeks; the
-year-start RS signal has zero cross-sectional power; the record caught 1.1% of
-each sector-year's top-5 winners.
+`project_yearly_trade_review_2026_09_04`): 162 A-trades = +$9.05M, the 552 B/C/D/F =
+−$6.36M; holding every stop exit 13 more weeks would have netted +$4.4M vs −$6.7M
+realised (unselected); the year-start RS signal has zero cross-sectional power;
+the record caught 2.5% of the tradeable top-5 winners per sector-year.
 
 1. **#2672 — delisting stub prints.** STMP 2021 ($327.75 → $0.04) and CLE 2014
    sit in the canonical record as −$741k of phantom loss; STMP also manufactured
@@ -71,13 +71,16 @@ each sector-year's top-5 winners.
    Cheapest real improvement on the table; do it FIRST — every later measurement
    inherits it.
 2. **Fallback-stop width as a surface on the 2019-vintage warehouse** (the
-   `initial_stop_buffer` axis, `project_fallback_stop_half_book_band`): the
-   141 D-grade whipsaws are 4%-ticket exits; the 09-03 stop-width surface was
+   `initial_stop_buffer` axis, `project_fallback_stop_half_book_band`): 389 of
+   469 stop exits are 4%-ticket exits carrying −$5.8M, and the unselected width
+   counterfactual puts 8–12% initial width at roughly half the loss; the 09-03 stop-width surface was
    regime-split on the survivor-tilted 2000-vintage warehouse — re-run it
    level-valid, 1y/3y/5y broad, salts 0–2, ex-monster reads.
 3. **Funnel admission** (`project_monster_funnel_top_of_funnel`): breakout-gate
    strictness and top-N as a surface, same cells. The review's catch rate
-   (1.1% of sector top-5 winners) is the number to move.
+   (2.5% of the tradeable sector top-5 winners) is the number to move — and the
+   tradeable overlap itself (23% of recent winners are in the record's 2000
+   universe) says the vintage warehouses matter as much as the gate.
 
 All three as surfaces per `experiment-flag-discipline.md`, never flips.
 

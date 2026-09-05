@@ -6,27 +6,32 @@ post-trade paths and the market/sector tables are the CSV store (`data/`), read 
 (every ratio inside one series). Universe per year = that year's `top-3000-<year>.sexp`
 composition (≈2,000–2,800 names with full-year prices). Sector = `data/sectors.csv`; delisted
 old names without a tag are "(untagged)". Working files: `/tmp/yr-run/` (graded.csv, sy.csv,
-sector_year.csv); scripts in the same directory (sh + awk).
+sector_year.csv); scripts in the same directory (sh + awk). The rank statistics and every
+table below use the winsorized, artifact-excluded set (`sector_year_winsorized.csv`,
+committed next to the raw `sector_year.csv`, whose means are artifact-inflated).
 
 ## Takeaway
 
-1. **The system is a 22%-hit-rate machine and the hits are everything.** 162 of 723 trades
-   graded A made **+$9.05M**; the other 561 lost **−$6.4M** between them, and two delisting
-   stub prints (STMP 2021, CLE 2014, issue #2672) took another **−$741k** that never happened.
-   Net +$2.2M realised. Thirteen of 26 years lose money; four years (2004, 2013, 2017, 2021)
+1. **The system is a 22%-A-rate machine (34% win rate) and the A's are everything.** 162 of
+   723 trades graded A made **+$9.05M**; the 552 graded B/C/D/F lost **−$6.36M** between them;
+   two delisting stub prints (STMP 2021, CLE 2014, issue #2672) took another **−$741k** that
+   never happened; 7 untraceable delisted names net +$0.25M. Net +$2.2M realised. Thirteen of 26 years lose money; four years (2004, 2013, 2017, 2021)
    carry the run, each on one or two names.
 2. **Exit mechanics sort cleanly by grade.** Laggard-rotation exits: 130 A / 71 B / 26 C / 10 D
    — 55% A. Stop exits: 26 A / 136 B / 159 C / 131 D / 15 F — 31% whipsaws (stopped, then
-   ≥ +15% within 13 weeks), 29% right (stock lower 13 weeks later), 34% noise. Holding the 141
-   D-grade whipsaws 13 more weeks would have been worth ≈ **+$6.9M** at the later close
-   instead of −$2.6M realised. That is the 4%-fallback-stop tax, and it is larger than the
-   whole run's net.
+   ≥ +15% within 13 weeks), 29% right (stock lower 13 weeks later), 34% noise. The unselected
+   counterfactual — hold **every** one of the 469 stop exits 13 more weeks at the later
+   close — is **+$4.43M vs −$6.74M realised** (the D-grade subset alone reads +$6.6M, but D is
+   *defined* by that rise, so that figure is selected on its own outcome and is not the tax).
+   The width counterfactual below, also unselected, puts the removable part of the
+   fallback-stop tax at roughly $4M at 13 weeks and $6M+ at 26 weeks.
 3. **The relative-strength signal has no cross-sectional power at the yearly horizon.** Within
    each sector-year, Spearman(year-start RS vs calendar-year return) = **−0.007** (322
-   groups, positive in 50%); mid-year RS vs H2 return +0.008. Signal deciles: median year
-   return 5.9% for the strongest decile vs 9–11% for the middle; the strongest decile has the
-   fattest right tail (winsorized mean +15–17% vs +13%), i.e. **RS at the top is a lottery
-   ticket, not a ranking**. Of each sector-year's five biggest winners, only **11%** were
+   groups, positive in 50%); mid-year RS vs H2 return +0.008. Signal deciles are
+   U-shaped: median year return 5.9% for the strongest decile and 3.8% for the weakest vs
+   9–11% in the middle, with the fattest right tails at both extremes (winsorized mean +15.0%
+   strongest, +16.8% weakest, +13–14% middle), i.e. **extreme RS is a lottery ticket, not a
+   ranking**. Of each sector-year's five biggest winners, only **11%** were
    top-5 by signal and 27% top-20.
 4. **The strongest sector by signal is almost never the strongest sector that year.** Median
    sector return: the signal-best sector at year start matched the market-best sector in
@@ -34,14 +39,18 @@ sector_year.csv); scripts in the same directory (sh + awk).
    (2009, 2020, 2026). Weinstein's sector call works as a *filter* (we made money in energy
    in 2000/2006, tech in 2020/2023/2025), not as a *forecast*.
 5. **We do not catch the money-makers, but we do pick above-median names.** Of 1,610 top-5-
-   by-return sector-year names, the record traded **17 (1.1%)**; of our 658 traded name-years,
-   3% were top-5 and 14% top-20 in their sector (base rate for top-20 ≈ 11%). Yet traded
+   by-return sector-year names, the record traded **17 (1.1%)** — but the record trades a
+   FIXED `top-3000-2000` universe while the denominator is each year's composition, and the
+   overlap decays (52% of top-5 winners tradeable in 2005, 40% in 2015, 23% in 2020–25): of
+   the **679 tradeable** top-5 winners it traded 17 (**2.5%**). Of our 658 traded name-years,
+   3% were top-5 and 14% top-20 in their sector (base rate for top-20 among tradeable names
+   ≈ 9%). Yet traded
    names returned **+32% for the year vs a +14% sector median, 69% above median** — partly
    real selection, partly look-ahead (we enter after the move that makes the year return).
 6. **What this implies.** The edge is not in ranking and not in exits; it is in *being in* the
    4–8 names a year that run 50–140% and *staying in*. Two levers follow directly: (a) the
-   stop that produces 141 whipsaws worth $9M of swing, and (b) the funnel that admits 1% of
-   the eventual winners. Everything else measured this week — rotation, extension stop,
+   stop that produces 141 whipsaws worth $9M of swing, and (b) the funnel that admits 2.5% of
+   the tradeable eventual winners. Everything else measured this week — rotation, extension stop,
    stage-3 exit, the clock — moves the needle by tens of thousands.
 
 ## Grade rubric (mechanical, hindsight-informed, applied to all 723)
@@ -68,6 +77,22 @@ stopped, then ≥ +15% within 13 weeks · F: stopped, then ≥ +50% · X: delist
 | liquidity_exit | 0 | 2 | 0 | 0 | 0 | 0 |
 | stage3_force_exit | 3 | 0 | 2 | 0 | 0 | 0 |
 | stop_loss | 26 | 136 | 159 | 131 | 15 | 2 |
+
+Stop-exit counterfactuals, **unselected** (all 469 stop exits; a trade whose 13-week post-entry
+low breaches the new width w is stopped at −w, otherwise held to the 13- or 26-week post-entry
+close; no ratchet, no re-entry, capital not reused — an upper-bound proxy, not a backtest):
+
+| initial width w | stop exits with width < w | actual realised | stopped within 13wk | P&L at 13wk | P&L at 26wk |
+|---|---:|---:|---:|---:|---:|
+| 6% | 402 | −$6.09M | 285 | −$2.29M | −$1.22M |
+| 8% | 405 | −$6.16M | 249 | −$2.29M | −$0.66M |
+| 10% | 416 | −$6.41M | 225 | −$2.53M | +$0.14M |
+| 12% | 432 | −$6.48M | 182 | −$1.84M | +$1.05M |
+| 15% | 469 | −$6.74M | 159 | −$1.60M | +$2.04M |
+
+Hold-13-more-weeks counterfactual over the same 469: +$4.43M vs −$6.74M realised (D subset
++$6.6M, non-D −$2.2M). Fallback ~4% tickets are 389 of the 469 stop exits and −$5.78M of the
+−$6.74M; 121 losers exited within 5 days (−$2.3M); gap-through fills are 3 trades (−$58k).
 
 ## Year by year — trades, grades, strongest sector by market / by signal / by our P&L
 
@@ -127,7 +152,9 @@ tail, a lower median. Of the top-5-by-return names per sector-year, 11% were top
 and 27% top-20.
 
 Catch rates: the record traded 17 of 1,610 top-5-by-return sector-year names (1.1%) and 18 of
-1,610 top-5-by-signal (1.1%). Of the 658 name-years it traded, 3% were top-5 and 14% top-20 by
+1,610 top-5-by-signal (1.1%); restricted to names in the record's own `top-3000-2000` universe
+(679 and 661 of them — the tradeable overlap falls from 52% of top-5 winners in 2005 to 23%
+in 2020–25), 2.5% and 2.7%. Of the 658 name-years it traded, 3% were top-5 and 14% top-20 by
 return in their sector (≈ 11% base rate), 3% / 11% by signal. Traded names' year return
 averaged +32% vs their sector-year median +14% (69% above median) — with the look-ahead caveat
 above.

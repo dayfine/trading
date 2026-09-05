@@ -9,7 +9,7 @@
   and mid-year 26-week RS vs `GSPC.INDX`, calendar-year and H2 return, sector, traded flag, trade P&L.
   Stale last-bars (> 45 days before the key) are dropped.
 - `sector_agg.sh` — within-(year, sector) ranks and the per-sector-year summary `sector_year.csv`
-  (committed): n, mean return, Spearman(RS, return), top-by-signal / top-by-return names and whether
+  (committed, raw means) and `sector_year_winsorized.csv` (committed; the note's tables use this one): n, mean return, Spearman(RS, return), top-by-signal / top-by-return names and whether
   the record traded them, top-5 catch counts. The note's robust tables use the winsorized variant
   (`syc.csv`, returns clipped to [−95%, +300%], 0.6% artifact symbol-years excluded).
 - `yr_sectors.txt` — per year: market-best sector (median return), signal-best sector, our best sector.
