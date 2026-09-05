@@ -100,6 +100,107 @@ _glob_count() {
   echo "${n}"
 }
 
+# _derived_scenario_report <target-file> <assertions-executed>
+#
+# H-AUDIT-TEST-SCENARIO-COUNT-UNRECONCILABLE: every "N scenarios" figure
+# ever quoted about THIS suite -- in PR bodies, in dev/status/harness.md,
+# in this file's own comments -- has been a hand-transcribed number that
+# reconciled with no mechanical count of the file (filed at 813a91e5: the
+# quoted "30" matched none of 34 distinct pass/fail labels, 29 header
+# lines, or 28 header-declared numbers measured at the time; by main@
+# 41fd244b the header count alone had drifted to 60 with nobody touching
+# the quoted figure). From here on, any "N scenarios" citation for this
+# suite MUST be one of the four counts below, quoted verbatim from this
+# function's own output -- never retyped by hand, so it cannot drift the
+# way "28" silently became "30" did.
+#
+# The four counts measure different things and are EXPECTED to disagree
+# with each other -- this function does not try to make them agree:
+#
+#   assertions executed        -- supplied by the caller as
+#                                  PASS_COUNT+FAIL_COUNT: the number of
+#                                  pass/fail calls actually RUN this
+#                                  invocation. The only one of the four
+#                                  that is machine-checked end to end (it
+#                                  drives this suite's own exit code).
+#   distinct scenario labels   -- distinct "scenario N[a-z]?" tokens
+#                                  appearing in pass/fail call TEXT in
+#                                  <target-file>. A sub-case with its own
+#                                  pass/fail call but no "# Scenario"
+#                                  header of its own (7a/7b are documented
+#                                  only inside scenario 7's header; see
+#                                  next) counts once here.
+#   '# Scenario' header lines  -- literal count of "# Scenario(s) ..."
+#                                  comment lines. A single header can name
+#                                  MORE THAN ONE scenario number (the
+#                                  "# Scenarios 25 & 26" header covers
+#                                  both), so this is NOT the same count as
+#                                  the header-numbers count below.
+#   distinct scenario numbers
+#     named in headers          -- distinct scenario-number tokens named
+#                                  ACROSS all header lines (the "25 & 26"
+#                                  header contributes both "25" and "26").
+#                                  Differs from "distinct scenario labels"
+#                                  above whenever a case is documented
+#                                  only inline under a parent header (7a/
+#                                  7b have no header line of their own, so
+#                                  they inflate the label count but not
+#                                  this one).
+#
+# None of these four is "the" scenario count of this suite; that is the
+# whole point of printing all four instead of transcribing one. A count of
+# ZERO on ANY of them is never a legitimate "nothing here" for a suite
+# this size -- it means the counting pattern broke (file moved, regex
+# drifted, argument mismatch), not that the file is actually empty. This
+# function treats that case as a hard FAIL rather than a clean "0" that
+# would look, to a reader, like a checked and honest measurement instead
+# of a broken one (H-AUDIT-TEST-SCENARIO-COUNT-UNRECONCILABLE's own
+# LINTER_CANDIDATE note: "a count printed by the suite cannot drift from
+# the suite" only holds if a broken counter is loud, not silent-zero).
+#
+# On success: prints four "  N <description>" lines to stdout, returns 0.
+# On failure: prints one "FAIL: derived scenario count '<label>' measured
+# 0 for <target-file> -- ..." line per broken count to stderr, prints
+# NOTHING to stdout, and returns 1. Callers MUST check the return code --
+# a caller that only greps stdout would treat "no output" the same as "no
+# findings", which is exactly backwards here.
+_derived_scenario_report() {
+  local target="$1" assertions="$2"
+  local labels headers header_nums ok=1
+
+  labels="$(grep -oE '\b(pass|fail) "scenario [0-9]+[a-z]?' "${target}" \
+    | sed -E 's/^(pass|fail) "scenario //' | sort -u | wc -l | tr -d ' ')" || true
+  headers="$(grep -c '^# Scenario' "${target}")" || true
+  header_nums="$(grep -oE '^# Scenarios? [0-9]+[a-z]?( & [0-9]+[a-z]?)?' "${target}" \
+    | grep -oE '[0-9]+[a-z]?' | sort -u | wc -l | tr -d ' ')" || true
+  : "${labels:=0}" "${headers:=0}" "${header_nums:=0}"
+
+  if [[ "${assertions}" -le 0 ]]; then
+    echo "FAIL: derived scenario count 'assertions executed' measured 0 for ${target} -- PASS_COUNT+FAIL_COUNT should never be 0 for this suite" >&2
+    ok=0
+  fi
+  if [[ "${labels}" -le 0 ]]; then
+    echo "FAIL: derived scenario count 'distinct scenario labels' measured 0 for ${target} -- the pass/fail label pattern matched nothing" >&2
+    ok=0
+  fi
+  if [[ "${headers}" -le 0 ]]; then
+    echo "FAIL: derived scenario count '# Scenario header lines' measured 0 for ${target} -- the header pattern matched nothing" >&2
+    ok=0
+  fi
+  if [[ "${header_nums}" -le 0 ]]; then
+    echo "FAIL: derived scenario count 'distinct scenario numbers named in headers' measured 0 for ${target} -- the header-number pattern matched nothing" >&2
+    ok=0
+  fi
+
+  [[ "${ok}" == "1" ]] || return 1
+
+  echo "  ${assertions} assertions executed"
+  echo "  ${labels} distinct scenario labels (pass/fail call text)"
+  echo "  ${headers} '# Scenario' header lines"
+  echo "  ${header_nums} distinct scenario numbers named in headers"
+  return 0
+}
+
 # Mock-gh factory. Emits a tiny shell script that responds to
 # `gh pr view N --json reviews [--jq '.reviews[]...']` with canned JSON
 # or canned `STATE:/body/ENDBODY` framed output.
@@ -3596,10 +3697,87 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scenario 53 — H-AUDIT-TEST-SCENARIO-COUNT-UNRECONCILABLE: _derived_scenario_report
+# fails loudly (non-zero return, no stdout) against a fixture that has zero
+# "# Scenario" headers and zero pass/fail scenario labels, rather than
+# printing a clean "0" for those two counts. This is the exact failure mode
+# the function exists to prevent -- see its own header comment.
+#
+# Two sub-checks against the SAME empty-of-scenario-content fixture, to
+# prove the four checks are wired independently rather than one blanket
+# "something is wrong" gate:
+#   53a: called with a NON-ZERO assertions count (5) -- only the label /
+#        header / header-number checks can fail; the stderr must therefore
+#        NOT mention "assertions executed".
+#   53b: called with a ZERO assertions count (0) on the identical fixture --
+#        now the stderr MUST additionally mention "assertions executed".
+# If either sub-check were dead code (e.g. the function just returned 1
+# unconditionally, or always complained about all four regardless of
+# input), 53a's negative assertion or 53b's positive one would catch it.
+# ---------------------------------------------------------------------------
+S53_FIXTURE="${TMP_REPO}/s53-empty-fixture.sh"
+cat > "${S53_FIXTURE}" <<'EOF'
+#!/usr/bin/env bash
+# A fixture file deliberately containing no "# Scenario" header and no
+# pass/fail scenario-label call -- everything _derived_scenario_report
+# looks for is absent by construction.
+echo "nothing to see here"
+EOF
+
+out53a=$(_derived_scenario_report "${S53_FIXTURE}" 5 2>&1) && rc53a=0 || rc53a=$?
+out53b=$(_derived_scenario_report "${S53_FIXTURE}" 0 2>&1) && rc53b=0 || rc53b=$?
+
+c53a_rc=1; (( rc53a != 0 )) || c53a_rc=0
+c53a_no_stdout=1; [[ -z "$(_derived_scenario_report "${S53_FIXTURE}" 5 2>/dev/null)" ]] || c53a_no_stdout=0
+c53a_no_assertions_complaint=1
+grep -q "assertions executed' measured 0" <<<"${out53a}" && c53a_no_assertions_complaint=0
+c53a_labels_complaint=1
+grep -q "distinct scenario labels' measured 0" <<<"${out53a}" || c53a_labels_complaint=0
+
+if [[ "${c53a_rc}${c53a_no_stdout}${c53a_no_assertions_complaint}${c53a_labels_complaint}" == "1111" ]]; then
+  pass "scenario 53a — _derived_scenario_report on a scenario-free fixture with assertions=5: fails loudly (rc!=0, no stdout), complains about labels, does NOT complain about assertions (H-AUDIT-TEST-SCENARIO-COUNT-UNRECONCILABLE)"
+else
+  fail "scenario 53a — expected rc!=0, no stdout, labels-complaint present, assertions-complaint absent; got rc=${rc53a}"
+  report_conjuncts \
+    "rc53a!=0 (actual=${rc53a})" "${c53a_rc}" \
+    "no stdout on failure" "${c53a_no_stdout}" \
+    "no 'assertions executed' complaint (assertions=5 was fine)" "${c53a_no_assertions_complaint}" \
+    "'distinct scenario labels' complaint present" "${c53a_labels_complaint}"
+  echo "${out53a}" | sed 's/^/      /'
+fi
+
+c53b_rc=1; (( rc53b != 0 )) || c53b_rc=0
+c53b_assertions_complaint=1
+grep -q "assertions executed' measured 0" <<<"${out53b}" || c53b_assertions_complaint=0
+
+if [[ "${c53b_rc}${c53b_assertions_complaint}" == "11" ]]; then
+  pass "scenario 53b — same fixture with assertions=0: now ALSO complains about 'assertions executed', proving that check is independently wired, not dead code (H-AUDIT-TEST-SCENARIO-COUNT-UNRECONCILABLE)"
+else
+  fail "scenario 53b — expected rc!=0 AND an 'assertions executed' complaint; got rc=${rc53b}"
+  report_conjuncts \
+    "rc53b!=0 (actual=${rc53b})" "${c53b_rc}" \
+    "'assertions executed' complaint present" "${c53b_assertions_complaint}"
+  echo "${out53b}" | sed 's/^/      /'
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
 echo "record_qc_audit_test: ${PASS_COUNT} passed, ${FAIL_COUNT} failed"
+
+# The real, self-referential derived-count report -- run against THIS
+# file, not a fixture. A failure here means the counting patterns above
+# have gone stale against the suite's own current shape, and per
+# _derived_scenario_report's own contract that is reported as a hard
+# FAIL, not folded silently into a passing summary.
+SELF_FILE="${SCRIPT_DIR}/record_qc_audit_test.sh"
+echo "record_qc_audit_test scenario counts (derived from ${SELF_FILE}, not hand-transcribed):"
+if ! _derived_scenario_report "${SELF_FILE}" "$(( PASS_COUNT + FAIL_COUNT ))"; then
+  echo "FAIL: derived scenario count report failed -- see above" >&2
+  FAIL_COUNT=$(( FAIL_COUNT + 1 ))
+fi
+
 if (( FAIL_COUNT > 0 )); then
   exit 1
 fi
