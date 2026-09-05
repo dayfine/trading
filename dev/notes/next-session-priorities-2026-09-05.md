@@ -19,15 +19,31 @@ half-done (built from the CSV store; the EODHD gap fetch is open); P2 carries.
   `project_exit_stack_survives_fixed_basis`. Tools: `dissect.sh` (closed-trade
   join) + `unreal.sh` (open-position MTM — the lagoff arm's +97pp was one
   unsold NVDA, invisible to the closed-trade join).
-- **Vintage warehouses** `/tmp/snap_top3000_2019` and `/tmp/snap_top3000_2009`
-  built fresh from the CSV store (bars from vintage−1, GSPC.INDX benchmark) —
-  see the build log `/tmp/xl0904-run/vintage.log` for the snap counts. CSV
+- **Vintage warehouses** `/tmp/snap_top3000_2019` (2,209 snaps ≈ 76% of the
+  2019 composition, 513 MB) and `/tmp/snap_top3000_2009` (2,033 ≈ 73%, 891 MB),
+  built fresh from the CSV store over a superset universe (composition +
+  `GSPC.INDX`), bars from vintage−1. Gotcha on the way: a 1-symbol
+  `-incremental` top-up REPLACED each manifest with one entry (#2669,
+  `project_build_snapshots_incremental_clobbers_manifest`); fixed by a full
+  superset rebuild. Check `grep -c "(symbol " manifest.sexp` vs the `.snap`
+  count before pointing a chain at any warehouse. CSV
   store coverage measured 2026-09-04: 2009 vintage 1932/2780 (69%), 2019
   vintage 2177/2904 (75%) — vs 44% / 32% on the 2000-vintage warehouse.
 - Housekeeping: five stale locked agent worktrees + three orphaned
   `dune build @fmt` processes from earlier sessions removed.
 
-## P0 — the clock-52 default's maxDD rationale, on the fixed basis
+## P0 — the clock-52 maxDD rationale on the fixed basis — DONE 2026-09-04 evening
+
+**Ran the same evening** (`dev/experiments/clock-default-fixed-basis-2026-09-04/`,
+paired c0/c52, salts 0–2, 2019–23 on the NEW 2019-vintage warehouse + the
+2000–04 record-lineage pairs): maxDD Δ −11.66 / +0.55 / +0.33pp on 2019–23,
++0.1 / 0.0 / +0.1 on 2000–04. Never materially worse; the salt-0 "win" is one null-only delisting
+stub-print loss (STMP $327.75 → $0.04, −$205k) — ex-artifact the clock is a
+no-op at every salt. **KEEP-52 stands; no re-open.** The record-convention
+worsening was the record's pins, not the clock. Cite the clock as a drawdown
+floor, not a win. Original framing kept below for the record.
+
+### (original P0 text)
 
 `project_clock52_promoted` keeps 52 on a "universal maxDD win" measured
 pre-fix on the DEFAULT bundle. On the record convention, fixed basis, the
@@ -48,6 +64,12 @@ warehouses with `-incremental`. Until then label every 2019-vintage number
 with its effective name count (`universe.txt` in the cell output).
 
 ## P2 — carried
+
+- Now that the exit stack AND the clock are settled on the fixed basis, the
+  next measurement is entry-side on the 2019-vintage warehouse (level-valid
+  2019 cells for the first time): re-run the default-bundle null at 26y? No —
+  5y broad first per the user; the c0 cells here (0.23 / 11.86 / 5.40%) are
+  the new 2019–23 default-bundle nulls at salts 0–2.
 
 - Entry-side / top-of-funnel: the record's exit stack is settled, so the
   remaining gap vs the record is `project_monster_funnel_top_of_funnel`
