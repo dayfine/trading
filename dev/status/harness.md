@@ -2264,3 +2264,66 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   in the `none`/`stale` branches, new NEXT-ACTION case-statement rows, header
   comment updated), `dev/scripts/pr_gate_status_test.sh` (cases 51-57), this
   entry.
+
+  **Rework iteration 1 (PR #2676, qc-behavioral review 5121326258).** Two
+  CP FAILs, both "the property is real but pinned at only one call site, so a
+  mutation removes it and the suite stays green":
+
+  - **CP4** -- `looks_corrupt`'s `$has_verdict_word and (...)` guard had no
+    assertion querying a gate the fixture does NOT name. Removing
+    `$has_verdict_word and` survived 68/68 because case 56
+    (`NO_VERDICT_SECTION`) only ever queries the "behavioral" gate its own
+    heading names, which never reaches the corrupt-scan branch at all. Fixed:
+    case 58 queries the SAME fixture for "structural" (a gate it does not
+    name), landing in the corrupt-scan branch and pinning `none`, not
+    `unreadable`.
+  - **CP2** -- branch (b) (`$len > 200 and $newlines < 3`, the "verdict
+    happens to still anchor at position 0" case) had no fixture at all.
+    Fixed: case 59 builds a >200-char, newline-sparse, no-gate-heading body
+    whose "## Verdict APPROVED" genuinely anchors at position 0 -- pinning
+    `unreadable(<sha>)` for both gates.
+
+  Both confirmed by hand: mutation applied to a scratch copy (`cmp` confirmed
+  non-vacuous), the unmodified 68-case suite re-run against it stayed green
+  pre-fix and went red post-fix naming exactly the new case, mutation
+  reverted. See the two new cases' own doc comments in
+  `pr_gate_status_test.sh` for the full mutation text.
+
+  **Also raised, and handled:**
+  - **Genuine over-fire, fixed:** `## Verdict: APPROVED` (compact, colon
+    style) used to be classified corrupt/unclear because the gap-class
+    `[ *`\r\n]` in both `looks_corrupt` and `review_result`'s verdict regex
+    excluded `:`. Widened to `[ :*`\r\n]` in both places (kept in sync
+    deliberately). Cases 60-61 pin the two symptoms this caused: the gate a
+    colon-style review actually names now reads its real verdict instead of
+    `unclear`, and an unrelated gate it never claimed now reads `none`
+    instead of a false `unreadable(<sha>)`.
+  - **Genuine over-fire, accepted (not fixed):** the corrupt-scan runs over
+    every review in the array regardless of authorship, so an ordinary,
+    non-QC review whose body happens to mention an unfenced verdict-shaped
+    heading (without a real anchored verdict elsewhere) can flag an
+    undispatched gate as `unreadable` instead of `none`. Still fails closed
+    (RE-POST, never MERGE); narrow (needs a formal GitHub PR *review*, not a
+    plain comment, that coincidentally resembles a QC block); a real fix
+    needs author-based filtering, a materially larger change than this PR's
+    scope. Documented in `looks_corrupt`'s doc comment, not pinned by a test,
+    same treatment as case 26's known pre-existing gap.
+  - **PR-body overclaim, corrected:** "unreadable never reaches MERGE" is
+    true of the state-to-action mapping (a returned `unreadable(<sha>)` can
+    only ever map to RE-POST) but is not a completeness claim about
+    detection. `$corrupt_sha` is computed once per `_gate` call but only
+    consulted in the `none`/`stale` branches -- if a readable, heading-matched
+    sibling review for the SAME gate exists at the same tip, the corrupt
+    sibling is silently dropped from consideration (pre-existing aggregation
+    behaviour, unchanged by this fix, not a regression it introduced) and the
+    gate reads whatever the readable sibling says, including `ok`. Documented
+    at the point `$corrupt_sha` is computed in `_gate` and in the file header;
+    NOT fixed here (deciding whether a corrupt sibling should demote an
+    otherwise-clean aggregation is a real design call, same category as the
+    open sha-less-aggregation question this file already defers to a human).
+
+  **Verify (rework iteration 1):** `sh dev/scripts/pr_gate_status_test.sh` --
+  73 tests clean (68 prior + 5 new: case 58, case 59 with 2 sub-checks, cases
+  60-61). `sh trading/devtools/checks/pr_gate_status_mutation_test.sh` --
+  unaffected, still 16/16 matching pin. `dune build @fmt && dune build &&
+  dune runtest` all exit 0, 0 `^FAIL:` lines.
