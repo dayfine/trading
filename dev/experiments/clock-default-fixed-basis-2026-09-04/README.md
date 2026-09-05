@@ -63,15 +63,16 @@ _(filled in as cells land — `chain.log`; raw per-arm artifacts under `results/
 
 Effective universe 3,000 names (`universe.txt`; 2,208 with bars — the
 first 2019 cell not confined to 2000-era survivors). Shared 152 trades drift
-**−$12k** (flat); null-only 46 trades −$133k; arm-only 52 trades +$49k. No
-lopsided monster — the largest cohort trades are CSIQ (+$43k null-only,
-+$46k arm-only: the same name entered a week apart), BBWI +$76k and AAP
-+$36k null-only, VRSK +$38k and CVE +$25k arm-only. Equity delta +$203k,
-maxDD **−11.7pp** with the clock. This is the promoted claim's shape
-(`project_clock52_promoted`: maxDD win, small return win on 5y broad), on
-the base it was made on — the record-convention inversion in
-`exit-lever-surface-2026-09-04` was the record's pins (MSTR slot effect),
-not the fixed basis. Salts 1–2 and 2000–04 decide.
+**−$12k** (flat); null-only 46 trades −$133k; arm-only 52 trades +$49k. **Correction (qc-behavioral CP2-a, rework 1): there IS a lopsided trade.**
+The null-only cohort contains STMP 2021-07-30 → 2021-10-06, filled at
+**$0.04 from $327.75: −$204,816, 101% of |Δ equity|** — a post-delisting
+stub print (Stamps.com was taken private for cash in Oct 2021), the same
+artifact as the 26y record's STMP and CLE rows. The null's equity curve
+drops $200k on 2021-10-05, inside its 41.7% drawdown window. **Ex-STMP the
+null-only cohort is +$71k and Δ equity is −$1.6k** — the clock is a no-op at
+this salt too, and the −11.7pp maxDD gap is the artifact landing in one arm.
+The cohort's positive tail (BBWI +$76k, CSIQ ±$43–46k, AAP +$36k, VRSK
++$38k) is real but nets to nothing. Neither arm holds STMP at salts 1–2.
 
 ### 2000–04, salt 0 (21:23 PDT): byte-identical to the prior chain — and the chain is trimmed
 
@@ -115,14 +116,16 @@ four arm-only (CPB, IMGN, TDS …) names as salt 1. Equity −$23k, maxDD
 
 | window | salt | null maxDD | c52 maxDD | Δ maxDD | Δ equity | shape |
 |---|---|---:|---:|---:|---:|---|
-| 2019–23 (2019-vintage wh) | 0 | 41.73 | 30.07 | **−11.66** | +$203k | 46 / 52 unique trades; no monster; null's drawdown = 2021-02-16 → 2023-10-23 grind, c52's = 2021-06-08 → 2022-10-26 |
+| 2019–23 (2019-vintage wh) | 0 | 41.73 | 30.07 | **−11.66** | +$203k | 46 / 52 unique; **null-only STMP stub print −$205k = 101% of |Δ|**; ex-STMP Δ equity −$1.6k; the null's 41.7% window (2021-02-16 → 2023-10-23) contains the STMP day (−$200k on 2021-10-05) |
 | 2019–23 | 1 | 32.77 | 33.33 | +0.55 | −$29k | 5 / 4 unique trades — near no-op |
 | 2019–23 | 2 | 32.48 | 32.81 | +0.33 | −$23k | 5 / 4 unique trades — near no-op |
 | 2000–04 (record lineage, from `exit-lever-surface`) | 0 / 1 / 2 | 28.36 / 19.56 / 28.36 | 28.48 / 19.56 / 28.50 | +0.12 / 0.00 / +0.14 | −$30k / −$20k / −$31k | neutral |
 
 - **Not "confirmed"** (c52 better at 1 of 3 salts on 2019–23, never on
-  2000–04) and **not "refuted"** (never worse by more than 0.6pp anywhere).
-  The rule's middle branch applies: **path-dependent**. The "universal
+  2000–04 — and that one salt is a null-only data artifact, not the clock)
+  and **not "refuted"** (never worse by more than 0.6pp anywhere). The rule's
+  middle branch applies, and ex-artifact the honest word is **no-op**: Δ equity
+  −$1.6k / −$29k / −$23k, maxDD +0.55 / +0.33pp where measurable. The "universal
   maxDD win" leg of the KEEP-52 decision is, on the fixed basis and the
   first level-valid 2019 universe, "**never materially worse, occasionally
   much better**" — a weaker but still true statement, and the 10.8–13.0pp
@@ -139,20 +142,25 @@ four arm-only (CPB, IMGN, TDS …) names as salt 1. Equity −$23k, maxDD
 At salts 1 and 2 the clock cancels four or five tickets over five years
 and the books are otherwise identical — the default bundle (with
 `freeze_entry_at_first_breakout`, anchor 4, `Drop_over_max`) issues few
-tickets that rest 52 weeks. At salt 0 the null's path diverged early
-(46 null-only entries — BBWI +$76k, AAP +$36k, CSIQ +$43k — vs 52 arm-only)
-and then rode a 2021-02 → 2023-10 drawdown to 41.7% that the c52 book, one
-ticket lighter in the right weeks, did not: it peaked later (2021-06) and
-troughed in 2022-10 at 30.1%. One salt of three is a path lottery, the
-same shape as cell A at 26y in the clock surface
-(`project_clock52_promoted`: "A = 26y salt-LOTTERY"). The mechanism's
-direct footprint is tiny; its portfolio-level effect is whatever the
-reshuffled book happens to hold.
+tickets that rest 52 weeks. At salt 0 the null's book entered STMP on
+2021-07-30 at a ~14% weight and the feed's post-delisting print filled the
+stop at $0.04 on 2021-10-06: −$205k on one ticket, −$200k on the equity
+curve in one day, inside the drawdown that reads 41.7%. The c52 book never
+held STMP at that salt (its slot went elsewhere weeks earlier), and neither
+arm held it at salts 1–2. Remove that one print and the three salts agree:
+the clock's direct footprint is 4–5 cancelled tickets and its portfolio
+effect is within $30k and 0.6pp of the null. The earlier "path lottery"
+reading was wrong — it was a data artifact, not a path.
 
 ### Forward guidance
 
 - Cite the clock for "no added drawdown", not for a drawdown win; the only
-  cell where the win was large was a single salt.
+  cell where a win appeared was a delisting stub print in the null.
+- **Delisting stub prints are a live defect in every warehouse.** STMP 2021
+  ($327.75 → $0.04) here and in the 26y record, CLE 2014 ($37.65 → $0.71)
+  in the record: −$741k of phantom loss in the canonical 26y number alone.
+  The V15 splice check (#2649) flags the shape; the fix is a delisting-aware
+  exit fill (last real print, not the stub). Filed as a follow-up issue.
 - The 2019-vintage warehouse is now the base for 2019-window levels
   (c0 = 0.23 / 11.86 / 5.40 % across salts — the level of the default
   bundle on a 2,208-name 2019 universe is roughly flat; the survivor-tilted

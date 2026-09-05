@@ -37,8 +37,9 @@ half-done (built from the CSV store; the EODHD gap fetch is open); P2 carries.
 **Ran the same evening** (`dev/experiments/clock-default-fixed-basis-2026-09-04/`,
 paired c0/c52, salts 0–2, 2019–23 on the NEW 2019-vintage warehouse + the
 2000–04 record-lineage pairs): maxDD Δ −11.66 / +0.55 / +0.33pp on 2019–23,
-+0.1 / 0.0 / +0.1 on 2000–04. Never materially worse; the salt-0 win is a
-null path-lottery. **KEEP-52 stands; no re-open.** The record-convention
++0.1 / 0.0 / +0.1 on 2000–04. Never materially worse; the salt-0 "win" is one null-only delisting
+stub-print loss (STMP $327.75 → $0.04, −$205k) — ex-artifact the clock is a
+no-op at every salt. **KEEP-52 stands; no re-open.** The record-convention
 worsening was the record's pins, not the clock. Cite the clock as a drawdown
 floor, not a win. Original framing kept below for the record.
 
