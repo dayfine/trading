@@ -2174,3 +2174,156 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   "fixed") (that is separate work, not this item — H-GATEPARSER-CURL-PROJECTION-UNPINNED
   remains untouched too), and the "first→last match" structural mutation noted
   above. `pr_gate_status.sh`'s production logic was not modified by this PR.
+
+- [x] **H-QC-VERDICT-NEWLINE-COLLAPSE** (found by hand 2026-09-04, PR #2663;
+  landed here since it was never written into this file at the time): a
+  qc-structural review of #2663 was posted **APPROVED at the correct tip**,
+  but the GitHub API returned the body with every newline collapsed -- one
+  line reading `...all passing).## VerdictAPPROVED`. Every heading regex in
+  `_gate` (`dev/scripts/pr_gate_status.sh`) requires `^` at a REAL line start,
+  so the collapsed review failed its own heading-attribution test and
+  vanished from `$results` entirely; the gate then fell back to an OLDER,
+  genuinely-parseable review in the array and reported the misleading
+  `stale(25d1a938)`, emitting `re-run qc-structural at a142243f` -- naming
+  the wrong review as the problem (a fresh QC pass was never the fix; the
+  real review just needed re-posting with its markdown intact).
+
+  Two properties were correct and preserved, one was fixed:
+  - **It failed in the safe direction.** The corrupted review never read
+    `ok` -- `.claude/rules/pr-merge-gates.md` Rule 0's lesson (the #2384
+    -40.91pp regression) is that a merge gate must never guess, and this one
+    didn't.
+  - **The operator could not tell WHY.** `stale(<sha>)` is emitted
+    identically for "a genuinely older review" and "an unreadable review at
+    the current tip" -- two different problems needing two different fixes
+    (re-run QC vs. re-post the body).
+  - **Fixed:** a new `looks_corrupt` jq predicate in `_gate` flags a review
+    whose body contains "## Verdict" as a loose, unanchored substring
+    (`#+\s*verdict`, no `^` requirement) but where the real, anchored verdict
+    regex never matches it -- or the body is long (>200 chars) with almost no
+    newlines (<3), a variant collapse that happens to still line up "##
+    Verdict" at true position 0. Both branches require the "## Verdict"
+    substring to be present at all, so a genuinely unfinished review (case
+    11's "unclear" shape -- "Ran out of budget before reaching a verdict.")
+    is never flagged merely for being short.
+
+    The sha used for the current-tip comparison is extracted via a NEW
+    `review_sha` def (`Reviewed SHA:` line, falling back to `commit_id` per
+    #2626) -- factored out of `review_result` specifically so it does not
+    depend on the heading having survived, since the whole point is that the
+    heading is the thing that's gone. When a `looks_corrupt` review sits AT
+    the current tip, `_gate` reports a new, distinct, loud state:
+    `unreadable(<sha>)` -- checked in both places a review can otherwise
+    disappear (the `length == 0` no-heading-match branch, and the
+    `$current | length == 0` all-matched-reviews-are-stale branch), never
+    silently folded into `none` or `stale(...)`. The main script's
+    NEXT-ACTION case statement maps it to `RE-POST -- qc-<gate> review body
+    unreadable (newline-collapsed) at $tip`, distinct from both `ADJUDICATE`
+    (unclear) and `re-run qc-<gate> at $tip` (stale) -- and, being outside
+    every pattern that leads to `MERGE`, falls to the safe `inspect manually`
+    catch-all even if the explicit case were ever removed (verified by
+    mutation, see below).
+
+  **Scoping decision, stated explicitly:** this fix covers the shape
+  actually observed on #2663 -- the ENTIRE review (heading included)
+  collapsed to one line, so it vanishes from heading-attribution entirely.
+  A narrower corruption (heading survives, only the embedded "## Verdict"
+  section loses its line breaks) still reaches `review_result`'s existing
+  verdict-matching logic, finds zero verdict matches, and reads `unclear` --
+  which already fails closed (never `ok`) and is a well-understood
+  "needs a human" state distinct from a false-green. Left alone rather than
+  over-scoped into this same fix.
+
+  **Verify:** `sh dev/scripts/pr_gate_status_test.sh` -- 68 tests clean (59
+  pre-existing + 9 new: cases 51-57, one of which asserts 2 sub-checks).
+  `sh trading/devtools/checks/pr_gate_status_mutation_test.sh` -- unaffected,
+  still 16/16 matching pin (11 killed / 4 live survivor / 1 equivalent
+  mutant) -- this PR's production change does not touch any of the 16
+  pinned mutations' target lines (the sha-extraction regex was relocated,
+  not altered, into the new `review_sha` def, preserving `x5`'s single
+  target occurrence of `[0-9a-f]{7,40}`).
+
+  **RED/GREEN non-vacuity proof, measured directly:**
+  - (RED 1) `looks_corrupt`'s final line replaced with `| false;` (detector
+    disabled): 4 of the 9 new assertions fail --
+    `want unreadable(7dc57cc0), got none` (x2, cases 51),
+    `want unreadable(7dc57cc0), got stale(deadbeef)` (case 55, the exact
+    #2663 shape), `want REPOST, got other` (case 57, e2e) -- while the 5
+    control assertions (52, 53, 54, 56) correctly stay green, since they
+    assert the ABSENCE of the new state. (GREEN) restoring the file: 68/68
+    clean.
+  - (RED 2) the two new `*:unreadable*:*` / `*:*:unreadable*` NEXT-ACTION
+    case-statement lines deleted: case 57 (e2e) fails `want REPOST, got
+    other` -- `other`, not `MERGE`, confirming the catch-all `inspect
+    manually` default still fails closed even without the explicit case.
+    (GREEN) restoring the file: 68/68 clean.
+
+  Files touched: `dev/scripts/pr_gate_status.sh` (new `review_sha` +
+  `looks_corrupt` defs, `review_result` now calls `review_sha` instead of
+  inlining it, `$corrupt_sha` computed once per `_gate` call and consulted
+  in the `none`/`stale` branches, new NEXT-ACTION case-statement rows, header
+  comment updated), `dev/scripts/pr_gate_status_test.sh` (cases 51-57), this
+  entry.
+
+  **Rework iteration 1 (PR #2676, qc-behavioral review 5121326258).** Two
+  CP FAILs, both "the property is real but pinned at only one call site, so a
+  mutation removes it and the suite stays green":
+
+  - **CP4** -- `looks_corrupt`'s `$has_verdict_word and (...)` guard had no
+    assertion querying a gate the fixture does NOT name. Removing
+    `$has_verdict_word and` survived 68/68 because case 56
+    (`NO_VERDICT_SECTION`) only ever queries the "behavioral" gate its own
+    heading names, which never reaches the corrupt-scan branch at all. Fixed:
+    case 58 queries the SAME fixture for "structural" (a gate it does not
+    name), landing in the corrupt-scan branch and pinning `none`, not
+    `unreadable`.
+  - **CP2** -- branch (b) (`$len > 200 and $newlines < 3`, the "verdict
+    happens to still anchor at position 0" case) had no fixture at all.
+    Fixed: case 59 builds a >200-char, newline-sparse, no-gate-heading body
+    whose "## Verdict APPROVED" genuinely anchors at position 0 -- pinning
+    `unreadable(<sha>)` for both gates.
+
+  Both confirmed by hand: mutation applied to a scratch copy (`cmp` confirmed
+  non-vacuous), the unmodified 68-case suite re-run against it stayed green
+  pre-fix and went red post-fix naming exactly the new case, mutation
+  reverted. See the two new cases' own doc comments in
+  `pr_gate_status_test.sh` for the full mutation text.
+
+  **Also raised, and handled:**
+  - **Genuine over-fire, fixed:** `## Verdict: APPROVED` (compact, colon
+    style) used to be classified corrupt/unclear because the gap-class
+    `[ *`\r\n]` in both `looks_corrupt` and `review_result`'s verdict regex
+    excluded `:`. Widened to `[ :*`\r\n]` in both places (kept in sync
+    deliberately). Cases 60-61 pin the two symptoms this caused: the gate a
+    colon-style review actually names now reads its real verdict instead of
+    `unclear`, and an unrelated gate it never claimed now reads `none`
+    instead of a false `unreadable(<sha>)`.
+  - **Genuine over-fire, accepted (not fixed):** the corrupt-scan runs over
+    every review in the array regardless of authorship, so an ordinary,
+    non-QC review whose body happens to mention an unfenced verdict-shaped
+    heading (without a real anchored verdict elsewhere) can flag an
+    undispatched gate as `unreadable` instead of `none`. Still fails closed
+    (RE-POST, never MERGE); narrow (needs a formal GitHub PR *review*, not a
+    plain comment, that coincidentally resembles a QC block); a real fix
+    needs author-based filtering, a materially larger change than this PR's
+    scope. Documented in `looks_corrupt`'s doc comment, not pinned by a test,
+    same treatment as case 26's known pre-existing gap.
+  - **PR-body overclaim, corrected:** "unreadable never reaches MERGE" is
+    true of the state-to-action mapping (a returned `unreadable(<sha>)` can
+    only ever map to RE-POST) but is not a completeness claim about
+    detection. `$corrupt_sha` is computed once per `_gate` call but only
+    consulted in the `none`/`stale` branches -- if a readable, heading-matched
+    sibling review for the SAME gate exists at the same tip, the corrupt
+    sibling is silently dropped from consideration (pre-existing aggregation
+    behaviour, unchanged by this fix, not a regression it introduced) and the
+    gate reads whatever the readable sibling says, including `ok`. Documented
+    at the point `$corrupt_sha` is computed in `_gate` and in the file header;
+    NOT fixed here (deciding whether a corrupt sibling should demote an
+    otherwise-clean aggregation is a real design call, same category as the
+    open sha-less-aggregation question this file already defers to a human).
+
+  **Verify (rework iteration 1):** `sh dev/scripts/pr_gate_status_test.sh` --
+  73 tests clean (68 prior + 5 new: case 58, case 59 with 2 sub-checks, cases
+  60-61). `sh trading/devtools/checks/pr_gate_status_mutation_test.sh` --
+  unaffected, still 16/16 matching pin. `dune build @fmt && dune build &&
+  dune runtest` all exit 0, 0 `^FAIL:` lines.

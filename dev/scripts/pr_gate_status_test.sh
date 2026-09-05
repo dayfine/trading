@@ -1243,6 +1243,235 @@ APPROVED"
 check "(g) 2/2: a hash with no following space before the real heading does not mask it -- behavioral gate still reads ok" \
   ok "$(_gate "$(reviews "$NO_SPACE_AFTER_HASH_MASKS_REAL_HEADING")" behavioral "$TIP")"
 
+# --- 51-57: H-QC-VERDICT-NEWLINE-COLLAPSE (dev/status/harness.md, PR #2663) -
+# On PR #2663 a qc-structural review was posted APPROVED at the correct tip,
+# but the GitHub API returned its body with EVERY newline collapsed -- one
+# line reading "...all passing).## VerdictAPPROVED". Every heading regex in
+# this parser requires `^` at a REAL line start, so the review failed its
+# own heading-attribution test and vanished from $results entirely; the gate
+# fell back to an OLDER, genuinely-parseable review and reported the
+# misleading `stale(25d1a938)` -- naming the wrong review as the problem and
+# telling the operator to "re-run qc-structural" when a review HAD been
+# posted, it just could not be read.
+#
+# Fix: `looks_corrupt` flags a review whose body contains "## Verdict" as a
+# loose, unanchored substring but where the real, anchored verdict regex
+# never matches it (or the body is long with almost no newlines) -- the
+# signature of newline collapse. When such a review sits AT THE CURRENT TIP,
+# the gate reports "unreadable(<sha>)" instead of "none"/"stale(<sha>)".
+# "unreadable" must never be "ok" (fails closed, same as "unclear") and must
+# never be indistinguishable from "stale" (the two need different fixes: a
+# re-post vs. a fresh QC pass).
+
+# Single-line body (built with a shell double-quoted string that spans no
+# real newline) mimicking the observed corruption: content is otherwise a
+# normal checklist review, but "## Verdict" never lands at a genuine line
+# start.
+NEWLINE_COLLAPSED_APPROVED="Reviewed SHA: $TIP Structural QC checklist: file scope clean, naming consistent, no magic numbers introduced, all tests passing).## VerdictAPPROVED"
+
+# 51. THE REGRESSION ITSELF: a newline-collapsed APPROVED review, alone, at
+#     the current tip must read "unreadable(<sha>)" for the gate it would
+#     otherwise vanish from -- never "none" (which would read as "nothing
+#     posted yet, dispatch QC") and never "ok".
+check "newline-collapsed APPROVED at the current tip reads unreadable, not none" \
+  "unreadable(7dc57cc0)" "$(_gate "$(reviews "$NEWLINE_COLLAPSED_APPROVED")" behavioral "$TIP")"
+check "...and the same for the structural gate (heading is unreadable for BOTH, not just one)" \
+  "unreadable(7dc57cc0)" "$(_gate "$(reviews "$NEWLINE_COLLAPSED_APPROVED")" structural "$TIP")"
+
+# 52. CONTROL (the point of a detector is what it does NOT fire on): the
+#     identical content, properly newlined, must read completely normally --
+#     "ok" for its own gate, and a plain "none" (not "unreadable") for the
+#     gate it does not name. Proves the detector keys off newline collapse,
+#     not off content ("Structural QC", "checklist", etc).
+PROPERLY_NEWLINED_COUNTERPART="Reviewed SHA: $TIP
+
+## Structural QC checklist
+
+File scope clean, naming consistent, no magic numbers introduced, all tests
+passing.
+
+## Verdict
+
+APPROVED"
+
+check "control: the properly-newlined counterpart reads ok for its own gate" \
+  ok "$(_gate "$(reviews "$PROPERLY_NEWLINED_COUNTERPART")" structural "$TIP")"
+check "control: ...and plain none (not unreadable) for the gate it does not name" \
+  none "$(_gate "$(reviews "$PROPERLY_NEWLINED_COUNTERPART")" behavioral "$TIP")"
+
+# 53. CONTROL: a genuinely stale prior verdict, with no corruption anywhere in
+#     the reviews array, must keep reading "stale(<old-sha>)" -- unaffected by
+#     this fix. Reuses STALE_BEHAVIORAL (case 6) to pin the exact previous
+#     behaviour still holds.
+check "control: genuinely stale verdict (no corruption present) still reads stale, not unreadable" \
+  "stale(deadbeef)" "$(_gate "$(reviews "$STALE_BEHAVIORAL")" behavioral "$TIP")"
+
+# 54. CONTROL: the SAME collapsed review, evaluated against an UNRELATED tip,
+#     must read "none" -- the detector is scoped to the CURRENT tip, not "any
+#     corrupt review anywhere in the array flags every gate on every PR".
+check "control: a collapsed review at an UNRELATED tip does not trigger unreadable" \
+  none "$(_gate "$(reviews "$NEWLINE_COLLAPSED_APPROVED")" behavioral "9999999999999999999999999999999999999999")"
+
+# 55. THE EXACT #2663 SHAPE: an older, properly-formatted, genuinely stale
+#     review ("deadbeef") COEXISTS with a newline-collapsed review AT the
+#     current tip. Before this fix, $results only ever contained the stale
+#     review (the collapsed one never attributes to any heading), so the gate
+#     reported "stale(deadbeef)" -- exactly PR #2663's live
+#     `stale(25d1a938)` misdiagnosis. Must now read "unreadable(<sha>)",
+#     naming the review that actually exists at the tip.
+STALE_PLUS_CORRUPT_AT_TIP=$(jq -nc --arg a "Reviewed SHA: deadbeef
+
+## Behavioral QC — an earlier tip
+
+## Verdict
+
+APPROVED" --arg b "$NEWLINE_COLLAPSED_APPROVED" '[{body: $a}, {body: $b}]')
+
+check "#2663 shape: a stale review plus a collapsed review AT the tip reads unreadable, not stale(deadbeef)" \
+  "unreadable(7dc57cc0)" "$(_gate "$STALE_PLUS_CORRUPT_AT_TIP" behavioral "$TIP")"
+
+# 56. GUARD: a body that never mentions a verdict at all (case 11's shape --
+#     genuinely unfinished, not corrupted) must never be flagged as
+#     "unreadable" merely for being short or having few newlines. Re-asserts
+#     case 11's fixture directly against this fix's own detector to make the
+#     non-interaction explicit rather than relying on case 11 not regressing
+#     silently.
+check "an unfinished review with no verdict mention anywhere stays unclear, never unreadable" \
+  unclear "$(_gate "$(reviews "$NO_VERDICT_SECTION")" behavioral "$TIP")"
+
+# 57. END TO END: the real script (not just _gate) must route a collapsed
+#     review to a distinct, loud NEXT-ACTION that is never "MERGE" and never
+#     reads as a plain "re-run QC" (stale's action) -- proving the fail-closed
+#     property holds through the whole CLI, not just the library function.
+NEWLINE_E2E_STUB_DIR=$(mktemp -d)
+cat > "$NEWLINE_E2E_STUB_DIR/gh" <<'STUB'
+#!/bin/sh
+case "$1 $2" in
+  "pr list")
+    printf '%s\n' "$GATE_PR_NUMBER"
+    ;;
+  "pr view")
+    jq -n --arg tip "$GATE_TIP" --argjson reviews "$GATE_REVIEWS_JSON" --arg files "$GATE_FILES" \
+      --argjson labels "${GATE_LABELS_JSON:-[]}" \
+      '{headRefOid: $tip,
+        files: ($files | split("\n") | map(select(length > 0) | {path: .})),
+        reviews: $reviews,
+        labels: $labels}'
+    ;;
+  "pr checks")
+    printf '%s\n' "$GATE_CHECKS" | awk 'NF{print "check-name\t" $0 "\tlink"}'
+    ;;
+esac
+STUB
+chmod +x "$NEWLINE_E2E_STUB_DIR/gh"
+
+GATE_PR_NUMBER=502
+GATE_TIP=$TIP
+GATE_FILES="trading/foo/bar.ml"
+GATE_CHECKS="pass"
+GATE_LABELS_JSON='[]'
+export GATE_PR_NUMBER GATE_TIP GATE_FILES GATE_CHECKS GATE_LABELS_JSON
+GATE_REVIEWS_JSON=$(reviews "$NEWLINE_COLLAPSED_APPROVED")
+export GATE_REVIEWS_JSON
+row=$(_e2e_probe "$NEWLINE_E2E_STUB_DIR" "" 502 | tail -1)
+case "$row" in
+  *"RE-POST"*) got=REPOST ;;
+  *MERGE*)     got=MERGE ;;
+  *)           got=other ;;
+esac
+check "H-QC-VERDICT-NEWLINE-COLLAPSE e2e: a newline-collapsed review at the tip never reaches MERGE" \
+  REPOST "$got"
+rm -rf "$NEWLINE_E2E_STUB_DIR"
+
+# --- 58-61: qc-behavioral rework iteration 1 of #2676 (review 5121326258) --
+# Two CP FAILs on the H-QC-VERDICT-NEWLINE-COLLAPSE work above: the
+# `looks_corrupt` guard and its two detection branches were each real
+# properties of the shipped code, but pinned at only ONE call site apiece, so
+# a one-line mutation removed the property and the suite stayed green. Cases
+# 58-59 below are the direct kill for each; both were verified BY HAND before
+# being written here: apply the mutation to a scratch copy of
+# dev/scripts/pr_gate_status.sh, confirm with `cmp` that it actually changed
+# the file (a mutation that silently does not apply is a false survivor, same
+# discipline as trading/devtools/checks/pr_gate_status_mutation_test.sh's own
+# NON-VACUITY guard), re-run this suite unmodified against the mutated copy,
+# confirm it goes red naming exactly this case, then revert.
+
+# 58. CP4 FAIL: `$has_verdict_word and (...)` in `looks_corrupt` -- drop
+#     `$has_verdict_word and` (leaving just the parenthesized OR) and the
+#     69-case suite up to this point stays green, because every existing
+#     fixture that reaches the corrupt-scan branch either already has a real
+#     "## Verdict" substring (so the guard was never the thing keeping it
+#     "none") or is case 11/56's NO_VERDICT_SECTION, whose own assertion only
+#     ever queries the "behavioral" gate -- the ONE gate whose heading DOES
+#     match this fixture, so it never reaches the corrupt-scan branch at all
+#     (heading attribution succeeds first) and the guard removal has no
+#     effect there either. Querying the SAME fixture for "structural" (a gate
+#     its heading does NOT name) is what actually exercises the corrupt-scan
+#     branch: pre-mutation, `has_anchored_verdict` is false (no "## Verdict"
+#     substring anywhere) but so is `has_verdict_word`, so `looks_corrupt` is
+#     false and the gate correctly reads "none" (nothing was ever posted for
+#     structural). Confirmed RED (reads "unreadable(7dc57cc0)" instead) with
+#     `$has_verdict_word and` deleted from `looks_corrupt` -- the bare
+#     `(not-anchored or ...)` term is true whenever a review carries no
+#     verdict at all, which is every unfinished review, not just corrupted
+#     ones.
+check "CP4: an unfinished review naming only ONE gate reads none (not unreadable) for the OTHER, unnamed gate" \
+  none "$(_gate "$(reviews "$NO_VERDICT_SECTION")" structural "$TIP")"
+
+# 59. CP2 FAIL: branch (b) of `looks_corrupt` -- `($len > 200 and $newlines <
+#     3)` -- catches a collapse that, by coincidence, still lines up "##
+#     Verdict" at the true start of the body (so the ANCHORED regex matches
+#     fine and $has_anchored_verdict is true) but the rest of the review is
+#     squashed onto that same line. No pre-#2676 fixture exercises this: every
+#     existing "corrupt" fixture fails the anchor itself. Built here: zero
+#     newlines, well over 200 characters, and a real "## Verdict APPROVED"
+#     match at position 0 -- with NO heading naming either gate (the entire
+#     rest of the body is prose, not a "## Structural QC" / "## Behavioral
+#     QC" heading), so both gate calls fall into the corrupt-scan branch.
+#     Confirmed RED (reads "none" for both gates instead) with the
+#     `or ($len > 200 and $newlines < 3)` disjunct deleted from
+#     `looks_corrupt` -- with only branch (a) left, a body whose verdict DOES
+#     anchor correctly is never flagged, no matter how squashed the rest of
+#     it is.
+NEWLINE_COLLAPSED_VERDICT_LUCKY_POSITION_ZERO="## Verdict APPROVED — Structural QC checklist: file scope clean, naming consistent, no magic numbers introduced, all tests passing, docstrings updated, coverage confirmed, review complete and thorough across every changed module in this diff."
+
+check "CP2: a body-long, newline-sparse review whose verdict happens to anchor at position 0 still reads unreadable (structural)" \
+  "unreadable(7dc57cc0)" \
+  "$(_gate "$(reviews "$NEWLINE_COLLAPSED_VERDICT_LUCKY_POSITION_ZERO" "$TIP")" structural "$TIP")"
+check "CP2: ...and the same for the behavioral gate (no heading names either, so both fall into the corrupt scan)" \
+  "unreadable(7dc57cc0)" \
+  "$(_gate "$(reviews "$NEWLINE_COLLAPSED_VERDICT_LUCKY_POSITION_ZERO" "$TIP")" behavioral "$TIP")"
+
+# 60-61. Genuine over-fire found alongside CP4/CP2 (same review, "Also
+# raised"): a compact, colon-style verdict heading ("## Verdict: APPROVED",
+# one line, no blank-line separation) used to fail the ANCHORED regex in both
+# `looks_corrupt` and `review_result` -- the gap class between "Verdict" and
+# its token did not include `:`. Two distinct symptoms of the same root
+# cause, both confirmed RED against the pre-fix class (`[ *`\r\n]`, no colon)
+# before the class was widened to `[ :*`\r\n]` in this rework:
+#   - queried for the gate its OWN heading names: `has_verdict_word` true,
+#     `has_anchored_verdict` false -> heading attribution succeeds (this
+#     review names its own gate) so the corrupt-scan is never consulted, but
+#     `review_result`'s identical, un-widened regex ALSO failed to match, so
+#     the real APPROVED verdict was lost and the gate read "unclear" for a
+#     perfectly well-formed review.
+#   - queried for the OTHER gate (never named by this review at all): heading
+#     attribution fails (as it should -- this review never claimed to review
+#     that gate), so the corrupt-scan runs; pre-fix, `looks_corrupt` was true
+#     (verdict word present, anchor broken by the colon) and the OTHER gate --
+#     which was simply never reviewed -- read a false "unreadable(<sha>)"
+#     instead of the correct "none".
+COLON_STYLE_VERDICT="Reviewed SHA: $TIP
+
+## Behavioral QC — compact colon-style verdict
+
+## Verdict: APPROVED"
+
+check "colon-style verdict: the gate it actually names reads its real ok verdict, not unclear" \
+  ok "$(_gate "$(reviews "$COLON_STYLE_VERDICT")" behavioral "$TIP")"
+check "colon-style verdict: an unrelated, never-reviewed gate reads none, not a false unreadable" \
+  none "$(_gate "$(reviews "$COLON_STYLE_VERDICT")" structural "$TIP")"
+
 if [ "$fails" -gt 0 ]; then
   printf 'FAIL: pr_gate_status linter -- %d test(s) failed.\n' "$fails"
   exit 1
