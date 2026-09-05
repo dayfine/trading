@@ -84,8 +84,9 @@ NVDA 2020-04-06 (1,988 sh @ 66.51 → 495.22) **+$852k**, MSTR 2023-11-13
 +$78k, PKG +$22k, R +$18k, PAA −$6k. The null entered the same NVDA
 position on the same day and laggard-rotated it out on 2020-11-30 for
 +$117k; the arm, with no rotation, simply never sold it. Ex-NVDA (removed
-from both arms) the arm is +$235k ahead on equity, of which STMP is +$171k;
-ex-NVDA-ex-STMP ≈ +$64k with shared drift running −$180k against it — a
+from both arms; realised + engine unrealised on both sides) the arm is +$229k
+ahead on equity, of which STMP is +$171k; ex-NVDA-ex-STMP ≈ +$58k with shared
+drift running −$180k against it — a
 mixed read, not a lever. Per the pre-registered rule this cell's headline is
 a monster and does not count; whether the arm wins ex-monster is what salts
 1–2 and the 2000–04 window are for.
@@ -103,13 +104,13 @@ that one eject is worth more than every rotation combined.
 | null (`rec5y-2000-new-s0`) | 76.64 | 98 | 0.655 | 28.36 | +622,371 | +158,240 | 74 / 19 / 3 |
 | lagoff | 19.67 | 70 | 0.294 | 28.29 | +151,503 | +51,670 | 67 / 0 / 2 |
 
-Equity delta **−$577k**. Shared 66 trades drift **−$169k** — the rotation sold
+Equity delta **−$575k** (realised −$471k, engine unrealised +$54k vs +$158k). Shared 66 trades drift **−$169k** — the rotation sold
 WNC 2003-05-09 at +$271k (2004-03-01) where the arm held it to a stop at
 +$155k (2004-10-26), BEC +12k → −36k, BSC +15k → −5k: in this tape the
 rotation exits *at the top*. Null-only 32 trades **+$276k** — IPIXQ +256k
 (extension stop) and CNX 2000-06 +142k are entries the null could fund
 because rotations released the capital; the arm's 4 unique entries lost
-−$26k. Ex-IPIXQ (the only lopsided monster) the arm is still **−$320k**.
+−$26k. Ex-IPIXQ (the only lopsided monster, null-only +$256k) the arm is still **−$319k**.
 maxDD flat. The rotation survives the fix on this window at salt 0 with the
 opposite sign to 2019–23 — same regime split as the stop width, and for the
 same structural reason: in 2000–04 the things you hold instead of rotating
@@ -123,11 +124,13 @@ go down.
 | 2000–04 | 76.64 / 98 / 0.655 / 28.36 | 75.99 / 98 / 0.652 / 28.37 | −$6k realised | 1 (CRE_old 2000-06-12: +15k force-exit → +10k stop three days later) |
 
 98/98 shared on 2000–04, every other trade identical to the dollar (two
-sub-$100 sizing ripples). With hysteresis 1 the mechanism fires 0–1 times
-per five-year window on the record convention: the stop and the laggard
-rotation take every position out before a Stage-3 streak forms. Not a
-lever in either direction; its salts-1/2 cells are kept for completeness
-(expect the same).
+sub-$100 sizing ripples). With hysteresis 1 the mechanism fires at most once per window-salt on the
+record convention (across the six nulls: CRE_old 2000-06-12 +$15k at every
+2000–04 salt, FHN 2023-03-10 −$10k at 2019–23 salt 1, nothing at 2019–23
+salts 0 and 2 — four single-trade fires): the stop and the laggard rotation
+take every position out before a Stage-3 streak forms. Not a lever in either
+direction; its salts-1/2 cells were dropped after salt 0 (see "Chain trimmed"
+below — each could differ from its null by at most that one trade).
 
 ### Interim — extoff, both windows, salt 0 (16:31 PDT): the extension stop is the blow-off catcher, and only 2000–04 has blow-offs
 
@@ -176,15 +179,18 @@ window.
 
 | arm | 2019–23 Δ equity | 2019–23 ex-monster | 2000–04 Δ equity | 2000–04 ex-monster | read |
 |---|---:|---|---:|---|---|
-| lagoff | +$970k | NVDA hold +$852k; ex-NVDA-ex-STMP ≈ +$64k, shared drift −$180k | −$577k | ex-IPIXQ −$320k, shared drift −$169k | rotation survives; 2019 is a lottery |
+| lagoff | +$965k | NVDA hold +$852k; ex-NVDA-ex-STMP ≈ +$58k, shared drift −$180k | −$575k | ex-IPIXQ −$319k, shared drift −$169k | rotation survives; 2019 is a lottery |
 | s3off | 0 (identical) | never fires | −$6k (1 fire) | — | inert |
 | extoff | 0 (identical) | never fires | −$283k | all shared drift (3 blow-off exits) | survives; regime lever |
 | clock52 | +$515k | MSTR +$561k; ex-MSTR −$138k, maxDD +11pp | −$30k | neutral | lottery on 2019, neutral on 2000 |
 
 **Chain trimmed after salt 0 (deviation from the design, recorded here):**
-s3off (both windows) and extoff-2019 are dropped from salts 1–2 — a
-mechanism that never fires produces the null digit-for-digit at every salt,
-so those six cells would be copies of the existing nulls. Salts 1–2 run
+s3off (both windows) and extoff-2019 are dropped from salts 1–2. extoff-2019:
+the 2019–23 null has zero `extension_stop` exits at all three salts, so those
+cells would be the null digit-for-digit. s3off: the nulls fire at most once
+per window-salt (four single-trade fires ≤ $15k across the six nulls), so each
+dropped cell could differ from its null by one trade — not worth ~70 minutes
+of container time against a mechanism already read as inert. Salts 1–2 run
 lagoff (both windows), extoff-2000 and clock52 (both windows): 10 cells.
 
 ### lagoff, salt 1 (17:27 PDT) — the same two shapes
@@ -227,11 +233,12 @@ at two salts.
 
 | cell | null (b1.0-s2) | arm | Δ realised | shared drift | the trades | maxDD |
 |---|---|---|---:|---:|---|---|
-| lagoff-2000-s2 | 75.73 / 98 / 28.36 | 18.96 / 70 / 28.48 | −$469k | −$168k (66) | WNC +$270k rotated → +$154k stopped; null-only IPIXQ +$255k, CNX +$141k; **ex-IPIXQ −$214k** | +0.1pp |
+| lagoff-2000-s2 | 75.73 / 98 / 28.36 | 18.96 / 70 / 28.48 | −$469k realised (equity **−$573k**) | −$168k (66) | WNC +$270k rotated → +$154k stopped; null-only IPIXQ +$255k, CNX +$141k; **ex-IPIXQ −$318k equity** | +0.1pp |
 | extoff-2000-s2 | 75.73 / 98 / 28.36 | 47.94 / 94 / 32.57 | −$187k | −$224k (90) | APWR +$90k → +$3k, IPIXQ +$255k → +$184k, WNC sized smaller | **+4.2pp** |
 
 Salt-by-salt on 2000–04 the two mechanisms are near-invariant: laggard
-rotation is worth +$320k / +$369k / +$214k ex-monster (realised + unrealised),
+rotation is worth +$319k / +$369k / +$318k ex-monster (realised + engine
+unrealised, both arms),
 the extension stop +$190k / +$187k / +$187k — the same named trades every
 time. Only the clock's salt-2 pair remains.
 
@@ -249,8 +256,8 @@ exceeds half of |Δ|; shared drift in parentheses.
 
 | arm | 2019–23 s0 / s1 / s2 | 2000–04 s0 / s1 / s2 | rule outcome | what the record does |
 |---|---|---|---|---|
-| **lagoff** | raw +$970k / +$885k / +$969k = NVDA hold +$852k / +$857k / +$857k; ex-NVDA ≈ +$235k / +$147k / +$231k (drift −$180k / −$182k / −$160k); maxDD +2.6 / +4.8 / +2.4pp | −$577k / −$369k / −$469k; ex-IPIXQ −$320k / −$369k / −$214k (drift −$169k / −$173k / −$168k); maxDD 0 / +9.0 / +0.1pp | wins ONE window ex-monster (2019, on fewer re-entries), loses the other 3/3 on every line → **regime-dependent dial** | **keeps laggard rotation on** |
-| **s3off** | 0 / — / — (never fires) | −$6k / — / — (one fire) | inert | keeps it; it is a no-op on this convention |
+| **lagoff** | raw +$965k / +$879k / +$963k = NVDA hold +$852k / +$857k / +$857k; ex-NVDA +$229k / +$142k / +$226k (drift −$180k / −$182k / −$160k); maxDD +2.6 / +4.8 / +2.4pp | −$575k / −$369k / −$573k; ex-IPIXQ −$319k / −$369k / −$318k (drift −$169k / −$173k / −$168k); maxDD 0 / +9.0 / +0.1pp | wins ONE window ex-monster (2019, on fewer re-entries), loses the other 3/3 on every line → **regime-dependent dial** | **keeps laggard rotation on** |
+| **s3off** | 0 (s0; the s1 null fires once, FHN −$10k, cell dropped) | −$6k (s0; one CRE_old fire in every 2000–04 null, cells dropped) | inert | keeps it; it is a no-op on this convention |
 | **extoff** | 0 / — / — (never fires) | −$283k / −$217k / −$280k, all shared drift (−$225k / −$155k / −$224k); maxDD +4.2 / +8.7 / +4.2pp | loses 3/3 where it fires, never wins | **keeps the extension stop on** |
 | **clock52** | +$515k / +$316k / +$507k = MSTR +$561k / +$563k / +$562k; ex-MSTR **−$46k / −$247k / −$55k**; maxDD **+10.8 / +13.0 / +10.8pp** | −$30k / −$20k / −$31k (realised +$5k / +$15k / +$4k) | wins NEITHER ex-monster; worse maxDD 3/3 on 2019 | **keeps the clock-0 pin**; see the flag below |
 

@@ -12,7 +12,7 @@ half-done (built from the CSV store; the EODHD gap fetch is open); P2 carries.
   salts 0–2; nulls reused from record-rebase + stop-width at the same build
   `e4984c5fe`). **Every mechanism the record arms survives the fix**:
   laggard rotation and the extension stop are regime dials worth
-  $200–370k on 2000–04 (keep on); stage-3 force-exit is inert (0–1 fires);
+  $320–370k on 2000–04 (keep on); stage-3 force-exit is inert (0–1 fires);
   clock 52 is an MSTR lottery on 2019–23 (ex-MSTR loses 3/3, maxDD +11–13pp)
   and neutral on 2000–04 (record keeps the clock-0 pin). No arm won both
   windows → no 26y run; record convention unchanged. Memory:
