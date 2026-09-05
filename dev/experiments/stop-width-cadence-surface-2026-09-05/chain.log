@@ -1,0 +1,81 @@
+[09-05 00:15:10] run tree HEAD=e4984c5fe (expect e4984c5fe)
+[09-05 00:15:14] RUN sw5y-2019-w4-W-s0
+[09-05 00:15:14] RUN sw5y-2019-w4-D-s0
+[09-05 00:35:19] RESULT sw5y-2019-w4-W-s0 => total_return_pct 3.498723955015326 total_trades 189 win_rate 30.158730158730158 sharpe_ratio 0.13315954203984284 max_drawdown_pct 27.36337405556618  (wall 1205s)
+[09-05 00:35:29] RESULT sw5y-2019-w4-D-s0 => total_return_pct 16.792748043895 total_trades 179 win_rate 29.608938547486037 sharpe_ratio 0.2613116138679743 max_drawdown_pct 22.0449294765248  (wall 1215s)
+[09-05 00:35:30] RUN sw5y-2000-w4-W-s0
+[09-05 00:35:30] RUN sw5y-2019-w8-D-s0
+[09-05 00:56:19] RESULT sw5y-2019-w8-D-s0 => total_return_pct 5.18392023018992 total_trades 156 win_rate 30.128205128205128 sharpe_ratio 0.14890099528873513 max_drawdown_pct 27.255519522280398  (wall 1249s)
+[09-05 00:57:09] RESULT sw5y-2000-w4-W-s0 => total_return_pct 78.257253270335951 total_trades 97 win_rate 31.958762886597935 sharpe_ratio 0.66457713001758367 max_drawdown_pct 28.125313215499894  (wall 1299s)
+[09-05 00:57:10] RUN sw5y-2019-w10-D-s0
+[09-05 00:57:10] RUN sw5y-2000-w8-D-s0
+[09-05 01:19:06] RESULT sw5y-2019-w10-D-s0 => total_return_pct 18.931671104858349 total_trades 184 win_rate 29.891304347826086 sharpe_ratio 0.2699334763811958 max_drawdown_pct 30.939367504237282  (wall 1316s)
+[09-05 01:19:16] RESULT sw5y-2000-w8-D-s0 => total_return_pct 79.861643748346083 total_trades 90 win_rate 36.666666666666664 sharpe_ratio 0.791959950879711 max_drawdown_pct 18.218718425202578  (wall 1326s)
+[09-05 01:19:18] RUN sw5y-2000-w10-D-s0
+[09-05 01:19:18] RUN sw5y-2019-w12-D-s0
+[09-05 01:40:29] RESULT sw5y-2019-w12-D-s0 => total_return_pct 20.480980740316234 total_trades 176 win_rate 36.93181818181818 sharpe_ratio 0.29927780377780927 max_drawdown_pct 32.264180243877234  (wall 1271s)
+[09-05 01:41:34] RESULT sw5y-2000-w10-D-s0 => total_return_pct 79.634843057148913 total_trades 99 win_rate 42.424242424242422 sharpe_ratio 0.85605562060644458 max_drawdown_pct 17.532519442178508  (wall 1336s)
+[09-05 01:41:35] RUN sw5y-2019-w14-D-s0
+[09-05 01:41:35] RUN sw5y-2000-w12-D-s0
+[09-05 02:04:20] RESULT sw5y-2019-w14-D-s0 => total_return_pct 32.478208557018355 total_trades 196 win_rate 39.795918367346935 sharpe_ratio 0.40935707103342556 max_drawdown_pct 21.329189397413238  (wall 1365s)
+[09-05 02:05:06] RESULT sw5y-2000-w12-D-s0 => total_return_pct 72.472919898326325 total_trades 116 win_rate 41.379310344827587 sharpe_ratio 0.73296384976395623 max_drawdown_pct 20.196458094391  (wall 1411s)
+[09-05 02:05:08] RUN sw5y-2019-w8-W-s0
+[09-05 02:05:08] RUN sw5y-2000-w14-D-s0
+[09-05 02:25:37] RESULT sw5y-2019-w8-W-s0 => total_return_pct 1.082965382167371 total_trades 139 win_rate 34.532374100719423 sharpe_ratio 0.10683574108179936 max_drawdown_pct 24.750303908975539  (wall 1229s)
+[09-05 02:28:15] RESULT sw5y-2000-w14-D-s0 => total_return_pct 145.29342507835952 total_trades 123 win_rate 46.341463414634148 sharpe_ratio 1.1732827145137787 max_drawdown_pct 20.064894987317309  (wall 1387s)
+[09-05 02:28:17] RUN sw5y-2000-w8-W-s0
+[09-05 02:28:17] RUN sw5y-2019-w10-W-s0
+[09-05 02:49:17] RESULT sw5y-2019-w10-W-s0 => total_return_pct 18.639265379302135 total_trades 179 win_rate 31.284916201117319 sharpe_ratio 0.2689589576918433 max_drawdown_pct 27.634426406721506  (wall 1260s)
+[09-05 02:49:47] RESULT sw5y-2000-w8-W-s0 => total_return_pct 64.315434572597084 total_trades 89 win_rate 38.202247191011232 sharpe_ratio 0.69018440184464735 max_drawdown_pct 18.218718425202578  (wall 1290s)
+[09-05 02:49:48] RUN sw5y-2000-w10-W-s0
+[09-05 02:49:48] RUN sw5y-2019-w12-W-s0
+[09-05 03:10:42] RESULT sw5y-2019-w12-W-s0 => total_return_pct 56.077509147114824 total_trades 181 win_rate 40.331491712707184 sharpe_ratio 0.58985887843235651 max_drawdown_pct 24.980843659662387  (wall 1254s)
+[09-05 03:11:18] RESULT sw5y-2000-w10-W-s0 => total_return_pct 88.807546396942342 total_trades 98 win_rate 44.897959183673471 sharpe_ratio 0.91102549469366922 max_drawdown_pct 17.532519442178508  (wall 1290s)
+[09-05 03:11:21] RUN sw5y-2000-w12-W-s0
+[09-05 03:11:21] RUN sw5y-2019-w14-W-s0
+[09-05 03:32:39] RESULT sw5y-2019-w14-W-s0 => total_return_pct 18.573095488115026 total_trades 200 win_rate 37 sharpe_ratio 0.28179969491011347 max_drawdown_pct 25.195196235608837  (wall 1278s)
+[09-05 03:33:30] RESULT sw5y-2000-w12-W-s0 => total_return_pct 96.40244798877724 total_trades 117 win_rate 41.880341880341881 sharpe_ratio 0.8767563600309608 max_drawdown_pct 20.276544342972759  (wall 1329s)
+[09-05 03:33:30] RUN sw5y-2000-w14-W-s0
+[09-05 03:55:09] RESULT sw5y-2000-w14-W-s0 => total_return_pct 122.49719242020798 total_trades 129 win_rate 45.736434108527128 sharpe_ratio 1.0373096397319999 max_drawdown_pct 18.460751981523678  (wall 1299s)
+[09-05 03:55:09] SALT 0 COMPLETE
+[09-05 03:55:09] SW0905 CHAIN DONE
+[09-05 03:56:44] run tree HEAD=e4984c5fe (expect e4984c5fe)
+[09-05 03:56:46] v2 salts 1-2 start
+[09-05 03:56:48] RUN sw5y-2019-w14-D-s1
+[09-05 03:56:48] RUN sw5y-2019-w4-D-s1
+[09-05 04:16:46] RESULT sw5y-2019-w4-D-s1 => total_return_pct 8.9518349853218773 total_trades 179 win_rate 29.608938547486037 sharpe_ratio 0.1844225004319342 max_drawdown_pct 25.585665170098572  (wall 1198s)
+[09-05 04:18:29] RESULT sw5y-2019-w14-D-s1 => total_return_pct 16.480272478695422 total_trades 204 win_rate 37.254901960784316 sharpe_ratio 0.26293065219055239 max_drawdown_pct 22.051960725678967  (wall 1301s)
+[09-05 04:18:30] RUN sw5y-2019-w12-W-s1
+[09-05 04:18:30] RUN sw5y-2000-w8-D-s1
+[09-05 04:39:17] RESULT sw5y-2019-w12-W-s1 => total_return_pct 40.811818332159724 total_trades 182 win_rate 42.857142857142854 sharpe_ratio 0.4682446269479828 max_drawdown_pct 27.126007603004631  (wall 1247s)
+[09-05 04:39:27] RESULT sw5y-2000-w8-D-s1 => total_return_pct 80.414398538893465 total_trades 89 win_rate 35.955056179775283 sharpe_ratio 0.7957342910956543 max_drawdown_pct 18.214158633660972  (wall 1257s)
+[09-05 04:39:28] RUN sw5y-2000-w10-W-s1
+[09-05 04:39:28] RUN sw5y-2000-w10-D-s1
+[09-05 05:00:57] RESULT sw5y-2000-w10-W-s1 => total_return_pct 87.989857654105151 total_trades 98 win_rate 44.897959183673471 sharpe_ratio 0.90530306845001829 max_drawdown_pct 17.535063201413724  (wall 1289s)
+[09-05 05:00:59] RESULT sw5y-2000-w10-D-s1 => total_return_pct 78.674831146226325 total_trades 99 win_rate 42.424242424242422 sharpe_ratio 0.8489166827837219 max_drawdown_pct 17.535063201413724  (wall 1291s)
+[09-05 05:01:01] RUN sw5y-2000-w12-W-s1
+[09-05 05:01:01] RUN sw5y-2000-w14-D-s1
+[09-05 05:23:12] RESULT sw5y-2000-w12-W-s1 => total_return_pct 95.396258158147077 total_trades 117 win_rate 42.735042735042732 sharpe_ratio 0.870671612301669 max_drawdown_pct 20.283777926370171  (wall 1331s)
+[09-05 05:23:26] RESULT sw5y-2000-w14-D-s1 => total_return_pct 93.5175865288414 total_trades 129 win_rate 45.736434108527128 sharpe_ratio 0.89034530322925609 max_drawdown_pct 20.030065571005693  (wall 1345s)
+[09-05 05:23:26] SALT 1 COMPLETE (survivors)
+[09-05 05:23:28] RUN sw5y-2019-w4-D-s2
+[09-05 05:23:28] RUN sw5y-2019-w14-D-s2
+[09-05 05:43:27] RESULT sw5y-2019-w4-D-s2 => total_return_pct 15.539102664179403 total_trades 179 win_rate 29.608938547486037 sharpe_ratio 0.2492998324780597 max_drawdown_pct 22.042023525074331  (wall 1199s)
+[09-05 05:44:47] RESULT sw5y-2019-w14-D-s2 => total_return_pct 19.280688791531045 total_trades 205 win_rate 39.024390243902438 sharpe_ratio 0.28743212060355827 max_drawdown_pct 21.289665125888696  (wall 1279s)
+[09-05 05:44:49] RUN sw5y-2019-w12-W-s2
+[09-05 05:44:49] RUN sw5y-2000-w8-D-s2
+[09-05 06:05:38] RESULT sw5y-2019-w12-W-s2 => total_return_pct 36.267064855310018 total_trades 183 win_rate 42.076502732240442 sharpe_ratio 0.431072163930809 max_drawdown_pct 27.40219878448335  (wall 1249s)
+[09-05 06:05:46] RESULT sw5y-2000-w8-D-s2 => total_return_pct 80.970119313958762 total_trades 89 win_rate 35.955056179775283 sharpe_ratio 0.799456409755583 max_drawdown_pct 18.238987225131851  (wall 1257s)
+[09-05 06:05:48] RUN sw5y-2000-w10-D-s2
+[09-05 06:05:48] RUN sw5y-2000-w10-W-s2
+[09-05 06:27:21] RESULT sw5y-2000-w10-W-s2 => total_return_pct 88.191132834255285 total_trades 98 win_rate 44.897959183673471 sharpe_ratio 0.90575804159460438 max_drawdown_pct 17.542678089115807  (wall 1293s)
+[09-05 06:27:23] RESULT sw5y-2000-w10-D-s2 => total_return_pct 74.708309977258 total_trades 99 win_rate 42.424242424242422 sharpe_ratio 0.82230627561184066 max_drawdown_pct 17.542678089115807  (wall 1295s)
+[09-05 06:27:24] RUN sw5y-2000-w14-D-s2
+[09-05 06:27:24] RUN sw5y-2000-w12-W-s2
+[09-05 06:49:34] RESULT sw5y-2000-w12-W-s2 => total_return_pct 95.65344018518941 total_trades 117 win_rate 41.880341880341881 sharpe_ratio 0.87167940393832366 max_drawdown_pct 20.288107627822818  (wall 1330s)
+[09-05 06:49:44] RESULT sw5y-2000-w14-D-s2 => total_return_pct 88.843297189997671 total_trades 128 win_rate 46.09375 sharpe_ratio 0.86491714785809826 max_drawdown_pct 20.142472128930887  (wall 1340s)
+[09-05 06:49:44] SALT 2 COMPLETE (survivors)
+[09-05 06:49:44] SW0905 V2 DONE
+[09-05 06:50:12] run tree HEAD=e4984c5fe (expect e4984c5fe)
+[09-05 06:50:14] v3 26y confirmation start
+[09-05 06:50:14] RUN sw26y-w14-D-s0

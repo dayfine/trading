@@ -84,6 +84,27 @@ the record caught 2.5% of the tradeable top-5 winners per sector-year.
 
 All three as surfaces per `experiment-flag-discipline.md`, never flips.
 
+## Stop surface — RAN 2026-09-05 00:15–06:50 (P0 item 2 above), 26y confirmation in flight
+
+`dev/experiments/stop-width-cadence-surface-2026-09-05/` (PR opened 09-05 ~07:00): fallback width
+{4, 8, 10, 12, 14}% × cadence {daily, weekly-close}, record convention, fixed basis, 2019–23 on
+the 2019-vintage warehouse (first level-valid record null there: 16.8% / maxDD 22.0) and
+2000–04, salts 0–2 for the survivors. **Widening never cuts the loss bill** (the yearly
+review's counterfactual was wrong on that: survivors of a 4% stop mostly lose 8–14%); it cuts
+≤ 5-day exits 65–87%, lifts win rate 30 → 37–46%, and hands the exit from the stop to the
+laggard rotation (139/40 → ~100/100 on 2019–23). **Two widths pass equity + maxDD on BOTH
+windows at ≥ 2/3 salts: 14% daily (2019 shared drift +$115–166k every salt, maxDD −0.7 to
+−3.5pp; 2000 maxDD −8pp) and 12% weekly-close** (2019 +$204–389k with a salt-stable
+APPS/NVDA/HVT cohort but +1.5 to +5.4pp maxDD; 2000 −8pp). On 2000–04 every width ≥ 8% holds
+maxDD at 17.5–20% vs 28% at 3/3 salts. Cadence is width-dependent (wins only at 12%).
+
+**Next (user decision after the 26y arms land, ~13:00 09-05):** `sw26y-w14-D` and
+`sw26y-w12-W` vs `rec26y-new-s0` (302.65% / maxDD 36.26). If 26y maxDD is not worse, either is
+a promotion CANDIDATE — but **fix #2672 first** (DTV at $0.00 in the 14% arm; wide arms hold
+delisted names longer) and re-run the 26y pair on the fix before any flip PR
+(`config-default-blast-radius.md` paired goldens apply: `initial_stop_buffer` is in
+`weinstein_strategy_config.ml`'s `default_config`).
+
 ## P1 — vintage warehouse gap fetch (carried)
 
 ~600 (2009) / ~730 (2019) names in each composition have no CSV — delisted
