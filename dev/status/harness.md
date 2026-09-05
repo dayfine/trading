@@ -2174,3 +2174,111 @@ Items surfaced in daily summaries but not yet scheduled as T1–T4 items.
   "fixed") (that is separate work, not this item — H-GATEPARSER-CURL-PROJECTION-UNPINNED
   remains untouched too), and the "first→last match" structural mutation noted
   above. `pr_gate_status.sh`'s production logic was not modified by this PR.
+
+## Added 2026-09-05 (lead-orchestrator, GHA run 33962894987)
+
+Three items filed by the orchestrator itself. **The first two were described in
+the 2026-09-04 daily summary as "both filed", but a repo-wide grep this run found
+them in `dev/daily/2026-09-04.md` and the `_index.md` header only — never in this
+file.** Step 2c dispatches from *this* file, so as recorded they were
+undispatchable and would have been lost. Filing them here is the fix; the lesson
+is that "filed" must mean "written to the backlog the dispatcher reads", not
+"described in a run summary".
+
+- [ ] **H-GATE-TWO-VERDICTS-ONE-SHA**: a body-only fix is the correct, cheap
+  response to a PR-body finding — it changes no SHA and re-runs no CI — but it
+  necessarily produces **two behavioral verdicts at one SHA**, which the
+  SHA-keyed `pr_gate_status.sh` cannot rank. It printed
+  `ADJUDICATE -- conflicting verdicts at 8775df22 (behavioral)` on #2664 and
+  correctly refused to decide. Two legitimate mechanisms interacting badly, not
+  a bug in either. Options: (a) rank by `submitted_at` within a SHA — a two-line
+  change to the reader; (b) dismiss the superseded review via the API so only one
+  survives. **Both need a decision, not a patch**, and the decision is the
+  standing Question 1 to the maintainer ("is *latest verdict at the same SHA
+  wins* a rule the orchestrator may apply itself?"). **Status 2026-09-05: the
+  #2664 instance was resolved by the maintainer merging it (`0be43856`,
+  2026-09-04T20:26Z) — that settles the instance but NOT the durable rule, so
+  the next body-only fix reproduces it.**
+  **SECOND INSTANCE, same day (2026-09-05, run 33962894987): PR #2676.** Its
+  re-QC behavioral verdict was NEEDS_REWORK on a **body-only** finding — the PR
+  body still quoted "68 tests clean" against a shipped 73, and asserted a
+  categorical "unreadable never reaches MERGE" that the reviewer showed
+  over-reads what the code guarantees. The orchestrator corrected the body (no
+  commit, no SHA change, CI not re-run) and then **stopped**: asking for a
+  re-read at the same SHA would produce two behavioral verdicts at `cd7a3bc7`
+  and land back on `ADJUDICATE`, and the orchestrator had itself written both
+  the original body and the correction — merging would be automation breaking a
+  tie in favour of its own work, the #2384 shape. **Two instances in two days
+  means this is not an edge case; it is the normal cost of the (correct, cheap)
+  body-only fix.** The cheapest durable answer is a one-line rule from the
+  maintainer; the two-line reader change (rank by `submitted_at` within a SHA)
+  is the mechanical alternative. `harness_gap: ONGOING_REVIEW`.
+  (source: 2026-09-04 run 33894722318; second instance 2026-09-05 run 33962894987)
+
+- [ ] **H-QC-VERDICT-NEWLINE-COLLAPSE**: a QC review can post with every newline
+  stripped — the whole body one line, reading `...all passing).## VerdictAPPROVED`.
+  It renders acceptably for a human but is **invisible to `pr_gate_status.sh`**,
+  which anchors on `^## Verdict`, so a current APPROVED reads as `stale(<sha>)`.
+  Observed once (#2663's re-structural review, 2026-09-04); the reviewer's `POST`
+  returned success both times, so **nothing detects it**. It failed in the safe
+  direction (unreadable → *stale*, never *approved*) and that property must be
+  preserved by any fix. **A dispatch against this item is in flight this run**
+  (branch `harness/qc-verdict-newline-collapse`) scoped to a gate-side *detector*
+  — the posting side lives in `.claude/agents/**`, which this runtime cannot
+  write. `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-09-04 orchestrator run 33894722318)
+
+- [ ] **H-SETTINGS-HOOKS-ABSOLUTE-LOCAL-PATH**: both hooks in
+  `.claude/settings.json` are hardcoded to **macOS-local absolute paths** that
+  cannot exist on a GHA runner:
+  `SessionStart -> bash /Users/difan/Projects/trading-1/dev/scripts/sweep_stale_worktrees.sh ...`
+  and `Stop -> bash /Users/difan/Projects/trading-1/dev/scripts/cleanup_merged_worktrees.sh`.
+  Every containerised workflow loads project settings (`settingSources:
+  ["user","project","local"]`, confirmed in the SDK-options block of all three
+  container workflows' logs), so **both hooks fail on every GHA run of every
+  workflow**, silently — no gate observes hook exit status. Consequence: the
+  worktree sweep and merged-worktree cleanup that `worktree-isolation.md`
+  §Cleanup documents as automatic have never once run in CI, so stale
+  `.claude/worktrees/` and orchestrator `wt-*` trees accumulate on runner disk
+  with no reclaim path but the per-run fresh checkout. Fix shape: use the
+  repo-relative form (`bash dev/scripts/sweep_stale_worktrees.sh ...`), which
+  works in both environments. Same defect class as the book path in
+  `.claude/rules/book-as-authority.md` — except that one *documents* its
+  local-only nature and supplies a detection snippet; these do not.
+  **Explicitly NOT the cause of #2662**: the two workflows that succeed load the
+  identical settings file and fail the identical hooks (verified against
+  successful runs 33408488106 and 33894722318). `harness_gap: LINTER_CANDIDATE`
+  (a settings-path linter asserting no absolute `/Users/` or `/home/<user>/`
+  prefix in `.claude/settings.json` is a few lines and closes the class).
+  (source: 2026-09-05 orchestrator run 33962894987, found while diagnosing #2662)
+
+- [ ] **H-AGENT-WORKTREE-DISK-16GB-EACH**: measured 2026-09-05 (run 33962894987)
+  — **a dispatched agent's worktree costs ~16 GB once it has run `dune build`**,
+  and the GHA runner has ~145 GB total with ~13 GB already taken by the main
+  checkout. Three concurrent QC worktrees measured **16 GB / 16 GB / 16 GB = 48
+  GB**; combined with image layers and `_build` growth this run reached **100%
+  disk** and the harness's own task-output filesystem returned **ENOSPC**
+  (`the temp filesystem ... is full (0MB free)`), killing a tool call
+  mid-orchestration. Reclaimed 46 GB by removing four finished agents'
+  worktrees. Two consequences worth separating:
+  (a) **`.claude/rules/container-capacity-scheduling.md`'s "cap 3 agents" is
+  stated in terms of memory and cores; it has an undocumented DISK dimension.**
+  3 agents is roughly the disk ceiling too, by coincidence rather than design —
+  and a 4th agent would ENOSPC rather than merely contend. The rule's table
+  should carry a `disk` column (~16 GB per agent worktree, measured) so the two
+  limits are visible together.
+  (b) **The orchestrator batched its worktree cleanup instead of removing each
+  worktree as its agent finished**, which is exactly what `sweep-hygiene.md`
+  §"After each dispatched agent" forbids ("**rm -rf immediately — DON'T
+  batch**"; it cites 5-8 GB each, an underestimate against today's 16 GB). The
+  batching is what turned a survivable 69% into 100%. Fix shape: make the
+  post-agent `git worktree remove --force` unconditional in the orchestrator's
+  Step 4 cleanup rather than deferred to end-of-run, and consider a pre-dispatch
+  `df` guard that refuses a new agent below a free-space floor — a dispatch that
+  ENOSPCs mid-flight destroys the agent's work, which is strictly worse than
+  not dispatching it.
+  Note this cost is **not** avoidable by sharing a `_build`: per issue #2470
+  each agent needs its own worktree precisely so their builds do not contend.
+  The disk cost is the price of that isolation, so the answer is prompt
+  reclamation, not fewer worktrees. `harness_gap: LINTER_CANDIDATE`.
+  (source: 2026-09-05 orchestrator run 33962894987)
