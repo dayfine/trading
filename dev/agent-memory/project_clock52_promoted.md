@@ -74,3 +74,13 @@ re-run matching digit-for-digit; the 3001-symbol `all_eligible` emission
 scan burns HOURS after actual.sexp is written in ~9min — always pass
 `--no-emit-all-eligible` (a pre-reboot run lost ~20h to it, [[feedback_announce_wait_duration]]).
 Related: [[project_fill_model_inversion]], [[project_entry_trigger_decision]].
+
+**AMENDMENT 2026-09-04 (record convention, fixed basis —
+`dev/experiments/exit-lever-surface-2026-09-04/`):** clock 52 vs the record's
+clock-0 pin, 3 salts: 2019–23 +$515k / +$316k / +$507k is MSTR 2020-10-12
+(+$561k arm-only, every salt); ex-MSTR −$46k / −$247k / −$55k and **maxDD
+WORSE by 10.8 / 13.0 / 10.8pp**. 2000–04 neutral (+$4–15k realised). The
+"universal maxDD win" does not hold on this base. Different config base
+(record pins) → KEEP-52 not overturned, but the default-bundle paired
+re-measure on the fixed basis is owed before the maxDD rationale is cited
+again. See [[project_exit_stack_survives_fixed_basis]].

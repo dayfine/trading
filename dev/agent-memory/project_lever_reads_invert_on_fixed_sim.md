@@ -50,3 +50,12 @@ mildly positive in every window (2000–04 +$222k with MaxDD 10.8%) — the
 deficit vs the record is structural (what the ticket buys and when), not
 the exit plumbing. Record: `dev/notes/arc-rerun-dissection-2026-09-01.md`
 §5b.
+
+**Record-side follow-up (2026-09-04):** the record convention's own exit
+mechanisms (laggard rotation, extension stop, stage-3 force-exit) and the
+clock were re-measured on the fixed basis at 3 salts × 2 windows —
+[[project_exit_stack_survives_fixed_basis]]. Unlike the arc's eject gate,
+they all survive (rotation and extension stop are regime dials worth
+$200–370k on 2000–04; s3 inert; clock neutral-to-lottery). Exit-side
+re-measurement is now complete: eject, stop width, stop anchor, rotation,
+extension stop, s3, clock.
